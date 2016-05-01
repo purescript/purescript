@@ -98,8 +98,8 @@ typesOf bindingGroupType moduleName vals = do
         $ CannotGeneralizeRecursiveFunction ident generalized
       -- Make sure any unsolved type constraints only use type variables which appear
       -- unknown in the inferred type.
-      forM_ unsolved $ \(_, con@(Constraint className classTys _)) -> do
-        let constraintTypeVars = nub $ foldMap unknownsInType classTys
+      forM_ unsolved $ \(_, con) -> do
+        let constraintTypeVars = nub $ foldMap unknownsInType (constraintArgs con)
         when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $
           throwError . errorMessage $ NoInstanceFound con
 
