@@ -5,7 +5,6 @@ module TestUtils where
 import Prelude ()
 import Prelude.Compat
 
-import Data.Maybe (fromMaybe)
 import Control.Monad
 import Control.Monad.Trans.Maybe
 import Control.Exception
@@ -13,8 +12,6 @@ import Control.Exception
 import System.Process
 import System.Directory
 import System.Info
-
-import Language.PureScript.Crash
 
 findNodeProcess :: IO (Maybe String)
 findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
