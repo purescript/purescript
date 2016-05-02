@@ -12,4 +12,4 @@ module Main where
 
   data Test = Test
 
-  main = log (runZ (Z "done"))
+  main = log (runZ (Z "Done"))

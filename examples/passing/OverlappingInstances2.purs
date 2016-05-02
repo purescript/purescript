@@ -1,6 +1,8 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
+import Test.Assert (assert)
 
 data A = A | B
 
@@ -20,4 +22,6 @@ instance ordA :: Ord A where
 test :: forall a. (Ord a) => a -> a -> String
 test x y = show $ x == y
 
-main = Test.Assert.assert $ test A B == "false"
+main = do
+  assert $ test A B == "false"
+  log "Done"

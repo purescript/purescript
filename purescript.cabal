@@ -351,7 +351,7 @@ test-suite tests
                    Glob -any, aeson-better-errors -any, bytestring -any, aeson -any,
                    base-compat -any, haskeline >= 0.7.0.0, optparse-applicative -any,
                    boxes -any, HUnit -any, hspec -any, hspec-discover -any, stm -any, text -any,
-                   vector -any, utf8-string -any
+                   vector -any, utf8-string -any, silently -any
     ghc-options: -Wall
     type: exitcode-stdio-1.0
     main-is: Main.hs

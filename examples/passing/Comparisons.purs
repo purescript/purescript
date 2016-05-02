@@ -12,4 +12,4 @@ main = do
   assert ("a" < "b")
   assert ("a" == "a")
   assert ("z" > "a")
-  log "Done!"
+  log "Done"

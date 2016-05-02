@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 update1 = \o -> o { foo = "Foo" }
 
@@ -17,4 +18,6 @@ polyUpdate = \o -> o { foo = "Foo" }
 
 inferPolyUpdate = \o -> o { foo = "Foo" }
 
-main = Control.Monad.Eff.Console.log ((update1 {foo: ""}).foo)
+main = do
+  log ((update1 {foo: ""}).foo)
+  log "Done"

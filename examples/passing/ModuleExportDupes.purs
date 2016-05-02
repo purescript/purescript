@@ -17,3 +17,4 @@ module Main where
 
   main = do
     logShow (show 1.0)
+    log "Done"

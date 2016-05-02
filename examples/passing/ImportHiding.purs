@@ -16,3 +16,4 @@ data Unit = X | Y
 
 main = do
   logShow show
+  log "Done"
