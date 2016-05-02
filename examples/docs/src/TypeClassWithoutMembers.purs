@@ -8,4 +8,4 @@ module Intermediate
   ( module SomeTypeClass )
   where
 
-import SomeTypeClass (SomeClass)
+import SomeTypeClass (class SomeClass)
