@@ -12,3 +12,4 @@ module Main where
 
   main = do
     logShow (show bar)
+    log "Done"

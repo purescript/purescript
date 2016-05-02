@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude hiding (add)
+import Control.Monad.Eff.Console (log)
 
 data Id = Id forall a. a -> a
 
@@ -26,4 +27,4 @@ two = succ zero'
 four = add two two
 fourNumber = runNat four
 
-main = Control.Monad.Eff.Console.log "Done'"
+main = log "Done"

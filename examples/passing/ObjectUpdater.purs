@@ -22,3 +22,5 @@ main = do
 
   let record2 = (_ { x = _ }) { x: 0.0 } 10.0
   assert $ record2.x == 10.0
+
+  log "Done"

@@ -92,7 +92,9 @@ spec = do
   getShouldFailWith = fmap extractFailWiths . readUTF8File
     where
     extractFailWiths = lines >>> mapMaybe (stripPrefix "-- @shouldFailWith ") >>> map trim
-    trim = dropWhile isSpace >>> reverse >>> dropWhile isSpace >>> reverse
+
+trim :: String -> String
+trim = dropWhile isSpace >>> reverse >>> dropWhile isSpace >>> reverse
 
 modulesDir :: FilePath
 modulesDir = ".test_modules" </> "node_modules"
@@ -156,7 +158,10 @@ assertCompiles inputFiles foreigns = do
         writeFile entryPoint "require('Main').main()"
         result <- traverse (\node -> readProcessWithExitCode node [entryPoint] "") process
         case result of
-          Just (ExitSuccess, _, _) -> return Nothing
+          Just (ExitSuccess, out, err)
+            | not (null err) -> return $ Just $ "Test wrote to stderr:\n\n" <> err
+            | trim (last (lines out)) == "Done" -> return Nothing
+            | otherwise -> return $ Just $ "Test did not finish with 'Done':\n\n" <> out
           Just (ExitFailure _, _, err) -> return $ Just err
           Nothing -> return $ Just "Couldn't find node.js executable"
 
