@@ -35,7 +35,7 @@ reloadFile stateVar ev = do
   case ef' of
     Left _ -> pure ()
     Right ef -> do
-      atomically (insertModule' stateVar ef)
+      atomically (insertModuleSTM stateVar ef)
       putStrLn ("Reloaded File at: " ++ fp)
 
 -- | Installs filewatchers for the given directory and reloads ExternsFiles when
