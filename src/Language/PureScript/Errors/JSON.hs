@@ -30,7 +30,10 @@ data ErrorPosition = ErrorPosition
   , endColumn :: Int
   } deriving (Show, Eq, Ord)
 
-data ErrorSuggestion = ErrorSuggestion { replacement :: String } deriving (Show, Eq)
+data ErrorSuggestion = ErrorSuggestion
+  { replacement :: String
+  , replaceRange :: Maybe ErrorPosition
+  } deriving (Show, Eq)
 
 data JSONError = JSONError
   { position :: Maybe ErrorPosition
@@ -40,7 +43,7 @@ data JSONError = JSONError
   , filename :: Maybe String
   , moduleName :: Maybe String
   , suggestion :: Maybe ErrorSuggestion
-  }  deriving (Show, Eq)
+  } deriving (Show, Eq)
 
 data JSONResult = JSONResult
   { warnings :: [JSONError]
@@ -64,7 +67,7 @@ toJSONError verbose level e =
             (P.wikiUri e)
             (P.spanName <$> sspan)
             (P.runModuleName <$> P.errorModule e)
-            (toSuggestion <$> P.errorSuggestion (P.unwrapErrorMessage e))
+            (toSuggestion e)
   where
   sspan :: Maybe P.SourceSpan
   sspan = P.errorSpan e
@@ -75,6 +78,11 @@ toJSONError verbose level e =
                   (P.sourcePosColumn (P.spanStart ss))
                   (P.sourcePosLine   (P.spanEnd   ss))
                   (P.sourcePosColumn (P.spanEnd   ss))
-  toSuggestion :: P.ErrorSuggestion -> ErrorSuggestion
--- TODO: Adding a newline because source spans chomp everything up to the next character
-  toSuggestion (P.ErrorSuggestion s) = ErrorSuggestion $ if null s then s else s ++ "\n"
+  toSuggestion :: P.ErrorMessage -> Maybe ErrorSuggestion
+  toSuggestion em =
+    case P.errorSuggestion $ P.unwrapErrorMessage em of
+      Nothing -> Nothing
+      Just s -> Just $ ErrorSuggestion (suggestionText s) (toErrorPosition <$> P.suggestionSpan em)
+
+  -- TODO: Adding a newline because source spans chomp everything up to the next character
+  suggestionText (P.ErrorSuggestion s) = if null s then s else s ++ "\n"

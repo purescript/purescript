@@ -11,6 +11,6 @@ newtype IdentityEff e a = IdentityEff (Eff e (Identity a))
 test :: forall e a. IdentityEff e a -> IdentityEff e Unit
 test (IdentityEff action) = IdentityEff $ do
   (Identity x :: Identity _) <- action
-  return $ Identity unit
+  pure $ Identity unit
 
 main = log "Done"

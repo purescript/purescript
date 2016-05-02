@@ -11,4 +11,4 @@ null _ = false
 test = [1.0, 2.0, 3.0] `comparing null` [4.0, 5.0, 6.0]
 
 main = do
-  Control.Monad.Eff.Console.print test
+  Control.Monad.Eff.Console.logShow test

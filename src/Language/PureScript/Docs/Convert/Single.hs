@@ -140,7 +140,7 @@ convertDeclaration (P.ValueDeclaration _ _ _ (Right (P.TypedValue _ _ ty))) titl
 convertDeclaration (P.ValueDeclaration {}) title =
   -- If no explicit type declaration was provided, insert a wildcard, so that
   -- the actual type will be added during type checking.
-  basicDeclaration title (ValueDeclaration P.TypeWildcard)
+  basicDeclaration title (ValueDeclaration P.TypeWildcard{})
 convertDeclaration (P.ExternDeclaration _ ty) title =
   basicDeclaration title (ValueDeclaration ty)
 convertDeclaration (P.DataDeclaration dtype _ args ctors) title =

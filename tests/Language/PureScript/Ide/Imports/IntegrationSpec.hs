@@ -44,9 +44,9 @@ spec = beforeAll_ setup $ afterAll_ teardown $ describe "Adding imports" $ do
     sourceFileSkeleton importSection =
       [ "module ImportsSpec where" , ""] ++ importSection ++ [ "" , "myId = id"]
   it "adds an implicit import" $ do
-    withSupportFiles (Integration.addImplicitImport "Prelude")
+    withSupportFiles (Integration.addImplicitImport "ImportsSpec1")
     outputFileShouldBe (sourceFileSkeleton
-                        [ "import Prelude"
+                        [ "import ImportsSpec1"
                         , "import Main (id)"
                         ])
   it "adds an explicit unqualified import" $ do

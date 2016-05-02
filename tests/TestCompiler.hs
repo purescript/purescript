@@ -52,8 +52,8 @@ main :: IO ()
 main = do
   cwd <- getCurrentDirectory
 
-  let supportDir  = cwd </> "tests" </> "support" </> "flattened"
-  let supportFiles ext = Glob.globDir1 (Glob.compile ("*." ++ ext)) supportDir
+  let supportDir  = cwd </> "tests" </> "support" </> "bower_components"
+  let supportFiles ext = Glob.globDir1 (Glob.compile ("purescript-*/**/*." ++ ext)) supportDir
 
   supportPurs <- supportFiles "purs"
   supportJS   <- supportFiles "js"
@@ -180,15 +180,3 @@ assertDoesNotCompile inputFiles foreigns = do
 
   trim =
     dropWhile isSpace >>> reverse >>> dropWhile isSpace >>> reverse
-
-supportModules :: [String]
-supportModules =
-  [ "Control.Monad.Eff.Class"
-  , "Control.Monad.Eff.Console"
-  , "Control.Monad.Eff"
-  , "Control.Monad.Eff.Unsafe"
-  , "Control.Monad.ST"
-  , "Data.Function"
-  , "Prelude"
-  , "Test.Assert"
-  ]

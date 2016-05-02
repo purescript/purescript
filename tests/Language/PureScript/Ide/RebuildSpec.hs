@@ -16,7 +16,7 @@ teardown :: IO ()
 teardown = Integration.quitServer
 
 restart :: IO ()
-restart = Integration.quitServer *> (void Integration.startServer)
+restart = Integration.quitServer *> void Integration.startServer
 
 shouldBeSuccess :: String -> IO ()
 shouldBeSuccess = shouldBe True . Integration.resultIsSuccess
@@ -25,7 +25,7 @@ shouldBeFailure :: String -> IO ()
 shouldBeFailure = shouldBe False . Integration.resultIsSuccess
 
 spec :: Spec
-spec = beforeAll_ compile $ afterAll_ teardown $ before_ restart $ do
+spec = beforeAll_ compile $ afterAll_ teardown $ before_ restart $
   describe "Rebuilding single modules" $ do
     it "rebuilds a correct module without dependencies successfully" $ do
       _ <- Integration.loadModuleWithDeps "RebuildSpecSingleModule"
@@ -60,3 +60,15 @@ spec = beforeAll_ compile $ afterAll_ teardown $ before_ restart $ do
       pdir <- Integration.projectDirectory
       let file = pdir </> "src" </> "RebuildSpecWithMissingForeign.fail"
       Integration.rebuildModule file >>= shouldBeFailure
+    it "completes a hidden identifier after rebuilding with caching enabled" $ do
+      pdir <- Integration.projectDirectory
+      let file = pdir </> "src" </> "RebuildSpecWithHiddenIdent.purs"
+      Integration.rebuildModuleWithCache file >>= shouldBeSuccess
+      res <- Integration.getFlexCompletionsInModule "hid" "RebuildSpecWithHiddenIdent"
+      shouldBe False (null res)
+    it "fails to complete a hidden identifier after rebuilding with caching disabled" $ do
+      pdir <- Integration.projectDirectory
+      let file = pdir </> "src" </> "RebuildSpecWithHiddenIdent.purs"
+      Integration.rebuildModule file >>= shouldBeSuccess
+      res <- Integration.getFlexCompletionsInModule "hid" "RebuildSpecWithHiddenIdent"
+      shouldBe True (null res)

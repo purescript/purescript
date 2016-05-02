@@ -8,4 +8,4 @@ type Y = X -> X
 fn :: Y
 fn a = a
 
-main = Control.Monad.Eff.Console.print (fn "Done")
+main = Control.Monad.Eff.Console.logShow (fn "Done")

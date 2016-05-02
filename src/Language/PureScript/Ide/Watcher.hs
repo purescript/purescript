@@ -12,44 +12,38 @@
 -- File watcher for externs files
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE RecordWildCards #-}
-
 module Language.PureScript.Ide.Watcher where
-
-import           Prelude                         ()
-import           Prelude.Compat
 
 import           Control.Concurrent              (threadDelay)
 import           Control.Concurrent.STM
 import           Control.Monad
 import           Control.Monad.Trans.Except
-import qualified Data.Map                        as M
-import           Data.Maybe                      (isJust)
-import           Language.PureScript.Externs
 import           Language.PureScript.Ide.Externs
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
+import           Prelude
 import           System.FilePath
 import           System.FSNotify
 
+-- | Reloads an ExternsFile from Disc. If the Event indicates the ExternsFile
+-- was deleted we don't do anything.
+reloadFile :: TVar PscIdeState -> Event -> IO ()
+reloadFile _ Removed{} = pure ()
+reloadFile stateVar ev = do
+  let fp = eventPath ev
+  ef' <- runExceptT (readExternFile fp)
+  case ef' of
+    Left _ -> pure ()
+    Right ef -> do
+      atomically (insertModuleSTM stateVar ef)
+      putStrLn ("Reloaded File at: " ++ fp)
 
-reloadFile :: TVar PscIdeState -> FilePath -> IO ()
-reloadFile stateVar fp = do
-  (Right ef@ExternsFile{..}) <- runExceptT $ readExternFile fp
-  reloaded <- atomically $ do
-    st <- readTVar stateVar
-    if isLoaded efModuleName st
-      then
-        insertModule' stateVar ef *> pure True
-      else
-        pure False
-  when reloaded $ putStrLn $ "Reloaded File at: " ++ fp
-  where
-    isLoaded name st = isJust (M.lookup name (externsFiles st))
-
+-- | Installs filewatchers for the given directory and reloads ExternsFiles when
+-- they change on disc
 watcher :: TVar PscIdeState -> FilePath -> IO ()
-watcher stateVar fp = withManager $ \mgr -> do
-  _ <- watchTree mgr fp
-    (\ev -> takeFileName (eventPath ev) == "externs.json")
-    (reloadFile stateVar . eventPath)
-  forever (threadDelay 10000)
+watcher stateVar fp =
+  withManagerConf (defaultConfig { confDebounce = NoDebounce }) $ \mgr -> do
+    _ <- watchTree mgr fp
+      (\ev -> takeFileName (eventPath ev) == "externs.json")
+      (reloadFile stateVar)
+    forever (threadDelay 100000)

@@ -30,6 +30,9 @@ runProperNameT = T.pack . P.runProperName
 runIdentT :: P.Ident -> Text
 runIdentT = T.pack . P.runIdent
 
+runModuleNameT :: P.ModuleName -> Text
+runModuleNameT = T.pack . P.runModuleName
+
 prettyTypeT :: P.Type -> Text
 prettyTypeT = T.unwords . fmap T.strip . T.lines . T.pack . P.prettyPrintType
 
