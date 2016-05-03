@@ -247,9 +247,8 @@ executable psci
 
     main-is: Main.hs
     buildable: True
-    hs-source-dirs: psci psci/main
-    other-modules: PSCi
-                   PSCi.Types
+    hs-source-dirs: psci
+    other-modules: PSCi.Types
                    PSCi.Parser
                    PSCi.Directive
                    PSCi.Completion

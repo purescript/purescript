@@ -18,10 +18,10 @@ module PSCi.Types where
 import Prelude ()
 import Prelude.Compat
 
-import Control.Arrow (second)
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Language.PureScript as P
+import qualified Language.PureScript.Externs as P
 
 data PSCiOptions = PSCiOptions
   { psciMultiLineMode     :: Bool
@@ -38,46 +38,15 @@ data PSCiOptions = PSCiOptions
 --
 data PSCiState = PSCiState
   { psciImportedModules     :: [ImportedModule]
-  , _psciLoadedModules      :: Map FilePath [P.Module]
+  , psciLoadedFiles         :: [FilePath]
+  , psciLoadedExterns       :: [P.ExternsFile]
   , psciForeignFiles        :: Map P.ModuleName FilePath
   , psciLetBindings         :: [P.Declaration]
   , psciNodeFlags           :: [String]
   }
 
 initialPSCiState :: PSCiState
-initialPSCiState =
-  PSCiState [] Map.empty Map.empty [] []
-
-mkPSCiState :: [ImportedModule]
-            -> [(FilePath, P.Module)]
-            -> Map P.ModuleName FilePath
-            -> [P.Declaration]
-            -> [String]
-            -> PSCiState
-mkPSCiState imported loaded foreigns lets nodeFlags =
-  (initialPSCiState
-    |> each imported updateImportedModules
-    |> updateModules loaded)
-    { psciForeignFiles = foreigns
-    , psciLetBindings = lets
-    , psciNodeFlags = nodeFlags
-    }
-  where
-  x |> f = f x
-  each xs f st = foldl (flip f) st xs
-
---  Public psci state accessors
-
--- | Get the imported filenames as a list.
-psciImportedFilenames :: PSCiState -> [FilePath]
-psciImportedFilenames = Map.keys . _psciLoadedModules
-
--- | Get the loaded modules as a list.
-psciLoadedModules :: PSCiState -> [(FilePath, P.Module)]
-psciLoadedModules = collect . Map.toList . _psciLoadedModules
-  where
-  collect :: [(k, [v])] -> [(k, v)]
-  collect vss = [ (k, v) | (k, vs) <- vss, v <- vs ]
+initialPSCiState = PSCiState [] [] [] Map.empty [] []
 
 -- | All of the data that is contained by an ImportDeclaration in the AST.
 -- That is:
@@ -109,15 +78,13 @@ allImportsOf m (PSCiState{psciImportedModules = is}) =
 updateImportedModules :: ImportedModule -> PSCiState -> PSCiState
 updateImportedModules im st = st { psciImportedModules = im : psciImportedModules st }
 
--- |
--- Updates the state to have more loaded modules (available for import, but
--- not necessarily imported).
---
-updateModules :: [(FilePath, P.Module)] -> PSCiState -> PSCiState
-updateModules modules st =
-  st { _psciLoadedModules = Map.union (go modules) (_psciLoadedModules st) }
-  where
-  go = Map.fromListWith (++) . map (second (:[]))
+-- | Updates the state to have more loaded .purs files.
+updateLoadedFiles :: [FilePath] -> PSCiState -> PSCiState
+updateLoadedFiles paths st = st { psciLoadedFiles = psciLoadedFiles st ++ paths }
+
+-- | Updates the state to have more loaded externs files.
+updateLoadedExterns :: [P.ExternsFile] -> PSCiState -> PSCiState
+updateLoadedExterns externs st = st { psciLoadedExterns = psciLoadedExterns st ++ externs }
 
 -- |
 -- Updates the state to have more let bindings.

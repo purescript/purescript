@@ -1,5 +1,6 @@
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DataKinds #-}
@@ -7,23 +8,21 @@
 -- |
 -- PureScript Compiler Interactive.
 --
-module PSCi (runPSCi) where
+module Main (main) where
 
 import Prelude ()
 import Prelude.Compat
 
 import Data.Foldable (traverse_)
 import Data.List (intercalate, nub, sort, find)
-import Data.Tuple (swap)
 import qualified Data.Map as M
 
-import Control.Arrow (first)
 import Control.Monad
-import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except (ExceptT(), runExceptT)
-import Control.Monad.Trans.State.Strict
-import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.State.Strict (StateT, evalStateT, runStateT)
+import Control.Monad.State.Class
+import Control.Monad.IO.Class (MonadIO, liftIO)
 import Control.Monad.Writer.Strict (Writer(), runWriter)
 
 import System.Console.Haskeline
@@ -32,10 +31,10 @@ import System.Exit
 import System.FilePath ((</>))
 import System.FilePath.Glob (glob)
 import System.Process (readProcessWithExitCode)
-import System.IO.Error (tryIOError)
 import System.IO.UTF8 (readUTF8File)
 
 import qualified Language.PureScript as P
+import qualified Language.PureScript.Externs as P
 import qualified Language.PureScript.Names as N
 
 import PSCi.Completion (completion)
@@ -47,61 +46,61 @@ import PSCi.IO
 import PSCi.Printer
 import PSCi.Module
 
--- |
--- PSCI monad
---
+-- | This is the top-level application monad which manages input/output
+-- and keeps track of the application state.
 newtype PSCI a = PSCI { runPSCI :: InputT (StateT PSCiState IO) a } deriving (Functor, Applicative, Monad)
 
-psciIO :: IO a -> PSCI a
-psciIO io = PSCI . lift $ lift io
+instance MonadIO PSCI where
+  liftIO = PSCI . lift . lift
 
--- |
--- The runner
---
-runPSCi :: IO ()
-runPSCi = getOpt >>= loop
+instance MonadState PSCiState PSCI where
+  state = PSCI . lift . state
 
--- |
--- The PSCI main loop.
---
-loop :: PSCiOptions -> IO ()
-loop PSCiOptions{..} = do
-  config <- loadUserConfig
-  inputFiles <- concat <$> traverse glob psciInputFile
-  foreignFiles <- concat <$> traverse glob psciForeignInputFiles
-  modulesOrFirstError <- loadAllModules inputFiles
-  case modulesOrFirstError of
-    Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
-    Right modules -> do
-      historyFilename <- getHistoryFilename
-      let settings = defaultSettings { historyFile = Just historyFilename }
-      foreignsOrError <- runMake $ do
-        foreignFilesContent <- forM foreignFiles (\inFile -> (inFile,) <$> makeIO (const (P.ErrorMessage [] $ P.CannotReadFile inFile)) (readUTF8File inFile))
-        P.parseForeignModulesFromFiles foreignFilesContent
-      case foreignsOrError of
+-- | Get command line options and drop into the REPL
+main :: IO ()
+main = getOpt >>= loop
+  where
+    loop :: PSCiOptions -> IO ()
+    loop PSCiOptions{..} = do
+      config <- loadUserConfig
+      inputFiles <- concat <$> traverse glob psciInputFile
+      foreignFiles <- concat <$> traverse glob psciForeignInputFiles
+      modulesOrFirstError <- loadAllModules inputFiles
+      case modulesOrFirstError of
         Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
-        Right foreigns ->
-          flip evalStateT (mkPSCiState [] modules foreigns [] psciInputNodeFlags) . runInputT (setComplete completion settings) $ do
-            outputStrLn prologueMessage
-            traverse_ (traverse_ (runPSCI . handleCommand)) config
-            modules' <- lift $ gets psciLoadedModules
-            unless (consoleIsDefined (map snd modules')) . outputStrLn $ unlines
-              [ "PSCi requires the purescript-console module to be installed."
-              , "For help getting started, visit http://wiki.purescript.org/PSCi"
-              ]
-            go
-      where
-        go :: InputT (StateT PSCiState IO) ()
-        go = do
-          c <- getCommand (not psciMultiLineMode)
-          case c of
-            Left err -> outputStrLn err >> go
-            Right Nothing -> go
-            Right (Just QuitPSCi) -> outputStrLn quitMessage
-            Right (Just c') -> do
-              handleInterrupt (outputStrLn "Interrupted.")
-                              (withInterrupt (runPSCI (loadAllImportedModules >> handleCommand c')))
-              go
+        Right modules -> do
+          historyFilename <- getHistoryFilename
+          let settings = defaultSettings { historyFile = Just historyFilename }
+          foreignsOrError <- runMake $ do
+            foreignFilesContent <- forM foreignFiles (\inFile -> (inFile,) <$> readFileMake inFile)
+            P.parseForeignModulesFromFiles foreignFilesContent
+          case foreignsOrError of
+            Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
+            Right foreigns -> do
+              e <- runMake . make (PSCiState [] [] [] foreigns [] []) . (supportModule :) . map snd $ modules
+              case e of
+                Left err -> putStrLn (P.prettyPrintMultipleErrors False err) >> exitFailure
+                Right (externs, _) ->
+                  flip evalStateT (PSCiState [] inputFiles externs foreigns [] psciInputNodeFlags) . runInputT (setComplete completion settings) $ do
+                    outputStrLn prologueMessage
+                    traverse_ (traverse_ (runPSCI . handleCommand)) config
+                    unless (consoleIsDefined externs) . outputStrLn $ unlines
+                      [ "PSCi requires the purescript-console module to be installed."
+                      , "For help getting started, visit http://wiki.purescript.org/PSCi"
+                      ]
+                    go
+          where
+            go :: InputT (StateT PSCiState IO) ()
+            go = do
+              c <- getCommand (not psciMultiLineMode)
+              case c of
+                Left err -> outputStrLn err >> go
+                Right Nothing -> go
+                Right (Just QuitPSCi) -> outputStrLn quitMessage
+                Right (Just c') -> do
+                  handleInterrupt (outputStrLn "Interrupted.")
+                                  (withInterrupt (runPSCI (handleCommand c')))
+                  go
 
 -- Compile the module
 
@@ -110,31 +109,48 @@ loop PSCiOptions{..} = do
 --
 loadAllImportedModules :: PSCI ()
 loadAllImportedModules = do
-  files <- PSCI . lift $ fmap psciImportedFilenames get
-  modulesOrFirstError <- psciIO $ loadAllModules files
+  files <- gets psciLoadedFiles
+  modulesOrFirstError <- liftIO $ loadAllModules files
   case modulesOrFirstError of
     Left errs -> PSCI $ printErrors errs
-    Right modules -> PSCI . lift . modify $ updateModules modules
+    Right mods -> do
+      st <- get
+      e <- liftIO . runMake . make st . map snd $ mods
+      case e of
+        Left err -> PSCI . outputStrLn $ P.prettyPrintMultipleErrors False err
+        Right (externs, _) -> modify . updateLoadedExterns $ externs
 
 -- | This is different than the runMake in 'Language.PureScript.Make' in that it specifies the
 -- options and ignores the warning messages.
 runMake :: P.Make a -> IO (Either P.MultipleErrors a)
 runMake mk = fst <$> P.runMake P.defaultOptions mk
 
-makeIO :: (IOError -> P.ErrorMessage) -> IO a -> P.Make a
-makeIO f io = do
-  e <- liftIO $ tryIOError io
-  either (throwError . P.singleError . f) return e
+readFileMake :: FilePath -> P.Make String
+readFileMake path = P.makeIO (const (P.ErrorMessage [] $ P.CannotReadFile path)) (readUTF8File path)
 
-make :: PSCiState -> [P.Module] -> P.Make P.Environment
-make st@PSCiState{..} ms = P.make actions' (map snd loadedModules ++ ms)
+rebuild :: PSCiState -> P.Module -> P.Make P.ExternsFile
+rebuild PSCiState{..} m = P.rebuildModule buildActions psciLoadedExterns m
   where
-  filePathMap = M.fromList $ (first P.getModuleName . swap) `map` allModules
-  actions = P.buildMakeActions modulesDir filePathMap psciForeignFiles False
-  actions' = actions { P.progress = const (return ()) }
-  loadedModules = psciLoadedModules st
-  allModules = map (first Right) loadedModules ++ map (Left P.RebuildAlways,) ms
+    buildActions :: P.MakeActions P.Make
+    buildActions = (P.buildMakeActions modulesDir
+                                       filePathMap
+                                       psciForeignFiles
+                                       False) { P.progress = const (return ()) }
 
+    filePathMap :: M.Map P.ModuleName (Either P.RebuildPolicy FilePath)
+    filePathMap = M.singleton (P.getModuleName m) (Left P.RebuildAlways)
+
+make :: PSCiState -> [P.Module] -> P.Make ([P.ExternsFile], P.Environment)
+make PSCiState{..} ms = P.make buildActions ms
+  where
+    buildActions :: P.MakeActions P.Make
+    buildActions = (P.buildMakeActions modulesDir
+                                       filePathMap
+                                       psciForeignFiles
+                                       False)
+
+    filePathMap :: M.Map P.ModuleName (Either P.RebuildPolicy FilePath)
+    filePathMap = M.fromList $ map (\m -> (P.getModuleName m, Left P.RebuildAlways)) ms
 
 -- Commands
 
@@ -161,20 +177,27 @@ handleCommand (Expression val) = handleExpression val
 handleCommand ShowHelp = PSCI $ outputStrLn helpMessage
 handleCommand (Import im) = handleImport im
 handleCommand (Decls l) = handleDecls l
-handleCommand (LoadFile filePath) = PSCI $ whenFileExists filePath $ \absPath -> do
-  m <- lift . lift $ loadModule absPath
-  case m of
-    Left err -> outputStrLn err
-    Right mods -> lift $ modify (updateModules (map (absPath,) mods))
-handleCommand (LoadForeign filePath) = PSCI $ whenFileExists filePath $ \absPath -> do
-  foreignsOrError <- lift . lift . runMake $ do
-    foreignFile <- makeIO (const (P.ErrorMessage [] $ P.CannotReadFile absPath)) (readUTF8File absPath)
-    P.parseForeignModulesFromFiles [(absPath, foreignFile)]
-  case foreignsOrError of
-    Left err -> outputStrLn $ P.prettyPrintMultipleErrors False err
-    Right foreigns -> lift $ modify (updateForeignFiles foreigns)
+handleCommand (LoadFile filePath) = PSCI $ whenFileExists filePath $ \absPath ->
+  runPSCI $ do
+    e1 <- liftIO $ loadModule absPath
+    case e1 of
+      Left err -> PSCI $ outputStrLn err
+      Right [m] -> do -- todo
+        st <- get
+        e2 <- liftIO . runMake $ rebuild st m
+        case e2 of
+          Left err -> PSCI . outputStrLn $ P.prettyPrintMultipleErrors False err
+          Right externs -> modify $ updateLoadedExterns [externs] . updateLoadedFiles [absPath]
+handleCommand (LoadForeign filePath) = PSCI $ whenFileExists filePath $ \absPath ->
+  runPSCI $ do
+    foreignsOrError <- liftIO . runMake $ do
+      foreignFile <- readFileMake absPath
+      P.parseForeignModulesFromFiles [(absPath, foreignFile)]
+    case foreignsOrError of
+      Left err -> PSCI . outputStrLn $ P.prettyPrintMultipleErrors False err
+      Right foreigns -> modify (updateForeignFiles foreigns)
 handleCommand ResetState = do
-  PSCI . lift . modify $ \st ->
+  modify $ \st ->
     st { psciImportedModules = []
        , psciLetBindings     = []
        }
@@ -186,22 +209,21 @@ handleCommand (ShowInfo QueryLoaded) = handleShowLoadedModules
 handleCommand (ShowInfo QueryImport) = handleShowImportedModules
 handleCommand QuitPSCi = P.internalError "`handleCommand QuitPSCi` was called. This is a bug."
 
-
 -- |
 -- Takes a value expression and evaluates it with the current state.
 --
 handleExpression :: P.Expr -> PSCI ()
 handleExpression val = do
-  st <- PSCI $ lift get
+  st <- get
   let m = createTemporaryModule True st val
   let nodeArgs = psciNodeFlags st ++ [indexFile]
-  e <- psciIO . runMake $ make st [supportModule, m]
+  e <- liftIO . runMake $ rebuild st m
   case e of
     Left errs -> PSCI $ printErrors errs
     Right _ -> do
-      psciIO $ writeFile indexFile "require('$PSCI')['$main']();"
-      process <- psciIO findNodeProcess
-      result  <- psciIO $ traverse (\node -> readProcessWithExitCode node nodeArgs "") process
+      liftIO $ writeFile indexFile "require('$PSCI')['$main']();"
+      process <- liftIO findNodeProcess
+      result  <- liftIO $ traverse (\node -> readProcessWithExitCode node nodeArgs "") process
       case result of
         Just (ExitSuccess,   out, _)   -> PSCI $ outputStrLn out
         Just (ExitFailure _, _,   err) -> PSCI $ outputStrLn err
@@ -213,32 +235,31 @@ handleExpression val = do
 --
 handleDecls :: [P.Declaration] -> PSCI ()
 handleDecls ds = do
-  st <- PSCI $ lift get
+  st <- get
   let st' = updateLets ds st
   let m = createTemporaryModule False st' (P.Literal (P.ObjectLiteral []))
-  e <- psciIO . runMake $ make st' [m]
+  e <- liftIO . runMake $ rebuild st' m
   case e of
     Left err -> PSCI $ printErrors err
-    Right _ -> PSCI $ lift (put st')
+    Right _ -> put st'
 
 -- |
 -- Show actual loaded modules in psci.
 --
 handleShowLoadedModules :: PSCI ()
 handleShowLoadedModules = do
-  loadedModules <- PSCI $ lift $ gets psciLoadedModules
-  psciIO $ readModules loadedModules >>= putStrLn
-  return ()
-  where readModules = return . unlines . sort . nub . map toModuleName
-        toModuleName =  N.runModuleName . (\ (P.Module _ _ mdName _ _) -> mdName) . snd
+    loadedModules <- gets psciLoadedExterns
+    PSCI $ outputStrLn (readModules loadedModules)
+  where
+    readModules = unlines . sort . nub . map (P.runModuleName . P.efModuleName)
 
 -- |
 -- Show the imported modules in psci.
 --
 handleShowImportedModules :: PSCI ()
 handleShowImportedModules = do
-  PSCiState { psciImportedModules = importedModules } <- PSCI $ lift get
-  psciIO $ showModules importedModules >>= putStrLn
+  PSCiState { psciImportedModules = importedModules } <- get
+  liftIO $ showModules importedModules >>= putStrLn
   return ()
   where
   showModules = return . unlines . sort . map showModule
@@ -271,24 +292,22 @@ handleImport :: ImportedModule -> PSCI ()
 handleImport im = do
    st <- updateImportedModules im <$> PSCI (lift get)
    let m = createTemporaryModuleForImports st
-   e <- psciIO . runMake $ make st [m]
+   e <- liftIO . runMake $ rebuild st m
    case e of
      Left errs -> PSCI $ printErrors errs
-     Right _  -> do
-       PSCI $ lift $ put st
-       return ()
+     Right _  -> put st
 
 -- |
 -- Takes a value and prints its type
 --
 handleTypeOf :: P.Expr -> PSCI ()
 handleTypeOf val = do
-  st <- PSCI $ lift get
+  st <- get
   let m = createTemporaryModule False st val
-  e <- psciIO . runMake $ make st [m]
+  e <- liftIO . runMake $ make st [m] --todo
   case e of
     Left errs -> PSCI $ printErrors errs
-    Right env' ->
+    Right (_, env') ->
       case M.lookup (P.ModuleName [P.ProperName "$PSCI"], P.Ident "it") (P.names env') of
         Just (ty, _, _) -> PSCI . outputStrLn . P.prettyPrintType $ ty
         Nothing -> PSCI $ outputStrLn "Could not find type"
@@ -298,11 +317,11 @@ handleTypeOf val = do
 --
 handleBrowse :: P.ModuleName -> PSCI ()
 handleBrowse moduleName = do
-  st <- PSCI $ lift get
-  env <- psciIO . runMake $ make st []
+  st <- get
+  env <- liftIO . runMake $ make st [] -- todo
   case env of
     Left errs -> PSCI $ printErrors errs
-    Right env' ->
+    Right (_, env') ->
       if isModInEnv moduleName st
         then PSCI $ printModuleSignatures moduleName env'
         else case lookupUnQualifiedModName moduleName st of
@@ -314,7 +333,7 @@ handleBrowse moduleName = do
             failNotInEnv moduleName
   where
     isModInEnv modName =
-        any ((== modName) . P.getModuleName . snd) . psciLoadedModules
+        any ((== modName) . P.efModuleName) . psciLoadedExterns
     failNotInEnv modName =
         PSCI $ outputStrLn $ "Module '" ++ N.runModuleName modName ++ "' is not valid."
     lookupUnQualifiedModName quaModName st =
@@ -325,13 +344,13 @@ handleBrowse moduleName = do
 --
 handleKindOf :: P.Type -> PSCI ()
 handleKindOf typ = do
-  st <- PSCI $ lift get
+  st <- get
   let m = createTemporaryModuleForKind st typ
       mName = P.ModuleName [P.ProperName "$PSCI"]
-  e <- psciIO . runMake $ make st [m]
+  e <- liftIO . runMake $ make st [m] -- todo
   case e of
     Left errs -> PSCI $ printErrors errs
-    Right env' ->
+    Right (_, env') ->
       case M.lookup (P.Qualified (Just mName) $ P.ProperName "IT") (P.typeSynonyms env') of
         Just (_, typ') -> do
           let chk = (P.emptyCheckState env') { P.checkCurrentModule = Just mName }
@@ -368,5 +387,5 @@ loadUserConfig = onFirstFileMatching readCommands pathGetters
       return Nothing
 
 -- | Checks if the Console module is defined
-consoleIsDefined :: [P.Module] -> Bool
-consoleIsDefined = any ((== P.ModuleName (map P.ProperName [ "Control", "Monad", "Eff", "Console" ])) . P.getModuleName)
+consoleIsDefined :: [P.ExternsFile] -> Bool
+consoleIsDefined = any ((== P.ModuleName (map P.ProperName [ "Control", "Monad", "Eff", "Console" ])) . P.efModuleName)

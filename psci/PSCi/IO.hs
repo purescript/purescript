@@ -58,7 +58,6 @@ expandTilde :: FilePath -> IO FilePath
 expandTilde ('~':p:rest) | isPathSeparator p = (</> rest) <$> getHomeDirectory
 expandTilde p = return p
 
-
 whenFileExists :: MonadIO m => FilePath -> (FilePath -> InputT m ()) -> InputT m ()
 whenFileExists filePath f = do
   absPath <- liftIO $ expandTilde filePath

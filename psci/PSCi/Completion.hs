@@ -16,6 +16,7 @@ import Control.Monad.Trans.State.Strict
 import System.Console.Haskeline
 
 import qualified Language.PureScript as P
+import qualified Language.PureScript.Externs as P
 import qualified Language.PureScript.Names as N
 
 import qualified PSCi.Directive as D
@@ -128,8 +129,8 @@ getCompletion ctx =
   completeDirectives = map (':' :) . D.directiveStringsFor
 
 
-getLoadedModules :: CompletionM [P.Module]
-getLoadedModules = asks (map snd . psciLoadedModules)
+getLoadedModules :: CompletionM [P.ExternsFile]
+getLoadedModules = asks psciLoadedExterns
 
 getImportedModules :: CompletionM [ImportedModule]
 getImportedModules = asks psciImportedModules
@@ -138,12 +139,12 @@ getModuleNames :: CompletionM [String]
 getModuleNames = moduleNames <$> getLoadedModules
 
 mapLoadedModulesAndQualify :: (a -> String) -> (P.Module -> [(a, P.Declaration)]) -> CompletionM [String]
-mapLoadedModulesAndQualify sho f = do
-  ms <- getLoadedModules
-  let argPairs = do m <- ms
-                    fm <- f m
-                    return (m, fm)
-  concat <$> traverse (uncurry (getAllQualifications sho)) argPairs
+mapLoadedModulesAndQualify sho f = undefined --do
+  -- ms <- getLoadedModules
+  -- let argPairs = do m <- ms
+  --                   fm <- f m
+  --                   return (m, fm)
+  -- concat <$> traverse (uncurry (getAllQualifications sho)) argPairs
 
 getIdentNames :: CompletionM [String]
 getIdentNames = mapLoadedModulesAndQualify P.showIdent identNames
@@ -211,8 +212,8 @@ dctorNames = nubOnFst . concatMap go . P.exportedDeclarations
   go (P.PositionedDeclaration _ _ d) = go d
   go _ = []
 
-moduleNames :: [P.Module] -> [String]
-moduleNames ms = nub [P.runModuleName moduleName | P.Module _ _ moduleName _ _ <- ms]
+moduleNames :: [P.ExternsFile] -> [String]
+moduleNames = nub . map (P.runModuleName . P.efModuleName)
 
 directivesFirst :: Completion -> Completion -> Ordering
 directivesFirst (Completion _ d1 _) (Completion _ d2 _) = go d1 d2

@@ -20,6 +20,7 @@ module Language.PureScript.Make
   -- * Implementation of Make API using files on disk
   , Make(..)
   , runMake
+  , makeIO
   , buildMakeActions
   ) where
 
@@ -179,7 +180,7 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
 make :: forall m. (Monad m, MonadBaseControl IO m, MonadReader Options m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
      => MakeActions m
      -> [Module]
-     -> m Environment
+     -> m ([ExternsFile], Environment)
 make ma@MakeActions{..} ms = do
   checkModuleNamesAreUnique
 
@@ -199,7 +200,7 @@ make ma@MakeActions{..} ms = do
 
   -- Bundle up all the externs and return them as an Environment
   (_, externs) <- unzip . fromMaybe (internalError "make: externs were missing but no errors reported.") . sequence <$> for barriers (takeMVar . fst . snd)
-  return $ foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
+  return (externs, foldl' (flip applyExternsFileToEnvironment) initEnvironment externs)
 
   where
   checkModuleNamesAreUnique :: m ()
