@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 type X r = { | r }
 
@@ -14,4 +15,4 @@ test = blah x
   { baz = "blah"
   }
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

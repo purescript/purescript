@@ -111,8 +111,6 @@ fileGlob :: String
 fileGlob = unwords
   [ "\"src/**/*.purs\""
   , "\"src/**/*.js\""
-  , "\"bower_components/purescript-*/**/*.purs\""
-  , "\"bower_components/purescript-*/**/*.js\""
   ]
 
 -- Integration Testing API

@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 data A = A B
 
@@ -16,4 +17,4 @@ g b = case b of B a -> f a
 showN :: A -> S
 showN a = f a
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

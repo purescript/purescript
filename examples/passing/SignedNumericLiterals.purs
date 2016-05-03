@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 p = 0.5
 q = 1.0
@@ -14,4 +15,4 @@ f x = -x
 
 test1 = 2.0 - 1.0
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

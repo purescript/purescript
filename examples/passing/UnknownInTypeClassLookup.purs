@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 class EQ a b
 
@@ -11,4 +12,4 @@ test _ _ = "Done"
 
 runTest a = test a a
 
-main = Control.Monad.Eff.Console.log $ runTest 0.0
+main = log $ runTest 0.0

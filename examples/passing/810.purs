@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 data Maybe a = Nothing | Just a
 
@@ -10,4 +11,4 @@ test m = o.x
     o = case m of Nothing -> { x : Nothing }
                   Just a  -> { x : Just a }
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

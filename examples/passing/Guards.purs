@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 collatz = \x -> case x of
   y | y `mod` 2.0 == 0.0 -> y / 2.0
@@ -26,4 +27,4 @@ testIndentation x y | x > 0.0
                     | otherwise
   = y - x
 
-main = Control.Monad.Eff.Console.log $ min "Done" "ZZZZ"
+main = log $ min "Done" "ZZZZ"

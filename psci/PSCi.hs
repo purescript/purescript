@@ -17,7 +17,7 @@ import Data.List (intercalate, nub, sort, find)
 import Data.Tuple (swap)
 import qualified Data.Map as M
 
-import Control.Arrow (first)
+import Control.Arrow (first, (&&&))
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Trans.Class
@@ -127,13 +127,14 @@ makeIO f io = do
   either (throwError . P.singleError . f) return e
 
 make :: PSCiState -> [P.Module] -> P.Make P.Environment
-make st@PSCiState{..} ms = P.make actions' (map snd loadedModules ++ ms)
+make st@PSCiState{..} ms = P.make actions' (map P.extractModuleHeader (map snd loadedModules ++ ms)) loadModule
   where
   filePathMap = M.fromList $ (first P.getModuleName . swap) `map` allModules
   actions = P.buildMakeActions modulesDir filePathMap psciForeignFiles False
   actions' = actions { P.progress = const (return ()) }
   loadedModules = psciLoadedModules st
   allModules = map (first Right) loadedModules ++ map (Left P.RebuildAlways,) ms
+  loadModule = undefined
 
 
 -- Commands
@@ -256,7 +257,6 @@ handleShowImportedModules = do
   showRef (P.TypeOpRef ident) = "type (" ++ N.runIdent ident ++ ")"
   showRef (P.ValueRef ident) = N.runIdent ident
   showRef (P.TypeClassRef pn) = "class " ++ N.runProperName pn
-  showRef (P.ProperRef pn) = pn
   showRef (P.TypeInstanceRef ident) = N.runIdent ident
   showRef (P.ModuleRef name) = "module " ++ N.runModuleName name
   showRef (P.PositionedDeclarationRef _ _ ref) = showRef ref

@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 data Tuple a b = Tuple a b
 
@@ -38,20 +39,20 @@ modify f = do
 
 test :: Tuple String String
 test = runState "" $ do
-  modify $ (++) "World!"
-  modify $ (++) "Hello, "
+  modify $ (<>) "World!"
+  modify $ (<>) "Hello, "
   str :: String <- get
-  return str
+  pure str
 
 test2 :: (Int -> Int) -> Int
 test2 = (\(f :: Int -> Int) -> f 10)
 
-test3 :: Int -> Boolean 
+test3 :: Int -> Boolean
 test3 n = case n of
   (0 :: Int) -> true
   _ -> false
 
-test4 :: Tuple Int Int -> Tuple Int Int 
+test4 :: Tuple Int Int -> Tuple Int Int
 test4 = (\(Tuple a b :: Tuple Int Int) -> Tuple b a)
 
 type Int1 = Int
@@ -64,4 +65,4 @@ main = do
       t2 = test2 id
       t3 = test3 1
       t4 = test4 (Tuple 1 0)
-  Control.Monad.Eff.Console.log "Done"
+  log "Done"

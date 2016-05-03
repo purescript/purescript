@@ -7,4 +7,4 @@ import Control.Monad.ST
 
 test _ = do
   r <- runST (newSTRef 0)
-  return 0
+  pure 0

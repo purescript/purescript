@@ -29,6 +29,16 @@ import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Comments
 import Language.PureScript.Environment
 
+-- | The module header consists of everything up to the end of
+-- the import section.
+--
+-- This is all that is needed to determine the module graph.
+data ModuleHeader = ModuleHeader
+  { moduleHeaderName :: ModuleName
+  , moduleHeaderExports :: Maybe [DeclarationRef]
+  , moduleHeaderImports :: [Declaration]
+  } deriving (Show, Read)
+
 -- |
 -- A module declaration, consisting of comments about the module, a module name,
 -- a list of declarations, and a list of the declarations that are
@@ -36,6 +46,13 @@ import Language.PureScript.Environment
 --
 data Module = Module SourceSpan [Comment] ModuleName [Declaration] (Maybe [DeclarationRef])
   deriving (Show, Read)
+
+-- | Extract a valid module header from an existing module.
+--
+-- Note, it is generally better to obtain a 'ModuleHeader' by parsing it separately,
+-- since parsing is cheaper compared to a full 'Module'.
+extractModuleHeader :: Module -> ModuleHeader
+extractModuleHeader (Module _ _ name ds exps) = ModuleHeader name exps (filter isImportDecl ds)
 
 -- | Return a module's name.
 getModuleName :: Module -> ModuleName
@@ -47,9 +64,9 @@ getModuleName (Module _ _ name _ _) = name
 addDefaultImport :: ModuleName -> Module -> Module
 addDefaultImport toImport m@(Module ss coms mn decls exps)  =
   if isExistingImport `any` decls || mn == toImport then m
-  else Module ss coms mn (ImportDeclaration toImport Implicit Nothing False : decls) exps
+  else Module ss coms mn (ImportDeclaration toImport Implicit Nothing : decls) exps
   where
-  isExistingImport (ImportDeclaration mn' _ _ _) | mn' == toImport = True
+  isExistingImport (ImportDeclaration mn' _ _) | mn' == toImport = True
   isExistingImport (PositionedDeclaration _ _ d) = isExistingImport d
   isExistingImport _ = False
 
@@ -82,10 +99,6 @@ data DeclarationRef
   --
   | ModuleRef ModuleName
   -- |
-  -- An unspecified ProperName ref. This will be replaced with a TypeClassRef
-  -- or TypeRef during name desugaring.
-  | ProperRef String
-  -- |
   -- A declaration reference with source position information
   --
   | PositionedDeclarationRef SourceSpan [Comment] DeclarationRef
@@ -98,7 +111,6 @@ instance Eq DeclarationRef where
   (TypeClassRef name)    == (TypeClassRef name')    = name == name'
   (TypeInstanceRef name) == (TypeInstanceRef name') = name == name'
   (ModuleRef name)       == (ModuleRef name')       = name == name'
-  (ProperRef name)       == (ProperRef name')       = name == name'
   (PositionedDeclarationRef _ _ r) == r' = r == r'
   r == (PositionedDeclarationRef _ _ r') = r == r'
   _ == _ = False
@@ -198,9 +210,8 @@ data Declaration
   | FixityDeclaration Fixity String (Maybe (Qualified FixityAlias))
   -- |
   -- A module import (module name, qualified/unqualified/hiding, optional "qualified as" name)
-  -- TODO: also a boolean specifying whether the old `qualified` syntax was used, so a warning can be raised in desugaring (remove for 0.9)
   --
-  | ImportDeclaration ModuleName ImportDeclarationType (Maybe ModuleName) Bool
+  | ImportDeclaration ModuleName ImportDeclarationType (Maybe ModuleName)
   -- |
   -- A type class declaration (name, argument, implies, member declarations)
   --
@@ -360,10 +371,6 @@ data Expr
   -- certain traversals from matching.
   --
   | Parens Expr
-  -- |
-  -- Operator section. This will be removed during desugaring and replaced with lambda.
-  --
-  | OperatorSection Expr (Either Expr Expr)
   -- |
   -- An object property getter (e.g. `_.x`). This will be removed during
   -- desugaring and expanded into a lambda that reads a property from an object.

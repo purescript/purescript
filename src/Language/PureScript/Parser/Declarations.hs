@@ -5,18 +5,20 @@
 -- |
 -- Parsers for module definitions and declarations
 --
-module Language.PureScript.Parser.Declarations (
-    parseDeclaration,
-    parseModule,
-    parseModules,
-    parseModulesFromFiles,
-    parseValue,
-    parseGuard,
-    parseBinder,
-    parseBinderNoParens,
-    parseImportDeclaration',
-    parseLocalDeclaration
-) where
+module Language.PureScript.Parser.Declarations
+  ( parseDeclaration
+  , parseModule
+  , parseModuleHeader
+  , parseModuleFromFile
+  , parseModulesFromFiles
+  , parseModuleHeadersFromFiles
+  , parseValue
+  , parseGuard
+  , parseBinder
+  , parseBinderNoParens
+  , parseImportDeclaration'
+  , parseLocalDeclaration
+  ) where
 
 import Prelude hiding (lex)
 
@@ -43,6 +45,82 @@ import qualified Language.PureScript.Parser.Common as C
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
+-- | Parse the module header, consisting of everything up to the end of
+-- the import section.
+--
+-- We use the lazy lexer so that we don't have to read the whole file.
+-- This means that we might miss some import declarations, if they are poorly
+-- formed, but that's okay - such a module will fail to parse later anyway.
+parseModuleHeader :: TokenParser ModuleHeader
+parseModuleHeader = do
+  reserved "module"
+  indented
+  name <- moduleName
+  exports <- P.optionMaybe $ parens $ commaSep1 parseDeclarationRef
+  reserved "where"
+  imps <- mark (P.many (same *> parseImportDeclaration))
+  return (ModuleHeader name exports imps)
+
+-- |
+-- Parse a module header and a collection of declarations
+--
+parseModule :: TokenParser Module
+parseModule = do
+  comments <- C.readComments
+  start <- P.getPosition
+  header <- parseModuleHeader
+  decls <- mark (P.many (same *> parseDeclaration))
+  end <- P.getPosition
+  let ss = SourceSpan (P.sourceName start) (C.toSourcePos start) (C.toSourcePos end)
+  return $ Module ss comments (moduleHeaderName header) (moduleHeaderImports header ++ decls) (moduleHeaderExports header)
+
+-- | Parse a collection of headers.
+parseModuleHeadersFromFiles
+  :: (MonadError MultipleErrors m)
+  => (k -> FilePath)
+  -> [(k, String)]
+  -> m [(k, ModuleHeader)]
+parseModuleHeadersFromFiles toFilePath input = do
+  parseInParallel . flip map input $ \(k, content) -> do
+    let filename = toFilePath k
+    hdr <- runTokenParser filename parseModuleHeader . snd . lexLazy filename $ content
+    return (k, hdr)
+
+-- | Parse a collection of modules in parallel
+parseModuleFromFile
+  :: (MonadError MultipleErrors m)
+  => FilePath
+  -> String
+  -> m Module
+parseModuleFromFile path content = throwParserError $ do
+  ts <- lex path content
+  runTokenParser path parseModule ts
+
+-- | Parse a collection of modules in parallel
+parseModulesFromFiles
+  :: (MonadError MultipleErrors m)
+  => (k -> FilePath)
+  -> [(k, String)]
+  -> m [(k, Module)]
+parseModulesFromFiles toFilePath input = do
+  parseInParallel . flip map input $ \(k, content) -> do
+    let path = toFilePath k
+    ts <- lex path content
+    m <- runTokenParser path parseModule ts
+    return (k, m)
+
+parseInParallel :: MonadError MultipleErrors m => [Either P.ParseError (k, a)] -> m [(k, a)]
+parseInParallel = flip parU id . map throwParserError . inParallel
+
+throwParserError :: MonadError MultipleErrors m => Either P.ParseError a -> m a
+throwParserError = either (throwError . MultipleErrors . pure . toPositionedError) return
+
+-- It is enough to force each parse result to WHNF, since success or failure can't be
+-- determined until the end of parsing, so this effectively distributes parsing of each file
+-- to a different spark.
+inParallel :: [Either e (k, a)] -> [Either e (k, a)]
+inParallel = withStrategy (parList rseq)
+
 -- |
 -- Read source position information
 --
@@ -52,7 +130,11 @@ withSourceSpan f p = do
   comments <- C.readComments
   x <- p
   end <- P.getPosition
-  let sp = SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos end)
+  input <- P.getInput
+  let end' = case input of
+        pt:_ -> ptPrevEndPos pt
+        _ -> Nothing
+  let sp = SourceSpan (P.sourceName start) (C.toSourcePos start) (C.toSourcePos $ fromMaybe end end')
   return $ f sp comments x
 
 kindedIdent :: TokenParser (String, Maybe Kind)
@@ -93,6 +175,7 @@ parseValueDeclaration = do
   where
   parseValueWithWhereClause :: TokenParser Expr
   parseValueWithWhereClause = do
+    C.indented
     value <- parseValue
     whereClause <- P.optionMaybe $ do
       C.indented
@@ -132,28 +215,19 @@ parseFixityDeclaration = do
 
 parseImportDeclaration :: TokenParser Declaration
 parseImportDeclaration = do
-  (mn, declType, asQ, isOldSyntax) <- parseImportDeclaration'
-  return $ ImportDeclaration mn declType asQ isOldSyntax
+  (mn, declType, asQ) <- parseImportDeclaration'
+  return $ ImportDeclaration mn declType asQ
 
-parseImportDeclaration' :: TokenParser (ModuleName, ImportDeclarationType, Maybe ModuleName, Bool)
+parseImportDeclaration' :: TokenParser (ModuleName, ImportDeclarationType, Maybe ModuleName)
 parseImportDeclaration' = do
   reserved "import"
   indented
-  qualImport <|> stdImport
+  moduleName' <- moduleName
+  declType <- reserved "hiding" *> qualifyingList Hiding <|> qualifyingList Explicit
+  qName <- P.optionMaybe qualifiedName
+  return (moduleName', declType, qName)
   where
-  stdImport = do
-    moduleName' <- moduleName
-    declType <- reserved "hiding" *> qualifyingList Hiding <|> qualifyingList Explicit
-    qName <- P.optionMaybe qualifiedName
-    return (moduleName', declType, qName, False)
   qualifiedName = reserved "as" *> moduleName
-  qualImport = do
-    reserved "qualified"
-    indented
-    moduleName' <- moduleName
-    declType <- qualifyingList Explicit
-    qName <- qualifiedName
-    return (moduleName', declType, Just qName, True)
   qualifyingList expectedType = do
     declType <- P.optionMaybe (expectedType <$> (indented *> parens (commaSep parseDeclarationRef)))
     return $ fromMaybe Implicit declType
@@ -162,15 +236,15 @@ parseDeclarationRef :: TokenParser DeclarationRef
 parseDeclarationRef =
   withSourceSpan PositionedDeclarationRef
     $ (ValueRef <$> parseIdent)
-    <|> parseProperRef
+    <|> parseTypeRef
     <|> (TypeClassRef <$> (reserved "class" *> properName))
     <|> (ModuleRef <$> (indented *> reserved "module" *> moduleName))
     <|> (TypeOpRef <$> (indented *> reserved "type" *> parens (Op <$> symbol)))
   where
-  parseProperRef = do
+  parseTypeRef = do
     name <- properName
     dctors <- P.optionMaybe $ parens (symbol' ".." *> pure Nothing <|> Just <$> commaSep properName)
-    return $ maybe (ProperRef (runProperName name)) (TypeRef name) dctors
+    return $ TypeRef name (fromMaybe (Just []) dctors)
 
 parseTypeClassDeclaration :: TokenParser Declaration
 parseTypeClassDeclaration = do
@@ -231,7 +305,6 @@ parseDeclaration = positioned (P.choice
                    , parseValueDeclaration
                    , parseExternDeclaration
                    , parseFixityDeclaration
-                   , parseImportDeclaration
                    , parseTypeClassDeclaration
                    , parseTypeInstanceDeclaration
                    , parseDerivingInstanceDeclaration
@@ -243,59 +316,12 @@ parseLocalDeclaration = positioned (P.choice
                    , parseValueDeclaration
                    ] P.<?> "local declaration")
 
--- |
--- Parse a module header and a collection of declarations
---
-parseModule :: TokenParser Module
-parseModule = do
-  comments <- C.readComments
-  start <- P.getPosition
-  reserved "module"
-  indented
-  name <- moduleName
-  exports <- P.optionMaybe $ parens $ commaSep1 parseDeclarationRef
-  reserved "where"
-  decls <- mark (P.many (same *> parseDeclaration))
-  end <- P.getPosition
-  let ss = SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos end)
-  return $ Module ss comments name decls exports
-
--- | Parse a collection of modules in parallel
-parseModulesFromFiles :: forall m k. (MonadError MultipleErrors m) =>
-                                     (k -> FilePath) -> [(k, String)] -> m [(k, Module)]
-parseModulesFromFiles toFilePath input = do
-  modules <- flip parU id $ map wrapError $ inParallel $ flip map input $ \(k, content) -> do
-    let filename = toFilePath k
-    ts <- lex filename content
-    ms <- runTokenParser filename parseModules ts
-    return (k, ms)
-  return $ collect modules
-  where
-  collect :: [(k, [v])] -> [(k, v)]
-  collect vss = [ (k, v) | (k, vs) <- vss, v <- vs ]
-  wrapError :: Either P.ParseError a -> m a
-  wrapError = either (throwError . MultipleErrors . pure . toPositionedError) return
-  -- It is enough to force each parse result to WHNF, since success or failure can't be
-  -- determined until the end of the file, so this effectively distributes parsing of each file
-  -- to a different spark.
-  inParallel :: [Either P.ParseError (k, [Module])] -> [Either P.ParseError (k, [Module])]
-  inParallel = withStrategy (parList rseq)
-
 toPositionedError :: P.ParseError -> ErrorMessage
 toPositionedError perr = ErrorMessage [ PositionedError (SourceSpan name start end) ] (ErrorParsingModule perr)
   where
-  name   = (P.sourceName . P.errorPos) perr
-  start  = (toSourcePos  . P.errorPos) perr
+  name   = (P.sourceName  . P.errorPos) perr
+  start  = (C.toSourcePos . P.errorPos) perr
   end    = start
-
-toSourcePos :: P.SourcePos -> SourcePos
-toSourcePos pos = SourcePos (P.sourceLine pos) (P.sourceColumn pos)
-
--- |
--- Parse a collection of modules
---
-parseModules :: TokenParser [Module]
-parseModules = mark (P.many (same *> parseModule)) <* P.eof
 
 booleanLiteral :: TokenParser Bool
 booleanLiteral = (reserved "true" >> return True) P.<|> (reserved "false" >> return False)
@@ -382,7 +408,7 @@ parseValueAtom = P.choice
                  , Literal <$> parseStringLiteral
                  , Literal <$> parseBooleanLiteral
                  , Literal <$> parseArrayLiteral parseValue
-                 , Literal <$> P.try (parseObjectLiteral parseIdentifierAndValue)
+                 , Literal <$> parseObjectLiteral parseIdentifierAndValue
                  , parseAbs
                  , P.try parseConstructor
                  , P.try parseVar
@@ -391,7 +417,6 @@ parseValueAtom = P.choice
                  , parseDo
                  , parseLet
                  , P.try $ Parens <$> parens parseValue
-                 , parseOperatorSection
                  , parseHole
                  ]
 
@@ -401,12 +426,6 @@ parseValueAtom = P.choice
 parseInfixExpr :: TokenParser Expr
 parseInfixExpr = P.between tick tick parseValue
                  <|> Var <$> parseQualified (Op <$> symbol)
-
-parseOperatorSection :: TokenParser Expr
-parseOperatorSection = parens $ left <|> right
-  where
-  right = OperatorSection <$> parseInfixExpr <* indented <*> (Right <$> indexersAndAccessors)
-  left = flip OperatorSection <$> (Left <$> indexersAndAccessors) <* indented <*> parseInfixExpr
 
 parseHole :: TokenParser Expr
 parseHole = Hole <$> holeLit
@@ -499,7 +518,7 @@ parseVarOrNamedBinder = do
   -- TODO: once operator aliases are finalized in 0.9, this 'try' won't be needed
   -- any more since identifiers in binders won't be 'Op's.
   name <- P.try C.parseIdent
-  let parseNamedBinder = NamedBinder name <$> (at *> C.indented *> parseBinder)
+  let parseNamedBinder = NamedBinder name <$> (at *> C.indented *> parseBinderAtom)
   parseNamedBinder <|> return (VarBinder name)
 
 parseNullBinder :: TokenParser Binder
@@ -531,25 +550,27 @@ parseBinder =
           return (BinaryNoParensBinder op)) P.AssocRight
       ]
     ]
+
   -- TODO: parsePolyType when adding support for polymorphic types
   postfixTable = [ \b -> flip TypedBinder b <$> (indented *> doubleColon *> parseType)
                  ]
-  parseBinderAtom :: TokenParser Binder
-  parseBinderAtom = P.choice
-                    [ parseNullBinder
-                    , LiteralBinder <$> parseCharLiteral
-                    , LiteralBinder <$> parseStringLiteral
-                    , LiteralBinder <$> parseBooleanLiteral
-                    , parseNumberLiteral
-                    , parseVarOrNamedBinder
-                    , parseConstructorBinder
-                    , parseObjectBinder
-                    , parseArrayBinder
-                    , ParensInBinder <$> parens parseBinder
-                    ] P.<?> "binder"
 
   parseOpBinder :: TokenParser Binder
   parseOpBinder = OpBinder <$> parseQualified (Op <$> symbol)
+
+parseBinderAtom :: TokenParser Binder
+parseBinderAtom = P.choice
+  [ parseNullBinder
+  , LiteralBinder <$> parseCharLiteral
+  , LiteralBinder <$> parseStringLiteral
+  , LiteralBinder <$> parseBooleanLiteral
+  , parseNumberLiteral
+  , parseVarOrNamedBinder
+  , parseConstructorBinder
+  , parseObjectBinder
+  , parseArrayBinder
+  , ParensInBinder <$> parens parseBinder
+  ] P.<?> "binder"
 
 -- |
 -- Parse a binder as it would appear in a top level declaration

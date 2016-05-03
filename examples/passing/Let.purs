@@ -2,6 +2,7 @@ module Main where
 
 import Prelude
 import Control.Monad.Eff
+import Control.Monad.Eff.Console (log, logShow)
 import Control.Monad.ST
 
 test1 x = let
@@ -44,10 +45,11 @@ test10 _ =
   in f 10.0
 
 main = do
-  Control.Monad.Eff.Console.print (test1 1.0)
-  Control.Monad.Eff.Console.print (test2 1.0 2.0)
-  Control.Monad.Eff.Console.print test3
-  Control.Monad.Eff.Console.print test4
-  Control.Monad.Eff.Console.print test5
-  Control.Monad.Eff.Console.print test7
-  Control.Monad.Eff.Console.print (test8 100.0)
+  logShow (test1 1.0)
+  logShow (test2 1.0 2.0)
+  logShow test3
+  logShow test4
+  logShow test5
+  logShow test7
+  logShow (test8 100.0)
+  log "Done"

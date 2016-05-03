@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 data E a b = L a | R b
 
@@ -14,4 +15,4 @@ lefts = go N
   go ls (C (L a) rest) = go (C a ls) rest
   go ls (C _ rest) = go ls rest
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

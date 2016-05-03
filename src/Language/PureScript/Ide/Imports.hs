@@ -95,9 +95,9 @@ parseImportsWithModuleName ls = do
   (P.Module _ _ mn decls _) <- moduleParse ls
   pure (mn, concatMap mkImport (unwrapPositioned <$> decls))
   where
-    mkImport (P.ImportDeclaration mn (P.Explicit refs) qual _) =
+    mkImport (P.ImportDeclaration mn (P.Explicit refs) qual) =
       [Import mn (P.Explicit (unwrapPositionedRef <$> refs)) qual]
-    mkImport (P.ImportDeclaration mn it qual _) = [Import mn it qual]
+    mkImport (P.ImportDeclaration mn it qual) = [Import mn it qual]
     mkImport _ = []
 
 sliceImportSection :: [Text] -> Either String (P.ModuleName, [Text], [Import], [Text])
@@ -233,10 +233,8 @@ addExplicitImport' decl moduleName imports =
     insertDeclIntoRefs (DataConstructor dtor tn _) refs =
       let
         dtor' = P.ProperName (T.unpack dtor)
-        -- TODO: Get rid of this once typeclasses can't be imported like types
-        refs' = properRefToTypeRef <$> refs
       in
-        updateAtFirstOrPrepend (matchType tn) (insertDtor dtor') (P.TypeRef tn (Just [dtor'])) refs'
+        updateAtFirstOrPrepend (matchType tn) (insertDtor dtor') (P.TypeRef tn (Just [dtor'])) refs
     insertDeclIntoRefs dr refs = List.nubBy ((==) `on` P.prettyPrintRef) (refFromDeclaration dr : refs)
 
     insertDtor dtor (P.TypeRef tn' dtors) =
@@ -246,11 +244,6 @@ addExplicitImport' decl moduleName imports =
         -- import Data.Maybe (Maybe(..)) -> import Data.Maybe (Maybe(Just))
         Nothing -> P.TypeRef tn' Nothing
     insertDtor _ refs = refs
-
-
-    -- TODO: Get rid of this once typeclasses can't be imported like types
-    properRefToTypeRef (P.ProperRef n) = P.TypeRef (P.ProperName n) (Just [])
-    properRefToTypeRef r = r
 
     matchType :: P.ProperName 'P.TypeName -> P.DeclarationRef -> Bool
     matchType tn (P.TypeRef n _) = tn == n
@@ -348,8 +341,7 @@ parseImport :: Text -> Maybe Import
 parseImport t =
   case P.lex "<psc-ide>" (T.unpack t)
        >>= P.runTokenParser "<psc-ide>" P.parseImportDeclaration' of
-    Right (mn, P.Explicit refs, mmn, _) ->
+    Right (mn, P.Explicit refs, mmn) ->
       Just (Import mn (P.Explicit (unwrapPositionedRef <$> refs)) mmn)
-    Right (mn, idt, mmn, _) -> Just (Import mn idt mmn)
+    Right (mn, idt, mmn) -> Just (Import mn idt mmn)
     Left _ -> Nothing
-

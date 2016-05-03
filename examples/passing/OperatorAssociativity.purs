@@ -22,4 +22,4 @@ main = do
   assert (1.0 + 10.0 - 5.0 == 6.0)
   assert (1.0 + 10.0 * 5.0 == 51.0)
   assert (10.0 * 5.0 - 1.0 == 49.0)
-  log "Success!"
+  log "Done"

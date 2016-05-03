@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 f 0.0 = 0.0
 f x = g x + 0.0
@@ -16,4 +17,4 @@ evenToNumber (Even n) = oddToNumber n + 0.0
 
 oddToNumber (Odd n) = evenToNumber n + 0.0
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

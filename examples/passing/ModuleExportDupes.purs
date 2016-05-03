@@ -1,14 +1,5 @@
-module A (module Prelude) where
-  import Prelude
-
-module B (module Prelude) where
-  import Prelude
-
-module C (module Prelude, module A) where
-  import Prelude
-  import A
-
 module Main where
+
   import Control.Monad.Eff.Console
   import A
   import B
@@ -16,4 +7,5 @@ module Main where
   import Prelude
 
   main = do
-    print (show 1.0)
+    logShow (show 1.0)
+    log "Done"

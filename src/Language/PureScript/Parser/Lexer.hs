@@ -20,6 +20,7 @@ module Language.PureScript.Parser.Lexer
   , Token()
   , TokenParser()
   , lex
+  , lexLazy
   , anyToken
   , token
   , match
@@ -86,6 +87,7 @@ import Language.PureScript.Parser.State
 import Language.PureScript.Comments
 
 import qualified Text.Parsec as P
+import qualified Text.Parsec.Pos as P
 import qualified Text.Parsec.Token as PT
 
 data Token
@@ -152,7 +154,12 @@ prettyPrintToken (Number n)        = either show show n
 prettyPrintToken (HoleLit name)    = "?" ++ name
 
 data PositionedToken = PositionedToken
-  { ptSourcePos :: P.SourcePos
+  { -- | Start position of this token
+    ptSourcePos :: P.SourcePos
+    -- | End position of this token (not including whitespace)
+  , ptEndPos :: P.SourcePos
+    -- | End position of the previous token
+  , ptPrevEndPos :: Maybe P.SourcePos
   , ptToken     :: Token
   , ptComments  :: [Comment]
   } deriving (Eq)
@@ -162,10 +169,30 @@ instance Show PositionedToken where
   show = prettyPrintToken . ptToken
 
 lex :: FilePath -> String -> Either P.ParseError [PositionedToken]
-lex = P.parse parseTokens
+lex path = toEither . lexLazy path
+  where
+    toEither :: (Maybe e, [a]) -> Either e [a]
+    toEither (Nothing, xs) = Right xs
+    toEither (Just e, _) = Left e
 
-parseTokens :: P.Parsec String u [PositionedToken]
-parseTokens = whitespace *> P.many parsePositionedToken <* P.skipMany parseComment <* P.eof
+-- | Lex many tokens, lazily.
+--
+-- Note: the odd approach here is necessary in order to generate the output list
+-- lazily. Otherwise, we need to parse the entire input in order to force the list
+-- to WHNF.
+lexLazy :: FilePath -> String -> (Maybe P.ParseError, [PositionedToken])
+lexLazy path = go (P.initialPos path) . dropWhile isSpace
+  where
+    go :: P.SourcePos -> String -> (Maybe P.ParseError, [PositionedToken])
+    go pos s =
+      case P.parse (P.setPosition pos *> parseOneToken) path s of
+        Left err -> (Just err, [])
+        Right Nothing -> (Nothing, [])
+        Right (Just (t, pos', s')) -> let ~(e, ts) = go pos' s' in (e, t : ts)
+
+    parseOneToken :: P.Parsec String u (Maybe (PositionedToken, P.SourcePos, String))
+    parseOneToken = Just <$> ((,,) <$> parsePositionedToken <*> P.getPosition <*> P.getInput)
+                <|> Nothing <$ P.skipMany parseComment <* P.eof
 
 whitespace :: P.Parsec String u ()
 whitespace = P.skipMany (P.satisfy isSpace)
@@ -184,7 +211,9 @@ parsePositionedToken = P.try $ do
   comments <- P.many parseComment
   pos <- P.getPosition
   tok <- parseToken
-  return $ PositionedToken pos tok comments
+  pos' <- P.getPosition
+  whitespace
+  return $ PositionedToken pos pos' Nothing tok comments
 
 parseToken :: P.Parsec String u Token
 parseToken = P.choice
@@ -221,7 +250,7 @@ parseToken = P.choice
   , CharLiteral   <$> parseCharLiteral
   , StringLiteral <$> parseStringLiteral
   , Number        <$> parseNumber
-  ] <* whitespace
+  ]
 
   where
   parseLName :: P.Parsec String u String

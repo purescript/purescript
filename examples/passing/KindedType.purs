@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 type Star2Star f = f :: * -> *
 
@@ -30,4 +31,4 @@ class Clazz (a :: *) where
 instance clazzString :: Clazz String where
   def = "test"
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

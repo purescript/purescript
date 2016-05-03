@@ -9,12 +9,15 @@ import           Language.PureScript.Ide.Types
 import qualified Language.PureScript as P
 import           Test.Hspec
 
+wildcard :: P.Type
+wildcard = P.TypeWildcard $ P.SourceSpan "" (P.SourcePos 0 0) (P.SourcePos 0 0)
+
 decl1 :: ExternDecl
-decl1 = ValueDeclaration "filter" P.TypeWildcard
+decl1 = ValueDeclaration "filter" wildcard
 decl2 :: ExternDecl
-decl2 = ValueDeclaration "map" P.TypeWildcard
+decl2 = ValueDeclaration "map" wildcard
 decl3 :: ExternDecl
-decl3 = ValueDeclaration "catMaybe" P.TypeWildcard
+decl3 = ValueDeclaration "catMaybe" wildcard
 dep1 :: ExternDecl
 dep1 = Dependency "Test.Foo" [] (Just "T")
 dep2 :: ExternDecl

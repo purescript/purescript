@@ -11,6 +11,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Strict
 
 import Data.List (isSuffixOf, partition)
+import Data.Maybe (fromMaybe)
 import Data.Version (showVersion)
 import qualified Data.Map as M
 import qualified Data.Aeson as A
@@ -71,9 +72,13 @@ compile PSCMakeOptions{..} = do
   foreignFiles <- forM (inputForeign ++ jsFiles) (\inFile -> (inFile,) <$> readUTF8File inFile)
   (makeErrors, makeWarnings) <- runMake pscmOpts $ do
     (ms, foreigns) <- parseInputs moduleFiles foreignFiles
-    let filePathMap = M.fromList $ map (\(fp, P.Module _ _ mn _ _) -> (mn, fp)) ms
-        makeActions = buildMakeActions pscmOutputDir filePathMap foreigns pscmUsePrefix
-    P.make makeActions (map snd ms)
+    let filePathMap = M.fromList $ map (\(fp, mh) -> (P.moduleHeaderName mh, fp)) ms
+        makeActions = buildMakeActions pscmOutputDir (fmap Right filePathMap) foreigns pscmUsePrefix
+        loadModule name = do
+          let path = fromMaybe (error "compile: no path for module name") $ M.lookup name filePathMap
+              content = fromMaybe (error "compile: no content for module name") $ lookup path moduleFiles
+          P.parseModuleFromFile path content
+    P.make makeActions (map snd ms) loadModule
   printWarningsAndErrors (P.optionsVerboseErrors pscmOpts) pscmJSONErrors makeWarnings makeErrors
   exitSuccess
 
@@ -89,15 +94,15 @@ globWarningOnMisses warn = concatMapM globWithWarning
     return paths
   concatMapM f = liftM concat . mapM f
 
-readInput :: InputOptions -> IO [(Either P.RebuildPolicy FilePath, String)]
-readInput InputOptions{..} = forM ioInputFiles $ \inFile -> (Right inFile, ) <$> readUTF8File inFile
+readInput :: InputOptions -> IO [(FilePath, String)]
+readInput InputOptions{..} = forM ioInputFiles $ \inFile -> (inFile, ) <$> readUTF8File inFile
 
 parseInputs :: (MonadError P.MultipleErrors m, MonadWriter P.MultipleErrors m)
-            => [(Either P.RebuildPolicy FilePath, String)]
+            => [(FilePath, String)]
             -> [(FilePath, P.ForeignJS)]
-            -> m ([(Either P.RebuildPolicy FilePath, P.Module)], M.Map P.ModuleName FilePath)
+            -> m ([(FilePath, P.ModuleHeader)], M.Map P.ModuleName FilePath)
 parseInputs modules foreigns =
-  (,) <$> P.parseModulesFromFiles (either (const "") id) modules
+  (,) <$> P.parseModuleHeadersFromFiles id modules
       <*> P.parseForeignModulesFromFiles foreigns
 
 inputFile :: Parser FilePath
@@ -118,12 +123,6 @@ outputDirectory = strOption $
   <> Opts.value "output"
   <> showDefault
   <> help "The output directory"
-
-requirePath :: Parser (Maybe FilePath)
-requirePath = optional $ strOption $
-     short 'r'
-  <> long "require-path"
-  <> help "The path prefix to use for require() calls in the generated JavaScript [deprecated]"
 
 noTco :: Parser Bool
 noTco = switch $
@@ -175,7 +174,6 @@ options = P.Options <$> noTco
                     <*> noOpts
                     <*> verboseErrors
                     <*> (not <$> comments)
-                    <*> requirePath
                     <*> sourceMaps
 
 pscMakeOptions :: Parser PSCMakeOptions

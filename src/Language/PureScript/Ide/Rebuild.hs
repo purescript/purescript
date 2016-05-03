@@ -68,17 +68,17 @@ sortExterns
   -> M.Map P.ModuleName P.ExternsFile
   -> m [P.ExternsFile]
 sortExterns m ex = do
-  sorted' <- runExceptT . P.sortModules . (:) m . map mkShallowModule . M.elems $ ex
+  sorted' <- runExceptT . P.sortModules id . (:) (P.extractModuleHeader m) . map mkShallowModule . M.elems $ ex
   case sorted' of
     Left _ -> throwError (GeneralError "There was a cycle in the dependencies")
     Right (sorted, graph) -> do
       let deps = fromJust (lookup (P.getModuleName m) graph)
-      pure $ mapMaybe getExtern (deps `inOrderOf` map P.getModuleName sorted)
+      pure $ mapMaybe getExtern (deps `inOrderOf` map P.moduleHeaderName sorted)
   where
     mkShallowModule P.ExternsFile{..} =
-      P.Module undefined [] efModuleName (map mkImport efImports) Nothing
+      P.ModuleHeader efModuleName Nothing (map mkImport efImports)
     mkImport (P.ExternsImport mn it iq) =
-      P.ImportDeclaration mn it iq False
+      P.ImportDeclaration mn it iq
     getExtern mn = M.lookup mn ex
     -- Sort a list so its elements appear in the same order as in another list.
     inOrderOf :: (Ord a) => [a] -> [a] -> [a]

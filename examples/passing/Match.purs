@@ -1,9 +1,10 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 data Foo a = Foo
 
 foo = \f -> case f of Foo -> "foo"
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"
