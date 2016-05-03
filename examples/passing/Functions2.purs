@@ -2,6 +2,7 @@ module Main where
 
 import Prelude
 import Test.Assert
+import Control.Monad.Eff.Console (log)
 
 test :: forall a b. a -> b -> a
 test = \const _ -> const
@@ -9,4 +10,4 @@ test = \const _ -> const
 main = do
   let value = test "Done" {}
   assert' "Not done" $ value == "Done"
-  Control.Monad.Eff.Console.log "Done"
+  log "Done"

@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 data Maybe a = Nothing | Just a
 
@@ -64,4 +65,4 @@ test10 _ = do
     g x = f x / 2.0
   Just (f 10.0)
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

@@ -1,8 +1,9 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 foo :: String
 foo = """foo"""
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

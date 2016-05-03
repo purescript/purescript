@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 data Tuple a b = Tuple a b
 
@@ -64,4 +65,4 @@ main = do
       t2 = test2 id
       t3 = test3 1
       t4 = test4 (Tuple 1 0)
-  Control.Monad.Eff.Console.log "Done"
+  log "Done"

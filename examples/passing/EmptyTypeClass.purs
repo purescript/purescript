@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 class PartialP
 
@@ -9,4 +10,4 @@ head [x] = x
 
 instance allowPartials :: PartialP
 
-main = Control.Monad.Eff.Console.log $ head ["Done"]
+main = log $ head ["Done"]

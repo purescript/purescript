@@ -2,6 +2,7 @@
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module TestCompiler where
 
@@ -28,7 +29,7 @@ import qualified Language.PureScript as P
 import Data.Char (isSpace)
 import Data.Function (on)
 import Data.List (sort, stripPrefix, intercalate, groupBy, sortBy, partition)
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, fromMaybe)
 import Data.Time.Clock (UTCTime())
 
 import qualified Data.Map as M
@@ -171,8 +172,13 @@ compile
   -> IO (Either P.MultipleErrors P.Environment)
 compile inputFiles foreigns = silence $ runTest $ do
   fs <- liftIO $ readInput inputFiles
-  ms <- P.parseModulesFromFiles id fs
-  P.make (makeActions foreigns) (map snd ms)
+  ms <- P.parseModuleHeadersFromFiles id fs
+  let filePathMap = M.fromList $ map (\(fp, mh) -> (P.moduleHeaderName mh, fp)) ms
+      loadModule name = do
+        let path = fromMaybe (error "compile: no path for module name") $ M.lookup name filePathMap
+            content = fromMaybe (error "compile: no content for module name") $ lookup path fs
+        P.parseModuleFromFile path content
+  P.make (makeActions foreigns) (map snd ms) loadModule
 
 assert
   :: [FilePath]

@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 class NullaryTypeClass where
   greeting :: String
@@ -17,4 +18,4 @@ instance coerceRefl :: Coerce a a where
 instance coerceShow :: (Prelude.Show a) => Coerce a String where
   coerce = show
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

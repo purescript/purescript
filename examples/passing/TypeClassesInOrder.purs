@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 class Foo a where
   foo :: a -> String
@@ -8,4 +9,4 @@ class Foo a where
 instance fooString :: Foo String where
   foo s = s
 
-main = Control.Monad.Eff.Console.log $ foo "Done"
+main = log $ foo "Done"

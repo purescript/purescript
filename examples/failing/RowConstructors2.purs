@@ -2,8 +2,9 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 type Foo r = (x :: Number | r)
 type Bar = { | Foo }
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

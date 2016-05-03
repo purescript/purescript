@@ -1,9 +1,10 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 x a = 1.0 + y a
 
 y a = x a
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

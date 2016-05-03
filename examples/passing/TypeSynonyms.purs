@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 type Lens a b =
   { get :: a -> b
@@ -24,4 +25,4 @@ fst =
 test1 :: forall a b c. Lens (Pair (Pair a b) c) a
 test1 = composeLenses fst fst
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

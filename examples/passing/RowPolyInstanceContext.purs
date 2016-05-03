@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 class T s m where
   state :: (s -> s) -> m Unit
@@ -19,4 +20,4 @@ test2 = state $ \o -> o { foo = o.foo <> "!" }
 main = do
   let t1 = test1
   let t2 = test2
-  Control.Monad.Eff.Console.log "Done"
+  log "Done"

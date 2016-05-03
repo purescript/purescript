@@ -1,9 +1,11 @@
 module Main where
 
-foo = 
+import Control.Monad.Eff.Console (log)
+
+foo =
  1
 
-bar 
+bar
  = 2
 
 baz
@@ -14,4 +16,4 @@ qux
   =
  3
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

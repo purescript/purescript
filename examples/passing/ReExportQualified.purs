@@ -2,5 +2,6 @@ module Main where
 
 import Prelude
 import C
+import Control.Monad.Eff.Console (log)
 
-main = Control.Monad.Eff.Console.log (x <> y)
+main = log (x <> y)
