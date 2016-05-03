@@ -26,8 +26,9 @@ import Prelude.Compat
 import qualified Language.PureScript as P
 
 import Data.Char (isSpace)
+import Data.Function (on)
+import Data.List (sort, stripPrefix, intercalate, groupBy, sortBy, partition)
 import Data.Maybe (mapMaybe)
-import Data.List (isSuffixOf, sort, stripPrefix, intercalate)
 import Data.Time.Clock (UTCTime())
 
 import qualified Data.Map as M
@@ -55,39 +56,75 @@ main = hspec spec
 
 spec :: Spec
 spec = do
-  (supportPurs, foreigns, passing, passingTestCases, failing, failingTestCases) <- runIO $ do
+
+  (supportPurs, supportForeigns, passingTestCases, failingTestCases) <- runIO $ do
     cwd <- getCurrentDirectory
-
-    let supportDir  = cwd </> "tests" </> "support" </> "bower_components"
-    let supportFiles ext = Glob.globDir1 (Glob.compile ("purescript-*/**/*." ++ ext)) supportDir
-
-    supportPurs <- supportFiles "purs"
-    supportJS   <- supportFiles "js"
-
-    foreignFiles <- forM supportJS (\f -> (f,) <$> readUTF8File f)
-    Right (foreigns, _) <- runExceptT $ runWriterT $ P.parseForeignModulesFromFiles foreignFiles
-
     let passing = cwd </> "examples" </> "passing"
-    passingTestCases <- sort . filter (".purs" `isSuffixOf`) <$> getDirectoryContents passing
-
     let failing = cwd </> "examples" </> "failing"
-    failingTestCases <- sort . filter (".purs" `isSuffixOf`) <$> getDirectoryContents failing
-
-    return (supportPurs, foreigns, passing, passingTestCases, failing, failingTestCases)
+    let supportDir = cwd </> "tests" </> "support" </> "bower_components"
+    let supportFiles ext = Glob.globDir1 (Glob.compile ("purescript-*/**/*." ++ ext)) supportDir
+    passingFiles <- getTestFiles passing <$> testGlob passing
+    failingFiles <- getTestFiles failing <$> testGlob failing
+    supportPurs <- supportFiles "purs"
+    supportForeigns <- loadForeigns =<< supportFiles "js"
+    return (supportPurs, supportForeigns, passingFiles, failingFiles)
 
   context ("Passing examples") $ do
-    forM_ passingTestCases $ \inputFile ->
-      it ("'" <> inputFile <> "' should compile and run without error") $ do
-        assertCompiles (supportPurs ++ [passing </> inputFile]) foreigns
+    forM_ passingTestCases $ \(testPurs, testJS) ->
+      it ("'" <> takeFileName (getTestMain testPurs) <> "' should compile and run without error") $ do
+        testForeigns <- loadForeigns testJS
+        assertCompiles (supportPurs ++ testPurs) (supportForeigns <> testForeigns)
 
   context ("Failing examples") $ do
-    forM_ failingTestCases $ \inputFile -> do
-      expectedFailures <- runIO $ getShouldFailWith (failing </> inputFile)
-      it ("'" <> inputFile <> "' should fail with '" <> intercalate "', '" expectedFailures <> "'") $ do
-        assertDoesNotCompile (supportPurs ++ [failing </> inputFile]) foreigns expectedFailures
+    forM_ failingTestCases $ \(testPurs, testJS) -> do
+      let mainPath = getTestMain testPurs
+      expectedFailures <- runIO $ getShouldFailWith mainPath
+      it ("'" <> takeFileName mainPath <> "' should fail with '" <> intercalate "', '" expectedFailures <> "'") $ do
+        testForeigns <- loadForeigns testJS
+        assertDoesNotCompile (supportPurs ++ testPurs) (supportForeigns <> testForeigns) expectedFailures
 
   where
 
+  -- A glob for all purs and js files within a test directory
+  testGlob :: FilePath -> IO [FilePath]
+  testGlob dir = join . fst <$> Glob.globDir (map Glob.compile ["**/*.purs", "**/*.js"]) dir
+
+  -- Loads foreign modules from source files
+  loadForeigns :: [FilePath] -> IO (M.Map P.ModuleName FilePath)
+  loadForeigns paths = do
+    files <- forM paths (\f -> (f,) <$> readUTF8File f)
+    Right (foreigns, _) <- runExceptT $ runWriterT $ P.parseForeignModulesFromFiles files
+    return foreigns
+
+  -- Groups the test files so that a top-level file can have dependencies in a
+  -- subdirectory of the same name. The inner tuple contains a list of the
+  -- .purs files and the .js files for the test case.
+  getTestFiles :: FilePath -> [FilePath] -> [([FilePath], [FilePath])]
+  getTestFiles baseDir
+    = map (partition ((== ".purs") . takeExtensions))
+    . map (map (baseDir </>))
+    . groupBy ((==) `on` extractPrefix)
+    . sortBy (compare `on` extractPrefix)
+    . map (makeRelative baseDir)
+
+  -- Takes the test entry point from a group of purs files - this is determined
+  -- by the file with the shortest path name, as everything but the main file
+  -- will be under a subdirectory.
+  getTestMain :: [FilePath] -> FilePath
+  getTestMain = head . sortBy (compare `on` length)
+
+  -- Extracts the filename part of a .purs file, or if the file is in a
+  -- subdirectory, the first part of that directory path.
+  extractPrefix :: FilePath -> FilePath
+  extractPrefix fp =
+    let dir = takeDirectory fp
+        ext = reverse ".purs"
+    in if dir == "."
+       then maybe fp reverse $ stripPrefix ext $ reverse fp
+       else dir
+
+  -- Scans a file for @shouldFailWith directives in the comments, used to
+  -- determine expected failures
   getShouldFailWith :: FilePath -> IO [String]
   getShouldFailWith = fmap extractFailWiths . readUTF8File
     where

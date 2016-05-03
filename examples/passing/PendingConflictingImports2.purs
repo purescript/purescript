@@ -1,8 +1,3 @@
-module A where
-
-  thing :: Int
-  thing = 1
-
 module Main where
 
   import A
