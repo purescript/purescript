@@ -3,7 +3,7 @@ module Main where
 import Control.Monad.Eff.Console
 import Prelude hiding (
   show, -- a value
-  Show, -- a type class
+  class Show, -- a type class
   Unit(..)  -- a constructor
   )
 
@@ -16,3 +16,4 @@ data Unit = X | Y
 
 main = do
   logShow show
+  log "Done"

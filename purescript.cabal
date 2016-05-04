@@ -20,7 +20,52 @@ author: Phil Freeman <paf31@cantab.net>,
 tested-with: GHC==7.10.3
 
 extra-source-files: examples/passing/*.purs
+                  , examples/passing/2018/*.purs
+                  , examples/passing/ClassRefSyntax/*.purs
+                  , examples/passing/DctorOperatorAlias/*.purs
+                  , examples/passing/ExplicitImportReExport/*.purs
+                  , examples/passing/ExportExplicit/*.purs
+                  , examples/passing/ExportExplicit2/*.purs
+                  , examples/passing/Import/*.purs
+                  , examples/passing/ImportExplicit/*.purs
+                  , examples/passing/ImportQualified/*.purs
+                  , examples/passing/Module/*.purs
+                  , examples/passing/ModuleDeps/*.purs
+                  , examples/passing/ModuleExport/*.purs
+                  , examples/passing/ModuleExportDupes/*.purs
+                  , examples/passing/ModuleExportExcluded/*.purs
+                  , examples/passing/ModuleExportQualified/*.purs
+                  , examples/passing/ModuleExportSelf/*.purs
+                  , examples/passing/NonConflictingExports/*.purs
+                  , examples/passing/OperatorAliasElsewhere/*.purs
+                  , examples/passing/PendingConflictingImports/*.purs
+                  , examples/passing/PendingConflictingImports2/*.purs
+                  , examples/passing/QualifiedNames/*.purs
+                  , examples/passing/RedefinedFixity/*.purs
+                  , examples/passing/ReExportQualified/*.purs
+                  , examples/passing/ResolvableScopeConflict/*.purs
+                  , examples/passing/ResolvableScopeConflict2/*.purs
+                  , examples/passing/ResolvableScopeConflict3/*.purs
+                  , examples/passing/ShadowedModuleName/*.purs
+                  , examples/passing/TransitiveImport/*.purs
+                  , examples/passing/TypeOperators/*.purs
+                  , examples/passing/TypeWithoutParens/*.purs
                   , examples/failing/*.purs
+                  , examples/failing/1733/*.purs
+                  , examples/failing/ConflictingExports/*.purs
+                  , examples/failing/ConflictingImports/*.purs
+                  , examples/failing/ConflictingImports2/*.purs
+                  , examples/failing/ConflictingQualifiedImports/*.purs
+                  , examples/failing/ConflictingQualifiedImports2/*.purs
+                  , examples/failing/ExportExplicit1/*.purs
+                  , examples/failing/ExportExplicit3/*.purs
+                  , examples/failing/ImportExplicit/*.purs
+                  , examples/failing/ImportExplicit2/*.purs
+                  , examples/failing/ImportHidingModule/*.purs
+                  , examples/failing/ImportModule/*.purs
+                  , examples/failing/InstanceExport/*.purs
+                  , examples/failing/OrphanInstance/*.purs
+                  , examples/failing/OverlappingReExport/*.purs
                   , examples/docs/bower_components/purescript-prelude/src/*.purs
                   , examples/docs/bower.json
                   , examples/docs/src/*.purs
@@ -350,7 +395,7 @@ test-suite tests
                    Glob -any, aeson-better-errors -any, bytestring -any, aeson -any,
                    base-compat -any, haskeline >= 0.7.0.0, optparse-applicative -any,
                    boxes -any, HUnit -any, hspec -any, hspec-discover -any, stm -any, text -any,
-                   vector -any, utf8-string -any
+                   vector -any, utf8-string -any, silently -any
     ghc-options: -Wall
     type: exitcode-stdio-1.0
     main-is: Main.hs

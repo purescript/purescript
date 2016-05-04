@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude hiding (add)
+import Control.Monad.Eff.Console (log)
 
 runNat f = f 0.0 (\n -> n + 1.0)
 
@@ -15,4 +16,6 @@ two = succ one'
 four = add two two
 fourNumber = runNat four
 
-main = Control.Monad.Eff.Console.log $ show fourNumber
+main = do
+  log $ show fourNumber
+  log "Done"

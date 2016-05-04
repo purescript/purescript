@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 example1 :: String
 example1 = do
@@ -35,5 +36,6 @@ example2 = do
   bind x f = x *> f unit
 
 main = do
-  Control.Monad.Eff.Console.log example1
-  Control.Monad.Eff.Console.log $ runConst example2
+  log example1
+  log $ runConst example2
+  log "Done"

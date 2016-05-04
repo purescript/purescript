@@ -82,10 +82,6 @@ data DeclarationRef
   --
   | ModuleRef ModuleName
   -- |
-  -- An unspecified ProperName ref. This will be replaced with a TypeClassRef
-  -- or TypeRef during name desugaring.
-  | ProperRef String
-  -- |
   -- A declaration reference with source position information
   --
   | PositionedDeclarationRef SourceSpan [Comment] DeclarationRef
@@ -98,7 +94,6 @@ instance Eq DeclarationRef where
   (TypeClassRef name)    == (TypeClassRef name')    = name == name'
   (TypeInstanceRef name) == (TypeInstanceRef name') = name == name'
   (ModuleRef name)       == (ModuleRef name')       = name == name'
-  (ProperRef name)       == (ProperRef name')       = name == name'
   (PositionedDeclarationRef _ _ r) == r' = r == r'
   r == (PositionedDeclarationRef _ _ r') = r == r'
   _ == _ = False

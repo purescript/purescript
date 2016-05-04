@@ -17,4 +17,4 @@ main = do
   point <- { x: _, y: x } <$> pure 2.0
   assert $ point.x == 2.0
   assert $ point.y == 1.0
-  log (mkRecord 1.0 "Done!").bar
+  log (mkRecord 1.0 "Done").bar

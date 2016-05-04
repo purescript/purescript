@@ -38,6 +38,47 @@ updateSupportCode = do
       callProcess "node_modules/.bin/bower" ["--allow-root", "install", "--config.interactive=false"]
   setCurrentDirectory "../.."
 
+-- |
+-- The support modules that should be cached between test cases, to avoid
+-- excessive rebuilding.
+--
+supportModules :: [String]
+supportModules =
+  [ "Control.Applicative"
+  , "Control.Apply"
+  , "Control.Bind"
+  , "Control.Category"
+  , "Control.Monad.Eff.Class"
+  , "Control.Monad.Eff.Console"
+  , "Control.Monad.Eff.Unsafe"
+  , "Control.Monad.Eff"
+  , "Control.Monad.ST"
+  , "Control.Monad"
+  , "Control.Semigroupoid"
+  , "Data.Boolean"
+  , "Data.BooleanAlgebra"
+  , "Data.Bounded"
+  , "Data.CommutativeRing"
+  , "Data.Eq"
+  , "Data.EuclideanRing"
+  , "Data.Field"
+  , "Data.Function.Uncurried"
+  , "Data.Function"
+  , "Data.Functor"
+  , "Data.HeytingAlgebra"
+  , "Data.Ord.Unsafe"
+  , "Data.Ord"
+  , "Data.Ordering"
+  , "Data.Ring"
+  , "Data.Semigroup"
+  , "Data.Semiring"
+  , "Data.Show"
+  , "Data.Unit"
+  , "Data.Void"
+  , "Prelude"
+  , "Test.Assert"
+  ]
+
 pushd :: forall a. FilePath -> IO a -> IO a
 pushd dir act = do
   original <- getCurrentDirectory

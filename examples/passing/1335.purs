@@ -4,9 +4,11 @@ import Prelude
 import Control.Monad.Eff.Console (log)
 
 x :: forall a. a -> String
-x a = y "Done"
+x a = y "Test"
   where
   y :: forall a. (Show a) => a -> String
   y a = show (a :: a)
 
-main = log (x 0)
+main = do
+  log (x 0)
+  log "Done"
