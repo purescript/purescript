@@ -1,9 +1,11 @@
 module PSCi.Message where
 
 
-import Data.List (intercalate)
+import           Data.List (intercalate)
+import           Data.Version (showVersion)
+import qualified Paths_purescript as Paths
 import qualified PSCi.Directive as D
-import PSCi.Types
+import           PSCi.Types
 
 -- Messages
 
@@ -34,15 +36,9 @@ helpMessage = "The following commands are available:\n\n    " ++
 -- The welcome prologue.
 --
 prologueMessage :: String
-prologueMessage = intercalate "\n"
-  [ " ____                 ____            _       _   "
-  , "|  _ \\ _   _ _ __ ___/ ___|  ___ _ __(_)_ __ | |_ "
-  , "| |_) | | | | '__/ _ \\___ \\ / __| '__| | '_ \\| __|"
-  , "|  __/| |_| | | |  __/___) | (__| |  | | |_) | |_ "
-  , "|_|    \\__,_|_|  \\___|____/ \\___|_|  |_| .__/ \\__|"
-  , "                                       |_|        "
-  , ""
-  , ":? shows help"
+prologueMessage = unlines
+  [ "PSCi, version " ++ showVersion Paths.version
+  , "Type :? for help"
   ]
 
 -- |
@@ -50,4 +46,3 @@ prologueMessage = intercalate "\n"
 --
 quitMessage :: String
 quitMessage = "See ya!"
-

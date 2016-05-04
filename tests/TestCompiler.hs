@@ -168,7 +168,7 @@ runTest = fmap fst . P.runMake P.defaultOptions
 compile
   :: [FilePath]
   -> M.Map P.ModuleName FilePath
-  -> IO (Either P.MultipleErrors P.Environment)
+  -> IO (Either P.MultipleErrors [P.ExternsFile])
 compile inputFiles foreigns = silence $ runTest $ do
   fs <- liftIO $ readInput inputFiles
   ms <- P.parseModulesFromFiles id fs
@@ -177,7 +177,7 @@ compile inputFiles foreigns = silence $ runTest $ do
 assert
   :: [FilePath]
   -> M.Map P.ModuleName FilePath
-  -> (Either P.MultipleErrors P.Environment -> IO (Maybe String))
+  -> (Either P.MultipleErrors [P.ExternsFile] -> IO (Maybe String))
   -> Expectation
 assert inputFiles foreigns f = do
   e <- compile inputFiles foreigns

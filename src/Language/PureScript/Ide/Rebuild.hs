@@ -22,7 +22,6 @@ import           Data.Maybe                      (fromJust, mapMaybe)
 import qualified Data.Set                        as S
 import qualified Language.PureScript             as P
 import           Language.PureScript.Errors.JSON
-import qualified Language.PureScript.Externs     as P
 import           System.FilePath (replaceExtension)
 import           System.Directory (doesFileExist)
 import           System.IO.UTF8 (readUTF8File)

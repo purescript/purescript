@@ -16,7 +16,6 @@ import Control.Monad.Trans.State.Strict
 import System.Console.Haskeline
 
 import qualified Language.PureScript as P
-import qualified Language.PureScript.Externs as P
 import qualified Language.PureScript.Names as N
 
 import qualified PSCi.Directive as D
@@ -75,8 +74,6 @@ completeDirective ws w =
 
 directiveArg :: String -> Directive -> [CompletionContext]
 directiveArg _ Browse      = [CtxModule]
-directiveArg w Load        = [CtxFilePath w]
-directiveArg w Foreign     = [CtxFilePath w]
 directiveArg _ Quit        = []
 directiveArg _ Reset       = []
 directiveArg _ Help        = []
@@ -129,8 +126,8 @@ getCompletion ctx =
   completeDirectives = map (':' :) . D.directiveStringsFor
 
 
-getLoadedModules :: CompletionM [P.ExternsFile]
-getLoadedModules = asks psciLoadedExterns
+getLoadedModules :: CompletionM [P.Module]
+getLoadedModules = asks (map fst . psciLoadedExterns)
 
 getImportedModules :: CompletionM [ImportedModule]
 getImportedModules = asks psciImportedModules
@@ -139,12 +136,12 @@ getModuleNames :: CompletionM [String]
 getModuleNames = moduleNames <$> getLoadedModules
 
 mapLoadedModulesAndQualify :: (a -> String) -> (P.Module -> [(a, P.Declaration)]) -> CompletionM [String]
-mapLoadedModulesAndQualify sho f = undefined --do
-  -- ms <- getLoadedModules
-  -- let argPairs = do m <- ms
-  --                   fm <- f m
-  --                   return (m, fm)
-  -- concat <$> traverse (uncurry (getAllQualifications sho)) argPairs
+mapLoadedModulesAndQualify sho f = do
+  ms <- getLoadedModules
+  let argPairs = do m <- ms
+                    fm <- f m
+                    return (m, fm)
+  concat <$> traverse (uncurry (getAllQualifications sho)) argPairs
 
 getIdentNames :: CompletionM [String]
 getIdentNames = mapLoadedModulesAndQualify P.showIdent identNames
@@ -212,8 +209,8 @@ dctorNames = nubOnFst . concatMap go . P.exportedDeclarations
   go (P.PositionedDeclaration _ _ d) = go d
   go _ = []
 
-moduleNames :: [P.ExternsFile] -> [String]
-moduleNames = nub . map (P.runModuleName . P.efModuleName)
+moduleNames :: [P.Module] -> [String]
+moduleNames = nub . map (P.runModuleName . P.getModuleName)
 
 directivesFirst :: Completion -> Completion -> Ordering
 directivesFirst (Completion _ d1 _) (Completion _ d2 _) = go d1 d2

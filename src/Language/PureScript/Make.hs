@@ -158,9 +158,10 @@ rebuildModule :: forall m. (Monad m, MonadBaseControl IO m, MonadReader Options 
 rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
   progress $ CompilingModule moduleName
   let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
-  lint m
+      withPrim = importPrim m
+  lint withPrim
   ((checked@(Module ss coms _ elaborated exps), env'), nextVar) <- runSupplyT 0 $ do
-    [desugared] <- desugar externs [m]
+    [desugared] <- desugar externs [withPrim]
     runCheck' env $ typeCheckModule desugared
   checkExhaustiveModule env' checked
   regrouped <- createBindingGroups moduleName . collapseBindingGroups $ elaborated
@@ -180,7 +181,7 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
 make :: forall m. (Monad m, MonadBaseControl IO m, MonadReader Options m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
      => MakeActions m
      -> [Module]
-     -> m ([ExternsFile], Environment)
+     -> m [ExternsFile]
 make ma@MakeActions{..} ms = do
   checkModuleNamesAreUnique
 
@@ -200,7 +201,7 @@ make ma@MakeActions{..} ms = do
 
   -- Bundle up all the externs and return them as an Environment
   (_, externs) <- unzip . fromMaybe (internalError "make: externs were missing but no errors reported.") . sequence <$> for barriers (takeMVar . fst . snd)
-  return (externs, foldl' (flip applyExternsFileToEnvironment) initEnvironment externs)
+  return externs
 
   where
   checkModuleNamesAreUnique :: m ()

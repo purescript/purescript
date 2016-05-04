@@ -21,7 +21,6 @@ import Prelude.Compat
 import Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Language.PureScript as P
-import qualified Language.PureScript.Externs as P
 
 data PSCiOptions = PSCiOptions
   { psciMultiLineMode     :: Bool
@@ -39,14 +38,15 @@ data PSCiOptions = PSCiOptions
 data PSCiState = PSCiState
   { psciImportedModules     :: [ImportedModule]
   , psciLoadedFiles         :: [FilePath]
-  , psciLoadedExterns       :: [P.ExternsFile]
+  , psciLoadedExterns       :: [(P.Module, P.ExternsFile)]
   , psciForeignFiles        :: Map P.ModuleName FilePath
   , psciLetBindings         :: [P.Declaration]
   , psciNodeFlags           :: [String]
-  }
+  , psciEnvironment         :: P.Environment
+  } deriving Show
 
 initialPSCiState :: PSCiState
-initialPSCiState = PSCiState [] [] [] Map.empty [] []
+initialPSCiState = PSCiState [] [] [] Map.empty [] [] P.initEnvironment
 
 -- | All of the data that is contained by an ImportDeclaration in the AST.
 -- That is:
@@ -83,7 +83,7 @@ updateLoadedFiles :: [FilePath] -> PSCiState -> PSCiState
 updateLoadedFiles paths st = st { psciLoadedFiles = psciLoadedFiles st ++ paths }
 
 -- | Updates the state to have more loaded externs files.
-updateLoadedExterns :: [P.ExternsFile] -> PSCiState -> PSCiState
+updateLoadedExterns :: [(P.Module, P.ExternsFile)] -> PSCiState -> PSCiState
 updateLoadedExterns externs st = st { psciLoadedExterns = psciLoadedExterns st ++ externs }
 
 -- |
@@ -118,14 +118,6 @@ data Command
   -- Browse a module
   --
   | BrowseModule P.ModuleName
-  -- |
-  -- Load a file for use with importing
-  --
-  | LoadFile FilePath
-  -- |
-  -- Load a foreign module
-  --
-  | LoadForeign FilePath
   -- |
   -- Exit PSCI
   --
@@ -177,8 +169,6 @@ data Directive
   | Quit
   | Reset
   | Browse
-  | Load
-  | Foreign
   | Type
   | Kind
   | Show

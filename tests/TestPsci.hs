@@ -49,11 +49,10 @@ completionTests =
 completionTestData :: [(String, [String])]
 completionTestData =
   -- basic directives
-  [ (":h", [":help"])
+  [ (":h",  [":help"])
   , (":re", [":reset"])
-  , (":q", [":quit"])
-  , (":mo", [":module"])
-  , (":b", [":browse"])
+  , (":q",  [":quit"])
+  , (":b",  [":browse"])
 
   -- :browse should complete module names
   , (":b Control.Monad.E",    map (":b Control.Monad.Eff" ++) ["", ".Unsafe", ".Class", ".Console"])
@@ -62,10 +61,6 @@ completionTestData =
   -- import should complete module names
   , ("import Control.Monad.E",    map ("import Control.Monad.Eff" ++) ["", ".Unsafe", ".Class", ".Console"])
   , ("import Control.Monad.Eff.", map ("import Control.Monad.Eff" ++) [".Unsafe", ".Class", ".Console"])
-
-  -- :load, :module should complete file paths
-  , (":l tests/support/psci/", [":l tests/support/psci/Sample.purs"])
-  , (":module tests/support/psci/", [":module tests/support/psci/Sample.purs"])
 
   -- :quit, :help, :reset should not complete
   , (":help ", [])
@@ -140,7 +135,8 @@ getPSCiState = do
       print err >> exitFailure
     Right modules ->
       let imports = [controlMonadSTasST, (P.ModuleName [P.ProperName "Prelude"], P.Implicit, Nothing)]
-      in  return (mkPSCiState imports modules foreigns [] [])
+          dummyExterns = P.internalError "TestPsci: dummyExterns should not be used"
+      in  return (PSCiState [] pursFiles (zip (map snd modules) (repeat dummyExterns)) foreigns [] [] P.initEnvironment)
 
 controlMonadSTasST :: ImportedModule
 controlMonadSTasST = (s "Control.Monad.ST", P.Implicit, Just (s "ST"))
