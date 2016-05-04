@@ -398,7 +398,7 @@ test-suite tests
                    vector -any, utf8-string -any, silently -any
     ghc-options: -Wall
     type: exitcode-stdio-1.0
-    main-is: Main.hs
+    main-is: Test.hs
     other-modules: TestUtils
                    TestCompiler
                    TestDocs
