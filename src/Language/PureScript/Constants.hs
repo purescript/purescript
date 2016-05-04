@@ -1,7 +1,10 @@
--- |
--- Various constants which refer to things in the Prelude
---
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE PatternSynonyms #-}
+
+-- | Various constants which refer to things in the Prelude
 module Language.PureScript.Constants where
+
+import Language.PureScript.Names
 
 -- Operators
 
@@ -321,6 +324,9 @@ main = "main"
 
 partial :: String
 partial = "Partial"
+
+pattern Partial :: Qualified (ProperName 'ClassName)
+pattern Partial = Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Partial")
 
 -- Code Generation
 

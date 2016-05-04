@@ -29,6 +29,7 @@ import Language.PureScript.Pretty
 import Language.PureScript.Types
 import Language.PureScript.Names
 import Language.PureScript.Kinds
+import qualified Language.PureScript.Constants as C
 import qualified Language.PureScript.Bundle as Bundle
 
 import qualified Text.PrettyPrint.Boxes as Box
@@ -753,8 +754,7 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             , line "They may be disallowed completely in a future version of the compiler."
             ]
     renderSimpleErrorMessage OverlappingInstances{} = internalError "OverlappingInstances: empty instance list"
-    renderSimpleErrorMessage (NoInstanceFound (Constraint (Qualified (Just (ModuleName [ProperName "Prim"]))
-                                                                     (ProperName "Partial"))
+    renderSimpleErrorMessage (NoInstanceFound (Constraint C.Partial
                                                           _
                                                           (Just (PartialConstraintData bs b)))) =
       paras [ line "A case expression could not be determined to cover all inputs."
