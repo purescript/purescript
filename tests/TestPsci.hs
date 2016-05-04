@@ -136,7 +136,7 @@ getPSCiState = do
     Right modules ->
       let imports = [controlMonadSTasST, (P.ModuleName [P.ProperName "Prelude"], P.Implicit, Nothing)]
           dummyExterns = P.internalError "TestPsci: dummyExterns should not be used"
-      in  return (PSCiState [] pursFiles (zip (map snd modules) (repeat dummyExterns)) foreigns [] [] P.initEnvironment)
+      in  return (PSCiState imports pursFiles (zip (map snd modules) (repeat dummyExterns)) foreigns [] [] P.initEnvironment)
 
 controlMonadSTasST :: ImportedModule
 controlMonadSTasST = (s "Control.Monad.ST", P.Implicit, Just (s "ST"))
