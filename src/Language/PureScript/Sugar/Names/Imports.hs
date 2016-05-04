@@ -63,8 +63,7 @@ resolveImports
 resolveImports env (Module ss coms currentModule decls exps) =
   warnAndRethrow (addHint (ErrorInModule currentModule)) $ do
 
-    decls' <- traverse updateImportRef decls
-    imports <- findImports decls'
+    imports <- findImports decls
 
     for_ (M.toList imports) $ \(mn, imps) -> do
 
@@ -97,7 +96,7 @@ resolveImports env (Module ss coms currentModule decls exps) =
         scope = M.insert currentModule [(Nothing, Nothing, Nothing)] imports'
     resolved <- foldM (resolveModuleImport env) nullImports (M.toList scope)
 
-    return (Module ss coms currentModule decls' exps, resolved)
+    return (Module ss coms currentModule decls exps, resolved)
 
   where
   defQual :: ImportDef -> Maybe ModuleName
@@ -132,29 +131,6 @@ resolveImports env (Module ss coms currentModule decls exps) =
 
   warn :: Maybe SourceSpan -> SimpleErrorMessage -> m ()
   warn pos msg = maybe id warnWithPosition pos $ tell . errorMessage $ msg
-
-  updateImportRef :: Declaration -> m Declaration
-  updateImportRef (PositionedDeclaration pos com d) =
-    warnAndRethrowWithPosition pos $ PositionedDeclaration pos com <$> updateImportRef d
-  updateImportRef (ImportDeclaration mn typ qual) = do
-    modExports <- getExports env mn
-    typ' <- case typ of
-      Implicit -> return Implicit
-      Explicit refs -> Explicit <$> updateProperRef mn modExports `traverse` refs
-      Hiding refs -> Hiding <$> updateProperRef mn modExports `traverse` refs
-    return $ ImportDeclaration mn typ' qual
-  updateImportRef other = return other
-
-  updateProperRef :: ModuleName -> Exports -> DeclarationRef -> m DeclarationRef
-  updateProperRef importModule modExports (ProperRef name) =
-    if ProperName name `elem` (fst `map` exportedTypeClasses modExports)
-    then do
-      tell . errorMessage $ DeprecatedClassImport importModule (ProperName name)
-      return . TypeClassRef $ ProperName name
-    else return $ TypeRef (ProperName name) (Just [])
-  updateProperRef importModule modExports (PositionedDeclarationRef pos com ref) =
-    PositionedDeclarationRef pos com <$> updateProperRef importModule modExports ref
-  updateProperRef _ _ other = return other
 
 -- | Constructs a set of imports for a single module import.
 resolveModuleImport

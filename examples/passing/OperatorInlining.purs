@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console
+import Control.Monad.Eff.Console (logShow, log)
 
 main = do
 
@@ -44,3 +44,5 @@ main = do
 
   -- complementedLatticeBoolean
   logShow (not true)
+
+  log "Done"

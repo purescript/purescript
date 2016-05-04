@@ -10,4 +10,6 @@ replicateM_ n act = do
   act
   replicateM_ (n - 1.0) act
 
-main = replicateM_ 10.0 (log "Hello World!")
+main = do
+  replicateM_ 10.0 (log "Hello World!")
+  log "Done"

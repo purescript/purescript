@@ -10,4 +10,6 @@ shout = log <<< (_ <> "!") <<< show
 usesShowTwice true = shout
 usesShowTwice false = logShow
 
-main = usesShowTwice true "Done"
+main = do
+  usesShowTwice true "Test"
+  log "Done"

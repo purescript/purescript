@@ -15,6 +15,8 @@ import Language.PureScript.Parser.Kinds
 import Language.PureScript.Parser.Lexer
 import Language.PureScript.Environment
 
+import Language.PureScript.AST.SourcePos
+
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
@@ -25,7 +27,11 @@ parseObject :: TokenParser Type
 parseObject = braces $ TypeApp tyObject <$> parseRow
 
 parseTypeWildcard :: TokenParser Type
-parseTypeWildcard = underscore >> return TypeWildcard
+parseTypeWildcard = do
+  start <- P.getPosition
+  let end = P.incSourceColumn start 1
+  underscore
+  return $ TypeWildcard (SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos end))
 
 parseTypeVariable :: TokenParser Type
 parseTypeVariable = do

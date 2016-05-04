@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 test1 = \_ -> show "testing"
 
@@ -65,5 +66,6 @@ test9 _ = runReader 0.0 $ do
   n <- ask
   pure $ n + 1.0
 
-main = Control.Monad.Eff.Console.log (test7 "Done")
-
+main = do
+  log (test7 "Hello")
+  log "Done"

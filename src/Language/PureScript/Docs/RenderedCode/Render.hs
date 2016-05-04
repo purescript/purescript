@@ -32,7 +32,7 @@ import Language.PureScript.Docs.Utils.MonoidExtras
 typeLiterals :: Pattern () Type RenderedCode
 typeLiterals = mkPattern match
   where
-  match TypeWildcard =
+  match TypeWildcard{} =
     Just (syntax "_")
   match (TypeVar var) =
     Just (ident var)

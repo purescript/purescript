@@ -28,6 +28,8 @@ import PSCi.Module (loadAllModules)
 import PSCi.Completion
 import PSCi.Types
 
+import TestUtils (supportModules)
+
 main :: IO ()
 main = do
   Counts{..} <- runTestTT allTests
@@ -144,40 +146,3 @@ controlMonadSTasST :: ImportedModule
 controlMonadSTasST = (s "Control.Monad.ST", P.Implicit, Just (s "ST"))
   where
   s = P.moduleNameFromString
-
-supportModules :: [String]
-supportModules =
-  [ "Control.Applicative"
-  , "Control.Apply"
-  , "Control.Bind"
-  , "Control.Category"
-  , "Control.Monad"
-  , "Control.Monad.Eff"
-  , "Control.Monad.Eff.Class"
-  , "Control.Monad.Eff.Console"
-  , "Control.Monad.Eff.Unsafe"
-  , "Control.Monad.ST"
-  , "Control.Semigroupoid"
-  , "Data.Boolean"
-  , "Data.BooleanAlgebra"
-  , "Data.Bounded"
-  , "Data.CommutativeRing"
-  , "Data.Eq"
-  , "Data.EuclideanRing"
-  , "Data.Field"
-  , "Data.Function"
-  , "Data.Function.Uncurried"
-  , "Data.Functor"
-  , "Data.HeytingAlgebra"
-  , "Data.Ord"
-  , "Data.Ord.Unsafe"
-  , "Data.Ordering"
-  , "Data.Ring"
-  , "Data.Semigroup"
-  , "Data.Semiring"
-  , "Data.Show"
-  , "Data.Unit"
-  , "Data.Void"
-  , "Prelude"
-  , "Test.Assert"
-  ]

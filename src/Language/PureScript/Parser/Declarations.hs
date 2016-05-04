@@ -52,7 +52,11 @@ withSourceSpan f p = do
   comments <- C.readComments
   x <- p
   end <- P.getPosition
-  let sp = SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos end)
+  input <- P.getInput
+  let end' = case input of
+        pt:_ -> ptPrevEndPos pt
+        _ -> Nothing
+  let sp = SourceSpan (P.sourceName start) (C.toSourcePos start) (C.toSourcePos $ fromMaybe end end')
   return $ f sp comments x
 
 kindedIdent :: TokenParser (String, Maybe Kind)
@@ -93,6 +97,7 @@ parseValueDeclaration = do
   where
   parseValueWithWhereClause :: TokenParser Expr
   parseValueWithWhereClause = do
+    C.indented
     value <- parseValue
     whereClause <- P.optionMaybe $ do
       C.indented
@@ -153,15 +158,15 @@ parseDeclarationRef :: TokenParser DeclarationRef
 parseDeclarationRef =
   withSourceSpan PositionedDeclarationRef
     $ (ValueRef <$> parseIdent)
-    <|> parseProperRef
+    <|> parseTypeRef
     <|> (TypeClassRef <$> (reserved "class" *> properName))
     <|> (ModuleRef <$> (indented *> reserved "module" *> moduleName))
     <|> (TypeOpRef <$> (indented *> reserved "type" *> parens (Op <$> symbol)))
   where
-  parseProperRef = do
+  parseTypeRef = do
     name <- properName
     dctors <- P.optionMaybe $ parens (symbol' ".." *> pure Nothing <|> Just <$> commaSep properName)
-    return $ maybe (ProperRef (runProperName name)) (TypeRef name) dctors
+    return $ TypeRef name (fromMaybe (Just []) dctors)
 
 parseTypeClassDeclaration :: TokenParser Declaration
 parseTypeClassDeclaration = do
@@ -250,7 +255,7 @@ parseModule = do
   reserved "where"
   decls <- mark (P.many (same *> parseDeclaration))
   end <- P.getPosition
-  let ss = SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos end)
+  let ss = SourceSpan (P.sourceName start) (C.toSourcePos start) (C.toSourcePos end)
   return $ Module ss comments name decls exports
 
 -- | Parse a collection of modules in parallel
@@ -274,15 +279,13 @@ parseModulesFromFiles toFilePath input = do
   inParallel :: [Either P.ParseError (k, [Module])] -> [Either P.ParseError (k, [Module])]
   inParallel = withStrategy (parList rseq)
 
+
 toPositionedError :: P.ParseError -> ErrorMessage
 toPositionedError perr = ErrorMessage [ PositionedError (SourceSpan name start end) ] (ErrorParsingModule perr)
   where
-  name   = (P.sourceName . P.errorPos) perr
-  start  = (toSourcePos  . P.errorPos) perr
+  name   = (P.sourceName  . P.errorPos) perr
+  start  = (C.toSourcePos . P.errorPos) perr
   end    = start
-
-toSourcePos :: P.SourcePos -> SourcePos
-toSourcePos pos = SourcePos (P.sourceLine pos) (P.sourceColumn pos)
 
 -- |
 -- Parse a collection of modules

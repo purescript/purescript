@@ -1,6 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 module Language.PureScript.Errors where
 
@@ -139,8 +140,6 @@ data SimpleErrorMessage
   | UnusedDctorImport (ProperName 'TypeName)
   | UnusedDctorExplicitImport (ProperName 'TypeName) [ProperName 'ConstructorName]
   | DeprecatedOperatorDecl String
-  | DeprecatedClassImport ModuleName (ProperName 'ClassName)
-  | DeprecatedClassExport (ProperName 'ClassName)
   | DuplicateSelectiveImport ModuleName
   | DuplicateImport ModuleName ImportDeclarationType (Maybe ModuleName)
   | DuplicateImportRef String
@@ -325,8 +324,6 @@ errorCode em = case unwrapErrorMessage em of
   UnusedDctorImport{} -> "UnusedDctorImport"
   UnusedDctorExplicitImport{} -> "UnusedDctorExplicitImport"
   DeprecatedOperatorDecl{} -> "DeprecatedOperatorDecl"
-  DeprecatedClassImport{} -> "DeprecatedClassImport"
-  DeprecatedClassExport{} -> "DeprecatedClassExport"
   DuplicateSelectiveImport{} -> "DuplicateSelectiveImport"
   DuplicateImport{} -> "DuplicateImport"
   DuplicateImportRef{} -> "DuplicateImportRef"
@@ -450,7 +447,6 @@ wikiUri e = "https://github.com/purescript/purescript/wiki/Error-Code-" ++ error
 -- TODO Other possible suggestions:
 -- WildcardInferredType - source span not small enough
 -- DuplicateSelectiveImport - would require 2 ranges to remove and 1 insert
--- DeprecatedClassExport, DeprecatedClassImport, would want to replace smaller span?
 errorSuggestion :: SimpleErrorMessage -> Maybe ErrorSuggestion
 errorSuggestion err = case err of
   UnusedImport{} -> emptySuggestion
@@ -460,6 +456,8 @@ errorSuggestion err = case err of
   ImplicitImport mn refs -> suggest $ importSuggestion mn refs Nothing
   ImplicitQualifiedImport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
   HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
+  MissingTypeDeclaration ident ty -> suggest $ showIdent ident ++ " :: " ++ prettyPrintType ty
+  WildcardInferredType ty -> suggest $ prettyPrintType ty
   _ -> Nothing
 
   where
@@ -473,6 +471,17 @@ errorSuggestion err = case err of
     qstr :: Maybe ModuleName -> String
     qstr (Just mn) = " as " ++ runModuleName mn
     qstr Nothing = ""
+
+suggestionSpan :: ErrorMessage -> Maybe SourceSpan
+suggestionSpan e =
+  getSpan (unwrapErrorMessage e) <$> errorSpan e
+  where
+    startOnly SourceSpan{spanName, spanStart} = SourceSpan {spanName, spanStart, spanEnd = spanStart}
+
+    getSpan simple ss =
+      case simple of
+        MissingTypeDeclaration{} -> startOnly ss
+        _ -> ss
 
 showSuggestion :: SimpleErrorMessage -> String
 showSuggestion suggestion = case errorSuggestion suggestion of
@@ -920,22 +929,6 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             , line "Support for value-declared operators will be removed in PureScript 0.9."
             ]
 
-    renderSimpleErrorMessage (DeprecatedClassImport mn name) =
-      paras [ line $ "Class import from " ++ runModuleName mn ++ " uses deprecated syntax that omits the 'class' keyword:"
-            , indent $ line $ runProperName name
-            , line "Should instead use the form:"
-            , indent $ line $ "class " ++ runProperName name
-            , line "The deprecated syntax will be removed in PureScript 0.9."
-            ]
-
-    renderSimpleErrorMessage (DeprecatedClassExport name) =
-      paras [ line "Class export uses deprecated syntax that omits the 'class' keyword:"
-            , indent $ line $ runProperName name
-            , line "Should instead use the form:"
-            , indent $ line $ "class " ++ runProperName name
-            , line "The deprecated syntax will be removed in PureScript 0.9."
-            ]
-
     renderSimpleErrorMessage (DuplicateSelectiveImport name) =
       line $ "There is an existing import of " ++ runModuleName name ++ ", consider merging the import lists"
 
@@ -1194,7 +1187,6 @@ prettyPrintRef (TypeRef pn (Just dctors)) = runProperName pn ++ "(" ++ intercala
 prettyPrintRef (TypeOpRef ident) = "type " ++ showIdent ident
 prettyPrintRef (ValueRef ident) = showIdent ident
 prettyPrintRef (TypeClassRef pn) = "class " ++ runProperName pn
-prettyPrintRef (ProperRef name) = name
 prettyPrintRef (TypeInstanceRef ident) = showIdent ident
 prettyPrintRef (ModuleRef name) = "module " ++ runModuleName name
 prettyPrintRef (PositionedDeclarationRef _ _ ref) = prettyPrintExport ref

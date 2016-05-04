@@ -1,7 +1,6 @@
 module Main where
 
 import Prelude
-import Test.Assert
 import Control.Monad.Eff
 import Control.Monad.Eff.Console
 

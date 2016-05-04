@@ -24,4 +24,4 @@ main = do
   runFn9 (mkFn9 $ \a b c d e f g h i -> log $ show [a, b, c, d, e, f, g, h, i]) 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
   runFn10 (mkFn10 $ \a b c d e f g h i j-> log $ show [a, b, c, d, e, f, g, h, i, j]) 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
   logShow $ runFn2 g 0.0 0.0
-  log "Done!"
+  log "Done"

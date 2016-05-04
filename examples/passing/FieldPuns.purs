@@ -5,4 +5,6 @@ import Control.Monad.Eff.Console
 
 greet { greeting, name } = log $ greeting <> ", " <> name <> "."
 
-main = greet { greeting: "Hello", name: "World" } 
+main = do
+  greet { greeting: "Hello", name: "World" }
+  log "Done"

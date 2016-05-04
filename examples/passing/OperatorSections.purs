@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 import Test.Assert
 
 main = do
@@ -14,4 +15,4 @@ main = do
   let (//) x y = x.x / y.x
   assert $ (_ // foo { x = 4.0 }) { x: 4.0 } == 1.0
   assert $ (foo { x = 4.0 } // _) { x: 4.0 } == 1.0
-  Control.Monad.Eff.Console.log "Done!"
+  log "Done"

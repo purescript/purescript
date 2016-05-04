@@ -152,7 +152,12 @@ prettyPrintToken (Number n)        = either show show n
 prettyPrintToken (HoleLit name)    = "?" ++ name
 
 data PositionedToken = PositionedToken
-  { ptSourcePos :: P.SourcePos
+  { -- | Start position of this token
+    ptSourcePos :: P.SourcePos
+    -- | End position of this token (not including whitespace)
+  , ptEndPos :: P.SourcePos
+    -- | End position of the previous token
+  , ptPrevEndPos :: Maybe P.SourcePos
   , ptToken     :: Token
   , ptComments  :: [Comment]
   } deriving (Eq)
@@ -162,7 +167,13 @@ instance Show PositionedToken where
   show = prettyPrintToken . ptToken
 
 lex :: FilePath -> String -> Either P.ParseError [PositionedToken]
-lex = P.parse parseTokens
+lex f s = updatePositions <$> P.parse parseTokens f s
+
+updatePositions :: [PositionedToken] -> [PositionedToken]
+updatePositions [] = []
+updatePositions (x:xs) = x : zipWith update (x:xs) xs
+  where
+  update PositionedToken { ptEndPos = pos } pt = pt { ptPrevEndPos = Just pos }
 
 parseTokens :: P.Parsec String u [PositionedToken]
 parseTokens = whitespace *> P.many parsePositionedToken <* P.skipMany parseComment <* P.eof
@@ -184,7 +195,9 @@ parsePositionedToken = P.try $ do
   comments <- P.many parseComment
   pos <- P.getPosition
   tok <- parseToken
-  return $ PositionedToken pos tok comments
+  pos' <- P.getPosition
+  whitespace
+  return $ PositionedToken pos pos' Nothing tok comments
 
 parseToken :: P.Parsec String u Token
 parseToken = P.choice
@@ -221,7 +234,7 @@ parseToken = P.choice
   , CharLiteral   <$> parseCharLiteral
   , StringLiteral <$> parseStringLiteral
   , Number        <$> parseNumber
-  ] <* whitespace
+  ]
 
   where
   parseLName :: P.Parsec String u String
