@@ -75,6 +75,8 @@ supportModules =
   , "Data.Show"
   , "Data.Unit"
   , "Data.Void"
+  , "Partial"
+  , "Partial.Unsafe"
   , "Prelude"
   , "Test.Assert"
   ]

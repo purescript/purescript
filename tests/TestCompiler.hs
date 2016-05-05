@@ -197,7 +197,7 @@ assertCompiles inputFiles foreigns = do
         case result of
           Just (ExitSuccess, out, err)
             | not (null err) -> return $ Just $ "Test wrote to stderr:\n\n" <> err
-            | trim (last (lines out)) == "Done" -> return Nothing
+            | not (null out) && trim (last (lines out)) == "Done" -> return Nothing
             | otherwise -> return $ Just $ "Test did not finish with 'Done':\n\n" <> out
           Just (ExitFailure _, _, err) -> return $ Just err
           Nothing -> return $ Just "Couldn't find node.js executable"
