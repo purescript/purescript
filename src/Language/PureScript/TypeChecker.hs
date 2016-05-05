@@ -36,7 +36,9 @@ import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Kinds
+import Language.PureScript.Linter
 import Language.PureScript.Names
+import Language.PureScript.Traversals
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 
@@ -228,26 +230,30 @@ typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
       addTypeSynonym moduleName name args' ty kind
     return $ TypeSynonymDeclaration name args ty
   go TypeDeclaration{} = internalError "Type declarations should have been removed"
-  go (ValueDeclaration name nameKind [] (Right val)) =
+  go (ValueDeclaration name nameKind [] (Right val)) = do
+    env <- getEnv
     warnAndRethrow (addHint (ErrorInValueDeclaration name)) $ do
+      val' <- checkExhaustiveExpr env moduleName val
       valueIsNotDefined moduleName name
-      [(_, (val', ty))] <- typesOf NonRecursiveBindingGroup moduleName [(name, val)]
+      [(_, (val'', ty))] <- typesOf NonRecursiveBindingGroup moduleName [(name, val')]
       addValue moduleName name ty nameKind
-      return $ ValueDeclaration name nameKind [] $ Right val'
+      return $ ValueDeclaration name nameKind [] $ Right val''
   go ValueDeclaration{} = internalError "Binders were not desugared"
-  go (BindingGroupDeclaration vals) =
+  go (BindingGroupDeclaration vals) = do
+    env <- getEnv
     warnAndRethrow (addHint (ErrorInBindingGroup (map (\(ident, _, _) -> ident) vals))) $ do
-      for_ (map (\(ident, _, _) -> ident) vals) $ \name ->
-        valueIsNotDefined moduleName name
-      tys <- typesOf RecursiveBindingGroup moduleName $ map (\(ident, _, ty) -> (ident, ty)) vals
-      vals' <- forM [ (name, val, nameKind, ty)
-                    | (name, nameKind, _) <- vals
-                    , (name', (val, ty)) <- tys
-                    , name == name'
-                    ] $ \(name, val, nameKind, ty) -> do
+      for_ vals $ \(ident, _, _) ->
+        valueIsNotDefined moduleName ident
+      vals' <- mapM (thirdM (checkExhaustiveExpr env moduleName)) vals
+      tys <- typesOf RecursiveBindingGroup moduleName $ map (\(ident, _, ty) -> (ident, ty)) vals'
+      vals'' <- forM [ (name, val, nameKind, ty)
+                     | (name, nameKind, _) <- vals'
+                     , (name', (val, ty)) <- tys
+                     , name == name'
+                     ] $ \(name, val, nameKind, ty) -> do
         addValue moduleName name ty nameKind
         return (name, nameKind, val)
-      return $ BindingGroupDeclaration vals'
+      return $ BindingGroupDeclaration vals''
   go (d@(ExternDataDeclaration name kind)) = do
     env <- getEnv
     putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (kind, ExternData) (types env) }
@@ -268,7 +274,7 @@ typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
     return d
   go (d@(TypeInstanceDeclaration dictName deps className tys body)) = rethrow (addHint (ErrorInInstance className tys)) $ do
     traverse_ (checkTypeClassInstance moduleName) tys
-    forM_ deps $ traverse_ (checkTypeClassInstance moduleName) . snd
+    forM_ deps $ traverse_ (checkTypeClassInstance moduleName) . constraintArgs
     checkOrphanInstance dictName className tys
     _ <- traverseTypeInstanceBody checkInstanceMembers body
     let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps)
@@ -415,7 +421,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint 
     findClasses :: Type -> [DeclarationRef]
     findClasses = everythingOnTypes (++) go
       where
-      go (ConstrainedType cs _) = mapMaybe (fmap TypeClassRef . extractCurrentModuleClass . fst) cs
+      go (ConstrainedType cs _) = mapMaybe (fmap TypeClassRef . extractCurrentModuleClass . constraintClass) cs
       go _ = []
     extractCurrentModuleClass :: Qualified (ProperName 'ClassName) -> Maybe (ProperName 'ClassName)
     extractCurrentModuleClass (Qualified (Just mn') name) | mn == mn' = Just name

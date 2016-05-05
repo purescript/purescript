@@ -14,6 +14,7 @@ import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Pretty.Common
 import Language.PureScript.Pretty.Types (typeAsBox, typeAtomAsBox)
+import Language.PureScript.Types (Constraint(..))
 
 import Text.PrettyPrint.Boxes
 
@@ -57,7 +58,7 @@ prettyPrintValue d (Let ds val) =
     (text "in " <> prettyPrintValue (d - 1) val)
 prettyPrintValue d (Do els) =
   text "do " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els)
-prettyPrintValue _ (TypeClassDictionary (name, tys) _) = foldl1 beforeWithSpace $ text ("#dict " ++ runProperName (disqualify name)) : map typeAtomAsBox tys
+prettyPrintValue _ (TypeClassDictionary (Constraint name tys _) _) = foldl1 beforeWithSpace $ text ("#dict " ++ runProperName (disqualify name)) : map typeAtomAsBox tys
 prettyPrintValue _ (SuperClassDictionary name _) = text $ "#dict " ++ runProperName (disqualify name)
 prettyPrintValue _ (TypeClassDictionaryAccessor className ident) =
     text "#dict-accessor " <> text (runProperName (disqualify className)) <> text "." <> text (showIdent ident) <> text ">"

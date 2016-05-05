@@ -14,7 +14,6 @@ import Data.List (minimumBy, sortBy, groupBy)
 import Data.Maybe (maybeToList, mapMaybe)
 import qualified Data.Map as M
 
-import Control.Arrow (Arrow(..))
 import Control.Monad.State
 import Control.Monad.Writer
 import Control.Monad.Error.Class (MonadError(..))
@@ -81,13 +80,13 @@ entails shouldGeneralize moduleName context = solve
     findDicts ctx cn = maybe [] M.elems . (>>= M.lookup cn) . flip M.lookup ctx
 
     solve :: Constraint -> StateT Context m (Expr, [(Ident, Constraint)])
-    solve (className, tys) = do
-      (dict, unsolved) <- go 0 className tys
+    solve con = do
+      (dict, unsolved) <- go 0 con
       return (dictionaryValueToValue dict, unsolved)
       where
-      go :: Int -> Qualified (ProperName 'ClassName) -> [Type] -> StateT Context m (DictionaryValue, [(Ident, Constraint)])
-      go work className' tys' | work > 1000 = throwError . errorMessage $ PossiblyInfiniteInstance className' tys'
-      go work className' tys' = do
+      go :: Int -> Constraint -> StateT Context m (DictionaryValue, [(Ident, Constraint)])
+      go work (Constraint className' tys' _) | work > 1000 = throwError . errorMessage $ PossiblyInfiniteInstance className' tys'
+      go work con'@(Constraint className' tys' _) = do
         -- Get the inferred constraint context so far, and merge it with the global context
         inferred <- get
         let instances = do
@@ -104,7 +103,7 @@ entails shouldGeneralize moduleName context = solve
                               (mkDictionary (tcdName tcd) args)
                               (tcdPath tcd)
             return (match, unsolved)
-          Right unsolved@(unsolvedClassName@(Qualified _ pn), unsolvedTys) -> do
+          Right unsolved@(Constraint unsolvedClassName@(Qualified _ pn) unsolvedTys _) -> do
             -- Generate a fresh name for the unsolved constraint's new dictionary
             ident <- freshIdent ("dict" ++ runProperName pn)
             let qident = Qualified Nothing ident
@@ -117,8 +116,8 @@ entails shouldGeneralize moduleName context = solve
         where
 
         unique :: [(a, TypeClassDictionaryInScope)] -> m (Either (a, TypeClassDictionaryInScope) Constraint)
-        unique [] | shouldGeneralize && all canBeGeneralized tys' = return $ Right (className, tys)
-                  | otherwise = throwError . errorMessage $ NoInstanceFound className' tys'
+        unique [] | shouldGeneralize && all canBeGeneralized tys' = return (Right con')
+                  | otherwise = throwError . errorMessage $ NoInstanceFound con'
         unique [a] = return $ Left a
         unique tcds | pairwise overlapping (map snd tcds) = do
                         tell . errorMessage $ OverlappingInstances className' tys' (map (tcdName . snd) tcds)
@@ -148,7 +147,7 @@ entails shouldGeneralize moduleName context = solve
         solveSubgoals :: [(String, Type)] -> Maybe [Constraint] -> StateT Context m (Maybe [DictionaryValue], [(Ident, Constraint)])
         solveSubgoals _ Nothing = return (Nothing, [])
         solveSubgoals subst (Just subgoals) = do
-          zipped <- traverse (uncurry (go (work + 1)) . second (map (replaceAllTypeVars subst))) subgoals
+          zipped <- traverse (go (work + 1) . mapConstraintArgs (map (replaceAllTypeVars subst))) subgoals
           let (dicts, unsolved) = unzip zipped
           return (Just dicts, concat unsolved)
 

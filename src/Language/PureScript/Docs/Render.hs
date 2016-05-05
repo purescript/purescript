@@ -107,7 +107,7 @@ renderConstraint :: P.Constraint -> RenderedCode
 renderConstraint = renderConstraintWithOptions defaultRenderTypeOptions
 
 renderConstraintWithOptions :: RenderTypeOptions -> P.Constraint -> RenderedCode
-renderConstraintWithOptions opts (pn, tys) =
+renderConstraintWithOptions opts (P.Constraint pn tys _) =
   renderTypeWithOptions opts $ foldl P.TypeApp (P.TypeConstructor (fmap P.coerceProperName pn)) tys
 
 renderConstraints :: [P.Constraint] -> Maybe RenderedCode

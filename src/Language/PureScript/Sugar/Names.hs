@@ -251,7 +251,10 @@ renameInModule env imports (Module ss coms mn decls exps) =
     updateType t = return t
 
   updateConstraints :: Maybe SourceSpan -> [Constraint] -> m [Constraint]
-  updateConstraints pos = traverse (\(name, ts) -> (,) <$> updateClassName name pos <*> traverse (updateTypesEverywhere pos) ts)
+  updateConstraints pos = traverse (\(Constraint name ts info) ->
+                                       Constraint <$> updateClassName name pos
+                                                  <*> traverse (updateTypesEverywhere pos) ts
+                                                  <*> pure info)
 
   updateTypeName
     :: Qualified (ProperName 'TypeName)

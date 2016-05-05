@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Partial.Unsafe (unsafeCrashWith)
 import Control.Monad.Eff.Console
 import Control.Monad.Eff
 
@@ -17,3 +18,4 @@ main = do
   b <- set
   case b of
     true -> log "Done"
+    false -> unsafeCrashWith "Failed"

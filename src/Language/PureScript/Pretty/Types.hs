@@ -42,8 +42,8 @@ typeLiterals = mkPattern match
   match _ = Nothing
 
 constraintsAsBox :: [Constraint] -> Box -> Box
-constraintsAsBox [(pn, tys)] ty = text "(" <> constraintAsBox pn tys <> text ") => " <> ty
-constraintsAsBox xs ty = vcat left (zipWith (\i (pn, tys) -> text (if i == 0 then "( " else ", ") <> constraintAsBox pn tys) [0 :: Int ..] xs) `before` (text ") => " <> ty)
+constraintsAsBox [(Constraint pn tys _)] ty = text "(" <> constraintAsBox pn tys <> text ") => " <> ty
+constraintsAsBox xs ty = vcat left (zipWith (\i (Constraint pn tys _) -> text (if i == 0 then "( " else ", ") <> constraintAsBox pn tys) [0 :: Int ..] xs) `before` (text ") => " <> ty)
 
 constraintAsBox :: Qualified (ProperName a) -> [Type] -> Box
 constraintAsBox pn tys = hsep 1 left (text (runProperName (disqualify pn)) : map typeAtomAsBox tys)

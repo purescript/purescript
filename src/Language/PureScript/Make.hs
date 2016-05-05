@@ -158,10 +158,9 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
   progress $ CompilingModule moduleName
   let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
   lint m
-  ((checked@(Module ss coms _ elaborated exps), env'), nextVar) <- runSupplyT 0 $ do
+  ((Module ss coms _ elaborated exps, env'), nextVar) <- runSupplyT 0 $ do
     [desugared] <- desugar externs [m]
     runCheck' env $ typeCheckModule desugared
-  checkExhaustiveModule env' checked
   regrouped <- createBindingGroups moduleName . collapseBindingGroups $ elaborated
   let mod' = Module ss coms moduleName regrouped exps
       corefn = CF.moduleToCoreFn env' mod'

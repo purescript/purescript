@@ -10,6 +10,7 @@ empty = []
 
 foldMap :: forall a m. (Semigroup m) => (a -> m) -> Array a -> m
 foldMap f [a, b, c, d, e] = f a <> f b <> f c <> f d <> f e
+foldMap f xs = foldMap f xs -- spin, not used
 
 regression :: Array Int
 regression =
