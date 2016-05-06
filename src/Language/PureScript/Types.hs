@@ -49,7 +49,7 @@ data Type
   -- A type operator. This will be desugared into a type constructor during the
   -- "operators" phase of desugaring.
   --
-  | TypeOp (Qualified Ident)
+  | TypeOp (Qualified (OpName 'TypeOpName))
   -- |
   -- A type application
   --
@@ -78,7 +78,6 @@ data Type
   -- A type with a kind annotation
   --
   | KindedType Type Kind
-  --
   -- |
   -- A placeholder used in pretty printing
   --

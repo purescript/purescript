@@ -1,4 +1,4 @@
--- @shouldFailWith UnknownValue
+-- @shouldFailWith UnknownName
 module Main where
 
 import Thingy as Thing

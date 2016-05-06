@@ -70,12 +70,6 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
   declToCoreFn ss _   (A.DataBindingGroupDeclaration ds) = concatMap (declToCoreFn ss []) ds
   declToCoreFn ss com (A.ValueDeclaration name _ _ (Right e)) =
     [NonRec (ssA ss) name (exprToCoreFn ss com Nothing e)]
-  declToCoreFn ss com (A.FixityDeclaration _ name (Just (Qualified mn' (A.AliasValue name')))) =
-    let meta = getValueMeta (Qualified mn' name')
-    in [NonRec (ssA ss) (Op name) (Var (ss, com, Nothing, meta) (Qualified mn' name'))]
-  declToCoreFn ss com (A.FixityDeclaration _ name (Just (Qualified mn' (A.AliasConstructor name')))) =
-    let meta = Just $ getConstructorMeta (Qualified mn' name')
-    in [NonRec (ssA ss) (Op name) (Var (ss, com, Nothing, meta) (Qualified mn' (properToIdent name')))]
   declToCoreFn ss _   (A.BindingGroupDeclaration ds) =
     [Rec $ map (\(name, _, e) -> ((ssA ss, name), exprToCoreFn ss [] Nothing e)) ds]
   declToCoreFn ss com (A.TypeClassDeclaration name _ supers members) =
@@ -204,25 +198,25 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
 findQualModules :: [A.Declaration] -> [(Ann, ModuleName)]
 findQualModules decls =
   let (f, _, _, _, _) = everythingOnValues (++) fqDecls fqValues fqBinders (const []) (const [])
-  in f `concatMap` decls
+  in map (nullAnn,) $ f `concatMap` decls
   where
-  fqDecls :: A.Declaration -> [(Ann, ModuleName)]
-  fqDecls (A.TypeInstanceDeclaration _ _ q _ _) = getQual q
-  fqDecls (A.FixityDeclaration _ _ (Just q)) = getQual q
+  fqDecls :: A.Declaration -> [ModuleName]
+  fqDecls (A.TypeInstanceDeclaration _ _ q _ _) = getQual' q
+  fqDecls (A.ValueFixityDeclaration _ q _) = getQual' q
+  fqDecls (A.TypeFixityDeclaration _ q _) = getQual' q
   fqDecls _ = []
 
-  fqValues :: A.Expr -> [(Ann, ModuleName)]
-  fqValues (A.Var q) = getQual q
-  fqValues (A.Constructor q) = getQual q
+  fqValues :: A.Expr -> [ModuleName]
+  fqValues (A.Var q) = getQual' q
+  fqValues (A.Constructor q) = getQual' q
   fqValues _ = []
 
-  fqBinders :: A.Binder -> [(Ann, ModuleName)]
-  fqBinders (A.ConstructorBinder q _) = getQual q
+  fqBinders :: A.Binder -> [ModuleName]
+  fqBinders (A.ConstructorBinder q _) = getQual' q
   fqBinders _ = []
 
-  getQual :: Qualified a -> [(Ann, ModuleName)]
-  getQual (Qualified (Just mn) _) = [(nullAnn, mn)]
-  getQual _ = []
+  getQual' :: Qualified a -> [ModuleName]
+  getQual' = maybe [] return . getQual
 
 -- |
 -- Desugars import declarations from AST to CoreFn representation.

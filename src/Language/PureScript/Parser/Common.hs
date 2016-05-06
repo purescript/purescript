@@ -43,10 +43,16 @@ parseQualified parser = part []
   qual path = if null path then Nothing else Just $ ModuleName path
 
 -- |
--- Parse an identifier or parenthesized operator
+-- Parse an identifier.
 --
 parseIdent :: TokenParser Ident
-parseIdent = (Ident <$> identifier) <|> (Op <$> parens symbol)
+parseIdent = Ident <$> identifier
+
+-- |
+-- Parse an operator.
+--
+parseOperator :: TokenParser (OpName a)
+parseOperator = OpName <$> symbol
 
 -- |
 -- Run the first parser, then match the second if possible, applying the specified function on a successful match

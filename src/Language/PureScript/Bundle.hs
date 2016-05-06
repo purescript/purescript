@@ -4,15 +4,15 @@
 -- This module takes as input the individual generated modules from 'Language.PureScript.Make' and
 -- performs dead code elimination, filters empty modules,
 -- and generates the final Javascript bundle.
-module Language.PureScript.Bundle (
-     bundle
-   , ModuleIdentifier(..)
-   , moduleName
-   , ModuleType(..)
-   , ErrorMessage(..)
-   , printErrorMessage
-   , getExportedIdentifiers
-) where
+module Language.PureScript.Bundle
+  ( bundle
+  , ModuleIdentifier(..)
+  , moduleName
+  , ModuleType(..)
+  , ErrorMessage(..)
+  , printErrorMessage
+  , getExportedIdentifiers
+  ) where
 
 import Prelude.Compat
 

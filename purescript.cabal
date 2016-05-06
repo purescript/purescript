@@ -194,9 +194,10 @@ library
                      Language.PureScript.Sugar.CaseDeclarations
                      Language.PureScript.Sugar.DoNotation
                      Language.PureScript.Sugar.Names
+                     Language.PureScript.Sugar.Names.Common
                      Language.PureScript.Sugar.Names.Env
-                     Language.PureScript.Sugar.Names.Imports
                      Language.PureScript.Sugar.Names.Exports
+                     Language.PureScript.Sugar.Names.Imports
                      Language.PureScript.Sugar.ObjectWildcards
                      Language.PureScript.Sugar.Operators
                      Language.PureScript.Sugar.Operators.Common

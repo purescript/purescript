@@ -293,7 +293,7 @@ infer' (Var var) = do
 infer' v@(Constructor c) = do
   env <- getEnv
   case M.lookup c (dataConstructors env) of
-    Nothing -> throwError . errorMessage $ UnknownDataConstructor c Nothing
+    Nothing -> throwError . errorMessage . UnknownName . fmap DctorName $ c
     Just (_, _, ty, _) -> do (v', ty') <- sndM (introduceSkolemScope <=< replaceAllTypeSynonyms) <=< instantiatePolyTypeWithUnknowns v $ ty
                              return $ TypedValue True v' ty'
 infer' (Case vals binders) = do
@@ -391,7 +391,7 @@ inferBinder val (ConstructorBinder ctor binders) = do
       unless (length args == length binders) . throwError . errorMessage $ IncorrectConstructorArity ctor
       unifyTypes ret val
       M.unions <$> zipWithM inferBinder (reverse args) binders
-    _ -> throwError . errorMessage $ UnknownDataConstructor ctor Nothing
+    _ -> throwError . errorMessage . UnknownName . fmap DctorName $ ctor
   where
   peelArgs :: Type -> ([Type], Type)
   peelArgs = go []
@@ -640,7 +640,7 @@ check' (Accessor prop val) ty = rethrow (addHint (ErrorCheckingAccessor val prop
 check' v@(Constructor c) ty = do
   env <- getEnv
   case M.lookup c (dataConstructors env) of
-    Nothing -> throwError . errorMessage $ UnknownDataConstructor c Nothing
+    Nothing -> throwError . errorMessage . UnknownName . fmap DctorName $ c
     Just (_, _, ty1, _) -> do
       repl <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1
       mv <- subsumes (Just v) repl ty

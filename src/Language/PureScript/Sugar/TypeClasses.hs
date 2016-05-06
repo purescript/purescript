@@ -269,7 +269,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
 
   -- Lookup the type arguments and member types for the type class
   (args, implies, tyDecls) <-
-    maybe (throwError . errorMessage $ UnknownTypeClass className) return $
+    maybe (throwError . errorMessage . UnknownName $ fmap TyClassName className) return $
       M.lookup (qualify mn className) m
 
   case mapMaybe declName tyDecls \\ mapMaybe declName decls of

@@ -1,8 +1,6 @@
 -- @shouldFailWith TypesDoNotUnify
 module Main where
 
-import Prelude
+foreign import ix :: forall a. Array a -> Int -> a
 
-foreign import (!!) :: forall a. Array a -> Int -> a
-
-test = \arr -> arr !! (0 !! 0)
+test = \arr -> arr `ix` (0 `ix` 0)

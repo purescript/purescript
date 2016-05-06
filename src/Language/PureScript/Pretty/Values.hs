@@ -71,6 +71,7 @@ prettyPrintValue _ (Hole name) = text "?" <> text name
 prettyPrintValue d expr@AnonymousArgument{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@Constructor{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@Var{} = prettyPrintValueAtom d expr
+prettyPrintValue d expr@Op{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@BinaryNoParens{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@Parens{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@UnaryMinus{} = prettyPrintValueAtom d expr
@@ -85,7 +86,7 @@ prettyPrintValueAtom _ (Var ident) = text $ showIdent (disqualify ident)
 prettyPrintValueAtom d (BinaryNoParens op lhs rhs) =
   prettyPrintValue (d - 1) lhs `beforeWithSpace` printOp op `beforeWithSpace` prettyPrintValue (d - 1) rhs
   where
-  printOp (Var (Qualified _ (Op opName))) = text opName
+  printOp (Op (Qualified _ name)) = text (runOpName name)
   printOp expr = text "`" <> prettyPrintValue (d - 1) expr <> text "`"
 prettyPrintValueAtom d (TypedValue _ val _) = prettyPrintValueAtom d val
 prettyPrintValueAtom d (PositionedValue _ _ val) = prettyPrintValueAtom d val
@@ -154,7 +155,7 @@ prettyPrintBinderAtom b@ConstructorBinder{} = parens (prettyPrintBinder b)
 prettyPrintBinderAtom (NamedBinder ident binder) = showIdent ident ++ "@" ++ prettyPrintBinder binder
 prettyPrintBinderAtom (PositionedBinder _ _ binder) = prettyPrintBinderAtom binder
 prettyPrintBinderAtom (TypedBinder _ binder) = prettyPrintBinderAtom binder
-prettyPrintBinderAtom (OpBinder op) = showIdent (disqualify op)
+prettyPrintBinderAtom (OpBinder op) = runOpName (disqualify op)
 prettyPrintBinderAtom (BinaryNoParensBinder op b1 b2) =
   prettyPrintBinderAtom b1 ++ " " ++ prettyPrintBinderAtom op ++ " " ++ prettyPrintBinderAtom b2
 prettyPrintBinderAtom (ParensInBinder b) = parens (prettyPrintBinder b)

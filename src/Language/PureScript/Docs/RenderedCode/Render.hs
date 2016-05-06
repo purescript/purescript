@@ -49,7 +49,7 @@ typeLiterals = mkPattern match
   match (BinaryNoParensType op l r) =
     Just $ renderTypeAtom l <> sp <> renderTypeAtom op <> sp <> renderTypeAtom r
   match (TypeOp (Qualified mn op)) =
-    Just (ident' (runIdent op) (maybeToContainingModule mn))
+    Just (ident' (runOpName op) (maybeToContainingModule mn))
   match _ =
     Nothing
 

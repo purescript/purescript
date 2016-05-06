@@ -270,11 +270,6 @@ testCases =
       , ChildShouldNotBeDocumented (n "Intermediate") "SomeClass" "member"
       ])
 
-  -- Remove this after 0.9.
-  , ("OldOperators",
-      [ ShouldBeDocumented  (n "OldOperators2") "(>>)" []
-      ])
-
   , ("NewOperators",
       [ ShouldBeDocumented (n "NewOperators2") "(>>>)" []
       ])

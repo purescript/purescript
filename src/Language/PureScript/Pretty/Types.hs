@@ -40,7 +40,7 @@ typeLiterals = mkPattern match
   match row@RCons{} = Just $ prettyPrintRowWith '(' ')' row
   match (BinaryNoParensType op l r) =
     Just $ typeAsBox l <> text " " <> typeAsBox op <> text " " <> typeAsBox r
-  match (TypeOp op) = Just $ text $ showQualified runIdent op
+  match (TypeOp op) = Just $ text $ showQualified runOpName op
   match _ = Nothing
 
 constraintsAsBox :: [Constraint] -> Box -> Box

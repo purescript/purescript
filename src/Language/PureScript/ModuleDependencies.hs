@@ -69,8 +69,8 @@ usedModules ams d =
     -- Regardless of whether an imported module is qualified we still need to
     -- take into account its import to build an accurate list of dependencies.
     [mn]
-  forDecls (FixityDeclaration _ _ (Just (Qualified (Just mn) _)))
-    | mn `notElem` ams = [mn]
+  forDecls (FixityDeclaration fd)
+    | Just mn <- extractQualFixity fd, mn `notElem` ams = [mn]
   forDecls (TypeInstanceDeclaration _ _ (Qualified (Just mn) _) _ _)
     | mn `notElem` ams = [mn]
   forDecls _ = []
@@ -86,6 +86,10 @@ usedModules ams d =
   forTypes (TypeConstructor (Qualified (Just mn) _))
     | mn `notElem` ams = [mn]
   forTypes _ = []
+
+  extractQualFixity :: Either ValueFixity TypeFixity -> Maybe ModuleName
+  extractQualFixity (Left (ValueFixity _ (Qualified mn _) _)) = mn
+  extractQualFixity (Right (TypeFixity _ (Qualified mn _) _)) = mn
 
 -- |
 -- Convert a strongly connected component of the module graph to a module

@@ -48,32 +48,19 @@ data SimpleErrorMessage
   | CannotWriteFile FilePath
   | InfiniteType Type
   | InfiniteKind Kind
-  | MultipleFixities Ident
+  | MultipleValueOpFixities (OpName 'ValueOpName)
+  | MultipleTypeOpFixities (OpName 'TypeOpName)
   | OrphanTypeDeclaration Ident
-  | OrphanFixityDeclaration String
   | RedefinedModule ModuleName [SourceSpan]
   | RedefinedIdent Ident
   | OverlappingNamesInLet
-  | UnknownModule ModuleName
-  | UnknownType (Qualified (ProperName 'TypeName))
-  | UnknownTypeOp (Qualified Ident)
-  | UnknownTypeClass (Qualified (ProperName 'ClassName))
-  | UnknownValue (Qualified Ident)
-  | UnknownDataConstructor (Qualified (ProperName 'ConstructorName)) (Maybe (Qualified (ProperName 'ConstructorName)))
-  | UnknownTypeConstructor (Qualified (ProperName 'TypeName))
-  | UnknownImportType ModuleName (ProperName 'TypeName)
-  | UnknownExportType (ProperName 'TypeName)
-  | UnknownImportTypeOp ModuleName Ident
-  | UnknownExportTypeOp Ident
-  | UnknownImportTypeClass ModuleName (ProperName 'ClassName)
-  | UnknownExportTypeClass (ProperName 'ClassName)
-  | UnknownImportValue ModuleName Ident
-  | UnknownExportValue Ident
-  | UnknownExportModule ModuleName
+  | UnknownName (Qualified Name)
+  | UnknownImport ModuleName Name
   | UnknownImportDataConstructor ModuleName (ProperName 'TypeName) (ProperName 'ConstructorName)
+  | UnknownExport Name
   | UnknownExportDataConstructor (ProperName 'TypeName) (ProperName 'ConstructorName)
-  | ScopeConflict String [ModuleName]
-  | ScopeShadowing String (Maybe ModuleName) [ModuleName]
+  | ScopeConflict Name [ModuleName]
+  | ScopeShadowing Name (Maybe ModuleName) [ModuleName]
   | ConflictingTypeDecls (ProperName 'TypeName)
   | ConflictingCtorDecls (ProperName 'ConstructorName)
   | TypeConflictsWithClass (ProperName 'TypeName)
@@ -83,7 +70,8 @@ data SimpleErrorMessage
   | DuplicateModuleName ModuleName
   | DuplicateClassExport (ProperName 'ClassName)
   | DuplicateValueExport Ident
-  | DuplicateTypeOpExport Ident
+  | DuplicateValueOpExport (OpName 'ValueOpName)
+  | DuplicateTypeOpExport (OpName 'TypeOpName)
   | DuplicateTypeArgument String
   | InvalidDoBind
   | InvalidDoLet
@@ -128,18 +116,16 @@ data SimpleErrorMessage
   | MissingTypeDeclaration Ident Type
   | OverlappingPattern [[Binder]] Bool
   | IncompleteExhaustivityCheck
-  | ClassOperator (ProperName 'ClassName) Ident
   | MisleadingEmptyTypeImport ModuleName (ProperName 'TypeName)
   | ImportHidingModule ModuleName
   | UnusedImport ModuleName
   | UnusedExplicitImport ModuleName [String] (Maybe ModuleName) [DeclarationRef]
   | UnusedDctorImport (ProperName 'TypeName)
   | UnusedDctorExplicitImport (ProperName 'TypeName) [ProperName 'ConstructorName]
-  | DeprecatedOperatorDecl String
   | DuplicateSelectiveImport ModuleName
   | DuplicateImport ModuleName ImportDeclarationType (Maybe ModuleName)
-  | DuplicateImportRef String
-  | DuplicateExportRef String
+  | DuplicateImportRef Name
+  | DuplicateExportRef Name
   | IntOutOfRange Integer String Integer Integer
   | RedundantEmptyHidingImport ModuleName
   | ImplicitQualifiedImport ModuleName ModuleName [DeclarationRef]
@@ -147,7 +133,7 @@ data SimpleErrorMessage
   | HidingImport ModuleName [DeclarationRef]
   | CaseBinderLengthDiffers Int [Binder]
   | IncorrectAnonymousArgument
-  | InvalidOperatorInBinder Ident Ident
+  | InvalidOperatorInBinder (Qualified (OpName 'ValueOpName)) (Qualified Ident)
   | DeprecatedRequirePath
   | CannotGeneralizeRecursiveFunction Ident Type
   deriving (Show)
@@ -232,29 +218,16 @@ errorCode em = case unwrapErrorMessage em of
   CannotWriteFile{} -> "CannotWriteFile"
   InfiniteType{} -> "InfiniteType"
   InfiniteKind{} -> "InfiniteKind"
-  MultipleFixities{} -> "MultipleFixities"
+  MultipleValueOpFixities{} -> "MultipleValueOpFixities"
+  MultipleTypeOpFixities{} -> "MultipleTypeOpFixities"
   OrphanTypeDeclaration{} -> "OrphanTypeDeclaration"
-  OrphanFixityDeclaration{} -> "OrphanFixityDeclaration"
   RedefinedModule{} -> "RedefinedModule"
   RedefinedIdent{} -> "RedefinedIdent"
   OverlappingNamesInLet -> "OverlappingNamesInLet"
-  UnknownModule{} -> "UnknownModule"
-  UnknownType{} -> "UnknownType"
-  UnknownTypeOp{} -> "UnknownTypeOp"
-  UnknownTypeClass{} -> "UnknownTypeClass"
-  UnknownValue{} -> "UnknownValue"
-  UnknownDataConstructor{} -> "UnknownDataConstructor"
-  UnknownTypeConstructor{} -> "UnknownTypeConstructor"
-  UnknownImportType{} -> "UnknownImportType"
-  UnknownImportTypeOp{} -> "UnknownImportTypeOp"
-  UnknownExportType{} -> "UnknownExportType"
-  UnknownExportTypeOp{} -> "UnknownExportTypeOp"
-  UnknownImportTypeClass{} -> "UnknownImportTypeClass"
-  UnknownExportTypeClass{} -> "UnknownExportTypeClass"
-  UnknownImportValue{} -> "UnknownImportValue"
-  UnknownExportValue{} -> "UnknownExportValue"
-  UnknownExportModule{} -> "UnknownExportModule"
+  UnknownName{} -> "UnknownName"
+  UnknownImport{} -> "UnknownImport"
   UnknownImportDataConstructor{} -> "UnknownImportDataConstructor"
+  UnknownExport{} -> "UnknownExport"
   UnknownExportDataConstructor{} -> "UnknownExportDataConstructor"
   ScopeConflict{} -> "ScopeConflict"
   ScopeShadowing{} -> "ScopeShadowing"
@@ -267,6 +240,7 @@ errorCode em = case unwrapErrorMessage em of
   DuplicateModuleName{} -> "DuplicateModuleName"
   DuplicateClassExport{} -> "DuplicateClassExport"
   DuplicateValueExport{} -> "DuplicateValueExport"
+  DuplicateValueOpExport{} -> "DuplicateValueOpExport"
   DuplicateTypeOpExport{} -> "DuplicateTypeOpExport"
   DuplicateTypeArgument{} -> "DuplicateTypeArgument"
   InvalidDoBind -> "InvalidDoBind"
@@ -312,14 +286,12 @@ errorCode em = case unwrapErrorMessage em of
   MissingTypeDeclaration{} -> "MissingTypeDeclaration"
   OverlappingPattern{} -> "OverlappingPattern"
   IncompleteExhaustivityCheck{} -> "IncompleteExhaustivityCheck"
-  ClassOperator{} -> "ClassOperator"
   MisleadingEmptyTypeImport{} -> "MisleadingEmptyTypeImport"
   ImportHidingModule{} -> "ImportHidingModule"
   UnusedImport{} -> "UnusedImport"
   UnusedExplicitImport{} -> "UnusedExplicitImport"
   UnusedDctorImport{} -> "UnusedDctorImport"
   UnusedDctorExplicitImport{} -> "UnusedDctorExplicitImport"
-  DeprecatedOperatorDecl{} -> "DeprecatedOperatorDecl"
   DuplicateSelectiveImport{} -> "DuplicateSelectiveImport"
   DuplicateImport{} -> "DuplicateImport"
   DuplicateImportRef{} -> "DuplicateImportRef"
@@ -541,7 +513,7 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       paras $ [ line "Unable to parse foreign module:"
               , indent . line $ path
               ] ++
-              (map (indent . line) (concatMap Bundle.printErrorMessage (maybeToList extra)))
+              map (indent . line) (concatMap Bundle.printErrorMessage (maybeToList extra))
     renderSimpleErrorMessage (ErrorParsingModule err) =
       paras [ line "Unable to parse module: "
             , prettyPrintParseError err
@@ -586,70 +558,36 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       paras [ line "An infinite kind was inferred for a type: "
             , indent $ line $ prettyPrintKind ki
             ]
-    renderSimpleErrorMessage (MultipleFixities name) =
-      line $ "There are multiple fixity/precedence declarations for " ++ showIdent name
+    renderSimpleErrorMessage (MultipleValueOpFixities op) =
+      line $ "There are multiple fixity/precedence declarations for operator " ++ showOp op
+    renderSimpleErrorMessage (MultipleTypeOpFixities op) =
+      line $ "There are multiple fixity/precedence declarations for type operator " ++ showOp op
     renderSimpleErrorMessage (OrphanTypeDeclaration nm) =
       line $ "The type declaration for " ++ showIdent nm ++ " should be followed by its definition."
-    renderSimpleErrorMessage (OrphanFixityDeclaration op) =
-      line $ "The fixity/precedence declaration for " ++ show op ++ " should appear in the same module as its definition."
     renderSimpleErrorMessage (RedefinedModule name filenames) =
       paras [ line ("The module " ++ runModuleName name ++ " has been defined multiple times:")
             , indent . paras $ map (line . displaySourceSpan) filenames
             ]
     renderSimpleErrorMessage (RedefinedIdent name) =
       line $ "The value " ++ showIdent name ++ " has been defined multiple times"
-    renderSimpleErrorMessage (UnknownModule mn) =
-      line $ "Unknown module " ++ runModuleName mn
-    renderSimpleErrorMessage (UnknownType name) =
-      line $ "Unknown type " ++ showQualified runProperName name
-    renderSimpleErrorMessage (UnknownTypeOp name) =
-      line $ "Unknown type operator " ++ showQualified showIdent name
-    renderSimpleErrorMessage (UnknownTypeClass name) =
-      line $ "Unknown type class " ++ showQualified runProperName name
-    renderSimpleErrorMessage (UnknownValue name) =
-      line $ "Unknown value " ++ showQualified showIdent name
-    renderSimpleErrorMessage (UnknownTypeConstructor name) =
-      line $ "Unknown type constructor " ++ showQualified runProperName name
-    renderSimpleErrorMessage (UnknownDataConstructor dc tc) =
-      line $ "Unknown data constructor " ++ showQualified runProperName dc ++ foldMap ((" for type constructor " ++) . showQualified runProperName) tc
-    renderSimpleErrorMessage (UnknownImportType mn name) =
-      paras [ line $ "Cannot import type " ++ runProperName name ++ " from module " ++ runModuleName mn
+    renderSimpleErrorMessage (UnknownName name) =
+      line $ "Unknown " ++ printName name
+    renderSimpleErrorMessage (UnknownImport mn name) =
+      paras [ line $ "Cannot import " ++ printName (Qualified Nothing name) ++ " from module " ++ runModuleName mn
             , line "It either does not exist or the module does not export it."
             ]
-    renderSimpleErrorMessage (UnknownExportType name) =
-      line $ "Cannot export unknown type " ++ runProperName name
-    renderSimpleErrorMessage (UnknownImportTypeOp mn name) =
-      paras [ line $ "Cannot import type operator " ++ showIdent name ++ " from module " ++ runModuleName mn
-            , line "It either does not exist or the module does not export it."
-            ]
-    renderSimpleErrorMessage (UnknownExportTypeOp name) =
-      line $ "Cannot export unknown type operator " ++ showIdent name
-    renderSimpleErrorMessage (UnknownImportTypeClass mn name) =
-      paras [ line $ "Cannot import type class " ++ runProperName name ++ " from module " ++ runModuleName mn
-            , line "It either does not exist or the module does not export it."
-            ]
-    renderSimpleErrorMessage (UnknownExportTypeClass name) =
-      line $ "Cannot export unknown type class " ++ runProperName name
-    renderSimpleErrorMessage (UnknownImportValue mn name) =
-      paras [ line $ "Cannot import value " ++ showIdent name ++ " from module " ++ runModuleName mn
-            , line "It either does not exist or the module does not export it."
-            ]
-    renderSimpleErrorMessage (UnknownExportValue name) =
-      line $ "Cannot export unknown value " ++ showIdent name
-    renderSimpleErrorMessage (UnknownExportModule name) =
-      paras [ line $ "Cannot export unknown module " ++ runModuleName name
-            , line "It either does not exist or has not been imported by the current module."
-            ]
-    renderSimpleErrorMessage (UnknownImportDataConstructor mn tcon dcon) =
+    renderSimpleErrorMessage (UnknownImportDataConstructor mn dcon tcon) =
       line $ "Module " ++ runModuleName mn ++ " does not export data constructor " ++ runProperName dcon ++ " for type " ++ runProperName tcon
+    renderSimpleErrorMessage (UnknownExport name) =
+      line $ "Cannot export unknown " ++ printName (Qualified Nothing name)
     renderSimpleErrorMessage (UnknownExportDataConstructor tcon dcon) =
       line $ "Cannot export data constructor " ++ runProperName dcon ++ " for type " ++ runProperName tcon ++ ", as it has not been declared."
     renderSimpleErrorMessage (ScopeConflict nm ms) =
-      paras [ line $ "Conflicting definitions are in scope for " ++ nm ++ " from the following modules:"
+      paras [ line $ "Conflicting definitions are in scope for " ++ printName (Qualified Nothing nm) ++ " from the following modules:"
             , indent $ paras $ map (line . runModuleName) ms
             ]
     renderSimpleErrorMessage (ScopeShadowing nm exmn ms) =
-      paras [ line $ "Shadowed definitions are in scope for " ++ nm ++ " from the following open imports:"
+      paras [ line $ "Shadowed definitions are in scope for " ++ printName (Qualified Nothing nm) ++ " from the following open imports:"
             , indent $ paras $ map (line . ("import " ++) . runModuleName) ms
             , line $ "These will be ignored and the " ++ case exmn of
                 Just exmn' -> "declaration from " ++ runModuleName exmn' ++ " will be used."
@@ -673,8 +611,10 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       line $ "Duplicate export declaration for type class " ++ runProperName nm
     renderSimpleErrorMessage (DuplicateValueExport nm) =
       line $ "Duplicate export declaration for value " ++ showIdent nm
-    renderSimpleErrorMessage (DuplicateTypeOpExport nm) =
-      line $ "Duplicate export declaration for type operator " ++ showIdent nm
+    renderSimpleErrorMessage (DuplicateValueOpExport op) =
+      line $ "Duplicate export declaration for operator " ++ showOp op
+    renderSimpleErrorMessage (DuplicateTypeOpExport op) =
+      line $ "Duplicate export declaration for type operator " ++ showOp op
     renderSimpleErrorMessage (CycleInDeclaration nm) =
       line $ "The value of " ++ showIdent nm ++ " is undefined here, so this reference is not allowed."
     renderSimpleErrorMessage (CycleInModules mns) =
@@ -867,11 +807,6 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       line $ "Type variable '" ++ tv ++ "' was shadowed."
     renderSimpleErrorMessage (UnusedTypeVar tv) =
       line $ "Type variable '" ++ tv ++ "' was declared but not used."
-    renderSimpleErrorMessage (ClassOperator className opName) =
-      paras [ line $ "Type class '" ++ runProperName className ++ "' declares operator " ++ showIdent opName ++ "."
-            , line "This may be disallowed in the future - consider declaring a named member in the class and making the operator an alias:"
-            , indent . line $ showIdent opName ++ " = someMember"
-            ]
     renderSimpleErrorMessage (MisleadingEmptyTypeImport mn name) =
       line $ "Importing type " ++ runProperName name ++ "(..) from " ++ runModuleName mn ++ " is misleading as it has no exported data constructors."
     renderSimpleErrorMessage (ImportHidingModule name) =
@@ -917,24 +852,17 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       paras [ line $ "The import of type " ++ runProperName name ++ " includes the following unused data constructors:"
             , indent $ paras $ map (line .runProperName) names ]
 
-    renderSimpleErrorMessage (DeprecatedOperatorDecl name) =
-      paras [ line $ "The operator (" ++ name ++ ") was declared as a value rather than an alias for a named function."
-            , line "Operator aliases are declared by using a fixity declaration, for example:"
-            , indent $ line $ "infixl 9 someFunction as " ++ name
-            , line "Support for value-declared operators will be removed in PureScript 0.9."
-            ]
-
     renderSimpleErrorMessage (DuplicateSelectiveImport name) =
       line $ "There is an existing import of " ++ runModuleName name ++ ", consider merging the import lists"
 
     renderSimpleErrorMessage (DuplicateImport name imp qual) =
       line $ "Duplicate import of " ++ prettyPrintImport name imp qual
 
-    renderSimpleErrorMessage (DuplicateImportRef ref) =
-      line $ "Import list contains multiple references to " ++ ref
+    renderSimpleErrorMessage (DuplicateImportRef name) =
+      line $ "Import list contains multiple references to " ++ printName (Qualified Nothing name)
 
-    renderSimpleErrorMessage (DuplicateExportRef ref) =
-      line $ "Export list contains multiple references to " ++ ref
+    renderSimpleErrorMessage (DuplicateExportRef name) =
+      line $ "Export list contains multiple references to " ++ printName (Qualified Nothing name)
 
     renderSimpleErrorMessage (IntOutOfRange value backend lo hi) =
       paras [ line $ "Integer value " ++ show value ++ " is out of range for the " ++ backend ++ " backend."
@@ -969,7 +897,7 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       line "An anonymous function argument appears in an invalid context."
 
     renderSimpleErrorMessage (InvalidOperatorInBinder op fn) =
-      paras [ line $ "Operator " ++ showIdent op ++ " cannot be used in a pattern as it is an alias for function " ++ showIdent fn ++ "."
+      paras [ line $ "Operator " ++ showQualified showOp op ++ " cannot be used in a pattern as it is an alias for function " ++ showQualified showIdent fn ++ "."
             , line "Only aliases for data constructors may be used in patterns."
             ]
 
@@ -1099,6 +1027,24 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             , detail
             ]
 
+    printName :: Qualified Name -> String
+    printName (Qualified mn (IdentName name)) =
+      "value " ++ showQualified showIdent (Qualified mn name)
+    printName (Qualified mn (ValOpName op)) =
+      "operator " ++ showQualified showOp (Qualified mn op)
+    printName (Qualified mn (TyName name)) =
+      "type " ++ showQualified runProperName (Qualified mn name)
+    printName (Qualified mn (TyOpName op)) =
+      "type operator " ++ showQualified showOp (Qualified mn op)
+    printName (Qualified mn (DctorName name)) =
+      "data constructor " ++ showQualified runProperName (Qualified mn name)
+    printName (Qualified mn (TyClassName name)) =
+      "type class " ++ showQualified runProperName (Qualified mn name)
+    printName (Qualified Nothing (ModName name)) =
+      "module " ++ runModuleName name
+    printName (Qualified _ ModName{}) =
+      internalError "qualified ModName in printName"
+
   valueDepth :: Int
   valueDepth | full = 1000
              | otherwise = 3
@@ -1179,8 +1125,9 @@ prettyPrintRef :: DeclarationRef -> String
 prettyPrintRef (TypeRef pn Nothing) = runProperName pn ++ "(..)"
 prettyPrintRef (TypeRef pn (Just [])) = runProperName pn
 prettyPrintRef (TypeRef pn (Just dctors)) = runProperName pn ++ "(" ++ intercalate ", " (map runProperName dctors) ++ ")"
-prettyPrintRef (TypeOpRef ident) = "type " ++ showIdent ident
+prettyPrintRef (TypeOpRef op) = "type " ++ showOp op
 prettyPrintRef (ValueRef ident) = showIdent ident
+prettyPrintRef (ValueOpRef op) = showOp op
 prettyPrintRef (TypeClassRef pn) = "class " ++ runProperName pn
 prettyPrintRef (TypeInstanceRef ident) = showIdent ident
 prettyPrintRef (ModuleRef name) = "module " ++ runModuleName name

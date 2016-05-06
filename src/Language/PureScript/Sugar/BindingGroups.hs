@@ -31,11 +31,10 @@ import Language.PureScript.Types
 --
 createBindingGroupsModule
   :: (MonadError MultipleErrors m)
-  => [Module]
-  -> m [Module]
-createBindingGroupsModule =
-  mapM $ \(Module ss coms name ds exps) ->
-    Module ss coms name <$> createBindingGroups name ds <*> pure exps
+  => Module
+  -> m Module
+createBindingGroupsModule (Module ss coms name ds exps) =
+  Module ss coms name <$> createBindingGroups name ds <*> pure exps
 
 -- |
 -- Collapse all binding groups in a module to individual declarations
@@ -67,11 +66,11 @@ createBindingGroups moduleName = mapM f <=< handleDecls
   handleDecls ds = do
     let values = filter isValueDecl ds
         dataDecls = filter isDataDecl ds
-        allProperNames = map getTypeName dataDecls
-        dataVerts = map (\d -> (d, getTypeName d, usedTypeNames moduleName d `intersect` allProperNames)) dataDecls
+        allProperNames = map declTypeName dataDecls
+        dataVerts = map (\d -> (d, declTypeName d, usedTypeNames moduleName d `intersect` allProperNames)) dataDecls
     dataBindingGroupDecls <- parU (stronglyConnComp dataVerts) toDataBindingGroup
-    let allIdents = map getIdent values
-        valueVerts = map (\d -> (d, getIdent d, usedIdents moduleName d `intersect` allIdents)) values
+    let allIdents = map declIdent values
+        valueVerts = map (\d -> (d, declIdent d, usedIdents moduleName d `intersect` allIdents)) values
     bindingGroupDecls <- parU (stronglyConnComp valueVerts) (toBindingGroup moduleName)
     return $ filter isImportDecl ds ++
              filter isExternDataDecl ds ++
@@ -149,16 +148,16 @@ usedTypeNames moduleName =
     | moduleName == moduleName' = [name]
   usedNames _ = []
 
-getIdent :: Declaration -> Ident
-getIdent (ValueDeclaration ident _ _ _) = ident
-getIdent (PositionedDeclaration _ _ d) = getIdent d
-getIdent _ = internalError "Expected ValueDeclaration"
+declIdent :: Declaration -> Ident
+declIdent (ValueDeclaration ident _ _ _) = ident
+declIdent (PositionedDeclaration _ _ d) = declIdent d
+declIdent _ = internalError "Expected ValueDeclaration"
 
-getTypeName :: Declaration -> ProperName 'TypeName
-getTypeName (DataDeclaration _ pn _ _) = pn
-getTypeName (TypeSynonymDeclaration pn _ _) = pn
-getTypeName (PositionedDeclaration _ _ d) = getTypeName d
-getTypeName _ = internalError "Expected DataDeclaration"
+declTypeName :: Declaration -> ProperName 'TypeName
+declTypeName (DataDeclaration _ pn _ _) = pn
+declTypeName (TypeSynonymDeclaration pn _ _) = pn
+declTypeName (PositionedDeclaration _ _ d) = declTypeName d
+declTypeName _ = internalError "Expected DataDeclaration"
 
 -- |
 -- Convert a group of mutually-recursive dependencies into a BindingGroupDeclaration (or simple ValueDeclaration).
@@ -187,7 +186,7 @@ toBindingGroup moduleName (CyclicSCC ds') =
   idents = map (\(_, i, _) -> i) valueVerts
 
   valueVerts :: [(Declaration, Ident, [Ident])]
-  valueVerts = map (\d -> (d, getIdent d, usedImmediateIdents moduleName d `intersect` idents)) ds'
+  valueVerts = map (\d -> (d, declIdent d, usedImmediateIdents moduleName d `intersect` idents)) ds'
 
   toBinding :: SCC Declaration -> m (Ident, NameKind, Expr)
   toBinding (AcyclicSCC d) = return $ fromValueDecl d
