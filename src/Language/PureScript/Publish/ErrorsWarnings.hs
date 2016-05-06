@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 
 module Language.PureScript.Publish.ErrorsWarnings
   ( PackageError(..)
@@ -16,26 +15,24 @@ module Language.PureScript.Publish.ErrorsWarnings
   , renderWarnings
   ) where
 
-import Prelude ()
 import Prelude.Compat
 
+import Control.Exception (IOException)
+
 import Data.Aeson.BetterErrors
-import Data.Version
-import Data.Maybe
-import Data.Monoid
 import Data.List (intersperse, intercalate)
 import Data.List.NonEmpty (NonEmpty(..))
+import Data.Maybe
+import Data.Monoid
+import Data.Version
 import qualified Data.List.NonEmpty as NonEmpty
-
 import qualified Data.Text as T
 
-import Control.Exception (IOException)
-import Web.Bower.PackageMeta (BowerError, PackageName, runPackageName, showBowerError)
-import qualified Web.Bower.PackageMeta as Bower
-
+import Language.PureScript.Publish.BoxesHelpers
 import qualified Language.PureScript as P
 
-import Language.PureScript.Publish.BoxesHelpers
+import Web.Bower.PackageMeta (BowerError, PackageName, runPackageName, showBowerError)
+import qualified Web.Bower.PackageMeta as Bower
 
 -- | An error which meant that it was not possible to retrieve metadata for a
 -- package.

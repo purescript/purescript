@@ -264,7 +264,23 @@ library
 
                      System.IO.UTF8
 
-    extensions:      DataKinds
+    extensions:      ConstraintKinds
+                     DataKinds
+                     DeriveFunctor
+                     EmptyDataDecls
+                     FlexibleContexts
+                     GeneralizedNewtypeDeriving
+                     KindSignatures
+                     LambdaCase
+                     MultiParamTypeClasses
+                     NoImplicitPrelude
+                     PatternGuards
+                     PatternSynonyms
+                     RankNTypes
+                     RecordWildCards
+                     ScopedTypeVariables
+                     TupleSections
+                     ViewPatterns
     exposed: True
     buildable: True
     hs-source-dirs: src

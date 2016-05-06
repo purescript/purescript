@@ -1,6 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module Language.PureScript.Sugar.Names.Env
   ( ImportRecord(..)
   , ImportProvenance(..)
@@ -21,21 +18,23 @@ module Language.PureScript.Sugar.Names.Env
   , checkImportConflicts
   ) where
 
+import Prelude.Compat
+
+import Control.Monad
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Writer.Class (MonadWriter(..))
+
 import Data.Function (on)
 import Data.List (groupBy, sortBy, nub, delete)
 import Data.Maybe (fromJust)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
-import Control.Monad
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Writer.Class (MonadWriter(..))
-
 import Language.PureScript.AST
 import Language.PureScript.Crash
-import Language.PureScript.Names
 import Language.PureScript.Environment
 import Language.PureScript.Errors
+import Language.PureScript.Names
 
 -- |
 -- The details for an import: the name of the thing that is being imported

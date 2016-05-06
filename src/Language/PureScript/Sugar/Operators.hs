@@ -1,8 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TupleSections #-}
-
 -- |
 -- This module implements the desugaring pass which reapplies binary operators based
 -- on their fixity data and removes explicit parentheses.
@@ -15,7 +10,6 @@ module Language.PureScript.Sugar.Operators
   , removeSignedLiterals
   ) where
 
-import Prelude ()
 import Prelude.Compat
 
 import Language.PureScript.AST

@@ -1,22 +1,18 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE LambdaCase #-}
 
 -- |
 -- Data types for modules and declarations
 --
 module Language.PureScript.AST.Declarations where
 
-import Prelude ()
 import Prelude.Compat
+
+import Control.Monad.Identity
 
 import Data.Aeson.TH
 import Data.List (nub, (\\))
 import Data.Maybe (mapMaybe)
-
 import qualified Data.Map as M
-
-import Control.Monad.Identity
 
 import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Literals

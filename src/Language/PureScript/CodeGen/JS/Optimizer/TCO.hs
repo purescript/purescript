@@ -1,19 +1,9 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.CodeGen.JS.Optimizer.TCO
--- Copyright   :  (c) Phil Freeman 2013-14
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- This module implements tail call elimination.
 --
------------------------------------------------------------------------------
-
 module Language.PureScript.CodeGen.JS.Optimizer.TCO (tco) where
+
+import Prelude.Compat
 
 import Data.Monoid
 

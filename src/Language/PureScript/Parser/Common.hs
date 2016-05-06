@@ -1,19 +1,18 @@
-{-# LANGUAGE FlexibleContexts #-}
-
 -- |
--- Constants, and utility functions to be used when parsing
+-- Constants and utility functions to be used when parsing
 --
 module Language.PureScript.Parser.Common where
+
+import Prelude.Compat
 
 import Control.Applicative
 import Control.Monad (guard)
 
+import Language.PureScript.AST.SourcePos
 import Language.PureScript.Comments
+import Language.PureScript.Names
 import Language.PureScript.Parser.Lexer
 import Language.PureScript.Parser.State
-import Language.PureScript.Names
-
-import Language.PureScript.AST.SourcePos
 
 import qualified Text.Parsec as P
 

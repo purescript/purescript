@@ -17,6 +17,7 @@ module Language.PureScript.Ide.Error
        (ErrorMsg, PscIdeError(..), textError)
        where
 
+import           Prelude.Compat
 import           Data.Aeson
 import           Data.Monoid
 import           Data.Text                     (Text, pack)

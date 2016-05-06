@@ -1,37 +1,23 @@
------------------------------------------------------------------------------
---
--- Module      :  Foreign
--- Copyright   :  (c) 2013-14 Phil Freeman, (c) 2014 Gary Burgess, and other contributors
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>, Gary Burgess <gary.burgess@gmail.com>
--- Stability   :  experimental
--- Portability :
---
--- |
---
------------------------------------------------------------------------------
-
-{-# LANGUAGE FlexibleContexts #-}
-
 module Language.PureScript.Parser.JS
   ( ForeignJS()
   , parseForeignModulesFromFiles
   ) where
 
-import Prelude ()
 import Prelude.Compat hiding (lex)
 
 import Control.Monad (forM_, when, msum)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class (MonadWriter(..))
+
 import Data.Function (on)
 import Data.List (sortBy, groupBy)
+import qualified Data.Map as M
+
 import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.Parser.Common
 import Language.PureScript.Parser.Lexer
-import qualified Data.Map as M
+
 import qualified Text.Parsec as PS
 
 type ForeignJS = String

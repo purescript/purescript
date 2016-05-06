@@ -1,26 +1,25 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleContexts #-}
-
 -- |
 -- Type class entailment
 --
-module Language.PureScript.TypeChecker.Entailment (Context, replaceTypeClassDictionaries) where
+module Language.PureScript.TypeChecker.Entailment
+  ( Context
+  , replaceTypeClassDictionaries
+  ) where
 
-import Prelude ()
 import Prelude.Compat
+
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.State
+import Control.Monad.Supply.Class (MonadSupply(..))
+import Control.Monad.Writer
 
 import Data.Function (on)
 import Data.List (minimumBy, sortBy, groupBy)
 import Data.Maybe (maybeToList, mapMaybe)
 import qualified Data.Map as M
 
-import Control.Monad.State
-import Control.Monad.Writer
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Supply.Class (MonadSupply(..))
-
-import Language.PureScript.Crash
 import Language.PureScript.AST
+import Language.PureScript.Crash
 import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Unify

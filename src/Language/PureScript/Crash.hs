@@ -1,5 +1,7 @@
 module Language.PureScript.Crash where
 
+import Prelude.Compat
+
 -- | Exit with an error message and a crash report link.
 internalError :: String -> a
 internalError =

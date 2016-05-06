@@ -1,30 +1,16 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Pretty.Common
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- Common pretty-printing utility functions
 --
------------------------------------------------------------------------------
-
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Language.PureScript.Pretty.Common where
 
-import Prelude ()
 import Prelude.Compat
 
 import Control.Monad.State (StateT, modify, get)
+
 import Data.List (elemIndices, intersperse)
 
-import Language.PureScript.Parser.Lexer (reservedPsNames, isUnquotedKey)
 import Language.PureScript.AST (SourcePos(..), SourceSpan(..))
+import Language.PureScript.Parser.Lexer (reservedPsNames, isUnquotedKey)
 
 import Text.PrettyPrint.Boxes
 

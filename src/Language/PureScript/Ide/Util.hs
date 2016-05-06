@@ -16,6 +16,7 @@
 
 module Language.PureScript.Ide.Util where
 
+import           Prelude.Compat
 import           Data.Aeson
 import           Data.Text                     (Text)
 import qualified Data.Text                     as T

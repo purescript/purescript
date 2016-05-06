@@ -3,11 +3,13 @@
 
 module Language.PureScript.Environment where
 
-import Data.Maybe (fromMaybe)
+import Prelude.Compat
+
 import Data.Aeson.TH
+import Data.Maybe (fromMaybe)
+import qualified Data.Aeson as A
 import qualified Data.Map as M
 import qualified Data.Text as T
-import qualified Data.Aeson as A
 
 import Language.PureScript.Crash
 import Language.PureScript.Kinds

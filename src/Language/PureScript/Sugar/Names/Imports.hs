@@ -1,35 +1,28 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE LambdaCase #-}
-
 module Language.PureScript.Sugar.Names.Imports
   ( resolveImports
   , resolveModuleImport
   , findImports
   ) where
 
-import Prelude ()
 import Prelude.Compat
-
-import Data.Foldable (traverse_, for_)
-import Data.Function (on)
-import Data.List (find, sortBy, groupBy, (\\))
-import Data.Maybe (fromMaybe, isNothing)
-import Data.Traversable (for)
 
 import Control.Arrow (first)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer (MonadWriter(..))
 
+import Data.Foldable (traverse_, for_)
+import Data.Function (on)
+import Data.List (find, sortBy, groupBy, (\\))
+import Data.Maybe (fromMaybe, isNothing)
+import Data.Traversable (for)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
-import Language.PureScript.Crash
 import Language.PureScript.AST
-import Language.PureScript.Names
+import Language.PureScript.Crash
 import Language.PureScript.Errors
+import Language.PureScript.Names
 import Language.PureScript.Sugar.Names.Env
 
 -- |

@@ -1,41 +1,35 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
 
 module Language.PureScript.Errors where
 
-import Prelude ()
 import Prelude.Compat
 
-import Data.Ord (comparing)
-import Data.Char (isSpace)
-import Data.Either (lefts, rights)
-import Data.List (intercalate, transpose, nub, nubBy, sortBy, partition)
-import Data.Foldable (fold)
-import Data.Maybe (maybeToList)
-
-import qualified Data.Map as M
-
+import Control.Arrow ((&&&))
 import Control.Monad
-import Control.Monad.Writer
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Trans.State.Lazy
-import Control.Arrow ((&&&))
+import Control.Monad.Writer
 
-import Language.PureScript.Crash
+import Data.Char (isSpace)
+import Data.Either (lefts, rights)
+import Data.Foldable (fold)
+import Data.List (intercalate, transpose, nub, nubBy, sortBy, partition)
+import Data.Maybe (maybeToList)
+import Data.Ord (comparing)
+import qualified Data.Map as M
+
 import Language.PureScript.AST
+import Language.PureScript.Crash
+import Language.PureScript.Kinds
+import Language.PureScript.Names
 import Language.PureScript.Pretty
 import Language.PureScript.Types
-import Language.PureScript.Names
-import Language.PureScript.Kinds
-import qualified Language.PureScript.Constants as C
 import qualified Language.PureScript.Bundle as Bundle
-
-import qualified Text.PrettyPrint.Boxes as Box
+import qualified Language.PureScript.Constants as C
 
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Error as PE
+import qualified Text.PrettyPrint.Boxes as Box
 import Text.Parsec.Error (Message(..))
 
 -- | A type of error messages

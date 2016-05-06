@@ -1,9 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE RankNTypes #-}
 
 -- |
 -- This module implements the kind checker
@@ -15,16 +10,15 @@ module Language.PureScript.TypeChecker.Kinds
   , kindsOfAll
   ) where
 
-import Prelude ()
 import Prelude.Compat
-
-import qualified Data.Map as M
 
 import Control.Arrow (second)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Writer.Class (MonadWriter(..))
 import Control.Monad.State
+import Control.Monad.Writer.Class (MonadWriter(..))
+
+import qualified Data.Map as M
 
 import Language.PureScript.Crash
 import Language.PureScript.Environment

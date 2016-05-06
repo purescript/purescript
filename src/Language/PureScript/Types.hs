@@ -1,4 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 -- |
@@ -6,19 +5,18 @@
 --
 module Language.PureScript.Types where
 
-import Prelude ()
 import Prelude.Compat
+
+import Control.Monad ((<=<))
 
 import Data.List (nub)
 import Data.Maybe (fromMaybe)
 import qualified Data.Aeson as A
 import qualified Data.Aeson.TH as A
 
-import Control.Monad ((<=<))
-
-import Language.PureScript.Names
-import Language.PureScript.Kinds
 import Language.PureScript.AST.SourcePos
+import Language.PureScript.Kinds
+import Language.PureScript.Names
 
 -- |
 -- An identifier for the scope of a skolem variable

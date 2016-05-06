@@ -1,13 +1,9 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleContexts #-}
-
 module Language.PureScript.Linter.Imports
   ( lintImports
   , Name(..)
   , UsedImports()
   ) where
 
-import Prelude ()
 import Prelude.Compat
 
 import Control.Monad (unless, when)
@@ -23,12 +19,10 @@ import qualified Data.Map as M
 import Language.PureScript.AST.Declarations
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.Crash
-import Language.PureScript.Names as P
-
 import Language.PureScript.Errors
+import Language.PureScript.Names as P
 import Language.PureScript.Sugar.Names.Env
 import Language.PureScript.Sugar.Names.Imports
-
 import qualified Language.PureScript.Constants as C
 
 -- | Imported name used in some type or expression.

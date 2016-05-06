@@ -1,30 +1,24 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE PatternGuards #-}
-
 -- |
 -- This module implements a simple linting pass on the PureScript AST.
 --
 module Language.PureScript.Linter (lint, module L) where
 
-import Prelude ()
 import Prelude.Compat
+
+import Control.Monad.Writer.Class
 
 import Data.List (nub, (\\))
 import Data.Maybe (mapMaybe)
 import Data.Monoid
-
 import qualified Data.Set as S
 
-import Control.Monad.Writer.Class
-
-import Language.PureScript.Crash
 import Language.PureScript.AST
-import Language.PureScript.Names
+import Language.PureScript.Crash
 import Language.PureScript.Errors
-import Language.PureScript.Types
 import Language.PureScript.Linter.Exhaustive as L
 import Language.PureScript.Linter.Imports as L
+import Language.PureScript.Names
+import Language.PureScript.Types
 
 -- | Lint the PureScript AST.
 -- |

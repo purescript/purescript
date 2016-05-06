@@ -1,20 +1,17 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-
 -- |
 -- AST traversal helpers
 --
 module Language.PureScript.AST.Traversals where
 
-import Prelude ()
 import Prelude.Compat
-
-import Data.Maybe (mapMaybe)
-import Data.List (mapAccumL)
-import Data.Foldable (fold)
-import qualified Data.Set as S
 
 import Control.Monad
 import Control.Arrow ((***), (+++))
+
+import Data.Foldable (fold)
+import Data.List (mapAccumL)
+import Data.Maybe (mapMaybe)
+import qualified Data.Set as S
 
 import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Literals

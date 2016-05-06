@@ -1,28 +1,14 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Parser.Kinds
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- A parser for kinds
 --
------------------------------------------------------------------------------
+module Language.PureScript.Parser.Kinds (parseKind) where
 
-module Language.PureScript.Parser.Kinds (
-    parseKind
-) where
-
-import Prelude ()
 import Prelude.Compat
 
 import Language.PureScript.Kinds
 import Language.PureScript.Parser.Common
 import Language.PureScript.Parser.Lexer
+
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
