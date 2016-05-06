@@ -269,7 +269,6 @@ library
                      DeriveFunctor
                      EmptyDataDecls
                      FlexibleContexts
-                     GeneralizedNewtypeDeriving
                      KindSignatures
                      LambdaCase
                      MultiParamTypeClasses

@@ -1,3 +1,4 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 -- |
@@ -39,7 +40,7 @@ data Type
   -- |
   -- A type wildcard, as would appear in a partial type synonym
   --
-  | TypeWildcard (SourceSpan)
+  | TypeWildcard SourceSpan
   -- |
   -- A type constructor
   --
