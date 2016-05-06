@@ -1,16 +1,18 @@
 -- |
 -- Pretty printer for values
 --
-module Language.PureScript.Pretty.Values (
-    prettyPrintValue,
-    prettyPrintBinder,
-    prettyPrintBinderAtom
-) where
+module Language.PureScript.Pretty.Values
+  ( prettyPrintValue
+  , prettyPrintBinder
+  , prettyPrintBinderAtom
+  ) where
+
+import Prelude.Compat
 
 import Control.Arrow (second)
 
-import Language.PureScript.Crash
 import Language.PureScript.AST
+import Language.PureScript.Crash
 import Language.PureScript.Names
 import Language.PureScript.Pretty.Common
 import Language.PureScript.Pretty.Types (typeAsBox, typeAtomAsBox)

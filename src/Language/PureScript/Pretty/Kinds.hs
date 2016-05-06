@@ -1,26 +1,16 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Pretty.Kinds
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- Pretty printer for kinds
 --
------------------------------------------------------------------------------
+module Language.PureScript.Pretty.Kinds
+  ( prettyPrintKind
+  ) where
 
-module Language.PureScript.Pretty.Kinds (
-    prettyPrintKind
-) where
-
-import Data.Maybe (fromMaybe)
+import Prelude.Compat
 
 import Control.Arrow (ArrowPlus(..))
-import Control.PatternArrows
+import Control.PatternArrows as PA
+
+import Data.Maybe (fromMaybe)
 
 import Language.PureScript.Crash
 import Language.PureScript.Kinds
@@ -48,7 +38,9 @@ funKind = mkPattern match
 
 -- | Generate a pretty-printed string representing a Kind
 prettyPrintKind :: Kind -> String
-prettyPrintKind = fromMaybe (internalError "Incomplete pattern") . pattern matchKind ()
+prettyPrintKind
+  = fromMaybe (internalError "Incomplete pattern")
+  . PA.pattern matchKind ()
   where
   matchKind :: Pattern () Kind String
   matchKind = buildPrettyPrinter operators (typeLiterals <+> fmap parens matchKind)

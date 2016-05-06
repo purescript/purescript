@@ -2,7 +2,6 @@
 
 module Language.PureScript.Kinds where
 
-import Prelude ()
 import Prelude.Compat
 
 import qualified Data.Aeson.TH as A

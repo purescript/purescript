@@ -1,22 +1,18 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
-
 -- |
 -- Parsers for module definitions and declarations
 --
-module Language.PureScript.Parser.Declarations (
-    parseDeclaration,
-    parseModule,
-    parseModules,
-    parseModulesFromFiles,
-    parseValue,
-    parseGuard,
-    parseBinder,
-    parseBinderNoParens,
-    parseImportDeclaration',
-    parseLocalDeclaration
-) where
+module Language.PureScript.Parser.Declarations
+  ( parseDeclaration
+  , parseModule
+  , parseModules
+  , parseModulesFromFiles
+  , parseValue
+  , parseGuard
+  , parseBinder
+  , parseBinderNoParens
+  , parseImportDeclaration'
+  , parseLocalDeclaration
+  ) where
 
 import Prelude hiding (lex)
 
@@ -541,7 +537,7 @@ parseBinderAtom = P.choice
   , parseArrayBinder
   , ParensInBinder <$> parens parseBinder
   ] P.<?> "binder"
-  
+
 -- |
 -- Parse a binder as it would appear in a top level declaration
 --

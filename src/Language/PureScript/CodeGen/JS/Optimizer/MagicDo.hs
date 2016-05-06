@@ -4,6 +4,8 @@
 --
 module Language.PureScript.CodeGen.JS.Optimizer.MagicDo (magicDo) where
 
+import Prelude.Compat
+
 import Data.List (nub)
 import Data.Maybe (fromJust, isJust)
 

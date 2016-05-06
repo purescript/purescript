@@ -1,6 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 -- |
 -- Module for exhaustivity checking over pattern matching definitions
 -- The algorithm analyses the clauses of a definition one by one from top
@@ -11,31 +8,30 @@ module Language.PureScript.Linter.Exhaustive
   ( checkExhaustiveExpr
   ) where
 
-import Prelude ()
 import Prelude.Compat
 
-import qualified Data.Map as M
-import Data.Maybe (fromMaybe)
-import Data.List (foldl', sortBy, nub)
-import Data.Function (on)
-
-import Control.Monad (unless)
 import Control.Applicative
 import Control.Arrow (first, second)
+import Control.Monad (unless)
 import Control.Monad.Writer.Class
 
-import Language.PureScript.Crash
-import qualified Language.PureScript.Constants as C
+import Data.Function (on)
+import Data.List (foldl', sortBy, nub)
+import Data.Maybe (fromMaybe)
+import qualified Data.Map as M
+
 import Language.PureScript.AST.Binders
-import Language.PureScript.AST.Literals
 import Language.PureScript.AST.Declarations
+import Language.PureScript.AST.Literals
+import Language.PureScript.Crash
 import Language.PureScript.Environment
-import Language.PureScript.Names as P
+import Language.PureScript.Errors
 import Language.PureScript.Kinds
+import Language.PureScript.Names as P
 import Language.PureScript.Pretty.Values (prettyPrintBinderAtom)
 import Language.PureScript.Traversals
 import Language.PureScript.Types as P
-import Language.PureScript.Errors
+import qualified Language.PureScript.Constants as C
 
 -- | There are two modes of failure for the redundancy check:
 --

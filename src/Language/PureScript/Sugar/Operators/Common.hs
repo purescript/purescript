@@ -1,10 +1,5 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE PatternGuards #-}
-
 module Language.PureScript.Sugar.Operators.Common where
 
-import Prelude ()
 import Prelude.Compat
 
 import Control.Monad.State

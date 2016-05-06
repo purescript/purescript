@@ -1,35 +1,19 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Sugar
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- Desugaring passes
 --
------------------------------------------------------------------------------
-
-{-# LANGUAGE FlexibleContexts #-}
-
 module Language.PureScript.Sugar (desugar, module S) where
 
-import Prelude ()
 import Prelude.Compat
 
-import Control.Monad
 import Control.Category ((>>>))
+import Control.Monad
 import Control.Monad.Error.Class (MonadError())
-import Control.Monad.Writer.Class (MonadWriter())
 import Control.Monad.Supply.Class
+import Control.Monad.Writer.Class (MonadWriter())
 
 import Language.PureScript.AST
 import Language.PureScript.Errors
 import Language.PureScript.Externs
-
 import Language.PureScript.Sugar.BindingGroups as S
 import Language.PureScript.Sugar.CaseDeclarations as S
 import Language.PureScript.Sugar.DoNotation as S

@@ -1,18 +1,6 @@
------------------------------------------------------------------------------
---
--- Module      :  Types
--- Copyright   :  (c) Phil Freeman 2014
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- Type declarations and associated basic functions for PSCI.
 --
------------------------------------------------------------------------------
-
 module PSCi.Types where
 
 import Prelude ()

@@ -13,7 +13,6 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE OverloadedStrings   #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 module Language.PureScript.Ide.Pursuit where
 

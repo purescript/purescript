@@ -1,22 +1,12 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.CodeGen.JS.Optimizer.Blocks
--- Copyright   :  (c) Phil Freeman 2013-14
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- Optimizer steps for simplifying Javascript blocks
 --
------------------------------------------------------------------------------
-
 module Language.PureScript.CodeGen.JS.Optimizer.Blocks
   ( collapseNestedBlocks
   , collapseNestedIfs
   ) where
+
+import Prelude.Compat
 
 import Language.PureScript.CodeGen.JS.AST
 

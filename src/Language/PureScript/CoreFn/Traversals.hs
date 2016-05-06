@@ -3,11 +3,13 @@
 --
 module Language.PureScript.CoreFn.Traversals where
 
+import Prelude.Compat
+
 import Control.Arrow (second, (***), (+++))
 
+import Language.PureScript.AST.Literals
 import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Expr
-import Language.PureScript.AST.Literals
 
 everywhereOnValues :: (Bind a -> Bind a) ->
                       (Expr a -> Expr a) ->

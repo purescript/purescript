@@ -1,18 +1,6 @@
------------------------------------------------------------------------------
---
--- Module      :  Directive
--- Copyright   :
--- License     :  MIT
---
--- Maintainer  :
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- Directives for PSCI.
 --
------------------------------------------------------------------------------
-
 module PSCi.Directive where
 
 import Prelude ()
@@ -116,4 +104,3 @@ help =
   , (Show,    "import",   "Show all imported modules")
   , (Show,    "loaded",   "Show all loaded modules")
   ]
-

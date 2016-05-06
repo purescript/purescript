@@ -12,16 +12,16 @@ module Language.PureScript.CodeGen.JS.Optimizer.Inliner
   , evaluateIifes
   ) where
 
-import Prelude ()
 import Prelude.Compat
 
 import Control.Monad.Supply.Class (MonadSupply, freshName)
+
 import Data.Maybe (fromMaybe)
 
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.CodeGen.JS.Common
-import Language.PureScript.Names
 import Language.PureScript.CodeGen.JS.Optimizer.Common
+import Language.PureScript.Names
 import qualified Language.PureScript.Constants as C
 
 -- TODO: Potential bug:

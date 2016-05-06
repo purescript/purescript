@@ -3,7 +3,10 @@ module Language.PureScript.AST.Exported
   , isExported
   ) where
 
+import Prelude.Compat
+
 import Control.Category ((>>>))
+
 import Data.Maybe (mapMaybe)
 
 import Language.PureScript.AST.Declarations

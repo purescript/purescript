@@ -1,31 +1,23 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE LambdaCase #-}
-
 module Language.PureScript.Sugar.Names.Exports
   ( findExportable
   , resolveExports
   ) where
 
-import Prelude ()
 import Prelude.Compat
-
-import Data.List (find, intersect)
-import Data.Maybe (fromMaybe, mapMaybe)
-import Data.Foldable (traverse_)
 
 import Control.Monad
 import Control.Monad.Writer.Class (MonadWriter(..))
 import Control.Monad.Error.Class (MonadError(..))
 
+import Data.Foldable (traverse_)
+import Data.List (find, intersect)
+import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
 
-import Language.PureScript.Crash
 import Language.PureScript.AST
-import Language.PureScript.Names
+import Language.PureScript.Crash
 import Language.PureScript.Errors
+import Language.PureScript.Names
 import Language.PureScript.Sugar.Names.Env
 
 -- |

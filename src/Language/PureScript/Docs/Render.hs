@@ -1,6 +1,5 @@
-{-# LANGUAGE RecordWildCards #-}
-
--- | Functions for creating `RenderedCode` values from data types in
+-- |
+-- Functions for creating `RenderedCode` values from data types in
 -- Language.PureScript.Docs.Types.
 --
 -- These functions are the ones that are used in markdown/html documentation
@@ -10,13 +9,15 @@
 
 module Language.PureScript.Docs.Render where
 
+import Prelude.Compat
+
 import Data.Maybe (maybeToList)
 import Data.Monoid ((<>))
-import qualified Language.PureScript as P
 
-import Language.PureScript.Docs.Types
 import Language.PureScript.Docs.RenderedCode
+import Language.PureScript.Docs.Types
 import Language.PureScript.Docs.Utils.MonoidExtras
+import qualified Language.PureScript as P
 
 renderDeclaration :: Declaration -> RenderedCode
 renderDeclaration = renderDeclarationWithOptions defaultRenderTypeOptions

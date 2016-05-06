@@ -12,13 +12,9 @@
 -- Interface for the psc-ide-server
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PackageImports        #-}
 {-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE TupleSections         #-}
 
 module Language.PureScript.Ide
        ( handleCommand

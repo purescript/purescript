@@ -1,7 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 -- |
 -- This module implements the desugaring pass which creates type synonyms for type class dictionaries
 -- and dictionary expressions for type class instances.
@@ -12,7 +8,6 @@ module Language.PureScript.Sugar.TypeClasses
   , superClassDictionaryNames
   ) where
 
-import Prelude ()
 import Prelude.Compat
 
 import Language.PureScript.Crash

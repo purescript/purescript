@@ -1,12 +1,12 @@
-{-# LANGUAGE FlexibleContexts #-}
-
 -- |
 -- Provides the ability to sort modules based on module dependencies
 --
-module Language.PureScript.ModuleDependencies (
-  sortModules,
-  ModuleGraph
-) where
+module Language.PureScript.ModuleDependencies
+  ( sortModules
+  , ModuleGraph
+  ) where
+
+import Prelude.Compat
 
 import Control.Monad.Error.Class (MonadError(..))
 
@@ -14,11 +14,11 @@ import Data.Graph
 import Data.List (nub)
 import Data.Maybe (fromMaybe)
 
-import Language.PureScript.Crash
 import Language.PureScript.AST
+import Language.PureScript.Crash
+import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.Types
-import Language.PureScript.Errors
 
 -- | A list of modules with their transitive dependencies
 type ModuleGraph = [(ModuleName, [ModuleName])]

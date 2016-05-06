@@ -1,26 +1,20 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 -- |
 -- This module implements the desugaring pass which replaces do-notation statements with
 -- appropriate calls to bind from the Prelude.Monad type class.
 --
-module Language.PureScript.Sugar.DoNotation (
-    desugarDoModule
-) where
+module Language.PureScript.Sugar.DoNotation (desugarDoModule) where
 
-import Prelude ()
 import Prelude.Compat
-
-import Language.PureScript.Crash
-import Language.PureScript.Names
-import Language.PureScript.AST
-import Language.PureScript.Errors
-
-import qualified Language.PureScript.Constants as C
 
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class
+
+
+import Language.PureScript.AST
+import Language.PureScript.Crash
+import Language.PureScript.Errors
+import Language.PureScript.Names
+import qualified Language.PureScript.Constants as C
 
 -- |
 -- Replace all @DoNotationBind@ and @DoNotationValue@ constructors with applications of the Prelude.bind function,

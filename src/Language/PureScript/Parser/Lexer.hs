@@ -1,20 +1,6 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Parser.Lexer
--- Copyright   :  (c) Phil Freeman 2014
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- The first step in the parsing process - turns source code into a list of lexemes
 --
------------------------------------------------------------------------------
-
-{-# LANGUAGE TupleSections #-}
-
 module Language.PureScript.Parser.Lexer
   ( PositionedToken(..)
   , Token()
@@ -75,15 +61,14 @@ module Language.PureScript.Parser.Lexer
 
 import Prelude hiding (lex)
 
-import Data.Char (isSpace, isAscii, isSymbol, isAlphaNum)
-
+import Control.Applicative
 import Control.Monad (void, guard)
+
+import Data.Char (isSpace, isAscii, isSymbol, isAlphaNum)
 import Data.Functor.Identity
 
-import Control.Applicative
-
-import Language.PureScript.Parser.State
 import Language.PureScript.Comments
+import Language.PureScript.Parser.State
 
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Token as PT

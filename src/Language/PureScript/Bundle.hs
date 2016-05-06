@@ -1,25 +1,9 @@
------------------------------------------------------------------------------
---
--- Module      :  psc-bundle
--- Copyright   :  (c) Phil Freeman 2015
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- | Bundles compiled PureScript modules for the browser.
+-- |
+-- Bundles compiled PureScript modules for the browser.
 --
 -- This module takes as input the individual generated modules from 'Language.PureScript.Make' and
 -- performs dead code elimination, filters empty modules,
 -- and generates the final Javascript bundle.
------------------------------------------------------------------------------
-
-{-# LANGUAGE PatternGuards #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
-
 module Language.PureScript.Bundle (
      bundle
    , ModuleIdentifier(..)
@@ -30,19 +14,18 @@ module Language.PureScript.Bundle (
    , getExportedIdentifiers
 ) where
 
-import Prelude ()
 import Prelude.Compat
-
-import Data.List (nub, stripPrefix)
-import Data.Maybe (mapMaybe, catMaybes)
-import Data.Generics (everything, everywhere, mkQ, mkT)
-import Data.Graph
-import Data.Version (showVersion)
-
-import qualified Data.Set as S
 
 import Control.Monad
 import Control.Monad.Error.Class
+
+import Data.Generics (everything, everywhere, mkQ, mkT)
+import Data.Graph
+import Data.List (nub, stripPrefix)
+import Data.Maybe (mapMaybe, catMaybes)
+import Data.Version (showVersion)
+import qualified Data.Set as S
+
 import Language.JavaScript.Parser
 import Language.JavaScript.Parser.AST
 

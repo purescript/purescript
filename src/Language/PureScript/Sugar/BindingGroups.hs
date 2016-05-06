@@ -1,7 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE LambdaCase #-}
-
 -- |
 -- This module implements the desugaring pass which creates binding groups from sets of
 -- mutually-recursive value declarations and mutually-recursive type declarations.
@@ -13,7 +9,6 @@ module Language.PureScript.Sugar.BindingGroups
   , collapseBindingGroupsModule
   ) where
 
-import Prelude ()
 import Prelude.Compat
 
 import Control.Monad ((<=<))

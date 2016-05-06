@@ -1,21 +1,22 @@
-module Language.PureScript.Parser.Types (
-    parseType,
-    parsePolyType,
-    noWildcards,
-    parseTypeAtom
-) where
+module Language.PureScript.Parser.Types
+  ( parseType
+  , parsePolyType
+  , noWildcards
+  , parseTypeAtom
+  ) where
+
+import Prelude.Compat
 
 import Control.Applicative
 import Control.Monad (when, unless)
 
+import Language.PureScript.AST.SourcePos
+import Language.PureScript.Environment
 import Language.PureScript.Names
-import Language.PureScript.Types
 import Language.PureScript.Parser.Common
 import Language.PureScript.Parser.Kinds
 import Language.PureScript.Parser.Lexer
-import Language.PureScript.Environment
-
-import Language.PureScript.AST.SourcePos
+import Language.PureScript.Types
 
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P

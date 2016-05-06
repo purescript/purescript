@@ -12,11 +12,7 @@
 -- Type definitions for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE ConstraintKinds            #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
 
 module Language.PureScript.Ide.Types where
 

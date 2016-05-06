@@ -1,35 +1,25 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE PatternGuards #-}
 
 -- |
 -- The top-level type checker, which checks all declarations in a module.
 --
-module Language.PureScript.TypeChecker (
-    module T,
-    typeCheckModule
-) where
+module Language.PureScript.TypeChecker
+  ( module T
+  , typeCheckModule
+  ) where
 
-import Prelude ()
 import Prelude.Compat
 
-import Language.PureScript.TypeChecker.Monad as T
-import Language.PureScript.TypeChecker.Kinds as T
-import Language.PureScript.TypeChecker.Types as T
-import Language.PureScript.TypeChecker.Synonyms as T
-
-import Data.Maybe
-import Data.List (nub, nubBy, (\\), sort, group)
-import Data.Foldable (for_, traverse_)
-
-import qualified Data.Map as M
-
 import Control.Monad (when, unless, void, forM, forM_)
-import Control.Monad.Supply.Class (MonadSupply)
-import Control.Monad.State.Class (MonadState(..), modify)
 import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.State.Class (MonadState(..), modify)
+import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Writer.Class (MonadWriter(..))
+
+import Data.Foldable (for_, traverse_)
+import Data.List (nub, nubBy, (\\), sort, group)
+import Data.Maybe
+import qualified Data.Map as M
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -39,6 +29,10 @@ import Language.PureScript.Kinds
 import Language.PureScript.Linter
 import Language.PureScript.Names
 import Language.PureScript.Traversals
+import Language.PureScript.TypeChecker.Kinds as T
+import Language.PureScript.TypeChecker.Monad as T
+import Language.PureScript.TypeChecker.Synonyms as T
+import Language.PureScript.TypeChecker.Types as T
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 

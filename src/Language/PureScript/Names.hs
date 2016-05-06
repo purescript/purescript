@@ -1,19 +1,18 @@
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE EmptyDataDecls #-}
-{-# LANGUAGE KindSignatures #-}
 
 -- |
 -- Data types for names
 --
 module Language.PureScript.Names where
 
+import Prelude.Compat
+
 import Control.Monad (liftM)
 import Control.Monad.Supply.Class
 
-import Data.List
 import Data.Aeson
 import Data.Aeson.TH
+import Data.List
 
 -- |
 -- Names for value identifiers

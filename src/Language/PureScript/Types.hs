@@ -6,19 +6,18 @@
 --
 module Language.PureScript.Types where
 
-import Prelude ()
 import Prelude.Compat
+
+import Control.Monad ((<=<))
 
 import Data.List (nub)
 import Data.Maybe (fromMaybe)
 import qualified Data.Aeson as A
 import qualified Data.Aeson.TH as A
 
-import Control.Monad ((<=<))
-
-import Language.PureScript.Names
-import Language.PureScript.Kinds
 import Language.PureScript.AST.SourcePos
+import Language.PureScript.Kinds
+import Language.PureScript.Names
 
 -- |
 -- An identifier for the scope of a skolem variable
@@ -41,7 +40,7 @@ data Type
   -- |
   -- A type wildcard, as would appear in a partial type synonym
   --
-  | TypeWildcard (SourceSpan)
+  | TypeWildcard SourceSpan
   -- |
   -- A type constructor
   --
