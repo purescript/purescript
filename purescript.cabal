@@ -77,8 +77,6 @@ extra-source-files: examples/passing/*.purs
                   , tests/support/pscide/src/*.js
                   , tests/support/pscide/src/*.fail
                   , stack.yaml
-                  , stack-lts-5.yaml
-                  , stack-nightly.yaml
                   , README.md
                   , INSTALL.md
                   , CONTRIBUTORS.md
