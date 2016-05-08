@@ -99,7 +99,7 @@ insertPlaceholders :: Type -> Type
 insertPlaceholders = everywhereOnTypesTopDown convertForAlls . everywhereOnTypes convert
   where
   convert (TypeApp (TypeApp f arg) ret) | f == tyFunction = PrettyPrintFunction arg ret
-  convert (TypeApp o r) | o == tyObject = PrettyPrintObject r
+  convert (TypeApp o r) | o == tyRecord = PrettyPrintObject r
   convert other = other
   convertForAlls (ForAll ident ty _) = go [ident] ty
     where

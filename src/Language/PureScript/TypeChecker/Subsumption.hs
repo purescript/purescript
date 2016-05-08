@@ -53,7 +53,7 @@ subsumes' val ty1 (KindedType ty2 _) =
 subsumes' (Just val) (ConstrainedType constraints ty1) ty2 = do
   dicts <- getTypeClassDictionaries
   subsumes' (Just $ foldl App val (map (flip TypeClassDictionary dicts) constraints)) ty1 ty2
-subsumes' val (TypeApp f1 r1) (TypeApp f2 r2) | f1 == tyObject && f2 == tyObject = do
+subsumes' val (TypeApp f1 r1) (TypeApp f2 r2) | f1 == tyRecord && f2 == tyRecord = do
   let
     (ts1, r1') = rowToList r1
     (ts2, r2') = rowToList r2
@@ -80,7 +80,7 @@ subsumes' val (TypeApp f1 r1) (TypeApp f2 r2) | f1 == tyObject && f2 == tyObject
                        REmpty -> throwError . errorMessage $ PropertyIsMissing p2
                        _ -> unifyTypes r1' (RCons p2 ty2 rest)
                      go ((p1, ty1) : ts1) ts2 rest r2'
-subsumes' val ty1 ty2@(TypeApp obj _) | obj == tyObject = subsumes val ty2 ty1
+subsumes' val ty1 ty2@(TypeApp obj _) | obj == tyRecord = subsumes val ty2 ty1
 subsumes' val ty1 ty2 = do
   unifyTypes ty1 ty2
   return val

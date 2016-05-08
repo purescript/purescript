@@ -233,7 +233,7 @@ typeClassDictionaryDeclaration name args implies members =
         ]
       members' = map (first runIdent . memberToNameAndType) members
       mtys = members' ++ superclassTypes
-  in TypeSynonymDeclaration (coerceProperName name) args (TypeApp tyObject $ rowFromList (mtys, REmpty))
+  in TypeSynonymDeclaration (coerceProperName name) args (TypeApp tyRecord $ rowFromList (mtys, REmpty))
 
 typeClassMemberToDictionaryAccessor
   :: ModuleName
@@ -251,7 +251,7 @@ typeClassMemberToDictionaryAccessor mn name args (PositionedDeclaration pos com 
 typeClassMemberToDictionaryAccessor _ _ _ _ = internalError "Invalid declaration in type class definition"
 
 unit :: Type
-unit = TypeApp tyObject REmpty
+unit = TypeApp tyRecord REmpty
 
 typeInstanceDictionaryDeclaration
   :: forall m

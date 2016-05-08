@@ -410,7 +410,7 @@ mkVar :: Ident -> Expr
 mkVar = mkVarMn Nothing
 
 objectType :: Type -> Maybe Type
-objectType (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Object"))) rec) = Just rec
+objectType (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Record"))) rec) = Just rec
 objectType _ = Nothing
 
 decomposeRec :: Type -> [(String, Type)]
