@@ -202,7 +202,7 @@ tyRecord :: Type
 tyRecord = primTy "Record"
 
 -- |
--- Check whether a type is an object
+-- Check whether a type is a record
 --
 isObject :: Type -> Bool
 isObject = isTypeOrApplied tyRecord
