@@ -258,6 +258,16 @@ library
                      Language.PureScript.Ide.Util
                      Language.PureScript.Ide.Rebuild
 
+                     Language.PureScript.Interactive
+                     Language.PureScript.Interactive.Types
+                     Language.PureScript.Interactive.Parser
+                     Language.PureScript.Interactive.Directive
+                     Language.PureScript.Interactive.Completion
+                     Language.PureScript.Interactive.IO
+                     Language.PureScript.Interactive.Message
+                     Language.PureScript.Interactive.Module
+                     Language.PureScript.Interactive.Printer
+
                      Control.Monad.Logger
                      Control.Monad.Supply
                      Control.Monad.Supply.Class
@@ -308,16 +318,7 @@ executable psci
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psci
-    other-modules: PSCi.Types
-                   PSCi.Parser
-                   PSCi.Directive
-                   PSCi.Completion
-                   PSCi.IO
-                   PSCi.Message
-                   PSCi.Option
-                   PSCi.Module
-                   PSCi.Printer
-                   Paths_purescript
+    other-modules: Paths_purescript
     ghc-options: -Wall -O2
 
 executable psc-docs

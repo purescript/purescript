@@ -24,9 +24,9 @@ import Test.HUnit
 
 import qualified Language.PureScript as P
 
-import PSCi.Module (loadAllModules)
-import PSCi.Completion
-import PSCi.Types
+import Language.PureScript.Interactive.Module (loadAllModules)
+import Language.PureScript.Interactive.Completion
+import Language.PureScript.Interactive.Types
 
 import TestUtils (supportModules)
 

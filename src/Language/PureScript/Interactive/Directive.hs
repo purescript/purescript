@@ -1,17 +1,15 @@
 -- |
 -- Directives for PSCI.
 --
-module PSCi.Directive where
+module Language.PureScript.Interactive.Directive where
 
-import Prelude ()
 import Prelude.Compat
-
 
 import Data.Maybe (fromJust, listToMaybe)
 import Data.List (isPrefixOf)
 import Data.Tuple (swap)
 
-import PSCi.Types
+import Language.PureScript.Interactive.Types
 
 -- |
 -- List of all avaliable directives.

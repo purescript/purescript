@@ -1,12 +1,11 @@
 -- |
 -- Type declarations and associated basic functions for PSCI.
 --
-module PSCi.Types where
+module Language.PureScript.Interactive.Types where
 
-import Prelude ()
 import Prelude.Compat
 
-import Data.Map (Map)
+import           Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Language.PureScript as P
 

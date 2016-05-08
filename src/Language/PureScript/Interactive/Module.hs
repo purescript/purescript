@@ -1,13 +1,12 @@
-module PSCi.Module where
+module Language.PureScript.Interactive.Module where
 
-import Prelude ()
-import Prelude.Compat
+import           Prelude.Compat
 
+import           Control.Monad
 import qualified Language.PureScript as P
-import PSCi.Types
-import System.FilePath (pathSeparator)
-import System.IO.UTF8 (readUTF8File)
-import Control.Monad
+import           Language.PureScript.Interactive.Types
+import           System.FilePath (pathSeparator)
+import           System.IO.UTF8 (readUTF8File)
 
 -- | The name of the PSCI support module
 supportModuleName :: P.ModuleName

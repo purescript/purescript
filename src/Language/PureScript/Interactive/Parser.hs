@@ -1,23 +1,19 @@
 -- |
 -- Parser for PSCI.
 --
-module PSCi.Parser
+module Language.PureScript.Interactive.Parser
   ( parseCommand
   ) where
 
-import Prelude ()
-import Prelude.Compat hiding (lex)
+import           Prelude.Compat hiding (lex)
 
-import Data.Char (isSpace)
-import Data.List (intercalate)
-
-import Text.Parsec hiding ((<|>))
-
+import           Data.Char (isSpace)
+import           Data.List (intercalate)
+import           Text.Parsec hiding ((<|>))
 import qualified Language.PureScript as P
-import Language.PureScript.Parser.Common (mark, same)
-
-import qualified PSCi.Directive as D
-import PSCi.Types
+import qualified Language.PureScript.Interactive.Directive as D
+import           Language.PureScript.Interactive.Types
+import           Language.PureScript.Parser.Common (mark, same)
 
 -- |
 -- Parses PSCI metacommands or expressions input from the user.

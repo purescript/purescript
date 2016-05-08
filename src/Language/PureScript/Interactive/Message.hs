@@ -1,11 +1,12 @@
-module PSCi.Message where
+module Language.PureScript.Interactive.Message where
 
+import           Prelude.Compat
 
 import           Data.List (intercalate)
 import           Data.Version (showVersion)
 import qualified Paths_purescript as Paths
-import qualified PSCi.Directive as D
-import           PSCi.Types
+import qualified Language.PureScript.Interactive.Directive as D
+import           Language.PureScript.Interactive.Types
 
 -- Messages
 
