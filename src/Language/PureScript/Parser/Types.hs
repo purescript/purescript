@@ -82,10 +82,10 @@ parseConstrainedType = do
 parseAnyType :: TokenParser Type
 parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTable parseTypeAtom) P.<?> "type"
   where
-  operators = [ [ P.Infix (P.try (parseQualified (Op <$> symbol)) >>= \ident ->
+  operators = [ [ P.Infix (return TypeApp) P.AssocLeft ]
+              , [ P.Infix (P.try (parseQualified (Op <$> symbol)) >>= \ident ->
                     return (BinaryNoParensType (TypeOp ident))) P.AssocRight
                 ]
-              , [ P.Infix (return TypeApp) P.AssocLeft ]
               , [ P.Infix (rarrow >> return function) P.AssocRight ]
               ]
   postfixTable = [ \t -> KindedType t <$> (indented *> doubleColon *> parseKind)
