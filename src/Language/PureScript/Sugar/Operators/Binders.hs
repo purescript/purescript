@@ -1,6 +1,5 @@
 module Language.PureScript.Sugar.Operators.Binders where
 
-import Prelude ()
 import Prelude.Compat
 
 import Language.PureScript.AST

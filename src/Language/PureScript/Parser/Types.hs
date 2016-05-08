@@ -1,21 +1,22 @@
-module Language.PureScript.Parser.Types (
-    parseType,
-    parsePolyType,
-    noWildcards,
-    parseTypeAtom
-) where
+module Language.PureScript.Parser.Types
+  ( parseType
+  , parsePolyType
+  , noWildcards
+  , parseTypeAtom
+  ) where
+
+import Prelude.Compat
 
 import Control.Applicative
 import Control.Monad (when, unless)
 
+import Language.PureScript.AST.SourcePos
+import Language.PureScript.Environment
 import Language.PureScript.Names
-import Language.PureScript.Types
 import Language.PureScript.Parser.Common
 import Language.PureScript.Parser.Kinds
 import Language.PureScript.Parser.Lexer
-import Language.PureScript.Environment
-
-import Language.PureScript.AST.SourcePos
+import Language.PureScript.Types
 
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
@@ -75,16 +76,16 @@ parseConstrainedType = do
     className <- parseQualified properName
     indented
     ty <- P.many parseTypeAtom
-    return (className, ty)
+    return (Constraint className ty Nothing)
 
 
 parseAnyType :: TokenParser Type
 parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTable parseTypeAtom) P.<?> "type"
   where
-  operators = [ [ P.Infix (P.try (parseQualified (Op <$> symbol)) >>= \ident ->
+  operators = [ [ P.Infix (return TypeApp) P.AssocLeft ]
+              , [ P.Infix (P.try (parseQualified (Op <$> symbol)) >>= \ident ->
                     return (BinaryNoParensType (TypeOp ident))) P.AssocRight
                 ]
-              , [ P.Infix (return TypeApp) P.AssocLeft ]
               , [ P.Infix (rarrow >> return function) P.AssocRight ]
               ]
   postfixTable = [ \t -> KindedType t <$> (indented *> doubleColon *> parseKind)

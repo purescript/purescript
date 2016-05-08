@@ -1,18 +1,6 @@
------------------------------------------------------------------------------
---
--- Module      :  Parser
--- Copyright   :  (c) Phil Freeman 2014
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- Parser for PSCI.
 --
------------------------------------------------------------------------------
-
 module PSCi.Parser
   ( parseCommand
   ) where

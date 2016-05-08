@@ -1,9 +1,9 @@
-{-# LANGUAGE DeriveFunctor #-}
-
 -- |
 -- The core functional representation for binders
 --
 module Language.PureScript.CoreFn.Binders where
+
+import Prelude.Compat
 
 import Language.PureScript.AST.Literals
 import Language.PureScript.Names

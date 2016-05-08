@@ -4,7 +4,10 @@ module Language.PureScript.Publish.BoxesHelpers
   , module Language.PureScript.Publish.BoxesHelpers
   ) where
 
+import Prelude.Compat
+
 import System.IO (hPutStr, stderr)
+
 import qualified Text.PrettyPrint.Boxes as Boxes
 
 width :: Int

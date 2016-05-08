@@ -1,12 +1,9 @@
-{-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PackageImports        #-}
-{-# LANGUAGE RecordWildCards       #-}
-{-# LANGUAGE TupleSections         #-}
 
 module Language.PureScript.Ide.Rebuild where
+
+import           Prelude.Compat
 
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.State

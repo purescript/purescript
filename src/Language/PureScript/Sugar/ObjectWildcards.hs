@@ -1,12 +1,7 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE PatternGuards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
+module Language.PureScript.Sugar.ObjectWildcards
+  ( desugarObjectConstructors
+  ) where
 
-module Language.PureScript.Sugar.ObjectWildcards (
-  desugarObjectConstructors
-) where
-
-import Prelude ()
 import Prelude.Compat
 
 import Control.Monad (forM)

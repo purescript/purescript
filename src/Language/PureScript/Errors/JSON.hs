@@ -1,22 +1,7 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Errors.JSON
--- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
--- License     :  MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- |
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE TemplateHaskell #-}
 
 module Language.PureScript.Errors.JSON where
 
-import Prelude ()
 import Prelude.Compat
 
 import qualified Data.Aeson.TH as A

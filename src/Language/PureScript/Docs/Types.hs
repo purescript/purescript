@@ -1,7 +1,4 @@
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE RankNTypes #-}
 
 module Language.PureScript.Docs.Types
   ( module Language.PureScript.Docs.Types
@@ -9,24 +6,25 @@ module Language.PureScript.Docs.Types
   )
   where
 
-import Prelude ()
 import Prelude.Compat
 
 import Control.Arrow (first, (***))
 import Control.Monad (when)
-import Data.Maybe (mapMaybe)
-import Data.Version
+
 import Data.Aeson ((.=))
-import qualified Data.Aeson as A
 import Data.Aeson.BetterErrors
-import Text.ParserCombinators.ReadP (readP_to_S)
-import Data.Text (Text)
 import Data.ByteString.Lazy (ByteString)
+import Data.Maybe (mapMaybe)
+import Data.Text (Text)
+import Data.Version
+import qualified Data.Aeson as A
 import qualified Data.Text as T
 
-import Web.Bower.PackageMeta hiding (Version, displayError)
-
 import qualified Language.PureScript as P
+
+import Text.ParserCombinators.ReadP (readP_to_S)
+
+import Web.Bower.PackageMeta hiding (Version, displayError)
 
 import Language.PureScript.Docs.RenderedCode as ReExports
   (RenderedCode, asRenderedCode,
@@ -465,8 +463,9 @@ asSourcePos = P.SourcePos <$> nth 0 asIntegral
                           <*> nth 1 asIntegral
 
 asConstraint :: Parse PackageError P.Constraint
-asConstraint = (,) <$> nth 0 asQualifiedProperName
-                   <*> nth 1 (eachInArray asType)
+asConstraint = P.Constraint <$> key "constraintClass" asQualifiedProperName
+                            <*> key "constraintArgs" (eachInArray asType)
+                            <*> pure Nothing
 
 asQualifiedProperName :: Parse e (P.Qualified (P.ProperName a))
 asQualifiedProperName = fromAesonParser

@@ -1,6 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE FlexibleContexts #-}
-
 module Language.PureScript.Docs.AsMarkdown
   ( renderModulesAsMarkdown
   , Docs
@@ -9,19 +6,18 @@ module Language.PureScript.Docs.AsMarkdown
   , codeToString
   ) where
 
-import Prelude ()
 import Prelude.Compat
 
 import Control.Monad (unless, zipWithM_)
-import Control.Monad.Writer (Writer, tell, execWriter)
 import Control.Monad.Error.Class (MonadError)
+import Control.Monad.Writer (Writer, tell, execWriter)
+
 import Data.Foldable (for_)
 import Data.List (partition)
 
-import qualified Language.PureScript as P
-
-import Language.PureScript.Docs.Types
 import Language.PureScript.Docs.RenderedCode
+import Language.PureScript.Docs.Types
+import qualified Language.PureScript as P
 import qualified Language.PureScript.Docs.Convert as Convert
 import qualified Language.PureScript.Docs.Render as Render
 

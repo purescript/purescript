@@ -12,10 +12,6 @@
 -- Provides functionality to manage imports
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE LambdaCase            #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PackageImports        #-}
 
@@ -34,6 +30,7 @@ module Language.PureScript.Ide.Imports
        )
        where
 
+import           Prelude.Compat
 import           Control.Applicative                ((<|>))
 import           Control.Monad.Error.Class
 import           Control.Monad.IO.Class

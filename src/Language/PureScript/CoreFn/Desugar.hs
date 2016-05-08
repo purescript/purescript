@@ -1,30 +1,28 @@
 module Language.PureScript.CoreFn.Desugar (moduleToCoreFn) where
 
-import Prelude ()
 import Prelude.Compat
 
+import Control.Arrow (second, (***))
 
 import Data.Function (on)
 import Data.List (sort, sortBy, nub)
 import Data.Maybe (mapMaybe)
 import qualified Data.Map as M
 
-import Control.Arrow (second, (***))
-
-import Language.PureScript.Crash
+import Language.PureScript.AST.Literals
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.AST.Traversals
+import Language.PureScript.Comments
 import Language.PureScript.CoreFn.Ann
 import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Expr
-import Language.PureScript.AST.Literals
 import Language.PureScript.CoreFn.Meta
 import Language.PureScript.CoreFn.Module
+import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Names
 import Language.PureScript.Sugar.TypeClasses (typeClassMemberName, superClassDictionaryNames)
 import Language.PureScript.Types
-import Language.PureScript.Comments
 import qualified Language.PureScript.AST as A
 
 -- |

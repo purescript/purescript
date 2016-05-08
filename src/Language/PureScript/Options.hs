@@ -1,19 +1,9 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Options
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- The data type of compiler options
 --
------------------------------------------------------------------------------
-
 module Language.PureScript.Options where
+
+import Prelude.Compat
 
 -- |
 -- The data type of compiler options

@@ -1,30 +1,26 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 -- |
 -- This module implements the desugaring pass which replaces top-level binders with
 -- case expressions.
 --
-module Language.PureScript.Sugar.CaseDeclarations (
-    desugarCases,
-    desugarCasesModule
-) where
+module Language.PureScript.Sugar.CaseDeclarations
+  ( desugarCases
+  , desugarCasesModule
+  ) where
 
-import Prelude ()
 import Prelude.Compat
 
-import Language.PureScript.Crash
-import Data.Maybe (catMaybes, mapMaybe)
 import Data.List (nub, groupBy, foldl1')
+import Data.Maybe (catMaybes, mapMaybe)
 
 import Control.Monad ((<=<), forM, replicateM, join, unless)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class
 
-import Language.PureScript.Names
 import Language.PureScript.AST
+import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
+import Language.PureScript.Names
 import Language.PureScript.Traversals
 import Language.PureScript.TypeChecker.Monad (guardWith)
 

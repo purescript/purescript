@@ -1,10 +1,4 @@
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Language.PureScript.Make
@@ -24,56 +18,41 @@ module Language.PureScript.Make
   , buildMakeActions
   ) where
 
-import Prelude ()
 import Prelude.Compat
 
 import Control.Applicative ((<|>))
-import Control.Monad hiding (sequence)
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Writer.Class (MonadWriter(..))
-import Control.Monad.Trans.Class (MonadTrans(..))
-import Control.Monad.Trans.Except
-import Control.Monad.IO.Class
-import Control.Monad.Reader (MonadReader(..), ReaderT(..), asks)
-import Control.Monad.Logger
-import Control.Monad.Supply
-import Control.Monad.Base (MonadBase(..))
-import Control.Monad.Trans.Control (MonadBaseControl(..))
-
 import Control.Concurrent.Lifted as C
+import Control.Monad hiding (sequence)
+import Control.Monad.Base (MonadBase(..))
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.IO.Class
+import Control.Monad.Logger
+import Control.Monad.Reader (MonadReader(..), ReaderT(..), asks)
+import Control.Monad.Supply
+import Control.Monad.Trans.Class (MonadTrans(..))
+import Control.Monad.Trans.Control (MonadBaseControl(..))
+import Control.Monad.Trans.Except
+import Control.Monad.Writer.Class (MonadWriter(..))
 
+import Data.Aeson (encode, decode)
+import Data.Either (partitionEithers)
+import Data.Foldable (for_)
 import Data.List (foldl', sort)
 import Data.Maybe (fromMaybe, catMaybes)
-import Data.Either (partitionEithers)
-import Data.Time.Clock
 import Data.String (fromString)
-import Data.Foldable (for_)
+import Data.Time.Clock
 import Data.Traversable (for)
 import Data.Version (showVersion)
-import Data.Aeson (encode, decode)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.UTF8 as BU8
-import qualified Data.Set as S
 import qualified Data.Map as M
+import qualified Data.Set as S
 
-import qualified Text.Parsec as Parsec
-
-import SourceMap.Types
-import SourceMap
-
-import System.Directory
-       (doesFileExist, getModificationTime, createDirectoryIfMissing, getCurrentDirectory)
-import System.FilePath ((</>), takeDirectory, makeRelative, splitPath, normalise)
-import System.IO.Error (tryIOError)
-import System.IO.UTF8 (readUTF8File, writeUTF8File)
-
-import qualified Language.JavaScript.Parser as JS
-
-import Language.PureScript.Crash
 import Language.PureScript.AST
-import Language.PureScript.Externs
+import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
+import Language.PureScript.Externs
 import Language.PureScript.Linter
 import Language.PureScript.ModuleDependencies
 import Language.PureScript.Names
@@ -83,13 +62,24 @@ import Language.PureScript.Pretty.Common(SMap(..))
 import Language.PureScript.Renamer
 import Language.PureScript.Sugar
 import Language.PureScript.TypeChecker
-import qualified Language.PureScript.Constants as C
+import qualified Language.JavaScript.Parser as JS
 import qualified Language.PureScript.Bundle as Bundle
+import qualified Language.PureScript.CodeGen.JS as J
+import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.CoreFn as CF
 import qualified Language.PureScript.Parser as PSParser
 
-import qualified Language.PureScript.CodeGen.JS as J
-import qualified Language.PureScript.CoreFn as CF
 import qualified Paths_purescript as Paths
+
+import SourceMap
+import SourceMap.Types
+
+import System.Directory (doesFileExist, getModificationTime, createDirectoryIfMissing, getCurrentDirectory)
+import System.FilePath ((</>), takeDirectory, makeRelative, splitPath, normalise)
+import System.IO.Error (tryIOError)
+import System.IO.UTF8 (readUTF8File, writeUTF8File)
+
+import qualified Text.Parsec as Parsec
 
 -- | Progress messages from the make process
 data ProgressMessage
@@ -160,10 +150,9 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
   let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
       withPrim = importPrim m
   lint withPrim
-  ((checked@(Module ss coms _ elaborated exps), env'), nextVar) <- runSupplyT 0 $ do
+  ((Module ss coms _ elaborated exps, env'), nextVar) <- runSupplyT 0 $ do
     [desugared] <- desugar externs [withPrim]
     runCheck' env $ typeCheckModule desugared
-  checkExhaustiveModule env' checked
   regrouped <- createBindingGroups moduleName . collapseBindingGroups $ elaborated
   let mod' = Module ss coms moduleName regrouped exps
       corefn = CF.moduleToCoreFn env' mod'

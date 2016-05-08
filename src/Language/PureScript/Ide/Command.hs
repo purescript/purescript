@@ -12,9 +12,7 @@
 -- Datatypes for the commands psc-ide accepts
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
 
 module Language.PureScript.Ide.Command where
 

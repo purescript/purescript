@@ -1,8 +1,3 @@
-{-# LANGUAGE GADTs #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 -- |
 -- This module generates code in the simplified Javascript intermediate representation from Purescript code
 --
@@ -12,14 +7,7 @@ module Language.PureScript.CodeGen.JS
   , moduleToJs
   ) where
 
-import Prelude ()
 import Prelude.Compat
-
-import Data.List ((\\), delete, intersect)
-import Data.Maybe (isNothing, fromMaybe)
-import qualified Data.Map as M
-import qualified Data.Foldable as F
-import qualified Data.Traversable as T
 
 import Control.Arrow ((&&&))
 import Control.Monad (replicateM, forM, void)
@@ -27,14 +15,20 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Reader (MonadReader, asks)
 import Control.Monad.Supply.Class
 
-import Language.PureScript.Crash
+import Data.List ((\\), delete, intersect)
+import Data.Maybe (isNothing, fromMaybe)
+import qualified Data.Foldable as F
+import qualified Data.Map as M
+import qualified Data.Traversable as T
+
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.CodeGen.JS.AST as AST
 import Language.PureScript.CodeGen.JS.Common as Common
-import Language.PureScript.CoreFn
-import Language.PureScript.Names
-import Language.PureScript.Errors
 import Language.PureScript.CodeGen.JS.Optimizer
+import Language.PureScript.CoreFn
+import Language.PureScript.Crash
+import Language.PureScript.Errors
+import Language.PureScript.Names
 import Language.PureScript.Options
 import Language.PureScript.Traversals (sndM)
 import qualified Language.PureScript.Constants as C

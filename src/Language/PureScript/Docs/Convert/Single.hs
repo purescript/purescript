@@ -1,26 +1,21 @@
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 module Language.PureScript.Docs.Convert.Single
   ( convertSingleModule
   , collectBookmarks
   ) where
 
-import Prelude ()
 import Prelude.Compat
-import Data.Maybe (mapMaybe, isNothing)
 
-import Control.Monad
 import Control.Category ((>>>))
+import Control.Monad
+
 import Data.Either
 import Data.List (nub, isPrefixOf, isSuffixOf)
-
-import qualified Language.PureScript as P
+import Data.Maybe (mapMaybe, isNothing)
 
 import Language.PureScript.Docs.Types
+import qualified Language.PureScript as P
 
 -- |
 -- Convert a single Module, but ignore re-exports; any re-exported types or

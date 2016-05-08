@@ -3,7 +3,10 @@ module Language.PureScript.AST.Exported
   , isExported
   ) where
 
+import Prelude.Compat
+
 import Control.Category ((>>>))
+
 import Data.Maybe (mapMaybe)
 
 import Language.PureScript.AST.Declarations
@@ -99,7 +102,7 @@ typeInstanceConstituents (TypeInstanceDeclaration _ constraints className tys _)
   Left className : (concatMap fromConstraint constraints ++ concatMap fromType tys)
   where
 
-  fromConstraint (name, tys') = Left name : concatMap fromType tys'
+  fromConstraint c = Left (constraintClass c) : concatMap fromType (constraintArgs c)
   fromType = everythingOnTypes (++) go
 
   -- Note that type synonyms are disallowed in instance declarations, so

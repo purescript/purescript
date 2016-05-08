@@ -58,7 +58,7 @@ printModuleSignatures moduleName (P.Environment {..}) =
                     if null constrs
                     then Box.text ""
                     else Box.text "("
-                         Box.<> Box.hcat Box.left (intersperse (Box.text ", ") $ map (\(P.Qualified _ pn, lt) -> Box.text (P.runProperName pn) Box.<+> Box.hcat Box.left (map P.typeAtomAsBox lt)) constrs)
+                         Box.<> Box.hcat Box.left (intersperse (Box.text ", ") $ map (\(P.Constraint (P.Qualified _ pn) lt _) -> Box.text (P.runProperName pn) Box.<+> Box.hcat Box.left (map P.typeAtomAsBox lt)) constrs)
                          Box.<> Box.text ") <= "
                 className =
                     Box.text (P.runProperName name)

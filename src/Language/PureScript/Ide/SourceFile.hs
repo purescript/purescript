@@ -12,8 +12,6 @@
 -- Getting declarations from PureScript sourcefiles
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 
 module Language.PureScript.Ide.SourceFile where

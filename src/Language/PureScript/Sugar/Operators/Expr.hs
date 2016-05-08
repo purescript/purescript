@@ -1,9 +1,5 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module Language.PureScript.Sugar.Operators.Expr where
 
-import Prelude ()
 import Prelude.Compat
 
 import Data.Functor.Identity

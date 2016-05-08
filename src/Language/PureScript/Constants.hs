@@ -1,7 +1,9 @@
--- |
--- Various constants which refer to things in the Prelude
---
+-- | Various constants which refer to things in the Prelude
 module Language.PureScript.Constants where
+
+import Prelude.Compat
+
+import Language.PureScript.Names
 
 -- Operators
 
@@ -316,6 +318,14 @@ toSignature = "toSignature"
 
 main :: String
 main = "main"
+
+-- Prim
+
+partial :: String
+partial = "Partial"
+
+pattern Partial :: Qualified (ProperName 'ClassName)
+pattern Partial = Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Partial")
 
 -- Code Generation
 

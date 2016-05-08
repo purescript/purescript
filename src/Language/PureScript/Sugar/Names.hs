@@ -1,8 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
-
 module Language.PureScript.Sugar.Names
   ( desugarImports
   , desugarImportsWithEnv
@@ -13,32 +8,30 @@ module Language.PureScript.Sugar.Names
   , Exports(..)
   ) where
 
-import Prelude ()
 import Prelude.Compat
-
-import Data.List (find, nub)
-import Data.Maybe (fromMaybe, mapMaybe)
 
 import Control.Arrow (first)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Writer (MonadWriter(..), censor)
 import Control.Monad.State.Lazy
+import Control.Monad.Writer (MonadWriter(..), censor)
 
+import Data.List (find, nub)
+import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
-import Language.PureScript.Crash
 import Language.PureScript.AST
-import Language.PureScript.Names
-import Language.PureScript.Types
+import Language.PureScript.Crash
 import Language.PureScript.Errors
-import Language.PureScript.Traversals
 import Language.PureScript.Externs
-import Language.PureScript.Sugar.Names.Env
-import Language.PureScript.Sugar.Names.Imports
-import Language.PureScript.Sugar.Names.Exports
 import Language.PureScript.Linter.Imports
+import Language.PureScript.Names
+import Language.PureScript.Sugar.Names.Env
+import Language.PureScript.Sugar.Names.Exports
+import Language.PureScript.Sugar.Names.Imports
+import Language.PureScript.Traversals
+import Language.PureScript.Types
 
 -- |
 -- Replaces all local names with qualified names within a list of modules. The
@@ -251,7 +244,10 @@ renameInModule env imports (Module ss coms mn decls exps) =
     updateType t = return t
 
   updateConstraints :: Maybe SourceSpan -> [Constraint] -> m [Constraint]
-  updateConstraints pos = traverse (\(name, ts) -> (,) <$> updateClassName name pos <*> traverse (updateTypesEverywhere pos) ts)
+  updateConstraints pos = traverse (\(Constraint name ts info) ->
+                                       Constraint <$> updateClassName name pos
+                                                  <*> traverse (updateTypesEverywhere pos) ts
+                                                  <*> pure info)
 
   updateTypeName
     :: Qualified (ProperName 'TypeName)

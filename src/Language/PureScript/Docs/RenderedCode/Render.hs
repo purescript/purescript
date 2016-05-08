@@ -1,33 +1,31 @@
 -- | Functions for producing RenderedCode values from PureScript Type values.
 
-module Language.PureScript.Docs.RenderedCode.Render (
-    renderType,
-    renderTypeAtom,
-    renderRow,
-    renderKind,
-    RenderTypeOptions(..),
-    defaultRenderTypeOptions,
-    renderTypeWithOptions
-) where
+module Language.PureScript.Docs.RenderedCode.Render
+  ( renderType
+  , renderTypeAtom
+  , renderRow
+  , renderKind
+  , RenderTypeOptions(..)
+  , defaultRenderTypeOptions
+  , renderTypeWithOptions
+  ) where
 
-import Prelude ()
 import Prelude.Compat
 
-import Data.Monoid ((<>))
 import Data.Maybe (fromMaybe)
+import Data.Monoid ((<>))
 
 import Control.Arrow ((<+>))
-import Control.PatternArrows
+import Control.PatternArrows as PA
 
 import Language.PureScript.Crash
-import Language.PureScript.Names
-import Language.PureScript.Types
-import Language.PureScript.Kinds
-import Language.PureScript.Pretty.Kinds
-import Language.PureScript.Environment
-
 import Language.PureScript.Docs.RenderedCode.Types
 import Language.PureScript.Docs.Utils.MonoidExtras
+import Language.PureScript.Environment
+import Language.PureScript.Kinds
+import Language.PureScript.Names
+import Language.PureScript.Pretty.Kinds
+import Language.PureScript.Types
 
 typeLiterals :: Pattern () Type RenderedCode
 typeLiterals = mkPattern match
@@ -56,7 +54,7 @@ typeLiterals = mkPattern match
     Nothing
 
 renderConstraint :: Constraint -> RenderedCode
-renderConstraint (pn, tys) =
+renderConstraint (Constraint pn tys _) =
   let instApp = foldl TypeApp (TypeConstructor (fmap coerceProperName pn)) tys
   in  renderType instApp
 
@@ -184,9 +182,10 @@ renderKind = kind . prettyPrintKind
 -- Render code representing a Type, as it should appear inside parentheses
 --
 renderTypeAtom :: Type -> RenderedCode
-renderTypeAtom =
-  fromMaybe (internalError "Incomplete pattern") . pattern matchTypeAtom () . preprocessType defaultRenderTypeOptions
-
+renderTypeAtom
+  = fromMaybe (internalError "Incomplete pattern")
+  . PA.pattern matchTypeAtom ()
+  . preprocessType defaultRenderTypeOptions
 
 -- |
 -- Render code representing a Type
@@ -207,5 +206,7 @@ defaultRenderTypeOptions =
     }
 
 renderTypeWithOptions :: RenderTypeOptions -> Type -> RenderedCode
-renderTypeWithOptions opts =
-  fromMaybe (internalError "Incomplete pattern") . pattern matchType () . preprocessType opts
+renderTypeWithOptions opts
+  = fromMaybe (internalError "Incomplete pattern")
+  . PA.pattern matchType ()
+  . preprocessType opts

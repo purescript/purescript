@@ -1,8 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TupleSections #-}
-
 -- |
 -- This module implements the desugaring pass which reapplies binary operators based
 -- on their fixity data and removes explicit parentheses.
@@ -15,7 +10,6 @@ module Language.PureScript.Sugar.Operators
   , removeSignedLiterals
   ) where
 
-import Prelude ()
 import Prelude.Compat
 
 import Language.PureScript.AST
@@ -280,10 +274,10 @@ updateTypes goType = (goDecl, goExpr)
     ty' <- goType' pos ty
     return (pos, ExternDeclaration name ty')
   goDecl pos (TypeClassDeclaration name args implies decls) = do
-    implies' <- traverse (sndM (traverse (goType' pos))) implies
+    implies' <- traverse (overConstraintArgs (traverse (goType' pos))) implies
     return (pos, TypeClassDeclaration name args implies' decls)
   goDecl pos (TypeInstanceDeclaration name cs className tys impls) = do
-    cs' <- traverse (sndM (traverse (goType' pos))) cs
+    cs' <- traverse (overConstraintArgs (traverse (goType' pos))) cs
     tys' <- traverse (goType' pos) tys
     return (pos, TypeInstanceDeclaration name cs' className tys' impls)
   goDecl pos (TypeSynonymDeclaration name args ty) = do
@@ -296,9 +290,9 @@ updateTypes goType = (goDecl, goExpr)
 
   goExpr :: Maybe SourceSpan -> Expr -> m (Maybe SourceSpan, Expr)
   goExpr _ e@(PositionedValue pos _ _) = return (Just pos, e)
-  goExpr pos (TypeClassDictionary (name, tys) dicts) = do
+  goExpr pos (TypeClassDictionary (Constraint name tys info) dicts) = do
     tys' <- traverse (goType' pos) tys
-    return (pos, TypeClassDictionary (name, tys') dicts)
+    return (pos, TypeClassDictionary (Constraint name tys' info) dicts)
   goExpr pos (SuperClassDictionary cls tys) = do
     tys' <- traverse (goType' pos) tys
     return (pos, SuperClassDictionary cls tys')

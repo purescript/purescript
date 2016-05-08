@@ -1,6 +1,4 @@
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleContexts #-}
 
 -- | Functions for converting PureScript ASTs into values of the data types
 -- from Language.PureScript.Docs.
@@ -11,24 +9,23 @@ module Language.PureScript.Docs.Convert
   , collectBookmarks
   ) where
 
-import Prelude ()
 import Prelude.Compat
 
 import Control.Arrow ((&&&), second)
 import Control.Category ((>>>))
 import Control.Monad
+import Control.Monad.Error.Class (MonadError)
 import Control.Monad.State (runStateT)
 import Control.Monad.Writer.Strict (runWriterT)
-import Control.Monad.Error.Class (MonadError)
 import qualified Data.Map as Map
-
-import Text.Parsec (eof)
-import qualified Language.PureScript as P
-import qualified Language.PureScript.Constants as C
 
 import Language.PureScript.Docs.Convert.ReExports (updateReExports)
 import Language.PureScript.Docs.Convert.Single (convertSingleModule, collectBookmarks)
 import Language.PureScript.Docs.Types
+import qualified Language.PureScript as P
+import qualified Language.PureScript.Constants as C
+
+import Text.Parsec (eof)
 
 -- |
 -- Like convertModules, except that it takes a list of modules, together with

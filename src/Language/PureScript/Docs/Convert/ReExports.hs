@@ -1,29 +1,24 @@
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE FlexibleContexts #-}
-
 module Language.PureScript.Docs.Convert.ReExports
   ( updateReExports
   ) where
 
-import Prelude ()
 import Prelude.Compat
 
+import Control.Arrow ((&&&), first, second)
 import Control.Monad
-import Control.Monad.Trans.State.Strict (execState)
+import Control.Monad.Reader.Class (MonadReader, ask)
 import Control.Monad.State.Class (MonadState, gets, modify)
 import Control.Monad.Trans.Reader (runReaderT)
-import Control.Monad.Reader.Class (MonadReader, ask)
-import Control.Arrow ((&&&), first, second)
-import Data.Either
-import Data.Maybe (mapMaybe)
-import Data.Map (Map)
-import qualified Data.Map as Map
-import Data.Monoid ((<>))
+import Control.Monad.Trans.State.Strict (execState)
 
-import qualified Language.PureScript as P
+import Data.Either
+import Data.Map (Map)
+import Data.Maybe (mapMaybe)
+import Data.Monoid ((<>))
+import qualified Data.Map as Map
 
 import Language.PureScript.Docs.Types
+import qualified Language.PureScript as P
 
 -- |
 -- Given:
@@ -489,7 +484,7 @@ typeClassConstraintFor :: Declaration -> Maybe P.Constraint
 typeClassConstraintFor Declaration{..} =
   case declInfo of
     TypeClassDeclaration tyArgs _ ->
-      Just (P.Qualified Nothing (P.ProperName declTitle), mkConstraint tyArgs)
+      Just (P.Constraint (P.Qualified Nothing (P.ProperName declTitle)) (mkConstraint tyArgs) Nothing)
     _ ->
       Nothing
   where

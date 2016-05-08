@@ -1,29 +1,23 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PatternGuards #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 -- |
 -- This module implements the generic deriving elaboration that takes place during desugaring.
 --
 module Language.PureScript.Sugar.TypeClasses.Deriving (deriveInstances) where
 
-import Prelude ()
 import Prelude.Compat
+
+import Control.Arrow (second)
+import Control.Monad (replicateM)
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Supply.Class (MonadSupply)
 
 import Data.List (foldl', find, sortBy)
 import Data.Maybe (fromMaybe)
 import Data.Ord (comparing)
 
-import Control.Arrow (second)
-import Control.Monad (replicateM)
-import Control.Monad.Supply.Class (MonadSupply)
-import Control.Monad.Error.Class (MonadError(..))
-
-import Language.PureScript.Crash
 import Language.PureScript.AST
+import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Names

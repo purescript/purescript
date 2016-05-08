@@ -1,7 +1,4 @@
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 
 -- |
@@ -9,16 +6,15 @@
 --
 module Language.PureScript.TypeChecker.Monad where
 
-import Prelude ()
 import Prelude.Compat
+
+import Control.Arrow (second)
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.State
+import Control.Monad.Writer.Class (MonadWriter(..), listen, censor)
 
 import Data.Maybe
 import qualified Data.Map as M
-
-import Control.Arrow (second)
-import Control.Monad.State
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Writer.Class (MonadWriter(..), listen, censor)
 
 import Language.PureScript.Environment
 import Language.PureScript.Errors

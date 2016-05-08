@@ -3,6 +3,8 @@
 --
 module Language.PureScript.CodeGen.JS.Optimizer.Common where
 
+import Prelude.Compat
+
 import Data.Maybe (fromMaybe)
 
 import Language.PureScript.Crash

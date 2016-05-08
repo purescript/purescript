@@ -1,9 +1,8 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 -- |
--- This module generates code for \"externs\" files, i.e. files containing only foreign import declarations.
+-- This module generates code for \"externs\" files, i.e. files containing only
+-- foreign import declarations.
 --
 module Language.PureScript.Externs
   ( ExternsFile(..)
@@ -14,24 +13,22 @@ module Language.PureScript.Externs
   , applyExternsFileToEnvironment
   ) where
 
-import Prelude ()
 import Prelude.Compat
 
+import Data.Aeson.TH
+import Data.Foldable (fold)
 import Data.List (find, foldl')
 import Data.Maybe (mapMaybe, maybeToList, fromMaybe)
-import Data.Foldable (fold)
 import Data.Version (showVersion)
-import Data.Aeson.TH
-
 import qualified Data.Map as M
 
-import Language.PureScript.Crash
 import Language.PureScript.AST
+import Language.PureScript.Crash
 import Language.PureScript.Environment
-import Language.PureScript.Names
-import Language.PureScript.Types
 import Language.PureScript.Kinds
+import Language.PureScript.Names
 import Language.PureScript.TypeClassDictionaries
+import Language.PureScript.Types
 
 import Paths_purescript as Paths
 
