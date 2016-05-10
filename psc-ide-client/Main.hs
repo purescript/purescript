@@ -35,7 +35,7 @@ main = do
 client :: PortID -> IO ()
 client port = do
     h <-
-        connectTo "localhost" port `catch`
+        connectTo "127.0.0.1" port `catch`
         (\(SomeException e) ->
               putStrLn
                   ("Couldn't connect to psc-ide-server on port: " ++
