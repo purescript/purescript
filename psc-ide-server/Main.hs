@@ -40,10 +40,10 @@ import           Language.PureScript.Ide.Util
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Watcher
-import           Network                           hiding (socketPort)
+import           Network                           hiding (socketPort, accept)
 import           Network.BSD                       (getProtocolNumber)
 import           Network.Socket                    hiding (PortNumber, Type,
-                                                    accept, sClose)
+                                                    sClose)
 import           Options.Applicative
 import           System.Directory
 import           System.FilePath
@@ -167,7 +167,9 @@ acceptCommand sock = do
       pure (cmd, h)
   where
    acceptConnection = liftIO $ do
-     (h,_,_) <- accept sock
+     -- Use low level accept to prevent accidental reverse name resolution
+     (s,_) <- accept sock
+     h     <- socketToHandle s ReadWriteMode
      hSetEncoding h utf8
      hSetBuffering h LineBuffering
      pure h
