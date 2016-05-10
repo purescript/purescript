@@ -12,7 +12,7 @@ foo = { x: 0.0, y: 0.0, z: 0.0 }
 bar :: { | Bar }
 bar = { x: 0.0, y: 0.0, z: 0.0 }
 
-id' :: Object Foo -> Object Bar
+id' :: Record Foo -> Record Bar
 id' = id
 
 foo' :: { | Foo }

@@ -254,7 +254,7 @@ infer' (Literal (ObjectLiteral ps)) = do
   ensureNoDuplicateProperties ps
   ts <- traverse (infer . snd) ps
   let fields = zipWith (\name (TypedValue _ _ t) -> (name, t)) (map fst ps) ts
-      ty = TypeApp tyObject $ rowFromList (fields, REmpty)
+      ty = TypeApp tyRecord $ rowFromList (fields, REmpty)
   return $ TypedValue True (Literal (ObjectLiteral (zip (map fst ps) ts))) ty
 infer' (ObjectUpdate o ps) = do
   ensureNoDuplicateProperties ps
@@ -262,13 +262,13 @@ infer' (ObjectUpdate o ps) = do
   newVals <- zipWith (\(name, _) t -> (name, t)) ps <$> traverse (infer . snd) ps
   let newTys = map (\(name, TypedValue _ _ ty) -> (name, ty)) newVals
   oldTys <- zip (map fst ps) <$> replicateM (length ps) freshType
-  let oldTy = TypeApp tyObject $ rowFromList (oldTys, row)
+  let oldTy = TypeApp tyRecord $ rowFromList (oldTys, row)
   o' <- TypedValue True <$> check o oldTy <*> pure oldTy
-  return $ TypedValue True (ObjectUpdate o' newVals) $ TypeApp tyObject $ rowFromList (newTys, row)
+  return $ TypedValue True (ObjectUpdate o' newVals) $ TypeApp tyRecord $ rowFromList (newTys, row)
 infer' (Accessor prop val) = rethrow (addHint (ErrorCheckingAccessor val prop)) $ do
   field <- freshType
   rest <- freshType
-  typed <- check val (TypeApp tyObject (RCons prop field rest))
+  typed <- check val (TypeApp tyRecord (RCons prop field rest))
   return $ TypedValue True (Accessor prop typed) field
 infer' (Abs (Left arg) ret) = do
   ty <- freshType
@@ -402,7 +402,7 @@ inferBinder val (LiteralBinder (ObjectLiteral props)) = do
   row <- freshType
   rest <- freshType
   m1 <- inferRowProperties row rest props
-  unifyTypes val (TypeApp tyObject row)
+  unifyTypes val (TypeApp tyRecord row)
   return m1
   where
   inferRowProperties :: Type -> Type -> [(String, Binder)] -> m (M.Map Ident Type)
@@ -616,26 +616,26 @@ check' (IfThenElse cond th el) ty = do
   th' <- check th ty
   el' <- check el ty
   return $ TypedValue True (IfThenElse cond' th' el') ty
-check' e@(Literal (ObjectLiteral ps)) t@(TypeApp obj row) | obj == tyObject = do
+check' e@(Literal (ObjectLiteral ps)) t@(TypeApp obj row) | obj == tyRecord = do
   ensureNoDuplicateProperties ps
   ps' <- checkProperties e ps row False
   return $ TypedValue True (Literal (ObjectLiteral ps')) t
 check' (TypeClassDictionaryConstructorApp name ps) t = do
   ps' <- check' ps t
   return $ TypedValue True (TypeClassDictionaryConstructorApp name ps') t
-check' e@(ObjectUpdate obj ps) t@(TypeApp o row) | o == tyObject = do
+check' e@(ObjectUpdate obj ps) t@(TypeApp o row) | o == tyRecord = do
   ensureNoDuplicateProperties ps
   -- We need to be careful to avoid duplicate labels here.
   -- We check _obj_ against the type _t_ with the types in _ps_ replaced with unknowns.
   let (propsToCheck, rest) = rowToList row
       (removedProps, remainingProps) = partition (\(p, _) -> p `elem` map fst ps) propsToCheck
   us <- zip (map fst removedProps) <$> replicateM (length ps) freshType
-  obj' <- check obj (TypeApp tyObject (rowFromList (us ++ remainingProps, rest)))
+  obj' <- check obj (TypeApp tyRecord (rowFromList (us ++ remainingProps, rest)))
   ps' <- checkProperties e ps row True
   return $ TypedValue True (ObjectUpdate obj' ps') t
 check' (Accessor prop val) ty = rethrow (addHint (ErrorCheckingAccessor val prop)) $ do
   rest <- freshType
-  val' <- check val (TypeApp tyObject (RCons prop ty rest))
+  val' <- check val (TypeApp tyRecord (RCons prop ty rest))
   return $ TypedValue True (Accessor prop val') ty
 check' v@(Constructor c) ty = do
   env <- getEnv
@@ -698,7 +698,7 @@ checkProperties expr ps row lax = let (ts, r') = rowToList row in go ps ts r' wh
         v' <- check v ty
         ps'' <- go ps' (delete (p, ty) ts) r
         return $ (p, v') : ps''
-  go _ _ _ = throwError . errorMessage $ ExprDoesNotHaveType expr (TypeApp tyObject row)
+  go _ _ _ = throwError . errorMessage $ ExprDoesNotHaveType expr (TypeApp tyRecord row)
 
 -- | Check the type of a function application, rethrowing errors to provide a better error message
 checkFunctionApplication ::

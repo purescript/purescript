@@ -25,7 +25,7 @@ parseFunction :: TokenParser Type
 parseFunction = parens rarrow >> return tyFunction
 
 parseObject :: TokenParser Type
-parseObject = braces $ TypeApp tyObject <$> parseRow
+parseObject = braces $ TypeApp tyRecord <$> parseRow
 
 parseTypeWildcard :: TokenParser Type
 parseTypeWildcard = do
