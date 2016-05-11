@@ -580,6 +580,4 @@ bundle inputStrs entryPoints mainModule namespace requirePath optimize = do
 
   let sorted   = sortModules (filter (not . isModuleEmpty) compiled')
 
-  -- trace ("AST: " ++ show sorted) $ return ()
-
   return (codeGen mainModule namespace sorted)
