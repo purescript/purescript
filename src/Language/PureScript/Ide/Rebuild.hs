@@ -19,7 +19,6 @@ import           Data.Maybe                      (fromJust, mapMaybe)
 import qualified Data.Set                        as S
 import qualified Language.PureScript             as P
 import           Language.PureScript.Errors.JSON
-import qualified Language.PureScript.Externs     as P
 import           System.FilePath (replaceExtension)
 import           System.Directory (doesFileExist)
 import           System.IO.UTF8 (readUTF8File)
@@ -54,7 +53,7 @@ rebuildFile path = do
   (result, warnings) <- liftIO
                    . P.runMake P.defaultOptions
                    . P.rebuildModule (ma { P.progress = const (pure ()) }) externs
-                   $ P.addDefaultImport (P.ModuleName [P.ProperName "Prim"]) m
+                   $ m
   case result of
     Left errors -> throwError . RebuildError $ toJSONErrors False P.Error errors
     Right _ -> pure . RebuildSuccess $ toJSONErrors False P.Warning warnings

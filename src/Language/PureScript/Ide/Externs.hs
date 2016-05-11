@@ -41,10 +41,9 @@ import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 
 import qualified Language.PureScript           as P
-import qualified Language.PureScript.Externs   as PE
 
 readExternFile :: (MonadIO m, MonadError PscIdeError m) =>
-                  FilePath -> m PE.ExternsFile
+                  FilePath -> m P.ExternsFile
 readExternFile fp = do
    parseResult <- liftIO (decodeStrict <$> BS.readFile fp)
    case parseResult of
@@ -57,15 +56,15 @@ moduleNameToText = T.pack . P.runModuleName
 identToText :: P.Ident -> Text
 identToText  = T.pack . P.runIdent
 
-convertExterns :: PE.ExternsFile -> Module
+convertExterns :: P.ExternsFile -> Module
 convertExterns ef = (moduleName, exportDecls ++ importDecls ++ decls)
   where
-    moduleName = moduleNameToText (PE.efModuleName ef)
-    importDecls = convertImport <$> PE.efImports ef
-    exportDecls = mapMaybe (convertExport . unwrapPositionedRef) (PE.efExports ef)
+    moduleName = moduleNameToText (P.efModuleName ef)
+    importDecls = convertImport <$> P.efImports ef
+    exportDecls = mapMaybe (convertExport . unwrapPositionedRef) (P.efExports ef)
     -- Ignoring operator fixities for now since we're not using them
-    -- operatorDecls = convertOperator <$> PE.efFixities ef
-    otherDecls = mapMaybe convertDecl (PE.efDeclarations ef)
+    -- operatorDecls = convertOperator <$> P.efFixities ef
+    otherDecls = mapMaybe convertDecl (P.efDeclarations ef)
 
     typeClassFilter = foldMap removeTypeDeclarationsForClass (filter isTypeClassDeclaration otherDecls)
     decls = nub $ appEndo typeClassFilter otherDecls
@@ -81,26 +80,26 @@ isTypeClassDeclaration :: ExternDecl -> Bool
 isTypeClassDeclaration TypeClassDeclaration{} = True
 isTypeClassDeclaration _ = False
 
-convertImport :: PE.ExternsImport -> ExternDecl
+convertImport :: P.ExternsImport -> ExternDecl
 convertImport ei = Dependency
-  (moduleNameToText (PE.eiModule ei))
+  (moduleNameToText (P.eiModule ei))
   []
-  (moduleNameToText <$> PE.eiImportedAs ei)
+  (moduleNameToText <$> P.eiImportedAs ei)
 
 convertExport :: P.DeclarationRef -> Maybe ExternDecl
 convertExport (P.ModuleRef mn) = Just (Export (moduleNameToText mn))
 convertExport _ = Nothing
 
-convertDecl :: PE.ExternsDeclaration -> Maybe ExternDecl
-convertDecl PE.EDType{..} = Just $ TypeDeclaration edTypeName edTypeKind
-convertDecl PE.EDTypeSynonym{..} = Just $
+convertDecl :: P.ExternsDeclaration -> Maybe ExternDecl
+convertDecl P.EDType{..} = Just $ TypeDeclaration edTypeName edTypeKind
+convertDecl P.EDTypeSynonym{..} = Just $
   TypeSynonymDeclaration edTypeSynonymName edTypeSynonymType
-convertDecl PE.EDDataConstructor{..} = Just $
+convertDecl P.EDDataConstructor{..} = Just $
   DataConstructor (runProperNameT edDataCtorName) edDataCtorTypeCtor edDataCtorType
-convertDecl PE.EDValue{..} = Just $
+convertDecl P.EDValue{..} = Just $
   ValueDeclaration (identToText edValueName) edValueType
-convertDecl PE.EDClass{..} = Just $ TypeClassDeclaration edClassName
-convertDecl PE.EDInstance{} = Nothing
+convertDecl P.EDClass{..} = Just $ TypeClassDeclaration edClassName
+convertDecl P.EDInstance{} = Nothing
 
 unwrapPositioned :: P.Declaration -> P.Declaration
 unwrapPositioned (P.PositionedDeclaration _ _ x) = x

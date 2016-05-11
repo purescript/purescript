@@ -13,7 +13,7 @@ import Prelude ()
 import Prelude.Compat
 
 import Data.Foldable (traverse_)
-import Data.List (intercalate, nub, sort, find)
+import Data.List (intercalate, nub, sort, find, foldl')
 import Data.Tuple (swap)
 import qualified Data.Map as M
 
@@ -127,13 +127,15 @@ makeIO f io = do
   either (throwError . P.singleError . f) return e
 
 make :: PSCiState -> [P.Module] -> P.Make P.Environment
-make st@PSCiState{..} ms = P.make actions' (map snd loadedModules ++ ms)
+make st@PSCiState{..} ms = do
+    externs <- P.make actions' (map snd loadedModules ++ ms)
+    return $ foldl' (flip P.applyExternsFileToEnvironment) P.initEnvironment externs
   where
-  filePathMap = M.fromList $ (first P.getModuleName . swap) `map` allModules
-  actions = P.buildMakeActions modulesDir filePathMap psciForeignFiles False
-  actions' = actions { P.progress = const (return ()) }
-  loadedModules = psciLoadedModules st
-  allModules = map (first Right) loadedModules ++ map (Left P.RebuildAlways,) ms
+    filePathMap = M.fromList $ (first P.getModuleName . swap) `map` allModules
+    actions = P.buildMakeActions modulesDir filePathMap psciForeignFiles False
+    actions' = actions { P.progress = const (return ()) }
+    loadedModules = psciLoadedModules st
+    allModules = map (first Right) loadedModules ++ map (Left P.RebuildAlways,) ms
 
 
 -- Commands
