@@ -27,9 +27,7 @@ runFlex :: Text -> [Match]
 runFlex s = runMatcher (flexMatcher s) completions
 
 setup :: IO ()
-setup = do
-  reset
-  void (loadModuleWithDeps "Main")
+setup = reset *> void (loadModuleWithDeps "Main")
 
 spec :: Spec
 spec = do

@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Language.PureScript.Ide.Imports.IntegrationSpec where
 
-import           Control.Monad
+import           Control.Monad                       (void)
 import           Data.Text                           (Text)
 import qualified Data.Text                           as T
 import qualified Data.Text.IO                        as TIO
@@ -13,9 +13,6 @@ import           System.FilePath
 
 setup :: IO ()
 setup = do
-  Integration.deleteOutputFolder
-  s <- Integration.compileTestProject
-  unless s $ fail "Failed to compile .purs sources"
   Integration.reset
   mapM_ Integration.loadModuleWithDeps ["ImportsSpec", "ImportsSpec1"]
 
@@ -34,7 +31,7 @@ outputFileShouldBe expectation = do
   shouldBe (T.lines outRes) expectation
 
 spec :: Spec
-spec = beforeAll_ setup $ afterAll_ Integration.reset $ describe "Adding imports" $ do
+spec = beforeAll_ setup . describe "Adding imports" $ do
   let
     sourceFileSkeleton :: [Text] -> [Text]
     sourceFileSkeleton importSection =

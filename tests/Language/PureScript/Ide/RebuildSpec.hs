@@ -1,15 +1,8 @@
 module Language.PureScript.Ide.RebuildSpec where
 
-import           Control.Monad
 import qualified Language.PureScript.Ide.Integration as Integration
 import           System.FilePath
 import           Test.Hspec
-
-setup :: IO ()
-setup = do
-  Integration.deleteOutputFolder
-  s <- Integration.compileTestProject
-  unless s $ fail "Failed to compile .purs sources"
 
 shouldBeSuccess :: String -> IO ()
 shouldBeSuccess = shouldBe True . Integration.resultIsSuccess
@@ -18,10 +11,7 @@ shouldBeFailure :: String -> IO ()
 shouldBeFailure = shouldBe False . Integration.resultIsSuccess
 
 spec :: Spec
-spec = beforeAll_ setup
-       . afterAll_ Integration.reset
-       . before_ Integration.reset $
-  describe "Rebuilding single modules" $ do
+spec = before_ Integration.reset $ describe "Rebuilding single modules" $ do
     it "rebuilds a correct module without dependencies successfully" $ do
       _ <- Integration.loadModuleWithDeps "RebuildSpecSingleModule"
       pdir <- Integration.projectDirectory
