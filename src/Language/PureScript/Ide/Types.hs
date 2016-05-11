@@ -61,6 +61,7 @@ data ExternDecl
       P.Type      -- The "type"
     -- | An exported module
     | TypeClassDeclaration (P.ProperName 'P.ClassName)
+    | FixityDeclaration (Either (P.OpName 'P.ValueOpName) (P.OpName 'P.TypeOpName))
     | Export ModuleIdent -- The exported Modules name
     deriving (Show,Eq,Ord)
 

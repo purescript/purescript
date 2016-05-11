@@ -1,4 +1,4 @@
--- @shouldFailWith UnknownExportValue
+-- @shouldFailWith UnknownExport
 -- should fail as z does not exist in the module
 module M1 (x, y, z) where
 

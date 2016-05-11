@@ -77,8 +77,6 @@ extra-source-files: examples/passing/*.purs
                   , tests/support/pscide/src/*.js
                   , tests/support/pscide/src/*.fail
                   , stack.yaml
-                  , stack-lts-5.yaml
-                  , stack-nightly.yaml
                   , README.md
                   , INSTALL.md
                   , CONTRIBUTORS.md
@@ -197,9 +195,10 @@ library
                      Language.PureScript.Sugar.CaseDeclarations
                      Language.PureScript.Sugar.DoNotation
                      Language.PureScript.Sugar.Names
+                     Language.PureScript.Sugar.Names.Common
                      Language.PureScript.Sugar.Names.Env
-                     Language.PureScript.Sugar.Names.Imports
                      Language.PureScript.Sugar.Names.Exports
+                     Language.PureScript.Sugar.Names.Imports
                      Language.PureScript.Sugar.ObjectWildcards
                      Language.PureScript.Sugar.Operators
                      Language.PureScript.Sugar.Operators.Common
@@ -298,11 +297,22 @@ library
     ghc-options: -Wall -O2
 
 executable psc
-    build-depends: base >=4 && <5, base-compat >=0.6.0,
-                   containers -any, directory -any, filepath -any,
-                   mtl -any, optparse-applicative >= 0.12.1, parsec -any, purescript -any,
-                   time -any, transformers -any, transformers-compat -any, Glob >= 0.7 && < 0.8,
-                   aeson >= 0.8 && < 0.12, bytestring -any, utf8-string >= 1 && < 2
+    build-depends: base >=4 && <5,
+                   purescript -any,
+                   aeson >= 0.8 && < 0.12,
+                   base-compat >=0.6.0,
+                   bytestring -any,
+                   containers -any,
+                   directory -any,
+                   filepath -any,
+                   Glob >= 0.7 && < 0.8,
+                   mtl -any,
+                   optparse-applicative >= 0.12.1,
+                   parsec -any,
+                   time -any,
+                   transformers -any,
+                   transformers-compat -any,
+                   utf8-string >= 1 && < 2
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc
@@ -310,12 +320,22 @@ executable psc
     ghc-options: -Wall -O2 -fno-warn-unused-do-bind -threaded -rtsopts "-with-rtsopts=-N"
 
 executable psci
-    build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
-                   mtl -any, optparse-applicative >= 0.12.1, parsec -any,
-                   haskeline >= 0.7.0.0, purescript -any, transformers -any,
-                   transformers-compat -any, process -any, time -any, Glob -any, base-compat >=0.6.0,
-                   boxes >= 0.1.4 && < 0.2.0
-
+    build-depends: base >=4 && <5,
+                   purescript -any,
+                   base-compat >=0.6.0,
+                   boxes >= 0.1.4 && < 0.2.0,
+                   containers -any,
+                   directory -any,
+                   filepath -any,
+                   Glob -any,
+                   haskeline >= 0.7.0.0,
+                   mtl -any,
+                   optparse-applicative >= 0.12.1,
+                   parsec -any,
+                   process -any,
+                   time -any,
+                   transformers -any,
+                   transformers-compat -any
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psci
@@ -323,10 +343,17 @@ executable psci
     ghc-options: -Wall -O2
 
 executable psc-docs
-    build-depends: base >=4 && <5, purescript -any,
-                   optparse-applicative >= 0.12.1, process -any, mtl -any,
-                   split -any, ansi-wl-pprint -any, directory -any,
-                   filepath -any, Glob -any, transformers -any,
+    build-depends: base >=4 && <5,
+                   purescript -any,
+                   ansi-wl-pprint -any,
+                   directory -any,
+                   filepath -any,
+                   Glob -any,
+                   mtl -any,
+                   optparse-applicative >= 0.12.1,
+                   process -any,
+                   split -any,
+                   transformers -any,
                    transformers-compat -any
     main-is: Main.hs
     other-modules: Paths_purescript
@@ -338,7 +365,11 @@ executable psc-docs
     ghc-options: -Wall -O2
 
 executable psc-publish
-    build-depends: base >=4 && <5, purescript -any, bytestring -any, aeson -any, optparse-applicative -any
+    build-depends: base >=4 && <5,
+                   purescript -any,
+                   aeson -any,
+                   bytestring -any,
+                   optparse-applicative -any
     main-is: Main.hs
     other-modules: Paths_purescript
     buildable: True
@@ -346,9 +377,15 @@ executable psc-publish
     ghc-options: -Wall -O2
 
 executable psc-hierarchy
-    build-depends: base >=4 && <5, purescript -any, optparse-applicative >= 0.12.1,
-                   process -any, mtl -any, parsec -any, filepath -any, directory -any,
-                   Glob -any
+    build-depends: base >=4 && <5,
+                   purescript -any,
+                   directory -any,
+                   filepath -any,
+                   Glob -any,
+                   mtl -any,
+                   optparse-applicative >= 0.12.1,
+                   parsec -any,
+                   process -any
     main-is: Main.hs
     other-modules: Paths_purescript
     buildable: True
@@ -362,13 +399,13 @@ executable psc-bundle
   other-extensions:
   build-depends:       base >=4 && <5,
                        purescript -any,
-                       filepath -any,
                        directory -any,
+                       filepath -any,
+                       Glob -any,
                        mtl -any,
-                       transformers -any,
-                       transformers-compat -any,
                        optparse-applicative >= 0.12.1,
-                       Glob -any
+                       transformers -any,
+                       transformers-compat -any
   ghc-options:         -Wall -O2
   hs-source-dirs:      psc-bundle
 
@@ -376,19 +413,19 @@ executable psc-ide-server
   main-is:             Main.hs
   other-modules:       Paths_purescript
   other-extensions:
-  build-depends:       base >=4 && <5
-                     , purescript -any
-                     , directory -any
-                     , filepath -any
-                     , monad-logger -any
-                     , mtl -any
-                     , transformers -any
-                     , transformers-compat -any
-                     , network -any
-                     , optparse-applicative >= 0.12.1
-                     , stm -any
-                     , text -any
-                     , base-compat >=0.6.0
+  build-depends:       base >=4 && <5,
+                       purescript -any,
+                       base-compat >=0.6.0,
+                       directory -any,
+                       filepath -any,
+                       monad-logger -any,
+                       mtl -any,
+                       network -any,
+                       optparse-applicative >= 0.12.1,
+                       stm -any,
+                       text -any,
+                       transformers -any,
+                       transformers-compat -any
   ghc-options:         -Wall -O2 -threaded
   hs-source-dirs:      psc-ide-server
 
@@ -396,26 +433,46 @@ executable psc-ide-client
   main-is:             Main.hs
   other-modules:       Paths_purescript
   other-extensions:
-  build-depends:       base >=4 && <5
-                     , mtl -any
-                     , text -any
-                     , optparse-applicative >= 0.12.1
-                     , network -any
-                     , base-compat >=0.6.0
+  build-depends:       base >=4 && <5,
+                       base-compat >=0.6.0,
+                       mtl -any,
+                       network -any,
+                       optparse-applicative >= 0.12.1,
+                       text -any
   ghc-options:         -Wall -O2
   hs-source-dirs:      psc-ide-client
 
 test-suite tests
-    build-depends: base >=4 && <5, containers -any, directory -any,
-                   filepath -any, mtl -any, parsec -any, purescript -any,
-                   transformers -any, process -any, transformers-compat -any, time -any,
-                   Glob -any, aeson-better-errors -any, bytestring -any, aeson -any,
-                   base-compat -any, haskeline >= 0.7.0.0, optparse-applicative -any,
-                   boxes -any, HUnit -any, hspec -any, hspec-discover -any, stm -any, text -any,
-                   vector -any, utf8-string -any, silently -any
+    build-depends: base >=4 && <5,
+                   purescript -any,
+                   aeson -any,
+                   aeson-better-errors -any,
+                   base-compat -any,
+                   boxes -any,
+                   bytestring -any,
+                   containers -any,
+                   directory -any,
+                   filepath -any,
+                   Glob -any,
+                   haskeline >= 0.7.0.0,
+                   hspec -any,
+                   hspec-discover -any,
+                   HUnit -any,
+                   mtl -any,
+                   optparse-applicative -any,
+                   parsec -any,
+                   process -any,
+                   silently -any,
+                   stm -any,
+                   text -any,
+                   time -any,
+                   transformers -any,
+                   transformers-compat -any,
+                   utf8-string -any,
+                   vector -any
     ghc-options: -Wall
     type: exitcode-stdio-1.0
-    main-is: Test.hs
+    main-is: Main.hs
     other-modules: TestUtils
                    TestCompiler
                    TestDocs
@@ -432,4 +489,4 @@ test-suite tests
                    Language.PureScript.Ide.ReexportsSpec
                    Language.PureScript.IdeSpec
     buildable: True
-    hs-source-dirs: tests psci
+    hs-source-dirs: tests

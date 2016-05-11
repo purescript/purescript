@@ -40,7 +40,7 @@ typeLiterals = mkPattern match
   match row@RCons{} = Just $ prettyPrintRowWith '(' ')' row
   match (BinaryNoParensType op l r) =
     Just $ typeAsBox l <> text " " <> typeAsBox op <> text " " <> typeAsBox r
-  match (TypeOp op) = Just $ text $ showQualified runIdent op
+  match (TypeOp op) = Just $ text $ showQualified runOpName op
   match _ = Nothing
 
 constraintsAsBox :: [Constraint] -> Box -> Box
@@ -99,7 +99,7 @@ insertPlaceholders :: Type -> Type
 insertPlaceholders = everywhereOnTypesTopDown convertForAlls . everywhereOnTypes convert
   where
   convert (TypeApp (TypeApp f arg) ret) | f == tyFunction = PrettyPrintFunction arg ret
-  convert (TypeApp o r) | o == tyObject = PrettyPrintObject r
+  convert (TypeApp o r) | o == tyRecord = PrettyPrintObject r
   convert other = other
   convertForAlls (ForAll ident ty _) = go [ident] ty
     where

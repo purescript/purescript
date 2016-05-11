@@ -9,7 +9,7 @@ foo s = s
 
 type AndFoo r = (foo :: String | r)
 
-getFoo :: forall r. Prim.Object (AndFoo r) -> String
+getFoo :: forall r. Prim.Record (AndFoo r) -> String
 getFoo o = o.foo
 
 type F r = { | r } -> { | r }

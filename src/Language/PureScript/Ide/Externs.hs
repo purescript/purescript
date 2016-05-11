@@ -57,13 +57,13 @@ identToText :: P.Ident -> Text
 identToText  = T.pack . P.runIdent
 
 convertExterns :: P.ExternsFile -> Module
-convertExterns ef = (moduleName, exportDecls ++ importDecls ++ decls)
+convertExterns ef = (moduleName, exportDecls ++ importDecls ++ decls ++ operatorDecls ++ tyOperatorDecls)
   where
     moduleName = moduleNameToText (P.efModuleName ef)
     importDecls = convertImport <$> P.efImports ef
     exportDecls = mapMaybe (convertExport . unwrapPositionedRef) (P.efExports ef)
-    -- Ignoring operator fixities for now since we're not using them
-    -- operatorDecls = convertOperator <$> P.efFixities ef
+    operatorDecls = convertOperator <$> P.efFixities ef
+    tyOperatorDecls = convertTypeOperator <$> P.efTypeFixities ef
     otherDecls = mapMaybe convertDecl (P.efDeclarations ef)
 
     typeClassFilter = foldMap removeTypeDeclarationsForClass (filter isTypeClassDeclaration otherDecls)
@@ -100,6 +100,14 @@ convertDecl P.EDValue{..} = Just $
   ValueDeclaration (identToText edValueName) edValueType
 convertDecl P.EDClass{..} = Just $ TypeClassDeclaration edClassName
 convertDecl P.EDInstance{} = Nothing
+
+convertOperator :: P.ExternsFixity -> ExternDecl
+convertOperator P.ExternsFixity{..} =
+  FixityDeclaration (Left efOperator)
+
+convertTypeOperator :: P.ExternsTypeFixity -> ExternDecl
+convertTypeOperator P.ExternsTypeFixity{..} =
+  FixityDeclaration (Right efTypeOperator)
 
 unwrapPositioned :: P.Declaration -> P.Declaration
 unwrapPositioned (P.PositionedDeclaration _ _ x) = x

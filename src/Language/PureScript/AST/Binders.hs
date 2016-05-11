@@ -35,7 +35,7 @@ data Binder
   -- A operator alias binder. During the rebracketing phase of desugaring,
   -- this data constructor will be removed.
   --
-  | OpBinder (Qualified Ident)
+  | OpBinder (Qualified (OpName 'ValueOpName))
   -- |
   -- Binary operator application. During the rebracketing phase of desugaring,
   -- this data constructor will be removed.

@@ -42,7 +42,10 @@ import qualified Text.Parsec.Expr as P
 -- |
 -- Read source position information
 --
-withSourceSpan :: (SourceSpan -> [Comment] -> a -> a) -> P.Parsec [PositionedToken] u a -> P.Parsec [PositionedToken] u a
+withSourceSpan
+  :: (SourceSpan -> [Comment] -> a -> a)
+  -> P.Parsec [PositionedToken] u a
+  -> P.Parsec [PositionedToken] u a
 withSourceSpan f p = do
   start <- P.getPosition
   comments <- C.readComments
@@ -123,13 +126,17 @@ parseFixityDeclaration :: TokenParser Declaration
 parseFixityDeclaration = do
   fixity <- parseFixity
   indented
-  alias <- P.optionMaybe $ parseQualified aliased <* reserved "as"
-  name <- symbol
-  return $ FixityDeclaration fixity name alias
+  FixityDeclaration
+    <$> ((Right <$> typeFixity fixity) <|> (Left <$> valueFixity fixity))
   where
-  aliased = (AliasValue . Ident <$> identifier)
-        <|> (AliasConstructor <$> properName)
-        <|> reserved "type" *> (AliasType <$> properName)
+  typeFixity fixity =
+    TypeFixity fixity
+      <$> (reserved "type" *> parseQualified properName)
+      <*> (reserved "as" *> parseOperator)
+  valueFixity fixity =
+    ValueFixity fixity
+      <$> parseQualified ((Left <$> parseIdent) <|> (Right <$> properName))
+      <*> (reserved "as" *> parseOperator)
 
 parseImportDeclaration :: TokenParser Declaration
 parseImportDeclaration = do
@@ -154,10 +161,11 @@ parseDeclarationRef :: TokenParser DeclarationRef
 parseDeclarationRef =
   withSourceSpan PositionedDeclarationRef
     $ (ValueRef <$> parseIdent)
+    <|> (ValueOpRef <$> parens parseOperator)
     <|> parseTypeRef
     <|> (TypeClassRef <$> (reserved "class" *> properName))
     <|> (ModuleRef <$> (indented *> reserved "module" *> moduleName))
-    <|> (TypeOpRef <$> (indented *> reserved "type" *> parens (Op <$> symbol)))
+    <|> (TypeOpRef <$> (indented *> reserved "type" *> parens parseOperator))
   where
   parseTypeRef = do
     name <- properName
@@ -323,8 +331,7 @@ parseIdentifierAndValue =
 parseAbs :: TokenParser Expr
 parseAbs = do
   symbol' "\\"
-  -- TODO: remove this 'try' after operator aliases are finished (0.9)
-  args <- P.many1 (C.indented *> (Abs <$> (Left <$> P.try C.parseIdent <|> Right <$> parseBinderNoParens)))
+  args <- P.many1 (C.indented *> (Abs <$> (Left <$> C.parseIdent <|> Right <$> parseBinderNoParens)))
   C.indented *> rarrow
   value <- parseValue
   return $ toFunction args value
@@ -343,7 +350,7 @@ parseCase = Case <$> P.between (reserved "case") (C.indented *> reserved "of") (
                  <*> (C.indented *> C.mark (P.many1 (C.same *> C.mark parseCaseAlternative)))
 
 parseCaseAlternative :: TokenParser CaseAlternative
-parseCaseAlternative = CaseAlternative <$> (commaSep1 parseBinder)
+parseCaseAlternative = CaseAlternative <$> commaSep1 parseBinder
                                        <*> (Left <$> (C.indented *>
                                                         P.many1 ((,) <$> parseGuard
                                                                      <*> (indented *> rarrow *> parseValue)
@@ -383,6 +390,7 @@ parseValueAtom = P.choice
                  , parseDo
                  , parseLet
                  , P.try $ Parens <$> parens parseValue
+                 , Op <$> parseQualified (parens parseOperator)
                  , parseHole
                  ]
 
@@ -390,8 +398,9 @@ parseValueAtom = P.choice
 -- Parse an expression in backticks or an operator
 --
 parseInfixExpr :: TokenParser Expr
-parseInfixExpr = P.between tick tick parseValue
-                 <|> Var <$> parseQualified (Op <$> symbol)
+parseInfixExpr
+  = P.between tick tick parseValue
+  <|> Op <$> parseQualified parseOperator
 
 parseHole :: TokenParser Expr
 parseHole = Hole <$> holeLit
@@ -481,9 +490,7 @@ parseArrayBinder = LiteralBinder <$> parseArrayLiteral (C.indented *> parseBinde
 
 parseVarOrNamedBinder :: TokenParser Binder
 parseVarOrNamedBinder = do
-  -- TODO: once operator aliases are finalized in 0.9, this 'try' won't be needed
-  -- any more since identifiers in binders won't be 'Op's.
-  name <- P.try C.parseIdent
+  name <- C.parseIdent
   let parseNamedBinder = NamedBinder name <$> (at *> C.indented *> parseBinderAtom)
   parseNamedBinder <|> return (VarBinder name)
 
@@ -522,7 +529,7 @@ parseBinder =
                  ]
 
   parseOpBinder :: TokenParser Binder
-  parseOpBinder = OpBinder <$> parseQualified (Op <$> symbol)
+  parseOpBinder = OpBinder <$> parseQualified parseOperator
 
 parseBinderAtom :: TokenParser Binder
 parseBinderAtom = P.choice

@@ -183,7 +183,7 @@ typeCheckAll
   -> [DeclarationRef]
   -> [Declaration]
   -> m [Declaration]
-typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
+typeCheckAll moduleName _ = traverse go
   where
   go :: Declaration -> m Declaration
   go (DataDeclaration dtype name args dctors) = do
@@ -223,7 +223,8 @@ typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
       let args' = args `withKinds` kind
       addTypeSynonym moduleName name args' ty kind
     return $ TypeSynonymDeclaration name args ty
-  go TypeDeclaration{} = internalError "Type declarations should have been removed"
+  go TypeDeclaration{} =
+    internalError "Type declarations should have been removed before typeCheckAlld"
   go (ValueDeclaration name nameKind [] (Right val)) = do
     env <- getEnv
     warnAndRethrow (addHint (ErrorInValueDeclaration name)) $ do
@@ -261,9 +262,9 @@ typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
         Just _ -> throwError . errorMessage $ RedefinedIdent name
         Nothing -> putEnv (env { names = M.insert (moduleName, name) (ty, External, Defined) (names env) })
     return d
-  go (d@FixityDeclaration{}) = return d
-  go (d@ImportDeclaration{}) = return d
-  go (d@(TypeClassDeclaration pn args implies tys)) = do
+  go d@FixityDeclaration{} = return d
+  go d@ImportDeclaration{} = return d
+  go d@(TypeClassDeclaration pn args implies tys) = do
     addTypeClass moduleName pn args implies tys
     return d
   go (d@(TypeInstanceDeclaration dictName deps className tys body)) = rethrow (addHint (ErrorInInstance className tys)) $ do
@@ -276,23 +277,6 @@ typeCheckAll moduleName _ ds = traverse go ds <* traverse_ checkFixities ds
     return d
   go (PositionedDeclaration pos com d) =
     warnAndRethrowWithPosition pos $ PositionedDeclaration pos com <$> go d
-
-  checkFixities :: Declaration -> m ()
-  checkFixities (FixityDeclaration _ name (Just (Qualified mn' (AliasValue ident)))) = do
-    ty <- lookupVariable moduleName (Qualified mn' ident)
-    addValue moduleName (Op name) ty Public
-  checkFixities (FixityDeclaration _ name (Just (Qualified mn' (AliasConstructor ctor)))) = do
-    env <- getEnv
-    let alias = Qualified mn' ctor
-    case M.lookup alias (dataConstructors env) of
-      Nothing -> throwError . errorMessage $ UnknownDataConstructor alias Nothing
-      Just (_, _, ty, _) -> addValue moduleName (Op name) ty Public
-  checkFixities (FixityDeclaration _ name Nothing) = do
-    env <- getEnv
-    guardWith (errorMessage (OrphanFixityDeclaration name)) $ M.member (moduleName, Op name) $ names env
-  checkFixities (PositionedDeclaration pos _ d) =
-    warnAndRethrowWithPosition pos $ checkFixities d
-  checkFixities _ = return ()
 
   checkInstanceMembers :: [Declaration] -> m [Declaration]
   checkInstanceMembers instDecls = do
@@ -348,16 +332,17 @@ typeCheckModule
    . (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => Module
   -> m Module
-typeCheckModule (Module _ _ _ _ Nothing) = internalError "exports should have been elaborated"
-typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint (ErrorInModule mn)) $ do
-  modify (\s -> s { checkCurrentModule = Just mn })
-  decls' <- typeCheckAll mn exps decls
-  for_ exps $ \e -> do
-    checkTypesAreExported e
-    checkClassMembersAreExported e
-    checkClassesAreExported e
-    checkNonAliasesAreExported (exportedDataConstructors exps) e
-  return $ Module ss coms mn decls' (Just exps)
+typeCheckModule (Module _ _ _ _ Nothing) =
+  internalError "exports should have been elaborated before typeCheckModule"
+typeCheckModule (Module ss coms mn decls (Just exps)) =
+  warnAndRethrow (addHint (ErrorInModule mn)) $ do
+    modify (\s -> s { checkCurrentModule = Just mn })
+    decls' <- typeCheckAll mn exps decls
+    for_ exps $ \e -> do
+      checkTypesAreExported e
+      checkClassMembersAreExported e
+      checkClassesAreExported e
+    return $ Module ss coms mn decls' (Just exps)
   where
 
   checkMemberExport :: (Type -> [DeclarationRef]) -> DeclarationRef -> m ()
@@ -436,38 +421,3 @@ typeCheckModule (Module ss coms mn decls (Just exps)) = warnAndRethrow (addHint 
     extractMemberName (TypeDeclaration memberName _) = memberName
     extractMemberName _ = internalError "Unexpected declaration in typeclass member list"
   checkClassMembersAreExported _ = return ()
-
-  checkNonAliasesAreExported :: [ProperName 'ConstructorName] -> DeclarationRef -> m ()
-  checkNonAliasesAreExported exportedDctors dr@(ValueRef (Op name)) =
-    case listToMaybe (mapMaybe (getAlias getValueAlias name) decls) of
-      Just (Left ident) ->
-        unless (ValueRef ident `elem` exps) $
-          throwError . errorMessage $ TransitiveExportError dr [ValueRef ident]
-      Just (Right ctor) ->
-        unless (ctor `elem` exportedDctors) $
-          throwError . errorMessage $ TransitiveDctorExportError dr ctor
-      _ -> return ()
-  checkNonAliasesAreExported _ dr@(TypeOpRef (Op name)) =
-    case listToMaybe (mapMaybe (getAlias getTypeAlias name) decls) of
-      Just ty ->
-        unless (any (isTypeRefFor ty) exps) $
-          throwError . errorMessage $ TransitiveExportError dr [TypeRef ty Nothing]
-      _ -> return ()
-    where
-    isTypeRefFor :: ProperName 'TypeName -> DeclarationRef -> Bool
-    isTypeRefFor ty (TypeRef ty' _) = ty == ty'
-    isTypeRefFor _ _ = False
-  checkNonAliasesAreExported _ _ = return ()
-
-  getAlias :: (FixityAlias -> Maybe a) -> String -> Declaration -> Maybe a
-  getAlias match name (PositionedDeclaration _ _ d) = getAlias match name d
-  getAlias match name (FixityDeclaration _ name' (Just (Qualified (Just mn') a)))
-    | Just alias <- match a, name == name' && mn == mn' = Just alias
-  getAlias _ _ _ = Nothing
-
-  exportedDataConstructors :: [DeclarationRef] -> [ProperName 'ConstructorName]
-  exportedDataConstructors = foldMap extractCtor
-    where
-    extractCtor :: DeclarationRef -> [ProperName 'ConstructorName]
-    extractCtor (TypeRef _ (Just ctors)) = ctors
-    extractCtor _ = []

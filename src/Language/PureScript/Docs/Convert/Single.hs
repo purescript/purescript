@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Language.PureScript.Docs.Convert.Single
   ( convertSingleModule
   , collectBookmarks
@@ -11,8 +9,8 @@ import Control.Category ((>>>))
 import Control.Monad
 
 import Data.Either
-import Data.List (nub, isPrefixOf, isSuffixOf)
-import Data.Maybe (mapMaybe, isNothing)
+import Data.List (nub)
+import Data.Maybe (mapMaybe)
 
 import Language.PureScript.Docs.Types
 import qualified Language.PureScript as P
@@ -30,7 +28,6 @@ convertSingleModule m@(P.Module _ coms moduleName  _ _) =
     P.exportedDeclarations
     >>> mapMaybe (\d -> getDeclarationTitle d >>= convertDeclaration d)
     >>> augmentDeclarations
-    >>> map addDefaultFixity
 
 -- | The data type for an intermediate stage which we go through during
 -- converting.
@@ -60,12 +57,8 @@ type IntermediateDeclaration
 -- since they appear at the top level in the AST, and since they might need to
 -- appear as children in two places (for example, if a data type defined in a
 -- module is an instance of a type class also defined in that module).
---
--- The AugmentFixity constructor allows us to augment operator definitions
--- with their associativity and precedence.
 data DeclarationAugment
   = AugmentChild ChildDeclaration
-  | AugmentFixity P.Fixity
 
 -- | Augment top-level declarations; the second pass. See the comments under
 -- the type synonym IntermediateDeclaration for more information.
@@ -79,28 +72,8 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
         then augmentWith a d
         else d) ds
 
-  augmentWith a d =
-    case a of
-      AugmentChild child ->
-        d { declChildren = declChildren d ++ [child] }
-      AugmentFixity fixity ->
-        d { declFixity = Just fixity }
-
--- | Add the default operator fixity for operators which do not have associated
--- fixity declarations.
---
--- TODO: This may no longer be necessary after issue 806 is resolved, hopefully
--- in 0.9.
-addDefaultFixity :: Declaration -> Declaration
-addDefaultFixity decl@Declaration{..}
-  | isOp declTitle && isNothing declFixity =
-        decl { declFixity = Just defaultFixity }
-  | otherwise =
-        decl
-  where
-  isOp :: String -> Bool
-  isOp str = "(" `isPrefixOf` str && ")" `isSuffixOf` str
-  defaultFixity = P.Fixity P.Infixl (-1)
+  augmentWith (AugmentChild child) d =
+    d { declChildren = declChildren d ++ [child] }
 
 getDeclarationTitle :: P.Declaration -> Maybe String
 getDeclarationTitle (P.ValueDeclaration name _ _ _) = Just (P.showIdent name)
@@ -110,8 +83,8 @@ getDeclarationTitle (P.ExternDataDeclaration name _) = Just (P.runProperName nam
 getDeclarationTitle (P.TypeSynonymDeclaration name _ _) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeClassDeclaration name _ _ _) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeInstanceDeclaration name _ _ _ _) = Just (P.showIdent name)
-getDeclarationTitle (P.FixityDeclaration _ name (Just (P.Qualified _ P.AliasType{}))) = Just ("type (" ++ name ++ ")")
-getDeclarationTitle (P.FixityDeclaration _ name _) = Just ("(" ++ name ++ ")")
+getDeclarationTitle (P.TypeFixityDeclaration _ _ op) = Just ("type " ++ P.showOp op)
+getDeclarationTitle (P.ValueFixityDeclaration _ _ op) = Just (P.showOp op)
 getDeclarationTitle (P.PositionedDeclaration _ _ d) = getDeclarationTitle d
 getDeclarationTitle _ = Nothing
 
@@ -122,7 +95,6 @@ mkDeclaration title info =
               , declComments   = Nothing
               , declSourceSpan = Nothing
               , declChildren   = []
-              , declFixity     = Nothing
               , declInfo       = info
               }
 
@@ -132,7 +104,7 @@ basicDeclaration title info = Just $ Right $ mkDeclaration title info
 convertDeclaration :: P.Declaration -> String -> Maybe IntermediateDeclaration
 convertDeclaration (P.ValueDeclaration _ _ _ (Right (P.TypedValue _ _ ty))) title =
   basicDeclaration title (ValueDeclaration ty)
-convertDeclaration (P.ValueDeclaration {}) title =
+convertDeclaration P.ValueDeclaration{} title =
   -- If no explicit type declaration was provided, insert a wildcard, so that
   -- the actual type will be added during type checking.
   basicDeclaration title (ValueDeclaration P.TypeWildcard{})
@@ -172,10 +144,10 @@ convertDeclaration (P.TypeInstanceDeclaration _ constraints className tys _) tit
 
   childDecl = ChildDeclaration title Nothing Nothing (ChildInstance constraints classApp)
   classApp = foldl P.TypeApp (P.TypeConstructor (fmap P.coerceProperName className)) tys
-convertDeclaration (P.FixityDeclaration fixity _ Nothing) title =
-  Just (Left ([title], AugmentFixity fixity))
-convertDeclaration (P.FixityDeclaration fixity _ (Just alias)) title =
-  Just $ Right $ (mkDeclaration title (AliasDeclaration alias fixity)) { declFixity = Just fixity }
+convertDeclaration (P.ValueFixityDeclaration fixity (P.Qualified mn alias) _) title =
+  Just $ Right $ mkDeclaration title (AliasDeclaration fixity (P.Qualified mn (Right alias)))
+convertDeclaration (P.TypeFixityDeclaration fixity (P.Qualified mn alias) _) title =
+  Just $ Right $ mkDeclaration title (AliasDeclaration fixity (P.Qualified mn (Left alias)))
 convertDeclaration (P.PositionedDeclaration srcSpan com d') title =
   fmap (addComments . addSourceSpan) (convertDeclaration d' title)
   where
@@ -191,10 +163,7 @@ convertDeclaration (P.PositionedDeclaration srcSpan com d') title =
     Left (withAugmentChild (\d -> d { cdeclSourceSpan = Just srcSpan })
                            augment)
 
-  withAugmentChild f (t, a) =
-    case a of
-      AugmentChild d -> (t, AugmentChild (f d))
-      _              -> (t, a)
+  withAugmentChild f (t, AugmentChild d) = (t, AugmentChild (f d))
 convertDeclaration _ _ = Nothing
 
 convertComments :: [P.Comment] -> Maybe String

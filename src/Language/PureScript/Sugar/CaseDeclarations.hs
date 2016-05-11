@@ -12,7 +12,7 @@ import Prelude.Compat
 import Data.List (nub, groupBy, foldl1')
 import Data.Maybe (catMaybes, mapMaybe)
 
-import Control.Monad ((<=<), forM, replicateM, join, unless)
+import Control.Monad ((<=<), replicateM, join, unless)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class
 
@@ -32,10 +32,15 @@ isLeft (Right _) = False
 -- |
 -- Replace all top-level binders in a module with case expressions.
 --
-desugarCasesModule :: (MonadSupply m, MonadError MultipleErrors m) => [Module] -> m [Module]
-desugarCasesModule ms = forM ms $ \(Module ss coms name ds exps) ->
+desugarCasesModule
+  :: (MonadSupply m, MonadError MultipleErrors m)
+  => Module
+  -> m Module
+desugarCasesModule (Module ss coms name ds exps) =
   rethrow (addHint (ErrorInModule name)) $
-    Module ss coms name <$> (desugarCases <=< desugarAbs <=< validateCases $ ds) <*> pure exps
+    Module ss coms name
+      <$> (desugarCases <=< desugarAbs <=< validateCases $ ds)
+      <*> pure exps
 
 -- |
 -- Validates that case head and binder lengths match.

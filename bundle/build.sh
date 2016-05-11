@@ -29,8 +29,10 @@ mkdir -p bundle/build/purescript
 for BIN in psc psci psc-docs psc-publish psc-bundle psc-ide-server psc-ide-client
 do
   FULL_BIN="$LOCAL_INSTALL_ROOT/bin/${BIN}${BIN_EXT}"
-  strip "$FULL_BIN" || true # not the end of the world if this fails, and
-                            # AppVeyor can't seem to handle it for some reason
+  if [ "$OS" != "win64" ]
+  then
+    strip "$FULL_BIN"
+  fi
   cp "$FULL_BIN" bundle/build/purescript
 done
 

@@ -233,7 +233,7 @@ typeClassDictionaryDeclaration name args implies members =
         ]
       members' = map (first runIdent . memberToNameAndType) members
       mtys = members' ++ superclassTypes
-  in TypeSynonymDeclaration (coerceProperName name) args (TypeApp tyObject $ rowFromList (mtys, REmpty))
+  in TypeSynonymDeclaration (coerceProperName name) args (TypeApp tyRecord $ rowFromList (mtys, REmpty))
 
 typeClassMemberToDictionaryAccessor
   :: ModuleName
@@ -251,7 +251,7 @@ typeClassMemberToDictionaryAccessor mn name args (PositionedDeclaration pos com 
 typeClassMemberToDictionaryAccessor _ _ _ _ = internalError "Invalid declaration in type class definition"
 
 unit :: Type
-unit = TypeApp tyObject REmpty
+unit = TypeApp tyRecord REmpty
 
 typeInstanceDictionaryDeclaration
   :: forall m
@@ -269,7 +269,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
 
   -- Lookup the type arguments and member types for the type class
   (args, implies, tyDecls) <-
-    maybe (throwError . errorMessage $ UnknownTypeClass className) return $
+    maybe (throwError . errorMessage . UnknownName $ fmap TyClassName className) return $
       M.lookup (qualify mn className) m
 
   case mapMaybe declName tyDecls \\ mapMaybe declName decls of
@@ -285,8 +285,8 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
       members <- zip (map typeClassMemberName decls) <$> traverse (memberToValue memberTypes) decls
 
       -- Create the type of the dictionary
-      -- The type is an object type, but depending on type instance dependencies, may be constrained.
-      -- The dictionary itself is an object literal.
+      -- The type is a record type, but depending on type instance dependencies, may be constrained.
+      -- The dictionary itself is a record literal.
       let superclasses = superClassDictionaryNames implies `zip`
             [ Abs (Left (Ident C.__unused)) (SuperClassDictionary superclass tyArgs)
             | (Constraint superclass suTyArgs _) <- implies
