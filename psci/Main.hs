@@ -10,8 +10,6 @@ module Main (main) where
 import           Prelude ()
 import           Prelude.Compat
 
-import           Data.List (isPrefixOf, sortBy)
-import           Data.Maybe (mapMaybe)
 import           Data.Monoid ((<>))
 import           Data.Version (showVersion)
 
@@ -23,7 +21,6 @@ import           Control.Monad.Trans.State.Strict (StateT, evalStateT)
 
 import qualified Language.PureScript as P
 import           Language.PureScript.Interactive
-import qualified Language.PureScript.Interactive.Directive as D
 
 import qualified Options.Applicative as Opts
 
@@ -100,53 +97,6 @@ getCommand singleLineMode = handleInterrupt (return (Right Nothing)) $ do
 -- | Checks if the Console module is defined
 consoleIsDefined :: [P.ExternsFile] -> Bool
 consoleIsDefined = any ((== P.ModuleName (map P.ProperName [ "Control", "Monad", "Eff", "Console" ])) . P.efModuleName)
-
--- | Loads module, function, and file completions.
-completion :: CompletionFunc (StateT PSCiState IO)
-completion = liftCompletionM . completion'
-
-completion' :: CompletionFunc CompletionM
-completion' = completeWordWithPrev Nothing " \t\n\r" findCompletions
-
-getCompletion :: CompletionContext -> CompletionM [Either String Completion]
-getCompletion ctx =
-  case ctx of
-    CtxFilePath f        -> map Right <$> listFiles f
-    CtxModule            -> map Left <$> getModuleNames
-    CtxIdentifier        -> map Left <$> ((++) <$> getIdentNames <*> getDctorNames)
-    CtxType              -> map Left <$> getTypeNames
-    CtxFixed str         -> return [Left str]
-    CtxDirective d       -> return (map Left (completeDirectives d))
-
-  where
-  completeDirectives :: String -> [String]
-  completeDirectives = map (':' :) . D.directiveStringsFor
-
--- | Callback for Haskeline's `completeWordWithPrev`.
--- Expects:
---   * Line contents to the left of the word, reversed
---   * Word to be completed
-findCompletions :: String -> String -> CompletionM [Completion]
-findCompletions prev word = do
-    let ctx = completionContext (words (reverse prev)) word
-    completions <- concat <$> traverse getCompletions ctx
-    return $ sortBy directivesFirst completions
-  where
-    getCompletions :: CompletionContext -> CompletionM [Completion]
-    getCompletions = fmap (mapMaybe (either (prefixedBy word) Just)) . getCompletion
-
-    prefixedBy :: String -> String -> Maybe Completion
-    prefixedBy w cand = if w `isPrefixOf` cand
-                          then Just (simpleCompletion cand)
-                          else Nothing
-
-    directivesFirst :: Completion -> Completion -> Ordering
-    directivesFirst (Completion _ d1 _) (Completion _ d2 _) = go d1 d2
-      where
-      go (':' : xs) (':' : ys) = compare xs ys
-      go (':' : _) _ = LT
-      go _ (':' : _) = GT
-      go xs ys = compare xs ys
 
 -- | Get command line options and drop into the REPL
 main :: IO ()

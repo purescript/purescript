@@ -90,47 +90,48 @@ source-repository head
 
 library
     build-depends: base >=4.8 && <5,
+                   aeson >= 0.8 && < 0.12,
+                   aeson-better-errors >= 0.8,
                    base-compat >=0.6.0,
+                   bower-json >= 0.8,
+                   boxes >= 0.1.4 && < 0.2.0,
+                   bytestring -any,
+                   containers -any,
+                   directory >= 1.2,
+                   dlist -any,
+                   edit-distance -any,
+                   filepath -any,
+                   fsnotify >= 0.2.1,
+                   Glob >= 0.7 && < 0.8,
+                   haskeline >= 0.7.0.0,
+                   http-types -any,
+                   language-javascript == 0.6.*,
                    lifted-base >= 0.2.3 && < 0.2.4,
                    monad-control >= 1.0.0.0 && < 1.1,
-                   transformers-base >= 0.4.0 && < 0.5,
-                   containers -any,
-                   unordered-containers -any,
-                   dlist -any,
-                   directory >= 1.2,
-                   filepath -any,
+                   monad-logger >= 0.3 && < 0.4,
                    mtl >= 2.1.0 && < 2.3.0,
+                   parallel >= 3.2 && < 3.3,
                    parsec -any,
-                   transformers >= 0.3.0 && < 0.6,
-                   transformers-compat >= 0.3.0,
-                   utf8-string >= 1 && < 2,
                    pattern-arrows >= 0.0.2 && < 0.1,
-                   time -any,
-                   boxes >= 0.1.4 && < 0.2.0,
-                   aeson >= 0.8 && < 0.12,
-                   vector -any,
-                   bower-json >= 0.8,
-                   aeson-better-errors >= 0.8,
-                   bytestring -any,
-                   text -any,
-                   split -any,
-                   language-javascript == 0.6.*,
-                   syb -any,
-                   Glob >= 0.7 && < 0.8,
+                   pipes >= 4.0.0 && < 4.2.0,
+                   pipes-http -any,
                    process >= 1.2.0 && < 1.5,
+                   regex-tdfa -any,
                    safe >= 0.3.9 && < 0.4,
                    semigroups >= 0.16.2 && < 0.19,
-                   parallel >= 3.2 && < 3.3,
                    sourcemap >= 0.1.6,
+                   spdx == 0.2.*,
+                   split -any,
                    stm >= 0.2.4.0,
-                   regex-tdfa -any,
-                   edit-distance -any,
-                   fsnotify >= 0.2.1,
-                   monad-logger >= 0.3 && < 0.4,
-                   pipes >= 4.0.0 && < 4.2.0 ,
-                   pipes-http -any,
-                   http-types -any,
-                   spdx == 0.2.*
+                   syb -any,
+                   text -any,
+                   time -any,
+                   transformers >= 0.3.0 && < 0.6,
+                   transformers-base >= 0.4.0 && < 0.5,
+                   transformers-compat >= 0.3.0,
+                   unordered-containers -any,
+                   utf8-string >= 1 && < 2,
+                   vector -any
 
     exposed-modules: Language.PureScript
                      Language.PureScript.AST
@@ -430,9 +431,5 @@ test-suite tests
                    Language.PureScript.Ide.RebuildSpec
                    Language.PureScript.Ide.ReexportsSpec
                    Language.PureScript.IdeSpec
-                   PSCi.Completion
-                   PSCi.Directive
-                   PSCi.Module
-                   PSCi.Types
     buildable: True
     hs-source-dirs: tests psci
