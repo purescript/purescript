@@ -57,7 +57,7 @@ main = hspec spec
 spec :: Spec
 spec = do
 
-  (supportPurs, supportForeigns, passingTestCases, failingTestCases) <- runIO $ do
+  (supportExterns, supportForeigns, passingTestCases, failingTestCases) <- runIO $ do
     cwd <- getCurrentDirectory
     let passing = cwd </> "examples" </> "passing"
     let failing = cwd </> "examples" </> "failing"
@@ -67,13 +67,20 @@ spec = do
     failingFiles <- getTestFiles failing <$> testGlob failing
     supportPurs <- supportFiles "purs"
     supportForeigns <- loadForeigns =<< supportFiles "js"
-    return (supportPurs, supportForeigns, passingFiles, failingFiles)
+    supportPursFiles <- readInput supportPurs
+    supportExterns <- runExceptT $ do
+      modules <- ExceptT . return $ P.parseModulesFromFiles id supportPursFiles
+      externs <- ExceptT . runTest $ P.make (makeActions supportForeigns) (map snd modules)
+      return (zip (map snd modules) externs)
+    case supportExterns of
+      Left errs -> fail (P.prettyPrintMultipleErrors False errs)
+      Right externs -> return (externs, supportForeigns, passingFiles, failingFiles)
 
   context ("Passing examples") $ do
     forM_ passingTestCases $ \(testPurs, testJS) ->
       it ("'" <> takeFileName (getTestMain testPurs) <> "' should compile and run without error") $ do
         testForeigns <- loadForeigns testJS
-        assertCompiles (supportPurs ++ testPurs) (supportForeigns <> testForeigns)
+        assertCompiles supportExterns testPurs (supportForeigns <> testForeigns)
 
   context ("Failing examples") $ do
     forM_ failingTestCases $ \(testPurs, testJS) -> do
@@ -81,7 +88,7 @@ spec = do
       expectedFailures <- runIO $ getShouldFailWith mainPath
       it ("'" <> takeFileName mainPath <> "' should fail with '" <> intercalate "', '" expectedFailures <> "'") $ do
         testForeigns <- loadForeigns testJS
-        assertDoesNotCompile (supportPurs ++ testPurs) (supportForeigns <> testForeigns) expectedFailures
+        assertDoesNotCompile supportExterns testPurs (supportForeigns <> testForeigns) expectedFailures
 
   where
 
@@ -166,27 +173,36 @@ runTest :: P.Make a -> IO (Either P.MultipleErrors a)
 runTest = fmap fst . P.runMake P.defaultOptions
 
 compile
-  :: [FilePath]
+  :: [(P.Module, P.ExternsFile)]
+  -> [FilePath]
   -> M.Map P.ModuleName FilePath
-  -> IO (Either P.MultipleErrors P.Environment)
-compile inputFiles foreigns = silence $ runTest $ do
+  -> IO (Either P.MultipleErrors [P.ExternsFile])
+compile supportExterns inputFiles foreigns = silence $ runTest $ do
   fs <- liftIO $ readInput inputFiles
   ms <- P.parseModulesFromFiles id fs
-  P.make (makeActions foreigns) (map snd ms)
+  let actions = makeActions foreigns
+  case ms of
+    [singleModule] -> pure <$> P.rebuildModule actions (map snd supportExterns) (snd singleModule)
+    _ -> P.make actions (map fst supportExterns ++ map snd ms)
 
 assert
-  :: [FilePath]
+  :: [(P.Module, P.ExternsFile)]
+  -> [FilePath]
   -> M.Map P.ModuleName FilePath
-  -> (Either P.MultipleErrors P.Environment -> IO (Maybe String))
+  -> (Either P.MultipleErrors [P.ExternsFile] -> IO (Maybe String))
   -> Expectation
-assert inputFiles foreigns f = do
-  e <- compile inputFiles foreigns
+assert supportExterns inputFiles foreigns f = do
+  e <- compile supportExterns inputFiles foreigns
   maybeErr <- f e
   maybe (return ()) expectationFailure maybeErr
 
-assertCompiles :: [FilePath] -> M.Map P.ModuleName FilePath -> Expectation
-assertCompiles inputFiles foreigns = do
-  assert inputFiles foreigns $ \e ->
+assertCompiles
+  :: [(P.Module, P.ExternsFile)]
+  -> [FilePath]
+  -> M.Map P.ModuleName FilePath
+  -> Expectation
+assertCompiles supportExterns inputFiles foreigns = do
+  assert supportExterns inputFiles foreigns $ \e ->
     case e of
       Left errs -> return . Just . P.prettyPrintMultipleErrors False $ errs
       Right _ -> do
@@ -203,12 +219,13 @@ assertCompiles inputFiles foreigns = do
           Nothing -> return $ Just "Couldn't find node.js executable"
 
 assertDoesNotCompile
-  :: [FilePath]
+  :: [(P.Module, P.ExternsFile)]
+  -> [FilePath]
   -> M.Map P.ModuleName FilePath
   -> [String]
   -> Expectation
-assertDoesNotCompile inputFiles foreigns shouldFailWith = do
-  assert inputFiles foreigns $ \e ->
+assertDoesNotCompile supportExterns inputFiles foreigns shouldFailWith = do
+  assert supportExterns inputFiles foreigns $ \e ->
     case e of
       Left errs -> do
         return $ if null shouldFailWith
