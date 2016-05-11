@@ -16,12 +16,8 @@ setup = do
   Integration.deleteOutputFolder
   s <- Integration.compileTestProject
   unless s $ fail "Failed to compile .purs sources"
-  -- Integration.quitServer -- kill a eventually running psc-ide-server instance
-  _ <- Integration.startServer
+  Integration.reset
   mapM_ Integration.loadModuleWithDeps ["ImportsSpec", "ImportsSpec1"]
-
-teardown :: IO ()
-teardown = Integration.quitServer
 
 withSupportFiles :: (FilePath -> FilePath -> IO a) -> IO ()
 withSupportFiles test = do
@@ -38,7 +34,7 @@ outputFileShouldBe expectation = do
   shouldBe (T.lines outRes) expectation
 
 spec :: Spec
-spec = beforeAll_ setup $ afterAll_ teardown $ describe "Adding imports" $ do
+spec = beforeAll_ setup $ afterAll_ Integration.reset $ describe "Adding imports" $ do
   let
     sourceFileSkeleton :: [Text] -> [Text]
     sourceFileSkeleton importSection =

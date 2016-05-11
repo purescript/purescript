@@ -27,29 +27,30 @@ module Language.PureScript.Ide.Integration
        , projectDirectory
        , deleteFileIfExists
          -- sending commands
+       , addImport
+       , addImplicitImport
        , loadModule
        , loadModuleWithDeps
        , getFlexCompletions
        , getType
-       , addImport
-       , addImplicitImport
        , rebuildModule
+       , reset
          -- checking results
        , resultIsSuccess
        , parseCompletions
        , parseTextResult
        ) where
 
-import           Control.Concurrent                (threadDelay)
+import           Control.Concurrent           (threadDelay)
 import           Control.Exception
-import           Control.Monad                     (join, when)
+import           Control.Monad                (join, when)
 import           Data.Aeson
 import           Data.Aeson.Types
-import qualified Data.ByteString.Lazy.UTF8         as BSL
-import           Data.Either                       (isRight)
-import           Data.Maybe                        (fromJust)
-import qualified Data.Text                         as T
-import qualified Data.Vector                       as V
+import qualified Data.ByteString.Lazy.UTF8    as BSL
+import           Data.Either                  (isRight)
+import           Data.Maybe                   (fromJust)
+import qualified Data.Text                    as T
+import qualified Data.Vector                  as V
 import           Language.PureScript.Ide.Util
 import           System.Directory
 import           System.Exit
@@ -64,7 +65,9 @@ projectDirectory = do
 startServer :: IO ProcessHandle
 startServer = do
   pdir <- projectDirectory
-  (_, _, _, procHandle) <- createProcess $ (shell "psc-ide-server") {cwd=Just pdir}
+  -- Turn off filewatching since it creates race condition in a testing environment
+  (_, _, _, procHandle) <- createProcess $
+    (shell "psc-ide-server --no-watch") {cwd = Just pdir}
   threadDelay 500000 -- give the server 500ms to start up
   return procHandle
 
@@ -126,6 +129,12 @@ quitServer :: IO ()
 quitServer = do
   let quitCommand = object ["command" .= ("quit" :: String)]
   _ <- try $ sendCommand quitCommand :: IO (Either SomeException String)
+  return ()
+
+reset :: IO ()
+reset = do
+  let resetCommand = object ["command" .= ("reset" :: String)]
+  _ <- try $ sendCommand resetCommand :: IO (Either SomeException String)
   return ()
 
 loadModuleWithDeps :: String -> IO String

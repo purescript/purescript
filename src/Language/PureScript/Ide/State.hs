@@ -35,6 +35,11 @@ import           Language.PureScript.Ide.Reexports
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Names
 
+resetPscIdeState :: PscIde m => m ()
+resetPscIdeState = do
+  stateVar <- envStateVar <$> ask
+  liftIO $ atomically (writeTVar stateVar emptyPscIdeState)
+
 getPscIdeState :: (PscIde m) =>
                   m (M.Map ModuleIdent [ExternDecl])
 getPscIdeState = do

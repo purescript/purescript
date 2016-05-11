@@ -2,6 +2,7 @@ module TestPscIde where
 
 import qualified PscIdeSpec
 import Test.Hspec
+import Language.PureScript.Ide.Integration
 
 main :: IO ()
-main = hspec PscIdeSpec.spec
+main = withServer (hspec PscIdeSpec.spec)

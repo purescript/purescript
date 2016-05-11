@@ -63,6 +63,7 @@ data Command
     | List { listType :: ListType }
     | Rebuild FilePath -- ^ Rebuild the specified file using the loaded externs
     | Cwd
+    | Reset
     | Quit
 
 data ImportCommand
@@ -104,6 +105,7 @@ instance FromJSON Command where
         return $ List (fromMaybe LoadedModules listType')
       "cwd"  -> return Cwd
       "quit" -> return Quit
+      "reset" -> pure Reset
       "load" ->
         maybe (pure (Load [] [])) (\params -> do
           mods <- params .:? "modules"
