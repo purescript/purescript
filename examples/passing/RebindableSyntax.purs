@@ -12,8 +12,10 @@ example1 = do
   where
   bind x f = x <> f unit
 
-(*>) :: forall f a b. (Apply f) => f a -> f b -> f b
-(*>) fa fb = const id <$> fa <*> fb
+applySecond :: forall f a b. (Apply f) => f a -> f b -> f b
+applySecond fa fb = const id <$> fa <*> fb
+
+infixl 4 applySecond as *>
 
 newtype Const a b = Const a
 

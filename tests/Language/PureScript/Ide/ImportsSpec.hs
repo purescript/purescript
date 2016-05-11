@@ -69,6 +69,8 @@ spec = do
     let simpleFileImports = let (_, _, i, _) = splitSimpleFile in i
         addValueImport i mn is =
           prettyPrintImportSection (addExplicitImport' (ValueDeclaration i wildcard) mn is)
+        addOpImport op mn is =
+          prettyPrintImportSection (addExplicitImport' (FixityDeclaration op) mn is)
         addDtorImport i t mn is =
           prettyPrintImportSection (addExplicitImport' (DataConstructor i t wildcard) mn is)
     it "adds an implicit unqualified import" $
@@ -96,7 +98,7 @@ spec = do
         ]
     it "adds an operator to an explicit import list" $
       shouldBe
-        (addValueImport "<~>" (P.moduleNameFromString "Data.Array") explicitImports)
+        (addOpImport (Left (P.OpName "<~>")) (P.moduleNameFromString "Data.Array") explicitImports)
         [ "import Prelude"
         , "import Data.Array ((<~>), tail)"
         ]

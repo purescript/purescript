@@ -1,9 +1,9 @@
 module PSCi.Message where
 
-
 import Data.List (intercalate)
-import qualified PSCi.Directive as D
+
 import PSCi.Types
+import qualified PSCi.Directive as D
 
 -- Messages
 
@@ -50,4 +50,3 @@ prologueMessage = intercalate "\n"
 --
 quitMessage :: String
 quitMessage = "See ya!"
-

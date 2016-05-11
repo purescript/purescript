@@ -3,13 +3,14 @@
 --
 module Language.PureScript.Sugar (desugar, module S) where
 
-import Prelude.Compat
-
 import Control.Category ((>>>))
 import Control.Monad
 import Control.Monad.Error.Class (MonadError())
 import Control.Monad.Supply.Class
 import Control.Monad.Writer.Class (MonadWriter())
+
+import Data.List (map)
+import Data.Traversable (traverse)
 
 import Language.PureScript.AST
 import Language.PureScript.Errors
@@ -47,15 +48,20 @@ import Language.PureScript.Sugar.TypeDeclarations as S
 --
 --  * Group mutually recursive value and data declarations into binding groups.
 --
-desugar :: (MonadSupply m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) => [ExternsFile] -> [Module] -> m [Module]
+desugar
+  :: (MonadSupply m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => [ExternsFile]
+  -> [Module]
+  -> m [Module]
 desugar externs =
-  map removeSignedLiterals
+  map desugarSignedLiterals
     >>> traverse desugarObjectConstructors
     >=> traverse desugarDoModule
-    >=> desugarCasesModule
-    >=> desugarTypeDeclarationsModule
+    >=> traverse desugarCasesModule
+    >=> traverse desugarTypeDeclarationsModule
     >=> desugarImports externs
     >=> rebracket externs
+    >=> traverse checkFixityExports
     >=> traverse deriveInstances
     >=> desugarTypeClasses externs
-    >=> createBindingGroupsModule
+    >=> traverse createBindingGroupsModule

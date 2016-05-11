@@ -253,8 +253,9 @@ handleShowImportedModules = do
 
   showRef :: P.DeclarationRef -> String
   showRef (P.TypeRef pn dctors) = N.runProperName pn ++ "(" ++ maybe ".." (commaList . map N.runProperName) dctors ++ ")"
-  showRef (P.TypeOpRef ident) = "type (" ++ N.runIdent ident ++ ")"
+  showRef (P.TypeOpRef op) = "type " ++ N.showOp op
   showRef (P.ValueRef ident) = N.runIdent ident
+  showRef (P.ValueOpRef op) = N.showOp op
   showRef (P.TypeClassRef pn) = "class " ++ N.runProperName pn
   showRef (P.TypeInstanceRef ident) = N.runIdent ident
   showRef (P.ModuleRef name) = "module " ++ N.runModuleName name

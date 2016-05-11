@@ -209,15 +209,18 @@ addExplicitImport' decl moduleName imports =
     then imports
     else updateAtFirstOrPrepend matches (insertDeclIntoImport decl) freshImport imports
   where
-    refFromDeclaration (TypeClassDeclaration n) = P.TypeClassRef n
+    refFromDeclaration (TypeClassDeclaration n) =
+      P.TypeClassRef n
     refFromDeclaration (DataConstructor n tn _) =
       P.TypeRef tn (Just [P.ProperName (T.unpack n)])
-    refFromDeclaration (TypeDeclaration n _) = P.TypeRef n (Just [])
+    refFromDeclaration (TypeDeclaration n _) =
+      P.TypeRef n (Just [])
+    refFromDeclaration (FixityDeclaration (Left op)) =
+      P.ValueOpRef op
+    refFromDeclaration (FixityDeclaration (Right op)) =
+      P.TypeOpRef op
     refFromDeclaration d =
-      let
-        ident = T.unpack (identifierFromExternDecl d)
-      in
-        P.ValueRef ((if all P.isSymbolChar ident then P.Op else P.Ident) ident)
+      P.ValueRef $ P.Ident $ T.unpack (identifierFromExternDecl d)
 
     -- | Adds a declaration to an import:
     -- TypeDeclaration "Maybe" + Data.Maybe (maybe) -> Data.Maybe(Maybe, maybe)

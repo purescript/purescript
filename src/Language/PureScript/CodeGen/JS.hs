@@ -173,7 +173,6 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   --
   accessor :: Ident -> JS -> JS
   accessor (Ident prop) = accessorString prop
-  accessor (Op op) = JSIndexer Nothing (JSStringLiteral Nothing op)
   accessor (GenIdent _ _) = internalError "GenIdent in accessor"
 
   accessorString :: String -> JS -> JS

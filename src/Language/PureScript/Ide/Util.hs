@@ -31,6 +31,9 @@ runProperNameT = T.pack . P.runProperName
 runIdentT :: P.Ident -> Text
 runIdentT = T.pack . P.runIdent
 
+runOpNameT :: P.OpName a -> Text
+runOpNameT = T.pack . P.runOpName
+
 prettyTypeT :: P.Type -> Text
 prettyTypeT = T.unwords . fmap T.strip . T.lines . T.pack . P.prettyPrintType
 
@@ -41,6 +44,8 @@ identifierFromExternDecl (TypeSynonymDeclaration name _) = runProperNameT name
 identifierFromExternDecl (DataConstructor name _ _) = name
 identifierFromExternDecl (TypeClassDeclaration name) = runProperNameT name
 identifierFromExternDecl (ModuleDecl name _) = name
+identifierFromExternDecl (FixityDeclaration (Left op)) = runOpNameT op
+identifierFromExternDecl (FixityDeclaration (Right op)) = runOpNameT op
 identifierFromExternDecl Dependency{} = "~Dependency~"
 identifierFromExternDecl Export{} = "~Export~"
 

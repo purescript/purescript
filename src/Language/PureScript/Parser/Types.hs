@@ -12,7 +12,6 @@ import Control.Monad (when, unless)
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.Environment
-import Language.PureScript.Names
 import Language.PureScript.Parser.Common
 import Language.PureScript.Parser.Kinds
 import Language.PureScript.Parser.Lexer
@@ -83,7 +82,7 @@ parseAnyType :: TokenParser Type
 parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTable parseTypeAtom) P.<?> "type"
   where
   operators = [ [ P.Infix (return TypeApp) P.AssocLeft ]
-              , [ P.Infix (P.try (parseQualified (Op <$> symbol)) >>= \ident ->
+              , [ P.Infix (P.try (parseQualified parseOperator) >>= \ident ->
                     return (BinaryNoParensType (TypeOp ident))) P.AssocRight
                 ]
               , [ P.Infix (rarrow >> return function) P.AssocRight ]

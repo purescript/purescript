@@ -2,10 +2,10 @@ module Main where
 
 import Prelude ()
 
-($) :: forall a b. (a -> b) -> a -> b
-($) f x = f x
+applyFn :: forall a b. (a -> b) -> a -> b
+applyFn f x = f x
 
-infixr 1000 $
+infixr 1000 applyFn as $
 
 id x = x
 
