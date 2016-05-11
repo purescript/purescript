@@ -40,23 +40,13 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
   lintDeclaration :: Declaration -> m ()
   lintDeclaration = tell . f
     where
-    (warningsInDecl, _, _, _, _) = everythingWithScope stepD stepE stepB (\_ _ -> mempty) stepDo
+    (warningsInDecl, _, _, _, _) = everythingWithScope (\_ _ -> mempty) stepE stepB (\_ _ -> mempty) stepDo
 
     f :: Declaration -> MultipleErrors
     f (PositionedDeclaration pos _ dec) = addHint (PositionedError pos) (f dec)
     f dec@(ValueDeclaration name _ _ _) = addHint (ErrorInValueDeclaration name) (warningsInDecl moduleNames dec <> checkTypeVarsInDecl dec)
     f (TypeDeclaration name ty) = addHint (ErrorInTypeDeclaration name) (checkTypeVars ty)
     f dec = warningsInDecl moduleNames dec <> checkTypeVarsInDecl dec
-
-    stepD :: S.Set Ident -> Declaration -> MultipleErrors
-    stepD _ (ValueDeclaration (Op name) _ _ _) = errorMessage (DeprecatedOperatorDecl name)
-    stepD _ (TypeClassDeclaration _ _ _ decls) = foldMap go decls
-      where
-      go :: Declaration -> MultipleErrors
-      go (PositionedDeclaration _ _ d') = go d'
-      go (TypeDeclaration (Op name) _)  = errorMessage (DeprecatedOperatorDecl name)
-      go _ = mempty
-    stepD _ _ = mempty
 
     stepE :: S.Set Ident -> Expr -> MultipleErrors
     stepE s (Abs (Left name) _) | name `S.member` s = errorMessage (ShadowedName name)

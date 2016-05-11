@@ -59,27 +59,33 @@ renderDeclarationWithOptions opts Declaration{..} =
             syntax "("
             <> mintersperse (syntax "," <> sp) (map renderConstraint implies)
             <> syntax ")" <> sp <> syntax "<="
-    AliasDeclaration for@(P.Qualified _ alias) (P.Fixity associativity precedence) ->
+
+    AliasDeclaration (P.Fixity associativity precedence) for@(P.Qualified _ alias) ->
       [ keywordFixity associativity
       , syntax $ show precedence
-      , ident $ renderAlias for
+      , ident $ renderQualAlias for
       , keyword "as"
       , ident $ adjustAliasName alias declTitle
       ]
 
   where
+  renderType' :: P.Type -> RenderedCode
   renderType' = renderTypeWithOptions opts
-  renderAlias (P.Qualified mn alias)
-    | mn == currentModule opts =
-        P.foldFixityAlias P.runIdent P.runProperName (("type " ++) . P.runProperName) alias
-    | otherwise =
-        P.foldFixityAlias
-          (P.showQualified P.runIdent . P.Qualified mn)
-          (P.showQualified P.runProperName . P.Qualified mn)
-          (("type " ++) . P.showQualified P.runProperName . P.Qualified mn)
-          alias
 
-  adjustAliasName (P.AliasType{}) title = drop 6 (init title)
+  renderQualAlias :: FixityAlias -> String
+  renderQualAlias (P.Qualified mn alias)
+    | mn == currentModule opts = renderAlias id alias
+    | otherwise = renderAlias (\f -> P.showQualified f . P.Qualified mn) alias
+
+  renderAlias
+    :: (forall a. (a -> String) -> a -> String)
+    -> Either (P.ProperName 'P.TypeName) (Either P.Ident (P.ProperName 'P.ConstructorName))
+    -> String
+  renderAlias f
+    = either (("type " ++) . f P.runProperName)
+    $ either (f P.runIdent) (f P.runProperName)
+
+  -- adjustAliasName (P.AliasType{}) title = drop 6 (init title)
   adjustAliasName _ title = tail (init title)
 
 renderChildDeclaration :: ChildDeclaration -> RenderedCode

@@ -16,7 +16,7 @@ setup = do
   Integration.deleteOutputFolder
   s <- Integration.compileTestProject
   unless s $ fail "Failed to compile .purs sources"
-  Integration.quitServer -- kill a eventually running psc-ide-server instance
+  -- Integration.quitServer -- kill a eventually running psc-ide-server instance
   _ <- Integration.startServer
   mapM_ Integration.loadModuleWithDeps ["ImportsSpec", "ImportsSpec1"]
 
