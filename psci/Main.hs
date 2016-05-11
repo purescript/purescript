@@ -96,7 +96,9 @@ getCommand singleLineMode = handleInterrupt (return (Right Nothing)) $ do
 
 -- | Checks if the Console module is defined
 consoleIsDefined :: [P.ExternsFile] -> Bool
-consoleIsDefined = any ((== P.ModuleName (map P.ProperName [ "Control", "Monad", "Eff", "Console" ])) . P.efModuleName)
+consoleIsDefined = any ((== consoleModule) . P.efModuleName)
+  where
+    consoleModule = P.moduleNameFromString "Control.Monad.Eff.Console"
 
 -- | Get command line options and drop into the REPL
 main :: IO ()
