@@ -20,7 +20,6 @@ module Language.PureScript.BundleOpt (
     uncurryFunc
 ) where
 
-import Debug.Trace
 import qualified Data.Map as M
 import Data.Maybe (mapMaybe)
 
@@ -70,7 +69,7 @@ uncurryFunc modules entryPoints =
     -- add exports for uncurried functions
         (modulesWithExports,funcCollector2)  = foldr (generateUncurriedExports entryPoints) ([],funcCollector) modulesWithUncurried
     -- replace satured calls to calls to uncurried functions
-        (modulesWithCalls, _funcCollector3)    = trace ("Uncurry Stats: " ++ (show (stats funcCollector2))) $
+        (modulesWithCalls, _funcCollector3)    = -- trace ("Uncurry Stats: " ++ (show (stats funcCollector2))) $
                                                 foldr generateSaturedCalls ([],funcCollector2) modulesWithExports
 
     in  modulesWithCalls
@@ -230,8 +229,8 @@ generateSaturedCalls (Module moduleIdentifier moduleElements) (modules, funcColl
 -- |  Generate uncurried functions from curried functions
 generateSaturedC :: ModuleIdentifier -> [(String, ModuleIdentifier)] -> ModuleElement ->
     ([ModuleElement],FuncCollector) -> ([ModuleElement],FuncCollector)
-generateSaturedC mid imports (Member jSNode' sort name decl keys) (eles, funcCollector) =
-    let replaceSaturedNode = replaceSaturedStatement jSNode'
+generateSaturedC mid imports (Member node' sort name decl keys) (eles, funcCollector) =
+    let replaceSaturedNode = replaceSaturedStatement node'
         replaceSaturedDecl = replaceSaturedExpression decl
     in  (Member replaceSaturedNode sort name replaceSaturedDecl keys : eles, funcCollector)
   where
@@ -309,10 +308,9 @@ generateSaturedC mid imports (Member jSNode' sort name decl keys) (eles, funcCol
         JSArrayLiteral u1 (map replaceSaturedArrayElement arrayElementL) u2
     replaceSaturedExpression  (JSAssignExpression expr1 u1 expr2) =
         JSAssignExpression (replaceSaturedExpression expr1) u1 (replaceSaturedExpression expr2)
-    replaceSaturedExpression  inp@(JSCallExpression _expr _u1 _exprL _u2) =
-        mayUncurryCallExpression inp [] inp -- TODO
-
---        JSCallExpression (replaceSaturedExpression expr) u1 (mapJSCommaList replaceSaturedExpression exprL) u2
+    replaceSaturedExpression  inp@(JSCallExpression _expr _u1 _exprL _u2) = -- Here we uncurry Calls
+        mayUncurryCallExpression inp [] inp
+        -- JSCallExpression (replaceSaturedExpression expr) u1 (mapJSCommaList replaceSaturedExpression exprL) u2
     replaceSaturedExpression  (JSCallExpressionDot expr1 u1 expr2) =
         JSCallExpressionDot (replaceSaturedExpression expr1) u1 (replaceSaturedExpression expr2)
     replaceSaturedExpression (JSCallExpressionSquare expr1 u1 expr2 u2) =
@@ -359,14 +357,14 @@ generateSaturedC mid imports (Member jSNode' sort name decl keys) (eles, funcCol
     replaceSaturedVarInitializer JSVarInitNone = JSVarInitNone
 
     mayUncurryCallExpression :: JSExpression -> [JSExpression] -> JSExpression -> JSExpression
-    mayUncurryCallExpression expr args original -- One more argument
+    mayUncurryCallExpression expr args original  -- One more argument
         | JSCallExpression cexpr _cu1 cexprL _cu2 <- expr
         , JSLOne arg <- cexprL
         = mayUncurryCallExpression cexpr (replaceSaturedExpression arg : args) original
-    mayUncurryCallExpression expr [] original   -- Empty effect arg left untouched
+    mayUncurryCallExpression expr [] _original   -- Empty effect arg left untouched
         | JSCallExpression cexpr cu1 cexprL cu2 <- expr
         , JSLNil <- cexprL
-        = JSCallExpression (mayUncurryCallExpression cexpr [] original) cu1 cexprL cu2
+        = JSCallExpression (replaceSaturedExpression cexpr) cu1 cexprL cu2
     mayUncurryCallExpression expr args original
         | JSMemberExpression mexpr mu1 mexprL mu2 <- expr
         , JSIdentifier iu1 funcName <- mexpr
@@ -381,8 +379,18 @@ generateSaturedC mid imports (Member jSNode' sort name decl keys) (eles, funcCol
                 Just admin ->
                     if arity admin <= arityFound
                         then {-trace ("!*" ++ show arityFound) $-}
-                            let argList = toJSCommaList (reverse (replaceSaturedExpression arg1 : args))
-                            in JSMemberExpression (JSIdentifier iu1 newName) mu1 argList mu2
+                            if arity admin == arityFound
+                                then
+                                    let argList = toJSCommaList (reverse (replaceSaturedExpression arg1 : args))
+                                    in JSMemberExpression (JSIdentifier iu1 newName) mu1 argList mu2
+                                else
+                                    let newArgs     = replaceSaturedExpression arg1 : args
+                                        argList     = toJSCommaList (reverse (take (arity admin) newArgs))
+                                        mExpr       = JSMemberExpression (JSIdentifier iu1 newName) mu1 argList mu2
+                                        extraArgs   = reverse $ drop (arity admin) newArgs
+                                        callFunc arg ex = JSCallExpression ex JSNoAnnot (JSLOne arg) JSNoAnnot
+                                    in -- trace ("special In: " ++ show (arity admin) ++ " " ++ show arityFound ++ " " ++ newName) $
+                                        foldr callFunc mExpr extraArgs
                         else {-trace ("no replace!!! " ++ show (arity admin) ++ " " ++ show arityFound ++ " " ++ newName) $-}
                              continueUncurry original
     mayUncurryCallExpression expr args original
@@ -404,8 +412,18 @@ generateSaturedC mid imports (Member jSNode' sort name decl keys) (eles, funcCol
                 Just admin ->
                     if arity admin <= arityFound
                         then {-trace ("!!*" ++ show (arity admin)) $-}
-                            let argList = toJSCommaList (reverse (replaceSaturedExpression arg1 : args))
-                            in JSMemberExpression (JSMemberDot l m (JSIdentifier a1 newName)) mu1 argList mu2
+                            if arity admin == arityFound
+                                then
+                                    let argList = toJSCommaList (reverse (replaceSaturedExpression arg1 : args))
+                                    in JSMemberExpression (JSMemberDot l m (JSIdentifier a1 newName)) mu1 argList mu2
+                                else
+                                    let newArgs     = replaceSaturedExpression arg1 : args
+                                        argList     = toJSCommaList (reverse (take (arity admin) newArgs))
+                                        mExpr       = JSMemberExpression (JSMemberDot l m (JSIdentifier a1 newName)) mu1 argList mu2
+                                        extraArgs   = reverse $ drop (arity admin) newArgs
+                                        callFunc arg ex = JSCallExpression ex JSNoAnnot (JSLOne arg) JSNoAnnot
+                                    in {- trace ("special In: " ++ show (arity admin) ++ " " ++ show arityFound ++ " " ++ newName)  $ -}
+                                        foldr callFunc mExpr extraArgs
                         else {-trace ("no replace!!! " ++ show (arity admin) ++ " " ++ show arityFound ++ " " ++ newName)-}
                             continueUncurry original
     mayUncurryCallExpression _expr _args original = continueUncurry original
