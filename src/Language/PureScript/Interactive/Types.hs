@@ -6,9 +6,9 @@ module Language.PureScript.Interactive.Types where
 import Prelude.Compat
 
 import           Data.Map (Map)
-import qualified Data.Map as Map
 import qualified Language.PureScript as P
 
+-- | Command line options
 data PSCiOptions = PSCiOptions
   { psciMultiLineMode     :: Bool
   , psciInputFile         :: [FilePath]
@@ -16,24 +16,30 @@ data PSCiOptions = PSCiOptions
   , psciInputNodeFlags    :: [String]
   }
 
--- |
--- The PSCI state.
--- Holds a list of imported modules, loaded files, and partial let bindings.
--- The let bindings are partial,
--- because it makes more sense to apply the binding to the final evaluated expression.
+-- | The PSCI configuration.
 --
-data PSCiState = PSCiState
-  { psciImportedModules     :: [ImportedModule]
-  , psciLoadedFiles         :: [FilePath]
-  , psciLoadedExterns       :: [(P.Module, P.ExternsFile)]
+-- These configuration values do not change during execution.
+--
+data PSCiConfig = PSCiConfig
+  { psciLoadedFiles         :: [FilePath]
   , psciForeignFiles        :: Map P.ModuleName FilePath
-  , psciLetBindings         :: [P.Declaration]
   , psciNodeFlags           :: [String]
   , psciEnvironment         :: P.Environment
   } deriving Show
 
+-- | The PSCI state.
+--
+-- Holds a list of imported modules, loaded files, and partial let bindings.
+-- The let bindings are partial,
+-- because it makes more sense to apply the binding to the final evaluated expression.
+data PSCiState = PSCiState
+  { psciImportedModules     :: [ImportedModule]
+  , psciLetBindings         :: [P.Declaration]
+  , psciLoadedExterns       :: [(P.Module, P.ExternsFile)]
+  } deriving Show
+
 initialPSCiState :: PSCiState
-initialPSCiState = PSCiState [] [] [] Map.empty [] [] P.initEnvironment
+initialPSCiState = PSCiState [] [] []
 
 -- | All of the data that is contained by an ImportDeclaration in the AST.
 -- That is:
@@ -57,33 +63,21 @@ allImportsOf m (PSCiState{psciImportedModules = is}) =
   name = P.getModuleName m
   isImportOfThis (name', _, _) = name == name'
 
--- State helpers
+-- * State helpers
 
--- |
--- Updates the state to have more imported modules.
---
-updateImportedModules :: ImportedModule -> PSCiState -> PSCiState
-updateImportedModules im st = st { psciImportedModules = im : psciImportedModules st }
+-- | Updates the imported modules in the state record.
+updateImportedModules :: ([ImportedModule] -> [ImportedModule]) -> PSCiState -> PSCiState
+updateImportedModules f st = st { psciImportedModules = f (psciImportedModules st) }
 
--- | Updates the state to have more loaded .purs files.
-updateLoadedFiles :: [FilePath] -> PSCiState -> PSCiState
-updateLoadedFiles paths st = st { psciLoadedFiles = psciLoadedFiles st ++ paths }
+-- | Updates the loaded externs files in the state record.
+updateLoadedExterns :: ([(P.Module, P.ExternsFile)] -> [(P.Module, P.ExternsFile)]) -> PSCiState -> PSCiState
+updateLoadedExterns f st = st { psciLoadedExterns = f (psciLoadedExterns st) }
 
--- | Updates the state to have more loaded externs files.
-updateLoadedExterns :: [(P.Module, P.ExternsFile)] -> PSCiState -> PSCiState
-updateLoadedExterns externs st = st { psciLoadedExterns = psciLoadedExterns st ++ externs }
+-- | Updates the let bindings in the state record.
+updateLets :: ([P.Declaration] -> [P.Declaration]) -> PSCiState -> PSCiState
+updateLets f st = st { psciLetBindings = f (psciLetBindings st) }
 
--- |
--- Updates the state to have more let bindings.
---
-updateLets :: [P.Declaration] -> PSCiState -> PSCiState
-updateLets ds st = st { psciLetBindings = psciLetBindings st ++ ds }
-
--- |
--- Updates the state to have more let bindings.
---
-updateForeignFiles :: Map P.ModuleName FilePath -> PSCiState -> PSCiState
-updateForeignFiles fs st = st { psciForeignFiles = psciForeignFiles st `Map.union` fs }
+-- * Commands
 
 -- |
 -- Valid Meta-commands for PSCI

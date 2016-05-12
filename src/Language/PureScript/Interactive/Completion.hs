@@ -10,8 +10,9 @@ module Language.PureScript.Interactive.Completion
 import Prelude.Compat
 
 import           Control.Arrow (second)
+import           Control.Monad.IO.Class (MonadIO(..))
+import           Control.Monad.State.Class (MonadState(..))
 import           Control.Monad.Trans.Reader (asks, runReaderT, ReaderT)
-import           Control.Monad.Trans.State.Strict
 import           Data.Function (on)
 import           Data.List (nub, nubBy, isPrefixOf, sortBy, stripPrefix)
 import           Data.Maybe (mapMaybe)
@@ -24,14 +25,21 @@ import           System.Console.Haskeline
 -- Completions may read the state, but not modify it.
 type CompletionM = ReaderT PSCiState IO
 
--- Lift a `CompletionM` action to a `StateT PSCiState IO` one.
-liftCompletionM :: CompletionM a -> StateT PSCiState IO a
-liftCompletionM act = StateT (\s -> (\a -> (a, s)) <$> runReaderT act s)
+-- Lift a `CompletionM` action into a state monad.
+liftCompletionM
+  :: (MonadState PSCiState m, MonadIO m)
+  => CompletionM a
+  -> m a
+liftCompletionM act = do
+  st <- get
+  liftIO $ runReaderT act st
 
 -- Haskeline completions
 
 -- | Loads module, function, and file completions.
-completion :: CompletionFunc (StateT PSCiState IO)
+completion
+  :: (MonadState PSCiState m, MonadIO m)
+  => CompletionFunc m
 completion = liftCompletionM . completion'
 
 completion' :: CompletionFunc CompletionM

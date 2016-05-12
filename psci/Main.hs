@@ -1,9 +1,10 @@
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE DataKinds #-}
 
 module Main (main) where
 
@@ -18,6 +19,7 @@ import           Control.Monad
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import           Control.Monad.Trans.State.Strict (StateT, evalStateT)
+import           Control.Monad.Trans.Reader (ReaderT, runReaderT)
 
 import qualified Language.PureScript as P
 import           Language.PureScript.Interactive
@@ -29,7 +31,6 @@ import qualified Paths_purescript as Paths
 import           System.Console.Haskeline
 import           System.Exit
 import           System.FilePath.Glob (glob)
-import           System.IO.UTF8 (readUTF8File)
 
 multiLineMode :: Opts.Parser Bool
 multiLineMode = Opts.switch $
@@ -77,21 +78,17 @@ getOpt = Opts.execParser opts
       headerInfo  = Opts.header   "psci - Interactive mode for PureScript"
       footerInfo  = Opts.footer $ "psci " ++ showVersion Paths.version
 
--- | Read a file in the 'P.Make' monad, handling errors.
-readFileMake :: FilePath -> P.Make String
-readFileMake path = P.makeIO (const (P.ErrorMessage [] $ P.CannotReadFile path)) (readUTF8File path)
-
 -- | Parses the input and returns either a command, or an error as a 'String'.
-getCommand :: Bool -> InputT (StateT PSCiState IO) (Either String (Maybe Command))
+getCommand :: forall m. MonadException m => Bool -> InputT m (Either String (Maybe Command))
 getCommand singleLineMode = handleInterrupt (return (Right Nothing)) $ do
   firstLine <- withInterrupt $ getInputLine "> "
   case firstLine of
     Nothing -> return (Right (Just QuitPSCi)) -- Ctrl-D when input is empty
     Just "" -> return (Right Nothing)
-    Just s | singleLineMode || head s == ':' -> return .fmap Just $ parseCommand s
+    Just s | singleLineMode || head s == ':' -> return . fmap Just $ parseCommand s
     Just s -> fmap Just . parseCommand <$> go [s]
   where
-    go :: [String] -> InputT (StateT PSCiState IO) String
+    go :: [String] -> InputT m String
     go ls = maybe (return . unlines $ reverse ls) (go . (:ls)) =<< getInputLine "  "
 
 -- | Checks if the Console module is defined
@@ -112,16 +109,21 @@ main = getOpt >>= loop
           modules <- ExceptT (loadAllModules inputFiles)
           let allModules = ("<internal>", supportModule) : modules
           foreigns <- ExceptT . runMake $ do
-            foreignFilesContent <- forM foreignFiles (\inFile -> (inFile,) <$> readFileMake inFile)
+            foreignFilesContent <- forM foreignFiles (\inFile -> (inFile,) <$> P.readTextFile inFile)
             P.parseForeignModulesFromFiles foreignFilesContent
-          (externs, env) <- ExceptT . runMake . make (initialPSCiState { psciForeignFiles = foreigns }) . map snd $ allModules
+          (externs, env) <- ExceptT . runMake . make foreigns . map snd $ allModules
           return (allModules, foreigns, externs, env)
         case e of
           Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
           Right (modules, foreigns, externs, env) -> do
             historyFilename <- getHistoryFilename
             let settings = defaultSettings { historyFile = Just historyFilename }
-            flip evalStateT (PSCiState [] inputFiles (zip (map snd modules) externs) foreigns [] psciInputNodeFlags env) . runInputT (setComplete completion settings) $ do
+                initialState = PSCiState [] [] (zip (map snd modules) externs)
+                config = PSCiConfig inputFiles foreigns psciInputNodeFlags env
+                runner = flip runReaderT config
+                         . flip evalStateT initialState
+                         . runInputT (setComplete completion settings)
+            runner $ do
               outputStrLn prologueMessage
               unless (consoleIsDefined externs) . outputStrLn $ unlines
                 [ "PSCi requires the purescript-console module to be installed."
@@ -129,7 +131,7 @@ main = getOpt >>= loop
                 ]
               go
       where
-        go :: InputT (StateT PSCiState IO) ()
+        go :: InputT (StateT PSCiState (ReaderT PSCiConfig IO)) ()
         go = do
           c <- getCommand (not psciMultiLineMode)
           case c of

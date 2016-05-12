@@ -6,10 +6,8 @@ module TestPsci where
 import Prelude ()
 import Prelude.Compat
 
-import Control.Monad.Trans.State.Strict (runStateT)
-import Control.Monad (when, forM)
-import Control.Monad.Writer.Strict (runWriterT)
-import Control.Monad.Trans.Except (runExceptT)
+import Control.Monad.Trans.State.Strict (evalStateT)
+import Control.Monad (when)
 
 import Data.List (sort)
 
@@ -17,7 +15,6 @@ import System.Exit (exitFailure)
 import System.Console.Haskeline
 import System.FilePath ((</>))
 import System.Directory (getCurrentDirectory)
-import System.IO.UTF8 (readUTF8File)
 import qualified System.FilePath.Glob as Glob
 
 import Test.HUnit
@@ -117,7 +114,7 @@ assertCompletedOk (line, expecteds) = do
 runCM :: CompletionM a -> IO a
 runCM act = do
   psciState <- getPSCiState
-  fmap fst (runStateT (liftCompletionM act) psciState)
+  evalStateT (liftCompletionM act) psciState
 
 getPSCiState :: IO PSCiState
 getPSCiState = do
@@ -125,18 +122,15 @@ getPSCiState = do
   let supportDir = cwd </> "tests" </> "support" </> "bower_components"
   let supportFiles ext = Glob.globDir1 (Glob.compile ("purescript-*/**/*." ++ ext)) supportDir
   pursFiles <- supportFiles "purs"
-  jsFiles   <- supportFiles "js"
 
   modulesOrFirstError <- loadAllModules pursFiles
-  foreignFiles <- forM jsFiles (\f -> (f,) <$> readUTF8File f)
-  Right (foreigns, _) <- runExceptT $ runWriterT $ P.parseForeignModulesFromFiles foreignFiles
   case modulesOrFirstError of
     Left err ->
       print err >> exitFailure
     Right modules ->
       let imports = [controlMonadSTasST, (P.ModuleName [P.ProperName "Prelude"], P.Implicit, Nothing)]
           dummyExterns = P.internalError "TestPsci: dummyExterns should not be used"
-      in  return (PSCiState imports pursFiles (zip (map snd modules) (repeat dummyExterns)) foreigns [] [] P.initEnvironment)
+      in  return (PSCiState imports [] (zip (map snd modules) (repeat dummyExterns)))
 
 controlMonadSTasST :: ImportedModule
 controlMonadSTasST = (s "Control.Monad.ST", P.Implicit, Just (s "ST"))

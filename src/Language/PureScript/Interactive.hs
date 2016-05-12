@@ -23,6 +23,7 @@ import qualified Data.Map as M
 
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.State.Class
+import           Control.Monad.Reader.Class
 import           Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import           Control.Monad.Trans.State.Strict (StateT, runStateT)
 import           Control.Monad.Writer.Strict (Writer(), runWriter)
@@ -51,31 +52,37 @@ runMake :: P.Make a -> IO (Either P.MultipleErrors a)
 runMake mk = fst <$> P.runMake P.defaultOptions mk
 
 -- | Rebuild a module, using the cached externs data for dependencies.
-rebuild :: PSCiState -> P.Module -> P.Make (P.ExternsFile, P.Environment)
-rebuild PSCiState{..} m = do
-    let loadedExterns = map snd psciLoadedExterns
+rebuild
+  :: M.Map P.ModuleName FilePath
+  -> [P.ExternsFile]
+  -> P.Module
+  -> P.Make (P.ExternsFile, P.Environment)
+rebuild foreignFiles loadedExterns m = do
     externs <- P.rebuildModule buildActions loadedExterns m
     return (externs, foldl' (flip P.applyExternsFileToEnvironment) P.initEnvironment (loadedExterns ++ [externs]))
   where
     buildActions :: P.MakeActions P.Make
     buildActions = (P.buildMakeActions modulesDir
                                        filePathMap
-                                       psciForeignFiles
+                                       foreignFiles
                                        False) { P.progress = const (return ()) }
 
     filePathMap :: M.Map P.ModuleName (Either P.RebuildPolicy FilePath)
     filePathMap = M.singleton (P.getModuleName m) (Left P.RebuildAlways)
 
 -- | Build the collection of modules from scratch. This is usually done on startup.
-make :: PSCiState -> [P.Module] -> P.Make ([P.ExternsFile], P.Environment)
-make PSCiState{..} ms = do
+make
+  :: M.Map P.ModuleName FilePath
+  -> [P.Module]
+  -> P.Make ([P.ExternsFile], P.Environment)
+make foreignFiles ms = do
     externs <- P.make buildActions ms
     return (externs, foldl' (flip P.applyExternsFileToEnvironment) P.initEnvironment externs)
   where
     buildActions :: P.MakeActions P.Make
     buildActions = (P.buildMakeActions modulesDir
                                        filePathMap
-                                       psciForeignFiles
+                                       foreignFiles
                                        False)
 
     filePathMap :: M.Map P.ModuleName (Either P.RebuildPolicy FilePath)
@@ -83,7 +90,7 @@ make PSCiState{..} ms = do
 
 -- | Performs a PSCi command
 handleCommand
-  :: (MonadState PSCiState m, MonadIO m)
+  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
   => Command
   -> m ()
 handleCommand ShowHelp                  = liftIO $ putStrLn helpMessage
@@ -100,35 +107,34 @@ handleCommand QuitPSCi                  = P.internalError "`handleCommand QuitPS
 
 -- | Reset the application state
 handleResetState
-  :: (MonadState PSCiState m, MonadIO m)
+  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
   => m ()
 handleResetState = do
-  modify $ \st ->
-    st { psciImportedModules = []
-       , psciLetBindings     = []
-       }
-  files <- gets psciLoadedFiles
+  modify $ updateImportedModules (const [])
+         . updateLets (const [])
+  files <- asks psciLoadedFiles
   e <- runExceptT $ do
     modules <- ExceptT . liftIO $ loadAllModules files
-    st <- get
-    (externs, _) <- ExceptT . liftIO . runMake . make st . map snd $ modules
+    foreignFiles <- asks psciForeignFiles
+    (externs, _) <- ExceptT . liftIO . runMake . make foreignFiles . map snd $ modules
     return (map snd modules, externs)
   case e of
     Left errs -> printErrors errs
-    Right (modules, externs) -> modify . updateLoadedExterns $ zip modules externs
+    Right (modules, externs) -> modify (updateLoadedExterns (++ zip modules externs))
 
 -- | Takes a value expression and evaluates it with the current state.
 --
 -- TODO: factor out the Node process runner, so that we can use PSCi in other settings.
 handleExpression
-  :: (MonadState PSCiState m, MonadIO m)
+  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
   => P.Expr
   -> m ()
 handleExpression val = do
   st <- get
   let m = createTemporaryModule True st val
-  let nodeArgs = psciNodeFlags st ++ [indexFile]
-  e <- liftIO . runMake $ rebuild st m
+  foreignFiles <- asks psciForeignFiles
+  nodeArgs <- asks ((++ [indexFile]) . psciNodeFlags)
+  e <- liftIO . runMake $ rebuild foreignFiles (map snd (psciLoadedExterns st)) m
   case e of
     Left errs -> printErrors errs
     Right _ -> do
@@ -145,17 +151,17 @@ handleExpression val = do
 -- restore the original environment.
 --
 handleDecls
-  :: (MonadState PSCiState m, MonadIO m)
+  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
   => [P.Declaration]
   -> m ()
 handleDecls ds = do
-  st <- get
-  let st' = updateLets ds st
-  let m = createTemporaryModule False st' (P.Literal (P.ObjectLiteral []))
-  e <- liftIO . runMake $ rebuild st' m
+  st <- gets (updateLets (++ ds))
+  let m = createTemporaryModule False st (P.Literal (P.ObjectLiteral []))
+  foreignFiles <- asks psciForeignFiles
+  e <- liftIO . runMake $ rebuild foreignFiles (map snd (psciLoadedExterns st)) m
   case e of
     Left err -> printErrors err
-    Right _ -> put st'
+    Right _ -> put st
 
 -- | Show actual loaded modules in psci.
 handleShowLoadedModules
@@ -201,26 +207,28 @@ handleShowImportedModules = do
 
 -- | Imports a module, preserving the initial state on failure.
 handleImport
-  :: (MonadState PSCiState m, MonadIO m)
+  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
   => ImportedModule
   -> m ()
 handleImport im = do
-   st <- updateImportedModules im <$> get
+   st <- gets (updateImportedModules (im :))
+   foreignFiles <- asks psciForeignFiles
    let m = createTemporaryModuleForImports st
-   e <- liftIO . runMake $ rebuild st m
+   e <- liftIO . runMake $ rebuild foreignFiles (map snd (psciLoadedExterns st)) m
    case e of
      Left errs -> printErrors errs
      Right _  -> put st
 
 -- | Takes a value and prints its type
 handleTypeOf
-  :: (MonadState PSCiState m, MonadIO m)
+  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
   => P.Expr
   -> m ()
 handleTypeOf val = do
   st <- get
+  foreignFiles <- asks psciForeignFiles
   let m = createTemporaryModule False st val
-  e <- liftIO . runMake $ rebuild st m
+  e <- liftIO . runMake $ rebuild foreignFiles (map snd (psciLoadedExterns st)) m
   case e of
     Left errs -> printErrors errs
     Right (_, env') ->
@@ -228,14 +236,40 @@ handleTypeOf val = do
         Just (ty, _, _) -> liftIO . putStrLn . P.prettyPrintType $ ty
         Nothing -> liftIO $ putStrLn "Could not find type"
 
+-- | Takes a type and prints its kind
+handleKindOf
+  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
+  => P.Type
+  -> m ()
+handleKindOf typ = do
+  st <- get
+  foreignFiles <- asks psciForeignFiles
+  let m = createTemporaryModuleForKind st typ
+      mName = P.ModuleName [P.ProperName "$PSCI"]
+  e <- liftIO . runMake $ rebuild foreignFiles (map snd (psciLoadedExterns st)) m
+  case e of
+    Left errs -> printErrors errs
+    Right (_, env') ->
+      case M.lookup (P.Qualified (Just mName) $ P.ProperName "IT") (P.typeSynonyms env') of
+        Just (_, typ') -> do
+          let chk = (P.emptyCheckState env') { P.checkCurrentModule = Just mName }
+              k   = check (P.kindOf typ') chk
+
+              check :: StateT P.CheckState (ExceptT P.MultipleErrors (Writer P.MultipleErrors)) a -> P.CheckState -> Either P.MultipleErrors (a, P.CheckState)
+              check sew = fst . runWriter . runExceptT . runStateT sew
+          case k of
+            Left err        -> printErrors err
+            Right (kind, _) -> liftIO . putStrLn . P.prettyPrintKind $ kind
+        Nothing -> liftIO $ putStrLn "Could not find kind"
+
 -- | Browse a module and displays its signature
 handleBrowse
-  :: (MonadState PSCiState m, MonadIO m)
+  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
   => P.ModuleName
   -> m ()
 handleBrowse moduleName = do
   st <- get
-  let env = psciEnvironment st
+  env <- asks psciEnvironment
   if isModInEnv moduleName st
     then liftIO . putStrLn $ printModuleSignatures moduleName env
     else case lookupUnQualifiedModName moduleName st of
@@ -252,28 +286,3 @@ handleBrowse moduleName = do
         liftIO $ putStrLn $ "Module '" ++ N.runModuleName modName ++ "' is not valid."
     lookupUnQualifiedModName quaModName st =
         (\(modName,_,_) -> modName) <$> find ( \(_, _, mayQuaName) -> mayQuaName == Just quaModName) (psciImportedModules st)
-
--- | Takes a type and prints its kind
-handleKindOf
-  :: (MonadState PSCiState m, MonadIO m)
-  => P.Type
-  -> m ()
-handleKindOf typ = do
-  st <- get
-  let m = createTemporaryModuleForKind st typ
-      mName = P.ModuleName [P.ProperName "$PSCI"]
-  e <- liftIO . runMake $ rebuild st m
-  case e of
-    Left errs -> printErrors errs
-    Right (_, env') ->
-      case M.lookup (P.Qualified (Just mName) $ P.ProperName "IT") (P.typeSynonyms env') of
-        Just (_, typ') -> do
-          let chk = (P.emptyCheckState env') { P.checkCurrentModule = Just mName }
-              k   = check (P.kindOf typ') chk
-
-              check :: StateT P.CheckState (ExceptT P.MultipleErrors (Writer P.MultipleErrors)) a -> P.CheckState -> Either P.MultipleErrors (a, P.CheckState)
-              check sew = fst . runWriter . runExceptT . runStateT sew
-          case k of
-            Left err        -> printErrors err
-            Right (kind, _) -> liftIO . putStrLn . P.prettyPrintKind $ kind
-        Nothing -> liftIO $ putStrLn "Could not find kind"
