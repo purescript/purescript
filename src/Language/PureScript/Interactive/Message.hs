@@ -37,6 +37,16 @@ prologueMessage = unlines
   , "Type :? for help"
   ]
 
+supportModuleMessage :: String
+supportModuleMessage = unlines
+  [ "PSCi requires the purescript-psci-support package to be installed."
+  , "You can install it using Bower as follows:"
+  , ""
+  , "  bower i purescript-psci-support --save"
+  , ""
+  , "For help getting started, visit http://wiki.purescript.org/PSCi"
+  ]
+
 -- | The quit message.
 quitMessage :: String
 quitMessage = "See ya!"

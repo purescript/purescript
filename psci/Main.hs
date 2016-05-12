@@ -99,12 +99,6 @@ getCommand singleLineMode = handleInterrupt (return (Right Nothing)) $ do
     go :: [String] -> InputT m String
     go ls = maybe (return . unlines $ reverse ls) (go . (:ls)) =<< getInputLine "  "
 
--- | Checks if the Console module is defined
-consoleIsDefined :: [P.ExternsFile] -> Bool
-consoleIsDefined = any ((== consoleModule) . P.efModuleName)
-  where
-    consoleModule = P.moduleNameFromString "Control.Monad.Eff.Console"
-
 -- | Get command line options and drop into the REPL
 main :: IO ()
 main = getOpt >>= loop
@@ -115,12 +109,11 @@ main = getOpt >>= loop
         foreignFiles <- concat <$> traverse glob psciForeignInputFiles
         e <- runExceptT $ do
           modules <- ExceptT (loadAllModules inputFiles)
-          let allModules = ("<internal>", supportModule) : modules
           foreigns <- ExceptT . runMake $ do
             foreignFilesContent <- forM foreignFiles (\inFile -> (inFile,) <$> P.readTextFile inFile)
             P.parseForeignModulesFromFiles foreignFilesContent
-          (externs, env) <- ExceptT . runMake . make foreigns . map snd $ allModules
-          return (allModules, foreigns, externs, env)
+          (externs, env) <- ExceptT . runMake . make foreigns . map snd $ modules
+          return (modules, foreigns, externs, env)
         case e of
           Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
           Right (modules, foreigns, externs, env) -> do
@@ -133,10 +126,7 @@ main = getOpt >>= loop
                          . runInputT (setComplete completion settings)
             runner $ do
               outputStrLn prologueMessage
-              unless (consoleIsDefined externs) . outputStrLn $ unlines
-                [ "PSCi requires the purescript-console module to be installed."
-                , "For help getting started, visit http://wiki.purescript.org/PSCi"
-                ]
+              unless (supportModuleIsDefined externs) . outputStrLn $ supportModuleMessage
               go
       where
         go :: InputT (StateT PSCiState (ReaderT PSCiConfig IO)) ()
