@@ -32,6 +32,14 @@ import           System.Console.Haskeline
 import           System.Exit
 import           System.FilePath.Glob (glob)
 
+-- | Command line options
+data PSCiOptions = PSCiOptions
+  { psciMultiLineMode     :: Bool
+  , psciInputFile         :: [FilePath]
+  , psciForeignInputFiles :: [FilePath]
+  , psciInputNodeFlags    :: [String]
+  }
+
 multiLineMode :: Opts.Parser Bool
 multiLineMode = Opts.switch $
      Opts.long "multi-line-mode"

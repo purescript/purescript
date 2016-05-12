@@ -8,14 +8,6 @@ import Prelude.Compat
 import           Data.Map (Map)
 import qualified Language.PureScript as P
 
--- | Command line options
-data PSCiOptions = PSCiOptions
-  { psciMultiLineMode     :: Bool
-  , psciInputFile         :: [FilePath]
-  , psciForeignInputFiles :: [FilePath]
-  , psciInputNodeFlags    :: [String]
-  }
-
 -- | The PSCI configuration.
 --
 -- These configuration values do not change during execution.
