@@ -2,21 +2,22 @@
 
 module Language.PureScript.Ide.MatcherSpec where
 
+import           Control.Monad                       (void)
 import           Data.Text                           (Text)
+import qualified Language.PureScript                 as P
 import           Language.PureScript.Ide.Integration
 import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Types
-import qualified Language.PureScript as P
 import           Test.Hspec
 
 value :: Text -> ExternDecl
 value s = ValueDeclaration s $ P.TypeWildcard $ P.SourceSpan "" (P.SourcePos 0 0) (P.SourcePos 0 0)
 
 completions :: [Match]
-completions = [
-  Match "" $ value "firstResult",
-  Match "" $ value "secondResult",
-  Match "" $ value "fiult"
+completions =
+  [ Match "" (value "firstResult")
+  , Match "" (value "secondResult")
+  , Match "" (value "fiult")
   ]
 
 mkResult :: [Int] -> [Match]
@@ -26,15 +27,7 @@ runFlex :: Text -> [Match]
 runFlex s = runMatcher (flexMatcher s) completions
 
 setup :: IO ()
-setup = do
-  deleteOutputFolder
-  _ <- compileTestProject
-  _ <- startServer
-  _ <- loadModuleWithDeps "Main"
-  return ()
-
-teardown :: IO ()
-teardown = quitServer
+setup = reset *> void (loadModuleWithDeps "Main")
 
 spec :: Spec
 spec = do
@@ -46,8 +39,7 @@ spec = do
     it "scores short matches higher and sorts accordingly" $
       runFlex "filt" `shouldBe` mkResult [2, 0]
 
-  beforeAll_ setup $ afterAll_ teardown $
-    describe "Integration Tests: Flex Matcher" $ do
+  beforeAll_ setup . describe "Integration Tests: Flex Matcher" $ do
       it "doesn't match on an empty string" $ do
         cs <- getFlexCompletions ""
         cs `shouldBe` []

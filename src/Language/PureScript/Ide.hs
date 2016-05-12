@@ -90,6 +90,7 @@ handleCommand (Rebuild file) =
   rebuildFile file
 handleCommand Cwd =
   TextResult . T.pack <$> liftIO getCurrentDirectory
+handleCommand Reset = resetPscIdeState *> pure (TextResult "State has been reset.")
 handleCommand Quit = liftIO exitSuccess
 
 findCompletions :: (PscIde m, MonadLogger m) =>

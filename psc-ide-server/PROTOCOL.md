@@ -407,14 +407,16 @@ Hiding Import(`import Data.Array hiding (filter, filterM, join)`):
   }
 ]
 ```
-### Cwd/Quit
+### Cwd/Quit/Reset
 `cwd` returns the working directory of the server(should be your project root).
 
 `quit` quits the server.
 
+`reset` resets all loaded modules.
+
 ```json
 {
-  "command": "cwd|quit"
+  "command": "cwd|quit|reset"
 }
 ```
 

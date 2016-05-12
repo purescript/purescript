@@ -72,12 +72,13 @@ data Options = Options
   { optionsDirectory  :: Maybe FilePath
   , optionsOutputPath :: FilePath
   , optionsPort       :: PortID
+  , optionsNoWatch    :: Bool
   , optionsDebug      :: Bool
   }
 
 main :: IO ()
 main = do
-  Options dir outputPath port debug  <- execParser opts
+  Options dir outputPath port noWatch debug  <- execParser opts
   maybe (pure ()) setCurrentDirectory dir
   serverState <- newTVarIO emptyPscIdeState
   cwd <- getCurrentDirectory
@@ -88,31 +89,23 @@ main = do
     (do putStrLn ("Your output directory didn't exist. I'll create it at: " <> fullOutputPath)
         createDirectory fullOutputPath
         putStrLn "This usually means you didn't compile your project yet."
-        putStrLn "psc-ide needs you to compile your project (for example by running pulp build)"
-    )
+        putStrLn "psc-ide needs you to compile your project (for example by running pulp build)")
 
-  _ <- forkFinally (watcher serverState fullOutputPath) print
-  let conf =
-        Configuration
-        {
-          confDebug = debug
-        , confOutputPath = outputPath
-        }
-  let env =
-        PscIdeEnvironment
-        {
-          envStateVar = serverState
-        , envConfiguration = conf
-        }
+  unless noWatch $
+    void (forkFinally (watcher serverState fullOutputPath) print)
+
+  let conf = Configuration {confDebug = debug, confOutputPath = outputPath}
+      env = PscIdeEnvironment {envStateVar = serverState, envConfiguration = conf}
   startServer port env
   where
     parser =
-      Options <$>
-        optional (strOption (long "directory" <> short 'd')) <*>
-        strOption (long "output-directory" <> value "output/") <*>
-        (PortNumber . fromIntegral <$>
-         option auto (long "port" <> short 'p' <> value (4242 :: Integer))) <*>
-        switch (long "debug")
+      Options
+        <$> optional (strOption (long "directory" <> short 'd'))
+        <*> strOption (long "output-directory" <> value "output/")
+        <*> (PortNumber . fromIntegral <$>
+             option auto (long "port" <> short 'p' <> value (4242 :: Integer)))
+        <*> switch (long "no-watch")
+        <*> switch (long "debug")
     opts = info (version <*> helper <*> parser) mempty
     version = abortOption
       (InfoMsg (showVersion Paths.version))
