@@ -16,6 +16,7 @@ import           Data.Version (showVersion)
 
 import           Control.Applicative (many)
 import           Control.Monad
+import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import           Control.Monad.Trans.State.Strict (StateT, evalStateT)
@@ -109,6 +110,9 @@ main = getOpt >>= loop
         foreignFiles <- concat <$> traverse glob psciForeignInputFiles
         e <- runExceptT $ do
           modules <- ExceptT (loadAllModules inputFiles)
+          unless (supportModuleIsDefined (map snd modules)) . liftIO $ do
+            putStrLn supportModuleMessage
+            exitFailure
           foreigns <- ExceptT . runMake $ do
             foreignFilesContent <- forM foreignFiles (\inFile -> (inFile,) <$> P.readTextFile inFile)
             P.parseForeignModulesFromFiles foreignFilesContent
@@ -124,10 +128,8 @@ main = getOpt >>= loop
                 runner = flip runReaderT config
                          . flip evalStateT initialState
                          . runInputT (setComplete completion settings)
-            runner $ do
-              outputStrLn prologueMessage
-              unless (supportModuleIsDefined externs) . outputStrLn $ supportModuleMessage
-              go
+            putStrLn prologueMessage
+            runner go
       where
         go :: InputT (StateT PSCiState (ReaderT PSCiConfig IO)) ()
         go = do

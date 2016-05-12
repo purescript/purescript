@@ -120,7 +120,7 @@ handleResetState = do
     return (map snd modules, externs)
   case e of
     Left errs -> printErrors errs
-    Right (modules, externs) -> modify (updateLoadedExterns (++ zip modules externs))
+    Right (modules, externs) -> modify (updateLoadedExterns (const (zip modules externs)))
 
 -- | Takes a value expression and evaluates it with the current state.
 --

@@ -15,8 +15,8 @@ supportModuleName :: P.ModuleName
 supportModuleName = P.moduleNameFromString "PSCI.Support"
 
 -- | Checks if the Console module is defined
-supportModuleIsDefined :: [P.ExternsFile] -> Bool
-supportModuleIsDefined = any ((== supportModuleName) . P.efModuleName)
+supportModuleIsDefined :: [P.Module] -> Bool
+supportModuleIsDefined = any ((== supportModuleName) . P.getModuleName)
 
 -- * Module Management
 
