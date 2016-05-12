@@ -34,7 +34,7 @@ import Language.PureScript.Sugar.TypeDeclarations as S
 --
 --  * Desugar operator sections
 --
---  * Desugar do-notation using the @Prelude.Monad@ type class
+--  * Desugar do-notation
 --
 --  * Desugar top-level case declarations into explicit case expressions
 --
