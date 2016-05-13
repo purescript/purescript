@@ -77,7 +77,7 @@ loop PSCiOptions{..} = do
       let settings = defaultSettings { historyFile = Just historyFilename }
       foreignsOrError <- runMake $ do
         foreignFilesContent <- forM foreignFiles (\inFile -> (inFile,) <$> makeIO (const (P.ErrorMessage [] $ P.CannotReadFile inFile)) (readUTF8File inFile))
-        P.parseForeignModulesFromFiles foreignFilesContent
+        error "TODO: wait for psci branch to be merged"
       case foreignsOrError of
         Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
         Right foreigns ->
@@ -171,7 +171,7 @@ handleCommand (LoadFile filePath) = PSCI $ whenFileExists filePath $ \absPath ->
 handleCommand (LoadForeign filePath) = PSCI $ whenFileExists filePath $ \absPath -> do
   foreignsOrError <- lift . lift . runMake $ do
     foreignFile <- makeIO (const (P.ErrorMessage [] $ P.CannotReadFile absPath)) (readUTF8File absPath)
-    P.parseForeignModulesFromFiles [(absPath, foreignFile)]
+    error "TODO: wait for psci branch to be merged"
   case foreignsOrError of
     Left err -> outputStrLn $ P.prettyPrintMultipleErrors False err
     Right foreigns -> lift $ modify (updateForeignFiles foreigns)

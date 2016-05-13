@@ -134,7 +134,7 @@ getPSCiState = do
 
   modulesOrFirstError <- loadAllModules pursFiles
   foreignFiles <- forM jsFiles (\f -> (f,) <$> readUTF8File f)
-  Right (foreigns, _) <- runExceptT $ runWriterT $ P.parseForeignModulesFromFiles foreignFiles
+  Right (foreigns, _) <- runExceptT $ runWriterT $ error "Wait for psci branch merge"
   case modulesOrFirstError of
     Left err ->
       print err >> exitFailure

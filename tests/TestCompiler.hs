@@ -27,14 +27,15 @@ import qualified Language.PureScript as P
 
 import Data.Char (isSpace)
 import Data.Function (on)
-import Data.List (sort, stripPrefix, intercalate, groupBy, sortBy, partition)
+import Data.List (sort, stripPrefix, intercalate, groupBy, sortBy)
 import Data.Maybe (mapMaybe)
 import Data.Time.Clock (UTCTime())
+import Data.Tuple (swap)
 
 import qualified Data.Map as M
 
 import Control.Monad
-import Control.Arrow ((>>>))
+import Control.Arrow ((***), (>>>))
 
 import Control.Monad.Reader
 import Control.Monad.Writer.Strict
@@ -57,7 +58,7 @@ main = hspec spec
 spec :: Spec
 spec = do
 
-  (supportExterns, supportForeigns, passingTestCases, failingTestCases) <- runIO $ do
+  (supportExterns, passingTestCases, failingTestCases) <- runIO $ do
     cwd <- getCurrentDirectory
     let passing = cwd </> "examples" </> "passing"
     let failing = cwd </> "examples" </> "failing"
@@ -66,29 +67,27 @@ spec = do
     passingFiles <- getTestFiles passing <$> testGlob passing
     failingFiles <- getTestFiles failing <$> testGlob failing
     supportPurs <- supportFiles "purs"
-    supportForeigns <- loadForeigns =<< supportFiles "js"
     supportPursFiles <- readInput supportPurs
     supportExterns <- runExceptT $ do
       modules <- ExceptT . return $ P.parseModulesFromFiles id supportPursFiles
-      externs <- ExceptT . runTest $ P.make (makeActions supportForeigns) (map snd modules)
+      foreigns <- inferForeignModules modules
+      externs <- ExceptT . runTest $ P.make (makeActions foreigns) (map snd modules)
       return (zip (map snd modules) externs)
     case supportExterns of
       Left errs -> fail (P.prettyPrintMultipleErrors False errs)
-      Right externs -> return (externs, supportForeigns, passingFiles, failingFiles)
+      Right externs -> return (externs, passingFiles, failingFiles)
 
   context ("Passing examples") $ do
-    forM_ passingTestCases $ \(testPurs, testJS) ->
-      it ("'" <> takeFileName (getTestMain testPurs) <> "' should compile and run without error") $ do
-        testForeigns <- loadForeigns testJS
-        assertCompiles supportExterns testPurs (supportForeigns <> testForeigns)
+    forM_ passingTestCases $ \testPurs ->
+      it ("'" <> takeFileName (getTestMain testPurs) <> "' should compile and run without error") $
+        assertCompiles supportExterns testPurs
 
   context ("Failing examples") $ do
-    forM_ failingTestCases $ \(testPurs, testJS) -> do
+    forM_ failingTestCases $ \testPurs -> do
       let mainPath = getTestMain testPurs
       expectedFailures <- runIO $ getShouldFailWith mainPath
-      it ("'" <> takeFileName mainPath <> "' should fail with '" <> intercalate "', '" expectedFailures <> "'") $ do
-        testForeigns <- loadForeigns testJS
-        assertDoesNotCompile supportExterns testPurs (supportForeigns <> testForeigns) expectedFailures
+      it ("'" <> takeFileName mainPath <> "' should fail with '" <> intercalate "', '" expectedFailures <> "'") $
+        assertDoesNotCompile supportExterns testPurs expectedFailures
 
   where
 
@@ -96,19 +95,12 @@ spec = do
   testGlob :: FilePath -> IO [FilePath]
   testGlob dir = join . fst <$> Glob.globDir (map Glob.compile ["**/*.purs", "**/*.js"]) dir
 
-  -- Loads foreign modules from source files
-  loadForeigns :: [FilePath] -> IO (M.Map P.ModuleName FilePath)
-  loadForeigns paths = do
-    files <- forM paths (\f -> (f,) <$> readUTF8File f)
-    Right (foreigns, _) <- runExceptT $ runWriterT $ P.parseForeignModulesFromFiles files
-    return foreigns
-
   -- Groups the test files so that a top-level file can have dependencies in a
   -- subdirectory of the same name. The inner tuple contains a list of the
   -- .purs files and the .js files for the test case.
-  getTestFiles :: FilePath -> [FilePath] -> [([FilePath], [FilePath])]
+  getTestFiles :: FilePath -> [FilePath] -> [[FilePath]]
   getTestFiles baseDir
-    = map (partition ((== ".purs") . takeExtensions))
+    = map (filter ((== ".purs") . takeExtensions))
     . map (map (baseDir </>))
     . groupBy ((==) `on` extractPrefix)
     . sortBy (compare `on` extractPrefix)
@@ -136,6 +128,15 @@ spec = do
   getShouldFailWith = fmap extractFailWiths . readUTF8File
     where
     extractFailWiths = lines >>> mapMaybe (stripPrefix "-- @shouldFailWith ") >>> map trim
+
+inferForeignModules
+  :: MonadIO m
+  => [(FilePath, P.Module)]
+  -> m (M.Map P.ModuleName FilePath)
+inferForeignModules = P.inferForeignModules . fromList
+  where
+    fromList :: [(FilePath, P.Module)] -> M.Map P.ModuleName (Either P.RebuildPolicy FilePath)
+    fromList = M.fromList . map ((P.getModuleName *** Right) . swap)
 
 trim :: String -> String
 trim = dropWhile isSpace >>> reverse >>> dropWhile isSpace >>> reverse
@@ -175,11 +176,11 @@ runTest = fmap fst . P.runMake P.defaultOptions
 compile
   :: [(P.Module, P.ExternsFile)]
   -> [FilePath]
-  -> M.Map P.ModuleName FilePath
   -> IO (Either P.MultipleErrors [P.ExternsFile])
-compile supportExterns inputFiles foreigns = silence $ runTest $ do
+compile supportExterns inputFiles = silence $ runTest $ do
   fs <- liftIO $ readInput inputFiles
   ms <- P.parseModulesFromFiles id fs
+  foreigns <- inferForeignModules ms
   let actions = makeActions foreigns
   case ms of
     [singleModule] -> pure <$> P.rebuildModule actions (map snd supportExterns) (snd singleModule)
@@ -188,21 +189,19 @@ compile supportExterns inputFiles foreigns = silence $ runTest $ do
 assert
   :: [(P.Module, P.ExternsFile)]
   -> [FilePath]
-  -> M.Map P.ModuleName FilePath
   -> (Either P.MultipleErrors [P.ExternsFile] -> IO (Maybe String))
   -> Expectation
-assert supportExterns inputFiles foreigns f = do
-  e <- compile supportExterns inputFiles foreigns
+assert supportExterns inputFiles f = do
+  e <- compile supportExterns inputFiles
   maybeErr <- f e
   maybe (return ()) expectationFailure maybeErr
 
 assertCompiles
   :: [(P.Module, P.ExternsFile)]
   -> [FilePath]
-  -> M.Map P.ModuleName FilePath
   -> Expectation
-assertCompiles supportExterns inputFiles foreigns = do
-  assert supportExterns inputFiles foreigns $ \e ->
+assertCompiles supportExterns inputFiles = do
+  assert supportExterns inputFiles $ \e ->
     case e of
       Left errs -> return . Just . P.prettyPrintMultipleErrors False $ errs
       Right _ -> do
@@ -221,11 +220,10 @@ assertCompiles supportExterns inputFiles foreigns = do
 assertDoesNotCompile
   :: [(P.Module, P.ExternsFile)]
   -> [FilePath]
-  -> M.Map P.ModuleName FilePath
   -> [String]
   -> Expectation
-assertDoesNotCompile supportExterns inputFiles foreigns shouldFailWith = do
-  assert supportExterns inputFiles foreigns $ \e ->
+assertDoesNotCompile supportExterns inputFiles shouldFailWith = do
+  assert supportExterns inputFiles  $ \e ->
     case e of
       Left errs -> do
         return $ if null shouldFailWith
