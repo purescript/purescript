@@ -109,7 +109,7 @@ library
                    monad-logger >= 0.3 && < 0.4,
                    mtl >= 2.1.0 && < 2.3.0,
                    parallel >= 3.2 && < 3.3,
-                   parsec -any,
+                   parsec >=3.1.10,
                    pattern-arrows >= 0.0.2 && < 0.1,
                    pipes >= 4.0.0 && < 4.2.0,
                    pipes-http -any,
