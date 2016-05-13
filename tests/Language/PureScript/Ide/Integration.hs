@@ -78,12 +78,12 @@ stopServer = terminateProcess
 
 withServer :: IO a -> IO a
 withServer s = do
-  procHandle <- startServer
+  _ <- startServer
   started <- tryNTimes 5 (shush <$> (try getCwd :: IO (Either SomeException String)))
   when (isNothing started) $
     throwIO (mkIOError userErrorType "psc-ide-server didn't start in time" Nothing Nothing)
   r <- s
-  stopServer procHandle
+  quitServer
   pure r
 
 shush :: Either a b -> Maybe b
