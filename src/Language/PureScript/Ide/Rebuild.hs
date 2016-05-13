@@ -36,8 +36,7 @@ import           System.IO.UTF8                  (readUTF8File)
 -- * Attempts to find an FFI definition file for the module by looking
 -- for a file with the same filepath except for a .js extension.
 --
--- * Adds a default import for Prim to the parsed module and passes all the
--- created artifacts to @rebuildModule@.
+-- * Passes all the created artifacts to @rebuildModule@.
 --
 -- * If the rebuilding succeeds, returns a @RebuildSuccess@ with the generated
 -- warnings, and if rebuilding fails, returns a @RebuildError@ with the
@@ -51,12 +50,11 @@ rebuildFile path cacheSuccess = do
 
   input <- liftIO $ readUTF8File path
 
-  m <- P.addDefaultImport (P.ModuleName [P.ProperName "Prim"]) <$>
-    case map snd <$> P.parseModulesFromFiles id [(path, input)] of
-      Left parseError ->
-        throwError . RebuildError . toJSONErrors False P.Error $ parseError
-      Right [m] -> pure m
-      Right _ -> throwError . GeneralError $ "Please define exactly one module."
+  m <- case map snd <$> P.parseModulesFromFiles id [(path, input)] of
+    Left parseError ->
+      throwError . RebuildError . toJSONErrors False P.Error $ parseError
+    Right [m] -> pure m
+    Right _ -> throwError . GeneralError $ "Please define exactly one module."
 
   -- Externs files must be sorted ahead of time, so that they get applied
   -- correctly to the 'Environment'.
