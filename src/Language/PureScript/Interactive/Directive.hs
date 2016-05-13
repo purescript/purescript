@@ -1,17 +1,15 @@
 -- |
 -- Directives for PSCI.
 --
-module PSCi.Directive where
+module Language.PureScript.Interactive.Directive where
 
-import Prelude ()
 import Prelude.Compat
-
 
 import Data.Maybe (fromJust, listToMaybe)
 import Data.List (isPrefixOf)
 import Data.Tuple (swap)
 
-import PSCi.Types
+import Language.PureScript.Interactive.Types
 
 -- |
 -- List of all avaliable directives.
@@ -29,8 +27,6 @@ directiveStrings =
     , (Quit   , ["quit"])
     , (Reset  , ["reset"])
     , (Browse , ["browse"])
-    , (Load   , ["load", "module"])
-    , (Foreign, ["foreign"])
     , (Type   , ["type"])
     , (Kind   , ["kind"])
     , (Show   , ["show"])
@@ -97,8 +93,6 @@ help =
   , (Quit,    "",         "Quit PSCi")
   , (Reset,   "",         "Discard all imported modules and declared bindings")
   , (Browse,  "<module>", "See all functions in <module>")
-  , (Load,    "<file>",   "Load <file> for importing")
-  , (Foreign, "<file>",   "Load foreign module <file>")
   , (Type,    "<expr>",   "Show the type of <expr>")
   , (Kind,    "<type>",   "Show the kind of <type>")
   , (Show,    "import",   "Show all imported modules")

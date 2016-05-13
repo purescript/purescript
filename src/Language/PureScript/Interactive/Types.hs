@@ -1,71 +1,37 @@
 -- |
 -- Type declarations and associated basic functions for PSCI.
 --
-module PSCi.Types where
+module Language.PureScript.Interactive.Types where
 
-import Prelude ()
 import Prelude.Compat
 
-import Control.Arrow (second)
-import Data.Map (Map)
-import qualified Data.Map as Map
+import           Data.Map (Map)
 import qualified Language.PureScript as P
 
-data PSCiOptions = PSCiOptions
-  { psciMultiLineMode     :: Bool
-  , psciInputFile         :: [FilePath]
-  , psciForeignInputFiles :: [FilePath]
-  , psciInputNodeFlags    :: [String]
-  }
+-- | The PSCI configuration.
+--
+-- These configuration values do not change during execution.
+--
+data PSCiConfig = PSCiConfig
+  { psciLoadedFiles         :: [FilePath]
+  , psciForeignFiles        :: Map P.ModuleName FilePath
+  , psciNodeFlags           :: [String]
+  , psciEnvironment         :: P.Environment
+  } deriving Show
 
--- |
--- The PSCI state.
+-- | The PSCI state.
+--
 -- Holds a list of imported modules, loaded files, and partial let bindings.
 -- The let bindings are partial,
 -- because it makes more sense to apply the binding to the final evaluated expression.
---
 data PSCiState = PSCiState
   { psciImportedModules     :: [ImportedModule]
-  , _psciLoadedModules      :: Map FilePath [P.Module]
-  , psciForeignFiles        :: Map P.ModuleName FilePath
   , psciLetBindings         :: [P.Declaration]
-  , psciNodeFlags           :: [String]
-  }
+  , psciLoadedExterns       :: [(P.Module, P.ExternsFile)]
+  } deriving Show
 
 initialPSCiState :: PSCiState
-initialPSCiState =
-  PSCiState [] Map.empty Map.empty [] []
-
-mkPSCiState :: [ImportedModule]
-            -> [(FilePath, P.Module)]
-            -> Map P.ModuleName FilePath
-            -> [P.Declaration]
-            -> [String]
-            -> PSCiState
-mkPSCiState imported loaded foreigns lets nodeFlags =
-  (initialPSCiState
-    |> each imported updateImportedModules
-    |> updateModules loaded)
-    { psciForeignFiles = foreigns
-    , psciLetBindings = lets
-    , psciNodeFlags = nodeFlags
-    }
-  where
-  x |> f = f x
-  each xs f st = foldl (flip f) st xs
-
---  Public psci state accessors
-
--- | Get the imported filenames as a list.
-psciImportedFilenames :: PSCiState -> [FilePath]
-psciImportedFilenames = Map.keys . _psciLoadedModules
-
--- | Get the loaded modules as a list.
-psciLoadedModules :: PSCiState -> [(FilePath, P.Module)]
-psciLoadedModules = collect . Map.toList . _psciLoadedModules
-  where
-  collect :: [(k, [v])] -> [(k, v)]
-  collect vss = [ (k, v) | (k, vs) <- vss, v <- vs ]
+initialPSCiState = PSCiState [] [] []
 
 -- | All of the data that is contained by an ImportDeclaration in the AST.
 -- That is:
@@ -89,35 +55,21 @@ allImportsOf m (PSCiState{psciImportedModules = is}) =
   name = P.getModuleName m
   isImportOfThis (name', _, _) = name == name'
 
--- State helpers
+-- * State helpers
 
--- |
--- Updates the state to have more imported modules.
---
-updateImportedModules :: ImportedModule -> PSCiState -> PSCiState
-updateImportedModules im st = st { psciImportedModules = im : psciImportedModules st }
+-- | Updates the imported modules in the state record.
+updateImportedModules :: ([ImportedModule] -> [ImportedModule]) -> PSCiState -> PSCiState
+updateImportedModules f st = st { psciImportedModules = f (psciImportedModules st) }
 
--- |
--- Updates the state to have more loaded modules (available for import, but
--- not necessarily imported).
---
-updateModules :: [(FilePath, P.Module)] -> PSCiState -> PSCiState
-updateModules modules st =
-  st { _psciLoadedModules = Map.union (go modules) (_psciLoadedModules st) }
-  where
-  go = Map.fromListWith (++) . map (second (:[]))
+-- | Updates the loaded externs files in the state record.
+updateLoadedExterns :: ([(P.Module, P.ExternsFile)] -> [(P.Module, P.ExternsFile)]) -> PSCiState -> PSCiState
+updateLoadedExterns f st = st { psciLoadedExterns = f (psciLoadedExterns st) }
 
--- |
--- Updates the state to have more let bindings.
---
-updateLets :: [P.Declaration] -> PSCiState -> PSCiState
-updateLets ds st = st { psciLetBindings = psciLetBindings st ++ ds }
+-- | Updates the let bindings in the state record.
+updateLets :: ([P.Declaration] -> [P.Declaration]) -> PSCiState -> PSCiState
+updateLets f st = st { psciLetBindings = f (psciLetBindings st) }
 
--- |
--- Updates the state to have more let bindings.
---
-updateForeignFiles :: Map P.ModuleName FilePath -> PSCiState -> PSCiState
-updateForeignFiles fs st = st { psciForeignFiles = psciForeignFiles st `Map.union` fs }
+-- * Commands
 
 -- |
 -- Valid Meta-commands for PSCI
@@ -139,14 +91,6 @@ data Command
   -- Browse a module
   --
   | BrowseModule P.ModuleName
-  -- |
-  -- Load a file for use with importing
-  --
-  | LoadFile FilePath
-  -- |
-  -- Load a foreign module
-  --
-  | LoadForeign FilePath
   -- |
   -- Exit PSCI
   --
@@ -198,8 +142,6 @@ data Directive
   | Quit
   | Reset
   | Browse
-  | Load
-  | Foreign
   | Type
   | Kind
   | Show

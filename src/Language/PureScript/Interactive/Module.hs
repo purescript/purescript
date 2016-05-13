@@ -1,45 +1,24 @@
-module PSCi.Module where
+module Language.PureScript.Interactive.Module where
 
-import Prelude ()
-import Prelude.Compat
+import           Prelude.Compat
 
+import           Control.Monad
 import qualified Language.PureScript as P
-import PSCi.Types
-import System.FilePath (pathSeparator)
-import System.IO.UTF8 (readUTF8File)
-import Control.Monad
+import           Language.PureScript.Interactive.Types
+import           System.FilePath (pathSeparator)
+import           System.IO.UTF8 (readUTF8File)
+
+-- * Support Module
 
 -- | The name of the PSCI support module
 supportModuleName :: P.ModuleName
-supportModuleName = P.ModuleName [P.ProperName "$PSCI", P.ProperName "Support"]
+supportModuleName = P.moduleNameFromString "PSCI.Support"
 
--- | Support module, contains code to evaluate terms
-supportModule :: P.Module
-supportModule =
-  case P.parseModulesFromFiles id [("", code)] of
-    Right [(_, P.Module ss cs _ ds exps)] -> P.Module ss cs supportModuleName ds exps
-    _ -> P.internalError "Support module could not be parsed"
-  where
-  code :: String
-  code = unlines
-    [ "module S where"
-    , ""
-    , "import Prelude"
-    , "import Control.Monad.Eff (Eff)"
-    , "import Control.Monad.Eff.Console (CONSOLE, logShow)"
-    , "import Control.Monad.Eff.Unsafe (unsafeInterleaveEff)"
-    , ""
-    , "class Eval a where"
-    , "  eval :: a -> Eff (console :: CONSOLE) Unit"
-    , ""
-    , "instance evalShow :: (Show a) => Eval a where"
-    , "  eval = logShow"
-    , ""
-    , "instance evalEff :: (Eval a) => Eval (Eff eff a) where"
-    , "  eval x = unsafeInterleaveEff x >>= eval"
-    ]
+-- | Checks if the Console module is defined
+supportModuleIsDefined :: [P.Module] -> Bool
+supportModuleIsDefined = any ((== supportModuleName) . P.getModuleName)
 
--- Module Management
+-- * Module Management
 
 -- |
 -- Loads a file for use with imports.
@@ -58,7 +37,6 @@ loadAllModules files = do
     content <- readUTF8File filename
     return (filename, content)
   return $ P.parseModulesFromFiles id filesAndContent
-
 
 -- |
 -- Makes a volatile module to execute the current expression.
