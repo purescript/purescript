@@ -93,7 +93,7 @@ spec = do
 
   -- A glob for all purs and js files within a test directory
   testGlob :: FilePath -> IO [FilePath]
-  testGlob dir = join . fst <$> Glob.globDir (map Glob.compile ["**/*.purs", "**/*.js"]) dir
+  testGlob = Glob.globDir1 (Glob.compile "**/*.purs")
 
   -- Groups the test files so that a top-level file can have dependencies in a
   -- subdirectory of the same name. The inner tuple contains a list of the

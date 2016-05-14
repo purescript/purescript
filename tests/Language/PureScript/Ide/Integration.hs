@@ -131,7 +131,6 @@ isSuccess (ExitFailure _) = False
 fileGlob :: String
 fileGlob = unwords
   [ "\"src/**/*.purs\""
-  , "\"src/**/*.js\""
   ]
 
 -- Integration Testing API
