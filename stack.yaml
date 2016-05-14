@@ -4,4 +4,5 @@ packages:
 extra-deps:
 - bower-json-0.8.0
 - language-javascript-0.6.0.4
+- parsec-3.1.11
 flags: {}
