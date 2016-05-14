@@ -1,11 +1,5 @@
 module TypeClassWithoutMembers
-  ( module Intermediate )
+  ( module TypeClassWithoutMembersIntermediate )
   where
 
-import Intermediate
-
-module Intermediate
-  ( module SomeTypeClass )
-  where
-
-import SomeTypeClass (class SomeClass)
+import TypeClassWithoutMembersIntermediate
