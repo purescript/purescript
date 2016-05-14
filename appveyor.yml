@@ -3,12 +3,10 @@ version: '{build}'
 environment:
   # Keep the path as short as possible, just in case.
   STACK_ROOT: c:\s
-  # Appveyor does not seem to be able to cope with the symbolic link
-  # stack.yaml, so this is a workaround.
   RELEASE_USER: purescript
   RELEASE_REPO: purescript
 cache:
-- c:\s
+- c:\s -> appveyor/cache-buster.txt
 install:
 - git submodule update --init
 - ps: Install-Product node 5
