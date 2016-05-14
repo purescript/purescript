@@ -14,6 +14,8 @@ module Language.PureScript.Make
   -- * Implementation of Make API using files on disk
   , Make(..)
   , runMake
+  , makeIO
+  , readTextFile
   , buildMakeActions
   , inferForeignModules
   ) where
@@ -282,6 +284,11 @@ makeIO f io = do
   e <- liftIO $ tryIOError io
   either (throwError . singleError . f) return e
 
+-- | Read a text file in the 'Make' monad, capturing any errors using the
+-- 'MonadError' instance.
+readTextFile :: FilePath -> Make String
+readTextFile path = makeIO (const (ErrorMessage [] $ CannotReadFile path)) $ readUTF8File path
+
 -- Traverse (Either e) instance (base 4.7)
 traverseEither :: Applicative f => (a -> f b) -> Either e a -> f (Either e b)
 traverseEither _ (Left x) = pure (Left x)
@@ -409,9 +416,6 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 
   progress :: ProgressMessage -> Make ()
   progress = liftIO . putStrLn . renderProgressMessage
-
-readTextFile :: FilePath -> Make String
-readTextFile path = makeIO (const (ErrorMessage [] $ CannotReadFile path)) $ readUTF8File path
 
 -- |
 -- Check that the declarations in a given PureScript module match with those

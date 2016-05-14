@@ -112,13 +112,13 @@ rebracket externs modules = do
   renameAliasedOperators valueAliased typeAliased (Module ss coms mn ds exts) =
     Module ss coms mn <$> mapM f' ds <*> pure exts
     where
-    (goDecl', goExpr') = updateTypes goType
+    (goDecl', goExpr', goBinder') = updateTypes goType
     (f', _, _, _, _) =
       everywhereWithContextOnValuesM
         Nothing
         (\pos -> uncurry goDecl <=< goDecl' pos)
         (\pos -> uncurry goExpr <=< goExpr' pos)
-        goBinder
+        (\pos -> uncurry goBinder <=< goBinder' pos)
         defS
         defS
 
@@ -182,9 +182,9 @@ rebracketModule valueOpTable typeOpTable (Module ss coms mn ds exts) =
       everywhereOnValuesTopDownM
         (decontextify goDecl)
         (goExpr <=< decontextify goExpr')
-        goBinder
+        (goBinder <=< decontextify goBinder')
 
-  (goDecl, goExpr') = updateTypes (const goType)
+  (goDecl, goExpr', goBinder') = updateTypes (const goType)
 
   goExpr :: Expr -> m Expr
   goExpr = return . matchExprOperators valueOpTable
@@ -205,9 +205,9 @@ removeParens = f
       everywhereOnValues
         (decontextify goDecl)
         (goExpr . decontextify goExpr')
-        goBinder
+        (goBinder . decontextify goBinder')
 
-  (goDecl, goExpr') = updateTypes (\_ -> return . goType)
+  (goDecl, goExpr', goBinder') = updateTypes (\_ -> return . goType)
 
   goExpr :: Expr -> Expr
   goExpr (Parens val) = val
@@ -294,10 +294,11 @@ updateTypes
   :: forall m
    . Monad m
   => (Maybe SourceSpan -> Type -> m Type)
-  -> ( Maybe SourceSpan -> Declaration -> m (Maybe SourceSpan, Declaration)
-     , Maybe SourceSpan -> Expr -> m (Maybe SourceSpan, Expr)
+  -> ( Maybe SourceSpan -> Declaration  -> m (Maybe SourceSpan, Declaration)
+     , Maybe SourceSpan -> Expr         -> m (Maybe SourceSpan, Expr)
+     , Maybe SourceSpan -> Binder       -> m (Maybe SourceSpan, Binder)
      )
-updateTypes goType = (goDecl, goExpr)
+updateTypes goType = (goDecl, goExpr, goBinder)
   where
 
   goType' :: Maybe SourceSpan -> Type -> m Type
@@ -338,6 +339,13 @@ updateTypes goType = (goDecl, goExpr)
     ty' <- goType' pos ty
     return (pos, TypedValue check v ty')
   goExpr pos other = return (pos, other)
+
+  goBinder :: Maybe SourceSpan -> Binder -> m (Maybe SourceSpan, Binder)
+  goBinder _ e@(PositionedBinder pos _ _) = return (Just pos, e)
+  goBinder pos (TypedBinder ty b) = do
+    ty' <- goType' pos ty
+    return (pos, TypedBinder ty' b)
+  goBinder pos other = return (pos, other)
 
 -- |
 -- Checks all the fixity exports within a module to ensure that members aliased

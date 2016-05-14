@@ -1,14 +1,11 @@
-module PSCi.IO where
+module Language.PureScript.Interactive.IO where
 
-import Prelude ()
 import Prelude.Compat
 
-import System.Directory (createDirectoryIfMissing, getHomeDirectory, findExecutable, doesFileExist)
-import System.FilePath (takeDirectory, (</>), isPathSeparator)
-import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad (msum)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import System.Console.Haskeline (outputStrLn, InputT)
+import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
+import System.Directory (createDirectoryIfMissing, getHomeDirectory, findExecutable)
+import System.FilePath (takeDirectory, (</>), isPathSeparator)
 
 mkdirp :: FilePath -> IO ()
 mkdirp = createDirectoryIfMissing True . takeDirectory
@@ -36,19 +33,9 @@ getHistoryFilename = do
   mkdirp filename
   return filename
 
-
 -- |
 -- Expands tilde in path.
 --
 expandTilde :: FilePath -> IO FilePath
 expandTilde ('~':p:rest) | isPathSeparator p = (</> rest) <$> getHomeDirectory
 expandTilde p = return p
-
-
-whenFileExists :: MonadIO m => FilePath -> (FilePath -> InputT m ()) -> InputT m ()
-whenFileExists filePath f = do
-  absPath <- liftIO $ expandTilde filePath
-  exists <- liftIO $ doesFileExist absPath
-  if exists
-    then f absPath
-    else outputStrLn $ "Couldn't locate: " ++ filePath

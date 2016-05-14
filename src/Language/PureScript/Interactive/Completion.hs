@@ -1,34 +1,88 @@
 {-# LANGUAGE DataKinds #-}
 
-module PSCi.Completion where
+module Language.PureScript.Interactive.Completion
+  ( CompletionM
+  , liftCompletionM
+  , completion
+  , completion'
+  ) where
 
-import Prelude ()
 import Prelude.Compat
 
-import Data.Maybe (mapMaybe)
-import Data.List (nub, nubBy, sortBy, isPrefixOf, stripPrefix)
-import Data.Function (on)
-
-import Control.Arrow (second)
-import Control.Monad.Trans.Reader (asks, runReaderT, ReaderT)
-import Control.Monad.Trans.State.Strict
-
-import System.Console.Haskeline
-
+import           Control.Arrow (second)
+import           Control.Monad.IO.Class (MonadIO(..))
+import           Control.Monad.State.Class (MonadState(..))
+import           Control.Monad.Trans.Reader (asks, runReaderT, ReaderT)
+import           Data.Function (on)
+import           Data.List (nub, nubBy, isPrefixOf, sortBy, stripPrefix)
+import           Data.Maybe (mapMaybe)
 import qualified Language.PureScript as P
+import qualified Language.PureScript.Interactive.Directive as D
+import           Language.PureScript.Interactive.Types
 import qualified Language.PureScript.Names as N
-
-import qualified PSCi.Directive as D
-import PSCi.Types
+import           System.Console.Haskeline
 
 -- Completions may read the state, but not modify it.
 type CompletionM = ReaderT PSCiState IO
 
--- Lift a `CompletionM` action to a `StateT PSCiState IO` one.
-liftCompletionM :: CompletionM a -> StateT PSCiState IO a
-liftCompletionM act = StateT (\s -> (\a -> (a, s)) <$> runReaderT act s)
+-- Lift a `CompletionM` action into a state monad.
+liftCompletionM
+  :: (MonadState PSCiState m, MonadIO m)
+  => CompletionM a
+  -> m a
+liftCompletionM act = do
+  st <- get
+  liftIO $ runReaderT act st
 
 -- Haskeline completions
+
+-- | Loads module, function, and file completions.
+completion
+  :: (MonadState PSCiState m, MonadIO m)
+  => CompletionFunc m
+completion = liftCompletionM . completion'
+
+completion' :: CompletionFunc CompletionM
+completion' = completeWordWithPrev Nothing " \t\n\r" findCompletions
+
+-- | Callback for Haskeline's `completeWordWithPrev`.
+-- Expects:
+--   * Line contents to the left of the word, reversed
+--   * Word to be completed
+findCompletions :: String -> String -> CompletionM [Completion]
+findCompletions prev word = do
+    let ctx = completionContext (words (reverse prev)) word
+    completions <- concat <$> traverse getCompletions ctx
+    return $ sortBy directivesFirst completions
+  where
+    getCompletions :: CompletionContext -> CompletionM [Completion]
+    getCompletions = fmap (mapMaybe (either (prefixedBy word) Just)) . getCompletion
+
+    getCompletion :: CompletionContext -> CompletionM [Either String Completion]
+    getCompletion ctx =
+      case ctx of
+        CtxFilePath f        -> map Right <$> listFiles f
+        CtxModule            -> map Left <$> getModuleNames
+        CtxIdentifier        -> map Left <$> ((++) <$> getIdentNames <*> getDctorNames)
+        CtxType              -> map Left <$> getTypeNames
+        CtxFixed str         -> return [Left str]
+        CtxDirective d       -> return (map Left (completeDirectives d))
+
+    completeDirectives :: String -> [String]
+    completeDirectives = map (':' :) . D.directiveStringsFor
+
+    prefixedBy :: String -> String -> Maybe Completion
+    prefixedBy w cand = if w `isPrefixOf` cand
+                          then Just (simpleCompletion cand)
+                          else Nothing
+
+    directivesFirst :: Completion -> Completion -> Ordering
+    directivesFirst (Completion _ d1 _) (Completion _ d2 _) = go d1 d2
+      where
+      go (':' : xs) (':' : ys) = compare xs ys
+      go (':' : _) _ = LT
+      go _ (':' : _) = GT
+      go xs ys = compare xs ys
 
 data CompletionContext
   = CtxDirective String
@@ -38,15 +92,6 @@ data CompletionContext
   | CtxType
   | CtxFixed String
   deriving (Show, Read)
-
--- |
--- Loads module, function, and file completions.
---
-completion :: CompletionFunc (StateT PSCiState IO)
-completion = liftCompletionM . completion'
-
-completion' :: CompletionFunc CompletionM
-completion' = completeWordWithPrev Nothing " \t\n\r" findCompletions
 
 -- |
 -- Decide what kind of completion we need based on input. This function expects
@@ -74,8 +119,6 @@ completeDirective ws w =
 
 directiveArg :: String -> Directive -> [CompletionContext]
 directiveArg _ Browse      = [CtxModule]
-directiveArg w Load        = [CtxFilePath w]
-directiveArg w Foreign     = [CtxFilePath w]
 directiveArg _ Quit        = []
 directiveArg _ Reset       = []
 directiveArg _ Help        = []
@@ -95,44 +138,8 @@ headSatisfies p str =
     (c:_)  -> p c
     _     -> False
 
--- | Callback for Haskeline's `completeWordWithPrev`.
--- Expects:
---   * Line contents to the left of the word, reversed
---   * Word to be completed
-findCompletions :: String -> String -> CompletionM [Completion]
-findCompletions prev word = do
-  let ctx = completionContext (words (reverse prev)) word
-  completions <- concat <$> traverse getCompletions ctx
-  return $ sortBy directivesFirst completions
-  where
-  getCompletions :: CompletionContext -> CompletionM [Completion]
-  getCompletions = fmap (mapMaybe (either (prefixedBy word) Just)) . getCompletion
-
-  prefixedBy :: String -> String -> Maybe Completion
-  prefixedBy w cand = if w `isPrefixOf` cand
-                        then Just (simpleCompletion cand)
-                        else Nothing
-
-getCompletion :: CompletionContext -> CompletionM [Either String Completion]
-getCompletion ctx =
-  case ctx of
-    CtxFilePath f        -> map Right <$> listFiles f
-    CtxModule            -> map Left <$> getModuleNames
-    CtxIdentifier        -> map Left <$> ((++) <$> getIdentNames <*> getDctorNames)
-    CtxType              -> map Left <$> getTypeNames
-    CtxFixed str         -> return [Left str]
-    CtxDirective d       -> return (map Left (completeDirectives d))
-
-  where
-  completeDirectives :: String -> [String]
-  completeDirectives = map (':' :) . D.directiveStringsFor
-
-
 getLoadedModules :: CompletionM [P.Module]
-getLoadedModules = asks (map snd . psciLoadedModules)
-
-getImportedModules :: CompletionM [ImportedModule]
-getImportedModules = asks psciImportedModules
+getLoadedModules = asks (map fst . psciLoadedExterns)
 
 getModuleNames :: CompletionM [String]
 getModuleNames = moduleNames <$> getLoadedModules
@@ -212,12 +219,4 @@ dctorNames = nubOnFst . concatMap go . P.exportedDeclarations
   go _ = []
 
 moduleNames :: [P.Module] -> [String]
-moduleNames ms = nub [P.runModuleName moduleName | P.Module _ _ moduleName _ _ <- ms]
-
-directivesFirst :: Completion -> Completion -> Ordering
-directivesFirst (Completion _ d1 _) (Completion _ d2 _) = go d1 d2
-  where
-  go (':' : xs) (':' : ys) = compare xs ys
-  go (':' : _) _ = LT
-  go _ (':' : _) = GT
-  go xs ys = compare xs ys
+moduleNames = nub . map (P.runModuleName . P.getModuleName)

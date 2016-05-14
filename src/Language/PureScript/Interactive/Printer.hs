@@ -1,25 +1,22 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE DataKinds #-}
 
-module PSCi.Printer where
+module Language.PureScript.Interactive.Printer where
 
-import Prelude ()
-import Prelude.Compat
+import           Prelude.Compat
 
+import           Data.List (intersperse)
+import qualified Data.Map as M
+import           Data.Maybe (mapMaybe)
 import qualified Language.PureScript as P
 import qualified Text.PrettyPrint.Boxes as Box
-import qualified Data.Map as M
-import System.Console.Haskeline
-import Data.Maybe (mapMaybe)
-import Data.List (intersperse)
-import Control.Monad.IO.Class (MonadIO)
 
 -- Printers
 
 -- |
 -- Pretty print a module's signatures
 --
-printModuleSignatures :: MonadIO m => P.ModuleName -> P.Environment -> InputT m ()
+printModuleSignatures :: P.ModuleName -> P.Environment -> String
 printModuleSignatures moduleName (P.Environment {..}) =
     -- get relevant components of a module from environment
     let moduleNamesIdent = (filter ((== moduleName) . fst) . M.keys) names
@@ -28,7 +25,7 @@ printModuleSignatures moduleName (P.Environment {..}) =
 
   in
     -- print each component
-    (outputStr . unlines . map trimEnd . lines . Box.render . Box.vsep 1 Box.left)
+    (unlines . map trimEnd . lines . Box.render . Box.vsep 1 Box.left)
       [ printModule's (mapMaybe (showTypeClass . findTypeClass typeClasses)) moduleTypeClasses -- typeClasses
       , printModule's (mapMaybe (showType typeClasses dataConstructors typeSynonyms . findType types)) moduleTypes -- types
       , printModule's (map (showNameType . findNameType names)) moduleNamesIdent -- functions
@@ -125,7 +122,3 @@ printModuleSignatures moduleName (P.Environment {..}) =
                 mapFirstRest f g (x:xs) = f x : map g xs
 
         trimEnd = reverse . dropWhile (== ' ') . reverse
-
--- | Pretty-print errors
-printErrors :: MonadIO m => P.MultipleErrors -> InputT m ()
-printErrors = outputStrLn . P.prettyPrintMultipleErrors False
