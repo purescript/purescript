@@ -289,11 +289,6 @@ makeIO f io = do
 readTextFile :: FilePath -> Make String
 readTextFile path = makeIO (const (ErrorMessage [] $ CannotReadFile path)) $ readUTF8File path
 
--- Traverse (Either e) instance (base 4.7)
-traverseEither :: Applicative f => (a -> f b) -> Either e a -> f (Either e b)
-traverseEither _ (Left x) = pure (Left x)
-traverseEither f (Right y) = Right <$> f y
-
 -- | Infer the module name for a module by looking for the same filename with
 -- a .js extension.
 inferForeignModules
@@ -327,7 +322,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   getInputTimestamp :: ModuleName -> Make (Either RebuildPolicy (Maybe UTCTime))
   getInputTimestamp mn = do
     let path = fromMaybe (internalError "Module has no filename in 'make'") $ M.lookup mn filePathMap
-    e1 <- traverseEither getTimestamp path
+    e1 <- traverse getTimestamp path
     fPath <- maybe (return Nothing) getTimestamp $ M.lookup mn foreigns
     return $ fmap (max fPath) e1
 

@@ -1,9 +1,10 @@
 -- Tests that instances for non-exported classes / types do not appear in the
 -- result of `exportedDeclarations`.
-module ExportedInstanceDeclarations
+module Main
   ( Const(..)
   , class Foo
   , foo
+  , main
   ) where
 
 import Prelude

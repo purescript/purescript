@@ -176,11 +176,13 @@ runTest = fmap fst . P.runMake P.defaultOptions
 compile
   :: [(P.Module, P.ExternsFile)]
   -> [FilePath]
+  -> ([P.Module] -> IO ())
   -> IO (Either P.MultipleErrors [P.ExternsFile])
-compile supportExterns inputFiles = silence $ runTest $ do
+compile supportExterns inputFiles check = silence $ runTest $ do
   fs <- liftIO $ readInput inputFiles
   ms <- P.parseModulesFromFiles id fs
   foreigns <- inferForeignModules ms
+  liftIO (check (map snd ms))
   let actions = makeActions foreigns
   case ms of
     [singleModule] -> pure <$> P.rebuildModule actions (map snd supportExterns) (snd singleModule)
@@ -189,10 +191,11 @@ compile supportExterns inputFiles = silence $ runTest $ do
 assert
   :: [(P.Module, P.ExternsFile)]
   -> [FilePath]
+  -> ([P.Module] -> IO ())
   -> (Either P.MultipleErrors [P.ExternsFile] -> IO (Maybe String))
   -> Expectation
-assert supportExterns inputFiles f = do
-  e <- compile supportExterns inputFiles
+assert supportExterns inputFiles check f = do
+  e <- compile supportExterns inputFiles check
   maybeErr <- f e
   maybe (return ()) expectationFailure maybeErr
 
@@ -201,7 +204,7 @@ assertCompiles
   -> [FilePath]
   -> Expectation
 assertCompiles supportExterns inputFiles = do
-  assert supportExterns inputFiles $ \e ->
+  assert supportExterns inputFiles checkMain $ \e ->
     case e of
       Left errs -> return . Just . P.prettyPrintMultipleErrors False $ errs
       Right _ -> do
@@ -216,6 +219,10 @@ assertCompiles supportExterns inputFiles = do
             | otherwise -> return $ Just $ "Test did not finish with 'Done':\n\n" <> out
           Just (ExitFailure _, _, err) -> return $ Just err
           Nothing -> return $ Just "Couldn't find node.js executable"
+  where
+  checkMain ms =
+    unless (any ((== P.moduleNameFromString "Main") . P.getModuleName) ms)
+      (fail "Main module missing")
 
 assertDoesNotCompile
   :: [(P.Module, P.ExternsFile)]
@@ -223,9 +230,9 @@ assertDoesNotCompile
   -> [String]
   -> Expectation
 assertDoesNotCompile supportExterns inputFiles shouldFailWith = do
-  assert supportExterns inputFiles  $ \e ->
+  assert supportExterns inputFiles noPreCheck $ \e ->
     case e of
-      Left errs -> do
+      Left errs ->
         return $ if null shouldFailWith
           then Just $ "shouldFailWith declaration is missing (errors were: "
                       ++ show (map P.errorCode (P.runMultipleErrors errs))
@@ -235,6 +242,8 @@ assertDoesNotCompile supportExterns inputFiles shouldFailWith = do
         return $ Just "Should not have compiled"
 
   where
+  noPreCheck = const (return ())
+
   checkShouldFailWith expected errs =
     let actual = map P.errorCode $ P.runMultipleErrors errs
     in if sort expected == sort actual

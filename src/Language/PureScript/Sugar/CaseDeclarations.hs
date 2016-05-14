@@ -9,6 +9,7 @@ module Language.PureScript.Sugar.CaseDeclarations
 
 import Prelude.Compat
 
+import Data.Either (isLeft)
 import Data.List (nub, groupBy, foldl1')
 import Data.Maybe (catMaybes, mapMaybe)
 
@@ -23,11 +24,6 @@ import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.Traversals
 import Language.PureScript.TypeChecker.Monad (guardWith)
-
--- Data.Either.isLeft (base 4.7)
-isLeft :: Either a b -> Bool
-isLeft (Left _) = True
-isLeft (Right _) = False
 
 -- |
 -- Replace all top-level binders in a module with case expressions.
