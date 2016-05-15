@@ -5,12 +5,14 @@ module Language.PureScript.Parser.Declarations
   ( parseDeclaration
   , parseModule
   , parseModulesFromFiles
+  , parseModuleFromFile
   , parseValue
   , parseGuard
   , parseBinder
   , parseBinderNoParens
   , parseImportDeclaration'
   , parseLocalDeclaration
+  , toPositionedError
   ) where
 
 import Prelude hiding (lex)
@@ -270,11 +272,7 @@ parseModulesFromFiles
   -> [(k, String)]
   -> m [(k, Module)]
 parseModulesFromFiles toFilePath input =
-  flip parU wrapError . inParallel . flip map input $ \(k, content) -> do
-    let filename = toFilePath k
-    ts <- lex filename content
-    m <- runTokenParser filename parseModule ts
-    return (k, m)
+  flip parU wrapError . inParallel . flip map input $ parseModuleFromFile toFilePath
   where
   wrapError :: Either P.ParseError a -> m a
   wrapError = either (throwError . MultipleErrors . pure . toPositionedError) return
@@ -285,6 +283,18 @@ parseModulesFromFiles toFilePath input =
   inParallel = withStrategy (parList rseq)
 
 
+-- | Parses a single module with FilePath for eventual parsing errors
+parseModuleFromFile
+  :: (k -> FilePath)
+  -> (k, String)
+  -> Either P.ParseError (k, Module)
+parseModuleFromFile toFilePath (k, content) = do
+    let filename = toFilePath k
+    ts <- lex filename content
+    m <- runTokenParser filename parseModule ts
+    pure (k, m)
+
+-- | Converts a @ParseError@ into a @PositionedError@
 toPositionedError :: P.ParseError -> ErrorMessage
 toPositionedError perr = ErrorMessage [ PositionedError (SourceSpan name start end) ] (ErrorParsingModule perr)
   where
@@ -562,3 +572,4 @@ parseBinderNoParens = P.choice
 --
 parseGuard :: TokenParser Guard
 parseGuard = pipe *> C.indented *> parseValue
+

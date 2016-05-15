@@ -48,13 +48,14 @@ rebuildFile
   -> m Success
 rebuildFile path cacheSuccess = do
 
-  input <- liftIO $ readUTF8File path
+  input <- liftIO (readUTF8File path)
 
-  m <- case map snd <$> P.parseModulesFromFiles id [(path, input)] of
-    Left parseError ->
-      throwError . RebuildError . toJSONErrors False P.Error $ parseError
-    Right [m] -> pure m
-    Right _ -> throwError . GeneralError $ "Please define exactly one module."
+  m <- case snd <$> P.parseModuleFromFile id (path, input) of
+    Left parseError -> throwError
+                       . RebuildError
+                       . toJSONErrors False P.Error
+                       $ P.MultipleErrors [P.toPositionedError parseError]
+    Right m -> pure m
 
   -- Externs files must be sorted ahead of time, so that they get applied
   -- correctly to the 'Environment'.
