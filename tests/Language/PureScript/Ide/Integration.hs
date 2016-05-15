@@ -36,7 +36,6 @@ module Language.PureScript.Ide.Integration
        , getFlexCompletionsInModule
        , getType
        , rebuildModule
-       , rebuildModuleWithCache
        , reset
          -- checking results
        , resultIsSuccess
@@ -184,10 +183,8 @@ addImplicitImport :: String -> FilePath -> FilePath -> IO String
 addImplicitImport mn fp outfp = sendCommand (addImplicitImportC mn fp outfp)
 
 rebuildModule :: FilePath -> IO String
-rebuildModule m = sendCommand (rebuildC m Nothing False)
+rebuildModule m = sendCommand (rebuildC m Nothing)
 
-rebuildModuleWithCache :: FilePath -> IO String
-rebuildModuleWithCache m = sendCommand (rebuildC m Nothing True)
 -- Command Encoding
 
 commandWrapper :: String -> Value -> Value
@@ -211,11 +208,10 @@ addImplicitImportC mn = addImportW $
          , "module" .= mn
          ]
 
-rebuildC :: FilePath -> Maybe FilePath -> Bool -> Value
-rebuildC file outFile cacheSuccess =
+rebuildC :: FilePath -> Maybe FilePath -> Value
+rebuildC file outFile =
   commandWrapper "rebuild" (object [ "file" .= file
                                    , "outfile" .= outFile
-                                   , "cacheSuccess" .= cacheSuccess
                                    ])
 
 addImportW :: Value -> FilePath -> FilePath -> Value

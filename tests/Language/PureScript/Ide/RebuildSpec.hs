@@ -45,15 +45,9 @@ spec = before_ Integration.reset . describe "Rebuilding single modules" $ do
       pdir <- Integration.projectDirectory
       let file = pdir </> "src" </> "RebuildSpecWithMissingForeign.fail"
       Integration.rebuildModule file >>= shouldBeFailure
-    it "completes a hidden identifier after rebuilding with caching enabled" $ do
-      pdir <- Integration.projectDirectory
-      let file = pdir </> "src" </> "RebuildSpecWithHiddenIdent.purs"
-      Integration.rebuildModuleWithCache file >>= shouldBeSuccess
-      res <- Integration.getFlexCompletionsInModule "hid" "RebuildSpecWithHiddenIdent"
-      shouldBe False (null res)
-    it "fails to complete a hidden identifier after rebuilding with caching disabled" $ do
+    it "completes a hidden identifier after rebuilding" $ do
       pdir <- Integration.projectDirectory
       let file = pdir </> "src" </> "RebuildSpecWithHiddenIdent.purs"
       Integration.rebuildModule file >>= shouldBeSuccess
       res <- Integration.getFlexCompletionsInModule "hid" "RebuildSpecWithHiddenIdent"
-      shouldBe True (null res)
+      shouldBe False (null res)

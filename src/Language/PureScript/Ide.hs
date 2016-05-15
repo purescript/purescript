@@ -87,8 +87,8 @@ handleCommand (Import fp outfp filters (AddImportForIdentifier ident)) = do
   case rs of
     Right rs' -> answerRequest outfp rs'
     Left question -> pure $ CompletionResult (mapMaybe completionFromMatch question)
-handleCommand (Rebuild file cacheSuccess) =
-  rebuildFile file cacheSuccess
+handleCommand (Rebuild file) =
+  rebuildFile file
 handleCommand Cwd =
   TextResult . T.pack <$> liftIO getCurrentDirectory
 handleCommand Reset = resetPscIdeState *> pure (TextResult "State has been reset.")

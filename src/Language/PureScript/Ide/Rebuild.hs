@@ -44,9 +44,8 @@ import           System.IO.UTF8                  (readUTF8File)
 rebuildFile
   :: (PscIde m, MonadLogger m, MonadError PscIdeError m)
   => FilePath
-  -> Bool
   -> m Success
-rebuildFile path cacheSuccess = do
+rebuildFile path = do
 
   input <- liftIO (readUTF8File path)
 
@@ -77,8 +76,7 @@ rebuildFile path cacheSuccess = do
   case result of
     Left errors -> throwError (RebuildError (toJSONErrors False P.Error errors))
     Right _ -> do
-      when cacheSuccess $
-        rebuildModuleOpen makeEnv externs m
+      rebuildModuleOpen makeEnv externs m
       pure (RebuildSuccess (toJSONErrors False P.Warning warnings))
 
 -- | Rebuilds a module but opens up its export list first and stores the result

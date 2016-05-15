@@ -252,19 +252,17 @@ Example:
 
 The `rebuild` command provides a fast rebuild for a single module. It doesn't
 recompile the entire project though. All the modules dependencies need to be
-loaded. If the cacheSuccess flag is set, a successful rebuild will be stored for
-completions.
+loaded. A successful rebuild will be stored to allow for completions of private
+identifiers.
 
 Arguments:
   - `file :: String` the path to the module to rebuild
-  - `cacheSuccess :: (optional) Boolean` whether to store successful rebuilds
 
 ```json
 {
   "command": "rebuild",
   "params": {
-    "file": "/path/to/file.purs",
-    "cacheSuccess": true
+    "file": "/path/to/file.purs"
   }
 }
 ```
