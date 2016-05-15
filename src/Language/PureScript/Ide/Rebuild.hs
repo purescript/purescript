@@ -41,9 +41,10 @@ rebuildFile path = do
 
   outputDirectory <- confOutputPath . envConfiguration <$> ask
 
-  -- Infer foreign modules using their file paths
+  -- For rebuilding, we want to 'RebuildAlways', but for inferring foreign
+  -- modules using their file paths, we need to specify the path in the 'Map'.
   let filePathMap = M.singleton (P.getModuleName m) (Left P.RebuildAlways)
-  foreigns <- P.inferForeignModules filePathMap
+  foreigns <- P.inferForeignModules (M.singleton (P.getModuleName m) (Right path))
 
   -- Silence progress update messages during the build
   let actions = (P.buildMakeActions outputDirectory filePathMap foreigns False)
