@@ -7,12 +7,10 @@ module Language.PureScript.Sugar.Names.Imports
 
 import Prelude.Compat
 
-import Control.Arrow (first)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Foldable (for_, traverse_)
-import Data.List (find)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -118,30 +116,30 @@ resolveImport importModule exps imps impQual = resolveByType
     check (PositionedDeclarationRef pos _ r) =
       rethrowWithPosition pos $ check r
     check (ValueRef name) =
-      checkImportExists IdentName (fst `map` exportedValues exps) name
+      checkImportExists IdentName (exportedValues exps) name
     check (ValueOpRef op) =
-      checkImportExists ValOpName (fst `map` exportedValueOps exps) op
+      checkImportExists ValOpName (exportedValueOps exps) op
     check (TypeRef name dctors) = do
-      checkImportExists TyName ((fst . fst) `map` exportedTypes exps) name
-      let allDctors = fst `map` allExportedDataConstructors name
+      checkImportExists TyName (exportedTypes exps) name
+      let (allDctors, _) = allExportedDataConstructors name
       for_ dctors $ traverse_ (checkDctorExists name allDctors)
     check (TypeOpRef name) =
-      checkImportExists TyOpName (fst `map` exportedTypeOps exps) name
+      checkImportExists TyOpName (exportedTypeOps exps) name
     check (TypeClassRef name) =
-      checkImportExists TyClassName (fst `map` exportedTypeClasses exps) name
+      checkImportExists TyClassName (exportedTypeClasses exps) name
     check (ModuleRef name) | isHiding =
       throwError . errorMessage $ ImportHidingModule name
     check r = internalError $ "Invalid argument to checkRefs: " ++ show r
 
   -- Check that an explicitly imported item exists in the module it is being imported from
   checkImportExists
-    :: Eq a
+    :: Ord a
     => (a -> Name)
-    -> [a]
+    -> M.Map a b
     -> a
     -> m ()
   checkImportExists toName exports item
-    = when (item `notElem` exports)
+    = when (item `M.notMember` exports)
     . throwError . errorMessage
     $ UnknownImport importModule (toName item)
 
@@ -177,35 +175,34 @@ resolveImport importModule exps imps impQual = resolveByType
   -- Import all symbols
   importAll :: (Imports -> DeclarationRef -> m Imports) -> m Imports
   importAll importer =
-    foldM (\m ((name, dctors), _) -> importer m (TypeRef name (Just dctors))) imps (exportedTypes exps)
-      >>= flip (foldM (\m (name, _) -> importer m (TypeOpRef name))) (exportedTypeOps exps)
-      >>= flip (foldM (\m (name, _) -> importer m (ValueRef name))) (exportedValues exps)
-      >>= flip (foldM (\m (name, _) -> importer m (ValueOpRef name))) (exportedValueOps exps)
-      >>= flip (foldM (\m (name, _) -> importer m (TypeClassRef name))) (exportedTypeClasses exps)
+    foldM (\m (name, (dctors, _)) -> importer m (TypeRef name (Just dctors))) imps (M.toList (exportedTypes exps))
+      >>= flip (foldM (\m (name, _) -> importer m (TypeOpRef name))) (M.toList (exportedTypeOps exps))
+      >>= flip (foldM (\m (name, _) -> importer m (ValueRef name))) (M.toList (exportedValues exps))
+      >>= flip (foldM (\m (name, _) -> importer m (ValueOpRef name))) (M.toList (exportedValueOps exps))
+      >>= flip (foldM (\m (name, _) -> importer m (TypeClassRef name))) (M.toList (exportedTypeClasses exps))
 
   importRef :: ImportProvenance -> Imports -> DeclarationRef -> m Imports
   importRef prov imp (PositionedDeclarationRef pos _ r) =
     rethrowWithPosition pos $ importRef prov imp r
   importRef prov imp (ValueRef name) = do
-    let values' = updateImports (importedValues imp) (exportedValues exps) name prov
+    let values' = updateImports (importedValues imp) (exportedValues exps) id name prov
     return $ imp { importedValues = values' }
   importRef prov imp (ValueOpRef name) = do
-    let valueOps' = updateImports (importedValueOps imp) (exportedValueOps exps) name prov
+    let valueOps' = updateImports (importedValueOps imp) (exportedValueOps exps) id name prov
     return $ imp { importedValueOps = valueOps' }
   importRef prov imp (TypeRef name dctors) = do
-    let types' = updateImports (importedTypes imp) (first fst `map` exportedTypes exps) name prov
-    let exportedDctors :: [(ProperName 'ConstructorName, ModuleName)]
-        exportedDctors = allExportedDataConstructors name
-        dctorNames :: [ProperName 'ConstructorName]
-        dctorNames = fst `map` exportedDctors
-    maybe (return ()) (traverse_ $ checkDctorExists name dctorNames) dctors
-    let dctors' = foldl (\m d -> updateImports m exportedDctors d prov) (importedDataConstructors imp) (fromMaybe dctorNames dctors)
+    let types' = updateImports (importedTypes imp) (exportedTypes exps) snd name prov
+    let (dctorNames, mn) = allExportedDataConstructors name
+        dctorLookup :: M.Map (ProperName 'ConstructorName) ModuleName
+        dctorLookup = M.fromList $ map (, mn) dctorNames
+    traverse_ (traverse_ $ checkDctorExists name dctorNames) dctors
+    let dctors' = foldl (\m d -> updateImports m dctorLookup id d prov) (importedDataConstructors imp) (fromMaybe dctorNames dctors)
     return $ imp { importedTypes = types', importedDataConstructors = dctors' }
   importRef prov imp (TypeOpRef name) = do
-    let ops' = updateImports (importedTypeOps imp) (exportedTypeOps exps) name prov
+    let ops' = updateImports (importedTypeOps imp) (exportedTypeOps exps) id name prov
     return $ imp { importedTypeOps = ops' }
   importRef prov imp (TypeClassRef name) = do
-    let typeClasses' = updateImports (importedTypeClasses imp) (exportedTypeClasses exps) name prov
+    let typeClasses' = updateImports (importedTypeClasses imp) (exportedTypeClasses exps) id name prov
     return $ imp { importedTypeClasses = typeClasses' }
   importRef _ _ TypeInstanceRef{} = internalError "TypeInstanceRef in importRef"
   importRef _ _ ModuleRef{} = internalError "ModuleRef in importRef"
@@ -213,23 +210,23 @@ resolveImport importModule exps imps impQual = resolveByType
   -- Find all exported data constructors for a given type
   allExportedDataConstructors
     :: ProperName 'TypeName
-    -> [(ProperName 'ConstructorName, ModuleName)]
+    -> ([ProperName 'ConstructorName], ModuleName)
   allExportedDataConstructors name =
-    case find ((== name) . fst . fst) (exportedTypes exps) of
-      Nothing -> internalError "Invalid state in allExportedDataConstructors"
-      Just ((_, dctors), mn) -> map (, mn) dctors
+    fromMaybe (internalError "Invalid state in allExportedDataConstructors")
+      $ name `M.lookup` exportedTypes exps
 
   -- Add something to an import resolution list
   updateImports
     :: (Ord a)
     => M.Map (Qualified a) [ImportRecord a]
-    -> [(a, ModuleName)]
+    -> M.Map a b
+    -> (b -> ModuleName)
     -> a
     -> ImportProvenance
     -> M.Map (Qualified a) [ImportRecord a]
-  updateImports imps' exps' name prov =
+  updateImports imps' exps' expName name prov =
     let
-      mnOrig = fromMaybe (internalError "Invalid state in updateImports") (name `lookup` exps')
+      mnOrig = maybe (internalError "Invalid state in updateImports") expName (name `M.lookup` exps')
       rec = ImportRecord (Qualified (Just importModule) name) mnOrig prov
     in
       M.alter

@@ -10,7 +10,7 @@ module Language.PureScript.Sugar.Names
 
 import Prelude.Compat
 
-import Control.Arrow (first)
+import Control.Arrow (first, second)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Lazy
@@ -72,10 +72,10 @@ desugarImportsWithEnv externs modules = do
     return $ M.insert efModuleName (ss, imps, exps) env
     where
 
-    exportedTypes :: [((ProperName 'TypeName, [ProperName 'ConstructorName]), ModuleName)]
-    exportedTypes = mapMaybe toExportedType efExports
+    exportedTypes :: M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ModuleName)
+    exportedTypes = M.fromList $ mapMaybe toExportedType efExports
       where
-      toExportedType (TypeRef tyCon dctors) = Just ((tyCon, fromMaybe (mapMaybe forTyCon efDeclarations) dctors), efModuleName)
+      toExportedType (TypeRef tyCon dctors) = Just (tyCon, (fromMaybe (mapMaybe forTyCon efDeclarations) dctors, efModuleName))
         where
         forTyCon :: ExternsDeclaration -> Maybe (ProperName 'ConstructorName)
         forTyCon (EDDataConstructor pn _ tNm _ _) | tNm == tyCon = Just pn
@@ -83,17 +83,17 @@ desugarImportsWithEnv externs modules = do
       toExportedType (PositionedDeclarationRef _ _ r) = toExportedType r
       toExportedType _ = Nothing
 
-    exportedTypeOps :: [(OpName 'TypeOpName, ModuleName)]
-    exportedTypeOps = (, efModuleName) <$> mapMaybe getTypeOpRef efExports
+    exportedTypeOps :: M.Map (OpName 'TypeOpName) ModuleName
+    exportedTypeOps = M.fromList $ (, efModuleName) <$> mapMaybe getTypeOpRef efExports
 
-    exportedTypeClasses :: [(ProperName 'ClassName, ModuleName)]
-    exportedTypeClasses = (, efModuleName) <$> mapMaybe getTypeClassRef efExports
+    exportedTypeClasses :: M.Map (ProperName 'ClassName) ModuleName
+    exportedTypeClasses = M.fromList $ (, efModuleName) <$> mapMaybe getTypeClassRef efExports
 
-    exportedValues :: [(Ident, ModuleName)]
-    exportedValues = (, efModuleName) <$> mapMaybe getValueRef efExports
+    exportedValues :: M.Map Ident ModuleName
+    exportedValues = M.fromList $ (, efModuleName) <$> mapMaybe getValueRef efExports
 
-    exportedValueOps :: [(OpName 'ValueOpName, ModuleName)]
-    exportedValueOps = (, efModuleName) <$> mapMaybe getValueOpRef efExports
+    exportedValueOps :: M.Map (OpName 'ValueOpName) ModuleName
+    exportedValueOps = M.fromList $ (, efModuleName) <$> mapMaybe getValueOpRef efExports
 
   updateEnv :: ([Module], Env) -> Module -> m ([Module], Env)
   updateEnv (ms, env) m@(Module ss _ mn _ refs) =
@@ -122,7 +122,7 @@ desugarImportsWithEnv externs modules = do
 elaborateExports :: Exports -> Module -> Module
 elaborateExports exps (Module ss coms mn decls refs) =
   Module ss coms mn decls $
-    Just $ map (\(ctor, dctors) -> TypeRef ctor (Just dctors)) (my exportedTypes) ++
+    Just $ map (\(ctor, dctors) -> TypeRef ctor (Just dctors)) myTypes ++
            map TypeOpRef (my exportedTypeOps) ++
            map TypeClassRef (my exportedTypeClasses) ++
            map ValueRef (my exportedValues) ++
@@ -131,8 +131,14 @@ elaborateExports exps (Module ss coms mn decls refs) =
   where
   -- Extracts a list of values from the exports and filters out any values that
   -- are re-exports from other modules.
-  my :: (Exports -> [(a, ModuleName)]) -> [a]
-  my f = fst `map` filter ((== mn) . snd) (f exps)
+  my :: (Exports -> M.Map a ModuleName) -> [a]
+  my = map fst <$> filt (== mn)
+
+  myTypes :: [(ProperName 'TypeName, [ProperName 'ConstructorName])]
+  myTypes = second fst <$> filt ((== mn) . snd) exportedTypes
+
+  filt :: (b -> Bool) -> (Exports -> M.Map a b) -> [(a, b)]
+  filt predicate f = M.toList $ predicate `M.filter` f exps
 
 -- |
 -- Replaces all local names with qualified names within a module and checks that all existing
@@ -294,26 +300,26 @@ renameInModule env imports (Module ss coms mn decls exps) =
 
   -- Used when performing an update to qualify values and classes with their
   -- module of original definition.
-  resolve :: (Eq a) => [(a, ModuleName)] -> a -> Maybe (Qualified a)
-  resolve as name = mkQualified name <$> name `lookup` as
+  resolve :: Ord a => M.Map a ModuleName -> a -> Maybe (Qualified a)
+  resolve as name = mkQualified name <$> name `M.lookup` as
 
   -- Used when performing an update to qualify types with their module of
   -- original definition.
   resolveType
-    :: [((ProperName 'TypeName, [ProperName 'ConstructorName]), ModuleName)]
+    :: M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ModuleName)
     -> ProperName 'TypeName
     -> Maybe (Qualified (ProperName 'TypeName))
   resolveType tys name =
-    mkQualified name . snd <$> find ((== name) . fst . fst) tys
+    mkQualified name . snd <$> M.lookup name tys
 
   -- Used when performing an update to qualify data constructors with their
   -- module of original definition.
   resolveDctor
-    :: [((ProperName 'TypeName, [ProperName 'ConstructorName]), ModuleName)]
+    :: M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ModuleName)
     -> ProperName 'ConstructorName
     -> Maybe (Qualified (ProperName 'ConstructorName))
   resolveDctor tys name =
-    mkQualified name . snd <$> find (elem name . snd . fst) tys
+    mkQualified name . snd <$> find (elem name . fst) tys
 
   -- Update names so unqualified references become qualified, and locally
   -- qualified references are replaced with their canoncial qualified names

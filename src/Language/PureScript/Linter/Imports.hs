@@ -158,17 +158,17 @@ lintImports (Module ss _ mn mdecls (Just mexports)) env usedImps = do
   -- that are implicitly exported and then re-exported.
   elaborateUsed :: Imports -> ModuleName -> UsedImports -> UsedImports
   elaborateUsed scope mne used =
-    let classes = extractByQual mne (importedTypeClasses scope) TyClassName
-        types = extractByQual mne (importedTypes scope) TyName
-        dctors = extractByQual mne (importedDataConstructors scope) DctorName
-        values = extractByQual mne (importedValues scope) IdentName
-    in foldr go used (classes ++ types ++ dctors ++ values)
+    foldr go used
+      $ extractByQual mne (importedTypeClasses scope) TyClassName
+      ++ extractByQual mne (importedTypes scope) TyName
+      ++ extractByQual mne (importedDataConstructors scope) DctorName
+      ++ extractByQual mne (importedValues scope) IdentName
     where
     go :: (ModuleName, Qualified Name) -> UsedImports -> UsedImports
     go (q, name) = M.alter (Just . maybe [name] (name :)) q
 
   extractByQual
-    :: (Eq a)
+    :: Eq a
     => ModuleName
     -> M.Map (Qualified a) [ImportRecord a]
     -> (a -> Name)
@@ -257,21 +257,20 @@ lintImportDecl env mni qualifierName names declType allowImplicit =
 
   dtys
     :: ModuleName
-    -> [((ProperName 'TypeName, [ProperName 'ConstructorName]), ModuleName)]
-  dtys mn = maybe [] exportedTypes $ envModuleExports <$> mn `M.lookup` env
+    -> M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ModuleName)
+  dtys mn = maybe M.empty exportedTypes $ envModuleExports <$> mn `M.lookup` env
 
   dctorsForType
     :: ModuleName
     -> ProperName 'TypeName
     -> [ProperName 'ConstructorName]
-  dctorsForType mn tn =
-    maybe [] (snd . fst) $ find ((== tn) . fst . fst) (dtys mn)
+  dctorsForType mn tn = maybe [] fst $ tn `M.lookup` dtys mn
 
   typeForDCtor
     :: ModuleName
     -> ProperName 'ConstructorName
     -> Maybe (ProperName 'TypeName)
-  typeForDCtor mn pn = fst . fst <$> find (elem pn . snd . fst) (dtys mn)
+  typeForDCtor mn pn = fst <$> find (elem pn . fst . snd) (M.toList (dtys mn))
 
 findUsedRefs
   :: Env
@@ -310,8 +309,8 @@ findUsedRefs env mni qn names =
   findTypeForDctor mn dctor =
     case mn `M.lookup` env of
       Just (_, _, exps) ->
-        case find (elem dctor . snd . fst) (exportedTypes exps) of
-          Just ((ty, _), _) -> ty
+        case find (elem dctor . fst . snd) (M.toList (exportedTypes exps)) of
+          Just (ty, _) -> ty
           Nothing -> internalError $ "missing type for data constructor " ++ runProperName dctor ++ " in findTypeForDctor"
       Nothing -> internalError $ "missing module " ++ runModuleName mn  ++ " in findTypeForDctor"
 
