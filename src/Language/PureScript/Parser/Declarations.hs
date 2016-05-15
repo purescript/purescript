@@ -4,7 +4,6 @@
 module Language.PureScript.Parser.Declarations
   ( parseDeclaration
   , parseModule
-  , parseModules
   , parseModulesFromFiles
   , parseValue
   , parseGuard
@@ -258,29 +257,31 @@ parseModule = do
   exports <- P.optionMaybe $ parens $ commaSep1 parseDeclarationRef
   reserved "where"
   decls <- mark (P.many (same *> parseDeclaration))
+  _ <- P.eof
   end <- P.getPosition
   let ss = SourceSpan (P.sourceName start) (C.toSourcePos start) (C.toSourcePos end)
   return $ Module ss comments name decls exports
 
 -- | Parse a collection of modules in parallel
-parseModulesFromFiles :: forall m k. (MonadError MultipleErrors m) =>
-                                     (k -> FilePath) -> [(k, String)] -> m [(k, Module)]
-parseModulesFromFiles toFilePath input = do
-  modules <- flip parU id $ map wrapError $ inParallel $ flip map input $ \(k, content) -> do
+parseModulesFromFiles
+  :: forall m k
+   . MonadError MultipleErrors m
+  => (k -> FilePath)
+  -> [(k, String)]
+  -> m [(k, Module)]
+parseModulesFromFiles toFilePath input =
+  flip parU wrapError . inParallel . flip map input $ \(k, content) -> do
     let filename = toFilePath k
     ts <- lex filename content
-    ms <- runTokenParser filename parseModules ts
-    return (k, ms)
-  return $ collect modules
+    m <- runTokenParser filename parseModule ts
+    return (k, m)
   where
-  collect :: [(k, [v])] -> [(k, v)]
-  collect vss = [ (k, v) | (k, vs) <- vss, v <- vs ]
   wrapError :: Either P.ParseError a -> m a
   wrapError = either (throwError . MultipleErrors . pure . toPositionedError) return
   -- It is enough to force each parse result to WHNF, since success or failure can't be
   -- determined until the end of the file, so this effectively distributes parsing of each file
   -- to a different spark.
-  inParallel :: [Either P.ParseError (k, [Module])] -> [Either P.ParseError (k, [Module])]
+  inParallel :: [Either P.ParseError (k, a)] -> [Either P.ParseError (k, a)]
   inParallel = withStrategy (parList rseq)
 
 
@@ -290,12 +291,6 @@ toPositionedError perr = ErrorMessage [ PositionedError (SourceSpan name start e
   name   = (P.sourceName  . P.errorPos) perr
   start  = (C.toSourcePos . P.errorPos) perr
   end    = start
-
--- |
--- Parse a collection of modules
---
-parseModules :: TokenParser [Module]
-parseModules = mark (P.many (same *> parseModule)) <* P.eof
 
 booleanLiteral :: TokenParser Bool
 booleanLiteral = (reserved "true" >> return True) P.<|> (reserved "false" >> return False)

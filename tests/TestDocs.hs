@@ -266,8 +266,8 @@ testCases =
       ])
 
   , ("TypeClassWithoutMembers",
-      [ ShouldBeDocumented         (n "Intermediate") "SomeClass" []
-      , ChildShouldNotBeDocumented (n "Intermediate") "SomeClass" "member"
+      [ ShouldBeDocumented         (n "TypeClassWithoutMembersIntermediate") "SomeClass" []
+      , ChildShouldNotBeDocumented (n "TypeClassWithoutMembersIntermediate") "SomeClass" "member"
       ])
 
   , ("NewOperators",
