@@ -24,6 +24,7 @@ import Language.PureScript.Crash
 import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.Pretty
+import Language.PureScript.Traversals
 import Language.PureScript.Types
 import qualified Language.PureScript.Bundle as Bundle
 import qualified Language.PureScript.Constants as C
@@ -112,7 +113,7 @@ data SimpleErrorMessage
   | ShadowedTypeVar String
   | UnusedTypeVar String
   | WildcardInferredType Type
-  | HoleInferredType String Type
+  | HoleInferredType String Type [(Ident, Type)]
   | MissingTypeDeclaration Ident Type
   | OverlappingPattern [[Binder]] Bool
   | IncompleteExhaustivityCheck
@@ -395,7 +396,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
   gSimple (OrphanInstance nm cl ts) = OrphanInstance nm cl <$> traverse f ts
   gSimple (WildcardInferredType ty) = WildcardInferredType <$> f ty
-  gSimple (HoleInferredType name ty) = HoleInferredType name <$> f ty
+  gSimple (HoleInferredType name ty env) = HoleInferredType name <$> f ty <*> traverse (sndM f) env
   gSimple (MissingTypeDeclaration nm ty) = MissingTypeDeclaration nm <$> f ty
   gSimple (CannotGeneralizeRecursiveFunction nm ty) = CannotGeneralizeRecursiveFunction nm <$> f ty
 
@@ -494,7 +495,7 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
           : foldMap (return . line . ("  bound at " ++) . displayStartEndPos) ss
 
       unknownInfo :: Int -> Box.Box
-      unknownInfo u = line $ "_" ++ show u ++ " is an unknown type"
+      unknownInfo u = line $ "t" ++ show u ++ " is an unknown type"
 
     renderSimpleErrorMessage :: SimpleErrorMessage -> Box.Box
     renderSimpleErrorMessage (CannotGetFileInfo path) =
@@ -817,10 +818,20 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       paras [ line "Wildcard type definition has the inferred type "
             , indent $ typeAsBox ty
             ]
-    renderSimpleErrorMessage (HoleInferredType name ty) =
-      paras [ line $ "Hole '" ++ name ++ "' has the inferred type "
-            , indent $ typeAsBox ty
-            ]
+    renderSimpleErrorMessage (HoleInferredType name ty env) =
+      paras $ [ line $ "Hole '" ++ name ++ "' has the inferred type "
+              , indent $ typeAsBox ty
+              ] ++ if null env then [] else envInfo
+      where
+        envInfo :: [Box.Box]
+        envInfo = [ line "in the following context:"
+                  , indent $ paras
+                      [ Box.hcat Box.left [ Box.text (showIdent ident <> " :: ")
+                                          , typeAsBox ty'
+                                          ]
+                      | (ident, ty') <- take 5 env
+                      ]
+                  ]
     renderSimpleErrorMessage (MissingTypeDeclaration ident ty) =
       paras [ line $ "No type declaration was provided for the top-level declaration of " ++ showIdent ident ++ "."
             , line "It is good practice to provide type declarations as a form of documentation."
