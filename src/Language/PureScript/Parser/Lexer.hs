@@ -254,7 +254,7 @@ parseToken = P.choice
 
   parseNumber :: P.Parsec String u (Either Integer Double)
   parseNumber = (consumeLeadingZero >> P.parserZero) <|>
-                  (Right <$> P.try (PT.float tokenParser) <|>
+                  (Right <$> P.try parseDouble <|>
                   Left <$> P.try (PT.natural tokenParser))
                 P.<?> "number"
     where
@@ -262,6 +262,54 @@ parseToken = P.choice
     -- if notFollowedBy fails though, the consumed '0' will break the choice chain
     consumeLeadingZero = P.lookAhead (P.char '0' >>
       (P.notFollowedBy P.digit P.<?> "no leading zero in number literal"))
+
+-- This implementation is based on the Haskell 98 report. We avoid Parsec's
+-- because it uses floating point addition and multiplication, leading to
+-- rounding errors.
+parseDouble :: P.Parsec String u Double
+parseDouble =
+  readDoubleP (P.try withDecimalPoint <|> withExponent) P.<?> "float"
+
+  where
+  readDoubleP :: P.Parsec String u String -> P.Parsec String u Double
+  readDoubleP p = do
+    str <- p
+    case readDouble str of
+      Just x  -> return x
+      Nothing -> P.parserZero
+
+  withDecimalPoint :: P.Parsec String u String
+  withDecimalPoint =
+    fmap concat $ sequence
+      [ decimal
+      , P.string "."
+      , decimal
+      , P.option "" exponent'
+      ]
+
+  withExponent :: P.Parsec String u String
+  withExponent =
+    fmap concat $ sequence
+      [ decimal
+      , exponent'
+      ]
+
+  decimal :: P.Parsec String u String
+  decimal = P.many1 P.digit
+
+  exponent' :: P.Parsec String u String
+  exponent' =
+    fmap concat $ sequence
+      [ P.string "e" <|> P.string "E"
+      , P.option "" (P.string "+" <|> P.string "-")
+      , decimal
+      ]
+
+  readDouble :: String -> Maybe Double
+  readDouble s =
+    case reads s of
+      [(x, "")] -> Just x
+      _         -> Nothing
 
 -- |
 -- We use Text.Parsec.Token to implement the string and number lexemes
