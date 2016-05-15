@@ -42,7 +42,7 @@ supportModuleMessage = unlines
   [ "PSCi requires the purescript-psci-support package to be installed."
   , "You can install it using Bower as follows:"
   , ""
-  , "  bower i purescript-psci-support --save"
+  , "  bower i purescript-psci-support --save-dev"
   , ""
   , "For help getting started, visit http://wiki.purescript.org/PSCi"
   ]
