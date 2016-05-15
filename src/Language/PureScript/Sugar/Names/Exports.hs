@@ -10,7 +10,7 @@ import Control.Monad.Writer.Class (MonadWriter(..))
 import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Foldable (traverse_)
-import Data.List (find, intersect)
+import Data.List (intersect)
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
 
@@ -76,11 +76,11 @@ resolveExports env ss mn imps exps refs =
   elaborateModuleExports result (PositionedDeclarationRef pos _ r) =
     warnAndRethrowWithPosition pos $ elaborateModuleExports result r
   elaborateModuleExports result (ModuleRef name) | name == mn = do
-    let types' = exportedTypes result ++ exportedTypes exps
-    let typeOps' = exportedTypeOps result ++ exportedTypeOps exps
-    let classes' = exportedTypeClasses result ++ exportedTypeClasses exps
-    let values' = exportedValues result ++ exportedValues exps
-    let valueOps' = exportedValueOps result ++ exportedValueOps exps
+    let types' = exportedTypes result `M.union` exportedTypes exps
+    let typeOps' = exportedTypeOps result `M.union` exportedTypeOps exps
+    let classes' = exportedTypeClasses result `M.union` exportedTypeClasses exps
+    let values' = exportedValues result `M.union` exportedValues exps
+    let valueOps' = exportedValueOps result `M.union` exportedValueOps exps
     return result
       { exportedTypes = types'
       , exportedTypeOps = typeOps'
@@ -155,11 +155,12 @@ resolveExports env ss mn imps exps refs =
     go
       :: Qualified (ProperName 'TypeName)
       -> ((ProperName 'TypeName, [ProperName 'ConstructorName]), ModuleName)
-    go (Qualified (Just mn'') name) = fromMaybe (internalError "Missing value in resolveTypeExports") $ do
-      exps' <- envModuleExports <$> mn'' `M.lookup` env
-      ((_, dctors'), mnOrig) <- find (\((name', _), _) -> name == name') (exportedTypes exps')
-      let relevantDctors = mapMaybe (\(Qualified mn''' dctor) -> if mn''' == Just mn'' then Just dctor else Nothing) dctors
-      return ((name, relevantDctors `intersect` dctors'), mnOrig)
+    go (Qualified (Just mn'') name) =
+      fromMaybe (internalError "Missing value in resolveTypeExports") $ do
+        exps' <- envModuleExports <$> mn'' `M.lookup` env
+        (dctors', mnOrig) <- name `M.lookup` exportedTypes exps'
+        let relevantDctors = mapMaybe (disqualifyFor (Just mn'')) dctors
+        return ((name, relevantDctors `intersect` dctors'), mnOrig)
     go (Qualified Nothing _) = internalError "Unqualified value in resolveTypeExports"
 
   -- Looks up an imported type operator and re-qualifies it with the original
@@ -194,10 +195,14 @@ resolveExports env ss mn imps exps refs =
     . fromMaybe (internalError "Missing value in resolveValueOp")
     $ resolve exportedValueOps op
 
-  resolve :: (Eq a) => (Exports -> [(a, ModuleName)]) -> Qualified a -> Maybe (Qualified a)
+  resolve
+    :: Ord a
+    => (Exports -> M.Map a ModuleName)
+    -> Qualified a
+    -> Maybe (Qualified a)
   resolve f (Qualified (Just mn'') a) = do
     exps' <- envModuleExports <$> mn'' `M.lookup` env
-    mn''' <- snd <$> find ((== a) . fst) (f exps')
+    mn''' <- a `M.lookup` f exps'
     return $ Qualified (Just mn''') a
   resolve _ _ = internalError "Unqualified value in resolve"
 
@@ -219,11 +224,11 @@ filterModule
   -> [DeclarationRef]
   -> m Exports
 filterModule mn exps refs = do
-  types <- foldM filterTypes [] refs
-  typeOps <- foldM (filterExport TyOpName getTypeOpRef exportedTypeOps) [] refs
-  classes <- foldM (filterExport TyClassName getTypeClassRef exportedTypeClasses) [] refs
-  values <- foldM (filterExport IdentName getValueRef exportedValues) [] refs
-  valueOps <- foldM (filterExport ValOpName getValueOpRef exportedValueOps) [] refs
+  types <- foldM filterTypes M.empty refs
+  typeOps <- foldM (filterExport TyOpName getTypeOpRef exportedTypeOps) M.empty refs
+  classes <- foldM (filterExport TyClassName getTypeClassRef exportedTypeClasses) M.empty refs
+  values <- foldM (filterExport IdentName getValueRef exportedValues) M.empty refs
+  valueOps <- foldM (filterExport ValOpName getValueOpRef exportedValueOps) M.empty refs
   return Exports
     { exportedTypes = types
     , exportedTypeOps = typeOps
@@ -235,21 +240,19 @@ filterModule mn exps refs = do
   where
 
   filterTypes
-    :: [((ProperName 'TypeName, [ProperName 'ConstructorName]), ModuleName)]
+    :: M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ModuleName)
     -> DeclarationRef
-    -> m [((ProperName 'TypeName, [ProperName 'ConstructorName]), ModuleName)]
+    -> m (M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ModuleName))
   filterTypes result (PositionedDeclarationRef pos _ r) =
     rethrowWithPosition pos $ filterTypes result r
   filterTypes result (TypeRef name expDcons) =
-    case matchType `find` exportedTypes exps of
+    case name `M.lookup` exportedTypes exps of
       Nothing -> throwError . errorMessage . UnknownExport $ TyName name
-      Just ((_, dcons), _) -> do
+      Just (dcons, _) -> do
         let expDcons' = fromMaybe dcons expDcons
         traverse_ (checkDcon name dcons) expDcons'
-        return $ ((name, expDcons'), mn) : result
+        return $ M.insert name (expDcons', mn) result
     where
-    -- Finds a type declaration by matching its name and defining module
-    matchType ((name', _), mn') = name == name' && mn == mn'
     -- Ensures a data constructor is exportable for a given type. Takes a type
     -- name, a list of exportable data constructors for the type, and the name of
     -- the data constructor to check.
@@ -264,18 +267,19 @@ filterModule mn exps refs = do
   filterTypes result _ = return result
 
   filterExport
-    :: Eq a
+    :: Ord a
     => (a -> Name)
     -> (DeclarationRef -> Maybe a)
-    -> (Exports -> [(a, ModuleName)])
-    -> [(a, ModuleName)]
+    -> (Exports -> M.Map a ModuleName)
+    -> M.Map a ModuleName
     -> DeclarationRef
-    -> m [(a, ModuleName)]
+    -> m (M.Map a ModuleName)
   filterExport toName get fromExps result (PositionedDeclarationRef pos _ r) =
     rethrowWithPosition pos $ filterExport toName get fromExps result r
   filterExport toName get fromExps result ref
     | Just name <- get ref =
-        if (name, mn) `elem` fromExps exps
-        then return $ (name, mn) : result
-        else throwError . errorMessage . UnknownExport $ toName name
+        case name `M.lookup` fromExps exps of
+          -- TODO: I'm not sure if we actually need to check mn == mn' here -gb
+          Just mn' | mn == mn' -> return $ M.insert name mn result
+          _ -> throwError . errorMessage . UnknownExport $ toName name
   filterExport _ _ _ result _ = return result

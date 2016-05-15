@@ -4,7 +4,7 @@ module Language.PureScript.Docs.Convert.ReExports
 
 import Prelude.Compat
 
-import Control.Arrow ((&&&), first, second)
+import Control.Arrow ((&&&), second)
 import Control.Monad
 import Control.Monad.Reader.Class (MonadReader, ask)
 import Control.Monad.State.Class (MonadState, gets, modify)
@@ -96,7 +96,7 @@ getReExports env mn =
 --      * Filters type class declarations to ensure that only re-exported type
 --      class members are listed.
 --
-collectDeclarations ::
+collectDeclarations :: forall m.
   (MonadState (Map P.ModuleName Module) m, MonadReader P.ModuleName m) =>
   P.Imports ->
   P.Exports ->
@@ -111,13 +111,20 @@ collectDeclarations imports exports = do
   (vals, classes) <- handleTypeClassMembers valsAndMembers typeClasses
 
   let filteredTypes = filterDataConstructors expCtors types
-  let filteredClasses = filterTypeClassMembers (map fst expVals) classes
+  let filteredClasses = filterTypeClassMembers (Map.keys expVals) classes
 
   pure (Map.toList (Map.unionsWith (<>) [filteredTypes, filteredClasses, vals, valOps, typeOps]))
 
   where
+
+  collect
+    :: (Eq a, Show a)
+    => (P.ModuleName -> a -> m (P.ModuleName, [b]))
+    -> [P.ImportRecord a]
+    -> Map a P.ModuleName
+    -> m (Map P.ModuleName [b])
   collect lookup' imps exps = do
-    imps' <- traverse (findImport imps) exps
+    imps' <- traverse (findImport imps) $ Map.toList exps
     Map.fromListWith (<>) <$> traverse (uncurry lookup') imps'
 
   expVals = P.exportedValues exports
@@ -126,13 +133,13 @@ collectDeclarations imports exports = do
   expValOps = P.exportedValueOps exports
   impValOps = concat (Map.elems (P.importedValueOps imports))
 
-  expTypes = map (first fst) (P.exportedTypes exports)
+  expTypes = Map.map snd (P.exportedTypes exports)
   impTypes = concat (Map.elems (P.importedTypes imports))
 
   expTypeOps = P.exportedTypeOps exports
   impTypeOps = concat (Map.elems (P.importedTypeOps imports))
 
-  expCtors = concatMap (snd . fst) (P.exportedTypes exports)
+  expCtors = concatMap fst (Map.elems (P.exportedTypes exports))
 
   expTCs = P.exportedTypeClasses exports
   impTCs = concat (Map.elems (P.importedTypeClasses imports))
