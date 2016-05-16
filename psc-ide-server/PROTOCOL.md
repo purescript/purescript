@@ -67,8 +67,7 @@ The `complete` command looks up possible completions/corrections.
   descending order where the nth element is better then the n+1-th.
  - `currentModule :: (optional) String`: The current modules name. If it matches
    with the rebuild cache non-exported modules will also be completed. You can
-   fill the rebuild cache by using the "Rebuild" command and setting the
-   `cacheSuccess` flag.
+   fill the rebuild cache by using the "Rebuild" command.
 
   If no matcher is given every candidate, that passes the filters, is returned
   in no particular order.
