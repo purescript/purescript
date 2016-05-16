@@ -37,7 +37,6 @@ import           System.FilePath.Glob (glob)
 data PSCiOptions = PSCiOptions
   { psciMultiLineMode     :: Bool
   , psciInputFile         :: [FilePath]
-  , psciForeignInputFiles :: [FilePath]
   , psciInputNodeFlags    :: [String]
   }
 
@@ -52,12 +51,6 @@ inputFile = Opts.strArgument $
      Opts.metavar "FILE"
   <> Opts.help "Optional .purs files to load on start"
 
-inputForeignFile :: Opts.Parser FilePath
-inputForeignFile = Opts.strOption $
-     Opts.short 'f'
-  <> Opts.long "ffi"
-  <> Opts.help "The input .js file(s) providing foreign import implementations"
-
 nodeFlagsFlag :: Opts.Parser [String]
 nodeFlagsFlag = Opts.option parser $
      Opts.long "node-opts"
@@ -70,7 +63,6 @@ nodeFlagsFlag = Opts.option parser $
 psciOptions :: Opts.Parser PSCiOptions
 psciOptions = PSCiOptions <$> multiLineMode
                           <*> many inputFile
-                          <*> many inputForeignFile
                           <*> nodeFlagsFlag
 
 version :: Opts.Parser (a -> a)
@@ -107,24 +99,20 @@ main = getOpt >>= loop
     loop :: PSCiOptions -> IO ()
     loop PSCiOptions{..} = do
         inputFiles <- concat <$> traverse glob psciInputFile
-        foreignFiles <- concat <$> traverse glob psciForeignInputFiles
         e <- runExceptT $ do
           modules <- ExceptT (loadAllModules inputFiles)
           unless (supportModuleIsDefined (map snd modules)) . liftIO $ do
             putStrLn supportModuleMessage
             exitFailure
-          foreigns <- ExceptT . runMake $ do
-            foreignFilesContent <- forM foreignFiles (\inFile -> (inFile,) <$> P.readTextFile inFile)
-            P.parseForeignModulesFromFiles foreignFilesContent
-          (externs, env) <- ExceptT . runMake . make foreigns . map snd $ modules
-          return (modules, foreigns, externs, env)
+          (externs, env) <- ExceptT . runMake . make $ modules
+          return (modules, externs, env)
         case e of
           Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
-          Right (modules, foreigns, externs, env) -> do
+          Right (modules, externs, env) -> do
             historyFilename <- getHistoryFilename
             let settings = defaultSettings { historyFile = Just historyFilename }
                 initialState = PSCiState [] [] (zip (map snd modules) externs)
-                config = PSCiConfig inputFiles foreigns psciInputNodeFlags env
+                config = PSCiConfig inputFiles psciInputNodeFlags env
                 runner = flip runReaderT config
                          . flip evalStateT initialState
                          . runInputT (setComplete completion settings)
