@@ -1,6 +1,7 @@
 module M2 where
 
 import Prelude
+import M1 as M1
 
 baz :: M1.Foo -> String
 baz = M1.foo

@@ -53,7 +53,7 @@ resolveImports env (Module ss coms currentModule decls exps) =
         imports' = M.map (map (\(ss', dt, mmn) -> (ss', Just dt, mmn))) imports
         scope = M.insert currentModule [(Nothing, Nothing, Nothing)] imports'
     (Module ss coms currentModule decls exps,) <$>
-      foldM (resolveModuleImport env) nullImports (M.toList scope)
+      foldM (resolveModuleImport env) primImports (M.toList scope)
 
 -- | Constructs a set of imports for a single module import.
 resolveModuleImport
@@ -74,9 +74,10 @@ resolveModuleImport env ie (mn, imps) = foldM go ie imps
         (throwError . errorMessage . UnknownName . Qualified Nothing $ ModName mn)
         (return . envModuleExports)
         (mn `M.lookup` env)
-    let virtualModules = importedVirtualModules ie'
-        ie'' = ie' { importedModules = S.insert mn (importedModules ie')
-                   , importedVirtualModules = maybe virtualModules (`S.insert` virtualModules) impQual
+    let impModules = importedModules ie'
+        qualModules = importedQualModules ie'
+        ie'' = ie' { importedModules = maybe (S.insert mn impModules) (const impModules) impQual
+                   , importedQualModules = maybe qualModules (`S.insert` qualModules) impQual
                    }
     positioned $ resolveImport mn modExports ie'' impQual typ
     where

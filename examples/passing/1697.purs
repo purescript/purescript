@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 _2 :: forall a. a -> a
 _2 a = a
@@ -21,4 +22,4 @@ wtf = do
   let tmp = _2 1
   pure unit
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

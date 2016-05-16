@@ -1,5 +1,7 @@
 module Main where
 
+import Control.Monad.Eff.Console (log)
+
 data Person = Person String Boolean
 
 getName :: Person -> String
@@ -10,4 +12,4 @@ getName p = case p of
 name :: String
 name = getName (Person "John Smith" true)
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

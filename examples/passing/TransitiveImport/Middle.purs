@@ -1,3 +1,5 @@
 module Middle where
 
-middle = Test.test
+import Test (test)
+
+middle = test

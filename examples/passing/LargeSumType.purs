@@ -1,5 +1,7 @@
 module Main where
-    
+
+import Control.Monad.Eff.Console (log)
+
 data Large = A | B | C | D | E | F | G | H | I | J | K | L | M | N | O | P | Q | R | S | T | U | V | W | X | Y | Z
 
 explode A A = "A"
@@ -30,4 +32,4 @@ explode Y Y = "Y"
 explode Z Z = "Z"
 explode _ _ = ""
 
-main = Control.Monad.Eff.Console.log "Done" 
+main = log "Done"

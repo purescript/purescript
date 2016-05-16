@@ -60,7 +60,7 @@ lintImports (Module ss _ mn mdecls (Just mexports)) env usedImps = do
 
   -- TODO: this needs some work to be easier to understand
 
-  let scope = maybe nullImports (\(_, imps', _) -> imps') (M.lookup mn env)
+  let scope = maybe primImports (\(_, imps', _) -> imps') (M.lookup mn env)
       usedImps' = foldr (elaborateUsed scope) usedImps exportedModules
       numOpenImports = getSum $ foldMap (Sum . countOpenImports) mdecls
       allowImplicit = numOpenImports == 1
@@ -159,9 +159,11 @@ lintImports (Module ss _ mn mdecls (Just mexports)) env usedImps = do
   elaborateUsed scope mne used =
     foldr go used
       $ extractByQual mne (importedTypeClasses scope) TyClassName
+      ++ extractByQual mne (importedTypeOps scope) TyOpName
       ++ extractByQual mne (importedTypes scope) TyName
       ++ extractByQual mne (importedDataConstructors scope) DctorName
       ++ extractByQual mne (importedValues scope) IdentName
+      ++ extractByQual mne (importedValueOps scope) ValOpName
     where
     go :: (ModuleName, Qualified Name) -> UsedImports -> UsedImports
     go (q, name) = M.alter (Just . maybe [name] (name :)) q
@@ -298,6 +300,7 @@ findUsedRefs env mni qn names =
   let
     classRefs = TypeClassRef <$> mapMaybe (getClassName <=< disqualifyFor qn) names
     valueRefs = ValueRef <$> mapMaybe (getIdentName <=< disqualifyFor qn) names
+    valueOpRefs = ValueOpRef <$> mapMaybe (getValOpName <=< disqualifyFor qn) names
     typeOpRefs = TypeOpRef <$> mapMaybe (getTypeOpName <=< disqualifyFor qn) names
     types = mapMaybe (getTypeName <=< disqualifyFor qn) names
     dctors = mapMaybe (getDctorName <=< disqualifyFor qn) names
@@ -306,7 +309,7 @@ findUsedRefs env mni qn names =
     typesRefs
       = map (flip TypeRef (Just [])) typesWithoutDctors
       ++ map (\(ty, ds) -> TypeRef ty (Just ds)) (M.toList typesWithDctors)
-  in classRefs ++ typeOpRefs ++ typesRefs ++ valueRefs
+  in classRefs ++ typeOpRefs ++ typesRefs ++ valueRefs ++ valueOpRefs
 
   where
 

@@ -1,6 +1,7 @@
 module Main where
 
 import A
+import Control.Monad.Eff.Console (log)
 
 thing :: Int
 thing = 1
@@ -11,4 +12,4 @@ what :: Boolean -> Int
 what true = thing
 what false = zing
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

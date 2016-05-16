@@ -1,6 +1,8 @@
 module Main where
 
 import Prelude
+import Other (foo)
+import Other as Other
 import Control.Monad.Eff
 import Control.Monad.Eff.Console
 
@@ -8,9 +10,6 @@ op1 :: forall a. a -> a -> a
 op1 x _ = x
 
 infix 4 op1 as ?!
-
-bar :: String -> String -> String
-bar = \s1 s2 -> s1 <> s2
 
 test1 :: forall n. (Semiring n) => n -> n -> (n -> n -> n) -> n
 test1 x y z = x * y + z x y
@@ -44,14 +43,11 @@ op4 = \f x -> f x
 
 infix 4 op4 as @@
 
-foo :: String -> String
-foo = \s -> s
-
 test8 = foo @@ "Hello World"
 
-test9 = Main.foo @@ "Hello World"
+test9 = Other.foo @@ "Hello World"
 
-test10 = "Hello" `Main.bar` "World"
+test10 = "Hello" `Other.baz` "World"
 
 op5 :: forall a. Array a -> Array a -> Array a
 op5 = \as -> \bs -> as

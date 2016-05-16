@@ -1,5 +1,7 @@
 module Main where
 
+import Control.Monad.Eff.Console (log)
+
 f asgård = asgård
 
-main = Control.Monad.Eff.Console.log (f "Done")
+main = log (f "Done")

@@ -7,6 +7,6 @@
     "purescript-functions": "1.0.0-rc.1",
     "purescript-prelude": "1.0.0-rc.3",
     "purescript-st": "1.0.0-rc.1",
-    "purescript-partial": "1.1.1"
+    "purescript-partial": "1.1.2"
   }
 }

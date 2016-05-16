@@ -2,6 +2,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 test = case 1 of
   (0 :: String) -> true
@@ -9,4 +10,4 @@ test = case 1 of
 
 main = do
   let t = test
-  Control.Monad.Eff.Console.log "Done"
+  log "Done"

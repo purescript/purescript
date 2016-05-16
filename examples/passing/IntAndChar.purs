@@ -2,6 +2,7 @@ module Main where
 
 import Prelude
 import Control.Monad.Eff
+import Control.Monad.Eff.Console (log)
 import Test.Assert
 
 f 1 = 1
@@ -15,4 +16,4 @@ main = do
   assert $ f 0 == 0
   assert $ g 'a' == 'a'
   assert $ g 'b' == 'b'
-  Control.Monad.Eff.Console.log "Done"
+  log "Done"

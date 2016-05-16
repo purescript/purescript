@@ -1,9 +1,10 @@
 -- @shouldFailWith UnknownName
 module Main where
 
-import M1
+import M1 as M
+import Control.Monad.Eff.Console (log)
 
 -- should fail as Z is not exported from M1
-testZ = M1.Z
+testZ = M.Z
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

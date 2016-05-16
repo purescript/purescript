@@ -3,6 +3,7 @@ module Main where
 
 import Prelude
 import Control.Monad.Eff
+import Control.Monad.Eff.Console (log)
 
 o :: { type :: String }
 o = { type: "o" }
@@ -15,4 +16,4 @@ f { type = "p" } = "Done"
 f _ = "Fail"
 
 main :: Eff _ _
-main = Control.Monad.Eff.Console.log $ f { type: p.type, foo: "bar" }
+main = log $ f { type: p.type, foo: "bar" }

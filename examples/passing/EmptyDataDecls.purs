@@ -2,6 +2,7 @@ module Main where
 
 import Prelude
 import Test.Assert
+import Control.Monad.Eff.Console (log)
 
 data Z
 data S n
@@ -15,5 +16,5 @@ cons' :: forall a n. a -> ArrayBox n a -> ArrayBox (S n) a
 cons' x (ArrayBox xs) = ArrayBox $ append [x] xs
 
 main = case cons' 1 $ cons' 2 $ cons' 3 nil of
-         ArrayBox [1, 2, 3] -> Control.Monad.Eff.Console.log "Done"
+         ArrayBox [1, 2, 3] -> log "Done"
          _ -> assert' "Failed" false

@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 type Inner = Number
 
@@ -12,4 +13,4 @@ type Outer = { inner :: Inner }
 outer :: Outer
 outer = { inner: inner }
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

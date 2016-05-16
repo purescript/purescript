@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 test = \x -> case x of
   { str = "Foo", bool = true } -> true
@@ -19,4 +20,4 @@ isDesc :: Array Number -> Boolean
 isDesc [x, y] | x > y = true
 isDesc _ = false
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"
