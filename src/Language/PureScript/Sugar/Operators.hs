@@ -313,10 +313,10 @@ updateTypes goType = (goDecl, goExpr, goBinder)
     ty' <- goType' pos ty
     return (pos, ExternDeclaration name ty')
   goDecl pos (TypeClassDeclaration name args implies decls) = do
-    implies' <- traverse (overConstraintArgs (traverse (goType' pos))) implies
+    implies' <- traverse (sndM (traverse (goType' pos))) implies
     return (pos, TypeClassDeclaration name args implies' decls)
   goDecl pos (TypeInstanceDeclaration name cs className tys impls) = do
-    cs' <- traverse (overConstraintArgs (traverse (goType' pos))) cs
+    cs' <- traverse (sndM (traverse (goType' pos))) cs
     tys' <- traverse (goType' pos) tys
     return (pos, TypeInstanceDeclaration name cs' className tys' impls)
   goDecl pos (TypeSynonymDeclaration name args ty) = do
@@ -329,12 +329,12 @@ updateTypes goType = (goDecl, goExpr, goBinder)
 
   goExpr :: Maybe SourceSpan -> Expr -> m (Maybe SourceSpan, Expr)
   goExpr _ e@(PositionedValue pos _ _) = return (Just pos, e)
-  goExpr pos (TypeClassDictionary (Constraint name tys info) dicts) = do
-    tys' <- traverse (goType' pos) tys
-    return (pos, TypeClassDictionary (Constraint name tys' info) dicts)
-  goExpr pos (SuperClassDictionary cls tys) = do
-    tys' <- traverse (goType' pos) tys
-    return (pos, SuperClassDictionary cls tys')
+  goExpr pos (TypeClassDictionary (Constraint conTy info) dicts) = do
+    conTy' <- goType' pos conTy
+    return (pos, TypeClassDictionary (Constraint conTy' info) dicts)
+  goExpr pos (SuperClassDictionary conTy) = do
+    conTy' <- goType' pos conTy
+    return (pos, SuperClassDictionary conTy')
   goExpr pos (TypedValue check v ty) = do
     ty' <- goType' pos ty
     return (pos, TypedValue check v ty')

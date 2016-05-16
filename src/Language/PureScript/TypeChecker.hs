@@ -111,12 +111,12 @@ addTypeClass
   => ModuleName
   -> ProperName 'ClassName
   -> [(String, Maybe Kind)]
-  -> [Constraint]
+  -> [(Qualified (ProperName 'ClassName), [Type])]
   -> [Declaration]
   -> m ()
 addTypeClass moduleName pn args implies ds =
   let members = map toPair ds in
-  modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) (args, members, implies) (typeClasses . checkEnv $ st) } }
+  modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (TypeConstructor (Qualified (Just moduleName) (coerceProperName pn))) (args, members, implies) (typeClasses . checkEnv $ st) } }
   where
   toPair (TypeDeclaration ident ty) = (ident, ty)
   toPair (PositionedDeclaration _ _ d) = toPair d
@@ -125,7 +125,7 @@ addTypeClass moduleName pn args implies ds =
 addTypeClassDictionaries
   :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => Maybe ModuleName
-  -> M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) TypeClassDictionaryInScope)
+  -> M.Map Type (M.Map (Qualified Ident) TypeClassDictionaryInScope)
   -> m ()
 addTypeClassDictionaries mn entries =
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = insertState st } }
@@ -269,11 +269,11 @@ typeCheckAll moduleName _ = traverse go
     return d
   go (d@(TypeInstanceDeclaration dictName deps className tys body)) = rethrow (addHint (ErrorInInstance className tys)) $ do
     traverse_ (checkTypeClassInstance moduleName) tys
-    forM_ deps $ traverse_ (checkTypeClassInstance moduleName) . constraintArgs
+    forM_ deps $ traverse (checkTypeClassInstance moduleName) . snd
     checkOrphanInstance dictName className tys
     _ <- traverseTypeInstanceBody checkInstanceMembers body
-    let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps)
-    addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdName dict) dict
+    let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] (TypeConstructor (fmap coerceProperName className)) tys (Just deps)
+    addTypeClassDictionaries (Just moduleName) . M.singleton (TypeConstructor (fmap coerceProperName className)) $ M.singleton (tcdName dict) dict
     return d
   go (PositionedDeclaration pos com d) =
     warnAndRethrowWithPosition pos $ PositionedDeclaration pos com <$> go d
@@ -400,10 +400,10 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     findClasses :: Type -> [DeclarationRef]
     findClasses = everythingOnTypes (++) go
       where
-      go (ConstrainedType cs _) = mapMaybe (fmap TypeClassRef . extractCurrentModuleClass . constraintClass) cs
+      go (ConstrainedType cs _) = mapMaybe (fmap TypeClassRef . extractCurrentModuleClass . constraintType) cs
       go _ = []
-    extractCurrentModuleClass :: Qualified (ProperName 'ClassName) -> Maybe (ProperName 'ClassName)
-    extractCurrentModuleClass (Qualified (Just mn') name) | mn == mn' = Just name
+    extractCurrentModuleClass :: Type -> Maybe (ProperName 'ClassName)
+    extractCurrentModuleClass (TypeConstructor (Qualified (Just mn') name)) | mn == mn' = Just (coerceProperName name)
     extractCurrentModuleClass _ = Nothing
 
   checkClassMembersAreExported :: DeclarationRef -> m ()

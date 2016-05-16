@@ -16,7 +16,7 @@ import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Graph
 import Data.List (nub, intersect)
-import Data.Maybe (isJust, mapMaybe)
+import Data.Maybe (isJust)
 import qualified Data.Set as S
 
 import Language.PureScript.AST
@@ -139,11 +139,6 @@ usedTypeNames moduleName =
   in nub . f
   where
   usedNames :: Type -> [ProperName 'TypeName]
-  usedNames (ConstrainedType constraints _) =
-    flip mapMaybe constraints $ \case
-      (Constraint (Qualified (Just moduleName') name) _ _)
-        | moduleName == moduleName' -> Just (coerceProperName name)
-      _ -> Nothing
   usedNames (TypeConstructor (Qualified (Just moduleName') name))
     | moduleName == moduleName' = [name]
   usedNames _ = []

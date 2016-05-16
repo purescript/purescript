@@ -286,9 +286,7 @@ checkExhaustive env mn numArgs cas expr = makeResult . first nub $ foldl' step (
                                                          ty))
 
       ty :: Type
-      ty = ForAll "a" (ConstrainedType [ Constraint (Qualified (Just (ModuleName [ProperName C.prim]))
-                                                               (ProperName "Partial"))
-                                                    []
+      ty = ForAll "a" (ConstrainedType [ Constraint C.Partial
                                                     (Just (PartialConstraintData (map (map prettyPrintBinderAtom) bss) complete))
                                        ]
                                        (TypeApp (TypeApp tyFunction (TypeVar "a"))

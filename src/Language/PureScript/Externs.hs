@@ -121,14 +121,14 @@ data ExternsDeclaration =
       { edClassName :: ProperName 'ClassName
       , edClassTypeArguments :: [(String, Maybe Kind)]
       , edClassMembers :: [(Ident, Type)]
-      , edClassConstraints :: [Constraint]
+      , edClassConstraints :: [(Qualified (ProperName 'ClassName), [Type])]
       }
   -- | An instance declaration
   | EDInstance
       { edInstanceClassName :: Qualified (ProperName 'ClassName)
       , edInstanceName :: Ident
       , edInstanceTypes :: [Type]
-      , edInstanceConstraints :: Maybe [Constraint]
+      , edInstanceConstraints :: Maybe [(Qualified (ProperName 'ClassName), [Type])]
       }
   deriving (Show, Read)
 
@@ -141,11 +141,11 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   applyDecl env (EDTypeSynonym pn args ty) = env { typeSynonyms = M.insert (qual pn) (args, ty) (typeSynonyms env) }
   applyDecl env (EDDataConstructor pn dTy tNm ty nms) = env { dataConstructors = M.insert (qual pn) (dTy, tNm, ty, nms) (dataConstructors env) }
   applyDecl env (EDValue ident ty) = env { names = M.insert (efModuleName, ident) (ty, External, Defined) (names env) }
-  applyDecl env (EDClass pn args members cs) = env { typeClasses = M.insert (qual pn) (args, members, cs) (typeClasses env) }
-  applyDecl env (EDInstance className ident tys cs) = env { typeClassDictionaries = updateMap (updateMap (M.insert (qual ident) dict) className) (Just efModuleName) (typeClassDictionaries env) }
+  applyDecl env (EDClass pn args members cs) = env { typeClasses = M.insert (TypeConstructor (qual (coerceProperName pn))) (args, members, cs) (typeClasses env) }
+  applyDecl env (EDInstance className ident tys cs) = env { typeClassDictionaries = updateMap (updateMap (M.insert (qual ident) dict) (TypeConstructor (fmap coerceProperName className))) (Just efModuleName) (typeClassDictionaries env) }
     where
     dict :: TypeClassDictionaryInScope
-    dict = TypeClassDictionaryInScope (qual ident) [] className tys cs
+    dict = TypeClassDictionaryInScope (qual ident) [] (TypeConstructor (fmap coerceProperName className)) tys cs
 
     updateMap :: (Ord k, Monoid a) => (a -> a) -> k -> M.Map k a -> M.Map k a
     updateMap f = M.alter (Just . f . fold)
@@ -204,7 +204,7 @@ moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
     | Just (ty, _, _) <- (mn, ident) `M.lookup` names env
     = [ EDValue ident ty ]
   toExternsDeclaration (TypeClassRef className)
-    | Just (args, members, implies) <- Qualified (Just mn) className `M.lookup` typeClasses env
+    | Just (args, members, implies) <- TypeConstructor (Qualified (Just mn) (coerceProperName className)) `M.lookup` typeClasses env
     , Just (kind, TypeSynonym) <- Qualified (Just mn) (coerceProperName className) `M.lookup` types env
     , Just (_, synTy) <- Qualified (Just mn) (coerceProperName className) `M.lookup` typeSynonyms env
     = [ EDType (coerceProperName className) kind TypeSynonym
@@ -212,10 +212,11 @@ moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
       , EDClass className args members implies
       ]
   toExternsDeclaration (TypeInstanceRef ident)
-    = [ EDInstance tcdClassName ident tcdInstanceTypes tcdDependencies
+    = [ EDInstance (fmap coerceProperName className) ident tcdInstanceTypes tcdDependencies
       | m1 <- maybeToList (M.lookup (Just mn) (typeClassDictionaries env))
       , m2 <- M.elems m1
       , TypeClassDictionaryInScope{..} <- maybeToList (M.lookup (Qualified (Just mn) ident) m2)
+      , let TypeConstructor className = tcdClassName
       ]
   toExternsDeclaration _ = []
 

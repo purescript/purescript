@@ -94,7 +94,7 @@ typesOf bindingGroupType moduleName vals = do
       -- Make sure any unsolved type constraints only use type variables which appear
       -- unknown in the inferred type.
       forM_ unsolved $ \(_, con) -> do
-        let constraintTypeVars = nub $ foldMap unknownsInType (constraintArgs con)
+        let constraintTypeVars = nub $ unknownsInType (constraintType con)
         when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $
           throwError . errorMessage $ NoInstanceFound con
 
@@ -199,7 +199,7 @@ overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
   where
   g :: Expr -> Expr
   g (TypedValue checkTy val t) = TypedValue checkTy val (f t)
-  g (TypeClassDictionary c sco) = TypeClassDictionary (mapConstraintArgs (map f) c) sco
+  g (TypeClassDictionary c sco) = TypeClassDictionary (mapConstraintType f c) sco
   g other = other
 
 -- | Check the kind of a type, failing if it is not of kind *.
@@ -312,9 +312,9 @@ infer' (IfThenElse cond th el) = do
 infer' (Let ds val) = do
   (ds', val'@(TypedValue _ _ valTy)) <- inferLetBinding [] ds val infer
   return $ TypedValue True (Let ds' val') valTy
-infer' (SuperClassDictionary className tys) = do
+infer' (SuperClassDictionary conTy) = do
   dicts <- getTypeClassDictionaries
-  return $ TypeClassDictionary (Constraint className tys Nothing) dicts
+  return $ TypeClassDictionary (Constraint conTy Nothing) dicts
 infer' (TypedValue checkType val ty) = do
   Just moduleName <- checkCurrentModule <$> get
   (kind, args) <- kindOfWithScopedVars ty
@@ -522,8 +522,7 @@ check' val (ForAll ident ty _) = do
   val' <- check skVal sk
   return $ TypedValue True val' (ForAll ident ty (Just scope))
 check' val t@(ConstrainedType constraints ty) = do
-  dictNames <- forM constraints $ \(Constraint (Qualified _ (ProperName className)) _ _) ->
-    freshIdent ("dict" ++ className)
+  dictNames <- replicateM (length constraints) $ freshIdent "dict"
   dicts <- join <$> zipWithM (newDictionaries []) (map (Qualified Nothing) dictNames) constraints
   val' <- withBindingGroupVisible $ withTypeClassDictionaries dicts $ check val ty
   return $ TypedValue True (foldr (Abs . Left) val' dictNames) t
@@ -531,19 +530,22 @@ check' val t@(ConstrainedType constraints ty) = do
   -- | Add a dictionary for the constraint to the scope, and dictionaries
   -- for all implied superclass instances.
   newDictionaries
-    :: [(Qualified (ProperName 'ClassName), Integer)]
+    :: [Integer]
     -> Qualified Ident
     -> Constraint
     -> m [TypeClassDictionaryInScope]
-  newDictionaries path name (Constraint className instanceTy _) = do
+  newDictionaries path name (Constraint conTy _) = do
     tcs <- gets (typeClasses . checkEnv)
-    let (args, _, superclasses) = fromMaybe (internalError "newDictionaries: type class lookup failed") $ M.lookup className tcs
-    supDicts <- join <$> zipWithM (\(Constraint supName supArgs _) index ->
-                                      newDictionaries ((supName, index) : path)
-                                                      name
-                                                      (Constraint supName (instantiateSuperclass (map fst args) supArgs instanceTy) Nothing)
-                                  ) superclasses [0..]
-    return (TypeClassDictionaryInScope name path className instanceTy Nothing : supDicts)
+    let (className, instanceTy) = stripTypeArguments [] conTy
+    case M.lookup className tcs of
+      Just (args, _, superclasses) -> do
+        supDicts <- join <$> zipWithM (\(supName, supArgs) index ->
+                                          newDictionaries (index : path)
+                                                          name
+                                                          (Constraint (foldl TypeApp (TypeConstructor (fmap coerceProperName supName)) (instantiateSuperclass (map fst args) supArgs instanceTy)) Nothing)
+                                      ) superclasses [0..]
+        return (TypeClassDictionaryInScope name path className instanceTy Nothing : supDicts)
+      Nothing -> return [TypeClassDictionaryInScope name path className instanceTy Nothing]
 
   instantiateSuperclass :: [String] -> [Type] -> [Type] -> [Type]
   instantiateSuperclass args supArgs tys = map (replaceAllTypeVars (zip args tys)) supArgs
@@ -586,7 +588,7 @@ check' v@(Var var) ty = do
   case v' of
     Nothing -> internalError "check: unable to check the subsumes relation."
     Just v'' -> return $ TypedValue True v'' ty'
-check' (SuperClassDictionary className tys) _ = do
+check' (SuperClassDictionary conTy) _ = do
   {-
   -- Here, we replace a placeholder for a superclass dictionary with a regular
   -- TypeClassDictionary placeholder. The reason we do this is that it is necessary to have the
@@ -594,7 +596,7 @@ check' (SuperClassDictionary className tys) _ = do
   -- declaration gets desugared.
   -}
   dicts <- getTypeClassDictionaries
-  return $ TypeClassDictionary (Constraint className tys Nothing) dicts
+  return $ TypeClassDictionary (Constraint conTy Nothing) dicts
 check' (TypedValue checkType val ty1) ty2 = do
   Just moduleName <- checkCurrentModule <$> get
   (kind, args) <- kindOfWithScopedVars ty1
