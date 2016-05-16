@@ -71,8 +71,8 @@ skolemizeTypesInValue ident sko scope ss =
   in runIdentity . f
   where
   onExpr :: [String] -> Expr -> Identity ([String], Expr)
-  onExpr sco (SuperClassDictionary c ts)
-    | ident `notElem` sco = return (sco, SuperClassDictionary c (map (skolemize ident sko scope ss) ts))
+  onExpr sco (SuperClassDictionary conTy)
+    | ident `notElem` sco = return (sco, SuperClassDictionary (skolemize ident sko scope ss conTy))
   onExpr sco (TypedValue check val ty)
     | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedValue check val (skolemize ident sko scope ss ty))
   onExpr sco other = return (sco, other)

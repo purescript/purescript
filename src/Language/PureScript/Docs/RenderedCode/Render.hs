@@ -54,9 +54,7 @@ typeLiterals = mkPattern match
     Nothing
 
 renderConstraint :: Constraint -> RenderedCode
-renderConstraint (Constraint pn tys _) =
-  let instApp = foldl TypeApp (TypeConstructor (fmap coerceProperName pn)) tys
-  in  renderType instApp
+renderConstraint (Constraint ty _) = renderType ty
 
 renderConstraints :: [Constraint] -> RenderedCode -> RenderedCode
 renderConstraints deps ty =

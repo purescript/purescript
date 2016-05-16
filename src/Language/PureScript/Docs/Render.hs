@@ -110,17 +110,25 @@ renderChildDeclarationWithOptions opts ChildDeclaration{..} =
   where
   renderType' = renderTypeWithOptions opts
 
-renderConstraint :: P.Constraint -> RenderedCode
+renderConstraint :: (P.Qualified (P.ProperName 'P.ClassName), [P.Type]) -> RenderedCode
 renderConstraint = renderConstraintWithOptions defaultRenderTypeOptions
 
-renderConstraintWithOptions :: RenderTypeOptions -> P.Constraint -> RenderedCode
-renderConstraintWithOptions opts (P.Constraint pn tys _) =
-  renderTypeWithOptions opts $ foldl P.TypeApp (P.TypeConstructor (fmap P.coerceProperName pn)) tys
+renderConstraintWithOptions
+  :: RenderTypeOptions
+  -> (P.Qualified (P.ProperName 'P.ClassName), [P.Type])
+  -> RenderedCode
+renderConstraintWithOptions opts (con, args) =
+  renderTypeWithOptions opts (foldl P.TypeApp (P.TypeConstructor (fmap P.coerceProperName con)) args)
 
-renderConstraints :: [P.Constraint] -> Maybe RenderedCode
+renderConstraints
+  :: [(P.Qualified (P.ProperName 'P.ClassName), [P.Type])]
+  -> Maybe RenderedCode
 renderConstraints = renderConstraintsWithOptions defaultRenderTypeOptions
 
-renderConstraintsWithOptions :: RenderTypeOptions -> [P.Constraint] -> Maybe RenderedCode
+renderConstraintsWithOptions
+  :: RenderTypeOptions
+  -> [(P.Qualified (P.ProperName 'P.ClassName), [P.Type])]
+  -> Maybe RenderedCode
 renderConstraintsWithOptions opts constraints
   | null constraints = Nothing
   | otherwise = Just $

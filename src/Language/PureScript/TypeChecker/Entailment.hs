@@ -8,6 +8,7 @@ module Language.PureScript.TypeChecker.Entailment
 
 import Prelude.Compat
 
+import Control.Arrow (second)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 import Control.Monad.Supply.Class (MonadSupply(..))
@@ -29,7 +30,7 @@ import qualified Language.PureScript.Constants as C
 
 -- | The 'Context' tracks those constraints which can be satisfied.
 type Context = M.Map (Maybe ModuleName)
-                     (M.Map (Qualified (ProperName 'ClassName))
+                     (M.Map Type
                             (M.Map (Qualified Ident)
                                    TypeClassDictionaryInScope))
 
@@ -65,9 +66,8 @@ entails
   -> StateT Context m (Expr, [(Ident, Constraint)])
 entails shouldGeneralize moduleName context = solve
   where
-    forClassName :: Context -> Qualified (ProperName 'ClassName) -> [Type] -> [TypeClassDictionaryInScope]
-    forClassName ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (Nothing : Just mn : map Just (mapMaybe ctorModules tys))
-    forClassName _ _ _ = internalError "forClassName: expected qualified class name"
+    forClassName :: Context -> Type -> [Type] -> [TypeClassDictionaryInScope]
+    forClassName ctx hd tys = concatMap (findDicts ctx hd) (Nothing : map Just (mapMaybe ctorModules (hd : tys)))
 
     ctorModules :: Type -> Maybe ModuleName
     ctorModules (TypeConstructor (Qualified (Just mn) _)) = Just mn
@@ -75,7 +75,7 @@ entails shouldGeneralize moduleName context = solve
     ctorModules (TypeApp ty _) = ctorModules ty
     ctorModules _ = Nothing
 
-    findDicts :: Context -> Qualified (ProperName 'ClassName) -> Maybe ModuleName -> [TypeClassDictionaryInScope]
+    findDicts :: Context -> Type -> Maybe ModuleName -> [TypeClassDictionaryInScope]
     findDicts ctx cn = maybe [] M.elems . (>>= M.lookup cn) . flip M.lookup ctx
 
     solve :: Constraint -> StateT Context m (Expr, [(Ident, Constraint)])
@@ -84,44 +84,47 @@ entails shouldGeneralize moduleName context = solve
       return (dictionaryValueToValue dict, unsolved)
       where
       go :: Int -> Constraint -> StateT Context m (DictionaryValue, [(Ident, Constraint)])
-      go work (Constraint className' tys' _) | work > 1000 = throwError . errorMessage $ PossiblyInfiniteInstance className' tys'
-      go work con'@(Constraint className' tys' _) = do
+      go work (Constraint conTy _) | work > 1000 = throwError . errorMessage $ PossiblyInfiniteInstance conTy
+      go work con'@(Constraint conTy _) = do
+        let (conHd, conTys) = stripTypeArguments [] conTy
+
+            unique :: [(a, TypeClassDictionaryInScope)] -> m (Either (a, TypeClassDictionaryInScope) Constraint)
+            unique [] | shouldGeneralize && all canBeGeneralized conTys = return (Right con')
+                      | otherwise = throwError . errorMessage $ NoInstanceFound con'
+            unique [a] = return $ Left a
+            unique tcds | pairwise overlapping (map snd tcds) = do
+                            tell . errorMessage $ OverlappingInstances conTy (map (tcdName . snd) tcds)
+                            return $ Left (head tcds)
+                        | otherwise = return $ Left (minimumBy (compare `on` length . tcdPath . snd) tcds)
+
         -- Get the inferred constraint context so far, and merge it with the global context
         inferred <- get
         let instances = do
-              tcd <- forClassName (combineContexts context inferred) className' tys'
+              tcd <- forClassName (combineContexts context inferred) conHd conTys
               -- Make sure the type unifies with the type in the type instance definition
-              subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName) tys' (tcdInstanceTypes tcd)
+              subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName) conTys (tcdInstanceTypes tcd)
               return (subst, tcd)
         solution <- lift $ unique instances
         case solution of
           Left (subst, tcd) -> do
             -- Solve any necessary subgoals
             (args, unsolved) <- solveSubgoals subst (tcdDependencies tcd)
-            let match = foldr (\(superclassName, index) dict -> SubclassDictionaryValue dict superclassName index)
+            let match = foldr (flip SubclassDictionaryValue)
                               (mkDictionary (tcdName tcd) args)
                               (tcdPath tcd)
             return (match, unsolved)
-          Right unsolved@(Constraint unsolvedClassName@(Qualified _ pn) unsolvedTys _) -> do
+          Right unsolved@(Constraint unsolvedType _) -> do
+            let (unsolvedHead, unsolvedTys) = stripTypeArguments [] unsolvedType
             -- Generate a fresh name for the unsolved constraint's new dictionary
-            ident <- freshIdent ("dict" ++ runProperName pn)
+            ident <- freshIdent "dict"
             let qident = Qualified Nothing ident
             -- Store the new dictionary in the Context so that we can solve this goal in
             -- future.
-            let newDict = TypeClassDictionaryInScope qident [] unsolvedClassName unsolvedTys Nothing
-                newContext = M.singleton Nothing (M.singleton unsolvedClassName (M.singleton qident newDict))
+            let newDict = TypeClassDictionaryInScope qident [] unsolvedHead unsolvedTys Nothing
+                newContext = M.singleton Nothing (M.singleton unsolvedHead (M.singleton qident newDict))
             modify (combineContexts newContext)
             return (LocalDictionaryValue qident, [(ident, unsolved)])
         where
-
-        unique :: [(a, TypeClassDictionaryInScope)] -> m (Either (a, TypeClassDictionaryInScope) Constraint)
-        unique [] | shouldGeneralize && all canBeGeneralized tys' = return (Right con')
-                  | otherwise = throwError . errorMessage $ NoInstanceFound con'
-        unique [a] = return $ Left a
-        unique tcds | pairwise overlapping (map snd tcds) = do
-                        tell . errorMessage $ OverlappingInstances className' tys' (map (tcdName . snd) tcds)
-                        return $ Left (head tcds)
-                    | otherwise = return $ Left (minimumBy (compare `on` length . tcdPath . snd) tcds)
 
         canBeGeneralized :: Type -> Bool
         canBeGeneralized TUnknown{} = True
@@ -143,12 +146,15 @@ entails shouldGeneralize moduleName context = solve
         -- Create dictionaries for subgoals which still need to be solved by calling go recursively
         -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
         -- unifies with Either a b, and we can satisfy the subgoals Show a and Show b recursively.
-        solveSubgoals :: [(String, Type)] -> Maybe [Constraint] -> StateT Context m (Maybe [DictionaryValue], [(Ident, Constraint)])
+        solveSubgoals :: [(String, Type)] -> Maybe [(Qualified (ProperName 'ClassName), [Type])] -> StateT Context m (Maybe [DictionaryValue], [(Ident, Constraint)])
         solveSubgoals _ Nothing = return (Nothing, [])
         solveSubgoals subst (Just subgoals) = do
-          zipped <- traverse (go (work + 1) . mapConstraintArgs (map (replaceAllTypeVars subst))) subgoals
-          let (dicts, unsolved) = unzip zipped
-          return (Just dicts, concat unsolved)
+            zipped <- traverse (go (work + 1) . toConstraint . second (map (replaceAllTypeVars subst))) subgoals
+            let (dicts, unsolved) = unzip zipped
+            return (Just dicts, concat unsolved)
+          where
+            toConstraint :: (Qualified (ProperName 'ClassName), [Type]) -> Constraint
+            toConstraint (hd, tl) = Constraint (foldl TypeApp (TypeConstructor (fmap coerceProperName hd)) tl) Nothing
 
         -- Make a dictionary from subgoal dictionaries by applying the correct function
         mkDictionary :: Qualified Ident -> Maybe [DictionaryValue] -> DictionaryValue
@@ -161,8 +167,8 @@ entails shouldGeneralize moduleName context = solve
       dictionaryValueToValue (LocalDictionaryValue fnName) = Var fnName
       dictionaryValueToValue (GlobalDictionaryValue fnName) = Var fnName
       dictionaryValueToValue (DependentDictionaryValue fnName dicts) = foldl App (Var fnName) (map dictionaryValueToValue dicts)
-      dictionaryValueToValue (SubclassDictionaryValue dict superclassName index) =
-        App (Accessor (C.__superclass_ ++ showQualified runProperName superclassName ++ "_" ++ show index)
+      dictionaryValueToValue (SubclassDictionaryValue dict index) =
+        App (Accessor (C.__superclass_ ++ show index)
                       (dictionaryValueToValue dict))
             valUndefined
       -- Ensure that a substitution is valid

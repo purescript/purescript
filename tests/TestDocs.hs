@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
 {-# LANGUAGE DataKinds #-}
@@ -196,8 +197,10 @@ checkConstrained ty tyClass =
     _ ->
       False
   where
-  matches className =
-    (==) className . P.runProperName . P.disqualify . P.constraintClass
+  matches className (P.Constraint ty' _)
+    | (P.TypeConstructor className', _) <- P.stripTypeArguments [] ty'
+    = className == P.runProperName (P.disqualify className')
+  matches _ _ = False
 
 runAssertionIO :: Assertion -> Docs.Module -> IO ()
 runAssertionIO assertion mdl = do

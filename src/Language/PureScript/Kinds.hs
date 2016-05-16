@@ -6,31 +6,22 @@ import Prelude.Compat
 
 import qualified Data.Aeson.TH as A
 
--- |
--- The data type of kinds
---
+-- | The data type of kinds
 data Kind
-  -- |
-  -- Unification variable of type Kind
-  --
+  -- | Unification variable of type Kind
   = KUnknown Int
-  -- |
-  -- The kind of types
-  --
+  -- | A named kind variable
+  | KindVar String
+  -- | The kind of types
   | Star
-  -- |
-  -- The kind of effects
-  --
+  -- | The kind of effects
   | Bang
-  -- |
-  -- Kinds for labelled, unordered rows without duplicates
-  --
+  -- | The kind of constraints
+  | ConstraintKind
+  -- | Kinds for labelled, unordered rows without duplicates
   | Row Kind
-  -- |
-  -- Function kinds
-  --
-  | FunKind Kind Kind
-  deriving (Show, Read, Eq, Ord)
+  -- | Function kinds
+  | FunKind Kind Kind deriving (Show, Read, Eq, Ord)
 
 $(A.deriveJSON A.defaultOptions ''Kind)
 

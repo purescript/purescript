@@ -168,9 +168,9 @@ renameInModule env imports (Module ss coms mn decls exps) =
   updateDecl (pos, bound) (TypeSynonymDeclaration name ps ty) =
     (,) (pos, bound) <$> (TypeSynonymDeclaration name ps <$> updateTypesEverywhere pos ty)
   updateDecl (pos, bound) (TypeClassDeclaration className args implies ds) =
-    (,) (pos, bound) <$> (TypeClassDeclaration className args <$> updateConstraints pos implies <*> pure ds)
+    (,) (pos, bound) <$> (TypeClassDeclaration className args <$> updateConstraints' pos implies <*> pure ds)
   updateDecl (pos, bound) (TypeInstanceDeclaration name cs cn ts ds) =
-    (,) (pos, bound) <$> (TypeInstanceDeclaration name <$> updateConstraints pos cs <*> updateClassName cn pos <*> traverse (updateTypesEverywhere pos) ts <*> pure ds)
+    (,) (pos, bound) <$> (TypeInstanceDeclaration name <$> updateConstraints' pos cs <*> updateClassName cn pos <*> traverse (updateTypesEverywhere pos) ts <*> pure ds)
   updateDecl (pos, bound) (TypeDeclaration name ty) =
     (,) (pos, bound) <$> (TypeDeclaration name <$> updateTypesEverywhere pos ty)
   updateDecl (pos, bound) (ExternDeclaration name ty) =
@@ -248,10 +248,13 @@ renameInModule env imports (Module ss coms mn decls exps) =
     updateType t = return t
 
   updateConstraints :: Maybe SourceSpan -> [Constraint] -> m [Constraint]
-  updateConstraints pos = traverse (\(Constraint name ts info) ->
-                                       Constraint <$> updateClassName name pos
-                                                  <*> traverse (updateTypesEverywhere pos) ts
-                                                  <*> pure info)
+  updateConstraints pos = traverse (overConstraintType (updateTypesEverywhere pos))
+
+  updateConstraints'
+    :: Maybe SourceSpan
+    -> [(Qualified (ProperName 'ClassName), [Type])]
+    -> m [(Qualified (ProperName 'ClassName), [Type])]
+  updateConstraints' pos = traverse (\(name, ts) -> (,) <$> updateClassName name pos <*> traverse (updateTypesEverywhere pos) ts)
 
   updateTypeName
     :: Qualified (ProperName 'TypeName)

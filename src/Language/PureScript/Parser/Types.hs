@@ -65,18 +65,15 @@ parseTypeAtom = indented *> P.choice
 
 parseConstrainedType :: TokenParser Type
 parseConstrainedType = do
-  constraints <- P.try (return <$> parseConstraint) <|> parens (commaSep1 parseConstraint)
+  constraints <- parens (commaSep1 parseConstraint)
   _ <- rfatArrow
   indented
   ty <- parseType
   return $ ConstrainedType constraints ty
   where
   parseConstraint = do
-    className <- parseQualified properName
-    indented
-    ty <- P.many parseTypeAtom
-    return (Constraint className ty Nothing)
-
+    ty <- parseType
+    return (Constraint ty Nothing)
 
 parseAnyType :: TokenParser Type
 parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTable parseTypeAtom) P.<?> "type"

@@ -4,6 +4,7 @@ module Language.PureScript.Constants where
 import Prelude.Compat
 
 import Language.PureScript.Names
+import Language.PureScript.Types
 
 -- Operators
 
@@ -324,8 +325,8 @@ main = "main"
 partial :: String
 partial = "Partial"
 
-pattern Partial :: Qualified (ProperName 'ClassName)
-pattern Partial = Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Partial")
+pattern Partial :: Type
+pattern Partial = TypeConstructor (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Partial"))
 
 -- Code Generation
 

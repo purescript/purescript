@@ -85,9 +85,9 @@ data SimpleErrorMessage
   | TypesDoNotUnify Type Type
   | KindsDoNotUnify Kind Kind
   | ConstrainedTypeUnified Type Type
-  | OverlappingInstances (Qualified (ProperName 'ClassName)) [Type] [Qualified Ident]
+  | OverlappingInstances Type [Qualified Ident]
   | NoInstanceFound Constraint
-  | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [Type]
+  | PossiblyInfiniteInstance Type
   | CannotDerive (Qualified (ProperName 'ClassName)) [Type]
   | CannotFindDerivingType (ProperName 'TypeName)
   | DuplicateLabel String (Maybe Expr)
@@ -388,9 +388,9 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
   gSimple (CannotApplyFunction t e) = CannotApplyFunction <$> f t <*> pure e
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
-  gSimple (NoInstanceFound con) = NoInstanceFound <$> overConstraintArgs (traverse f) con
-  gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> pure insts
-  gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
+  gSimple (NoInstanceFound con) = NoInstanceFound <$> overConstraintType f con
+  gSimple (OverlappingInstances ty insts) = OverlappingInstances <$> f ty <*> pure insts
+  gSimple (PossiblyInfiniteInstance ty) = PossiblyInfiniteInstance <$> f ty
   gSimple (CannotDerive cl ts) = CannotDerive cl <$> traverse f ts
   gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
   gSimple (OrphanInstance nm cl ts) = OrphanInstance nm cl <$> traverse f ts
@@ -678,11 +678,9 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             , line "with type"
             , indent $ typeAsBox t2
             ]
-    renderSimpleErrorMessage (OverlappingInstances nm ts (d : ds)) =
+    renderSimpleErrorMessage (OverlappingInstances con (d : ds)) =
       paras [ line "Overlapping type class instances found for"
-            , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName nm)
-                                           , Box.vcat Box.left (map typeAtomAsBox ts)
-                                           ]
+            , indent $ typeAsBox con
             , line "The following instances were found:"
             , indent $ paras (line (showQualified showIdent d ++ " (chosen)") : map (line . showQualified showIdent) ds)
             , line "Overlapping type class instances can lead to different behavior based on the order of module imports, and for that reason are not recommended."
@@ -690,7 +688,6 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             ]
     renderSimpleErrorMessage OverlappingInstances{} = internalError "OverlappingInstances: empty instance list"
     renderSimpleErrorMessage (NoInstanceFound (Constraint C.Partial
-                                                          _
                                                           (Just (PartialConstraintData bs b)))) =
       paras [ line "A case expression could not be determined to cover all inputs."
             , line "The following additional cases are required to cover all inputs:\n"
@@ -700,13 +697,11 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
                   : [line "..." | not b]
             , line "Alternatively, add a Partial constraint to the type of the enclosing value."
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint nm ts _)) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint conTy _)) =
       paras [ line "No type class instance was found for"
-            , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName nm)
-                                           , Box.vcat Box.left (map typeAtomAsBox ts)
-                                           ]
+            , indent $ typeAsBox conTy
             , paras [ line "The instance head contains unknown type variables. Consider adding a type annotation."
-                    | any containsUnknowns ts
+                    | containsUnknowns conTy
                     ]
             ]
       where
@@ -715,11 +710,9 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
         where
         go TUnknown{} = True
         go _ = False
-    renderSimpleErrorMessage (PossiblyInfiniteInstance nm ts) =
+    renderSimpleErrorMessage (PossiblyInfiniteInstance con) =
       paras [ line "Type class instance for"
-            , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName nm)
-                                           , Box.vcat Box.left (map typeAtomAsBox ts)
-                                           ]
+            , indent $ typeAsBox con
             , line "is possibly infinite."
             ]
     renderSimpleErrorMessage (CannotDerive nm ts) =

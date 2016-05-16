@@ -41,18 +41,18 @@ data Environment = Environment {
   -- |
   -- Available type class dictionaries
   --
-  , typeClassDictionaries :: M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) TypeClassDictionaryInScope))
+  , typeClassDictionaries :: M.Map (Maybe ModuleName) (M.Map Type (M.Map (Qualified Ident) TypeClassDictionaryInScope))
   -- |
   -- Type classes
   --
-  , typeClasses :: M.Map (Qualified (ProperName 'ClassName)) ([(String, Maybe Kind)], [(Ident, Type)], [Constraint])
+  , typeClasses :: M.Map Type ([(String, Maybe Kind)], [(Ident, Type)], [(Qualified (ProperName 'ClassName), [Type])])
   } deriving (Show, Read)
 
 -- |
 -- The initial environment with no values and only the default javascript types defined
 --
 initEnvironment :: Environment
-initEnvironment = Environment M.empty primTypes M.empty M.empty M.empty primClasses
+initEnvironment = Environment M.empty primTypes M.empty M.empty M.empty (M.mapKeys (TypeConstructor . fmap coerceProperName) primClasses)
 
 -- |
 -- The visibility of a name in scope
@@ -246,10 +246,8 @@ primTypes =
 -- The primitive class map. This just contains to `Partial` class, used as a
 -- kind of magic constraint for partial functions.
 --
-primClasses :: M.Map (Qualified (ProperName 'ClassName)) ([(String, Maybe Kind)], [(Ident, Type)], [Constraint])
-primClasses =
-  M.fromList
-    [ (primName "Partial", ([], [], [])) ]
+primClasses :: M.Map (Qualified (ProperName 'ClassName)) ([(String, Maybe Kind)], [(Ident, Type)], [(Qualified (ProperName 'ClassName), [Type])])
+primClasses = M.singleton (primName "Partial") ([], [], [])
 
 -- |
 -- Finds information about data constructors from the current environment.

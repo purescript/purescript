@@ -37,7 +37,7 @@ checkDuplicateLabels =
     checkDups (TypeApp t1 t2) = checkDups t1 >> checkDups t2
     checkDups (ForAll _ t _) = checkDups t
     checkDups (ConstrainedType args t) = do
-      mapM_ checkDups $ concatMap constraintArgs args
+      mapM_ (checkDups . constraintType) args
       checkDups t
     checkDups r@RCons{} =
       let (ls, _) = rowToList r in

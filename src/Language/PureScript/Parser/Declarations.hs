@@ -186,10 +186,8 @@ parseTypeClassDeclaration = do
     indented *> mark (P.many (same *> positioned parseTypeDeclaration))
   return $ TypeClassDeclaration className idents implies members
 
-parseConstraint :: TokenParser Constraint
-parseConstraint = Constraint <$> parseQualified properName
-                             <*> P.many (noWildcards parseTypeAtom)
-                             <*> pure Nothing
+parseConstraint :: TokenParser (Qualified (ProperName 'ClassName), [Type])
+parseConstraint = (,) <$> parseQualified properName <*> P.many (noWildcards parseTypeAtom)
 
 parseInstanceDeclaration :: TokenParser (TypeInstanceBody -> Declaration)
 parseInstanceDeclaration = do

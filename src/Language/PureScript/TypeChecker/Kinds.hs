@@ -87,6 +87,7 @@ unifyKinds k1 k2 = do
   go k (KUnknown u) = solveKind u k
   go Star Star = return ()
   go Bang Bang = return ()
+  go ConstraintKind ConstraintKind = return ()
   go (Row k1') (Row k2') = go k1' k2'
   go (FunKind k1' k2') (FunKind k3 k4) = do
     go k1' k3
@@ -256,9 +257,9 @@ infer' other = (, []) <$> go other
     unifyKinds k2 (Row k1)
     return $ Row k1
   go (ConstrainedType deps ty) = do
-    forM_ deps $ \(Constraint className tys _) -> do
-      k <- go $ foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
-      unifyKinds k Star
+    forM_ deps $ \(Constraint conTy _) -> do
+      k <- go conTy
+      unifyKinds k ConstraintKind
     k <- go ty
     unifyKinds k Star
     return Star

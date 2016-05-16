@@ -183,7 +183,7 @@ lookupValueDeclaration ::
    MonadReader P.ModuleName m) =>
   P.ModuleName ->
   P.Ident ->
-  m (P.ModuleName, [Either (String, P.Constraint, ChildDeclaration) Declaration])
+  m (P.ModuleName, [Either (String, Constraint, ChildDeclaration) Declaration])
 lookupValueDeclaration importedFrom ident = do
   decls <- lookupModuleDeclarations "lookupValueDeclaration" importedFrom
   let
@@ -321,9 +321,12 @@ lookupModuleDeclarations definedIn moduleName = do
     Just mdl ->
       pure (allDeclarations mdl)
 
+-- To tidy up some type signatures
+type Constraint = (P.Qualified (P.ProperName 'P.ClassName), [P.Type])
+
 handleTypeClassMembers ::
   (MonadReader P.ModuleName m) =>
-  Map P.ModuleName [Either (String, P.Constraint, ChildDeclaration) Declaration] ->
+  Map P.ModuleName [Either (String, Constraint, ChildDeclaration) Declaration] ->
   Map P.ModuleName [Declaration] ->
   m (Map P.ModuleName [Declaration], Map P.ModuleName [Declaration])
 handleTypeClassMembers valsAndMembers typeClasses =
@@ -338,7 +341,7 @@ handleTypeClassMembers valsAndMembers typeClasses =
       |> fmap splitMap
 
 valsAndMembersToEnv ::
-  [Either (String, P.Constraint, ChildDeclaration) Declaration] -> TypeClassEnv
+  [Either (String, Constraint, ChildDeclaration) Declaration] -> TypeClassEnv
 valsAndMembersToEnv xs =
   let (envUnhandledMembers, envValues) = partitionEithers xs
       envTypeClasses = []
@@ -363,7 +366,7 @@ data TypeClassEnv = TypeClassEnv
     -- name of the type class they belong to, and the constraint is used to
     -- make sure that they have the correct type if they get promoted.
     --
-    envUnhandledMembers :: [(String, P.Constraint, ChildDeclaration)]
+    envUnhandledMembers :: [(String, Constraint, ChildDeclaration)]
     -- |
     -- A list of normal value declarations. Type class members will be added to
     -- this list if their parent type class is not available.
@@ -429,8 +432,8 @@ handleEnv TypeClassEnv{..} =
           ("handleEnv: Bad child declaration passed to promoteChild: "
           ++ cdeclTitle)
 
-  addConstraint constraint =
-    P.quantify . P.moveQuantifiersToFront . P.ConstrainedType [constraint]
+  addConstraint (con, tys) =
+    P.quantify . P.moveQuantifiersToFront . P.ConstrainedType [P.Constraint (foldl P.TypeApp (P.TypeConstructor (fmap P.coerceProperName con)) tys) Nothing]
 
 splitMap :: (Ord k) => Map k (v1, v2) -> (Map k v1, Map k v2)
 splitMap = foldl go (Map.empty, Map.empty) . Map.toList
@@ -499,11 +502,11 @@ internalErrorInModule msg = do
 -- If the provided Declaration is a TypeClassDeclaration, construct an
 -- appropriate Constraint for use with the types of its members.
 --
-typeClassConstraintFor :: Declaration -> Maybe P.Constraint
+typeClassConstraintFor :: Declaration -> Maybe Constraint
 typeClassConstraintFor Declaration{..} =
   case declInfo of
     TypeClassDeclaration tyArgs _ ->
-      Just (P.Constraint (P.Qualified Nothing (P.ProperName declTitle)) (mkConstraint tyArgs) Nothing)
+      Just (P.Qualified Nothing (P.ProperName declTitle), mkConstraint tyArgs)
     _ ->
       Nothing
   where
