@@ -26,6 +26,7 @@ import Language.PureScript.Names
 import Language.PureScript.Pretty
 import Language.PureScript.Traversals
 import Language.PureScript.Types
+import Language.PureScript.Pretty.Common (endWith)
 import qualified Language.PureScript.Bundle as Bundle
 import qualified Language.PureScript.Constants as C
 
@@ -460,8 +461,8 @@ showSuggestion suggestion = case errorSuggestion suggestion of
 markCode :: String -> String
 markCode c = "`" ++ c ++ "`"
 
-withBoxBackTicks :: Box.Box -> Box.Box
-withBoxBackTicks b = Box.text "`" Box.<> b Box.<> Box.text "`"
+markCodeBox :: Box.Box -> Box.Box
+markCodeBox b = Box.text "`" Box.<> b `endWith` Box.text "`"
 
 -- |
 -- Pretty print a single error, simplifying if necessary
@@ -929,16 +930,16 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
     renderHint (ErrorUnifyingTypes t1 t2) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ line "while trying to match type"
-                                 , withBoxBackTicks $ typeAsBox t1
+                                 , markCodeBox $ typeAsBox t1
                                  ]
             , Box.moveRight 2 $ Box.hsep 1 Box.top [ line "with type"
-                                                   , withBoxBackTicks $ typeAsBox t2
+                                                   , markCodeBox $ typeAsBox t2
                                                    ]
             ]
     renderHint (ErrorInExpression expr) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ Box.text "in the expression"
-                                 , withBoxBackTicks $ prettyPrintValue valueDepth expr
+                                 , markCodeBox $ prettyPrintValue valueDepth expr
                                  ]
             ]
     renderHint (ErrorInModule mn) detail =
@@ -948,23 +949,23 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
     renderHint (ErrorInSubsumption t1 t2) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ line "while checking that type"
-                                 , withBoxBackTicks $ typeAsBox t1
+                                 , markCodeBox $ typeAsBox t1
                                  ]
             , Box.moveRight 2 $ Box.hsep 1 Box.top [ line "is at least as general as type"
-                                                   , withBoxBackTicks $ typeAsBox t2
+                                                   , markCodeBox $ typeAsBox t2
                                                    ]
             ]
     renderHint (ErrorInInstance nm ts) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ line "in type class instance"
-                                 , withBoxBackTicks $ line (showQualified runProperName nm)
-                                 , Box.vcat Box.left (map (withBoxBackTicks . typeAtomAsBox) ts)
+                                 , markCodeBox $ line (showQualified runProperName nm)
+                                 , Box.vcat Box.left (map (markCodeBox . typeAtomAsBox) ts)
                                  ]
             ]
     renderHint (ErrorCheckingKind ty) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ line "while checking the kind of"
-                                 , withBoxBackTicks $ typeAsBox ty
+                                 , markCodeBox $ typeAsBox ty
                                  ]
             ]
     renderHint ErrorCheckingGuard detail =
@@ -974,34 +975,34 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
     renderHint (ErrorInferringType expr) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ line "while inferring the type of"
-                                 , withBoxBackTicks $ prettyPrintValue valueDepth expr
+                                 , markCodeBox $ prettyPrintValue valueDepth expr
                                  ]
             ]
     renderHint (ErrorCheckingType expr ty) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ line "while checking that expression"
-                                 , withBoxBackTicks $ prettyPrintValue valueDepth expr
+                                 , markCodeBox $ prettyPrintValue valueDepth expr
                                  ]
             , Box.moveRight 2 $ Box.hsep 1 Box.top [ line "has type"
-                                                   , withBoxBackTicks $ typeAsBox ty
+                                                   , markCodeBox $ typeAsBox ty
                                                    ]
             ]
     renderHint (ErrorCheckingAccessor expr prop) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ line "while checking type of property accessor"
-                                 , withBoxBackTicks $ prettyPrintValue valueDepth (Accessor prop expr)
+                                 , markCodeBox $ prettyPrintValue valueDepth (Accessor prop expr)
                                  ]
             ]
     renderHint (ErrorInApplication f t a) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ line "while applying a function"
-                                 , withBoxBackTicks $ prettyPrintValue valueDepth f
+                                 , markCodeBox $ prettyPrintValue valueDepth f
                                  ]
             , Box.moveRight 2 $ Box.hsep 1 Box.top [ line "of type"
-                                                   , withBoxBackTicks $ typeAsBox t
+                                                   , markCodeBox $ typeAsBox t
                                                    ]
             , Box.moveRight 2 $ Box.hsep 1 Box.top [ line "to argument"
-                                                   , withBoxBackTicks $ prettyPrintValue valueDepth a
+                                                   , markCodeBox $ prettyPrintValue valueDepth a
                                                    ]
             ]
     renderHint (ErrorInDataConstructor nm) detail =
