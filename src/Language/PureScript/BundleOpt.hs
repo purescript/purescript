@@ -69,7 +69,7 @@ uncurryFunc modules entryPoints =
     let (modulesWithUncurried,funcCollector) = foldr generateUncurried ([],emptyCollector) modules
     -- add exports for uncurried functions
         (modulesWithExports,funcCollector2)  = foldr (generateUncurriedExports entryPoints) ([],funcCollector) modulesWithUncurried
-    -- replace satured calls to calls to uncurried functions
+    -- replace saturated calls to calls to uncurried functions
         (modulesWithCalls, _funcCollector3)    = -- trace ("Uncurry Stats: " ++ (show (stats funcCollector2))) $
                                                 foldr generateSaturedCalls ([],funcCollector2) modulesWithExports
 
@@ -213,7 +213,7 @@ generateUncurriedEx _mid t (eles, funcCollector) =
 
 -- * Call replacement
 
--- | replace satured calls to calls to uncurried functions
+-- | replace saturated calls to calls to uncurried functions
 generateSaturedCalls :: Module -> ([Module],FuncCollector) -> ([Module],FuncCollector)
 generateSaturedCalls (Module moduleIdentifier moduleElements) (modules, funcCollector) =
     {- trace ("generateSaturedCalls: " ++ show moduleIdentifier) $ -}

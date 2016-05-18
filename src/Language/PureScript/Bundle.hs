@@ -15,10 +15,6 @@
 -- and generates the final Javascript bundle.
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE PatternGuards #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
 
 module Language.PureScript.Bundle (
      bundle
@@ -33,7 +29,7 @@ module Language.PureScript.Bundle (
 import Prelude.Compat
 
 import Data.List (nub, stripPrefix)
-import Data.Maybe (mapMaybe, catMaybes, fromMaybe)
+import Data.Maybe (mapMaybe, catMaybes)
 import Data.Generics (everything, everywhere, mkQ, mkT)
 import Data.Graph
 import Data.Version (showVersion)
