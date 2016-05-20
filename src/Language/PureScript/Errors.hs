@@ -462,7 +462,9 @@ markCode :: String -> String
 markCode c = "`" ++ c ++ "`"
 
 markCodeBox :: Box.Box -> Box.Box
-markCodeBox b = Box.text "`" Box.<> b `endWith` Box.text "`"
+markCodeBox b
+  | Box.rows b == 1 = Box.text "`" Box.<> b `endWith` Box.text "`"
+  | otherwise = b
 
 -- |
 -- Pretty print a single error, simplifying if necessary
