@@ -14,6 +14,7 @@ import Control.Applicative
 import Control.Arrow (first, second)
 import Control.Monad (unless)
 import Control.Monad.Writer.Class
+import Control.Monad.Supply.Class (MonadSupply, fresh, freshName)
 
 import Data.Function (on)
 import Data.List (foldl', sortBy, nub)
@@ -45,7 +46,7 @@ data RedundancyError = Incomplete | Unknown
 -- Qualifies a propername from a given qualified propername and a default module name
 --
 qualifyName
-  :: (ProperName a)
+  :: ProperName a
   -> ModuleName
   -> Qualified (ProperName b)
   -> Qualified (ProperName a)
@@ -231,7 +232,7 @@ missingAlternative env mn ca uncovered
 --
 checkExhaustive
   :: forall m
-   . (MonadWriter MultipleErrors m)
+   . (MonadWriter MultipleErrors m, MonadSupply m)
    => Environment
    -> ModuleName
    -> Int
@@ -262,7 +263,7 @@ checkExhaustive env mn numArgs cas expr = makeResult . first nub $ foldl' step (
          _ -> return ()
        if null bss
          then return expr
-         else return (addPartialConstraint (second null (splitAt 5 bss)) expr)
+         else addPartialConstraint (second null (splitAt 5 bss)) expr
     where
       tellRedundant = tell . errorMessage . uncurry OverlappingPattern . second null . splitAt 5 $ bss'
       tellIncomplete = tell . errorMessage $ IncompleteExhaustivityCheck
@@ -273,34 +274,42 @@ checkExhaustive env mn numArgs cas expr = makeResult . first nub $ foldl' step (
   --
   -- The binder information is provided so that it can be embedded in the constraint,
   -- and then included in the error message.
-  addPartialConstraint :: ([[Binder]], Bool) -> Expr -> Expr
-  addPartialConstraint (bss, complete) e =
-      Let [ partial ] (App (Var (Qualified Nothing (Ident C.__unused))) e)
+  addPartialConstraint :: MonadSupply m => ([[Binder]], Bool) -> Expr -> m Expr
+  addPartialConstraint (bss, complete) e = do
+    tyVar <- ("p" ++) . show <$> fresh
+    var <- freshName
+    return $
+      Let
+        [ partial var tyVar ]
+        $ App (Var (Qualified Nothing (Ident C.__unused))) e
     where
-      partial :: Declaration
-      partial = ValueDeclaration (Ident C.__unused)
-                                 Private
-                                 []
-                                 (Right (TypedValue True (Abs (Left (Ident "x"))
-                                                              (Var (Qualified Nothing (Ident "x"))))
-                                                         ty))
+      partial :: String -> String -> Declaration
+      partial var tyVar =
+        ValueDeclaration (Ident C.__unused) Private [] $ Right $
+          TypedValue
+            True
+            (Abs (Left (Ident var)) (Var (Qualified Nothing (Ident var))))
+            (ty tyVar)
 
-      ty :: Type
-      ty = ForAll "a" (ConstrainedType [ Constraint (Qualified (Just (ModuleName [ProperName C.prim]))
-                                                               (ProperName "Partial"))
-                                                    []
-                                                    (Just (PartialConstraintData (map (map prettyPrintBinderAtom) bss) complete))
-                                       ]
-                                       (TypeApp (TypeApp tyFunction (TypeVar "a"))
-                                                (TypeVar "a")))
-                      Nothing
+      ty :: String -> Type
+      ty tyVar =
+        ForAll tyVar
+          ( ConstrainedType
+              [ Constraint C.Partial [] (Just constraintData) ]
+              $ TypeApp (TypeApp tyFunction (TypeVar tyVar)) (TypeVar tyVar)
+          )
+          Nothing
+
+      constraintData :: ConstraintData
+      constraintData =
+        PartialConstraintData (map (map prettyPrintBinderAtom) bss) complete
 
 -- |
 -- Exhaustivity checking
 --
 checkExhaustiveExpr
   :: forall m
-   . MonadWriter MultipleErrors m
+   . (MonadWriter MultipleErrors m, MonadSupply m)
    => Environment
    -> ModuleName
    -> Expr
