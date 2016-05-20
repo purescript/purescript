@@ -213,7 +213,15 @@ lintImportDecl env mni qualifierName names declType allowImplicit =
   checkImplicit warning =
     if null allRefs
     then unused
-    else warn (warning mni allRefs)
+    else warn (warning mni (map simplifyTypeRef allRefs))
+    where
+    -- Replace explicit type refs with data constructor lists from listing the
+    -- used constructors explicity `T(X, Y, [...])` to `T(..)` for suggestion
+    -- message.
+    simplifyTypeRef :: DeclarationRef -> DeclarationRef
+    simplifyTypeRef (TypeRef name (Just dctors))
+      | not (null dctors) = TypeRef name Nothing
+    simplifyTypeRef other = other
 
   checkExplicit
     :: [DeclarationRef]
