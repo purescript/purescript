@@ -111,7 +111,7 @@ desugarImportsWithEnv externs modules = do
     warnAndRethrow (addHint (ErrorInModule mn)) $ do
       let (_, imps, exps) = fromMaybe (internalError "Module is missing in renameInModule'") $ M.lookup mn env
       (m', used) <- flip runStateT M.empty $ renameInModule env imps (elaborateExports exps m)
-      lintImports m env used
+      lintImports m' env used
       return m'
 
 -- |

@@ -27,7 +27,7 @@ import qualified Language.PureScript as P
 
 import Data.Char (isSpace)
 import Data.Function (on)
-import Data.List (sort, stripPrefix, intercalate, groupBy, sortBy)
+import Data.List (sort, stripPrefix, intercalate, groupBy, sortBy, minimumBy)
 import Data.Maybe (mapMaybe)
 import Data.Time.Clock (UTCTime())
 import Data.Tuple (swap)
@@ -58,31 +58,40 @@ main = hspec spec
 spec :: Spec
 spec = do
 
-  (supportExterns, passingTestCases, failingTestCases) <- runIO $ do
+  (supportExterns, passingTestCases, warningTestCases, failingTestCases) <- runIO $ do
     cwd <- getCurrentDirectory
     let passing = cwd </> "examples" </> "passing"
+    let warning = cwd </> "examples" </> "warning"
     let failing = cwd </> "examples" </> "failing"
     let supportDir = cwd </> "tests" </> "support" </> "bower_components"
     let supportFiles ext = Glob.globDir1 (Glob.compile ("purescript-*/**/*." ++ ext)) supportDir
     passingFiles <- getTestFiles passing <$> testGlob passing
+    warningFiles <- getTestFiles warning <$> testGlob warning
     failingFiles <- getTestFiles failing <$> testGlob failing
     supportPurs <- supportFiles "purs"
     supportPursFiles <- readInput supportPurs
     supportExterns <- runExceptT $ do
       modules <- ExceptT . return $ P.parseModulesFromFiles id supportPursFiles
       foreigns <- inferForeignModules modules
-      externs <- ExceptT . runTest $ P.make (makeActions foreigns) (map snd modules)
+      externs <- ExceptT . fmap fst . runTest $ P.make (makeActions foreigns) (map snd modules)
       return (zip (map snd modules) externs)
     case supportExterns of
       Left errs -> fail (P.prettyPrintMultipleErrors False errs)
-      Right externs -> return (externs, passingFiles, failingFiles)
+      Right externs -> return (externs, passingFiles, warningFiles, failingFiles)
 
-  context ("Passing examples") $ do
+  context "Passing examples" $
     forM_ passingTestCases $ \testPurs ->
       it ("'" <> takeFileName (getTestMain testPurs) <> "' should compile and run without error") $
         assertCompiles supportExterns testPurs
 
-  context ("Failing examples") $ do
+  context "Warning examples" $
+    forM_ warningTestCases $ \testPurs -> do
+      let mainPath = getTestMain testPurs
+      expectedWarnings <- runIO $ getShouldWarnWith mainPath
+      it ("'" <> takeFileName mainPath <> "' should compile with warning(s) '" <> intercalate "', '" expectedWarnings <> "'") $
+        assertCompilesWithWarnings supportExterns testPurs expectedWarnings
+
+  context "Failing examples" $
     forM_ failingTestCases $ \testPurs -> do
       let mainPath = getTestMain testPurs
       expectedFailures <- runIO $ getShouldFailWith mainPath
@@ -100,8 +109,7 @@ spec = do
   -- .purs files and the .js files for the test case.
   getTestFiles :: FilePath -> [FilePath] -> [[FilePath]]
   getTestFiles baseDir
-    = map (filter ((== ".purs") . takeExtensions))
-    . map (map (baseDir </>))
+    = map (filter ((== ".purs") . takeExtensions) . map (baseDir </>))
     . groupBy ((==) `on` extractPrefix)
     . sortBy (compare `on` extractPrefix)
     . map (makeRelative baseDir)
@@ -110,7 +118,7 @@ spec = do
   -- by the file with the shortest path name, as everything but the main file
   -- will be under a subdirectory.
   getTestMain :: [FilePath] -> FilePath
-  getTestMain = head . sortBy (compare `on` length)
+  getTestMain = minimumBy (compare `on` length)
 
   -- Extracts the filename part of a .purs file, or if the file is in a
   -- subdirectory, the first part of that directory path.
@@ -125,9 +133,17 @@ spec = do
   -- Scans a file for @shouldFailWith directives in the comments, used to
   -- determine expected failures
   getShouldFailWith :: FilePath -> IO [String]
-  getShouldFailWith = fmap extractFailWiths . readUTF8File
+  getShouldFailWith = extractPragma "shouldFailWith"
+
+  -- Scans a file for @shouldWarnWith directives in the comments, used to
+  -- determine expected warnings
+  getShouldWarnWith :: FilePath -> IO [String]
+  getShouldWarnWith = extractPragma "shouldWarnWith"
+
+  extractPragma :: String -> FilePath -> IO [String]
+  extractPragma pragma = fmap go . readUTF8File
     where
-    extractFailWiths = lines >>> mapMaybe (stripPrefix "-- @shouldFailWith ") >>> map trim
+    go = lines >>> mapMaybe (stripPrefix ("-- @" ++ pragma ++ " ")) >>> map trim
 
 inferForeignModules
   :: MonadIO m
@@ -168,16 +184,14 @@ readInput inputFiles = forM inputFiles $ \inputFile -> do
   text <- readUTF8File inputFile
   return (inputFile, text)
 
-type TestM = WriterT [(FilePath, String)] IO
-
-runTest :: P.Make a -> IO (Either P.MultipleErrors a)
-runTest = fmap fst . P.runMake P.defaultOptions
+runTest :: P.Make a -> IO (Either P.MultipleErrors a, P.MultipleErrors)
+runTest = P.runMake P.defaultOptions
 
 compile
   :: [(P.Module, P.ExternsFile)]
   -> [FilePath]
   -> ([P.Module] -> IO ())
-  -> IO (Either P.MultipleErrors [P.ExternsFile])
+  -> IO (Either P.MultipleErrors [P.ExternsFile], P.MultipleErrors)
 compile supportExterns inputFiles check = silence $ runTest $ do
   fs <- liftIO $ readInput inputFiles
   ms <- P.parseModulesFromFiles id fs
@@ -192,18 +206,30 @@ assert
   :: [(P.Module, P.ExternsFile)]
   -> [FilePath]
   -> ([P.Module] -> IO ())
-  -> (Either P.MultipleErrors [P.ExternsFile] -> IO (Maybe String))
+  -> (Either P.MultipleErrors P.MultipleErrors -> IO (Maybe String))
   -> Expectation
 assert supportExterns inputFiles check f = do
-  e <- compile supportExterns inputFiles check
-  maybeErr <- f e
+  (e, w) <- compile supportExterns inputFiles check
+  maybeErr <- f (const w <$> e)
   maybe (return ()) expectationFailure maybeErr
+
+checkMain :: [P.Module] -> IO ()
+checkMain ms =
+  unless (any ((== P.moduleNameFromString "Main") . P.getModuleName) ms)
+    (fail "Main module missing")
+
+checkShouldFailWith :: [String] -> P.MultipleErrors -> Maybe String
+checkShouldFailWith expected errs =
+  let actual = map P.errorCode $ P.runMultipleErrors errs
+  in if sort expected == sort actual
+    then Nothing
+    else Just $ "Expected these errors: " ++ show expected ++ ", but got these: " ++ show actual
 
 assertCompiles
   :: [(P.Module, P.ExternsFile)]
   -> [FilePath]
   -> Expectation
-assertCompiles supportExterns inputFiles = do
+assertCompiles supportExterns inputFiles =
   assert supportExterns inputFiles checkMain $ \e ->
     case e of
       Left errs -> return . Just . P.prettyPrintMultipleErrors False $ errs
@@ -219,17 +245,32 @@ assertCompiles supportExterns inputFiles = do
             | otherwise -> return $ Just $ "Test did not finish with 'Done':\n\n" <> out
           Just (ExitFailure _, _, err) -> return $ Just err
           Nothing -> return $ Just "Couldn't find node.js executable"
+
+assertCompilesWithWarnings
+  :: [(P.Module, P.ExternsFile)]
+  -> [FilePath]
+  -> [String]
+  -> Expectation
+assertCompilesWithWarnings supportExterns inputFiles shouldWarnWith =
+  assert supportExterns inputFiles checkMain $ \e ->
+    case e of
+      Left errs ->
+        return . Just . P.prettyPrintMultipleErrors False $ errs
+      Right warnings ->
+        return
+          . fmap (printAllWarnings warnings)
+          $ checkShouldFailWith shouldWarnWith warnings
+
   where
-  checkMain ms =
-    unless (any ((== P.moduleNameFromString "Main") . P.getModuleName) ms)
-      (fail "Main module missing")
+  printAllWarnings warnings =
+    (<> "\n\n" <> P.prettyPrintMultipleErrors False warnings)
 
 assertDoesNotCompile
   :: [(P.Module, P.ExternsFile)]
   -> [FilePath]
   -> [String]
   -> Expectation
-assertDoesNotCompile supportExterns inputFiles shouldFailWith = do
+assertDoesNotCompile supportExterns inputFiles shouldFailWith =
   assert supportExterns inputFiles noPreCheck $ \e ->
     case e of
       Left errs ->
@@ -243,9 +284,3 @@ assertDoesNotCompile supportExterns inputFiles shouldFailWith = do
 
   where
   noPreCheck = const (return ())
-
-  checkShouldFailWith expected errs =
-    let actual = map P.errorCode $ P.runMultipleErrors errs
-    in if sort expected == sort actual
-      then Nothing
-      else Just $ "Expected these errors: " ++ show expected ++ ", but got these: " ++ show actual
