@@ -43,15 +43,17 @@ warnDuplicateRefs pos toError refs = do
   -- referenced type is used in the duplicate check - constructors are handled
   -- separately
   deleteCtors :: DeclarationRef -> DeclarationRef
+  deleteCtors (PositionedDeclarationRef ss com ref) =
+    PositionedDeclarationRef ss com (deleteCtors ref)
   deleteCtors (TypeRef pn _) = TypeRef pn Nothing
   deleteCtors other = other
 
   -- Extracts the names of duplicate constructor references from TypeRefs.
   extractCtors :: SourceSpan -> DeclarationRef -> Maybe [(SourceSpan, Name)]
+  extractCtors _ (PositionedDeclarationRef pos' _ ref) = extractCtors pos' ref
   extractCtors pos' (TypeRef _ (Just dctors)) =
     let dupes = dctors \\ nub dctors
     in if null dupes then Nothing else Just $ ((pos',) . DctorName) <$> dupes
-  extractCtors _ (PositionedDeclarationRef pos' _ ref) = extractCtors pos' ref
   extractCtors _ _ = Nothing
 
   -- Converts a DeclarationRef into a name for an error message.

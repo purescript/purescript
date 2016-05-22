@@ -26,7 +26,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Function (on)
-import Data.List (groupBy, sortBy, nub, delete)
+import Data.List (groupBy, sortBy, delete)
 import Data.Maybe (fromJust, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -92,7 +92,9 @@ data Imports = Imports
   --
   , importedValueOps :: ImportMap (OpName 'ValueOpName)
   -- |
-  -- The modules that have been imported into the current scope.
+  -- The name of modules that have been imported into the current scope that
+  -- can be re-exported. If a module is imported with `as` qualification, the
+  -- `as` name appears here, otherwise the original name.
   --
   , importedModules :: S.Set ModuleName
   -- |
@@ -114,37 +116,34 @@ nullImports = Imports M.empty M.empty M.empty M.empty M.empty M.empty S.empty S.
 data Exports = Exports
   {
   -- |
-  -- The types exported from each module along with the module they originally
-  -- came from.
+  -- The exported types along with the module they originally came from.
   --
-    exportedTypes :: [((ProperName 'TypeName, [ProperName 'ConstructorName]), ModuleName)]
+    exportedTypes :: M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ModuleName)
   -- |
-  -- The type operators exported from each module along with the module they
-  -- originally came from.
+  -- The exported type operators along with the module they originally came
+  -- from.
   --
-  , exportedTypeOps :: [(OpName 'TypeOpName, ModuleName)]
+  , exportedTypeOps :: M.Map (OpName 'TypeOpName) ModuleName
   -- |
-  -- The classes exported from each module along with the module they originally
-  -- came from.
+  -- The exported classes along with the module they originally came from.
   --
-  , exportedTypeClasses :: [(ProperName 'ClassName, ModuleName)]
+  , exportedTypeClasses :: M.Map (ProperName 'ClassName) ModuleName
   -- |
-  -- The values exported from each module along with the module they originally
-  -- came from.
+  -- The exported values along with the module they originally came from.
   --
-  , exportedValues :: [(Ident, ModuleName)]
+  , exportedValues :: M.Map Ident ModuleName
   -- |
-  -- The value operators exported from each module along with the module they
-  -- originally came from.
+  -- The exported value operators along with the module they originally came
+  -- from.
   --
-  , exportedValueOps :: [(OpName 'ValueOpName, ModuleName)]
+  , exportedValueOps :: M.Map (OpName 'ValueOpName) ModuleName
   } deriving (Show, Read)
 
 -- |
 -- An empty 'Exports' value.
 --
 nullExports :: Exports
-nullExports = Exports [] [] [] [] []
+nullExports = Exports M.empty M.empty M.empty M.empty M.empty
 
 -- |
 -- The imports and exports for a collection of modules. The 'SourceSpan' is used
@@ -177,11 +176,11 @@ envModuleExports (_, _, exps) = exps
 primExports :: Exports
 primExports =
   nullExports
-    { exportedTypes = mkTypeEntry `map` M.keys primTypes
-    , exportedTypeClasses = mkClassEntry `map` M.keys primClasses
+    { exportedTypes = M.fromList $ mkTypeEntry `map` M.keys primTypes
+    , exportedTypeClasses = M.fromList $ mkClassEntry `map` M.keys primClasses
     }
   where
-  mkTypeEntry (Qualified mn name) = ((name, []), fromJust mn)
+  mkTypeEntry (Qualified mn name) = (name, ([], fromJust mn))
   mkClassEntry (Qualified mn name) = (name, fromJust mn)
 
 -- | Environment which only contains the Prim module.
@@ -202,20 +201,21 @@ exportType
   -> ModuleName
   -> m Exports
 exportType exps name dctors mn = do
-  let exTypes' = exportedTypes exps
-  let exTypes = filter ((/= mn) . snd) exTypes'
-  let exDctors = (snd . fst) `concatMap` exTypes
+  let exTypes = exportedTypes exps
   let exClasses = exportedTypeClasses exps
-  when (any ((== name) . fst . fst) exTypes) $
-    throwConflictError ConflictingTypeDecls name
-  when (any ((== coerceProperName name) . fst) exClasses) $
+  case name `M.lookup` exTypes of
+    Just (_, mn') | mn /= mn' -> throwConflictError ConflictingTypeDecls name
+    _ -> return ()
+  when (coerceProperName name `M.member` exClasses) $
     throwConflictError TypeConflictsWithClass name
   forM_ dctors $ \dctor -> do
-    when (dctor `elem` exDctors) $
+    when (dctorExists (coerceProperName dctor) `any` exTypes) $
       throwConflictError ConflictingCtorDecls dctor
-    when (any ((== coerceProperName dctor) . fst) exClasses) $
+    when (coerceProperName dctor `M.member` exClasses) $
       throwConflictError CtorConflictsWithClass dctor
-  return $ exps { exportedTypes = nub $ ((name, dctors), mn) : exTypes' }
+  return $ exps { exportedTypes = M.insert name (dctors, mn) exTypes }
+  where
+  dctorExists dctor (dctors', mn') = mn /= mn' && elem dctor dctors'
 
 -- |
 -- Safely adds a type operator to some exports, returning an error if a
@@ -242,10 +242,9 @@ exportTypeClass
   -> m Exports
 exportTypeClass exps name mn = do
   let exTypes = exportedTypes exps
-  let exDctors = (snd . fst) `concatMap` exTypes
-  when (any ((== coerceProperName name) . fst . fst) exTypes) $
+  when (coerceProperName name `M.member` exTypes) $
     throwConflictError ClassConflictsWithType name
-  when (coerceProperName name `elem` exDctors) $
+  when ((elem (coerceProperName name) . fst) `any` exTypes) $
     throwConflictError ClassConflictsWithCtor name
   classes <- addExport DuplicateClassExport name mn (exportedTypeClasses exps)
   return $ exps { exportedTypeClasses = classes }
@@ -282,16 +281,19 @@ exportValueOp exps op mn = do
 -- case an error is returned.
 --
 addExport
-  :: (MonadError MultipleErrors m, Eq a)
+  :: (MonadError MultipleErrors m, Ord a)
   => (a -> SimpleErrorMessage)
   -> a
   -> ModuleName
-  -> [(a, ModuleName)]
-  -> m [(a, ModuleName)]
+  -> M.Map a ModuleName
+  -> m (M.Map a ModuleName)
 addExport what name mn exports =
-  if any (\(name', mn') -> name == name' && mn /= mn') exports
-  then throwConflictError what name
-  else return $ nub $ (name, mn) : exports
+  case M.lookup name exports of
+    Just mn'
+      | mn == mn' -> return exports
+      | otherwise -> throwConflictError what name
+    Nothing ->
+      return $ M.insert name mn exports
 
 -- |
 -- Raises an error for when there is more than one definition for something.

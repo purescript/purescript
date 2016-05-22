@@ -1,46 +1,40 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 
 module Main where
 
-import Control.Applicative
-import Control.Monad
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Writer.Strict
+import           Control.Applicative
+import           Control.Monad
+import           Control.Monad.Writer.Strict
 
-import Data.List (isSuffixOf, partition)
-import Data.Version (showVersion)
-import qualified Data.Map as M
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.UTF8 as BU8
-
-import Options.Applicative as Opts
-
-import System.Exit (exitSuccess, exitFailure)
-import System.IO (hSetEncoding, hPutStrLn, stdout, stderr, utf8)
-import System.IO.UTF8
-import System.FilePath.Glob (glob)
+import qualified Data.Map as M
+import           Data.Version (showVersion)
 
 import qualified Language.PureScript as P
+import           Language.PureScript.Errors.JSON
+import           Language.PureScript.Make
+
+import           Options.Applicative as Opts
+
 import qualified Paths_purescript as Paths
 
-import Language.PureScript.Make
-import Language.PureScript.Errors.JSON
+import           System.Exit (exitSuccess, exitFailure)
+import           System.FilePath.Glob (glob)
+import           System.IO (hSetEncoding, hPutStrLn, stdout, stderr, utf8)
+import           System.IO.UTF8
 
 data PSCMakeOptions = PSCMakeOptions
   { pscmInput        :: [FilePath]
-  , pscmForeignInput :: [FilePath]
   , pscmOutputDir    :: FilePath
   , pscmOpts         :: P.Options
   , pscmUsePrefix    :: Bool
   , pscmJSONErrors   :: Bool
-  }
-
-data InputOptions = InputOptions
-  { ioInputFiles  :: [FilePath]
   }
 
 -- | Argumnets: verbose, use JSON, warnings, errors
@@ -65,14 +59,12 @@ compile PSCMakeOptions{..} = do
   when (null input && not pscmJSONErrors) $ do
     hPutStrLn stderr "psc: No input files."
     exitFailure
-  let (jsFiles, pursFiles) = partition (isSuffixOf ".js") input
-  moduleFiles <- readInput (InputOptions pursFiles)
-  inputForeign <- globWarningOnMisses (unless pscmJSONErrors . warnFileTypeNotFound) pscmForeignInput
-  foreignFiles <- forM (inputForeign ++ jsFiles) (\inFile -> (inFile,) <$> readUTF8File inFile)
+  moduleFiles <- readInput input
   (makeErrors, makeWarnings) <- runMake pscmOpts $ do
-    (ms, foreigns) <- parseInputs moduleFiles foreignFiles
-    let filePathMap = M.fromList $ map (\(fp, P.Module _ _ mn _ _) -> (mn, fp)) ms
-        makeActions = buildMakeActions pscmOutputDir filePathMap foreigns pscmUsePrefix
+    ms <- P.parseModulesFromFiles id moduleFiles
+    let filePathMap = M.fromList $ map (\(fp, P.Module _ _ mn _ _) -> (mn, Right fp)) ms
+    foreigns <- inferForeignModules filePathMap
+    let makeActions = buildMakeActions pscmOutputDir filePathMap foreigns pscmUsePrefix
     P.make makeActions (map snd ms)
   printWarningsAndErrors (P.optionsVerboseErrors pscmOpts) pscmJSONErrors makeWarnings makeErrors
   exitSuccess
@@ -89,27 +81,13 @@ globWarningOnMisses warn = concatMapM globWithWarning
     return paths
   concatMapM f = liftM concat . mapM f
 
-readInput :: InputOptions -> IO [(Either P.RebuildPolicy FilePath, String)]
-readInput InputOptions{..} = forM ioInputFiles $ \inFile -> (Right inFile, ) <$> readUTF8File inFile
-
-parseInputs :: (MonadError P.MultipleErrors m, MonadWriter P.MultipleErrors m)
-            => [(Either P.RebuildPolicy FilePath, String)]
-            -> [(FilePath, P.ForeignJS)]
-            -> m ([(Either P.RebuildPolicy FilePath, P.Module)], M.Map P.ModuleName FilePath)
-parseInputs modules foreigns =
-  (,) <$> P.parseModulesFromFiles (either (const "") id) modules
-      <*> P.parseForeignModulesFromFiles foreigns
+readInput :: [FilePath] -> IO [(FilePath, String)]
+readInput inputFiles = forM inputFiles $ \inFile -> (inFile, ) <$> readUTF8File inFile
 
 inputFile :: Parser FilePath
 inputFile = strArgument $
      metavar "FILE"
   <> help "The input .purs file(s)"
-
-inputForeignFile :: Parser FilePath
-inputForeignFile = strOption $
-     short 'f'
-  <> long "ffi"
-  <> help "The input .js file(s) providing foreign import implementations"
 
 outputDirectory :: Parser FilePath
 outputDirectory = strOption $
@@ -173,7 +151,6 @@ options = P.Options <$> noTco
 
 pscMakeOptions :: Parser PSCMakeOptions
 pscMakeOptions = PSCMakeOptions <$> many inputFile
-                                <*> many inputForeignFile
                                 <*> outputDirectory
                                 <*> options
                                 <*> (not <$> noPrefix)

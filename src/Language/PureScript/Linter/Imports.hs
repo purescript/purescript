@@ -6,7 +6,7 @@ module Language.PureScript.Linter.Imports
 
 import Prelude.Compat
 
-import Control.Monad (join, unless, when, foldM, (<=<))
+import Control.Monad (join, unless, foldM, (<=<))
 import Control.Monad.Writer.Class
 
 import Data.Function (on)
@@ -54,7 +54,8 @@ lintImports
   -> Env
   -> UsedImports
   -> m ()
-lintImports (Module _ _ _ _ Nothing) _ _ = return ()
+lintImports (Module _ _ _ _ Nothing) _ _ =
+  internalError "lintImports needs desugared exports"
 lintImports (Module ss _ mn mdecls (Just mexports)) env usedImps = do
 
   -- TODO: this needs some work to be easier to understand
@@ -100,13 +101,11 @@ lintImports (Module ss _ mn mdecls (Just mexports)) env usedImps = do
       maybe id warnWithPosition pos $
         tell $ errorMessage $ DuplicateSelectiveImport mnq
 
-    for_ (imps \\ (warned ++ duplicates)) $ \(pos, typ, _) -> do
+    for_ (imps \\ (warned ++ duplicates)) $ \(pos, typ, _) ->
       warnDuplicateRefs (fromMaybe ss pos) DuplicateImportRef $ case typ of
         Explicit refs -> refs
         Hiding refs -> refs
         _ -> []
-      for_ (M.lookup mn env) $ \(_, imported, _) ->
-        checkEmptyImport mnq imported typ
 
   where
 
@@ -120,9 +119,9 @@ lintImports (Module ss _ mn mdecls (Just mexports)) env usedImps = do
   countOpenImports :: Declaration -> Int
   countOpenImports (PositionedDeclaration _ _ d) = countOpenImports d
   countOpenImports (ImportDeclaration mn' Implicit Nothing)
-    | not (isPrim mn') = 1
+    | not (isPrim mn' || mn == mn') = 1
   countOpenImports (ImportDeclaration mn' (Hiding _) Nothing)
-    | not (isPrim mn') = 1
+    | not (isPrim mn' || mn == mn') = 1
   countOpenImports _ = 0
 
   -- Checks whether a module is the Prim module - used to suppress any checks
@@ -158,17 +157,17 @@ lintImports (Module ss _ mn mdecls (Just mexports)) env usedImps = do
   -- that are implicitly exported and then re-exported.
   elaborateUsed :: Imports -> ModuleName -> UsedImports -> UsedImports
   elaborateUsed scope mne used =
-    let classes = extractByQual mne (importedTypeClasses scope) TyClassName
-        types = extractByQual mne (importedTypes scope) TyName
-        dctors = extractByQual mne (importedDataConstructors scope) DctorName
-        values = extractByQual mne (importedValues scope) IdentName
-    in foldr go used (classes ++ types ++ dctors ++ values)
+    foldr go used
+      $ extractByQual mne (importedTypeClasses scope) TyClassName
+      ++ extractByQual mne (importedTypes scope) TyName
+      ++ extractByQual mne (importedDataConstructors scope) DctorName
+      ++ extractByQual mne (importedValues scope) IdentName
     where
     go :: (ModuleName, Qualified Name) -> UsedImports -> UsedImports
     go (q, name) = M.alter (Just . maybe [name] (name :)) q
 
   extractByQual
-    :: (Eq a)
+    :: Eq a
     => ModuleName
     -> M.Map (Qualified a) [ImportRecord a]
     -> (a -> Name)
@@ -199,7 +198,10 @@ lintImportDecl
 lintImportDecl env mni qualifierName names declType allowImplicit =
   case declType of
     Implicit -> case qualifierName of
-      Nothing -> unless' allowImplicit (checkImplicit ImplicitImport)
+      Nothing ->
+        if null allRefs
+        then unused
+        else unless' allowImplicit (checkImplicit ImplicitImport)
       Just q -> unless' (q `elem` mapMaybe getQual names) unused
     Hiding _ -> unless' allowImplicit (checkImplicit HidingImport)
     Explicit [] -> unused
@@ -213,7 +215,15 @@ lintImportDecl env mni qualifierName names declType allowImplicit =
   checkImplicit warning =
     if null allRefs
     then unused
-    else warn (warning mni allRefs)
+    else warn (warning mni (map simplifyTypeRef allRefs))
+    where
+    -- Replace explicit type refs with data constructor lists from listing the
+    -- used constructors explicity `T(X, Y, [...])` to `T(..)` for suggestion
+    -- message.
+    simplifyTypeRef :: DeclarationRef -> DeclarationRef
+    simplifyTypeRef (TypeRef name (Just dctors))
+      | not (null dctors) = TypeRef name Nothing
+    simplifyTypeRef other = other
 
   checkExplicit
     :: [DeclarationRef]
@@ -248,30 +258,35 @@ lintImportDecl env mni qualifierName names declType allowImplicit =
   warn :: SimpleErrorMessage -> m Bool
   warn err = tell (errorMessage err) >> return True
 
+  -- Unless the boolean is true, run the action. Return false when the action is
+  -- not run, otherwise return whatever the action does.
+  --
+  -- The return value is intended for cases where we want to track whether some
+  -- work was done, as there may be further conditions in the action that mean
+  -- it ends up doing nothing.
   unless' :: Bool -> m Bool -> m Bool
-  unless' True m = m
-  unless' False _ = return False
+  unless' False m = m
+  unless' True _ = return False
 
   allRefs :: [DeclarationRef]
   allRefs = findUsedRefs env mni qualifierName names
 
   dtys
     :: ModuleName
-    -> [((ProperName 'TypeName, [ProperName 'ConstructorName]), ModuleName)]
-  dtys mn = maybe [] exportedTypes $ envModuleExports <$> mn `M.lookup` env
+    -> M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ModuleName)
+  dtys mn = maybe M.empty exportedTypes $ envModuleExports <$> mn `M.lookup` env
 
   dctorsForType
     :: ModuleName
     -> ProperName 'TypeName
     -> [ProperName 'ConstructorName]
-  dctorsForType mn tn =
-    maybe [] (snd . fst) $ find ((== tn) . fst . fst) (dtys mn)
+  dctorsForType mn tn = maybe [] fst $ tn `M.lookup` dtys mn
 
   typeForDCtor
     :: ModuleName
     -> ProperName 'ConstructorName
     -> Maybe (ProperName 'TypeName)
-  typeForDCtor mn pn = fst . fst <$> find (elem pn . snd . fst) (dtys mn)
+  typeForDCtor mn pn = fst <$> find (elem pn . fst . snd) (M.toList (dtys mn))
 
 findUsedRefs
   :: Env
@@ -310,8 +325,8 @@ findUsedRefs env mni qn names =
   findTypeForDctor mn dctor =
     case mn `M.lookup` env of
       Just (_, _, exps) ->
-        case find (elem dctor . snd . fst) (exportedTypes exps) of
-          Just ((ty, _), _) -> ty
+        case find (elem dctor . fst . snd) (M.toList (exportedTypes exps)) of
+          Just (ty, _) -> ty
           Nothing -> internalError $ "missing type for data constructor " ++ runProperName dctor ++ " in findTypeForDctor"
       Nothing -> internalError $ "missing module " ++ runModuleName mn  ++ " in findTypeForDctor"
 
@@ -345,25 +360,3 @@ checkDuplicateImports mn xs ((_, t1, q1), (pos, t2, q2)) =
       tell $ errorMessage $ DuplicateImport mn t2 q2
     return $ (pos, t2, q2) : xs
   else return xs
-
--- |
--- Checks that an import with a hiding reference is not hiding all possible
--- imports.
---
-checkEmptyImport
-  :: MonadWriter MultipleErrors m
-  => ModuleName
-  -> Imports
-  -> ImportDeclarationType
-  -> m ()
-checkEmptyImport importModule imps (Hiding _) = do
-  let isEmptyImport
-         = M.null (importedTypes imps)
-        && M.null (importedTypeOps imps)
-        && M.null (importedDataConstructors imps)
-        && M.null (importedTypeClasses imps)
-        && M.null (importedValues imps)
-        && M.null (importedValueOps imps)
-  when isEmptyImport . tell . errorMessage $
-    RedundantEmptyHidingImport importModule
-checkEmptyImport _ _ _ = return ()

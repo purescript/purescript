@@ -5,7 +5,6 @@ module Language.PureScript.Interactive.Types where
 
 import Prelude.Compat
 
-import           Data.Map (Map)
 import qualified Language.PureScript as P
 
 -- | The PSCI configuration.
@@ -14,7 +13,6 @@ import qualified Language.PureScript as P
 --
 data PSCiConfig = PSCiConfig
   { psciLoadedFiles         :: [FilePath]
-  , psciForeignFiles        :: Map P.ModuleName FilePath
   , psciNodeFlags           :: [String]
   , psciEnvironment         :: P.Environment
   } deriving Show
