@@ -34,6 +34,9 @@ runIdentT = T.pack . P.runIdent
 runOpNameT :: P.OpName a -> Text
 runOpNameT = T.pack . P.runOpName
 
+runModuleNameT :: P.ModuleName -> Text
+runModuleNameT = T.pack . P.runModuleName
+
 prettyTypeT :: P.Type -> Text
 prettyTypeT = T.unwords . fmap T.strip . T.lines . T.pack . P.prettyPrintType
 

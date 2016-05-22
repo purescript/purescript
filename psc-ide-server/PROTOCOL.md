@@ -38,15 +38,17 @@ The `type` command looks up the type for a given identifier.
 
 **Params:**
  - `search :: String`: The identifier to look for. Only matches on equality.
- - `filters :: [Filter]`: These filters will be applied before looking for the
+ - `filters :: (optional) [Filter]`: These filters will be applied before looking for the
   identifier. These filters get combined with *AND*, so a candidate must match *ALL*
   of them to be eligible.
+ - `currentModule :: (optional) String`: see *Complete* command
 ```json
 {
   "command": "type",
   "params": {
     "search": "filterM",
-    "filters": [Filter]
+    "filters": [{..}],
+    "currentModule": "Main"
   }
 }
 ```
@@ -58,20 +60,25 @@ The possible types are returned in the same format as completions
 The `complete` command looks up possible completions/corrections.
 
 **Params**:
- - `filters :: [Filter]`: The same as for the `type` command. A candidate must match
-  all filters.
- - `matcher :: (optional) Matcher`: The strategy used for matching candidates after filtering.
-  Results are scored internally and will be returned in the descending order where
-  the nth element is better then the n+1-th.
+ - `filters :: [Filter]`: The same as for the `type` command. A candidate must
+  match all filters.
+ - `matcher :: (optional) Matcher`: The strategy used for matching candidates
+  after filtering. Results are scored internally and will be returned in the
+  descending order where the nth element is better then the n+1-th.
+ - `currentModule :: (optional) String`: The current modules name. If it matches
+   with the rebuild cache non-exported modules will also be completed. You can
+   fill the rebuild cache by using the "Rebuild" command.
 
-  If no matcher is given every candidate, that passes the filters, is returned in no 
-  particular order.
+  If no matcher is given every candidate, that passes the filters, is returned
+  in no particular order.
+  
 ```json
 {
   "command": "complete",
   "params": {
-    "filters": [Filter],
-    "matcher": (optional) Matcher
+    "filters": [{..}, {..}],
+    "matcher": {..}
+    "currentModule": "Main"
   }
 }
 ```
@@ -244,10 +251,11 @@ Example:
 
 The `rebuild` command provides a fast rebuild for a single module. It doesn't
 recompile the entire project though. All the modules dependencies need to be
-loaded.
+loaded. A successful rebuild will be stored to allow for completions of private
+identifiers.
 
 Arguments:
-- `file :: String` the path to the module to rebuild
+  - `file :: String` the path to the module to rebuild
 
 ```json
 {
