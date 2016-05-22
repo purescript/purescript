@@ -504,9 +504,10 @@ parseNullBinder = underscore *> return NullBinder
 
 parseIdentifierAndBinder :: TokenParser (String, Binder)
 parseIdentifierAndBinder =
-    do name <- lname <|> stringLiteral
+    do name <- lname
        b <- P.option (VarBinder (Ident name)) rest
        return (name, b)
+    <|> (,) <$> stringLiteral <*> rest
   where
     rest = C.indented *> colon *> C.indented *> parseBinder
 
