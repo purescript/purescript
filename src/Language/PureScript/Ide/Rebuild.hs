@@ -19,8 +19,6 @@ import           Data.Maybe                      (fromJust, mapMaybe)
 import qualified Data.Set                        as S
 import qualified Language.PureScript             as P
 import           Language.PureScript.Errors.JSON
-import           System.FilePath (replaceExtension)
-import           System.Directory (doesFileExist)
 import           System.IO.UTF8 (readUTF8File)
 
 rebuildFile
@@ -37,23 +35,26 @@ rebuildFile path = do
          Right [m] -> pure m
          Right _ -> throwError . GeneralError $ "Please define exactly one module."
 
+  -- Externs files must be sorted ahead of time, so that they get applied
+  -- correctly to the 'Environment'.
   externs <- sortExterns m . M.delete (P.getModuleName m) =<< getExternFiles
 
   outputDirectory <- confOutputPath . envConfiguration <$> ask
 
-  let foreignModule = replaceExtension path "js"
-  foreignExists <- liftIO (doesFileExist foreignModule)
+  -- For rebuilding, we want to 'RebuildAlways', but for inferring foreign
+  -- modules using their file paths, we need to specify the path in the 'Map'.
+  let filePathMap = M.singleton (P.getModuleName m) (Left P.RebuildAlways)
+  foreigns <- P.inferForeignModules (M.singleton (P.getModuleName m) (Right path))
 
-  let ma = P.buildMakeActions outputDirectory
-                              (M.singleton (P.getModuleName m) (Left P.RebuildAlways))
-                              (if foreignExists
-                                 then M.singleton (P.getModuleName m) foreignModule
-                                 else M.empty)
-                              False
+  -- Silence progress update messages during the build
+  let actions = (P.buildMakeActions outputDirectory filePathMap foreigns False)
+                  { P.progress = const (pure ()) }
+
+  -- Rebuild the single module using the cached externs
   (result, warnings) <- liftIO
-                   . P.runMake P.defaultOptions
-                   . P.rebuildModule (ma { P.progress = const (pure ()) }) externs
-                   $ m
+                        . P.runMake P.defaultOptions
+                        . P.rebuildModule actions externs
+                        $ m
   case result of
     Left errors -> throwError . RebuildError $ toJSONErrors False P.Error errors
     Right _ -> pure . RebuildSuccess $ toJSONErrors False P.Warning warnings

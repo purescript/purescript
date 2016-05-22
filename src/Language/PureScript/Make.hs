@@ -17,6 +17,7 @@ module Language.PureScript.Make
   , makeIO
   , readTextFile
   , buildMakeActions
+  , inferForeignModules
   ) where
 
 import Prelude.Compat
@@ -75,7 +76,7 @@ import SourceMap
 import SourceMap.Types
 
 import System.Directory (doesFileExist, getModificationTime, createDirectoryIfMissing, getCurrentDirectory)
-import System.FilePath ((</>), takeDirectory, makeRelative, splitPath, normalise)
+import System.FilePath ((</>), takeDirectory, makeRelative, splitPath, normalise, replaceExtension)
 import System.IO.Error (tryIOError)
 import System.IO.UTF8 (readUTF8File, writeUTF8File)
 
@@ -98,31 +99,22 @@ renderProgressMessage (CompilingModule mn) = "Compiling " ++ runModuleName mn
 --
 -- * The details of how files are read/written etc.
 --
-data MakeActions m = MakeActions {
-  -- |
-  -- Get the timestamp for the input file(s) for a module. If there are multiple
-  -- files (.purs and foreign files, for example) the timestamp should be for
+data MakeActions m = MakeActions
+  { getInputTimestamp :: ModuleName -> m (Either RebuildPolicy (Maybe UTCTime))
+  -- ^ Get the timestamp for the input file(s) for a module. If there are multiple
+  -- files (@.purs@ and foreign files, for example) the timestamp should be for
   -- the most recently modified file.
-  --
-    getInputTimestamp :: ModuleName -> m (Either RebuildPolicy (Maybe UTCTime))
-  -- |
-  -- Get the timestamp for the output files for a module. This should be the
-  -- timestamp for the oldest modified file, or Nothing if any of the required
-  -- output files are missing.
-  --
   , getOutputTimestamp :: ModuleName -> m (Maybe UTCTime)
-  -- |
-  -- Read the externs file for a module as a string and also return the actual
-  -- path for the file.
+  -- ^ Get the timestamp for the output files for a module. This should be the
+  -- timestamp for the oldest modified file, or 'Nothing' if any of the required
+  -- output files are missing.
   , readExterns :: ModuleName -> m (FilePath, Externs)
-  -- |
-  -- Run the code generator for the module and write any required output files.
-  --
+  -- ^ Read the externs file for a module as a string and also return the actual
+  -- path for the file.
   , codegen :: CF.Module CF.Ann -> Environment -> Externs -> SupplyT m ()
-  -- |
-  -- Respond to a progress update.
-  --
+  -- ^ Run the code generator for the module and write any required output files.
   , progress :: ProgressMessage -> m ()
+  -- ^ Respond to a progress update.
   }
 
 -- |
@@ -296,6 +288,24 @@ makeIO f io = do
 -- 'MonadError' instance.
 readTextFile :: FilePath -> Make String
 readTextFile path = makeIO (const (ErrorMessage [] $ CannotReadFile path)) $ readUTF8File path
+
+-- | Infer the module name for a module by looking for the same filename with
+-- a .js extension.
+inferForeignModules
+  :: forall m
+   . MonadIO m
+  => M.Map ModuleName (Either RebuildPolicy FilePath)
+  -> m (M.Map ModuleName FilePath)
+inferForeignModules = fmap (M.mapMaybe id) . traverse inferForeignModule
+  where
+    inferForeignModule :: Either RebuildPolicy FilePath -> m (Maybe FilePath)
+    inferForeignModule (Left _) = return Nothing
+    inferForeignModule (Right path) = do
+      let jsFile = replaceExtension path "js"
+      exists <- liftIO $ doesFileExist jsFile
+      if exists
+        then return (Just jsFile)
+        else return Nothing
 
 -- |
 -- A set of make actions that read and write modules from the given directory.

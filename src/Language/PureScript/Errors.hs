@@ -127,7 +127,6 @@ data SimpleErrorMessage
   | DuplicateImportRef Name
   | DuplicateExportRef Name
   | IntOutOfRange Integer String Integer Integer
-  | RedundantEmptyHidingImport ModuleName
   | ImplicitQualifiedImport ModuleName ModuleName [DeclarationRef]
   | ImplicitImport ModuleName [DeclarationRef]
   | HidingImport ModuleName [DeclarationRef]
@@ -297,7 +296,6 @@ errorCode em = case unwrapErrorMessage em of
   DuplicateImportRef{} -> "DuplicateImportRef"
   DuplicateExportRef{} -> "DuplicateExportRef"
   IntOutOfRange{} -> "IntOutOfRange"
-  RedundantEmptyHidingImport{} -> "RedundantEmptyHidingImport"
   ImplicitQualifiedImport{} -> "ImplicitQualifiedImport"
   ImplicitImport{} -> "ImplicitImport"
   HidingImport{} -> "HidingImport"
@@ -418,7 +416,6 @@ wikiUri e = "https://github.com/purescript/purescript/wiki/Error-Code-" ++ error
 errorSuggestion :: SimpleErrorMessage -> Maybe ErrorSuggestion
 errorSuggestion err = case err of
   UnusedImport{} -> emptySuggestion
-  RedundantEmptyHidingImport{} -> emptySuggestion
   DuplicateImport{} -> emptySuggestion
   UnusedExplicitImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
   ImplicitImport mn refs -> suggest $ importSuggestion mn refs Nothing
@@ -860,9 +857,6 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
     renderSimpleErrorMessage (IntOutOfRange value backend lo hi) =
       paras [ line $ "Integer value " ++ show value ++ " is out of range for the " ++ backend ++ " backend."
             , line $ "Acceptable values fall within the range " ++ show lo ++ " to " ++ show hi ++ " (inclusive)." ]
-
-    renderSimpleErrorMessage (RedundantEmptyHidingImport mn) =
-      line $ "The import for module " ++ runModuleName mn ++ " is redundant as all members have been explicitly hidden."
 
     renderSimpleErrorMessage msg@(ImplicitQualifiedImport importedModule asModule _) =
       paras [ line $ "Module " ++ runModuleName importedModule ++ " was imported as " ++ runModuleName asModule ++ " with unspecified imports."

@@ -53,40 +53,41 @@ runMake mk = fst <$> P.runMake P.defaultOptions mk
 
 -- | Rebuild a module, using the cached externs data for dependencies.
 rebuild
-  :: M.Map P.ModuleName FilePath
-  -> [P.ExternsFile]
+  :: [P.ExternsFile]
   -> P.Module
   -> P.Make (P.ExternsFile, P.Environment)
-rebuild foreignFiles loadedExterns m = do
+rebuild loadedExterns m = do
     externs <- P.rebuildModule buildActions loadedExterns m
     return (externs, foldl' (flip P.applyExternsFileToEnvironment) P.initEnvironment (loadedExterns ++ [externs]))
   where
     buildActions :: P.MakeActions P.Make
-    buildActions = (P.buildMakeActions modulesDir
-                                       filePathMap
-                                       foreignFiles
-                                       False) { P.progress = const (return ()) }
+    buildActions =
+      (P.buildMakeActions modulesDir
+                          filePathMap
+                          M.empty
+                          False) { P.progress = const (return ()) }
 
     filePathMap :: M.Map P.ModuleName (Either P.RebuildPolicy FilePath)
     filePathMap = M.singleton (P.getModuleName m) (Left P.RebuildAlways)
 
 -- | Build the collection of modules from scratch. This is usually done on startup.
 make
-  :: M.Map P.ModuleName FilePath
-  -> [P.Module]
+  :: [(FilePath, P.Module)]
   -> P.Make ([P.ExternsFile], P.Environment)
-make foreignFiles ms = do
-    externs <- P.make buildActions ms
+make ms = do
+    foreignFiles <- P.inferForeignModules filePathMap
+    externs <- P.make (buildActions foreignFiles) (map snd ms)
     return (externs, foldl' (flip P.applyExternsFileToEnvironment) P.initEnvironment externs)
   where
-    buildActions :: P.MakeActions P.Make
-    buildActions = (P.buildMakeActions modulesDir
-                                       filePathMap
-                                       foreignFiles
-                                       False)
+    buildActions :: M.Map P.ModuleName FilePath -> P.MakeActions P.Make
+    buildActions foreignFiles =
+      P.buildMakeActions modulesDir
+                         filePathMap
+                         foreignFiles
+                         False
 
     filePathMap :: M.Map P.ModuleName (Either P.RebuildPolicy FilePath)
-    filePathMap = M.fromList $ map (\m -> (P.getModuleName m, Left P.RebuildAlways)) ms
+    filePathMap = M.fromList $ map (\(fp, m) -> (P.getModuleName m, Right fp)) ms
 
 -- | Performs a PSCi command
 handleCommand
@@ -115,8 +116,7 @@ handleResetState = do
   files <- asks psciLoadedFiles
   e <- runExceptT $ do
     modules <- ExceptT . liftIO $ loadAllModules files
-    foreignFiles <- asks psciForeignFiles
-    (externs, _) <- ExceptT . liftIO . runMake . make foreignFiles . map snd $ modules
+    (externs, _) <- ExceptT . liftIO . runMake . make $ modules
     return (map snd modules, externs)
   case e of
     Left errs -> printErrors errs
@@ -132,9 +132,8 @@ handleExpression
 handleExpression val = do
   st <- get
   let m = createTemporaryModule True st val
-  foreignFiles <- asks psciForeignFiles
   nodeArgs <- asks ((++ [indexFile]) . psciNodeFlags)
-  e <- liftIO . runMake $ rebuild foreignFiles (map snd (psciLoadedExterns st)) m
+  e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
   case e of
     Left errs -> printErrors errs
     Right _ -> do
@@ -157,8 +156,7 @@ handleDecls
 handleDecls ds = do
   st <- gets (updateLets (++ ds))
   let m = createTemporaryModule False st (P.Literal (P.ObjectLiteral []))
-  foreignFiles <- asks psciForeignFiles
-  e <- liftIO . runMake $ rebuild foreignFiles (map snd (psciLoadedExterns st)) m
+  e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
   case e of
     Left err -> printErrors err
     Right _ -> put st
@@ -212,9 +210,8 @@ handleImport
   -> m ()
 handleImport im = do
    st <- gets (updateImportedModules (im :))
-   foreignFiles <- asks psciForeignFiles
    let m = createTemporaryModuleForImports st
-   e <- liftIO . runMake $ rebuild foreignFiles (map snd (psciLoadedExterns st)) m
+   e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
    case e of
      Left errs -> printErrors errs
      Right _  -> put st
@@ -226,9 +223,8 @@ handleTypeOf
   -> m ()
 handleTypeOf val = do
   st <- get
-  foreignFiles <- asks psciForeignFiles
   let m = createTemporaryModule False st val
-  e <- liftIO . runMake $ rebuild foreignFiles (map snd (psciLoadedExterns st)) m
+  e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
   case e of
     Left errs -> printErrors errs
     Right (_, env') ->
@@ -243,10 +239,9 @@ handleKindOf
   -> m ()
 handleKindOf typ = do
   st <- get
-  foreignFiles <- asks psciForeignFiles
   let m = createTemporaryModuleForKind st typ
       mName = P.ModuleName [P.ProperName "$PSCI"]
-  e <- liftIO . runMake $ rebuild foreignFiles (map snd (psciLoadedExterns st)) m
+  e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
   case e of
     Left errs -> printErrors errs
     Right (_, env') ->
