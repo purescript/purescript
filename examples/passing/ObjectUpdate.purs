@@ -9,8 +9,8 @@ update2 :: forall r. { foo :: String | r } -> { foo :: String | r }
 update2 = \o -> o { foo = "Foo" }
 
 replace = \o -> case o of
-  { foo = "Foo" } -> o { foo = "Bar" }
-  { foo = "Bar" } -> o { bar = "Baz" }
+  { foo: "Foo" } -> o { foo = "Bar" }
+  { foo: "Bar" } -> o { bar = "Baz" }
   o -> o
 
 polyUpdate :: forall a r. { foo :: a | r } -> { foo :: String | r }

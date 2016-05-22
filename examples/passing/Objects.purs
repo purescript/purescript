@@ -26,7 +26,7 @@ test4 = test2 weirdObj
   weirdObj = { "!@#": 1.0 }
 
 test5 = case { "***": 1.0 } of
-  { "***" = n } -> n
+  { "***": n } -> n
 
 test6 = case { "***": 1.0 } of
              { "***": n } -> n
