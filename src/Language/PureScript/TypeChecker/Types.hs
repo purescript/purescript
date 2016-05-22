@@ -26,6 +26,7 @@ module Language.PureScript.TypeChecker.Types
 
 import Prelude.Compat
 
+import Control.Arrow (second)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets)
@@ -118,8 +119,9 @@ typesOf bindingGroupType moduleName vals = do
   -- Replace all the wildcards types with their inferred types
   replace sub (ErrorMessage hints (WildcardInferredType ty)) =
     ErrorMessage hints . WildcardInferredType $ substituteType sub ty
-  replace sub (ErrorMessage hints (HoleInferredType name ty)) =
-    ErrorMessage hints . HoleInferredType name $ substituteType sub ty
+  replace sub (ErrorMessage hints (HoleInferredType name ty env)) =
+    ErrorMessage hints $ HoleInferredType name (substituteType sub ty)
+                                               (map (second (substituteType sub)) env)
   replace _ em = em
 
   isHoleError :: ErrorMessage -> Bool
@@ -324,7 +326,10 @@ infer' (TypedValue checkType val ty) = do
   return $ TypedValue True val' ty'
 infer' (Hole name) = do
   ty <- freshType
-  tell . errorMessage $ HoleInferredType name ty
+  env <- M.toList . names <$> getEnv
+  Just moduleName <- checkCurrentModule <$> get
+  let ctx = [ (ident, ty') | ((mn, ident@Ident{}), (ty', _, Defined)) <- env, mn == moduleName ]
+  tell . errorMessage $ HoleInferredType name ty ctx
   return $ TypedValue True (Hole name) ty
 infer' (PositionedValue pos c val) = warnAndRethrowWithPosition pos $ do
   TypedValue t v ty <- infer' val
