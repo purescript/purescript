@@ -182,7 +182,7 @@ parseTypeClassDeclaration = do
     return implies
   className <- indented *> properName
   idents <- P.many (indented *> kindedIdent)
-  members <- P.option [] . P.try $ do
+  members <- P.option [] $ do
     indented *> reserved "where"
     indented *> mark (P.many (same *> positioned parseTypeDeclaration))
   return $ TypeClassDeclaration className idents implies members
@@ -206,7 +206,7 @@ parseInstanceDeclaration = do
 parseTypeInstanceDeclaration :: TokenParser Declaration
 parseTypeInstanceDeclaration = do
   instanceDecl <- parseInstanceDeclaration
-  members <- P.option [] . P.try $ do
+  members <- P.option [] $ do
     indented *> reserved "where"
     mark (P.many (same *> positioned parseValueDeclaration))
   return $ instanceDecl (ExplicitInstance members)
