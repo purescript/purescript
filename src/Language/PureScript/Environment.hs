@@ -240,6 +240,7 @@ primTypes =
     , (primName "Int",      (Star, ExternData))
     , (primName "Boolean",  (Star, ExternData))
     , (primName "Partial",  (Star, ExternData))
+    , (primName "Dict",     (FunKind ConstraintKind Star, ExternData))
     ]
 
 -- |

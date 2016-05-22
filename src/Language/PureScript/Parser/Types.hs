@@ -83,6 +83,7 @@ parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTabl
                     return (BinaryNoParensType (TypeOp ident))) P.AssocRight
                 ]
               , [ P.Infix (rarrow >> return function) P.AssocRight ]
+              , [ P.Infix (rfatArrow >> return (\ty -> ConstrainedType [Constraint ty Nothing])) P.AssocRight ]
               ]
   postfixTable = [ \t -> KindedType t <$> (indented *> doubleColon *> parseKind)
                  ]

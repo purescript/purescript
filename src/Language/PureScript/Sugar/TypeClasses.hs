@@ -27,7 +27,7 @@ import Control.Arrow (first, second)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 import Data.List ((\\), find, sortBy)
-import Data.Maybe (catMaybes, mapMaybe, isJust)
+import Data.Maybe (catMaybes, fromMaybe, mapMaybe, isJust)
 
 import qualified Data.Map as M
 
@@ -180,11 +180,11 @@ desugarDecl mn exps = go
   where
   go d@(TypeClassDeclaration name args implies members) = do
     modify (M.insert (mn, name) (args, implies, members))
-    return (Nothing, d : typeClassDictionaryDeclaration name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
+    return (Nothing, d : desugarTypeClassDecl name args implies members ++ map (typeClassMemberToDictionaryAccessor mn name args) members)
   go (TypeInstanceDeclaration _ _ _ _ DerivedInstance) = internalError "Derived instanced should have been desugared"
   go d@(TypeInstanceDeclaration name deps className tys (ExplicitInstance members)) = do
     desugared <- desugarCases members
-    dictDecl <- typeInstanceDictionaryDeclaration name mn deps className tys desugared
+    dictDecl <- desugarTypeInstanceDecl name mn deps className tys desugared
     return (expRef name className tys, [d, dictDecl])
   go (PositionedDeclaration pos com d) = do
     (dr, ds) <- rethrowWithPosition pos $ desugarDecl mn exps d
@@ -224,20 +224,27 @@ memberToNameAndType (TypeDeclaration ident ty) = (ident, ty)
 memberToNameAndType (PositionedDeclaration _ _ d) = memberToNameAndType d
 memberToNameAndType _ = internalError "Invalid declaration in type class definition"
 
-typeClassDictionaryDeclaration
+desugarTypeClassDecl
   :: ProperName 'ClassName
   -> [(String, Maybe Kind)]
   -> [(Qualified (ProperName 'ClassName), [Type])]
   -> [Declaration]
-  -> Declaration
-typeClassDictionaryDeclaration name args implies members =
+  -> [Declaration]
+desugarTypeClassDecl name args implies members =
   let superclassTypes = superClassDictionaryNames `zip`
         [ function unit (foldl TypeApp (TypeConstructor (fmap coerceProperName superclass)) tyArgs)
         | (superclass, tyArgs) <- implies
         ]
       members' = map (first runIdent . memberToNameAndType) members
       mtys = members' ++ superclassTypes
-  in TypeSynonymDeclaration (coerceProperName name) args (TypeApp tyRecord $ rowFromList (mtys, REmpty))
+  in [ TypeSynonymDeclaration (toWitnessName name) args (TypeApp tyRecord $ rowFromList (mtys, REmpty))
+     , ExternDataDeclaration (coerceProperName name) (foldr FunKind ConstraintKind (map (fromMaybe Star . snd) args))
+     -- TODO: this won't be kind checked properly, we need a trick
+     ]
+
+-- | Convert a class name into the name of its witness type
+toWitnessName :: ProperName 'ClassName -> ProperName 'TypeName
+toWitnessName = ProperName . ("Witness_" ++) . runProperName
 
 typeClassMemberToDictionaryAccessor
   :: ModuleName
@@ -247,9 +254,10 @@ typeClassMemberToDictionaryAccessor
   -> Declaration
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration ident ty) =
   let className = Qualified (Just mn) name
+      withKind (arg, mk) = maybe id (flip KindedType) mk (TypeVar arg)
   in ValueDeclaration ident Private [] $ Right $
-      TypedValue False (TypeClassDictionaryAccessor className ident) $
-      moveQuantifiersToFront (quantify (ConstrainedType [Constraint (foldl TypeApp (TypeConstructor (fmap coerceProperName className)) (map (TypeVar . fst) args)) Nothing] ty))
+       TypedValue False (TypeClassDictionaryAccessor className ident) $
+         moveQuantifiersToFront (quantify (ConstrainedType [Constraint (foldl TypeApp (TypeConstructor (fmap coerceProperName className)) (map withKind args)) Nothing] ty))
 typeClassMemberToDictionaryAccessor mn name args (PositionedDeclaration pos com d) =
   PositionedDeclaration pos com $ typeClassMemberToDictionaryAccessor mn name args d
 typeClassMemberToDictionaryAccessor _ _ _ _ = internalError "Invalid declaration in type class definition"
@@ -257,7 +265,7 @@ typeClassMemberToDictionaryAccessor _ _ _ _ = internalError "Invalid declaration
 unit :: Type
 unit = TypeApp tyRecord REmpty
 
-typeInstanceDictionaryDeclaration
+desugarTypeInstanceDecl
   :: forall m
    . (MonadSupply m, MonadError MultipleErrors m)
   => Ident
@@ -267,7 +275,7 @@ typeInstanceDictionaryDeclaration
   -> [Type]
   -> [Declaration]
   -> Desugar m Declaration
-typeInstanceDictionaryDeclaration name mn deps className tys decls =
+desugarTypeInstanceDecl name mn deps className tys decls =
   rethrow (addHint (ErrorInInstance className tys)) $ do
   m <- get
 
@@ -292,18 +300,33 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
       -- The type is a record type, but depending on type instance dependencies, may be constrained.
       -- The dictionary itself is a record literal.
       let superclasses = superClassDictionaryNames `zip`
-            [ Abs (Left (Ident C.__unused)) (SuperClassDictionary (toConstraint (superclass, tyArgs)))
+            [ Abs (Left (Ident C.__unused)) (SuperClassDictionary (applyConstraintType (superclass, tyArgs)))
             | (superclass, suTyArgs) <- implies
             , let tyArgs = map (replaceAllTypeVars (zip (map fst args) tys)) suTyArgs
             ]
 
+          props :: Expr
           props = Literal $ ObjectLiteral (members ++ superclasses)
-          dictTy = foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
-          toConstraint (hd, tys') = foldl TypeApp (TypeConstructor (fmap coerceProperName hd)) tys'
-          toConstraint' x = Constraint (toConstraint x) Nothing
-          constrainedTy = quantify (if null deps then dictTy else ConstrainedType (map toConstraint' deps) dictTy)
-          dict = TypeClassDictionaryConstructorApp className props
-          result = ValueDeclaration name Private [] (Right (TypedValue True dict constrainedTy))
+
+          applyConstraintType :: (Qualified (ProperName nameType), [Type]) -> Type
+          applyConstraintType (hd, tys') = foldl TypeApp (TypeConstructor (fmap coerceProperName hd)) tys'
+
+          toConstraint :: (Qualified (ProperName 'ClassName), [Type]) -> Constraint
+          toConstraint x = Constraint (applyConstraintType x) Nothing
+
+          witnessTy :: Type
+          witnessTy = applyConstraintType (fmap toWitnessName className, tys)
+
+          constrainedTy :: Type
+          constrainedTy = quantify (if null deps
+                                      then witnessTy
+                                      else ConstrainedType (map toConstraint deps) witnessTy)
+
+          witness :: Expr
+          witness = TypeClassDictionaryConstructorApp className props
+
+          result :: Declaration
+          result = ValueDeclaration name Private [] (Right (TypedValue True witness constrainedTy))
       return result
 
   where

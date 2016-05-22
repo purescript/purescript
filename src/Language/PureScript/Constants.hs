@@ -328,6 +328,12 @@ partial = "Partial"
 pattern Partial :: Type
 pattern Partial = TypeConstructor (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Partial"))
 
+dict :: String
+dict = "Dict"
+
+pattern Dict :: Type
+pattern Dict = TypeConstructor (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Dict"))
+
 -- Code Generation
 
 __superclass_ :: String
