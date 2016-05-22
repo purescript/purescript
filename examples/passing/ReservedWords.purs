@@ -12,7 +12,7 @@ p :: { type :: String }
 p = o { type = "p" }
 
 f :: forall r. { type :: String | r } -> String
-f { type = "p" } = "Done"
+f { type: "p" } = "Done"
 f _ = "Fail"
 
 main :: Eff _ _
