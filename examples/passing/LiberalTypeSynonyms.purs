@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 type Reader = (->) String
 
@@ -18,4 +19,4 @@ f :: (forall r. F r) -> String
 f g = case g { x: "Hello" } of
         { x = x } -> x
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

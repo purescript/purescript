@@ -38,6 +38,7 @@ extra-source-files: examples/passing/*.purs
                   , examples/passing/ModuleExportSelf/*.purs
                   , examples/passing/NonConflictingExports/*.purs
                   , examples/passing/OperatorAliasElsewhere/*.purs
+                  , examples/passing/Operators/*.purs
                   , examples/passing/PendingConflictingImports/*.purs
                   , examples/passing/PendingConflictingImports2/*.purs
                   , examples/passing/QualifiedNames/*.purs

@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 data A = A | B | C
 
@@ -18,4 +19,4 @@ h f N a = a
 h f a N = a
 h f (J a) (J b) = J (f a b)
 
-main = Control.Monad.Eff.Console.log $ f "Done" "Failed" A
+main = log $ f "Done" "Failed" A

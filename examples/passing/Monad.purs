@@ -1,6 +1,6 @@
 module Main where
 
-import Prelude ()
+import Control.Monad.Eff.Console (log)
 
 type Monad m = { return :: forall a. a -> m a
 	 , bind :: forall a b. m a -> (a -> m b) -> m b }
@@ -29,4 +29,4 @@ test1 = test id
 
 test2 = test maybe
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

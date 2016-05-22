@@ -1,9 +1,10 @@
 module Main where
 
 import M1
+import Control.Monad.Eff.Console (log)
 
 testX = X
 testZ = Z
 testFoo = foo
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"
