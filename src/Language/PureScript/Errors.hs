@@ -340,14 +340,17 @@ addHint hint = onErrorMessages $ \(ErrorMessage hints se) -> ErrorMessage (hint 
 
 -- | A map from rigid type variable name/unknown variable pairs to new variables.
 data TypeMap = TypeMap
-  { umSkolemMap :: M.Map Int (String, Int, Maybe SourceSpan)
-  , umNextSkolem :: Int
-  , umUnknownMap :: M.Map Int Int
-  , umNextUnknown :: Int
+  { umSkolemMap   :: M.Map Int (String, Int, Maybe SourceSpan)
+  -- ^ a map from skolems to their new names, including source and naming info
+  , umUnknownMap  :: M.Map Int Int
+  -- ^ a map from unification variables to their new names
+  , umNextIndex   :: Int
+  -- ^ unknowns and skolems share a source of names during renaming, to
+  -- avoid overlaps in error messages. This is the next label for either case.
   } deriving Show
 
 defaultUnknownMap :: TypeMap
-defaultUnknownMap = TypeMap M.empty 0 M.empty 0
+defaultUnknownMap = TypeMap M.empty M.empty 0
 
 -- | How critical the issue is
 data Level = Error | Warning deriving Show
@@ -366,16 +369,16 @@ replaceUnknowns = everywhereOnTypesM replaceTypes
     m <- get
     case M.lookup u (umUnknownMap m) of
       Nothing -> do
-        let u' = umNextUnknown m
-        put $ m { umUnknownMap = M.insert u u' (umUnknownMap m), umNextUnknown = u' + 1 }
+        let u' = umNextIndex m
+        put $ m { umUnknownMap = M.insert u u' (umUnknownMap m), umNextIndex = u' + 1 }
         return (TUnknown u')
       Just u' -> return (TUnknown u')
   replaceTypes (Skolem name s sko ss) = do
     m <- get
     case M.lookup s (umSkolemMap m) of
       Nothing -> do
-        let s' = umNextSkolem m
-        put $ m { umSkolemMap = M.insert s (name, s', ss) (umSkolemMap m), umNextSkolem = s' + 1 }
+        let s' = umNextIndex m
+        put $ m { umSkolemMap = M.insert s (name, s', ss) (umSkolemMap m), umNextIndex = s' + 1 }
         return (Skolem name s' sko ss)
       Just (_, s', _) -> return (Skolem name s' sko ss)
   replaceTypes other = return other
