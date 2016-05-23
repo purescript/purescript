@@ -147,6 +147,7 @@ checkTypeClassInstance
   -> Type
   -> m ()
 checkTypeClassInstance _ (TypeVar _) = return ()
+checkTypeClassInstance _ (TypeLevelString _) = return ()
 checkTypeClassInstance _ (TypeConstructor ctor) = do
   env <- getEnv
   when (ctor `M.member` typeSynonyms env) . throwError . errorMessage $ TypeSynonymInstance

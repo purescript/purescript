@@ -327,6 +327,9 @@ partial = "Partial"
 pattern Partial :: Qualified (ProperName 'ClassName)
 pattern Partial = Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Partial")
 
+pattern Fail :: Qualified (ProperName 'ClassName)
+pattern Fail = Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Fail")
+
 -- Code Generation
 
 __superclass_ :: String

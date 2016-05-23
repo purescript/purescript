@@ -44,14 +44,15 @@ loadAllModules files = do
 createTemporaryModule :: Bool -> PSCiState -> P.Expr -> P.Module
 createTemporaryModule exec PSCiState{psciImportedModules = imports, psciLetBindings = lets} val =
   let
-    moduleName = P.ModuleName [P.ProperName "$PSCI"]
-    trace = P.Var (P.Qualified (Just supportModuleName) (P.Ident "eval"))
-    mainValue = P.App trace (P.Var (P.Qualified Nothing (P.Ident "it")))
-    itDecl = P.ValueDeclaration (P.Ident "it") P.Public [] $ Right val
-    mainDecl = P.ValueDeclaration (P.Ident "$main") P.Public [] $ Right mainValue
-    decls = if exec then [itDecl, mainDecl] else [itDecl]
+    moduleName    = P.ModuleName [P.ProperName "$PSCI"]
+    supportImport = (supportModuleName, P.Implicit, Just (P.ModuleName [P.ProperName "$Support"]))
+    eval          = P.Var (P.Qualified (Just (P.ModuleName [P.ProperName "$Support"])) (P.Ident "eval"))
+    mainValue     = P.App eval (P.Var (P.Qualified Nothing (P.Ident "it")))
+    itDecl        = P.ValueDeclaration (P.Ident "it") P.Public [] $ Right val
+    mainDecl      = P.ValueDeclaration (P.Ident "$main") P.Public [] $ Right mainValue
+    decls         = if exec then [itDecl, mainDecl] else [itDecl]
   in
-    P.Module (P.internalModuleSourceSpan "<internal>") [] moduleName ((importDecl `map` imports) ++ lets ++ decls) Nothing
+    P.Module (P.internalModuleSourceSpan "<internal>") [] moduleName ((importDecl `map` (supportImport : imports)) ++ lets ++ decls) Nothing
 
 
 -- |

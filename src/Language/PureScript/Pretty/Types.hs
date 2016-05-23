@@ -32,6 +32,7 @@ typeLiterals = mkPattern match
   where
   match TypeWildcard{} = Just $ text "_"
   match (TypeVar var) = Just $ text var
+  match (TypeLevelString s) = Just . text $ show s
   match (PrettyPrintObject row) = Just $ prettyPrintRowWith '{' '}' row
   match (TypeConstructor ctor) = Just $ text $ runProperName $ disqualify ctor
   match (TUnknown u) = Just $ text $ 't' : show u
