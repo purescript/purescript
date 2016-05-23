@@ -219,9 +219,8 @@ exportType
 exportType exps name dctors mn = do
   let exTypes = exportedTypes exps
   let exClasses = exportedTypeClasses exps
-  case name `M.lookup` exTypes of
-    Just (_, mn') | mn /= mn' -> throwConflictError ConflictingTypeDecls name
-    _ -> return ()
+  forM_ (name `M.lookup` exTypes) $ \(_, mn') ->
+    when (mn /= mn') $ throwConflictError ConflictingTypeDecls name
   when (coerceProperName name `M.member` exClasses) $
     throwConflictError TypeConflictsWithClass name
   forM_ dctors $ \dctor -> do
@@ -229,9 +228,11 @@ exportType exps name dctors mn = do
       throwConflictError ConflictingCtorDecls dctor
     when (coerceProperName dctor `M.member` exClasses) $
       throwConflictError CtorConflictsWithClass dctor
-  return $ exps { exportedTypes = M.insert name (dctors, mn) exTypes }
+  return $ exps { exportedTypes = M.alter updateOrInsert name exTypes }
   where
   dctorExists dctor (dctors', mn') = mn /= mn' && elem dctor dctors'
+  updateOrInsert Nothing = Just (dctors, mn)
+  updateOrInsert (Just (dctors', _)) = Just (dctors ++ dctors', mn)
 
 -- |
 -- Safely adds a type operator to some exports, returning an error if a
