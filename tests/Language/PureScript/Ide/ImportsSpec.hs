@@ -70,7 +70,7 @@ spec = do
         addValueImport i mn is =
           prettyPrintImportSection (addExplicitImport' (ValueDeclaration i wildcard) mn is)
         addOpImport op mn is =
-          prettyPrintImportSection (addExplicitImport' (FixityDeclaration op) mn is)
+          prettyPrintImportSection (addExplicitImport' (ValueOperator op "" 2 P.Infix) mn is)
         addDtorImport i t mn is =
           prettyPrintImportSection (addExplicitImport' (DataConstructor i t wildcard) mn is)
     it "adds an implicit unqualified import" $
@@ -98,7 +98,7 @@ spec = do
         ]
     it "adds an operator to an explicit import list" $
       shouldBe
-        (addOpImport (Left (P.OpName "<~>")) (P.moduleNameFromString "Data.Array") explicitImports)
+        (addOpImport (P.OpName "<~>") (P.moduleNameFromString "Data.Array") explicitImports)
         [ "import Prelude"
         , "import Data.Array ((<~>), tail)"
         ]

@@ -103,11 +103,19 @@ convertDecl P.EDInstance{} = Nothing
 
 convertOperator :: P.ExternsFixity -> ExternDecl
 convertOperator P.ExternsFixity{..} =
-  FixityDeclaration (Left efOperator)
+  ValueOperator
+    efOperator
+    (T.pack (P.showQualified (either P.runIdent P.runProperName) efAlias))
+    efPrecedence
+    efAssociativity
 
 convertTypeOperator :: P.ExternsTypeFixity -> ExternDecl
 convertTypeOperator P.ExternsTypeFixity{..} =
-  FixityDeclaration (Right efTypeOperator)
+  TypeOperator
+    efTypeOperator
+    (T.pack (P.showQualified P.runProperName efTypeAlias))
+    efTypePrecedence
+    efTypeAssociativity
 
 unwrapPositioned :: P.Declaration -> P.Declaration
 unwrapPositioned (P.PositionedDeclaration _ _ x) = x
