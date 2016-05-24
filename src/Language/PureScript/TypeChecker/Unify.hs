@@ -153,13 +153,14 @@ unifyRows r1 r2 =
 -- Check that two types unify
 --
 unifiesWith :: Type -> Type -> Bool
-unifiesWith (TUnknown u1) (TUnknown u2) | u1 == u2 = True
-unifiesWith (Skolem _ s1 _ _) (Skolem _ s2 _ _) | s1 == s2 = True
-unifiesWith (TypeVar v1) (TypeVar v2) | v1 == v2 = True
-unifiesWith (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = True
-unifiesWith (TypeApp h1 t1) (TypeApp h2 t2) = h1 `unifiesWith` h2 && t1 `unifiesWith` t2
-unifiesWith REmpty REmpty = True
-unifiesWith r1@RCons{} r2@RCons{} =
+unifiesWith (TUnknown u1)        (TUnknown u2)        = u1 == u2
+unifiesWith (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    = s1 == s2
+unifiesWith (TypeVar v1)         (TypeVar v2)         = v1 == v2
+unifiesWith (TypeLevelString s1) (TypeLevelString s2) = s1 == s2
+unifiesWith (TypeConstructor c1) (TypeConstructor c2) = c1 == c2
+unifiesWith (TypeApp h1 t1)      (TypeApp h2 t2)      = h1 `unifiesWith` h2 && t1 `unifiesWith` t2
+unifiesWith REmpty               REmpty               = True
+unifiesWith r1@RCons{}           r2@RCons{} =
   let (s1, r1') = rowToList r1
       (s2, r2') = rowToList r2
 
