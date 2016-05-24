@@ -18,6 +18,7 @@ module Language.PureScript.Ide.Util where
 
 import           Prelude.Compat
 import           Data.Aeson
+import           Data.Monoid ((<>))
 import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import           Data.Text.Lazy                (fromStrict, toStrict)
@@ -47,8 +48,8 @@ identifierFromExternDecl (TypeSynonymDeclaration name _) = runProperNameT name
 identifierFromExternDecl (DataConstructor name _ _) = name
 identifierFromExternDecl (TypeClassDeclaration name) = runProperNameT name
 identifierFromExternDecl (ModuleDecl name _) = name
-identifierFromExternDecl (FixityDeclaration (Left op)) = runOpNameT op
-identifierFromExternDecl (FixityDeclaration (Right op)) = runOpNameT op
+identifierFromExternDecl (ValueOperator op _) = runOpNameT op
+identifierFromExternDecl (TypeOperator op _) = runOpNameT op
 identifierFromExternDecl Dependency{} = "~Dependency~"
 identifierFromExternDecl Export{} = "~Export~"
 
@@ -65,7 +66,10 @@ completionFromMatch (Match m d) = Just $ case d of
   DataConstructor name _ type' -> Completion (m, name, prettyTypeT type')
   TypeClassDeclaration name -> Completion (m, runProperNameT name, "class")
   ModuleDecl name _ -> Completion ("module", name, "module")
-  _ -> error "the impossible happened in completionFromMatch"
+  ValueOperator op ref -> Completion (m, runOpNameT op, "Operator for: " <> ref)
+  TypeOperator op ref -> Completion (m, runOpNameT op, "Operator for: " <> ref)
+  Dependency{} -> error "the impossible happened in completionFromMatch, Dependency"
+  Export{} -> error "the impossible happened in completionFromMatch, Export"
 
 encodeT :: (ToJSON a) => a -> Text
 encodeT = toStrict . decodeUtf8 . encode
