@@ -9,8 +9,9 @@ import Control.Monad
 import Control.Monad.Writer.Class (MonadWriter(..))
 import Control.Monad.Error.Class (MonadError(..))
 
+import Data.Function (on)
 import Data.Foldable (traverse_)
-import Data.List (intersect)
+import Data.List (intersect, groupBy, sortBy)
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
 
@@ -224,7 +225,7 @@ filterModule
   -> [DeclarationRef]
   -> m Exports
 filterModule mn exps refs = do
-  types <- foldM filterTypes M.empty refs
+  types <- foldM filterTypes M.empty (combineTypeRefs refs)
   typeOps <- foldM (filterExport TyOpName getTypeOpRef exportedTypeOps) M.empty refs
   classes <- foldM (filterExport TyClassName getTypeClassRef exportedTypeClasses) M.empty refs
   values <- foldM (filterExport IdentName getValueRef exportedValues) M.empty refs
@@ -238,6 +239,18 @@ filterModule mn exps refs = do
     }
 
   where
+
+  -- Takes the list of exported refs, filters out any non-TypeRefs, then
+  -- combines any duplicate type exports to ensure that all constructors
+  -- listed for the type are covered. Without this, only the data constructor
+  -- listing for the last ref would be used.
+  combineTypeRefs :: [DeclarationRef] -> [DeclarationRef]
+  combineTypeRefs
+    = fmap (uncurry TypeRef)
+    . map (foldr1 $ \(tc, dcs1) (_, dcs2) -> (tc, liftM2 (++) dcs1 dcs2))
+    . groupBy ((==) `on` fst)
+    . sortBy (compare `on` fst)
+    . mapMaybe getTypeRef
 
   filterTypes
     :: M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ModuleName)

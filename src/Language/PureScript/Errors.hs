@@ -577,7 +577,7 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       paras [ line $ "Cannot import " ++ printName (Qualified Nothing name) ++ " from module " ++ runModuleName mn
             , line "It either does not exist or the module does not export it."
             ]
-    renderSimpleErrorMessage (UnknownImportDataConstructor mn dcon tcon) =
+    renderSimpleErrorMessage (UnknownImportDataConstructor mn tcon dcon) =
       line $ "Module " ++ runModuleName mn ++ " does not export data constructor " ++ runProperName dcon ++ " for type " ++ runProperName tcon
     renderSimpleErrorMessage (UnknownExport name) =
       line $ "Cannot export unknown " ++ printName (Qualified Nothing name)

@@ -17,6 +17,6 @@ type F r = { | r } -> { | r }
 
 f :: (forall r. F r) -> String
 f g = case g { x: "Hello" } of
-        { x = x } -> x
+        { x: x } -> x
 
 main = log "Done"

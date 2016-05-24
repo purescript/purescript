@@ -234,7 +234,6 @@ parseDeclaration = positioned (P.choice
                    , parseValueDeclaration
                    , parseExternDeclaration
                    , parseFixityDeclaration
-                   , parseImportDeclaration
                    , parseTypeClassDeclaration
                    , parseTypeInstanceDeclaration
                    , parseDerivingInstanceDeclaration
@@ -258,7 +257,13 @@ parseModule = do
   name <- moduleName
   exports <- P.optionMaybe $ parens $ commaSep1 parseDeclarationRef
   reserved "where"
-  decls <- mark (P.many (same *> parseDeclaration))
+  decls <- mark $ do
+    -- TODO: extract a module header structure here, and provide a
+    -- parseModuleHeader function. This should allow us to speed up rebuilds
+    -- by only parsing as far as the module header. See PR #2054.
+    imports <- P.many (same *> parseImportDeclaration)
+    decls   <- P.many (same *> parseDeclaration)
+    return (imports ++ decls)
   _ <- P.eof
   end <- P.getPosition
   let ss = SourceSpan (P.sourceName start) (C.toSourcePos start) (C.toSourcePos end)
@@ -504,12 +509,12 @@ parseNullBinder = underscore *> return NullBinder
 
 parseIdentifierAndBinder :: TokenParser (String, Binder)
 parseIdentifierAndBinder =
-  do name <- lname
-     b <- P.option (VarBinder (Ident name)) rest
-     return (name, b)
-  <|> (,) <$> stringLiteral <*> rest
+    do name <- lname
+       b <- P.option (VarBinder (Ident name)) rest
+       return (name, b)
+    <|> (,) <$> stringLiteral <*> rest
   where
-  rest = C.indented *> (equals <|> colon) *> C.indented *> parseBinder
+    rest = C.indented *> colon *> C.indented *> parseBinder
 
 -- |
 -- Parse a binder
@@ -572,4 +577,3 @@ parseBinderNoParens = P.choice
 --
 parseGuard :: TokenParser Guard
 parseGuard = pipe *> C.indented *> parseValue
-
