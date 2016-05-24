@@ -18,7 +18,6 @@ module Language.PureScript.Ide.Util where
 
 import           Prelude.Compat
 import           Data.Aeson
-import           Data.Monoid ((<>))
 import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import           Data.Text.Lazy                (fromStrict, toStrict)
@@ -48,8 +47,8 @@ identifierFromExternDecl (TypeSynonymDeclaration name _) = runProperNameT name
 identifierFromExternDecl (DataConstructor name _ _) = name
 identifierFromExternDecl (TypeClassDeclaration name) = runProperNameT name
 identifierFromExternDecl (ModuleDecl name _) = name
-identifierFromExternDecl (ValueOperator op _) = runOpNameT op
-identifierFromExternDecl (TypeOperator op _) = runOpNameT op
+identifierFromExternDecl (ValueOperator op _ _ _) = runOpNameT op
+identifierFromExternDecl (TypeOperator op _ _ _) = runOpNameT op
 identifierFromExternDecl Dependency{} = "~Dependency~"
 identifierFromExternDecl Export{} = "~Export~"
 
@@ -57,19 +56,25 @@ identifierFromMatch :: Match -> Text
 identifierFromMatch (Match _ ed) = identifierFromExternDecl ed
 
 completionFromMatch :: Match -> Maybe Completion
-completionFromMatch (Match _ Dependency{}) = Nothing
-completionFromMatch (Match _ Export{}) = Nothing
-completionFromMatch (Match m d) = Just $ case d of
-  ValueDeclaration name type' -> Completion (m, name, prettyTypeT type')
-  TypeDeclaration name kind -> Completion (m, runProperNameT name, T.pack $ P.prettyPrintKind kind)
-  TypeSynonymDeclaration name kind -> Completion (m, runProperNameT name, prettyTypeT kind)
-  DataConstructor name _ type' -> Completion (m, name, prettyTypeT type')
-  TypeClassDeclaration name -> Completion (m, runProperNameT name, "class")
-  ModuleDecl name _ -> Completion ("module", name, "module")
-  ValueOperator op ref -> Completion (m, runOpNameT op, "Operator for: " <> ref)
-  TypeOperator op ref -> Completion (m, runOpNameT op, "Operator for: " <> ref)
-  Dependency{} -> error "the impossible happened in completionFromMatch, Dependency"
-  Export{} -> error "the impossible happened in completionFromMatch, Export"
+completionFromMatch (Match m d) = case d of
+  ValueDeclaration name type' -> Just $ Completion (m, name, prettyTypeT type')
+  TypeDeclaration name kind -> Just $ Completion (m, runProperNameT name, T.pack $ P.prettyPrintKind kind)
+  TypeSynonymDeclaration name kind -> Just $ Completion (m, runProperNameT name, prettyTypeT kind)
+  DataConstructor name _ type' -> Just $ Completion (m, name, prettyTypeT type')
+  TypeClassDeclaration name -> Just $ Completion (m, runProperNameT name, "class")
+  ModuleDecl name _ -> Just $ Completion ("module", name, "module")
+  ValueOperator op ref precedence associativity -> Just $ Completion (m, runOpNameT op, showFixity precedence associativity ref op)
+  TypeOperator op ref precedence associativity -> Just $ Completion (m, runOpNameT op, showFixity precedence associativity ref op)
+  Dependency{} -> Nothing
+  Export{} -> Nothing
+  where
+    showFixity p a r o =
+      let asso = case a of
+            P.Infix -> "infix"
+            P.Infixl -> "infixl"
+            P.Infixr -> "infixr"
+      in T.unwords [asso, T.pack (show p), r, "as", runOpNameT o]
+
 
 encodeT :: (ToJSON a) => a -> Text
 encodeT = toStrict . decodeUtf8 . encode

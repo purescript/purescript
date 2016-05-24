@@ -61,8 +61,8 @@ data ExternDecl
       P.Type      -- The "type"
     -- | An exported module
     | TypeClassDeclaration (P.ProperName 'P.ClassName)
-    | ValueOperator (P.OpName 'P.ValueOpName) Ident
-    | TypeOperator (P.OpName 'P.TypeOpName) Ident
+    | ValueOperator (P.OpName 'P.ValueOpName) Ident P.Precedence P.Associativity
+    | TypeOperator (P.OpName 'P.TypeOpName) Ident P.Precedence P.Associativity
     | Export ModuleIdent -- The exported Modules name
     deriving (Show,Eq,Ord)
 

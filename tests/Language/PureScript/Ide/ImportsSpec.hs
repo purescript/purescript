@@ -70,7 +70,7 @@ spec = do
         addValueImport i mn is =
           prettyPrintImportSection (addExplicitImport' (ValueDeclaration i wildcard) mn is)
         addOpImport op mn is =
-          prettyPrintImportSection (addExplicitImport' (ValueOperator op "") mn is)
+          prettyPrintImportSection (addExplicitImport' (ValueOperator op "" 2 P.Infix) mn is)
         addDtorImport i t mn is =
           prettyPrintImportSection (addExplicitImport' (DataConstructor i t wildcard) mn is)
     it "adds an implicit unqualified import" $
