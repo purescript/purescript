@@ -28,4 +28,6 @@ fi
 
 stack exec psc 'tests/**/*.purs' 'bower_components/purescript-*/src/**/*.purs'
 
+stack exec psc-docs 'bower_components/purescript-*/src/**/*.purs' > core-docs.md
+
 NODE_PATH=output node -e "require('Test.Main').main()"
