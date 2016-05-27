@@ -304,6 +304,7 @@ executable psc
     build-depends: base >=4 && <5,
                    purescript -any,
                    aeson >= 0.8 && < 0.12,
+                   ansi-terminal >= 0.6.2 && < 0.7,
                    base-compat >=0.6.0,
                    bytestring -any,
                    containers -any,

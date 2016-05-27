@@ -30,12 +30,12 @@ import Language.PureScript.Pretty.Common (endWith)
 import qualified Language.PureScript.Bundle as Bundle
 import qualified Language.PureScript.Constants as C
 
+import qualified System.Console.ANSI as ANSI
+
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Error as PE
 import qualified Text.PrettyPrint.Boxes as Box
 import Text.Parsec.Error (Message(..))
-
-import qualified System.Console.ANSI as ANSI
 
 -- | A type of error messages
 data SimpleErrorMessage
@@ -489,11 +489,11 @@ colorCodeBox codeColor b = case codeColor of
 
 -- | Default color intesity and color for code
 defaultCodeColor :: (ANSI.ColorIntensity, ANSI.Color)
-defaultCodeColor = (ANSI.Vivid, ANSI.Yellow)
+defaultCodeColor = (ANSI.Dull, ANSI.Yellow)
 
 -- | `prettyPrintSingleError` Options
 data PPEOptions = PPEOptions
-  { ppeColorCode :: Maybe (ANSI.ColorIntensity, ANSI.Color) -- ^ Color code with this color... or not
+  { ppeCodeColor :: Maybe (ANSI.ColorIntensity, ANSI.Color) -- ^ Color code with this color... or not
   , ppeFull      :: Bool -- ^ Should write a full error message?
   , ppeLevel     :: Level -- ^ Should this report an error or a warning?
   , ppeShowWiki  :: Bool -- ^ Should show a link to error message's wiki page?
@@ -502,7 +502,7 @@ data PPEOptions = PPEOptions
 -- | Default options for PPEOptions
 defaultPPEOptions :: PPEOptions
 defaultPPEOptions = PPEOptions
-  { ppeColorCode = Just defaultCodeColor
+  { ppeCodeColor = Just defaultCodeColor
   , ppeFull      = False
   , ppeLevel     = Error
   , ppeShowWiki  = True
