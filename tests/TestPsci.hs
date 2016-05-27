@@ -12,6 +12,7 @@ import Control.Monad.Writer.Strict (runWriterT)
 import Control.Monad.Trans.Except (runExceptT)
 
 import Data.List (sort)
+import qualified Data.Map as M
 
 import System.Exit (exitFailure)
 import System.Console.Haskeline
@@ -110,7 +111,6 @@ completionTestData =
   , ("ST.new", ["ST.newSTRef"])
   , ("Control.Monad.ST.new", ["Control.Monad.ST.newSTRef"])
   ]
-  where
 
 assertCompletedOk :: (String, [String]) -> Assertion
 assertCompletedOk (line, expecteds) = do
@@ -140,7 +140,7 @@ getPSCiState = do
       print err >> exitFailure
     Right modules ->
       let imports = [controlMonadSTasST, (P.ModuleName [P.ProperName "Prelude"], P.Implicit, Nothing)]
-      in  return (mkPSCiState imports modules foreigns [] [])
+      in  return (mkPSCiState imports modules foreigns M.empty [] [])
 
 controlMonadSTasST :: ImportedModule
 controlMonadSTasST = (s "Control.Monad.ST", P.Implicit, Just (s "ST"))
