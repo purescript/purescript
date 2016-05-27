@@ -41,10 +41,10 @@ data PSCMakeOptions = PSCMakeOptions
 printWarningsAndErrors :: Bool -> Bool -> P.MultipleErrors -> Either P.MultipleErrors a -> IO ()
 printWarningsAndErrors verbose False warnings errors = do
   when (P.nonEmpty warnings) $
-    hPutStrLn stderr (P.prettyPrintMultipleWarnings True verbose warnings)
+    hPutStrLn stderr (P.prettyPrintMultipleWarnings (P.defaultPPEOptions { P.ppeFull = verbose }) warnings)
   case errors of
     Left errs -> do
-      hPutStrLn stderr (P.prettyPrintMultipleErrors True verbose errs)
+      hPutStrLn stderr (P.prettyPrintMultipleErrors (P.defaultPPEOptions { P.ppeFull = verbose }) errs)
       exitFailure
     Right _ -> return ()
 printWarningsAndErrors verbose True warnings errors = do

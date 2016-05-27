@@ -460,41 +460,65 @@ showSuggestion suggestion = case errorSuggestion suggestion of
   Just (ErrorSuggestion x) -> x
   _ -> ""
 
-ansiColor :: ANSI.Color -> String
-ansiColor color =
-   ANSI.setSGRCode [ANSI.SetColor ANSI.Foreground ANSI.Vivid color]
+ansiColor :: (ANSI.ColorIntensity, ANSI.Color) -> String
+ansiColor (intesity, color) =
+   ANSI.setSGRCode [ANSI.SetColor ANSI.Foreground intesity color]
 
 ansiColorReset :: String
 ansiColorReset =
    ANSI.setSGRCode [ANSI.Reset]
 
-codeColor :: ANSI.Color
-codeColor = ANSI.Yellow
-   
-colorCode :: Bool -> String -> String
-colorCode shouldColorCode code
-  | shouldColorCode = concat [ansiColor codeColor, code, ansiColorReset]
-  | otherwise = code
+colorCode :: Maybe (ANSI.ColorIntensity, ANSI.Color) -> String -> String
+colorCode codeColor code = case codeColor of
+  Nothing -> code
+  Just cc -> concat [ansiColor cc, code, ansiColorReset]
 
-colorCodeBox :: Bool -> Box.Box -> Box.Box
-colorCodeBox shouldColorCode b
-  | not shouldColorCode = b
-  | shouldColorCode && Box.rows b == 1 = Box.text (ansiColor codeColor) Box.<> b `endWith` Box.text ansiColorReset
-  | otherwise = Box.hcat Box.left
-      [ Box.vcat Box.top $ replicate (Box.rows b) $ Box.text $ ansiColor codeColor
-      , b
-      , Box.vcat Box.top $ replicate (Box.rows b) $ Box.text ansiColorReset
-      ]
+colorCodeBox :: Maybe (ANSI.ColorIntensity, ANSI.Color) -> Box.Box -> Box.Box
+colorCodeBox codeColor b = case codeColor of
+  Nothing -> b
+  Just cc
+    | Box.rows b == 1 ->
+        Box.text (ansiColor cc) Box.<> b `endWith` Box.text ansiColorReset
+        
+    | otherwise -> Box.hcat Box.left -- making two boxes, one for each side of the box so that it will set each row it's own color and will reset it afterwards
+        [ Box.vcat Box.top $ replicate (Box.rows b) $ Box.text $ ansiColor cc
+        , b
+        , Box.vcat Box.top $ replicate (Box.rows b) $ Box.text ansiColorReset
+        ]
+
+
+-- | Default color intesity and color for code
+defaultCodeColor :: (ANSI.ColorIntensity, ANSI.Color)
+defaultCodeColor = (ANSI.Vivid, ANSI.Yellow)
+
+-- | `prettyPrintSingleError` Options
+data PPEOptions = PPEOptions
+  { ppeColorCode :: Maybe (ANSI.ColorIntensity, ANSI.Color) -- ^ Color code with this color... or not
+  , ppeFull      :: Bool -- ^ Should write a full error message?
+  , ppeLevel     :: Level -- ^ Should this report an error or a warning?
+  , ppeShowWiki  :: Bool -- ^ Should show a link to error message's wiki page?
+  }
+
+-- | Default options for PPEOptions
+defaultPPEOptions :: PPEOptions
+defaultPPEOptions = PPEOptions
+  { ppeColorCode = Just defaultCodeColor
+  , ppeFull      = False
+  , ppeLevel     = Error
+  , ppeShowWiki  = True
+  }
+
 
 -- |
 -- Pretty print a single error, simplifying if necessary
 --
-prettyPrintSingleError :: Bool -> Bool -> Level -> Bool -> ErrorMessage -> Box.Box
-prettyPrintSingleError (colorCode &&& colorCodeBox -> (markCode, markCodeBox)) full level showWiki e = flip evalState defaultUnknownMap $ do
+prettyPrintSingleError :: PPEOptions -> ErrorMessage -> Box.Box
+prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalState defaultUnknownMap $ do
   em <- onTypesInErrorMessageM replaceUnknowns (if full then e else simplifyErrorMessage e)
   um <- get
   return (prettyPrintErrorMessage um em)
   where
+  (markCode, markCodeBox) = (colorCode &&& colorCodeBox) codeColor
 
   -- Pretty print an ErrorMessage
   prettyPrintErrorMessage :: TypeMap -> ErrorMessage -> Box.Box
@@ -503,9 +527,10 @@ prettyPrintSingleError (colorCode &&& colorCodeBox -> (markCode, markCodeBox)) f
       [ foldr renderHint (indent (renderSimpleErrorMessage simple)) hints
       ] ++
       maybe [] (return . Box.moveDown 1) typeInformation ++
-      [ Box.moveDown 1 $ paras [ line $ "See " ++ wikiUri e ++ " for more information, "
-                                 , line $ "or to contribute content related to this " ++ levelText ++ "."
-                                 ]
+      [ Box.moveDown 1 $ paras
+          [ line $ "See " ++ wikiUri e ++ " for more information, "
+          , line $ "or to contribute content related to this " ++ levelText ++ "."
+          ]
       | showWiki
       ]
     where
@@ -1179,32 +1204,32 @@ prettyPrintRef (PositionedDeclarationRef _ _ ref) = prettyPrintExport ref
 -- |
 -- Pretty print multiple errors
 --
-prettyPrintMultipleErrors :: Bool -> Bool -> MultipleErrors -> String
-prettyPrintMultipleErrors shouldMarkCode full = unlines . map renderBox . prettyPrintMultipleErrorsBox shouldMarkCode full
+prettyPrintMultipleErrors :: PPEOptions -> MultipleErrors -> String
+prettyPrintMultipleErrors ppeOptions = unlines . map renderBox . prettyPrintMultipleErrorsBox ppeOptions
 
 -- |
 -- Pretty print multiple warnings
 --
-prettyPrintMultipleWarnings :: Bool -> Bool -> MultipleErrors -> String
-prettyPrintMultipleWarnings shouldMarkCode full = unlines . map renderBox . prettyPrintMultipleWarningsBox shouldMarkCode full
+prettyPrintMultipleWarnings :: PPEOptions -> MultipleErrors -> String
+prettyPrintMultipleWarnings ppeOptions = unlines . map renderBox . prettyPrintMultipleWarningsBox ppeOptions
 
 -- | Pretty print warnings as a Box
-prettyPrintMultipleWarningsBox :: Bool -> Bool -> MultipleErrors -> [Box.Box]
-prettyPrintMultipleWarningsBox shouldMarkCode = prettyPrintMultipleErrorsWith shouldMarkCode Warning "Warning found:" "Warning"
+prettyPrintMultipleWarningsBox :: PPEOptions -> MultipleErrors -> [Box.Box]
+prettyPrintMultipleWarningsBox ppeOptions = prettyPrintMultipleErrorsWith (ppeOptions { ppeLevel = Warning }) "Warning found:" "Warning"
 
 -- | Pretty print errors as a Box
-prettyPrintMultipleErrorsBox :: Bool -> Bool -> MultipleErrors -> [Box.Box]
-prettyPrintMultipleErrorsBox shouldMarkCode = prettyPrintMultipleErrorsWith shouldMarkCode Error "Error found:" "Error"
+prettyPrintMultipleErrorsBox :: PPEOptions -> MultipleErrors -> [Box.Box]
+prettyPrintMultipleErrorsBox ppeOptions = prettyPrintMultipleErrorsWith (ppeOptions { ppeLevel = Error }) "Error found:" "Error"
 
-prettyPrintMultipleErrorsWith :: Bool -> Level -> String -> String -> Bool -> MultipleErrors -> [Box.Box]
-prettyPrintMultipleErrorsWith shouldMarkCode level intro _ full (MultipleErrors [e]) =
-  let result = prettyPrintSingleError shouldMarkCode full level True e
+prettyPrintMultipleErrorsWith :: PPEOptions -> String -> String -> MultipleErrors -> [Box.Box]
+prettyPrintMultipleErrorsWith ppeOptions intro _ (MultipleErrors [e]) =
+  let result = prettyPrintSingleError ppeOptions e
   in [ Box.vcat Box.left [ Box.text intro
                          , result
                          ]
      ]
-prettyPrintMultipleErrorsWith shouldMarkCode level _ intro full (MultipleErrors es) =
-  let result = map (prettyPrintSingleError shouldMarkCode full level True) es
+prettyPrintMultipleErrorsWith ppeOptions _ intro (MultipleErrors es) =
+  let result = map (prettyPrintSingleError ppeOptions) es
   in concat $ zipWith withIntro [1 :: Int ..] result
   where
   withIntro i err = [ Box.text (intro ++ " " ++ show i ++ " of " ++ show (length es) ++ ":")
