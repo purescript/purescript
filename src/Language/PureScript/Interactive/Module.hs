@@ -26,7 +26,7 @@ supportModuleIsDefined = any ((== supportModuleName) . P.getModuleName)
 loadModule :: FilePath -> IO (Either String [P.Module])
 loadModule filename = do
   content <- readUTF8File filename
-  return $ either (Left . P.prettyPrintMultipleErrors False) (Right . map snd) $ P.parseModulesFromFiles id [(filename, content)]
+  return $ either (Left . P.prettyPrintMultipleErrors True False) (Right . map snd) $ P.parseModulesFromFiles id [(filename, content)]
 
 -- |
 -- Load all modules.

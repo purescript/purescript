@@ -133,7 +133,8 @@ library
                    transformers-compat >= 0.3.0,
                    unordered-containers -any,
                    utf8-string >= 1 && < 2,
-                   vector -any
+                   vector -any,
+                   ansi-terminal >= 0.6.2 && < 0.7
 
     exposed-modules: Language.PureScript
                      Language.PureScript.AST

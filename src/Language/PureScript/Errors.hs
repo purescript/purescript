@@ -35,6 +35,8 @@ import qualified Text.Parsec.Error as PE
 import qualified Text.PrettyPrint.Boxes as Box
 import Text.Parsec.Error (Message(..))
 
+import qualified System.Console.ANSI as ANSI
+
 -- | A type of error messages
 data SimpleErrorMessage
   = ErrorParsingFFIModule FilePath (Maybe Bundle.ErrorMessage)
@@ -458,19 +460,37 @@ showSuggestion suggestion = case errorSuggestion suggestion of
   Just (ErrorSuggestion x) -> x
   _ -> ""
 
-markCode :: String -> String
-markCode c = "`" ++ c ++ "`"
+ansiColor :: ANSI.Color -> String
+ansiColor color =
+   ANSI.setSGRCode [ANSI.SetColor ANSI.Foreground ANSI.Vivid color]
 
-markCodeBox :: Box.Box -> Box.Box
-markCodeBox b
-  | Box.rows b == 1 = Box.text "`" Box.<> b `endWith` Box.text "`"
-  | otherwise = b
+ansiColorReset :: String
+ansiColorReset =
+   ANSI.setSGRCode [ANSI.Reset]
+
+codeColor :: ANSI.Color
+codeColor = ANSI.Yellow
+   
+colorCode :: Bool -> String -> String
+colorCode shouldColorCode code
+  | shouldColorCode = concat [ansiColor codeColor, code, ansiColorReset]
+  | otherwise = code
+
+colorCodeBox :: Bool -> Box.Box -> Box.Box
+colorCodeBox shouldColorCode b
+  | not shouldColorCode = b
+  | shouldColorCode && Box.rows b == 1 = Box.text (ansiColor codeColor) Box.<> b `endWith` Box.text ansiColorReset
+  | otherwise = Box.hcat Box.left
+      [ Box.vcat Box.top $ replicate (Box.rows b) $ Box.text $ ansiColor codeColor
+      , b
+      , Box.vcat Box.top $ replicate (Box.rows b) $ Box.text ansiColorReset
+      ]
 
 -- |
 -- Pretty print a single error, simplifying if necessary
 --
-prettyPrintSingleError :: Bool -> Level -> Bool -> ErrorMessage -> Box.Box
-prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap $ do
+prettyPrintSingleError :: Bool -> Bool -> Level -> Bool -> ErrorMessage -> Box.Box
+prettyPrintSingleError (colorCode &&& colorCodeBox -> (markCode, markCodeBox)) full level showWiki e = flip evalState defaultUnknownMap $ do
   em <- onTypesInErrorMessageM replaceUnknowns (if full then e else simplifyErrorMessage e)
   um <- get
   return (prettyPrintErrorMessage um em)
@@ -562,11 +582,11 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       line "The same name was used more than once in a let binding."
     renderSimpleErrorMessage (InfiniteType ty) =
       paras [ line "An infinite type was inferred for an expression: "
-            , indent $ typeAsBox ty
+            , markCodeBox $ indent $ typeAsBox ty
             ]
     renderSimpleErrorMessage (InfiniteKind ki) =
       paras [ line "An infinite kind was inferred for a type: "
-            , indent $ line $ prettyPrintKind ki
+            , indent $ line $ markCode $ prettyPrintKind ki
             ]
     renderSimpleErrorMessage (MultipleValueOpFixities op) =
       line $ "There are multiple fixity/precedence declarations for operator " ++ markCode (showOp op)
@@ -594,11 +614,11 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       line $ "Cannot export data constructor " ++ markCode (runProperName dcon) ++ " for type " ++ markCode (runProperName tcon) ++ ", as it has not been declared."
     renderSimpleErrorMessage (ScopeConflict nm ms) =
       paras [ line $ "Conflicting definitions are in scope for " ++ printName (Qualified Nothing nm) ++ " from the following modules:"
-            , indent $ paras $ map (line . runModuleName) ms
+            , indent $ paras $ map (line . markCode . runModuleName) ms
             ]
     renderSimpleErrorMessage (ScopeShadowing nm exmn ms) =
       paras [ line $ "Shadowed definitions are in scope for " ++ printName (Qualified Nothing nm) ++ " from the following open imports:"
-            , indent $ paras $ map (line . ("import " ++) . runModuleName) ms
+            , indent $ paras $ map (line . markCode . ("import " ++) . runModuleName) ms
             , line $ "These will be ignored and the " ++ case exmn of
                 Just exmn' -> "declaration from " ++ markCode (runModuleName exmn') ++ " will be used."
                 Nothing -> "local declaration will be used."
@@ -629,7 +649,7 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       line $ "The value of " ++ markCode (showIdent nm) ++ " is undefined here, so this reference is not allowed."
     renderSimpleErrorMessage (CycleInModules mns) =
       paras [ line "There is a cycle in module dependencies in these modules: "
-            , indent $ paras (map (line . runModuleName) mns)
+            , indent $ paras (map (line . markCode . runModuleName) mns)
             ]
     renderSimpleErrorMessage (CycleInTypeSynonym name) =
       paras [ line $ case name of
@@ -649,7 +669,7 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
     renderSimpleErrorMessage (EscapedSkolem binding) =
       paras $ [ line "A type variable has escaped its scope." ]
                      <> foldMap (\expr -> [ line "Relevant expression: "
-                                          , indent $ prettyPrintValue valueDepth expr
+                                          , markCodeBox $ indent $ prettyPrintValue valueDepth expr
                                           ]) binding
     renderSimpleErrorMessage (TypesDoNotUnify u1 u2)
       = let (sorted1, sorted2) = sortRows u1 u2
@@ -671,28 +691,29 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
                  , rowFromList (sortBy (comparing fst) sd2 ++ map (fst &&& snd . snd) common, r2)
                  )
         in paras [ line "Could not match type"
-                 , indent $ typeAsBox sorted1
+                 , markCodeBox $ indent $ typeAsBox sorted1
                  , line "with type"
-                 , indent $ typeAsBox sorted2
+                 , markCodeBox $ indent $ typeAsBox sorted2
                  ]
 
     renderSimpleErrorMessage (KindsDoNotUnify k1 k2) =
       paras [ line "Could not match kind"
-            , indent $ line $ prettyPrintKind k1
+            , indent $ line $ markCode $ prettyPrintKind k1
             , line "with kind"
-            , indent $ line $ prettyPrintKind k2
+            , indent $ line $ markCode $ prettyPrintKind k2
             ]
     renderSimpleErrorMessage (ConstrainedTypeUnified t1 t2) =
       paras [ line "Could not match constrained type"
-            , indent $ typeAsBox t1
+            , markCodeBox $ indent $ typeAsBox t1
             , line "with type"
-            , indent $ typeAsBox t2
+            , markCodeBox $ indent $ typeAsBox t2
             ]
     renderSimpleErrorMessage (OverlappingInstances nm ts (d : ds)) =
       paras [ line "Overlapping type class instances found for"
-            , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName nm)
-                                           , Box.vcat Box.left (map typeAtomAsBox ts)
-                                           ]
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName nm)
+                , Box.vcat Box.left (map typeAtomAsBox ts)
+                ]
             , line "The following instances were found:"
             , indent $ paras (line (showQualified showIdent d ++ " (chosen)") : map (line . showQualified showIdent) ds)
             , line "Overlapping type class instances can lead to different behavior based on the order of module imports, and for that reason are not recommended."
@@ -706,15 +727,16 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             , line "The following additional cases are required to cover all inputs:\n"
             , indent $ paras $
                 Box.hsep 1 Box.left
-                  (map (paras . map line) (transpose bs))
+                  (map (paras . map (line . markCode)) (transpose bs))
                   : [line "..." | not b]
             , line "Alternatively, add a Partial constraint to the type of the enclosing value."
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint nm ts _)) =
       paras [ line "No type class instance was found for"
-            , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName nm)
-                                           , Box.vcat Box.left (map typeAtomAsBox ts)
-                                           ]
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName nm)
+                , Box.vcat Box.left (map typeAtomAsBox ts)
+                ]
             , paras [ line "The instance head contains unknown type variables. Consider adding a type annotation."
                     | any containsUnknowns ts
                     ]
@@ -727,23 +749,25 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
         go _ = False
     renderSimpleErrorMessage (PossiblyInfiniteInstance nm ts) =
       paras [ line "Type class instance for"
-            , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName nm)
-                                           , Box.vcat Box.left (map typeAtomAsBox ts)
-                                           ]
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName nm)
+                , Box.vcat Box.left (map typeAtomAsBox ts)
+                ]
             , line "is possibly infinite."
             ]
     renderSimpleErrorMessage (CannotDerive nm ts) =
       paras [ line "Cannot derive a type class instance for"
-            , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName nm)
-                                           , Box.vcat Box.left (map typeAtomAsBox ts)
-                                           ]
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName nm)
+                , Box.vcat Box.left (map typeAtomAsBox ts)
+                ]
             ]
     renderSimpleErrorMessage (CannotFindDerivingType nm) =
       line $ "Cannot derive a type class instance, because the type declaration for " ++ markCode (runProperName nm) ++ " could not be found."
     renderSimpleErrorMessage (DuplicateLabel l expr) =
       paras $ [ line $ "Label " ++ markCode l ++ " appears more than once in a row type." ]
                        <> foldMap (\expr' -> [ line "Relevant expression: "
-                                             , indent $ prettyPrintValue valueDepth expr'
+                                             , markCodeBox $ indent $ prettyPrintValue valueDepth expr'
                                              ]) expr
     renderSimpleErrorMessage (DuplicateTypeArgument name) =
       line $ "Type argument " ++ markCode name ++ " appears more than once."
@@ -760,18 +784,18 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
     renderSimpleErrorMessage (ExpectedType ty kind) =
       paras [ line $ "In a type-annotated expression " ++ markCode "x :: t" ++ ", the type " ++ markCode "t" ++ " must have kind " ++ markCode "*" ++ "."
             , line "The error arises from the type"
-            , indent $ typeAsBox ty
+            , markCodeBox $ indent $ typeAsBox ty
             , line "having the kind"
-            , indent $ line $ prettyPrintKind kind
+            , indent $ line $ markCode $ prettyPrintKind kind
             , line "instead."
             ]
     renderSimpleErrorMessage (IncorrectConstructorArity nm) =
       line $ "Data constructor " ++ markCode (showQualified runProperName nm) ++ " was given the wrong number of arguments in a case expression."
     renderSimpleErrorMessage (ExprDoesNotHaveType expr ty) =
       paras [ line "Expression"
-            , indent $ prettyPrintValue valueDepth expr
+            , markCodeBox $ indent $ prettyPrintValue valueDepth expr
             , line "does not have type"
-            , indent $ typeAsBox ty
+            , markCodeBox $ indent $ typeAsBox ty
             ]
     renderSimpleErrorMessage (PropertyIsMissing prop) =
       line $ "Type of expression lacks required label " ++ markCode prop ++ "."
@@ -779,17 +803,18 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       line $ "Type of expression contains additional label " ++ markCode prop ++ "."
     renderSimpleErrorMessage (CannotApplyFunction fn arg) =
       paras [ line "A function of type"
-            , indent $ typeAsBox fn
+            , markCodeBox $ indent $ typeAsBox fn
             , line "can not be applied to the argument"
-            , indent $ prettyPrintValue valueDepth arg
+            , markCodeBox $ indent $ prettyPrintValue valueDepth arg
             ]
     renderSimpleErrorMessage TypeSynonymInstance =
       line "Type class instances for type synonyms are disallowed."
     renderSimpleErrorMessage (OrphanInstance nm cnm ts) =
       paras [ line $ "Type class instance " ++ markCode (showIdent nm) ++ " for "
-            , indent $ Box.hsep 1 Box.left [ line (showQualified runProperName cnm)
-                                           , Box.vcat Box.left (map typeAtomAsBox ts)
-                                           ]
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName cnm)
+                , Box.vcat Box.left (map typeAtomAsBox ts)
+                ]
             , line "is an orphan instance."
             , line "An orphan instance is an instance which is defined in neither the class module nor the data type module."
             , line "Consider moving the instance, if possible, or using a newtype wrapper."
@@ -800,16 +825,16 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             ]
     renderSimpleErrorMessage (InvalidInstanceHead ty) =
       paras [ line "Type class instance head is invalid due to use of type"
-            , indent $ typeAsBox ty
+            , markCodeBox $ indent $ typeAsBox ty
             , line "All types appearing in instance declarations must be of the form T a_1 .. a_n, where each type a_i is of the same form."
             ]
     renderSimpleErrorMessage (TransitiveExportError x ys) =
       paras [ line $ "An export for " ++ markCode (prettyPrintExport x) ++ " requires the following to also be exported: "
-            , indent $ paras $ map (line . prettyPrintExport) ys
+            , indent $ paras $ map (line . markCode . prettyPrintExport) ys
             ]
     renderSimpleErrorMessage (TransitiveDctorExportError x ctor) =
       paras [ line $ "An export for " ++ markCode (prettyPrintExport x) ++ " requires the following data constructor to also be exported: "
-            , indent $ line $ runProperName ctor
+            , indent $ line $ markCode $ runProperName ctor
             ]
     renderSimpleErrorMessage (ShadowedName nm) =
       line $ "Name " ++ markCode (showIdent nm) ++ " was shadowed."
@@ -825,18 +850,18 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             ]
     renderSimpleErrorMessage (WildcardInferredType ty) =
       paras [ line "Wildcard type definition has the inferred type "
-            , indent $ typeAsBox ty
+            , markCodeBox $ indent $ typeAsBox ty
             ]
     renderSimpleErrorMessage (HoleInferredType name ty env) =
       paras $ [ line $ "Hole '" ++ markCode name ++ "' has the inferred type "
-              , indent $ typeAsBox ty
+              , markCodeBox $ indent $ typeAsBox ty
               ] ++ if null env then [] else envInfo
       where
         envInfo :: [Box.Box]
         envInfo = [ line "in the following context:"
                   , indent $ paras
                       [ Box.hcat Box.left [ Box.text (showIdent ident <> " :: ")
-                                          , typeAsBox ty'
+                                          , markCodeBox $ typeAsBox ty'
                                           ]
                       | (ident, ty') <- take 5 env
                       ]
@@ -845,7 +870,7 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       paras [ line $ "No type declaration was provided for the top-level declaration of " ++ markCode (showIdent ident) ++ "."
             , line "It is good practice to provide type declarations as a form of documentation."
             , line $ "The inferred type of " ++ markCode (showIdent ident) ++ " was:"
-            , indent $ typeAsBox ty
+            , markCodeBox $ indent $ typeAsBox ty
             ]
     renderSimpleErrorMessage (OverlappingPattern bs b) =
       paras $ [ line "A case expression contains unreachable cases:\n"
@@ -863,14 +888,14 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
       paras [ line $ "The import of module " ++ markCode (runModuleName mn) ++ " contains the following unused references:"
             , indent $ paras $ map line names
             , line "It could be replaced with:"
-            , indent $ line $ showSuggestion msg ]
+            , indent $ line $ markCode $ showSuggestion msg ]
 
     renderSimpleErrorMessage (UnusedDctorImport name) =
       line $ "The import of type " ++ markCode (runProperName name) ++ " includes data constructors but only the type is used"
 
     renderSimpleErrorMessage (UnusedDctorExplicitImport name names) =
       paras [ line $ "The import of type " ++ markCode (runProperName name) ++ " includes the following unused data constructors:"
-            , indent $ paras $ map (line .runProperName) names ]
+            , indent $ paras $ map (line . markCode . runProperName) names ]
 
     renderSimpleErrorMessage (DuplicateSelectiveImport name) =
       line $ "There is an existing import of " ++ markCode (runModuleName name) ++ ", consider merging the import lists"
@@ -891,17 +916,17 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
     renderSimpleErrorMessage msg@(ImplicitQualifiedImport importedModule asModule _) =
       paras [ line $ "Module " ++ markCode (runModuleName importedModule) ++ " was imported as " ++ markCode (runModuleName asModule) ++ " with unspecified imports."
             , line $ "As there are multiple modules being imported as " ++ markCode (runModuleName asModule) ++ ", consider using the explicit form:"
-            , indent $ line $ showSuggestion msg
+            , indent $ line $ markCode $ showSuggestion msg
             ]
 
     renderSimpleErrorMessage msg@(ImplicitImport mn _) =
       paras [ line $ "Module " ++ markCode (runModuleName mn) ++ " has unspecified imports, consider using the explicit form: "
-            , indent $ line $ showSuggestion msg
+            , indent $ line $ markCode $ showSuggestion msg
             ]
 
     renderSimpleErrorMessage msg@(HidingImport mn _) =
       paras [ line $ "Module " ++ markCode (runModuleName mn) ++ " has unspecified imports, consider using the inclusive form: "
-            , indent $ line $ showSuggestion msg
+            , indent $ line $ markCode $ showSuggestion msg
             ]
 
     renderSimpleErrorMessage (CaseBinderLengthDiffers l bs) =
@@ -924,7 +949,7 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
     renderSimpleErrorMessage (CannotGeneralizeRecursiveFunction ident ty) =
       paras [ line $ "Unable to generalize the type of the recursive function " ++ markCode (showIdent ident) ++ "."
             , line $ "The inferred type of " ++ markCode (showIdent ident) ++ " was:"
-            , indent $ typeAsBox ty
+            , markCodeBox $ indent $ typeAsBox ty
             , line "Try adding a type signature."
             ]
 
@@ -941,7 +966,7 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
     renderHint (ErrorInExpression expr) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ Box.text "in the expression"
-                                 , markCodeBox $ prettyPrintValue valueDepth expr
+                                 , markCodeBox $ markCodeBox $ prettyPrintValue valueDepth expr
                                  ]
             ]
     renderHint (ErrorInModule mn) detail =
@@ -959,10 +984,11 @@ prettyPrintSingleError full level showWiki e = flip evalState defaultUnknownMap 
             ]
     renderHint (ErrorInInstance nm ts) detail =
       paras [ detail
-            , Box.hsep 1 Box.top [ line "in type class instance"
-                                 , markCodeBox $ line (showQualified runProperName nm)
-                                 , Box.vcat Box.left (map (markCodeBox . typeAtomAsBox) ts)
-                                 ]
+            , line "in type class instance"
+            , markCodeBox $ indent $ Box.hsep 1 Box.top
+               [ line $ showQualified runProperName nm
+               , Box.vcat Box.left (map typeAtomAsBox ts)
+               ]
             ]
     renderHint (ErrorCheckingKind ty) detail =
       paras [ detail
@@ -1153,32 +1179,32 @@ prettyPrintRef (PositionedDeclarationRef _ _ ref) = prettyPrintExport ref
 -- |
 -- Pretty print multiple errors
 --
-prettyPrintMultipleErrors :: Bool -> MultipleErrors -> String
-prettyPrintMultipleErrors full = unlines . map renderBox . prettyPrintMultipleErrorsBox full
+prettyPrintMultipleErrors :: Bool -> Bool -> MultipleErrors -> String
+prettyPrintMultipleErrors shouldMarkCode full = unlines . map renderBox . prettyPrintMultipleErrorsBox shouldMarkCode full
 
 -- |
 -- Pretty print multiple warnings
 --
-prettyPrintMultipleWarnings :: Bool -> MultipleErrors -> String
-prettyPrintMultipleWarnings full = unlines . map renderBox . prettyPrintMultipleWarningsBox full
+prettyPrintMultipleWarnings :: Bool -> Bool -> MultipleErrors -> String
+prettyPrintMultipleWarnings shouldMarkCode full = unlines . map renderBox . prettyPrintMultipleWarningsBox shouldMarkCode full
 
 -- | Pretty print warnings as a Box
-prettyPrintMultipleWarningsBox :: Bool -> MultipleErrors -> [Box.Box]
-prettyPrintMultipleWarningsBox = prettyPrintMultipleErrorsWith Warning "Warning found:" "Warning"
+prettyPrintMultipleWarningsBox :: Bool -> Bool -> MultipleErrors -> [Box.Box]
+prettyPrintMultipleWarningsBox shouldMarkCode = prettyPrintMultipleErrorsWith shouldMarkCode Warning "Warning found:" "Warning"
 
 -- | Pretty print errors as a Box
-prettyPrintMultipleErrorsBox :: Bool -> MultipleErrors -> [Box.Box]
-prettyPrintMultipleErrorsBox = prettyPrintMultipleErrorsWith Error "Error found:" "Error"
+prettyPrintMultipleErrorsBox :: Bool -> Bool -> MultipleErrors -> [Box.Box]
+prettyPrintMultipleErrorsBox shouldMarkCode = prettyPrintMultipleErrorsWith shouldMarkCode Error "Error found:" "Error"
 
-prettyPrintMultipleErrorsWith :: Level -> String -> String -> Bool -> MultipleErrors -> [Box.Box]
-prettyPrintMultipleErrorsWith level intro _ full (MultipleErrors [e]) =
-  let result = prettyPrintSingleError full level True e
+prettyPrintMultipleErrorsWith :: Bool -> Level -> String -> String -> Bool -> MultipleErrors -> [Box.Box]
+prettyPrintMultipleErrorsWith shouldMarkCode level intro _ full (MultipleErrors [e]) =
+  let result = prettyPrintSingleError shouldMarkCode full level True e
   in [ Box.vcat Box.left [ Box.text intro
                          , result
                          ]
      ]
-prettyPrintMultipleErrorsWith level _ intro full (MultipleErrors es) =
-  let result = map (prettyPrintSingleError full level True) es
+prettyPrintMultipleErrorsWith shouldMarkCode level _ intro full (MultipleErrors es) =
+  let result = map (prettyPrintSingleError shouldMarkCode full level True) es
   in concat $ zipWith withIntro [1 :: Int ..] result
   where
   withIntro i err = [ Box.text (intro ++ " " ++ show i ++ " of " ++ show (length es) ++ ":")
