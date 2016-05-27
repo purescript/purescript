@@ -5,6 +5,7 @@ This file lists the contributors to the PureScript compiler project, and the ter
 ### Individuals
 
 - [@5outh](https://github.com/5outh) (Benjamin Kovach) - My existing contributions and all future contributions until further notice are Copyright Benjamin Kovach, and are licensed to the owners and users of the PureScript compiler project under the terms of the MIT license.
+- [@adinapoli](https://github.com/adinapoli) (Alfredo Di Napoli) My existing contributions and all future contributions until further notice are Copyright Alfredo Di Napoli, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 - [@andyarvanitis](https://github.com/andyarvanitis) (Andy Arvanitis) My existing contributions and all future contributions until further notice are Copyright Andy Arvanitis, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 - [@anthok88](https://github.com/anthoq88) - My existing contributions and all future contributions until further notice are Copyright anthoq88, and are licensed to the owners and users of the PureScript compiler project under the terms of the MIT license
 - [@ardumont](https://github.com/ardumont) (Antoine R. Dumont) My existing contributions and all future contributions until further notice are Copyright Antoine R. Dumont, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
@@ -75,4 +76,5 @@ This file lists the contributors to the PureScript compiler project, and the ter
 
 ### Companies
 
+- [@iconnect](https://github.com/iconnect) (IRIS Connect, Ltd.) Speaking on behalf of IRIS Connect for IRIS Connect employees, our existing contributions and all future contributions to the PureScript compiler are, until further notice, Copyright IRIS Connect Ltd., and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT). - @adinapoli & @filib
 - [@slamdata](https://github.com/slamdata) (SlamData, Inc.) Speaking on behalf of SlamData for SlamData employees, our existing contributions and all future contributions to the PureScript compiler are, until further notice, Copyright SlamData Inc., and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT). - @jdegoes
