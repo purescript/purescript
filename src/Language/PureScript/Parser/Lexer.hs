@@ -41,8 +41,8 @@ module Language.PureScript.Parser.Lexer
   , commaSep1
   , lname
   , qualifier
+  , tyname
   , uname
-  , uname'
   , mname
   , reserved
   , symbol
@@ -213,8 +213,9 @@ parseToken = P.choice
   , P.try $ P.char '_'    *> P.notFollowedBy identLetter *> pure Underscore
   , HoleLit <$> P.try (P.char '?' *> P.many1 identLetter)
   , LName         <$> parseLName
-  , do uName <- parseUName
-       (guard (validModuleName uName) >> Qualifier uName <$ P.char '.') <|> pure (UName uName)
+  , parseUName >>= \uName ->
+      (guard (validModuleName uName) >> Qualifier uName <$ P.char '.')
+        <|> pure (UName uName)
   , Symbol        <$> parseSymbol
   , CharLiteral   <$> parseCharLiteral
   , StringLiteral <$> parseStringLiteral
@@ -226,7 +227,7 @@ parseToken = P.choice
   parseLName = (:) <$> identStart <*> P.many identLetter
 
   parseUName :: P.Parsec String u String
-  parseUName = (:) <$> P.upper <*> P.many uidentLetter
+  parseUName = (:) <$> P.upper <*> P.many identLetter
 
   parseSymbol :: P.Parsec String u String
   parseSymbol = P.many1 symbolChar
@@ -236,9 +237,6 @@ parseToken = P.choice
 
   identLetter :: P.Parsec String u Char
   identLetter = P.alphaNum <|> P.oneOf "_'"
-
-  uidentLetter :: P.Parsec String u Char
-  uidentLetter = P.alphaNum <|> P.char '_'
 
   symbolChar :: P.Parsec String u Char
   symbolChar = P.satisfy isSymbolChar
@@ -431,6 +429,12 @@ reserved s = token go P.<?> show s
 uname :: TokenParser String
 uname = token go P.<?> "proper name"
   where
+  go (UName s) | validUName s = Just s
+  go _ = Nothing
+
+tyname :: TokenParser String
+tyname = token go P.<?> "type name"
+  where
   go (UName s) = Just s
   go _ = Nothing
 
@@ -438,12 +442,6 @@ mname :: TokenParser String
 mname = token go P.<?> "module name"
   where
   go (UName s) | validModuleName s = Just s
-  go _ = Nothing
-
-uname' :: String -> TokenParser ()
-uname' s = token go P.<?> show s
-  where
-  go (UName s') | s == s' = Just ()
   go _ = Nothing
 
 symbol :: TokenParser String
@@ -495,6 +493,9 @@ identifier = token go P.<?> "identifier"
 
 validModuleName :: String -> Bool
 validModuleName s = '_' `notElem` s
+
+validUName :: String -> Bool
+validUName s = '\'' `notElem` s
 
 -- |
 -- A list of purescript reserved identifiers
