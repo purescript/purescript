@@ -1,47 +1,30 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.TypeChecker.Unify
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
+{-# LANGUAGE FlexibleInstances #-}
+
 -- |
 -- Functions and instances relating to unification
 --
------------------------------------------------------------------------------
+module Language.PureScript.TypeChecker.Unify
+  ( freshType
+  , solveType
+  , substituteType
+  , unknownsInType
+  , unifyTypes
+  , unifyRows
+  , unifiesWith
+  , replaceVarWithUnknown
+  , replaceTypeWildcards
+  , varIfUnknown
+  ) where
 
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE CPP #-}
+import Prelude.Compat
 
-module Language.PureScript.TypeChecker.Unify (
-    freshType,
-    solveType,
-    substituteType,
-    unknownsInType,
-    unifyTypes,
-    unifyRows,
-    unifiesWith,
-    replaceVarWithUnknown,
-    replaceTypeWildcards,
-    varIfUnknown
-) where
+import Control.Monad
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.State.Class (MonadState(..), gets, modify)
+import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.List (nub, sort)
 import qualified Data.Map as M
-
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
-import Control.Monad
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Writer.Class (MonadWriter(..))
-import Control.Monad.State.Class (MonadState(..), gets, modify)
 
 import Language.PureScript.Crash
 import Language.PureScript.Errors
@@ -209,9 +192,9 @@ replaceVarWithUnknown ident ty = do
 replaceTypeWildcards :: (MonadWriter MultipleErrors m, MonadState CheckState m) => Type -> m Type
 replaceTypeWildcards = everywhereOnTypesM replace
   where
-  replace TypeWildcard = do
+  replace (TypeWildcard ss) = do
     t <- freshType
-    tell . errorMessage $ WildcardInferredType t
+    warnWithPosition ss $ tell . errorMessage $ WildcardInferredType t
     return t
   replace other = return other
 

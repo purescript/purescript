@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console
+import Control.Monad.Eff.Console (log)
 
 class Show a <= Nonsense a where
   method :: a -> a

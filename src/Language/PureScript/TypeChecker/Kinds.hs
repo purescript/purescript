@@ -1,9 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE RankNTypes #-}
 
 -- |
 -- This module implements the kind checker
@@ -15,16 +10,15 @@ module Language.PureScript.TypeChecker.Kinds
   , kindsOfAll
   ) where
 
-import Prelude ()
 import Prelude.Compat
-
-import qualified Data.Map as M
 
 import Control.Arrow (second)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Writer.Class (MonadWriter(..))
 import Control.Monad.State
+import Control.Monad.Writer.Class (MonadWriter(..))
+
+import qualified Data.Map as M
 
 import Language.PureScript.Crash
 import Language.PureScript.Environment
@@ -235,7 +229,7 @@ infer' other = (, []) <$> go other
     k' <- go ty
     unifyKinds k k'
     return k'
-  go TypeWildcard = freshKind
+  go TypeWildcard{} = freshKind
   go (TypeVar v) = do
     Just moduleName <- checkCurrentModule <$> get
     lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
@@ -245,7 +239,7 @@ infer' other = (, []) <$> go other
   go (TypeConstructor v) = do
     env <- getEnv
     case M.lookup v (types env) of
-      Nothing -> throwError . errorMessage $ UnknownTypeConstructor v
+      Nothing -> throwError . errorMessage . UnknownName $ fmap TyName v
       Just (kind, _) -> return kind
   go (TypeApp t1 t2) = do
     k0 <- freshKind
@@ -262,7 +256,7 @@ infer' other = (, []) <$> go other
     unifyKinds k2 (Row k1)
     return $ Row k1
   go (ConstrainedType deps ty) = do
-    forM_ deps $ \(className, tys) -> do
+    forM_ deps $ \(Constraint className tys _) -> do
       k <- go $ foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
       unifyKinds k Star
     k <- go ty

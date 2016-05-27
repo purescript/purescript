@@ -1,9 +1,9 @@
 module Main where
 
-import Prelude ()
+import Control.Monad.Eff.Console (log)
 
 fns = \f -> if f true then f else \x -> x
 
 not = \x -> if x then false else true
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

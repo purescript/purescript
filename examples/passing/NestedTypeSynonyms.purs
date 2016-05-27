@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 type X = String
 type Y = X -> X
@@ -8,4 +9,4 @@ type Y = X -> X
 fn :: Y
 fn a = a
 
-main = Control.Monad.Eff.Console.print (fn "Done")
+main = log (fn "Done")

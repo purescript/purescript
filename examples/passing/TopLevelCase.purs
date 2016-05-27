@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 gcd :: Number -> Number -> Number
 gcd 0.0 x = x
@@ -15,4 +16,4 @@ data A = A
 
 parseTest A 0.0 = 0.0
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

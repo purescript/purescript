@@ -36,6 +36,9 @@ listImport = testParseImport "import Data.List as List"
 consoleImport = testParseImport "import Control.Monad.Eff.Console (log) as Console"
 maybeImport = testParseImport "import Data.Maybe (Maybe(Just))"
 
+wildcard :: P.Type
+wildcard = P.TypeWildcard $ P.SourceSpan "" (P.SourcePos 0 0) (P.SourcePos 0 0)
+
 spec :: Spec
 spec = do
   describe "determining the importsection" $ do
@@ -65,9 +68,11 @@ spec = do
   describe "import commands" $ do
     let simpleFileImports = let (_, _, i, _) = splitSimpleFile in i
         addValueImport i mn is =
-          prettyPrintImportSection (addExplicitImport' (ValueDeclaration i P.TypeWildcard) mn is)
+          prettyPrintImportSection (addExplicitImport' (ValueDeclaration i wildcard) mn is)
+        addOpImport op mn is =
+          prettyPrintImportSection (addExplicitImport' (ValueOperator op "" 2 P.Infix) mn is)
         addDtorImport i t mn is =
-          prettyPrintImportSection (addExplicitImport' (DataConstructor i t P.TypeWildcard) mn is)
+          prettyPrintImportSection (addExplicitImport' (DataConstructor i t wildcard) mn is)
     it "adds an implicit unqualified import" $
       shouldBe
         (addImplicitImport' simpleFileImports (P.moduleNameFromString "Data.Map"))
@@ -93,7 +98,7 @@ spec = do
         ]
     it "adds an operator to an explicit import list" $
       shouldBe
-        (addValueImport "<~>" (P.moduleNameFromString "Data.Array") explicitImports)
+        (addOpImport (P.OpName "<~>") (P.moduleNameFromString "Data.Array") explicitImports)
         [ "import Prelude"
         , "import Data.Array ((<~>), tail)"
         ]

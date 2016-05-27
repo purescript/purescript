@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log, logShow)
 
 test =
   let f :: Number -> Boolean
@@ -14,4 +15,6 @@ test =
       x = f 1.0
   in not x
 
-main = Control.Monad.Eff.Console.print test
+main = do
+  logShow test
+  log "Done"

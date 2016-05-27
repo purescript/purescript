@@ -12,10 +12,6 @@
 -- Provides functionality to manage imports
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE LambdaCase            #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PackageImports        #-}
 
@@ -34,6 +30,7 @@ module Language.PureScript.Ide.Imports
        )
        where
 
+import           Prelude.Compat
 import           Control.Applicative                ((<|>))
 import           Control.Monad.Error.Class
 import           Control.Monad.IO.Class
@@ -95,9 +92,9 @@ parseImportsWithModuleName ls = do
   (P.Module _ _ mn decls _) <- moduleParse ls
   pure (mn, concatMap mkImport (unwrapPositioned <$> decls))
   where
-    mkImport (P.ImportDeclaration mn (P.Explicit refs) qual _) =
+    mkImport (P.ImportDeclaration mn (P.Explicit refs) qual) =
       [Import mn (P.Explicit (unwrapPositionedRef <$> refs)) qual]
-    mkImport (P.ImportDeclaration mn it qual _) = [Import mn it qual]
+    mkImport (P.ImportDeclaration mn it qual) = [Import mn it qual]
     mkImport _ = []
 
 sliceImportSection :: [Text] -> Either String (P.ModuleName, [Text], [Import], [Text])
@@ -212,15 +209,18 @@ addExplicitImport' decl moduleName imports =
     then imports
     else updateAtFirstOrPrepend matches (insertDeclIntoImport decl) freshImport imports
   where
-    refFromDeclaration (TypeClassDeclaration n) = P.TypeClassRef n
+    refFromDeclaration (TypeClassDeclaration n) =
+      P.TypeClassRef n
     refFromDeclaration (DataConstructor n tn _) =
       P.TypeRef tn (Just [P.ProperName (T.unpack n)])
-    refFromDeclaration (TypeDeclaration n _) = P.TypeRef n (Just [])
+    refFromDeclaration (TypeDeclaration n _) =
+      P.TypeRef n (Just [])
+    refFromDeclaration (ValueOperator op _ _ _) =
+      P.ValueOpRef op
+    refFromDeclaration (TypeOperator op _ _ _) =
+      P.TypeOpRef op
     refFromDeclaration d =
-      let
-        ident = T.unpack (identifierFromExternDecl d)
-      in
-        P.ValueRef ((if all P.isSymbolChar ident then P.Op else P.Ident) ident)
+      P.ValueRef $ P.Ident $ T.unpack (identifierFromExternDecl d)
 
     -- | Adds a declaration to an import:
     -- TypeDeclaration "Maybe" + Data.Maybe (maybe) -> Data.Maybe(Maybe, maybe)
@@ -233,10 +233,8 @@ addExplicitImport' decl moduleName imports =
     insertDeclIntoRefs (DataConstructor dtor tn _) refs =
       let
         dtor' = P.ProperName (T.unpack dtor)
-        -- TODO: Get rid of this once typeclasses can't be imported like types
-        refs' = properRefToTypeRef <$> refs
       in
-        updateAtFirstOrPrepend (matchType tn) (insertDtor dtor') (P.TypeRef tn (Just [dtor'])) refs'
+        updateAtFirstOrPrepend (matchType tn) (insertDtor dtor') (P.TypeRef tn (Just [dtor'])) refs
     insertDeclIntoRefs dr refs = List.nubBy ((==) `on` P.prettyPrintRef) (refFromDeclaration dr : refs)
 
     insertDtor dtor (P.TypeRef tn' dtors) =
@@ -246,11 +244,6 @@ addExplicitImport' decl moduleName imports =
         -- import Data.Maybe (Maybe(..)) -> import Data.Maybe (Maybe(Just))
         Nothing -> P.TypeRef tn' Nothing
     insertDtor _ refs = refs
-
-
-    -- TODO: Get rid of this once typeclasses can't be imported like types
-    properRefToTypeRef (P.ProperRef n) = P.TypeRef (P.ProperName n) (Just [])
-    properRefToTypeRef r = r
 
     matchType :: P.ProperName 'P.TypeName -> P.DeclarationRef -> Bool
     matchType tn (P.TypeRef n _) = tn == n
@@ -348,8 +341,7 @@ parseImport :: Text -> Maybe Import
 parseImport t =
   case P.lex "<psc-ide>" (T.unpack t)
        >>= P.runTokenParser "<psc-ide>" P.parseImportDeclaration' of
-    Right (mn, P.Explicit refs, mmn, _) ->
+    Right (mn, P.Explicit refs, mmn) ->
       Just (Import mn (P.Explicit (unwrapPositionedRef <$> refs)) mmn)
-    Right (mn, idt, mmn, _) -> Just (Import mn idt mmn)
+    Right (mn, idt, mmn) -> Just (Import mn idt mmn)
     Left _ -> Nothing
-

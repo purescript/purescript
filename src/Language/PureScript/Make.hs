@@ -1,10 +1,4 @@
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module Language.PureScript.Make
@@ -20,59 +14,46 @@ module Language.PureScript.Make
   -- * Implementation of Make API using files on disk
   , Make(..)
   , runMake
+  , makeIO
+  , readTextFile
   , buildMakeActions
+  , inferForeignModules
   ) where
 
-import Prelude ()
 import Prelude.Compat
 
-import Control.Applicative ((<|>))
-import Control.Monad hiding (sequence)
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Writer.Class (MonadWriter(..))
-import Control.Monad.Trans.Class (MonadTrans(..))
-import Control.Monad.Trans.Except
-import Control.Monad.IO.Class
-import Control.Monad.Reader (MonadReader(..), ReaderT(..), asks)
-import Control.Monad.Logger
-import Control.Monad.Supply
-import Control.Monad.Base (MonadBase(..))
-import Control.Monad.Trans.Control (MonadBaseControl(..))
-
 import Control.Concurrent.Lifted as C
+import Control.Monad hiding (sequence)
+import Control.Monad.Base (MonadBase(..))
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.IO.Class
+import Control.Monad.Logger
+import Control.Monad.Reader (MonadReader(..), ReaderT(..), asks)
+import Control.Monad.Supply
+import Control.Monad.Trans.Class (MonadTrans(..))
+import Control.Monad.Trans.Control (MonadBaseControl(..))
+import Control.Monad.Trans.Except
+import Control.Monad.Writer.Class (MonadWriter(..))
 
-import Data.List (foldl', sort)
-import Data.Maybe (fromMaybe, catMaybes, isJust)
+import Data.Aeson (encode, decode)
 import Data.Either (partitionEithers)
-import Data.Time.Clock
-import Data.String (fromString)
 import Data.Foldable (for_)
+import Data.List (foldl', sort)
+import Data.Maybe (fromMaybe, catMaybes)
+import Data.String (fromString)
+import Data.Time.Clock
 import Data.Traversable (for)
 import Data.Version (showVersion)
-import Data.Aeson (encode, decode)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.UTF8 as BU8
-import qualified Data.Set as S
 import qualified Data.Map as M
+import qualified Data.Set as S
 
-import qualified Text.Parsec as Parsec
-
-import SourceMap.Types
-import SourceMap
-
-import System.Directory
-       (doesFileExist, getModificationTime, createDirectoryIfMissing, getCurrentDirectory)
-import System.FilePath ((</>), takeDirectory, makeRelative, splitPath, normalise)
-import System.IO.Error (tryIOError)
-import System.IO.UTF8 (readUTF8File, writeUTF8File)
-
-import qualified Language.JavaScript.Parser as JS
-
-import Language.PureScript.Crash
 import Language.PureScript.AST
-import Language.PureScript.Externs
+import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
+import Language.PureScript.Externs
 import Language.PureScript.Linter
 import Language.PureScript.ModuleDependencies
 import Language.PureScript.Names
@@ -82,13 +63,24 @@ import Language.PureScript.Pretty.Common(SMap(..))
 import Language.PureScript.Renamer
 import Language.PureScript.Sugar
 import Language.PureScript.TypeChecker
-import qualified Language.PureScript.Constants as C
+import qualified Language.JavaScript.Parser as JS
 import qualified Language.PureScript.Bundle as Bundle
+import qualified Language.PureScript.CodeGen.JS as J
+import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.CoreFn as CF
 import qualified Language.PureScript.Parser as PSParser
 
-import qualified Language.PureScript.CodeGen.JS as J
-import qualified Language.PureScript.CoreFn as CF
 import qualified Paths_purescript as Paths
+
+import SourceMap
+import SourceMap.Types
+
+import System.Directory (doesFileExist, getModificationTime, createDirectoryIfMissing, getCurrentDirectory)
+import System.FilePath ((</>), takeDirectory, makeRelative, splitPath, normalise, replaceExtension)
+import System.IO.Error (tryIOError)
+import System.IO.UTF8 (readUTF8File, writeUTF8File)
+
+import qualified Text.Parsec as Parsec
 
 -- | Progress messages from the make process
 data ProgressMessage
@@ -107,31 +99,22 @@ renderProgressMessage (CompilingModule mn) = "Compiling " ++ runModuleName mn
 --
 -- * The details of how files are read/written etc.
 --
-data MakeActions m = MakeActions {
-  -- |
-  -- Get the timestamp for the input file(s) for a module. If there are multiple
-  -- files (.purs and foreign files, for example) the timestamp should be for
+data MakeActions m = MakeActions
+  { getInputTimestamp :: ModuleName -> m (Either RebuildPolicy (Maybe UTCTime))
+  -- ^ Get the timestamp for the input file(s) for a module. If there are multiple
+  -- files (@.purs@ and foreign files, for example) the timestamp should be for
   -- the most recently modified file.
-  --
-    getInputTimestamp :: ModuleName -> m (Either RebuildPolicy (Maybe UTCTime))
-  -- |
-  -- Get the timestamp for the output files for a module. This should be the
-  -- timestamp for the oldest modified file, or Nothing if any of the required
-  -- output files are missing.
-  --
   , getOutputTimestamp :: ModuleName -> m (Maybe UTCTime)
-  -- |
-  -- Read the externs file for a module as a string and also return the actual
-  -- path for the file.
+  -- ^ Get the timestamp for the output files for a module. This should be the
+  -- timestamp for the oldest modified file, or 'Nothing' if any of the required
+  -- output files are missing.
   , readExterns :: ModuleName -> m (FilePath, Externs)
-  -- |
-  -- Run the code generator for the module and write any required output files.
-  --
+  -- ^ Read the externs file for a module as a string and also return the actual
+  -- path for the file.
   , codegen :: CF.Module CF.Ann -> Environment -> Externs -> SupplyT m ()
-  -- |
-  -- Respond to a progress update.
-  --
+  -- ^ Run the code generator for the module and write any required output files.
   , progress :: ProgressMessage -> m ()
+  -- ^ Respond to a progress update.
   }
 
 -- |
@@ -157,11 +140,11 @@ rebuildModule :: forall m. (Monad m, MonadBaseControl IO m, MonadReader Options 
 rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
   progress $ CompilingModule moduleName
   let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
-  lint m
-  ((checked@(Module ss coms _ elaborated exps), env'), nextVar) <- runSupplyT 0 $ do
-    [desugared] <- desugar externs [m]
+      withPrim = importPrim m
+  lint withPrim
+  ((Module ss coms _ elaborated exps, env'), nextVar) <- runSupplyT 0 $ do
+    [desugared] <- desugar externs [withPrim]
     runCheck' env $ typeCheckModule desugared
-  checkExhaustiveModule env' checked
   regrouped <- createBindingGroups moduleName . collapseBindingGroups $ elaborated
   let mod' = Module ss coms moduleName regrouped exps
       corefn = CF.moduleToCoreFn env' mod'
@@ -179,11 +162,8 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
 make :: forall m. (Monad m, MonadBaseControl IO m, MonadReader Options m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
      => MakeActions m
      -> [Module]
-     -> m Environment
+     -> m [ExternsFile]
 make ma@MakeActions{..} ms = do
-  requirePath <- asks optionsRequirePath
-  when (isJust requirePath) $ tell $ errorMessage DeprecatedRequirePath
-
   checkModuleNamesAreUnique
 
   (sorted, graph) <- sortModules ms
@@ -202,7 +182,7 @@ make ma@MakeActions{..} ms = do
 
   -- Bundle up all the externs and return them as an Environment
   (_, externs) <- unzip . fromMaybe (internalError "make: externs were missing but no errors reported.") . sequence <$> for barriers (takeMVar . fst . snd)
-  return $ foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
+  return externs
 
   where
   checkModuleNamesAreUnique :: m ()
@@ -304,10 +284,28 @@ makeIO f io = do
   e <- liftIO $ tryIOError io
   either (throwError . singleError . f) return e
 
--- Traverse (Either e) instance (base 4.7)
-traverseEither :: Applicative f => (a -> f b) -> Either e a -> f (Either e b)
-traverseEither _ (Left x) = pure (Left x)
-traverseEither f (Right y) = Right <$> f y
+-- | Read a text file in the 'Make' monad, capturing any errors using the
+-- 'MonadError' instance.
+readTextFile :: FilePath -> Make String
+readTextFile path = makeIO (const (ErrorMessage [] $ CannotReadFile path)) $ readUTF8File path
+
+-- | Infer the module name for a module by looking for the same filename with
+-- a .js extension.
+inferForeignModules
+  :: forall m
+   . MonadIO m
+  => M.Map ModuleName (Either RebuildPolicy FilePath)
+  -> m (M.Map ModuleName FilePath)
+inferForeignModules = fmap (M.mapMaybe id) . traverse inferForeignModule
+  where
+    inferForeignModule :: Either RebuildPolicy FilePath -> m (Maybe FilePath)
+    inferForeignModule (Left _) = return Nothing
+    inferForeignModule (Right path) = do
+      let jsFile = replaceExtension path "js"
+      exists <- liftIO $ doesFileExist jsFile
+      if exists
+        then return (Just jsFile)
+        else return Nothing
 
 -- |
 -- A set of make actions that read and write modules from the given directory.
@@ -324,7 +322,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   getInputTimestamp :: ModuleName -> Make (Either RebuildPolicy (Maybe UTCTime))
   getInputTimestamp mn = do
     let path = fromMaybe (internalError "Module has no filename in 'make'") $ M.lookup mn filePathMap
-    e1 <- traverseEither getTimestamp path
+    e1 <- traverse getTimestamp path
     fPath <- maybe (return Nothing) getTimestamp $ M.lookup mn foreigns
     return $ fmap (max fPath) e1
 
@@ -375,7 +373,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   genSourceMap dir mapFile extraLines mappings = do
     let pathToDir = iterate (".." </>) ".." !! length (splitPath $ normalise outputDir)
         sourceFile = case mappings of
-                      ((SMap file _ _):_) -> Just $ pathToDir </> makeRelative dir file
+                      (SMap file _ _ : _) -> Just $ pathToDir </> makeRelative dir file
                       _ -> Nothing
     let rawMapping = SourceMapping { smFile = "index.js", smSourceRoot = Nothing, smMappings =
       map (\(SMap _ orig gen) -> Mapping {
@@ -413,9 +411,6 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 
   progress :: ProgressMessage -> Make ()
   progress = liftIO . putStrLn . renderProgressMessage
-
-readTextFile :: FilePath -> Make String
-readTextFile path = makeIO (const (ErrorMessage [] $ CannotReadFile path)) $ readUTF8File path
 
 -- |
 -- Check that the declarations in a given PureScript module match with those
@@ -464,11 +459,10 @@ checkForeignDecls m path = do
       (errs, _) ->
         Left errs
 
-  -- TODO: Handling for parenthesised operators should be removed after 0.9.
   -- We ignore the error message here, just being told it's an invalid
   -- identifier should be enough.
   parseIdent :: String -> Either String Ident
-  parseIdent str = try str <|> try ("(" ++ str ++ ")")
+  parseIdent str = try str
     where
     try s = either (const (Left str)) Right $ do
       ts <- PSParser.lex "" s

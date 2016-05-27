@@ -1,20 +1,17 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-
 -- |
 -- AST traversal helpers
 --
 module Language.PureScript.AST.Traversals where
 
-import Prelude ()
 import Prelude.Compat
-
-import Data.Maybe (mapMaybe)
-import Data.List (mapAccumL)
-import Data.Foldable (fold)
-import qualified Data.Set as S
 
 import Control.Monad
 import Control.Arrow ((***), (+++))
+
+import Data.Foldable (fold)
+import Data.List (mapAccumL)
+import Data.Maybe (mapMaybe)
+import qualified Data.Set as S
 
 import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Literals
@@ -47,8 +44,6 @@ everywhereOnValues f g h = (f', g', h')
   g' (UnaryMinus v) = g (UnaryMinus (g' v))
   g' (BinaryNoParens op v1 v2) = g (BinaryNoParens (g' op) (g' v1) (g' v2))
   g' (Parens v) = g (Parens (g' v))
-  g' (OperatorSection op (Left v)) = g (OperatorSection (g' op) (Left $ g' v))
-  g' (OperatorSection op (Right v)) = g (OperatorSection (g' op) (Right $ g' v))
   g' (TypeClassDictionaryConstructorApp name v) = g (TypeClassDictionaryConstructorApp name (g' v))
   g' (Accessor prop v) = g (Accessor prop (g' v))
   g' (ObjectUpdate obj vs) = g (ObjectUpdate (g' obj) (map (fmap g') vs))
@@ -116,8 +111,6 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   g' (UnaryMinus v) = UnaryMinus <$> (g v >>= g')
   g' (BinaryNoParens op v1 v2) = BinaryNoParens <$> (g op >>= g') <*> (g v1 >>= g') <*> (g v2 >>= g')
   g' (Parens v) = Parens <$> (g v >>= g')
-  g' (OperatorSection op (Left v)) = OperatorSection <$> (g op >>= g') <*> (Left <$> (g v >>= g'))
-  g' (OperatorSection op (Right v)) = OperatorSection <$> (g op >>= g') <*> (Right <$> (g v >>= g'))
   g' (TypeClassDictionaryConstructorApp name v) = TypeClassDictionaryConstructorApp name <$> (g v >>= g')
   g' (Accessor prop v) = Accessor prop <$> (g v >>= g')
   g' (ObjectUpdate obj vs) = ObjectUpdate <$> (g obj >>= g') <*> traverse (sndM (g' <=< g)) vs
@@ -185,8 +178,6 @@ everywhereOnValuesM f g h = (f', g', h')
   g' (UnaryMinus v) = (UnaryMinus <$> g' v) >>= g
   g' (BinaryNoParens op v1 v2) = (BinaryNoParens <$> g' op <*> g' v1 <*> g' v2) >>= g
   g' (Parens v) = (Parens <$> g' v) >>= g
-  g' (OperatorSection op (Left v)) = (OperatorSection <$> g' op <*> (Left <$> g' v)) >>= g
-  g' (OperatorSection op (Right v)) = (OperatorSection <$> g' op <*> (Right <$> g' v)) >>= g
   g' (TypeClassDictionaryConstructorApp name v) = (TypeClassDictionaryConstructorApp name <$> g' v) >>= g
   g' (Accessor prop v) = (Accessor prop <$> g' v) >>= g
   g' (ObjectUpdate obj vs) = (ObjectUpdate <$> g' obj <*> traverse (sndM g') vs) >>= g
@@ -259,8 +250,6 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   g' v@(UnaryMinus v1) = g v <> g' v1
   g' v@(BinaryNoParens op v1 v2) = g v <> g' op <> g' v1 <> g' v2
   g' v@(Parens v1) = g v <> g' v1
-  g' v@(OperatorSection op (Left v1)) = g v <> g' op <> g' v1
-  g' v@(OperatorSection op (Right v1)) = g v <> g' op <> g' v1
   g' v@(TypeClassDictionaryConstructorApp _ v1) = g v <> g' v1
   g' v@(Accessor _ v1) = g v <> g' v1
   g' v@(ObjectUpdate obj vs) = foldl (<>) (g v <> g' obj) (map (g' . snd) vs)
@@ -338,8 +327,6 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   g' s (UnaryMinus v1) = g'' s v1
   g' s (BinaryNoParens op v1 v2) = g'' s op <> g'' s v1 <> g'' s v2
   g' s (Parens v1) = g'' s v1
-  g' s (OperatorSection op (Left v)) = g'' s op <> g'' s v
-  g' s (OperatorSection op (Right v)) = g'' s op <> g'' s v
   g' s (TypeClassDictionaryConstructorApp _ v1) = g'' s v1
   g' s (Accessor _ v1) = g'' s v1
   g' s (ObjectUpdate obj vs) = foldl (<>) (g'' s obj) (map (g'' s . snd) vs)
@@ -419,8 +406,6 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   g' s (UnaryMinus v) = UnaryMinus <$> g'' s v
   g' s (BinaryNoParens op v1 v2) = BinaryNoParens <$> g'' s op <*> g'' s v1 <*> g'' s v2
   g' s (Parens v) = Parens <$> g'' s v
-  g' s (OperatorSection op (Left v)) = OperatorSection <$> g'' s op <*> (Left <$> g'' s v)
-  g' s (OperatorSection op (Right v)) = OperatorSection <$> g'' s op <*> (Right <$> g'' s v)
   g' s (TypeClassDictionaryConstructorApp name v) = TypeClassDictionaryConstructorApp name <$> g'' s v
   g' s (Accessor prop v) = Accessor prop <$> g'' s v
   g' s (ObjectUpdate obj vs) = ObjectUpdate <$> g'' s obj <*> traverse (sndM (g'' s)) vs
@@ -510,8 +495,6 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   g' s (UnaryMinus v1) = g'' s v1
   g' s (BinaryNoParens op v1 v2) = g'' s op <> g'' s v1 <> g'' s v2
   g' s (Parens v1) = g'' s v1
-  g' s (OperatorSection op (Left v)) = g'' s op <> g'' s v
-  g' s (OperatorSection op (Right v)) = g'' s op <> g'' s v
   g' s (TypeClassDictionaryConstructorApp _ v1) = g'' s v1
   g' s (Accessor _ v1) = g'' s v1
   g' s (ObjectUpdate obj vs) = g'' s obj <> foldMap (g'' s . snd) vs
@@ -593,13 +576,13 @@ accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (con
   where
   forDecls (DataDeclaration _ _ _ dctors) = mconcat (concatMap (map f . snd) dctors)
   forDecls (ExternDeclaration _ ty) = f ty
-  forDecls (TypeClassDeclaration _ _ implies _) = mconcat (concatMap (map f . snd) implies)
-  forDecls (TypeInstanceDeclaration _ cs _ tys _) = mconcat (concatMap (map f . snd) cs) `mappend` mconcat (map f tys)
+  forDecls (TypeClassDeclaration _ _ implies _) = mconcat (concatMap (map f . constraintArgs) implies)
+  forDecls (TypeInstanceDeclaration _ cs _ tys _) = mconcat (concatMap (map f . constraintArgs) cs) `mappend` mconcat (map f tys)
   forDecls (TypeSynonymDeclaration _ _ ty) = f ty
   forDecls (TypeDeclaration _ ty) = f ty
   forDecls _ = mempty
 
-  forValues (TypeClassDictionary (_, cs) _) = mconcat (map f cs)
+  forValues (TypeClassDictionary c _) = mconcat (map f (constraintArgs c))
   forValues (SuperClassDictionary _ tys) = mconcat (map f tys)
   forValues (TypedValue _ _ ty) = f ty
   forValues _ = mempty

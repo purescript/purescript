@@ -12,14 +12,8 @@
 -- Casesplitting and adding function clauses
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE DataKinds             #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE LambdaCase            #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PackageImports        #-}
-{-# LANGUAGE RecordWildCards       #-}
 
 module Language.PureScript.Ide.CaseSplit
        ( WildcardAnnotations()

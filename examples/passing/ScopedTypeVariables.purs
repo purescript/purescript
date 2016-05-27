@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 test1 :: forall a. (a -> a) -> a -> a
 test1 f x = g (g x)
@@ -33,4 +34,4 @@ test4 = h
       j x = x
 
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

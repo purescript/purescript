@@ -1,12 +1,15 @@
 
 module Language.PureScript.Publish.Utils where
 
-import Data.List
+import Prelude.Compat
+
 import Data.Either (partitionEithers)
+import Data.List
+
 import System.Directory
 import System.Exit (exitFailure)
-import System.IO (hPutStrLn, stderr)
 import System.FilePath (pathSeparator)
+import System.IO (hPutStrLn, stderr)
 import qualified System.FilePath.Glob as Glob
 
 -- | Glob relative to the current directory, and produce relative pathnames.

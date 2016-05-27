@@ -8,7 +8,7 @@ import qualified Language.PureScript as P
 import           Test.Hspec
 
 value :: Text -> ExternDecl
-value s = ValueDeclaration s P.TypeWildcard
+value s = ValueDeclaration s $ P.TypeWildcard $ P.SourceSpan "" (P.SourcePos 0 0) (P.SourcePos 0 0)
 
 modules :: [Module]
 modules =

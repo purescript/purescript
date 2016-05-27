@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Language.PureScript.Ide.Imports.IntegrationSpec where
 
-import           Control.Monad
+import           Control.Monad                       (void)
 import           Data.Text                           (Text)
 import qualified Data.Text                           as T
 import qualified Data.Text.IO                        as TIO
@@ -13,15 +13,8 @@ import           System.FilePath
 
 setup :: IO ()
 setup = do
-  Integration.deleteOutputFolder
-  s <- Integration.compileTestProject
-  unless s $ fail "Failed to compile .purs sources"
-  Integration.quitServer -- kill a eventually running psc-ide-server instance
-  _ <- Integration.startServer
+  Integration.reset
   mapM_ Integration.loadModuleWithDeps ["ImportsSpec", "ImportsSpec1"]
-
-teardown :: IO ()
-teardown = Integration.quitServer
 
 withSupportFiles :: (FilePath -> FilePath -> IO a) -> IO ()
 withSupportFiles test = do
@@ -38,15 +31,15 @@ outputFileShouldBe expectation = do
   shouldBe (T.lines outRes) expectation
 
 spec :: Spec
-spec = beforeAll_ setup $ afterAll_ teardown $ describe "Adding imports" $ do
+spec = beforeAll_ setup . describe "Adding imports" $ do
   let
     sourceFileSkeleton :: [Text] -> [Text]
     sourceFileSkeleton importSection =
       [ "module ImportsSpec where" , ""] ++ importSection ++ [ "" , "myId = id"]
   it "adds an implicit import" $ do
-    withSupportFiles (Integration.addImplicitImport "Prelude")
+    withSupportFiles (Integration.addImplicitImport "ImportsSpec1")
     outputFileShouldBe (sourceFileSkeleton
-                        [ "import Prelude"
+                        [ "import ImportsSpec1"
                         , "import Main (id)"
                         ])
   it "adds an explicit unqualified import" $ do

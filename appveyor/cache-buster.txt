@@ -1,0 +1,8 @@
+This file acts as a cache buster for the AppVeyor (Windows CI) build
+cache. In order to invalidate the AppVeyor build cache, simply make a
+change to the number at the end of this file and commit.
+
+See http://www.appveyor.com/docs/build-cache#cache-dependencies for more
+information.
+
+Increment me to invalidate the cache: 0

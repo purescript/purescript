@@ -3,6 +3,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (logShow)
 
 class Su a where
   su :: a -> a
@@ -22,4 +23,4 @@ instance clNumber :: Cl Number where
 test :: forall a. (Cl a) => a -> Array a
 test x = su [cl x x]
 
-main = Control.Monad.Eff.Console.print $ test 10.0
+main = logShow $ test 10.0

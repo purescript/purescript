@@ -1,9 +1,5 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 module Language.PureScript.Sugar.Operators.Expr where
 
-import Prelude ()
 import Prelude.Compat
 
 import Data.Functor.Identity
@@ -15,7 +11,7 @@ import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Sugar.Operators.Common
 
-matchExprOperators :: [[(Qualified Ident, Associativity)]] -> Expr -> Expr
+matchExprOperators :: [[(Qualified (OpName 'ValueOpName), Associativity)]] -> Expr -> Expr
 matchExprOperators = matchOperators isBinOp extractOp fromOp reapply modOpTable
   where
 
@@ -27,12 +23,12 @@ matchExprOperators = matchOperators isBinOp extractOp fromOp reapply modOpTable
   extractOp (BinaryNoParens op l r) = Just (op, l, r)
   extractOp _ = Nothing
 
-  fromOp :: Expr -> Maybe (Qualified Ident)
-  fromOp (Var q@(Qualified _ (Op _))) = Just q
+  fromOp :: Expr -> Maybe (Qualified (OpName 'ValueOpName))
+  fromOp (Op q@(Qualified _ (OpName _))) = Just q
   fromOp _ = Nothing
 
-  reapply :: Qualified Ident -> Expr -> Expr -> Expr
-  reapply op t1 t2 = App (App (Var op) t1) t2
+  reapply :: Qualified (OpName 'ValueOpName) -> Expr -> Expr -> Expr
+  reapply op t1 t2 = App (App (Op op) t1) t2
 
   modOpTable
     :: [[P.Operator (Chain Expr) () Identity Expr]]
@@ -44,5 +40,5 @@ matchExprOperators = matchOperators isBinOp extractOp fromOp reapply modOpTable
   parseTicks :: P.Parsec (Chain Expr) () Expr
   parseTicks = token (either (const Nothing) fromOther) P.<?> "infix function"
     where
-    fromOther (Var (Qualified _ (Op _))) = Nothing
+    fromOther (Op _) = Nothing
     fromOther v = Just v

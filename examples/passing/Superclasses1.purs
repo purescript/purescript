@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log, logShow)
 
 class Su a where
   su :: a -> a
@@ -17,4 +18,6 @@ instance clNumber :: Cl Number where
 test :: forall a. (Cl a) => a -> a
 test a = su (cl a a)
 
-main = Control.Monad.Eff.Console.print $ test 10.0
+main = do
+  logShow $ test 10.0
+  log "Done"

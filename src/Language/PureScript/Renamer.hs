@@ -1,26 +1,20 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 -- |
 -- Renaming pass that prevents shadowing of local identifiers.
 --
 module Language.PureScript.Renamer (renameInModules) where
 
-import Prelude ()
 import Prelude.Compat
 
 import Control.Monad.State
 
 import Data.List (find)
 import Data.Maybe (fromJust, fromMaybe)
-
 import qualified Data.Map as M
 import qualified Data.Set as S
 
 import Language.PureScript.CoreFn
 import Language.PureScript.Names
 import Language.PureScript.Traversals
-
 import qualified Language.PureScript.Constants as C
 
 -- |
