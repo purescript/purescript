@@ -16,8 +16,17 @@ import Language.PureScript.Parser.State
 
 import qualified Text.Parsec as P
 
+-- |
+-- Parse a general proper name.
+--
 properName :: TokenParser (ProperName a)
 properName = ProperName <$> uname
+
+-- |
+-- Parse a proper name for a type.
+--
+typeName :: TokenParser (ProperName a)
+typeName = ProperName <$> tyname
 
 -- |
 -- Parse a module name
