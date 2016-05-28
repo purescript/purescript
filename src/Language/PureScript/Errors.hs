@@ -65,17 +65,9 @@ data SimpleErrorMessage
   | UnknownExportDataConstructor (ProperName 'TypeName) (ProperName 'ConstructorName)
   | ScopeConflict Name [ModuleName]
   | ScopeShadowing Name (Maybe ModuleName) [ModuleName]
-  | ConflictingTypeDecls (ProperName 'TypeName)
-  | ConflictingCtorDecls (ProperName 'ConstructorName)
-  | TypeConflictsWithClass (ProperName 'TypeName)
-  | CtorConflictsWithClass (ProperName 'ConstructorName)
-  | ClassConflictsWithType (ProperName 'ClassName)
-  | ClassConflictsWithCtor (ProperName 'ClassName)
+  | DeclConflict Name Name
+  | ExportConflict (Qualified Name) (Qualified Name)
   | DuplicateModuleName ModuleName
-  | DuplicateClassExport (ProperName 'ClassName)
-  | DuplicateValueExport Ident
-  | DuplicateValueOpExport (OpName 'ValueOpName)
-  | DuplicateTypeOpExport (OpName 'TypeOpName)
   | DuplicateTypeArgument String
   | InvalidDoBind
   | InvalidDoLet
@@ -234,17 +226,9 @@ errorCode em = case unwrapErrorMessage em of
   UnknownExportDataConstructor{} -> "UnknownExportDataConstructor"
   ScopeConflict{} -> "ScopeConflict"
   ScopeShadowing{} -> "ScopeShadowing"
-  ConflictingTypeDecls{} -> "ConflictingTypeDecls"
-  ConflictingCtorDecls{} -> "ConflictingCtorDecls"
-  TypeConflictsWithClass{} -> "TypeConflictsWithClass"
-  CtorConflictsWithClass{} -> "CtorConflictsWithClass"
-  ClassConflictsWithType{} -> "ClassConflictsWithType"
-  ClassConflictsWithCtor{} -> "ClassConflictsWithCtor"
+  DeclConflict{} -> "DeclConflict"
+  ExportConflict{} -> "ExportConflict"
   DuplicateModuleName{} -> "DuplicateModuleName"
-  DuplicateClassExport{} -> "DuplicateClassExport"
-  DuplicateValueExport{} -> "DuplicateValueExport"
-  DuplicateValueOpExport{} -> "DuplicateValueOpExport"
-  DuplicateTypeOpExport{} -> "DuplicateTypeOpExport"
   DuplicateTypeArgument{} -> "DuplicateTypeArgument"
   InvalidDoBind -> "InvalidDoBind"
   InvalidDoLet -> "InvalidDoLet"
@@ -479,7 +463,7 @@ colorCodeBox codeColor b = case codeColor of
   Just cc
     | Box.rows b == 1 ->
         Box.text (ansiColor cc) Box.<> b `endWith` Box.text ansiColorReset
-        
+
     | otherwise -> Box.hcat Box.left -- making two boxes, one for each side of the box so that it will set each row it's own color and will reset it afterwards
         [ Box.vcat Box.top $ replicate (Box.rows b) $ Box.text $ ansiColor cc
         , b
@@ -648,28 +632,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
                 Just exmn' -> "declaration from " ++ markCode (runModuleName exmn') ++ " will be used."
                 Nothing -> "local declaration will be used."
             ]
-    renderSimpleErrorMessage (ConflictingTypeDecls nm) =
-      line $ "Conflicting type declarations for " ++ markCode (runProperName nm)
-    renderSimpleErrorMessage (ConflictingCtorDecls nm) =
-      line $ "Conflicting data constructor declarations for " ++ markCode (runProperName nm)
-    renderSimpleErrorMessage (TypeConflictsWithClass nm) =
-      line $ "Type " ++ markCode (runProperName nm) ++ " conflicts with a type class declaration with the same name."
-    renderSimpleErrorMessage (CtorConflictsWithClass nm) =
-      line $ "Data constructor " ++ markCode (runProperName nm) ++ " conflicts with a type class declaration with the same name."
-    renderSimpleErrorMessage (ClassConflictsWithType nm) =
-      line $ "Type class " ++ markCode (runProperName nm) ++ " conflicts with a type declaration with the same name."
-    renderSimpleErrorMessage (ClassConflictsWithCtor nm) =
-      line $ "Type class " ++ markCode (runProperName nm) ++ " conflicts with a data constructor declaration with the same name."
+    renderSimpleErrorMessage (DeclConflict new existing) =
+      line $ "Declaration for " ++ printName (Qualified Nothing new) ++ " conflicts with an existing " ++ nameType existing ++ " of the same name."
+    renderSimpleErrorMessage (ExportConflict new existing) =
+      line $ "Export for " ++ printName new ++ " conflicts with " ++ runName existing
     renderSimpleErrorMessage (DuplicateModuleName mn) =
       line $ "Module " ++ markCode (runModuleName mn) ++ " has been defined multiple times."
-    renderSimpleErrorMessage (DuplicateClassExport nm) =
-      line $ "Duplicate export declaration for type class " ++ markCode (runProperName nm)
-    renderSimpleErrorMessage (DuplicateValueExport nm) =
-      line $ "Duplicate export declaration for value " ++ markCode (showIdent nm)
-    renderSimpleErrorMessage (DuplicateValueOpExport op) =
-      line $ "Duplicate export declaration for operator " ++ markCode (showOp op)
-    renderSimpleErrorMessage (DuplicateTypeOpExport op) =
-      line $ "Duplicate export declaration for type operator " ++ markCode (showOp op)
     renderSimpleErrorMessage (CycleInDeclaration nm) =
       line $ "The value of " ++ markCode (showIdent nm) ++ " is undefined here, so this reference is not allowed."
     renderSimpleErrorMessage (CycleInModules mns) =
@@ -1096,22 +1064,34 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
             ]
 
     printName :: Qualified Name -> String
-    printName (Qualified mn (IdentName name)) =
-      "value " ++ markCode (showQualified showIdent (Qualified mn name))
-    printName (Qualified mn (ValOpName op)) =
-      "operator " ++ markCode (showQualified showOp (Qualified mn op))
-    printName (Qualified mn (TyName name)) =
-      "type " ++ markCode (showQualified runProperName (Qualified mn name))
-    printName (Qualified mn (TyOpName op)) =
-      "type operator " ++ markCode (showQualified showOp (Qualified mn op))
-    printName (Qualified mn (DctorName name)) =
-      "data constructor " ++ markCode (showQualified runProperName (Qualified mn name))
-    printName (Qualified mn (TyClassName name)) =
-      "type class " ++ markCode (showQualified runProperName (Qualified mn name))
-    printName (Qualified Nothing (ModName name)) =
-      "module " ++ markCode (runModuleName name)
-    printName (Qualified _ ModName{}) =
-      internalError "qualified ModName in printName"
+    printName qn = nameType (disqualify qn) ++ " " ++ markCode (runName qn)
+
+    nameType :: Name -> String
+    nameType (IdentName _) = "value"
+    nameType (ValOpName _) = "operator"
+    nameType (TyName _) = "type"
+    nameType (TyOpName _) = "type operator"
+    nameType (DctorName _) = "data constructor"
+    nameType (TyClassName _) = "type class"
+    nameType (ModName _) = "module"
+
+    runName :: Qualified Name -> String
+    runName (Qualified mn (IdentName name)) =
+      showQualified showIdent (Qualified mn name)
+    runName (Qualified mn (ValOpName op)) =
+      showQualified showOp (Qualified mn op)
+    runName (Qualified mn (TyName name)) =
+      showQualified runProperName (Qualified mn name)
+    runName (Qualified mn (TyOpName op)) =
+      showQualified showOp (Qualified mn op)
+    runName (Qualified mn (DctorName name)) =
+      showQualified runProperName (Qualified mn name)
+    runName (Qualified mn (TyClassName name)) =
+      showQualified runProperName (Qualified mn name)
+    runName (Qualified Nothing (ModName name)) =
+      runModuleName name
+    runName (Qualified _ ModName{}) =
+      internalError "qualified ModName in runName"
 
   valueDepth :: Int
   valueDepth | full = 1000

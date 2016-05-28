@@ -31,20 +31,28 @@ findExportable (Module _ _ mn ds _) =
   where
   updateExports :: Exports -> Declaration -> m Exports
   updateExports exps (TypeClassDeclaration tcn _ _ ds') = do
-    exps' <- exportTypeClass exps tcn mn
+    exps' <- exportTypeClass Internal exps tcn mn
     foldM go exps' ds'
     where
     go exps'' (TypeDeclaration name _) = exportValue exps'' name mn
     go exps'' (PositionedDeclaration pos _ d) = rethrowWithPosition pos $ go exps'' d
     go _ _ = internalError "Invalid declaration in TypeClassDeclaration"
-  updateExports exps (DataDeclaration _ tn _ dcs) = exportType exps tn (map fst dcs) mn
-  updateExports exps (TypeSynonymDeclaration tn _ _) = exportType exps tn [] mn
-  updateExports exps (ExternDataDeclaration tn _) = exportType exps tn [] mn
-  updateExports exps (ValueDeclaration name _ _ _) = exportValue exps name mn
-  updateExports exps (ValueFixityDeclaration _ _ op) = exportValueOp exps op mn
-  updateExports exps (TypeFixityDeclaration _ _ op) = exportTypeOp exps op mn
-  updateExports exps (ExternDeclaration name _) = exportValue exps name mn
-  updateExports exps (PositionedDeclaration pos _ d) = rethrowWithPosition pos $ updateExports exps d
+  updateExports exps (DataDeclaration _ tn _ dcs) =
+    exportType Internal exps tn (map fst dcs) mn
+  updateExports exps (TypeSynonymDeclaration tn _ _) =
+    exportType Internal exps tn [] mn
+  updateExports exps (ExternDataDeclaration tn _) =
+    exportType Internal exps tn [] mn
+  updateExports exps (ValueDeclaration name _ _ _) =
+    exportValue exps name mn
+  updateExports exps (ValueFixityDeclaration _ _ op) =
+    exportValueOp exps op mn
+  updateExports exps (TypeFixityDeclaration _ _ op) =
+    exportTypeOp exps op mn
+  updateExports exps (ExternDeclaration name _) =
+    exportValue exps name mn
+  updateExports exps (PositionedDeclaration pos _ d) =
+    rethrowWithPosition pos $ updateExports exps d
   updateExports exps _ = return exps
 
 -- |
@@ -99,9 +107,9 @@ resolveExports env ss mn imps exps refs =
     reClasses <- extract isPseudo name TyClassName (importedTypeClasses imps)
     reValues <- extract isPseudo name IdentName (importedValues imps)
     reValueOps <- extract isPseudo name ValOpName (importedValueOps imps)
-    foldM (\exps' ((tctor, dctors), mn') -> exportType exps' tctor dctors mn') result (resolveTypeExports reTypes reDctors)
+    foldM (\exps' ((tctor, dctors), mn') -> exportType ReExport exps' tctor dctors mn') result (resolveTypeExports reTypes reDctors)
       >>= flip (foldM (uncurry . exportTypeOp)) (map resolveTypeOp reTypeOps)
-      >>= flip (foldM (uncurry . exportTypeClass)) (map resolveClass reClasses)
+      >>= flip (foldM (uncurry . exportTypeClass ReExport)) (map resolveClass reClasses)
       >>= flip (foldM (uncurry . exportValue)) (map resolveValue reValues)
       >>= flip (foldM (uncurry . exportValueOp)) (map resolveValueOp reValueOps)
   elaborateModuleExports result _ = return result
