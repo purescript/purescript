@@ -140,7 +140,7 @@ parseFixityDeclaration = do
       <*> (reserved "as" *> parseOperator)
 
 parseImportDeclaration :: TokenParser Declaration
-parseImportDeclaration = do
+parseImportDeclaration = withSourceSpan PositionedDeclaration $ do
   (mn, declType, asQ) <- parseImportDeclaration'
   return $ ImportDeclaration mn declType asQ
 
