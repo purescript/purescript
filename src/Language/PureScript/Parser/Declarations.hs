@@ -66,7 +66,7 @@ kindedIdent = (, Nothing) <$> identifier
 parseDataDeclaration :: TokenParser Declaration
 parseDataDeclaration = do
   dtype <- (reserved "data" *> return Data) <|> (reserved "newtype" *> return Newtype)
-  name <- indented *> properName
+  name <- indented *> typeName
   tyArgs <- many (indented *> kindedIdent)
   ctors <- P.option [] $ do
     indented *> equals
@@ -80,7 +80,7 @@ parseTypeDeclaration =
 
 parseTypeSynonymDeclaration :: TokenParser Declaration
 parseTypeSynonymDeclaration =
-  TypeSynonymDeclaration <$> (reserved "type" *> indented *> properName)
+  TypeSynonymDeclaration <$> (reserved "type" *> indented *> typeName)
                          <*> many (indented *> kindedIdent)
                          <*> (indented *> equals *> noWildcards parsePolyType)
 
@@ -108,7 +108,7 @@ parseValueDeclaration = do
 
 parseExternDeclaration :: TokenParser Declaration
 parseExternDeclaration = reserved "foreign" *> indented *> reserved "import" *> indented *>
-   (ExternDataDeclaration <$> (reserved "data" *> indented *> properName)
+   (ExternDataDeclaration <$> (reserved "data" *> indented *> typeName)
                           <*> (indented *> doubleColon *> parseKind)
    <|> (do ident <- parseIdent
            ty <- indented *> doubleColon *> noWildcards parsePolyType
@@ -132,7 +132,7 @@ parseFixityDeclaration = do
   where
   typeFixity fixity =
     TypeFixity fixity
-      <$> (reserved "type" *> parseQualified properName)
+      <$> (reserved "type" *> parseQualified typeName)
       <*> (reserved "as" *> parseOperator)
   valueFixity fixity =
     ValueFixity fixity
@@ -169,7 +169,7 @@ parseDeclarationRef =
     <|> (TypeOpRef <$> (indented *> reserved "type" *> parens parseOperator))
   where
   parseTypeRef = do
-    name <- properName
+    name <- typeName
     dctors <- P.optionMaybe $ parens (symbol' ".." *> pure Nothing <|> Just <$> commaSep properName)
     return $ TypeRef name (fromMaybe (Just []) dctors)
 

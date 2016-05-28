@@ -40,7 +40,7 @@ parseTypeVariable = do
   return $ TypeVar ident
 
 parseTypeConstructor :: TokenParser Type
-parseTypeConstructor = TypeConstructor <$> parseQualified properName
+parseTypeConstructor = TypeConstructor <$> parseQualified typeName
 
 parseForAll :: TokenParser Type
 parseForAll = mkForAll <$> ((reserved "forall" <|> reserved "∀") *> P.many1 (indented *> identifier) <* indented <* dot)
