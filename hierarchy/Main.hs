@@ -65,7 +65,7 @@ compile (HierarchyOptions inputGlob mOutput) = do
   input <- glob inputGlob
   modules <- readInput input
   case modules of
-    Left errs -> hPutStr stderr (P.prettyPrintMultipleErrors False errs) >> exitFailure
+    Left errs -> hPutStr stderr (P.prettyPrintMultipleErrors P.defaultPPEOptions errs) >> exitFailure
     Right ms -> do
       for_ ms $ \(P.Module _ _ moduleName decls _) ->
         let name = runModuleName moduleName

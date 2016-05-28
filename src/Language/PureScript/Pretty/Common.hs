@@ -153,3 +153,7 @@ before b1 b2 | rows b1 > 1 = b1 // b2
 
 beforeWithSpace :: Box -> Box -> Box
 beforeWithSpace b1 = before (b1 <> text " ")
+
+-- | Place a Box on the bottom right of another
+endWith :: Box -> Box -> Box
+endWith l r = l <> vcat top [emptyBox (rows l - 1) (cols r), r]

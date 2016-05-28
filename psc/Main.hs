@@ -11,6 +11,7 @@ import           Control.Monad
 import           Control.Monad.Writer.Strict
 
 import qualified Data.Aeson as A
+import           Data.Bool (bool)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.UTF8 as BU8
 import qualified Data.Map as M
@@ -24,6 +25,7 @@ import           Options.Applicative as Opts
 
 import qualified Paths_purescript as Paths
 
+import qualified System.Console.ANSI as ANSI
 import           System.Exit (exitSuccess, exitFailure)
 import           System.FilePath.Glob (glob)
 import           System.IO (hSetEncoding, hPutStrLn, stdout, stderr, utf8)
@@ -40,11 +42,13 @@ data PSCMakeOptions = PSCMakeOptions
 -- | Argumnets: verbose, use JSON, warnings, errors
 printWarningsAndErrors :: Bool -> Bool -> P.MultipleErrors -> Either P.MultipleErrors a -> IO ()
 printWarningsAndErrors verbose False warnings errors = do
+  cc <- bool Nothing (Just P.defaultCodeColor) <$> ANSI.hSupportsANSI stderr
+  let ppeOpts = P.defaultPPEOptions { P.ppeCodeColor = cc, P.ppeFull = verbose }
   when (P.nonEmpty warnings) $
-    hPutStrLn stderr (P.prettyPrintMultipleWarnings verbose warnings)
+    hPutStrLn stderr (P.prettyPrintMultipleWarnings ppeOpts warnings)
   case errors of
     Left errs -> do
-      hPutStrLn stderr (P.prettyPrintMultipleErrors verbose errs)
+      hPutStrLn stderr (P.prettyPrintMultipleErrors ppeOpts errs)
       exitFailure
     Right _ -> return ()
 printWarningsAndErrors verbose True warnings errors = do

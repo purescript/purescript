@@ -76,7 +76,7 @@ spec = do
       externs <- ExceptT . fmap fst . runTest $ P.make (makeActions foreigns) (map snd modules)
       return (zip (map snd modules) externs)
     case supportExterns of
-      Left errs -> fail (P.prettyPrintMultipleErrors False errs)
+      Left errs -> fail (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
       Right externs -> return (externs, passingFiles, warningFiles, failingFiles)
 
   context "Passing examples" $
@@ -232,7 +232,7 @@ assertCompiles
 assertCompiles supportExterns inputFiles =
   assert supportExterns inputFiles checkMain $ \e ->
     case e of
-      Left errs -> return . Just . P.prettyPrintMultipleErrors False $ errs
+      Left errs -> return . Just . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
       Right _ -> do
         process <- findNodeProcess
         let entryPoint = modulesDir </> "index.js"
@@ -255,7 +255,7 @@ assertCompilesWithWarnings supportExterns inputFiles shouldWarnWith =
   assert supportExterns inputFiles checkMain $ \e ->
     case e of
       Left errs ->
-        return . Just . P.prettyPrintMultipleErrors False $ errs
+        return . Just . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
       Right warnings ->
         return
           . fmap (printAllWarnings warnings)
@@ -263,7 +263,7 @@ assertCompilesWithWarnings supportExterns inputFiles shouldWarnWith =
 
   where
   printAllWarnings warnings =
-    (<> "\n\n" <> P.prettyPrintMultipleErrors False warnings)
+    (<> "\n\n" <> P.prettyPrintMultipleErrors P.defaultPPEOptions warnings)
 
 assertDoesNotCompile
   :: [(P.Module, P.ExternsFile)]

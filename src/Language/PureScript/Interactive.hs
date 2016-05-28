@@ -44,7 +44,7 @@ import           System.Process (readProcessWithExitCode)
 
 -- | Pretty-print errors
 printErrors :: MonadIO m => P.MultipleErrors -> m ()
-printErrors = liftIO . putStrLn . P.prettyPrintMultipleErrors False
+printErrors = liftIO . putStrLn . P.prettyPrintMultipleErrors P.defaultPPEOptions
 
 -- | This is different than the runMake in 'Language.PureScript.Make' in that it specifies the
 -- options and ignores the warning messages.

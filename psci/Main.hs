@@ -107,7 +107,7 @@ main = getOpt >>= loop
           (externs, env) <- ExceptT . runMake . make $ modules
           return (modules, externs, env)
         case e of
-          Left errs -> putStrLn (P.prettyPrintMultipleErrors False errs) >> exitFailure
+          Left errs -> putStrLn (P.prettyPrintMultipleErrors P.defaultPPEOptions errs) >> exitFailure
           Right (modules, externs, env) -> do
             historyFilename <- getHistoryFilename
             let settings = defaultSettings { historyFile = Just historyFilename }

@@ -225,7 +225,7 @@ displayUserError e = case e of
   CompileError err ->
     vcat
       [ para "Compile error:"
-      , indented (vcat (P.prettyPrintMultipleErrorsBox False err))
+      , indented (vcat (P.prettyPrintMultipleErrorsBox P.defaultPPEOptions err))
       ]
   DirtyWorkingTree ->
     para (
