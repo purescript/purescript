@@ -1,2 +1,3 @@
 module A where
-x = true
+
+class X

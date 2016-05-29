@@ -10,6 +10,7 @@ module Language.PureScript.Sugar.Names.Env
   , envModuleSourceSpan
   , envModuleImports
   , envModuleExports
+  , ExportMode(..)
   , exportType
   , exportTypeOp
   , exportTypeClass
@@ -26,6 +27,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Function (on)
+import Data.Foldable (find)
 import Data.List (groupBy, sortBy, delete)
 import Data.Maybe (fromJust, mapMaybe)
 import qualified Data.Map as M
@@ -206,31 +208,50 @@ primEnv = M.singleton
   (internalModuleSourceSpan "<Prim>", nullImports, primExports)
 
 -- |
+-- When updating the `Exports` the behaviour is slightly different depending
+-- on whether we are exporting values defined within the module or elaborating
+-- re-exported values. This type is used to indicate which behaviour should be
+-- used.
+--
+data ExportMode = Internal | ReExport
+  deriving (Eq, Show)
+
+-- |
 -- Safely adds a type and its data constructors to some exports, returning an
 -- error if a conflict occurs.
 --
 exportType
   :: MonadError MultipleErrors m
-  => Exports
+  => ExportMode
+  -> Exports
   -> ProperName 'TypeName
   -> [ProperName 'ConstructorName]
   -> ModuleName
   -> m Exports
-exportType exps name dctors mn = do
+exportType exportMode exps name dctors mn = do
   let exTypes = exportedTypes exps
   let exClasses = exportedTypeClasses exps
-  forM_ (name `M.lookup` exTypes) $ \(_, mn') ->
-    when (mn /= mn') $ throwConflictError ConflictingTypeDecls name
-  when (coerceProperName name `M.member` exClasses) $
-    throwConflictError TypeConflictsWithClass name
-  forM_ dctors $ \dctor -> do
-    when (dctorExists (coerceProperName dctor) `any` exTypes) $
-      throwConflictError ConflictingCtorDecls dctor
-    when (coerceProperName dctor `M.member` exClasses) $
-      throwConflictError CtorConflictsWithClass dctor
+  case exportMode of
+    Internal -> do
+      when (name `M.member` exTypes) $
+        throwDeclConflict (TyName name) (TyName name)
+      when (coerceProperName name `M.member` exClasses) $
+        throwDeclConflict (TyName name) (TyClassName (coerceProperName name))
+      forM_ dctors $ \dctor -> do
+        when ((elem dctor . fst) `any` exTypes) $
+          throwDeclConflict (DctorName dctor) (DctorName dctor)
+        when (coerceProperName dctor `M.member` exClasses) $
+          throwDeclConflict (DctorName dctor) (TyClassName (coerceProperName dctor))
+    ReExport -> do
+      forM_ (name `M.lookup` exTypes) $ \(_, mn') ->
+        when (mn /= mn') $
+          throwExportConflict mn mn' (TyName name)
+      forM_ dctors $ \dctor ->
+        forM_ ((elem dctor . fst) `find` exTypes) $ \(_, mn') ->
+          when (mn /= mn') $
+            throwExportConflict mn mn' (DctorName dctor)
   return $ exps { exportedTypes = M.alter updateOrInsert name exTypes }
   where
-  dctorExists dctor (dctors', mn') = mn /= mn' && elem dctor dctors'
   updateOrInsert Nothing = Just (dctors, mn)
   updateOrInsert (Just (dctors', _)) = Just (dctors ++ dctors', mn)
 
@@ -245,7 +266,7 @@ exportTypeOp
   -> ModuleName
   -> m Exports
 exportTypeOp exps op mn = do
-  typeOps <- addExport DuplicateTypeOpExport op mn (exportedTypeOps exps)
+  typeOps <- addExport TyOpName op mn (exportedTypeOps exps)
   return $ exps { exportedTypeOps = typeOps }
 
 -- |
@@ -253,17 +274,19 @@ exportTypeOp exps op mn = do
 --
 exportTypeClass
   :: MonadError MultipleErrors m
-  => Exports
+  => ExportMode
+  -> Exports
   -> ProperName 'ClassName
   -> ModuleName
   -> m Exports
-exportTypeClass exps name mn = do
+exportTypeClass exportMode exps name mn = do
   let exTypes = exportedTypes exps
-  when (coerceProperName name `M.member` exTypes) $
-    throwConflictError ClassConflictsWithType name
-  when ((elem (coerceProperName name) . fst) `any` exTypes) $
-    throwConflictError ClassConflictsWithCtor name
-  classes <- addExport DuplicateClassExport name mn (exportedTypeClasses exps)
+  when (exportMode == Internal) $ do
+    when (coerceProperName name `M.member` exTypes) $
+      throwDeclConflict (TyClassName name) (TyName (coerceProperName name))
+    when ((elem (coerceProperName name) . fst) `any` exTypes) $
+      throwDeclConflict (TyClassName name) (DctorName (coerceProperName name))
+  classes <- addExport TyClassName name mn (exportedTypeClasses exps)
   return $ exps { exportedTypeClasses = classes }
 
 -- |
@@ -276,7 +299,7 @@ exportValue
   -> ModuleName
   -> m Exports
 exportValue exps name mn = do
-  values <- addExport DuplicateValueExport name mn (exportedValues exps)
+  values <- addExport IdentName name mn (exportedValues exps)
   return $ exps { exportedValues = values }
 
 -- |
@@ -290,7 +313,7 @@ exportValueOp
   -> ModuleName
   -> m Exports
 exportValueOp exps op mn = do
-  valueOps <- addExport DuplicateValueOpExport op mn (exportedValueOps exps)
+  valueOps <- addExport ValOpName op mn (exportedValueOps exps)
   return $ exps { exportedValueOps = valueOps }
 
 -- |
@@ -299,28 +322,42 @@ exportValueOp exps op mn = do
 --
 addExport
   :: (MonadError MultipleErrors m, Ord a)
-  => (a -> SimpleErrorMessage)
+  => (a -> Name)
   -> a
   -> ModuleName
   -> M.Map a ModuleName
   -> m (M.Map a ModuleName)
-addExport what name mn exports =
+addExport toName name mn exports =
   case M.lookup name exports of
     Just mn'
       | mn == mn' -> return exports
-      | otherwise -> throwConflictError what name
+      | otherwise -> throwExportConflict mn mn' (toName name)
     Nothing ->
       return $ M.insert name mn exports
 
 -- |
 -- Raises an error for when there is more than one definition for something.
 --
-throwConflictError
+throwDeclConflict
   :: MonadError MultipleErrors m
-  => (a -> SimpleErrorMessage)
-  -> a
-  -> m b
-throwConflictError conflict = throwError . errorMessage . conflict
+  => Name
+  -> Name
+  -> m a
+throwDeclConflict new existing =
+  throwError . errorMessage $ DeclConflict new existing
+
+-- |
+-- Raises an error for when there are conflicting names in the exports.
+--
+throwExportConflict
+  :: MonadError MultipleErrors m
+  => ModuleName
+  -> ModuleName
+  -> Name
+  -> m a
+throwExportConflict new existing name =
+  throwError . errorMessage $
+    ExportConflict (Qualified (Just new) name) (Qualified (Just existing) name)
 
 -- |
 -- Gets the exports for a module, or raise an error if the module doesn't exist.

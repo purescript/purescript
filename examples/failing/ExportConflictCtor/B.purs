@@ -1,2 +1,3 @@
 module B where
-x = false
+
+data T2 = X
