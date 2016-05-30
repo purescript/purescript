@@ -80,19 +80,25 @@ data DeclarationRef
   --
   | ModuleRef ModuleName
   -- |
+  -- A value re-exported from another module. These will be inserted during
+  -- elaboration in name desugaring.
+  --
+  | ReExportRef ModuleName DeclarationRef
+  -- |
   -- A declaration reference with source position information
   --
   | PositionedDeclarationRef SourceSpan [Comment] DeclarationRef
   deriving (Show, Read)
 
 instance Eq DeclarationRef where
-  (TypeRef name dctors)  == (TypeRef name' dctors') = name == name' && dctors == dctors'
-  (TypeOpRef name)       == (TypeOpRef name')       = name == name'
-  (ValueRef name)        == (ValueRef name')        = name == name'
-  (ValueOpRef name)      == (ValueOpRef name')      = name == name'
-  (TypeClassRef name)    == (TypeClassRef name')    = name == name'
+  (TypeRef name dctors) == (TypeRef name' dctors') = name == name' && dctors == dctors'
+  (TypeOpRef name) == (TypeOpRef name') = name == name'
+  (ValueRef name) == (ValueRef name') = name == name'
+  (ValueOpRef name) == (ValueOpRef name') = name == name'
+  (TypeClassRef name) == (TypeClassRef name') = name == name'
   (TypeInstanceRef name) == (TypeInstanceRef name') = name == name'
-  (ModuleRef name)       == (ModuleRef name')       = name == name'
+  (ModuleRef name) == (ModuleRef name') = name == name'
+  (ReExportRef mn ref) == (ReExportRef mn' ref') = mn == mn' && ref == ref'
   (PositionedDeclarationRef _ _ r) == r' = r == r'
   r == (PositionedDeclarationRef _ _ r') = r == r'
   _ == _ = False

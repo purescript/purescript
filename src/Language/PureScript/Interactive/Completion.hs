@@ -9,18 +9,18 @@ module Language.PureScript.Interactive.Completion
 
 import Prelude.Compat
 
-import           Control.Arrow (second)
+import           Control.Monad ((<=<))
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.State.Class (MonadState(..))
 import           Control.Monad.Trans.Reader (asks, runReaderT, ReaderT)
-import           Data.Function (on)
-import           Data.List (nub, nubBy, isPrefixOf, sortBy, stripPrefix)
+import           Data.List (nub, isPrefixOf, sortBy, stripPrefix)
 import           Data.Maybe (mapMaybe)
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Interactive.Directive as D
 import           Language.PureScript.Interactive.Types
 import qualified Language.PureScript.Names as N
 import           System.Console.Haskeline
+import Debug.Trace
 
 -- Completions may read the state, but not modify it.
 type CompletionM = ReaderT PSCiState IO
@@ -144,12 +144,20 @@ getLoadedModules = asks (map fst . psciLoadedExterns)
 getModuleNames :: CompletionM [String]
 getModuleNames = moduleNames <$> getLoadedModules
 
-mapLoadedModulesAndQualify :: (a -> String) -> (P.Module -> [(a, P.Declaration)]) -> CompletionM [String]
+mapLoadedModulesAndQualify :: (a -> String) -> ([P.DeclarationRef] -> [a]) -> CompletionM [String]
 mapLoadedModulesAndQualify sho f = do
   ms <- getLoadedModules
-  let argPairs = do m <- ms
-                    fm <- f m
-                    return (m, fm)
+  let
+    argPairs = do
+      m <- ms
+      case m of
+        P.Module _ _ _ _ Nothing -> do
+          traceShow ("error", P.getModuleName m) $ return ()
+          P.internalError "unelaborated module exports in mapLoadedModulesAndQualify"
+        P.Module _ _ _ _ (Just refs) -> do
+          traceShow ("non-error", P.getModuleName m) $ return ()
+          fm <- f refs
+          return (m, fm)
   concat <$> traverse (uncurry (getAllQualifications sho)) argPairs
 
 getIdentNames :: CompletionM [String]
@@ -164,22 +172,15 @@ getTypeNames = mapLoadedModulesAndQualify P.runProperName typeDecls
 -- | Given a module and a declaration in that module, return all possible ways
 -- it could have been referenced given the current PSCiState - including fully
 -- qualified, qualified using an alias, and unqualified.
-getAllQualifications :: (a -> String) -> P.Module -> (a, P.Declaration) -> CompletionM [String]
-getAllQualifications sho m (declName, decl) = do
+getAllQualifications :: (a -> String) -> P.Module -> a -> CompletionM [String]
+getAllQualifications sho m declName = do
   imports <- getAllImportsOf m
   let fullyQualified = qualifyWith (Just (P.getModuleName m))
   let otherQuals = nub (concatMap qualificationsUsing imports)
   return $ fullyQualified : otherQuals
   where
   qualifyWith mMod = P.showQualified sho (P.Qualified mMod declName)
-  referencedBy refs = P.isExported (Just refs) decl
-
-  qualificationsUsing (_, importType, asQ') =
-    let q = qualifyWith asQ'
-    in case importType of
-          P.Implicit      -> [q]
-          P.Explicit refs -> [q | referencedBy refs]
-          P.Hiding refs   -> [q | not $ referencedBy refs]
+  qualificationsUsing (_, _, asQ') = [qualifyWith asQ']
 
 
 -- | Returns all the ImportedModule values referring to imports of a particular
@@ -187,36 +188,14 @@ getAllQualifications sho m (declName, decl) = do
 getAllImportsOf :: P.Module -> CompletionM [ImportedModule]
 getAllImportsOf = asks . allImportsOf
 
-nubOnFst :: Eq a => [(a, b)] -> [(a, b)]
-nubOnFst = nubBy ((==) `on` fst)
+typeDecls :: [P.DeclarationRef] -> [N.ProperName 'N.TypeName]
+typeDecls = mapMaybe (fmap fst . P.getTypeRef)
 
-typeDecls :: P.Module -> [(N.ProperName 'N.TypeName, P.Declaration)]
-typeDecls = mapMaybe getTypeName . filter P.isDataDecl . P.exportedDeclarations
-  where
-  getTypeName :: P.Declaration -> Maybe (N.ProperName 'N.TypeName, P.Declaration)
-  getTypeName d@(P.TypeSynonymDeclaration name _ _) = Just (name, d)
-  getTypeName d@(P.DataDeclaration _ name _ _) = Just (name, d)
-  getTypeName (P.PositionedDeclaration _ _ d) = getTypeName d
-  getTypeName _ = Nothing
+identNames :: [P.DeclarationRef] -> [N.Ident]
+identNames = mapMaybe P.getValueRef
 
-identNames :: P.Module -> [(N.Ident, P.Declaration)]
-identNames = nubOnFst . concatMap getDeclNames . P.exportedDeclarations
-  where
-  getDeclNames :: P.Declaration -> [(P.Ident, P.Declaration)]
-  getDeclNames d@(P.ValueDeclaration ident _ _ _)  = [(ident, d)]
-  getDeclNames d@(P.TypeDeclaration ident _ ) = [(ident, d)]
-  getDeclNames d@(P.ExternDeclaration ident _) = [(ident, d)]
-  getDeclNames d@(P.TypeClassDeclaration _ _ _ ds) = map (second (const d)) $ concatMap getDeclNames ds
-  getDeclNames (P.PositionedDeclaration _ _ d) = getDeclNames d
-  getDeclNames _ = []
-
-dctorNames :: P.Module -> [(N.ProperName 'N.ConstructorName, P.Declaration)]
-dctorNames = nubOnFst . concatMap go . P.exportedDeclarations
-  where
-  go :: P.Declaration -> [(N.ProperName 'N.ConstructorName, P.Declaration)]
-  go decl@(P.DataDeclaration _ _ _ ctors) = map (\n -> (n, decl)) (map fst ctors)
-  go (P.PositionedDeclaration _ _ d) = go d
-  go _ = []
+dctorNames :: [P.DeclarationRef] -> [N.ProperName 'N.ConstructorName]
+dctorNames = concat . mapMaybe (snd <=< P.getTypeRef)
 
 moduleNames :: [P.Module] -> [String]
 moduleNames = nub . map (P.runModuleName . P.getModuleName)
