@@ -14,12 +14,12 @@ matrix:
       sudo: required
       env: BUILD_TYPE=normal COVERAGE=true DEPLOY=true
 
-    - compiler: cc-linux-nightly-normal
-      os: linux
-      dist: trusty
-      sudo: required
-      env: BUILD_TYPE=normal STACKAGE_NIGHTLY=true
-      allow_failures: true
+    # - compiler: cc-linux-nightly-normal
+    #   os: linux
+    #   dist: trusty
+    #   sudo: required
+    #   env: BUILD_TYPE=normal STACKAGE_NIGHTLY=true
+    #   allow_failures: true
 
     - compiler: cc-linux-lts-sdist
       os: linux
