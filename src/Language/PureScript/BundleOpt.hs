@@ -56,6 +56,7 @@ data FuncCollector = FuncCollector {
 
 -- * Constants
 
+-- arbitrary suffix that gets mangled into an uncurried function's name
 suffix :: String
 suffix = "$_$_$"
 

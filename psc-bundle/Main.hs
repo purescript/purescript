@@ -35,7 +35,12 @@ data Options = Options
   , optionsEntryPoints :: [String]
   , optionsMainModule  :: Maybe String
   , optionsNamespace   :: String
+<<<<<<< HEAD
   , optionsShouldUncurry :: Maybe String
+=======
+  , optionsRequirePath :: Maybe FilePath
+  , optionsShouldUncurry :: Maybe Bool
+>>>>>>> 3fc3dc4... fixup!
   } deriving Show
 
 -- | Given a filename, assuming it is in the correct place on disk, infer a ModuleIdentifier.
@@ -61,7 +66,11 @@ app Options{..} = do
     length js `seq` return (mid, js)                                            -- evaluate readFile till EOF before returning, not to exhaust file handles
 
   let entryIds = map (`ModuleIdentifier` Regular) optionsEntryPoints
+<<<<<<< HEAD
   bundle input entryIds optionsMainModule optionsNamespace optionsShouldUncurry
+=======
+  bundle input entryIds optionsMainModule optionsNamespace optionsRequirePath (fromMaybe False optionsShouldUncurry)
+>>>>>>> 3fc3dc4... fixup!
 
 -- | Command line options parser.
 options :: Parser Options
@@ -70,7 +79,12 @@ options = Options <$> some inputFile
                   <*> many entryPoint
                   <*> optional mainModule
                   <*> namespace
+<<<<<<< HEAD
                   <*> optional shouldUncurry
+=======
+                  <*> optional requirePath
+                  <*> (optional (not <$> noShouldUncurry) <|> optional shouldUncurry)
+>>>>>>> 3fc3dc4... fixup!
   where
   inputFile :: Parser FilePath
   inputFile = strArgument $
@@ -103,11 +117,16 @@ options = Options <$> some inputFile
     <> help "Specify the namespace that PureScript modules will be exported to when running in the browser."
 
 
-  shouldUncurry :: Parser String
-  shouldUncurry = strOption $
-       short 'p'
+  shouldUncurry :: Parser Bool
+  shouldUncurry = switch $
+       short 'O'
     <> long "optimize"
-    <> help "optimize uncurry or optimize u - When given this option psc-bundle will apply an uncurry optimization"
+    <> help "When given this option psc-bundle will apply an uncurry optimization"
+
+  noShouldUncurry :: Parser Bool
+  noShouldUncurry = switch $
+    long "no-optimize"
+    <> help "When given this option psc-bundle will prevent the uncurry optimization"
 
 -- | Make it go.
 main :: IO ()
