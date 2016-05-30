@@ -43,6 +43,7 @@ module Language.PureScript.Parser.Lexer
   , qualifier
   , tyname
   , uname
+  , uname'
   , mname
   , reserved
   , symbol
@@ -430,6 +431,12 @@ uname :: TokenParser String
 uname = token go P.<?> "proper name"
   where
   go (UName s) | validUName s = Just s
+  go _ = Nothing
+
+uname' :: String -> TokenParser ()
+uname' s = token go P.<?> "proper name"
+  where
+  go (UName s') | s == s' = Just ()
   go _ = Nothing
 
 tyname :: TokenParser String
