@@ -26,6 +26,9 @@ parseFunction = parens rarrow >> return tyFunction
 parseObject :: TokenParser Type
 parseObject = braces $ TypeApp tyRecord <$> parseRow
 
+parseTypeLevelString :: TokenParser Type
+parseTypeLevelString = TypeLevelString <$> stringLiteral
+
 parseTypeWildcard :: TokenParser Type
 parseTypeWildcard = do
   start <- P.getPosition
@@ -53,6 +56,7 @@ parseTypeAtom :: TokenParser Type
 parseTypeAtom = indented *> P.choice
             [ P.try parseConstrainedType
             , P.try parseFunction
+            , parseTypeLevelString
             , parseObject
             , parseTypeWildcard
             , parseForAll

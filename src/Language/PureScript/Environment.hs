@@ -240,6 +240,7 @@ primTypes =
     , (primName "Int",      (Star, ExternData))
     , (primName "Boolean",  (Star, ExternData))
     , (primName "Partial",  (Star, ExternData))
+    , (primName "Fail",     (FunKind Symbol Star, ExternData))
     ]
 
 -- |
@@ -249,7 +250,9 @@ primTypes =
 primClasses :: M.Map (Qualified (ProperName 'ClassName)) ([(String, Maybe Kind)], [(Ident, Type)], [Constraint])
 primClasses =
   M.fromList
-    [ (primName "Partial", ([], [], [])) ]
+    [ (primName "Partial", ([], [], []))
+    , (primName "Fail",    ([("message", Just Symbol)], [], []))
+    ]
 
 -- |
 -- Finds information about data constructors from the current environment.

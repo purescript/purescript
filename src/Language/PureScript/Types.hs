@@ -29,79 +29,47 @@ newtype SkolemScope = SkolemScope { runSkolemScope :: Int }
 -- The type of types
 --
 data Type
-  -- |
-  -- A unification variable of type Type
-  --
+  -- | A unification variable of type Type
   = TUnknown Int
-  -- |
-  -- A named type variable
-  --
+  -- | A named type variable
   | TypeVar String
-  -- |
-  -- A type wildcard, as would appear in a partial type synonym
-  --
+  -- | A type-level string
+  | TypeLevelString String
+  -- | A type wildcard, as would appear in a partial type synonym
   | TypeWildcard SourceSpan
-  -- |
-  -- A type constructor
-  --
+  -- | A type constructor
   | TypeConstructor (Qualified (ProperName 'TypeName))
-  -- |
-  -- A type operator. This will be desugared into a type constructor during the
+  -- | A type operator. This will be desugared into a type constructor during the
   -- "operators" phase of desugaring.
-  --
   | TypeOp (Qualified (OpName 'TypeOpName))
-  -- |
-  -- A type application
-  --
+  -- | A type application
   | TypeApp Type Type
-  -- |
-  -- Forall quantifier
-  --
+  -- | Forall quantifier
   | ForAll String Type (Maybe SkolemScope)
-  -- |
-  -- A type with a set of type class constraints
-  --
+  -- | A type with a set of type class constraints
   | ConstrainedType [Constraint] Type
-  -- |
-  -- A skolem constant
-  --
+  -- | A skolem constant
   | Skolem String Int SkolemScope (Maybe SourceSpan)
-  -- |
-  -- An empty row
-  --
+  -- | An empty row
   | REmpty
-  -- |
-  -- A non-empty row
-  --
+  -- | A non-empty row
   | RCons String Type Type
-  -- |
-  -- A type with a kind annotation
-  --
+  -- | A type with a kind annotation
   | KindedType Type Kind
-  -- |
-  -- A placeholder used in pretty printing
-  --
+  -- | A placeholder used in pretty printing
   | PrettyPrintFunction Type Type
-  -- |
-  -- A placeholder used in pretty printing
-  --
+  -- | A placeholder used in pretty printing
   | PrettyPrintObject Type
-  -- |
-  -- A placeholder used in pretty printing
-  --
+  -- | A placeholder used in pretty printing
   | PrettyPrintForAll [String] Type
-  -- |
-  -- Binary operator application. During the rebracketing phase of desugaring,
+  -- | Binary operator application. During the rebracketing phase of desugaring,
   -- this data constructor will be removed.
-  --
   | BinaryNoParensType Type Type Type
-  -- |
-  -- Explicit parentheses. During the rebracketing phase of desugaring, this
+  -- | Explicit parentheses. During the rebracketing phase of desugaring, this
   -- data constructor will be removed.
   --
   -- Note: although it seems this constructor is not used, it _is_ useful,
   -- since it prevents certain traversals from matching.
-  --
   | ParensInType Type
   deriving (Show, Read, Eq, Ord)
 

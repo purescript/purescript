@@ -184,6 +184,7 @@ typeHeadsAreEqual _ (TUnknown u1)        (TUnknown u2)        | u1 == u2 = Just 
 typeHeadsAreEqual _ (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    | s1 == s2 = Just []
 typeHeadsAreEqual _ t                    (TypeVar v)                     = Just [(v, t)]
 typeHeadsAreEqual _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
+typeHeadsAreEqual _ (TypeLevelString s1) (TypeLevelString s2) | s1 == s2 = Just []
 typeHeadsAreEqual m (TypeApp h1 t1)      (TypeApp h2 t2)                 = (++) <$> typeHeadsAreEqual m h1 h2
                                                                                 <*> typeHeadsAreEqual m t1 t2
 typeHeadsAreEqual _ REmpty REmpty = Just []
