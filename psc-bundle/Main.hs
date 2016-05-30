@@ -8,6 +8,7 @@ module Main (main) where
 
 import Data.Traversable (for)
 import Data.Version (showVersion)
+import Data.Maybe (fromMaybe)
 
 import Control.Applicative
 import Control.Monad
@@ -35,7 +36,6 @@ data Options = Options
   , optionsEntryPoints :: [String]
   , optionsMainModule  :: Maybe String
   , optionsNamespace   :: String
-  , optionsRequirePath :: Maybe FilePath
   , optionsShouldUncurry :: Maybe Bool
   } deriving Show
 
@@ -62,7 +62,7 @@ app Options{..} = do
     length js `seq` return (mid, js)                                            -- evaluate readFile till EOF before returning, not to exhaust file handles
 
   let entryIds = map (`ModuleIdentifier` Regular) optionsEntryPoints
-  bundle input entryIds optionsMainModule optionsNamespace optionsRequirePath (fromMaybe False optionsShouldUncurry)
+  bundle input entryIds optionsMainModule optionsNamespace (fromMaybe False optionsShouldUncurry)
 
 -- | Command line options parser.
 options :: Parser Options
@@ -71,7 +71,6 @@ options = Options <$> some inputFile
                   <*> many entryPoint
                   <*> optional mainModule
                   <*> namespace
-                  <*> optional requirePath
                   <*> (optional (not <$> noShouldUncurry) <|> optional shouldUncurry)
   where
   inputFile :: Parser FilePath

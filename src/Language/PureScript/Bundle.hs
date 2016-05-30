@@ -540,10 +540,9 @@ bundle :: (Applicative m, MonadError ErrorMessage m)
      -> [ModuleIdentifier] -- ^ Entry points.  These module identifiers are used as the roots for dead-code elimination
      -> Maybe String -- ^ An optional main
      -> String -- ^ The namespace (e.g. PS).
-     -> Maybe FilePath -- ^ The require path prefix
      -> Bool
      -> m String
-bundle inputStrs entryPoints mainModule namespace requirePath shouldUncurry = do
+bundle inputStrs entryPoints mainModule namespace shouldUncurry = do
   input <- forM inputStrs $ \(ident, js) -> do
                 ast <- either (throwError . ErrorInModule ident . UnableToParseModule) pure $ parse js (moduleName ident)
                 return (ident, ast)
