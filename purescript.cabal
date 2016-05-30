@@ -20,6 +20,7 @@ author: Phil Freeman <paf31@cantab.net>,
 tested-with: GHC==7.10.3
 
 extra-source-files: examples/passing/*.purs
+                  , examples/passing/*.js
                   , examples/passing/2018/*.purs
                   , examples/passing/2138/*.purs
                   , examples/passing/ClassRefSyntax/*.purs
