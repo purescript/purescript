@@ -19,6 +19,7 @@ import Prelude.Compat
 import Control.Monad
 import Control.Monad.Error.Class
 
+import Data.Char (chr, digitToInt)
 import Data.Generics (everything, everywhere, mkQ, mkT)
 import Data.Graph
 import Data.List (nub, stripPrefix)
@@ -186,11 +187,34 @@ withDeps (Module modulePath es) = Module modulePath (map expandDeps es)
 
 -- String literals include the quote chars
 fromStringLiteral :: JSExpression -> Maybe String
-fromStringLiteral (JSStringLiteral _ str) = Just $ trimStringQuotes str
+fromStringLiteral (JSStringLiteral _ str) = Just $ strValue str
 fromStringLiteral _ = Nothing
 
-trimStringQuotes :: String -> String
-trimStringQuotes str = reverse $ drop 1 $ reverse $ drop 1 $ str
+strValue :: String -> String
+strValue str = go $ drop 1 str
+  where
+  go ('\\' : 'b' : xs) = '\b' : go xs
+  go ('\\' : 'f' : xs) = '\f' : go xs
+  go ('\\' : 'n' : xs) = '\n' : go xs
+  go ('\\' : 'r' : xs) = '\r' : go xs
+  go ('\\' : 't' : xs) = '\t' : go xs
+  go ('\\' : 'v' : xs) = '\v' : go xs
+  go ('\\' : '0' : xs) = '\0' : go xs
+  go ('\\' : 'x' : a : b : xs) = chr (a' + b') : go xs
+    where
+    a' = 16 * digitToInt a
+    b' = digitToInt b
+  go ('\\' : 'u' : a : b : c : d : xs) = chr (a' + b' + c' + d') : go xs
+    where
+    a' = 16 * 16 * 16 * digitToInt a
+    b' = 16 * 16 * digitToInt b
+    c' = 16 * digitToInt c
+    d' = digitToInt d
+  go ('\\' : x : xs) = x : go xs
+  go "\"" = ""
+  go "'" = ""
+  go (x : xs) = x : go xs
+  go "" = ""
 
 commaList :: JSCommaList a -> [a]
 commaList JSLNil = []
@@ -332,7 +356,7 @@ matchExportsAssignment stmt
   = Nothing
 
 extractLabel :: JSPropertyName -> Maybe String
-extractLabel (JSPropertyString _ nm) = Just (trimStringQuotes nm)
+extractLabel (JSPropertyString _ nm) = Just $ strValue nm
 extractLabel (JSPropertyIdent _ nm) = Just nm
 extractLabel _ = Nothing
 
