@@ -1,19 +1,56 @@
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE EmptyDataDecls #-}
-{-# LANGUAGE KindSignatures #-}
 
 -- |
 -- Data types for names
 --
 module Language.PureScript.Names where
 
-import Control.Monad (liftM)
+import Prelude.Compat
+
 import Control.Monad.Supply.Class
 
-import Data.List
 import Data.Aeson
 import Data.Aeson.TH
+import Data.List
+
+-- | A sum of the possible name types, useful for error and lint messages.
+data Name
+  = IdentName Ident
+  | ValOpName (OpName 'ValueOpName)
+  | TyName (ProperName 'TypeName)
+  | TyOpName (OpName 'TypeOpName)
+  | DctorName (ProperName 'ConstructorName)
+  | TyClassName (ProperName 'ClassName)
+  | ModName ModuleName
+  deriving (Eq, Show)
+
+getIdentName :: Name -> Maybe Ident
+getIdentName (IdentName name) = Just name
+getIdentName _ = Nothing
+
+getValOpName :: Name -> Maybe (OpName 'ValueOpName)
+getValOpName (ValOpName name) = Just name
+getValOpName _ = Nothing
+
+getTypeName :: Name -> Maybe (ProperName 'TypeName)
+getTypeName (TyName name) = Just name
+getTypeName _ = Nothing
+
+getTypeOpName :: Name -> Maybe (OpName 'TypeOpName)
+getTypeOpName (TyOpName name) = Just name
+getTypeOpName _ = Nothing
+
+getDctorName :: Name -> Maybe (ProperName 'ConstructorName)
+getDctorName (DctorName name) = Just name
+getDctorName _ = Nothing
+
+getClassName :: Name -> Maybe (ProperName 'ClassName)
+getClassName (TyClassName name) = Just name
+getClassName _ = Nothing
+
+getModName :: Name -> Maybe ModuleName
+getModName (ModName name) = Just name
+getModName _ = Nothing
 
 -- |
 -- Names for value identifiers
@@ -24,10 +61,6 @@ data Ident
   --
   = Ident String
   -- |
-  -- A symbolic name for an infix operator
-  --
-  | Op String
-  -- |
   -- A generated name for an identifier
   --
   | GenIdent (Maybe String) Integer
@@ -35,19 +68,37 @@ data Ident
 
 runIdent :: Ident -> String
 runIdent (Ident i) = i
-runIdent (Op op) = op
 runIdent (GenIdent Nothing n) = "$" ++ show n
 runIdent (GenIdent (Just name) n) = "$" ++ name ++ show n
 
 showIdent :: Ident -> String
-showIdent (Op op) = '(' : op ++ ")"
-showIdent i = runIdent i
+showIdent = runIdent
 
-freshIdent :: (MonadSupply m) => String -> m Ident
-freshIdent name = liftM (GenIdent (Just name)) fresh
+freshIdent :: MonadSupply m => String -> m Ident
+freshIdent name = GenIdent (Just name) <$> fresh
 
-freshIdent' :: (MonadSupply m) => m Ident
-freshIdent' = liftM (GenIdent Nothing) fresh
+freshIdent' :: MonadSupply m => m Ident
+freshIdent' = GenIdent Nothing <$> fresh
+
+-- |
+-- Operator alias names.
+--
+newtype OpName (a :: OpNameType) = OpName { runOpName :: String }
+  deriving (Show, Read, Eq, Ord)
+
+instance ToJSON (OpName a) where
+  toJSON = toJSON . runOpName
+
+instance FromJSON (OpName a) where
+  parseJSON = fmap OpName . parseJSON
+
+showOp :: OpName a -> String
+showOp op = '(' : runOpName op ++ ")"
+
+-- |
+-- The closed set of operator alias types.
+--
+data OpNameType = ValueOpName | TypeOpName
 
 -- |
 -- Proper names, i.e. capitalized names for e.g. module names, type//data constructors.
@@ -101,6 +152,9 @@ showQualified :: (a -> String) -> Qualified a -> String
 showQualified f (Qualified Nothing a) = f a
 showQualified f (Qualified (Just name) a) = runModuleName name ++ "." ++ f a
 
+getQual :: Qualified a -> Maybe ModuleName
+getQual (Qualified mn _) = mn
+
 -- |
 -- Provide a default module name, if a name is unqualified
 --
@@ -117,6 +171,14 @@ mkQualified name mn = Qualified (Just mn) name
 -- | Remove the module name from a qualified name
 disqualify :: Qualified a -> a
 disqualify (Qualified _ a) = a
+
+-- |
+-- Remove the qualification from a value when it is qualified with a particular
+-- module name.
+--
+disqualifyFor :: Maybe ModuleName -> Qualified a -> Maybe a
+disqualifyFor mn (Qualified mn' a) | mn == mn' = Just a
+disqualifyFor _ _ = Nothing
 
 -- |
 -- Checks whether a qualified value is actually qualified with a module reference

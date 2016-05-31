@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude hiding (append)
+import Control.Monad.Eff.Console (log)
 
 test = \x -> x.foo + x.bar + 1.0
 
@@ -25,11 +26,11 @@ test4 = test2 weirdObj
   weirdObj = { "!@#": 1.0 }
 
 test5 = case { "***": 1.0 } of
-  { "***" = n } -> n
+  { "***": n } -> n
 
 test6 = case { "***": 1.0 } of
              { "***": n } -> n
 
 test7 {a:    snoog , b     : blah } = blah
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

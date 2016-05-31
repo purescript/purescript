@@ -1,16 +1,11 @@
 -- from #1244
-module Foo where
+module Main where
 
-  foo :: Int
-  foo = 3
+import Prelude
+import Control.Monad.Eff.Console (log)
+import Bar (foo)
 
-module Bar (module Foo) where
+baz :: Int
+baz = foo
 
-  import Foo
-
-module Baz where
-
-  import Bar (foo)
-
-  baz :: Int
-  baz = foo
+main = log "Done"

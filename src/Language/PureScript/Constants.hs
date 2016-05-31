@@ -1,7 +1,9 @@
--- |
--- Various constants which refer to things in the Prelude
---
+-- | Various constants which refer to things in the Prelude
 module Language.PureScript.Constants where
+
+import Prelude.Compat
+
+import Language.PureScript.Names
 
 -- Operators
 
@@ -247,6 +249,12 @@ moduloSemiringNumber = "moduloSemiringNumber"
 moduloSemiringInt :: String
 moduloSemiringInt = "moduloSemiringInt"
 
+euclideanRingNumber :: String
+euclideanRingNumber = "euclideanRingNumber"
+
+euclideanRingInt :: String
+euclideanRingInt = "euclideanRingInt"
+
 ordBoolean :: String
 ordBoolean = "ordBoolean"
 
@@ -283,6 +291,9 @@ boundedBoolean = "boundedBoolean"
 booleanAlgebraBoolean :: String
 booleanAlgebraBoolean = "booleanAlgebraBoolean"
 
+heytingAlgebraBoolean :: String
+heytingAlgebraBoolean = "heytingAlgebraBoolean"
+
 semigroupString :: String
 semigroupString = "semigroupString"
 
@@ -307,6 +318,17 @@ toSignature = "toSignature"
 
 main :: String
 main = "main"
+
+-- Prim
+
+partial :: String
+partial = "Partial"
+
+pattern Partial :: Qualified (ProperName 'ClassName)
+pattern Partial = Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Partial")
+
+pattern Fail :: Qualified (ProperName 'ClassName)
+pattern Fail = Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Fail")
 
 -- Code Generation
 
@@ -348,11 +370,8 @@ dataBounded = "Data_Bounded"
 dataSemigroup :: String
 dataSemigroup = "Data_Semigroup"
 
-dataModuloSemiring :: String
-dataModuloSemiring = "Data_ModuloSemiring"
-
-dataBooleanAlgebra :: String
-dataBooleanAlgebra = "Data_BooleanAlgebra"
+dataHeytingAlgebra :: String
+dataHeytingAlgebra = "Data_HeytingAlgebra"
 
 dataEq :: String
 dataEq = "Data_Eq"
@@ -365,6 +384,9 @@ dataSemiring = "Data_Semiring"
 
 dataRing :: String
 dataRing = "Data_Ring"
+
+dataEuclideanRing :: String
+dataEuclideanRing = "Data_EuclideanRing"
 
 dataFunction :: String
 dataFunction = "Data_Function"

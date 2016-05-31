@@ -3,6 +3,8 @@
 --
 module Language.PureScript.CodeGen.JS.Common where
 
+import Prelude.Compat
+
 import Data.Char
 import Data.List (intercalate)
 
@@ -27,7 +29,6 @@ identToJs :: Ident -> String
 identToJs (Ident name)
   | nameIsJsReserved name || nameIsJsBuiltIn name = "$$" ++ name
   | otherwise = concatMap identCharToString name
-identToJs (Op op) = concatMap identCharToString op
 identToJs (GenIdent _ _) = internalError "GenIdent in identToJs"
 
 -- |

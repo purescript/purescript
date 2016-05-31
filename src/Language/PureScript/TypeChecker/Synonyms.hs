@@ -1,35 +1,19 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.TypeChecker.Synonyms
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
+{-# LANGUAGE GADTs #-}
+
 -- |
 -- Functions for replacing fully applied type synonyms
 --
------------------------------------------------------------------------------
+module Language.PureScript.TypeChecker.Synonyms
+  ( replaceAllTypeSynonyms
+  ) where
 
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE PatternGuards #-}
-{-# LANGUAGE GADTs #-}
-
-module Language.PureScript.TypeChecker.Synonyms (
-    replaceAllTypeSynonyms
-) where
-
-import Prelude ()
 import Prelude.Compat
-
-import Data.Maybe (fromMaybe)
-import qualified Data.Map as M
 
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
+
+import Data.Maybe (fromMaybe)
+import qualified Data.Map as M
 
 import Language.PureScript.Environment
 import Language.PureScript.Errors

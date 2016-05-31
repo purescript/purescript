@@ -1,19 +1,22 @@
 -- |
 -- Pretty printer for values
 --
-module Language.PureScript.Pretty.Values (
-    prettyPrintValue,
-    prettyPrintBinder,
-    prettyPrintBinderAtom
-) where
+module Language.PureScript.Pretty.Values
+  ( prettyPrintValue
+  , prettyPrintBinder
+  , prettyPrintBinderAtom
+  ) where
+
+import Prelude.Compat
 
 import Control.Arrow (second)
 
-import Language.PureScript.Crash
 import Language.PureScript.AST
+import Language.PureScript.Crash
 import Language.PureScript.Names
 import Language.PureScript.Pretty.Common
 import Language.PureScript.Pretty.Types (typeAsBox, typeAtomAsBox)
+import Language.PureScript.Types (Constraint(..))
 
 import Text.PrettyPrint.Boxes
 
@@ -57,7 +60,7 @@ prettyPrintValue d (Let ds val) =
     (text "in " <> prettyPrintValue (d - 1) val)
 prettyPrintValue d (Do els) =
   text "do " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els)
-prettyPrintValue _ (TypeClassDictionary (name, tys) _) = foldl1 beforeWithSpace $ text ("#dict " ++ runProperName (disqualify name)) : map typeAtomAsBox tys
+prettyPrintValue _ (TypeClassDictionary (Constraint name tys _) _) = foldl1 beforeWithSpace $ text ("#dict " ++ runProperName (disqualify name)) : map typeAtomAsBox tys
 prettyPrintValue _ (SuperClassDictionary name _) = text $ "#dict " ++ runProperName (disqualify name)
 prettyPrintValue _ (TypeClassDictionaryAccessor className ident) =
     text "#dict-accessor " <> text (runProperName (disqualify className)) <> text "." <> text (showIdent ident) <> text ">"
@@ -68,7 +71,7 @@ prettyPrintValue _ (Hole name) = text "?" <> text name
 prettyPrintValue d expr@AnonymousArgument{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@Constructor{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@Var{} = prettyPrintValueAtom d expr
-prettyPrintValue d expr@OperatorSection{} = prettyPrintValueAtom d expr
+prettyPrintValue d expr@Op{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@BinaryNoParens{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@Parens{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@UnaryMinus{} = prettyPrintValueAtom d expr
@@ -80,12 +83,10 @@ prettyPrintValueAtom d (Literal l) = prettyPrintLiteralValue d l
 prettyPrintValueAtom _ AnonymousArgument = text "_"
 prettyPrintValueAtom _ (Constructor name) = text $ runProperName (disqualify name)
 prettyPrintValueAtom _ (Var ident) = text $ showIdent (disqualify ident)
-prettyPrintValueAtom d (OperatorSection op (Right val)) = ((text "(" <> prettyPrintValue (d - 1) op) `beforeWithSpace` prettyPrintValue (d - 1) val) `before` text ")"
-prettyPrintValueAtom d (OperatorSection op (Left val)) = ((text "(" <> prettyPrintValue (d - 1) val) `beforeWithSpace` prettyPrintValue (d - 1) op) `before` text ")"
 prettyPrintValueAtom d (BinaryNoParens op lhs rhs) =
   prettyPrintValue (d - 1) lhs `beforeWithSpace` printOp op `beforeWithSpace` prettyPrintValue (d - 1) rhs
   where
-  printOp (Var (Qualified _ (Op opName))) = text opName
+  printOp (Op (Qualified _ name)) = text (runOpName name)
   printOp expr = text "`" <> prettyPrintValue (d - 1) expr <> text "`"
 prettyPrintValueAtom d (TypedValue _ val _) = prettyPrintValueAtom d val
 prettyPrintValueAtom d (PositionedValue _ _ val) = prettyPrintValueAtom d val
@@ -154,7 +155,7 @@ prettyPrintBinderAtom b@ConstructorBinder{} = parens (prettyPrintBinder b)
 prettyPrintBinderAtom (NamedBinder ident binder) = showIdent ident ++ "@" ++ prettyPrintBinder binder
 prettyPrintBinderAtom (PositionedBinder _ _ binder) = prettyPrintBinderAtom binder
 prettyPrintBinderAtom (TypedBinder _ binder) = prettyPrintBinderAtom binder
-prettyPrintBinderAtom (OpBinder op) = showIdent (disqualify op)
+prettyPrintBinderAtom (OpBinder op) = runOpName (disqualify op)
 prettyPrintBinderAtom (BinaryNoParensBinder op b1 b2) =
   prettyPrintBinderAtom b1 ++ " " ++ prettyPrintBinderAtom op ++ " " ++ prettyPrintBinderAtom b2
 prettyPrintBinderAtom (ParensInBinder b) = parens (prettyPrintBinder b)

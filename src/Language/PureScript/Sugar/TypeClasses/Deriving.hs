@@ -1,29 +1,23 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PatternGuards #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 
 -- |
 -- This module implements the generic deriving elaboration that takes place during desugaring.
 --
 module Language.PureScript.Sugar.TypeClasses.Deriving (deriveInstances) where
 
-import Prelude ()
 import Prelude.Compat
+
+import Control.Arrow (second)
+import Control.Monad (replicateM)
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Supply.Class (MonadSupply)
 
 import Data.List (foldl', find, sortBy)
 import Data.Maybe (fromMaybe)
 import Data.Ord (comparing)
 
-import Control.Arrow (second)
-import Control.Monad (replicateM)
-import Control.Monad.Supply.Class (MonadSupply)
-import Control.Monad.Error.Class (MonadError(..))
-
-import Language.PureScript.Crash
 import Language.PureScript.AST
+import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Names
@@ -50,11 +44,11 @@ deriveInstance mn ds (TypeInstanceDeclaration nm deps className tys@[ty] Derived
   , Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor ty
   , mn == fromMaybe mn mn'
   = TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveGeneric mn ds tyCon args
-  | className == Qualified (Just (ModuleName [ ProperName "Prelude" ])) (ProperName "Eq")
+  | className == Qualified (Just (ModuleName [ ProperName "Data", ProperName "Eq" ])) (ProperName "Eq")
   , Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
   , mn == fromMaybe mn mn'
   = TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveEq mn ds tyCon
-  | className == Qualified (Just (ModuleName [ ProperName "Prelude" ])) (ProperName "Ord")
+  | className == Qualified (Just (ModuleName [ ProperName "Data", ProperName "Ord" ])) (ProperName "Ord")
   , Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
   , mn == fromMaybe mn mn'
   = TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveOrd mn ds tyCon
@@ -218,8 +212,8 @@ deriveGeneric mn ds tyConNm dargs = do
         = App (lamCase (Ident "r") [ mkRecCase (decomposeRec rec)
                                    , CaseAlternative [NullBinder] (Right mkNothing)
                                    ])
-              (App e (mkPrelVar (Ident "unit")))
-      fromSpineFun e _ = App (mkGenVar (Ident C.fromSpine)) (App e (mkPrelVar (Ident "unit")))
+              (App e unitVal)
+      fromSpineFun e _ = App (mkGenVar (Ident C.fromSpine)) (App e unitVal)
 
       mkRecCase :: [(String, Type)] -> CaseAlternative
       mkRecCase rs =
@@ -237,10 +231,13 @@ deriveGeneric mn ds tyConNm dargs = do
     -- Helpers
 
     liftApplicative :: Expr -> [Expr] -> Expr
-    liftApplicative = foldl' (\x e -> App (App (mkPrelVar (Ident "apply")) x) e)
+    liftApplicative = foldl' (\x e -> App (App applyFn x) e)
 
-    mkPrelVar :: Ident -> Expr
-    mkPrelVar = mkVarMn (Just (ModuleName [ProperName C.prelude]))
+    unitVal :: Expr
+    unitVal = mkVarMn (Just (ModuleName [ProperName "Data", ProperName "Unit"])) (Ident "unit")
+
+    applyFn :: Expr
+    applyFn = mkVarMn (Just (ModuleName [ProperName "Control", ProperName "Apply"])) (Ident "apply")
 
     mkGenVar :: Ident -> Expr
     mkGenVar = mkVarMn (Just (ModuleName [ProperName "Data", ProperName C.generic]))
@@ -265,10 +262,10 @@ deriveEq mn ds tyConNm = do
     mkEqFunction _ = internalError "mkEqFunction: expected DataDeclaration"
 
     preludeConj :: Expr -> Expr -> Expr
-    preludeConj = App . App (Var (Qualified (Just (ModuleName [ProperName C.prelude])) (Ident C.conj)))
+    preludeConj = App . App (Var (Qualified (Just (ModuleName [ProperName "Data", ProperName "HeytingAlgebra"])) (Ident C.conj)))
 
     preludeEq :: Expr -> Expr -> Expr
-    preludeEq = App . App (Var (Qualified (Just (ModuleName [ProperName C.prelude])) (Ident C.eq)))
+    preludeEq = App . App (Var (Qualified (Just (ModuleName [ProperName "Data", ProperName "Eq"])) (Ident C.eq)))
 
     addCatch :: [CaseAlternative] -> [CaseAlternative]
     addCatch xs
@@ -326,13 +323,19 @@ deriveOrd mn ds tyConNm = do
       | null xs = [catchAll] -- No type constructors
       | otherwise = xs
       where
-      catchAll = CaseAlternative [NullBinder, NullBinder] (Right (preludeCtor "EQ"))
+      catchAll = CaseAlternative [NullBinder, NullBinder] (Right (orderingCtor "EQ"))
 
-    preludeCtor :: String -> Expr
-    preludeCtor = Constructor . Qualified (Just (ModuleName [ProperName C.prelude])) . ProperName
+    orderingName :: String -> Qualified (ProperName a)
+    orderingName = Qualified (Just (ModuleName [ProperName "Data", ProperName "Ordering"])) . ProperName
 
-    preludeCompare :: Expr -> Expr -> Expr
-    preludeCompare = App . App (Var (Qualified (Just (ModuleName [ProperName C.prelude])) (Ident C.compare)))
+    orderingCtor :: String -> Expr
+    orderingCtor = Constructor . orderingName
+
+    orderingBinder :: String -> Binder
+    orderingBinder name = ConstructorBinder (orderingName name) []
+
+    ordCompare :: Expr -> Expr -> Expr
+    ordCompare = App . App (Var (Qualified (Just (ModuleName [ProperName "Data", ProperName "Ord"])) (Ident C.compare)))
 
     mkCtorClauses :: ((ProperName 'ConstructorName, [Type]), Bool) -> m [CaseAlternative]
     mkCtorClauses ((ctorName, tys), isLast) = do
@@ -342,11 +345,11 @@ deriveOrd mn ds tyConNm = do
           extras | not isLast = [ CaseAlternative [ ConstructorBinder (Qualified (Just mn) ctorName) (replicate (length tys) NullBinder)
                                                   , NullBinder
                                                   ]
-                                                  (Right (preludeCtor "LT"))
+                                                  (Right (orderingCtor "LT"))
                                 , CaseAlternative [ NullBinder
                                                   , ConstructorBinder (Qualified (Just mn) ctorName) (replicate (length tys) NullBinder)
                                                   ]
-                                                  (Right (preludeCtor "GT"))
+                                                  (Right (orderingCtor "GT"))
                                 ]
                  | otherwise = []
       return $ CaseAlternative [ caseBinder identsL
@@ -359,12 +362,12 @@ deriveOrd mn ds tyConNm = do
       caseBinder idents = ConstructorBinder (Qualified (Just mn) ctorName) (map VarBinder idents)
 
     appendAll :: [Expr] -> Expr
-    appendAll [] = preludeCtor "EQ"
+    appendAll [] = orderingCtor "EQ"
     appendAll [x] = x
-    appendAll (x : xs) = Case [x] [ CaseAlternative [ ConstructorBinder (Qualified (Just (ModuleName [ProperName C.prelude])) (ProperName "LT")) [] ]
-                                                    (Right (preludeCtor "LT"))
-                                  , CaseAlternative [ ConstructorBinder (Qualified (Just (ModuleName [ProperName C.prelude])) (ProperName "GT")) [] ]
-                                                    (Right (preludeCtor "GT"))
+    appendAll (x : xs) = Case [x] [ CaseAlternative [orderingBinder "LT"]
+                                                    (Right (orderingCtor "LT"))
+                                  , CaseAlternative [orderingBinder "GT"]
+                                                    (Right (orderingCtor "GT"))
                                   , CaseAlternative [ NullBinder ]
                                                     (Right (appendAll xs))
                                   ]
@@ -374,7 +377,7 @@ deriveOrd mn ds tyConNm = do
       appendAll
       . map (\(str, typ) -> toOrdering (Accessor str l) (Accessor str r) typ)
       $ decomposeRec rec
-    toOrdering l r _ = preludeCompare l r
+    toOrdering l r _ = ordCompare l r
 
 findTypeDecl
   :: (MonadError MultipleErrors m)
@@ -407,7 +410,7 @@ mkVar :: Ident -> Expr
 mkVar = mkVarMn Nothing
 
 objectType :: Type -> Maybe Type
-objectType (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Object"))) rec) = Just rec
+objectType (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Record"))) rec) = Just rec
 objectType _ = Nothing
 
 decomposeRec :: Type -> [(String, Type)]

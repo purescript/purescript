@@ -1,11 +1,12 @@
 {
   "name": "purescript-test-suite-support",
   "dependencies": {
-    "purescript-eff": "0.1.0",
-    "purescript-prelude": "0.1.3",
-    "purescript-assert": "0.1.1",
-    "purescript-st": "0.1.0",
-    "purescript-console": "0.1.0",
-    "purescript-functions": "0.1.0"
+    "purescript-assert": "1.0.0-rc.1",
+    "purescript-console": "1.0.0-rc.1",
+    "purescript-eff": "1.0.0-rc.1",
+    "purescript-functions": "1.0.0-rc.1",
+    "purescript-prelude": "1.0.0-rc.3",
+    "purescript-st": "1.0.0-rc.1",
+    "purescript-partial": "1.1.2"
   }
 }

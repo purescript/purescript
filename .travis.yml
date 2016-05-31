@@ -1,73 +1,80 @@
 language: c
-dist: trusty
+dist: trusty # because of perf issues
 sudo: required
 matrix:
   include:
-    - env: GHCVER=7.10.3 CABALVER=1.22 STACKAGE=lts-5.4 RUNSDISTTESTS=YES
-      compiler: ": #GHC 7.10.3 lts-5.4"
-      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
-    - env: GHCVER=7.10.3 CABALVER=1.22 STACKAGE=nightly-2016-02-25
-      compiler: ": #GHC 7.10.3 nightly-2016-02-25"
-      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
-    - env: GHCVER=7.10.3 CABALVER=1.22 DEPLOY=yes
-      compiler: ": #GHC 7.10.3"
-      addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3,happy-1.19.5,alex-3.1.4], sources: [hvr-ghc]}}
-before_install:
-  - unset CC
-  - export PATH="/opt/ghc/$GHCVER/bin:$PATH"
-  - export PATH="/opt/cabal/$CABALVER/bin:$PATH"
-  - export PATH="$HOME/.cabal/bin:$PATH"
-  - export PATH="/opt/happy/1.19.5/bin:/$PATH"
-  - export PATH="/opt/alex/3.1.4/bin:/$PATH"
-  - export PATH="$HOME/build/purescript/purescript/dist/build/psc:/$PATH"
-  - export PATH="$HOME/build/purescript/purescript/dist/build/psc-ide-server:/$PATH"
-  - export PATH="$HOME/build/purescript/purescript/dist/build/psc-ide-client:/$PATH"
+    # The 'compiler' key is a hack to get Travis to use different caches for
+    # each job in a build, in order to avoid the separate jobs stomping on each
+    # other's caches. See https://github.com/travis-ci/travis-ci/issues/4393
+    #
+    # We use trusty boxes because they seem to be a bit faster.
+    - compiler: cc-linux-lts-normal
+      os: linux
+      dist: trusty
+      sudo: required
+      env: BUILD_TYPE=normal COVERAGE=true DEPLOY=true
+
+    # - compiler: cc-linux-nightly-normal
+    #   os: linux
+    #   dist: trusty
+    #   sudo: required
+    #   env: BUILD_TYPE=normal STACKAGE_NIGHTLY=true
+    #   allow_failures: true
+
+    - compiler: cc-linux-lts-sdist
+      os: linux
+      dist: trusty
+      sudo: required
+      env: BUILD_TYPE=sdist
+
+    - compiler: cc-linux-lts-haddock
+      os: linux
+      dist: trusty
+      sudo: required
+      env: BUILD_TYPE=haddock
+
+    - compiler: cc-osx-lts-normal
+      os: osx
+      env: BUILD_TYPE=normal DEPLOY=true
+
+    - compiler: cc-osx-lts-sdist
+      os: osx
+      env: BUILD_TYPE=sdist
+addons:
+  apt:
+    packages:
+    - libgmp-dev
+cache:
+  directories:
+  - $HOME/.local/bin
+  - $HOME/.stack
 install:
-  - cabal --version
-  - echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
-  - travis_retry cabal update
-  # Run sequentially
-  # Travis container infrastructure seems to expose all host CPUs (16?), thus
-  # cabal and ghc tries to use them all. Which is bad idea on a shared box.
-  # See also: https://ghc.haskell.org/trac/ghc/ticket/9221
-  - sed -i 's/^jobs:/-- jobs:/' ${HOME}/.cabal/config
-  # Cache sandboxes in ~/cabal-sandboxes
-  # Move right sandbox to .cabal-sandbox if exists
-  - if [ -d ~/cabal-sandboxes/$GHCVER-${STACKAGE:-none} ]; then
-      mv ~/cabal-sandboxes/$GHCVER-${STACKAGE:-none} .cabal-sandbox;
-    fi
-  - mkdir -p .cabal-sandbox
-  - cabal sandbox init --sandbox .cabal-sandbox
-  # Download stackage cabal.config. Filter this package and 'extra deps'
-  - if [ -n "$STACKAGE" ]; then curl https://www.stackage.org/$STACKAGE/cabal.config | egrep -v 'purescript|language-javascript|bower-json' > cabal.config; fi
-  - cabal install --only-dependencies --enable-tests
-  - cabal install hpc-coveralls
-  # Snapshot state of the sandbox now, so we don't need to make new one for test install
-  - rm -rf ~/cabal-sandboxes/$GHCVER-${STACKAGE:-none}
-  - cp -r .cabal-sandbox ~/cabal-sandboxes/$GHCVER-${STACKAGE:-none}
-  # Install bower globally (for psc-docs/psc-publish tests)
-  - npm install -g bower
+- | # Install stack.
+  if test ! -f "$HOME/.local/bin/stack"
+  then
+    URL="https://www.stackage.org/stack/$TRAVIS_OS_NAME-x86_64"
+    curl --location "$URL" > stack.tar.gz
+    gunzip stack.tar.gz
+    tar -x -f stack.tar --strip-components 1
+    mkdir -p "$HOME/.local/bin"
+    mv stack "$HOME/.local/bin/"
+  fi
+- npm install -g bower # for psc-docs / psc-publish tests
+# Fix the CC environment variable, because Travis changes it
+- export CC=gcc
+- export OS_NAME=$(./travis/convert-os-name.sh)
 script:
-  - ./travis/configure.sh
-  - cabal build --ghc-options="-Werror"
-  - cabal test
-  - ./travis/test-install.sh
-after_script:
-  - ./travis/after.sh
-notifications:
-  email: true
-before_deploy: "./bundle/build.sh linux64"
+- travis/build.sh
+before_deploy:
+- ./bundle/build.sh $OS_NAME
 deploy:
   provider: releases
   api_key: $RELEASE_KEY
   file:
-    - bundle/linux64.tar.gz
-    - bundle/linux64.sha
+    - bundle/$OS_NAME.tar.gz
+    - bundle/$OS_NAME.sha
   skip_cleanup: true
   on:
     all_branches: true
     tags: true
-    condition: "$DEPLOY = yes"
-cache:
-  directories:
-    - ~/cabal-sandboxes
+    condition: "$DEPLOY = true"

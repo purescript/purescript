@@ -1,22 +1,16 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE LambdaCase #-}
 
 -- |
 -- Data types for modules and declarations
 --
 module Language.PureScript.AST.Declarations where
 
-import Prelude ()
 import Prelude.Compat
 
-import Data.Aeson.TH
-import Data.List (nub, (\\))
-import Data.Maybe (mapMaybe)
-
-import qualified Data.Map as M
-
 import Control.Monad.Identity
+
+import Data.Aeson.TH
+import qualified Data.Map as M
 
 import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Literals
@@ -47,9 +41,9 @@ getModuleName (Module _ _ name _ _) = name
 addDefaultImport :: ModuleName -> Module -> Module
 addDefaultImport toImport m@(Module ss coms mn decls exps)  =
   if isExistingImport `any` decls || mn == toImport then m
-  else Module ss coms mn (ImportDeclaration toImport Implicit Nothing False : decls) exps
+  else Module ss coms mn (ImportDeclaration toImport Implicit Nothing : decls) exps
   where
-  isExistingImport (ImportDeclaration mn' _ _ _) | mn' == toImport = True
+  isExistingImport (ImportDeclaration mn' _ _) | mn' == toImport = True
   isExistingImport (PositionedDeclaration _ _ d) = isExistingImport d
   isExistingImport _ = False
 
@@ -64,16 +58,20 @@ data DeclarationRef
   -- |
   -- A type operator
   --
-  | TypeOpRef Ident
+  | TypeOpRef (OpName 'TypeOpName)
   -- |
   -- A value
   --
   | ValueRef Ident
   -- |
+  -- A value-level operator
+  --
+  | ValueOpRef (OpName 'ValueOpName)
+  -- |
   -- A type class
   --
   | TypeClassRef (ProperName 'ClassName)
-    -- |
+  -- |
   -- A type class instance, created during typeclass desugaring (name, class name, instance types)
   --
   | TypeInstanceRef Ident
@@ -81,10 +79,6 @@ data DeclarationRef
   -- A module, in its entirety
   --
   | ModuleRef ModuleName
-  -- |
-  -- An unspecified ProperName ref. This will be replaced with a TypeClassRef
-  -- or TypeRef during name desugaring.
-  | ProperRef String
   -- |
   -- A declaration reference with source position information
   --
@@ -95,40 +89,43 @@ instance Eq DeclarationRef where
   (TypeRef name dctors)  == (TypeRef name' dctors') = name == name' && dctors == dctors'
   (TypeOpRef name)       == (TypeOpRef name')       = name == name'
   (ValueRef name)        == (ValueRef name')        = name == name'
+  (ValueOpRef name)      == (ValueOpRef name')      = name == name'
   (TypeClassRef name)    == (TypeClassRef name')    = name == name'
   (TypeInstanceRef name) == (TypeInstanceRef name') = name == name'
   (ModuleRef name)       == (ModuleRef name')       = name == name'
-  (ProperRef name)       == (ProperRef name')       = name == name'
   (PositionedDeclarationRef _ _ r) == r' = r == r'
   r == (PositionedDeclarationRef _ _ r') = r == r'
   _ == _ = False
+
+getTypeRef :: DeclarationRef -> Maybe (ProperName 'TypeName, Maybe [ProperName 'ConstructorName])
+getTypeRef (TypeRef name dctors) = Just (name, dctors)
+getTypeRef (PositionedDeclarationRef _ _ r) = getTypeRef r
+getTypeRef _ = Nothing
+
+getTypeOpRef :: DeclarationRef -> Maybe (OpName 'TypeOpName)
+getTypeOpRef (TypeOpRef op) = Just op
+getTypeOpRef (PositionedDeclarationRef _ _ r) = getTypeOpRef r
+getTypeOpRef _ = Nothing
+
+getValueRef :: DeclarationRef -> Maybe Ident
+getValueRef (ValueRef name) = Just name
+getValueRef (PositionedDeclarationRef _ _ r) = getValueRef r
+getValueRef _ = Nothing
+
+getValueOpRef :: DeclarationRef -> Maybe (OpName 'ValueOpName)
+getValueOpRef (ValueOpRef op) = Just op
+getValueOpRef (PositionedDeclarationRef _ _ r) = getValueOpRef r
+getValueOpRef _ = Nothing
+
+getTypeClassRef :: DeclarationRef -> Maybe (ProperName 'ClassName)
+getTypeClassRef (TypeClassRef name) = Just name
+getTypeClassRef (PositionedDeclarationRef _ _ r) = getTypeClassRef r
+getTypeClassRef _ = Nothing
 
 isModuleRef :: DeclarationRef -> Bool
 isModuleRef (PositionedDeclarationRef _ _ r) = isModuleRef r
 isModuleRef (ModuleRef _) = True
 isModuleRef _ = False
-
--- |
--- Finds duplicate values in a list of declaration refs. The returned values
--- are the duplicate refs with data constructors elided, and then a separate
--- list of duplicate data constructors.
---
-findDuplicateRefs :: [DeclarationRef] -> ([DeclarationRef], [ProperName 'ConstructorName])
-findDuplicateRefs refs =
-  let positionless = stripPosInfo `map` refs
-      simplified = simplifyTypeRefs `map` positionless
-      dupeRefs = nub $ simplified \\ nub simplified
-      dupeCtors = concat $ flip mapMaybe positionless $ \case
-        TypeRef _ (Just dctors) ->
-          let dupes = dctors \\ nub dctors
-          in if null dupes then Nothing else Just dupes
-        _ -> Nothing
-  in (dupeRefs, dupeCtors)
-  where
-  stripPosInfo (PositionedDeclarationRef _ _ ref) = stripPosInfo ref
-  stripPosInfo other = other
-  simplifyTypeRefs (TypeRef pn _) = TypeRef pn Nothing
-  simplifyTypeRefs other = other
 
 -- |
 -- The data type which specifies type of import declaration
@@ -193,14 +190,13 @@ data Declaration
   --
   | ExternDataDeclaration (ProperName 'TypeName) Kind
   -- |
-  -- A fixity declaration (fixity data, operator name, value the operator is an alias for)
+  -- A fixity declaration
   --
-  | FixityDeclaration Fixity String (Maybe (Qualified FixityAlias))
+  | FixityDeclaration (Either ValueFixity TypeFixity)
   -- |
   -- A module import (module name, qualified/unqualified/hiding, optional "qualified as" name)
-  -- TODO: also a boolean specifying whether the old `qualified` syntax was used, so a warning can be raised in desugaring (remove for 0.9)
   --
-  | ImportDeclaration ModuleName ImportDeclarationType (Maybe ModuleName) Bool
+  | ImportDeclaration ModuleName ImportDeclarationType (Maybe ModuleName)
   -- |
   -- A type class declaration (name, argument, implies, member declarations)
   --
@@ -216,30 +212,14 @@ data Declaration
   | PositionedDeclaration SourceSpan [Comment] Declaration
   deriving (Show, Read)
 
-data FixityAlias
-  = AliasValue Ident
-  | AliasConstructor (ProperName 'ConstructorName)
-  | AliasType (ProperName 'TypeName)
+data ValueFixity = ValueFixity Fixity (Qualified (Either Ident (ProperName 'ConstructorName))) (OpName 'ValueOpName)
   deriving (Eq, Ord, Show, Read)
 
-foldFixityAlias
-  :: (Ident -> a)
-  -> (ProperName 'ConstructorName -> a)
-  -> (ProperName 'TypeName -> a)
-  -> FixityAlias
-  -> a
-foldFixityAlias f _ _ (AliasValue name) = f name
-foldFixityAlias _ g _ (AliasConstructor name) = g name
-foldFixityAlias _ _ h (AliasType name) = h name
+data TypeFixity = TypeFixity Fixity (Qualified (ProperName 'TypeName)) (OpName 'TypeOpName)
+  deriving (Eq, Ord, Show, Read)
 
-getValueAlias :: FixityAlias -> Maybe (Either Ident (ProperName 'ConstructorName))
-getValueAlias (AliasValue name) = Just $ Left name
-getValueAlias (AliasConstructor name) = Just $ Right name
-getValueAlias _ = Nothing
-
-getTypeAlias :: FixityAlias -> Maybe (ProperName 'TypeName)
-getTypeAlias (AliasType name) = Just name
-getTypeAlias _ = Nothing
+pattern ValueFixityDeclaration fixity name op = FixityDeclaration (Left (ValueFixity fixity name op))
+pattern TypeFixityDeclaration fixity name op = FixityDeclaration (Right (TypeFixity fixity name op))
 
 -- | The members of a type class instance declaration
 data TypeInstanceBody
@@ -297,6 +277,11 @@ isFixityDecl :: Declaration -> Bool
 isFixityDecl FixityDeclaration{} = True
 isFixityDecl (PositionedDeclaration _ _ d) = isFixityDecl d
 isFixityDecl _ = False
+
+getFixityDecl :: Declaration -> Maybe (Either ValueFixity TypeFixity)
+getFixityDecl (FixityDeclaration fixity) = Just fixity
+getFixityDecl (PositionedDeclaration _ _ d) = getFixityDecl d
+getFixityDecl _ = Nothing
 
 -- |
 -- Test if a declaration is a foreign import
@@ -361,12 +346,8 @@ data Expr
   --
   | Parens Expr
   -- |
-  -- Operator section. This will be removed during desugaring and replaced with lambda.
-  --
-  | OperatorSection Expr (Either Expr Expr)
-  -- |
-  -- An object property getter (e.g. `_.x`). This will be removed during
-  -- desugaring and expanded into a lambda that reads a property from an object.
+  -- A record property getter (e.g. `_.x`). This will be removed during
+  -- desugaring and expanded into a lambda that reads a property from a record.
   --
   | ObjectGetter String
   -- |
@@ -389,6 +370,11 @@ data Expr
   -- Variable
   --
   | Var (Qualified Ident)
+  -- |
+  -- An operator. This will be desugared into a function during the "operators"
+  -- phase of desugaring.
+  --
+  | Op (Qualified (OpName 'ValueOpName))
   -- |
   -- Conditional (if-then-else expression)
   --
@@ -487,4 +473,3 @@ data DoNotationElement
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''DeclarationRef)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ImportDeclarationType)
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''FixityAlias)

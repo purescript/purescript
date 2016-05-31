@@ -1,34 +1,32 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 -- |
 -- This module implements the desugaring pass which replaces do-notation statements with
--- appropriate calls to bind from the Prelude.Monad type class.
+-- appropriate calls to bind.
 --
-module Language.PureScript.Sugar.DoNotation (
-    desugarDoModule
-) where
+module Language.PureScript.Sugar.DoNotation (desugarDoModule) where
 
-import Prelude ()
 import Prelude.Compat
-
-import Language.PureScript.Crash
-import Language.PureScript.Names
-import Language.PureScript.AST
-import Language.PureScript.Errors
-
-import qualified Language.PureScript.Constants as C
 
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class
 
+
+import Language.PureScript.AST
+import Language.PureScript.Crash
+import Language.PureScript.Errors
+import Language.PureScript.Names
+import qualified Language.PureScript.Constants as C
+
 -- |
--- Replace all @DoNotationBind@ and @DoNotationValue@ constructors with applications of the Prelude.bind function,
--- and all @DoNotationLet@ constructors with let expressions.
+-- Replace all @DoNotationBind@ and @DoNotationValue@ constructors with
+-- applications of the bind function in scope, and all @DoNotationLet@
+-- constructors with let expressions.
 --
 desugarDoModule :: forall m. (MonadSupply m, MonadError MultipleErrors m) => Module -> m Module
 desugarDoModule (Module ss coms mn ds exts) = Module ss coms mn <$> parU ds desugarDo <*> pure exts
 
+-- |
+-- Desugar a single do statement
+--
 desugarDo :: forall m. (MonadSupply m, MonadError MultipleErrors m) => Declaration -> m Declaration
 desugarDo (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> rethrowWithPosition pos (desugarDo d)
 desugarDo d =

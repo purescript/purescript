@@ -1,6 +1,6 @@
-module System.IO.UTF8
+module System.IO.UTF8 where
 
-where
+import Prelude.Compat
 
 import System.IO ( IOMode(..)
                  , hGetContents

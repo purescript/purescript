@@ -1,6 +1,6 @@
 module Main where
 
-import Prelude ()
+import Control.Monad.Eff.Console (log)
 
 type List a = forall r. r -> (a -> r -> r) -> r
 
@@ -15,4 +15,4 @@ append = \l1 l2 r f -> l2 (l1 r f) f
 
 test = append (cons 1 empty) (cons 2 empty)
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

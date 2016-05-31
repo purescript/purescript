@@ -20,6 +20,7 @@ It supports the following options:
   project directory. Defaults to `output/`, relative to either the current
   directory or the directory specified by `-d`.
 - `--debug`: Enables some logging meant for debugging
+- `--no-watch`: Disables the filewatcher
 - `--version`: Output psc-ide version
 
 ## Issuing queries

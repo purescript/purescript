@@ -1,29 +1,24 @@
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE FlexibleContexts #-}
-
 module Language.PureScript.Docs.Convert.ReExports
   ( updateReExports
   ) where
 
-import Prelude ()
 import Prelude.Compat
 
+import Control.Arrow ((&&&), second)
 import Control.Monad
-import Control.Monad.Trans.State.Strict (execState)
+import Control.Monad.Reader.Class (MonadReader, ask)
 import Control.Monad.State.Class (MonadState, gets, modify)
 import Control.Monad.Trans.Reader (runReaderT)
-import Control.Monad.Reader.Class (MonadReader, ask)
-import Control.Arrow ((&&&), first, second)
-import Data.Either
-import Data.Maybe (mapMaybe)
-import Data.Map (Map)
-import qualified Data.Map as Map
-import Data.Monoid ((<>))
+import Control.Monad.Trans.State.Strict (execState)
 
-import qualified Language.PureScript as P
+import Data.Either
+import Data.Map (Map)
+import Data.Maybe (mapMaybe)
+import Data.Monoid ((<>))
+import qualified Data.Map as Map
 
 import Language.PureScript.Docs.Types
+import qualified Language.PureScript as P
 
 -- |
 -- Given:
@@ -40,8 +35,7 @@ updateReExports ::
   [P.ModuleName] ->
   Map P.ModuleName Module ->
   Map P.ModuleName Module
-updateReExports env order modules =
-  execState action modules
+updateReExports env order = execState action
   where
   action =
     void (traverse go order)
@@ -102,39 +96,50 @@ getReExports env mn =
 --      * Filters type class declarations to ensure that only re-exported type
 --      class members are listed.
 --
-collectDeclarations ::
+collectDeclarations :: forall m.
   (MonadState (Map P.ModuleName Module) m, MonadReader P.ModuleName m) =>
   P.Imports ->
   P.Exports ->
   m [(P.ModuleName, [Declaration])]
 collectDeclarations imports exports = do
-  valsAndMembers <- collect lookupValueDeclaration     impVals  expVals
-  typeClasses    <- collect lookupTypeClassDeclaration impTCs   expTCs
-  types          <- collect lookupTypeDeclaration      impTypes expTypes
-  typeOps        <- collect lookupTypeOpDeclaration    impTypeOps expTypeOps
+  valsAndMembers <- collect lookupValueDeclaration impVals expVals
+  valOps <- collect lookupValueOpDeclaration impValOps expValOps
+  typeClasses <- collect lookupTypeClassDeclaration impTCs expTCs
+  types <- collect lookupTypeDeclaration impTypes expTypes
+  typeOps <- collect lookupTypeOpDeclaration impTypeOps expTypeOps
 
   (vals, classes) <- handleTypeClassMembers valsAndMembers typeClasses
 
   let filteredTypes = filterDataConstructors expCtors types
-  let filteredClasses = filterTypeClassMembers (map fst expVals) classes
+  let filteredClasses = filterTypeClassMembers (Map.keys expVals) classes
 
-  pure (Map.toList (Map.unionsWith (<>) [filteredTypes, typeOps, filteredClasses, vals]))
+  pure (Map.toList (Map.unionsWith (<>) [filteredTypes, filteredClasses, vals, valOps, typeOps]))
 
   where
+
+  collect
+    :: (Eq a, Show a)
+    => (P.ModuleName -> a -> m (P.ModuleName, [b]))
+    -> [P.ImportRecord a]
+    -> Map a P.ModuleName
+    -> m (Map P.ModuleName [b])
   collect lookup' imps exps = do
-    imps' <- traverse (findImport imps) exps
+    imps' <- traverse (findImport imps) $ Map.toList exps
     Map.fromListWith (<>) <$> traverse (uncurry lookup') imps'
 
   expVals = P.exportedValues exports
   impVals = concat (Map.elems (P.importedValues imports))
 
-  expTypes = map (first fst) (P.exportedTypes exports)
+  expValOps = P.exportedValueOps exports
+  impValOps = concat (Map.elems (P.importedValueOps imports))
+
+  expTypes = Map.map snd (P.exportedTypes exports)
   impTypes = concat (Map.elems (P.importedTypes imports))
 
   expTypeOps = P.exportedTypeOps exports
   impTypeOps = concat (Map.elems (P.importedTypeOps imports))
 
-  expCtors = concatMap (snd . fst) (P.exportedTypes exports)
+  expCtors = concatMap fst (Map.elems (P.exportedTypes exports))
 
   expTCs = P.exportedTypeClasses exports
   impTCs = concat (Map.elems (P.importedTypeClasses imports))
@@ -226,6 +231,20 @@ lookupValueDeclaration importedFrom ident = do
   thd :: (a, b, c) -> c
   thd (_, _, x) = x
 
+lookupValueOpDeclaration
+  :: (MonadState (Map P.ModuleName Module) m, MonadReader P.ModuleName m)
+  => P.ModuleName
+  -> P.OpName 'P.ValueOpName
+  -> m (P.ModuleName, [Declaration])
+lookupValueOpDeclaration importedFrom op = do
+  decls <- lookupModuleDeclarations "lookupValueOpDeclaration" importedFrom
+  case filter (\d -> declTitle d == P.showOp op && isValueAlias d) decls of
+    [d] ->
+      pure (importedFrom, [d])
+    other ->
+      internalErrorInModule
+        ("lookupValueOpDeclaration: unexpected result for: " ++ show other)
+
 -- |
 -- Extract a particular type declaration. For data declarations, constructors
 -- are only included in the output if they are listed in the arguments.
@@ -247,16 +266,15 @@ lookupTypeDeclaration importedFrom ty = do
       internalErrorInModule
         ("lookupTypeDeclaration: unexpected result: " ++ show other)
 
-lookupTypeOpDeclaration ::
-  (MonadState (Map P.ModuleName Module) m,
-   MonadReader P.ModuleName m) =>
-  P.ModuleName ->
-  P.Ident ->
-  m (P.ModuleName, [Declaration])
+lookupTypeOpDeclaration
+  :: (MonadState (Map P.ModuleName Module) m,MonadReader P.ModuleName m)
+  => P.ModuleName
+  -> P.OpName 'P.TypeOpName
+  -> m (P.ModuleName, [Declaration])
 lookupTypeOpDeclaration importedFrom tyOp = do
   decls <- lookupModuleDeclarations "lookupTypeOpDeclaration" importedFrom
   let
-    ds = filter (\d -> declTitle d == ("type " ++ P.showIdent tyOp) && isTypeAlias d) decls
+    ds = filter (\d -> declTitle d == ("type " ++ P.showOp tyOp) && isTypeAlias d) decls
   case ds of
     [d] ->
       pure (importedFrom, [d])
@@ -264,12 +282,11 @@ lookupTypeOpDeclaration importedFrom tyOp = do
       internalErrorInModule
         ("lookupTypeOpDeclaration: unexpected result: " ++ show other)
 
-lookupTypeClassDeclaration ::
-  (MonadState (Map P.ModuleName Module) m,
-   MonadReader P.ModuleName m) =>
-  P.ModuleName ->
-  P.ProperName 'P.ClassName ->
-  m (P.ModuleName, [Declaration])
+lookupTypeClassDeclaration
+  :: (MonadState (Map P.ModuleName Module) m, MonadReader P.ModuleName m)
+  => P.ModuleName
+  -> P.ProperName 'P.ClassName
+  -> m (P.ModuleName, [Declaration])
 lookupTypeClassDeclaration importedFrom tyClass = do
   decls <- lookupModuleDeclarations "lookupTypeClassDeclaration" importedFrom
   let
@@ -374,10 +391,10 @@ instance Monoid TypeClassEnv where
 --
 -- Returns a tuple of (values, type classes).
 --
-handleEnv ::
-  (MonadReader P.ModuleName m) =>
-  TypeClassEnv ->
-  m ([Declaration], [Declaration])
+handleEnv
+  :: (MonadReader P.ModuleName m)
+  => TypeClassEnv
+  -> m ([Declaration], [Declaration])
 handleEnv TypeClassEnv{..} =
   envUnhandledMembers
     |> foldM go (envValues, mkMap envTypeClasses)
@@ -405,7 +422,6 @@ handleEnv TypeClassEnv{..} =
           , declComments   = cdeclComments
           , declSourceSpan = cdeclSourceSpan
           , declChildren   = []
-          , declFixity     = Nothing
           , declInfo       = ValueDeclaration (addConstraint constraint typ)
           }
       _ ->
@@ -426,10 +442,10 @@ splitMap = foldl go (Map.empty, Map.empty) . Map.toList
 -- Given a list of exported constructor names, remove any data constructor
 -- names in the provided Map of declarations which are not in the list.
 --
-filterDataConstructors ::
-  [P.ProperName 'P.ConstructorName] ->
-  Map P.ModuleName [Declaration] ->
-  Map P.ModuleName [Declaration]
+filterDataConstructors
+  :: [P.ProperName 'P.ConstructorName]
+  -> Map P.ModuleName [Declaration]
+  -> Map P.ModuleName [Declaration]
 filterDataConstructors =
   filterExportedChildren isDataConstructor P.runProperName
 
@@ -438,27 +454,25 @@ filterDataConstructors =
 -- type class member names in the provided Map of declarations which are not in
 -- the list.
 --
-filterTypeClassMembers ::
-  [P.Ident] ->
-  Map P.ModuleName [Declaration] ->
-  Map P.ModuleName [Declaration]
+filterTypeClassMembers
+  :: [P.Ident]
+  -> Map P.ModuleName [Declaration]
+  -> Map P.ModuleName [Declaration]
 filterTypeClassMembers =
   filterExportedChildren isTypeClassMember P.showIdent
 
-filterExportedChildren ::
-  (Functor f) =>
-  (ChildDeclaration -> Bool) ->
-  (name -> String) ->
-  [name] ->
-  f [Declaration] ->
-  f [Declaration]
-filterExportedChildren isTargetedKind runName expNames =
-  fmap filterDecls
+filterExportedChildren
+  :: (Functor f)
+  => (ChildDeclaration -> Bool)
+  -> (name -> String)
+  -> [name]
+  -> f [Declaration]
+  -> f [Declaration]
+filterExportedChildren isTargetedKind runName expNames = fmap filterDecls
   where
   filterDecls =
-    map (filterChildren (\c -> not (isTargetedKind c) ||
-                               cdeclTitle c `elem` expNames'))
-
+    map $ filterChildren $ \c ->
+      not (isTargetedKind c) || cdeclTitle c `elem` expNames'
   expNames' = map runName expNames
 
 allDeclarations :: Module -> [Declaration]
@@ -471,10 +485,10 @@ x |> f = f x
 internalError :: String -> a
 internalError = P.internalError . ("Docs.Convert.ReExports: " ++)
 
-internalErrorInModule ::
-  (MonadReader P.ModuleName m) =>
-  String ->
-  m a
+internalErrorInModule
+  :: (MonadReader P.ModuleName m)
+  => String
+  -> m a
 internalErrorInModule msg = do
   mn <- ask
   internalError
@@ -489,7 +503,7 @@ typeClassConstraintFor :: Declaration -> Maybe P.Constraint
 typeClassConstraintFor Declaration{..} =
   case declInfo of
     TypeClassDeclaration tyArgs _ ->
-      Just (P.Qualified Nothing (P.ProperName declTitle), mkConstraint tyArgs)
+      Just (P.Constraint (P.Qualified Nothing (P.ProperName declTitle)) (mkConstraint tyArgs) Nothing)
     _ ->
       Nothing
   where

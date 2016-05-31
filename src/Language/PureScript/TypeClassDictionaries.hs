@@ -1,5 +1,7 @@
 module Language.PureScript.TypeClassDictionaries where
 
+import Prelude.Compat
+
 import Language.PureScript.Names
 import Language.PureScript.Types
 

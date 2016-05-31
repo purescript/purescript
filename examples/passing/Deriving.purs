@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 import Test.Assert
 
 data V
@@ -27,5 +28,7 @@ main = do
   assert $ X 0 < X 1
   assert $ X 0 < Y "Foo"
   assert $ Y "Bar" < Y "Baz"
-  assert $ z == z where
-    z = Z { left: X 0, right: Y "Foo" }
+  assert $ z == z
+  log "Done"
+  where
+  z = Z { left: X 0, right: Y "Foo" }

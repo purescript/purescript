@@ -4,6 +4,8 @@
 --
 module Language.PureScript.CodeGen.JS.Optimizer.MagicDo (magicDo) where
 
+import Prelude.Compat
+
 import Data.List (nub)
 import Data.Maybe (fromJust, isJust)
 
@@ -61,9 +63,9 @@ magicDo' = everywhereOnJS undo . everywhereOnJSTopDown convert
   isPure (JSApp _ fn [dict]) | isDict (C.eff, C.applicativeEffDictionary) dict && isPurePoly fn = True
   isPure _ = False
   -- Check if an expression represents the polymorphic >>= function
-  isBindPoly = isFn' [(C.prelude, C.bind), (C.prelude, (C.>>=)), (C.controlBind, C.bind)]
+  isBindPoly = isFn (C.controlBind, C.bind)
   -- Check if an expression represents the polymorphic pure or return function
-  isPurePoly = isFn' [(C.prelude, C.pure'), (C.prelude, C.return), (C.controlApplicative, C.pure')]
+  isPurePoly = isFn (C.controlApplicative, C.pure')
   -- Check if an expression represents a function in the Eff module
   isEffFunc name (JSAccessor _ name' (JSVar _ eff)) = eff == C.eff && name == name'
   isEffFunc _ _ = False

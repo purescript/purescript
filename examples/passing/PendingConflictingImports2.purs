@@ -1,14 +1,10 @@
-module A where
-
-  thing :: Int
-  thing = 1
-
 module Main where
 
-  import A
+import A
+import Control.Monad.Eff.Console (log)
 
-  -- No error as we never force `thing` to be resolved in `Main`
-  thing :: Int
-  thing = 2
+-- No error as we never force `thing` to be resolved in `Main`
+thing :: Int
+thing = 2
 
-  main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

@@ -1,19 +1,21 @@
-module Language.PureScript.Parser.Types (
-    parseType,
-    parsePolyType,
-    noWildcards,
-    parseTypeAtom
-) where
+module Language.PureScript.Parser.Types
+  ( parseType
+  , parsePolyType
+  , noWildcards
+  , parseTypeAtom
+  ) where
+
+import Prelude.Compat
 
 import Control.Applicative
 import Control.Monad (when, unless)
 
-import Language.PureScript.Names
-import Language.PureScript.Types
+import Language.PureScript.AST.SourcePos
+import Language.PureScript.Environment
 import Language.PureScript.Parser.Common
 import Language.PureScript.Parser.Kinds
 import Language.PureScript.Parser.Lexer
-import Language.PureScript.Environment
+import Language.PureScript.Types
 
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
@@ -22,10 +24,17 @@ parseFunction :: TokenParser Type
 parseFunction = parens rarrow >> return tyFunction
 
 parseObject :: TokenParser Type
-parseObject = braces $ TypeApp tyObject <$> parseRow
+parseObject = braces $ TypeApp tyRecord <$> parseRow
+
+parseTypeLevelString :: TokenParser Type
+parseTypeLevelString = TypeLevelString <$> stringLiteral
 
 parseTypeWildcard :: TokenParser Type
-parseTypeWildcard = underscore >> return TypeWildcard
+parseTypeWildcard = do
+  start <- P.getPosition
+  let end = P.incSourceColumn start 1
+  underscore
+  return $ TypeWildcard (SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos end))
 
 parseTypeVariable :: TokenParser Type
 parseTypeVariable = do
@@ -34,7 +43,7 @@ parseTypeVariable = do
   return $ TypeVar ident
 
 parseTypeConstructor :: TokenParser Type
-parseTypeConstructor = TypeConstructor <$> parseQualified properName
+parseTypeConstructor = TypeConstructor <$> parseQualified typeName
 
 parseForAll :: TokenParser Type
 parseForAll = mkForAll <$> ((reserved "forall" <|> reserved "∀") *> P.many1 (indented *> identifier) <* indented <* dot)
@@ -47,6 +56,7 @@ parseTypeAtom :: TokenParser Type
 parseTypeAtom = indented *> P.choice
             [ P.try parseConstrainedType
             , P.try parseFunction
+            , parseTypeLevelString
             , parseObject
             , parseTypeWildcard
             , parseForAll
@@ -69,16 +79,16 @@ parseConstrainedType = do
     className <- parseQualified properName
     indented
     ty <- P.many parseTypeAtom
-    return (className, ty)
+    return (Constraint className ty Nothing)
 
 
 parseAnyType :: TokenParser Type
 parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTable parseTypeAtom) P.<?> "type"
   where
-  operators = [ [ P.Infix (P.try (parseQualified (Op <$> symbol)) >>= \ident ->
+  operators = [ [ P.Infix (return TypeApp) P.AssocLeft ]
+              , [ P.Infix (P.try (parseQualified parseOperator) >>= \ident ->
                     return (BinaryNoParensType (TypeOp ident))) P.AssocRight
                 ]
-              , [ P.Infix (return TypeApp) P.AssocLeft ]
               , [ P.Infix (rarrow >> return function) P.AssocRight ]
               ]
   postfixTable = [ \t -> KindedType t <$> (indented *> doubleColon *> parseKind)

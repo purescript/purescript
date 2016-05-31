@@ -3,7 +3,7 @@ module Main where
 import Prelude
 import Control.Monad.Eff
 import Control.Monad.ST
-import Control.Monad.Eff.Console
+import Control.Monad.Eff.Console (log, logShow)
 
 test1 = do
   log "Line 1"
@@ -21,5 +21,6 @@ test3 = pureST (do
 
 main = do
   test1
-  Control.Monad.Eff.Console.print test2
-  Control.Monad.Eff.Console.print test3
+  logShow test2
+  logShow test3
+  log "Done"

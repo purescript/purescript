@@ -3,6 +3,8 @@
 --
 module Language.PureScript.CoreFn.Meta where
 
+import Prelude.Compat
+
 import Language.PureScript.Names
 
 -- |

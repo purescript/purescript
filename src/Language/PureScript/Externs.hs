@@ -1,37 +1,35 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 -- |
--- This module generates code for \"externs\" files, i.e. files containing only foreign import declarations.
+-- This module generates code for \"externs\" files, i.e. files containing only
+-- foreign import declarations.
 --
 module Language.PureScript.Externs
   ( ExternsFile(..)
   , ExternsImport(..)
   , ExternsFixity(..)
+  , ExternsTypeFixity(..)
   , ExternsDeclaration(..)
   , moduleToExternsFile
   , applyExternsFileToEnvironment
   ) where
 
-import Prelude ()
 import Prelude.Compat
 
+import Data.Aeson.TH
+import Data.Foldable (fold)
 import Data.List (find, foldl')
 import Data.Maybe (mapMaybe, maybeToList, fromMaybe)
-import Data.Foldable (fold)
 import Data.Version (showVersion)
-import Data.Aeson.TH
-
 import qualified Data.Map as M
 
-import Language.PureScript.Crash
 import Language.PureScript.AST
+import Language.PureScript.Crash
 import Language.PureScript.Environment
-import Language.PureScript.Names
-import Language.PureScript.Types
 import Language.PureScript.Kinds
+import Language.PureScript.Names
 import Language.PureScript.TypeClassDictionaries
+import Language.PureScript.Types
 
 import Paths_purescript as Paths
 
@@ -48,6 +46,8 @@ data ExternsFile = ExternsFile
   , efImports :: [ExternsImport]
   -- | List of operators and their fixities
   , efFixities :: [ExternsFixity]
+  -- | List of type operators and their fixities
+  , efTypeFixities :: [ExternsTypeFixity]
   -- | List of type and value declaration
   , efDeclarations :: [ExternsDeclaration]
   } deriving (Show, Read)
@@ -71,9 +71,22 @@ data ExternsFixity = ExternsFixity
   -- | The precedence level of the operator
   , efPrecedence :: Precedence
   -- | The operator symbol
-  , efOperator :: String
+  , efOperator :: OpName 'ValueOpName
   -- | The value the operator is an alias for
-  , efAlias :: Maybe (Qualified FixityAlias)
+  , efAlias :: Qualified (Either Ident (ProperName 'ConstructorName))
+  } deriving (Show, Read)
+
+-- | A type fixity declaration in an externs file
+data ExternsTypeFixity = ExternsTypeFixity
+  {
+  -- | The associativity of the operator
+    efTypeAssociativity :: Associativity
+  -- | The precedence level of the operator
+  , efTypePrecedence :: Precedence
+  -- | The operator symbol
+  , efTypeOperator :: OpName 'TypeOpName
+  -- | The value the operator is an alias for
+  , efTypeAlias :: Qualified (ProperName 'TypeName)
   } deriving (Show, Read)
 
 -- | A type or value declaration appearing in an externs file
@@ -150,22 +163,26 @@ moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
   efExports       = exps
   efImports       = mapMaybe importDecl ds
   efFixities      = mapMaybe fixityDecl ds
+  efTypeFixities  = mapMaybe typeFixityDecl ds
   efDeclarations  = concatMap toExternsDeclaration efExports
 
   fixityDecl :: Declaration -> Maybe ExternsFixity
-  fixityDecl (FixityDeclaration (Fixity assoc prec) op alias) =
-      fmap (const (ExternsFixity assoc prec op alias)) (find exportsOp exps)
-    where
-    exportsOp :: DeclarationRef -> Bool
-    exportsOp (PositionedDeclarationRef _ _ r) = exportsOp r
-    exportsOp (ValueRef ident') = ident' == Op op
-    exportsOp (TypeOpRef ident') = ident' == Op op
-    exportsOp _ = False
+  fixityDecl (ValueFixityDeclaration (Fixity assoc prec) name op) =
+      fmap (const (ExternsFixity assoc prec op name)) (find (findOp getValueOpRef op) exps)
   fixityDecl (PositionedDeclaration _ _ d) = fixityDecl d
   fixityDecl _ = Nothing
 
+  typeFixityDecl :: Declaration -> Maybe ExternsTypeFixity
+  typeFixityDecl (TypeFixityDeclaration (Fixity assoc prec) name op) =
+      fmap (const (ExternsTypeFixity assoc prec op name)) (find (findOp getTypeOpRef op) exps)
+  typeFixityDecl (PositionedDeclaration _ _ d) = typeFixityDecl d
+  typeFixityDecl _ = Nothing
+
+  findOp :: (DeclarationRef -> Maybe (OpName a)) -> OpName a -> DeclarationRef -> Bool
+  findOp get op = maybe False (== op) . get
+
   importDecl :: Declaration -> Maybe ExternsImport
-  importDecl (ImportDeclaration m mt qmn _) = Just (ExternsImport m mt qmn)
+  importDecl (ImportDeclaration m mt qmn) = Just (ExternsImport m mt qmn)
   importDecl (PositionedDeclaration _ _ d) = importDecl d
   importDecl _ = Nothing
 
@@ -204,5 +221,6 @@ moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsImport)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsFixity)
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsTypeFixity)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsDeclaration)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsFile)

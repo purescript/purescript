@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
-
 -- |
 -- This module optimizes code in the simplified-Javascript intermediate representation.
 --
@@ -23,22 +21,20 @@
 --
 module Language.PureScript.CodeGen.JS.Optimizer (optimize) where
 
-import Prelude ()
 import Prelude.Compat
 
 import Control.Monad.Reader (MonadReader, ask, asks)
 import Control.Monad.Supply.Class (MonadSupply)
 
 import Language.PureScript.CodeGen.JS.AST
+import Language.PureScript.CodeGen.JS.Optimizer.Blocks
+import Language.PureScript.CodeGen.JS.Optimizer.Common
+import Language.PureScript.CodeGen.JS.Optimizer.Inliner
+import Language.PureScript.CodeGen.JS.Optimizer.MagicDo
+import Language.PureScript.CodeGen.JS.Optimizer.TCO
+import Language.PureScript.CodeGen.JS.Optimizer.Unused
 import Language.PureScript.Options
 import qualified Language.PureScript.Constants as C
-
-import Language.PureScript.CodeGen.JS.Optimizer.Common
-import Language.PureScript.CodeGen.JS.Optimizer.TCO
-import Language.PureScript.CodeGen.JS.Optimizer.MagicDo
-import Language.PureScript.CodeGen.JS.Optimizer.Inliner
-import Language.PureScript.CodeGen.JS.Optimizer.Unused
-import Language.PureScript.CodeGen.JS.Optimizer.Blocks
 
 -- |
 -- Apply a series of optimizer passes to simplified Javascript code

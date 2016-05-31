@@ -3,13 +3,10 @@ version: '{build}'
 environment:
   # Keep the path as short as possible, just in case.
   STACK_ROOT: c:\s
-  # Appveyor does not seem to be able to cope with the symbolic link
-  # stack.yaml, so this is a workaround.
-  STACK_YAML: stack-lts-5.yaml
   RELEASE_USER: purescript
   RELEASE_REPO: purescript
 cache:
-- c:\s
+- c:\s -> appveyor/cache-buster.txt
 install:
 - git submodule update --init
 - ps: Install-Product node 5
@@ -31,9 +28,6 @@ build_script:
 test_script:
 - stack -j1 --no-terminal test --pedantic
 on_success:
-# this seems to be necessary; if omitted, the bash script fails to find the
-# tool 'strip'.
-- copy C:\MinGW\bin\strip.exe C:\tools\strip.exe
 - ps: |
     function UploadFile
     {
@@ -42,7 +36,7 @@ on_success:
 
     if ($env:APPVEYOR_REPO_TAG_NAME)
     {
-      bash ./bundle/build-stack.sh win64
+      bash ./bundle/build.sh win64
 
       (New-Object Net.WebClient).DownloadFile('https://github.com/aktau/github-release/releases/download/v0.6.2/windows-amd64-github-release.zip', 'c:\tools\github-release.zip')
       pushd c:\tools

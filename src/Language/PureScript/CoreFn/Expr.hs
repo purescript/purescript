@@ -1,14 +1,14 @@
-{-# LANGUAGE DeriveFunctor #-}
-
 -- |
 -- The core functional representation
 --
 module Language.PureScript.CoreFn.Expr where
 
+import Prelude.Compat
+
 import Control.Arrow ((***))
 
-import Language.PureScript.CoreFn.Binders
 import Language.PureScript.AST.Literals
+import Language.PureScript.CoreFn.Binders
 import Language.PureScript.Names
 
 -- |

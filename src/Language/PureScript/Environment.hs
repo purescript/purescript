@@ -3,11 +3,13 @@
 
 module Language.PureScript.Environment where
 
-import Data.Maybe (fromMaybe)
+import Prelude.Compat
+
 import Data.Aeson.TH
+import Data.Maybe (fromMaybe)
+import qualified Data.Aeson as A
 import qualified Data.Map as M
 import qualified Data.Text as T
-import qualified Data.Aeson as A
 
 import Language.PureScript.Crash
 import Language.PureScript.Kinds
@@ -194,16 +196,16 @@ tyArray :: Type
 tyArray = primTy "Array"
 
 -- |
--- Type constructor for objects
+-- Type constructor for records
 --
-tyObject :: Type
-tyObject = primTy "Object"
+tyRecord :: Type
+tyRecord = primTy "Record"
 
 -- |
--- Check whether a type is an object
+-- Check whether a type is a record
 --
 isObject :: Type -> Bool
-isObject = isTypeOrApplied tyObject
+isObject = isTypeOrApplied tyRecord
 
 -- |
 -- Check whether a type is a function
@@ -230,14 +232,15 @@ primTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
 primTypes =
   M.fromList
     [ (primName "Function", (FunKind Star (FunKind Star Star), ExternData))
-    , (primName "Array", (FunKind Star Star, ExternData))
-    , (primName "Object", (FunKind (Row Star) Star, ExternData))
-    , (primName "String", (Star, ExternData))
-    , (primName "Char", (Star, ExternData))
-    , (primName "Number", (Star, ExternData))
-    , (primName "Int", (Star, ExternData))
-    , (primName "Boolean", (Star, ExternData))
-    , (primName "Partial", (Star, ExternData))
+    , (primName "Array",    (FunKind Star Star, ExternData))
+    , (primName "Record",   (FunKind (Row Star) Star, ExternData))
+    , (primName "String",   (Star, ExternData))
+    , (primName "Char",     (Star, ExternData))
+    , (primName "Number",   (Star, ExternData))
+    , (primName "Int",      (Star, ExternData))
+    , (primName "Boolean",  (Star, ExternData))
+    , (primName "Partial",  (Star, ExternData))
+    , (primName "Fail",     (FunKind Symbol Star, ExternData))
     ]
 
 -- |
@@ -247,7 +250,9 @@ primTypes =
 primClasses :: M.Map (Qualified (ProperName 'ClassName)) ([(String, Maybe Kind)], [(Ident, Type)], [Constraint])
 primClasses =
   M.fromList
-    [ (primName "Partial", ([], [], [])) ]
+    [ (primName "Partial", ([], [], []))
+    , (primName "Fail",    ([("message", Just Symbol)], [], []))
+    ]
 
 -- |
 -- Finds information about data constructors from the current environment.

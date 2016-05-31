@@ -32,12 +32,12 @@ module Language.PureScript.Docs.RenderedCode.Types
  , keywordFixity
  ) where
 
-import Prelude ()
 import Prelude.Compat
 
-import qualified Data.Aeson as A
-import Data.Aeson.BetterErrors
 import Control.Monad.Error.Class (MonadError(..))
+
+import Data.Aeson.BetterErrors
+import qualified Data.Aeson as A
 
 import qualified Language.PureScript as P
 

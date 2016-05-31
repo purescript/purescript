@@ -1,5 +1,5 @@
 name: purescript
-version: 0.8.5.0
+version: 0.9.1
 cabal-version: >=1.8
 build-type: Simple
 license: MIT
@@ -20,27 +20,73 @@ author: Phil Freeman <paf31@cantab.net>,
 tested-with: GHC==7.10.3
 
 extra-source-files: examples/passing/*.purs
+                  , examples/passing/*.js
+                  , examples/passing/2018/*.purs
+                  , examples/passing/2138/*.purs
+                  , examples/passing/ClassRefSyntax/*.purs
+                  , examples/passing/DctorOperatorAlias/*.purs
+                  , examples/passing/ExplicitImportReExport/*.purs
+                  , examples/passing/ExportExplicit/*.purs
+                  , examples/passing/ExportExplicit2/*.purs
+                  , examples/passing/Import/*.purs
+                  , examples/passing/ImportExplicit/*.purs
+                  , examples/passing/ImportQualified/*.purs
+                  , examples/passing/Module/*.purs
+                  , examples/passing/ModuleDeps/*.purs
+                  , examples/passing/ModuleExport/*.purs
+                  , examples/passing/ModuleExportDupes/*.purs
+                  , examples/passing/ModuleExportExcluded/*.purs
+                  , examples/passing/ModuleExportQualified/*.purs
+                  , examples/passing/ModuleExportSelf/*.purs
+                  , examples/passing/NonConflictingExports/*.purs
+                  , examples/passing/OperatorAliasElsewhere/*.purs
+                  , examples/passing/Operators/*.purs
+                  , examples/passing/PendingConflictingImports/*.purs
+                  , examples/passing/PendingConflictingImports2/*.purs
+                  , examples/passing/QualifiedNames/*.purs
+                  , examples/passing/RedefinedFixity/*.purs
+                  , examples/passing/ReExportQualified/*.purs
+                  , examples/passing/ResolvableScopeConflict/*.purs
+                  , examples/passing/ResolvableScopeConflict2/*.purs
+                  , examples/passing/ResolvableScopeConflict3/*.purs
+                  , examples/passing/ShadowedModuleName/*.purs
+                  , examples/passing/TransitiveImport/*.purs
+                  , examples/passing/TypeOperators/*.purs
+                  , examples/passing/TypeWithoutParens/*.purs
                   , examples/failing/*.purs
+                  , examples/failing/1733/*.purs
+                  , examples/failing/ConflictingExports/*.purs
+                  , examples/failing/ConflictingImports/*.purs
+                  , examples/failing/ConflictingImports2/*.purs
+                  , examples/failing/ConflictingQualifiedImports/*.purs
+                  , examples/failing/ConflictingQualifiedImports2/*.purs
+                  , examples/failing/ExportConflictClass/*.purs
+                  , examples/failing/ExportConflictCtor/*.purs
+                  , examples/failing/ExportConflictType/*.purs
+                  , examples/failing/ExportConflictTypeOp/*.purs
+                  , examples/failing/ExportConflictValue/*.purs
+                  , examples/failing/ExportConflictValueOp/*.purs
+                  , examples/failing/ExportExplicit1/*.purs
+                  , examples/failing/ExportExplicit3/*.purs
+                  , examples/failing/ImportExplicit/*.purs
+                  , examples/failing/ImportExplicit2/*.purs
+                  , examples/failing/ImportHidingModule/*.purs
+                  , examples/failing/ImportModule/*.purs
+                  , examples/failing/InstanceExport/*.purs
+                  , examples/failing/OrphanInstance/*.purs
+                  , examples/warning/*.purs
+                  , examples/warning/*.js
                   , examples/docs/bower_components/purescript-prelude/src/*.purs
                   , examples/docs/bower.json
                   , examples/docs/src/*.purs
-                  , tests/support/setup.js
                   , tests/support/package.json
-                  , tests/support/prelude/bower.json
-                  , tests/support/prelude/src/*.purs
-                  , tests/support/prelude/src/*.js
-                  , tests/support/prelude/LICENSE
                   , tests/support/bower.json
                   , tests/support/setup-win.cmd
-                  , tests/support/flattened/*.purs
-                  , tests/support/flattened/*.js
                   , tests/support/psci/*.purs
                   , tests/support/pscide/src/*.purs
                   , tests/support/pscide/src/*.js
                   , tests/support/pscide/src/*.fail
                   , stack.yaml
-                  , stack-lts-5.yaml
-                  , stack-nightly.yaml
                   , README.md
                   , INSTALL.md
                   , CONTRIBUTORS.md
@@ -52,47 +98,49 @@ source-repository head
 
 library
     build-depends: base >=4.8 && <5,
+                   aeson >= 0.8 && < 0.12,
+                   aeson-better-errors >= 0.8,
+                   ansi-terminal >= 0.6.2 && < 0.7,
                    base-compat >=0.6.0,
+                   bower-json >= 0.8,
+                   boxes >= 0.1.4 && < 0.2.0,
+                   bytestring -any,
+                   containers -any,
+                   directory >= 1.2,
+                   dlist -any,
+                   edit-distance -any,
+                   filepath -any,
+                   fsnotify >= 0.2.1,
+                   Glob >= 0.7 && < 0.8,
+                   haskeline >= 0.7.0.0,
+                   http-types -any,
+                   language-javascript == 0.6.*,
                    lifted-base >= 0.2.3 && < 0.2.4,
                    monad-control >= 1.0.0.0 && < 1.1,
-                   transformers-base >= 0.4.0 && < 0.5,
-                   containers -any,
-                   unordered-containers -any,
-                   dlist -any,
-                   directory >= 1.2,
-                   filepath -any,
+                   monad-logger >= 0.3 && < 0.4,
                    mtl >= 2.1.0 && < 2.3.0,
-                   parsec -any,
-                   transformers >= 0.3.0 && < 0.6,
-                   transformers-compat >= 0.3.0,
-                   utf8-string >= 1 && < 2,
+                   parallel >= 3.2 && < 3.3,
+                   parsec >=3.1.10,
                    pattern-arrows >= 0.0.2 && < 0.1,
-                   time -any,
-                   boxes >= 0.1.4 && < 0.2.0,
-                   aeson >= 0.8 && < 0.12,
-                   vector -any,
-                   bower-json >= 0.8,
-                   aeson-better-errors >= 0.8,
-                   bytestring -any,
-                   text -any,
-                   split -any,
-                   language-javascript == 0.6.*,
-                   syb -any,
-                   Glob >= 0.7 && < 0.8,
+                   pipes >= 4.0.0 && < 4.2.0,
+                   pipes-http -any,
                    process >= 1.2.0 && < 1.5,
+                   regex-tdfa -any,
                    safe >= 0.3.9 && < 0.4,
                    semigroups >= 0.16.2 && < 0.19,
-                   parallel >= 3.2 && < 3.3,
                    sourcemap >= 0.1.6,
+                   spdx == 0.2.*,
+                   split -any,
                    stm >= 0.2.4.0,
-                   regex-tdfa -any,
-                   edit-distance -any,
-                   fsnotify >= 0.2.1,
-                   monad-logger >= 0.3 && < 0.4,
-                   pipes >= 4.0.0 && < 4.2.0 ,
-                   pipes-http -any,
-                   http-types -any,
-                   spdx == 0.2.*
+                   syb -any,
+                   text -any,
+                   time -any,
+                   transformers >= 0.3.0 && < 0.6,
+                   transformers-base >= 0.4.0 && < 0.5,
+                   transformers-compat >= 0.3.0,
+                   unordered-containers -any,
+                   utf8-string >= 1 && < 2,
+                   vector -any
 
     exposed-modules: Language.PureScript
                      Language.PureScript.AST
@@ -142,7 +190,6 @@ library
                      Language.PureScript.Parser.Lexer
                      Language.PureScript.Parser.Common
                      Language.PureScript.Parser.Declarations
-                     Language.PureScript.Parser.JS
                      Language.PureScript.Parser.Kinds
                      Language.PureScript.Parser.State
                      Language.PureScript.Parser.Types
@@ -158,9 +205,10 @@ library
                      Language.PureScript.Sugar.CaseDeclarations
                      Language.PureScript.Sugar.DoNotation
                      Language.PureScript.Sugar.Names
+                     Language.PureScript.Sugar.Names.Common
                      Language.PureScript.Sugar.Names.Env
-                     Language.PureScript.Sugar.Names.Imports
                      Language.PureScript.Sugar.Names.Exports
+                     Language.PureScript.Sugar.Names.Imports
                      Language.PureScript.Sugar.ObjectWildcards
                      Language.PureScript.Sugar.Operators
                      Language.PureScript.Sugar.Operators.Common
@@ -220,13 +268,38 @@ library
                      Language.PureScript.Ide.Util
                      Language.PureScript.Ide.Rebuild
 
+                     Language.PureScript.Interactive
+                     Language.PureScript.Interactive.Types
+                     Language.PureScript.Interactive.Parser
+                     Language.PureScript.Interactive.Directive
+                     Language.PureScript.Interactive.Completion
+                     Language.PureScript.Interactive.IO
+                     Language.PureScript.Interactive.Message
+                     Language.PureScript.Interactive.Module
+                     Language.PureScript.Interactive.Printer
+
                      Control.Monad.Logger
                      Control.Monad.Supply
                      Control.Monad.Supply.Class
 
                      System.IO.UTF8
 
-    extensions:      DataKinds
+    extensions:      ConstraintKinds
+                     DataKinds
+                     DeriveFunctor
+                     EmptyDataDecls
+                     FlexibleContexts
+                     KindSignatures
+                     LambdaCase
+                     MultiParamTypeClasses
+                     NoImplicitPrelude
+                     PatternGuards
+                     PatternSynonyms
+                     RankNTypes
+                     RecordWildCards
+                     ScopedTypeVariables
+                     TupleSections
+                     ViewPatterns
     exposed: True
     buildable: True
     hs-source-dirs: src
@@ -234,11 +307,23 @@ library
     ghc-options: -Wall -O2
 
 executable psc
-    build-depends: base >=4 && <5, base-compat >=0.6.0,
-                   containers -any, directory -any, filepath -any,
-                   mtl -any, optparse-applicative >= 0.12.1, parsec -any, purescript -any,
-                   time -any, transformers -any, transformers-compat -any, Glob >= 0.7 && < 0.8,
-                   aeson >= 0.8 && < 0.12, bytestring -any, utf8-string >= 1 && < 2
+    build-depends: base >=4 && <5,
+                   purescript -any,
+                   aeson >= 0.8 && < 0.12,
+                   ansi-terminal >= 0.6.2 && < 0.7,
+                   base-compat >=0.6.0,
+                   bytestring -any,
+                   containers -any,
+                   directory -any,
+                   filepath -any,
+                   Glob >= 0.7 && < 0.8,
+                   mtl -any,
+                   optparse-applicative >= 0.12.1,
+                   parsec -any,
+                   time -any,
+                   transformers -any,
+                   transformers-compat -any,
+                   utf8-string >= 1 && < 2
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psc
@@ -246,33 +331,40 @@ executable psc
     ghc-options: -Wall -O2 -fno-warn-unused-do-bind -threaded -rtsopts "-with-rtsopts=-N"
 
 executable psci
-    build-depends: base >=4 && <5, containers -any, directory -any, filepath -any,
-                   mtl -any, optparse-applicative >= 0.12.1, parsec -any,
-                   haskeline >= 0.7.0.0, purescript -any, transformers -any,
-                   transformers-compat -any, process -any, time -any, Glob -any, base-compat >=0.6.0,
-                   boxes >= 0.1.4 && < 0.2.0
-
+    build-depends: base >=4 && <5,
+                   purescript -any,
+                   base-compat >=0.6.0,
+                   boxes >= 0.1.4 && < 0.2.0,
+                   containers -any,
+                   directory -any,
+                   filepath -any,
+                   Glob -any,
+                   haskeline >= 0.7.0.0,
+                   mtl -any,
+                   optparse-applicative >= 0.12.1,
+                   parsec -any,
+                   process -any,
+                   time -any,
+                   transformers -any,
+                   transformers-compat -any
     main-is: Main.hs
     buildable: True
-    hs-source-dirs: psci psci/main
-    other-modules: PSCi
-                   PSCi.Types
-                   PSCi.Parser
-                   PSCi.Directive
-                   PSCi.Completion
-                   PSCi.IO
-                   PSCi.Message
-                   PSCi.Option
-                   PSCi.Module
-                   PSCi.Printer
-                   Paths_purescript
+    hs-source-dirs: psci
+    other-modules: Paths_purescript
     ghc-options: -Wall -O2
 
 executable psc-docs
-    build-depends: base >=4 && <5, purescript -any,
-                   optparse-applicative >= 0.12.1, process -any, mtl -any,
-                   split -any, ansi-wl-pprint -any, directory -any,
-                   filepath -any, Glob -any, transformers -any,
+    build-depends: base >=4 && <5,
+                   purescript -any,
+                   ansi-wl-pprint -any,
+                   directory -any,
+                   filepath -any,
+                   Glob -any,
+                   mtl -any,
+                   optparse-applicative >= 0.12.1,
+                   process -any,
+                   split -any,
+                   transformers -any,
                    transformers-compat -any
     main-is: Main.hs
     other-modules: Paths_purescript
@@ -284,7 +376,11 @@ executable psc-docs
     ghc-options: -Wall -O2
 
 executable psc-publish
-    build-depends: base >=4 && <5, purescript -any, bytestring -any, aeson -any, optparse-applicative -any
+    build-depends: base >=4 && <5,
+                   purescript -any,
+                   aeson -any,
+                   bytestring -any,
+                   optparse-applicative -any
     main-is: Main.hs
     other-modules: Paths_purescript
     buildable: True
@@ -292,9 +388,15 @@ executable psc-publish
     ghc-options: -Wall -O2
 
 executable psc-hierarchy
-    build-depends: base >=4 && <5, purescript -any, optparse-applicative >= 0.12.1,
-                   process -any, mtl -any, parsec -any, filepath -any, directory -any,
-                   Glob -any
+    build-depends: base >=4 && <5,
+                   purescript -any,
+                   directory -any,
+                   filepath -any,
+                   Glob -any,
+                   mtl -any,
+                   optparse-applicative >= 0.12.1,
+                   parsec -any,
+                   process -any
     main-is: Main.hs
     other-modules: Paths_purescript
     buildable: True
@@ -308,13 +410,13 @@ executable psc-bundle
   other-extensions:
   build-depends:       base >=4 && <5,
                        purescript -any,
-                       filepath -any,
                        directory -any,
+                       filepath -any,
+                       Glob -any,
                        mtl -any,
-                       transformers -any,
-                       transformers-compat -any,
                        optparse-applicative >= 0.12.1,
-                       Glob -any
+                       transformers -any,
+                       transformers-compat -any
   ghc-options:         -Wall -O2
   hs-source-dirs:      psc-bundle
 
@@ -322,19 +424,19 @@ executable psc-ide-server
   main-is:             Main.hs
   other-modules:       Paths_purescript
   other-extensions:
-  build-depends:       base >=4 && <5
-                     , purescript -any
-                     , directory -any
-                     , filepath -any
-                     , monad-logger -any
-                     , mtl -any
-                     , transformers -any
-                     , transformers-compat -any
-                     , network -any
-                     , optparse-applicative >= 0.12.1
-                     , stm -any
-                     , text -any
-                     , base-compat >=0.6.0
+  build-depends:       base >=4 && <5,
+                       purescript -any,
+                       base-compat >=0.6.0,
+                       directory -any,
+                       filepath -any,
+                       monad-logger -any,
+                       mtl -any,
+                       network -any,
+                       optparse-applicative >= 0.12.1,
+                       stm -any,
+                       text -any,
+                       transformers -any,
+                       transformers-compat -any
   ghc-options:         -Wall -O2 -threaded
   hs-source-dirs:      psc-ide-server
 
@@ -342,23 +444,43 @@ executable psc-ide-client
   main-is:             Main.hs
   other-modules:       Paths_purescript
   other-extensions:
-  build-depends:       base >=4 && <5
-                     , mtl -any
-                     , text -any
-                     , optparse-applicative >= 0.12.1
-                     , network -any
-                     , base-compat >=0.6.0
+  build-depends:       base >=4 && <5,
+                       base-compat >=0.6.0,
+                       mtl -any,
+                       network -any,
+                       optparse-applicative >= 0.12.1,
+                       text -any
   ghc-options:         -Wall -O2
   hs-source-dirs:      psc-ide-client
 
 test-suite tests
-    build-depends: base >=4 && <5, containers -any, directory -any,
-                   filepath -any, mtl -any, parsec -any, purescript -any,
-                   transformers -any, process -any, transformers-compat -any, time -any,
-                   Glob -any, aeson-better-errors -any, bytestring -any, aeson -any,
-                   base-compat -any, haskeline >= 0.7.0.0, optparse-applicative -any,
-                   boxes -any, HUnit -any, hspec -any, hspec-discover -any, stm -any, text -any,
-                   vector -any, utf8-string -any
+    build-depends: base >=4 && <5,
+                   purescript -any,
+                   aeson -any,
+                   aeson-better-errors -any,
+                   base-compat -any,
+                   boxes -any,
+                   bytestring -any,
+                   containers -any,
+                   directory -any,
+                   filepath -any,
+                   Glob -any,
+                   haskeline >= 0.7.0.0,
+                   hspec -any,
+                   hspec-discover -any,
+                   HUnit -any,
+                   mtl -any,
+                   optparse-applicative -any,
+                   parsec -any,
+                   process -any,
+                   silently -any,
+                   stm -any,
+                   text -any,
+                   time -any,
+                   transformers -any,
+                   transformers-compat -any,
+                   utf8-string -any,
+                   vector -any
     ghc-options: -Wall
     type: exitcode-stdio-1.0
     main-is: Main.hs
@@ -377,9 +499,5 @@ test-suite tests
                    Language.PureScript.Ide.RebuildSpec
                    Language.PureScript.Ide.ReexportsSpec
                    Language.PureScript.IdeSpec
-                   PSCi.Completion
-                   PSCi.Directive
-                   PSCi.Module
-                   PSCi.Types
     buildable: True
-    hs-source-dirs: tests psci
+    hs-source-dirs: tests

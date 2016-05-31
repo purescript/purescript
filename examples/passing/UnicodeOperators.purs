@@ -1,5 +1,7 @@
 module Main where
 
+import Control.Monad.Eff.Console (log)
+
 compose :: forall a b c. (b -> c) -> (a -> b) -> a -> c
 compose f g a = f (g a)
 
@@ -17,4 +19,4 @@ emptySet _ = true
 
 test2 = 1 ∈ emptySet
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"
