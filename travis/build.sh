@@ -45,7 +45,7 @@ then
 elif [ "$BUILD_TYPE" = "haddock" ]
 then
   echo ">>> Checking haddock documentation..."
-  $STACK --fast haddock
+  $STACK haddock --fast
 else
   echo "Unrecognised BUILD_TYPE: $BUILD_TYPE"
   exit 1
