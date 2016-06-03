@@ -21,6 +21,12 @@ matrix:
     #   env: BUILD_TYPE=normal STACKAGE_NIGHTLY=true
     #   allow_failures: true
 
+    - compiler: cc-linux-ghc8.0-normal
+      os: linux
+      dist: trusty
+      sudo: required
+      env: BUILD_TYPE=normal STACK_YAML=stack-ghc-8.0.yaml
+
     - compiler: cc-linux-lts-sdist
       os: linux
       dist: trusty
