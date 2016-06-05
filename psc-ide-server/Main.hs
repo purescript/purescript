@@ -85,12 +85,11 @@ main = do
   cwd <- getCurrentDirectory
   let fullOutputPath = cwd </> outputPath
 
-  doesDirectoryExist fullOutputPath
-    >>= flip unless
-    (do putStrLn ("Your output directory didn't exist. I'll create it at: " <> fullOutputPath)
-        createDirectory fullOutputPath
-        putStrLn "This usually means you didn't compile your project yet."
-        putStrLn "psc-ide needs you to compile your project (for example by running pulp build)")
+  unlessM (doesDirectoryExist fullOutputPath) $ do
+    putStrLn ("Your output directory didn't exist. I'll create it at: " <> fullOutputPath)
+    createDirectory fullOutputPath
+    putStrLn "This usually means you didn't compile your project yet."
+    putStrLn "psc-ide needs you to compile your project (for example by running pulp build)"
 
   unless noWatch $
     void (forkFinally (watcher ideState fullOutputPath) print)

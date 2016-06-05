@@ -9,12 +9,20 @@
 -- Stability   : experimental
 --
 -- |
--- Generally useful functions and conversions
+-- Generally useful functions
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.PureScript.Ide.Util where
+module Language.PureScript.Ide.Util
+  ( identifierFromIdeDeclaration
+  , identifierFromMatch
+  , completionFromMatch
+  , encodeT
+  , decodeT
+  , unlessM
+  , module Language.PureScript.Ide.Conversions
+  ) where
 
 import           Prelude.Compat
 import           Control.Monad                 (unless)
@@ -25,21 +33,7 @@ import           Data.Text.Lazy                (fromStrict, toStrict)
 import           Data.Text.Lazy.Encoding       (decodeUtf8, encodeUtf8)
 import qualified Language.PureScript           as P
 import           Language.PureScript.Ide.Types
-
-runProperNameT :: P.ProperName a -> Text
-runProperNameT = T.pack . P.runProperName
-
-runIdentT :: P.Ident -> Text
-runIdentT = T.pack . P.runIdent
-
-runOpNameT :: P.OpName a -> Text
-runOpNameT = T.pack . P.runOpName
-
-runModuleNameT :: P.ModuleName -> Text
-runModuleNameT = T.pack . P.runModuleName
-
-prettyTypeT :: P.Type -> Text
-prettyTypeT = T.unwords . fmap T.strip . T.lines . T.pack . P.prettyPrintType
+import           Language.PureScript.Ide.Conversions
 
 identifierFromIdeDeclaration :: IdeDeclaration -> Text
 identifierFromIdeDeclaration d = case d of

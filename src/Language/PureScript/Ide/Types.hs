@@ -26,12 +26,10 @@ import           Control.Monad.Trans
 import           Data.Aeson
 import           Data.Map.Lazy                        as M
 import           Data.Maybe                           (maybeToList)
-import           Data.Text                            (Text (), pack, unpack)
-import qualified Language.PureScript.AST.Declarations as D
-import           Language.PureScript.Externs
+import           Data.Text                            (Text, pack, unpack)
 import qualified Language.PureScript.Errors.JSON      as P
-import qualified Language.PureScript.Names            as N
 import qualified Language.PureScript as P
+import           Language.PureScript.Ide.Conversions
 
 import           Text.Parsec
 import           Text.Parsec.Text
@@ -116,13 +114,12 @@ emptyStage2 :: Stage2
 emptyStage2 = Stage2 M.empty Nothing
 
 data Stage1 = Stage1
-  { s1Externs :: M.Map P.ModuleName ExternsFile
-  -- , s1Modules :: M.Map P.ModuleName P.Module
+  { s1Externs :: M.Map P.ModuleName P.ExternsFile
   }
 
 data Stage2 = Stage2
   { s2Modules :: M.Map P.ModuleName [IdeDeclaration]
-  , s2CachedRebuild :: Maybe (P.ModuleName, ExternsFile)
+  , s2CachedRebuild :: Maybe (P.ModuleName, P.ExternsFile)
   }
 
 data Match = Match P.ModuleName IdeDeclaration
@@ -139,7 +136,7 @@ instance ToJSON Completion where
 data ModuleImport =
   ModuleImport
   { importModuleName :: ModuleIdent
-  , importType       :: D.ImportDeclarationType
+  , importType       :: P.ImportDeclarationType
   , importQualifier  :: Maybe Text
   } deriving(Show)
 
@@ -149,25 +146,25 @@ instance Eq ModuleImport where
     && importQualifier mi1 == importQualifier mi2
 
 instance ToJSON ModuleImport where
-  toJSON (ModuleImport mn D.Implicit qualifier) =
+  toJSON (ModuleImport mn P.Implicit qualifier) =
     object $ [ "module" .= mn
              , "importType" .= ("implicit" :: Text)
              ] ++ fmap (\x -> "qualifier" .= x) (maybeToList qualifier)
-  toJSON (ModuleImport mn (D.Explicit refs) _) =
+  toJSON (ModuleImport mn (P.Explicit refs) _) =
     object [ "module" .= mn
            , "importType" .= ("explicit" :: Text)
            , "identifiers" .= (identifierFromDeclarationRef <$> refs)
            ]
-  toJSON (ModuleImport mn (D.Hiding refs) _) =
+  toJSON (ModuleImport mn (P.Hiding refs) _) =
     object [ "module" .= mn
            , "importType" .= ("hiding" :: Text)
            , "identifiers" .= (identifierFromDeclarationRef <$> refs)
            ]
 
-identifierFromDeclarationRef :: D.DeclarationRef -> String
-identifierFromDeclarationRef (D.TypeRef name _) = N.runProperName name
-identifierFromDeclarationRef (D.ValueRef ident) = N.runIdent ident
-identifierFromDeclarationRef (D.TypeClassRef name) = N.runProperName name
+identifierFromDeclarationRef :: P.DeclarationRef -> Text
+identifierFromDeclarationRef (P.TypeRef name _) = runProperNameT name
+identifierFromDeclarationRef (P.ValueRef ident) = runIdentT ident
+identifierFromDeclarationRef (P.TypeClassRef name) = runProperNameT name
 identifierFromDeclarationRef _ = ""
 
 data Success =

@@ -138,14 +138,14 @@ getAllModules2 mmoduleName = do
   modules <- s2Modules <$> getStage2
   rebuild <- cachedRebuild
   case mmoduleName of
-    Nothing -> pure . M.toList $ modules
+    Nothing -> pure (M.toList modules)
     Just moduleName ->
       case rebuild of
         Just (cachedModulename, ef)
           | cachedModulename == moduleName ->
             pure . M.toList $
               M.insert moduleName (snd . convertModule . convertExterns $ ef) modules
-        _ -> pure . M.toList $ modules
+        _ -> pure (M.toList modules)
 
 -- | Adds an ExternsFile into psc-ide's State Stage1. This does not populate the
 -- following Stages, which needs to be done after all the necessary Exterms have
@@ -190,7 +190,7 @@ populateStage2STM :: TVar IdeState -> STM ()
 populateStage2STM ref = do
   externs <- s1Externs <$> getStage1STM ref
   -- Build the "old" ExternDecl format
-  let modules = M.mapKeys runModuleNameT . M.map (snd . convertExterns) $ externs
+  let modules = M.mapKeys runModuleNameT (M.map (snd . convertExterns) externs)
       -- Convert ExternDecl into IdeDeclaration
       declarations = resolveReexports2 modules <$> M.toList modules
   setStage2STM ref (Stage2 (M.fromList declarations) Nothing)

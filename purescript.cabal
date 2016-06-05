@@ -252,22 +252,23 @@ library
                      Language.PureScript.Publish.BoxesHelpers
 
                      Language.PureScript.Ide
+                     Language.PureScript.Ide.CaseSplit
                      Language.PureScript.Ide.Command
+                     Language.PureScript.Ide.Completion
+                     Language.PureScript.Ide.Conversions
                      Language.PureScript.Ide.Externs
                      Language.PureScript.Ide.Error
-                     Language.PureScript.Ide.Pursuit
-                     Language.PureScript.Ide.Completion
-                     Language.PureScript.Ide.Matcher
-                     Language.PureScript.Ide.Filter
-                     Language.PureScript.Ide.Types
-                     Language.PureScript.Ide.State
-                     Language.PureScript.Ide.CaseSplit
-                     Language.PureScript.Ide.SourceFile
-                     Language.PureScript.Ide.Watcher
-                     Language.PureScript.Ide.Reexports
                      Language.PureScript.Ide.Imports
-                     Language.PureScript.Ide.Util
+                     Language.PureScript.Ide.Filter
+                     Language.PureScript.Ide.Matcher
+                     Language.PureScript.Ide.Pursuit
                      Language.PureScript.Ide.Rebuild
+                     Language.PureScript.Ide.Reexports
+                     Language.PureScript.Ide.SourceFile
+                     Language.PureScript.Ide.State
+                     Language.PureScript.Ide.Types
+                     Language.PureScript.Ide.Util
+                     Language.PureScript.Ide.Watcher
 
                      Language.PureScript.Interactive
                      Language.PureScript.Interactive.Types
