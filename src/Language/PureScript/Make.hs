@@ -132,7 +132,7 @@ data RebuildPolicy
   | RebuildAlways deriving (Show, Read, Eq, Ord)
 
 -- | Rebuild a single module
-rebuildModule :: forall m. (Monad m, MonadBaseControl IO m, MonadReader Options m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+rebuildModule :: forall m. (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
      => MakeActions m
      -> [ExternsFile]
      -> Module
@@ -159,7 +159,7 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
 -- If timestamps have not changed, the externs file can be used to provide the module's types without
 -- having to typecheck the module again.
 --
-make :: forall m. (Monad m, MonadBaseControl IO m, MonadReader Options m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+make :: forall m. (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
      => MakeActions m
      -> [Module]
      -> m [ExternsFile]

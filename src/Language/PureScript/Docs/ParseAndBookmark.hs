@@ -44,7 +44,7 @@ parseAndBookmark inputFiles depsFiles = do
   addBookmarks <$> parseFiles (inputFiles' ++ depsFiles')
 
 parseFiles ::
-  (MonadError P.MultipleErrors m, MonadIO m) =>
+  (MonadError P.MultipleErrors m) =>
   [(FileInfo, FilePath)]
   -> m [(FileInfo, P.Module)]
 parseFiles =

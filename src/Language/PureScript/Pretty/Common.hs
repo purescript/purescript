@@ -114,7 +114,7 @@ blockIndent = 4
 -- |
 -- Pretty print with a new indentation level
 --
-withIndent :: (Emit gen) => StateT PrinterState Maybe gen -> StateT PrinterState Maybe gen
+withIndent :: StateT PrinterState Maybe gen -> StateT PrinterState Maybe gen
 withIndent action = do
   modify $ \st -> st { indent = indent st + blockIndent }
   result <- action

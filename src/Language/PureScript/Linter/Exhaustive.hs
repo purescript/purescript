@@ -140,7 +140,7 @@ missingCasesSingle env mn (LiteralBinder (ObjectLiteral bs)) (LiteralBinder (Obj
     where
     fm = fromMaybe e
 
-  compBS :: Eq a => b -> a -> Maybe b -> Maybe b -> (a, (b, b))
+  compBS :: b -> a -> Maybe b -> Maybe b -> (a, (b, b))
   compBS e s b b' = (s, compB e b b')
 
   (sortedNames, binders) = unzip $ genericMerge (compBS NullBinder) sbs sbs'
@@ -274,7 +274,7 @@ checkExhaustive env mn numArgs cas expr = makeResult . first nub $ foldl' step (
   --
   -- The binder information is provided so that it can be embedded in the constraint,
   -- and then included in the error message.
-  addPartialConstraint :: MonadSupply m => ([[Binder]], Bool) -> Expr -> m Expr
+  addPartialConstraint :: ([[Binder]], Bool) -> Expr -> m Expr
   addPartialConstraint (bss, complete) e = do
     tyVar <- ("p" ++) . show <$> fresh
     var <- freshName

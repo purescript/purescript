@@ -13,7 +13,6 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE PackageImports        #-}
 
 module Language.PureScript.Ide.Imports
        ( addImplicitImport
@@ -34,7 +33,6 @@ import           Prelude.Compat
 import           Control.Applicative                ((<|>))
 import           Control.Monad.Error.Class
 import           Control.Monad.IO.Class
-import           "monad-logger" Control.Monad.Logger
 import           Data.Bifunctor                     (first, second)
 import           Data.Function                      (on)
 import qualified Data.List                          as List
@@ -182,7 +180,7 @@ addImplicitImport' imports mn =
 -- So @addExplicitImport "/File.purs" "bind" "Prelude"@ with an already existing
 -- @import Prelude (bind)@ in the file File.purs returns @["import Prelude
 -- (bind, unit)"]@
-addExplicitImport :: (MonadIO m, MonadError PscIdeError m, MonadLogger m) =>
+addExplicitImport :: (MonadIO m, MonadError PscIdeError m) =>
                      FilePath -> ExternDecl -> P.ModuleName -> m [Text]
 addExplicitImport fp decl moduleName = do
   (mn, pre, imports, post) <- parseImportsFromFile fp
@@ -265,7 +263,7 @@ updateAtFirstOrPrepend p t d l =
 --
 -- * If more than one possible imports are found, reports the possibilities as a
 -- list of completions.
-addImportForIdentifier :: (PscIde m, MonadError PscIdeError m, MonadLogger m)
+addImportForIdentifier :: (PscIde m, MonadError PscIdeError m)
                           => FilePath -- ^ The Sourcefile to read from
                           -> Text     -- ^ The identifier to import
                           -> [Filter] -- ^ Filters to apply before searching for

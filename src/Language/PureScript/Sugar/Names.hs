@@ -292,7 +292,7 @@ renameInModule imports (Module ss coms mn decls exps) =
   -- qualified references are replaced with their canoncial qualified names
   -- (e.g. M.Map -> Data.Map.Map).
   update
-    :: (Ord a, Show a)
+    :: (Ord a)
     => M.Map (Qualified a) [ImportRecord a]
     -> (a -> Name)
     -> Qualified a

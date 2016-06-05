@@ -94,24 +94,24 @@ handleCommand Cwd =
 handleCommand Reset = resetPscIdeState *> pure (TextResult "State has been reset.")
 handleCommand Quit = liftIO exitSuccess
 
-findCompletions :: (PscIde m, MonadLogger m) =>
+findCompletions :: (PscIde m) =>
                    [Filter] -> Matcher -> Maybe P.ModuleName -> m Success
 findCompletions filters matcher currentModule = do
   modules <- getAllModulesWithReexportsAndCache currentModule
   pure . CompletionResult . mapMaybe completionFromMatch . getCompletions filters matcher $ modules
 
-findType :: (PscIde m, MonadLogger m) =>
+findType :: (PscIde m) =>
             DeclIdent -> [Filter] -> Maybe P.ModuleName -> m Success
 findType search filters currentModule = do
   modules <- getAllModulesWithReexportsAndCache currentModule
   pure . CompletionResult . mapMaybe completionFromMatch . getExactMatches search filters $ modules
 
-findPursuitCompletions :: (MonadIO m, MonadLogger m) =>
+findPursuitCompletions :: (MonadIO m) =>
                           PursuitQuery -> m Success
 findPursuitCompletions (PursuitQuery q) =
   PursuitResult <$> liftIO (searchPursuitForDeclarations q)
 
-findPursuitPackages :: (MonadIO m, MonadLogger m) =>
+findPursuitPackages :: (MonadIO m) =>
                        PursuitQuery -> m Success
 findPursuitPackages (PursuitQuery q) =
   PursuitResult <$> liftIO (findPackagesForModuleIdent q)
@@ -141,7 +141,7 @@ listAvailableModules' dirs =
   let cleanedModules = filter (`notElem` [".", ".."]) dirs
   in map T.pack cleanedModules
 
-caseSplit :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
+caseSplit :: (PscIde m, MonadError PscIdeError m) =>
   Text -> Int -> Int -> CS.WildcardAnnotations -> Text -> m Success
 caseSplit l b e csa t = do
   patterns <- CS.makePattern l b e csa <$> CS.caseSplit t
@@ -150,7 +150,7 @@ caseSplit l b e csa t = do
 addClause :: Text -> CS.WildcardAnnotations -> Success
 addClause t wca = MultilineTextResult (CS.addClause t wca)
 
-importsForFile :: (MonadIO m, MonadLogger m, MonadError PscIdeError m) =>
+importsForFile :: (MonadIO m, MonadError PscIdeError m) =>
                   FilePath -> m Success
 importsForFile fp = do
   imports <- getImportsForFile fp

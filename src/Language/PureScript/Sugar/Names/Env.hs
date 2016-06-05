@@ -375,7 +375,7 @@ getExports env mn =
 --
 checkImportConflicts
   :: forall m a
-   . (Show a, MonadError MultipleErrors m, MonadWriter MultipleErrors m, Ord a)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
   -> (a -> Name)
   -> [ImportRecord a]

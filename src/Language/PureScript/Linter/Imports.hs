@@ -169,8 +169,7 @@ lintImports (Module ss _ mn mdecls (Just mexports)) env usedImps = do
     go (q, name) = M.alter (Just . maybe [name] (name :)) q
 
   extractByQual
-    :: Eq a
-    => ModuleName
+    :: ModuleName
     -> M.Map (Qualified a) [ImportRecord a]
     -> (a -> Name)
     -> [(ModuleName, Qualified Name)]

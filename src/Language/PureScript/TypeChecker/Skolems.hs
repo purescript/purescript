@@ -89,7 +89,7 @@ skolemizeTypesInValue ident sko scope ss =
 -- |
 -- Ensure skolem variables do not escape their scope
 --
-skolemEscapeCheck :: (MonadError MultipleErrors m, MonadState CheckState m) => Expr -> m ()
+skolemEscapeCheck :: (MonadError MultipleErrors m) => Expr -> m ()
 skolemEscapeCheck (TypedValue False _ _) = return ()
 skolemEscapeCheck root@TypedValue{} =
   -- Every skolem variable is created when a ForAll type is skolemized.

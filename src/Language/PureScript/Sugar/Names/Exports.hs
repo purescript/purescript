@@ -117,8 +117,7 @@ resolveExports env ss mn imps exps refs =
   -- Extracts a list of values for a module based on a lookup table. If the
   -- boolean is true the values are filtered by the qualification
   extract
-    :: (Show a, Ord a)
-    => Bool
+    :: Bool
     -> ModuleName
     -> (a -> Name)
     -> M.Map (Qualified a) [ImportRecord a]

@@ -9,17 +9,15 @@ import Prelude.Compat
 
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State.Class (MonadState(..))
 
 import Data.List
 
 import Language.PureScript.AST
 import Language.PureScript.Errors
-import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Types
 
 -- | Ensure rows do not contain duplicate labels
-checkDuplicateLabels :: forall m. (MonadError MultipleErrors m, MonadState CheckState m) => Expr -> m ()
+checkDuplicateLabels :: forall m. (MonadError MultipleErrors m) => Expr -> m ()
 checkDuplicateLabels =
   let (_, f, _) = everywhereOnValuesM def go def
   in void . f
