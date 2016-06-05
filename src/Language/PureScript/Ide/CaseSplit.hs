@@ -13,7 +13,6 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE PackageImports        #-}
 
 module Language.PureScript.Ide.CaseSplit
        ( WildcardAnnotations()
@@ -29,7 +28,6 @@ import           Prelude.Compat                          hiding (lex)
 
 import           Control.Arrow                           (second)
 import           Control.Monad.Error.Class
-import           "monad-logger" Control.Monad.Logger
 import           Data.List                               (find)
 import           Data.Monoid
 import           Data.Text                               (Text)
@@ -55,7 +53,7 @@ explicitAnnotations = WildcardAnnotations True
 noAnnotations :: WildcardAnnotations
 noAnnotations = WildcardAnnotations False
 
-caseSplit :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
+caseSplit :: (PscIde m, MonadError PscIdeError m) =>
              Text -> m [Constructor]
 caseSplit q = do
   type' <- parseType' (T.unpack q)
@@ -65,7 +63,7 @@ caseSplit q = do
   let appliedCtors = map (second (map applyTypeVars)) ctors
   pure appliedCtors
 
-findTypeDeclaration :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
+findTypeDeclaration :: (PscIde m, MonadError PscIdeError m) =>
                          P.ProperName 'P.TypeName -> m ExternsDeclaration
 findTypeDeclaration q = do
   efs <- getExternFiles

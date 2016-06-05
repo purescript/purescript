@@ -91,7 +91,7 @@ getAllModulesWithReexportsAndCache (Just mn) = do
     _ -> getAllModulesWithReexports
 
 -- | Looks up a single Module inside the loaded Modules
-getModule :: (PscIde m, MonadLogger m) => ModuleIdent -> m (Maybe Module)
+getModule :: (PscIde m) => ModuleIdent -> m (Maybe Module)
 getModule m = getModule' <$> getPscIdeState <*> pure m
 
 -- | Pure version of @getModule@

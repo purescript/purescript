@@ -72,7 +72,7 @@ augment p q f = flip (maybe id $ flip f) <$> p <*> P.optionMaybe q
 -- |
 -- Run the first parser, then match the second zero or more times, applying the specified function for each match
 --
-fold :: P.Stream s m t => P.ParsecT s u m a -> P.ParsecT s u m b -> (a -> b -> a) -> P.ParsecT s u m a
+fold :: P.ParsecT s u m a -> P.ParsecT s u m b -> (a -> b -> a) -> P.ParsecT s u m a
 fold first more combine = do
   a <- first
   bs <- P.many more

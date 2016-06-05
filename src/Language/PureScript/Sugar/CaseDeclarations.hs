@@ -144,7 +144,7 @@ toTuple (ValueDeclaration _ _ bs result) = (bs, result)
 toTuple (PositionedDeclaration _ _ d) = toTuple d
 toTuple _ = internalError "Not a value declaration"
 
-makeCaseDeclaration :: forall m. (MonadSupply m, MonadError MultipleErrors m) => Ident -> [([Binder], Either [(Guard, Expr)] Expr)] -> m Declaration
+makeCaseDeclaration :: forall m. (MonadSupply m) => Ident -> [([Binder], Either [(Guard, Expr)] Expr)] -> m Declaration
 makeCaseDeclaration ident alternatives = do
   let namedArgs = map findName . fst <$> alternatives
       argNames = foldl1 resolveNames namedArgs

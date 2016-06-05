@@ -133,7 +133,7 @@ type TypeData = M.Map (ModuleName, Ident) (Type, NameKind, NameVisibility)
 type UntypedData = [(Ident, Type)]
 
 typeDictionaryForBindingGroup ::
-  (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
+  (MonadState CheckState m) =>
   ModuleName ->
   [(Ident, Expr)] ->
   m ([(Ident, Expr)], [(Ident, (Expr, Type, Bool))], TypeData, UntypedData)
@@ -206,7 +206,7 @@ overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
 
 -- | Check the kind of a type, failing if it is not of kind *.
 checkTypeKind ::
-  (MonadState CheckState m, MonadError MultipleErrors m) =>
+  (MonadError MultipleErrors m) =>
   Type ->
   Kind ->
   m ()

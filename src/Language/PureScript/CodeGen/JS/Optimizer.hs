@@ -39,12 +39,12 @@ import qualified Language.PureScript.Constants as C
 -- |
 -- Apply a series of optimizer passes to simplified Javascript code
 --
-optimize :: (Monad m, MonadReader Options m, MonadSupply m) => JS -> m JS
+optimize :: (MonadReader Options m, MonadSupply m) => JS -> m JS
 optimize js = do
   noOpt <- asks optionsNoOptimizations
   if noOpt then return js else optimize' js
 
-optimize' :: (Monad m, MonadReader Options m, MonadSupply m) => JS -> m JS
+optimize' :: (MonadReader Options m, MonadSupply m) => JS -> m JS
 optimize' js = do
   opts <- ask
   js' <- untilFixedPoint (inlineFnComposition . tidyUp . applyAll
