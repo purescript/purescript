@@ -101,6 +101,7 @@ library
                    aeson >= 0.8 && < 0.12,
                    aeson-better-errors >= 0.8,
                    ansi-terminal >= 0.6.2 && < 0.7,
+                   async,
                    base-compat >=0.6.0,
                    bower-json >= 0.8,
                    boxes >= 0.1.4 && < 0.2.0,
@@ -498,6 +499,5 @@ test-suite tests
                    Language.PureScript.Ide.MatcherSpec
                    Language.PureScript.Ide.RebuildSpec
                    Language.PureScript.Ide.ReexportsSpec
-                   Language.PureScript.IdeSpec
     buildable: True
     hs-source-dirs: tests

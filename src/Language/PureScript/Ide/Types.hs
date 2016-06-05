@@ -37,7 +37,6 @@ import           Text.Parsec
 import           Text.Parsec.Text
 
 type Ident = Text
-type DeclIdent = Text
 type ModuleIdent = Text
 
 data ExternDecl
@@ -53,10 +52,10 @@ data ExternDecl
     -- | A module declaration
     | ModuleDecl
         ModuleIdent -- The modules name
-        [DeclIdent] -- The exported identifiers
+        [Ident] -- The exported identifiers
     -- | A data/newtype declaration
     | DataConstructor
-      DeclIdent -- The type name
+      Ident -- The type name
       (P.ProperName 'P.TypeName)
       P.Type      -- The "type"
     -- | An exported module
@@ -66,7 +65,18 @@ data ExternDecl
     | Export ModuleIdent -- The exported Modules name
     deriving (Show,Eq,Ord)
 
-type Module = (ModuleIdent, [ExternDecl])
+data IdeDeclaration
+  = IdeValue Ident P.Type
+  | IdeType (P.ProperName 'P.TypeName) P.Kind
+  | IdeTypeSynonym (P.ProperName 'P.TypeName) P.Type
+  | IdeDataConstructor Ident (P.ProperName 'P.TypeName) P.Type
+  | IdeTypeClass (P.ProperName 'P.ClassName)
+  | IdeValueOperator (P.OpName 'P.ValueOpName) Ident P.Precedence P.Associativity
+  | IdeTypeOperator (P.OpName 'P.TypeOpName) Ident P.Precedence P.Associativity
+  deriving (Show, Eq, Ord)
+
+type Module = (P.ModuleName, [IdeDeclaration])
+type ModuleOld = (Text, [ExternDecl])
 
 data Configuration =
   Configuration
@@ -74,29 +84,52 @@ data Configuration =
   , confDebug      :: Bool
   }
 
-data PscIdeEnvironment =
-  PscIdeEnvironment
+data IdeEnvironment =
+  IdeEnvironment
   { envStateVar      :: TVar PscIdeState
-  , envConfiguration :: Configuration
+  , ideStateVar      :: TVar IdeState
+  , ideConfiguration :: Configuration
   }
 
-type PscIde m = (MonadIO m, MonadReader PscIdeEnvironment m)
+type Ide m = (MonadIO m, MonadReader IdeEnvironment m)
 
 data PscIdeState =
   PscIdeState
   { pscIdeStateModules       :: M.Map Text [ExternDecl]
-  , pscIdeStateExternsFiles  :: M.Map P.ModuleName ExternsFile
-  , pscIdeStateCachedRebuild :: Maybe (P.ModuleName, ExternsFile)
   } deriving Show
 
 emptyPscIdeState :: PscIdeState
-emptyPscIdeState = PscIdeState M.empty M.empty Nothing
+emptyPscIdeState = PscIdeState M.empty
 
-data Match = Match ModuleIdent ExternDecl
-               deriving (Show, Eq)
+data IdeState = IdeState
+  { ideStage1 :: Stage1
+  , ideStage2 :: Stage2
+  }
+
+emptyIdeState :: IdeState
+emptyIdeState = IdeState emptyStage1 emptyStage2
+
+emptyStage1 :: Stage1
+emptyStage1 = Stage1 M.empty
+
+emptyStage2 :: Stage2
+emptyStage2 = Stage2 M.empty Nothing
+
+data Stage1 = Stage1
+  { s1Externs :: M.Map P.ModuleName ExternsFile
+  -- , s1Modules :: M.Map P.ModuleName P.Module
+  }
+
+data Stage2 = Stage2
+  { s2Modules :: M.Map P.ModuleName [IdeDeclaration]
+  , s2CachedRebuild :: Maybe (P.ModuleName, ExternsFile)
+  }
+
+data Match = Match P.ModuleName IdeDeclaration
+           deriving (Show, Eq)
 
 newtype Completion =
-  Completion (ModuleIdent, DeclIdent, Text)
+  Completion (ModuleIdent, Ident, Text)
   deriving (Show,Eq)
 
 instance ToJSON Completion where
@@ -182,7 +215,7 @@ data PursuitResponse =
   ModuleResponse ModuleIdent Text
   -- | A Pursuit Response for a declaration. Consist of the declarations type,
   -- module, name and package
-  | DeclarationResponse Text ModuleIdent DeclIdent Text
+  | DeclarationResponse Text ModuleIdent Ident Text
   deriving (Show,Eq)
 
 instance FromJSON PursuitResponse where

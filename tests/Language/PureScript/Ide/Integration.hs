@@ -29,8 +29,9 @@ module Language.PureScript.Ide.Integration
          -- sending commands
        , addImport
        , addImplicitImport
+       , loadAll
        , loadModule
-       , loadModuleWithDeps
+       , loadModules
        , getCwd
        , getFlexCompletions
        , getFlexCompletionsInModule
@@ -161,11 +162,14 @@ getCwd = do
   let cwdCommand = object ["command" .= ("cwd" :: String)]
   sendCommand cwdCommand
 
-loadModuleWithDeps :: String -> IO String
-loadModuleWithDeps m = sendCommand $ load [] [m]
-
 loadModule :: String -> IO String
-loadModule m = sendCommand $ load [m] []
+loadModule m = loadModules [m]
+
+loadModules :: [String] -> IO String
+loadModules = sendCommand . load
+
+loadAll :: IO String
+loadAll = sendCommand (load [])
 
 getFlexCompletions :: String -> IO [(String, String, String)]
 getFlexCompletions q = parseCompletions <$> sendCommand (completion [] (Just (flexMatcher q)) Nothing)
@@ -190,8 +194,8 @@ rebuildModule m = sendCommand (rebuildC m Nothing)
 commandWrapper :: String -> Value -> Value
 commandWrapper c p = object ["command" .= c, "params" .= p]
 
-load :: [String] -> [String] -> Value
-load ms ds = commandWrapper "load" (object ["modules" .= ms, "dependencies" .= ds])
+load :: [String] -> Value
+load ms = commandWrapper "load" (object ["modules" .= ms])
 
 typeC :: String -> [Value] -> Value
 typeC q filters = commandWrapper "type" (object ["search" .= q, "filters" .= filters])
