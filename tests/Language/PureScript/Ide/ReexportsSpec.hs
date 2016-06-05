@@ -23,28 +23,28 @@ dep1 = Dependency "Test.Foo" [] (Just "T")
 dep2 :: ExternDecl
 dep2 = Dependency "Test.Bar" [] (Just "T")
 
-circularModule :: Module
+circularModule :: ModuleOld
 circularModule = ("Circular", [Export "Circular"])
 
-module1 :: Module
+module1 :: ModuleOld
 module1 = ("Module1", [Export "Module2", Export "Module3", decl1])
 
-module2 :: Module
+module2 :: ModuleOld
 module2 = ("Module2", [decl2])
 
-module3 :: Module
+module3 :: ModuleOld
 module3 = ("Module3", [decl3])
 
-module4 :: Module
+module4 :: ModuleOld
 module4 = ("Module4", [Export "T", decl1, dep1, dep2])
 
-result :: Module
+result :: ModuleOld
 result = ("Module1", [decl1, decl2, Export "Module3"])
 
 db :: Map.Map ModuleIdent [ExternDecl]
 db = Map.fromList [module1, module2, module3]
 
-shouldBeEqualSorted :: Module -> Module -> Expectation
+shouldBeEqualSorted :: ModuleOld -> ModuleOld -> Expectation
 shouldBeEqualSorted (n1, d1) (n2, d2) = (n1, sort d1) `shouldBe` (n2, sort d2)
 
 spec :: Spec

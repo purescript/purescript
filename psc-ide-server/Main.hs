@@ -81,21 +81,21 @@ main = do
   Options dir outputPath port noWatch debug  <- execParser opts
   maybe (pure ()) setCurrentDirectory dir
   serverState <- newTVarIO emptyPscIdeState
+  ideState <- newTVarIO emptyIdeState
   cwd <- getCurrentDirectory
   let fullOutputPath = cwd </> outputPath
 
-  doesDirectoryExist fullOutputPath
-    >>= flip unless
-    (do putStrLn ("Your output directory didn't exist. I'll create it at: " <> fullOutputPath)
-        createDirectory fullOutputPath
-        putStrLn "This usually means you didn't compile your project yet."
-        putStrLn "psc-ide needs you to compile your project (for example by running pulp build)")
+  unlessM (doesDirectoryExist fullOutputPath) $ do
+    putStrLn ("Your output directory didn't exist. I'll create it at: " <> fullOutputPath)
+    createDirectory fullOutputPath
+    putStrLn "This usually means you didn't compile your project yet."
+    putStrLn "psc-ide needs you to compile your project (for example by running pulp build)"
 
   unless noWatch $
-    void (forkFinally (watcher serverState fullOutputPath) print)
+    void (forkFinally (watcher ideState fullOutputPath) print)
 
   let conf = Configuration {confDebug = debug, confOutputPath = outputPath}
-      env = PscIdeEnvironment {envStateVar = serverState, envConfiguration = conf}
+      env = IdeEnvironment {envStateVar = serverState, ideStateVar = ideState, ideConfiguration = conf}
   startServer port env
   where
     parser =
@@ -111,14 +111,14 @@ main = do
       (InfoMsg (showVersion Paths.version))
       (long "version" <> help "Show the version number")
 
-startServer :: PortID -> PscIdeEnvironment -> IO ()
+startServer :: PortID -> IdeEnvironment -> IO ()
 startServer port env = withSocketsDo $ do
   sock <- listenOnLocalhost port
   runLogger (runReaderT (forever (loop sock)) env)
   where
-    runLogger = runStdoutLoggingT . filterLogger (\_ _ -> confDebug (envConfiguration env))
+    runLogger = runStdoutLoggingT . filterLogger (\_ _ -> confDebug (ideConfiguration env))
 
-    loop :: (PscIde m, MonadLogger m) => Socket -> m ()
+    loop :: (Ide m, MonadLogger m) => Socket -> m ()
     loop sock = do
       accepted <- runExceptT $ acceptCommand sock
       case accepted of

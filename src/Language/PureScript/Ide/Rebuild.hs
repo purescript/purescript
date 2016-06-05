@@ -42,7 +42,7 @@ import           System.IO.UTF8                  (readUTF8File)
 -- warnings, and if rebuilding fails, returns a @RebuildError@ with the
 -- generated errors.
 rebuildFile
-  :: (PscIde m, MonadLogger m, MonadError PscIdeError m)
+  :: (Ide m, MonadLogger m, MonadError PscIdeError m)
   => FilePath
   -> m Success
 rebuildFile path = do
@@ -60,7 +60,7 @@ rebuildFile path = do
   -- correctly to the 'Environment'.
   externs <- sortExterns m =<< getExternFiles
 
-  outputDirectory <- confOutputPath . envConfiguration <$> ask
+  outputDirectory <- confOutputPath . ideConfiguration <$> ask
 
   -- For rebuilding, we want to 'RebuildAlways', but for inferring foreign
   -- modules using their file paths, we need to specify the path in the 'Map'.
@@ -82,7 +82,7 @@ rebuildFile path = do
 -- | Rebuilds a module but opens up its export list first and stores the result
 -- inside the rebuild cache
 rebuildModuleOpen
-  :: (PscIde m, MonadLogger m, MonadError PscIdeError m)
+  :: (Ide m, MonadLogger m, MonadError PscIdeError m)
   => MakeActionsEnv
   -> [P.ExternsFile]
   -> P.Module
@@ -100,7 +100,7 @@ rebuildModuleOpen makeEnv externs m = do
     Right result -> do
       $(logDebug)
         ("Setting Rebuild cache: " <> runModuleNameT (P.efModuleName result))
-      setCachedRebuild result
+      cacheRebuild result
 
 -- | Parameters we can access while building our @MakeActions@
 data MakeActionsEnv =
@@ -135,7 +135,7 @@ shushCodegen ma MakeActionsEnv{..} =
 -- module. Throws an error if there is a cyclic dependency within the
 -- ExternsFiles
 sortExterns
-  :: (PscIde m, MonadError PscIdeError m)
+  :: (Ide m, MonadError PscIdeError m)
   => P.Module
   -> M.Map P.ModuleName P.ExternsFile
   -> m [P.ExternsFile]

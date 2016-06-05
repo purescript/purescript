@@ -41,7 +41,7 @@ import           Text.Regex.TDFA               ((=~))
 
 type ScoredMatch = (Match, Double)
 
-newtype Matcher = Matcher (Endo [Match]) deriving(Monoid)
+newtype Matcher = Matcher (Endo [Match]) deriving (Monoid)
 
 instance FromJSON Matcher where
   parseJSON = withObject "matcher" $ \o -> do
@@ -105,7 +105,7 @@ flexRate p c = do
 -- By string =~ pattern we'll get the start of the match and the length of
 -- the matchas a (start, length) tuple if there's a match.
 -- If match fails then it would be (-1,0)
-flexScore :: Text -> DeclIdent -> Maybe Double
+flexScore :: Text -> Text -> Maybe Double
 flexScore pat str =
   case T.uncons pat of
     Nothing -> Nothing

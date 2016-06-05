@@ -1,5 +1,3 @@
 module ImportsSpec where
 
-import Main (id)
-
-myId = id
+myId x = x
