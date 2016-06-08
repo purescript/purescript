@@ -197,7 +197,7 @@ checkConstrained ty tyClass =
       False
   where
   matches className =
-    (==) className . P.runProperName . P.disqualify . fst
+    (==) className . P.runProperName . P.disqualify . P.constraintClass
 
 runAssertionIO :: Assertion -> Docs.Module -> IO ()
 runAssertionIO assertion mdl = do
@@ -266,13 +266,8 @@ testCases =
       ])
 
   , ("TypeClassWithoutMembers",
-      [ ShouldBeDocumented         (n "Intermediate") "SomeClass" []
-      , ChildShouldNotBeDocumented (n "Intermediate") "SomeClass" "member"
-      ])
-
-  -- Remove this after 0.9.
-  , ("OldOperators",
-      [ ShouldBeDocumented  (n "OldOperators2") "(>>)" []
+      [ ShouldBeDocumented         (n "TypeClassWithoutMembersIntermediate") "SomeClass" []
+      , ChildShouldNotBeDocumented (n "TypeClassWithoutMembersIntermediate") "SomeClass" "member"
       ])
 
   , ("NewOperators",

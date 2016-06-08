@@ -4,12 +4,14 @@
 --
 module Language.PureScript.CoreFn.Traversals where
 
+import Control.Arrow (second, (***), (+++))
 import Data.Functor.Identity (runIdentity)
-
+import Language.PureScript.AST.Literals
+import Language.PureScript.AST.Literals
 import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Expr
-import Language.PureScript.AST.Literals
 import Language.PureScript.Traversals (eitherM, pairM)
+import Prelude.Compat
 
 everywhereOnValues :: (Bind a -> Bind a) ->
                       (Expr a -> Expr a) ->

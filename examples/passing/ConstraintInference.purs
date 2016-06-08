@@ -1,7 +1,10 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
-shout = Control.Monad.Eff.Console.log <<< (<> "!") <<< show
+shout = log <<< (_ <> "!") <<< show
 
-main = shout "Done"
+main = do
+  shout "Test"
+  log "Done"

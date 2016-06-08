@@ -3,6 +3,8 @@
 --
 module Language.PureScript.CodeGen.JS.Optimizer.Common where
 
+import Prelude.Compat
+
 import Data.Maybe (fromMaybe)
 
 import Language.PureScript.Crash
@@ -66,12 +68,11 @@ removeFromBlock go (JSBlock ss sts) = JSBlock ss (go sts)
 removeFromBlock _  js = js
 
 isFn :: (String, String) -> JS -> Bool
-isFn (moduleName, fnName) (JSAccessor _ x (JSVar _ y)) = x == fnName && y == moduleName
-isFn (moduleName, fnName) (JSIndexer _ (JSStringLiteral _ x) (JSVar _ y)) = x == fnName && y == moduleName
+isFn (moduleName, fnName) (JSAccessor _ x (JSVar _ y)) =
+  x == fnName && y == moduleName
+isFn (moduleName, fnName) (JSIndexer _ (JSStringLiteral _ x) (JSVar _ y)) =
+  x == fnName && y == moduleName
 isFn _ _ = False
-
-isFn' :: [(String, String)] -> JS -> Bool
-isFn' xs js = any (`isFn` js) xs
 
 isDict :: (String, String) -> JS -> Bool
 isDict (moduleName, dictName) (JSAccessor _ x (JSVar _ y)) = x == dictName && y == moduleName

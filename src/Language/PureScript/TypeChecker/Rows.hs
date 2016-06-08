@@ -1,42 +1,23 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.TypeChecker.Rows
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- Functions relating to type checking for rows
 --
------------------------------------------------------------------------------
+module Language.PureScript.TypeChecker.Rows
+  ( checkDuplicateLabels
+  ) where
 
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE CPP #-}
+import Prelude.Compat
 
-module Language.PureScript.TypeChecker.Rows (
-    checkDuplicateLabels
-) where
+import Control.Monad
+import Control.Monad.Error.Class (MonadError(..))
 
 import Data.List
 
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
-import Control.Monad
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State.Class (MonadState(..))
-
 import Language.PureScript.AST
 import Language.PureScript.Errors
-import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Types
 
 -- | Ensure rows do not contain duplicate labels
-checkDuplicateLabels :: forall m. (MonadError MultipleErrors m, MonadState CheckState m) => Expr -> m ()
+checkDuplicateLabels :: forall m. (MonadError MultipleErrors m) => Expr -> m ()
 checkDuplicateLabels =
   let (_, f, _) = everywhereOnValuesM def go def
   in void . f
@@ -54,7 +35,7 @@ checkDuplicateLabels =
     checkDups (TypeApp t1 t2) = checkDups t1 >> checkDups t2
     checkDups (ForAll _ t _) = checkDups t
     checkDups (ConstrainedType args t) = do
-      mapM_ checkDups $ concatMap snd args
+      mapM_ checkDups $ concatMap constraintArgs args
       checkDups t
     checkDups r@RCons{} =
       let (ls, _) = rowToList r in

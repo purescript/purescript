@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude hiding (add)
+import Control.Monad.Eff.Console (log, logShow)
 
 class E e where
   num :: Number -> e Number
@@ -19,4 +20,6 @@ runId (Id a) = a
 three :: Expr Number
 three = add (num 1.0) (num 2.0)
 
-main = Control.Monad.Eff.Console.print $ runId three
+main = do
+  logShow $ runId three
+  log "Done"

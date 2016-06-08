@@ -2,6 +2,7 @@ module Main where
 
 import Prelude
 import Control.Monad.Eff
+import Control.Monad.Eff.Console (log)
 
 data List a = Cons a (List a) | Nil
 
@@ -12,4 +13,4 @@ instance sequenceList :: Sequence List where
   sequence Nil = pure Nil
   sequence (Cons x xs) = Cons <$> x <*> sequence xs
 
-main = sequence $ Cons (Control.Monad.Eff.Console.log "Done") Nil
+main = sequence $ Cons (log "Done") Nil

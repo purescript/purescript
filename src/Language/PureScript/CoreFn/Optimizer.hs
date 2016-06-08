@@ -7,6 +7,7 @@ import Language.PureScript.CoreFn.Ann (Ann)
 import Language.PureScript.CoreFn.Module (Module)
 import Language.PureScript.CoreFn.Optimizer.PassThroughCases
 import Language.PureScript.Options (Options, optionsNoOptimizations)
+import Prelude
 
 -- |
 -- Apply a series of optimizer passes to CoreFn

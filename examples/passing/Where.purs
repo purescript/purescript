@@ -1,8 +1,9 @@
 module Main where
 
 import Prelude
+import Partial.Unsafe (unsafePartial)
 import Control.Monad.Eff
-import Control.Monad.ST
+import Control.Monad.Eff.Console (logShow, log)
 
 test1 x = y
   where
@@ -14,14 +15,11 @@ test2 x y = x' + y'
   x' = x + 1.0
   y' = y + 1.0
 
-
 test3 = f 1.0 2.0 3.0
   where f x y z = x + y + z
 
-
 test4 = f (+) [1.0, 2.0]
   where f x [y, z] = x y z
-
 
 test5 = g 10.0
   where
@@ -39,11 +37,13 @@ test7 x = go x
   go y | (x - 0.1 < y * y) && (y * y < x + 0.1) = y
   go y = go $ (y + x / y) / 2.0
 
+main :: Eff _ _
 main = do
-  Control.Monad.Eff.Console.print (test1 1.0)
-  Control.Monad.Eff.Console.print (test2 1.0 2.0)
-  Control.Monad.Eff.Console.print test3
-  Control.Monad.Eff.Console.print test4
-  Control.Monad.Eff.Console.print test5
-  Control.Monad.Eff.Console.print test6
-  Control.Monad.Eff.Console.print (test7 100.0)
+  logShow (test1 1.0)
+  logShow (test2 1.0 2.0)
+  logShow test3
+  unsafePartial (logShow test4)
+  logShow test5
+  logShow test6
+  logShow (test7 100.0)
+  log "Done"

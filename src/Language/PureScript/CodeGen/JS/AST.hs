@@ -3,14 +3,13 @@
 --
 module Language.PureScript.CodeGen.JS.AST where
 
-import Prelude ()
 import Prelude.Compat
 
 import Control.Monad.Identity
 
+import Language.PureScript.AST (SourceSpan(..))
 import Language.PureScript.Comments
 import Language.PureScript.Traversals
-import Language.PureScript.AST (SourceSpan(..))
 
 -- |
 -- Built-in unary operators

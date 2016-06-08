@@ -1,8 +1,11 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log, logShow)
 
-test 100.0 = 100.0
-test n = test(1.0 + n)
+test 100 = 100
+test n = test(1 + n)
 
-main = Control.Monad.Eff.Console.print $ test 0.0
+main = do
+  logShow (test 0)
+  log "Done"

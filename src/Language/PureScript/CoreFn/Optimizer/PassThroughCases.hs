@@ -25,6 +25,7 @@ import Language.PureScript.CoreFn.Meta (Meta(IsConstructor))
 import Language.PureScript.CoreFn.Module (Module, moduleDecls)
 import Language.PureScript.CoreFn.Traversals (everywhereOnValues, everywhereOnValuesM)
 import Language.PureScript.Names
+import Prelude
 
 passThroughCases :: (Monad m, MonadSupply m) => Module Ann -> m (Module Ann)
 passThroughCases m = (\mds -> m { moduleDecls = mds }) <$> onBinds (moduleDecls m)

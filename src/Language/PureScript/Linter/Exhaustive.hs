@@ -1,36 +1,38 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 -- |
 -- Module for exhaustivity checking over pattern matching definitions
 -- The algorithm analyses the clauses of a definition one by one from top
 -- to bottom, where in each step it has the cases already missing (uncovered),
 -- and it generates the new set of missing cases.
 --
-module Language.PureScript.Linter.Exhaustive (checkExhaustiveModule) where
+module Language.PureScript.Linter.Exhaustive
+  ( checkExhaustiveExpr
+  ) where
 
-import Prelude ()
 import Prelude.Compat
 
-import qualified Data.Map as M
-import Data.Maybe (fromMaybe)
-import Data.List (foldl', sortBy, nub)
-import Data.Function (on)
-
-import Control.Monad (unless)
 import Control.Applicative
 import Control.Arrow (first, second)
+import Control.Monad (unless)
 import Control.Monad.Writer.Class
+import Control.Monad.Supply.Class (MonadSupply, fresh, freshName)
 
-import Language.PureScript.Crash
+import Data.Function (on)
+import Data.List (foldl', sortBy, nub)
+import Data.Maybe (fromMaybe)
+import qualified Data.Map as M
+
 import Language.PureScript.AST.Binders
-import Language.PureScript.AST.Literals
 import Language.PureScript.AST.Declarations
+import Language.PureScript.AST.Literals
+import Language.PureScript.Crash
 import Language.PureScript.Environment
-import Language.PureScript.Names as P
-import Language.PureScript.Kinds
-import Language.PureScript.Types as P
 import Language.PureScript.Errors
+import Language.PureScript.Kinds
+import Language.PureScript.Names as P
+import Language.PureScript.Pretty.Values (prettyPrintBinderAtom)
+import Language.PureScript.Traversals
+import Language.PureScript.Types as P
+import qualified Language.PureScript.Constants as C
 
 -- | There are two modes of failure for the redundancy check:
 --
@@ -44,7 +46,7 @@ data RedundancyError = Incomplete | Unknown
 -- Qualifies a propername from a given qualified propername and a default module name
 --
 qualifyName
-  :: (ProperName a)
+  :: ProperName a
   -> ModuleName
   -> Qualified (ProperName b)
   -> Qualified (ProperName a)
@@ -138,7 +140,7 @@ missingCasesSingle env mn (LiteralBinder (ObjectLiteral bs)) (LiteralBinder (Obj
     where
     fm = fromMaybe e
 
-  compBS :: Eq a => b -> a -> Maybe b -> Maybe b -> (a, (b, b))
+  compBS :: b -> a -> Maybe b -> Maybe b -> (a, (b, b))
   compBS e s b b' = (s, compB e b b')
 
   (sortedNames, binders) = unzip $ genericMerge (compBS NullBinder) sbs sbs'
@@ -179,12 +181,11 @@ missingCasesSingle _ _ b _ = ([b], Left Unknown)
 missingCasesMultiple :: Environment -> ModuleName -> [Binder] -> [Binder] -> ([[Binder]], Either RedundancyError Bool)
 missingCasesMultiple env mn = go
   where
-  go [] [] = ([], pure True)
   go (x:xs) (y:ys) = (map (: xs) miss1 ++ map (x :) miss2, liftA2 (&&) pr1 pr2)
     where
     (miss1, pr1) = missingCasesSingle env mn x y
     (miss2, pr2) = go xs ys
-  go _ _ = internalError "Argument lengths did not match in missingCasesMultiple."
+  go _ _ = ([], pure True)
 
 -- |
 -- Guard handling
@@ -229,8 +230,16 @@ missingAlternative env mn ca uncovered
 -- it partitions that set with the new uncovered cases, until it consumes the whole set of clauses.
 -- Then, returns the uncovered set of case alternatives.
 --
-checkExhaustive :: forall m. (MonadWriter MultipleErrors m) => Bool -> Environment -> ModuleName -> Int -> [CaseAlternative] -> m ()
-checkExhaustive hasConstraint env mn numArgs cas = makeResult . first nub $ foldl' step ([initialize numArgs], (pure True, [])) cas
+checkExhaustive
+  :: forall m
+   . (MonadWriter MultipleErrors m, MonadSupply m)
+   => Environment
+   -> ModuleName
+   -> Int
+   -> [CaseAlternative]
+   -> Expr
+   -> m Expr
+checkExhaustive env mn numArgs cas expr = makeResult . first nub $ foldl' step ([initialize numArgs], (pure True, [])) cas
   where
   step :: ([[Binder]], (Either RedundancyError Bool, [[Binder]])) -> CaseAlternative -> ([[Binder]], (Either RedundancyError Bool, [[Binder]]))
   step (uncovered, (nec, redundant)) ca =
@@ -246,69 +255,91 @@ checkExhaustive hasConstraint env mn numArgs cas = makeResult . first nub $ fold
                  )
        )
 
-  makeResult :: ([[Binder]], (Either RedundancyError Bool, [[Binder]])) -> m ()
+  makeResult :: ([[Binder]], (Either RedundancyError Bool, [[Binder]])) -> m Expr
   makeResult (bss, (rr, bss')) =
-    do unless (hasConstraint || null bss) tellNonExhaustive
-       unless (null bss') tellRedundant
+    do unless (null bss') tellRedundant
        case rr of
-         Left Incomplete -> unless hasConstraint tellIncomplete
+         Left Incomplete -> tellIncomplete
          _ -> return ()
+       if null bss
+         then return expr
+         else addPartialConstraint (second null (splitAt 5 bss)) expr
     where
-    tellNonExhaustive = tell . errorMessage . uncurry NotExhaustivePattern . second null . splitAt 5 $ bss
-    tellRedundant = tell . errorMessage . uncurry OverlappingPattern . second null . splitAt 5 $ bss'
-    tellIncomplete = tell . errorMessage $ IncompleteExhaustivityCheck
+      tellRedundant = tell . errorMessage . uncurry OverlappingPattern . second null . splitAt 5 $ bss'
+      tellIncomplete = tell . errorMessage $ IncompleteExhaustivityCheck
+
+  -- | We add a Partial constraint by adding a call to the following identity function:
+  --
+  -- partial :: forall a. Partial => a -> a
+  --
+  -- The binder information is provided so that it can be embedded in the constraint,
+  -- and then included in the error message.
+  addPartialConstraint :: ([[Binder]], Bool) -> Expr -> m Expr
+  addPartialConstraint (bss, complete) e = do
+    tyVar <- ("p" ++) . show <$> fresh
+    var <- freshName
+    return $
+      Let
+        [ partial var tyVar ]
+        $ App (Var (Qualified Nothing (Ident C.__unused))) e
+    where
+      partial :: String -> String -> Declaration
+      partial var tyVar =
+        ValueDeclaration (Ident C.__unused) Private [] $ Right $
+          TypedValue
+            True
+            (Abs (Left (Ident var)) (Var (Qualified Nothing (Ident var))))
+            (ty tyVar)
+
+      ty :: String -> Type
+      ty tyVar =
+        ForAll tyVar
+          ( ConstrainedType
+              [ Constraint C.Partial [] (Just constraintData) ]
+              $ TypeApp (TypeApp tyFunction (TypeVar tyVar)) (TypeVar tyVar)
+          )
+          Nothing
+
+      constraintData :: ConstraintData
+      constraintData =
+        PartialConstraintData (map (map prettyPrintBinderAtom) bss) complete
 
 -- |
--- Exhaustivity checking over a list of declarations
+-- Exhaustivity checking
 --
-checkExhaustiveDecls :: forall m. MonadWriter MultipleErrors m => Environment -> ModuleName -> [Declaration] -> m ()
-checkExhaustiveDecls env mn = mapM_ onDecl
+checkExhaustiveExpr
+  :: forall m
+   . (MonadWriter MultipleErrors m, MonadSupply m)
+   => Environment
+   -> ModuleName
+   -> Expr
+   -> m Expr
+checkExhaustiveExpr env mn = onExpr
   where
-  onDecl :: Declaration -> m ()
-  onDecl (BindingGroupDeclaration bs) = mapM_ (onDecl . convert) bs
-    where
-    convert :: (Ident, NameKind, Expr) -> Declaration
-    convert (name, nk, e) = ValueDeclaration name nk [] (Right e)
-  onDecl (ValueDeclaration name _ _ (Right e)) = censor (addHint (ErrorInValueDeclaration name)) (onExpr False e)
-  onDecl (PositionedDeclaration pos _ dec) = censor (addHint (PositionedError pos)) (onDecl dec)
-  onDecl _ = return ()
+  onDecl :: Declaration -> m Declaration
+  onDecl (BindingGroupDeclaration bs) = BindingGroupDeclaration <$> mapM (thirdM onExpr) bs
+  onDecl (ValueDeclaration name x y (Right e)) = ValueDeclaration name x y . Right <$> censor (addHint (ErrorInValueDeclaration name)) (onExpr e)
+  onDecl (PositionedDeclaration pos x dec) = PositionedDeclaration pos x <$> censor (addHint (PositionedError pos)) (onDecl dec)
+  onDecl decl = return decl
 
-  onExpr :: Bool -> Expr -> m ()
-  onExpr isP (UnaryMinus e) = onExpr isP e
-  onExpr isP (Literal (ArrayLiteral es)) = mapM_ (onExpr isP) es
-  onExpr isP (Literal (ObjectLiteral es)) = mapM_ (onExpr isP . snd) es
-  onExpr isP (TypeClassDictionaryConstructorApp _ e) = onExpr isP e
-  onExpr isP (Accessor _ e) = onExpr isP e
-  onExpr isP (ObjectUpdate o es) = onExpr isP o >> mapM_ (onExpr isP . snd) es
-  onExpr isP (Abs _ e) = onExpr isP e
-  onExpr isP (App e1 e2) = onExpr isP e1 >> onExpr isP e2
-  onExpr isP (IfThenElse e1 e2 e3) = onExpr isP e1 >> onExpr isP e2 >> onExpr isP e3
-  onExpr isP (Case es cas) = checkExhaustive isP env mn (length es) cas >> mapM_ (onExpr isP) es >> mapM_ (onCaseAlternative isP) cas
-  onExpr isP (TypedValue _ e ty) = onExpr (isP || hasPartialConstraint ty) e
-  onExpr isP (Let ds e) = mapM_ onDecl ds >> onExpr isP e
-  onExpr isP (PositionedValue pos _ e) = censor (addHint (PositionedError pos)) (onExpr isP e)
-  onExpr _ _ = return ()
+  onExpr :: Expr -> m Expr
+  onExpr (UnaryMinus e) = UnaryMinus <$> onExpr e
+  onExpr (Literal (ArrayLiteral es)) = Literal . ArrayLiteral <$> mapM onExpr es
+  onExpr (Literal (ObjectLiteral es)) = Literal . ObjectLiteral <$> mapM (sndM onExpr) es
+  onExpr (TypeClassDictionaryConstructorApp x e) = TypeClassDictionaryConstructorApp x <$> onExpr e
+  onExpr (Accessor x e) = Accessor x <$> onExpr e
+  onExpr (ObjectUpdate o es) = ObjectUpdate <$> onExpr o <*> mapM (sndM onExpr) es
+  onExpr (Abs x e) = Abs x <$> onExpr e
+  onExpr (App e1 e2) = App <$> onExpr e1 <*> onExpr e2
+  onExpr (IfThenElse e1 e2 e3) = IfThenElse <$> onExpr e1 <*> onExpr e2 <*> onExpr e3
+  onExpr (Case es cas) = do
+    case' <- Case <$> mapM onExpr es <*> mapM onCaseAlternative cas
+    checkExhaustive env mn (length es) cas case'
+  onExpr (TypedValue x e y) = TypedValue x <$> onExpr e <*> pure y
+  onExpr (Let ds e) = Let <$> mapM onDecl ds <*> onExpr e
+  onExpr (PositionedValue pos x e) = PositionedValue pos x <$> censor (addHint (PositionedError pos)) (onExpr e)
+  onExpr expr = return expr
 
-  onCaseAlternative :: Bool -> CaseAlternative -> m ()
-  onCaseAlternative isP (CaseAlternative _ (Left es)) = mapM_ (\(e, g) -> onExpr isP e >> onExpr isP g) es
-  onCaseAlternative isP (CaseAlternative _ (Right e)) = onExpr isP e
-
-  hasPartialConstraint :: Type -> Bool
-  hasPartialConstraint (ConstrainedType cs _) = any (go . fst) cs
-    where
-    go :: Qualified (ProperName 'ClassName) -> Bool
-    go qname
-      | qname == partialClass = True
-      | otherwise =
-          case qname `M.lookup` typeClasses env of
-            Just ([], _, cs') -> any (go . fst) cs'
-            _ -> False
-    partialClass :: Qualified (ProperName 'ClassName)
-    partialClass = primName "Partial"
-  hasPartialConstraint _ = False
-
--- |
--- Exhaustivity checking over a single module
---
-checkExhaustiveModule :: forall m. MonadWriter MultipleErrors m => Environment -> Module -> m ()
-checkExhaustiveModule env (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ checkExhaustiveDecls env mn ds
+  onCaseAlternative :: CaseAlternative -> m CaseAlternative
+  onCaseAlternative (CaseAlternative x (Left es)) = CaseAlternative x . Left <$> mapM (\(e, g) -> (,) <$> onExpr e <*> onExpr g) es
+  onCaseAlternative (CaseAlternative x (Right e)) = CaseAlternative x . Right <$> onExpr e

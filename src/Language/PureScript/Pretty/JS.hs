@@ -1,44 +1,29 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Pretty.JS
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- Pretty printer for the Javascript AST
 --
------------------------------------------------------------------------------
+module Language.PureScript.Pretty.JS
+  ( prettyPrintJS
+  , prettyPrintJSWithSourceMaps
+  ) where
 
-module Language.PureScript.Pretty.JS (
-    prettyPrintJS, prettyPrintJSWithSourceMaps
-) where
-
-import Prelude ()
 import Prelude.Compat
-
-import Data.Maybe (fromMaybe)
 
 import Control.Arrow ((<+>))
 import Control.Monad.State hiding (sequence)
 import Control.PatternArrows
 import qualified Control.Arrow as A
 
-import Language.PureScript.Crash
-import Language.PureScript.CodeGen.JS.AST
-import Language.PureScript.CodeGen.JS.Common
-import Language.PureScript.Pretty.Common
-import Language.PureScript.Comments
-
+import Data.Maybe (fromMaybe)
+import Data.Monoid
 
 import Language.PureScript.AST (SourceSpan(..))
+import Language.PureScript.CodeGen.JS.AST
+import Language.PureScript.CodeGen.JS.Common
+import Language.PureScript.Comments
+import Language.PureScript.Crash
+import Language.PureScript.Pretty.Common
 
 import Numeric
-
-import Data.Monoid
 
 literals :: (Emit gen) => Pattern PrinterState JS gen
 literals = mkPattern' match'

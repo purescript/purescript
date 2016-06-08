@@ -12,13 +12,9 @@
 -- Interface for the psc-ide-server
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE ConstraintKinds       #-}
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PackageImports        #-}
 {-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE TupleSections         #-}
 
 module Language.PureScript.Ide
        ( handleCommand
@@ -40,6 +36,7 @@ import           Data.Maybe                         (catMaybes, mapMaybe)
 import           Data.Monoid
 import           Data.Text                          (Text)
 import qualified Data.Text                          as T
+import qualified Language.PureScript                as P
 import qualified Language.PureScript.Ide.CaseSplit  as CS
 import           Language.PureScript.Ide.Command
 import           Language.PureScript.Ide.Completion
@@ -64,10 +61,10 @@ handleCommand :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
 handleCommand (Load [] []) = loadAllModules
 handleCommand (Load modules deps) =
   loadModulesAndDeps modules deps
-handleCommand (Type search filters) =
-  findType search filters
-handleCommand (Complete filters matcher) =
-  findCompletions filters matcher
+handleCommand (Type search filters currentModule) =
+  findType search filters currentModule
+handleCommand (Complete filters matcher currentModule) =
+  findCompletions filters matcher currentModule
 handleCommand (Pursuit query Package) =
   findPursuitPackages query
 handleCommand (Pursuit query Identifier) =
@@ -94,36 +91,39 @@ handleCommand (Rebuild file) =
   rebuildFile file
 handleCommand Cwd =
   TextResult . T.pack <$> liftIO getCurrentDirectory
+handleCommand Reset = resetPscIdeState *> pure (TextResult "State has been reset.")
 handleCommand Quit = liftIO exitSuccess
 
-findCompletions :: (PscIde m, MonadLogger m) =>
-                   [Filter] -> Matcher -> m Success
-findCompletions filters matcher =
-  CompletionResult . mapMaybe completionFromMatch . getCompletions filters matcher <$> getAllModulesWithReexports
+findCompletions :: (PscIde m) =>
+                   [Filter] -> Matcher -> Maybe P.ModuleName -> m Success
+findCompletions filters matcher currentModule = do
+  modules <- getAllModulesWithReexportsAndCache currentModule
+  pure . CompletionResult . mapMaybe completionFromMatch . getCompletions filters matcher $ modules
 
-findType :: (PscIde m, MonadLogger m) =>
-            DeclIdent -> [Filter] -> m Success
-findType search filters =
-  CompletionResult . mapMaybe completionFromMatch . getExactMatches search filters <$> getAllModulesWithReexports
+findType :: (PscIde m) =>
+            DeclIdent -> [Filter] -> Maybe P.ModuleName -> m Success
+findType search filters currentModule = do
+  modules <- getAllModulesWithReexportsAndCache currentModule
+  pure . CompletionResult . mapMaybe completionFromMatch . getExactMatches search filters $ modules
 
-findPursuitCompletions :: (MonadIO m, MonadLogger m) =>
+findPursuitCompletions :: (MonadIO m) =>
                           PursuitQuery -> m Success
 findPursuitCompletions (PursuitQuery q) =
   PursuitResult <$> liftIO (searchPursuitForDeclarations q)
 
-findPursuitPackages :: (MonadIO m, MonadLogger m) =>
+findPursuitPackages :: (MonadIO m) =>
                        PursuitQuery -> m Success
 findPursuitPackages (PursuitQuery q) =
   PursuitResult <$> liftIO (findPackagesForModuleIdent q)
 
-loadExtern ::(PscIde m, MonadLogger m, MonadError PscIdeError m) =>
+loadExtern :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
              FilePath -> m ()
 loadExtern fp = do
   m <- readExternFile fp
   insertModule m
 
 printModules :: (PscIde m) => m Success
-printModules = printModules' <$> getPscIdeState
+printModules = printModules' . pscIdeStateModules <$> getPscIdeState
 
 printModules' :: M.Map ModuleIdent [ExternDecl] -> Success
 printModules' = ModuleList . M.keys
@@ -141,7 +141,7 @@ listAvailableModules' dirs =
   let cleanedModules = filter (`notElem` [".", ".."]) dirs
   in map T.pack cleanedModules
 
-caseSplit :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
+caseSplit :: (PscIde m, MonadError PscIdeError m) =>
   Text -> Int -> Int -> CS.WildcardAnnotations -> Text -> m Success
 caseSplit l b e csa t = do
   patterns <- CS.makePattern l b e csa <$> CS.caseSplit t
@@ -150,7 +150,7 @@ caseSplit l b e csa t = do
 addClause :: Text -> CS.WildcardAnnotations -> Success
 addClause t wca = MultilineTextResult (CS.addClause t wca)
 
-importsForFile :: (MonadIO m, MonadLogger m, MonadError PscIdeError m) =>
+importsForFile :: (MonadIO m, MonadError PscIdeError m) =>
                   FilePath -> m Success
 importsForFile fp = do
   imports <- getImportsForFile fp

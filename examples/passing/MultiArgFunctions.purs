@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Data.Function
+import Data.Function.Uncurried
 import Control.Monad.Eff
 import Control.Monad.Eff.Console
 
@@ -23,5 +23,5 @@ main = do
   runFn8 (mkFn8 $ \a b c d e f g h -> log $ show [a, b, c, d, e, f, g, h]) 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
   runFn9 (mkFn9 $ \a b c d e f g h i -> log $ show [a, b, c, d, e, f, g, h, i]) 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
   runFn10 (mkFn10 $ \a b c d e f g h i j-> log $ show [a, b, c, d, e, f, g, h, i, j]) 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0
-  print $ runFn2 g 0.0 0.0
-  log "Done!"
+  logShow $ runFn2 g 0.0 0.0
+  log "Done"

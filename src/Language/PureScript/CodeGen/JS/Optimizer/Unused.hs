@@ -1,27 +1,16 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.CodeGen.JS.Optimizer.Unused
--- Copyright   :  (c) Phil Freeman 2013-14
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- Removes unused variables
 --
------------------------------------------------------------------------------
-
 module Language.PureScript.CodeGen.JS.Optimizer.Unused
   ( removeCodeAfterReturnStatements
   , removeUnusedArg
   , removeUndefinedApp
   ) where
 
+import Prelude.Compat
+
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.CodeGen.JS.Optimizer.Common
-
 import qualified Language.PureScript.Constants as C
 
 removeCodeAfterReturnStatements :: JS -> JS

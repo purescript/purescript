@@ -1,7 +1,5 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Language.PureScript.Publish
   ( preparePackage
@@ -23,47 +21,46 @@ module Language.PureScript.Publish
   , getResolvedDependencies
   ) where
 
-import Prelude ()
 import Prelude.Compat hiding (userError)
 
-import Data.Maybe
-import Data.Char (isSpace)
-import Data.List (stripPrefix, isSuffixOf, (\\), nubBy)
-import Data.List.Split (splitOn)
-import Data.List.NonEmpty (NonEmpty(..))
-import Data.Version
-import Data.Function (on)
-import Data.Foldable (traverse_)
-import Safe (headMay)
+import Control.Arrow ((***))
+import Control.Category ((>>>))
+import Control.Exception (catch, try)
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Trans.Except
+import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
+import Control.Monad.Writer.Strict
+
 import Data.Aeson.BetterErrors
+import Data.Char (isSpace)
+import Data.Foldable (traverse_)
+import Data.Function (on)
+import Data.List (stripPrefix, isSuffixOf, (\\), nubBy)
+import Data.List.NonEmpty (NonEmpty(..))
+import Data.List.Split (splitOn)
+import Data.Maybe
+import Data.Version
+import qualified Data.SPDX as SPDX
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
-import qualified Data.SPDX as SPDX
 
-import Control.Category ((>>>))
-import Control.Arrow ((***))
-import Control.Exception (catch, try)
-import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
-import Control.Monad.Trans.Except
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Writer.Strict
+import Safe (headMay)
 
 import System.Directory (doesFileExist, findExecutable)
-import System.Process (readProcess)
 import System.Exit (exitFailure)
 import System.FilePath (pathSeparator)
+import System.Process (readProcess)
 import qualified System.FilePath.Glob as Glob
 import qualified System.Info
 
-import Web.Bower.PackageMeta (PackageMeta(..), BowerError(..), PackageName,
-                              runPackageName, parsePackageName, Repository(..))
+import Web.Bower.PackageMeta (PackageMeta(..), BowerError(..), PackageName, runPackageName, parsePackageName, Repository(..))
 import qualified Web.Bower.PackageMeta as Bower
 
+import Language.PureScript.Publish.ErrorsWarnings
+import Language.PureScript.Publish.Utils
 import qualified Language.PureScript as P (version)
 import qualified Language.PureScript.Docs as D
-import Language.PureScript.Publish.Utils
-import Language.PureScript.Publish.ErrorsWarnings
 
 data PublishOptions = PublishOptions
   { -- | How to obtain the version tag and version that the data being
@@ -216,8 +213,12 @@ getBowerRepositoryInfo = either (userError . BadRepositoryField) return . tryExt
 
 checkLicense :: PackageMeta -> PrepareM ()
 checkLicense pkgMeta =
-  unless (any isValidSPDX (bowerLicense pkgMeta))
-    (userError NoLicenseSpecified)
+  case bowerLicense pkgMeta of
+    [] ->
+      userError NoLicenseSpecified
+    ls ->
+      unless (any isValidSPDX ls)
+        (userError InvalidLicense)
 
 -- |
 -- Check if a string is a valid SPDX license expression.

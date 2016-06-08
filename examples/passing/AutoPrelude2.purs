@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import qualified Prelude as P
+import Prelude as P
 import Control.Monad.Eff.Console
 
 f :: forall a. a -> a

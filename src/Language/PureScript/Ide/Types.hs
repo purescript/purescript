@@ -12,11 +12,7 @@
 -- Type definitions for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE ConstraintKinds            #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
 
 module Language.PureScript.Ide.Types where
 
@@ -65,6 +61,8 @@ data ExternDecl
       P.Type      -- The "type"
     -- | An exported module
     | TypeClassDeclaration (P.ProperName 'P.ClassName)
+    | ValueOperator (P.OpName 'P.ValueOpName) Ident P.Precedence P.Associativity
+    | TypeOperator (P.OpName 'P.TypeOpName) Ident P.Precedence P.Associativity
     | Export ModuleIdent -- The exported Modules name
     deriving (Show,Eq,Ord)
 
@@ -86,12 +84,13 @@ type PscIde m = (MonadIO m, MonadReader PscIdeEnvironment m)
 
 data PscIdeState =
   PscIdeState
-  { pscStateModules :: M.Map Text [ExternDecl]
-  , externsFiles    :: M.Map P.ModuleName ExternsFile
+  { pscIdeStateModules       :: M.Map Text [ExternDecl]
+  , pscIdeStateExternsFiles  :: M.Map P.ModuleName ExternsFile
+  , pscIdeStateCachedRebuild :: Maybe (P.ModuleName, ExternsFile)
   } deriving Show
 
 emptyPscIdeState :: PscIdeState
-emptyPscIdeState = PscIdeState M.empty M.empty
+emptyPscIdeState = PscIdeState M.empty M.empty Nothing
 
 data Match = Match ModuleIdent ExternDecl
                deriving (Show, Eq)

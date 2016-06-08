@@ -1,5 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- |
@@ -7,7 +5,6 @@
 --
 module Language.PureScript.AST.SourcePos where
 
-import Prelude ()
 import Prelude.Compat
 
 import Data.Aeson ((.=), (.:))

@@ -12,7 +12,6 @@
 -- The server accepting commands for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE ConstraintKinds       #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
@@ -40,10 +39,10 @@ import           Language.PureScript.Ide.Util
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Watcher
-import           Network                           hiding (socketPort)
+import           Network                           hiding (socketPort, accept)
 import           Network.BSD                       (getProtocolNumber)
 import           Network.Socket                    hiding (PortNumber, Type,
-                                                    accept, sClose)
+                                                    sClose)
 import           Options.Applicative
 import           System.Directory
 import           System.FilePath
@@ -73,12 +72,13 @@ data Options = Options
   { optionsDirectory  :: Maybe FilePath
   , optionsOutputPath :: FilePath
   , optionsPort       :: PortID
+  , optionsNoWatch    :: Bool
   , optionsDebug      :: Bool
   }
 
 main :: IO ()
 main = do
-  Options dir outputPath port debug  <- execParser opts
+  Options dir outputPath port noWatch debug  <- execParser opts
   maybe (pure ()) setCurrentDirectory dir
   serverState <- newTVarIO emptyPscIdeState
   cwd <- getCurrentDirectory
@@ -89,31 +89,23 @@ main = do
     (do putStrLn ("Your output directory didn't exist. I'll create it at: " <> fullOutputPath)
         createDirectory fullOutputPath
         putStrLn "This usually means you didn't compile your project yet."
-        putStrLn "psc-ide needs you to compile your project (for example by running pulp build)"
-    )
+        putStrLn "psc-ide needs you to compile your project (for example by running pulp build)")
 
-  _ <- forkFinally (watcher serverState fullOutputPath) print
-  let conf =
-        Configuration
-        {
-          confDebug = debug
-        , confOutputPath = outputPath
-        }
-  let env =
-        PscIdeEnvironment
-        {
-          envStateVar = serverState
-        , envConfiguration = conf
-        }
+  unless noWatch $
+    void (forkFinally (watcher serverState fullOutputPath) print)
+
+  let conf = Configuration {confDebug = debug, confOutputPath = outputPath}
+      env = PscIdeEnvironment {envStateVar = serverState, envConfiguration = conf}
   startServer port env
   where
     parser =
-      Options <$>
-        optional (strOption (long "directory" <> short 'd')) <*>
-        strOption (long "output-directory" <> value "output/") <*>
-        (PortNumber . fromIntegral <$>
-         option auto (long "port" <> short 'p' <> value (4242 :: Integer))) <*>
-        switch (long "debug")
+      Options
+        <$> optional (strOption (long "directory" <> short 'd'))
+        <*> strOption (long "output-directory" <> value "output/")
+        <*> (PortNumber . fromIntegral <$>
+             option auto (long "port" <> short 'p' <> value (4242 :: Integer)))
+        <*> switch (long "no-watch")
+        <*> switch (long "debug")
     opts = info (version <*> helper <*> parser) mempty
     version = abortOption
       (InfoMsg (showVersion Paths.version))
@@ -167,7 +159,9 @@ acceptCommand sock = do
       pure (cmd, h)
   where
    acceptConnection = liftIO $ do
-     (h,_,_) <- accept sock
+     -- Use low level accept to prevent accidental reverse name resolution
+     (s,_) <- accept sock
+     h     <- socketToHandle s ReadWriteMode
      hSetEncoding h utf8
      hSetBuffering h LineBuffering
      pure h

@@ -14,8 +14,6 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PatternGuards     #-}
-{-# LANGUAGE TupleSections     #-}
 
 module Language.PureScript.Ide.Reexports where
 

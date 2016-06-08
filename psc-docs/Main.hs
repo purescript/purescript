@@ -95,7 +95,7 @@ docgen (PSCDocsOptions fmt inputGlob output) = do
       Right x ->
         return x
       Left err -> do
-        hPutStrLn stderr $ P.prettyPrintMultipleErrors False err
+        hPutStrLn stderr $ P.prettyPrintMultipleErrors P.defaultPPEOptions err
         exitFailure
 
   takeByName = takeModulesByName D.modName

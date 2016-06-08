@@ -1,6 +1,5 @@
 module Language.PureScript.Sugar.Operators.Types where
 
-import Prelude ()
 import Prelude.Compat
 
 import Language.PureScript.AST
@@ -8,7 +7,7 @@ import Language.PureScript.Names
 import Language.PureScript.Sugar.Operators.Common
 import Language.PureScript.Types
 
-matchTypeOperators :: [[(Qualified Ident, Associativity)]] -> Type -> Type
+matchTypeOperators :: [[(Qualified (OpName 'TypeOpName), Associativity)]] -> Type -> Type
 matchTypeOperators = matchOperators isBinOp extractOp fromOp reapply id
   where
 
@@ -20,9 +19,9 @@ matchTypeOperators = matchOperators isBinOp extractOp fromOp reapply id
   extractOp (BinaryNoParensType op l r) = Just (op, l, r)
   extractOp _ = Nothing
 
-  fromOp :: Type -> Maybe (Qualified Ident)
-  fromOp (TypeOp q@(Qualified _ (Op _))) = Just q
+  fromOp :: Type -> Maybe (Qualified (OpName 'TypeOpName))
+  fromOp (TypeOp q@(Qualified _ (OpName _))) = Just q
   fromOp _ = Nothing
 
-  reapply :: Qualified Ident -> Type -> Type -> Type
+  reapply :: Qualified (OpName 'TypeOpName) -> Type -> Type -> Type
   reapply = BinaryNoParensType . TypeOp

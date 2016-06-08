@@ -1,9 +1,9 @@
 -- @shouldFailWith KindsDoNotUnify
 module Main where
 
-import Prelude
+import Control.Monad.Eff.Console (log)
 
 data Foo = Bar
 type Baz = { | Foo }
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

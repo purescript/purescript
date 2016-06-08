@@ -1,7 +1,4 @@
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE RankNTypes #-}
 
 module Language.PureScript.Docs.Types
   ( module Language.PureScript.Docs.Types
@@ -9,24 +6,26 @@ module Language.PureScript.Docs.Types
   )
   where
 
-import Prelude ()
 import Prelude.Compat
 
 import Control.Arrow (first, (***))
 import Control.Monad (when)
-import Data.Maybe (mapMaybe)
-import Data.Version
+
 import Data.Aeson ((.=))
-import qualified Data.Aeson as A
 import Data.Aeson.BetterErrors
-import Text.ParserCombinators.ReadP (readP_to_S)
-import Data.Text (Text)
 import Data.ByteString.Lazy (ByteString)
+import Data.Either (isLeft, isRight)
+import Data.Maybe (mapMaybe)
+import Data.Text (Text)
+import Data.Version
+import qualified Data.Aeson as A
 import qualified Data.Text as T
 
-import Web.Bower.PackageMeta hiding (Version, displayError)
-
 import qualified Language.PureScript as P
+
+import Text.ParserCombinators.ReadP (readP_to_S)
+
+import Web.Bower.PackageMeta hiding (Version, displayError)
 
 import Language.PureScript.Docs.RenderedCode as ReExports
   (RenderedCode, asRenderedCode,
@@ -86,7 +85,6 @@ data Declaration = Declaration
   , declComments   :: Maybe String
   , declSourceSpan :: Maybe P.SourceSpan
   , declChildren   :: [ChildDeclaration]
-  , declFixity     :: Maybe P.Fixity -- TODO: remove in 0.9
   , declInfo       :: DeclarationInfo
   }
   deriving (Show, Eq, Ord)
@@ -133,8 +131,10 @@ data DeclarationInfo
   -- An operator alias declaration, with the member the alias is for and the
   -- operator's fixity.
   --
-  | AliasDeclaration (P.Qualified P.FixityAlias) P.Fixity
+  | AliasDeclaration P.Fixity FixityAlias
   deriving (Show, Eq, Ord)
+
+type FixityAlias = P.Qualified (Either (P.ProperName 'P.TypeName) (Either P.Ident (P.ProperName 'P.ConstructorName)))
 
 declInfoToString :: DeclarationInfo -> String
 declInfoToString (ValueDeclaration _) = "value"
@@ -167,14 +167,13 @@ isType Declaration{..} =
 isValueAlias :: Declaration -> Bool
 isValueAlias Declaration{..} =
   case declInfo of
-    (AliasDeclaration (P.Qualified _ P.AliasConstructor{}) _) -> True
-    (AliasDeclaration (P.Qualified _ P.AliasValue{}) _) -> True
+    AliasDeclaration _ (P.Qualified _ d) -> isRight d
     _ -> False
 
 isTypeAlias :: Declaration -> Bool
 isTypeAlias Declaration{..} =
   case declInfo of
-    (AliasDeclaration (P.Qualified _ P.AliasType{}) _) -> True
+    AliasDeclaration _ (P.Qualified _ d) -> isLeft d
     _ -> False
 
 -- | Discard any children which do not satisfy the given predicate.
@@ -364,7 +363,6 @@ asDeclaration =
               <*> key "comments" (perhaps asString)
               <*> key "sourceSpan" (perhaps asSourceSpan)
               <*> key "children" (eachInArray asChildDeclaration)
-              <*> key "fixity" (perhaps asFixity)
               <*> key "info" asDeclarationInfo
 
 asReExport :: Parse PackageError (P.ModuleName, [Declaration])
@@ -384,6 +382,9 @@ asFixity :: Parse PackageError P.Fixity
 asFixity =
   P.Fixity <$> key "associativity" asAssociativity
            <*> key "precedence" asIntegral
+
+asFixityAlias :: Parse PackageError FixityAlias
+asFixityAlias = fromAesonParser
 
 parseAssociativity :: String -> Maybe P.Associativity
 parseAssociativity str = case str of
@@ -413,13 +414,10 @@ asDeclarationInfo = do
       TypeClassDeclaration <$> key "arguments" asTypeArguments
                            <*> key "superclasses" (eachInArray asConstraint)
     "alias" ->
-      AliasDeclaration <$> key "for" asAliasFor
-                       <*> key "fixity" asFixity
+      AliasDeclaration <$> key "fixity" asFixity
+                       <*> key "alias" asFixityAlias
     other ->
       throwCustomError (InvalidDeclarationType other)
-
-asAliasFor :: Parse e (P.Qualified P.FixityAlias)
-asAliasFor = fromAesonParser
 
 asTypeArguments :: Parse PackageError [(String, Maybe P.Kind)]
 asTypeArguments = eachInArray asTypeArgument
@@ -465,8 +463,9 @@ asSourcePos = P.SourcePos <$> nth 0 asIntegral
                           <*> nth 1 asIntegral
 
 asConstraint :: Parse PackageError P.Constraint
-asConstraint = (,) <$> nth 0 asQualifiedProperName
-                   <*> nth 1 (eachInArray asType)
+asConstraint = P.Constraint <$> key "constraintClass" asQualifiedProperName
+                            <*> key "constraintArgs" (eachInArray asType)
+                            <*> pure Nothing
 
 asQualifiedProperName :: Parse e (P.Qualified (P.ProperName a))
 asQualifiedProperName = fromAesonParser
@@ -538,7 +537,6 @@ instance A.ToJSON Declaration where
              , "comments"   .= declComments
              , "sourceSpan" .= declSourceSpan
              , "children"   .= declChildren
-             , "fixity"     .= declFixity
              , "info"       .= declInfo
              ]
 
@@ -559,7 +557,7 @@ instance A.ToJSON DeclarationInfo where
       ExternDataDeclaration kind -> ["kind" .= kind]
       TypeSynonymDeclaration args ty -> ["arguments" .= args, "type" .= ty]
       TypeClassDeclaration args super -> ["arguments" .= args, "superclasses" .= super]
-      AliasDeclaration for fixity -> ["for" .= for, "fixity" .= fixity]
+      AliasDeclaration fixity alias -> ["fixity" .= fixity, "alias" .= alias]
 
 instance A.ToJSON ChildDeclarationInfo where
   toJSON info = A.object $ "declType" .= childDeclInfoToString info : props

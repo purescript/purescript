@@ -1,0 +1,5 @@
+resolver: nightly-2016-05-29
+packages:
+- '.'
+extra-deps:
+- pipes-http-1.0.2

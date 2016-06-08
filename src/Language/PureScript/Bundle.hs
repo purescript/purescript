@@ -1,48 +1,32 @@
------------------------------------------------------------------------------
---
--- Module      :  psc-bundle
--- Copyright   :  (c) Phil Freeman 2015
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- | Bundles compiled PureScript modules for the browser.
+-- |
+-- Bundles compiled PureScript modules for the browser.
 --
 -- This module takes as input the individual generated modules from 'Language.PureScript.Make' and
 -- performs dead code elimination, filters empty modules,
 -- and generates the final Javascript bundle.
------------------------------------------------------------------------------
+module Language.PureScript.Bundle
+  ( bundle
+  , ModuleIdentifier(..)
+  , moduleName
+  , ModuleType(..)
+  , ErrorMessage(..)
+  , printErrorMessage
+  , getExportedIdentifiers
+  ) where
 
-{-# LANGUAGE PatternGuards #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
-
-module Language.PureScript.Bundle (
-     bundle
-   , ModuleIdentifier(..)
-   , moduleName
-   , ModuleType(..)
-   , ErrorMessage(..)
-   , printErrorMessage
-   , getExportedIdentifiers
-) where
-
-import Prelude ()
 import Prelude.Compat
-
-import Data.List (nub, stripPrefix)
-import Data.Maybe (mapMaybe, catMaybes, fromMaybe)
-import Data.Generics (everything, everywhere, mkQ, mkT)
-import Data.Graph
-import Data.Version (showVersion)
-
-import qualified Data.Set as S
 
 import Control.Monad
 import Control.Monad.Error.Class
+
+import Data.Char (chr, digitToInt)
+import Data.Generics (everything, everywhere, mkQ, mkT)
+import Data.Graph
+import Data.List (nub, stripPrefix)
+import Data.Maybe (mapMaybe, catMaybes)
+import Data.Version (showVersion)
+import qualified Data.Set as S
+
 import Language.JavaScript.Parser
 import Language.JavaScript.Parser.AST
 
@@ -134,13 +118,13 @@ printErrorMessage (ErrorInModule mid e) =
     name ++ " (" ++ showModuleType ty ++ ")"
 
 -- | Calculate the ModuleIdentifier which a require(...) statement imports.
-checkImportPath :: Maybe FilePath -> String -> ModuleIdentifier -> S.Set String -> Either String ModuleIdentifier
-checkImportPath _ "./foreign" m _ =
+checkImportPath :: String -> ModuleIdentifier -> S.Set String -> Either String ModuleIdentifier
+checkImportPath "./foreign" m _ =
   Right (ModuleIdentifier (moduleName m) Foreign)
-checkImportPath requirePath name _ names
-  | Just name' <- stripPrefix (fromMaybe "../" requirePath) name
+checkImportPath name _ names
+  | Just name' <- stripPrefix "../" name
   , name' `S.member` names = Right (ModuleIdentifier name' Regular)
-checkImportPath _ name _ _ = Left name
+checkImportPath name _ _ = Left name
 
 -- | Compute the dependencies of all elements in a module, and add them to the tree.
 --
@@ -203,11 +187,34 @@ withDeps (Module modulePath es) = Module modulePath (map expandDeps es)
 
 -- String literals include the quote chars
 fromStringLiteral :: JSExpression -> Maybe String
-fromStringLiteral (JSStringLiteral _ str) = Just $ trimStringQuotes str
+fromStringLiteral (JSStringLiteral _ str) = Just $ strValue str
 fromStringLiteral _ = Nothing
 
-trimStringQuotes :: String -> String
-trimStringQuotes str = reverse $ drop 1 $ reverse $ drop 1 $ str
+strValue :: String -> String
+strValue str = go $ drop 1 str
+  where
+  go ('\\' : 'b' : xs) = '\b' : go xs
+  go ('\\' : 'f' : xs) = '\f' : go xs
+  go ('\\' : 'n' : xs) = '\n' : go xs
+  go ('\\' : 'r' : xs) = '\r' : go xs
+  go ('\\' : 't' : xs) = '\t' : go xs
+  go ('\\' : 'v' : xs) = '\v' : go xs
+  go ('\\' : '0' : xs) = '\0' : go xs
+  go ('\\' : 'x' : a : b : xs) = chr (a' + b') : go xs
+    where
+    a' = 16 * digitToInt a
+    b' = digitToInt b
+  go ('\\' : 'u' : a : b : c : d : xs) = chr (a' + b' + c' + d') : go xs
+    where
+    a' = 16 * 16 * 16 * digitToInt a
+    b' = 16 * 16 * digitToInt b
+    c' = 16 * digitToInt c
+    d' = digitToInt d
+  go ('\\' : x : xs) = x : go xs
+  go "\"" = ""
+  go "'" = ""
+  go (x : xs) = x : go xs
+  go "" = ""
 
 commaList :: JSCommaList a -> [a]
 commaList JSLNil = []
@@ -222,8 +229,8 @@ trailingCommaList (JSCTLNone l) = commaList l
 --
 -- Each type of module element is matched using pattern guards, and everything else is bundled into the
 -- Other constructor.
-toModule :: forall m. (MonadError ErrorMessage m) => Maybe FilePath -> S.Set String -> ModuleIdentifier -> JSAST -> m Module
-toModule requirePath mids mid top
+toModule :: forall m. (MonadError ErrorMessage m) => S.Set String -> ModuleIdentifier -> JSAST -> m Module
+toModule mids mid top
   | JSAstProgram smts _ <- top = Module mid <$> traverse toModuleElement smts
   | otherwise = err InvalidTopLevel
   where
@@ -231,7 +238,7 @@ toModule requirePath mids mid top
 
   toModuleElement :: JSStatement -> m ModuleElement
   toModuleElement stmt
-    | Just (importName, importPath) <- matchRequire requirePath mids mid stmt
+    | Just (importName, importPath) <- matchRequire mids mid stmt
     = pure (Require stmt importName importPath)
   toModuleElement stmt
     | Just (exported, name, decl) <- matchMember stmt
@@ -291,12 +298,11 @@ getExportedIdentifiers mname top
 
 -- Matches JS statements like this:
 -- var ModuleName = require("file");
-matchRequire :: Maybe FilePath
-                -> S.Set String
+matchRequire :: S.Set String
                 -> ModuleIdentifier
                 -> JSStatement
                 -> Maybe (String, Either String ModuleIdentifier)
-matchRequire requirePath mids mid stmt
+matchRequire mids mid stmt
   | JSVariable _ jsInit _ <- stmt
   , [JSVarInitExpression var varInit] <- commaList jsInit
   , JSIdentifier _ importName <- var
@@ -304,7 +310,7 @@ matchRequire requirePath mids mid stmt
   , JSMemberExpression req _ argsE _ <- jsInitEx
   , JSIdentifier _ "require" <- req
   , [ Just importPath ] <- map fromStringLiteral (commaList argsE)
-  , importPath' <- checkImportPath requirePath importPath mid mids
+  , importPath' <- checkImportPath importPath mid mids
   = Just (importName, importPath')
   | otherwise
   = Nothing
@@ -350,7 +356,7 @@ matchExportsAssignment stmt
   = Nothing
 
 extractLabel :: JSPropertyName -> Maybe String
-extractLabel (JSPropertyString _ nm) = Just (trimStringQuotes nm)
+extractLabel (JSPropertyString _ nm) = Just $ strValue nm
 extractLabel (JSPropertyIdent _ nm) = Just nm
 extractLabel _ = Nothing
 
@@ -590,16 +596,15 @@ bundle :: (MonadError ErrorMessage m)
        -> [ModuleIdentifier] -- ^ Entry points.  These module identifiers are used as the roots for dead-code elimination
        -> Maybe String -- ^ An optional main module.
        -> String -- ^ The namespace (e.g. PS).
-       -> Maybe FilePath -- ^ The require path prefix
        -> m String
-bundle inputStrs entryPoints mainModule namespace requirePath = do
+bundle inputStrs entryPoints mainModule namespace = do
   input <- forM inputStrs $ \(ident, js) -> do
                 ast <- either (throwError . ErrorInModule ident . UnableToParseModule) pure $ parse js (moduleName ident)
                 return (ident, ast)
 
   let mids = S.fromList (map (moduleName . fst) input)
 
-  modules <- traverse (fmap withDeps . uncurry (toModule requirePath mids)) input
+  modules <- traverse (fmap withDeps . uncurry (toModule mids)) input
 
   let compiled = compile modules entryPoints
       sorted   = sortModules (filter (not . isModuleEmpty) compiled)

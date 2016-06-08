@@ -1,26 +1,22 @@
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE FlexibleContexts #-}
-
 module Language.PureScript.Docs.ParseAndBookmark
   ( parseAndBookmark
   ) where
 
-import Prelude ()
 import Prelude.Compat
 
-import qualified Data.Map as M
 import Control.Arrow (first)
-
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.IO.Class (MonadIO(..))
 
-import Web.Bower.PackageMeta (PackageName)
+import qualified Data.Map as M
+
+import Language.PureScript.Docs.Convert (collectBookmarks)
+import Language.PureScript.Docs.Types
+import qualified Language.PureScript as P
 
 import System.IO.UTF8 (readUTF8File)
 
-import qualified Language.PureScript as P
-import Language.PureScript.Docs.Types
-import Language.PureScript.Docs.Convert (collectBookmarks)
+import Web.Bower.PackageMeta (PackageName)
 
 -- |
 -- Given:
@@ -48,7 +44,7 @@ parseAndBookmark inputFiles depsFiles = do
   addBookmarks <$> parseFiles (inputFiles' ++ depsFiles')
 
 parseFiles ::
-  (MonadError P.MultipleErrors m, MonadIO m) =>
+  (MonadError P.MultipleErrors m) =>
   [(FileInfo, FilePath)]
   -> m [(FileInfo, P.Module)]
 parseFiles =

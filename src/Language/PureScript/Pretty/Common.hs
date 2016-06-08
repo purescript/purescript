@@ -1,30 +1,18 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Pretty.Common
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 -- |
 -- Common pretty-printing utility functions
 --
------------------------------------------------------------------------------
-
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Language.PureScript.Pretty.Common where
 
-import Prelude ()
 import Prelude.Compat
 
 import Control.Monad.State (StateT, modify, get)
+
 import Data.List (elemIndices, intersperse)
 
-import Language.PureScript.Parser.Lexer (reservedPsNames, isUnquotedKey)
 import Language.PureScript.AST (SourcePos(..), SourceSpan(..))
+import Language.PureScript.Parser.Lexer (reservedPsNames, isUnquotedKey)
 
 import Text.PrettyPrint.Boxes
 
@@ -126,7 +114,7 @@ blockIndent = 4
 -- |
 -- Pretty print with a new indentation level
 --
-withIndent :: (Emit gen) => StateT PrinterState Maybe gen -> StateT PrinterState Maybe gen
+withIndent :: StateT PrinterState Maybe gen -> StateT PrinterState Maybe gen
 withIndent action = do
   modify $ \st -> st { indent = indent st + blockIndent }
   result <- action
@@ -165,3 +153,7 @@ before b1 b2 | rows b1 > 1 = b1 // b2
 
 beforeWithSpace :: Box -> Box -> Box
 beforeWithSpace b1 = before (b1 <> text " ")
+
+-- | Place a Box on the bottom right of another
+endWith :: Box -> Box -> Box
+endWith l r = l <> vcat top [emptyBox (rows l - 1) (cols r), r]

@@ -1,12 +1,12 @@
-{-# LANGUAGE FlexibleContexts #-}
-
 -- |
 -- Provides the ability to sort modules based on module dependencies
 --
-module Language.PureScript.ModuleDependencies (
-  sortModules,
-  ModuleGraph
-) where
+module Language.PureScript.ModuleDependencies
+  ( sortModules
+  , ModuleGraph
+  ) where
+
+import Prelude.Compat
 
 import Control.Monad.Error.Class (MonadError(..))
 
@@ -14,11 +14,11 @@ import Data.Graph
 import Data.List (nub)
 import Data.Maybe (fromMaybe)
 
-import Language.PureScript.Crash
 import Language.PureScript.AST
+import Language.PureScript.Crash
+import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.Types
-import Language.PureScript.Errors
 
 -- | A list of modules with their transitive dependencies
 type ModuleGraph = [(ModuleName, [ModuleName])]
@@ -47,7 +47,7 @@ sortModules ms = do
   -- Extract module names that have been brought into scope by an `as` import.
   extractQualAs :: Declaration -> [ModuleName]
   extractQualAs (PositionedDeclaration _ _ d) = extractQualAs d
-  extractQualAs (ImportDeclaration _ _ (Just am) _) = [am]
+  extractQualAs (ImportDeclaration _ _ (Just am)) = [am]
   extractQualAs _ = []
 
 -- |
@@ -65,12 +65,12 @@ usedModules ams d =
   where
 
   forDecls :: Declaration -> [ModuleName]
-  forDecls (ImportDeclaration mn _ _ _) =
+  forDecls (ImportDeclaration mn _ _) =
     -- Regardless of whether an imported module is qualified we still need to
     -- take into account its import to build an accurate list of dependencies.
     [mn]
-  forDecls (FixityDeclaration _ _ (Just (Qualified (Just mn) _)))
-    | mn `notElem` ams = [mn]
+  forDecls (FixityDeclaration fd)
+    | Just mn <- extractQualFixity fd, mn `notElem` ams = [mn]
   forDecls (TypeInstanceDeclaration _ _ (Qualified (Just mn) _) _ _)
     | mn `notElem` ams = [mn]
   forDecls _ = []
@@ -86,6 +86,10 @@ usedModules ams d =
   forTypes (TypeConstructor (Qualified (Just mn) _))
     | mn `notElem` ams = [mn]
   forTypes _ = []
+
+  extractQualFixity :: Either ValueFixity TypeFixity -> Maybe ModuleName
+  extractQualFixity (Left (ValueFixity _ (Qualified mn _) _)) = mn
+  extractQualFixity (Right (TypeFixity _ (Qualified mn _) _)) = mn
 
 -- |
 -- Convert a strongly connected component of the module graph to a module

@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log, logShow)
 
 class A a where
   a :: a -> Boolean
@@ -16,4 +17,6 @@ instance bNumber :: B Number where
   b 0.0 = false
   b n = a (n - 1.0)
 
-main = Control.Monad.Eff.Console.print $ a 10.0
+main = do
+  logShow $ a 10.0
+  log "Done"

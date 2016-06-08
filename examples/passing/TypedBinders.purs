@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 data Tuple a b = Tuple a b
 
@@ -31,17 +32,17 @@ instance monadStateState :: MonadState s (State s) where
   get = State (\s -> Tuple s s)
   put s = State (\_ -> Tuple s {})
 
-modify :: forall m s. (Prelude.Monad m, MonadState s m) => (s -> s) -> m {}
+modify :: forall m s. (Monad m, MonadState s m) => (s -> s) -> m {}
 modify f = do
   s <- get
   put (f s)
 
 test :: Tuple String String
 test = runState "" $ do
-  modify $ (++) "World!"
-  modify $ (++) "Hello, "
+  modify $ (<>) "World!"
+  modify $ (<>) "Hello, "
   str :: String <- get
-  return str
+  pure str
 
 test2 :: (Int -> Int) -> Int
 test2 = (\(f :: Int -> Int) -> f 10)
@@ -64,4 +65,4 @@ main = do
       t2 = test2 id
       t3 = test3 1
       t4 = test4 (Tuple 1 0)
-  Control.Monad.Eff.Console.log "Done"
+  log "Done"

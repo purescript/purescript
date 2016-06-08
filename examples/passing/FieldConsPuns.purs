@@ -1,10 +1,13 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console
+import Control.Monad.Eff.Console (log, logShow)
 
 greet { greeting, name } = log $ greeting <> ", " <> name <> "."
 
-main = greet { greeting, name} where
+main = do
+  greet { greeting, name }
+  log "Done"
+  where
   greeting = "Hello"
   name = "World"

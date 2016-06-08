@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -e
 
@@ -18,62 +18,16 @@ if [ "$force_reinstall" = "true" ] && [ -d "bower_components" ]; then
   rm -r bower_components
 fi
 
-bower i \
-        purescript-prelude \
-        purescript-eff \
-        purescript-st \
-        purescript-integers \
-        purescript-functions \
-        purescript-console \
-        purescript-profunctor \
-        purescript-contravariant \
-        purescript-parallel \
-        purescript-control \
-        purescript-tailrec \
-        purescript-maps \
-        purescript-free \
-        purescript-transformers \
-        purescript-exists \
-        purescript-monoid \
-        purescript-either \
-        purescript-maybe \
-        purescript-inject \
-        purescript-graphs \
-        purescript-enums \
-        purescript-unfoldable \
-        purescript-coproducts \
-        purescript-lazy \
-        purescript-distributive \
-        purescript-identity \
-        purescript-bifunctors \
-        purescript-const \
-        purescript-sets \
-        purescript-quickcheck \
-        purescript-foreign \
-        purescript-foldable-traversable \
-        purescript-tuples \
-        purescript-strings \
-        purescript-arrays \
-        purescript-random \
-        purescript-refs \
-        purescript-globals \
-        purescript-exceptions \
-        purescript-validation \
-        purescript-parallel \
-        purescript-proxy \
-        purescript-semirings \
-        purescript-math \
-        purescript-generics
+# todo : fix this once core libraries reach 1.0
+yes 1 | bower i
 
 if [ "$force_recompile" = "true" ] && [ -d "output" ]; then
   echo "Recompiling..."
   rm -r output
 fi
 
-../dist/build/psc/psc tests/*/*.purs \
-                      'bower_components/purescript-*/src/**/*.purs' \
-                --ffi 'bower_components/purescript-*/src/**/*.js'
+stack exec psc 'tests/**/*.purs' 'bower_components/purescript-*/src/**/*.purs'
 
-../dist/build/psc-docs/psc-docs tests/*/*.purs \
-                      'bower_components/purescript-*/src/**/*.purs' \
-                      > full-core-docs.md
+stack exec psc-docs 'bower_components/purescript-*/src/**/*.purs' > core-docs.md
+
+NODE_PATH=output node -e "require('Test.Main').main()"

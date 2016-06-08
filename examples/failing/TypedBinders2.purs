@@ -2,8 +2,8 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 main = do
-  s :: String <- Control.Monad.Eff.Console.log "Foo"
-  Control.Monad.Eff.Console.log "Done"
-
+  s :: String <- log "Foo"
+  log "Done"

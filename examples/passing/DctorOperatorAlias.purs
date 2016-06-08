@@ -1,17 +1,11 @@
-module Data.List where
-
-  data List a = Cons a (List a) | Nil
-
-  infixr 6 Cons as :
-
 module Main where
 
   import Prelude (Unit, bind, (==))
   import Control.Monad.Eff (Eff)
   import Control.Monad.Eff.Console (CONSOLE, log)
   import Test.Assert (ASSERT, assert')
-  import Data.List (List(..), (:))
-  import Data.List as L
+  import List (List(..), (:))
+  import List as L
 
   -- unqualified
   infixl 6 Cons as !

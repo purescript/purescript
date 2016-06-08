@@ -12,15 +12,13 @@ module Language.PureScript.CodeGen.JS.Optimizer.Inliner
   , evaluateIifes
   ) where
 
-import Prelude ()
 import Prelude.Compat
 
 import Control.Monad.Supply.Class (MonadSupply, freshName)
+
 import Data.Maybe (fromMaybe)
 
 import Language.PureScript.CodeGen.JS.AST
-import Language.PureScript.CodeGen.JS.Common
-import Language.PureScript.Names
 import Language.PureScript.CodeGen.JS.Optimizer.Common
 import qualified Language.PureScript.Constants as C
 
@@ -82,24 +80,24 @@ inlineCommonValues = everywhereOnJS convert
   where
   convert :: JS -> JS
   convert (JSApp ss fn [dict])
-    | isDict' (semiringNumber ++ semiringInt) dict && isFn' fnZero fn = JSNumericLiteral ss (Left 0)
-    | isDict' (semiringNumber ++ semiringInt) dict && isFn' fnOne fn = JSNumericLiteral ss (Left 1)
-    | isDict' boundedBoolean dict && isFn' fnBottom fn = JSBooleanLiteral ss False
-    | isDict' boundedBoolean dict && isFn' fnTop fn = JSBooleanLiteral ss True
+    | isDict' [semiringNumber, semiringInt] dict && isFn fnZero fn = JSNumericLiteral ss (Left 0)
+    | isDict' [semiringNumber, semiringInt] dict && isFn fnOne fn = JSNumericLiteral ss (Left 1)
+    | isDict boundedBoolean dict && isFn fnBottom fn = JSBooleanLiteral ss False
+    | isDict boundedBoolean dict && isFn fnTop fn = JSBooleanLiteral ss True
   convert (JSApp ss (JSApp _ (JSApp _ fn [dict]) [x]) [y])
-    | isDict' semiringInt dict && isFn' fnAdd fn = intOp ss Add x y
-    | isDict' semiringInt dict && isFn' fnMultiply fn = intOp ss Multiply x y
-    | isDict' moduloSemiringInt dict && isFn' fnDivide fn = intOp ss Divide x y
-    | isDict' ringInt dict && isFn' fnSubtract fn = intOp ss Subtract x y
+    | isDict semiringInt dict && isFn fnAdd fn = intOp ss Add x y
+    | isDict semiringInt dict && isFn fnMultiply fn = intOp ss Multiply x y
+    | isDict euclideanRingInt dict && isFn fnDivide fn = intOp ss Divide x y
+    | isDict ringInt dict && isFn fnSubtract fn = intOp ss Subtract x y
   convert other = other
-  fnZero = [(C.prelude, C.zero), (C.dataSemiring, C.zero)]
-  fnOne = [(C.prelude, C.one), (C.dataSemiring, C.one)]
-  fnBottom = [(C.prelude, C.bottom), (C.dataBounded, C.bottom)]
-  fnTop = [(C.prelude, C.top), (C.dataBounded, C.top)]
-  fnAdd = [(C.prelude, (C.+)), (C.prelude, C.add), (C.dataSemiring, (C.+)), (C.dataSemiring, C.add)]
-  fnDivide = [(C.prelude, (C./)), (C.prelude, C.div), (C.dataModuloSemiring, C.div)]
-  fnMultiply = [(C.prelude, (C.*)), (C.prelude, C.mul), (C.dataSemiring, (C.*)), (C.dataSemiring, C.mul)]
-  fnSubtract = [(C.prelude, (C.-)), (C.prelude, C.sub), (C.dataRing, C.sub)]
+  fnZero = (C.dataSemiring, C.zero)
+  fnOne = (C.dataSemiring, C.one)
+  fnBottom = (C.dataBounded, C.bottom)
+  fnTop = (C.dataBounded, C.top)
+  fnAdd = (C.dataSemiring, C.add)
+  fnDivide = (C.dataEuclideanRing, C.div)
+  fnMultiply = (C.dataSemiring, C.mul)
+  fnSubtract = (C.dataRing, C.sub)
   intOp ss op x y = JSBinary ss BitwiseOr (JSBinary ss op x y) (JSNumericLiteral ss (Left 0))
 
 inlineOperator :: (String, String) -> (JS -> JS -> JS) -> JS -> JS
@@ -108,7 +106,6 @@ inlineOperator (m, op) f = everywhereOnJS convert
   convert :: JS -> JS
   convert (JSApp _ (JSApp _ op' [x]) [y]) | isOp op' = f x y
   convert other = other
-  isOp (JSAccessor _ longForm (JSVar _ m')) = m == m' && longForm == identToJs (Op op)
   isOp (JSIndexer _ (JSStringLiteral _ op') (JSVar _ m')) = m == m' && op == op'
   isOp _ = False
 
@@ -122,8 +119,8 @@ inlineCommonOperators = applyAll $
   , binary ringInt opSub Subtract
   , unary  ringInt opNegate Negate
 
-  , binary moduloSemiringNumber opDiv Divide
-  , binary moduloSemiringInt opMod Modulus
+  , binary euclideanRingNumber opDiv Divide
+  , binary euclideanRingInt opMod Modulus
 
   , binary eqNumber opEq EqualTo
   , binary eqNumber opNotEq NotEqualTo
@@ -159,9 +156,9 @@ inlineCommonOperators = applyAll $
 
   , binary semigroupString opAppend Add
 
-  , binary booleanAlgebraBoolean opConj And
-  , binary booleanAlgebraBoolean opDisj Or
-  , unary  booleanAlgebraBoolean opNot Not
+  , binary heytingAlgebraBoolean opConj And
+  , binary heytingAlgebraBoolean opDisj Or
+  , unary  heytingAlgebraBoolean opNot Not
 
   , binary' C.dataIntBits (C..|.) BitwiseOr
   , binary' C.dataIntBits (C..&.) BitwiseAnd
@@ -173,11 +170,11 @@ inlineCommonOperators = applyAll $
   ] ++
   [ fn | i <- [0..10], fn <- [ mkFn i, runFn i ] ]
   where
-  binary :: [(String, String)] -> [(String, String)] -> BinaryOperator -> JS -> JS
+  binary :: (String, String) -> (String, String) -> BinaryOperator -> JS -> JS
   binary dict fns op = everywhereOnJS convert
     where
     convert :: JS -> JS
-    convert (JSApp ss (JSApp _ (JSApp _ fn [dict']) [x]) [y]) | isDict' dict dict' && isFn' fns fn = JSBinary ss op x y
+    convert (JSApp ss (JSApp _ (JSApp _ fn [dict']) [x]) [y]) | isDict dict dict' && isFn fns fn = JSBinary ss op x y
     convert other = other
   binary' :: String -> String -> BinaryOperator -> JS -> JS
   binary' moduleName opString op = everywhereOnJS convert
@@ -185,11 +182,11 @@ inlineCommonOperators = applyAll $
     convert :: JS -> JS
     convert (JSApp ss (JSApp _ fn [x]) [y]) | isFn (moduleName, opString) fn = JSBinary ss op x y
     convert other = other
-  unary :: [(String, String)] -> [(String, String)] -> UnaryOperator -> JS -> JS
+  unary :: (String, String) -> (String, String) -> UnaryOperator -> JS -> JS
   unary dicts fns op = everywhereOnJS convert
     where
     convert :: JS -> JS
-    convert (JSApp ss (JSApp _ fn [dict']) [x]) | isDict' dicts dict' && isFn' fns fn = JSUnary ss op x
+    convert (JSApp ss (JSApp _ fn [dict']) [x]) | isDict dicts dict' && isFn fns fn = JSUnary ss op x
     convert other = other
   unary' :: String -> String -> UnaryOperator -> JS -> JS
   unary' moduleName fnName op = everywhereOnJS convert
@@ -251,118 +248,118 @@ inlineFnComposition = everywhereOnJSTopDownM convert
         return $ JSFunction ss Nothing [arg] (JSBlock ss [JSReturn Nothing $ JSApp Nothing y [JSApp Nothing x [JSVar Nothing arg]]])
   convert other = return other
   isFnCompose :: JS -> JS -> Bool
-  isFnCompose dict' fn = isDict' semigroupoidFn dict' && isFn' fnCompose fn
+  isFnCompose dict' fn = isDict semigroupoidFn dict' && isFn fnCompose fn
   isFnComposeFlipped :: JS -> JS -> Bool
-  isFnComposeFlipped dict' fn = isDict' semigroupoidFn dict' && isFn' fnComposeFlipped fn
-  fnCompose :: [(String, String)]
-  fnCompose = [(C.prelude, C.compose), (C.prelude, (C.<<<)), (C.controlSemigroupoid, C.compose)]
-  fnComposeFlipped :: [(String, String)]
-  fnComposeFlipped = [(C.prelude, (C.>>>)), (C.controlSemigroupoid, C.composeFlipped)]
+  isFnComposeFlipped dict' fn = isDict semigroupoidFn dict' && isFn fnComposeFlipped fn
+  fnCompose :: (String, String)
+  fnCompose = (C.controlSemigroupoid, C.compose)
+  fnComposeFlipped :: (String, String)
+  fnComposeFlipped = (C.controlSemigroupoid, C.composeFlipped)
 
-semiringNumber :: [(String, String)]
-semiringNumber = [(C.prelude, C.semiringNumber), (C.dataSemiring, C.semiringNumber)]
+semiringNumber :: (String, String)
+semiringNumber = (C.dataSemiring, C.semiringNumber)
 
-semiringInt :: [(String, String)]
-semiringInt = [(C.prelude, C.semiringInt), (C.dataSemiring, C.semiringInt)]
+semiringInt :: (String, String)
+semiringInt = (C.dataSemiring, C.semiringInt)
 
-ringNumber :: [(String, String)]
-ringNumber = [(C.prelude, C.ringNumber), (C.dataRing, C.ringNumber)]
+ringNumber :: (String, String)
+ringNumber = (C.dataRing, C.ringNumber)
 
-ringInt :: [(String, String)]
-ringInt = [(C.prelude, C.ringInt), (C.dataRing, C.ringInt)]
+ringInt :: (String, String)
+ringInt = (C.dataRing, C.ringInt)
 
-moduloSemiringNumber :: [(String, String)]
-moduloSemiringNumber = [(C.prelude, C.moduloSemiringNumber), (C.dataModuloSemiring, C.moduloSemiringNumber)]
+euclideanRingNumber :: (String, String)
+euclideanRingNumber = (C.dataEuclideanRing, C.euclideanRingNumber)
 
-moduloSemiringInt :: [(String, String)]
-moduloSemiringInt = [(C.prelude, C.moduloSemiringInt), (C.dataModuloSemiring, C.moduloSemiringInt)]
+euclideanRingInt :: (String, String)
+euclideanRingInt = (C.dataEuclideanRing, C.euclideanRingInt)
 
-eqNumber :: [(String, String)]
-eqNumber = [(C.prelude, C.eqNumber), (C.dataEq, C.eqNumber)]
+eqNumber :: (String, String)
+eqNumber = (C.dataEq, C.eqNumber)
 
-eqInt :: [(String, String)]
-eqInt = [(C.prelude, C.eqInt), (C.dataEq, C.eqInt)]
+eqInt :: (String, String)
+eqInt = (C.dataEq, C.eqInt)
 
-eqString :: [(String, String)]
-eqString = [(C.prelude, C.eqString), (C.dataEq, C.eqString)]
+eqString :: (String, String)
+eqString = (C.dataEq, C.eqString)
 
-eqChar :: [(String, String)]
-eqChar = [(C.prelude, C.eqChar), (C.dataEq, C.eqChar)]
+eqChar :: (String, String)
+eqChar = (C.dataEq, C.eqChar)
 
-eqBoolean :: [(String, String)]
-eqBoolean = [(C.prelude, C.eqBoolean), (C.dataEq, C.eqBoolean)]
+eqBoolean :: (String, String)
+eqBoolean = (C.dataEq, C.eqBoolean)
 
-ordBoolean :: [(String, String)]
-ordBoolean = [(C.prelude, C.ordBoolean), (C.dataOrd, C.ordBoolean)]
+ordBoolean :: (String, String)
+ordBoolean = (C.dataOrd, C.ordBoolean)
 
-ordNumber :: [(String, String)]
-ordNumber = [(C.prelude, C.ordNumber), (C.dataOrd, C.ordNumber)]
+ordNumber :: (String, String)
+ordNumber = (C.dataOrd, C.ordNumber)
 
-ordInt :: [(String, String)]
-ordInt = [(C.prelude, C.ordInt), (C.dataOrd, C.ordInt)]
+ordInt :: (String, String)
+ordInt = (C.dataOrd, C.ordInt)
 
-ordString :: [(String, String)]
-ordString = [(C.prelude, C.ordString), (C.dataOrd, C.ordString)]
+ordString :: (String, String)
+ordString = (C.dataOrd, C.ordString)
 
-ordChar :: [(String, String)]
-ordChar = [(C.prelude, C.ordChar), (C.dataOrd, C.ordChar)]
+ordChar :: (String, String)
+ordChar = (C.dataOrd, C.ordChar)
 
-semigroupString :: [(String, String)]
-semigroupString = [(C.prelude, C.semigroupString), (C.dataSemigroup, C.semigroupString)]
+semigroupString :: (String, String)
+semigroupString = (C.dataSemigroup, C.semigroupString)
 
-boundedBoolean :: [(String, String)]
-boundedBoolean = [(C.prelude, C.boundedBoolean), (C.dataBounded, C.boundedBoolean)]
+boundedBoolean :: (String, String)
+boundedBoolean = (C.dataBounded, C.boundedBoolean)
 
-booleanAlgebraBoolean :: [(String, String)]
-booleanAlgebraBoolean = [(C.prelude, C.booleanAlgebraBoolean), (C.dataBooleanAlgebra, C.booleanAlgebraBoolean)]
+heytingAlgebraBoolean :: (String, String)
+heytingAlgebraBoolean = (C.dataHeytingAlgebra, C.heytingAlgebraBoolean)
 
-semigroupoidFn :: [(String, String)]
-semigroupoidFn = [(C.prelude, C.semigroupoidFn), (C.controlSemigroupoid, C.semigroupoidFn)]
+semigroupoidFn :: (String, String)
+semigroupoidFn = (C.controlSemigroupoid, C.semigroupoidFn)
 
-opAdd :: [(String, String)]
-opAdd = [(C.prelude, (C.+)), (C.prelude, C.add), (C.dataSemiring, C.add)]
+opAdd :: (String, String)
+opAdd = (C.dataSemiring, C.add)
 
-opMul :: [(String, String)]
-opMul = [(C.prelude, (C.*)), (C.prelude, C.mul), (C.dataSemiring, C.mul)]
+opMul :: (String, String)
+opMul = (C.dataSemiring, C.mul)
 
-opEq :: [(String, String)]
-opEq = [(C.prelude, (C.==)), (C.prelude, C.eq), (C.dataEq, C.eq)]
+opEq :: (String, String)
+opEq = (C.dataEq, C.eq)
 
-opNotEq :: [(String, String)]
-opNotEq = [(C.prelude, (C./=)), (C.dataEq, C.notEq)]
+opNotEq :: (String, String)
+opNotEq = (C.dataEq, C.notEq)
 
-opLessThan :: [(String, String)]
-opLessThan = [(C.prelude, (C.<)), (C.dataOrd, C.lessThan)]
+opLessThan :: (String, String)
+opLessThan = (C.dataOrd, C.lessThan)
 
-opLessThanOrEq :: [(String, String)]
-opLessThanOrEq = [(C.prelude, (C.<=)), (C.dataOrd, C.lessThanOrEq)]
+opLessThanOrEq :: (String, String)
+opLessThanOrEq = (C.dataOrd, C.lessThanOrEq)
 
-opGreaterThan :: [(String, String)]
-opGreaterThan = [(C.prelude, (C.>)), (C.dataOrd, C.greaterThan)]
+opGreaterThan :: (String, String)
+opGreaterThan = (C.dataOrd, C.greaterThan)
 
-opGreaterThanOrEq :: [(String, String)]
-opGreaterThanOrEq = [(C.prelude, (C.>=)), (C.dataOrd, C.greaterThanOrEq)]
+opGreaterThanOrEq :: (String, String)
+opGreaterThanOrEq = (C.dataOrd, C.greaterThanOrEq)
 
-opAppend :: [(String, String)]
-opAppend = [(C.prelude, (C.<>)), (C.prelude, (C.++)), (C.prelude, C.append), (C.dataSemigroup, C.append)]
+opAppend :: (String, String)
+opAppend = (C.dataSemigroup, C.append)
 
-opSub :: [(String, String)]
-opSub = [(C.prelude, (C.-)), (C.prelude, C.sub), (C.dataRing, C.sub)]
+opSub :: (String, String)
+opSub = (C.dataRing, C.sub)
 
-opNegate :: [(String, String)]
-opNegate = [(C.prelude, C.negate), (C.dataRing, C.negate)]
+opNegate :: (String, String)
+opNegate = (C.dataRing, C.negate)
 
-opDiv :: [(String, String)]
-opDiv = [(C.prelude, (C./)), (C.prelude, C.div), (C.dataModuloSemiring, C.div)]
+opDiv :: (String, String)
+opDiv = (C.dataEuclideanRing, C.div)
 
-opMod :: [(String, String)]
-opMod = [(C.prelude, C.mod), (C.dataModuloSemiring, C.mod)]
+opMod :: (String, String)
+opMod = (C.dataEuclideanRing, C.mod)
 
-opConj :: [(String, String)]
-opConj = [(C.prelude, (C.&&)), (C.prelude, C.conj), (C.dataBooleanAlgebra, C.conj)]
+opConj :: (String, String)
+opConj = (C.dataHeytingAlgebra, C.conj)
 
-opDisj :: [(String, String)]
-opDisj = [(C.prelude, (C.||)), (C.prelude, C.disj), (C.dataBooleanAlgebra, C.disj)]
+opDisj :: (String, String)
+opDisj = (C.dataHeytingAlgebra, C.disj)
 
-opNot :: [(String, String)]
-opNot = [(C.prelude, C.not), (C.dataBooleanAlgebra, C.not)]
+opNot :: (String, String)
+opNot = (C.dataHeytingAlgebra, C.not)
