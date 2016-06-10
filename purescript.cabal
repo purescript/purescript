@@ -122,7 +122,7 @@ library
                    parallel >= 3.2 && < 3.3,
                    parsec >=3.1.10,
                    pattern-arrows >= 0.0.2 && < 0.1,
-                   pipes >= 4.0.0 && < 4.2.0,
+                   pipes >= 4.0.0 && < 4.3.0,
                    pipes-http -any,
                    process >= 1.2.0 && < 1.5,
                    regex-tdfa -any,
