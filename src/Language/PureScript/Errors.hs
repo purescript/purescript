@@ -15,7 +15,7 @@ import Data.Char (isSpace)
 import Data.Either (lefts, rights)
 import Data.Foldable (fold)
 import Data.List (intercalate, transpose, nub, nubBy, sortBy, partition)
-import Data.Maybe (maybeToList)
+import Data.Maybe (maybeToList, fromMaybe, mapMaybe)
 import Data.Ord (comparing)
 import qualified Data.Map as M
 
@@ -422,7 +422,7 @@ errorSuggestion err = case err of
 
     importSuggestion :: ModuleName -> [ DeclarationRef ] -> Maybe ModuleName -> String
     importSuggestion mn refs qual =
-      "import " ++ runModuleName mn ++ " (" ++ intercalate ", " (map prettyPrintRef refs) ++ ")" ++ qstr qual
+      "import " ++ runModuleName mn ++ " (" ++ intercalate ", " (mapMaybe prettyPrintRef refs) ++ ")" ++ qstr qual
 
     qstr :: Maybe ModuleName -> String
     qstr (Just mn) = " as " ++ runModuleName mn
@@ -1159,27 +1159,42 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
 -- Pretty print and export declaration
 prettyPrintExport :: DeclarationRef -> String
 prettyPrintExport (TypeRef pn _) = runProperName pn
-prettyPrintExport ref = prettyPrintRef ref
+prettyPrintExport ref =
+  fromMaybe
+    (internalError "prettyPrintRef returned Nothing in prettyPrintExport")
+    (prettyPrintRef ref)
 
 prettyPrintImport :: ModuleName -> ImportDeclarationType -> Maybe ModuleName -> String
 prettyPrintImport mn idt qual =
   let i = case idt of
             Implicit -> runModuleName mn
-            Explicit refs -> runModuleName mn ++ " (" ++ intercalate ", " (map prettyPrintRef refs) ++ ")"
-            Hiding refs -> runModuleName mn ++ " hiding (" ++ intercalate "," (map prettyPrintRef refs) ++ ")"
+            Explicit refs -> runModuleName mn ++ " (" ++ intercalate ", " (mapMaybe prettyPrintRef refs) ++ ")"
+            Hiding refs -> runModuleName mn ++ " hiding (" ++ intercalate "," (mapMaybe prettyPrintRef refs) ++ ")"
   in i ++ maybe "" (\q -> " as " ++ runModuleName q) qual
 
-prettyPrintRef :: DeclarationRef -> String
-prettyPrintRef (TypeRef pn Nothing) = runProperName pn ++ "(..)"
-prettyPrintRef (TypeRef pn (Just [])) = runProperName pn
-prettyPrintRef (TypeRef pn (Just dctors)) = runProperName pn ++ "(" ++ intercalate ", " (map runProperName dctors) ++ ")"
-prettyPrintRef (TypeOpRef op) = "type " ++ showOp op
-prettyPrintRef (ValueRef ident) = showIdent ident
-prettyPrintRef (ValueOpRef op) = showOp op
-prettyPrintRef (TypeClassRef pn) = "class " ++ runProperName pn
-prettyPrintRef (TypeInstanceRef ident) = showIdent ident
-prettyPrintRef (ModuleRef name) = "module " ++ runModuleName name
-prettyPrintRef (PositionedDeclarationRef _ _ ref) = prettyPrintExport ref
+prettyPrintRef :: DeclarationRef -> Maybe String
+prettyPrintRef (TypeRef pn Nothing) =
+  Just $ runProperName pn ++ "(..)"
+prettyPrintRef (TypeRef pn (Just [])) =
+  Just $ runProperName pn
+prettyPrintRef (TypeRef pn (Just dctors)) =
+  Just $ runProperName pn ++ "(" ++ intercalate ", " (map runProperName dctors) ++ ")"
+prettyPrintRef (TypeOpRef op) =
+  Just $ "type " ++ showOp op
+prettyPrintRef (ValueRef ident) =
+  Just $ showIdent ident
+prettyPrintRef (ValueOpRef op) =
+  Just $ showOp op
+prettyPrintRef (TypeClassRef pn) =
+  Just $ "class " ++ runProperName pn
+prettyPrintRef (TypeInstanceRef ident) =
+  Just $ showIdent ident
+prettyPrintRef (ModuleRef name) =
+  Just $ "module " ++ runModuleName name
+prettyPrintRef (ReExportRef _ _) =
+  Nothing
+prettyPrintRef (PositionedDeclarationRef _ _ ref) =
+  prettyPrintRef ref
 
 -- |
 -- Pretty print multiple errors
