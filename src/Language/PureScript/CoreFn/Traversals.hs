@@ -4,9 +4,7 @@
 --
 module Language.PureScript.CoreFn.Traversals where
 
-import Control.Arrow (second, (***), (+++))
 import Data.Functor.Identity (runIdentity)
-import Language.PureScript.AST.Literals
 import Language.PureScript.AST.Literals
 import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Expr
