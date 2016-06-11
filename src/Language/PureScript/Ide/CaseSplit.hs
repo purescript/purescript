@@ -23,14 +23,8 @@ module Language.PureScript.Ide.CaseSplit
        , caseSplit
        ) where
 
-import           Prelude                                 ()
-import           Prelude.Compat                          hiding (lex)
+import           Protolude hiding (Constructor)
 
-import           Control.Arrow                           (second)
-import           Control.Monad.Error.Class
-import           Data.List                               (find)
-import           Data.Monoid
-import           Data.Text                               (Text)
 import qualified Data.Text                               as T
 import qualified Language.PureScript                     as P
 
@@ -56,7 +50,7 @@ noAnnotations = WildcardAnnotations False
 caseSplit :: (Ide m, MonadError PscIdeError m) =>
              Text -> m [Constructor]
 caseSplit q = do
-  type' <- parseType' (T.unpack q)
+  type' <- parseType' q
   (tc, args) <- splitTypeConstructor type'
   (EDType _ _ (P.DataType typeVars ctors)) <- findTypeDeclaration tc
   let applyTypeVars = P.everywhereOnTypes (P.replaceAllTypeVars (zip (map fst typeVars) args))
@@ -115,26 +109,26 @@ makePattern t x y wsa = makePattern' (T.take x t) (T.drop y t)
 
 addClause :: (MonadError PscIdeError m) => Text -> WildcardAnnotations -> m [Text]
 addClause s wca = do
-  (fName, fType) <- parseTypeDeclaration' (T.unpack s)
-  let (args, _) = splitFunctionType fType
+  (fName, fType) <- parseTypeDeclaration' s
+  let args = splitFunctionType fType
       template = runIdentT fName <> " " <>
         T.unwords (map (prettyPrintWildcard wca) args) <>
         " = ?" <> (T.strip . runIdentT $ fName)
   pure [s, template]
 
 parseType' :: (MonadError PscIdeError m) =>
-              String -> m P.Type
+              Text -> m P.Type
 parseType' s =
-  case P.lex "<psc-ide>" s >>= P.runTokenParser "<psc-ide>" (P.parseType <* Parsec.eof) of
+  case P.lex "<psc-ide>" (toS s) >>= P.runTokenParser "<psc-ide>" (P.parseType <* Parsec.eof) of
     Right type' -> pure type'
     Left err ->
       throwError (GeneralError ("Parsing the splittype failed with:"
-                                ++ show err))
+                                <> show err))
 
-parseTypeDeclaration' :: (MonadError PscIdeError m) => String -> m (P.Ident, P.Type)
+parseTypeDeclaration' :: (MonadError PscIdeError m) => Text -> m (P.Ident, P.Type)
 parseTypeDeclaration' s =
   let x = do
-        ts <- P.lex "" s
+        ts <- P.lex "" (toS s)
         P.runTokenParser "" (P.parseDeclaration <* Parsec.eof) ts
   in
     case unwrapPositioned <$> x of
@@ -142,13 +136,12 @@ parseTypeDeclaration' s =
       Right _ -> throwError (GeneralError "Found a non-type-declaration")
       Left err ->
         throwError (GeneralError ("Parsing the typesignature failed with: "
-                                ++ show err))
+                                  <> show err))
 
-splitFunctionType :: P.Type -> ([P.Type], P.Type)
-splitFunctionType t = (arguments, returns)
+splitFunctionType :: P.Type -> [P.Type]
+splitFunctionType t = fromMaybe [] arguments
   where
-    returns = last splitted
-    arguments = init splitted
+    arguments = initMay splitted
     splitted = splitType' t
     splitType' (P.ForAll _ t' _) = splitType' t'
     splitType' (P.ConstrainedType _ t') = splitType' t'

@@ -24,14 +24,10 @@ module Language.PureScript.Ide.Filter
        , applyFilters
        ) where
 
-import           Prelude                       ()
-import           Prelude.Compat
+import           Protolude hiding (isPrefixOf)
 
-import           Control.Monad
 import           Data.Aeson
-import           Data.Foldable
-import           Data.Monoid
-import           Data.Text                     (Text, isPrefixOf)
+import           Data.Text                     (isPrefixOf)
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 import qualified Language.PureScript as P
@@ -51,7 +47,7 @@ moduleFilter' moduleIdents = filter (flip elem moduleIdents . fst)
 
 -- | Only keeps Identifiers that start with the given prefix
 prefixFilter :: Text -> Filter
-prefixFilter "" = mkFilter id
+prefixFilter "" = mkFilter identity
 prefixFilter t = mkFilter $ identFilter prefix t
   where
     prefix :: IdeDeclaration -> Text -> Bool
@@ -80,7 +76,7 @@ applyFilters = runFilter . fold
 
 instance FromJSON Filter where
   parseJSON = withObject "filter" $ \o -> do
-    (filter' :: String) <- o .: "filter"
+    (filter' :: Text) <- o .: "filter"
     case filter' of
       "exact" -> do
         params <- o .: "params"

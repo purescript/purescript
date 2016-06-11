@@ -29,17 +29,9 @@ module Language.PureScript.Ide.Imports
        )
        where
 
-import           Prelude.Compat
-import           Control.Applicative                ((<|>))
-import           Control.Monad.Error.Class
-import           Control.Monad.IO.Class
-import           Data.Bifunctor                     (first, second)
-import           Data.Function                      (on)
-import qualified Data.List                          as List
-import           Data.Maybe                         (isNothing)
-import           Data.Monoid                        ((<>))
-import           Data.Text                          (Text)
+import           Protolude
 import qualified Data.Text                          as T
+import           Data.List                          (nubBy, findIndex)
 import qualified Data.Text.IO                       as TIO
 import qualified Language.PureScript                as P
 import           Language.PureScript.Ide.Completion
@@ -50,6 +42,7 @@ import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
+import           System.FilePath
 
 data Import = Import P.ModuleName P.ImportDeclarationType  (Maybe P.ModuleName)
               deriving (Eq, Show)
@@ -85,7 +78,7 @@ parseImportsFromFile fp = do
     Right res -> pure res
     Left err -> throwError (GeneralError err)
 
-parseImportsWithModuleName :: [Text] -> Either String (P.ModuleName, [Import])
+parseImportsWithModuleName :: [Text] -> Either Text (P.ModuleName, [Import])
 parseImportsWithModuleName ls = do
   (P.Module _ _ mn decls _) <- moduleParse ls
   pure (mn, concatMap mkImport (unwrapPositioned <$> decls))
@@ -95,13 +88,13 @@ parseImportsWithModuleName ls = do
     mkImport (P.ImportDeclaration mn it qual) = [Import mn it qual]
     mkImport _ = []
 
-sliceImportSection :: [Text] -> Either String (P.ModuleName, [Text], [Import], [Text])
+sliceImportSection :: [Text] -> Either Text (P.ModuleName, [Text], [Import], [Text])
 sliceImportSection ts =
   case foldl step (ModuleHeader 0) (zip [0..] ts) of
     Res start end ->
       let
         (moduleHeader, (importSection, remainingFile)) =
-          List.splitAt (succ (end - start)) `second` List.splitAt start ts
+          splitAt (succ (end - start)) `second` splitAt start ts
       in
         (\(mn, is) -> (mn, moduleHeader, is, remainingFile)) <$>
           parseImportsWithModuleName (moduleHeader <> importSection)
@@ -109,7 +102,7 @@ sliceImportSection ts =
     -- If we don't find any imports, we insert a newline after the module
     -- declaration and begin a new importsection
     ModuleHeader ix ->
-      let (moduleHeader, remainingFile) = List.splitAt (succ ix) ts
+      let (moduleHeader, remainingFile) = splitAt (succ ix) ts
       in
         (\(mn, is) -> (mn, moduleHeader ++ [""], is, remainingFile)) <$>
           parseImportsWithModuleName moduleHeader
@@ -151,7 +144,7 @@ step (ImportSection start lastImportLine) (ix, l)
   | otherwise                              = Res start lastImportLine
 step (Res start end) _ = Res start end
 
-moduleParse :: [Text] -> Either String P.Module
+moduleParse :: [Text] -> Either Text P.Module
 moduleParse t = first show $ do
   tokens <- (P.lex "" . T.unpack . T.unlines) t
   P.runTokenParser "<psc-ide>" P.parseModule tokens
@@ -233,11 +226,11 @@ addExplicitImport' decl moduleName imports =
         dtor' = P.ProperName (T.unpack dtor)
       in
         updateAtFirstOrPrepend (matchType tn) (insertDtor dtor') (P.TypeRef tn (Just [dtor'])) refs
-    insertDeclIntoRefs dr refs = List.nubBy ((==) `on` P.prettyPrintRef) (refFromDeclaration dr : refs)
+    insertDeclIntoRefs dr refs = nubBy ((==) `on` P.prettyPrintRef) (refFromDeclaration dr : refs)
 
     insertDtor dtor (P.TypeRef tn' dtors) =
       case dtors of
-        Just dtors' -> P.TypeRef tn' (Just (List.nub (dtor : dtors')))
+        Just dtors' -> P.TypeRef tn' (Just (ordNub (dtor : dtors')))
         -- This means the import was opened. We don't add anything in this case
         -- import Data.Maybe (Maybe(..)) -> import Data.Maybe (Maybe(Just))
         Nothing -> P.TypeRef tn' Nothing
@@ -249,10 +242,10 @@ addExplicitImport' decl moduleName imports =
 
 updateAtFirstOrPrepend :: (a -> Bool) -> (a -> a) -> a -> [a] -> [a]
 updateAtFirstOrPrepend p t d l =
-  case List.findIndex p l of
+  case findIndex p l of
     Nothing -> d : l
     Just ix ->
-      let (x, a : y) = List.splitAt ix l
+      let (x, a : y) = splitAt ix l
       in x ++ [t a] ++ y
 
 -- | Looks up the given identifier in the currently loaded modules.
@@ -321,7 +314,7 @@ prettyPrintImport' (Import mn idt qual) =
   T.pack $ "import " ++ P.prettyPrintImport mn idt qual
 
 prettyPrintImportSection :: [Import] -> [Text]
-prettyPrintImportSection imports = map prettyPrintImport' (List.sort imports)
+prettyPrintImportSection imports = map prettyPrintImport' (sort imports)
 
 -- | Writes a list of lines to @Just filepath@ and responds with a @TextResult@,
 -- or returns the lines as a @MultilineTextResult@ if @Nothing@ was given as the

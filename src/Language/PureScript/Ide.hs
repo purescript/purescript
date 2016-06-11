@@ -21,19 +21,9 @@ module Language.PureScript.Ide
        , printModules
        ) where
 
-import           Prelude                            ()
-import           Prelude.Compat
+import           Protolude
 
-import           Control.Concurrent.Async
-import           Control.Monad.Error.Class
-import           Control.Monad.IO.Class
 import           "monad-logger" Control.Monad.Logger
-import           Control.Monad.Reader
-import           Data.Foldable
-import           Data.Maybe                         (catMaybes)
-import           Data.Monoid
-import           Data.Text                          (Text)
-import qualified Data.Text                          as T
 import qualified Language.PureScript                as P
 import qualified Language.PureScript.Ide.CaseSplit  as CS
 import           Language.PureScript.Ide.Command
@@ -50,7 +40,6 @@ import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 import           System.Directory
-import           System.Exit
 import           System.FilePath
 
 handleCommand :: (Ide m, MonadLogger m, MonadError PscIdeError m) =>
@@ -86,7 +75,7 @@ handleCommand (Import fp outfp filters (AddImportForIdentifier ident)) = do
 handleCommand (Rebuild file) =
   rebuildFile file
 handleCommand Cwd =
-  TextResult . T.pack <$> liftIO getCurrentDirectory
+  TextResult . toS <$> liftIO getCurrentDirectory
 handleCommand Reset = resetIdeState *> pure (TextResult "State has been reset.")
 handleCommand Quit = liftIO exitSuccess
 
@@ -127,7 +116,7 @@ listAvailableModules = do
   liftIO $ do
     contents <- getDirectoryContents oDir
     let cleaned = filter (`notElem` [".", ".."]) contents
-    return (ModuleList (map T.pack cleaned))
+    return (ModuleList (map toS cleaned))
 
 caseSplit :: (Ide m, MonadError PscIdeError m) =>
   Text -> Int -> Int -> CS.WildcardAnnotations -> Text -> m Success

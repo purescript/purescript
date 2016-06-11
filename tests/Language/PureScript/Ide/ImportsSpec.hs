@@ -1,8 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 module Language.PureScript.Ide.ImportsSpec where
 
-import           Data.Maybe                      (fromJust)
-import           Data.Text                       (Text)
+import           Protolude
+import           Unsafe                          (fromJust)
+
 import qualified Language.PureScript             as P
 import           Language.PureScript.Ide.Imports
 import           Language.PureScript.Ide.Types
@@ -17,11 +19,9 @@ simpleFile =
   ]
 
 splitSimpleFile :: (P.ModuleName, [Text], [Import], [Text])
-splitSimpleFile = fromRight $ sliceImportSection simpleFile
+splitSimpleFile = fromRight (sliceImportSection simpleFile)
   where
-    fromRight (Right r) = r
-    fromRight (Left _) = error "fromRight"
-
+    fromRight = fromJust . rightToMaybe
 withImports :: [Text] -> [Text]
 withImports is =
   take 2 simpleFile ++ is ++ drop 2 simpleFile

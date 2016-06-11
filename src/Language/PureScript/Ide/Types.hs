@@ -16,22 +16,16 @@
 
 module Language.PureScript.Ide.Types where
 
-import           Prelude                              ()
-import           Prelude.Compat
+import           Protolude
 
 import           Control.Concurrent.STM
-import           Control.Monad
-import           Control.Monad.Reader.Class
-import           Control.Monad.Trans
 import           Data.Aeson
 import           Data.Map.Lazy                        as M
-import           Data.Maybe                           (maybeToList)
-import           Data.Text                            (Text, pack, unpack)
 import qualified Language.PureScript.Errors.JSON      as P
 import qualified Language.PureScript as P
 import           Language.PureScript.Ide.Conversions
-
-import           Text.Parsec
+import           System.FilePath
+import           Text.Parsec as Parsec
 import           Text.Parsec.Text
 
 type Ident = Text
@@ -219,7 +213,7 @@ instance FromJSON PursuitResponse where
   parseJSON (Object o) = do
     package <- o .: "package"
     info <- o .: "info"
-    (type' :: String) <- info .: "type"
+    (type' :: Text) <- info .: "type"
     case type' of
       "module" -> do
         name <- info .: "module"
@@ -234,26 +228,26 @@ instance FromJSON PursuitResponse where
 
 typeParse :: Text -> Either Text (Text, Text)
 typeParse t = case parse parseType "" t of
-  Right (x,y) -> Right (pack x, pack y)
-  Left err -> Left (pack (show err))
+  Right (x,y) -> Right (x, y)
+  Left err -> Left (show err)
   where
-    parseType :: Parser (String, String)
+    parseType :: Parser (Text, Text)
     parseType = do
       name <- identifier
       _ <- string "::"
       spaces
       type' <- many1 anyChar
-      pure (unpack name, type')
+      pure (name, toS type')
 
     identifier :: Parser Text
     identifier = do
       spaces
       ident <-
         -- necessary for being able to parse the following ((++), concat)
-        between (char '(') (char ')') (many1 (noneOf ", )")) <|>
+        between (char '(') (char ')') (many1 (noneOf ", )")) Parsec.<|>
         many1 (noneOf ", )")
       spaces
-      pure (pack ident)
+      pure (toS ident)
 
 instance ToJSON PursuitResponse where
   toJSON (ModuleResponse name package) =

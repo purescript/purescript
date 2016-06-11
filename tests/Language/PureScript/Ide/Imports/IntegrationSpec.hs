@@ -1,8 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 module Language.PureScript.Ide.Imports.IntegrationSpec where
 
-import           Control.Monad                       (void)
-import           Data.Text                           (Text)
+
+import           Protolude
+
 import qualified Data.Text                           as T
 import qualified Data.Text.IO                        as TIO
 import qualified Language.PureScript.Ide.Integration as Integration

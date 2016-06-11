@@ -1,13 +1,17 @@
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Language.PureScript.Ide.RebuildSpec where
+
+import           Protolude
 
 import qualified Language.PureScript.Ide.Integration as Integration
 import           System.FilePath
 import           Test.Hspec
 
-shouldBeSuccess :: String -> IO ()
+shouldBeSuccess :: Text -> IO ()
 shouldBeSuccess = shouldBe True . Integration.resultIsSuccess
 
-shouldBeFailure :: String -> IO ()
+shouldBeFailure :: Text -> IO ()
 shouldBeFailure = shouldBe False . Integration.resultIsSuccess
 
 spec :: Spec

@@ -14,6 +14,7 @@
 
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE NoImplicitPrelude   #-}
 module Language.PureScript.Ide.Integration
        (
          -- managing the server process
@@ -44,19 +45,15 @@ module Language.PureScript.Ide.Integration
        , parseTextResult
        ) where
 
-import           Control.Concurrent           (threadDelay)
-import           Control.Exception
-import           Control.Monad                (join, when)
+import           Protolude
+import           Unsafe                       (fromJust)
+
 import           Data.Aeson
 import           Data.Aeson.Types
-import qualified Data.ByteString.Lazy.UTF8    as BSL
-import           Data.Either                  (isRight)
-import           Data.Maybe                   (fromJust, isNothing, fromMaybe)
 import qualified Data.Text                    as T
 import qualified Data.Vector                  as V
 import           Language.PureScript.Ide.Util
 import           System.Directory
-import           System.Exit
 import           System.FilePath
 import           System.IO.Error              (mkIOError, userErrorType)
 import           System.Process
@@ -81,15 +78,12 @@ stopServer = terminateProcess
 withServer :: IO a -> IO a
 withServer s = do
   _ <- startServer
-  started <- tryNTimes 5 (shush <$> (try getCwd :: IO (Either SomeException String)))
+  started <- tryNTimes 5 (rightToMaybe <$> (try getCwd :: IO (Either SomeException Text)))
   when (isNothing started) $
     throwIO (mkIOError userErrorType "psc-ide-server didn't start in time" Nothing Nothing)
   r <- s
   quitServer
   pure r
-
-shush :: Either a b -> Maybe b
-shush = either (const Nothing) Just
 
 -- project management utils
 
@@ -97,10 +91,10 @@ compileTestProject :: IO Bool
 compileTestProject = do
   pdir <- projectDirectory
   (_, _, _, procHandle) <- createProcess $
-    (shell $ "psc " ++ fileGlob) { cwd = Just pdir
-                                 , std_out = CreatePipe
-                                 , std_err = CreatePipe
-                                 }
+    (shell . toS $ "psc " <> fileGlob) { cwd = Just pdir
+                                       , std_out = CreatePipe
+                                       , std_err = CreatePipe
+                                       }
   r <- tryNTimes 5 (getProcessExitCode procHandle)
   pure (fromMaybe False (isSuccess <$> r))
 
@@ -122,24 +116,17 @@ deleteOutputFolder = do
 deleteFileIfExists :: FilePath -> IO ()
 deleteFileIfExists fp = whenM (doesFileExist fp) (removeFile fp)
 
-whenM :: Monad m => m Bool -> m () -> m ()
-whenM p f = do
-  x <- p
-  when x f
-
 isSuccess :: ExitCode -> Bool
 isSuccess ExitSuccess = True
 isSuccess (ExitFailure _) = False
 
-fileGlob :: String
-fileGlob = unwords
-  [ "\"src/**/*.purs\""
-  ]
+fileGlob :: Text
+fileGlob = "\"src/**/*.purs\""
 
 -- Integration Testing API
 
-sendCommand :: Value -> IO String
-sendCommand v = readCreateProcess
+sendCommand :: Value -> IO Text
+sendCommand v = toS <$> readCreateProcess
   ((shell "psc-ide-client") { std_out=CreatePipe
                             , std_err=CreatePipe
                             })
@@ -147,68 +134,68 @@ sendCommand v = readCreateProcess
 
 quitServer :: IO ()
 quitServer = do
-  let quitCommand = object ["command" .= ("quit" :: String)]
-  _ <- try $ sendCommand quitCommand :: IO (Either SomeException String)
+  let quitCommand = object ["command" .= ("quit" :: Text)]
+  _ <- try $ sendCommand quitCommand :: IO (Either SomeException Text)
   return ()
 
 reset :: IO ()
 reset = do
-  let resetCommand = object ["command" .= ("reset" :: String)]
-  _ <- try $ sendCommand resetCommand :: IO (Either SomeException String)
+  let resetCommand = object ["command" .= ("reset" :: Text)]
+  _ <- try $ sendCommand resetCommand :: IO (Either SomeException Text)
   return ()
 
-getCwd :: IO String
+getCwd :: IO Text
 getCwd = do
-  let cwdCommand = object ["command" .= ("cwd" :: String)]
+  let cwdCommand = object ["command" .= ("cwd" :: Text)]
   sendCommand cwdCommand
 
-loadModule :: String -> IO String
+loadModule :: Text -> IO Text
 loadModule m = loadModules [m]
 
-loadModules :: [String] -> IO String
+loadModules :: [Text] -> IO Text
 loadModules = sendCommand . load
 
-loadAll :: IO String
+loadAll :: IO Text
 loadAll = sendCommand (load [])
 
-getFlexCompletions :: String -> IO [(String, String, String)]
+getFlexCompletions :: Text -> IO [(Text, Text, Text)]
 getFlexCompletions q = parseCompletions <$> sendCommand (completion [] (Just (flexMatcher q)) Nothing)
 
-getFlexCompletionsInModule :: String -> String -> IO [(String, String, String)]
+getFlexCompletionsInModule :: Text -> Text -> IO [(Text, Text, Text)]
 getFlexCompletionsInModule q m = parseCompletions <$> sendCommand (completion [] (Just (flexMatcher q)) (Just m))
 
-getType :: String -> IO [(String, String, String)]
+getType :: Text -> IO [(Text, Text, Text)]
 getType q = parseCompletions <$> sendCommand (typeC q [])
 
-addImport :: String -> FilePath -> FilePath -> IO String
+addImport :: Text -> FilePath -> FilePath -> IO Text
 addImport identifier fp outfp = sendCommand (addImportC identifier fp outfp)
 
-addImplicitImport :: String -> FilePath -> FilePath -> IO String
+addImplicitImport :: Text -> FilePath -> FilePath -> IO Text
 addImplicitImport mn fp outfp = sendCommand (addImplicitImportC mn fp outfp)
 
-rebuildModule :: FilePath -> IO String
+rebuildModule :: FilePath -> IO Text
 rebuildModule m = sendCommand (rebuildC m Nothing)
 
 -- Command Encoding
 
-commandWrapper :: String -> Value -> Value
+commandWrapper :: Text -> Value -> Value
 commandWrapper c p = object ["command" .= c, "params" .= p]
 
-load :: [String] -> Value
+load :: [Text] -> Value
 load ms = commandWrapper "load" (object ["modules" .= ms])
 
-typeC :: String -> [Value] -> Value
+typeC :: Text -> [Value] -> Value
 typeC q filters = commandWrapper "type" (object ["search" .= q, "filters" .= filters])
 
-addImportC :: String -> FilePath -> FilePath -> Value
+addImportC :: Text -> FilePath -> FilePath -> Value
 addImportC identifier = addImportW $
-  object [ "importCommand" .= ("addImport" :: String)
+  object [ "importCommand" .= ("addImport" :: Text)
          , "identifier" .= identifier
          ]
 
-addImplicitImportC :: String -> FilePath -> FilePath -> Value
+addImplicitImportC :: Text -> FilePath -> FilePath -> Value
 addImplicitImportC mn = addImportW $
-  object [ "importCommand" .= ("addImplicitImport" :: String)
+  object [ "importCommand" .= ("addImplicitImport" :: Text)
          , "module" .= mn
          ]
 
@@ -226,7 +213,7 @@ addImportW importCommand fp outfp =
                                   ])
 
 
-completion :: [Value] -> Maybe Value -> Maybe String -> Value
+completion :: [Value] -> Maybe Value -> Maybe Text -> Value
 completion filters matcher currentModule =
   let
     matcher' = case matcher of
@@ -238,16 +225,16 @@ completion filters matcher currentModule =
   in
     commandWrapper "complete" (object $ "filters" .= filters : matcher' ++ currentModule' )
 
-flexMatcher :: String -> Value
-flexMatcher q = object [ "matcher" .= ("flex" :: String)
+flexMatcher :: Text -> Value
+flexMatcher q = object [ "matcher" .= ("flex" :: Text)
                        , "params" .= object ["search" .= q]
                        ]
 
 -- Result parsing
 
-unwrapResult :: Value -> Parser (Either String Value)
+unwrapResult :: Value -> Parser (Either Text Value)
 unwrapResult = withObject "result" $ \o -> do
-  (rt :: String) <- o .: "resultType"
+  (rt :: Text) <- o .: "resultType"
   case rt of
     "error" -> do
       res <- o .: "result"
@@ -255,16 +242,16 @@ unwrapResult = withObject "result" $ \o -> do
     "success" -> do
       res <- o .: "result"
       pure (Right res)
-    _ -> fail "lol"
+    _ -> mzero
 
-withResult :: (Value -> Parser a) -> Value -> Parser (Either String a)
+withResult :: (Value -> Parser a) -> Value -> Parser (Either Text a)
 withResult p v = do
   r <- unwrapResult v
   case r of
     Left err -> pure (Left err)
     Right res -> Right <$> p res
 
-completionParser :: Value -> Parser [(String, String, String)]
+completionParser :: Value -> Parser [(Text, Text, Text)]
 completionParser = withArray "res" $ \cs ->
   mapM (withObject "completion" $ \o -> do
            ident <- o .: "identifier"
@@ -272,22 +259,16 @@ completionParser = withArray "res" $ \cs ->
            ty <- o .: "type"
            pure (module', ident, ty)) (V.toList cs)
 
-valueFromString :: String -> Value
-valueFromString = fromJust . decode . BSL.fromString
+valueFromText :: Text -> Value
+valueFromText = fromJust . decode . toS
 
-resultIsSuccess :: String -> Bool
-resultIsSuccess = isRight . join . parseEither unwrapResult . valueFromString
+resultIsSuccess :: Text -> Bool
+resultIsSuccess = isRight . join . first toS . parseEither unwrapResult . valueFromText
 
-parseCompletions :: String -> [(String, String, String)]
-parseCompletions s = fromJust $ do
-  cs <- parseMaybe (withResult completionParser) (valueFromString s)
-  case cs of
-    Left _ -> error "Failed to parse completions"
-    Right cs' -> pure cs'
+parseCompletions :: Text -> [(Text, Text, Text)]
+parseCompletions s =
+  fromJust $ join (rightToMaybe <$> parseMaybe (withResult completionParser) (valueFromText s))
 
-parseTextResult :: String -> String
-parseTextResult s = fromJust $ do
-  r <- parseMaybe (withResult (withText "tr" pure)) (valueFromString s)
-  case r of
-    Left _ -> error "Failed to parse textResult"
-    Right r' -> pure (T.unpack r')
+parseTextResult :: Text -> Text
+parseTextResult s =
+  fromJust $ join (rightToMaybe <$> parseMaybe (withResult (withText "tr" pure)) (valueFromText s))

@@ -33,15 +33,11 @@ module Language.PureScript.Ide.State
   , populateStage2STM
   ) where
 
-import           Prelude                           ()
-import           Prelude.Compat
+import           Protolude
 
 import           Control.Concurrent.STM
-import           Control.Monad.IO.Class
 import           "monad-logger" Control.Monad.Logger
-import           Control.Monad.Reader.Class
 import qualified Data.Map.Lazy                     as M
-import           Data.Monoid
 import qualified Data.Text                         as T
 import           Data.Time                         (getCurrentTime, diffUTCTime)
 import           Language.PureScript.Externs

@@ -20,16 +20,12 @@ module Language.PureScript.Ide.Util
   , completionFromMatch
   , encodeT
   , decodeT
-  , unlessM
   , module Language.PureScript.Ide.Conversions
   ) where
 
-import           Prelude.Compat
-import           Control.Monad                 (unless)
+import           Protolude
 import           Data.Aeson
-import           Data.Text                     (Text)
 import qualified Data.Text                     as T
-import           Data.Text.Lazy                (fromStrict, toStrict)
 import           Data.Text.Lazy.Encoding       (decodeUtf8, encodeUtf8)
 import qualified Language.PureScript           as P
 import           Language.PureScript.Ide.Types
@@ -51,7 +47,7 @@ identifierFromMatch (Match _ ed) = identifierFromIdeDeclaration ed
 completionFromMatch :: Match -> Completion
 completionFromMatch (Match m' d) = case d of
   IdeValue name type' -> Completion (m, name, prettyTypeT type')
-  IdeType name kind -> Completion (m, runProperNameT name, T.pack $ P.prettyPrintKind kind)
+  IdeType name kind -> Completion (m, runProperNameT name, toS (P.prettyPrintKind kind))
   IdeTypeSynonym name kind -> Completion (m, runProperNameT name, prettyTypeT kind)
   IdeDataConstructor name _ type' -> Completion (m, name, prettyTypeT type')
   IdeTypeClass name -> Completion (m, runProperNameT name, "class")
@@ -64,13 +60,10 @@ completionFromMatch (Match m' d) = case d of
             P.Infix -> "infix"
             P.Infixl -> "infixl"
             P.Infixr -> "infixr"
-      in T.unwords [asso, T.pack (show p), r, "as", runOpNameT o]
+      in T.unwords [asso, show p, r, "as", runOpNameT o]
 
 encodeT :: (ToJSON a) => a -> Text
-encodeT = toStrict . decodeUtf8 . encode
+encodeT = toS . decodeUtf8 . encode
 
 decodeT :: (FromJSON a) => Text -> Maybe a
-decodeT = decode . encodeUtf8 . fromStrict
-
-unlessM :: Monad m => m Bool -> m () -> m ()
-unlessM cond act = cond >>= flip unless act
+decodeT = decode . encodeUtf8 . toS

@@ -14,14 +14,12 @@
 
 module Language.PureScript.Ide.Watcher where
 
-import           Control.Concurrent              (threadDelay)
+import           Protolude
+
 import           Control.Concurrent.STM
-import           Control.Monad
-import           Control.Monad.Trans.Except
 import           Language.PureScript.Ide.Externs
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
-import           Prelude
 import           System.FilePath
 import           System.FSNotify
 

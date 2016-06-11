@@ -14,23 +14,22 @@
 
 module Language.PureScript.Ide.Conversions where
 
-import           Prelude.Compat
-import           Data.Text           (Text)
-import qualified Data.Text           as T
+import           Protolude
+import           Data.Text           (unwords, lines, strip)
 import qualified Language.PureScript as P
 
 runProperNameT :: P.ProperName a -> Text
-runProperNameT = T.pack . P.runProperName
+runProperNameT = toS . P.runProperName
 
 runIdentT :: P.Ident -> Text
-runIdentT = T.pack . P.runIdent
+runIdentT = toS . P.runIdent
 
 runOpNameT :: P.OpName a -> Text
-runOpNameT = T.pack . P.runOpName
+runOpNameT = toS . P.runOpName
 
 runModuleNameT :: P.ModuleName -> Text
-runModuleNameT = T.pack . P.runModuleName
+runModuleNameT = toS . P.runModuleName
 
 prettyTypeT :: P.Type -> Text
-prettyTypeT = T.unwords . fmap T.strip . T.lines . T.pack . P.prettyPrintType
+prettyTypeT = unwords . map strip . lines . toS . P.prettyPrintType
 
