@@ -92,16 +92,16 @@ main = do
   where
     parser =
       Options
-        <$> optional (strOption (long "directory" <> short 'd'))
-        <*> strOption (long "output-directory" <> value "output/")
+        <$> optional (strOption (long "directory" `mappend` short 'd'))
+        <*> strOption (long "output-directory" `mappend` value "output/")
         <*> (fromIntegral <$>
-             option auto (long "port" <> short 'p' <> value (4242 :: Integer)))
+             option auto (long "port" `mappend` short 'p' `mappend` value (4242 :: Integer)))
         <*> switch (long "no-watch")
         <*> switch (long "debug")
     opts = info (version <*> helper <*> parser) mempty
     version = abortOption
       (InfoMsg (showVersion Paths.version))
-      (long "version" <> help "Show the version number")
+      (long "version" `mappend` help "Show the version number")
 
 startServer :: PortNumber -> IdeEnvironment -> IO ()
 startServer port env = withSocketsDo $ do
