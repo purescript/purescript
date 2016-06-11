@@ -14,7 +14,12 @@
 
 {-# LANGUAGE OverloadedStrings     #-}
 
-module Language.PureScript.Ide.SourceFile where
+module Language.PureScript.Ide.SourceFile
+  ( parseModule
+  , getImportsForFile
+  -- SOON...
+  , getDeclPosition
+  ) where
 
 import           Protolude
 
@@ -24,26 +29,18 @@ import           Language.PureScript.Ide.Util
 import           Language.PureScript.Ide.Externs      (unwrapPositioned,
                                                        unwrapPositionedRef)
 import           Language.PureScript.Ide.Types
-import           System.Directory
 import           System.FilePath
 import           System.IO.UTF8                       (readUTF8File)
 
-parseModuleFromFile :: (MonadIO m, MonadError PscIdeError m) =>
-                       FilePath -> m P.Module
-parseModuleFromFile fp = do
-  exists <- liftIO (doesFileExist fp)
-  if exists
-    then do
-      content <- liftIO (readUTF8File fp)
-      let m = do tokens <- P.lex fp content
-                 P.runTokenParser "" P.parseModule tokens
-      either (throwError . (`ParseError` "File could not be parsed.")) pure m
-    else throwError (NotFound "File does not exist.")
-
--- data Module = Module SourceSpan [Comment] ModuleName [Declaration] (Maybe [DeclarationRef])
-
-getDeclarations :: P.Module -> [P.Declaration]
-getDeclarations (P.Module _ _ _ declarations _) = declarations
+parseModule
+  :: (MonadIO m)
+  => FilePath
+  -> m (Either FilePath (FilePath, P.Module) )
+parseModule path = do
+  contents <- liftIO (readUTF8File path)
+  case P.parseModuleFromFile identity (path, contents) of
+    Left _ -> pure (Left path)
+    Right m -> pure (Right m)
 
 getImports :: P.Module -> [(P.ModuleName, P.ImportDeclarationType, Maybe P.ModuleName)]
 getImports (P.Module _ _ _ declarations _) =
@@ -55,26 +52,21 @@ getImports (P.Module _ _ _ declarations _) =
 getImportsForFile :: (MonadIO m, MonadError PscIdeError m) =>
                      FilePath -> m [ModuleImport]
 getImportsForFile fp = do
-  module' <- parseModuleFromFile fp
-  let imports = getImports module'
-  pure (mkModuleImport . unwrapPositionedImport <$> imports)
-  where
-    mkModuleImport (mn, importType', qualifier) =
-      ModuleImport
-      (runModuleNameT mn)
-      importType'
-      (runModuleNameT <$> qualifier)
-    unwrapPositionedImport (mn, it, q) = (mn, unwrapImportType it, q)
-    unwrapImportType (P.Explicit decls) = P.Explicit (map unwrapPositionedRef decls)
-    unwrapImportType (P.Hiding decls)   = P.Hiding (map unwrapPositionedRef decls)
-    unwrapImportType P.Implicit         = P.Implicit
-
-getPositionedImports :: P.Module -> [P.Declaration]
-getPositionedImports (P.Module _ _ _ declarations _) =
-  mapMaybe isImport declarations
-  where
-    isImport i@(P.PositionedDeclaration _ _ P.ImportDeclaration{}) = Just i
-    isImport _ = Nothing
+  moduleE <- parseModule fp
+  case moduleE of
+    Left _ -> throwError (GeneralError "Failed to parse sourcefile.")
+    Right (_, module') ->
+      pure (mkModuleImport . unwrapPositionedImport <$> getImports module')
+      where
+        mkModuleImport (mn, importType', qualifier) =
+          ModuleImport
+          (runModuleNameT mn)
+          importType'
+          (runModuleNameT <$> qualifier)
+        unwrapPositionedImport (mn, it, q) = (mn, unwrapImportType it, q)
+        unwrapImportType (P.Explicit decls) = P.Explicit (map unwrapPositionedRef decls)
+        unwrapImportType (P.Hiding decls)   = P.Hiding (map unwrapPositionedRef decls)
+        unwrapImportType P.Implicit         = P.Implicit
 
 getDeclPosition :: P.Module -> Text -> Maybe P.SourceSpan
 getDeclPosition m ident = getFirst (foldMap (match ident) decls)
@@ -102,9 +94,5 @@ getDeclPosition m ident = getFirst (foldMap (match ident) decls)
     properEqual x q = runProperNameT x == q
     identEqual x q = runIdentT x == q
 
-goToDefinition :: Text -> FilePath -> IO (Maybe P.SourceSpan)
-goToDefinition q fp = do
-  m <- runExceptT (parseModuleFromFile fp)
-  case m of
-    Right module' -> pure (getDeclPosition module' q)
-    Left _ -> pure Nothing
+    getDeclarations :: P.Module -> [P.Declaration]
+    getDeclarations (P.Module _ _ _ declarations _) = declarations

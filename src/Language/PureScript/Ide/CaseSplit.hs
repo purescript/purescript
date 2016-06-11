@@ -36,6 +36,7 @@ import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 
 import           Text.Parsec                             as Parsec
+import qualified Text.PrettyPrint.Boxes                  as Box
 
 type Constructor = (P.ProperName 'P.ConstructorName, [P.Type])
 
@@ -135,8 +136,8 @@ parseTypeDeclaration' s =
       Right (P.TypeDeclaration i t) -> pure (i, t)
       Right _ -> throwError (GeneralError "Found a non-type-declaration")
       Left err ->
-        throwError (GeneralError ("Parsing the typesignature failed with: "
-                                  <> show err))
+        throwError (GeneralError ("Parsing the type signature failed with: "
+                                   <> toS (Box.render (P.prettyPrintParseError err))))
 
 splitFunctionType :: P.Type -> [P.Type]
 splitFunctionType t = fromMaybe [] arguments

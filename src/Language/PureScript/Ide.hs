@@ -14,11 +14,10 @@
 
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PackageImports        #-}
+{-# LANGUAGE TemplateHaskell       #-}
 
 module Language.PureScript.Ide
        ( handleCommand
-         -- for tests
-       , printModules
        ) where
 
 import           Protolude
@@ -41,67 +40,74 @@ import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 import           System.Directory
 import           System.FilePath
+import           System.FilePath.Glob
 
 handleCommand :: (Ide m, MonadLogger m, MonadError PscIdeError m) =>
                  Command -> m Success
-handleCommand (Load []) = loadAllModules
-handleCommand (Load modules) = loadModules modules
-handleCommand (Type search filters currentModule) =
-  findType search filters currentModule
-handleCommand (Complete filters matcher currentModule) =
-  findCompletions filters matcher currentModule
-handleCommand (Pursuit query Package) =
-  findPursuitPackages query
-handleCommand (Pursuit query Identifier) =
-  findPursuitCompletions query
-handleCommand (List LoadedModules) =
-  printModules
-handleCommand (List AvailableModules) =
-  listAvailableModules
-handleCommand (List (Imports fp)) =
-  importsForFile fp
-handleCommand (CaseSplit l b e wca t) =
-  caseSplit l b e wca t
-handleCommand (AddClause l wca) =
-  addClause l wca
-handleCommand (Import fp outfp _ (AddImplicitImport mn)) = do
-  rs <- addImplicitImport fp mn
-  answerRequest outfp rs
-handleCommand (Import fp outfp filters (AddImportForIdentifier ident)) = do
-  rs <- addImportForIdentifier fp ident filters
-  case rs of
-    Right rs' -> answerRequest outfp rs'
-    Left question -> pure $ CompletionResult (map completionFromMatch question)
-handleCommand (Rebuild file) =
-  rebuildFile file
-handleCommand Cwd =
-  TextResult . toS <$> liftIO getCurrentDirectory
-handleCommand Reset = resetIdeState *> pure (TextResult "State has been reset.")
-handleCommand Quit = liftIO exitSuccess
+handleCommand c = case c of
+  Load [] ->
+    findAvailableExterns >>= loadModules
+  Load modules ->
+    loadModules modules
+  Type search filters currentModule ->
+    findType search filters currentModule
+  Complete filters matcher currentModule ->
+    findCompletions filters matcher currentModule
+  Pursuit query Package ->
+    findPursuitPackages query
+  Pursuit query Identifier ->
+    findPursuitCompletions query
+  List LoadedModules ->
+    printModules
+  List AvailableModules ->
+    listAvailableModules
+  List (Imports fp) ->
+    ImportList <$> getImportsForFile fp
+  CaseSplit l b e wca t ->
+    caseSplit l b e wca t
+  AddClause l wca ->
+    addClause l wca
+  Import fp outfp _ (AddImplicitImport mn) -> do
+    rs <- addImplicitImport fp mn
+    answerRequest outfp rs
+  Import fp outfp filters (AddImportForIdentifier ident) -> do
+    rs <- addImportForIdentifier fp ident filters
+    case rs of
+      Right rs' -> answerRequest outfp rs'
+      Left question ->
+        pure (CompletionResult (map completionFromMatch question))
+  Rebuild file ->
+    rebuildFile file
+  Cwd ->
+    TextResult . toS <$> liftIO getCurrentDirectory
+  Reset ->
+    resetIdeState $> TextResult "State has been reset."
+  Quit ->
+    liftIO exitSuccess
 
-findCompletions :: (Ide m) =>
+findCompletions :: Ide m =>
                    [Filter] -> Matcher -> Maybe P.ModuleName -> m Success
 findCompletions filters matcher currentModule = do
   modules <- getAllModules2 currentModule
   pure . CompletionResult . map completionFromMatch . getCompletions filters matcher $ modules
 
-findType :: (Ide m) =>
+findType :: Ide m =>
             Text -> [Filter] -> Maybe P.ModuleName -> m Success
 findType search filters currentModule = do
   modules <- getAllModules2 currentModule
   pure . CompletionResult . map completionFromMatch . getExactMatches search filters $ modules
 
-findPursuitCompletions :: (MonadIO m) =>
+findPursuitCompletions :: MonadIO m =>
                           PursuitQuery -> m Success
 findPursuitCompletions (PursuitQuery q) =
   PursuitResult <$> liftIO (searchPursuitForDeclarations q)
 
-findPursuitPackages :: (MonadIO m) =>
+findPursuitPackages :: MonadIO m =>
                        PursuitQuery -> m Success
 findPursuitPackages (PursuitQuery q) =
   PursuitResult <$> liftIO (findPackagesForModuleIdent q)
 
-printModules :: (Ide m) => m Success
+printModules :: Ide m => m Success
 printModules = ModuleList . map runModuleNameT <$> getLoadedModulenames
 
 outputDirectory :: Ide m => m FilePath
@@ -131,54 +137,70 @@ addClause
   -> m Success
 addClause t wca = MultilineTextResult <$> CS.addClause t wca
 
-importsForFile :: (MonadIO m, MonadError PscIdeError m) =>
-                  FilePath -> m Success
-importsForFile fp = do
-  imports <- getImportsForFile fp
-  pure (ImportList imports)
-
--- | Takes the output directory and a filepath like "Monad.Control.Eff" and
--- looks up, whether that folder contains an externs.json
-checkExternsPath :: FilePath -> FilePath -> IO (Maybe FilePath)
-checkExternsPath oDir d
-  | d `elem` [".", ".."] = pure Nothing
-  | otherwise = do
-      let file = oDir </> d </> "externs.json"
-      ex <- doesFileExist file
-      if ex
-        then pure (Just file)
-        else pure Nothing
-
-findAllExterns :: (Ide m, MonadError PscIdeError m) => m [FilePath]
-findAllExterns = do
+-- | Finds all the externs.json files inside the output folder and returns the
+-- corresponding Modulenames
+findAvailableExterns :: (Ide m, MonadError PscIdeError m) => m [P.ModuleName]
+findAvailableExterns = do
   oDir <- outputDirectory
   unlessM (liftIO (doesDirectoryExist oDir))
     (throwError (GeneralError "Couldn't locate your output directory."))
   liftIO $ do
-    dirs <- getDirectoryContents oDir
-    externPaths <- traverse (checkExternsPath oDir) dirs
-    pure (catMaybes externPaths)
+    directories <- getDirectoryContents oDir
+    moduleNames <- filterM (checkExternsPath oDir) directories
+    pure (P.moduleNameFromString <$> moduleNames)
+  where
+    -- | Takes the output directory and a filepath like "Monad.Control.Eff" and
+    -- looks up, whether that folder contains an externs.json
+    checkExternsPath :: FilePath -> FilePath -> IO Bool
+    checkExternsPath oDir d
+      | d `elem` [".", ".."] = pure False
+      | otherwise = do
+          let file = oDir </> d </> "externs.json"
+          doesFileExist file
 
+-- | Finds all matches for the globs specified at the commandline
+findAllSourceFiles :: Ide m => m [FilePath]
+findAllSourceFiles = do
+  globs <- confGlobs . ideConfiguration <$> ask
+  liftIO (concatMapM glob globs)
+
+-- | Looks up the ExternsFiles for the given Modulenames and loads them into the
+-- server state. Then proceeds to parse all the specified sourcefiles and
+-- inserts their ASTs into the state. Finally kicks off an async worker, which
+-- populates Stage 2 and 3 of the state.
 loadModules
   :: (Ide m, MonadError PscIdeError m, MonadLogger m)
   => [P.ModuleName]
   -> m Success
-loadModules mns = do
+loadModules moduleNames = do
+  -- We resolve all the modulenames to externs files and load these into memory.
   oDir <- outputDirectory
-  let efPaths = map (\mn -> oDir </> P.runModuleName mn </> "externs.json") mns
+  let efPaths =
+        map (\mn -> oDir </> P.runModuleName mn </> "externs.json") moduleNames
   efiles <- traverse readExternFile efPaths
   traverse_ insertExterns efiles
-  --TODO Get rid of this once ModuleOld is gone
-  traverse_ insertModule efiles
-  populateStage2
-  pure (TextResult ("Loaded " <> foldMap runModuleNameT mns <> "."))
 
-loadAllModules :: (Ide m, MonadError PscIdeError m) => m Success
-loadAllModules = do
-  exts <- traverse readExternFile =<< findAllExterns
-  traverse_ insertExterns exts
-  --TODO Get rid of this once ModuleOld is gone
-  traverse_ insertModule exts
+  -- We parse all source files, log eventual parse failures if the debug flag
+  -- was set and insert the succesful parses into the state.
+  (failures, allModules) <-
+    partitionEithers <$> (traverse parseModule =<< findAllSourceFiles)
+  unless (null failures) $
+    $(logDebug) ("Failed to parse: " <> show failures)
+  traverse_ insertModule allModules
+
+  -- Because we still need the "old" module format to resolve reexports in the
+  -- worker thread, we insert it into the state aswell.
+  -- TODO Get rid of this once ModuleOld is gone
+  traverse_ insertModuleOld efiles
+
+  -- Finally we kick off the worker with @async@ and return the number of
+  -- successfully parsed modules.
   env <- ask
-  _ <- liftIO $ async (runStdoutLoggingT (runReaderT populateStage2 env))
-  pure (TextResult "All modules loaded.")
+  let runLogger =
+        runStdoutLoggingT
+        . filterLogger (\_ _ -> confDebug (ideConfiguration env))
+  -- populateStage2 returns Unit for now, so it's fine to discard this result.
+  -- We might want to block on this in a benchmarking situation.
+  _ <- liftIO (async (runLogger (runReaderT populateStage2 env)))
+  pure (TextResult ("Loaded " <> show (length efiles) <> " modules and "
+                    <> show (length allModules) <> " source files."))

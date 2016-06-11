@@ -28,7 +28,6 @@ import           Protolude
 
 import           Data.List                     (union)
 import qualified Data.Map                      as Map
-import qualified Data.Text as T
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Externs
 import qualified Language.PureScript as P
@@ -94,5 +93,5 @@ resolveReexports modules m =
      then replaced
      else resolveReexports modules replaced
 
-resolveReexports2 :: Map T.Text [ExternDecl] -> ModuleOld -> Module
+resolveReexports2 :: Map Text [ExternDecl] -> ModuleOld -> Module
 resolveReexports2 decls = convertModule . resolveReexports decls

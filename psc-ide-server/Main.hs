@@ -44,9 +44,6 @@ import           System.IO.Error                   (isEOFError)
 
 import qualified Paths_purescript                  as Paths
 
--- "Borrowed" from the Idris Compiler
--- Copied from upstream impl of listenOn
--- bound to localhost interface instead of iNADDR_ANY
 listenOnLocalhost :: PortNumber -> IO Socket
 listenOnLocalhost port = do
   proto <- getProtocolNumber "tcp"
@@ -62,6 +59,7 @@ listenOnLocalhost port = do
 
 data Options = Options
   { optionsDirectory  :: Maybe FilePath
+  , optionsGlobs      :: [FilePath]
   , optionsOutputPath :: FilePath
   , optionsPort       :: PortNumber
   , optionsNoWatch    :: Bool
@@ -70,7 +68,7 @@ data Options = Options
 
 main :: IO ()
 main = do
-  Options dir outputPath port noWatch debug  <- execParser opts
+  Options dir globs outputPath port noWatch debug <- execParser opts
   maybe (pure ()) setCurrentDirectory dir
   serverState <- newTVarIO emptyPscIdeState
   ideState <- newTVarIO emptyIdeState
@@ -86,13 +84,14 @@ main = do
   unless noWatch $
     void (forkFinally (watcher ideState fullOutputPath) print)
 
-  let conf = Configuration {confDebug = debug, confOutputPath = outputPath}
+  let conf = Configuration {confDebug = debug, confOutputPath = outputPath, confGlobs = globs}
       env = IdeEnvironment {envStateVar = serverState, ideStateVar = ideState, ideConfiguration = conf}
   startServer port env
   where
     parser =
       Options
         <$> optional (strOption (long "directory" `mappend` short 'd'))
+        <*> many (argument str (metavar "Source GLOBS..."))
         <*> strOption (long "output-directory" `mappend` value "output/")
         <*> (fromIntegral <$>
              option auto (long "port" `mappend` short 'p' `mappend` value (4242 :: Integer)))

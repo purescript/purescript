@@ -19,10 +19,12 @@
 module Language.PureScript.Ide.State
   ( getLoadedModulenames
   , getExternFiles
-  , insertModule
+  , insertModuleOld
   , resetIdeState
   , cacheRebuild
   , insertExterns
+  , insertModule
+  , insertModuleSTM
   , insertExternsSTM
   , getAllModules2
   , getStage1
@@ -34,18 +36,19 @@ module Language.PureScript.Ide.State
   ) where
 
 import           Protolude
+import qualified Prelude
 
 import           Control.Concurrent.STM
 import           "monad-logger" Control.Monad.Logger
 import qualified Data.Map.Lazy                     as M
-import qualified Data.Text                         as T
-import           Data.Time                         (getCurrentTime, diffUTCTime)
 import           Language.PureScript.Externs
 import           Language.PureScript.Ide.Externs
 import           Language.PureScript.Ide.Reexports
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 import qualified Language.PureScript as P
+import           System.Clock
+import           System.FilePath
 
 -- | Resets all State inside psc-ide
 resetIdeState :: Ide m => m ()
@@ -68,22 +71,38 @@ getExternFiles = s1Externs <$> getStage1
 -- | Inserts an @ExternsFile@ into the PscIdeState. Also converts the
 -- ExternsFile into psc-ide's internal Declaration format
 -- TODO: should be removed when the "old" Declaration format gets removed
-insertModule :: Ide m => ExternsFile -> m ()
-insertModule externsFile = do
+insertModuleOld :: Ide m => ExternsFile -> m ()
+insertModuleOld externsFile = do
   stateVar <- envStateVar <$> ask
-  liftIO . atomically $ insertModuleSTM stateVar externsFile
+  liftIO . atomically $ insertModuleOldSTM stateVar externsFile
 
--- | STM version of insertModule
-insertModuleSTM :: TVar PscIdeState -> ExternsFile -> STM ()
-insertModuleSTM st ef = modifyTVar st (insertModule' ef)
+-- | STM version of insertModuleOld
+insertModuleOldSTM :: TVar PscIdeState -> ExternsFile -> STM ()
+insertModuleOldSTM st ef = modifyTVar st (insertModule' ef)
 
--- | Pure version of insertModule
+-- | Pure version of insertModuleOld
 insertModule' :: ExternsFile -> PscIdeState -> PscIdeState
 insertModule' ef state =
   state
   { pscIdeStateModules = let (mn, decls) = convertExterns ef
                          in M.insert mn decls (pscIdeStateModules state)
   }
+
+-- | Insert a Module into Stage1 of the State
+insertModule :: Ide m => (FilePath, P.Module) -> m ()
+insertModule module' = do
+  stateVar <- ideStateVar <$> ask
+  liftIO . atomically $ insertModuleSTM stateVar module'
+
+-- | STM version of insertModule
+insertModuleSTM :: TVar IdeState -> (FilePath, P.Module) -> STM ()
+insertModuleSTM ref (fp, module') =
+  modifyTVar ref $ \x ->
+    x { ideStage1 = (ideStage1 x) {
+          s1Modules = M.insert
+            (P.getModuleName module')
+            (module', fp)
+            (s1Modules (ideStage1 x))}}
 
 -- | Retrieves Stage1 from the State.
 --  This includes loaded Externfiles
@@ -131,17 +150,17 @@ setStage2STM ref s2 = do
 -- cache
 getAllModules2 :: Ide m => Maybe P.ModuleName -> m [(P.ModuleName, [IdeDeclaration])]
 getAllModules2 mmoduleName = do
-  modules <- s2Modules <$> getStage2
+  declarations <- s2Declarations <$> getStage2
   rebuild <- cachedRebuild
   case mmoduleName of
-    Nothing -> pure (M.toList modules)
+    Nothing -> pure (M.toList declarations)
     Just moduleName ->
       case rebuild of
         Just (cachedModulename, ef)
           | cachedModulename == moduleName ->
             pure . M.toList $
-              M.insert moduleName (snd . convertModule . convertExterns $ ef) modules
-        _ -> pure (M.toList modules)
+              M.insert moduleName (snd . convertModule . convertExterns $ ef) declarations
+        _ -> pure (M.toList declarations)
 
 -- | Adds an ExternsFile into psc-ide's State Stage1. This does not populate the
 -- following Stages, which needs to be done after all the necessary Exterms have
@@ -175,11 +194,11 @@ populateStage2 :: (Ide m, MonadLogger m) => m ()
 populateStage2 = do
   st <- ideStateVar <$> ask
   duration <- liftIO $ do
-    start <- getCurrentTime
+    start <- getTime Monotonic
     atomically (populateStage2STM st)
-    end <- getCurrentTime
-    pure (diffUTCTime end start)
-  $(logDebug) $ "Finished populating Stage2 in " <> T.pack (show duration)
+    end <- getTime Monotonic
+    pure (Prelude.show (diffTimeSpec start end))
+  $(logDebug) $ "Finished populating Stage2 in " <> toS duration
 
 -- | STM version of populateStage2
 populateStage2STM :: TVar IdeState -> STM ()

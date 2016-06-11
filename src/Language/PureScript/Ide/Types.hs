@@ -12,7 +12,7 @@
 -- Type definitions for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Language.PureScript.Ide.Types where
 
@@ -74,6 +74,7 @@ data Configuration =
   Configuration
   { confOutputPath :: FilePath
   , confDebug      :: Bool
+  , confGlobs      :: [FilePath]
   }
 
 data IdeEnvironment =
@@ -102,17 +103,18 @@ emptyIdeState :: IdeState
 emptyIdeState = IdeState emptyStage1 emptyStage2
 
 emptyStage1 :: Stage1
-emptyStage1 = Stage1 M.empty
+emptyStage1 = Stage1 M.empty M.empty
 
 emptyStage2 :: Stage2
 emptyStage2 = Stage2 M.empty Nothing
 
 data Stage1 = Stage1
   { s1Externs :: M.Map P.ModuleName P.ExternsFile
+  , s1Modules :: M.Map P.ModuleName (P.Module, FilePath)
   }
 
 data Stage2 = Stage2
-  { s2Modules :: M.Map P.ModuleName [IdeDeclaration]
+  { s2Declarations :: M.Map P.ModuleName [IdeDeclaration]
   , s2CachedRebuild :: Maybe (P.ModuleName, P.ExternsFile)
   }
 

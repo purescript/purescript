@@ -10,7 +10,10 @@ A tool which provides editor support for the PureScript programming language.
 * Vim integration is available here: https://github.com/FrigoEU/psc-ide-vim.
 
 ## Running the Server
-Start the server by running the `psc-ide-server` executable.
+
+Start the server by running the `psc-ide-server [SOURCEGLOBS]` executable, where
+`SOURCEGLOBS` are (optional) globs that match your PureScript sourcefiles.
+
 It supports the following options:
 
 - `-p / --port` specify a port. Defaults to 4242

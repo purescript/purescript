@@ -106,6 +106,7 @@ library
                    boxes >= 0.1.4 && < 0.2.0,
                    bytestring -any,
                    containers -any,
+                   clock -any,
                    directory >= 1.2,
                    dlist -any,
                    edit-distance -any,
