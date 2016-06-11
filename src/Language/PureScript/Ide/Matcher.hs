@@ -21,16 +21,9 @@ module Language.PureScript.Ide.Matcher
        , runMatcher
        ) where
 
-import           Prelude                       ()
-import           Prelude.Compat
+import           Protolude
 
-import           Control.Monad
 import           Data.Aeson
-import           Data.Function                 (on)
-import           Data.List                     (sortBy)
-import           Data.Maybe                    (mapMaybe)
-import           Data.Monoid
-import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import qualified Data.Text.Encoding            as TE
 import           Language.PureScript.Ide.Types
@@ -45,7 +38,7 @@ newtype Matcher = Matcher (Endo [Match]) deriving (Monoid)
 
 instance FromJSON Matcher where
   parseJSON = withObject "matcher" $ \o -> do
-    (matcher :: Maybe String) <- o .:? "matcher"
+    (matcher :: Maybe Text) <- o .:? "matcher"
     case matcher of
       Just "flex" -> do
         params <- o .: "params"
@@ -109,7 +102,7 @@ flexScore :: Text -> Text -> Maybe Double
 flexScore pat str =
   case T.uncons pat of
     Nothing -> Nothing
-    Just (first, p) ->
+    Just (first', p) ->
       case TE.encodeUtf8 str =~ TE.encodeUtf8 pat' :: (Int, Int) of
         (-1,0) -> Nothing
         (start,len) -> Just $ calcScore start (start + len)
@@ -120,11 +113,11 @@ flexScore pat str =
         -- escape prepends a backslash to "regexy" characters to prevent the
         -- matcher from crashing when trying to build the regex
         escape :: Char -> Text
-        escape c = if c `elem` ("[\\^$.|?*+(){}" :: String)
+        escape c = if c `elem` T.unpack "[\\^$.|?*+(){}"
                    then T.pack ['\\', c]
                    else T.singleton c
         -- This just interleaves the search pattern with .*
         -- abcd[*] -> a.*b.*c.*d.*[*]
-        pat' = escape first <> foldMap (<> ".*") escapedPattern
+        pat' = escape first' <> foldMap (<> ".*") escapedPattern
         calcScore start end =
           100.0 / fromIntegral ((1 + start) * (end - start + 1))

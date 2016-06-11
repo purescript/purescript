@@ -16,17 +16,15 @@
 
 module Language.PureScript.Ide.Command where
 
-import           Prelude                           ()
-import           Prelude.Compat
+import           Protolude
 
-import           Control.Monad
 import           Data.Aeson
-import           Data.Text                         (Text)
 import qualified Language.PureScript               as P
 import           Language.PureScript.Ide.CaseSplit
 import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Types
+import           System.FilePath
 
 data Command
     = Load [P.ModuleName]
@@ -70,7 +68,7 @@ data ImportCommand
 
 instance FromJSON ImportCommand where
   parseJSON = withObject "ImportCommand" $ \o -> do
-    (command :: String) <- o .: "importCommand"
+    (command :: Text) <- o .: "importCommand"
     case command of
       "addImplicitImport" ->
         AddImplicitImport <$> (P.moduleNameFromString <$> o .: "module")
@@ -82,7 +80,7 @@ data ListType = LoadedModules | Imports FilePath | AvailableModules
 
 instance FromJSON ListType where
   parseJSON = withObject "ListType" $ \o -> do
-    (listType' :: String) <- o .: "type"
+    (listType' :: Text) <- o .: "type"
     case listType' of
       "import" -> Imports <$> o .: "file"
       "loadedModules" -> pure LoadedModules
@@ -91,7 +89,7 @@ instance FromJSON ListType where
 
 instance FromJSON Command where
   parseJSON = withObject "command" $ \o -> do
-    (command :: String) <- o .: "command"
+    (command :: Text) <- o .: "command"
     case command of
       "list" -> List <$> o .:? "params" .!= LoadedModules
       "cwd"  -> pure Cwd

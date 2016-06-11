@@ -24,16 +24,14 @@ module Language.PureScript.Ide.Reexports
   ) where
 
 
-import           Prelude                       ()
-import           Prelude.Compat
+import           Protolude
 
 import           Data.List                     (union)
-import           Data.Map                      (Map)
 import qualified Data.Map                      as Map
-import           Data.Maybe
 import qualified Data.Text as T
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Externs
+import qualified Language.PureScript as P
 
 getReexports :: ModuleOld -> [ExternDecl]
 getReexports (mn, decls)= concatMap getExport decls
@@ -59,7 +57,7 @@ replaceExportWithAliases decls ident =
 replaceReexport :: ExternDecl -> ModuleOld -> ModuleOld -> ModuleOld
 replaceReexport e@(Export _) (m, decls) (_, newDecls) =
   (m, filter (/= e) decls `union` newDecls)
-replaceReexport _ _ _ = error "Should only get Exports here."
+replaceReexport _ _ _ = P.internalError "Should only get Exports here"
 
 emptyModule :: ModuleOld
 emptyModule = ("Empty", [])
@@ -79,7 +77,7 @@ replaceReexports m db = result
 
     go :: ModuleOld -> ExternDecl -> ModuleOld
     go m' re@(Export name) = replaceReexport re m' (getModule name)
-    go _ _ = error "partiality! woohoo"
+    go _ _ = P.internalError "Should only get Exports here"
 
     getModule :: ModuleIdent -> ModuleOld
     getModule name = clean res

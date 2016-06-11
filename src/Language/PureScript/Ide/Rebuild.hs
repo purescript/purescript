@@ -8,14 +8,12 @@ module Language.PureScript.Ide.Rebuild
   ( rebuildFile
   ) where
 
-import           Control.Monad.Error.Class
-import           Control.Monad.IO.Class
+import           Protolude
+
 import           "monad-logger" Control.Monad.Logger
-import           Control.Monad.Reader
-import           Control.Monad.Trans.Except
+import qualified Data.List as List
 import qualified Data.Map.Lazy                   as M
-import           Data.Maybe                      (fromJust, mapMaybe)
-import           Data.Monoid                     ((<>))
+import           Data.Maybe                      (fromJust)
 import qualified Data.Set                        as S
 import qualified Language.PureScript             as P
 import           Language.PureScript.Errors.JSON
@@ -23,8 +21,8 @@ import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
-import           Prelude.Compat
 import           System.IO.UTF8                  (readUTF8File)
+import           System.FilePath
 
 -- | Given a filepath performs the following steps:
 --
@@ -49,7 +47,7 @@ rebuildFile path = do
 
   input <- liftIO (readUTF8File path)
 
-  m <- case snd <$> P.parseModuleFromFile id (path, input) of
+  m <- case snd <$> P.parseModuleFromFile identity (path, input) of
     Left parseError -> throwError
                        . RebuildError
                        . toJSONErrors False P.Error
@@ -106,8 +104,8 @@ rebuildModuleOpen makeEnv externs m = do
 data MakeActionsEnv =
   MakeActionsEnv
   { maeOutputDirectory :: FilePath
-  , maeFilePathMap     :: M.Map P.ModuleName (Either P.RebuildPolicy FilePath)
-  , maeForeignPathMap  :: M.Map P.ModuleName FilePath
+  , maeFilePathMap     :: Map P.ModuleName (Either P.RebuildPolicy FilePath)
+  , maeForeignPathMap  :: Map P.ModuleName FilePath
   , maePrefixComment   :: Bool
   }
 
@@ -137,7 +135,7 @@ shushCodegen ma MakeActionsEnv{..} =
 sortExterns
   :: (Ide m, MonadError PscIdeError m)
   => P.Module
-  -> M.Map P.ModuleName P.ExternsFile
+  -> Map P.ModuleName P.ExternsFile
   -> m [P.ExternsFile]
 sortExterns m ex = do
   sorted' <- runExceptT
@@ -149,11 +147,11 @@ sortExterns m ex = do
   case sorted' of
     Left _ -> throwError (GeneralError "There was a cycle in the dependencies")
     Right (sorted, graph) -> do
-      let deps = fromJust (lookup (P.getModuleName m) graph)
+      let deps = fromJust (List.lookup (P.getModuleName m) graph)
       pure $ mapMaybe getExtern (deps `inOrderOf` map P.getModuleName sorted)
   where
     mkShallowModule P.ExternsFile{..} =
-      P.Module undefined [] efModuleName (map mkImport efImports) Nothing
+      P.Module (P.internalModuleSourceSpan "<rebuild>") [] efModuleName (map mkImport efImports) Nothing
     mkImport (P.ExternsImport mn it iq) =
       P.ImportDeclaration mn it iq
     getExtern mn = M.lookup mn ex

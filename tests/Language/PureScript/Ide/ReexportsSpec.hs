@@ -1,8 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 module Language.PureScript.Ide.ReexportsSpec where
 
-import           Control.Exception                 (evaluate)
-import           Data.List                         (sort)
+import           Protolude
+
 import qualified Data.Map                          as Map
 import           Language.PureScript.Ide.Reexports
 import           Language.PureScript.Ide.Types
@@ -41,7 +42,7 @@ module4 = ("Module4", [Export "T", decl1, dep1, dep2])
 result :: ModuleOld
 result = ("Module1", [decl1, decl2, Export "Module3"])
 
-db :: Map.Map ModuleIdent [ExternDecl]
+db :: Map ModuleIdent [ExternDecl]
 db = Map.fromList [module1, module2, module3]
 
 shouldBeEqualSorted :: ModuleOld -> ModuleOld -> Expectation
@@ -64,9 +65,6 @@ spec =
       let replaced = replaceReexport (Export "Module2") module1 module2
       in replaceReexport (Export "Module2") replaced module2  `shouldBeEqualSorted` result
 
-    it "should error when given a non-Export to replace" $
-      evaluate (replaceReexport decl1 module1 module2)
-      `shouldThrow` errorCall "Should only get Exports here."
     it "replaces all Exports with their corresponding declarations" $
       replaceReexports module1 db `shouldBe` ("Module1", [decl1, decl2, decl3])
 

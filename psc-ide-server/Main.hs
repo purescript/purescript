@@ -17,21 +17,14 @@
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PackageImports        #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
 
 module Main where
 
-import           Prelude                           ()
-import           Prelude.Compat
+import           Protolude
 
-import           Control.Concurrent                (forkFinally)
 import           Control.Concurrent.STM
-import           Control.Exception                 (bracketOnError, catchJust)
-import           Control.Monad
-import           Control.Monad.Error.Class
 import           "monad-logger" Control.Monad.Logger
-import           Control.Monad.Reader
-import           Control.Monad.Trans.Except
-import qualified Data.Text                         as T
 import qualified Data.Text.IO                      as T
 import           Data.Version                      (showVersion)
 import           Language.PureScript.Ide
@@ -43,10 +36,10 @@ import           Network                           hiding (socketPort, accept)
 import           Network.BSD                       (getProtocolNumber)
 import           Network.Socket                    hiding (PortNumber, Type,
                                                     sClose)
-import           Options.Applicative
+import           Options.Applicative               hiding ((<>))
 import           System.Directory
 import           System.FilePath
-import           System.IO
+import           System.IO                         hiding (putStrLn, print)
 import           System.IO.Error                   (isEOFError)
 
 import qualified Paths_purescript                  as Paths
@@ -54,8 +47,8 @@ import qualified Paths_purescript                  as Paths
 -- "Borrowed" from the Idris Compiler
 -- Copied from upstream impl of listenOn
 -- bound to localhost interface instead of iNADDR_ANY
-listenOnLocalhost :: PortID -> IO Socket
-listenOnLocalhost (PortNumber port) = do
+listenOnLocalhost :: PortNumber -> IO Socket
+listenOnLocalhost port = do
   proto <- getProtocolNumber "tcp"
   localhost <- inet_addr "127.0.0.1"
   bracketOnError
@@ -66,12 +59,11 @@ listenOnLocalhost (PortNumber port) = do
       bindSocket sock (SockAddrInet port localhost)
       listen sock maxListenQueue
       pure sock)
-listenOnLocalhost _ = error "Wrong Porttype"
 
 data Options = Options
   { optionsDirectory  :: Maybe FilePath
   , optionsOutputPath :: FilePath
-  , optionsPort       :: PortID
+  , optionsPort       :: PortNumber
   , optionsNoWatch    :: Bool
   , optionsDebug      :: Bool
   }
@@ -88,8 +80,8 @@ main = do
   unlessM (doesDirectoryExist fullOutputPath) $ do
     putStrLn ("Your output directory didn't exist. I'll create it at: " <> fullOutputPath)
     createDirectory fullOutputPath
-    putStrLn "This usually means you didn't compile your project yet."
-    putStrLn "psc-ide needs you to compile your project (for example by running pulp build)"
+    putText "This usually means you didn't compile your project yet."
+    putText "psc-ide needs you to compile your project (for example by running pulp build)"
 
   unless noWatch $
     void (forkFinally (watcher ideState fullOutputPath) print)
@@ -100,18 +92,18 @@ main = do
   where
     parser =
       Options
-        <$> optional (strOption (long "directory" <> short 'd'))
-        <*> strOption (long "output-directory" <> value "output/")
-        <*> (PortNumber . fromIntegral <$>
-             option auto (long "port" <> short 'p' <> value (4242 :: Integer)))
+        <$> optional (strOption (long "directory" `mappend` short 'd'))
+        <*> strOption (long "output-directory" `mappend` value "output/")
+        <*> (fromIntegral <$>
+             option auto (long "port" `mappend` short 'p' `mappend` value (4242 :: Integer)))
         <*> switch (long "no-watch")
         <*> switch (long "debug")
     opts = info (version <*> helper <*> parser) mempty
     version = abortOption
       (InfoMsg (showVersion Paths.version))
-      (long "version" <> help "Show the version number")
+      (long "version" `mappend` help "Show the version number")
 
-startServer :: PortID -> IdeEnvironment -> IO ()
+startServer :: PortNumber -> IdeEnvironment -> IO ()
 startServer port env = withSocketsDo $ do
   sock <- listenOnLocalhost port
   runLogger (runReaderT (forever (loop sock)) env)
@@ -141,8 +133,8 @@ startServer port env = withSocketsDo $ do
           liftIO (hClose h)
 
 
-acceptCommand :: (MonadIO m, MonadLogger m, MonadError T.Text m)
-                 => Socket -> m (T.Text, Handle)
+acceptCommand :: (MonadIO m, MonadLogger m, MonadError Text m)
+                 => Socket -> m (Text, Handle)
 acceptCommand sock = do
   h <- acceptConnection
   $(logDebug) "Accepted a connection"
