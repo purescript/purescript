@@ -235,6 +235,21 @@ typeClassDictionaryDeclaration name args implies members =
       mtys = members' ++ superclassTypes
   in TypeSynonymDeclaration (coerceProperName name) args (TypeApp tyRecord $ rowFromList (mtys, REmpty))
 
+typeClassDictionaryDeclaration'
+  :: ProperName 'ClassName
+  -> [(String, Maybe Kind)]
+  -> [Constraint]
+  -> [Declaration]
+  -> Declaration
+typeClassDictionaryDeclaration' name args implies members =
+  let superclassTypes = superClassDictionaryNames implies `zip`
+        [ function unit (foldl TypeApp (TypeConstructor (fmap coerceProperName superclass)) tyArgs)
+        | (Constraint superclass tyArgs _) <- implies
+        ]
+      members' = map (first runIdent . memberToNameAndType) members
+      mtys = members' ++ superclassTypes
+  in TypeSynonymDeclaration (coerceProperName name) args (TypeApp tyRecord $ rowFromList (mtys, REmpty))
+
 typeClassMemberToDictionaryAccessor
   :: ModuleName
   -> ProperName 'ClassName

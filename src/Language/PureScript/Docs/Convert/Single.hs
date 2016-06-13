@@ -115,8 +115,8 @@ convertDeclaration (P.DataDeclaration dtype _ args ctors) title =
   where
   info = DataDeclaration dtype args
   children = map convertCtor ctors
-  convertCtor (ctor', tys) =
-    ChildDeclaration (P.runProperName ctor') Nothing Nothing (ChildDataConstructor tys)
+  convertCtor (ctor', fields) =
+    ChildDeclaration (P.runProperName ctor') Nothing Nothing (ChildDataConstructor (map snd fields))
 convertDeclaration (P.ExternDataDeclaration _ kind') title =
   basicDeclaration title (ExternDataDeclaration kind')
 convertDeclaration (P.TypeSynonymDeclaration _ args ty) title =

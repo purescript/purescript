@@ -574,7 +574,7 @@ accumTypes
      )
 accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (const mempty) (const mempty)
   where
-  forDecls (DataDeclaration _ _ _ dctors) = mconcat (concatMap (map f . snd) dctors)
+  forDecls (DataDeclaration _ _ _ dctors) = mconcat (concatMap (map (f . snd) . snd) dctors)
   forDecls (ExternDeclaration _ ty) = f ty
   forDecls (TypeClassDeclaration _ _ implies _) = mconcat (concatMap (map f . constraintArgs) implies)
   forDecls (TypeInstanceDeclaration _ cs _ tys _) = mconcat (concatMap (map f . constraintArgs) cs) `mappend` mconcat (map f tys)

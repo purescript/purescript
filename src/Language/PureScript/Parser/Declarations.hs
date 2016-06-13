@@ -68,10 +68,16 @@ parseDataDeclaration = do
   dtype <- (reserved "data" *> return Data) <|> (reserved "newtype" *> return Newtype)
   name <- indented *> typeName
   tyArgs <- many (indented *> kindedIdent)
-  ctors <- P.option [] $ do
+  ctorTypes <- P.option [] $ do
     indented *> equals
     P.sepBy1 ((,) <$> properName <*> P.many (indented *> noWildcards parseTypeAtom)) pipe
+  let ctors = map (fmap addFieldNames) ctorTypes
   return $ DataDeclaration dtype name tyArgs ctors
+  where
+  addFieldNames :: [Type] -> [(Ident, Type)]
+  addFieldNames tys =
+    let fields = [Ident ("value" ++ show n) | n <- [0..(length tys - 1)]]
+    in zip fields tys
 
 parseTypeDeclaration :: TokenParser Declaration
 parseTypeDeclaration =
