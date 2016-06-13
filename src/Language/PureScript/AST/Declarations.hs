@@ -153,6 +153,9 @@ isExplicit :: ImportDeclarationType -> Bool
 isExplicit (Explicit _) = True
 isExplicit _ = False
 
+type DataConstructor
+  = (ProperName 'ConstructorName, [(Ident, Type)])
+
 -- |
 -- The data type of declarations
 --
@@ -160,7 +163,7 @@ data Declaration
   -- |
   -- A data type declaration (data or newtype, name, arguments, data constructors)
   --
-  = DataDeclaration DataDeclType (ProperName 'TypeName) [(String, Maybe Kind)] [(ProperName 'ConstructorName, [Type])]
+  = DataDeclaration DataDeclType (ProperName 'TypeName) [(String, Maybe Kind)] [DataConstructor]
   -- |
   -- A minimal mutually recursive set of data type declarations
   --
@@ -218,7 +221,7 @@ data ValueFixity = ValueFixity Fixity (Qualified (Either Ident (ProperName 'Cons
 data TypeFixity = TypeFixity Fixity (Qualified (ProperName 'TypeName)) (OpName 'TypeOpName)
   deriving (Eq, Ord, Show, Read)
 
-pattern ValueFixityDeclaration :: Fixity -> Qualified (Either Ident (ProperName 'ConstructorName)) -> OpName 'ValueOpName -> Declaration 
+pattern ValueFixityDeclaration :: Fixity -> Qualified (Either Ident (ProperName 'ConstructorName)) -> OpName 'ValueOpName -> Declaration
 pattern ValueFixityDeclaration fixity name op = FixityDeclaration (Left (ValueFixity fixity name op))
 
 pattern TypeFixityDeclaration :: Fixity -> Qualified (ProperName 'TypeName) -> OpName 'TypeOpName -> Declaration

@@ -60,7 +60,7 @@ caseSplit q = do
   (tc, args) <- splitTypeConstructor type'
   (EDType _ _ (P.DataType typeVars ctors)) <- findTypeDeclaration tc
   let applyTypeVars = P.everywhereOnTypes (P.replaceAllTypeVars (zip (map fst typeVars) args))
-  let appliedCtors = map (second (map applyTypeVars)) ctors
+  let appliedCtors = map (second (map (applyTypeVars . snd))) ctors
   pure appliedCtors
 
 findTypeDeclaration :: (PscIde m, MonadError PscIdeError m) =>
