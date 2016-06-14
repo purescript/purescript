@@ -2,34 +2,30 @@
 -- This module implements the desugaring pass which creates type synonyms for type class dictionaries
 -- and dictionary expressions for type class instances.
 --
-module Language.PureScript.Sugar.TypeClasses
-  ( desugarTypeClasses
-  , typeClassMemberName
-  , superClassDictionaryNames
-  ) where
+module Language.PureScript.Sugar.TypeClasses (desugarTypeClasses) where
 
 import Prelude.Compat
 
-import Language.PureScript.Crash
-import Language.PureScript.AST hiding (isExported)
-import Language.PureScript.Environment
-import Language.PureScript.Errors
-import Language.PureScript.Kinds
-import Language.PureScript.Names
-import Language.PureScript.Externs
-import Language.PureScript.Sugar.CaseDeclarations
-import Control.Monad.Supply.Class
-import Language.PureScript.Types
-
-import qualified Language.PureScript.Constants as C
-
-import Control.Arrow (first, second)
+import Control.Arrow (second)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
-import Data.List ((\\), find, sortBy)
-import Data.Maybe (catMaybes, mapMaybe, isJust)
+import Control.Monad.Supply.Class
 
+import Data.Function (on)
+import Data.List ((\\), find, sortBy, elemIndex)
+import Data.Maybe (catMaybes, mapMaybe, isJust)
 import qualified Data.Map as M
+
+import Language.PureScript.AST hiding (isExported)
+import Language.PureScript.Crash
+import Language.PureScript.Environment
+import Language.PureScript.Errors
+import Language.PureScript.Externs
+import Language.PureScript.Kinds
+import Language.PureScript.Names
+import Language.PureScript.Sugar.CaseDeclarations
+import Language.PureScript.Types
+import qualified Language.PureScript.Constants as C
 
 type MemberMap = M.Map (ModuleName, ProperName 'ClassName) ([(String, Maybe Kind)], [Constraint], [Declaration])
 
@@ -176,7 +172,9 @@ desugarDecl mn exps = go
   where
   go d@(TypeClassDeclaration name args implies members) = do
     modify (M.insert (mn, name) (args, implies, members))
-    return (Nothing, d : typeClassDictionaryDeclaration name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
+    let fields = superClassDictionaryNames implies ++ typeClassMemberNames members
+    return (Nothing, d : typeClassDictionaryDeclaration name args implies members
+                       : map (typeClassMemberToDictionaryAccessor mn name args fields) members)
   go (TypeInstanceDeclaration _ _ _ _ DerivedInstance) = internalError "Derived instanced should have been desugared"
   go d@(TypeInstanceDeclaration name deps className tys (ExplicitInstance members)) = do
     desugared <- desugarCases members
@@ -227,43 +225,41 @@ typeClassDictionaryDeclaration
   -> [Declaration]
   -> Declaration
 typeClassDictionaryDeclaration name args implies members =
-  let superclassTypes = superClassDictionaryNames implies `zip`
+  let
+    typeName :: ProperName 'TypeName
+    typeName = coerceProperName name
+    ctorName :: ProperName 'ConstructorName
+    ctorName = coerceProperName name
+    superclasses =
+      superClassDictionaryNames implies `zip`
         [ function unit (foldl TypeApp (TypeConstructor (fmap coerceProperName superclass)) tyArgs)
         | (Constraint superclass tyArgs _) <- implies
         ]
-      members' = map (first runIdent . memberToNameAndType) members
-      mtys = members' ++ superclassTypes
-  in TypeSynonymDeclaration (coerceProperName name) args (TypeApp tyRecord $ rowFromList (mtys, REmpty))
-
-typeClassDictionaryDeclaration'
-  :: ProperName 'ClassName
-  -> [(String, Maybe Kind)]
-  -> [Constraint]
-  -> [Declaration]
-  -> Declaration
-typeClassDictionaryDeclaration' name args implies members =
-  let superclassTypes = superClassDictionaryNames implies `zip`
-        [ function unit (foldl TypeApp (TypeConstructor (fmap coerceProperName superclass)) tyArgs)
-        | (Constraint superclass tyArgs _) <- implies
-        ]
-      members' = map (first runIdent . memberToNameAndType) members
-      mtys = members' ++ superclassTypes
-  in TypeSynonymDeclaration (coerceProperName name) args (TypeApp tyRecord $ rowFromList (mtys, REmpty))
+    fields = superclasses ++ map memberToNameAndType members
+  in
+    DataDeclaration Data typeName args [(ctorName, fields)]
 
 typeClassMemberToDictionaryAccessor
   :: ModuleName
   -> ProperName 'ClassName
   -> [(String, Maybe Kind)]
+  -> [Ident]
   -> Declaration
   -> Declaration
-typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration ident ty) =
-  let className = Qualified (Just mn) name
-  in ValueDeclaration ident Private [] $ Right $
-      TypedValue False (TypeClassDictionaryAccessor className ident) $
-      moveQuantifiersToFront (quantify (ConstrainedType [Constraint className (map (TypeVar . fst) args) Nothing] ty))
-typeClassMemberToDictionaryAccessor mn name args (PositionedDeclaration pos com d) =
-  PositionedDeclaration pos com $ typeClassMemberToDictionaryAccessor mn name args d
-typeClassMemberToDictionaryAccessor _ _ _ _ = internalError "Invalid declaration in type class definition"
+typeClassMemberToDictionaryAccessor mn name args dctorArgs (TypeDeclaration ident ty) =
+  let
+    ctorName :: ProperName 'ConstructorName
+    ctorName = coerceProperName name
+    className :: Qualified (ProperName 'ClassName)
+    className = Qualified (Just mn) name
+    binders = [if argName == ident then VarBinder ident else NullBinder | argName <- dctorArgs]
+  in
+    ValueDeclaration ident Private [] $ Right $
+      TypedValue False (Abs (Right $ ConstructorBinder (Qualified (Just mn) ctorName) binders) (Var (Qualified Nothing ident))) $
+        moveQuantifiersToFront (quantify (ConstrainedType [Constraint className (map (TypeVar . fst) args) Nothing] ty))
+typeClassMemberToDictionaryAccessor mn name args dctorArgs (PositionedDeclaration pos com d) =
+  PositionedDeclaration pos com $ typeClassMemberToDictionaryAccessor mn name args dctorArgs d
+typeClassMemberToDictionaryAccessor _ _ _ _ _ = internalError "Invalid declaration in type class definition"
 
 unit :: Type
 unit = TypeApp tyRecord REmpty
@@ -297,21 +293,30 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
       let memberTypes = map (second (replaceAllTypeVars (zip (map fst args) tys))) instanceTys
 
       -- Create values for the type instance members
-      members <- zip (map typeClassMemberName decls) <$> traverse (memberToValue memberTypes) decls
+      members <- mapM (memberToValue memberTypes) decls
+
+      -- The member names in the order defined in the class declaration
+      let memberOrder = typeClassMemberNames tyDecls
+
+      -- The members of the instance resorted to match the order in the class
+      -- declaration
+      let sortedMembers =
+            map fst .
+            sortBy (compare `on` (flip elemIndex memberOrder . snd)) $
+            zip members (typeClassMemberNames decls)
 
       -- Create the type of the dictionary
       -- The type is a record type, but depending on type instance dependencies, may be constrained.
       -- The dictionary itself is a record literal.
-      let superclasses = superClassDictionaryNames implies `zip`
+      let superclasses =
             [ Abs (Left (Ident C.__unused)) (SuperClassDictionary superclass tyArgs)
             | (Constraint superclass suTyArgs _) <- implies
             , let tyArgs = map (replaceAllTypeVars (zip (map fst args) tys)) suTyArgs
             ]
 
-      let props = Literal $ ObjectLiteral (members ++ superclasses)
-          dictTy = foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
+      let dictTy = foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
           constrainedTy = quantify (if null deps then dictTy else ConstrainedType deps dictTy)
-          dict = TypeClassDictionaryConstructorApp className props
+          dict = foldl App (Constructor (fmap coerceProperName className)) (superclasses ++ sortedMembers)
           result = ValueDeclaration name Private [] (Right (TypedValue True dict constrainedTy))
       return result
 
@@ -332,14 +337,16 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
     return (PositionedValue pos com val)
   memberToValue _ _ = internalError "Invalid declaration in type instance definition"
 
-typeClassMemberName :: Declaration -> String
-typeClassMemberName (TypeDeclaration ident _) = runIdent ident
-typeClassMemberName (ValueDeclaration ident _ _ _) = runIdent ident
-typeClassMemberName (PositionedDeclaration _ _ d) = typeClassMemberName d
-typeClassMemberName _ = internalError "typeClassMemberName: Invalid declaration in type class definition"
+typeClassMemberNames :: [Declaration] -> [Ident]
+typeClassMemberNames = map go
+  where
+  go (TypeDeclaration ident _) = ident
+  go (ValueDeclaration ident _ _ _) = ident
+  go (PositionedDeclaration _ _ d) = go d
+  go d = error $ "Invalid declaration in type class definition: " ++ show d
 
-superClassDictionaryNames :: [Constraint] -> [String]
+superClassDictionaryNames :: [Constraint] -> [Ident]
 superClassDictionaryNames supers =
-  [ C.__superclass_ ++ showQualified runProperName pn ++ "_" ++ show (index :: Integer)
+  [ Ident (C.__superclass_ ++ showQualified runProperName pn ++ "_" ++ show (index :: Integer))
   | (index, Constraint pn _ _) <- zip [0..] supers
   ]

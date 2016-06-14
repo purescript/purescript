@@ -413,11 +413,6 @@ data Expr
   --
   | Do [DoNotationElement]
   -- |
-  -- An application of a typeclass dictionary constructor. The value should be
-  -- an ObjectLiteral.
-  --
-  | TypeClassDictionaryConstructorApp (Qualified (ProperName 'ClassName)) Expr
-  -- |
   -- A placeholder for a type class dictionary to be inserted later. At the end of type checking, these
   -- placeholders will be replaced with actual expressions representing type classes dictionaries which
   -- can be evaluated at runtime. The constructor arguments represent (in order): whether or not to look
@@ -425,10 +420,6 @@ data Expr
   -- instance type, and the type class dictionaries in scope.
   --
   | TypeClassDictionary Constraint (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) TypeClassDictionaryInScope)))
-  -- |
-  -- A typeclass dictionary accessor, the implementation is left unspecified until CoreFn desugaring.
-  --
-  | TypeClassDictionaryAccessor (Qualified (ProperName 'ClassName)) Ident
   -- |
   -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
   --

@@ -326,7 +326,6 @@ checkExhaustiveExpr env mn = onExpr
   onExpr (UnaryMinus e) = UnaryMinus <$> onExpr e
   onExpr (Literal (ArrayLiteral es)) = Literal . ArrayLiteral <$> mapM onExpr es
   onExpr (Literal (ObjectLiteral es)) = Literal . ObjectLiteral <$> mapM (sndM onExpr) es
-  onExpr (TypeClassDictionaryConstructorApp x e) = TypeClassDictionaryConstructorApp x <$> onExpr e
   onExpr (Accessor x e) = Accessor x <$> onExpr e
   onExpr (ObjectUpdate o es) = ObjectUpdate <$> onExpr o <*> mapM (sndM onExpr) es
   onExpr (Abs x e) = Abs x <$> onExpr e
