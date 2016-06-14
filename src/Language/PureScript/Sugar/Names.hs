@@ -329,5 +329,5 @@ renameInModule imports (Module ss coms mn decls exps) =
       _ -> throwUnknown
 
     where
-    positioned err = maybe err (`rethrowWithPosition` err) pos
+    positioned err = maybe err (`warnAndRethrowWithPosition` err) pos
     throwUnknown = throwError . errorMessage . UnknownName . fmap toName $ qname
