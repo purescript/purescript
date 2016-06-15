@@ -4,7 +4,7 @@ A dead code elimination tool for PureScript-style CommonJS modules. This can be 
 
 ## Usage
 
-    psc-bundle FILE (-m|--module ARG) [--main ARG] [--namespace ARG] [--optimize uncurry]
+    psc-bundle FILE (-m|--module ARG) [--main ARG] [--namespace ARG] [--optimize]
 
 Options:
 
