@@ -2,6 +2,7 @@
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
@@ -15,6 +16,8 @@ import           Data.Monoid ((<>))
 import           Data.Version (showVersion)
 
 import           Control.Applicative (many)
+import           Control.Concurrent (forkIO)
+import           Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
 import           Control.Monad
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Trans.Class
@@ -25,6 +28,10 @@ import           Control.Monad.Trans.Reader (ReaderT, runReaderT)
 import qualified Language.PureScript as P
 import           Language.PureScript.Interactive
 
+import           Network.HTTP.Types.Status (status400)
+import qualified Network.Wai as Wai
+import qualified Network.Wai.Handler.Warp as Warp
+import qualified Network.Wai.Handler.WebSockets as WS
 import qualified Network.WebSockets as WS
 
 import qualified Options.Applicative as Opts
@@ -112,28 +119,47 @@ main = getOpt >>= loop
           Left errs -> putStrLn (P.prettyPrintMultipleErrors P.defaultPPEOptions errs) >> exitFailure
           Right (modules, externs, env) -> do
             historyFilename <- getHistoryFilename
+            shutdown <- newEmptyMVar
             let settings = defaultSettings { historyFile = Just historyFilename }
                 initialState = PSCiState [] [] (zip (map snd modules) externs)
                 config = PSCiConfig inputFiles psciInputNodeFlags env
                 runner = flip runReaderT config
                          . flip evalStateT initialState
                          . runInputT (setComplete completion settings)
+
+                handleWebsocket :: WS.PendingConnection -> IO ()
+                handleWebsocket pending = do
+                  putStrLn "Browser is connected."
+                  conn <- WS.acceptRequest pending
+                  runner (go conn)
+
+                shutdownHandler :: IO () -> IO ()
+                shutdownHandler stopServer = void . forkIO $ do
+                  () <- takeMVar shutdown
+                  stopServer
+
+                go :: WS.Connection -> InputT (StateT PSCiState (ReaderT PSCiConfig IO)) ()
+                go conn = do
+                  c <- getCommand (not psciMultiLineMode)
+                  case c of
+                    Left err -> outputStrLn err >> go conn
+                    Right Nothing -> go conn
+                    Right (Just QuitPSCi) -> do
+                      outputStrLn quitMessage
+                      liftIO $ putMVar shutdown ()
+                    Right (Just c') -> do
+                      handleInterrupt (outputStrLn "Interrupted.")
+                                      (withInterrupt (lift (handleCommand conn c')))
+                      go conn
+
+                staticServer :: Wai.Application
+                staticServer _ respond = respond $ Wai.responseLBS status400 [] "Not a WebSocket request"
             putStrLn prologueMessage
             putStrLn "Listening on port 9160. Waiting for connection..."
-            WS.runServer "0.0.0.0" 9160 $ \pending -> do
-              putStrLn "Browser is connected."
-              conn <- WS.acceptRequest pending
-              WS.forkPingThread conn 30
-              runner (go conn)
-      where
-        go :: WS.Connection -> InputT (StateT PSCiState (ReaderT PSCiConfig IO)) ()
-        go conn = do
-          c <- getCommand (not psciMultiLineMode)
-          case c of
-            Left err -> outputStrLn err >> go conn
-            Right Nothing -> go conn
-            Right (Just QuitPSCi) -> outputStrLn quitMessage
-            Right (Just c') -> do
-              handleInterrupt (outputStrLn "Interrupted.")
-                              (withInterrupt (lift (handleCommand conn c')))
-              go conn
+            Warp.runSettings ( Warp.setInstallShutdownHandler shutdownHandler
+                             . Warp.setPort 9160
+                             $ Warp.defaultSettings
+                             ) $
+              WS.websocketsOr WS.defaultConnectionOptions
+                              handleWebsocket
+                              staticServer
