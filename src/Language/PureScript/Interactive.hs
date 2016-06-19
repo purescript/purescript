@@ -20,6 +20,8 @@ import           Prelude.Compat
 
 import           Data.List (intercalate, nub, sort, find, foldl')
 import qualified Data.Map as M
+import           Data.String (fromString)
+import qualified Data.Text as T
 
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.State.Class
@@ -39,8 +41,9 @@ import           Language.PureScript.Interactive.Parser       as Interactive
 import           Language.PureScript.Interactive.Printer      as Interactive
 import           Language.PureScript.Interactive.Types        as Interactive
 
-import           System.Exit
-import           System.Process (readProcessWithExitCode)
+import qualified Network.WebSockets as WS
+
+import           System.FilePath ((</>))
 
 -- | Pretty-print errors
 printErrors :: MonadIO m => P.MultipleErrors -> m ()
@@ -92,19 +95,20 @@ make ms = do
 -- | Performs a PSCi command
 handleCommand
   :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
-  => Command
+  => WS.Connection
+  -> Command
   -> m ()
-handleCommand ShowHelp                  = liftIO $ putStrLn helpMessage
-handleCommand ResetState                = handleResetState
-handleCommand (Expression val)          = handleExpression val
-handleCommand (Import im)               = handleImport im
-handleCommand (Decls l)                 = handleDecls l
-handleCommand (TypeOf val)              = handleTypeOf val
-handleCommand (KindOf typ)              = handleKindOf typ
-handleCommand (BrowseModule moduleName) = handleBrowse moduleName
-handleCommand (ShowInfo QueryLoaded)    = handleShowLoadedModules
-handleCommand (ShowInfo QueryImport)    = handleShowImportedModules
-handleCommand QuitPSCi                  = P.internalError "`handleCommand QuitPSCi` was called. This is a bug."
+handleCommand _ ShowHelp                  = liftIO $ putStrLn helpMessage
+handleCommand _ ResetState                = handleResetState
+handleCommand c (Expression val)          = handleExpression c val
+handleCommand _ (Import im)               = handleImport im
+handleCommand _ (Decls l)                 = handleDecls l
+handleCommand _ (TypeOf val)              = handleTypeOf val
+handleCommand _ (KindOf typ)              = handleKindOf typ
+handleCommand _ (BrowseModule moduleName) = handleBrowse moduleName
+handleCommand _ (ShowInfo QueryLoaded)    = handleShowLoadedModules
+handleCommand _ (ShowInfo QueryImport)    = handleShowImportedModules
+handleCommand _ QuitPSCi                  = P.internalError "`handleCommand QuitPSCi` was called. This is a bug."
 
 -- | Reset the application state
 handleResetState
@@ -127,23 +131,25 @@ handleResetState = do
 -- TODO: factor out the Node process runner, so that we can use PSCi in other settings.
 handleExpression
   :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
-  => P.Expr
+  => WS.Connection
+  -> P.Expr
   -> m ()
-handleExpression val = do
+handleExpression conn val = do
   st <- get
   let m = createTemporaryModule True st val
-  nodeArgs <- asks ((++ [indexFile]) . psciNodeFlags)
+  -- nodeArgs <- asks ((++ [indexFile]) . psciNodeFlags)
   e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
   case e of
     Left errs -> printErrors errs
-    Right _ -> do
-      liftIO $ writeFile indexFile "require('$PSCI')['$main']();"
-      process <- liftIO findNodeProcess
-      result  <- liftIO $ traverse (\node -> readProcessWithExitCode node nodeArgs "") process
-      case result of
-        Just (ExitSuccess,   out, _)   -> liftIO $ putStrLn out
-        Just (ExitFailure _, _,   err) -> liftIO $ putStrLn err
-        Nothing                        -> liftIO $ putStrLn "Couldn't find node.js"
+    Right _ -> liftIO $ do
+      -- liftIO $ writeFile indexFile "require('$PSCI')['$main']();"
+      -- process <- liftIO findNodeProcess
+      -- result  <- liftIO $ traverse (\node -> readProcessWithExitCode node nodeArgs "") process
+      js <- liftIO $ readFile (modulesDir </> "$PSCI" </> "index.js")
+      -- copyFile ".psci_modules/node_modules/$PSCI/index.js" "../psci-experiment/node_modules/$PSCI/index.js"
+      WS.sendTextData conn (fromString js :: T.Text)
+      result <- WS.receiveData conn
+      putStrLn (T.unpack result)
 
 -- |
 -- Takes a list of declarations and updates the environment, then run a make. If the declaration fails,

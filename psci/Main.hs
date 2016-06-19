@@ -25,6 +25,8 @@ import           Control.Monad.Trans.Reader (ReaderT, runReaderT)
 import qualified Language.PureScript as P
 import           Language.PureScript.Interactive
 
+import qualified Network.WebSockets as WS
+
 import qualified Options.Applicative as Opts
 
 import qualified Paths_purescript as Paths
@@ -117,16 +119,21 @@ main = getOpt >>= loop
                          . flip evalStateT initialState
                          . runInputT (setComplete completion settings)
             putStrLn prologueMessage
-            runner go
+            putStrLn "Listening on port 9160. Waiting for connection..."
+            WS.runServer "0.0.0.0" 9160 $ \pending -> do
+              putStrLn "Browser is connected."
+              conn <- WS.acceptRequest pending
+              WS.forkPingThread conn 30
+              runner (go conn)
       where
-        go :: InputT (StateT PSCiState (ReaderT PSCiConfig IO)) ()
-        go = do
+        go :: WS.Connection -> InputT (StateT PSCiState (ReaderT PSCiConfig IO)) ()
+        go conn = do
           c <- getCommand (not psciMultiLineMode)
           case c of
-            Left err -> outputStrLn err >> go
-            Right Nothing -> go
+            Left err -> outputStrLn err >> go conn
+            Right Nothing -> go conn
             Right (Just QuitPSCi) -> outputStrLn quitMessage
             Right (Just c') -> do
               handleInterrupt (outputStrLn "Interrupted.")
-                              (withInterrupt (lift (handleCommand c')))
-              go
+                              (withInterrupt (lift (handleCommand conn c')))
+              go conn

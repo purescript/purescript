@@ -140,7 +140,8 @@ library
                    transformers-compat >= 0.3.0,
                    unordered-containers -any,
                    utf8-string >= 1 && < 2,
-                   vector -any
+                   vector -any,
+                   websockets >= 0.9 && <0.10
 
     exposed-modules: Language.PureScript
                      Language.PureScript.AST
@@ -346,7 +347,8 @@ executable psci
                    process -any,
                    time -any,
                    transformers -any,
-                   transformers-compat -any
+                   transformers-compat -any,
+                   websockets >= 0.9 && <0.10
     main-is: Main.hs
     buildable: True
     hs-source-dirs: psci
