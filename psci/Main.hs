@@ -3,6 +3,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
@@ -13,6 +14,8 @@ import           Prelude ()
 import           Prelude.Compat
 
 import           Data.Monoid ((<>))
+import           Data.String (IsString(..))
+import           Data.Traversable (for)
 import           Data.Version (showVersion)
 
 import           Control.Applicative (many)
@@ -26,9 +29,11 @@ import           Control.Monad.Trans.State.Strict (StateT, evalStateT)
 import           Control.Monad.Trans.Reader (ReaderT, runReaderT)
 
 import qualified Language.PureScript as P
+import qualified Language.PureScript.Bundle as Bundle
 import           Language.PureScript.Interactive
 
-import           Network.HTTP.Types.Status (status400)
+import           Network.HTTP.Types.Header (hContentType)
+import           Network.HTTP.Types.Status (status200, status404)
 import qualified Network.Wai as Wai
 import qualified Network.Wai.Handler.Warp as Warp
 import qualified Network.Wai.Handler.WebSockets as WS
@@ -39,7 +44,9 @@ import qualified Options.Applicative as Opts
 import qualified Paths_purescript as Paths
 
 import           System.Console.Haskeline
+import           System.IO.UTF8 (readUTF8File)
 import           System.Exit
+import           System.FilePath ((</>))
 import           System.FilePath.Glob (glob)
 
 -- | Command line options
@@ -101,6 +108,51 @@ getCommand singleLineMode = handleInterrupt (return (Right Nothing)) $ do
     go :: [String] -> InputT m String
     go ls = maybe (return . unlines $ reverse ls) (go . (:ls)) =<< getInputLine "  "
 
+-- | Make a JavaScript bundle for the browser.
+bundle :: IO (Either Bundle.ErrorMessage String)
+bundle = runExceptT $ do
+  inputFiles <- liftIO (glob (".psci_modules" </> "node_modules" </> "*" </> "*.js"))
+  input <- for inputFiles $ \filename -> do
+    js <- liftIO (readUTF8File filename)
+    mid <- Bundle.guessModuleIdentifier filename
+    length js `seq` return (mid, js)
+  Bundle.bundle input [] Nothing "PSCI"
+
+indexPage :: IsString string => string
+indexPage = fromString . unlines $
+  [ "<!DOCTYPE html>"
+  , "<html>"
+  , "  <head>"
+  , "    <script src=\"js/bundle.js\"></script>"
+  , "    <script>"
+  , "      window.onload = function() {"
+  , "        var socket = new WebSocket(\"ws://0.0.0.0:9160\");"
+  , "        socket.onopen = function () {"
+  , "          console.log(\"Connected\");"
+  , "          socket.onmessage = function (event) {"
+  , "            var replaced = event.data.replace(/require\\(\"[^\"]*\"\\)/g, function(s) {"
+  , "              return \"PSCI['\" + s.substring(12, s.length - 2) + \"']\";"
+  , "            });"
+  , "            var wrapped ="
+  , "                [ 'var module = {};'"
+  , "                , '(function(module) {'"
+  , "                , replaced"
+  , "                , '})(module);'"
+  , "                , 'return module.exports[\"$main\"] && module.exports[\"$main\"]();'"
+  , "                ].join('\\n');"
+  , "            var result = new Function(wrapped)();"
+  , "            console.log(result);"
+  , "            socket.send(JSON.stringify(result));"
+  , "          };"
+  , "        };"
+  , "      };"
+  , "    </script>"
+  , "  </head>"
+  , "  <body>"
+  , "  </body>"
+  , "</html>"
+  ]
+
 -- | Get command line options and drop into the REPL
 main :: IO ()
 main = getOpt >>= loop
@@ -152,14 +204,31 @@ main = getOpt >>= loop
                                       (withInterrupt (lift (handleCommand conn c')))
                       go conn
 
-                staticServer :: Wai.Application
-                staticServer _ respond = respond $ Wai.responseLBS status400 [] "Not a WebSocket request"
+                staticServer :: String -> Wai.Application
+                staticServer js req respond
+                  | [] <- Wai.pathInfo req =
+                      respond $ Wai.responseLBS status200
+                                                [(hContentType, "text/html")]
+                                                indexPage
+                  | ["js", "bundle.js"] <- Wai.pathInfo req =
+                      respond $ Wai.responseLBS status200
+                                                [(hContentType, "application/javascript")]
+                                                (fromString js)
+                  | otherwise =
+                      respond $ Wai.responseLBS status404 [] "Not found"
             putStrLn prologueMessage
-            putStrLn "Listening on port 9160. Waiting for connection..."
-            Warp.runSettings ( Warp.setInstallShutdownHandler shutdownHandler
-                             . Warp.setPort 9160
-                             $ Warp.defaultSettings
-                             ) $
-              WS.websocketsOr WS.defaultConnectionOptions
-                              handleWebsocket
-                              staticServer
+            putStrLn "Bundling Javascript..."
+            ejs <- bundle
+            case ejs of
+              Left err -> do
+                putStrLn (unlines (Bundle.printErrorMessage err))
+                exitFailure
+              Right js -> do
+                putStrLn "Listening on port 9160. Waiting for connection..."
+                Warp.runSettings ( Warp.setInstallShutdownHandler shutdownHandler
+                                 . Warp.setPort 9160
+                                 $ Warp.defaultSettings
+                                 ) $
+                  WS.websocketsOr WS.defaultConnectionOptions
+                                  handleWebsocket
+                                  (staticServer js)
