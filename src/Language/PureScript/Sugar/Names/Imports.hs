@@ -207,6 +207,7 @@ resolveImport importModule exps imps impQual = resolveByType
     return $ imp { importedTypeClasses = typeClasses' }
   importRef _ _ TypeInstanceRef{} = internalError "TypeInstanceRef in importRef"
   importRef _ _ ModuleRef{} = internalError "ModuleRef in importRef"
+  importRef _ _ ReExportRef{} = internalError "ReExportRef in importRef"
 
   -- Find all exported data constructors for a given type
   allExportedDataConstructors
@@ -218,7 +219,7 @@ resolveImport importModule exps imps impQual = resolveByType
 
   -- Add something to an import resolution list
   updateImports
-    :: (Ord a)
+    :: Ord a
     => M.Map (Qualified a) [ImportRecord a]
     -> M.Map a b
     -> (b -> ModuleName)

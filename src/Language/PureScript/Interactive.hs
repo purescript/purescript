@@ -1,8 +1,6 @@
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DataKinds #-}
 
@@ -19,6 +17,7 @@ import           Prelude ()
 import           Prelude.Compat
 
 import           Data.List (intercalate, nub, sort, find, foldl')
+import           Data.Maybe (mapMaybe)
 import qualified Data.Map as M
 
 import           Control.Monad.IO.Class (MonadIO, liftIO)
@@ -188,17 +187,27 @@ handleShowImportedModules = do
   showDeclType P.Implicit = ""
   showDeclType (P.Explicit refs) = refsList refs
   showDeclType (P.Hiding refs) = " hiding " ++ refsList refs
-  refsList refs = " (" ++ commaList (map showRef refs) ++ ")"
+  refsList refs = " (" ++ commaList (mapMaybe showRef refs) ++ ")"
 
-  showRef :: P.DeclarationRef -> String
-  showRef (P.TypeRef pn dctors) = N.runProperName pn ++ "(" ++ maybe ".." (commaList . map N.runProperName) dctors ++ ")"
-  showRef (P.TypeOpRef op) = "type " ++ N.showOp op
-  showRef (P.ValueRef ident) = N.runIdent ident
-  showRef (P.ValueOpRef op) = N.showOp op
-  showRef (P.TypeClassRef pn) = "class " ++ N.runProperName pn
-  showRef (P.TypeInstanceRef ident) = N.runIdent ident
-  showRef (P.ModuleRef name) = "module " ++ N.runModuleName name
-  showRef (P.PositionedDeclarationRef _ _ ref) = showRef ref
+  showRef :: P.DeclarationRef -> Maybe String
+  showRef (P.TypeRef pn dctors) =
+    Just $ N.runProperName pn ++ "(" ++ maybe ".." (commaList . map N.runProperName) dctors ++ ")"
+  showRef (P.TypeOpRef op) =
+    Just $ "type " ++ N.showOp op
+  showRef (P.ValueRef ident) =
+    Just $ N.runIdent ident
+  showRef (P.ValueOpRef op) =
+    Just $ N.showOp op
+  showRef (P.TypeClassRef pn) =
+    Just $ "class " ++ N.runProperName pn
+  showRef (P.TypeInstanceRef ident) =
+    Just $ N.runIdent ident
+  showRef (P.ModuleRef name) =
+    Just $ "module " ++ N.runModuleName name
+  showRef (P.ReExportRef _ _) =
+    Nothing
+  showRef (P.PositionedDeclarationRef _ _ ref) =
+    showRef ref
 
   commaList :: [String] -> String
   commaList = intercalate ", "

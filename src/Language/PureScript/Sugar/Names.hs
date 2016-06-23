@@ -10,7 +10,7 @@ module Language.PureScript.Sugar.Names
 
 import Prelude.Compat
 
-import Control.Arrow (first, second)
+import Control.Arrow (first)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Lazy
@@ -84,16 +84,19 @@ desugarImportsWithEnv externs modules = do
       toExportedType _ = Nothing
 
     exportedTypeOps :: M.Map (OpName 'TypeOpName) ModuleName
-    exportedTypeOps = M.fromList $ (, efModuleName) <$> mapMaybe getTypeOpRef efExports
+    exportedTypeOps = exportedRefs getTypeOpRef
 
     exportedTypeClasses :: M.Map (ProperName 'ClassName) ModuleName
-    exportedTypeClasses = M.fromList $ (, efModuleName) <$> mapMaybe getTypeClassRef efExports
+    exportedTypeClasses = exportedRefs getTypeClassRef
 
     exportedValues :: M.Map Ident ModuleName
-    exportedValues = M.fromList $ (, efModuleName) <$> mapMaybe getValueRef efExports
+    exportedValues = exportedRefs getValueRef
 
     exportedValueOps :: M.Map (OpName 'ValueOpName) ModuleName
-    exportedValueOps = M.fromList $ (, efModuleName) <$> mapMaybe getValueOpRef efExports
+    exportedValueOps = exportedRefs getValueOpRef
+
+    exportedRefs :: Ord a => (DeclarationRef -> Maybe a) -> M.Map a ModuleName
+    exportedRefs f = M.fromList $ (, efModuleName) <$> mapMaybe f efExports
 
   updateEnv :: ([Module], Env) -> Module -> m ([Module], Env)
   updateEnv (ms, env) m@(Module ss _ mn _ refs) =
@@ -110,9 +113,10 @@ desugarImportsWithEnv externs modules = do
   renameInModule' env m@(Module _ _ mn _ _) =
     warnAndRethrow (addHint (ErrorInModule mn)) $ do
       let (_, imps, exps) = fromMaybe (internalError "Module is missing in renameInModule'") $ M.lookup mn env
-      (m', used) <- flip runStateT M.empty $ renameInModule imps (elaborateExports exps m)
-      lintImports m' env used
-      return m'
+      (m', used) <- flip runStateT M.empty $ renameInModule imps m
+      let m'' = elaborateExports exps m'
+      lintImports m'' env used
+      return m''
 
 -- |
 -- Make all exports for a module explicit. This may still effect modules that
@@ -121,24 +125,25 @@ desugarImportsWithEnv externs modules = do
 --
 elaborateExports :: Exports -> Module -> Module
 elaborateExports exps (Module ss coms mn decls refs) =
-  Module ss coms mn decls $
-    Just $ map (\(ctor, dctors) -> TypeRef ctor (Just dctors)) myTypes ++
-           map TypeOpRef (my exportedTypeOps) ++
-           map TypeClassRef (my exportedTypeClasses) ++
-           map ValueRef (my exportedValues) ++
-           map ValueOpRef (my exportedValueOps) ++
-           maybe [] (filter isModuleRef) refs
+  Module ss coms mn decls $ Just
+    $ elaboratedTypeRefs
+    ++ go TypeOpRef exportedTypeOps
+    ++ go TypeClassRef exportedTypeClasses
+    ++ go ValueRef exportedValues
+    ++ go ValueOpRef exportedValueOps
+    ++ maybe [] (filter isModuleRef) refs
   where
-  -- Extracts a list of values from the exports and filters out any values that
-  -- are re-exports from other modules.
-  my :: (Exports -> M.Map a ModuleName) -> [a]
-  my = map fst <$> filt (== mn)
 
-  myTypes :: [(ProperName 'TypeName, [ProperName 'ConstructorName])]
-  myTypes = second fst <$> filt ((== mn) . snd) exportedTypes
+  elaboratedTypeRefs :: [DeclarationRef]
+  elaboratedTypeRefs =
+    flip map (M.toList (exportedTypes exps)) $ \(tctor, (dctors, mn')) ->
+      let ref = TypeRef tctor (Just dctors)
+      in if mn == mn' then ref else ReExportRef mn' ref
 
-  filt :: (b -> Bool) -> (Exports -> M.Map a b) -> [(a, b)]
-  filt predicate f = M.toList $ predicate `M.filter` f exps
+  go :: (a -> DeclarationRef) -> (Exports -> M.Map a ModuleName) -> [DeclarationRef]
+  go toRef select =
+    flip map (M.toList (select exps)) $ \(export, mn') ->
+      if mn == mn' then toRef export else ReExportRef mn' (toRef export)
 
 -- |
 -- Replaces all local names with qualified names within a module and checks that all existing
