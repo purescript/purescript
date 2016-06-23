@@ -27,20 +27,20 @@ import           System.FSNotify
 
 -- | Reloads an ExternsFile from Disc. If the Event indicates the ExternsFile
 -- was deleted we don't do anything.
-reloadFile :: TVar PscIdeState -> Event -> IO ()
+reloadFile :: TVar IdeState -> Event -> IO ()
 reloadFile _ Removed{} = pure ()
-reloadFile stateVar ev = do
+reloadFile ref ev = do
   let fp = eventPath ev
   ef' <- runExceptT (readExternFile fp)
   case ef' of
     Left _ -> pure ()
     Right ef -> do
-      atomically (insertModuleSTM stateVar ef)
+      atomically (insertExternsSTM ref ef *> populateStage2STM ref)
       putStrLn ("Reloaded File at: " ++ fp)
 
 -- | Installs filewatchers for the given directory and reloads ExternsFiles when
 -- they change on disc
-watcher :: TVar PscIdeState -> FilePath -> IO ()
+watcher :: TVar IdeState -> FilePath -> IO ()
 watcher stateVar fp =
   withManagerConf (defaultConfig { confDebounce = NoDebounce }) $ \mgr -> do
     _ <- watchTree mgr fp

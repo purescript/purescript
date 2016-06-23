@@ -181,7 +181,7 @@ addImplicitImport' imports mn =
 -- @import Prelude (bind)@ in the file File.purs returns @["import Prelude
 -- (bind, unit)"]@
 addExplicitImport :: (MonadIO m, MonadError PscIdeError m) =>
-                     FilePath -> ExternDecl -> P.ModuleName -> m [Text]
+                     FilePath -> IdeDeclaration -> P.ModuleName -> m [Text]
 addExplicitImport fp decl moduleName = do
   (mn, pre, imports, post) <- parseImportsFromFile fp
   let newImportSection =
@@ -192,7 +192,7 @@ addExplicitImport fp decl moduleName = do
         else addExplicitImport' decl moduleName imports
   pure (pre ++ prettyPrintImportSection newImportSection ++ post)
 
-addExplicitImport' :: ExternDecl -> P.ModuleName -> [Import] -> [Import]
+addExplicitImport' :: IdeDeclaration -> P.ModuleName -> [Import] -> [Import]
 addExplicitImport' decl moduleName imports =
   let
     isImplicitlyImported =
@@ -207,28 +207,28 @@ addExplicitImport' decl moduleName imports =
     then imports
     else updateAtFirstOrPrepend matches (insertDeclIntoImport decl) freshImport imports
   where
-    refFromDeclaration (TypeClassDeclaration n) =
+    refFromDeclaration (IdeTypeClass n) =
       P.TypeClassRef n
-    refFromDeclaration (DataConstructor n tn _) =
+    refFromDeclaration (IdeDataConstructor n tn _) =
       P.TypeRef tn (Just [P.ProperName (T.unpack n)])
-    refFromDeclaration (TypeDeclaration n _) =
+    refFromDeclaration (IdeType n _) =
       P.TypeRef n (Just [])
-    refFromDeclaration (ValueOperator op _ _ _) =
+    refFromDeclaration (IdeValueOperator op _ _ _) =
       P.ValueOpRef op
-    refFromDeclaration (TypeOperator op _ _ _) =
+    refFromDeclaration (IdeTypeOperator op _ _ _) =
       P.TypeOpRef op
     refFromDeclaration d =
-      P.ValueRef $ P.Ident $ T.unpack (identifierFromExternDecl d)
+      P.ValueRef $ P.Ident $ T.unpack (identifierFromIdeDeclaration d)
 
     -- | Adds a declaration to an import:
     -- TypeDeclaration "Maybe" + Data.Maybe (maybe) -> Data.Maybe(Maybe, maybe)
-    insertDeclIntoImport :: ExternDecl -> Import -> Import
+    insertDeclIntoImport :: IdeDeclaration -> Import -> Import
     insertDeclIntoImport decl' (Import mn (P.Explicit refs) Nothing) =
       Import mn (P.Explicit (insertDeclIntoRefs decl' refs)) Nothing
     insertDeclIntoImport _ is = is
 
-    insertDeclIntoRefs :: ExternDecl -> [P.DeclarationRef] -> [P.DeclarationRef]
-    insertDeclIntoRefs (DataConstructor dtor tn _) refs =
+    insertDeclIntoRefs :: IdeDeclaration -> [P.DeclarationRef] -> [P.DeclarationRef]
+    insertDeclIntoRefs (IdeDataConstructor dtor tn _) refs =
       let
         dtor' = P.ProperName (T.unpack dtor)
       in
@@ -263,14 +263,14 @@ updateAtFirstOrPrepend p t d l =
 --
 -- * If more than one possible imports are found, reports the possibilities as a
 -- list of completions.
-addImportForIdentifier :: (PscIde m, MonadError PscIdeError m)
+addImportForIdentifier :: (Ide m, MonadError PscIdeError m)
                           => FilePath -- ^ The Sourcefile to read from
                           -> Text     -- ^ The identifier to import
                           -> [Filter] -- ^ Filters to apply before searching for
                                       -- the identifier
                           -> m (Either [Match] [Text])
 addImportForIdentifier fp ident filters = do
-  modules <- getAllModulesWithReexports
+  modules <- getAllModules2 Nothing
   case getExactMatches ident filters modules of
     [] ->
       throwError (NotFound "Couldn't find the given identifier. \
@@ -279,7 +279,7 @@ addImportForIdentifier fp ident filters = do
     -- Only one match was found for the given identifier, so we can insert it
     -- right away
     [Match m decl] ->
-      Right <$> addExplicitImport fp decl (P.moduleNameFromString (T.unpack m))
+      Right <$> addExplicitImport fp decl m
 
     -- This case comes up for newtypes and dataconstructors. Because values and
     -- types don't share a namespace we can get multiple matches from the same
@@ -296,7 +296,7 @@ addImportForIdentifier fp ident filters = do
         -- dataconstructor as that will give us an unnecessary import warning at
         -- worst
         Just decl ->
-          Right <$> addExplicitImport fp decl (P.moduleNameFromString (T.unpack m1))
+          Right <$> addExplicitImport fp decl m1
         -- Here we need the user to specify whether he wanted a dataconstructor
         -- or a type
         Nothing ->
@@ -307,9 +307,9 @@ addImportForIdentifier fp ident filters = do
     xs ->
       pure $ Left xs
     where
-      decideRedundantCase dtor@(DataConstructor _ t _) (TypeDeclaration t' _) =
+      decideRedundantCase dtor@(IdeDataConstructor _ t _) (IdeType t' _) =
         if t == t' then Just dtor else Nothing
-      decideRedundantCase TypeDeclaration{} ts@TypeSynonymDeclaration{} =
+      decideRedundantCase IdeType{} ts@IdeTypeSynonym{} =
         Just ts
       decideRedundantCase _ _ = Nothing
 

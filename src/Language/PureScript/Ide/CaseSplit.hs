@@ -53,7 +53,7 @@ explicitAnnotations = WildcardAnnotations True
 noAnnotations :: WildcardAnnotations
 noAnnotations = WildcardAnnotations False
 
-caseSplit :: (PscIde m, MonadError PscIdeError m) =>
+caseSplit :: (Ide m, MonadError PscIdeError m) =>
              Text -> m [Constructor]
 caseSplit q = do
   type' <- parseType' (T.unpack q)
@@ -63,7 +63,7 @@ caseSplit q = do
   let appliedCtors = map (second (map applyTypeVars)) ctors
   pure appliedCtors
 
-findTypeDeclaration :: (PscIde m, MonadError PscIdeError m) =>
+findTypeDeclaration :: (Ide m, MonadError PscIdeError m) =>
                          P.ProperName 'P.TypeName -> m ExternsDeclaration
 findTypeDeclaration q = do
   efs <- getExternFiles
@@ -113,14 +113,14 @@ makePattern t x y wsa = makePattern' (T.take x t) (T.drop y t)
   where
     makePattern' lhs rhs = map (\ctor -> lhs <> prettyCtor wsa ctor <> rhs)
 
-addClause :: Text -> WildcardAnnotations -> [Text]
-addClause s wca =
-  let (fName, fType) = parseTypeDeclaration' (T.unpack s)
-      (args, _) = splitFunctionType fType
+addClause :: (MonadError PscIdeError m) => Text -> WildcardAnnotations -> m [Text]
+addClause s wca = do
+  (fName, fType) <- parseTypeDeclaration' (T.unpack s)
+  let (args, _) = splitFunctionType fType
       template = runIdentT fName <> " " <>
         T.unwords (map (prettyPrintWildcard wca) args) <>
         " = ?" <> (T.strip . runIdentT $ fName)
-  in [s, template]
+  pure [s, template]
 
 parseType' :: (MonadError PscIdeError m) =>
               String -> m P.Type
@@ -131,15 +131,18 @@ parseType' s =
       throwError (GeneralError ("Parsing the splittype failed with:"
                                 ++ show err))
 
-parseTypeDeclaration' :: String -> (P.Ident, P.Type)
+parseTypeDeclaration' :: (MonadError PscIdeError m) => String -> m (P.Ident, P.Type)
 parseTypeDeclaration' s =
   let x = do
         ts <- P.lex "" s
         P.runTokenParser "" (P.parseDeclaration <* Parsec.eof) ts
   in
     case unwrapPositioned <$> x of
-      Right (P.TypeDeclaration i t) -> (i, t)
-      y -> error (show y)
+      Right (P.TypeDeclaration i t) -> pure (i, t)
+      Right _ -> throwError (GeneralError "Found a non-type-declaration")
+      Left err ->
+        throwError (GeneralError ("Parsing the typesignature failed with: "
+                                ++ show err))
 
 splitFunctionType :: P.Type -> ([P.Type], P.Type)
 splitFunctionType t = (arguments, returns)

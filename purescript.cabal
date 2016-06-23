@@ -101,6 +101,7 @@ library
                    aeson >= 0.8 && < 0.12,
                    aeson-better-errors >= 0.8,
                    ansi-terminal >= 0.6.2 && < 0.7,
+                   async,
                    base-compat >=0.6.0,
                    bower-json >= 0.8,
                    boxes >= 0.1.4 && < 0.2.0,
@@ -251,22 +252,23 @@ library
                      Language.PureScript.Publish.BoxesHelpers
 
                      Language.PureScript.Ide
+                     Language.PureScript.Ide.CaseSplit
                      Language.PureScript.Ide.Command
+                     Language.PureScript.Ide.Completion
+                     Language.PureScript.Ide.Conversions
                      Language.PureScript.Ide.Externs
                      Language.PureScript.Ide.Error
-                     Language.PureScript.Ide.Pursuit
-                     Language.PureScript.Ide.Completion
-                     Language.PureScript.Ide.Matcher
-                     Language.PureScript.Ide.Filter
-                     Language.PureScript.Ide.Types
-                     Language.PureScript.Ide.State
-                     Language.PureScript.Ide.CaseSplit
-                     Language.PureScript.Ide.SourceFile
-                     Language.PureScript.Ide.Watcher
-                     Language.PureScript.Ide.Reexports
                      Language.PureScript.Ide.Imports
-                     Language.PureScript.Ide.Util
+                     Language.PureScript.Ide.Filter
+                     Language.PureScript.Ide.Matcher
+                     Language.PureScript.Ide.Pursuit
                      Language.PureScript.Ide.Rebuild
+                     Language.PureScript.Ide.Reexports
+                     Language.PureScript.Ide.SourceFile
+                     Language.PureScript.Ide.State
+                     Language.PureScript.Ide.Types
+                     Language.PureScript.Ide.Util
+                     Language.PureScript.Ide.Watcher
 
                      Language.PureScript.Interactive
                      Language.PureScript.Interactive.Types
@@ -498,6 +500,5 @@ test-suite tests
                    Language.PureScript.Ide.MatcherSpec
                    Language.PureScript.Ide.RebuildSpec
                    Language.PureScript.Ide.ReexportsSpec
-                   Language.PureScript.IdeSpec
     buildable: True
     hs-source-dirs: tests

@@ -13,7 +13,7 @@ shouldBeFailure = shouldBe False . Integration.resultIsSuccess
 spec :: Spec
 spec = before_ Integration.reset . describe "Rebuilding single modules" $ do
     it "rebuilds a correct module without dependencies successfully" $ do
-      _ <- Integration.loadModuleWithDeps "RebuildSpecSingleModule"
+      _ <- Integration.loadModule "RebuildSpecSingleModule"
       pdir <- Integration.projectDirectory
       let file = pdir </> "src" </> "RebuildSpecSingleModule.purs"
       Integration.rebuildModule file >>= shouldBeSuccess
@@ -22,12 +22,12 @@ spec = before_ Integration.reset . describe "Rebuilding single modules" $ do
       let file = pdir </> "src" </> "RebuildSpecSingleModule.fail"
       Integration.rebuildModule file >>= shouldBeFailure
     it "rebuilds a correct module with its dependencies successfully" $ do
-      _ <- Integration.loadModuleWithDeps "RebuildSpecWithDeps"
+      _ <- Integration.loadModules ["RebuildSpecWithDeps", "RebuildSpecDep"]
       pdir <- Integration.projectDirectory
       let file = pdir </> "src" </> "RebuildSpecWithDeps.purs"
       Integration.rebuildModule file >>= shouldBeSuccess
     it "rebuilds a correct module that has reverse dependencies" $ do
-      _ <- Integration.loadModuleWithDeps "RebuildSpecWithDeps"
+      _ <- Integration.loadModule "RebuildSpecWithDeps"
       pdir <- Integration.projectDirectory
       let file = pdir </> "src" </> "RebuildSpecDep.purs"
       Integration.rebuildModule file >>= shouldBeSuccess
@@ -37,7 +37,7 @@ spec = before_ Integration.reset . describe "Rebuilding single modules" $ do
       let file = pdir </> "src" </> "RebuildSpecWithDeps.purs"
       Integration.rebuildModule file >>= shouldBeFailure
     it "rebuilds a correct module with a foreign file" $ do
-      _ <- Integration.loadModuleWithDeps "RebuildSpecWithForeign"
+      _ <- Integration.loadModule "RebuildSpecWithForeign"
       pdir <- Integration.projectDirectory
       let file = pdir </> "src" </> "RebuildSpecWithForeign.purs"
       Integration.rebuildModule file >>= shouldBeSuccess

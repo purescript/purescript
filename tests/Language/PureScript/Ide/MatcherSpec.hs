@@ -10,14 +10,14 @@ import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Types
 import           Test.Hspec
 
-value :: Text -> ExternDecl
-value s = ValueDeclaration s $ P.TypeWildcard $ P.SourceSpan "" (P.SourcePos 0 0) (P.SourcePos 0 0)
+value :: Text -> IdeDeclaration
+value s = IdeValue s $ P.TypeWildcard $ P.SourceSpan "" (P.SourcePos 0 0) (P.SourcePos 0 0)
 
 completions :: [Match]
 completions =
-  [ Match "" (value "firstResult")
-  , Match "" (value "secondResult")
-  , Match "" (value "fiult")
+  [ Match (P.moduleNameFromString "Match") (value "firstResult")
+  , Match (P.moduleNameFromString "Match") (value "secondResult")
+  , Match (P.moduleNameFromString "Match") (value "fiult")
   ]
 
 mkResult :: [Int] -> [Match]
@@ -27,7 +27,7 @@ runFlex :: Text -> [Match]
 runFlex s = runMatcher (flexMatcher s) completions
 
 setup :: IO ()
-setup = reset *> void (loadModuleWithDeps "Main")
+setup = reset *> void loadAll
 
 spec :: Spec
 spec = do
@@ -45,4 +45,4 @@ spec = do
         cs `shouldBe` []
       it "matches on equality" $ do
         cs <- getFlexCompletions "const"
-        cs `shouldBe` [("Main", "const", "forall a b. a -> b -> a")]
+        cs `shouldBe` [("MatcherSpec", "const", "forall a b. a -> b -> a")]

@@ -29,12 +29,9 @@ import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Types
 
 data Command
-    = Load
-      { loadModules      :: [ModuleIdent]
-      , loadDependencies :: [ModuleIdent]
-      }
+    = Load [P.ModuleName]
     | Type
-      { typeSearch        :: DeclIdent
+      { typeSearch        :: Text
       , typeFilters       :: [Filter]
       , typeCurrentModule :: Maybe P.ModuleName
       }
@@ -68,7 +65,7 @@ data Command
 
 data ImportCommand
   = AddImplicitImport P.ModuleName
-  | AddImportForIdentifier DeclIdent
+  | AddImportForIdentifier Text
   deriving (Show, Eq)
 
 instance FromJSON ImportCommand where
@@ -103,11 +100,9 @@ instance FromJSON Command where
       "load" -> do
         params' <- o .:? "params"
         case params' of
-          Nothing -> pure (Load [] [])
+          Nothing -> pure (Load [])
           Just params ->
-            Load
-              <$> params .:? "modules" .!= []
-              <*> params .:? "dependencies" .!= []
+            Load <$> (map P.moduleNameFromString <$> params .:? "modules" .!= [])
       "type" -> do
         params <- o .: "params"
         Type
