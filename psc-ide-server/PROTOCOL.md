@@ -14,24 +14,20 @@ to detect all the compiled modules in your project and load them.
 
 **Params:**
  - `modules :: (optional) [ModuleName]`: A list of modules to load.
-  psc-ide-server will try to parse all the declarations in these modules
- - `dependencies :: (optional) [ModuleName]`: A list of modules to load 
-  including their dependencies. In contrast to the `module` field, all the
-  imports in these Modules will also be loaded.
+ psc-ide-server will try to parse all the declarations in these modules
 
 ```json
 {
   "command": "load",
   "params": (optional) {
-    "modules": (optional)["Module.Name1", "Module.Name2"],
-    "dependencies": (optional)["Module.Name3"]
+    "modules": (optional)["Module.Name1", "Module.Name2"]
   }
 }
 ```
 
 **Result:**
 
-The Load Command returns a string.
+The Load Command returns a string with a summary about the loading process.
 
 ### Type
 The `type` command looks up the type for a given identifier.
