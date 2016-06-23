@@ -123,8 +123,6 @@ handleResetState = do
     Right (modules, externs) -> modify (updateLoadedExterns (const (zip modules externs)))
 
 -- | Takes a value expression and evaluates it with the current state.
---
--- TODO: factor out the Node process runner, so that we can use PSCi in other settings.
 handleExpression
   :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
   => (String -> m ())
@@ -133,7 +131,6 @@ handleExpression
 handleExpression evaluate val = do
   st <- get
   let m = createTemporaryModule True st val
-  -- nodeArgs <- asks ((++ [indexFile]) . psciNodeFlags)
   e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
   case e of
     Left errs -> printErrors errs
