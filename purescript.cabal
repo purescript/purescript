@@ -345,6 +345,7 @@ executable psci
                    optparse-applicative >= 0.12.1,
                    parsec -any,
                    process -any,
+                   stm >= 0.2.4.0,
                    text -any,
                    time -any,
                    transformers -any,

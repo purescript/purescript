@@ -22,6 +22,7 @@ import           Data.Version (showVersion)
 import           Control.Applicative (many)
 import           Control.Concurrent (forkIO)
 import           Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
+import           Control.Concurrent.STM (atomically, newTVarIO, writeTVar, readTVarIO)
 import           Control.Monad
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Trans.Class
@@ -33,8 +34,9 @@ import qualified Language.PureScript as P
 import qualified Language.PureScript.Bundle as Bundle
 import           Language.PureScript.Interactive
 
-import           Network.HTTP.Types.Header (hContentType)
-import           Network.HTTP.Types.Status (status200, status404)
+import           Network.HTTP.Types.Header (hContentType, hCacheControl,
+                                            hPragma, hExpires)
+import           Network.HTTP.Types.Status (status200, status404, status503)
 import qualified Network.Wai as Wai
 import qualified Network.Wai.Handler.Warp as Warp
 import qualified Network.Wai.Handler.WebSockets as WS
@@ -119,35 +121,74 @@ bundle = runExceptT $ do
     length js `seq` return (mid, js)
   Bundle.bundle input [] Nothing "PSCI"
 
+-- TODO: use JMacro here?
+indexJS :: IsString string => string
+indexJS = fromString . unlines $
+  [ "var get = function get(uri, callback, onError) {"
+  , "  var request = new XMLHttpRequest();"
+  , "  request.addEventListener('load', function() {"
+  , "    callback(request.responseText);"
+  , "  });"
+  , "  request.addEventListener('error', onError);"
+  , "  request.open('GET', uri);"
+  , "  request.send();"
+  , "};"
+  , "var evaluate = function evaluate(js) {"
+  , "  var buffer = [];"
+  , "  console.log = function(s) {"
+  , "    // Push log output into a temporary buffer"
+  , "    // which will be returned to PSCi."
+  , "    buffer.push(s);"
+  , "  };"
+  , "  // Replace any require(...) statements with lookups on the PSCI object."
+  , "  var replaced = js.replace(/require\\(\"[^\"]*\"\\)/g, function(s) {"
+  , "    return \"PSCI['\" + s.substring(12, s.length - 2) + \"']\";"
+  , "  });"
+  , "  // Wrap the module and evaluate it."
+  , "  var wrapped ="
+  , "      [ 'var module = {};'"
+  , "      , '(function(module) {'"
+  , "      , replaced"
+  , "      , '})(module);'"
+  , "      , 'return module.exports[\"$main\"] && module.exports[\"$main\"]();'"
+  , "      ].join('\\n');"
+  , "  new Function(wrapped)();"
+  , "  return buffer.join('\\n');"
+  , "};"
+  , "window.onload = function() {"
+  , "  var socket = new WebSocket('ws://0.0.0.0:9160');"
+  , "  var reload = function reload() {"
+  , "    get('js/latest.js', function(response) {"
+  , "      try {"
+  , "        var result = evaluate(response);"
+  , "        socket.send(result);"
+  , "      } catch (ex) {"
+  , "        socket.send(ex.stack);"
+  , "      }"
+  , "    }, function(err) {"
+  , "      socket.send('Error sending JavaScript');"
+  , "    });"
+  , "  };"
+  , "  socket.onopen = function () {"
+  , "    console.log('Connected');"
+  , "    socket.onmessage = function (event) {"
+  , "      switch (event.data) {"
+  , "        case 'reload':"
+  , "          reload();"
+  , "          break;"
+  , "      }"
+  , "    };"
+  , "  };"
+  , "};"
+  ]
+
 indexPage :: IsString string => string
 indexPage = fromString . unlines $
   [ "<!DOCTYPE html>"
   , "<html>"
   , "  <head>"
-  , "    <script src=\"js/bundle.js\"></script>"
-  , "    <script>"
-  , "      window.onload = function() {"
-  , "        var socket = new WebSocket(\"ws://0.0.0.0:9160\");"
-  , "        socket.onopen = function () {"
-  , "          console.log(\"Connected\");"
-  , "          socket.onmessage = function (event) {"
-  , "            var replaced = event.data.replace(/require\\(\"[^\"]*\"\\)/g, function(s) {"
-  , "              return \"PSCI['\" + s.substring(12, s.length - 2) + \"']\";"
-  , "            });"
-  , "            var wrapped ="
-  , "                [ 'var module = {};'"
-  , "                , '(function(module) {'"
-  , "                , replaced"
-  , "                , '})(module);'"
-  , "                , 'return module.exports[\"$main\"] && module.exports[\"$main\"]();'"
-  , "                ].join('\\n');"
-  , "            var result = new Function(wrapped)();"
-  , "            console.log(result);"
-  , "            socket.send(JSON.stringify(result));"
-  , "          };"
-  , "        };"
-  , "      };"
-  , "    </script>"
+  , "    <script src='js/bundle.js'></script>"
+  , "    <script src='js/index.js'></script>"
   , "  </head>"
   , "  <body>"
   , "  </body>"
@@ -173,6 +214,7 @@ main = getOpt >>= loop
           Right (modules, externs, env) -> do
             historyFilename <- getHistoryFilename
             shutdown <- newEmptyMVar
+            latestVar <- newTVarIO Nothing
             let settings = defaultSettings { historyFile = Just historyFilename }
                 initialState = PSCiState [] [] (zip (map snd modules) externs)
                 config = PSCiConfig inputFiles psciInputNodeFlags env
@@ -212,7 +254,9 @@ main = getOpt >>= loop
                   -- result  <- liftIO $ traverse (\node -> readProcessWithExitCode node nodeArgs "") process
 
                   -- copyFile ".psci_modules/node_modules/$PSCI/index.js" "../psci-experiment/node_modules/$PSCI/index.js"
-                  WS.sendTextData conn (fromString js :: Text)
+
+                  _ <- atomically (writeTVar latestVar (Just js))
+                  WS.sendTextData conn ("reload" :: Text)
                   result <- WS.receiveData conn
                   putStrLn (unpack result)
 
@@ -222,6 +266,23 @@ main = getOpt >>= loop
                       respond $ Wai.responseLBS status200
                                                 [(hContentType, "text/html")]
                                                 indexPage
+                  | ["js", "index.js"] <- Wai.pathInfo req =
+                      respond $ Wai.responseLBS status200
+                                                [(hContentType, "application/javascript")]
+                                                indexJS
+                  | ["js", "latest.js"] <- Wai.pathInfo req = do
+                      may <- readTVarIO latestVar
+                      case may of
+                        Nothing ->
+                          respond $ Wai.responseLBS status503 [] "Service not available"
+                        Just latest ->
+                          respond $ Wai.responseLBS status200
+                                                    [ (hContentType, "application/javascript")
+                                                    , (hCacheControl, "no-cache, no-store, must-revalidate")
+                                                    , (hPragma, "no-cache")
+                                                    , (hExpires, "0")
+                                                    ]
+                                                    (fromString latest)
                   | ["js", "bundle.js"] <- Wai.pathInfo req =
                       respond $ Wai.responseLBS status200
                                                 [(hContentType, "application/javascript")]
