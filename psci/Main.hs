@@ -15,6 +15,7 @@ import           Prelude.Compat
 
 import           Data.Monoid ((<>))
 import           Data.String (IsString(..))
+import           Data.Text (Text, unpack)
 import           Data.Traversable (for)
 import           Data.Version (showVersion)
 
@@ -22,7 +23,7 @@ import           Control.Applicative (many)
 import           Control.Concurrent (forkIO)
 import           Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
 import           Control.Monad
-import           Control.Monad.IO.Class (liftIO)
+import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import           Control.Monad.Trans.State.Strict (StateT, evalStateT)
@@ -201,8 +202,19 @@ main = getOpt >>= loop
                       liftIO $ putMVar shutdown ()
                     Right (Just c') -> do
                       handleInterrupt (outputStrLn "Interrupted.")
-                                      (withInterrupt (lift (handleCommand conn c')))
+                                      (withInterrupt (lift (handleCommand (evaluate conn) c')))
                       go conn
+
+                evaluate :: MonadIO io => WS.Connection -> String -> io ()
+                evaluate conn js = liftIO $ do
+                  -- liftIO $ writeFile indexFile "require('$PSCI')['$main']();"
+                  -- process <- liftIO findNodeProcess
+                  -- result  <- liftIO $ traverse (\node -> readProcessWithExitCode node nodeArgs "") process
+
+                  -- copyFile ".psci_modules/node_modules/$PSCI/index.js" "../psci-experiment/node_modules/$PSCI/index.js"
+                  WS.sendTextData conn (fromString js :: Text)
+                  result <- WS.receiveData conn
+                  putStrLn (unpack result)
 
                 staticServer :: String -> Wai.Application
                 staticServer js req respond

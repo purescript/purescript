@@ -140,8 +140,7 @@ library
                    transformers-compat >= 0.3.0,
                    unordered-containers -any,
                    utf8-string >= 1 && < 2,
-                   vector -any,
-                   websockets >= 0.9 && <0.10
+                   vector -any
 
     exposed-modules: Language.PureScript
                      Language.PureScript.AST
@@ -346,6 +345,7 @@ executable psci
                    optparse-applicative >= 0.12.1,
                    parsec -any,
                    process -any,
+                   text -any,
                    time -any,
                    transformers -any,
                    transformers-compat -any,

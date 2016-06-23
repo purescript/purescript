@@ -20,8 +20,6 @@ import           Prelude.Compat
 
 import           Data.List (intercalate, nub, sort, find, foldl')
 import qualified Data.Map as M
-import           Data.String (fromString)
-import qualified Data.Text as T
 
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.State.Class
@@ -40,8 +38,6 @@ import           Language.PureScript.Interactive.Module       as Interactive
 import           Language.PureScript.Interactive.Parser       as Interactive
 import           Language.PureScript.Interactive.Printer      as Interactive
 import           Language.PureScript.Interactive.Types        as Interactive
-
-import qualified Network.WebSockets as WS
 
 import           System.FilePath ((</>))
 
@@ -95,7 +91,7 @@ make ms = do
 -- | Performs a PSCi command
 handleCommand
   :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
-  => WS.Connection
+  => (String -> m ())
   -> Command
   -> m ()
 handleCommand _ ShowHelp                  = liftIO $ putStrLn helpMessage
@@ -131,25 +127,19 @@ handleResetState = do
 -- TODO: factor out the Node process runner, so that we can use PSCi in other settings.
 handleExpression
   :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
-  => WS.Connection
+  => (String -> m ())
   -> P.Expr
   -> m ()
-handleExpression conn val = do
+handleExpression evaluate val = do
   st <- get
   let m = createTemporaryModule True st val
   -- nodeArgs <- asks ((++ [indexFile]) . psciNodeFlags)
   e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
   case e of
     Left errs -> printErrors errs
-    Right _ -> liftIO $ do
-      -- liftIO $ writeFile indexFile "require('$PSCI')['$main']();"
-      -- process <- liftIO findNodeProcess
-      -- result  <- liftIO $ traverse (\node -> readProcessWithExitCode node nodeArgs "") process
+    Right _ -> do
       js <- liftIO $ readFile (modulesDir </> "$PSCI" </> "index.js")
-      -- copyFile ".psci_modules/node_modules/$PSCI/index.js" "../psci-experiment/node_modules/$PSCI/index.js"
-      WS.sendTextData conn (fromString js :: T.Text)
-      result <- WS.receiveData conn
-      putStrLn (T.unpack result)
+      evaluate js
 
 -- |
 -- Takes a list of declarations and updates the environment, then run a make. If the declaration fails,
