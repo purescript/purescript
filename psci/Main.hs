@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DoAndIfThenElse #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -21,10 +22,10 @@ import           Data.Version (showVersion)
 
 import           Control.Applicative (many)
 import           Control.Concurrent (forkIO)
-import           Control.Concurrent.MVar (newEmptyMVar, putMVar, takeMVar)
-import           Control.Concurrent.STM (atomically, newTVarIO, writeTVar, readTVarIO)
+import           Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
+import           Control.Concurrent.STM (TVar, atomically, newTVarIO, writeTVar, readTVarIO)
 import           Control.Monad
-import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import           Control.Monad.Trans.State.Strict (StateT, evalStateT)
@@ -51,6 +52,7 @@ import           System.IO.UTF8 (readUTF8File)
 import           System.Exit
 import           System.FilePath ((</>))
 import           System.FilePath.Glob (glob)
+import           System.Process (readProcessWithExitCode)
 
 -- | Command line options
 data PSCiOptions = PSCiOptions
@@ -195,6 +197,121 @@ indexPage = fromString . unlines $
   , "</html>"
   ]
 
+-- | All of the functions required to implement a PSCi backend
+data Backend = forall state. Backend
+  { _backendSetup :: (state -> IO ()) -> IO ()
+  -- ^ Initialize, and call the continuation when the backend is ready
+  , _backendEval :: state -> String -> IO ()
+  -- ^ Evaluate JavaScript code
+  , _backendShutdown :: state -> IO ()
+  -- ^ Shut down the backend
+  }
+
+-- | State for the browser backend
+data BrowserState = BrowserState
+  { browserSocket         :: WS.Connection
+  -- ^ The active websocket connection
+  , browserShutdownNotice :: MVar ()
+  -- ^ An MVar which becomes full when the server should shut down
+  , browserLatestJS       :: TVar (Maybe String)
+  -- ^ A TVar holding the latest compiled JS
+  }
+
+browserBackend :: Int -> Backend
+browserBackend port = Backend setup evaluate shutdown
+  where
+    setup :: (BrowserState -> IO ()) -> IO ()
+    setup ready = do
+      shutdownVar <- newEmptyMVar
+      latestVar <- newTVarIO Nothing
+
+      let
+        handleWebsocket :: WS.PendingConnection -> IO ()
+        handleWebsocket pending = do
+          putStrLn "Browser is connected."
+          conn <- WS.acceptRequest pending
+          ready (BrowserState conn shutdownVar latestVar)
+
+        shutdownHandler :: IO () -> IO ()
+        shutdownHandler stopServer = void . forkIO $ do
+          () <- takeMVar shutdownVar
+          stopServer
+
+        staticServer :: String -> Wai.Application
+        staticServer js req respond
+          | [] <- Wai.pathInfo req =
+              respond $ Wai.responseLBS status200
+                                        [(hContentType, "text/html")]
+                                        indexPage
+          | ["js", "index.js"] <- Wai.pathInfo req =
+              respond $ Wai.responseLBS status200
+                                        [(hContentType, "application/javascript")]
+                                        indexJS
+          | ["js", "latest.js"] <- Wai.pathInfo req = do
+              may <- readTVarIO latestVar
+              case may of
+                Nothing ->
+                  respond $ Wai.responseLBS status503 [] "Service not available"
+                Just latest ->
+                  respond $ Wai.responseLBS status200
+                                            [ (hContentType, "application/javascript")
+                                            , (hCacheControl, "no-cache, no-store, must-revalidate")
+                                            , (hPragma, "no-cache")
+                                            , (hExpires, "0")
+                                            ]
+                                            (fromString latest)
+          | ["js", "bundle.js"] <- Wai.pathInfo req =
+              respond $ Wai.responseLBS status200
+                                        [(hContentType, "application/javascript")]
+                                        (fromString js)
+          | otherwise =
+              respond $ Wai.responseLBS status404 [] "Not found"
+
+      putStrLn "Bundling Javascript..."
+      ejs <- bundle
+      case ejs of
+        Left err -> do
+          putStrLn (unlines (Bundle.printErrorMessage err))
+          exitFailure
+        Right js -> do
+          putStrLn $ "Listening on port " <> show port <> ". Waiting for connection..."
+          Warp.runSettings ( Warp.setInstallShutdownHandler shutdownHandler
+                           . Warp.setPort port
+                           $ Warp.defaultSettings
+                           ) $
+            WS.websocketsOr WS.defaultConnectionOptions
+                            handleWebsocket
+                            (staticServer js)
+
+    shutdown :: BrowserState -> IO ()
+    shutdown state = putMVar (browserShutdownNotice state) ()
+
+    evaluate :: BrowserState -> String -> IO ()
+    evaluate state js = liftIO $ do
+      _ <- atomically (writeTVar (browserLatestJS state) (Just js))
+      WS.sendTextData (browserSocket state) ("reload" :: Text)
+      result <- WS.receiveData (browserSocket state)
+      putStrLn (unpack result)
+
+nodeBackend :: [String] -> Backend
+nodeBackend nodeArgs = Backend setup eval shutdown
+  where
+    setup :: (() -> IO ()) -> IO ()
+    setup f = f ()
+
+    eval :: () -> String -> IO ()
+    eval _ _ = do
+      writeFile indexFile "require('$PSCI')['$main']();"
+      process <- findNodeProcess
+      result <- traverse (\node -> readProcessWithExitCode node (nodeArgs ++ [indexFile]) "") process
+      case result of
+        Just (ExitSuccess,   out, _)   -> putStrLn out
+        Just (ExitFailure _, _,   err) -> putStrLn err
+        Nothing                        -> putStrLn "Couldn't find node.js"
+
+    shutdown :: () -> IO ()
+    shutdown _ = return ()
+
 -- | Get command line options and drop into the REPL
 main :: IO ()
 main = getOpt >>= loop
@@ -209,99 +326,31 @@ main = getOpt >>= loop
             exitFailure
           (externs, env) <- ExceptT . runMake . make $ modules
           return (modules, externs, env)
-        case e of
-          Left errs -> putStrLn (P.prettyPrintMultipleErrors P.defaultPPEOptions errs) >> exitFailure
-          Right (modules, externs, env) -> do
-            historyFilename <- getHistoryFilename
-            shutdown <- newEmptyMVar
-            latestVar <- newTVarIO Nothing
-            let settings = defaultSettings { historyFile = Just historyFilename }
-                initialState = PSCiState [] [] (zip (map snd modules) externs)
-                config = PSCiConfig inputFiles psciInputNodeFlags env
-                runner = flip runReaderT config
-                         . flip evalStateT initialState
-                         . runInputT (setComplete completion settings)
+        case nodeBackend [] of
+          Backend setup eval (shutdown :: state -> IO ()) -> do
+            case e of
+              Left errs -> putStrLn (P.prettyPrintMultipleErrors P.defaultPPEOptions errs) >> exitFailure
+              Right (modules, externs, env) -> do
+                historyFilename <- getHistoryFilename
+                let settings = defaultSettings { historyFile = Just historyFilename }
+                    initialState = PSCiState [] [] (zip (map snd modules) externs)
+                    config = PSCiConfig inputFiles psciInputNodeFlags env
+                    runner = flip runReaderT config
+                             . flip evalStateT initialState
+                             . runInputT (setComplete completion settings)
 
-                handleWebsocket :: WS.PendingConnection -> IO ()
-                handleWebsocket pending = do
-                  putStrLn "Browser is connected."
-                  conn <- WS.acceptRequest pending
-                  runner (go conn)
-
-                shutdownHandler :: IO () -> IO ()
-                shutdownHandler stopServer = void . forkIO $ do
-                  () <- takeMVar shutdown
-                  stopServer
-
-                go :: WS.Connection -> InputT (StateT PSCiState (ReaderT PSCiConfig IO)) ()
-                go conn = do
-                  c <- getCommand (not psciMultiLineMode)
-                  case c of
-                    Left err -> outputStrLn err >> go conn
-                    Right Nothing -> go conn
-                    Right (Just QuitPSCi) -> do
-                      outputStrLn quitMessage
-                      liftIO $ putMVar shutdown ()
-                    Right (Just c') -> do
-                      handleInterrupt (outputStrLn "Interrupted.")
-                                      (withInterrupt (lift (handleCommand (evaluate conn) c')))
-                      go conn
-
-                evaluate :: MonadIO io => WS.Connection -> String -> io ()
-                evaluate conn js = liftIO $ do
-                  -- liftIO $ writeFile indexFile "require('$PSCI')['$main']();"
-                  -- process <- liftIO findNodeProcess
-                  -- result  <- liftIO $ traverse (\node -> readProcessWithExitCode node nodeArgs "") process
-
-                  -- copyFile ".psci_modules/node_modules/$PSCI/index.js" "../psci-experiment/node_modules/$PSCI/index.js"
-
-                  _ <- atomically (writeTVar latestVar (Just js))
-                  WS.sendTextData conn ("reload" :: Text)
-                  result <- WS.receiveData conn
-                  putStrLn (unpack result)
-
-                staticServer :: String -> Wai.Application
-                staticServer js req respond
-                  | [] <- Wai.pathInfo req =
-                      respond $ Wai.responseLBS status200
-                                                [(hContentType, "text/html")]
-                                                indexPage
-                  | ["js", "index.js"] <- Wai.pathInfo req =
-                      respond $ Wai.responseLBS status200
-                                                [(hContentType, "application/javascript")]
-                                                indexJS
-                  | ["js", "latest.js"] <- Wai.pathInfo req = do
-                      may <- readTVarIO latestVar
-                      case may of
-                        Nothing ->
-                          respond $ Wai.responseLBS status503 [] "Service not available"
-                        Just latest ->
-                          respond $ Wai.responseLBS status200
-                                                    [ (hContentType, "application/javascript")
-                                                    , (hCacheControl, "no-cache, no-store, must-revalidate")
-                                                    , (hPragma, "no-cache")
-                                                    , (hExpires, "0")
-                                                    ]
-                                                    (fromString latest)
-                  | ["js", "bundle.js"] <- Wai.pathInfo req =
-                      respond $ Wai.responseLBS status200
-                                                [(hContentType, "application/javascript")]
-                                                (fromString js)
-                  | otherwise =
-                      respond $ Wai.responseLBS status404 [] "Not found"
-            putStrLn prologueMessage
-            putStrLn "Bundling Javascript..."
-            ejs <- bundle
-            case ejs of
-              Left err -> do
-                putStrLn (unlines (Bundle.printErrorMessage err))
-                exitFailure
-              Right js -> do
-                putStrLn "Listening on port 9160. Waiting for connection..."
-                Warp.runSettings ( Warp.setInstallShutdownHandler shutdownHandler
-                                 . Warp.setPort 9160
-                                 $ Warp.defaultSettings
-                                 ) $
-                  WS.websocketsOr WS.defaultConnectionOptions
-                                  handleWebsocket
-                                  (staticServer js)
+                    go :: state -> InputT (StateT PSCiState (ReaderT PSCiConfig IO)) ()
+                    go state = do
+                      c <- getCommand (not psciMultiLineMode)
+                      case c of
+                        Left err -> outputStrLn err >> go state
+                        Right Nothing -> go state
+                        Right (Just QuitPSCi) -> do
+                          outputStrLn quitMessage
+                          liftIO $ shutdown state
+                        Right (Just c') -> do
+                          handleInterrupt (outputStrLn "Interrupted.")
+                                          (withInterrupt (lift (handleCommand (liftIO . eval state) c')))
+                          go state
+                putStrLn prologueMessage
+                setup (runner . go)
