@@ -13,7 +13,6 @@ import qualified Language.PureScript as P
 --
 data PSCiConfig = PSCiConfig
   { psciLoadedFiles         :: [FilePath]
-  , psciNodeFlags           :: [String]
   , psciEnvironment         :: P.Environment
   } deriving Show
 

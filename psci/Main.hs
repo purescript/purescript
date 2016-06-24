@@ -20,7 +20,7 @@ import           Data.Text (Text, unpack)
 import           Data.Traversable (for)
 import           Data.Version (showVersion)
 
-import           Control.Applicative (many)
+import           Control.Applicative (many, (<|>))
 import           Control.Concurrent (forkIO)
 import           Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
 import           Control.Concurrent.STM (TVar, atomically, newTVarIO, writeTVar, readTVarIO)
@@ -58,7 +58,7 @@ import           System.Process (readProcessWithExitCode)
 data PSCiOptions = PSCiOptions
   { psciMultiLineMode     :: Bool
   , psciInputFile         :: [FilePath]
-  , psciInputNodeFlags    :: [String]
+  , psciBackend           :: Backend
   }
 
 multiLineMode :: Opts.Parser Bool
@@ -81,10 +81,21 @@ nodeFlagsFlag = Opts.option parser $
   where
     parser = words <$> Opts.str
 
+port :: Opts.Parser Int
+port = Opts.option Opts.auto $
+     Opts.long "port"
+  <> Opts.short 'p'
+  <> Opts.help "The web server port"
+
+backend :: Opts.Parser Backend
+backend =
+  (browserBackend <$> port)
+  <|> (nodeBackend <$> nodeFlagsFlag)
+
 psciOptions :: Opts.Parser PSCiOptions
 psciOptions = PSCiOptions <$> multiLineMode
                           <*> many inputFile
-                          <*> nodeFlagsFlag
+                          <*> backend
 
 version :: Opts.Parser (a -> a)
 version = Opts.abortOption (Opts.InfoMsg (showVersion Paths.version)) $
@@ -124,8 +135,8 @@ bundle = runExceptT $ do
   Bundle.bundle input [] Nothing "PSCI"
 
 -- TODO: use JMacro here?
-indexJS :: IsString string => string
-indexJS = fromString . unlines $
+indexJS :: IsString string => Int -> string
+indexJS serverPort = fromString . unlines $
   [ "var get = function get(uri, callback, onError) {"
   , "  var request = new XMLHttpRequest();"
   , "  request.addEventListener('load', function() {"
@@ -158,7 +169,7 @@ indexJS = fromString . unlines $
   , "  return buffer.join('\\n');"
   , "};"
   , "window.onload = function() {"
-  , "  var socket = new WebSocket('ws://0.0.0.0:9160');"
+  , "  var socket = new WebSocket('ws://0.0.0.0:" <> show serverPort <> "');"
   , "  var reload = function reload() {"
   , "    get('js/latest.js', function(response) {"
   , "      try {"
@@ -189,6 +200,7 @@ indexPage = fromString . unlines $
   [ "<!DOCTYPE html>"
   , "<html>"
   , "  <head>"
+  , "    <title>PureScript Interactive</title>"
   , "    <script src='js/bundle.js'></script>"
   , "    <script src='js/index.js'></script>"
   , "  </head>"
@@ -218,7 +230,7 @@ data BrowserState = BrowserState
   }
 
 browserBackend :: Int -> Backend
-browserBackend port = Backend setup evaluate shutdown
+browserBackend serverPort = Backend setup evaluate shutdown
   where
     setup :: (BrowserState -> IO ()) -> IO ()
     setup ready = do
@@ -230,6 +242,7 @@ browserBackend port = Backend setup evaluate shutdown
         handleWebsocket pending = do
           putStrLn "Browser is connected."
           conn <- WS.acceptRequest pending
+          WS.forkPingThread conn 10
           ready (BrowserState conn shutdownVar latestVar)
 
         shutdownHandler :: IO () -> IO ()
@@ -246,7 +259,7 @@ browserBackend port = Backend setup evaluate shutdown
           | ["js", "index.js"] <- Wai.pathInfo req =
               respond $ Wai.responseLBS status200
                                         [(hContentType, "application/javascript")]
-                                        indexJS
+                                        (indexJS serverPort)
           | ["js", "latest.js"] <- Wai.pathInfo req = do
               may <- readTVarIO latestVar
               case may of
@@ -274,9 +287,9 @@ browserBackend port = Backend setup evaluate shutdown
           putStrLn (unlines (Bundle.printErrorMessage err))
           exitFailure
         Right js -> do
-          putStrLn $ "Listening on port " <> show port <> ". Waiting for connection..."
+          putStrLn $ "Listening on port " <> show serverPort <> ". Waiting for connection..."
           Warp.runSettings ( Warp.setInstallShutdownHandler shutdownHandler
-                           . Warp.setPort port
+                           . Warp.setPort serverPort
                            $ Warp.defaultSettings
                            ) $
             WS.websocketsOr WS.defaultConnectionOptions
@@ -326,7 +339,7 @@ main = getOpt >>= loop
             exitFailure
           (externs, env) <- ExceptT . runMake . make $ modules
           return (modules, externs, env)
-        case nodeBackend [] of
+        case psciBackend of
           Backend setup eval (shutdown :: state -> IO ()) -> do
             case e of
               Left errs -> putStrLn (P.prettyPrintMultipleErrors P.defaultPPEOptions errs) >> exitFailure
@@ -334,7 +347,7 @@ main = getOpt >>= loop
                 historyFilename <- getHistoryFilename
                 let settings = defaultSettings { historyFile = Just historyFilename }
                     initialState = PSCiState [] [] (zip (map snd modules) externs)
-                    config = PSCiConfig inputFiles psciInputNodeFlags env
+                    config = PSCiConfig inputFiles env
                     runner = flip runReaderT config
                              . flip evalStateT initialState
                              . runInputT (setComplete completion settings)
