@@ -23,7 +23,8 @@ import           Data.Version (showVersion)
 import           Control.Applicative (many, (<|>))
 import           Control.Concurrent (forkIO)
 import           Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar)
-import           Control.Concurrent.STM (TVar, atomically, newTVarIO, writeTVar, readTVarIO)
+import           Control.Concurrent.STM (TVar, atomically, newTVarIO, writeTVar,
+                                        readTVar, readTVarIO)
 import           Control.Monad
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Trans.Class
@@ -236,14 +237,22 @@ browserBackend serverPort = Backend setup evaluate shutdown
     setup ready = do
       shutdownVar <- newEmptyMVar
       latestVar <- newTVarIO Nothing
+      connectedVar <- newTVarIO False
 
       let
         handleWebsocket :: WS.PendingConnection -> IO ()
         handleWebsocket pending = do
-          putStrLn "Browser is connected."
-          conn <- WS.acceptRequest pending
-          WS.forkPingThread conn 10
-          ready (BrowserState conn shutdownVar latestVar)
+          existing <- atomically $ do
+            cur <- readTVar connectedVar
+            unless cur (writeTVar connectedVar True)
+            return cur
+          case existing of
+            True -> putStrLn "Received connect request but a browser is already connected."
+            False -> do
+              putStrLn "Browser is connected."
+              conn <- WS.acceptRequest pending
+              WS.forkPingThread conn 10
+              ready (BrowserState conn shutdownVar latestVar)
 
         shutdownHandler :: IO () -> IO ()
         shutdownHandler stopServer = void . forkIO $ do
