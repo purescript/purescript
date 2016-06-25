@@ -262,7 +262,6 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
       let
         handleWebsocket :: WS.PendingConnection -> IO ()
         handleWebsocket pending = do
-          -- putStrLn "Browser is connected."
           conn <- WS.acceptRequest pending
           -- Fork a thread to keep the connection alive
           WS.forkPingThread conn 10
