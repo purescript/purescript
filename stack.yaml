@@ -1,7 +1,5 @@
 resolver: lts-6.1
 packages:
 - '.'
-extra-deps:
-- wai-websockets-3.0.0.9
-- websockets-0.9.6.2
+extra-deps: []
 flags: {}
