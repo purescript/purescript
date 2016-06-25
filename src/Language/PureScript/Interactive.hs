@@ -92,25 +92,27 @@ make ms = do
 handleCommand
   :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
   => (String -> m ())
+  -> m ()
   -> Command
   -> m ()
-handleCommand _ ShowHelp                  = liftIO $ putStrLn helpMessage
-handleCommand _ ResetState                = handleResetState
-handleCommand c (Expression val)          = handleExpression c val
-handleCommand _ (Import im)               = handleImport im
-handleCommand _ (Decls l)                 = handleDecls l
-handleCommand _ (TypeOf val)              = handleTypeOf val
-handleCommand _ (KindOf typ)              = handleKindOf typ
-handleCommand _ (BrowseModule moduleName) = handleBrowse moduleName
-handleCommand _ (ShowInfo QueryLoaded)    = handleShowLoadedModules
-handleCommand _ (ShowInfo QueryImport)    = handleShowImportedModules
-handleCommand _ QuitPSCi                  = P.internalError "`handleCommand QuitPSCi` was called. This is a bug."
+handleCommand _ _ ShowHelp                  = liftIO $ putStrLn helpMessage
+handleCommand _ r ResetState                = handleResetState r
+handleCommand c _ (Expression val)          = handleExpression c val
+handleCommand _ _ (Import im)               = handleImport im
+handleCommand _ _ (Decls l)                 = handleDecls l
+handleCommand _ _ (TypeOf val)              = handleTypeOf val
+handleCommand _ _ (KindOf typ)              = handleKindOf typ
+handleCommand _ _ (BrowseModule moduleName) = handleBrowse moduleName
+handleCommand _ _ (ShowInfo QueryLoaded)    = handleShowLoadedModules
+handleCommand _ _ (ShowInfo QueryImport)    = handleShowImportedModules
+handleCommand _ _ QuitPSCi                  = P.internalError "`handleCommand QuitPSCi` was called. This is a bug."
 
 -- | Reset the application state
 handleResetState
   :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
   => m ()
-handleResetState = do
+  -> m ()
+handleResetState reload = do
   modify $ updateImportedModules (const [])
          . updateLets (const [])
   files <- asks psciLoadedFiles
@@ -120,7 +122,9 @@ handleResetState = do
     return (map snd modules, externs)
   case e of
     Left errs -> printErrors errs
-    Right (modules, externs) -> modify (updateLoadedExterns (const (zip modules externs)))
+    Right (modules, externs) -> do
+      modify (updateLoadedExterns (const (zip modules externs)))
+      reload
 
 -- | Takes a value expression and evaluates it with the current state.
 handleExpression
