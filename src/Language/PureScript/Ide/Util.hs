@@ -16,10 +16,12 @@
 
 module Language.PureScript.Ide.Util
   ( identifierFromIdeDeclaration
-  , identifierFromMatch
+  , unwrapMatch
   , completionFromMatch
+  , infoFromMatch
   , encodeT
   , decodeT
+  , discardAstInfo
   , module Language.PureScript.Ide.Conversions
   ) where
 
@@ -41,18 +43,24 @@ identifierFromIdeDeclaration d = case d of
   IdeValueOperator op _ _ _ -> runOpNameT op
   IdeTypeOperator op _ _ _ -> runOpNameT op
 
-identifierFromMatch :: Match -> Text
-identifierFromMatch (Match _ ed) = identifierFromIdeDeclaration ed
+discardAstInfo :: IdeDeclarationAnn -> IdeDeclaration
+discardAstInfo (IdeDeclarationAnn _ d) = d
 
-completionFromMatch :: Match -> Completion
-completionFromMatch (Match m' d) = case d of
-  IdeValue name type' -> Completion (m, name, prettyTypeT type')
-  IdeType name kind -> Completion (m, runProperNameT name, toS (P.prettyPrintKind kind))
-  IdeTypeSynonym name kind -> Completion (m, runProperNameT name, prettyTypeT kind)
-  IdeDataConstructor name _ type' -> Completion (m, name, prettyTypeT type')
-  IdeTypeClass name -> Completion (m, runProperNameT name, "class")
-  IdeValueOperator op ref precedence associativity -> Completion (m, runOpNameT op, showFixity precedence associativity ref op)
-  IdeTypeOperator op ref precedence associativity -> Completion (m, runOpNameT op, showFixity precedence associativity ref op)
+unwrapMatch :: Match a -> a
+unwrapMatch (Match (_, ed)) = ed
+
+completionFromMatch :: Match IdeDeclaration -> Completion
+completionFromMatch = Completion . completionFromMatch'
+
+completionFromMatch' :: Match IdeDeclaration -> (Text, Text, Text)
+completionFromMatch' (Match (m', d)) = case d of
+  IdeValue name type' -> (m, name, prettyTypeT type')
+  IdeType name kind -> (m, runProperNameT name, toS (P.prettyPrintKind kind))
+  IdeTypeSynonym name kind -> (m, runProperNameT name, prettyTypeT kind)
+  IdeDataConstructor name _ type' -> (m, name, prettyTypeT type')
+  IdeTypeClass name -> (m, runProperNameT name, "class")
+  IdeValueOperator op ref precedence associativity -> (m, runOpNameT op, showFixity precedence associativity ref op)
+  IdeTypeOperator op ref precedence associativity -> (m, runOpNameT op, showFixity precedence associativity ref op)
   where
     m = runModuleNameT m'
     showFixity p a r o =
@@ -61,6 +69,12 @@ completionFromMatch (Match m' d) = case d of
             P.Infixl -> "infixl"
             P.Infixr -> "infixr"
       in T.unwords [asso, show p, r, "as", runOpNameT o]
+
+infoFromMatch :: Match IdeDeclarationAnn -> Info
+infoFromMatch (Match (m, (IdeDeclarationAnn ss d))) =
+  Info (a, b, c, ss)
+  where
+    (a, b, c) = completionFromMatch' (Match (m, d))
 
 encodeT :: (ToJSON a) => a -> Text
 encodeT = toS . decodeUtf8 . encode
