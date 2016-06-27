@@ -12,29 +12,24 @@
 -- Handles externs files for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE FlexibleContexts  #-}
 
 module Language.PureScript.Ide.Externs
   ( ExternDecl(..),
     ModuleIdent,
-    DeclIdent,
     readExternFile,
     convertExterns,
+    convertModule,
     unwrapPositioned,
     unwrapPositionedRef
   ) where
 
-import           Prelude                       ()
-import           Prelude.Compat
+import           Protolude
 
-import           Control.Monad.Error.Class
-import           Control.Monad.IO.Class
 import           Data.Aeson                    (decodeStrict)
 import           Data.List                     (nub)
-import           Data.Maybe                    (mapMaybe)
-import           Data.Monoid
-import           Data.Text                     (Text)
-import qualified Data.Text                     as T
 import qualified Data.ByteString               as BS
 import           Language.PureScript.Ide.Error (PscIdeError (..))
 import           Language.PureScript.Ide.Types
@@ -42,24 +37,20 @@ import           Language.PureScript.Ide.Util
 
 import qualified Language.PureScript           as P
 
+import System.FilePath
+
 readExternFile :: (MonadIO m, MonadError PscIdeError m) =>
                   FilePath -> m P.ExternsFile
 readExternFile fp = do
    parseResult <- liftIO (decodeStrict <$> BS.readFile fp)
    case parseResult of
-     Nothing -> throwError . GeneralError $ "Parsing the extern at: " ++ fp ++ " failed"
+     Nothing -> throwError . GeneralError $ "Parsing the extern at: " <> toS fp <> " failed"
      Just externs -> pure externs
 
-moduleNameToText :: P.ModuleName -> Text
-moduleNameToText = T.pack . P.runModuleName
-
-identToText :: P.Ident -> Text
-identToText  = T.pack . P.runIdent
-
-convertExterns :: P.ExternsFile -> Module
-convertExterns ef = (moduleName, exportDecls ++ importDecls ++ decls ++ operatorDecls ++ tyOperatorDecls)
+convertExterns :: P.ExternsFile -> ModuleOld
+convertExterns ef = (runModuleNameT moduleName, exportDecls ++ importDecls ++ decls ++ operatorDecls ++ tyOperatorDecls)
   where
-    moduleName = moduleNameToText (P.efModuleName ef)
+    moduleName = P.efModuleName ef
     importDecls = convertImport <$> P.efImports ef
     exportDecls = mapMaybe (convertExport . unwrapPositionedRef) (P.efExports ef)
     operatorDecls = convertOperator <$> P.efFixities ef
@@ -82,12 +73,12 @@ isTypeClassDeclaration _ = False
 
 convertImport :: P.ExternsImport -> ExternDecl
 convertImport ei = Dependency
-  (moduleNameToText (P.eiModule ei))
+  (runModuleNameT (P.eiModule ei))
   []
-  (moduleNameToText <$> P.eiImportedAs ei)
+  (runModuleNameT <$> P.eiImportedAs ei)
 
 convertExport :: P.DeclarationRef -> Maybe ExternDecl
-convertExport (P.ModuleRef mn) = Just (Export (moduleNameToText mn))
+convertExport (P.ModuleRef mn) = Just (Export (runModuleNameT mn))
 convertExport _ = Nothing
 
 convertDecl :: P.ExternsDeclaration -> Maybe ExternDecl
@@ -97,7 +88,7 @@ convertDecl P.EDTypeSynonym{..} = Just $
 convertDecl P.EDDataConstructor{..} = Just $
   DataConstructor (runProperNameT edDataCtorName) edDataCtorTypeCtor edDataCtorType
 convertDecl P.EDValue{..} = Just $
-  ValueDeclaration (identToText edValueName) edValueType
+  ValueDeclaration (runIdentT edValueName) edValueType
 convertDecl P.EDClass{..} = Just $ TypeClassDeclaration edClassName
 convertDecl P.EDInstance{} = Nothing
 
@@ -105,7 +96,7 @@ convertOperator :: P.ExternsFixity -> ExternDecl
 convertOperator P.ExternsFixity{..} =
   ValueOperator
     efOperator
-    (T.pack (P.showQualified (either P.runIdent P.runProperName) efAlias))
+    (toS (P.showQualified (either P.runIdent P.runProperName) efAlias))
     efPrecedence
     efAssociativity
 
@@ -113,7 +104,7 @@ convertTypeOperator :: P.ExternsTypeFixity -> ExternDecl
 convertTypeOperator P.ExternsTypeFixity{..} =
   TypeOperator
     efTypeOperator
-    (T.pack (P.showQualified P.runProperName efTypeAlias))
+    (toS (P.showQualified P.runProperName efTypeAlias))
     efTypePrecedence
     efTypeAssociativity
 
@@ -124,3 +115,18 @@ unwrapPositioned x = x
 unwrapPositionedRef :: P.DeclarationRef -> P.DeclarationRef
 unwrapPositionedRef (P.PositionedDeclarationRef _ _ x) = x
 unwrapPositionedRef x = x
+
+convertModule :: ModuleOld -> Module
+convertModule (mn, decls) = (P.moduleNameFromString (toS mn), mapMaybe convertDeclaration decls)
+  where convertDeclaration :: ExternDecl -> Maybe IdeDeclaration
+        convertDeclaration d = case d of
+          ValueDeclaration i t -> Just (IdeValue i t)
+          TypeDeclaration i k -> Just (IdeType i k)
+          TypeSynonymDeclaration i t -> Just (IdeTypeSynonym i t)
+          DataConstructor i tn t -> Just (IdeDataConstructor i tn t)
+          TypeClassDeclaration i -> Just (IdeTypeClass i)
+          ValueOperator n i p a -> Just (IdeValueOperator n i p a)
+          TypeOperator n i p a -> Just (IdeTypeOperator n i p a)
+          Dependency{} -> Nothing
+          ModuleDecl _ _ -> Nothing
+          Export _ -> Nothing

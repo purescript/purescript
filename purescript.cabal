@@ -106,6 +106,7 @@ library
                    boxes >= 0.1.4 && < 0.2.0,
                    bytestring -any,
                    containers -any,
+                   clock -any,
                    directory >= 1.2,
                    dlist -any,
                    edit-distance -any,
@@ -125,6 +126,7 @@ library
                    pipes >= 4.0.0 && < 4.3.0,
                    pipes-http -any,
                    process >= 1.2.0 && < 1.5,
+                   protolude >= 0.1.5,
                    regex-tdfa -any,
                    safe >= 0.3.9 && < 0.4,
                    semigroups >= 0.16.2 && < 0.19,
@@ -251,22 +253,23 @@ library
                      Language.PureScript.Publish.BoxesHelpers
 
                      Language.PureScript.Ide
+                     Language.PureScript.Ide.CaseSplit
                      Language.PureScript.Ide.Command
+                     Language.PureScript.Ide.Completion
+                     Language.PureScript.Ide.Conversions
                      Language.PureScript.Ide.Externs
                      Language.PureScript.Ide.Error
-                     Language.PureScript.Ide.Pursuit
-                     Language.PureScript.Ide.Completion
-                     Language.PureScript.Ide.Matcher
-                     Language.PureScript.Ide.Filter
-                     Language.PureScript.Ide.Types
-                     Language.PureScript.Ide.State
-                     Language.PureScript.Ide.CaseSplit
-                     Language.PureScript.Ide.SourceFile
-                     Language.PureScript.Ide.Watcher
-                     Language.PureScript.Ide.Reexports
                      Language.PureScript.Ide.Imports
-                     Language.PureScript.Ide.Util
+                     Language.PureScript.Ide.Filter
+                     Language.PureScript.Ide.Matcher
+                     Language.PureScript.Ide.Pursuit
                      Language.PureScript.Ide.Rebuild
+                     Language.PureScript.Ide.Reexports
+                     Language.PureScript.Ide.SourceFile
+                     Language.PureScript.Ide.State
+                     Language.PureScript.Ide.Types
+                     Language.PureScript.Ide.Util
+                     Language.PureScript.Ide.Watcher
 
                      Language.PureScript.Interactive
                      Language.PureScript.Interactive.Types
@@ -433,6 +436,7 @@ executable psc-ide-server
                        mtl -any,
                        network -any,
                        optparse-applicative >= 0.12.1,
+                       protolude >= 0.1.5,
                        stm -any,
                        text -any,
                        transformers -any,
@@ -473,6 +477,7 @@ test-suite tests
                    optparse-applicative -any,
                    parsec -any,
                    process -any,
+                   protolude >= 0.1.5,
                    silently -any,
                    stm -any,
                    text -any,
@@ -498,6 +503,5 @@ test-suite tests
                    Language.PureScript.Ide.MatcherSpec
                    Language.PureScript.Ide.RebuildSpec
                    Language.PureScript.Ide.ReexportsSpec
-                   Language.PureScript.IdeSpec
     buildable: True
     hs-source-dirs: tests

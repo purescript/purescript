@@ -18,24 +18,11 @@
 
 module Language.PureScript.Ide
        ( handleCommand
-         -- for tests
-       , printModules
        ) where
 
-import           Prelude                            ()
-import           Prelude.Compat
+import           Protolude
 
-import           Control.Monad                      (unless)
-import           Control.Monad.Error.Class
-import           Control.Monad.IO.Class
 import           "monad-logger" Control.Monad.Logger
-import           Control.Monad.Reader.Class
-import           Data.Foldable
-import qualified Data.Map.Lazy                      as M
-import           Data.Maybe                         (catMaybes, mapMaybe)
-import           Data.Monoid
-import           Data.Text                          (Text)
-import qualified Data.Text                          as T
 import qualified Language.PureScript                as P
 import qualified Language.PureScript.Ide.CaseSplit  as CS
 import           Language.PureScript.Ide.Command
@@ -47,199 +34,173 @@ import           Language.PureScript.Ide.Imports    hiding (Import)
 import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Pursuit
 import           Language.PureScript.Ide.Rebuild
-import           Language.PureScript.Ide.Reexports
 import           Language.PureScript.Ide.SourceFile
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 import           System.Directory
-import           System.Exit
 import           System.FilePath
+import           System.FilePath.Glob
 
-handleCommand :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
+handleCommand :: (Ide m, MonadLogger m, MonadError PscIdeError m) =>
                  Command -> m Success
-handleCommand (Load [] []) = loadAllModules
-handleCommand (Load modules deps) =
-  loadModulesAndDeps modules deps
-handleCommand (Type search filters currentModule) =
-  findType search filters currentModule
-handleCommand (Complete filters matcher currentModule) =
-  findCompletions filters matcher currentModule
-handleCommand (Pursuit query Package) =
-  findPursuitPackages query
-handleCommand (Pursuit query Identifier) =
-  findPursuitCompletions query
-handleCommand (List LoadedModules) =
-  printModules
-handleCommand (List AvailableModules) =
-  listAvailableModules
-handleCommand (List (Imports fp)) =
-  importsForFile fp
-handleCommand (CaseSplit l b e wca t) =
-  caseSplit l b e wca t
-handleCommand (AddClause l wca) =
-  pure $ addClause l wca
-handleCommand (Import fp outfp _ (AddImplicitImport mn)) = do
-  rs <- addImplicitImport fp mn
-  answerRequest outfp rs
-handleCommand (Import fp outfp filters (AddImportForIdentifier ident)) = do
-  rs <- addImportForIdentifier fp ident filters
-  case rs of
-    Right rs' -> answerRequest outfp rs'
-    Left question -> pure $ CompletionResult (mapMaybe completionFromMatch question)
-handleCommand (Rebuild file) =
-  rebuildFile file
-handleCommand Cwd =
-  TextResult . T.pack <$> liftIO getCurrentDirectory
-handleCommand Reset = resetPscIdeState *> pure (TextResult "State has been reset.")
-handleCommand Quit = liftIO exitSuccess
+handleCommand c = case c of
+  Load [] ->
+    findAvailableExterns >>= loadModules
+  Load modules ->
+    loadModules modules
+  Type search filters currentModule ->
+    findType search filters currentModule
+  Complete filters matcher currentModule ->
+    findCompletions filters matcher currentModule
+  Pursuit query Package ->
+    findPursuitPackages query
+  Pursuit query Identifier ->
+    findPursuitCompletions query
+  List LoadedModules ->
+    printModules
+  List AvailableModules ->
+    listAvailableModules
+  List (Imports fp) ->
+    ImportList <$> getImportsForFile fp
+  CaseSplit l b e wca t ->
+    caseSplit l b e wca t
+  AddClause l wca ->
+    addClause l wca
+  Import fp outfp _ (AddImplicitImport mn) -> do
+    rs <- addImplicitImport fp mn
+    answerRequest outfp rs
+  Import fp outfp filters (AddImportForIdentifier ident) -> do
+    rs <- addImportForIdentifier fp ident filters
+    case rs of
+      Right rs' -> answerRequest outfp rs'
+      Left question ->
+        pure (CompletionResult (map completionFromMatch question))
+  Rebuild file ->
+    rebuildFile file
+  Cwd ->
+    TextResult . toS <$> liftIO getCurrentDirectory
+  Reset ->
+    resetIdeState $> TextResult "State has been reset."
+  Quit ->
+    liftIO exitSuccess
 
-findCompletions :: (PscIde m) =>
+findCompletions :: Ide m =>
                    [Filter] -> Matcher -> Maybe P.ModuleName -> m Success
 findCompletions filters matcher currentModule = do
-  modules <- getAllModulesWithReexportsAndCache currentModule
-  pure . CompletionResult . mapMaybe completionFromMatch . getCompletions filters matcher $ modules
+  modules <- getAllModules2 currentModule
+  pure . CompletionResult . map completionFromMatch . getCompletions filters matcher $ modules
 
-findType :: (PscIde m) =>
-            DeclIdent -> [Filter] -> Maybe P.ModuleName -> m Success
+findType :: Ide m =>
+            Text -> [Filter] -> Maybe P.ModuleName -> m Success
 findType search filters currentModule = do
-  modules <- getAllModulesWithReexportsAndCache currentModule
-  pure . CompletionResult . mapMaybe completionFromMatch . getExactMatches search filters $ modules
+  modules <- getAllModules2 currentModule
+  pure . CompletionResult . map completionFromMatch . getExactMatches search filters $ modules
 
-findPursuitCompletions :: (MonadIO m) =>
+findPursuitCompletions :: MonadIO m =>
                           PursuitQuery -> m Success
 findPursuitCompletions (PursuitQuery q) =
   PursuitResult <$> liftIO (searchPursuitForDeclarations q)
 
-findPursuitPackages :: (MonadIO m) =>
+findPursuitPackages :: MonadIO m =>
                        PursuitQuery -> m Success
 findPursuitPackages (PursuitQuery q) =
   PursuitResult <$> liftIO (findPackagesForModuleIdent q)
 
-loadExtern :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
-             FilePath -> m ()
-loadExtern fp = do
-  m <- readExternFile fp
-  insertModule m
+printModules :: Ide m => m Success
+printModules = ModuleList . map runModuleNameT <$> getLoadedModulenames
 
-printModules :: (PscIde m) => m Success
-printModules = printModules' . pscIdeStateModules <$> getPscIdeState
+outputDirectory :: Ide m => m FilePath
+outputDirectory = do
+  outputPath <- confOutputPath . ideConfiguration <$> ask
+  cwd <- liftIO getCurrentDirectory
+  pure (cwd </> outputPath)
 
-printModules' :: M.Map ModuleIdent [ExternDecl] -> Success
-printModules' = ModuleList . M.keys
-
-listAvailableModules :: PscIde m => m Success
+listAvailableModules :: Ide m => m Success
 listAvailableModules = do
-  outputPath <- confOutputPath . envConfiguration <$> ask
+  oDir <- outputDirectory
   liftIO $ do
-    cwd <- getCurrentDirectory
-    dirs <- getDirectoryContents (cwd </> outputPath)
-    return (ModuleList (listAvailableModules' dirs))
+    contents <- getDirectoryContents oDir
+    let cleaned = filter (`notElem` [".", ".."]) contents
+    return (ModuleList (map toS cleaned))
 
-listAvailableModules' :: [FilePath] -> [Text]
-listAvailableModules' dirs =
-  let cleanedModules = filter (`notElem` [".", ".."]) dirs
-  in map T.pack cleanedModules
-
-caseSplit :: (PscIde m, MonadError PscIdeError m) =>
+caseSplit :: (Ide m, MonadError PscIdeError m) =>
   Text -> Int -> Int -> CS.WildcardAnnotations -> Text -> m Success
 caseSplit l b e csa t = do
   patterns <- CS.makePattern l b e csa <$> CS.caseSplit t
   pure (MultilineTextResult patterns)
 
-addClause :: Text -> CS.WildcardAnnotations -> Success
-addClause t wca = MultilineTextResult (CS.addClause t wca)
+addClause
+  :: (MonadError PscIdeError m)
+  => Text
+  -> CS.WildcardAnnotations
+  -> m Success
+addClause t wca = MultilineTextResult <$> CS.addClause t wca
 
-importsForFile :: (MonadIO m, MonadError PscIdeError m) =>
-                  FilePath -> m Success
-importsForFile fp = do
-  imports <- getImportsForFile fp
-  pure (ImportList imports)
-
--- | The first argument is a set of modules to load. The second argument
---   denotes modules for which to load dependencies
-loadModulesAndDeps :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
-                     [ModuleIdent] -> [ModuleIdent] -> m Success
-loadModulesAndDeps mods deps = do
-  r1 <- mapM loadModule (mods ++ deps)
-  r2 <- mapM loadModuleDependencies deps
-  let moduleResults = T.concat r1
-  let dependencyResults = T.concat r2
-  pure (TextResult (moduleResults <> ", " <> dependencyResults))
-
-loadModuleDependencies ::(PscIde m, MonadLogger m, MonadError PscIdeError m) =>
-                         ModuleIdent -> m Text
-loadModuleDependencies moduleName = do
-  m <- getModule moduleName
-  case getDependenciesForModule <$> m of
-    Just deps -> do
-      mapM_ loadModule deps
-      -- We need to load the modules, that get reexported from the dependencies
-      depModules <- catMaybes <$> mapM getModule deps
-      -- What to do with errors here? This basically means a reexported dependency
-      -- doesn't exist in the output/ folder
-      traverse_ loadReexports depModules
-      pure ("Dependencies for " <> moduleName <> " loaded.")
-    Nothing -> throwError (ModuleNotFound moduleName)
-
-loadReexports :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
-                Module -> m [ModuleIdent]
-loadReexports m = case getReexports m of
-  [] -> pure []
-  exportDeps -> do
-    -- I'm fine with this crashing on a failed pattern match.
-    -- If this ever fails I'll need to look at GADTs
-    let reexports = map (\(Export mn) -> mn) exportDeps
-    $(logDebug) ("Loading reexports for module: " <> fst m <>
-                 " reexports: " <> T.intercalate ", " reexports)
-    traverse_ loadModule reexports
-    exportDepsModules <- catMaybes <$> traverse getModule reexports
-    exportDepDeps <- traverse loadReexports exportDepsModules
-    return $ concat exportDepDeps
-
-getDependenciesForModule :: Module -> [ModuleIdent]
-getDependenciesForModule (_, decls) = mapMaybe getDependencyName decls
-  where getDependencyName (Dependency dependencyName _ _) = Just dependencyName
-        getDependencyName _ = Nothing
-
-loadModule :: (PscIde m, MonadLogger m, MonadError PscIdeError m) =>
-              ModuleIdent -> m Text
-loadModule "Prim" = pure "Prim won't be loaded"
-loadModule mn = do
-  path <- filePathFromModule mn
-  loadExtern path
-  $(logDebug) ("Loaded extern file at: " <> T.pack path)
-  pure ("Loaded extern file at: " <> T.pack path)
-
-loadAllModules :: (PscIde m, MonadLogger m, MonadError PscIdeError m) => m Success
-loadAllModules = do
-  outputPath <- confOutputPath . envConfiguration <$> ask
-  cwd <- liftIO getCurrentDirectory
-  let outputDirectory = cwd </> outputPath
-  liftIO (doesDirectoryExist outputDirectory)
-    >>= flip unless (throwError (GeneralError "Couldn't locate your output directory"))
-  liftIO (getDirectoryContents outputDirectory)
-    >>= liftIO . traverse (getExternsPath outputDirectory)
-    >>= traverse_ loadExtern . catMaybes
-  pure (TextResult "All modules loaded.")
+-- | Finds all the externs.json files inside the output folder and returns the
+-- corresponding Modulenames
+findAvailableExterns :: (Ide m, MonadError PscIdeError m) => m [P.ModuleName]
+findAvailableExterns = do
+  oDir <- outputDirectory
+  unlessM (liftIO (doesDirectoryExist oDir))
+    (throwError (GeneralError "Couldn't locate your output directory."))
+  liftIO $ do
+    directories <- getDirectoryContents oDir
+    moduleNames <- filterM (checkExternsPath oDir) directories
+    pure (P.moduleNameFromString <$> moduleNames)
   where
-    getExternsPath :: FilePath -> FilePath -> IO (Maybe FilePath)
-    getExternsPath outputDirectory d
-      | d `elem` [".", ".."] = pure Nothing
+    -- | Takes the output directory and a filepath like "Monad.Control.Eff" and
+    -- looks up, whether that folder contains an externs.json
+    checkExternsPath :: FilePath -> FilePath -> IO Bool
+    checkExternsPath oDir d
+      | d `elem` [".", ".."] = pure False
       | otherwise = do
-          let file = outputDirectory </> d </> "externs.json"
-          ex <- doesFileExist file
-          if ex
-            then pure (Just file)
-            else pure Nothing
+          let file = oDir </> d </> "externs.json"
+          doesFileExist file
 
-filePathFromModule :: (PscIde m, MonadError PscIdeError m) =>
-                      ModuleIdent -> m FilePath
-filePathFromModule moduleName = do
-  outputPath <- confOutputPath . envConfiguration <$> ask
-  cwd <- liftIO getCurrentDirectory
-  let path = cwd </> outputPath </> T.unpack moduleName </> "externs.json"
-  ex <- liftIO $ doesFileExist path
-  if ex
-    then pure path
-    else throwError (ModuleFileNotFound moduleName)
+-- | Finds all matches for the globs specified at the commandline
+findAllSourceFiles :: Ide m => m [FilePath]
+findAllSourceFiles = do
+  globs <- confGlobs . ideConfiguration <$> ask
+  liftIO (concatMapM glob globs)
+
+-- | Looks up the ExternsFiles for the given Modulenames and loads them into the
+-- server state. Then proceeds to parse all the specified sourcefiles and
+-- inserts their ASTs into the state. Finally kicks off an async worker, which
+-- populates Stage 2 and 3 of the state.
+loadModules
+  :: (Ide m, MonadError PscIdeError m, MonadLogger m)
+  => [P.ModuleName]
+  -> m Success
+loadModules moduleNames = do
+  -- We resolve all the modulenames to externs files and load these into memory.
+  oDir <- outputDirectory
+  let efPaths =
+        map (\mn -> oDir </> P.runModuleName mn </> "externs.json") moduleNames
+  efiles <- traverse readExternFile efPaths
+  traverse_ insertExterns efiles
+
+  -- We parse all source files, log eventual parse failures if the debug flag
+  -- was set and insert the succesful parses into the state.
+  (failures, allModules) <-
+    partitionEithers <$> (traverse parseModule =<< findAllSourceFiles)
+  unless (null failures) $
+    $(logDebug) ("Failed to parse: " <> show failures)
+  traverse_ insertModule allModules
+
+  -- Because we still need the "old" module format to resolve reexports in the
+  -- worker thread, we insert it into the state aswell.
+  -- TODO Get rid of this once ModuleOld is gone
+  traverse_ insertModuleOld efiles
+
+  -- Finally we kick off the worker with @async@ and return the number of
+  -- successfully parsed modules.
+  env <- ask
+  let runLogger =
+        runStdoutLoggingT
+        . filterLogger (\_ _ -> confDebug (ideConfiguration env))
+  -- populateStage2 returns Unit for now, so it's fine to discard this result.
+  -- We might want to block on this in a benchmarking situation.
+  _ <- liftIO (async (runLogger (runReaderT populateStage2 env)))
+  pure (TextResult ("Loaded " <> show (length efiles) <> " modules and "
+                    <> show (length allModules) <> " source files."))

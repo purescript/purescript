@@ -29,17 +29,9 @@ module Language.PureScript.Ide.Imports
        )
        where
 
-import           Prelude.Compat
-import           Control.Applicative                ((<|>))
-import           Control.Monad.Error.Class
-import           Control.Monad.IO.Class
-import           Data.Bifunctor                     (first, second)
-import           Data.Function                      (on)
-import qualified Data.List                          as List
-import           Data.Maybe                         (isNothing)
-import           Data.Monoid                        ((<>))
-import           Data.Text                          (Text)
+import           Protolude
 import qualified Data.Text                          as T
+import           Data.List                          (nubBy, findIndex)
 import qualified Data.Text.IO                       as TIO
 import qualified Language.PureScript                as P
 import           Language.PureScript.Ide.Completion
@@ -50,6 +42,7 @@ import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
+import           System.FilePath
 
 data Import = Import P.ModuleName P.ImportDeclarationType  (Maybe P.ModuleName)
               deriving (Eq, Show)
@@ -85,7 +78,7 @@ parseImportsFromFile fp = do
     Right res -> pure res
     Left err -> throwError (GeneralError err)
 
-parseImportsWithModuleName :: [Text] -> Either String (P.ModuleName, [Import])
+parseImportsWithModuleName :: [Text] -> Either Text (P.ModuleName, [Import])
 parseImportsWithModuleName ls = do
   (P.Module _ _ mn decls _) <- moduleParse ls
   pure (mn, concatMap mkImport (unwrapPositioned <$> decls))
@@ -95,13 +88,13 @@ parseImportsWithModuleName ls = do
     mkImport (P.ImportDeclaration mn it qual) = [Import mn it qual]
     mkImport _ = []
 
-sliceImportSection :: [Text] -> Either String (P.ModuleName, [Text], [Import], [Text])
+sliceImportSection :: [Text] -> Either Text (P.ModuleName, [Text], [Import], [Text])
 sliceImportSection ts =
   case foldl step (ModuleHeader 0) (zip [0..] ts) of
     Res start end ->
       let
         (moduleHeader, (importSection, remainingFile)) =
-          List.splitAt (succ (end - start)) `second` List.splitAt start ts
+          splitAt (succ (end - start)) `second` splitAt start ts
       in
         (\(mn, is) -> (mn, moduleHeader, is, remainingFile)) <$>
           parseImportsWithModuleName (moduleHeader <> importSection)
@@ -109,7 +102,7 @@ sliceImportSection ts =
     -- If we don't find any imports, we insert a newline after the module
     -- declaration and begin a new importsection
     ModuleHeader ix ->
-      let (moduleHeader, remainingFile) = List.splitAt (succ ix) ts
+      let (moduleHeader, remainingFile) = splitAt (succ ix) ts
       in
         (\(mn, is) -> (mn, moduleHeader ++ [""], is, remainingFile)) <$>
           parseImportsWithModuleName moduleHeader
@@ -151,7 +144,7 @@ step (ImportSection start lastImportLine) (ix, l)
   | otherwise                              = Res start lastImportLine
 step (Res start end) _ = Res start end
 
-moduleParse :: [Text] -> Either String P.Module
+moduleParse :: [Text] -> Either Text P.Module
 moduleParse t = first show $ do
   tokens <- (P.lex "" . T.unpack . T.unlines) t
   P.runTokenParser "<psc-ide>" P.parseModule tokens
@@ -181,7 +174,7 @@ addImplicitImport' imports mn =
 -- @import Prelude (bind)@ in the file File.purs returns @["import Prelude
 -- (bind, unit)"]@
 addExplicitImport :: (MonadIO m, MonadError PscIdeError m) =>
-                     FilePath -> ExternDecl -> P.ModuleName -> m [Text]
+                     FilePath -> IdeDeclaration -> P.ModuleName -> m [Text]
 addExplicitImport fp decl moduleName = do
   (mn, pre, imports, post) <- parseImportsFromFile fp
   let newImportSection =
@@ -192,7 +185,7 @@ addExplicitImport fp decl moduleName = do
         else addExplicitImport' decl moduleName imports
   pure (pre ++ prettyPrintImportSection newImportSection ++ post)
 
-addExplicitImport' :: ExternDecl -> P.ModuleName -> [Import] -> [Import]
+addExplicitImport' :: IdeDeclaration -> P.ModuleName -> [Import] -> [Import]
 addExplicitImport' decl moduleName imports =
   let
     isImplicitlyImported =
@@ -207,37 +200,37 @@ addExplicitImport' decl moduleName imports =
     then imports
     else updateAtFirstOrPrepend matches (insertDeclIntoImport decl) freshImport imports
   where
-    refFromDeclaration (TypeClassDeclaration n) =
+    refFromDeclaration (IdeTypeClass n) =
       P.TypeClassRef n
-    refFromDeclaration (DataConstructor n tn _) =
+    refFromDeclaration (IdeDataConstructor n tn _) =
       P.TypeRef tn (Just [P.ProperName (T.unpack n)])
-    refFromDeclaration (TypeDeclaration n _) =
+    refFromDeclaration (IdeType n _) =
       P.TypeRef n (Just [])
-    refFromDeclaration (ValueOperator op _ _ _) =
+    refFromDeclaration (IdeValueOperator op _ _ _) =
       P.ValueOpRef op
-    refFromDeclaration (TypeOperator op _ _ _) =
+    refFromDeclaration (IdeTypeOperator op _ _ _) =
       P.TypeOpRef op
     refFromDeclaration d =
-      P.ValueRef $ P.Ident $ T.unpack (identifierFromExternDecl d)
+      P.ValueRef $ P.Ident $ T.unpack (identifierFromIdeDeclaration d)
 
     -- | Adds a declaration to an import:
     -- TypeDeclaration "Maybe" + Data.Maybe (maybe) -> Data.Maybe(Maybe, maybe)
-    insertDeclIntoImport :: ExternDecl -> Import -> Import
+    insertDeclIntoImport :: IdeDeclaration -> Import -> Import
     insertDeclIntoImport decl' (Import mn (P.Explicit refs) Nothing) =
       Import mn (P.Explicit (insertDeclIntoRefs decl' refs)) Nothing
     insertDeclIntoImport _ is = is
 
-    insertDeclIntoRefs :: ExternDecl -> [P.DeclarationRef] -> [P.DeclarationRef]
-    insertDeclIntoRefs (DataConstructor dtor tn _) refs =
+    insertDeclIntoRefs :: IdeDeclaration -> [P.DeclarationRef] -> [P.DeclarationRef]
+    insertDeclIntoRefs (IdeDataConstructor dtor tn _) refs =
       let
         dtor' = P.ProperName (T.unpack dtor)
       in
         updateAtFirstOrPrepend (matchType tn) (insertDtor dtor') (P.TypeRef tn (Just [dtor'])) refs
-    insertDeclIntoRefs dr refs = List.nubBy ((==) `on` P.prettyPrintRef) (refFromDeclaration dr : refs)
+    insertDeclIntoRefs dr refs = nubBy ((==) `on` P.prettyPrintRef) (refFromDeclaration dr : refs)
 
     insertDtor dtor (P.TypeRef tn' dtors) =
       case dtors of
-        Just dtors' -> P.TypeRef tn' (Just (List.nub (dtor : dtors')))
+        Just dtors' -> P.TypeRef tn' (Just (ordNub (dtor : dtors')))
         -- This means the import was opened. We don't add anything in this case
         -- import Data.Maybe (Maybe(..)) -> import Data.Maybe (Maybe(Just))
         Nothing -> P.TypeRef tn' Nothing
@@ -249,10 +242,10 @@ addExplicitImport' decl moduleName imports =
 
 updateAtFirstOrPrepend :: (a -> Bool) -> (a -> a) -> a -> [a] -> [a]
 updateAtFirstOrPrepend p t d l =
-  case List.findIndex p l of
+  case findIndex p l of
     Nothing -> d : l
     Just ix ->
-      let (x, a : y) = List.splitAt ix l
+      let (x, a : y) = splitAt ix l
       in x ++ [t a] ++ y
 
 -- | Looks up the given identifier in the currently loaded modules.
@@ -263,14 +256,14 @@ updateAtFirstOrPrepend p t d l =
 --
 -- * If more than one possible imports are found, reports the possibilities as a
 -- list of completions.
-addImportForIdentifier :: (PscIde m, MonadError PscIdeError m)
+addImportForIdentifier :: (Ide m, MonadError PscIdeError m)
                           => FilePath -- ^ The Sourcefile to read from
                           -> Text     -- ^ The identifier to import
                           -> [Filter] -- ^ Filters to apply before searching for
                                       -- the identifier
                           -> m (Either [Match] [Text])
 addImportForIdentifier fp ident filters = do
-  modules <- getAllModulesWithReexports
+  modules <- getAllModules2 Nothing
   case getExactMatches ident filters modules of
     [] ->
       throwError (NotFound "Couldn't find the given identifier. \
@@ -279,7 +272,7 @@ addImportForIdentifier fp ident filters = do
     -- Only one match was found for the given identifier, so we can insert it
     -- right away
     [Match m decl] ->
-      Right <$> addExplicitImport fp decl (P.moduleNameFromString (T.unpack m))
+      Right <$> addExplicitImport fp decl m
 
     -- This case comes up for newtypes and dataconstructors. Because values and
     -- types don't share a namespace we can get multiple matches from the same
@@ -296,7 +289,7 @@ addImportForIdentifier fp ident filters = do
         -- dataconstructor as that will give us an unnecessary import warning at
         -- worst
         Just decl ->
-          Right <$> addExplicitImport fp decl (P.moduleNameFromString (T.unpack m1))
+          Right <$> addExplicitImport fp decl m1
         -- Here we need the user to specify whether he wanted a dataconstructor
         -- or a type
         Nothing ->
@@ -307,9 +300,9 @@ addImportForIdentifier fp ident filters = do
     xs ->
       pure $ Left xs
     where
-      decideRedundantCase dtor@(DataConstructor _ t _) (TypeDeclaration t' _) =
+      decideRedundantCase dtor@(IdeDataConstructor _ t _) (IdeType t' _) =
         if t == t' then Just dtor else Nothing
-      decideRedundantCase TypeDeclaration{} ts@TypeSynonymDeclaration{} =
+      decideRedundantCase IdeType{} ts@IdeTypeSynonym{} =
         Just ts
       decideRedundantCase _ _ = Nothing
 
@@ -321,7 +314,7 @@ prettyPrintImport' (Import mn idt qual) =
   T.pack $ "import " ++ P.prettyPrintImport mn idt qual
 
 prettyPrintImportSection :: [Import] -> [Text]
-prettyPrintImportSection imports = map prettyPrintImport' (List.sort imports)
+prettyPrintImportSection imports = map prettyPrintImport' (sort imports)
 
 -- | Writes a list of lines to @Just filepath@ and responds with a @TextResult@,
 -- or returns the lines as a @MultilineTextResult@ if @Nothing@ was given as the

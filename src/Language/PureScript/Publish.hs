@@ -21,6 +21,7 @@ module Language.PureScript.Publish
   , getResolvedDependencies
   ) where
 
+import Prelude ()
 import Prelude.Compat hiding (userError)
 
 import Control.Arrow ((***))

@@ -1,8 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 module Language.PureScript.Ide.ImportsSpec where
 
-import           Data.Maybe                      (fromJust)
-import           Data.Text                       (Text)
+import           Protolude
+import           Unsafe                          (fromJust)
+
 import qualified Language.PureScript             as P
 import           Language.PureScript.Ide.Imports
 import           Language.PureScript.Ide.Types
@@ -17,11 +19,9 @@ simpleFile =
   ]
 
 splitSimpleFile :: (P.ModuleName, [Text], [Import], [Text])
-splitSimpleFile = fromRight $ sliceImportSection simpleFile
+splitSimpleFile = fromRight (sliceImportSection simpleFile)
   where
-    fromRight (Right r) = r
-    fromRight (Left _) = error "fromRight"
-
+    fromRight = fromJust . rightToMaybe
 withImports :: [Text] -> [Text]
 withImports is =
   take 2 simpleFile ++ is ++ drop 2 simpleFile
@@ -68,11 +68,11 @@ spec = do
   describe "import commands" $ do
     let simpleFileImports = let (_, _, i, _) = splitSimpleFile in i
         addValueImport i mn is =
-          prettyPrintImportSection (addExplicitImport' (ValueDeclaration i wildcard) mn is)
+          prettyPrintImportSection (addExplicitImport' (IdeValue i wildcard) mn is)
         addOpImport op mn is =
-          prettyPrintImportSection (addExplicitImport' (ValueOperator op "" 2 P.Infix) mn is)
+          prettyPrintImportSection (addExplicitImport' (IdeValueOperator op "" 2 P.Infix) mn is)
         addDtorImport i t mn is =
-          prettyPrintImportSection (addExplicitImport' (DataConstructor i t wildcard) mn is)
+          prettyPrintImportSection (addExplicitImport' (IdeDataConstructor i t wildcard) mn is)
     it "adds an implicit unqualified import" $
       shouldBe
         (addImplicitImport' simpleFileImports (P.moduleNameFromString "Data.Map"))
