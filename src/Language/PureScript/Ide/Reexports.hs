@@ -93,5 +93,14 @@ resolveReexports modules m =
      then replaced
      else resolveReexports modules replaced
 
-resolveReexports2 :: Map Text [ExternDecl] -> ModuleOld -> Module
-resolveReexports2 decls = convertModule . resolveReexports decls
+resolveReexports2
+  :: Map Text [ExternDecl]
+  -> AstData P.SourceSpan
+  -> ModuleOld
+  -> Module
+resolveReexports2 decls (AstData ast) oldModule =
+  let
+    moduleName = P.moduleNameFromString (toS (fst oldModule))
+    astData = fromMaybe Map.empty (Map.lookup moduleName ast)
+  in
+    convertModule astData (resolveReexports decls oldModule)

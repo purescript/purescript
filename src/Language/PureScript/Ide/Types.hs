@@ -13,6 +13,7 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveFoldable    #-}
 
 module Language.PureScript.Ide.Types where
 
@@ -67,8 +68,17 @@ data IdeDeclaration
   | IdeTypeOperator (P.OpName 'P.TypeOpName) Ident P.Precedence P.Associativity
   deriving (Show, Eq, Ord)
 
-type Module = (P.ModuleName, [IdeDeclaration])
+data IdeDeclarationAnn = IdeDeclarationAnn AstInfo IdeDeclaration
+  deriving (Show, Eq, Ord)
+
+type Module = (P.ModuleName, [IdeDeclarationAnn])
 type ModuleOld = (Text, [ExternDecl])
+
+type AstInfo = Maybe P.SourceSpan
+
+newtype AstData a =
+  AstData (Map P.ModuleName (Map (Either Text Text) a))
+  deriving (Show, Eq, Ord, Functor, Foldable)
 
 data Configuration =
   Configuration
@@ -97,16 +107,20 @@ emptyPscIdeState = PscIdeState M.empty
 data IdeState = IdeState
   { ideStage1 :: Stage1
   , ideStage2 :: Stage2
+  , ideStage3 :: Stage3
   }
 
 emptyIdeState :: IdeState
-emptyIdeState = IdeState emptyStage1 emptyStage2
+emptyIdeState = IdeState emptyStage1 emptyStage2 emptyStage3
 
 emptyStage1 :: Stage1
 emptyStage1 = Stage1 M.empty M.empty
 
 emptyStage2 :: Stage2
-emptyStage2 = Stage2 M.empty Nothing
+emptyStage2 = Stage2 (AstData M.empty)
+
+emptyStage3 :: Stage3
+emptyStage3 = Stage3 M.empty Nothing
 
 data Stage1 = Stage1
   { s1Externs :: M.Map P.ModuleName P.ExternsFile
@@ -114,19 +128,31 @@ data Stage1 = Stage1
   }
 
 data Stage2 = Stage2
-  { s2Declarations :: M.Map P.ModuleName [IdeDeclaration]
-  , s2CachedRebuild :: Maybe (P.ModuleName, P.ExternsFile)
+  { s2AstData :: AstData P.SourceSpan
   }
 
-data Match = Match P.ModuleName IdeDeclaration
-           deriving (Show, Eq)
+data Stage3 = Stage3
+  { s3Declarations :: M.Map P.ModuleName [IdeDeclarationAnn]
+  , s3CachedRebuild :: Maybe (P.ModuleName, P.ExternsFile)
+  }
+
+newtype Match a = Match (P.ModuleName, a)
+           deriving (Show, Eq, Functor)
 
 newtype Completion =
   Completion (ModuleIdent, Ident, Text)
   deriving (Show,Eq)
 
+newtype Info =
+  Info (ModuleIdent, Ident, Text, Maybe P.SourceSpan)
+  deriving (Show,Eq)
+
+instance ToJSON Info where
+  toJSON (Info (m, d, t, sourceSpan)) =
+    object ["module" .= m, "identifier" .= d, "type" .= t, "definedAt" .= sourceSpan]
+
 instance ToJSON Completion where
-  toJSON (Completion (m,d,t)) =
+  toJSON (Completion (m, d, t)) =
     object ["module" .= m, "identifier" .= d, "type" .= t]
 
 data ModuleImport =
@@ -165,6 +191,7 @@ identifierFromDeclarationRef _ = ""
 
 data Success =
   CompletionResult [Completion]
+  | InfoResult [Info]
   | TextResult Text
   | MultilineTextResult [Text]
   | PursuitResult [PursuitResponse]
@@ -179,6 +206,7 @@ encodeSuccess res =
 
 instance ToJSON Success where
   toJSON (CompletionResult cs) = encodeSuccess cs
+  toJSON (InfoResult i) = encodeSuccess i
   toJSON (TextResult t) = encodeSuccess t
   toJSON (MultilineTextResult ts) = encodeSuccess ts
   toJSON (PursuitResult resp) = encodeSuccess resp
