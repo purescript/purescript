@@ -216,7 +216,7 @@ inlineCommonOperators = applyAll $
 
   isNFn :: String -> Int -> JS -> Bool
   isNFn prefix n (JSVar _ name) = name == (prefix ++ show n)
-  isNFn prefix n (JSAccessor _ name (JSVar _ dataFunction)) | dataFunction == C.dataFunction = name == (prefix ++ show n)
+  isNFn prefix n (JSAccessor _ name (JSVar _ dataFunctionUncurried)) | dataFunctionUncurried == C.dataFunctionUncurried = name == (prefix ++ show n)
   isNFn _ _ _ = False
 
   runFn :: Int -> JS -> JS
