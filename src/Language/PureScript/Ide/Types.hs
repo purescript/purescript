@@ -29,52 +29,31 @@ import           System.FilePath
 import           Text.Parsec as Parsec
 import           Text.Parsec.Text
 
-type Ident = Text
 type ModuleIdent = Text
 
-data ExternDecl
-    -- | A function/value declaration
-    = ValueDeclaration Ident P.Type
-    | TypeDeclaration (P.ProperName 'P.TypeName) P.Kind
-    | TypeSynonymDeclaration (P.ProperName 'P.TypeName) P.Type
-    -- | A Dependency onto another Module
-    | Dependency
-        ModuleIdent  -- name of the dependency
-        [Text]       -- explicit imports
-        (Maybe Text) -- An eventual qualifier
-    -- | A module declaration
-    | ModuleDecl
-        ModuleIdent -- The modules name
-        [Ident] -- The exported identifiers
-    -- | A data/newtype declaration
-    | DataConstructor
-      Ident -- The type name
-      (P.ProperName 'P.TypeName)
-      P.Type      -- The "type"
-    -- | An exported module
-    | TypeClassDeclaration (P.ProperName 'P.ClassName)
-    | ValueOperator (P.OpName 'P.ValueOpName) Ident P.Precedence P.Associativity
-    | TypeOperator (P.OpName 'P.TypeOpName) Ident P.Precedence P.Associativity
-    | Export ModuleIdent -- The exported Modules name
-    deriving (Show,Eq,Ord)
-
 data IdeDeclaration
-  = IdeValue Ident P.Type
+  = IdeValue P.Ident P.Type
   | IdeType (P.ProperName 'P.TypeName) P.Kind
   | IdeTypeSynonym (P.ProperName 'P.TypeName) P.Type
-  | IdeDataConstructor Ident (P.ProperName 'P.TypeName) P.Type
+  | IdeDataConstructor (P.ProperName 'P.ConstructorName) (P.ProperName 'P.TypeName) P.Type
   | IdeTypeClass (P.ProperName 'P.ClassName)
-  | IdeValueOperator (P.OpName 'P.ValueOpName) Ident P.Precedence P.Associativity
-  | IdeTypeOperator (P.OpName 'P.TypeOpName) Ident P.Precedence P.Associativity
+  | IdeValueOperator (P.OpName 'P.ValueOpName) Text P.Precedence P.Associativity
+  | IdeTypeOperator (P.OpName 'P.TypeOpName) Text P.Precedence P.Associativity
   deriving (Show, Eq, Ord)
 
-data IdeDeclarationAnn = IdeDeclarationAnn AstInfo IdeDeclaration
+data IdeDeclarationAnn = IdeDeclarationAnn Annotation IdeDeclaration
   deriving (Show, Eq, Ord)
+
+data Annotation
+  = Annotation
+  { annLocation     :: Maybe P.SourceSpan
+  , annExportedFrom :: Maybe P.ModuleName
+  } deriving (Show, Eq, Ord)
+
+emptyAnn :: Annotation
+emptyAnn = Annotation Nothing Nothing
 
 type Module = (P.ModuleName, [IdeDeclarationAnn])
-type ModuleOld = (Text, [ExternDecl])
-
-type AstInfo = Maybe P.SourceSpan
 
 newtype AstData a =
   AstData (Map P.ModuleName (Map (Either Text Text) a))
@@ -89,20 +68,11 @@ data Configuration =
 
 data IdeEnvironment =
   IdeEnvironment
-  { envStateVar      :: TVar PscIdeState
-  , ideStateVar      :: TVar IdeState
+  { ideStateVar      :: TVar IdeState
   , ideConfiguration :: Configuration
   }
 
 type Ide m = (MonadIO m, MonadReader IdeEnvironment m)
-
-data PscIdeState =
-  PscIdeState
-  { pscIdeStateModules       :: M.Map Text [ExternDecl]
-  } deriving Show
-
-emptyPscIdeState :: PscIdeState
-emptyPscIdeState = PscIdeState M.empty
 
 data IdeState = IdeState
   { ideStage1 :: Stage1
@@ -140,11 +110,11 @@ newtype Match a = Match (P.ModuleName, a)
            deriving (Show, Eq, Functor)
 
 newtype Completion =
-  Completion (ModuleIdent, Ident, Text)
+  Completion (Text, Text, Text)
   deriving (Show,Eq)
 
 newtype Info =
-  Info (ModuleIdent, Ident, Text, Maybe P.SourceSpan)
+  Info (Text, Text, Text, Maybe P.SourceSpan)
   deriving (Show,Eq)
 
 instance ToJSON Info where
@@ -236,7 +206,7 @@ data PursuitResponse =
   ModuleResponse ModuleIdent Text
   -- | A Pursuit Response for a declaration. Consist of the declarations type,
   -- module, name and package
-  | DeclarationResponse Text ModuleIdent Ident Text
+  | DeclarationResponse Text ModuleIdent Text Text
   deriving (Show,Eq)
 
 instance FromJSON PursuitResponse where

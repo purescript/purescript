@@ -72,7 +72,7 @@ startServer = do
   -- Turn off filewatching since it creates race condition in a testing environment
   (_, _, _, procHandle) <- createProcess $
     (shell "psc-ide-server --no-watch src/*.purs") {cwd = Just pdir}
-  threadDelay 500000 -- give the server 500ms to start up
+  threadDelay 2000000 -- give the server 2s to start up
   return procHandle
 
 stopServer :: ProcessHandle -> IO ()

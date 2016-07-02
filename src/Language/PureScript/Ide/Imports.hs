@@ -36,8 +36,6 @@ import qualified Data.Text.IO                       as TIO
 import qualified Language.PureScript                as P
 import           Language.PureScript.Ide.Completion
 import           Language.PureScript.Ide.Error
-import           Language.PureScript.Ide.Externs    (unwrapPositioned,
-                                                     unwrapPositionedRef)
 import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
@@ -203,7 +201,7 @@ addExplicitImport' decl moduleName imports =
     refFromDeclaration (IdeTypeClass n) =
       P.TypeClassRef n
     refFromDeclaration (IdeDataConstructor n tn _) =
-      P.TypeRef tn (Just [P.ProperName (T.unpack n)])
+      P.TypeRef tn (Just [n])
     refFromDeclaration (IdeType n _) =
       P.TypeRef n (Just [])
     refFromDeclaration (IdeValueOperator op _ _ _) =
@@ -222,10 +220,7 @@ addExplicitImport' decl moduleName imports =
 
     insertDeclIntoRefs :: IdeDeclaration -> [P.DeclarationRef] -> [P.DeclarationRef]
     insertDeclIntoRefs (IdeDataConstructor dtor tn _) refs =
-      let
-        dtor' = P.ProperName (T.unpack dtor)
-      in
-        updateAtFirstOrPrepend (matchType tn) (insertDtor dtor') (P.TypeRef tn (Just [dtor'])) refs
+      updateAtFirstOrPrepend (matchType tn) (insertDtor dtor) (P.TypeRef tn (Just [dtor])) refs
     insertDeclIntoRefs dr refs = nubBy ((==) `on` P.prettyPrintRef) (refFromDeclaration dr : refs)
 
     insertDtor dtor (P.TypeRef tn' dtors) =
@@ -263,8 +258,8 @@ addImportForIdentifier :: (Ide m, MonadError PscIdeError m)
                                       -- the identifier
                           -> m (Either [Match IdeDeclaration] [Text])
 addImportForIdentifier fp ident filters = do
-  modules <- getAllModules2 Nothing
-  case map (fmap discardAstInfo) (getExactMatches ident filters modules) of
+  modules <- getAllModules Nothing
+  case map (fmap discardAnn) (getExactMatches ident filters modules) of
     [] ->
       throwError (NotFound "Couldn't find the given identifier. \
                            \Have you loaded the corresponding module?")

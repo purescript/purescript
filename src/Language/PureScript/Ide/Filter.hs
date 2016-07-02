@@ -20,7 +20,6 @@ module Language.PureScript.Ide.Filter
        , moduleFilter
        , prefixFilter
        , equalityFilter
-       , runFilter
        , applyFilters
        ) where
 
@@ -70,7 +69,7 @@ identFilter predicate search =
     getDeclaration (IdeDeclarationAnn _ d) = d
 
 runFilter :: Filter -> [Module] -> [Module]
-runFilter (Filter f)= appEndo f
+runFilter (Filter f) = appEndo f
 
 applyFilters :: [Filter] -> [Module] -> [Module]
 applyFilters = runFilter . fold

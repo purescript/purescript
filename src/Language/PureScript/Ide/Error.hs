@@ -15,7 +15,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Language.PureScript.Ide.Error
        ( PscIdeError(..)
-       , textError
        ) where
 
 import           Protolude

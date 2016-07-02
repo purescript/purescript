@@ -9,7 +9,7 @@ import qualified Language.PureScript as P
 import           Test.Hspec
 
 value :: Text -> IdeDeclarationAnn
-value s = IdeDeclarationAnn Nothing $ IdeValue s P.REmpty
+value s = IdeDeclarationAnn emptyAnn (IdeValue (P.Ident (toS s)) P.REmpty)
 
 moduleA, moduleB :: Module
 moduleA = (P.moduleNameFromString "Module.A", [value "function1"])
@@ -19,13 +19,13 @@ modules :: [Module]
 modules = [moduleA, moduleB]
 
 runEq :: Text -> [Module]
-runEq s = runFilter (equalityFilter s) modules
+runEq s = applyFilters [equalityFilter s] modules
 
 runPrefix :: Text -> [Module]
-runPrefix s = runFilter (prefixFilter s) modules
+runPrefix s = applyFilters [prefixFilter s] modules
 
 runModule :: [P.ModuleName] -> [Module]
-runModule ms = runFilter (moduleFilter ms) modules
+runModule ms = applyFilters [moduleFilter ms] modules
 
 spec :: Spec
 spec = do

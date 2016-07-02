@@ -42,6 +42,8 @@ import           System.Directory
 import           System.FilePath
 import           System.FilePath.Glob
 
+-- | Accepts a Commmand and runs it against psc-ide's State. This is the main
+-- entry point for the server.
 handleCommand :: (Ide m, MonadLogger m, MonadError PscIdeError m) =>
                  Command -> m Success
 handleCommand c = case c of
@@ -66,7 +68,7 @@ handleCommand c = case c of
   CaseSplit l b e wca t ->
     caseSplit l b e wca t
   AddClause l wca ->
-    addClause l wca
+    MultilineTextResult <$> CS.addClause l wca
   Import fp outfp _ (AddImplicitImport mn) -> do
     rs <- addImplicitImport fp mn
     answerRequest outfp rs
@@ -88,13 +90,13 @@ handleCommand c = case c of
 findCompletions :: Ide m =>
                    [Filter] -> Matcher IdeDeclaration -> Maybe P.ModuleName -> m Success
 findCompletions filters matcher currentModule = do
-  modules <- getAllModules2 currentModule
+  modules <- getAllModules currentModule
   pure . CompletionResult . map completionFromMatch . getCompletions filters matcher $ modules
 
 findType :: Ide m =>
             Text -> [Filter] -> Maybe P.ModuleName -> m Success
 findType search filters currentModule = do
-  modules <- getAllModules2 currentModule
+  modules <- getAllModules currentModule
   pure . InfoResult . map infoFromMatch . getExactMatches search filters $ modules
 
 findPursuitCompletions :: MonadIO m =>
@@ -129,13 +131,6 @@ caseSplit :: (Ide m, MonadError PscIdeError m) =>
 caseSplit l b e csa t = do
   patterns <- CS.makePattern l b e csa <$> CS.caseSplit t
   pure (MultilineTextResult patterns)
-
-addClause
-  :: (MonadError PscIdeError m)
-  => Text
-  -> CS.WildcardAnnotations
-  -> m Success
-addClause t wca = MultilineTextResult <$> CS.addClause t wca
 
 -- | Finds all the externs.json files inside the output folder and returns the
 -- corresponding Modulenames
@@ -187,11 +182,6 @@ loadModules moduleNames = do
   unless (null failures) $
     $(logDebug) ("Failed to parse: " <> show failures)
   traverse_ insertModule allModules
-
-  -- Because we still need the "old" module format to resolve reexports in the
-  -- worker thread, we insert it into the state aswell.
-  -- TODO Get rid of this once ModuleOld is gone
-  traverse_ insertModuleOld efiles
 
   -- Finally we kick off the worker with @async@ and return the number of
   -- successfully parsed modules.

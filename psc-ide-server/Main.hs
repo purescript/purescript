@@ -70,7 +70,6 @@ main :: IO ()
 main = do
   Options dir globs outputPath port noWatch debug <- execParser opts
   maybe (pure ()) setCurrentDirectory dir
-  serverState <- newTVarIO emptyPscIdeState
   ideState <- newTVarIO emptyIdeState
   cwd <- getCurrentDirectory
   let fullOutputPath = cwd </> outputPath
@@ -85,7 +84,7 @@ main = do
     void (forkFinally (watcher ideState fullOutputPath) print)
 
   let conf = Configuration {confDebug = debug, confOutputPath = outputPath, confGlobs = globs}
-      env = IdeEnvironment {envStateVar = serverState, ideStateVar = ideState, ideConfiguration = conf}
+      env = IdeEnvironment {ideStateVar = ideState, ideConfiguration = conf}
   startServer port env
   where
     parser =

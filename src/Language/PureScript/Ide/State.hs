@@ -19,18 +19,12 @@
 module Language.PureScript.Ide.State
   ( getLoadedModulenames
   , getExternFiles
-  , insertModuleOld
   , resetIdeState
   , cacheRebuild
   , insertExterns
   , insertModule
-  , insertModuleSTM
   , insertExternsSTM
-  , getAllModules2
-  , getStage1
-  , setStage1
-  , getStage3
-  , setStage3
+  , getAllModules
   , populateStage2
   , populateStage3
   , populateStage3STM
@@ -55,10 +49,8 @@ import           System.FilePath
 -- | Resets all State inside psc-ide
 resetIdeState :: Ide m => m ()
 resetIdeState = do
-  stateVar <- envStateVar <$> ask
   ideVar <- ideStateVar <$> ask
   liftIO . atomically $ do
-    writeTVar stateVar emptyPscIdeState
     writeTVar ideVar emptyIdeState
     setStage3STM ideVar emptyStage3
 
@@ -69,26 +61,6 @@ getLoadedModulenames = M.keys <$> getExternFiles
 -- | Gets all loaded ExternFiles
 getExternFiles :: Ide m => m (M.Map P.ModuleName ExternsFile)
 getExternFiles = s1Externs <$> getStage1
-
--- | Inserts an @ExternsFile@ into the PscIdeState. Also converts the
--- ExternsFile into psc-ide's internal Declaration format
--- TODO: should be removed when the "old" Declaration format gets removed
-insertModuleOld :: Ide m => ExternsFile -> m ()
-insertModuleOld externsFile = do
-  stateVar <- envStateVar <$> ask
-  liftIO . atomically $ insertModuleOldSTM stateVar externsFile
-
--- | STM version of insertModuleOld
-insertModuleOldSTM :: TVar PscIdeState -> ExternsFile -> STM ()
-insertModuleOldSTM st ef = modifyTVar st (insertModule' ef)
-
--- | Pure version of insertModuleOld
-insertModule' :: ExternsFile -> PscIdeState -> PscIdeState
-insertModule' ef state =
-  state
-  { pscIdeStateModules = let (mn, decls) = convertExterns ef
-                         in M.insert mn decls (pscIdeStateModules state)
-  }
 
 -- | Insert a Module into Stage1 of the State
 insertModule :: Ide m => (FilePath, P.Module) -> m ()
@@ -117,14 +89,6 @@ getStage1 = do
 getStage1STM :: TVar IdeState -> STM Stage1
 getStage1STM ref = ideStage1 <$> readTVar ref
 
--- | Sets Stage1 inside the compiler
-setStage1 :: Ide m => Stage1 -> m ()
-setStage1 s1 = do
-  st <- ideStateVar <$> ask
-  liftIO . atomically . modifyTVar st $ \x ->
-    x {ideStage1 = s1}
-  pure ()
-
 -- | Retrieves Stage2 from the State.
 getStage2 :: Ide m => m Stage2
 getStage2 = do
@@ -149,12 +113,6 @@ getStage3 = do
   fmap ideStage3 . liftIO . readTVarIO $ st
 
 -- | Sets Stage3 inside the compiler
-setStage3 :: Ide m => Stage3 -> m ()
-setStage3 s3 = do
-  st <- ideStateVar <$> ask
-  liftIO . atomically $ setStage3STM st s3
-
--- | STM version of setStage3
 setStage3STM :: TVar IdeState -> Stage3 -> STM ()
 setStage3STM ref s3 = do
   modifyTVar ref $ \x ->
@@ -164,8 +122,8 @@ setStage3STM ref s3 = do
 -- | Checks if the given ModuleName matches the last rebuild cache and if it
 -- does returns all loaded definitions + the definitions inside the rebuild
 -- cache
-getAllModules2 :: Ide m => Maybe P.ModuleName -> m [Module]
-getAllModules2 mmoduleName = do
+getAllModules :: Ide m => Maybe P.ModuleName -> m [Module]
+getAllModules mmoduleName = do
   declarations <- s3Declarations <$> getStage3
   rebuild <- cachedRebuild
   case mmoduleName of
@@ -178,7 +136,7 @@ getAllModules2 mmoduleName = do
               let ast = fromMaybe M.empty (M.lookup moduleName asts)
               pure . M.toList $
                 M.insert moduleName
-                (snd . convertModule ast . convertExterns $ ef) declarations
+                (snd . annotateLocations ast . fst . convertExterns $ ef) declarations
         _ -> pure (M.toList declarations)
 
 -- | Adds an ExternsFile into psc-ide's State Stage1. This does not populate the
@@ -230,20 +188,27 @@ populateStage2STM ref = do
 populateStage3 :: (Ide m, MonadLogger m) => m ()
 populateStage3 = do
   st <- ideStateVar <$> ask
-  duration <- liftIO $ do
+  (duration, results) <- liftIO $ do
     start <- getTime Monotonic
-    atomically (populateStage3STM st)
+    results <- atomically (populateStage3STM st)
     end <- getTime Monotonic
-    pure (Prelude.show (diffTimeSpec start end))
+    pure (Prelude.show (diffTimeSpec start end), results)
+  traverse_
+    (logWarnN . prettyPrintReexportResult (runModuleNameT . fst))
+    (filter reexportHasFailures results)
   $(logDebug) $ "Finished populating Stage3 in " <> toS duration
 
 -- | STM version of populateStage3
-populateStage3STM :: TVar IdeState -> STM ()
+populateStage3STM :: TVar IdeState -> STM [ReexportResult Module]
 populateStage3STM ref = do
   externs <- s1Externs <$> getStage1STM ref
-  asts <- s2AstData <$> getStage2STM ref
-  -- Build the "old" ExternDecl format
-  let modules = M.mapKeys runModuleNameT (M.map (snd . convertExterns) externs)
-      -- Convert ExternDecl into IdeDeclaration
-      declarations = resolveReexports2 modules asts <$> M.toList modules
-  setStage3STM ref (Stage3 (M.fromList declarations) Nothing)
+  (AstData asts) <- s2AstData <$> getStage2STM ref
+  let modules = M.map convertExterns externs
+      nModules :: Map P.ModuleName (Module, [(P.ModuleName, P.DeclarationRef)])
+      nModules = M.mapWithKey
+        (\moduleName (m, refs) ->
+           (fromMaybe m $ annotateLocations <$> M.lookup moduleName asts <*> pure m, refs)) modules
+      -- resolves reexports and discards load failures for now
+      result = resolveReexports (M.map (snd . fst) nModules) <$> M.elems nModules
+  setStage3STM ref (Stage3 (M.fromList (map reResolved result)) Nothing)
+  pure result

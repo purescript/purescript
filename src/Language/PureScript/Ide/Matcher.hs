@@ -18,8 +18,9 @@
 
 module Language.PureScript.Ide.Matcher
        ( Matcher
-       , flexMatcher
        , runMatcher
+       -- for tests
+       , flexMatcher
        ) where
 
 import           Protolude

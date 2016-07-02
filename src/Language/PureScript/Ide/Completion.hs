@@ -19,7 +19,7 @@ getCompletions
   -> [Module]
   -> [Match IdeDeclaration]
 getCompletions filters matcher modules =
-  runMatcher matcher (completionsFromModules discardAstInfo (applyFilters filters modules))
+  runMatcher matcher (completionsFromModules discardAnn (applyFilters filters modules))
 
 getExactMatches :: Text -> [Filter] -> [Module] -> [Match IdeDeclarationAnn]
 getExactMatches search filters modules =

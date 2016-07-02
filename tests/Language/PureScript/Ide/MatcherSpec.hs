@@ -12,7 +12,7 @@ import           Language.PureScript.Ide.Types
 import           Test.Hspec
 
 value :: Text -> IdeDeclaration
-value s = IdeValue s P.REmpty
+value s = IdeValue (P.Ident (toS s)) P.REmpty
 
 firstResult, secondResult, fiult :: Match IdeDeclaration
 firstResult = Match (P.moduleNameFromString "Match", value "firstResult")
