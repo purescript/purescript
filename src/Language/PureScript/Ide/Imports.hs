@@ -261,17 +261,17 @@ addImportForIdentifier :: (Ide m, MonadError PscIdeError m)
                           -> Text     -- ^ The identifier to import
                           -> [Filter] -- ^ Filters to apply before searching for
                                       -- the identifier
-                          -> m (Either [Match] [Text])
+                          -> m (Either [Match IdeDeclaration] [Text])
 addImportForIdentifier fp ident filters = do
   modules <- getAllModules2 Nothing
-  case getExactMatches ident filters modules of
+  case map (fmap discardAstInfo) (getExactMatches ident filters modules) of
     [] ->
       throwError (NotFound "Couldn't find the given identifier. \
                            \Have you loaded the corresponding module?")
 
     -- Only one match was found for the given identifier, so we can insert it
     -- right away
-    [Match m decl] ->
+    [Match (m, decl)] ->
       Right <$> addExplicitImport fp decl m
 
     -- This case comes up for newtypes and dataconstructors. Because values and
@@ -279,7 +279,7 @@ addImportForIdentifier fp ident filters = do
     -- module. This also happens for parameterized types, as these generate both
     -- a type aswell as a type synonym.
 
-    ms@[Match m1 d1, Match m2 d2] ->
+    ms@[Match (m1, d1), Match (m2, d2)] ->
       if m1 /= m2
          -- If the modules don't line up we just ask the user to specify the
          -- module

@@ -86,7 +86,7 @@ handleCommand c = case c of
     liftIO exitSuccess
 
 findCompletions :: Ide m =>
-                   [Filter] -> Matcher -> Maybe P.ModuleName -> m Success
+                   [Filter] -> Matcher IdeDeclaration -> Maybe P.ModuleName -> m Success
 findCompletions filters matcher currentModule = do
   modules <- getAllModules2 currentModule
   pure . CompletionResult . map completionFromMatch . getCompletions filters matcher $ modules
@@ -95,7 +95,7 @@ findType :: Ide m =>
             Text -> [Filter] -> Maybe P.ModuleName -> m Success
 findType search filters currentModule = do
   modules <- getAllModules2 currentModule
-  pure . CompletionResult . map completionFromMatch . getExactMatches search filters $ modules
+  pure . InfoResult . map infoFromMatch . getExactMatches search filters $ modules
 
 findPursuitCompletions :: MonadIO m =>
                           PursuitQuery -> m Success
@@ -146,13 +146,13 @@ findAvailableExterns = do
     (throwError (GeneralError "Couldn't locate your output directory."))
   liftIO $ do
     directories <- getDirectoryContents oDir
-    moduleNames <- filterM (checkExternsPath oDir) directories
+    moduleNames <- filterM (containsExterns oDir) directories
     pure (P.moduleNameFromString <$> moduleNames)
   where
-    -- | Takes the output directory and a filepath like "Monad.Control.Eff" and
+    -- Takes the output directory and a filepath like "Monad.Control.Eff" and
     -- looks up, whether that folder contains an externs.json
-    checkExternsPath :: FilePath -> FilePath -> IO Bool
-    checkExternsPath oDir d
+    containsExterns :: FilePath -> FilePath -> IO Bool
+    containsExterns oDir d
       | d `elem` [".", ".."] = pure False
       | otherwise = do
           let file = oDir </> d </> "externs.json"
@@ -199,8 +199,8 @@ loadModules moduleNames = do
   let runLogger =
         runStdoutLoggingT
         . filterLogger (\_ _ -> confDebug (ideConfiguration env))
-  -- populateStage2 returns Unit for now, so it's fine to discard this result.
-  -- We might want to block on this in a benchmarking situation.
-  _ <- liftIO (async (runLogger (runReaderT populateStage2 env)))
+  -- populateStage2 and 3 return Unit for now, so it's fine to discard this
+  -- result. We might want to block on this in a benchmarking situation.
+  _ <- liftIO (async (runLogger (runReaderT (populateStage2 *> populateStage3) env)))
   pure (TextResult ("Loaded " <> show (length efiles) <> " modules and "
                     <> show (length allModules) <> " source files."))

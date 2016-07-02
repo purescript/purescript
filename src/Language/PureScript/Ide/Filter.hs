@@ -65,8 +65,9 @@ identFilter predicate search =
     filter (not . null . snd) . fmap filterModuleDecls
   where
     filterModuleDecls :: Module -> Module
-    filterModuleDecls (moduleIdent,decls) =
-        (moduleIdent, filter (`predicate` search) decls)
+    filterModuleDecls (moduleIdent, decls) =
+        (moduleIdent, filter (flip predicate search . getDeclaration) decls)
+    getDeclaration (IdeDeclarationAnn _ d) = d
 
 runFilter :: Filter -> [Module] -> [Module]
 runFilter (Filter f)= appEndo f

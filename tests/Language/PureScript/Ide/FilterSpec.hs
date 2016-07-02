@@ -8,8 +8,8 @@ import           Language.PureScript.Ide.Types
 import qualified Language.PureScript as P
 import           Test.Hspec
 
-value :: Text -> IdeDeclaration
-value s = IdeValue s $ P.TypeWildcard $ P.SourceSpan "" (P.SourcePos 0 0) (P.SourcePos 0 0)
+value :: Text -> IdeDeclarationAnn
+value s = IdeDeclarationAnn Nothing $ IdeValue s P.REmpty
 
 moduleA, moduleB :: Module
 moduleA = (P.moduleNameFromString "Module.A", [value "function1"])

@@ -30,14 +30,14 @@ import           Protolude
 
 import           Data.Aeson                    (decodeStrict)
 import           Data.List                     (nub)
+import qualified Data.Map                      as Map
 import qualified Data.ByteString               as BS
 import           Language.PureScript.Ide.Error (PscIdeError (..))
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 
 import qualified Language.PureScript           as P
-
-import System.FilePath
+import           System.FilePath
 
 readExternFile :: (MonadIO m, MonadError PscIdeError m) =>
                   FilePath -> m P.ExternsFile
@@ -116,17 +116,27 @@ unwrapPositionedRef :: P.DeclarationRef -> P.DeclarationRef
 unwrapPositionedRef (P.PositionedDeclarationRef _ _ x) = x
 unwrapPositionedRef x = x
 
-convertModule :: ModuleOld -> Module
-convertModule (mn, decls) = (P.moduleNameFromString (toS mn), mapMaybe convertDeclaration decls)
-  where convertDeclaration :: ExternDecl -> Maybe IdeDeclaration
+convertModule :: Map (Either Text Text) P.SourceSpan -> ModuleOld -> Module
+convertModule ast (mn, decls) =
+  (P.moduleNameFromString (toS mn), mapMaybe convertDeclaration decls)
+  where convertDeclaration :: ExternDecl -> Maybe IdeDeclarationAnn
         convertDeclaration d = case d of
-          ValueDeclaration i t -> Just (IdeValue i t)
-          TypeDeclaration i k -> Just (IdeType i k)
-          TypeSynonymDeclaration i t -> Just (IdeTypeSynonym i t)
-          DataConstructor i tn t -> Just (IdeDataConstructor i tn t)
-          TypeClassDeclaration i -> Just (IdeTypeClass i)
-          ValueOperator n i p a -> Just (IdeValueOperator n i p a)
-          TypeOperator n i p a -> Just (IdeTypeOperator n i p a)
+          ValueDeclaration i t ->
+            annotateValue i (IdeValue i t)
+          TypeDeclaration i k ->
+            annotateType (runProperNameT i) (IdeType i k)
+          TypeSynonymDeclaration i t ->
+            annotateType (runProperNameT i) (IdeTypeSynonym i t)
+          DataConstructor i tn t ->
+            annotateValue i (IdeDataConstructor i tn t)
+          TypeClassDeclaration i ->
+            annotateType (runProperNameT i) (IdeTypeClass i)
+          ValueOperator n i p a ->
+            annotateValue i (IdeValueOperator n i p a)
+          TypeOperator n i p a ->
+            annotateType i (IdeTypeOperator n i p a)
           Dependency{} -> Nothing
           ModuleDecl _ _ -> Nothing
           Export _ -> Nothing
+        annotateValue x = Just . IdeDeclarationAnn (Map.lookup (Left x) ast)
+        annotateType x = Just . IdeDeclarationAnn (Map.lookup (Right x) ast)
