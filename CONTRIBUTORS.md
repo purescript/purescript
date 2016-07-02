@@ -72,6 +72,7 @@ This file lists the contributors to the PureScript compiler project, and the ter
 - [@LiamGoodacre](https://github.com/LiamGoodacre) (Liam Goodacre) My existing contributions and all future contributions until further notice are Copyright Liam Goodacre, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 - [@bsermons](https://github.com/bsermons) (Brian Sermons) My existing contributions and all future contributions until further notice are Copyright Brian Sermons, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 - [@bmjames](https://github.com/bmjames) (Ben James) My existing contributions and all future contributions until further notice are Copyright Ben James, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
+- - [@felixSchl](https://github.com/felixSchl) (Felix Schlitter) My existing contributions and all future contributions until further notice are Copyright Felix Schlitter, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 
 ### Companies
 
