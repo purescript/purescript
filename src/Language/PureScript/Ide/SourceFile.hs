@@ -69,11 +69,13 @@ getImportsForFile fp = do
 -- | Given a surrounding Sourcespan and a Declaration from the PS AST, extracts
 -- definition sites inside that Declaration.
 extractSpans
-  :: P.SourceSpan -- ^ The surrounding span
-  -> P.Declaration -- ^ The declaration to extract spans from
-  -> [(Either Text Text, P.SourceSpan)] -- ^ A @Right@ corresponds to a type
-                                        -- level declaration, and a @Left@ to a
-                                        -- value level one
+  :: P.SourceSpan
+  -- ^ The surrounding span
+  -> P.Declaration
+  -- ^ The declaration to extract spans from
+  -> [(Either Text Text, P.SourceSpan)]
+  -- ^ A @Right@ corresponds to a type level declaration, and a @Left@ to a
+  -- value level one
 extractSpans ss d = case d of
   P.PositionedDeclaration ss' _ d' ->
     extractSpans ss' d'
@@ -82,10 +84,10 @@ extractSpans ss d = case d of
   P.TypeSynonymDeclaration name _ _ ->
     [(Right (runProperNameT name), ss)]
   P.TypeClassDeclaration name _ _ members ->
-    [(Right (runProperNameT name), ss)] ++ concatMap (extractSpans' ss) members
+    (Right (runProperNameT name), ss) : concatMap (extractSpans' ss) members
   P.DataDeclaration _ name _ ctors ->
-    [(Right (runProperNameT name), ss)]
-    ++ map (\(cname, _) -> (Left (runProperNameT cname), ss)) ctors
+    (Right (runProperNameT name), ss)
+    : map (\(cname, _) -> (Left (runProperNameT cname), ss)) ctors
   P.ExternDeclaration ident _ ->
     [(Left (runIdentT ident), ss)]
   P.ExternDataDeclaration name _ ->
