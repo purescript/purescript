@@ -7,6 +7,7 @@
 {-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 
 module Main (main) where
@@ -14,6 +15,7 @@ module Main (main) where
 import           Prelude ()
 import           Prelude.Compat
 
+import           Data.FileEmbed (embedStringFile)
 import           Data.Monoid ((<>))
 import           Data.String (IsString(..))
 import           Data.Text (Text, unpack)
@@ -139,83 +141,11 @@ bundle = runExceptT $ do
     length js `seq` return (mid, js)
   Bundle.bundle input [] Nothing "PSCI"
 
--- TODO: use JMacro here?
-indexJS :: IsString string => Int -> string
-indexJS serverPort = fromString . unlines $
-  [ "var get = function get(uri, callback, onError) {"
-  , "  var request = new XMLHttpRequest();"
-  , "  request.addEventListener('load', function() {"
-  , "    callback(request.responseText);"
-  , "  });"
-  , "  request.addEventListener('error', onError);"
-  , "  request.open('GET', uri);"
-  , "  request.send();"
-  , "};"
-  , "var evaluate = function evaluate(js) {"
-  , "  var buffer = [];"
-  , "  console.log = function(s) {"
-  , "    // Push log output into a temporary buffer"
-  , "    // which will be returned to PSCi."
-  , "    buffer.push(s);"
-  , "  };"
-  , "  // Replace any require(...) statements with lookups on the PSCI object."
-  , "  var replaced = js.replace(/require\\(\"[^\"]*\"\\)/g, function(s) {"
-  , "    return \"PSCI['\" + s.substring(12, s.length - 2) + \"']\";"
-  , "  });"
-  , "  // Wrap the module and evaluate it."
-  , "  var wrapped ="
-  , "      [ 'var module = {};'"
-  , "      , '(function(module) {'"
-  , "      , replaced"
-  , "      , '})(module);'"
-  , "      , 'return module.exports[\"$main\"] && module.exports[\"$main\"]();'"
-  , "      ].join('\\n');"
-  , "  new Function(wrapped)();"
-  , "  return buffer.join('\\n');"
-  , "};"
-  , "window.onload = function() {"
-  , "  var socket = new WebSocket('ws://0.0.0.0:" <> show serverPort <> "');"
-  , "  var evalNext = function reload() {"
-  , "    get('js/latest.js', function(response) {"
-  , "      try {"
-  , "        var result = evaluate(response);"
-  , "        socket.send(result);"
-  , "      } catch (ex) {"
-  , "        socket.send(ex.stack);"
-  , "      }"
-  , "    }, function(err) {"
-  , "      socket.send('Error sending JavaScript');"
-  , "    });"
-  , "  };"
-  , "  socket.onopen = function () {"
-  , "    console.log('Connected');"
-  , "    socket.onmessage = function (event) {"
-  , "      switch (event.data) {"
-  , "        case 'eval':"
-  , "          evalNext();"
-  , "          break;"
-  , "        case 'reload':"
-  , "          location.reload();"
-  , "          break;"
-  , "      }"
-  , "    };"
-  , "  };"
-  , "};"
-  ]
+indexJS :: IsString string => string
+indexJS = $(embedStringFile "psci/static/index.js")
 
 indexPage :: IsString string => string
-indexPage = fromString . unlines $
-  [ "<!DOCTYPE html>"
-  , "<html>"
-  , "  <head>"
-  , "    <title>PureScript Interactive</title>"
-  , "    <script src='js/bundle.js'></script>"
-  , "    <script src='js/index.js'></script>"
-  , "  </head>"
-  , "  <body>"
-  , "  </body>"
-  , "</html>"
-  ]
+indexPage = $(embedStringFile "psci/static/index.html")
 
 -- | All of the functions required to implement a PSCi backend
 data Backend = forall state. Backend
@@ -292,16 +222,17 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
           | otherwise = Warp.defaultOnException req ex
 
         staticServer :: Wai.Application
-        staticServer req respond
-          | [] <- Wai.pathInfo req =
+        staticServer req respond =
+          case Wai.pathInfo req of
+            [] ->
               respond $ Wai.responseLBS status200
                                         [(hContentType, "text/html")]
                                         indexPage
-          | ["js", "index.js"] <- Wai.pathInfo req =
+            ["js", "index.js"] ->
               respond $ Wai.responseLBS status200
                                         [(hContentType, "application/javascript")]
-                                        (indexJS serverPort)
-          | ["js", "latest.js"] <- Wai.pathInfo req = do
+                                        indexJS
+            ["js", "latest.js"] -> do
               may <- readTVarIO indexJs
               case may of
                 Nothing ->
@@ -314,7 +245,7 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
                                             , (hExpires, "0")
                                             ]
                                             (fromString js)
-          | ["js", "bundle.js"] <- Wai.pathInfo req =do
+            ["js", "bundle.js"] -> do
               may <- readTVarIO bundleJs
               case may of
                 Nothing ->
@@ -323,8 +254,7 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
                   respond $ Wai.responseLBS status200
                                             [ (hContentType, "application/javascript")]
                                             (fromString js)
-          | otherwise =
-              respond $ Wai.responseLBS status404 [] "Not found"
+            _ -> respond $ Wai.responseLBS status404 [] "Not found"
 
       let browserState = BrowserState cmdChan shutdownVar indexJs bundleJs
       createBundle browserState
