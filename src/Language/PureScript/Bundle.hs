@@ -28,6 +28,7 @@ module Language.PureScript.Bundle (
 
 import Prelude.Compat
 
+import Data.Char (chr, digitToInt)
 import Data.List (nub, stripPrefix)
 import Data.Maybe (mapMaybe, catMaybes)
 import Data.Generics (everything, everywhere, mkQ, mkT)
@@ -40,8 +41,8 @@ import Control.Monad
 import Control.Monad.Error.Class
 import Language.JavaScript.Parser.AST hiding (showStripped)
 import Language.JavaScript.Parser
-import Language.PureScript.BundleOpt
-import Language.PureScript.BundleTypes
+import Language.PureScript.Bundle.BundleOpt
+import Language.PureScript.Bundle.BundleTypes
 
 -- import Debug.Trace
 

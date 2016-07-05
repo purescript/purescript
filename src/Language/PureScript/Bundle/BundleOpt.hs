@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  Language.PureScript.BundleOpt
+-- Module      :  Language.PureScript.Bundle.BundleOpt
 -- Copyright   :  (c) Jürgen Nicklisch-Franken 2016
 -- License     :  MIT
 --
@@ -16,7 +16,7 @@
 
 {-# LANGUAGE PatternGuards #-}
 
-module Language.PureScript.BundleOpt (
+module Language.PureScript.Bundle.BundleOpt (
     uncurryFunc
 ) where
 
@@ -24,17 +24,17 @@ import Prelude.Compat
 import qualified Data.Map as M
 import Data.Maybe (mapMaybe)
 
-import Language.PureScript.BundleTypes
+import Language.PureScript.Bundle.BundleTypes
 import Language.JavaScript.Parser
 import Language.JavaScript.Parser.AST
 
 
 -- * Types
 
-data FuncAdmin = FuncAdmin
-    { moduleId  :: ModuleIdentifier
-    , arity     :: Int
-    , exported  :: Bool}
+data FuncAdmin = FuncAdmin {
+    moduleId  :: ModuleIdentifier,
+    arity     :: Int,
+    exported  :: Bool}
     deriving (Eq,Show)
 
 type FuncAdminMap = M.Map String [FuncAdmin]

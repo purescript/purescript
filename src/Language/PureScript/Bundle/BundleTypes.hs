@@ -1,6 +1,6 @@
 -----------------------------------------------------------------------------
 --
--- Module      :  psc-bundle
+-- Module      :  Language.PureScript.Bundle.BundleTypes
 -- Copyright   :  (c) Phil Freeman 2015
 -- License     :  MIT
 --
@@ -17,7 +17,7 @@
 
 {-# LANGUAGE PatternGuards #-}
 
-module Language.PureScript.BundleTypes where
+module Language.PureScript.Bundle.BundleTypes where
 
 import Prelude
 import Language.JavaScript.Parser
