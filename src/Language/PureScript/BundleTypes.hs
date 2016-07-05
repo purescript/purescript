@@ -19,6 +19,7 @@
 
 module Language.PureScript.BundleTypes where
 
+import Prelude
 import Language.JavaScript.Parser
 import Language.JavaScript.Parser.AST
 

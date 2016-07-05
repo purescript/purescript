@@ -8,6 +8,7 @@ module Main (main) where
 
 import Data.Traversable (for)
 import Data.Version (showVersion)
+import Data.Maybe (fromMaybe)
 
 import Control.Applicative
 import Control.Monad
@@ -35,6 +36,7 @@ data Options = Options
   , optionsEntryPoints :: [String]
   , optionsMainModule  :: Maybe String
   , optionsNamespace   :: String
+  , optionsShouldUncurry :: Maybe Bool
   } deriving Show
 
 -- | Given a filename, assuming it is in the correct place on disk, infer a ModuleIdentifier.
@@ -60,8 +62,7 @@ app Options{..} = do
     length js `seq` return (mid, js)                                            -- evaluate readFile till EOF before returning, not to exhaust file handles
 
   let entryIds = map (`ModuleIdentifier` Regular) optionsEntryPoints
-
-  bundle input entryIds optionsMainModule optionsNamespace
+  bundle input entryIds optionsMainModule optionsNamespace (fromMaybe False optionsShouldUncurry)
 
 -- | Command line options parser.
 options :: Parser Options
@@ -70,6 +71,7 @@ options = Options <$> some inputFile
                   <*> many entryPoint
                   <*> optional mainModule
                   <*> namespace
+                  <*> (optional (not <$> noShouldUncurry) <|> optional shouldUncurry)
   where
   inputFile :: Parser FilePath
   inputFile = strArgument $
@@ -100,6 +102,18 @@ options = Options <$> some inputFile
     <> Opts.value "PS"
     <> showDefault
     <> help "Specify the namespace that PureScript modules will be exported to when running in the browser."
+
+
+  shouldUncurry :: Parser Bool
+  shouldUncurry = switch $
+       short 'O'
+    <> long "optimize"
+    <> help "When given this option psc-bundle will apply an uncurry optimization"
+
+  noShouldUncurry :: Parser Bool
+  noShouldUncurry = switch $
+    long "no-optimize"
+    <> help "When given this option psc-bundle will prevent the uncurry optimization"
 
 -- | Make it go.
 main :: IO ()

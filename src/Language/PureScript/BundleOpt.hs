@@ -20,6 +20,7 @@ module Language.PureScript.BundleOpt (
     uncurryFunc
 ) where
 
+import Prelude.Compat
 import qualified Data.Map as M
 import Data.Maybe (mapMaybe)
 
@@ -55,6 +56,7 @@ data FuncCollector = FuncCollector {
 
 -- * Constants
 
+-- arbitrary suffix that gets mangled into an uncurried function's name
 suffix :: String
 suffix = "$_$_$"
 
@@ -68,7 +70,7 @@ uncurryFunc modules entryPoints =
     let (modulesWithUncurried,funcCollector) = foldr generateUncurried ([],emptyCollector) modules
     -- add exports for uncurried functions
         (modulesWithExports,funcCollector2)  = foldr (generateUncurriedExports entryPoints) ([],funcCollector) modulesWithUncurried
-    -- replace satured calls to calls to uncurried functions
+    -- replace saturated calls to calls to uncurried functions
         (modulesWithCalls, _funcCollector3)    = -- trace ("Uncurry Stats: " ++ (show (stats funcCollector2))) $
                                                 foldr generateSaturedCalls ([],funcCollector2) modulesWithExports
 
@@ -212,7 +214,7 @@ generateUncurriedEx _mid t (eles, funcCollector) =
 
 -- * Call replacement
 
--- | replace satured calls to calls to uncurried functions
+-- | replace saturated calls to calls to uncurried functions
 generateSaturedCalls :: Module -> ([Module],FuncCollector) -> ([Module],FuncCollector)
 generateSaturedCalls (Module moduleIdentifier moduleElements) (modules, funcCollector) =
     {- trace ("generateSaturedCalls: " ++ show moduleIdentifier) $ -}
