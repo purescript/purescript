@@ -1,47 +1,48 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console
+import Control.Monad.Eff.Console (logShow, log)
 
 main = do
 
   -- semiringNumber
-  print (1.0 + 2.0)
-  print (1.0 * 2.0)
+  logShow (1.0 + 2.0)
+  logShow (1.0 * 2.0)
 
   -- ringNumber
-  print (1.0 - 2.0)
-  print (negate 1.0)
+  logShow (1.0 - 2.0)
+  logShow (negate 1.0)
 
   -- moduleSemiringNumber
-  print (1.0 / 2.0)
+  logShow (1.0 / 2.0)
 
   -- ordNumber
-  print (1.0 > 2.0)
-  print (1.0 < 2.0)
-  print (1.0 <= 2.0)
-  print (1.0 >= 2.0)
-  print (1.0 == 2.0)
+  logShow (1.0 > 2.0)
+  logShow (1.0 < 2.0)
+  logShow (1.0 <= 2.0)
+  logShow (1.0 >= 2.0)
+  logShow (1.0 == 2.0)
 
   -- eqNumber
-  print (1.0 == 2.0)
-  print (1.0 /= 2.0)
+  logShow (1.0 == 2.0)
+  logShow (1.0 /= 2.0)
 
   -- eqString
-  print ("foo" == "bar")
-  print ("foo" /= "bar")
+  logShow ("foo" == "bar")
+  logShow ("foo" /= "bar")
 
   -- eqBoolean
-  print (true == false)
-  print (true /= false)
+  logShow (true == false)
+  logShow (true /= false)
 
   -- semigroupString
-  print ("foo" ++ "bar")
-  print ("foo" <> "bar")
+  logShow ("foo" <> "bar")
 
   -- latticeBoolean
-  print (top && true)
-  print (bottom || false)
+  logShow (top && true)
+  logShow (bottom || false)
 
   -- complementedLatticeBoolean
-  print (not true)
+  logShow (not true)
+
+  log "Done"

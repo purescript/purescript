@@ -1,19 +1,9 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Options
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- The data type of compiler options
 --
------------------------------------------------------------------------------
-
 module Language.PureScript.Options where
+
+import Prelude.Compat
 
 -- |
 -- The data type of compiler options
@@ -39,9 +29,6 @@ data Options = Options {
     -- Remove the comments from the generated js
   , optionsNoComments :: Bool
     -- |
-    -- The path to prepend to require statements
-  , optionsRequirePath :: Maybe FilePath
-    -- |
     -- Generate soure maps
   , optionsSourceMaps :: Bool
   } deriving Show
@@ -49,4 +36,4 @@ data Options = Options {
 -- |
 -- Default make options
 defaultOptions :: Options
-defaultOptions = Options False False Nothing False False False Nothing False
+defaultOptions = Options False False Nothing False False False False

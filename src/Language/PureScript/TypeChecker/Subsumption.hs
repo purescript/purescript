@@ -1,36 +1,20 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.TypeChecker.Subsumption
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- Subsumption checking
 --
------------------------------------------------------------------------------
+module Language.PureScript.TypeChecker.Subsumption
+  ( subsumes
+  ) where
 
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE CPP #-}
+import Prelude.Compat
 
-module Language.PureScript.TypeChecker.Subsumption (
-    subsumes
-) where
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.State.Class (MonadState(..))
 
 import Data.List (sortBy)
 import Data.Ord (comparing)
 
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State.Class (MonadState(..))
-
-import Language.PureScript.Crash
 import Language.PureScript.AST
+import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.TypeChecker.Monad
@@ -69,7 +53,7 @@ subsumes' val ty1 (KindedType ty2 _) =
 subsumes' (Just val) (ConstrainedType constraints ty1) ty2 = do
   dicts <- getTypeClassDictionaries
   subsumes' (Just $ foldl App val (map (flip TypeClassDictionary dicts) constraints)) ty1 ty2
-subsumes' val (TypeApp f1 r1) (TypeApp f2 r2) | f1 == tyObject && f2 == tyObject = do
+subsumes' val (TypeApp f1 r1) (TypeApp f2 r2) | f1 == tyRecord && f2 == tyRecord = do
   let
     (ts1, r1') = rowToList r1
     (ts2, r2') = rowToList r2
@@ -96,7 +80,7 @@ subsumes' val (TypeApp f1 r1) (TypeApp f2 r2) | f1 == tyObject && f2 == tyObject
                        REmpty -> throwError . errorMessage $ PropertyIsMissing p2
                        _ -> unifyTypes r1' (RCons p2 ty2 rest)
                      go ((p1, ty1) : ts1) ts2 rest r2'
-subsumes' val ty1 ty2@(TypeApp obj _) | obj == tyObject = subsumes val ty2 ty1
+subsumes' val ty1 ty2@(TypeApp obj _) | obj == tyRecord = subsumes val ty2 ty1
 subsumes' val ty1 ty2 = do
   unifyTypes ty1 ty2
   return val

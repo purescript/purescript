@@ -4,24 +4,10 @@
 -- re-exports it from Control.Monad.Trans).
 
 module ImportedTwice
-  ( module A
-  , module B
+  ( module ImportedTwiceA
+  , module ImportedTwiceB
   )
   where
 
-import A
-import B
-
-module A
-  ( module B )
-  where
-
-import B
-
-bar :: Int
-bar = 1
-
-module B where
-
-foo :: Int
-foo = 0
+import ImportedTwiceA
+import ImportedTwiceB

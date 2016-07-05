@@ -3,7 +3,10 @@ module Language.PureScript.AST.Exported
   , isExported
   ) where
 
+import Prelude.Compat
+
 import Control.Category ((>>>))
+
 import Data.Maybe (mapMaybe)
 
 import Language.PureScript.AST.Declarations
@@ -99,7 +102,7 @@ typeInstanceConstituents (TypeInstanceDeclaration _ constraints className tys _)
   Left className : (concatMap fromConstraint constraints ++ concatMap fromType tys)
   where
 
-  fromConstraint (name, tys') = Left name : concatMap fromType tys'
+  fromConstraint c = Left (constraintClass c) : concatMap fromType (constraintArgs c)
   fromType = everythingOnTypes (++) go
 
   -- Note that type synonyms are disallowed in instance declarations, so
@@ -124,21 +127,15 @@ isExported _ TypeInstanceDeclaration{} = True
 isExported exps (PositionedDeclaration _ _ d) = isExported exps d
 isExported (Just exps) decl = any (matches decl) exps
   where
-  matches (TypeDeclaration ident _)          (ValueRef ident')     = ident == ident'
-  matches (ValueDeclaration ident _ _ _)     (ValueRef ident')     = ident == ident'
-  matches (ExternDeclaration ident _)        (ValueRef ident')     = ident == ident'
-  matches (DataDeclaration _ ident _ _)      (TypeRef ident' _)    = ident == ident'
-  matches (ExternDataDeclaration ident _)    (TypeRef ident' _)    = ident == ident'
-  matches (TypeSynonymDeclaration ident _ _) (TypeRef ident' _)    = ident == ident'
+  matches (TypeDeclaration ident _) (ValueRef ident') = ident == ident'
+  matches (ValueDeclaration ident _ _ _) (ValueRef ident') = ident == ident'
+  matches (ExternDeclaration ident _) (ValueRef ident') = ident == ident'
+  matches (DataDeclaration _ ident _ _) (TypeRef ident' _) = ident == ident'
+  matches (ExternDataDeclaration ident _) (TypeRef ident' _) = ident == ident'
+  matches (TypeSynonymDeclaration ident _ _) (TypeRef ident' _) = ident == ident'
   matches (TypeClassDeclaration ident _ _ _) (TypeClassRef ident') = ident == ident'
-
-  matches (DataDeclaration _ ident _ _)      (ProperRef ident')    = runProperName ident == ident'
-  matches (TypeClassDeclaration ident _ _ _) (ProperRef ident')    = runProperName ident == ident'
-
-  matches (FixityDeclaration _ name (Just (Qualified _ (AliasValue _)))) (ValueRef ident') = name == runIdent ident'
-  matches (FixityDeclaration _ name (Just (Qualified _ (AliasConstructor _)))) (ValueRef ident') = name == runIdent ident'
-  matches (FixityDeclaration _ name (Just (Qualified _ (AliasType _)))) (TypeOpRef ident') = name == runIdent ident'
-
+  matches (ValueFixityDeclaration _ _ op) (ValueOpRef op') = op == op'
+  matches (TypeFixityDeclaration _ _ op) (TypeOpRef op') = op == op'
   matches (PositionedDeclaration _ _ d) r = d `matches` r
   matches d (PositionedDeclarationRef _ _ r) = d `matches` r
   matches _ _ = False

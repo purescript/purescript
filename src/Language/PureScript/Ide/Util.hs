@@ -9,57 +9,61 @@
 -- Stability   : experimental
 --
 -- |
--- Generally useful functions and conversions
+-- Generally useful functions
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.PureScript.Ide.Util where
+module Language.PureScript.Ide.Util
+  ( identifierFromIdeDeclaration
+  , identifierFromMatch
+  , completionFromMatch
+  , encodeT
+  , decodeT
+  , module Language.PureScript.Ide.Conversions
+  ) where
 
+import           Protolude
 import           Data.Aeson
-import           Data.Text                     (Text)
 import qualified Data.Text                     as T
-import           Data.Text.Lazy                (fromStrict, toStrict)
 import           Data.Text.Lazy.Encoding       (decodeUtf8, encodeUtf8)
 import qualified Language.PureScript           as P
 import           Language.PureScript.Ide.Types
+import           Language.PureScript.Ide.Conversions
 
-runProperNameT :: P.ProperName a -> Text
-runProperNameT = T.pack . P.runProperName
-
-runIdentT :: P.Ident -> Text
-runIdentT = T.pack . P.runIdent
-
-prettyTypeT :: P.Type -> Text
-prettyTypeT = T.unwords . fmap T.strip . T.lines . T.pack . P.prettyPrintType
-
-identifierFromExternDecl :: ExternDecl -> Text
-identifierFromExternDecl (ValueDeclaration name _) = name
-identifierFromExternDecl (TypeDeclaration name _) = runProperNameT name
-identifierFromExternDecl (TypeSynonymDeclaration name _) = runProperNameT name
-identifierFromExternDecl (DataConstructor name _ _) = name
-identifierFromExternDecl (TypeClassDeclaration name) = runProperNameT name
-identifierFromExternDecl (ModuleDecl name _) = name
-identifierFromExternDecl Dependency{} = "~Dependency~"
-identifierFromExternDecl Export{} = "~Export~"
+identifierFromIdeDeclaration :: IdeDeclaration -> Text
+identifierFromIdeDeclaration d = case d of
+  IdeValue name _ -> name
+  IdeType name _ -> runProperNameT name
+  IdeTypeSynonym name _ -> runProperNameT name
+  IdeDataConstructor name _ _ -> name
+  IdeTypeClass name -> runProperNameT name
+  IdeValueOperator op _ _ _ -> runOpNameT op
+  IdeTypeOperator op _ _ _ -> runOpNameT op
 
 identifierFromMatch :: Match -> Text
-identifierFromMatch (Match _ ed) = identifierFromExternDecl ed
+identifierFromMatch (Match _ ed) = identifierFromIdeDeclaration ed
 
-completionFromMatch :: Match -> Maybe Completion
-completionFromMatch (Match _ Dependency{}) = Nothing
-completionFromMatch (Match _ Export{}) = Nothing
-completionFromMatch (Match m d) = Just $ case d of
-  ValueDeclaration name type' -> Completion (m, name, prettyTypeT type')
-  TypeDeclaration name kind -> Completion (m, runProperNameT name, T.pack $ P.prettyPrintKind kind)
-  TypeSynonymDeclaration name kind -> Completion (m, runProperNameT name, prettyTypeT kind)
-  DataConstructor name _ type' -> Completion (m, name, prettyTypeT type')
-  TypeClassDeclaration name -> Completion (m, runProperNameT name, "class")
-  ModuleDecl name _ -> Completion ("module", name, "module")
-  _ -> error "the impossible happened in completionFromMatch"
+completionFromMatch :: Match -> Completion
+completionFromMatch (Match m' d) = case d of
+  IdeValue name type' -> Completion (m, name, prettyTypeT type')
+  IdeType name kind -> Completion (m, runProperNameT name, toS (P.prettyPrintKind kind))
+  IdeTypeSynonym name kind -> Completion (m, runProperNameT name, prettyTypeT kind)
+  IdeDataConstructor name _ type' -> Completion (m, name, prettyTypeT type')
+  IdeTypeClass name -> Completion (m, runProperNameT name, "class")
+  IdeValueOperator op ref precedence associativity -> Completion (m, runOpNameT op, showFixity precedence associativity ref op)
+  IdeTypeOperator op ref precedence associativity -> Completion (m, runOpNameT op, showFixity precedence associativity ref op)
+  where
+    m = runModuleNameT m'
+    showFixity p a r o =
+      let asso = case a of
+            P.Infix -> "infix"
+            P.Infixl -> "infixl"
+            P.Infixr -> "infixr"
+      in T.unwords [asso, show p, r, "as", runOpNameT o]
 
 encodeT :: (ToJSON a) => a -> Text
-encodeT = toStrict . decodeUtf8 . encode
+encodeT = toS . decodeUtf8 . encode
 
 decodeT :: (FromJSON a) => Text -> Maybe a
-decodeT = decode . encodeUtf8 . fromStrict
+decodeT = decode . encodeUtf8 . toS

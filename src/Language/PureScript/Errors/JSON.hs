@@ -1,22 +1,7 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.Errors.JSON
--- Copyright   :  (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
--- License     :  MIT (http://opensource.org/licenses/MIT)
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
--- |
---
------------------------------------------------------------------------------
-
 {-# LANGUAGE TemplateHaskell #-}
 
 module Language.PureScript.Errors.JSON where
 
-import Prelude ()
 import Prelude.Compat
 
 import qualified Data.Aeson.TH as A
@@ -30,7 +15,10 @@ data ErrorPosition = ErrorPosition
   , endColumn :: Int
   } deriving (Show, Eq, Ord)
 
-data ErrorSuggestion = ErrorSuggestion { replacement :: String } deriving (Show, Eq)
+data ErrorSuggestion = ErrorSuggestion
+  { replacement :: String
+  , replaceRange :: Maybe ErrorPosition
+  } deriving (Show, Eq)
 
 data JSONError = JSONError
   { position :: Maybe ErrorPosition
@@ -40,7 +28,7 @@ data JSONError = JSONError
   , filename :: Maybe String
   , moduleName :: Maybe String
   , suggestion :: Maybe ErrorSuggestion
-  }  deriving (Show, Eq)
+  } deriving (Show, Eq)
 
 data JSONResult = JSONResult
   { warnings :: [JSONError]
@@ -59,12 +47,12 @@ toJSONErrors verbose level = map (toJSONError verbose level) . P.runMultipleErro
 toJSONError :: Bool -> P.Level -> P.ErrorMessage -> JSONError
 toJSONError verbose level e =
   JSONError (toErrorPosition <$> sspan)
-            (P.renderBox (P.prettyPrintSingleError verbose level False (P.stripModuleAndSpan e)))
+            (P.renderBox (P.prettyPrintSingleError (P.PPEOptions Nothing verbose level False) (P.stripModuleAndSpan e)))
             (P.errorCode e)
             (P.wikiUri e)
             (P.spanName <$> sspan)
             (P.runModuleName <$> P.errorModule e)
-            (toSuggestion <$> P.errorSuggestion (P.unwrapErrorMessage e))
+            (toSuggestion e)
   where
   sspan :: Maybe P.SourceSpan
   sspan = P.errorSpan e
@@ -75,6 +63,11 @@ toJSONError verbose level e =
                   (P.sourcePosColumn (P.spanStart ss))
                   (P.sourcePosLine   (P.spanEnd   ss))
                   (P.sourcePosColumn (P.spanEnd   ss))
-  toSuggestion :: P.ErrorSuggestion -> ErrorSuggestion
--- TODO: Adding a newline because source spans chomp everything up to the next character
-  toSuggestion (P.ErrorSuggestion s) = ErrorSuggestion $ if null s then s else s ++ "\n"
+  toSuggestion :: P.ErrorMessage -> Maybe ErrorSuggestion
+  toSuggestion em =
+    case P.errorSuggestion $ P.unwrapErrorMessage em of
+      Nothing -> Nothing
+      Just s -> Just $ ErrorSuggestion (suggestionText s) (toErrorPosition <$> P.suggestionSpan em)
+
+  -- TODO: Adding a newline because source spans chomp everything up to the next character
+  suggestionText (P.ErrorSuggestion s) = if null s then s else s ++ "\n"

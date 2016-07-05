@@ -1,31 +1,18 @@
------------------------------------------------------------------------------
---
--- Module      :  Control.Monad.Supply
--- Copyright   :  (c) Phil Freeman 2014
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+
 -- |
 -- Fresh variable supply
 --
------------------------------------------------------------------------------
-
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Control.Monad.Supply where
 
-import Prelude ()
 import Prelude.Compat
 
-import Data.Functor.Identity
-
-import Control.Monad.State
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Reader
+import Control.Monad.State
 import Control.Monad.Writer
+
+import Data.Functor.Identity
 
 newtype SupplyT m a = SupplyT { unSupplyT :: StateT Integer m a }
   deriving (Functor, Applicative, Monad, MonadTrans, MonadError e, MonadWriter w, MonadReader r)

@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff
+import Control.Monad.Eff.Console (log, logShow)
 
 type Foo a = forall f. (Monad f) => f a
 
@@ -13,4 +13,5 @@ bar = foo 3.0
 
 main = do
   x <- bar
-  Control.Monad.Eff.Console.print x
+  logShow x
+  log "Done"

@@ -1,5 +1,5 @@
 -- @shouldFailWith TransitiveExportError
-module Test (Foo) where
+module Test (class Foo) where
 
 import Prelude
 

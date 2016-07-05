@@ -12,64 +12,50 @@
 -- Handles externs files for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE FlexibleContexts      #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE RecordWildCards       #-}
-{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE FlexibleContexts  #-}
 
 module Language.PureScript.Ide.Externs
   ( ExternDecl(..),
     ModuleIdent,
-    DeclIdent,
     readExternFile,
     convertExterns,
+    convertModule,
     unwrapPositioned,
     unwrapPositionedRef
   ) where
 
-import           Prelude                       ()
-import           Prelude.Compat
+import           Protolude
 
-import           Control.Monad.Error.Class
-import           Control.Monad.IO.Class
 import           Data.Aeson                    (decodeStrict)
 import           Data.List                     (nub)
-import           Data.Maybe                    (mapMaybe)
-import           Data.Monoid
-import           Data.Text                     (Text)
-import qualified Data.Text                     as T
 import qualified Data.ByteString               as BS
 import           Language.PureScript.Ide.Error (PscIdeError (..))
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 
 import qualified Language.PureScript           as P
-import qualified Language.PureScript.Externs   as PE
+
+import System.FilePath
 
 readExternFile :: (MonadIO m, MonadError PscIdeError m) =>
-                  FilePath -> m PE.ExternsFile
+                  FilePath -> m P.ExternsFile
 readExternFile fp = do
    parseResult <- liftIO (decodeStrict <$> BS.readFile fp)
    case parseResult of
-     Nothing -> throwError . GeneralError $ "Parsing the extern at: " ++ fp ++ " failed"
+     Nothing -> throwError . GeneralError $ "Parsing the extern at: " <> toS fp <> " failed"
      Just externs -> pure externs
 
-moduleNameToText :: P.ModuleName -> Text
-moduleNameToText = T.pack . P.runModuleName
-
-identToText :: P.Ident -> Text
-identToText  = T.pack . P.runIdent
-
-convertExterns :: PE.ExternsFile -> Module
-convertExterns ef = (moduleName, exportDecls ++ importDecls ++ decls)
+convertExterns :: P.ExternsFile -> ModuleOld
+convertExterns ef = (runModuleNameT moduleName, exportDecls ++ importDecls ++ decls ++ operatorDecls ++ tyOperatorDecls)
   where
-    moduleName = moduleNameToText (PE.efModuleName ef)
-    importDecls = convertImport <$> PE.efImports ef
-    exportDecls = mapMaybe (convertExport . unwrapPositionedRef) (PE.efExports ef)
-    -- Ignoring operator fixities for now since we're not using them
-    -- operatorDecls = convertOperator <$> PE.efFixities ef
-    otherDecls = mapMaybe convertDecl (PE.efDeclarations ef)
+    moduleName = P.efModuleName ef
+    importDecls = convertImport <$> P.efImports ef
+    exportDecls = mapMaybe (convertExport . unwrapPositionedRef) (P.efExports ef)
+    operatorDecls = convertOperator <$> P.efFixities ef
+    tyOperatorDecls = convertTypeOperator <$> P.efTypeFixities ef
+    otherDecls = mapMaybe convertDecl (P.efDeclarations ef)
 
     typeClassFilter = foldMap removeTypeDeclarationsForClass (filter isTypeClassDeclaration otherDecls)
     decls = nub $ appEndo typeClassFilter otherDecls
@@ -85,26 +71,42 @@ isTypeClassDeclaration :: ExternDecl -> Bool
 isTypeClassDeclaration TypeClassDeclaration{} = True
 isTypeClassDeclaration _ = False
 
-convertImport :: PE.ExternsImport -> ExternDecl
+convertImport :: P.ExternsImport -> ExternDecl
 convertImport ei = Dependency
-  (moduleNameToText (PE.eiModule ei))
+  (runModuleNameT (P.eiModule ei))
   []
-  (moduleNameToText <$> PE.eiImportedAs ei)
+  (runModuleNameT <$> P.eiImportedAs ei)
 
 convertExport :: P.DeclarationRef -> Maybe ExternDecl
-convertExport (P.ModuleRef mn) = Just (Export (moduleNameToText mn))
+convertExport (P.ModuleRef mn) = Just (Export (runModuleNameT mn))
 convertExport _ = Nothing
 
-convertDecl :: PE.ExternsDeclaration -> Maybe ExternDecl
-convertDecl PE.EDType{..} = Just $ TypeDeclaration edTypeName edTypeKind
-convertDecl PE.EDTypeSynonym{..} = Just $
+convertDecl :: P.ExternsDeclaration -> Maybe ExternDecl
+convertDecl P.EDType{..} = Just $ TypeDeclaration edTypeName edTypeKind
+convertDecl P.EDTypeSynonym{..} = Just $
   TypeSynonymDeclaration edTypeSynonymName edTypeSynonymType
-convertDecl PE.EDDataConstructor{..} = Just $
+convertDecl P.EDDataConstructor{..} = Just $
   DataConstructor (runProperNameT edDataCtorName) edDataCtorTypeCtor edDataCtorType
-convertDecl PE.EDValue{..} = Just $
-  ValueDeclaration (identToText edValueName) edValueType
-convertDecl PE.EDClass{..} = Just $ TypeClassDeclaration edClassName
-convertDecl PE.EDInstance{} = Nothing
+convertDecl P.EDValue{..} = Just $
+  ValueDeclaration (runIdentT edValueName) edValueType
+convertDecl P.EDClass{..} = Just $ TypeClassDeclaration edClassName
+convertDecl P.EDInstance{} = Nothing
+
+convertOperator :: P.ExternsFixity -> ExternDecl
+convertOperator P.ExternsFixity{..} =
+  ValueOperator
+    efOperator
+    (toS (P.showQualified (either P.runIdent P.runProperName) efAlias))
+    efPrecedence
+    efAssociativity
+
+convertTypeOperator :: P.ExternsTypeFixity -> ExternDecl
+convertTypeOperator P.ExternsTypeFixity{..} =
+  TypeOperator
+    efTypeOperator
+    (toS (P.showQualified P.runProperName efTypeAlias))
+    efTypePrecedence
+    efTypeAssociativity
 
 unwrapPositioned :: P.Declaration -> P.Declaration
 unwrapPositioned (P.PositionedDeclaration _ _ x) = x
@@ -113,3 +115,18 @@ unwrapPositioned x = x
 unwrapPositionedRef :: P.DeclarationRef -> P.DeclarationRef
 unwrapPositionedRef (P.PositionedDeclarationRef _ _ x) = x
 unwrapPositionedRef x = x
+
+convertModule :: ModuleOld -> Module
+convertModule (mn, decls) = (P.moduleNameFromString (toS mn), mapMaybe convertDeclaration decls)
+  where convertDeclaration :: ExternDecl -> Maybe IdeDeclaration
+        convertDeclaration d = case d of
+          ValueDeclaration i t -> Just (IdeValue i t)
+          TypeDeclaration i k -> Just (IdeType i k)
+          TypeSynonymDeclaration i t -> Just (IdeTypeSynonym i t)
+          DataConstructor i tn t -> Just (IdeDataConstructor i tn t)
+          TypeClassDeclaration i -> Just (IdeTypeClass i)
+          ValueOperator n i p a -> Just (IdeValueOperator n i p a)
+          TypeOperator n i p a -> Just (IdeTypeOperator n i p a)
+          Dependency{} -> Nothing
+          ModuleDecl _ _ -> Nothing
+          Export _ -> Nothing

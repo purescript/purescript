@@ -1,47 +1,30 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.TypeChecker.Unify
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
+{-# LANGUAGE FlexibleInstances #-}
+
 -- |
 -- Functions and instances relating to unification
 --
------------------------------------------------------------------------------
+module Language.PureScript.TypeChecker.Unify
+  ( freshType
+  , solveType
+  , substituteType
+  , unknownsInType
+  , unifyTypes
+  , unifyRows
+  , unifiesWith
+  , replaceVarWithUnknown
+  , replaceTypeWildcards
+  , varIfUnknown
+  ) where
 
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE CPP #-}
+import Prelude.Compat
 
-module Language.PureScript.TypeChecker.Unify (
-    freshType,
-    solveType,
-    substituteType,
-    unknownsInType,
-    unifyTypes,
-    unifyRows,
-    unifiesWith,
-    replaceVarWithUnknown,
-    replaceTypeWildcards,
-    varIfUnknown
-) where
+import Control.Monad
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.State.Class (MonadState(..), gets, modify)
+import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.List (nub, sort)
 import qualified Data.Map as M
-
-#if __GLASGOW_HASKELL__ < 710
-import Control.Applicative
-#endif
-import Control.Monad
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Writer.Class (MonadWriter(..))
-import Control.Monad.State.Class (MonadState(..), gets, modify)
 
 import Language.PureScript.Crash
 import Language.PureScript.Errors
@@ -170,13 +153,14 @@ unifyRows r1 r2 =
 -- Check that two types unify
 --
 unifiesWith :: Type -> Type -> Bool
-unifiesWith (TUnknown u1) (TUnknown u2) | u1 == u2 = True
-unifiesWith (Skolem _ s1 _ _) (Skolem _ s2 _ _) | s1 == s2 = True
-unifiesWith (TypeVar v1) (TypeVar v2) | v1 == v2 = True
-unifiesWith (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = True
-unifiesWith (TypeApp h1 t1) (TypeApp h2 t2) = h1 `unifiesWith` h2 && t1 `unifiesWith` t2
-unifiesWith REmpty REmpty = True
-unifiesWith r1@RCons{} r2@RCons{} =
+unifiesWith (TUnknown u1)        (TUnknown u2)        = u1 == u2
+unifiesWith (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    = s1 == s2
+unifiesWith (TypeVar v1)         (TypeVar v2)         = v1 == v2
+unifiesWith (TypeLevelString s1) (TypeLevelString s2) = s1 == s2
+unifiesWith (TypeConstructor c1) (TypeConstructor c2) = c1 == c2
+unifiesWith (TypeApp h1 t1)      (TypeApp h2 t2)      = h1 `unifiesWith` h2 && t1 `unifiesWith` t2
+unifiesWith REmpty               REmpty               = True
+unifiesWith r1@RCons{}           r2@RCons{} =
   let (s1, r1') = rowToList r1
       (s2, r2') = rowToList r2
 
@@ -209,9 +193,9 @@ replaceVarWithUnknown ident ty = do
 replaceTypeWildcards :: (MonadWriter MultipleErrors m, MonadState CheckState m) => Type -> m Type
 replaceTypeWildcards = everywhereOnTypesM replace
   where
-  replace TypeWildcard = do
+  replace (TypeWildcard ss) = do
     t <- freshType
-    tell . errorMessage $ WildcardInferredType t
+    warnWithPosition ss $ tell . errorMessage $ WildcardInferredType t
     return t
   replace other = return other
 

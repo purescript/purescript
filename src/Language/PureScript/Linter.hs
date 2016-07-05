@@ -1,30 +1,24 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE PatternGuards #-}
-
 -- |
 -- This module implements a simple linting pass on the PureScript AST.
 --
 module Language.PureScript.Linter (lint, module L) where
 
-import Prelude ()
 import Prelude.Compat
+
+import Control.Monad.Writer.Class
 
 import Data.List (nub, (\\))
 import Data.Maybe (mapMaybe)
 import Data.Monoid
-
 import qualified Data.Set as S
 
-import Control.Monad.Writer.Class
-
-import Language.PureScript.Crash
 import Language.PureScript.AST
-import Language.PureScript.Names
+import Language.PureScript.Crash
 import Language.PureScript.Errors
-import Language.PureScript.Types
 import Language.PureScript.Linter.Exhaustive as L
 import Language.PureScript.Linter.Imports as L
+import Language.PureScript.Names
+import Language.PureScript.Types
 
 -- | Lint the PureScript AST.
 -- |
@@ -46,23 +40,13 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
   lintDeclaration :: Declaration -> m ()
   lintDeclaration = tell . f
     where
-    (warningsInDecl, _, _, _, _) = everythingWithScope stepD stepE stepB (\_ _ -> mempty) stepDo
+    (warningsInDecl, _, _, _, _) = everythingWithScope (\_ _ -> mempty) stepE stepB (\_ _ -> mempty) stepDo
 
     f :: Declaration -> MultipleErrors
     f (PositionedDeclaration pos _ dec) = addHint (PositionedError pos) (f dec)
     f dec@(ValueDeclaration name _ _ _) = addHint (ErrorInValueDeclaration name) (warningsInDecl moduleNames dec <> checkTypeVarsInDecl dec)
     f (TypeDeclaration name ty) = addHint (ErrorInTypeDeclaration name) (checkTypeVars ty)
     f dec = warningsInDecl moduleNames dec <> checkTypeVarsInDecl dec
-
-    stepD :: S.Set Ident -> Declaration -> MultipleErrors
-    stepD _ (ValueDeclaration (Op name) _ _ _) = errorMessage (DeprecatedOperatorDecl name)
-    stepD _ (TypeClassDeclaration _ _ _ decls) = foldMap go decls
-      where
-      go :: Declaration -> MultipleErrors
-      go (PositionedDeclaration _ _ d') = go d'
-      go (TypeDeclaration (Op name) _)  = errorMessage (DeprecatedOperatorDecl name)
-      go _ = mempty
-    stepD _ _ = mempty
 
     stepE :: S.Set Ident -> Expr -> MultipleErrors
     stepE s (Abs (Left name) _) | name `S.member` s = errorMessage (ShadowedName name)
@@ -71,7 +55,6 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
       go d | Just i <- getDeclIdent d
            , i `S.member` s = errorMessage (ShadowedName i)
            | otherwise = mempty
-    stepE _ (OperatorSection op val) = errorMessage $ DeprecatedOperatorSection op val
     stepE _ _ = mempty
 
     stepB :: S.Set Ident -> Binder -> MultipleErrors

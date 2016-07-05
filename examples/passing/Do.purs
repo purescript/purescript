@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 data Maybe a = Nothing | Just a
 
@@ -19,7 +20,7 @@ instance bindMaybe :: Bind Maybe where
   bind Nothing _ = Nothing
   bind (Just a) f = f a
 
-instance monadMaybe :: Prelude.Monad Maybe
+instance monadMaybe :: Monad Maybe
 
 test1 = \_ -> do
   Just "abc"
@@ -64,4 +65,4 @@ test10 _ = do
     g x = f x / 2.0
   Just (f 10.0)
 
-main = Control.Monad.Eff.Console.log "Done"
+main = log "Done"

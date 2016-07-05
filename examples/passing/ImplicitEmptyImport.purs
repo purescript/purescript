@@ -1,8 +1,9 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff.Console (log)
 
 main = do
-  Control.Monad.Eff.Console.log "Hello"
-  Control.Monad.Eff.Console.log "Goodbye"
-  Control.Monad.Eff.Console.log "Done"
+  log "Hello"
+  log "Goodbye"
+  log "Done"

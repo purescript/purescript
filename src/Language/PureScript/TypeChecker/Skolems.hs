@@ -1,45 +1,30 @@
------------------------------------------------------------------------------
---
--- Module      :  Language.PureScript.TypeChecker.Skolems
--- Copyright   :  (c) Phil Freeman 2013
--- License     :  MIT
---
--- Maintainer  :  Phil Freeman <paf31@cantab.net>
--- Stability   :  experimental
--- Portability :
---
 -- |
 -- Functions relating to skolemization used during typechecking
 --
------------------------------------------------------------------------------
+module Language.PureScript.TypeChecker.Skolems
+  ( newSkolemConstant
+  , introduceSkolemScope
+  , newSkolemScope
+  , skolemize
+  , skolemizeTypesInValue
+  , skolemEscapeCheck
+  ) where
 
-{-# LANGUAGE FlexibleContexts #-}
-
-module Language.PureScript.TypeChecker.Skolems (
-    newSkolemConstant,
-    introduceSkolemScope,
-    newSkolemScope,
-    skolemize,
-    skolemizeTypesInValue,
-    skolemEscapeCheck
-) where
-
-import Prelude ()
 import Prelude.Compat
-
-import Data.List (nub, (\\))
-import Data.Monoid
-import Data.Functor.Identity (Identity(), runIdentity)
 
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets, modify)
 
-import Language.PureScript.Crash
+import Data.Functor.Identity (Identity(), runIdentity)
+import Data.List (nub, (\\))
+import Data.Monoid
+
 import Language.PureScript.AST
+import Language.PureScript.Crash
 import Language.PureScript.Errors
+import Language.PureScript.Traversals (defS)
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Types
-import Language.PureScript.Traversals (defS)
 
 -- |
 -- Generate a new skolem constant
@@ -104,7 +89,7 @@ skolemizeTypesInValue ident sko scope ss =
 -- |
 -- Ensure skolem variables do not escape their scope
 --
-skolemEscapeCheck :: (MonadError MultipleErrors m, MonadState CheckState m) => Expr -> m ()
+skolemEscapeCheck :: (MonadError MultipleErrors m) => Expr -> m ()
 skolemEscapeCheck (TypedValue False _ _) = return ()
 skolemEscapeCheck root@TypedValue{} =
   -- Every skolem variable is created when a ForAll type is skolemized.

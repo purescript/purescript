@@ -1,12 +1,11 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff
+import Control.Monad.Eff.Console
 
-class PartialP
-
-head :: forall a. (PartialP) => Array a -> a
+head :: forall a. Partial => Array a -> a
 head [x] = x
 
-instance allowPartials :: PartialP
-
-main = Control.Monad.Eff.Console.log $ head ["Done"]
+main :: Eff _ _
+main = log "Done"

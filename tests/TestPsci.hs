@@ -6,10 +6,8 @@ module TestPsci where
 import Prelude ()
 import Prelude.Compat
 
-import Control.Monad.Trans.State.Strict (runStateT)
-import Control.Monad (when, forM)
-import Control.Monad.Writer.Strict (runWriterT)
-import Control.Monad.Trans.Except (runExceptT)
+import Control.Monad.Trans.State.Strict (evalStateT)
+import Control.Monad (when)
 
 import Data.List (sort)
 
@@ -17,16 +15,17 @@ import System.Exit (exitFailure)
 import System.Console.Haskeline
 import System.FilePath ((</>))
 import System.Directory (getCurrentDirectory)
-import System.IO.UTF8 (readUTF8File)
 import qualified System.FilePath.Glob as Glob
 
 import Test.HUnit
 
 import qualified Language.PureScript as P
 
-import PSCi.Module (loadAllModules)
-import PSCi.Completion
-import PSCi.Types
+import Language.PureScript.Interactive.Module (loadAllModules)
+import Language.PureScript.Interactive.Completion
+import Language.PureScript.Interactive.Types
+
+import TestUtils (supportModules)
 
 main :: IO ()
 main = do
@@ -47,11 +46,10 @@ completionTests =
 completionTestData :: [(String, [String])]
 completionTestData =
   -- basic directives
-  [ (":h", [":help"])
+  [ (":h",  [":help"])
   , (":re", [":reset"])
-  , (":q", [":quit"])
-  , (":mo", [":module"])
-  , (":b", [":browse"])
+  , (":q",  [":quit"])
+  , (":b",  [":browse"])
 
   -- :browse should complete module names
   , (":b Control.Monad.E",    map (":b Control.Monad.Eff" ++) ["", ".Unsafe", ".Class", ".Console"])
@@ -60,11 +58,6 @@ completionTestData =
   -- import should complete module names
   , ("import Control.Monad.E",    map ("import Control.Monad.Eff" ++) ["", ".Unsafe", ".Class", ".Console"])
   , ("import Control.Monad.Eff.", map ("import Control.Monad.Eff" ++) [".Unsafe", ".Class", ".Console"])
-  , ("import qualified Control.Monad.Eff.", map ("import qualified Control.Monad.Eff" ++) [".Unsafe", ".Class", ".Console"])
-
-  -- :load, :module should complete file paths
-  , (":l tests/support/psci/", [":l tests/support/psci/Sample.purs"])
-  , (":module tests/support/psci/", [":module tests/support/psci/Sample.purs"])
 
   -- :quit, :help, :reset should not complete
   , (":help ", [])
@@ -76,13 +69,13 @@ completionTestData =
   , (":show a", [])
 
   -- :type should complete values and data constructors in scope
-  , (":type Control.Monad.Eff.Console.lo", [":type Control.Monad.Eff.Console.log"])
-  , (":type uni", [":type unit"])
-  , (":type E", [":type EQ"])
+  , (":type Control.Monad.Eff.Console.lo", [":type Control.Monad.Eff.Console.log", ":type Control.Monad.Eff.Console.logShow"])
+  --, (":type uni", [":type unit"])
+  --, (":type E", [":type EQ"])
 
   -- :kind should complete types in scope
-  , (":kind C", [":kind Control.Monad.Eff.Pure"])
-  , (":kind O", [":kind Ordering"])
+  --, (":kind C", [":kind Control.Monad.Eff.Pure"])
+  --, (":kind O", [":kind Ordering"])
 
   -- Only one argument for directives should be completed
   , (":show import ", [])
@@ -91,8 +84,7 @@ completionTestData =
 
   -- a few other import tests
   , ("impor", ["import"])
-  , ("import q", ["import qualified"])
-  , ("import ", map ("import " ++) supportModules ++ ["import qualified"])
+  , ("import ", map ("import " ++) supportModules)
   , ("import Prelude ", [])
 
   -- String and number literals should not be completed
@@ -100,10 +92,10 @@ completionTestData =
   , ("34", [])
 
   -- Identifiers and data constructors should be completed
-  , ("uni", ["unit"])
+  --, ("uni", ["unit"])
   , ("Control.Monad.Eff.Class.", ["Control.Monad.Eff.Class.liftEff"])
-  , ("G", ["GT"])
-  , ("Prelude.L", ["Prelude.LT"])
+  --, ("G", ["GT"])
+  , ("Data.Ordering.L", ["Data.Ordering.LT"])
 
   -- if a module is imported qualified, values should complete under the
   -- qualified name, as well as the original name.
@@ -122,39 +114,25 @@ assertCompletedOk (line, expecteds) = do
 runCM :: CompletionM a -> IO a
 runCM act = do
   psciState <- getPSCiState
-  fmap fst (runStateT (liftCompletionM act) psciState)
+  evalStateT (liftCompletionM act) psciState
 
 getPSCiState :: IO PSCiState
 getPSCiState = do
   cwd <- getCurrentDirectory
-  let supportDir = cwd </> "tests" </> "support" </> "flattened"
-  let supportFiles ext = Glob.globDir1 (Glob.compile ("*." ++ ext)) supportDir
+  let supportDir = cwd </> "tests" </> "support" </> "bower_components"
+  let supportFiles ext = Glob.globDir1 (Glob.compile ("purescript-*/**/*." ++ ext)) supportDir
   pursFiles <- supportFiles "purs"
-  jsFiles   <- supportFiles "js"
 
   modulesOrFirstError <- loadAllModules pursFiles
-  foreignFiles <- forM jsFiles (\f -> (f,) <$> readUTF8File f)
-  Right (foreigns, _) <- runExceptT $ runWriterT $ P.parseForeignModulesFromFiles foreignFiles
   case modulesOrFirstError of
     Left err ->
       print err >> exitFailure
     Right modules ->
       let imports = [controlMonadSTasST, (P.ModuleName [P.ProperName "Prelude"], P.Implicit, Nothing)]
-      in  return (mkPSCiState imports modules foreigns [] [])
+          dummyExterns = P.internalError "TestPsci: dummyExterns should not be used"
+      in  return (PSCiState imports [] (zip (map snd modules) (repeat dummyExterns)))
 
 controlMonadSTasST :: ImportedModule
 controlMonadSTasST = (s "Control.Monad.ST", P.Implicit, Just (s "ST"))
   where
   s = P.moduleNameFromString
-
-supportModules :: [String]
-supportModules =
-  [ "Control.Monad.Eff.Class"
-  , "Control.Monad.Eff.Console"
-  , "Control.Monad.Eff"
-  , "Control.Monad.Eff.Unsafe"
-  , "Control.Monad.ST"
-  , "Data.Function"
-  , "Prelude"
-  , "Test.Assert"
-  ]

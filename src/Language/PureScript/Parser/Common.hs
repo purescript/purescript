@@ -1,22 +1,32 @@
-{-# LANGUAGE FlexibleContexts #-}
-
 -- |
--- Constants, and utility functions to be used when parsing
+-- Constants and utility functions to be used when parsing
 --
 module Language.PureScript.Parser.Common where
+
+import Prelude.Compat
 
 import Control.Applicative
 import Control.Monad (guard)
 
+import Language.PureScript.AST.SourcePos
 import Language.PureScript.Comments
+import Language.PureScript.Names
 import Language.PureScript.Parser.Lexer
 import Language.PureScript.Parser.State
-import Language.PureScript.Names
 
 import qualified Text.Parsec as P
 
+-- |
+-- Parse a general proper name.
+--
 properName :: TokenParser (ProperName a)
 properName = ProperName <$> uname
+
+-- |
+-- Parse a proper name for a type.
+--
+typeName :: TokenParser (ProperName 'TypeName)
+typeName = ProperName <$> tyname
 
 -- |
 -- Parse a module name
@@ -42,10 +52,16 @@ parseQualified parser = part []
   qual path = if null path then Nothing else Just $ ModuleName path
 
 -- |
--- Parse an identifier or parenthesized operator
+-- Parse an identifier.
 --
 parseIdent :: TokenParser Ident
-parseIdent = (Ident <$> identifier) <|> (Op <$> parens symbol)
+parseIdent = Ident <$> identifier
+
+-- |
+-- Parse an operator.
+--
+parseOperator :: TokenParser (OpName a)
+parseOperator = OpName <$> symbol
 
 -- |
 -- Run the first parser, then match the second if possible, applying the specified function on a successful match
@@ -56,7 +72,7 @@ augment p q f = flip (maybe id $ flip f) <$> p <*> P.optionMaybe q
 -- |
 -- Run the first parser, then match the second zero or more times, applying the specified function for each match
 --
-fold :: P.Stream s m t => P.ParsecT s u m a -> P.ParsecT s u m b -> (a -> b -> a) -> P.ParsecT s u m a
+fold :: P.ParsecT s u m a -> P.ParsecT s u m b -> (a -> b -> a) -> P.ParsecT s u m a
 fold first more combine = do
   a <- first
   bs <- P.many more
@@ -120,3 +136,9 @@ readComments = P.lookAhead $ ptComments <$> P.anyToken
 --
 runTokenParser :: FilePath -> TokenParser a -> [PositionedToken] -> Either P.ParseError a
 runTokenParser filePath p = P.runParser p (ParseState 0) filePath
+
+-- |
+-- Convert from Parsec sourcepos
+--
+toSourcePos :: P.SourcePos -> SourcePos
+toSourcePos pos = SourcePos (P.sourceLine pos) (P.sourceColumn pos)

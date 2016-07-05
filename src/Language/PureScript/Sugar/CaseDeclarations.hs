@@ -1,45 +1,42 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-
 -- |
 -- This module implements the desugaring pass which replaces top-level binders with
 -- case expressions.
 --
-module Language.PureScript.Sugar.CaseDeclarations (
-    desugarCases,
-    desugarCasesModule
-) where
+module Language.PureScript.Sugar.CaseDeclarations
+  ( desugarCases
+  , desugarCasesModule
+  ) where
 
-import Prelude ()
 import Prelude.Compat
 
-import Language.PureScript.Crash
-import Data.Maybe (catMaybes, mapMaybe)
+import Data.Either (isLeft)
 import Data.List (nub, groupBy, foldl1')
+import Data.Maybe (catMaybes, mapMaybe)
 
-import Control.Monad ((<=<), forM, replicateM, join, unless)
+import Control.Monad ((<=<), replicateM, join, unless)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class
 
-import Language.PureScript.Names
 import Language.PureScript.AST
+import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
+import Language.PureScript.Names
 import Language.PureScript.Traversals
 import Language.PureScript.TypeChecker.Monad (guardWith)
-
--- Data.Either.isLeft (base 4.7)
-isLeft :: Either a b -> Bool
-isLeft (Left _) = True
-isLeft (Right _) = False
 
 -- |
 -- Replace all top-level binders in a module with case expressions.
 --
-desugarCasesModule :: (MonadSupply m, MonadError MultipleErrors m) => [Module] -> m [Module]
-desugarCasesModule ms = forM ms $ \(Module ss coms name ds exps) ->
+desugarCasesModule
+  :: (MonadSupply m, MonadError MultipleErrors m)
+  => Module
+  -> m Module
+desugarCasesModule (Module ss coms name ds exps) =
   rethrow (addHint (ErrorInModule name)) $
-    Module ss coms name <$> (desugarCases <=< desugarAbs <=< validateCases $ ds) <*> pure exps
+    Module ss coms name
+      <$> (desugarCases <=< desugarAbs <=< validateCases $ ds)
+      <*> pure exps
 
 -- |
 -- Validates that case head and binder lengths match.
@@ -147,7 +144,7 @@ toTuple (ValueDeclaration _ _ bs result) = (bs, result)
 toTuple (PositionedDeclaration _ _ d) = toTuple d
 toTuple _ = internalError "Not a value declaration"
 
-makeCaseDeclaration :: forall m. (MonadSupply m, MonadError MultipleErrors m) => Ident -> [([Binder], Either [(Guard, Expr)] Expr)] -> m Declaration
+makeCaseDeclaration :: forall m. (MonadSupply m) => Ident -> [([Binder], Either [(Guard, Expr)] Expr)] -> m Declaration
 makeCaseDeclaration ident alternatives = do
   let namedArgs = map findName . fst <$> alternatives
       argNames = foldl1 resolveNames namedArgs

@@ -1,10 +1,10 @@
--- @shouldFailWith ErrorParsingModule 
+-- @shouldFailWith ErrorParsingModule
 module Main where
 
-import Prelude
+import Control.Monad.Eff.Console (log)
 
 test = (\f :: Int -> Int -> f 10) id
 
 main = do
   let t1 = test
-  Control.Monad.Eff.Console.log "Done"
+  log "Done"

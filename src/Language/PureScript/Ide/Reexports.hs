@@ -14,22 +14,25 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PatternGuards     #-}
-{-# LANGUAGE TupleSections     #-}
 
-module Language.PureScript.Ide.Reexports where
+module Language.PureScript.Ide.Reexports
+  ( resolveReexports2
+  -- for tests
+  , getReexports
+  , replaceReexport
+  , replaceReexports
+  ) where
 
 
-import           Prelude                       ()
-import           Prelude.Compat
+import           Protolude
 
 import           Data.List                     (union)
-import           Data.Map                      (Map)
 import qualified Data.Map                      as Map
-import           Data.Maybe
 import           Language.PureScript.Ide.Types
+import           Language.PureScript.Ide.Externs
+import qualified Language.PureScript as P
 
-getReexports :: Module -> [ExternDecl]
+getReexports :: ModuleOld -> [ExternDecl]
 getReexports (mn, decls)= concatMap getExport decls
   where getExport d
           | (Export mn') <- d
@@ -50,32 +53,32 @@ replaceExportWithAliases decls ident =
           , alias == ident = True
           | otherwise = False
 
-replaceReexport :: ExternDecl -> Module -> Module -> Module
+replaceReexport :: ExternDecl -> ModuleOld -> ModuleOld -> ModuleOld
 replaceReexport e@(Export _) (m, decls) (_, newDecls) =
   (m, filter (/= e) decls `union` newDecls)
-replaceReexport _ _ _ = error "Should only get Exports here."
+replaceReexport _ _ _ = P.internalError "Should only get Exports here"
 
-emptyModule :: Module
+emptyModule :: ModuleOld
 emptyModule = ("Empty", [])
 
 isExport :: ExternDecl -> Bool
 isExport (Export _) = True
 isExport _ = False
 
-removeExportDecls :: Module -> Module
+removeExportDecls :: ModuleOld -> ModuleOld
 removeExportDecls = fmap (filter (not . isExport))
 
-replaceReexports :: Module -> Map ModuleIdent [ExternDecl] -> Module
+replaceReexports :: ModuleOld -> Map ModuleIdent [ExternDecl] -> ModuleOld
 replaceReexports m db = result
   where
     reexports = getReexports m
     result = foldl go (removeExportDecls m) reexports
 
-    go :: Module -> ExternDecl -> Module
+    go :: ModuleOld -> ExternDecl -> ModuleOld
     go m' re@(Export name) = replaceReexport re m' (getModule name)
-    go _ _ = error "partiality! woohoo"
+    go _ _ = P.internalError "Should only get Exports here"
 
-    getModule :: ModuleIdent -> Module
+    getModule :: ModuleIdent -> ModuleOld
     getModule name = clean res
       where
         res = fromMaybe emptyModule $ (name , ) <$> Map.lookup name db
@@ -83,9 +86,12 @@ replaceReexports m db = result
         -- infinite loops
         clean (mn, decls) = (mn,) (filter (/= Export mn) decls)
 
-resolveReexports :: Map ModuleIdent [ExternDecl] -> Module ->  Module
+resolveReexports :: Map ModuleIdent [ExternDecl] -> ModuleOld -> ModuleOld
 resolveReexports modules m =
   let replaced = replaceReexports m modules
   in if null (getReexports replaced)
      then replaced
      else resolveReexports modules replaced
+
+resolveReexports2 :: Map Text [ExternDecl] -> ModuleOld -> Module
+resolveReexports2 decls = convertModule . resolveReexports decls

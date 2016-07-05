@@ -1,6 +1,8 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console
+import Control.Monad.Eff.Console (logShow, log)
 
-main = print (const unit $ "Hello world")
+main = do
+  logShow (const unit $ "Hello world")
+  log "Done"

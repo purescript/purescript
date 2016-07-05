@@ -5,6 +5,8 @@
 --
 module Language.PureScript.AST.Operators where
 
+import Prelude.Compat
+
 import Data.Aeson ((.=))
 import qualified Data.Aeson as A
 
