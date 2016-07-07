@@ -23,9 +23,11 @@ module Main where
 
 import           Protolude
 
+import qualified Data.Aeson as Aeson
 import           Control.Concurrent.STM
 import           "monad-logger" Control.Monad.Logger
 import qualified Data.Text.IO                      as T
+import qualified Data.ByteString.Lazy.Char8        as BS8
 import           Data.Version                      (showVersion)
 import           Language.PureScript.Ide
 import           Language.PureScript.Ide.Util
@@ -121,9 +123,8 @@ startServer port env = withSocketsDo $ do
               -- $(logDebug) ("Answer was: " <> T.pack (show result))
               liftIO (hFlush stdout)
               case result of
-                -- What function can I use to clean this up?
-                Right r  -> liftIO $ T.hPutStrLn h (encodeT r)
-                Left err -> liftIO $ T.hPutStrLn h (encodeT err)
+                Right r  -> liftIO $ BS8.hPutStrLn h (Aeson.encode r)
+                Left err -> liftIO $ BS8.hPutStrLn h (Aeson.encode err)
             Nothing -> do
               $(logDebug) ("Parsing the command failed. Command: " <> cmd)
               liftIO $ do
