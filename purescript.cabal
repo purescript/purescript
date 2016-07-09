@@ -428,6 +428,8 @@ executable psc-ide-server
   other-modules:       Paths_purescript
   other-extensions:
   build-depends:       base >=4 && <5,
+                       aeson >= 0.8 && < 0.12,
+                       bytestring -any,
                        purescript -any,
                        base-compat >=0.6.0,
                        directory -any,
@@ -450,6 +452,7 @@ executable psc-ide-client
   other-extensions:
   build-depends:       base >=4 && <5,
                        base-compat >=0.6.0,
+                       bytestring -any,
                        mtl -any,
                        network -any,
                        optparse-applicative >= 0.12.1,
