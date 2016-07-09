@@ -20,7 +20,6 @@ module Language.PureScript.Ide.Filter
        , moduleFilter
        , prefixFilter
        , equalityFilter
-       , runFilter
        , applyFilters
        ) where
 
@@ -65,11 +64,12 @@ identFilter predicate search =
     filter (not . null . snd) . fmap filterModuleDecls
   where
     filterModuleDecls :: Module -> Module
-    filterModuleDecls (moduleIdent,decls) =
-        (moduleIdent, filter (`predicate` search) decls)
+    filterModuleDecls (moduleIdent, decls) =
+        (moduleIdent, filter (flip predicate search . getDeclaration) decls)
+    getDeclaration (IdeDeclarationAnn _ d) = d
 
 runFilter :: Filter -> [Module] -> [Module]
-runFilter (Filter f)= appEndo f
+runFilter (Filter f) = appEndo f
 
 applyFilters :: [Filter] -> [Module] -> [Module]
 applyFilters = runFilter . fold

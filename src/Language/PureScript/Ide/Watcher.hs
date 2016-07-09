@@ -12,7 +12,9 @@
 -- File watcher for externs files
 -----------------------------------------------------------------------------
 
-module Language.PureScript.Ide.Watcher where
+module Language.PureScript.Ide.Watcher
+ ( watcher
+ ) where
 
 import           Protolude
 
@@ -33,7 +35,7 @@ reloadFile ref ev = do
   case ef' of
     Left _ -> pure ()
     Right ef -> do
-      atomically (insertExternsSTM ref ef *> populateStage2STM ref)
+      void $ atomically (insertExternsSTM ref ef *> populateStage3STM ref)
       putStrLn ("Reloaded File at: " ++ fp)
 
 -- | Installs filewatchers for the given directory and reloads ExternsFiles when

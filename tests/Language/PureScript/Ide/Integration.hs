@@ -37,11 +37,13 @@ module Language.PureScript.Ide.Integration
        , getFlexCompletions
        , getFlexCompletionsInModule
        , getType
+       , getInfo
        , rebuildModule
        , reset
          -- checking results
        , resultIsSuccess
        , parseCompletions
+       , parseInfo
        , parseTextResult
        ) where
 
@@ -53,6 +55,7 @@ import           Data.Aeson.Types
 import qualified Data.Text                    as T
 import qualified Data.Vector                  as V
 import           Language.PureScript.Ide.Util
+import qualified Language.PureScript          as P
 import           System.Directory
 import           System.FilePath
 import           System.IO.Error              (mkIOError, userErrorType)
@@ -68,8 +71,8 @@ startServer = do
   pdir <- projectDirectory
   -- Turn off filewatching since it creates race condition in a testing environment
   (_, _, _, procHandle) <- createProcess $
-    (shell "psc-ide-server --no-watch") {cwd = Just pdir}
-  threadDelay 500000 -- give the server 500ms to start up
+    (shell "psc-ide-server --no-watch src/*.purs") {cwd = Just pdir}
+  threadDelay 2000000 -- give the server 2s to start up
   return procHandle
 
 stopServer :: ProcessHandle -> IO ()
@@ -91,10 +94,7 @@ compileTestProject :: IO Bool
 compileTestProject = do
   pdir <- projectDirectory
   (_, _, _, procHandle) <- createProcess $
-    (shell . toS $ "psc " <> fileGlob) { cwd = Just pdir
-                                       , std_out = CreatePipe
-                                       , std_err = CreatePipe
-                                       }
+    (shell . toS $ "psc " <> fileGlob) { cwd = Just pdir }
   r <- tryNTimes 5 (getProcessExitCode procHandle)
   pure (fromMaybe False (isSuccess <$> r))
 
@@ -166,6 +166,9 @@ getFlexCompletionsInModule q m = parseCompletions <$> sendCommand (completion []
 
 getType :: Text -> IO [(Text, Text, Text)]
 getType q = parseCompletions <$> sendCommand (typeC q [])
+
+getInfo :: Text -> IO [P.SourceSpan]
+getInfo q = parseInfo <$> sendCommand (typeC q [])
 
 addImport :: Text -> FilePath -> FilePath -> IO Text
 addImport identifier fp outfp = sendCommand (addImportC identifier fp outfp)
@@ -259,6 +262,10 @@ completionParser = withArray "res" $ \cs ->
            ty <- o .: "type"
            pure (module', ident, ty)) (V.toList cs)
 
+infoParser :: Value -> Parser [P.SourceSpan]
+infoParser = withArray "res" $ \cs ->
+  mapM (withObject "info" $ \o -> o .: "definedAt") (V.toList cs)
+
 valueFromText :: Text -> Value
 valueFromText = fromJust . decode . toS
 
@@ -268,6 +275,10 @@ resultIsSuccess = isRight . join . first toS . parseEither unwrapResult . valueF
 parseCompletions :: Text -> [(Text, Text, Text)]
 parseCompletions s =
   fromJust $ join (rightToMaybe <$> parseMaybe (withResult completionParser) (valueFromText s))
+
+parseInfo :: Text -> [P.SourceSpan]
+parseInfo s =
+  fromJust $ join (rightToMaybe <$> parseMaybe (withResult infoParser) (valueFromText s))
 
 parseTextResult :: Text -> Text
 parseTextResult s =
