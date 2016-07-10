@@ -6,6 +6,7 @@
 -- and generates the final Javascript bundle.
 module Language.PureScript.Bundle
   ( bundle
+  , guessModuleIdentifier
   , ModuleIdentifier(..)
   , moduleName
   , ModuleType(..)
@@ -32,6 +33,8 @@ import Language.JavaScript.Parser.AST
 
 import qualified Paths_purescript as Paths
 
+import System.FilePath (takeFileName, takeDirectory)
+
 -- | The type of error messages. We separate generation and rendering of errors using a data
 -- type, in case we need to match on error types later.
 data ErrorMessage
@@ -57,6 +60,14 @@ data ModuleIdentifier = ModuleIdentifier String ModuleType deriving (Show, Read,
 
 moduleName :: ModuleIdentifier -> String
 moduleName (ModuleIdentifier name _) = name
+
+-- | Given a filename, assuming it is in the correct place on disk, infer a ModuleIdentifier.
+guessModuleIdentifier :: MonadError ErrorMessage m => FilePath -> m ModuleIdentifier
+guessModuleIdentifier filename = ModuleIdentifier (takeFileName (takeDirectory filename)) <$> guessModuleType (takeFileName filename)
+  where
+    guessModuleType "index.js" = pure Regular
+    guessModuleType "foreign.js" = pure Foreign
+    guessModuleType name = throwError $ UnsupportedModulePath name
 
 -- | A piece of code is identified by its module and its name. These keys are used to label vertices
 -- in the dependency graph.

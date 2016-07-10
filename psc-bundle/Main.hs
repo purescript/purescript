@@ -15,7 +15,7 @@ import Control.Monad.Error.Class
 import Control.Monad.Trans.Except
 import Control.Monad.IO.Class
 
-import System.FilePath (takeFileName, takeDirectory)
+import System.FilePath (takeDirectory)
 import System.FilePath.Glob (glob)
 import System.Exit (exitFailure)
 import System.IO (stderr, stdout, hPutStrLn, hSetEncoding, utf8)
@@ -36,14 +36,6 @@ data Options = Options
   , optionsMainModule  :: Maybe String
   , optionsNamespace   :: String
   } deriving Show
-
--- | Given a filename, assuming it is in the correct place on disk, infer a ModuleIdentifier.
-guessModuleIdentifier :: (MonadError ErrorMessage m) => FilePath -> m ModuleIdentifier
-guessModuleIdentifier filename = ModuleIdentifier (takeFileName (takeDirectory filename)) <$> guessModuleType (takeFileName filename)
-  where
-  guessModuleType "index.js" = pure Regular
-  guessModuleType "foreign.js" = pure Foreign
-  guessModuleType name = throwError $ UnsupportedModulePath name
 
 -- | The main application function.
 -- This function parses the input files, performs dead code elimination, filters empty modules
