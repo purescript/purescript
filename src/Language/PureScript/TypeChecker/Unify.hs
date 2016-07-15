@@ -80,7 +80,7 @@ unknownsInType t = everythingOnTypes (.) go t []
 unifyTypes :: (MonadError MultipleErrors m, MonadState CheckState m) => Type -> Type -> m ()
 unifyTypes t1 t2 = do
   sub <- gets checkSubstitution
-  rethrow (addHint (ErrorUnifyingTypes t1 t2)) $ unifyTypes' (substituteType sub t1) (substituteType sub t2)
+  withErrorMessageHint (ErrorUnifyingTypes t1 t2) $ unifyTypes' (substituteType sub t1) (substituteType sub t2)
   where
   unifyTypes' (TUnknown u1) (TUnknown u2) | u1 == u2 = return ()
   unifyTypes' (TUnknown u) t = solveType u t

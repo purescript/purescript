@@ -8,7 +8,7 @@ module Language.PureScript.TypeChecker.Subsumption
 import Prelude.Compat
 
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State.Class (MonadState(..))
+import Control.Monad.State.Class (MonadState(..), gets)
 
 import Data.List (sortBy)
 import Data.Ord (comparing)
@@ -24,7 +24,7 @@ import Language.PureScript.Types
 
 -- | Check that one type subsumes another, rethrowing errors to provide a better error message
 subsumes :: (MonadError MultipleErrors m, MonadState CheckState m) => Maybe Expr -> Type -> Type -> m (Maybe Expr)
-subsumes val ty1 ty2 = rethrow (addHint (ErrorInSubsumption ty1 ty2)) $ subsumes' val ty1 ty2
+subsumes val ty1 ty2 = withErrorMessageHint (ErrorInSubsumption ty1 ty2) $ subsumes' val ty1 ty2
 
 -- | Check tahat one type subsumes another
 subsumes' :: (MonadError MultipleErrors m, MonadState CheckState m) =>
@@ -52,7 +52,8 @@ subsumes' val ty1 (KindedType ty2 _) =
   subsumes val ty1 ty2
 subsumes' (Just val) (ConstrainedType constraints ty1) ty2 = do
   dicts <- getTypeClassDictionaries
-  subsumes' (Just $ foldl App val (map (flip TypeClassDictionary dicts) constraints)) ty1 ty2
+  hints <- gets checkHints
+  subsumes' (Just $ foldl App val (map (\cs -> TypeClassDictionary cs dicts hints) constraints)) ty1 ty2
 subsumes' val (TypeApp f1 r1) (TypeApp f2 r2) | f1 == tyRecord && f2 == tyRecord = do
   let
     (ts1, r1') = rowToList r1

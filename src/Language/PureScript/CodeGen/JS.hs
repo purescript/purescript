@@ -27,7 +27,9 @@ import Language.PureScript.CodeGen.JS.Common as Common
 import Language.PureScript.CodeGen.JS.Optimizer
 import Language.PureScript.CoreFn
 import Language.PureScript.Crash
-import Language.PureScript.Errors
+import Language.PureScript.Errors (ErrorMessageHint(..), SimpleErrorMessage(..),
+                                   MultipleErrors(..), rethrow,
+                                   errorMessage, rethrowWithPosition, addHint)
 import Language.PureScript.Names
 import Language.PureScript.Options
 import Language.PureScript.Traversals (sndM)

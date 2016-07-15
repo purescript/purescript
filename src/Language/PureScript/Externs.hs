@@ -50,7 +50,7 @@ data ExternsFile = ExternsFile
   , efTypeFixities :: [ExternsTypeFixity]
   -- | List of type and value declaration
   , efDeclarations :: [ExternsDeclaration]
-  } deriving (Show, Read)
+  } deriving (Show)
 
 -- | A module import in an externs file
 data ExternsImport = ExternsImport
@@ -61,7 +61,7 @@ data ExternsImport = ExternsImport
   , eiImportType :: ImportDeclarationType
   -- | The imported-as name, for qualified imports
   , eiImportedAs :: Maybe ModuleName
-  } deriving (Show, Read)
+  } deriving (Show)
 
 -- | A fixity declaration in an externs file
 data ExternsFixity = ExternsFixity
@@ -74,7 +74,7 @@ data ExternsFixity = ExternsFixity
   , efOperator :: OpName 'ValueOpName
   -- | The value the operator is an alias for
   , efAlias :: Qualified (Either Ident (ProperName 'ConstructorName))
-  } deriving (Show, Read)
+  } deriving (Show)
 
 -- | A type fixity declaration in an externs file
 data ExternsTypeFixity = ExternsTypeFixity
@@ -87,7 +87,7 @@ data ExternsTypeFixity = ExternsTypeFixity
   , efTypeOperator :: OpName 'TypeOpName
   -- | The value the operator is an alias for
   , efTypeAlias :: Qualified (ProperName 'TypeName)
-  } deriving (Show, Read)
+  } deriving (Show)
 
 -- | A type or value declaration appearing in an externs file
 data ExternsDeclaration =
@@ -130,7 +130,7 @@ data ExternsDeclaration =
       , edInstanceTypes :: [Type]
       , edInstanceConstraints :: Maybe [Constraint]
       }
-  deriving (Show, Read)
+  deriving (Show)
 
 -- | Convert an externs file back into a module
 applyExternsFileToEnvironment :: ExternsFile -> Environment -> Environment

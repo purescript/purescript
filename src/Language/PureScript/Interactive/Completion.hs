@@ -91,7 +91,7 @@ data CompletionContext
   | CtxIdentifier
   | CtxType
   | CtxFixed String
-  deriving (Show, Read)
+  deriving (Show)
 
 -- |
 -- Decide what kind of completion we need based on input. This function expects

@@ -35,18 +35,30 @@ emptySubstitution = Substitution M.empty M.empty
 
 -- | State required for type checking
 data CheckState = CheckState
-  { checkEnv :: Environment                 -- ^ The current @Environment@
-  , checkNextType :: Int                    -- ^ The next type unification variable
-  , checkNextKind :: Int                    -- ^ The next kind unification variable
-  , checkNextSkolem :: Int                  -- ^ The next skolem variable
-  , checkNextSkolemScope :: Int             -- ^ The next skolem scope constant
-  , checkCurrentModule :: Maybe ModuleName  -- ^ The current module
-  , checkSubstitution :: Substitution       -- ^ The current substitution
+  { checkEnv :: Environment
+  -- ^ The current @Environment@
+  , checkNextType :: Int
+  -- ^ The next type unification variable
+  , checkNextKind :: Int
+  -- ^ The next kind unification variable
+  , checkNextSkolem :: Int
+  -- ^ The next skolem variable
+  , checkNextSkolemScope :: Int
+  -- ^ The next skolem scope constant
+  , checkCurrentModule :: Maybe ModuleName
+  -- ^ The current module
+  , checkSubstitution :: Substitution
+  -- ^ The current substitution
+  , checkHints :: [ErrorMessageHint]
+  -- ^ The current error message hint stack.
+  -- This goes into state, rather than using 'rethrow',
+  -- since this way, we can provide good error messages
+  -- during instance resolution.
   }
 
 -- | Create an empty @CheckState@
 emptyCheckState :: Environment -> CheckState
-emptyCheckState env = CheckState env 0 0 0 0 Nothing emptySubstitution
+emptyCheckState env = CheckState env 0 0 0 0 Nothing emptySubstitution []
 
 -- | Unification variables
 type Unknown = Int
@@ -90,6 +102,33 @@ withScopedTypeVars mn ks ma = do
     when (Qualified (Just mn) (ProperName name) `M.member` types (checkEnv orig)) $
       tell . errorMessage $ ShadowedTypeVar name
   bindTypes (M.fromList (map (\(name, k) -> (Qualified (Just mn) (ProperName name), (k, ScopedTypeVar))) ks)) ma
+
+withErrorMessageHint
+  :: (MonadState CheckState m, MonadError MultipleErrors m)
+  => ErrorMessageHint
+  -> m a
+  -> m a
+withErrorMessageHint hint action = do
+  orig <- get
+  modify $ \st -> st { checkHints = hint : checkHints st }
+  -- Need to use 'rethrow' anyway, since we have to handle regular errors
+  a <- rethrow (addHint hint) action
+  modify $ \st -> st { checkHints = checkHints orig }
+  return a
+
+rethrowWithPositionTC
+  :: (MonadState CheckState m, MonadError MultipleErrors m)
+  => SourceSpan
+  -> m a
+  -> m a
+rethrowWithPositionTC pos = withErrorMessageHint (PositionedError pos)
+
+warnAndRethrowWithPositionTC
+  :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => SourceSpan
+  -> m a
+  -> m a
+warnAndRethrowWithPositionTC pos = rethrowWithPositionTC pos . warnWithPosition pos
 
 -- | Temporarily make a collection of type class dictionaries available
 withTypeClassDictionaries
