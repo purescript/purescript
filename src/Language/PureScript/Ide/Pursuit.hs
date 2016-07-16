@@ -14,7 +14,10 @@
 
 {-# LANGUAGE OverloadedStrings   #-}
 
-module Language.PureScript.Ide.Pursuit where
+module Language.PureScript.Ide.Pursuit
+  ( searchPursuitForDeclarations
+  , findPackagesForModuleIdent
+  ) where
 
 import           Protolude
 

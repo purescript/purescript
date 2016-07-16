@@ -391,5 +391,8 @@ dataEuclideanRing = "Data_EuclideanRing"
 dataFunction :: String
 dataFunction = "Data_Function"
 
+dataFunctionUncurried :: String
+dataFunctionUncurried = "Data_Function_Uncurried"
+
 dataIntBits :: String
 dataIntBits = "Data_Int_Bits"

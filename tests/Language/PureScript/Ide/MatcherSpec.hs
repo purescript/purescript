@@ -12,17 +12,17 @@ import           Language.PureScript.Ide.Types
 import           Test.Hspec
 
 value :: Text -> IdeDeclaration
-value s = IdeValue s $ P.TypeWildcard $ P.SourceSpan "" (P.SourcePos 0 0) (P.SourcePos 0 0)
+value s = IdeValue (P.Ident (toS s)) P.REmpty
 
-firstResult, secondResult, fiult :: Match
-firstResult = Match (P.moduleNameFromString "Match") (value "firstResult")
-secondResult = Match (P.moduleNameFromString "Match") (value "secondResult")
-fiult = Match (P.moduleNameFromString "Match") (value "fiult")
+firstResult, secondResult, fiult :: Match IdeDeclaration
+firstResult = Match (P.moduleNameFromString "Match", value "firstResult")
+secondResult = Match (P.moduleNameFromString "Match", value "secondResult")
+fiult = Match (P.moduleNameFromString "Match", value "fiult")
 
-completions :: [Match]
+completions :: [Match IdeDeclaration]
 completions = [firstResult, secondResult, fiult]
 
-runFlex :: Text -> [Match]
+runFlex :: Text -> [Match IdeDeclaration]
 runFlex s = runMatcher (flexMatcher s) completions
 
 setup :: IO ()
