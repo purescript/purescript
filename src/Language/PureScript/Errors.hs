@@ -19,11 +19,13 @@ import Data.Either (lefts, rights)
 import Data.Foldable (fold)
 import Data.List (intercalate, transpose, nub, nubBy, sortBy, partition)
 import Data.Maybe (maybeToList, fromMaybe, mapMaybe)
-import Data.Ord (comparing)
+import Data.Ord (Down(..), comparing)
 import qualified Data.Map as M
+import qualified Data.Set as S
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
+import Language.PureScript.Environment
 import Language.PureScript.Names
 import Language.PureScript.Pretty
 import Language.PureScript.Traversals
@@ -259,7 +261,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
   gSimple (OrphanInstance nm cl ts) = OrphanInstance nm cl <$> traverse f ts
   gSimple (WildcardInferredType ty) = WildcardInferredType <$> f ty
-  gSimple (HoleInferredType name ty env) = HoleInferredType name <$> f ty <*> traverse (sndM f) env
+  gSimple (HoleInferredType mn name ty env) = HoleInferredType mn name <$> f ty <*> traverse (sndM f) env
   gSimple (MissingTypeDeclaration nm ty) = MissingTypeDeclaration nm <$> f ty
   gSimple (CannotGeneralizeRecursiveFunction nm ty) = CannotGeneralizeRecursiveFunction nm <$> f ty
 
@@ -725,20 +727,60 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
       paras [ line "Wildcard type definition has the inferred type "
             , markCodeBox $ indent $ typeAsBox ty
             ]
-    renderSimpleErrorMessage (HoleInferredType name ty env) =
+    renderSimpleErrorMessage (HoleInferredType mn name ty env) =
       paras $ [ line $ "Hole '" ++ markCode name ++ "' has the inferred type "
               , markCodeBox $ indent $ typeAsBox ty
-              ] ++ if null env then [] else envInfo
+              ] ++ if null relevant then [] else envInfo
       where
         envInfo :: [Box.Box]
         envInfo = [ line "in the following context:"
                   , indent $ paras
-                      [ Box.hcat Box.left [ Box.text (showIdent ident <> " :: ")
+                      [ Box.hcat Box.left [ Box.text (showQualified showIdent ident <> " :: ")
                                           , markCodeBox $ typeAsBox ty'
                                           ]
-                      | (ident, ty') <- take 5 env
+                      | (ident, ty') <- take 5 relevant
                       ]
                   ]
+
+        relevant :: [(Qualified Ident, Type)]
+        relevant = map fst
+                   . sortBy (comparing (Down . snd))
+                   . filter ((> 1) . snd)
+                   . map (id &&& uncurry score)
+                   $ env where
+          score :: Qualified Ident -> Type -> Int
+          score (Qualified mn1 _) ty1 =
+            let (labels1, constraints1, tyCons1) = features ty1
+                -- One point for each record label in common
+                s1 = S.size (S.intersection labels labels1)
+                -- One point for each type class in common
+                s2 = S.size (S.intersection constraints constraints1)
+                -- One point for each concrete type constructor in common
+                s3 = S.size (S.intersection tyCons tyCons1)
+                -- One more point for things defined in the same module
+                s4 | mn1 == Just mn = 1
+                   | mn1 == Nothing = 1
+                   | otherwise = 0
+            in s1 + s2 + s3 + s4
+
+        -- Collect all record labels and concrete type constructors
+        -- appearing in a type
+        features :: Type -> ( S.Set String
+                            , S.Set (Qualified (ProperName 'ClassName))
+                            , S.Set (Qualified (ProperName 'TypeName))
+                            )
+        features = everythingOnTypes (<>) go where
+          go (TypeConstructor x) = (mempty, mempty, S.singleton x)
+          go (ConstrainedType cs _) = (mempty, S.fromList (map constraintClass cs), mempty)
+          go (TypeApp rec row) | rec == tyRecord =
+            let (labels1, _) = rowToList row
+            in (S.fromList (map fst labels1), mempty, mempty)
+          go _ = mempty
+
+        labels :: S.Set String
+        constraints :: S.Set (Qualified (ProperName 'ClassName))
+        tyCons :: S.Set (Qualified (ProperName 'TypeName))
+        (labels, constraints, tyCons) = features ty
     renderSimpleErrorMessage (MissingTypeDeclaration ident ty) =
       paras [ line $ "No type declaration was provided for the top-level declaration of " ++ markCode (showIdent ident) ++ "."
             , line "It is good practice to provide type declarations as a form of documentation."

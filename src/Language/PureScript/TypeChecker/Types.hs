@@ -119,9 +119,9 @@ typesOf bindingGroupType moduleName vals = do
   -- Replace all the wildcards types with their inferred types
   replace sub (ErrorMessage hints (WildcardInferredType ty)) =
     ErrorMessage hints . WildcardInferredType $ substituteType sub ty
-  replace sub (ErrorMessage hints (HoleInferredType name ty env)) =
-    ErrorMessage hints $ HoleInferredType name (substituteType sub ty)
-                                               (map (second (substituteType sub)) env)
+  replace sub (ErrorMessage hints (HoleInferredType mn name ty env)) =
+    ErrorMessage hints $ HoleInferredType mn name (substituteType sub ty)
+                                                  (map (second (substituteType sub)) env)
   replace _ em = em
 
   isHoleError :: ErrorMessage -> Bool
@@ -331,8 +331,8 @@ infer' (Hole name) = do
   ty <- freshType
   env <- M.toList . names <$> getEnv
   Just moduleName <- checkCurrentModule <$> get
-  let ctx = [ (ident, ty') | ((mn, ident@Ident{}), (ty', _, Defined)) <- env, mn == moduleName ]
-  tell . errorMessage $ HoleInferredType name ty ctx
+  let ctx = [ (Qualified (Just mn) ident, ty') | ((mn, ident@Ident{}), (ty', _, Defined)) <- env ]
+  tell . errorMessage $ HoleInferredType moduleName name ty ctx
   return $ TypedValue True (Hole name) ty
 infer' (PositionedValue pos c val) = warnAndRethrowWithPositionTC pos $ do
   TypedValue t v ty <- infer' val
