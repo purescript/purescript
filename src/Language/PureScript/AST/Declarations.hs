@@ -97,7 +97,7 @@ data SimpleErrorMessage
   | ShadowedTypeVar String
   | UnusedTypeVar String
   | WildcardInferredType Type
-  | HoleInferredType String Type [(Ident, Type)]
+  | HoleInferredType ModuleName String Type [(Qualified Ident, Type)]
   | MissingTypeDeclaration Ident Type
   | OverlappingPattern [[Binder]] Bool
   | IncompleteExhaustivityCheck
