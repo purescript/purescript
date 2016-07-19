@@ -22,7 +22,6 @@ import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 import           System.IO.UTF8                  (readUTF8File)
-import           System.FilePath
 
 -- | Given a filepath performs the following steps:
 --

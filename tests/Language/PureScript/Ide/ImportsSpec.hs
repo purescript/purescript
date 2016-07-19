@@ -3,7 +3,7 @@
 module Language.PureScript.Ide.ImportsSpec where
 
 import           Protolude
-import           Unsafe                          (fromJust)
+import           Data.Maybe                      (fromJust)
 
 import qualified Language.PureScript             as P
 import           Language.PureScript.Ide.Imports

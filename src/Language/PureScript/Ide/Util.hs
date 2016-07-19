@@ -27,7 +27,7 @@ module Language.PureScript.Ide.Util
   , module Language.PureScript.Ide.Conversions
   ) where
 
-import           Protolude
+import           Protolude                     hiding (decodeUtf8, encodeUtf8)
 import           Data.Aeson
 import qualified Data.Text                     as T
 import           Data.Text.Lazy.Encoding       (decodeUtf8, encodeUtf8)
