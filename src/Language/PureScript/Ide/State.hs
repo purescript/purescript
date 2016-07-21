@@ -16,7 +16,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PackageImports    #-}
 {-# LANGUAGE TemplateHaskell   #-}
-{-# LANGUAGE BangPatterns      #-}
 
 module Language.PureScript.Ide.State
   ( getLoadedModulenames
