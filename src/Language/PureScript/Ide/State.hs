@@ -12,9 +12,11 @@
 -- Functions to access psc-ide's state
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE PackageImports        #-}
-{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE BangPatterns      #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PackageImports    #-}
+{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE BangPatterns      #-}
 
 module Language.PureScript.Ide.State
   ( getLoadedModulenames
@@ -30,19 +32,19 @@ module Language.PureScript.Ide.State
   , populateStage3STM
   ) where
 
-import           Protolude
 import qualified Prelude
+import           Protolude
 
 import           Control.Concurrent.STM
 import           "monad-logger" Control.Monad.Logger
-import qualified Data.Map.Lazy                     as M
+import qualified Data.Map.Lazy                      as M
+import qualified Language.PureScript                as P
 import           Language.PureScript.Externs
 import           Language.PureScript.Ide.Externs
 import           Language.PureScript.Ide.Reexports
 import           Language.PureScript.Ide.SourceFile
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
-import qualified Language.PureScript as P
 import           System.Clock
 import           System.FilePath
 
@@ -181,7 +183,8 @@ populateStage2 = do
 populateStage2STM :: TVar IdeState -> STM ()
 populateStage2STM ref = do
   modules <- s1Modules <$> getStage1STM ref
-  let spans = map (\((P.Module ss _ _ decls _), _) -> M.fromList (concatMap (extractSpans ss) decls)) modules
+  let !spans = map (\((P.Module ss _ _ decls _), _) ->
+                     M.fromList (concatMap (extractSpans ss) decls)) modules
   setStage2STM ref (Stage2 (AstData spans))
 
 -- | Resolves reexports and populates Stage3 with data to be used in queries.
@@ -209,6 +212,6 @@ populateStage3STM ref = do
         (\moduleName (m, refs) ->
            (fromMaybe m $ annotateLocations <$> M.lookup moduleName asts <*> pure m, refs)) modules
       -- resolves reexports and discards load failures for now
-      result = resolveReexports (M.map (snd . fst) nModules) <$> M.elems nModules
+      !result = resolveReexports (M.map (snd . fst) nModules) <$> M.elems nModules
   setStage3STM ref (Stage3 (M.fromList (map reResolved result)) Nothing)
   pure result
