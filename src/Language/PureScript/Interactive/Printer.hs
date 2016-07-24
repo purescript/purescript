@@ -19,9 +19,10 @@ import qualified Text.PrettyPrint.Boxes as Box
 printModuleSignatures :: P.ModuleName -> P.Environment -> String
 printModuleSignatures moduleName (P.Environment {..}) =
     -- get relevant components of a module from environment
-    let moduleNamesIdent = (filter ((== moduleName) . fst) . M.keys) names
-        moduleTypeClasses = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) typeClasses
-        moduleTypes = (filter (\(P.Qualified maybeName _) -> maybeName == Just moduleName) . M.keys) types
+    let moduleNamesIdent = byModuleName names
+        moduleTypeClasses = byModuleName typeClasses
+        moduleTypes = byModuleName types
+        byModuleName = filter ((== Just moduleName) . P.getQual) . M.keys
 
   in
     -- print each component
@@ -33,8 +34,10 @@ printModuleSignatures moduleName (P.Environment {..}) =
 
   where printModule's showF = Box.vsep 1 Box.left . showF
 
-        findNameType :: M.Map (P.ModuleName, P.Ident) (P.Type, P.NameKind, P.NameVisibility) -> (P.ModuleName, P.Ident) -> (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility))
-        findNameType envNames m@(_, mIdent) = (mIdent, M.lookup m envNames)
+        findNameType :: M.Map (P.Qualified P.Ident) (P.Type, P.NameKind, P.NameVisibility)
+                     -> P.Qualified P.Ident
+                     -> (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility))
+        findNameType envNames m = (P.disqualify m, M.lookup m envNames)
 
         showNameType :: (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility)) -> Box.Box
         showNameType (mIdent, Just (mType, _, _)) = Box.text (P.showIdent mIdent ++ " :: ") Box.<> P.typeAsBox mType

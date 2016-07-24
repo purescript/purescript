@@ -25,7 +25,7 @@ data Environment = Environment {
   -- |
   -- Value names currently in scope
   --
-    names :: M.Map (ModuleName, Ident) (Type, NameKind, NameVisibility)
+    names :: M.Map (Qualified Ident) (Type, NameKind, NameVisibility)
   -- |
   -- Type names currently in scope
   --
@@ -273,7 +273,6 @@ isNewtypeConstructor e ctor = case lookupConstructor e ctor of
 -- Finds information about values from the current environment.
 --
 lookupValue :: Environment -> Qualified Ident -> Maybe (Type, NameKind, NameVisibility)
-lookupValue env (Qualified (Just mn) ident) = (mn, ident) `M.lookup` names env
-lookupValue _ _ = Nothing
+lookupValue env ident = ident `M.lookup` names env
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''TypeKind)
