@@ -35,7 +35,7 @@ identToJs (GenIdent _ _) = internalError "GenIdent in identToJs"
 -- Test if a string is a valid JS identifier without escaping.
 --
 identNeedsEscaping :: String -> Bool
-identNeedsEscaping s = s /= identToJs (Ident s)
+identNeedsEscaping s = s /= identToJs (Ident s) || null s
 
 -- |
 -- Attempts to find a human-readable name for a symbol, if none has been specified returns the
