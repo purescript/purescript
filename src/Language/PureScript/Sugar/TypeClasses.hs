@@ -11,9 +11,8 @@ module Language.PureScript.Sugar.TypeClasses
 import Prelude.Compat
 
 import Language.PureScript.Crash
-import Language.PureScript.AST hiding (isExported)
 import Language.PureScript.Environment
-import Language.PureScript.Errors
+import Language.PureScript.Errors hiding (isExported)
 import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.Externs

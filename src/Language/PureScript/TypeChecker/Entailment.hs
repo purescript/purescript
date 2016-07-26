@@ -22,6 +22,7 @@ import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Errors
 import Language.PureScript.Names
+import Language.PureScript.TypeChecker.Monad (CheckState, withErrorMessageHint)
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
@@ -39,7 +40,7 @@ combineContexts = M.unionWith (M.unionWith M.union)
 
 -- | Replace type class dictionary placeholders with inferred type class dictionaries
 replaceTypeClassDictionaries
-  :: (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
+  :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
   => Bool
   -> ModuleName
   -> Expr
@@ -48,7 +49,8 @@ replaceTypeClassDictionaries shouldGeneralize mn =
   let (_, f, _) = everywhereOnValuesTopDownM return (WriterT . go) return
   in flip evalStateT M.empty . runWriterT . f
   where
-  go (TypeClassDictionary constraint dicts) = entails shouldGeneralize mn dicts constraint
+  go (TypeClassDictionary constraint dicts hints) =
+    rethrow (addHints hints) $ entails shouldGeneralize mn dicts constraint
   go other = return (other, [])
 
 -- |
@@ -57,7 +59,7 @@ replaceTypeClassDictionaries shouldGeneralize mn =
 --
 entails
   :: forall m
-   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
+   . (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
   => Bool
   -> ModuleName
   -> Context
@@ -79,7 +81,7 @@ entails shouldGeneralize moduleName context = solve
     findDicts ctx cn = maybe [] M.elems . (>>= M.lookup cn) . flip M.lookup ctx
 
     solve :: Constraint -> StateT Context m (Expr, [(Ident, Constraint)])
-    solve con = do
+    solve con = StateT . (withErrorMessageHint (ErrorSolvingConstraint con) .) . runStateT $ do
       (dict, unsolved) <- go 0 con
       return (dictionaryValueToValue dict, unsolved)
       where

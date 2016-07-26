@@ -201,7 +201,7 @@ overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
   where
   g :: Expr -> Expr
   g (TypedValue checkTy val t) = TypedValue checkTy val (f t)
-  g (TypeClassDictionary c sco) = TypeClassDictionary (mapConstraintArgs (map f) c) sco
+  g (TypeClassDictionary c sco hints) = TypeClassDictionary (mapConstraintArgs (map f) c) sco hints
   g other = other
 
 -- | Check the kind of a type, failing if it is not of kind *.
@@ -227,7 +227,8 @@ instantiatePolyTypeWithUnknowns val (ForAll ident ty _) = do
   instantiatePolyTypeWithUnknowns val ty'
 instantiatePolyTypeWithUnknowns val (ConstrainedType constraints ty) = do
    dicts <- getTypeClassDictionaries
-   instantiatePolyTypeWithUnknowns (foldl App val (map (flip TypeClassDictionary dicts) constraints)) ty
+   hints <- gets checkHints
+   instantiatePolyTypeWithUnknowns (foldl App val (map (\cs -> TypeClassDictionary cs dicts hints) constraints)) ty
 instantiatePolyTypeWithUnknowns val ty = return (val, ty)
 
 -- | Infer a type for a value, rethrowing any error to provide a more useful error message
@@ -235,7 +236,7 @@ infer ::
   (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
   Expr ->
   m Expr
-infer val = rethrow (addHint (ErrorInferringType val)) $ infer' val
+infer val = withErrorMessageHint (ErrorInferringType val) $ infer' val
 
 -- | Infer a type for a value
 infer' ::
@@ -267,7 +268,7 @@ infer' (ObjectUpdate o ps) = do
   let oldTy = TypeApp tyRecord $ rowFromList (oldTys, row)
   o' <- TypedValue True <$> check o oldTy <*> pure oldTy
   return $ TypedValue True (ObjectUpdate o' newVals) $ TypeApp tyRecord $ rowFromList (newTys, row)
-infer' (Accessor prop val) = rethrow (addHint (ErrorCheckingAccessor val prop)) $ do
+infer' (Accessor prop val) = withErrorMessageHint (ErrorCheckingAccessor val prop) $ do
   field <- freshType
   rest <- freshType
   typed <- check val (TypeApp tyRecord (RCons prop field rest))
@@ -290,7 +291,8 @@ infer' (Var var) = do
   case ty of
     ConstrainedType constraints ty' -> do
       dicts <- getTypeClassDictionaries
-      return $ TypedValue True (foldl App (Var var) (map (flip TypeClassDictionary dicts) constraints)) ty'
+      hints <- gets checkHints
+      return $ TypedValue True (foldl App (Var var) (map (\cs -> TypeClassDictionary cs dicts hints) constraints)) ty'
     _ -> return $ TypedValue True (Var var) ty
 infer' v@(Constructor c) = do
   env <- getEnv
@@ -316,7 +318,8 @@ infer' (Let ds val) = do
   return $ TypedValue True (Let ds' val') valTy
 infer' (SuperClassDictionary className tys) = do
   dicts <- getTypeClassDictionaries
-  return $ TypeClassDictionary (Constraint className tys Nothing) dicts
+  hints <- gets checkHints
+  return $ TypeClassDictionary (Constraint className tys Nothing) dicts hints
 infer' (TypedValue checkType val ty) = do
   Just moduleName <- checkCurrentModule <$> get
   (kind, args) <- kindOfWithScopedVars ty
@@ -331,7 +334,7 @@ infer' (Hole name) = do
   let ctx = [ (ident, ty') | ((mn, ident@Ident{}), (ty', _, Defined)) <- env, mn == moduleName ]
   tell . errorMessage $ HoleInferredType name ty ctx
   return $ TypedValue True (Hole name) ty
-infer' (PositionedValue pos c val) = warnAndRethrowWithPosition pos $ do
+infer' (PositionedValue pos c val) = warnAndRethrowWithPositionTC pos $ do
   TypedValue t v ty <- infer' val
   return $ TypedValue t (PositionedValue pos c v) ty
 infer' v = internalError $ "Invalid argument to infer: " ++ show v
@@ -368,7 +371,7 @@ inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
   bindNames dict $ do
     makeBindingGroupVisible
     inferLetBinding (seen ++ [BindingGroupDeclaration ds']) rest ret j
-inferLetBinding seen (PositionedDeclaration pos com d : ds) ret j = warnAndRethrowWithPosition pos $ do
+inferLetBinding seen (PositionedDeclaration pos com d : ds) ret j = warnAndRethrowWithPositionTC pos $ do
   (d' : ds', val') <- inferLetBinding seen (d : ds) ret j
   return (PositionedDeclaration pos com d' : ds', val')
 inferLetBinding _ _ _ _ = internalError "Invalid argument to inferLetBinding"
@@ -426,7 +429,7 @@ inferBinder val (NamedBinder name binder) = do
   m <- inferBinder val binder
   return $ M.insert name val m
 inferBinder val (PositionedBinder pos _ binder) =
-  warnAndRethrowWithPosition pos $ inferBinder val binder
+  warnAndRethrowWithPositionTC pos $ inferBinder val binder
 -- TODO: When adding support for polymorphic types, check subsumption here,
 -- change the definition of `binderRequiresMonotype`,
 -- and use `kindOfWithScopedVars`.
@@ -487,7 +490,7 @@ checkBinders nvals ret (CaseAlternative binders result : bs) = do
       case result of
         Left gs -> do
           gs' <- forM gs $ \(grd, val) -> do
-            grd' <- rethrow (addHint ErrorCheckingGuard) $ check grd tyBoolean
+            grd' <- withErrorMessageHint ErrorCheckingGuard $ check grd tyBoolean
             val' <- TypedValue True <$> check val ret <*> pure ret
             return (grd', val')
           return $ Left gs'
@@ -505,7 +508,7 @@ check ::
   Expr ->
   Type ->
   m Expr
-check val ty = rethrow (addHint (ErrorCheckingType val ty)) $ check' val ty
+check val ty = withErrorMessageHint (ErrorCheckingType val ty) $ check' val ty
 
 -- |
 -- Check the type of a value
@@ -599,7 +602,8 @@ check' (SuperClassDictionary className tys) _ = do
   -- declaration gets desugared.
   -}
   dicts <- getTypeClassDictionaries
-  return $ TypeClassDictionary (Constraint className tys Nothing) dicts
+  hints <- gets checkHints
+  return $ TypeClassDictionary (Constraint className tys Nothing) dicts hints
 check' (TypedValue checkType val ty1) ty2 = do
   Just moduleName <- checkCurrentModule <$> get
   (kind, args) <- kindOfWithScopedVars ty1
@@ -638,7 +642,7 @@ check' e@(ObjectUpdate obj ps) t@(TypeApp o row) | o == tyRecord = do
   obj' <- check obj (TypeApp tyRecord (rowFromList (us ++ remainingProps, rest)))
   ps' <- checkProperties e ps row True
   return $ TypedValue True (ObjectUpdate obj' ps') t
-check' (Accessor prop val) ty = rethrow (addHint (ErrorCheckingAccessor val prop)) $ do
+check' (Accessor prop val) ty = withErrorMessageHint (ErrorCheckingAccessor val prop) $ do
   rest <- freshType
   val' <- check val (TypeApp tyRecord (RCons prop ty rest))
   return $ TypedValue True (Accessor prop val') ty
@@ -659,7 +663,7 @@ check' val kt@(KindedType ty kind) = do
   checkTypeKind ty kind
   val' <- check' val ty
   return $ TypedValue True val' kt
-check' (PositionedValue pos c val) ty = warnAndRethrowWithPosition pos $ do
+check' (PositionedValue pos c val) ty = warnAndRethrowWithPositionTC pos $ do
   TypedValue t v ty' <- check' val ty
   return $ TypedValue t (PositionedValue pos c v) ty'
 check' val ty = do
@@ -713,7 +717,7 @@ checkFunctionApplication ::
   Expr ->
   Maybe Type ->
   m (Type, Expr)
-checkFunctionApplication fn fnTy arg ret = rethrow (addHint (ErrorInApplication fn fnTy arg)) $ do
+checkFunctionApplication fn fnTy arg ret = withErrorMessageHint (ErrorInApplication fn fnTy arg) $ do
   subst <- gets checkSubstitution
   checkFunctionApplication' fn (substituteType subst fnTy) arg (substituteType subst <$> ret)
 
@@ -749,7 +753,8 @@ checkFunctionApplication' fn (KindedType ty _) arg ret =
   checkFunctionApplication fn ty arg ret
 checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg ret = do
   dicts <- getTypeClassDictionaries
-  checkFunctionApplication' (foldl App fn (map (flip TypeClassDictionary dicts) constraints)) fnTy arg ret
+  hints <- gets checkHints
+  checkFunctionApplication' (foldl App fn (map (\cs -> TypeClassDictionary cs dicts hints) constraints)) fnTy arg ret
 checkFunctionApplication' fn fnTy dict@TypeClassDictionary{} _ =
   return (fnTy, App fn dict)
 checkFunctionApplication' _ fnTy arg _ = throwError . errorMessage $ CannotApplyFunction fnTy arg

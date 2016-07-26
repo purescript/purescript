@@ -85,7 +85,7 @@ import qualified Text.Parsec as Parsec
 -- | Progress messages from the make process
 data ProgressMessage
   = CompilingModule ModuleName
-  deriving (Show, Read, Eq, Ord)
+  deriving (Show, Eq, Ord)
 
 -- | Render a progress message
 renderProgressMessage :: ProgressMessage -> String
@@ -129,7 +129,7 @@ data RebuildPolicy
   -- | Never rebuild this module
   = RebuildNever
   -- | Always rebuild this module
-  | RebuildAlways deriving (Show, Read, Eq, Ord)
+  | RebuildAlways deriving (Show, Eq, Ord)
 
 -- | Rebuild a single module
 rebuildModule :: forall m. (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)

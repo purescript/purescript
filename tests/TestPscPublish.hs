@@ -30,7 +30,7 @@ data TestResult
   = ParseFailed String
   | Mismatch ByteString ByteString -- ^ encoding before, encoding after
   | Pass ByteString
-  deriving (Show, Read)
+  deriving (Show)
 
 roundTrip :: UploadedPackage -> TestResult
 roundTrip pkg =

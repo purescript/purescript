@@ -329,9 +329,9 @@ updateTypes goType = (goDecl, goExpr, goBinder)
 
   goExpr :: Maybe SourceSpan -> Expr -> m (Maybe SourceSpan, Expr)
   goExpr _ e@(PositionedValue pos _ _) = return (Just pos, e)
-  goExpr pos (TypeClassDictionary (Constraint name tys info) dicts) = do
+  goExpr pos (TypeClassDictionary (Constraint name tys info) dicts hints) = do
     tys' <- traverse (goType' pos) tys
-    return (pos, TypeClassDictionary (Constraint name tys' info) dicts)
+    return (pos, TypeClassDictionary (Constraint name tys' info) dicts hints)
   goExpr pos (SuperClassDictionary cls tys) = do
     tys' <- traverse (goType' pos) tys
     return (pos, SuperClassDictionary cls tys')
