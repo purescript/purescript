@@ -25,7 +25,6 @@ import           Data.Map.Lazy                        as M
 import qualified Language.PureScript.Errors.JSON      as P
 import qualified Language.PureScript as P
 import           Language.PureScript.Ide.Conversions
-import           System.FilePath
 import           Text.Parsec as Parsec
 import           Text.Parsec.Text
 

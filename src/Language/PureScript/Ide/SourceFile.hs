@@ -26,7 +26,6 @@ import qualified Language.PureScript                  as P
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Util
 import           Language.PureScript.Ide.Types
-import           System.FilePath
 import           System.IO.UTF8                       (readUTF8File)
 
 parseModule

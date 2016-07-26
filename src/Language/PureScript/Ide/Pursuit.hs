@@ -19,7 +19,7 @@ module Language.PureScript.Ide.Pursuit
   , findPackagesForModuleIdent
   ) where
 
-import           Protolude
+import           Protolude                     hiding (fromStrict)
 
 import qualified Control.Exception             as E
 import           Data.Aeson
@@ -36,7 +36,7 @@ import qualified Pipes.Prelude                 as P
 queryPursuit :: Text -> IO ByteString
 queryPursuit q = do
   let qClean = T.dropWhileEnd (== '.') q
-  req' <- parseUrl "http://pursuit.purescript.org/search"
+  req' <- parseRequest "http://pursuit.purescript.org/search"
   let req = req'
         { queryString= "q=" <> (fromString . T.unpack) qClean
         , requestHeaders=[(hAccept, "application/json")]

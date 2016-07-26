@@ -24,7 +24,6 @@ import           Language.PureScript.Ide.CaseSplit
 import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Types
-import           System.FilePath
 
 data Command
     = Load [P.ModuleName]
