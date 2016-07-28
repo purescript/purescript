@@ -36,6 +36,7 @@ import Control.Monad.Trans.Except
 import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Aeson (encode, decode)
+import Data.ByteString.Builder (toLazyByteString, stringUtf8)
 import Data.Either (partitionEithers)
 import Data.Foldable (for_)
 import Data.List (foldl', sort)
@@ -252,7 +253,7 @@ make ma@MakeActions{..} ms = do
 
   decodeExterns :: Externs -> Maybe ExternsFile
   decodeExterns bs = do
-    externs <- decode (fromString bs)
+    externs <- decode (toLazyByteString (stringUtf8 bs))
     guard $ efVersion externs == showVersion Paths.version
     return externs
 
