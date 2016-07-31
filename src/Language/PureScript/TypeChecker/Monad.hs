@@ -202,6 +202,12 @@ lookupTypeVariable currentModule (Qualified moduleName name) = do
 getEnv :: (MonadState CheckState m) => m Environment
 getEnv = checkEnv <$> get
 
+-- | Get locally-bound names in context, to create an error message.
+getLocalContext :: MonadState CheckState m => m Context
+getLocalContext = do
+  env <- getEnv
+  return [ (ident, ty') | ((Qualified Nothing ident@Ident{}), (ty', _, Defined)) <- M.toList (names env) ]
+
 -- | Update the @Environment@
 putEnv :: (MonadState CheckState m) => Environment -> m ()
 putEnv env = modify (\s -> s { checkEnv = env })
