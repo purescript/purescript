@@ -31,9 +31,12 @@ data Options = Options {
     -- |
     -- Generate soure maps
   , optionsSourceMaps :: Bool
+    -- |
+    -- Dump CoreFn
+  , optionsDumpCoreFn :: Bool
   } deriving Show
 
 -- |
 -- Default make options
 defaultOptions :: Options
-defaultOptions = Options False False Nothing False False False False
+defaultOptions = Options False False Nothing False False False False False
