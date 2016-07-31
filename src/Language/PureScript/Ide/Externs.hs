@@ -33,7 +33,6 @@ import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 
 import qualified Language.PureScript           as P
-import           System.FilePath
 
 readExternFile :: (MonadIO m, MonadError PscIdeError m) =>
                   FilePath -> m P.ExternsFile

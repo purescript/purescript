@@ -104,7 +104,7 @@ data Token
   | StringLiteral String
   | Number (Either Integer Double)
   | HoleLit String
-  deriving (Show, Read, Eq, Ord)
+  deriving (Show, Eq, Ord)
 
 prettyPrintToken :: Token -> String
 prettyPrintToken LParen            = "("

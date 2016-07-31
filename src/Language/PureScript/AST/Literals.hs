@@ -34,4 +34,4 @@ data Literal a
   -- An object literal
   --
   | ObjectLiteral [(String, a)]
-  deriving (Eq, Ord, Show, Read, Functor)
+  deriving (Eq, Ord, Show, Functor)

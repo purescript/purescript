@@ -23,7 +23,7 @@ import Language.PureScript.Names
 -- An identifier for the scope of a skolem variable
 --
 newtype SkolemScope = SkolemScope { runSkolemScope :: Int }
-  deriving (Show, Read, Eq, Ord, A.ToJSON, A.FromJSON)
+  deriving (Show, Eq, Ord, A.ToJSON, A.FromJSON)
 
 -- |
 -- The type of types
@@ -71,7 +71,7 @@ data Type
   -- Note: although it seems this constructor is not used, it _is_ useful,
   -- since it prevents certain traversals from matching.
   | ParensInType Type
-  deriving (Show, Read, Eq, Ord)
+  deriving (Show, Eq, Ord)
 
 -- | Additional data relevant to type class constraints
 data ConstraintData
@@ -81,7 +81,7 @@ data ConstraintData
   -- not matched, and a flag indicating whether the list was truncated or not.
   -- Note: we use 'String' here because using 'Binder' would introduce a cyclic
   -- dependency in the module graph.
-  deriving (Show, Read, Eq, Ord)
+  deriving (Show, Eq, Ord)
 
 -- | A typeclass constraint
 data Constraint = Constraint
@@ -91,7 +91,7 @@ data Constraint = Constraint
   -- ^ type arguments
   , constraintData  :: Maybe ConstraintData
   -- ^ additional data relevant to this constraint
-  } deriving (Show, Read, Eq, Ord)
+  } deriving (Show, Eq, Ord)
 
 mapConstraintArgs :: ([Type] -> [Type]) -> Constraint -> Constraint
 mapConstraintArgs f c = c { constraintArgs = f (constraintArgs c) }

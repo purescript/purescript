@@ -48,7 +48,7 @@ module Language.PureScript.Ide.Integration
        ) where
 
 import           Protolude
-import           Unsafe                       (fromJust)
+import           Data.Maybe                   (fromJust)
 
 import           Data.Aeson
 import           Data.Aeson.Types

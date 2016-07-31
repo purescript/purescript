@@ -44,7 +44,6 @@ import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 import qualified Language.PureScript as P
 import           System.Clock
-import           System.FilePath
 
 -- | Resets all State inside psc-ide
 resetIdeState :: Ide m => m ()
