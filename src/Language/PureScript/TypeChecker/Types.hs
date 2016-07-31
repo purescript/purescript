@@ -245,8 +245,11 @@ infer' v@(Literal (BooleanLiteral _)) = return $ TypedValue True v tyBoolean
 infer' (Literal (ArrayLiteral vals)) = do
   ts <- traverse infer vals
   els <- freshType
-  forM_ ts $ \(TypedValue _ _ t) -> unifyTypes els t
-  return $ TypedValue True (Literal (ArrayLiteral ts)) (TypeApp tyArray els)
+  ts' <- forM ts $ \(TypedValue ch val t) -> do
+    (val', t') <- instantiatePolyTypeWithUnknowns val t
+    unifyTypes els t'
+    return (TypedValue ch val' t')
+  return $ TypedValue True (Literal (ArrayLiteral ts')) (TypeApp tyArray els)
 infer' (Literal (ObjectLiteral ps)) = do
   ensureNoDuplicateProperties ps
   ts <- traverse (infer . snd) ps
