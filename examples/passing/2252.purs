@@ -1,18 +1,15 @@
 module Main where
-
+	
 import Control.Monad.Eff.Console (log)
 
 data T a = T
-
--- inferred as `Array t0`
-xs :: _
-xs = [T, T, T]
+	 
+ti :: T Int
+ti = T
 
 t :: forall a. T a
 t = T
 
--- inferred as `Array (forall a. T a)`
-xs' :: _
-xs' = [t, t, t]
+xs = [ti, t, t]
 
 main = log "Done"
