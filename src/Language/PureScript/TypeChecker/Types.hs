@@ -26,7 +26,6 @@ module Language.PureScript.TypeChecker.Types
 
 import Prelude.Compat
 
-import Control.Arrow (second)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets)
@@ -71,7 +70,7 @@ typesOf ::
   m [(Ident, (Expr, Type))]
 typesOf bindingGroupType moduleName vals = do
   tys <- fmap tidyUp . escalateWarningWhen isHoleError . liftUnifyWarnings replace $ do
-    (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName vals
+    (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup (Just moduleName) vals
     ds1 <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
     ds2 <- forM untyped $ \e -> typeForBindingGroupElement e dict untypedDict
     return (map (\x -> (False, x)) ds1 ++ map (\x -> (True, x)) ds2)
@@ -117,26 +116,21 @@ typesOf bindingGroupType moduleName vals = do
   tidyUp (ts, sub) = map (\(b, (i, (val, ty))) -> (b, (i, (overTypes (substituteType sub) val, substituteType sub ty)))) ts
 
   -- Replace all the wildcards types with their inferred types
-  replace sub (ErrorMessage hints (WildcardInferredType ty)) =
-    ErrorMessage hints . WildcardInferredType $ substituteType sub ty
-  replace sub (ErrorMessage hints (HoleInferredType name ty env)) =
-    ErrorMessage hints $ HoleInferredType name (substituteType sub ty)
-                                               (map (second (substituteType sub)) env)
-  replace _ em = em
+  replace sub = onTypesInErrorMessage (substituteType sub)
 
   isHoleError :: ErrorMessage -> Bool
   isHoleError (ErrorMessage _ HoleInferredType{}) = True
   isHoleError _ = False
 
-type TypeData = M.Map (ModuleName, Ident) (Type, NameKind, NameVisibility)
+type TypeData = M.Map (Qualified Ident) (Type, NameKind, NameVisibility)
 
 type UntypedData = [(Ident, Type)]
 
-typeDictionaryForBindingGroup ::
-  (MonadState CheckState m) =>
-  ModuleName ->
-  [(Ident, Expr)] ->
-  m ([(Ident, Expr)], [(Ident, (Expr, Type, Bool))], TypeData, UntypedData)
+typeDictionaryForBindingGroup
+  :: (MonadState CheckState m)
+  => Maybe ModuleName
+  -> [(Ident, Expr)]
+  -> m ([(Ident, Expr)], [(Ident, (Expr, Type, Bool))], TypeData, UntypedData)
 typeDictionaryForBindingGroup moduleName vals = do
   let
     -- Map each declaration to a name/value pair, with an optional type, if the declaration is typed
@@ -154,15 +148,15 @@ typeDictionaryForBindingGroup moduleName vals = do
     -- Make a map of names to the unification variables of untyped declarations
     untypedDict = zip (map fst untyped) untypedNames
     -- Create the dictionary of all name/type pairs, which will be added to the environment during type checking
-    dict = M.fromList (map (\(ident, ty) -> ((moduleName, ident), (ty, Private, Undefined))) $ typedDict ++ untypedDict)
+    dict = M.fromList (map (\(ident, ty) -> ((Qualified moduleName ident), (ty, Private, Undefined))) $ typedDict ++ untypedDict)
   return (untyped, typed, dict, untypedDict)
 
-checkTypedBindingGroupElement ::
-  (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  ModuleName ->
-  (Ident, (Expr, Type, Bool)) ->
-  TypeData ->
-  m (Ident, (Expr, Type))
+checkTypedBindingGroupElement
+  :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => ModuleName
+  -> (Ident, (Expr, Type, Bool))
+  -> TypeData
+  -> m (Ident, (Expr, Type))
 checkTypedBindingGroupElement mn (ident, (val', ty, checkType)) dict = do
   -- Replace type wildcards
   ty' <- replaceTypeWildcards ty
@@ -176,12 +170,12 @@ checkTypedBindingGroupElement mn (ident, (val', ty, checkType)) dict = do
            else return (TypedValue False val' ty'')
   return (ident, (val'', ty''))
 
-typeForBindingGroupElement ::
-  (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  (Ident, Expr) ->
-  TypeData ->
-  UntypedData ->
-  m (Ident, (Expr, Type))
+typeForBindingGroupElement
+  :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => (Ident, Expr)
+  -> TypeData
+  -> UntypedData
+  -> m (Ident, (Expr, Type))
 typeForBindingGroupElement (ident, val) dict untypedDict = do
   -- Infer the type with the new names in scope
   TypedValue _ val' ty <- bindNames dict $ infer val
@@ -275,8 +269,7 @@ infer' (Accessor prop val) = withErrorMessageHint (ErrorCheckingAccessor val pro
   return $ TypedValue True (Accessor prop typed) field
 infer' (Abs (Left arg) ret) = do
   ty <- freshType
-  Just moduleName <- checkCurrentModule <$> get
-  withBindingGroupVisible $ bindLocalVariables moduleName [(arg, ty, Defined)] $ do
+  withBindingGroupVisible $ bindLocalVariables [(arg, ty, Defined)] $ do
     body@(TypedValue _ _ bodyTy) <- infer' ret
     return $ TypedValue True (Abs (Left arg) body) $ function ty bodyTy
 infer' (Abs (Right _) _) = internalError "Binder was not desugared"
@@ -285,9 +278,8 @@ infer' (App f arg) = do
   (ret, app) <- checkFunctionApplication f' ft arg Nothing
   return $ TypedValue True app ret
 infer' (Var var) = do
-  Just moduleName <- checkCurrentModule <$> get
-  checkVisibility moduleName var
-  ty <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards <=< lookupVariable moduleName $ var
+  checkVisibility var
+  ty <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards <=< lookupVariable $ var
   case ty of
     ConstrainedType constraints ty' -> do
       dicts <- getTypeClassDictionaries
@@ -329,9 +321,7 @@ infer' (TypedValue checkType val ty) = do
   return $ TypedValue True val' ty'
 infer' (Hole name) = do
   ty <- freshType
-  env <- M.toList . names <$> getEnv
-  Just moduleName <- checkCurrentModule <$> get
-  let ctx = [ (ident, ty') | ((mn, ident@Ident{}), (ty', _, Defined)) <- env, mn == moduleName ]
+  ctx <- getLocalContext
   tell . errorMessage $ HoleInferredType name ty ctx
   return $ TypedValue True (Hole name) ty
 infer' (PositionedValue pos c val) = warnAndRethrowWithPositionTC pos $ do
@@ -351,20 +341,19 @@ inferLetBinding seen (ValueDeclaration ident nameKind [] (Right (tv@(TypedValue 
   Just moduleName <- checkCurrentModule <$> get
   (kind, args) <- kindOfWithScopedVars ty
   checkTypeKind ty kind
-  let dict = M.singleton (moduleName, ident) (ty, nameKind, Undefined)
+  let dict = M.singleton (Qualified Nothing ident) (ty, nameKind, Undefined)
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   TypedValue _ val' ty'' <- if checkType then withScopedTypeVars moduleName args (bindNames dict (check val ty')) else return tv
-  bindNames (M.singleton (moduleName, ident) (ty'', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] (Right (TypedValue checkType val' ty''))]) rest ret j
+  bindNames (M.singleton (Qualified Nothing ident) (ty'', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] (Right (TypedValue checkType val' ty''))]) rest ret j
 inferLetBinding seen (ValueDeclaration ident nameKind [] (Right val) : rest) ret j = do
   valTy <- freshType
-  Just moduleName <- checkCurrentModule <$> get
-  let dict = M.singleton (moduleName, ident) (valTy, nameKind, Undefined)
+  let dict = M.singleton (Qualified Nothing ident) (valTy, nameKind, Undefined)
   TypedValue _ val' valTy' <- bindNames dict $ infer val
   unifyTypes valTy valTy'
-  bindNames (M.singleton (moduleName, ident) (valTy', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] (Right val')]) rest ret j
+  bindNames (M.singleton (Qualified Nothing ident) (valTy', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] (Right val')]) rest ret j
 inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
   Just moduleName <- checkCurrentModule <$> get
-  (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup moduleName (map (\(i, _, v) -> (i, v)) ds)
+  (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup Nothing (map (\(i, _, v) -> (i, v)) ds)
   ds1' <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
   ds2' <- forM untyped $ \e -> typeForBindingGroupElement e dict untypedDict
   let ds' = [(ident, Private, val') | (ident, (val', _)) <- ds1' ++ ds2']
@@ -483,9 +472,8 @@ checkBinders _ _ [] = return []
 checkBinders nvals ret (CaseAlternative binders result : bs) = do
   guardWith (errorMessage $ OverlappingArgNames Nothing) $
     let ns = concatMap binderNames binders in length (nub ns) == length ns
-  Just moduleName <- checkCurrentModule <$> get
   m1 <- M.unions <$> zipWithM inferBinder nvals binders
-  r <- bindLocalVariables moduleName [ (name, ty, Defined) | (name, ty) <- M.toList m1 ] $
+  r <- bindLocalVariables [ (name, ty, Defined) | (name, ty) <- M.toList m1 ] $
     CaseAlternative binders <$>
       case result of
         Left gs -> do
@@ -577,8 +565,7 @@ check' (Literal (ArrayLiteral vals)) t@(TypeApp a ty) = do
   return $ TypedValue True array t
 check' (Abs (Left arg) ret) ty@(TypeApp (TypeApp t argTy) retTy) = do
   unifyTypes t tyFunction
-  Just moduleName <- checkCurrentModule <$> get
-  ret' <- withBindingGroupVisible $ bindLocalVariables moduleName [(arg, argTy, Defined)] $ check ret retTy
+  ret' <- withBindingGroupVisible $ bindLocalVariables [(arg, argTy, Defined)] $ check ret retTy
   return $ TypedValue True (Abs (Left arg) ret') ty
 check' (Abs (Right _) _) _ = internalError "Binder was not desugared"
 check' (App f arg) ret = do
@@ -586,9 +573,8 @@ check' (App f arg) ret = do
   (_, app) <- checkFunctionApplication f' ft arg (Just ret)
   return $ TypedValue True app ret
 check' v@(Var var) ty = do
-  Just moduleName <- checkCurrentModule <$> get
-  checkVisibility moduleName var
-  repl <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< lookupVariable moduleName $ var
+  checkVisibility var
+  repl <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< lookupVariable $ var
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   v' <- subsumes (Just v) repl ty'
   case v' of

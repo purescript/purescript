@@ -17,6 +17,7 @@ import Control.Monad.Writer
 import Data.Char (isSpace)
 import Data.Either (lefts, rights)
 import Data.Foldable (fold)
+import Data.Functor.Identity (Identity(..))
 import Data.List (intercalate, transpose, nub, nubBy, sortBy, partition)
 import Data.Maybe (maybeToList, fromMaybe, mapMaybe)
 import Data.Ord (comparing)
@@ -243,7 +244,10 @@ replaceUnknowns = everywhereOnTypesM replaceTypes
       Just (_, s', _) -> return (Skolem name s' sko ss)
   replaceTypes other = return other
 
-onTypesInErrorMessageM :: (Applicative m) => (Type -> m Type) -> ErrorMessage -> m ErrorMessage
+onTypesInErrorMessage :: (Type -> Type) -> ErrorMessage -> ErrorMessage
+onTypesInErrorMessage f = runIdentity . onTypesInErrorMessageM (Identity . f)
+
+onTypesInErrorMessageM :: Applicative m => (Type -> m Type) -> ErrorMessage -> m ErrorMessage
 onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse gHint hints <*> gSimple simple
   where
   gSimple (InfiniteType t) = InfiniteType <$> f t
@@ -258,11 +262,10 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (CannotDerive cl ts) = CannotDerive cl <$> traverse f ts
   gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
   gSimple (OrphanInstance nm cl ts) = OrphanInstance nm cl <$> traverse f ts
-  gSimple (WildcardInferredType ty) = WildcardInferredType <$> f ty
-  gSimple (HoleInferredType name ty env) = HoleInferredType name <$> f ty <*> traverse (sndM f) env
+  gSimple (WildcardInferredType ty ctx) = WildcardInferredType <$> f ty <*> traverse (sndM f) ctx
+  gSimple (HoleInferredType name ty ctx) = HoleInferredType name <$> f ty <*> traverse (sndM f) ctx
   gSimple (MissingTypeDeclaration nm ty) = MissingTypeDeclaration nm <$> f ty
   gSimple (CannotGeneralizeRecursiveFunction nm ty) = CannotGeneralizeRecursiveFunction nm <$> f ty
-
   gSimple other = pure other
 
   gHint (ErrorInSubsumption t1 t2) = ErrorInSubsumption <$> f t1 <*> f t2
@@ -289,7 +292,7 @@ errorSuggestion err = case err of
   ImplicitQualifiedImport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
   HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
   MissingTypeDeclaration ident ty -> suggest $ showIdent ident ++ " :: " ++ prettyPrintType ty
-  WildcardInferredType ty -> suggest $ prettyPrintType ty
+  WildcardInferredType ty _ -> suggest $ prettyPrintType ty
   _ -> Nothing
 
   where
@@ -721,24 +724,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
       paras [ line "hiding imports cannot be used to hide modules."
             , line $ "An attempt was made to hide the import of " ++ markCode (runModuleName name)
             ]
-    renderSimpleErrorMessage (WildcardInferredType ty) =
-      paras [ line "Wildcard type definition has the inferred type "
-            , markCodeBox $ indent $ typeAsBox ty
-            ]
-    renderSimpleErrorMessage (HoleInferredType name ty env) =
+    renderSimpleErrorMessage (WildcardInferredType ty ctx) =
+      paras $ [ line "Wildcard type definition has the inferred type "
+              , markCodeBox $ indent $ typeAsBox ty
+              ] ++ renderContext ctx
+    renderSimpleErrorMessage (HoleInferredType name ty ctx) =
       paras $ [ line $ "Hole '" ++ markCode name ++ "' has the inferred type "
               , markCodeBox $ indent $ typeAsBox ty
-              ] ++ if null env then [] else envInfo
-      where
-        envInfo :: [Box.Box]
-        envInfo = [ line "in the following context:"
-                  , indent $ paras
-                      [ Box.hcat Box.left [ Box.text (showIdent ident <> " :: ")
-                                          , markCodeBox $ typeAsBox ty'
-                                          ]
-                      | (ident, ty') <- take 5 env
-                      ]
-                  ]
+              ] ++ renderContext ctx
     renderSimpleErrorMessage (MissingTypeDeclaration ident ty) =
       paras [ line $ "No type declaration was provided for the top-level declaration of " ++ markCode (showIdent ident) ++ "."
             , line "It is good practice to provide type declarations as a form of documentation."
@@ -950,6 +943,18 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
       paras [ line $ "at " ++ displaySourceSpan srcSpan
             , detail
             ]
+
+    renderContext :: Context -> [Box.Box]
+    renderContext [] = []
+    renderContext ctx =
+      [ line "in the following context:"
+      , indent $ paras
+          [ Box.hcat Box.left [ Box.text (showIdent ident <> " :: ")
+                              , markCodeBox $ typeAsBox ty'
+                              ]
+          | (ident, ty') <- take 5 ctx
+          ]
+      ]
 
     printName :: Qualified Name -> String
     printName qn = nameType (disqualify qn) ++ " " ++ markCode (runName qn)

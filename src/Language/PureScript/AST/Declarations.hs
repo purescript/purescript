@@ -26,6 +26,9 @@ import qualified Language.PureScript.Bundle as Bundle
 
 import qualified Text.Parsec as P
 
+-- | A map of locally-bound names in scope.
+type Context = [(Ident, Type)]
+
 -- | A type of error messages
 data SimpleErrorMessage
   = ErrorParsingFFIModule FilePath (Maybe Bundle.ErrorMessage)
@@ -96,8 +99,8 @@ data SimpleErrorMessage
   | ShadowedName Ident
   | ShadowedTypeVar String
   | UnusedTypeVar String
-  | WildcardInferredType Type
-  | HoleInferredType String Type [(Ident, Type)]
+  | WildcardInferredType Type Context
+  | HoleInferredType String Type Context
   | MissingTypeDeclaration Ident Type
   | OverlappingPattern [[Binder]] Bool
   | IncompleteExhaustivityCheck

@@ -234,7 +234,7 @@ handleTypeOf val = do
   case e of
     Left errs -> printErrors errs
     Right (_, env') ->
-      case M.lookup (P.ModuleName [P.ProperName "$PSCI"], P.Ident "it") (P.names env') of
+      case M.lookup (P.mkQualified (P.Ident "it") (P.ModuleName [P.ProperName "$PSCI"])) (P.names env') of
         Just (ty, _, _) -> liftIO . putStrLn . P.prettyPrintType $ ty
         Nothing -> liftIO $ putStrLn "Could not find type"
 

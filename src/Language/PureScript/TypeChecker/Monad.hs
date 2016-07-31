@@ -66,7 +66,7 @@ type Unknown = Int
 -- | Temporarily bind a collection of names to values
 bindNames
   :: MonadState CheckState m
-  => M.Map (ModuleName, Ident) (Type, NameKind, NameVisibility)
+  => M.Map (Qualified Ident) (Type, NameKind, NameVisibility)
   -> m a
   -> m a
 bindNames newNames action = do
@@ -160,12 +160,11 @@ lookupTypeClassDictionaries mn = fromMaybe M.empty . M.lookup mn . typeClassDict
 -- | Temporarily bind a collection of names to local variables
 bindLocalVariables
   :: (MonadState CheckState m)
-  => ModuleName
-  -> [(Ident, Type, NameVisibility)]
+  => [(Ident, Type, NameVisibility)]
   -> m a
   -> m a
-bindLocalVariables moduleName bindings =
-  bindNames (M.fromList $ flip map bindings $ \(name, ty, visibility) -> ((moduleName, name), (ty, Private, visibility)))
+bindLocalVariables bindings =
+  bindNames (M.fromList $ flip map bindings $ \(name, ty, visibility) -> (Qualified Nothing name, (ty, Private, visibility)))
 
 -- | Temporarily bind a collection of names to local type variables
 bindLocalTypeVariables
@@ -196,35 +195,32 @@ preservingNames action = do
 -- | Lookup the type of a value by name in the @Environment@
 lookupVariable
   :: (e ~ MultipleErrors, MonadState CheckState m, MonadError e m)
-  => ModuleName
-  -> Qualified Ident
+  => Qualified Ident
   -> m Type
-lookupVariable currentModule (Qualified moduleName var) = do
+lookupVariable qual = do
   env <- getEnv
-  case M.lookup (fromMaybe currentModule moduleName, var) (names env) of
-    Nothing -> throwError . errorMessage $ NameIsUndefined var
+  case M.lookup qual (names env) of
+    Nothing -> throwError . errorMessage $ NameIsUndefined (disqualify qual)
     Just (ty, _, _) -> return ty
 
 -- | Lookup the visibility of a value by name in the @Environment@
 getVisibility
   :: (e ~ MultipleErrors, MonadState CheckState m, MonadError e m)
-  => ModuleName
-  -> Qualified Ident
+  => Qualified Ident
   -> m NameVisibility
-getVisibility currentModule (Qualified moduleName var) = do
+getVisibility qual = do
   env <- getEnv
-  case M.lookup (fromMaybe currentModule moduleName, var) (names env) of
-    Nothing -> throwError . errorMessage $ NameIsUndefined var
+  case M.lookup qual (names env) of
+    Nothing -> throwError . errorMessage $ NameIsUndefined (disqualify qual)
     Just (_, _, vis) -> return vis
 
 -- | Assert that a name is visible
 checkVisibility
   :: (e ~ MultipleErrors, MonadState CheckState m, MonadError e m)
-  => ModuleName
-  -> Qualified Ident
+  => Qualified Ident
   -> m ()
-checkVisibility currentModule name@(Qualified _ var) = do
-  vis <- getVisibility currentModule name
+checkVisibility name@(Qualified _ var) = do
+  vis <- getVisibility name
   case vis of
     Undefined -> throwError . errorMessage $ CycleInDeclaration var
     _ -> return ()
@@ -244,6 +240,12 @@ lookupTypeVariable currentModule (Qualified moduleName name) = do
 -- | Get the current @Environment@
 getEnv :: (MonadState CheckState m) => m Environment
 getEnv = checkEnv <$> get
+
+-- | Get locally-bound names in context, to create an error message.
+getLocalContext :: MonadState CheckState m => m Context
+getLocalContext = do
+  env <- getEnv
+  return [ (ident, ty') | ((Qualified Nothing ident@Ident{}), (ty', _, Defined)) <- M.toList (names env) ]
 
 -- | Update the @Environment@
 putEnv :: (MonadState CheckState m) => Environment -> m ()
