@@ -1,5 +1,6 @@
 module Language.PureScript.Sugar.ObjectWildcards
   ( desugarObjectConstructors
+  , desugarDecl
   ) where
 
 import Prelude.Compat
@@ -21,13 +22,12 @@ desugarObjectConstructors
   => Module
   -> m Module
 desugarObjectConstructors (Module ss coms mn ds exts) = Module ss coms mn <$> mapM desugarDecl ds <*> pure exts
-  where
 
-  desugarDecl :: Declaration -> m Declaration
-  desugarDecl (PositionedDeclaration pos com d) = rethrowWithPosition pos $ PositionedDeclaration pos com <$> desugarDecl d
-  desugarDecl other = f other
-    where
-    (f, _, _) = everywhereOnValuesTopDownM return desugarExpr return
+desugarDecl :: forall m. (MonadSupply m, MonadError MultipleErrors m) => Declaration -> m Declaration
+desugarDecl (PositionedDeclaration pos com d) = rethrowWithPosition pos $ PositionedDeclaration pos com <$> desugarDecl d
+desugarDecl other = fn other
+  where
+  (fn, _, _) = everywhereOnValuesTopDownM return desugarExpr return
 
   desugarExpr :: Expr -> m Expr
   desugarExpr AnonymousArgument = throwError . errorMessage $ IncorrectAnonymousArgument
