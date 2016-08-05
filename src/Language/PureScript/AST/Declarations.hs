@@ -497,12 +497,9 @@ data Expr
   --
   | Parens Expr
   -- |
-  -- A record property getter (e.g. `_.x`). This will be removed during
-  -- desugaring and expanded into a lambda that reads a property from a record.
-  --
-  | ObjectGetter String
-  -- |
-  -- An record property accessor expression
+  -- An record property accessor expression (e.g. `obj.x` or `_.x`).
+  -- anonymous argument will be removed during desugaring and expanded
+  -- into a lambda that reads a property from a record.
   --
   | Accessor String Expr
   -- |
