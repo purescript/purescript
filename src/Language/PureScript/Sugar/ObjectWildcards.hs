@@ -45,9 +45,9 @@ desugarDecl other = fn other
     obj <- freshIdent'
     Abs (Left obj) <$> wrapLambda (ObjectUpdate (argToExpr obj)) ps
   desugarExpr (ObjectUpdate obj ps) = wrapLambda (ObjectUpdate obj) ps
-  desugarExpr (Accessor prop u) | isAnonymousArgument u = do
+  desugarExpr (Accessor prop u) | isAnonymousAccessorChain u = do
     arg <- freshIdent'
-    return $ Abs (Left arg) (Accessor prop (argToExpr arg))
+    return $ Abs (Left arg) (Accessor prop $ buildAccessor u (argToExpr arg))
   desugarExpr (Case args cas) | any isAnonymousArgument args = do
     argIdents <- forM args freshIfAnon
     let args' = zipWith (\p -> maybe p argToExpr) args argIdents
@@ -72,6 +72,16 @@ desugarDecl other = fn other
   stripPositionInfo :: Expr -> Expr
   stripPositionInfo (PositionedValue _ _ e) = stripPositionInfo e
   stripPositionInfo e = e
+
+  buildAccessor :: Expr -> Expr -> Expr
+  buildAccessor (Accessor p ps) var = Accessor p (buildAccessor ps var)
+  buildAccessor _ var = var
+
+  isAnonymousAccessorChain :: Expr -> Bool
+  isAnonymousAccessorChain (Accessor _ e) = isAnonymousAccessorChain e
+  isAnonymousAccessorChain (PositionedValue _ _ e) = isAnonymousAccessorChain e
+  isAnonymousAccessorChain AnonymousArgument = True
+  isAnonymousAccessorChain _ = False
 
   isAnonymousArgument :: Expr -> Bool
   isAnonymousArgument AnonymousArgument = True
