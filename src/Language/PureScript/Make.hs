@@ -36,6 +36,7 @@ import Control.Monad.Trans.Except
 import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Aeson (encode, decode)
+import Data.ByteString.Builder (toLazyByteString, stringUtf8)
 import Data.Either (partitionEithers)
 import Data.Foldable (for_)
 import Data.List (foldl', sort)
@@ -85,7 +86,7 @@ import qualified Text.Parsec as Parsec
 -- | Progress messages from the make process
 data ProgressMessage
   = CompilingModule ModuleName
-  deriving (Show, Read, Eq, Ord)
+  deriving (Show, Eq, Ord)
 
 -- | Render a progress message
 renderProgressMessage :: ProgressMessage -> String
@@ -129,7 +130,7 @@ data RebuildPolicy
   -- | Never rebuild this module
   = RebuildNever
   -- | Always rebuild this module
-  | RebuildAlways deriving (Show, Read, Eq, Ord)
+  | RebuildAlways deriving (Show, Eq, Ord)
 
 -- | Rebuild a single module
 rebuildModule :: forall m. (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
@@ -252,7 +253,7 @@ make ma@MakeActions{..} ms = do
 
   decodeExterns :: Externs -> Maybe ExternsFile
   decodeExterns bs = do
-    externs <- decode (fromString bs)
+    externs <- decode (toLazyByteString (stringUtf8 bs))
     guard $ efVersion externs == showVersion Paths.version
     return externs
 

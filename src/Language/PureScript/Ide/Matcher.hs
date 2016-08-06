@@ -14,23 +14,18 @@
 
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE FlexibleInstances          #-}
 
 module Language.PureScript.Ide.Matcher
        ( Matcher
-       , flexMatcher
        , runMatcher
+       -- for tests
+       , flexMatcher
        ) where
 
-import           Prelude                       ()
-import           Prelude.Compat
+import           Protolude
 
-import           Control.Monad
 import           Data.Aeson
-import           Data.Function                 (on)
-import           Data.List                     (sortBy)
-import           Data.Maybe                    (mapMaybe)
-import           Data.Monoid
-import           Data.Text                     (Text)
 import qualified Data.Text                     as T
 import qualified Data.Text.Encoding            as TE
 import           Language.PureScript.Ide.Types
@@ -39,23 +34,22 @@ import           Text.EditDistance
 import           Text.Regex.TDFA               ((=~))
 
 
-type ScoredMatch = (Match, Double)
+type ScoredMatch a = (Match a, Double)
 
-newtype Matcher = Matcher (Endo [Match]) deriving(Monoid)
+newtype Matcher a = Matcher (Endo [Match a]) deriving (Monoid)
 
-instance FromJSON Matcher where
+instance FromJSON (Matcher IdeDeclaration) where
   parseJSON = withObject "matcher" $ \o -> do
-    (matcher :: Maybe String) <- o .:? "matcher"
+    (matcher :: Maybe Text) <- o .:? "matcher"
     case matcher of
       Just "flex" -> do
         params <- o .: "params"
-        search <- params .: "search"
-        pure $ flexMatcher search
+        flexMatcher <$> params .: "search"
       Just "distance" -> do
         params <- o .: "params"
-        search <- params .: "search"
-        maxDist <- params .: "maximumDistance"
-        pure $ distanceMatcher search maxDist
+        distanceMatcher
+          <$> params .: "search"
+          <*> params .: "maximumDistance"
       Just _ -> mzero
       Nothing -> return mempty
 
@@ -66,37 +60,37 @@ instance FromJSON Matcher where
 -- Examples:
 --   flMa matches flexMatcher. Score: 14.28
 --   sons matches sortCompletions. Score: 6.25
-flexMatcher :: Text -> Matcher
+flexMatcher :: Text -> Matcher IdeDeclaration
 flexMatcher p = mkMatcher (flexMatch p)
 
-distanceMatcher :: Text -> Int -> Matcher
+distanceMatcher :: Text -> Int -> Matcher IdeDeclaration
 distanceMatcher q maxDist = mkMatcher (distanceMatcher' q maxDist)
 
-distanceMatcher' :: Text -> Int -> [Match] -> [ScoredMatch]
+distanceMatcher' :: Text -> Int -> [Match IdeDeclaration] -> [ScoredMatch IdeDeclaration]
 distanceMatcher' q maxDist = mapMaybe go
   where
     go m = let d = dist (T.unpack y)
-               y = identifierFromMatch m
+               y = identifierFromIdeDeclaration (unwrapMatch m)
           in if d <= maxDist
              then Just (m, 1 / fromIntegral d)
              else Nothing
     dist = levenshteinDistance defaultEditCosts (T.unpack q)
 
-mkMatcher :: ([Match] -> [ScoredMatch]) -> Matcher
+mkMatcher :: ([Match a] -> [ScoredMatch a]) -> Matcher a
 mkMatcher matcher = Matcher . Endo  $ fmap fst . sortCompletions . matcher
 
-runMatcher :: Matcher -> [Match] -> [Match]
+runMatcher :: Matcher a -> [Match a] -> [Match a]
 runMatcher (Matcher m)= appEndo m
 
-sortCompletions :: [ScoredMatch] -> [ScoredMatch]
+sortCompletions :: [ScoredMatch a] -> [ScoredMatch a]
 sortCompletions = sortBy (flip compare `on` snd)
 
-flexMatch :: Text -> [Match] -> [ScoredMatch]
+flexMatch :: Text -> [Match IdeDeclaration] -> [ScoredMatch IdeDeclaration]
 flexMatch = mapMaybe . flexRate
 
-flexRate :: Text -> Match -> Maybe ScoredMatch
+flexRate :: Text -> Match IdeDeclaration -> Maybe (ScoredMatch IdeDeclaration)
 flexRate p c = do
-  score <- flexScore p (identifierFromMatch c)
+  score <- flexScore p (identifierFromIdeDeclaration (unwrapMatch c))
   return (c, score)
 
 -- FlexMatching ala Sublime.
@@ -105,11 +99,11 @@ flexRate p c = do
 -- By string =~ pattern we'll get the start of the match and the length of
 -- the matchas a (start, length) tuple if there's a match.
 -- If match fails then it would be (-1,0)
-flexScore :: Text -> DeclIdent -> Maybe Double
+flexScore :: Text -> Text -> Maybe Double
 flexScore pat str =
   case T.uncons pat of
     Nothing -> Nothing
-    Just (first, p) ->
+    Just (first', p) ->
       case TE.encodeUtf8 str =~ TE.encodeUtf8 pat' :: (Int, Int) of
         (-1,0) -> Nothing
         (start,len) -> Just $ calcScore start (start + len)
@@ -120,11 +114,11 @@ flexScore pat str =
         -- escape prepends a backslash to "regexy" characters to prevent the
         -- matcher from crashing when trying to build the regex
         escape :: Char -> Text
-        escape c = if c `elem` ("[\\^$.|?*+(){}" :: String)
+        escape c = if c `elem` T.unpack "[\\^$.|?*+(){}"
                    then T.pack ['\\', c]
                    else T.singleton c
         -- This just interleaves the search pattern with .*
         -- abcd[*] -> a.*b.*c.*d.*[*]
-        pat' = escape first <> foldMap (<> ".*") escapedPattern
+        pat' = escape first' <> foldMap (<> ".*") escapedPattern
         calcScore start end =
           100.0 / fromIntegral ((1 + start) * (end - start + 1))

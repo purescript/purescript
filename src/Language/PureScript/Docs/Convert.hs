@@ -158,7 +158,7 @@ insertValueTypes env m =
     either (err . ("failed to parse Ident: " ++)) id . runParser P.parseIdent
 
   lookupName name =
-    let key = (modName m, name)
+    let key = P.Qualified (Just (modName m)) name
     in case Map.lookup key (P.names env) of
       Just (ty, _, _) ->
         ty

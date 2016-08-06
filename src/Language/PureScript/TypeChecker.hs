@@ -91,7 +91,7 @@ valueIsNotDefined
   -> m ()
 valueIsNotDefined moduleName name = do
   env <- getEnv
-  case M.lookup (moduleName, name) (names env) of
+  case M.lookup (Qualified (Just moduleName) name) (names env) of
     Just _ -> throwError . errorMessage $ RedefinedIdent name
     Nothing -> return ()
 
@@ -104,7 +104,7 @@ addValue
   -> m ()
 addValue moduleName name ty nameKind = do
   env <- getEnv
-  putEnv (env { names = M.insert (moduleName, name) (ty, nameKind, Defined) (names env) })
+  putEnv (env { names = M.insert (Qualified (Just moduleName) name) (ty, nameKind, Defined) (names env) })
 
 addTypeClass
   :: (MonadState CheckState m)
@@ -259,9 +259,9 @@ typeCheckAll moduleName _ = traverse go
       env <- getEnv
       kind <- kindOf ty
       guardWith (errorMessage (ExpectedType ty kind)) $ kind == Star
-      case M.lookup (moduleName, name) (names env) of
+      case M.lookup (Qualified (Just moduleName) name) (names env) of
         Just _ -> throwError . errorMessage $ RedefinedIdent name
-        Nothing -> putEnv (env { names = M.insert (moduleName, name) (ty, External, Defined) (names env) })
+        Nothing -> putEnv (env { names = M.insert (Qualified (Just moduleName) name) (ty, External, Defined) (names env) })
     return d
   go d@FixityDeclaration{} = return d
   go d@ImportDeclaration{} = return d
@@ -360,7 +360,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
           Just (_, _, ty, _) -> checkExport dr extract ty
     return ()
   checkMemberExport extract dr@(ValueRef name) = do
-    ty <- lookupVariable mn (Qualified (Just mn) name)
+    ty <- lookupVariable (Qualified (Just mn) name)
     checkExport dr extract ty
   checkMemberExport _ _ = return ()
 

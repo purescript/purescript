@@ -14,25 +14,21 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 module Language.PureScript.Ide.Error
-       (ErrorMsg, PscIdeError(..), textError)
-       where
+       ( PscIdeError(..)
+       ) where
 
-import           Prelude.Compat
+import           Protolude
 import           Data.Aeson
-import           Data.Monoid
-import           Data.Text                     (Text, pack)
 import           Language.PureScript.Errors.JSON
 import           Language.PureScript.Ide.Types (ModuleIdent)
 import qualified Text.Parsec.Error             as P
 
-type ErrorMsg = String
-
 data PscIdeError
-    = GeneralError ErrorMsg
+    = GeneralError Text
     | NotFound Text
     | ModuleNotFound ModuleIdent
     | ModuleFileNotFound ModuleIdent
-    | ParseError P.ParseError ErrorMsg
+    | ParseError P.ParseError Text
     | RebuildError [JSONError]
 
 instance ToJSON PscIdeError where
@@ -46,7 +42,7 @@ instance ToJSON PscIdeError where
     ]
 
 textError :: PscIdeError -> Text
-textError (GeneralError msg)          = pack msg
+textError (GeneralError msg)          = msg
 textError (NotFound ident)            = "Symbol '" <> ident <> "' not found."
 textError (ModuleNotFound ident)      = "Module '" <> ident <> "' not found."
 textError (ModuleFileNotFound ident)  = "Extern file for module " <> ident <>" could not be found"
@@ -54,5 +50,5 @@ textError (ParseError parseError msg) = let escape = show
                                             -- escape newlines and other special
                                             -- chars so we can send the error
                                             -- over the socket as a single line
-                                        in pack $ msg <> ": " <> show (escape parseError)
-textError (RebuildError err)          = pack (show err)
+                                        in msg <> ": " <> escape parseError
+textError (RebuildError err)          = show err

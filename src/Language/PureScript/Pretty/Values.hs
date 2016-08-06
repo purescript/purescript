@@ -58,7 +58,7 @@ prettyPrintValue d (Let ds val) =
     (text "in " <> prettyPrintValue (d - 1) val)
 prettyPrintValue d (Do els) =
   text "do " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els)
-prettyPrintValue _ (TypeClassDictionary (Constraint name tys _) _) = foldl1 beforeWithSpace $ text ("#dict " ++ runProperName (disqualify name)) : map typeAtomAsBox tys
+prettyPrintValue _ (TypeClassDictionary (Constraint name tys _) _ _) = foldl1 beforeWithSpace $ text ("#dict " ++ runProperName (disqualify name)) : map typeAtomAsBox tys
 prettyPrintValue _ (SuperClassDictionary name _) = text $ "#dict " ++ runProperName (disqualify name)
 prettyPrintValue d (TypedValue _ val _) = prettyPrintValue d val
 prettyPrintValue d (PositionedValue _ _ val) = prettyPrintValue d val

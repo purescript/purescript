@@ -1,4 +1,4 @@
-module Main where
+module MatcherSpec where
 
 id :: forall a. a -> a
 id x = x

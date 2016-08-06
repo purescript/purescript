@@ -21,7 +21,7 @@ data TypeClassDictionaryInScope
     -- | Type class dependencies which must be satisfied to construct this dictionary
     , tcdDependencies :: Maybe [Constraint]
     }
-    deriving (Show, Read)
+    deriving (Show)
 
 -- |
 -- A simplified representation of expressions which are used to represent type
@@ -44,4 +44,4 @@ data DictionaryValue
   -- A subclass dictionary
   --
   | SubclassDictionaryValue DictionaryValue (Qualified (ProperName 'ClassName)) Integer
-  deriving (Show, Read, Ord, Eq)
+  deriving (Show, Ord, Eq)

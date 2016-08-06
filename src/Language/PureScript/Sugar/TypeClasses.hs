@@ -16,10 +16,10 @@ import Data.List ((\\), find, sortBy, elemIndex)
 import Data.Maybe (catMaybes, mapMaybe, isJust)
 import qualified Data.Map as M
 
-import Language.PureScript.AST hiding (isExported)
+import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Environment
-import Language.PureScript.Errors
+import Language.PureScript.Errors hiding (isExported)
 import Language.PureScript.Externs
 import Language.PureScript.Kinds
 import Language.PureScript.Names

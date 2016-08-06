@@ -20,22 +20,16 @@ module Language.PureScript.Ide.Filter
        , moduleFilter
        , prefixFilter
        , equalityFilter
-       , dependencyFilter
-       , runFilter
        , applyFilters
        ) where
 
-import           Prelude                       ()
-import           Prelude.Compat
+import           Protolude hiding (isPrefixOf)
 
-import           Control.Monad
 import           Data.Aeson
-import           Data.Foldable
-import           Data.Maybe                    (listToMaybe, mapMaybe)
-import           Data.Monoid
-import           Data.Text                     (Text, isPrefixOf)
+import           Data.Text                     (isPrefixOf)
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
+import qualified Language.PureScript as P
 
 newtype Filter = Filter (Endo [Module]) deriving(Monoid)
 
@@ -43,69 +37,46 @@ mkFilter :: ([Module] -> [Module]) -> Filter
 mkFilter = Filter . Endo
 
 -- | Only keeps the given Modules
-moduleFilter :: [ModuleIdent] -> Filter
+moduleFilter :: [P.ModuleName] -> Filter
 moduleFilter =
     mkFilter . moduleFilter'
 
-moduleFilter' :: [ModuleIdent] -> [Module] -> [Module]
+moduleFilter' :: [P.ModuleName] -> [Module] -> [Module]
 moduleFilter' moduleIdents = filter (flip elem moduleIdents . fst)
-
--- | Only keeps the given Modules and all of their dependencies
-dependencyFilter :: [ModuleIdent] -> Filter
-dependencyFilter = mkFilter . dependencyFilter'
-
-dependencyFilter' :: [ModuleIdent] -> [Module] -> [Module]
-dependencyFilter' moduleIdents mods =
-  moduleFilter' (concatMap (getDepForModule mods) moduleIdents) mods
-  where
-    getDepForModule :: [Module] -> ModuleIdent -> [ModuleIdent]
-    getDepForModule ms moduleIdent =
-      moduleIdent : maybe [] extractDeps (findModule moduleIdent ms)
-
-    findModule :: ModuleIdent -> [Module] -> Maybe Module
-    findModule i ms = listToMaybe $ filter go ms
-      where go (mn, _) = i == mn
-
-    extractDeps :: Module -> [ModuleIdent]
-    extractDeps = mapMaybe extractDep . snd
-      where extractDep (Dependency n _ _) = Just n
-            extractDep _ = Nothing
 
 -- | Only keeps Identifiers that start with the given prefix
 prefixFilter :: Text -> Filter
-prefixFilter "" = mkFilter id
+prefixFilter "" = mkFilter identity
 prefixFilter t = mkFilter $ identFilter prefix t
   where
-    prefix :: ExternDecl -> Text -> Bool
-    prefix Export{} _ = False
-    prefix Dependency{} _ = False
-    prefix ed search = search `isPrefixOf` identifierFromExternDecl ed
-
+    prefix :: IdeDeclaration -> Text -> Bool
+    prefix ed search = search `isPrefixOf` identifierFromIdeDeclaration ed
 
 -- | Only keeps Identifiers that are equal to the search string
 equalityFilter :: Text -> Filter
 equalityFilter = mkFilter . identFilter equality
   where
-    equality :: ExternDecl -> Text -> Bool
-    equality ed search = identifierFromExternDecl ed == search
+    equality :: IdeDeclaration -> Text -> Bool
+    equality ed search = identifierFromIdeDeclaration ed == search
 
-identFilter :: (ExternDecl -> Text -> Bool ) -> Text -> [Module] -> [Module]
+identFilter :: (IdeDeclaration -> Text -> Bool) -> Text -> [Module] -> [Module]
 identFilter predicate search =
     filter (not . null . snd) . fmap filterModuleDecls
   where
     filterModuleDecls :: Module -> Module
-    filterModuleDecls (moduleIdent,decls) =
-        (moduleIdent, filter (`predicate` search) decls)
+    filterModuleDecls (moduleIdent, decls) =
+        (moduleIdent, filter (flip predicate search . getDeclaration) decls)
+    getDeclaration (IdeDeclarationAnn _ d) = d
 
 runFilter :: Filter -> [Module] -> [Module]
-runFilter (Filter f)= appEndo f
+runFilter (Filter f) = appEndo f
 
 applyFilters :: [Filter] -> [Module] -> [Module]
 applyFilters = runFilter . fold
 
 instance FromJSON Filter where
   parseJSON = withObject "filter" $ \o -> do
-    (filter' :: String) <- o .: "filter"
+    (filter' :: Text) <- o .: "filter"
     case filter' of
       "exact" -> do
         params <- o .: "params"
@@ -117,10 +88,6 @@ instance FromJSON Filter where
         return $ prefixFilter search
       "modules" -> do
         params <- o .: "params"
-        modules <- params .: "modules"
+        modules <- map P.moduleNameFromString <$> params .: "modules"
         return $ moduleFilter modules
-      "dependencies" -> do
-        params <- o .: "params"
-        deps <- params .: "modules"
-        return $ dependencyFilter deps
       _ -> mzero
