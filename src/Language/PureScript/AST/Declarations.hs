@@ -498,7 +498,7 @@ data Expr
   | Parens Expr
   -- |
   -- An record property accessor expression (e.g. `obj.x` or `_.x`).
-  -- anonymous argument will be removed during desugaring and expanded
+  -- Anonymous arguments will be removed during desugaring and expanded
   -- into a lambda that reads a property from a record.
   --
   | Accessor String Expr
