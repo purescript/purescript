@@ -125,6 +125,10 @@ elaborateExports exps (Module ss coms mn decls refs) =
     Just $ map (\(ctor, dctors) -> TypeRef ctor (Just dctors)) myTypes ++
            map TypeOpRef (my exportedTypeOps) ++
            map TypeClassRef (my exportedTypeClasses) ++
+           -- TODO CKs: For now, dump the class namespace into the type namespace
+           -- Later, unify these properly, and remove the "class X" syntax for
+           -- imports and exports.
+           map (flip TypeRef Nothing . coerceProperName) (my exportedTypeClasses) ++
            map ValueRef (my exportedValues) ++
            map ValueOpRef (my exportedValueOps) ++
            maybe [] (filter isModuleRef) refs
@@ -260,8 +264,12 @@ renameInModule env imports (Module ss coms mn decls exps) =
     :: Qualified (ProperName 'TypeName)
     -> Maybe SourceSpan
     -> m (Qualified (ProperName 'TypeName))
-  updateTypeName =
-    update (importedTypes imports) (resolveType . exportedTypes) TyName
+  updateTypeName = do
+    update (importedTypes imports `M.union` M.mapKeys (fmap coerceProperName) (M.map (fmap (fmap coerceProperName)) (importedTypeClasses imports))) (resolveType . getExports) TyName where
+      getExports :: Exports
+                 -> M.Map
+                      (ProperName 'TypeName) ([ProperName 'ConstructorName], ModuleName)
+      getExports e = exportedTypes e `M.union` M.mapKeys coerceProperName (M.map ([], ) (exportedTypeClasses e))
 
   updateTypeOpName
     :: Qualified (OpName 'TypeOpName)

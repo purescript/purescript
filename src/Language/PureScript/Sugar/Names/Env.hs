@@ -47,7 +47,7 @@ data ImportRecord a =
     , importSourceModule :: ModuleName
     , importProvenance :: ImportProvenance
     }
-    deriving (Eq, Ord, Show, Read)
+    deriving (Eq, Ord, Show, Read, Functor)
 
 -- |
 -- Used to track how an import was introduced into scope. This allows us to

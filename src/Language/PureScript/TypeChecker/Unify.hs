@@ -153,6 +153,8 @@ unifyRows r1 r2 =
 -- Check that two types unify
 --
 unifiesWith :: Type -> Type -> Bool
+unifiesWith (KindedType t1 _) t2 = unifiesWith t1 t2
+unifiesWith t1 (KindedType t2 _) = unifiesWith t1 t2
 unifiesWith (TUnknown u1) (TUnknown u2) | u1 == u2 = True
 unifiesWith (Skolem _ s1 _ _) (Skolem _ s2 _ _) | s1 == s2 = True
 unifiesWith (TypeVar v1) (TypeVar v2) | v1 == v2 = True

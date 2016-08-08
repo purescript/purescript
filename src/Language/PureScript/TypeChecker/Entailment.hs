@@ -186,6 +186,8 @@ entails shouldGeneralize moduleName context = solve
 -- and return a substitution from type variables to types which makes the type heads unify.
 --
 typeHeadsAreEqual :: ModuleName -> Type -> Type -> Maybe [(String, Type)]
+typeHeadsAreEqual m (KindedType t1 _) t2 = typeHeadsAreEqual m t1 t2
+typeHeadsAreEqual m t1 (KindedType t2 _) = typeHeadsAreEqual m t1 t2
 typeHeadsAreEqual _ (TUnknown u1)        (TUnknown u2)        | u1 == u2 = Just []
 typeHeadsAreEqual _ (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    | s1 == s2 = Just []
 typeHeadsAreEqual _ t                    (TypeVar v)                     = Just [(v, t)]
