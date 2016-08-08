@@ -68,18 +68,18 @@ subsumes' val (TypeApp f1 r1) (TypeApp f2 r2) | f1 == tyRecord && f2 == tyRecord
   go ((p1, ty1) : ts1) ((p2, ty2) : ts2) r1' r2'
     | p1 == p2 = do _ <- subsumes Nothing ty1 ty2
                     go ts1 ts2 r1' r2'
+    | p1 /= p2 && r1' == REmpty && p2 `notElem` map fst ts1 = 
+        throwError . errorMessage $ PropertyIsMissing p2
+    | p1 /= p2 && r2' == REmpty && p1 `notElem` map fst ts2 = 
+        throwError . errorMessage $ AdditionalProperty p1
     | p1 < p2 = do rest <- freshType
                    -- What happens next is a bit of a hack.
                    -- TODO: in the new type checker, object properties will probably be restricted to being monotypes
                    -- in which case, this branch of the subsumes function should not even be necessary.
-                   case r2' of
-                     REmpty -> throwError . errorMessage $ AdditionalProperty p1
-                     _ -> unifyTypes r2' (RCons p1 ty1 rest)
+                   unifyTypes r2' (RCons p1 ty1 rest)
                    go ts1 ((p2, ty2) : ts2) r1' rest
     | otherwise = do rest <- freshType
-                     case r1' of
-                       REmpty -> throwError . errorMessage $ PropertyIsMissing p2
-                       _ -> unifyTypes r1' (RCons p2 ty2 rest)
+                     unifyTypes r1' (RCons p2 ty2 rest)
                      go ((p1, ty1) : ts1) ts2 rest r2'
 subsumes' val ty1 ty2@(TypeApp obj _) | obj == tyRecord = subsumes val ty2 ty1
 subsumes' val ty1 ty2 = do
