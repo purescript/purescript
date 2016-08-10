@@ -17,6 +17,6 @@ data Module a = Module
   , moduleExports :: [Ident]
   , moduleForeign :: [ForeignDecl]
   , moduleDecls :: [Bind a]
-  } deriving (Show, Read)
+  } deriving (Show)
 
 type ForeignDecl = (Ident, Type)

@@ -107,7 +107,7 @@ kindOfWithScopedVars ::
   Type ->
   m (Kind, [(String, Kind)])
 kindOfWithScopedVars ty =
-  rethrow (addHint (ErrorCheckingKind ty)) $
+  withErrorMessageHint (ErrorCheckingKind ty) $
     fmap tidyUp . liftUnify $ infer ty
   where
   tidyUp ((k, args), sub) = ( starIfUnknown (substituteKind sub k)
@@ -200,7 +200,7 @@ infer
   :: (MonadError MultipleErrors m, MonadState CheckState m)
   => Type
   -> m (Kind, [(String, Kind)])
-infer ty = rethrow (addHint (ErrorCheckingKind ty)) $ infer' ty
+infer ty = withErrorMessageHint (ErrorCheckingKind ty) $ infer' ty
 
 infer'
   :: forall m

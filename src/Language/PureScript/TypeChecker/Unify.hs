@@ -80,7 +80,7 @@ unknownsInType t = everythingOnTypes (.) go t []
 unifyTypes :: (MonadError MultipleErrors m, MonadState CheckState m) => Type -> Type -> m ()
 unifyTypes t1 t2 = do
   sub <- gets checkSubstitution
-  rethrow (addHint (ErrorUnifyingTypes t1 t2)) $ unifyTypes' (substituteType sub t1) (substituteType sub t2)
+  withErrorMessageHint (ErrorUnifyingTypes t1 t2) $ unifyTypes' (substituteType sub t1) (substituteType sub t2)
   where
   unifyTypes' (TUnknown u1) (TUnknown u2) | u1 == u2 = return ()
   unifyTypes' (TUnknown u) t = solveType u t
@@ -112,9 +112,11 @@ unifyTypes t1 t2 = do
   unifyTypes' r1 r2@RCons{} = unifyRows r1 r2
   unifyTypes' r1@REmpty r2 = unifyRows r1 r2
   unifyTypes' r1 r2@REmpty = unifyRows r1 r2
-  unifyTypes' ty1@(ConstrainedType _ _) ty2 = throwError . errorMessage $ ConstrainedTypeUnified ty1 ty2
+  unifyTypes' ty1@(ConstrainedType _ _) ty2 =
+    throwError . errorMessage $ ConstrainedTypeUnified ty1 ty2
   unifyTypes' t3 t4@(ConstrainedType _ _) = unifyTypes' t4 t3
-  unifyTypes' t3 t4 = throwError . errorMessage $ TypesDoNotUnify t3 t4
+  unifyTypes' t3 t4 =
+    throwError . errorMessage $ TypesDoNotUnify t3 t4
 
 -- |
 -- Unify two rows, updating the current substitution
@@ -147,7 +149,8 @@ unifyRows r1 r2 =
   unifyRows' [] REmpty [] REmpty = return ()
   unifyRows' [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
   unifyRows' [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) | s1 == s2 = return ()
-  unifyRows' _ _ _ _ = throwError . errorMessage $ TypesDoNotUnify r1 r2
+  unifyRows' _ _ _ _ =
+    throwError . errorMessage $ TypesDoNotUnify r1 r2
 
 -- |
 -- Check that two types unify
@@ -195,7 +198,8 @@ replaceTypeWildcards = everywhereOnTypesM replace
   where
   replace (TypeWildcard ss) = do
     t <- freshType
-    warnWithPosition ss $ tell . errorMessage $ WildcardInferredType t
+    ctx <- getLocalContext
+    warnWithPosition ss $ tell . errorMessage $ WildcardInferredType t ctx
     return t
   replace other = return other
 

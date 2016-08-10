@@ -30,7 +30,6 @@ import qualified Language.PureScript                     as P
 
 import           Language.PureScript.Externs
 import           Language.PureScript.Ide.Error
-import           Language.PureScript.Ide.Externs         (unwrapPositioned)
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util

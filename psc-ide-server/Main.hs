@@ -23,9 +23,11 @@ module Main where
 
 import           Protolude
 
+import qualified Data.Aeson as Aeson
 import           Control.Concurrent.STM
 import           "monad-logger" Control.Monad.Logger
 import qualified Data.Text.IO                      as T
+import qualified Data.ByteString.Lazy.Char8        as BS8
 import           Data.Version                      (showVersion)
 import           Language.PureScript.Ide
 import           Language.PureScript.Ide.Util
@@ -70,7 +72,6 @@ main :: IO ()
 main = do
   Options dir globs outputPath port noWatch debug <- execParser opts
   maybe (pure ()) setCurrentDirectory dir
-  serverState <- newTVarIO emptyPscIdeState
   ideState <- newTVarIO emptyIdeState
   cwd <- getCurrentDirectory
   let fullOutputPath = cwd </> outputPath
@@ -85,7 +86,7 @@ main = do
     void (forkFinally (watcher ideState fullOutputPath) print)
 
   let conf = Configuration {confDebug = debug, confOutputPath = outputPath, confGlobs = globs}
-      env = IdeEnvironment {envStateVar = serverState, ideStateVar = ideState, ideConfiguration = conf}
+      env = IdeEnvironment {ideStateVar = ideState, ideConfiguration = conf}
   startServer port env
   where
     parser =
@@ -121,9 +122,8 @@ startServer port env = withSocketsDo $ do
               -- $(logDebug) ("Answer was: " <> T.pack (show result))
               liftIO (hFlush stdout)
               case result of
-                -- What function can I use to clean this up?
-                Right r  -> liftIO $ T.hPutStrLn h (encodeT r)
-                Left err -> liftIO $ T.hPutStrLn h (encodeT err)
+                Right r  -> liftIO $ BS8.hPutStrLn h (Aeson.encode r)
+                Left err -> liftIO $ BS8.hPutStrLn h (Aeson.encode err)
             Nothing -> do
               $(logDebug) ("Parsing the command failed. Command: " <> cmd)
               liftIO $ do

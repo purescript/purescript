@@ -22,7 +22,7 @@ data SourcePos = SourcePos
     -- Column number
     --
   , sourcePosColumn :: Int
-  } deriving (Show, Read, Eq, Ord)
+  } deriving (Show, Eq, Ord)
 
 displaySourcePos :: SourcePos -> String
 displaySourcePos sp =
@@ -50,7 +50,7 @@ data SourceSpan = SourceSpan
     -- End of the span
     --
   , spanEnd :: SourcePos
-  } deriving (Show, Read, Eq, Ord)
+  } deriving (Show, Eq, Ord)
 
 displayStartEndPos :: SourceSpan -> String
 displayStartEndPos sp =

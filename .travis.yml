@@ -12,7 +12,7 @@ matrix:
       os: linux
       dist: trusty
       sudo: required
-      env: BUILD_TYPE=normal COVERAGE=true DEPLOY=true
+      env: BUILD_TYPE=normal DEPLOY=true
 
     # - compiler: cc-linux-nightly-normal
     #   os: linux
@@ -31,7 +31,7 @@ matrix:
       os: linux
       dist: trusty
       sudo: required
-      env: BUILD_TYPE=sdist
+      env: BUILD_TYPE=sdist COVERAGE=true
 
     - compiler: cc-linux-lts-haddock
       os: linux

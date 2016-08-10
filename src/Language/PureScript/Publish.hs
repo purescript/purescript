@@ -169,7 +169,7 @@ getModulesAndBookmarks = do
       Left err ->
         userError (CompileError err)
 
-data TreeStatus = Clean | Dirty deriving (Show, Read, Eq, Ord, Enum)
+data TreeStatus = Clean | Dirty deriving (Show, Eq, Ord, Enum)
 
 getGitWorkingTreeStatus :: PrepareM TreeStatus
 getGitWorkingTreeStatus = do
@@ -273,7 +273,7 @@ data DependencyStatus
   | ResolvedVersion String
     -- ^ Resolved to a version. The String argument is the resolution tag (eg,
     -- "v0.1.0").
-  deriving (Show, Read, Eq)
+  deriving (Show, Eq)
 
 -- Go through all bower dependencies which contain purescript code, and
 -- extract their versions.

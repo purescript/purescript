@@ -50,7 +50,7 @@ data ExternsFile = ExternsFile
   , efTypeFixities :: [ExternsTypeFixity]
   -- | List of type and value declaration
   , efDeclarations :: [ExternsDeclaration]
-  } deriving (Show, Read)
+  } deriving (Show)
 
 -- | A module import in an externs file
 data ExternsImport = ExternsImport
@@ -61,7 +61,7 @@ data ExternsImport = ExternsImport
   , eiImportType :: ImportDeclarationType
   -- | The imported-as name, for qualified imports
   , eiImportedAs :: Maybe ModuleName
-  } deriving (Show, Read)
+  } deriving (Show)
 
 -- | A fixity declaration in an externs file
 data ExternsFixity = ExternsFixity
@@ -74,7 +74,7 @@ data ExternsFixity = ExternsFixity
   , efOperator :: OpName 'ValueOpName
   -- | The value the operator is an alias for
   , efAlias :: Qualified (Either Ident (ProperName 'ConstructorName))
-  } deriving (Show, Read)
+  } deriving (Show)
 
 -- | A type fixity declaration in an externs file
 data ExternsTypeFixity = ExternsTypeFixity
@@ -87,7 +87,7 @@ data ExternsTypeFixity = ExternsTypeFixity
   , efTypeOperator :: OpName 'TypeOpName
   -- | The value the operator is an alias for
   , efTypeAlias :: Qualified (ProperName 'TypeName)
-  } deriving (Show, Read)
+  } deriving (Show)
 
 -- | A type or value declaration appearing in an externs file
 data ExternsDeclaration =
@@ -130,7 +130,7 @@ data ExternsDeclaration =
       , edInstanceTypes :: [Type]
       , edInstanceConstraints :: Maybe [Constraint]
       }
-  deriving (Show, Read)
+  deriving (Show)
 
 -- | Convert an externs file back into a module
 applyExternsFileToEnvironment :: ExternsFile -> Environment -> Environment
@@ -140,7 +140,7 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   applyDecl env (EDType pn kind tyKind) = env { types = M.insert (qual pn) (kind, tyKind) (types env) }
   applyDecl env (EDTypeSynonym pn args ty) = env { typeSynonyms = M.insert (qual pn) (args, ty) (typeSynonyms env) }
   applyDecl env (EDDataConstructor pn dTy tNm ty nms) = env { dataConstructors = M.insert (qual pn) (dTy, tNm, ty, nms) (dataConstructors env) }
-  applyDecl env (EDValue ident ty) = env { names = M.insert (efModuleName, ident) (ty, External, Defined) (names env) }
+  applyDecl env (EDValue ident ty) = env { names = M.insert (Qualified (Just efModuleName) ident) (ty, External, Defined) (names env) }
   applyDecl env (EDClass pn args members cs) = env { typeClasses = M.insert (qual pn) (args, members, cs) (typeClasses env) }
   applyDecl env (EDInstance className ident tys cs) = env { typeClassDictionaries = updateMap (updateMap (M.insert (qual ident) dict) className) (Just efModuleName) (typeClassDictionaries env) }
     where
@@ -201,7 +201,7 @@ moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
                             ]
       _ -> internalError "toExternsDeclaration: Invalid input"
   toExternsDeclaration (ValueRef ident)
-    | Just (ty, _, _) <- (mn, ident) `M.lookup` names env
+    | Just (ty, _, _) <- Qualified (Just mn) ident `M.lookup` names env
     = [ EDValue ident ty ]
   toExternsDeclaration (TypeClassRef className)
     | Just (args, members, implies) <- Qualified (Just mn) className `M.lookup` typeClasses env

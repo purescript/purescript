@@ -21,7 +21,7 @@ type Precedence = Integer
 -- Associativity for infix operators
 --
 data Associativity = Infixl | Infixr | Infix
-  deriving (Show, Read, Eq, Ord)
+  deriving (Show, Eq, Ord)
 
 showAssoc :: Associativity -> String
 showAssoc Infixl = "infixl"
@@ -44,7 +44,7 @@ instance A.FromJSON Associativity where
 -- Fixity data for infix operators
 --
 data Fixity = Fixity Associativity Precedence
-  deriving (Show, Read, Eq, Ord)
+  deriving (Show, Eq, Ord)
 
 instance A.ToJSON Fixity where
   toJSON (Fixity associativity precedence) =

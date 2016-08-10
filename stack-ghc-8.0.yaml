@@ -1,5 +1,7 @@
-resolver: nightly-2016-05-29
+resolver: nightly-2016-07-19
 packages:
 - '.'
 extra-deps:
 - pipes-http-1.0.2
+- wai-websockets-3.0.0.9
+- websockets-0.9.6.2

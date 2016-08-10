@@ -49,7 +49,7 @@ data ImportRecord a =
     , importSourceModule :: ModuleName
     , importProvenance :: ImportProvenance
     }
-    deriving (Eq, Ord, Show, Read)
+    deriving (Eq, Ord, Show)
 
 -- |
 -- Used to track how an import was introduced into scope. This allows us to
@@ -61,7 +61,7 @@ data ImportProvenance
   | FromExplicit
   | Local
   | Prim
-  deriving (Eq, Ord, Show, Read)
+  deriving (Eq, Ord, Show)
 
 type ImportMap a = M.Map (Qualified a) [ImportRecord a]
 
@@ -104,7 +104,7 @@ data Imports = Imports
   -- The "as" names of modules that have been imported qualified.
   --
   , importedQualModules :: S.Set ModuleName
-  } deriving (Show, Read)
+  } deriving (Show)
 
 nullImports :: Imports
 nullImports = Imports M.empty M.empty M.empty M.empty M.empty M.empty S.empty S.empty
@@ -155,7 +155,7 @@ data Exports = Exports
   -- from.
   --
   , exportedValueOps :: M.Map (OpName 'ValueOpName) ModuleName
-  } deriving (Show, Read)
+  } deriving (Show)
 
 -- |
 -- An empty 'Exports' value.

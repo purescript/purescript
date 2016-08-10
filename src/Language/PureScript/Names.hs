@@ -64,7 +64,7 @@ data Ident
   -- A generated name for an identifier
   --
   | GenIdent (Maybe String) Integer
-  deriving (Show, Read, Eq, Ord)
+  deriving (Show, Eq, Ord)
 
 runIdent :: Ident -> String
 runIdent (Ident i) = i
@@ -84,7 +84,7 @@ freshIdent' = GenIdent Nothing <$> fresh
 -- Operator alias names.
 --
 newtype OpName (a :: OpNameType) = OpName { runOpName :: String }
-  deriving (Show, Read, Eq, Ord)
+  deriving (Show, Eq, Ord)
 
 instance ToJSON (OpName a) where
   toJSON = toJSON . runOpName
@@ -104,7 +104,7 @@ data OpNameType = ValueOpName | TypeOpName
 -- Proper names, i.e. capitalized names for e.g. module names, type//data constructors.
 --
 newtype ProperName (a :: ProperNameType) = ProperName { runProperName :: String }
-  deriving (Show, Read, Eq, Ord)
+  deriving (Show, Eq, Ord)
 
 instance ToJSON (ProperName a) where
   toJSON = toJSON . runProperName
@@ -129,7 +129,7 @@ coerceProperName = ProperName . runProperName
 -- Module names
 --
 newtype ModuleName = ModuleName [ProperName 'Namespace]
-  deriving (Show, Read, Eq, Ord)
+  deriving (Show, Eq, Ord)
 
 runModuleName :: ModuleName -> String
 runModuleName (ModuleName pns) = intercalate "." (runProperName `map` pns)
@@ -146,7 +146,7 @@ moduleNameFromString = ModuleName . splitProperNames
 -- A qualified name, i.e. a name with an optional module name
 --
 data Qualified a = Qualified (Maybe ModuleName) a
-  deriving (Show, Read, Eq, Ord, Functor)
+  deriving (Show, Eq, Ord, Functor)
 
 showQualified :: (a -> String) -> Qualified a -> String
 showQualified f (Qualified Nothing a) = f a
