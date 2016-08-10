@@ -139,7 +139,7 @@ bundle = runExceptT $ do
     js <- liftIO (readUTF8File filename)
     mid <- Bundle.guessModuleIdentifier filename
     length js `seq` return (mid, js)
-  Bundle.bundle input [] Nothing "PSCI"
+  Bundle.bundle input [] Nothing "PSCI" False
 
 indexJS :: IsString string => string
 indexJS = $(embedStringFile "psci/static/index.js")

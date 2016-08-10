@@ -18,6 +18,7 @@
 
 module Language.PureScript.Bundle (
      bundle
+   , guessModuleIdentifier
    , ModuleIdentifier(..)
    , moduleName
    , ModuleType(..)
@@ -48,6 +49,8 @@ import Language.PureScript.Bundle.BundleTypes
 
 import qualified Paths_purescript as Paths
 
+import System.FilePath (takeFileName, takeDirectory)
+
 -- | The type of error messages. We separate generation and rendering of errors using a data
 -- type, in case we need to match on error types later.
 data ErrorMessage
@@ -57,6 +60,14 @@ data ErrorMessage
   | UnsupportedExport
   | ErrorInModule ModuleIdentifier ErrorMessage
   deriving (Show, Read)
+
+-- | Given a filename, assuming it is in the correct place on disk, infer a ModuleIdentifier.
+guessModuleIdentifier :: MonadError ErrorMessage m => FilePath -> m ModuleIdentifier
+guessModuleIdentifier filename = ModuleIdentifier (takeFileName (takeDirectory filename)) <$> guessModuleType (takeFileName filename)
+  where
+    guessModuleType "index.js" = pure Regular
+    guessModuleType "foreign.js" = pure Foreign
+guessModuleType name = throwError $ UnsupportedModulePath name
 
 -- | Prepare an error message for consumption by humans.
 printErrorMessage :: ErrorMessage -> [String]
