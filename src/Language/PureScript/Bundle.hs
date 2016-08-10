@@ -67,7 +67,7 @@ guessModuleIdentifier filename = ModuleIdentifier (takeFileName (takeDirectory f
   where
     guessModuleType "index.js" = pure Regular
     guessModuleType "foreign.js" = pure Foreign
-guessModuleType name = throwError $ UnsupportedModulePath name
+    guessModuleType name = throwError $ UnsupportedModulePath name
 
 -- | Prepare an error message for consumption by humans.
 printErrorMessage :: ErrorMessage -> [String]
