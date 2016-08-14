@@ -109,6 +109,7 @@ library
                    bytestring -any,
                    containers -any,
                    clock -any,
+                   data-ordlist >= 0.4.7.0,
                    directory >= 1.2,
                    dlist -any,
                    edit-distance -any,

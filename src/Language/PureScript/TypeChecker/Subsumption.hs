@@ -11,7 +11,9 @@ import Control.Monad (when)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets)
 
+import Data.Foldable (for_)
 import Data.List (sortBy, uncons)
+import Data.List.Ordered (minusBy')
 import Data.Ord (comparing)
 
 import Language.PureScript.AST
@@ -63,10 +65,10 @@ subsumes' val (TypeApp f1 r1) (TypeApp f2 r2) | f1 == tyRecord && f2 == tyRecord
     (ts2, r2') = rowToList r2
     ts1' = sortBy (comparing fst) ts1
     ts2' = sortBy (comparing fst) ts2
-  when (r1' == REmpty) 
-    (maybe (return ()) (throwError . errorMessage . PropertyIsMissing . fst) (firstMissingProp ts2' ts1'))
-  when (r2' == REmpty) 
-    (maybe (return ()) (throwError . errorMessage . AdditionalProperty . fst) (firstMissingProp ts1' ts2'))
+  when (r1' == REmpty)
+    (for_ (firstMissingProp ts2' ts1') (throwError . errorMessage . PropertyIsMissing . fst))
+  when (r2' == REmpty)
+    (for_ (firstMissingProp ts1' ts2') (throwError . errorMessage . AdditionalProperty . fst))
   go ts1' ts2' r1' r2'
   return val
   where
@@ -84,27 +86,9 @@ subsumes' val (TypeApp f1 r1) (TypeApp f2 r2) | f1 == tyRecord && f2 == tyRecord
     | otherwise = do rest <- freshType
                      unifyTypes r1' (RCons p2 ty2 rest)
                      go ((p1, ty1) : ts1) ts2 rest r2'
-
+  firstMissingProp t2 t1 = fst <$> (uncons $ minusBy' (comparing fst) t2 t1)
 subsumes' val ty1 ty2@(TypeApp obj _) | obj == tyRecord = subsumes val ty2 ty1
 subsumes' val ty1 ty2 = do
   unifyTypes ty1 ty2
   return val
 
-firstMissingProp :: forall a b. Ord a => [(a, b)] -> [(a, b)] -> Maybe (a, b)
-firstMissingProp t2 t1 = fst <$> (uncons $ minusBy (comparing fst) t2 t1)
-
--- |  The 'minusBy' function computes the difference of two ordered lists.
--- The result consists of elements from the first list that do not appear
--- in the second list.  If the first input is a set, then the output is
--- a set.
---
-minusBy :: (a -> b -> Ordering) -> [a] -> [b] -> [a]
-minusBy cmp = loop
-  where
-     loop [] _ys = []
-     loop xs [] = xs
-     loop (x:xs) (y:ys)
-       = case cmp x y of
-          LT -> x : loop xs (y:ys)
-          EQ ->     loop xs (y:ys)
-          GT ->     loop (x:xs) ys
