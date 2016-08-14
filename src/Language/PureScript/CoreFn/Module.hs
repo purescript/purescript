@@ -1,4 +1,7 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Language.PureScript.CoreFn.Module where
+
+import qualified Data.Aeson.TH as A
 
 import Prelude.Compat
 
@@ -20,3 +23,5 @@ data Module a = Module
   } deriving (Show)
 
 type ForeignDecl = (Ident, Type)
+
+$(A.deriveJSON A.defaultOptions ''Module)

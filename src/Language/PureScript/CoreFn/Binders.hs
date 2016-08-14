@@ -1,7 +1,10 @@
+{-# LANGUAGE TemplateHaskell #-}
 -- |
 -- The core functional representation for binders
 --
 module Language.PureScript.CoreFn.Binders where
+
+import qualified Data.Aeson.TH as A
 
 import Prelude.Compat
 
@@ -33,6 +36,7 @@ data Binder a
   --
   | NamedBinder a Ident (Binder a) deriving (Show, Functor)
 
+$(A.deriveJSON A.defaultOptions ''Binder)
 
 extractBinderAnn :: Binder a -> a
 extractBinderAnn (NullBinder a) = a
