@@ -1,5 +1,9 @@
-resolver: lts-6.9
+resolver: lts-6.10
 packages:
 - '.'
-extra-deps: []
-flags: {}
+extra-deps:
+- aeson-1.0.0.0
+- semigroups-0.18.2
+flags:
+  semigroups:
+    bytestring-builder: false
