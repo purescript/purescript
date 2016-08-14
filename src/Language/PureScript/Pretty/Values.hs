@@ -75,7 +75,6 @@ prettyPrintValue d expr@Op{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@BinaryNoParens{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@Parens{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@UnaryMinus{} = prettyPrintValueAtom d expr
-prettyPrintValue d expr@ObjectGetter{} = prettyPrintValueAtom d expr
 
 -- | Pretty-print an atomic expression, adding parentheses if necessary.
 prettyPrintValueAtom :: Int -> Expr -> Box
@@ -92,7 +91,6 @@ prettyPrintValueAtom d (TypedValue _ val _) = prettyPrintValueAtom d val
 prettyPrintValueAtom d (PositionedValue _ _ val) = prettyPrintValueAtom d val
 prettyPrintValueAtom d (Parens expr) = (text "(" <> prettyPrintValue d expr) `before` text ")"
 prettyPrintValueAtom d (UnaryMinus expr) = text "(-" <> prettyPrintValue d expr <> text ")"
-prettyPrintValueAtom _ (ObjectGetter field) = text "_." <> text field
 prettyPrintValueAtom d expr = (text "(" <> prettyPrintValue d expr) `before` text ")"
 
 prettyPrintLiteralValue :: Int -> Literal Expr -> Box
