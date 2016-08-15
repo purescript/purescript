@@ -14,3 +14,5 @@ anInt = 0
 
 -- This should infer a type.
 aNumber = 1.0
+
+foreign import nestedForAll :: forall c. (forall a b. c)

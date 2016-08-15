@@ -257,8 +257,8 @@ everywhereOnTypesTopDown f = go . f
   go (PrettyPrintFunction t1 t2) = PrettyPrintFunction (go (f t1)) (go (f t2))
   go (PrettyPrintObject t) = PrettyPrintObject (go (f t))
   go (PrettyPrintForAll args t) = PrettyPrintForAll args (go (f t))
-  go (BinaryNoParensType t1 t2 t3) = BinaryNoParensType (f (go t1)) (f (go t2)) (f (go t3))
-  go (ParensInType t) = ParensInType (f (go t))
+  go (BinaryNoParensType t1 t2 t3) = BinaryNoParensType (go (f t1)) (go (f t2)) (go (f t3))
+  go (ParensInType t) = ParensInType (go (f t))
   go other = f other
 
 everywhereOnTypesM :: Monad m => (Type -> m Type) -> Type -> m Type
