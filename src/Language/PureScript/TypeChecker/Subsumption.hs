@@ -25,13 +25,11 @@ import Language.PureScript.TypeChecker.Skolems
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.Types
 
-
 -- | Check that one type subsumes another, rethrowing errors to provide a better error message
 subsumes :: (MonadError MultipleErrors m, MonadState CheckState m) => Maybe Expr -> Type -> Type -> m (Maybe Expr)
-subsumes val ty1 ty2 = do 
-  withErrorMessageHint (ErrorInSubsumption ty1 ty2) $ subsumes' val ty1 ty2
+subsumes val ty1 ty2 = withErrorMessageHint (ErrorInSubsumption ty1 ty2) $ subsumes' val ty1 ty2
 
--- | Check tahat one type subsumes another
+-- | Check that one type subsumes another
 subsumes' :: (MonadError MultipleErrors m, MonadState CheckState m) =>
   Maybe Expr ->
   Type ->
@@ -65,6 +63,10 @@ subsumes' val (TypeApp f1 r1) (TypeApp f2 r2) | f1 == tyRecord && f2 == tyRecord
     (ts2, r2') = rowToList r2
     ts1' = sortBy (comparing fst) ts1
     ts2' = sortBy (comparing fst) ts2
+  -- For { ts1 | r1 } to subsume { ts2 | r2 } when r1 is empty (= we're working with a closed row),
+  -- every property in ts2 must appear in ts1. If not, then the candidate expression is missing a required property.
+  -- Conversely, when r2 is empty, every property in ts1 must appear in ts2, or else the expression has
+  -- an additional property which is not allowed.
   when (r1' == REmpty)
     (for_ (firstMissingProp ts2' ts1') (throwError . errorMessage . PropertyIsMissing . fst))
   when (r2' == REmpty)
@@ -86,9 +88,9 @@ subsumes' val (TypeApp f1 r1) (TypeApp f2 r2) | f1 == tyRecord && f2 == tyRecord
     | otherwise = do rest <- freshType
                      unifyTypes r1' (RCons p2 ty2 rest)
                      go ((p1, ty1) : ts1) ts2 rest r2'
-  firstMissingProp t2 t1 = fst <$> (uncons $ minusBy' (comparing fst) t2 t1)
+  -- Find the first property that's in the first list (of tuples) but not in the second
+  firstMissingProp t1 t2 = fst <$> (uncons $ minusBy' (comparing fst) t1 t2)
 subsumes' val ty1 ty2@(TypeApp obj _) | obj == tyRecord = subsumes val ty2 ty1
 subsumes' val ty1 ty2 = do
   unifyTypes ty1 ty2
   return val
-
