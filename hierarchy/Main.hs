@@ -23,6 +23,7 @@ import Control.Monad (unless)
 import Data.List (intercalate,nub,sort)
 import Data.Foldable (for_)
 import Data.Version (showVersion)
+import Data.Monoid ((<>))
 
 import Options.Applicative
 import System.Directory (createDirectoryIfMissing)

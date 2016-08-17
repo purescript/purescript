@@ -4,6 +4,7 @@ module Main where
 import Data.Version (Version(..), showVersion)
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy.Char8 as BL
+import Data.Monoid ((<>))
 
 import Options.Applicative hiding (str)
 

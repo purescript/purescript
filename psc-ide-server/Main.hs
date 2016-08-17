@@ -38,7 +38,12 @@ import           Network                           hiding (socketPort, accept)
 import           Network.BSD                       (getProtocolNumber)
 import           Network.Socket                    hiding (PortNumber, Type,
                                                     sClose)
-import           Options.Applicative               hiding ((<>))
+import           Options.Applicative               (ParseError (..),
+                                                    abortOption, argument, auto,
+                                                    execParser, help, helper,
+                                                    info, long, option, metavar,
+                                                    short, str, strOption,
+                                                    switch, value)
 import           System.Directory
 import           System.FilePath
 import           System.IO                         hiding (putStrLn, print)

@@ -8,6 +8,7 @@ module Main (main) where
 
 import Data.Traversable (for)
 import Data.Version (showVersion)
+import Data.Monoid ((<>))
 
 import Control.Applicative
 import Control.Monad

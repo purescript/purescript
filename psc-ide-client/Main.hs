@@ -8,6 +8,7 @@ import           Control.Exception
 import qualified Data.ByteString.Char8 as BS8
 import qualified Data.Text.IO          as T
 import           Data.Version          (showVersion)
+import           Data.Monoid           ((<>))
 import           Network
 import           Options.Applicative
 import           System.Exit
