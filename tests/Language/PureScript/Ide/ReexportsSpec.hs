@@ -2,7 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Language.PureScript.Ide.ReexportsSpec where
 
-import qualified Prelude as Prelude
+import qualified Prelude
 import           Protolude
 
 import qualified Data.Map as Map

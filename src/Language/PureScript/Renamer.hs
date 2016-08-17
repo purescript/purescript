@@ -142,7 +142,7 @@ renameInDecl isTopLevel (Rec ds) = do
 renameInValue :: Expr Ann -> Rename (Expr Ann)
 renameInValue (Literal ann l) =
   Literal ann <$> renameInLiteral renameInValue l
-renameInValue c@(Constructor{}) = return c
+renameInValue c@Constructor{} = return c
 renameInValue (Accessor ann prop v) =
   Accessor ann prop <$> renameInValue v
 renameInValue (ObjectUpdate ann obj vs) =
@@ -154,7 +154,7 @@ renameInValue (App ann v1 v2) =
   App ann <$> renameInValue v1 <*> renameInValue v2
 renameInValue (Var ann (Qualified Nothing name)) =
   Var ann . Qualified Nothing <$> lookupIdent name
-renameInValue v@(Var{}) = return v
+renameInValue v@Var{} = return v
 renameInValue (Case ann vs alts) =
   newScope $ Case ann <$> traverse renameInValue vs <*> traverse renameInCaseAlternative alts
 renameInValue (Let ann ds v) =
@@ -180,7 +180,7 @@ renameInCaseAlternative (CaseAlternative bs v) = newScope $
 -- Renames within binders.
 --
 renameInBinder :: Binder a -> Rename (Binder a)
-renameInBinder n@(NullBinder{}) = return n
+renameInBinder n@NullBinder{} = return n
 renameInBinder (LiteralBinder ann b) =
   LiteralBinder ann <$> renameInLiteral renameInBinder b
 renameInBinder (VarBinder ann name) =

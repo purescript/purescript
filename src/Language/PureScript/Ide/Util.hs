@@ -75,7 +75,7 @@ completionFromMatch' (Match (m', d)) = case d of
       in T.unwords [asso, show p, r, "as", runOpNameT o]
 
 infoFromMatch :: Match IdeDeclarationAnn -> Info
-infoFromMatch (Match (m, (IdeDeclarationAnn ann d))) =
+infoFromMatch (Match (m, IdeDeclarationAnn ann d)) =
   Info (a, b, c, annLocation ann)
   where
     (a, b, c) = completionFromMatch' (Match (m, d))

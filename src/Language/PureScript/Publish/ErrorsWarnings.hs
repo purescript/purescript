@@ -182,10 +182,10 @@ displayUserError e = case e of
       , spacer
       ] ++ spdxExamples ++
       [ spacer
-      , para (concat
-          [ "Note that distributing code without a license means that nobody "
-          , "will (legally) be able to use it."
-          ])
+      , para (
+          "Note that distributing code without a license means that nobody "
+          ++ "will (legally) be able to use it."
+          )
       , spacer
       , para (concat
           [ "It is also recommended to add a LICENSE file to the repository, "
@@ -420,10 +420,10 @@ warnUnacceptableVersions pkgs =
 
 warnDirtyWorkingTree :: Box
 warnDirtyWorkingTree =
-  para (concat
-    [ "Your working tree is dirty. (Note: this would be an error if it "
-    , "were not a dry run)"
-    ])
+  para (
+    "Your working tree is dirty. (Note: this would be an error if it "
+    ++ "were not a dry run)"
+    )
 
 printWarnings :: [PackageWarning] -> IO ()
 printWarnings = printToStderr . renderWarnings

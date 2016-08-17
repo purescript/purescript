@@ -79,11 +79,11 @@ warnFileTypeNotFound = hPutStrLn stderr . ("psc: No files found using pattern: "
 globWarningOnMisses :: (String -> IO ()) -> [FilePath] -> IO [FilePath]
 globWarningOnMisses warn = concatMapM globWithWarning
   where
-  globWithWarning pattern = do
-    paths <- glob pattern
-    when (null paths) $ warn pattern
+  globWithWarning pattern' = do
+    paths <- glob pattern'
+    when (null paths) $ warn pattern'
     return paths
-  concatMapM f = liftM concat . mapM f
+  concatMapM f = fmap concat . mapM f
 
 readInput :: [FilePath] -> IO [(FilePath, String)]
 readInput inputFiles = forM inputFiles $ \inFile -> (inFile, ) <$> readUTF8File inFile
