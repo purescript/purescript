@@ -55,7 +55,7 @@ listenOnLocalhost port = do
     sClose
     (\sock -> do
       setSocketOption sock ReuseAddr 1
-      bindSocket sock (SockAddrInet port localhost)
+      bind sock (SockAddrInet port localhost)
       listen sock maxListenQueue
       pure sock)
 
