@@ -38,12 +38,8 @@ import           Network                           hiding (socketPort, accept)
 import           Network.BSD                       (getProtocolNumber)
 import           Network.Socket                    hiding (PortNumber, Type,
                                                     sClose)
-import           Options.Applicative               (ParseError (..),
-                                                    abortOption, argument, auto,
-                                                    execParser, help, helper,
-                                                    info, long, option, metavar,
-                                                    short, str, strOption,
-                                                    switch, value)
+import           Options.Applicative               (ParseError (..))
+import qualified Options.Applicative               as Opts
 import           System.Directory
 import           System.FilePath
 import           System.IO                         hiding (putStrLn, print)
@@ -75,7 +71,7 @@ data Options = Options
 
 main :: IO ()
 main = do
-  Options dir globs outputPath port noWatch debug <- execParser opts
+  Options dir globs outputPath port noWatch debug <- Opts.execParser opts
   maybe (pure ()) setCurrentDirectory dir
   ideState <- newTVarIO emptyIdeState
   cwd <- getCurrentDirectory
@@ -96,17 +92,17 @@ main = do
   where
     parser =
       Options
-        <$> optional (strOption (long "directory" `mappend` short 'd'))
-        <*> many (argument str (metavar "Source GLOBS..."))
-        <*> strOption (long "output-directory" `mappend` value "output/")
+        <$> optional (Opts.strOption (Opts.long "directory" `mappend` Opts.short 'd'))
+        <*> many (Opts.argument Opts.str (Opts.metavar "Source GLOBS..."))
+        <*> Opts.strOption (Opts.long "output-directory" `mappend` Opts.value "output/")
         <*> (fromIntegral <$>
-             option auto (long "port" `mappend` short 'p' `mappend` value (4242 :: Integer)))
-        <*> switch (long "no-watch")
-        <*> switch (long "debug")
-    opts = info (version <*> helper <*> parser) mempty
-    version = abortOption
+             Opts.option Opts.auto (Opts.long "port" `mappend` Opts.short 'p' `mappend` Opts.value (4242 :: Integer)))
+        <*> Opts.switch (Opts.long "no-watch")
+        <*> Opts.switch (Opts.long "debug")
+    opts = Opts.info (version <*> Opts.helper <*> parser) mempty
+    version = Opts.abortOption
       (InfoMsg (showVersion Paths.version))
-      (long "version" `mappend` help "Show the version number")
+      (Opts.long "version" `mappend` Opts.help "Show the version number")
 
 startServer :: PortNumber -> IdeEnvironment -> IO ()
 startServer port env = withSocketsDo $ do
