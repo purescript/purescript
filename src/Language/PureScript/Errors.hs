@@ -594,9 +594,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
             , line "They may be disallowed completely in a future version of the compiler."
             ]
     renderSimpleErrorMessage OverlappingInstances{} = internalError "OverlappingInstances: empty instance list"
-    renderSimpleErrorMessage (NoInstanceFound (Constraint C.Fail [ TypeLevelString message ] _)) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint C.Fail [ ty ] _)) =
       paras [ line "A custom type error occurred while solving type class constraints:"
-            , indent . paras . map line . lines $ message
+            , markCodeBox $ indent $ typeAsBox ty
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint C.Partial
                                                           _

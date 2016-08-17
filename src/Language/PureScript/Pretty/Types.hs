@@ -32,7 +32,7 @@ typeLiterals = mkPattern match
   where
   match TypeWildcard{} = Just $ text "_"
   match (TypeVar var) = Just $ text var
-  match (TypeLevelString s) = Just . text $ show s
+  match (TypeLevelString s) = Just $ text s
   match (PrettyPrintObject row) = Just $ prettyPrintRowWith '{' '}' row
   match (TypeConstructor ctor) = Just $ text $ runProperName $ disqualify ctor
   match (TUnknown u) = Just $ text $ 't' : show u
@@ -99,6 +99,10 @@ kinded = mkPattern match
 insertPlaceholders :: Type -> Type
 insertPlaceholders = everywhereOnTypesTopDown convertForAlls . everywhereOnTypes convert
   where
+  -- Replacing applications of type level functions with placeholders
+  -- that we'll interpret later.
+  convert (TypeApp (TypeApp (TypeConstructor f) x) ret) | f == primName "TypeConcat" = PrettyPrintTypeApplication "TypeConcat" x ret
+  convert (TypeApp (TypeConstructor f) x) | f == primName "TypeString" = x
   convert (TypeApp (TypeApp f arg) ret) | f == tyFunction = PrettyPrintFunction arg ret
   convert (TypeApp o r) | o == tyRecord = PrettyPrintObject r
   convert other = other
@@ -107,6 +111,12 @@ insertPlaceholders = everywhereOnTypesTopDown convertForAlls . everywhereOnTypes
     go idents (ForAll ident' ty' _) = go (ident' : idents) ty'
     go idents other = PrettyPrintForAll idents other
   convertForAlls other = other
+
+typeLevelEval :: Pattern () Type (Type, Type)
+typeLevelEval = mkPattern match
+  where
+  match (PrettyPrintTypeApplication "TypeConcat" a b) = Just (a, b)
+  match _ = Nothing
 
 constrained :: Pattern () Type ([Constraint], Type)
 constrained = mkPattern match
@@ -128,7 +138,8 @@ matchType = buildPrettyPrinter operators matchTypeAtom
   where
   operators :: OperatorTable () Type Box
   operators =
-    OperatorTable [ [ AssocL typeApp $ \f x -> keepSingleLinesOr (moveRight 2) f x ]
+    OperatorTable [ [ AssocL typeLevelEval $ \a b -> keepSingleLinesOr id a b]
+                  , [ AssocL typeApp $ \f x -> keepSingleLinesOr (moveRight 2) f x ]
                   , [ AssocR appliedFunction $ \arg ret -> keepSingleLinesOr id arg (text "-> " <> ret) ]
                   , [ Wrap constrained $ \deps ty -> constraintsAsBox deps ty ]
                   , [ Wrap forall_ $ \idents ty -> keepSingleLinesOr (moveRight 2) (text ("forall " ++ unwords idents ++ ".")) ty ]
