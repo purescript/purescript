@@ -933,7 +933,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
             ]
     renderHint (ErrorSolvingConstraint (Constraint nm ts _)) detail =
       paras [ detail
-            , line "while solving type class constriant"
+            , line "while solving type class constraint"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
                 , Box.vcat Box.left (map typeAtomAsBox ts)

@@ -8,11 +8,13 @@ module Language.PureScript.TypeChecker.Entailment
 
 import Prelude.Compat
 
+import Control.Arrow (second)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 import Control.Monad.Supply.Class (MonadSupply(..))
 import Control.Monad.Writer
 
+import Data.Foldable (for_)
 import Data.Function (on)
 import Data.List (minimumBy, sortBy, groupBy)
 import Data.Maybe (maybeToList, mapMaybe)
@@ -22,7 +24,7 @@ import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Errors
 import Language.PureScript.Names
-import Language.PureScript.TypeChecker.Monad (CheckState, withErrorMessageHint)
+import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
@@ -93,13 +95,18 @@ entails shouldGeneralize moduleName context = solve
         let instances = do
               tcd <- forClassName (combineContexts context inferred) className' tys'
               -- Make sure the type unifies with the type in the type instance definition
-              subst <- maybeToList . (>>= verifySubstitution) . fmap concat $ zipWithM (typeHeadsAreEqual moduleName) tys' (tcdInstanceTypes tcd)
+              subst <- maybeToList . fmap concat $ zipWithM (typeHeadsAreEqual moduleName) tys' (tcdInstanceTypes tcd)
               return (subst, tcd)
         solution <- lift $ unique instances
         case solution of
           Left (subst, tcd) -> do
+            -- Ensure that a substitution is valid, using unification
+            let grps = groupBy ((==) `on` fst) . sortBy (compare `on` fst) $ subst
+            for_ grps (pairwiseM (\x y -> lift $ unifyTypes x y) . map snd)
+            currentSubst <- lift (gets checkSubstitution)
+            let subst' = map (second (substituteType currentSubst)) subst
             -- Solve any necessary subgoals
-            (args, unsolved) <- solveSubgoals subst (tcdDependencies tcd)
+            (args, unsolved) <- solveSubgoals subst' (tcdDependencies tcd)
             let match = foldr (\(superclassName, index) dict -> SubclassDictionaryValue dict superclassName index)
                               (mkDictionary (tcdName tcd) args)
                               (tcdPath tcd)
@@ -167,12 +174,6 @@ entails shouldGeneralize moduleName context = solve
         App (Accessor (C.__superclass_ ++ showQualified runProperName superclassName ++ "_" ++ show index)
                       (dictionaryValueToValue dict))
             valUndefined
-      -- Ensure that a substitution is valid
-      verifySubstitution :: [(String, Type)] -> Maybe [(String, Type)]
-      verifySubstitution subst = do
-        let grps = groupBy ((==) `on` fst) . sortBy (compare `on` fst) $ subst
-        guard (all (pairwise unifiesWith . map snd) grps)
-        return $ map head grps
 
     valUndefined :: Expr
     valUndefined = Var (Qualified (Just (ModuleName [ProperName C.prim])) (Ident C.undefined))
@@ -216,3 +217,8 @@ pairwise :: (a -> a -> Bool) -> [a] -> Bool
 pairwise _ [] = True
 pairwise _ [_] = True
 pairwise p (x : xs) = all (p x) xs && pairwise p xs
+
+pairwiseM :: Applicative m => (a -> a -> m ()) -> [a] -> m ()
+pairwiseM _ [] = pure ()
+pairwiseM _ [_] = pure ()
+pairwiseM p (x : xs) = traverse (p x) xs *> pairwiseM p xs

@@ -80,7 +80,8 @@ typesOf bindingGroupType moduleName vals = do
     (val', unsolved) <- replaceTypeClassDictionaries shouldGeneralize moduleName val
     let unsolvedTypeVars = nub $ unknownsInType ty
     -- Generalize and constrain the type
-    let generalized = generalize unsolved ty
+    currentSubst <- gets checkSubstitution
+    let generalized = generalize unsolved (substituteType currentSubst ty)
 
     when shouldGeneralize $ do
       -- Show the inferred type in a warning
