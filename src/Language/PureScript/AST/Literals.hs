@@ -1,10 +1,7 @@
-{-# LANGUAGE TemplateHaskell #-}
 -- |
 -- The core functional representation for literal values.
 --
 module Language.PureScript.AST.Literals where
-
-import qualified Data.Aeson.TH as A
 
 import Prelude.Compat
 
@@ -38,5 +35,3 @@ data Literal a
   --
   | ObjectLiteral [(String, a)]
   deriving (Eq, Ord, Show, Functor)
-
-$(A.deriveJSON A.defaultOptions ''Literal)

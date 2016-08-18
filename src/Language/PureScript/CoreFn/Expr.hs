@@ -1,10 +1,7 @@
-{-# LANGUAGE TemplateHaskell #-}
 -- |
 -- The core functional representation
 --
 module Language.PureScript.CoreFn.Expr where
-
-import qualified Data.Aeson.TH as A
 
 import Prelude.Compat
 
@@ -93,10 +90,6 @@ instance Functor CaseAlternative where
   fmap f (CaseAlternative cabs car) = CaseAlternative
     (fmap (fmap f) cabs)
     (either (Left . fmap (fmap f *** fmap f)) (Right . fmap f) car)
-
-$(A.deriveJSON A.defaultOptions ''Expr)
-$(A.deriveJSON A.defaultOptions ''Bind)
-$(A.deriveJSON A.defaultOptions ''CaseAlternative)
 
 -- |
 -- Extract the annotation from a term
