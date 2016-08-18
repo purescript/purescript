@@ -40,6 +40,7 @@ import Language.PureScript.Comments
 import Language.PureScript.CoreFn
 import Language.PureScript.Names
 import Language.PureScript.Types
+import Language.PureScript.Kinds
 
 literalToJSON :: (a -> Value) -> Literal a -> Value
 literalToJSON _ (NumericLiteral (Left n)) = toJSON ("NumericLiteral", ("Left", n))
@@ -94,6 +95,14 @@ moduleImportToJSON t (a, n) = toJSON (t a, moduleNameToJSON n)
 
 foreignDeclToJSON :: ForeignDecl -> Value
 foreignDeclToJSON (i, t) = toJSON (identToJSON i, typeToJSON t)
+
+kindToJSON :: Kind -> Value
+kindToJSON (KUnknown n) = toJSON ("KUnknown", n)
+kindToJSON Star = toJSON ["Star"]
+kindToJSON Bang = toJSON ["Bang"]
+kindToJSON (Row boat) = toJSON ("Row", kindToJSON boat)
+kindToJSON (FunKind d c) = toJSON ("FunKind", kindToJSON d, kindToJSON c)
+kindToJSON Symbol = toJSON ["Symbol"]
 
 typeToJSON :: Type -> Value
 typeToJSON (TUnknown n) = toJSON ("TUnknown", n)
