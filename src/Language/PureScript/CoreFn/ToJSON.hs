@@ -96,7 +96,24 @@ foreignDeclToJSON :: ForeignDecl -> Value
 foreignDeclToJSON (i, t) = toJSON (identToJSON i, typeToJSON t)
 
 typeToJSON :: Type -> Value
-typeToJSON _ = Null
+typeToJSON (TUnknown n) = toJSON ("TUnknown", n)
+typeToJSON (TypeVar v) = toJSON ("TypeVar", v)
+typeToJSON (TypeLevelString s) = toJSON ("TypeLevelString", s)
+typeToJSON (TypeWildcard s) = toJSON ("TypeWildcard", sourceSpanToJSON s)
+typeToJSON (TypeConstructor q) = toJSON ("TypeConstructor", qualifiedToJSON properNameToJSON q)
+typeToJSON (TypeOp n) = toJSON ("TypeOp", qualifiedToJSON opNameToJSON n)
+typeToJSON (TypeApp f x) = toJSON ("TypeApp", typeToJSON f, typeToJSON x)
+typeToJSON (ForAll s t ss) = toJSON ("ForAll", s, typeToJSON t, skolemScopeToJSON <$> ss)
+typeToJSON (ConstrainedType cs t) = toJSON ("ConstrainedType", map constraintTypeToJSON cs, typeToJSON t)
+typeToJSON (Skolem s i sc ss) = toJSON ("Skolem", s, i, skolemScopeToJSON sc, sourceSpanToJSON <$> ss)
+typeToJSON REmpty = toJSON ["REmpty"]
+typeToJSON (RCons s t tl) = toJSON ("RCons", s, typeToJSON t, typeToJSON tl)
+typeToJSON (KindedType t k) = toJSON ("KindedType", typeToJSON t, kindToJSON k)
+typeToJSON PrettyPrintFunction{} = error "this shouldn't be here"
+typeToJSON PrettyPrintObject{} = error "this shouldn't be here"
+typeToJSON PrettyPrintForAll{} = error "this shouldn't be here"
+typeToJSON BinaryNoParensType{} = error "this should have been removed"
+typeToJSON ParensInType{} = error "this should have been removed"
 
 bindToJSON :: (a -> Value) -> Bind a -> Value
 bindToJSON t (NonRec a n e) = toJSON ("NonRec", t a, identToJSON n, exprToJSON t e)
