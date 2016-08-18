@@ -108,8 +108,8 @@ data SimpleErrorMessage
   | ImportHidingModule ModuleName
   | UnusedImport ModuleName
   | UnusedExplicitImport ModuleName [String] (Maybe ModuleName) [DeclarationRef]
-  | UnusedDctorImport (ProperName 'TypeName)
-  | UnusedDctorExplicitImport (ProperName 'TypeName) [ProperName 'ConstructorName]
+  | UnusedDctorImport ModuleName (ProperName 'TypeName) (Maybe ModuleName) [DeclarationRef]
+  | UnusedDctorExplicitImport ModuleName (ProperName 'TypeName) [ProperName 'ConstructorName] (Maybe ModuleName) [DeclarationRef]
   | DuplicateSelectiveImport ModuleName
   | DuplicateImport ModuleName ImportDeclarationType (Maybe ModuleName)
   | DuplicateImportRef Name
