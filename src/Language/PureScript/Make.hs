@@ -35,7 +35,7 @@ import Control.Monad.Trans.Control (MonadBaseControl(..))
 import Control.Monad.Trans.Except
 import Control.Monad.Writer.Class (MonadWriter(..))
 
-import Data.Aeson (encode, decode, Value(Null))
+import Data.Aeson (encode, decode)
 import Data.ByteString.Builder (toLazyByteString, stringUtf8)
 import Data.Either (partitionEithers)
 import Data.Foldable (for_)
@@ -373,7 +373,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     dumpCoreFn <- lift $ asks optionsDumpCoreFn
     when dumpCoreFn $ do
       let coreFnFile = outputDir </> filePath </> "corefn.json"
-      lift $ writeTextFile coreFnFile (BU8.toString . B.toStrict . encode $ CFJ.moduleToJSON (const Null) m)
+      lift $ writeTextFile coreFnFile (BU8.toString . B.toStrict . encode $ CFJ.moduleToJSON CFJ.annToJSON m)
 
   genSourceMap :: String -> String -> Int -> [SMap] -> Make ()
   genSourceMap dir mapFile extraLines mappings = do

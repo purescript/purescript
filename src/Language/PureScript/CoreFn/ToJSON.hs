@@ -58,6 +58,13 @@ metaToJSON IsNewtype = toJSON ["IsNewtype"]
 metaToJSON IsTypeClassConstructor = toJSON ["IsTypeClassConstructor"]
 metaToJSON IsForeign = toJSON ["IsForeign"]
 
+annToJSON :: Ann -> Value
+annToJSON (ss, cs, t, m) = toJSON ( sourceSpanToJSON <$> ss
+                                  , map commentToJSON cs
+                                  , typeToJSON <$> t
+                                  , metaToJSON <$> m
+                                  )
+
 constructorTypeToJSON :: ConstructorType -> Value
 constructorTypeToJSON ProductType = toJSON ["ProductType"]
 constructorTypeToJSON SumType = toJSON ["SumType"]
