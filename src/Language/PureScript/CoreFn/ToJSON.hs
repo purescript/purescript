@@ -36,6 +36,7 @@ import Data.Aeson
 import Data.Text (pack)
 
 import Language.PureScript.AST.Literals
+import Language.PureScript.AST.SourcePos
 import Language.PureScript.Comments
 import Language.PureScript.CoreFn
 import Language.PureScript.Names
@@ -75,6 +76,22 @@ moduleNameToJSON (ModuleName ss) = toJSON ("ModuleName", map properNameToJSON ss
 properNameToJSON :: ProperName a -> Value
 properNameToJSON (ProperName n) = toJSON ("ProperName", n)
 
+opNameToJSON :: OpName a -> Value
+opNameToJSON (OpName s) = toJSON ("OpName", s)
+
+sourceSpanToJSON :: SourceSpan -> Value
+sourceSpanToJSON (SourceSpan name start end) =
+  object [ pack "spanName" .= name
+         , pack "spanStart" .= sourcePosToJSON start
+         , pack "spanEnd" .= sourcePosToJSON end
+         ]
+
+sourcePosToJSON :: SourcePos -> Value
+sourcePosToJSON (SourcePos line col) =
+  object [ pack "sourcePosLine" .= line
+         , pack "sourcePosColumn" .= col
+         ]
+
 commentToJSON :: Comment -> Value
 commentToJSON (LineComment s) = toJSON ("LineComment", s)
 commentToJSON (BlockComment s) = toJSON ("BlockComment", s)
@@ -113,7 +130,7 @@ typeToJSON (TypeConstructor q) = toJSON ("TypeConstructor", qualifiedToJSON prop
 typeToJSON (TypeOp n) = toJSON ("TypeOp", qualifiedToJSON opNameToJSON n)
 typeToJSON (TypeApp f x) = toJSON ("TypeApp", typeToJSON f, typeToJSON x)
 typeToJSON (ForAll s t ss) = toJSON ("ForAll", s, typeToJSON t, skolemScopeToJSON <$> ss)
-typeToJSON (ConstrainedType cs t) = toJSON ("ConstrainedType", map constraintTypeToJSON cs, typeToJSON t)
+typeToJSON (ConstrainedType cs t) = toJSON ("ConstrainedType", map constraintToJSON cs, typeToJSON t)
 typeToJSON (Skolem s i sc ss) = toJSON ("Skolem", s, i, skolemScopeToJSON sc, sourceSpanToJSON <$> ss)
 typeToJSON REmpty = toJSON ["REmpty"]
 typeToJSON (RCons s t tl) = toJSON ("RCons", s, typeToJSON t, typeToJSON tl)
@@ -123,6 +140,20 @@ typeToJSON PrettyPrintObject{} = error "this shouldn't be here"
 typeToJSON PrettyPrintForAll{} = error "this shouldn't be here"
 typeToJSON BinaryNoParensType{} = error "this should have been removed"
 typeToJSON ParensInType{} = error "this should have been removed"
+
+constraintToJSON :: Constraint -> Value
+constraintToJSON (Constraint cls args dat) =
+  object [ pack "constraintClass" .= qualifiedToJSON properNameToJSON cls
+         , pack "constraintArgs" .= map typeToJSON args
+         , pack "constraintData" .= (constraintDataToJSON <$> dat)
+         ]
+
+constraintDataToJSON :: ConstraintData -> Value
+constraintDataToJSON (PartialConstraintData cs b) =
+  toJSON ("PartialConstraintData", cs, b)
+
+skolemScopeToJSON :: SkolemScope -> Value
+skolemScopeToJSON (SkolemScope n) = toJSON ("SkolemScope", n)
 
 bindToJSON :: (a -> Value) -> Bind a -> Value
 bindToJSON t (NonRec a n e) = toJSON ("NonRec", t a, identToJSON n, exprToJSON t e)
