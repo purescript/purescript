@@ -288,6 +288,8 @@ errorSuggestion err = case err of
   UnusedImport{} -> emptySuggestion
   DuplicateImport{} -> emptySuggestion
   UnusedExplicitImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
+  UnusedDctorImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
+  UnusedDctorExplicitImport mn _ _ qual refs -> suggest $ importSuggestion mn refs qual
   ImplicitImport mn refs -> suggest $ importSuggestion mn refs Nothing
   ImplicitQualifiedImport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
   HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
@@ -756,12 +758,18 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
             , line "It could be replaced with:"
             , indent $ line $ markCode $ showSuggestion msg ]
 
-    renderSimpleErrorMessage (UnusedDctorImport name) =
-      line $ "The import of type " ++ markCode (runProperName name) ++ " includes data constructors but only the type is used"
+    renderSimpleErrorMessage msg@(UnusedDctorImport mn name _ _) =
+      paras [line $ "The import of type " ++ markCode (runProperName name)
+                    ++ " from module " ++ markCode (runModuleName mn) ++ " includes data constructors but only the type is used"
+            , line "It could be replaced with:"
+            , indent $ line $ markCode $ showSuggestion msg ]
 
-    renderSimpleErrorMessage (UnusedDctorExplicitImport name names) =
-      paras [ line $ "The import of type " ++ markCode (runProperName name) ++ " includes the following unused data constructors:"
-            , indent $ paras $ map (line . markCode . runProperName) names ]
+    renderSimpleErrorMessage msg@(UnusedDctorExplicitImport mn name names _ _) =
+      paras [ line $ "The import of type " ++ markCode (runProperName name)
+                     ++ " from module " ++ markCode (runModuleName mn) ++ " includes the following unused data constructors:"
+            , indent $ paras $ map (line . markCode . runProperName) names
+            , line "It could be replaced with:"
+            , indent $ line $ markCode $ showSuggestion msg ]
 
     renderSimpleErrorMessage (DuplicateSelectiveImport name) =
       line $ "There is an existing import of " ++ markCode (runModuleName name) ++ ", consider merging the import lists"
