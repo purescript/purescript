@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Language.PureScript.Make
   (
@@ -36,6 +37,7 @@ import Control.Monad.Trans.Except
 import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Aeson (encode, decode)
+import qualified Data.Aeson as Aeson
 import Data.ByteString.Builder (toLazyByteString, stringUtf8)
 import Data.Either (partitionEithers)
 import Data.Foldable (for_)
@@ -373,7 +375,11 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     dumpCoreFn <- lift $ asks optionsDumpCoreFn
     when dumpCoreFn $ do
       let coreFnFile = outputDir </> filePath </> "corefn.json"
-      lift $ writeTextFile coreFnFile (BU8.toString . B.toStrict . encode $ CFJ.moduleToJSON CFJ.annToJSON m)
+      let jsonPayload = CFJ.moduleToJSON CFJ.annToJSON m
+      let json = Aeson.object [ ("version", Aeson.toJSON $ showVersion Paths.version)
+                              , ("payload", jsonPayload)
+                              ]
+      lift $ writeTextFile coreFnFile (BU8.toString . B.toStrict . encode $ json)
 
   genSourceMap :: String -> String -> Int -> [SMap] -> Make ()
   genSourceMap dir mapFile extraLines mappings = do
