@@ -9,6 +9,7 @@ import Language.PureScript.AST.Literals
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.Comments
 import Language.PureScript.CoreFn
+import Language.PureScript.Crash (internalError)
 import Language.PureScript.Names
 import Language.PureScript.Types
 import Language.PureScript.Kinds
@@ -112,11 +113,11 @@ typeToJSON (Skolem s i sc ss) = toJSON ("Skolem", s, i, skolemScopeToJSON sc, so
 typeToJSON REmpty = toJSON ["REmpty"]
 typeToJSON (RCons s t tl) = toJSON ("RCons", s, typeToJSON t, typeToJSON tl)
 typeToJSON (KindedType t k) = toJSON ("KindedType", typeToJSON t, kindToJSON k)
-typeToJSON PrettyPrintFunction{} = error "this shouldn't be here"
-typeToJSON PrettyPrintObject{} = error "this shouldn't be here"
-typeToJSON PrettyPrintForAll{} = error "this shouldn't be here"
-typeToJSON BinaryNoParensType{} = error "this should have been removed"
-typeToJSON ParensInType{} = error "this should have been removed"
+typeToJSON PrettyPrintFunction{} = internalError "CoreFn.ToJSON: PrettyPrintFunction was not erased"
+typeToJSON PrettyPrintObject{} = internalError "CoreFn.ToJSON: PrettyPrintObject was not erased"
+typeToJSON PrettyPrintForAll{} = internalError "CoreFn.ToJSON: PrettyPrintForAll was not erased"
+typeToJSON BinaryNoParensType{} = internalError "CoreFn.ToJSON: BinaryNoParensType was not erased"
+typeToJSON ParensInType{} = internalError "CoreFn.ToJSON: ParensInType was not erased"
 
 constraintToJSON :: Constraint -> Value
 constraintToJSON (Constraint cls args dat) =
