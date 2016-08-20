@@ -8,7 +8,7 @@ import Control.Monad.Eff.Console (log)
 
 newtype MyType a = MyType a
 
-instance cannotShowFunctions :: Fail ("Don't want to show" <> TypeString (MyType a) <> "because.") => Show (MyType a) where
+instance cannotShowFunctions :: Fail ("Don't want to show " <> TypeString (MyType a) <> " because.") => Show (MyType a) where
   show _ = "unreachable"
 
 infixl 6 type TypeConcat as <>
