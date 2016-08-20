@@ -128,7 +128,7 @@ entails shouldGeneralize moduleName context = solve
         where
 
         unique :: [(a, TypeClassDictionaryInScope)] -> m (Either (a, TypeClassDictionaryInScope) Constraint)
-        unique [] | shouldGeneralize && any canBeGeneralized tys' = return (Right con')
+        unique [] | shouldGeneralize && all canBeGeneralized tys' = return (Right con')
                   | otherwise = throwError . errorMessage $ NoInstanceFound con'
         unique [a] = return $ Left a
         unique tcds | pairwise overlapping (map snd tcds) = do
