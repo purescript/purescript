@@ -1,4 +1,4 @@
--- @shouldFailWith NoInstanceFound
+-- @shouldFailWith TypesDoNotUnify
 module Main where
 
 import Prelude
@@ -12,4 +12,3 @@ instance overlappingVarsFoo :: OverlappingVars (Foo a a) where
   f a = a
 
 test = f (Foo "" 0)
-

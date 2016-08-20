@@ -90,12 +90,16 @@ entails shouldGeneralize moduleName context = solve
       go :: Int -> Constraint -> StateT InstanceContext m (DictionaryValue, [(Ident, Constraint)])
       go work (Constraint className' tys' _) | work > 1000 = throwError . errorMessage $ PossiblyInfiniteInstance className' tys'
       go work con'@(Constraint className' tys' _) = do
+        -- We might have unified types by solving other constraints, so we need to
+        -- apply the latest substitution.
+        latestSubst <- lift (gets checkSubstitution)
+        let tys'' = map (substituteType latestSubst) tys'
         -- Get the inferred constraint context so far, and merge it with the global context
         inferred <- get
         let instances = do
-              tcd <- forClassName (combineContexts context inferred) className' tys'
+              tcd <- forClassName (combineContexts context inferred) className' tys''
               -- Make sure the type unifies with the type in the type instance definition
-              subst <- maybeToList . fmap concat $ zipWithM (typeHeadsAreEqual moduleName) tys' (tcdInstanceTypes tcd)
+              subst <- maybeToList . fmap concat $ zipWithM (typeHeadsAreEqual moduleName) tys'' (tcdInstanceTypes tcd)
               return (subst, tcd)
         solution <- lift $ unique instances
         case solution of
@@ -124,7 +128,7 @@ entails shouldGeneralize moduleName context = solve
         where
 
         unique :: [(a, TypeClassDictionaryInScope)] -> m (Either (a, TypeClassDictionaryInScope) Constraint)
-        unique [] | shouldGeneralize && all canBeGeneralized tys' = return (Right con')
+        unique [] | shouldGeneralize && any canBeGeneralized tys' = return (Right con')
                   | otherwise = throwError . errorMessage $ NoInstanceFound con'
         unique [a] = return $ Left a
         unique tcds | pairwise overlapping (map snd tcds) = do
