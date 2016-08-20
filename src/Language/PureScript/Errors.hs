@@ -21,10 +21,12 @@ import Data.Functor.Identity (Identity(..))
 import Data.List (intercalate, transpose, nub, nubBy, sortBy, partition)
 import Data.Maybe (maybeToList, fromMaybe, mapMaybe)
 import Data.Ord (comparing)
+import Data.Text (strip, pack, unpack)
 import qualified Data.Map as M
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
+import Language.PureScript.Environment
 import Language.PureScript.Names
 import Language.PureScript.Pretty
 import Language.PureScript.Traversals
@@ -596,7 +598,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
     renderSimpleErrorMessage OverlappingInstances{} = internalError "OverlappingInstances: empty instance list"
     renderSimpleErrorMessage (NoInstanceFound (Constraint C.Fail [ ty ] _)) =
       paras [ line "A custom type error occurred while solving type class constraints:"
-            , markCodeBox $ indent $ typeAsBox ty
+            , markCodeBox $ indent $ typeAsBox $ evalTypelevelFunctions ty
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint C.Partial
                                                           _
@@ -1202,6 +1204,15 @@ renderBox = unlines
   where
   dropWhileEnd p = reverse . dropWhile p . reverse
   whiteSpace = all isSpace
+
+evalTypelevelFunctions :: Type -> Type
+evalTypelevelFunctions = everywhereOnTypes go
+  where
+  go (TypeApp (TypeConstructor f) x)
+    | f == primName "TypeString" = TypeLevelString $ unpack $ strip $ pack $ prettyPrintTypeAtom x
+  go (TypeApp (TypeApp (TypeConstructor f) (TypeLevelString x)) (TypeLevelString ret))
+    | f == primName "TypeConcat" = TypeLevelString (x ++ " " ++ ret)
+  go t = t
 
 -- |
 -- Rethrow an error with a more detailed error message in the case of failure

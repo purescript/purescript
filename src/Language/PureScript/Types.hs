@@ -57,8 +57,6 @@ data Type
   -- | A type with a kind annotation
   | KindedType Type Kind
   -- | A placeholder used in pretty printing
-  | PrettyPrintTypeApplication String Type Type
-  -- | A placeholder used in pretty printing
   | PrettyPrintFunction Type Type
   -- | A placeholder used in pretty printing
   | PrettyPrintObject Type
@@ -241,7 +239,6 @@ everywhereOnTypes f = go
   go (ConstrainedType cs ty) = f (ConstrainedType (map (mapConstraintArgs (map go)) cs) (go ty))
   go (RCons name ty rest) = f (RCons name (go ty) (go rest))
   go (KindedType ty k) = f (KindedType (go ty) k)
-  go (PrettyPrintTypeApplication a t1 t2) = f (PrettyPrintTypeApplication a (go t1) (go t2))
   go (PrettyPrintFunction t1 t2) = f (PrettyPrintFunction (go t1) (go t2))
   go (PrettyPrintObject t) = f (PrettyPrintObject (go t))
   go (PrettyPrintForAll args t) = f (PrettyPrintForAll args (go t))
@@ -257,7 +254,6 @@ everywhereOnTypesTopDown f = go . f
   go (ConstrainedType cs ty) = ConstrainedType (map (mapConstraintArgs (map (go . f))) cs) (go (f ty))
   go (RCons name ty rest) = RCons name (go (f ty)) (go (f rest))
   go (KindedType ty k) = KindedType (go (f ty)) k
-  go (PrettyPrintTypeApplication a t1 t2) = PrettyPrintTypeApplication a (go (f t1)) (go (f t2))
   go (PrettyPrintFunction t1 t2) = PrettyPrintFunction (go (f t1)) (go (f t2))
   go (PrettyPrintObject t) = PrettyPrintObject (go (f t))
   go (PrettyPrintForAll args t) = PrettyPrintForAll args (go (f t))
@@ -273,7 +269,6 @@ everywhereOnTypesM f = go
   go (ConstrainedType cs ty) = (ConstrainedType <$> mapM (overConstraintArgs (mapM go)) cs <*> go ty) >>= f
   go (RCons name ty rest) = (RCons name <$> go ty <*> go rest) >>= f
   go (KindedType ty k) = (KindedType <$> go ty <*> pure k) >>= f
-  go (PrettyPrintTypeApplication a t1 t2) = (PrettyPrintTypeApplication a <$> (go t1) <*> (go t2)) >>= f
   go (PrettyPrintFunction t1 t2) = (PrettyPrintFunction <$> go t1 <*> go t2) >>= f
   go (PrettyPrintObject t) = (PrettyPrintObject <$> go t) >>= f
   go (PrettyPrintForAll args t) = (PrettyPrintForAll args <$> go t) >>= f
@@ -289,7 +284,6 @@ everywhereOnTypesTopDownM f = go <=< f
   go (ConstrainedType cs ty) = ConstrainedType <$> mapM (overConstraintArgs (mapM (go <=< f))) cs <*> (f ty >>= go)
   go (RCons name ty rest) = RCons name <$> (f ty >>= go) <*> (f rest >>= go)
   go (KindedType ty k) = KindedType <$> (f ty >>= go) <*> pure k
-  go (PrettyPrintTypeApplication a t1 t2) = PrettyPrintTypeApplication a <$> (f t1 >>= go) <*> (f t2 >>= go)
   go (PrettyPrintFunction t1 t2) = PrettyPrintFunction <$> (f t1 >>= go) <*> (f t2 >>= go)
   go (PrettyPrintObject t) = PrettyPrintObject <$> (f t >>= go)
   go (PrettyPrintForAll args t) = PrettyPrintForAll args <$> (f t >>= go)
@@ -305,7 +299,6 @@ everythingOnTypes (<>) f = go
   go t@(ConstrainedType cs ty) = foldl (<>) (f t) (map go $ concatMap constraintArgs cs) <> go ty
   go t@(RCons _ ty rest) = f t <> go ty <> go rest
   go t@(KindedType ty _) = f t <> go ty
-  go t@(PrettyPrintTypeApplication _ t1 t2) = f t <> go t1 <> go t2
   go t@(PrettyPrintFunction t1 t2) = f t <> go t1 <> go t2
   go t@(PrettyPrintObject t1) = f t <> go t1
   go t@(PrettyPrintForAll _ t1) = f t <> go t1
@@ -322,7 +315,6 @@ everythingWithContextOnTypes s0 r0 (<>) f = go' s0
   go s (ConstrainedType cs ty) = foldl (<>) r0 (map (go' s) $ concatMap constraintArgs cs) <> go' s ty
   go s (RCons _ ty rest) = go' s ty <> go' s rest
   go s (KindedType ty _) = go' s ty
-  go s (PrettyPrintTypeApplication _ t1 t2) = go' s t1 <> go' s t2
   go s (PrettyPrintFunction t1 t2) = go' s t1 <> go' s t2
   go s (PrettyPrintObject t1) = go' s t1
   go s (PrettyPrintForAll _ t1) = go' s t1
