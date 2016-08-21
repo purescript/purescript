@@ -214,7 +214,7 @@ dctorNames :: P.Module -> [(N.ProperName 'N.ConstructorName, P.Declaration)]
 dctorNames = nubOnFst . concatMap go . P.exportedDeclarations
   where
   go :: P.Declaration -> [(N.ProperName 'N.ConstructorName, P.Declaration)]
-  go decl@(P.DataDeclaration _ _ _ ctors) = map (\n -> (n, decl)) (map fst ctors)
+  go decl@(P.DataDeclaration _ _ _ ctors) = map ((\n -> (n, decl)) . fst) ctors
   go (P.PositionedDeclaration _ _ d) = go d
   go _ = []
 

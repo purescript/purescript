@@ -256,7 +256,7 @@ toModule mids mid top
     = pure (Member stmt exported name decl [])
   toModuleElement stmt
     | Just props <- matchExportsAssignment stmt
-    = (ExportsList <$> traverse toExport (trailingCommaList props))
+    = ExportsList <$> traverse toExport (trailingCommaList props)
     where
       toExport :: JSObjectProperty -> m (ExportType, String, JSExpression, [Key])
       toExport (JSPropertyNameandValue name _ [val]) =
@@ -524,7 +524,7 @@ codeGen optionsMainModule optionsNamespace ms =  renderToString (JSAstProgram (p
   indent :: [JSStatement] -> [JSStatement]
   indent = everywhere (mkT squash)
     where
-    squash JSNoAnnot = (JSAnnot (TokenPn 0 0 2) [])
+    squash JSNoAnnot = JSAnnot (TokenPn 0 0 2) []
     squash (JSAnnot pos ann) = JSAnnot (keepCol pos) (map splat ann)
 
     splat (CommentA pos s) = CommentA (keepCol pos) s
@@ -571,15 +571,15 @@ codeGen optionsMainModule optionsNamespace ms =  renderToString (JSAstProgram (p
                   (JSSemi JSNoAnnot)
     ]
     where
-      lfHead (h:t) = (addAnn (WhiteSpace tokenPosnEmpty "\n  ") h) : t
+      lfHead (h:t) = addAnn (WhiteSpace tokenPosnEmpty "\n  ") h : t
       lfHead x = x
 
       addAnn :: CommentAnnotation -> JSStatement -> JSStatement
       addAnn a (JSExpressionStatement (JSStringLiteral ann s) _) =
-        (JSExpressionStatement (JSStringLiteral (appendAnn a ann) s) (JSSemi JSNoAnnot))
+        JSExpressionStatement (JSStringLiteral (appendAnn a ann) s) (JSSemi JSNoAnnot)
       addAnn _ x = x
 
-      appendAnn a JSNoAnnot = (JSAnnot tokenPosnEmpty [a])
+      appendAnn a JSNoAnnot = JSAnnot tokenPosnEmpty [a]
       appendAnn a (JSAnnot _ anns) = JSAnnot tokenPosnEmpty (a:anns ++ [WhiteSpace tokenPosnEmpty "  "])
 
   runMain :: String -> [JSStatement]

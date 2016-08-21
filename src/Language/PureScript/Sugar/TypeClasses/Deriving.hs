@@ -223,7 +223,7 @@ deriveGeneric mn ds tyConNm dargs = do
           $ liftApplicative (mkRecFun rs) (map (\(x, y) -> fromSpineFun (Accessor "recValue" (mkVar (Ident x))) y) rs)
 
       mkRecFun :: [(String, Type)] -> Expr
-      mkRecFun xs = mkJust $ foldr lam recLiteral (map (Ident . fst) xs)
+      mkRecFun xs = mkJust $ foldr (lam . Ident . fst) recLiteral xs
          where recLiteral = Literal . ObjectLiteral $ map (\(s,_) -> (s, mkVar (Ident s))) xs
     mkFromSpineFunction (PositionedDeclaration _ _ d) = mkFromSpineFunction d
     mkFromSpineFunction _ = internalError "mkFromSpineFunction: expected DataDeclaration"

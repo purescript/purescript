@@ -28,12 +28,12 @@ parseValue :: P.Parsec (Chain a) () a
 parseValue = token (either Just (const Nothing)) P.<?> "expression"
 
 parseOp
-  :: (a -> (Maybe (Qualified (OpName nameType))))
+  :: (a -> Maybe (Qualified (OpName nameType)))
   -> P.Parsec (Chain a) () (Qualified (OpName nameType))
 parseOp fromOp = token (either (const Nothing) fromOp) P.<?> "operator"
 
 matchOp
-  :: (a -> (Maybe (Qualified (OpName nameType))))
+  :: (a -> Maybe (Qualified (OpName nameType)))
   -> Qualified (OpName nameType)
   -> P.Parsec (Chain a) () ()
 matchOp fromOp op = do

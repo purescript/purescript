@@ -28,7 +28,7 @@ matchExprOperators = matchOperators isBinOp extractOp fromOp reapply modOpTable
   fromOp _ = Nothing
 
   reapply :: Qualified (OpName 'ValueOpName) -> Expr -> Expr -> Expr
-  reapply op t1 t2 = App (App (Op op) t1) t2
+  reapply op t1 = App (App (Op op) t1)
 
   modOpTable
     :: [[P.Operator (Chain Expr) () Identity Expr]]

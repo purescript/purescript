@@ -89,7 +89,7 @@ subsumes' val (TypeApp f1 r1) (TypeApp f2 r2) | f1 == tyRecord && f2 == tyRecord
                      unifyTypes r1' (RCons p2 ty2 rest)
                      go ((p1, ty1) : ts1) ts2 rest r2'
   -- Find the first property that's in the first list (of tuples) but not in the second
-  firstMissingProp t1 t2 = fst <$> (uncons $ minusBy' (comparing fst) t1 t2)
+  firstMissingProp t1 t2 = fst <$> uncons (minusBy' (comparing fst) t1 t2)
 subsumes' val ty1 ty2@(TypeApp obj _) | obj == tyRecord = subsumes val ty2 ty1
 subsumes' val ty1 ty2 = do
   unifyTypes ty1 ty2
