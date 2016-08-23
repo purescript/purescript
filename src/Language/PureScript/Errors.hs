@@ -19,9 +19,8 @@ import Data.Either (lefts, rights)
 import Data.Foldable (fold)
 import Data.Functor.Identity (Identity(..))
 import Data.List (intercalate, transpose, nub, nubBy, sortBy, partition)
-import Data.Maybe (maybeToList, fromMaybe, mapMaybe, isJust)
+import Data.Maybe (maybeToList, fromMaybe, mapMaybe)
 import Data.Ord (comparing)
-import Data.Text (strip, pack, unpack)
 import qualified Data.Map as M
 
 import Language.PureScript.AST
@@ -596,9 +595,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
             , line "They may be disallowed completely in a future version of the compiler."
             ]
     renderSimpleErrorMessage OverlappingInstances{} = internalError "OverlappingInstances: empty instance list"
-    renderSimpleErrorMessage (NoInstanceFound (Constraint C.Fail [ ty ] _)) | isJust (toTypelevelString ty) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint C.Fail [ ty ] _)) | Just box <- toTypelevelString ty =
       paras [ line "A custom type error occurred while solving type class constraints:"
-            , indent $ line $ maybe "" id (toTypelevelString ty)
+            , indent $ box
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint C.Partial
                                                           _
@@ -1205,19 +1204,13 @@ renderBox = unlines
   dropWhileEnd p = reverse . dropWhile p . reverse
   whiteSpace = all isSpace
 
-toTypelevelString :: Type -> Maybe String
-toTypelevelString t = case evalTypelevelFunctions t of
-  (TypeLevelString str) -> Just str
-  _ -> Nothing
-
-evalTypelevelFunctions :: Type -> Type
-evalTypelevelFunctions = everywhereOnTypes go
-  where
-  go (TypeApp (TypeConstructor f) x)
-    | f == primName "TypeString" = TypeLevelString $ unpack $ strip $ pack $ prettyPrintTypeAtom x
-  go (TypeApp (TypeApp (TypeConstructor f) (TypeLevelString x)) (TypeLevelString ret))
-    | f == primName "TypeConcat" = TypeLevelString (x ++ ret)
-  go t = t
+toTypelevelString :: Type -> Maybe Box.Box
+toTypelevelString (TypeLevelString s) = Just $ Box.text s
+toTypelevelString (TypeApp (TypeConstructor f) x)
+  | f == primName "TypeString" = Just $ typeAsBox x
+toTypelevelString (TypeApp (TypeApp (TypeConstructor f) x) ret)
+  | f == primName "TypeConcat" = (Box.<>) <$> (toTypelevelString x) <*> (toTypelevelString ret)
+toTypelevelString _ = Nothing
 
 -- |
 -- Rethrow an error with a more detailed error message in the case of failure
