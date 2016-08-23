@@ -173,7 +173,7 @@ desugarDecl
   -> Desugar m (Maybe DeclarationRef, [Declaration])
 desugarDecl mn exps = go
   where
-  go d@(TypeClassDeclaration name args implies members) = do
+  go d@(TypeClassDeclaration name args implies _ members) = do
     modify (M.insert (mn, name) (args, implies, members))
     return (Nothing, d : typeClassDictionaryDeclaration name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
   go (TypeInstanceDeclaration _ _ _ _ DerivedInstance) = internalError "Derived instanced should have been desugared"

@@ -301,6 +301,15 @@ isExplicit :: ImportDeclarationType -> Bool
 isExplicit (Explicit _) = True
 isExplicit _ = False
 
+-- | A functional dependency indicates a relationship between two sets of
+-- type arguments in a class declaration.
+data FunctionalDependency = FunctionalDependency
+  { fdDeterminers :: [Int]
+  -- ^ the type arguments which determine the determined type arguments
+  , fdDetermined  :: [Int]
+  -- ^ the determined type arguments
+  } deriving Show
+
 -- |
 -- The data type of declarations
 --
@@ -348,7 +357,7 @@ data Declaration
   -- |
   -- A type class declaration (name, argument, implies, member declarations)
   --
-  | TypeClassDeclaration (ProperName 'ClassName) [(String, Maybe Kind)] [Constraint] [Declaration]
+  | TypeClassDeclaration (ProperName 'ClassName) [(String, Maybe Kind)] [Constraint] [FunctionalDependency] [Declaration]
   -- |
   -- A type instance declaration (name, dependencies, class name, instance types, member
   -- declarations)

@@ -30,7 +30,7 @@ findExportable (Module _ _ mn ds _) =
   rethrow (addHint (ErrorInModule mn)) $ foldM updateExports nullExports ds
   where
   updateExports :: Exports -> Declaration -> m Exports
-  updateExports exps (TypeClassDeclaration tcn _ _ ds') = do
+  updateExports exps (TypeClassDeclaration tcn _ _ _ ds') = do
     exps' <- exportTypeClass Internal exps tcn mn
     foldM go exps' ds'
     where

@@ -81,7 +81,7 @@ getDeclarationTitle (P.ExternDeclaration name _) = Just (P.showIdent name)
 getDeclarationTitle (P.DataDeclaration _ name _ _) = Just (P.runProperName name)
 getDeclarationTitle (P.ExternDataDeclaration name _) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeSynonymDeclaration name _ _) = Just (P.runProperName name)
-getDeclarationTitle (P.TypeClassDeclaration name _ _ _) = Just (P.runProperName name)
+getDeclarationTitle (P.TypeClassDeclaration name _ _ _ _) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeInstanceDeclaration name _ _ _ _) = Just (P.showIdent name)
 getDeclarationTitle (P.TypeFixityDeclaration _ _ op) = Just ("type " ++ P.showOp op)
 getDeclarationTitle (P.ValueFixityDeclaration _ _ op) = Just (P.showOp op)
@@ -121,7 +121,7 @@ convertDeclaration (P.ExternDataDeclaration _ kind') title =
   basicDeclaration title (ExternDataDeclaration kind')
 convertDeclaration (P.TypeSynonymDeclaration _ args ty) title =
   basicDeclaration title (TypeSynonymDeclaration args ty)
-convertDeclaration (P.TypeClassDeclaration _ args implies ds) title =
+convertDeclaration (P.TypeClassDeclaration _ args implies _ ds) title = -- TODO: include fundep info
   Just (Right (mkDeclaration title info) { declChildren = children })
   where
   info = TypeClassDeclaration args implies

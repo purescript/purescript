@@ -112,15 +112,16 @@ addTypeClass
   -> ProperName 'ClassName
   -> [(String, Maybe Kind)]
   -> [Constraint]
+  -> [FunctionalDependency]
   -> [Declaration]
   -> m ()
-addTypeClass moduleName pn args implies ds =
-  let members = map toPair ds in
-  modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) (args, members, implies) (typeClasses . checkEnv $ st) } }
+addTypeClass moduleName pn args implies _ ds =
+    let members = map toPair ds in
+    modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) (args, members, implies) (typeClasses . checkEnv $ st) } }
   where
-  toPair (TypeDeclaration ident ty) = (ident, ty)
-  toPair (PositionedDeclaration _ _ d) = toPair d
-  toPair _ = internalError "Invalid declaration in TypeClassDeclaration"
+    toPair (TypeDeclaration ident ty) = (ident, ty)
+    toPair (PositionedDeclaration _ _ d) = toPair d
+    toPair _ = internalError "Invalid declaration in TypeClassDeclaration"
 
 addTypeClassDictionaries
   :: (MonadState CheckState m)
@@ -265,8 +266,8 @@ typeCheckAll moduleName _ = traverse go
     return d
   go d@FixityDeclaration{} = return d
   go d@ImportDeclaration{} = return d
-  go d@(TypeClassDeclaration pn args implies tys) = do
-    addTypeClass moduleName pn args implies tys
+  go d@(TypeClassDeclaration pn args implies deps tys) = do
+    addTypeClass moduleName pn args implies deps tys
     return d
   go (d@(TypeInstanceDeclaration dictName deps className tys body)) = rethrow (addHint (ErrorInInstance className tys)) $ do
     traverse_ (checkTypeClassInstance moduleName) tys
@@ -414,7 +415,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     unless (null missingMembers) $ throwError . errorMessage $ TransitiveExportError dr members
     where
     findClassMembers :: Declaration -> Maybe [Ident]
-    findClassMembers (TypeClassDeclaration name' _ _ ds) | name == name' = Just $ map extractMemberName ds
+    findClassMembers (TypeClassDeclaration name' _ _ _ ds) | name == name' = Just $ map extractMemberName ds
     findClassMembers (PositionedDeclaration _ _ d) = findClassMembers d
     findClassMembers _ = Nothing
     extractMemberName :: Declaration -> Ident

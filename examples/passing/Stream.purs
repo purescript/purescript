@@ -5,7 +5,7 @@ import Prelude
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Console (CONSOLE, log)
 
-class IsStream el s where
+class IsStream el s | s -> el where
   cons :: el -> (Unit -> s) -> s
   uncons :: s -> { head :: el, tail :: s }
 

@@ -40,6 +40,7 @@ module Language.PureScript.Parser.Lexer
   , commaSep
   , commaSep1
   , lname
+  , lname'
   , qualifier
   , tyname
   , uname
@@ -412,6 +413,12 @@ lname :: TokenParser String
 lname = token go P.<?> "identifier"
   where
   go (LName s) = Just s
+  go _ = Nothing
+
+lname' :: String -> TokenParser ()
+lname' s = token go P.<?> show s
+  where
+  go (LName s') | s == s' = Just ()
   go _ = Nothing
 
 qualifier :: TokenParser String

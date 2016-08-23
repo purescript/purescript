@@ -133,7 +133,7 @@ isExported (Just exps) decl = any (matches decl) exps
   matches (DataDeclaration _ ident _ _) (TypeRef ident' _) = ident == ident'
   matches (ExternDataDeclaration ident _) (TypeRef ident' _) = ident == ident'
   matches (TypeSynonymDeclaration ident _ _) (TypeRef ident' _) = ident == ident'
-  matches (TypeClassDeclaration ident _ _ _) (TypeClassRef ident') = ident == ident'
+  matches (TypeClassDeclaration ident _ _ _ _) (TypeClassRef ident') = ident == ident'
   matches (ValueFixityDeclaration _ _ op) (ValueOpRef op') = op == op'
   matches (TypeFixityDeclaration _ _ op) (TypeOpRef op') = op == op'
   matches (PositionedDeclaration _ _ d) r = d `matches` r
