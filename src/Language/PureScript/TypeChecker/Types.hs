@@ -77,7 +77,7 @@ typesOf bindingGroupType moduleName vals = do
 
   forM tys $ \(shouldGeneralize, (ident, (val, ty))) -> do
     -- Replace type class dictionary placeholders with actual dictionaries
-    (val', unsolved) <- replaceTypeClassDictionaries shouldGeneralize moduleName val
+    (val', unsolved) <- replaceTypeClassDictionaries shouldGeneralize val
     let unsolvedTypeVars = nub $ unknownsInType ty
     -- Generalize and constrain the type
     currentSubst <- gets checkSubstitution

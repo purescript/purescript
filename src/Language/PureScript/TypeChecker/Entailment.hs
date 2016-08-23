@@ -45,10 +45,9 @@ replaceTypeClassDictionaries
   :: forall m
    . (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
   => Bool
-  -> ModuleName
   -> Expr
   -> m (Expr, [(Ident, Constraint)])
-replaceTypeClassDictionaries shouldGeneralize mn expr = do
+replaceTypeClassDictionaries shouldGeneralize expr = do
     -- Loop, deferring any unsolved constraints, until there are no more
     -- constraints which can be solved, then make a generalization pass.
     let loop e = do
@@ -72,7 +71,7 @@ replaceTypeClassDictionaries shouldGeneralize mn expr = do
 
     go :: Bool -> Expr -> StateT InstanceContext (WriterT (Any, [(Ident, Constraint)]) m) Expr
     go deferErrors dict@(TypeClassDictionary _ _ hints) =
-      rethrow (addHints hints) $ entails shouldGeneralize deferErrors mn dict
+      rethrow (addHints hints) $ entails shouldGeneralize deferErrors dict
     go _ other = return other
 
 -- | Three options for how we can handle a constraint, depending on the mode we're in.
@@ -93,10 +92,9 @@ entails
    . (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
   => Bool
   -> Bool
-  -> ModuleName
   -> Expr
   -> StateT InstanceContext (WriterT (Any, [(Ident, Constraint)]) m) Expr
-entails shouldGeneralize deferErrors moduleName (TypeClassDictionary constraint context hints) =
+entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hints) =
     solve constraint
   where
     forClassName :: InstanceContext -> Qualified (ProperName 'ClassName) -> [Type] -> [TypeClassDictionaryInScope]
@@ -131,7 +129,7 @@ entails shouldGeneralize deferErrors moduleName (TypeClassDictionary constraint 
             let instances = do
                   tcd <- forClassName (combineContexts context inferred) className' tys''
                   -- Make sure the type unifies with the type in the type instance definition
-                  subst <- maybeToList . fmap concat $ zipWithM (typeHeadsAreEqual moduleName) tys'' (tcdInstanceTypes tcd)
+                  subst <- maybeToList . fmap concat $ zipWithM typeHeadsAreEqual tys'' (tcdInstanceTypes tcd)
                   return (subst, tcd)
             solution <- lift . lift $ unique instances
             case solution of
@@ -215,39 +213,40 @@ entails shouldGeneralize deferErrors moduleName (TypeClassDictionary constraint 
           App (Accessor (C.__superclass_ ++ showQualified runProperName superclassName ++ "_" ++ show index)
                         dict)
               valUndefined
-entails _ _ _ _ = internalError "entails: expected TypeClassDictionary"
+entails _ _ _ = internalError "entails: expected TypeClassDictionary"
 
 --
 -- Check whether the type heads of two types are equal (for the purposes of type class dictionary lookup),
 -- and return a substitution from type variables to types which makes the type heads unify.
 --
-typeHeadsAreEqual :: ModuleName -> Type -> Type -> Maybe [(String, Type)]
-typeHeadsAreEqual _ (TUnknown u1)        (TUnknown u2)        | u1 == u2 = Just []
-typeHeadsAreEqual _ (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    | s1 == s2 = Just []
-typeHeadsAreEqual _ t                    (TypeVar v)                     = Just [(v, t)]
-typeHeadsAreEqual _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
-typeHeadsAreEqual _ (TypeLevelString s1) (TypeLevelString s2) | s1 == s2 = Just []
-typeHeadsAreEqual m (TypeApp h1 t1)      (TypeApp h2 t2)                 = (++) <$> typeHeadsAreEqual m h1 h2
-                                                                                <*> typeHeadsAreEqual m t1 t2
-typeHeadsAreEqual _ REmpty REmpty = Just []
-typeHeadsAreEqual m r1@RCons{} r2@RCons{} =
-  let (s1, r1') = rowToList r1
-      (s2, r2') = rowToList r2
-
-      int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
-      sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
-      sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
-  in (++) <$> foldMap (uncurry (typeHeadsAreEqual m)) int
-          <*> go sd1 r1' sd2 r2'
+typeHeadsAreEqual :: Type -> Type -> Maybe [(String, Type)]
+typeHeadsAreEqual (TUnknown u1)        (TUnknown u2)        | u1 == u2 = Just []
+typeHeadsAreEqual (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    | s1 == s2 = Just []
+typeHeadsAreEqual t                    (TypeVar v)                     = Just [(v, t)]
+typeHeadsAreEqual (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
+typeHeadsAreEqual (TypeLevelString s1) (TypeLevelString s2) | s1 == s2 = Just []
+typeHeadsAreEqual (TypeApp h1 t1)      (TypeApp h2 t2)                 = (++) <$> typeHeadsAreEqual h1 h2
+                                                                              <*> typeHeadsAreEqual t1 t2
+typeHeadsAreEqual REmpty REmpty = Just []
+typeHeadsAreEqual r1@RCons{} r2@RCons{} =
+    (++) <$> foldMap (uncurry typeHeadsAreEqual) int
+         <*> go sd1 r1' sd2 r2'
   where
-  go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Maybe [(String, Type)]
-  go [] REmpty            [] REmpty            = Just []
-  go [] (TUnknown _)      _  _                 = Just []
-  go [] (TypeVar v1)      [] (TypeVar v2)      | v1 == v2 = Just []
-  go [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) | s1 == s2 = Just []
-  go sd r                 [] (TypeVar v)       = Just [(v, rowFromList (sd, r))]
-  go _  _                 _  _                 = Nothing
-typeHeadsAreEqual _ _ _ = Nothing
+    (s1, r1') = rowToList r1
+    (s2, r2') = rowToList r2
+
+    int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
+    sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
+    sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
+
+    go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Maybe [(String, Type)]
+    go [] REmpty             [] REmpty             = Just []
+    go [] (TUnknown _)       _  _                  = Just []
+    go [] (TypeVar v1)       [] (TypeVar v2)       | v1 == v2 = Just []
+    go [] (Skolem _ sk1 _ _) [] (Skolem _ sk2 _ _) | sk1 == sk2 = Just []
+    go sd r                  [] (TypeVar v)        = Just [(v, rowFromList (sd, r))]
+    go _  _                  _  _                  = Nothing
+typeHeadsAreEqual _ _ = Nothing
 
 -- |
 -- Check all values in a list pairwise match a predicate
