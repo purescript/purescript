@@ -33,6 +33,7 @@ import Language.PureScript.Types
 import Language.PureScript.Pretty.Common (endWith)
 import qualified Language.PureScript.Bundle as Bundle
 import qualified Language.PureScript.Constants as C
+import Language.PureScript.Pretty.Common (before)
 
 import qualified System.Console.ANSI as ANSI
 
@@ -597,7 +598,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
     renderSimpleErrorMessage OverlappingInstances{} = internalError "OverlappingInstances: empty instance list"
     renderSimpleErrorMessage (NoInstanceFound (Constraint C.Fail [ ty ] _)) | Just box <- toTypelevelString ty =
       paras [ line "A custom type error occurred while solving type class constraints:"
-            , indent $ box
+            , indent box
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint C.Partial
                                                           _
@@ -1209,7 +1210,7 @@ toTypelevelString (TypeLevelString s) = Just $ Box.text s
 toTypelevelString (TypeApp (TypeConstructor f) x)
   | f == primName "TypeString" = Just $ typeAsBox x
 toTypelevelString (TypeApp (TypeApp (TypeConstructor f) x) ret)
-  | f == primName "TypeConcat" = (Box.<>) <$> (toTypelevelString x) <*> (toTypelevelString ret)
+  | f == primName "TypeConcat" = before <$> (toTypelevelString x) <*> (toTypelevelString ret)
 toTypelevelString _ = Nothing
 
 -- |
