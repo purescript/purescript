@@ -95,7 +95,7 @@ compileTestProject = do
   pdir <- projectDirectory
   (_, _, _, procHandle) <- createProcess $
     (shell . toS $ "psc " <> fileGlob) { cwd = Just pdir }
-  r <- tryNTimes 5 (getProcessExitCode procHandle)
+  r <- tryNTimes 10 (getProcessExitCode procHandle)
   pure (fromMaybe False (isSuccess <$> r))
 
 tryNTimes :: Int -> IO (Maybe a) -> IO (Maybe a)
