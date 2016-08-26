@@ -117,7 +117,7 @@ library
                    fsnotify >= 0.2.1,
                    Glob >= 0.7 && < 0.8,
                    haskeline >= 0.7.0.0,
-                   http-client >= 0.4.30 && <0.5,
+                   http-client >= 0.4.30 && <0.6,
                    http-types -any,
                    language-javascript == 0.6.*,
                    lifted-base >= 0.2.3 && < 0.2.4,
