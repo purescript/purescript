@@ -115,10 +115,17 @@ addTypeClass
   -> [FunctionalDependency]
   -> [Declaration]
   -> m ()
-addTypeClass moduleName pn args implies _ ds =
-    let members = map toPair ds in
-    modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) (args, members, implies) (typeClasses . checkEnv $ st) } }
+addTypeClass moduleName pn args implies dependencies ds =
+    modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) newClass (typeClasses . checkEnv $ st) } }
   where
+    newClass :: TypeClassData
+    newClass =
+      TypeClassData { typeClassArguments    = args
+                    , typeClassMembers      = map toPair ds
+                    , typeClassSuperclasses = implies
+                    , typeClassDependencies = dependencies
+                    }
+
     toPair (TypeDeclaration ident ty) = (ident, ty)
     toPair (PositionedDeclaration _ _ d) = toPair d
     toPair _ = internalError "Invalid declaration in TypeClassDeclaration"
