@@ -3,7 +3,7 @@ module Main where
 import Prelude
 import Control.Monad.Eff.Console (log)
 
-class T s m where
+class T s m | m -> s where
   state :: (s -> s) -> m Unit
 
 data S s a = S (s -> { new :: s, ret :: a })

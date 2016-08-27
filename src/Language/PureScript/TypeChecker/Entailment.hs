@@ -1,3 +1,5 @@
+{-# LANGUAGE NamedFieldPuns #-}
+
 -- |
 -- Type class entailment
 --
@@ -14,14 +16,17 @@ import Control.Monad.State
 import Control.Monad.Supply.Class (MonadSupply(..))
 import Control.Monad.Writer
 
-import Data.Foldable (for_)
+import Data.Foldable (for_, fold)
 import Data.Function (on)
+import Data.Functor (($>))
 import Data.List (minimumBy, sortBy, groupBy)
-import Data.Maybe (maybeToList, mapMaybe)
+import Data.Maybe (fromMaybe, isJust, maybeToList, mapMaybe)
 import qualified Data.Map as M
+import qualified Data.Set as S
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
+import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Monad
@@ -126,11 +131,16 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
             let tys'' = map (substituteType latestSubst) tys'
             -- Get the inferred constraint context so far, and merge it with the global context
             inferred <- get
-            let instances = do
-                  tcd <- forClassName (combineContexts context inferred) className' tys''
-                  -- Make sure the type unifies with the type in the type instance definition
-                  subst <- maybeToList . fmap concat $ zipWithM typeHeadsAreEqual tys'' (tcdInstanceTypes tcd)
-                  return (subst, tcd)
+            -- We need information about functional dependencies, so we have to look up the class
+            -- name in the environment:
+            let findClass = fromMaybe (internalError "entails: type class inf") . M.lookup className'
+            TypeClassData{ typeClassDependencies } <- lift (gets (findClass . typeClasses . checkEnv))
+            let instances =
+                  [ (subst, tcd)
+                  | tcd <- forClassName (combineContexts context inferred) className' tys''
+                    -- Make sure the type unifies with the type in the type instance definition
+                  , subst <- maybeToList . covers typeClassDependencies $ zipWith typeHeadsAreEqual tys'' (tcdInstanceTypes tcd)
+                  ]
             solution <- lift . lift $ unique instances
             case solution of
               Solved subst tcd -> do
@@ -215,6 +225,34 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
               valUndefined
 entails _ _ _ = internalError "entails: expected TypeClassDictionary"
 
+-- | Find the closure of a set of functional dependencies.
+covers :: Monoid m => [FunctionalDependency] -> [Maybe m] -> Maybe m
+covers deps ms = guard covered $> foldMap fold ms
+  where
+    covered :: Bool
+    covered = finalSet == S.fromList [0..length ms - 1]
+
+    initialSet :: S.Set Int
+    initialSet = S.fromList . map snd . filter (isJust . fst) $ zip ms [0..]
+
+    finalSet :: S.Set Int
+    finalSet = untilFixedPoint applyAll initialSet
+
+    untilFixedPoint :: Eq a => (a -> a) -> a -> a
+    untilFixedPoint f = go
+      where
+      go a | a' == a = a'
+           | otherwise = go a'
+        where a' = f a
+
+    applyAll :: S.Set Int -> S.Set Int
+    applyAll s = foldr applyDependency s deps
+
+    applyDependency :: FunctionalDependency -> S.Set Int -> S.Set Int
+    applyDependency FunctionalDependency{..} xs
+      | S.fromList fdDeterminers `S.isSubsetOf` xs = xs <> S.fromList fdDetermined
+      | otherwise = xs
+
 --
 -- Check whether the type heads of two types are equal (for the purposes of type class dictionary lookup),
 -- and return a substitution from type variables to types which makes the type heads unify.
@@ -241,7 +279,7 @@ typeHeadsAreEqual r1@RCons{} r2@RCons{} =
 
     go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Maybe [(String, Type)]
     go [] REmpty             [] REmpty             = Just []
-    go [] (TUnknown _)       _  _                  = Just []
+    go [] (TUnknown u1)      [] (TUnknown u2)      | u1 == u2 = Just []
     go [] (TypeVar v1)       [] (TypeVar v2)       | v1 == v2 = Just []
     go [] (Skolem _ sk1 _ _) [] (Skolem _ sk2 _ _) | sk1 == sk2 = Just []
     go sd r                  [] (TypeVar v)        = Just [(v, rowFromList (sd, r))]
