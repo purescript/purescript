@@ -133,26 +133,36 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
             inferred <- get
             -- We need information about functional dependencies, so we have to look up the class
             -- name in the environment:
-            let findClass = fromMaybe (internalError "entails: type class inf") . M.lookup className'
+            let findClass = fromMaybe (internalError "entails: type class not found in environment") . M.lookup className'
             TypeClassData{ typeClassDependencies } <- lift (gets (findClass . typeClasses . checkEnv))
             let instances =
-                  [ (subst, tcd)
+                  [ (substs, tcd)
                   | tcd <- forClassName (combineContexts context inferred) className' tys''
                     -- Make sure the type unifies with the type in the type instance definition
-                  , subst <- maybeToList . covers typeClassDependencies $ zipWith typeHeadsAreEqual tys'' (tcdInstanceTypes tcd)
+                  , substs <- maybeToList . covers typeClassDependencies $ zipWith typeHeadsAreEqual tys'' (tcdInstanceTypes tcd)
                   ]
             solution <- lift . lift $ unique instances
             case solution of
-              Solved subst tcd -> do
+              Solved substs tcd -> do
+                let subst = fold substs
                 -- Note that we solved something.
                 tell (Any True, mempty)
                 -- Ensure that a substitution is valid, using unification
                 let grps = groupBy ((==) `on` fst) . sortBy (compare `on` fst) $ subst
                 for_ grps (pairwiseM (\x y -> lift $ unifyTypes x y) . map snd)
+                -- Now enforce any functional dependencies, using unification
+                -- Note: we need to generate fresh types for any unconstrained
+                -- type variables before unifying.
                 currentSubst <- lift (gets checkSubstitution)
-                let subst' = map (second (substituteType currentSubst)) subst
+                subst' <- lift $ withFreshTypes (tcdInstanceTypes tcd) (map (second (substituteType currentSubst)) subst)
+                for_ typeClassDependencies $ \FunctionalDependency{..} -> do
+                  for_ fdDetermined $ \index -> do
+                    let inferredType = replaceAllTypeVars subst' (tcdInstanceTypes tcd !! index)
+                        actualType = tys'' !! index
+                    lift $ unifyTypes inferredType actualType
+                let subst'' = map (second (substituteType currentSubst)) subst'
                 -- Solve any necessary subgoals
-                args <- solveSubgoals subst' (tcdDependencies tcd)
+                args <- solveSubgoals subst'' (tcdDependencies tcd)
                 let match = foldr (\(superclassName, index) dict -> subclassDictionaryValue dict superclassName index)
                                   (mkDictionary (tcdName tcd) args)
                                   (tcdPath tcd)
@@ -225,9 +235,39 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
               valUndefined
 entails _ _ _ = internalError "entails: expected TypeClassDictionary"
 
+-- | When checking functional dependencies, we need to use unification to make
+-- sure it is safe to use the selected instance. We will unify the solved type with
+-- the type in the instance head under the substition inferred from its instantiation.
+-- As an example, when solving MonadState t0 (State Int), we choose the
+-- MonadState s (State s) instance, and we unify t0 with Int, since the functional
+-- dependency from MonadState dictates that t0 should unify with s\[s -> Int], which is
+-- Int. This is fine, but in some cases, the substitution does not remove all TypeVars
+-- from the type, so we end up with a unification error. So, any type arguments which
+-- appear in the instance head, but not in the substitution need to be replaced with
+-- fresh type variables. This function extends a substitution with fresh type variables
+-- as necessary, based on the types in the instance head.
+withFreshTypes
+  :: MonadState CheckState m
+  => [Type]
+  -> [(String, Type)]
+  -> m [(String, Type)]
+withFreshTypes instanceHead subst = do
+    let typeVarsInHead = foldMap (everythingOnTypes S.union fromTypeVar) instanceHead
+        typeVarsInSubst = S.fromList (map fst subst)
+        uninstantiatedTypeVars = typeVarsInHead S.\\ typeVarsInSubst
+    newSubst <- traverse withFreshType (S.toList uninstantiatedTypeVars)
+    return (subst ++ newSubst)
+  where
+    fromTypeVar (TypeVar v) = S.singleton v
+    fromTypeVar _ = S.empty
+
+    withFreshType s = do
+      t <- freshType
+      return (s, t)
+
 -- | Find the closure of a set of functional dependencies.
-covers :: Monoid m => [FunctionalDependency] -> [Maybe m] -> Maybe m
-covers deps ms = guard covered $> foldMap fold ms
+covers :: Monoid m => [FunctionalDependency] -> [Maybe m] -> Maybe [m]
+covers deps ms = guard covered $> map fold ms
   where
     covered :: Bool
     covered = finalSet == S.fromList [0..length ms - 1]
