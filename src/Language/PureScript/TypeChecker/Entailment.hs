@@ -119,12 +119,11 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
     valUndefined = Var (Qualified (Just (ModuleName [ProperName C.prim])) (Ident C.undefined))
 
     solve :: Constraint -> StateT InstanceContext (WriterT (Any, [(Ident, Constraint)]) m) Expr
-    solve con =
-        StateT . (withErrorMessageHint (ErrorSolvingConstraint con) .) . runStateT $ go 0 con
+    solve con = go 0 con
       where
         go :: Int -> Constraint -> StateT InstanceContext (WriterT (Any, [(Ident, Constraint)]) m) Expr
         go work (Constraint className' tys' _) | work > 1000 = throwError . errorMessage $ PossiblyInfiniteInstance className' tys'
-        go work con'@(Constraint className' tys' conInfo) = do
+        go work con'@(Constraint className' tys' conInfo) = StateT . (withErrorMessageHint (ErrorSolvingConstraint con') .) . runStateT $ do
             -- We might have unified types by solving other constraints, so we need to
             -- apply the latest substitution.
             latestSubst <- lift (gets checkSubstitution)
@@ -158,7 +157,7 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
                 for_ typeClassDependencies $ \FunctionalDependency{..} -> do
                   let d1 = map (fst . (typeClassArguments !!)) fdDeterminers
                       d2 = map (fst . (typeClassArguments !!)) fdDetermined
-                  lift $ withErrorMessageHint (ErrorEnforcingFunctionalDependency d1 d2 className' (tcdInstanceTypes tcd)) $
+                  lift $ withErrorMessageHint (ErrorEnforcingFunctionalDependency d1 d2 className' (tcdInstanceTypes tcd)) $ do
                     for_ fdDetermined $ \index -> do
                       let inferredType = replaceAllTypeVars subst' (tcdInstanceTypes tcd !! index)
                           actualType = tys'' !! index
