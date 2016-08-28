@@ -23,4 +23,4 @@ main :: Eff (console :: CONSOLE) Unit
 main = do
   let dones :: Stream String
       dones = cons "Done" \_ -> dones
-  log (uncons dones).head
+  log (uncons (test dones)).head

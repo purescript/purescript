@@ -134,7 +134,7 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
             -- We need information about functional dependencies, so we have to look up the class
             -- name in the environment:
             let findClass = fromMaybe (internalError "entails: type class not found in environment") . M.lookup className'
-            TypeClassData{ typeClassDependencies } <- lift (gets (findClass . typeClasses . checkEnv))
+            TypeClassData{ typeClassArguments, typeClassDependencies } <- lift (gets (findClass . typeClasses . checkEnv))
             let instances =
                   [ (substs, tcd)
                   | tcd <- forClassName (combineContexts context inferred) className' tys''
@@ -156,10 +156,13 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
                 currentSubst <- lift (gets checkSubstitution)
                 subst' <- lift $ withFreshTypes (tcdInstanceTypes tcd) (map (second (substituteType currentSubst)) subst)
                 for_ typeClassDependencies $ \FunctionalDependency{..} -> do
-                  for_ fdDetermined $ \index -> do
-                    let inferredType = replaceAllTypeVars subst' (tcdInstanceTypes tcd !! index)
-                        actualType = tys'' !! index
-                    lift $ unifyTypes inferredType actualType
+                  let d1 = map (fst . (typeClassArguments !!)) fdDeterminers
+                      d2 = map (fst . (typeClassArguments !!)) fdDetermined
+                  lift $ withErrorMessageHint (ErrorEnforcingFunctionalDependency d1 d2 className' (tcdInstanceTypes tcd)) $
+                    for_ fdDetermined $ \index -> do
+                      let inferredType = replaceAllTypeVars subst' (tcdInstanceTypes tcd !! index)
+                          actualType = tys'' !! index
+                      unifyTypes inferredType actualType
                 let subst'' = map (second (substituteType currentSubst)) subst'
                 -- Solve any necessary subgoals
                 args <- solveSubgoals subst'' (tcdDependencies tcd)

@@ -147,6 +147,7 @@ data ErrorMessageHint
   | ErrorInTypeDeclaration Ident
   | ErrorInForeignImport Ident
   | ErrorSolvingConstraint Constraint
+  | ErrorEnforcingFunctionalDependency [String] [String] (Qualified (ProperName 'ClassName)) [Type]
   | PositionedError SourceSpan
   deriving (Show)
 

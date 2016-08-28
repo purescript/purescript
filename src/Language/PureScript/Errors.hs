@@ -275,6 +275,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gHint (ErrorInApplication e1 t1 e2) = ErrorInApplication e1 <$> f t1 <*> pure e2
   gHint (ErrorInInstance cl ts) = ErrorInInstance cl <$> traverse f ts
   gHint (ErrorSolvingConstraint con) = ErrorSolvingConstraint <$> overConstraintArgs (traverse f) con
+  gHint (ErrorEnforcingFunctionalDependency d1 d2 cl tys) = ErrorEnforcingFunctionalDependency d1 d2 cl <$> traverse f tys
   gHint other = pure other
 
 wikiUri :: ErrorMessage -> String
@@ -939,6 +940,16 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
                 , Box.vcat Box.left (map typeAtomAsBox ts)
                 ]
             ]
+    renderHint (ErrorEnforcingFunctionalDependency d1 d2 nm ts) detail =
+      paras [ detail
+            , line "while checking functional dependency"
+            , indent . line $ intercalate " " d1 ++ " -> " ++ intercalate " " d2
+            , line "for the selected instance"
+            , markCodeBox $ indent $ Box.hsep 1 Box.top
+               [ line $ showQualified runProperName nm
+               , Box.vcat Box.left (map typeAtomAsBox ts)
+               ]
+            ]
     renderHint (PositionedError srcSpan) detail =
       paras [ line $ "at " ++ displaySourceSpan srcSpan
             , detail
@@ -1043,16 +1054,17 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
     stripFirst _ [] = []
 
   hintCategory :: ErrorMessageHint -> HintCategory
-  hintCategory ErrorCheckingType{}      = ExprHint
-  hintCategory ErrorInferringType{}     = ExprHint
-  hintCategory ErrorInExpression{}      = ExprHint
-  hintCategory ErrorUnifyingTypes{}     = CheckHint
-  hintCategory ErrorInSubsumption{}     = CheckHint
-  hintCategory ErrorInApplication{}     = CheckHint
-  hintCategory ErrorCheckingKind{}      = CheckHint
-  hintCategory ErrorSolvingConstraint{} = SolverHint
-  hintCategory PositionedError{}        = PositionHint
-  hintCategory _                        = OtherHint
+  hintCategory ErrorCheckingType{}                  = ExprHint
+  hintCategory ErrorInferringType{}                 = ExprHint
+  hintCategory ErrorInExpression{}                  = ExprHint
+  hintCategory ErrorUnifyingTypes{}                 = CheckHint
+  hintCategory ErrorInSubsumption{}                 = CheckHint
+  hintCategory ErrorInApplication{}                 = CheckHint
+  hintCategory ErrorCheckingKind{}                  = CheckHint
+  hintCategory ErrorSolvingConstraint{}             = SolverHint
+  hintCategory ErrorEnforcingFunctionalDependency{} = SolverHint
+  hintCategory PositionedError{}                    = PositionHint
+  hintCategory _                                    = OtherHint
 
 -- Pretty print and export declaration
 prettyPrintExport :: DeclarationRef -> String
