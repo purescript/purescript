@@ -336,8 +336,8 @@ parseIdentifierAndValue =
     return (name, b)
   <|> (do name <- C.indented *> stringLiteral; b <- rest name; return (name, b))
   where
-  rest name = C.indented *> (colon <|> P.lookAhead equals *> fail (updateSyntaxError name)) *> C.indented *> parseValue
-  updateSyntaxError name = "\nYou are using record update syntax {" ++ name ++ " = ...} inside a record literal.\nDid you mean to write {" ++ name ++ " : ...} instead?"
+  rest name = C.indented *> (colon <|> P.try (P.lookAhead equals) *> fail (updateSyntaxError name)) *> C.indented *> parseValue
+  updateSyntaxError name = "\n  You are using record update syntax {" ++ name ++ " = ...} inside a record literal.\n  Did you mean to write {" ++ name ++ " : ...} instead?"
 
 parseAbs :: TokenParser Expr
 parseAbs = do
