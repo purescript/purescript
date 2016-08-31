@@ -332,11 +332,12 @@ parseIdentifierAndValue :: TokenParser (String, Expr)
 parseIdentifierAndValue =
   do
     name <- C.indented *> lname
-    b <- P.option (Var $ Qualified Nothing (Ident name)) rest
+    b <- P.option (Var $ Qualified Nothing (Ident name)) (rest name)
     return (name, b)
-  <|> (,) <$> (C.indented *> stringLiteral) <*> rest
+  <|> (do name <- C.indented *> stringLiteral; b <- rest name; return (name, b))
   where
-  rest = C.indented *> colon *> C.indented *> parseValue
+  rest name = C.indented *> (colon <|> P.lookAhead equals *> fail (updateSyntaxError name)) *> C.indented *> parseValue
+  updateSyntaxError name = "\nYou are using record update syntax {" ++ name ++ " = ...} inside a record literal.\nDid you mean to write {" ++ name ++ " : ...} instead?"
 
 parseAbs :: TokenParser Expr
 parseAbs = do
