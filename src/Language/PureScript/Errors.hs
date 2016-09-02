@@ -1043,16 +1043,16 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
     stripFirst _ [] = []
 
   hintCategory :: ErrorMessageHint -> HintCategory
-  hintCategory ErrorCheckingType{}      = ExprHint
-  hintCategory ErrorInferringType{}     = ExprHint
-  hintCategory ErrorInExpression{}      = ExprHint
-  hintCategory ErrorUnifyingTypes{}     = CheckHint
-  hintCategory ErrorInSubsumption{}     = CheckHint
-  hintCategory ErrorInApplication{}     = CheckHint
-  hintCategory ErrorCheckingKind{}      = CheckHint
-  hintCategory ErrorSolvingConstraint{} = SolverHint
-  hintCategory PositionedError{}        = PositionHint
-  hintCategory _                        = OtherHint
+  hintCategory ErrorCheckingType{}                  = ExprHint
+  hintCategory ErrorInferringType{}                 = ExprHint
+  hintCategory ErrorInExpression{}                  = ExprHint
+  hintCategory ErrorUnifyingTypes{}                 = CheckHint
+  hintCategory ErrorInSubsumption{}                 = CheckHint
+  hintCategory ErrorInApplication{}                 = CheckHint
+  hintCategory ErrorCheckingKind{}                  = CheckHint
+  hintCategory ErrorSolvingConstraint{}             = SolverHint
+  hintCategory PositionedError{}                    = PositionHint
+  hintCategory _                                    = OtherHint
 
 -- Pretty print and export declaration
 prettyPrintExport :: DeclarationRef -> String

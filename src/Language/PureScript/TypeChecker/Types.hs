@@ -537,12 +537,12 @@ check' val t@(ConstrainedType constraints ty) = do
     -> m [TypeClassDictionaryInScope]
   newDictionaries path name (Constraint className instanceTy _) = do
     tcs <- gets (typeClasses . checkEnv)
-    let (args, _, superclasses) = fromMaybe (internalError "newDictionaries: type class lookup failed") $ M.lookup className tcs
+    let TypeClassData{..} = fromMaybe (internalError "newDictionaries: type class lookup failed") $ M.lookup className tcs
     supDicts <- join <$> zipWithM (\(Constraint supName supArgs _) index ->
                                       newDictionaries ((supName, index) : path)
                                                       name
-                                                      (Constraint supName (instantiateSuperclass (map fst args) supArgs instanceTy) Nothing)
-                                  ) superclasses [0..]
+                                                      (Constraint supName (instantiateSuperclass (map fst typeClassArguments) supArgs instanceTy) Nothing)
+                                  ) typeClassSuperclasses [0..]
     return (TypeClassDictionaryInScope name path className instanceTy Nothing : supDicts)
 
   instantiateSuperclass :: [String] -> [Type] -> [Type] -> [Type]
