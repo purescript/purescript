@@ -16,7 +16,7 @@ import Control.Monad.State
 import Control.Monad.Supply.Class (MonadSupply(..))
 import Control.Monad.Writer
 
-import Data.Foldable (for_, fold)
+import Data.Foldable (fold)
 import Data.Function (on)
 import Data.Functor (($>))
 import Data.List (minimumBy, sortBy, groupBy)
@@ -133,36 +133,28 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
             -- We need information about functional dependencies, so we have to look up the class
             -- name in the environment:
             let findClass = fromMaybe (internalError "entails: type class not found in environment") . M.lookup className'
-            TypeClassData{ typeClassArguments, typeClassDependencies } <- lift (gets (findClass . typeClasses . checkEnv))
+            TypeClassData{ typeClassDependencies } <- lift (gets (findClass . typeClasses . checkEnv))
             let instances =
                   [ (substs, tcd)
                   | tcd <- forClassName (combineContexts context inferred) className' tys''
                     -- Make sure the type unifies with the type in the type instance definition
-                  , substs <- maybeToList . covers typeClassDependencies $ zipWith typeHeadsAreEqual tys'' (tcdInstanceTypes tcd)
+                  , substs <- maybeToList . (>>= verifySubstitution . fold) . covers typeClassDependencies $ zipWith typeHeadsAreEqual tys'' (tcdInstanceTypes tcd)
                   ]
             solution <- lift . lift $ unique instances
             case solution of
-              Solved substs tcd -> do
-                let subst = fold substs
+              Solved subst tcd -> do
                 -- Note that we solved something.
                 tell (Any True, mempty)
-                -- Ensure that a substitution is valid, using unification
-                let grps = groupBy ((==) `on` fst) . sortBy (compare `on` fst) $ subst
-                for_ grps (pairwiseM (\x y -> lift $ unifyTypes x y) . map snd)
                 -- Now enforce any functional dependencies, using unification
                 -- Note: we need to generate fresh types for any unconstrained
                 -- type variables before unifying.
                 currentSubst <- lift (gets checkSubstitution)
-                subst' <- lift $ withFreshTypes (tcdInstanceTypes tcd) (map (second (substituteType currentSubst)) subst)
-                for_ typeClassDependencies $ \FunctionalDependency{..} -> do
-                  let d1 = map (fst . (typeClassArguments !!)) fdDeterminers
-                      d2 = map (fst . (typeClassArguments !!)) fdDetermined
-                  lift $ withErrorMessageHint (ErrorEnforcingFunctionalDependency d1 d2 className' (tcdInstanceTypes tcd)) $ do
-                    for_ fdDetermined $ \index -> do
-                      let inferredType = replaceAllTypeVars subst' (tcdInstanceTypes tcd !! index)
-                          actualType = tys'' !! index
-                      unifyTypes inferredType actualType
-                let subst'' = map (second (substituteType currentSubst)) subst'
+                subst' <- lift $ withFreshTypes tcd (map (second (substituteType currentSubst)) subst)
+                lift $ zipWithM_ (\t1 t2 -> do
+                  let inferredType = replaceAllTypeVars subst' t1
+                  unifyTypes inferredType t2) (tcdInstanceTypes tcd) tys''
+                currentSubst' <- lift (gets checkSubstitution)
+                let subst'' = map (second (substituteType currentSubst')) subst'
                 -- Solve any necessary subgoals
                 args <- solveSubgoals subst'' (tcdDependencies tcd)
                 let match = foldr (\(superclassName, index) dict -> subclassDictionaryValue dict superclassName index)
@@ -229,6 +221,13 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
             mkDictionary fnName (Just []) = Var fnName
             mkDictionary fnName (Just dicts) = foldl App (Var fnName) dicts
 
+        -- Ensure that a substitution is valid
+        verifySubstitution :: [(String, Type)] -> Maybe [(String, Type)]
+        verifySubstitution subst = do
+          let grps = groupBy ((==) `on` fst) . sortBy (compare `on` fst) $ subst
+          guard (all (pairwise unifiesWith . map snd) grps)
+          return subst
+
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName a) -> Integer -> Expr
         subclassDictionaryValue dict superclassName index =
@@ -250,11 +249,13 @@ entails _ _ _ = internalError "entails: expected TypeClassDictionary"
 -- as necessary, based on the types in the instance head.
 withFreshTypes
   :: MonadState CheckState m
-  => [Type]
+  => TypeClassDictionaryInScope
   -> [(String, Type)]
   -> m [(String, Type)]
-withFreshTypes instanceHead subst = do
-    let typeVarsInHead = foldMap (everythingOnTypes S.union fromTypeVar) instanceHead
+withFreshTypes TypeClassDictionaryInScope{..} subst = do
+    let onType = everythingOnTypes S.union fromTypeVar
+        typeVarsInHead = foldMap onType tcdInstanceTypes
+                      <> foldMap (foldMap (foldMap onType . constraintArgs)) tcdDependencies
         typeVarsInSubst = S.fromList (map fst subst)
         uninstantiatedTypeVars = typeVarsInHead S.\\ typeVarsInSubst
     newSubst <- traverse withFreshType (S.toList uninstantiatedTypeVars)
@@ -335,8 +336,3 @@ pairwise :: (a -> a -> Bool) -> [a] -> Bool
 pairwise _ [] = True
 pairwise _ [_] = True
 pairwise p (x : xs) = all (p x) xs && pairwise p xs
-
-pairwiseM :: Applicative m => (a -> a -> m ()) -> [a] -> m ()
-pairwiseM _ [] = pure ()
-pairwiseM _ [_] = pure ()
-pairwiseM p (x : xs) = traverse (p x) xs *> pairwiseM p xs
