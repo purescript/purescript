@@ -1,4 +1,4 @@
--- @shouldFailWith TypesDoNotUnify
+-- @shouldFailWith NoInstanceFound
 module Main where
 
 import Prelude
