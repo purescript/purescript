@@ -12,33 +12,31 @@
 -- Pursuit client for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Language.PureScript.Ide.Pursuit
   ( searchPursuitForDeclarations
   , findPackagesForModuleIdent
   ) where
 
-import           Protolude                     hiding (fromStrict)
+import           Protolude
 
 import qualified Control.Exception             as E
-import           Data.Aeson
-import           Data.ByteString.Lazy          (fromStrict)
-import           Data.String
-import qualified Data.Text                     as T
+import           Data.Aeson                    (Array, Result (Success), decode,
+                                                fromJSON)
 import           Language.PureScript.Ide.Types
 import           Network.HTTP.Types.Header     (hAccept)
-import           Pipes.HTTP
+import           Pipes.HTTP                    (HttpException, newManager,
+                                                parseRequest, queryString,
+                                                requestHeaders, responseBody,
+                                                tlsManagerSettings, withHTTP)
 import qualified Pipes.Prelude                 as P
 
--- We need to remove trailing dots because Pursuit will return a 400 otherwise
--- TODO: remove this when the issue is fixed at Pursuit
 queryPursuit :: Text -> IO ByteString
 queryPursuit q = do
-    let qClean = T.dropWhileEnd (== '.') q
     req' <- parseRequest "http://pursuit.purescript.org/search"
     let req = req'
-          { queryString= "q=" <> (fromString . T.unpack) qClean
+          { queryString= "q=" <> toS q
           , requestHeaders=[(hAccept, "application/json")]
           }
     m <- newManager tlsManagerSettings
@@ -51,10 +49,11 @@ handler _ = pure []
 searchPursuitForDeclarations :: Text -> IO [PursuitResponse]
 searchPursuitForDeclarations query = E.handle handler $ do
     r <- queryPursuit query
-    let results' = decode (fromStrict r) :: Maybe Array
+    let results' = decode (toS r) :: Maybe Array
     case results' of
         Nothing -> pure []
-        Just results -> pure (mapMaybe (isDeclarationResponse . fromJSON) (toList results))
+        Just results ->
+          pure (mapMaybe (isDeclarationResponse . fromJSON) (toList results))
   where
     isDeclarationResponse (Success a@DeclarationResponse{}) = Just a
     isDeclarationResponse _ = Nothing
@@ -62,10 +61,11 @@ searchPursuitForDeclarations query = E.handle handler $ do
 findPackagesForModuleIdent :: Text -> IO [PursuitResponse]
 findPackagesForModuleIdent query = E.handle handler $ do
     r <- queryPursuit query
-    let results' = decode (fromStrict r) :: Maybe Array
+    let results' = decode (toS r) :: Maybe Array
     case results' of
         Nothing -> pure []
-        Just results -> pure (mapMaybe (isModuleResponse . fromJSON) (toList results))
+        Just results ->
+          pure (mapMaybe (isModuleResponse . fromJSON) (toList results))
   where
     isModuleResponse (Success a@ModuleResponse{}) = Just a
     isModuleResponse _ = Nothing
