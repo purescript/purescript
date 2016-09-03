@@ -1,4 +1,11 @@
-module Language.PureScript.CoreFn.ToJSON where
+-- |
+-- Dump the core functional representation in JSON format for consumption
+-- by third-party code generators
+--
+module Language.PureScript.CoreFn.ToJSON
+  ( moduleToJSON
+  , annToJSON
+  ) where
 
 import Prelude.Compat
 
