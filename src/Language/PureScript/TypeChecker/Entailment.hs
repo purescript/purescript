@@ -138,7 +138,7 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
                   [ (substs, tcd)
                   | tcd <- forClassName (combineContexts context inferred) className' tys''
                     -- Make sure the type unifies with the type in the type instance definition
-                  , substs <- maybeToList . (>>= verifySubstitution . fold) . covers typeClassDependencies $ zipWith typeHeadsAreEqual tys'' (tcdInstanceTypes tcd)
+                  , substs <- maybeToList (matches typeClassDependencies tcd tys'')
                   ]
             solution <- lift . lift $ unique instances
             case solution of
@@ -178,6 +178,18 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
                 -- with no unsolved constraints. Hopefully, we can solve this later.
                 return (TypeClassDictionary (Constraint className' tys'' conInfo) context hints)
           where
+            -- Check if an instance matches our list of types, allowing for types
+            -- to be solved via functional dependencies. If the types match, we return a
+            -- substitution which makes them match. If not, we return 'Nothing'.
+            matches :: [FunctionalDependency] -> TypeClassDictionaryInScope -> [Type] -> Maybe [(String, Type)]
+            matches deps TypeClassDictionaryInScope{..} tys = do
+              -- First, find those types which match exactly
+              let matched = zipWith typeHeadsAreEqual tys tcdInstanceTypes
+              -- Now, use any functional dependencies to infer any remaining types
+              substs <- covers deps matched
+              -- Verify that any repeated type variables are unifiable
+              verifySubstitution (fold substs)
+
             unique :: [(a, TypeClassDictionaryInScope)] -> m (EntailsResult a)
             unique [] | deferErrors = return Deferred
                       -- We need a special case for nullary type classes, since we want
