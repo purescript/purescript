@@ -19,7 +19,7 @@ import Control.Monad.Writer
 import Data.Foldable (fold)
 import Data.Function (on)
 import Data.Functor (($>))
-import Data.List (minimumBy, sortBy, groupBy)
+import Data.List (minimumBy, sortBy, groupBy, nub)
 import Data.Maybe (fromMaybe, isJust, maybeToList, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -103,7 +103,7 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
     solve constraint
   where
     forClassName :: InstanceContext -> Qualified (ProperName 'ClassName) -> [Type] -> [TypeClassDictionaryInScope]
-    forClassName ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (Nothing : Just mn : map Just (mapMaybe ctorModules tys))
+    forClassName ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (nub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
     forClassName _ _ _ = internalError "forClassName: expected qualified class name"
 
     ctorModules :: Type -> Maybe ModuleName
@@ -185,7 +185,7 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
                       | shouldGeneralize && (null tys' || any canBeGeneralized tys') = return (Unsolved con')
                       | otherwise = throwError . errorMessage $ NoInstanceFound con'
             unique [(a, dict)] = return $ Solved a dict
-            unique tcds | pairwise overlapping (map snd tcds) = do
+            unique tcds | pairwiseAny overlapping (map snd tcds) = do
                             tell . errorMessage $ OverlappingInstances className' tys' (map (tcdName . snd) tcds)
                             return $ uncurry Solved (head tcds)
                         | otherwise = return $ uncurry Solved (minimumBy (compare `on` length . tcdPath . snd) tcds)
@@ -225,7 +225,7 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
         verifySubstitution :: [(String, Type)] -> Maybe [(String, Type)]
         verifySubstitution subst = do
           let grps = groupBy ((==) `on` fst) . sortBy (compare `on` fst) $ subst
-          guard (all (pairwise unifiesWith . map snd) grps)
+          guard (all (pairwiseAny unifiesWith . map snd) grps)
           return subst
 
         -- Turn a DictionaryValue into a Expr
@@ -330,9 +330,17 @@ typeHeadsAreEqual r1@RCons{} r2@RCons{} =
 typeHeadsAreEqual _ _ = Nothing
 
 -- |
--- Check all values in a list pairwise match a predicate
+-- Check all pairs of values in a list match a predicate
 --
-pairwise :: (a -> a -> Bool) -> [a] -> Bool
-pairwise _ [] = True
-pairwise _ [_] = True
-pairwise p (x : xs) = all (p x) xs && pairwise p xs
+pairwiseAll :: (a -> a -> Bool) -> [a] -> Bool
+pairwiseAll _ [] = True
+pairwiseAll _ [_] = True
+pairwiseAll p (x : xs) = all (p x) xs && pairwiseAll p xs
+
+-- |
+-- Check any pair of values in a list match a predicate
+--
+pairwiseAny :: (a -> a -> Bool) -> [a] -> Bool
+pairwiseAny _ [] = True
+pairwiseAny _ [_] = True
+pairwiseAny p (x : xs) = any (p x) xs || pairwiseAny p xs
