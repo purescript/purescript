@@ -225,7 +225,7 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
         verifySubstitution :: [(String, Type)] -> Maybe [(String, Type)]
         verifySubstitution subst = do
           let grps = groupBy ((==) `on` fst) . sortBy (compare `on` fst) $ subst
-          guard (all (pairwiseAny unifiesWith . map snd) grps)
+          guard (all (pairwiseAll unifiesWith . map snd) grps)
           return subst
 
         -- Turn a DictionaryValue into a Expr
