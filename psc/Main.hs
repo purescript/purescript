@@ -146,7 +146,7 @@ sourceMaps = switch $
 dumpCoreFn :: Parser Bool
 dumpCoreFn = switch $
      long "dump-corefn"
-  <> help "Dump CoreFn"
+  <> help "Dump the (functional) core representation of the compiled code at output/*/corefn.json"
 
 
 options :: Parser P.Options
