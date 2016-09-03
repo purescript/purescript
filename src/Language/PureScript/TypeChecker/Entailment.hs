@@ -20,7 +20,7 @@ import Data.Foldable (fold, for_)
 import Data.Function (on)
 import Data.Functor (($>))
 import Data.List (minimumBy, nub)
-import Data.Maybe (fromMaybe, isJust, maybeToList, mapMaybe)
+import Data.Maybe (fromMaybe, maybeToList, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
@@ -282,14 +282,14 @@ matches deps TypeClassDictionaryInScope{..} tys = do
     verifySubstitution (M.unionsWith (++) substs)
   where
     -- | Find the closure of a set of functional dependencies.
-    covers :: Monoid subst => [Maybe subst] -> Maybe [subst]
+    covers :: Monoid subst => [(Bool, subst)] -> Maybe [subst]
     covers ms = guard covered $> map fold ms
       where
         covered :: Bool
         covered = finalSet == S.fromList [0..length ms - 1]
 
         initialSet :: S.Set Int
-        initialSet = S.fromList . map snd . filter (isJust . fst) $ zip ms [0..]
+        initialSet = S.fromList . map snd . filter (fst . fst) $ zip ms [0..]
 
         finalSet :: S.Set Int
         finalSet = untilFixedPoint applyAll initialSet
@@ -313,18 +313,17 @@ matches deps TypeClassDictionaryInScope{..} tys = do
     -- Check whether the type heads of two types are equal (for the purposes of type class dictionary lookup),
     -- and return a substitution from type variables to types which makes the type heads unify.
     --
-    typeHeadsAreEqual :: Type -> Type -> Maybe (Matching [Type])
-    typeHeadsAreEqual (TUnknown u1)        (TUnknown u2)        | u1 == u2 = Just M.empty
-    typeHeadsAreEqual (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    | s1 == s2 = Just M.empty
-    typeHeadsAreEqual t                    (TypeVar v)                     = Just (M.singleton v [t])
-    typeHeadsAreEqual (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just M.empty
-    typeHeadsAreEqual (TypeLevelString s1) (TypeLevelString s2) | s1 == s2 = Just M.empty
-    typeHeadsAreEqual (TypeApp h1 t1)      (TypeApp h2 t2)                 = M.unionWith (++) <$> typeHeadsAreEqual h1 h2
-                                                                                              <*> typeHeadsAreEqual t1 t2
-    typeHeadsAreEqual REmpty REmpty = Just M.empty
+    typeHeadsAreEqual :: Type -> Type -> (Bool, Matching [Type])
+    typeHeadsAreEqual (TUnknown u1)        (TUnknown u2)        | u1 == u2 = (True, M.empty)
+    typeHeadsAreEqual (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    | s1 == s2 = (True, M.empty)
+    typeHeadsAreEqual t                    (TypeVar v)                     = (True, M.singleton v [t])
+    typeHeadsAreEqual (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = (True, M.empty)
+    typeHeadsAreEqual (TypeLevelString s1) (TypeLevelString s2) | s1 == s2 = (True, M.empty)
+    typeHeadsAreEqual (TypeApp h1 t1)      (TypeApp h2 t2)                 =
+      both (typeHeadsAreEqual h1 h2) (typeHeadsAreEqual t1 t2)
+    typeHeadsAreEqual REmpty REmpty = (True, M.empty)
     typeHeadsAreEqual r1@RCons{} r2@RCons{} =
-        M.unionWith (++) <$> foldMap (uncurry typeHeadsAreEqual) int
-                         <*> go sd1 r1' sd2 r2'
+        foldr both (go sd1 r1' sd2 r2') (map (uncurry typeHeadsAreEqual) int)
       where
         (s1, r1') = rowToList r1
         (s2, r2') = rowToList r2
@@ -333,14 +332,17 @@ matches deps TypeClassDictionaryInScope{..} tys = do
         sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
         sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
 
-        go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Maybe (Matching [Type])
-        go [] REmpty             [] REmpty             = Just M.empty
-        go [] (TUnknown u1)      [] (TUnknown u2)      | u1 == u2 = Just M.empty
-        go [] (TypeVar v1)       [] (TypeVar v2)       | v1 == v2 = Just M.empty
-        go [] (Skolem _ sk1 _ _) [] (Skolem _ sk2 _ _) | sk1 == sk2 = Just M.empty
-        go sd r                  [] (TypeVar v)        = Just (M.singleton v [rowFromList (sd, r)])
-        go _  _                  _  _                  = Nothing
-    typeHeadsAreEqual _ _ = Nothing
+        go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> (Bool, Matching [Type])
+        go [] REmpty             [] REmpty             = (True, M.empty)
+        go [] (TUnknown u1)      [] (TUnknown u2)      | u1 == u2 = (True, M.empty)
+        go [] (TypeVar v1)       [] (TypeVar v2)       | v1 == v2 = (True, M.empty)
+        go [] (Skolem _ sk1 _ _) [] (Skolem _ sk2 _ _) | sk1 == sk2 = (True, M.empty)
+        go sd r                  [] (TypeVar v)        = (True, M.singleton v [rowFromList (sd, r)])
+        go _  _                  _  _                  = (False, M.empty)
+    typeHeadsAreEqual _ _ = (False, M.empty)
+
+    both :: (Bool, Matching [Type]) -> (Bool, Matching [Type]) -> (Bool, Matching [Type])
+    both (b1, m1) (b2, m2) = (b1 && b2, M.unionWith (++) m1 m2)
 
     -- Ensure that a substitution is valid
     verifySubstitution :: Matching [Type] -> Maybe (Matching [Type])
