@@ -19,7 +19,7 @@ import Control.Monad.Writer
 import Data.Foldable (fold)
 import Data.Function (on)
 import Data.Functor (($>))
-import Data.List (minimumBy, sortBy, groupBy, nub)
+import Data.List (minimumBy, nub)
 import Data.Maybe (fromMaybe, isJust, maybeToList, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -40,6 +40,12 @@ type InstanceContext = M.Map (Maybe ModuleName)
                          (M.Map (Qualified (ProperName 'ClassName))
                            (M.Map (Qualified Ident)
                              TypeClassDictionaryInScope))
+
+-- | A type substitution which makes an instance head match a list of types.
+--
+-- Note: we store many types per type variable name. For any name, all types
+-- should unify if we are going to commit to an instance.
+type Matching a = M.Map String a
 
 -- | Merge two type class contexts
 combineContexts :: InstanceContext -> InstanceContext -> InstanceContext
@@ -149,12 +155,12 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
                 -- Note: we need to generate fresh types for any unconstrained
                 -- type variables before unifying.
                 currentSubst <- lift (gets checkSubstitution)
-                subst' <- lift $ withFreshTypes tcd (map (second (substituteType currentSubst)) subst)
+                subst' <- lift $ withFreshTypes tcd (fmap (substituteType currentSubst) subst)
                 lift $ zipWithM_ (\t1 t2 -> do
-                  let inferredType = replaceAllTypeVars subst' t1
+                  let inferredType = replaceAllTypeVars (M.toList subst') t1
                   unifyTypes inferredType t2) (tcdInstanceTypes tcd) tys''
                 currentSubst' <- lift (gets checkSubstitution)
-                let subst'' = map (second (substituteType currentSubst')) subst'
+                let subst'' = fmap (substituteType currentSubst') subst'
                 -- Solve any necessary subgoals
                 args <- solveSubgoals subst'' (tcdDependencies tcd)
                 let match = foldr (\(superclassName, index) dict -> subclassDictionaryValue dict superclassName index)
@@ -181,14 +187,14 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
             -- Check if an instance matches our list of types, allowing for types
             -- to be solved via functional dependencies. If the types match, we return a
             -- substitution which makes them match. If not, we return 'Nothing'.
-            matches :: [FunctionalDependency] -> TypeClassDictionaryInScope -> [Type] -> Maybe [(String, Type)]
+            matches :: [FunctionalDependency] -> TypeClassDictionaryInScope -> [Type] -> Maybe (Matching Type)
             matches deps TypeClassDictionaryInScope{..} tys = do
               -- First, find those types which match exactly
               let matched = zipWith typeHeadsAreEqual tys tcdInstanceTypes
               -- Now, use any functional dependencies to infer any remaining types
               substs <- covers deps matched
               -- Verify that any repeated type variables are unifiable
-              verifySubstitution (fold substs)
+              verifySubstitution (M.unionsWith (++) substs)
 
             unique :: [(a, TypeClassDictionaryInScope)] -> m (EntailsResult a)
             unique [] | deferErrors = return Deferred
@@ -222,10 +228,10 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
             -- Create dictionaries for subgoals which still need to be solved by calling go recursively
             -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
             -- unifies with Either a b, and we can satisfy the subgoals Show a and Show b recursively.
-            solveSubgoals :: [(String, Type)] -> Maybe [Constraint] -> StateT InstanceContext (WriterT (Any, [(Ident, Constraint)]) m) (Maybe [Expr])
+            solveSubgoals :: Matching Type -> Maybe [Constraint] -> StateT InstanceContext (WriterT (Any, [(Ident, Constraint)]) m) (Maybe [Expr])
             solveSubgoals _ Nothing = return Nothing
             solveSubgoals subst (Just subgoals) =
-              Just <$> traverse (go (work + 1) . mapConstraintArgs (map (replaceAllTypeVars subst))) subgoals
+              Just <$> traverse (go (work + 1) . mapConstraintArgs (map (replaceAllTypeVars (M.toList subst)))) subgoals
 
             -- Make a dictionary from subgoal dictionaries by applying the correct function
             mkDictionary :: Qualified Ident -> Maybe [Expr] -> Expr
@@ -234,11 +240,10 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
             mkDictionary fnName (Just dicts) = foldl App (Var fnName) dicts
 
         -- Ensure that a substitution is valid
-        verifySubstitution :: [(String, Type)] -> Maybe [(String, Type)]
-        verifySubstitution subst = do
-          let grps = groupBy ((==) `on` fst) . sortBy (compare `on` fst) $ subst
-          guard (all (pairwiseAll unifiesWith . map snd) grps)
-          return subst
+        verifySubstitution :: Matching [Type] -> Maybe (Matching Type)
+        verifySubstitution = traverse meet where
+          meet tys | pairwiseAll unifiesWith tys = Just (head tys)
+                   | otherwise = Nothing
 
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName a) -> Integer -> Expr
@@ -262,16 +267,16 @@ entails _ _ _ = internalError "entails: expected TypeClassDictionary"
 withFreshTypes
   :: MonadState CheckState m
   => TypeClassDictionaryInScope
-  -> [(String, Type)]
-  -> m [(String, Type)]
+  -> Matching Type
+  -> m (Matching Type)
 withFreshTypes TypeClassDictionaryInScope{..} subst = do
     let onType = everythingOnTypes S.union fromTypeVar
         typeVarsInHead = foldMap onType tcdInstanceTypes
                       <> foldMap (foldMap (foldMap onType . constraintArgs)) tcdDependencies
-        typeVarsInSubst = S.fromList (map fst subst)
+        typeVarsInSubst = S.fromList (M.keys subst)
         uninstantiatedTypeVars = typeVarsInHead S.\\ typeVarsInSubst
     newSubst <- traverse withFreshType (S.toList uninstantiatedTypeVars)
-    return (subst ++ newSubst)
+    return (subst <> M.fromList newSubst)
   where
     fromTypeVar (TypeVar v) = S.singleton v
     fromTypeVar _ = S.empty
@@ -312,18 +317,18 @@ covers deps ms = guard covered $> map fold ms
 -- Check whether the type heads of two types are equal (for the purposes of type class dictionary lookup),
 -- and return a substitution from type variables to types which makes the type heads unify.
 --
-typeHeadsAreEqual :: Type -> Type -> Maybe [(String, Type)]
-typeHeadsAreEqual (TUnknown u1)        (TUnknown u2)        | u1 == u2 = Just []
-typeHeadsAreEqual (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    | s1 == s2 = Just []
-typeHeadsAreEqual t                    (TypeVar v)                     = Just [(v, t)]
-typeHeadsAreEqual (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
-typeHeadsAreEqual (TypeLevelString s1) (TypeLevelString s2) | s1 == s2 = Just []
-typeHeadsAreEqual (TypeApp h1 t1)      (TypeApp h2 t2)                 = (++) <$> typeHeadsAreEqual h1 h2
-                                                                              <*> typeHeadsAreEqual t1 t2
-typeHeadsAreEqual REmpty REmpty = Just []
+typeHeadsAreEqual :: Type -> Type -> Maybe (Matching [Type])
+typeHeadsAreEqual (TUnknown u1)        (TUnknown u2)        | u1 == u2 = Just M.empty
+typeHeadsAreEqual (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    | s1 == s2 = Just M.empty
+typeHeadsAreEqual t                    (TypeVar v)                     = Just (M.singleton v [t])
+typeHeadsAreEqual (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just M.empty
+typeHeadsAreEqual (TypeLevelString s1) (TypeLevelString s2) | s1 == s2 = Just M.empty
+typeHeadsAreEqual (TypeApp h1 t1)      (TypeApp h2 t2)                 = M.unionWith (++) <$> typeHeadsAreEqual h1 h2
+                                                                                          <*> typeHeadsAreEqual t1 t2
+typeHeadsAreEqual REmpty REmpty = Just M.empty
 typeHeadsAreEqual r1@RCons{} r2@RCons{} =
-    (++) <$> foldMap (uncurry typeHeadsAreEqual) int
-         <*> go sd1 r1' sd2 r2'
+    M.unionWith (++) <$> foldMap (uncurry typeHeadsAreEqual) int
+                     <*> go sd1 r1' sd2 r2'
   where
     (s1, r1') = rowToList r1
     (s2, r2') = rowToList r2
@@ -332,14 +337,42 @@ typeHeadsAreEqual r1@RCons{} r2@RCons{} =
     sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
     sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
 
-    go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Maybe [(String, Type)]
-    go [] REmpty             [] REmpty             = Just []
-    go [] (TUnknown u1)      [] (TUnknown u2)      | u1 == u2 = Just []
-    go [] (TypeVar v1)       [] (TypeVar v2)       | v1 == v2 = Just []
-    go [] (Skolem _ sk1 _ _) [] (Skolem _ sk2 _ _) | sk1 == sk2 = Just []
-    go sd r                  [] (TypeVar v)        = Just [(v, rowFromList (sd, r))]
+    go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Maybe (Matching [Type])
+    go [] REmpty             [] REmpty             = Just M.empty
+    go [] (TUnknown u1)      [] (TUnknown u2)      | u1 == u2 = Just M.empty
+    go [] (TypeVar v1)       [] (TypeVar v2)       | v1 == v2 = Just M.empty
+    go [] (Skolem _ sk1 _ _) [] (Skolem _ sk2 _ _) | sk1 == sk2 = Just M.empty
+    go sd r                  [] (TypeVar v)        = Just (M.singleton v [rowFromList (sd, r)])
     go _  _                  _  _                  = Nothing
 typeHeadsAreEqual _ _ = Nothing
+
+-- | Check that two types can be unified
+unifiesWith :: Type -> Type -> Bool
+unifiesWith (TUnknown _)         _                    = True
+unifiesWith _                    (TUnknown _)         = True
+unifiesWith (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    = s1 == s2
+unifiesWith (TypeVar v1)         (TypeVar v2)         = v1 == v2
+unifiesWith (TypeLevelString s1) (TypeLevelString s2) = s1 == s2
+unifiesWith (TypeConstructor c1) (TypeConstructor c2) = c1 == c2
+unifiesWith (TypeApp h1 t1)      (TypeApp h2 t2)      = h1 `unifiesWith` h2 && t1 `unifiesWith` t2
+unifiesWith REmpty               REmpty               = True
+unifiesWith r1@RCons{}           r2@RCons{} =
+    let (s1, r1') = rowToList r1
+        (s2, r2') = rowToList r2
+
+        int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
+        sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
+        sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
+    in all (uncurry unifiesWith) int && go sd1 r1' sd2 r2'
+  where
+    go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Bool
+    go _  (TUnknown _)      _  _                 = True
+    go _  _                 _  (TUnknown _)      = True
+    go [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) = s1 == s2
+    go [] REmpty            [] REmpty            = True
+    go [] (TypeVar v1)      [] (TypeVar v2)      = v1 == v2
+    go _  _                 _  _                 = False
+unifiesWith _ _ = False
 
 -- |
 -- Check all pairs of values in a list match a predicate
