@@ -16,9 +16,8 @@ import Control.Monad.State
 import Control.Monad.Supply.Class (MonadSupply(..))
 import Control.Monad.Writer
 
-import Data.Foldable (fold, for_)
+import Data.Foldable (for_)
 import Data.Function (on)
-import Data.Functor (($>))
 import Data.List (minimumBy, nub)
 import Data.Maybe (fromMaybe, maybeToList, mapMaybe)
 import qualified Data.Map as M
@@ -277,17 +276,16 @@ matches deps TypeClassDictionaryInScope{..} tys = do
     -- First, find those types which match exactly
     let matched = zipWith typeHeadsAreEqual tys tcdInstanceTypes
     -- Now, use any functional dependencies to infer any remaining types
-    substs <- covers matched
+    guard $ covers matched
     -- Verify that any repeated type variables are unifiable
-    verifySubstitution (M.unionsWith (++) substs)
+    let inferredSet = foldMap (S.fromList . fdDetermined) deps
+        tagged = zipWith (\(_, ts) i -> fmap (fmap (S.member i inferredSet, )) ts) matched [0..]
+    verifySubstitution (M.unionsWith (++) tagged)
   where
     -- | Find the closure of a set of functional dependencies.
-    covers :: Monoid subst => [(Bool, subst)] -> Maybe [subst]
-    covers ms = guard covered $> map fold ms
+    covers :: [(Bool, subst)] -> Bool
+    covers ms = finalSet == S.fromList [0..length ms - 1]
       where
-        covered :: Bool
-        covered = finalSet == S.fromList [0..length ms - 1]
-
         initialSet :: S.Set Int
         initialSet = S.fromList . map snd . filter (fst . fst) $ zip ms [0..]
 
@@ -345,37 +343,41 @@ matches deps TypeClassDictionaryInScope{..} tys = do
     both (b1, m1) (b2, m2) = (b1 && b2, M.unionWith (++) m1 m2)
 
     -- Ensure that a substitution is valid
-    verifySubstitution :: Matching [Type] -> Maybe (Matching [Type])
+    verifySubstitution :: Matching [(Bool, Type)] -> Maybe (Matching [Type])
     verifySubstitution = traverse meet where
-      meet ts | pairwiseAll unifiesWith ts = Just ts
+      meet ts | pairwiseAll unifiesWith ts = Just (fmap snd ts)
               | otherwise = Nothing
 
-      unifiesWith :: Type -> Type -> Bool
-      unifiesWith (TUnknown _)         _                    = True
-      unifiesWith _                    (TUnknown _)         = True
-      unifiesWith (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    = s1 == s2
-      unifiesWith (TypeVar v1)         (TypeVar v2)         = v1 == v2
-      unifiesWith (TypeLevelString s1) (TypeLevelString s2) = s1 == s2
-      unifiesWith (TypeConstructor c1) (TypeConstructor c2) = c1 == c2
-      unifiesWith (TypeApp h1 t1)      (TypeApp h2 t2)      = h1 `unifiesWith` h2 && t1 `unifiesWith` t2
-      unifiesWith REmpty               REmpty               = True
-      unifiesWith r1@RCons{}           r2@RCons{} =
-          let (s1, r1') = rowToList r1
-              (s2, r2') = rowToList r2
+      -- Note that unknowns are only allowed to unify if they came from a type
+      -- which was _not_ solved, i.e. one which was inferred by a functional
+      -- dependency.
+      unifiesWith :: (Bool, Type) -> (Bool, Type) -> Bool
+      unifiesWith (solved1, ty1) (solved2, ty2) = unifiesWith' ty1 ty2 where
+        unifiesWith' (TUnknown _)         _                    | solved1 = True
+        unifiesWith' _                    (TUnknown _)         | solved2 = True
+        unifiesWith' (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    = s1 == s2
+        unifiesWith' (TypeVar v1)         (TypeVar v2)         = v1 == v2
+        unifiesWith' (TypeLevelString s1) (TypeLevelString s2) = s1 == s2
+        unifiesWith' (TypeConstructor c1) (TypeConstructor c2) = c1 == c2
+        unifiesWith' (TypeApp h1 t1)      (TypeApp h2 t2)      = unifiesWith' h1 h2 && unifiesWith' t1 t2
+        unifiesWith' REmpty               REmpty               = True
+        unifiesWith' r1@RCons{}           r2@RCons{} =
+            let (s1, r1') = rowToList r1
+                (s2, r2') = rowToList r2
 
-              int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
-              sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
-              sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
-          in all (uncurry unifiesWith) int && go sd1 r1' sd2 r2'
-        where
-          go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Bool
-          go _  (TUnknown _)      _  _                 = True
-          go _  _                 _  (TUnknown _)      = True
-          go [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) = s1 == s2
-          go [] REmpty            [] REmpty            = True
-          go [] (TypeVar v1)      [] (TypeVar v2)      = v1 == v2
-          go _  _                 _  _                 = False
-      unifiesWith _ _ = False
+                int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
+                sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
+                sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
+            in all (uncurry unifiesWith') int && go sd1 r1' sd2 r2'
+          where
+            go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Bool
+            go _  (TUnknown _)      _  _                 | solved1 = True
+            go _  _                 _  (TUnknown _)      | solved2 = True
+            go [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) = s1 == s2
+            go [] REmpty            [] REmpty            = True
+            go [] (TypeVar v1)      [] (TypeVar v2)      = v1 == v2
+            go _  _                 _  _                 = False
+        unifiesWith' _ _ = False
 
 -- | Check all pairs of values in a list match a predicate
 pairwiseAll :: (a -> a -> Bool) -> [a] -> Bool

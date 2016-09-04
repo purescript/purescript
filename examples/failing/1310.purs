@@ -1,4 +1,4 @@
--- @shouldFailWith TypesDoNotUnify
+-- @shouldFailWith NoInstanceFound
 
 module Issue1310 where
 
