@@ -191,7 +191,7 @@ checkConstrained ty tyClass =
   case ty of
     P.ConstrainedType cs _ | any (matches tyClass) cs ->
       True
-    P.ForAll _ ty' _ ->
+    P.ForAll _ ty' ->
       checkConstrained ty' tyClass
     _ ->
       False

@@ -17,7 +17,6 @@ import Data.List.Ordered (minusBy')
 import Data.Ord (comparing)
 
 import Language.PureScript.AST
-import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.TypeChecker.Monad
@@ -35,16 +34,12 @@ subsumes' :: (MonadError MultipleErrors m, MonadState CheckState m) =>
   Type ->
   Type ->
   m (Maybe Expr)
-subsumes' val (ForAll ident ty1 _) ty2 = do
+subsumes' val (ForAll ident ty1) ty2 = do
   replaced <- replaceVarWithUnknown ident ty1
   subsumes val replaced ty2
-subsumes' val ty1 (ForAll ident ty2 sco) =
-  case sco of
-    Just sco' -> do
-      sko <- newSkolemConstant
-      let sk = skolemize ident sko sco' Nothing ty2
-      subsumes val ty1 sk
-    Nothing -> internalError "subsumes: unspecified skolem scope"
+subsumes' val ty1 (ForAll ident ty2) = newSkolemConstant $ \sko -> do
+  let sk = skolemize ident sko Nothing ty2
+  subsumes val ty1 sk
 subsumes' val (TypeApp (TypeApp f1 arg1) ret1) (TypeApp (TypeApp f2 arg2) ret2) | f1 == tyFunction && f2 == tyFunction = do
   _ <- subsumes Nothing arg2 arg1
   _ <- subsumes Nothing ret1 ret2

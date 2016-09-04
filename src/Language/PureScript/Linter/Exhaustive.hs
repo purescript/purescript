@@ -298,7 +298,6 @@ checkExhaustive env mn numArgs cas expr = makeResult . first nub $ foldl' step (
               [ Constraint C.Partial [] (Just constraintData) ]
               $ TypeApp (TypeApp tyFunction (TypeVar tyVar)) (TypeVar tyVar)
           )
-          Nothing
 
       constraintData :: ConstraintData
       constraintData =

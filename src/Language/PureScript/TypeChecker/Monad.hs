@@ -6,32 +6,58 @@
 --
 module Language.PureScript.TypeChecker.Monad where
 
-import Prelude.Compat
+import           Prelude.Compat
 
-import Control.Arrow (second)
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State
-import Control.Monad.Writer.Class (MonadWriter(..), listen, censor)
+import           Control.Arrow (second)
+import           Control.Monad.Error.Class (MonadError(..))
+import           Control.Monad.State
+import           Control.Monad.Writer.Class (MonadWriter(..), listen, censor)
 
-import Data.Maybe
+import qualified Data.IntMap as IM
+import qualified Data.IntSet as IS
+import           Data.Maybe
 import qualified Data.Map as M
 
-import Language.PureScript.Environment
-import Language.PureScript.Errors
-import Language.PureScript.Kinds
-import Language.PureScript.Names
-import Language.PureScript.TypeClassDictionaries
-import Language.PureScript.Types
+import           Language.PureScript.Environment
+import           Language.PureScript.Errors
+import           Language.PureScript.Kinds
+import           Language.PureScript.Names
+import           Language.PureScript.TypeClassDictionaries
+import           Language.PureScript.Types
 
 -- | A substitution of unification variables for types or kinds
 data Substitution = Substitution
-  { substType :: M.Map Int Type -- ^ Type substitution
-  , substKind :: M.Map Int Kind -- ^ Kind substitution
+  { substType :: IM.IntMap Type -- ^ Type substitution
+  , substKind :: IM.IntMap Kind -- ^ Kind substitution
   }
 
 -- | An empty substitution
 emptySubstitution :: Substitution
-emptySubstitution = Substitution M.empty M.empty
+emptySubstitution = Substitution IM.empty IM.empty
+
+data SkolemData = SkolemData
+  { skolemUnifiedWith :: IS.IntSet
+  -- ^ Any unification variables which this skolem was unified with
+  , skolemLowBound :: Int
+  -- ^ The least unification variable which this skolem variable
+  -- is allowed to unify with
+  , skolemHighBound :: Maybe Int
+  -- ^ The highest unification variable which this skolem variable
+  -- is allowed to unify with
+  }
+
+-- | Note that a skolem variable unified with a unification variable.
+unifySkolem :: Int -> SkolemData -> SkolemData
+unifySkolem u s = s { skolemUnifiedWith = IS.insert u (skolemUnifiedWith s) }
+
+-- | Create an empty 'SkolemData' from the current unification variable.
+newSkolemData :: Int -> SkolemData
+newSkolemData u = SkolemData mempty u Nothing
+
+-- | Mark a 'SkolemData' structure with the current unification variable at the
+-- high bound.
+closeSkolemData :: Int -> SkolemData -> SkolemData
+closeSkolemData u s = s { skolemHighBound = Just u }
 
 -- | State required for type checking
 data CheckState = CheckState
@@ -42,8 +68,6 @@ data CheckState = CheckState
   , checkNextKind :: Int
   -- ^ The next kind unification variable
   , checkNextSkolem :: Int
-  -- ^ The next skolem variable
-  , checkNextSkolemScope :: Int
   -- ^ The next skolem scope constant
   , checkCurrentModule :: Maybe ModuleName
   -- ^ The current module
@@ -54,11 +78,40 @@ data CheckState = CheckState
   -- This goes into state, rather than using 'rethrow',
   -- since this way, we can provide good error messages
   -- during instance resolution.
+  , checkSkolems :: IM.IntMap SkolemData
+  -- ^ Whenever a skolem variable is unified with a
+  -- unification variable, we log it here. When
+  -- type-checking is complete, we use this map to check
+  -- no skolems escaped their scope.
   }
+
+-- | Generate a new skolem constant
+newSkolemConstant
+  :: MonadState CheckState m
+  => (Int -> m a)
+  -- ^ The action which defines the scope of the new skolem constant
+  -> m a
+newSkolemConstant scoped = do
+  s <- gets checkNextSkolem
+  low <- gets checkNextType
+  modify $ \st -> st { checkNextSkolem = s + 1
+                     , checkSkolems = IM.insert s (newSkolemData low) (checkSkolems st)
+                     }
+  a <- scoped s
+  high <- gets checkNextType
+  withSkolemData s (closeSkolemData high)
+  return a
+
+withSkolemData
+  :: MonadState CheckState m
+  => Int
+  -> (SkolemData -> SkolemData)
+  -> m ()
+withSkolemData s f = modify $ \st -> st { checkSkolems = IM.adjust f s (checkSkolems st) }
 
 -- | Create an empty @CheckState@
 emptyCheckState :: Environment -> CheckState
-emptyCheckState env = CheckState env 0 0 0 0 Nothing emptySubstitution []
+emptyCheckState env = CheckState env 0 0 0 Nothing emptySubstitution [] mempty
 
 -- | Unification variables
 type Unknown = Int

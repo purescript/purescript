@@ -16,21 +16,20 @@ module Language.PureScript.TypeChecker.Unify
   , varIfUnknown
   ) where
 
-import Prelude.Compat
+import           Prelude.Compat
 
-import Control.Monad
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State.Class (MonadState(..), gets, modify)
-import Control.Monad.Writer.Class (MonadWriter(..))
+import           Control.Monad
+import           Control.Monad.Error.Class (MonadError(..))
+import           Control.Monad.State.Class (MonadState(..), gets, modify)
+import           Control.Monad.Writer.Class (MonadWriter(..))
 
-import Data.List (nub, sort)
-import qualified Data.Map as M
+import qualified Data.IntMap as IM
+import           Data.List (nub, sort)
 
-import Language.PureScript.Crash
-import Language.PureScript.Errors
-import Language.PureScript.TypeChecker.Monad
-import Language.PureScript.TypeChecker.Skolems
-import Language.PureScript.Types
+import           Language.PureScript.Errors
+import           Language.PureScript.TypeChecker.Monad
+import           Language.PureScript.TypeChecker.Skolems
+import           Language.PureScript.Types
 
 -- | Generate a fresh type variable
 freshType :: (MonadState CheckState m) => m Type
@@ -45,7 +44,7 @@ solveType u t = do
   occursCheck u t
   modify $ \cs -> cs { checkSubstitution =
                          (checkSubstitution cs) { substType =
-                                                    M.insert u t $ substType $ checkSubstitution cs
+                                                    IM.insert u t $ substType $ checkSubstitution cs
                                                 }
                      }
 
@@ -54,7 +53,7 @@ substituteType :: Substitution -> Type -> Type
 substituteType sub = everywhereOnTypes go
   where
   go (TUnknown u) =
-    case M.lookup u (substType sub) of
+    case IM.lookup u (substType sub) of
       Nothing -> TUnknown u
       Just (TUnknown u1) | u1 == u -> TUnknown u1
       Just t -> substituteType sub t
@@ -83,21 +82,17 @@ unifyTypes t1 t2 = do
   withErrorMessageHint (ErrorUnifyingTypes t1 t2) $ unifyTypes' (substituteType sub t1) (substituteType sub t2)
   where
   unifyTypes' (TUnknown u1) (TUnknown u2) | u1 == u2 = return ()
+  unifyTypes' (TUnknown u) t@(Skolem _ s _) = withSkolemData s (unifySkolem u) >> solveType u t
+  unifyTypes' t@(Skolem _ s _) (TUnknown u) = withSkolemData s (unifySkolem u) >> solveType u t
   unifyTypes' (TUnknown u) t = solveType u t
   unifyTypes' t (TUnknown u) = solveType u t
-  unifyTypes' (ForAll ident1 ty1 sc1) (ForAll ident2 ty2 sc2) =
-    case (sc1, sc2) of
-      (Just sc1', Just sc2') -> do
-        sko <- newSkolemConstant
-        let sk1 = skolemize ident1 sko sc1' Nothing ty1
-        let sk2 = skolemize ident2 sko sc2' Nothing ty2
-        sk1 `unifyTypes` sk2
-      _ -> internalError "unifyTypes: unspecified skolem scope"
-  unifyTypes' (ForAll ident ty1 (Just sc)) ty2 = do
-    sko <- newSkolemConstant
-    let sk = skolemize ident sko sc Nothing ty1
+  unifyTypes' (ForAll ident1 ty1) (ForAll ident2 ty2) = newSkolemConstant $ \sko -> do
+    let sk1 = skolemize ident1 sko Nothing ty1
+    let sk2 = skolemize ident2 sko Nothing ty2
+    sk1 `unifyTypes` sk2
+  unifyTypes' (ForAll ident ty1) ty2 = newSkolemConstant $ \sko -> do
+    let sk = skolemize ident sko Nothing ty1
     sk `unifyTypes` ty2
-  unifyTypes' ForAll{} _ = internalError "unifyTypes: unspecified skolem scope"
   unifyTypes' ty f@ForAll{} = f `unifyTypes` ty
   unifyTypes' (TypeVar v1) (TypeVar v2) | v1 == v2 = return ()
   unifyTypes' ty1@(TypeConstructor c1) ty2@(TypeConstructor c2) =
@@ -105,7 +100,7 @@ unifyTypes t1 t2 = do
   unifyTypes' (TypeApp t3 t4) (TypeApp t5 t6) = do
     t3 `unifyTypes` t5
     t4 `unifyTypes` t6
-  unifyTypes' (Skolem _ s1 _ _) (Skolem _ s2 _ _) | s1 == s2 = return ()
+  unifyTypes' (Skolem _ s1 _) (Skolem _ s2 _) | s1 == s2 = return ()
   unifyTypes' (KindedType ty1 _) ty2 = ty1 `unifyTypes` ty2
   unifyTypes' ty1 (KindedType ty2 _) = ty1 `unifyTypes` ty2
   unifyTypes' r1@RCons{} r2 = unifyRows r1 r2
@@ -148,7 +143,7 @@ unifyRows r1 r2 =
     solveType u2 (rowFromList (sd1, rest))
   unifyRows' [] REmpty [] REmpty = return ()
   unifyRows' [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
-  unifyRows' [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) | s1 == s2 = return ()
+  unifyRows' [] (Skolem _ s1 _) [] (Skolem _ s2 _) | s1 == s2 = return ()
   unifyRows' _ _ _ _ =
     throwError . errorMessage $ TypesDoNotUnify r1 r2
 
@@ -157,7 +152,7 @@ unifyRows r1 r2 =
 --
 unifiesWith :: Type -> Type -> Bool
 unifiesWith (TUnknown u1)        (TUnknown u2)        = u1 == u2
-unifiesWith (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    = s1 == s2
+unifiesWith (Skolem _ s1 _)      (Skolem _ s2 _)      = s1 == s2
 unifiesWith (TypeVar v1)         (TypeVar v2)         = v1 == v2
 unifiesWith (TypeLevelString s1) (TypeLevelString s2) = s1 == s2
 unifiesWith (TypeConstructor c1) (TypeConstructor c2) = c1 == c2
@@ -175,7 +170,7 @@ unifiesWith r1@RCons{}           r2@RCons{} =
   go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Bool
   go [] REmpty          [] REmpty          = True
   go [] (TypeVar v1)    [] (TypeVar v2)    = v1 == v2
-  go [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) = s1 == s2
+  go [] (Skolem _ s1 _) [] (Skolem _ s2 _) = s1 == s2
   go [] (TUnknown _)    _  _               = True
   go _  _               [] (TUnknown _)    = True
   go _  (TUnknown _)    _  (TUnknown _)    = True

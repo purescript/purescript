@@ -20,12 +20,6 @@ import Language.PureScript.Kinds
 import Language.PureScript.Names
 
 -- |
--- An identifier for the scope of a skolem variable
---
-newtype SkolemScope = SkolemScope { runSkolemScope :: Int }
-  deriving (Show, Eq, Ord, A.ToJSON, A.FromJSON)
-
--- |
 -- The type of types
 --
 data Type
@@ -45,11 +39,11 @@ data Type
   -- | A type application
   | TypeApp Type Type
   -- | Forall quantifier
-  | ForAll String Type (Maybe SkolemScope)
+  | ForAll String Type
   -- | A type with a set of type class constraints
   | ConstrainedType [Constraint] Type
   -- | A skolem constant
-  | Skolem String Int SkolemScope (Maybe SourceSpan)
+  | Skolem String Int (Maybe SourceSpan)
   -- | An empty row
   | REmpty
   -- | A non-empty row
@@ -129,7 +123,7 @@ isMonoType _        = True
 -- Universally quantify a type
 --
 mkForAll :: [String] -> Type -> Type
-mkForAll args ty = foldl (\t arg -> ForAll arg t Nothing) ty args
+mkForAll args ty = foldl (\t arg -> ForAll arg t) ty args
 
 -- |
 -- Replace a type variable, taking into account variable shadowing
@@ -147,12 +141,12 @@ replaceAllTypeVars = go []
   go :: [String] -> [(String, Type)] -> Type -> Type
   go _  m (TypeVar v) = fromMaybe (TypeVar v) (v `lookup` m)
   go bs m (TypeApp t1 t2) = TypeApp (go bs m t1) (go bs m t2)
-  go bs m f@(ForAll v t sco) | v `elem` keys = go bs (filter ((/= v) . fst) m) f
-                             | v `elem` usedVars =
-                               let v' = genName v (keys ++ bs ++ usedVars)
-                                   t' = go bs [(v, TypeVar v')] t
-                               in ForAll v' (go (v' : bs) m t') sco
-                             | otherwise = ForAll v (go (v : bs) m t) sco
+  go bs m f@(ForAll v t) | v `elem` keys = go bs (filter ((/= v) . fst) m) f
+                         | v `elem` usedVars =
+                           let v' = genName v (keys ++ bs ++ usedVars)
+                               t' = go bs [(v, TypeVar v')] t
+                           in ForAll v' (go (v' : bs) m t')
+                         | otherwise = ForAll v (go (v : bs) m t)
     where
     keys = map fst m
     usedVars = concatMap (usedTypeVariables . snd) m
@@ -187,7 +181,7 @@ freeTypeVariables = nub . go []
   go :: [String] -> Type -> [String]
   go bound (TypeVar v) | v `notElem` bound = [v]
   go bound (TypeApp t1 t2) = go bound t1 ++ go bound t2
-  go bound (ForAll v t _) = go (v : bound) t
+  go bound (ForAll v t) = go (v : bound) t
   go bound (ConstrainedType cs t) = concatMap (concatMap (go bound) . constraintArgs) cs ++ go bound t
   go bound (RCons _ t r) = go bound t ++ go bound r
   go bound (KindedType t _) = go bound t
@@ -199,7 +193,7 @@ freeTypeVariables = nub . go []
 -- Universally quantify over all type variables appearing free in a type
 --
 quantify :: Type -> Type
-quantify ty = foldr (\arg t -> ForAll arg t Nothing) ty $ freeTypeVariables ty
+quantify ty = foldr ForAll ty $ freeTypeVariables ty
 
 -- |
 -- Move all universal quantifiers to the front of a type
@@ -207,7 +201,7 @@ quantify ty = foldr (\arg t -> ForAll arg t Nothing) ty $ freeTypeVariables ty
 moveQuantifiersToFront :: Type -> Type
 moveQuantifiersToFront = go [] []
   where
-  go qs cs (ForAll q ty sco) = go ((q, sco) : qs) cs ty
+  go qs cs (ForAll q ty) = go (q : qs) cs ty
   go qs cs (ConstrainedType cs' ty) = go qs (cs ++ cs') ty
   go qs cs ty =
     let constrained = case cs of
@@ -215,7 +209,7 @@ moveQuantifiersToFront = go [] []
                         cs' -> ConstrainedType cs' ty
     in case qs of
          [] -> constrained
-         qs' -> foldl (\ty' (q, sco) -> ForAll q ty' sco) constrained qs'
+         qs' -> foldl (flip ForAll) constrained qs'
 
 -- |
 -- Check if a type contains wildcards
@@ -235,7 +229,7 @@ everywhereOnTypes :: (Type -> Type) -> Type -> Type
 everywhereOnTypes f = go
   where
   go (TypeApp t1 t2) = f (TypeApp (go t1) (go t2))
-  go (ForAll arg ty sco) = f (ForAll arg (go ty) sco)
+  go (ForAll arg ty) = f (ForAll arg (go ty))
   go (ConstrainedType cs ty) = f (ConstrainedType (map (mapConstraintArgs (map go)) cs) (go ty))
   go (RCons name ty rest) = f (RCons name (go ty) (go rest))
   go (KindedType ty k) = f (KindedType (go ty) k)
@@ -250,7 +244,7 @@ everywhereOnTypesTopDown :: (Type -> Type) -> Type -> Type
 everywhereOnTypesTopDown f = go . f
   where
   go (TypeApp t1 t2) = TypeApp (go (f t1)) (go (f t2))
-  go (ForAll arg ty sco) = ForAll arg (go (f ty)) sco
+  go (ForAll arg ty) = ForAll arg (go (f ty))
   go (ConstrainedType cs ty) = ConstrainedType (map (mapConstraintArgs (map (go . f))) cs) (go (f ty))
   go (RCons name ty rest) = RCons name (go (f ty)) (go (f rest))
   go (KindedType ty k) = KindedType (go (f ty)) k
@@ -265,7 +259,7 @@ everywhereOnTypesM :: Monad m => (Type -> m Type) -> Type -> m Type
 everywhereOnTypesM f = go
   where
   go (TypeApp t1 t2) = (TypeApp <$> go t1 <*> go t2) >>= f
-  go (ForAll arg ty sco) = (ForAll arg <$> go ty <*> pure sco) >>= f
+  go (ForAll arg ty) = (ForAll arg <$> go ty) >>= f
   go (ConstrainedType cs ty) = (ConstrainedType <$> mapM (overConstraintArgs (mapM go)) cs <*> go ty) >>= f
   go (RCons name ty rest) = (RCons name <$> go ty <*> go rest) >>= f
   go (KindedType ty k) = (KindedType <$> go ty <*> pure k) >>= f
@@ -280,7 +274,7 @@ everywhereOnTypesTopDownM :: Monad m => (Type -> m Type) -> Type -> m Type
 everywhereOnTypesTopDownM f = go <=< f
   where
   go (TypeApp t1 t2) = TypeApp <$> (f t1 >>= go) <*> (f t2 >>= go)
-  go (ForAll arg ty sco) = ForAll arg <$> (f ty >>= go) <*> pure sco
+  go (ForAll arg ty) = ForAll arg <$> (f ty >>= go)
   go (ConstrainedType cs ty) = ConstrainedType <$> mapM (overConstraintArgs (mapM (go <=< f))) cs <*> (f ty >>= go)
   go (RCons name ty rest) = RCons name <$> (f ty >>= go) <*> (f rest >>= go)
   go (KindedType ty k) = KindedType <$> (f ty >>= go) <*> pure k
@@ -295,7 +289,7 @@ everythingOnTypes :: (r -> r -> r) -> (Type -> r) -> Type -> r
 everythingOnTypes (<>) f = go
   where
   go t@(TypeApp t1 t2) = f t <> go t1 <> go t2
-  go t@(ForAll _ ty _) = f t <> go ty
+  go t@(ForAll _ ty) = f t <> go ty
   go t@(ConstrainedType cs ty) = foldl (<>) (f t) (map go $ concatMap constraintArgs cs) <> go ty
   go t@(RCons _ ty rest) = f t <> go ty <> go rest
   go t@(KindedType ty _) = f t <> go ty
@@ -311,7 +305,7 @@ everythingWithContextOnTypes s0 r0 (<>) f = go' s0
   where
   go' s t = let (s', r) = f s t in r <> go s' t
   go s (TypeApp t1 t2) = go' s t1 <> go' s t2
-  go s (ForAll _ ty _) = go' s ty
+  go s (ForAll _ ty) = go' s ty
   go s (ConstrainedType cs ty) = foldl (<>) r0 (map (go' s) $ concatMap constraintArgs cs) <> go' s ty
   go s (RCons _ ty rest) = go' s ty <> go' s rest
   go s (KindedType ty _) = go' s ty

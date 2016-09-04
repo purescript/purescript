@@ -234,14 +234,14 @@ replaceUnknowns = everywhereOnTypesM replaceTypes
         put $ m { umUnknownMap = M.insert u u' (umUnknownMap m), umNextIndex = u' + 1 }
         return (TUnknown u')
       Just u' -> return (TUnknown u')
-  replaceTypes (Skolem name s sko ss) = do
+  replaceTypes (Skolem name s ss) = do
     m <- get
     case M.lookup s (umSkolemMap m) of
       Nothing -> do
         let s' = umNextIndex m
         put $ m { umSkolemMap = M.insert s (name, s', ss) (umSkolemMap m), umNextIndex = s' + 1 }
-        return (Skolem name s' sko ss)
-      Just (_, s', _) -> return (Skolem name s' sko ss)
+        return (Skolem name s' ss)
+      Just (_, s', _) -> return (Skolem name s' ss)
   replaceTypes other = return other
 
 onTypesInErrorMessage :: (Type -> Type) -> ErrorMessage -> ErrorMessage

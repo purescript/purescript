@@ -6,5 +6,4 @@ import Control.Monad.Eff
 import Control.Monad.ST
 
 test _ = do
-  r <- runST (newSTRef 0)
-  pure 0
+  runST (newSTRef 0)

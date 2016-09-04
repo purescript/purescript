@@ -143,7 +143,7 @@ splitFunctionType t = fromMaybe [] arguments
   where
     arguments = initMay splitted
     splitted = splitType' t
-    splitType' (P.ForAll _ t' _) = splitType' t'
+    splitType' (P.ForAll _ t') = splitType' t'
     splitType' (P.ConstrainedType _ t') = splitType' t'
     splitType' (P.TypeApp (P.TypeApp t' lhs) rhs)
           | t' == P.tyFunction = lhs : splitType' rhs

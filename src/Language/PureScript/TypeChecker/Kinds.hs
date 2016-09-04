@@ -18,6 +18,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 import Control.Monad.Writer.Class (MonadWriter(..))
 
+import qualified Data.IntMap as IM
 import qualified Data.Map as M
 
 import Language.PureScript.Crash
@@ -45,7 +46,7 @@ solveKind u k = do
   occursCheck u k
   modify $ \cs -> cs { checkSubstitution =
                          (checkSubstitution cs) { substKind =
-                                                    M.insert u k $ substKind $ checkSubstitution cs
+                                                    IM.insert u k $ substKind $ checkSubstitution cs
                                                 }
                      }
 
@@ -54,7 +55,7 @@ substituteKind :: Substitution -> Kind -> Kind
 substituteKind sub = everywhereOnKinds go
   where
   go (KUnknown u) =
-    case M.lookup u (substKind sub) of
+    case IM.lookup u (substKind sub) of
       Nothing -> KUnknown u
       Just (KUnknown u1) | u1 == u -> KUnknown u1
       Just t -> substituteKind sub t
@@ -207,7 +208,7 @@ infer'
    . (MonadError MultipleErrors m, MonadState CheckState m)
   => Type
   -> m (Kind, [(String, Kind)])
-infer' (ForAll ident ty _) = do
+infer' (ForAll ident ty) = do
   k1 <- freshKind
   Just moduleName <- checkCurrentModule <$> get
   (k2, args) <- bindLocalTypeVariables moduleName [(ProperName ident, k1)] $ infer ty
@@ -220,7 +221,7 @@ infer' (KindedType ty k) = do
 infer' other = (, []) <$> go other
   where
   go :: Type -> m Kind
-  go (ForAll ident ty _) = do
+  go (ForAll ident ty) = do
     k1 <- freshKind
     Just moduleName <- checkCurrentModule <$> get
     k2 <- bindLocalTypeVariables moduleName [(ProperName ident, k1)] $ go ty
@@ -235,7 +236,7 @@ infer' other = (, []) <$> go other
   go (TypeVar v) = do
     Just moduleName <- checkCurrentModule <$> get
     lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
-  go (Skolem v _ _ _) = do
+  go (Skolem v _ _) = do
     Just moduleName <- checkCurrentModule <$> get
     lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
   go (TypeConstructor v) = do

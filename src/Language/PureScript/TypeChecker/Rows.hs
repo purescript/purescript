@@ -33,7 +33,7 @@ checkDuplicateLabels =
     where
     checkDups :: Type -> m ()
     checkDups (TypeApp t1 t2) = checkDups t1 >> checkDups t2
-    checkDups (ForAll _ t _) = checkDups t
+    checkDups (ForAll _ t) = checkDups t
     checkDups (ConstrainedType args t) = do
       mapM_ checkDups $ concatMap constraintArgs args
       checkDups t

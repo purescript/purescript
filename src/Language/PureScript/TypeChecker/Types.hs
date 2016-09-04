@@ -69,58 +69,59 @@ typesOf ::
   [(Ident, Expr)] ->
   m [(Ident, (Expr, Type))]
 typesOf bindingGroupType moduleName vals = do
-  tys <- fmap tidyUp . escalateWarningWhen isHoleError . liftUnifyWarnings replace $ do
-    (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup (Just moduleName) vals
-    ds1 <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
-    ds2 <- forM untyped $ \e -> typeForBindingGroupElement e dict untypedDict
-    return (map (\x -> (False, x)) ds1 ++ map (\x -> (True, x)) ds2)
+    tys <- fmap tidyUp . escalateWarningWhen isHoleError . liftUnifyWarnings replace $ do
+      (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup (Just moduleName) vals
+      ds1 <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
+      ds2 <- forM untyped $ \e -> typeForBindingGroupElement e dict untypedDict
+      return (map (\x -> (False, x)) ds1 ++ map (\x -> (True, x)) ds2)
 
-  forM tys $ \(shouldGeneralize, (ident, (val, ty))) -> do
-    -- Replace type class dictionary placeholders with actual dictionaries
-    (val', unsolved) <- replaceTypeClassDictionaries shouldGeneralize moduleName val
-    let unsolvedTypeVars = nub $ unknownsInType ty
-    -- Generalize and constrain the type
-    let generalized = generalize unsolved ty
+    typed <- forM tys $ \(shouldGeneralize, (ident, (val, ty))) -> do
+      -- Replace type class dictionary placeholders with actual dictionaries
+      (val', unsolved) <- replaceTypeClassDictionaries shouldGeneralize moduleName val
+      let unsolvedTypeVars = nub $ unknownsInType ty
+      -- Generalize and constrain the type
+      let generalized = generalize unsolved ty
 
-    when shouldGeneralize $ do
-      -- Show the inferred type in a warning
-      tell . errorMessage $ MissingTypeDeclaration ident generalized
-      -- For non-recursive binding groups, can generalize over constraints.
-      -- For recursive binding groups, we throw an error here for now.
-      when (bindingGroupType == RecursiveBindingGroup && not (null unsolved))
-        . throwError
-        . errorMessage
-        $ CannotGeneralizeRecursiveFunction ident generalized
-      -- Make sure any unsolved type constraints only use type variables which appear
-      -- unknown in the inferred type.
-      forM_ unsolved $ \(_, con) -> do
-        let constraintTypeVars = nub $ foldMap unknownsInType (constraintArgs con)
-        when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $
-          throwError . errorMessage $ NoInstanceFound con
-
+      when shouldGeneralize $ do
+        -- Show the inferred type in a warning
+        tell . errorMessage $ MissingTypeDeclaration ident generalized
+        -- For non-recursive binding groups, can generalize over constraints.
+        -- For recursive binding groups, we throw an error here for now.
+        when (bindingGroupType == RecursiveBindingGroup && not (null unsolved))
+          . throwError
+          . errorMessage
+          $ CannotGeneralizeRecursiveFunction ident generalized
+        -- Make sure any unsolved type constraints only use type variables which appear
+        -- unknown in the inferred type.
+        forM_ unsolved $ \(_, con) -> do
+          let constraintTypeVars = nub $ foldMap unknownsInType (constraintArgs con)
+          when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $
+            throwError . errorMessage $ NoInstanceFound con
+      -- Check rows do not contain duplicate labels
+      checkDuplicateLabels val'
+      return (ident, (foldr (Abs . Left . fst) val' unsolved, generalized))
+      
     -- Check skolem variables did not escape their scope
-    skolemEscapeCheck val'
-    -- Check rows do not contain duplicate labels
-    checkDuplicateLabels val'
-    return (ident, (foldr (Abs . Left . fst) val' unsolved, generalized))
+    skolemEscapeCheck
+
+    return typed
   where
+    -- | Generalize type vars using forall and add inferred constraints
+    generalize unsolved = varIfUnknown . constrain unsolved
 
-  -- | Generalize type vars using forall and add inferred constraints
-  generalize unsolved = varIfUnknown . constrain unsolved
+    -- | Add any unsolved constraints
+    constrain [] = id
+    constrain cs = ConstrainedType (map snd cs)
 
-  -- | Add any unsolved constraints
-  constrain [] = id
-  constrain cs = ConstrainedType (map snd cs)
+    -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
+    tidyUp (ts, sub) = map (\(b, (i, (val, ty))) -> (b, (i, (overTypes (substituteType sub) val, substituteType sub ty)))) ts
 
-  -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
-  tidyUp (ts, sub) = map (\(b, (i, (val, ty))) -> (b, (i, (overTypes (substituteType sub) val, substituteType sub ty)))) ts
+    -- Replace all the wildcards types with their inferred types
+    replace sub = onTypesInErrorMessage (substituteType sub)
 
-  -- Replace all the wildcards types with their inferred types
-  replace sub = onTypesInErrorMessage (substituteType sub)
-
-  isHoleError :: ErrorMessage -> Bool
-  isHoleError (ErrorMessage _ HoleInferredType{}) = True
-  isHoleError _ = False
+    isHoleError :: ErrorMessage -> Bool
+    isHoleError (ErrorMessage _ HoleInferredType{}) = True
+    isHoleError _ = False
 
 type TypeData = M.Map (Qualified Ident) (Type, NameKind, NameVisibility)
 
@@ -164,7 +165,7 @@ checkTypedBindingGroupElement mn (ident, (val', ty, checkType)) dict = do
   (kind, args) <- kindOfWithScopedVars ty
   checkTypeKind ty kind
   -- Check the type with the new names in scope
-  ty'' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty'
+  ty'' <- replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty'
   val'' <- if checkType
            then withScopedTypeVars mn args $ bindNames dict $ TypedValue True <$> check val' ty'' <*> pure ty''
            else return (TypedValue False val' ty'')
@@ -216,7 +217,7 @@ instantiatePolyTypeWithUnknowns ::
   Expr ->
   Type ->
   m (Expr, Type)
-instantiatePolyTypeWithUnknowns val (ForAll ident ty _) = do
+instantiatePolyTypeWithUnknowns val (ForAll ident ty) = do
   ty' <- replaceVarWithUnknown ident ty
   instantiatePolyTypeWithUnknowns val ty'
 instantiatePolyTypeWithUnknowns val (ConstrainedType constraints ty) = do
@@ -282,7 +283,7 @@ infer' (App f arg) = do
   return $ TypedValue True app ret
 infer' (Var var) = do
   checkVisibility var
-  ty <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards <=< lookupVariable $ var
+  ty <- replaceAllTypeSynonyms <=< replaceTypeWildcards <=< lookupVariable $ var
   case ty of
     ConstrainedType constraints ty' -> do
       dicts <- getTypeClassDictionaries
@@ -293,7 +294,7 @@ infer' v@(Constructor c) = do
   env <- getEnv
   case M.lookup c (dataConstructors env) of
     Nothing -> throwError . errorMessage . UnknownName . fmap DctorName $ c
-    Just (_, _, ty, _) -> do (v', ty') <- sndM (introduceSkolemScope <=< replaceAllTypeSynonyms) <=< instantiatePolyTypeWithUnknowns v $ ty
+    Just (_, _, ty, _) -> do (v', ty') <- sndM replaceAllTypeSynonyms <=< instantiatePolyTypeWithUnknowns v $ ty
                              return $ TypedValue True v' ty'
 infer' (Case vals binders) = do
   (vals', ts) <- instantiateForBinders vals binders
@@ -319,7 +320,7 @@ infer' (TypedValue checkType val ty) = do
   Just moduleName <- checkCurrentModule <$> get
   (kind, args) <- kindOfWithScopedVars ty
   checkTypeKind ty kind
-  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
+  ty' <- replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   val' <- if checkType then withScopedTypeVars moduleName args (check val ty') else return val
   return $ TypedValue True val' ty'
 infer' (Hole name) = do
@@ -345,7 +346,7 @@ inferLetBinding seen (ValueDeclaration ident nameKind [] (Right (tv@(TypedValue 
   (kind, args) <- kindOfWithScopedVars ty
   checkTypeKind ty kind
   let dict = M.singleton (Qualified Nothing ident) (ty, nameKind, Undefined)
-  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
+  ty' <- replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   TypedValue _ val' ty'' <- if checkType then withScopedTypeVars moduleName args (bindNames dict (check val ty')) else return tv
   bindNames (M.singleton (Qualified Nothing ident) (ty'', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] (Right (TypedValue checkType val' ty''))]) rest ret j
 inferLetBinding seen (ValueDeclaration ident nameKind [] (Right val) : rest) ret j = do
@@ -386,7 +387,7 @@ inferBinder val (ConstructorBinder ctor binders) = do
   case M.lookup ctor (dataConstructors env) of
     Just (_, _, ty, _) -> do
       (_, fn) <- instantiatePolyTypeWithUnknowns (internalError "Data constructor types cannot contain constraints") ty
-      fn' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ fn
+      fn' <- replaceAllTypeSynonyms fn
       let (args, ret) = peelArgs fn'
       unless (length args == length binders) . throwError . errorMessage $ IncorrectConstructorArity ctor
       unifyTypes ret val
@@ -510,16 +511,14 @@ check'
   => Expr
   -> Type
   -> m Expr
-check' val (ForAll ident ty _) = do
-  scope <- newSkolemScope
-  sko <- newSkolemConstant
+check' val (ForAll ident ty) = newSkolemConstant $ \sko -> do
   let ss = case val of
              PositionedValue pos _ _ -> Just pos
              _ -> Nothing
-      sk = skolemize ident sko scope ss ty
-      skVal = skolemizeTypesInValue ident sko scope ss val
+      sk = skolemize ident sko ss ty
+      skVal = skolemizeTypesInValue ident sko ss val
   val' <- check skVal sk
-  return $ TypedValue True val' (ForAll ident ty (Just scope))
+  return $ TypedValue True val' (ForAll ident ty)
 check' val t@(ConstrainedType constraints ty) = do
   dictNames <- forM constraints $ \(Constraint (Qualified _ (ProperName className)) _ _) ->
     freshIdent ("dict" ++ className)
@@ -577,8 +576,8 @@ check' (App f arg) ret = do
   return $ TypedValue True app ret
 check' v@(Var var) ty = do
   checkVisibility var
-  repl <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< lookupVariable $ var
-  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
+  repl <- replaceAllTypeSynonyms <=< lookupVariable $ var
+  ty' <- replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   v' <- subsumes (Just v) repl ty'
   case v' of
     Nothing -> internalError "check: unable to check the subsumes relation."
@@ -597,8 +596,8 @@ check' (TypedValue checkType val ty1) ty2 = do
   Just moduleName <- checkCurrentModule <$> get
   (kind, args) <- kindOfWithScopedVars ty1
   checkTypeKind ty1 kind
-  ty1' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty1
-  ty2' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty2
+  ty1' <- replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty1
+  ty2' <- replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty2
   val' <- subsumes (Just val) ty1' ty2'
   case val' of
     Nothing -> internalError "check: unable to check the subsumes relation."
@@ -640,7 +639,7 @@ check' v@(Constructor c) ty = do
   case M.lookup c (dataConstructors env) of
     Nothing -> throwError . errorMessage . UnknownName . fmap DctorName $ c
     Just (_, _, ty1, _) -> do
-      repl <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1
+      repl <- replaceAllTypeSynonyms ty1
       mv <- subsumes (Just v) repl ty
       case mv of
         Nothing -> internalError "check: unable to check the subsumes relation."
@@ -726,7 +725,7 @@ checkFunctionApplication' fn (TypeApp (TypeApp tyFunction' argTy) retTy) arg ret
     Just ret' -> do
       Just app' <- subsumes (Just (App fn arg')) retTy ret'
       return (retTy, app')
-checkFunctionApplication' fn (ForAll ident ty _) arg ret = do
+checkFunctionApplication' fn (ForAll ident ty) arg ret = do
   replaced <- replaceVarWithUnknown ident ty
   checkFunctionApplication fn replaced arg ret
 checkFunctionApplication' fn u@(TUnknown _) arg ret = do

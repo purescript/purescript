@@ -77,7 +77,7 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
   checkTypeVars ty = everythingWithContextOnTypes S.empty mempty mappend step ty <> findUnused ty
     where
     step :: S.Set String -> Type -> (S.Set String, MultipleErrors)
-    step s (ForAll tv _ _) = bindVar s tv
+    step s (ForAll tv _) = bindVar s tv
     step s _ = (s, mempty)
     bindVar :: S.Set String -> String -> (S.Set String, MultipleErrors)
     bindVar = bind ShadowedTypeVar
@@ -89,7 +89,7 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
       in foldl (<>) mempty $ map (errorMessage . UnusedTypeVar) unused
       where
       go :: Type -> [String]
-      go (ForAll tv _ _) = [tv]
+      go (ForAll tv _) = [tv]
       go _ = []
 
   bind :: (Ord a) => (a -> SimpleErrorMessage) -> S.Set a -> a -> (S.Set a, MultipleErrors)

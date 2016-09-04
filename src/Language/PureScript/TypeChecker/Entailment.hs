@@ -183,7 +183,7 @@ entails shouldGeneralize moduleName context = solve
 --
 typeHeadsAreEqual :: ModuleName -> Type -> Type -> Maybe [(String, Type)]
 typeHeadsAreEqual _ (TUnknown u1)        (TUnknown u2)        | u1 == u2 = Just []
-typeHeadsAreEqual _ (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    | s1 == s2 = Just []
+typeHeadsAreEqual _ (Skolem _ s1 _)      (Skolem _ s2 _)      | s1 == s2 = Just []
 typeHeadsAreEqual _ t                    (TypeVar v)                     = Just [(v, t)]
 typeHeadsAreEqual _ (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Just []
 typeHeadsAreEqual _ (TypeLevelString s1) (TypeLevelString s2) | s1 == s2 = Just []
@@ -204,7 +204,7 @@ typeHeadsAreEqual m r1@RCons{} r2@RCons{} =
   go [] REmpty            [] REmpty            = Just []
   go [] (TUnknown _)      _  _                 = Just []
   go [] (TypeVar v1)      [] (TypeVar v2)      | v1 == v2 = Just []
-  go [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) | s1 == s2 = Just []
+  go [] (Skolem _ s1 _)   [] (Skolem _ s2 _)   | s1 == s2 = Just []
   go sd r                 [] (TypeVar v)       = Just [(v, rowFromList (sd, r))]
   go _  _                 _  _                 = Nothing
 typeHeadsAreEqual _ _ _ = Nothing

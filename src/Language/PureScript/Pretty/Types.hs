@@ -36,7 +36,7 @@ typeLiterals = mkPattern match
   match (PrettyPrintObject row) = Just $ prettyPrintRowWith '{' '}' row
   match (TypeConstructor ctor) = Just $ text $ runProperName $ disqualify ctor
   match (TUnknown u) = Just $ text $ 't' : show u
-  match (Skolem name s _ _) = Just $ text $ name ++ show s
+  match (Skolem name s _) = Just $ text $ name ++ show s
   match REmpty = Just $ text "()"
   match row@RCons{} = Just $ prettyPrintRowWith '(' ')' row
   match (BinaryNoParensType op l r) =
@@ -102,9 +102,9 @@ insertPlaceholders = everywhereOnTypesTopDown convertForAlls . everywhereOnTypes
   convert (TypeApp (TypeApp f arg) ret) | f == tyFunction = PrettyPrintFunction arg ret
   convert (TypeApp o r) | o == tyRecord = PrettyPrintObject r
   convert other = other
-  convertForAlls (ForAll ident ty _) = go [ident] ty
+  convertForAlls (ForAll ident ty) = go [ident] ty
     where
-    go idents (ForAll ident' ty' _) = go (ident' : idents) ty'
+    go idents (ForAll ident' ty') = go (ident' : idents) ty'
     go idents other = PrettyPrintForAll idents other
   convertForAlls other = other
 

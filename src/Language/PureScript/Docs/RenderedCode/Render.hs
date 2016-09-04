@@ -163,9 +163,9 @@ convert opts (TypeApp o r) | o == tyRecord && prettyPrintObjects opts = PrettyPr
 convert _ other = other
 
 convertForAlls :: Type -> Type
-convertForAlls (ForAll i ty _) = go [i] ty
+convertForAlls (ForAll i ty) = go [i] ty
   where
-  go idents (ForAll i' ty' _) = go (i' : idents) ty'
+  go idents (ForAll i' ty') = go (i' : idents) ty'
   go idents other = PrettyPrintForAll idents other
 convertForAlls other = other
 
