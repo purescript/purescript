@@ -54,8 +54,7 @@ parseForAll = mkForAll <$> ((reserved "forall" <|> reserved "∀") *> P.many1 (i
 --
 parseTypeAtom :: TokenParser Type
 parseTypeAtom = indented *> P.choice
-            [ P.try parseConstrainedType
-            , P.try parseFunction
+            [ P.try parseFunction
             , parseTypeLevelString
             , parseObject
             , parseTypeWildcard
@@ -81,9 +80,8 @@ parseConstrainedType = do
     ty <- P.many parseTypeAtom
     return (Constraint className ty Nothing)
 
-
 parseAnyType :: TokenParser Type
-parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTable parseTypeAtom) P.<?> "type"
+parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTable (P.try parseConstrainedType <|> parseTypeAtom)) P.<?> "type"
   where
   operators = [ [ P.Infix (return TypeApp) P.AssocLeft ]
               , [ P.Infix (P.try (parseQualified parseOperator) >>= \ident ->
