@@ -28,11 +28,11 @@ literalToJSON t (ArrayLiteral xs) = toJSON ("ArrayLiteral", map t xs)
 literalToJSON t (ObjectLiteral xs) = toJSON ("ObjectLiteral", map (fmap t) xs)
 
 annToJSON :: Ann -> Value
-annToJSON (_ss, _cs, _t, m) = toJSON ( Null -- sourceSpanToJSON <$> ss
-                                     , Null -- map commentToJSON cs
-                                     , Null -- typeToJSON <$> t
-                                     , metaToJSON <$> m
-                                     )
+annToJSON (_ss, cs, _t, m) = toJSON ( Null -- sourceSpanToJSON <$> ss
+                                    , map commentToJSON cs
+                                    , Null -- typeToJSON <$> t
+                                    , metaToJSON <$> m
+                                    )
 
 metaToJSON :: Meta -> Value
 metaToJSON (IsConstructor t is) = toJSON ("IsConstructor", constructorTypeToJSON t, map identToJSON is)
@@ -65,13 +65,13 @@ identToJSON (GenIdent s i) = toJSON ("GenIdent", s, i)
 
 qualifiedToJSON :: (a -> Value) -> Qualified a -> Value
 qualifiedToJSON t (Qualified m i) =
-  toJSON ("Qualified", fmap moduleNameToJSON m, t i)
+  toJSON (fmap moduleNameToJSON m, t i)
 
 moduleNameToJSON :: ModuleName -> Value
-moduleNameToJSON (ModuleName ss) = toJSON ("ModuleName", map properNameToJSON ss)
+moduleNameToJSON (ModuleName ss) = toJSON (map properNameToJSON ss)
 
 properNameToJSON :: ProperName a -> Value
-properNameToJSON (ProperName n) = toJSON ("ProperName", n)
+properNameToJSON (ProperName n) = toJSON n
 
 commentToJSON :: Comment -> Value
 commentToJSON (LineComment s) = toJSON ("LineComment", s)
