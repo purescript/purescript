@@ -19,8 +19,8 @@ import Language.PureScript.Names
 import Language.PureScript.Types
 
 literalToJSON :: (a -> Value) -> Literal a -> Value
-literalToJSON _ (NumericLiteral (Left n)) = toJSON ("NumericLiteral", ("Left", n))
-literalToJSON _ (NumericLiteral (Right n)) = toJSON ("NumericLiteral", ("Right", n))
+literalToJSON _ (NumericLiteral (Left n)) = toJSON ("NumericLiteral", "Int", n)
+literalToJSON _ (NumericLiteral (Right n)) = toJSON ("NumericLiteral", "Number", n)
 literalToJSON _ (StringLiteral s) = toJSON ("StringLiteral", s)
 literalToJSON _ (CharLiteral c) = toJSON ("CharLiteral", c)
 literalToJSON _ (BooleanLiteral b) = toJSON ("BooleanLiteral", b)
