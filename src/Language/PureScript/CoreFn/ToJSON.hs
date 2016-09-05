@@ -16,10 +16,8 @@ import Language.PureScript.AST.Literals
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.Comments
 import Language.PureScript.CoreFn
-import Language.PureScript.Crash (internalError)
 import Language.PureScript.Names
 import Language.PureScript.Types
-import Language.PureScript.Kinds
 
 literalToJSON :: (a -> Value) -> Literal a -> Value
 literalToJSON _ (NumericLiteral (Left n)) = toJSON ("NumericLiteral", ("Left", n))
@@ -61,9 +59,6 @@ moduleNameToJSON (ModuleName ss) = toJSON ("ModuleName", map properNameToJSON ss
 properNameToJSON :: ProperName a -> Value
 properNameToJSON (ProperName n) = toJSON ("ProperName", n)
 
-opNameToJSON :: OpName a -> Value
-opNameToJSON (OpName s) = toJSON ("OpName", s)
-
 sourceSpanToJSON :: SourceSpan -> Value
 sourceSpanToJSON (SourceSpan name start end) =
   object [ pack "spanName" .= name
@@ -98,15 +93,12 @@ moduleImportToJSON t (a, n) = toJSON (t a, moduleNameToJSON n)
 foreignDeclToJSON :: ForeignDecl -> Value
 foreignDeclToJSON (i, t) = toJSON (identToJSON i, typeToJSON t)
 
-kindToJSON :: Kind -> Value
-kindToJSON (KUnknown n) = toJSON ("KUnknown", n)
-kindToJSON Star = toJSON ["Star"]
-kindToJSON Bang = toJSON ["Bang"]
-kindToJSON (Row boat) = toJSON ("Row", kindToJSON boat)
-kindToJSON (FunKind d c) = toJSON ("FunKind", kindToJSON d, kindToJSON c)
-kindToJSON Symbol = toJSON ["Symbol"]
-
 typeToJSON :: Type -> Value
+typeToJSON = const Null
+{-
+Types are omitted for now, because they take up a lot of space and we don't
+need them in the output yet.
+
 typeToJSON (TUnknown n) = toJSON ("TUnknown", n)
 typeToJSON (TypeVar v) = toJSON ("TypeVar", v)
 typeToJSON (TypeLevelString s) = toJSON ("TypeLevelString", s)
@@ -126,6 +118,17 @@ typeToJSON PrettyPrintForAll{} = internalError "CoreFn.ToJSON: PrettyPrintForAll
 typeToJSON BinaryNoParensType{} = internalError "CoreFn.ToJSON: BinaryNoParensType was not erased"
 typeToJSON ParensInType{} = internalError "CoreFn.ToJSON: ParensInType was not erased"
 
+kindToJSON :: Kind -> Value
+kindToJSON (KUnknown n) = toJSON ("KUnknown", n)
+kindToJSON Star = toJSON ["Star"]
+kindToJSON Bang = toJSON ["Bang"]
+kindToJSON (Row boat) = toJSON ("Row", kindToJSON boat)
+kindToJSON (FunKind d c) = toJSON ("FunKind", kindToJSON d, kindToJSON c)
+kindToJSON Symbol = toJSON ["Symbol"]
+
+opNameToJSON :: OpName a -> Value
+opNameToJSON (OpName s) = toJSON ("OpName", s)
+
 constraintToJSON :: Constraint -> Value
 constraintToJSON (Constraint cls args dat) =
   object [ pack "constraintClass" .= qualifiedToJSON properNameToJSON cls
@@ -139,6 +142,7 @@ constraintDataToJSON (PartialConstraintData cs b) =
 
 skolemScopeToJSON :: SkolemScope -> Value
 skolemScopeToJSON (SkolemScope n) = toJSON ("SkolemScope", n)
+-}
 
 bindToJSON :: (a -> Value) -> Bind a -> Value
 bindToJSON t (NonRec a n e) = toJSON ("NonRec", t a, identToJSON n, exprToJSON t e)
