@@ -13,7 +13,6 @@ import Data.Aeson
 import Data.Text (pack)
 
 import Language.PureScript.AST.Literals
-import Language.PureScript.AST.SourcePos
 import Language.PureScript.Comments
 import Language.PureScript.CoreFn
 import Language.PureScript.Names
@@ -28,22 +27,37 @@ literalToJSON _ (BooleanLiteral b) = toJSON ("BooleanLiteral", b)
 literalToJSON t (ArrayLiteral xs) = toJSON ("ArrayLiteral", map t xs)
 literalToJSON t (ObjectLiteral xs) = toJSON ("ObjectLiteral", map (fmap t) xs)
 
+annToJSON :: Ann -> Value
+annToJSON (_ss, _cs, _t, m) = toJSON ( Null -- sourceSpanToJSON <$> ss
+                                     , Null -- map commentToJSON cs
+                                     , Null -- typeToJSON <$> t
+                                     , metaToJSON <$> m
+                                     )
+
 metaToJSON :: Meta -> Value
 metaToJSON (IsConstructor t is) = toJSON ("IsConstructor", constructorTypeToJSON t, map identToJSON is)
 metaToJSON IsNewtype = toJSON ["IsNewtype"]
 metaToJSON IsTypeClassConstructor = toJSON ["IsTypeClassConstructor"]
 metaToJSON IsForeign = toJSON ["IsForeign"]
 
-annToJSON :: Ann -> Value
-annToJSON (ss, cs, t, m) = toJSON ( sourceSpanToJSON <$> ss
-                                  , map commentToJSON cs
-                                  , typeToJSON <$> t
-                                  , metaToJSON <$> m
-                                  )
-
 constructorTypeToJSON :: ConstructorType -> Value
 constructorTypeToJSON ProductType = toJSON ["ProductType"]
 constructorTypeToJSON SumType = toJSON ["SumType"]
+
+{-
+sourceSpanToJSON :: SourceSpan -> Value
+sourceSpanToJSON (SourceSpan name start end) =
+  object [ pack "spanName" .= name
+         , pack "spanStart" .= sourcePosToJSON start
+         , pack "spanEnd" .= sourcePosToJSON end
+         ]
+
+sourcePosToJSON :: SourcePos -> Value
+sourcePosToJSON (SourcePos line col) =
+  object [ pack "sourcePosLine" .= line
+         , pack "sourcePosColumn" .= col
+         ]
+-}
 
 identToJSON :: Ident -> Value
 identToJSON (Ident s) = toJSON ("Ident", s)
@@ -58,19 +72,6 @@ moduleNameToJSON (ModuleName ss) = toJSON ("ModuleName", map properNameToJSON ss
 
 properNameToJSON :: ProperName a -> Value
 properNameToJSON (ProperName n) = toJSON ("ProperName", n)
-
-sourceSpanToJSON :: SourceSpan -> Value
-sourceSpanToJSON (SourceSpan name start end) =
-  object [ pack "spanName" .= name
-         , pack "spanStart" .= sourcePosToJSON start
-         , pack "spanEnd" .= sourcePosToJSON end
-         ]
-
-sourcePosToJSON :: SourcePos -> Value
-sourcePosToJSON (SourcePos line col) =
-  object [ pack "sourcePosLine" .= line
-         , pack "sourcePosColumn" .= col
-         ]
 
 commentToJSON :: Comment -> Value
 commentToJSON (LineComment s) = toJSON ("LineComment", s)
@@ -96,9 +97,6 @@ foreignDeclToJSON (i, t) = toJSON (identToJSON i, typeToJSON t)
 typeToJSON :: Type -> Value
 typeToJSON = const Null
 {-
-Types are omitted for now, because they take up a lot of space and we don't
-need them in the output yet.
-
 typeToJSON (TUnknown n) = toJSON ("TUnknown", n)
 typeToJSON (TypeVar v) = toJSON ("TypeVar", v)
 typeToJSON (TypeLevelString s) = toJSON ("TypeLevelString", s)
