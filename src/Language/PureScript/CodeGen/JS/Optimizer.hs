@@ -34,7 +34,6 @@ import Language.PureScript.CodeGen.JS.Optimizer.MagicDo
 import Language.PureScript.CodeGen.JS.Optimizer.TCO
 import Language.PureScript.CodeGen.JS.Optimizer.Unused
 import Language.PureScript.Options
-import qualified Language.PureScript.Constants as C
 
 -- |
 -- Apply a series of optimizer passes to simplified Javascript code
@@ -49,11 +48,6 @@ optimize' js = do
   opts <- ask
   js' <- untilFixedPoint (inlineFnComposition . tidyUp . applyAll
     [ inlineCommonValues
-    , inlineOperator (C.prelude, (C.$)) $ \f x -> JSApp Nothing f [x]
-    , inlineOperator (C.dataFunction, C.apply) $ \f x -> JSApp Nothing f [x]
-    , inlineOperator (C.prelude, (C.#)) $ \x f -> JSApp Nothing f [x]
-    , inlineOperator (C.dataFunction, C.applyFlipped) $ \x f -> JSApp Nothing f [x]
-    , inlineOperator (C.dataArrayUnsafe, C.unsafeIndex) $ flip (JSIndexer Nothing)
     , inlineCommonOperators
     ]) js
   untilFixedPoint (return . tidyUp) . tco opts . magicDo opts $ js'
