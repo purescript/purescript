@@ -213,7 +213,7 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
               -- to generalize over Partial constraints.
               | shouldGeneralize && (null tyArgs || any canBeGeneralized tyArgs) = return (Unsolved (Constraint className' tyArgs conInfo))
               | otherwise = throwError . errorMessage $ NoInstanceFound (Constraint className' tyArgs conInfo)
-            unique tyArgs [(a, dict)] = return $ Solved a dict
+            unique _      [(a, dict)] = return $ Solved a dict
             unique tyArgs tcds
               | pairwiseAny overlapping (map snd tcds) = do
                   tell . errorMessage $ OverlappingInstances className' tyArgs (map (tcdName . snd) tcds)
