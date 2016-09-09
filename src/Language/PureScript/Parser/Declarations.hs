@@ -190,7 +190,7 @@ parseTypeClassDeclaration = do
 
 parseConstraint :: TokenParser Constraint
 parseConstraint = Constraint <$> parseQualified properName
-                             <*> P.many parseConstraintArg
+                             <*> P.many (noWildcards parseTypeAtom)
                              <*> pure Nothing
 parseInstanceDeclaration :: TokenParser (TypeInstanceBody -> Declaration)
 parseInstanceDeclaration = do

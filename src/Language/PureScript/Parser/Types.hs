@@ -3,7 +3,6 @@ module Language.PureScript.Parser.Types
   , parsePolyType
   , noWildcards
   , parseTypeAtom
-  , parseConstraintArg
   ) where
 
 import Prelude.Compat
@@ -125,11 +124,3 @@ parseRowEnding = P.option REmpty $ indented *> pipe *> indented *> parseType
 
 parseRow :: TokenParser Type
 parseRow = (curry rowFromList <$> commaSep (parseNameAndType parsePolyType) <*> parseRowEnding) P.<?> "row"
-
-parseConstraintArg :: TokenParser Type
-parseConstraintArg = indented *> P.choice [ P.try parseFunction
-                                          , parseTypeLevelString
-                                          , parseTypeVariable
-                                          , parseTypeConstructor
-                                          , ParensInType <$> parens parsePolyType
-                                          ]
