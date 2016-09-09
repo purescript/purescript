@@ -78,10 +78,11 @@ typesOf bindingGroupType moduleName vals = do
   forM tys $ \(shouldGeneralize, (ident, (val, ty))) -> do
     -- Replace type class dictionary placeholders with actual dictionaries
     (val', unsolved) <- replaceTypeClassDictionaries shouldGeneralize val
-    let unsolvedTypeVars = nub $ unknownsInType ty
     -- Generalize and constrain the type
     currentSubst <- gets checkSubstitution
-    let generalized = generalize unsolved (substituteType currentSubst ty)
+    let ty' = substituteType currentSubst ty
+        unsolvedTypeVars = nub $ unknownsInType ty'
+        generalized = generalize unsolved ty'
 
     when shouldGeneralize $ do
       -- Show the inferred type in a warning
@@ -97,7 +98,7 @@ typesOf bindingGroupType moduleName vals = do
       forM_ unsolved $ \(_, con) -> do
         let constraintTypeVars = nub $ foldMap unknownsInType (constraintArgs con)
         when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $
-          throwError . errorMessage $ NoInstanceFound con
+          throwError . onErrorMessages (replace currentSubst) . errorMessage $ NoInstanceFound con
 
     -- Check skolem variables did not escape their scope
     skolemEscapeCheck val'
