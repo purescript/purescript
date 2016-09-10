@@ -202,8 +202,7 @@ typeHeadsAreEqual m r1@RCons{} r2@RCons{} =
   where
   go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Maybe [(String, Type)]
   go [] REmpty            [] REmpty            = Just []
-  go [] (TUnknown _)      _  _                 = Just []
-  go [] (TypeVar v1)      [] (TypeVar v2)      | v1 == v2 = Just []
+  go [] (TUnknown u1)     [] (TUnknown u2)     | u1 == u2 = Just []
   go [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) | s1 == s2 = Just []
   go sd r                 [] (TypeVar v)       = Just [(v, rowFromList (sd, r))]
   go _  _                 _  _                 = Nothing

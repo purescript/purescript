@@ -173,13 +173,11 @@ unifiesWith r1@RCons{}           r2@RCons{} =
   in all (uncurry unifiesWith) int && go sd1 r1' sd2 r2'
   where
   go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Bool
-  go [] REmpty          [] REmpty          = True
-  go [] (TypeVar v1)    [] (TypeVar v2)    = v1 == v2
+  go [] (TUnknown u1)     [] (TUnknown u2)     = u1 == u2
   go [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) = s1 == s2
-  go [] (TUnknown _)    _  _               = True
-  go _  _               [] (TUnknown _)    = True
-  go _  (TUnknown _)    _  (TUnknown _)    = True
-  go _  _               _  _               = False
+  go [] (TypeVar v1)      [] (TypeVar v2)      = v1 == v2
+  go [] REmpty            [] REmpty            = True
+  go _  _                 _  _                 = False
 unifiesWith _ _ = False
 
 -- |
