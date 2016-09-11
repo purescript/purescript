@@ -18,6 +18,7 @@ module Language.PureScript.Ide.SourceFile
   ( parseModule
   , getImportsForFile
   , extractSpans
+  , extractTypeAnnotations
   ) where
 
 import           Protolude
@@ -63,6 +64,16 @@ getImportsForFile fp = do
         unwrapImportType (P.Explicit decls) = P.Explicit (map unwrapPositionedRef decls)
         unwrapImportType (P.Hiding decls)   = P.Hiding (map unwrapPositionedRef decls)
         unwrapImportType P.Implicit         = P.Implicit
+
+-- | Extracts type annotations for functions from a given Module
+extractTypeAnnotations
+  :: [P.Declaration]
+  -> [(P.Ident, P.Type)]
+extractTypeAnnotations = mapMaybe extract
+  where
+    extract d = case unwrapPositioned d of
+      P.TypeDeclaration ident ty -> Just (ident, ty)
+      _ -> Nothing
 
 -- | Given a surrounding Sourcespan and a Declaration from the PS AST, extracts
 -- definition sites inside that Declaration.

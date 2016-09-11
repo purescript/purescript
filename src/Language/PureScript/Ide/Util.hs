@@ -76,7 +76,7 @@ completionFromMatch' (Match (m', d)) = case d of
 
 infoFromMatch :: Match IdeDeclarationAnn -> Info
 infoFromMatch (Match (m, IdeDeclarationAnn ann d)) =
-  Info (a, b, c, annLocation ann)
+  Info (a, b, maybe c prettyTypeT (annTypeAnnotation ann), annLocation ann)
   where
     (a, b, c) = completionFromMatch' (Match (m, d))
 

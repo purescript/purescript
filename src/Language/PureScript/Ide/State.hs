@@ -132,10 +132,10 @@ getAllModules mmoduleName = do
         Just (cachedModulename, ef)
           | cachedModulename == moduleName -> do
               (AstData asts) <- s2AstData <$> getStage2
-              let ast = fromMaybe M.empty (M.lookup moduleName asts)
+              let ast = fromMaybe (M.empty, M.empty) (M.lookup moduleName asts)
               pure . M.toList $
                 M.insert moduleName
-                (snd . annotateLocations ast . fst . convertExterns $ ef) declarations
+                (snd . annotateModule ast . fst . convertExterns $ ef) declarations
         _ -> pure (M.toList declarations)
 
 -- | Adds an ExternsFile into psc-ide's State Stage1. This does not populate the
@@ -180,8 +180,11 @@ populateStage2 = do
 populateStage2STM :: TVar IdeState -> STM ()
 populateStage2STM ref = do
   modules <- s1Modules <$> getStage1STM ref
-  let spans = map (\(P.Module ss _ _ decls _, _) -> M.fromList (concatMap (extractSpans ss) decls)) modules
-  setStage2STM ref (Stage2 (AstData spans))
+  let astData = map (\(P.Module ss _ _ decls _, _) ->
+                       let definitions = M.fromList (concatMap (extractSpans ss) decls)
+                           typeAnnotations = M.fromList (extractTypeAnnotations decls)
+                       in (definitions, typeAnnotations)) modules
+  setStage2STM ref (Stage2 (AstData astData))
 
 -- | Resolves reexports and populates Stage3 with data to be used in queries.
 populateStage3 :: (Ide m, MonadLogger m) => m ()
@@ -206,7 +209,7 @@ populateStage3STM ref = do
       nModules :: Map P.ModuleName (Module, [(P.ModuleName, P.DeclarationRef)])
       nModules = M.mapWithKey
         (\moduleName (m, refs) ->
-           (fromMaybe m $ annotateLocations <$> M.lookup moduleName asts <*> pure m, refs)) modules
+           (fromMaybe m $ annotateModule <$> M.lookup moduleName asts <*> pure m, refs)) modules
       -- resolves reexports and discards load failures for now
       result = resolveReexports (M.map (snd . fst) nModules) <$> M.elems nModules
   setStage3STM ref (Stage3 (M.fromList (map reResolved result)) Nothing)
