@@ -47,15 +47,19 @@ data Annotation
   = Annotation
   { annLocation     :: Maybe P.SourceSpan
   , annExportedFrom :: Maybe P.ModuleName
+  , annTypeAnnotation :: Maybe P.Type
   } deriving (Show, Eq, Ord)
 
 emptyAnn :: Annotation
-emptyAnn = Annotation Nothing Nothing
+emptyAnn = Annotation Nothing Nothing Nothing
 
 type Module = (P.ModuleName, [IdeDeclarationAnn])
 
-newtype AstData a =
-  AstData (Map P.ModuleName (Map (Either Text Text) a))
+type DefinitionSites a = Map (Either Text Text) a
+type TypeAnnotations = Map P.Ident P.Type
+newtype AstData a = AstData (Map P.ModuleName (DefinitionSites a, TypeAnnotations))
+  -- ^ SourceSpans for the definition sites of Values and Types aswell as type
+  -- annotations found in a module
   deriving (Show, Eq, Ord, Functor, Foldable)
 
 data Configuration =

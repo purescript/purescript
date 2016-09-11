@@ -17,9 +17,9 @@
 {-# LANGUAGE FlexibleContexts  #-}
 
 module Language.PureScript.Ide.Externs
-  ( readExternFile,
-    convertExterns,
-    annotateLocations
+  ( readExternFile
+  , convertExterns
+  , annotateModule
   ) where
 
 import           Protolude
@@ -99,14 +99,17 @@ convertTypeOperator P.ExternsTypeFixity{..} =
     efTypePrecedence
     efTypeAssociativity
 
-annotateLocations :: Map (Either Text Text) P.SourceSpan -> Module -> Module
-annotateLocations ast (moduleName, decls) =
+annotateModule
+  :: (DefinitionSites P.SourceSpan, TypeAnnotations)
+  -> Module
+  -> Module
+annotateModule (defs, types) (moduleName, decls) =
   (moduleName, map convertDeclaration decls)
   where
     convertDeclaration :: IdeDeclarationAnn -> IdeDeclarationAnn
     convertDeclaration (IdeDeclarationAnn ann d) = case d of
       IdeValue i t ->
-        annotateValue (runIdentT i) (IdeValue i t)
+        annotateFunction i (IdeValue i t)
       IdeType i k ->
         annotateType (runProperNameT i) (IdeType i k)
       IdeTypeSynonym i t ->
@@ -120,5 +123,8 @@ annotateLocations ast (moduleName, decls) =
       IdeTypeOperator n i p a ->
         annotateType i (IdeTypeOperator n i p a)
       where
-        annotateValue x = IdeDeclarationAnn (ann {annLocation = Map.lookup (Left x) ast})
-        annotateType x = IdeDeclarationAnn (ann {annLocation = Map.lookup (Right x) ast})
+        annotateFunction x = IdeDeclarationAnn (ann { annLocation = Map.lookup (Left (runIdentT x)) defs
+                                                    , annTypeAnnotation = Map.lookup x types
+                                                    })
+        annotateValue x = IdeDeclarationAnn (ann {annLocation = Map.lookup (Left x) defs})
+        annotateType x = IdeDeclarationAnn (ann {annLocation = Map.lookup (Right x) defs})
