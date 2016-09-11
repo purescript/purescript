@@ -120,6 +120,7 @@ errorCode em = case unwrapErrorMessage em of
   NoInstanceFound{} -> "NoInstanceFound"
   PossiblyInfiniteInstance{} -> "PossiblyInfiniteInstance"
   CannotDerive{} -> "CannotDerive"
+  InvalidNewtypeInstance{} -> "InvalidNewtypeInstance"
   CannotFindDerivingType{} -> "CannotFindDerivingType"
   DuplicateLabel{} -> "DuplicateLabel"
   DuplicateValueDeclaration{} -> "DuplicateValueDeclaration"
@@ -262,6 +263,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> pure insts
   gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
   gSimple (CannotDerive cl ts) = CannotDerive cl <$> traverse f ts
+  gSimple (InvalidNewtypeInstance cl ts) = InvalidNewtypeInstance cl <$> traverse f ts
   gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
   gSimple (OrphanInstance nm cl ts) = OrphanInstance nm cl <$> traverse f ts
   gSimple (WildcardInferredType ty ctx) = WildcardInferredType <$> f ty <*> traverse (sndM f) ctx
@@ -641,6 +643,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
                 [ line (showQualified runProperName nm)
                 , Box.vcat Box.left (map typeAtomAsBox ts)
                 ]
+            ]
+    renderSimpleErrorMessage (InvalidNewtypeInstance nm ts) =
+      paras [ line "Cannot derive newtype instance for"
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName nm)
+                , Box.vcat Box.left (map typeAtomAsBox ts)
+                ]
+            , line "Make sure this is a newtype."
             ]
     renderSimpleErrorMessage (CannotFindDerivingType nm) =
       line $ "Cannot derive a type class instance, because the type declaration for " ++ markCode (runProperName nm) ++ " could not be found."

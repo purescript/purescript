@@ -54,6 +54,12 @@ deriveInstance mn ds (TypeInstanceDeclaration nm deps className tys@[ty] Derived
   = TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveOrd mn ds tyCon
 deriveInstance _ _ (TypeInstanceDeclaration _ _ className tys DerivedInstance)
   = throwError . errorMessage $ CannotDerive className tys
+deriveInstance mn ds (TypeInstanceDeclaration nm deps className tys@[ty] NewtypeInstance)
+  | Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor ty
+  , mn == fromMaybe mn mn'
+  = TypeInstanceDeclaration nm deps className tys . NewtypeInstanceWithDictionary <$> deriveNewtypeInstance className ds ty tyCon args
+deriveInstance _ _ (TypeInstanceDeclaration _ _ className tys NewtypeInstance)
+  = throwError . errorMessage $ InvalidNewtypeInstance className tys
 deriveInstance mn ds (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> deriveInstance mn ds d
 deriveInstance _  _  e = return e
 
@@ -65,6 +71,25 @@ unwrapTypeConstructor = fmap (second reverse) . go
     (tyCon, args) <- go ty
     return (tyCon, arg : args)
   go _ = Nothing
+
+deriveNewtypeInstance
+  :: forall m
+   . MonadError MultipleErrors m
+  => Qualified (ProperName 'ClassName)
+  -> [Declaration]
+  -> Type
+  -> ProperName 'TypeName
+  -> [Type]
+  -> m Expr
+deriveNewtypeInstance className ds ty tyConNm dargs = do
+    tyCon <- findTypeDecl tyConNm ds
+    go tyCon
+  where
+    go (DataDeclaration Newtype _ tyArgNames [(_, [wrapped])]) = do
+      let subst = zipWith (\(name, _) t -> (name, t)) tyArgNames dargs
+      return (SuperClassDictionary className [replaceAllTypeVars subst wrapped])
+    go (PositionedDeclaration _ _ d) = go d
+    go _ = throwError . errorMessage $ InvalidNewtypeInstance className [ty]
 
 dataGeneric :: ModuleName
 dataGeneric = ModuleName [ ProperName "Data", ProperName "Generic" ]

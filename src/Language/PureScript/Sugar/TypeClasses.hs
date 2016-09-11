@@ -181,6 +181,10 @@ desugarDecl mn exps = go
     desugared <- desugarCases members
     dictDecl <- typeInstanceDictionaryDeclaration name mn deps className tys desugared
     return (expRef name className tys, [d, dictDecl])
+  go d@(TypeInstanceDeclaration name deps className tys (NewtypeInstanceWithDictionary dict)) = do
+    let dictTy = foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
+        constrainedTy = quantify (if null deps then dictTy else ConstrainedType deps dictTy)
+    return (expRef name className tys, [d, ValueDeclaration name Private [] (Right (TypedValue True dict constrainedTy))])
   go (PositionedDeclaration pos com d) = do
     (dr, ds) <- rethrowWithPosition pos $ desugarDecl mn exps d
     return (dr, map (PositionedDeclaration pos com) ds)

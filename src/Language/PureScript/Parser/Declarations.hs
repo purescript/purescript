@@ -63,9 +63,8 @@ kindedIdent :: TokenParser (String, Maybe Kind)
 kindedIdent = (, Nothing) <$> identifier
           <|> parens ((,) <$> identifier <*> (Just <$> (indented *> doubleColon *> indented *> parseKind)))
 
-parseDataDeclaration :: TokenParser Declaration
-parseDataDeclaration = do
-  dtype <- (reserved "data" *> return Data) <|> (reserved "newtype" *> return Newtype)
+parseDataDeclaration :: DataDeclType -> TokenParser Declaration
+parseDataDeclaration dtype = do
   name <- indented *> typeName
   tyArgs <- many (indented *> kindedIdent)
   ctors <- P.option [] $ do
@@ -219,6 +218,16 @@ parseDerivingInstanceDeclaration = do
   instanceDecl <- parseInstanceDeclaration
   return $ instanceDecl DerivedInstance
 
+parseNewtypeInstanceDeclaration :: TokenParser Declaration
+parseNewtypeInstanceDeclaration = do
+  instanceDecl <- parseInstanceDeclaration
+  return $ instanceDecl NewtypeInstance
+
+parseNewtypeOrNewtypeInstance :: TokenParser Declaration
+parseNewtypeOrNewtypeInstance =
+  reserved "newtype" *>
+    (parseDataDeclaration Newtype <|> parseNewtypeInstanceDeclaration)
+
 positioned :: TokenParser Declaration -> TokenParser Declaration
 positioned = withSourceSpan PositionedDeclaration
 
@@ -227,7 +236,8 @@ positioned = withSourceSpan PositionedDeclaration
 --
 parseDeclaration :: TokenParser Declaration
 parseDeclaration = positioned (P.choice
-                   [ parseDataDeclaration
+                   [ parseNewtypeOrNewtypeInstance
+                   , reserved "data" *> parseDataDeclaration Data
                    , parseTypeDeclaration
                    , parseTypeSynonymDeclaration
                    , parseValueDeclaration
