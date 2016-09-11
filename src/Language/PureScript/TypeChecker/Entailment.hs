@@ -379,8 +379,8 @@ pairwiseAll p (x : xs) = all (p x) xs && pairwiseAll p xs
 
 -- | Check any pair of values in a list match a predicate
 pairwiseAny :: (a -> a -> Bool) -> [a] -> Bool
-pairwiseAny _ [] = True
-pairwiseAny _ [_] = True
+pairwiseAny _ [] = False
+pairwiseAny _ [_] = False
 pairwiseAny p (x : xs) = any (p x) xs || pairwiseAny p xs
 
 pairwiseM :: Applicative m => (a -> a -> m ()) -> [a] -> m ()
