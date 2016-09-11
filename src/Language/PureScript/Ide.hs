@@ -38,9 +38,9 @@ import           Language.PureScript.Ide.SourceFile
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
-import           System.Directory
-import           System.FilePath
-import           System.FilePath.Glob
+import           System.Directory (getCurrentDirectory, getDirectoryContents, doesDirectoryExist, doesFileExist)
+import           System.FilePath ((</>))
+import           System.FilePath.Glob (glob)
 
 -- | Accepts a Commmand and runs it against psc-ide's State. This is the main
 -- entry point for the server.
@@ -77,7 +77,7 @@ handleCommand c = case c of
     case rs of
       Right rs' -> answerRequest outfp rs'
       Left question ->
-        pure (CompletionResult (map completionFromMatch question))
+        pure (CompletionResult (map (completionFromMatch . map withEmptyAnn) question))
   Rebuild file ->
     rebuildFile file
   Cwd ->
@@ -88,7 +88,7 @@ handleCommand c = case c of
     liftIO exitSuccess
 
 findCompletions :: Ide m =>
-                   [Filter] -> Matcher IdeDeclaration -> Maybe P.ModuleName -> m Success
+                   [Filter] -> Matcher IdeDeclarationAnn -> Maybe P.ModuleName -> m Success
 findCompletions filters matcher currentModule = do
   modules <- getAllModules currentModule
   pure . CompletionResult . map completionFromMatch . getCompletions filters matcher $ modules
@@ -97,7 +97,7 @@ findType :: Ide m =>
             Text -> [Filter] -> Maybe P.ModuleName -> m Success
 findType search filters currentModule = do
   modules <- getAllModules currentModule
-  pure . InfoResult . map infoFromMatch . getExactMatches search filters $ modules
+  pure . CompletionResult . map completionFromMatch . getExactMatches search filters $ modules
 
 findPursuitCompletions :: MonadIO m =>
                           PursuitQuery -> m Success

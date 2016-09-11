@@ -31,6 +31,11 @@ spec = beforeAll_ setup $
 
 testCase :: Text -> (Int, Int) -> IO ()
 testCase s (x, y) = do
-  P.SourceSpan f (P.SourcePos l c) _ : _ <- Integration.getInfo s
+  P.SourceSpan f (P.SourcePos l c) _ <- getLocation s
   toS f `shouldSatisfy` T.isSuffixOf "SourceFileSpec.purs"
   (l, c) `shouldBe` (x, y)
+
+getLocation :: Text -> IO P.SourceSpan
+getLocation s = do
+  (_, _, _, Just location) : _ <- Integration.getType s
+  pure location

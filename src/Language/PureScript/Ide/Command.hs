@@ -34,7 +34,7 @@ data Command
       }
     | Complete
       { completeFilters       :: [Filter]
-      , completeMatcher       :: Matcher IdeDeclaration
+      , completeMatcher       :: Matcher IdeDeclarationAnn
       , completeCurrentModule :: Maybe P.ModuleName
       }
     | Pursuit
