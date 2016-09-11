@@ -16,7 +16,6 @@ import Control.Arrow (second)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
-import Control.Monad.Writer.Class (MonadWriter(..))
 
 import qualified Data.Map as M
 
@@ -96,14 +95,14 @@ unifyKinds k1 k2 = do
 
 -- | Infer the kind of a single type
 kindOf
-  :: (MonadError MultipleErrors m, MonadState CheckState m, MonadWriter MultipleErrors m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m)
   => Type
   -> m Kind
 kindOf ty = fst <$> kindOfWithScopedVars ty
 
 -- | Infer the kind of a single type, returning the kinds of any scoped type variables
 kindOfWithScopedVars ::
-  (MonadError MultipleErrors m, MonadState CheckState m, MonadWriter MultipleErrors m) =>
+  (MonadError MultipleErrors m, MonadState CheckState m) =>
   Type ->
   m (Kind, [(String, Kind)])
 kindOfWithScopedVars ty =
@@ -116,7 +115,7 @@ kindOfWithScopedVars ty =
 
 -- | Infer the kind of a type constructor with a collection of arguments and a collection of associated data constructors
 kindsOf
-  :: (MonadError MultipleErrors m, MonadState CheckState m, MonadWriter MultipleErrors m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m)
   => Bool
   -> ModuleName
   -> ProperName 'TypeName
@@ -145,7 +144,7 @@ freshKindVar (arg, Just kind') kind = do
 
 -- | Simultaneously infer the kinds of several mutually recursive type constructors
 kindsOfAll
-  :: (MonadError MultipleErrors m, MonadState CheckState m, MonadWriter MultipleErrors m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m)
   => ModuleName
   -> [(ProperName 'TypeName, [(String, Maybe Kind)], Type)]
   -> [(ProperName 'TypeName, [(String, Maybe Kind)], [Type])]
