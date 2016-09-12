@@ -6,15 +6,15 @@ import Control.Monad.Eff.Console
 
 newtype X = X String
 
-newtype instance showX :: Show X
+derive newtype instance showX :: Show X
 
-newtype instance eqX :: Eq X
+derive newtype instance eqX :: Eq X
 
-newtype instance ordX :: Ord X
+derive newtype instance ordX :: Ord X
 
 newtype Y a = Y (Array a)
 
-newtype instance showY :: Show (Y String)
+derive newtype instance showY :: Show (Y String)
 
 main = do
   logShow (X "test")

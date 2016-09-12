@@ -87,7 +87,7 @@ deriveNewtypeInstance className ds ty tyConNm dargs = do
   where
     go (DataDeclaration Newtype _ tyArgNames [(_, [wrapped])]) = do
       let subst = zipWith (\(name, _) t -> (name, t)) tyArgNames dargs
-      return (SuperClassDictionary className [replaceAllTypeVars subst wrapped])
+      return (DeferredDictionary className [replaceAllTypeVars subst wrapped])
     go (PositionedDeclaration _ _ d) = go d
     go _ = throwError . errorMessage $ InvalidNewtypeInstance className [ty]
 

@@ -576,7 +576,7 @@ data Expr
   -- |
   -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
   --
-  | SuperClassDictionary (Qualified (ProperName 'ClassName)) [Type]
+  | DeferredDictionary (Qualified (ProperName 'ClassName)) [Type]
   -- |
   -- A placeholder for an anonymous function argument
   --

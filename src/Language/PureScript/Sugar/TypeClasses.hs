@@ -129,7 +129,7 @@ desugarModule _ = internalError "Exports should have been elaborated in name des
 --
 --   subString :: {} -> Sub String
 --   subString _ = { sub: "",
---                 , "__superclass_Foo_0": \_ -> <SuperClassDictionary Foo String>
+--                 , "__superclass_Foo_0": \_ -> <DeferredDictionary Foo String>
 --                 }
 --
 -- and finally as the generated javascript:
@@ -291,7 +291,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
       -- The type is a record type, but depending on type instance dependencies, may be constrained.
       -- The dictionary itself is a record literal.
       let superclasses = superClassDictionaryNames implies `zip`
-            [ Abs (Left (Ident C.__unused)) (SuperClassDictionary superclass tyArgs)
+            [ Abs (Left (Ident C.__unused)) (DeferredDictionary superclass tyArgs)
             | (Constraint superclass suTyArgs _) <- implies
             , let tyArgs = map (replaceAllTypeVars (zip (map fst args) tys)) suTyArgs
             ]

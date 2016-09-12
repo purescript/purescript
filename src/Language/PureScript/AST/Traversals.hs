@@ -583,6 +583,6 @@ accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (con
   forDecls _ = mempty
 
   forValues (TypeClassDictionary c _ _) = mconcat (map f (constraintArgs c))
-  forValues (SuperClassDictionary _ tys) = mconcat (map f tys)
+  forValues (DeferredDictionary _ tys) = mconcat (map f tys)
   forValues (TypedValue _ _ ty) = f ty
   forValues _ = mempty

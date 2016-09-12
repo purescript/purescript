@@ -17,6 +17,7 @@ module Language.PureScript.Parser.Declarations
 
 import Prelude hiding (lex)
 
+import Data.Functor (($>))
 import Data.Maybe (fromMaybe)
 
 import Control.Applicative
@@ -63,8 +64,9 @@ kindedIdent :: TokenParser (String, Maybe Kind)
 kindedIdent = (, Nothing) <$> identifier
           <|> parens ((,) <$> identifier <*> (Just <$> (indented *> doubleColon *> indented *> parseKind)))
 
-parseDataDeclaration :: DataDeclType -> TokenParser Declaration
-parseDataDeclaration dtype = do
+parseDataDeclaration :: TokenParser Declaration
+parseDataDeclaration = do
+  dtype <- (reserved "data" *> return Data) <|> (reserved "newtype" *> return Newtype)
   name <- indented *> typeName
   tyArgs <- many (indented *> kindedIdent)
   ctors <- P.option [] $ do
@@ -191,6 +193,7 @@ parseConstraint :: TokenParser Constraint
 parseConstraint = Constraint <$> parseQualified properName
                              <*> P.many (noWildcards parseTypeAtom)
                              <*> pure Nothing
+
 parseInstanceDeclaration :: TokenParser (TypeInstanceBody -> Declaration)
 parseInstanceDeclaration = do
   reserved "instance"
@@ -215,18 +218,9 @@ parseTypeInstanceDeclaration = do
 parseDerivingInstanceDeclaration :: TokenParser Declaration
 parseDerivingInstanceDeclaration = do
   reserved "derive"
+  ty <- P.option DerivedInstance (reserved "newtype" $> NewtypeInstance)
   instanceDecl <- parseInstanceDeclaration
-  return $ instanceDecl DerivedInstance
-
-parseNewtypeInstanceDeclaration :: TokenParser Declaration
-parseNewtypeInstanceDeclaration = do
-  instanceDecl <- parseInstanceDeclaration
-  return $ instanceDecl NewtypeInstance
-
-parseNewtypeOrNewtypeInstance :: TokenParser Declaration
-parseNewtypeOrNewtypeInstance =
-  reserved "newtype" *>
-    (parseDataDeclaration Newtype <|> parseNewtypeInstanceDeclaration)
+  return $ instanceDecl ty
 
 positioned :: TokenParser Declaration -> TokenParser Declaration
 positioned = withSourceSpan PositionedDeclaration
@@ -236,8 +230,7 @@ positioned = withSourceSpan PositionedDeclaration
 --
 parseDeclaration :: TokenParser Declaration
 parseDeclaration = positioned (P.choice
-                   [ parseNewtypeOrNewtypeInstance
-                   , reserved "data" *> parseDataDeclaration Data
+                   [ parseDataDeclaration
                    , parseTypeDeclaration
                    , parseTypeSynonymDeclaration
                    , parseValueDeclaration
