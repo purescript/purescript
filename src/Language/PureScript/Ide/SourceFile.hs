@@ -17,12 +17,15 @@
 module Language.PureScript.Ide.SourceFile
   ( parseModule
   , getImportsForFile
+  , extractAstInformation
+  -- for tests
   , extractSpans
   , extractTypeAnnotations
   ) where
 
 import           Protolude
 
+import qualified Data.Map as Map
 import qualified Language.PureScript                  as P
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Util
@@ -64,6 +67,15 @@ getImportsForFile fp = do
         unwrapImportType (P.Explicit decls) = P.Explicit (map unwrapPositionedRef decls)
         unwrapImportType (P.Hiding decls)   = P.Hiding (map unwrapPositionedRef decls)
         unwrapImportType P.Implicit         = P.Implicit
+
+-- | Extracts AST information from a parsed module
+extractAstInformation
+  :: P.Module
+  -> (DefinitionSites P.SourceSpan, TypeAnnotations)
+extractAstInformation (P.Module ss _ _ decls _) =
+  let definitions = Map.fromList (concatMap (extractSpans ss) decls)
+      typeAnnotations = Map.fromList (extractTypeAnnotations decls)
+  in (definitions, typeAnnotations)
 
 -- | Extracts type annotations for functions from a given Module
 extractTypeAnnotations

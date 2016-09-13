@@ -112,21 +112,25 @@ data Stage3 = Stage3
 newtype Match a = Match (P.ModuleName, a)
            deriving (Show, Eq, Functor)
 
-newtype Completion =
-  Completion (Text, Text, Text)
-  deriving (Show,Eq)
-
-newtype Info =
-  Info (Text, Text, Text, Maybe P.SourceSpan)
-  deriving (Show,Eq)
-
-instance ToJSON Info where
-  toJSON (Info (m, d, t, sourceSpan)) =
-    object ["module" .= m, "identifier" .= d, "type" .= t, "definedAt" .= sourceSpan]
+-- | A completion as it gets sent to the editors
+data Completion = Completion
+  { complModule :: Text
+  , complIdentifier :: Text
+  , complType :: Text
+  , complExpandedType :: Text
+  , complLocation :: Maybe P.SourceSpan
+  , complDocumentation :: Maybe Text
+  } deriving (Show, Eq)
 
 instance ToJSON Completion where
-  toJSON (Completion (m, d, t)) =
-    object ["module" .= m, "identifier" .= d, "type" .= t]
+  toJSON (Completion {..}) =
+    object [ "module" .= complModule
+           , "identifier" .= complIdentifier
+           , "type" .= complType
+           , "expandedType" .= complExpandedType
+           , "definedAt" .= complLocation
+           , "documentation" .= complDocumentation
+           ]
 
 data ModuleImport =
   ModuleImport
@@ -164,14 +168,13 @@ identifierFromDeclarationRef _ = ""
 
 data Success =
   CompletionResult [Completion]
-  | InfoResult [Info]
   | TextResult Text
   | MultilineTextResult [Text]
   | PursuitResult [PursuitResponse]
   | ImportList [ModuleImport]
   | ModuleList [ModuleIdent]
   | RebuildSuccess [P.JSONError]
-  deriving(Show, Eq)
+  deriving (Show, Eq)
 
 encodeSuccess :: (ToJSON a) => a -> Value
 encodeSuccess res =
@@ -179,7 +182,6 @@ encodeSuccess res =
 
 instance ToJSON Success where
   toJSON (CompletionResult cs) = encodeSuccess cs
-  toJSON (InfoResult i) = encodeSuccess i
   toJSON (TextResult t) = encodeSuccess t
   toJSON (MultilineTextResult ts) = encodeSuccess ts
   toJSON (PursuitResult resp) = encodeSuccess resp

@@ -38,7 +38,7 @@ type ScoredMatch a = (Match a, Double)
 
 newtype Matcher a = Matcher (Endo [Match a]) deriving (Monoid)
 
-instance FromJSON (Matcher IdeDeclaration) where
+instance FromJSON (Matcher IdeDeclarationAnn) where
   parseJSON = withObject "matcher" $ \o -> do
     (matcher :: Maybe Text) <- o .:? "matcher"
     case matcher of
@@ -60,17 +60,17 @@ instance FromJSON (Matcher IdeDeclaration) where
 -- Examples:
 --   flMa matches flexMatcher. Score: 14.28
 --   sons matches sortCompletions. Score: 6.25
-flexMatcher :: Text -> Matcher IdeDeclaration
+flexMatcher :: Text -> Matcher IdeDeclarationAnn
 flexMatcher p = mkMatcher (flexMatch p)
 
-distanceMatcher :: Text -> Int -> Matcher IdeDeclaration
+distanceMatcher :: Text -> Int -> Matcher IdeDeclarationAnn
 distanceMatcher q maxDist = mkMatcher (distanceMatcher' q maxDist)
 
-distanceMatcher' :: Text -> Int -> [Match IdeDeclaration] -> [ScoredMatch IdeDeclaration]
+distanceMatcher' :: Text -> Int -> [Match IdeDeclarationAnn] -> [ScoredMatch IdeDeclarationAnn]
 distanceMatcher' q maxDist = mapMaybe go
   where
     go m = let d = dist (T.unpack y)
-               y = identifierFromIdeDeclaration (unwrapMatch m)
+               y = identifierFromIdeDeclaration (discardAnn (unwrapMatch m))
           in if d <= maxDist
              then Just (m, 1 / fromIntegral d)
              else Nothing
@@ -85,12 +85,12 @@ runMatcher (Matcher m)= appEndo m
 sortCompletions :: [ScoredMatch a] -> [ScoredMatch a]
 sortCompletions = sortBy (flip compare `on` snd)
 
-flexMatch :: Text -> [Match IdeDeclaration] -> [ScoredMatch IdeDeclaration]
+flexMatch :: Text -> [Match IdeDeclarationAnn] -> [ScoredMatch IdeDeclarationAnn]
 flexMatch = mapMaybe . flexRate
 
-flexRate :: Text -> Match IdeDeclaration -> Maybe (ScoredMatch IdeDeclaration)
+flexRate :: Text -> Match IdeDeclarationAnn -> Maybe (ScoredMatch IdeDeclarationAnn)
 flexRate p c = do
-  score <- flexScore p (identifierFromIdeDeclaration (unwrapMatch c))
+  score <- flexScore p (identifierFromIdeDeclaration (discardAnn (unwrapMatch c)))
   return (c, score)
 
 -- FlexMatching ala Sublime.
