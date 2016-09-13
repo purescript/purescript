@@ -307,7 +307,7 @@ updateTypes goType = (goDecl, goExpr, goBinder)
   goDecl :: Maybe SourceSpan -> Declaration -> m (Maybe SourceSpan, Declaration)
   goDecl _ d@(PositionedDeclaration pos _ _) = return (Just pos, d)
   goDecl pos (DataDeclaration ddt name args dctors) = do
-    dctors' <- traverse (sndM (traverse (goType' pos))) dctors
+    dctors' <- traverse (sndM (traverse (sndM (goType' pos)))) dctors
     return (pos, DataDeclaration ddt name args dctors')
   goDecl pos (ExternDeclaration name ty) = do
     ty' <- goType' pos ty

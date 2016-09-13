@@ -12,7 +12,7 @@ import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Graph
 import Data.List (nub)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, mapMaybe)
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -71,8 +71,10 @@ usedModules ams d =
     [mn]
   forDecls (FixityDeclaration fd)
     | Just mn <- extractQualFixity fd, mn `notElem` ams = [mn]
-  forDecls (TypeInstanceDeclaration _ _ (Qualified (Just mn) _) _ _)
-    | mn `notElem` ams = [mn]
+  forDecls (TypeClassDeclaration _ _ cs _)
+    = filter (`notElem` ams) (constraintModules cs)
+  forDecls (TypeInstanceDeclaration _ cs (Qualified (Just mn) _) _ _)
+    = filter (`notElem` ams) (mn : constraintModules cs)
   forDecls _ = []
 
   forValues :: Expr -> [ModuleName]
@@ -86,6 +88,9 @@ usedModules ams d =
   forTypes (TypeConstructor (Qualified (Just mn) _))
     | mn `notElem` ams = [mn]
   forTypes _ = []
+
+  constraintModules :: [Constraint] -> [ModuleName]
+  constraintModules = mapMaybe (getQual . constraintClass)
 
   extractQualFixity :: Either ValueFixity TypeFixity -> Maybe ModuleName
   extractQualFixity (Left (ValueFixity _ (Qualified mn _) _)) = mn

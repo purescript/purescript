@@ -94,7 +94,7 @@ data TypeKind
   -- |
   -- Data type
   --
-  = DataType [(String, Maybe Kind)] [(ProperName 'ConstructorName, [Type])]
+  = DataType [(String, Maybe Kind)] [(ProperName 'ConstructorName, [(Ident, Type)])]
   -- |
   -- Type synonym
   --

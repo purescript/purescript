@@ -58,13 +58,13 @@ qualifyName n defmn qn = Qualified (Just mn) n
 -- Given an environment and a datatype or newtype name,
 -- this function returns the associated data constructors if it is the case of a datatype
 -- where: - ProperName is the name of the constructor (for example, "Nothing" in Maybe)
---        - [Type] is the list of arguments, if it has (for example, "Just" has [TypeVar "a"])
+--        - [(Ident, Type)] is the list of arguments, if it has (for example, "Just" has [TypeVar "a"])
 --
-getConstructors :: Environment -> ModuleName -> Qualified (ProperName 'ConstructorName) -> [(ProperName 'ConstructorName, [Type])]
+getConstructors :: Environment -> ModuleName -> Qualified (ProperName 'ConstructorName) -> [(ProperName 'ConstructorName, [(Ident, Type)])]
 getConstructors env defmn n = extractConstructors lnte
   where
 
-  extractConstructors :: Maybe (Kind, TypeKind) -> [(ProperName 'ConstructorName, [Type])]
+  extractConstructors :: Maybe (Kind, TypeKind) -> [(ProperName 'ConstructorName, [(Ident, Type)])]
   extractConstructors (Just (_, DataType _ pt)) = pt
   extractConstructors _ = internalError "Data name not in the scope of the current environment in extractConstructors"
 
@@ -326,7 +326,6 @@ checkExhaustiveExpr env mn = onExpr
   onExpr (UnaryMinus e) = UnaryMinus <$> onExpr e
   onExpr (Literal (ArrayLiteral es)) = Literal . ArrayLiteral <$> mapM onExpr es
   onExpr (Literal (ObjectLiteral es)) = Literal . ObjectLiteral <$> mapM (sndM onExpr) es
-  onExpr (TypeClassDictionaryConstructorApp x e) = TypeClassDictionaryConstructorApp x <$> onExpr e
   onExpr (Accessor x e) = Accessor x <$> onExpr e
   onExpr (ObjectUpdate o es) = ObjectUpdate <$> onExpr o <*> mapM (sndM onExpr) es
   onExpr (Abs x e) = Abs x <$> onExpr e

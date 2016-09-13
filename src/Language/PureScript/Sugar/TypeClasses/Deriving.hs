@@ -103,12 +103,12 @@ deriveGeneric mn ds tyConNm dargs = do
       recordConstructor :: Expr -> Expr
       recordConstructor = App (Constructor (Qualified (Just dataGeneric) (ProperName "SRecord")))
 
-      mkCtorClause :: (ProperName 'ConstructorName, [Type]) -> m CaseAlternative
-      mkCtorClause (ctorName, tys) = do
-        idents <- replicateM (length tys) freshIdent'
-        return $ CaseAlternative [ConstructorBinder (Qualified (Just mn) ctorName) (map VarBinder idents)] (Right (caseResult idents))
+      mkCtorClause :: (ProperName 'ConstructorName, [(Ident, Type)]) -> m CaseAlternative
+      mkCtorClause (ctorName, fields) = do
+        let (idents, tys) = unzip fields
+        return $ CaseAlternative [ConstructorBinder (Qualified (Just mn) ctorName) (map VarBinder idents)] (Right (caseResult idents tys))
         where
-        caseResult idents =
+        caseResult idents tys =
           App (prodConstructor (Literal . StringLiteral . showQualified runProperName $ Qualified (Just mn) ctorName))
             . Literal . ArrayLiteral
             $ zipWith toSpineFun (map (Var . Qualified Nothing) idents) tys
@@ -147,11 +147,11 @@ deriveGeneric mn ds tyConNm dargs = do
       proxy :: Type -> Type
       proxy = TypeApp (TypeConstructor (Qualified (Just typesProxy) (ProperName "Proxy")))
 
-      mkProdClause :: (ProperName 'ConstructorName, [Type]) -> Expr
+      mkProdClause :: (ProperName 'ConstructorName, [(Ident, Type)]) -> Expr
       mkProdClause (ctorName, tys) =
         Literal $ ObjectLiteral
           [ ("sigConstructor", Literal (StringLiteral (showQualified runProperName (Qualified (Just mn) ctorName))))
-          , ("sigValues", Literal . ArrayLiteral . map (mkProductSignature . instantiate) $ tys)
+          , ("sigValues", Literal . ArrayLiteral . map (mkProductSignature . instantiate) $ fmap snd tys)
           ]
 
       mkProductSignature :: Type -> Expr
@@ -186,9 +186,9 @@ deriveGeneric mn ds tyConNm dargs = do
       recordBinder :: [Binder] -> Binder
       recordBinder = ConstructorBinder (Qualified (Just dataGeneric) (ProperName "SRecord"))
 
-      mkAlternative :: (ProperName 'ConstructorName, [Type]) -> m CaseAlternative
-      mkAlternative (ctorName, tys) = do
-        idents <- replicateM (length tys) freshIdent'
+      mkAlternative :: (ProperName 'ConstructorName, [(Ident, Type)]) -> m CaseAlternative
+      mkAlternative (ctorName, fields) = do
+        let (idents, tys) = unzip fields
         return $
           CaseAlternative
             [ prodBinder
@@ -274,11 +274,11 @@ deriveEq mn ds tyConNm = do
       where
       catchAll = CaseAlternative [NullBinder, NullBinder] (Right (Literal (BooleanLiteral False)))
 
-    mkCtorClause :: (ProperName 'ConstructorName, [Type]) -> m CaseAlternative
+    mkCtorClause :: (ProperName 'ConstructorName, [(Ident, Type)]) -> m CaseAlternative
     mkCtorClause (ctorName, tys) = do
       identsL <- replicateM (length tys) (freshIdent "l")
       identsR <- replicateM (length tys) (freshIdent "r")
-      let tests = zipWith3 toEqTest (map (Var . Qualified Nothing) identsL) (map (Var . Qualified Nothing) identsR) tys
+      let tests = zipWith3 toEqTest (map (Var . Qualified Nothing) identsL) (map (Var . Qualified Nothing) identsR) (map snd tys)
       return $ CaseAlternative [caseBinder identsL, caseBinder identsR] (Right (conjAll tests))
       where
       caseBinder idents = ConstructorBinder (Qualified (Just mn) ctorName) (map VarBinder idents)
@@ -337,10 +337,11 @@ deriveOrd mn ds tyConNm = do
     ordCompare :: Expr -> Expr -> Expr
     ordCompare = App . App (Var (Qualified (Just (ModuleName [ProperName "Data", ProperName "Ord"])) (Ident C.compare)))
 
-    mkCtorClauses :: ((ProperName 'ConstructorName, [Type]), Bool) -> m [CaseAlternative]
-    mkCtorClauses ((ctorName, tys), isLast) = do
-      identsL <- replicateM (length tys) (freshIdent "l")
-      identsR <- replicateM (length tys) (freshIdent "r")
+    mkCtorClauses :: ((ProperName 'ConstructorName, [(Ident, Type)]), Bool) -> m [CaseAlternative]
+    mkCtorClauses ((ctorName, fields), isLast) = do
+      let (idents, tys) = unzip fields
+      identsL <- mapM (\field -> freshIdent (runIdent field ++ "L")) idents
+      identsR <- mapM (\field -> freshIdent (runIdent field ++ "R")) idents
       let tests = zipWith3 toOrdering (map (Var . Qualified Nothing) identsL) (map (Var . Qualified Nothing) identsR) tys
           extras | not isLast = [ CaseAlternative [ ConstructorBinder (Qualified (Just mn) ctorName) (replicate (length tys) NullBinder)
                                                   , NullBinder

@@ -5,7 +5,7 @@ import Prelude.Compat
 import Control.Arrow (second, (***))
 
 import Data.Function (on)
-import Data.List (sort, sortBy, nub)
+import Data.List (nub)
 import Data.Maybe (mapMaybe)
 import qualified Data.Map as M
 
@@ -21,7 +21,6 @@ import Language.PureScript.CoreFn.Module
 import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Names
-import Language.PureScript.Sugar.TypeClasses (typeClassMemberName, superClassDictionaryNames)
 import Language.PureScript.Types
 import qualified Language.PureScript.AST as A
 
@@ -72,8 +71,6 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
     [NonRec (ssA ss) name (exprToCoreFn ss com Nothing e)]
   declToCoreFn ss _   (A.BindingGroupDeclaration ds) =
     [Rec $ map (\(name, _, e) -> ((ssA ss, name), exprToCoreFn ss [] Nothing e)) ds]
-  declToCoreFn ss com (A.TypeClassDeclaration name _ supers members) =
-    [NonRec (ssA ss) (properToIdent name) $ mkTypeClassConstructor ss com supers members]
   declToCoreFn _  com (A.PositionedDeclaration ss com1 d) =
     declToCoreFn (Just ss) (com ++ com1) d
   declToCoreFn _ _ _ = []
@@ -110,13 +107,6 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
     exprToCoreFn ss com (Just ty) v
   exprToCoreFn ss com ty (A.Let ds v) =
     Let (ss, com, ty, Nothing) (concatMap (declToCoreFn ss []) ds) (exprToCoreFn ss [] Nothing v)
-  exprToCoreFn ss com _  (A.TypeClassDictionaryConstructorApp name (A.TypedValue _ (A.Literal (A.ObjectLiteral vs)) _)) =
-    let args = map (exprToCoreFn ss [] Nothing . snd) $ sortBy (compare `on` fst) vs
-        ctor = Var (ss, [], Nothing, Just IsTypeClassConstructor) (fmap properToIdent name)
-    in foldl (App (ss, com, Nothing, Nothing)) ctor args
-  exprToCoreFn ss com ty  (A.TypeClassDictionaryAccessor _ ident) =
-    Abs (ss, com, ty, Nothing) (Ident "dict")
-      (Accessor nullAnn (runIdent ident) (Var nullAnn $ Qualified Nothing (Ident "dict")))
   exprToCoreFn _ com ty (A.PositionedValue ss com1 v) =
     exprToCoreFn (Just ss) (com ++ com1) ty v
   exprToCoreFn _ _ _ e =
@@ -247,21 +237,6 @@ exportToCoreFn (A.TypeClassRef name) = [properToIdent name]
 exportToCoreFn (A.TypeInstanceRef name) = [name]
 exportToCoreFn (A.PositionedDeclarationRef _ _ d) = exportToCoreFn d
 exportToCoreFn _ = []
-
--- |
--- Makes a typeclass dictionary constructor function. The returned expression
--- is a function that accepts the superclass instances and member
--- implementations and returns a record for the instance dictionary.
---
-mkTypeClassConstructor :: Maybe SourceSpan -> [Comment] -> [Constraint] -> [A.Declaration] -> Expr Ann
-mkTypeClassConstructor ss com [] [] = Literal (ss, com, Nothing, Just IsTypeClassConstructor) (ObjectLiteral [])
-mkTypeClassConstructor ss com supers members =
-  let args@(a:as) = sort $ map typeClassMemberName members ++ superClassDictionaryNames supers
-      props = [ (arg, Var nullAnn $ Qualified Nothing (Ident arg)) | arg <- args ]
-      dict = Literal nullAnn (ObjectLiteral props)
-  in Abs (ss, com, Nothing, Just IsTypeClassConstructor)
-         (Ident a)
-         (foldr (Abs nullAnn . Ident) dict as)
 
 -- |
 -- Converts a ProperName to an Ident.

@@ -42,15 +42,15 @@ addDataType
   -> DataDeclType
   -> ProperName 'TypeName
   -> [(String, Maybe Kind)]
-  -> [(ProperName 'ConstructorName, [Type])]
+  -> [(ProperName 'ConstructorName, [(Ident, Type)])]
   -> Kind
   -> m ()
 addDataType moduleName dtype name args dctors ctorKind = do
   env <- getEnv
   putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (ctorKind, DataType args dctors) (types env) }
-  for_ dctors $ \(dctor, tys) ->
+  for_ dctors $ \(dctor, fields) ->
     warnAndRethrow (addHint (ErrorInDataConstructor dctor)) $
-      addDataConstructor moduleName dtype name (map fst args) dctor tys
+      addDataConstructor moduleName dtype name (map fst args) dctor fields
 
 addDataConstructor
   :: (MonadState CheckState m, MonadError MultipleErrors m)
@@ -59,16 +59,16 @@ addDataConstructor
   -> ProperName 'TypeName
   -> [String]
   -> ProperName 'ConstructorName
-  -> [Type]
+  -> [(Ident, Type)]
   -> m ()
-addDataConstructor moduleName dtype name args dctor tys = do
+addDataConstructor moduleName dtype name args dctor fields = do
   env <- getEnv
+  let (idents, tys) = unzip fields
   traverse_ checkTypeSynonyms tys
   let retTy = foldl TypeApp (TypeConstructor (Qualified (Just moduleName) name)) (map TypeVar args)
   let dctorTy = foldr function retTy tys
   let polyType = mkForAll args dctorTy
-  let fields = [Ident ("value" ++ show n) | n <- [0..(length tys - 1)]]
-  putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (dtype, name, polyType, fields) (dataConstructors env) }
+  putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (dtype, name, polyType, idents) (dataConstructors env) }
 
 addTypeSynonym
   :: (MonadState CheckState m, MonadError MultipleErrors m)
@@ -191,7 +191,7 @@ typeCheckAll moduleName _ = traverse go
     warnAndRethrow (addHint (ErrorInTypeConstructor name)) $ do
       when (dtype == Newtype) $ checkNewtype name dctors
       checkDuplicateTypeArguments $ map fst args
-      ctorKind <- kindsOf True moduleName name args (concatMap snd dctors)
+      ctorKind <- kindsOf True moduleName name args (concatMap (map snd . snd) dctors)
       let args' = args `withKinds` ctorKind
       addDataType moduleName dtype name args' dctors ctorKind
     return $ DataDeclaration dtype name args dctors
@@ -199,7 +199,7 @@ typeCheckAll moduleName _ = traverse go
     warnAndRethrow (addHint ErrorInDataBindingGroup) $ do
       let syns = mapMaybe toTypeSynonym tys
       let dataDecls = mapMaybe toDataDecl tys
-      (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
+      (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap (map snd . snd) dctors)) dataDecls)
       for_ (zip dataDecls data_ks) $ \((dtype, name, args, dctors), ctorKind) -> do
         when (dtype == Newtype) $ checkNewtype name dctors
         checkDuplicateTypeArguments $ map fst args
@@ -310,7 +310,7 @@ typeCheckAll moduleName _ = traverse go
     checkType _ = internalError "Invalid type in instance in checkOrphanInstance"
   checkOrphanInstance _ _ _ = internalError "Unqualified class name in checkOrphanInstance"
 
-  checkNewtype :: ProperName 'TypeName -> [(ProperName 'ConstructorName, [Type])] -> m ()
+  checkNewtype :: ProperName 'TypeName -> [(ProperName 'ConstructorName, [(Ident, Type)])] -> m ()
   checkNewtype _ [(_, [_])] = return ()
   checkNewtype name _ = throwError . errorMessage $ InvalidNewtype name
 
