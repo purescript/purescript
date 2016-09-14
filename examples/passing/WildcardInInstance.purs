@@ -16,5 +16,8 @@ instance monadEffEff :: MonadEff eff (Eff eff) where
 test :: forall m. MonadEff _ m => m Unit
 test = liftEff $ log "Done"
 
+test1 :: Eff _ Unit
+test1 = liftEff $ log "Done"
+
 main :: forall eff. Eff (console :: CONSOLE | eff) Unit
 main = test

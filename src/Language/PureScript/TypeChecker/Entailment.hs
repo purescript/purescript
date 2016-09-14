@@ -364,7 +364,7 @@ matches deps TypeClassDictionaryInScope{..} tys = do
         unifiesWith' (TypeConstructor c1) (TypeConstructor c2) = c1 == c2
         unifiesWith' (TypeApp h1 t1)      (TypeApp h2 t2)      = unifiesWith' h1 h2 && unifiesWith' t1 t2
         unifiesWith' REmpty               REmpty               = True
-        unifiesWith' r1@RCons{}           r2@RCons{} =
+        unifiesWith' r1                   r2                   | isRCons r1 || isRCons r2 =
             let (s1, r1') = rowToList r1
                 (s2, r2') = rowToList r2
 
@@ -381,6 +381,10 @@ matches deps TypeClassDictionaryInScope{..} tys = do
             go [] (TypeVar v1)      [] (TypeVar v2)      = v1 == v2
             go _  _                 _  _                 = False
         unifiesWith' _ _ = False
+
+        isRCons :: Type -> Bool
+        isRCons RCons{}    = True
+        isRCons _          = False
 
 -- | Add a dictionary for the constraint to the scope, and dictionaries
 -- for all implied superclass instances.
