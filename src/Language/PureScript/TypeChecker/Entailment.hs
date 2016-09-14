@@ -6,6 +6,7 @@
 module Language.PureScript.TypeChecker.Entailment
   ( InstanceContext
   , replaceTypeClassDictionaries
+  , newDictionaries
   ) where
 
 import Prelude.Compat
@@ -46,6 +47,9 @@ type InstanceContext = M.Map (Maybe ModuleName)
 -- should unify if we are going to commit to an instance.
 type Matching a = M.Map String a
 
+combineContexts :: InstanceContext -> InstanceContext -> InstanceContext
+combineContexts = M.unionWith (M.unionWith M.union)
+
 -- | Replace type class dictionary placeholders with inferred type class dictionaries
 replaceTypeClassDictionaries
   :: forall m
@@ -53,7 +57,7 @@ replaceTypeClassDictionaries
   => Bool
   -> Expr
   -> m (Expr, [(Ident, Constraint)])
-replaceTypeClassDictionaries shouldGeneralize expr = do
+replaceTypeClassDictionaries shouldGeneralize expr = flip evalStateT M.empty $ do
     -- Loop, deferring any unsolved constraints, until there are no more
     -- constraints which can be solved, then make a generalization pass.
     let loop e = do
@@ -64,18 +68,18 @@ replaceTypeClassDictionaries shouldGeneralize expr = do
     loop expr >>= generalizePass
   where
     -- This pass solves constraints where possible, deferring constraints if not.
-    deferPass :: Expr -> m (Expr, Any)
+    deferPass :: Expr -> StateT InstanceContext m (Expr, Any)
     deferPass = fmap (second fst) . runWriterT . f where
-      f :: Expr -> WriterT (Any, [(Ident, Constraint)]) m Expr
+      f :: Expr -> WriterT (Any, [(Ident, Constraint)]) (StateT InstanceContext m) Expr
       (_, f, _) = everywhereOnValuesTopDownM return (go True) return
 
     -- This pass generalizes any remaining constraints
-    generalizePass :: Expr -> m (Expr, [(Ident, Constraint)])
+    generalizePass :: Expr -> StateT InstanceContext m (Expr, [(Ident, Constraint)])
     generalizePass = fmap (second snd) . runWriterT . f where
-      f :: Expr -> WriterT (Any, [(Ident, Constraint)]) m Expr
+      f :: Expr -> WriterT (Any, [(Ident, Constraint)]) (StateT InstanceContext m) Expr
       (_, f, _) = everywhereOnValuesTopDownM return (go False) return
 
-    go :: Bool -> Expr -> WriterT (Any, [(Ident, Constraint)]) m Expr
+    go :: Bool -> Expr -> WriterT (Any, [(Ident, Constraint)]) (StateT InstanceContext m) Expr
     go deferErrors dict@(TypeClassDictionary _ _ hints) =
       rethrow (addHints hints) $ entails shouldGeneralize deferErrors dict
     go _ other = return other
@@ -99,7 +103,7 @@ entails
   => Bool
   -> Bool
   -> Expr
-  -> WriterT (Any, [(Ident, Constraint)]) m Expr
+  -> WriterT (Any, [(Ident, Constraint)]) (StateT InstanceContext m) Expr
 entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hints) =
     solve constraint
   where
@@ -119,43 +123,45 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
     valUndefined :: Expr
     valUndefined = Var (Qualified (Just (ModuleName [ProperName C.prim])) (Ident C.undefined))
 
-    solve :: Constraint -> WriterT (Any, [(Ident, Constraint)]) m Expr
+    solve :: Constraint -> WriterT (Any, [(Ident, Constraint)]) (StateT InstanceContext m) Expr
     solve con = go 0 con
       where
-        go :: Int -> Constraint -> WriterT (Any, [(Ident, Constraint)]) m Expr
+        go :: Int -> Constraint -> WriterT (Any, [(Ident, Constraint)]) (StateT InstanceContext m) Expr
         go work (Constraint className' tys' _) | work > 1000 = throwError . errorMessage $ PossiblyInfiniteInstance className' tys'
-        go work con'@(Constraint className' tys' conInfo) = withErrorMessageHint (ErrorSolvingConstraint con') $ do
+        go work con'@(Constraint className' tys' conInfo) = WriterT . StateT . (withErrorMessageHint (ErrorSolvingConstraint con') .) . runStateT . runWriterT $ do
             -- We might have unified types by solving other constraints, so we need to
             -- apply the latest substitution.
-            latestSubst <- lift (gets checkSubstitution)
+            latestSubst <- lift . lift $ gets checkSubstitution
             let tys'' = map (substituteType latestSubst) tys'
+            -- Get the inferred constraint context so far, and merge it with the global context
+            inferred <- lift get
             -- We need information about functional dependencies, so we have to look up the class
             -- name in the environment:
             let findClass = fromMaybe (internalError "entails: type class not found in environment") . M.lookup className'
-            TypeClassData{ typeClassDependencies } <- lift (gets (findClass . typeClasses . checkEnv))
+            TypeClassData{ typeClassDependencies } <- lift . lift $ gets (findClass . typeClasses . checkEnv)
             let instances =
                   [ (substs, tcd)
-                  | tcd <- forClassName context className' tys''
+                  | tcd <- forClassName (combineContexts context inferred) className' tys''
                     -- Make sure the type unifies with the type in the type instance definition
                   , substs <- maybeToList (matches typeClassDependencies tcd tys'')
                   ]
-            solution <- lift $ unique tys'' instances
+            solution <- lift . lift $ unique tys'' instances
             case solution of
               Solved substs tcd -> do
                 -- Note that we solved something.
                 tell (Any True, mempty)
                 -- Make sure the substitution is valid:
-                lift . for_ substs $ pairwiseM unifyTypes
+                lift . lift . for_ substs $ pairwiseM unifyTypes
                 -- Now enforce any functional dependencies, using unification
                 -- Note: we need to generate fresh types for any unconstrained
                 -- type variables before unifying.
                 let subst = fmap head substs
-                currentSubst <- lift (gets checkSubstitution)
-                subst' <- lift $ withFreshTypes tcd (fmap (substituteType currentSubst) subst)
-                lift $ zipWithM_ (\t1 t2 -> do
+                currentSubst <- lift . lift $ gets checkSubstitution
+                subst' <- lift . lift $ withFreshTypes tcd (fmap (substituteType currentSubst) subst)
+                lift . lift $ zipWithM_ (\t1 t2 -> do
                   let inferredType = replaceAllTypeVars (M.toList subst') t1
                   unifyTypes inferredType t2) (tcdInstanceTypes tcd) tys''
-                currentSubst' <- lift (gets checkSubstitution)
+                currentSubst' <- lift . lift $ gets checkSubstitution
                 let subst'' = fmap (substituteType currentSubst') subst'
                 -- Solve any necessary subgoals
                 args <- solveSubgoals subst'' (tcdDependencies tcd)
@@ -163,10 +169,15 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
                                   (mkDictionary (tcdName tcd) args)
                                   (tcdPath tcd)
                 return match
-              Unsolved unsolved@(Constraint (Qualified _ pn) _ _) -> do
+              Unsolved unsolved -> do
                 -- Generate a fresh name for the unsolved constraint's new dictionary
-                ident <- freshIdent ("dict" ++ runProperName pn)
+                ident <- freshIdent ("dict" ++ runProperName (disqualify (constraintClass unsolved)))
                 let qident = Qualified Nothing ident
+                -- Store the new dictionary in the InstanceContext so that we can solve this goal in
+                -- future.
+                newDicts <- lift . lift $ newDictionaries [] qident unsolved
+                let newContext = mkContext newDicts
+                modify (combineContexts newContext)
                 -- Mark this constraint for generalization
                 tell (mempty, [(ident, unsolved)])
                 return (Var qident)
@@ -240,7 +251,7 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
             -- Create dictionaries for subgoals which still need to be solved by calling go recursively
             -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
             -- unifies with Either a b, and we can satisfy the subgoals Show a and Show b recursively.
-            solveSubgoals :: Matching Type -> Maybe [Constraint] -> WriterT (Any, [(Ident, Constraint)]) m (Maybe [Expr])
+            solveSubgoals :: Matching Type -> Maybe [Constraint] -> WriterT (Any, [(Ident, Constraint)]) (StateT InstanceContext m) (Maybe [Expr])
             solveSubgoals _ Nothing = return Nothing
             solveSubgoals subst (Just subgoals) =
               Just <$> traverse (go (work + 1) . mapConstraintArgs (map (replaceAllTypeVars (M.toList subst)))) subgoals
@@ -370,6 +381,31 @@ matches deps TypeClassDictionaryInScope{..} tys = do
             go [] (TypeVar v1)      [] (TypeVar v2)      = v1 == v2
             go _  _                 _  _                 = False
         unifiesWith' _ _ = False
+
+-- | Add a dictionary for the constraint to the scope, and dictionaries
+-- for all implied superclass instances.
+newDictionaries
+  :: MonadState CheckState m
+  => [(Qualified (ProperName 'ClassName), Integer)]
+  -> Qualified Ident
+  -> Constraint
+  -> m [TypeClassDictionaryInScope]
+newDictionaries path name (Constraint className instanceTy _) = do
+    tcs <- gets (typeClasses . checkEnv)
+    let TypeClassData{..} = fromMaybe (internalError "newDictionaries: type class lookup failed") $ M.lookup className tcs
+    supDicts <- join <$> zipWithM (\(Constraint supName supArgs _) index ->
+                                      newDictionaries ((supName, index) : path)
+                                                      name
+                                                      (Constraint supName (instantiateSuperclass (map fst typeClassArguments) supArgs instanceTy) Nothing)
+                                  ) typeClassSuperclasses [0..]
+    return (TypeClassDictionaryInScope name path className instanceTy Nothing : supDicts)
+  where
+    instantiateSuperclass :: [String] -> [Type] -> [Type] -> [Type]
+    instantiateSuperclass args supArgs tys = map (replaceAllTypeVars (zip args tys)) supArgs
+
+mkContext :: [TypeClassDictionaryInScope] -> InstanceContext
+mkContext = foldr combineContexts M.empty . map fromDict where
+  fromDict d = M.singleton Nothing (M.singleton (tcdClassName d) (M.singleton (tcdName d) d))
 
 -- | Check all pairs of values in a list match a predicate
 pairwiseAll :: (a -> a -> Bool) -> [a] -> Bool

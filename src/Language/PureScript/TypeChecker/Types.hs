@@ -54,7 +54,6 @@ import Language.PureScript.TypeChecker.Skolems
 import Language.PureScript.TypeChecker.Subsumption
 import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.TypeChecker.Unify
-import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 
 data BindingGroupType
@@ -541,26 +540,6 @@ check' val t@(ConstrainedType constraints ty) = do
   dicts <- join <$> zipWithM (newDictionaries []) (map (Qualified Nothing) dictNames) constraints
   val' <- withBindingGroupVisible $ withTypeClassDictionaries dicts $ check val ty
   return $ TypedValue True (foldr (Abs . Left) val' dictNames) t
-  where
-  -- | Add a dictionary for the constraint to the scope, and dictionaries
-  -- for all implied superclass instances.
-  newDictionaries
-    :: [(Qualified (ProperName 'ClassName), Integer)]
-    -> Qualified Ident
-    -> Constraint
-    -> m [TypeClassDictionaryInScope]
-  newDictionaries path name (Constraint className instanceTy _) = do
-    tcs <- gets (typeClasses . checkEnv)
-    let TypeClassData{..} = fromMaybe (internalError "newDictionaries: type class lookup failed") $ M.lookup className tcs
-    supDicts <- join <$> zipWithM (\(Constraint supName supArgs _) index ->
-                                      newDictionaries ((supName, index) : path)
-                                                      name
-                                                      (Constraint supName (instantiateSuperclass (map fst typeClassArguments) supArgs instanceTy) Nothing)
-                                  ) typeClassSuperclasses [0..]
-    return (TypeClassDictionaryInScope name path className instanceTy Nothing : supDicts)
-
-  instantiateSuperclass :: [String] -> [Type] -> [Type] -> [Type]
-  instantiateSuperclass args supArgs tys = map (replaceAllTypeVars (zip args tys)) supArgs
 check' val u@(TUnknown _) = do
   val'@(TypedValue _ _ ty) <- infer val
   -- Don't unify an unknown with an inferred polytype

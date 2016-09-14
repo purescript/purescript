@@ -32,6 +32,8 @@ ala _ f = map unwrap (f wrap)
 
 test = ala Multiplicative foldPair
 
+test1 = ala Multiplicative foldPair (Pair 2 3)
+
 main = do
   logShow (test (Pair 2 3))
   log "Done"
