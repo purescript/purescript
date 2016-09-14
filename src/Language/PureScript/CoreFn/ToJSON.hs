@@ -9,6 +9,7 @@ module Language.PureScript.CoreFn.ToJSON
 import Prelude.Compat
 
 import Data.Aeson
+import Data.Version (Version, showVersion)
 import Data.Text (pack)
 
 import Language.PureScript.AST.Literals
@@ -27,22 +28,22 @@ literalToJSON t (ObjectLiteral xs) = toJSON ("ObjectLiteral", recordToJSON t xs)
 identToJSON :: Ident -> Value
 identToJSON = toJSON . runIdent
 
-qualifiedToJSON :: (a -> Value) -> Qualified a -> Value
-qualifiedToJSON t (Qualified Nothing i) = t i
-qualifiedToJSON t (Qualified (Just mn) i) = toJSON [moduleNameToJSON mn, t i]
+properNameToJSON :: ProperName a -> Value
+properNameToJSON = toJSON . runProperName
+
+qualifiedToJSON :: (a -> String) -> Qualified a -> Value
+qualifiedToJSON f = toJSON . showQualified f
 
 moduleNameToJSON :: ModuleName -> Value
 moduleNameToJSON = toJSON . runModuleName
 
-properNameToJSON :: ProperName a -> Value
-properNameToJSON (ProperName n) = toJSON n
-
-moduleToJSON :: Module a -> Value
-moduleToJSON m = object [ pack "imports"  .= map (moduleNameToJSON . snd) (moduleImports m)
-                        , pack "exports"  .= map identToJSON (moduleExports m)
-                        , pack "foreign"  .= map (identToJSON . fst) (moduleForeign m)
-                        , pack "decls"    .= recordToJSON exprToJSON (foldMap fromBind (moduleDecls m))
-                        ]
+moduleToJSON :: Version -> Module a -> Value
+moduleToJSON v m = object [ pack "imports"   .= map (moduleNameToJSON . snd) (moduleImports m)
+                          , pack "exports"   .= map identToJSON (moduleExports m)
+                          , pack "foreign"   .= map (identToJSON . fst) (moduleForeign m)
+                          , pack "decls"     .= recordToJSON exprToJSON (foldMap fromBind (moduleDecls m))
+                          , pack "builtWith" .= toJSON (showVersion v)
+                          ]
 
 fromBind :: Bind a -> [(String, Expr a)]
 fromBind (NonRec _ n e) = [(runIdent n, e)]
@@ -52,7 +53,7 @@ recordToJSON :: (a -> Value) -> [(String, a)] -> Value
 recordToJSON f = object . map (\(label, a) -> pack label .= f a)
 
 exprToJSON :: Expr a -> Value
-exprToJSON (Var _ i)              = qualifiedToJSON identToJSON i
+exprToJSON (Var _ i)              = qualifiedToJSON runIdent i
 exprToJSON (Literal _ l)          = toJSON ( "Literal"
                                            , literalToJSON (exprToJSON) l
                                            )
@@ -95,16 +96,14 @@ caseAlternativeToJSON (CaseAlternative bs r') =
          ]
 
 binderToJSON :: Binder a -> Value
+binderToJSON (VarBinder _ v)              = identToJSON v
 binderToJSON (NullBinder _)               = toJSON "NullBinder"
 binderToJSON (LiteralBinder _ l)          = toJSON ( "LiteralBinder"
                                                    , literalToJSON binderToJSON l
                                                    )
-binderToJSON (VarBinder _ v)              = toJSON ( "VarBinder"
-                                                   , identToJSON v
-                                                   )
 binderToJSON (ConstructorBinder _ d c bs) = toJSON ( "ConstructorBinder"
-                                                   , qualifiedToJSON properNameToJSON d
-                                                   , qualifiedToJSON properNameToJSON c
+                                                   , qualifiedToJSON runProperName d
+                                                   , qualifiedToJSON runProperName c
                                                    , map binderToJSON bs
                                                    )
 binderToJSON (NamedBinder _ n b)          = toJSON ( "NamedBinder"
