@@ -29,6 +29,11 @@ import qualified Text.Parsec as P
 -- | A map of locally-bound names in scope.
 type Context = [(Ident, Type)]
 
+newtype TypeSearch = TypeSearch (Type -> [Qualified Ident])
+
+instance Show TypeSearch where
+  show _ = "TypeSearch"
+
 -- | A type of error messages
 data SimpleErrorMessage
   = ErrorParsingFFIModule FilePath (Maybe Bundle.ErrorMessage)
@@ -99,7 +104,7 @@ data SimpleErrorMessage
   | ShadowedTypeVar String
   | UnusedTypeVar String
   | WildcardInferredType Type Context
-  | HoleInferredType String Type Context
+  | HoleInferredType String Type Context TypeSearch
   | MissingTypeDeclaration Ident Type
   | OverlappingPattern [[Binder]] Bool
   | IncompleteExhaustivityCheck

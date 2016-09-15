@@ -58,6 +58,8 @@ import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.Types
 
+import Language.PureScript.Infernal
+
 data BindingGroupType
   = RecursiveBindingGroup
   | NonRecursiveBindingGroup
@@ -345,7 +347,8 @@ infer' (TypedValue checkType val ty) = do
 infer' (Hole name) = do
   ty <- freshType
   ctx <- getLocalContext
-  tell . errorMessage $ HoleInferredType name ty ctx
+  typeSearchFn <- (\e -> M.keys . typeSearch e) <$> getEnv
+  tell . errorMessage $ HoleInferredType name ty ctx (TypeSearch typeSearchFn)
   return $ TypedValue True (Hole name) ty
 infer' (PositionedValue pos c val) = warnAndRethrowWithPositionTC pos $ do
   TypedValue t v ty <- infer' val

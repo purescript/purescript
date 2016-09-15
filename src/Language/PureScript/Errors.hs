@@ -266,7 +266,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
   gSimple (OrphanInstance nm cl ts) = OrphanInstance nm cl <$> traverse f ts
   gSimple (WildcardInferredType ty ctx) = WildcardInferredType <$> f ty <*> traverse (sndM f) ctx
-  gSimple (HoleInferredType name ty ctx) = HoleInferredType name <$> f ty <*> traverse (sndM f) ctx
+  gSimple (HoleInferredType name ty ctx env) = HoleInferredType name <$> f ty <*> traverse (sndM f) ctx  <*> pure env
   gSimple (MissingTypeDeclaration nm ty) = MissingTypeDeclaration nm <$> f ty
   gSimple (CannotGeneralizeRecursiveFunction nm ty) = CannotGeneralizeRecursiveFunction nm <$> f ty
   gSimple other = pure other
@@ -733,10 +733,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
       paras $ [ line "Wildcard type definition has the inferred type "
               , markCodeBox $ indent $ typeAsBox ty
               ] ++ renderContext ctx
-    renderSimpleErrorMessage (HoleInferredType name ty ctx) =
+    renderSimpleErrorMessage (HoleInferredType name ty ctx (TypeSearch typeSearch)) =
       paras $ [ line $ "Hole '" ++ markCode name ++ "' has the inferred type "
               , markCodeBox $ indent $ typeAsBox ty
-              ] ++ renderContext ctx
+              ]
+      ++ map (line . showQualified runIdent) (typeSearch ty)
+      ++ renderContext ctx
     renderSimpleErrorMessage (MissingTypeDeclaration ident ty) =
       paras [ line $ "No type declaration was provided for the top-level declaration of " ++ markCode (showIdent ident) ++ "."
             , line "It is good practice to provide type declarations as a form of documentation."

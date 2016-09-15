@@ -288,6 +288,8 @@ library
                      Language.PureScript.Interactive.Module
                      Language.PureScript.Interactive.Printer
 
+                     Language.PureScript.Infernal
+
                      Control.Monad.Logger
                      Control.Monad.Supply
                      Control.Monad.Supply.Class
