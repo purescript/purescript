@@ -53,7 +53,9 @@ recordToJSON :: (a -> Value) -> [(String, a)] -> Value
 recordToJSON f = object . map (\(label, a) -> pack label .= f a)
 
 exprToJSON :: Expr a -> Value
-exprToJSON (Var _ i)              = qualifiedToJSON runIdent i
+exprToJSON (Var _ i)              = toJSON ( "Var"
+                                           , qualifiedToJSON runIdent i
+                                           )
 exprToJSON (Literal _ l)          = toJSON ( "Literal"
                                            , literalToJSON (exprToJSON) l
                                            )
@@ -96,7 +98,9 @@ caseAlternativeToJSON (CaseAlternative bs r') =
          ]
 
 binderToJSON :: Binder a -> Value
-binderToJSON (VarBinder _ v)              = identToJSON v
+binderToJSON (VarBinder _ v)              = toJSON ( "VarBinder"
+                                                   , identToJSON v
+                                                   )
 binderToJSON (NullBinder _)               = toJSON "NullBinder"
 binderToJSON (LiteralBinder _ l)          = toJSON ( "LiteralBinder"
                                                    , literalToJSON binderToJSON l
