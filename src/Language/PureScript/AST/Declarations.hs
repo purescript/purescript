@@ -29,7 +29,7 @@ import qualified Text.Parsec as P
 -- | A map of locally-bound names in scope.
 type Context = [(Ident, Type)]
 
-newtype TypeSearch = TypeSearch (Type -> [Qualified Ident])
+newtype TypeSearch = TypeSearch (Type -> M.Map (Qualified Ident) (Type, NameKind, NameVisibility))
 
 instance Show TypeSearch where
   show _ = "TypeSearch"

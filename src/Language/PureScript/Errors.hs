@@ -737,7 +737,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
       paras $ [ line $ "Hole '" ++ markCode name ++ "' has the inferred type "
               , markCodeBox $ indent $ typeAsBox ty
               ]
-      ++ map (line . showQualified runIdent) (typeSearch ty)
+      ++ map (\(i, (t, _, _)) -> line $ showQualified runIdent i ++ " :: " ++ prettyPrintTypeAtom t) (M.toList (typeSearch ty))
       ++ renderContext ctx
     renderSimpleErrorMessage (MissingTypeDeclaration ident ty) =
       paras [ line $ "No type declaration was provided for the top-level declaration of " ++ markCode (showIdent ident) ++ "."

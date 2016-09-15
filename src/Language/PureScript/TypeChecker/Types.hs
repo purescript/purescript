@@ -347,7 +347,7 @@ infer' (TypedValue checkType val ty) = do
 infer' (Hole name) = do
   ty <- freshType
   ctx <- getLocalContext
-  typeSearchFn <- (\e -> M.keys . typeSearch e) <$> getEnv
+  typeSearchFn <- typeSearch <$> getEnv
   tell . errorMessage $ HoleInferredType name ty ctx (TypeSearch typeSearchFn)
   return $ TypedValue True (Hole name) ty
 infer' (PositionedValue pos c val) = warnAndRethrowWithPositionTC pos $ do
