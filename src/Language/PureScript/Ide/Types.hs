@@ -36,8 +36,8 @@ data IdeDeclaration
   | IdeTypeSynonym (P.ProperName 'P.TypeName) P.Type
   | IdeDataConstructor (P.ProperName 'P.ConstructorName) (P.ProperName 'P.TypeName) P.Type
   | IdeTypeClass (P.ProperName 'P.ClassName)
-  | IdeValueOperator (P.OpName 'P.ValueOpName) Text P.Precedence P.Associativity
-  | IdeTypeOperator (P.OpName 'P.TypeOpName) Text P.Precedence P.Associativity
+  | IdeValueOperator (P.OpName 'P.ValueOpName) (P.Qualified (Either P.Ident (P.ProperName 'P.ConstructorName))) P.Precedence P.Associativity (Maybe P.Type)
+  | IdeTypeOperator (P.OpName 'P.TypeOpName) (P.Qualified (P.ProperName 'P.TypeName)) P.Precedence P.Associativity (Maybe P.Kind)
   deriving (Show, Eq, Ord)
 
 data IdeDeclarationAnn = IdeDeclarationAnn Annotation IdeDeclaration

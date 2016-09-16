@@ -203,9 +203,9 @@ addExplicitImport' decl moduleName imports =
       P.TypeRef tn (Just [n])
     refFromDeclaration (IdeType n _) =
       P.TypeRef n (Just [])
-    refFromDeclaration (IdeValueOperator op _ _ _) =
+    refFromDeclaration (IdeValueOperator op _ _ _ _) =
       P.ValueOpRef op
-    refFromDeclaration (IdeTypeOperator op _ _ _) =
+    refFromDeclaration (IdeTypeOperator op _ _ _ _) =
       P.TypeOpRef op
     refFromDeclaration d =
       P.ValueRef $ P.Ident $ T.unpack (identifierFromIdeDeclaration d)

@@ -521,5 +521,6 @@ test-suite tests
                    Language.PureScript.Ide.ReexportsSpec
                    Language.PureScript.Ide.SourceFile.IntegrationSpec
                    Language.PureScript.Ide.SourceFileSpec
+                   Language.PureScript.Ide.StateSpec
     buildable: True
     hs-source-dirs: tests
