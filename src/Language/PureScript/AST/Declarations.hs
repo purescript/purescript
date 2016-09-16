@@ -77,6 +77,7 @@ data SimpleErrorMessage
   | NoInstanceFound Constraint
   | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [Type]
   | CannotDerive (Qualified (ProperName 'ClassName)) [Type]
+  | InvalidNewtypeInstance (Qualified (ProperName 'ClassName)) [Type]
   | CannotFindDerivingType (ProperName 'TypeName)
   | DuplicateLabel String (Maybe Expr)
   | DuplicateValueDeclaration Ident
@@ -374,10 +375,15 @@ pattern TypeFixityDeclaration fixity name op = FixityDeclaration (Right (TypeFix
 
 -- | The members of a type class instance declaration
 data TypeInstanceBody
-  -- | This is a derived instance
   = DerivedInstance
-  -- | This is a regular (explicit) instance
+  -- ^ This is a derived instance
+  | NewtypeInstance
+  -- ^ This is an instance derived from a newtype
+  | NewtypeInstanceWithDictionary Expr
+  -- ^ This is an instance derived from a newtype, desugared to include a
+  -- dictionary for the type under the newtype.
   | ExplicitInstance [Declaration]
+  -- ^ This is a regular (explicit) instance
   deriving (Show)
 
 mapTypeInstanceBody :: ([Declaration] -> [Declaration]) -> TypeInstanceBody -> TypeInstanceBody
@@ -385,8 +391,8 @@ mapTypeInstanceBody f = runIdentity . traverseTypeInstanceBody (Identity . f)
 
 -- | A traversal for TypeInstanceBody
 traverseTypeInstanceBody :: (Applicative f) => ([Declaration] -> f [Declaration]) -> TypeInstanceBody -> f TypeInstanceBody
-traverseTypeInstanceBody _ DerivedInstance = pure DerivedInstance
 traverseTypeInstanceBody f (ExplicitInstance ds) = ExplicitInstance <$> f ds
+traverseTypeInstanceBody _ other = pure other
 
 -- |
 -- Test if a declaration is a value declaration
@@ -570,7 +576,7 @@ data Expr
   -- |
   -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
   --
-  | SuperClassDictionary (Qualified (ProperName 'ClassName)) [Type]
+  | DeferredDictionary (Qualified (ProperName 'ClassName)) [Type]
   -- |
   -- A placeholder for an anonymous function argument
   --

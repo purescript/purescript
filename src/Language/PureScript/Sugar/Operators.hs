@@ -332,9 +332,9 @@ updateTypes goType = (goDecl, goExpr, goBinder)
   goExpr pos (TypeClassDictionary (Constraint name tys info) dicts hints) = do
     tys' <- traverse (goType' pos) tys
     return (pos, TypeClassDictionary (Constraint name tys' info) dicts hints)
-  goExpr pos (SuperClassDictionary cls tys) = do
+  goExpr pos (DeferredDictionary cls tys) = do
     tys' <- traverse (goType' pos) tys
-    return (pos, SuperClassDictionary cls tys')
+    return (pos, DeferredDictionary cls tys')
   goExpr pos (TypedValue check v ty) = do
     ty' <- goType' pos ty
     return (pos, TypedValue check v ty')

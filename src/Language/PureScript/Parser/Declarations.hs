@@ -17,6 +17,7 @@ module Language.PureScript.Parser.Declarations
 
 import Prelude hiding (lex)
 
+import Data.Functor (($>))
 import Data.Maybe (fromMaybe)
 
 import Control.Applicative
@@ -192,6 +193,7 @@ parseConstraint :: TokenParser Constraint
 parseConstraint = Constraint <$> parseQualified properName
                              <*> P.many (noWildcards parseTypeAtom)
                              <*> pure Nothing
+
 parseInstanceDeclaration :: TokenParser (TypeInstanceBody -> Declaration)
 parseInstanceDeclaration = do
   reserved "instance"
@@ -216,8 +218,9 @@ parseTypeInstanceDeclaration = do
 parseDerivingInstanceDeclaration :: TokenParser Declaration
 parseDerivingInstanceDeclaration = do
   reserved "derive"
+  ty <- P.option DerivedInstance (reserved "newtype" $> NewtypeInstance)
   instanceDecl <- parseInstanceDeclaration
-  return $ instanceDecl DerivedInstance
+  return $ instanceDecl ty
 
 positioned :: TokenParser Declaration -> TokenParser Declaration
 positioned = withSourceSpan PositionedDeclaration
