@@ -29,10 +29,8 @@ import qualified Text.Parsec as P
 -- | A map of locally-bound names in scope.
 type Context = [(Ident, Type)]
 
-newtype TypeSearch = TypeSearch (Type -> M.Map (Qualified Ident) (Type, NameKind, NameVisibility))
-
-instance Show TypeSearch where
-  show _ = "TypeSearch"
+data TypeSearch = TSBefore Environment | TSAfter [(Qualified Ident, Type)]
+  deriving Show
 
 -- | A type of error messages
 data SimpleErrorMessage
