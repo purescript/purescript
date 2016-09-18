@@ -122,6 +122,7 @@ library
                    http-client >= 0.4.30 && <0.5,
                    http-types -any,
                    language-javascript == 0.6.*,
+                   lens == 4.*,
                    lifted-base >= 0.2.3 && < 0.2.4,
                    monad-control >= 1.0.0.0 && < 1.1,
                    monad-logger >= 0.3 && < 0.4,

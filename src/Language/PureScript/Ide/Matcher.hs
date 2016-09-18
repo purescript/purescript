@@ -12,9 +12,9 @@
 -- Matchers for psc-ide commands
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE FlexibleInstances          #-}
 
 module Language.PureScript.Ide.Matcher
        ( Matcher
