@@ -41,13 +41,13 @@ moduleToJSON :: Version -> Module a -> Value
 moduleToJSON v m = object [ pack "imports"   .= map (moduleNameToJSON . snd) (moduleImports m)
                           , pack "exports"   .= map identToJSON (moduleExports m)
                           , pack "foreign"   .= map (identToJSON . fst) (moduleForeign m)
-                          , pack "decls"     .= recordToJSON exprToJSON (foldMap fromBind (moduleDecls m))
+                          , pack "decls"     .= map bindToJSON (moduleDecls m)
                           , pack "builtWith" .= toJSON (showVersion v)
                           ]
 
-fromBind :: Bind a -> [(String, Expr a)]
-fromBind (NonRec _ n e) = [(runIdent n, e)]
-fromBind (Rec bs) = map (\((_, n), e) -> (runIdent n, e)) bs
+bindToJSON :: Bind a -> Value
+bindToJSON (NonRec _ n e) = object [ pack (runIdent n) .= exprToJSON e ]
+bindToJSON (Rec bs) = object $ map (\((_, n), e) -> pack (runIdent n) .= exprToJSON e) bs
 
 recordToJSON :: (a -> Value) -> [(String, a)] -> Value
 recordToJSON f = object . map (\(label, a) -> pack label .= f a)
@@ -85,7 +85,7 @@ exprToJSON (Case _ ss cs)         = toJSON ( "Case"
                                            , map caseAlternativeToJSON cs
                                            )
 exprToJSON (Let _ bs e)           = toJSON ( "Let"
-                                           , recordToJSON exprToJSON (foldMap fromBind bs)
+                                           , map bindToJSON bs
                                            , exprToJSON e
                                            )
 
