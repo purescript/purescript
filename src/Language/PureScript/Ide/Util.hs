@@ -24,6 +24,8 @@ module Language.PureScript.Ide.Util
   , decodeT
   , discardAnn
   , withEmptyAnn
+  , valueOperatorAliasT
+  , typeOperatorAliasT
   , module Language.PureScript.Ide.Conversions
   ) where
 
@@ -42,8 +44,8 @@ identifierFromIdeDeclaration d = case d of
   IdeTypeSynonym name _ -> runProperNameT name
   IdeDataConstructor name _ _ -> runProperNameT name
   IdeTypeClass name -> runProperNameT name
-  IdeValueOperator op _ _ _ -> runOpNameT op
-  IdeTypeOperator op _ _ _ -> runOpNameT op
+  IdeValueOperator op _ _ _ _ -> runOpNameT op
+  IdeTypeOperator op _ _ _ _ -> runOpNameT op
 
 discardAnn :: IdeDeclarationAnn -> IdeDeclaration
 discardAnn (IdeDeclarationAnn _ d) = d
@@ -64,10 +66,10 @@ completionFromMatch (Match (m, IdeDeclarationAnn ann decl)) =
       IdeTypeSynonym name kind -> (runProperNameT name, prettyTypeT kind)
       IdeDataConstructor name _ type' -> (runProperNameT name, prettyTypeT type')
       IdeTypeClass name -> (runProperNameT name, "class")
-      IdeValueOperator op ref precedence associativity ->
-        (runOpNameT op, showFixity precedence associativity ref op)
-      IdeTypeOperator op ref precedence associativity ->
-        (runOpNameT op, showFixity precedence associativity ref op)
+      IdeValueOperator op ref precedence associativity typeP ->
+        (runOpNameT op, maybe (showFixity precedence associativity (valueOperatorAliasT ref) op) prettyTypeT typeP) 
+      IdeTypeOperator op ref precedence associativity kind ->
+        (runOpNameT op, maybe (showFixity precedence associativity (typeOperatorAliasT ref) op) (toS . P.prettyPrintKind) kind)
             
     complModule = runModuleNameT m
 
@@ -84,6 +86,16 @@ completionFromMatch (Match (m, IdeDeclarationAnn ann decl)) =
             P.Infixr -> "infixr"
       in T.unwords [asso, show p, r, "as", runOpNameT o]
 
+valueOperatorAliasT
+  :: P.Qualified (Either P.Ident (P.ProperName 'P.ConstructorName)) -> Text
+valueOperatorAliasT i =
+  toS (P.showQualified (either P.runIdent P.runProperName) i)
+
+typeOperatorAliasT
+  :: P.Qualified (P.ProperName 'P.TypeName) -> Text
+typeOperatorAliasT i =
+  toS (P.showQualified P.runProperName i)
+  
 encodeT :: (ToJSON a) => a -> Text
 encodeT = toS . decodeUtf8 . encode
 
