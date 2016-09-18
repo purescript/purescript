@@ -2,9 +2,6 @@ module Main where
 
 import Control.Monad.Eff.Console (log)
 
-data Z = Z
-data S n = S n
-
 data T
 data F
 
@@ -15,11 +12,11 @@ instance eqF :: EQ x y F
 test :: forall a b. (EQ a b T) => a -> b -> a
 test a _ = a
 
-spin :: forall a b. a -> b
-spin a = spin a
-
--- Expected type: 
--- forall t. (EQ t (S Z) T) => t
-test1 = test (spin 1) (S Z)
+-- Note the expected type: 
+--   Char -> Char 
+-- Not 
+--   forall t. (EQ t Char T) => t -> t
+-- as in Haskell
+test1 a = test a 'x'
 
 main = log "Done"
