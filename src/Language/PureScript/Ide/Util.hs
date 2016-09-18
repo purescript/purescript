@@ -20,10 +20,12 @@ module Language.PureScript.Ide.Util
   , unwrapPositioned
   , unwrapPositionedRef
   , completionFromMatch
-  , infoFromMatch
   , encodeT
   , decodeT
   , discardAnn
+  , withEmptyAnn
+  , valueOperatorAliasT
+  , typeOperatorAliasT
   , module Language.PureScript.Ide.Conversions
   ) where
 
@@ -42,31 +44,41 @@ identifierFromIdeDeclaration d = case d of
   IdeTypeSynonym name _ -> runProperNameT name
   IdeDataConstructor name _ _ -> runProperNameT name
   IdeTypeClass name -> runProperNameT name
-  IdeValueOperator op _ _ _ -> runOpNameT op
-  IdeTypeOperator op _ _ _ -> runOpNameT op
+  IdeValueOperator op _ _ _ _ -> runOpNameT op
+  IdeTypeOperator op _ _ _ _ -> runOpNameT op
 
 discardAnn :: IdeDeclarationAnn -> IdeDeclaration
 discardAnn (IdeDeclarationAnn _ d) = d
 
+withEmptyAnn :: IdeDeclaration -> IdeDeclarationAnn
+withEmptyAnn = IdeDeclarationAnn emptyAnn
+
 unwrapMatch :: Match a -> a
 unwrapMatch (Match (_, ed)) = ed
 
-completionFromMatch :: Match IdeDeclaration -> Completion
-completionFromMatch = Completion . completionFromMatch'
-
-completionFromMatch' :: Match IdeDeclaration -> (Text, Text, Text)
-completionFromMatch' (Match (m', d)) = case d of
-  IdeValue name type' -> (m, runIdentT name, prettyTypeT type')
-  IdeType name kind -> (m, runProperNameT name, toS (P.prettyPrintKind kind))
-  IdeTypeSynonym name kind -> (m, runProperNameT name, prettyTypeT kind)
-  IdeDataConstructor name _ type' -> (m, runProperNameT name, prettyTypeT type')
-  IdeTypeClass name -> (m, runProperNameT name, "class")
-  IdeValueOperator op ref precedence associativity ->
-    (m, runOpNameT op, showFixity precedence associativity ref op)
-  IdeTypeOperator op ref precedence associativity ->
-    (m, runOpNameT op, showFixity precedence associativity ref op)
+completionFromMatch :: Match IdeDeclarationAnn -> Completion
+completionFromMatch (Match (m, IdeDeclarationAnn ann decl)) =
+  Completion {..}
   where
-    m = runModuleNameT m'
+    (complIdentifier, complExpandedType) = case decl of
+      IdeValue name type' -> (runIdentT name, prettyTypeT type')
+      IdeType name kind -> (runProperNameT name, toS (P.prettyPrintKind kind))
+      IdeTypeSynonym name kind -> (runProperNameT name, prettyTypeT kind)
+      IdeDataConstructor name _ type' -> (runProperNameT name, prettyTypeT type')
+      IdeTypeClass name -> (runProperNameT name, "class")
+      IdeValueOperator op ref precedence associativity typeP ->
+        (runOpNameT op, maybe (showFixity precedence associativity (valueOperatorAliasT ref) op) prettyTypeT typeP) 
+      IdeTypeOperator op ref precedence associativity kind ->
+        (runOpNameT op, maybe (showFixity precedence associativity (typeOperatorAliasT ref) op) (toS . P.prettyPrintKind) kind)
+            
+    complModule = runModuleNameT m
+
+    complType = maybe complExpandedType prettyTypeT (annTypeAnnotation ann)
+    
+    complLocation = annLocation ann
+
+    complDocumentation = Nothing
+    
     showFixity p a r o =
       let asso = case a of
             P.Infix -> "infix"
@@ -74,12 +86,16 @@ completionFromMatch' (Match (m', d)) = case d of
             P.Infixr -> "infixr"
       in T.unwords [asso, show p, r, "as", runOpNameT o]
 
-infoFromMatch :: Match IdeDeclarationAnn -> Info
-infoFromMatch (Match (m, (IdeDeclarationAnn ann d))) =
-  Info (a, b, c, annLocation ann)
-  where
-    (a, b, c) = completionFromMatch' (Match (m, d))
+valueOperatorAliasT
+  :: P.Qualified (Either P.Ident (P.ProperName 'P.ConstructorName)) -> Text
+valueOperatorAliasT i =
+  toS (P.showQualified (either P.runIdent P.runProperName) i)
 
+typeOperatorAliasT
+  :: P.Qualified (P.ProperName 'P.TypeName) -> Text
+typeOperatorAliasT i =
+  toS (P.showQualified P.runProperName i)
+  
 encodeT :: (ToJSON a) => a -> Text
 encodeT = toS . decodeUtf8 . encode
 
@@ -87,9 +103,9 @@ decodeT :: (FromJSON a) => Text -> Maybe a
 decodeT = decode . encodeUtf8 . toS
 
 unwrapPositioned :: P.Declaration -> P.Declaration
-unwrapPositioned (P.PositionedDeclaration _ _ x) = x
+unwrapPositioned (P.PositionedDeclaration _ _ x) = unwrapPositioned x
 unwrapPositioned x = x
 
 unwrapPositionedRef :: P.DeclarationRef -> P.DeclarationRef
-unwrapPositionedRef (P.PositionedDeclarationRef _ _ x) = x
+unwrapPositionedRef (P.PositionedDeclarationRef _ _ x) = unwrapPositionedRef x
 unwrapPositionedRef x = x

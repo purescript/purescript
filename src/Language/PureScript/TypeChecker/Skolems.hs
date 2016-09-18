@@ -61,7 +61,7 @@ skolemize ident sko scope ss = replaceTypeVars ident (Skolem ident sko scope ss)
 
 -- |
 -- This function has one purpose - to skolemize type variables appearing in a
--- SuperClassDictionary placeholder. These type variables are somewhat unique since they are the
+-- DeferredDictionary placeholder. These type variables are somewhat unique since they are the
 -- only example of scoped type variables.
 --
 skolemizeTypesInValue :: String -> Int -> SkolemScope -> Maybe SourceSpan -> Expr -> Expr
@@ -71,8 +71,8 @@ skolemizeTypesInValue ident sko scope ss =
   in runIdentity . f
   where
   onExpr :: [String] -> Expr -> Identity ([String], Expr)
-  onExpr sco (SuperClassDictionary c ts)
-    | ident `notElem` sco = return (sco, SuperClassDictionary c (map (skolemize ident sko scope ss) ts))
+  onExpr sco (DeferredDictionary c ts)
+    | ident `notElem` sco = return (sco, DeferredDictionary c (map (skolemize ident sko scope ss) ts))
   onExpr sco (TypedValue check val ty)
     | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedValue check val (skolemize ident sko scope ss ty))
   onExpr sco other = return (sco, other)

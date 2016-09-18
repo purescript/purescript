@@ -223,8 +223,9 @@ parseTypeInstanceDeclaration = do
 parseDerivingInstanceDeclaration :: TokenParser Declaration
 parseDerivingInstanceDeclaration = do
   reserved "derive"
+  ty <- P.option DerivedInstance (reserved "newtype" $> NewtypeInstance)
   instanceDecl <- parseInstanceDeclaration
-  return $ instanceDecl DerivedInstance
+  return $ instanceDecl ty
 
 positioned :: TokenParser Declaration -> TokenParser Declaration
 positioned = withSourceSpan PositionedDeclaration

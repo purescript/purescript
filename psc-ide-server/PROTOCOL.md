@@ -51,27 +51,7 @@ definition position, if it can be found in the passed source files.
 ```
 
 **Result:**
-The possible types are returned in the same format as completions + eventual position information
-```json
-[
-  {
-  "module": "Data.Array",
-  "identifier": "filter",
-  "type": "forall a. (a -> Boolean) -> Array a -> Array a"
-  },
-  {
-  "module": "Data.Array",
-  "identifier": "filter",
-  "type": "forall a. (a -> Boolean) -> Array a -> Array a",
-  "definedAt":
-    {
-    "name": "/path/to/file",
-    "start": [1, 3],
-    "end": [3, 1]
-    }
-  }
-]
-```
+The possible types are returned in the same format as completions
 
 ### Complete
 The `complete` command looks up possible completions/corrections.
@@ -104,12 +84,23 @@ The `complete` command looks up possible completions/corrections.
 
 The following format is returned as the Result:
 
+Both the `definedAt` aswell as the `documentation` field might be `null` if they
+couldn't be extracted from a source file.
+
 ```json
 [
   {
   "module": "Data.Array",
   "identifier": "filter",
-  "type": "forall a. (a -> Boolean) -> Array a -> Array a"
+  "type": "forall a. (a -> Boolean) -> Array a -> Array a",
+  "expandedType": "forall a. (a -> Boolean) -> Array a -> Array a",
+  "definedAt":
+    {
+    "name": "/path/to/file",
+    "start": [1, 3],
+    "end": [3, 1]
+    },
+  "documentation": "A filtering function"
   }
 ]
 ```

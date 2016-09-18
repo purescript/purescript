@@ -28,6 +28,8 @@ module Language.PureScript.Ide.State
   , populateStage2
   , populateStage3
   , populateStage3STM
+  -- for tests
+  , resolveOperatorsForModule
   ) where
 
 import           Protolude
@@ -35,7 +37,8 @@ import qualified Prelude
 
 import           Control.Concurrent.STM
 import           "monad-logger" Control.Monad.Logger
-import qualified Data.Map.Lazy                     as M
+import qualified Data.Map.Lazy                     as Map
+import qualified Data.List                         as List
 import           Language.PureScript.Externs
 import           Language.PureScript.Ide.Externs
 import           Language.PureScript.Ide.Reexports
@@ -55,10 +58,10 @@ resetIdeState = do
 
 -- | Gets the loaded Modulenames
 getLoadedModulenames :: Ide m => m [P.ModuleName]
-getLoadedModulenames = M.keys <$> getExternFiles
+getLoadedModulenames = Map.keys <$> getExternFiles
 
 -- | Gets all loaded ExternFiles
-getExternFiles :: Ide m => m (M.Map P.ModuleName ExternsFile)
+getExternFiles :: Ide m => m (Map P.ModuleName ExternsFile)
 getExternFiles = s1Externs <$> getStage1
 
 -- | Insert a Module into Stage1 of the State
@@ -72,7 +75,7 @@ insertModuleSTM :: TVar IdeState -> (FilePath, P.Module) -> STM ()
 insertModuleSTM ref (fp, module') =
   modifyTVar ref $ \x ->
     x { ideStage1 = (ideStage1 x) {
-          s1Modules = M.insert
+          s1Modules = Map.insert
             (P.getModuleName module')
             (module', fp)
             (s1Modules (ideStage1 x))}}
@@ -126,17 +129,24 @@ getAllModules mmoduleName = do
   declarations <- s3Declarations <$> getStage3
   rebuild <- cachedRebuild
   case mmoduleName of
-    Nothing -> pure (M.toList declarations)
+    Nothing -> pure (Map.toList declarations)
     Just moduleName ->
       case rebuild of
         Just (cachedModulename, ef)
           | cachedModulename == moduleName -> do
               (AstData asts) <- s2AstData <$> getStage2
-              let ast = fromMaybe M.empty (M.lookup moduleName asts)
-              pure . M.toList $
-                M.insert moduleName
-                (snd . annotateLocations ast . fst . convertExterns $ ef) declarations
-        _ -> pure (M.toList declarations)
+              let
+                ast =
+                  fromMaybe (Map.empty, Map.empty) (Map.lookup moduleName asts)
+                cachedModule =
+                  snd . annotateModule ast . fst . convertExterns $ ef
+                tmp =
+                  Map.insert moduleName cachedModule declarations
+                resolved =
+                  Map.adjust (resolveOperatorsForModule tmp) moduleName tmp
+
+              pure (Map.toList resolved)
+        _ -> pure (Map.toList declarations)
 
 -- | Adds an ExternsFile into psc-ide's State Stage1. This does not populate the
 -- following Stages, which needs to be done after all the necessary Exterms have
@@ -151,7 +161,7 @@ insertExternsSTM :: TVar IdeState -> ExternsFile -> STM ()
 insertExternsSTM ref ef =
   modifyTVar ref $ \x ->
     x { ideStage1 = (ideStage1 x) {
-          s1Externs = M.insert (efModuleName ef) ef (s1Externs (ideStage1 x))}}
+          s1Externs = Map.insert (efModuleName ef) ef (s1Externs (ideStage1 x))}}
 
 -- | Sets rebuild cache to the given ExternsFile
 cacheRebuild :: Ide m => ExternsFile -> m ()
@@ -180,8 +190,8 @@ populateStage2 = do
 populateStage2STM :: TVar IdeState -> STM ()
 populateStage2STM ref = do
   modules <- s1Modules <$> getStage1STM ref
-  let spans = map (\((P.Module ss _ _ decls _), _) -> M.fromList (concatMap (extractSpans ss) decls)) modules
-  setStage2STM ref (Stage2 (AstData spans))
+  let astData = map (extractAstInformation . fst) modules
+  setStage2STM ref (Stage2 (AstData astData))
 
 -- | Resolves reexports and populates Stage3 with data to be used in queries.
 populateStage3 :: (Ide m, MonadLogger m) => m ()
@@ -202,12 +212,70 @@ populateStage3STM :: TVar IdeState -> STM [ReexportResult Module]
 populateStage3STM ref = do
   externs <- s1Externs <$> getStage1STM ref
   (AstData asts) <- s2AstData <$> getStage2STM ref
-  let modules = M.map convertExterns externs
+  let modules = Map.map convertExterns externs
       nModules :: Map P.ModuleName (Module, [(P.ModuleName, P.DeclarationRef)])
-      nModules = M.mapWithKey
+      nModules = Map.mapWithKey
         (\moduleName (m, refs) ->
-           (fromMaybe m $ annotateLocations <$> M.lookup moduleName asts <*> pure m, refs)) modules
+           (fromMaybe m $ annotateModule <$> Map.lookup moduleName asts <*> pure m, refs)) modules
       -- resolves reexports and discards load failures for now
-      result = resolveReexports (M.map (snd . fst) nModules) <$> M.elems nModules
-  setStage3STM ref (Stage3 (M.fromList (map reResolved result)) Nothing)
+      result = resolveReexports (map (snd . fst) nModules) <$> Map.elems nModules
+      resultP = resolveOperators (Map.fromList (reResolved <$> result))
+  setStage3STM ref (Stage3 resultP Nothing)
   pure result
+
+resolveOperators
+  :: Map P.ModuleName [IdeDeclarationAnn]
+  -> Map P.ModuleName [IdeDeclarationAnn]
+resolveOperators modules =
+  map (resolveOperatorsForModule modules) modules
+
+-- | Looks up the types and kinds for operators and assigns them to their
+-- declarations
+resolveOperatorsForModule
+  :: Map P.ModuleName [IdeDeclarationAnn]
+  -> [IdeDeclarationAnn]
+  -> [IdeDeclarationAnn]
+resolveOperatorsForModule modules = map (mapIdeDeclaration resolveOperator)
+  where
+    resolveOperator (IdeValueOperator
+                    opName
+                    i@(P.Qualified (Just moduleName)
+                        (Left ident)) precedence assoc _) =
+      let t = do
+            sourceModule <- Map.lookup moduleName modules
+            IdeValue _ tP <-
+              List.find (\case
+                            IdeValue iP _ -> iP == ident
+                            _ -> False) (discardAnn <$> sourceModule)
+            pure tP
+
+      in IdeValueOperator opName i precedence assoc t
+    resolveOperator (IdeValueOperator
+                    opName
+                    i@(P.Qualified (Just moduleName)
+                        (Right ctor)) precedence assoc _) =
+      let t = do
+            sourceModule <- Map.lookup moduleName modules
+            IdeDataConstructor _ _ tP <-
+              List.find (\case
+                            IdeDataConstructor cname _ _ -> ctor == cname
+                            _ -> False) (discardAnn <$> sourceModule)
+            pure tP
+
+      in IdeValueOperator opName i precedence assoc t
+    resolveOperator (IdeTypeOperator
+                    opName
+                    i@(P.Qualified (Just moduleName) properName) precedence assoc _)  =
+      let k = do
+            sourceModule <- Map.lookup moduleName modules
+            IdeType _ kP <-
+              List.find (\case
+                            IdeType name _ -> name == properName
+                            _ -> False) (discardAnn <$> sourceModule)
+            pure kP
+
+      in IdeTypeOperator opName i precedence assoc k
+    resolveOperator x = x
+
+mapIdeDeclaration :: (IdeDeclaration -> IdeDeclaration) -> IdeDeclarationAnn -> IdeDeclarationAnn
+mapIdeDeclaration f (IdeDeclarationAnn ann decl) = IdeDeclarationAnn ann (f decl)

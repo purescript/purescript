@@ -42,11 +42,11 @@ initialPSCiState = PSCiState [] [] []
 type ImportedModule = (P.ModuleName, P.ImportDeclarationType, Maybe P.ModuleName)
 
 psciImportedModuleNames :: PSCiState -> [P.ModuleName]
-psciImportedModuleNames (PSCiState{psciImportedModules = is}) =
+psciImportedModuleNames PSCiState{psciImportedModules = is} =
   map (\(mn, _, _) -> mn) is
 
 allImportsOf :: P.Module -> PSCiState -> [ImportedModule]
-allImportsOf m (PSCiState{psciImportedModules = is}) =
+allImportsOf m PSCiState{psciImportedModules = is} =
   filter isImportOfThis is
   where
   name = P.getModuleName m

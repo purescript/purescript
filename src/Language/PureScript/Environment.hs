@@ -252,6 +252,8 @@ primTypes =
     , (primName "Boolean",  (Star, ExternData))
     , (primName "Partial",  (Star, ExternData))
     , (primName "Fail",     (FunKind Symbol Star, ExternData))
+    , (primName "TypeString", (FunKind Star Symbol, ExternData))
+    , (primName "TypeConcat", (FunKind Symbol (FunKind Symbol Symbol), ExternData))
     ]
 
 -- |

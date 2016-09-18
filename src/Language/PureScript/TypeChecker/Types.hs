@@ -162,7 +162,7 @@ typeDictionaryForBindingGroup moduleName vals = do
     -- Make a map of names to the unification variables of untyped declarations
     untypedDict = zip (map fst untyped) untypedNames
     -- Create the dictionary of all name/type pairs, which will be added to the environment during type checking
-    dict = M.fromList (map (\(ident, ty) -> ((Qualified moduleName ident), (ty, Private, Undefined))) $ typedDict ++ untypedDict)
+    dict = M.fromList (map (\(ident, ty) -> (Qualified moduleName ident, (ty, Private, Undefined))) $ typedDict ++ untypedDict)
   return (untyped, typed, dict, untypedDict)
 
 checkTypedBindingGroupElement
@@ -325,7 +325,7 @@ infer' (IfThenElse cond th el) = do
 infer' (Let ds val) = do
   (ds', val'@(TypedValue _ _ valTy)) <- inferLetBinding [] ds val infer
   return $ TypedValue True (Let ds' val') valTy
-infer' (SuperClassDictionary className tys) = do
+infer' (DeferredDictionary className tys) = do
   dicts <- getTypeClassDictionaries
   hints <- gets checkHints
   return $ TypeClassDictionary (Constraint className tys Nothing) dicts hints
@@ -577,7 +577,7 @@ check' v@(Var var) ty = do
   case v' of
     Nothing -> internalError "check: unable to check the subsumes relation."
     Just v'' -> return $ TypedValue True v'' ty'
-check' (SuperClassDictionary className tys) _ = do
+check' (DeferredDictionary className tys) _ = do
   {-
   -- Here, we replace a placeholder for a superclass dictionary with a regular
   -- TypeClassDictionary placeholder. The reason we do this is that it is necessary to have the

@@ -4,8 +4,10 @@ module Main where
 import Data.Version (Version(..), showVersion)
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy.Char8 as BL
+import Data.Monoid ((<>))
 
-import Options.Applicative hiding (str)
+import Options.Applicative (Parser, ParseError (..))
+import qualified Options.Applicative as Opts
 
 import System.IO (hSetEncoding, stderr, stdout, utf8)
 
@@ -14,9 +16,9 @@ import Language.PureScript.Publish
 import Language.PureScript.Publish.ErrorsWarnings
 
 dryRun :: Parser Bool
-dryRun = switch $
-     long "dry-run"
-  <> help "Produce no output, and don't require a tagged version to be checked out."
+dryRun = Opts.switch $
+     Opts.long "dry-run"
+  <> Opts.help "Produce no output, and don't require a tagged version to be checked out."
 
 dryRunOptions :: PublishOptions
 dryRunOptions = defaultPublishOptions
@@ -29,15 +31,16 @@ main :: IO ()
 main = do
   hSetEncoding stdout utf8
   hSetEncoding stderr utf8
-  execParser opts >>= publish
+  Opts.execParser opts >>= publish
   where
-  opts        = info (version <*> helper <*> dryRun) infoModList
-  infoModList = fullDesc <> headerInfo <> footerInfo
-  headerInfo  = header "psc-publish - Generates documentation packages for upload to http://pursuit.purescript.org"
-  footerInfo  = footer $ "psc-publish " ++ showVersion Paths.version
+  opts        = Opts.info (version <*> Opts.helper <*> dryRun) infoModList
+  infoModList = Opts.fullDesc <> headerInfo <> footerInfo
+  headerInfo  = Opts.header "psc-publish - Generates documentation packages for upload to http://pursuit.purescript.org"
+  footerInfo  = Opts.footer $ "psc-publish " ++ showVersion Paths.version
 
   version :: Parser (a -> a)
-  version = abortOption (InfoMsg (showVersion Paths.version)) $ long "version" <> help "Show the version number" <> hidden
+  version = Opts.abortOption (InfoMsg (showVersion Paths.version)) $
+    Opts.long "version" <> Opts.help "Show the version number" <> Opts.hidden
 
 publish :: Bool -> IO ()
 publish isDryRun =

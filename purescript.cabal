@@ -109,6 +109,7 @@ library
                    bytestring -any,
                    containers -any,
                    clock -any,
+                   data-ordlist >= 0.4.7.0,
                    directory >= 1.2,
                    dlist -any,
                    edit-distance -any,
@@ -116,7 +117,7 @@ library
                    fsnotify >= 0.2.1,
                    Glob >= 0.7 && < 0.8,
                    haskeline >= 0.7.0.0,
-                   http-client >= 0.4.30 && <0.5,
+                   http-client >= 0.4.30 && <0.6,
                    http-types -any,
                    language-javascript == 0.6.*,
                    lifted-base >= 0.2.3 && < 0.2.4,
@@ -520,5 +521,6 @@ test-suite tests
                    Language.PureScript.Ide.ReexportsSpec
                    Language.PureScript.Ide.SourceFile.IntegrationSpec
                    Language.PureScript.Ide.SourceFileSpec
+                   Language.PureScript.Ide.StateSpec
     buildable: True
     hs-source-dirs: tests

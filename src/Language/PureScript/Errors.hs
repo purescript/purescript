@@ -25,6 +25,7 @@ import qualified Data.Map as M
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
+import Language.PureScript.Environment
 import Language.PureScript.Names
 import Language.PureScript.Pretty
 import Language.PureScript.Traversals
@@ -32,6 +33,7 @@ import Language.PureScript.Types
 import Language.PureScript.Pretty.Common (endWith)
 import qualified Language.PureScript.Bundle as Bundle
 import qualified Language.PureScript.Constants as C
+import Language.PureScript.Pretty.Common (before)
 
 import qualified System.Console.ANSI as ANSI
 
@@ -118,6 +120,7 @@ errorCode em = case unwrapErrorMessage em of
   NoInstanceFound{} -> "NoInstanceFound"
   PossiblyInfiniteInstance{} -> "PossiblyInfiniteInstance"
   CannotDerive{} -> "CannotDerive"
+  InvalidNewtypeInstance{} -> "InvalidNewtypeInstance"
   CannotFindDerivingType{} -> "CannotFindDerivingType"
   DuplicateLabel{} -> "DuplicateLabel"
   DuplicateValueDeclaration{} -> "DuplicateValueDeclaration"
@@ -260,6 +263,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> pure insts
   gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
   gSimple (CannotDerive cl ts) = CannotDerive cl <$> traverse f ts
+  gSimple (InvalidNewtypeInstance cl ts) = InvalidNewtypeInstance cl <$> traverse f ts
   gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
   gSimple (OrphanInstance nm cl ts) = OrphanInstance nm cl <$> traverse f ts
   gSimple (WildcardInferredType ty ctx) = WildcardInferredType <$> f ty <*> traverse (sndM f) ctx
@@ -288,6 +292,8 @@ errorSuggestion err = case err of
   UnusedImport{} -> emptySuggestion
   DuplicateImport{} -> emptySuggestion
   UnusedExplicitImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
+  UnusedDctorImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
+  UnusedDctorExplicitImport mn _ _ qual refs -> suggest $ importSuggestion mn refs qual
   ImplicitImport mn refs -> suggest $ importSuggestion mn refs Nothing
   ImplicitQualifiedImport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
   HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
@@ -592,9 +598,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
             , line "They may be disallowed completely in a future version of the compiler."
             ]
     renderSimpleErrorMessage OverlappingInstances{} = internalError "OverlappingInstances: empty instance list"
-    renderSimpleErrorMessage (NoInstanceFound (Constraint C.Fail [ TypeLevelString message ] _)) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint C.Fail [ ty ] _)) | Just box <- toTypelevelString ty =
       paras [ line "A custom type error occurred while solving type class constraints:"
-            , indent . paras . map line . lines $ message
+            , indent box
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint C.Partial
                                                           _
@@ -637,6 +643,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
                 [ line (showQualified runProperName nm)
                 , Box.vcat Box.left (map typeAtomAsBox ts)
                 ]
+            ]
+    renderSimpleErrorMessage (InvalidNewtypeInstance nm ts) =
+      paras [ line "Cannot derive newtype instance for"
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName nm)
+                , Box.vcat Box.left (map typeAtomAsBox ts)
+                ]
+            , line "Make sure this is a newtype."
             ]
     renderSimpleErrorMessage (CannotFindDerivingType nm) =
       line $ "Cannot derive a type class instance, because the type declaration for " ++ markCode (runProperName nm) ++ " could not be found."
@@ -756,12 +770,18 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
             , line "It could be replaced with:"
             , indent $ line $ markCode $ showSuggestion msg ]
 
-    renderSimpleErrorMessage (UnusedDctorImport name) =
-      line $ "The import of type " ++ markCode (runProperName name) ++ " includes data constructors but only the type is used"
+    renderSimpleErrorMessage msg@(UnusedDctorImport mn name _ _) =
+      paras [line $ "The import of type " ++ markCode (runProperName name)
+                    ++ " from module " ++ markCode (runModuleName mn) ++ " includes data constructors but only the type is used"
+            , line "It could be replaced with:"
+            , indent $ line $ markCode $ showSuggestion msg ]
 
-    renderSimpleErrorMessage (UnusedDctorExplicitImport name names) =
-      paras [ line $ "The import of type " ++ markCode (runProperName name) ++ " includes the following unused data constructors:"
-            , indent $ paras $ map (line . markCode . runProperName) names ]
+    renderSimpleErrorMessage msg@(UnusedDctorExplicitImport mn name names _ _) =
+      paras [ line $ "The import of type " ++ markCode (runProperName name)
+                     ++ " from module " ++ markCode (runModuleName mn) ++ " includes the following unused data constructors:"
+            , indent $ paras $ map (line . markCode . runProperName) names
+            , line "It could be replaced with:"
+            , indent $ line $ markCode $ showSuggestion msg ]
 
     renderSimpleErrorMessage (DuplicateSelectiveImport name) =
       line $ "There is an existing import of " ++ markCode (runModuleName name) ++ ", consider merging the import lists"
@@ -1194,6 +1214,14 @@ renderBox = unlines
   where
   dropWhileEnd p = reverse . dropWhile p . reverse
   whiteSpace = all isSpace
+
+toTypelevelString :: Type -> Maybe Box.Box
+toTypelevelString (TypeLevelString s) = Just $ Box.text s
+toTypelevelString (TypeApp (TypeConstructor f) x)
+  | f == primName "TypeString" = Just $ typeAsBox x
+toTypelevelString (TypeApp (TypeApp (TypeConstructor f) x) ret)
+  | f == primName "TypeConcat" = before <$> (toTypelevelString x) <*> (toTypelevelString ret)
+toTypelevelString _ = Nothing
 
 -- |
 -- Rethrow an error with a more detailed error message in the case of failure

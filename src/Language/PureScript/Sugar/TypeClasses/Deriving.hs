@@ -54,6 +54,12 @@ deriveInstance mn ds (TypeInstanceDeclaration nm deps className tys@[ty] Derived
   = TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveOrd mn ds tyCon
 deriveInstance _ _ (TypeInstanceDeclaration _ _ className tys DerivedInstance)
   = throwError . errorMessage $ CannotDerive className tys
+deriveInstance mn ds (TypeInstanceDeclaration nm deps className tys@(_ : _) NewtypeInstance)
+  | Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor (last tys)
+  , mn == fromMaybe mn mn'
+  = TypeInstanceDeclaration nm deps className tys . NewtypeInstanceWithDictionary <$> deriveNewtypeInstance className ds tys tyCon args
+deriveInstance _ _ (TypeInstanceDeclaration _ _ className tys NewtypeInstance)
+  = throwError . errorMessage $ InvalidNewtypeInstance className tys
 deriveInstance mn ds (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> deriveInstance mn ds d
 deriveInstance _  _  e = return e
 
@@ -65,6 +71,25 @@ unwrapTypeConstructor = fmap (second reverse) . go
     (tyCon, args) <- go ty
     return (tyCon, arg : args)
   go _ = Nothing
+
+deriveNewtypeInstance
+  :: forall m
+   . MonadError MultipleErrors m
+  => Qualified (ProperName 'ClassName)
+  -> [Declaration]
+  -> [Type]
+  -> ProperName 'TypeName
+  -> [Type]
+  -> m Expr
+deriveNewtypeInstance className ds tys tyConNm dargs = do
+    tyCon <- findTypeDecl tyConNm ds
+    go tyCon
+  where
+    go (DataDeclaration Newtype _ tyArgNames [(_, [wrapped])]) = do
+      let subst = zipWith (\(name, _) t -> (name, t)) tyArgNames dargs
+      return (DeferredDictionary className (init tys ++ [replaceAllTypeVars subst wrapped]))
+    go (PositionedDeclaration _ _ d) = go d
+    go _ = throwError . errorMessage $ InvalidNewtypeInstance className tys
 
 dataGeneric :: ModuleName
 dataGeneric = ModuleName [ ProperName "Data", ProperName "Generic" ]
@@ -223,7 +248,7 @@ deriveGeneric mn ds tyConNm dargs = do
           $ liftApplicative (mkRecFun rs) (map (\(x, y) -> fromSpineFun (Accessor "recValue" (mkVar (Ident x))) y) rs)
 
       mkRecFun :: [(String, Type)] -> Expr
-      mkRecFun xs = mkJust $ foldr lam recLiteral (map (Ident . fst) xs)
+      mkRecFun xs = mkJust $ foldr (lam . Ident . fst) recLiteral xs
          where recLiteral = Literal . ObjectLiteral $ map (\(s,_) -> (s, mkVar (Ident s))) xs
     mkFromSpineFunction (PositionedDeclaration _ _ d) = mkFromSpineFunction d
     mkFromSpineFunction _ = internalError "mkFromSpineFunction: expected DataDeclaration"

@@ -135,7 +135,7 @@ desugarModule _ = internalError "Exports should have been elaborated in name des
 --
 --   subString :: {} -> Sub String
 --   subString _ = { sub: "",
---                 , "__superclass_Foo_0": \_ -> <SuperClassDictionary Foo String>
+--                 , "__superclass_Foo_0": \_ -> <DeferredDictionary Foo String>
 --                 }
 --
 -- and finally as the generated javascript:
@@ -187,6 +187,10 @@ desugarDecl mn exps = go
     desugared <- desugarCases members
     dictDecl <- typeInstanceDictionaryDeclaration name mn deps className tys desugared
     return (expRef name className tys, [d, dictDecl])
+  go d@(TypeInstanceDeclaration name deps className tys (NewtypeInstanceWithDictionary dict)) = do
+    let dictTy = foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
+        constrainedTy = quantify (if null deps then dictTy else ConstrainedType deps dictTy)
+    return (expRef name className tys, [d, ValueDeclaration name Private [] (Right (TypedValue True dict constrainedTy))])
   go (PositionedDeclaration pos com d) = do
     (dr, ds) <- rethrowWithPosition pos $ desugarDecl mn exps d
     return (dr, map (PositionedDeclaration pos com) ds)
@@ -290,7 +294,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
       -- The type is a record type, but depending on type instance dependencies, may be constrained.
       -- The dictionary itself is a record literal.
       let superclasses = superClassDictionaryNames typeClassSuperclasses `zip`
-            [ Abs (Left (Ident C.__unused)) (SuperClassDictionary superclass tyArgs)
+            [ Abs (Left (Ident C.__unused)) (DeferredDictionary superclass tyArgs)
             | (Constraint superclass suTyArgs _) <- typeClassSuperclasses
             , let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
             ]

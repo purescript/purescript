@@ -367,7 +367,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   -- binder.
   --
   binderToJs' :: String -> [JS] -> Binder Ann -> m [JS]
-  binderToJs' _ done (NullBinder{}) = return done
+  binderToJs' _ done NullBinder{} = return done
   binderToJs' varName done (LiteralBinder _ l) =
     literalToBinderJS varName done l
   binderToJs' varName done (VarBinder _ ident) =

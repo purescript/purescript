@@ -245,7 +245,7 @@ getEnv = checkEnv <$> get
 getLocalContext :: MonadState CheckState m => m Context
 getLocalContext = do
   env <- getEnv
-  return [ (ident, ty') | ((Qualified Nothing ident@Ident{}), (ty', _, Defined)) <- M.toList (names env) ]
+  return [ (ident, ty') | (Qualified Nothing ident@Ident{}, (ty', _, Defined)) <- M.toList (names env) ]
 
 -- | Update the @Environment@
 putEnv :: (MonadState CheckState m) => Environment -> m ()
