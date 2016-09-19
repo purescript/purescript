@@ -26,7 +26,7 @@ foreign2 = P.ExternDataDeclaration (P.ProperName "Foreign2") P.Star
 member1 = P.TypeDeclaration (P.Ident "member1") P.REmpty
 
 spec :: Spec
-spec = do
+spec =
   describe "Extracting Spans" $ do
     it "extracts a span for a value declaration" $
       extractSpans span0 (P.PositionedDeclaration span1 [] value1) `shouldBe` [(Left "value1", span1)]

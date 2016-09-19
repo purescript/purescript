@@ -180,7 +180,7 @@ populateStage2 = do
 populateStage2STM :: TVar IdeState -> STM ()
 populateStage2STM ref = do
   modules <- s1Modules <$> getStage1STM ref
-  let spans = map (\((P.Module ss _ _ decls _), _) -> M.fromList (concatMap (extractSpans ss) decls)) modules
+  let spans = map (\(P.Module ss _ _ decls _, _) -> M.fromList (concatMap (extractSpans ss) decls)) modules
   setStage2STM ref (Stage2 (AstData spans))
 
 -- | Resolves reexports and populates Stage3 with data to be used in queries.

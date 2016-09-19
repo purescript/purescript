@@ -17,7 +17,7 @@ import qualified Text.PrettyPrint.Boxes as Box
 -- Pretty print a module's signatures
 --
 printModuleSignatures :: P.ModuleName -> P.Environment -> String
-printModuleSignatures moduleName (P.Environment {..}) =
+printModuleSignatures moduleName P.Environment{..} =
     -- get relevant components of a module from environment
     let moduleNamesIdent = byModuleName names
         moduleTypeClasses = byModuleName typeClasses

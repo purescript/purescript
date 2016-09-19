@@ -50,7 +50,7 @@ desugarDecl other = fn other
     return $ Abs (Left arg) (Accessor prop $ buildAccessor u (argToExpr arg))
   desugarExpr (Case args cas) | any isAnonymousArgument args = do
     argIdents <- forM args freshIfAnon
-    let args' = zipWith (\p -> maybe p argToExpr) args argIdents
+    let args' = zipWith (`maybe` argToExpr) args argIdents
     return $ foldr (Abs . Left) (Case args' cas) (catMaybes argIdents)
   desugarExpr (IfThenElse u t f) | any isAnonymousArgument [u, t, f] = do
     u' <- freshIfAnon u

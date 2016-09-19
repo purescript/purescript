@@ -245,10 +245,10 @@ lintImportDecl env mni qualifierName names declType allowImplicit =
       -- If we've not already warned a type is unused, check its data constructors
       unless' (runProperName tn `notElem` usedNames) $
         case (c, dctors `intersect` allCtors) of
-          (_, []) | c /= Just [] -> warn (UnusedDctorImport tn)
+          (_, []) | c /= Just [] -> warn (UnusedDctorImport mni tn qualifierName allRefs)
           (Just ctors, dctors') ->
             let ddiff = ctors \\ dctors'
-            in unless' (null ddiff) $ warn $ UnusedDctorExplicitImport tn ddiff
+            in unless' (null ddiff) $ warn $ UnusedDctorExplicitImport mni tn ddiff qualifierName allRefs
           _ -> return False
 
     return (didWarn || or didWarn')

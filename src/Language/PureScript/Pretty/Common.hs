@@ -74,7 +74,7 @@ instance Emit StrPos where
   -- |
   -- Add a new mapping entry for given source position with initially zero generated position
   --
-  addMapping (SourceSpan { spanName = file, spanStart = startPos }) = StrPos (zeroPos, mempty, [mapping])
+  addMapping SourceSpan { spanName = file, spanStart = startPos } = StrPos (zeroPos, mempty, [mapping])
     where
       mapping = SMap file startPos zeroPos
       zeroPos = SourcePos 0 0

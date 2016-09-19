@@ -108,8 +108,8 @@ data SimpleErrorMessage
   | ImportHidingModule ModuleName
   | UnusedImport ModuleName
   | UnusedExplicitImport ModuleName [String] (Maybe ModuleName) [DeclarationRef]
-  | UnusedDctorImport (ProperName 'TypeName)
-  | UnusedDctorExplicitImport (ProperName 'TypeName) [ProperName 'ConstructorName]
+  | UnusedDctorImport ModuleName (ProperName 'TypeName) (Maybe ModuleName) [DeclarationRef]
+  | UnusedDctorExplicitImport ModuleName (ProperName 'TypeName) [ProperName 'ConstructorName] (Maybe ModuleName) [DeclarationRef]
   | DuplicateSelectiveImport ModuleName
   | DuplicateImport ModuleName ImportDeclarationType (Maybe ModuleName)
   | DuplicateImportRef Name
@@ -497,12 +497,9 @@ data Expr
   --
   | Parens Expr
   -- |
-  -- A record property getter (e.g. `_.x`). This will be removed during
-  -- desugaring and expanded into a lambda that reads a property from a record.
-  --
-  | ObjectGetter String
-  -- |
-  -- An record property accessor expression
+  -- An record property accessor expression (e.g. `obj.x` or `_.x`).
+  -- Anonymous arguments will be removed during desugaring and expanded
+  -- into a lambda that reads a property from a record.
   --
   | Accessor String Expr
   -- |

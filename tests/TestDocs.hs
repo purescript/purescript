@@ -278,6 +278,7 @@ testCases =
       [ ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "explicit" (ShowFn (hasTypeVar "something"))
       , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "anInt"    (ShowFn (P.tyInt ==))
       , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "aNumber"  (ShowFn (P.tyNumber ==))
+      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "nestedForAll" (renderedType "forall c. (forall a b. c)")
       ])
 
   , ("ConstrainedArgument",

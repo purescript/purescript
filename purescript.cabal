@@ -100,7 +100,7 @@ source-repository head
 
 library
     build-depends: base >=4.8 && <5,
-                   aeson >= 0.8 && < 0.12,
+                   aeson >= 0.8 && < 1.1,
                    aeson-better-errors >= 0.8,
                    ansi-terminal >= 0.6.2 && < 0.7,
                    base-compat >=0.6.0,
@@ -109,6 +109,7 @@ library
                    bytestring -any,
                    containers -any,
                    clock -any,
+                   data-ordlist >= 0.4.7.0,
                    directory >= 1.2,
                    dlist -any,
                    edit-distance -any,
@@ -315,7 +316,7 @@ library
 executable psc
     build-depends: base >=4 && <5,
                    purescript -any,
-                   aeson >= 0.8 && < 0.12,
+                   aeson >= 0.8 && < 1.1,
                    ansi-terminal >= 0.6.2 && < 0.7,
                    base-compat >=0.6.0,
                    bytestring -any,
@@ -440,7 +441,7 @@ executable psc-ide-server
   other-modules:       Paths_purescript
   other-extensions:
   build-depends:       base >=4 && <5,
-                       aeson >= 0.8 && < 0.12,
+                       aeson >= 0.8 && < 1.1,
                        bytestring -any,
                        purescript -any,
                        base-compat >=0.6.0,
