@@ -45,9 +45,10 @@ desugarDecl other = fn other
     obj <- freshIdent'
     Abs (Left obj) <$> wrapLambda (ObjectUpdate (argToExpr obj)) ps
   desugarExpr (ObjectUpdate obj ps) = wrapLambda (ObjectUpdate obj) ps
-  desugarExpr (Accessor prop u) | isAnonymousAccessorChain u = do
-    arg <- freshIdent'
-    return $ Abs (Left arg) (Accessor prop $ buildAccessor u (argToExpr arg))
+  desugarExpr (Accessor prop u)
+    | Just props <- peelAnonAccessorChain u = do
+      arg <- freshIdent'
+      return $ Abs (Left arg) $ foldr Accessor (argToExpr arg) (prop:props)
   desugarExpr (Case args cas) | any isAnonymousArgument args = do
     argIdents <- forM args freshIfAnon
     let args' = zipWith (`maybe` argToExpr) args argIdents
@@ -73,15 +74,11 @@ desugarDecl other = fn other
   stripPositionInfo (PositionedValue _ _ e) = stripPositionInfo e
   stripPositionInfo e = e
 
-  buildAccessor :: Expr -> Expr -> Expr
-  buildAccessor (Accessor p ps) var = Accessor p (buildAccessor ps var)
-  buildAccessor _ var = var
-
-  isAnonymousAccessorChain :: Expr -> Bool
-  isAnonymousAccessorChain (Accessor _ e) = isAnonymousAccessorChain e
-  isAnonymousAccessorChain (PositionedValue _ _ e) = isAnonymousAccessorChain e
-  isAnonymousAccessorChain AnonymousArgument = True
-  isAnonymousAccessorChain _ = False
+  peelAnonAccessorChain :: Expr -> Maybe [String]
+  peelAnonAccessorChain (Accessor p e) = (p :) <$> peelAnonAccessorChain e
+  peelAnonAccessorChain (PositionedValue _ _ e) = peelAnonAccessorChain e
+  peelAnonAccessorChain AnonymousArgument = Just []
+  peelAnonAccessorChain _ = Nothing
 
   isAnonymousArgument :: Expr -> Bool
   isAnonymousArgument AnonymousArgument = True
