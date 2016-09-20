@@ -1,48 +1,69 @@
+{-# LANGUAGE TupleSections #-}
 -- |
 -- CoreFn traversal helpers
 --
 module Language.PureScript.CoreFn.Traversals where
 
-import Prelude.Compat
-
-import Control.Arrow (second, (***), (+++))
-
+import Data.Functor.Identity (runIdentity)
 import Language.PureScript.AST.Literals
 import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Expr
+import Language.PureScript.Traversals (eitherM, pairM)
+import Prelude.Compat
 
 everywhereOnValues :: (Bind a -> Bind a) ->
                       (Expr a -> Expr a) ->
                       (Binder a -> Binder a) ->
                       (Bind a -> Bind a, Expr a -> Expr a, Binder a -> Binder a)
-everywhereOnValues f g h = (f', g', h')
-  where
-  f' (NonRec a name e) = f (NonRec a name (g' e))
-  f' (Rec es) = f (Rec (map (second g') es))
+everywhereOnValues f g h =
+  let (f', g', h') = everywhereOnValuesM (return . f) (return . g) (return . h)
+   in (runIdentity . f', runIdentity . g', runIdentity . h')
 
-  g' (Literal ann e) = g (Literal ann (handleLiteral g' e))
-  g' (Accessor ann prop e) = g (Accessor ann prop (g' e))
-  g' (ObjectUpdate ann obj vs) = g (ObjectUpdate ann (g' obj) (map (fmap g') vs))
-  g' (Abs ann name e) = g (Abs ann name (g' e))
-  g' (App ann v1 v2) = g (App ann (g' v1) (g' v2))
-  g' (Case ann vs alts) = g (Case ann (map g' vs) (map handleCaseAlternative alts))
-  g' (Let ann ds e) = g (Let ann (map f' ds) (g' e))
+everywhereOnValuesM :: (Monad m) =>
+                       (Bind a -> m (Bind a)) ->
+                       (Expr a -> m (Expr a)) ->
+                       (Binder a -> m (Binder a)) ->
+                       (Bind a -> m (Bind a), Expr a -> m (Expr a), Binder a -> m (Binder a))
+everywhereOnValuesM f g h = (f', g', h')
+  where
+  f' (NonRec a name e) = f . NonRec a name =<< g' e
+  f' (Rec es) = f . Rec =<< mapM (\(b, e) -> (b,) <$> g' e) es
+
+  g' (Literal ann e) = g . Literal ann =<< handleLiteral g' e
+  g' (Accessor ann prop e) = g . Accessor ann prop =<< g' e
+  g' (ObjectUpdate ann obj vs) = do
+    obj' <- g' obj
+    vs' <- mapM (mapM g') vs
+    g (ObjectUpdate ann obj' vs')
+  g' (Abs ann name e) = g . Abs ann name =<< g' e
+  g' (App ann v1 v2) = do
+    v1' <- g' v1
+    v2' <- g' v2
+    g (App ann v1' v2')
+  g' (Case ann vs alts) = do
+    vs' <- mapM g' vs
+    alts' <- mapM handleCaseAlternative alts
+    g (Case ann vs' alts')
+  g' (Let ann ds e) = do
+    ds' <- mapM f' ds
+    e' <- g' e
+    g (Let ann ds' e')
   g' e = g e
 
-  h' (LiteralBinder a b) = h (LiteralBinder a (handleLiteral h' b))
-  h' (NamedBinder a name b) = h (NamedBinder a name (h' b))
-  h' (ConstructorBinder a q1 q2 bs) = h (ConstructorBinder a q1 q2 (map h' bs))
+  h' (LiteralBinder a b) = h . LiteralBinder a =<< handleLiteral h' b
+  h' (NamedBinder a name b) = h . NamedBinder a name =<< h' b
+  h' (ConstructorBinder a q1 q2 bs) = h . ConstructorBinder a q1 q2 =<< mapM h' bs
   h' b = h b
 
   handleCaseAlternative ca =
-    ca { caseAlternativeBinders = map h' (caseAlternativeBinders ca)
-       , caseAlternativeResult = (map (g' *** g') +++ g') (caseAlternativeResult ca)
-       }
+    CaseAlternative
+      <$> traverse h' (caseAlternativeBinders ca)
+      <*> eitherM (traverse (pairM g' g')) g' (caseAlternativeResult ca)
 
-  handleLiteral :: (a -> a) -> Literal a -> Literal a
-  handleLiteral i (ArrayLiteral ls) = ArrayLiteral (map i ls)
-  handleLiteral i (ObjectLiteral ls) = ObjectLiteral (map (fmap i) ls)
-  handleLiteral _ other = other
+  handleLiteral :: (Monad m) => (a -> m a) -> Literal a -> m (Literal a)
+  handleLiteral i (ArrayLiteral ls) = ArrayLiteral <$> mapM i ls
+  handleLiteral i (ObjectLiteral ls) = ObjectLiteral <$> mapM (mapM i) ls
+  handleLiteral _ other = return other
 
 everythingOnValues :: (r -> r -> r) ->
                       (Bind a -> r) ->

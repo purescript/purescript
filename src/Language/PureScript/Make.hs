@@ -133,7 +133,7 @@ data RebuildPolicy
   | RebuildAlways deriving (Show, Eq, Ord)
 
 -- | Rebuild a single module
-rebuildModule :: forall m. (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+rebuildModule :: forall m. (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadReader Options m)
      => MakeActions m
      -> [ExternsFile]
      -> Module
@@ -149,9 +149,10 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
   regrouped <- createBindingGroups moduleName . collapseBindingGroups $ elaborated
   let mod' = Module ss coms moduleName regrouped exps
       corefn = CF.moduleToCoreFn env' mod'
-      [renamed] = renameInModules [corefn]
+  let [renamed] = renameInModules [corefn]
       exts = moduleToExternsFile mod' env'
-  evalSupplyT nextVar . codegen renamed env' . BU8.toString . B.toStrict . encode $ exts
+  (optRenamed, nextVar') <- runSupplyT nextVar $ CF.optimize renamed
+  evalSupplyT nextVar' . codegen optRenamed env' . BU8.toString . B.toStrict . encode $ exts
   return exts
 
 -- |
@@ -160,7 +161,7 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
 -- If timestamps have not changed, the externs file can be used to provide the module's types without
 -- having to typecheck the module again.
 --
-make :: forall m. (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+make :: forall m. (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadReader Options m)
      => MakeActions m
      -> [Module]
      -> m [ExternsFile]
