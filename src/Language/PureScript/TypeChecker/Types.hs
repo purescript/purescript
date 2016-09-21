@@ -292,7 +292,7 @@ infer' (Abs (Left arg) ret) = do
 infer' (Abs (Right _) _) = internalError "Binder was not desugared"
 infer' (App f arg) = do
   f'@(TypedValue _ _ ft) <- infer f
-  (ret, app) <- checkFunctionApplication f' ft arg Nothing
+  (ret, app) <- checkFunctionApplication f' ft arg
   return $ TypedValue True app ret
 infer' (Var var) = do
   checkVisibility var
@@ -567,8 +567,11 @@ check' (Abs (Left arg) ret) ty@(TypeApp (TypeApp t argTy) retTy) = do
 check' (Abs (Right _) _) _ = internalError "Binder was not desugared"
 check' (App f arg) ret = do
   f'@(TypedValue _ _ ft) <- infer f
-  (_, app) <- checkFunctionApplication f' ft arg (Just ret)
-  return $ TypedValue True app ret
+  (retTy, app) <- checkFunctionApplication f' ft arg
+  v' <- subsumes (Just app) retTy ret
+  case v' of
+    Nothing -> internalError "check: unable to check the subsumes relation."
+    Just app' -> return $ TypedValue True app' ret
 check' v@(Var var) ty = do
   checkVisibility var
   repl <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< lookupVariable $ var
@@ -692,55 +695,64 @@ checkProperties expr ps row lax = let (ts, r') = rowToList row in go ps ts r' wh
         return $ (p, v') : ps''
   go _ _ _ = throwError . errorMessage $ ExprDoesNotHaveType expr (TypeApp tyRecord row)
 
--- | Check the type of a function application, rethrowing errors to provide a better error message
-checkFunctionApplication ::
-  (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  Expr ->
-  Type ->
-  Expr ->
-  Maybe Type ->
-  m (Type, Expr)
-checkFunctionApplication fn fnTy arg ret = withErrorMessageHint (ErrorInApplication fn fnTy arg) $ do
+-- | Check the type of a function application, rethrowing errors to provide a better error message.
+--
+-- This judgment takes three inputs:
+--
+-- * The expression of the function we are applying
+-- * The type of that function
+-- * The expression we are applying it to
+--
+-- and synthesizes two outputs:
+--
+-- * The return type
+-- * The elaborated expression for the function application (since we might need to
+--   insert type class dictionaries, etc.)
+checkFunctionApplication
+  :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => Expr
+  -- ^ The function expression
+  -> Type
+  -- ^ The type of the function
+  -> Expr
+  -- ^ The argument expression
+  -> m (Type, Expr)
+  -- ^ The result type, and the elaborated term
+checkFunctionApplication fn fnTy arg = withErrorMessageHint (ErrorInApplication fn fnTy arg) $ do
   subst <- gets checkSubstitution
-  checkFunctionApplication' fn (substituteType subst fnTy) arg (substituteType subst <$> ret)
+  checkFunctionApplication' fn (substituteType subst fnTy) arg
 
 -- | Check the type of a function application
-checkFunctionApplication' ::
-  (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  Expr ->
-  Type ->
-  Expr ->
-  Maybe Type ->
-  m (Type, Expr)
-checkFunctionApplication' fn (TypeApp (TypeApp tyFunction' argTy) retTy) arg ret = do
+checkFunctionApplication'
+  :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => Expr
+  -> Type
+  -> Expr
+  -> m (Type, Expr)
+checkFunctionApplication' fn (TypeApp (TypeApp tyFunction' argTy) retTy) arg = do
   unifyTypes tyFunction' tyFunction
   arg' <- check arg argTy
-  case ret of
-    Nothing -> return (retTy, App fn arg')
-    Just ret' -> do
-      Just app' <- subsumes (Just (App fn arg')) retTy ret'
-      return (retTy, app')
-checkFunctionApplication' fn (ForAll ident ty _) arg ret = do
+  return (retTy, App fn arg')
+checkFunctionApplication' fn (ForAll ident ty _) arg = do
   replaced <- replaceVarWithUnknown ident ty
-  checkFunctionApplication fn replaced arg ret
-checkFunctionApplication' fn u@(TUnknown _) arg ret = do
+  checkFunctionApplication fn replaced arg
+checkFunctionApplication' fn (KindedType ty _) arg =
+  checkFunctionApplication fn ty arg
+checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg = do
+  dicts <- getTypeClassDictionaries
+  hints <- gets checkHints
+  checkFunctionApplication' (foldl App fn (map (\cs -> TypeClassDictionary cs dicts hints) constraints)) fnTy arg
+checkFunctionApplication' fn fnTy dict@TypeClassDictionary{} =
+  return (fnTy, App fn dict)
+checkFunctionApplication' fn u arg = do
   arg' <- do
     TypedValue _ arg' t <- infer arg
     (arg'', t') <- instantiatePolyTypeWithUnknowns arg' t
     return $ TypedValue True arg'' t'
   let ty = (\(TypedValue _ _ t) -> t) arg'
-  ret' <- maybe freshType return ret
-  unifyTypes u (function ty ret')
-  return (ret', App fn arg')
-checkFunctionApplication' fn (KindedType ty _) arg ret =
-  checkFunctionApplication fn ty arg ret
-checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg ret = do
-  dicts <- getTypeClassDictionaries
-  hints <- gets checkHints
-  checkFunctionApplication' (foldl App fn (map (\cs -> TypeClassDictionary cs dicts hints) constraints)) fnTy arg ret
-checkFunctionApplication' fn fnTy dict@TypeClassDictionary{} _ =
-  return (fnTy, App fn dict)
-checkFunctionApplication' _ fnTy arg _ = throwError . errorMessage $ CannotApplyFunction fnTy arg
+  ret <- freshType
+  unifyTypes u (function ty ret)
+  return (ret, App fn arg')
 
 -- |
 -- Ensure a set of property names and value does not contain duplicate labels
