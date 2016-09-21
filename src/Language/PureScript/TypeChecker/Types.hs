@@ -723,15 +723,6 @@ checkFunctionApplication' fn (TypeApp (TypeApp tyFunction' argTy) retTy) arg ret
 checkFunctionApplication' fn (ForAll ident ty _) arg ret = do
   replaced <- replaceVarWithUnknown ident ty
   checkFunctionApplication fn replaced arg ret
-checkFunctionApplication' fn u@(TUnknown _) arg ret = do
-  arg' <- do
-    TypedValue _ arg' t <- infer arg
-    (arg'', t') <- instantiatePolyTypeWithUnknowns arg' t
-    return $ TypedValue True arg'' t'
-  let ty = (\(TypedValue _ _ t) -> t) arg'
-  ret' <- maybe freshType return ret
-  unifyTypes u (function ty ret')
-  return (ret', App fn arg')
 checkFunctionApplication' fn (KindedType ty _) arg ret =
   checkFunctionApplication fn ty arg ret
 checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg ret = do
@@ -740,7 +731,15 @@ checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg ret = do
   checkFunctionApplication' (foldl App fn (map (\cs -> TypeClassDictionary cs dicts hints) constraints)) fnTy arg ret
 checkFunctionApplication' fn fnTy dict@TypeClassDictionary{} _ =
   return (fnTy, App fn dict)
-checkFunctionApplication' _ fnTy arg _ = throwError . errorMessage $ CannotApplyFunction fnTy arg
+checkFunctionApplication' fn u arg ret = do
+  arg' <- do
+    TypedValue _ arg' t <- infer arg
+    (arg'', t') <- instantiatePolyTypeWithUnknowns arg' t
+    return $ TypedValue True arg'' t'
+  let ty = (\(TypedValue _ _ t) -> t) arg'
+  ret' <- maybe freshType return ret
+  unifyTypes u (function ty ret')
+  return (ret', App fn arg')
 
 -- |
 -- Ensure a set of property names and value does not contain duplicate labels

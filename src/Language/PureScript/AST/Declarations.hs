@@ -90,7 +90,6 @@ data SimpleErrorMessage
   | ExprDoesNotHaveType Expr Type
   | PropertyIsMissing String
   | AdditionalProperty String
-  | CannotApplyFunction Type Expr
   | TypeSynonymInstance
   | OrphanInstance Ident (Qualified (ProperName 'ClassName)) [Type]
   | InvalidNewtype (ProperName 'TypeName)
