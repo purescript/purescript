@@ -13,6 +13,6 @@ tags = concatMap dtags . P.exportedDeclarations
         names (P.TypeDeclaration ident _) = [P.showIdent ident]
         names (P.ExternDeclaration ident _) = [P.showIdent ident]
         names (P.TypeSynonymDeclaration name _ _) = [P.runProperName name]
-        names (P.TypeClassDeclaration name _ _ _) = [P.runProperName name]
+        names (P.TypeClassDeclaration name _ _ _ _) = [P.runProperName name]
         names (P.TypeInstanceDeclaration name _ _ _ _) = [P.showIdent name]
         names _ = []

@@ -184,10 +184,15 @@ parseTypeClassDeclaration = do
     return implies
   className <- indented *> properName
   idents <- P.many (indented *> kindedIdent)
+  let parseNamedIdent = foldl (<|>) empty (zipWith (\(name, _) index -> lname' name $> index) idents [0..])
+      parseFunctionalDependency =
+        FunctionalDependency <$> P.many parseNamedIdent <* rarrow
+                             <*> P.many parseNamedIdent
+  dependencies <- P.option [] (indented *> pipe *> commaSep1 parseFunctionalDependency)
   members <- P.option [] $ do
     indented *> reserved "where"
     indented *> mark (P.many (same *> positioned parseTypeDeclaration))
-  return $ TypeClassDeclaration className idents implies members
+  return $ TypeClassDeclaration className idents implies dependencies members
 
 parseConstraint :: TokenParser Constraint
 parseConstraint = Constraint <$> parseQualified properName

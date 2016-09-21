@@ -104,7 +104,7 @@ extractSpans ss d = case d of
     [(Left (runIdentT i), ss)]
   P.TypeSynonymDeclaration name _ _ ->
     [(Right (runProperNameT name), ss)]
-  P.TypeClassDeclaration name _ _ members ->
+  P.TypeClassDeclaration name _ _ _ members ->
     (Right (runProperNameT name), ss) : concatMap (extractSpans' ss) members
   P.DataDeclaration _ name _ ctors ->
     (Right (runProperNameT name), ss)
