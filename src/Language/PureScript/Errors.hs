@@ -133,7 +133,6 @@ errorCode em = case unwrapErrorMessage em of
   ExprDoesNotHaveType{} -> "ExprDoesNotHaveType"
   PropertyIsMissing{} -> "PropertyIsMissing"
   AdditionalProperty{} -> "AdditionalProperty"
-  CannotApplyFunction{} -> "CannotApplyFunction"
   TypeSynonymInstance -> "TypeSynonymInstance"
   OrphanInstance{} -> "OrphanInstance"
   InvalidNewtype{} -> "InvalidNewtype"
@@ -257,7 +256,6 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (TypesDoNotUnify t1 t2) = TypesDoNotUnify <$> f t1 <*> f t2
   gSimple (ConstrainedTypeUnified t1 t2) = ConstrainedTypeUnified <$> f t1 <*> f t2
   gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
-  gSimple (CannotApplyFunction t e) = CannotApplyFunction <$> f t <*> pure e
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
   gSimple (NoInstanceFound con) = NoInstanceFound <$> overConstraintArgs (traverse f) con
   gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> pure insts
@@ -691,12 +689,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
       line $ "Type of expression lacks required label " ++ markCode prop ++ "."
     renderSimpleErrorMessage (AdditionalProperty prop) =
       line $ "Type of expression contains additional label " ++ markCode prop ++ "."
-    renderSimpleErrorMessage (CannotApplyFunction fn arg) =
-      paras [ line "A function of type"
-            , markCodeBox $ indent $ typeAsBox fn
-            , line "can not be applied to the argument"
-            , markCodeBox $ indent $ prettyPrintValue valueDepth arg
-            ]
     renderSimpleErrorMessage TypeSynonymInstance =
       line "Type class instances for type synonyms are disallowed."
     renderSimpleErrorMessage (OrphanInstance nm cnm ts) =
@@ -1036,10 +1028,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
 
     -- | See https://github.com/purescript/purescript/issues/1802
     stripRedudantHints :: SimpleErrorMessage -> [ErrorMessageHint] -> [ErrorMessageHint]
-    stripRedudantHints CannotApplyFunction{} = stripFirst isApplicationHint
-      where
-      isApplicationHint ErrorInApplication{} = True
-      isApplicationHint _ = False
     stripRedudantHints ExprDoesNotHaveType{} = stripFirst isCheckHint
       where
       isCheckHint ErrorCheckingType{} = True
