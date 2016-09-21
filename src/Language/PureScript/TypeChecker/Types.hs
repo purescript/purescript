@@ -693,25 +693,30 @@ checkProperties expr ps row lax = let (ts, r') = rowToList row in go ps ts r' wh
   go _ _ _ = throwError . errorMessage $ ExprDoesNotHaveType expr (TypeApp tyRecord row)
 
 -- | Check the type of a function application, rethrowing errors to provide a better error message
-checkFunctionApplication ::
-  (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  Expr ->
-  Type ->
-  Expr ->
-  Maybe Type ->
-  m (Type, Expr)
+checkFunctionApplication
+  :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => Expr
+  -- ^ The function expression
+  -> Type
+  -- ^ The type of the function
+  -> Expr
+  -- ^ The argument expression
+  -> Maybe Type
+  -- ^ The result type we are expecting
+  -> m (Type, Expr)
+  -- ^ The result type, and the elaborated term
 checkFunctionApplication fn fnTy arg ret = withErrorMessageHint (ErrorInApplication fn fnTy arg) $ do
   subst <- gets checkSubstitution
   checkFunctionApplication' fn (substituteType subst fnTy) arg (substituteType subst <$> ret)
 
 -- | Check the type of a function application
-checkFunctionApplication' ::
-  (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  Expr ->
-  Type ->
-  Expr ->
-  Maybe Type ->
-  m (Type, Expr)
+checkFunctionApplication'
+  :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => Expr
+  -> Type
+  -> Expr
+  -> Maybe Type
+  -> m (Type, Expr)
 checkFunctionApplication' fn (TypeApp (TypeApp tyFunction' argTy) retTy) arg ret = do
   unifyTypes tyFunction' tyFunction
   arg' <- check arg argTy
