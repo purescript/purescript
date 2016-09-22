@@ -180,6 +180,7 @@ library
                      Language.PureScript.CoreFn.Meta
                      Language.PureScript.CoreFn.Module
                      Language.PureScript.CoreFn.Traversals
+                     Language.PureScript.CoreFn.ToJSON
                      Language.PureScript.Comments
                      Language.PureScript.Environment
                      Language.PureScript.Errors

@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Language.PureScript.Make
   (
@@ -36,6 +37,7 @@ import Control.Monad.Trans.Except
 import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Aeson (encode, decode)
+import qualified Data.Aeson as Aeson
 import Data.ByteString.Builder (toLazyByteString, stringUtf8)
 import Data.Either (partitionEithers)
 import Data.Foldable (for_)
@@ -69,6 +71,7 @@ import qualified Language.PureScript.Bundle as Bundle
 import qualified Language.PureScript.CodeGen.JS as J
 import qualified Language.PureScript.Constants as C
 import qualified Language.PureScript.CoreFn as CF
+import qualified Language.PureScript.CoreFn.ToJSON as CFJ
 import qualified Language.PureScript.Parser as PSParser
 
 import qualified Paths_purescript as Paths
@@ -369,6 +372,12 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
       for_ (mn `M.lookup` foreigns) (readTextFile >=> writeTextFile foreignFile)
       writeTextFile externsFile exts
     lift $ when sourceMaps $ genSourceMap dir mapFile (length prefix) mappings
+    dumpCoreFn <- lift $ asks optionsDumpCoreFn
+    when dumpCoreFn $ do
+      let coreFnFile = outputDir </> filePath </> "corefn.json"
+      let jsonPayload = CFJ.moduleToJSON Paths.version m
+      let json = Aeson.object [ (fromString (runModuleName mn), jsonPayload) ]
+      lift $ writeTextFile coreFnFile (BU8.toString . B.toStrict . encode $ json)
 
   genSourceMap :: String -> String -> Int -> [SMap] -> Make ()
   genSourceMap dir mapFile extraLines mappings = do
