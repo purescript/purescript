@@ -25,8 +25,6 @@ import           Data.Map.Lazy                        as M
 import qualified Language.PureScript.Errors.JSON      as P
 import qualified Language.PureScript as P
 import           Language.PureScript.Ide.Conversions
-import           Text.Parsec as Parsec
-import           Text.Parsec.Text
 
 type ModuleIdent = Text
 
@@ -209,9 +207,9 @@ data PursuitResponse =
   -- | A Pursuit Response for a module. Consists of the modules name and the
   -- package it belongs to
   ModuleResponse ModuleIdent Text
-  -- | A Pursuit Response for a declaration. Consist of the declarations type,
-  -- module, name and package
-  | DeclarationResponse Text ModuleIdent Text Text
+  -- | A Pursuit Response for a declaration. Consist of the declaration's
+  -- module, name, package, type summary text
+  | DeclarationResponse Text ModuleIdent Text (Maybe Text) Text
   deriving (Show,Eq)
 
 instance FromJSON PursuitResponse where
@@ -225,42 +223,21 @@ instance FromJSON PursuitResponse where
         pure (ModuleResponse name package)
       "declaration" -> do
         moduleName <- info .: "module"
-        Right (ident, declType) <- typeParse <$> o .: "text"
-        pure (DeclarationResponse declType moduleName ident package)
+        ident <- info .: "title"
+        (text :: Text) <- o .: "text"
+        typ <- info .:? "typeText"
+        pure (DeclarationResponse moduleName ident package typ text)
       _ -> mzero
   parseJSON _ = mzero
-
-
-typeParse :: Text -> Either Text (Text, Text)
-typeParse t = case parse parseType "" t of
-  Right (x,y) -> Right (x, y)
-  Left err -> Left (show err)
-  where
-    parseType :: Parser (Text, Text)
-    parseType = do
-      name <- identifier
-      _ <- string "::"
-      spaces
-      type' <- many1 anyChar
-      pure (name, toS type')
-
-    identifier :: Parser Text
-    identifier = do
-      spaces
-      ident <-
-        -- necessary for being able to parse the following ((++), concat)
-        between (char '(') (char ')') (many1 (noneOf ", )")) Parsec.<|>
-        many1 (noneOf ", )")
-      spaces
-      pure (toS ident)
 
 instance ToJSON PursuitResponse where
   toJSON (ModuleResponse name package) =
     object ["module" .= name, "package" .= package]
-  toJSON (DeclarationResponse module' ident type' package) =
+  toJSON (DeclarationResponse module' ident package type' text) =
     object
       [ "module"  .= module'
       , "ident"   .= ident
       , "type"    .= type'
       , "package" .= package
+      , "text"    .= text
       ]
