@@ -123,6 +123,8 @@ data SimpleErrorMessage
   | InvalidOperatorInBinder (Qualified (OpName 'ValueOpName)) (Qualified Ident)
   | DeprecatedRequirePath
   | CannotGeneralizeRecursiveFunction Ident Type
+  | CannotDeriveNewtypeForData (ProperName 'TypeName)
+  | NonWildcardNewtypeInstance (ProperName 'TypeName)
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.

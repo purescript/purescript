@@ -5,8 +5,9 @@
     "purescript-console": "1.0.0-rc.1",
     "purescript-eff": "1.0.0-rc.1",
     "purescript-functions": "1.0.0-rc.1",
-    "purescript-prelude": "1.0.0-rc.3",
+    "purescript-prelude": "1.1.0",
     "purescript-st": "1.0.0-rc.1",
-    "purescript-partial": "1.1.2"
+    "purescript-partial": "1.1.2",
+    "purescript-newtype": "0.1.0"
   }
 }
