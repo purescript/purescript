@@ -21,7 +21,7 @@ import           Protolude
 
 import           Control.Concurrent.STM
 import           Data.Aeson
-import           Data.Map.Lazy                        as M
+import qualified Data.Map.Lazy                        as M
 import qualified Language.PureScript.Errors.JSON      as P
 import qualified Language.PureScript as P
 import           Language.PureScript.Ide.Conversions
@@ -146,17 +146,17 @@ instance ToJSON ModuleImport where
   toJSON (ModuleImport mn P.Implicit qualifier) =
     object $ [ "module" .= mn
              , "importType" .= ("implicit" :: Text)
-             ] ++ fmap (\x -> "qualifier" .= x) (maybeToList qualifier)
-  toJSON (ModuleImport mn (P.Explicit refs) _) =
-    object [ "module" .= mn
-           , "importType" .= ("explicit" :: Text)
-           , "identifiers" .= (identifierFromDeclarationRef <$> refs)
-           ]
-  toJSON (ModuleImport mn (P.Hiding refs) _) =
-    object [ "module" .= mn
-           , "importType" .= ("hiding" :: Text)
-           , "identifiers" .= (identifierFromDeclarationRef <$> refs)
-           ]
+             ] ++ map (\x -> "qualifier" .= x) (maybeToList qualifier)
+  toJSON (ModuleImport mn (P.Explicit refs) qualifier) =
+    object $ [ "module" .= mn
+             , "importType" .= ("explicit" :: Text)
+             , "identifiers" .= (identifierFromDeclarationRef <$> refs)
+             ] ++ map (\x -> "qualifier" .= x) (maybeToList qualifier)
+  toJSON (ModuleImport mn (P.Hiding refs) qualifier) =
+    object $ [ "module" .= mn
+             , "importType" .= ("hiding" :: Text)
+             , "identifiers" .= (identifierFromDeclarationRef <$> refs)
+             ] ++ map (\x -> "qualifier" .= x) (maybeToList qualifier)
 
 identifierFromDeclarationRef :: P.DeclarationRef -> Text
 identifierFromDeclarationRef (P.TypeRef name _) = runProperNameT name

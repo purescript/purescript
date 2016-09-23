@@ -68,7 +68,7 @@ The `complete` command looks up possible completions/corrections.
 
   If no matcher is given every candidate, that passes the filters, is returned
   in no particular order.
-  
+
 ```json
 {
   "command": "complete",
@@ -106,7 +106,7 @@ couldn't be extracted from a source file.
 ```
 
 
-### CaseSplit 
+### CaseSplit
 
 The CaseSplit command takes a line of source code, an area in that line of code
 and replaces it with all patterns for a given type. The parameter `annotations`
@@ -250,9 +250,9 @@ Example:
     "importCommand": {
       "importCommand": "addImport",
       "identifier": "bind"
-    } 
+    }
   }
-} 
+}
 ```
 
 ### Rebuild
@@ -381,7 +381,7 @@ The list commmand can also list the imports for a given file.
 
 The list import command returns a list of imports where imports are of the following form:
 
-Implicit Import(`import Data.Array`):
+Implicit Import (`import Data.Array`):
 ```json
 [
   {
@@ -391,7 +391,7 @@ Implicit Import(`import Data.Array`):
 ]
 ```
 
-Implicit qualified Import(`import qualified Data.Array as A`):
+Implicit qualified Import (`import Data.Array as A`):
 ```json
 [
   {
@@ -402,7 +402,7 @@ Implicit qualified Import(`import qualified Data.Array as A`):
 ]
 ```
 
-Explicit Import(`import Data.Array (filter, filterM, join)`):
+Explicit Import (`import Data.Array (filter, filterM, join)`):
 ```json
 [
   {
@@ -413,7 +413,19 @@ Explicit Import(`import Data.Array (filter, filterM, join)`):
 ]
 ```
 
-Hiding Import(`import Data.Array hiding (filter, filterM, join)`):
+Explicit qualified Import (`import Data.Array (filter, filterM, join) as A`):
+```json
+[
+  {
+  "module": "Data.Array",
+  "importType": "explicit",
+  "identifiers": ["filter", "filterM", "join"],
+  "qualifier": "A"
+  }
+]
+```
+
+Hiding Import (`import Data.Array hiding (filter, filterM, join)`):
 ```json
 [
   {
@@ -423,6 +435,19 @@ Hiding Import(`import Data.Array hiding (filter, filterM, join)`):
   }
 ]
 ```
+
+Qualified Hiding Import (`import Data.Array hiding (filter, filterM, join) as A`):
+```json
+[
+  {
+  "module": "Data.Array",
+  "importType": "hiding",
+  "identifiers": ["filter", "filterM", "join"],
+  "qualifier": "A"
+  }
+]
+```
+
 ### Cwd/Quit/Reset
 `cwd` returns the working directory of the server(should be your project root).
 
