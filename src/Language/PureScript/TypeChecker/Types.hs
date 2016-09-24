@@ -32,7 +32,7 @@ import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets)
 import Control.Monad.Supply.Class (MonadSupply)
-import Control.Monad.Writer.Class (MonadWriter(..), censor)
+import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Bifunctor (bimap)
 import Data.Either (lefts, rights)
@@ -139,16 +139,17 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
     isHoleError :: ErrorMessage -> Bool
     isHoleError (ErrorMessage _ HoleInferredType{}) = True
     isHoleError _ = False
-  -- Replace all the wildcards types with their inferred types
+    -- Replace all the wildcards types with their inferred types
     replace sub = runTypeSearch . onTypesInErrorMessage (substituteType sub)
       where
       runTypeSearch (ErrorMessage hints (HoleInferredType x ty y (TSBefore env))) =
-        ErrorMessage hints (HoleInferredType x ty y $
-                            TSAfter $
-                            fmap (\(i, (z, _, _)) ->
-                                    (i, substituteType sub z))
-                             (M.toList $ typeSearch env (substituteType sub ty)))
+        ErrorMessage hints (HoleInferredType x ty y $ TSAfter $
+                             fmap (substituteType sub) <$> M.toList (typeSearch' env (substituteType sub ty)))
       runTypeSearch x = x
+
+    isHoleError :: ErrorMessage -> Bool
+    isHoleError (ErrorMessage _ HoleInferredType{}) = True
+    isHoleError _ = False
 
 type TypeData = M.Map (Qualified Ident) (Type, NameKind, NameVisibility)
 

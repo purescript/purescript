@@ -2,7 +2,10 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.PureScript.Infernal (typeSearch) where
+module Language.PureScript.Infernal
+  ( typeSearch
+  , typeSearch'
+  ) where
 
 import           Protolude
 
@@ -99,6 +102,15 @@ typeSearch
   -> Map (P.Qualified P.Ident) (P.Type, P.NameKind, P.NameVisibility)
 typeSearch env type' =
   Map.filter (\(x, _, _) -> isRight (filtering env type' x)) (P.names env)
+
+typeSearch'
+  :: P.Environment
+  -> P.Type
+  -> Map (P.Qualified P.Ident) P.Type
+typeSearch' env type' =
+  Map.mapMaybe (\(x, _, _) -> if isRight (filtering env type' x)
+                              then Just x
+                              else Nothing) (P.names env)
 
 overTypes :: (P.Type -> P.Type) -> P.Expr -> P.Expr
 overTypes f = let (_, f', _) = P.everywhereOnValues identity g identity in f'
