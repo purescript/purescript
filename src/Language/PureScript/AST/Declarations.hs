@@ -47,7 +47,6 @@ data SimpleErrorMessage
   | MultipleValueOpFixities (OpName 'ValueOpName)
   | MultipleTypeOpFixities (OpName 'TypeOpName)
   | OrphanTypeDeclaration Ident
-  | RedefinedModule ModuleName [SourceSpan]
   | RedefinedIdent Ident
   | OverlappingNamesInLet
   | UnknownName (Qualified Name)
@@ -59,7 +58,7 @@ data SimpleErrorMessage
   | ScopeShadowing Name (Maybe ModuleName) [ModuleName]
   | DeclConflict Name Name
   | ExportConflict (Qualified Name) (Qualified Name)
-  | DuplicateModuleName ModuleName
+  | DuplicateModule ModuleName [SourceSpan]
   | DuplicateTypeArgument String
   | InvalidDoBind
   | InvalidDoLet
@@ -176,6 +175,10 @@ data Module = Module SourceSpan [Comment] ModuleName [Declaration] (Maybe [Decla
 -- | Return a module's name.
 getModuleName :: Module -> ModuleName
 getModuleName (Module _ _ name _ _) = name
+
+-- | Return a module's source span.
+getModuleSourceSpan :: Module -> SourceSpan
+getModuleSourceSpan (Module ss _ _ _ _) = ss
 
 -- |
 -- Add an import declaration for a module if it does not already explicitly import it.

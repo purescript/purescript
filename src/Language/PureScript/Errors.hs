@@ -90,7 +90,6 @@ errorCode em = case unwrapErrorMessage em of
   MultipleValueOpFixities{} -> "MultipleValueOpFixities"
   MultipleTypeOpFixities{} -> "MultipleTypeOpFixities"
   OrphanTypeDeclaration{} -> "OrphanTypeDeclaration"
-  RedefinedModule{} -> "RedefinedModule"
   RedefinedIdent{} -> "RedefinedIdent"
   OverlappingNamesInLet -> "OverlappingNamesInLet"
   UnknownName{} -> "UnknownName"
@@ -102,7 +101,7 @@ errorCode em = case unwrapErrorMessage em of
   ScopeShadowing{} -> "ScopeShadowing"
   DeclConflict{} -> "DeclConflict"
   ExportConflict{} -> "ExportConflict"
-  DuplicateModuleName{} -> "DuplicateModuleName"
+  DuplicateModule{} -> "DuplicateModule"
   DuplicateTypeArgument{} -> "DuplicateTypeArgument"
   InvalidDoBind -> "InvalidDoBind"
   InvalidDoLet -> "InvalidDoLet"
@@ -486,10 +485,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
       line $ "There are multiple fixity/precedence declarations for type operator " ++ markCode (showOp op)
     renderSimpleErrorMessage (OrphanTypeDeclaration nm) =
       line $ "The type declaration for " ++ markCode (showIdent nm) ++ " should be followed by its definition."
-    renderSimpleErrorMessage (RedefinedModule name filenames) =
-      paras [ line ("The module " ++ markCode (runModuleName name) ++ " has been defined multiple times:")
-            , indent . paras $ map (line . displaySourceSpan) filenames
-            ]
     renderSimpleErrorMessage (RedefinedIdent name) =
       line $ "The value " ++ markCode (showIdent name) ++ " has been defined multiple times"
     renderSimpleErrorMessage (UnknownName name) =
@@ -519,8 +514,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
       line $ "Declaration for " ++ printName (Qualified Nothing new) ++ " conflicts with an existing " ++ nameType existing ++ " of the same name."
     renderSimpleErrorMessage (ExportConflict new existing) =
       line $ "Export for " ++ printName new ++ " conflicts with " ++ runName existing
-    renderSimpleErrorMessage (DuplicateModuleName mn) =
-      line $ "Module " ++ markCode (runModuleName mn) ++ " has been defined multiple times."
+    renderSimpleErrorMessage (DuplicateModule mn ss) =
+      paras [ line ("Module " ++ markCode (runModuleName mn) ++ " has been defined multiple times:")
+            , indent . paras $ map (line . displaySourceSpan) ss
+            ]
     renderSimpleErrorMessage (CycleInDeclaration nm) =
       line $ "The value of " ++ markCode (showIdent nm) ++ " is undefined here, so this reference is not allowed."
     renderSimpleErrorMessage (CycleInModules mns) =

@@ -99,15 +99,12 @@ desugarImportsWithEnv externs modules = do
     exportedRefs f = M.fromList $ (, efModuleName) <$> mapMaybe f efExports
 
   updateEnv :: ([Module], Env) -> Module -> m ([Module], Env)
-  updateEnv (ms, env) m@(Module ss _ mn _ refs) =
-    case mn `M.lookup` env of
-      Just m' -> throwError . errorMessage $ RedefinedModule mn [envModuleSourceSpan m', ss]
-      Nothing -> do
-        members <- findExportable m
-        let env' = M.insert mn (ss, primImports, members) env
-        (m', imps) <- resolveImports env' m
-        exps <- maybe (return members) (resolveExports env' ss mn imps members) refs
-        return (m' : ms, M.insert mn (ss, imps, exps) env)
+  updateEnv (ms, env) m@(Module ss _ mn _ refs) = do
+    members <- findExportable m
+    let env' = M.insert mn (ss, primImports, members) env
+    (m', imps) <- resolveImports env' m
+    exps <- maybe (return members) (resolveExports env' ss mn imps members) refs
+    return (m' : ms, M.insert mn (ss, imps, exps) env)
 
   renameInModule' :: Env -> Module -> m Module
   renameInModule' env m@(Module _ _ mn _ _) =
