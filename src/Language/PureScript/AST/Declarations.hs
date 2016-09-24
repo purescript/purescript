@@ -107,7 +107,7 @@ data SimpleErrorMessage
   | MisleadingEmptyTypeImport ModuleName (ProperName 'TypeName)
   | ImportHidingModule ModuleName
   | UnusedImport ModuleName
-  | UnusedExplicitImport ModuleName [String] (Maybe ModuleName) [DeclarationRef]
+  | UnusedExplicitImport ModuleName [Name] (Maybe ModuleName) [DeclarationRef]
   | UnusedDctorImport ModuleName (ProperName 'TypeName) (Maybe ModuleName) [DeclarationRef]
   | UnusedDctorExplicitImport ModuleName (ProperName 'TypeName) [ProperName 'ConstructorName] (Maybe ModuleName) [DeclarationRef]
   | DuplicateSelectiveImport ModuleName
