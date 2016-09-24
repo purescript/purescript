@@ -76,6 +76,7 @@ extra-source-files: examples/passing/*.purs
                   , examples/failing/OrphanInstance/*.purs
                   , examples/warning/*.purs
                   , examples/warning/*.js
+                  , examples/warning/UnusedExplicitImportTypeOp/*.purs
                   , examples/docs/bower_components/purescript-prelude/src/*.purs
                   , examples/docs/bower.json
                   , examples/docs/src/*.purs

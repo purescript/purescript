@@ -760,7 +760,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
 
     renderSimpleErrorMessage msg@(UnusedExplicitImport mn names _ _) =
       paras [ line $ "The import of module " ++ markCode (runModuleName mn) ++ " contains the following unused references:"
-            , indent $ paras $ map line names
+            , indent $ paras $ map (line . markCode . runName . Qualified Nothing) names
             , line "It could be replaced with:"
             , indent $ line $ markCode $ showSuggestion msg ]
 
