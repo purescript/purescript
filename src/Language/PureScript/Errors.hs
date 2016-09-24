@@ -166,6 +166,8 @@ errorCode em = case unwrapErrorMessage em of
   InvalidOperatorInBinder{} -> "InvalidOperatorInBinder"
   DeprecatedRequirePath{} -> "DeprecatedRequirePath"
   CannotGeneralizeRecursiveFunction{} -> "CannotGeneralizeRecursiveFunction"
+  CannotDeriveNewtypeForData{} -> "CannotDeriveNewtypeForData"
+  NonWildcardNewtypeInstance{} -> "NonWildcardNewtypeInstance"
 
 -- |
 -- A stack trace for an error
@@ -829,6 +831,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
             , line $ "The inferred type of " ++ markCode (showIdent ident) ++ " was:"
             , markCodeBox $ indent $ typeAsBox ty
             , line "Try adding a type signature."
+            ]
+
+    renderSimpleErrorMessage (CannotDeriveNewtypeForData tyName) =
+      paras [ line $ "Cannot derive an instance of the " ++ markCode "Newtype" ++ " class for non-newtype " ++ markCode (runProperName tyName) ++ "."
+            ]
+
+    renderSimpleErrorMessage (NonWildcardNewtypeInstance tyName) =
+      paras [ line $ "A type wildcard (_) should be used for the inner type when deriving the " ++ markCode "Newtype" ++ " instance for " ++ markCode (runProperName tyName) ++ "."
             ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box

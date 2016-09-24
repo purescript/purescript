@@ -6,6 +6,7 @@
 module Language.PureScript.TypeChecker
   ( module T
   , typeCheckModule
+  , checkNewtype
   ) where
 
 import Prelude.Compat
@@ -318,10 +319,6 @@ typeCheckAll moduleName _ = traverse go
     checkType _ = internalError "Invalid type in instance in checkOrphanInstance"
   checkOrphanInstance _ _ _ = internalError "Unqualified class name in checkOrphanInstance"
 
-  checkNewtype :: ProperName 'TypeName -> [(ProperName 'ConstructorName, [Type])] -> m ()
-  checkNewtype _ [(_, [_])] = return ()
-  checkNewtype name _ = throwError . errorMessage $ InvalidNewtype name
-
   -- |
   -- This function adds the argument kinds for a type constructor so that they may appear in the externs file,
   -- extracted from the kind of the type constructor itself.
@@ -331,6 +328,15 @@ typeCheckAll moduleName _ = traverse go
   withKinds (s@(_, Just _ ):ss) (FunKind _   k) = s : withKinds ss k
   withKinds (  (s, Nothing):ss) (FunKind k1 k2) = (s, Just k1) : withKinds ss k2
   withKinds _                   _               = internalError "Invalid arguments to peelKinds"
+
+checkNewtype
+  :: forall m
+   . MonadError MultipleErrors m
+  => ProperName 'TypeName
+  -> [(ProperName 'ConstructorName, [Type])]
+  -> m ()
+checkNewtype _ [(_, [_])] = return ()
+checkNewtype name _ = throwError . errorMessage $ InvalidNewtype name
 
 -- |
 -- Type check an entire module and ensure all types and classes defined within the module that are

@@ -209,7 +209,7 @@ parseInstanceDeclaration = do
     rfatArrow
     return deps
   className <- indented *> parseQualified properName
-  ty <- P.many (indented *> noWildcards parseTypeAtom)
+  ty <- P.many (indented *> parseTypeAtom)
   return $ TypeInstanceDeclaration name (fromMaybe [] deps) className ty
 
 parseTypeInstanceDeclaration :: TokenParser Declaration
