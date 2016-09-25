@@ -5,6 +5,7 @@ This file lists the contributors to the PureScript compiler project, and the ter
 ### Individuals
 
 - [@5outh](https://github.com/5outh) (Benjamin Kovach) - My existing contributions and all future contributions until further notice are Copyright Benjamin Kovach, and are licensed to the owners and users of the PureScript compiler project under the terms of the MIT license.
+- [@andreypopp](https://github.com/andreypopp) (Andrey Popp) My existing contributions and all future contributions until further notice are Copyright Andrey Popp, and are licensed to the owners and users of the PureScript compiler project under the terms of the MIT license.
 - [@andyarvanitis](https://github.com/andyarvanitis) (Andy Arvanitis) My existing contributions and all future contributions until further notice are Copyright Andy Arvanitis, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 - [@anthok88](https://github.com/anthoq88) - My existing contributions and all future contributions until further notice are Copyright anthoq88, and are licensed to the owners and users of the PureScript compiler project under the terms of the MIT license
 - [@ardumont](https://github.com/ardumont) (Antoine R. Dumont) My existing contributions and all future contributions until further notice are Copyright Antoine R. Dumont, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
