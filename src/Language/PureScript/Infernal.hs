@@ -2,6 +2,8 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{-# OPTIONS -fno-warn-unused-binds #-}
+
 module Language.PureScript.Infernal
   ( typeSearch
   , typeSearch'
@@ -28,6 +30,8 @@ import Language.PureScript.Errors as P
 import Language.PureScript.Names as P
 import Language.PureScript.Externs as P
 import Language.PureScript.Types as P
+import Language.PureScript.TypeChecker.Skolems as Skolem
+import Language.PureScript.TypeChecker.Synonyms as P
 import Language.PureScript.ModuleDependencies as P
 
 -- REPL functions
@@ -44,7 +48,8 @@ loadEnv modules = do
       case parseResult of
         Nothing -> internalError "parsing an extern failed"
         Just externs -> pure externs
---
+
+-- Potentially needed for psc-ide integration
 
 mkEnv :: [P.ExternsFile] -> P.Environment
 mkEnv externs =
@@ -68,31 +73,38 @@ sortExterns externs = do
     inOrderOf :: (Ord a) => [a] -> [a] -> [a]
     inOrderOf xs ys = let s = Set.fromList xs in filter (`Set.member` s) ys
 
+------
+
+xrunSubsume
+  :: Environment
+  -> StateT TC.CheckState (SupplyT (WriterT b (Except e))) a
+  -> Either e (a, Environment)
 xrunSubsume env = runExcept . evalWriterT . P.evalSupplyT 0 . TC.runCheck' env
 
+evalWriterT :: Monad m => WriterT b m r -> m r
 evalWriterT m = liftM fst (runWriterT m)
 
 filtering
   :: P.Environment
   -- ^ The Environment which contains the relevant definitions and typeclasses
   -> P.Type
-  -- ^ The type we want to try and subsume
+  -- ^ The type supplied by the environment
   -> P.Type
-  -- ^ The type we want to check against
+  -- ^ The user supplied type
   -> Either P.MultipleErrors ((P.Expr, [(P.Ident, P.Constraint)]), P.Environment)
-filtering env t x = xrunSubsume env $ do
+filtering env x t = xrunSubsume env $ do
+  let initializeSkolems = Skolem.introduceSkolemScope <=< P.replaceAllTypeSynonyms <=< P.replaceTypeWildcards
+
+  x' <- initializeSkolems x
+  t' <- initializeSkolems t
+
   let dummyExpression = P.Var (P.Qualified Nothing (P.Ident "x"))
-  -- let expr = P.Var (P.Qualified (Just (P.moduleNameFromString "Data.Traversable")) (P.Ident "traverse"))
-  elab <- runExceptT $ subsumes (Just dummyExpression) x t
+  elab <- runExceptT $ subsumes (Just dummyExpression) t' x'
   subst <- gets TC.checkSubstitution
   case elab of
     Left _ -> throwError undefined
     Right (Just expP) -> do
       let expPP = overTypes (P.substituteType subst) expP
-      -- traceShowM (P.substituteType subst (P.TUnknown 3))
-      -- traceM $ show $ Boxes.render . P.prettyPrintValue 79 $ expP
-      -- traceM $ show $ Boxes.render . P.prettyPrintValue 79 $ expPP
-      -- traceShowM expPP
       Entailment.replaceTypeClassDictionaries True (P.moduleNameFromString "Dx") expPP
     Right Nothing -> throwError undefined
 
@@ -101,7 +113,7 @@ typeSearch
   -> P.Type
   -> Map (P.Qualified P.Ident) (P.Type, P.NameKind, P.NameVisibility)
 typeSearch env type' =
-  Map.filter (\(x, _, _) -> isRight (filtering env type' x)) (P.names env)
+  Map.filter (\(x, _, _) -> isRight (filtering env x type')) (P.names env)
 
 typeSearch'
   :: P.Environment
