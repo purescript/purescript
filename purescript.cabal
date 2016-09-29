@@ -406,6 +406,23 @@ executable psc-publish
     hs-source-dirs: psc-publish
     ghc-options: -Wall -O2
 
+executable psc-package
+    build-depends: base >=4 && <5,
+                   purescript -any,
+                   aeson -any,
+                   bytestring -any,
+                   containers -any,
+                   foldl -any,
+                   optparse-applicative -any,
+                   system-filepath -any,
+                   text -any,
+                   turtle -any
+    main-is: Main.hs
+    other-modules: Paths_purescript
+    buildable: True
+    hs-source-dirs: psc-package
+    ghc-options: -Wall -O2
+
 executable psc-hierarchy
     build-depends: base >=4 && <5,
                    purescript -any,
