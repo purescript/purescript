@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PatternGuards #-}
 
 -- |
 -- This module implements the generic deriving elaboration that takes place during desugaring.
@@ -93,11 +94,30 @@ deriveNewtypeInstance className ds tys tyConNm dargs = do
     tyCon <- findTypeDecl tyConNm ds
     go tyCon
   where
-    go (DataDeclaration Newtype _ tyArgNames [(_, [wrapped])]) = do
-      let subst = zipWith (\(name, _) t -> (name, t)) tyArgNames dargs
-      return (DeferredDictionary className (init tys ++ [replaceAllTypeVars subst wrapped]))
+    go (DataDeclaration Newtype _ tyArgNames [(_, [wrapped])])
+      -- The newtype might not be applied to all type arguments.
+      -- This is okay as long as the newtype wraps something which ends with
+      -- sufficiently many type applications to variables.
+      -- For example, we can derive Functor for
+      --
+      -- newtype MyArray a = MyArray (Array a)
+      --
+      -- since Array a is a type application which uses the last
+      -- type argument
+      | Just wrapped' <- stripRight (takeReverse (length tyArgNames - length dargs) tyArgNames) wrapped =
+          do let subst = zipWith (\(name, _) t -> (name, t)) tyArgNames dargs
+             return (DeferredDictionary className (init tys ++ [replaceAllTypeVars subst wrapped']))
     go (PositionedDeclaration _ _ d) = go d
     go _ = throwError . errorMessage $ InvalidNewtypeInstance className tys
+
+    takeReverse :: Int -> [a] -> [a]
+    takeReverse n = take n . reverse
+
+    stripRight :: [(String, Maybe kind)] -> Type -> Maybe Type
+    stripRight [] ty = Just ty
+    stripRight ((arg, _) : args) (TypeApp t (TypeVar arg'))
+      | arg == arg' = stripRight args t
+    stripRight _ _ = Nothing
 
 dataGeneric :: ModuleName
 dataGeneric = ModuleName [ ProperName "Data", ProperName "Generic" ]
