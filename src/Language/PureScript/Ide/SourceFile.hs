@@ -17,11 +17,15 @@
 module Language.PureScript.Ide.SourceFile
   ( parseModule
   , getImportsForFile
+  , extractAstInformation
+  -- for tests
   , extractSpans
+  , extractTypeAnnotations
   ) where
 
 import           Protolude
 
+import qualified Data.Map as Map
 import qualified Language.PureScript                  as P
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Util
@@ -64,6 +68,25 @@ getImportsForFile fp = do
         unwrapImportType (P.Hiding decls)   = P.Hiding (map unwrapPositionedRef decls)
         unwrapImportType P.Implicit         = P.Implicit
 
+-- | Extracts AST information from a parsed module
+extractAstInformation
+  :: P.Module
+  -> (DefinitionSites P.SourceSpan, TypeAnnotations)
+extractAstInformation (P.Module ss _ _ decls _) =
+  let definitions = Map.fromList (concatMap (extractSpans ss) decls)
+      typeAnnotations = Map.fromList (extractTypeAnnotations decls)
+  in (definitions, typeAnnotations)
+
+-- | Extracts type annotations for functions from a given Module
+extractTypeAnnotations
+  :: [P.Declaration]
+  -> [(P.Ident, P.Type)]
+extractTypeAnnotations = mapMaybe extract
+  where
+    extract d = case unwrapPositioned d of
+      P.TypeDeclaration ident ty -> Just (ident, ty)
+      _ -> Nothing
+
 -- | Given a surrounding Sourcespan and a Declaration from the PS AST, extracts
 -- definition sites inside that Declaration.
 extractSpans
@@ -81,7 +104,7 @@ extractSpans ss d = case d of
     [(Left (runIdentT i), ss)]
   P.TypeSynonymDeclaration name _ _ ->
     [(Right (runProperNameT name), ss)]
-  P.TypeClassDeclaration name _ _ members ->
+  P.TypeClassDeclaration name _ _ _ members ->
     (Right (runProperNameT name), ss) : concatMap (extractSpans' ss) members
   P.DataDeclaration _ name _ ctors ->
     (Right (runProperNameT name), ss)

@@ -75,6 +75,8 @@ supportModules =
   , "Data.Function"
   , "Data.Functor"
   , "Data.HeytingAlgebra"
+  , "Data.NaturalTransformation"
+  , "Data.Newtype"
   , "Data.Ord.Unsafe"
   , "Data.Ord"
   , "Data.Ordering"

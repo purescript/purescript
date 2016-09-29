@@ -22,26 +22,3 @@ data TypeClassDictionaryInScope
     , tcdDependencies :: Maybe [Constraint]
     }
     deriving (Show)
-
--- |
--- A simplified representation of expressions which are used to represent type
--- class dictionaries at runtime, which can be compared for equality
---
-data DictionaryValue
-  -- |
-  -- A dictionary which is brought into scope by a local constraint
-  --
-  = LocalDictionaryValue (Qualified Ident)
-  -- |
-  -- A dictionary which is brought into scope by an instance declaration
-  --
-  | GlobalDictionaryValue (Qualified Ident)
-  -- |
-  -- A dictionary which depends on other dictionaries
-  --
-  | DependentDictionaryValue (Qualified Ident) [DictionaryValue]
-  -- |
-  -- A subclass dictionary
-  --
-  | SubclassDictionaryValue DictionaryValue (Qualified (ProperName 'ClassName)) Integer
-  deriving (Show, Ord, Eq)

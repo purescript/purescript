@@ -79,11 +79,11 @@ warnFileTypeNotFound = hPutStrLn stderr . ("psc: No files found using pattern: "
 globWarningOnMisses :: (String -> IO ()) -> [FilePath] -> IO [FilePath]
 globWarningOnMisses warn = concatMapM globWithWarning
   where
-  globWithWarning pattern = do
-    paths <- glob pattern
-    when (null paths) $ warn pattern
+  globWithWarning pattern' = do
+    paths <- glob pattern'
+    when (null paths) $ warn pattern'
     return paths
-  concatMapM f = liftM concat . mapM f
+  concatMapM f = fmap concat . mapM f
 
 readInput :: [FilePath] -> IO [(FilePath, String)]
 readInput inputFiles = forM inputFiles $ \inFile -> (inFile, ) <$> readUTF8File inFile
@@ -143,6 +143,11 @@ sourceMaps = switch $
      long "source-maps"
   <> help "Generate source maps"
 
+dumpCoreFn :: Parser Bool
+dumpCoreFn = switch $
+     long "dump-corefn"
+  <> help "Dump the (functional) core representation of the compiled code at output/*/corefn.json"
+
 
 options :: Parser P.Options
 options = P.Options <$> noTco
@@ -152,6 +157,7 @@ options = P.Options <$> noTco
                     <*> verboseErrors
                     <*> (not <$> comments)
                     <*> sourceMaps
+                    <*> dumpCoreFn
 
 pscMakeOptions :: Parser PSCMakeOptions
 pscMakeOptions = PSCMakeOptions <$> many inputFile

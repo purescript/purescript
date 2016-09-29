@@ -6,6 +6,7 @@
 module Language.PureScript.TypeChecker
   ( module T
   , typeCheckModule
+  , checkNewtype
   ) where
 
 import Prelude.Compat
@@ -112,15 +113,23 @@ addTypeClass
   -> ProperName 'ClassName
   -> [(String, Maybe Kind)]
   -> [Constraint]
+  -> [FunctionalDependency]
   -> [Declaration]
   -> m ()
-addTypeClass moduleName pn args implies ds =
-  let members = map toPair ds in
-  modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) (args, members, implies) (typeClasses . checkEnv $ st) } }
+addTypeClass moduleName pn args implies dependencies ds =
+    modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) newClass (typeClasses . checkEnv $ st) } }
   where
-  toPair (TypeDeclaration ident ty) = (ident, ty)
-  toPair (PositionedDeclaration _ _ d) = toPair d
-  toPair _ = internalError "Invalid declaration in TypeClassDeclaration"
+    newClass :: TypeClassData
+    newClass =
+      TypeClassData { typeClassArguments    = args
+                    , typeClassMembers      = map toPair ds
+                    , typeClassSuperclasses = implies
+                    , typeClassDependencies = dependencies
+                    }
+
+    toPair (TypeDeclaration ident ty) = (ident, ty)
+    toPair (PositionedDeclaration _ _ d) = toPair d
+    toPair _ = internalError "Invalid declaration in TypeClassDeclaration"
 
 addTypeClassDictionaries
   :: (MonadState CheckState m)
@@ -265,8 +274,8 @@ typeCheckAll moduleName _ = traverse go
     return d
   go d@FixityDeclaration{} = return d
   go d@ImportDeclaration{} = return d
-  go d@(TypeClassDeclaration pn args implies tys) = do
-    addTypeClass moduleName pn args implies tys
+  go d@(TypeClassDeclaration pn args implies deps tys) = do
+    addTypeClass moduleName pn args implies deps tys
     return d
   go (d@(TypeInstanceDeclaration dictName deps className tys body)) = rethrow (addHint (ErrorInInstance className tys)) $ do
     traverse_ (checkTypeClassInstance moduleName) tys
@@ -310,10 +319,6 @@ typeCheckAll moduleName _ = traverse go
     checkType _ = internalError "Invalid type in instance in checkOrphanInstance"
   checkOrphanInstance _ _ _ = internalError "Unqualified class name in checkOrphanInstance"
 
-  checkNewtype :: ProperName 'TypeName -> [(ProperName 'ConstructorName, [Type])] -> m ()
-  checkNewtype _ [(_, [_])] = return ()
-  checkNewtype name _ = throwError . errorMessage $ InvalidNewtype name
-
   -- |
   -- This function adds the argument kinds for a type constructor so that they may appear in the externs file,
   -- extracted from the kind of the type constructor itself.
@@ -323,6 +328,15 @@ typeCheckAll moduleName _ = traverse go
   withKinds (s@(_, Just _ ):ss) (FunKind _   k) = s : withKinds ss k
   withKinds (  (s, Nothing):ss) (FunKind k1 k2) = (s, Just k1) : withKinds ss k2
   withKinds _                   _               = internalError "Invalid arguments to peelKinds"
+
+checkNewtype
+  :: forall m
+   . MonadError MultipleErrors m
+  => ProperName 'TypeName
+  -> [(ProperName 'ConstructorName, [Type])]
+  -> m ()
+checkNewtype _ [(_, [_])] = return ()
+checkNewtype name _ = throwError . errorMessage $ InvalidNewtype name
 
 -- |
 -- Type check an entire module and ensure all types and classes defined within the module that are
@@ -414,7 +428,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     unless (null missingMembers) $ throwError . errorMessage $ TransitiveExportError dr members
     where
     findClassMembers :: Declaration -> Maybe [Ident]
-    findClassMembers (TypeClassDeclaration name' _ _ ds) | name == name' = Just $ map extractMemberName ds
+    findClassMembers (TypeClassDeclaration name' _ _ _ ds) | name == name' = Just $ map extractMemberName ds
     findClassMembers (PositionedDeclaration _ _ d) = findClassMembers d
     findClassMembers _ = Nothing
     extractMemberName :: Declaration -> Ident

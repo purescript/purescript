@@ -37,13 +37,11 @@ module Language.PureScript.Ide.Integration
        , getFlexCompletions
        , getFlexCompletionsInModule
        , getType
-       , getInfo
        , rebuildModule
        , reset
          -- checking results
        , resultIsSuccess
        , parseCompletions
-       , parseInfo
        , parseTextResult
        ) where
 
@@ -95,7 +93,7 @@ compileTestProject = do
   pdir <- projectDirectory
   (_, _, _, procHandle) <- createProcess $
     (shell . toS $ "psc " <> fileGlob) { cwd = Just pdir }
-  r <- tryNTimes 5 (getProcessExitCode procHandle)
+  r <- tryNTimes 10 (getProcessExitCode procHandle)
   pure (fromMaybe False (isSuccess <$> r))
 
 tryNTimes :: Int -> IO (Maybe a) -> IO (Maybe a)
@@ -158,17 +156,14 @@ loadModules = sendCommand . load
 loadAll :: IO Text
 loadAll = sendCommand (load [])
 
-getFlexCompletions :: Text -> IO [(Text, Text, Text)]
+getFlexCompletions :: Text -> IO [(Text, Text, Text, Maybe P.SourceSpan)]
 getFlexCompletions q = parseCompletions <$> sendCommand (completion [] (Just (flexMatcher q)) Nothing)
 
-getFlexCompletionsInModule :: Text -> Text -> IO [(Text, Text, Text)]
+getFlexCompletionsInModule :: Text -> Text -> IO [(Text, Text, Text, Maybe P.SourceSpan)]
 getFlexCompletionsInModule q m = parseCompletions <$> sendCommand (completion [] (Just (flexMatcher q)) (Just m))
 
-getType :: Text -> IO [(Text, Text, Text)]
+getType :: Text -> IO [(Text, Text, Text, Maybe P.SourceSpan)]
 getType q = parseCompletions <$> sendCommand (typeC q [])
-
-getInfo :: Text -> IO [P.SourceSpan]
-getInfo q = parseInfo <$> sendCommand (typeC q [])
 
 addImport :: Text -> FilePath -> FilePath -> IO Text
 addImport identifier fp outfp = sendCommand (addImportC identifier fp outfp)
@@ -254,17 +249,14 @@ withResult p v = do
     Left err -> pure (Left err)
     Right res -> Right <$> p res
 
-completionParser :: Value -> Parser [(Text, Text, Text)]
+completionParser :: Value -> Parser [(Text, Text, Text, Maybe P.SourceSpan)]
 completionParser = withArray "res" $ \cs ->
   mapM (withObject "completion" $ \o -> do
            ident <- o .: "identifier"
            module' <- o .: "module"
            ty <- o .: "type"
-           pure (module', ident, ty)) (V.toList cs)
-
-infoParser :: Value -> Parser [P.SourceSpan]
-infoParser = withArray "res" $ \cs ->
-  mapM (withObject "info" $ \o -> o .: "definedAt") (V.toList cs)
+           ss <- o .: "definedAt"
+           pure (module', ident, ty, ss)) (V.toList cs)
 
 valueFromText :: Text -> Value
 valueFromText = fromJust . decode . toS
@@ -272,13 +264,9 @@ valueFromText = fromJust . decode . toS
 resultIsSuccess :: Text -> Bool
 resultIsSuccess = isRight . join . first toS . parseEither unwrapResult . valueFromText
 
-parseCompletions :: Text -> [(Text, Text, Text)]
+parseCompletions :: Text -> [(Text, Text, Text, Maybe P.SourceSpan)]
 parseCompletions s =
   fromJust $ join (rightToMaybe <$> parseMaybe (withResult completionParser) (valueFromText s))
-
-parseInfo :: Text -> [P.SourceSpan]
-parseInfo s =
-  fromJust $ join (rightToMaybe <$> parseMaybe (withResult infoParser) (valueFromText s))
 
 parseTextResult :: Text -> Text
 parseTextResult s =

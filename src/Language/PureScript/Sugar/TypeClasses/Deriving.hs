@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PatternGuards #-}
 
 -- |
 -- This module implements the generic deriving elaboration that takes place during desugaring.
@@ -22,6 +23,7 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.Types
+import Language.PureScript.TypeChecker (checkNewtype)
 import qualified Language.PureScript.Constants as C
 
 -- | Elaborates deriving instance declarations by code generation.
@@ -44,16 +46,29 @@ deriveInstance mn ds (TypeInstanceDeclaration nm deps className tys@[ty] Derived
   , Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor ty
   , mn == fromMaybe mn mn'
   = TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveGeneric mn ds tyCon args
-  | className == Qualified (Just (ModuleName [ ProperName "Data", ProperName "Eq" ])) (ProperName "Eq")
+  | className == Qualified (Just dataEq) (ProperName "Eq")
   , Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
   , mn == fromMaybe mn mn'
   = TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveEq mn ds tyCon
-  | className == Qualified (Just (ModuleName [ ProperName "Data", ProperName "Ord" ])) (ProperName "Ord")
+  | className == Qualified (Just dataOrd) (ProperName "Ord")
   , Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
   , mn == fromMaybe mn mn'
   = TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveOrd mn ds tyCon
+deriveInstance mn ds (TypeInstanceDeclaration nm deps className [wrappedTy, unwrappedTy] DerivedInstance)
+  | className == Qualified (Just dataNewtype) (ProperName "Newtype")
+  , Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor wrappedTy
+  , mn == fromMaybe mn mn'
+  = do
+    (inst, actualUnwrappedTy) <- deriveNewtype mn ds tyCon args unwrappedTy
+    return $ TypeInstanceDeclaration nm deps className [wrappedTy, actualUnwrappedTy] (ExplicitInstance inst)
 deriveInstance _ _ (TypeInstanceDeclaration _ _ className tys DerivedInstance)
   = throwError . errorMessage $ CannotDerive className tys
+deriveInstance mn ds (TypeInstanceDeclaration nm deps className tys@(_ : _) NewtypeInstance)
+  | Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor (last tys)
+  , mn == fromMaybe mn mn'
+  = TypeInstanceDeclaration nm deps className tys . NewtypeInstanceWithDictionary <$> deriveNewtypeInstance className ds tys tyCon args
+deriveInstance _ _ (TypeInstanceDeclaration _ _ className tys NewtypeInstance)
+  = throwError . errorMessage $ InvalidNewtypeInstance className tys
 deriveInstance mn ds (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> deriveInstance mn ds d
 deriveInstance _  _  e = return e
 
@@ -66,6 +81,44 @@ unwrapTypeConstructor = fmap (second reverse) . go
     return (tyCon, arg : args)
   go _ = Nothing
 
+deriveNewtypeInstance
+  :: forall m
+   . MonadError MultipleErrors m
+  => Qualified (ProperName 'ClassName)
+  -> [Declaration]
+  -> [Type]
+  -> ProperName 'TypeName
+  -> [Type]
+  -> m Expr
+deriveNewtypeInstance className ds tys tyConNm dargs = do
+    tyCon <- findTypeDecl tyConNm ds
+    go tyCon
+  where
+    go (DataDeclaration Newtype _ tyArgNames [(_, [wrapped])])
+      -- The newtype might not be applied to all type arguments.
+      -- This is okay as long as the newtype wraps something which ends with
+      -- sufficiently many type applications to variables.
+      -- For example, we can derive Functor for
+      --
+      -- newtype MyArray a = MyArray (Array a)
+      --
+      -- since Array a is a type application which uses the last
+      -- type argument
+      | Just wrapped' <- stripRight (takeReverse (length tyArgNames - length dargs) tyArgNames) wrapped =
+          do let subst = zipWith (\(name, _) t -> (name, t)) tyArgNames dargs
+             return (DeferredDictionary className (init tys ++ [replaceAllTypeVars subst wrapped']))
+    go (PositionedDeclaration _ _ d) = go d
+    go _ = throwError . errorMessage $ InvalidNewtypeInstance className tys
+
+    takeReverse :: Int -> [a] -> [a]
+    takeReverse n = take n . reverse
+
+    stripRight :: [(String, Maybe kind)] -> Type -> Maybe Type
+    stripRight [] ty = Just ty
+    stripRight ((arg, _) : args) (TypeApp t (TypeVar arg'))
+      | arg == arg' = stripRight args t
+    stripRight _ _ = Nothing
+
 dataGeneric :: ModuleName
 dataGeneric = ModuleName [ ProperName "Data", ProperName "Generic" ]
 
@@ -74,6 +127,15 @@ dataMaybe = ModuleName [ ProperName "Data", ProperName "Maybe" ]
 
 typesProxy :: ModuleName
 typesProxy = ModuleName [ ProperName "Type", ProperName "Proxy" ]
+
+dataEq :: ModuleName
+dataEq = ModuleName [ ProperName "Data", ProperName "Eq" ]
+
+dataOrd :: ModuleName
+dataOrd = ModuleName [ ProperName "Data", ProperName "Ord" ]
+
+dataNewtype :: ModuleName
+dataNewtype = ModuleName [ ProperName "Data", ProperName "Newtype" ]
 
 deriveGeneric
   :: forall m. (MonadError MultipleErrors m, MonadSupply m)
@@ -223,7 +285,7 @@ deriveGeneric mn ds tyConNm dargs = do
           $ liftApplicative (mkRecFun rs) (map (\(x, y) -> fromSpineFun (Accessor "recValue" (mkVar (Ident x))) y) rs)
 
       mkRecFun :: [(String, Type)] -> Expr
-      mkRecFun xs = mkJust $ foldr lam recLiteral (map (Ident . fst) xs)
+      mkRecFun xs = mkJust $ foldr (lam . Ident . fst) recLiteral xs
          where recLiteral = Literal . ObjectLiteral $ map (\(s,_) -> (s, mkVar (Ident s))) xs
     mkFromSpineFunction (PositionedDeclaration _ _ d) = mkFromSpineFunction d
     mkFromSpineFunction _ = internalError "mkFromSpineFunction: expected DataDeclaration"
@@ -265,7 +327,7 @@ deriveEq mn ds tyConNm = do
     preludeConj = App . App (Var (Qualified (Just (ModuleName [ProperName "Data", ProperName "HeytingAlgebra"])) (Ident C.conj)))
 
     preludeEq :: Expr -> Expr -> Expr
-    preludeEq = App . App (Var (Qualified (Just (ModuleName [ProperName "Data", ProperName "Eq"])) (Ident C.eq)))
+    preludeEq = App . App (Var (Qualified (Just dataEq) (Ident C.eq)))
 
     addCatch :: [CaseAlternative] -> [CaseAlternative]
     addCatch xs
@@ -335,7 +397,7 @@ deriveOrd mn ds tyConNm = do
     orderingBinder name = ConstructorBinder (orderingName name) []
 
     ordCompare :: Expr -> Expr -> Expr
-    ordCompare = App . App (Var (Qualified (Just (ModuleName [ProperName "Data", ProperName "Ord"])) (Ident C.compare)))
+    ordCompare = App . App (Var (Qualified (Just dataOrd) (Ident C.compare)))
 
     mkCtorClauses :: ((ProperName 'ConstructorName, [Type]), Bool) -> m [CaseAlternative]
     mkCtorClauses ((ctorName, tys), isLast) = do
@@ -378,6 +440,48 @@ deriveOrd mn ds tyConNm = do
       . map (\(str, typ) -> toOrdering (Accessor str l) (Accessor str r) typ)
       $ decomposeRec rec
     toOrdering l r _ = ordCompare l r
+
+deriveNewtype
+  :: forall m
+   . (MonadError MultipleErrors m, MonadSupply m)
+  => ModuleName
+  -> [Declaration]
+  -> ProperName 'TypeName
+  -> [Type]
+  -> Type
+  -> m ([Declaration], Type)
+deriveNewtype mn ds tyConNm tyConArgs unwrappedTy = do
+    checkIsWildcard unwrappedTy
+    go =<< findTypeDecl tyConNm ds
+  where
+    go :: Declaration -> m ([Declaration], Type)
+    go (DataDeclaration Data name _ _) =
+      throwError . errorMessage $ CannotDeriveNewtypeForData name
+    go (DataDeclaration Newtype name args dctors) = do
+      checkNewtype name dctors
+      wrappedIdent <- freshIdent "n"
+      unwrappedIdent <- freshIdent "a"
+      let (ctorName, [ty]) = head dctors
+          inst =
+            [ ValueDeclaration (Ident "wrap") Public [] $ Right $
+                Constructor (Qualified (Just mn) ctorName)
+            , ValueDeclaration (Ident "unwrap") Public [] $ Right $
+                lamCase wrappedIdent
+                  [ CaseAlternative
+                      [ConstructorBinder (Qualified (Just mn) ctorName) [VarBinder unwrappedIdent]]
+                      (Right (Var (Qualified Nothing unwrappedIdent)))
+                  ]
+            ]
+          subst = zipWith ((,) . fst) args tyConArgs
+      return (inst, replaceAllTypeVars subst ty)
+    go (PositionedDeclaration _ _ d) = go d
+    go _ = internalError "deriveNewtype go: expected DataDeclaration"
+
+    checkIsWildcard :: Type -> m ()
+    checkIsWildcard (TypeWildcard _) =
+      return ()
+    checkIsWildcard _ =
+      throwError . errorMessage $ NonWildcardNewtypeInstance tyConNm
 
 findTypeDecl
   :: (MonadError MultipleErrors m)

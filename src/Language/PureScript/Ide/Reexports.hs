@@ -14,8 +14,6 @@
 -----------------------------------------------------------------------------
 
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PackageImports    #-}
-{-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE RecordWildCards   #-}
 
 module Language.PureScript.Ide.Reexports
@@ -93,9 +91,9 @@ resolveRef decls ref = case ref of
   P.ValueRef i ->
     findWrapped (\case IdeValue i' _ -> i' == i; _ -> False)
   P.TypeOpRef name ->
-    findWrapped (\case IdeTypeOperator n _ _ _ -> n == name; _ -> False)
+    findWrapped (\case IdeTypeOperator n _ _ _ _ -> n == name; _ -> False)
   P.ValueOpRef name ->
-    findWrapped (\case IdeValueOperator n _ _ _ -> n == name; _ -> False)
+    findWrapped (\case IdeValueOperator n _ _ _ _ -> n == name; _ -> False)
   P.TypeClassRef name ->
     findWrapped (\case IdeTypeClass n -> n == name; _ -> False)
   _ ->

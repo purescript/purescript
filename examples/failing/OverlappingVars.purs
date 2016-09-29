@@ -12,4 +12,3 @@ instance overlappingVarsFoo :: OverlappingVars (Foo a a) where
   f a = a
 
 test = f (Foo "" 0)
-

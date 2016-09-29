@@ -18,35 +18,46 @@ import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 import qualified Language.PureScript.Constants as C
 
--- |
--- The @Environment@ defines all values and types which are currently in scope:
---
-data Environment = Environment {
-  -- |
-  -- Value names currently in scope
-  --
-    names :: M.Map (Qualified Ident) (Type, NameKind, NameVisibility)
-  -- |
-  -- Type names currently in scope
-  --
+-- | The @Environment@ defines all values and types which are currently in scope:
+data Environment = Environment
+  { names :: M.Map (Qualified Ident) (Type, NameKind, NameVisibility)
+  -- ^ Values currently in scope
   , types :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
-  -- |
-  -- Data constructors currently in scope, along with their associated type
-  -- constructor name, argument types and return type.
+  -- ^ Type names currently in scope
   , dataConstructors :: M.Map (Qualified (ProperName 'ConstructorName)) (DataDeclType, ProperName 'TypeName, Type, [Ident])
-  -- |
-  -- Type synonyms currently in scope
-  --
+  -- ^ Data constructors currently in scope, along with their associated type
+  -- constructor name, argument types and return type.
   , typeSynonyms :: M.Map (Qualified (ProperName 'TypeName)) ([(String, Maybe Kind)], Type)
-  -- |
-  -- Available type class dictionaries
-  --
+  -- ^ Type synonyms currently in scope
   , typeClassDictionaries :: M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) TypeClassDictionaryInScope))
-  -- |
-  -- Type classes
-  --
-  , typeClasses :: M.Map (Qualified (ProperName 'ClassName)) ([(String, Maybe Kind)], [(Ident, Type)], [Constraint])
-  } deriving (Show)
+  -- ^ Available type class dictionaries
+  , typeClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
+  -- ^ Type classes
+  } deriving Show
+
+-- | Information about a type class
+data TypeClassData = TypeClassData
+  { typeClassArguments :: [(String, Maybe Kind)]
+  -- ^ A list of type argument names, and their kinds, where kind annotations
+  -- were provided.
+  , typeClassMembers :: [(Ident, Type)]
+  -- ^ A list of type class members and their types. Type arguments listed above
+  -- are considered bound in these types.
+  , typeClassSuperclasses :: [Constraint]
+  -- ^ A list of superclasses of this type class. Type arguments listed above
+  -- are considered bound in the types appearing in these constraints.
+  , typeClassDependencies :: [FunctionalDependency]
+  -- ^ A list of functional dependencies for the type arguments of this class.
+  } deriving Show
+
+-- | A functional dependency indicates a relationship between two sets of
+-- type arguments in a class declaration.
+data FunctionalDependency = FunctionalDependency
+  { fdDeterminers :: [Int]
+  -- ^ the type arguments which determine the determined type arguments
+  , fdDetermined  :: [Int]
+  -- ^ the determined type arguments
+  } deriving Show
 
 -- |
 -- The initial environment with no values and only the default javascript types defined
@@ -241,17 +252,19 @@ primTypes =
     , (primName "Boolean",  (Star, ExternData))
     , (primName "Partial",  (Star, ExternData))
     , (primName "Fail",     (FunKind Symbol Star, ExternData))
+    , (primName "TypeString", (FunKind Star Symbol, ExternData))
+    , (primName "TypeConcat", (FunKind Symbol (FunKind Symbol Symbol), ExternData))
     ]
 
 -- |
 -- The primitive class map. This just contains to `Partial` class, used as a
 -- kind of magic constraint for partial functions.
 --
-primClasses :: M.Map (Qualified (ProperName 'ClassName)) ([(String, Maybe Kind)], [(Ident, Type)], [Constraint])
+primClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primClasses =
   M.fromList
-    [ (primName "Partial", ([], [], []))
-    , (primName "Fail",    ([("message", Just Symbol)], [], []))
+    [ (primName "Partial", (TypeClassData [] [] [] []))
+    , (primName "Fail",    (TypeClassData [("message", Just Symbol)] [] [] []))
     ]
 
 -- |
@@ -276,3 +289,4 @@ lookupValue :: Environment -> Qualified Ident -> Maybe (Type, NameKind, NameVisi
 lookupValue env ident = ident `M.lookup` names env
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''TypeKind)
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''FunctionalDependency)

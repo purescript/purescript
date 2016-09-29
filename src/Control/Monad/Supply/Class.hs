@@ -7,6 +7,7 @@ import Prelude.Compat
 
 import Control.Monad.Supply
 import Control.Monad.State
+import Control.Monad.Writer
 
 class Monad m => MonadSupply m where
   fresh :: m Integer
@@ -18,6 +19,9 @@ instance Monad m => MonadSupply (SupplyT m) where
     return n
 
 instance MonadSupply m => MonadSupply (StateT s m) where
+  fresh = lift fresh
+
+instance (Monoid w, MonadSupply m) => MonadSupply (WriterT w m) where
   fresh = lift fresh
 
 freshName :: MonadSupply m => m String

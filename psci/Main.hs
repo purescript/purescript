@@ -207,7 +207,7 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
                 -- With many connected clients, all but one of
                 -- these attempts will fail.
                 tryPutMVar resultVar (unpack result)
-              Reload -> do
+              Reload ->
                 WS.sendTextData conn ("reload" :: Text)
 
         shutdownHandler :: IO () -> IO ()
@@ -278,7 +278,7 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
         Left err -> do
           putStrLn (unlines (Bundle.printErrorMessage err))
           exitFailure
-        Right js -> do
+        Right js ->
           atomically $ writeTVar (browserBundleJS state) (Just js)
 
     reload :: BrowserState -> IO ()
@@ -335,7 +335,7 @@ main = getOpt >>= loop
           (externs, env) <- ExceptT . runMake . make $ modules
           return (modules, externs, env)
         case psciBackend of
-          Backend setup eval reload (shutdown :: state -> IO ()) -> do
+          Backend setup eval reload (shutdown :: state -> IO ()) ->
             case e of
               Left errs -> putStrLn (P.prettyPrintMultipleErrors P.defaultPPEOptions errs) >> exitFailure
               Right (modules, externs, env) -> do

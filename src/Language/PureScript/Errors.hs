@@ -25,6 +25,7 @@ import qualified Data.Map as M
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
+import Language.PureScript.Environment
 import Language.PureScript.Names
 import Language.PureScript.Pretty
 import Language.PureScript.Traversals
@@ -32,6 +33,7 @@ import Language.PureScript.Types
 import Language.PureScript.Pretty.Common (endWith)
 import qualified Language.PureScript.Bundle as Bundle
 import qualified Language.PureScript.Constants as C
+import Language.PureScript.Pretty.Common (before)
 
 import qualified System.Console.ANSI as ANSI
 
@@ -88,7 +90,6 @@ errorCode em = case unwrapErrorMessage em of
   MultipleValueOpFixities{} -> "MultipleValueOpFixities"
   MultipleTypeOpFixities{} -> "MultipleTypeOpFixities"
   OrphanTypeDeclaration{} -> "OrphanTypeDeclaration"
-  RedefinedModule{} -> "RedefinedModule"
   RedefinedIdent{} -> "RedefinedIdent"
   OverlappingNamesInLet -> "OverlappingNamesInLet"
   UnknownName{} -> "UnknownName"
@@ -100,7 +101,7 @@ errorCode em = case unwrapErrorMessage em of
   ScopeShadowing{} -> "ScopeShadowing"
   DeclConflict{} -> "DeclConflict"
   ExportConflict{} -> "ExportConflict"
-  DuplicateModuleName{} -> "DuplicateModuleName"
+  DuplicateModule{} -> "DuplicateModule"
   DuplicateTypeArgument{} -> "DuplicateTypeArgument"
   InvalidDoBind -> "InvalidDoBind"
   InvalidDoLet -> "InvalidDoLet"
@@ -118,6 +119,7 @@ errorCode em = case unwrapErrorMessage em of
   NoInstanceFound{} -> "NoInstanceFound"
   PossiblyInfiniteInstance{} -> "PossiblyInfiniteInstance"
   CannotDerive{} -> "CannotDerive"
+  InvalidNewtypeInstance{} -> "InvalidNewtypeInstance"
   CannotFindDerivingType{} -> "CannotFindDerivingType"
   DuplicateLabel{} -> "DuplicateLabel"
   DuplicateValueDeclaration{} -> "DuplicateValueDeclaration"
@@ -130,7 +132,6 @@ errorCode em = case unwrapErrorMessage em of
   ExprDoesNotHaveType{} -> "ExprDoesNotHaveType"
   PropertyIsMissing{} -> "PropertyIsMissing"
   AdditionalProperty{} -> "AdditionalProperty"
-  CannotApplyFunction{} -> "CannotApplyFunction"
   TypeSynonymInstance -> "TypeSynonymInstance"
   OrphanInstance{} -> "OrphanInstance"
   InvalidNewtype{} -> "InvalidNewtype"
@@ -164,6 +165,8 @@ errorCode em = case unwrapErrorMessage em of
   InvalidOperatorInBinder{} -> "InvalidOperatorInBinder"
   DeprecatedRequirePath{} -> "DeprecatedRequirePath"
   CannotGeneralizeRecursiveFunction{} -> "CannotGeneralizeRecursiveFunction"
+  CannotDeriveNewtypeForData{} -> "CannotDeriveNewtypeForData"
+  NonWildcardNewtypeInstance{} -> "NonWildcardNewtypeInstance"
 
 -- |
 -- A stack trace for an error
@@ -254,12 +257,12 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (TypesDoNotUnify t1 t2) = TypesDoNotUnify <$> f t1 <*> f t2
   gSimple (ConstrainedTypeUnified t1 t2) = ConstrainedTypeUnified <$> f t1 <*> f t2
   gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
-  gSimple (CannotApplyFunction t e) = CannotApplyFunction <$> f t <*> pure e
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
   gSimple (NoInstanceFound con) = NoInstanceFound <$> overConstraintArgs (traverse f) con
   gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> pure insts
   gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
   gSimple (CannotDerive cl ts) = CannotDerive cl <$> traverse f ts
+  gSimple (InvalidNewtypeInstance cl ts) = InvalidNewtypeInstance cl <$> traverse f ts
   gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
   gSimple (OrphanInstance nm cl ts) = OrphanInstance nm cl <$> traverse f ts
   gSimple (WildcardInferredType ty ctx) = WildcardInferredType <$> f ty <*> traverse (sndM f) ctx
@@ -288,6 +291,8 @@ errorSuggestion err = case err of
   UnusedImport{} -> emptySuggestion
   DuplicateImport{} -> emptySuggestion
   UnusedExplicitImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
+  UnusedDctorImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
+  UnusedDctorExplicitImport mn _ _ qual refs -> suggest $ importSuggestion mn refs qual
   ImplicitImport mn refs -> suggest $ importSuggestion mn refs Nothing
   ImplicitQualifiedImport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
   HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
@@ -482,10 +487,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
       line $ "There are multiple fixity/precedence declarations for type operator " ++ markCode (showOp op)
     renderSimpleErrorMessage (OrphanTypeDeclaration nm) =
       line $ "The type declaration for " ++ markCode (showIdent nm) ++ " should be followed by its definition."
-    renderSimpleErrorMessage (RedefinedModule name filenames) =
-      paras [ line ("The module " ++ markCode (runModuleName name) ++ " has been defined multiple times:")
-            , indent . paras $ map (line . displaySourceSpan) filenames
-            ]
     renderSimpleErrorMessage (RedefinedIdent name) =
       line $ "The value " ++ markCode (showIdent name) ++ " has been defined multiple times"
     renderSimpleErrorMessage (UnknownName name) =
@@ -515,8 +516,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
       line $ "Declaration for " ++ printName (Qualified Nothing new) ++ " conflicts with an existing " ++ nameType existing ++ " of the same name."
     renderSimpleErrorMessage (ExportConflict new existing) =
       line $ "Export for " ++ printName new ++ " conflicts with " ++ runName existing
-    renderSimpleErrorMessage (DuplicateModuleName mn) =
-      line $ "Module " ++ markCode (runModuleName mn) ++ " has been defined multiple times."
+    renderSimpleErrorMessage (DuplicateModule mn ss) =
+      paras [ line ("Module " ++ markCode (runModuleName mn) ++ " has been defined multiple times:")
+            , indent . paras $ map (line . displaySourceSpan) ss
+            ]
     renderSimpleErrorMessage (CycleInDeclaration nm) =
       line $ "The value of " ++ markCode (showIdent nm) ++ " is undefined here, so this reference is not allowed."
     renderSimpleErrorMessage (CycleInModules mns) =
@@ -592,9 +595,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
             , line "They may be disallowed completely in a future version of the compiler."
             ]
     renderSimpleErrorMessage OverlappingInstances{} = internalError "OverlappingInstances: empty instance list"
-    renderSimpleErrorMessage (NoInstanceFound (Constraint C.Fail [ TypeLevelString message ] _)) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint C.Fail [ ty ] _)) | Just box <- toTypelevelString ty =
       paras [ line "A custom type error occurred while solving type class constraints:"
-            , indent . paras . map line . lines $ message
+            , indent box
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint C.Partial
                                                           _
@@ -638,6 +641,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
                 , Box.vcat Box.left (map typeAtomAsBox ts)
                 ]
             ]
+    renderSimpleErrorMessage (InvalidNewtypeInstance nm ts) =
+      paras [ line "Cannot derive newtype instance for"
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName nm)
+                , Box.vcat Box.left (map typeAtomAsBox ts)
+                ]
+            , line "Make sure this is a newtype."
+            ]
     renderSimpleErrorMessage (CannotFindDerivingType nm) =
       line $ "Cannot derive a type class instance, because the type declaration for " ++ markCode (runProperName nm) ++ " could not be found."
     renderSimpleErrorMessage (DuplicateLabel l expr) =
@@ -677,12 +688,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
       line $ "Type of expression lacks required label " ++ markCode prop ++ "."
     renderSimpleErrorMessage (AdditionalProperty prop) =
       line $ "Type of expression contains additional label " ++ markCode prop ++ "."
-    renderSimpleErrorMessage (CannotApplyFunction fn arg) =
-      paras [ line "A function of type"
-            , markCodeBox $ indent $ typeAsBox fn
-            , line "can not be applied to the argument"
-            , markCodeBox $ indent $ prettyPrintValue valueDepth arg
-            ]
     renderSimpleErrorMessage TypeSynonymInstance =
       line "Type class instances for type synonyms are disallowed."
     renderSimpleErrorMessage (OrphanInstance nm cnm ts) =
@@ -752,16 +757,22 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
 
     renderSimpleErrorMessage msg@(UnusedExplicitImport mn names _ _) =
       paras [ line $ "The import of module " ++ markCode (runModuleName mn) ++ " contains the following unused references:"
-            , indent $ paras $ map line names
+            , indent $ paras $ map (line . markCode . runName . Qualified Nothing) names
             , line "It could be replaced with:"
             , indent $ line $ markCode $ showSuggestion msg ]
 
-    renderSimpleErrorMessage (UnusedDctorImport name) =
-      line $ "The import of type " ++ markCode (runProperName name) ++ " includes data constructors but only the type is used"
+    renderSimpleErrorMessage msg@(UnusedDctorImport mn name _ _) =
+      paras [line $ "The import of type " ++ markCode (runProperName name)
+                    ++ " from module " ++ markCode (runModuleName mn) ++ " includes data constructors but only the type is used"
+            , line "It could be replaced with:"
+            , indent $ line $ markCode $ showSuggestion msg ]
 
-    renderSimpleErrorMessage (UnusedDctorExplicitImport name names) =
-      paras [ line $ "The import of type " ++ markCode (runProperName name) ++ " includes the following unused data constructors:"
-            , indent $ paras $ map (line . markCode . runProperName) names ]
+    renderSimpleErrorMessage msg@(UnusedDctorExplicitImport mn name names _ _) =
+      paras [ line $ "The import of type " ++ markCode (runProperName name)
+                     ++ " from module " ++ markCode (runModuleName mn) ++ " includes the following unused data constructors:"
+            , indent $ paras $ map (line . markCode . runProperName) names
+            , line "It could be replaced with:"
+            , indent $ line $ markCode $ showSuggestion msg ]
 
     renderSimpleErrorMessage (DuplicateSelectiveImport name) =
       line $ "There is an existing import of " ++ markCode (runModuleName name) ++ ", consider merging the import lists"
@@ -817,6 +828,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
             , line $ "The inferred type of " ++ markCode (showIdent ident) ++ " was:"
             , markCodeBox $ indent $ typeAsBox ty
             , line "Try adding a type signature."
+            ]
+
+    renderSimpleErrorMessage (CannotDeriveNewtypeForData tyName) =
+      paras [ line $ "Cannot derive an instance of the " ++ markCode "Newtype" ++ " class for non-newtype " ++ markCode (runProperName tyName) ++ "."
+            ]
+
+    renderSimpleErrorMessage (NonWildcardNewtypeInstance tyName) =
+      paras [ line $ "A type wildcard (_) should be used for the inner type when deriving the " ++ markCode "Newtype" ++ " instance for " ++ markCode (runProperName tyName) ++ "."
             ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
@@ -933,7 +952,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
             ]
     renderHint (ErrorSolvingConstraint (Constraint nm ts _)) detail =
       paras [ detail
-            , line "while solving type class constriant"
+            , line "while solving type class constraint"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
                 , Box.vcat Box.left (map typeAtomAsBox ts)
@@ -1016,10 +1035,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
 
     -- | See https://github.com/purescript/purescript/issues/1802
     stripRedudantHints :: SimpleErrorMessage -> [ErrorMessageHint] -> [ErrorMessageHint]
-    stripRedudantHints CannotApplyFunction{} = stripFirst isApplicationHint
-      where
-      isApplicationHint ErrorInApplication{} = True
-      isApplicationHint _ = False
     stripRedudantHints ExprDoesNotHaveType{} = stripFirst isCheckHint
       where
       isCheckHint ErrorCheckingType{} = True
@@ -1043,16 +1058,16 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
     stripFirst _ [] = []
 
   hintCategory :: ErrorMessageHint -> HintCategory
-  hintCategory ErrorCheckingType{}      = ExprHint
-  hintCategory ErrorInferringType{}     = ExprHint
-  hintCategory ErrorInExpression{}      = ExprHint
-  hintCategory ErrorUnifyingTypes{}     = CheckHint
-  hintCategory ErrorInSubsumption{}     = CheckHint
-  hintCategory ErrorInApplication{}     = CheckHint
-  hintCategory ErrorCheckingKind{}      = CheckHint
-  hintCategory ErrorSolvingConstraint{} = SolverHint
-  hintCategory PositionedError{}        = PositionHint
-  hintCategory _                        = OtherHint
+  hintCategory ErrorCheckingType{}                  = ExprHint
+  hintCategory ErrorInferringType{}                 = ExprHint
+  hintCategory ErrorInExpression{}                  = ExprHint
+  hintCategory ErrorUnifyingTypes{}                 = CheckHint
+  hintCategory ErrorInSubsumption{}                 = CheckHint
+  hintCategory ErrorInApplication{}                 = CheckHint
+  hintCategory ErrorCheckingKind{}                  = CheckHint
+  hintCategory ErrorSolvingConstraint{}             = SolverHint
+  hintCategory PositionedError{}                    = PositionHint
+  hintCategory _                                    = OtherHint
 
 -- Pretty print and export declaration
 prettyPrintExport :: DeclarationRef -> String
@@ -1194,6 +1209,14 @@ renderBox = unlines
   where
   dropWhileEnd p = reverse . dropWhile p . reverse
   whiteSpace = all isSpace
+
+toTypelevelString :: Type -> Maybe Box.Box
+toTypelevelString (TypeLevelString s) = Just $ Box.text s
+toTypelevelString (TypeApp (TypeConstructor f) x)
+  | f == primName "TypeString" = Just $ typeAsBox x
+toTypelevelString (TypeApp (TypeApp (TypeConstructor f) x) ret)
+  | f == primName "TypeConcat" = before <$> (toTypelevelString x) <*> (toTypelevelString ret)
+toTypelevelString _ = Nothing
 
 -- |
 -- Rethrow an error with a more detailed error message in the case of failure

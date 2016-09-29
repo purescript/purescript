@@ -11,9 +11,8 @@ If you would like to contribute, please consider the issues in the current miles
 Please follow the following guidelines:
 
 - Add at least a test to `examples/passing/` and possibly to `examples/failing`.
-- Build the binaries and libs with `cabal build`
-- Install the binaries and libs with `cabal install`.
-- Run `cabal configure --enable-tests && cabal build && cabal test` to build the test suite. You will need `npm` and `node` on your PATH to run the tests.
+- Build the binaries and libs with `stack build`
+- Run the test suite with `stack test`. You will need `npm` and `node` on your PATH to run the tests.
 - Build the core libraries by running the script in `core-tests`.
 
 ## Code Review

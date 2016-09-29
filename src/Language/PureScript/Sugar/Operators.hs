@@ -312,9 +312,9 @@ updateTypes goType = (goDecl, goExpr, goBinder)
   goDecl pos (ExternDeclaration name ty) = do
     ty' <- goType' pos ty
     return (pos, ExternDeclaration name ty')
-  goDecl pos (TypeClassDeclaration name args implies decls) = do
+  goDecl pos (TypeClassDeclaration name args implies deps decls) = do
     implies' <- traverse (overConstraintArgs (traverse (goType' pos))) implies
-    return (pos, TypeClassDeclaration name args implies' decls)
+    return (pos, TypeClassDeclaration name args implies' deps decls)
   goDecl pos (TypeInstanceDeclaration name cs className tys impls) = do
     cs' <- traverse (overConstraintArgs (traverse (goType' pos))) cs
     tys' <- traverse (goType' pos) tys
@@ -332,9 +332,9 @@ updateTypes goType = (goDecl, goExpr, goBinder)
   goExpr pos (TypeClassDictionary (Constraint name tys info) dicts hints) = do
     tys' <- traverse (goType' pos) tys
     return (pos, TypeClassDictionary (Constraint name tys' info) dicts hints)
-  goExpr pos (SuperClassDictionary cls tys) = do
+  goExpr pos (DeferredDictionary cls tys) = do
     tys' <- traverse (goType' pos) tys
-    return (pos, SuperClassDictionary cls tys')
+    return (pos, DeferredDictionary cls tys')
   goExpr pos (TypedValue check v ty) = do
     ty' <- goType' pos ty
     return (pos, TypedValue check v ty')

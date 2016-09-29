@@ -27,16 +27,19 @@ GHC 7.10.1 or newer is required to compile from source. The easiest way is to
 use stack:
 
 ```
-$ stack install --resolver=nightly purescript
+$ stack update
+$ stack unpack purescript
+$ cd purescript-x.y.z  # (replace x.y.z with whichever version you just downloaded)
+$ stack install
 ```
 
 This will then copy the compiler and utilities into `~/.local/bin`.
 
 
-If you don't have stack installed yet there are install instructions
+If you don't have stack installed, there are install instructions
 [here](https://github.com/commercialhaskell/stack/blob/master/doc/install_and_upgrade.md).
 
-If you don't have ghc installed yet, stack will prompt you to run `stack setup`
+If you don't have ghc installed, stack will prompt you to run `stack setup`
 which will install ghc for you.
 
 ## The "curses" library

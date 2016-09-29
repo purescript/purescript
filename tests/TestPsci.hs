@@ -102,7 +102,6 @@ completionTestData =
   , ("ST.new", ["ST.newSTRef"])
   , ("Control.Monad.ST.new", ["Control.Monad.ST.newSTRef"])
   ]
-  where
 
 assertCompletedOk :: (String, [String]) -> Assertion
 assertCompletedOk (line, expecteds) = do

@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Language.PureScript.Make
   (
@@ -36,10 +37,12 @@ import Control.Monad.Trans.Except
 import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Aeson (encode, decode)
+import qualified Data.Aeson as Aeson
 import Data.ByteString.Builder (toLazyByteString, stringUtf8)
 import Data.Either (partitionEithers)
+import Data.Function (on)
 import Data.Foldable (for_)
-import Data.List (foldl', sort)
+import Data.List (foldl', sortBy, groupBy)
 import Data.Maybe (fromMaybe, catMaybes)
 import Data.String (fromString)
 import Data.Time.Clock
@@ -69,6 +72,7 @@ import qualified Language.PureScript.Bundle as Bundle
 import qualified Language.PureScript.CodeGen.JS as J
 import qualified Language.PureScript.Constants as C
 import qualified Language.PureScript.CoreFn as CF
+import qualified Language.PureScript.CoreFn.ToJSON as CFJ
 import qualified Language.PureScript.Parser as PSParser
 
 import qualified Paths_purescript as Paths
@@ -188,18 +192,17 @@ make ma@MakeActions{..} ms = do
   where
   checkModuleNamesAreUnique :: m ()
   checkModuleNamesAreUnique =
-    case findDuplicate (map getModuleName ms) of
-      Nothing -> return ()
-      Just mn -> throwError . errorMessage $ DuplicateModuleName mn
+    for_ (findDuplicates getModuleName ms) $ \mss ->
+      throwError . flip foldMap mss $ \ms' ->
+        let mn = getModuleName (head ms')
+        in errorMessage $ DuplicateModule mn (map getModuleSourceSpan ms')
 
-  -- Verify that a list of values has unique keys
-  findDuplicate :: (Ord a) => [a] -> Maybe a
-  findDuplicate = go . sort
-    where
-    go (x : y : xs)
-      | x == y = Just x
-      | otherwise = go (y : xs)
-    go _ = Nothing
+  -- Find all groups of duplicate values in a list based on a projection.
+  findDuplicates :: Ord b => (a -> b) -> [a] -> Maybe [[a]]
+  findDuplicates f xs =
+    case filter ((> 1) . length) . groupBy ((==) `on` f) . sortBy (compare `on` f) $ xs of
+      [] -> Nothing
+      xss -> Just xss
 
   -- Sort a list so its elements appear in the same order as in another list.
   inOrderOf :: (Ord a) => [a] -> [a] -> [a]
@@ -369,6 +372,12 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
       for_ (mn `M.lookup` foreigns) (readTextFile >=> writeTextFile foreignFile)
       writeTextFile externsFile exts
     lift $ when sourceMaps $ genSourceMap dir mapFile (length prefix) mappings
+    dumpCoreFn <- lift $ asks optionsDumpCoreFn
+    when dumpCoreFn $ do
+      let coreFnFile = outputDir </> filePath </> "corefn.json"
+      let jsonPayload = CFJ.moduleToJSON Paths.version m
+      let json = Aeson.object [ (fromString (runModuleName mn), jsonPayload) ]
+      lift $ writeTextFile coreFnFile (BU8.toString . B.toStrict . encode $ json)
 
   genSourceMap :: String -> String -> Int -> [SMap] -> Make ()
   genSourceMap dir mapFile extraLines mappings = do

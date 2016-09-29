@@ -1,5 +1,5 @@
 name: purescript
-version: 0.9.3
+version: 0.10.0
 cabal-version: >=1.8
 build-type: Simple
 license: MIT
@@ -60,6 +60,7 @@ extra-source-files: examples/passing/*.purs
                   , examples/failing/ConflictingImports2/*.purs
                   , examples/failing/ConflictingQualifiedImports/*.purs
                   , examples/failing/ConflictingQualifiedImports2/*.purs
+                  , examples/failing/DuplicateModule/*.purs
                   , examples/failing/ExportConflictClass/*.purs
                   , examples/failing/ExportConflictCtor/*.purs
                   , examples/failing/ExportConflictType/*.purs
@@ -76,6 +77,7 @@ extra-source-files: examples/passing/*.purs
                   , examples/failing/OrphanInstance/*.purs
                   , examples/warning/*.purs
                   , examples/warning/*.js
+                  , examples/warning/UnusedExplicitImportTypeOp/*.purs
                   , examples/docs/bower_components/purescript-prelude/src/*.purs
                   , examples/docs/bower.json
                   , examples/docs/src/*.purs
@@ -100,7 +102,7 @@ source-repository head
 
 library
     build-depends: base >=4.8 && <5,
-                   aeson >= 0.8 && < 0.12,
+                   aeson >= 0.8 && < 1.1,
                    aeson-better-errors >= 0.8,
                    ansi-terminal >= 0.6.2 && < 0.7,
                    base-compat >=0.6.0,
@@ -109,6 +111,7 @@ library
                    bytestring -any,
                    containers -any,
                    clock -any,
+                   data-ordlist >= 0.4.7.0,
                    directory >= 1.2,
                    dlist -any,
                    edit-distance -any,
@@ -116,7 +119,7 @@ library
                    fsnotify >= 0.2.1,
                    Glob >= 0.7 && < 0.8,
                    haskeline >= 0.7.0.0,
-                   http-client >= 0.4.30 && <0.5,
+                   http-client >= 0.4.30 && <0.6,
                    http-types -any,
                    language-javascript == 0.6.*,
                    lifted-base >= 0.2.3 && < 0.2.4,
@@ -181,6 +184,7 @@ library
                      Language.PureScript.CoreFn.Meta
                      Language.PureScript.CoreFn.Module
                      Language.PureScript.CoreFn.Traversals
+                     Language.PureScript.CoreFn.ToJSON
                      Language.PureScript.Comments
                      Language.PureScript.Environment
                      Language.PureScript.Errors
@@ -317,7 +321,7 @@ library
 executable psc
     build-depends: base >=4 && <5,
                    purescript -any,
-                   aeson >= 0.8 && < 0.12,
+                   aeson >= 0.8 && < 1.1,
                    ansi-terminal >= 0.6.2 && < 0.7,
                    base-compat >=0.6.0,
                    bytestring -any,
@@ -442,7 +446,7 @@ executable psc-ide-server
   other-modules:       Paths_purescript
   other-extensions:
   build-depends:       base >=4 && <5,
-                       aeson >= 0.8 && < 0.12,
+                       aeson >= 0.8 && < 1.1,
                        bytestring -any,
                        purescript -any,
                        base-compat >=0.6.0,
@@ -522,5 +526,6 @@ test-suite tests
                    Language.PureScript.Ide.ReexportsSpec
                    Language.PureScript.Ide.SourceFile.IntegrationSpec
                    Language.PureScript.Ide.SourceFileSpec
+                   Language.PureScript.Ide.StateSpec
     buildable: True
     hs-source-dirs: tests

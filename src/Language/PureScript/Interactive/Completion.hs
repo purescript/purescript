@@ -206,7 +206,7 @@ identNames = nubOnFst . concatMap getDeclNames . P.exportedDeclarations
   getDeclNames d@(P.ValueDeclaration ident _ _ _)  = [(ident, d)]
   getDeclNames d@(P.TypeDeclaration ident _ ) = [(ident, d)]
   getDeclNames d@(P.ExternDeclaration ident _) = [(ident, d)]
-  getDeclNames d@(P.TypeClassDeclaration _ _ _ ds) = map (second (const d)) $ concatMap getDeclNames ds
+  getDeclNames d@(P.TypeClassDeclaration _ _ _ _ ds) = map (second (const d)) $ concatMap getDeclNames ds
   getDeclNames (P.PositionedDeclaration _ _ d) = getDeclNames d
   getDeclNames _ = []
 
@@ -214,7 +214,7 @@ dctorNames :: P.Module -> [(N.ProperName 'N.ConstructorName, P.Declaration)]
 dctorNames = nubOnFst . concatMap go . P.exportedDeclarations
   where
   go :: P.Declaration -> [(N.ProperName 'N.ConstructorName, P.Declaration)]
-  go decl@(P.DataDeclaration _ _ _ ctors) = map (\n -> (n, decl)) (map fst ctors)
+  go decl@(P.DataDeclaration _ _ _ ctors) = map ((\n -> (n, decl)) . fst) ctors
   go (P.PositionedDeclaration _ _ d) = go d
   go _ = []
 

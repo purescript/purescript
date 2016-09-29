@@ -15,7 +15,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Reader (MonadReader, asks)
 import Control.Monad.Supply.Class
 
-import Data.List ((\\), delete, intersect)
+import Data.List ((\\), delete, intersect, nub)
 import Data.Maybe (isNothing, fromMaybe)
 import qualified Data.Foldable as F
 import qualified Data.Map as M
@@ -51,7 +51,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
     let mnLookup = renameImports usedNames imps
-    jsImports <- T.traverse (importToJs mnLookup) . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ map snd imps
+    jsImports <- T.traverse (importToJs mnLookup) . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ nub $ map snd imps
     let decls' = renameModules mnLookup decls
     jsDecls <- mapM bindToJs decls'
     optimized <- T.traverse (T.traverse optimize) jsDecls
@@ -89,7 +89,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
       in if mn' /= mn && mni `elem` used
          then let newName = freshModuleName 1 mn' used
               in go (M.insert mn' (ann, newName) acc) (Ident (runModuleName newName) : used) mns'
-         else go (M.insert mn' (ann, mn') acc) (mni : used) mns'
+         else go (M.insert mn' (ann, mn') acc) used mns'
     go acc _ [] = acc
 
     freshModuleName :: Integer -> ModuleName -> [Ident] -> ModuleName
@@ -367,7 +367,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   -- binder.
   --
   binderToJs' :: String -> [JS] -> Binder Ann -> m [JS]
-  binderToJs' _ done (NullBinder{}) = return done
+  binderToJs' _ done NullBinder{} = return done
   binderToJs' varName done (LiteralBinder _ l) =
     literalToBinderJS varName done l
   binderToJs' varName done (VarBinder _ ident) =

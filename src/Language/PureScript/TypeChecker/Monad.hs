@@ -11,7 +11,7 @@ import Prelude.Compat
 import Control.Arrow (second)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
-import Control.Monad.Writer.Class (MonadWriter(..), listen, censor)
+import Control.Monad.Writer.Class (MonadWriter(..), censor)
 
 import Data.Maybe
 import qualified Data.Map as M
@@ -245,7 +245,7 @@ getEnv = checkEnv <$> get
 getLocalContext :: MonadState CheckState m => m Context
 getLocalContext = do
   env <- getEnv
-  return [ (ident, ty') | ((Qualified Nothing ident@Ident{}), (ty', _, Defined)) <- M.toList (names env) ]
+  return [ (ident, ty') | (Qualified Nothing ident@Ident{}, (ty', _, Defined)) <- M.toList (names env) ]
 
 -- | Update the @Environment@
 putEnv :: (MonadState CheckState m) => Environment -> m ()
@@ -269,23 +269,35 @@ guardWith _ True = return ()
 guardWith e False = throwError e
 
 -- | Run a computation in the substitution monad, generating a return value and the final substitution.
-liftUnify ::
-  (MonadState CheckState m, MonadWriter MultipleErrors m, MonadError MultipleErrors m) =>
-  m a ->
-  m (a, Substitution)
-liftUnify = liftUnifyWarnings (const id)
+captureSubstitution
+  :: MonadState CheckState m
+  => m a
+  -> m (a, Substitution)
+captureSubstitution = capturingSubstitution (,)
 
--- | Run a computation in the substitution monad, generating a return value, the final substitution and updating warnings values.
-liftUnifyWarnings ::
-  (MonadState CheckState m, MonadWriter MultipleErrors m, MonadError MultipleErrors m) =>
-  (Substitution -> ErrorMessage -> ErrorMessage) ->
-  m a ->
-  m (a, Substitution)
-liftUnifyWarnings replace ma = do
+capturingSubstitution
+  :: MonadState CheckState m
+  => (a -> Substitution -> b)
+  -> m a
+  -> m b
+capturingSubstitution f ma = do
+  a <- ma
+  subst <- gets checkSubstitution
+  return (f a subst)
+
+withFreshSubstitution
+  :: MonadState CheckState m
+  => m a
+  -> m a
+withFreshSubstitution ma = do
   orig <- get
   modify $ \st -> st { checkSubstitution = emptySubstitution }
-  (a, w) <- reflectErrors . censor (const mempty) . reifyErrors . listen $ ma
-  subst <- gets checkSubstitution
-  tell . onErrorMessages (replace subst) $ w
+  a <- ma
   modify $ \st -> st { checkSubstitution = checkSubstitution orig }
-  return (a, subst)
+  return a
+
+withoutWarnings
+  :: MonadWriter w m
+  => m a
+  -> m (a, w)
+withoutWarnings = censor (const mempty) . listen

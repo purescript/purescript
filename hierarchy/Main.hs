@@ -18,13 +18,16 @@
 
 module Main where
 
+import Control.Applicative (optional)
 import Control.Monad (unless)
 
 import Data.List (intercalate,nub,sort)
 import Data.Foldable (for_)
 import Data.Version (showVersion)
+import Data.Monoid ((<>))
 
-import Options.Applicative
+import Options.Applicative (Parser)
+import qualified Options.Applicative as Opts
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath ((</>))
 import System.FilePath.Glob (glob)
@@ -40,7 +43,7 @@ data HierarchyOptions = HierarchyOptions
   , hierarchyOutput :: Maybe FilePath
   }
 
-newtype SuperMap = SuperMap { unSuperMap :: Either (P.ProperName 'P.ClassName) ((P.ProperName 'P.ClassName), (P.ProperName 'P.ClassName)) }
+newtype SuperMap = SuperMap { unSuperMap :: Either (P.ProperName 'P.ClassName) (P.ProperName 'P.ClassName, P.ProperName 'P.ClassName) }
   deriving Eq
 
 instance Show SuperMap where
@@ -83,33 +86,33 @@ compile (HierarchyOptions inputGlob mOutput) = do
       exitSuccess
 
 superClasses :: P.Declaration -> [SuperMap]
-superClasses (P.TypeClassDeclaration sub _ supers@(_:_) _) =
+superClasses (P.TypeClassDeclaration sub _ supers@(_:_) _ _) =
   fmap (\(P.Constraint (P.Qualified _ super) _ _) -> SuperMap (Right (super, sub))) supers
-superClasses (P.TypeClassDeclaration sub _ _ _) = [SuperMap (Left sub)]
+superClasses (P.TypeClassDeclaration sub _ _ _ _) = [SuperMap (Left sub)]
 superClasses (P.PositionedDeclaration _ _ decl) = superClasses decl
 superClasses _ = []
 
 inputFile :: Parser FilePath
-inputFile = strArgument $
-     metavar "FILE"
-  <> value "main.purs"
-  <> showDefault
-  <> help "The input file to generate a hierarchy from"
+inputFile = Opts.strArgument $
+     Opts.metavar "FILE"
+  <> Opts.value "main.purs"
+  <> Opts.showDefault
+  <> Opts.help "The input file to generate a hierarchy from"
 
 outputFile :: Parser (Maybe FilePath)
-outputFile = optional . strOption $
-     short 'o'
-  <> long "output"
-  <> help "The output directory"
+outputFile = optional . Opts.strOption $
+     Opts.short 'o'
+  <> Opts.long "output"
+  <> Opts.help "The output directory"
 
 pscOptions :: Parser HierarchyOptions
 pscOptions = HierarchyOptions <$> inputFile
                               <*> outputFile
 
 main :: IO ()
-main = execParser opts >>= compile
+main = Opts.execParser opts >>= compile
   where
-  opts        = info (helper <*> pscOptions) infoModList
-  infoModList = fullDesc <> headerInfo <> footerInfo
-  headerInfo  = header   "hierarchy - Creates a GraphViz directed graph of PureScript TypeClasses"
-  footerInfo  = footer $ "hierarchy " ++ showVersion Paths.version
+  opts        = Opts.info (Opts.helper <*> pscOptions) infoModList
+  infoModList = Opts.fullDesc <> headerInfo <> footerInfo
+  headerInfo  = Opts.header "hierarchy - Creates a GraphViz directed graph of PureScript TypeClasses"
+  footerInfo  = Opts.footer $ "hierarchy " ++ showVersion Paths.version

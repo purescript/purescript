@@ -16,7 +16,6 @@ import Control.Arrow (second)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
-import Control.Monad.Writer.Class (MonadWriter(..))
 
 import qualified Data.Map as M
 
@@ -96,19 +95,19 @@ unifyKinds k1 k2 = do
 
 -- | Infer the kind of a single type
 kindOf
-  :: (MonadError MultipleErrors m, MonadState CheckState m, MonadWriter MultipleErrors m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m)
   => Type
   -> m Kind
 kindOf ty = fst <$> kindOfWithScopedVars ty
 
 -- | Infer the kind of a single type, returning the kinds of any scoped type variables
 kindOfWithScopedVars ::
-  (MonadError MultipleErrors m, MonadState CheckState m, MonadWriter MultipleErrors m) =>
+  (MonadError MultipleErrors m, MonadState CheckState m) =>
   Type ->
   m (Kind, [(String, Kind)])
 kindOfWithScopedVars ty =
   withErrorMessageHint (ErrorCheckingKind ty) $
-    fmap tidyUp . liftUnify $ infer ty
+    fmap tidyUp . withFreshSubstitution . captureSubstitution $ infer ty
   where
   tidyUp ((k, args), sub) = ( starIfUnknown (substituteKind sub k)
                             , map (second (starIfUnknown . substituteKind sub)) args
@@ -116,14 +115,14 @@ kindOfWithScopedVars ty =
 
 -- | Infer the kind of a type constructor with a collection of arguments and a collection of associated data constructors
 kindsOf
-  :: (MonadError MultipleErrors m, MonadState CheckState m, MonadWriter MultipleErrors m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m)
   => Bool
   -> ModuleName
   -> ProperName 'TypeName
   -> [(String, Maybe Kind)]
   -> [Type]
   -> m Kind
-kindsOf isData moduleName name args ts = fmap tidyUp . liftUnify $ do
+kindsOf isData moduleName name args ts = fmap tidyUp . withFreshSubstitution . captureSubstitution $ do
   tyCon <- freshKind
   kargs <- replicateM (length args) freshKind
   rest <- zipWithM freshKindVar args kargs
@@ -145,12 +144,12 @@ freshKindVar (arg, Just kind') kind = do
 
 -- | Simultaneously infer the kinds of several mutually recursive type constructors
 kindsOfAll
-  :: (MonadError MultipleErrors m, MonadState CheckState m, MonadWriter MultipleErrors m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m)
   => ModuleName
   -> [(ProperName 'TypeName, [(String, Maybe Kind)], Type)]
   -> [(ProperName 'TypeName, [(String, Maybe Kind)], [Type])]
   -> m ([Kind], [Kind])
-kindsOfAll moduleName syns tys = fmap tidyUp . liftUnify $ do
+kindsOfAll moduleName syns tys = fmap tidyUp . withFreshSubstitution . captureSubstitution $ do
   synVars <- replicateM (length syns) freshKind
   let dict = zipWith (\(name, _, _) var -> (name, var)) syns synVars
   bindLocalTypeVariables moduleName dict $ do

@@ -47,7 +47,6 @@ data SimpleErrorMessage
   | MultipleValueOpFixities (OpName 'ValueOpName)
   | MultipleTypeOpFixities (OpName 'TypeOpName)
   | OrphanTypeDeclaration Ident
-  | RedefinedModule ModuleName [SourceSpan]
   | RedefinedIdent Ident
   | OverlappingNamesInLet
   | UnknownName (Qualified Name)
@@ -59,7 +58,7 @@ data SimpleErrorMessage
   | ScopeShadowing Name (Maybe ModuleName) [ModuleName]
   | DeclConflict Name Name
   | ExportConflict (Qualified Name) (Qualified Name)
-  | DuplicateModuleName ModuleName
+  | DuplicateModule ModuleName [SourceSpan]
   | DuplicateTypeArgument String
   | InvalidDoBind
   | InvalidDoLet
@@ -77,6 +76,7 @@ data SimpleErrorMessage
   | NoInstanceFound Constraint
   | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [Type]
   | CannotDerive (Qualified (ProperName 'ClassName)) [Type]
+  | InvalidNewtypeInstance (Qualified (ProperName 'ClassName)) [Type]
   | CannotFindDerivingType (ProperName 'TypeName)
   | DuplicateLabel String (Maybe Expr)
   | DuplicateValueDeclaration Ident
@@ -89,7 +89,6 @@ data SimpleErrorMessage
   | ExprDoesNotHaveType Expr Type
   | PropertyIsMissing String
   | AdditionalProperty String
-  | CannotApplyFunction Type Expr
   | TypeSynonymInstance
   | OrphanInstance Ident (Qualified (ProperName 'ClassName)) [Type]
   | InvalidNewtype (ProperName 'TypeName)
@@ -107,9 +106,9 @@ data SimpleErrorMessage
   | MisleadingEmptyTypeImport ModuleName (ProperName 'TypeName)
   | ImportHidingModule ModuleName
   | UnusedImport ModuleName
-  | UnusedExplicitImport ModuleName [String] (Maybe ModuleName) [DeclarationRef]
-  | UnusedDctorImport (ProperName 'TypeName)
-  | UnusedDctorExplicitImport (ProperName 'TypeName) [ProperName 'ConstructorName]
+  | UnusedExplicitImport ModuleName [Name] (Maybe ModuleName) [DeclarationRef]
+  | UnusedDctorImport ModuleName (ProperName 'TypeName) (Maybe ModuleName) [DeclarationRef]
+  | UnusedDctorExplicitImport ModuleName (ProperName 'TypeName) [ProperName 'ConstructorName] (Maybe ModuleName) [DeclarationRef]
   | DuplicateSelectiveImport ModuleName
   | DuplicateImport ModuleName ImportDeclarationType (Maybe ModuleName)
   | DuplicateImportRef Name
@@ -123,6 +122,8 @@ data SimpleErrorMessage
   | InvalidOperatorInBinder (Qualified (OpName 'ValueOpName)) (Qualified Ident)
   | DeprecatedRequirePath
   | CannotGeneralizeRecursiveFunction Ident Type
+  | CannotDeriveNewtypeForData (ProperName 'TypeName)
+  | NonWildcardNewtypeInstance (ProperName 'TypeName)
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
@@ -176,6 +177,10 @@ data Module = Module SourceSpan [Comment] ModuleName [Declaration] (Maybe [Decla
 -- | Return a module's name.
 getModuleName :: Module -> ModuleName
 getModuleName (Module _ _ name _ _) = name
+
+-- | Return a module's source span.
+getModuleSourceSpan :: Module -> SourceSpan
+getModuleSourceSpan (Module ss _ _ _ _) = ss
 
 -- |
 -- Add an import declaration for a module if it does not already explicitly import it.
@@ -348,7 +353,7 @@ data Declaration
   -- |
   -- A type class declaration (name, argument, implies, member declarations)
   --
-  | TypeClassDeclaration (ProperName 'ClassName) [(String, Maybe Kind)] [Constraint] [Declaration]
+  | TypeClassDeclaration (ProperName 'ClassName) [(String, Maybe Kind)] [Constraint] [FunctionalDependency] [Declaration]
   -- |
   -- A type instance declaration (name, dependencies, class name, instance types, member
   -- declarations)
@@ -374,10 +379,15 @@ pattern TypeFixityDeclaration fixity name op = FixityDeclaration (Right (TypeFix
 
 -- | The members of a type class instance declaration
 data TypeInstanceBody
-  -- | This is a derived instance
   = DerivedInstance
-  -- | This is a regular (explicit) instance
+  -- ^ This is a derived instance
+  | NewtypeInstance
+  -- ^ This is an instance derived from a newtype
+  | NewtypeInstanceWithDictionary Expr
+  -- ^ This is an instance derived from a newtype, desugared to include a
+  -- dictionary for the type under the newtype.
   | ExplicitInstance [Declaration]
+  -- ^ This is a regular (explicit) instance
   deriving (Show)
 
 mapTypeInstanceBody :: ([Declaration] -> [Declaration]) -> TypeInstanceBody -> TypeInstanceBody
@@ -385,8 +395,8 @@ mapTypeInstanceBody f = runIdentity . traverseTypeInstanceBody (Identity . f)
 
 -- | A traversal for TypeInstanceBody
 traverseTypeInstanceBody :: (Applicative f) => ([Declaration] -> f [Declaration]) -> TypeInstanceBody -> f TypeInstanceBody
-traverseTypeInstanceBody _ DerivedInstance = pure DerivedInstance
 traverseTypeInstanceBody f (ExplicitInstance ds) = ExplicitInstance <$> f ds
+traverseTypeInstanceBody _ other = pure other
 
 -- |
 -- Test if a declaration is a value declaration
@@ -497,12 +507,9 @@ data Expr
   --
   | Parens Expr
   -- |
-  -- A record property getter (e.g. `_.x`). This will be removed during
-  -- desugaring and expanded into a lambda that reads a property from a record.
-  --
-  | ObjectGetter String
-  -- |
-  -- An record property accessor expression
+  -- An record property accessor expression (e.g. `obj.x` or `_.x`).
+  -- Anonymous arguments will be removed during desugaring and expanded
+  -- into a lambda that reads a property from a record.
   --
   | Accessor String Expr
   -- |
@@ -573,7 +580,7 @@ data Expr
   -- |
   -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
   --
-  | SuperClassDictionary (Qualified (ProperName 'ClassName)) [Type]
+  | DeferredDictionary (Qualified (ProperName 'ClassName)) [Type]
   -- |
   -- A placeholder for an anonymous function argument
   --

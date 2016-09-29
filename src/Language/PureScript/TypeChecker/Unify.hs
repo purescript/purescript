@@ -10,7 +10,6 @@ module Language.PureScript.TypeChecker.Unify
   , unknownsInType
   , unifyTypes
   , unifyRows
-  , unifiesWith
   , replaceVarWithUnknown
   , replaceTypeWildcards
   , varIfUnknown
@@ -102,6 +101,7 @@ unifyTypes t1 t2 = do
   unifyTypes' (TypeVar v1) (TypeVar v2) | v1 == v2 = return ()
   unifyTypes' ty1@(TypeConstructor c1) ty2@(TypeConstructor c2) =
     guardWith (errorMessage (TypesDoNotUnify ty1 ty2)) (c1 == c2)
+  unifyTypes' (TypeLevelString s1) (TypeLevelString s2) | s1 == s2 = return ()
   unifyTypes' (TypeApp t3 t4) (TypeApp t5 t6) = do
     t3 `unifyTypes` t5
     t4 `unifyTypes` t6
@@ -151,36 +151,6 @@ unifyRows r1 r2 =
   unifyRows' [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) | s1 == s2 = return ()
   unifyRows' _ _ _ _ =
     throwError . errorMessage $ TypesDoNotUnify r1 r2
-
--- |
--- Check that two types unify
---
-unifiesWith :: Type -> Type -> Bool
-unifiesWith (TUnknown u1)        (TUnknown u2)        = u1 == u2
-unifiesWith (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    = s1 == s2
-unifiesWith (TypeVar v1)         (TypeVar v2)         = v1 == v2
-unifiesWith (TypeLevelString s1) (TypeLevelString s2) = s1 == s2
-unifiesWith (TypeConstructor c1) (TypeConstructor c2) = c1 == c2
-unifiesWith (TypeApp h1 t1)      (TypeApp h2 t2)      = h1 `unifiesWith` h2 && t1 `unifiesWith` t2
-unifiesWith REmpty               REmpty               = True
-unifiesWith r1@RCons{}           r2@RCons{} =
-  let (s1, r1') = rowToList r1
-      (s2, r2') = rowToList r2
-
-      int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
-      sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
-      sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
-  in all (uncurry unifiesWith) int && go sd1 r1' sd2 r2'
-  where
-  go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Bool
-  go [] REmpty          [] REmpty          = True
-  go [] (TypeVar v1)    [] (TypeVar v2)    = v1 == v2
-  go [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) = s1 == s2
-  go [] (TUnknown _)    _  _               = True
-  go _  _               [] (TUnknown _)    = True
-  go _  (TUnknown _)    _  (TUnknown _)    = True
-  go _  _               _  _               = False
-unifiesWith _ _ = False
 
 -- |
 -- Replace a single type variable with a new unification variable

@@ -21,12 +21,10 @@ import           Protolude
 
 import           Control.Concurrent.STM
 import           Data.Aeson
-import           Data.Map.Lazy                        as M
+import qualified Data.Map.Lazy                        as M
 import qualified Language.PureScript.Errors.JSON      as P
 import qualified Language.PureScript as P
 import           Language.PureScript.Ide.Conversions
-import           Text.Parsec as Parsec
-import           Text.Parsec.Text
 
 type ModuleIdent = Text
 
@@ -36,8 +34,8 @@ data IdeDeclaration
   | IdeTypeSynonym (P.ProperName 'P.TypeName) P.Type
   | IdeDataConstructor (P.ProperName 'P.ConstructorName) (P.ProperName 'P.TypeName) P.Type
   | IdeTypeClass (P.ProperName 'P.ClassName)
-  | IdeValueOperator (P.OpName 'P.ValueOpName) Text P.Precedence P.Associativity
-  | IdeTypeOperator (P.OpName 'P.TypeOpName) Text P.Precedence P.Associativity
+  | IdeValueOperator (P.OpName 'P.ValueOpName) (P.Qualified (Either P.Ident (P.ProperName 'P.ConstructorName))) P.Precedence P.Associativity (Maybe P.Type)
+  | IdeTypeOperator (P.OpName 'P.TypeOpName) (P.Qualified (P.ProperName 'P.TypeName)) P.Precedence P.Associativity (Maybe P.Kind)
   deriving (Show, Eq, Ord)
 
 data IdeDeclarationAnn = IdeDeclarationAnn Annotation IdeDeclaration
@@ -47,15 +45,19 @@ data Annotation
   = Annotation
   { annLocation     :: Maybe P.SourceSpan
   , annExportedFrom :: Maybe P.ModuleName
+  , annTypeAnnotation :: Maybe P.Type
   } deriving (Show, Eq, Ord)
 
 emptyAnn :: Annotation
-emptyAnn = Annotation Nothing Nothing
+emptyAnn = Annotation Nothing Nothing Nothing
 
 type Module = (P.ModuleName, [IdeDeclarationAnn])
 
-newtype AstData a =
-  AstData (Map P.ModuleName (Map (Either Text Text) a))
+type DefinitionSites a = Map (Either Text Text) a
+type TypeAnnotations = Map P.Ident P.Type
+newtype AstData a = AstData (Map P.ModuleName (DefinitionSites a, TypeAnnotations))
+  -- ^ SourceSpans for the definition sites of Values and Types aswell as type
+  -- annotations found in a module
   deriving (Show, Eq, Ord, Functor, Foldable)
 
 data Configuration =
@@ -108,21 +110,25 @@ data Stage3 = Stage3
 newtype Match a = Match (P.ModuleName, a)
            deriving (Show, Eq, Functor)
 
-newtype Completion =
-  Completion (Text, Text, Text)
-  deriving (Show,Eq)
-
-newtype Info =
-  Info (Text, Text, Text, Maybe P.SourceSpan)
-  deriving (Show,Eq)
-
-instance ToJSON Info where
-  toJSON (Info (m, d, t, sourceSpan)) =
-    object ["module" .= m, "identifier" .= d, "type" .= t, "definedAt" .= sourceSpan]
+-- | A completion as it gets sent to the editors
+data Completion = Completion
+  { complModule :: Text
+  , complIdentifier :: Text
+  , complType :: Text
+  , complExpandedType :: Text
+  , complLocation :: Maybe P.SourceSpan
+  , complDocumentation :: Maybe Text
+  } deriving (Show, Eq)
 
 instance ToJSON Completion where
-  toJSON (Completion (m, d, t)) =
-    object ["module" .= m, "identifier" .= d, "type" .= t]
+  toJSON (Completion {..}) =
+    object [ "module" .= complModule
+           , "identifier" .= complIdentifier
+           , "type" .= complType
+           , "expandedType" .= complExpandedType
+           , "definedAt" .= complLocation
+           , "documentation" .= complDocumentation
+           ]
 
 data ModuleImport =
   ModuleImport
@@ -140,17 +146,17 @@ instance ToJSON ModuleImport where
   toJSON (ModuleImport mn P.Implicit qualifier) =
     object $ [ "module" .= mn
              , "importType" .= ("implicit" :: Text)
-             ] ++ fmap (\x -> "qualifier" .= x) (maybeToList qualifier)
-  toJSON (ModuleImport mn (P.Explicit refs) _) =
-    object [ "module" .= mn
-           , "importType" .= ("explicit" :: Text)
-           , "identifiers" .= (identifierFromDeclarationRef <$> refs)
-           ]
-  toJSON (ModuleImport mn (P.Hiding refs) _) =
-    object [ "module" .= mn
-           , "importType" .= ("hiding" :: Text)
-           , "identifiers" .= (identifierFromDeclarationRef <$> refs)
-           ]
+             ] ++ map (\x -> "qualifier" .= x) (maybeToList qualifier)
+  toJSON (ModuleImport mn (P.Explicit refs) qualifier) =
+    object $ [ "module" .= mn
+             , "importType" .= ("explicit" :: Text)
+             , "identifiers" .= (identifierFromDeclarationRef <$> refs)
+             ] ++ map (\x -> "qualifier" .= x) (maybeToList qualifier)
+  toJSON (ModuleImport mn (P.Hiding refs) qualifier) =
+    object $ [ "module" .= mn
+             , "importType" .= ("hiding" :: Text)
+             , "identifiers" .= (identifierFromDeclarationRef <$> refs)
+             ] ++ map (\x -> "qualifier" .= x) (maybeToList qualifier)
 
 identifierFromDeclarationRef :: P.DeclarationRef -> Text
 identifierFromDeclarationRef (P.TypeRef name _) = runProperNameT name
@@ -160,14 +166,13 @@ identifierFromDeclarationRef _ = ""
 
 data Success =
   CompletionResult [Completion]
-  | InfoResult [Info]
   | TextResult Text
   | MultilineTextResult [Text]
   | PursuitResult [PursuitResponse]
   | ImportList [ModuleImport]
   | ModuleList [ModuleIdent]
   | RebuildSuccess [P.JSONError]
-  deriving(Show, Eq)
+  deriving (Show, Eq)
 
 encodeSuccess :: (ToJSON a) => a -> Value
 encodeSuccess res =
@@ -175,7 +180,6 @@ encodeSuccess res =
 
 instance ToJSON Success where
   toJSON (CompletionResult cs) = encodeSuccess cs
-  toJSON (InfoResult i) = encodeSuccess i
   toJSON (TextResult t) = encodeSuccess t
   toJSON (MultilineTextResult ts) = encodeSuccess ts
   toJSON (PursuitResult resp) = encodeSuccess resp
@@ -203,9 +207,9 @@ data PursuitResponse =
   -- | A Pursuit Response for a module. Consists of the modules name and the
   -- package it belongs to
   ModuleResponse ModuleIdent Text
-  -- | A Pursuit Response for a declaration. Consist of the declarations type,
-  -- module, name and package
-  | DeclarationResponse Text ModuleIdent Text Text
+  -- | A Pursuit Response for a declaration. Consist of the declaration's
+  -- module, name, package, type summary text
+  | DeclarationResponse Text ModuleIdent Text (Maybe Text) Text
   deriving (Show,Eq)
 
 instance FromJSON PursuitResponse where
@@ -219,42 +223,21 @@ instance FromJSON PursuitResponse where
         pure (ModuleResponse name package)
       "declaration" -> do
         moduleName <- info .: "module"
-        Right (ident, declType) <- typeParse <$> o .: "text"
-        pure (DeclarationResponse declType moduleName ident package)
+        ident <- info .: "title"
+        (text :: Text) <- o .: "text"
+        typ <- info .:? "typeText"
+        pure (DeclarationResponse moduleName ident package typ text)
       _ -> mzero
   parseJSON _ = mzero
-
-
-typeParse :: Text -> Either Text (Text, Text)
-typeParse t = case parse parseType "" t of
-  Right (x,y) -> Right (x, y)
-  Left err -> Left (show err)
-  where
-    parseType :: Parser (Text, Text)
-    parseType = do
-      name <- identifier
-      _ <- string "::"
-      spaces
-      type' <- many1 anyChar
-      pure (name, toS type')
-
-    identifier :: Parser Text
-    identifier = do
-      spaces
-      ident <-
-        -- necessary for being able to parse the following ((++), concat)
-        between (char '(') (char ')') (many1 (noneOf ", )")) Parsec.<|>
-        many1 (noneOf ", )")
-      spaces
-      pure (toS ident)
 
 instance ToJSON PursuitResponse where
   toJSON (ModuleResponse name package) =
     object ["module" .= name, "package" .= package]
-  toJSON (DeclarationResponse module' ident type' package) =
+  toJSON (DeclarationResponse module' ident package type' text) =
     object
       [ "module"  .= module'
       , "ident"   .= ident
       , "type"    .= type'
       , "package" .= package
+      , "text"    .= text
       ]

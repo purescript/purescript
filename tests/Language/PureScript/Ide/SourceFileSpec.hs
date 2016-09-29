@@ -13,11 +13,12 @@ span0 = P.SourceSpan "ModuleLevel" (P.SourcePos 0 0) (P.SourcePos 1 1)
 span1 = P.SourceSpan "" (P.SourcePos 1 1) (P.SourcePos 2 2)
 span2 = P.SourceSpan "" (P.SourcePos 2 2) (P.SourcePos 3 3)
 
-value1, synonym1, class1, class2, data1, data2, foreign1, foreign2, member1 :: P.Declaration
+typeAnnotation1, value1, synonym1, class1, class2, data1, data2, foreign1, foreign2, member1 :: P.Declaration
+typeAnnotation1 = P.TypeDeclaration (P.Ident "value1") P.REmpty
 value1 = P.ValueDeclaration (P.Ident "value1") P.Public [] (Left [])
 synonym1 = P.TypeSynonymDeclaration (P.ProperName "Synonym1") [] P.REmpty
-class1 = P.TypeClassDeclaration (P.ProperName "Class1") [] [] []
-class2 = P.TypeClassDeclaration (P.ProperName "Class2") [] []
+class1 = P.TypeClassDeclaration (P.ProperName "Class1") [] [] [] []
+class2 = P.TypeClassDeclaration (P.ProperName "Class2") [] [] []
   [P.PositionedDeclaration span2 [] member1]
 data1 = P.DataDeclaration P.Newtype (P.ProperName "Data1") [] []
 data2 = P.DataDeclaration P.Data (P.ProperName "Data2") [] [(P.ProperName "Cons1", [])]
@@ -44,3 +45,6 @@ spec = do
       extractSpans span0 (P.PositionedDeclaration span1 [] foreign1) `shouldBe` [(Left "foreign1", span1)]
     it "extracts a span for a data foreign declaration" $
       extractSpans span0 (P.PositionedDeclaration span1 [] foreign2) `shouldBe` [(Right "Foreign2", span1)]
+  describe "Type annotations" $ do
+    it "extracts a type annotation" $
+      extractTypeAnnotations [typeAnnotation1] `shouldBe` [(P.Ident "value1", P.REmpty)]

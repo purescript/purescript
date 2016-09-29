@@ -30,7 +30,7 @@ import Data.Maybe (catMaybes, mapMaybe, isJust)
 
 import qualified Data.Map as M
 
-type MemberMap = M.Map (ModuleName, ProperName 'ClassName) ([(String, Maybe Kind)], [Constraint], [Declaration])
+type MemberMap = M.Map (ModuleName, ProperName 'ClassName) TypeClassData
 
 type Desugar = StateT MemberMap
 
@@ -46,14 +46,20 @@ desugarTypeClasses
 desugarTypeClasses externs = flip evalStateT initialState . traverse desugarModule
   where
   initialState :: MemberMap
-  initialState = M.singleton (ModuleName [ProperName C.prim], ProperName C.partial) ([], [], [])
-       `M.union` M.fromList (externs >>= \ExternsFile{..} -> mapMaybe (fromExternsDecl efModuleName) efDeclarations)
+  initialState =
+    M.mapKeys (qualify (ModuleName [ProperName C.prim])) primClasses
+    `M.union` M.fromList (externs >>= \ExternsFile{..} -> mapMaybe (fromExternsDecl efModuleName) efDeclarations)
 
   fromExternsDecl
     :: ModuleName
     -> ExternsDeclaration
-    -> Maybe ((ModuleName, ProperName 'ClassName), ([(String, Maybe Kind)], [Constraint], [Declaration]))
-  fromExternsDecl mn (EDClass name args members implies) = Just ((mn, name), (args, implies, map (uncurry TypeDeclaration) members))
+    -> Maybe ((ModuleName, ProperName 'ClassName), TypeClassData)
+  fromExternsDecl mn (EDClass name args members implies deps) = Just ((mn, name), typeClass) where
+    typeClass = TypeClassData { typeClassArguments    = args
+                              , typeClassMembers      = members
+                              , typeClassSuperclasses = implies
+                              , typeClassDependencies = deps
+                              }
   fromExternsDecl _ _ = Nothing
 
 desugarModule
@@ -129,7 +135,7 @@ desugarModule _ = internalError "Exports should have been elaborated in name des
 --
 --   subString :: {} -> Sub String
 --   subString _ = { sub: "",
---                 , "__superclass_Foo_0": \_ -> <SuperClassDictionary Foo String>
+--                 , "__superclass_Foo_0": \_ -> <DeferredDictionary Foo String>
 --                 }
 --
 -- and finally as the generated javascript:
@@ -173,14 +179,18 @@ desugarDecl
   -> Desugar m (Maybe DeclarationRef, [Declaration])
 desugarDecl mn exps = go
   where
-  go d@(TypeClassDeclaration name args implies members) = do
-    modify (M.insert (mn, name) (args, implies, members))
+  go d@(TypeClassDeclaration name args implies deps members) = do
+    modify (M.insert (mn, name) (TypeClassData args (map memberToNameAndType members) implies deps))
     return (Nothing, d : typeClassDictionaryDeclaration name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
   go (TypeInstanceDeclaration _ _ _ _ DerivedInstance) = internalError "Derived instanced should have been desugared"
   go d@(TypeInstanceDeclaration name deps className tys (ExplicitInstance members)) = do
     desugared <- desugarCases members
     dictDecl <- typeInstanceDictionaryDeclaration name mn deps className tys desugared
     return (expRef name className tys, [d, dictDecl])
+  go d@(TypeInstanceDeclaration name deps className tys (NewtypeInstanceWithDictionary dict)) = do
+    let dictTy = foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
+        constrainedTy = quantify (if null deps then dictTy else ConstrainedType deps dictTy)
+    return (expRef name className tys, [d, ValueDeclaration name Private [] (Right (TypedValue True dict constrainedTy))])
   go (PositionedDeclaration pos com d) = do
     (dr, ds) <- rethrowWithPosition pos $ desugarDecl mn exps d
     return (dr, map (PositionedDeclaration pos com) ds)
@@ -267,18 +277,15 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
   m <- get
 
   -- Lookup the type arguments and member types for the type class
-  (args, implies, tyDecls) <-
+  TypeClassData{..} <-
     maybe (throwError . errorMessage . UnknownName $ fmap TyClassName className) return $
       M.lookup (qualify mn className) m
 
-  case mapMaybe declName tyDecls \\ mapMaybe declName decls of
+  case map fst typeClassMembers \\ mapMaybe declName decls of
     member : _ -> throwError . errorMessage $ MissingClassMember member
     [] -> do
-
-      let instanceTys = map memberToNameAndType tyDecls
-
       -- Replace the type arguments with the appropriate types in the member types
-      let memberTypes = map (second (replaceAllTypeVars (zip (map fst args) tys))) instanceTys
+      let memberTypes = map (second (replaceAllTypeVars (zip (map fst typeClassArguments) tys))) typeClassMembers
 
       -- Create values for the type instance members
       members <- zip (map typeClassMemberName decls) <$> traverse (memberToValue memberTypes) decls
@@ -286,10 +293,10 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
       -- Create the type of the dictionary
       -- The type is a record type, but depending on type instance dependencies, may be constrained.
       -- The dictionary itself is a record literal.
-      let superclasses = superClassDictionaryNames implies `zip`
-            [ Abs (Left (Ident C.__unused)) (SuperClassDictionary superclass tyArgs)
-            | (Constraint superclass suTyArgs _) <- implies
-            , let tyArgs = map (replaceAllTypeVars (zip (map fst args) tys)) suTyArgs
+      let superclasses = superClassDictionaryNames typeClassSuperclasses `zip`
+            [ Abs (Left (Ident C.__unused)) (DeferredDictionary superclass tyArgs)
+            | (Constraint superclass suTyArgs _) <- typeClassSuperclasses
+            , let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
             ]
 
       let props = Literal $ ObjectLiteral (members ++ superclasses)

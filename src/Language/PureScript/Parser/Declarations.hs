@@ -17,6 +17,7 @@ module Language.PureScript.Parser.Declarations
 
 import Prelude hiding (lex)
 
+import Data.Functor (($>))
 import Data.Maybe (fromMaybe)
 
 import Control.Applicative
@@ -183,10 +184,15 @@ parseTypeClassDeclaration = do
     return implies
   className <- indented *> properName
   idents <- P.many (indented *> kindedIdent)
+  let parseNamedIdent = foldl (<|>) empty (zipWith (\(name, _) index -> lname' name $> index) idents [0..])
+      parseFunctionalDependency =
+        FunctionalDependency <$> P.many parseNamedIdent <* rarrow
+                             <*> P.many parseNamedIdent
+  dependencies <- P.option [] (indented *> pipe *> commaSep1 parseFunctionalDependency)
   members <- P.option [] $ do
     indented *> reserved "where"
     indented *> mark (P.many (same *> positioned parseTypeDeclaration))
-  return $ TypeClassDeclaration className idents implies members
+  return $ TypeClassDeclaration className idents implies dependencies members
 
 parseConstraint :: TokenParser Constraint
 parseConstraint = Constraint <$> parseQualified properName
@@ -203,7 +209,7 @@ parseInstanceDeclaration = do
     rfatArrow
     return deps
   className <- indented *> parseQualified properName
-  ty <- P.many (indented *> noWildcards parseTypeAtom)
+  ty <- P.many (indented *> parseTypeAtom)
   return $ TypeInstanceDeclaration name (fromMaybe [] deps) className ty
 
 parseTypeInstanceDeclaration :: TokenParser Declaration
@@ -217,8 +223,9 @@ parseTypeInstanceDeclaration = do
 parseDerivingInstanceDeclaration :: TokenParser Declaration
 parseDerivingInstanceDeclaration = do
   reserved "derive"
+  ty <- P.option DerivedInstance (reserved "newtype" $> NewtypeInstance)
   instanceDecl <- parseInstanceDeclaration
-  return $ instanceDecl DerivedInstance
+  return $ instanceDecl ty
 
 positioned :: TokenParser Declaration -> TokenParser Declaration
 positioned = withSourceSpan PositionedDeclaration

@@ -243,12 +243,12 @@ lintImportDecl env mni qualifierName names declType allowImplicit =
     didWarn' <- forM (mapMaybe getTypeRef declrefs) $ \(tn, c) -> do
       let allCtors = dctorsForType mni tn
       -- If we've not already warned a type is unused, check its data constructors
-      unless' (runProperName tn `notElem` usedNames) $
+      unless' (TyName tn `notElem` usedNames) $
         case (c, dctors `intersect` allCtors) of
-          (_, []) | c /= Just [] -> warn (UnusedDctorImport tn)
+          (_, []) | c /= Just [] -> warn (UnusedDctorImport mni tn qualifierName allRefs)
           (Just ctors, dctors') ->
             let ddiff = ctors \\ dctors'
-            in unless' (null ddiff) $ warn $ UnusedDctorExplicitImport tn ddiff
+            in unless' (null ddiff) $ warn $ UnusedDctorExplicitImport mni tn ddiff qualifierName allRefs
           _ -> return False
 
     return (didWarn || or didWarn')
@@ -335,18 +335,18 @@ findUsedRefs env mni qn names =
 matchName
   :: (ProperName 'ConstructorName -> Maybe (ProperName 'TypeName))
   -> Name
-  -> Maybe String
-matchName _ (IdentName x) = Just $ showIdent x
-matchName _ (TyName x) = Just $ runProperName x
-matchName _ (TyClassName x) = Just $ runProperName x
-matchName lookupDc (DctorName x) = runProperName <$> lookupDc x
-matchName _ _ = Nothing
+  -> Maybe Name
+matchName lookupDc (DctorName x) = TyName <$> lookupDc x
+matchName _ ModName{} = Nothing
+matchName _ name = Just name
 
-runDeclRef :: DeclarationRef -> Maybe String
+runDeclRef :: DeclarationRef -> Maybe Name
 runDeclRef (PositionedDeclarationRef _ _ ref) = runDeclRef ref
-runDeclRef (ValueRef ident) = Just $ showIdent ident
-runDeclRef (TypeRef pn _) = Just $ runProperName pn
-runDeclRef (TypeClassRef pn) = Just $ runProperName pn
+runDeclRef (ValueRef ident) = Just $ IdentName ident
+runDeclRef (ValueOpRef op) = Just $ ValOpName op
+runDeclRef (TypeRef pn _) = Just $ TyName pn
+runDeclRef (TypeOpRef op) = Just $ TyOpName op
+runDeclRef (TypeClassRef pn) = Just $ TyClassName pn
 runDeclRef _ = Nothing
 
 checkDuplicateImports

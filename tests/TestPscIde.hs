@@ -11,4 +11,5 @@ main = do
   s <- compileTestProject
   unless s $ fail "Failed to compile .purs sources"
 
+  quitServer -- shuts down any left over server (primarily happens during development)
   withServer (hspec PscIdeSpec.spec)
