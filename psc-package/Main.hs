@@ -9,6 +9,7 @@ import qualified Control.Foldl as Foldl
 import qualified Data.Aeson as Aeson
 import qualified Data.Aeson.Text as Aeson
 import           Data.Foldable (fold, for_)
+import           Data.List (nub)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import           Data.Text (pack)
@@ -34,6 +35,18 @@ data PackageConfig = PackageConfig
 
 defaultPackage :: Text -> PackageConfig
 defaultPackage pkgName = PackageConfig pkgName [ "prelude" ]
+
+readPackageFile :: IO PackageConfig
+readPackageFile = do
+  mpkg <- Aeson.decodeStrict . encodeUtf8 <$> readTextFile packageFile
+  case mpkg of
+    Nothing -> do
+      echo "Unable to parse psc-package.json"
+      exit (ExitFailure 1)
+    Just pkg -> return pkg
+
+writePackageFile :: PackageConfig -> IO ()
+writePackageFile = writeTextFile packageFile . toStrict . Aeson.encodeToLazyText
 
 data PackageInfo = PackageInfo
   { repo         :: Text
@@ -61,10 +74,15 @@ main = do
 
     commands :: Parser (IO ())
     commands = (Opts.subparser . fold)
-      [ Opts.command "init"    (Opts.info (pure initialize) (Opts.progDesc "Initialize a new package"))
-      , Opts.command "update"  (Opts.info (pure update)     (Opts.progDesc "Update dependencies"))
-      , Opts.command "build"   (Opts.info (pure build)      (Opts.progDesc "Build the current package and dependencies"))
-      ]
+        [ Opts.command "init"    (Opts.info (pure initialize) (Opts.progDesc "Initialize a new package"))
+        , Opts.command "update"  (Opts.info (pure update)     (Opts.progDesc "Update dependencies"))
+        , Opts.command "install" (Opts.info (install <$> pkg) (Opts.progDesc "Build the current package and dependencies"))
+        , Opts.command "build"   (Opts.info (pure build)      (Opts.progDesc "Build the current package and dependencies"))
+        ]
+      where
+        pkg = Opts.strArgument $
+             Opts.metavar "PACKAGE"
+          <> Opts.help "The name of the package to install"
 
 initialize :: IO ()
 initialize = do
@@ -76,7 +94,7 @@ initialize = do
   echo "Initializing new project in current directory"
   let pkgName = either (const "new-package") id (Path.toText (Path.filename here))
       pkg = defaultPackage pkgName
-  writeTextFile packageFile (toStrict (Aeson.encodeToLazyText pkg))
+  writePackageFile pkg
   updateImpl pkg
 
 update :: IO ()
@@ -84,13 +102,16 @@ update = do
   exists <- testfile packageFile
   unless exists $ do
     echo "psc-package.json does not exist"
-    exit (ExitFailure 2)
-  mpkg <- Aeson.decodeStrict . encodeUtf8 <$> readTextFile packageFile
-  case mpkg of
-    Nothing -> do
-      echo "Unable to parse psc-package.json"
-      exit (ExitFailure 3)
-    Just pkg -> updateImpl pkg
+    exit (ExitFailure 1)
+  pkg <- readPackageFile
+  updateImpl pkg
+
+install :: String -> IO ()
+install pkgName = do
+  pkg <- readPackageFile
+  let pkg' = pkg { depends = nub (pack pkgName : depends pkg) }
+  writePackageFile pkg'
+  updateImpl pkg'
 
 getPackageSet :: IO ()
 getPackageSet = do
@@ -114,12 +135,12 @@ readPackageSet = do
   exists <- testfile dbFile
   unless exists $ do
     echo "packages.json does not exist"
-    exit (ExitFailure 4)
+    exit (ExitFailure 1)
   mdb <- Aeson.decodeStrict . encodeUtf8 <$> readTextFile dbFile
   case mdb of
     Nothing -> do
       echo "Unable to parse packages.json"
-      exit (ExitFailure 5)
+      exit (ExitFailure 1)
     Just db -> return db
 
 installOrUpdate :: Text -> PackageInfo -> IO ()
@@ -158,7 +179,7 @@ updateImpl PackageConfig{..} = do
     case Map.lookup pkg db of
       Nothing -> do
         echo ("Package " <> pkg <> " does not exist in package set")
-        exit (ExitFailure 6)
+        exit (ExitFailure 1)
       Just PackageInfo{..} -> return (pkg : dependencies)
   let allDeps = foldMap Set.fromList pkgs
   echo ("Updating " <> pack (show (Set.size allDeps)) <> " packages")
