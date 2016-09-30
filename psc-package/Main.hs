@@ -103,6 +103,7 @@ getPackageSet = do
     else
       procs "git"
             [ "clone"
+            , "--depth", "1"
             , "https://github.com/paf31/purescript-package-db.git"
             , (either (error "Path.toText failed") id . Path.toText) pkgDir
             ] empty
@@ -135,8 +136,9 @@ installOrUpdate pkgName PackageInfo{..} = do
     else
       procs "git"
             [ "clone"
-            , repo
             , "-b", version
+            , "--depth", "1"
+            , repo
             , (either (error "Path.toText failed") id . Path.toText) pkgDir
             ] empty
 
