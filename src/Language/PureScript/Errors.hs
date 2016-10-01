@@ -746,6 +746,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
           paras $ [ line $ "Hole '" ++ markCode name ++ "' has the inferred type "
                   , markCodeBox $ indent $ typeAsBox ty
                   ]
+          ++ [line "You could substitute the hole with one of these values:"]
           ++ map (\(i, t) -> (Box.text (showQualified runIdent i))
                              Box.<>
                              BoxHelpers.indented (Box.text ":: "

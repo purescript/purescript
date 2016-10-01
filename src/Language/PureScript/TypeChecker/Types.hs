@@ -124,7 +124,12 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
 
     return inferred
   where
-    replaceTypes subst = onTypesInErrorMessage (substituteType subst)
+    replaceTypes subst = runTypeSearch . onTypesInErrorMessage (substituteType subst)
+      where
+      runTypeSearch (ErrorMessage hints (HoleInferredType x ty y (TSBefore env))) =
+        ErrorMessage hints (HoleInferredType x ty y $ TSAfter $
+                             fmap (substituteType subst) <$> M.toList (typeSearch' env (substituteType subst ty)))
+      runTypeSearch x = x
 
     -- | Generalize type vars using forall and add inferred constraints
     generalize unsolved = varIfUnknown . constrain unsolved
@@ -135,17 +140,6 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
 
     -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
     tidyUp ts sub = map (\(b, (i, (val, ty))) -> (b, (i, (overTypes (substituteType sub) val, substituteType sub ty)))) ts
-
-    isHoleError :: ErrorMessage -> Bool
-    isHoleError (ErrorMessage _ HoleInferredType{}) = True
-    isHoleError _ = False
-    -- Replace all the wildcards types with their inferred types
-    replace sub = runTypeSearch . onTypesInErrorMessage (substituteType sub)
-      where
-      runTypeSearch (ErrorMessage hints (HoleInferredType x ty y (TSBefore env))) =
-        ErrorMessage hints (HoleInferredType x ty y $ TSAfter $
-                             fmap (substituteType sub) <$> M.toList (typeSearch' env (substituteType sub ty)))
-      runTypeSearch x = x
 
     isHoleError :: ErrorMessage -> Bool
     isHoleError (ErrorMessage _ HoleInferredType{}) = True

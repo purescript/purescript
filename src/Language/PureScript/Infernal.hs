@@ -105,7 +105,7 @@ filtering env x t = xrunSubsume env $ do
     Left _ -> throwError undefined
     Right (Just expP) -> do
       let expPP = overTypes (P.substituteType subst) expP
-      Entailment.replaceTypeClassDictionaries True (P.moduleNameFromString "Dx") expPP
+      Entailment.replaceTypeClassDictionaries True expPP
     Right Nothing -> throwError undefined
 
 typeSearch
