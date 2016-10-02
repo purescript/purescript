@@ -2,11 +2,11 @@ resolver: lts-6.13
 packages:
 - '.'
 extra-deps:
-- aeson-1.0.0.0
+# - aeson-1.0.0.0
 - http-client-0.5.1
 - http-client-tls-0.3.0
 - pipes-http-1.0.4
-- semigroups-0.18.2
-flags:
-  semigroups:
-    bytestring-builder: false
+# - semigroups-0.18.2
+# flags:
+#   semigroups:
+#     bytestring-builder: false

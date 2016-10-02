@@ -102,7 +102,7 @@ source-repository head
 
 library
     build-depends: base >=4.8 && <5,
-                   aeson >= 0.8 && < 1.1,
+                   aeson >= 0.8 && < 1.0,
                    aeson-better-errors >= 0.8,
                    ansi-terminal >= 0.6.2 && < 0.7,
                    base-compat >=0.6.0,
@@ -319,7 +319,7 @@ library
 executable psc
     build-depends: base >=4 && <5,
                    purescript -any,
-                   aeson >= 0.8 && < 1.1,
+                   aeson >= 0.8 && < 1.0,
                    ansi-terminal >= 0.6.2 && < 0.7,
                    base-compat >=0.6.0,
                    bytestring -any,
@@ -397,7 +397,7 @@ executable psc-docs
 executable psc-publish
     build-depends: base >=4 && <5,
                    purescript -any,
-                   aeson -any,
+                   aeson >= 0.8 && < 1.0,
                    bytestring -any,
                    optparse-applicative -any
     main-is: Main.hs
@@ -444,7 +444,7 @@ executable psc-ide-server
   other-modules:       Paths_purescript
   other-extensions:
   build-depends:       base >=4 && <5,
-                       aeson >= 0.8 && < 1.1,
+                       aeson >= 0.8 && < 1.0,
                        bytestring -any,
                        purescript -any,
                        base-compat >=0.6.0,
