@@ -1,10 +1,10 @@
 name: purescript
-version: 0.10.0
+version: 0.10.1
 cabal-version: >=1.8
 build-type: Simple
-license: MIT
+license: BSD3
 license-file: LICENSE
-copyright: (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
+copyright: (c) 2013-16 Phil Freeman, (c) 2014-16 Gary Burgess
 maintainer: Phil Freeman <paf31@cantab.net>
 stability: experimental
 synopsis: PureScript Programming Language Compiler
