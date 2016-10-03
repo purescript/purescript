@@ -123,7 +123,7 @@ data SimpleErrorMessage
   | DeprecatedRequirePath
   | CannotGeneralizeRecursiveFunction Ident Type
   | CannotDeriveNewtypeForData (ProperName 'TypeName)
-  | NonWildcardNewtypeInstance (ProperName 'TypeName)
+  | ExpectedWildcard (ProperName 'TypeName)
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
