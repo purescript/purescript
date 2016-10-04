@@ -26,6 +26,13 @@ derive instance genericZ :: Generic Z _
 instance eqZ :: Eq Z where
   eq x y = genericEq x y
 
+data W = W { x :: Int, y :: String }
+
+derive instance genericQ :: Generic W _
+
+instance eqW :: Eq W where
+  eq x y = genericEq x y
+
 main :: Eff (console :: CONSOLE) Unit
 main = do
   logShow (X 0 == X 1)
@@ -33,4 +40,5 @@ main = do
   logShow (Z 1 Y == Z 1 Y)
   logShow (Z 1 Y == Y)
   logShow (Y == Y :: Y Z)
+  logShow (W { x: 0, y: "A" } == W { x: 0, y: "A" })
   log "Done"

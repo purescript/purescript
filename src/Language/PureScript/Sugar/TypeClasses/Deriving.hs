@@ -373,30 +373,49 @@ deriveGenericRep mn ds tyConNm tyConArgs repTy = do
       -> m (Type, CaseAlternative, CaseAlternative)
     makeInst (ctorName, args) = do
         argNames <- replicateM (length args) (freshIdent "arg")
-        let (ctorTy, matchProduct, mkProduct) = makeProduct argNames args
+        let (ctorTy, matchProduct, ctorArgs, matchCtor, mkProduct) = makeProduct argNames args
         return ( TypeApp (TypeApp (TypeConstructor constructor)
                                   (TypeLevelString (runProperName ctorName)))
                          ctorTy
                , CaseAlternative [ ConstructorBinder constructor [matchProduct] ]
-                                 (Right (productIntro argNames))
-               , CaseAlternative [ ConstructorBinder (Qualified (Just mn) ctorName) (map VarBinder argNames) ]
+                                 (Right (foldl App (Constructor (Qualified (Just mn) ctorName)) ctorArgs))
+               , CaseAlternative [ ConstructorBinder (Qualified (Just mn) ctorName) matchCtor ]
                                  (Right (constructor' mkProduct))
                )
-      where
-        productIntro = foldl App (Constructor (Qualified (Just mn) ctorName))
-                       . map (Var . Qualified Nothing)
 
     makeProduct
       :: [Ident]
       -> [Type]
-      -> (Type, Binder, Expr)
+      -> (Type, Binder, [Expr], [Binder], Expr)
     makeProduct [] _ =
-      (noArgs, NullBinder, noArgs')
+      (noArgs, NullBinder, [], [], noArgs')
+    makeProduct _ [arg] | Just rec <- objectType arg =
+      let fields = decomposeRec rec in
+      ( TypeApp (TypeConstructor record)
+          (foldr1 (\f -> TypeApp (TypeApp (TypeConstructor productName) f))
+            (map (\(name, ty) ->
+              TypeApp (TypeApp (TypeConstructor field) (TypeLevelString name)) ty) fields))
+      , ConstructorBinder record
+          [ foldr1 (\b1 b2 -> ConstructorBinder productName [b1, b2])
+              (map (ConstructorBinder field . pure . VarBinder . Ident . fst) fields)
+          ]
+      , [ Literal . ObjectLiteral $
+           map (\(name, _) -> (name, Var (Qualified Nothing (Ident name)))) fields
+        ]
+      , [ LiteralBinder . ObjectLiteral $
+            map (\(name, _) -> (name, VarBinder (Ident name))) fields
+        ]
+      , record' $
+          foldr1 (\e1 -> App (App (Constructor productName) e1))
+            (map (\(name, _) -> field' (Var (Qualified Nothing (Ident name)))) fields)
+      )
     makeProduct argNames args =
       ( foldr1 (\f -> TypeApp (TypeApp (TypeConstructor productName) f))
                (map (TypeApp (TypeConstructor argument)) args)
       , foldr1 (\b1 b2 -> ConstructorBinder productName [b1, b2])
           (map (ConstructorBinder argument . pure . VarBinder) argNames)
+      , map (Var . Qualified Nothing) argNames
+      , map VarBinder argNames
       , foldr1 (\e1 -> App (App (Constructor productName) e1))
           (map (\name -> argument' (Var (Qualified Nothing name))) argNames)
       )
@@ -451,6 +470,18 @@ deriveGenericRep mn ds tyConNm tyConArgs repTy = do
 
     argument' :: Expr -> Expr
     argument' = App (Constructor argument)
+
+    record :: Qualified (ProperName ty)
+    record = Qualified (Just dataGenericRep) (ProperName "Rec")
+
+    record' :: Expr -> Expr
+    record' = App (Constructor record)
+
+    field :: Qualified (ProperName ty)
+    field = Qualified (Just dataGenericRep) (ProperName "Field")
+
+    field' :: Expr -> Expr
+    field' = App (Constructor field)
 
 checkIsWildcard :: MonadError MultipleErrors m => ProperName 'TypeName -> Type -> m ()
 checkIsWildcard _ (TypeWildcard _) = return ()
