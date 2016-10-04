@@ -386,16 +386,6 @@ deriveGenericRep mn ds tyConNm tyConArgs repTy = do
                       [ConstructorBinder (Qualified (Just mn) ctorName) []]
                       (Right noArgs')
                   )
-                [(onlyName, only)] ->
-                  ( TypeApp (TypeConstructor argument) only
-                  , CaseAlternative
-                      [ConstructorBinder argument [VarBinder onlyName]]
-                      (Right (App (Constructor (Qualified (Just mn) ctorName))
-                                  (Var (Qualified Nothing onlyName))))
-                  , CaseAlternative
-                      [ConstructorBinder (Qualified (Just mn) ctorName) [VarBinder onlyName]]
-                      (Right (argument' (Var (Qualified Nothing onlyName))))
-                  )
                 _ ->
                   ( foldr1 (\f -> TypeApp (TypeApp (TypeConstructor productName) f))
                            (map (TypeApp (TypeConstructor argument)) args)

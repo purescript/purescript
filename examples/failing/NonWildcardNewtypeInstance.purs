@@ -1,4 +1,4 @@
--- @shouldFailWith NonWildcardNewtypeInstance
+-- @shouldFailWith ExpectedWildcard
 module NonWildcardNewtypeInstance where
 
 import Data.Newtype
