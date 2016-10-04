@@ -373,43 +373,32 @@ deriveGenericRep mn ds tyConNm tyConArgs repTy = do
       -> m (Type, CaseAlternative, CaseAlternative)
     makeInst (ctorName, args) = do
         argNames <- replicateM (length args) (freshIdent "arg")
-        let (ctorTy, to, from) = makeProduct productIntro productElim argNames args
+        let (ctorTy, matchProduct, mkProduct) = makeProduct argNames args
         return ( TypeApp (TypeApp (TypeConstructor constructor)
                                   (TypeLevelString (runProperName ctorName)))
                          ctorTy
-               , underBinder (ConstructorBinder constructor . pure) to
-               , underExpr constructor' from
+               , CaseAlternative [ ConstructorBinder constructor [matchProduct] ]
+                                 (Right (productIntro argNames))
+               , CaseAlternative [ ConstructorBinder (Qualified (Just mn) ctorName) (map VarBinder argNames) ]
+                                 (Right (constructor' mkProduct))
                )
       where
-        productIntro [] = Constructor (Qualified (Just mn) ctorName)
-        productIntro xs = foldl App (Constructor (Qualified (Just mn) ctorName))
-                                    (map (Var . Qualified Nothing) xs)
-
-        productElim = ConstructorBinder (Qualified (Just mn) ctorName) . map VarBinder
+        productIntro = foldl App (Constructor (Qualified (Just mn) ctorName))
+                       . map (Var . Qualified Nothing)
 
     makeProduct
-      :: ([Ident] -> Expr)
-      -> ([Ident] -> Binder)
-      -> [Ident]
+      :: [Ident]
       -> [Type]
-      -> (Type, CaseAlternative, CaseAlternative)
-    makeProduct intro elim [] _ =
-      ( noArgs
-      , CaseAlternative [NullBinder] (Right (intro []))
-      , CaseAlternative [elim []] (Right noArgs')
-      )
-    makeProduct intro elim argNames args =
+      -> (Type, Binder, Expr)
+    makeProduct [] _ =
+      (noArgs, NullBinder, noArgs')
+    makeProduct argNames args =
       ( foldr1 (\f -> TypeApp (TypeApp (TypeConstructor productName) f))
                (map (TypeApp (TypeConstructor argument)) args)
-      , CaseAlternative
-          [ foldr1 (\b1 b2 -> ConstructorBinder productName [b1, b2])
-                   (map (ConstructorBinder argument . pure . VarBinder) argNames)
-          ]
-          (Right (intro argNames))
-      , CaseAlternative
-          [elim argNames]
-          (Right (foldr1 (\e1 -> App (App (Constructor productName) e1))
-                         (map (\name -> argument' (Var (Qualified Nothing name))) argNames)))
+      , foldr1 (\b1 b2 -> ConstructorBinder productName [b1, b2])
+          (map (ConstructorBinder argument . pure . VarBinder) argNames)
+      , foldr1 (\e1 -> App (App (Constructor productName) e1))
+          (map (\name -> argument' (Var (Qualified Nothing name))) argNames)
       )
 
     underBinder :: (Binder -> Binder) -> CaseAlternative -> CaseAlternative
