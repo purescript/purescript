@@ -9,7 +9,6 @@ module Main (main) where
 import Data.Traversable (for)
 import Data.Version (showVersion)
 import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
 
 import Control.Applicative
 import Control.Monad
@@ -26,7 +25,6 @@ import System.Directory (createDirectoryIfMissing)
 
 import Language.PureScript.Bundle
 
-import Options.Applicative (Parser, ParseError (..))
 import Options.Applicative as Opts
 
 import qualified Paths_purescript as Paths
