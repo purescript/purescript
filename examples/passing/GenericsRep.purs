@@ -33,6 +33,13 @@ derive instance genericW :: Generic W _
 instance eqW :: Eq W where
   eq x y = genericEq x y
 
+data V = V { x :: Int } { x :: Int }
+ 
+derive instance genericV :: Generic V _
+
+instance eqV :: Eq V where
+  eq x y = genericEq x y
+
 main :: Eff (console :: CONSOLE) Unit
 main = do
   logShow (X 0 == X 1)
@@ -41,4 +48,5 @@ main = do
   logShow (Z 1 Y == Y)
   logShow (Y == Y :: Y Z)
   logShow (W { x: 0, y: "A" } == W { x: 0, y: "A" })
+  logShow (V { x: 0 } { x: 0 } == V { x: 0 } { x: 0 })
   log "Done"

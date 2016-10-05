@@ -13,7 +13,7 @@ import Control.Monad (replicateM)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class (MonadSupply)
 
-import Data.List (foldl', find, sortBy)
+import Data.List (foldl', find, sortBy, unzip5)
 import Data.Maybe (fromMaybe)
 import Data.Ord (comparing)
 
@@ -372,8 +372,7 @@ deriveGenericRep mn ds tyConNm tyConArgs repTy = do
       :: (ProperName 'ConstructorName, [Type])
       -> m (Type, CaseAlternative, CaseAlternative)
     makeInst (ctorName, args) = do
-        argNames <- replicateM (length args) (freshIdent "arg")
-        (ctorTy, matchProduct, ctorArgs, matchCtor, mkProduct) <- makeProduct argNames args
+        (ctorTy, matchProduct, ctorArgs, matchCtor, mkProduct) <- makeProduct args
         return ( TypeApp (TypeApp (TypeConstructor constructor)
                                   (TypeLevelString (runProperName ctorName)))
                          ctorTy
@@ -384,12 +383,21 @@ deriveGenericRep mn ds tyConNm tyConArgs repTy = do
                )
 
     makeProduct
-      :: [Ident]
-      -> [Type]
+      :: [Type]
       -> m (Type, Binder, [Expr], [Binder], Expr)
-    makeProduct [] _ =
+    makeProduct [] =
       pure (noArgs, NullBinder, [], [], noArgs')
-    makeProduct _ [arg] | Just rec <- objectType arg = do
+    makeProduct args = do
+      (tys, bs1, es1, bs2, es2) <- unzip5 <$> traverse makeArg args
+      pure ( foldr1 (\f -> TypeApp (TypeApp (TypeConstructor productName) f)) tys
+           , foldr1 (\b1 b2 -> ConstructorBinder productName [b1, b2]) bs1
+           , es1
+           , bs2
+           , foldr1 (\e1 -> App (App (Constructor productName) e1)) es2
+           )
+
+    makeArg :: Type -> m (Type, Binder, Expr, Binder, Expr)
+    makeArg arg | Just rec <- objectType arg = do
       let fields = decomposeRec rec
       fieldNames <- traverse freshIdent (map fst fields)
       pure ( TypeApp (TypeConstructor record)
@@ -400,26 +408,22 @@ deriveGenericRep mn ds tyConNm tyConArgs repTy = do
                [ foldr1 (\b1 b2 -> ConstructorBinder productName [b1, b2])
                    (map (\ident -> ConstructorBinder field [VarBinder ident]) fieldNames)
                ]
-           , [ Literal . ObjectLiteral $
+           , Literal . ObjectLiteral $
                 zipWith (\(name, _) ident -> (name, Var (Qualified Nothing ident))) fields fieldNames
-             ]
-           , [ LiteralBinder . ObjectLiteral $
+           , LiteralBinder . ObjectLiteral $
                  zipWith (\(name, _) ident -> (name, VarBinder ident)) fields fieldNames
-             ]
            , record' $
                foldr1 (\e1 -> App (App (Constructor productName) e1))
                  (map (field' . Var . Qualified Nothing) fieldNames)
            )
-    makeProduct argNames args = pure
-      ( foldr1 (\f -> TypeApp (TypeApp (TypeConstructor productName) f))
-               (map (TypeApp (TypeConstructor argument)) args)
-      , foldr1 (\b1 b2 -> ConstructorBinder productName [b1, b2])
-          (map (ConstructorBinder argument . pure . VarBinder) argNames)
-      , map (Var . Qualified Nothing) argNames
-      , map VarBinder argNames
-      , foldr1 (\e1 -> App (App (Constructor productName) e1))
-          (map (\name -> argument' (Var (Qualified Nothing name))) argNames)
-      )
+    makeArg arg = do
+      argName <- freshIdent "arg"
+      pure ( TypeApp (TypeConstructor argument) arg
+           , ConstructorBinder argument [ VarBinder argName ]
+           , Var (Qualified Nothing argName)
+           , VarBinder argName
+           , argument' (Var (Qualified Nothing argName))
+           )
 
     underBinder :: (Binder -> Binder) -> CaseAlternative -> CaseAlternative
     underBinder f (CaseAlternative bs e) = CaseAlternative (map f bs) e
