@@ -49,14 +49,18 @@ filtering env x t = xrunSubsume env $ do
   t' <- initializeSkolems t
 
   let dummyExpression = P.Var (P.Qualified Nothing (P.Ident "x"))
+
+  -- We need to add a dummy expression here so that @subsumes@ can succesfully
+  -- pattern match on @Just@. It would usually insert dictionaries into the
+  -- expression to prove it solved all the constraints, but we don't need to do
+  -- any codegen so we're fine with pretending.
   elab <- runExceptT $ subsumes (Just dummyExpression) t' x'
   subst <- gets TC.checkSubstitution
   case elab of
-    Left _ -> throwError undefined
     Right (Just expP) -> do
       let expPP = overTypes (P.substituteType subst) expP
-      Entailment.replaceTypeClassDictionaries True expPP
-    Right Nothing -> throwError undefined
+      Entailment.replaceTypeClassDictionaries False expPP
+    _ -> throwError undefined
 
 typeSearch
   :: P.Environment
