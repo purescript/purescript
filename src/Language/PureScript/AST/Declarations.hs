@@ -29,7 +29,13 @@ import qualified Text.Parsec as P
 -- | A map of locally-bound names in scope.
 type Context = [(Ident, Type)]
 
-data TypeSearch = TSBefore Environment | TSAfter [(Qualified Ident, Type)]
+-- | Holds the data necessary to do type directed search for typed holes
+data TypeSearch
+  = TSBefore Environment
+  -- ^ An Environment captured for later consumption by type directed search
+  | TSAfter [(Qualified Ident, Type)]
+  -- ^ Results of applying type directed search to the previously captured
+  -- Environment
   deriving Show
 
 -- | A type of error messages
