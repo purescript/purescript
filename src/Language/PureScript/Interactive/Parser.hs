@@ -62,6 +62,7 @@ parseDirective cmd =
     Help    -> return ShowHelp
     Quit    -> return QuitPSCi
     Reset   -> return ResetState
+    Paste   -> return PasteLines
     Browse  -> BrowseModule <$> parseRest P.moduleName arg
     Show    -> ShowInfo <$> parseReplQuery' (trim arg)
     Type    -> TypeOf <$> parseRest P.parseValue arg

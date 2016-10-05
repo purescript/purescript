@@ -122,6 +122,7 @@ directiveArg _ Browse      = [CtxModule]
 directiveArg _ Quit        = []
 directiveArg _ Reset       = []
 directiveArg _ Help        = []
+directiveArg _ Paste       = []
 directiveArg _ Show        = map CtxFixed replQueryStrings
 directiveArg _ Type        = [CtxIdentifier]
 directiveArg _ Kind        = [CtxType]
