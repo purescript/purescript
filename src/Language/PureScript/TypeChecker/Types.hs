@@ -55,10 +55,10 @@ import Language.PureScript.TypeChecker.Rows
 import Language.PureScript.TypeChecker.Skolems
 import Language.PureScript.TypeChecker.Subsumption
 import Language.PureScript.TypeChecker.Synonyms
+import Language.PureScript.TypeChecker.TypeSearch
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.Types
 
-import Language.PureScript.Infernal
 
 data BindingGroupType
   = RecursiveBindingGroup
@@ -128,7 +128,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
       where
       runTypeSearch (ErrorMessage hints (HoleInferredType x ty y (TSBefore env))) =
         ErrorMessage hints (HoleInferredType x ty y $ TSAfter $
-                             fmap (substituteType subst) <$> M.toList (typeSearch' env (substituteType subst ty)))
+                             fmap (substituteType subst) <$> M.toList (typeSearch env (substituteType subst ty)))
       runTypeSearch x = x
 
     -- | Generalize type vars using forall and add inferred constraints

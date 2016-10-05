@@ -237,6 +237,7 @@ library
                      Language.PureScript.TypeChecker.Subsumption
                      Language.PureScript.TypeChecker.Synonyms
                      Language.PureScript.TypeChecker.Types
+                     Language.PureScript.TypeChecker.TypeSearch
                      Language.PureScript.TypeChecker.Unify
                      Language.PureScript.TypeClassDictionaries
                      Language.PureScript.Types
@@ -287,8 +288,6 @@ library
                      Language.PureScript.Interactive.Message
                      Language.PureScript.Interactive.Module
                      Language.PureScript.Interactive.Printer
-
-                     Language.PureScript.Infernal
 
                      Control.Monad.Logger
                      Control.Monad.Supply
