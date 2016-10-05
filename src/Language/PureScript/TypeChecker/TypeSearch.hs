@@ -1,6 +1,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module Language.PureScript.TypeChecker.TypeSearch
   ( typeSearch
@@ -9,21 +9,21 @@ module Language.PureScript.TypeChecker.TypeSearch
 import           Protolude
 
 import           Control.Monad.Writer
-import qualified Data.Map as Map
-import qualified Language.PureScript.TypeChecker.Entailment as Entailment
+import qualified Data.Map                                    as Map
+import qualified Language.PureScript.TypeChecker.Entailment  as Entailment
 
-import qualified Language.PureScript.TypeChecker.Monad      as TC
+import qualified Language.PureScript.TypeChecker.Monad       as TC
 import           Language.PureScript.TypeChecker.Subsumption
-import           Language.PureScript.TypeChecker.Unify as P
+import           Language.PureScript.TypeChecker.Unify       as P
 
-import Language.PureScript.AST as P
-import Control.Monad.Supply as P
-import Language.PureScript.Environment as P
-import Language.PureScript.Errors as P
-import Language.PureScript.Names as P
-import Language.PureScript.Types as P
-import Language.PureScript.TypeChecker.Skolems as Skolem
-import Language.PureScript.TypeChecker.Synonyms as P
+import           Control.Monad.Supply                        as P
+import           Language.PureScript.AST                     as P
+import           Language.PureScript.Environment             as P
+import           Language.PureScript.Errors                  as P
+import           Language.PureScript.Names                   as P
+import           Language.PureScript.TypeChecker.Skolems     as Skolem
+import           Language.PureScript.TypeChecker.Synonyms    as P
+import           Language.PureScript.Types                   as P
 
 xrunSubsume
   :: Environment
