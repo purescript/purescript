@@ -49,10 +49,10 @@ data ModeSing (mode :: Mode) where
 -- | This type family tracks what evidence we return from 'subsumes' for each
 -- mode.
 type family Coercion (mode :: Mode) where
+  -- When elaborating, we generate a coercion
   Coercion 'Elaborate = Expr -> Expr
-  -- ^ When elaborating, we generate a coercion
+  -- When we're not elaborating, we don't generate coercions
   Coercion 'NoElaborate = ()
-  -- ^ When we're not elaborating, we don't generate coercions
 
 -- | The default coercion for each mode.
 defaultCoercion :: ModeSing mode -> Coercion mode
