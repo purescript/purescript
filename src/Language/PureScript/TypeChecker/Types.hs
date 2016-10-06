@@ -27,12 +27,14 @@ module Language.PureScript.TypeChecker.Types
 
 import Prelude.Compat
 
+import Control.Arrow (second)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets)
 import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Writer.Class (MonadWriter(..))
 
+import Data.Bifunctor (bimap)
 import Data.Either (lefts, rights)
 import Data.List (transpose, nub, (\\), partition, delete)
 import Data.Maybe (fromMaybe)
@@ -199,6 +201,10 @@ typeForBindingGroupElement (ident, val) dict untypedDict = do
 -- | Check if a value contains a type annotation
 isTyped :: (Ident, Expr) -> Either (Ident, Expr) (Ident, (Expr, Type, Bool))
 isTyped (name, TypedValue checkType value ty) = Right (name, (value, ty, checkType))
+isTyped (name, PositionedValue pos c value) =
+  bimap (second (PositionedValue pos c))
+        (second (\(e, t, b) -> (PositionedValue pos c e, t, b)))
+        (isTyped (name, value))
 isTyped (name, value) = Left (name, value)
 
 -- |
