@@ -107,23 +107,26 @@ mark p = do
 -- |
 -- Check that the current identation level matches a predicate
 --
-checkIndentation :: (P.Column -> P.Column -> Bool) -> P.Parsec s ParseState ()
-checkIndentation rel = do
+checkIndentation
+  :: (P.Column -> String)
+  -> (P.Column -> P.Column -> Bool)
+  -> P.Parsec s ParseState ()
+checkIndentation mkMsg rel = do
   col <- P.sourceColumn <$> P.getPosition
   current <- indentationLevel <$> P.getState
-  guard (col `rel` current)
+  guard (col `rel` current) P.<?> mkMsg current
 
 -- |
 -- Check that the current indentation level is past the current mark
 --
 indented :: P.Parsec s ParseState ()
-indented = checkIndentation (>) P.<?> "indentation"
+indented = checkIndentation (("indentation past column " ++) . show) (>)
 
 -- |
 -- Check that the current indentation level is at the same indentation as the current mark
 --
 same :: P.Parsec s ParseState ()
-same = checkIndentation (==) P.<?> "no indentation"
+same = checkIndentation (("indentation at column " ++) . show) (==)
 
 -- |
 -- Read the comments from the the next token, without consuming it
