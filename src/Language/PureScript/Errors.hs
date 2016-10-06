@@ -748,7 +748,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
               ++ let formatTS (names, types) =
                         let
                           idBoxes = Box.text . showQualified runIdent <$> names
-                          tyBoxes = (\t -> BoxHelpers.indented (Box.text ":: " Box.<> typeAsBox t)) <$> types
+                          tyBoxes = (\t -> BoxHelpers.indented
+                                      (Box.text ":: " Box.<> typeAsBox t)) <$> types
                           longestId = maximum (map Box.cols idBoxes)
                         in
                           Box.vcat Box.top $

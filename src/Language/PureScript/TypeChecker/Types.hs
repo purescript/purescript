@@ -109,7 +109,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           let solved = foldMap (S.fromList . fdDetermined) typeClassDependencies
           let constraintTypeVars = nub . foldMap (unknownsInType . fst) . filter ((`notElem` solved) . snd) $ zip (constraintArgs con) [0..]
           when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $
-            throwError . onErrorMessages (replaceTypes currentSubst) . errorMessage $ NoInstanceFound con
+            throwError . onErrorMessages (replaceTypes shouldGeneralize currentSubst) . errorMessage $ NoInstanceFound con
 
       -- Check skolem variables did not escape their scope
       skolemEscapeCheck val'
@@ -120,11 +120,13 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
     -- Show warnings here, since types in wildcards might have been solved during
     -- instance resolution (by functional dependencies).
     finalSubst <- gets checkSubstitution
-    escalateWarningWhen isHoleError . tell . onErrorMessages (replaceTypes finalSubst) $ w
+    escalateWarningWhen isHoleError . tell . onErrorMessages (replaceTypes False finalSubst) $ w
 
     return inferred
   where
-    replaceTypes subst = runTypeSearch . onTypesInErrorMessage (substituteType subst)
+    replaceTypes shouldGeneralize subst =
+      (if not shouldGeneralize then runTypeSearch else id)
+      . onTypesInErrorMessage (substituteType subst)
       where
       runTypeSearch (ErrorMessage hints (HoleInferredType x ty y (TSBefore env))) =
         ErrorMessage hints (HoleInferredType x ty y $ TSAfter $
