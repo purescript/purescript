@@ -568,18 +568,14 @@ check' (Abs (Right _) _) _ = internalError "Binder was not desugared"
 check' (App f arg) ret = do
   f'@(TypedValue _ _ ft) <- infer f
   (retTy, app) <- checkFunctionApplication f' ft arg
-  v' <- subsumes (Just app) retTy ret
-  case v' of
-    Nothing -> internalError "check: unable to check the subsumes relation."
-    Just app' -> return $ TypedValue True app' ret
+  elaborate <- subsumes retTy ret
+  return $ TypedValue True (elaborate app) ret
 check' v@(Var var) ty = do
   checkVisibility var
   repl <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< lookupVariable $ var
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
-  v' <- subsumes (Just v) repl ty'
-  case v' of
-    Nothing -> internalError "check: unable to check the subsumes relation."
-    Just v'' -> return $ TypedValue True v'' ty'
+  elaborate <- subsumes repl ty'
+  return $ TypedValue True (elaborate v) ty'
 check' (DeferredDictionary className tys) _ = do
   {-
   -- Here, we replace a placeholder for a superclass dictionary with a regular
@@ -596,12 +592,11 @@ check' (TypedValue checkType val ty1) ty2 = do
   checkTypeKind ty1 kind
   ty1' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty1
   ty2' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty2
-  val' <- subsumes (Just val) ty1' ty2'
-  case val' of
-    Nothing -> internalError "check: unable to check the subsumes relation."
-    Just _ -> do
-      val''' <- if checkType then withScopedTypeVars moduleName args (check val ty2') else return val
-      return $ TypedValue checkType val''' ty2'
+  _ <- subsumes ty1' ty2'
+  val' <- if checkType
+            then withScopedTypeVars moduleName args (check val ty2')
+            else return val
+  return $ TypedValue checkType val' ty2'
 check' (Case vals binders) ret = do
   (vals', ts) <- instantiateForBinders vals binders
   binders' <- checkBinders ts ret binders
@@ -638,10 +633,8 @@ check' v@(Constructor c) ty = do
     Nothing -> throwError . errorMessage . UnknownName . fmap DctorName $ c
     Just (_, _, ty1, _) -> do
       repl <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1
-      mv <- subsumes (Just v) repl ty
-      case mv of
-        Nothing -> internalError "check: unable to check the subsumes relation."
-        Just v' -> return $ TypedValue True v' ty
+      elaborate <- subsumes repl ty
+      return $ TypedValue True (elaborate v) ty
 check' (Let ds val) ty = do
   (ds', val') <- inferLetBinding [] ds val (`check` ty)
   return $ TypedValue True (Let ds' val') ty
@@ -654,10 +647,8 @@ check' (PositionedValue pos c val) ty = warnAndRethrowWithPositionTC pos $ do
   return $ TypedValue t (PositionedValue pos c v) ty'
 check' val ty = do
   TypedValue _ val' ty' <- infer val
-  mt <- subsumes (Just val') ty' ty
-  case mt of
-    Nothing -> internalError "check: unable to check the subsumes relation."
-    Just v' -> return $ TypedValue True v' ty
+  elaborate <- subsumes ty' ty
+  return $ TypedValue True (elaborate val') ty
 
 -- |
 -- Check the type of a collection of named record fields
