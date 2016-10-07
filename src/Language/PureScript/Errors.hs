@@ -731,7 +731,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
             ]
     renderSimpleErrorMessage (WildcardInferredType ty ctx) =
       paras $ [ line "Wildcard type definition has the inferred type "
-              , markCodeBox $ indent $ typeAsBox ty
+              , markCodeBox $ indent $ suggestedTypeAsBox ty
               ] ++ renderContext ctx
     renderSimpleErrorMessage (HoleInferredType name ty ctx) =
       paras $ [ line $ "Hole '" ++ markCode name ++ "' has the inferred type "
@@ -741,7 +741,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
       paras [ line $ "No type declaration was provided for the top-level declaration of " ++ markCode (showIdent ident) ++ "."
             , line "It is good practice to provide type declarations as a form of documentation."
             , line $ "The inferred type of " ++ markCode (showIdent ident) ++ " was:"
-            , markCodeBox $ indent $ typeAsBox ty
+            , markCodeBox $ indent $ suggestedTypeAsBox ty
             ]
     renderSimpleErrorMessage (OverlappingPattern bs b) =
       paras $ [ line "A case expression contains unreachable cases:\n"
