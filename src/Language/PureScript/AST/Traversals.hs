@@ -586,3 +586,15 @@ accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (con
   forValues (DeferredDictionary _ tys) = mconcat (map f tys)
   forValues (TypedValue _ _ ty) = f ty
   forValues _ = mempty
+
+-- |
+-- Map a function over type annotations appearing inside a value
+--
+overTypes :: (Type -> Type) -> Expr -> Expr
+overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
+  where
+  g :: Expr -> Expr
+  g (TypedValue checkTy val t) = TypedValue checkTy val (f t)
+  g (TypeClassDictionary c sco hints) = TypeClassDictionary (mapConstraintArgs (map f) c) sco hints
+  g other = other
+

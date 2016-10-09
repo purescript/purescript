@@ -74,6 +74,10 @@ typesOf
   -> [(Ident, Expr)]
   -> m [(Ident, (Expr, Type))]
 typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
+  -- TODO: If we push withoutWarnings into the do block we can differentiate
+  -- between ds1 and ds2 warnings and capture shouldGeneralize and the unsolved
+  -- dictionaries
+  -- Careful: We need to make sure the capturingSubstitution still does the right thing
     (tys, w) <- withoutWarnings . capturingSubstitution tidyUp $ do
       (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup (Just moduleName) vals
       ds1 <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
@@ -109,7 +113,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           let solved = foldMap (S.fromList . fdDetermined) typeClassDependencies
           let constraintTypeVars = nub . foldMap (unknownsInType . fst) . filter ((`notElem` solved) . snd) $ zip (constraintArgs con) [0..]
           when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $
-            throwError . onErrorMessages (replaceTypes shouldGeneralize currentSubst) . errorMessage $ NoInstanceFound con
+            throwError . onErrorMessages (replaceTypes (not shouldGeneralize) currentSubst) . errorMessage $ NoInstanceFound con
 
       -- Check skolem variables did not escape their scope
       skolemEscapeCheck val'
@@ -120,12 +124,16 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
     -- Show warnings here, since types in wildcards might have been solved during
     -- instance resolution (by functional dependencies).
     finalSubst <- gets checkSubstitution
-    escalateWarningWhen isHoleError . tell . onErrorMessages (replaceTypes False finalSubst) $ w
+
+    -- TODO: We should only do type search for Typed Holes which we inferred
+    -- without generalizing type class constraints
+    -- eg. foldMap ?x [1, 2, 3] finds `negate` right now, which is wrong
+    escalateWarningWhen isHoleError . tell . onErrorMessages (replaceTypes True finalSubst) $ w
 
     return inferred
   where
-    replaceTypes shouldGeneralize subst =
-      (if not shouldGeneralize then runTypeSearch else id)
+    replaceTypes shouldRunTypeSearch subst =
+      (if shouldRunTypeSearch then runTypeSearch else id)
       . onTypesInErrorMessage (substituteType subst)
       where
       runTypeSearch (ErrorMessage hints (HoleInferredType x ty y (TSBefore env))) =
@@ -215,17 +223,6 @@ isTyped (name, PositionedValue pos c value) =
         (second (\(e, t, b) -> (PositionedValue pos c e, t, b)))
         (isTyped (name, value))
 isTyped (name, value) = Left (name, value)
-
--- |
--- Map a function over type annotations appearing inside a value
---
-overTypes :: (Type -> Type) -> Expr -> Expr
-overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
-  where
-  g :: Expr -> Expr
-  g (TypedValue checkTy val t) = TypedValue checkTy val (f t)
-  g (TypeClassDictionary c sco hints) = TypeClassDictionary (mapConstraintArgs (map f) c) sco hints
-  g other = other
 
 -- | Check the kind of a type, failing if it is not of kind *.
 checkTypeKind ::
