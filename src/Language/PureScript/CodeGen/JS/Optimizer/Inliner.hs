@@ -169,7 +169,7 @@ inlineCommonOperators = applyAll $
 
   , inlineNonClassFunction (C.dataFunction, C.apply) $ \f x -> JSApp Nothing f [x]
   , inlineNonClassFunction (C.dataFunction, C.applyFlipped) $ \x f -> JSApp Nothing f [x]
-  , inlineNonClassFunction (C.dataArrayUnsafe, C.unsafeIndex) $ flip (JSIndexer Nothing)
+  , inlineNonClassFunction (C.dataArray, C.unsafeIndex) $ flip (JSIndexer Nothing)
   ] ++
   [ fn | i <- [0..10], fn <- [ mkFn i, runFn i ] ]
   where
