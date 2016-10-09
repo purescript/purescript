@@ -287,19 +287,19 @@ wikiUri e = "https://github.com/purescript/purescript/wiki/Error-Code-" ++ error
 -- WildcardInferredType - source span not small enough
 -- DuplicateSelectiveImport - would require 2 ranges to remove and 1 insert
 errorSuggestion :: SimpleErrorMessage -> Maybe ErrorSuggestion
-errorSuggestion err = case err of
-  UnusedImport{} -> emptySuggestion
-  DuplicateImport{} -> emptySuggestion
-  UnusedExplicitImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
-  UnusedDctorImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
-  UnusedDctorExplicitImport mn _ _ qual refs -> suggest $ importSuggestion mn refs qual
-  ImplicitImport mn refs -> suggest $ importSuggestion mn refs Nothing
-  ImplicitQualifiedImport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
-  HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
-  MissingTypeDeclaration ident ty -> suggest $ showIdent ident ++ " :: " ++ prettyPrintType ty
-  WildcardInferredType ty _ -> suggest $ prettyPrintType ty
-  _ -> Nothing
-
+errorSuggestion err =
+    case err of
+      UnusedImport{} -> emptySuggestion
+      DuplicateImport{} -> emptySuggestion
+      UnusedExplicitImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
+      UnusedDctorImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
+      UnusedDctorExplicitImport mn _ _ qual refs -> suggest $ importSuggestion mn refs qual
+      ImplicitImport mn refs -> suggest $ importSuggestion mn refs Nothing
+      ImplicitQualifiedImport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
+      HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
+      MissingTypeDeclaration ident ty -> suggest $ showIdent ident ++ " :: " ++ prettyPrintSuggestedType ty
+      WildcardInferredType ty _ -> suggest $ prettyPrintSuggestedType ty
+      _ -> Nothing
   where
     emptySuggestion = Just $ ErrorSuggestion ""
     suggest = Just . ErrorSuggestion
@@ -731,7 +731,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
             ]
     renderSimpleErrorMessage (WildcardInferredType ty ctx) =
       paras $ [ line "Wildcard type definition has the inferred type "
-              , markCodeBox $ indent $ suggestedTypeAsBox ty
+              , markCodeBox $ indent $ typeAsBox ty
               ] ++ renderContext ctx
     renderSimpleErrorMessage (HoleInferredType name ty ctx) =
       paras $ [ line $ "Hole '" ++ markCode name ++ "' has the inferred type "
@@ -741,7 +741,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
       paras [ line $ "No type declaration was provided for the top-level declaration of " ++ markCode (showIdent ident) ++ "."
             , line "It is good practice to provide type declarations as a form of documentation."
             , line $ "The inferred type of " ++ markCode (showIdent ident) ++ " was:"
-            , markCodeBox $ indent $ suggestedTypeAsBox ty
+            , markCodeBox $ indent $ typeAsBox ty
             ]
     renderSimpleErrorMessage (OverlappingPattern bs b) =
       paras $ [ line "A case expression contains unreachable cases:\n"

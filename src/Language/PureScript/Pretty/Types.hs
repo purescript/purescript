@@ -5,6 +5,7 @@ module Language.PureScript.Pretty.Types
   ( typeAsBox
   , suggestedTypeAsBox
   , prettyPrintType
+  , prettyPrintSuggestedType
   , typeAtomAsBox
   , prettyPrintTypeAtom
   , prettyPrintRowWith
@@ -175,6 +176,10 @@ typeAsBoxImpl suggesting
   . PA.pattern (matchType suggesting) ()
   . insertPlaceholders
 
--- | Generate a pretty-printed string representing a Type
+-- | Generate a pretty-printed string representing a 'Type'
 prettyPrintType :: Type -> String
-prettyPrintType = render . typeAsBoxImpl True
+prettyPrintType = render . typeAsBoxImpl False
+
+-- | Generate a pretty-printed string representing a suggested 'Type'
+prettyPrintSuggestedType :: Type -> String
+prettyPrintSuggestedType = render . typeAsBoxImpl True
