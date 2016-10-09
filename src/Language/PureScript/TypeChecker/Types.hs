@@ -130,7 +130,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
       where
       runTypeSearch (ErrorMessage hints (HoleInferredType x ty y (TSBefore env))) =
         ErrorMessage hints (HoleInferredType x ty y $ TSAfter $
-                             fmap (substituteType subst) <$> M.toList (typeSearch env (substituteType subst ty)))
+                             fmap (substituteType subst) <$> M.toList (typeSearch env subst (substituteType subst ty)))
       runTypeSearch x = x
 
     -- | Generalize type vars using forall and add inferred constraints

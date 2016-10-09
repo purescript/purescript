@@ -268,6 +268,14 @@ guardWith :: (MonadError e m) => e -> Bool -> m ()
 guardWith _ True = return ()
 guardWith e False = throwError e
 
+-- | Run a computation wit the given substitution
+withSubstitution
+  :: MonadState CheckState m
+  => Substitution
+  -> m a
+  -> m a
+withSubstitution subst f = modify (\cs -> cs {checkSubstitution = subst}) *> f
+
 -- | Run a computation in the substitution monad, generating a return value and the final substitution.
 captureSubstitution
   :: MonadState CheckState m

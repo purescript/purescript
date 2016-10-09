@@ -26,10 +26,13 @@ import           Language.PureScript.TypeChecker.Synonyms    as P
 import           Language.PureScript.Types                   as P
 
 xrunSubsume
-  :: Environment
+  :: (Monoid b)
+  => Environment
+  -> TC.Substitution
   -> StateT TC.CheckState (SupplyT (WriterT b (Except e))) a
   -> Either e (a, Environment)
-xrunSubsume env = runExcept . evalWriterT . P.evalSupplyT 0 . TC.runCheck' env
+xrunSubsume env sub f =
+  runExcept $ evalWriterT $ P.evalSupplyT 0 $ TC.runCheck' env (TC.withSubstitution sub f)
 
 evalWriterT :: Monad m => WriterT b m r -> m r
 evalWriterT m = liftM fst (runWriterT m)
@@ -37,12 +40,14 @@ evalWriterT m = liftM fst (runWriterT m)
 filtering
   :: P.Environment
   -- ^ The Environment which contains the relevant definitions and typeclasses
+  -> TC.Substitution
+  -- ^ A substitution
   -> P.Type
   -- ^ The type supplied by the environment
   -> P.Type
   -- ^ The user supplied type
   -> Either P.MultipleErrors ((P.Expr, [(P.Ident, P.Constraint)]), P.Environment)
-filtering env x t = xrunSubsume env $ do
+filtering env sub x t = xrunSubsume env sub $ do
   let initializeSkolems = Skolem.introduceSkolemScope <=< P.replaceAllTypeSynonyms <=< P.replaceTypeWildcards
 
   x' <- initializeSkolems x
@@ -64,10 +69,11 @@ filtering env x t = xrunSubsume env $ do
 
 typeSearch
   :: P.Environment
+  -> TC.Substitution
   -> P.Type
   -> Map (P.Qualified P.Ident) P.Type
-typeSearch env type' =
-  Map.mapMaybe (\(x, _, _) -> if isRight (filtering env type' x)
+typeSearch env sub type' =
+  Map.mapMaybe (\(x, _, _) -> if isRight (filtering env sub type' x)
                               then Just x
                               else Nothing) (P.names env)
 
