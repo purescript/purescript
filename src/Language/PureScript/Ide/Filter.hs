@@ -23,13 +23,13 @@ module Language.PureScript.Ide.Filter
        , applyFilters
        ) where
 
-import           Protolude hiding (isPrefixOf)
+import           Protolude                     hiding (isPrefixOf)
 
 import           Data.Aeson
 import           Data.Text                     (isPrefixOf)
+import qualified Language.PureScript           as P
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
-import qualified Language.PureScript as P
 
 newtype Filter = Filter (Endo [Module]) deriving(Monoid)
 
@@ -65,8 +65,7 @@ identFilter predicate search =
   where
     filterModuleDecls :: Module -> Module
     filterModuleDecls (moduleIdent, decls) =
-        (moduleIdent, filter (flip predicate search . getDeclaration) decls)
-    getDeclaration (IdeDeclarationAnn _ d) = d
+        (moduleIdent, filter (flip predicate search . discardAnn) decls)
 
 runFilter :: Filter -> [Module] -> [Module]
 runFilter (Filter f) = appEndo f

@@ -68,11 +68,11 @@ spec = do
   describe "import commands" $ do
     let simpleFileImports = let (_, _, i, _) = splitSimpleFile in i
         addValueImport i mn is =
-          prettyPrintImportSection (addExplicitImport' (IdeValue (P.Ident i) wildcard) mn is)
+          prettyPrintImportSection (addExplicitImport' (IdeDeclValue (IdeValue (P.Ident i) wildcard)) mn is)
         addOpImport op mn is =
-          prettyPrintImportSection (addExplicitImport' (IdeValueOperator op (P.Qualified Nothing (Left (P.Ident ""))) 2 P.Infix Nothing) mn is)
+          prettyPrintImportSection (addExplicitImport' (IdeDeclValueOperator (IdeValueOperator op (P.Qualified Nothing (Left (P.Ident ""))) 2 P.Infix Nothing)) mn is)
         addDtorImport i t mn is =
-          prettyPrintImportSection (addExplicitImport' (IdeDataConstructor (P.ProperName i) t wildcard) mn is)
+          prettyPrintImportSection (addExplicitImport' (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName i) t wildcard)) mn is)
     it "adds an implicit unqualified import" $
       shouldBe
         (addImplicitImport' simpleFileImports (P.moduleNameFromString "Data.Map"))

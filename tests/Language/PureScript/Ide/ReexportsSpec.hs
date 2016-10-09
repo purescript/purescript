@@ -18,11 +18,11 @@ d :: IdeDeclaration -> IdeDeclarationAnn
 d = IdeDeclarationAnn emptyAnn
 
 valueA, typeA, classA, dtorA1, dtorA2 :: IdeDeclarationAnn
-valueA = d (IdeValue (P.Ident "valueA") P.REmpty)
-typeA = d (IdeType (P.ProperName "TypeA") P.Star)
-classA = d (IdeTypeClass (P.ProperName "ClassA"))
-dtorA1 = d (IdeDataConstructor (P.ProperName "DtorA1") (P.ProperName "TypeA") P.REmpty)
-dtorA2 = d (IdeDataConstructor (P.ProperName "DtorA2") (P.ProperName "TypeA") P.REmpty)
+valueA = d (IdeDeclValue (IdeValue (P.Ident "valueA") P.REmpty))
+typeA = d (IdeDeclType (IdeType(P.ProperName "TypeA") P.Star))
+classA = d (IdeDeclTypeClass (P.ProperName "ClassA"))
+dtorA1 = d (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName "DtorA1") (P.ProperName "TypeA") P.REmpty))
+dtorA2 = d (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName "DtorA2") (P.ProperName "TypeA") P.REmpty))
 
 env :: Map P.ModuleName [IdeDeclarationAnn]
 env = Map.fromList

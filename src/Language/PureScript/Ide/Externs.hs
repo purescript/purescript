@@ -14,7 +14,6 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards   #-}
-{-# LANGUAGE FlexibleContexts  #-}
 
 module Language.PureScript.Ide.Externs
   ( readExternFile
@@ -24,10 +23,11 @@ module Language.PureScript.Ide.Externs
 
 import           Protolude
 
+import           Control.Lens                  ((^.))
 import           Data.Aeson                    (decodeStrict)
+import qualified Data.ByteString               as BS
 import           Data.List                     (nub)
 import qualified Data.Map                      as Map
-import qualified Data.ByteString               as BS
 import           Language.PureScript.Ide.Error (PscIdeError (..))
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
@@ -58,14 +58,14 @@ convertExterns ef =
     cleanDeclarations = nub $ appEndo typeClassFilter declarations
 
 removeTypeDeclarationsForClass :: IdeDeclaration -> Endo [IdeDeclaration]
-removeTypeDeclarationsForClass (IdeTypeClass n) = Endo (filter notDuplicate)
-  where notDuplicate (IdeType n' _) = runProperNameT n /= runProperNameT n'
-        notDuplicate (IdeTypeSynonym n' _) = runProperNameT n /= runProperNameT n'
+removeTypeDeclarationsForClass (IdeDeclTypeClass n) = Endo (filter notDuplicate)
+  where notDuplicate (IdeDeclType t) = n ^. properNameT /= t ^. ideTypeName . properNameT
+        notDuplicate (IdeDeclTypeSynonym s) = n ^. properNameT /= s ^. ideSynonymName . properNameT
         notDuplicate _ = True
 removeTypeDeclarationsForClass _ = mempty
 
 isTypeClassDeclaration :: IdeDeclaration -> Bool
-isTypeClassDeclaration IdeTypeClass{} = True
+isTypeClassDeclaration IdeDeclTypeClass{} = True
 isTypeClassDeclaration _ = False
 
 convertExport :: P.DeclarationRef -> Maybe (P.ModuleName, P.DeclarationRef)
@@ -73,19 +73,20 @@ convertExport (P.ReExportRef m r) = Just (m, r)
 convertExport _ = Nothing
 
 convertDecl :: P.ExternsDeclaration -> Maybe IdeDeclaration
-convertDecl P.EDType{..} = Just (IdeType edTypeName edTypeKind)
-convertDecl P.EDTypeSynonym{..} =
-  Just (IdeTypeSynonym edTypeSynonymName edTypeSynonymType)
-convertDecl P.EDDataConstructor{..} = Just $
+convertDecl P.EDType{..} = Just $ IdeDeclType $
+  IdeType edTypeName edTypeKind
+convertDecl P.EDTypeSynonym{..} = Just $ IdeDeclTypeSynonym
+  (IdeSynonym edTypeSynonymName edTypeSynonymType)
+convertDecl P.EDDataConstructor{..} = Just $ IdeDeclDataConstructor $
   IdeDataConstructor edDataCtorName edDataCtorTypeCtor edDataCtorType
-convertDecl P.EDValue{..} = Just $
+convertDecl P.EDValue{..} = Just $ IdeDeclValue $
   IdeValue edValueName edValueType
-convertDecl P.EDClass{..} = Just (IdeTypeClass edClassName)
+convertDecl P.EDClass{..} = Just (IdeDeclTypeClass edClassName)
 convertDecl P.EDInstance{} = Nothing
 
 convertOperator :: P.ExternsFixity -> IdeDeclaration
 convertOperator P.ExternsFixity{..} =
-  IdeValueOperator
+  IdeDeclValueOperator $ IdeValueOperator
     efOperator
     efAlias
     efPrecedence
@@ -94,7 +95,7 @@ convertOperator P.ExternsFixity{..} =
 
 convertTypeOperator :: P.ExternsTypeFixity -> IdeDeclaration
 convertTypeOperator P.ExternsTypeFixity{..} =
-  IdeTypeOperator
+  IdeDeclTypeOperator $ IdeTypeOperator
     efTypeOperator
     efTypeAlias
     efTypePrecedence
@@ -110,20 +111,20 @@ annotateModule (defs, types) (moduleName, decls) =
   where
     convertDeclaration :: IdeDeclarationAnn -> IdeDeclarationAnn
     convertDeclaration (IdeDeclarationAnn ann d) = case d of
-      IdeValue i t ->
-        annotateFunction i (IdeValue i t)
-      IdeType i k ->
-        annotateType (runProperNameT i) (IdeType i k)
-      IdeTypeSynonym i t ->
-        annotateType (runProperNameT i) (IdeTypeSynonym i t)
-      IdeDataConstructor i tn t ->
-        annotateValue (runProperNameT i) (IdeDataConstructor i tn t)
-      IdeTypeClass i ->
-        annotateType (runProperNameT i) (IdeTypeClass i)
-      IdeValueOperator n i p a t ->
-        annotateValue (valueOperatorAliasT i) (IdeValueOperator n i p a t)
-      IdeTypeOperator n i p a k ->
-        annotateType (typeOperatorAliasT i) (IdeTypeOperator n i p a k)
+      IdeDeclValue v ->
+        annotateFunction (v ^. ideValueIdent) (IdeDeclValue v)
+      IdeDeclType t ->
+        annotateType (t ^. ideTypeName . properNameT) (IdeDeclType t)
+      IdeDeclTypeSynonym s ->
+        annotateType (s ^. ideSynonymName . properNameT) (IdeDeclTypeSynonym s)
+      IdeDeclDataConstructor dtor ->
+        annotateValue (dtor ^. ideDtorName . properNameT) (IdeDeclDataConstructor dtor)
+      IdeDeclTypeClass i ->
+        annotateType (runProperNameT i) (IdeDeclTypeClass i)
+      IdeDeclValueOperator op ->
+        annotateValue (op ^. ideValueOpAlias & valueOperatorAliasT) (IdeDeclValueOperator op)
+      IdeDeclTypeOperator op ->
+        annotateType (op ^. ideTypeOpAlias & typeOperatorAliasT) (IdeDeclTypeOperator op)
       where
         annotateFunction x = IdeDeclarationAnn (ann { annLocation = Map.lookup (Left (runIdentT x)) defs
                                                     , annTypeAnnotation = Map.lookup x types

@@ -11,7 +11,7 @@ module Language.PureScript.Ide.Rebuild
 import           Protolude
 
 import           "monad-logger" Control.Monad.Logger
-import qualified Data.List as List
+import qualified Data.List                       as List
 import qualified Data.Map.Lazy                   as M
 import           Data.Maybe                      (fromJust)
 import qualified Data.Set                        as S
