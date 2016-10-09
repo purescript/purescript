@@ -50,15 +50,11 @@ filtering env x t = xrunSubsume env $ do
 
   let dummyExpression = P.Var (P.Qualified Nothing (P.Ident "x"))
 
-  -- We need to add a dummy expression here so that @subsumes@ can succesfully
-  -- pattern match on @Just@. It would usually insert dictionaries into the
-  -- expression to prove it solved all the constraints, but we don't need to do
-  -- any codegen so we're fine with pretending.
-  elab <- runExceptT $ subsumes (Just dummyExpression) t' x'
+  elab' <- runExceptT $ subsumes t' x'
   subst <- gets TC.checkSubstitution
-  case elab of
-    Right (Just expP) -> do
-      let expPP = overTypes (P.substituteType subst) expP
+  case elab' of
+    Right elab -> do
+      let expPP = overTypes (P.substituteType subst) (elab dummyExpression)
       Entailment.replaceTypeClassDictionaries False expPP
     _ -> throwError undefined
 
