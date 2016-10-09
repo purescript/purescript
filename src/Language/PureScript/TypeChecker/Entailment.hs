@@ -233,7 +233,6 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
 
             canBeGeneralized :: Type -> Bool
             canBeGeneralized TUnknown{} = True
-            canBeGeneralized Skolem{} = True
             canBeGeneralized _ = False
 
             -- |
