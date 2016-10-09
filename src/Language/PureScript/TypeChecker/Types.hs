@@ -31,7 +31,7 @@ import Control.Arrow (second)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets)
-import Control.Monad.Supply.Class (MonadSupply)
+import Control.Monad.Supply.Class (MonadSupply, peek)
 import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Bifunctor (bimap)
@@ -112,8 +112,9 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           TypeClassData{ typeClassDependencies } <- gets (findClass . typeClasses . checkEnv)
           let solved = foldMap (S.fromList . fdDetermined) typeClassDependencies
           let constraintTypeVars = nub . foldMap (unknownsInType . fst) . filter ((`notElem` solved) . snd) $ zip (constraintArgs con) [0..]
-          when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $
-            throwError . onErrorMessages (replaceTypes (not shouldGeneralize) currentSubst) . errorMessage $ NoInstanceFound con
+          when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $ do
+            nextVar <- peek
+            throwError . onErrorMessages (replaceTypes (not shouldGeneralize) currentSubst nextVar) . errorMessage $ NoInstanceFound con
 
       -- Check skolem variables did not escape their scope
       skolemEscapeCheck val'
@@ -128,17 +129,19 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
     -- TODO: We should only do type search for Typed Holes which we inferred
     -- without generalizing type class constraints
     -- eg. foldMap ?x [1, 2, 3] finds `negate` right now, which is wrong
-    escalateWarningWhen isHoleError . tell . onErrorMessages (replaceTypes True finalSubst) $ w
+
+    nextVar <- peek
+    escalateWarningWhen isHoleError . tell . onErrorMessages (replaceTypes True finalSubst nextVar) $ w
 
     return inferred
   where
-    replaceTypes shouldRunTypeSearch subst =
+    replaceTypes shouldRunTypeSearch subst nextVar =
       (if shouldRunTypeSearch then runTypeSearch else id)
       . onTypesInErrorMessage (substituteType subst)
       where
       runTypeSearch (ErrorMessage hints (HoleInferredType x ty y (TSBefore env))) =
         ErrorMessage hints (HoleInferredType x ty y $ TSAfter $
-                             fmap (substituteType subst) <$> M.toList (typeSearch env (substituteType subst ty)))
+                             fmap (substituteType subst) <$> M.toList (typeSearch env nextVar (substituteType subst ty)))
       runTypeSearch x = x
 
     -- | Generalize type vars using forall and add inferred constraints
