@@ -33,7 +33,6 @@ checkInEnvironment env nextVar =
   either (const Nothing) Just
   . runExcept
   . evalWriterT
-  -- TODO: make sure that unification variables don't overlap
   . P.evalSupplyT nextVar
   . TC.runCheck' env
 
@@ -45,22 +44,22 @@ checkSubsume
   -- ^ The Environment which contains the relevant definitions and typeclasses
   -> Integer
   -> P.Type
-  -- ^ The type supplied by the environment
-  -> P.Type
   -- ^ The user supplied type
+  -> P.Type
+  -- ^ The type supplied by the environment
   -> Maybe ((P.Expr, [(P.Ident, P.Constraint)]), P.Environment)
-checkSubsume env nextVar x t = checkInEnvironment env nextVar $ do
+checkSubsume env nextVar userT envT = checkInEnvironment env nextVar $ do
   let initializeSkolems =
         Skolem.introduceSkolemScope
         <=< P.replaceAllTypeSynonyms
         <=< P.replaceTypeWildcards
 
-  x' <- initializeSkolems x
-  t' <- initializeSkolems t
+  userT' <- initializeSkolems userT
+  envT' <- initializeSkolems envT
 
   let dummyExpression = P.Var (P.Qualified Nothing (P.Ident "x"))
 
-  elab <- subsumes t' x'
+  elab <- subsumes envT' userT'
   subst <- gets TC.checkSubstitution
   let expP = P.overTypes (P.substituteType subst) (elab dummyExpression)
   Entailment.replaceTypeClassDictionaries False expP
