@@ -71,7 +71,7 @@ parseDataDeclaration = do
   tyArgs <- many (indented *> kindedIdent)
   ctors <- P.option [] $ do
     indented *> equals
-    P.sepBy1 ((,) <$> properName <*> P.many (indented *> noWildcards parseTypeAtom)) pipe
+    P.sepBy1 ((,) <$> dataConstructorName <*> P.many (indented *> noWildcards parseTypeAtom)) pipe
   return $ DataDeclaration dtype name tyArgs ctors
 
 parseTypeDeclaration :: TokenParser Declaration
