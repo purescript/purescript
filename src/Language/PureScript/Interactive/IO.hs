@@ -1,4 +1,4 @@
-module Language.PureScript.Interactive.IO where
+module Language.PureScript.Interactive.IO (findNodeProcess, getHistoryFilename) where
 
 import Prelude.Compat
 
