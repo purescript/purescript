@@ -32,10 +32,3 @@ getHistoryFilename = do
   let filename = home </> ".purescript" </> "psci_history"
   mkdirp filename
   return filename
-
--- |
--- Expands tilde in path.
---
-expandTilde :: FilePath -> IO FilePath
-expandTilde ('~':p:rest) | isPathSeparator p = (</> rest) <$> getHomeDirectory
-expandTilde p = return p
