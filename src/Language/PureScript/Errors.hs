@@ -737,29 +737,31 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
       paras $ [ line "Wildcard type definition has the inferred type "
               , markCodeBox $ indent $ typeAsBox ty
               ] ++ renderContext ctx
-    renderSimpleErrorMessage (HoleInferredType name ty ctx (TSBefore _)) =
-      paras $ [ line $ "Hole '" ++ markCode name ++ "' has the inferred type "
-              , markCodeBox (indent (typeAsBox ty))
-              ] ++ renderContext ctx
-    renderSimpleErrorMessage (HoleInferredType name ty ctx (TSAfter idents)) =
-      paras $ [ line $ "Hole '" ++ markCode name ++ "' has the inferred type "
-              , markCodeBox (indent (typeAsBox ty))
-              ]
-              ++ let formatTS (names, types) =
-                        let
-                          idBoxes = Box.text . showQualified runIdent <$> names
-                          tyBoxes = (\t -> BoxHelpers.indented
-                                      (Box.text ":: " Box.<> typeAsBox t)) <$> types
-                          longestId = maximum (map Box.cols idBoxes)
-                        in
-                          Box.vcat Box.top $
-                            zipWith (Box.<>)
-                            (Box.alignHoriz Box.left longestId <$> idBoxes)
-                            tyBoxes
-                  in [ line "You could substitute the hole with one of these values:"
-                     , markCodeBox (indent (formatTS (unzip idents)))
-                     ]
-              ++ renderContext ctx
+    renderSimpleErrorMessage (HoleInferredType name ty ctx ts) =
+      let
+        maxTSResults = 15
+        tsResult = case ts of
+          (TSAfter idents) | not (null idents) ->
+            let
+              formatTS (names, types) =
+                let
+                  idBoxes = Box.text . showQualified runIdent <$> names
+                  tyBoxes = (\t -> BoxHelpers.indented
+                              (Box.text ":: " Box.<> typeAsBox t)) <$> types
+                  longestId = maximum (map Box.cols idBoxes)
+                in
+                  Box.vcat Box.top $
+                      zipWith (Box.<>)
+                      (Box.alignHoriz Box.left longestId <$> idBoxes)
+                      tyBoxes
+            in [ line "You could substitute the hole with one of these values:"
+               , markCodeBox (indent (formatTS (unzip (take maxTSResults idents))))
+               ]
+          _ -> []
+      in
+        paras $ [ line $ "Hole '" ++ markCode name ++ "' has the inferred type "
+                , markCodeBox (indent (typeAsBox ty))
+                ] ++ tsResult ++ renderContext ctx
     renderSimpleErrorMessage (MissingTypeDeclaration ident ty) =
       paras [ line $ "No type declaration was provided for the top-level declaration of " ++ markCode (showIdent ident) ++ "."
             , line "It is good practice to provide type declarations as a form of documentation."
