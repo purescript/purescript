@@ -5,7 +5,7 @@ import Prelude.Compat
 import Control.Monad (msum)
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import System.Directory (createDirectoryIfMissing, getHomeDirectory, findExecutable)
-import System.FilePath (takeDirectory, (</>), isPathSeparator)
+import System.FilePath (takeDirectory, (</>))
 
 mkdirp :: FilePath -> IO ()
 mkdirp = createDirectoryIfMissing True . takeDirectory
