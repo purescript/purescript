@@ -287,19 +287,19 @@ wikiUri e = "https://github.com/purescript/purescript/wiki/Error-Code-" ++ error
 -- WildcardInferredType - source span not small enough
 -- DuplicateSelectiveImport - would require 2 ranges to remove and 1 insert
 errorSuggestion :: SimpleErrorMessage -> Maybe ErrorSuggestion
-errorSuggestion err = case err of
-  UnusedImport{} -> emptySuggestion
-  DuplicateImport{} -> emptySuggestion
-  UnusedExplicitImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
-  UnusedDctorImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
-  UnusedDctorExplicitImport mn _ _ qual refs -> suggest $ importSuggestion mn refs qual
-  ImplicitImport mn refs -> suggest $ importSuggestion mn refs Nothing
-  ImplicitQualifiedImport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
-  HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
-  MissingTypeDeclaration ident ty -> suggest $ showIdent ident ++ " :: " ++ prettyPrintType ty
-  WildcardInferredType ty _ -> suggest $ prettyPrintType ty
-  _ -> Nothing
-
+errorSuggestion err =
+    case err of
+      UnusedImport{} -> emptySuggestion
+      DuplicateImport{} -> emptySuggestion
+      UnusedExplicitImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
+      UnusedDctorImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
+      UnusedDctorExplicitImport mn _ _ qual refs -> suggest $ importSuggestion mn refs qual
+      ImplicitImport mn refs -> suggest $ importSuggestion mn refs Nothing
+      ImplicitQualifiedImport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
+      HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
+      MissingTypeDeclaration ident ty -> suggest $ showIdent ident ++ " :: " ++ prettyPrintSuggestedType ty
+      WildcardInferredType ty _ -> suggest $ prettyPrintSuggestedType ty
+      _ -> Nothing
   where
     emptySuggestion = Just $ ErrorSuggestion ""
     suggest = Just . ErrorSuggestion
