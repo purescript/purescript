@@ -1,7 +1,9 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
 
 module Main where
 
@@ -11,6 +13,7 @@ import qualified Data.ByteString.Lazy as BL
 import           Data.Foldable (fold, for_)
 import           Data.List (nub)
 import qualified Data.Map as Map
+import           Data.Maybe (mapMaybe)
 import qualified Data.Set as Set
 import           Data.Text (pack)
 import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
@@ -30,13 +33,27 @@ packageFile = "psc-package.json"
 data PackageConfig = PackageConfig
   { name    :: Text
   , depends :: [Text]
+  , set     :: Text
+  , source  :: Text
   } deriving (Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
 
+pathToTextUnsafe :: Turtle.FilePath -> Text
+pathToTextUnsafe = either (error "Path.toText failed") id . Path.toText
+
 defaultPackage :: Text -> PackageConfig
-defaultPackage pkgName = PackageConfig pkgName [ "prelude" ]
+defaultPackage pkgName =
+  PackageConfig { name    = pkgName
+                , depends = [ "prelude" ]
+                , set     = "psc-" <> pack (showVersion Paths.version)
+                , source  = "https://github.com/paf31/purescript-package-db.git"
+                }
 
 readPackageFile :: IO PackageConfig
 readPackageFile = do
+  exists <- testfile packageFile
+  unless exists $ do
+    echo "psc-package.json does not exist"
+    exit (ExitFailure 1)
   mpkg <- Aeson.decodeStrict . encodeUtf8 <$> readTextFile packageFile
   case mpkg of
     Nothing -> do
@@ -54,6 +71,111 @@ data PackageInfo = PackageInfo
   } deriving (Show, Eq, Generic, Aeson.FromJSON, Aeson.ToJSON)
 
 type PackageSet = Map.Map Text PackageInfo
+
+cloneShallow
+  :: MonadIO io
+  => Text
+  -- ^ repo
+  -> Text
+  -- ^ branch/tag
+  -> Turtle.FilePath
+  -- ^ target directory
+  -> io ()
+cloneShallow from ref into =
+  procs "git"
+        [ "clone"
+        , "--depth", "1"
+        , "-b", ref
+        , from
+        , pathToTextUnsafe into
+        ] empty
+
+getPackageSet :: PackageConfig -> IO ()
+getPackageSet PackageConfig{ source, set } = do
+  let pkgDir = ".psc-package" </> fromText set </> ".set"
+  exists <- testdir pkgDir
+  unless exists $ cloneShallow source set pkgDir
+
+readPackageSet :: PackageConfig -> IO PackageSet
+readPackageSet PackageConfig{ set } = do
+  let dbFile = ".psc-package" </> fromText set </> ".set" </> "packages.json"
+  exists <- testfile dbFile
+  unless exists $ do
+    echo "packages.json does not exist"
+    exit (ExitFailure 1)
+  mdb <- Aeson.decodeStrict . encodeUtf8 <$> readTextFile dbFile
+  case mdb of
+    Nothing -> do
+      echo "Unable to parse packages.json"
+      exit (ExitFailure 1)
+    Just db -> return db
+
+installOrUpdate :: PackageConfig -> Text -> PackageInfo -> IO ()
+installOrUpdate PackageConfig{ set } pkgName PackageInfo{ repo, version } = do
+  let pkgDir = ".psc-package" </> fromText set </> fromText pkgName </> fromText version
+  exists <- testdir pkgDir
+  unless exists $ cloneShallow repo version pkgDir
+
+getTransitiveDeps :: PackageSet -> [Text] -> IO [(Text, PackageInfo)]
+getTransitiveDeps db depends = do
+  pkgs <- for depends $ \pkg ->
+    case Map.lookup pkg db of
+      Nothing -> do
+        echo ("Package " <> pkg <> " does not exist in package set")
+        exit (ExitFailure 1)
+      Just PackageInfo{ dependencies } -> return (pkg : dependencies)
+  let unique = Set.toList (foldMap Set.fromList pkgs)
+  return (mapMaybe (\name -> fmap (name, ) (Map.lookup name db)) unique)
+
+updateImpl :: PackageConfig -> IO ()
+updateImpl config@PackageConfig{ depends } = do
+  getPackageSet config
+  db <- readPackageSet config
+  trans <- getTransitiveDeps db depends
+  echo ("Updating " <> pack (show (length trans)) <> " packages")
+  for_ trans $ \(pkgName, pkg) ->
+    installOrUpdate config pkgName pkg
+
+initialize :: IO ()
+initialize = do
+  here <- pwd
+  isEmpty <- Shell.fold (ls here) Foldl.null
+  unless isEmpty $ do
+    echo "Current directory is not empty"
+    exit (ExitFailure 1)
+  echo "Initializing new project in current directory"
+  let pkgName = pathToTextUnsafe (Path.filename here)
+      pkg = defaultPackage pkgName
+  writePackageFile pkg
+  updateImpl pkg
+
+update :: IO ()
+update = do
+  pkg <- readPackageFile
+  updateImpl pkg
+
+install :: String -> IO ()
+install pkgName = do
+  pkg <- readPackageFile
+  let pkg' = pkg { depends = nub (pack pkgName : depends pkg) }
+  writePackageFile pkg'
+  updateImpl pkg'
+
+exec :: Text -> IO ()
+exec exeName = do
+  pkg@PackageConfig{..} <- readPackageFile
+  db <- readPackageSet pkg
+  trans <- getTransitiveDeps db depends
+  let paths = [ ".psc-package"
+                </> fromText set
+                </> fromText pkgName
+                </> fromText version
+                </> "src" </> "**" </> "*.purs"
+              | (pkgName, PackageInfo{ version }) <- trans
+              ]
+  procs exeName
+        (map pathToTextUnsafe ("src" </> "**" </> "*.purs" : paths))
+        empty
 
 main :: IO ()
 main = do
@@ -73,131 +195,12 @@ main = do
 
     commands :: Parser (IO ())
     commands = (Opts.subparser . fold)
-        [ Opts.command "init"    (Opts.info (pure initialize) (Opts.progDesc "Initialize a new package"))
-        , Opts.command "update"  (Opts.info (pure update)     (Opts.progDesc "Update dependencies"))
-        , Opts.command "install" (Opts.info (install <$> pkg) (Opts.progDesc "Build the current package and dependencies"))
-        , Opts.command "build"   (Opts.info (pure build)      (Opts.progDesc "Build the current package and dependencies"))
+        [ Opts.command "init"    (Opts.info (pure initialize)    (Opts.progDesc "Initialize a new package"))
+        , Opts.command "update"  (Opts.info (pure update)        (Opts.progDesc "Update dependencies"))
+        , Opts.command "install" (Opts.info (install <$> pkg)    (Opts.progDesc "Install the named package"))
+        , Opts.command "build"   (Opts.info (pure (exec "psc"))  (Opts.progDesc "Build the current package and dependencies"))
         ]
       where
         pkg = Opts.strArgument $
              Opts.metavar "PACKAGE"
           <> Opts.help "The name of the package to install"
-
-initialize :: IO ()
-initialize = do
-  here <- pwd
-  isEmpty <- Shell.fold (ls here) Foldl.null
-  unless isEmpty $ do
-    echo "Current directory is not empty"
-    exit (ExitFailure 1)
-  echo "Initializing new project in current directory"
-  let pkgName = either (const "new-package") id (Path.toText (Path.filename here))
-      pkg = defaultPackage pkgName
-  writePackageFile pkg
-  updateImpl pkg
-
-update :: IO ()
-update = do
-  exists <- testfile packageFile
-  unless exists $ do
-    echo "psc-package.json does not exist"
-    exit (ExitFailure 1)
-  pkg <- readPackageFile
-  updateImpl pkg
-
-install :: String -> IO ()
-install pkgName = do
-  pkg <- readPackageFile
-  let pkg' = pkg { depends = nub (pack pkgName : depends pkg) }
-  writePackageFile pkg'
-  updateImpl pkg'
-
-cloneShallow
-  :: MonadIO io
-  => Text
-  -- ^ repo
-  -> Text
-  -- ^ branch/tag
-  -> Turtle.FilePath
-  -- ^ target directory
-  -> io ()
-cloneShallow from ref into =
-  procs "git"
-        [ "clone"
-        , "--depth", "1"
-        , "-b", ref
-        , from
-        , (either (error "Path.toText failed") id . Path.toText) into
-        ] empty
-
-getPackageSet :: IO ()
-getPackageSet = do
-  let pkgDir = ".psc-package" </> ".package-set"
-  exists <- testdir pkgDir
-  if exists
-    then
-      pushd pkgDir $
-        procs "git" [ "pull", "origin", "master" ] empty
-    else
-      cloneShallow "https://github.com/paf31/purescript-package-db.git" "master" pkgDir
-
-readPackageSet :: IO PackageSet
-readPackageSet = do
-  let dbFile = ".psc-package" </> ".package-set" </> "packages.json"
-  exists <- testfile dbFile
-  unless exists $ do
-    echo "packages.json does not exist"
-    exit (ExitFailure 1)
-  mdb <- Aeson.decodeStrict . encodeUtf8 <$> readTextFile dbFile
-  case mdb of
-    Nothing -> do
-      echo "Unable to parse packages.json"
-      exit (ExitFailure 1)
-    Just db -> return db
-
-installOrUpdate :: Text -> PackageInfo -> IO ()
-installOrUpdate pkgName PackageInfo{..} = do
-  let pkgDir = ".psc-package" </> ".packages" </> fromText pkgName
-  exists <- testdir pkgDir
-  if exists
-    then
-      pushd pkgDir $
-        procs "git"
-              [ "checkout"
-              , version
-              ] empty
-    else
-      cloneShallow repo version pkgDir
-
-pushd :: Path.FilePath -> IO a -> IO a
-pushd dir action = do
-  cur <- pwd
-  cd dir
-  a <- action
-  cd cur
-  return a
-
-updateImpl :: PackageConfig -> IO ()
-updateImpl PackageConfig{..} = do
-  getPackageSet
-  db <- readPackageSet
-  pkgs <- for depends $ \pkg ->
-    case Map.lookup pkg db of
-      Nothing -> do
-        echo ("Package " <> pkg <> " does not exist in package set")
-        exit (ExitFailure 1)
-      Just PackageInfo{..} -> return (pkg : dependencies)
-  let allDeps = foldMap Set.fromList pkgs
-  echo ("Updating " <> pack (show (Set.size allDeps)) <> " packages")
-  for_ allDeps $ \pkgName ->
-    for_ (Map.lookup pkgName db) $ \pkg ->
-      installOrUpdate pkgName pkg
-
-build :: IO ()
-build = do
-  -- TODO: use the psc-package.json file to figure out which files
-  -- to actually include here
-  procs "psc"
-        [ "src/**/*.purs"
-        , ".psc-package/.packages/*/src/**/*.purs"
-        ] empty
