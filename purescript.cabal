@@ -1,10 +1,10 @@
 name: purescript
-version: 0.10.0
+version: 0.10.1
 cabal-version: >=1.8
 build-type: Simple
-license: MIT
+license: BSD3
 license-file: LICENSE
-copyright: (c) 2013-15 Phil Freeman, (c) 2014-15 Gary Burgess
+copyright: (c) 2013-16 Phil Freeman, (c) 2014-16 Gary Burgess
 maintainer: Phil Freeman <paf31@cantab.net>
 stability: experimental
 synopsis: PureScript Programming Language Compiler
@@ -102,7 +102,7 @@ source-repository head
 
 library
     build-depends: base >=4.8 && <5,
-                   aeson >= 0.8 && < 1.1,
+                   aeson >= 0.8 && < 1.0,
                    aeson-better-errors >= 0.8,
                    ansi-terminal >= 0.6.2 && < 0.7,
                    base-compat >=0.6.0,
@@ -119,7 +119,7 @@ library
                    fsnotify >= 0.2.1,
                    Glob >= 0.7 && < 0.8,
                    haskeline >= 0.7.0.0,
-                   http-client >= 0.4.30 && <0.6,
+                   http-client >= 0.4.30 && <0.5,
                    http-types -any,
                    language-javascript == 0.6.*,
                    lifted-base >= 0.2.3 && < 0.2.4,
@@ -319,7 +319,7 @@ library
 executable psc
     build-depends: base >=4 && <5,
                    purescript -any,
-                   aeson >= 0.8 && < 1.1,
+                   aeson >= 0.8 && < 1.0,
                    ansi-terminal >= 0.6.2 && < 0.7,
                    base-compat >=0.6.0,
                    bytestring -any,
@@ -397,7 +397,7 @@ executable psc-docs
 executable psc-publish
     build-depends: base >=4 && <5,
                    purescript -any,
-                   aeson -any,
+                   aeson >= 0.8 && < 1.0,
                    bytestring -any,
                    optparse-applicative -any
     main-is: Main.hs
@@ -461,7 +461,7 @@ executable psc-ide-server
   other-modules:       Paths_purescript
   other-extensions:
   build-depends:       base >=4 && <5,
-                       aeson >= 0.8 && < 1.1,
+                       aeson >= 0.8 && < 1.0,
                        bytestring -any,
                        purescript -any,
                        base-compat >=0.6.0,
