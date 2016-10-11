@@ -551,7 +551,7 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   j' s (DoNotationValue v) = (s, g'' s v)
   j' s (DoNotationBind b v) =
     let s' = S.union (S.fromList (binderNames b)) s
-    in (s', h'' s b <> g'' s' v)
+    in (s', h'' s b <> g'' s v)
   j' s (DoNotationLet ds) =
     let s' = S.union s (S.fromList (mapMaybe getDeclIdent ds))
     in (s', foldMap (f'' s') ds)
