@@ -7,14 +7,13 @@ module Main where
 
 import qualified Control.Foldl as Foldl
 import qualified Data.Aeson as Aeson
-import qualified Data.Aeson.Text as Aeson
+import qualified Data.ByteString.Lazy as BL
 import           Data.Foldable (fold, for_)
 import           Data.List (nub)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import           Data.Text (pack)
-import           Data.Text.Lazy (toStrict)
-import           Data.Text.Encoding (encodeUtf8)
+import           Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import           Data.Traversable (for)
 import           Data.Version (showVersion)
 import qualified Filesystem.Path.CurrentOS as Path
@@ -46,7 +45,7 @@ readPackageFile = do
     Just pkg -> return pkg
 
 writePackageFile :: PackageConfig -> IO ()
-writePackageFile = writeTextFile packageFile . toStrict . Aeson.encodeToLazyText
+writePackageFile = writeTextFile packageFile . decodeUtf8 . BL.toStrict . Aeson.encode
 
 data PackageInfo = PackageInfo
   { repo         :: Text
