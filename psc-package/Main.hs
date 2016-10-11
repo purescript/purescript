@@ -112,6 +112,24 @@ install pkgName = do
   writePackageFile pkg'
   updateImpl pkg'
 
+cloneShallow
+  :: MonadIO io
+  => Text
+  -- ^ repo
+  -> Text
+  -- ^ branch/tag
+  -> Turtle.FilePath
+  -- ^ target directory
+  -> io ()
+cloneShallow from ref into =
+  procs "git"
+        [ "clone"
+        , "--depth", "1"
+        , "-b", ref
+        , from
+        , (either (error "Path.toText failed") id . Path.toText) into
+        ] empty
+
 getPackageSet :: IO ()
 getPackageSet = do
   let pkgDir = ".psc-package" </> ".package-set"
@@ -121,12 +139,7 @@ getPackageSet = do
       pushd pkgDir $
         procs "git" [ "pull", "origin", "master" ] empty
     else
-      procs "git"
-            [ "clone"
-            , "--depth", "1"
-            , "https://github.com/paf31/purescript-package-db.git"
-            , (either (error "Path.toText failed") id . Path.toText) pkgDir
-            ] empty
+      cloneShallow "https://github.com/paf31/purescript-package-db.git" "master" pkgDir
 
 readPackageSet :: IO PackageSet
 readPackageSet = do
@@ -154,13 +167,7 @@ installOrUpdate pkgName PackageInfo{..} = do
               , version
               ] empty
     else
-      procs "git"
-            [ "clone"
-            , "-b", version
-            , "--depth", "1"
-            , repo
-            , (either (error "Path.toText failed") id . Path.toText) pkgDir
-            ] empty
+      cloneShallow repo version pkgDir
 
 pushd :: Path.FilePath -> IO a -> IO a
 pushd dir action = do
@@ -188,6 +195,8 @@ updateImpl PackageConfig{..} = do
 
 build :: IO ()
 build = do
+  -- TODO: use the psc-package.json file to figure out which files
+  -- to actually include here
   procs "psc"
         [ "src/**/*.purs"
         , ".psc-package/.packages/*/src/**/*.purs"
