@@ -16,6 +16,11 @@ moduleNameToJs (ModuleName pns) =
   let name = intercalate "_" (runProperName `map` pns)
   in if nameIsJsBuiltIn name then "$$" ++ name else name
 
+properToJs :: String -> String
+properToJs name
+  | nameIsJsReserved name || nameIsJsBuiltIn name = "$$" ++ name
+  | otherwise = concatMap identCharToString name
+
 -- |
 -- Convert an Ident into a valid Javascript identifier:
 --

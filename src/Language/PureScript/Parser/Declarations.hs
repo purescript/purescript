@@ -360,7 +360,7 @@ parseVar :: TokenParser Expr
 parseVar = Var <$> C.parseQualified C.parseIdent
 
 parseConstructor :: TokenParser Expr
-parseConstructor = Constructor <$> C.parseQualified C.properName
+parseConstructor = Constructor <$> C.parseQualified C.dataConstructorName
 
 parseCase :: TokenParser Expr
 parseCase = Case <$> P.between (reserved "case") (C.indented *> reserved "of") (commaSep1 parseValue)
@@ -494,10 +494,10 @@ parseNumberLiteral = LiteralBinder . NumericLiteral <$> (sign <*> number)
          <|> return id
 
 parseNullaryConstructorBinder :: TokenParser Binder
-parseNullaryConstructorBinder = ConstructorBinder <$> C.parseQualified C.properName <*> pure []
+parseNullaryConstructorBinder = ConstructorBinder <$> C.parseQualified C.dataConstructorName <*> pure []
 
 parseConstructorBinder :: TokenParser Binder
-parseConstructorBinder = ConstructorBinder <$> C.parseQualified C.properName <*> many (C.indented *> parseBinderNoParens)
+parseConstructorBinder = ConstructorBinder <$> C.parseQualified C.dataConstructorName <*> many (C.indented *> parseBinderNoParens)
 
 parseObjectBinder:: TokenParser Binder
 parseObjectBinder = LiteralBinder <$> parseObjectLiteral (C.indented *> parseIdentifierAndBinder)
