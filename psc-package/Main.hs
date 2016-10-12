@@ -47,7 +47,7 @@ defaultPackage pkgName =
   PackageConfig { name    = pkgName
                 , depends = [ "prelude" ]
                 , set     = "psc-" <> pack (showVersion Paths.version)
-                , source  = "https://github.com/paf31/purescript-package-db.git"
+                , source  = "https://github.com/purescript/package-sets.git"
                 }
 
 readPackageFile :: IO PackageConfig
