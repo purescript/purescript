@@ -29,6 +29,12 @@ typeName :: TokenParser (ProperName 'TypeName)
 typeName = ProperName <$> tyname
 
 -- |
+-- Parse a proper name for a data constructor.
+--
+dataConstructorName :: TokenParser (ProperName 'ConstructorName)
+dataConstructorName = ProperName <$> dconsname
+
+-- |
 -- Parse a module name
 --
 moduleName :: TokenParser ModuleName

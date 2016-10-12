@@ -43,6 +43,7 @@ module Language.PureScript.Parser.Lexer
   , lname'
   , qualifier
   , tyname
+  , dconsname
   , uname
   , uname'
   , mname
@@ -448,6 +449,12 @@ uname' s = token go P.<?> "proper name"
 
 tyname :: TokenParser String
 tyname = token go P.<?> "type name"
+  where
+  go (UName s) = Just s
+  go _ = Nothing
+
+dconsname :: TokenParser String
+dconsname = token go P.<?> "data constructor name"
   where
   go (UName s) = Just s
   go _ = Nothing
