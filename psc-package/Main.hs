@@ -7,7 +7,6 @@
 
 module Main where
 
-import           Control.Exception (catch)
 import qualified Control.Foldl as Foldl
 import qualified Data.Aeson as Aeson
 import           Data.Aeson.Encode.Pretty (encodePrettyToTextBuilder)
