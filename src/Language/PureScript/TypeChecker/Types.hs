@@ -31,7 +31,7 @@ import Control.Arrow (second)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets)
-import Control.Monad.Supply.Class (MonadSupply)
+import Control.Monad.Supply.Class (MonadSupply, peek)
 import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Bifunctor (bimap)
@@ -55,8 +55,10 @@ import Language.PureScript.TypeChecker.Rows
 import Language.PureScript.TypeChecker.Skolems
 import Language.PureScript.TypeChecker.Subsumption
 import Language.PureScript.TypeChecker.Synonyms
+import Language.PureScript.TypeChecker.TypeSearch
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.Types
+
 
 data BindingGroupType
   = RecursiveBindingGroup
@@ -72,6 +74,10 @@ typesOf
   -> [(Ident, Expr)]
   -> m [(Ident, (Expr, Type))]
 typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
+  -- TODO: If we push withoutWarnings into the do block we can differentiate
+  -- between ds1 and ds2 warnings and capture shouldGeneralize and the unsolved
+  -- dictionaries
+  -- Careful: We need to make sure the capturingSubstitution still does the right thing
     (tys, w) <- withoutWarnings . capturingSubstitution tidyUp $ do
       (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup (Just moduleName) vals
       ds1 <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
@@ -106,8 +112,9 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           TypeClassData{ typeClassDependencies } <- gets (findClass . typeClasses . checkEnv)
           let solved = foldMap (S.fromList . fdDetermined) typeClassDependencies
           let constraintTypeVars = nub . foldMap (unknownsInType . fst) . filter ((`notElem` solved) . snd) $ zip (constraintArgs con) [0..]
-          when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $
-            throwError . onErrorMessages (replaceTypes currentSubst) . errorMessage $ NoInstanceFound con
+          when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $ do
+            nextVar <- peek
+            throwError . onErrorMessages (replaceTypes (not shouldGeneralize) currentSubst nextVar) . errorMessage $ NoInstanceFound con
 
       -- Check skolem variables did not escape their scope
       skolemEscapeCheck val'
@@ -118,11 +125,24 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
     -- Show warnings here, since types in wildcards might have been solved during
     -- instance resolution (by functional dependencies).
     finalSubst <- gets checkSubstitution
-    escalateWarningWhen isHoleError . tell . onErrorMessages (replaceTypes finalSubst) $ w
+
+    -- TODO: We should only do type search for Typed Holes which we inferred
+    -- without generalizing type class constraints
+    -- eg. foldMap ?x [1, 2, 3] finds `negate` right now, which is wrong
+
+    nextVar <- peek
+    escalateWarningWhen isHoleError . tell . onErrorMessages (replaceTypes True finalSubst nextVar) $ w
 
     return inferred
   where
-    replaceTypes subst = onTypesInErrorMessage (substituteType subst)
+    replaceTypes shouldRunTypeSearch subst nextVar =
+      (if shouldRunTypeSearch then runTypeSearch else id)
+      . onTypesInErrorMessage (substituteType subst)
+      where
+      runTypeSearch (ErrorMessage hints (HoleInferredType x ty y (TSBefore env))) =
+        ErrorMessage hints (HoleInferredType x ty y $ TSAfter $
+                             fmap (substituteType subst) <$> M.toList (typeSearch env nextVar (substituteType subst ty)))
+      runTypeSearch x = x
 
     -- | Generalize type vars using forall and add inferred constraints
     generalize unsolved = varIfUnknown . constrain unsolved
@@ -206,17 +226,6 @@ isTyped (name, PositionedValue pos c value) =
         (second (\(e, t, b) -> (PositionedValue pos c e, t, b)))
         (isTyped (name, value))
 isTyped (name, value) = Left (name, value)
-
--- |
--- Map a function over type annotations appearing inside a value
---
-overTypes :: (Type -> Type) -> Expr -> Expr
-overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
-  where
-  g :: Expr -> Expr
-  g (TypedValue checkTy val t) = TypedValue checkTy val (f t)
-  g (TypeClassDictionary c sco hints) = TypeClassDictionary (mapConstraintArgs (map f) c) sco hints
-  g other = other
 
 -- | Check the kind of a type, failing if it is not of kind *.
 checkTypeKind ::
@@ -345,7 +354,8 @@ infer' (TypedValue checkType val ty) = do
 infer' (Hole name) = do
   ty <- freshType
   ctx <- getLocalContext
-  tell . errorMessage $ HoleInferredType name ty ctx
+  env <- getEnv
+  tell . errorMessage $ HoleInferredType name ty ctx (TSBefore env)
   return $ TypedValue True (Hole name) ty
 infer' (PositionedValue pos c val) = warnAndRethrowWithPositionTC pos $ do
   TypedValue t v ty <- infer' val

@@ -238,6 +238,7 @@ library
                      Language.PureScript.TypeChecker.Subsumption
                      Language.PureScript.TypeChecker.Synonyms
                      Language.PureScript.TypeChecker.Types
+                     Language.PureScript.TypeChecker.TypeSearch
                      Language.PureScript.TypeChecker.Unify
                      Language.PureScript.TypeClassDictionaries
                      Language.PureScript.Types

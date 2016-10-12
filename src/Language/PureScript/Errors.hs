@@ -40,6 +40,7 @@ import qualified System.Console.ANSI as ANSI
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Error as PE
 import qualified Text.PrettyPrint.Boxes as Box
+import qualified Language.PureScript.Publish.BoxesHelpers as BoxHelpers
 import Text.Parsec.Error (Message(..))
 
 newtype ErrorSuggestion = ErrorSuggestion String
@@ -266,7 +267,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
   gSimple (OrphanInstance nm cl ts) = OrphanInstance nm cl <$> traverse f ts
   gSimple (WildcardInferredType ty ctx) = WildcardInferredType <$> f ty <*> traverse (sndM f) ctx
-  gSimple (HoleInferredType name ty ctx) = HoleInferredType name <$> f ty <*> traverse (sndM f) ctx
+  gSimple (HoleInferredType name ty ctx env) = HoleInferredType name <$> f ty <*> traverse (sndM f) ctx  <*> gTypeSearch env
   gSimple (MissingTypeDeclaration nm ty) = MissingTypeDeclaration nm <$> f ty
   gSimple (CannotGeneralizeRecursiveFunction nm ty) = CannotGeneralizeRecursiveFunction nm <$> f ty
   gSimple other = pure other
@@ -279,6 +280,9 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gHint (ErrorInInstance cl ts) = ErrorInInstance cl <$> traverse f ts
   gHint (ErrorSolvingConstraint con) = ErrorSolvingConstraint <$> overConstraintArgs (traverse f) con
   gHint other = pure other
+
+  gTypeSearch (TSBefore env) = pure (TSBefore env)
+  gTypeSearch (TSAfter result) = TSAfter <$> traverse (traverse f) result
 
 wikiUri :: ErrorMessage -> String
 wikiUri e = "https://github.com/purescript/purescript/wiki/Error-Code-" ++ errorCode e
@@ -733,10 +737,31 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
       paras $ [ line "Wildcard type definition has the inferred type "
               , markCodeBox $ indent $ typeAsBox ty
               ] ++ renderContext ctx
-    renderSimpleErrorMessage (HoleInferredType name ty ctx) =
-      paras $ [ line $ "Hole '" ++ markCode name ++ "' has the inferred type "
-              , markCodeBox $ indent $ typeAsBox ty
-              ] ++ renderContext ctx
+    renderSimpleErrorMessage (HoleInferredType name ty ctx ts) =
+      let
+        maxTSResults = 15
+        tsResult = case ts of
+          (TSAfter idents) | not (null idents) ->
+            let
+              formatTS (names, types) =
+                let
+                  idBoxes = Box.text . showQualified runIdent <$> names
+                  tyBoxes = (\t -> BoxHelpers.indented
+                              (Box.text ":: " Box.<> typeAsBox t)) <$> types
+                  longestId = maximum (map Box.cols idBoxes)
+                in
+                  Box.vcat Box.top $
+                      zipWith (Box.<>)
+                      (Box.alignHoriz Box.left longestId <$> idBoxes)
+                      tyBoxes
+            in [ line "You could substitute the hole with one of these values:"
+               , markCodeBox (indent (formatTS (unzip (take maxTSResults idents))))
+               ]
+          _ -> []
+      in
+        paras $ [ line $ "Hole '" ++ markCode name ++ "' has the inferred type "
+                , markCodeBox (indent (typeAsBox ty))
+                ] ++ tsResult ++ renderContext ctx
     renderSimpleErrorMessage (MissingTypeDeclaration ident ty) =
       paras [ line $ "No type declaration was provided for the top-level declaration of " ++ markCode (showIdent ident) ++ "."
             , line "It is good practice to provide type declarations as a form of documentation."
