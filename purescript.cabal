@@ -410,6 +410,7 @@ executable psc-package
     build-depends: base >=4 && <5,
                    purescript -any,
                    aeson -any,
+                   aeson-pretty -any,
                    bytestring -any,
                    containers -any,
                    foldl -any,

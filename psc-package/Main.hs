@@ -9,12 +9,15 @@ module Main where
 
 import qualified Control.Foldl as Foldl
 import qualified Data.Aeson as Aeson
+import           Data.Aeson.Encode.Pretty (encodePrettyToTextBuilder)
 import           Data.Foldable (fold, for_)
 import           Data.List (nub)
 import qualified Data.Map as Map
 import           Data.Maybe (mapMaybe)
 import qualified Data.Set as Set
 import           Data.Text (pack)
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Builder as TB
 import           Data.Text.Encoding (encodeUtf8)
 import           Data.Traversable (for)
 import           Data.Version (showVersion)
@@ -61,17 +64,11 @@ readPackageFile = do
     Just pkg -> return pkg
 
 writePackageFile :: PackageConfig -> IO ()
-writePackageFile = writeTextFile packageFile . pack . configAsJSON where
-  configAsJSON PackageConfig{..} = unlines $
-    [ "{"
-    , "  \"name\": "    <> show name   <> ","
-    , "  \"source\": "  <> show source <> ","
-    , "  \"set\": "     <> show set    <> ","
-    , "  \"depends\": ["
-    ] ++ map (("    " <>) . show) depends ++
-    [ "  ]"
-    , "}"
-    ]
+writePackageFile =
+  writeTextFile packageFile
+  . TL.toStrict
+  . TB.toLazyText
+  . encodePrettyToTextBuilder
 
 data PackageInfo = PackageInfo
   { repo         :: Text
