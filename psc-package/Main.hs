@@ -63,12 +63,16 @@ readPackageFile = do
       exit (ExitFailure 1)
     Just pkg -> return pkg
 
+encodePrettyToText :: Aeson.ToJSON json => json -> Text
+encodePrettyToText =
+  TL.toStrict
+  . TB.toLazyText
+  . encodePrettyToTextBuilder
+
 writePackageFile :: PackageConfig -> IO ()
 writePackageFile =
   writeTextFile packageFile
-  . TL.toStrict
-  . TB.toLazyText
-  . encodePrettyToTextBuilder
+  . encodePrettyToText
 
 data PackageInfo = PackageInfo
   { repo         :: Text
@@ -167,6 +171,13 @@ install pkgName = do
   writePackageFile pkg'
   updateImpl pkg'
 
+listDependencies :: IO ()
+listDependencies = do
+  pkg@PackageConfig{ depends } <- readPackageFile
+  db <- readPackageSet pkg
+  trans <- getTransitiveDeps db depends
+  echo (encodePrettyToText (map fst trans))
+
 exec :: Text -> IO ()
 exec exeName = do
   pkg@PackageConfig{..} <- readPackageFile
@@ -201,10 +212,11 @@ main = do
 
     commands :: Parser (IO ())
     commands = (Opts.subparser . fold)
-        [ Opts.command "init"    (Opts.info (pure initialize)    (Opts.progDesc "Initialize a new package"))
-        , Opts.command "update"  (Opts.info (pure update)        (Opts.progDesc "Update dependencies"))
-        , Opts.command "install" (Opts.info (install <$> pkg)    (Opts.progDesc "Install the named package"))
-        , Opts.command "build"   (Opts.info (pure (exec "psc"))  (Opts.progDesc "Build the current package and dependencies"))
+        [ Opts.command "init"         (Opts.info (pure initialize)       (Opts.progDesc "Initialize a new package"))
+        , Opts.command "update"       (Opts.info (pure update)           (Opts.progDesc "Update dependencies"))
+        , Opts.command "install"      (Opts.info (install <$> pkg)       (Opts.progDesc "Install the named package"))
+        , Opts.command "build"        (Opts.info (pure (exec "psc"))     (Opts.progDesc "Build the current package and dependencies"))
+        , Opts.command "dependencies" (Opts.info (pure listDependencies) (Opts.progDesc "List all (transitive) dependencies for the current package"))
         ]
       where
         pkg = Opts.strArgument $
