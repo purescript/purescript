@@ -27,7 +27,7 @@ module Language.PureScript.TypeChecker.Types
 
 import Prelude.Compat
 
-import Control.Arrow (second)
+import Control.Arrow (first, second, (***))
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets)
@@ -74,17 +74,13 @@ typesOf
   -> [(Ident, Expr)]
   -> m [(Ident, (Expr, Type))]
 typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
-  -- TODO: If we push withoutWarnings into the do block we can differentiate
-  -- between ds1 and ds2 warnings and capture shouldGeneralize and the unsolved
-  -- dictionaries
-  -- Careful: We need to make sure the capturingSubstitution still does the right thing
-    (tys, w) <- withoutWarnings . capturingSubstitution tidyUp $ do
+    tys <- capturingSubstitution tidyUp $ do
       (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup (Just moduleName) vals
-      ds1 <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
-      ds2 <- forM untyped $ \e -> typeForBindingGroupElement e dict untypedDict
-      return (map (\x -> (False, x)) ds1 ++ map (\x -> (True, x)) ds2)
+      ds1 <- parU typed $ \e -> withoutWarnings $ checkTypedBindingGroupElement moduleName e dict
+      ds2 <- forM untyped $ \e -> withoutWarnings $ typeForBindingGroupElement e dict untypedDict
+      return (map (False, ) ds1 ++ map (True, ) ds2)
 
-    inferred <- forM tys $ \(shouldGeneralize, (ident, (val, ty))) -> do
+    inferred <- forM tys $ \(shouldGeneralize, ((ident, (val, ty)), _)) -> do
       -- Replace type class dictionary placeholders with actual dictionaries
       (val', unsolved) <- replaceTypeClassDictionaries shouldGeneralize val
       -- Generalize and constrain the type
@@ -125,13 +121,9 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
     -- Show warnings here, since types in wildcards might have been solved during
     -- instance resolution (by functional dependencies).
     finalSubst <- gets checkSubstitution
-
-    -- TODO: We should only do type search for Typed Holes which we inferred
-    -- without generalizing type class constraints
-    -- eg. foldMap ?x [1, 2, 3] finds `negate` right now, which is wrong
-
     nextVar <- peek
-    escalateWarningWhen isHoleError . tell . onErrorMessages (replaceTypes True finalSubst nextVar) $ w
+    forM_ tys $ \(shouldGeneralize, ((_, (_, _)), w)) -> do
+      escalateWarningWhen isHoleError . tell . onErrorMessages (replaceTypes (not shouldGeneralize) finalSubst nextVar) $ w
 
     return inferred
   where
@@ -152,7 +144,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
     constrain cs = ConstrainedType (map snd cs)
 
     -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
-    tidyUp ts sub = map (\(b, (i, (val, ty))) -> (b, (i, (overTypes (substituteType sub) val, substituteType sub ty)))) ts
+    tidyUp ts sub = map (second (first (second (overTypes (substituteType sub) *** substituteType sub)))) ts
 
     isHoleError :: ErrorMessage -> Bool
     isHoleError (ErrorMessage _ HoleInferredType{}) = True
