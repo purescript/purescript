@@ -168,8 +168,8 @@ install :: String -> IO ()
 install pkgName = do
   pkg <- readPackageFile
   let pkg' = pkg { depends = nub (pack pkgName : depends pkg) }
-  writePackageFile pkg'
   updateImpl pkg'
+  writePackageFile pkg'
 
 listDependencies :: IO ()
 listDependencies = do
@@ -200,6 +200,7 @@ main = do
     IO.hSetEncoding IO.stderr IO.utf8
     cmd <- Opts.execParser opts
     cmd
+    echo "Done"
   where
     opts        = Opts.info (versionInfo <*> Opts.helper <*> commands) infoModList
     infoModList = Opts.fullDesc <> headerInfo <> footerInfo
