@@ -7,6 +7,7 @@
 
 module Main where
 
+import           Control.Exception (catch)
 import qualified Control.Foldl as Foldl
 import qualified Data.Aeson as Aeson
 import           Data.Aeson.Encode.Pretty (encodePrettyToTextBuilder)
@@ -83,28 +84,27 @@ data PackageInfo = PackageInfo
 type PackageSet = Map.Map Text PackageInfo
 
 cloneShallow
-  :: MonadIO io
-  => Text
+  :: Text
   -- ^ repo
   -> Text
   -- ^ branch/tag
   -> Turtle.FilePath
   -- ^ target directory
-  -> io ()
+  -> IO ExitCode
 cloneShallow from ref into =
-  procs "git"
-        [ "clone"
-        , "--depth", "1"
-        , "-b", ref
-        , from
-        , pathToTextUnsafe into
-        ] empty
+  proc "git"
+       [ "clone"
+       , "--depth", "1"
+       , "-b", ref
+       , from
+       , pathToTextUnsafe into
+       ] empty .||. exit (ExitFailure 1)
 
 getPackageSet :: PackageConfig -> IO ()
 getPackageSet PackageConfig{ source, set } = do
   let pkgDir = ".psc-package" </> fromText set </> ".set"
   exists <- testdir pkgDir
-  unless exists $ cloneShallow source set pkgDir
+  unless exists . void $ cloneShallow source set pkgDir
 
 readPackageSet :: PackageConfig -> IO PackageSet
 readPackageSet PackageConfig{ set } = do
@@ -124,7 +124,7 @@ installOrUpdate :: PackageConfig -> Text -> PackageInfo -> IO ()
 installOrUpdate PackageConfig{ set } pkgName PackageInfo{ repo, version } = do
   let pkgDir = ".psc-package" </> fromText set </> fromText pkgName </> fromText version
   exists <- testdir pkgDir
-  unless exists $ cloneShallow repo version pkgDir
+  unless exists . void $ cloneShallow repo version pkgDir
 
 getTransitiveDeps :: PackageSet -> [Text] -> IO [(Text, PackageInfo)]
 getTransitiveDeps db depends = do
@@ -142,8 +142,9 @@ updateImpl config@PackageConfig{ depends } = do
   getPackageSet config
   db <- readPackageSet config
   trans <- getTransitiveDeps db depends
-  echo ("Updating " <> pack (show (length trans)) <> " packages")
-  for_ trans $ \(pkgName, pkg) ->
+  echo ("Updating " <> pack (show (length trans)) <> " packages...")
+  for_ trans $ \(pkgName, pkg) -> do
+    echo ("Updating " <> pkgName)
     installOrUpdate config pkgName pkg
 
 initialize :: IO ()
@@ -213,11 +214,21 @@ main = do
 
     commands :: Parser (IO ())
     commands = (Opts.subparser . fold)
-        [ Opts.command "init"         (Opts.info (pure initialize)       (Opts.progDesc "Initialize a new package"))
-        , Opts.command "update"       (Opts.info (pure update)           (Opts.progDesc "Update dependencies"))
-        , Opts.command "install"      (Opts.info (install <$> pkg)       (Opts.progDesc "Install the named package"))
-        , Opts.command "build"        (Opts.info (pure (exec "psc"))     (Opts.progDesc "Build the current package and dependencies"))
-        , Opts.command "dependencies" (Opts.info (pure listDependencies) (Opts.progDesc "List all (transitive) dependencies for the current package"))
+        [ Opts.command "init"
+            (Opts.info (pure initialize)
+            (Opts.progDesc "Initialize a new package"))
+        , Opts.command "update"
+            (Opts.info (pure update)
+            (Opts.progDesc "Update dependencies"))
+        , Opts.command "install"
+            (Opts.info (install <$> pkg)
+            (Opts.progDesc "Install the named package"))
+        , Opts.command "build"
+            (Opts.info (pure (exec "psc"))
+            (Opts.progDesc "Build the current package and dependencies"))
+        , Opts.command "dependencies"
+            (Opts.info (pure listDependencies)
+            (Opts.progDesc "List all (transitive) dependencies for the current package"))
         ]
       where
         pkg = Opts.strArgument $
