@@ -257,11 +257,11 @@ modifyEnv f = modify (\s -> s { checkEnv = f (checkEnv s) })
 
 -- | Run a computation in the typechecking monad, starting with an empty @Environment@
 runCheck :: (Functor m) => StateT CheckState m a -> m (a, Environment)
-runCheck = runCheck' initEnvironment
+runCheck = runCheck' (emptyCheckState initEnvironment)
 
 -- | Run a computation in the typechecking monad, failing with an error, or succeeding with a return value and the final @Environment@.
-runCheck' :: (Functor m) => Environment -> StateT CheckState m a -> m (a, Environment)
-runCheck' env check = second checkEnv <$> runStateT check (emptyCheckState env)
+runCheck' :: (Functor m) => CheckState -> StateT CheckState m a -> m (a, Environment)
+runCheck' st check = second checkEnv <$> runStateT check st
 
 -- | Make an assertion, failing with an error message
 guardWith :: (MonadError e m) => e -> Bool -> m ()

@@ -36,6 +36,7 @@ import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Bifunctor (bimap)
 import Data.Either (lefts, rights)
+import Data.Functor (($>))
 import Data.List (transpose, nub, (\\), partition, delete)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
@@ -100,7 +101,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           $ CannotGeneralizeRecursiveFunction ident generalized
         -- Make sure any unsolved type constraints only use type variables which appear
         -- unknown in the inferred type.
-        forM_ unsolved $ \(_, con) -> do
+        forM_ unsolved $ \(_, _, con) -> do
           -- We need information about functional dependencies, since we allow
           -- ambiguous types to be inferred if they can be solved by some functional
           -- dependency.
@@ -109,39 +110,44 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           let solved = foldMap (S.fromList . fdDetermined) typeClassDependencies
           let constraintTypeVars = nub . foldMap (unknownsInType . fst) . filter ((`notElem` solved) . snd) $ zip (constraintArgs con) [0..]
           when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $ do
-            nextVar <- peek
-            throwError . onErrorMessages (replaceTypes (not shouldGeneralize) currentSubst nextVar) . errorMessage $ NoInstanceFound con
+            checkState <- get
+            throwError . onErrorMessages (replaceTypes Nothing currentSubst checkState) . errorMessage $ NoInstanceFound con
 
       -- Check skolem variables did not escape their scope
       skolemEscapeCheck val'
       -- Check rows do not contain duplicate labels
       checkDuplicateLabels val'
-      return (ident, (foldr (Abs . Left . fst) val' unsolved, generalized))
+      return ((ident, (foldr (Abs . Left . (\(x, _, _) -> x)) val' unsolved, generalized)), unsolved)
 
     -- Show warnings here, since types in wildcards might have been solved during
     -- instance resolution (by functional dependencies).
     finalSubst <- gets checkSubstitution
-    nextVar <- peek
+    checkState <- get
     forM_ tys $ \(shouldGeneralize, ((_, (_, _)), w)) -> do
-      escalateWarningWhen isHoleError . tell . onErrorMessages (replaceTypes (not shouldGeneralize) finalSubst nextVar) $ w
+      escalateWarningWhen isHoleError . tell . onErrorMessages (replaceTypes (guard shouldGeneralize $> concatMap snd inferred) finalSubst checkState) $ w
 
-    return inferred
+    return (map fst inferred)
   where
-    replaceTypes shouldRunTypeSearch subst nextVar =
-      (if shouldRunTypeSearch then runTypeSearch else id)
-      . onTypesInErrorMessage (substituteType subst)
+    replaceTypes
+      :: Maybe [(Ident, InstanceContext, Constraint)]
+      -> Substitution
+      -> CheckState
+      -> ErrorMessage
+      -> ErrorMessage
+    replaceTypes cons subst st =
+        runTypeSearch . onTypesInErrorMessage (substituteType subst)
       where
-      runTypeSearch (ErrorMessage hints (HoleInferredType x ty y (TSBefore env))) =
-        ErrorMessage hints (HoleInferredType x ty y $ TSAfter $
-                             fmap (substituteType subst) <$> M.toList (typeSearch env nextVar (substituteType subst ty)))
-      runTypeSearch x = x
+        runTypeSearch (ErrorMessage hints (HoleInferredType x ty y (TSBefore env))) =
+          ErrorMessage hints (HoleInferredType x ty y $ TSAfter $
+                               fmap (substituteType subst) <$> M.toList (typeSearch cons env st (substituteType subst ty)))
+        runTypeSearch x = x
 
     -- | Generalize type vars using forall and add inferred constraints
     generalize unsolved = varIfUnknown . constrain unsolved
 
     -- | Add any unsolved constraints
     constrain [] = id
-    constrain cs = ConstrainedType (map snd cs)
+    constrain cs = ConstrainedType (map (\(_, _, x) -> x) cs)
 
     -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
     tidyUp ts sub = map (second (first (second (overTypes (substituteType sub) *** substituteType sub)))) ts

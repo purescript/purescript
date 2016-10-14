@@ -149,7 +149,7 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
   lint withPrim
   ((Module ss coms _ elaborated exps, env'), nextVar) <- runSupplyT 0 $ do
     [desugared] <- desugar externs [withPrim]
-    runCheck' env $ typeCheckModule desugared
+    runCheck' (emptyCheckState env) $ typeCheckModule desugared
   regrouped <- createBindingGroups moduleName . collapseBindingGroups $ elaborated
   let mod' = Module ss coms moduleName regrouped exps
       corefn = CF.moduleToCoreFn env' mod'
