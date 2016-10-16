@@ -99,15 +99,6 @@ inlineCommonValues = everywhereOnJS convert
   fnSubtract = (C.dataRing, C.sub)
   intOp ss op x y = JSBinary ss BitwiseOr (JSBinary ss op x y) (JSNumericLiteral ss (Left 0))
 
-inlineNonClassFunction :: (String, String) -> (JS -> JS -> JS) -> JS -> JS
-inlineNonClassFunction (m, op) f = everywhereOnJS convert
-  where
-  convert :: JS -> JS
-  convert (JSApp _ (JSApp _ op' [x]) [y]) | isOp op' = f x y
-  convert other = other
-  isOp (JSAccessor _ op' (JSVar _ m')) = m == m' && op == op'
-  isOp _ = False
-
 inlineCommonOperators :: JS -> JS
 inlineCommonOperators = applyAll $
   [ binary semiringNumber opAdd Add
@@ -167,9 +158,9 @@ inlineCommonOperators = applyAll $
   , binary' C.dataIntBits C.zshr ZeroFillShiftRight
   , unary'  C.dataIntBits C.complement BitwiseNot
 
-  , inlineNonClassFunction (C.dataFunction, C.apply) $ \f x -> JSApp Nothing f [x]
-  , inlineNonClassFunction (C.dataFunction, C.applyFlipped) $ \x f -> JSApp Nothing f [x]
-  , inlineNonClassFunction (C.dataArray, C.unsafeIndex) $ flip (JSIndexer Nothing)
+  , inlineNonClassFunction (isModFn (C.dataFunction, C.apply)) $ \f x -> JSApp Nothing f [x]
+  , inlineNonClassFunction (isModFn (C.dataFunction, C.applyFlipped)) $ \x f -> JSApp Nothing f [x]
+  , inlineNonClassFunction (isModFnWithDict (C.dataArray, C.unsafeIndex)) $ flip (JSIndexer Nothing)
   ] ++
   [ fn | i <- [0..10], fn <- [ mkFn i, runFn i ] ]
   where
@@ -232,6 +223,21 @@ inlineCommonOperators = applyAll $
     go 0 acc (JSApp ss runFnN [fn]) | isNFn C.runFn n runFnN && length acc == n = Just (JSApp ss fn acc)
     go m acc (JSApp _ lhs [arg]) = go (m - 1) (arg : acc) lhs
     go _ _   _ = Nothing
+
+  inlineNonClassFunction :: (JS -> Bool) -> (JS -> JS -> JS) -> JS -> JS
+  inlineNonClassFunction p f = everywhereOnJS convert
+    where
+    convert :: JS -> JS
+    convert (JSApp _ (JSApp _ op' [x]) [y]) | p op' = f x y
+    convert other = other
+
+  isModFn :: (String, String) -> JS -> Bool
+  isModFn (m, op) (JSAccessor _ op' (JSVar _ m')) = m == m' && op == op'
+  isModFn _ _ = False
+
+  isModFnWithDict :: (String, String) -> JS -> Bool
+  isModFnWithDict (m, op) (JSApp _ (JSAccessor _ op' (JSVar _ m')) [(JSVar _ _)]) = m == m' && op == op'
+  isModFnWithDict _ _ = False
 
 -- (f <<< g $ x) = f (g x)
 -- (f <<< g)     = \x -> f (g x)
