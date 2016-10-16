@@ -158,9 +158,9 @@ inlineCommonOperators = applyAll $
   , binary' C.dataIntBits C.zshr ZeroFillShiftRight
   , unary'  C.dataIntBits C.complement BitwiseNot
 
-  , inlineNonClassFunction (isMF (C.dataFunction, C.apply)) $ \f x -> JSApp Nothing f [x]
-  , inlineNonClassFunction (isMF (C.dataFunction, C.applyFlipped)) $ \x f -> JSApp Nothing f [x]
-  , inlineNonClassFunction (isDMF (C.partial, C.dataArray, C.unsafeIndex)) $ flip (JSIndexer Nothing)
+  , inlineNonClassFunction (isModFn (C.dataFunction, C.apply)) $ \f x -> JSApp Nothing f [x]
+  , inlineNonClassFunction (isModFn (C.dataFunction, C.applyFlipped)) $ \x f -> JSApp Nothing f [x]
+  , inlineNonClassFunction (isDictModFn (C.partial, C.dataArray, C.unsafeIndex)) $ flip (JSIndexer Nothing)
   ] ++
   [ fn | i <- [0..10], fn <- [ mkFn i, runFn i ] ]
   where
@@ -231,13 +231,13 @@ inlineCommonOperators = applyAll $
     convert (JSApp _ (JSApp _ op' [x]) [y]) | p op' = f x y
     convert other = other
 
-  isMF :: (String, String) -> JS -> Bool
-  isMF (m, op) (JSAccessor _ op' (JSVar _ m')) = m == m' && op == op'
-  isMF _ _ = False
+  isModFn :: (String, String) -> JS -> Bool
+  isModFn (m, op) (JSAccessor _ op' (JSVar _ m')) = m == m' && op == op'
+  isModFn _ _ = False
 
-  isDMF :: (String, String, String) -> JS -> Bool
-  isDMF (d, m, op) (JSApp _ (JSAccessor _ op' (JSVar _ m')) [(JSVar _ d')]) = m == m' && op == op' && d' == "dict" ++ d
-  isDMF _ _ = False
+  isDictModFn :: (String, String, String) -> JS -> Bool
+  isDictModFn (d, m, op) (JSApp _ (JSAccessor _ op' (JSVar _ m')) [(JSVar _ d')]) = m == m' && op == op' && d' == "dict" ++ d
+  isDictModFn _ _ = False
 
 -- (f <<< g $ x) = f (g x)
 -- (f <<< g)     = \x -> f (g x)
