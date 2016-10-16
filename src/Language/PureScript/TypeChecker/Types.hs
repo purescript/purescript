@@ -31,7 +31,7 @@ import Control.Arrow (first, second, (***))
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets)
-import Control.Monad.Supply.Class (MonadSupply, peek)
+import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Bifunctor (bimap)
