@@ -10,7 +10,7 @@ module Main where
 import qualified Control.Foldl as Foldl
 import qualified Data.Aeson as Aeson
 import           Data.Aeson.Encode.Pretty (encodePrettyToTextBuilder)
-import           Data.Foldable (fold, for_)
+import           Data.Foldable (fold, for_, traverse_)
 import           Data.List (nub)
 import qualified Data.Map as Map
 import           Data.Maybe (mapMaybe)
@@ -163,6 +163,7 @@ update :: IO ()
 update = do
   pkg <- readPackageFile
   updateImpl pkg
+  echo "Update complete"
 
 install :: String -> IO ()
 install pkgName = do
@@ -170,19 +171,18 @@ install pkgName = do
   let pkg' = pkg { depends = nub (pack pkgName : depends pkg) }
   updateImpl pkg'
   writePackageFile pkg'
+  echo "psc-package.json file was updated"
 
 listDependencies :: IO ()
 listDependencies = do
   pkg@PackageConfig{ depends } <- readPackageFile
   db <- readPackageSet pkg
   trans <- getTransitiveDeps db depends
-  echo (encodePrettyToText (map fst trans))
+  traverse_ (echo . fst) trans
 
-exec :: Text -> IO ()
-exec exeName = do
-  pkg@PackageConfig{..} <- readPackageFile
-  db <- readPackageSet pkg
-  trans <- getTransitiveDeps db depends
+getSourcePaths :: PackageConfig -> PackageSet -> [Text] -> IO [Turtle.FilePath]
+getSourcePaths PackageConfig{..} db pkgNames = do
+  trans <- getTransitiveDeps db pkgNames
   let paths = [ ".psc-package"
                 </> fromText set
                 </> fromText pkgName
@@ -190,6 +190,20 @@ exec exeName = do
                 </> "src" </> "**" </> "*.purs"
               | (pkgName, PackageInfo{ version }) <- trans
               ]
+  return paths
+
+listSourcePaths :: IO ()
+listSourcePaths = do
+  pkg@PackageConfig{ depends } <- readPackageFile
+  db <- readPackageSet pkg
+  paths <- getSourcePaths pkg db depends
+  traverse_ (echo . pathToTextUnsafe) paths
+
+exec :: Text -> IO ()
+exec exeName = do
+  pkg@PackageConfig{..} <- readPackageFile
+  db <- readPackageSet pkg
+  paths <- getSourcePaths pkg db depends
   procs exeName
         (map pathToTextUnsafe ("src" </> "**" </> "*.purs" : paths))
         empty
@@ -200,7 +214,6 @@ main = do
     IO.hSetEncoding IO.stderr IO.utf8
     cmd <- Opts.execParser opts
     cmd
-    echo "Done"
   where
     opts        = Opts.info (versionInfo <*> Opts.helper <*> commands) infoModList
     infoModList = Opts.fullDesc <> headerInfo <> footerInfo
@@ -228,6 +241,9 @@ main = do
         , Opts.command "dependencies"
             (Opts.info (pure listDependencies)
             (Opts.progDesc "List all (transitive) dependencies for the current package"))
+        , Opts.command "sources"
+            (Opts.info (pure listSourcePaths)
+            (Opts.progDesc "List all (active) source paths for dependencies"))
         ]
       where
         pkg = Opts.strArgument $
