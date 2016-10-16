@@ -160,7 +160,7 @@ inlineCommonOperators = applyAll $
 
   , inlineNonClassFunction (isModFn (C.dataFunction, C.apply)) $ \f x -> JSApp Nothing f [x]
   , inlineNonClassFunction (isModFn (C.dataFunction, C.applyFlipped)) $ \x f -> JSApp Nothing f [x]
-  , inlineNonClassFunction (isDictModFn (C.partial, C.dataArray, C.unsafeIndex)) $ flip (JSIndexer Nothing)
+  , inlineNonClassFunction (isModFnWithDict (C.dataArray, C.unsafeIndex)) $ flip (JSIndexer Nothing)
   ] ++
   [ fn | i <- [0..10], fn <- [ mkFn i, runFn i ] ]
   where
@@ -235,9 +235,9 @@ inlineCommonOperators = applyAll $
   isModFn (m, op) (JSAccessor _ op' (JSVar _ m')) = m == m' && op == op'
   isModFn _ _ = False
 
-  isDictModFn :: (String, String, String) -> JS -> Bool
-  isDictModFn (d, m, op) (JSApp _ (JSAccessor _ op' (JSVar _ m')) [(JSVar _ d')]) = m == m' && op == op' && d' == "dict" ++ d
-  isDictModFn _ _ = False
+  isModFnWithDict :: (String, String) -> JS -> Bool
+  isModFnWithDict (m, op) (JSApp _ (JSAccessor _ op' (JSVar _ m')) [(JSVar _ _)]) = m == m' && op == op'
+  isModFnWithDict _ _ = False
 
 -- (f <<< g $ x) = f (g x)
 -- (f <<< g)     = \x -> f (g x)
