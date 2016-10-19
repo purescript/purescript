@@ -236,8 +236,8 @@ function t1 = TypeApp (TypeApp tyFunction t1)
 
 -- |
 -- The primitive types in the external javascript environment with their
--- associated kinds. There is also a pseudo `Partial` type that corresponds to
--- the class with the same name.
+-- associated kinds. There are also pseudo `Fail` and `Partial` types
+-- that correspond to the classes with the same names.
 --
 primTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
 primTypes =
@@ -257,8 +257,9 @@ primTypes =
     ]
 
 -- |
--- The primitive class map. This just contains to `Partial` class, used as a
--- kind of magic constraint for partial functions.
+-- The primitive class map. This just contains the `Fail` and `Partial`
+-- classes. `Partial` is used as a kind of magic constraint for partial
+-- functions. `Fail` is used for user-defined type errors.
 --
 primClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primClasses =

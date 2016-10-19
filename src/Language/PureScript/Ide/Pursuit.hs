@@ -12,7 +12,7 @@
 -- Pursuit client for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Language.PureScript.Ide.Pursuit
   ( searchPursuitForDeclarations
@@ -35,37 +35,41 @@ import qualified Pipes.Prelude                 as P
 -- TODO: remove this when the issue is fixed at Pursuit
 queryPursuit :: Text -> IO ByteString
 queryPursuit q = do
-    let qClean = T.dropWhileEnd (== '.') q
-    req' <- parseRequest "http://pursuit.purescript.org/search"
-    let req = req'
-          { queryString= "q=" <> (fromString . T.unpack) qClean
-          , requestHeaders=[(hAccept, "application/json")]
-          }
-    m <- newManager tlsManagerSettings
-    withHTTP req m $ \resp ->
-      P.fold (<>) "" identity (responseBody resp)
+  let qClean = T.dropWhileEnd (== '.') q
+  req' <- parseRequest "http://pursuit.purescript.org/search"
+  let req = req'
+        { queryString= "q=" <> (fromString . T.unpack) qClean
+        , requestHeaders=[(hAccept, "application/json")]
+        }
+  m <- newManager tlsManagerSettings
+  withHTTP req m $ \resp ->
+    P.fold (<>) "" identity (responseBody resp)
+
 
 handler :: HttpException -> IO [a]
+handler StatusCodeException{} = pure []
 handler _ = pure []
 
 searchPursuitForDeclarations :: Text -> IO [PursuitResponse]
-searchPursuitForDeclarations query = E.handle handler $ do
-    r <- queryPursuit query
-    let results' = decode (fromStrict r) :: Maybe Array
-    case results' of
-        Nothing -> pure []
-        Just results -> pure (mapMaybe (isDeclarationResponse . fromJSON) (toList results))
+searchPursuitForDeclarations query =
+    (do r <- queryPursuit query
+        let results' = decode (fromStrict r) :: Maybe Array
+        case results' of
+          Nothing -> pure []
+          Just results -> pure (mapMaybe (isDeclarationResponse . fromJSON) (toList results))) `E.catch`
+    handler
   where
     isDeclarationResponse (Success a@DeclarationResponse{}) = Just a
     isDeclarationResponse _ = Nothing
 
 findPackagesForModuleIdent :: Text -> IO [PursuitResponse]
-findPackagesForModuleIdent query = E.handle handler $ do
-    r <- queryPursuit query
-    let results' = decode (fromStrict r) :: Maybe Array
-    case results' of
+findPackagesForModuleIdent query =
+  (do r <- queryPursuit query
+      let results' = decode (fromStrict r) :: Maybe Array
+      case results' of
         Nothing -> pure []
-        Just results -> pure (mapMaybe (isModuleResponse . fromJSON) (toList results))
+        Just results -> pure (mapMaybe (isModuleResponse . fromJSON) (toList results))) `E.catch`
+  handler
   where
     isModuleResponse (Success a@ModuleResponse{}) = Just a
     isModuleResponse _ = Nothing

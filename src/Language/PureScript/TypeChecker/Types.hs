@@ -27,12 +27,14 @@ module Language.PureScript.TypeChecker.Types
 
 import Prelude.Compat
 
+import Control.Arrow (second)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets)
-import Control.Monad.Supply.Class (MonadSupply)
+import Control.Monad.Supply.Class (MonadSupply, peek)
 import Control.Monad.Writer.Class (MonadWriter(..))
 
+import Data.Bifunctor (bimap)
 import Data.Either (lefts, rights)
 import Data.List (transpose, nub, (\\), partition, delete)
 import Data.Maybe (fromMaybe)
@@ -53,8 +55,10 @@ import Language.PureScript.TypeChecker.Rows
 import Language.PureScript.TypeChecker.Skolems
 import Language.PureScript.TypeChecker.Subsumption
 import Language.PureScript.TypeChecker.Synonyms
+import Language.PureScript.TypeChecker.TypeSearch
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.Types
+
 
 data BindingGroupType
   = RecursiveBindingGroup
@@ -70,6 +74,10 @@ typesOf
   -> [(Ident, Expr)]
   -> m [(Ident, (Expr, Type))]
 typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
+  -- TODO: If we push withoutWarnings into the do block we can differentiate
+  -- between ds1 and ds2 warnings and capture shouldGeneralize and the unsolved
+  -- dictionaries
+  -- Careful: We need to make sure the capturingSubstitution still does the right thing
     (tys, w) <- withoutWarnings . capturingSubstitution tidyUp $ do
       (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup (Just moduleName) vals
       ds1 <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
@@ -104,8 +112,9 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           TypeClassData{ typeClassDependencies } <- gets (findClass . typeClasses . checkEnv)
           let solved = foldMap (S.fromList . fdDetermined) typeClassDependencies
           let constraintTypeVars = nub . foldMap (unknownsInType . fst) . filter ((`notElem` solved) . snd) $ zip (constraintArgs con) [0..]
-          when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $
-            throwError . onErrorMessages (replaceTypes currentSubst) . errorMessage $ NoInstanceFound con
+          when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $ do
+            nextVar <- peek
+            throwError . onErrorMessages (replaceTypes (not shouldGeneralize) currentSubst nextVar) . errorMessage $ NoInstanceFound con
 
       -- Check skolem variables did not escape their scope
       skolemEscapeCheck val'
@@ -116,11 +125,24 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
     -- Show warnings here, since types in wildcards might have been solved during
     -- instance resolution (by functional dependencies).
     finalSubst <- gets checkSubstitution
-    escalateWarningWhen isHoleError . tell . onErrorMessages (replaceTypes finalSubst) $ w
+
+    -- TODO: We should only do type search for Typed Holes which we inferred
+    -- without generalizing type class constraints
+    -- eg. foldMap ?x [1, 2, 3] finds `negate` right now, which is wrong
+
+    nextVar <- peek
+    escalateWarningWhen isHoleError . tell . onErrorMessages (replaceTypes True finalSubst nextVar) $ w
 
     return inferred
   where
-    replaceTypes subst = onTypesInErrorMessage (substituteType subst)
+    replaceTypes shouldRunTypeSearch subst nextVar =
+      (if shouldRunTypeSearch then runTypeSearch else id)
+      . onTypesInErrorMessage (substituteType subst)
+      where
+      runTypeSearch (ErrorMessage hints (HoleInferredType x ty y (TSBefore env))) =
+        ErrorMessage hints (HoleInferredType x ty y $ TSAfter $
+                             fmap (substituteType subst) <$> M.toList (typeSearch env nextVar (substituteType subst ty)))
+      runTypeSearch x = x
 
     -- | Generalize type vars using forall and add inferred constraints
     generalize unsolved = varIfUnknown . constrain unsolved
@@ -199,18 +221,11 @@ typeForBindingGroupElement (ident, val) dict untypedDict = do
 -- | Check if a value contains a type annotation
 isTyped :: (Ident, Expr) -> Either (Ident, Expr) (Ident, (Expr, Type, Bool))
 isTyped (name, TypedValue checkType value ty) = Right (name, (value, ty, checkType))
+isTyped (name, PositionedValue pos c value) =
+  bimap (second (PositionedValue pos c))
+        (second (\(e, t, b) -> (PositionedValue pos c e, t, b)))
+        (isTyped (name, value))
 isTyped (name, value) = Left (name, value)
-
--- |
--- Map a function over type annotations appearing inside a value
---
-overTypes :: (Type -> Type) -> Expr -> Expr
-overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
-  where
-  g :: Expr -> Expr
-  g (TypedValue checkTy val t) = TypedValue checkTy val (f t)
-  g (TypeClassDictionary c sco hints) = TypeClassDictionary (mapConstraintArgs (map f) c) sco hints
-  g other = other
 
 -- | Check the kind of a type, failing if it is not of kind *.
 checkTypeKind ::
@@ -339,7 +354,8 @@ infer' (TypedValue checkType val ty) = do
 infer' (Hole name) = do
   ty <- freshType
   ctx <- getLocalContext
-  tell . errorMessage $ HoleInferredType name ty ctx
+  env <- getEnv
+  tell . errorMessage $ HoleInferredType name ty ctx (TSBefore env)
   return $ TypedValue True (Hole name) ty
 infer' (PositionedValue pos c val) = warnAndRethrowWithPositionTC pos $ do
   TypedValue t v ty <- infer' val
@@ -568,18 +584,14 @@ check' (Abs (Right _) _) _ = internalError "Binder was not desugared"
 check' (App f arg) ret = do
   f'@(TypedValue _ _ ft) <- infer f
   (retTy, app) <- checkFunctionApplication f' ft arg
-  v' <- subsumes (Just app) retTy ret
-  case v' of
-    Nothing -> internalError "check: unable to check the subsumes relation."
-    Just app' -> return $ TypedValue True app' ret
+  elaborate <- subsumes retTy ret
+  return $ TypedValue True (elaborate app) ret
 check' v@(Var var) ty = do
   checkVisibility var
   repl <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< lookupVariable $ var
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
-  v' <- subsumes (Just v) repl ty'
-  case v' of
-    Nothing -> internalError "check: unable to check the subsumes relation."
-    Just v'' -> return $ TypedValue True v'' ty'
+  elaborate <- subsumes repl ty'
+  return $ TypedValue True (elaborate v) ty'
 check' (DeferredDictionary className tys) _ = do
   {-
   -- Here, we replace a placeholder for a superclass dictionary with a regular
@@ -596,12 +608,11 @@ check' (TypedValue checkType val ty1) ty2 = do
   checkTypeKind ty1 kind
   ty1' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty1
   ty2' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty2
-  val' <- subsumes (Just val) ty1' ty2'
-  case val' of
-    Nothing -> internalError "check: unable to check the subsumes relation."
-    Just _ -> do
-      val''' <- if checkType then withScopedTypeVars moduleName args (check val ty2') else return val
-      return $ TypedValue checkType val''' ty2'
+  _ <- subsumes ty1' ty2'
+  val' <- if checkType
+            then withScopedTypeVars moduleName args (check val ty2')
+            else return val
+  return $ TypedValue checkType val' ty2'
 check' (Case vals binders) ret = do
   (vals', ts) <- instantiateForBinders vals binders
   binders' <- checkBinders ts ret binders
@@ -638,10 +649,8 @@ check' v@(Constructor c) ty = do
     Nothing -> throwError . errorMessage . UnknownName . fmap DctorName $ c
     Just (_, _, ty1, _) -> do
       repl <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1
-      mv <- subsumes (Just v) repl ty
-      case mv of
-        Nothing -> internalError "check: unable to check the subsumes relation."
-        Just v' -> return $ TypedValue True v' ty
+      elaborate <- subsumes repl ty
+      return $ TypedValue True (elaborate v) ty
 check' (Let ds val) ty = do
   (ds', val') <- inferLetBinding [] ds val (`check` ty)
   return $ TypedValue True (Let ds' val') ty
@@ -654,10 +663,8 @@ check' (PositionedValue pos c val) ty = warnAndRethrowWithPositionTC pos $ do
   return $ TypedValue t (PositionedValue pos c v) ty'
 check' val ty = do
   TypedValue _ val' ty' <- infer val
-  mt <- subsumes (Just val') ty' ty
-  case mt of
-    Nothing -> internalError "check: unable to check the subsumes relation."
-    Just v' -> return $ TypedValue True v' ty
+  elaborate <- subsumes ty' ty
+  return $ TypedValue True (elaborate val') ty
 
 -- |
 -- Check the type of a collection of named record fields

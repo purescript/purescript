@@ -29,23 +29,25 @@ module Language.PureScript.Ide.Util
   , module Language.PureScript.Ide.Conversions
   ) where
 
-import           Protolude                     hiding (decodeUtf8, encodeUtf8)
+import           Control.Lens                        ((^.))
 import           Data.Aeson
-import qualified Data.Text                     as T
-import           Data.Text.Lazy.Encoding       (decodeUtf8, encodeUtf8)
-import qualified Language.PureScript           as P
-import           Language.PureScript.Ide.Types
+import qualified Data.Text                           as T
+import           Data.Text.Lazy.Encoding             (decodeUtf8, encodeUtf8)
+import qualified Language.PureScript                 as P
 import           Language.PureScript.Ide.Conversions
+import           Language.PureScript.Ide.Types
+import           Protolude                           hiding (decodeUtf8,
+                                                      encodeUtf8)
 
 identifierFromIdeDeclaration :: IdeDeclaration -> Text
 identifierFromIdeDeclaration d = case d of
-  IdeValue name _ -> runIdentT name
-  IdeType name _ -> runProperNameT name
-  IdeTypeSynonym name _ -> runProperNameT name
-  IdeDataConstructor name _ _ -> runProperNameT name
-  IdeTypeClass name -> runProperNameT name
-  IdeValueOperator op _ _ _ _ -> runOpNameT op
-  IdeTypeOperator op _ _ _ _ -> runOpNameT op
+  IdeDeclValue v -> v ^. ideValueIdent . identT
+  IdeDeclType t -> t ^. ideTypeName . properNameT
+  IdeDeclTypeSynonym s -> s ^. ideSynonymName . properNameT
+  IdeDeclDataConstructor dtor -> dtor ^. ideDtorName . properNameT
+  IdeDeclTypeClass name -> runProperNameT name
+  IdeDeclValueOperator op -> op ^. ideValueOpName & runOpNameT
+  IdeDeclTypeOperator op -> op ^. ideTypeOpName & runOpNameT
 
 discardAnn :: IdeDeclarationAnn -> IdeDeclaration
 discardAnn (IdeDeclarationAnn _ d) = d
@@ -61,24 +63,24 @@ completionFromMatch (Match (m, IdeDeclarationAnn ann decl)) =
   Completion {..}
   where
     (complIdentifier, complExpandedType) = case decl of
-      IdeValue name type' -> (runIdentT name, prettyTypeT type')
-      IdeType name kind -> (runProperNameT name, toS (P.prettyPrintKind kind))
-      IdeTypeSynonym name kind -> (runProperNameT name, prettyTypeT kind)
-      IdeDataConstructor name _ type' -> (runProperNameT name, prettyTypeT type')
-      IdeTypeClass name -> (runProperNameT name, "class")
-      IdeValueOperator op ref precedence associativity typeP ->
-        (runOpNameT op, maybe (showFixity precedence associativity (valueOperatorAliasT ref) op) prettyTypeT typeP) 
-      IdeTypeOperator op ref precedence associativity kind ->
+      IdeDeclValue v -> (v ^. ideValueIdent . identT, v ^. ideValueType & prettyTypeT)
+      IdeDeclType t -> (t ^. ideTypeName . properNameT, t ^. ideTypeKind & P.prettyPrintKind & toS )
+      IdeDeclTypeSynonym s -> (s ^. ideSynonymName . properNameT, s ^. ideSynonymType & prettyTypeT)
+      IdeDeclDataConstructor d -> (d ^. ideDtorName . properNameT, d ^. ideDtorType & prettyTypeT)
+      IdeDeclTypeClass name -> (runProperNameT name, "class")
+      IdeDeclValueOperator (IdeValueOperator op ref precedence associativity typeP) ->
+        (runOpNameT op, maybe (showFixity precedence associativity (valueOperatorAliasT ref) op) prettyTypeT typeP)
+      IdeDeclTypeOperator (IdeTypeOperator op ref precedence associativity kind) ->
         (runOpNameT op, maybe (showFixity precedence associativity (typeOperatorAliasT ref) op) (toS . P.prettyPrintKind) kind)
-            
+
     complModule = runModuleNameT m
 
     complType = maybe complExpandedType prettyTypeT (annTypeAnnotation ann)
-    
+
     complLocation = annLocation ann
 
     complDocumentation = Nothing
-    
+
     showFixity p a r o =
       let asso = case a of
             P.Infix -> "infix"
@@ -95,7 +97,7 @@ typeOperatorAliasT
   :: P.Qualified (P.ProperName 'P.TypeName) -> Text
 typeOperatorAliasT i =
   toS (P.showQualified P.runProperName i)
-  
+
 encodeT :: (ToJSON a) => a -> Text
 encodeT = toS . decodeUtf8 . encode
 

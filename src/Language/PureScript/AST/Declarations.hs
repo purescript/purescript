@@ -29,6 +29,15 @@ import qualified Text.Parsec as P
 -- | A map of locally-bound names in scope.
 type Context = [(Ident, Type)]
 
+-- | Holds the data necessary to do type directed search for typed holes
+data TypeSearch
+  = TSBefore Environment
+  -- ^ An Environment captured for later consumption by type directed search
+  | TSAfter [(Qualified Ident, Type)]
+  -- ^ Results of applying type directed search to the previously captured
+  -- Environment
+  deriving Show
+
 -- | A type of error messages
 data SimpleErrorMessage
   = ErrorParsingFFIModule FilePath (Maybe Bundle.ErrorMessage)
@@ -99,7 +108,7 @@ data SimpleErrorMessage
   | ShadowedTypeVar String
   | UnusedTypeVar String
   | WildcardInferredType Type Context
-  | HoleInferredType String Type Context
+  | HoleInferredType String Type Context TypeSearch
   | MissingTypeDeclaration Ident Type
   | OverlappingPattern [[Binder]] Bool
   | IncompleteExhaustivityCheck

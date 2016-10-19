@@ -26,10 +26,13 @@ moduleNameToJs (ModuleName pns) =
 --  * Symbols are prefixed with '$' followed by a symbol name or their ordinal value.
 --
 identToJs :: Ident -> String
-identToJs (Ident name)
+identToJs (Ident name) = properToJs name
+identToJs (GenIdent _ _) = internalError "GenIdent in identToJs"
+
+properToJs :: String -> String
+properToJs name
   | nameIsJsReserved name || nameIsJsBuiltIn name = "$$" ++ name
   | otherwise = concatMap identCharToString name
-identToJs (GenIdent _ _) = internalError "GenIdent in identToJs"
 
 -- |
 -- Test if a string is a valid JS identifier without escaping.

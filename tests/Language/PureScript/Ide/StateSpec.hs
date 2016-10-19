@@ -11,20 +11,20 @@ import qualified Data.Map as Map
 
 valueOperator :: Maybe P.Type -> IdeDeclarationAnn
 valueOperator =
-  d . IdeValueOperator (P.OpName "<$>") (P.Qualified (Just (mn "Test")) (Left (P.Ident "function"))) 2 P.Infix
+  d . IdeDeclValueOperator . IdeValueOperator (P.OpName "<$>") (P.Qualified (Just (mn "Test")) (Left (P.Ident "function"))) 2 P.Infix
 
 ctorOperator :: Maybe P.Type -> IdeDeclarationAnn
 ctorOperator =
-  d . IdeValueOperator (P.OpName ":") (P.Qualified (Just (mn "Test")) (Right (P.ProperName "Cons"))) 2 P.Infix
+  d . IdeDeclValueOperator . IdeValueOperator (P.OpName ":") (P.Qualified (Just (mn "Test")) (Right (P.ProperName "Cons"))) 2 P.Infix
 
 typeOperator :: Maybe P.Kind -> IdeDeclarationAnn
 typeOperator =
-  d . IdeTypeOperator (P.OpName ":") (P.Qualified (Just (mn "Test")) (P.ProperName "List")) 2 P.Infix
+  d . IdeDeclTypeOperator . IdeTypeOperator (P.OpName ":") (P.Qualified (Just (mn "Test")) (P.ProperName "List")) 2 P.Infix
 
 testModule :: Module
-testModule = (mn "Test", [ d (IdeValue (P.Ident "function") P.REmpty)
-                         , d (IdeDataConstructor (P.ProperName "Cons") (P.ProperName "List") (P.REmpty))
-                         , d (IdeType (P.ProperName "List") P.Star)
+testModule = (mn "Test", [ d (IdeDeclValue (IdeValue (P.Ident "function") P.REmpty))
+                         , d (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName "Cons") (P.ProperName "List") (P.REmpty)))
+                         , d (IdeDeclType (IdeType (P.ProperName "List") P.Star))
                          , valueOperator Nothing
                          , ctorOperator Nothing
                          , typeOperator Nothing
