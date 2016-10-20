@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NamedFieldPuns #-}
 
@@ -110,8 +111,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           let solved = foldMap (S.fromList . fdDetermined) typeClassDependencies
           let constraintTypeVars = nub . foldMap (unknownsInType . fst) . filter ((`notElem` solved) . snd) $ zip (constraintArgs con) [0..]
           when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $ do
-            checkState <- get
-            throwError . onErrorMessages (replaceTypes Nothing currentSubst checkState) . errorMessage $ NoInstanceFound con
+            throwError . onErrorMessages (replaceTypes currentSubst) . errorMessage $ NoInstanceFound con
 
       -- Check skolem variables did not escape their scope
       skolemEscapeCheck val'
@@ -121,26 +121,35 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
 
     -- Show warnings here, since types in wildcards might have been solved during
     -- instance resolution (by functional dependencies).
-    finalSubst <- gets checkSubstitution
-    checkState <- get
+    finalState <- get
     forM_ tys $ \(shouldGeneralize, ((_, (_, _)), w)) -> do
-      escalateWarningWhen isHoleError . tell . onErrorMessages (replaceTypes (guard shouldGeneralize $> concatMap snd inferred) finalSubst checkState) $ w
+      let replaceTypes' = replaceTypes (checkSubstitution finalState)
+          runTypeSearch' = runTypeSearch (guard shouldGeneralize $> foldMap snd inferred) finalState
+      (escalateWarningWhen isHoleError . tell . onErrorMessages (runTypeSearch' . replaceTypes')) w
 
     return (map fst inferred)
   where
     replaceTypes
+      :: Substitution
+      -> ErrorMessage
+      -> ErrorMessage
+    replaceTypes subst = onTypesInErrorMessage (substituteType subst)
+
+    -- | Run type search to complete any typed hole error messages
+    runTypeSearch
       :: Maybe [(Ident, InstanceContext, Constraint)]
-      -> Substitution
+      -- ^ Any unsolved constraints which we need to continue to satisfy
       -> CheckState
+      -- ^ The final type checker state
       -> ErrorMessage
       -> ErrorMessage
-    replaceTypes cons subst st =
-        runTypeSearch . onTypesInErrorMessage (substituteType subst)
-      where
-        runTypeSearch (ErrorMessage hints (HoleInferredType x ty y (TSBefore env))) =
-          ErrorMessage hints (HoleInferredType x ty y $ TSAfter $
-                               fmap (substituteType subst) <$> M.toList (typeSearch cons env st (substituteType subst ty)))
-        runTypeSearch x = x
+    runTypeSearch cons st = \case
+      ErrorMessage hints (HoleInferredType x ty y (TSBefore env)) ->
+        let subst = checkSubstitution st
+            searchResult = (fmap . fmap) (substituteType subst)
+                             (M.toList (typeSearch cons env st (substituteType subst ty)))
+        in ErrorMessage hints (HoleInferredType x ty y (TSAfter searchResult))
+      other -> other
 
     -- | Generalize type vars using forall and add inferred constraints
     generalize unsolved = varIfUnknown . constrain unsolved

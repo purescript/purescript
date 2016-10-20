@@ -5,6 +5,7 @@
 --
 module Language.PureScript.TypeChecker.Entailment
   ( InstanceContext
+  , SolverOptions(..)
   , replaceTypeClassDictionaries
   , newDictionaries
   , entails
@@ -81,8 +82,8 @@ replaceTypeClassDictionaries shouldGeneralize expr = flip evalStateT M.empty $ d
       (_, f, _) = everywhereOnValuesTopDownM return (go False) return
 
     go :: Bool -> Expr -> WriterT (Any, [(Ident, InstanceContext, Constraint)]) (StateT InstanceContext m) Expr
-    go deferErrors dict@(TypeClassDictionary _ _ hints) =
-      rethrow (addHints hints) $ entails shouldGeneralize deferErrors dict
+    go deferErrors (TypeClassDictionary constraint context hints) =
+      rethrow (addHints hints) $ entails (SolverOptions shouldGeneralize deferErrors) constraint context hints
     go _ other = return other
 
 -- | Three options for how we can handle a constraint, depending on the mode we're in.
@@ -94,18 +95,29 @@ data EntailsResult a
   | Deferred
   -- ^ We couldn't solve this constraint right now, so it has been deferred
 
--- |
--- Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
+-- | Options for the constraint solver
+data SolverOptions = SolverOptions
+  { solverShouldGeneralize :: Bool
+  -- ^ Should the solver be allowed to generalize over unsolved constraints?
+  , solverDeferErrors      :: Bool
+  -- ^ Should the solver be allowed to defer errors by skipping constraints?
+  }
+
+-- | Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
---
 entails
   :: forall m
    . (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
-  => Bool
-  -> Bool
-  -> Expr
+  => SolverOptions
+  -- ^ Solver options
+  -> Constraint
+  -- ^ The constraint to solve
+  -> InstanceContext
+  -- ^ The contexts in which to solve the constraint
+  -> [ErrorMessageHint]
+  -- ^ Error message hints to apply to any instance errors
   -> WriterT (Any, [(Ident, InstanceContext, Constraint)]) (StateT InstanceContext m) Expr
-entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hints) =
+entails SolverOptions{..} constraint context hints =
     solve constraint
   where
     forClassName :: InstanceContext -> Qualified (ProperName 'ClassName) -> [Type] -> [TypeClassDictionaryInScope]
@@ -220,10 +232,10 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
 
             unique :: [Type] -> [(a, TypeClassDictionaryInScope)] -> m (EntailsResult a)
             unique tyArgs []
-              | deferErrors = return Deferred
+              | solverDeferErrors = return Deferred
               -- We need a special case for nullary type classes, since we want
               -- to generalize over Partial constraints.
-              | shouldGeneralize && (null tyArgs || any canBeGeneralized tyArgs) = return (Unsolved (Constraint className' tyArgs conInfo))
+              | solverShouldGeneralize && (null tyArgs || any canBeGeneralized tyArgs) = return (Unsolved (Constraint className' tyArgs conInfo))
               | otherwise = throwError . errorMessage $ NoInstanceFound (Constraint className' tyArgs conInfo)
             unique _      [(a, dict)] = return $ Solved a dict
             unique tyArgs tcds
@@ -268,7 +280,6 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
           App (Accessor (C.__superclass_ ++ showQualified runProperName superclassName ++ "_" ++ show index)
                         dict)
               valUndefined
-entails _ _ _ = internalError "entails: expected TypeClassDictionary"
 
 -- Check if an instance matches our list of types, allowing for types
 -- to be solved via functional dependencies. If the types match, we return a
