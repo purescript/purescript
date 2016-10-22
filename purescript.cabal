@@ -23,7 +23,6 @@ extra-source-files: examples/passing/*.purs
                   , examples/passing/*.js
                   , examples/passing/2018/*.purs
                   , examples/passing/2138/*.purs
-                  , examples/passing/2379/*.purs
                   , examples/passing/ClassRefSyntax/*.purs
                   , examples/passing/DctorOperatorAlias/*.purs
                   , examples/passing/ExplicitImportReExport/*.purs
@@ -57,6 +56,7 @@ extra-source-files: examples/passing/*.purs
                   , examples/failing/*.purs
                   , examples/failing/1733/*.purs
                   , examples/failing/2378/*.purs
+                  , examples/failing/2379/*.purs
                   , examples/failing/ConflictingExports/*.purs
                   , examples/failing/ConflictingImports/*.purs
                   , examples/failing/ConflictingImports2/*.purs

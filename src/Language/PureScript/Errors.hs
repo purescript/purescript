@@ -601,7 +601,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
             ]
     renderSimpleErrorMessage OverlappingInstances{} = internalError "OverlappingInstances: empty instance list"
     renderSimpleErrorMessage (UnknownClass nm) =
-      paras [ line "No instance instance was found for class"
+      paras [ line "No type class instance was found for class"
             , markCodeBox $ indent $ line (showQualified runProperName nm)
             , line "because the class was not in scope. Perhaps it was not exported."
             ]
