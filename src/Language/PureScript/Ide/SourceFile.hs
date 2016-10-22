@@ -12,7 +12,7 @@
 -- Getting declarations from PureScript sourcefiles
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Language.PureScript.Ide.SourceFile
   ( parseModule
@@ -25,12 +25,12 @@ module Language.PureScript.Ide.SourceFile
 
 import           Protolude
 
-import qualified Data.Map as Map
-import qualified Language.PureScript                  as P
+import qualified Data.Map                      as Map
+import qualified Language.PureScript           as P
 import           Language.PureScript.Ide.Error
-import           Language.PureScript.Ide.Util
 import           Language.PureScript.Ide.Types
-import           System.IO.UTF8                       (readUTF8File)
+import           Language.PureScript.Ide.Util
+import           System.IO.UTF8                (readUTF8File)
 
 parseModule
   :: (MonadIO m)

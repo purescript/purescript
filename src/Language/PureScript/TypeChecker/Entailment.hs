@@ -5,8 +5,10 @@
 --
 module Language.PureScript.TypeChecker.Entailment
   ( InstanceContext
+  , SolverOptions(..)
   , replaceTypeClassDictionaries
   , newDictionaries
+  , entails
   ) where
 
 import Prelude.Compat
@@ -56,7 +58,7 @@ replaceTypeClassDictionaries
    . (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
   => Bool
   -> Expr
-  -> m (Expr, [(Ident, Constraint)])
+  -> m (Expr, [(Ident, InstanceContext, Constraint)])
 replaceTypeClassDictionaries shouldGeneralize expr = flip evalStateT M.empty $ do
     -- Loop, deferring any unsolved constraints, until there are no more
     -- constraints which can be solved, then make a generalization pass.
@@ -70,18 +72,18 @@ replaceTypeClassDictionaries shouldGeneralize expr = flip evalStateT M.empty $ d
     -- This pass solves constraints where possible, deferring constraints if not.
     deferPass :: Expr -> StateT InstanceContext m (Expr, Any)
     deferPass = fmap (second fst) . runWriterT . f where
-      f :: Expr -> WriterT (Any, [(Ident, Constraint)]) (StateT InstanceContext m) Expr
+      f :: Expr -> WriterT (Any, [(Ident, InstanceContext, Constraint)]) (StateT InstanceContext m) Expr
       (_, f, _) = everywhereOnValuesTopDownM return (go True) return
 
     -- This pass generalizes any remaining constraints
-    generalizePass :: Expr -> StateT InstanceContext m (Expr, [(Ident, Constraint)])
+    generalizePass :: Expr -> StateT InstanceContext m (Expr, [(Ident, InstanceContext, Constraint)])
     generalizePass = fmap (second snd) . runWriterT . f where
-      f :: Expr -> WriterT (Any, [(Ident, Constraint)]) (StateT InstanceContext m) Expr
+      f :: Expr -> WriterT (Any, [(Ident, InstanceContext, Constraint)]) (StateT InstanceContext m) Expr
       (_, f, _) = everywhereOnValuesTopDownM return (go False) return
 
-    go :: Bool -> Expr -> WriterT (Any, [(Ident, Constraint)]) (StateT InstanceContext m) Expr
-    go deferErrors dict@(TypeClassDictionary _ _ hints) =
-      rethrow (addHints hints) $ entails shouldGeneralize deferErrors dict
+    go :: Bool -> Expr -> WriterT (Any, [(Ident, InstanceContext, Constraint)]) (StateT InstanceContext m) Expr
+    go deferErrors (TypeClassDictionary constraint context hints) =
+      rethrow (addHints hints) $ entails (SolverOptions shouldGeneralize deferErrors) constraint context hints
     go _ other = return other
 
 -- | Three options for how we can handle a constraint, depending on the mode we're in.
@@ -93,18 +95,29 @@ data EntailsResult a
   | Deferred
   -- ^ We couldn't solve this constraint right now, so it has been deferred
 
--- |
--- Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
+-- | Options for the constraint solver
+data SolverOptions = SolverOptions
+  { solverShouldGeneralize :: Bool
+  -- ^ Should the solver be allowed to generalize over unsolved constraints?
+  , solverDeferErrors      :: Bool
+  -- ^ Should the solver be allowed to defer errors by skipping constraints?
+  }
+
+-- | Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
---
 entails
   :: forall m
    . (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
-  => Bool
-  -> Bool
-  -> Expr
-  -> WriterT (Any, [(Ident, Constraint)]) (StateT InstanceContext m) Expr
-entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hints) =
+  => SolverOptions
+  -- ^ Solver options
+  -> Constraint
+  -- ^ The constraint to solve
+  -> InstanceContext
+  -- ^ The contexts in which to solve the constraint
+  -> [ErrorMessageHint]
+  -- ^ Error message hints to apply to any instance errors
+  -> WriterT (Any, [(Ident, InstanceContext, Constraint)]) (StateT InstanceContext m) Expr
+entails SolverOptions{..} constraint context hints =
     solve constraint
   where
     forClassName :: InstanceContext -> Qualified (ProperName 'ClassName) -> [Type] -> [TypeClassDictionaryInScope]
@@ -123,10 +136,10 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
     valUndefined :: Expr
     valUndefined = Var (Qualified (Just (ModuleName [ProperName C.prim])) (Ident C.undefined))
 
-    solve :: Constraint -> WriterT (Any, [(Ident, Constraint)]) (StateT InstanceContext m) Expr
+    solve :: Constraint -> WriterT (Any, [(Ident, InstanceContext, Constraint)]) (StateT InstanceContext m) Expr
     solve con = go 0 con
       where
-        go :: Int -> Constraint -> WriterT (Any, [(Ident, Constraint)]) (StateT InstanceContext m) Expr
+        go :: Int -> Constraint -> WriterT (Any, [(Ident, InstanceContext, Constraint)]) (StateT InstanceContext m) Expr
         go work (Constraint className' tys' _) | work > 1000 = throwError . errorMessage $ PossiblyInfiniteInstance className' tys'
         go work con'@(Constraint className' tys' conInfo) = WriterT . StateT . (withErrorMessageHint (ErrorSolvingConstraint con') .) . runStateT . runWriterT $ do
             -- We might have unified types by solving other constraints, so we need to
@@ -137,8 +150,10 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
             inferred <- lift get
             -- We need information about functional dependencies, so we have to look up the class
             -- name in the environment:
-            let findClass = fromMaybe (internalError "entails: type class not found in environment") . M.lookup className'
-            TypeClassData{ typeClassDependencies } <- lift . lift $ gets (findClass . typeClasses . checkEnv)
+            classesInScope <- lift . lift $ gets (typeClasses . checkEnv)
+            TypeClassData{ typeClassDependencies } <- case M.lookup className' classesInScope of
+              Nothing -> throwError . errorMessage $ UnknownClass className'
+              Just tcd -> pure tcd
             let instances =
                   [ (substs, tcd)
                   | tcd <- forClassName (combineContexts context inferred) className' tys''
@@ -179,7 +194,7 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
                 let newContext = mkContext newDicts
                 modify (combineContexts newContext)
                 -- Mark this constraint for generalization
-                tell (mempty, [(ident, unsolved)])
+                tell (mempty, [(ident, context, unsolved)])
                 return (Var qident)
               Deferred ->
                 -- Constraint was deferred, just return the dictionary unchanged,
@@ -219,10 +234,10 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
 
             unique :: [Type] -> [(a, TypeClassDictionaryInScope)] -> m (EntailsResult a)
             unique tyArgs []
-              | deferErrors = return Deferred
+              | solverDeferErrors = return Deferred
               -- We need a special case for nullary type classes, since we want
               -- to generalize over Partial constraints.
-              | shouldGeneralize && (null tyArgs || any canBeGeneralized tyArgs) = return (Unsolved (Constraint className' tyArgs conInfo))
+              | solverShouldGeneralize && (null tyArgs || any canBeGeneralized tyArgs) = return (Unsolved (Constraint className' tyArgs conInfo))
               | otherwise = throwError . errorMessage $ NoInstanceFound (Constraint className' tyArgs conInfo)
             unique _      [(a, dict)] = return $ Solved a dict
             unique tyArgs tcds
@@ -233,7 +248,6 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
 
             canBeGeneralized :: Type -> Bool
             canBeGeneralized TUnknown{} = True
-            canBeGeneralized Skolem{} = True
             canBeGeneralized _ = False
 
             -- |
@@ -251,7 +265,7 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
             -- Create dictionaries for subgoals which still need to be solved by calling go recursively
             -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
             -- unifies with Either a b, and we can satisfy the subgoals Show a and Show b recursively.
-            solveSubgoals :: Matching Type -> Maybe [Constraint] -> WriterT (Any, [(Ident, Constraint)]) (StateT InstanceContext m) (Maybe [Expr])
+            solveSubgoals :: Matching Type -> Maybe [Constraint] -> WriterT (Any, [(Ident, InstanceContext, Constraint)]) (StateT InstanceContext m) (Maybe [Expr])
             solveSubgoals _ Nothing = return Nothing
             solveSubgoals subst (Just subgoals) =
               Just <$> traverse (go (work + 1) . mapConstraintArgs (map (replaceAllTypeVars (M.toList subst)))) subgoals
@@ -268,7 +282,6 @@ entails shouldGeneralize deferErrors (TypeClassDictionary constraint context hin
           App (Accessor (C.__superclass_ ++ showQualified runProperName superclassName ++ "_" ++ show index)
                         dict)
               valUndefined
-entails _ _ _ = internalError "entails: expected TypeClassDictionary"
 
 -- Check if an instance matches our list of types, allowing for types
 -- to be solved via functional dependencies. If the types match, we return a

@@ -1,11 +1,11 @@
-module Language.PureScript.Interactive.IO where
+module Language.PureScript.Interactive.IO (findNodeProcess, getHistoryFilename) where
 
 import Prelude.Compat
 
 import Control.Monad (msum)
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import System.Directory (createDirectoryIfMissing, getHomeDirectory, findExecutable)
-import System.FilePath (takeDirectory, (</>), isPathSeparator)
+import System.FilePath (takeDirectory, (</>))
 
 mkdirp :: FilePath -> IO ()
 mkdirp = createDirectoryIfMissing True . takeDirectory
@@ -32,10 +32,3 @@ getHistoryFilename = do
   let filename = home </> ".purescript" </> "psci_history"
   mkdirp filename
   return filename
-
--- |
--- Expands tilde in path.
---
-expandTilde :: FilePath -> IO FilePath
-expandTilde ('~':p:rest) | isPathSeparator p = (</> rest) <$> getHomeDirectory
-expandTilde p = return p

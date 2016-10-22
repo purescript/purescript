@@ -11,7 +11,7 @@ module Language.PureScript.TypeChecker
 
 import Prelude.Compat
 
-import Control.Monad (when, unless, void, forM, forM_)
+import Control.Monad (when, unless, void, forM)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), modify)
 import Control.Monad.Supply.Class (MonadSupply)
@@ -279,7 +279,6 @@ typeCheckAll moduleName _ = traverse go
     return d
   go (d@(TypeInstanceDeclaration dictName deps className tys body)) = rethrow (addHint (ErrorInInstance className tys)) $ do
     traverse_ (checkTypeClassInstance moduleName) tys
-    forM_ deps $ traverse_ (checkTypeClassInstance moduleName) . constraintArgs
     checkOrphanInstance dictName className tys
     _ <- traverseTypeInstanceBody checkInstanceMembers body
     let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps)
@@ -313,6 +312,7 @@ typeCheckAll moduleName _ = traverse go
     where
     checkType :: Type -> Bool
     checkType (TypeVar _) = False
+    checkType (TypeLevelString _) = False
     checkType (TypeConstructor (Qualified (Just mn'') _)) = moduleName == mn''
     checkType (TypeConstructor (Qualified Nothing _)) = internalError "Unqualified type name in checkOrphanInstance"
     checkType (TypeApp t1 _) = checkType t1

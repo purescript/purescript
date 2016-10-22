@@ -12,41 +12,92 @@
 -- Type definitions for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveFoldable    #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell   #-}
 
 module Language.PureScript.Ide.Types where
 
 import           Protolude
 
 import           Control.Concurrent.STM
+import           Control.Lens.TH
 import           Data.Aeson
-import qualified Data.Map.Lazy                        as M
-import qualified Language.PureScript.Errors.JSON      as P
-import qualified Language.PureScript as P
+import qualified Data.Map.Lazy                       as M
+import qualified Language.PureScript                 as P
+import qualified Language.PureScript.Errors.JSON     as P
 import           Language.PureScript.Ide.Conversions
 
 type ModuleIdent = Text
 
 data IdeDeclaration
-  = IdeValue P.Ident P.Type
-  | IdeType (P.ProperName 'P.TypeName) P.Kind
-  | IdeTypeSynonym (P.ProperName 'P.TypeName) P.Type
-  | IdeDataConstructor (P.ProperName 'P.ConstructorName) (P.ProperName 'P.TypeName) P.Type
-  | IdeTypeClass (P.ProperName 'P.ClassName)
-  | IdeValueOperator (P.OpName 'P.ValueOpName) (P.Qualified (Either P.Ident (P.ProperName 'P.ConstructorName))) P.Precedence P.Associativity (Maybe P.Type)
-  | IdeTypeOperator (P.OpName 'P.TypeOpName) (P.Qualified (P.ProperName 'P.TypeName)) P.Precedence P.Associativity (Maybe P.Kind)
+  = IdeDeclValue IdeValue
+  | IdeDeclType IdeType
+  | IdeDeclTypeSynonym IdeSynonym
+  | IdeDeclDataConstructor IdeDataConstructor
+  | IdeDeclTypeClass (P.ProperName 'P.ClassName)
+  | IdeDeclValueOperator IdeValueOperator
+  | IdeDeclTypeOperator IdeTypeOperator
   deriving (Show, Eq, Ord)
 
-data IdeDeclarationAnn = IdeDeclarationAnn Annotation IdeDeclaration
-  deriving (Show, Eq, Ord)
+data IdeValue = IdeValue
+  { _ideValueIdent :: P.Ident
+  , _ideValueType  :: P.Type
+  } deriving (Show, Eq, Ord)
+
+data IdeType = IdeType
+ { _ideTypeName :: P.ProperName 'P.TypeName
+ , _ideTypeKind :: P.Kind
+ } deriving (Show, Eq, Ord)
+
+data IdeSynonym = IdeSynonym
+  { _ideSynonymName :: P.ProperName 'P.TypeName
+  , _ideSynonymType :: P.Type
+  } deriving (Show, Eq, Ord)
+
+data IdeDataConstructor = IdeDataConstructor
+  { _ideDtorName     :: P.ProperName 'P.ConstructorName
+  , _ideDtorTypeName :: P.ProperName 'P.TypeName
+  , _ideDtorType     :: P.Type
+  } deriving (Show, Eq, Ord)
+
+data IdeValueOperator = IdeValueOperator
+  { _ideValueOpName          :: P.OpName 'P.ValueOpName
+  , _ideValueOpAlias         :: P.Qualified (Either P.Ident (P.ProperName 'P.ConstructorName))
+  , _ideValueOpPrecedence    :: P.Precedence
+  , _ideValueOpAssociativity :: P.Associativity
+  , _ideValueOpType          :: Maybe P.Type
+  } deriving (Show, Eq, Ord)
+
+data IdeTypeOperator = IdeTypeOperator
+  { _ideTypeOpName          :: P.OpName 'P.TypeOpName
+  , _ideTypeOpAlias         :: P.Qualified (P.ProperName 'P.TypeName)
+  , _ideTypeOpPrecedence    :: P.Precedence
+  , _ideTypeOpAssociativity :: P.Associativity
+  , _ideTypeOpKind          :: Maybe P.Kind
+  } deriving (Show, Eq, Ord)
+
+makePrisms ''IdeDeclaration
+makeLenses ''IdeValue
+makeLenses ''IdeType
+makeLenses ''IdeSynonym
+makeLenses ''IdeDataConstructor
+makeLenses ''IdeValueOperator
+makeLenses ''IdeTypeOperator
+
+data IdeDeclarationAnn = IdeDeclarationAnn
+  { _idaAnnotation  :: Annotation
+  , _idaDeclaration :: IdeDeclaration
+  } deriving (Show, Eq, Ord)
 
 data Annotation
   = Annotation
-  { annLocation     :: Maybe P.SourceSpan
-  , annExportedFrom :: Maybe P.ModuleName
+  { annLocation       :: Maybe P.SourceSpan
+  , annExportedFrom   :: Maybe P.ModuleName
   , annTypeAnnotation :: Maybe P.Type
   } deriving (Show, Eq, Ord)
+
+makeLenses ''IdeDeclarationAnn
 
 emptyAnn :: Annotation
 emptyAnn = Annotation Nothing Nothing Nothing
@@ -103,7 +154,7 @@ data Stage2 = Stage2
   }
 
 data Stage3 = Stage3
-  { s3Declarations :: M.Map P.ModuleName [IdeDeclarationAnn]
+  { s3Declarations  :: M.Map P.ModuleName [IdeDeclarationAnn]
   , s3CachedRebuild :: Maybe (P.ModuleName, P.ExternsFile)
   }
 
@@ -112,11 +163,11 @@ newtype Match a = Match (P.ModuleName, a)
 
 -- | A completion as it gets sent to the editors
 data Completion = Completion
-  { complModule :: Text
-  , complIdentifier :: Text
-  , complType :: Text
-  , complExpandedType :: Text
-  , complLocation :: Maybe P.SourceSpan
+  { complModule        :: Text
+  , complIdentifier    :: Text
+  , complType          :: Text
+  , complExpandedType  :: Text
+  , complLocation      :: Maybe P.SourceSpan
   , complDocumentation :: Maybe Text
   } deriving (Show, Eq)
 

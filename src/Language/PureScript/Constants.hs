@@ -346,8 +346,8 @@ prim = "Prim"
 prelude :: String
 prelude = "Prelude"
 
-dataArrayUnsafe :: String
-dataArrayUnsafe = "Data_Array_Unsafe"
+dataArray :: String
+dataArray = "Data_Array"
 
 eff :: String
 eff = "Control_Monad_Eff"

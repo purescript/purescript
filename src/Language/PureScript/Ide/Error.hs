@@ -17,11 +17,11 @@ module Language.PureScript.Ide.Error
        ( PscIdeError(..)
        ) where
 
-import           Protolude
 import           Data.Aeson
 import           Language.PureScript.Errors.JSON
-import           Language.PureScript.Ide.Types (ModuleIdent)
-import qualified Text.Parsec.Error             as P
+import           Language.PureScript.Ide.Types   (ModuleIdent)
+import           Protolude
+import qualified Text.Parsec.Error               as P
 
 data PscIdeError
     = GeneralError Text

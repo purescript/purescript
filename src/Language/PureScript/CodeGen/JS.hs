@@ -244,23 +244,23 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
     ret <- valueToJs val
     return $ JSApp Nothing (JSFunction Nothing Nothing [] (JSBlock Nothing (ds' ++ [JSReturn Nothing ret]))) []
   valueToJs' (Constructor (_, _, _, Just IsNewtype) _ (ProperName ctor) _) =
-    return $ JSVariableIntroduction Nothing ctor (Just $
+    return $ JSVariableIntroduction Nothing (properToJs ctor) (Just $
                 JSObjectLiteral Nothing [("create",
                   JSFunction Nothing Nothing ["value"]
                     (JSBlock Nothing [JSReturn Nothing $ JSVar Nothing "value"]))])
   valueToJs' (Constructor _ _ (ProperName ctor) []) =
-    return $ iife ctor [ JSFunction Nothing (Just ctor) [] (JSBlock Nothing [])
-           , JSAssignment Nothing (JSAccessor Nothing "value" (JSVar Nothing ctor))
-                (JSUnary Nothing JSNew $ JSApp Nothing (JSVar Nothing ctor) []) ]
+    return $ iife (properToJs ctor) [ JSFunction Nothing (Just (properToJs ctor)) [] (JSBlock Nothing [])
+           , JSAssignment Nothing (JSAccessor Nothing "value" (JSVar Nothing (properToJs ctor)))
+                (JSUnary Nothing JSNew $ JSApp Nothing (JSVar Nothing (properToJs ctor)) []) ]
   valueToJs' (Constructor _ _ (ProperName ctor) fields) =
     let constructor =
           let body = [ JSAssignment Nothing (JSAccessor Nothing (identToJs f) (JSVar Nothing "this")) (var f) | f <- fields ]
-          in JSFunction Nothing (Just ctor) (identToJs `map` fields) (JSBlock Nothing body)
+          in JSFunction Nothing (Just (properToJs ctor)) (identToJs `map` fields) (JSBlock Nothing body)
         createFn =
-          let body = JSUnary Nothing JSNew $ JSApp Nothing (JSVar Nothing ctor) (var `map` fields)
+          let body = JSUnary Nothing JSNew $ JSApp Nothing (JSVar Nothing (properToJs ctor)) (var `map` fields)
           in foldr (\f inner -> JSFunction Nothing Nothing [identToJs f] (JSBlock Nothing [JSReturn Nothing inner])) body fields
-    in return $ iife ctor [ constructor
-                          , JSAssignment Nothing (JSAccessor Nothing "create" (JSVar Nothing ctor)) createFn
+    in return $ iife (properToJs ctor) [ constructor
+                          , JSAssignment Nothing (JSAccessor Nothing "create" (JSVar Nothing (properToJs ctor))) createFn
                           ]
 
   iife :: String -> [JS] -> JS
