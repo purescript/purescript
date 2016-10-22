@@ -118,6 +118,7 @@ errorCode em = case unwrapErrorMessage em of
   ConstrainedTypeUnified{} -> "ConstrainedTypeUnified"
   OverlappingInstances{} -> "OverlappingInstances"
   NoInstanceFound{} -> "NoInstanceFound"
+  UnknownClass{} -> "UnknownClass"
   PossiblyInfiniteInstance{} -> "PossiblyInfiniteInstance"
   CannotDerive{} -> "CannotDerive"
   InvalidNewtypeInstance{} -> "InvalidNewtypeInstance"
@@ -599,6 +600,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
             , line "They may be disallowed completely in a future version of the compiler."
             ]
     renderSimpleErrorMessage OverlappingInstances{} = internalError "OverlappingInstances: empty instance list"
+    renderSimpleErrorMessage (UnknownClass nm) =
+      paras [ line "No type class instance was found for class"
+            , markCodeBox $ indent $ line (showQualified runProperName nm)
+            , line "because the class was not in scope. Perhaps it was not exported."
+            ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint C.Fail [ ty ] _)) | Just box <- toTypelevelString ty =
       paras [ line "A custom type error occurred while solving type class constraints:"
             , indent box

@@ -150,8 +150,10 @@ entails SolverOptions{..} constraint context hints =
             inferred <- lift get
             -- We need information about functional dependencies, so we have to look up the class
             -- name in the environment:
-            let findClass = fromMaybe (internalError "entails: type class not found in environment") . M.lookup className'
-            TypeClassData{ typeClassDependencies } <- lift . lift $ gets (findClass . typeClasses . checkEnv)
+            classesInScope <- lift . lift $ gets (typeClasses . checkEnv)
+            TypeClassData{ typeClassDependencies } <- case M.lookup className' classesInScope of
+              Nothing -> throwError . errorMessage $ UnknownClass className'
+              Just tcd -> pure tcd
             let instances =
                   [ (substs, tcd)
                   | tcd <- forClassName (combineContexts context inferred) className' tys''
