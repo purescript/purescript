@@ -23,6 +23,7 @@ extra-source-files: examples/passing/*.purs
                   , examples/passing/*.js
                   , examples/passing/2018/*.purs
                   , examples/passing/2138/*.purs
+                  , examples/passing/2379/*.purs
                   , examples/passing/ClassRefSyntax/*.purs
                   , examples/passing/DctorOperatorAlias/*.purs
                   , examples/passing/ExplicitImportReExport/*.purs
