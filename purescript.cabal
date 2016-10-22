@@ -55,6 +55,7 @@ extra-source-files: examples/passing/*.purs
                   , examples/passing/TypeWithoutParens/*.purs
                   , examples/failing/*.purs
                   , examples/failing/1733/*.purs
+                  , examples/failing/2378/*.purs
                   , examples/failing/ConflictingExports/*.purs
                   , examples/failing/ConflictingImports/*.purs
                   , examples/failing/ConflictingImports2/*.purs

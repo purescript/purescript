@@ -312,6 +312,7 @@ typeCheckAll moduleName _ = traverse go
     where
     checkType :: Type -> Bool
     checkType (TypeVar _) = False
+    checkType (TypeLevelString _) = False
     checkType (TypeConstructor (Qualified (Just mn'') _)) = moduleName == mn''
     checkType (TypeConstructor (Qualified Nothing _)) = internalError "Unqualified type name in checkOrphanInstance"
     checkType (TypeApp t1 _) = checkType t1
