@@ -72,46 +72,28 @@ updateLets f st = st { psciLetBindings = f (psciLetBindings st) }
 -- Valid Meta-commands for PSCI
 --
 data Command
-  -- |
-  -- A purescript expression
-  --
+  -- | A purescript expression
   = Expression P.Expr
-  -- |
-  -- Show the help (ie, list of directives)
-  --
+  -- | Show the help (ie, list of directives)
   | ShowHelp
-  -- |
-  -- Import a module from a loaded file
-  --
+  -- | Import a module from a loaded file
   | Import ImportedModule
-  -- |
-  -- Browse a module
-  --
+  -- | Browse a module
   | BrowseModule P.ModuleName
-  -- |
-  -- Exit PSCI
-  --
+  -- | Exit PSCI
   | QuitPSCi
-  -- |
-  -- Reset the state of the REPL
-  --
+  -- | Reset the state of the REPL
   | ResetState
-  -- |
-  -- Add some declarations to the current evaluation context.
-  --
+  -- | Add some declarations to the current evaluation context
   | Decls [P.Declaration]
-  -- |
-  -- Find the type of an expression
-  --
+  -- | Find the type of an expression
   | TypeOf P.Expr
-  -- |
-  -- Find the kind of an expression
-  --
+  -- | Find the kind of an expression
   | KindOf P.Type
-  -- |
-  -- Shows information about the current state of the REPL
-  --
+  -- | Shows information about the current state of the REPL
   | ShowInfo ReplQuery
+  -- | Paste multiple lines
+  | PasteLines
 
 data ReplQuery
   = QueryLoaded
@@ -142,4 +124,5 @@ data Directive
   | Type
   | Kind
   | Show
+  | Paste
   deriving (Eq, Show)

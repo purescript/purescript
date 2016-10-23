@@ -63,16 +63,9 @@ import           System.Process (readProcessWithExitCode)
 
 -- | Command line options
 data PSCiOptions = PSCiOptions
-  { psciMultiLineMode     :: Bool
-  , psciInputFile         :: [FilePath]
+  { psciInputFile         :: [FilePath]
   , psciBackend           :: Backend
   }
-
-multiLineMode :: Opts.Parser Bool
-multiLineMode = Opts.switch $
-     Opts.long "multi-line-mode"
-  <> Opts.short 'm'
-  <> Opts.help "Run in multi-line mode (use ^D to terminate commands)"
 
 inputFile :: Opts.Parser FilePath
 inputFile = Opts.strArgument $
@@ -100,8 +93,7 @@ backend =
   <|> (nodeBackend <$> nodeFlagsFlag)
 
 psciOptions :: Opts.Parser PSCiOptions
-psciOptions = PSCiOptions <$> multiLineMode
-                          <*> many inputFile
+psciOptions = PSCiOptions <$> many inputFile
                           <*> backend
 
 version :: Opts.Parser (a -> a)
@@ -119,17 +111,20 @@ getOpt = Opts.execParser opts
       footerInfo  = Opts.footer $ "psci " ++ showVersion Paths.version
 
 -- | Parses the input and returns either a command, or an error as a 'String'.
-getCommand :: forall m. MonadException m => Bool -> InputT m (Either String (Maybe Command))
-getCommand singleLineMode = handleInterrupt (return (Right Nothing)) $ do
-  firstLine <- withInterrupt $ getInputLine "> "
-  case firstLine of
+getCommand :: forall m. MonadException m => InputT m (Either String (Maybe Command))
+getCommand = handleInterrupt (return (Right Nothing)) $ do
+  line <- withInterrupt $ getInputLine "> "
+  case line of
     Nothing -> return (Right (Just QuitPSCi)) -- Ctrl-D when input is empty
     Just "" -> return (Right Nothing)
-    Just s | singleLineMode || head s == ':' -> return . fmap Just $ parseCommand s
-    Just s -> fmap Just . parseCommand <$> go [s]
+    Just s  -> return . fmap Just $ parseCommand s
+
+pasteMode :: forall m. MonadException m => InputT m (Either String Command)
+pasteMode =
+    parseCommand <$> go []
   where
     go :: [String] -> InputT m String
-    go ls = maybe (return . unlines $ reverse ls) (go . (:ls)) =<< getInputLine "  "
+    go ls = maybe (return . unlines $ reverse ls) (go . (:ls)) =<< getInputLine "… "
 
 -- | Make a JavaScript bundle for the browser.
 bundle :: IO (Either Bundle.ErrorMessage String)
@@ -349,16 +344,28 @@ main = getOpt >>= loop
 
                     go :: state -> InputT (StateT PSCiState (ReaderT PSCiConfig IO)) ()
                     go state = do
-                      c <- getCommand (not psciMultiLineMode)
+                      c <- getCommand
                       case c of
                         Left err -> outputStrLn err >> go state
                         Right Nothing -> go state
+                        Right (Just PasteLines) -> do
+                          c' <- pasteMode
+                          case c' of
+                            Left err -> outputStrLn err >> go state
+                            Right c'' -> handleCommandWithInterrupts state c''
                         Right (Just QuitPSCi) -> do
                           outputStrLn quitMessage
                           liftIO $ shutdown state
-                        Right (Just c') -> do
-                          handleInterrupt (outputStrLn "Interrupted.")
-                                          (withInterrupt (lift (handleCommand (liftIO . eval state) (liftIO (reload state)) c')))
-                          go state
+                        Right (Just c') -> handleCommandWithInterrupts state c'
+
+                    handleCommandWithInterrupts
+                      :: state
+                      -> Command
+                      -> InputT (StateT PSCiState (ReaderT PSCiConfig IO)) ()
+                    handleCommandWithInterrupts state cmd = do
+                      handleInterrupt (outputStrLn "Interrupted.")
+                                      (withInterrupt (lift (handleCommand (liftIO . eval state) (liftIO (reload state)) cmd)))
+                      go state
+
                 putStrLn prologueMessage
                 setup >>= runner . go
