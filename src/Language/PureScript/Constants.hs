@@ -118,14 +118,14 @@ disj = "disj"
 unsafeIndex :: String
 unsafeIndex = "unsafeIndex"
 
-(.|.) :: String
-(.|.) = ".|."
+or :: String
+or = "or"
 
-(.&.) :: String
-(.&.) = ".&."
+and :: String
+and = "and"
 
-(.^.) :: String
-(.^.) = ".^."
+xor :: String
+xor = "xor"
 
 (<<<) :: String
 (<<<) = "<<<"

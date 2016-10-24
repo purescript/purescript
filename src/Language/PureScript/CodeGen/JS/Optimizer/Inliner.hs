@@ -150,9 +150,9 @@ inlineCommonOperators = applyAll $
   , binary heytingAlgebraBoolean opDisj Or
   , unary  heytingAlgebraBoolean opNot Not
 
-  , binary' C.dataIntBits (C..|.) BitwiseOr
-  , binary' C.dataIntBits (C..&.) BitwiseAnd
-  , binary' C.dataIntBits (C..^.) BitwiseXor
+  , binary' C.dataIntBits C.or BitwiseOr
+  , binary' C.dataIntBits C.and BitwiseAnd
+  , binary' C.dataIntBits C.xor BitwiseXor
   , binary' C.dataIntBits C.shl ShiftLeft
   , binary' C.dataIntBits C.shr ShiftRight
   , binary' C.dataIntBits C.zshr ZeroFillShiftRight
