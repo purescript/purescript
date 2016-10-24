@@ -13,6 +13,7 @@ import Data.Version (Version, showVersion)
 import Data.Text (pack)
 
 import Language.PureScript.AST.Literals
+import Language.PureScript.Comments
 import Language.PureScript.CoreFn
 import Language.PureScript.Names
 
@@ -24,6 +25,9 @@ literalToJSON _ (CharLiteral c) = toJSON ("CharLiteral", c)
 literalToJSON _ (BooleanLiteral b) = toJSON ("BooleanLiteral", b)
 literalToJSON t (ArrayLiteral xs) = toJSON ("ArrayLiteral", map t xs)
 literalToJSON t (ObjectLiteral xs) = toJSON ("ObjectLiteral", recordToJSON t xs)
+
+commentToJSON :: Comment -> Value
+commentToJSON = toJSON
 
 identToJSON :: Ident -> Value
 identToJSON = toJSON . runIdent
@@ -43,6 +47,7 @@ moduleToJSON v m = object [ pack "imports"   .= map (moduleNameToJSON . snd) (mo
                           , pack "foreign"   .= map (identToJSON . fst) (moduleForeign m)
                           , pack "decls"     .= map bindToJSON (moduleDecls m)
                           , pack "builtWith" .= toJSON (showVersion v)
+                          , pack "comments"  .= map commentToJSON (moduleComments m)
                           ]
 
 bindToJSON :: Bind a -> Value
