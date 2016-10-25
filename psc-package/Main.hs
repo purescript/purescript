@@ -7,15 +7,15 @@
 
 module Main where
 
-import qualified Control.Foldl as Foldl
 import qualified Data.Aeson as Aeson
-import           Data.Aeson.Encode.Pretty (encodePrettyToTextBuilder)
+import           Data.Aeson.Encode.Pretty
+import qualified Data.ByteString.Lazy as BL
 import           Data.Foldable (fold, for_, traverse_)
 import           Data.List (nub)
 import qualified Data.Map as Map
 import           Data.Maybe (mapMaybe)
 import qualified Data.Set as Set
-import           Data.Text (pack)
+import           Data.Text (pack, unpack)
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Builder as TB
 import           Data.Text.Encoding (encodeUtf8)
@@ -23,11 +23,11 @@ import           Data.Traversable (for)
 import           Data.Version (showVersion)
 import qualified Filesystem.Path.CurrentOS as Path
 import           GHC.Generics (Generic)
+import           Network.HTTP.Simple (getResponseBody, httpLBS)
 import qualified Options.Applicative as Opts
 import qualified Paths_purescript as Paths
 import qualified System.IO as IO
 import           Turtle hiding (fold)
-import qualified Turtle.Shell as Shell
 
 packageFile :: Path.FilePath
 packageFile = "psc-package.json"
@@ -44,11 +44,13 @@ pathToTextUnsafe = either (error "Path.toText failed") id . Path.toText
 
 defaultPackage :: Text -> PackageConfig
 defaultPackage pkgName =
-  PackageConfig { name    = pkgName
-                , depends = [ "prelude" ]
-                , set     = "psc-" <> pack (showVersion Paths.version)
-                , source  = "https://github.com/purescript/package-sets.git"
-                }
+    PackageConfig { name    = pkgName
+                  , depends = [ "prelude" ]
+                  , set     = branchName
+                  , source  = "https://raw.githubusercontent.com/purescript/package-sets/" <> branchName <> "/packages.json"
+                  }
+  where
+    branchName = "psc-" <> pack (showVersion Paths.version)
 
 readPackageFile :: IO PackageConfig
 readPackageFile = do
@@ -65,9 +67,18 @@ readPackageFile = do
 
 encodePrettyToText :: Aeson.ToJSON json => json -> Text
 encodePrettyToText =
-  TL.toStrict
-  . TB.toLazyText
-  . encodePrettyToTextBuilder
+    TL.toStrict
+    . TB.toLazyText
+    . encodePrettyToTextBuilder' config
+  where
+    config = defConfig
+               { confCompare =
+                   keyOrder [ "name"
+                            , "set"
+                            , "source"
+                            , "depends"
+                            ]
+               }
 
 writePackageFile :: PackageConfig -> IO ()
 writePackageFile =
@@ -101,13 +112,18 @@ cloneShallow from ref into =
 
 getPackageSet :: PackageConfig -> IO ()
 getPackageSet PackageConfig{ source, set } = do
-  let pkgDir = ".psc-package" </> fromText set </> ".set"
+  let pkgDir = ".psc-package" </> fromText set
+      pkgFile = unpack (pathToTextUnsafe (pkgDir </> "packages.json"))
   exists <- testdir pkgDir
-  unless exists . void $ cloneShallow source set pkgDir
+  unless exists . void $ do
+    echo ("Downloading package set config from " <> source)
+    res <- httpLBS (fromString (unpack source))
+    mktree pkgDir
+    BL.writeFile pkgFile (getResponseBody res)
 
 readPackageSet :: PackageConfig -> IO PackageSet
 readPackageSet PackageConfig{ set } = do
-  let dbFile = ".psc-package" </> fromText set </> ".set" </> "packages.json"
+  let dbFile = ".psc-package" </> fromText set </> "packages.json"
   exists <- testfile dbFile
   unless exists $ do
     echo "packages.json does not exist"
@@ -148,14 +164,13 @@ updateImpl config@PackageConfig{ depends } = do
 
 initialize :: IO ()
 initialize = do
-  here <- pwd
-  isEmpty <- Shell.fold (ls here) Foldl.null
-  unless isEmpty $ do
-    echo "Current directory is not empty"
+  exists <- testfile "psc-package.json"
+  when exists $ do
+    echo "psc-package.json already exists"
     exit (ExitFailure 1)
   echo "Initializing new project in current directory"
-  let pkgName = pathToTextUnsafe (Path.filename here)
-      pkg = defaultPackage pkgName
+  pkgName <- pathToTextUnsafe . Path.filename <$> pwd
+  let pkg = defaultPackage pkgName
   writePackageFile pkg
   updateImpl pkg
 
