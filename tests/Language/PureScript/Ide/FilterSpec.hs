@@ -11,12 +11,24 @@ import           Test.Hspec
 value :: Text -> IdeDeclarationAnn
 value s = IdeDeclarationAnn emptyAnn (IdeDeclValue (IdeValue (P.Ident (toS s)) P.REmpty))
 
-moduleA, moduleB :: Module
+valueOp :: Text -> Text -> IdeDeclarationAnn
+valueOp s alias =
+  IdeDeclarationAnn emptyAnn (IdeDeclValueOperator
+                              (IdeValueOperator
+                               (P.OpName (toS s))
+                               (P.Qualified Nothing (Left (P.Ident (toS alias))))
+                               1
+                               P.Infix
+                               Nothing
+                              ))
+
+moduleA, moduleB, moduleC :: Module
 moduleA = (P.moduleNameFromString "Module.A", [value "function1"])
 moduleB = (P.moduleNameFromString "Module.B", [value "data1"])
+moduleC = (P.moduleNameFromString "Module.C", [valueOp "<<>>" "operator"])
 
 modules :: [Module]
-modules = [moduleA, moduleB]
+modules = [moduleA, moduleB, moduleC]
 
 runEq :: Text -> [Module]
 runEq s = applyFilters [equalityFilter s] modules
@@ -43,6 +55,8 @@ spec = do
       runPrefix "fun" `shouldBe` [moduleA]
     it "keeps data decls prefix matches" $
       runPrefix "dat" `shouldBe` [moduleB]
+    it "keeps operator alias matches" $
+      runPrefix "oper" `shouldBe` [moduleC]
   describe "moduleFilter" $ do
     it "removes everything on empty input" $
       runModule [] `shouldBe` []
