@@ -104,6 +104,8 @@ cloneShallow
 cloneShallow from ref into =
   proc "git"
        [ "clone"
+       , "-q"
+       , "-c", "advice.detachedHead=false"
        , "--depth", "1"
        , "-b", ref
        , from
