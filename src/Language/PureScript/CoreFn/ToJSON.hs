@@ -101,7 +101,7 @@ binderToJSON :: Binder a -> Value
 binderToJSON (VarBinder _ v)              = toJSON ( "VarBinder"
                                                    , identToJSON v
                                                    )
-binderToJSON (NullBinder _)               = toJSON "NullBinder"
+binderToJSON (NullBinder _)               = toJSON [ "NullBinder" ]
 binderToJSON (LiteralBinder _ l)          = toJSON ( "LiteralBinder"
                                                    , literalToJSON binderToJSON l
                                                    )
