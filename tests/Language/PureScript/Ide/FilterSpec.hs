@@ -9,7 +9,7 @@ import qualified Language.PureScript as P
 import           Test.Hspec
 
 value :: Text -> IdeDeclarationAnn
-value s = IdeDeclarationAnn emptyAnn (IdeValue (P.Ident (toS s)) P.REmpty)
+value s = IdeDeclarationAnn emptyAnn (IdeDeclValue (IdeValue (P.Ident (toS s)) P.REmpty))
 
 moduleA, moduleB :: Module
 moduleA = (P.moduleNameFromString "Module.A", [value "function1"])

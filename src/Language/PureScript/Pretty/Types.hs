@@ -3,7 +3,9 @@
 --
 module Language.PureScript.Pretty.Types
   ( typeAsBox
+  , suggestedTypeAsBox
   , prettyPrintType
+  , prettyPrintSuggestedType
   , typeAtomAsBox
   , prettyPrintTypeAtom
   , prettyPrintRowWith
@@ -26,23 +28,6 @@ import Language.PureScript.Pretty.Kinds
 import Language.PureScript.Types
 
 import Text.PrettyPrint.Boxes hiding ((<+>))
-
-typeLiterals :: Pattern () Type Box
-typeLiterals = mkPattern match
-  where
-  match TypeWildcard{} = Just $ text "_"
-  match (TypeVar var) = Just $ text var
-  match (TypeLevelString s) = Just . text $ show s
-  match (PrettyPrintObject row) = Just $ prettyPrintRowWith '{' '}' row
-  match (TypeConstructor ctor) = Just $ text $ runProperName $ disqualify ctor
-  match (TUnknown u) = Just $ text $ 't' : show u
-  match (Skolem name s _ _) = Just $ text $ name ++ show s
-  match REmpty = Just $ text "()"
-  match row@RCons{} = Just $ prettyPrintRowWith '(' ')' row
-  match (BinaryNoParensType op l r) =
-    Just $ typeAsBox l <> text " " <> typeAsBox op <> text " " <> typeAsBox r
-  match (TypeOp op) = Just $ text $ showQualified runOpName op
-  match _ = Nothing
 
 constraintsAsBox :: [Constraint] -> Box -> Box
 constraintsAsBox [con] ty = text "(" <> constraintAsBox con `before` (text ") => " <> ty)
@@ -120,12 +105,32 @@ explicitParens = mkPattern match
   match (ParensInType ty) = Just ((), ty)
   match _ = Nothing
 
-matchTypeAtom :: Pattern () Type Box
-matchTypeAtom = typeLiterals <+> fmap ((`before` (text ")")) . (text "(" <>)) matchType
-
-matchType :: Pattern () Type Box
-matchType = buildPrettyPrinter operators matchTypeAtom
+matchTypeAtom :: Bool -> Pattern () Type Box
+matchTypeAtom suggesting =
+    typeLiterals <+> fmap ((`before` (text ")")) . (text "(" <>)) (matchType suggesting)
   where
+    typeLiterals :: Pattern () Type Box
+    typeLiterals = mkPattern match where
+      match TypeWildcard{} = Just $ text "_"
+      match (TypeVar var) = Just $ text var
+      match (TypeLevelString s) = Just . text $ show s
+      match (PrettyPrintObject row) = Just $ prettyPrintRowWith '{' '}' row
+      match (TypeConstructor ctor) = Just $ text $ runProperName $ disqualify ctor
+      match (TUnknown u)
+        | suggesting = Just $ text "_"
+        | otherwise = Just $ text $ 't' : show u
+      match (Skolem name s _ _)
+        | suggesting =  Just $ text name
+        | otherwise = Just $ text $ name ++ show s
+      match REmpty = Just $ text "()"
+      match row@RCons{} = Just $ prettyPrintRowWith '(' ')' row
+      match (BinaryNoParensType op l r) =
+        Just $ typeAsBox l <> text " " <> typeAsBox op <> text " " <> typeAsBox r
+      match (TypeOp op) = Just $ text $ showQualified runOpName op
+      match _ = Nothing
+
+matchType :: Bool -> Pattern () Type Box
+matchType = buildPrettyPrinter operators . matchTypeAtom where
   operators :: OperatorTable () Type Box
   operators =
     OperatorTable [ [ AssocL typeApp $ \f x -> keepSingleLinesOr (moveRight 2) f x ]
@@ -152,7 +157,7 @@ forall_ = mkPattern match
 typeAtomAsBox :: Type -> Box
 typeAtomAsBox
   = fromMaybe (internalError "Incomplete pattern")
-  . PA.pattern matchTypeAtom ()
+  . PA.pattern (matchTypeAtom False) ()
   . insertPlaceholders
 
 -- | Generate a pretty-printed string representing a Type, as it should appear inside parentheses
@@ -160,11 +165,21 @@ prettyPrintTypeAtom :: Type -> String
 prettyPrintTypeAtom = render . typeAtomAsBox
 
 typeAsBox :: Type -> Box
-typeAsBox
+typeAsBox = typeAsBoxImpl False
+
+suggestedTypeAsBox :: Type -> Box
+suggestedTypeAsBox = typeAsBoxImpl True
+
+typeAsBoxImpl :: Bool -> Type -> Box
+typeAsBoxImpl suggesting
   = fromMaybe (internalError "Incomplete pattern")
-  . PA.pattern matchType ()
+  . PA.pattern (matchType suggesting) ()
   . insertPlaceholders
 
--- | Generate a pretty-printed string representing a Type
+-- | Generate a pretty-printed string representing a 'Type'
 prettyPrintType :: Type -> String
-prettyPrintType = render . typeAsBox
+prettyPrintType = render . typeAsBoxImpl False
+
+-- | Generate a pretty-printed string representing a suggested 'Type'
+prettyPrintSuggestedType :: Type -> String
+prettyPrintSuggestedType = render . typeAsBoxImpl True

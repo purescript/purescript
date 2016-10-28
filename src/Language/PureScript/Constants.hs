@@ -118,14 +118,14 @@ disj = "disj"
 unsafeIndex :: String
 unsafeIndex = "unsafeIndex"
 
-(.|.) :: String
-(.|.) = ".|."
+or :: String
+or = "or"
 
-(.&.) :: String
-(.&.) = ".&."
+and :: String
+and = "and"
 
-(.^.) :: String
-(.^.) = ".^."
+xor :: String
+xor = "xor"
 
 (<<<) :: String
 (<<<) = "<<<"
@@ -346,8 +346,8 @@ prim = "Prim"
 prelude :: String
 prelude = "Prelude"
 
-dataArrayUnsafe :: String
-dataArrayUnsafe = "Data_Array_Unsafe"
+dataArray :: String
+dataArray = "Data_Array"
 
 eff :: String
 eff = "Control_Monad_Eff"

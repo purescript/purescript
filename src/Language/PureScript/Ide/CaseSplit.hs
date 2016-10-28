@@ -12,7 +12,7 @@
 -- Casesplitting and adding function clauses
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Language.PureScript.Ide.CaseSplit
        ( WildcardAnnotations()
@@ -23,10 +23,10 @@ module Language.PureScript.Ide.CaseSplit
        , caseSplit
        ) where
 
-import           Protolude hiding (Constructor)
+import           Protolude                     hiding (Constructor)
 
-import qualified Data.Text                               as T
-import qualified Language.PureScript                     as P
+import qualified Data.Text                     as T
+import qualified Language.PureScript           as P
 
 import           Language.PureScript.Externs
 import           Language.PureScript.Ide.Error
@@ -34,8 +34,8 @@ import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 
-import           Text.Parsec                             as Parsec
-import qualified Text.PrettyPrint.Boxes                  as Box
+import           Text.Parsec                   as Parsec
+import qualified Text.PrettyPrint.Boxes        as Box
 
 type Constructor = (P.ProperName 'P.ConstructorName, [P.Type])
 

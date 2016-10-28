@@ -13,7 +13,7 @@ import Control.Monad (replicateM)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class (MonadSupply)
 
-import Data.List (foldl', find, sortBy)
+import Data.List (foldl', find, sortBy, unzip5)
 import Data.Maybe (fromMaybe)
 import Data.Ord (comparing)
 
@@ -58,9 +58,14 @@ deriveInstance mn ds (TypeInstanceDeclaration nm deps className [wrappedTy, unwr
   | className == Qualified (Just dataNewtype) (ProperName "Newtype")
   , Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor wrappedTy
   , mn == fromMaybe mn mn'
-  = do
-    (inst, actualUnwrappedTy) <- deriveNewtype mn ds tyCon args unwrappedTy
-    return $ TypeInstanceDeclaration nm deps className [wrappedTy, actualUnwrappedTy] (ExplicitInstance inst)
+  = do (inst, actualUnwrappedTy) <- deriveNewtype mn ds tyCon args unwrappedTy
+       return $ TypeInstanceDeclaration nm deps className [wrappedTy, actualUnwrappedTy] (ExplicitInstance inst)
+deriveInstance mn ds (TypeInstanceDeclaration nm deps className [actualTy, repTy] DerivedInstance)
+  | className == Qualified (Just dataGenericRep) (ProperName C.generic)
+  , Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor actualTy
+  , mn == fromMaybe mn mn'
+  = do (inst, inferredRepTy) <- deriveGenericRep mn ds tyCon args repTy
+       return $ TypeInstanceDeclaration nm deps className [actualTy, inferredRepTy] (ExplicitInstance inst)
 deriveInstance _ _ (TypeInstanceDeclaration _ _ className tys DerivedInstance)
   = throwError . errorMessage $ CannotDerive className tys
 deriveInstance mn ds (TypeInstanceDeclaration nm deps className tys@(_ : _) NewtypeInstance)
@@ -121,6 +126,9 @@ deriveNewtypeInstance className ds tys tyConNm dargs = do
 
 dataGeneric :: ModuleName
 dataGeneric = ModuleName [ ProperName "Data", ProperName "Generic" ]
+
+dataGenericRep :: ModuleName
+dataGenericRep = ModuleName [ ProperName "Data", ProperName "Generic", ProperName "Rep" ]
 
 dataMaybe :: ModuleName
 dataMaybe = ModuleName [ ProperName "Data", ProperName "Maybe" ]
@@ -304,6 +312,187 @@ deriveGeneric mn ds tyConNm dargs = do
     mkGenVar :: Ident -> Expr
     mkGenVar = mkVarMn (Just (ModuleName [ProperName "Data", ProperName C.generic]))
 
+deriveGenericRep
+  :: forall m
+   . (MonadError MultipleErrors m, MonadSupply m)
+  => ModuleName
+  -> [Declaration]
+  -> ProperName 'TypeName
+  -> [Type]
+  -> Type
+  -> m ([Declaration], Type)
+deriveGenericRep mn ds tyConNm tyConArgs repTy = do
+    checkIsWildcard tyConNm repTy
+    go =<< findTypeDecl tyConNm ds
+  where
+    go :: Declaration -> m ([Declaration], Type)
+    go (DataDeclaration _ _ args dctors) = do
+      x <- freshIdent "x"
+      (reps, to, from) <- unzip3 <$> traverse makeInst dctors
+      let rep = toRepTy reps
+          inst | null reps =
+                   -- If there are no cases, spin
+                   [ ValueDeclaration (Ident "to") Public [] $ Right $
+                       lamCase x [ CaseAlternative [NullBinder]
+                                                   (Right (App toName (Var (Qualified Nothing x))))
+                                 ]
+                   , ValueDeclaration (Ident "from") Public [] $ Right $
+                       lamCase x [ CaseAlternative [NullBinder]
+                                                   (Right (App fromName (Var (Qualified Nothing x))))
+                                 ]
+                   ]
+               | otherwise =
+                   [ ValueDeclaration (Ident "to") Public [] $ Right $
+                       lamCase x (zipWith ($) (map underBinder (sumBinders (length dctors))) to)
+                   , ValueDeclaration (Ident "from") Public [] $ Right $
+                       lamCase x (zipWith ($) (map underExpr (sumExprs (length dctors))) from)
+                   ]
+
+          subst = zipWith ((,) . fst) args tyConArgs
+      return (inst, replaceAllTypeVars subst rep)
+    go (PositionedDeclaration _ _ d) = go d
+    go _ = internalError "deriveGenericRep go: expected DataDeclaration"
+
+    select :: (a -> a) -> (a -> a) -> Int -> [a -> a]
+    select _ _ 0 = []
+    select _ _ 1 = [id]
+    select l r n = take (n - 1) (iterate (r .) l) ++ [compN (n - 1) r]
+
+    sumBinders :: Int -> [Binder -> Binder]
+    sumBinders = select (ConstructorBinder inl . pure) (ConstructorBinder inr . pure)
+
+    sumExprs :: Int -> [Expr -> Expr]
+    sumExprs = select (App (Constructor inl)) (App (Constructor inr))
+
+    compN :: Int -> (a -> a) -> a -> a
+    compN 0 _ = id
+    compN n f = f . compN (n - 1) f
+
+    makeInst
+      :: (ProperName 'ConstructorName, [Type])
+      -> m (Type, CaseAlternative, CaseAlternative)
+    makeInst (ctorName, args) = do
+        (ctorTy, matchProduct, ctorArgs, matchCtor, mkProduct) <- makeProduct args
+        return ( TypeApp (TypeApp (TypeConstructor constructor)
+                                  (TypeLevelString (runProperName ctorName)))
+                         ctorTy
+               , CaseAlternative [ ConstructorBinder constructor [matchProduct] ]
+                                 (Right (foldl App (Constructor (Qualified (Just mn) ctorName)) ctorArgs))
+               , CaseAlternative [ ConstructorBinder (Qualified (Just mn) ctorName) matchCtor ]
+                                 (Right (constructor' mkProduct))
+               )
+
+    makeProduct
+      :: [Type]
+      -> m (Type, Binder, [Expr], [Binder], Expr)
+    makeProduct [] =
+      pure (noArgs, NullBinder, [], [], noArgs')
+    makeProduct args = do
+      (tys, bs1, es1, bs2, es2) <- unzip5 <$> traverse makeArg args
+      pure ( foldr1 (\f -> TypeApp (TypeApp (TypeConstructor productName) f)) tys
+           , foldr1 (\b1 b2 -> ConstructorBinder productName [b1, b2]) bs1
+           , es1
+           , bs2
+           , foldr1 (\e1 -> App (App (Constructor productName) e1)) es2
+           )
+
+    makeArg :: Type -> m (Type, Binder, Expr, Binder, Expr)
+    makeArg arg | Just rec <- objectType arg = do
+      let fields = decomposeRec rec
+      fieldNames <- traverse freshIdent (map fst fields)
+      pure ( TypeApp (TypeConstructor record)
+               (foldr1 (\f -> TypeApp (TypeApp (TypeConstructor productName) f))
+                 (map (\(name, ty) ->
+                   TypeApp (TypeApp (TypeConstructor field) (TypeLevelString name)) ty) fields))
+           , ConstructorBinder record
+               [ foldr1 (\b1 b2 -> ConstructorBinder productName [b1, b2])
+                   (map (\ident -> ConstructorBinder field [VarBinder ident]) fieldNames)
+               ]
+           , Literal . ObjectLiteral $
+                zipWith (\(name, _) ident -> (name, Var (Qualified Nothing ident))) fields fieldNames
+           , LiteralBinder . ObjectLiteral $
+                 zipWith (\(name, _) ident -> (name, VarBinder ident)) fields fieldNames
+           , record' $
+               foldr1 (\e1 -> App (App (Constructor productName) e1))
+                 (map (field' . Var . Qualified Nothing) fieldNames)
+           )
+    makeArg arg = do
+      argName <- freshIdent "arg"
+      pure ( TypeApp (TypeConstructor argument) arg
+           , ConstructorBinder argument [ VarBinder argName ]
+           , Var (Qualified Nothing argName)
+           , VarBinder argName
+           , argument' (Var (Qualified Nothing argName))
+           )
+
+    underBinder :: (Binder -> Binder) -> CaseAlternative -> CaseAlternative
+    underBinder f (CaseAlternative bs e) = CaseAlternative (map f bs) e
+
+    underExpr :: (Expr -> Expr) -> CaseAlternative -> CaseAlternative
+    underExpr f (CaseAlternative b (Right e)) = CaseAlternative b (Right (f e))
+    underExpr _ _ = internalError "underExpr: expected Right"
+
+    toRepTy :: [Type] -> Type
+    toRepTy [] = noCtors
+    toRepTy [only] = only
+    toRepTy ctors = foldr1 (\f -> TypeApp (TypeApp sumCtor f)) ctors
+
+    toName :: Expr
+    toName = Var (Qualified (Just dataGenericRep) (Ident "to"))
+
+    fromName :: Expr
+    fromName = Var (Qualified (Just dataGenericRep) (Ident "from"))
+
+    noCtors :: Type
+    noCtors = TypeConstructor (Qualified (Just dataGenericRep) (ProperName "NoConstructors"))
+
+    noArgs :: Type
+    noArgs = TypeConstructor (Qualified (Just dataGenericRep) (ProperName "NoArguments"))
+
+    noArgs' :: Expr
+    noArgs' = Constructor (Qualified (Just dataGenericRep) (ProperName "NoArguments"))
+
+    sumCtor :: Type
+    sumCtor = TypeConstructor (Qualified (Just dataGenericRep) (ProperName "Sum"))
+
+    inl :: Qualified (ProperName 'ConstructorName)
+    inl = Qualified (Just dataGenericRep) (ProperName "Inl")
+
+    inr :: Qualified (ProperName 'ConstructorName)
+    inr = Qualified (Just dataGenericRep) (ProperName "Inr")
+
+    productName :: Qualified (ProperName ty)
+    productName = Qualified (Just dataGenericRep) (ProperName "Product")
+
+    constructor :: Qualified (ProperName ty)
+    constructor = Qualified (Just dataGenericRep) (ProperName "Constructor")
+
+    constructor' :: Expr -> Expr
+    constructor' = App (Constructor constructor)
+
+    argument :: Qualified (ProperName ty)
+    argument = Qualified (Just dataGenericRep) (ProperName "Argument")
+
+    argument' :: Expr -> Expr
+    argument' = App (Constructor argument)
+
+    record :: Qualified (ProperName ty)
+    record = Qualified (Just dataGenericRep) (ProperName "Rec")
+
+    record' :: Expr -> Expr
+    record' = App (Constructor record)
+
+    field :: Qualified (ProperName ty)
+    field = Qualified (Just dataGenericRep) (ProperName "Field")
+
+    field' :: Expr -> Expr
+    field' = App (Constructor field)
+
+checkIsWildcard :: MonadError MultipleErrors m => ProperName 'TypeName -> Type -> m ()
+checkIsWildcard _ (TypeWildcard _) = return ()
+checkIsWildcard tyConNm _ =
+  throwError . errorMessage $ ExpectedWildcard tyConNm
+
 deriveEq ::
   forall m. (MonadError MultipleErrors m, MonadSupply m)
   => ModuleName
@@ -451,7 +640,7 @@ deriveNewtype
   -> Type
   -> m ([Declaration], Type)
 deriveNewtype mn ds tyConNm tyConArgs unwrappedTy = do
-    checkIsWildcard unwrappedTy
+    checkIsWildcard tyConNm unwrappedTy
     go =<< findTypeDecl tyConNm ds
   where
     go :: Declaration -> m ([Declaration], Type)
@@ -476,12 +665,6 @@ deriveNewtype mn ds tyConNm tyConArgs unwrappedTy = do
       return (inst, replaceAllTypeVars subst ty)
     go (PositionedDeclaration _ _ d) = go d
     go _ = internalError "deriveNewtype go: expected DataDeclaration"
-
-    checkIsWildcard :: Type -> m ()
-    checkIsWildcard (TypeWildcard _) =
-      return ()
-    checkIsWildcard _ =
-      throwError . errorMessage $ NonWildcardNewtypeInstance tyConNm
 
 findTypeDecl
   :: (MonadError MultipleErrors m)

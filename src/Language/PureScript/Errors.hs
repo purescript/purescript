@@ -40,6 +40,7 @@ import qualified System.Console.ANSI as ANSI
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Error as PE
 import qualified Text.PrettyPrint.Boxes as Box
+import qualified Language.PureScript.Publish.BoxesHelpers as BoxHelpers
 import Text.Parsec.Error (Message(..))
 
 newtype ErrorSuggestion = ErrorSuggestion String
@@ -117,6 +118,7 @@ errorCode em = case unwrapErrorMessage em of
   ConstrainedTypeUnified{} -> "ConstrainedTypeUnified"
   OverlappingInstances{} -> "OverlappingInstances"
   NoInstanceFound{} -> "NoInstanceFound"
+  UnknownClass{} -> "UnknownClass"
   PossiblyInfiniteInstance{} -> "PossiblyInfiniteInstance"
   CannotDerive{} -> "CannotDerive"
   InvalidNewtypeInstance{} -> "InvalidNewtypeInstance"
@@ -166,7 +168,7 @@ errorCode em = case unwrapErrorMessage em of
   DeprecatedRequirePath{} -> "DeprecatedRequirePath"
   CannotGeneralizeRecursiveFunction{} -> "CannotGeneralizeRecursiveFunction"
   CannotDeriveNewtypeForData{} -> "CannotDeriveNewtypeForData"
-  NonWildcardNewtypeInstance{} -> "NonWildcardNewtypeInstance"
+  ExpectedWildcard{} -> "ExpectedWildcard"
 
 -- |
 -- A stack trace for an error
@@ -266,7 +268,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
   gSimple (OrphanInstance nm cl ts) = OrphanInstance nm cl <$> traverse f ts
   gSimple (WildcardInferredType ty ctx) = WildcardInferredType <$> f ty <*> traverse (sndM f) ctx
-  gSimple (HoleInferredType name ty ctx) = HoleInferredType name <$> f ty <*> traverse (sndM f) ctx
+  gSimple (HoleInferredType name ty ctx env) = HoleInferredType name <$> f ty <*> traverse (sndM f) ctx  <*> gTypeSearch env
   gSimple (MissingTypeDeclaration nm ty) = MissingTypeDeclaration nm <$> f ty
   gSimple (CannotGeneralizeRecursiveFunction nm ty) = CannotGeneralizeRecursiveFunction nm <$> f ty
   gSimple other = pure other
@@ -280,6 +282,9 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gHint (ErrorSolvingConstraint con) = ErrorSolvingConstraint <$> overConstraintArgs (traverse f) con
   gHint other = pure other
 
+  gTypeSearch (TSBefore env) = pure (TSBefore env)
+  gTypeSearch (TSAfter result) = TSAfter <$> traverse (traverse f) result
+
 wikiUri :: ErrorMessage -> String
 wikiUri e = "https://github.com/purescript/purescript/wiki/Error-Code-" ++ errorCode e
 
@@ -287,19 +292,19 @@ wikiUri e = "https://github.com/purescript/purescript/wiki/Error-Code-" ++ error
 -- WildcardInferredType - source span not small enough
 -- DuplicateSelectiveImport - would require 2 ranges to remove and 1 insert
 errorSuggestion :: SimpleErrorMessage -> Maybe ErrorSuggestion
-errorSuggestion err = case err of
-  UnusedImport{} -> emptySuggestion
-  DuplicateImport{} -> emptySuggestion
-  UnusedExplicitImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
-  UnusedDctorImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
-  UnusedDctorExplicitImport mn _ _ qual refs -> suggest $ importSuggestion mn refs qual
-  ImplicitImport mn refs -> suggest $ importSuggestion mn refs Nothing
-  ImplicitQualifiedImport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
-  HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
-  MissingTypeDeclaration ident ty -> suggest $ showIdent ident ++ " :: " ++ prettyPrintType ty
-  WildcardInferredType ty _ -> suggest $ prettyPrintType ty
-  _ -> Nothing
-
+errorSuggestion err =
+    case err of
+      UnusedImport{} -> emptySuggestion
+      DuplicateImport{} -> emptySuggestion
+      UnusedExplicitImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
+      UnusedDctorImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
+      UnusedDctorExplicitImport mn _ _ qual refs -> suggest $ importSuggestion mn refs qual
+      ImplicitImport mn refs -> suggest $ importSuggestion mn refs Nothing
+      ImplicitQualifiedImport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
+      HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
+      MissingTypeDeclaration ident ty -> suggest $ showIdent ident ++ " :: " ++ prettyPrintSuggestedType ty
+      WildcardInferredType ty _ -> suggest $ prettyPrintSuggestedType ty
+      _ -> Nothing
   where
     emptySuggestion = Just $ ErrorSuggestion ""
     suggest = Just . ErrorSuggestion
@@ -595,6 +600,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
             , line "They may be disallowed completely in a future version of the compiler."
             ]
     renderSimpleErrorMessage OverlappingInstances{} = internalError "OverlappingInstances: empty instance list"
+    renderSimpleErrorMessage (UnknownClass nm) =
+      paras [ line "No type class instance was found for class"
+            , markCodeBox $ indent $ line (showQualified runProperName nm)
+            , line "because the class was not in scope. Perhaps it was not exported."
+            ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint C.Fail [ ty ] _)) | Just box <- toTypelevelString ty =
       paras [ line "A custom type error occurred while solving type class constraints:"
             , indent box
@@ -733,10 +743,31 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
       paras $ [ line "Wildcard type definition has the inferred type "
               , markCodeBox $ indent $ typeAsBox ty
               ] ++ renderContext ctx
-    renderSimpleErrorMessage (HoleInferredType name ty ctx) =
-      paras $ [ line $ "Hole '" ++ markCode name ++ "' has the inferred type "
-              , markCodeBox $ indent $ typeAsBox ty
-              ] ++ renderContext ctx
+    renderSimpleErrorMessage (HoleInferredType name ty ctx ts) =
+      let
+        maxTSResults = 15
+        tsResult = case ts of
+          (TSAfter idents) | not (null idents) ->
+            let
+              formatTS (names, types) =
+                let
+                  idBoxes = Box.text . showQualified runIdent <$> names
+                  tyBoxes = (\t -> BoxHelpers.indented
+                              (Box.text ":: " Box.<> typeAsBox t)) <$> types
+                  longestId = maximum (map Box.cols idBoxes)
+                in
+                  Box.vcat Box.top $
+                      zipWith (Box.<>)
+                      (Box.alignHoriz Box.left longestId <$> idBoxes)
+                      tyBoxes
+            in [ line "You could substitute the hole with one of these values:"
+               , markCodeBox (indent (formatTS (unzip (take maxTSResults idents))))
+               ]
+          _ -> []
+      in
+        paras $ [ line $ "Hole '" ++ markCode name ++ "' has the inferred type "
+                , markCodeBox (indent (typeAsBox ty))
+                ] ++ tsResult ++ renderContext ctx
     renderSimpleErrorMessage (MissingTypeDeclaration ident ty) =
       paras [ line $ "No type declaration was provided for the top-level declaration of " ++ markCode (showIdent ident) ++ "."
             , line "It is good practice to provide type declarations as a form of documentation."
@@ -834,8 +865,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
       paras [ line $ "Cannot derive an instance of the " ++ markCode "Newtype" ++ " class for non-newtype " ++ markCode (runProperName tyName) ++ "."
             ]
 
-    renderSimpleErrorMessage (NonWildcardNewtypeInstance tyName) =
-      paras [ line $ "A type wildcard (_) should be used for the inner type when deriving the " ++ markCode "Newtype" ++ " instance for " ++ markCode (runProperName tyName) ++ "."
+    renderSimpleErrorMessage (ExpectedWildcard tyName) =
+      paras [ line $ "Expected a type wildcard (_) when deriving an instance for " ++ markCode (runProperName tyName) ++ "."
             ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box

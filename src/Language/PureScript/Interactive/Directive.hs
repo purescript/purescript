@@ -30,6 +30,7 @@ directiveStrings =
     , (Type   , ["type"])
     , (Kind   , ["kind"])
     , (Show   , ["show"])
+    , (Paste  , ["paste"])
     ]
 
 -- |
@@ -82,6 +83,7 @@ hasArgument :: Directive -> Bool
 hasArgument Help = False
 hasArgument Quit = False
 hasArgument Reset = False
+hasArgument Paste = False
 hasArgument _ = True
 
 -- |
@@ -97,4 +99,5 @@ help =
   , (Kind,    "<type>",   "Show the kind of <type>")
   , (Show,    "import",   "Show all imported modules")
   , (Show,    "loaded",   "Show all loaded modules")
+  , (Paste,   "paste",    "Enter multiple lines, terminated by ^D")
   ]

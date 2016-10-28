@@ -32,20 +32,20 @@ module Language.PureScript.Ide.State
   , resolveOperatorsForModule
   ) where
 
-import           Protolude
 import qualified Prelude
+import           Protolude
 
 import           Control.Concurrent.STM
+import           Control.Lens                       hiding (op, (&))
 import           "monad-logger" Control.Monad.Logger
-import qualified Data.Map.Lazy                     as Map
-import qualified Data.List                         as List
+import qualified Data.Map.Lazy                      as Map
+import qualified Language.PureScript                as P
 import           Language.PureScript.Externs
 import           Language.PureScript.Ide.Externs
 import           Language.PureScript.Ide.Reexports
 import           Language.PureScript.Ide.SourceFile
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
-import qualified Language.PureScript as P
 import           System.Clock
 
 -- | Resets all State inside psc-ide
@@ -235,47 +235,39 @@ resolveOperatorsForModule
   :: Map P.ModuleName [IdeDeclarationAnn]
   -> [IdeDeclarationAnn]
   -> [IdeDeclarationAnn]
-resolveOperatorsForModule modules = map (mapIdeDeclaration resolveOperator)
+resolveOperatorsForModule modules = map ((over idaDeclaration) resolveOperator)
   where
-    resolveOperator (IdeValueOperator
-                    opName
-                    i@(P.Qualified (Just moduleName)
-                        (Left ident)) precedence assoc _) =
-      let t = do
-            sourceModule <- Map.lookup moduleName modules
-            IdeValue _ tP <-
-              List.find (\case
-                            IdeValue iP _ -> iP == ident
-                            _ -> False) (discardAnn <$> sourceModule)
-            pure tP
+    hasName :: Eq b => Lens' a b -> b -> a -> Bool
+    hasName l a x = x ^. l == a
 
-      in IdeValueOperator opName i precedence assoc t
-    resolveOperator (IdeValueOperator
-                    opName
-                    i@(P.Qualified (Just moduleName)
-                        (Right ctor)) precedence assoc _) =
-      let t = do
-            sourceModule <- Map.lookup moduleName modules
-            IdeDataConstructor _ _ tP <-
-              List.find (\case
-                            IdeDataConstructor cname _ _ -> ctor == cname
-                            _ -> False) (discardAnn <$> sourceModule)
-            pure tP
+    getDeclarations :: P.ModuleName -> [IdeDeclaration]
+    getDeclarations moduleName =
+      Map.lookup moduleName modules
+      & fromMaybe []
+      & map discardAnn
 
-      in IdeValueOperator opName i precedence assoc t
-    resolveOperator (IdeTypeOperator
-                    opName
-                    i@(P.Qualified (Just moduleName) properName) precedence assoc _)  =
-      let k = do
-            sourceModule <- Map.lookup moduleName modules
-            IdeType _ kP <-
-              List.find (\case
-                            IdeType name _ -> name == properName
-                            _ -> False) (discardAnn <$> sourceModule)
-            pure kP
-
-      in IdeTypeOperator opName i precedence assoc k
+    resolveOperator (IdeDeclValueOperator op)
+      | (P.Qualified (Just mn) (Left ident)) <- op ^. ideValueOpAlias =
+          let t = getDeclarations mn
+                  & mapMaybe (preview _IdeDeclValue)
+                  & filter (hasName ideValueIdent ident)
+                  & map (view ideValueType)
+                  & listToMaybe
+          in IdeDeclValueOperator (op & ideValueOpType .~ t)
+      | (P.Qualified (Just mn) (Right dtor)) <- op ^. ideValueOpAlias =
+          let t = getDeclarations mn
+                  & mapMaybe (preview _IdeDeclDataConstructor)
+                  & filter (hasName ideDtorName dtor)
+                  & map (view ideDtorType)
+                  & listToMaybe
+          in IdeDeclValueOperator (op & ideValueOpType .~ t)
+    resolveOperator (IdeDeclTypeOperator op)
+      | P.Qualified (Just mn) properName <- op ^. ideTypeOpAlias =
+          let k = getDeclarations mn
+                  & mapMaybe (preview _IdeDeclType)
+                  & filter (hasName ideTypeName properName)
+                  & map (view ideTypeKind)
+                  & listToMaybe
+          in IdeDeclTypeOperator (op & ideTypeOpKind .~ k)
     resolveOperator x = x
 
-mapIdeDeclaration :: (IdeDeclaration -> IdeDeclaration) -> IdeDeclarationAnn -> IdeDeclarationAnn
-mapIdeDeclaration f (IdeDeclarationAnn ann decl) = IdeDeclarationAnn ann (f decl)

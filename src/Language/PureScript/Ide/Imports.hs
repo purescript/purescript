@@ -30,8 +30,10 @@ module Language.PureScript.Ide.Imports
        where
 
 import           Protolude
+
+import           Control.Lens                       ((^.))
+import           Data.List                          (findIndex, nubBy)
 import qualified Data.Text                          as T
-import           Data.List                          (nubBy, findIndex)
 import qualified Data.Text.IO                       as TIO
 import qualified Language.PureScript                as P
 import           Language.PureScript.Ide.Completion
@@ -197,16 +199,16 @@ addExplicitImport' decl moduleName imports =
     then imports
     else updateAtFirstOrPrepend matches (insertDeclIntoImport decl) freshImport imports
   where
-    refFromDeclaration (IdeTypeClass n) =
+    refFromDeclaration (IdeDeclTypeClass n) =
       P.TypeClassRef n
-    refFromDeclaration (IdeDataConstructor n tn _) =
-      P.TypeRef tn (Just [n])
-    refFromDeclaration (IdeType n _) =
-      P.TypeRef n (Just [])
-    refFromDeclaration (IdeValueOperator op _ _ _ _) =
-      P.ValueOpRef op
-    refFromDeclaration (IdeTypeOperator op _ _ _ _) =
-      P.TypeOpRef op
+    refFromDeclaration (IdeDeclDataConstructor dtor) =
+      P.TypeRef (dtor ^. ideDtorTypeName) (Just [dtor ^. ideDtorName])
+    refFromDeclaration (IdeDeclType t) =
+      P.TypeRef (t ^. ideTypeName) (Just [])
+    refFromDeclaration (IdeDeclValueOperator op) =
+      P.ValueOpRef (op ^. ideValueOpName)
+    refFromDeclaration (IdeDeclTypeOperator op) =
+      P.TypeOpRef (op ^. ideTypeOpName)
     refFromDeclaration d =
       P.ValueRef $ P.Ident $ T.unpack (identifierFromIdeDeclaration d)
 
@@ -218,8 +220,12 @@ addExplicitImport' decl moduleName imports =
     insertDeclIntoImport _ is = is
 
     insertDeclIntoRefs :: IdeDeclaration -> [P.DeclarationRef] -> [P.DeclarationRef]
-    insertDeclIntoRefs (IdeDataConstructor dtor tn _) refs =
-      updateAtFirstOrPrepend (matchType tn) (insertDtor dtor) (P.TypeRef tn (Just [dtor])) refs
+    insertDeclIntoRefs d@(IdeDeclDataConstructor dtor) refs =
+      updateAtFirstOrPrepend
+        (matchType (dtor ^. ideDtorTypeName))
+        (insertDtor (dtor ^. ideDtorName))
+        (refFromDeclaration d)
+        refs
     insertDeclIntoRefs dr refs = nubBy ((==) `on` P.prettyPrintRef) (refFromDeclaration dr : refs)
 
     insertDtor dtor (P.TypeRef tn' dtors) =
@@ -294,9 +300,9 @@ addImportForIdentifier fp ident filters = do
     xs ->
       pure $ Left xs
     where
-      decideRedundantCase dtor@(IdeDataConstructor _ t _) (IdeType t' _) =
-        if t == t' then Just dtor else Nothing
-      decideRedundantCase IdeType{} ts@IdeTypeSynonym{} =
+      decideRedundantCase d@(IdeDeclDataConstructor dtor) (IdeDeclType t) =
+        if dtor ^. ideDtorTypeName == t ^. ideTypeName then Just d else Nothing
+      decideRedundantCase IdeDeclType{} ts@IdeDeclTypeSynonym{} =
         Just ts
       decideRedundantCase _ _ = Nothing
 

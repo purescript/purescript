@@ -104,7 +104,7 @@ handleCommand _ _ (KindOf typ)              = handleKindOf typ
 handleCommand _ _ (BrowseModule moduleName) = handleBrowse moduleName
 handleCommand _ _ (ShowInfo QueryLoaded)    = handleShowLoadedModules
 handleCommand _ _ (ShowInfo QueryImport)    = handleShowImportedModules
-handleCommand _ _ QuitPSCi                  = P.internalError "`handleCommand QuitPSCi` was called. This is a bug."
+handleCommand _ _ _                         = P.internalError "handleCommand: unexpected command"
 
 -- | Reset the application state
 handleResetState

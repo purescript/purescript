@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NamedFieldPuns #-}
 
@@ -27,13 +28,16 @@ module Language.PureScript.TypeChecker.Types
 
 import Prelude.Compat
 
+import Control.Arrow (first, second, (***))
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets)
 import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Writer.Class (MonadWriter(..))
 
+import Data.Bifunctor (bimap)
 import Data.Either (lefts, rights)
+import Data.Functor (($>))
 import Data.List (transpose, nub, (\\), partition, delete)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
@@ -53,8 +57,10 @@ import Language.PureScript.TypeChecker.Rows
 import Language.PureScript.TypeChecker.Skolems
 import Language.PureScript.TypeChecker.Subsumption
 import Language.PureScript.TypeChecker.Synonyms
+import Language.PureScript.TypeChecker.TypeSearch
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.Types
+
 
 data BindingGroupType
   = RecursiveBindingGroup
@@ -70,13 +76,13 @@ typesOf
   -> [(Ident, Expr)]
   -> m [(Ident, (Expr, Type))]
 typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
-    (tys, w) <- withoutWarnings . capturingSubstitution tidyUp $ do
+    tys <- capturingSubstitution tidyUp $ do
       (untyped, typed, dict, untypedDict) <- typeDictionaryForBindingGroup (Just moduleName) vals
-      ds1 <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
-      ds2 <- forM untyped $ \e -> typeForBindingGroupElement e dict untypedDict
-      return (map (\x -> (False, x)) ds1 ++ map (\x -> (True, x)) ds2)
+      ds1 <- parU typed $ \e -> withoutWarnings $ checkTypedBindingGroupElement moduleName e dict
+      ds2 <- forM untyped $ \e -> withoutWarnings $ typeForBindingGroupElement e dict untypedDict
+      return (map (False, ) ds1 ++ map (True, ) ds2)
 
-    inferred <- forM tys $ \(shouldGeneralize, (ident, (val, ty))) -> do
+    inferred <- forM tys $ \(shouldGeneralize, ((ident, (val, ty)), _)) -> do
       -- Replace type class dictionary placeholders with actual dictionaries
       (val', unsolved) <- replaceTypeClassDictionaries shouldGeneralize val
       -- Generalize and constrain the type
@@ -96,7 +102,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           $ CannotGeneralizeRecursiveFunction ident generalized
         -- Make sure any unsolved type constraints only use type variables which appear
         -- unknown in the inferred type.
-        forM_ unsolved $ \(_, con) -> do
+        forM_ unsolved $ \(_, _, con) -> do
           -- We need information about functional dependencies, since we allow
           -- ambiguous types to be inferred if they can be solved by some functional
           -- dependency.
@@ -104,33 +110,56 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           TypeClassData{ typeClassDependencies } <- gets (findClass . typeClasses . checkEnv)
           let solved = foldMap (S.fromList . fdDetermined) typeClassDependencies
           let constraintTypeVars = nub . foldMap (unknownsInType . fst) . filter ((`notElem` solved) . snd) $ zip (constraintArgs con) [0..]
-          when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $
+          when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $ do
             throwError . onErrorMessages (replaceTypes currentSubst) . errorMessage $ NoInstanceFound con
 
       -- Check skolem variables did not escape their scope
       skolemEscapeCheck val'
       -- Check rows do not contain duplicate labels
       checkDuplicateLabels val'
-      return (ident, (foldr (Abs . Left . fst) val' unsolved, generalized))
+      return ((ident, (foldr (Abs . Left . (\(x, _, _) -> x)) val' unsolved, generalized)), unsolved)
 
     -- Show warnings here, since types in wildcards might have been solved during
     -- instance resolution (by functional dependencies).
-    finalSubst <- gets checkSubstitution
-    escalateWarningWhen isHoleError . tell . onErrorMessages (replaceTypes finalSubst) $ w
+    finalState <- get
+    forM_ tys $ \(shouldGeneralize, ((_, (_, _)), w)) -> do
+      let replaceTypes' = replaceTypes (checkSubstitution finalState)
+          runTypeSearch' = runTypeSearch (guard shouldGeneralize $> foldMap snd inferred) finalState
+      (escalateWarningWhen isHoleError . tell . onErrorMessages (runTypeSearch' . replaceTypes')) w
 
-    return inferred
+    return (map fst inferred)
   where
+    replaceTypes
+      :: Substitution
+      -> ErrorMessage
+      -> ErrorMessage
     replaceTypes subst = onTypesInErrorMessage (substituteType subst)
+
+    -- | Run type search to complete any typed hole error messages
+    runTypeSearch
+      :: Maybe [(Ident, InstanceContext, Constraint)]
+      -- ^ Any unsolved constraints which we need to continue to satisfy
+      -> CheckState
+      -- ^ The final type checker state
+      -> ErrorMessage
+      -> ErrorMessage
+    runTypeSearch cons st = \case
+      ErrorMessage hints (HoleInferredType x ty y (TSBefore env)) ->
+        let subst = checkSubstitution st
+            searchResult = (fmap . fmap) (substituteType subst)
+                             (M.toList (typeSearch cons env st (substituteType subst ty)))
+        in ErrorMessage hints (HoleInferredType x ty y (TSAfter searchResult))
+      other -> other
 
     -- | Generalize type vars using forall and add inferred constraints
     generalize unsolved = varIfUnknown . constrain unsolved
 
     -- | Add any unsolved constraints
     constrain [] = id
-    constrain cs = ConstrainedType (map snd cs)
+    constrain cs = ConstrainedType (map (\(_, _, x) -> x) cs)
 
     -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
-    tidyUp ts sub = map (\(b, (i, (val, ty))) -> (b, (i, (overTypes (substituteType sub) val, substituteType sub ty)))) ts
+    tidyUp ts sub = map (second (first (second (overTypes (substituteType sub) *** substituteType sub)))) ts
 
     isHoleError :: ErrorMessage -> Bool
     isHoleError (ErrorMessage _ HoleInferredType{}) = True
@@ -199,18 +228,11 @@ typeForBindingGroupElement (ident, val) dict untypedDict = do
 -- | Check if a value contains a type annotation
 isTyped :: (Ident, Expr) -> Either (Ident, Expr) (Ident, (Expr, Type, Bool))
 isTyped (name, TypedValue checkType value ty) = Right (name, (value, ty, checkType))
+isTyped (name, PositionedValue pos c value) =
+  bimap (second (PositionedValue pos c))
+        (second (\(e, t, b) -> (PositionedValue pos c e, t, b)))
+        (isTyped (name, value))
 isTyped (name, value) = Left (name, value)
-
--- |
--- Map a function over type annotations appearing inside a value
---
-overTypes :: (Type -> Type) -> Expr -> Expr
-overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
-  where
-  g :: Expr -> Expr
-  g (TypedValue checkTy val t) = TypedValue checkTy val (f t)
-  g (TypeClassDictionary c sco hints) = TypeClassDictionary (mapConstraintArgs (map f) c) sco hints
-  g other = other
 
 -- | Check the kind of a type, failing if it is not of kind *.
 checkTypeKind ::
@@ -339,7 +361,8 @@ infer' (TypedValue checkType val ty) = do
 infer' (Hole name) = do
   ty <- freshType
   ctx <- getLocalContext
-  tell . errorMessage $ HoleInferredType name ty ctx
+  env <- getEnv
+  tell . errorMessage $ HoleInferredType name ty ctx (TSBefore env)
   return $ TypedValue True (Hole name) ty
 infer' (PositionedValue pos c val) = warnAndRethrowWithPositionTC pos $ do
   TypedValue t v ty <- infer' val
