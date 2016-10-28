@@ -23,7 +23,6 @@ import           Data.Traversable (for)
 import           Data.Version (showVersion)
 import qualified Filesystem.Path.CurrentOS as Path
 import           GHC.Generics (Generic)
-import           Network.HTTP.Simple (getResponseBody, httpLBS)
 import qualified Options.Applicative as Opts
 import qualified Paths_purescript as Paths
 import qualified System.IO as IO
@@ -44,13 +43,11 @@ pathToTextUnsafe = either (error "Path.toText failed") id . Path.toText
 
 defaultPackage :: Text -> PackageConfig
 defaultPackage pkgName =
-    PackageConfig { name    = pkgName
-                  , depends = [ "prelude" ]
-                  , set     = branchName
-                  , source  = "https://raw.githubusercontent.com/purescript/package-sets/" <> branchName <> "/packages.json"
-                  }
-  where
-    branchName = "psc-" <> pack (showVersion Paths.version)
+  PackageConfig { name    = pkgName
+                , depends = [ "prelude" ]
+                , set     = "psc-" <> pack (showVersion Paths.version)
+                , source  = "https://github.com/purescript/package-sets.git"
+                }
 
 readPackageFile :: IO PackageConfig
 readPackageFile = do
@@ -114,18 +111,13 @@ cloneShallow from ref into =
 
 getPackageSet :: PackageConfig -> IO ()
 getPackageSet PackageConfig{ source, set } = do
-  let pkgDir = ".psc-package" </> fromText set
-      pkgFile = unpack (pathToTextUnsafe (pkgDir </> "packages.json"))
+  let pkgDir = ".psc-package" </> fromText set </> ".set"
   exists <- testdir pkgDir
-  unless exists . void $ do
-    echo ("Downloading package set config from " <> source)
-    res <- httpLBS (fromString (unpack source))
-    mktree pkgDir
-    BL.writeFile pkgFile (getResponseBody res)
+  unless exists . void $ cloneShallow source set pkgDir
 
 readPackageSet :: PackageConfig -> IO PackageSet
 readPackageSet PackageConfig{ set } = do
-  let dbFile = ".psc-package" </> fromText set </> "packages.json"
+  let dbFile = ".psc-package" </> fromText set </> ".set" </> "packages.json"
   exists <- testfile dbFile
   unless exists $ do
     echo "packages.json does not exist"

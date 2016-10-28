@@ -414,7 +414,6 @@ executable psc-package
                    bytestring -any,
                    containers -any,
                    foldl -any,
-                   http-conduit -any,
                    optparse-applicative -any,
                    system-filepath -any,
                    text -any,
