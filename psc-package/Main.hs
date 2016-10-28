@@ -9,13 +9,12 @@ module Main where
 
 import qualified Data.Aeson as Aeson
 import           Data.Aeson.Encode.Pretty
-import qualified Data.ByteString.Lazy as BL
 import           Data.Foldable (fold, for_, traverse_)
 import           Data.List (nub)
 import qualified Data.Map as Map
 import           Data.Maybe (mapMaybe)
 import qualified Data.Set as Set
-import           Data.Text (pack, unpack)
+import           Data.Text (pack)
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Builder as TB
 import           Data.Text.Encoding (encodeUtf8)
