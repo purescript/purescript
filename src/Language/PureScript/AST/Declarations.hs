@@ -83,6 +83,7 @@ data SimpleErrorMessage
   | ConstrainedTypeUnified Type Type
   | OverlappingInstances (Qualified (ProperName 'ClassName)) [Type] [Qualified Ident]
   | NoInstanceFound Constraint
+  | AmbiguousTypeVariables Ident Type Constraint
   | UnknownClass (Qualified (ProperName 'ClassName))
   | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [Type]
   | CannotDerive (Qualified (ProperName 'ClassName)) [Type]
