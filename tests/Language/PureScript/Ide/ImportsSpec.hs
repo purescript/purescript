@@ -3,6 +3,7 @@
 module Language.PureScript.Ide.ImportsSpec where
 
 import           Protolude
+import           Data.List                       (nub)
 import           Data.Maybe                      (fromJust)
 
 import qualified Language.PureScript             as P
@@ -128,3 +129,38 @@ spec = do
       [ "import Prelude"
       , "import Data.Array (tail)"
       ]
+
+  describe "explicit import sorting" $ do
+    -- given some basic import skeleton
+    let Right (_, _, baseImports, _) = sliceImportSection $ withImports ["import Control.Monad (ap)"]
+        moduleName = (P.moduleNameFromString "Control.Monad")
+        addImport imports import' = addExplicitImport' import' moduleName imports
+        valueImport ident = (IdeDeclValue (IdeValue (P.Ident ident) wildcard))
+        typeImport name = (IdeDeclType (IdeType (P.ProperName name) P.Star))
+        classImport name = (IdeDeclTypeClass (P.ProperName name))
+        dtorImport name typeName = (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName name) (P.ProperName typeName) wildcard))
+        -- expect any list of provided identifiers, when imported, to come out as specified
+        expectSorted imports expected = shouldBe
+          (nub $ map
+            (prettyPrintImportSection . foldl addImport baseImports)
+            (permutations imports))
+          [expected]
+    it "sorts class" $
+      expectSorted (map classImport ["Applicative", "Bind"])
+        ["import Prelude", "import Control.Monad (class Applicative, class Bind, ap)"]
+    it "sorts value" $
+      expectSorted (map valueImport ["unless", "where"])
+        ["import Prelude", "import Control.Monad (ap, unless, where)"]
+    it "sorts type, value" $
+      expectSorted
+        ((map valueImport ["unless", "where"]) ++ (map typeImport ["Foo", "Bar"]))
+        ["import Prelude", "import Control.Monad (Bar, Foo, ap, unless, where)"]
+    it "sorts class, type, value" $
+      expectSorted
+        ((map valueImport ["unless", "where"]) ++ (map typeImport ["Foo", "Bar"]) ++ (map classImport ["Applicative", "Bind"]))
+        ["import Prelude", "import Control.Monad (class Applicative, class Bind, Bar, Foo, ap, unless, where)"]
+    it "sorts type with constructors" $
+      expectSorted
+        -- the imported names don't actually have to exist!
+        (map (uncurry dtorImport) [("Just", "Maybe"), ("Nothing", "Maybe"), ("SomeOtherConstructor", "SomeDataType")])
+        ["import Prelude", "import Control.Monad (Maybe(Just, Nothing), SomeDataType(SomeOtherConstructor), ap)"]
