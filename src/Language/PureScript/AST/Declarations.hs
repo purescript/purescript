@@ -260,10 +260,9 @@ instance Eq DeclarationRef where
   r == (PositionedDeclarationRef _ _ r') = r == r'
   _ == _ = False
 
--- enable sorting lists of explicitly imported refs
-instance Ord DeclarationRef where
-  compare = compDecRef
-
+-- enable sorting lists of explicitly imported refs when suggesting imports in linting, IDE, etc.
+-- not an Ord because this implementation is not consistent with its Eq instance.
+-- think of it as a notion of contextual, not inherent, ordering.
 compDecRef :: DeclarationRef -> DeclarationRef -> Ordering
 compDecRef (TypeRef name _) (TypeRef name' _) = compare name name'
 compDecRef (TypeOpRef name) (TypeOpRef name') = compare name name'
@@ -273,19 +272,18 @@ compDecRef (TypeClassRef name) (TypeClassRef name') = compare name name'
 compDecRef (TypeInstanceRef ident) (TypeInstanceRef ident') = compare ident ident'
 compDecRef (ModuleRef name) (ModuleRef name') = compare name name'
 compDecRef (ReExportRef name _) (ReExportRef name' _) = compare name name'
-compDecRef (PositionedDeclarationRef _ _ ref) (PositionedDeclarationRef _ _ ref') = compare ref ref'
-compDecRef ref ref' = compare (orderOf ref) (orderOf ref')
+compDecRef (PositionedDeclarationRef _ _ ref) ref' = compDecRef ref ref'
+compDecRef ref (PositionedDeclarationRef _ _ ref') = compDecRef ref ref'
+compDecRef ref ref' = compare
+  (orderOf ref) (orderOf ref')
     where
       orderOf :: DeclarationRef -> Int
-      orderOf (TypeRef _ _) = 7
-      orderOf (TypeOpRef _) = 3
-      orderOf (ValueRef _) = 8
+      orderOf (TypeClassRef _) = 0
+      orderOf (TypeOpRef _) = 1
+      orderOf (TypeRef _ _) = 2
+      orderOf (ValueRef _) = 3
       orderOf (ValueOpRef _) = 4
-      orderOf (TypeClassRef _) = 5
-      orderOf (TypeInstanceRef _) = 6
-      orderOf (ModuleRef _) = 2
-      orderOf (ReExportRef _ _) = 1
-      orderOf (PositionedDeclarationRef _ _ _) = 0
+      orderOf _ = 5
 
 getTypeRef :: DeclarationRef -> Maybe (ProperName 'TypeName, Maybe [ProperName 'ConstructorName])
 getTypeRef (TypeRef name dctors) = Just (name, dctors)
