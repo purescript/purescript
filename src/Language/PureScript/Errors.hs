@@ -638,8 +638,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
         where
         go TUnknown{} = True
         go _ = False
-    renderSimpleErrorMessage (AmbiguousTypeVariables t (Constraint nm ts _)) =
-      paras [ line $ "The inferred type " ++ (markCode (prettyPrintTypeAtom t)) ++ " has type variables which are not mentioned in the body of the type. Consider adding a type annotation."
+    renderSimpleErrorMessage (AmbiguousTypeVariables t _) =
+      paras [ line "The inferred type"
+            , indent $ line $ markCode $ prettyPrintType t
+            , line "has type variables which are not mentioned in the body of the type. Consider adding a type annotation."
             ]
     renderSimpleErrorMessage (PossiblyInfiniteInstance nm ts) =
       paras [ line "Type class instance for"
