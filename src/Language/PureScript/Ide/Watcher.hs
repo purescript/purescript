@@ -40,10 +40,13 @@ reloadFile ref ev = do
 
 -- | Installs filewatchers for the given directory and reloads ExternsFiles when
 -- they change on disc
-watcher :: TVar IdeState -> FilePath -> IO ()
-watcher stateVar fp =
-  withManagerConf (defaultConfig { confDebounce = NoDebounce }) $ \mgr -> do
-    _ <- watchTree mgr fp
-      (\ev -> takeFileName (eventPath ev) == "externs.json")
-      (reloadFile stateVar)
-    forever (threadDelay 100000)
+watcher :: Bool -> TVar IdeState -> FilePath -> IO ()
+watcher polling stateVar fp =
+  withManagerConf
+    (defaultConfig { confDebounce = NoDebounce
+                   , confUsePolling = polling
+                   }) $ \mgr -> do
+      _ <- watchTree mgr fp
+        (\ev -> takeFileName (eventPath ev) == "externs.json")
+        (reloadFile stateVar)
+      forever (threadDelay 100000)

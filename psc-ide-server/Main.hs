@@ -41,6 +41,7 @@ import           Network.Socket                    hiding (PortNumber, Type,
 import           Options.Applicative               (ParseError (..))
 import qualified Options.Applicative               as Opts
 import           System.Directory
+import           System.Info                       as SysInfo
 import           System.FilePath
 import           System.IO                         hiding (putStrLn, print)
 import           System.IO.Error                   (isEOFError)
@@ -66,12 +67,14 @@ data Options = Options
   , optionsOutputPath :: FilePath
   , optionsPort       :: PortNumber
   , optionsNoWatch    :: Bool
+  , optionsPolling    :: Bool
   , optionsDebug      :: Bool
-  }
+  } deriving (Show)
 
 main :: IO ()
 main = do
-  Options dir globs outputPath port noWatch debug <- Opts.execParser opts
+  opts'@(Options dir globs outputPath port noWatch polling debug) <- Opts.execParser opts
+  when debug (putText "Parsed Options:" *> print opts')
   maybe (pure ()) setCurrentDirectory dir
   ideState <- newTVarIO emptyIdeState
   cwd <- getCurrentDirectory
@@ -84,7 +87,7 @@ main = do
     putText "psc-ide needs you to compile your project (for example by running pulp build)"
 
   unless noWatch $
-    void (forkFinally (watcher ideState fullOutputPath) print)
+    void (forkFinally (watcher polling ideState fullOutputPath) print)
 
   let conf = Configuration {confDebug = debug, confOutputPath = outputPath, confGlobs = globs}
       env = IdeEnvironment {ideStateVar = ideState, ideConfiguration = conf}
@@ -98,11 +101,16 @@ main = do
         <*> (fromIntegral <$>
              Opts.option Opts.auto (Opts.long "port" `mappend` Opts.short 'p' `mappend` Opts.value (4242 :: Integer)))
         <*> Opts.switch (Opts.long "no-watch")
+        <*> flipIfWindows (Opts.switch (Opts.long "polling"))
         <*> Opts.switch (Opts.long "debug")
     opts = Opts.info (version <*> Opts.helper <*> parser) mempty
     version = Opts.abortOption
       (InfoMsg (showVersion Paths.version))
       (Opts.long "version" `mappend` Opts.help "Show the version number")
+
+    -- polling is the default on Windows and the flag turns it off. See
+    -- #2209 and #2414 for explanations
+    flipIfWindows = map (if SysInfo.os == "mingw32" then not else identity)
 
 startServer :: PortNumber -> IdeEnvironment -> IO ()
 startServer port env = withSocketsDo $ do
