@@ -100,7 +100,7 @@ spec = do
       shouldBe
         (addOpImport (P.OpName "<~>") (P.moduleNameFromString "Data.Array") explicitImports)
         [ "import Prelude"
-        , "import Data.Array ((<~>), tail)"
+        , "import Data.Array (tail, (<~>))"
         ]
     it "adds the type for a given DataConstructor" $
         shouldBe
