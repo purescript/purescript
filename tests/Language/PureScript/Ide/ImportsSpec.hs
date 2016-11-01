@@ -3,7 +3,6 @@
 module Language.PureScript.Ide.ImportsSpec where
 
 import           Protolude
-import           Data.List                       (nub)
 import           Data.Maybe                      (fromJust)
 
 import qualified Language.PureScript             as P
@@ -141,7 +140,7 @@ spec = do
         dtorImport name typeName = (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName name) (P.ProperName typeName) wildcard))
         -- expect any list of provided identifiers, when imported, to come out as specified
         expectSorted imports expected = shouldBe
-          (nub $ map
+          (ordNub $ map
             (prettyPrintImportSection . foldl addImport baseImports)
             (permutations imports))
           [expected]

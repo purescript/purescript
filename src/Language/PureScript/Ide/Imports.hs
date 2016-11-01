@@ -216,7 +216,7 @@ addExplicitImport' decl moduleName imports =
     -- TypeDeclaration "Maybe" + Data.Maybe (maybe) -> Data.Maybe(Maybe, maybe)
     insertDeclIntoImport :: IdeDeclaration -> Import -> Import
     insertDeclIntoImport decl' (Import mn (P.Explicit refs) Nothing) =
-      Import mn (P.Explicit (sort $ insertDeclIntoRefs decl' refs)) Nothing
+      Import mn (P.Explicit (sort (insertDeclIntoRefs decl' refs))) Nothing
     insertDeclIntoImport _ is = is
 
     insertDeclIntoRefs :: IdeDeclaration -> [P.DeclarationRef] -> [P.DeclarationRef]
@@ -230,7 +230,7 @@ addExplicitImport' decl moduleName imports =
 
     insertDtor dtor (P.TypeRef tn' dtors) =
       case dtors of
-        Just dtors' -> P.TypeRef tn' (Just (sort $ ordNub (dtor : dtors')))
+        Just dtors' -> P.TypeRef tn' (Just (sort (ordNub (dtor : dtors'))))
         -- This means the import was opened. We don't add anything in this case
         -- import Data.Maybe (Maybe(..)) -> import Data.Maybe (Maybe(Just))
         Nothing -> P.TypeRef tn' Nothing
