@@ -113,7 +113,7 @@ spec = do
       shouldBe
         (addDtorImport "Just" (P.ProperName "Maybe") (P.moduleNameFromString "Data.Maybe") typeImports)
         [ "import Prelude"
-        , "import Data.Maybe (Maybe(Just))"
+        , "import Data.Maybe (Maybe(..))"
         ]
     it "doesn't add a dataconstructor to an existing type import with open dtors" $ do
       let Right (_, _, typeImports, _) = sliceImportSection (withImports ["import Data.Maybe (Maybe(..))"])
@@ -162,4 +162,4 @@ spec = do
       expectSorted
         -- the imported names don't actually have to exist!
         (map (uncurry dtorImport) [("Just", "Maybe"), ("Nothing", "Maybe"), ("SomeOtherConstructor", "SomeDataType")])
-        ["import Prelude", "import Control.Monad (Maybe(Just, Nothing), SomeDataType(SomeOtherConstructor), ap)"]
+        ["import Prelude", "import Control.Monad (Maybe(..), SomeDataType(SomeOtherConstructor), ap)"]

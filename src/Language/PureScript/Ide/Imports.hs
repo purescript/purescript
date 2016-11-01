@@ -228,12 +228,7 @@ addExplicitImport' decl moduleName imports =
         refs
     insertDeclIntoRefs dr refs = nubBy ((==) `on` P.prettyPrintRef) (refFromDeclaration dr : refs)
 
-    insertDtor dtor (P.TypeRef tn' dtors) =
-      case dtors of
-        Just dtors' -> P.TypeRef tn' (Just (sort (ordNub (dtor : dtors'))))
-        -- This means the import was opened. We don't add anything in this case
-        -- import Data.Maybe (Maybe(..)) -> import Data.Maybe (Maybe(Just))
-        Nothing -> P.TypeRef tn' Nothing
+    insertDtor _ (P.TypeRef tn' _) = P.TypeRef tn' Nothing
     insertDtor _ refs = refs
 
     matchType :: P.ProperName 'P.TypeName -> P.DeclarationRef -> Bool
