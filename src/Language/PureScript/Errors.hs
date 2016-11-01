@@ -639,13 +639,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
         go TUnknown{} = True
         go _ = False
     renderSimpleErrorMessage (AmbiguousTypeVariables t (Constraint nm ts _)) =
-      paras [ line "Inferred type"
-            , markCodeBox $ typeAtomAsBox t
-            , line " has constraints, but we don't know what type values they require. Please add an explicit type declaration for: "
-            , markCodeBox $ indent $ Box.hsep 1 Box.left
-                [ line (showQualified runProperName nm)
-                , Box.vcat Box.left (map typeAtomAsBox ts)
-                ]
+      paras [ line $ "The inferred type " ++ (markCode (prettyPrintTypeAtom t)) ++ " has type variables which are not mentioned in the body of the type. Consider adding a type annotation."
             ]
     renderSimpleErrorMessage (PossiblyInfiniteInstance nm ts) =
       paras [ line "Type class instance for"
