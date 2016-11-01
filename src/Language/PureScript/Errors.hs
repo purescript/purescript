@@ -262,7 +262,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
   gSimple (NoInstanceFound con) = NoInstanceFound <$> overConstraintArgs (traverse f) con
-  gSimple (AmbiguousTypeVariables cl t con) = AmbiguousTypeVariables cl <$> (f t) <*> pure con
+  gSimple (AmbiguousTypeVariables t con) = AmbiguousTypeVariables <$> (f t) <*> pure con
   gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> pure insts
   gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
   gSimple (CannotDerive cl ts) = CannotDerive cl <$> traverse f ts
@@ -638,10 +638,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
         where
         go TUnknown{} = True
         go _ = False
-    renderSimpleErrorMessage (AmbiguousTypeVariables ident t (Constraint nm ts _)) =
-      paras [ line $ markCode (showIdent ident) ++ " doesn't have a type declaration, so it was inferred to be of type: "
+    renderSimpleErrorMessage (AmbiguousTypeVariables t (Constraint nm ts _)) =
+      paras [ line "Inferred type"
             , markCodeBox $ typeAtomAsBox t
-            , line $ "We don't know what instances to use to satisfy the following constraints. Please add a type declaration that specifies their types."
+            , line " has constraints, but we don't know what type values they require. Please add an explicit type declaration for: "
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
                 , Box.vcat Box.left (map typeAtomAsBox ts)
