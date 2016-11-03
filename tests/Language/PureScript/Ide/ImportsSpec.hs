@@ -73,6 +73,8 @@ spec = do
           prettyPrintImportSection (addExplicitImport' (IdeDeclValueOperator (IdeValueOperator op (P.Qualified Nothing (Left (P.Ident ""))) 2 P.Infix Nothing)) mn is)
         addDtorImport i t mn is =
           prettyPrintImportSection (addExplicitImport' (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName i) t wildcard)) mn is)
+        addTypeImport i mn is =
+          prettyPrintImportSection (addExplicitImport' (IdeDeclType (IdeType (P.ProperName i) P.Star)) mn is)
     it "adds an implicit unqualified import" $
       shouldBe
         (addImplicitImport' simpleFileImports (P.moduleNameFromString "Data.Map"))
@@ -102,11 +104,17 @@ spec = do
         [ "import Prelude"
         , "import Data.Array (tail, (<~>))"
         ]
+    it "adds a type with constructors without automatically adding an open import of said constructors " $
+        shouldBe
+          (addTypeImport "Maybe" (P.moduleNameFromString "Data.Maybe") simpleFileImports)
+          [ "import Prelude"
+          , "import Data.Maybe (Maybe)"
+          ]
     it "adds the type for a given DataConstructor" $
         shouldBe
           (addDtorImport "Just" (P.ProperName "Maybe") (P.moduleNameFromString "Data.Maybe") simpleFileImports)
           [ "import Prelude"
-          , "import Data.Maybe (Maybe(Just))"
+          , "import Data.Maybe (Maybe(..))"
           ]
     it "adds a dataconstructor to an existing type import" $ do
       let Right (_, _, typeImports, _) = sliceImportSection (withImports ["import Data.Maybe (Maybe)"])
@@ -158,8 +166,8 @@ spec = do
       expectSorted
         ((map valueImport ["unless", "where"]) ++ (map typeImport ["Foo", "Bar"]) ++ (map classImport ["Applicative", "Bind"]))
         ["import Prelude", "import Control.Monad (class Applicative, class Bind, Bar, Foo, ap, unless, where)"]
-    it "sorts type with constructors" $
+    it "sorts types with constructors, using open imports for the constructors" $
       expectSorted
         -- the imported names don't actually have to exist!
         (map (uncurry dtorImport) [("Just", "Maybe"), ("Nothing", "Maybe"), ("SomeOtherConstructor", "SomeDataType")])
-        ["import Prelude", "import Control.Monad (Maybe(..), SomeDataType(SomeOtherConstructor), ap)"]
+        ["import Prelude", "import Control.Monad (Maybe(..), SomeDataType(..), ap)"]

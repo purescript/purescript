@@ -202,7 +202,7 @@ addExplicitImport' decl moduleName imports =
     refFromDeclaration (IdeDeclTypeClass n) =
       P.TypeClassRef n
     refFromDeclaration (IdeDeclDataConstructor dtor) =
-      P.TypeRef (dtor ^. ideDtorTypeName) (Just [dtor ^. ideDtorName])
+      P.TypeRef (dtor ^. ideDtorTypeName) Nothing
     refFromDeclaration (IdeDeclType t) =
       P.TypeRef (t ^. ideTypeName) (Just [])
     refFromDeclaration (IdeDeclValueOperator op) =
