@@ -19,6 +19,7 @@ import Prelude hiding (lex)
 
 import Data.Functor (($>))
 import Data.Maybe (fromMaybe)
+import Data.Text (Text)
 
 import Control.Applicative
 import Control.Arrow ((+++))
@@ -281,7 +282,7 @@ parseModulesFromFiles
   :: forall m k
    . MonadError MultipleErrors m
   => (k -> FilePath)
-  -> [(k, String)]
+  -> [(k, Text)]
   -> m [(k, Module)]
 parseModulesFromFiles toFilePath input =
   flip parU wrapError . inParallel . flip map input $ parseModuleFromFile toFilePath
@@ -298,11 +299,11 @@ parseModulesFromFiles toFilePath input =
 -- | Parses a single module with FilePath for eventual parsing errors
 parseModuleFromFile
   :: (k -> FilePath)
-  -> (k, String)
+  -> (k, Text)
   -> Either P.ParseError (k, Module)
 parseModuleFromFile toFilePath (k, content) = do
     let filename = toFilePath k
-    ts <- lex filename content
+    ts <- lex' filename content
     m <- runTokenParser filename parseModule ts
     pure (k, m)
 

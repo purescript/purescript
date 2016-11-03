@@ -334,6 +334,7 @@ executable psc
                    mtl -any,
                    optparse-applicative >= 0.12.1,
                    parsec -any,
+                   text -any,
                    time -any,
                    transformers -any,
                    transformers-compat -any,
@@ -387,6 +388,7 @@ executable psc-docs
                    optparse-applicative >= 0.12.1,
                    process -any,
                    split -any,
+                   text -any,
                    transformers -any,
                    transformers-compat -any
     main-is: Main.hs
@@ -419,7 +421,8 @@ executable psc-hierarchy
                    mtl -any,
                    optparse-applicative >= 0.12.1,
                    parsec -any,
-                   process -any
+                   process -any,
+                   text -any
     main-is: Main.hs
     other-modules: Paths_purescript
     buildable: True

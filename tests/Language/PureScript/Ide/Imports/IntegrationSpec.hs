@@ -6,12 +6,12 @@ module Language.PureScript.Ide.Imports.IntegrationSpec where
 import           Protolude
 
 import qualified Data.Text                           as T
-import qualified Data.Text.IO                        as TIO
 import qualified Language.PureScript.Ide.Integration as Integration
 import           Test.Hspec
 
 import           System.Directory
 import           System.FilePath
+import           System.IO.UTF8                      (readUTF8FileT)
 
 setup :: IO ()
 setup = void (Integration.reset *> Integration.loadAll)
@@ -27,7 +27,7 @@ withSupportFiles test = do
 outputFileShouldBe :: [Text] -> IO ()
 outputFileShouldBe expectation = do
   outFp <- (</> "src" </> "ImportsSpecOut.tmp") <$> Integration.projectDirectory
-  outRes <- TIO.readFile outFp
+  outRes <- readUTF8FileT outFp
   shouldBe (T.lines outRes) expectation
 
 spec :: Spec
