@@ -1,12 +1,11 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
 module Language.PureScript.Environment where
 
-import Prelude.Compat
+import Protolude hiding (Constraint)
+import Prelude (fail)
 
 import Data.Aeson.TH
-import Data.Maybe (fromMaybe)
 import qualified Data.Aeson as A
 import qualified Data.Map as M
 import qualified Data.Text as T
@@ -27,7 +26,7 @@ data Environment = Environment
   , dataConstructors :: M.Map (Qualified (ProperName 'ConstructorName)) (DataDeclType, ProperName 'TypeName, Type, [Ident])
   -- ^ Data constructors currently in scope, along with their associated type
   -- constructor name, argument types and return type.
-  , typeSynonyms :: M.Map (Qualified (ProperName 'TypeName)) ([(String, Maybe Kind)], Type)
+  , typeSynonyms :: M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe Kind)], Type)
   -- ^ Type synonyms currently in scope
   , typeClassDictionaries :: M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict))
   -- ^ Available type class dictionaries
@@ -37,7 +36,7 @@ data Environment = Environment
 
 -- | Information about a type class
 data TypeClassData = TypeClassData
-  { typeClassArguments :: [(String, Maybe Kind)]
+  { typeClassArguments :: [(Text, Maybe Kind)]
   -- ^ A list of type argument names, and their kinds, where kind annotations
   -- were provided.
   , typeClassMembers :: [(Ident, Type)]
@@ -105,7 +104,7 @@ data TypeKind
   -- |
   -- Data type
   --
-  = DataType [(String, Maybe Kind)] [(ProperName 'ConstructorName, [Type])]
+  = DataType [(Text, Maybe Kind)] [(ProperName 'ConstructorName, [Type])]
   -- |
   -- Type synonym
   --
@@ -138,7 +137,7 @@ data DataDeclType
   | Newtype
   deriving (Show, Eq, Ord)
 
-showDataDeclType :: DataDeclType -> String
+showDataDeclType :: DataDeclType -> Text
 showDataDeclType Data = "data"
 showDataDeclType Newtype = "newtype"
 
@@ -155,13 +154,13 @@ instance A.FromJSON DataDeclType where
 -- |
 -- Construct a ProperName in the Prim module
 --
-primName :: String -> Qualified (ProperName a)
+primName :: Text -> Qualified (ProperName a)
 primName = Qualified (Just $ ModuleName [ProperName C.prim]) . ProperName
 
 -- |
 -- Construct a type in the Prim module
 --
-primTy :: String -> Type
+primTy :: Text -> Type
 primTy = TypeConstructor . primName
 
 -- |
