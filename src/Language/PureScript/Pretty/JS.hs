@@ -15,6 +15,8 @@ import qualified Control.Arrow as A
 
 import Data.Maybe (fromMaybe)
 import Data.Monoid
+import Data.Text (Text)
+import qualified Data.Text as T
 
 import Language.PureScript.AST (SourceSpan(..))
 import Language.PureScript.CodeGen.JS.AST
@@ -25,6 +27,8 @@ import Language.PureScript.Pretty.Common
 
 import Numeric
 
+-- TODO (Christoph): Get rid of T.unpack / pack
+
 literals :: (Emit gen) => Pattern PrinterState JS gen
 literals = mkPattern' match'
   where
@@ -33,7 +37,7 @@ literals = mkPattern' match'
 
   match :: (Emit gen) => JS -> StateT PrinterState Maybe gen
   match (JSNumericLiteral _ n) = return $ emit $ either show show n
-  match (JSStringLiteral _ s) = return $ string s
+  match (JSStringLiteral _ s) = return $ string (T.unpack s)
   match (JSBooleanLiteral _ True) = return $ emit "true"
   match (JSBooleanLiteral _ False) = return $ emit "false"
   match (JSArrayLiteral _ xs) = mconcat <$> sequence
@@ -53,9 +57,9 @@ literals = mkPattern' match'
     , return $ emit "}"
     ]
     where
-    objectPropertyToString :: (Emit gen) => String -> gen
+    objectPropertyToString :: (Emit gen) => Text -> gen
     objectPropertyToString s | identNeedsEscaping s = emit $ show s
-                             | otherwise = emit s
+                             | otherwise = emit (T.unpack s)
   match (JSBlock _ sts) = mconcat <$> sequence
     [ return $ emit "{\n"
     , withIndent $ prettyStatements sts
@@ -63,9 +67,9 @@ literals = mkPattern' match'
     , currentIndent
     , return $ emit "}"
     ]
-  match (JSVar _ ident) = return $ emit ident
+  match (JSVar _ ident) = return $ emit (T.unpack ident)
   match (JSVariableIntroduction _ ident value) = mconcat <$> sequence
-    [ return $ emit $ "var " ++ ident
+    [ return $ emit $ "var " ++ T.unpack ident
     , maybe (return mempty) (fmap (emit " = " <>) . prettyPrintJS') value
     ]
   match (JSAssignment _ target value) = mconcat <$> sequence
@@ -80,15 +84,15 @@ literals = mkPattern' match'
     , prettyPrintJS' sts
     ]
   match (JSFor _ ident start end sts) = mconcat <$> sequence
-    [ return $ emit $ "for (var " ++ ident ++ " = "
+    [ return $ emit $ "for (var " ++ T.unpack ident ++ " = "
     , prettyPrintJS' start
-    , return $ emit $ "; " ++ ident ++ " < "
+    , return $ emit $ "; " ++ T.unpack ident ++ " < "
     , prettyPrintJS' end
-    , return $ emit $ "; " ++ ident ++ "++) "
+    , return $ emit $ "; " ++ T.unpack ident ++ "++) "
     , prettyPrintJS' sts
     ]
   match (JSForIn _ ident obj sts) = mconcat <$> sequence
-    [ return $ emit $ "for (var " ++ ident ++ " in "
+    [ return $ emit $ "for (var " ++ T.unpack ident ++ " in "
     , prettyPrintJS' obj
     , return $ emit ") "
     , prettyPrintJS' sts
@@ -108,10 +112,10 @@ literals = mkPattern' match'
     [ return $ emit "throw "
     , prettyPrintJS' value
     ]
-  match (JSBreak _ lbl) = return $ emit $ "break " ++ lbl
-  match (JSContinue _ lbl) = return $ emit $ "continue " ++ lbl
+  match (JSBreak _ lbl) = return $ emit $ "break " ++ T.unpack lbl
+  match (JSContinue _ lbl) = return $ emit $ "continue " ++ T.unpack lbl
   match (JSLabel _ lbl js) = mconcat <$> sequence
-    [ return $ emit $ lbl ++ ": "
+    [ return $ emit $ T.unpack lbl ++ ": "
     , prettyPrintJS' js
     ]
   match (JSComment _ com js) = fmap mconcat $ sequence $
@@ -127,8 +131,8 @@ literals = mkPattern' match'
     ]
     where
     commentLines :: Comment -> [String]
-    commentLines (LineComment s) = [s]
-    commentLines (BlockComment s) = lines s
+    commentLines (LineComment s) = [T.unpack s]
+    commentLines (BlockComment s) = lines (T.unpack s)
 
     asLine :: (Emit gen) => String -> StateT PrinterState Maybe gen
     asLine s = do
@@ -140,7 +144,7 @@ literals = mkPattern' match'
     removeComments (c : s) = c : removeComments s
 
     removeComments [] = []
-  match (JSRaw _ js) = return $ emit js
+  match (JSRaw _ js) = return $ emit (T.unpack js)
   match _ = mzero
 
 string :: (Emit gen) => String -> gen
@@ -175,7 +179,7 @@ conditional = mkPattern match
 accessor :: (Emit gen) => Pattern PrinterState JS (gen, JS)
 accessor = mkPattern match
   where
-  match (JSAccessor _ prop val) = Just (emit prop, val)
+  match (JSAccessor _ prop val) = Just (emit (T.unpack prop), val)
   match _ = Nothing
 
 indexer :: (Emit gen) => Pattern PrinterState JS (gen, JS)
@@ -188,7 +192,7 @@ indexer = mkPattern' match
 lam :: Pattern PrinterState JS ((Maybe String, [String], Maybe SourceSpan), JS)
 lam = mkPattern match
   where
-  match (JSFunction ss name args ret) = Just ((name, args, ss), ret)
+  match (JSFunction ss name args ret) = Just ((T.unpack <$> name, map T.unpack args, ss), ret)
   match _ = Nothing
 
 app :: (Emit gen) => Pattern PrinterState JS (gen, JS)
