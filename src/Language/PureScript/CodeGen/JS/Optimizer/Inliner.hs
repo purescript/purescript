@@ -15,6 +15,8 @@ import Protolude
 
 import Control.Monad.Supply.Class (MonadSupply, freshName)
 
+import Data.List (init, last)
+
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.CodeGen.JS.Optimizer.Common
 import qualified Language.PureScript.Constants as C
@@ -48,10 +50,11 @@ unThunk :: JS -> JS
 unThunk = everywhereOnJS convert
   where
   convert :: JS -> JS
-  convert (JSBlock ss jss) = fromMaybe (JSBlock ss []) $ do
-    JSReturn _ (JSApp _ (JSFunction _ Nothing [] (JSBlock _ body)) []) <- lastMay jss
-    init <- initMay jss
-    pure (JSBlock ss (init ++ body))
+  convert (JSBlock ss []) = JSBlock ss []
+  convert (JSBlock ss jss) =
+    case last jss of
+      JSReturn _ (JSApp _ (JSFunction _ Nothing [] (JSBlock _ body)) []) -> JSBlock ss $ init jss ++ body
+      _ -> JSBlock ss jss
   convert js = js
 
 evaluateIifes :: JS -> JS
