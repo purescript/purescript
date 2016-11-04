@@ -5,13 +5,13 @@
 --
 module Language.PureScript.Comments where
 
-import Prelude.Compat
+import Protolude
 
 import Data.Aeson.TH
 
 data Comment
-  = LineComment String
-  | BlockComment String
+  = LineComment Text
+  | BlockComment Text
   deriving (Show, Eq, Ord)
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Comment)
