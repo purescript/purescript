@@ -14,12 +14,9 @@ module Language.PureScript.Externs
   , applyExternsFileToEnvironment
   ) where
 
-import Prelude.Compat
+import Protolude hiding (Constraint)
 
 import Data.Aeson.TH
-import Data.Foldable (fold)
-import Data.List (find, foldl')
-import Data.Maybe (mapMaybe, maybeToList, fromMaybe)
 import Data.Version (showVersion)
 import qualified Data.Map as M
 
@@ -37,7 +34,7 @@ import Paths_purescript as Paths
 data ExternsFile = ExternsFile
   {
   -- | The externs version
-    efVersion :: String
+    efVersion :: Text
   -- | Module name
   , efModuleName :: ModuleName
   -- | List of module exports
@@ -100,7 +97,7 @@ data ExternsDeclaration =
   -- | A type synonym
   | EDTypeSynonym
       { edTypeSynonymName         :: ProperName 'TypeName
-      , edTypeSynonymArguments    :: [(String, Maybe Kind)]
+      , edTypeSynonymArguments    :: [(Text, Maybe Kind)]
       , edTypeSynonymType         :: Type
       }
   -- | A data construtor
@@ -119,7 +116,7 @@ data ExternsDeclaration =
   -- | A type class declaration
   | EDClass
       { edClassName               :: ProperName 'ClassName
-      , edClassTypeArguments      :: [(String, Maybe Kind)]
+      , edClassTypeArguments      :: [(Text, Maybe Kind)]
       , edClassMembers            :: [(Ident, Type)]
       , edClassConstraints        :: [Constraint]
       , edFunctionalDependencies  :: [FunctionalDependency]
@@ -159,7 +156,7 @@ moduleToExternsFile :: Module -> Environment -> ExternsFile
 moduleToExternsFile (Module _ _ _ _ Nothing) _ = internalError "moduleToExternsFile: module exports were not elaborated"
 moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
   where
-  efVersion       = showVersion Paths.version
+  efVersion       = toS (showVersion Paths.version)
   efModuleName    = mn
   efExports       = exps
   efImports       = mapMaybe importDecl ds
@@ -180,7 +177,7 @@ moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
   typeFixityDecl _ = Nothing
 
   findOp :: (DeclarationRef -> Maybe (OpName a)) -> OpName a -> DeclarationRef -> Bool
-  findOp get op = maybe False (== op) . get
+  findOp g op = maybe False (== op) . g
 
   importDecl :: Declaration -> Maybe ExternsImport
   importDecl (ImportDeclaration m mt qmn) = Just (ExternsImport m mt qmn)
