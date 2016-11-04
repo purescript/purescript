@@ -10,6 +10,7 @@ import Prelude.Compat
 import Control.Monad.State (StateT, modify, get)
 
 import Data.List (elemIndices, intersperse)
+import qualified Data.Text as T
 
 import Language.PureScript.AST (SourcePos(..), SourceSpan(..))
 import Language.PureScript.Parser.Lexer (reservedPsNames, isUnquotedKey)
@@ -142,9 +143,10 @@ prettyPrintMany f xs = do
 -- Prints an object key, escaping reserved names.
 --
 prettyPrintObjectKey :: String -> String
-prettyPrintObjectKey s | s `elem` reservedPsNames = show s
-                       | isUnquotedKey s = s
+prettyPrintObjectKey s | T.pack s `elem` reservedPsNames = show s
+                       | isUnquotedKey (T.pack s) = s
                        | otherwise = show s
+-- TODO(Christoph): get rid of T.pack
 
 -- | Place a box before another, vertically when the first box takes up multiple lines.
 before :: Box -> Box -> Box
