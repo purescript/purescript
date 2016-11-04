@@ -11,7 +11,7 @@ module Language.PureScript.CodeGen.JS.Optimizer.Inliner
   , evaluateIifes
   ) where
 
-import Protolude
+import Language.PureScript.Prelude
 
 import Control.Monad.Supply.Class (MonadSupply, freshName)
 

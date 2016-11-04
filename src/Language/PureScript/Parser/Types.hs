@@ -5,7 +5,7 @@ module Language.PureScript.Parser.Types
   , parseTypeAtom
   ) where
 
-import Protolude
+import Language.PureScript.Prelude
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.Environment

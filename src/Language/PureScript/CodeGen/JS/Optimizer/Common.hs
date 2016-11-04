@@ -3,14 +3,13 @@
 --
 module Language.PureScript.CodeGen.JS.Optimizer.Common where
 
-import Protolude hiding (check)
+import Language.PureScript.Prelude hiding (check)
 
-import Data.List (lookup)
 import Language.PureScript.Crash
 import Language.PureScript.CodeGen.JS.AST
 
 applyAll :: [a -> a] -> a -> a
-applyAll = foldl' (.) identity
+applyAll = foldl' (.) id
 
 replaceIdent :: Text -> JS -> JS -> JS
 replaceIdent var1 js = everywhereOnJS replace

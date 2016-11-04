@@ -3,7 +3,7 @@
 --
 module Language.PureScript.CodeGen.JS.Optimizer.TCO (tco) where
 
-import Protolude
+import Language.PureScript.Prelude
 
 import Language.PureScript.Options
 import Language.PureScript.CodeGen.JS.AST
@@ -12,7 +12,7 @@ import Language.PureScript.CodeGen.JS.AST
 -- Eliminate tail calls
 --
 tco :: Options -> JS -> JS
-tco opts | optionsNoTco opts = identity
+tco opts | optionsNoTco opts = id
          | otherwise = tco'
 
 tco' :: JS -> JS
@@ -30,7 +30,7 @@ tco' = everywhereOnJS convert
   convert :: JS -> JS
   convert js@(JSVariableIntroduction ss name (Just fn@JSFunction {})) =
     let
-      (argss, body', replace) = collectAllFunctionArgs [] identity fn
+      (argss, body', replace) = collectAllFunctionArgs [] id fn
     in case () of
       _ | isTailCall name body' ->
             let

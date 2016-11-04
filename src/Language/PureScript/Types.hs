@@ -6,7 +6,7 @@
 --
 module Language.PureScript.Types where
 
-import Protolude hiding (Constraint)
+import Language.PureScript.Prelude
 
 import Data.List (lookup)
 import qualified Data.Aeson as A

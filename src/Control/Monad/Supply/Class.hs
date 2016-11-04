@@ -7,7 +7,7 @@
 
 module Control.Monad.Supply.Class where
 
-import Protolude
+import Language.PureScript.Prelude
 
 import Control.Monad.Supply
 import Control.Monad.State

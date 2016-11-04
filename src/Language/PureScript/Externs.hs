@@ -14,7 +14,7 @@ module Language.PureScript.Externs
   , applyExternsFileToEnvironment
   ) where
 
-import Protolude hiding (Constraint)
+import Language.PureScript.Prelude
 
 import Data.Aeson.TH
 import Data.Version (showVersion)

@@ -3,7 +3,7 @@
 --
 module Language.PureScript.CodeGen.JS.AST where
 
-import Protolude hiding ((<>))
+import Language.PureScript.Prelude hiding ((<>))
 
 import Language.PureScript.AST (SourceSpan(..))
 import Language.PureScript.Comments

@@ -5,7 +5,7 @@
 --
 module Language.PureScript.Comments where
 
-import Protolude
+import Language.PureScript.Prelude
 
 import Data.Aeson.TH
 

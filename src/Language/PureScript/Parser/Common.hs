@@ -3,7 +3,7 @@
 --
 module Language.PureScript.Parser.Common where
 
-import Protolude
+import Language.PureScript.Prelude
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.Comments
@@ -70,7 +70,7 @@ parseOperator = OpName <$> symbol
 -- Run the first parser, then match the second if possible, applying the specified function on a successful match
 --
 augment :: P.Stream s m t => P.ParsecT s u m a -> P.ParsecT s u m b -> (a -> b -> a) -> P.ParsecT s u m a
-augment p q f = flip (maybe identity $ flip f) <$> p <*> P.optionMaybe q
+augment p q f = flip (maybe id $ flip f) <$> p <*> P.optionMaybe q
 
 -- |
 -- Run the first parser, then match the second zero or more times, applying the specified function for each match

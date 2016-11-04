@@ -5,7 +5,7 @@
 --
 module Language.PureScript.Names where
 
-import Protolude
+import Language.PureScript.Prelude
 
 import Control.Monad.Supply.Class
 

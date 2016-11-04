@@ -2,7 +2,8 @@
 
 module Language.PureScript.Environment where
 
-import Protolude hiding (Constraint)
+import Language.PureScript.Prelude
+
 import Prelude (fail)
 
 import Data.Aeson.TH

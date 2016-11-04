@@ -62,7 +62,7 @@ module Language.PureScript.Parser.Lexer
   )
   where
 
-import Protolude
+import Language.PureScript.Prelude
 
 import qualified GHC.Show as Show
 

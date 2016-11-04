@@ -3,7 +3,7 @@
 --
 module Language.PureScript.CodeGen.JS.Common where
 
-import Protolude
+import Language.PureScript.Prelude
 
 import Data.Char
 import qualified Data.Text as T
