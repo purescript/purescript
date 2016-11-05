@@ -13,11 +13,15 @@ import Prelude.Compat
 
 import Data.Maybe (maybeToList)
 import Data.Monoid ((<>))
+import qualified Data.Text as T
+import Data.Text (Text)
 
 import Language.PureScript.Docs.RenderedCode
 import Language.PureScript.Docs.Types
 import Language.PureScript.Docs.Utils.MonoidExtras
 import qualified Language.PureScript as P
+
+-- TODO (Christoph): get rid of T.unpack's
 
 renderDeclaration :: Declaration -> RenderedCode
 renderDeclaration = renderDeclarationWithOptions defaultRenderTypeOptions
@@ -31,7 +35,7 @@ renderDeclarationWithOptions opts Declaration{..} =
       , renderType' ty
       ]
     DataDeclaration dtype args ->
-      [ keyword (P.showDataDeclType dtype)
+      [ keyword (T.unpack (P.showDataDeclType dtype))
       , renderType' (typeApp declTitle args)
       ]
     ExternDataDeclaration kind' ->
@@ -74,15 +78,15 @@ renderDeclarationWithOptions opts Declaration{..} =
 
   renderQualAlias :: FixityAlias -> String
   renderQualAlias (P.Qualified mn alias)
-    | mn == currentModule opts = renderAlias id alias
-    | otherwise = renderAlias (\f -> P.showQualified f . P.Qualified mn) alias
+    | mn == currentModule opts = T.unpack (renderAlias id alias)
+    | otherwise = T.unpack (renderAlias (\f -> P.showQualified f . P.Qualified mn) alias)
 
   renderAlias
-    :: (forall a. (a -> String) -> a -> String)
+    :: (forall a. (a -> Text) -> a -> Text)
     -> Either (P.ProperName 'P.TypeName) (Either P.Ident (P.ProperName 'P.ConstructorName))
-    -> String
+    -> Text
   renderAlias f
-    = either (("type " ++) . f P.runProperName)
+    = either (("type " <>) . f P.runProperName)
     $ either (f P.runIdent) (f P.runProperName)
 
   -- adjustAliasName (P.AliasType{}) title = drop 6 (init title)
@@ -133,7 +137,7 @@ renderConstraintsWithOptions opts constraints
                  (map (renderConstraintWithOptions opts) constraints)
 
 notQualified :: String -> P.Qualified (P.ProperName a)
-notQualified = P.Qualified Nothing . P.ProperName
+notQualified = P.Qualified Nothing . P.ProperName . T.pack
 
 typeApp :: String -> [(String, Maybe P.Kind)] -> P.Type
 typeApp title typeArgs =
@@ -142,5 +146,5 @@ typeApp title typeArgs =
         (map toTypeVar typeArgs)
 
 toTypeVar :: (String, Maybe P.Kind) -> P.Type
-toTypeVar (s, Nothing) = P.TypeVar s
-toTypeVar (s, Just k) = P.KindedType (P.TypeVar s) k
+toTypeVar (s, Nothing) = P.TypeVar (T.pack s)
+toTypeVar (s, Just k) = P.KindedType (P.TypeVar (T.pack s)) k
