@@ -18,6 +18,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 
 import qualified Data.Map as M
+import Data.Text (Text)
 
 import Language.PureScript.Crash
 import Language.PureScript.Environment
@@ -104,7 +105,7 @@ kindOf ty = fst <$> kindOfWithScopedVars ty
 kindOfWithScopedVars ::
   (MonadError MultipleErrors m, MonadState CheckState m) =>
   Type ->
-  m (Kind, [(String, Kind)])
+  m (Kind, [(Text, Kind)])
 kindOfWithScopedVars ty =
   withErrorMessageHint (ErrorCheckingKind ty) $
     fmap tidyUp . withFreshSubstitution . captureSubstitution $ infer ty
@@ -119,7 +120,7 @@ kindsOf
   => Bool
   -> ModuleName
   -> ProperName 'TypeName
-  -> [(String, Maybe Kind)]
+  -> [(Text, Maybe Kind)]
   -> [Type]
   -> m Kind
 kindsOf isData moduleName name args ts = fmap tidyUp . withFreshSubstitution . captureSubstitution $ do
@@ -134,7 +135,7 @@ kindsOf isData moduleName name args ts = fmap tidyUp . withFreshSubstitution . c
 
 freshKindVar
   :: (MonadError MultipleErrors m, MonadState CheckState m)
-  => (String, Maybe Kind)
+  => (Text, Maybe Kind)
   -> Kind
   -> m (ProperName 'TypeName, Kind)
 freshKindVar (arg, Nothing) kind = return (ProperName arg, kind)
@@ -146,8 +147,8 @@ freshKindVar (arg, Just kind') kind = do
 kindsOfAll
   :: (MonadError MultipleErrors m, MonadState CheckState m)
   => ModuleName
-  -> [(ProperName 'TypeName, [(String, Maybe Kind)], Type)]
-  -> [(ProperName 'TypeName, [(String, Maybe Kind)], [Type])]
+  -> [(ProperName 'TypeName, [(Text, Maybe Kind)], Type)]
+  -> [(ProperName 'TypeName, [(Text, Maybe Kind)], [Type])]
   -> m ([Kind], [Kind])
 kindsOfAll moduleName syns tys = fmap tidyUp . withFreshSubstitution . captureSubstitution $ do
   synVars <- replicateM (length syns) freshKind
@@ -198,14 +199,14 @@ starIfUnknown k = k
 infer
   :: (MonadError MultipleErrors m, MonadState CheckState m)
   => Type
-  -> m (Kind, [(String, Kind)])
+  -> m (Kind, [(Text, Kind)])
 infer ty = withErrorMessageHint (ErrorCheckingKind ty) $ infer' ty
 
 infer'
   :: forall m
    . (MonadError MultipleErrors m, MonadState CheckState m)
   => Type
-  -> m (Kind, [(String, Kind)])
+  -> m (Kind, [(Text, Kind)])
 infer' (ForAll ident ty _) = do
   k1 <- freshKind
   Just moduleName <- checkCurrentModule <$> get
