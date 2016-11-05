@@ -4,7 +4,7 @@ module Language.PureScript.Docs.Convert.ReExports
 
 import Prelude.Compat
 
-import Control.Arrow ((&&&), second)
+import Control.Arrow ((&&&), first, second)
 import Control.Monad
 import Control.Monad.Reader.Class (MonadReader, ask)
 import Control.Monad.State.Class (MonadState, gets, modify)
@@ -17,7 +17,6 @@ import Data.Maybe (mapMaybe)
 import Data.Monoid ((<>))
 import qualified Data.Map as Map
 import qualified Data.Text as T
-import Data.Text (Text)
 
 import Language.PureScript.Docs.Types
 import qualified Language.PureScript as P
@@ -319,7 +318,7 @@ lookupModuleDeclarations definedIn moduleName = do
     Nothing ->
       internalErrorInModule
         (definedIn ++ ": module missing: "
-         ++ P.runModuleName moduleName)
+         ++ T.unpack (P.runModuleName moduleName))
     Just mdl ->
       pure (allDeclarations mdl)
 
@@ -449,7 +448,7 @@ filterDataConstructors
   -> Map P.ModuleName [Declaration]
   -> Map P.ModuleName [Declaration]
 filterDataConstructors =
-  filterExportedChildren isDataConstructor P.runProperName
+  filterExportedChildren isDataConstructor (T.unpack . P.runProperName)
 
 -- |
 -- Given a list of exported type class member names, remove any data
@@ -461,7 +460,7 @@ filterTypeClassMembers
   -> Map P.ModuleName [Declaration]
   -> Map P.ModuleName [Declaration]
 filterTypeClassMembers =
-  filterExportedChildren isTypeClassMember P.showIdent
+  filterExportedChildren isTypeClassMember (T.unpack . P.showIdent)
 
 filterExportedChildren
   :: (Functor f)
@@ -494,7 +493,7 @@ internalErrorInModule
 internalErrorInModule msg = do
   mn <- ask
   internalError
-    ("while collecting re-exports for module: " ++ P.runModuleName mn ++
+    ("while collecting re-exports for module: " ++ T.unpack (P.runModuleName mn) ++
      ", " ++ msg)
 
 -- |
@@ -505,7 +504,7 @@ typeClassConstraintFor :: Declaration -> Maybe P.Constraint
 typeClassConstraintFor Declaration{..} =
   case declInfo of
     TypeClassDeclaration tyArgs _ ->
-      Just (P.Constraint (P.Qualified Nothing (P.ProperName declTitle)) (mkConstraint tyArgs) Nothing)
+      Just (P.Constraint (P.Qualified Nothing (P.ProperName (T.pack declTitle))) (mkConstraint (map (first T.pack) tyArgs)) Nothing)
     _ ->
       Nothing
   where
