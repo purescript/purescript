@@ -16,6 +16,7 @@ import Control.Monad.Supply.Class (MonadSupply)
 import Data.List (foldl', find, sortBy, unzip5)
 import Data.Maybe (fromMaybe)
 import Data.Ord (comparing)
+import Data.Text (Text)
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -118,7 +119,7 @@ deriveNewtypeInstance className ds tys tyConNm dargs = do
     takeReverse :: Int -> [a] -> [a]
     takeReverse n = take n . reverse
 
-    stripRight :: [(String, Maybe kind)] -> Type -> Maybe Type
+    stripRight :: [(Text, Maybe kind)] -> Type -> Maybe Type
     stripRight [] ty = Just ty
     stripRight ((arg, _) : args) (TypeApp t (TypeVar arg'))
       | arg == arg' = stripRight args t
@@ -285,14 +286,14 @@ deriveGeneric mn ds tyConNm dargs = do
               (App e unitVal)
       fromSpineFun e _ = App (mkGenVar (Ident C.fromSpine)) (App e unitVal)
 
-      mkRecCase :: [(String, Type)] -> CaseAlternative
+      mkRecCase :: [(Text, Type)] -> CaseAlternative
       mkRecCase rs =
         CaseAlternative
           [ recordBinder [ LiteralBinder (ArrayLiteral (map (VarBinder . Ident . fst) rs)) ] ]
           . Right
           $ liftApplicative (mkRecFun rs) (map (\(x, y) -> fromSpineFun (Accessor "recValue" (mkVar (Ident x))) y) rs)
 
-      mkRecFun :: [(String, Type)] -> Expr
+      mkRecFun :: [(Text, Type)] -> Expr
       mkRecFun xs = mkJust $ foldr (lam . Ident . fst) recLiteral xs
          where recLiteral = Literal . ObjectLiteral $ map (\(s,_) -> (s, mkVar (Ident s))) xs
     mkFromSpineFunction (PositionedDeclaration _ _ d) = mkFromSpineFunction d
@@ -576,13 +577,13 @@ deriveOrd mn ds tyConNm = do
       where
       catchAll = CaseAlternative [NullBinder, NullBinder] (Right (orderingCtor "EQ"))
 
-    orderingName :: String -> Qualified (ProperName a)
+    orderingName :: Text -> Qualified (ProperName a)
     orderingName = Qualified (Just (ModuleName [ProperName "Data", ProperName "Ordering"])) . ProperName
 
-    orderingCtor :: String -> Expr
+    orderingCtor :: Text -> Expr
     orderingCtor = Constructor . orderingName
 
-    orderingBinder :: String -> Binder
+    orderingBinder :: Text -> Binder
     orderingBinder name = ConstructorBinder (orderingName name) []
 
     ordCompare :: Expr -> Expr -> Expr
@@ -700,7 +701,7 @@ objectType :: Type -> Maybe Type
 objectType (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Record"))) rec) = Just rec
 objectType _ = Nothing
 
-decomposeRec :: Type -> [(String, Type)]
+decomposeRec :: Type -> [(Text, Type)]
 decomposeRec = sortBy (comparing fst) . go
   where go (RCons str typ typs) = (str, typ) : decomposeRec typs
         go _ = []
