@@ -140,7 +140,7 @@ matchType = buildPrettyPrinter operators . matchTypeAtom where
                   , [ AssocR appliedFunction $ \arg ret -> keepSingleLinesOr id arg (text "-> " <> ret) ]
                   , [ Wrap constrained $ \deps ty -> constraintsAsBox deps ty ]
                   , [ Wrap forall_ $ \idents ty -> keepSingleLinesOr (moveRight 2) (text ("forall " ++ unwords idents ++ ".")) ty ]
-                  , [ Wrap kinded $ \k ty -> keepSingleLinesOr (moveRight 2) ty (text (":: " ++ prettyPrintKind k)) ]
+                  , [ Wrap kinded $ \k ty -> keepSingleLinesOr (moveRight 2) ty (text (":: " ++ T.unpack (prettyPrintKind k))) ]
                   , [ Wrap explicitParens $ \_ ty -> ty ]
                   ]
 
