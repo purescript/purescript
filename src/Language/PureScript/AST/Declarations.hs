@@ -11,6 +11,7 @@ import Control.Monad.Identity
 
 import Data.Aeson.TH
 import qualified Data.Map as M
+import Data.Text (Text)
 
 import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Literals
@@ -47,7 +48,7 @@ data SimpleErrorMessage
   | UnnecessaryFFIModule ModuleName FilePath
   | MissingFFIImplementations ModuleName [Ident]
   | UnusedFFIImplementations ModuleName [Ident]
-  | InvalidFFIIdentifier ModuleName String
+  | InvalidFFIIdentifier ModuleName Text
   | CannotGetFileInfo FilePath
   | CannotReadFile FilePath
   | CannotWriteFile FilePath
@@ -68,7 +69,7 @@ data SimpleErrorMessage
   | DeclConflict Name Name
   | ExportConflict (Qualified Name) (Qualified Name)
   | DuplicateModule ModuleName [SourceSpan]
-  | DuplicateTypeArgument String
+  | DuplicateTypeArgument Text
   | InvalidDoBind
   | InvalidDoLet
   | CycleInDeclaration Ident
@@ -89,7 +90,7 @@ data SimpleErrorMessage
   | CannotDerive (Qualified (ProperName 'ClassName)) [Type]
   | InvalidNewtypeInstance (Qualified (ProperName 'ClassName)) [Type]
   | CannotFindDerivingType (ProperName 'TypeName)
-  | DuplicateLabel String (Maybe Expr)
+  | DuplicateLabel Text (Maybe Expr)
   | DuplicateValueDeclaration Ident
   | ArgListLengthsDiffer Ident
   | OverlappingArgNames (Maybe Ident)
@@ -98,8 +99,8 @@ data SimpleErrorMessage
   | ExpectedType Type Kind
   | IncorrectConstructorArity (Qualified (ProperName 'ConstructorName))
   | ExprDoesNotHaveType Expr Type
-  | PropertyIsMissing String
-  | AdditionalProperty String
+  | PropertyIsMissing Text
+  | AdditionalProperty Text
   | TypeSynonymInstance
   | OrphanInstance Ident (Qualified (ProperName 'ClassName)) [Type]
   | InvalidNewtype (ProperName 'TypeName)
@@ -107,10 +108,10 @@ data SimpleErrorMessage
   | TransitiveExportError DeclarationRef [DeclarationRef]
   | TransitiveDctorExportError DeclarationRef (ProperName 'ConstructorName)
   | ShadowedName Ident
-  | ShadowedTypeVar String
-  | UnusedTypeVar String
+  | ShadowedTypeVar Text
+  | UnusedTypeVar Text
   | WildcardInferredType Type Context
-  | HoleInferredType String Type Context TypeSearch
+  | HoleInferredType Text Type Context TypeSearch
   | MissingTypeDeclaration Ident Type
   | OverlappingPattern [[Binder]] Bool
   | IncompleteExhaustivityCheck
@@ -124,7 +125,7 @@ data SimpleErrorMessage
   | DuplicateImport ModuleName ImportDeclarationType (Maybe ModuleName)
   | DuplicateImportRef Name
   | DuplicateExportRef Name
-  | IntOutOfRange Integer String Integer Integer
+  | IntOutOfRange Integer Text Integer Integer
   | ImplicitQualifiedImport ModuleName ModuleName [DeclarationRef]
   | ImplicitImport ModuleName [DeclarationRef]
   | HidingImport ModuleName [DeclarationRef]
@@ -144,7 +145,7 @@ data ErrorMessageHint
   | ErrorInModule ModuleName
   | ErrorInInstance (Qualified (ProperName 'ClassName)) [Type]
   | ErrorInSubsumption Type Type
-  | ErrorCheckingAccessor Expr String
+  | ErrorCheckingAccessor Expr Text
   | ErrorCheckingType Expr Type
   | ErrorCheckingKind Type
   | ErrorCheckingGuard
@@ -349,7 +350,7 @@ data Declaration
   -- |
   -- A data type declaration (data or newtype, name, arguments, data constructors)
   --
-  = DataDeclaration DataDeclType (ProperName 'TypeName) [(String, Maybe Kind)] [(ProperName 'ConstructorName, [Type])]
+  = DataDeclaration DataDeclType (ProperName 'TypeName) [(Text, Maybe Kind)] [(ProperName 'ConstructorName, [Type])]
   -- |
   -- A minimal mutually recursive set of data type declarations
   --
@@ -357,7 +358,7 @@ data Declaration
   -- |
   -- A type synonym declaration (name, arguments, type)
   --
-  | TypeSynonymDeclaration (ProperName 'TypeName) [(String, Maybe Kind)] Type
+  | TypeSynonymDeclaration (ProperName 'TypeName) [(Text, Maybe Kind)] Type
   -- |
   -- A type declaration for a value (name, ty)
   --
@@ -389,7 +390,7 @@ data Declaration
   -- |
   -- A type class declaration (name, argument, implies, member declarations)
   --
-  | TypeClassDeclaration (ProperName 'ClassName) [(String, Maybe Kind)] [Constraint] [FunctionalDependency] [Declaration]
+  | TypeClassDeclaration (ProperName 'ClassName) [(Text, Maybe Kind)] [Constraint] [FunctionalDependency] [Declaration]
   -- |
   -- A type instance declaration (name, dependencies, class name, instance types, member
   -- declarations)
@@ -547,11 +548,11 @@ data Expr
   -- Anonymous arguments will be removed during desugaring and expanded
   -- into a lambda that reads a property from a record.
   --
-  | Accessor String Expr
+  | Accessor Text Expr
   -- |
   -- Partial record update
   --
-  | ObjectUpdate Expr [(String, Expr)]
+  | ObjectUpdate Expr [(Text, Expr)]
   -- |
   -- Function introduction
   --
@@ -624,7 +625,7 @@ data Expr
   -- |
   -- A typed hole that will be turned into a hint/error duing typechecking
   --
-  | Hole String
+  | Hole Text
   -- |
   -- A value with source position information
   --

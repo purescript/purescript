@@ -468,7 +468,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
     renderSimpleErrorMessage (InvalidFFIIdentifier mn ident) =
       paras [ line $ "In the FFI module for " <> markCode (runModuleName mn) <> ":"
             , indent . paras $
-                [ line $ "The identifier " <> markCode (T.pack ident) <> " is not valid in PureScript."
+                [ line $ "The identifier " <> markCode ident <> " is not valid in PureScript."
                 , line "Note that exported identifiers in FFI modules must be valid PureScript identifiers."
                 ]
             ]
@@ -671,12 +671,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
     renderSimpleErrorMessage (CannotFindDerivingType nm) =
       line $ "Cannot derive a type class instance, because the type declaration for " <> markCode (runProperName nm) <> " could not be found."
     renderSimpleErrorMessage (DuplicateLabel l expr) =
-      paras $ [ line $ "Label " <> markCode (T.pack l) <> " appears more than once in a row type." ]
+      paras $ [ line $ "Label " <> markCode l <> " appears more than once in a row type." ]
                        <> foldMap (\expr' -> [ line "Relevant expression: "
                                              , markCodeBox $ indent $ prettyPrintValue valueDepth expr'
                                              ]) expr
     renderSimpleErrorMessage (DuplicateTypeArgument name) =
-      line $ "Type argument " <> markCode (T.pack name) <> " appears more than once."
+      line $ "Type argument " <> markCode name <> " appears more than once."
     renderSimpleErrorMessage (DuplicateValueDeclaration nm) =
       line $ "Multiple value declarations exist for " <> markCode (showIdent nm) <> "."
     renderSimpleErrorMessage (ArgListLengthsDiffer ident) =
@@ -704,9 +704,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
             , markCodeBox $ indent $ typeAsBox ty
             ]
     renderSimpleErrorMessage (PropertyIsMissing prop) =
-      line $ "Type of expression lacks required label " <> markCode (T.pack prop) <> "."
+      line $ "Type of expression lacks required label " <> markCode prop <> "."
     renderSimpleErrorMessage (AdditionalProperty prop) =
-      line $ "Type of expression contains additional label " <> markCode (T.pack prop) <> "."
+      line $ "Type of expression contains additional label " <> markCode prop <> "."
     renderSimpleErrorMessage TypeSynonymInstance =
       line "Type class instances for type synonyms are disallowed."
     renderSimpleErrorMessage (OrphanInstance nm cnm ts) =
@@ -739,9 +739,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
     renderSimpleErrorMessage (ShadowedName nm) =
       line $ "Name " <> markCode (showIdent nm) <> " was shadowed."
     renderSimpleErrorMessage (ShadowedTypeVar tv) =
-      line $ "Type variable " <> markCode (T.pack tv) <> " was shadowed."
+      line $ "Type variable " <> markCode tv <> " was shadowed."
     renderSimpleErrorMessage (UnusedTypeVar tv) =
-      line $ "Type variable " <> markCode (T.pack tv) <> " was declared but not used."
+      line $ "Type variable " <> markCode tv <> " was declared but not used."
     renderSimpleErrorMessage (MisleadingEmptyTypeImport mn name) =
       line $ "Importing type " <> markCode (runProperName name <> "(..)") <> " from " <> markCode (runModuleName mn) <> " is misleading as it has no exported data constructors."
     renderSimpleErrorMessage (ImportHidingModule name) =
@@ -774,7 +774,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
                ]
           _ -> []
       in
-        paras $ [ line $ "Hole '" <> markCode (T.pack name) <> "' has the inferred type "
+        paras $ [ line $ "Hole '" <> markCode name <> "' has the inferred type "
                 , markCodeBox (indent (typeAsBox ty))
                 ] ++ tsResult ++ renderContext ctx
     renderSimpleErrorMessage (MissingTypeDeclaration ident ty) =
@@ -827,7 +827,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
       line $ "Export list contains multiple references to " <> printName (Qualified Nothing name)
 
     renderSimpleErrorMessage (IntOutOfRange value backend lo hi) =
-      paras [ line $ "Integer value " <> markCode (T.pack (show value)) <> " is out of range for the " <> T.pack backend <> " backend."
+      paras [ line $ "Integer value " <> markCode (T.pack (show value)) <> " is out of range for the " <> backend <> " backend."
             , line $ "Acceptable values fall within the range " <> markCode (T.pack (show lo)) <> " to " <> markCode (T.pack (show hi)) <> " (inclusive)." ]
 
     renderSimpleErrorMessage msg@(ImplicitQualifiedImport importedModule asModule _) =

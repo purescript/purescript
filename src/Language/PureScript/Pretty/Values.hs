@@ -54,8 +54,8 @@ prettyPrintValue d (IfThenElse cond th el) =
   // moveRight 2 (vcat left [ text "then " <> prettyPrintValueAtom (d - 1) th
                             , text "else " <> prettyPrintValueAtom (d - 1) el
                             ])
-prettyPrintValue d (Accessor prop val) = prettyPrintValueAtom (d - 1) val <> textT ("." Monoid.<> prettyPrintObjectKey (T.pack prop))
-prettyPrintValue d (ObjectUpdate o ps) = prettyPrintValueAtom (d - 1) o <> text " " <> list '{' '}' (\(key, val) -> text (key ++ " = ") <> prettyPrintValue (d - 1) val) ps
+prettyPrintValue d (Accessor prop val) = prettyPrintValueAtom (d - 1) val <> textT ("." Monoid.<> prettyPrintObjectKey prop)
+prettyPrintValue d (ObjectUpdate o ps) = prettyPrintValueAtom (d - 1) o <> text " " <> list '{' '}' (\(key, val) -> textT (key Monoid.<> " = ") <> prettyPrintValue (d - 1) val) ps
 prettyPrintValue d (App val arg) = prettyPrintValueAtom (d - 1) val `beforeWithSpace` prettyPrintValueAtom (d - 1) arg
 prettyPrintValue d (Abs (Left arg) val) = text ('\\' : T.unpack (showIdent arg) ++ " -> ") // moveRight 2 (prettyPrintValue (d - 1) val)
 prettyPrintValue d (Abs (Right arg) val) = text ('\\' : T.unpack (prettyPrintBinder arg) ++ " -> ") // moveRight 2 (prettyPrintValue (d - 1) val)
@@ -77,7 +77,7 @@ prettyPrintValue _ (TypeClassDictionaryAccessor className ident) =
 prettyPrintValue d (TypedValue _ val _) = prettyPrintValue d val
 prettyPrintValue d (PositionedValue _ _ val) = prettyPrintValue d val
 prettyPrintValue d (Literal l) = prettyPrintLiteralValue d l
-prettyPrintValue _ (Hole name) = text "?" <> text name
+prettyPrintValue _ (Hole name) = text "?" <> textT name
 prettyPrintValue d expr@AnonymousArgument{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@Constructor{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@Var{} = prettyPrintValueAtom d expr
