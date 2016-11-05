@@ -46,7 +46,7 @@ prettyPrintRowWith :: Char -> Char -> Type -> Box
 prettyPrintRowWith open close = uncurry listToBox . toList []
   where
   nameAndTypeToPs :: Char -> String -> Type -> Box
-  nameAndTypeToPs start name ty = text (start : ' ' : prettyPrintObjectKey name ++ " :: ") <> typeAsBox ty
+  nameAndTypeToPs start name ty = text (start : ' ' : T.unpack (prettyPrintObjectKey (T.pack name)) ++ " :: ") <> typeAsBox ty
 
   tailToPs :: Type -> Box
   tailToPs REmpty = nullBox
