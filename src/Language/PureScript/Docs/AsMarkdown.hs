@@ -14,6 +14,7 @@ import Control.Monad.Writer (Writer, tell, execWriter)
 
 import Data.Foldable (for_)
 import Data.List (partition)
+import qualified Data.Text as T
 
 import Language.PureScript.Docs.RenderedCode
 import Language.PureScript.Docs.Types
@@ -37,13 +38,13 @@ modulesAsMarkdown = mapM_ moduleAsMarkdown
 
 moduleAsMarkdown :: Module -> Docs
 moduleAsMarkdown Module{..} = do
-  headerLevel 2 $ "Module " ++ P.runModuleName modName
+  headerLevel 2 $ "Module " ++ T.unpack (P.runModuleName modName)
   spacer
   for_ modComments tell'
   mapM_ (declAsMarkdown modName) modDeclarations
   spacer
   for_ modReExports $ \(mn, decls) -> do
-    headerLevel 3 $ "Re-exported from " ++ P.runModuleName mn ++ ":"
+    headerLevel 3 $ "Re-exported from " ++ T.unpack (P.runModuleName mn) ++ ":"
     spacer
     mapM_ (declAsMarkdown mn) decls
 
