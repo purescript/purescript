@@ -5,14 +5,11 @@
 --
 module Language.PureScript.Pretty.Common where
 
-import Prelude.Compat
+import Prelude.Compat (String, last)
+import Language.PureScript.Prelude hiding (intercalate)
 
-import Control.Monad.State (StateT, modify, get)
-
-import Data.List (elemIndices, intersperse)
-import Data.Text (Text)
+import Data.List (elemIndices)
 import qualified Data.Text as T
-import Data.Monoid ((<>))
 
 import Language.PureScript.AST (SourcePos(..), SourceSpan(..))
 import Language.PureScript.Parser.Lexer (reservedPsNames, isUnquotedKey)
@@ -25,6 +22,9 @@ import qualified Text.PrettyPrint.Boxes as Box
 --
 parens :: String -> String
 parens s = "(" <> s <> ")"
+
+parensT :: Text -> Text
+parensT s = "(" <> s <> ")"
 
 parensPos :: (Emit gen) => gen -> gen
 parensPos s = emit "(" <> s <> emit ")"
@@ -146,9 +146,9 @@ prettyPrintMany f xs = do
 -- |
 -- Prints an object key, escaping reserved names.
 --
-prettyPrintObjectKey :: String -> String
-prettyPrintObjectKey s | T.pack s `elem` reservedPsNames = show s -- TODO(Christoph): get rid of T.pack
-                       | isUnquotedKey (T.pack s) = s
+prettyPrintObjectKey :: Text -> Text
+prettyPrintObjectKey s | s `elem` reservedPsNames = show s
+                       | isUnquotedKey s = s
                        | otherwise = show s
 
 -- | Place a box before another, vertically when the first box takes up multiple lines.
