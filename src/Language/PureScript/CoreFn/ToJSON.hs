@@ -1,3 +1,4 @@
+{-# LANGUAGE NoOverloadedStrings #-}
 -- |
 -- Dump the core functional representation in JSON format for consumption
 -- by third-party code generators
@@ -10,7 +11,8 @@ import Prelude.Compat
 
 import Data.Aeson
 import Data.Version (Version, showVersion)
-import Data.Text (pack)
+import Data.Text (Text)
+import qualified Data.Text as T
 
 import Language.PureScript.AST.Literals
 import Language.PureScript.CoreFn
@@ -31,26 +33,26 @@ identToJSON = toJSON . runIdent
 properNameToJSON :: ProperName a -> Value
 properNameToJSON = toJSON . runProperName
 
-qualifiedToJSON :: (a -> String) -> Qualified a -> Value
+qualifiedToJSON :: (a -> Text) -> Qualified a -> Value
 qualifiedToJSON f = toJSON . showQualified f
 
 moduleNameToJSON :: ModuleName -> Value
 moduleNameToJSON = toJSON . runModuleName
 
 moduleToJSON :: Version -> Module a -> Value
-moduleToJSON v m = object [ pack "imports"   .= map (moduleNameToJSON . snd) (moduleImports m)
-                          , pack "exports"   .= map identToJSON (moduleExports m)
-                          , pack "foreign"   .= map (identToJSON . fst) (moduleForeign m)
-                          , pack "decls"     .= map bindToJSON (moduleDecls m)
-                          , pack "builtWith" .= toJSON (showVersion v)
+moduleToJSON v m = object [ T.pack "imports"   .= map (moduleNameToJSON . snd) (moduleImports m)
+                          , T.pack "exports"   .= map identToJSON (moduleExports m)
+                          , T.pack "foreign"   .= map (identToJSON . fst) (moduleForeign m)
+                          , T.pack "decls"     .= map bindToJSON (moduleDecls m)
+                          , T.pack "builtWith" .= toJSON (showVersion v)
                           ]
 
 bindToJSON :: Bind a -> Value
-bindToJSON (NonRec _ n e) = object [ pack (runIdent n) .= exprToJSON e ]
-bindToJSON (Rec bs) = object $ map (\((_, n), e) -> pack (runIdent n) .= exprToJSON e) bs
+bindToJSON (NonRec _ n e) = object [ runIdent n .= exprToJSON e ]
+bindToJSON (Rec bs) = object $ map (\((_, n), e) -> runIdent n .= exprToJSON e) bs
 
-recordToJSON :: (a -> Value) -> [(String, a)] -> Value
-recordToJSON f = object . map (\(label, a) -> pack label .= f a)
+recordToJSON :: (a -> Value) -> [(Text, a)] -> Value
+recordToJSON f = object . map (\(label, a) -> label .= f a)
 
 exprToJSON :: Expr a -> Value
 exprToJSON (Var _ i)              = toJSON ( "Var"
