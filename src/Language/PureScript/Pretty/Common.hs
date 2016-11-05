@@ -23,7 +23,7 @@ import qualified Text.PrettyPrint.Boxes as Box
 -- |
 -- Wrap a string in parentheses
 --
-parens :: Text -> Text
+parens :: String -> String
 parens s = "(" <> s <> ")"
 
 parensPos :: (Emit gen) => gen -> gen

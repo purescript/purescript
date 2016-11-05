@@ -6,16 +6,12 @@ module Language.PureScript.Pretty.JS
   , prettyPrintJSWithSourceMaps
   ) where
 
-import Prelude.Compat
+import Language.PureScript.Prelude hiding (intercalate)
 
 import Control.Arrow ((<+>))
-import Control.Monad.State hiding (sequence)
 import Control.PatternArrows
 import qualified Control.Arrow as A
 
-import Data.Maybe (fromMaybe)
-import Data.Monoid
-import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.AST (SourceSpan(..))
@@ -37,7 +33,7 @@ literals = mkPattern' match'
 
   match :: (Emit gen) => JS -> StateT PrinterState Maybe gen
   match (JSNumericLiteral _ n) = return $ emit $ either show show n
-  match (JSStringLiteral _ s) = return $ string (T.unpack s)
+  match (JSStringLiteral _ s) = return $ string s
   match (JSBooleanLiteral _ True) = return $ emit "true"
   match (JSBooleanLiteral _ False) = return $ emit "false"
   match (JSArrayLiteral _ xs) = mconcat <$> sequence
@@ -59,7 +55,7 @@ literals = mkPattern' match'
     where
     objectPropertyToString :: (Emit gen) => Text -> gen
     objectPropertyToString s | identNeedsEscaping s = emit $ show s
-                             | otherwise = emit (T.unpack s)
+                             | otherwise = emit s
   match (JSBlock _ sts) = mconcat <$> sequence
     [ return $ emit "{\n"
     , withIndent $ prettyStatements sts
@@ -67,9 +63,9 @@ literals = mkPattern' match'
     , currentIndent
     , return $ emit "}"
     ]
-  match (JSVar _ ident) = return $ emit (T.unpack ident)
+  match (JSVar _ ident) = return $ emit ident
   match (JSVariableIntroduction _ ident value) = mconcat <$> sequence
-    [ return $ emit $ "var " ++ T.unpack ident
+    [ return $ emit $ "var " <> ident
     , maybe (return mempty) (fmap (emit " = " <>) . prettyPrintJS') value
     ]
   match (JSAssignment _ target value) = mconcat <$> sequence
@@ -84,15 +80,15 @@ literals = mkPattern' match'
     , prettyPrintJS' sts
     ]
   match (JSFor _ ident start end sts) = mconcat <$> sequence
-    [ return $ emit $ "for (var " ++ T.unpack ident ++ " = "
+    [ return $ emit $ "for (var " <> ident <> " = "
     , prettyPrintJS' start
-    , return $ emit $ "; " ++ T.unpack ident ++ " < "
+    , return $ emit $ "; " <> ident <> " < "
     , prettyPrintJS' end
-    , return $ emit $ "; " ++ T.unpack ident ++ "++) "
+    , return $ emit $ "; " <> ident <> "++) "
     , prettyPrintJS' sts
     ]
   match (JSForIn _ ident obj sts) = mconcat <$> sequence
-    [ return $ emit $ "for (var " ++ T.unpack ident ++ " in "
+    [ return $ emit $ "for (var " <> ident <> " in "
     , prettyPrintJS' obj
     , return $ emit ") "
     , prettyPrintJS' sts
@@ -112,10 +108,10 @@ literals = mkPattern' match'
     [ return $ emit "throw "
     , prettyPrintJS' value
     ]
-  match (JSBreak _ lbl) = return $ emit $ "break " ++ T.unpack lbl
-  match (JSContinue _ lbl) = return $ emit $ "continue " ++ T.unpack lbl
+  match (JSBreak _ lbl) = return $ emit $ "break " <> lbl
+  match (JSContinue _ lbl) = return $ emit $ "continue " <> lbl
   match (JSLabel _ lbl js) = mconcat <$> sequence
-    [ return $ emit $ T.unpack lbl ++ ": "
+    [ return $ emit $ lbl <> ": "
     , prettyPrintJS' js
     ]
   match (JSComment _ com js) = fmap mconcat $ sequence $
@@ -130,27 +126,29 @@ literals = mkPattern' match'
     , prettyPrintJS' js
     ]
     where
-    commentLines :: Comment -> [String]
-    commentLines (LineComment s) = [T.unpack s]
-    commentLines (BlockComment s) = lines (T.unpack s)
+    commentLines :: Comment -> [Text]
+    commentLines (LineComment s) = [s]
+    commentLines (BlockComment s) = T.lines s
 
-    asLine :: (Emit gen) => String -> StateT PrinterState Maybe gen
+    asLine :: (Emit gen) => Text -> StateT PrinterState Maybe gen
     asLine s = do
       i <- currentIndent
       return $ i <> emit " * " <> (emit . removeComments) s <> emit "\n"
 
-    removeComments :: String -> String
-    removeComments ('*' : '/' : s) = removeComments s
-    removeComments (c : s) = c : removeComments s
-
-    removeComments [] = []
-  match (JSRaw _ js) = return $ emit (T.unpack js)
+    removeComments :: Text -> Text
+    removeComments t =
+      case T.stripPrefix "*/" t of
+        Just rest -> removeComments rest
+        Nothing -> case T.uncons t of
+          Just (x, xs) -> x `T.cons` removeComments xs
+          Nothing -> ""
+  match (JSRaw _ js) = return $ emit js
   match _ = mzero
 
-string :: (Emit gen) => String -> gen
-string s = emit $ '"' : concatMap encodeChar s ++ "\""
+string :: (Emit gen) => Text -> gen
+string s = emit $ "\"" <> T.concatMap encodeChar s <> "\""
   where
-  encodeChar :: Char -> String
+  encodeChar :: Char -> Text
   encodeChar '\b' = "\\b"
   encodeChar '\t' = "\\t"
   encodeChar '\n' = "\\n"
@@ -159,16 +157,18 @@ string s = emit $ '"' : concatMap encodeChar s ++ "\""
   encodeChar '\r' = "\\r"
   encodeChar '"'  = "\\\""
   encodeChar '\\' = "\\\\"
-  encodeChar c | fromEnum c > 0xFFFF = "\\u" ++ showHex highSurrogate ("\\u" ++ showHex lowSurrogate "")
+  encodeChar c | fromEnum c > 0xFFFF = "\\u" <> showHex' highSurrogate ("\\u" ++ showHex lowSurrogate "")
     where
     (h, l) = divMod (fromEnum c - 0x10000) 0x400
     highSurrogate = h + 0xD800
     lowSurrogate = l + 0xDC00
-  encodeChar c | fromEnum c > 0xFFF = "\\u" ++ showHex (fromEnum c) ""
-  encodeChar c | fromEnum c > 0xFF = "\\u0" ++ showHex (fromEnum c) ""
-  encodeChar c | fromEnum c < 0x10 = "\\x0" ++ showHex (fromEnum c) ""
-  encodeChar c | fromEnum c > 0x7E || fromEnum c < 0x20 = "\\x" ++ showHex (fromEnum c) ""
-  encodeChar c = [c]
+  encodeChar c | fromEnum c > 0xFFF = "\\u" <> showHex' (fromEnum c) ""
+  encodeChar c | fromEnum c > 0xFF = "\\u0" <> showHex' (fromEnum c) ""
+  encodeChar c | fromEnum c < 0x10 = "\\x0" <> showHex' (fromEnum c) ""
+  encodeChar c | fromEnum c > 0x7E || fromEnum c < 0x20 = "\\x" <> showHex' (fromEnum c) ""
+  encodeChar c = T.singleton c
+
+  showHex' a b = T.pack (showHex a b)
 
 conditional :: Pattern PrinterState JS ((Maybe SourceSpan, JS, JS), JS)
 conditional = mkPattern match
@@ -179,7 +179,7 @@ conditional = mkPattern match
 accessor :: (Emit gen) => Pattern PrinterState JS (gen, JS)
 accessor = mkPattern match
   where
-  match (JSAccessor _ prop val) = Just (emit (T.unpack prop), val)
+  match (JSAccessor _ prop val) = Just (emit prop, val)
   match _ = Nothing
 
 indexer :: (Emit gen) => Pattern PrinterState JS (gen, JS)
@@ -189,10 +189,10 @@ indexer = mkPattern' match
 
   match _ = mzero
 
-lam :: Pattern PrinterState JS ((Maybe String, [String], Maybe SourceSpan), JS)
+lam :: Pattern PrinterState JS ((Maybe Text, [Text], Maybe SourceSpan), JS)
 lam = mkPattern match
   where
-  match (JSFunction ss name args ret) = Just ((T.unpack <$> name, map T.unpack args, ss), ret)
+  match (JSFunction ss name args ret) = Just ((name, args, ss), ret)
   match _ = Nothing
 
 app :: (Emit gen) => Pattern PrinterState JS (gen, JS)
@@ -215,7 +215,7 @@ instanceOf = mkPattern match
   match (JSInstanceOf _ val ty) = Just (val, ty)
   match _ = Nothing
 
-unary' :: (Emit gen) => UnaryOperator -> (JS -> String) -> Operator PrinterState JS gen
+unary' :: (Emit gen) => UnaryOperator -> (JS -> Text) -> Operator PrinterState JS gen
 unary' op mkStr = Wrap match (<>)
   where
   match :: (Emit gen) => Pattern PrinterState JS (gen, JS)
@@ -224,7 +224,7 @@ unary' op mkStr = Wrap match (<>)
     match' (JSUnary _ op' val) | op' == op = Just (emit $ mkStr val, val)
     match' _ = Nothing
 
-unary :: (Emit gen) => UnaryOperator -> String -> Operator PrinterState JS gen
+unary :: (Emit gen) => UnaryOperator -> Text -> Operator PrinterState JS gen
 unary op str = unary' op (const str)
 
 negateOperator :: (Emit gen) => Operator PrinterState JS gen
@@ -233,8 +233,8 @@ negateOperator = unary' Negate (\v -> if isNegate v then "- " else "-")
   isNegate (JSUnary _ Negate _) = True
   isNegate _ = False
 
-binary :: (Emit gen) => BinaryOperator -> String -> Operator PrinterState JS gen
-binary op str = AssocL match (\v1 v2 -> v1 <> emit (" " ++ str ++ " ") <> v2)
+binary :: (Emit gen) => BinaryOperator -> Text -> Operator PrinterState JS gen
+binary op str = AssocL match (\v1 v2 -> v1 <> emit (" " <> str <> " ") <> v2)
   where
   match :: Pattern PrinterState JS (JS, JS)
   match = mkPattern match'
@@ -257,12 +257,12 @@ prettyPrintJS1 = fromMaybe (internalError "Incomplete pattern") . flip evalState
 -- |
 -- Generate a pretty-printed string representing a collection of Javascript expressions at the same indentation level
 --
-prettyPrintJSWithSourceMaps :: [JS] -> (String, [SMap])
+prettyPrintJSWithSourceMaps :: [JS] -> (Text, [SMap])
 prettyPrintJSWithSourceMaps js =
   let StrPos (_, s, mp) = (fromMaybe (internalError "Incomplete pattern") . flip evalStateT (PrinterState 0) . prettyStatements) js
   in (s, mp)
 
-prettyPrintJS :: [JS] -> String
+prettyPrintJS :: [JS] -> Text
 prettyPrintJS = maybe (internalError "Incomplete pattern") runPlainString . flip evalStateT (PrinterState 0) . prettyStatements
 -- |
 -- Generate an indented, pretty-printed string representing a Javascript expression
@@ -280,8 +280,8 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
                   , [ unary JSNew "new " ]
                   , [ Wrap lam $ \(name, args, ss) ret -> addMapping' ss <>
                       emit ("function "
-                        ++ fromMaybe "" name
-                        ++ "(" ++ intercalate ", " args ++ ") ")
+                        <> fromMaybe "" name
+                        <> "(" <> intercalate ", " args <> ") ")
                         <> ret ]
                   , [ Wrap typeOf $ \_ s -> emit "typeof " <> s ]
                   , [ unary     Not                  "!"
