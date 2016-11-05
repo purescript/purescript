@@ -25,6 +25,8 @@ import Data.List (minimumBy, nub)
 import Data.Maybe (fromMaybe, maybeToList, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.Text as T
+import Data.Text (Text)
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -62,7 +64,7 @@ type InstanceContext = M.Map (Maybe ModuleName)
 --
 -- Note: we store many types per type variable name. For any name, all types
 -- should unify if we are going to commit to an instance.
-type Matching a = M.Map String a
+type Matching a = M.Map Text a
 
 combineContexts :: InstanceContext -> InstanceContext -> InstanceContext
 combineContexts = M.unionWith (M.unionWith M.union)
@@ -202,7 +204,7 @@ entails SolverOptions{..} constraint context hints =
                 return match
               Unsolved unsolved -> do
                 -- Generate a fresh name for the unsolved constraint's new dictionary
-                ident <- freshIdent ("dict" ++ runProperName (disqualify (constraintClass unsolved)))
+                ident <- freshIdent ("dict" <> runProperName (disqualify (constraintClass unsolved)))
                 let qident = Qualified Nothing ident
                 -- Store the new dictionary in the InstanceContext so that we can solve this goal in
                 -- future.
@@ -296,7 +298,7 @@ entails SolverOptions{..} constraint context hints =
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName a) -> Integer -> Expr
         subclassDictionaryValue dict superclassName index =
-          App (Accessor (C.__superclass_ ++ showQualified runProperName superclassName ++ "_" ++ show index)
+          App (Accessor (C.__superclass_ <> showQualified runProperName superclassName <> "_" <> T.pack (show index))
                         dict)
               valUndefined
 
@@ -362,7 +364,7 @@ matches deps TypeClassDictionaryInScope{..} tys = do
         sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
         sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
 
-        go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> (Bool, Matching [Type])
+        go :: [(Text, Type)] -> Type -> [(Text, Type)] -> Type -> (Bool, Matching [Type])
         go [] REmpty             [] REmpty             = (True, M.empty)
         go [] (TUnknown u1)      [] (TUnknown u2)      | u1 == u2 = (True, M.empty)
         go [] (TypeVar v1)       [] (TypeVar v2)       | v1 == v2 = (True, M.empty)
@@ -400,7 +402,7 @@ matches deps TypeClassDictionaryInScope{..} tys = do
               sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
           in all (uncurry typesAreEqual) int && go sd1 r1' sd2 r2'
         where
-          go :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> Bool
+          go :: [(Text, Type)] -> Type -> [(Text, Type)] -> Type -> Bool
           go [] (TUnknown u1)     [] (TUnknown u2)     | u1 == u2 = True
           go [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) = s1 == s2
           go [] REmpty            [] REmpty            = True
@@ -430,7 +432,7 @@ newDictionaries path name (Constraint className instanceTy _) = do
                                   ) typeClassSuperclasses [0..]
     return (TypeClassDictionaryInScope name path className instanceTy Nothing : supDicts)
   where
-    instantiateSuperclass :: [String] -> [Type] -> [Type] -> [Type]
+    instantiateSuperclass :: [Text] -> [Type] -> [Type] -> [Type]
     instantiateSuperclass args supArgs tys = map (replaceAllTypeVars (zip args tys)) supArgs
 
 mkContext :: [NamedDict] -> InstanceContext
