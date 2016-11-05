@@ -1,5 +1,4 @@
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NamedFieldPuns #-}
 
 -- |
@@ -40,8 +39,10 @@ import Data.Either (lefts, rights)
 import Data.Functor (($>))
 import Data.List (transpose, nub, (\\), partition, delete)
 import Data.Maybe (fromMaybe)
+import Data.Monoid ((<>))
 import qualified Data.Map as M
 import qualified Data.Set as S
+import Data.Text (Text)
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -442,7 +443,7 @@ inferBinder val (LiteralBinder (ObjectLiteral props)) = do
   unifyTypes val (TypeApp tyRecord row)
   return m1
   where
-  inferRowProperties :: Type -> Type -> [(String, Binder)] -> m (M.Map Ident Type)
+  inferRowProperties :: Type -> Type -> [(Text, Binder)] -> m (M.Map Ident Type)
   inferRowProperties nrow row [] = unifyTypes nrow row >> return M.empty
   inferRowProperties nrow row ((name, binder):binders) = do
     propTy <- freshType
@@ -559,7 +560,7 @@ check' val (ForAll ident ty _) = do
   return $ TypedValue True val' (ForAll ident ty (Just scope))
 check' val t@(ConstrainedType constraints ty) = do
   dictNames <- forM constraints $ \(Constraint (Qualified _ (ProperName className)) _ _) ->
-    freshIdent ("dict" ++ className)
+    freshIdent ("dict" <> className)
   dicts <- join <$> zipWithM (newDictionaries []) (map (Qualified Nothing) dictNames) constraints
   val' <- withBindingGroupVisible $ withTypeClassDictionaries dicts $ check val ty
   return $ TypedValue True (foldr (Abs . Left) val' dictNames) t
@@ -681,10 +682,10 @@ check' val ty = do
 checkProperties ::
   (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
   Expr ->
-  [(String, Expr)] ->
+  [(Text, Expr)] ->
   Type ->
   Bool ->
-  m [(String, Expr)]
+  m [(Text, Expr)]
 checkProperties expr ps row lax = let (ts, r') = rowToList row in go ps ts r' where
   go [] [] REmpty = return []
   go [] [] u@(TUnknown _)
@@ -771,7 +772,7 @@ checkFunctionApplication' fn u arg = do
 -- |
 -- Ensure a set of property names and value does not contain duplicate labels
 --
-ensureNoDuplicateProperties :: (MonadError MultipleErrors m) => [(String, Expr)] -> m ()
+ensureNoDuplicateProperties :: (MonadError MultipleErrors m) => [(Text, Expr)] -> m ()
 ensureNoDuplicateProperties ps =
   let ls = map fst ps in
   case ls \\ nub ls of
