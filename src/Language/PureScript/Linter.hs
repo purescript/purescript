@@ -11,6 +11,7 @@ import Data.List (nub, (\\))
 import Data.Maybe (mapMaybe)
 import Data.Monoid
 import qualified Data.Set as S
+import Data.Text (Text)
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -76,10 +77,10 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
   checkTypeVars :: Type -> MultipleErrors
   checkTypeVars ty = everythingWithContextOnTypes S.empty mempty mappend step ty <> findUnused ty
     where
-    step :: S.Set String -> Type -> (S.Set String, MultipleErrors)
+    step :: S.Set Text -> Type -> (S.Set Text, MultipleErrors)
     step s (ForAll tv _ _) = bindVar s tv
     step s _ = (s, mempty)
-    bindVar :: S.Set String -> String -> (S.Set String, MultipleErrors)
+    bindVar :: S.Set Text -> Text -> (S.Set Text, MultipleErrors)
     bindVar = bind ShadowedTypeVar
     findUnused :: Type -> MultipleErrors
     findUnused ty' =
@@ -88,7 +89,7 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
           unused = nub declared \\ nub used
       in foldl (<>) mempty $ map (errorMessage . UnusedTypeVar) unused
       where
-      go :: Type -> [String]
+      go :: Type -> [Text]
       go (ForAll tv _ _) = [tv]
       go _ = []
 
