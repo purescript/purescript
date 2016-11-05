@@ -8,7 +8,6 @@ module Language.PureScript.Types where
 
 import Language.PureScript.Prelude
 
-import Data.List (lookup)
 import qualified Data.Aeson as A
 import qualified Data.Aeson.TH as A
 
