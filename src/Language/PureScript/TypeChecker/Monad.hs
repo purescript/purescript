@@ -15,6 +15,7 @@ import Control.Monad.Writer.Class (MonadWriter(..), censor)
 
 import Data.Maybe
 import qualified Data.Map as M
+import Data.Text (Text)
 
 import Language.PureScript.Environment
 import Language.PureScript.Errors
@@ -93,7 +94,7 @@ bindTypes newNames action = do
 withScopedTypeVars
   :: (MonadState CheckState m, MonadWriter MultipleErrors m)
   => ModuleName
-  -> [(String, Kind)]
+  -> [(Text, Kind)]
   -> m a
   -> m a
 withScopedTypeVars mn ks ma = do
