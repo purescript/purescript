@@ -7,11 +7,12 @@
 
 module Control.Monad.Supply.Class where
 
-import Language.PureScript.Prelude
+import Prelude.Compat
 
 import Control.Monad.Supply
 import Control.Monad.State
 import Control.Monad.Writer
+import Data.Text (Text, pack)
 
 class Monad m => MonadSupply m where
   fresh :: m Integer
@@ -32,4 +33,4 @@ instance MonadSupply m => MonadSupply (StateT s m)
 instance (Monoid w, MonadSupply m) => MonadSupply (WriterT w m)
 
 freshName :: MonadSupply m => m Text
-freshName = fmap (("$" <> ) . show) fresh
+freshName = fmap (("$" <> ) . pack . show) fresh
