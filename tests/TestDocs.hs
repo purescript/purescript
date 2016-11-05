@@ -13,6 +13,7 @@ import Data.Monoid
 import Data.Maybe (fromMaybe)
 import Data.List ((\\))
 import Data.Foldable
+import qualified Data.Text as T
 import System.Exit
 
 import qualified Language.PureScript as P
@@ -36,8 +37,8 @@ main = pushd "examples/docs" $ do
   case res of
     Left e -> Publish.printErrorToStdout e >> exitFailure
     Right Docs.Package{..} ->
-      forM_ testCases $ \(P.moduleNameFromString -> mn, pragmas) ->
-        let mdl = takeJust ("module not found in docs: " ++ P.runModuleName mn)
+      forM_ testCases $ \(P.moduleNameFromString . T.pack -> mn, pragmas) ->
+        let mdl = takeJust ("module not found in docs: " ++ T.unpack (P.runModuleName mn))
                           (find ((==) mn . Docs.modName) pkgModules)
         in forM_ pragmas (`runAssertionIO` mdl)
 
@@ -197,11 +198,11 @@ checkConstrained ty tyClass =
       False
   where
   matches className =
-    (==) className . P.runProperName . P.disqualify . P.constraintClass
+    (==) className . T.unpack . P.runProperName . P.disqualify . P.constraintClass
 
 runAssertionIO :: Assertion -> Docs.Module -> IO ()
 runAssertionIO assertion mdl = do
-  putStrLn ("In " ++ P.runModuleName (Docs.modName mdl) ++ ": " ++ show assertion)
+  putStrLn ("In " ++ T.unpack (P.runModuleName (Docs.modName mdl)) ++ ": " ++ show assertion)
   case runAssertion assertion mdl of
     Pass -> pure ()
     Fail reason -> do
@@ -298,12 +299,12 @@ testCases =
   ]
 
   where
-  n = P.moduleNameFromString
+  n = P.moduleNameFromString . T.pack
 
   hasTypeVar varName =
     getAny . P.everythingOnTypes (<>) (Any . isVar varName)
 
-  isVar varName (P.TypeVar name) | varName == name = True
+  isVar varName (P.TypeVar name) | varName == T.unpack name = True
   isVar _ _ = False
 
   renderedType expected =

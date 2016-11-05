@@ -2,6 +2,7 @@
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module TestCompiler where
 
@@ -30,8 +31,8 @@ import Data.Function (on)
 import Data.List (sort, stripPrefix, intercalate, groupBy, sortBy, minimumBy)
 import Data.Maybe (mapMaybe)
 import Data.Time.Clock (UTCTime())
-import Data.Tuple (swap)
 import qualified Data.Text as T
+import Data.Tuple (swap)
 
 import qualified Data.Map as M
 
@@ -169,14 +170,14 @@ makeActions foreigns = (P.buildMakeActions modulesDir (P.internalError "makeActi
   where
   getInputTimestamp :: P.ModuleName -> P.Make (Either P.RebuildPolicy (Maybe UTCTime))
   getInputTimestamp mn
-    | isSupportModule (P.runModuleName mn) = return (Left P.RebuildNever)
+    | isSupportModule (T.unpack (P.runModuleName mn)) = return (Left P.RebuildNever)
     | otherwise = return (Left P.RebuildAlways)
     where
     isSupportModule = flip elem supportModules
 
   getOutputTimestamp :: P.ModuleName -> P.Make (Maybe UTCTime)
   getOutputTimestamp mn = do
-    let filePath = modulesDir </> P.runModuleName mn
+    let filePath = modulesDir </> T.unpack (P.runModuleName mn)
     exists <- liftIO $ doesDirectoryExist filePath
     return (if exists then Just (P.internalError "getOutputTimestamp: read timestamp") else Nothing)
 
@@ -222,7 +223,7 @@ checkMain ms =
 checkShouldFailWith :: [String] -> P.MultipleErrors -> Maybe String
 checkShouldFailWith expected errs =
   let actual = map P.errorCode $ P.runMultipleErrors errs
-  in if sort expected == sort actual
+  in if sort expected == sort (map T.unpack actual)
     then Nothing
     else Just $ "Expected these errors: " ++ show expected ++ ", but got these: " ++ show actual
 
