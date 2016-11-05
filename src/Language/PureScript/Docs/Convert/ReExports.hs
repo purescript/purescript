@@ -16,6 +16,8 @@ import Data.Map (Map)
 import Data.Maybe (mapMaybe)
 import Data.Monoid ((<>))
 import qualified Data.Map as Map
+import qualified Data.Text as T
+import Data.Text (Text)
 
 import Language.PureScript.Docs.Types
 import qualified Language.PureScript as P
@@ -52,7 +54,7 @@ updateReExports env order = execState action
       Just v' ->
         pure v'
       Nothing ->
-        internalError ("Module missing: " ++ P.runModuleName mn)
+        internalError ("Module missing: " ++ T.unpack (P.runModuleName mn))
 
 -- |
 -- Collect all of the re-exported declarations for a single module.
@@ -69,7 +71,7 @@ getReExports ::
 getReExports env mn =
   case Map.lookup mn env of
     Nothing ->
-      internalError ("Module missing: " ++ P.runModuleName mn)
+      internalError ("Module missing: " ++ T.unpack (P.runModuleName mn))
     Just (_, imports, exports) -> do
       allExports <- runReaderT (collectDeclarations imports exports) mn
       pure (filter notLocal allExports)
@@ -188,7 +190,7 @@ lookupValueDeclaration importedFrom ident = do
   decls <- lookupModuleDeclarations "lookupValueDeclaration" importedFrom
   let
     rs =
-      filter (\d -> declTitle d == P.showIdent ident
+      filter (\d -> declTitle d == T.unpack (P.showIdent ident)
                     && (isValue d || isValueAlias d)) decls
     errOther other =
       internalErrorInModule
@@ -214,7 +216,7 @@ lookupValueDeclaration importedFrom ident = do
                     (declChildren d))
 
         matchesIdent cdecl =
-          cdeclTitle cdecl == P.showIdent ident
+          cdeclTitle cdecl == T.unpack (P.showIdent ident)
 
         matchesAndIsTypeClassMember =
           uncurry (&&) . (matchesIdent &&& isTypeClassMember)
@@ -238,7 +240,7 @@ lookupValueOpDeclaration
   -> m (P.ModuleName, [Declaration])
 lookupValueOpDeclaration importedFrom op = do
   decls <- lookupModuleDeclarations "lookupValueOpDeclaration" importedFrom
-  case filter (\d -> declTitle d == P.showOp op && isValueAlias d) decls of
+  case filter (\d -> declTitle d == T.unpack (P.showOp op) && isValueAlias d) decls of
     [d] ->
       pure (importedFrom, [d])
     other ->
@@ -258,7 +260,7 @@ lookupTypeDeclaration ::
 lookupTypeDeclaration importedFrom ty = do
   decls <- lookupModuleDeclarations "lookupTypeDeclaration" importedFrom
   let
-    ds = filter (\d -> declTitle d == P.runProperName ty && isType d) decls
+    ds = filter (\d -> declTitle d == T.unpack (P.runProperName ty) && isType d) decls
   case ds of
     [d] ->
       pure (importedFrom, [d])
@@ -274,7 +276,7 @@ lookupTypeOpDeclaration
 lookupTypeOpDeclaration importedFrom tyOp = do
   decls <- lookupModuleDeclarations "lookupTypeOpDeclaration" importedFrom
   let
-    ds = filter (\d -> declTitle d == ("type " ++ P.showOp tyOp) && isTypeAlias d) decls
+    ds = filter (\d -> declTitle d == ("type " ++ T.unpack (P.showOp tyOp)) && isTypeAlias d) decls
   case ds of
     [d] ->
       pure (importedFrom, [d])
@@ -290,7 +292,7 @@ lookupTypeClassDeclaration
 lookupTypeClassDeclaration importedFrom tyClass = do
   decls <- lookupModuleDeclarations "lookupTypeClassDeclaration" importedFrom
   let
-    ds = filter (\d -> declTitle d == P.runProperName tyClass
+    ds = filter (\d -> declTitle d == T.unpack (P.runProperName tyClass)
                        && isTypeClass d)
                 decls
   case ds of
