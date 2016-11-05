@@ -19,7 +19,10 @@ import Control.Monad.Supply.Class (MonadSupply, fresh, freshName)
 import Data.Function (on)
 import Data.List (foldl', sortBy, nub)
 import Data.Maybe (fromMaybe)
+import Data.Monoid ((<>))
 import qualified Data.Map as M
+import Data.Text (Text)
+import qualified Data.Text as T
 
 import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Declarations
@@ -77,7 +80,7 @@ getConstructors env defmn n = extractConstructors lnte
   getConsDataName :: Qualified (ProperName 'ConstructorName) -> Qualified (ProperName 'TypeName)
   getConsDataName con =
     case getConsInfo con of
-      Nothing -> internalError $ "Constructor " ++ showQualified runProperName con ++ " not in the scope of the current environment in getConsDataName."
+      Nothing -> internalError $ "Constructor " ++ T.unpack (showQualified runProperName con) ++ " not in the scope of the current environment in getConsDataName."
       Just (_, pm, _, _) -> qualifyName pm defmn con
 
   getConsInfo :: Qualified (ProperName 'ConstructorName) -> Maybe (DataDeclType, ProperName 'TypeName, Type, [Ident])
@@ -276,14 +279,14 @@ checkExhaustive env mn numArgs cas expr = makeResult . first nub $ foldl' step (
   -- and then included in the error message.
   addPartialConstraint :: ([[Binder]], Bool) -> Expr -> m Expr
   addPartialConstraint (bss, complete) e = do
-    tyVar <- ("p" ++) . show <$> fresh
+    tyVar <- ("p" <>) . T.pack . show <$> fresh
     var <- freshName
     return $
       Let
         [ partial var tyVar ]
         $ App (Var (Qualified Nothing (Ident C.__unused))) e
     where
-      partial :: String -> String -> Declaration
+      partial :: Text -> Text -> Declaration
       partial var tyVar =
         ValueDeclaration (Ident C.__unused) Private [] $ Right $
           TypedValue
@@ -291,7 +294,7 @@ checkExhaustive env mn numArgs cas expr = makeResult . first nub $ foldl' step (
             (Abs (Left (Ident var)) (Var (Qualified Nothing (Ident var))))
             (ty tyVar)
 
-      ty :: String -> Type
+      ty :: Text -> Type
       ty tyVar =
         ForAll tyVar
           ( ConstrainedType
