@@ -27,8 +27,10 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 import Data.List ((\\), find, sortBy)
 import Data.Maybe (catMaybes, mapMaybe, isJust)
-
 import qualified Data.Map as M
+import Data.Monoid ((<>))
+import Data.Text (Text)
+import qualified Data.Text as T
 
 type MemberMap = M.Map (ModuleName, ProperName 'ClassName) TypeClassData
 
@@ -231,7 +233,7 @@ memberToNameAndType _ = internalError "Invalid declaration in type class definit
 
 typeClassDictionaryDeclaration
   :: ProperName 'ClassName
-  -> [(String, Maybe Kind)]
+  -> [(Text, Maybe Kind)]
   -> [Constraint]
   -> [Declaration]
   -> Declaration
@@ -247,7 +249,7 @@ typeClassDictionaryDeclaration name args implies members =
 typeClassMemberToDictionaryAccessor
   :: ModuleName
   -> ProperName 'ClassName
-  -> [(String, Maybe Kind)]
+  -> [(Text, Maybe Kind)]
   -> Declaration
   -> Declaration
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration ident ty) =
@@ -323,14 +325,14 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
     return (PositionedValue pos com val)
   memberToValue _ _ = internalError "Invalid declaration in type instance definition"
 
-typeClassMemberName :: Declaration -> String
+typeClassMemberName :: Declaration -> Text
 typeClassMemberName (TypeDeclaration ident _) = runIdent ident
 typeClassMemberName (ValueDeclaration ident _ _ _) = runIdent ident
 typeClassMemberName (PositionedDeclaration _ _ d) = typeClassMemberName d
 typeClassMemberName _ = internalError "typeClassMemberName: Invalid declaration in type class definition"
 
-superClassDictionaryNames :: [Constraint] -> [String]
+superClassDictionaryNames :: [Constraint] -> [Text]
 superClassDictionaryNames supers =
-  [ C.__superclass_ ++ showQualified runProperName pn ++ "_" ++ show (index :: Integer)
+  [ C.__superclass_ <> showQualified runProperName pn <> "_" <> T.pack (show (index :: Integer))
   | (index, Constraint pn _ _) <- zip [0..] supers
   ]
