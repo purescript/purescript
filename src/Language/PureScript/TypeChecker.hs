@@ -21,6 +21,9 @@ import Data.Foldable (for_, traverse_)
 import Data.List (nub, nubBy, (\\), sort, group)
 import Data.Maybe
 import qualified Data.Map as M
+import Data.Monoid ((<>))
+import qualified Data.Text as T
+import Data.Text (Text)
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -42,7 +45,7 @@ addDataType
   => ModuleName
   -> DataDeclType
   -> ProperName 'TypeName
-  -> [(String, Maybe Kind)]
+  -> [(Text, Maybe Kind)]
   -> [(ProperName 'ConstructorName, [Type])]
   -> Kind
   -> m ()
@@ -58,7 +61,7 @@ addDataConstructor
   => ModuleName
   -> DataDeclType
   -> ProperName 'TypeName
-  -> [String]
+  -> [Text]
   -> ProperName 'ConstructorName
   -> [Type]
   -> m ()
@@ -68,14 +71,14 @@ addDataConstructor moduleName dtype name args dctor tys = do
   let retTy = foldl TypeApp (TypeConstructor (Qualified (Just moduleName) name)) (map TypeVar args)
   let dctorTy = foldr function retTy tys
   let polyType = mkForAll args dctorTy
-  let fields = [Ident ("value" ++ show n) | n <- [0..(length tys - 1)]]
+  let fields = [Ident ("value" <> T.pack (show n)) | n <- [0..(length tys - 1)]]
   putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (dtype, name, polyType, fields) (dataConstructors env) }
 
 addTypeSynonym
   :: (MonadState CheckState m, MonadError MultipleErrors m)
   => ModuleName
   -> ProperName 'TypeName
-  -> [(String, Maybe Kind)]
+  -> [(Text, Maybe Kind)]
   -> Type
   -> Kind
   -> m ()
@@ -111,7 +114,7 @@ addTypeClass
   :: (MonadState CheckState m)
   => ModuleName
   -> ProperName 'ClassName
-  -> [(String, Maybe Kind)]
+  -> [(Text, Maybe Kind)]
   -> [Constraint]
   -> [FunctionalDependency]
   -> [Declaration]
@@ -142,12 +145,12 @@ addTypeClassDictionaries mn entries =
 
 checkDuplicateTypeArguments
   :: (MonadState CheckState m, MonadError MultipleErrors m)
-  => [String]
+  => [Text]
   -> m ()
 checkDuplicateTypeArguments args = for_ firstDup $ \dup ->
   throwError . errorMessage $ DuplicateTypeArgument dup
   where
-  firstDup :: Maybe String
+  firstDup :: Maybe Text
   firstDup = listToMaybe $ args \\ nub args
 
 checkTypeClassInstance
@@ -323,7 +326,7 @@ typeCheckAll moduleName _ = traverse go
   -- This function adds the argument kinds for a type constructor so that they may appear in the externs file,
   -- extracted from the kind of the type constructor itself.
   --
-  withKinds :: [(String, Maybe Kind)] -> Kind -> [(String, Maybe Kind)]
+  withKinds :: [(Text, Maybe Kind)] -> Kind -> [(Text, Maybe Kind)]
   withKinds []                  _               = []
   withKinds (s@(_, Just _ ):ss) (FunKind _   k) = s : withKinds ss k
   withKinds (  (s, Nothing):ss) (FunKind k1 k2) = (s, Just k1) : withKinds ss k2
