@@ -1,5 +1,4 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 -- | Data types and functions for representing a simplified form of PureScript
 -- code, intended for use in e.g. HTML documentation.
@@ -38,6 +37,7 @@ import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Aeson.BetterErrors
 import qualified Data.Aeson as A
+import qualified Data.Text as T
 
 import qualified Language.PureScript as P
 
@@ -103,7 +103,7 @@ instance A.ToJSON ContainingModule where
 
 asContainingModule :: Parse e ContainingModule
 asContainingModule =
-  maybeToContainingModule <$> perhaps (P.moduleNameFromString <$> asString)
+  maybeToContainingModule <$> perhaps (P.moduleNameFromString . T.pack <$> asString)
 
 -- |
 -- Convert a 'Maybe' 'P.ModuleName' to a 'ContainingModule', using the obvious
