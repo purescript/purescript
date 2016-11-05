@@ -142,7 +142,7 @@ findAvailableExterns = do
   liftIO $ do
     directories <- getDirectoryContents oDir
     moduleNames <- filterM (containsExterns oDir) directories
-    pure (P.moduleNameFromString <$> moduleNames)
+    pure (P.moduleNameFromString . toS <$> moduleNames)
   where
     -- Takes the output directory and a filepath like "Monad.Control.Eff" and
     -- looks up, whether that folder contains an externs.json
@@ -171,7 +171,7 @@ loadModules moduleNames = do
   -- We resolve all the modulenames to externs files and load these into memory.
   oDir <- outputDirectory
   let efPaths =
-        map (\mn -> oDir </> P.runModuleName mn </> "externs.json") moduleNames
+        map (\mn -> oDir </> toS (P.runModuleName mn) </> "externs.json") moduleNames
   efiles <- traverse readExternFile efPaths
   traverse_ insertExterns efiles
 
