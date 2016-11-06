@@ -34,7 +34,6 @@ import           Protolude
 import           Control.Lens                       ((^.))
 import           Data.List                          (findIndex, nubBy)
 import qualified Data.Text                          as T
-import qualified Data.Text.IO                       as TIO
 import qualified Language.PureScript                as P
 import           Language.PureScript.Ide.Completion
 import           Language.PureScript.Ide.Error
@@ -42,6 +41,7 @@ import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
+import           System.IO.UTF8                     (readUTF8FileT, writeUTF8FileT)
 
 data Import = Import P.ModuleName P.ImportDeclarationType  (Maybe P.ModuleName)
               deriving (Eq, Show)
@@ -72,7 +72,7 @@ compImport (Import n i q) (Import n' i' q')
 parseImportsFromFile :: (MonadIO m, MonadError PscIdeError m) =>
                         FilePath -> m (P.ModuleName, [Text], [Import], [Text])
 parseImportsFromFile fp = do
-  file <- liftIO (TIO.readFile fp)
+  file <- liftIO (readUTF8FileT fp)
   case sliceImportSection (T.lines file) of
     Right res -> pure res
     Left err -> throwError (GeneralError err)
@@ -322,10 +322,10 @@ prettyPrintImportSection imports = map prettyPrintImport' (sort imports)
 answerRequest :: (MonadIO m) => Maybe FilePath -> [Text] -> m Success
 answerRequest outfp rs  =
   case outfp of
-    Nothing -> pure $ MultilineTextResult rs
+    Nothing -> pure (MultilineTextResult rs)
     Just outfp' -> do
-      liftIO $ TIO.writeFile outfp' (T.unlines rs)
-      pure $ TextResult $ "Written to " <> T.pack outfp'
+      liftIO (writeUTF8FileT outfp' (T.unlines rs))
+      pure (TextResult ("Written to " <> T.pack outfp'))
 
 -- | Test and ghci helper
 parseImport :: Text -> Maybe Import

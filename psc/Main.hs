@@ -15,6 +15,7 @@ import           Data.Bool (bool)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.UTF8 as BU8
 import qualified Data.Map as M
+import           Data.Text (Text)
 import           Data.Version (showVersion)
 
 import qualified Language.PureScript as P
@@ -29,7 +30,7 @@ import qualified System.Console.ANSI as ANSI
 import           System.Exit (exitSuccess, exitFailure)
 import           System.FilePath.Glob (glob)
 import           System.IO (hSetEncoding, hPutStrLn, stdout, stderr, utf8)
-import           System.IO.UTF8
+import           System.IO.UTF8 (readUTF8FileT)
 
 data PSCMakeOptions = PSCMakeOptions
   { pscmInput        :: [FilePath]
@@ -85,8 +86,8 @@ globWarningOnMisses warn = concatMapM globWithWarning
     return paths
   concatMapM f = fmap concat . mapM f
 
-readInput :: [FilePath] -> IO [(FilePath, String)]
-readInput inputFiles = forM inputFiles $ \inFile -> (inFile, ) <$> readUTF8File inFile
+readInput :: [FilePath] -> IO [(FilePath, Text)]
+readInput inputFiles = forM inputFiles $ \inFile -> (inFile, ) <$> readUTF8FileT inFile
 
 inputFile :: Parser FilePath
 inputFile = strArgument $

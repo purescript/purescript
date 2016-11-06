@@ -9,13 +9,12 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.IO.Class (MonadIO(..))
 
 import qualified Data.Map as M
+import Data.Text (Text)
 
 import Language.PureScript.Docs.Convert (collectBookmarks)
 import Language.PureScript.Docs.Types
 import qualified Language.PureScript as P
-
-import System.IO.UTF8 (readUTF8File)
-
+import System.IO.UTF8 (readUTF8FileT)
 import Web.Bower.PackageMeta (PackageName)
 
 -- |
@@ -45,7 +44,7 @@ parseAndBookmark inputFiles depsFiles = do
 
 parseFiles ::
   (MonadError P.MultipleErrors m) =>
-  [(FileInfo, FilePath)]
+  [(FileInfo, Text)]
   -> m [(FileInfo, P.Module)]
 parseFiles =
   throwLeft . P.parseModulesFromFiles fileInfoToString
@@ -77,10 +76,10 @@ fileInfoToString :: FileInfo -> FilePath
 fileInfoToString (Local fn) = fn
 fileInfoToString (FromDep _ fn) = fn
 
-parseFile :: FilePath -> IO (FilePath, String)
-parseFile input' = (,) input' <$> readUTF8File input'
+parseFile :: FilePath -> IO (FilePath, Text)
+parseFile input' = (,) input' <$> readUTF8FileT input'
 
-parseAs :: (MonadIO m) => (FilePath -> a) -> FilePath -> m (a, String)
+parseAs :: (MonadIO m) => (FilePath -> a) -> FilePath -> m (a, Text)
 parseAs g = fmap (first g) . liftIO . parseFile
 
 getDepsModuleNames :: [InPackage (FilePath, P.Module)] -> M.Map P.ModuleName PackageName

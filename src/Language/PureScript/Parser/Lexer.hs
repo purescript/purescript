@@ -6,6 +6,7 @@ module Language.PureScript.Parser.Lexer
   , Token()
   , TokenParser()
   , lex
+  , lex'
   , anyToken
   , token
   , match
@@ -69,6 +70,8 @@ import Control.Monad (void, guard)
 
 import Data.Char (isSpace, isAscii, isSymbol, isAlphaNum)
 import Data.Functor.Identity
+import Data.Text (Text)
+import qualified Data.Text as T
 
 import Language.PureScript.Comments
 import Language.PureScript.Parser.State
@@ -154,8 +157,13 @@ data PositionedToken = PositionedToken
 instance Show PositionedToken where
   show = prettyPrintToken . ptToken
 
+type Lexer u a = P.Parsec Text u a
+
 lex :: FilePath -> String -> Either P.ParseError [PositionedToken]
-lex f s = updatePositions <$> P.parse parseTokens f s
+lex fp = lex' fp . T.pack
+
+lex' :: FilePath -> Text -> Either P.ParseError [PositionedToken]
+lex' f s = updatePositions <$> P.parse parseTokens f s
 
 updatePositions :: [PositionedToken] -> [PositionedToken]
 updatePositions [] = []
@@ -163,22 +171,22 @@ updatePositions (x:xs) = x : zipWith update (x:xs) xs
   where
   update PositionedToken { ptEndPos = pos } pt = pt { ptPrevEndPos = Just pos }
 
-parseTokens :: P.Parsec String u [PositionedToken]
+parseTokens :: Lexer u [PositionedToken]
 parseTokens = whitespace *> P.many parsePositionedToken <* P.skipMany parseComment <* P.eof
 
-whitespace :: P.Parsec String u ()
+whitespace :: Lexer u ()
 whitespace = P.skipMany (P.satisfy isSpace)
 
-parseComment :: P.Parsec String u Comment
+parseComment :: Lexer u Comment
 parseComment = (BlockComment <$> blockComment <|> LineComment <$> lineComment) <* whitespace
   where
-  blockComment :: P.Parsec String u String
+  blockComment :: Lexer u String
   blockComment = P.try $ P.string "{-" *> P.manyTill P.anyChar (P.try (P.string "-}"))
 
-  lineComment :: P.Parsec String u String
+  lineComment :: Lexer u String
   lineComment = P.try $ P.string "--" *> P.manyTill P.anyChar (P.try (void (P.char '\n') <|> P.eof))
 
-parsePositionedToken :: P.Parsec String u PositionedToken
+parsePositionedToken :: Lexer u PositionedToken
 parsePositionedToken = P.try $ do
   comments <- P.many parseComment
   pos <- P.getPosition
@@ -187,7 +195,7 @@ parsePositionedToken = P.try $ do
   whitespace
   return $ PositionedToken pos pos' Nothing tok comments
 
-parseToken :: P.Parsec String u Token
+parseToken :: Lexer u Token
 parseToken = P.choice
   [ P.try $ P.string "<-" *> P.notFollowedBy symbolChar *> pure LArrow
   , P.try $ P.string "←"  *> P.notFollowedBy symbolChar *> pure LArrow
@@ -226,34 +234,34 @@ parseToken = P.choice
   ]
 
   where
-  parseLName :: P.Parsec String u String
+  parseLName :: Lexer u String
   parseLName = (:) <$> identStart <*> P.many identLetter
 
-  parseUName :: P.Parsec String u String
+  parseUName :: Lexer u String
   parseUName = (:) <$> P.upper <*> P.many identLetter
 
-  parseSymbol :: P.Parsec String u String
+  parseSymbol :: Lexer u String
   parseSymbol = P.many1 symbolChar
 
-  identStart :: P.Parsec String u Char
+  identStart :: Lexer u Char
   identStart = P.lower <|> P.oneOf "_"
 
-  identLetter :: P.Parsec String u Char
+  identLetter :: Lexer u Char
   identLetter = P.alphaNum <|> P.oneOf "_'"
 
-  symbolChar :: P.Parsec String u Char
+  symbolChar :: Lexer u Char
   symbolChar = P.satisfy isSymbolChar
 
-  parseCharLiteral :: P.Parsec String u Char
+  parseCharLiteral :: Lexer u Char
   parseCharLiteral = PT.charLiteral tokenParser
 
-  parseStringLiteral :: P.Parsec String u String
+  parseStringLiteral :: Lexer u String
   parseStringLiteral = blockString <|> PT.stringLiteral tokenParser
     where
     delimiter   = P.try (P.string "\"\"\"")
     blockString = delimiter >> P.manyTill P.anyChar delimiter
 
-  parseNumber :: P.Parsec String u (Either Integer Double)
+  parseNumber :: Lexer u (Either Integer Double)
   parseNumber = (consumeLeadingZero >> P.parserZero) <|>
                   (Right <$> P.try (PT.float tokenParser) <|>
                   Left <$> P.try (PT.natural tokenParser))
@@ -267,7 +275,7 @@ parseToken = P.choice
 -- |
 -- We use Text.Parsec.Token to implement the string and number lexemes
 --
-langDef :: PT.GenLanguageDef String u Identity
+langDef :: PT.GenLanguageDef Text u Identity
 langDef = PT.LanguageDef
   { PT.reservedNames   = []
   , PT.reservedOpNames = []
@@ -285,7 +293,7 @@ langDef = PT.LanguageDef
 -- |
 -- A token parser based on the language definition
 --
-tokenParser :: PT.GenTokenParser String u Identity
+tokenParser :: PT.GenTokenParser Text u Identity
 tokenParser = PT.makeTokenParser langDef
 
 type TokenParser a = P.Parsec [PositionedToken] ParseState a
