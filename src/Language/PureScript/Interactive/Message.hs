@@ -39,10 +39,14 @@ prologueMessage = unlines
 
 supportModuleMessage :: String
 supportModuleMessage = unlines
-  [ "PSCi requires the purescript-psci-support package to be installed."
+  [ "PSCi requires the psci-support package to be installed."
   , "You can install it using Bower as follows:"
   , ""
   , "  bower i purescript-psci-support --save-dev"
+  , ""
+  , "Or using psc-package:"
+  , ""
+  , "  psc-package install psci-support"
   , ""
   , "For help getting started, visit http://wiki.purescript.org/PSCi"
   ]
