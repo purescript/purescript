@@ -308,7 +308,7 @@ findUsedRefs env mni qn names =
     typesRefs
       = map (flip TypeRef (Just [])) typesWithoutDctors
       ++ map (\(ty, ds) -> TypeRef ty (Just ds)) (M.toList typesWithDctors)
-  in classRefs ++ typeOpRefs ++ typesRefs ++ valueRefs ++ valueOpRefs
+  in sortBy compDecRef $ classRefs ++ typeOpRefs ++ typesRefs ++ valueRefs ++ valueOpRefs
 
   where
 

@@ -202,7 +202,7 @@ addExplicitImport' decl moduleName imports =
     refFromDeclaration (IdeDeclTypeClass n) =
       P.TypeClassRef n
     refFromDeclaration (IdeDeclDataConstructor dtor) =
-      P.TypeRef (dtor ^. ideDtorTypeName) (Just [dtor ^. ideDtorName])
+      P.TypeRef (dtor ^. ideDtorTypeName) Nothing
     refFromDeclaration (IdeDeclType t) =
       P.TypeRef (t ^. ideTypeName) (Just [])
     refFromDeclaration (IdeDeclValueOperator op) =
@@ -216,7 +216,7 @@ addExplicitImport' decl moduleName imports =
     -- TypeDeclaration "Maybe" + Data.Maybe (maybe) -> Data.Maybe(Maybe, maybe)
     insertDeclIntoImport :: IdeDeclaration -> Import -> Import
     insertDeclIntoImport decl' (Import mn (P.Explicit refs) Nothing) =
-      Import mn (P.Explicit (insertDeclIntoRefs decl' refs)) Nothing
+      Import mn (P.Explicit (sortBy P.compDecRef (insertDeclIntoRefs decl' refs))) Nothing
     insertDeclIntoImport _ is = is
 
     insertDeclIntoRefs :: IdeDeclaration -> [P.DeclarationRef] -> [P.DeclarationRef]
@@ -228,12 +228,7 @@ addExplicitImport' decl moduleName imports =
         refs
     insertDeclIntoRefs dr refs = nubBy ((==) `on` P.prettyPrintRef) (refFromDeclaration dr : refs)
 
-    insertDtor dtor (P.TypeRef tn' dtors) =
-      case dtors of
-        Just dtors' -> P.TypeRef tn' (Just (ordNub (dtor : dtors')))
-        -- This means the import was opened. We don't add anything in this case
-        -- import Data.Maybe (Maybe(..)) -> import Data.Maybe (Maybe(Just))
-        Nothing -> P.TypeRef tn' Nothing
+    insertDtor _ (P.TypeRef tn' _) = P.TypeRef tn' Nothing
     insertDtor _ refs = refs
 
     matchType :: P.ProperName 'P.TypeName -> P.DeclarationRef -> Bool

@@ -57,10 +57,10 @@ spec = beforeAll_ setup . describe "Adding imports" $ do
     outputFileShouldBe (sourceFileSkeleton ["import ImportsSpec1 (class ATypeClass)"])
   it "adds an explicit unqualified import (dataconstructor)" $ do
     withSupportFiles (Integration.addImport "MyJust")
-    outputFileShouldBe (sourceFileSkeleton ["import ImportsSpec1 (MyMaybe(MyJust))"])
+    outputFileShouldBe (sourceFileSkeleton ["import ImportsSpec1 (MyMaybe(..))"])
   it "adds an explicit unqualified import (newtype)" $ do
     withSupportFiles (Integration.addImport "MyNewtype")
-    outputFileShouldBe (sourceFileSkeleton ["import ImportsSpec1 (MyNewtype(MyNewtype))"])
+    outputFileShouldBe (sourceFileSkeleton ["import ImportsSpec1 (MyNewtype(..))"])
   it "adds an explicit unqualified import (typeclass member function)" $ do
     withSupportFiles (Integration.addImport "typeClassFun")
     outputFileShouldBe (sourceFileSkeleton ["import ImportsSpec1 (typeClassFun)"])
