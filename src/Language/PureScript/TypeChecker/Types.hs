@@ -111,7 +111,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           let solved = foldMap (S.fromList . fdDetermined) typeClassDependencies
           let constraintTypeVars = nub . foldMap (unknownsInType . fst) . filter ((`notElem` solved) . snd) $ zip (constraintArgs con) [0..]
           when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $ do
-            throwError . onErrorMessages (replaceTypes currentSubst) . errorMessage $ NoInstanceFound con
+            throwError . onErrorMessages (replaceTypes currentSubst) . errorMessage $ AmbiguousTypeVariables generalized con
 
       -- Check skolem variables did not escape their scope
       skolemEscapeCheck val'

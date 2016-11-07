@@ -118,6 +118,7 @@ errorCode em = case unwrapErrorMessage em of
   ConstrainedTypeUnified{} -> "ConstrainedTypeUnified"
   OverlappingInstances{} -> "OverlappingInstances"
   NoInstanceFound{} -> "NoInstanceFound"
+  AmbiguousTypeVariables{} -> "AmbiguousTypeVariables"
   UnknownClass{} -> "UnknownClass"
   PossiblyInfiniteInstance{} -> "PossiblyInfiniteInstance"
   CannotDerive{} -> "CannotDerive"
@@ -261,6 +262,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
   gSimple (NoInstanceFound con) = NoInstanceFound <$> overConstraintArgs (traverse f) con
+  gSimple (AmbiguousTypeVariables t con) = AmbiguousTypeVariables <$> (f t) <*> pure con
   gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> pure insts
   gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
   gSimple (CannotDerive cl ts) = CannotDerive cl <$> traverse f ts
@@ -636,6 +638,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
         where
         go TUnknown{} = True
         go _ = False
+    renderSimpleErrorMessage (AmbiguousTypeVariables t _) =
+      paras [ line "The inferred type"
+            , indent $ line $ markCode $ prettyPrintType t
+            , line "has type variables which are not mentioned in the body of the type. Consider adding a type annotation."
+            ]
     renderSimpleErrorMessage (PossiblyInfiniteInstance nm ts) =
       paras [ line "Type class instance for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
