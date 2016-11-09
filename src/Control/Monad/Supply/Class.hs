@@ -3,6 +3,7 @@
 --
 
 {-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Control.Monad.Supply.Class where
 
@@ -15,9 +16,9 @@ import Control.Monad.Writer
 class Monad m => MonadSupply m where
   fresh :: m Integer
   peek :: m Integer
-  default fresh :: MonadTrans t => t m Integer
+  default fresh :: (MonadTrans t, MonadSupply n, m ~ t n) => m Integer
   fresh = lift fresh
-  default peek :: MonadTrans t => t m Integer
+  default peek :: (MonadTrans t, MonadSupply n, m ~ t n) => m Integer
   peek = lift peek
 
 instance Monad m => MonadSupply (SupplyT m) where
