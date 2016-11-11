@@ -9,7 +9,7 @@
 A _package set_ is a mapping from package names to:
 
 - the Git repository URL for the package
-- the current version of the package
+- the Git ref which should be passed to `git clone` to clone the appropriate version (usually a tag name, but a SHA is also valid)
 - the package's transitive dependencies
 
 A package set repository contains a `packages.json` file which contains all mapping information. `psc-package` uses this information to decide which repos need to be cloned.
