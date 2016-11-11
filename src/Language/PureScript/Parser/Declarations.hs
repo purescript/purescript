@@ -392,7 +392,7 @@ parseLet = do
   return $ Let ds result
 
 parseValueAtom :: TokenParser Expr
-parseValueAtom = P.choice
+parseValueAtom = withSourceSpan PositionedValue $ P.choice
                  [ parseAnonymousArgument
                  , Literal <$> parseNumericLiteral
                  , Literal <$> parseCharLiteral
@@ -418,7 +418,7 @@ parseValueAtom = P.choice
 parseInfixExpr :: TokenParser Expr
 parseInfixExpr
   = P.between tick tick parseValue
-  <|> Op <$> parseQualified parseOperator
+  <|> withSourceSpan PositionedValue (Op <$> parseQualified parseOperator)
 
 parseHole :: TokenParser Expr
 parseHole = Hole <$> holeLit
