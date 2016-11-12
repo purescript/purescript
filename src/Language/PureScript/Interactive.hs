@@ -287,16 +287,20 @@ data InfoType =
     (P.ProperName 'N.TypeName)
     [(String, Maybe P.Kind)]
 
+data InfoConstructor =
+  InfoConstructor
+    P.Type
+    -- ^ Type of constructor (as displayed in GADT form)
+    (Maybe [P.Type])
+    -- ^ Arguments to constructor (as displayed in classic form)
+
 data InfoTarget
   = IValue
       P.Type
   | IConstructor
       InfoType
       P.Type
-  | IType
-      InfoType
-      [(String, P.Type)]
-      [(Maybe P.ModuleName, P.ProperName 'N.ClassName)]
+  | IType InfoType [(String, InfoConstructor)]
   | ITypeClass
       P.TypeClassData
       [(Maybe P.ModuleName, P.ProperName 'N.TypeName)]
