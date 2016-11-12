@@ -70,7 +70,7 @@ install:
 - export CC=gcc
 - export OS_NAME=$(./travis/convert-os-name.sh)
 script:
-- travis/build.sh
+- travis_wait 120 travis/build.sh
 before_deploy:
 - ./bundle/build.sh $OS_NAME
 deploy:
