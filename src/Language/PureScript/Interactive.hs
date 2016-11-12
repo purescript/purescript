@@ -17,9 +17,12 @@ import           Prelude ()
 import           Prelude.Compat
 
 import           Data.List (intercalate, nub, sort, find, foldl')
-import           Data.Maybe (mapMaybe)
+import           Data.Maybe (mapMaybe, fromMaybe, listToMaybe)
 import qualified Data.Map as M
+import qualified Data.Text as T
+import           Data.Foldable (fold)
 
+import           Control.Applicative ((<|>))
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.State.Class
 import           Control.Monad.Reader.Class
@@ -100,6 +103,7 @@ handleCommand c _ (Expression val)          = handleExpression c val
 handleCommand _ _ (Import im)               = handleImport im
 handleCommand _ _ (Decls l)                 = handleDecls l
 handleCommand _ _ (TypeOf val)              = handleTypeOf val
+handleCommand _ _ (InfoFor ident)           = handleInfoFor ident
 handleCommand _ _ (KindOf typ)              = handleKindOf typ
 handleCommand _ _ (BrowseModule moduleName) = handleBrowse moduleName
 handleCommand _ _ (ShowInfo QueryLoaded)    = handleShowLoadedModules
@@ -138,7 +142,7 @@ handleExpression evaluate val = do
   case e of
     Left errs -> printErrors errs
     Right _ -> do
-      js <- liftIO $ readFile (modulesDir </> "$PSCI" </> "index.js")
+      js <- liftIO $ readFile (modulesDir </> tempModuleNameRaw </> "index.js")
       evaluate js
 
 -- |
@@ -234,7 +238,13 @@ handleTypeOf val = do
   case e of
     Left errs -> printErrors errs
     Right (_, env') ->
-      case M.lookup (P.mkQualified (P.Ident "it") (P.ModuleName [P.ProperName "$PSCI"])) (P.names env') of
+      case
+        M.lookup
+          (P.mkQualified
+            (P.Ident "it")
+            tempModuleName)
+          (P.names env')
+      of
         Just (ty, _, _) -> liftIO . putStrLn . P.prettyPrintType $ ty
         Nothing -> liftIO $ putStrLn "Could not find type"
 
@@ -246,7 +256,7 @@ handleKindOf
 handleKindOf typ = do
   st <- get
   let m = createTemporaryModuleForKind st typ
-      mName = P.ModuleName [P.ProperName "$PSCI"]
+      mName = tempModuleName
   e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
   case e of
     Left errs -> printErrors errs
@@ -262,6 +272,189 @@ handleKindOf typ = do
             Left err        -> printErrors err
             Right (kind, _) -> liftIO . putStrLn . P.prettyPrintKind $ kind
         Nothing -> liftIO $ putStrLn "Could not find kind"
+
+-- | The data for :info. Could be a class, a data constructor, a type or a value
+-- 
+data InfoPrintable = InfoPrintable
+  (P.Qualified String)
+  -- ^ The name of this item
+  InfoTarget
+  -- ^ Data specific to the item
+
+data InfoType =
+  InfoType
+    P.DataDeclType
+    (P.ProperName 'N.TypeName)
+    [(String, Maybe P.Kind)]
+
+data InfoTarget
+  = IValue
+      P.Type
+  | IConstructor
+      InfoType
+      P.Type
+  | IType
+      InfoType
+      [(String, P.Type)]
+      [(Maybe P.ModuleName, P.ProperName 'N.ClassName)]
+  | ITypeClass
+      P.TypeClassData
+      [(Maybe P.ModuleName, P.ProperName 'N.TypeName)]
+
+data InfoCtors = Single (String, P.Type) | All [(String, P.Type)]
+
+showInfo :: InfoPrintable -> String
+showInfo (InfoPrintable idn@(P.Qualified mMdl nm) target) =
+  case target of
+    IValue typ ->
+      defCmt mMdl
+      ++ "\n"
+      ++ nm
+      ++ " :: "
+      ++ tyInline typ
+    IConstructor tyI ty ->
+      showAdt mMdl tyI $ Single (nm, ty)
+    IType        iTy ctors _ ->
+      showAdt mMdl iTy $ All ctors
+    ITypeClass   _ _ -> undefined
+  where
+    stripStr = T.unpack . T.strip . T.pack
+    tyInline = stripStr . P.prettyPrintType
+
+    defCmt mMod =
+      maybe
+        "-- Defined interactively"
+        (("-- Defined in " ++) . N.runModuleName)
+        mMod
+
+    showTypeVar (nm, Nothing) =
+      nm
+    showTypeVar (nm, Just knd) =
+      "(" ++ nm ++ " :: " ++ P.prettyPrintKind knd ++ ")"
+
+    showAdt
+      :: Maybe P.ModuleName
+      -> InfoType
+      -> InfoCtors
+      -> String
+    showAdt mMdl (InfoType P.Data tyName vars) ctors =
+      defCmt mMdl
+      ++ "\n"
+      ++ "data "
+      ++ P.runProperName tyName
+      ++ fold (map ((" " ++) . showTypeVar) vars)
+      ++ " where"
+      ++ showCtors ctors
+
+    -- TODO: Allow showing with both syntaxes
+    showAdt mMdl (InfoType P.Newtype tyName vars) (One ct) =
+      defCmt mMdl
+      ++ "\n"
+      ++ "newtype "
+      ++ P.runProperName tyName
+      ++ fold (map ((" " ++) . showTypeVar) vars)
+      ++ " = "
+      ++ showCtors ctors
+
+    showCtors (Single c) = "\n  ...\n  " ++ showCtor c ++ "\n  ..."
+    showCtors (All cs) = fold $ map (("\n  " ++) . showCtor) cs
+
+    showCtor :: (String, P.Type) -> String
+    showCtor (n, t) = n ++ " :: " ++ tyInline t
+
+-- | Takes a type and prints info about it
+handleInfoFor
+  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
+  => P.Qualified String
+  -> m ()
+handleInfoFor ident@(P.Qualified mMod name) = do
+  st <- get
+  let tMod = createTemporaryModuleForInfo st
+      ident' =
+        P.mkQualified name $
+          fromMaybe tempModuleName mMod
+  e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) tMod
+  case e of
+    Left errs -> printErrors errs
+    Right (_, env') ->
+      liftIO
+      . putStrLn
+      . maybe ("Not in scope: " ++ N.showQualified id ident) showInfo
+      . fmap (InfoPrintable ident)
+      . firstJust
+      . map (\f -> f env' ident')
+      $ [ getPrintableFromNames
+        , getPrintableFromTypeclasses
+        , getPrintableFromTypes
+        , getPrintableFromConstructors
+        ]
+
+firstJust :: [Maybe a] -> Maybe a
+firstJust = foldr (<|>) Nothing
+
+type GetPrintable = P.Environment -> P.Qualified String -> Maybe InfoTarget
+
+getPrintableFromNames :: GetPrintable
+getPrintableFromNames env qul = go <$> M.lookup (P.Ident <$> qul) (P.names env)
+  where
+    go (ty, _, _) = IValue ty
+
+getPrintableFromTypeclasses :: GetPrintable
+getPrintableFromTypeclasses = const . const $ Nothing
+
+getPrintableFromTypes :: GetPrintable
+getPrintableFromTypes env qul@(P.Qualified _ unQul) =
+  M.lookup (P.ProperName <$> qul) (P.types env) >>= go
+  where
+    ctorInfo
+      :: P.ProperName 'N.ConstructorName
+      -> Maybe (P.DataDeclType, (String, P.Type))
+    ctorInfo nm =
+      (\(ddt, _, ty, _) -> (ddt, (P.runProperName nm, ty)))
+      <$> M.lookup (const nm <$> qul) (P.dataConstructors env)
+    go
+      :: (P.Kind, P.TypeKind)
+      -> Maybe InfoTarget
+    go (knd, (P.DataType vars ctors)) =
+      makeTypeInfo vars <$>
+        -- Returns Just [a] if all elements are Just, Nothing otherwise
+        foldr
+          (\c l -> (:) <$> c <*> l)
+          (Just [])
+          (map (ctorInfo . fst) ctors)
+    go _                              = Nothing
+
+    makeTypeInfo
+      :: [(String, Maybe P.Kind)]
+      -> [(P.DataDeclType, (String, P.Type))]
+      -> InfoTarget
+    makeTypeInfo vars ctors =
+      let
+        -- If there are no constructors, it must be a data dec
+        ddt = fromMaybe P.Data . fmap fst $ listToMaybe ctors
+      in
+        IType (InfoType ddt (P.ProperName unQul) vars) (map snd ctors) []
+
+getPrintableFromConstructors :: GetPrintable
+getPrintableFromConstructors env qul =
+  M.lookup (P.ProperName <$> qul) (P.dataConstructors env) >>= go
+  where
+    tyInfo
+      :: P.DataDeclType
+      -> P.Qualified (P.ProperName 'N.TypeName)
+      -> Maybe InfoType
+    tyInfo ddt qNm@(P.Qualified _ nm) =
+      InfoType ddt nm <$> (M.lookup qNm (P.types env) >>= extractTypeVars . snd)
+    go
+      :: (P.DataDeclType, N.ProperName 'N.TypeName, P.Type, [N.Ident])
+      -> Maybe InfoTarget
+    go (ddt, tn, t, is) = flip IConstructor t <$> tyInfo ddt (const tn <$> qul)
+
+    extractTypeVars
+      :: P.TypeKind
+      -> Maybe [(String, Maybe P.Kind)]
+    extractTypeVars (P.DataType vars _) = Just vars
+    extractTypeVars _                   = Nothing
 
 -- | Browse a module and displays its signature
 handleBrowse

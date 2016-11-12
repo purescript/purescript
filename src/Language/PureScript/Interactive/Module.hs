@@ -2,7 +2,11 @@ module Language.PureScript.Interactive.Module where
 
 import           Prelude.Compat
 
+import           Data.List (nub, nubBy)
+import           Data.Maybe (mapMaybe)
+import           Data.Function (on)
 import           Control.Monad
+import           Control.Arrow (second)
 import qualified Language.PureScript as P
 import           Language.PureScript.Interactive.Types
 import           System.FilePath (pathSeparator)
@@ -38,13 +42,18 @@ loadAllModules files = do
     return (filename, content)
   return $ P.parseModulesFromFiles id filesAndContent
 
+tempModuleName :: P.ModuleName
+tempModuleName = P.ModuleName [P.ProperName tempModuleNameRaw]
+
+tempModuleNameRaw = "$PSCI"
+
 -- |
 -- Makes a volatile module to execute the current expression.
 --
 createTemporaryModule :: Bool -> PSCiState -> P.Expr -> P.Module
 createTemporaryModule exec PSCiState{psciImportedModules = imports, psciLetBindings = lets} val =
   let
-    moduleName    = P.ModuleName [P.ProperName "$PSCI"]
+    moduleName    = tempModuleName
     effModuleName = P.moduleNameFromString "Control.Monad.Eff"
     effImport     = (effModuleName, P.Implicit, Just (P.ModuleName [P.ProperName "$Eff"]))
     supportImport = (supportModuleName, P.Implicit, Just (P.ModuleName [P.ProperName "$Support"]))
@@ -74,7 +83,7 @@ createTemporaryModule exec PSCiState{psciImportedModules = imports, psciLetBindi
 createTemporaryModuleForKind :: PSCiState -> P.Type -> P.Module
 createTemporaryModuleForKind PSCiState{psciImportedModules = imports, psciLetBindings = lets} typ =
   let
-    moduleName = P.ModuleName [P.ProperName "$PSCI"]
+    moduleName = tempModuleName
     itDecl = P.TypeSynonymDeclaration (P.ProperName "IT") [] typ
   in
     P.Module (P.internalModuleSourceSpan "<internal>") [] moduleName ((importDecl `map` imports) ++ lets ++ [itDecl]) Nothing
@@ -85,9 +94,27 @@ createTemporaryModuleForKind PSCiState{psciImportedModules = imports, psciLetBin
 createTemporaryModuleForImports :: PSCiState -> P.Module
 createTemporaryModuleForImports PSCiState{psciImportedModules = imports} =
   let
-    moduleName = P.ModuleName [P.ProperName "$PSCI"]
+    moduleName = tempModuleName
   in
     P.Module (P.internalModuleSourceSpan "<internal>") [] moduleName (importDecl `map` imports) Nothing
+
+-- |
+-- Makes a volatile module to execute the current imports and let declarations.
+--
+createTemporaryModuleForInfo :: PSCiState -> P.Module
+createTemporaryModuleForInfo
+  PSCiState
+  { psciImportedModules = imports
+  , psciLetBindings = lets} =
+  let
+    moduleName = tempModuleName
+  in
+    P.Module
+      (P.internalModuleSourceSpan "<internal>")
+      []
+      moduleName
+      (importDecl `map` imports ++ lets)
+      Nothing
 
 importDecl :: ImportedModule -> P.Declaration
 importDecl (mn, declType, asQ) = P.ImportDeclaration mn declType asQ

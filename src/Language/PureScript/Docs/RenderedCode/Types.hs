@@ -50,6 +50,7 @@ data RenderedCodeElement
   | Ident String ContainingModule
   | Ctor String ContainingModule
   | Kind String
+  | Info String
   | Keyword String
   | Space
   deriving (Show, Eq, Ord)
