@@ -30,14 +30,14 @@ import qualified Language.PureScript           as P
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
-import           System.IO.UTF8                (readUTF8File)
+import           System.IO.UTF8                (readUTF8FileT)
 
 parseModule
   :: (MonadIO m)
   => FilePath
-  -> m (Either FilePath (FilePath, P.Module) )
+  -> m (Either FilePath (FilePath, P.Module))
 parseModule path = do
-  contents <- liftIO (readUTF8File path)
+  contents <- liftIO (readUTF8FileT path)
   case P.parseModuleFromFile identity (path, contents) of
     Left _ -> pure (Left path)
     Right m -> pure (Right m)

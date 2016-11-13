@@ -31,6 +31,7 @@ import Data.List (sort, stripPrefix, intercalate, groupBy, sortBy, minimumBy)
 import Data.Maybe (mapMaybe)
 import Data.Time.Clock (UTCTime())
 import Data.Tuple (swap)
+import qualified Data.Text as T
 
 import qualified Data.Map as M
 
@@ -71,7 +72,7 @@ spec = do
     supportPurs <- supportFiles "purs"
     supportPursFiles <- readInput supportPurs
     supportExterns <- runExceptT $ do
-      modules <- ExceptT . return $ P.parseModulesFromFiles id supportPursFiles
+      modules <- ExceptT . return $ P.parseModulesFromFiles id (map (fmap T.pack) supportPursFiles)
       foreigns <- inferForeignModules modules
       externs <- ExceptT . fmap fst . runTest $ P.make (makeActions foreigns) (map snd modules)
       return (zip (map snd modules) externs)
@@ -194,7 +195,7 @@ compile
   -> IO (Either P.MultipleErrors [P.ExternsFile], P.MultipleErrors)
 compile supportExterns inputFiles check = silence $ runTest $ do
   fs <- liftIO $ readInput inputFiles
-  ms <- P.parseModulesFromFiles id fs
+  ms <- P.parseModulesFromFiles id (map (fmap T.pack) fs)
   foreigns <- inferForeignModules ms
   liftIO (check (map snd ms))
   let actions = makeActions foreigns

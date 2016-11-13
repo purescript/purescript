@@ -474,7 +474,8 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
     in foldMap (f'' s') ds
   f' s (ValueDeclaration name _ bs (Right val)) =
     let s' = S.insert name s
-    in foldMap (h'' s') bs <> g'' s' val
+        s'' = S.union s' (S.fromList (concatMap binderNames bs))
+    in foldMap (h'' s') bs <> g'' s'' val
   f' s (ValueDeclaration name _ bs (Left gs)) =
     let s' = S.insert name s
         s'' = S.union s' (S.fromList (concatMap binderNames bs))

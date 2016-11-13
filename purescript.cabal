@@ -1,5 +1,5 @@
 name: purescript
-version: 0.10.1
+version: 0.10.2
 cabal-version: >=1.8
 build-type: Simple
 license: BSD3
@@ -334,6 +334,7 @@ executable psc
                    mtl -any,
                    optparse-applicative >= 0.12.1,
                    parsec -any,
+                   text -any,
                    time -any,
                    transformers -any,
                    transformers-compat -any,
@@ -387,6 +388,7 @@ executable psc-docs
                    optparse-applicative >= 0.12.1,
                    process -any,
                    split -any,
+                   text -any,
                    transformers -any,
                    transformers-compat -any
     main-is: Main.hs
@@ -410,6 +412,24 @@ executable psc-publish
     hs-source-dirs: psc-publish
     ghc-options: -Wall -O2
 
+executable psc-package
+    build-depends: base >=4 && <5,
+                   purescript -any,
+                   aeson -any,
+                   aeson-pretty -any,
+                   bytestring -any,
+                   containers -any,
+                   foldl -any,
+                   optparse-applicative -any,
+                   system-filepath -any,
+                   text -any,
+                   turtle -any
+    main-is: Main.hs
+    other-modules: Paths_purescript
+    buildable: True
+    hs-source-dirs: psc-package
+    ghc-options: -Wall -O2
+
 executable psc-hierarchy
     build-depends: base >=4 && <5,
                    purescript -any,
@@ -419,7 +439,8 @@ executable psc-hierarchy
                    mtl -any,
                    optparse-applicative >= 0.12.1,
                    parsec -any,
-                   process -any
+                   process -any,
+                   text -any
     main-is: Main.hs
     other-modules: Paths_purescript
     buildable: True

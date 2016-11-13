@@ -7,6 +7,7 @@ import Control.Monad.Trans.Except (runExceptT)
 import Control.Arrow (first, second)
 import Control.Category ((>>>))
 import Control.Monad.Writer
+import Data.Text (Text)
 import Data.Function (on)
 import Data.List
 import Data.Maybe (fromMaybe)
@@ -20,7 +21,7 @@ import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import System.Exit (exitFailure)
 import System.IO (hPutStrLn, hPrint, hSetEncoding, stderr, stdout, utf8)
-import System.IO.UTF8 (readUTF8File)
+import System.IO.UTF8 (readUTF8FileT)
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath (takeDirectory)
 import System.FilePath.Glob (glob)
@@ -139,8 +140,8 @@ dumpTags input renderTags = do
   ldump :: [String] -> IO ()
   ldump = mapM_ putStrLn
 
-parseFile :: FilePath -> IO (FilePath, String)
-parseFile input = (,) input <$> readUTF8File input
+parseFile :: FilePath -> IO (FilePath, Text)
+parseFile input = (,) input <$> readUTF8FileT input
 
 inputFile :: Parser FilePath
 inputFile = strArgument $
@@ -235,16 +236,16 @@ examples =
   PP.vcat $ map PP.text
     [ "Examples:"
     , "  print documentation for Data.List to stdout:"
-    , "    psc-docs \"src/**/*.purs\" \"bower_components/*/src/**/*.purs\" \\"
+    , "    psc-docs \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\" \\"
     , "      --docgen Data.List"
     , ""
     , "  write documentation for Data.List to docs/Data.List.md:"
-    , "    psc-docs \"src/**/*.purs\" \"bower_components/*/src/**/*.purs\" \\"
+    , "    psc-docs \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\" \\"
     , "      --docgen Data.List:docs/Data.List.md"
     , ""
     , "  write documentation for Data.List to docs/Data.List.md, and"
     , "  documentation for Data.List.Lazy to docs/Data.List.Lazy.md:"
-    , "    psc-docs \"src/**/*.purs\" \"bower_components/*/src/**/*.purs\" \\"
+    , "    psc-docs \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\" \\"
     , "      --docgen Data.List:docs/Data.List.md \\"
     , "      --docgen Data.List.Lazy:docs/Data.List.Lazy.md"
     ]

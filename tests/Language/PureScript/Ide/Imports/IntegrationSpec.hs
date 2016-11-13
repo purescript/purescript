@@ -6,12 +6,12 @@ module Language.PureScript.Ide.Imports.IntegrationSpec where
 import           Protolude
 
 import qualified Data.Text                           as T
-import qualified Data.Text.IO                        as TIO
 import qualified Language.PureScript.Ide.Integration as Integration
 import           Test.Hspec
 
 import           System.Directory
 import           System.FilePath
+import           System.IO.UTF8                      (readUTF8FileT)
 
 setup :: IO ()
 setup = void (Integration.reset *> Integration.loadAll)
@@ -27,7 +27,7 @@ withSupportFiles test = do
 outputFileShouldBe :: [Text] -> IO ()
 outputFileShouldBe expectation = do
   outFp <- (</> "src" </> "ImportsSpecOut.tmp") <$> Integration.projectDirectory
-  outRes <- TIO.readFile outFp
+  outRes <- readUTF8FileT outFp
   shouldBe (T.lines outRes) expectation
 
 spec :: Spec
@@ -57,10 +57,10 @@ spec = beforeAll_ setup . describe "Adding imports" $ do
     outputFileShouldBe (sourceFileSkeleton ["import ImportsSpec1 (class ATypeClass)"])
   it "adds an explicit unqualified import (dataconstructor)" $ do
     withSupportFiles (Integration.addImport "MyJust")
-    outputFileShouldBe (sourceFileSkeleton ["import ImportsSpec1 (MyMaybe(MyJust))"])
+    outputFileShouldBe (sourceFileSkeleton ["import ImportsSpec1 (MyMaybe(..))"])
   it "adds an explicit unqualified import (newtype)" $ do
     withSupportFiles (Integration.addImport "MyNewtype")
-    outputFileShouldBe (sourceFileSkeleton ["import ImportsSpec1 (MyNewtype(MyNewtype))"])
+    outputFileShouldBe (sourceFileSkeleton ["import ImportsSpec1 (MyNewtype(..))"])
   it "adds an explicit unqualified import (typeclass member function)" $ do
     withSupportFiles (Integration.addImport "typeClassFun")
     outputFileShouldBe (sourceFileSkeleton ["import ImportsSpec1 (typeClassFun)"])
