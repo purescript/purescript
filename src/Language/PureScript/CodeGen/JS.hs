@@ -7,15 +7,20 @@ module Language.PureScript.CodeGen.JS
   , moduleToJs
   ) where
 
-import Prelude.Compat (init, last, head)
-import Language.PureScript.Prelude hiding (head, evaluate, minInt, maxInt)
+import Prelude.Compat
 
 import Control.Arrow ((&&&))
+import Control.Monad (forM, replicateM, void)
+import Control.Monad.Except (MonadError, throwError)
+import Control.Monad.Reader (MonadReader, asks)
 import Control.Monad.Supply.Class
 
 import Data.List ((\\), delete, intersect, nub)
 import qualified Data.Foldable as F
 import qualified Data.Map as M
+import Data.Maybe (fromMaybe, isNothing)
+import Data.Monoid ((<>))
+import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.AST.SourcePos
@@ -91,7 +96,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
 
     freshModuleName :: Integer -> ModuleName -> [Ident] -> ModuleName
     freshModuleName i mn'@(ModuleName pns) used =
-      let newName = ModuleName $ init pns ++ [ProperName $ runProperName (last pns) <> "_" <> show i]
+      let newName = ModuleName $ init pns ++ [ProperName $ runProperName (last pns) <> "_" <> T.pack (show i)]
       in if Ident (runModuleName newName) `elem` used
          then freshModuleName (i + 1) mn' used
          else newName

@@ -5,10 +5,13 @@
 --
 module Language.PureScript.Pretty.Common where
 
-import Prelude.Compat (String, last)
-import Language.PureScript.Prelude hiding (intercalate)
+import Prelude.Compat
 
-import Data.List (elemIndices)
+import Control.Monad.State (StateT, modify, get)
+
+import Data.List (elemIndices, intersperse)
+import Data.Monoid ((<>))
+import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.AST (SourcePos(..), SourceSpan(..))
@@ -147,9 +150,9 @@ prettyPrintMany f xs = do
 -- Prints an object key, escaping reserved names.
 --
 prettyPrintObjectKey :: Text -> Text
-prettyPrintObjectKey s | s `elem` reservedPsNames = show s
+prettyPrintObjectKey s | s `elem` reservedPsNames = T.pack (show s)
                        | isUnquotedKey s = s
-                       | otherwise = show s
+                       | otherwise = T.pack (show s)
 
 -- | Place a box before another, vertically when the first box takes up multiple lines.
 before :: Box -> Box -> Box

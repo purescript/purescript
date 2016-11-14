@@ -5,7 +5,8 @@
 --
 module Language.PureScript.Comments where
 
-import Language.PureScript.Prelude
+import Prelude.Compat
+import Data.Text (Text)
 
 import Data.Aeson.TH
 

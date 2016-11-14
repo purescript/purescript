@@ -2,13 +2,13 @@
 
 module Language.PureScript.Environment where
 
-import Language.PureScript.Prelude
-
-import Prelude (fail)
+import Prelude.Compat
 
 import Data.Aeson.TH
 import qualified Data.Aeson as A
 import qualified Data.Map as M
+import Data.Maybe (fromMaybe)
+import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.Crash

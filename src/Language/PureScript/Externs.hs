@@ -14,9 +14,14 @@ module Language.PureScript.Externs
   , applyExternsFileToEnvironment
   ) where
 
-import Language.PureScript.Prelude
+import Prelude.Compat
 
 import Data.Aeson.TH
+import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
+import Data.List (foldl', find)
+import Data.Foldable (fold)
+import Data.Text (Text)
+import qualified Data.Text as T
 import Data.Version (showVersion)
 import qualified Data.Map as M
 
@@ -156,7 +161,7 @@ moduleToExternsFile :: Module -> Environment -> ExternsFile
 moduleToExternsFile (Module _ _ _ _ Nothing) _ = internalError "moduleToExternsFile: module exports were not elaborated"
 moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
   where
-  efVersion       = toS (showVersion Paths.version)
+  efVersion       = T.pack (showVersion Paths.version)
   efModuleName    = mn
   efExports       = exps
   efImports       = mapMaybe importDecl ds

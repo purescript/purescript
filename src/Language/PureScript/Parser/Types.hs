@@ -5,7 +5,12 @@ module Language.PureScript.Parser.Types
   , parseTypeAtom
   ) where
 
-import Language.PureScript.Prelude
+import Prelude.Compat
+
+import Control.Monad (when, unless)
+import Control.Applicative ((<|>))
+import Data.Text (Text)
+import qualified Data.Text as T
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.Environment
@@ -36,7 +41,7 @@ parseTypeWildcard = do
 parseTypeVariable :: TokenParser Type
 parseTypeVariable = do
   ident <- identifier
-  when (ident `elem` reservedTypeNames) $ P.unexpected (toS ident)
+  when (ident `elem` reservedTypeNames) $ P.unexpected (T.unpack ident)
   return $ TypeVar ident
 
 parseTypeConstructor :: TokenParser Type

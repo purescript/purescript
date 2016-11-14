@@ -3,7 +3,13 @@
 --
 module Language.PureScript.Parser.Common where
 
-import Language.PureScript.Prelude
+import Prelude.Compat
+
+import Control.Applicative ((<|>))
+import Control.Monad (guard)
+import Data.Monoid ((<>))
+import Data.Text (Text)
+import qualified Data.Text as T
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.Comments
@@ -117,19 +123,19 @@ checkIndentation
 checkIndentation mkMsg rel = do
   col <- P.sourceColumn <$> P.getPosition
   current <- indentationLevel <$> P.getState
-  guard (col `rel` current) P.<?> toS (mkMsg current)
+  guard (col `rel` current) P.<?> T.unpack (mkMsg current)
 
 -- |
 -- Check that the current indentation level is past the current mark
 --
 indented :: P.Parsec s ParseState ()
-indented = checkIndentation (("indentation past column " <>) . show) (>)
+indented = checkIndentation (("indentation past column " <>) . (T.pack . show)) (>)
 
 -- |
 -- Check that the current indentation level is at the same indentation as the current mark
 --
 same :: P.Parsec s ParseState ()
-same = checkIndentation (("indentation at column " <>) . show) (==)
+same = checkIndentation (("indentation at column " <>) . (T.pack . show)) (==)
 
 -- |
 -- Read the comments from the the next token, without consuming it

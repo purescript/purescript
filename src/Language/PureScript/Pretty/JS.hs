@@ -6,12 +6,17 @@ module Language.PureScript.Pretty.JS
   , prettyPrintJSWithSourceMaps
   ) where
 
-import Language.PureScript.Prelude hiding (intercalate)
+import Prelude.Compat
 
 import Control.Arrow ((<+>))
+import Control.Monad (forM, mzero)
+import Control.Monad.State (StateT, evalStateT)
 import Control.PatternArrows
 import qualified Control.Arrow as A
 
+import Data.Maybe (fromMaybe)
+import Data.Monoid ((<>))
+import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.AST (SourceSpan(..))
@@ -32,7 +37,7 @@ literals = mkPattern' match'
   match' js = (addMapping' (getSourceSpan js) <>) <$> match js
 
   match :: (Emit gen) => JS -> StateT PrinterState Maybe gen
-  match (JSNumericLiteral _ n) = return $ emit $ either show show n
+  match (JSNumericLiteral _ n) = return $ emit $ T.pack $ either show show n
   match (JSStringLiteral _ s) = return $ string s
   match (JSBooleanLiteral _ True) = return $ emit "true"
   match (JSBooleanLiteral _ False) = return $ emit "false"
@@ -54,7 +59,7 @@ literals = mkPattern' match'
     ]
     where
     objectPropertyToString :: (Emit gen) => Text -> gen
-    objectPropertyToString s | identNeedsEscaping s = emit $ show s
+    objectPropertyToString s | identNeedsEscaping s = emit $ T.pack $ show s
                              | otherwise = emit s
   match (JSBlock _ sts) = mconcat <$> sequence
     [ return $ emit "{\n"

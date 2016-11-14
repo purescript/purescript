@@ -3,7 +3,11 @@
 --
 module Language.PureScript.CodeGen.JS.AST where
 
-import Language.PureScript.Prelude hiding ((<>))
+import Prelude.Compat
+
+import Control.Monad ((>=>))
+import Control.Monad.Identity (Identity(..), runIdentity)
+import Data.Text (Text)
 
 import Language.PureScript.AST (SourceSpan(..))
 import Language.PureScript.Comments

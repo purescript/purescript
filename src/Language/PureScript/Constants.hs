@@ -1,8 +1,8 @@
 -- | Various constants which refer to things in the Prelude
 module Language.PureScript.Constants where
 
-import Language.PureScript.Prelude
-
+import Prelude.Compat
+import Data.Text (Text)
 import Language.PureScript.Names
 
 -- Operators

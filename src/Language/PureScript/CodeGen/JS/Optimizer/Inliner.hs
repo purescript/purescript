@@ -11,11 +11,14 @@ module Language.PureScript.CodeGen.JS.Optimizer.Inliner
   , evaluateIifes
   ) where
 
-import Language.PureScript.Prelude
+import Prelude.Compat
 
 import Control.Monad.Supply.Class (MonadSupply, freshName)
 
-import Data.List (init, last)
+import Data.Maybe (fromMaybe)
+import Data.Monoid ((<>))
+import Data.Text (Text)
+import qualified Data.Text as T
 
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.CodeGen.JS.Optimizer.Common
@@ -209,8 +212,8 @@ inlineCommonOperators = applyAll $
     collectArgs _ _   _ = Nothing
 
   isNFn :: Text -> Int -> JS -> Bool
-  isNFn prefix n (JSVar _ name) = name == (prefix <> show n)
-  isNFn prefix n (JSAccessor _ name (JSVar _ dataFunctionUncurried)) | dataFunctionUncurried == C.dataFunctionUncurried = name == (prefix <> show n)
+  isNFn prefix n (JSVar _ name) = name == (prefix <> T.pack (show n))
+  isNFn prefix n (JSAccessor _ name (JSVar _ dataFunctionUncurried)) | dataFunctionUncurried == C.dataFunctionUncurried = name == (prefix <> T.pack (show n))
   isNFn _ _ _ = False
 
   runFn :: Int -> JS -> JS

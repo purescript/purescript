@@ -3,9 +3,11 @@
 --
 module Language.PureScript.CodeGen.JS.Common where
 
-import Language.PureScript.Prelude
+import Prelude.Compat
 
 import Data.Char
+import Data.Monoid ((<>))
+import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.Crash
@@ -68,7 +70,7 @@ identCharToText '\\' = "$bslash"
 identCharToText '?' = "$qmark"
 identCharToText '@' = "$at"
 identCharToText '\'' = "$prime"
-identCharToText c = '$' `T.cons` show (ord c)
+identCharToText c = '$' `T.cons` T.pack (show (ord c))
 
 -- |
 -- Checks whether an identifier name is reserved in Javascript.

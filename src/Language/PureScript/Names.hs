@@ -5,12 +5,14 @@
 --
 module Language.PureScript.Names where
 
-import Language.PureScript.Prelude
+import Prelude.Compat
 
 import Control.Monad.Supply.Class
 
 import Data.Aeson
 import Data.Aeson.TH
+import Data.Monoid ((<>))
+import Data.Text (Text)
 import qualified Data.Text as T
 
 -- | A sum of the possible name types, useful for error and lint messages.
@@ -68,8 +70,8 @@ data Ident
 
 runIdent :: Ident -> Text
 runIdent (Ident i) = i
-runIdent (GenIdent Nothing n) = "$" <> show n
-runIdent (GenIdent (Just name) n) = "$" <> name <> show n
+runIdent (GenIdent Nothing n) = "$" <> T.pack (show n)
+runIdent (GenIdent (Just name) n) = "$" <> name <> T.pack (show n)
 
 showIdent :: Ident -> Text
 showIdent = runIdent

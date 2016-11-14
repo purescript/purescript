@@ -3,7 +3,10 @@
 --
 module Language.PureScript.CodeGen.JS.Optimizer.TCO (tco) where
 
-import Language.PureScript.Prelude
+import Prelude.Compat
+
+import Data.Text (Text)
+import Data.Monoid ((<>), getAny, Any(..))
 
 import Language.PureScript.Options
 import Language.PureScript.CodeGen.JS.AST

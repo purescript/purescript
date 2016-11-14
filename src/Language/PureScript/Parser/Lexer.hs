@@ -62,11 +62,14 @@ module Language.PureScript.Parser.Lexer
   )
   where
 
-import Language.PureScript.Prelude
+import Prelude.Compat hiding (lex)
 
-import qualified GHC.Show as Show
-
+import Control.Applicative ((<|>))
+import Control.Monad (void, guard)
+import Control.Monad.Identity (Identity)
 import Data.Char (isSpace, isAscii, isSymbol, isAlphaNum)
+import Data.Monoid ((<>))
+import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.Comments
@@ -128,14 +131,14 @@ prettyPrintToken Comma             = ","
 prettyPrintToken Semi              = ";"
 prettyPrintToken At                = "@"
 prettyPrintToken Underscore        = "_"
-prettyPrintToken (Indent n)        = "indentation at level " <> show n
-prettyPrintToken (LName s)         = show s
-prettyPrintToken (UName s)         = show s
+prettyPrintToken (Indent n)        = "indentation at level " <> T.pack (show n)
+prettyPrintToken (LName s)         = T.pack (show s)
+prettyPrintToken (UName s)         = T.pack (show s)
 prettyPrintToken (Qualifier _)     = "qualifier"
 prettyPrintToken (Symbol s)        = s
-prettyPrintToken (CharLiteral c)   = show c
-prettyPrintToken (StringLiteral s) = show s
-prettyPrintToken (Number n)        = either show show n
+prettyPrintToken (CharLiteral c)   = T.pack (show c)
+prettyPrintToken (StringLiteral s) = T.pack (show s)
+prettyPrintToken (Number n)        = T.pack (either show show n)
 prettyPrintToken (HoleLit name)    = "?" <> name
 
 data PositionedToken = PositionedToken
@@ -150,8 +153,8 @@ data PositionedToken = PositionedToken
   } deriving (Eq)
 
 -- Parsec requires this instance for various token-level combinators
-instance Show.Show PositionedToken where
-  show = toS . prettyPrintToken . ptToken
+instance Show PositionedToken where
+  show = T.unpack . prettyPrintToken . ptToken
 
 type Lexer u a = P.Parsec Text u a
 
@@ -174,10 +177,10 @@ parseComment :: Lexer u Comment
 parseComment = (BlockComment <$> blockComment <|> LineComment <$> lineComment) <* whitespace
   where
   blockComment :: Lexer u Text
-  blockComment = P.try $ P.string "{-" *> (toS <$> P.manyTill P.anyChar (P.try (P.string "-}")))
+  blockComment = P.try $ P.string "{-" *> (T.pack <$> P.manyTill P.anyChar (P.try (P.string "-}")))
 
   lineComment :: Lexer u Text
-  lineComment = P.try $ P.string "--" *> (toS <$> P.manyTill P.anyChar (P.try (void (P.char '\n') <|> P.eof)))
+  lineComment = P.try $ P.string "--" *> (T.pack <$> P.manyTill P.anyChar (P.try (void (P.char '\n') <|> P.eof)))
 
 parsePositionedToken :: Lexer u PositionedToken
 parsePositionedToken = P.try $ do
@@ -215,7 +218,7 @@ parseToken = P.choice
   , P.try $ P.char ';'    *> P.notFollowedBy symbolChar *> pure Semi
   , P.try $ P.char '@'    *> P.notFollowedBy symbolChar *> pure At
   , P.try $ P.char '_'    *> P.notFollowedBy identLetter *> pure Underscore
-  , HoleLit <$> P.try (P.char '?' *> (toS <$> P.many1 identLetter))
+  , HoleLit <$> P.try (P.char '?' *> (T.pack <$> P.many1 identLetter))
   , LName         <$> parseLName
   , parseUName >>= \uName ->
       guard (validModuleName uName) *> (Qualifier uName <$ P.char '.')
@@ -228,13 +231,13 @@ parseToken = P.choice
 
   where
   parseLName :: Lexer u Text
-  parseLName = T.cons <$> identStart <*> (toS <$> P.many identLetter)
+  parseLName = T.cons <$> identStart <*> (T.pack <$> P.many identLetter)
 
   parseUName :: Lexer u Text
-  parseUName = T.cons <$> P.upper <*> (toS <$> P.many identLetter)
+  parseUName = T.cons <$> P.upper <*> (T.pack <$> P.many identLetter)
 
   parseSymbol :: Lexer u Text
-  parseSymbol = toS <$> P.many1 symbolChar
+  parseSymbol = T.pack <$> P.many1 symbolChar
 
   identStart :: Lexer u Char
   identStart = P.lower <|> P.oneOf "_"
@@ -249,10 +252,10 @@ parseToken = P.choice
   parseCharLiteral = PT.charLiteral tokenParser
 
   parseStringLiteral :: Lexer u Text
-  parseStringLiteral = blockString <|> toS <$> PT.stringLiteral tokenParser
+  parseStringLiteral = blockString <|> T.pack <$> PT.stringLiteral tokenParser
     where
     delimiter   = P.try (P.string "\"\"\"")
-    blockString = delimiter *> (toS <$> P.manyTill P.anyChar delimiter)
+    blockString = delimiter *> (T.pack <$> P.manyTill P.anyChar delimiter)
 
   parseNumber :: Lexer u (Either Integer Double)
   parseNumber = (consumeLeadingZero *> P.parserZero) <|>
@@ -292,13 +295,13 @@ tokenParser = PT.makeTokenParser langDef
 type TokenParser a = P.Parsec [PositionedToken] ParseState a
 
 anyToken :: TokenParser PositionedToken
-anyToken = P.token (toS . prettyPrintToken . ptToken) ptSourcePos Just
+anyToken = P.token (T.unpack . prettyPrintToken . ptToken) ptSourcePos Just
 
 token :: (Token -> Maybe a) -> TokenParser a
-token f = P.token (toS . prettyPrintToken . ptToken) ptSourcePos (f . ptToken)
+token f = P.token (T.unpack . prettyPrintToken . ptToken) ptSourcePos (f . ptToken)
 
 match :: Token -> TokenParser ()
-match tok = token (\tok' -> if tok == tok' then Just () else Nothing) P.<?> toS (prettyPrintToken tok)
+match tok = token (\tok' -> if tok == tok' then Just () else Nothing) P.<?> T.unpack (prettyPrintToken tok)
 
 lparen :: TokenParser ()
 lparen = match LParen

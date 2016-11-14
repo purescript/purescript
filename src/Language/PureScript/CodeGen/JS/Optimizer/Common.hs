@@ -3,7 +3,11 @@
 --
 module Language.PureScript.CodeGen.JS.Optimizer.Common where
 
-import Language.PureScript.Prelude hiding (check)
+import Prelude.Compat
+
+import Data.Text (Text)
+import Data.List (foldl')
+import Data.Maybe (fromMaybe)
 
 import Language.PureScript.Crash
 import Language.PureScript.CodeGen.JS.AST

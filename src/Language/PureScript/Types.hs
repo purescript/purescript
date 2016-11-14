@@ -6,10 +6,16 @@
 --
 module Language.PureScript.Types where
 
-import Language.PureScript.Prelude
+import Prelude.Compat
 
+import Control.Monad ((<=<))
 import qualified Data.Aeson as A
 import qualified Data.Aeson.TH as A
+import Data.List (nub)
+import Data.Maybe (fromMaybe)
+import Data.Monoid ((<>))
+import Data.Text (Text)
+import qualified Data.Text as T
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.Kinds
@@ -162,14 +168,14 @@ replaceAllTypeVars = go []
   genName orig inUse = try' 0
     where
     try' :: Integer -> Text
-    try' n | (orig <> show n) `elem` inUse = try' (n + 1)
-          | otherwise = orig <> show n
+    try' n | (orig <> T.pack (show n)) `elem` inUse = try' (n + 1)
+           | otherwise = orig <> T.pack (show n)
 
 -- |
 -- Collect all type variables appearing in a type
 --
 usedTypeVariables :: Type -> [Text]
-usedTypeVariables = ordNub . everythingOnTypes (++) go
+usedTypeVariables = nub . everythingOnTypes (++) go
   where
   go (TypeVar v) = [v]
   go _ = []
@@ -178,7 +184,7 @@ usedTypeVariables = ordNub . everythingOnTypes (++) go
 -- Collect all free type variables appearing in a type
 --
 freeTypeVariables :: Type -> [Text]
-freeTypeVariables = ordNub . go []
+freeTypeVariables = nub . go []
   where
   go :: [Text] -> Type -> [Text]
   go bound (TypeVar v) | v `notElem` bound = [v]
