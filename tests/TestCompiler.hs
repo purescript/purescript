@@ -73,7 +73,7 @@ spec = do
     supportPurs <- supportFiles "purs"
     supportPursFiles <- readInput supportPurs
     supportExterns <- runExceptT $ do
-      modules <- ExceptT . return $ P.parseModulesFromFiles id (map (fmap T.pack) supportPursFiles)
+      modules <- ExceptT . return $ P.parseModulesFromFiles id supportPursFiles
       foreigns <- inferForeignModules modules
       externs <- ExceptT . fmap fst . runTest $ P.make (makeActions foreigns) (map snd modules)
       return (zip (map snd modules) externs)
@@ -181,9 +181,9 @@ makeActions foreigns = (P.buildMakeActions modulesDir (P.internalError "makeActi
     exists <- liftIO $ doesDirectoryExist filePath
     return (if exists then Just (P.internalError "getOutputTimestamp: read timestamp") else Nothing)
 
-readInput :: [FilePath] -> IO [(FilePath, String)]
+readInput :: [FilePath] -> IO [(FilePath, T.Text)]
 readInput inputFiles = forM inputFiles $ \inputFile -> do
-  text <- readUTF8File inputFile
+  text <- readUTF8FileT inputFile
   return (inputFile, text)
 
 runTest :: P.Make a -> IO (Either P.MultipleErrors a, P.MultipleErrors)
@@ -196,7 +196,7 @@ compile
   -> IO (Either P.MultipleErrors [P.ExternsFile], P.MultipleErrors)
 compile supportExterns inputFiles check = silence $ runTest $ do
   fs <- liftIO $ readInput inputFiles
-  ms <- P.parseModulesFromFiles id (map (fmap T.pack) fs)
+  ms <- P.parseModulesFromFiles id fs
   foreigns <- inferForeignModules ms
   liftIO (check (map snd ms))
   let actions = makeActions foreigns
