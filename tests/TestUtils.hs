@@ -104,6 +104,7 @@ supportModules =
   , "Data.Ring"
   , "Data.Semigroup"
   , "Data.Semiring"
+  , "Data.Symbol"
   , "Data.Show"
   , "Data.Unit"
   , "Data.Void"
@@ -112,6 +113,7 @@ supportModules =
   , "Prelude"
   , "Test.Assert"
   , "Test.Main"
+  , "Unsafe.Coerce"
   ]
 
 pushd :: forall a. FilePath -> IO a -> IO a

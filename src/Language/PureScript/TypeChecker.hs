@@ -134,7 +134,7 @@ addTypeClass moduleName pn args implies dependencies ds =
 addTypeClassDictionaries
   :: (MonadState CheckState m)
   => Maybe ModuleName
-  -> M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) TypeClassDictionaryInScope)
+  -> M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict)
   -> m ()
 addTypeClassDictionaries mn entries =
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = insertState st } }
@@ -282,7 +282,7 @@ typeCheckAll moduleName _ = traverse go
     checkOrphanInstance dictName className tys
     _ <- traverseTypeInstanceBody checkInstanceMembers body
     let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps)
-    addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdName dict) dict
+    addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) dict
     return d
   go (PositionedDeclaration pos com d) =
     warnAndRethrowWithPosition pos $ PositionedDeclaration pos com <$> go d
