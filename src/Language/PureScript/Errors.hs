@@ -640,7 +640,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
         go _ = False
     renderSimpleErrorMessage (AmbiguousTypeVariables t _) =
       paras [ line "The inferred type"
-            , indent $ line $ markCode $ prettyPrintType t
+            , markCodeBox $ indent $ typeAsBox t
             , line "has type variables which are not mentioned in the body of the type. Consider adding a type annotation."
             ]
     renderSimpleErrorMessage (PossiblyInfiniteInstance nm ts) =
