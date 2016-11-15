@@ -188,6 +188,15 @@ listDependencies = do
   trans <- getTransitiveDeps db depends
   traverse_ (echo . fst) trans
 
+listPackages :: IO ()
+listPackages = do
+  pkg <- readPackageFile
+  db <- readPackageSet pkg
+  traverse_ echo (fmt <$> Map.assocs db)
+  where
+  fmt :: (Text, PackageInfo) -> Text
+  fmt (name, PackageInfo{ version }) = name <> " (" <> version <> ")"
+
 getSourcePaths :: PackageConfig -> PackageSet -> [Text] -> IO [Turtle.FilePath]
 getSourcePaths PackageConfig{..} db pkgNames = do
   trans <- getTransitiveDeps db pkgNames
@@ -252,6 +261,9 @@ main = do
         , Opts.command "sources"
             (Opts.info (pure listSourcePaths)
             (Opts.progDesc "List all (active) source paths for dependencies"))
+        , Opts.command "available"
+            (Opts.info (pure listPackages)
+            (Opts.progDesc "List all packages available in the package set"))
         ]
       where
         pkg = Opts.strArgument $
