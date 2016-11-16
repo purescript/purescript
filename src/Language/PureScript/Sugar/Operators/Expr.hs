@@ -20,7 +20,9 @@ matchExprOperators = matchOperators isBinOp extractOp fromOp reapply modOpTable
   isBinOp _ = False
 
   extractOp :: Expr -> Maybe (Expr, Expr, Expr)
-  extractOp (BinaryNoParens op l r) = Just (op, l, r)
+  extractOp (BinaryNoParens op l r)
+    | PositionedValue _ _ op' <- op = Just (op', l, r)
+    | otherwise = Just (op, l, r)
   extractOp _ = Nothing
 
   fromOp :: Expr -> Maybe (Qualified (OpName 'ValueOpName))
