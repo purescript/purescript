@@ -984,6 +984,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
       paras [ detail
             , line $ "in type declaration for " ++ markCode (showIdent n)
             ]
+    renderHint (ErrorInTypeClassDeclaration name) detail =
+      paras [ detail
+            , line $ "in type class declaration for " ++ markCode (runProperName name)
+            ]
     renderHint (ErrorInForeignImport nm) detail =
       paras [ detail
             , line $ "in foreign import " ++ markCode (showIdent nm)
