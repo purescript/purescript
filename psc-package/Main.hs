@@ -181,6 +181,14 @@ install pkgName = do
   writePackageFile pkg'
   echo "psc-package.json file was updated"
 
+uninstall :: String -> IO ()
+uninstall pkgName = do
+  pkg <- readPackageFile
+  let pkg' = pkg { depends = filter (/= pack pkgName) $ depends pkg }
+  updateImpl pkg'
+  writePackageFile pkg'
+  echo "psc-package.json file was updated"
+
 listDependencies :: IO ()
 listDependencies = do
   pkg@PackageConfig{ depends } <- readPackageFile
@@ -249,6 +257,9 @@ main = do
         , Opts.command "update"
             (Opts.info (pure update)
             (Opts.progDesc "Update dependencies"))
+        , Opts.command "uninstall"
+            (Opts.info (uninstall <$> pkg)
+            (Opts.progDesc "Uninstall the named package"))
         , Opts.command "install"
             (Opts.info (install <$> pkg)
             (Opts.progDesc "Install the named package"))
