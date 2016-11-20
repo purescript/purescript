@@ -111,7 +111,8 @@ isSymbolDictionary sym =
   let inst = ObjectLiteral
                [ ("reflectSymbol", Abs (Left (Ident C.__unused)) (Literal (StringLiteral sym)))
                ]
-  in TypeClassDictionaryInScope (Left (Literal inst)) [] C.IsSymbol [TypeLevelString sym] Nothing
+      dict = TypeClassDictionaryConstructorApp C.IsSymbol (Literal inst) 
+  in TypeClassDictionaryInScope (Left dict) [] C.IsSymbol [TypeLevelString sym] Nothing
 
 -- | Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
