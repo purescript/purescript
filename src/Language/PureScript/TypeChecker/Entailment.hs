@@ -37,8 +37,21 @@ import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 import qualified Language.PureScript.Constants as C
 
-type TypeClassDict =
-  TypeClassDictionaryInScope (Either Expr (Qualified Ident))
+-- | Describes what sort of dictionary to generate for type class instances
+data Evidence
+  = NamedInstance (Qualified Ident)
+  -- ^ An existing named instance
+  | IsSymbolInstance String
+  -- ^ Computed instance of the IsSymbol type class for a given Symbol literal
+  deriving (Eq)
+
+-- | Extract the identifier of a named instance
+namedInstanceIdentifier :: Evidence -> Maybe (Qualified Ident)
+namedInstanceIdentifier (NamedInstance i) = Just i
+namedInstanceIdentifier _ = Nothing
+
+-- | Description of a type class dictionary with instance evidence
+type TypeClassDict = TypeClassDictionaryInScope Evidence
 
 -- | The 'InstanceContext' tracks those constraints which can be satisfied.
 type InstanceContext = M.Map (Maybe ModuleName)
@@ -105,15 +118,6 @@ data SolverOptions = SolverOptions
   -- ^ Should the solver be allowed to defer errors by skipping constraints?
   }
 
--- | Build a type class instance dictionary for the `IsSymbol` class for a symbol
-isSymbolDictionary :: String -> TypeClassDict
-isSymbolDictionary sym =
-  let inst = ObjectLiteral
-               [ ("reflectSymbol", Abs (Left (Ident C.__unused)) (Literal (StringLiteral sym)))
-               ]
-      dict = TypeClassDictionaryConstructorApp C.IsSymbol (Literal inst) 
-  in TypeClassDictionaryInScope (Left dict) [] C.IsSymbol [TypeLevelString sym] Nothing
-
 -- | Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
 entails
@@ -132,7 +136,7 @@ entails SolverOptions{..} constraint context hints =
     solve constraint
   where
     forClassName :: InstanceContext -> Qualified (ProperName 'ClassName) -> [Type] -> [TypeClassDict]
-    forClassName _ C.IsSymbol [TypeLevelString sym] = [isSymbolDictionary sym]
+    forClassName _ C.IsSymbol [TypeLevelString sym] = [TypeClassDictionaryInScope (IsSymbolInstance sym) [] C.IsSymbol [TypeLevelString sym] Nothing]
     forClassName ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (nub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
     forClassName _ _ _ = internalError "forClassName: expected qualified class name"
 
@@ -143,7 +147,7 @@ entails SolverOptions{..} constraint context hints =
     ctorModules _ = Nothing
 
     findDicts :: InstanceContext -> Qualified (ProperName 'ClassName) -> Maybe ModuleName -> [TypeClassDict]
-    findDicts ctx cn = fmap (fmap Right) . maybe [] M.elems . (>>= M.lookup cn) . flip M.lookup ctx
+    findDicts ctx cn = fmap (fmap NamedInstance) . maybe [] M.elems . (>>= M.lookup cn) . flip M.lookup ctx
 
     valUndefined :: Expr
     valUndefined = Var (Qualified (Just (ModuleName [ProperName C.prim])) (Ident C.undefined))
@@ -193,7 +197,7 @@ entails SolverOptions{..} constraint context hints =
                 -- Solve any necessary subgoals
                 args <- solveSubgoals subst'' (tcdDependencies tcd)
                 let match = foldr (\(superclassName, index) dict -> subclassDictionaryValue dict superclassName index)
-                                  (mkDictionary tcd args)
+                                  (mkDictionary (tcdValue tcd) args)
                                   (tcdPath tcd)
                 return match
               Unsolved unsolved -> do
@@ -254,7 +258,7 @@ entails SolverOptions{..} constraint context hints =
             unique _      [(a, dict)] = return $ Solved a dict
             unique tyArgs tcds
               | pairwiseAny overlapping (map snd tcds) = do
-                  tell . errorMessage $ OverlappingInstances className' tyArgs (tcds >>= (toList . tcdValue . snd))
+                  tell . errorMessage $ OverlappingInstances className' tyArgs (tcds >>= (toList . namedInstanceIdentifier . tcdValue . snd))
                   return $ uncurry Solved (head tcds)
               | otherwise = return $ uncurry Solved (minimumBy (compare `on` length . tcdPath . snd) tcds)
 
@@ -272,9 +276,7 @@ entails SolverOptions{..} constraint context hints =
             overlapping _ TypeClassDictionaryInScope{ tcdPath = _ : _ } = False
             overlapping TypeClassDictionaryInScope{ tcdDependencies = Nothing } _ = False
             overlapping _ TypeClassDictionaryInScope{ tcdDependencies = Nothing } = False
-            overlapping tcd1 tcd2 = check (tcdValue tcd1) (tcdValue tcd2) where
-              check (Right l) (Right r) = l /= r
-              check _ _ = False
+            overlapping tcd1 tcd2 = tcdValue tcd1 /= tcdValue tcd2
 
             -- Create dictionaries for subgoals which still need to be solved by calling go recursively
             -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
@@ -285,8 +287,11 @@ entails SolverOptions{..} constraint context hints =
               Just <$> traverse (go (work + 1) . mapConstraintArgs (map (replaceAllTypeVars (M.toList subst)))) subgoals
 
             -- Make a dictionary from subgoal dictionaries by applying the correct function
-            mkDictionary :: TypeClassDict -> Maybe [Expr] -> Expr
-            mkDictionary dict = foldl App (either id Var (tcdValue dict)) . fold
+            mkDictionary :: Evidence -> Maybe [Expr] -> Expr
+            mkDictionary (NamedInstance n) args = foldl App (Var n) (fold args)
+            mkDictionary (IsSymbolInstance sym) _ = TypeClassDictionaryConstructorApp C.IsSymbol (Literal (ObjectLiteral fields)) where
+              fields = [ ("reflectSymbol", Abs (Left (Ident C.__unused)) (Literal (StringLiteral sym)))
+                       ]
 
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName a) -> Integer -> Expr

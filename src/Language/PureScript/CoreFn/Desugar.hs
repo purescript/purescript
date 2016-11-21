@@ -212,6 +212,10 @@ findQualModules decls =
   fqValues :: A.Expr -> [ModuleName]
   fqValues (A.Var q) = getQual' q
   fqValues (A.Constructor q) = getQual' q
+  -- IsSymbol instances for literal symbols are automatically solved and the type
+  -- class dictionaries are built inline instead of having a named instance defined
+  -- and imported.  We therefore need to import the IsSymbol constructor from
+  -- Data.Symbol if it hasn't already been imported.
   fqValues (A.TypeClassDictionaryConstructorApp C.IsSymbol _) = getQual' C.IsSymbol
   fqValues _ = []
 
