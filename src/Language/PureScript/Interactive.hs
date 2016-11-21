@@ -23,6 +23,7 @@ import qualified Data.Text as T
 import           Data.Foldable (fold)
 
 import           Control.Applicative ((<|>))
+import           Control.Arrow ((>>>), first, second)
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.State.Class
 import           Control.Monad.Reader.Class
@@ -291,7 +292,7 @@ data InfoConstructor =
   InfoConstructor
     P.Type
     -- ^ Type of constructor (as displayed in GADT form)
-    (Maybe [P.Type])
+    [P.Type]
     -- ^ Arguments to constructor (as displayed in classic form)
 
 data InfoTarget
@@ -299,13 +300,20 @@ data InfoTarget
       P.Type
   | IConstructor
       InfoType
-      P.Type
-  | IType InfoType [(String, InfoConstructor)]
+      InfoConstructor
+  | IType
+    InfoType
+    [(String, InfoConstructor)]
+  | ITypeSynonym
+    [(String, Maybe P.Kind)]
+    P.Type
   | ITypeClass
       P.TypeClassData
       [(Maybe P.ModuleName, P.ProperName 'N.TypeName)]
 
-data InfoCtors = Single (String, P.Type) | All [(String, P.Type)]
+data InfoCtors
+  = Single (String, InfoConstructor)
+  | All [(String, InfoConstructor)]
 
 showInfo :: InfoPrintable -> String
 showInfo (InfoPrintable idn@(P.Qualified mMdl nm) target) =
@@ -318,8 +326,18 @@ showInfo (InfoPrintable idn@(P.Qualified mMdl nm) target) =
       ++ tyInline typ
     IConstructor tyI ty ->
       showAdt mMdl tyI $ Single (nm, ty)
-    IType        iTy ctors _ ->
+    IType        iTy ctors ->
       showAdt mMdl iTy $ All ctors
+    ITypeSynonym args ty ->
+      fold
+        [ defCmt mMdl
+        , "\n"
+        , "type "
+        , nm
+        , foldMap ((" " ++) . showTypeVar) args
+        , " = "
+        , tyInline ty
+        ]
     ITypeClass   _ _ -> undefined
   where
     stripStr = T.unpack . T.strip . T.pack
@@ -342,29 +360,43 @@ showInfo (InfoPrintable idn@(P.Qualified mMdl nm) target) =
       -> InfoCtors
       -> String
     showAdt mMdl (InfoType P.Data tyName vars) ctors =
-      defCmt mMdl
-      ++ "\n"
-      ++ "data "
-      ++ P.runProperName tyName
-      ++ fold (map ((" " ++) . showTypeVar) vars)
-      ++ " where"
-      ++ showCtors ctors
+      fold
+        [ defCmt mMdl
+        , "\n"
+        , "data "
+        , P.runProperName tyName
+        , foldMap ((" " ++) . showTypeVar) vars
+        , " where"
+        , showGADTCtors ctors
+        ]
 
     -- TODO: Allow showing with both syntaxes
-    showAdt mMdl (InfoType P.Newtype tyName vars) (One ct) =
-      defCmt mMdl
-      ++ "\n"
-      ++ "newtype "
-      ++ P.runProperName tyName
-      ++ fold (map ((" " ++) . showTypeVar) vars)
-      ++ " = "
-      ++ showCtors ctors
+    showAdt mMdl (InfoType P.Newtype tyName vars) (Single ct) =
+      showNewtype mMdl tyName vars [ct]
+    -- Defined so that showing the newtype by type name doesn't explode
+    showAdt mMdl (InfoType P.Newtype tyName vars) (All cts) =
+      showNewtype mMdl tyName vars cts
 
-    showCtors (Single c) = "\n  ...\n  " ++ showCtor c ++ "\n  ..."
-    showCtors (All cs) = fold $ map (("\n  " ++) . showCtor) cs
+    showNewtype mMdl tyName vars cts =
+      fold
+        [ defCmt mMdl
+        , "\n"
+        , "newtype "
+        , P.runProperName tyName
+        , foldMap ((" " ++) . showTypeVar) vars
+        , " = "
+        , foldMap showCtor cts
+        ]
 
-    showCtor :: (String, P.Type) -> String
-    showCtor (n, t) = n ++ " :: " ++ tyInline t
+    showGADTCtors (Single c) = "\n  ...\n  " ++ showCtor c ++ "\n  ..."
+    showGADTCtors (All cs) = foldMap (("\n  " ++) . showGADTCtor) cs
+
+    showGADTCtor :: (String, InfoConstructor) -> String
+    showGADTCtor (n, InfoConstructor t _) = n ++ " :: " ++ tyInline t
+
+    showCtor :: (String, InfoConstructor) -> String
+    showCtor (n, InfoConstructor _ ts) =
+      n ++ foldMap ((" " ++) . tyInline) ts
 
 -- | Takes a type and prints info about it
 handleInfoFor
@@ -412,53 +444,86 @@ getPrintableFromTypes env qul@(P.Qualified _ unQul) =
   where
     ctorInfo
       :: P.ProperName 'N.ConstructorName
-      -> Maybe (P.DataDeclType, (String, P.Type))
-    ctorInfo nm =
-      (\(ddt, _, ty, _) -> (ddt, (P.runProperName nm, ty)))
-      <$> M.lookup (const nm <$> qul) (P.dataConstructors env)
+      -> [P.Type]
+      -> Maybe (P.DataDeclType, (String, InfoConstructor))
+    ctorInfo nm argTypes =
+      go' <$> M.lookup (const nm <$> qul) (P.dataConstructors env)
+      where
+        go' (ddt, _, ty, _) =
+          (ddt, (P.runProperName nm, InfoConstructor ty argTypes))
     go
       :: (P.Kind, P.TypeKind)
       -> Maybe InfoTarget
-    go (knd, (P.DataType vars ctors)) =
+    go (knd, P.DataType vars ctors) =
       makeTypeInfo vars <$>
         -- Returns Just [a] if all elements are Just, Nothing otherwise
         foldr
           (\c l -> (:) <$> c <*> l)
           (Just [])
-          (map (ctorInfo . fst) ctors)
-    go _                              = Nothing
+          (map (uncurry ctorInfo) ctors)
+    go (_, P.TypeSynonym) =
+      uncurry ITypeSynonym <$>
+        M.lookup (N.ProperName <$> qul) (P.typeSynonyms env)
+    go _ =
+      Nothing
 
     makeTypeInfo
       :: [(String, Maybe P.Kind)]
-      -> [(P.DataDeclType, (String, P.Type))]
+      -> [(P.DataDeclType, (String, InfoConstructor))]
       -> InfoTarget
     makeTypeInfo vars ctors =
       let
         -- If there are no constructors, it must be a data dec
-        ddt = fromMaybe P.Data . fmap fst $ listToMaybe ctors
+        ddt = fromMaybe P.Data . fmap fst . listToMaybe $ ctors
       in
-        IType (InfoType ddt (P.ProperName unQul) vars) (map snd ctors) []
+        IType (InfoType ddt (P.ProperName unQul) vars) (map snd ctors)
 
 getPrintableFromConstructors :: GetPrintable
 getPrintableFromConstructors env qul =
   M.lookup (P.ProperName <$> qul) (P.dataConstructors env) >>= go
   where
-    tyInfo
-      :: P.DataDeclType
-      -> P.Qualified (P.ProperName 'N.TypeName)
-      -> Maybe InfoType
-    tyInfo ddt qNm@(P.Qualified _ nm) =
-      InfoType ddt nm <$> (M.lookup qNm (P.types env) >>= extractTypeVars . snd)
     go
       :: (P.DataDeclType, N.ProperName 'N.TypeName, P.Type, [N.Ident])
       -> Maybe InfoTarget
-    go (ddt, tn, t, is) = flip IConstructor t <$> tyInfo ddt (const tn <$> qul)
+    go (ddt, tn, t, is) =
+      uncurry IConstructor . second (InfoConstructor t)
+      <$>
+        tyInfo (N.disqualify qul) ddt (const tn <$> qul)
+
+    tyInfo
+      :: String
+      -> P.DataDeclType
+      -> P.Qualified (N.ProperName 'N.TypeName)
+      -> Maybe (InfoType, [P.Type])
+    tyInfo ctorName ddt qNm@(N.Qualified _ nm) =
+      first (InfoType ddt nm) <$> do
+        (_, info) <- M.lookup qNm (P.types env)
+        typeVars  <- extractTypeVars info
+        ctors     <- extractConstructors ctorName info
+        return (typeVars, ctors)
 
     extractTypeVars
       :: P.TypeKind
       -> Maybe [(String, Maybe P.Kind)]
-    extractTypeVars (P.DataType vars _) = Just vars
-    extractTypeVars _                   = Nothing
+    extractTypeVars = fmap fst . extractDataType
+
+    extractDataType
+      :: P.TypeKind
+      -> Maybe
+        ( [(String, Maybe P.Kind)]
+        , [(N.ProperName 'N.ConstructorName, [P.Type])]
+        )
+    extractDataType (P.DataType vars ctors) = Just (vars, ctors)
+    extractDataType _                       = Nothing
+
+    extractConstructors
+      :: String
+      -> P.TypeKind
+      -> Maybe [P.Type]
+    extractConstructors nm =
+      (>>= getByName) . fmap snd . extractDataType
+      where
+        getByName = lookup (N.ProperName nm)
 
 -- | Browse a module and displays its signature
 handleBrowse
