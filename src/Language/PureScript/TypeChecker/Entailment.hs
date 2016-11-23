@@ -43,7 +43,7 @@ import qualified Language.PureScript.Constants as C
 data Evidence
   = NamedInstance (Qualified Ident)
   -- ^ An existing named instance
-  | IsSymbolInstance String
+  | IsSymbolInstance Text
   -- ^ Computed instance of the IsSymbol type class for a given Symbol literal
   deriving (Eq)
 
