@@ -534,6 +534,7 @@ codeGen optionsMainModule optionsNamespace ms =  renderToString (JSAstProgram (p
     where
     squash JSNoAnnot = JSAnnot (TokenPn 0 0 2) []
     squash (JSAnnot pos ann) = JSAnnot (keepCol pos) (map splat ann)
+    squash ann = ann
 
     splat (CommentA pos s) = CommentA (keepCol pos) s
     splat (WhiteSpace pos w) = WhiteSpace (keepCol pos) w
@@ -589,6 +590,7 @@ codeGen optionsMainModule optionsNamespace ms =  renderToString (JSAstProgram (p
 
       appendAnn a JSNoAnnot = JSAnnot tokenPosnEmpty [a]
       appendAnn a (JSAnnot _ anns) = JSAnnot tokenPosnEmpty (a:anns ++ [WhiteSpace tokenPosnEmpty "  "])
+      appendAnn _ x = x
 
   runMain :: String -> [JSStatement]
   runMain mn =
