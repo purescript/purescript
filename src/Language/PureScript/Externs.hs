@@ -145,7 +145,7 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   applyDecl env (EDClass pn args members cs deps) = env { typeClasses = M.insert (qual pn) (TypeClassData args members cs deps) (typeClasses env) }
   applyDecl env (EDInstance className ident tys cs) = env { typeClassDictionaries = updateMap (updateMap (M.insert (qual ident) dict) className) (Just efModuleName) (typeClassDictionaries env) }
     where
-    dict :: TypeClassDictionaryInScope
+    dict :: NamedDict
     dict = TypeClassDictionaryInScope (qual ident) [] className tys cs
 
     updateMap :: (Ord k, Monoid a) => (a -> a) -> k -> M.Map k a -> M.Map k a

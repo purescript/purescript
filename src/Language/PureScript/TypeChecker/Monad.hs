@@ -133,12 +133,12 @@ warnAndRethrowWithPositionTC pos = rethrowWithPositionTC pos . warnWithPosition 
 -- | Temporarily make a collection of type class dictionaries available
 withTypeClassDictionaries
   :: MonadState CheckState m
-  => [TypeClassDictionaryInScope]
+  => [NamedDict]
   -> m a
   -> m a
 withTypeClassDictionaries entries action = do
   orig <- get
-  let mentries = M.fromListWith (M.unionWith M.union) [ (mn, M.singleton className (M.singleton (tcdName entry) entry)) | entry@TypeClassDictionaryInScope{ tcdName = Qualified mn _, tcdClassName = className }  <- entries ]
+  let mentries = M.fromListWith (M.unionWith M.union) [ (mn, M.singleton className (M.singleton (tcdValue entry) entry)) | entry@TypeClassDictionaryInScope{ tcdValue = Qualified mn _, tcdClassName = className }  <- entries ]
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = M.unionWith (M.unionWith M.union) (typeClassDictionaries . checkEnv $ st) mentries } }
   a <- action
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = typeClassDictionaries . checkEnv $ orig } }
@@ -147,14 +147,14 @@ withTypeClassDictionaries entries action = do
 -- | Get the currently available map of type class dictionaries
 getTypeClassDictionaries
   :: (MonadState CheckState m)
-  => m (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) TypeClassDictionaryInScope)))
+  => m (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict)))
 getTypeClassDictionaries = typeClassDictionaries . checkEnv <$> get
 
 -- | Lookup type class dictionaries in a module.
 lookupTypeClassDictionaries
   :: (MonadState CheckState m)
   => Maybe ModuleName
-  -> m (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) TypeClassDictionaryInScope))
+  -> m (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict))
 lookupTypeClassDictionaries mn = fromMaybe M.empty . M.lookup mn . typeClassDictionaries . checkEnv <$> get
 
 -- | Temporarily bind a collection of names to local variables

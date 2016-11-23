@@ -19,7 +19,7 @@ import Control.Monad.State
 import Control.Monad.Supply.Class (MonadSupply(..))
 import Control.Monad.Writer
 
-import Data.Foldable (for_)
+import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
 import Data.List (minimumBy, nub)
 import Data.Maybe (fromMaybe, maybeToList, mapMaybe)
@@ -37,11 +37,26 @@ import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 import qualified Language.PureScript.Constants as C
 
+-- | Describes what sort of dictionary to generate for type class instances
+data Evidence
+  = NamedInstance (Qualified Ident)
+  -- ^ An existing named instance
+  | IsSymbolInstance String
+  -- ^ Computed instance of the IsSymbol type class for a given Symbol literal
+  deriving (Eq)
+
+-- | Extract the identifier of a named instance
+namedInstanceIdentifier :: Evidence -> Maybe (Qualified Ident)
+namedInstanceIdentifier (NamedInstance i) = Just i
+namedInstanceIdentifier _ = Nothing
+
+-- | Description of a type class dictionary with instance evidence
+type TypeClassDict = TypeClassDictionaryInScope Evidence
+
 -- | The 'InstanceContext' tracks those constraints which can be satisfied.
 type InstanceContext = M.Map (Maybe ModuleName)
                          (M.Map (Qualified (ProperName 'ClassName))
-                           (M.Map (Qualified Ident)
-                             TypeClassDictionaryInScope))
+                           (M.Map (Qualified Ident) NamedDict))
 
 -- | A type substitution which makes an instance head match a list of types.
 --
@@ -88,7 +103,7 @@ replaceTypeClassDictionaries shouldGeneralize expr = flip evalStateT M.empty $ d
 
 -- | Three options for how we can handle a constraint, depending on the mode we're in.
 data EntailsResult a
-  = Solved a TypeClassDictionaryInScope
+  = Solved a TypeClassDict
   -- ^ We solved this constraint
   | Unsolved Constraint
   -- ^ We couldn't solve this constraint right now, it will be generalized
@@ -120,7 +135,8 @@ entails
 entails SolverOptions{..} constraint context hints =
     solve constraint
   where
-    forClassName :: InstanceContext -> Qualified (ProperName 'ClassName) -> [Type] -> [TypeClassDictionaryInScope]
+    forClassName :: InstanceContext -> Qualified (ProperName 'ClassName) -> [Type] -> [TypeClassDict]
+    forClassName _ C.IsSymbol [TypeLevelString sym] = [TypeClassDictionaryInScope (IsSymbolInstance sym) [] C.IsSymbol [TypeLevelString sym] Nothing]
     forClassName ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (nub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
     forClassName _ _ _ = internalError "forClassName: expected qualified class name"
 
@@ -130,8 +146,8 @@ entails SolverOptions{..} constraint context hints =
     ctorModules (TypeApp ty _) = ctorModules ty
     ctorModules _ = Nothing
 
-    findDicts :: InstanceContext -> Qualified (ProperName 'ClassName) -> Maybe ModuleName -> [TypeClassDictionaryInScope]
-    findDicts ctx cn = maybe [] M.elems . (>>= M.lookup cn) . flip M.lookup ctx
+    findDicts :: InstanceContext -> Qualified (ProperName 'ClassName) -> Maybe ModuleName -> [TypeClassDict]
+    findDicts ctx cn = fmap (fmap NamedInstance) . maybe [] M.elems . (>>= M.lookup cn) . flip M.lookup ctx
 
     valUndefined :: Expr
     valUndefined = Var (Qualified (Just (ModuleName [ProperName C.prim])) (Ident C.undefined))
@@ -181,7 +197,7 @@ entails SolverOptions{..} constraint context hints =
                 -- Solve any necessary subgoals
                 args <- solveSubgoals subst'' (tcdDependencies tcd)
                 let match = foldr (\(superclassName, index) dict -> subclassDictionaryValue dict superclassName index)
-                                  (mkDictionary (tcdName tcd) args)
+                                  (mkDictionary (tcdValue tcd) args)
                                   (tcdPath tcd)
                 return match
               Unsolved unsolved -> do
@@ -213,7 +229,7 @@ entails SolverOptions{..} constraint context hints =
             -- fresh type variables. This function extends a substitution with fresh type variables
             -- as necessary, based on the types in the instance head.
             withFreshTypes
-              :: TypeClassDictionaryInScope
+              :: TypeClassDict
               -> Matching Type
               -> m (Matching Type)
             withFreshTypes TypeClassDictionaryInScope{..} subst = do
@@ -232,7 +248,7 @@ entails SolverOptions{..} constraint context hints =
                   t <- freshType
                   return (s, t)
 
-            unique :: [Type] -> [(a, TypeClassDictionaryInScope)] -> m (EntailsResult a)
+            unique :: [Type] -> [(a, TypeClassDict)] -> m (EntailsResult a)
             unique tyArgs []
               | solverDeferErrors = return Deferred
               -- We need a special case for nullary type classes, since we want
@@ -242,7 +258,7 @@ entails SolverOptions{..} constraint context hints =
             unique _      [(a, dict)] = return $ Solved a dict
             unique tyArgs tcds
               | pairwiseAny overlapping (map snd tcds) = do
-                  tell . errorMessage $ OverlappingInstances className' tyArgs (map (tcdName . snd) tcds)
+                  tell . errorMessage $ OverlappingInstances className' tyArgs (tcds >>= (toList . namedInstanceIdentifier . tcdValue . snd))
                   return $ uncurry Solved (head tcds)
               | otherwise = return $ uncurry Solved (minimumBy (compare `on` length . tcdPath . snd) tcds)
 
@@ -255,12 +271,12 @@ entails SolverOptions{..} constraint context hints =
             --
             -- Dictionaries which are subclass dictionaries cannot overlap, since otherwise the overlap would have
             -- been caught when constructing superclass dictionaries.
-            overlapping :: TypeClassDictionaryInScope -> TypeClassDictionaryInScope -> Bool
+            overlapping :: TypeClassDict -> TypeClassDict -> Bool
             overlapping TypeClassDictionaryInScope{ tcdPath = _ : _ } _ = False
             overlapping _ TypeClassDictionaryInScope{ tcdPath = _ : _ } = False
             overlapping TypeClassDictionaryInScope{ tcdDependencies = Nothing } _ = False
             overlapping _ TypeClassDictionaryInScope{ tcdDependencies = Nothing } = False
-            overlapping tcd1 tcd2 = tcdName tcd1 /= tcdName tcd2
+            overlapping tcd1 tcd2 = tcdValue tcd1 /= tcdValue tcd2
 
             -- Create dictionaries for subgoals which still need to be solved by calling go recursively
             -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
@@ -271,10 +287,11 @@ entails SolverOptions{..} constraint context hints =
               Just <$> traverse (go (work + 1) . mapConstraintArgs (map (replaceAllTypeVars (M.toList subst)))) subgoals
 
             -- Make a dictionary from subgoal dictionaries by applying the correct function
-            mkDictionary :: Qualified Ident -> Maybe [Expr] -> Expr
-            mkDictionary fnName Nothing = Var fnName
-            mkDictionary fnName (Just []) = Var fnName
-            mkDictionary fnName (Just dicts) = foldl App (Var fnName) dicts
+            mkDictionary :: Evidence -> Maybe [Expr] -> Expr
+            mkDictionary (NamedInstance n) args = foldl App (Var n) (fold args)
+            mkDictionary (IsSymbolInstance sym) _ = TypeClassDictionaryConstructorApp C.IsSymbol (Literal (ObjectLiteral fields)) where
+              fields = [ ("reflectSymbol", Abs (Left (Ident C.__unused)) (Literal (StringLiteral sym)))
+                       ]
 
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName a) -> Integer -> Expr
@@ -286,7 +303,7 @@ entails SolverOptions{..} constraint context hints =
 -- Check if an instance matches our list of types, allowing for types
 -- to be solved via functional dependencies. If the types match, we return a
 -- substitution which makes them match. If not, we return 'Nothing'.
-matches :: [FunctionalDependency] -> TypeClassDictionaryInScope -> [Type] -> Maybe (Matching [Type])
+matches :: [FunctionalDependency] -> TypeClassDict -> [Type] -> Maybe (Matching [Type])
 matches deps TypeClassDictionaryInScope{..} tys = do
     -- First, find those types which match exactly
     let matched = zipWith typeHeadsAreEqual tys tcdInstanceTypes
@@ -402,7 +419,7 @@ newDictionaries
   => [(Qualified (ProperName 'ClassName), Integer)]
   -> Qualified Ident
   -> Constraint
-  -> m [TypeClassDictionaryInScope]
+  -> m [NamedDict]
 newDictionaries path name (Constraint className instanceTy _) = do
     tcs <- gets (typeClasses . checkEnv)
     let TypeClassData{..} = fromMaybe (internalError "newDictionaries: type class lookup failed") $ M.lookup className tcs
@@ -416,9 +433,9 @@ newDictionaries path name (Constraint className instanceTy _) = do
     instantiateSuperclass :: [String] -> [Type] -> [Type] -> [Type]
     instantiateSuperclass args supArgs tys = map (replaceAllTypeVars (zip args tys)) supArgs
 
-mkContext :: [TypeClassDictionaryInScope] -> InstanceContext
+mkContext :: [NamedDict] -> InstanceContext
 mkContext = foldr combineContexts M.empty . map fromDict where
-  fromDict d = M.singleton Nothing (M.singleton (tcdClassName d) (M.singleton (tcdName d) d))
+  fromDict d = M.singleton Nothing (M.singleton (tcdClassName d) (M.singleton (tcdValue d) d))
 
 -- | Check all pairs of values in a list match a predicate
 pairwiseAll :: (a -> a -> Bool) -> [a] -> Bool

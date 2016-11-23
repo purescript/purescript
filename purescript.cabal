@@ -50,6 +50,7 @@ extra-source-files: examples/passing/*.purs
                   , examples/passing/ResolvableScopeConflict2/*.purs
                   , examples/passing/ResolvableScopeConflict3/*.purs
                   , examples/passing/ShadowedModuleName/*.purs
+                  , examples/passing/SolvingIsSymbol/*.purs
                   , examples/passing/TransitiveImport/*.purs
                   , examples/passing/TypeOperators/*.purs
                   , examples/passing/TypeWithoutParens/*.purs

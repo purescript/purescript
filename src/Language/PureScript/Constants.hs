@@ -314,6 +314,11 @@ fromSpine = "fromSpine"
 toSignature :: String
 toSignature = "toSignature"
 
+-- IsSymbol class
+
+pattern IsSymbol :: Qualified (ProperName 'ClassName)
+pattern IsSymbol = Qualified (Just (ModuleName [ProperName "Data", ProperName "Symbol"])) (ProperName "IsSymbol")
+
 -- Main module
 
 main :: String
