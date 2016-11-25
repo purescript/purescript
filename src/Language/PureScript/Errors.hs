@@ -968,9 +968,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
       paras [ detail
             , line $ "in binding group " ++ intercalate ", " (map showIdent nms)
             ]
-    renderHint ErrorInDataBindingGroup detail =
+    renderHint (ErrorInDataBindingGroup nms) detail =
       paras [ detail
-            , line "in data binding group"
+            , line $ "in data binding group " ++ intercalate ", " (map runProperName nms)
             ]
     renderHint (ErrorInTypeSynonym name) detail =
       paras [ detail
