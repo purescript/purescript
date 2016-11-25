@@ -29,6 +29,7 @@ directiveStrings =
     , (Browse , ["browse"])
     , (Type   , ["type"])
     , (Kind   , ["kind"])
+    , (Info   , ["info"])
     , (Show   , ["show"])
     , (Paste  , ["paste"])
     ]

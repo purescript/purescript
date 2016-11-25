@@ -125,6 +125,7 @@ directiveArg _ Help        = []
 directiveArg _ Paste       = []
 directiveArg _ Show        = map CtxFixed replQueryStrings
 directiveArg _ Type        = [CtxIdentifier]
+directiveArg _ Info        = [CtxIdentifier, CtxType]
 directiveArg _ Kind        = [CtxType]
 
 completeImport :: [String] -> String -> [CompletionContext]

@@ -88,6 +88,8 @@ data Command
   | Decls [P.Declaration]
   -- | Find the type of an expression
   | TypeOf P.Expr
+  -- | Find the type of an expression
+  | InfoFor (P.Qualified String)
   -- | Find the kind of an expression
   | KindOf P.Type
   -- | Shows information about the current state of the REPL
@@ -123,6 +125,7 @@ data Directive
   | Browse
   | Type
   | Kind
+  | Info
   | Show
   | Paste
   deriving (Eq, Show)

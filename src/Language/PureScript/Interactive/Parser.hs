@@ -9,7 +9,7 @@ import           Prelude.Compat hiding (lex)
 
 import           Data.Char (isSpace)
 import           Data.List (intercalate)
-import           Text.Parsec hiding ((<|>))
+import           Text.Parsec
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Interactive.Directive as D
 import           Language.PureScript.Interactive.Types
@@ -66,6 +66,11 @@ parseDirective cmd =
     Browse  -> BrowseModule <$> parseRest P.moduleName arg
     Show    -> ShowInfo <$> parseReplQuery' (trim arg)
     Type    -> TypeOf <$> parseRest P.parseValue arg
+    Info    ->
+      InfoFor <$>
+        parseRest
+          (P.parseQualified (P.uname <|> P.identifier))
+          arg
     Kind    -> KindOf <$> parseRest P.parseType arg
 
 -- |
