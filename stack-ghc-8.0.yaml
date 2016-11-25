@@ -1,4 +1,4 @@
-resolver: nightly-2016-07-19
+resolver: lts-7.9
 packages:
 - '.'
 extra-deps:
