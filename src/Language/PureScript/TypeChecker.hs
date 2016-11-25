@@ -207,8 +207,8 @@ typeCheckAll moduleName _ = traverse go
     return $ DataDeclaration dtype name args dctors
   go (d@(DataBindingGroupDeclaration tys)) = do
     let syns = mapMaybe toTypeSynonym tys
-    let dataDecls = mapMaybe toDataDecl tys
-    let bindingGroupNames = (syns^..traverse._1) ++ (dataDecls^..traverse._2)
+        dataDecls = mapMaybe toDataDecl tys
+        bindingGroupNames = nub ((syns^..traverse._1) ++ (dataDecls^..traverse._2))
     warnAndRethrow (addHint (ErrorInDataBindingGroup bindingGroupNames)) $ do
       (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
       for_ (zip dataDecls data_ks) $ \((dtype, name, args, dctors), ctorKind) -> do
