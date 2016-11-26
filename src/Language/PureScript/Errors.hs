@@ -726,7 +726,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
     renderSimpleErrorMessage (InvalidInstanceHead ty) =
       paras [ line "Type class instance head is invalid due to use of type"
             , markCodeBox $ indent $ typeAsBox ty
-            , line "All types appearing in instance declarations must be of the form T a_1 .. a_n, where each type a_i is of the same form."
+            , line "All types appearing in instance declarations must be of the form T a_1 .. a_n, where each type a_i is of the same form, unless the type is fully determined by other type class arguments via functional dependencies."
             ]
     renderSimpleErrorMessage (TransitiveExportError x ys) =
       paras [ line $ "An export for " <> markCode (prettyPrintExport x) <> " requires the following to also be exported: "
