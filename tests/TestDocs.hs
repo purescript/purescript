@@ -58,6 +58,9 @@ data Assertion
   -- | Assert that a particular declaration has a particular type class
   -- constraint.
   | ShouldBeConstrained P.ModuleName String String
+  -- | Assert that a particular typeclass declaration has a functional
+  -- dependency list.
+  | ShouldHaveFunDeps P.ModuleName String [([String],[String])]
   -- | Assert that a particular value declaration exists, and its type
   -- satisfies the given predicate.
   | ValueShouldHaveTypeSignature P.ModuleName String (ShowFn (P.Type -> Bool))
@@ -83,6 +86,8 @@ data AssertionFailure
   | ChildDocumented P.ModuleName String String
   -- | A constraint was missing.
   | ConstraintMissing P.ModuleName String String
+  -- | A functional dependency was missing.
+  | FunDepMissing P.ModuleName String [([String], [String])]
   -- | A declaration had the wrong "type" (ie, value, type, type class)
   -- Fields: declaration title, expected "type", actual "type".
   | WrongDeclarationType P.ModuleName String String String
@@ -139,6 +144,20 @@ runAssertion assertion Docs.Module{..} =
               if checkConstrained ty tyClass
                 then Pass
                 else Fail (ConstraintMissing mn decl tyClass)
+            _ ->
+              Fail (WrongDeclarationType mn decl "value"
+                     (Docs.declInfoToString declInfo))
+
+    ShouldHaveFunDeps mn decl fds ->
+      case find ((==) decl . Docs.declTitle) (declarationsFor mn) of
+        Nothing ->
+          Fail (NotDocumented mn decl)
+        Just Docs.Declaration{..} ->
+          case declInfo of
+            Docs.TypeClassDeclaration _ _ fundeps ->
+              if fundeps == fds
+                then Pass
+                else Fail (FunDepMissing mn decl fds)
             _ ->
               Fail (WrongDeclarationType mn decl "value"
                      (Docs.declInfoToString declInfo))
@@ -269,6 +288,10 @@ testCases =
   , ("TypeClassWithoutMembers",
       [ ShouldBeDocumented         (n "TypeClassWithoutMembersIntermediate") "SomeClass" []
       , ChildShouldNotBeDocumented (n "TypeClassWithoutMembersIntermediate") "SomeClass" "member"
+      ])
+
+  , ("TypeClassWithFunDeps",
+      [ ShouldHaveFunDeps          (n "TypeClassWithFunDeps") "TypeClassWithFunDeps" [(["a","b"], ["c"]), (["c"], ["d","e"])]
       ])
 
   , ("NewOperators",
