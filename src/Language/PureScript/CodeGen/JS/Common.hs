@@ -40,7 +40,7 @@ properToJs name
 -- Test if a string is a valid JS identifier without escaping.
 --
 identNeedsEscaping :: Text -> Bool
-identNeedsEscaping s = s /= identToJs (Ident s) || T.null s
+identNeedsEscaping s = s /= properToJs s || T.null s
 
 -- |
 -- Attempts to find a human-readable name for a symbol, if none has been specified returns the
