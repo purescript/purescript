@@ -413,7 +413,7 @@ asDeclarationInfo = do
     "typeClass" ->
       TypeClassDeclaration <$> key "arguments" asTypeArguments
                            <*> key "superclasses" (eachInArray asConstraint)
-                           <*> keyOrDefault [] "fundeps" asFunDeps
+                           <*> keyOrDefault "fundeps" [] asFunDeps
     "alias" ->
       AliasDeclaration <$> key "fixity" asFixity
                        <*> key "alias" asFixityAlias

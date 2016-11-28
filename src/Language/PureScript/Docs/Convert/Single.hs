@@ -9,9 +9,13 @@ import Control.Arrow (first)
 import Control.Category ((>>>))
 import Control.Monad
 
+import Data.Bifunctor (bimap)
 import Data.Either
 import Data.List (nub)
 import Data.Maybe (mapMaybe)
+import Data.Monoid ((<>))
+import Data.Text (Text)
+import qualified Data.Text as T
 import qualified Data.Vector as V
 
 import Language.PureScript.Docs.Types
@@ -128,7 +132,7 @@ convertDeclaration (P.TypeSynonymDeclaration _ args ty) title =
 convertDeclaration (P.TypeClassDeclaration _ args implies fundeps ds) title =
   Just (Right (mkDeclaration title info) { declChildren = children })
   where
-  info = TypeClassDeclaration (map (first T.unpack) args) implies fundeps'
+  info = TypeClassDeclaration (map (first T.unpack) args) implies (map (bimap (map T.unpack) (map T.unpack)) fundeps')
   children = map convertClassMember ds
   convertClassMember (P.PositionedDeclaration _ _ d) =
     convertClassMember d
