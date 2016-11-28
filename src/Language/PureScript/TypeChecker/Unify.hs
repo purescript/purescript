@@ -24,6 +24,8 @@ import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.List (nub, sort)
 import qualified Data.Map as M
+import Data.Text (Text)
+import qualified Data.Text as T
 
 import Language.PureScript.Crash
 import Language.PureScript.Errors
@@ -137,7 +139,7 @@ unifyRows r1 r2 =
     forM_ int (uncurry unifyTypes)
     unifyRows' sd1 r1' sd2 r2'
   where
-  unifyRows' :: [(String, Type)] -> Type -> [(String, Type)] -> Type -> m ()
+  unifyRows' :: [(Text, Type)] -> Type -> [(Text, Type)] -> Type -> m ()
   unifyRows' [] (TUnknown u) sd r = solveType u (rowFromList (sd, r))
   unifyRows' sd r [] (TUnknown u) = solveType u (rowFromList (sd, r))
   unifyRows' sd1 (TUnknown u1) sd2 (TUnknown u2) = do
@@ -155,7 +157,7 @@ unifyRows r1 r2 =
 -- |
 -- Replace a single type variable with a new unification variable
 --
-replaceVarWithUnknown :: (MonadState CheckState m) => String -> Type -> m Type
+replaceVarWithUnknown :: (MonadState CheckState m) => Text -> Type -> m Type
 replaceVarWithUnknown ident ty = do
   tu <- freshType
   return $ replaceTypeVars ident tu ty
@@ -179,7 +181,7 @@ replaceTypeWildcards = everywhereOnTypesM replace
 varIfUnknown :: Type -> Type
 varIfUnknown ty =
   let unks = nub $ unknownsInType ty
-      toName = (:) 't' . show
+      toName = T.cons 't' . T.pack .  show
       ty' = everywhereOnTypes typeToVar ty
       typeToVar :: Type -> Type
       typeToVar (TUnknown u) = TypeVar (toName u)

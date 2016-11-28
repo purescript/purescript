@@ -5,7 +5,8 @@ module Language.PureScript.CodeGen.JS.Optimizer.TCO (tco) where
 
 import Prelude.Compat
 
-import Data.Monoid
+import Data.Text (Text)
+import Data.Monoid ((<>), getAny, Any(..))
 
 import Language.PureScript.Options
 import Language.PureScript.CodeGen.JS.AST
@@ -20,14 +21,14 @@ tco opts | optionsNoTco opts = id
 tco' :: JS -> JS
 tco' = everywhereOnJS convert
   where
-  tcoLabel :: String
+  tcoLabel :: Text
   tcoLabel = "tco"
 
-  tcoVar :: String -> String
-  tcoVar arg = "__tco_" ++ arg
+  tcoVar :: Text -> Text
+  tcoVar arg = "__tco_" <> arg
 
-  copyVar :: String -> String
-  copyVar arg = "__copy_" ++ arg
+  copyVar :: Text -> Text
+  copyVar arg = "__copy_" <> arg
 
   convert :: JS -> JS
   convert js@(JSVariableIntroduction ss name (Just fn@JSFunction {})) =
@@ -42,7 +43,7 @@ tco' = everywhereOnJS convert
         | otherwise -> js
   convert js = js
 
-  collectAllFunctionArgs :: [[String]] -> (JS -> JS) -> JS -> ([[String]], JS, JS -> JS)
+  collectAllFunctionArgs :: [[Text]] -> (JS -> JS) -> JS -> ([[Text]], JS, JS -> JS)
   collectAllFunctionArgs allArgs f (JSFunction s1 ident args (JSBlock s2 (body@(JSReturn _ _):_))) =
     collectAllFunctionArgs (args : allArgs) (\b -> f (JSFunction s1 ident (map copyVar args) (JSBlock s2 [b]))) body
   collectAllFunctionArgs allArgs f (JSFunction ss ident args body@(JSBlock _ _)) =
@@ -53,7 +54,7 @@ tco' = everywhereOnJS convert
     (args : allArgs, body, f . JSReturn s1 . JSFunction s2 ident (map copyVar args))
   collectAllFunctionArgs allArgs f body = (allArgs, body, f)
 
-  isTailCall :: String -> JS -> Bool
+  isTailCall :: Text -> JS -> Bool
   isTailCall ident js =
     let
       numSelfCalls = everythingOnJS (+) countSelfCalls js
@@ -81,7 +82,7 @@ tco' = everywhereOnJS convert
     countSelfCallsWithFnArgs :: JS -> Int
     countSelfCallsWithFnArgs ret = if isSelfCallWithFnArgs ident ret [] then 1 else 0
 
-  toLoop :: String -> [String] -> JS -> JS
+  toLoop :: Text -> [Text] -> JS -> JS
   toLoop ident allArgs js = JSBlock rootSS $
         map (\arg -> JSVariableIntroduction rootSS arg (Just (JSVar rootSS (copyVar arg)))) allArgs ++
         [ JSLabel rootSS tcoLabel $ JSWhile rootSS (JSBooleanLiteral rootSS True) (JSBlock rootSS [ everywhereOnJS loopify js ]) ]
@@ -103,12 +104,12 @@ tco' = everywhereOnJS convert
     collectSelfCallArgs allArgumentValues (JSApp _ fn args') = collectSelfCallArgs (args' : allArgumentValues) fn
     collectSelfCallArgs allArgumentValues _ = allArgumentValues
 
-  isSelfCall :: String -> JS -> Bool
+  isSelfCall :: Text -> JS -> Bool
   isSelfCall ident (JSApp _ (JSVar _ ident') _) = ident == ident'
   isSelfCall ident (JSApp _ fn _) = isSelfCall ident fn
   isSelfCall _ _ = False
 
-  isSelfCallWithFnArgs :: String -> JS -> [JS] -> Bool
+  isSelfCallWithFnArgs :: Text -> JS -> [JS] -> Bool
   isSelfCallWithFnArgs ident (JSVar _ ident') args | ident == ident' && any hasFunction args = True
   isSelfCallWithFnArgs ident (JSApp _ fn args) acc = isSelfCallWithFnArgs ident fn (args ++ acc)
   isSelfCallWithFnArgs _ _ _ = False

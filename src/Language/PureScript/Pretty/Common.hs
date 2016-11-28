@@ -10,20 +10,27 @@ import Prelude.Compat
 import Control.Monad.State (StateT, modify, get)
 
 import Data.List (elemIndices, intersperse)
+import Data.Monoid ((<>))
+import Data.Text (Text)
+import qualified Data.Text as T
 
 import Language.PureScript.AST (SourcePos(..), SourceSpan(..))
 import Language.PureScript.Parser.Lexer (reservedPsNames, isUnquotedKey)
 
-import Text.PrettyPrint.Boxes
+import Text.PrettyPrint.Boxes hiding ((<>))
+import qualified Text.PrettyPrint.Boxes as Box
 
 -- |
 -- Wrap a string in parentheses
 --
 parens :: String -> String
-parens s = '(':s ++ ")"
+parens s = "(" <> s <> ")"
+
+parensT :: Text -> Text
+parensT s = "(" <> s <> ")"
 
 parensPos :: (Emit gen) => gen -> gen
-parensPos s = emit "(" `mappend` s `mappend` emit ")"
+parensPos s = emit "(" <> s <> emit ")"
 
 -- |
 -- Generalize intercalate slightly for monoids
@@ -32,15 +39,15 @@ intercalate :: Monoid m => m -> [m] -> m
 intercalate x xs = mconcat (intersperse x xs)
 
 class (Monoid gen) => Emit gen where
-  emit :: String -> gen
+  emit :: Text -> gen
   addMapping :: SourceSpan -> gen
 
-data SMap = SMap String SourcePos SourcePos
+data SMap = SMap Text SourcePos SourcePos
 
 -- |
 -- String with length and source-map entries
 --
-newtype StrPos = StrPos (SourcePos, String, [SMap])
+newtype StrPos = StrPos (SourcePos, Text, [SMap])
 
 -- |
 -- Make a monoid where append consists of concatenating the string part, adding the lengths
@@ -50,10 +57,10 @@ newtype StrPos = StrPos (SourcePos, String, [SMap])
 instance Monoid StrPos where
   mempty = StrPos (SourcePos 0 0, "", [])
 
-  StrPos (a,b,c) `mappend` StrPos (a',b',c') = StrPos (a `addPos` a', b ++ b', c ++ (bumpPos a <$> c'))
+  StrPos (a,b,c) `mappend` StrPos (a',b',c') = StrPos (a `addPos` a', b <> b', c ++ (bumpPos a <$> c'))
 
   mconcat ms =
-    let s' = concatMap (\(StrPos(_, s, _)) -> s) ms
+    let s' = foldMap (\(StrPos(_, s, _)) -> s) ms
         (p, maps) = foldl plus (SourcePos 0 0, []) ms
     in
         StrPos (p, s', concat $ reverse maps)
@@ -66,22 +73,23 @@ instance Emit StrPos where
   -- Augment a string with its length (rows/column)
   --
   emit str =
-    let newlines = elemIndices '\n' str
+    -- TODO(Christoph): get rid of T.unpack
+    let newlines = elemIndices '\n' (T.unpack str)
         index = if null newlines then 0 else last newlines + 1
     in
-    StrPos (SourcePos { sourcePosLine = length newlines, sourcePosColumn = length str - index }, str, [])
+    StrPos (SourcePos { sourcePosLine = length newlines, sourcePosColumn = T.length str - index }, str, [])
 
   -- |
   -- Add a new mapping entry for given source position with initially zero generated position
   --
   addMapping SourceSpan { spanName = file, spanStart = startPos } = StrPos (zeroPos, mempty, [mapping])
     where
-      mapping = SMap file startPos zeroPos
+      mapping = SMap (T.pack file) startPos zeroPos
       zeroPos = SourcePos 0 0
 
-newtype PlainString = PlainString String deriving Monoid
+newtype PlainString = PlainString Text deriving Monoid
 
-runPlainString :: PlainString -> String
+runPlainString :: PlainString -> Text
 runPlainString (PlainString s) = s
 
 instance Emit PlainString where
@@ -127,7 +135,7 @@ withIndent action = do
 currentIndent :: (Emit gen) => StateT PrinterState Maybe gen
 currentIndent = do
   current <- get
-  return $ emit $ replicate (indent current) ' '
+  return $ emit $ T.replicate (indent current) " "
 
 -- |
 -- Print many lines
@@ -141,19 +149,19 @@ prettyPrintMany f xs = do
 -- |
 -- Prints an object key, escaping reserved names.
 --
-prettyPrintObjectKey :: String -> String
-prettyPrintObjectKey s | s `elem` reservedPsNames = show s
+prettyPrintObjectKey :: Text -> Text
+prettyPrintObjectKey s | s `elem` reservedPsNames = T.pack (show s)
                        | isUnquotedKey s = s
-                       | otherwise = show s
+                       | otherwise = T.pack (show s)
 
 -- | Place a box before another, vertically when the first box takes up multiple lines.
 before :: Box -> Box -> Box
 before b1 b2 | rows b1 > 1 = b1 // b2
-             | otherwise = b1 <> b2
+             | otherwise = b1 Box.<> b2
 
 beforeWithSpace :: Box -> Box -> Box
-beforeWithSpace b1 = before (b1 <> text " ")
+beforeWithSpace b1 = before (b1 Box.<> text " ")
 
 -- | Place a Box on the bottom right of another
 endWith :: Box -> Box -> Box
-endWith l r = l <> vcat top [emptyBox (rows l - 1) (cols r), r]
+endWith l r = l Box.<> vcat top [emptyBox (rows l - 1) (cols r), r]

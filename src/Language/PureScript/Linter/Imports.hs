@@ -15,6 +15,7 @@ import Data.List (find, intersect, nub, groupBy, sortBy, (\\))
 import Data.Maybe (mapMaybe, fromMaybe)
 import Data.Monoid (Sum(..))
 import Data.Traversable (forM)
+import qualified Data.Text as T
 import qualified Data.Map as M
 
 import Language.PureScript.AST.Declarations
@@ -329,8 +330,8 @@ findUsedRefs env mni qn names =
       Just (_, _, exps) ->
         case find (elem dctor . fst . snd) (M.toList (exportedTypes exps)) of
           Just (ty, _) -> ty
-          Nothing -> internalError $ "missing type for data constructor " ++ runProperName dctor ++ " in findTypeForDctor"
-      Nothing -> internalError $ "missing module " ++ runModuleName mn  ++ " in findTypeForDctor"
+          Nothing -> internalError $ "missing type for data constructor " ++ T.unpack (runProperName dctor) ++ " in findTypeForDctor"
+      Nothing -> internalError $ "missing module " ++ T.unpack (runModuleName mn)  ++ " in findTypeForDctor"
 
 matchName
   :: (ProperName 'ConstructorName -> Maybe (ProperName 'TypeName))

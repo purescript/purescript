@@ -10,7 +10,9 @@ import Control.Monad.State
 import Data.List (find)
 import Data.Maybe (fromJust, fromMaybe)
 import qualified Data.Map as M
+import Data.Monoid ((<>))
 import qualified Data.Set as S
+import qualified Data.Text as T
 
 import Language.PureScript.CoreFn
 import Language.PureScript.Names
@@ -80,7 +82,7 @@ updateScope ident =
   getNewName usedNames name =
     fromJust $ find
       (`S.notMember` usedNames)
-      [ Ident (runIdent name ++ show (i :: Int)) | i <- [1..] ]
+      [ Ident (runIdent name <> T.pack (show (i :: Int))) | i <- [1..] ]
 
 -- |
 -- Finds the new name to use for an ident.
@@ -91,7 +93,7 @@ lookupIdent name = do
   name' <- gets $ M.lookup name . rsBoundNames
   case name' of
     Just name'' -> return name''
-    Nothing -> error $ "Rename scope is missing ident '" ++ showIdent name ++ "'"
+    Nothing -> error $ "Rename scope is missing ident '" ++ T.unpack (showIdent name) ++ "'"
 
 -- |
 -- Finds idents introduced by declarations.

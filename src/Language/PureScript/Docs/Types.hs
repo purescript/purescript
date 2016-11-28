@@ -352,7 +352,7 @@ parseVersion' str =
 
 asModule :: Parse PackageError Module
 asModule =
-  Module <$> key "name" (P.moduleNameFromString <$> asString)
+  Module <$> key "name" (P.moduleNameFromString <$> asText)
          <*> key "comments" (perhaps asString)
          <*> key "declarations" (eachInArray asDeclaration)
          <*> key "reExports" (eachInArray asReExport)
@@ -478,7 +478,7 @@ asBookmarks = eachInArray asBookmark
 
 asBookmark :: Parse BowerError Bookmark
 asBookmark =
-  asInPackage ((,) <$> nth 0 (P.moduleNameFromString <$> asString)
+  asInPackage ((,) <$> nth 0 (P.moduleNameFromString <$> asText)
                    <*> nth 1 asString)
 
 asResolvedDependencies :: Parse PackageError [(PackageName, Version)]

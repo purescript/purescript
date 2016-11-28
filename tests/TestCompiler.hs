@@ -2,6 +2,7 @@
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module TestCompiler where
 
@@ -30,8 +31,8 @@ import Data.Function (on)
 import Data.List (sort, stripPrefix, intercalate, groupBy, sortBy, minimumBy)
 import Data.Maybe (mapMaybe)
 import Data.Time.Clock (UTCTime())
-import Data.Tuple (swap)
 import qualified Data.Text as T
+import Data.Tuple (swap)
 
 import qualified Data.Map as M
 
@@ -72,7 +73,7 @@ spec = do
     supportPurs <- supportFiles "purs"
     supportPursFiles <- readInput supportPurs
     supportExterns <- runExceptT $ do
-      modules <- ExceptT . return $ P.parseModulesFromFiles id (map (fmap T.pack) supportPursFiles)
+      modules <- ExceptT . return $ P.parseModulesFromFiles id supportPursFiles
       foreigns <- inferForeignModules modules
       externs <- ExceptT . fmap fst . runTest $ P.make (makeActions foreigns) (map snd modules)
       return (zip (map snd modules) externs)
@@ -169,20 +170,20 @@ makeActions foreigns = (P.buildMakeActions modulesDir (P.internalError "makeActi
   where
   getInputTimestamp :: P.ModuleName -> P.Make (Either P.RebuildPolicy (Maybe UTCTime))
   getInputTimestamp mn
-    | isSupportModule (P.runModuleName mn) = return (Left P.RebuildNever)
+    | isSupportModule (T.unpack (P.runModuleName mn)) = return (Left P.RebuildNever)
     | otherwise = return (Left P.RebuildAlways)
     where
     isSupportModule = flip elem supportModules
 
   getOutputTimestamp :: P.ModuleName -> P.Make (Maybe UTCTime)
   getOutputTimestamp mn = do
-    let filePath = modulesDir </> P.runModuleName mn
+    let filePath = modulesDir </> T.unpack (P.runModuleName mn)
     exists <- liftIO $ doesDirectoryExist filePath
     return (if exists then Just (P.internalError "getOutputTimestamp: read timestamp") else Nothing)
 
-readInput :: [FilePath] -> IO [(FilePath, String)]
+readInput :: [FilePath] -> IO [(FilePath, T.Text)]
 readInput inputFiles = forM inputFiles $ \inputFile -> do
-  text <- readUTF8File inputFile
+  text <- readUTF8FileT inputFile
   return (inputFile, text)
 
 runTest :: P.Make a -> IO (Either P.MultipleErrors a, P.MultipleErrors)
@@ -195,7 +196,7 @@ compile
   -> IO (Either P.MultipleErrors [P.ExternsFile], P.MultipleErrors)
 compile supportExterns inputFiles check = silence $ runTest $ do
   fs <- liftIO $ readInput inputFiles
-  ms <- P.parseModulesFromFiles id (map (fmap T.pack) fs)
+  ms <- P.parseModulesFromFiles id fs
   foreigns <- inferForeignModules ms
   liftIO (check (map snd ms))
   let actions = makeActions foreigns
@@ -222,7 +223,7 @@ checkMain ms =
 checkShouldFailWith :: [String] -> P.MultipleErrors -> Maybe String
 checkShouldFailWith expected errs =
   let actual = map P.errorCode $ P.runMultipleErrors errs
-  in if sort expected == sort actual
+  in if sort expected == sort (map T.unpack actual)
     then Nothing
     else Just $ "Expected these errors: " ++ show expected ++ ", but got these: " ++ show actual
 

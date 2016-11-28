@@ -5,7 +5,9 @@ module Language.PureScript.CodeGen.JS.AST where
 
 import Prelude.Compat
 
-import Control.Monad.Identity
+import Control.Monad ((>=>))
+import Control.Monad.Identity (Identity(..), runIdentity)
+import Data.Text (Text)
 
 import Language.PureScript.AST (SourceSpan(..))
 import Language.PureScript.Comments
@@ -130,7 +132,7 @@ data JS
   -- |
   -- A string literal
   --
-  | JSStringLiteral (Maybe SourceSpan) String
+  | JSStringLiteral (Maybe SourceSpan) Text
   -- |
   -- A boolean literal
   --
@@ -154,15 +156,15 @@ data JS
   -- |
   -- An object literal
   --
-  | JSObjectLiteral (Maybe SourceSpan) [(String, JS)]
+  | JSObjectLiteral (Maybe SourceSpan) [(Text, JS)]
   -- |
   -- An object property accessor expression
   --
-  | JSAccessor (Maybe SourceSpan) String JS
+  | JSAccessor (Maybe SourceSpan) Text JS
   -- |
   -- A function introduction (optional name, arguments, body)
   --
-  | JSFunction (Maybe SourceSpan) (Maybe String) [String] JS
+  | JSFunction (Maybe SourceSpan) (Maybe Text) [Text] JS
   -- |
   -- Function application
   --
@@ -170,7 +172,7 @@ data JS
   -- |
   -- Variable
   --
-  | JSVar (Maybe SourceSpan) String
+  | JSVar (Maybe SourceSpan) Text
   -- |
   -- Conditional expression
   --
@@ -182,7 +184,7 @@ data JS
   -- |
   -- A variable introduction and optional initialization
   --
-  | JSVariableIntroduction (Maybe SourceSpan) String (Maybe JS)
+  | JSVariableIntroduction (Maybe SourceSpan) Text (Maybe JS)
   -- |
   -- A variable assignment
   --
@@ -194,11 +196,11 @@ data JS
   -- |
   -- For loop
   --
-  | JSFor (Maybe SourceSpan) String JS JS JS
+  | JSFor (Maybe SourceSpan) Text JS JS JS
   -- |
   -- ForIn loop
   --
-  | JSForIn (Maybe SourceSpan) String JS JS
+  | JSForIn (Maybe SourceSpan) Text JS JS
   -- |
   -- If-then-else statement
   --
@@ -222,19 +224,19 @@ data JS
   -- |
   -- Labelled statement
   --
-  | JSLabel (Maybe SourceSpan) String JS
+  | JSLabel (Maybe SourceSpan) Text JS
   -- |
   -- Break statement
   --
-  | JSBreak (Maybe SourceSpan) String
+  | JSBreak (Maybe SourceSpan) Text
   -- |
   -- Continue statement
   --
-  | JSContinue (Maybe SourceSpan) String
+  | JSContinue (Maybe SourceSpan) Text
   -- |
   -- Raw Javascript (generated when parsing fails for an inline foreign import declaration)
   --
-  | JSRaw (Maybe SourceSpan) String
+  | JSRaw (Maybe SourceSpan) Text
   -- |
   -- Commented Javascript
   --

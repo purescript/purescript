@@ -12,6 +12,7 @@ import Prelude.Compat
 import Control.Monad.Supply
 import Control.Monad.State
 import Control.Monad.Writer
+import Data.Text (Text, pack)
 
 class Monad m => MonadSupply m where
   fresh :: m Integer
@@ -31,5 +32,5 @@ instance Monad m => MonadSupply (SupplyT m) where
 instance MonadSupply m => MonadSupply (StateT s m)
 instance (Monoid w, MonadSupply m) => MonadSupply (WriterT w m)
 
-freshName :: MonadSupply m => m String
-freshName = fmap (('$' :) . show) fresh
+freshName :: MonadSupply m => m Text
+freshName = fmap (("$" <> ) . pack . show) fresh

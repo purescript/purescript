@@ -25,6 +25,7 @@ import Data.List (intercalate,nub,sort)
 import Data.Foldable (for_)
 import Data.Version (showVersion)
 import Data.Monoid ((<>))
+import qualified Data.Text as T
 
 import Options.Applicative (Parser)
 import qualified Options.Applicative as Opts
@@ -56,7 +57,7 @@ instance Ord SuperMap where
       getCls = either id snd
 
 runModuleName :: P.ModuleName -> String
-runModuleName (P.ModuleName pns) = intercalate "_" (P.runProperName `map` pns)
+runModuleName (P.ModuleName pns) = intercalate "_" ((T.unpack . P.runProperName) `map` pns)
 
 readInput :: [FilePath] -> IO (Either P.MultipleErrors [P.Module])
 readInput paths = do

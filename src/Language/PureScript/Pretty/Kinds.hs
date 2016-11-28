@@ -11,6 +11,8 @@ import Control.Arrow (ArrowPlus(..))
 import Control.PatternArrows as PA
 
 import Data.Maybe (fromMaybe)
+import qualified Data.Text as T
+import Data.Text (Text)
 
 import Language.PureScript.Crash
 import Language.PureScript.Kinds
@@ -38,9 +40,11 @@ funKind = mkPattern match
   match _ = Nothing
 
 -- | Generate a pretty-printed string representing a Kind
-prettyPrintKind :: Kind -> String
+prettyPrintKind :: Kind -> Text
 prettyPrintKind
-  = fromMaybe (internalError "Incomplete pattern")
+  -- TODO(Christoph): get rid of T.pack
+  = T.pack
+  . fromMaybe (internalError "Incomplete pattern")
   . PA.pattern matchKind ()
   where
   matchKind :: Pattern () Kind String

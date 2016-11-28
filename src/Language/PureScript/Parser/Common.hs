@@ -5,8 +5,11 @@ module Language.PureScript.Parser.Common where
 
 import Prelude.Compat
 
-import Control.Applicative
+import Control.Applicative ((<|>))
 import Control.Monad (guard)
+import Data.Monoid ((<>))
+import Data.Text (Text)
+import qualified Data.Text as T
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.Comments
@@ -79,8 +82,8 @@ augment p q f = flip (maybe id $ flip f) <$> p <*> P.optionMaybe q
 -- Run the first parser, then match the second zero or more times, applying the specified function for each match
 --
 fold :: P.ParsecT s u m a -> P.ParsecT s u m b -> (a -> b -> a) -> P.ParsecT s u m a
-fold first more combine = do
-  a <- first
+fold first' more combine = do
+  a <- first'
   bs <- P.many more
   return $ foldl combine a bs
 
@@ -88,8 +91,8 @@ fold first more combine = do
 -- Build a parser from a smaller parser and a list of parsers for postfix operators
 --
 buildPostfixParser :: P.Stream s m t => [a -> P.ParsecT s u m a] -> P.ParsecT s u m a -> P.ParsecT s u m a
-buildPostfixParser fs first = do
-  a <- first
+buildPostfixParser fs first' = do
+  a <- first'
   go a
   where
   go a = do
@@ -114,25 +117,25 @@ mark p = do
 -- Check that the current identation level matches a predicate
 --
 checkIndentation
-  :: (P.Column -> String)
+  :: (P.Column -> Text)
   -> (P.Column -> P.Column -> Bool)
   -> P.Parsec s ParseState ()
 checkIndentation mkMsg rel = do
   col <- P.sourceColumn <$> P.getPosition
   current <- indentationLevel <$> P.getState
-  guard (col `rel` current) P.<?> mkMsg current
+  guard (col `rel` current) P.<?> T.unpack (mkMsg current)
 
 -- |
 -- Check that the current indentation level is past the current mark
 --
 indented :: P.Parsec s ParseState ()
-indented = checkIndentation (("indentation past column " ++) . show) (>)
+indented = checkIndentation (("indentation past column " <>) . (T.pack . show)) (>)
 
 -- |
 -- Check that the current indentation level is at the same indentation as the current mark
 --
 same :: P.Parsec s ParseState ()
-same = checkIndentation (("indentation at column " ++) . show) (==)
+same = checkIndentation (("indentation at column " <>) . (T.pack . show)) (==)
 
 -- |
 -- Read the comments from the the next token, without consuming it

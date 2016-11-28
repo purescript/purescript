@@ -2,316 +2,316 @@
 module Language.PureScript.Constants where
 
 import Prelude.Compat
-
+import Data.Text (Text)
 import Language.PureScript.Names
 
 -- Operators
 
-($) :: String
+($) :: Text
 ($) = "$"
 
-apply :: String
+apply :: Text
 apply = "apply"
 
-(#) :: String
+(#) :: Text
 (#) = "#"
 
-applyFlipped :: String
+applyFlipped :: Text
 applyFlipped = "applyFlipped"
 
-(<>) :: String
+(<>) :: Text
 (<>) = "<>"
 
-(++) :: String
+(++) :: Text
 (++) = "++"
 
-append :: String
+append :: Text
 append = "append"
 
-(>>=) :: String
+(>>=) :: Text
 (>>=) = ">>="
 
-bind :: String
+bind :: Text
 bind = "bind"
 
-(+) :: String
+(+) :: Text
 (+) = "+"
 
-add :: String
+add :: Text
 add = "add"
 
-(-) :: String
+(-) :: Text
 (-) = "-"
 
-sub :: String
+sub :: Text
 sub = "sub"
 
-(*) :: String
+(*) :: Text
 (*) = "*"
 
-mul :: String
+mul :: Text
 mul = "mul"
 
-(/) :: String
+(/) :: Text
 (/) = "/"
 
-div :: String
+div :: Text
 div = "div"
 
-(%) :: String
+(%) :: Text
 (%) = "%"
 
-mod :: String
+mod :: Text
 mod = "mod"
 
-(<) :: String
+(<) :: Text
 (<) = "<"
 
-lessThan :: String
+lessThan :: Text
 lessThan = "lessThan"
 
-(>) :: String
+(>) :: Text
 (>) = ">"
 
-greaterThan :: String
+greaterThan :: Text
 greaterThan = "greaterThan"
 
-(<=) :: String
+(<=) :: Text
 (<=) = "<="
 
-lessThanOrEq :: String
+lessThanOrEq :: Text
 lessThanOrEq = "lessThanOrEq"
 
-(>=) :: String
+(>=) :: Text
 (>=) = ">="
 
-greaterThanOrEq :: String
+greaterThanOrEq :: Text
 greaterThanOrEq = "greaterThanOrEq"
 
-(==) :: String
+(==) :: Text
 (==) = "=="
 
-eq :: String
+eq :: Text
 eq = "eq"
 
-(/=) :: String
+(/=) :: Text
 (/=) = "/="
 
-notEq :: String
+notEq :: Text
 notEq = "notEq"
 
-compare :: String
+compare :: Text
 compare = "compare"
 
-(&&) :: String
+(&&) :: Text
 (&&) = "&&"
 
-conj :: String
+conj :: Text
 conj = "conj"
 
-(||) :: String
+(||) :: Text
 (||) = "||"
 
-disj :: String
+disj :: Text
 disj = "disj"
 
-unsafeIndex :: String
+unsafeIndex :: Text
 unsafeIndex = "unsafeIndex"
 
-or :: String
+or :: Text
 or = "or"
 
-and :: String
+and :: Text
 and = "and"
 
-xor :: String
+xor :: Text
 xor = "xor"
 
-(<<<) :: String
+(<<<) :: Text
 (<<<) = "<<<"
 
-compose :: String
+compose :: Text
 compose = "compose"
 
-(>>>) :: String
+(>>>) :: Text
 (>>>) = ">>>"
 
-composeFlipped :: String
+composeFlipped :: Text
 composeFlipped = "composeFlipped"
 
 -- Functions
 
-negate :: String
+negate :: Text
 negate = "negate"
 
-not :: String
+not :: Text
 not = "not"
 
-shl :: String
+shl :: Text
 shl = "shl"
 
-shr :: String
+shr :: Text
 shr = "shr"
 
-zshr :: String
+zshr :: Text
 zshr = "zshr"
 
-complement :: String
+complement :: Text
 complement = "complement"
 
 -- Prelude Values
 
-zero :: String
+zero :: Text
 zero = "zero"
 
-one :: String
+one :: Text
 one = "one"
 
-bottom :: String
+bottom :: Text
 bottom = "bottom"
 
-top :: String
+top :: Text
 top = "top"
 
-return :: String
+return :: Text
 return = "return"
 
-pure' :: String
+pure' :: Text
 pure' = "pure"
 
-returnEscaped :: String
+returnEscaped :: Text
 returnEscaped = "$return"
 
-untilE :: String
+untilE :: Text
 untilE = "untilE"
 
-whileE :: String
+whileE :: Text
 whileE = "whileE"
 
-runST :: String
+runST :: Text
 runST = "runST"
 
-stRefValue :: String
+stRefValue :: Text
 stRefValue = "value"
 
-newSTRef :: String
+newSTRef :: Text
 newSTRef = "newSTRef"
 
-readSTRef :: String
+readSTRef :: Text
 readSTRef = "readSTRef"
 
-writeSTRef :: String
+writeSTRef :: Text
 writeSTRef = "writeSTRef"
 
-modifySTRef :: String
+modifySTRef :: Text
 modifySTRef = "modifySTRef"
 
-mkFn :: String
+mkFn :: Text
 mkFn = "mkFn"
 
-runFn :: String
+runFn :: Text
 runFn = "runFn"
 
-unit :: String
+unit :: Text
 unit = "unit"
 
 -- Prim values
 
-undefined :: String
+undefined :: Text
 undefined = "undefined"
 
 -- Type Class Dictionary Names
 
-monadEffDictionary :: String
+monadEffDictionary :: Text
 monadEffDictionary = "monadEff"
 
-applicativeEffDictionary :: String
+applicativeEffDictionary :: Text
 applicativeEffDictionary = "applicativeEff"
 
-bindEffDictionary :: String
+bindEffDictionary :: Text
 bindEffDictionary = "bindEff"
 
-semiringNumber :: String
+semiringNumber :: Text
 semiringNumber = "semiringNumber"
 
-semiringInt :: String
+semiringInt :: Text
 semiringInt = "semiringInt"
 
-ringNumber :: String
+ringNumber :: Text
 ringNumber = "ringNumber"
 
-ringInt :: String
+ringInt :: Text
 ringInt = "ringInt"
 
-moduloSemiringNumber :: String
+moduloSemiringNumber :: Text
 moduloSemiringNumber = "moduloSemiringNumber"
 
-moduloSemiringInt :: String
+moduloSemiringInt :: Text
 moduloSemiringInt = "moduloSemiringInt"
 
-euclideanRingNumber :: String
+euclideanRingNumber :: Text
 euclideanRingNumber = "euclideanRingNumber"
 
-euclideanRingInt :: String
+euclideanRingInt :: Text
 euclideanRingInt = "euclideanRingInt"
 
-ordBoolean :: String
+ordBoolean :: Text
 ordBoolean = "ordBoolean"
 
-ordNumber :: String
+ordNumber :: Text
 ordNumber = "ordNumber"
 
-ordInt :: String
+ordInt :: Text
 ordInt = "ordInt"
 
-ordString :: String
+ordString :: Text
 ordString = "ordString"
 
-ordChar :: String
+ordChar :: Text
 ordChar = "ordChar"
 
-eqNumber :: String
+eqNumber :: Text
 eqNumber = "eqNumber"
 
-eqInt :: String
+eqInt :: Text
 eqInt = "eqInt"
 
-eqString :: String
+eqString :: Text
 eqString = "eqString"
 
-eqChar :: String
+eqChar :: Text
 eqChar = "eqChar"
 
-eqBoolean :: String
+eqBoolean :: Text
 eqBoolean = "eqBoolean"
 
-boundedBoolean :: String
+boundedBoolean :: Text
 boundedBoolean = "boundedBoolean"
 
-booleanAlgebraBoolean :: String
+booleanAlgebraBoolean :: Text
 booleanAlgebraBoolean = "booleanAlgebraBoolean"
 
-heytingAlgebraBoolean :: String
+heytingAlgebraBoolean :: Text
 heytingAlgebraBoolean = "heytingAlgebraBoolean"
 
-semigroupString :: String
+semigroupString :: Text
 semigroupString = "semigroupString"
 
-semigroupoidFn :: String
+semigroupoidFn :: Text
 semigroupoidFn = "semigroupoidFn"
 
 -- Generic Deriving
 
-generic :: String
+generic :: Text
 generic = "Generic"
 
-toSpine :: String
+toSpine :: Text
 toSpine = "toSpine"
 
-fromSpine :: String
+fromSpine :: Text
 fromSpine = "fromSpine"
 
-toSignature :: String
+toSignature :: Text
 toSignature = "toSignature"
 
 -- IsSymbol class
@@ -321,12 +321,12 @@ pattern IsSymbol = Qualified (Just (ModuleName [ProperName "Data", ProperName "S
 
 -- Main module
 
-main :: String
+main :: Text
 main = "main"
 
 -- Prim
 
-partial :: String
+partial :: Text
 partial = "Partial"
 
 pattern Partial :: Qualified (ProperName 'ClassName)
@@ -337,67 +337,67 @@ pattern Fail = Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Fa
 
 -- Code Generation
 
-__superclass_ :: String
+__superclass_ :: Text
 __superclass_ = "__superclass_"
 
-__unused :: String
+__unused :: Text
 __unused = "__unused"
 
 -- Modules
 
-prim :: String
+prim :: Text
 prim = "Prim"
 
-prelude :: String
+prelude :: Text
 prelude = "Prelude"
 
-dataArray :: String
+dataArray :: Text
 dataArray = "Data_Array"
 
-eff :: String
+eff :: Text
 eff = "Control_Monad_Eff"
 
-st :: String
+st :: Text
 st = "Control_Monad_ST"
 
-controlApplicative :: String
+controlApplicative :: Text
 controlApplicative = "Control_Applicative"
 
-controlSemigroupoid :: String
+controlSemigroupoid :: Text
 controlSemigroupoid = "Control_Semigroupoid"
 
-controlBind :: String
+controlBind :: Text
 controlBind = "Control_Bind"
 
-dataBounded :: String
+dataBounded :: Text
 dataBounded = "Data_Bounded"
 
-dataSemigroup :: String
+dataSemigroup :: Text
 dataSemigroup = "Data_Semigroup"
 
-dataHeytingAlgebra :: String
+dataHeytingAlgebra :: Text
 dataHeytingAlgebra = "Data_HeytingAlgebra"
 
-dataEq :: String
+dataEq :: Text
 dataEq = "Data_Eq"
 
-dataOrd :: String
+dataOrd :: Text
 dataOrd = "Data_Ord"
 
-dataSemiring :: String
+dataSemiring :: Text
 dataSemiring = "Data_Semiring"
 
-dataRing :: String
+dataRing :: Text
 dataRing = "Data_Ring"
 
-dataEuclideanRing :: String
+dataEuclideanRing :: Text
 dataEuclideanRing = "Data_EuclideanRing"
 
-dataFunction :: String
+dataFunction :: Text
 dataFunction = "Data_Function"
 
-dataFunctionUncurried :: String
+dataFunctionUncurried :: Text
 dataFunctionUncurried = "Data_Function_Uncurried"
 
-dataIntBits :: String
+dataIntBits :: Text
 dataIntBits = "Data_Int_Bits"

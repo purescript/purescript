@@ -10,6 +10,7 @@ import Control.Monad.Trans.State.Strict (evalStateT)
 import Control.Monad (when)
 
 import Data.List (sort)
+import qualified Data.Text as T
 
 import System.Exit (exitFailure)
 import System.Console.Haskeline
@@ -127,11 +128,11 @@ getPSCiState = do
     Left err ->
       print err >> exitFailure
     Right modules ->
-      let imports = [controlMonadSTasST, (P.ModuleName [P.ProperName "Prelude"], P.Implicit, Nothing)]
+      let imports = [controlMonadSTasST, (P.ModuleName [P.ProperName (T.pack "Prelude")], P.Implicit, Nothing)]
           dummyExterns = P.internalError "TestPsci: dummyExterns should not be used"
       in  return (PSCiState imports [] (zip (map snd modules) (repeat dummyExterns)))
 
 controlMonadSTasST :: ImportedModule
 controlMonadSTasST = (s "Control.Monad.ST", P.Implicit, Just (s "ST"))
   where
-  s = P.moduleNameFromString
+  s = P.moduleNameFromString . T.pack

@@ -61,7 +61,7 @@ withSourceSpan f p = do
   let sp = SourceSpan (P.sourceName start) (C.toSourcePos start) (C.toSourcePos $ fromMaybe end end')
   return $ f sp comments x
 
-kindedIdent :: TokenParser (String, Maybe Kind)
+kindedIdent :: TokenParser (Text, Maybe Kind)
 kindedIdent = (, Nothing) <$> identifier
           <|> parens ((,) <$> identifier <*> (Just <$> (indented *> doubleColon *> indented *> parseKind)))
 
@@ -303,7 +303,7 @@ parseModuleFromFile
   -> Either P.ParseError (k, Module)
 parseModuleFromFile toFilePath (k, content) = do
     let filename = toFilePath k
-    ts <- lex' filename content
+    ts <- lex filename content
     m <- runTokenParser filename parseModule ts
     pure (k, m)
 
@@ -333,10 +333,10 @@ parseBooleanLiteral = BooleanLiteral <$> booleanLiteral
 parseArrayLiteral :: TokenParser a -> TokenParser (Literal a)
 parseArrayLiteral p = ArrayLiteral <$> squares (commaSep p)
 
-parseObjectLiteral :: TokenParser (String, a) -> TokenParser (Literal a)
+parseObjectLiteral :: TokenParser (Text, a) -> TokenParser (Literal a)
 parseObjectLiteral p = ObjectLiteral <$> braces (commaSep p)
 
-parseIdentifierAndValue :: TokenParser (String, Expr)
+parseIdentifierAndValue :: TokenParser (Text, Expr)
 parseIdentifierAndValue =
   do
     name <- C.indented *> lname
@@ -423,7 +423,7 @@ parseInfixExpr
 parseHole :: TokenParser Expr
 parseHole = Hole <$> holeLit
 
-parsePropertyUpdate :: TokenParser (String, Expr)
+parsePropertyUpdate :: TokenParser (Text, Expr)
 parsePropertyUpdate = do
   name <- lname <|> stringLiteral
   _ <- C.indented *> equals
@@ -515,7 +515,7 @@ parseVarOrNamedBinder = do
 parseNullBinder :: TokenParser Binder
 parseNullBinder = underscore *> return NullBinder
 
-parseIdentifierAndBinder :: TokenParser (String, Binder)
+parseIdentifierAndBinder :: TokenParser (Text, Binder)
 parseIdentifierAndBinder =
     do name <- lname
        b <- P.option (VarBinder (Ident name)) rest

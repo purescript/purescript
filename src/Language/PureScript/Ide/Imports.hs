@@ -145,7 +145,7 @@ step (Res start end) _ = Res start end
 
 moduleParse :: [Text] -> Either Text P.Module
 moduleParse t = first show $ do
-  tokens <- (P.lex "" . T.unpack . T.unlines) t
+  tokens <- P.lex "" (T.unlines t)
   P.runTokenParser "<psc-ide>" P.parseModule tokens
 
 -- | Adds an implicit import like @import Prelude@ to a Sourcefile.
@@ -210,7 +210,7 @@ addExplicitImport' decl moduleName imports =
     refFromDeclaration (IdeDeclTypeOperator op) =
       P.TypeOpRef (op ^. ideTypeOpName)
     refFromDeclaration d =
-      P.ValueRef $ P.Ident $ T.unpack (identifierFromIdeDeclaration d)
+      P.ValueRef (P.Ident (identifierFromIdeDeclaration d))
 
     -- | Adds a declaration to an import:
     -- TypeDeclaration "Maybe" + Data.Maybe (maybe) -> Data.Maybe(Maybe, maybe)
@@ -304,9 +304,9 @@ addImportForIdentifier fp ident filters = do
 prettyPrintImport' :: Import -> Text
 -- TODO: remove this clause once P.prettyPrintImport can properly handle PositionedRefs
 prettyPrintImport' (Import mn (P.Explicit refs) qual) =
-  T.pack $ "import " ++ P.prettyPrintImport mn (P.Explicit (unwrapPositionedRef <$> refs)) qual
+  "import " <> P.prettyPrintImport mn (P.Explicit (unwrapPositionedRef <$> refs)) qual
 prettyPrintImport' (Import mn idt qual) =
-  T.pack $ "import " ++ P.prettyPrintImport mn idt qual
+  "import " <> P.prettyPrintImport mn idt qual
 
 prettyPrintImportSection :: [Import] -> [Text]
 prettyPrintImportSection imports = map prettyPrintImport' (sort imports)
@@ -325,7 +325,7 @@ answerRequest outfp rs  =
 -- | Test and ghci helper
 parseImport :: Text -> Maybe Import
 parseImport t =
-  case P.lex "<psc-ide>" (T.unpack t)
+  case P.lex "<psc-ide>" t
        >>= P.runTokenParser "<psc-ide>" P.parseImportDeclaration' of
     Right (mn, P.Explicit refs, mmn) ->
       Just (Import mn (P.Explicit (unwrapPositionedRef <$> refs)) mmn)

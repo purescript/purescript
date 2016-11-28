@@ -18,6 +18,7 @@ import Control.Arrow ((<+>))
 import Control.PatternArrows as PA
 
 import Data.Maybe (fromMaybe)
+import qualified Data.Text as T
 
 import Language.PureScript.Crash
 import Language.PureScript.Environment
@@ -28,6 +29,8 @@ import Language.PureScript.Pretty.Kinds
 import Language.PureScript.Types
 
 import Text.PrettyPrint.Boxes hiding ((<+>))
+
+-- TODO(Christoph): get rid of T.unpack s
 
 constraintsAsBox :: [Constraint] -> Box -> Box
 constraintsAsBox [con] ty = text "(" <> constraintAsBox con `before` (text ") => " <> ty)
@@ -43,7 +46,7 @@ prettyPrintRowWith :: Char -> Char -> Type -> Box
 prettyPrintRowWith open close = uncurry listToBox . toList []
   where
   nameAndTypeToPs :: Char -> String -> Type -> Box
-  nameAndTypeToPs start name ty = text (start : ' ' : prettyPrintObjectKey name ++ " :: ") <> typeAsBox ty
+  nameAndTypeToPs start name ty = text (start : ' ' : T.unpack (prettyPrintObjectKey (T.pack name)) ++ " :: ") <> typeAsBox ty
 
   tailToPs :: Type -> Box
   tailToPs REmpty = nullBox
@@ -57,7 +60,7 @@ prettyPrintRowWith open close = uncurry listToBox . toList []
     [ tailToPs rest, text [close] ]
 
   toList :: [(String, Type)] -> Type -> ([(String, Type)], Type)
-  toList tys (RCons name ty row) = toList ((name, ty):tys) row
+  toList tys (RCons name ty row) = toList ((T.unpack name, ty):tys) row
   toList tys r = (reverse tys, r)
 
 prettyPrintRow :: Type -> String
@@ -112,21 +115,21 @@ matchTypeAtom suggesting =
     typeLiterals :: Pattern () Type Box
     typeLiterals = mkPattern match where
       match TypeWildcard{} = Just $ text "_"
-      match (TypeVar var) = Just $ text var
+      match (TypeVar var) = Just $ text $ T.unpack var
       match (TypeLevelString s) = Just . text $ show s
       match (PrettyPrintObject row) = Just $ prettyPrintRowWith '{' '}' row
-      match (TypeConstructor ctor) = Just $ text $ runProperName $ disqualify ctor
+      match (TypeConstructor ctor) = Just $ text $ T.unpack $ runProperName $ disqualify ctor
       match (TUnknown u)
         | suggesting = Just $ text "_"
         | otherwise = Just $ text $ 't' : show u
       match (Skolem name s _ _)
-        | suggesting =  Just $ text name
-        | otherwise = Just $ text $ name ++ show s
+        | suggesting =  Just $ text $ T.unpack name
+        | otherwise = Just $ text $ T.unpack name ++ show s
       match REmpty = Just $ text "()"
       match row@RCons{} = Just $ prettyPrintRowWith '(' ')' row
       match (BinaryNoParensType op l r) =
         Just $ typeAsBox l <> text " " <> typeAsBox op <> text " " <> typeAsBox r
-      match (TypeOp op) = Just $ text $ showQualified runOpName op
+      match (TypeOp op) = Just $ text $ T.unpack $ showQualified runOpName op
       match _ = Nothing
 
 matchType :: Bool -> Pattern () Type Box
@@ -137,7 +140,7 @@ matchType = buildPrettyPrinter operators . matchTypeAtom where
                   , [ AssocR appliedFunction $ \arg ret -> keepSingleLinesOr id arg (text "-> " <> ret) ]
                   , [ Wrap constrained $ \deps ty -> constraintsAsBox deps ty ]
                   , [ Wrap forall_ $ \idents ty -> keepSingleLinesOr (moveRight 2) (text ("forall " ++ unwords idents ++ ".")) ty ]
-                  , [ Wrap kinded $ \k ty -> keepSingleLinesOr (moveRight 2) ty (text (":: " ++ prettyPrintKind k)) ]
+                  , [ Wrap kinded $ \k ty -> keepSingleLinesOr (moveRight 2) ty (text (":: " ++ T.unpack (prettyPrintKind k))) ]
                   , [ Wrap explicitParens $ \_ ty -> ty ]
                   ]
 
@@ -151,7 +154,7 @@ matchType = buildPrettyPrinter operators . matchTypeAtom where
 forall_ :: Pattern () Type ([String], Type)
 forall_ = mkPattern match
   where
-  match (PrettyPrintForAll idents ty) = Just (idents, ty)
+  match (PrettyPrintForAll idents ty) = Just (map T.unpack idents, ty)
   match _ = Nothing
 
 typeAtomAsBox :: Type -> Box

@@ -6,6 +6,7 @@ module Language.PureScript.CoreFn.Expr where
 import Prelude.Compat
 
 import Control.Arrow ((***))
+import Data.Text (Text)
 
 import Language.PureScript.AST.Literals
 import Language.PureScript.CoreFn.Binders
@@ -26,11 +27,11 @@ data Expr a
   -- |
   -- A record property accessor
   --
-  | Accessor a String (Expr a)
+  | Accessor a Text (Expr a)
   -- |
   -- Partial record update
   --
-  | ObjectUpdate a (Expr a) [(String, Expr a)]
+  | ObjectUpdate a (Expr a) [(Text, Expr a)]
   -- |
   -- Function introduction
   --

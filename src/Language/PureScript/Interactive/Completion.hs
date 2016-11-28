@@ -16,6 +16,8 @@ import           Control.Monad.Trans.Reader (asks, runReaderT, ReaderT)
 import           Data.Function (on)
 import           Data.List (nub, nubBy, isPrefixOf, sortBy, stripPrefix)
 import           Data.Maybe (mapMaybe)
+import           Data.Text (Text)
+import qualified Data.Text as T
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Interactive.Directive as D
 import           Language.PureScript.Interactive.Types
@@ -145,7 +147,7 @@ getLoadedModules = asks (map fst . psciLoadedExterns)
 getModuleNames :: CompletionM [String]
 getModuleNames = moduleNames <$> getLoadedModules
 
-mapLoadedModulesAndQualify :: (a -> String) -> (P.Module -> [(a, P.Declaration)]) -> CompletionM [String]
+mapLoadedModulesAndQualify :: (a -> Text) -> (P.Module -> [(a, P.Declaration)]) -> CompletionM [String]
 mapLoadedModulesAndQualify sho f = do
   ms <- getLoadedModules
   let argPairs = do m <- ms
@@ -165,14 +167,14 @@ getTypeNames = mapLoadedModulesAndQualify P.runProperName typeDecls
 -- | Given a module and a declaration in that module, return all possible ways
 -- it could have been referenced given the current PSCiState - including fully
 -- qualified, qualified using an alias, and unqualified.
-getAllQualifications :: (a -> String) -> P.Module -> (a, P.Declaration) -> CompletionM [String]
+getAllQualifications :: (a -> Text) -> P.Module -> (a, P.Declaration) -> CompletionM [String]
 getAllQualifications sho m (declName, decl) = do
   imports <- getAllImportsOf m
   let fullyQualified = qualifyWith (Just (P.getModuleName m))
   let otherQuals = nub (concatMap qualificationsUsing imports)
   return $ fullyQualified : otherQuals
   where
-  qualifyWith mMod = P.showQualified sho (P.Qualified mMod declName)
+  qualifyWith mMod = T.unpack (P.showQualified sho (P.Qualified mMod declName))
   referencedBy refs = P.isExported (Just refs) decl
 
   qualificationsUsing (_, importType, asQ') =
@@ -220,4 +222,4 @@ dctorNames = nubOnFst . concatMap go . P.exportedDeclarations
   go _ = []
 
 moduleNames :: [P.Module] -> [String]
-moduleNames = nub . map (P.runModuleName . P.getModuleName)
+moduleNames = nub . map (T.unpack . P.runModuleName . P.getModuleName)

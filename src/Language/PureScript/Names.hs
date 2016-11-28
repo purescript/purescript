@@ -11,7 +11,9 @@ import Control.Monad.Supply.Class
 
 import Data.Aeson
 import Data.Aeson.TH
-import Data.List
+import Data.Monoid ((<>))
+import Data.Text (Text)
+import qualified Data.Text as T
 
 -- | A sum of the possible name types, useful for error and lint messages.
 data Name
@@ -59,22 +61,22 @@ data Ident
   -- |
   -- An alphanumeric identifier
   --
-  = Ident String
+  = Ident Text
   -- |
   -- A generated name for an identifier
   --
-  | GenIdent (Maybe String) Integer
+  | GenIdent (Maybe Text) Integer
   deriving (Show, Eq, Ord)
 
-runIdent :: Ident -> String
+runIdent :: Ident -> Text
 runIdent (Ident i) = i
-runIdent (GenIdent Nothing n) = "$" ++ show n
-runIdent (GenIdent (Just name) n) = "$" ++ name ++ show n
+runIdent (GenIdent Nothing n) = "$" <> T.pack (show n)
+runIdent (GenIdent (Just name) n) = "$" <> name <> T.pack (show n)
 
-showIdent :: Ident -> String
+showIdent :: Ident -> Text
 showIdent = runIdent
 
-freshIdent :: MonadSupply m => String -> m Ident
+freshIdent :: MonadSupply m => Text -> m Ident
 freshIdent name = GenIdent (Just name) <$> fresh
 
 freshIdent' :: MonadSupply m => m Ident
@@ -83,7 +85,7 @@ freshIdent' = GenIdent Nothing <$> fresh
 -- |
 -- Operator alias names.
 --
-newtype OpName (a :: OpNameType) = OpName { runOpName :: String }
+newtype OpName (a :: OpNameType) = OpName { runOpName :: Text }
   deriving (Show, Eq, Ord)
 
 instance ToJSON (OpName a) where
@@ -92,8 +94,8 @@ instance ToJSON (OpName a) where
 instance FromJSON (OpName a) where
   parseJSON = fmap OpName . parseJSON
 
-showOp :: OpName a -> String
-showOp op = '(' : runOpName op ++ ")"
+showOp :: OpName a -> Text
+showOp op = "(" <> runOpName op <> ")"
 
 -- |
 -- The closed set of operator alias types.
@@ -103,7 +105,7 @@ data OpNameType = ValueOpName | TypeOpName
 -- |
 -- Proper names, i.e. capitalized names for e.g. module names, type//data constructors.
 --
-newtype ProperName (a :: ProperNameType) = ProperName { runProperName :: String }
+newtype ProperName (a :: ProperNameType) = ProperName { runProperName :: Text }
   deriving (Show, Eq, Ord)
 
 instance ToJSON (ProperName a) where
@@ -131,16 +133,16 @@ coerceProperName = ProperName . runProperName
 newtype ModuleName = ModuleName [ProperName 'Namespace]
   deriving (Show, Eq, Ord)
 
-runModuleName :: ModuleName -> String
-runModuleName (ModuleName pns) = intercalate "." (runProperName `map` pns)
+runModuleName :: ModuleName -> Text
+runModuleName (ModuleName pns) = T.intercalate "." (runProperName <$> pns)
 
-moduleNameFromString :: String -> ModuleName
+moduleNameFromString :: Text -> ModuleName
 moduleNameFromString = ModuleName . splitProperNames
   where
-  splitProperNames s = case dropWhile (== '.') s of
+  splitProperNames s = case T.dropWhile (== '.') s of
     "" -> []
     s' -> ProperName w : splitProperNames s''
-      where (w, s'') = break (== '.') s'
+      where (w, s'') = T.break (== '.') s'
 
 -- |
 -- A qualified name, i.e. a name with an optional module name
@@ -148,9 +150,9 @@ moduleNameFromString = ModuleName . splitProperNames
 data Qualified a = Qualified (Maybe ModuleName) a
   deriving (Show, Eq, Ord, Functor)
 
-showQualified :: (a -> String) -> Qualified a -> String
+showQualified :: (a -> Text) -> Qualified a -> Text
 showQualified f (Qualified Nothing a) = f a
-showQualified f (Qualified (Just name) a) = runModuleName name ++ "." ++ f a
+showQualified f (Qualified (Just name) a) = runModuleName name <> "." <> f a
 
 getQual :: Qualified a -> Maybe ModuleName
 getQual (Qualified mn _) = mn

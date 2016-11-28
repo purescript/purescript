@@ -2,7 +2,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Language.PureScript.Ide.ReexportsSpec where
 
-import qualified Prelude
 import           Protolude
 
 import qualified Data.Map as Map
@@ -11,7 +10,7 @@ import           Language.PureScript.Ide.Types
 import qualified Language.PureScript as P
 import           Test.Hspec
 
-m :: Prelude.String -> P.ModuleName
+m :: Text -> P.ModuleName
 m = P.moduleNameFromString
 
 d :: IdeDeclaration -> IdeDeclarationAnn
