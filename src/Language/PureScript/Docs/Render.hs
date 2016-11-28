@@ -50,10 +50,11 @@ renderDeclarationWithOptions opts Declaration{..} =
       , syntax "="
       , renderType' ty
       ]
-    TypeClassDeclaration args implies ->
+    TypeClassDeclaration args implies fundeps ->
       [ keywordClass ]
       ++ maybeToList superclasses
       ++ [renderType' (typeApp declTitle args)]
+      ++ fundepsList
       ++ [keywordWhere | any isTypeClassMember declChildren]
 
       where
@@ -63,6 +64,15 @@ renderDeclarationWithOptions opts Declaration{..} =
             syntax "("
             <> mintersperse (syntax "," <> sp) (map renderConstraint implies)
             <> syntax ")" <> sp <> syntax "<="
+
+      fundepsList =
+           [syntax "|" | not (null fundeps)]
+        ++ [mintersperse
+             (syntax "," <> sp)
+             [idents from <> sp <> syntax "->" <> sp <> idents to | (from, to) <- fundeps ]
+           ]
+        where
+          idents = mintersperse sp . map ident
 
     AliasDeclaration (P.Fixity associativity precedence) for@(P.Qualified _ alias) ->
       [ keywordFixity associativity

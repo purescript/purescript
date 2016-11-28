@@ -9,12 +9,14 @@ import Control.Arrow (first)
 import Control.Category ((>>>))
 import Control.Monad
 
+import Data.Bifunctor (bimap)
 import Data.Either
 import Data.List (nub)
 import Data.Maybe (mapMaybe)
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Vector as V
 
 import Language.PureScript.Docs.Types
 import qualified Language.PureScript as P
@@ -127,10 +129,10 @@ convertDeclaration (P.ExternDataDeclaration _ kind') title =
   basicDeclaration title (ExternDataDeclaration kind')
 convertDeclaration (P.TypeSynonymDeclaration _ args ty) title =
   basicDeclaration title (TypeSynonymDeclaration (map (first T.unpack) args) ty)
-convertDeclaration (P.TypeClassDeclaration _ args implies _ ds) title = -- TODO: include fundep info
+convertDeclaration (P.TypeClassDeclaration _ args implies fundeps ds) title =
   Just (Right (mkDeclaration title info) { declChildren = children })
   where
-  info = TypeClassDeclaration (map (first T.unpack) args) implies
+  info = TypeClassDeclaration (map (first T.unpack) args) implies (map (bimap (map T.unpack) (map T.unpack)) fundeps')
   children = map convertClassMember ds
   convertClassMember (P.PositionedDeclaration _ _ d) =
     convertClassMember d
@@ -138,6 +140,21 @@ convertDeclaration (P.TypeClassDeclaration _ args implies _ ds) title = -- TODO:
     ChildDeclaration (T.unpack (P.showIdent ident')) Nothing Nothing (ChildTypeClassMember ty)
   convertClassMember _ =
     P.internalError "convertDeclaration: Invalid argument to convertClassMember."
+  fundeps' = map (\(P.FunctionalDependency from to) -> toArgs from to) fundeps
+    where
+      argsVec = V.fromList (map fst args)
+      getArg i =
+        maybe
+          (P.internalError $ unlines
+            [ "convertDeclaration: Functional dependency index"
+            , show i
+            , "is bigger than arguments list"
+            , show (map fst args)
+            , "Functional dependencies are"
+            , show fundeps
+            ]
+          ) id $ argsVec V.!? i
+      toArgs from to = (map getArg from, map getArg to)
 convertDeclaration (P.TypeInstanceDeclaration _ constraints className tys _) title =
   Just (Left (T.unpack classNameString : map T.unpack typeNameStrings, AugmentChild childDecl))
   where
