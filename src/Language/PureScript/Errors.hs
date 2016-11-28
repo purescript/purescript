@@ -972,7 +972,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
             ]
     renderHint (ErrorInDataBindingGroup nms) detail =
       paras [ detail
-            , line $ "in data binding group " ++ intercalate ", " (map runProperName nms)
+            , line $ "in data binding group " ++ T.intercalate ", " (map runProperName nms)
             ]
     renderHint (ErrorInTypeSynonym name) detail =
       paras [ detail
