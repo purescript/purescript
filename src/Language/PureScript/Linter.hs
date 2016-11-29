@@ -48,7 +48,7 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
     f (TypeClassDeclaration name args _ _ decs) = addHint (ErrorInTypeClassDeclaration name) (foldMap (f' (S.fromList $ fst <$> args)) decs)
     f dec = f' S.empty dec
 
-    f' :: S.Set String -> Declaration -> MultipleErrors
+    f' :: S.Set Text -> Declaration -> MultipleErrors
     f' s (PositionedDeclaration pos _ dec) = addHint (PositionedError pos) (f' s dec)
     f' s dec@(ValueDeclaration name _ _ _) = addHint (ErrorInValueDeclaration name) (warningsInDecl moduleNames dec <> checkTypeVarsInDecl s dec)
     f' s (TypeDeclaration name ty) = addHint (ErrorInTypeDeclaration name) (checkTypeVars s ty)
@@ -76,10 +76,10 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
            | otherwise = mempty
     stepDo _ _ = mempty
 
-  checkTypeVarsInDecl :: S.Set String -> Declaration -> MultipleErrors
+  checkTypeVarsInDecl :: S.Set Text -> Declaration -> MultipleErrors
   checkTypeVarsInDecl s d = let (f, _, _, _, _) = accumTypes (checkTypeVars s) in f d
 
-  checkTypeVars :: S.Set String -> Type -> MultipleErrors
+  checkTypeVars :: S.Set Text -> Type -> MultipleErrors
   checkTypeVars set ty = everythingWithContextOnTypes set mempty mappend step ty <> findUnused ty
     where
     step :: S.Set Text -> Type -> (S.Set Text, MultipleErrors)
