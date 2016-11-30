@@ -3,7 +3,7 @@ module Main where
 
 import Prelude
 
--- `c` appears in determiner position
-class C2 a b c | a -> c, c -> b
-instance c2 :: C2 Unit Unit {}
+-- `b` isn't determined by anything that `b` doesn't determine
+class C a b | a -> b, b -> a
+instance c :: C Unit {}
 

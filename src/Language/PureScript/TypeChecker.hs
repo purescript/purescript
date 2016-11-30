@@ -22,9 +22,10 @@ import Data.Foldable (for_, traverse_)
 import Data.List (nub, nubBy, (\\), sort, group)
 import Data.Maybe
 import qualified Data.Map as M
-import Data.Monoid ((<>), Any(..))
+import Data.Monoid ((<>))
 import qualified Data.Text as T
 import Data.Text (Text)
+import Data.Graph as G
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -161,10 +162,28 @@ checkTypeClassInstance
   -> Type
   -> m ()
 checkTypeClassInstance cls i = check where
-  -- is this argument fully determined via fundeps
-  isFunDepDetermined = (Any False, Any True) == foldMap determining (typeClassDependencies cls)
-    where determining fd = (Any (i `elem` fdDeterminers fd),
-                            Any (i `elem` fdDetermined fd))
+
+  -- we could precompute which vars are determined and store in TypeClassData?
+  -- there's no point in working this out for every instance
+
+  -- here we build a graph of which variables contribute to determining other variables
+  --
+  -- if we have a dependency such as `a b -> c`, then we have the following contributions:
+  -- `a -> c`, `b -> c`, note that this doesn't mean that, for example, `a` implies `c`,
+  -- it just means that `c` is determined by at least `a`
+  (depGraph, _, fromKey) = G.graphFromEdges ((\(n, v) -> (n, n, nub v)) <$> M.toList contributingDeps)
+    where
+      contributingDeps = M.fromListWith (++) $ do
+        fd <- typeClassDependencies cls
+        src <- fdDeterminers fd
+        (src, fdDetermined fd) : map (, []) (fdDetermined fd)
+
+  -- do there exist any vars that contribute to `i` that `i` doesn't contribute to
+  isFunDepDetermined = case fromKey i of
+    Nothing -> False -- not mentioned in fundeps
+    Just v -> let contributesToVar = G.reachable (G.transposeG depGraph) v
+                  varContributesTo = G.reachable depGraph v
+              in any (\r -> not (r `elem` varContributesTo)) contributesToVar
 
   check = \case
     TypeVar _ -> return ()
