@@ -22,10 +22,10 @@ import Data.Foldable (for_, traverse_)
 import Data.List (nub, nubBy, (\\), sort, group)
 import Data.Maybe
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Data.Monoid ((<>))
 import qualified Data.Text as T
 import Data.Text (Text)
-import Data.Graph as G
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -125,12 +125,7 @@ addTypeClass moduleName pn args implies dependencies ds =
     modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) newClass (typeClasses . checkEnv $ st) } }
   where
     newClass :: TypeClassData
-    newClass =
-      TypeClassData { typeClassArguments    = args
-                    , typeClassMembers      = map toPair ds
-                    , typeClassSuperclasses = implies
-                    , typeClassDependencies = dependencies
-                    }
+    newClass = makeTypeClassData args (map toPair ds) implies dependencies
 
     toPair (TypeDeclaration ident ty) = (ident, ty)
     toPair (PositionedDeclaration _ _ d) = toPair d
@@ -158,33 +153,15 @@ checkDuplicateTypeArguments args = for_ firstDup $ \dup ->
 checkTypeClassInstance
   :: (MonadState CheckState m, MonadError MultipleErrors m)
   => TypeClassData
-  -> Int -- type argument index
+  -> Int -- ^ index of type class argument
   -> Type
   -> m ()
 checkTypeClassInstance cls i = check where
-
-  -- we could precompute which vars are determined and store in TypeClassData?
-  -- there's no point in working this out for every instance
-
-  -- here we build a graph of which variables contribute to determining other variables
-  --
-  -- if we have a dependency such as `a b -> c`, then we have the following contributions:
-  -- `a -> c`, `b -> c`, note that this doesn't mean that, for example, `a` implies `c`,
-  -- it just means that `c` is determined by at least `a`
-  (depGraph, _, fromKey) = G.graphFromEdges ((\(n, v) -> (n, n, nub v)) <$> M.toList contributingDeps)
-    where
-      contributingDeps = M.fromListWith (++) $ do
-        fd <- typeClassDependencies cls
-        src <- fdDeterminers fd
-        (src, fdDetermined fd) : map (, []) (fdDetermined fd)
-
-  -- do there exist any vars that contribute to `i` that `i` doesn't contribute to
-  isFunDepDetermined = case fromKey i of
-    Nothing -> False -- not mentioned in fundeps
-    Just v -> let contributesToVar = G.reachable (G.transposeG depGraph) v
-                  varContributesTo = G.reachable depGraph v
-              in any (\r -> not (r `elem` varContributesTo)) contributesToVar
-
+  -- If the argument is determined via fundeps then we are less restrictive in
+  -- what type is allowed. This is because the type cannot be used to influence
+  -- which instance is selected. Currently the only weakened restriction is that
+  -- row types are allowed in determined type class arguments.
+  isFunDepDetermined = S.member i (typeClassDeterminedArguments cls)
   check = \case
     TypeVar _ -> return ()
     TypeLevelString _ -> return ()

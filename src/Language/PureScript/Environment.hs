@@ -7,9 +7,12 @@ import Prelude.Compat
 import Data.Aeson.TH
 import qualified Data.Aeson as A
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.List (nub)
+import qualified Data.Graph as G
 
 import Language.PureScript.Crash
 import Language.PureScript.Kinds
@@ -48,6 +51,10 @@ data TypeClassData = TypeClassData
   -- are considered bound in the types appearing in these constraints.
   , typeClassDependencies :: [FunctionalDependency]
   -- ^ A list of functional dependencies for the type arguments of this class.
+  , typeClassDeterminedArguments :: S.Set Int
+  -- ^ A set of indexes of type argument that are fully determined by other
+  -- arguments via functional dependencies. This can be computed from both
+  -- typeClassArguments and typeClassDependencies.
   } deriving Show
 
 -- | A functional dependency indicates a relationship between two sets of
@@ -64,6 +71,31 @@ data FunctionalDependency = FunctionalDependency
 --
 initEnvironment :: Environment
 initEnvironment = Environment M.empty primTypes M.empty M.empty M.empty primClasses
+
+-- A constructor for TypeClassData which computes which type class arguments are determined
+makeTypeClassData :: [(Text, Maybe Kind)] -> [(Ident, Type)] -> [Constraint] -> [FunctionalDependency] -> TypeClassData
+makeTypeClassData args m s deps = TypeClassData args m s deps determinedArgs
+  where
+    contributingDeps = M.fromListWith (++) $ do
+      fd <- deps
+      src <- fdDeterminers fd
+      (src, fdDetermined fd) : map (, []) (fdDetermined fd)
+
+    -- here we build a graph of which variables contribute to determining other variables
+    --
+    -- if we have a dependency such as `a b -> c`, then we have the following contributions:
+    -- `a -> c`, `b -> c`, note that this doesn't mean that, for example, `a` implies `c`,
+    -- it just means that `c` is determined by at least `a`
+    (depGraph, _, fromKey) = G.graphFromEdges ((\(n, v) -> (n, n, nub v)) <$> M.toList contributingDeps)
+
+    -- do there exist any args that contribute to `arg` that `arg` doesn't contribute to
+    isFunDepDetermined arg = case fromKey arg of
+      Nothing -> False -- not mentioned in fundeps
+      Just v -> let contributesToVar = G.reachable (G.transposeG depGraph) v
+                    varContributesTo = G.reachable depGraph v
+                in any (\r -> not (r `elem` varContributesTo)) contributesToVar
+
+    determinedArgs = S.fromList $ filter isFunDepDetermined [0 .. length args - 1]
 
 -- |
 -- The visibility of a name in scope
@@ -264,8 +296,8 @@ primTypes =
 primClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primClasses =
   M.fromList
-    [ (primName "Partial", (TypeClassData [] [] [] []))
-    , (primName "Fail",    (TypeClassData [("message", Just Symbol)] [] [] []))
+    [ (primName "Partial", (makeTypeClassData [] [] [] []))
+    , (primName "Fail",    (makeTypeClassData [("message", Just Symbol)] [] [] []))
     ]
 
 -- |
