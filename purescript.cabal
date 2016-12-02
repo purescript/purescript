@@ -473,6 +473,7 @@ executable psc-ide-server
   build-depends:       base >=4 && <5,
                        aeson >= 0.8 && < 1.0,
                        bytestring -any,
+                       clock -any,
                        purescript -any,
                        base-compat >=0.6.0,
                        directory -any,

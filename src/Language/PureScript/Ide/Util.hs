@@ -26,8 +26,12 @@ module Language.PureScript.Ide.Util
   , withEmptyAnn
   , valueOperatorAliasT
   , typeOperatorAliasT
+  , displayTimeSpec
   , module Language.PureScript.Ide.Conversions
   ) where
+
+import           Protolude                           hiding (decodeUtf8,
+                                                      encodeUtf8)
 
 import           Control.Lens                        ((^.))
 import           Data.Aeson
@@ -36,8 +40,8 @@ import           Data.Text.Lazy.Encoding             (decodeUtf8, encodeUtf8)
 import qualified Language.PureScript                 as P
 import           Language.PureScript.Ide.Conversions
 import           Language.PureScript.Ide.Types
-import           Protolude                           hiding (decodeUtf8,
-                                                      encodeUtf8)
+import           System.Clock
+import           Text.Printf
 
 identifierFromIdeDeclaration :: IdeDeclaration -> Text
 identifierFromIdeDeclaration d = case d of
@@ -111,3 +115,7 @@ unwrapPositioned x = x
 unwrapPositionedRef :: P.DeclarationRef -> P.DeclarationRef
 unwrapPositionedRef (P.PositionedDeclarationRef _ _ x) = unwrapPositionedRef x
 unwrapPositionedRef x = x
+
+displayTimeSpec :: TimeSpec -> Text
+displayTimeSpec ts =
+  T.pack (printf "%0.2f" (fromIntegral (toNanoSecs ts) / 1000000 :: Double)) <> "ms"

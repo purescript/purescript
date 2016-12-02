@@ -32,7 +32,6 @@ module Language.PureScript.Ide.State
   , resolveOperatorsForModule
   ) where
 
-import qualified Prelude
 import           Protolude
 
 import           Control.Concurrent.STM
@@ -183,8 +182,8 @@ populateStage2 = do
     start <- getTime Monotonic
     atomically (populateStage2STM st)
     end <- getTime Monotonic
-    pure (Prelude.show (diffTimeSpec start end))
-  $(logDebug) $ "Finished populating Stage2 in " <> toS duration
+    pure (diffTimeSpec start end)
+  $(logDebug) $ "Finished populating Stage2 in " <> displayTimeSpec duration
 
 -- | STM version of populateStage2
 populateStage2STM :: TVar IdeState -> STM ()
@@ -201,11 +200,11 @@ populateStage3 = do
     start <- getTime Monotonic
     results <- atomically (populateStage3STM st)
     end <- getTime Monotonic
-    pure (Prelude.show (diffTimeSpec start end), results)
+    pure (diffTimeSpec start end, results)
   traverse_
     (logWarnN . prettyPrintReexportResult (runModuleNameT . fst))
     (filter reexportHasFailures results)
-  $(logDebug) $ "Finished populating Stage3 in " <> toS duration
+  $(logDebug) $ "Finished populating Stage3 in " <> displayTimeSpec duration
 
 -- | STM version of populateStage3
 populateStage3STM :: TVar IdeState -> STM [ReexportResult Module]

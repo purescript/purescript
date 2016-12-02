@@ -30,6 +30,7 @@ import qualified Data.Text.IO                      as T
 import qualified Data.ByteString.Lazy.Char8        as BS8
 import           Data.Version                      (showVersion)
 import           Language.PureScript.Ide
+import           Language.PureScript.Ide.Command
 import           Language.PureScript.Ide.Util
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Types
@@ -40,12 +41,12 @@ import           Network.Socket                    hiding (PortNumber, Type,
                                                     sClose)
 import           Options.Applicative               (ParseError (..))
 import qualified Options.Applicative               as Opts
+import           System.Clock
 import           System.Directory
 import           System.Info                       as SysInfo
 import           System.FilePath
 import           System.IO                         hiding (putStrLn, print)
 import           System.IO.Error                   (isEOFError)
-
 import qualified Paths_purescript                  as Paths
 
 listenOnLocalhost :: PortNumber -> IO Socket
@@ -127,7 +128,10 @@ startServer port env = withSocketsDo $ do
         Right (cmd, h) -> do
           case decodeT cmd of
             Just cmd' -> do
+              start <- liftIO (getTime Monotonic)
               result <- runExceptT (handleCommand cmd')
+              end <- liftIO (getTime Monotonic)
+              $(logDebug) ("Command " <> commandName cmd' <> " took " <>  (displayTimeSpec (diffTimeSpec start end)))
               -- $(logDebug) ("Answer was: " <> T.pack (show result))
               liftIO (hFlush stdout)
               case result of
@@ -139,7 +143,6 @@ startServer port env = withSocketsDo $ do
                 T.hPutStrLn h (encodeT (GeneralError "Error parsing Command."))
                 hFlush stdout
           liftIO (hClose h)
-
 
 acceptCommand :: (MonadIO m, MonadLogger m, MonadError Text m)
                  => Socket -> m (Text, Handle)

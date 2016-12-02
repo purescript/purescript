@@ -61,6 +61,21 @@ data Command
     | Reset
     | Quit
 
+commandName :: Command -> Text
+commandName c = case c of
+  Load{} -> "Load"
+  Type{} -> "Type"
+  Complete{} -> "Complete"
+  Pursuit{} -> "Pursuit"
+  CaseSplit{} -> "CaseSplit"
+  AddClause{} -> "AddClause"
+  Import{} -> "Import"
+  List{} -> "List"
+  Rebuild{} -> "Rebuild"
+  Cwd{} -> "Cwd"
+  Reset{} -> "Reset"
+  Quit{} -> "Quit"
+
 data ImportCommand
   = AddImplicitImport P.ModuleName
   | AddImportForIdentifier Text
