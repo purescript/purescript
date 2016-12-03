@@ -425,6 +425,7 @@ executable psc-package
                    optparse-applicative -any,
                    system-filepath -any,
                    text -any,
+                   these -any,
                    turtle -any
     main-is: Main.hs
     other-modules: Paths_purescript
