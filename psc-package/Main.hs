@@ -266,7 +266,7 @@ install pkgName = do
 uninstall :: String -> IO ()
 uninstall pkgName = do
   pkg <- readPackageFile
-  let pkg' = pkg { depends = filter (/= pack pkgName) $ depends pkg }
+  let pkg' = pkg { packageConfigDependencies = filter (/= pack pkgName) $ packageConfigDependencies pkg }
   updateImpl pkg'
   writePackageFile pkg'
   echo "psc-package.json file was updated"
