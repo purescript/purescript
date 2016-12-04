@@ -224,6 +224,27 @@ listSourcePaths = do
   paths <- getSourcePaths pkg db depends
   traverse_ (echo . pathToTextUnsafe) paths
 
+verifyPackageSet :: IO ()
+verifyPackageSet  = do
+  -- Clone all repos into the packages/ directory
+  ps <- readPackageFile 
+  paths <- fromList <$>
+    (for (getGitRepoList ps) (\(name, (repo, version)) -> do
+      let pkgDir = ".psc-package" </> fromText name </> fromText version
+      exists <- testdir pkgDir
+      unless exists $ cloneShallow repo version pkgDir
+      return (name, pkgDir)))
+
+  -- Print out the psc version
+  procs "psc" [ "--version" ] empty
+
+  for_ (toList ps) $ \(name, PackageSpec{..}) -> do
+    let dirFor = fromMaybe (error "verifyPackageSet: no directory") . (`M.lookup` paths)
+    echo ("Building package " <> name)
+    let srcGlobs = map ((<> "/src/**/*.purs") . toTextUnsafe . dirFor) (name : dependencies)
+	procs "psc" srcGlobs empty
+
+
 exec :: Text -> IO ()
 exec exeName = do
   pkg@PackageConfig{..} <- readPackageFile
@@ -275,7 +296,10 @@ main = do
         , Opts.command "available"
             (Opts.info (pure listPackages)
             (Opts.progDesc "List all packages available in the package set"))
-        ]
+		, Opts.command "verify-all"
+			(Opts.info (pure verifyPackageSet)
+			(Opts.profDesc ""))	
+		]
       where
         pkg = Opts.strArgument $
              Opts.metavar "PACKAGE"
