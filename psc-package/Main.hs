@@ -26,6 +26,7 @@ import qualified Options.Applicative as Opts
 import qualified Paths_purescript as Paths
 import qualified System.IO as IO
 import           Turtle hiding (fold)
+import 			 Control.Lens((<.), toListOf, to, ifolded, withIndex)
 
 packageFile :: Path.FilePath
 packageFile = "psc-package.json"
@@ -127,6 +128,9 @@ readPackageSet PackageConfig{ set } = do
       echo "Unable to parse packages.json"
       exit (ExitFailure 1)
     Just db -> return db
+
+getGitRepoList :: PackageConfig -> [(PackageName, (Repo, Version))]
+getGitRepoList = toListOf ((ifolded <. to (repo &&& version)) . withIndex)
 
 installOrUpdate :: PackageConfig -> Text -> PackageInfo -> IO ()
 installOrUpdate PackageConfig{ set } pkgName PackageInfo{ repo, version } = do
@@ -230,18 +234,15 @@ verifyPackageSet  = do
   ps <- readPackageFile 
   paths <- fromList <$>
     (for (getGitRepoList ps) (\(name, (repo, version)) -> do
-      let pkgDir = ".psc-package" </> fromText name </> fromText version
+      let pkgDir = ".psc-package"  </> fromText repo </> fromText name </> fromText version
       exists <- testdir pkgDir
       unless exists $ cloneShallow repo version pkgDir
       return (name, pkgDir)))
 
-  -- Print out the psc version
-  procs "psc" [ "--version" ] empty
-
   for_ (toList ps) $ \(name, PackageSpec{..}) -> do
     let dirFor = fromMaybe (error "verifyPackageSet: no directory") . (`M.lookup` paths)
     echo ("Building package " <> name)
-    let srcGlobs = map ((<> "/src/**/*.purs") . toTextUnsafe . dirFor) (name : dependencies)
+    let srcGlobs = map ((</>"src"</>"**"</>"*.purs") . toTextUnsafe . dirFor) (name : dependencies)
 	procs "psc" srcGlobs empty
 
 
@@ -296,9 +297,9 @@ main = do
         , Opts.command "available"
             (Opts.info (pure listPackages)
             (Opts.progDesc "List all packages available in the package set"))
-		, Opts.command "verify-all"
+		, Opts.command "verify-set"
 			(Opts.info (pure verifyPackageSet)
-			(Opts.profDesc ""))	
+			(Opts.profDesc "Verify all packages in the package set"))	
 		]
       where
         pkg = Opts.strArgument $
