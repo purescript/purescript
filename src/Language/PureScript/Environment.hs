@@ -72,29 +72,48 @@ data FunctionalDependency = FunctionalDependency
 initEnvironment :: Environment
 initEnvironment = Environment M.empty primTypes M.empty M.empty M.empty primClasses
 
--- A constructor for TypeClassData which computes which type class arguments are determined
-makeTypeClassData :: [(Text, Maybe Kind)] -> [(Ident, Type)] -> [Constraint] -> [FunctionalDependency] -> TypeClassData
+-- |
+-- A constructor for TypeClassData that computes which type class arguments are fully determined.
+-- Fully determined means that this argument cannot be used when selecting a type class instance.
+--
+-- An example of the difference between determined and fully determined would be with the class:
+-- ```class C a b c | a -> b, b -> a, b -> c```
+-- In this case, `a` must differ when `b` differs, and vice versa - each is determined by the other.
+-- Both `a` and `b` can be used in selecting a type class instance. However, `c` cannot - it is
+-- fully determined by `a` and `b`.
+--
+-- Define a graph of type class arguments with edges being fundep determiners to determined.
+-- An argument is fully determined if doesn't appear at the start of a path of strongly connected components.
+-- An argument is not fully determined otherwise.
+--
+-- The way we compute this is by saying: an argument X is fully determined if there are arguments that
+-- determine X that X does not determine. This is the same thing: everything X determines includes everything
+-- in its SCC, and everything determining X is either before it in an SCC path, or in the same SCC.
+makeTypeClassData
+  :: [(Text, Maybe Kind)]
+  -> [(Ident, Type)]
+  -> [Constraint]
+  -> [FunctionalDependency]
+  -> TypeClassData
 makeTypeClassData args m s deps = TypeClassData args m s deps determinedArgs
   where
+    -- list all the edges in the graph: for each fundep an edge exists for each determiner to each determined
     contributingDeps = M.fromListWith (++) $ do
       fd <- deps
       src <- fdDeterminers fd
       (src, fdDetermined fd) : map (, []) (fdDetermined fd)
 
-    -- here we build a graph of which variables contribute to determining other variables
-    --
-    -- if we have a dependency such as `a b -> c`, then we have the following contributions:
-    -- `a -> c`, `b -> c`, note that this doesn't mean that, for example, `a` implies `c`,
-    -- it just means that `c` is determined by at least `a`
+    -- here we build a graph of which arguments determine other arguments
     (depGraph, _, fromKey) = G.graphFromEdges ((\(n, v) -> (n, n, nub v)) <$> M.toList contributingDeps)
 
-    -- do there exist any args that contribute to `arg` that `arg` doesn't contribute to
+    -- do there exist any arguments that contribute to `arg` that `arg` doesn't contribute to
     isFunDepDetermined arg = case fromKey arg of
       Nothing -> False -- not mentioned in fundeps
       Just v -> let contributesToVar = G.reachable (G.transposeG depGraph) v
                     varContributesTo = G.reachable depGraph v
                 in any (\r -> not (r `elem` varContributesTo)) contributesToVar
 
+    -- find all the arguments that are determined
     determinedArgs = S.fromList $ filter isFunDepDetermined [0 .. length args - 1]
 
 -- |
