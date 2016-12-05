@@ -26,7 +26,6 @@ import           Protolude
 import           Control.Lens                  ((^.))
 import           Data.Aeson                    (decodeStrict)
 import qualified Data.ByteString               as BS
-import           Data.List                     (nub)
 import qualified Data.Map                      as Map
 import           Language.PureScript.Ide.Error (PscIdeError (..))
 import           Language.PureScript.Ide.Types
@@ -55,7 +54,7 @@ convertExterns ef =
     declarations = mapMaybe convertDecl (P.efDeclarations ef)
 
     typeClassFilter = foldMap removeTypeDeclarationsForClass (filter isTypeClassDeclaration declarations)
-    cleanDeclarations = nub $ appEndo typeClassFilter declarations
+    cleanDeclarations = ordNub (appEndo typeClassFilter declarations)
 
 removeTypeDeclarationsForClass :: IdeDeclaration -> Endo [IdeDeclaration]
 removeTypeDeclarationsForClass (IdeDeclTypeClass n) = Endo (filter notDuplicate)

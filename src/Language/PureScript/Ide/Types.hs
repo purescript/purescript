@@ -111,10 +111,13 @@ newtype AstData a = AstData (Map P.ModuleName (DefinitionSites a, TypeAnnotation
   -- annotations found in a module
   deriving (Show, Eq, Ord, Functor, Foldable)
 
+data IdeLogLevel = LogDebug | LogPerf | LogAll | LogNone
+  deriving (Show, Eq)
+
 data Configuration =
   Configuration
   { confOutputPath :: FilePath
-  , confDebug      :: Bool
+  , confLogLevel   :: IdeLogLevel
   , confGlobs      :: [FilePath]
   }
 

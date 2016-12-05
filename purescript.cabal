@@ -271,8 +271,9 @@ library
                      Language.PureScript.Ide.Conversions
                      Language.PureScript.Ide.Externs
                      Language.PureScript.Ide.Error
-                     Language.PureScript.Ide.Imports
                      Language.PureScript.Ide.Filter
+                     Language.PureScript.Ide.Imports
+                     Language.PureScript.Ide.Logging
                      Language.PureScript.Ide.Matcher
                      Language.PureScript.Ide.Pursuit
                      Language.PureScript.Ide.Rebuild
@@ -473,7 +474,6 @@ executable psc-ide-server
   build-depends:       base >=4 && <5,
                        aeson >= 0.8 && < 1.0,
                        bytestring -any,
-                       clock -any,
                        purescript -any,
                        base-compat >=0.6.0,
                        directory -any,

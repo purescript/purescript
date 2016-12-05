@@ -186,11 +186,9 @@ loadModules moduleNames = do
   -- Finally we kick off the worker with @async@ and return the number of
   -- successfully parsed modules.
   env <- ask
-  let runLogger =
-        runStdoutLoggingT
-        . filterLogger (\_ _ -> confDebug (ideConfiguration env))
+  let ll = confLogLevel (ideConfiguration env)
   -- populateStage2 and 3 return Unit for now, so it's fine to discard this
   -- result. We might want to block on this in a benchmarking situation.
-  _ <- liftIO (async (runLogger (runReaderT (populateStage2 *> populateStage3) env)))
+  _ <- liftIO (async (runLogger ll (runReaderT (populateStage2 *> populateStage3) env)))
   pure (TextResult ("Loaded " <> show (length efiles) <> " modules and "
                     <> show (length allModules) <> " source files."))

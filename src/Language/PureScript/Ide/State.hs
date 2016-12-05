@@ -45,7 +45,6 @@ import           Language.PureScript.Ide.Reexports
 import           Language.PureScript.Ide.SourceFile
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
-import           System.Clock
 
 -- | Resets all State inside psc-ide
 resetIdeState :: Ide m => m ()
@@ -178,12 +177,8 @@ cachedRebuild = s3CachedRebuild <$> getStage3
 populateStage2 :: (Ide m, MonadLogger m) => m ()
 populateStage2 = do
   st <- ideStateVar <$> ask
-  duration <- liftIO $ do
-    start <- getTime Monotonic
-    atomically (populateStage2STM st)
-    end <- getTime Monotonic
-    pure (diffTimeSpec start end)
-  $(logDebug) $ "Finished populating Stage2 in " <> displayTimeSpec duration
+  let message duration = "Finished populating Stage2 in " <> displayTimeSpec duration
+  logPerf message (liftIO (atomically (populateStage2STM st)))
 
 -- | STM version of populateStage2
 populateStage2STM :: TVar IdeState -> STM ()
@@ -196,15 +191,11 @@ populateStage2STM ref = do
 populateStage3 :: (Ide m, MonadLogger m) => m ()
 populateStage3 = do
   st <- ideStateVar <$> ask
-  (duration, results) <- liftIO $ do
-    start <- getTime Monotonic
-    results <- atomically (populateStage3STM st)
-    end <- getTime Monotonic
-    pure (diffTimeSpec start end, results)
+  let message duration = "Finished populating Stage3 in " <> displayTimeSpec duration
+  results <- logPerf message (liftIO (atomically (populateStage3STM st)))
   traverse_
     (logWarnN . prettyPrintReexportResult (runModuleNameT . fst))
     (filter reexportHasFailures results)
-  $(logDebug) $ "Finished populating Stage3 in " <> displayTimeSpec duration
 
 -- | STM version of populateStage3
 populateStage3STM :: TVar IdeState -> STM [ReexportResult Module]
