@@ -19,9 +19,10 @@ import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
+import Language.PureScript.Kinds
 import Language.PureScript.Names
-import Language.PureScript.Types
 import Language.PureScript.TypeChecker (checkNewtype)
+import Language.PureScript.Types
 import qualified Language.PureScript.Constants as C
 
 -- | Elaborates deriving instance declarations by code generation.
@@ -44,14 +45,22 @@ deriveInstance mn ds (TypeInstanceDeclaration nm deps className tys@[ty] Derived
   , Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor ty
   , mn == fromMaybe mn mn'
   = TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveGeneric mn ds tyCon args
+
   | className == Qualified (Just dataEq) (ProperName "Eq")
   , Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
   , mn == fromMaybe mn mn'
   = TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveEq mn ds tyCon
+
   | className == Qualified (Just dataOrd) (ProperName "Ord")
   , Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
   , mn == fromMaybe mn mn'
   = TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveOrd mn ds tyCon
+
+  | className == Qualified (Just dataFunctor) (ProperName "Functor")
+  , Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
+  , mn == fromMaybe mn mn'
+  = TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveFunctor mn ds tyCon
+
 deriveInstance mn ds (TypeInstanceDeclaration nm deps className [wrappedTy, unwrappedTy] DerivedInstance)
   | className == Qualified (Just dataNewtype) (ProperName "Newtype")
   , Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor wrappedTy
@@ -142,6 +151,9 @@ dataOrd = ModuleName [ ProperName "Data", ProperName "Ord" ]
 
 dataNewtype :: ModuleName
 dataNewtype = ModuleName [ ProperName "Data", ProperName "Newtype" ]
+
+dataFunctor :: ModuleName
+dataFunctor = ModuleName [ ProperName "Data", ProperName "Functor" ]
 
 deriveGeneric
   :: forall m. (MonadError MultipleErrors m, MonadSupply m)
@@ -702,3 +714,45 @@ decomposeRec :: Type -> [(Text, Type)]
 decomposeRec = sortBy (comparing fst) . go
   where go (RCons str typ typs) = (str, typ) : decomposeRec typs
         go _ = []
+
+deriveFunctor
+  :: forall m
+   . (MonadError MultipleErrors m, MonadSupply m)
+  => ModuleName
+  -> [Declaration]
+  -> ProperName 'TypeName
+  -> m [Declaration]
+deriveFunctor mn ds tyConNm = do
+  tyCon <- findTypeDecl tyConNm ds
+  mapFun <- mkMapFunction tyCon
+  return [ ValueDeclaration (Ident C.map) Public [] (Right mapFun) ]
+  where
+    mkMapFunction :: Declaration -> m Expr
+    mkMapFunction (DataDeclaration _ _ tys ctors) = case reverse tys of
+      [] -> throwError . errorMessage $ KindsDoNotUnify (FunKind kindType kindType) kindType
+      ((iTy, _) : _) -> do
+        f <- freshIdent "f"
+        m <- freshIdent "m"
+        lam f . lamCase m <$> mapM (mkCtorClause iTy f) ctors
+    mkMapFunction (PositionedDeclaration _ _ d) = mkMapFunction d
+    mkMapFunction _ = internalError "mkMapFunction: expected DataDeclaration"
+
+    mkCtorClause :: Text -> Ident -> (ProperName 'ConstructorName, [Type]) -> m CaseAlternative
+    mkCtorClause iTyName f (ctorName, ctorTys) = do
+      idents <- replicateM (length ctorTys) (freshIdent "v")
+      let args = zipWith transformArg idents ctorTys
+          ctor = Constructor (Qualified (Just mn) ctorName)
+          rebuilt = foldl App ctor args
+          caseBinder = ConstructorBinder (Qualified (Just mn) ctorName) (VarBinder <$> idents)
+      return $ CaseAlternative [caseBinder] (Right rebuilt)
+      where
+        fVar = mkVar f
+        mapVar = mkVarMn (Just dataFunctor) (Ident C.map)
+
+        transformArg ident ty = foldr App (mkVar ident) (go ty) where
+          -- argument matches the index type
+          go (TypeVar t) | t == iTyName = Just fVar
+          -- under a `* -> *`, just assume functor for now
+          go (TypeApp _ t) = App mapVar <$> go t
+          -- otherwise do nothing - will fail type checking if type does actually contain index
+          go _ = Nothing
