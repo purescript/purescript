@@ -3,6 +3,7 @@ version: '{build}'
 environment:
   # Keep the path as short as possible, just in case.
   STACK_ROOT: c:\s
+  STACK_VER: 1.2.0
   RELEASE_USER: purescript
   RELEASE_REPO: purescript
 cache:
@@ -15,7 +16,9 @@ install:
 - ps: |
     New-Item -ItemType Directory -Force -Path C:\tools
     $env:Path += ";C:\tools"
-    (New-Object Net.WebClient).DownloadFile('https://www.stackage.org/stack/windows-x86_64', 'c:\tools\stack.zip')
+    $stackRelease = "stack-$env:STACK_VER-windows-x86_64"
+    $downloadUrl = "https://github.com/commercialhaskell/stack/releases/download/v$env:STACK_VER/$stackRelease.zip"
+    (New-Object Net.WebClient).DownloadFile($downloadUrl, 'c:\tools\stack.zip')
     pushd c:\tools
     7z x c:\tools\stack.zip stack.exe
     popd
