@@ -22,6 +22,7 @@ import Data.Foldable (for_, traverse_)
 import Data.List (nub, nubBy, (\\), sort, group)
 import Data.Maybe
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Data.Monoid ((<>))
 import qualified Data.Text as T
 import Data.Text (Text)
@@ -124,12 +125,7 @@ addTypeClass moduleName pn args implies dependencies ds =
     modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) newClass (typeClasses . checkEnv $ st) } }
   where
     newClass :: TypeClassData
-    newClass =
-      TypeClassData { typeClassArguments    = args
-                    , typeClassMembers      = map toPair ds
-                    , typeClassSuperclasses = implies
-                    , typeClassDependencies = dependencies
-                    }
+    newClass = makeTypeClassData args (map toPair ds) implies dependencies
 
     toPair (TypeDeclaration ident ty) = (ident, ty)
     toPair (PositionedDeclaration _ _ d) = toPair d
@@ -155,18 +151,28 @@ checkDuplicateTypeArguments args = for_ firstDup $ \dup ->
   firstDup = listToMaybe $ args \\ nub args
 
 checkTypeClassInstance
-  :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
-  => ModuleName
+  :: (MonadState CheckState m, MonadError MultipleErrors m)
+  => TypeClassData
+  -> Int -- ^ index of type class argument
   -> Type
   -> m ()
-checkTypeClassInstance _ (TypeVar _) = return ()
-checkTypeClassInstance _ (TypeLevelString _) = return ()
-checkTypeClassInstance _ (TypeConstructor ctor) = do
-  env <- getEnv
-  when (ctor `M.member` typeSynonyms env) . throwError . errorMessage $ TypeSynonymInstance
-  return ()
-checkTypeClassInstance m (TypeApp t1 t2) = checkTypeClassInstance m t1 >> checkTypeClassInstance m t2
-checkTypeClassInstance _ ty = throwError . errorMessage $ InvalidInstanceHead ty
+checkTypeClassInstance cls i = check where
+  -- If the argument is determined via fundeps then we are less restrictive in
+  -- what type is allowed. This is because the type cannot be used to influence
+  -- which instance is selected. Currently the only weakened restriction is that
+  -- row types are allowed in determined type class arguments.
+  isFunDepDetermined = S.member i (typeClassDeterminedArguments cls)
+  check = \case
+    TypeVar _ -> return ()
+    TypeLevelString _ -> return ()
+    TypeConstructor ctor -> do
+      env <- getEnv
+      when (ctor `M.member` typeSynonyms env) . throwError . errorMessage $ TypeSynonymInstance
+      return ()
+    TypeApp t1 t2 -> check t1 >> check t2
+    REmpty | isFunDepDetermined -> return ()
+    RCons _ hd tl | isFunDepDetermined -> check hd >> check tl
+    ty -> throwError . errorMessage $ InvalidInstanceHead ty
 
 -- |
 -- Check that type synonyms are fully-applied in a type
@@ -283,12 +289,16 @@ typeCheckAll moduleName _ = traverse go
     addTypeClass moduleName pn args implies deps tys
     return d
   go (d@(TypeInstanceDeclaration dictName deps className tys body)) = rethrow (addHint (ErrorInInstance className tys)) $ do
-    traverse_ (checkTypeClassInstance moduleName) tys
-    checkOrphanInstance dictName className tys
-    _ <- traverseTypeInstanceBody checkInstanceMembers body
-    let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps)
-    addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) dict
-    return d
+    env <- getEnv
+    case M.lookup className (typeClasses env) of
+      Nothing -> internalError "typeCheckAll: Encountered unknown type class in instance declaration"
+      Just typeClass -> do
+        sequence_ (zipWith (checkTypeClassInstance typeClass) [0..] tys)
+        checkOrphanInstance dictName className tys
+        _ <- traverseTypeInstanceBody checkInstanceMembers body
+        let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps)
+        addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) dict
+        return d
   go (PositionedDeclaration pos com d) =
     warnAndRethrowWithPosition pos $ PositionedDeclaration pos com <$> go d
 
