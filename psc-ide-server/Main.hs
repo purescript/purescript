@@ -74,7 +74,7 @@ data Options = Options
 
 main :: IO ()
 main = do
-  opts'@(Options dir globs outputPath port noWatch debug logLevel) <- Opts.execParser opts
+  opts'@(Options dir globs outputPath port noWatch polling debug logLevel) <- Opts.execParser opts
   when debug (putText "Parsed Options:" *> print opts')
   maybe (pure ()) setCurrentDirectory dir
   ideState <- newTVarIO emptyIdeState
@@ -106,14 +106,15 @@ main = do
         <*> Opts.switch (Opts.long "debug")
         <*> (parseLogLevel <$> Opts.strOption
              (Opts.long "log-level"
-              <> Opts.value ""
-              <> Opts.help "One of \"debug\", \"perf\" or \"all\""))
+              `mappend` Opts.value ""
+              `mappend` Opts.help "One of \"debug\", \"perf\", \"all\" or \"none\""))
     opts = Opts.info (version <*> Opts.helper <*> parser) mempty
     parseLogLevel s = case s of
       "debug" -> LogDebug
       "perf" -> LogPerf
       "all" -> LogAll
-      _ -> LogNone
+      "none" -> LogNone
+      _ -> LogDefault
     version = Opts.abortOption
       (InfoMsg (showVersion Paths.version))
       (Opts.long "version" `mappend` Opts.help "Show the version number")

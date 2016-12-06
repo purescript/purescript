@@ -22,6 +22,7 @@ import           Control.Concurrent.STM
 import           Language.PureScript.Ide.Externs
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
+import           Language.PureScript.Ide.Util
 import           System.FilePath
 import           System.FSNotify
 
@@ -31,7 +32,7 @@ reloadFile :: TVar IdeState -> Event -> IO ()
 reloadFile _ Removed{} = pure ()
 reloadFile ref ev = do
   let fp = eventPath ev
-  ef' <- runExceptT (readExternFile fp)
+  ef' <- runLogger LogDefault (runExceptT (readExternFile fp))
   case ef' of
     Left _ -> pure ()
     Right ef -> do

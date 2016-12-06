@@ -19,6 +19,7 @@ runLogger logLevel' =
   runStdoutLoggingT . filterLogger (\_ logLevel ->
                                        case logLevel' of
                                          LogAll -> True
+                                         LogDefault -> not (logLevel == LevelOther "perf" || logLevel == LevelDebug)
                                          LogNone -> False
                                          LogDebug -> not (logLevel == LevelOther "perf")
                                          LogPerf -> logLevel == LevelOther "perf")

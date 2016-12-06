@@ -12,8 +12,8 @@
 -- Handles externs files for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE PackageImports  #-}
 
 module Language.PureScript.Ide.Externs
   ( readExternFile
@@ -23,23 +23,37 @@ module Language.PureScript.Ide.Externs
 
 import           Protolude
 
-import           Control.Lens                  ((^.))
-import           Data.Aeson                    (decodeStrict)
-import qualified Data.ByteString               as BS
-import qualified Data.Map                      as Map
+import           Control.Lens ((^.))
+import           "monad-logger" Control.Monad.Logger
+import           Data.Aeson (decodeStrict)
+import qualified Data.ByteString as BS
+import qualified Data.Map as Map
+import           Data.Version (showVersion)
 import           Language.PureScript.Ide.Error (PscIdeError (..))
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 
-import qualified Language.PureScript           as P
+import qualified Language.PureScript as P
 
-readExternFile :: (MonadIO m, MonadError PscIdeError m) =>
+readExternFile :: (MonadIO m, MonadError PscIdeError m, MonadLogger m) =>
                   FilePath -> m P.ExternsFile
 readExternFile fp = do
    parseResult <- liftIO (decodeStrict <$> BS.readFile fp)
    case parseResult of
-     Nothing -> throwError . GeneralError $ "Parsing the extern at: " <> toS fp <> " failed"
+     Nothing ->
+       throwError (GeneralError
+                   ("Parsing the extern at: " <> toS fp <> " failed"))
+     Just externs
+       | P.efVersion externs /= version -> do
+           let errMsg = "Version mismatch for the externs at: " <> toS fp
+                        <> " Expected: " <> version
+                        <> " Found: " <> P.efVersion externs
+           logErrorN errMsg
+           throwError (GeneralError errMsg)
      Just externs -> pure externs
+
+     where
+       version = toS (showVersion P.version)
 
 convertExterns :: P.ExternsFile -> (Module, [(P.ModuleName, P.DeclarationRef)])
 convertExterns ef =
