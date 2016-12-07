@@ -22,7 +22,6 @@ It supports the following options:
 - `--output-directory`: Specify where to look for compiled output inside your
   project directory. Defaults to `output/`, relative to either the current
   directory or the directory specified by `-d`.
-<<<<<<< HEAD
 - `--polling`: Uses polling instead of file system events to watch the externs
   files. This flag is reversed on Windows and polling is the default.
 - `--debug`: DEPRECATED: use --log-level="debug"
