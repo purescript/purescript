@@ -23,6 +23,8 @@ It supports the following options:
   project directory. Defaults to `output/`, relative to either the current
   directory or the directory specified by `-d`.
 - `--debug`: Enables some logging meant for debugging
+- `--polling`: Uses polling instead of file system events to watch the externs
+  files. This flag is reversed on Windows and polling is the default.
 - `--no-watch`: Disables the filewatcher
 - `--version`: Output psc-ide version
 
