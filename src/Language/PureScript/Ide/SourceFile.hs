@@ -116,7 +116,7 @@ extractSpans ss d = case d of
   _ -> []
   where
     -- We need this special case to be able to also get the position info for
-    -- typeclass member functions. Typedeclaratations would clash with value
+    -- typeclass member functions. Typedeclarations would clash with value
     -- declarations for non-typeclass members, which is why we can't handle them
     -- in extractSpans.
     extractSpans' ssP dP = case dP of

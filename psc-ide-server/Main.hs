@@ -30,6 +30,7 @@ import qualified Data.Text.IO                      as T
 import qualified Data.ByteString.Lazy.Char8        as BS8
 import           Data.Version                      (showVersion)
 import           Language.PureScript.Ide
+import           Language.PureScript.Ide.Command
 import           Language.PureScript.Ide.Util
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Types
@@ -45,7 +46,6 @@ import           System.Info                       as SysInfo
 import           System.FilePath
 import           System.IO                         hiding (putStrLn, print)
 import           System.IO.Error                   (isEOFError)
-
 import qualified Paths_purescript                  as Paths
 
 listenOnLocalhost :: PortNumber -> IO Socket
@@ -69,11 +69,12 @@ data Options = Options
   , optionsNoWatch    :: Bool
   , optionsPolling    :: Bool
   , optionsDebug      :: Bool
+  , optionsLoglevel   :: IdeLogLevel
   } deriving (Show)
 
 main :: IO ()
 main = do
-  opts'@(Options dir globs outputPath port noWatch polling debug) <- Opts.execParser opts
+  opts'@(Options dir globs outputPath port noWatch polling debug logLevel) <- Opts.execParser opts
   when debug (putText "Parsed Options:" *> print opts')
   maybe (pure ()) setCurrentDirectory dir
   ideState <- newTVarIO emptyIdeState
@@ -88,8 +89,8 @@ main = do
 
   unless noWatch $
     void (forkFinally (watcher polling ideState fullOutputPath) print)
-
-  let conf = Configuration {confDebug = debug, confOutputPath = outputPath, confGlobs = globs}
+  -- TODO: deprecate and get rid of `debug`
+  let conf = Configuration {confLogLevel = if debug then LogDebug else logLevel, confOutputPath = outputPath, confGlobs = globs}
       env = IdeEnvironment {ideStateVar = ideState, ideConfiguration = conf}
   startServer port env
   where
@@ -103,7 +104,17 @@ main = do
         <*> Opts.switch (Opts.long "no-watch")
         <*> flipIfWindows (Opts.switch (Opts.long "polling"))
         <*> Opts.switch (Opts.long "debug")
+        <*> (parseLogLevel <$> Opts.strOption
+             (Opts.long "log-level"
+              `mappend` Opts.value ""
+              `mappend` Opts.help "One of \"debug\", \"perf\", \"all\" or \"none\""))
     opts = Opts.info (version <*> Opts.helper <*> parser) mempty
+    parseLogLevel s = case s of
+      "debug" -> LogDebug
+      "perf" -> LogPerf
+      "all" -> LogAll
+      "none" -> LogNone
+      _ -> LogDefault
     version = Opts.abortOption
       (InfoMsg (showVersion Paths.version))
       (Opts.long "version" `mappend` Opts.help "Show the version number")
@@ -115,10 +126,8 @@ main = do
 startServer :: PortNumber -> IdeEnvironment -> IO ()
 startServer port env = withSocketsDo $ do
   sock <- listenOnLocalhost port
-  runLogger (runReaderT (forever (loop sock)) env)
+  runLogger (confLogLevel (ideConfiguration env)) (runReaderT (forever (loop sock)) env)
   where
-    runLogger = runStdoutLoggingT . filterLogger (\_ _ -> confDebug (ideConfiguration env))
-
     loop :: (Ide m, MonadLogger m) => Socket -> m ()
     loop sock = do
       accepted <- runExceptT $ acceptCommand sock
@@ -127,7 +136,11 @@ startServer port env = withSocketsDo $ do
         Right (cmd, h) -> do
           case decodeT cmd of
             Just cmd' -> do
-              result <- runExceptT (handleCommand cmd')
+              let message duration =
+                    "Command " <> commandName cmd'
+                    <> " took "
+                    <> displayTimeSpec duration
+              result <- logPerf message (runExceptT (handleCommand cmd'))
               -- $(logDebug) ("Answer was: " <> T.pack (show result))
               liftIO (hFlush stdout)
               case result of
@@ -139,7 +152,6 @@ startServer port env = withSocketsDo $ do
                 T.hPutStrLn h (encodeT (GeneralError "Error parsing Command."))
                 hFlush stdout
           liftIO (hClose h)
-
 
 acceptCommand :: (MonadIO m, MonadLogger m, MonadError Text m)
                  => Socket -> m (Text, Handle)

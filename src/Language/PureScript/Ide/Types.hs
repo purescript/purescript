@@ -12,9 +12,8 @@
 -- Type definitions for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DeriveFoldable    #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE DeriveFoldable  #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Language.PureScript.Ide.Types where
 
@@ -111,10 +110,13 @@ newtype AstData a = AstData (Map P.ModuleName (DefinitionSites a, TypeAnnotation
   -- annotations found in a module
   deriving (Show, Eq, Ord, Functor, Foldable)
 
+data IdeLogLevel = LogDebug | LogPerf | LogAll | LogDefault | LogNone
+  deriving (Show, Eq)
+
 data Configuration =
   Configuration
   { confOutputPath :: FilePath
-  , confDebug      :: Bool
+  , confLogLevel   :: IdeLogLevel
   , confGlobs      :: [FilePath]
   }
 

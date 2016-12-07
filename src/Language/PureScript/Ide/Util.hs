@@ -27,7 +27,11 @@ module Language.PureScript.Ide.Util
   , valueOperatorAliasT
   , typeOperatorAliasT
   , module Language.PureScript.Ide.Conversions
+  , module Language.PureScript.Ide.Logging
   ) where
+
+import           Protolude                           hiding (decodeUtf8,
+                                                      encodeUtf8)
 
 import           Control.Lens                        ((^.))
 import           Data.Aeson
@@ -35,9 +39,8 @@ import qualified Data.Text                           as T
 import           Data.Text.Lazy.Encoding             (decodeUtf8, encodeUtf8)
 import qualified Language.PureScript                 as P
 import           Language.PureScript.Ide.Conversions
+import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.Types
-import           Protolude                           hiding (decodeUtf8,
-                                                      encodeUtf8)
 
 identifierFromIdeDeclaration :: IdeDeclaration -> Text
 identifierFromIdeDeclaration d = case d of

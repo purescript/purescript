@@ -271,8 +271,9 @@ library
                      Language.PureScript.Ide.Conversions
                      Language.PureScript.Ide.Externs
                      Language.PureScript.Ide.Error
-                     Language.PureScript.Ide.Imports
                      Language.PureScript.Ide.Filter
+                     Language.PureScript.Ide.Imports
+                     Language.PureScript.Ide.Logging
                      Language.PureScript.Ide.Matcher
                      Language.PureScript.Ide.Pursuit
                      Language.PureScript.Ide.Rebuild
