@@ -25,7 +25,6 @@ import           Data.Aeson
 import qualified Data.Map.Lazy                       as M
 import qualified Language.PureScript                 as P
 import qualified Language.PureScript.Errors.JSON     as P
-import           Language.PureScript.Ide.Conversions
 
 type ModuleIdent = Text
 

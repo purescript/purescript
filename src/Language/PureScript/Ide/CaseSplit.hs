@@ -12,8 +12,6 @@
 -- Casesplitting and adding function clauses
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings #-}
-
 module Language.PureScript.Ide.CaseSplit
        ( WildcardAnnotations()
        , explicitAnnotations

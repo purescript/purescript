@@ -1,5 +1,3 @@
-{-# LANGUAGE DataKinds #-}
-
 module Language.PureScript.Interactive.Completion
   ( CompletionM
   , liftCompletionM

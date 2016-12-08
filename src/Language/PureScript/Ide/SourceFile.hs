@@ -12,8 +12,6 @@
 -- Getting declarations from PureScript sourcefiles
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings #-}
-
 module Language.PureScript.Ide.SourceFile
   ( parseModule
   , getImportsForFile

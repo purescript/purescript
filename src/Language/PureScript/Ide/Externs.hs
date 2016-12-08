@@ -12,7 +12,6 @@
 -- Handles externs files for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE PackageImports  #-}
 
 module Language.PureScript.Ide.Externs

@@ -12,7 +12,6 @@
 -- Interface for the psc-ide-server
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PackageImports        #-}
 {-# LANGUAGE TemplateHaskell       #-}
 
@@ -175,12 +174,12 @@ loadModules moduleNames = do
   efiles <- traverse readExternFile efPaths
   traverse_ insertExterns efiles
 
-  -- We parse all source files, log eventual parse failures if the debug flag
-  -- was set and insert the succesful parses into the state.
+  -- We parse all source files, log eventual parse failures and insert the
+  -- successful parses into the state.
   (failures, allModules) <-
     partitionEithers <$> (traverse parseModule =<< findAllSourceFiles)
   unless (null failures) $
-    $(logDebug) ("Failed to parse: " <> show failures)
+    $(logWarn) ("Failed to parse: " <> show failures)
   traverse_ insertModule allModules
 
   -- Finally we kick off the worker with @async@ and return the number of

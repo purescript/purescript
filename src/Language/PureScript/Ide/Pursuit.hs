@@ -12,8 +12,6 @@
 -- Pursuit client for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings #-}
-
 module Language.PureScript.Ide.Pursuit
   ( searchPursuitForDeclarations
   , findPackagesForModuleIdent

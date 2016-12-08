@@ -12,8 +12,6 @@
 -- Generally useful functions
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings #-}
-
 module Language.PureScript.Ide.Util
   ( identifierFromIdeDeclaration
   , unwrapMatch

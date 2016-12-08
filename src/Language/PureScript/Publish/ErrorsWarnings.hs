@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Language.PureScript.Publish.ErrorsWarnings
   ( PackageError(..)
   , PackageWarning(..)

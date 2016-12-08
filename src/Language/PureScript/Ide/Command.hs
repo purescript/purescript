@@ -12,9 +12,6 @@
 -- Datatypes for the commands psc-ide accepts
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings #-}
-
-
 module Language.PureScript.Ide.Command where
 
 import           Protolude

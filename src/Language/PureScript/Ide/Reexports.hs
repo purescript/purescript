@@ -13,9 +13,6 @@
 -- Resolves reexports for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
-
 module Language.PureScript.Ide.Reexports
   ( resolveReexports
   , prettyPrintReexportResult

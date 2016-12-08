@@ -1,6 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PatternGuards #-}
-
 -- |
 -- This module implements the generic deriving elaboration that takes place during desugaring.
 --

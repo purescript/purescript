@@ -12,8 +12,6 @@
 -- Provides functionality to manage imports
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings     #-}
-
 module Language.PureScript.Ide.Imports
        ( addImplicitImport
        , addImportForIdentifier

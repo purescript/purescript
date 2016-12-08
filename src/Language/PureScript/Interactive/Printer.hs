@@ -1,6 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE DataKinds #-}
-
 module Language.PureScript.Interactive.Printer where
 
 import           Prelude.Compat
