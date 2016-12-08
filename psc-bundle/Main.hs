@@ -20,7 +20,7 @@ import System.FilePath (takeDirectory)
 import System.FilePath.Glob (glob)
 import System.Exit (exitFailure)
 import System.IO (stderr, stdout, hPutStrLn, hSetEncoding, utf8)
-import System.IO.UTF8 (readUTF8File)
+import System.IO.UTF8 (readUTF8File, writeUTF8File)
 import System.Directory (createDirectoryIfMissing)
 
 import Language.PureScript.Bundle
@@ -110,7 +110,7 @@ main = do
       case optionsOutputFile opts of
         Just outputFile -> do
           createDirectoryIfMissing True (takeDirectory outputFile)
-          writeFile outputFile js
+          writeUTF8File outputFile js
         Nothing -> putStrLn js
   where
   infoModList = Opts.fullDesc <> headerInfo <> footerInfo
