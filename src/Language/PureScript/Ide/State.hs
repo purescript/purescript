@@ -194,7 +194,7 @@ populateStage3 = do
   let message duration = "Finished populating Stage3 in " <> displayTimeSpec duration
   results <- logPerf message (liftIO (atomically (populateStage3STM st)))
   traverse_
-    (logWarnN . prettyPrintReexportResult (runModuleNameT . fst))
+    (logWarnN . prettyPrintReexportResult (P.runModuleName . fst))
     (filter reexportHasFailures results)
 
 -- | STM version of populateStage3

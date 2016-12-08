@@ -60,9 +60,9 @@ getImportsForFile fp = do
       where
         mkModuleImport (mn, importType', qualifier) =
           ModuleImport
-          (runModuleNameT mn)
+          (P.runModuleName mn)
           importType'
-          (runModuleNameT <$> qualifier)
+          (P.runModuleName <$> qualifier)
         unwrapPositionedImport (mn, it, q) = (mn, unwrapImportType it, q)
         unwrapImportType (P.Explicit decls) = P.Explicit (map unwrapPositionedRef decls)
         unwrapImportType (P.Hiding decls)   = P.Hiding (map unwrapPositionedRef decls)
@@ -101,18 +101,18 @@ extractSpans ss d = case d of
   P.PositionedDeclaration ss' _ d' ->
     extractSpans ss' d'
   P.ValueDeclaration i _ _ _ ->
-    [(Left (runIdentT i), ss)]
+    [(Left (P.runIdent i), ss)]
   P.TypeSynonymDeclaration name _ _ ->
-    [(Right (runProperNameT name), ss)]
+    [(Right (P.runProperName name), ss)]
   P.TypeClassDeclaration name _ _ _ members ->
-    (Right (runProperNameT name), ss) : concatMap (extractSpans' ss) members
+    (Right (P.runProperName name), ss) : concatMap (extractSpans' ss) members
   P.DataDeclaration _ name _ ctors ->
-    (Right (runProperNameT name), ss)
-    : map (\(cname, _) -> (Left (runProperNameT cname), ss)) ctors
+    (Right (P.runProperName name), ss)
+    : map (\(cname, _) -> (Left (P.runProperName cname), ss)) ctors
   P.ExternDeclaration ident _ ->
-    [(Left (runIdentT ident), ss)]
+    [(Left (P.runIdent ident), ss)]
   P.ExternDataDeclaration name _ ->
-    [(Right (runProperNameT name), ss)]
+    [(Right (P.runProperName name), ss)]
   _ -> []
   where
     -- We need this special case to be able to also get the position info for
@@ -123,5 +123,5 @@ extractSpans ss d = case d of
       P.PositionedDeclaration ssP' _ dP' ->
         extractSpans' ssP' dP'
       P.TypeDeclaration ident _ ->
-        [(Left (runIdentT ident), ssP)]
+        [(Left (P.runIdent ident), ssP)]
       _ -> []

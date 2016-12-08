@@ -110,7 +110,7 @@ findPursuitPackages (PursuitQuery q) =
   PursuitResult <$> liftIO (findPackagesForModuleIdent q)
 
 printModules :: Ide m => m Success
-printModules = ModuleList . map runModuleNameT <$> getLoadedModulenames
+printModules = ModuleList . map P.runModuleName <$> getLoadedModulenames
 
 outputDirectory :: Ide m => m FilePath
 outputDirectory = do

@@ -20,7 +20,6 @@ import           Language.PureScript.Errors.JSON
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Util
 import           System.IO.UTF8                  (readUTF8FileT)
 
 -- | Given a filepath performs the following steps:
@@ -96,7 +95,7 @@ rebuildModuleOpen makeEnv externs m = do
       throwError (GeneralError "Failed when rebuilding with open exports")
     Right result -> do
       $(logDebug)
-        ("Setting Rebuild cache: " <> runModuleNameT (P.efModuleName result))
+        ("Setting Rebuild cache: " <> P.runModuleName (P.efModuleName result))
       cacheRebuild result
 
 -- | Parameters we can access while building our @MakeActions@

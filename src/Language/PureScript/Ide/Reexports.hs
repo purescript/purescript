@@ -53,7 +53,7 @@ prettyPrintReexportResult f ReexportResult{..}
   | otherwise =
       "Failed to resolve reexports for "
       <> f reResolved
-      <> foldMap (\(mn, ref) -> runModuleNameT mn <> show ref) reFailed
+      <> foldMap (\(mn, ref) -> P.runModuleName mn <> show ref) reFailed
 
 -- | Whether any Refs couldn't be resolved
 reexportHasFailures :: ReexportResult a -> Bool
