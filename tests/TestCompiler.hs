@@ -47,6 +47,7 @@ import System.Exit
 import System.Process hiding (cwd)
 import System.FilePath
 import System.Directory
+import System.IO
 import System.IO.UTF8
 import System.IO.Silently
 import qualified System.FilePath.Glob as Glob
@@ -81,10 +82,15 @@ spec = do
       Left errs -> fail (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
       Right externs -> return (externs, passingFiles, warningFiles, failingFiles)
 
+  outputFile <- runIO $ do
+    tmp <- getTemporaryDirectory
+    createDirectoryIfMissing False (tmp </> logpath)
+    openFile (tmp </> logpath </> logfile) WriteMode
+
   context "Passing examples" $
     forM_ passingTestCases $ \testPurs ->
       it ("'" <> takeFileName (getTestMain testPurs) <> "' should compile and run without error") $
-        assertCompiles supportExterns testPurs
+        assertCompiles supportExterns testPurs outputFile
 
   context "Warning examples" $
     forM_ warningTestCases $ \testPurs -> do
@@ -230,8 +236,9 @@ checkShouldFailWith expected errs =
 assertCompiles
   :: [(P.Module, P.ExternsFile)]
   -> [FilePath]
+  -> Handle
   -> Expectation
-assertCompiles supportExterns inputFiles =
+assertCompiles supportExterns inputFiles outputFile =
   assert supportExterns inputFiles checkMain $ \e ->
     case e of
       Left errs -> return . Just . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
@@ -240,10 +247,13 @@ assertCompiles supportExterns inputFiles =
         let entryPoint = modulesDir </> "index.js"
         writeFile entryPoint "require('Main').main()"
         result <- traverse (\node -> readProcessWithExitCode node [entryPoint] "") process
+        hPutStrLn outputFile $ "\n" <> takeFileName (last inputFiles) <> ":"
         case result of
           Just (ExitSuccess, out, err)
             | not (null err) -> return $ Just $ "Test wrote to stderr:\n\n" <> err
-            | not (null out) && trim (last (lines out)) == "Done" -> return Nothing
+            | not (null out) && trim (last (lines out)) == "Done" -> do
+                hPutStr outputFile out
+                return Nothing
             | otherwise -> return $ Just $ "Test did not finish with 'Done':\n\n" <> out
           Just (ExitFailure _, _, err) -> return $ Just err
           Nothing -> return $ Just "Couldn't find node.js executable"
@@ -286,3 +296,9 @@ assertDoesNotCompile supportExterns inputFiles shouldFailWith =
 
   where
   noPreCheck = const (return ())
+
+logpath :: FilePath
+logpath = "purescript-output"
+
+logfile :: FilePath
+logfile = "psc-tests.out"
