@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 -- | Functions for converting PureScript ASTs into values of the data types
 -- from Language.PureScript.Docs.
 

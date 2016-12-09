@@ -12,7 +12,6 @@
 -- Error types for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings #-}
 module Language.PureScript.Ide.Error
        ( PscIdeError(..)
        ) where

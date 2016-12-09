@@ -12,7 +12,6 @@
 -- Handles externs files for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE PackageImports  #-}
 
 module Language.PureScript.Ide.Externs
@@ -133,13 +132,13 @@ annotateModule (defs, types) (moduleName, decls) =
       IdeDeclDataConstructor dtor ->
         annotateValue (dtor ^. ideDtorName . properNameT) (IdeDeclDataConstructor dtor)
       IdeDeclTypeClass i ->
-        annotateType (runProperNameT i) (IdeDeclTypeClass i)
+        annotateType (i ^. properNameT) (IdeDeclTypeClass i)
       IdeDeclValueOperator op ->
         annotateValue (op ^. ideValueOpAlias & valueOperatorAliasT) (IdeDeclValueOperator op)
       IdeDeclTypeOperator op ->
         annotateType (op ^. ideTypeOpAlias & typeOperatorAliasT) (IdeDeclTypeOperator op)
       where
-        annotateFunction x = IdeDeclarationAnn (ann { annLocation = Map.lookup (Left (runIdentT x)) defs
+        annotateFunction x = IdeDeclarationAnn (ann { annLocation = Map.lookup (Left (P.runIdent x)) defs
                                                     , annTypeAnnotation = Map.lookup x types
                                                     })
         annotateValue x = IdeDeclarationAnn (ann {annLocation = Map.lookup (Left x) defs})

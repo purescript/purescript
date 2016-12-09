@@ -1,8 +1,4 @@
 {-# LANGUAGE DoAndIfThenElse #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE DataKinds #-}
 
 module Language.PureScript.Interactive
   ( handleCommand

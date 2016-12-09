@@ -1,6 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module Language.PureScript.Make
   (

@@ -13,9 +13,6 @@
 -- Resolves reexports for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
-
 module Language.PureScript.Ide.Reexports
   ( resolveReexports
   , prettyPrintReexportResult
@@ -53,7 +50,7 @@ prettyPrintReexportResult f ReexportResult{..}
   | otherwise =
       "Failed to resolve reexports for "
       <> f reResolved
-      <> foldMap (\(mn, ref) -> runModuleNameT mn <> show ref) reFailed
+      <> foldMap (\(mn, ref) -> P.runModuleName mn <> show ref) reFailed
 
 -- | Whether any Refs couldn't be resolved
 reexportHasFailures :: ReexportResult a -> Bool

@@ -25,7 +25,6 @@ import           Data.Aeson
 import qualified Data.Map.Lazy                       as M
 import qualified Language.PureScript                 as P
 import qualified Language.PureScript.Errors.JSON     as P
-import           Language.PureScript.Ide.Conversions
 
 type ModuleIdent = Text
 
@@ -212,9 +211,9 @@ instance ToJSON ModuleImport where
              ] ++ map (\x -> "qualifier" .= x) (maybeToList qualifier)
 
 identifierFromDeclarationRef :: P.DeclarationRef -> Text
-identifierFromDeclarationRef (P.TypeRef name _) = runProperNameT name
-identifierFromDeclarationRef (P.ValueRef ident) = runIdentT ident
-identifierFromDeclarationRef (P.TypeClassRef name) = runProperNameT name
+identifierFromDeclarationRef (P.TypeRef name _) = P.runProperName name
+identifierFromDeclarationRef (P.ValueRef ident) = P.runIdent ident
+identifierFromDeclarationRef (P.TypeClassRef name) = P.runProperName name
 identifierFromDeclarationRef _ = ""
 
 data Success =

@@ -12,8 +12,6 @@
 -- Casesplitting and adding function clauses
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings #-}
-
 module Language.PureScript.Ide.CaseSplit
        ( WildcardAnnotations()
        , explicitAnnotations
@@ -84,9 +82,9 @@ splitTypeConstructor = go []
     go _ _ = throwError (GeneralError "Failed to read TypeConstructor")
 
 prettyCtor :: WildcardAnnotations -> Constructor -> Text
-prettyCtor _ (ctorName, []) = runProperNameT ctorName
+prettyCtor _ (ctorName, []) = P.runProperName ctorName
 prettyCtor wsa (ctorName, ctorArgs) =
-  "("<> runProperNameT ctorName <> " "
+  "("<> P.runProperName ctorName <> " "
   <> T.unwords (map (prettyPrintWildcard wsa) ctorArgs) <>")"
 
 prettyPrintWildcard :: WildcardAnnotations -> P.Type -> Text
@@ -111,9 +109,9 @@ addClause :: (MonadError PscIdeError m) => Text -> WildcardAnnotations -> m [Tex
 addClause s wca = do
   (fName, fType) <- parseTypeDeclaration' s
   let args = splitFunctionType fType
-      template = runIdentT fName <> " " <>
+      template = P.runIdent fName <> " " <>
         T.unwords (map (prettyPrintWildcard wca) args) <>
-        " = ?" <> (T.strip . runIdentT $ fName)
+        " = ?" <> (T.strip . P.runIdent $ fName)
   pure [s, template]
 
 parseType' :: (MonadError PscIdeError m) =>
