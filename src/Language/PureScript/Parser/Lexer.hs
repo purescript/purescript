@@ -248,11 +248,28 @@ parseToken = P.choice
   symbolChar :: Lexer u Char
   symbolChar = P.satisfy isSymbolChar
 
+  surrogates :: Char -> (Char, Char)
+  surrogates c = (high, low)
+    where
+      (h, l) = divMod (fromEnum c - 0x10000) 0x400
+      high = toEnum (h + 0xD800)
+      low = toEnum (l + 0xDC00)
+
+  expandAstralCodePointToUTF16Surrogates :: Char -> [Char]
+  expandAstralCodePointToUTF16Surrogates c | fromEnum c > 0xFFFF = [high, low]
+    where (high, low) = surrogates c
+  expandAstralCodePointToUTF16Surrogates c = [c]
+
   parseCharLiteral :: Lexer u Char
-  parseCharLiteral = PT.charLiteral tokenParser
+  parseCharLiteral = P.try $ do {
+    c <- PT.charLiteral tokenParser;
+    if fromEnum c > 0xFFFF
+      then P.unexpected "astral code point in character literal; characters must be valid UTF-16 code units"
+      else return c
+  }
 
   parseStringLiteral :: Lexer u Text
-  parseStringLiteral = blockString <|> T.pack <$> PT.stringLiteral tokenParser
+  parseStringLiteral = blockString <|> T.pack <$> concatMap expandAstralCodePointToUTF16Surrogates <$> PT.stringLiteral tokenParser
     where
     delimiter   = P.try (P.string "\"\"\"")
     blockString = delimiter *> (T.pack <$> P.manyTill P.anyChar delimiter)

@@ -59,7 +59,7 @@ literals = mkPattern' match'
     ]
     where
     objectPropertyToString :: (Emit gen) => Text -> gen
-    objectPropertyToString s | identNeedsEscaping s = emit $ T.pack $ show s
+    objectPropertyToString s | identNeedsEscaping s = string s
                              | otherwise = emit s
   match (JSBlock _ sts) = mconcat <$> sequence
     [ return $ emit "{\n"
@@ -162,11 +162,9 @@ string s = emit $ "\"" <> T.concatMap encodeChar s <> "\""
   encodeChar '\r' = "\\r"
   encodeChar '"'  = "\\\""
   encodeChar '\\' = "\\\\"
-  encodeChar c | fromEnum c > 0xFFFF = "\\u" <> showHex' highSurrogate ("\\u" ++ showHex lowSurrogate "")
-    where
-    (h, l) = divMod (fromEnum c - 0x10000) 0x400
-    highSurrogate = h + 0xD800
-    lowSurrogate = l + 0xDC00
+  -- PureScript strings are sequences of UTF-16 code units, so this case should never be hit.
+  -- If it is somehow hit, though, output the designated Unicode replacement character U+FFFD.
+  encodeChar c | fromEnum c > 0xFFFF = "\\uFFFD"
   encodeChar c | fromEnum c > 0xFFF = "\\u" <> showHex' (fromEnum c) ""
   encodeChar c | fromEnum c > 0xFF = "\\u0" <> showHex' (fromEnum c) ""
   encodeChar c | fromEnum c < 0x10 = "\\x0" <> showHex' (fromEnum c) ""
