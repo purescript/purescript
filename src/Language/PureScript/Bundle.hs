@@ -6,6 +6,7 @@
 -- and generates the final Javascript bundle.
 module Language.PureScript.Bundle
   ( bundle
+  , bundleSM
   , guessModuleIdentifier
   , ModuleIdentifier(..)
   , moduleName
@@ -19,6 +20,7 @@ import Prelude.Compat
 
 import Control.Monad
 import Control.Monad.Error.Class
+import Control.Arrow ((&&&))
 
 import Data.Char (chr, digitToInt)
 import Data.Generics (everything, everywhere, mkQ, mkT)
@@ -33,7 +35,9 @@ import Language.JavaScript.Parser.AST
 
 import qualified Paths_purescript as Paths
 
-import System.FilePath (takeFileName, takeDirectory)
+import System.FilePath (takeFileName, takeDirectory, takeDirectory, makeRelative)
+
+import SourceMap.Types
 
 -- | The type of error messages. We separate generation and rendering of errors using a data
 -- type, in case we need to match on error types later.
@@ -98,10 +102,11 @@ data ModuleElement
   | Member JSStatement Bool String JSExpression [Key]
   | ExportsList [(ExportType, String, JSExpression, [Key])]
   | Other JSStatement
+  | Skip JSStatement
   deriving (Show)
 
 -- | A module is just a list of elements of the types listed above.
-data Module = Module ModuleIdentifier [ModuleElement] deriving (Show)
+data Module = Module ModuleIdentifier (Maybe FilePath) [ModuleElement] deriving (Show)
 
 -- | Prepare an error message for consumption by humans.
 printErrorMessage :: ErrorMessage -> [String]
@@ -159,7 +164,7 @@ checkImportPath name _ _ = Left name
 --
 --    where name is the name of a member defined in the current module.
 withDeps :: Module -> Module
-withDeps (Module modulePath es) = Module modulePath (map expandDeps es)
+withDeps (Module modulePath fn es) = Module modulePath fn (map expandDeps es)
   where
   -- | Collects all modules which are imported, so that we can identify dependencies of the first type.
   imports :: [(String, ModuleIdentifier)]
@@ -248,9 +253,9 @@ trailingCommaList (JSCTLNone l) = commaList l
 --
 -- Each type of module element is matched using pattern guards, and everything else is bundled into the
 -- Other constructor.
-toModule :: forall m. (MonadError ErrorMessage m) => S.Set String -> ModuleIdentifier -> JSAST -> m Module
-toModule mids mid top
-  | JSAstProgram smts _ <- top = Module mid <$> traverse toModuleElement smts
+toModule :: forall m. (MonadError ErrorMessage m) => S.Set String -> ModuleIdentifier -> Maybe FilePath -> JSAST -> m Module
+toModule mids mid filename top
+  | JSAstProgram smts _ <- top = Module mid filename <$> traverse toModuleElement smts
   | otherwise = err InvalidTopLevel
   where
   err = throwError . ErrorInModule mid
@@ -389,7 +394,7 @@ compile modules entryPoints = filteredModules
   -- | The vertex set
   verts :: [(ModuleElement, Key, [Key])]
   verts = do
-    Module mid els <- modules
+    Module mid _ els <- modules
     concatMap (toVertices mid) els
     where
     -- | Create a set of vertices for a module element.
@@ -425,13 +430,20 @@ compile modules entryPoints = filteredModules
   filteredModules = map filterUsed modules
     where
     filterUsed :: Module -> Module
-    filterUsed (Module mid ds) = Module mid (map filterExports (go ds))
+    filterUsed (Module mid fn ds) = Module mid fn (map filterExports (go ds))
       where
       go :: [ModuleElement] -> [ModuleElement]
       go [] = []
       go (d : rest)
-        | not (isDeclUsed d) = go rest
+        | not (isDeclUsed d) = skipDecl d : go rest
         | otherwise = d : go rest
+
+      skipDecl :: ModuleElement -> ModuleElement
+      skipDecl (Require s _ _) = Skip s
+      skipDecl (Member s _ _ _ _) = Skip s
+      skipDecl (ExportsList _) = Skip (JSEmptyStatement JSNoAnnot)
+      skipDecl (Other s) = Skip s
+      skipDecl (Skip s) = Skip s
 
       -- | Filter out the exports for members which aren't used.
       filterExports :: ModuleElement -> ModuleElement
@@ -453,7 +465,7 @@ sortModules :: [Module] -> [Module]
 sortModules modules = map (\v -> case nodeFor v of (n, _, _) -> n) (reverse (topSort graph))
   where
   (graph, nodeFor, _) = graphFromEdges $ do
-    m@(Module mid els) <- modules
+    m@(Module mid _ els) <- modules
     return (m, mid, mapMaybe getKey els)
 
   getKey :: ModuleElement -> Maybe ModuleIdentifier
@@ -466,12 +478,13 @@ sortModules modules = map (\v -> case nodeFor v of (n, _, _) -> n) (reverse (top
 --
 -- If a module is empty, we don't want to generate code for it.
 isModuleEmpty :: Module -> Bool
-isModuleEmpty (Module _ els) = all isElementEmpty els
+isModuleEmpty (Module _ _ els) = all isElementEmpty els
   where
   isElementEmpty :: ModuleElement -> Bool
   isElementEmpty (ExportsList exps) = null exps
   isElementEmpty Require{} = True
   isElementEmpty (Other _) = True
+  isElementEmpty (Skip _) = True
   isElementEmpty _ = False
 
 -- | Generate code for a set of modules, including a call to main().
@@ -490,16 +503,62 @@ isModuleEmpty (Module _ els) = all isElementEmpty els
 codeGen :: Maybe String -- ^ main module
         -> String -- ^ namespace
         -> [Module] -- ^ input modules
-        -> String
-codeGen optionsMainModule optionsNamespace ms =  renderToString (JSAstProgram (prelude : concatMap moduleToJS ms ++ maybe [] runMain optionsMainModule) JSNoAnnot)
+        -> Maybe String -- ^ output filename
+        -> (Maybe SourceMapping, String)
+codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping outFileOpt, rendered)
   where
-  moduleToJS :: Module -> [JSStatement]
-  moduleToJS (Module mn ds) = wrap (moduleName mn) (indent (concatMap declToJS ds))
+  rendered = renderToString (JSAstProgram (prelude : concatMap fst modulesJS ++ maybe [] runMain optionsMainModule) JSNoAnnot)
+
+  sourceMapping :: String -> SourceMapping
+  sourceMapping outFile = SourceMapping {
+      smFile = outFile,
+      smSourceRoot = Nothing,
+      smMappings = concat $
+        zipWith3 (\file (pos :: Int) positions ->
+          map (\(porig, pgen) -> Mapping {
+                mapOriginal = Just (Pos (fromIntegral $ porig + 1) 0)
+              , mapSourceFile = pathToFile <$> file
+              , mapGenerated = (Pos (fromIntegral $ pos + pgen) 0)
+              , mapName = Nothing
+              })
+            (offsets (0,0) (Right 1 : positions)))
+          moduleFns
+          (scanl (+) (3 + moduleLength [prelude]) (map (3+) moduleLengths)) -- 3 lines between each module & at top
+          (map snd modulesJS)
+    }
     where
-    declToJS :: ModuleElement -> [JSStatement]
-    declToJS (Member n _ _ _ _) = [n]
-    declToJS (Other n) = [n]
-    declToJS (Require _ nm req) =
+      pathToFile = makeRelative (takeDirectory outFile)
+
+      offsets (m, n) (Left d:rest) = offsets (m+d, n) rest
+      offsets (m, n) (Right d:rest) = map ((m+) &&& (n+)) [0 .. d - 1] ++ offsets (m+d, n+d) rest
+      offsets _ _ = []
+
+  moduleLength :: [JSStatement] -> Int
+  moduleLength = everything (+) (mkQ 0 countw)
+    where
+      countw :: CommentAnnotation -> Int
+      countw (WhiteSpace _ s) = length (filter (== '\n') s)
+      countw _ = 0
+
+  moduleLengths :: [Int]
+  moduleLengths = map (sum . map (either (const 0) id) . snd) modulesJS
+  moduleFns = map (\(Module _ fn _) -> fn) ms
+
+  modulesJS = map moduleToJS ms
+
+  moduleToJS :: Module -> ([JSStatement], [Either Int Int])
+  moduleToJS (Module mn _ ds) = (wrap (moduleName mn) (indent (concat jsDecls)), lengths)
+    where
+    (jsDecls, lengths) = unzip $ map declToJS ds
+
+    withLength :: [JSStatement] -> ([JSStatement], Either Int Int)
+    withLength n = (n, Right $ moduleLength n)
+
+    declToJS :: ModuleElement -> ([JSStatement], Either Int Int)
+    declToJS (Member n _ _ _ _) = withLength [n]
+    declToJS (Other n) = withLength [n]
+    declToJS (Skip n) = ([], Left $ moduleLength [n])
+    declToJS (Require _ nm req) = withLength
       [
         JSVariable lfsp
           (cList [
@@ -507,9 +566,10 @@ codeGen optionsMainModule optionsNamespace ms =  renderToString (JSAstProgram (p
               (JSVarInit sp $ either require (moduleReference sp . moduleName) req )
           ]) (JSSemi JSNoAnnot)
       ]
-    declToJS (ExportsList exps) = map toExport exps
+    declToJS (ExportsList exps) = withLength $ map toExport exps
 
       where
+
       toExport :: (ExportType, String, JSExpression, [Key]) -> JSStatement
       toExport (_, nm, val, _) =
         JSAssignStatement
@@ -612,26 +672,39 @@ codeGen optionsMainModule optionsNamespace ms =  renderToString (JSAstProgram (p
 -- | The bundling function.
 -- This function performs dead code elimination, filters empty modules
 -- and generates and prints the final Javascript bundle.
+bundleSM :: (MonadError ErrorMessage m)
+       => [(ModuleIdentifier, Maybe FilePath, String)] -- ^ The input modules.  Each module should be javascript rendered from 'Language.PureScript.Make' or @psc@.
+       -> [ModuleIdentifier] -- ^ Entry points.  These module identifiers are used as the roots for dead-code elimination
+       -> Maybe String -- ^ An optional main module.
+       -> String -- ^ The namespace (e.g. PS).
+       -> Maybe FilePath -- ^ The output file name (if there is one - in which case generate source map)
+       -> m (Maybe SourceMapping, String)
+bundleSM inputStrs entryPoints mainModule namespace outFilename = do
+  let mid (a,_,_) = a
+  forM_ mainModule $ \mname ->
+    when (mname `notElem` map (moduleName . mid) inputStrs) (throwError (MissingMainModule mname))
+  forM_ entryPoints $ \mIdent ->
+    when (mIdent `notElem` map mid inputStrs) (throwError (MissingEntryPoint (moduleName mIdent)))
+  input <- forM inputStrs $ \(ident, filename, js) -> do
+                ast <- either (throwError . ErrorInModule ident . UnableToParseModule) pure $ parse js (moduleName ident)
+                return (ident, filename, ast)
+
+  let mids = S.fromList (map (moduleName . mid) input)
+
+  modules <- traverse (fmap withDeps . (\(a,fn,c) -> toModule mids a fn c)) input
+
+  let compiled = compile modules entryPoints
+      sorted   = sortModules (filter (not . isModuleEmpty) compiled)
+
+  return (codeGen mainModule namespace sorted outFilename)
+
+-- | The bundling function.
+-- This function performs dead code elimination, filters empty modules
+-- and generates and prints the final Javascript bundle.
 bundle :: (MonadError ErrorMessage m)
        => [(ModuleIdentifier, String)] -- ^ The input modules.  Each module should be javascript rendered from 'Language.PureScript.Make' or @psc@.
        -> [ModuleIdentifier] -- ^ Entry points.  These module identifiers are used as the roots for dead-code elimination
        -> Maybe String -- ^ An optional main module.
        -> String -- ^ The namespace (e.g. PS).
        -> m String
-bundle inputStrs entryPoints mainModule namespace = do
-  forM_ mainModule $ \mname ->
-    when (mname `notElem` map (moduleName . fst) inputStrs) (throwError (MissingMainModule mname))
-  forM_ entryPoints $ \mIdent ->
-    when (mIdent `notElem` map fst inputStrs) (throwError (MissingEntryPoint (moduleName mIdent)))
-  input <- forM inputStrs $ \(ident, js) -> do
-                ast <- either (throwError . ErrorInModule ident . UnableToParseModule) pure $ parse js (moduleName ident)
-                return (ident, ast)
-
-  let mids = S.fromList (map (moduleName . fst) input)
-
-  modules <- traverse (fmap withDeps . uncurry (toModule mids)) input
-
-  let compiled = compile modules entryPoints
-      sorted   = sortModules (filter (not . isModuleEmpty) compiled)
-
-  return (codeGen mainModule namespace sorted)
+bundle inputStrs entryPoints mainModule namespace = snd <$> bundleSM (map (\(a,b) -> (a,Nothing,b)) inputStrs) entryPoints mainModule namespace Nothing
