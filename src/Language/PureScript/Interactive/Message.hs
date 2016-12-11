@@ -27,8 +27,8 @@ helpMessage = "The following commands are available:\n\n    " ++
                ]
 
   extraHelp =
-    "Further information is available on the PureScript wiki:\n" ++
-    " --> https://github.com/purescript/purescript/wiki/psci"
+    "Further information is available on the PureScript documentation repository:\n" ++
+    " --> https://github.com/purescript/documentation/blob/master/PSCi.md"
 
 -- | The welcome prologue.
 prologueMessage :: String
@@ -48,7 +48,7 @@ supportModuleMessage = unlines
   , ""
   , "  psc-package install psci-support"
   , ""
-  , "For help getting started, visit http://wiki.purescript.org/PSCi"
+  , "For help getting started, visit https://github.com/purescript/documentation/blob/master/PSCi.md"
   ]
 
 -- | The quit message.

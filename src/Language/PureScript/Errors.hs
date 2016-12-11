@@ -289,8 +289,8 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gTypeSearch (TSBefore env) = pure (TSBefore env)
   gTypeSearch (TSAfter result) = TSAfter <$> traverse (traverse f) result
 
-wikiUri :: ErrorMessage -> Text
-wikiUri e = "https://github.com/purescript/purescript/wiki/Error-Code-" <> errorCode e
+errorDocUri :: ErrorMessage -> Text
+errorDocUri e = "https://github.com/purescript/documentation/blob/master/errors/" <> errorCode e <> ".md"
 
 -- TODO Other possible suggestions:
 -- WildcardInferredType - source span not small enough
@@ -373,7 +373,7 @@ data PPEOptions = PPEOptions
   { ppeCodeColor :: Maybe (ANSI.ColorIntensity, ANSI.Color) -- ^ Color code with this color... or not
   , ppeFull      :: Bool -- ^ Should write a full error message?
   , ppeLevel     :: Level -- ^ Should this report an error or a warning?
-  , ppeShowWiki  :: Bool -- ^ Should show a link to error message's wiki page?
+  , ppeShowDocs  :: Bool -- ^ Should show a link to error message's doc page?
   }
 
 -- | Default options for PPEOptions
@@ -382,7 +382,7 @@ defaultPPEOptions = PPEOptions
   { ppeCodeColor = Just defaultCodeColor
   , ppeFull      = False
   , ppeLevel     = Error
-  , ppeShowWiki  = True
+  , ppeShowDocs  = True
   }
 
 
@@ -390,7 +390,7 @@ defaultPPEOptions = PPEOptions
 -- Pretty print a single error, simplifying if necessary
 --
 prettyPrintSingleError :: PPEOptions -> ErrorMessage -> Box.Box
-prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalState defaultUnknownMap $ do
+prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalState defaultUnknownMap $ do
   em <- onTypesInErrorMessageM replaceUnknowns (if full then e else simplifyErrorMessage e)
   um <- get
   return (prettyPrintErrorMessage um em)
@@ -405,10 +405,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showWiki) e = flip evalS
       ] ++
       maybe [] (return . Box.moveDown 1) typeInformation ++
       [ Box.moveDown 1 $ paras
-          [ line $ "See " <> wikiUri e <> " for more information, "
+          [ line $ "See " <> errorDocUri e <> " for more information, "
           , line $ "or to contribute content related to this " <> levelText <> "."
           ]
-      | showWiki
+      | showDocs
       ]
     where
     typeInformation :: Maybe Box.Box
