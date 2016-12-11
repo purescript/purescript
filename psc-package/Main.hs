@@ -119,7 +119,7 @@ readPackageSet PackageConfig{ set } = do
   let dbFile = ".psc-package" </> fromText set </> ".set" </> "packages.json"
   exists <- testfile dbFile
   unless exists $ do
-    echo "packages.json does not exist"
+    echo $ format (fp%" does not exist") dbFile
     exit (ExitFailure 1)
   mdb <- Aeson.decodeStrict . encodeUtf8 <$> readTextFile dbFile
   case mdb of
