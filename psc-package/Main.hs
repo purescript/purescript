@@ -26,6 +26,7 @@ import qualified Options.Applicative as Opts
 import qualified Paths_purescript as Paths
 import qualified System.IO as IO
 import           Turtle hiding (fold)
+import 			 Control.Lens((<.), toListOf, to, ifolded, withIndex)
 
 packageFile :: Path.FilePath
 packageFile = "psc-package.json"
@@ -128,6 +129,9 @@ readPackageSet PackageConfig{ set } = do
       exit (ExitFailure 1)
     Just db -> return db
 
+getGitRepoList :: PackageConfig -> [(PackageName, (Repo, Version))]
+getGitRepoList = toListOf ((ifolded <. to (repo &&& version)) . withIndex)
+
 installOrUpdate :: PackageConfig -> Text -> PackageInfo -> IO ()
 installOrUpdate PackageConfig{ set } pkgName PackageInfo{ repo, version } = do
   let pkgDir = ".psc-package" </> fromText set </> fromText pkgName </> fromText version
@@ -224,6 +228,24 @@ listSourcePaths = do
   paths <- getSourcePaths pkg db depends
   traverse_ (echo . pathToTextUnsafe) paths
 
+verifyPackageSet :: IO ()
+verifyPackageSet  = do
+  -- Clone all repos into the packages/ directory
+  ps <- readPackageFile 
+  paths <- fromList <$>
+    (for (getGitRepoList ps) (\(name, (repo, version)) -> do
+      let pkgDir = ".psc-package"  </> fromText repo </> fromText name </> fromText version
+      exists <- testdir pkgDir
+      unless exists $ cloneShallow repo version pkgDir
+      return (name, pkgDir)))
+
+  for_ (toList ps) $ \(name, PackageSpec{..}) -> do
+    let dirFor = fromMaybe (error "verifyPackageSet: no directory") . (`M.lookup` paths)
+    echo ("Building package " <> name)
+    let srcGlobs = map ((</>"src"</>"**"</>"*.purs") . toTextUnsafe . dirFor) (name : dependencies)
+	procs "psc" srcGlobs empty
+
+
 exec :: Text -> IO ()
 exec exeName = do
   pkg@PackageConfig{..} <- readPackageFile
@@ -275,7 +297,10 @@ main = do
         , Opts.command "available"
             (Opts.info (pure listPackages)
             (Opts.progDesc "List all packages available in the package set"))
-        ]
+		, Opts.command "verify-set"
+			(Opts.info (pure verifyPackageSet)
+			(Opts.profDesc "Verify all packages in the package set"))	
+		]
       where
         pkg = Opts.strArgument $
              Opts.metavar "PACKAGE"
