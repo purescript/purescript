@@ -32,10 +32,11 @@ import Language.PureScript.Names
 import Language.PureScript.Pretty
 import Language.PureScript.Traversals
 import Language.PureScript.Types
-import Language.PureScript.Pretty.Common (endWith)
+import Language.PureScript.PSString (renderPSString)
+import Language.PureScript.Label (Label(..))
+import Language.PureScript.Pretty.Common (before, endWith)
 import qualified Language.PureScript.Bundle as Bundle
 import qualified Language.PureScript.Constants as C
-import Language.PureScript.Pretty.Common (before)
 
 import qualified System.Console.ANSI as ANSI
 
@@ -264,7 +265,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
   gSimple (NoInstanceFound con) = NoInstanceFound <$> overConstraintArgs (traverse f) con
-  gSimple (AmbiguousTypeVariables t con) = AmbiguousTypeVariables <$> (f t) <*> pure con
+  gSimple (AmbiguousTypeVariables t con) = AmbiguousTypeVariables <$> f t <*> pure con
   gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> pure insts
   gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
   gSimple (CannotDerive cl ts) = CannotDerive cl <$> traverse f ts
@@ -563,12 +564,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
             sortRows t1 t2 = (t1, t2)
 
             -- Put the common labels last
-            sortRows' :: ([(Text, Type)], Type) -> ([(Text, Type)], Type) -> (Type, Type)
+            sortRows' :: ([(Label, Type)], Type) -> ([(Label, Type)], Type) -> (Type, Type)
             sortRows' (s1, r1) (s2, r2) =
-              let common :: [(Text, (Type, Type))]
+              let common :: [(Label, (Type, Type))]
                   common = sortBy (comparing fst) [ (name, (t1, t2)) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
 
-                  sd1, sd2 :: [(Text, Type)]
+                  sd1, sd2 :: [(Label, Type)]
                   sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
                   sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
               in ( rowFromList (sortBy (comparing fst) sd1 ++ map (fst &&& fst . snd) common, r1)
@@ -670,8 +671,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
             ]
     renderSimpleErrorMessage (CannotFindDerivingType nm) =
       line $ "Cannot derive a type class instance, because the type declaration for " <> markCode (runProperName nm) <> " could not be found."
-    renderSimpleErrorMessage (DuplicateLabel l expr) =
-      paras $ [ line $ "Label " <> markCode l <> " appears more than once in a row type." ]
+    renderSimpleErrorMessage (DuplicateLabel (Label l) expr) =
+      paras $ [ line $ "Label " <> T.pack (show l) <> " appears more than once in a row type." ]
                        <> foldMap (\expr' -> [ line "Relevant expression: "
                                              , markCodeBox $ indent $ prettyPrintValue valueDepth expr'
                                              ]) expr
@@ -703,10 +704,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
             , line "does not have type"
             , markCodeBox $ indent $ typeAsBox ty
             ]
-    renderSimpleErrorMessage (PropertyIsMissing prop) =
-      line $ "Type of expression lacks required label " <> markCode prop <> "."
-    renderSimpleErrorMessage (AdditionalProperty prop) =
-      line $ "Type of expression contains additional label " <> markCode prop <> "."
+    renderSimpleErrorMessage (PropertyIsMissing (Label prop)) =
+      line $ "Type of expression lacks required label " <> T.pack (show prop) <> "."
+    renderSimpleErrorMessage (AdditionalProperty (Label prop)) =
+      line $ "Type of expression contains additional label " <> T.pack (show prop) <> "."
     renderSimpleErrorMessage TypeSynonymInstance =
       line "Type class instances for type synonyms are disallowed."
     renderSimpleErrorMessage (OrphanInstance nm cnm ts) =
@@ -1263,7 +1264,7 @@ renderBox = unlines
   whiteSpace = all isSpace
 
 toTypelevelString :: Type -> Maybe Box.Box
-toTypelevelString (TypeLevelString s) = Just $ Box.text (T.unpack s)
+toTypelevelString (TypeLevelString s) = Just $ Box.text $ T.unpack $ renderPSString s
 toTypelevelString (TypeApp (TypeConstructor f) x)
   | f == primName "TypeString" = Just $ typeAsBox x
 toTypelevelString (TypeApp (TypeApp (TypeConstructor f) x) ret)

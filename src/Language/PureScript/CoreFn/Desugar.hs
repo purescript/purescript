@@ -24,6 +24,7 @@ import Language.PureScript.Environment
 import Language.PureScript.Names
 import Language.PureScript.Sugar.TypeClasses (typeClassMemberName, superClassDictionaryNames)
 import Language.PureScript.Types
+import Language.PureScript.PSString (mkString)
 import qualified Language.PureScript.AST as A
 
 -- |
@@ -119,7 +120,7 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
     in foldl (App (ss, com, Nothing, Nothing)) ctor args
   exprToCoreFn ss com ty  (A.TypeClassDictionaryAccessor _ ident) =
     Abs (ss, com, ty, Nothing) (Ident "dict")
-      (Accessor nullAnn (runIdent ident) (Var nullAnn $ Qualified Nothing (Ident "dict")))
+      (Accessor nullAnn (mkString $ runIdent ident) (Var nullAnn $ Qualified Nothing (Ident "dict")))
   exprToCoreFn _ com ty (A.PositionedValue ss com1 v) =
     exprToCoreFn (Just ss) (com ++ com1) ty v
   exprToCoreFn _ _ _ e =
@@ -265,7 +266,7 @@ mkTypeClassConstructor :: Maybe SourceSpan -> [Comment] -> [Constraint] -> [A.De
 mkTypeClassConstructor ss com [] [] = Literal (ss, com, Nothing, Just IsTypeClassConstructor) (ObjectLiteral [])
 mkTypeClassConstructor ss com supers members =
   let args@(a:as) = sort $ map typeClassMemberName members ++ superClassDictionaryNames supers
-      props = [ (arg, Var nullAnn $ Qualified Nothing (Ident arg)) | arg <- args ]
+      props = [ (mkString arg, Var nullAnn $ Qualified Nothing (Ident arg)) | arg <- args ]
       dict = Literal nullAnn (ObjectLiteral props)
   in Abs (ss, com, Nothing, Just IsTypeClassConstructor)
          (Ident a)

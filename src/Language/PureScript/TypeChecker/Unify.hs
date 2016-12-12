@@ -31,6 +31,7 @@ import Language.PureScript.Crash
 import Language.PureScript.Errors
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Skolems
+import Language.PureScript.Label (Label(..))
 import Language.PureScript.Types
 
 -- | Generate a fresh type variable
@@ -139,7 +140,7 @@ unifyRows r1 r2 =
     forM_ int (uncurry unifyTypes)
     unifyRows' sd1 r1' sd2 r2'
   where
-  unifyRows' :: [(Text, Type)] -> Type -> [(Text, Type)] -> Type -> m ()
+  unifyRows' :: [(Label, Type)] -> Type -> [(Label, Type)] -> Type -> m ()
   unifyRows' [] (TUnknown u) sd r = solveType u (rowFromList (sd, r))
   unifyRows' sd r [] (TUnknown u) = solveType u (rowFromList (sd, r))
   unifyRows' sd1 (TUnknown u1) sd2 (TUnknown u2) = do

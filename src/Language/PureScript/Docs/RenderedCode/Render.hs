@@ -27,6 +27,7 @@ import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.Pretty.Kinds
 import Language.PureScript.Types
+import Language.PureScript.Label (Label(..), renderPSLabel)
 
 typeLiterals :: Pattern () Type RenderedCode
 typeLiterals = mkPattern match
@@ -79,13 +80,13 @@ renderRow = uncurry renderRow' . rowToList
   where
   renderRow' h t = renderHead h <> renderTail t
 
-renderHead :: [(Text, Type)] -> RenderedCode
+renderHead :: [(Label, Type)] -> RenderedCode
 renderHead = mintersperse (syntax "," <> sp) . map renderLabel
 
-renderLabel :: (Text, Type) -> RenderedCode
+renderLabel :: (Label, Type) -> RenderedCode
 renderLabel (label, ty) =
   mintersperse sp
-    [ ident label
+    [ syntax $ renderPSLabel label
     , syntax "::"
     , renderType ty
     ]

@@ -37,13 +37,15 @@ import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
+import Language.PureScript.Label (Label(..))
+import Language.PureScript.PSString (PSString, mkString)
 import qualified Language.PureScript.Constants as C
 
 -- | Describes what sort of dictionary to generate for type class instances
 data Evidence
   = NamedInstance (Qualified Ident)
   -- ^ An existing named instance
-  | IsSymbolInstance Text
+  | IsSymbolInstance PSString
   -- ^ Computed instance of the IsSymbol type class for a given Symbol literal
   | CompareSymbolInstance
   -- ^ Computed instance of CompareSymbol
@@ -319,7 +321,7 @@ entails SolverOptions{..} constraint context hints =
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName a) -> Integer -> Expr
         subclassDictionaryValue dict superclassName index =
-          App (Accessor (C.__superclass_ <> showQualified runProperName superclassName <> "_" <> T.pack (show index))
+          App (Accessor (mkString (C.__superclass_ <> showQualified runProperName superclassName <> "_" <> T.pack (show index)))
                         dict)
               valUndefined
 
@@ -387,7 +389,7 @@ matches deps TypeClassDictionaryInScope{..} tys = do
         sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
         sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
 
-        go :: [(Text, Type)] -> Type -> [(Text, Type)] -> Type -> (Bool, Matching [Type])
+        go :: [(Label, Type)] -> Type -> [(Label, Type)] -> Type -> (Bool, Matching [Type])
         go l  (KindedType t1 _)  r  t2                 = go l t1 r t2
         go l  t1                 r  (KindedType t2 _)  = go l t1 r t2
         go [] REmpty             [] REmpty             = (True, M.empty)
@@ -429,7 +431,7 @@ matches deps TypeClassDictionaryInScope{..} tys = do
               sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
           in all (uncurry typesAreEqual) int && go sd1 r1' sd2 r2'
         where
-          go :: [(Text, Type)] -> Type -> [(Text, Type)] -> Type -> Bool
+          go :: [(Label, Type)] -> Type -> [(Label, Type)] -> Type -> Bool
           go l  (KindedType t1 _) r  t2                = go l t1 r t2
           go l  t1                r  (KindedType t2 _) = go l t1 r t2
           go [] (TUnknown u1)     [] (TUnknown u2)     | u1 == u2 = True
