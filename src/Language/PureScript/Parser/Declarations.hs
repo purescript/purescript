@@ -386,7 +386,7 @@ parseLet = do
   reserved "let"
   C.indented
   ds <- C.mark $ P.many1 (C.same *> parseLocalDeclaration)
-  C.indented
+  C.indented P.<?> "properly indented in keyword"
   reserved "in"
   result <- parseValue
   return $ Let ds result
