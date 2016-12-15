@@ -86,6 +86,7 @@ This file lists the contributors to the PureScript compiler project, and the ter
 - [@brandonhamilton](https://github.com/brandonhamilton) (Brandon Hamilton) My existing contributions and all future contributions until further notice are Copyright Brandon Hamilton, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 - [@bbqbaron](https://github.com/bbqbaron) (Eric Loren) My existing contributions and all future contributions until further notice are Copyright Eric Loren, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 - [@RyanGlScott](https://github.com/RyanGlScott) (Ryan Scott) My existing contributions and all future contributions until further notice are Copyright Ryan Scott, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
+- [@seungha-kim](https://github.com/seungha-kim) (Seungha Kim) My existing contributions and all future contributions until further notice are Copyright Seungha Kim, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT).
 
 ### Companies
 
