@@ -20,6 +20,8 @@ data Kind
   | FunKind Kind Kind
   -- | Type-level strings
   | Symbol
+  -- | Type-level ordering
+  | Ordering
   deriving (Show, Eq, Ord)
 
 $(A.deriveJSON A.defaultOptions ''Kind)

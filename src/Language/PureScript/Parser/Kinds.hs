@@ -21,11 +21,15 @@ parseBang = const Bang <$> symbol' "!"
 parseSymbol :: TokenParser Kind
 parseSymbol = const Symbol <$> uname' "Symbol"
 
+parseOrdering :: TokenParser Kind
+parseOrdering = const Ordering <$> uname' "Ordering"
+
 parseTypeAtom :: TokenParser Kind
 parseTypeAtom = indented *> P.choice
             [ parseStar
             , parseBang
             , parseSymbol
+            , parseOrdering
             , parens parseKind
             ]
 -- |

@@ -335,6 +335,17 @@ pattern Partial = Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName 
 pattern Fail :: Qualified (ProperName 'ClassName)
 pattern Fail = Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Fail")
 
+-- Type-level ordering
+
+typeLT :: Text
+typeLT = "LT"
+
+typeEQ :: Text
+typeEQ = "EQ"
+
+typeGT :: Text
+typeGT = "GT"
+
 -- Code Generation
 
 __superclass_ :: Text

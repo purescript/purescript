@@ -305,6 +305,9 @@ primTypes =
     , (primName "Fail",     (FunKind Symbol Star, ExternData))
     , (primName "TypeString", (FunKind Star Symbol, ExternData))
     , (primName "TypeConcat", (FunKind Symbol (FunKind Symbol Symbol), ExternData))
+    , (primName C.typeLT, (Ordering, ExternData))
+    , (primName C.typeEQ, (Ordering, ExternData))
+    , (primName C.typeGT, (Ordering, ExternData))
     ]
 
 -- |

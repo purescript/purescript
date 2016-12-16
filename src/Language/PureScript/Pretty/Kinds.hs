@@ -24,6 +24,7 @@ typeLiterals = mkPattern match
   match Star = Just "*"
   match Bang = Just "!"
   match Symbol = Just "Symbol"
+  match Ordering = Just "Ordering"
   match (KUnknown u) = Just $ 'u' : show u
   match _ = Nothing
 
