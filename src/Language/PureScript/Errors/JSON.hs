@@ -52,7 +52,7 @@ toJSONError verbose level e =
   JSONError (toErrorPosition <$> sspan)
             (P.renderBox (P.prettyPrintSingleError (P.PPEOptions Nothing verbose level False) (P.stripModuleAndSpan e)))
             (P.errorCode e)
-            (P.wikiUri e)
+            (P.errorDocUri e)
             (P.spanName <$> sspan)
             (P.runModuleName <$> P.errorModule e)
             (toSuggestion e)
