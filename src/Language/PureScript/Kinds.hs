@@ -6,6 +6,8 @@ import Prelude.Compat
 
 import qualified Data.Aeson.TH as A
 
+import Language.PureScript.Names
+
 -- | The data type of kinds
 data Kind
   -- | Unification variable of type Kind
@@ -20,6 +22,8 @@ data Kind
   | FunKind Kind Kind
   -- | Type-level strings
   | Symbol
+  -- | A kind constructor
+  | KindConstructor (Qualified (ProperName 'KindName))
   deriving (Show, Eq, Ord)
 
 $(A.deriveJSON A.defaultOptions ''Kind)

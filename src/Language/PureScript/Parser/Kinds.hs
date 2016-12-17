@@ -21,18 +21,23 @@ parseBang = const Bang <$> symbol' "!"
 parseSymbol :: TokenParser Kind
 parseSymbol = const Symbol <$> uname' "Symbol"
 
-parseTypeAtom :: TokenParser Kind
-parseTypeAtom = indented *> P.choice
+parseKindConstructor :: TokenParser Kind
+parseKindConstructor = KindConstructor <$> parseQualified kindName
+
+parseKindAtom :: TokenParser Kind
+parseKindAtom = indented *> P.choice
             [ parseStar
             , parseBang
             , parseSymbol
+            , parseKindConstructor
             , parens parseKind
             ]
+
 -- |
 -- Parse a kind
 --
 parseKind :: TokenParser Kind
-parseKind = P.buildExpressionParser operators parseTypeAtom P.<?> "kind"
+parseKind = P.buildExpressionParser operators parseKindAtom P.<?> "kind"
   where
   operators = [ [ P.Prefix (symbol' "#" >> return Row) ]
               , [ P.Infix (rarrow >> return FunKind) P.AssocRight ] ]

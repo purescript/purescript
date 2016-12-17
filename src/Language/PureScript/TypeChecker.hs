@@ -274,6 +274,10 @@ typeCheckAll moduleName _ = traverse go
     env <- getEnv
     putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (kind, ExternData) (types env) }
     return d
+  go (d@(ExternKindDeclaration name)) = do
+    env <- getEnv
+    putEnv $ env { kinds = S.insert (Qualified (Just moduleName) name) (kinds env) }
+    return d
   go (d@(ExternDeclaration name ty)) = do
     warnAndRethrow (addHint (ErrorInForeignImport name)) $ do
       env <- getEnv

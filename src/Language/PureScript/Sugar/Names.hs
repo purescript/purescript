@@ -98,6 +98,9 @@ desugarImportsWithEnv externs modules = do
     exportedRefs :: Ord a => (DeclarationRef -> Maybe a) -> M.Map a ModuleName
     exportedRefs f = M.fromList $ (, efModuleName) <$> mapMaybe f efExports
 
+    exportedKinds :: M.Map (ProperName 'KindName) ModuleName
+    exportedKinds = exportedRefs getKindRef
+
   updateEnv :: ([Module], Env) -> Module -> m ([Module], Env)
   updateEnv (ms, env) m@(Module ss _ mn _ refs) = do
     members <- findExportable m
@@ -128,6 +131,7 @@ elaborateExports exps (Module ss coms mn decls refs) =
     ++ go TypeClassRef exportedTypeClasses
     ++ go ValueRef exportedValues
     ++ go ValueOpRef exportedValueOps
+    ++ go KindRef exportedKinds
     ++ maybe [] (filter isModuleRef) refs
   where
 

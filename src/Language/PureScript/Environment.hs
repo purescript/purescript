@@ -36,6 +36,8 @@ data Environment = Environment
   -- ^ Available type class dictionaries
   , typeClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
   -- ^ Type classes
+  , kinds :: S.Set (Qualified (ProperName 'KindName))
+  -- ^ Kinds in scope
   } deriving Show
 
 -- | Information about a type class
@@ -70,7 +72,7 @@ data FunctionalDependency = FunctionalDependency
 -- The initial environment with no values and only the default javascript types defined
 --
 initEnvironment :: Environment
-initEnvironment = Environment M.empty primTypes M.empty M.empty M.empty primClasses
+initEnvironment = Environment M.empty primTypes M.empty M.empty M.empty primClasses S.empty
 
 -- |
 -- A constructor for TypeClassData that computes which type class arguments are fully determined.

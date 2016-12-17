@@ -16,6 +16,7 @@ import Data.Text (Text)
 
 import Language.PureScript.Crash
 import Language.PureScript.Kinds
+import Language.PureScript.Names
 import Language.PureScript.Pretty.Common
 
 typeLiterals :: Pattern () Kind String
@@ -25,6 +26,12 @@ typeLiterals = mkPattern match
   match Bang = Just "!"
   match Symbol = Just "Symbol"
   match (KUnknown u) = Just $ 'u' : show u
+  match (KindConstructor (Qualified _ name)) =
+    Just (T.unpack (runProperName name))
+    -- TODO: the following is what we do for TypeConstructor, however here we
+    --       aren't using RenderedCode, and secondly importing these functions
+    --       causes a cycle
+    -- Just (ctor (T.unpack (runProperName name)) (maybeToContainingModule mn))
   match _ = Nothing
 
 matchRow :: Pattern () Kind ((), Kind)

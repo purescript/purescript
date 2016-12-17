@@ -200,6 +200,8 @@ handleShowImportedModules = do
     Just $ N.runIdent ident
   showRef (P.ModuleRef name) =
     Just $ "module " <> N.runModuleName name
+  showRef (P.KindRef pn) =
+    Just $ "kind " <> N.runProperName pn
   showRef (P.ReExportRef _ _) =
     Nothing
   showRef (P.PositionedDeclarationRef _ _ ref) =

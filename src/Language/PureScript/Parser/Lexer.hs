@@ -43,6 +43,7 @@ module Language.PureScript.Parser.Lexer
   , lname'
   , qualifier
   , tyname
+  , kiname
   , dconsname
   , uname
   , uname'
@@ -474,6 +475,12 @@ tyname = token go P.<?> "type name"
   go (UName s) = Just s
   go _ = Nothing
 
+kiname :: TokenParser Text
+kiname = token go P.<?> "kind name"
+  where
+  go (UName s) = Just s
+  go _ = Nothing
+
 dconsname :: TokenParser Text
 dconsname = token go P.<?> "data constructor name"
   where
@@ -549,6 +556,7 @@ reservedPsNames :: [Text]
 reservedPsNames = [ "data"
                   , "newtype"
                   , "type"
+                  , "kind"
                   , "foreign"
                   , "import"
                   , "infixl"

@@ -95,6 +95,7 @@ convertDecl P.EDValue{..} = Just $ IdeDeclValue $
   IdeValue edValueName edValueType
 convertDecl P.EDClass{..} = Just (IdeDeclTypeClass edClassName)
 convertDecl P.EDInstance{} = Nothing
+convertDecl P.EDKind{} = Nothing
 
 convertOperator :: P.ExternsFixity -> IdeDeclaration
 convertOperator P.ExternsFixity{..} =

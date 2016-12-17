@@ -29,6 +29,7 @@ module Language.PureScript.Docs.RenderedCode.Types
  , keywordInstance
  , keywordWhere
  , keywordFixity
+ , keywordKind
  ) where
 
 import Prelude.Compat
@@ -200,3 +201,6 @@ keywordFixity :: P.Associativity -> RenderedCode
 keywordFixity P.Infixl = keyword "infixl"
 keywordFixity P.Infixr = keyword "infixr"
 keywordFixity P.Infix = keyword "infix"
+
+keywordKind :: RenderedCode
+keywordKind = keyword "kind"
