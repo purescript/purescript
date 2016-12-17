@@ -28,6 +28,7 @@ extra-source-files: examples/passing/*.purs
                   , examples/passing/ExplicitImportReExport/*.purs
                   , examples/passing/ExportExplicit/*.purs
                   , examples/passing/ExportExplicit2/*.purs
+                  , examples/passing/ForeignKind/*.purs
                   , examples/passing/Import/*.purs
                   , examples/passing/ImportExplicit/*.purs
                   , examples/passing/ImportQualified/*.purs
