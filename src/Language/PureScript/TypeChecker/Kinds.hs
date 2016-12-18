@@ -88,7 +88,7 @@ unifyKinds k1 k2 = do
   go Star Star = return ()
   go Bang Bang = return ()
   go Symbol Symbol = return ()
-  go (KindConstructor k1') (KindConstructor k2') | k1' == k2' = return ()
+  go (NamedKind k1') (NamedKind k2') | k1' == k2' = return ()
   go (Row k1') (Row k2') = go k1' k2'
   go (FunKind k1' k2') (FunKind k3 k4) = do
     go k1' k3

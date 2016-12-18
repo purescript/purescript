@@ -22,8 +22,8 @@ data Kind
   | FunKind Kind Kind
   -- | Type-level strings
   | Symbol
-  -- | A kind constructor
-  | KindConstructor (Qualified (ProperName 'KindName))
+  -- | A named kind
+  | NamedKind (Qualified (ProperName 'KindName))
   deriving (Show, Eq, Ord)
 
 $(A.deriveJSON A.defaultOptions ''Kind)

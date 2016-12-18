@@ -82,7 +82,7 @@ renderDeclarationWithOptions opts Declaration{..} =
 
     ExternKindDeclaration ->
       [ keywordKind
-      , renderKind (P.KindConstructor (notQualified declTitle))
+      , renderKind (P.NamedKind (notQualified declTitle))
       ]
 
   where

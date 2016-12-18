@@ -14,11 +14,12 @@ import Data.Maybe (mapMaybe)
 import qualified Data.Set as S
 
 import Language.PureScript.AST.Binders
-import Language.PureScript.AST.Literals
 import Language.PureScript.AST.Declarations
-import Language.PureScript.Types
-import Language.PureScript.Traversals
+import Language.PureScript.AST.Literals
+import Language.PureScript.Kinds
 import Language.PureScript.Names
+import Language.PureScript.Traversals
+import Language.PureScript.Types
 
 everywhereOnValues
   :: (Declaration -> Declaration)
@@ -587,6 +588,42 @@ accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (con
   forValues (DeferredDictionary _ tys) = mconcat (map f tys)
   forValues (TypedValue _ _ ty) = f ty
   forValues _ = mempty
+
+accumKinds
+  :: (Monoid r)
+  => (Kind -> r)
+  -> ( Declaration -> r
+     , Expr -> r
+     , Binder -> r
+     , CaseAlternative -> r
+     , DoNotationElement -> r
+     )
+accumKinds f = everythingOnValues mappend forDecls forValues (const mempty) (const mempty) (const mempty)
+  where
+  forDecls (DataDeclaration _ _ args dctors) =
+    foldMap (foldMap f . snd) args `mappend`
+    foldMap (foldMap forTypes . snd) dctors
+  forDecls (TypeClassDeclaration _ args implies _ _) =
+    foldMap (foldMap f . snd) args `mappend`
+    foldMap (foldMap forTypes . constraintArgs) implies
+  forDecls (TypeInstanceDeclaration _ cs _ tys _) =
+    foldMap (foldMap forTypes . constraintArgs) cs `mappend`
+    foldMap forTypes tys
+  forDecls (TypeSynonymDeclaration _ args ty) =
+    foldMap (foldMap f . snd) args `mappend`
+    forTypes ty
+  forDecls (TypeDeclaration _ ty) = forTypes ty
+  forDecls (ExternDeclaration _ ty) = forTypes ty
+  forDecls (ExternDataDeclaration _ kn) = f kn
+  forDecls _ = mempty
+
+  forValues (TypeClassDictionary c _ _) = foldMap forTypes (constraintArgs c)
+  forValues (DeferredDictionary _ tys) = foldMap forTypes tys
+  forValues (TypedValue _ _ ty) = forTypes ty
+  forValues _ = mempty
+
+  forTypes (KindedType _ k) = f k
+  forTypes _ = mempty
 
 -- |
 -- Map a function over type annotations appearing inside a value

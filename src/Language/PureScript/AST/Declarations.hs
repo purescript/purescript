@@ -240,7 +240,7 @@ data DeclarationRef
   --
   | ModuleRef ModuleName
   -- |
-  -- A kind constructor
+  -- A named kind
   --
   | KindRef (ProperName 'KindName)
   -- |
