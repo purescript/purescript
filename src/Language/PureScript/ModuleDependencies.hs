@@ -17,7 +17,6 @@ import Data.Maybe (fromMaybe)
 import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Errors
-import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.Types
 
@@ -62,8 +61,7 @@ usedModules :: [ModuleName] -> Declaration -> [ModuleName]
 usedModules ams d =
   let (f, _, _, _, _) = everythingOnValues (++) forDecls forValues (const []) (const []) (const [])
       (g, _, _, _, _) = accumTypes (everythingOnTypes (++) forTypes)
-      (h, _, _, _, _) = accumKinds (everythingOnKinds (++) forKinds)
-  in nub (f d ++ g d ++ h d)
+  in nub (f d ++ g d)
   where
 
   forDecls :: Declaration -> [ModuleName]
@@ -88,11 +86,6 @@ usedModules ams d =
   forTypes (TypeConstructor (Qualified (Just mn) _))
     | mn `notElem` ams = [mn]
   forTypes _ = []
-
-  forKinds :: Kind -> [ModuleName]
-  forKinds (NamedKind (Qualified (Just mn) _))
-    | mn `notElem` ams = [mn]
-  forKinds _ = []
 
   extractQualFixity :: Either ValueFixity TypeFixity -> Maybe ModuleName
   extractQualFixity (Left (ValueFixity _ (Qualified mn _) _)) = mn
