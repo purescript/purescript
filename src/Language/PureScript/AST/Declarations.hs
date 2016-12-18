@@ -486,6 +486,14 @@ isExternDataDecl (PositionedDeclaration _ _ d) = isExternDataDecl d
 isExternDataDecl _ = False
 
 -- |
+-- Test if a declaration is a foreign kind import
+--
+isExternKindDecl :: Declaration -> Bool
+isExternKindDecl ExternKindDeclaration{} = True
+isExternKindDecl (PositionedDeclaration _ _ d) = isExternKindDecl d
+isExternKindDecl _ = False
+
+-- |
 -- Test if a declaration is a fixity declaration
 --
 isFixityDecl :: Declaration -> Bool

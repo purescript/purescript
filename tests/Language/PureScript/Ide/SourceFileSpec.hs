@@ -6,6 +6,7 @@ import           Protolude
 
 import qualified Language.PureScript as P
 import           Language.PureScript.Ide.SourceFile
+import           Language.PureScript.Ide.Types
 import           Test.Hspec
 
 span0, span1, span2 :: P.SourceSpan
@@ -24,27 +25,30 @@ data1 = P.DataDeclaration P.Newtype (P.ProperName "Data1") [] []
 data2 = P.DataDeclaration P.Data (P.ProperName "Data2") [] [(P.ProperName "Cons1", [])]
 foreign1 = P.ExternDeclaration (P.Ident "foreign1") P.REmpty
 foreign2 = P.ExternDataDeclaration (P.ProperName "Foreign2") P.Star
+foreign3 = P.ExternKindDeclaration (P.ProperName "Foreign3")
 member1 = P.TypeDeclaration (P.Ident "member1") P.REmpty
 
 spec :: Spec
 spec = do
   describe "Extracting Spans" $ do
     it "extracts a span for a value declaration" $
-      extractSpans span0 (P.PositionedDeclaration span1 [] value1) `shouldBe` [(Left "value1", span1)]
+      extractSpans span0 (P.PositionedDeclaration span1 [] value1) `shouldBe` [(IdeNameValue "value1", span1)]
     it "extracts a span for a type synonym declaration" $
-      extractSpans span0 (P.PositionedDeclaration span1 [] synonym1) `shouldBe` [(Right "Synonym1", span1)]
+      extractSpans span0 (P.PositionedDeclaration span1 [] synonym1) `shouldBe` [(IdeNameType "Synonym1", span1)]
     it "extracts a span for a typeclass declaration" $
-      extractSpans span0 (P.PositionedDeclaration span1 [] class1) `shouldBe` [(Right "Class1", span1)]
+      extractSpans span0 (P.PositionedDeclaration span1 [] class1) `shouldBe` [(IdeNameType "Class1", span1)]
     it "extracts spans for a typeclass declaration and its members" $
-      extractSpans span0 (P.PositionedDeclaration span1 [] class2) `shouldBe` [(Right "Class2", span1), (Left "member1", span2)]
+      extractSpans span0 (P.PositionedDeclaration span1 [] class2) `shouldBe` [(IdeNameType "Class2", span1), (IdeNameValue "member1", span2)]
     it "extracts a span for a data declaration" $
-      extractSpans span0 (P.PositionedDeclaration span1 [] data1) `shouldBe` [(Right "Data1", span1)]
+      extractSpans span0 (P.PositionedDeclaration span1 [] data1) `shouldBe` [(IdeNameType "Data1", span1)]
     it "extracts spans for a data declaration and its constructors" $
-      extractSpans span0 (P.PositionedDeclaration span1 [] data2) `shouldBe` [(Right "Data2", span1), (Left "Cons1", span1)]
+      extractSpans span0 (P.PositionedDeclaration span1 [] data2) `shouldBe` [(IdeNameType "Data2", span1), (IdeNameValue "Cons1", span1)]
     it "extracts a span for a foreign declaration" $
-      extractSpans span0 (P.PositionedDeclaration span1 [] foreign1) `shouldBe` [(Left "foreign1", span1)]
+      extractSpans span0 (P.PositionedDeclaration span1 [] foreign1) `shouldBe` [(IdeNameValue "foreign1", span1)]
     it "extracts a span for a data foreign declaration" $
-      extractSpans span0 (P.PositionedDeclaration span1 [] foreign2) `shouldBe` [(Right "Foreign2", span1)]
+      extractSpans span0 (P.PositionedDeclaration span1 [] foreign2) `shouldBe` [(IdeNameType "Foreign2", span1)]
+    it "extracts a span for a foreign kind declaration" $
+      extractSpans span0 (P.PositionedDeclaration span1 [] foreign3) `shouldBe` [(IdeNameKind "Foreign3", span1)]
   describe "Type annotations" $ do
     it "extracts a type annotation" $
       extractTypeAnnotations [typeAnnotation1] `shouldBe` [(P.Ident "value1", P.REmpty)]
