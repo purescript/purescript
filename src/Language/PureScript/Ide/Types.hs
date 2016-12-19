@@ -103,7 +103,7 @@ emptyAnn = Annotation Nothing Nothing Nothing
 
 type Module = (P.ModuleName, [IdeDeclarationAnn])
 
-type DefinitionSites a = Map IdeDeclName a
+type DefinitionSites a = Map IdeDeclNamespace a
 type TypeAnnotations = Map P.Ident P.Type
 newtype AstData a = AstData (Map P.ModuleName (DefinitionSites a, TypeAnnotations))
   -- ^ SourceSpans for the definition sites of Values and Types aswell as type
@@ -296,9 +296,11 @@ instance ToJSON PursuitResponse where
       , "text"    .= text
       ]
 
--- TODO: better names?
-data IdeDeclName
-  = IdeNameValue Text
-  | IdeNameType Text
-  | IdeNameKind Text
+data IdeDeclNamespace =
+  -- | An identifier in the value namespace
+  IdeNSValue Text
+  -- | An identifier in the type namespace
+  | IdeNSType Text
+  -- | An identifier in the kind namespace
+  | IdeNSKind Text
   deriving (Show, Eq, Ord)

@@ -32,23 +32,23 @@ spec :: Spec
 spec = do
   describe "Extracting Spans" $ do
     it "extracts a span for a value declaration" $
-      extractSpans span0 (P.PositionedDeclaration span1 [] value1) `shouldBe` [(IdeNameValue "value1", span1)]
+      extractSpans span0 (P.PositionedDeclaration span1 [] value1) `shouldBe` [(IdeNSValue "value1", span1)]
     it "extracts a span for a type synonym declaration" $
-      extractSpans span0 (P.PositionedDeclaration span1 [] synonym1) `shouldBe` [(IdeNameType "Synonym1", span1)]
+      extractSpans span0 (P.PositionedDeclaration span1 [] synonym1) `shouldBe` [(IdeNSType "Synonym1", span1)]
     it "extracts a span for a typeclass declaration" $
-      extractSpans span0 (P.PositionedDeclaration span1 [] class1) `shouldBe` [(IdeNameType "Class1", span1)]
+      extractSpans span0 (P.PositionedDeclaration span1 [] class1) `shouldBe` [(IdeNSType "Class1", span1)]
     it "extracts spans for a typeclass declaration and its members" $
-      extractSpans span0 (P.PositionedDeclaration span1 [] class2) `shouldBe` [(IdeNameType "Class2", span1), (IdeNameValue "member1", span2)]
+      extractSpans span0 (P.PositionedDeclaration span1 [] class2) `shouldBe` [(IdeNSType "Class2", span1), (IdeNSValue "member1", span2)]
     it "extracts a span for a data declaration" $
-      extractSpans span0 (P.PositionedDeclaration span1 [] data1) `shouldBe` [(IdeNameType "Data1", span1)]
+      extractSpans span0 (P.PositionedDeclaration span1 [] data1) `shouldBe` [(IdeNSType "Data1", span1)]
     it "extracts spans for a data declaration and its constructors" $
-      extractSpans span0 (P.PositionedDeclaration span1 [] data2) `shouldBe` [(IdeNameType "Data2", span1), (IdeNameValue "Cons1", span1)]
+      extractSpans span0 (P.PositionedDeclaration span1 [] data2) `shouldBe` [(IdeNSType "Data2", span1), (IdeNSValue "Cons1", span1)]
     it "extracts a span for a foreign declaration" $
-      extractSpans span0 (P.PositionedDeclaration span1 [] foreign1) `shouldBe` [(IdeNameValue "foreign1", span1)]
+      extractSpans span0 (P.PositionedDeclaration span1 [] foreign1) `shouldBe` [(IdeNSValue "foreign1", span1)]
     it "extracts a span for a data foreign declaration" $
-      extractSpans span0 (P.PositionedDeclaration span1 [] foreign2) `shouldBe` [(IdeNameType "Foreign2", span1)]
+      extractSpans span0 (P.PositionedDeclaration span1 [] foreign2) `shouldBe` [(IdeNSType "Foreign2", span1)]
     it "extracts a span for a foreign kind declaration" $
-      extractSpans span0 (P.PositionedDeclaration span1 [] foreign3) `shouldBe` [(IdeNameKind "Foreign3", span1)]
+      extractSpans span0 (P.PositionedDeclaration span1 [] foreign3) `shouldBe` [(IdeNSKind "Foreign3", span1)]
   describe "Type annotations" $ do
     it "extracts a type annotation" $
       extractTypeAnnotations [typeAnnotation1] `shouldBe` [(P.Ident "value1", P.REmpty)]
