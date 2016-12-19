@@ -12,11 +12,13 @@ import qualified Data.List                       as List
 import qualified Data.Map.Lazy                   as M
 import           Data.Maybe                      (fromJust)
 import qualified Data.Set                        as S
+import qualified Data.Text                       as T
 import qualified Language.PureScript             as P
 import           Language.PureScript.Errors.JSON
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
+import           System.FilePath                 (replaceExtension)
 import           System.IO.UTF8                  (readUTF8FileT)
 
 -- | Given a filepath performs the following steps:
@@ -67,7 +69,10 @@ rebuildFile path = do
     . P.rebuildModule (buildMakeActions
                         >>= shushProgress $ makeEnv) externs $ m
   case result of
-    Left errors -> throwError (RebuildError (toJSONErrors False P.Error errors))
+    Left errors -> do
+      diag <- diagnostics errors
+      for_ diag (logWarnN . prettyDiagnostics)
+      throwError (RebuildError (toJSONErrors False P.Error errors))
     Right _ -> do
       rebuildModuleOpen makeEnv externs m
       pure (RebuildSuccess (toJSONErrors False P.Warning warnings))
@@ -144,7 +149,7 @@ sortExterns m ex = do
       throwError (RebuildError (toJSONErrors False P.Error err))
     Right (sorted, graph) -> do
       let deps = fromJust (List.lookup (P.getModuleName m) graph)
-      pure $ mapMaybe getExtern (deps `inOrderOf` map P.getModuleName sorted)
+      pure (mapMaybe getExtern (deps `inOrderOf` map P.getModuleName sorted))
   where
     mkShallowModule P.ExternsFile{..} =
       P.Module (P.internalModuleSourceSpan "<rebuild>") [] efModuleName (map mkImport efImports) Nothing
@@ -158,3 +163,40 @@ sortExterns m ex = do
 -- | Removes a modules export list.
 openModuleExports :: P.Module -> P.Module
 openModuleExports (P.Module ss cs mn decls _) = P.Module ss cs mn decls Nothing
+
+data Diagnostics
+  = NotCompiledYet P.ModuleName
+  | CreateFFIFile FilePath
+  deriving (Show)
+
+prettyDiagnostics :: Diagnostics -> Text
+prettyDiagnostics d = case d of
+  NotCompiledYet mn ->
+    "Couldn't find an ExternsFile for "
+    <> P.runModuleName mn
+    <> " it does show up as a parsed module though, "
+    <> "did you try to fully compile the project yet?"
+  CreateFFIFile fp ->
+    "A new FFI file needs to be created at: " <> T.pack fp
+
+diagnostics :: (Ide m, MonadLogger m) => P.MultipleErrors -> m [Diagnostics]
+diagnostics errs = do
+  catMaybes <$> traverse f (P.runMultipleErrors errs)
+  where
+    f (P.ErrorMessage _ err) = case err of
+      P.UnknownName (P.Qualified Nothing (P.ModName mn)) -> do
+        -- Unknown module was imported. Check whether a module with the given
+        -- name exists in the parsed source ASTs. If it does, this most likely
+        -- means the module wasn't compiled yet and so psc-ide didn't pick up
+        -- its Externsfile.
+        modules <- s1Modules <$> getStage1
+        pure (mn `M.lookup` modules $> NotCompiledYet mn)
+      P.MissingFFIModule mn -> do
+        modules <- s1Modules <$> getStage1
+        case M.lookup mn modules of
+          Nothing -> do
+            logWarnN "Didn't find module that supposedly needs a new FFI file."
+            pure Nothing
+          Just (_, fp) ->
+            pure (Just (CreateFFIFile (replaceExtension fp "js")))
+      _ -> pure Nothing
