@@ -22,7 +22,9 @@ succProxy _ = NatProxy
 
 type Kinded f = f :: Nat
 
-type N0 = Kinded Zero
+type KindedZero = Kinded Zero
+
+type N0 = Zero
 type N1 = Succ N0
 type N2 = Succ N1
 type N3 = Succ N2

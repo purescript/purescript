@@ -270,6 +270,7 @@ renameInModule imports (Module ss coms mn decls exps) =
     updateType (TypeOp name) = TypeOp <$> updateTypeOpName name pos
     updateType (TypeConstructor name) = TypeConstructor <$> updateTypeName name pos
     updateType (ConstrainedType cs t) = ConstrainedType <$> traverse updateInConstraint cs <*> pure t
+    updateType (KindedType t k) = KindedType t <$> updateKindsEverywhere pos k
     updateType t = return t
     updateInConstraint :: Constraint -> m Constraint
     updateInConstraint (Constraint name ts info) =

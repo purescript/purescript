@@ -25,12 +25,7 @@ typeLiterals = mkPattern match
   match Star = Just "*"
   match Bang = Just "!"
   match (KUnknown u) = Just $ 'u' : show u
-  match (NamedKind (Qualified _ name)) =
-    Just (T.unpack (runProperName name))
-    -- TODO: the following is what we do for TypeConstructor, however here we
-    --       aren't using RenderedCode, and secondly importing these functions
-    --       causes a cycle
-    -- Just (ctor (T.unpack (runProperName name)) (maybeToContainingModule mn))
+  match (NamedKind name) = Just $ T.unpack (showQualified runProperName name)
   match _ = Nothing
 
 matchRow :: Pattern () Kind ((), Kind)
