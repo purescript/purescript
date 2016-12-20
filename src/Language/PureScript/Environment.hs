@@ -72,7 +72,7 @@ data FunctionalDependency = FunctionalDependency
 -- The initial environment with no values and only the default javascript types defined
 --
 initEnvironment :: Environment
-initEnvironment = Environment M.empty primTypes M.empty M.empty M.empty primClasses S.empty
+initEnvironment = Environment M.empty primTypes M.empty M.empty M.empty primClasses primKinds
 
 -- |
 -- A constructor for TypeClassData that computes which type class arguments are fully determined.
@@ -211,6 +211,13 @@ instance A.FromJSON DataDeclType where
 primName :: Text -> Qualified (ProperName a)
 primName = Qualified (Just $ ModuleName [ProperName C.prim]) . ProperName
 
+primKind :: Text -> Kind
+primKind = NamedKind . primName
+
+-- | Kind for type-level strings
+kindSymbol :: Kind
+kindSymbol = primKind C.symbol
+
 -- |
 -- Construct a type in the Prim module
 --
@@ -288,6 +295,13 @@ function :: Type -> Type -> Type
 function t1 = TypeApp (TypeApp tyFunction t1)
 
 -- |
+-- The primitive kinds
+primKinds :: S.Set (Qualified (ProperName 'KindName))
+primKinds =
+  S.fromList
+    [ primName C.symbol ]
+
+-- |
 -- The primitive types in the external javascript environment with their
 -- associated kinds. There are also pseudo `Fail` and `Partial` types
 -- that correspond to the classes with the same names.
@@ -304,9 +318,9 @@ primTypes =
     , (primName "Int",      (Star, ExternData))
     , (primName "Boolean",  (Star, ExternData))
     , (primName "Partial",  (Star, ExternData))
-    , (primName "Fail",     (FunKind Symbol Star, ExternData))
-    , (primName "TypeString", (FunKind Star Symbol, ExternData))
-    , (primName "TypeConcat", (FunKind Symbol (FunKind Symbol Symbol), ExternData))
+    , (primName "Fail",     (FunKind kindSymbol Star, ExternData))
+    , (primName "TypeString", (FunKind Star kindSymbol, ExternData))
+    , (primName "TypeConcat", (FunKind kindSymbol (FunKind kindSymbol kindSymbol), ExternData))
     ]
 
 -- |
@@ -318,7 +332,7 @@ primClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primClasses =
   M.fromList
     [ (primName "Partial", (makeTypeClassData [] [] [] []))
-    , (primName "Fail",    (makeTypeClassData [("message", Just Symbol)] [] [] []))
+    , (primName "Fail",    (makeTypeClassData [("message", Just kindSymbol)] [] [] []))
     ]
 
 -- |

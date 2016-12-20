@@ -87,7 +87,6 @@ unifyKinds k1 k2 = do
   go k (KUnknown u) = solveKind u k
   go Star Star = return ()
   go Bang Bang = return ()
-  go Symbol Symbol = return ()
   go (NamedKind k1') (NamedKind k2') | k1' == k2' = return ()
   go (Row k1') (Row k2') = go k1' k2'
   go (FunKind k1' k2') (FunKind k3 k4) = do
@@ -232,7 +231,7 @@ infer' other = (, []) <$> go other
     unifyKinds k k'
     return k'
   go TypeWildcard{} = freshKind
-  go (TypeLevelString _) = return Symbol
+  go (TypeLevelString _) = return kindSymbol
   go (TypeVar v) = do
     Just moduleName <- checkCurrentModule <$> get
     lookupTypeVariable moduleName (Qualified Nothing (ProperName v))

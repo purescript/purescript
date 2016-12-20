@@ -20,8 +20,6 @@ data Kind
   | Row Kind
   -- | Function kinds
   | FunKind Kind Kind
-  -- | Type-level strings
-  | Symbol
   -- | A named kind
   | NamedKind (Qualified (ProperName 'KindName))
   deriving (Show, Eq, Ord)

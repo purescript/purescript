@@ -205,10 +205,12 @@ primExports =
   nullExports
     { exportedTypes = M.fromList $ mkTypeEntry `map` M.keys primTypes
     , exportedTypeClasses = M.fromList $ mkClassEntry `map` M.keys primClasses
+    , exportedKinds = M.fromList $ mkKindEntry `map` S.toList primKinds
     }
   where
   mkTypeEntry (Qualified mn name) = (name, ([], fromJust mn))
   mkClassEntry (Qualified mn name) = (name, fromJust mn)
+  mkKindEntry (Qualified mn name) = (name, fromJust mn)
 
 -- | Environment which only contains the Prim module.
 primEnv :: Env

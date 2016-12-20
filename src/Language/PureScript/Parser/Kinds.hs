@@ -18,9 +18,6 @@ parseStar = const Star <$> symbol' "*"
 parseBang :: TokenParser Kind
 parseBang = const Bang <$> symbol' "!"
 
-parseSymbol :: TokenParser Kind
-parseSymbol = const Symbol <$> uname' "Symbol"
-
 parseNamedKind :: TokenParser Kind
 parseNamedKind = NamedKind <$> parseQualified kindName
 
@@ -28,7 +25,6 @@ parseKindAtom :: TokenParser Kind
 parseKindAtom = indented *> P.choice
             [ parseStar
             , parseBang
-            , parseSymbol
             , parseNamedKind
             , parens parseKind
             ]

@@ -24,7 +24,6 @@ typeLiterals = mkPattern match
   where
   match Star = Just "*"
   match Bang = Just "!"
-  match Symbol = Just "Symbol"
   match (KUnknown u) = Just $ 'u' : show u
   match (NamedKind (Qualified _ name)) =
     Just (T.unpack (runProperName name))
