@@ -1,4 +1,4 @@
-module ForeignKinds.Lib (kind Nat, Zero, Succ, N0, N1, N2, N3, NatProxy(..), class AddNat, addNat, proxy1, proxy2) where
+module ForeignKinds.Lib (kind Nat, Kinded, Zero, Succ, N0, N1, N2, N3, NatProxy(..), class AddNat, addNat, proxy1, proxy2) where
 
 -- declaration
 
@@ -20,7 +20,9 @@ succProxy _ = NatProxy
 
 -- use in alias
 
-type N0 = Zero
+type Kinded f = f :: Nat
+
+type N0 = Kinded Zero
 type N1 = Succ N0
 type N2 = Succ N1
 type N3 = Succ N2
