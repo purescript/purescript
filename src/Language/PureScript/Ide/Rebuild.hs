@@ -47,8 +47,8 @@ rebuildFile path = do
   m <- case snd <$> P.parseModuleFromFile identity (path, input) of
     Left parseError -> throwError
                        . RebuildError
-                       . toJSONErrors False P.Error
-                       $ P.MultipleErrors [P.toPositionedError parseError]
+                       . singleRebuildError
+                       $ P.toPositionedError parseError
     Right m -> pure m
 
   -- Externs files must be sorted ahead of time, so that they get applied
@@ -70,9 +70,9 @@ rebuildFile path = do
                         >>= shushProgress $ makeEnv) externs $ m
   case result of
     Left errors -> do
-      diag <- diagnostics errors
-      for_ diag (logWarnN . prettyDiagnostics)
-      throwError (RebuildError (toJSONErrors False P.Error errors))
+      diag <- diagnostics (P.runMultipleErrors errors)
+      -- for_ diag (logWarnN . prettyDiagnostics)
+      throwError (RebuildError (bimap (toJSONError False P.Error) (fmap prettyDiagnostics) <$> diag))
     Right _ -> do
       rebuildModuleOpen makeEnv externs m
       pure (RebuildSuccess (toJSONErrors False P.Warning warnings))
@@ -146,7 +146,7 @@ sortExterns m ex = do
            . M.delete (P.getModuleName m) $ ex
   case sorted' of
     Left err ->
-      throwError (RebuildError (toJSONErrors False P.Error err))
+      throwError (RebuildError ((, Nothing) <$> toJSONErrors False P.Error err))
     Right (sorted, graph) -> do
       let deps = fromJust (List.lookup (P.getModuleName m) graph)
       pure (mapMaybe getExtern (deps `inOrderOf` map P.getModuleName sorted))
@@ -179,9 +179,10 @@ prettyDiagnostics d = case d of
   CreateFFIFile fp ->
     "A new FFI file needs to be created at: " <> T.pack fp
 
-diagnostics :: (Ide m, MonadLogger m) => P.MultipleErrors -> m [Diagnostics]
+diagnostics :: (Ide m, MonadLogger m) => [P.ErrorMessage] -> m [(P.ErrorMessage, Maybe Diagnostics)]
 diagnostics errs = do
-  catMaybes <$> traverse f (P.runMultipleErrors errs)
+  diags <- traverse f errs
+  pure (zip errs diags)
   where
     f (P.ErrorMessage _ err) = case err of
       P.UnknownName (P.Qualified Nothing (P.ModName mn)) -> do
@@ -200,3 +201,6 @@ diagnostics errs = do
           Just (_, fp) ->
             pure (Just (CreateFFIFile (replaceExtension fp "js")))
       _ -> pure Nothing
+
+singleRebuildError :: P.ErrorMessage -> [(JSONError, Maybe a)]
+singleRebuildError = pure . (, Nothing) . toJSONError False P.Error

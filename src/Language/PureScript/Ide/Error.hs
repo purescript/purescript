@@ -17,6 +17,7 @@ module Language.PureScript.Ide.Error
        ) where
 
 import           Data.Aeson
+import qualified Data.HashMap.Strict as HM
 import           Language.PureScript.Errors.JSON
 import           Language.PureScript.Ide.Types   (ModuleIdent)
 import           Protolude
@@ -28,17 +29,24 @@ data PscIdeError
     | ModuleNotFound ModuleIdent
     | ModuleFileNotFound ModuleIdent
     | ParseError P.ParseError Text
-    | RebuildError [JSONError]
+    | RebuildError [(JSONError, Maybe Text)]
 
 instance ToJSON PscIdeError where
   toJSON (RebuildError errs) = object
     [ "resultType" .= ("error" :: Text)
-    , "result" .= errs
+    , "result" .= map addHint errs
     ]
   toJSON err = object
     [ "resultType" .= ("error" :: Text)
     , "result" .= textError err
     ]
+
+addHint :: (ToJSON a, ToJSON b) => (a, b) -> Value
+addHint (err, d) = addKey ("psc-ide-hint", toJSON d) (toJSON err )
+
+addKey :: (Text, Value) -> Value -> Value
+addKey (k, v) (Object hashMap) = Object (HM.insert k v hashMap)
+addKey _ _ = panic "Not an object"
 
 textError :: PscIdeError -> Text
 textError (GeneralError msg)          = msg
