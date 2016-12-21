@@ -146,6 +146,7 @@ entails SolverOptions{..} constraint context hints =
     ctorModules (TypeConstructor (Qualified (Just mn) _)) = Just mn
     ctorModules (TypeConstructor (Qualified Nothing _)) = internalError "ctorModules: unqualified type name"
     ctorModules (TypeApp ty _) = ctorModules ty
+    ctorModules (KindedType ty _) = ctorModules ty
     ctorModules _ = Nothing
 
     findDicts :: InstanceContext -> Qualified (ProperName 'ClassName) -> Maybe ModuleName -> [TypeClassDict]
@@ -266,6 +267,7 @@ entails SolverOptions{..} constraint context hints =
 
             canBeGeneralized :: Type -> Bool
             canBeGeneralized TUnknown{} = True
+            canBeGeneralized (KindedType t _) = canBeGeneralized t
             canBeGeneralized _ = False
 
             -- |
@@ -346,6 +348,8 @@ matches deps TypeClassDictionaryInScope{..} tys = do
     -- and return a substitution from type variables to types which makes the type heads unify.
     --
     typeHeadsAreEqual :: Type -> Type -> (Bool, Matching [Type])
+    typeHeadsAreEqual (KindedType t1 _)    t2                              = typeHeadsAreEqual t1 t2
+    typeHeadsAreEqual t1                   (KindedType t2 _)               = typeHeadsAreEqual t1 t2
     typeHeadsAreEqual (TUnknown u1)        (TUnknown u2)        | u1 == u2 = (True, M.empty)
     typeHeadsAreEqual (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    | s1 == s2 = (True, M.empty)
     typeHeadsAreEqual t                    (TypeVar v)                     = (True, M.singleton v [t])
@@ -365,6 +369,8 @@ matches deps TypeClassDictionaryInScope{..} tys = do
         sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
 
         go :: [(Text, Type)] -> Type -> [(Text, Type)] -> Type -> (Bool, Matching [Type])
+        go l  (KindedType t1 _)  r  t2                 = go l t1 r t2
+        go l  t1                 r  (KindedType t2 _)  = go l t1 r t2
         go [] REmpty             [] REmpty             = (True, M.empty)
         go [] (TUnknown u1)      [] (TUnknown u2)      | u1 == u2 = (True, M.empty)
         go [] (TypeVar v1)       [] (TypeVar v2)       | v1 == v2 = (True, M.empty)
@@ -386,6 +392,8 @@ matches deps TypeClassDictionaryInScope{..} tys = do
       -- which was _not_ solved, i.e. one which was inferred by a functional
       -- dependency.
       typesAreEqual :: Type -> Type -> Bool
+      typesAreEqual (KindedType t1 _)    t2                   = typesAreEqual t1 t2
+      typesAreEqual t1                   (KindedType t2 _)    = typesAreEqual t1 t2
       typesAreEqual (TUnknown u1)        (TUnknown u2)        | u1 == u2 = True
       typesAreEqual (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    = s1 == s2
       typesAreEqual (TypeVar v1)         (TypeVar v2)         = v1 == v2
@@ -403,6 +411,8 @@ matches deps TypeClassDictionaryInScope{..} tys = do
           in all (uncurry typesAreEqual) int && go sd1 r1' sd2 r2'
         where
           go :: [(Text, Type)] -> Type -> [(Text, Type)] -> Type -> Bool
+          go l  (KindedType t1 _) r  t2                = go l t1 r t2
+          go l  t1                r  (KindedType t2 _) = go l t1 r t2
           go [] (TUnknown u1)     [] (TUnknown u2)     | u1 == u2 = True
           go [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) = s1 == s2
           go [] REmpty            [] REmpty            = True
