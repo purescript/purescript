@@ -250,6 +250,7 @@ library
                      Language.PureScript.Docs.Convert
                      Language.PureScript.Docs.Convert.Single
                      Language.PureScript.Docs.Convert.ReExports
+                     Language.PureScript.Docs.Prim
                      Language.PureScript.Docs.Render
                      Language.PureScript.Docs.Types
                      Language.PureScript.Docs.RenderedCode
@@ -539,6 +540,7 @@ test-suite tests
     other-modules: TestUtils
                    TestCompiler
                    TestDocs
+                   TestPrimDocs
                    TestPscPublish
                    TestPsci
                    TestPscIde

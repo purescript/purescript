@@ -7,6 +7,7 @@ module Language.PureScript.Docs (
 ) where
 
 import Language.PureScript.Docs.Convert as Docs
+import Language.PureScript.Docs.Prim as Docs
 import Language.PureScript.Docs.ParseAndBookmark as Docs
 import Language.PureScript.Docs.Render as Docs
 import Language.PureScript.Docs.RenderedCode.Render as Docs
