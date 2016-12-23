@@ -240,7 +240,7 @@ checkTypeKind ::
   Type ->
   Kind ->
   m ()
-checkTypeKind ty kind = guardWith (errorMessage (ExpectedType ty kind)) $ kind == Star
+checkTypeKind ty kind = guardWith (errorMessage (ExpectedType ty kind)) $ kind == kindType
 
 -- | Remove any ForAlls and ConstrainedType constructors in a type by introducing new unknowns
 -- or TypeClassDictionary values.

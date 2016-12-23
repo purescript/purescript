@@ -210,6 +210,8 @@ resolveExports env ss mn imps exps refs =
     . fromMaybe (internalError "Missing value in resolveValueOp")
     $ resolve exportedValueOps op
 
+  -- Looks up an imported kind and re-qualifies it with the original
+  -- module it came from.
   resolveKind :: Qualified (ProperName 'KindName) -> (ProperName 'KindName, ModuleName)
   resolveKind kind
     = splitQual

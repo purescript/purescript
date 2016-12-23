@@ -74,7 +74,7 @@ spec = do
         addDtorImport i t mn is =
           prettyPrintImportSection (addExplicitImport' (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName i) t wildcard)) mn is)
         addTypeImport i mn is =
-          prettyPrintImportSection (addExplicitImport' (IdeDeclType (IdeType (P.ProperName i) P.Star)) mn is)
+          prettyPrintImportSection (addExplicitImport' (IdeDeclType (IdeType (P.ProperName i) P.kindType)) mn is)
     it "adds an implicit unqualified import" $
       shouldBe
         (addImplicitImport' simpleFileImports (P.moduleNameFromString "Data.Map"))
@@ -143,7 +143,7 @@ spec = do
         moduleName = (P.moduleNameFromString "Control.Monad")
         addImport imports import' = addExplicitImport' import' moduleName imports
         valueImport ident = (IdeDeclValue (IdeValue (P.Ident ident) wildcard))
-        typeImport name = (IdeDeclType (IdeType (P.ProperName name) P.Star))
+        typeImport name = (IdeDeclType (IdeType (P.ProperName name) P.kindType))
         classImport name = (IdeDeclTypeClass (P.ProperName name))
         dtorImport name typeName = (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName name) (P.ProperName typeName) wildcard))
         -- expect any list of provided identifiers, when imported, to come out as specified

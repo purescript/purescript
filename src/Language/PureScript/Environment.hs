@@ -214,7 +214,15 @@ primName = Qualified (Just $ ModuleName [ProperName C.prim]) . ProperName
 primKind :: Text -> Kind
 primKind = NamedKind . primName
 
--- | Kind for type-level strings
+-- |
+-- Kinds in prim
+--
+kindType :: Kind
+kindType = primKind C.typ
+
+kindEffect :: Kind
+kindEffect = primKind C.effect
+
 kindSymbol :: Kind
 kindSymbol = primKind C.symbol
 
@@ -299,7 +307,10 @@ function t1 = TypeApp (TypeApp tyFunction t1)
 primKinds :: S.Set (Qualified (ProperName 'KindName))
 primKinds =
   S.fromList
-    [ primName C.symbol ]
+    [ primName C.typ
+    , primName C.effect
+    , primName C.symbol
+    ]
 
 -- |
 -- The primitive types in the external javascript environment with their
@@ -309,17 +320,17 @@ primKinds =
 primTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
 primTypes =
   M.fromList
-    [ (primName "Function", (FunKind Star (FunKind Star Star), ExternData))
-    , (primName "Array",    (FunKind Star Star, ExternData))
-    , (primName "Record",   (FunKind (Row Star) Star, ExternData))
-    , (primName "String",   (Star, ExternData))
-    , (primName "Char",     (Star, ExternData))
-    , (primName "Number",   (Star, ExternData))
-    , (primName "Int",      (Star, ExternData))
-    , (primName "Boolean",  (Star, ExternData))
-    , (primName "Partial",  (Star, ExternData))
-    , (primName "Fail",     (FunKind kindSymbol Star, ExternData))
-    , (primName "TypeString", (FunKind Star kindSymbol, ExternData))
+    [ (primName "Function",   (FunKind kindType (FunKind kindType kindType), ExternData))
+    , (primName "Array",      (FunKind kindType kindType, ExternData))
+    , (primName "Record",     (FunKind (Row kindType) kindType, ExternData))
+    , (primName "String",     (kindType, ExternData))
+    , (primName "Char",       (kindType, ExternData))
+    , (primName "Number",     (kindType, ExternData))
+    , (primName "Int",        (kindType, ExternData))
+    , (primName "Boolean",    (kindType, ExternData))
+    , (primName "Partial",    (kindType, ExternData))
+    , (primName "Fail",       (FunKind kindSymbol kindType, ExternData))
+    , (primName "TypeString", (FunKind kindType kindSymbol, ExternData))
     , (primName "TypeConcat", (FunKind kindSymbol (FunKind kindSymbol kindSymbol), ExternData))
     ]
 

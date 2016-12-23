@@ -24,7 +24,7 @@ typeOperator =
 testModule :: Module
 testModule = (mn "Test", [ d (IdeDeclValue (IdeValue (P.Ident "function") P.REmpty))
                          , d (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName "Cons") (P.ProperName "List") (P.REmpty)))
-                         , d (IdeDeclType (IdeType (P.ProperName "List") P.Star))
+                         , d (IdeDeclType (IdeType (P.ProperName "List") P.kindType))
                          , valueOperator Nothing
                          , ctorOperator Nothing
                          , typeOperator Nothing
@@ -48,4 +48,4 @@ spec = describe "resolving operators" $ do
   it "resolves the type for a constructor operator" $
     resolveOperatorsForModule testState (snd testModule) `shouldSatisfy` elem (ctorOperator (Just P.REmpty))
   it "resolves the kind for a type operator" $
-    resolveOperatorsForModule testState (snd testModule) `shouldSatisfy` elem (typeOperator (Just P.Star))
+    resolveOperatorsForModule testState (snd testModule) `shouldSatisfy` elem (typeOperator (Just P.kindType))

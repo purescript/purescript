@@ -12,10 +12,6 @@ import Language.PureScript.Names
 data Kind
   -- | Unification variable of type Kind
   = KUnknown Int
-  -- | The kind of types
-  | Star
-  -- | The kind of effects
-  | Bang
   -- | Kinds for labelled, unordered rows without duplicates
   | Row Kind
   -- | Function kinds

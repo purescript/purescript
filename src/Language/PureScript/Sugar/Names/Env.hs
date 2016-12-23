@@ -122,6 +122,7 @@ primImports =
   nullImports
     { importedTypes = M.fromList $ mkEntries `concatMap` M.keys primTypes
     , importedTypeClasses = M.fromList $ mkEntries `concatMap` M.keys primClasses
+    , importedKinds = M.fromList $ mkEntries `concatMap` S.toList primKinds
     }
   where
   mkEntries :: Qualified a -> [(Qualified a, [ImportRecord a])]

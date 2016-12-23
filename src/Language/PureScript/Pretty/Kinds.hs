@@ -22,8 +22,6 @@ import Language.PureScript.Pretty.Common
 typeLiterals :: Pattern () Kind String
 typeLiterals = mkPattern match
   where
-  match Star = Just "*"
-  match Bang = Just "!"
   match (KUnknown u) = Just $ 'u' : show u
   match (NamedKind name) = Just $ T.unpack (showQualified runProperName name)
   match _ = Nothing

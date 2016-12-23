@@ -24,7 +24,7 @@ class2 = P.TypeClassDeclaration (P.ProperName "Class2") [] [] []
 data1 = P.DataDeclaration P.Newtype (P.ProperName "Data1") [] []
 data2 = P.DataDeclaration P.Data (P.ProperName "Data2") [] [(P.ProperName "Cons1", [])]
 foreign1 = P.ExternDeclaration (P.Ident "foreign1") P.REmpty
-foreign2 = P.ExternDataDeclaration (P.ProperName "Foreign2") P.Star
+foreign2 = P.ExternDataDeclaration (P.ProperName "Foreign2") P.kindType
 foreign3 = P.ExternKindDeclaration (P.ProperName "Foreign3")
 member1 = P.TypeDeclaration (P.Ident "member1") P.REmpty
 

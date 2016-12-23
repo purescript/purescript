@@ -5,6 +5,7 @@ module Language.PureScript.Parser.Kinds (parseKind) where
 
 import Prelude.Compat
 
+import Language.PureScript.Environment
 import Language.PureScript.Kinds
 import Language.PureScript.Parser.Common
 import Language.PureScript.Parser.Lexer
@@ -13,10 +14,10 @@ import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
 parseStar :: TokenParser Kind
-parseStar = const Star <$> symbol' "*"
+parseStar = const kindType <$> symbol' "*"
 
 parseBang :: TokenParser Kind
-parseBang = const Bang <$> symbol' "!"
+parseBang = const kindEffect <$> symbol' "!"
 
 parseNamedKind :: TokenParser Kind
 parseNamedKind = NamedKind <$> parseQualified kindName
