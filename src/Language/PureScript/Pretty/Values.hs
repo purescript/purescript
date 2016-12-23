@@ -54,15 +54,15 @@ prettyPrintValue d (IfThenElse cond th el) =
   // moveRight 2 (vcat left [ text "then " <> prettyPrintValueAtom (d - 1) th
                             , text "else " <> prettyPrintValueAtom (d - 1) el
                             ])
-prettyPrintValue d (Accessor prop val) = prettyPrintValueAtom (d - 1) val <> textT ("." Monoid.<> prettyPrintObjectKey prop)
-prettyPrintValue d (ObjectUpdate o ps) = prettyPrintValueAtom (d - 1) o <> text " " <> list '{' '}' (\(key, val) -> textT (key Monoid.<> " = ") <> prettyPrintValue (d - 1) val) ps
+prettyPrintValue d (Accessor prop val) = prettyPrintValueAtom (d - 1) val `before` textT ("." Monoid.<> prettyPrintObjectKey prop)
+prettyPrintValue d (ObjectUpdate o ps) = prettyPrintValueAtom (d - 1) o `beforeWithSpace` list '{' '}' (\(key, val) -> textT (key Monoid.<> " = ") <> prettyPrintValue (d - 1) val) ps
 prettyPrintValue d (App val arg) = prettyPrintValueAtom (d - 1) val `beforeWithSpace` prettyPrintValueAtom (d - 1) arg
 prettyPrintValue d (Abs (Left arg) val) = text ('\\' : T.unpack (showIdent arg) ++ " -> ") // moveRight 2 (prettyPrintValue (d - 1) val)
 prettyPrintValue d (Abs (Right arg) val) = text ('\\' : T.unpack (prettyPrintBinder arg) ++ " -> ") // moveRight 2 (prettyPrintValue (d - 1) val)
 prettyPrintValue d (TypeClassDictionaryConstructorApp className ps) =
   text (T.unpack (runProperName (disqualify className)) ++ " ") <> prettyPrintValueAtom (d - 1) ps
 prettyPrintValue d (Case values binders) =
-  (text "case " <> foldl1 beforeWithSpace (map (prettyPrintValueAtom (d - 1)) values) <> text " of") //
+  (text "case " <> foldr beforeWithSpace (text "of") (map (prettyPrintValueAtom (d - 1)) values)) //
     moveRight 2 (vcat left (map (prettyPrintCaseAlternative (d - 1)) binders))
 prettyPrintValue d (Let ds val) =
   text "let" //
@@ -96,7 +96,7 @@ prettyPrintValueAtom d (BinaryNoParens op lhs rhs) =
   prettyPrintValue (d - 1) lhs `beforeWithSpace` printOp op `beforeWithSpace` prettyPrintValue (d - 1) rhs
   where
   printOp (Op (Qualified _ name)) = text $ T.unpack $ runOpName name
-  printOp expr = text "`" <> prettyPrintValue (d - 1) expr <> text "`"
+  printOp expr = text "`" <> prettyPrintValue (d - 1) expr `before` text "`"
 prettyPrintValueAtom d (TypedValue _ val _) = prettyPrintValueAtom d val
 prettyPrintValueAtom d (PositionedValue _ _ val) = prettyPrintValueAtom d val
 prettyPrintValueAtom d (Parens expr) = (text "(" <> prettyPrintValue d expr) `before` text ")"
