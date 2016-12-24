@@ -10,7 +10,7 @@ import Control.Monad
 
 import Data.Either
 import Data.List (nub)
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, fromMaybe)
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -183,7 +183,10 @@ convertComments cs = do
   stripPipe =
     T.dropWhile (== ' ')
     >>> T.stripPrefix "|"
-    >>> fmap (T.dropWhile (== ' '))
+    >>> fmap (dropPrefix " ")
+
+  dropPrefix prefix str =
+    fromMaybe str (T.stripPrefix prefix str)
 
 -- | Go through a PureScript module and extract a list of Bookmarks; references
 -- to data types or values, to be used as a kind of index. These are used for
