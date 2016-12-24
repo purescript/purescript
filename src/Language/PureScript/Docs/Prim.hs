@@ -159,7 +159,7 @@ char = primType "Char" $ unlines
    , ""
    , "Construct values of this type with literals, using single quotes `'`:"
    , ""
-   , "    x = '0' :: Char"
+   , "    x = 'a' :: Char"
    ]
 
 boolean :: Declaration
