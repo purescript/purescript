@@ -23,7 +23,7 @@ module Language.PureScript.Publish
 import Prelude ()
 import Prelude.Compat hiding (userError)
 
-import Control.Arrow ((***))
+import Control.Arrow ((***), first)
 import Control.Category ((>>>))
 import Control.Exception (catch, try)
 import Control.Monad.Error.Class (MonadError(..))
@@ -35,12 +35,13 @@ import Data.Aeson.BetterErrors
 import Data.Char (isSpace)
 import Data.Foldable (traverse_)
 import Data.Function (on)
-import Data.List (stripPrefix, isSuffixOf, (\\), nubBy)
+import Data.List (stripPrefix, (\\), nubBy)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.List.Split (splitOn)
 import Data.Maybe
 import Data.Version
 import qualified Data.SPDX as SPDX
+import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
@@ -65,7 +66,7 @@ import qualified Language.PureScript.Docs as D
 data PublishOptions = PublishOptions
   { -- | How to obtain the version tag and version that the data being
     -- generated will refer to.
-    publishGetVersion :: PrepareM (String, Version)
+    publishGetVersion :: PrepareM (Text, Version)
   , -- | What to do when the working tree is dirty
     publishWorkingTreeDirty :: PrepareM ()
   }
@@ -184,13 +185,13 @@ checkCleanWorkingTree opts = do
   unless (status == Clean) $
     publishWorkingTreeDirty opts
 
-getVersionFromGitTag :: PrepareM (String, Version)
+getVersionFromGitTag :: PrepareM (Text, Version)
 getVersionFromGitTag = do
   out <- readProcess' "git" ["tag", "--list", "--points-at", "HEAD"] ""
   let vs = map trimWhitespace (lines out)
   case mapMaybe parseMay vs of
     []  -> userError TagMustBeCheckedOut
-    [x] -> return x
+    [x] -> return (first T.pack x)
     xs  -> userError (AmbiguousVersions (map snd xs))
   where
   trimWhitespace =
@@ -209,7 +210,7 @@ getBowerRepositoryInfo = either (userError . BadRepositoryField) return . tryExt
       Just Repository{..} -> do
         unless (repositoryType == "git")
           (Left (BadRepositoryType repositoryType))
-        maybe (Left NotOnGithub) Right (extractGithub repositoryUrl)
+        maybe (Left NotOnGithub) Right (extractGithub (T.pack repositoryUrl))
 
 checkLicense :: PackageMeta -> PrepareM ()
 checkLicense pkgMeta =
@@ -226,9 +227,9 @@ checkLicense pkgMeta =
 isValidSPDX :: String -> Bool
 isValidSPDX = (== 1) . length . SPDX.parseExpression
 
-extractGithub :: String -> Maybe (D.GithubUser, D.GithubRepo)
+extractGithub :: Text -> Maybe (D.GithubUser, D.GithubRepo)
 extractGithub = stripGitHubPrefixes
-   >>> fmap (splitOn "/")
+   >>> fmap (T.splitOn "/")
    >=> takeTwo
    >>> fmap (D.GithubUser *** (D.GithubRepo . dropDotGit))
 
@@ -237,18 +238,18 @@ extractGithub = stripGitHubPrefixes
   takeTwo [x, y] = Just (x, y)
   takeTwo _ = Nothing
 
-  stripGitHubPrefixes :: String -> Maybe String
+  stripGitHubPrefixes :: Text -> Maybe Text
   stripGitHubPrefixes = stripPrefixes [ "git://github.com/"
                                       , "https://github.com/"
                                       , "git@github.com:"
                                       ]
 
-  stripPrefixes :: [String] -> String -> Maybe String
-  stripPrefixes prefixes str = msum $ (`stripPrefix` str) <$> prefixes
+  stripPrefixes :: [Text] -> Text -> Maybe Text
+  stripPrefixes prefixes str = msum $ (`T.stripPrefix` str) <$> prefixes
 
-  dropDotGit :: String -> String
+  dropDotGit :: Text -> Text
   dropDotGit str
-    | ".git" `isSuffixOf` str = take (length str - 4) str
+    | ".git" `T.isSuffixOf` str = T.take (T.length str - 4) str
     | otherwise = str
 
 readProcess' :: String -> [String] -> String -> PrepareM String
@@ -265,12 +266,12 @@ data DependencyStatus
     -- _resolution key. This can be caused by adding the dependency using
     -- `bower link`, or simply copying it into bower_components instead of
     -- installing it normally.
-  | ResolvedOther String
-    -- ^ Resolved, but to something other than a version. The String argument
+  | ResolvedOther Text
+    -- ^ Resolved, but to something other than a version. The Text argument
     -- is the resolution type. The values it can take that I'm aware of are
     -- "commit" and "branch".
-  | ResolvedVersion String
-    -- ^ Resolved to a version. The String argument is the resolution tag (eg,
+  | ResolvedVersion Text
+    -- ^ Resolved to a version. The Text argument is the resolution tag (eg,
     -- "v0.1.0").
   deriving (Show, Eq)
 
@@ -341,9 +342,9 @@ asDependencyStatus = do
     else
       key "pkgMeta" $
         keyOrDefault "_resolution" NoResolution $ do
-          type_ <- key "type" asString
+          type_ <- key "type" asText
           case type_ of
-            "version" -> ResolvedVersion <$> key "tag" asString
+            "version" -> ResolvedVersion <$> key "tag" asText
             other -> return (ResolvedOther other)
 
 warnUndeclared :: [PackageName] -> [PackageName] -> PrepareM ()
@@ -374,15 +375,16 @@ handleDeps deps = do
   bowerDir pkgName = "bower_components/" ++ runPackageName pkgName
 
   -- Try to extract a version, and warn if unsuccessful.
+  tryExtractVersion' :: (PackageName, Text) -> PrepareM (Maybe (PackageName, Version))
   tryExtractVersion' pair =
     maybe (warn (UnacceptableVersion pair) >> return Nothing)
           (return . Just)
           (tryExtractVersion pair)
 
-tryExtractVersion :: (PackageName, String) -> Maybe (PackageName, Version)
+tryExtractVersion :: (PackageName, Text) -> Maybe (PackageName, Version)
 tryExtractVersion (pkgName, tag) =
-  let tag' = fromMaybe tag (stripPrefix "v" tag)
-  in  (pkgName,) <$> D.parseVersion' tag'
+  let tag' = fromMaybe tag (T.stripPrefix "v" tag)
+  in  (pkgName,) <$> D.parseVersion' (T.unpack tag')
 
 -- | Returns whether it looks like there is a purescript package checked out
 -- in the given directory.

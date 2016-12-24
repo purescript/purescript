@@ -1,20 +1,12 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
-{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module TestPscPublish where
 
-import Control.Monad
-import Control.Applicative
-import Control.Exception
-import System.Process
-import System.Directory
-import System.IO
-import System.Exit
-import qualified Data.ByteString.Lazy as BL
+import System.Exit (exitFailure)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.Aeson as A
-import Data.Aeson.BetterErrors
 import Data.Version
 
 import Language.PureScript.Docs

@@ -37,7 +37,7 @@ import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Aeson.BetterErrors
 import qualified Data.Aeson as A
-import qualified Data.Text as T
+import Data.Text (Text)
 
 import qualified Language.PureScript as P
 
@@ -46,11 +46,11 @@ import qualified Language.PureScript as P
 -- multiple output formats. For example, plain text, or highlighted HTML.
 --
 data RenderedCodeElement
-  = Syntax String
-  | Ident String ContainingModule
-  | Ctor String ContainingModule
-  | Kind String
-  | Keyword String
+  = Syntax Text
+  | Ident Text ContainingModule
+  | Ctor Text ContainingModule
+  | Kind Text
+  | Keyword Text
   | Space
   deriving (Show, Eq, Ord)
 
@@ -66,9 +66,9 @@ instance A.ToJSON RenderedCodeElement where
   toJSON (Keyword str) =
     A.toJSON ["keyword", str]
   toJSON Space =
-    A.toJSON ["space" :: String]
+    A.toJSON ["space" :: Text]
 
-asRenderedCodeElement :: Parse String RenderedCodeElement
+asRenderedCodeElement :: Parse Text RenderedCodeElement
 asRenderedCodeElement =
   a Syntax "syntax" <|>
   asIdent <|>
@@ -80,14 +80,14 @@ asRenderedCodeElement =
   where
   p <|> q = catchError p (const q)
 
-  a ctor' ctorStr = ctor' <$> (nth 0 (withString (eq ctorStr)) *> nth 1 asString)
-  asIdent = nth 0 (withString (eq "ident")) *> (Ident <$> nth 1 asString <*> nth 2 asContainingModule)
-  asCtor = nth 0 (withString (eq "ctor")) *> (Ctor <$> nth 1 asString <*> nth 2 asContainingModule)
-  asSpace = nth 0 (withString (eq "space")) *> pure Space
+  a ctor' ctorStr = ctor' <$> (nth 0 (withText (eq ctorStr)) *> nth 1 asText)
+  asIdent = nth 0 (withText (eq "ident")) *> (Ident <$> nth 1 asText <*> nth 2 asContainingModule)
+  asCtor = nth 0 (withText (eq "ctor")) *> (Ctor <$> nth 1 asText <*> nth 2 asContainingModule)
+  asSpace = nth 0 (withText (eq "space")) *> pure Space
 
   eq s s' = if s == s' then Right () else Left ""
 
-  unableToParse = withString (Left . show)
+  unableToParse = withText Left
 
 -- |
 -- This type is isomorphic to 'Maybe' 'P.ModuleName'. It makes code a bit easier
@@ -103,7 +103,7 @@ instance A.ToJSON ContainingModule where
 
 asContainingModule :: Parse e ContainingModule
 asContainingModule =
-  maybeToContainingModule <$> perhaps (P.moduleNameFromString . T.pack <$> asString)
+  maybeToContainingModule <$> perhaps (P.moduleNameFromString <$> asText)
 
 -- |
 -- Convert a 'Maybe' 'P.ModuleName' to a 'ContainingModule', using the obvious
@@ -139,7 +139,7 @@ newtype RenderedCode
 instance A.ToJSON RenderedCode where
   toJSON (RC elems) = A.toJSON elems
 
-asRenderedCode :: Parse String RenderedCode
+asRenderedCode :: Parse Text RenderedCode
 asRenderedCode = RC <$> eachInArray asRenderedCodeElement
 
 -- |
@@ -157,22 +157,22 @@ outputWith f = foldMap f . unRC
 sp :: RenderedCode
 sp = RC [Space]
 
-syntax :: String -> RenderedCode
+syntax :: Text -> RenderedCode
 syntax x = RC [Syntax x]
 
-ident :: String -> RenderedCode
+ident :: Text -> RenderedCode
 ident x = RC [Ident x ThisModule]
 
-ident' :: String -> ContainingModule -> RenderedCode
+ident' :: Text -> ContainingModule -> RenderedCode
 ident' x m = RC [Ident x m]
 
-ctor :: String -> ContainingModule -> RenderedCode
+ctor :: Text -> ContainingModule -> RenderedCode
 ctor x m = RC [Ctor x m]
 
-kind :: String -> RenderedCode
+kind :: Text -> RenderedCode
 kind x = RC [Kind x]
 
-keyword :: String -> RenderedCode
+keyword :: Text -> RenderedCode
 keyword kw = RC [Keyword kw]
 
 keywordForall :: RenderedCode

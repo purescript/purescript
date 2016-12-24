@@ -14,10 +14,9 @@ import Prelude.Compat
 
 import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
-import qualified Data.Text as T
 import Data.Text (Text)
 
-import Control.Arrow ((<+>), first)
+import Control.Arrow ((<+>))
 import Control.PatternArrows as PA
 
 import Language.PureScript.Crash
@@ -35,7 +34,7 @@ typeLiterals = mkPattern match
   match TypeWildcard{} =
     Just (syntax "_")
   match (TypeVar var) =
-    Just (ident (T.unpack var))
+    Just (ident var)
   match (PrettyPrintObject row) =
     Just $ mintersperse sp
               [ syntax "{"
@@ -43,7 +42,7 @@ typeLiterals = mkPattern match
               , syntax "}"
               ]
   match (TypeConstructor (Qualified mn name)) =
-    Just (ctor (T.unpack (runProperName name)) (maybeToContainingModule mn))
+    Just (ctor (runProperName name) (maybeToContainingModule mn))
   match REmpty =
     Just (syntax "()")
   match row@RCons{} =
@@ -51,7 +50,7 @@ typeLiterals = mkPattern match
   match (BinaryNoParensType op l r) =
     Just $ renderTypeAtom l <> sp <> renderTypeAtom op <> sp <> renderTypeAtom r
   match (TypeOp (Qualified mn op)) =
-    Just (ident' (T.unpack (runOpName op)) (maybeToContainingModule mn))
+    Just (ident' (runOpName op) (maybeToContainingModule mn))
   match _ =
     Nothing
 
@@ -76,16 +75,14 @@ renderConstraints deps ty =
 -- Render code representing a Row
 --
 renderRow :: Type -> RenderedCode
-renderRow = uncurry renderRow' . convertString . rowToList
+renderRow = uncurry renderRow' . rowToList
   where
-  convertString :: ([(Text, Type)], Type) -> ([(String, Type)], Type)
-  convertString = first (map (first T.unpack))
   renderRow' h t = renderHead h <> renderTail t
 
-renderHead :: [(String, Type)] -> RenderedCode
+renderHead :: [(Text, Type)] -> RenderedCode
 renderHead = mintersperse (syntax "," <> sp) . map renderLabel
 
-renderLabel :: (String, Type) -> RenderedCode
+renderLabel :: (Text, Type) -> RenderedCode
 renderLabel (label, ty) =
   mintersperse sp
     [ ident label
@@ -145,10 +142,10 @@ matchType = buildPrettyPrinter operators matchTypeAtom
                   , [ Wrap explicitParens $ \_ ty -> ty ]
                   ]
 
-forall_ :: Pattern () Type ([String], Type)
+forall_ :: Pattern () Type ([Text], Type)
 forall_ = mkPattern match
   where
-  match (PrettyPrintForAll idents ty) = Just (map T.unpack idents, ty)
+  match (PrettyPrintForAll idents ty) = Just (idents, ty)
   match _ = Nothing
 
 insertPlaceholders :: RenderTypeOptions -> Type -> Type
@@ -180,7 +177,7 @@ preprocessType opts = dePrim . insertPlaceholders opts
 -- Render code representing a Kind
 --
 renderKind :: Kind -> RenderedCode
-renderKind = kind . T.unpack . prettyPrintKind
+renderKind = kind . prettyPrintKind
 
 -- |
 -- Render code representing a Type, as it should appear inside parentheses

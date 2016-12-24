@@ -2,7 +2,7 @@
 module Language.PureScript.Docs.Prim (primDocsModule) where
 
 import Prelude.Compat hiding (fail)
-import Control.Arrow (first)
+import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Map as Map
 import Language.PureScript.Docs.Types
@@ -30,18 +30,18 @@ primDocsModule = Module
   }
 
 unsafeLookup :: forall v (a :: P.ProperNameType).
-  Map.Map (P.Qualified (P.ProperName a)) v -> String -> String -> v
-unsafeLookup m errorMsg ty = go ty
+  Map.Map (P.Qualified (P.ProperName a)) v -> String -> Text -> v
+unsafeLookup m errorMsg name = go name
   where
-  go = fromJust' . flip Map.lookup m . P.primName . T.pack
+  go = fromJust' . flip Map.lookup m . P.primName
 
   fromJust' (Just x) = x
-  fromJust' _ = P.internalError $ errorMsg ++ ty
+  fromJust' _ = P.internalError $ errorMsg ++ show name
 
-lookupPrimKind :: String -> P.Kind
+lookupPrimKind :: Text -> P.Kind
 lookupPrimKind = fst . unsafeLookup P.primTypes "Docs.Prim: No such Prim type: "
 
-primType :: String -> String ->  Declaration
+primType :: Text -> Text ->  Declaration
 primType title comments = Declaration
   { declTitle = title
   , declComments = Just comments
@@ -52,10 +52,10 @@ primType title comments = Declaration
 
 -- | Lookup the TypeClassData of a Prim class. This function is specifically
 -- not exported because it is partial.
-lookupPrimClass :: String -> P.TypeClassData
+lookupPrimClass :: Text -> P.TypeClassData
 lookupPrimClass = unsafeLookup P.primClasses "Docs.Prim: No such Prim class: "
 
-primClass :: String -> String -> Declaration
+primClass :: Text -> Text -> Declaration
 primClass title comments = Declaration
   { declTitle = title
   , declComments = Just comments
@@ -68,11 +68,11 @@ primClass title comments = Declaration
         superclasses = P.typeClassSuperclasses tcd
         fundeps = convertFundepsToStrings args (P.typeClassDependencies tcd)
       in
-        TypeClassDeclaration (map (first T.unpack) args) superclasses fundeps
+        TypeClassDeclaration args superclasses fundeps
   }
 
 function :: Declaration
-function = primType "Function" $ unlines
+function = primType "Function" $ T.unlines
   [ "A function, which takes values of the type specified by the first type"
   , "parameter, and returns values of the type specified by the second."
   , "In the JavaScript backend, this is a standard JavaScript Function."
@@ -91,7 +91,7 @@ function = primType "Function" $ unlines
   ]
 
 array :: Declaration
-array = primType "Array" $ unlines
+array = primType "Array" $ T.unlines
   [ "An Array: a data structure supporting efficient random access. In"
   , "the JavaScript backend, values of this type are represented as JavaScript"
   , "Arrays at runtime."
@@ -102,7 +102,7 @@ array = primType "Array" $ unlines
   ]
 
 record :: Declaration
-record = primType "Record" $ unlines
+record = primType "Record" $ T.unlines
   [ "The type of records whose fields are known at compile time. In the"
   , "JavaScript backend, values of this type are represented as JavaScript"
   , "Objects at runtime."
@@ -118,7 +118,7 @@ record = primType "Record" $ unlines
   ]
 
 number :: Declaration
-number = primType "Number" $ unlines
+number = primType "Number" $ T.unlines
   [ "A double precision floating point number (IEEE 754)."
   , ""
   , "Construct values of this type with literals:"
@@ -128,7 +128,7 @@ number = primType "Number" $ unlines
   ]
 
 int :: Declaration
-int = primType "Int" $ unlines
+int = primType "Int" $ T.unlines
   [ "A 32-bit signed integer. See the purescript-integers package for details"
   , "of how this is accomplished when compiling to JavaScript."
   , ""
@@ -138,7 +138,7 @@ int = primType "Int" $ unlines
   ]
 
 string :: Declaration
-string = primType "String" $ unlines
+string = primType "String" $ T.unlines
   [ "A String. As in JavaScript, String values represent sequences of UTF-16"
   , "code units, which are not required to form a valid encoding of Unicode"
   , "text (for example, lone surrogates are permitted)."
@@ -151,7 +151,7 @@ string = primType "String" $ unlines
   ]
 
 char :: Declaration
-char = primType "Char" $ unlines
+char = primType "Char" $ T.unlines
    [ "A single character (UTF-16 code unit). The JavaScript representation is a"
    , "normal String, which is guaranteed to contain one code unit. This means"
    , "that astral plane characters (i.e. those with code point values greater"
@@ -163,14 +163,14 @@ char = primType "Char" $ unlines
    ]
 
 boolean :: Declaration
-boolean = primType "Boolean" $ unlines
+boolean = primType "Boolean" $ T.unlines
   [ "A JavaScript Boolean value."
   , ""
   , "Construct values of this type with the literals `true` and `false`."
   ]
 
 partial :: Declaration
-partial = primClass "Partial" $ unlines
+partial = primClass "Partial" $ T.unlines
   [ "The Partial type class is used to indicate that a function is *partial,*"
   , "that is, it is not defined for all inputs. In practice, attempting to use"
   , "a partial function with a bad input will usually cause an error to be"
@@ -180,7 +180,7 @@ partial = primClass "Partial" $ unlines
   ]
 
 fail :: Declaration
-fail = primClass "Fail" $ unlines
+fail = primClass "Fail" $ T.unlines
   [ "The Fail type class is part of the custom type errors feature. To provide"
   , "a custom type error when someone tries to use a particular instance,"
   , "write that instance out with a Fail constraint."
@@ -190,7 +190,7 @@ fail = primClass "Fail" $ unlines
   ]
 
 typeConcat :: Declaration
-typeConcat = primType "TypeConcat" $ unlines
+typeConcat = primType "TypeConcat" $ T.unlines
   [ "The TypeConcat type constructor concatenates two Symbols in a custom type"
   , "error."
   , ""
@@ -199,7 +199,7 @@ typeConcat = primType "TypeConcat" $ unlines
   ]
 
 typeString :: Declaration
-typeString = primType "TypeString" $ unlines
+typeString = primType "TypeString" $ T.unlines
   [ "The TypeString type constructor renders any concrete type into a Symbol"
   , "in a custom type error."
   , ""

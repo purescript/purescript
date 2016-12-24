@@ -5,21 +5,18 @@ module Language.PureScript.Docs.Convert.Single
 
 import Prelude.Compat
 
-import Control.Arrow (first)
 import Control.Category ((>>>))
 import Control.Monad
 
 import Data.Either
 import Data.List (nub)
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, fromMaybe)
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.Docs.Types
 import qualified Language.PureScript as P
-
--- TODO (Christoph): Get rid of the T.unpack s
 
 -- |
 -- Convert a single Module, but ignore re-exports; any re-exported types or
@@ -46,14 +43,14 @@ convertSingleModule m@(P.Module _ coms moduleName  _ _) =
 -- In the second pass, we go over all of the Left values and augment the
 -- relevant declarations, leaving only the augmented Right values.
 --
--- Note that in the Left case, we provide a [String] as well as augment
--- information. The [String] value should be a list of titles of declarations
+-- Note that in the Left case, we provide a [Text] as well as augment
+-- information. The [Text] value should be a list of titles of declarations
 -- that the augmentation should apply to. For example, for a type instance
 -- declaration, that would be any types or type classes mentioned in the
 -- instance. For a fixity declaration, it would be just the relevant operator's
 -- name.
 type IntermediateDeclaration
-  = Either ([String], DeclarationAugment) Declaration
+  = Either ([Text], DeclarationAugment) Declaration
 
 -- | Some data which will be used to augment a Declaration in the
 -- output.
@@ -97,7 +94,7 @@ getDeclarationTitle _ = Nothing
 -- | Create a basic Declaration value.
 mkDeclaration :: Text -> DeclarationInfo -> Declaration
 mkDeclaration title info =
-  Declaration { declTitle      = T.unpack title
+  Declaration { declTitle      = title
               , declComments   = Nothing
               , declSourceSpan = Nothing
               , declChildren   = []
@@ -119,27 +116,27 @@ convertDeclaration (P.ExternDeclaration _ ty) title =
 convertDeclaration (P.DataDeclaration dtype _ args ctors) title =
   Just (Right (mkDeclaration title info) { declChildren = children })
   where
-  info = DataDeclaration dtype (map (first T.unpack) args)
+  info = DataDeclaration dtype args
   children = map convertCtor ctors
   convertCtor (ctor', tys) =
-    ChildDeclaration (T.unpack (P.runProperName ctor')) Nothing Nothing (ChildDataConstructor tys)
+    ChildDeclaration (P.runProperName ctor') Nothing Nothing (ChildDataConstructor tys)
 convertDeclaration (P.ExternDataDeclaration _ kind') title =
   basicDeclaration title (ExternDataDeclaration kind')
 convertDeclaration (P.TypeSynonymDeclaration _ args ty) title =
-  basicDeclaration title (TypeSynonymDeclaration (map (first T.unpack) args) ty)
+  basicDeclaration title (TypeSynonymDeclaration args ty)
 convertDeclaration (P.TypeClassDeclaration _ args implies fundeps ds) title =
   Just (Right (mkDeclaration title info) { declChildren = children })
   where
-  info = TypeClassDeclaration (map (first T.unpack) args) implies (convertFundepsToStrings args fundeps)
+  info = TypeClassDeclaration args implies (convertFundepsToStrings args fundeps)
   children = map convertClassMember ds
   convertClassMember (P.PositionedDeclaration _ _ d) =
     convertClassMember d
   convertClassMember (P.TypeDeclaration ident' ty) =
-    ChildDeclaration (T.unpack (P.showIdent ident')) Nothing Nothing (ChildTypeClassMember ty)
+    ChildDeclaration (P.showIdent ident') Nothing Nothing (ChildTypeClassMember ty)
   convertClassMember _ =
     P.internalError "convertDeclaration: Invalid argument to convertClassMember."
 convertDeclaration (P.TypeInstanceDeclaration _ constraints className tys _) title =
-  Just (Left (T.unpack classNameString : map T.unpack typeNameStrings, AugmentChild childDecl))
+  Just (Left (classNameString : typeNameStrings, AugmentChild childDecl))
   where
   classNameString = unQual className
   typeNameStrings = nub (concatMap (P.everythingOnTypes (++) extractProperNames) tys)
@@ -148,7 +145,7 @@ convertDeclaration (P.TypeInstanceDeclaration _ constraints className tys _) tit
   extractProperNames (P.TypeConstructor n) = [unQual n]
   extractProperNames _ = []
 
-  childDecl = ChildDeclaration (T.unpack title) Nothing Nothing (ChildInstance constraints classApp)
+  childDecl = ChildDeclaration title Nothing Nothing (ChildInstance constraints classApp)
   classApp = foldl P.TypeApp (P.TypeConstructor (fmap P.coerceProperName className)) tys
 convertDeclaration (P.ValueFixityDeclaration fixity (P.Qualified mn alias) _) title =
   Just $ Right $ mkDeclaration title (AliasDeclaration fixity (P.Qualified mn (Right alias)))
@@ -172,25 +169,24 @@ convertDeclaration (P.PositionedDeclaration srcSpan com d') title =
   withAugmentChild f (t, AugmentChild d) = (t, AugmentChild (f d))
 convertDeclaration _ _ = Nothing
 
-convertComments :: [P.Comment] -> Maybe String
+convertComments :: [P.Comment] -> Maybe Text
 convertComments cs = do
   let raw = concatMap toLines cs
   let docs = mapMaybe stripPipe raw
   guard (not (null docs))
-  pure (unlines docs)
+  pure (T.unlines docs)
 
   where
-  toLines (P.LineComment s) = [T.unpack s]
-  toLines (P.BlockComment s) = lines (T.unpack s)
+  toLines (P.LineComment s) = [s]
+  toLines (P.BlockComment s) = T.lines s
 
-  stripPipe s' =
-    case dropWhile (== ' ') s' of
-      ('|':' ':s) ->
-        Just s
-      ('|':s) ->
-        Just s
-      _ ->
-        Nothing
+  stripPipe =
+    T.dropWhile (== ' ')
+    >>> T.stripPrefix "|"
+    >>> fmap (dropPrefix " ")
+
+  dropPrefix prefix str =
+    fromMaybe str (T.stripPrefix prefix str)
 
 -- | Go through a PureScript module and extract a list of Bookmarks; references
 -- to data types or values, to be used as a kind of index. These are used for
@@ -199,8 +195,7 @@ collectBookmarks :: InPackage P.Module -> [Bookmark]
 collectBookmarks (Local m) = map Local (collectBookmarks' m)
 collectBookmarks (FromDep pkg m) = map (FromDep pkg) (collectBookmarks' m)
 
-collectBookmarks' :: P.Module -> [(P.ModuleName, String)]
+collectBookmarks' :: P.Module -> [(P.ModuleName, Text)]
 collectBookmarks' m =
   map (P.getModuleName m, )
-      (mapMaybe (fmap T.unpack . getDeclarationTitle)
-                (P.exportedDeclarations m))
+      (mapMaybe getDeclarationTitle (P.exportedDeclarations m))
