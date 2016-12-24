@@ -70,6 +70,9 @@ data Assertion
   -- type, when rendered, matches a given string exactly
   -- fields: module, type synonym name, expected type
   | TypeSynonymShouldRenderAs P.ModuleName Text Text
+  -- | Assert that a documented declaration includes a documentation comment
+  -- containing a particular string
+  | ShouldHaveDocComment P.ModuleName Text Text
   deriving (Show)
 
 newtype ShowFn a = ShowFn a
@@ -101,6 +104,9 @@ data AssertionFailure
   -- | A Type synonym has been rendered in an unexpected format
   -- Fields: module name, declaration name, expected rendering, actual rendering
   | TypeSynonymMismatch P.ModuleName Text Text Text
+  -- | A doc comment was not found or did not match what was expected
+  -- Fields: declaration title, expected substring, actual comments
+  | DocCommentMissing P.ModuleName Text (Maybe Text)
   deriving (Show)
 
 data AssertionResult
@@ -137,62 +143,56 @@ runAssertion assertion Docs.Module{..} =
           Fail (NotDocumented mn decl)
 
     ShouldBeConstrained mn decl tyClass ->
-      case find ((==) decl . Docs.declTitle) (declarationsFor mn) of
-        Nothing ->
-          Fail (NotDocumented mn decl)
-        Just Docs.Declaration{..} ->
-          case declInfo of
-            Docs.ValueDeclaration ty ->
-              if checkConstrained ty tyClass
-                then Pass
-                else Fail (ConstraintMissing mn decl tyClass)
-            _ ->
-              Fail (WrongDeclarationType mn decl "value"
-                     (Docs.declInfoToString declInfo))
+      findDecl mn decl $ \Docs.Declaration{..} ->
+        case declInfo of
+          Docs.ValueDeclaration ty ->
+            if checkConstrained ty tyClass
+              then Pass
+              else Fail (ConstraintMissing mn decl tyClass)
+          _ ->
+            Fail (WrongDeclarationType mn decl "value"
+                   (Docs.declInfoToString declInfo))
 
     ShouldHaveFunDeps mn decl fds ->
-      case find ((==) decl . Docs.declTitle) (declarationsFor mn) of
-        Nothing ->
-          Fail (NotDocumented mn decl)
-        Just Docs.Declaration{..} ->
-          case declInfo of
-            Docs.TypeClassDeclaration _ _ fundeps ->
-              if fundeps == fds
-                then Pass
-                else Fail (FunDepMissing mn decl fds)
-            _ ->
-              Fail (WrongDeclarationType mn decl "value"
-                     (Docs.declInfoToString declInfo))
+      findDecl mn decl $ \Docs.Declaration{..} ->
+        case declInfo of
+          Docs.TypeClassDeclaration _ _ fundeps ->
+            if fundeps == fds
+              then Pass
+              else Fail (FunDepMissing mn decl fds)
+          _ ->
+            Fail (WrongDeclarationType mn decl "value"
+                   (Docs.declInfoToString declInfo))
 
     ValueShouldHaveTypeSignature mn decl (ShowFn tyPredicate) ->
-      case find ((==) decl . Docs.declTitle) (declarationsFor mn) of
-        Nothing ->
-          Fail (NotDocumented mn decl)
-        Just Docs.Declaration{..} ->
-          case declInfo of
-            Docs.ValueDeclaration ty ->
-              if tyPredicate ty
-                then Pass
-                else Fail
-                  (ValueDeclarationWrongType mn decl ty)
-            _ ->
-              Fail (WrongDeclarationType mn decl "value"
-                     (Docs.declInfoToString declInfo))
+      findDecl mn decl $ \Docs.Declaration{..} ->
+        case declInfo of
+          Docs.ValueDeclaration ty ->
+            if tyPredicate ty
+              then Pass
+              else Fail
+                (ValueDeclarationWrongType mn decl ty)
+          _ ->
+            Fail (WrongDeclarationType mn decl "value"
+                   (Docs.declInfoToString declInfo))
 
     TypeSynonymShouldRenderAs mn decl expected ->
-      case find ((==) decl . Docs.declTitle) (declarationsFor mn) of
-        Nothing ->
-          Fail (NotDocumented mn decl)
-        Just Docs.Declaration{..} ->
-          case declInfo of
-            Docs.TypeSynonymDeclaration [] ty ->
-              let actual = codeToString (Docs.renderType ty) in
-              if actual == expected
-                 then Pass
-                 else Fail (TypeSynonymMismatch mn decl expected actual)
-            _ ->
-              Fail (WrongDeclarationType mn decl "synonym"
-                    (Docs.declInfoToString declInfo))
+      findDecl mn decl $ \Docs.Declaration{..} ->
+        case declInfo of
+          Docs.TypeSynonymDeclaration [] ty ->
+            let actual = codeToString (Docs.renderType ty) in
+            if actual == expected
+               then Pass
+               else Fail (TypeSynonymMismatch mn decl expected actual)
+          _ ->
+            Fail (WrongDeclarationType mn decl "synonym"
+                  (Docs.declInfoToString declInfo))
+
+    ShouldHaveDocComment mn decl expected ->
+      findDecl mn decl $ \Docs.Declaration{..} ->
+        if maybe False (expected `T.isInfixOf`) declComments
+          then Pass
+          else Fail (DocCommentMissing mn decl declComments)
 
   where
   declarationsFor mn =
@@ -202,6 +202,13 @@ runAssertion assertion Docs.Module{..} =
 
   findChildren title =
     fmap childrenTitles . find ((==) title . Docs.declTitle)
+
+  findDecl mn title f =
+      case find ((==) title . Docs.declTitle) (declarationsFor mn) of
+        Nothing ->
+          Fail (NotDocumented mn title)
+        Just decl ->
+          f decl
 
   childrenTitles = map Docs.cdeclTitle . Docs.declChildren
 
@@ -320,6 +327,10 @@ testCases =
       , ValueShouldHaveTypeSignature (n "TypeOpAliases") "test3" (renderedType "forall a b c d. a ~> (b ~> c) ~> d")
       , ValueShouldHaveTypeSignature (n "TypeOpAliases") "test4" (renderedType "forall a b c d. ((a ~> b) ~> c) ~> d")
       , ValueShouldHaveTypeSignature (n "TypeOpAliases") "third" (renderedType "forall a b c. a × b × c -> c")
+      ])
+
+  , ("DocComments",
+      [ ShouldHaveDocComment (n "DocComments") "example" "    example == 0"
       ])
   ]
 
