@@ -13,6 +13,7 @@ import qualified TestDocs
 import qualified TestPsci
 import qualified TestPscIde
 import qualified TestPscPublish
+import qualified TestPrimDocs
 import qualified TestUtils
 
 import System.IO (hSetEncoding, stdout, stderr, utf8)
@@ -28,6 +29,7 @@ main = do
   TestCompiler.main
   heading "Documentation test suite"
   TestDocs.main
+  TestPrimDocs.main
   heading "psc-publish test suite"
   TestPscPublish.main
   heading "psci test suite"

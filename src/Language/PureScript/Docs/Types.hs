@@ -9,6 +9,7 @@ import Prelude.Compat
 import Control.Arrow (first, (***))
 import Control.Monad (when)
 
+import Data.Bifunctor (bimap)
 import Data.Aeson ((.=))
 import Data.Aeson.BetterErrors
 import Data.ByteString.Lazy (ByteString)
@@ -16,6 +17,7 @@ import Data.Either (isLeft, isRight)
 import Data.Maybe (mapMaybe)
 import Data.Text (Text)
 import Data.Version
+import qualified Data.Vector as V
 import qualified Data.Aeson as A
 import qualified Data.Text as T
 
@@ -131,6 +133,25 @@ data DeclarationInfo
   --
   | AliasDeclaration P.Fixity FixityAlias
   deriving (Show, Eq, Ord)
+
+convertFundepsToStrings :: [(Text, Maybe P.Kind)] -> [P.FunctionalDependency] -> [([String], [String])]
+convertFundepsToStrings args fundeps =
+  map (bimap (map T.unpack) (map T.unpack)) fundeps'
+  where
+  fundeps' = map (\(P.FunctionalDependency from to) -> toArgs from to) fundeps
+  argsVec = V.fromList (map fst args)
+  getArg i =
+    maybe
+      (P.internalError $ unlines
+        [ "convertDeclaration: Functional dependency index"
+        , show i
+        , "is bigger than arguments list"
+        , show (map fst args)
+        , "Functional dependencies are"
+        , show fundeps
+        ]
+      ) id $ argsVec V.!? i
+  toArgs from to = (map getArg from, map getArg to)
 
 type FixityAlias = P.Qualified (Either (P.ProperName 'P.TypeName) (Either P.Ident (P.ProperName 'P.ConstructorName)))
 
