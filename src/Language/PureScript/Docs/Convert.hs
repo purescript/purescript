@@ -16,7 +16,7 @@ import Control.Monad.Error.Class (MonadError)
 import Control.Monad.State (runStateT)
 import Control.Monad.Writer.Strict (runWriterT)
 import qualified Data.Map as Map
-import qualified Data.Text as T
+import Data.Text (Text)
 
 import Language.PureScript.Docs.Convert.ReExports (updateReExports)
 import Language.PureScript.Docs.Convert.Single (convertSingleModule, collectBookmarks)
@@ -167,9 +167,9 @@ insertValueTypes env m =
   err msg =
     P.internalError ("Docs.Convert.insertValueTypes: " ++ msg)
 
-runParser :: P.TokenParser a -> String -> Either String a
+runParser :: P.TokenParser a -> Text -> Either String a
 runParser p s = either (Left . show) Right $ do
-  ts <- P.lex "" (T.pack s)
+  ts <- P.lex "" s
   P.runTokenParser "" (p <* eof) ts
 
 -- |

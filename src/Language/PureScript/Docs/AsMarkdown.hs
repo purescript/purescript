@@ -13,7 +13,9 @@ import Control.Monad.Error.Class (MonadError)
 import Control.Monad.Writer (Writer, tell, execWriter)
 
 import Data.Foldable (for_)
+import Data.Monoid ((<>))
 import Data.List (partition)
+import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.Docs.RenderedCode
@@ -24,12 +26,12 @@ import qualified Language.PureScript.Docs.Render as Render
 
 -- |
 -- Take a list of modules and render them all in order, returning a single
--- Markdown-formatted String.
+-- Markdown-formatted Text.
 --
 renderModulesAsMarkdown ::
   (MonadError P.MultipleErrors m) =>
   [P.Module] ->
-  m String
+  m Text
 renderModulesAsMarkdown =
   fmap (runDocs . modulesAsMarkdown) . Convert.convertModules
 
@@ -38,13 +40,13 @@ modulesAsMarkdown = mapM_ moduleAsMarkdown
 
 moduleAsMarkdown :: Module -> Docs
 moduleAsMarkdown Module{..} = do
-  headerLevel 2 $ "Module " ++ T.unpack (P.runModuleName modName)
+  headerLevel 2 $ "Module " <> P.runModuleName modName
   spacer
   for_ modComments tell'
   mapM_ (declAsMarkdown modName) modDeclarations
   spacer
   for_ modReExports $ \(mn, decls) -> do
-    headerLevel 3 $ "Re-exported from " ++ T.unpack (P.runModuleName mn) ++ ":"
+    headerLevel 3 $ "Re-exported from " <> P.runModuleName mn <> ":"
     spacer
     mapM_ (declAsMarkdown mn) decls
 
@@ -71,7 +73,7 @@ declAsMarkdown mn decl@Declaration{..} = do
   isChildInstance (ChildInstance _ _) = True
   isChildInstance _ = False
 
-codeToString :: RenderedCode -> String
+codeToString :: RenderedCode -> Text
 codeToString = outputWith elemAsMarkdown
   where
   elemAsMarkdown (Syntax x)  = x
@@ -95,14 +97,14 @@ codeToString = outputWith elemAsMarkdown
 --     P.Infixr -> "right-associative"
 --     P.Infix  -> "non-associative"
 
-childToString :: First -> ChildDeclaration -> String
+childToString :: First -> ChildDeclaration -> Text
 childToString f decl@ChildDeclaration{..} =
   case cdeclInfo of
     ChildDataConstructor _ ->
       let c = if f == First then "=" else "|"
-      in  "  " ++ c ++ " " ++ str
+      in  "  " <> c <> " " <> str
     ChildTypeClassMember _ ->
-      "  " ++ str
+      "  " <> str
     ChildInstance _ _ ->
       str
   where
@@ -113,19 +115,19 @@ data First
   | NotFirst
   deriving (Show, Eq, Ord)
 
-type Docs = Writer [String] ()
+type Docs = Writer [Text] ()
 
-runDocs :: Docs -> String
-runDocs = unlines . execWriter
+runDocs :: Docs -> Text
+runDocs = T.unlines . execWriter
 
-tell' :: String -> Docs
+tell' :: Text -> Docs
 tell' = tell . (:[])
 
 spacer :: Docs
 spacer = tell' ""
 
-headerLevel :: Int -> String -> Docs
-headerLevel level hdr = tell' (replicate level '#' ++ ' ' : hdr)
+headerLevel :: Int -> Text -> Docs
+headerLevel level hdr = tell' (T.replicate level "#" <> " " <> hdr)
 
 fencedBlock :: Docs -> Docs
 fencedBlock inner = do
@@ -133,5 +135,5 @@ fencedBlock inner = do
   inner
   tell' "```"
 
-ticks :: String -> String
-ticks = ("`" ++) . (++ "`")
+ticks :: Text -> Text
+ticks = ("`" <>) . (<> "`")

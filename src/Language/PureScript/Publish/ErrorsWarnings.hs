@@ -24,6 +24,7 @@ import Data.Maybe
 import Data.Monoid
 import Data.Version
 import qualified Data.List.NonEmpty as NonEmpty
+import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.Publish.BoxesHelpers
@@ -43,7 +44,7 @@ data PackageError
 data PackageWarning
   = NoResolvedVersion PackageName
   | UndeclaredDependency PackageName
-  | UnacceptableVersion (PackageName, String)
+  | UnacceptableVersion (PackageName, Text)
   | DirtyWorkingTree_Warn
   deriving (Show)
 
@@ -311,7 +312,7 @@ displayOtherError e = case e of
 data CollectedWarnings = CollectedWarnings
   { noResolvedVersions     :: [PackageName]
   , undeclaredDependencies :: [PackageName]
-  , unacceptableVersions   :: [(PackageName, String)]
+  , unacceptableVersions   :: [(PackageName, Text)]
   , dirtyWorkingTree       :: Any
   }
   deriving (Show, Eq, Ord)
@@ -387,7 +388,7 @@ warnUndeclaredDependencies pkgNames =
       ])
     : bulletedList runPackageName (NonEmpty.toList pkgNames)
 
-warnUnacceptableVersions :: NonEmpty (PackageName, String) -> Box
+warnUnacceptableVersions :: NonEmpty (PackageName, Text) -> Box
 warnUnacceptableVersions pkgs =
   let singular = NonEmpty.length pkgs == 1
       pl a b = if singular then b else a
@@ -414,7 +415,7 @@ warnUnacceptableVersions pkgs =
       ])
     ]
   where
-  showTuple (pkgName, tag) = runPackageName pkgName ++ "#" ++ tag
+  showTuple (pkgName, tag) = runPackageName pkgName ++ "#" ++ T.unpack tag
 
 warnDirtyWorkingTree :: Box
 warnDirtyWorkingTree =

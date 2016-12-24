@@ -13,15 +13,13 @@ import Prelude.Compat
 
 import Data.Maybe (maybeToList)
 import Data.Monoid ((<>))
-import qualified Data.Text as T
 import Data.Text (Text)
+import qualified Data.Text as T
 
 import Language.PureScript.Docs.RenderedCode
 import Language.PureScript.Docs.Types
 import Language.PureScript.Docs.Utils.MonoidExtras
 import qualified Language.PureScript as P
-
--- TODO (Christoph): get rid of T.unpack's
 
 renderDeclaration :: Declaration -> RenderedCode
 renderDeclaration = renderDeclarationWithOptions defaultRenderTypeOptions
@@ -35,7 +33,7 @@ renderDeclarationWithOptions opts Declaration{..} =
       , renderType' ty
       ]
     DataDeclaration dtype args ->
-      [ keyword (T.unpack (P.showDataDeclType dtype))
+      [ keyword (P.showDataDeclType dtype)
       , renderType' (typeApp declTitle args)
       ]
     ExternDataDeclaration kind' ->
@@ -76,7 +74,7 @@ renderDeclarationWithOptions opts Declaration{..} =
 
     AliasDeclaration (P.Fixity associativity precedence) for@(P.Qualified _ alias) ->
       [ keywordFixity associativity
-      , syntax $ show precedence
+      , syntax $ T.pack $ show precedence
       , ident $ renderQualAlias for
       , keyword "as"
       , ident $ adjustAliasName alias declTitle
@@ -86,10 +84,10 @@ renderDeclarationWithOptions opts Declaration{..} =
   renderType' :: P.Type -> RenderedCode
   renderType' = renderTypeWithOptions opts
 
-  renderQualAlias :: FixityAlias -> String
+  renderQualAlias :: FixityAlias -> Text
   renderQualAlias (P.Qualified mn alias)
-    | mn == currentModule opts = T.unpack (renderAlias id alias)
-    | otherwise = T.unpack (renderAlias (\f -> P.showQualified f . P.Qualified mn) alias)
+    | mn == currentModule opts = renderAlias id alias
+    | otherwise = renderAlias (\f -> P.showQualified f . P.Qualified mn) alias
 
   renderAlias
     :: (forall a. (a -> Text) -> a -> Text)
@@ -99,8 +97,7 @@ renderDeclarationWithOptions opts Declaration{..} =
     = either (("type " <>) . f P.runProperName)
     $ either (f P.runIdent) (f P.runProperName)
 
-  -- adjustAliasName (P.AliasType{}) title = drop 6 (init title)
-  adjustAliasName _ title = tail (init title)
+  adjustAliasName _ title = T.tail (T.init title)
 
 renderChildDeclaration :: ChildDeclaration -> RenderedCode
 renderChildDeclaration = renderChildDeclarationWithOptions defaultRenderTypeOptions
@@ -146,15 +143,15 @@ renderConstraintsWithOptions opts constraints
     mintersperse (syntax "," <> sp)
                  (map (renderConstraintWithOptions opts) constraints)
 
-notQualified :: String -> P.Qualified (P.ProperName a)
-notQualified = P.Qualified Nothing . P.ProperName . T.pack
+notQualified :: Text -> P.Qualified (P.ProperName a)
+notQualified = P.Qualified Nothing . P.ProperName
 
-typeApp :: String -> [(String, Maybe P.Kind)] -> P.Type
+typeApp :: Text -> [(Text, Maybe P.Kind)] -> P.Type
 typeApp title typeArgs =
   foldl P.TypeApp
         (P.TypeConstructor (notQualified title))
         (map toTypeVar typeArgs)
 
-toTypeVar :: (String, Maybe P.Kind) -> P.Type
-toTypeVar (s, Nothing) = P.TypeVar (T.pack s)
-toTypeVar (s, Just k) = P.KindedType (P.TypeVar (T.pack s)) k
+toTypeVar :: (Text, Maybe P.Kind) -> P.Type
+toTypeVar (s, Nothing) = P.TypeVar s
+toTypeVar (s, Just k) = P.KindedType (P.TypeVar s) k
