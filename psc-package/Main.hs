@@ -7,17 +7,21 @@
 
 module Main where
 
+import           Control.Applicative (liftA3)
+import           Data.Aeson ((.:), (.:?), (.=))
 import qualified Data.Aeson as Aeson
 import           Data.Aeson.Encode.Pretty
+import           Data.Align.Key (alignWithKey)
 import           Data.Foldable (fold, for_, traverse_)
 import           Data.List (nub)
 import qualified Data.Map as Map
-import           Data.Maybe (mapMaybe)
+import           Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Set as Set
 import           Data.Text (pack)
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Builder as TB
 import           Data.Text.Encoding (encodeUtf8)
+import           Data.These (These(..))
 import           Data.Traversable (for)
 import           Data.Version (showVersion)
 import qualified Filesystem.Path.CurrentOS as Path
@@ -30,22 +34,86 @@ import           Turtle hiding (fold)
 packageFile :: Path.FilePath
 packageFile = "psc-package.json"
 
+data PackageInfo = PackageInfo
+  { packageInfoRepo         :: Text
+  , packageInfoVersion      :: Text
+  , packageInfoDependencies :: [Text]
+  } deriving (Show, Eq, Generic)
+
+instance Aeson.ToJSON PackageInfo where
+  toJSON PackageInfo{..} =
+    Aeson.object [ "repo"         .= packageInfoRepo
+                 , "version"      .= packageInfoVersion
+                 , "dependencies" .= packageInfoDependencies
+                 ]
+
+instance Aeson.FromJSON PackageInfo where
+  parseJSON (Aeson.Object v) =
+    PackageInfo <$> v .: "repo"
+                <*> v .: "version"
+                <*> v .: "dependencies"
+  parseJSON _ = empty
+
+type PackageSet = Map.Map Text PackageInfo
+
+data Override = Override
+  { overrideRepo         :: Maybe Text
+  , overrideVersion      :: Maybe Text
+  , overrideDependencies :: Maybe [Text]
+  } deriving (Show, Eq, Generic)
+
+instance Aeson.ToJSON Override where
+  toJSON Override{..} =
+    Aeson.object [ "repo"         .= overrideRepo
+                 , "version"      .= overrideVersion
+                 , "dependencies" .= overrideDependencies
+                 ]
+
+instance Aeson.FromJSON Override where
+  parseJSON (Aeson.Object v) =
+    Override <$> v .:? "repo"
+             <*> v .:? "version"
+             <*> v .:? "dependencies"
+  parseJSON _ = empty
+
+type Overrides = Map.Map Text Override
+
 data PackageConfig = PackageConfig
-  { name    :: Text
-  , depends :: [Text]
-  , set     :: Text
-  , source  :: Text
-  } deriving (Show, Generic, Aeson.FromJSON, Aeson.ToJSON)
+  { packageConfigName         :: Text
+  , packageConfigDependencies :: [Text]
+  , packageConfigSet          :: Text
+  , packageConfigSource       :: Text
+  , packageConfigOverrides    :: Maybe Overrides
+  } deriving (Show, Generic)
+
+instance Aeson.ToJSON PackageConfig where
+  toJSON PackageConfig{..} =
+    Aeson.object [ "name"      .= packageConfigName
+                 , "depends"   .= packageConfigDependencies
+                 , "set"       .= packageConfigSet
+                 , "source"    .= packageConfigSource
+                 , "overrides" .= packageConfigOverrides
+                 ]
+
+instance Aeson.FromJSON PackageConfig where
+  parseJSON (Aeson.Object v) =
+    PackageConfig <$> v .:  "name"
+                  <*> v .:  "depends"
+                  <*> v .:  "set"
+                  <*> v .:  "source"
+                  <*> v .:? "overrides"
+  parseJSON _ = empty
 
 pathToTextUnsafe :: Turtle.FilePath -> Text
 pathToTextUnsafe = either (error "Path.toText failed") id . Path.toText
 
 defaultPackage :: Text -> PackageConfig
 defaultPackage pkgName =
-  PackageConfig { name    = pkgName
-                , depends = [ "prelude" ]
-                , set     = "psc-" <> pack (showVersion Paths.version)
-                , source  = "https://github.com/purescript/package-sets.git"
+  PackageConfig { packageConfigName         = pkgName
+                , packageConfigDependencies = [ "prelude" ]
+                , packageConfigSet          = "psc-" <> pack (showVersion Paths.version)
+                , packageConfigSource       = "https://github.com/purescript/package-sets.git"
+                , packageConfigOverrides    = Nothing
                 }
 
 readPackageFile :: IO PackageConfig
@@ -81,14 +149,6 @@ writePackageFile =
   writeTextFile packageFile
   . encodePrettyToText
 
-data PackageInfo = PackageInfo
-  { repo         :: Text
-  , version      :: Text
-  , dependencies :: [Text]
-  } deriving (Show, Eq, Generic, Aeson.FromJSON, Aeson.ToJSON)
-
-type PackageSet = Map.Map Text PackageInfo
-
 cloneShallow
   :: Text
   -- ^ repo
@@ -109,14 +169,17 @@ cloneShallow from ref into =
        ] empty .||. exit (ExitFailure 1)
 
 getPackageSet :: PackageConfig -> IO ()
-getPackageSet PackageConfig{ source, set } = do
-  let pkgDir = ".psc-package" </> fromText set </> ".set"
+getPackageSet PackageConfig{ packageConfigSource, packageConfigSet } = do
+  let pkgDir = ".psc-package" </> fromText packageConfigSet
+                              </> ".set"
   exists <- testdir pkgDir
-  unless exists . void $ cloneShallow source set pkgDir
+  unless exists . void $ cloneShallow packageConfigSource packageConfigSet pkgDir
 
 readPackageSet :: PackageConfig -> IO PackageSet
-readPackageSet PackageConfig{ set } = do
-  let dbFile = ".psc-package" </> fromText set </> ".set" </> "packages.json"
+readPackageSet PackageConfig{ packageConfigOverrides, packageConfigSet } = do
+  let dbFile = ".psc-package" </> fromText packageConfigSet
+                              </> ".set"
+                              </> "packages.json"
   exists <- testfile dbFile
   unless exists $ do
     echo $ format (fp%" does not exist") dbFile
@@ -126,13 +189,32 @@ readPackageSet PackageConfig{ set } = do
     Nothing -> do
       echo "Unable to parse packages.json"
       exit (ExitFailure 1)
-    Just db -> return db
+    Just db ->
+      case sequence (alignWithKey applyOverride (fold packageConfigOverrides) db) of
+        Left msg -> do
+          echo msg
+          exit (ExitFailure 1)
+        Right db' -> return db'
+
+applyOverride :: Text -> These Override PackageInfo -> Either Text PackageInfo
+applyOverride pkgName (This Override{..}) =
+  case liftA3 PackageInfo overrideRepo overrideVersion overrideDependencies of
+    Just result -> Right result
+    Nothing -> Left ("Package " <> pkgName <> " was not present in the package set. Please specify its overrides completely.")
+applyOverride _ (That pkg) = pure pkg
+applyOverride _ (These Override{..} PackageInfo{..}) = pure
+  PackageInfo { packageInfoRepo         = fromMaybe packageInfoRepo overrideRepo
+              , packageInfoVersion      = fromMaybe packageInfoVersion overrideVersion
+              , packageInfoDependencies = fromMaybe packageInfoDependencies overrideDependencies
+              }
 
 installOrUpdate :: PackageConfig -> Text -> PackageInfo -> IO ()
-installOrUpdate PackageConfig{ set } pkgName PackageInfo{ repo, version } = do
-  let pkgDir = ".psc-package" </> fromText set </> fromText pkgName </> fromText version
+installOrUpdate PackageConfig{ packageConfigSet } pkgName PackageInfo{ packageInfoRepo, packageInfoVersion } = do
+  let pkgDir = ".psc-package" </> fromText packageConfigSet
+                              </> fromText pkgName
+                              </> fromText packageInfoVersion
   exists <- testdir pkgDir
-  unless exists . void $ cloneShallow repo version pkgDir
+  unless exists . void $ cloneShallow packageInfoRepo packageInfoVersion pkgDir
 
 getTransitiveDeps :: PackageSet -> [Text] -> IO [(Text, PackageInfo)]
 getTransitiveDeps db depends = do
@@ -141,15 +223,15 @@ getTransitiveDeps db depends = do
       Nothing -> do
         echo ("Package " <> pkg <> " does not exist in package set")
         exit (ExitFailure 1)
-      Just PackageInfo{ dependencies } -> return (pkg : dependencies)
+      Just PackageInfo{ packageInfoDependencies } -> return (pkg : packageInfoDependencies)
   let unique = Set.toList (foldMap Set.fromList pkgs)
   return (mapMaybe (\name -> fmap (name, ) (Map.lookup name db)) unique)
 
 updateImpl :: PackageConfig -> IO ()
-updateImpl config@PackageConfig{ depends } = do
+updateImpl config@PackageConfig{ packageConfigDependencies } = do
   getPackageSet config
   db <- readPackageSet config
-  trans <- getTransitiveDeps db depends
+  trans <- getTransitiveDeps db packageConfigDependencies
   echo ("Updating " <> pack (show (length trans)) <> " packages...")
   for_ trans $ \(pkgName, pkg) -> do
     echo ("Updating " <> pkgName)
@@ -176,7 +258,7 @@ update = do
 install :: String -> IO ()
 install pkgName = do
   pkg <- readPackageFile
-  let pkg' = pkg { depends = nub (pack pkgName : depends pkg) }
+  let pkg' = pkg { packageConfigDependencies = nub (pack pkgName : packageConfigDependencies pkg) }
   updateImpl pkg'
   writePackageFile pkg'
   echo "psc-package.json file was updated"
@@ -184,51 +266,51 @@ install pkgName = do
 uninstall :: String -> IO ()
 uninstall pkgName = do
   pkg <- readPackageFile
-  let pkg' = pkg { depends = filter (/= pack pkgName) $ depends pkg }
+  let pkg' = pkg { packageConfigDependencies = filter (/= pack pkgName) $ packageConfigDependencies pkg }
   updateImpl pkg'
   writePackageFile pkg'
   echo "psc-package.json file was updated"
 
 listDependencies :: IO ()
 listDependencies = do
-  pkg@PackageConfig{ depends } <- readPackageFile
+  pkg@PackageConfig{ packageConfigDependencies } <- readPackageFile
   db <- readPackageSet pkg
-  trans <- getTransitiveDeps db depends
+  trans <- getTransitiveDeps db packageConfigDependencies
   traverse_ (echo . fst) trans
 
 listPackages :: IO ()
 listPackages = do
-  pkg <- readPackageFile
-  db <- readPackageSet pkg
-  traverse_ echo (fmt <$> Map.assocs db)
+    pkg <- readPackageFile
+    db <- readPackageSet pkg
+    traverse_ echo (fmt <$> Map.assocs db)
   where
-  fmt :: (Text, PackageInfo) -> Text
-  fmt (name, PackageInfo{ version }) = name <> " (" <> version <> ")"
+    fmt :: (Text, PackageInfo) -> Text
+    fmt (name, PackageInfo{ packageInfoVersion }) = name <> " (" <> packageInfoVersion <> ")"
 
 getSourcePaths :: PackageConfig -> PackageSet -> [Text] -> IO [Turtle.FilePath]
 getSourcePaths PackageConfig{..} db pkgNames = do
   trans <- getTransitiveDeps db pkgNames
   let paths = [ ".psc-package"
-                </> fromText set
+                </> fromText packageConfigSet
                 </> fromText pkgName
-                </> fromText version
+                </> fromText packageInfoVersion
                 </> "src" </> "**" </> "*.purs"
-              | (pkgName, PackageInfo{ version }) <- trans
+              | (pkgName, PackageInfo{ packageInfoVersion }) <- trans
               ]
   return paths
 
 listSourcePaths :: IO ()
 listSourcePaths = do
-  pkg@PackageConfig{ depends } <- readPackageFile
+  pkg@PackageConfig{ packageConfigDependencies } <- readPackageFile
   db <- readPackageSet pkg
-  paths <- getSourcePaths pkg db depends
+  paths <- getSourcePaths pkg db packageConfigDependencies
   traverse_ (echo . pathToTextUnsafe) paths
 
 exec :: Text -> IO ()
 exec exeName = do
   pkg@PackageConfig{..} <- readPackageFile
   db <- readPackageSet pkg
-  paths <- getSourcePaths pkg db depends
+  paths <- getSourcePaths pkg db packageConfigDependencies
   procs exeName
         (map pathToTextUnsafe ("src" </> "**" </> "*.purs" : paths))
         empty

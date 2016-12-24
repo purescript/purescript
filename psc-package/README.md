@@ -61,7 +61,7 @@ Active project dependencies and project source files under `src` can be compiled
 
 This command is provided as a convenience until external tools add support for `psc-package`. It _might_ be removed in future.
 
-### Query the local package database 
+### Query the local package database
 
 The local package database can be queried using the following commands:
 
@@ -81,19 +81,28 @@ Adding a package is a manual process right now. We would like to add commands to
 - Make a pull request on the package set repository (against `master`) to add a new entry to `packages.json`. Use the dependency information above to fill in the fields, and the name of your new tag.
 
 Travis will verify your package builds correctly, and then we will try to merge your pull request. Your package will then be available in the next tagged package set.
- 
+
 ### Update a package in the set
 
 - Tag a new release
 - Make a pull request on `master` to modify the tag named in the package set repository.
 
 Again, once Travis verifies your change, we will merge it into `master` and your change will be available in the next tag.
- 
+
+### Overriding package information
+
+Package informtion can be overridden by using the `overrides` section in the package config file. This can be useful if you need to
+
+- Use a more recent package version before the package set has been updated
+- Use a fork of a package
+
+The format of the `overrides` section is the same as the package set format, keyed by name and containing `repo`, `version` and `dependencies` fields.
+
 ## FAQ
 
 ### Can I add a dependency which is not in the package set?
 
-Not right now. We might add this feature in future, but for now, consider either:
+Yes! Simply add the package information to the `overrides` section as explained above (with a new package name). However, if you are using a lot of packages which are not present in the package set then you might like to consider:
 
 - Adding your dependency to the package set if possible, or
 - Creating your own custom package set
