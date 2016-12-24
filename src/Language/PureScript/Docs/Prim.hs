@@ -5,6 +5,7 @@ import Prelude.Compat hiding (fail)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Language.PureScript.Docs.Types
 import qualified Language.PureScript as P
 
@@ -25,6 +26,9 @@ primDocsModule = Module
       , fail
       , typeConcat
       , typeString
+      , kindType
+      , kindEffect
+      , kindSymbol
       ]
   , modReExports = []
   }
@@ -38,16 +42,28 @@ unsafeLookup m errorMsg name = go name
   fromJust' (Just x) = x
   fromJust' _ = P.internalError $ errorMsg ++ show name
 
-lookupPrimKind :: Text -> P.Kind
-lookupPrimKind = fst . unsafeLookup P.primTypes "Docs.Prim: No such Prim type: "
+primKind :: Text -> Text -> Declaration
+primKind title comments =
+  if Set.member (P.primName title) P.primKinds
+     then Declaration
+          { declTitle = title
+          , declComments = Just comments
+          , declSourceSpan = Nothing
+          , declChildren = []
+          , declInfo = ExternKindDeclaration
+          }
+    else P.internalError $ "Docs.Prim: No such Prim kind: " ++ T.unpack title
 
-primType :: Text -> Text ->  Declaration
+lookupPrimTypeKind :: Text -> P.Kind
+lookupPrimTypeKind = fst . unsafeLookup P.primTypes "Docs.Prim: No such Prim type: "
+
+primType :: Text -> Text -> Declaration
 primType title comments = Declaration
   { declTitle = title
   , declComments = Just comments
   , declSourceSpan = Nothing
   , declChildren = []
-  , declInfo = ExternDataDeclaration (lookupPrimKind title)
+  , declInfo = ExternDataDeclaration (lookupPrimTypeKind title)
   }
 
 -- | Lookup the TypeClassData of a Prim class. This function is specifically
@@ -70,6 +86,26 @@ primClass title comments = Declaration
       in
         TypeClassDeclaration args superclasses fundeps
   }
+
+kindType :: Declaration
+kindType = primKind "Type" $ T.unlines
+  [ "`Type` (also known as `*`) is the kind of all proper types: those that"
+  , "classify value-level terms."
+  , "For example the type `Boolean` has kind `Type`; denoted by `Boolean :: Type`."
+  ]
+
+kindEffect :: Declaration
+kindEffect = primKind "Effect" $ T.unlines
+  [ "`Effect` (also known as `!`) is the kind of all effect types."
+  ]
+
+kindSymbol :: Declaration
+kindSymbol = primKind "Symbol" $ T.unlines
+  [ "`Symbol` is the kind of type-level strings."
+  , ""
+  , "Construct types of this kind using the same literal syntax as documented"
+  , "for strings."
+  ]
 
 function :: Declaration
 function = primType "Function" $ T.unlines

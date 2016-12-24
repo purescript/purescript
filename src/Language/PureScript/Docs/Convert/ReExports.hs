@@ -309,14 +309,14 @@ lookupTypeClassDeclaration importedFrom tyClass = do
          ++ (unlines . map show) other)
 
 lookupKindDeclaration
-  :: (MonadState (Map P.ModuleName Module) m,MonadReader P.ModuleName m)
+  :: (MonadState (Map P.ModuleName Module) m, MonadReader P.ModuleName m)
   => P.ModuleName
   -> P.ProperName 'P.KindName
   -> m (P.ModuleName, [Declaration])
 lookupKindDeclaration importedFrom kind = do
   decls <- lookupModuleDeclarations "lookupKindDeclaration" importedFrom
   let
-    ds = filter (\d -> declTitle d == T.unpack (P.runProperName kind)
+    ds = filter (\d -> declTitle d == P.runProperName kind
                        && isKind d)
                 decls
   case ds of
