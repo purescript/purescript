@@ -183,7 +183,7 @@ fail = primClass "Fail" $ unlines
   , "write that instance out with a Fail constraint."
   , ""
   , "For more information, see"
-  , "[the Custom Type Errors guide](https://github.com/paf31/24-days-of-purescript-2016/blob/master/21.markdown)."
+  , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
   ]
 
 typeConcat :: Declaration
@@ -192,7 +192,7 @@ typeConcat = primType "TypeConcat" $ unlines
   , "error."
   , ""
   , "For more information, see"
-  , "[the Custom Type Errors guide](https://github.com/paf31/24-days-of-purescript-2016/blob/master/21.markdown)."
+  , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
   ]
 
 typeString :: Declaration
@@ -201,5 +201,5 @@ typeString = primType "TypeString" $ unlines
   , "in a custom type error."
   , ""
   , "For more information, see"
-  , "[the Custom Type Errors guide](https://github.com/paf31/24-days-of-purescript-2016/blob/master/21.markdown)."
+  , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
   ]
