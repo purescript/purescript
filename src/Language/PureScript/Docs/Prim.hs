@@ -172,8 +172,11 @@ boolean = primType "Boolean" $ unlines
 partial :: Declaration
 partial = primClass "Partial" $ unlines
   [ "The Partial type class is used to indicate that a function is *partial,*"
-  , "that is, it will throw an error for some inputs. For more information,"
-  , "see [the Partial type class guide](https://github.com/purescript/documentation/blob/master/guides/The-Partial-type-class.md)."
+  , "that is, it is not defined for all inputs. In practice, attempting to use"
+  , "a partial function with a bad input will usually cause an error to be"
+  , "thrown, although it is not safe to assume that this will happen in all"
+  , "cases. For more information, see"
+  , "[the Partial type class guide](https://github.com/purescript/documentation/blob/master/guides/The-Partial-type-class.md)."
   ]
 
 fail :: Declaration
