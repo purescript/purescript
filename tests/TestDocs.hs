@@ -8,8 +8,9 @@ module TestDocs where
 import Prelude ()
 import Prelude.Compat
 
-import Data.Version (Version(..))
+import Control.Arrow (first)
 
+import Data.Version (Version(..))
 import Data.Monoid
 import Data.Maybe (fromMaybe)
 import Data.List ((\\))
@@ -23,6 +24,8 @@ import qualified Language.PureScript.Docs as Docs
 import Language.PureScript.Docs.AsMarkdown (codeToString)
 import qualified Language.PureScript.Publish as Publish
 import qualified Language.PureScript.Publish.ErrorsWarnings as Publish
+
+import Web.Bower.PackageMeta (parsePackageName)
 
 import TestUtils
 
@@ -73,6 +76,9 @@ data Assertion
   -- | Assert that a documented declaration includes a documentation comment
   -- containing a particular string
   | ShouldHaveDocComment P.ModuleName Text Text
+  -- | Assert that there should be some declarations re-exported from a
+  -- particular module in a particular package.
+  | ShouldHaveReExport (Docs.InPackage P.ModuleName)
   deriving (Show)
 
 newtype ShowFn a = ShowFn a
@@ -105,8 +111,11 @@ data AssertionFailure
   -- Fields: module name, declaration name, expected rendering, actual rendering
   | TypeSynonymMismatch P.ModuleName Text Text Text
   -- | A doc comment was not found or did not match what was expected
-  -- Fields: declaration title, expected substring, actual comments
+  -- Fields: module name, expected substring, actual comments
   | DocCommentMissing P.ModuleName Text (Maybe Text)
+  -- | A module was missing re-exports from a particular module.
+  -- Fields: module name, expected re-export, actual re-exports.
+  | ReExportMissing P.ModuleName (Docs.InPackage P.ModuleName) [Docs.InPackage P.ModuleName]
   deriving (Show)
 
 data AssertionResult
@@ -194,11 +203,19 @@ runAssertion assertion Docs.Module{..} =
           then Pass
           else Fail (DocCommentMissing mn decl declComments)
 
+    ShouldHaveReExport reExp ->
+      let
+        reExps = map fst modReExports
+      in
+        if reExp `elem` reExps
+          then Pass
+          else Fail (ReExportMissing modName reExp reExps)
+
   where
   declarationsFor mn =
     if mn == modName
       then modDeclarations
-      else fromMaybe [] (lookup mn modReExports)
+      else fromMaybe [] (lookup mn (map (first Docs.ignorePackage) modReExports))
 
   findChildren title =
     fmap childrenTitles . find ((==) title . Docs.declTitle)
@@ -247,7 +264,12 @@ testCases =
         -- From local files
       , ShouldBeDocumented    (n "Example2") "one" []
       , ShouldNotBeDocumented (n "Example2") "two"
+
+        -- Re-exports
+      , ShouldHaveReExport (Docs.FromDep (pkg "purescript-prelude") (n "Prelude"))
+      , ShouldHaveReExport (Docs.Local (n "Example2"))
       ])
+
   , ("Example2",
       [ ShouldBeDocumented (n "Example2") "one" []
       , ShouldBeDocumented (n "Example2") "two" []
@@ -336,6 +358,7 @@ testCases =
 
   where
   n = P.moduleNameFromString . T.pack
+  pkg str = let Right p = parsePackageName str in p
 
   hasTypeVar varName =
     getAny . P.everythingOnTypes (<>) (Any . isVar varName)

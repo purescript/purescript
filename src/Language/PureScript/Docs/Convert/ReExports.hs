@@ -4,7 +4,7 @@ module Language.PureScript.Docs.Convert.ReExports
 
 import Prelude.Compat
 
-import Control.Arrow ((&&&), second)
+import Control.Arrow ((&&&), first, second)
 import Control.Monad
 import Control.Monad.Reader.Class (MonadReader, ask)
 import Control.Monad.State.Class (MonadState, gets, modify)
@@ -35,9 +35,10 @@ import qualified Language.PureScript as P
 updateReExports ::
   P.Env ->
   [P.ModuleName] ->
+  (P.ModuleName -> InPackage P.ModuleName) ->
   Map P.ModuleName Module ->
   Map P.ModuleName Module
-updateReExports env order = execState action
+updateReExports env order withPackage = execState action
   where
   action =
     void (traverse go order)
@@ -45,7 +46,7 @@ updateReExports env order = execState action
   go mn = do
     mdl <- lookup' mn
     reExports <- getReExports env mn
-    let mdl' = mdl { modReExports = reExports }
+    let mdl' = mdl { modReExports = map (first withPackage) reExports }
     modify (Map.insert mn mdl')
 
   lookup' mn = do
