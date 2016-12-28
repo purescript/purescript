@@ -8,6 +8,7 @@ import Prelude.Compat
 
 import Control.Arrow (first, (***))
 import Control.Monad (when)
+import Control.Monad.Error.Class (catchError)
 
 import Data.Aeson ((.=))
 import Data.Aeson.BetterErrors
@@ -75,7 +76,7 @@ data Module = Module
   , modComments     :: Maybe Text
   , modDeclarations :: [Declaration]
   -- Re-exported values from other modules
-  , modReExports    :: [(P.ModuleName, [Declaration])]
+  , modReExports    :: [(InPackage P.ModuleName, [Declaration])]
   }
   deriving (Show, Eq, Ord)
 
@@ -382,10 +383,21 @@ asDeclaration =
               <*> key "children" (eachInArray asChildDeclaration)
               <*> key "info" asDeclarationInfo
 
-asReExport :: Parse PackageError (P.ModuleName, [Declaration])
+asReExport :: Parse PackageError (InPackage P.ModuleName, [Declaration])
 asReExport =
-  (,) <$> key "moduleName" fromAesonParser
+  (,) <$> key "moduleName" asReExportModuleName
       <*> key "declarations" (eachInArray asDeclaration)
+  where
+  -- This is to preserve backwards compatibility with 0.10.3 and earlier versions
+  -- of the compiler, where the modReExports field had the type
+  -- [(P.ModuleName, [Declaration])]. This should eventually be removed,
+  -- possibly at the same time as the next breaking change to this JSON format.
+  asReExportModuleName :: Parse PackageError (InPackage P.ModuleName)
+  asReExportModuleName =
+    asInPackage fromAesonParser .! ErrorInPackageMeta
+    <|> fmap Local fromAesonParser
+
+  (<|>) p q = catchError p (const q)
 
 asInPackage :: Parse BowerError a -> Parse BowerError (InPackage a)
 asInPackage inner =

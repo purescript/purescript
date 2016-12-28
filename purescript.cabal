@@ -511,6 +511,7 @@ test-suite tests
                    aeson -any,
                    aeson-better-errors -any,
                    base-compat -any,
+                   bower-json -any,
                    boxes -any,
                    bytestring -any,
                    containers -any,

@@ -15,6 +15,7 @@ import Control.Monad
 import Control.Monad.Error.Class (MonadError)
 import Control.Monad.State (runStateT)
 import Control.Monad.Writer.Strict (runWriterT)
+import Data.List (find)
 import qualified Data.Map as Map
 import Data.Text (Text)
 
@@ -42,8 +43,17 @@ convertModulesInPackage modules =
     map P.getModuleName (takeLocals modules)
   go =
     map ignorePackage
-     >>> convertModules
+     >>> convertModules withPackage
      >>> fmap (filter ((`elem` localNames) . modName))
+
+  withPackage :: P.ModuleName -> InPackage P.ModuleName
+  withPackage mn =
+    case find ((== mn) . P.getModuleName . ignorePackage) modules of
+      Just m ->
+        fmap P.getModuleName m
+      Nothing ->
+        P.internalError $ "withPackage: missing module:" ++
+          show (P.runModuleName mn)
 
 -- |
 -- Convert a group of modules to the intermediate format, designed for
@@ -61,12 +71,13 @@ convertModulesInPackage modules =
 --
 convertModules ::
   (MonadError P.MultipleErrors m) =>
+  (P.ModuleName -> InPackage P.ModuleName) ->
   [P.Module] ->
   m [Module]
-convertModules =
+convertModules withPackage =
   P.sortModules
     >>> fmap (fst >>> map importPrim)
-    >=> convertSorted
+    >=> convertSorted withPackage
 
 importPrim :: P.Module -> P.Module
 importPrim = P.addDefaultImport (P.ModuleName [P.ProperName C.prim])
@@ -76,16 +87,17 @@ importPrim = P.addDefaultImport (P.ModuleName [P.ProperName C.prim])
 --
 convertSorted ::
   (MonadError P.MultipleErrors m) =>
+  (P.ModuleName -> InPackage P.ModuleName) ->
   [P.Module] ->
   m [Module]
-convertSorted modules = do
+convertSorted withPackage modules = do
   (env, convertedModules) <- second (map convertSingleModule) <$> partiallyDesugar modules
 
   modulesWithTypes <- typeCheckIfNecessary modules convertedModules
   let moduleMap = Map.fromList (map (modName &&& id) modulesWithTypes)
 
   let traversalOrder = map P.getModuleName modules
-  pure (Map.elems (updateReExports env traversalOrder moduleMap))
+  pure (Map.elems (updateReExports env traversalOrder withPackage moduleMap))
 
 -- |
 -- If any exported value declarations have either wildcard type signatures, or

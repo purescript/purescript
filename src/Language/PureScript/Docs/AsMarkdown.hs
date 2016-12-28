@@ -33,7 +33,7 @@ renderModulesAsMarkdown ::
   [P.Module] ->
   m Text
 renderModulesAsMarkdown =
-  fmap (runDocs . modulesAsMarkdown) . Convert.convertModules
+  fmap (runDocs . modulesAsMarkdown) . Convert.convertModules Local
 
 modulesAsMarkdown :: [Module] -> Docs
 modulesAsMarkdown = mapM_ moduleAsMarkdown
@@ -45,7 +45,8 @@ moduleAsMarkdown Module{..} = do
   for_ modComments tell'
   mapM_ (declAsMarkdown modName) modDeclarations
   spacer
-  for_ modReExports $ \(mn, decls) -> do
+  for_ modReExports $ \(mn', decls) -> do
+    let mn = ignorePackage mn'
     headerLevel 3 $ "Re-exported from " <> P.runModuleName mn <> ":"
     spacer
     mapM_ (declAsMarkdown mn) decls
