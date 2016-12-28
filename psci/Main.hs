@@ -308,7 +308,7 @@ nodeBackend nodePath nodeArgs = Backend setup eval reload shutdown
     eval :: () -> String -> IO ()
     eval _ _ = do
       writeFile indexFile "require('$PSCI')['$main']();"
-      process <- (nodePath <|>) <$> findNodeProcess
+      process <- maybe findNodeProcess (pure . pure) nodePath
       result <- traverse (\node -> readProcessWithExitCode node (nodeArgs ++ [indexFile]) "") process
       case result of
         Just (ExitSuccess, out, _)   -> putStrLn out
