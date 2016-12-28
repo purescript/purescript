@@ -113,6 +113,9 @@ supportModules =
   , "Prelude"
   , "Test.Assert"
   , "Test.Main"
+  , "Type.Data.Ordering"
+  , "Type.Data.Symbol"
+  , "Type.Prelude"
   , "Unsafe.Coerce"
   ]
 

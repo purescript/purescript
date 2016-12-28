@@ -314,10 +314,38 @@ fromSpine = "fromSpine"
 toSignature :: Text
 toSignature = "toSignature"
 
--- IsSymbol class
+-- Data.Symbol
+
+pattern DataSymbol :: ModuleName
+pattern DataSymbol = ModuleName [ProperName "Data", ProperName "Symbol"]
 
 pattern IsSymbol :: Qualified (ProperName 'ClassName)
-pattern IsSymbol = Qualified (Just (ModuleName [ProperName "Data", ProperName "Symbol"])) (ProperName "IsSymbol")
+pattern IsSymbol = Qualified (Just DataSymbol) (ProperName "IsSymbol")
+
+-- Type.Data.Symbol
+
+pattern TypeDataSymbol :: ModuleName
+pattern TypeDataSymbol = ModuleName [ProperName "Type", ProperName "Data", ProperName "Symbol"]
+
+pattern CompareSymbol :: Qualified (ProperName 'ClassName)
+pattern CompareSymbol = Qualified (Just TypeDataSymbol) (ProperName "CompareSymbol")
+
+pattern AppendSymbol :: Qualified (ProperName 'ClassName)
+pattern AppendSymbol = Qualified (Just TypeDataSymbol) (ProperName "AppendSymbol")
+
+-- Type.Data.Ordering
+
+typeDataOrdering :: ModuleName
+typeDataOrdering = ModuleName [ProperName "Type", ProperName "Data", ProperName "Ordering"]
+
+orderingLT :: Qualified (ProperName 'TypeName)
+orderingLT = Qualified (Just typeDataOrdering) (ProperName "LT")
+
+orderingEQ :: Qualified (ProperName 'TypeName)
+orderingEQ = Qualified (Just typeDataOrdering) (ProperName "EQ")
+
+orderingGT :: Qualified (ProperName 'TypeName)
+orderingGT = Qualified (Just typeDataOrdering) (ProperName "GT")
 
 -- Main module
 
@@ -329,11 +357,14 @@ main = "main"
 partial :: Text
 partial = "Partial"
 
+pattern Prim :: ModuleName
+pattern Prim = ModuleName [ProperName "Prim"]
+
 pattern Partial :: Qualified (ProperName 'ClassName)
-pattern Partial = Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Partial")
+pattern Partial = Qualified (Just Prim) (ProperName "Partial")
 
 pattern Fail :: Qualified (ProperName 'ClassName)
-pattern Fail = Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Fail")
+pattern Fail = Qualified (Just Prim) (ProperName "Fail")
 
 typ :: Text
 typ = "Type"
