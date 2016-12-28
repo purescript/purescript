@@ -109,12 +109,16 @@ parseValueDeclaration = do
     return $ maybe value (`Let` value) whereClause
 
 parseExternDeclaration :: TokenParser Declaration
-parseExternDeclaration = reserved "foreign" *> indented *> reserved "import" *> indented *>
-   (ExternDataDeclaration <$> (reserved "data" *> indented *> typeName)
-                          <*> (indented *> doubleColon *> parseKind)
-   <|> (do ident <- parseIdent
-           ty <- indented *> doubleColon *> noWildcards parsePolyType
-           return $ ExternDeclaration ident ty))
+parseExternDeclaration = reserved "foreign" *> indented *> reserved "import" *> indented *> parseExternAlt where
+  parseExternAlt = parseExternData <|> parseExternKind <|> parseExternTerm
+
+  parseExternData = ExternDataDeclaration <$> (reserved "data" *> indented *> typeName)
+                                          <*> (indented *> doubleColon *> parseKind)
+
+  parseExternKind = ExternKindDeclaration <$> (reserved "kind" *> indented *> kindName)
+
+  parseExternTerm = ExternDeclaration <$> parseIdent
+                                      <*> (indented *> doubleColon *> noWildcards parsePolyType)
 
 parseAssociativity :: TokenParser Associativity
 parseAssociativity =
@@ -167,6 +171,7 @@ parseDeclarationRef =
     <|> (ValueOpRef <$> parens parseOperator)
     <|> parseTypeRef
     <|> (TypeClassRef <$> (reserved "class" *> properName))
+    <|> (KindRef <$> (reserved "kind" *> kindName))
     <|> (ModuleRef <$> (indented *> reserved "module" *> moduleName))
     <|> (TypeOpRef <$> (indented *> reserved "type" *> parens parseOperator))
   where

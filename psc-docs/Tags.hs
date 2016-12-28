@@ -17,4 +17,5 @@ tags = map (first T.unpack) . concatMap dtags . P.exportedDeclarations
         names (P.TypeSynonymDeclaration name _ _) = [P.runProperName name]
         names (P.TypeClassDeclaration name _ _ _ _) = [P.runProperName name]
         names (P.TypeInstanceDeclaration name _ _ _ _) = [P.showIdent name]
+        names (P.ExternKindDeclaration name) = [P.runProperName name]
         names _ = []

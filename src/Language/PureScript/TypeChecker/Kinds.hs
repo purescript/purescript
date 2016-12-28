@@ -85,9 +85,7 @@ unifyKinds k1 k2 = do
   go (KUnknown u1) (KUnknown u2) | u1 == u2 = return ()
   go (KUnknown u) k = solveKind u k
   go k (KUnknown u) = solveKind u k
-  go Star Star = return ()
-  go Bang Bang = return ()
-  go Symbol Symbol = return ()
+  go (NamedKind k1') (NamedKind k2') | k1' == k2' = return ()
   go (Row k1') (Row k2') = go k1' k2'
   go (FunKind k1' k2') (FunKind k3 k4) = do
     go k1' k3
@@ -182,15 +180,15 @@ solveTypes
 solveTypes isData ts kargs tyCon = do
   ks <- traverse (fmap fst . infer) ts
   when isData $ do
-    unifyKinds tyCon (foldr FunKind Star kargs)
-    forM_ ks $ \k -> unifyKinds k Star
+    unifyKinds tyCon (foldr FunKind kindType kargs)
+    forM_ ks $ \k -> unifyKinds k kindType
   unless isData $
     unifyKinds tyCon (foldr FunKind (head ks) kargs)
   return tyCon
 
--- | Default all unknown kinds to the Star kind of types
+-- | Default all unknown kinds to the kindType kind of types
 starIfUnknown :: Kind -> Kind
-starIfUnknown (KUnknown _) = Star
+starIfUnknown (KUnknown _) = kindType
 starIfUnknown (Row k) = Row (starIfUnknown k)
 starIfUnknown (FunKind k1 k2) = FunKind (starIfUnknown k1) (starIfUnknown k2)
 starIfUnknown k = k
@@ -211,8 +209,8 @@ infer' (ForAll ident ty _) = do
   k1 <- freshKind
   Just moduleName <- checkCurrentModule <$> get
   (k2, args) <- bindLocalTypeVariables moduleName [(ProperName ident, k1)] $ infer ty
-  unifyKinds k2 Star
-  return (Star, (ident, k1) : args)
+  unifyKinds k2 kindType
+  return (kindType, (ident, k1) : args)
 infer' (KindedType ty k) = do
   (k', args) <- infer ty
   unifyKinds k k'
@@ -224,14 +222,14 @@ infer' other = (, []) <$> go other
     k1 <- freshKind
     Just moduleName <- checkCurrentModule <$> get
     k2 <- bindLocalTypeVariables moduleName [(ProperName ident, k1)] $ go ty
-    unifyKinds k2 Star
-    return Star
+    unifyKinds k2 kindType
+    return kindType
   go (KindedType ty k) = do
     k' <- go ty
     unifyKinds k k'
     return k'
   go TypeWildcard{} = freshKind
-  go (TypeLevelString _) = return Symbol
+  go (TypeLevelString _) = return kindSymbol
   go (TypeVar v) = do
     Just moduleName <- checkCurrentModule <$> get
     lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
@@ -260,8 +258,8 @@ infer' other = (, []) <$> go other
   go (ConstrainedType deps ty) = do
     forM_ deps $ \(Constraint className tys _) -> do
       k <- go $ foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
-      unifyKinds k Star
+      unifyKinds k kindType
     k <- go ty
-    unifyKinds k Star
-    return Star
+    unifyKinds k kindType
+    return kindType
   go ty = internalError $ "Invalid argument to infer: " ++ show ty

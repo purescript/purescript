@@ -83,6 +83,7 @@ getDeclarationTitle (P.ValueDeclaration name _ _ _) = Just (P.showIdent name)
 getDeclarationTitle (P.ExternDeclaration name _) = Just (P.showIdent name)
 getDeclarationTitle (P.DataDeclaration _ name _ _) = Just (P.runProperName name)
 getDeclarationTitle (P.ExternDataDeclaration name _) = Just (P.runProperName name)
+getDeclarationTitle (P.ExternKindDeclaration name) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeSynonymDeclaration name _ _) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeClassDeclaration name _ _ _ _) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeInstanceDeclaration name _ _ _ _) = Just (P.showIdent name)
@@ -122,6 +123,8 @@ convertDeclaration (P.DataDeclaration dtype _ args ctors) title =
     ChildDeclaration (P.runProperName ctor') Nothing Nothing (ChildDataConstructor tys)
 convertDeclaration (P.ExternDataDeclaration _ kind') title =
   basicDeclaration title (ExternDataDeclaration kind')
+convertDeclaration (P.ExternKindDeclaration _) title =
+  basicDeclaration title ExternKindDeclaration
 convertDeclaration (P.TypeSynonymDeclaration _ args ty) title =
   basicDeclaration title (TypeSynonymDeclaration args ty)
 convertDeclaration (P.TypeClassDeclaration _ args implies fundeps ds) title =

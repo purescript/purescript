@@ -16,15 +16,14 @@ import Data.Text (Text)
 
 import Language.PureScript.Crash
 import Language.PureScript.Kinds
+import Language.PureScript.Names
 import Language.PureScript.Pretty.Common
 
 typeLiterals :: Pattern () Kind String
 typeLiterals = mkPattern match
   where
-  match Star = Just "*"
-  match Bang = Just "!"
-  match Symbol = Just "Symbol"
   match (KUnknown u) = Just $ 'u' : show u
+  match (NamedKind name) = Just $ T.unpack (showQualified runProperName name)
   match _ = Nothing
 
 matchRow :: Pattern () Kind ((), Kind)

@@ -6,20 +6,18 @@ import Prelude.Compat
 
 import qualified Data.Aeson.TH as A
 
+import Language.PureScript.Names
+
 -- | The data type of kinds
 data Kind
   -- | Unification variable of type Kind
   = KUnknown Int
-  -- | The kind of types
-  | Star
-  -- | The kind of effects
-  | Bang
   -- | Kinds for labelled, unordered rows without duplicates
   | Row Kind
   -- | Function kinds
   | FunKind Kind Kind
-  -- | Type-level strings
-  | Symbol
+  -- | A named kind
+  | NamedKind (Qualified (ProperName 'KindName))
   deriving (Show, Eq, Ord)
 
 $(A.deriveJSON A.defaultOptions ''Kind)

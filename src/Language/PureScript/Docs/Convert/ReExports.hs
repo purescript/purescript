@@ -110,13 +110,14 @@ collectDeclarations imports exports = do
   typeClasses <- collect lookupTypeClassDeclaration impTCs expTCs
   types <- collect lookupTypeDeclaration impTypes expTypes
   typeOps <- collect lookupTypeOpDeclaration impTypeOps expTypeOps
+  kinds <- collect lookupKindDeclaration impKinds expKinds
 
   (vals, classes) <- handleTypeClassMembers valsAndMembers typeClasses
 
   let filteredTypes = filterDataConstructors expCtors types
   let filteredClasses = filterTypeClassMembers (Map.keys expVals) classes
 
-  pure (Map.toList (Map.unionsWith (<>) [filteredTypes, filteredClasses, vals, valOps, typeOps]))
+  pure (Map.toList (Map.unionsWith (<>) [filteredTypes, filteredClasses, vals, valOps, typeOps, kinds]))
 
   where
 
@@ -146,6 +147,9 @@ collectDeclarations imports exports = do
 
   expTCs = P.exportedTypeClasses exports
   impTCs = concat (Map.elems (P.importedTypeClasses imports))
+
+  expKinds = P.exportedKinds exports
+  impKinds = concat (Map.elems (P.importedKinds imports))
 
 -- |
 -- Given a list of imported declarations (of a particular kind, ie. type, data,
@@ -303,6 +307,24 @@ lookupTypeClassDeclaration importedFrom tyClass = do
       internalErrorInModule
         ("lookupTypeClassDeclaration: unexpected result: "
          ++ (unlines . map show) other)
+
+lookupKindDeclaration
+  :: (MonadState (Map P.ModuleName Module) m, MonadReader P.ModuleName m)
+  => P.ModuleName
+  -> P.ProperName 'P.KindName
+  -> m (P.ModuleName, [Declaration])
+lookupKindDeclaration importedFrom kind = do
+  decls <- lookupModuleDeclarations "lookupKindDeclaration" importedFrom
+  let
+    ds = filter (\d -> declTitle d == P.runProperName kind
+                       && isKind d)
+                decls
+  case ds of
+    [d] ->
+      pure (importedFrom, [d])
+    other ->
+      internalErrorInModule
+        ("lookupKindDeclaration: unexpected result: " ++ show other)
 
 -- |
 -- Get the full list of declarations for a particular module out of the

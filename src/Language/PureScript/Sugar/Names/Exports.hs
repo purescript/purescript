@@ -51,6 +51,8 @@ findExportable (Module _ _ mn ds _) =
     exportTypeOp exps op mn
   updateExports exps (ExternDeclaration name _) =
     exportValue exps name mn
+  updateExports exps (ExternKindDeclaration pn) =
+    exportKind exps pn mn
   updateExports exps (PositionedDeclaration pos _ d) =
     rethrowWithPosition pos $ updateExports exps d
   updateExports exps _ = return exps
@@ -90,12 +92,14 @@ resolveExports env ss mn imps exps refs =
     let classes' = exportedTypeClasses result `M.union` exportedTypeClasses exps
     let values' = exportedValues result `M.union` exportedValues exps
     let valueOps' = exportedValueOps result `M.union` exportedValueOps exps
+    let kinds' = exportedKinds result `M.union` exportedKinds exps
     return result
       { exportedTypes = types'
       , exportedTypeOps = typeOps'
       , exportedTypeClasses = classes'
       , exportedValues = values'
       , exportedValueOps = valueOps'
+      , exportedKinds = kinds'
       }
   elaborateModuleExports result (ModuleRef name) = do
     let isPseudo = isPseudoModule name
@@ -107,11 +111,13 @@ resolveExports env ss mn imps exps refs =
     reClasses <- extract isPseudo name TyClassName (importedTypeClasses imps)
     reValues <- extract isPseudo name IdentName (importedValues imps)
     reValueOps <- extract isPseudo name ValOpName (importedValueOps imps)
+    reKinds <- extract isPseudo name KiName (importedKinds imps)
     foldM (\exps' ((tctor, dctors), mn') -> exportType ReExport exps' tctor dctors mn') result (resolveTypeExports reTypes reDctors)
       >>= flip (foldM (uncurry . exportTypeOp)) (map resolveTypeOp reTypeOps)
       >>= flip (foldM (uncurry . exportTypeClass ReExport)) (map resolveClass reClasses)
       >>= flip (foldM (uncurry . exportValue)) (map resolveValue reValues)
       >>= flip (foldM (uncurry . exportValueOp)) (map resolveValueOp reValueOps)
+      >>= flip (foldM (uncurry . exportKind)) (map resolveKind reKinds)
   elaborateModuleExports result _ = return result
 
   -- Extracts a list of values for a module based on a lookup table. If the
@@ -146,6 +152,7 @@ resolveExports env ss mn imps exps refs =
                    || any (isQualifiedWith mn') (f (importedTypeClasses imps))
                    || any (isQualifiedWith mn') (f (importedValues imps))
                    || any (isQualifiedWith mn') (f (importedValueOps imps))
+                   || any (isQualifiedWith mn') (f (importedKinds imps))
 
   -- Check whether a module name refers to a module that has been imported
   -- without qualification into an import scope.
@@ -203,6 +210,14 @@ resolveExports env ss mn imps exps refs =
     . fromMaybe (internalError "Missing value in resolveValueOp")
     $ resolve exportedValueOps op
 
+  -- Looks up an imported kind and re-qualifies it with the original
+  -- module it came from.
+  resolveKind :: Qualified (ProperName 'KindName) -> (ProperName 'KindName, ModuleName)
+  resolveKind kind
+    = splitQual
+    . fromMaybe (internalError "Missing value in resolveKind")
+    $ resolve exportedKinds kind
+
   resolve
     :: Ord a
     => (Exports -> M.Map a ModuleName)
@@ -237,12 +252,14 @@ filterModule mn exps refs = do
   classes <- foldM (filterExport TyClassName getTypeClassRef exportedTypeClasses) M.empty refs
   values <- foldM (filterExport IdentName getValueRef exportedValues) M.empty refs
   valueOps <- foldM (filterExport ValOpName getValueOpRef exportedValueOps) M.empty refs
+  kinds <- foldM (filterExport KiName getKindRef exportedKinds) M.empty refs
   return Exports
     { exportedTypes = types
     , exportedTypeOps = typeOps
     , exportedTypeClasses = classes
     , exportedValues = values
     , exportedValueOps = valueOps
+    , exportedKinds = kinds
     }
 
   where

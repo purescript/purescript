@@ -49,6 +49,7 @@ identifierFromIdeDeclaration d = case d of
   IdeDeclTypeClass name -> P.runProperName name
   IdeDeclValueOperator op -> op ^. ideValueOpName & P.runOpName
   IdeDeclTypeOperator op -> op ^. ideTypeOpName & P.runOpName
+  IdeDeclKind name -> P.runProperName name
 
 discardAnn :: IdeDeclarationAnn -> IdeDeclaration
 discardAnn (IdeDeclarationAnn _ d) = d
@@ -73,6 +74,7 @@ completionFromMatch (Match (m, IdeDeclarationAnn ann decl)) =
         (P.runOpName op, maybe (showFixity precedence associativity (valueOperatorAliasT ref) op) prettyTypeT typeP)
       IdeDeclTypeOperator (IdeTypeOperator op ref precedence associativity kind) ->
         (P.runOpName op, maybe (showFixity precedence associativity (typeOperatorAliasT ref) op) (toS . P.prettyPrintKind) kind)
+      IdeDeclKind k -> (P.runProperName k, "kind")
 
     complModule = P.runModuleName m
 

@@ -114,6 +114,7 @@ acceptable P.ExternDeclaration{} = True
 acceptable P.ExternDataDeclaration{} = True
 acceptable P.TypeClassDeclaration{} = True
 acceptable P.TypeInstanceDeclaration{} = True
+acceptable P.ExternKindDeclaration{} = True
 acceptable _ = False
 
 parseReplQuery' :: String -> Either String ReplQuery

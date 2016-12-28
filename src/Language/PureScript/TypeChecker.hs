@@ -274,11 +274,15 @@ typeCheckAll moduleName _ = traverse go
     env <- getEnv
     putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (kind, ExternData) (types env) }
     return d
+  go (d@(ExternKindDeclaration name)) = do
+    env <- getEnv
+    putEnv $ env { kinds = S.insert (Qualified (Just moduleName) name) (kinds env) }
+    return d
   go (d@(ExternDeclaration name ty)) = do
     warnAndRethrow (addHint (ErrorInForeignImport name)) $ do
       env <- getEnv
       kind <- kindOf ty
-      guardWith (errorMessage (ExpectedType ty kind)) $ kind == Star
+      guardWith (errorMessage (ExpectedType ty kind)) $ kind == kindType
       case M.lookup (Qualified (Just moduleName) name) (names env) of
         Just _ -> throwError . errorMessage $ RedefinedIdent name
         Nothing -> putEnv (env { names = M.insert (Qualified (Just moduleName) name) (ty, External, Defined) (names env) })

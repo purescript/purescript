@@ -32,6 +32,12 @@ typeName :: TokenParser (ProperName 'TypeName)
 typeName = ProperName <$> tyname
 
 -- |
+-- Parse a proper name for a kind.
+--
+kindName :: TokenParser (ProperName 'KindName)
+kindName = ProperName <$> kiname
+
+-- |
 -- Parse a proper name for a data constructor.
 --
 dataConstructorName :: TokenParser (ProperName 'ConstructorName)

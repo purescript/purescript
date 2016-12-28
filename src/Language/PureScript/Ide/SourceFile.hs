@@ -92,25 +92,26 @@ extractSpans
   -- ^ The surrounding span
   -> P.Declaration
   -- ^ The declaration to extract spans from
-  -> [(Either Text Text, P.SourceSpan)]
-  -- ^ A @Right@ corresponds to a type level declaration, and a @Left@ to a
-  -- value level one
+  -> [(IdeDeclNamespace, P.SourceSpan)]
+  -- ^ Declarations and their source locations
 extractSpans ss d = case d of
   P.PositionedDeclaration ss' _ d' ->
     extractSpans ss' d'
   P.ValueDeclaration i _ _ _ ->
-    [(Left (P.runIdent i), ss)]
+    [(IdeNSValue (P.runIdent i), ss)]
   P.TypeSynonymDeclaration name _ _ ->
-    [(Right (P.runProperName name), ss)]
+    [(IdeNSType (P.runProperName name), ss)]
   P.TypeClassDeclaration name _ _ _ members ->
-    (Right (P.runProperName name), ss) : concatMap (extractSpans' ss) members
+    (IdeNSType (P.runProperName name), ss) : concatMap (extractSpans' ss) members
   P.DataDeclaration _ name _ ctors ->
-    (Right (P.runProperName name), ss)
-    : map (\(cname, _) -> (Left (P.runProperName cname), ss)) ctors
+    (IdeNSType (P.runProperName name), ss)
+    : map (\(cname, _) -> (IdeNSValue (P.runProperName cname), ss)) ctors
   P.ExternDeclaration ident _ ->
-    [(Left (P.runIdent ident), ss)]
+    [(IdeNSValue (P.runIdent ident), ss)]
   P.ExternDataDeclaration name _ ->
-    [(Right (P.runProperName name), ss)]
+    [(IdeNSType (P.runProperName name), ss)]
+  P.ExternKindDeclaration name ->
+    [(IdeNSKind (P.runProperName name), ss)]
   _ -> []
   where
     -- We need this special case to be able to also get the position info for
@@ -121,5 +122,5 @@ extractSpans ss d = case d of
       P.PositionedDeclaration ssP' _ dP' ->
         extractSpans' ssP' dP'
       P.TypeDeclaration ident _ ->
-        [(Left (P.runIdent ident), ssP)]
+        [(IdeNSValue (P.runIdent ident), ssP)]
       _ -> []

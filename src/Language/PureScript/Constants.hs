@@ -335,6 +335,15 @@ pattern Partial = Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName 
 pattern Fail :: Qualified (ProperName 'ClassName)
 pattern Fail = Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Fail")
 
+typ :: Text
+typ = "Type"
+
+effect :: Text
+effect = "Effect"
+
+symbol :: Text
+symbol = "Symbol"
+
 -- Code Generation
 
 __superclass_ :: Text

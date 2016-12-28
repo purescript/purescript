@@ -24,6 +24,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Version (showVersion)
 import qualified Data.Map as M
+import qualified Data.Set as S
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -133,6 +134,10 @@ data ExternsDeclaration =
       , edInstanceTypes           :: [Type]
       , edInstanceConstraints     :: Maybe [Constraint]
       }
+  -- | A kind declaration
+  | EDKind
+      { edKindName                :: ProperName 'KindName
+      }
   deriving Show
 
 -- | Convert an externs file back into a module
@@ -145,6 +150,7 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   applyDecl env (EDDataConstructor pn dTy tNm ty nms) = env { dataConstructors = M.insert (qual pn) (dTy, tNm, ty, nms) (dataConstructors env) }
   applyDecl env (EDValue ident ty) = env { names = M.insert (Qualified (Just efModuleName) ident) (ty, External, Defined) (names env) }
   applyDecl env (EDClass pn args members cs deps) = env { typeClasses = M.insert (qual pn) (makeTypeClassData args members cs deps) (typeClasses env) }
+  applyDecl env (EDKind pn) = env { kinds = S.insert (qual pn) (kinds env) }
   applyDecl env (EDInstance className ident tys cs) = env { typeClassDictionaries = updateMap (updateMap (M.insert (qual ident) dict) className) (Just efModuleName) (typeClassDictionaries env) }
     where
     dict :: NamedDict
@@ -220,6 +226,9 @@ moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
       , m2 <- M.elems m1
       , TypeClassDictionaryInScope{..} <- maybeToList (M.lookup (Qualified (Just mn) ident) m2)
       ]
+  toExternsDeclaration (KindRef pn)
+    | Qualified (Just mn) pn `S.member` kinds env
+    = [ EDKind pn ]
   toExternsDeclaration _ = []
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsImport)

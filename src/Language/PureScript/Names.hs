@@ -24,6 +24,7 @@ data Name
   | DctorName (ProperName 'ConstructorName)
   | TyClassName (ProperName 'ClassName)
   | ModName ModuleName
+  | KiName (ProperName 'KindName)
   deriving (Eq, Show)
 
 getIdentName :: Name -> Maybe Ident
@@ -117,7 +118,12 @@ instance FromJSON (ProperName a) where
 -- |
 -- The closed set of proper name types.
 --
-data ProperNameType = TypeName | ConstructorName | ClassName | Namespace
+data ProperNameType
+  = TypeName
+  | ConstructorName
+  | ClassName
+  | KindName
+  | Namespace
 
 -- |
 -- Coerces a ProperName from one ProperNameType to another. This should be used

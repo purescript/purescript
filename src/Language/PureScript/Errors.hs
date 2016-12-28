@@ -1030,6 +1030,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
     nameType (DctorName _) = "data constructor"
     nameType (TyClassName _) = "type class"
     nameType (ModName _) = "module"
+    nameType (KiName _) = "kind"
 
     runName :: Qualified Name -> Text
     runName (Qualified mn (IdentName name)) =
@@ -1043,6 +1044,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
     runName (Qualified mn (DctorName name)) =
       showQualified runProperName (Qualified mn name)
     runName (Qualified mn (TyClassName name)) =
+      showQualified runProperName (Qualified mn name)
+    runName (Qualified mn (KiName name)) =
       showQualified runProperName (Qualified mn name)
     runName (Qualified Nothing (ModName name)) =
       runModuleName name
@@ -1148,6 +1151,8 @@ prettyPrintRef (TypeInstanceRef ident) =
   Just $ showIdent ident
 prettyPrintRef (ModuleRef name) =
   Just $ "module " <> runModuleName name
+prettyPrintRef (KindRef pn) =
+  Just $ "kind " <> runProperName pn
 prettyPrintRef (ReExportRef _ _) =
   Nothing
 prettyPrintRef (PositionedDeclarationRef _ _ ref) =

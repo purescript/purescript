@@ -240,6 +240,10 @@ data DeclarationRef
   --
   | ModuleRef ModuleName
   -- |
+  -- A named kind
+  --
+  | KindRef (ProperName 'KindName)
+  -- |
   -- A value re-exported from another module. These will be inserted during
   -- elaboration in name desugaring.
   --
@@ -258,6 +262,7 @@ instance Eq DeclarationRef where
   (TypeClassRef name) == (TypeClassRef name') = name == name'
   (TypeInstanceRef name) == (TypeInstanceRef name') = name == name'
   (ModuleRef name) == (ModuleRef name') = name == name'
+  (KindRef name) == (KindRef name') = name == name'
   (ReExportRef mn ref) == (ReExportRef mn' ref') = mn == mn' && ref == ref'
   (PositionedDeclarationRef _ _ r) == r' = r == r'
   r == (PositionedDeclarationRef _ _ r') = r == r'
@@ -274,6 +279,7 @@ compDecRef (ValueOpRef name) (ValueOpRef name') = compare name name'
 compDecRef (TypeClassRef name) (TypeClassRef name') = compare name name'
 compDecRef (TypeInstanceRef ident) (TypeInstanceRef ident') = compare ident ident'
 compDecRef (ModuleRef name) (ModuleRef name') = compare name name'
+compDecRef (KindRef name) (KindRef name') = compare name name'
 compDecRef (ReExportRef name _) (ReExportRef name' _) = compare name name'
 compDecRef (PositionedDeclarationRef _ _ ref) ref' = compDecRef ref ref'
 compDecRef ref (PositionedDeclarationRef _ _ ref') = compDecRef ref ref'
@@ -286,7 +292,8 @@ compDecRef ref ref' = compare
       orderOf (TypeRef _ _) = 2
       orderOf (ValueRef _) = 3
       orderOf (ValueOpRef _) = 4
-      orderOf _ = 5
+      orderOf (KindRef _) = 5
+      orderOf _ = 6
 
 getTypeRef :: DeclarationRef -> Maybe (ProperName 'TypeName, Maybe [ProperName 'ConstructorName])
 getTypeRef (TypeRef name dctors) = Just (name, dctors)
@@ -312,6 +319,11 @@ getTypeClassRef :: DeclarationRef -> Maybe (ProperName 'ClassName)
 getTypeClassRef (TypeClassRef name) = Just name
 getTypeClassRef (PositionedDeclarationRef _ _ r) = getTypeClassRef r
 getTypeClassRef _ = Nothing
+
+getKindRef :: DeclarationRef -> Maybe (ProperName 'KindName)
+getKindRef (KindRef name) = Just name
+getKindRef (PositionedDeclarationRef _ _ r) = getKindRef r
+getKindRef _ = Nothing
 
 isModuleRef :: DeclarationRef -> Bool
 isModuleRef (PositionedDeclarationRef _ _ r) = isModuleRef r
@@ -380,6 +392,10 @@ data Declaration
   -- A data type foreign import (name, kind)
   --
   | ExternDataDeclaration (ProperName 'TypeName) Kind
+  -- |
+  -- A foreign kind import (name)
+  --
+  | ExternKindDeclaration (ProperName 'KindName)
   -- |
   -- A fixity declaration
   --
@@ -468,6 +484,14 @@ isExternDataDecl :: Declaration -> Bool
 isExternDataDecl ExternDataDeclaration{} = True
 isExternDataDecl (PositionedDeclaration _ _ d) = isExternDataDecl d
 isExternDataDecl _ = False
+
+-- |
+-- Test if a declaration is a foreign kind import
+--
+isExternKindDecl :: Declaration -> Bool
+isExternKindDecl ExternKindDeclaration{} = True
+isExternKindDecl (PositionedDeclaration _ _ d) = isExternKindDecl d
+isExternKindDecl _ = False
 
 -- |
 -- Test if a declaration is a fixity declaration

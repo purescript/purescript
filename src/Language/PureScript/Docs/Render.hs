@@ -80,6 +80,11 @@ renderDeclarationWithOptions opts Declaration{..} =
       , ident $ adjustAliasName alias declTitle
       ]
 
+    ExternKindDeclaration ->
+      [ keywordKind
+      , renderKind (P.NamedKind (notQualified declTitle))
+      ]
+
   where
   renderType' :: P.Type -> RenderedCode
   renderType' = renderTypeWithOptions opts

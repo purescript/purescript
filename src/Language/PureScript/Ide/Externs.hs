@@ -94,6 +94,7 @@ convertDecl P.EDDataConstructor{..} = Just $ IdeDeclDataConstructor $
 convertDecl P.EDValue{..} = Just $ IdeDeclValue $
   IdeValue edValueName edValueType
 convertDecl P.EDClass{..} = Just (IdeDeclTypeClass edClassName)
+convertDecl P.EDKind{..} = Just (IdeDeclKind edKindName)
 convertDecl P.EDInstance{} = Nothing
 
 convertOperator :: P.ExternsFixity -> IdeDeclaration
@@ -137,9 +138,12 @@ annotateModule (defs, types) (moduleName, decls) =
         annotateValue (op ^. ideValueOpAlias & valueOperatorAliasT) (IdeDeclValueOperator op)
       IdeDeclTypeOperator op ->
         annotateType (op ^. ideTypeOpAlias & typeOperatorAliasT) (IdeDeclTypeOperator op)
+      IdeDeclKind i ->
+        annotateKind (i ^. properNameT) (IdeDeclKind i)
       where
-        annotateFunction x = IdeDeclarationAnn (ann { annLocation = Map.lookup (Left (P.runIdent x)) defs
+        annotateFunction x = IdeDeclarationAnn (ann { annLocation = Map.lookup (IdeNSValue (P.runIdent x)) defs
                                                     , annTypeAnnotation = Map.lookup x types
                                                     })
-        annotateValue x = IdeDeclarationAnn (ann {annLocation = Map.lookup (Left x) defs})
-        annotateType x = IdeDeclarationAnn (ann {annLocation = Map.lookup (Right x) defs})
+        annotateValue x = IdeDeclarationAnn (ann {annLocation = Map.lookup (IdeNSValue x) defs})
+        annotateType x = IdeDeclarationAnn (ann {annLocation = Map.lookup (IdeNSType x) defs})
+        annotateKind x = IdeDeclarationAnn (ann {annLocation = Map.lookup (IdeNSKind x) defs})
