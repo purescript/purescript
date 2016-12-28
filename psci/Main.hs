@@ -72,10 +72,16 @@ inputFile = Opts.strArgument $
      Opts.metavar "FILE"
   <> Opts.help "Optional .purs files to load on start"
 
-nodeFlagsFlag :: Opts.Parser [String]
-nodeFlagsFlag = Opts.option parser $
+nodePathOption :: Opts.Parser (Maybe FilePath)
+nodePathOption = Opts.optional . Opts.strOption $
+     Opts.metavar "FILE"
+  <> Opts.long "node-path"
+  <> Opts.help "Path to the Node executable"
+
+nodeFlagsOption :: Opts.Parser [String]
+nodeFlagsOption = Opts.option parser $
      Opts.long "node-opts"
-  <> Opts.metavar "NODE_OPTS"
+  <> Opts.metavar "OPTS"
   <> Opts.value []
   <> Opts.help "Flags to pass to node, separated by spaces"
   where
@@ -90,7 +96,7 @@ port = Opts.option Opts.auto $
 backend :: Opts.Parser Backend
 backend =
   (browserBackend <$> port)
-  <|> (nodeBackend <$> nodeFlagsFlag)
+  <|> (nodeBackend <$> nodePathOption <*> nodeFlagsOption)
 
 psciOptions :: Opts.Parser PSCiOptions
 psciOptions = PSCiOptions <$> many inputFile
@@ -293,8 +299,8 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
       result <- takeMVar resultVar
       putStrLn result
 
-nodeBackend :: [String] -> Backend
-nodeBackend nodeArgs = Backend setup eval reload shutdown
+nodeBackend :: Maybe FilePath -> [String] -> Backend
+nodeBackend nodePath nodeArgs = Backend setup eval reload shutdown
   where
     setup :: IO ()
     setup = return ()
@@ -302,12 +308,12 @@ nodeBackend nodeArgs = Backend setup eval reload shutdown
     eval :: () -> String -> IO ()
     eval _ _ = do
       writeFile indexFile "require('$PSCI')['$main']();"
-      process <- findNodeProcess
+      process <- maybe findNodeProcess (pure . pure) nodePath
       result <- traverse (\node -> readProcessWithExitCode node (nodeArgs ++ [indexFile]) "") process
       case result of
-        Just (ExitSuccess,   out, _)   -> putStrLn out
-        Just (ExitFailure _, _,   err) -> putStrLn err
-        Nothing                        -> putStrLn "Couldn't find node.js"
+        Just (ExitSuccess, out, _)   -> putStrLn out
+        Just (ExitFailure _, _, err) -> putStrLn err
+        Nothing                      -> putStrLn "Couldn't find node.js"
 
     reload :: () -> IO ()
     reload _ = return ()
