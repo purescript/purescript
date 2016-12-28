@@ -67,7 +67,7 @@ spec = do
     let warning = cwd </> "examples" </> "warning"
     let failing = cwd </> "examples" </> "failing"
     let supportDir = cwd </> "tests" </> "support" </> "bower_components"
-    let supportFiles ext = Glob.globDir1 (Glob.compile ("purescript-*/**/*." ++ ext)) supportDir
+    let supportFiles ext = Glob.globDir1 (Glob.compile ("purescript-*/src/**/*." ++ ext)) supportDir
     passingFiles <- getTestFiles passing <$> testGlob passing
     warningFiles <- getTestFiles warning <$> testGlob warning
     failingFiles <- getTestFiles failing <$> testGlob failing
