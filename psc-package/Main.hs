@@ -7,6 +7,7 @@
 
 module Main where
 
+import qualified Control.Foldl as Foldl
 import qualified Data.Aeson as Aeson
 import           Data.Aeson.Encode.Pretty
 import           Data.Foldable (fold, for_, traverse_)
@@ -15,9 +16,11 @@ import qualified Data.Map as Map
 import           Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Set as Set
 import           Data.Text (pack)
+import qualified Data.Text as T
+import           Data.Text.Encoding (encodeUtf8)
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Builder as TB
-import           Data.Text.Encoding (encodeUtf8)
+import qualified Data.Text.Read as TR
 import           Data.Traversable (for)
 import           Data.Version (showVersion)
 import qualified Filesystem.Path.CurrentOS as Path
@@ -25,7 +28,8 @@ import           GHC.Generics (Generic)
 import qualified Options.Applicative as Opts
 import qualified Paths_purescript as Paths
 import qualified System.IO as IO
-import           Turtle hiding (fold)
+import           Turtle hiding (fold, s, x)
+import qualified Turtle
 
 packageFile :: Path.FilePath
 packageFile = "psc-package.json"
@@ -108,6 +112,18 @@ cloneShallow from ref into =
        , pathToTextUnsafe into
        ] empty .||. exit (ExitFailure 1)
 
+listRemoteTags
+  :: Text
+  -- ^ repo
+  -> Turtle.Shell Text
+listRemoteTags from =
+  inproc "git"
+         [ "ls-remote"
+         , "-q"
+         , "-t"
+         , from
+         ] empty
+
 getPackageSet :: PackageConfig -> IO ()
 getPackageSet PackageConfig{ source, set } = do
   let pkgDir = ".psc-package" </> fromText set </> ".set"
@@ -127,6 +143,11 @@ readPackageSet PackageConfig{ set } = do
       echo "Unable to parse packages.json"
       exit (ExitFailure 1)
     Just db -> return db
+
+writePackageSet :: PackageConfig -> PackageSet -> IO ()
+writePackageSet PackageConfig{ set } =
+  let dbFile = ".psc-package" </> fromText set </> ".set" </> "packages.json"
+  in writeTextFile dbFile . encodePrettyToText
 
 installOrUpdate :: Text -> Text -> PackageInfo -> IO Turtle.FilePath
 installOrUpdate set pkgName PackageInfo{ repo, version } = do
@@ -233,6 +254,73 @@ exec exeName = do
         (map pathToTextUnsafe ("src" </> "**" </> "*.purs" : paths))
         empty
 
+checkForUpdates :: Bool -> IO ()
+checkForUpdates applyMinorUpdates = do
+    pkg <- readPackageFile
+    db <- readPackageSet pkg
+
+    echo ("Checking " <> pack (show (Map.size db)) <> " packages for updates.")
+    echo "Warning: this could take some time!"
+
+    newDb <- Map.fromList <$> (for (Map.toList db) $ \(name, p@PackageInfo{ repo, version }) -> do
+      echo ("Checking package " <> name)
+      tagLines <- Turtle.fold (listRemoteTags repo) Foldl.list
+      let tags = mapMaybe parseTag tagLines
+      newVersion <- case parseVersion version of
+        Just parts -> do
+          when (any (isMajorReleaseFrom parts) tags) $
+            echo ("New major release available")
+          case filter (isMinorReleaseFrom parts) tags of
+            [] -> pure version
+            minorReleases -> do
+              echo ("New minor release available")
+              case applyMinorUpdates of
+                True -> do
+                  let latestMinorRelease = maximum minorReleases
+                  pure ("v" <> T.intercalate "." (map (pack . show) latestMinorRelease))
+                False -> pure version
+        _ -> do
+          echo "Unable to parse version string"
+          pure version
+      pure (name, p { version = newVersion }))
+
+    when applyMinorUpdates (writePackageSet pkg newDb)
+  where
+    parseTag :: Text -> Maybe [Int]
+    parseTag line =
+      case T.splitOn "\t" line of
+        [_sha, ref] ->
+          case T.stripPrefix "refs/tags/" ref of
+            Just tag ->
+              case parseVersion tag of
+                Just parts -> pure parts
+                _ -> Nothing
+            _ -> Nothing
+        _ -> Nothing
+
+    parseVersion :: Text -> Maybe [Int]
+    parseVersion ref =
+      case T.stripPrefix "v" ref of
+        Just tag ->
+          traverse parseDecimal (T.splitOn "." tag)
+        _ -> Nothing
+
+    parseDecimal :: Text -> Maybe Int
+    parseDecimal s =
+      case TR.decimal s of
+        Right (n, "") -> Just n
+        _ -> Nothing
+
+    isMajorReleaseFrom :: [Int] -> [Int] -> Bool
+    isMajorReleaseFrom (0 : xs) (0 : ys) = isMajorReleaseFrom xs ys
+    isMajorReleaseFrom (x : _)  (y : _)  = y > x
+    isMajorReleaseFrom _        _        = False
+
+    isMinorReleaseFrom :: [Int] -> [Int] -> Bool
+    isMinorReleaseFrom (0 : xs) (0 : ys) = isMinorReleaseFrom xs ys
+    isMinorReleaseFrom (x : xs) (y : ys) = y == x && ys > xs
+    isMinorReleaseFrom _        _        = False
+
 verifyPackageSet :: IO ()
 verifyPackageSet = do
   pkg <- readPackageFile
@@ -292,6 +380,9 @@ main = do
         , Opts.command "available"
             (Opts.info (pure listPackages)
             (Opts.progDesc "List all packages available in the package set"))
+        , Opts.command "updates"
+            (Opts.info (checkForUpdates <$> apply)
+            (Opts.progDesc "Check all packages in the package set for new releases"))
         , Opts.command "verify-set"
             (Opts.info (pure verifyPackageSet)
             (Opts.progDesc "Verify that the packages in the package set build correctly"))
@@ -300,3 +391,7 @@ main = do
         pkg = Opts.strArgument $
              Opts.metavar "PACKAGE"
           <> Opts.help "The name of the package to install"
+
+        apply = Opts.switch $
+             Opts.long "apply"
+          <> Opts.help "Apply all minor package updates"
