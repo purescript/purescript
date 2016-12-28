@@ -12,7 +12,7 @@ import           Data.Aeson.Encode.Pretty
 import           Data.Foldable (fold, for_, traverse_)
 import           Data.List (nub)
 import qualified Data.Map as Map
-import           Data.Maybe (mapMaybe)
+import           Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Set as Set
 import           Data.Text (pack)
 import qualified Data.Text.Lazy as TL
@@ -128,11 +128,13 @@ readPackageSet PackageConfig{ set } = do
       exit (ExitFailure 1)
     Just db -> return db
 
-installOrUpdate :: PackageConfig -> Text -> PackageInfo -> IO ()
-installOrUpdate PackageConfig{ set } pkgName PackageInfo{ repo, version } = do
+installOrUpdate :: Text -> Text -> PackageInfo -> IO Turtle.FilePath
+installOrUpdate set pkgName PackageInfo{ repo, version } = do
+  echo ("Updating " <> pkgName)
   let pkgDir = ".psc-package" </> fromText set </> fromText pkgName </> fromText version
   exists <- testdir pkgDir
   unless exists . void $ cloneShallow repo version pkgDir
+  pure pkgDir
 
 getTransitiveDeps :: PackageSet -> [Text] -> IO [(Text, PackageInfo)]
 getTransitiveDeps db depends = do
@@ -151,9 +153,7 @@ updateImpl config@PackageConfig{ depends } = do
   db <- readPackageSet config
   trans <- getTransitiveDeps db depends
   echo ("Updating " <> pack (show (length trans)) <> " packages...")
-  for_ trans $ \(pkgName, pkg) -> do
-    echo ("Updating " <> pkgName)
-    installOrUpdate config pkgName pkg
+  for_ trans $ \(pkgName, pkg) -> installOrUpdate (set config) pkgName pkg
 
 initialize :: IO ()
 initialize = do
@@ -233,6 +233,23 @@ exec exeName = do
         (map pathToTextUnsafe ("src" </> "**" </> "*.purs" : paths))
         empty
 
+verifyPackageSet :: IO ()
+verifyPackageSet = do
+  pkg <- readPackageFile
+  db <- readPackageSet pkg
+
+  echo ("Verifying " <> pack (show (Map.size db)) <> " packages.")
+  echo "Warning: this could take some time!"
+
+  let installOrUpdate' (name, pkgInfo) = (name, ) <$> installOrUpdate (set pkg) name pkgInfo
+  paths <- Map.fromList <$> traverse installOrUpdate' (Map.toList db)
+
+  for_ (Map.toList db) $ \(name, PackageInfo{..}) -> do
+    let dirFor = fromMaybe (error "verifyPackageSet: no directory") . (`Map.lookup` paths)
+    echo ("Verifying package " <> name)
+    let srcGlobs = map (pathToTextUnsafe . (</> ("src" </> "**" </> "*.purs")) . dirFor) (name : dependencies)
+    procs "psc" srcGlobs empty
+
 main :: IO ()
 main = do
     IO.hSetEncoding IO.stdout IO.utf8
@@ -275,6 +292,9 @@ main = do
         , Opts.command "available"
             (Opts.info (pure listPackages)
             (Opts.progDesc "List all packages available in the package set"))
+        , Opts.command "verify-set"
+            (Opts.info (pure verifyPackageSet)
+            (Opts.progDesc "Verify that the packages in the package set build correctly"))
         ]
       where
         pkg = Opts.strArgument $
