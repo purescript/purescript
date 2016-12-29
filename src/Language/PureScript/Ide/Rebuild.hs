@@ -8,6 +8,7 @@ module Language.PureScript.Ide.Rebuild
 import           Protolude
 
 import           "monad-logger" Control.Monad.Logger
+import           Data.Aeson
 import qualified Data.List                       as List
 import qualified Data.Map.Lazy                   as M
 import           Data.Maybe                      (fromJust)
@@ -72,7 +73,7 @@ rebuildFile path = do
     Left errors -> do
       diag <- diagnostics (P.runMultipleErrors errors)
       -- for_ diag (logWarnN . prettyDiagnostics)
-      throwError (RebuildError (bimap (toJSONError False P.Error) (fmap prettyDiagnostics) <$> diag))
+      throwError (RebuildError (bimap (toJSONError False P.Error) (fmap toJSON) <$> diag))
     Right _ -> do
       rebuildModuleOpen makeEnv externs m
       pure (RebuildSuccess (toJSONErrors False P.Warning warnings))
@@ -167,19 +168,33 @@ openModuleExports (P.Module ss cs mn decls _) = P.Module ss cs mn decls Nothing
 data Diagnostics
   = NotCompiledYet P.ModuleName
   | CreateFFIFile FilePath
+  | TypeSearchResult Text P.Type [(P.Qualified P.Ident, P.Type)]
   deriving (Show)
 
-prettyDiagnostics :: Diagnostics -> Text
-prettyDiagnostics d = case d of
-  NotCompiledYet mn ->
-    "Couldn't find an ExternsFile for "
-    <> P.runModuleName mn
-    <> " it does show up as a parsed module though, "
-    <> "did you try to fully compile the project yet?"
-  CreateFFIFile fp ->
-    "A new FFI file needs to be created at: " <> T.pack fp
+instance ToJSON Diagnostics where
+  toJSON d = case d of
+    NotCompiledYet mn -> toJSON $
+      "Couldn't find an ExternsFile for "
+      <> P.runModuleName mn
+      <> " it does show up as a parsed module though, "
+      <> "did you try to fully compile the project yet?"
+    CreateFFIFile fp -> toJSON $
+      "A new FFI file needs to be created at: " <> T.pack fp
+    TypeSearchResult label type' matches ->
+      object [ "label" .= label
+             , "type" .= P.prettyPrintType type'
+             , "matches" .= map go matches
+             ]
+        where
+          go (ident, t) = object [ "module" .= maybe "" P.runModuleName (P.getQual ident)
+                                 , "ident" .= P.runIdent (P.disqualify ident)
+                                 , "type" .= P.prettyPrintType t
+                                 ]
 
-diagnostics :: (Ide m, MonadLogger m) => [P.ErrorMessage] -> m [(P.ErrorMessage, Maybe Diagnostics)]
+diagnostics
+  :: (Ide m, MonadLogger m)
+  => [P.ErrorMessage]
+  -> m [(P.ErrorMessage, Maybe Diagnostics)]
 diagnostics errs = do
   diags <- traverse f errs
   pure (zip errs diags)
@@ -192,6 +207,8 @@ diagnostics errs = do
         -- its Externsfile.
         modules <- s1Modules <$> getStage1
         pure (mn `M.lookup` modules $> NotCompiledYet mn)
+      P.HoleInferredType label type' _ (P.TSAfter matches) ->
+        pure (Just (TypeSearchResult label type' matches))
       P.MissingFFIModule mn -> do
         modules <- s1Modules <$> getStage1
         case M.lookup mn modules of

@@ -29,7 +29,7 @@ data PscIdeError
     | ModuleNotFound ModuleIdent
     | ModuleFileNotFound ModuleIdent
     | ParseError P.ParseError Text
-    | RebuildError [(JSONError, Maybe Text)]
+    | RebuildError [(JSONError, Maybe Value)]
 
 instance ToJSON PscIdeError where
   toJSON (RebuildError errs) = object
@@ -41,8 +41,10 @@ instance ToJSON PscIdeError where
     , "result" .= textError err
     ]
 
-addHint :: (ToJSON a, ToJSON b) => (a, b) -> Value
-addHint (err, d) = addKey ("psc-ide-hint", toJSON d) (toJSON err )
+addHint :: (ToJSON a) => (a, Maybe Value) -> Value
+addHint (err, v) = case v of
+  Just v' -> addKey ("psc-ide-hint", v') (toJSON err)
+  Nothing -> toJSON err
 
 addKey :: (Text, Value) -> Value -> Value
 addKey (k, v) (Object hashMap) = Object (HM.insert k v hashMap)
