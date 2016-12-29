@@ -65,8 +65,8 @@ readPackageFile = do
       exit (ExitFailure 1)
     Just pkg -> return pkg
 
-encodePrettyToText :: Aeson.ToJSON json => json -> Text
-encodePrettyToText =
+packageConfigToJSON :: PackageConfig -> Text
+packageConfigToJSON =
     TL.toStrict
     . TB.toLazyText
     . encodePrettyToTextBuilder' config
@@ -80,10 +80,18 @@ encodePrettyToText =
                             ]
                }
 
+packageSetToJSON :: PackageSet -> Text
+packageSetToJSON =
+    TL.toStrict
+    . TB.toLazyText
+    . encodePrettyToTextBuilder' config
+  where
+    config = defConfig { confCompare = compare }
+
 writePackageFile :: PackageConfig -> IO ()
 writePackageFile =
   writeTextFile packageFile
-  . encodePrettyToText
+  . packageConfigToJSON
 
 data PackageInfo = PackageInfo
   { repo         :: Text
@@ -147,7 +155,7 @@ readPackageSet PackageConfig{ set } = do
 writePackageSet :: PackageConfig -> PackageSet -> IO ()
 writePackageSet PackageConfig{ set } =
   let dbFile = ".psc-package" </> fromText set </> ".set" </> "packages.json"
-  in writeTextFile dbFile . encodePrettyToText
+  in writeTextFile dbFile . packageSetToJSON
 
 installOrUpdate :: Text -> Text -> PackageInfo -> IO Turtle.FilePath
 installOrUpdate set pkgName PackageInfo{ repo, version } = do
@@ -254,8 +262,8 @@ exec exeName = do
         (map pathToTextUnsafe ("src" </> "**" </> "*.purs" : paths))
         empty
 
-checkForUpdates :: Bool -> IO ()
-checkForUpdates applyMinorUpdates = do
+checkForUpdates :: Bool -> Bool -> IO ()
+checkForUpdates applyMinorUpdates applyMajorUpdates = do
     pkg <- readPackageFile
     db <- readPackageSet pkg
 
@@ -267,24 +275,35 @@ checkForUpdates applyMinorUpdates = do
       tagLines <- Turtle.fold (listRemoteTags repo) Foldl.list
       let tags = mapMaybe parseTag tagLines
       newVersion <- case parseVersion version of
-        Just parts -> do
-          when (any (isMajorReleaseFrom parts) tags) $
-            echo ("New major release available")
-          case filter (isMinorReleaseFrom parts) tags of
-            [] -> pure version
-            minorReleases -> do
-              echo ("New minor release available")
-              case applyMinorUpdates of
-                True -> do
-                  let latestMinorRelease = maximum minorReleases
-                  pure ("v" <> T.intercalate "." (map (pack . show) latestMinorRelease))
-                False -> pure version
+        Just parts ->
+          let applyMinor =
+                case filter (isMinorReleaseFrom parts) tags of
+                  [] -> pure version
+                  minorReleases -> do
+                    echo ("New minor release available")
+                    case applyMinorUpdates of
+                      True -> do
+                        let latestMinorRelease = maximum minorReleases
+                        pure ("v" <> T.intercalate "." (map (pack . show) latestMinorRelease))
+                      False -> pure version
+              applyMajor =
+                case filter (isMajorReleaseFrom parts) tags of
+                  [] -> applyMinor
+                  newReleases -> do
+                    echo ("New major release available")
+                    case applyMajorUpdates of
+                      True -> do
+                        let latestRelease = maximum newReleases
+                        pure ("v" <> T.intercalate "." (map (pack . show) latestRelease))
+                      False -> applyMinor
+          in applyMajor
         _ -> do
           echo "Unable to parse version string"
           pure version
       pure (name, p { version = newVersion }))
 
-    when applyMinorUpdates (writePackageSet pkg newDb)
+    when (applyMinorUpdates || applyMajorUpdates)
+      (writePackageSet pkg newDb)
   where
     parseTag :: Text -> Maybe [Int]
     parseTag line =
@@ -381,7 +400,7 @@ main = do
             (Opts.info (pure listPackages)
             (Opts.progDesc "List all packages available in the package set"))
         , Opts.command "updates"
-            (Opts.info (checkForUpdates <$> apply)
+            (Opts.info (checkForUpdates <$> apply <*> applyMajor)
             (Opts.progDesc "Check all packages in the package set for new releases"))
         , Opts.command "verify-set"
             (Opts.info (pure verifyPackageSet)
@@ -395,3 +414,7 @@ main = do
         apply = Opts.switch $
              Opts.long "apply"
           <> Opts.help "Apply all minor package updates"
+
+        applyMajor = Opts.switch $
+             Opts.long "apply-breaking"
+          <> Opts.help "Apply all major package updates"
