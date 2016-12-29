@@ -24,7 +24,7 @@ main = do
   let gotLT = reflectOrdering egLT == LT
       gotEQ = reflectOrdering egEQ == EQ
       gotGT = reflectOrdering egGT == GT
-  when (not gotLT) log "Did not get LT"
-  when (not gotEQ) log "Did not get EQ"
-  when (not gotGT) log "Did not get GT"
-  when (gotLT && gotEQ && gotGT) log "Done"
+  when (not gotLT) $ log "Did not get LT"
+  when (not gotEQ) $ log "Did not get EQ"
+  when (not gotGT) $ log "Did not get GT"
+  when (gotLT && gotEQ && gotGT) $ log "Done"
