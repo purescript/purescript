@@ -45,6 +45,10 @@ data Evidence
   -- ^ An existing named instance
   | IsSymbolInstance Text
   -- ^ Computed instance of the IsSymbol type class for a given Symbol literal
+  | CompareSymbolInstance
+  -- ^ Computed instance of CompareSymbol
+  | AppendSymbolInstance
+  -- ^ Computed instance of AppendSymbol
   deriving (Eq)
 
 -- | Extract the identifier of a named instance
@@ -138,7 +142,18 @@ entails SolverOptions{..} constraint context hints =
     solve constraint
   where
     forClassName :: InstanceContext -> Qualified (ProperName 'ClassName) -> [Type] -> [TypeClassDict]
-    forClassName _ C.IsSymbol [TypeLevelString sym] = [TypeClassDictionaryInScope (IsSymbolInstance sym) [] C.IsSymbol [TypeLevelString sym] Nothing]
+    forClassName _ C.IsSymbol [TypeLevelString sym] =
+      [TypeClassDictionaryInScope (IsSymbolInstance sym) [] C.IsSymbol [TypeLevelString sym] Nothing]
+    forClassName _ C.CompareSymbol [arg0@(TypeLevelString lhs), arg1@(TypeLevelString rhs), _] =
+      let ordering = case compare lhs rhs of
+                  LT -> C.orderingLT
+                  EQ -> C.orderingEQ
+                  GT -> C.orderingGT
+          args = [arg0, arg1, TypeConstructor ordering]
+      in [TypeClassDictionaryInScope CompareSymbolInstance [] C.CompareSymbol args Nothing]
+    forClassName _ C.AppendSymbol [arg0@(TypeLevelString lhs), arg1@(TypeLevelString rhs), _] =
+      let args = [arg0, arg1, TypeLevelString (lhs <> rhs)]
+      in [TypeClassDictionaryInScope AppendSymbolInstance [] C.AppendSymbol args Nothing]
     forClassName ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (nub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
     forClassName _ _ _ = internalError "forClassName: expected qualified class name"
 
@@ -293,9 +308,13 @@ entails SolverOptions{..} constraint context hints =
             -- Make a dictionary from subgoal dictionaries by applying the correct function
             mkDictionary :: Evidence -> Maybe [Expr] -> Expr
             mkDictionary (NamedInstance n) args = foldl App (Var n) (fold args)
-            mkDictionary (IsSymbolInstance sym) _ = TypeClassDictionaryConstructorApp C.IsSymbol (Literal (ObjectLiteral fields)) where
-              fields = [ ("reflectSymbol", Abs (Left (Ident C.__unused)) (Literal (StringLiteral sym)))
-                       ]
+            mkDictionary (IsSymbolInstance sym) _ =
+              let fields = [ ("reflectSymbol", Abs (Left (Ident C.__unused)) (Literal (StringLiteral sym))) ] in
+              TypeClassDictionaryConstructorApp C.IsSymbol (Literal (ObjectLiteral fields))
+            mkDictionary CompareSymbolInstance _ =
+              TypeClassDictionaryConstructorApp C.CompareSymbol (Literal (ObjectLiteral []))
+            mkDictionary AppendSymbolInstance _ =
+              TypeClassDictionaryConstructorApp C.AppendSymbol (Literal (ObjectLiteral []))
 
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName a) -> Integer -> Expr
