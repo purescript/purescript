@@ -18,7 +18,7 @@ import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Writer.Class (MonadWriter(..))
 import Control.Lens ((^..), _1, _2)
 
-import Data.Foldable (for_, traverse_)
+import Data.Foldable (for_, traverse_, toList)
 import Data.List (nub, nubBy, (\\), sort, group)
 import Data.Maybe
 import qualified Data.Map as M
@@ -298,7 +298,7 @@ typeCheckAll moduleName _ = traverse go
       Nothing -> internalError "typeCheckAll: Encountered unknown type class in instance declaration"
       Just typeClass -> do
         sequence_ (zipWith (checkTypeClassInstance typeClass) [0..] tys)
-        checkOrphanInstance dictName className tys
+        checkOrphanInstance dictName className typeClass tys
         _ <- traverseTypeInstanceBody checkInstanceMembers body
         let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps)
         addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) dict
@@ -324,19 +324,35 @@ typeCheckAll moduleName _ = traverse go
       | otherwise = firstDuplicate xs
     firstDuplicate _ = Nothing
 
-  checkOrphanInstance :: Ident -> Qualified (ProperName 'ClassName) -> [Type] -> m ()
-  checkOrphanInstance dictName className@(Qualified (Just mn') _) tys'
-    | moduleName == mn' || any checkType tys' = return ()
+  checkOrphanInstance :: Ident -> Qualified (ProperName 'ClassName) -> TypeClassData -> [Type] -> m ()
+  checkOrphanInstance dictName className@(Qualified (Just mn') _) typeClass tys'
+    | moduleName == mn' || moduleName `S.member` nonOrphanModules = return ()
     | otherwise = throwError . errorMessage $ OrphanInstance dictName className tys'
     where
-    checkType :: Type -> Bool
-    checkType (TypeVar _) = False
-    checkType (TypeLevelString _) = False
-    checkType (TypeConstructor (Qualified (Just mn'') _)) = moduleName == mn''
-    checkType (TypeConstructor (Qualified Nothing _)) = internalError "Unqualified type name in checkOrphanInstance"
-    checkType (TypeApp t1 _) = checkType t1
-    checkType _ = internalError "Invalid type in instance in checkOrphanInstance"
-  checkOrphanInstance _ _ _ = internalError "Unqualified class name in checkOrphanInstance"
+    typeModule :: Type -> Maybe ModuleName
+    typeModule (TypeVar _) = Nothing
+    typeModule (TypeLevelString _) = Nothing
+    typeModule (TypeConstructor (Qualified (Just mn'') _)) = Just mn''
+    typeModule (TypeConstructor (Qualified Nothing _)) = internalError "Unqualified type name in checkOrphanInstance"
+    typeModule (TypeApp t1 _) = typeModule t1
+    typeModule _ = internalError "Invalid type in instance in checkOrphanInstance"
+
+    modulesByTypeIndex :: M.Map Int (Maybe ModuleName)
+    modulesByTypeIndex = M.fromList (zip [0 ..] (typeModule <$> tys'))
+
+    lookupModule :: Int -> S.Set ModuleName
+    lookupModule idx = case M.lookup idx modulesByTypeIndex of
+      Just ms -> S.fromList (toList ms)
+      Nothing -> internalError "Unknown type index in checkOrphanInstance"
+
+    -- If the instance is declared in a module that wouldn't be found based on a covering set
+    -- then it is considered an orphan - because we'd have a situation in which we expect an
+    -- instance but can't find it. So a valid module must be applicable across *all* covering
+    -- sets - therefore we take the intersection of covering set modules.
+    nonOrphanModules :: S.Set ModuleName
+    nonOrphanModules = foldl1 S.intersection (foldMap lookupModule `S.map` typeClassCoveringSets typeClass)
+
+  checkOrphanInstance _ _ _ _ = internalError "Unqualified class name in checkOrphanInstance"
 
   -- |
   -- This function adds the argument kinds for a type constructor so that they may appear in the externs file,

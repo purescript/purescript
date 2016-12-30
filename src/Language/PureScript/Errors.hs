@@ -716,7 +716,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
                 , Box.vcat Box.left (map typeAtomAsBox ts)
                 ]
             , line "is an orphan instance."
-            , line "An orphan instance is an instance which is defined in neither the class module nor the data type module."
+            , line "An orphan instance is one which is defined in a module that is unrelated to either the class or the collection of data types that the instance is defined for."
             , line "Consider moving the instance, if possible, or using a newtype wrapper."
             ]
     renderSimpleErrorMessage (InvalidNewtype name) =

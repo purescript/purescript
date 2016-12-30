@@ -40,6 +40,8 @@ extra-source-files: examples/passing/*.purs
                   , examples/passing/ModuleExportQualified/*.purs
                   , examples/passing/ModuleExportSelf/*.purs
                   , examples/passing/NonConflictingExports/*.purs
+                  , examples/passing/NonOrphanInstanceMulti/*.purs
+                  , examples/passing/NonOrphanInstanceFunDepExtra/*.purs
                   , examples/passing/OperatorAliasElsewhere/*.purs
                   , examples/passing/Operators/*.purs
                   , examples/passing/PendingConflictingImports/*.purs
@@ -80,6 +82,9 @@ extra-source-files: examples/passing/*.purs
                   , examples/failing/ImportModule/*.purs
                   , examples/failing/InstanceExport/*.purs
                   , examples/failing/OrphanInstance/*.purs
+                  , examples/failing/OrphanInstanceFunDepCycle/*.purs
+                  , examples/failing/OrphanInstanceWithDetermined/*.purs
+                  , examples/failing/OrphanInstanceNullary/*.purs
                   , examples/warning/*.purs
                   , examples/warning/*.js
                   , examples/warning/UnusedExplicitImportTypeOp/*.purs
