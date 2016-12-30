@@ -196,10 +196,9 @@ getVersionFromGitTag = do
   where
   trimWhitespace =
     dropWhile isSpace >>> reverse >>> dropWhile isSpace >>> reverse
-  parseMay str =
-    (str,) <$> D.parseVersion' (dropPrefix "v" str)
-  dropPrefix prefix str =
-    fromMaybe str (stripPrefix prefix str)
+  parseMay str = do
+    digits <- stripPrefix "v" str
+    (str,) <$> D.parseVersion' digits
 
 getBowerRepositoryInfo :: PackageMeta -> PrepareM (D.GithubUser, D.GithubRepo)
 getBowerRepositoryInfo = either (userError . BadRepositoryField) return . tryExtract

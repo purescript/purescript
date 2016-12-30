@@ -148,9 +148,8 @@ displayUserError e = case e of
             , "version."
             ])
         , spacer
-        , para "Note: tagged versions must be in one of the following forms:"
+        , para "Note: tagged versions must be in the following form:"
         , indented (para "* v{MAJOR}.{MINOR}.{PATCH} (example: \"v1.6.2\")")
-        , indented (para "* {MAJOR}.{MINOR}.{PATCH} (example: \"1.6.2\")")
         , spacer
         , para (concat
            [ "If the version you are publishing is not yet tagged, you might "
