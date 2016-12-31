@@ -4,8 +4,9 @@
 -- Functions for replacing fully applied type synonyms
 --
 module Language.PureScript.TypeChecker.Synonyms
-  ( replaceAllTypeSynonyms
-  , replaceAllTypeSynonyms'
+  ( SynonymMap
+  , replaceAllTypeSynonyms
+  , replaceAllTypeSynonymsM
   ) where
 
 import           Prelude.Compat
@@ -22,9 +23,11 @@ import           Language.PureScript.Names
 import           Language.PureScript.TypeChecker.Monad
 import           Language.PureScript.Types
 
--- | Replace fully applied type synonyms
+-- | Type synonym information (arguments with kinds, aliased type), indexed by name
+type SynonymMap = M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe Kind)], Type)
+
 replaceAllTypeSynonyms'
-  :: M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe Kind)], Type)
+  :: SynonymMap
   -> Type
   -> Either MultipleErrors Type
 replaceAllTypeSynonyms' syns = everywhereOnTypesTopDownM try
@@ -49,3 +52,11 @@ replaceAllTypeSynonyms :: (e ~ MultipleErrors, MonadState CheckState m, MonadErr
 replaceAllTypeSynonyms d = do
   env <- getEnv
   either throwError return $ replaceAllTypeSynonyms' (typeSynonyms env) d
+
+-- | Replace fully applied type synonyms by explicitly providing a 'SynonymMap'.
+replaceAllTypeSynonymsM
+  :: MonadError MultipleErrors m
+  => SynonymMap
+  -> Type
+  -> m Type
+replaceAllTypeSynonymsM syns = either throwError pure . replaceAllTypeSynonyms' syns
