@@ -6,7 +6,7 @@ module Language.PureScript.Sugar.TypeClasses.Deriving (deriveInstances) where
 import Prelude.Compat
 
 import Control.Arrow (second)
-import Control.Monad (replicateM)
+import Control.Monad (replicateM, zipWithM)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class (MonadSupply)
 
@@ -740,8 +740,8 @@ deriveFunctor mn ds tyConNm = do
     mkCtorClause :: Text -> Ident -> (ProperName 'ConstructorName, [Type]) -> m CaseAlternative
     mkCtorClause iTyName f (ctorName, ctorTys) = do
       idents <- replicateM (length ctorTys) (freshIdent "v")
-      let args = zipWith transformArg idents ctorTys
-          ctor = Constructor (Qualified (Just mn) ctorName)
+      args <- zipWithM transformArg idents ctorTys
+      let ctor = Constructor (Qualified (Just mn) ctorName)
           rebuilt = foldl App ctor args
           caseBinder = ConstructorBinder (Qualified (Just mn) ctorName) (VarBinder <$> idents)
       return $ CaseAlternative [caseBinder] (Right rebuilt)
@@ -749,10 +749,33 @@ deriveFunctor mn ds tyConNm = do
         fVar = mkVar f
         mapVar = mkVarMn (Just dataFunctor) (Ident C.map)
 
-        transformArg ident ty = foldr App (mkVar ident) (go ty) where
+        -- TODO: deal with type synonyms, ala https://github.com/purescript/purescript/pull/2516
+        transformArg :: Ident -> Type -> m Expr
+        transformArg ident = fmap (foldr App (mkVar ident)) . goType where
+
+          goType :: Type -> m (Maybe Expr)
           -- argument matches the index type
-          go (TypeVar t) | t == iTyName = Just fVar
+          goType (TypeVar t) | t == iTyName = return (Just fVar)
+
+          -- records
+          goType recTy | Just row <- objectType recTy =
+              traverse buildUpdate (decomposeRec row) >>= (traverse buildRecord . justUpdates)
+            where
+              justUpdates :: [Maybe (Text, Expr)] -> Maybe [(Text, Expr)]
+              justUpdates = foldMap (fmap return)
+
+              buildUpdate :: (Text, Type) -> m (Maybe (Text, Expr))
+              buildUpdate (lbl, ty) = do upd <- goType ty
+                                         return ((lbl,) <$> upd)
+
+              buildRecord :: [(Text, Expr)] -> m Expr
+              buildRecord updates = do arg <- freshIdent "o"
+                                       let argVar = mkVar arg
+                                           mkAssignment (l, x) = (l, App x (Accessor l argVar))
+                                       return (lam arg (ObjectUpdate argVar (mkAssignment <$> updates)))
+
           -- under a `* -> *`, just assume functor for now
-          go (TypeApp _ t) = App mapVar <$> go t
+          goType (TypeApp _ t) = fmap (App mapVar) <$> goType t
+
           -- otherwise do nothing - will fail type checking if type does actually contain index
-          go _ = Nothing
+          goType _ = return Nothing
