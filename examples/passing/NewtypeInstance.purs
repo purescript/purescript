@@ -4,7 +4,9 @@ import Prelude
 import Control.Monad.Eff
 import Control.Monad.Eff.Console
 
-newtype X = X String
+type MyString = String 
+
+newtype X = X MyString
 
 derive newtype instance showX :: Show X
 

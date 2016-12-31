@@ -62,6 +62,6 @@ desugar externs =
     >=> desugarImports externs
     >=> rebracket externs
     >=> traverse checkFixityExports
-    >=> traverse deriveInstances
+    >=> traverse (deriveInstances externs)
     >=> desugarTypeClasses externs
     >=> traverse createBindingGroupsModule
