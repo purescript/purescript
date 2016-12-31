@@ -139,6 +139,9 @@ compose = "compose"
 composeFlipped :: Text
 composeFlipped = "composeFlipped"
 
+map :: Text
+map = "map"
+
 -- Functions
 
 negate :: Text
