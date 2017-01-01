@@ -28,7 +28,7 @@ outputFileShouldBe :: [Text] -> IO ()
 outputFileShouldBe expectation = do
   outFp <- (</> "src" </> "ImportsSpecOut.tmp") <$> Integration.projectDirectory
   outRes <- readUTF8FileT outFp
-  shouldBe (T.lines outRes) expectation
+  shouldBe (T.strip <$> T.lines outRes) expectation
 
 spec :: Spec
 spec = beforeAll_ setup . describe "Adding imports" $ do
