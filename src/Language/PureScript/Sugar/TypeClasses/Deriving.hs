@@ -6,7 +6,7 @@ module Language.PureScript.Sugar.TypeClasses.Deriving (deriveInstances) where
 import           Prelude.Compat
 
 import           Control.Arrow (second)
-import           Control.Monad (replicateM)
+import           Control.Monad (replicateM, zipWithM)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Supply.Class (MonadSupply)
 import           Data.List (foldl', find, sortBy, unzip5)
@@ -15,6 +15,7 @@ import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Ord (comparing)
 import           Data.Text (Text)
 import           Language.PureScript.AST
+import qualified Language.PureScript.Constants as C
 import           Language.PureScript.Crash
 import           Language.PureScript.Environment
 import           Language.PureScript.Errors
@@ -24,7 +25,6 @@ import           Language.PureScript.Names
 import           Language.PureScript.Types
 import           Language.PureScript.TypeChecker (checkNewtype)
 import           Language.PureScript.TypeChecker.Synonyms (SynonymMap, replaceAllTypeSynonymsM)
-import qualified Language.PureScript.Constants as C
 
 -- | Elaborates deriving instance declarations by code generation.
 deriveInstances
@@ -73,6 +73,10 @@ deriveInstance mn syns ds (TypeInstanceDeclaration nm deps className tys@[ty] De
   , Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
   , mn == fromMaybe mn mn'
   = TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveOrd mn syns ds tyCon
+  | className == Qualified (Just dataFunctor) (ProperName "Functor")
+  , Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
+  , mn == fromMaybe mn mn'
+  = TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveFunctor mn syns ds tyCon
 deriveInstance mn syns ds (TypeInstanceDeclaration nm deps className [wrappedTy, unwrappedTy] DerivedInstance)
   | className == Qualified (Just dataNewtype) (ProperName "Newtype")
   , Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor wrappedTy
@@ -166,6 +170,9 @@ dataOrd = ModuleName [ ProperName "Data", ProperName "Ord" ]
 dataNewtype :: ModuleName
 dataNewtype = ModuleName [ ProperName "Data", ProperName "Newtype" ]
 
+dataFunctor :: ModuleName
+dataFunctor = ModuleName [ ProperName "Data", ProperName "Functor" ]
+
 deriveGeneric
   :: forall m. (MonadError MultipleErrors m, MonadSupply m)
   => ModuleName
@@ -199,11 +206,11 @@ deriveGeneric mn syns ds tyConNm dargs = do
       mkCtorClause (ctorName, tys) = do
         idents <- replicateM (length tys) freshIdent'
         tys' <- mapM (replaceAllTypeSynonymsM syns) tys
-        let caseResult idents =
+        let caseResult =
               App (prodConstructor (Literal . StringLiteral . showQualified runProperName $ Qualified (Just mn) ctorName))
                 . Literal . ArrayLiteral
                 $ zipWith toSpineFun (map (Var . Qualified Nothing) idents) tys'
-        return $ CaseAlternative [ConstructorBinder (Qualified (Just mn) ctorName) (map VarBinder idents)] (Right (caseResult idents))
+        return $ CaseAlternative [ConstructorBinder (Qualified (Just mn) ctorName) (map VarBinder idents)] (Right caseResult)
 
       toSpineFun :: Expr -> Type -> Expr
       toSpineFun i r | Just rec <- objectType r =
@@ -734,3 +741,70 @@ decomposeRec :: Type -> [(Text, Type)]
 decomposeRec = sortBy (comparing fst) . go
   where go (RCons str typ typs) = (str, typ) : decomposeRec typs
         go _ = []
+
+deriveFunctor
+  :: forall m
+   . (MonadError MultipleErrors m, MonadSupply m)
+  => ModuleName
+  -> SynonymMap
+  -> [Declaration]
+  -> ProperName 'TypeName
+  -> m [Declaration]
+deriveFunctor mn syns ds tyConNm = do
+  tyCon <- findTypeDecl tyConNm ds
+  mapFun <- mkMapFunction tyCon
+  return [ ValueDeclaration (Ident C.map) Public [] (Right mapFun) ]
+  where
+    mkMapFunction :: Declaration -> m Expr
+    mkMapFunction (DataDeclaration _ _ tys ctors) = case reverse tys of
+      [] -> throwError . errorMessage $ KindsDoNotUnify (FunKind kindType kindType) kindType
+      ((iTy, _) : _) -> do
+        f <- freshIdent "f"
+        m <- freshIdent "m"
+        lam f . lamCase m <$> mapM (mkCtorClause iTy f) ctors
+    mkMapFunction (PositionedDeclaration _ _ d) = mkMapFunction d
+    mkMapFunction _ = internalError "mkMapFunction: expected DataDeclaration"
+
+    mkCtorClause :: Text -> Ident -> (ProperName 'ConstructorName, [Type]) -> m CaseAlternative
+    mkCtorClause iTyName f (ctorName, ctorTys) = do
+      idents <- replicateM (length ctorTys) (freshIdent "v")
+      ctorTys' <- mapM (replaceAllTypeSynonymsM syns) ctorTys
+      args <- zipWithM transformArg idents ctorTys'
+      let ctor = Constructor (Qualified (Just mn) ctorName)
+          rebuilt = foldl App ctor args
+          caseBinder = ConstructorBinder (Qualified (Just mn) ctorName) (VarBinder <$> idents)
+      return $ CaseAlternative [caseBinder] (Right rebuilt)
+      where
+        fVar = mkVar f
+        mapVar = mkVarMn (Just dataFunctor) (Ident C.map)
+
+        -- TODO: deal with type synonyms, ala https://github.com/purescript/purescript/pull/2516
+        transformArg :: Ident -> Type -> m Expr
+        transformArg ident = fmap (foldr App (mkVar ident)) . goType where
+
+          goType :: Type -> m (Maybe Expr)
+          -- argument matches the index type
+          goType (TypeVar t) | t == iTyName = return (Just fVar)
+
+          -- records
+          goType recTy | Just row <- objectType recTy =
+              traverse buildUpdate (decomposeRec row) >>= (traverse buildRecord . justUpdates)
+            where
+              justUpdates :: [Maybe (Text, Expr)] -> Maybe [(Text, Expr)]
+              justUpdates = foldMap (fmap return)
+
+              buildUpdate :: (Text, Type) -> m (Maybe (Text, Expr))
+              buildUpdate (lbl, ty) = do upd <- goType ty
+                                         return ((lbl,) <$> upd)
+
+              buildRecord :: [(Text, Expr)] -> m Expr
+              buildRecord updates = do arg <- freshIdent "o"
+                                       let argVar = mkVar arg
+                                           mkAssignment (l, x) = (l, App x (Accessor l argVar))
+                                       return (lam arg (ObjectUpdate argVar (mkAssignment <$> updates)))
+
+          -- under a `* -> *`, just assume functor for now
+          goType (TypeApp _ t) = fmap (App mapVar) <$> goType t
+
+          -- otherwise do nothing - will fail type checking if type does actually contain index
+          goType _ = return Nothing
