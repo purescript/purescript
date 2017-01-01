@@ -27,7 +27,9 @@ derive instance genericZ :: Generic Z _
 instance eqZ :: Eq Z where
   eq x y = genericEq x y
 
-newtype W = W { x :: Int, y :: String }
+type MyString = String
+
+newtype W = W { x :: Int, y :: MyString }
 
 derive instance genericW :: Generic W _
 
