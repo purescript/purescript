@@ -209,7 +209,7 @@ getBowerRepositoryInfo = either (userError . BadRepositoryField) return . tryExt
       Just Repository{..} -> do
         unless (repositoryType == "git")
           (Left (BadRepositoryType repositoryType))
-        maybe (Left NotOnGithub) Right (extractGithub (T.pack repositoryUrl))
+        maybe (Left NotOnGithub) Right (extractGithub repositoryUrl)
 
 checkLicense :: PackageMeta -> PrepareM ()
 checkLicense pkgMeta =
@@ -217,7 +217,7 @@ checkLicense pkgMeta =
     [] ->
       userError NoLicenseSpecified
     ls ->
-      unless (any isValidSPDX ls)
+      unless (any (isValidSPDX . T.unpack) ls)
         (userError InvalidLicense)
 
 -- |
@@ -320,8 +320,7 @@ asResolvedDependencies = nubBy ((==) `on` fst) <$> go
   go =
     fmap (fromMaybe []) $
       keyMay "dependencies" $
-        (++) <$> eachInObjectWithKey (parsePackageName . T.unpack)
-                                     asDependencyStatus
+        (++) <$> eachInObjectWithKey parsePackageName asDependencyStatus
              <*> (concatMap snd <$> eachInObject asResolvedDependencies)
 
 -- | Extracts only the top level dependency names from the output of
@@ -330,7 +329,7 @@ asToplevelDependencies :: Parse BowerError [PackageName]
 asToplevelDependencies =
   fmap (map fst) $
     key "dependencies" $
-      eachInObjectWithKey (parsePackageName . T.unpack) (return ())
+      eachInObjectWithKey parsePackageName (return ())
 
 asDependencyStatus :: Parse e DependencyStatus
 asDependencyStatus = do
@@ -371,7 +370,7 @@ handleDeps deps = do
       ResolvedOther _   -> (ms, pkgName : os, is)
       ResolvedVersion v -> (ms, os, (pkgName, v) : is)
 
-  bowerDir pkgName = "bower_components/" ++ runPackageName pkgName
+  bowerDir pkgName = T.unpack $ "bower_components/" <> runPackageName pkgName
 
   -- Try to extract a version, and warn if unsuccessful.
   tryExtractVersion' :: (PackageName, Text) -> PrepareM (Maybe (PackageName, Version))
@@ -406,6 +405,6 @@ getPackageName fp = do
   let xs = splitOn [pathSeparator] fp
   ys <- stripPrefix ["bower_components"] xs
   y <- headMay ys
-  case Bower.mkPackageName y of
+  case Bower.mkPackageName (T.pack y) of
     Right name -> Just name
     Left _ -> Nothing
