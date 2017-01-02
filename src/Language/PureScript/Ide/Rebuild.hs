@@ -61,7 +61,8 @@ rebuildFile path = do
   -- For rebuilding, we want to 'RebuildAlways', but for inferring foreign
   -- modules using their file paths, we need to specify the path in the 'Map'.
   let filePathMap = M.singleton (P.getModuleName m) (Left P.RebuildAlways)
-  foreigns <- P.inferForeignModules (M.singleton (P.getModuleName m) (Right path))
+  foreigns <-
+    P.inferForeignModules (M.singleton (P.getModuleName m) (Right path))
 
   let makeEnv = MakeActionsEnv outputDirectory filePathMap foreigns False
   -- Rebuild the single module using the cached externs
@@ -73,7 +74,8 @@ rebuildFile path = do
     Left errors -> do
       diag <- diagnostics (P.runMultipleErrors errors)
       -- for_ diag (logWarnN . prettyDiagnostics)
-      throwError (RebuildError (bimap (toJSONError False P.Error) (fmap toJSON) <$> diag))
+      throwError
+        (RebuildError (bimap (toJSONError False P.Error) (fmap toJSON) <$> diag))
     Right _ -> do
       rebuildModuleOpen makeEnv externs m
       pure (RebuildSuccess (toJSONErrors False P.Warning warnings))
@@ -191,6 +193,9 @@ instance ToJSON Diagnostics where
                                  , "type" .= P.prettyPrintType t
                                  ]
 
+pattern UnknownModule :: P.ModuleName -> P.SimpleErrorMessage
+pattern UnknownModule mn = P.UnknownName (P.Qualified Nothing (P.ModName mn))
+
 diagnostics
   :: (Ide m, MonadLogger m)
   => [P.ErrorMessage]
@@ -200,7 +205,7 @@ diagnostics errs = do
   pure (zip errs diags)
   where
     f (P.ErrorMessage _ err) = case err of
-      P.UnknownName (P.Qualified Nothing (P.ModName mn)) -> do
+      UnknownModule mn -> do
         -- Unknown module was imported. Check whether a module with the given
         -- name exists in the parsed source ASTs. If it does, this most likely
         -- means the module wasn't compiled yet and so psc-ide didn't pick up
@@ -213,7 +218,7 @@ diagnostics errs = do
         modules <- s1Modules <$> getStage1
         case M.lookup mn modules of
           Nothing -> do
-            logWarnN "Didn't find module that supposedly needs a new FFI file."
+            logErrorN "Didn't find module that supposedly needs a new FFI file."
             pure Nothing
           Just (_, fp) ->
             pure (Just (CreateFFIFile (replaceExtension fp "js")))
