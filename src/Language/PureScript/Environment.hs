@@ -8,11 +8,13 @@ import Data.Aeson.TH
 import qualified Data.Aeson as A
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.List (nub)
+import Data.Tree (Tree, rootLabel)
 import qualified Data.Graph as G
+import Data.Foldable (toList)
 
 import Language.PureScript.Crash
 import Language.PureScript.Kinds
@@ -57,6 +59,8 @@ data TypeClassData = TypeClassData
   -- ^ A set of indexes of type argument that are fully determined by other
   -- arguments via functional dependencies. This can be computed from both
   -- typeClassArguments and typeClassDependencies.
+  , typeClassCoveringSets :: S.Set (S.Set Int)
+  -- ^ A sets of arguments that can be used to infer all other arguments.
   } deriving Show
 
 -- | A functional dependency indicates a relationship between two sets of
@@ -75,8 +79,11 @@ initEnvironment :: Environment
 initEnvironment = Environment M.empty primTypes M.empty M.empty M.empty primClasses primKinds
 
 -- |
--- A constructor for TypeClassData that computes which type class arguments are fully determined.
+-- A constructor for TypeClassData that computes which type class arguments are fully determined
+-- and argument covering sets.
 -- Fully determined means that this argument cannot be used when selecting a type class instance.
+-- A covering set is a minimal collection of arguments that can be used to find an instance and
+-- therefore determine all other type arguments.
 --
 -- An example of the difference between determined and fully determined would be with the class:
 -- ```class C a b c | a -> b, b -> a, b -> c```
@@ -84,7 +91,8 @@ initEnvironment = Environment M.empty primTypes M.empty M.empty M.empty primClas
 -- Both `a` and `b` can be used in selecting a type class instance. However, `c` cannot - it is
 -- fully determined by `a` and `b`.
 --
--- Define a graph of type class arguments with edges being fundep determiners to determined.
+-- Define a graph of type class arguments with edges being fundep determiners to determined. Each
+-- argument also has a self looping edge.
 -- An argument is fully determined if doesn't appear at the start of a path of strongly connected components.
 -- An argument is not fully determined otherwise.
 --
@@ -97,26 +105,51 @@ makeTypeClassData
   -> [Constraint]
   -> [FunctionalDependency]
   -> TypeClassData
-makeTypeClassData args m s deps = TypeClassData args m s deps determinedArgs
+makeTypeClassData args m s deps = TypeClassData args m s deps determinedArgs coveringSets
   where
+    argumentIndicies = [0 .. length args - 1]
+
+    -- each argument determines themselves
+    identities = (\i -> (i, [i])) <$> argumentIndicies
+
     -- list all the edges in the graph: for each fundep an edge exists for each determiner to each determined
-    contributingDeps = M.fromListWith (++) $ do
+    contributingDeps = M.fromListWith (++) $ identities ++ do
       fd <- deps
       src <- fdDeterminers fd
       (src, fdDetermined fd) : map (, []) (fdDetermined fd)
 
-    -- here we build a graph of which arguments determine other arguments
-    (depGraph, _, fromKey) = G.graphFromEdges ((\(n, v) -> (n, n, nub v)) <$> M.toList contributingDeps)
+    -- build a graph of which arguments determine other arguments
+    (depGraph, fromVertex, fromKey) = G.graphFromEdges ((\(n, v) -> (n, n, nub v)) <$> M.toList contributingDeps)
 
     -- do there exist any arguments that contribute to `arg` that `arg` doesn't contribute to
+    isFunDepDetermined :: Int -> Bool
     isFunDepDetermined arg = case fromKey arg of
-      Nothing -> False -- not mentioned in fundeps
+      Nothing -> internalError "Unknown argument index in makeTypeClassData"
       Just v -> let contributesToVar = G.reachable (G.transposeG depGraph) v
                     varContributesTo = G.reachable depGraph v
                 in any (\r -> not (r `elem` varContributesTo)) contributesToVar
 
     -- find all the arguments that are determined
-    determinedArgs = S.fromList $ filter isFunDepDetermined [0 .. length args - 1]
+    determinedArgs :: S.Set Int
+    determinedArgs = S.fromList $ filter isFunDepDetermined argumentIndicies
+
+    argFromVertex :: G.Vertex -> Int
+    argFromVertex index = let (_, arg, _) = fromVertex index in arg
+
+    isVertexDetermined :: G.Vertex -> Bool
+    isVertexDetermined = isFunDepDetermined . argFromVertex
+
+    -- from an scc find the non-determined args
+    sccNonDetermined :: Tree G.Vertex -> Maybe [Int]
+    sccNonDetermined tree
+      -- if any arg in an scc is determined then all of them are
+      | isVertexDetermined (rootLabel tree) = Nothing
+      | otherwise = Just (argFromVertex <$> toList tree)
+
+    -- find the covering sets
+    coveringSets :: S.Set (S.Set Int)
+    coveringSets = let funDepSets = sequence (mapMaybe sccNonDetermined (G.scc depGraph))
+                   in S.fromList (S.fromList <$> funDepSets)
 
 -- |
 -- The visibility of a name in scope
