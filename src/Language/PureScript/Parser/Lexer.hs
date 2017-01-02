@@ -556,7 +556,6 @@ reservedPsNames :: [Text]
 reservedPsNames = [ "data"
                   , "newtype"
                   , "type"
-                  , "kind"
                   , "foreign"
                   , "import"
                   , "infixl"

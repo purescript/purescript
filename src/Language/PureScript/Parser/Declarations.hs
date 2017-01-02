@@ -110,7 +110,7 @@ parseValueDeclaration = do
 
 parseExternDeclaration :: TokenParser Declaration
 parseExternDeclaration = reserved "foreign" *> indented *> reserved "import" *> indented *> parseExternAlt where
-  parseExternAlt = parseExternData <|> parseExternKind <|> parseExternTerm
+  parseExternAlt = parseExternData <|> P.try parseExternKind <|> parseExternTerm
 
   parseExternData = ExternDataDeclaration <$> (reserved "data" *> indented *> typeName)
                                           <*> (indented *> doubleColon *> parseKind)
@@ -167,11 +167,11 @@ parseImportDeclaration' = do
 parseDeclarationRef :: TokenParser DeclarationRef
 parseDeclarationRef =
   withSourceSpan PositionedDeclarationRef
-    $ (ValueRef <$> parseIdent)
+    $ (KindRef <$> P.try (reserved "kind" *> kindName))
+    <|> (ValueRef <$> parseIdent)
     <|> (ValueOpRef <$> parens parseOperator)
     <|> parseTypeRef
     <|> (TypeClassRef <$> (reserved "class" *> properName))
-    <|> (KindRef <$> (reserved "kind" *> kindName))
     <|> (ModuleRef <$> (indented *> reserved "module" *> moduleName))
     <|> (TypeOpRef <$> (indented *> reserved "type" *> parens parseOperator))
   where
