@@ -5,3 +5,4 @@ extra-deps:
 - pipes-http-1.0.2
 - wai-websockets-3.0.0.9
 - websockets-0.9.6.2
+- bower-json-1.0.0.1

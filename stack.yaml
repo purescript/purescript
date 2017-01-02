@@ -1,3 +1,5 @@
 resolver: lts-6.25
 packages:
 - '.'
+extra-deps:
+- bower-json-1.0.0.1

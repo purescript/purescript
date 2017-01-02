@@ -413,7 +413,7 @@ asReExport =
 
 asInPackage :: Parse BowerError a -> Parse BowerError (InPackage a)
 asInPackage inner =
-  build <$> key "package" (perhaps (withString parsePackageName))
+  build <$> key "package" (perhaps (withText parsePackageName))
         <*> key "item" inner
   where
   build Nothing = Local
@@ -532,7 +532,7 @@ asBookmark =
 
 asResolvedDependencies :: Parse PackageError [(PackageName, Version)]
 asResolvedDependencies =
-  eachInObjectWithKey (mapLeft ErrorInPackageMeta . parsePackageName . T.unpack) asVersion
+  eachInObjectWithKey (mapLeft ErrorInPackageMeta . parsePackageName) asVersion
   where
   mapLeft f (Left x) = Left (f x)
   mapLeft _ (Right x) = Right x
@@ -557,7 +557,7 @@ instance A.ToJSON a => A.ToJSON (Package a) where
       , "versionTag"           .= pkgVersionTag
       , "modules"              .= pkgModules
       , "bookmarks"            .= map (fmap (first P.runModuleName)) pkgBookmarks
-      , "resolvedDependencies" .= assocListToJSON (T.pack . runPackageName)
+      , "resolvedDependencies" .= assocListToJSON runPackageName
                                                   (T.pack . showVersion)
                                                   pkgResolvedDependencies
       , "github"               .= pkgGithub

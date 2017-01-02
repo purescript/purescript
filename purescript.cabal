@@ -116,7 +116,7 @@ library
                    aeson-better-errors >= 0.8,
                    ansi-terminal >= 0.6.2 && < 0.7,
                    base-compat >=0.6.0,
-                   bower-json >= 0.8,
+                   bower-json >= 1.0.0.1 && < 1.1,
                    boxes >= 0.1.4 && < 0.2.0,
                    bytestring -any,
                    containers -any,
