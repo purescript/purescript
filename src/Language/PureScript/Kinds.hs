@@ -48,7 +48,7 @@ kindFromJSON :: Parse Text Kind
 kindFromJSON = do
   t <- key "tag" asText
   case t of
-    "KUnknown" -> do
+    "KUnknown" ->
       KUnknown <$> key "contents" (nth 0 asIntegral)
     "Star" ->
       pure kindType
