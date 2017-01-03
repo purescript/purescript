@@ -498,6 +498,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
       line $ "The type declaration for " <> markCode (showIdent nm) <> " should be followed by its definition."
     renderSimpleErrorMessage (RedefinedIdent name) =
       line $ "The value " <> markCode (showIdent name) <> " has been defined multiple times"
+    renderSimpleErrorMessage (UnknownName name@(Qualified Nothing (IdentName (Ident "bind")))) =
+      line $ "Unknown " <> printName name <> ". You're probably using do-notation, which the compiler replaces with calls to the " <> markCode "bind" <> " function. Please import " <> markCode "bind" <> " from module " <> markCode "Prelude"
     renderSimpleErrorMessage (UnknownName name) =
       line $ "Unknown " <> printName name
     renderSimpleErrorMessage (UnknownImport mn name) =
