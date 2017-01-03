@@ -23,7 +23,6 @@ import qualified Data.Text as T
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.CodeGen.JS.Optimizer.Common
 import qualified Language.PureScript.Constants as C
-import Language.PureScript.PSString (mkString)
 
 -- TODO: Potential bug:
 -- Shouldn't just inline this case: { var x = 0; x.toFixed(10); }
@@ -214,7 +213,7 @@ inlineCommonOperators = applyAll $
 
   isNFn :: Text -> Int -> JS -> Bool
   isNFn prefix n (JSVar _ name) = name == (prefix <> T.pack (show n))
-  isNFn prefix n (JSAccessor _ name (JSVar _ dataFunctionUncurried)) | dataFunctionUncurried == C.dataFunctionUncurried = name == mkString (prefix <> T.pack (show n))
+  isNFn prefix n (JSAccessor _ name (JSVar _ dataFunctionUncurried)) | dataFunctionUncurried == C.dataFunctionUncurried = name == (prefix <> T.pack (show n))
   isNFn _ _ _ = False
 
   runFn :: Int -> JS -> JS
@@ -236,11 +235,11 @@ inlineCommonOperators = applyAll $
     convert other = other
 
   isModFn :: (Text, Text) -> JS -> Bool
-  isModFn (m, op) (JSAccessor _ op' (JSVar _ m')) = m == m' && mkString op == op'
+  isModFn (m, op) (JSAccessor _ op' (JSVar _ m')) = m == m' && op == op'
   isModFn _ _ = False
 
   isModFnWithDict :: (Text, Text) -> JS -> Bool
-  isModFnWithDict (m, op) (JSApp _ (JSAccessor _ op' (JSVar _ m')) [JSVar _ _]) = m == m' && mkString op == op'
+  isModFnWithDict (m, op) (JSApp _ (JSAccessor _ op' (JSVar _ m')) [JSVar _ _]) = m == m' && op == op'
   isModFnWithDict _ _ = False
 
 -- (f <<< g $ x) = f (g x)

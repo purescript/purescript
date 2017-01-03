@@ -10,6 +10,8 @@ module Language.PureScript.Pretty.Types
   , prettyPrintTypeAtom
   , prettyPrintRowWith
   , prettyPrintRow
+  , prettyPrintLabel
+  , prettyPrintObjectKey
   ) where
 
 import Prelude.Compat
@@ -18,6 +20,7 @@ import Control.Arrow ((<+>))
 import Control.PatternArrows as PA
 
 import Data.Maybe (fromMaybe)
+import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.Crash
@@ -27,8 +30,8 @@ import Language.PureScript.Names
 import Language.PureScript.Pretty.Common
 import Language.PureScript.Pretty.Kinds
 import Language.PureScript.Types
-import Language.PureScript.PSString (renderPSString)
-import Language.PureScript.Label (Label)
+import Language.PureScript.PSString (PSString, prettyPrintString, decodeString)
+import Language.PureScript.Label (Label(..))
 
 import Text.PrettyPrint.Boxes hiding ((<+>))
 
@@ -118,7 +121,7 @@ matchTypeAtom suggesting =
     typeLiterals = mkPattern match where
       match TypeWildcard{} = Just $ text "_"
       match (TypeVar var) = Just $ text $ T.unpack var
-      match (TypeLevelString s) = Just . text $ T.unpack $ renderPSString s
+      match (TypeLevelString s) = Just $ text $ T.unpack $ prettyPrintString s
       match (PrettyPrintObject row) = Just $ prettyPrintRowWith '{' '}' row
       match (TypeConstructor ctor) = Just $ text $ T.unpack $ runProperName $ disqualify ctor
       match (TUnknown u)
@@ -188,3 +191,14 @@ prettyPrintType = render . typeAsBoxImpl False
 -- | Generate a pretty-printed string representing a suggested 'Type'
 prettyPrintSuggestedType :: Type -> String
 prettyPrintSuggestedType = render . typeAsBoxImpl True
+
+prettyPrintLabel :: Label -> Text
+prettyPrintLabel (Label s) =
+  case decodeString s of
+    Just s' | not (objectKeyRequiresQuoting s') ->
+      s'
+    _ ->
+      prettyPrintString s
+
+prettyPrintObjectKey :: PSString -> Text
+prettyPrintObjectKey = prettyPrintLabel . Label

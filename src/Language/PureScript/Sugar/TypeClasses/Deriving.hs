@@ -11,6 +11,7 @@ import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Supply.Class (MonadSupply)
 import           Data.List (foldl', find, sortBy, unzip5)
 import qualified Data.Map as M
+import           Data.Monoid ((<>))
 import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Ord (comparing)
 import           Data.Text (Text)
@@ -24,7 +25,7 @@ import           Language.PureScript.Externs
 import           Language.PureScript.Kinds
 import           Language.PureScript.Names
 import           Language.PureScript.Label (Label(..))
-import           Language.PureScript.PSString (mkString, codePoints)
+import           Language.PureScript.PSString (mkString, decodeStringEither)
 import           Language.PureScript.Types
 import           Language.PureScript.TypeChecker (checkNewtype)
 import           Language.PureScript.TypeChecker.Synonyms (SynonymMap, replaceAllTypeSynonymsM)
@@ -433,7 +434,7 @@ deriveGenericRep mn syns ds tyConNm tyConArgs repTy = do
     makeArg :: Type -> m (Type, Binder, Expr, Binder, Expr)
     makeArg arg | Just rec <- objectType arg = do
       let fields = decomposeRec rec
-      fieldNames <- traverse freshIdent (map ((\(Label s) -> either T.pack id $ codePoints s) . fst) fields)
+      fieldNames <- traverse freshIdent (map (runIdent . labelToIdent . fst) fields)
       pure ( TypeApp (TypeConstructor record)
                (foldr1 (\f -> TypeApp (TypeApp (TypeConstructor productName) f))
                  (map (\((Label name), ty) ->
@@ -736,8 +737,16 @@ mkVarMn mn = Var . Qualified mn
 mkVar :: Ident -> Expr
 mkVar = mkVarMn Nothing
 
+-- This function may seem a little obtuse, but it's only this way to ensure
+-- that it is injective. Injectivity is important here; without it, we can end
+-- up with accidental variable shadowing in the generated code.
 labelToIdent :: Label -> Ident
-labelToIdent (Label l) = Ident $ either T.pack id $ codePoints l
+labelToIdent =
+  Ident . foldMap (either loneSurrogate char) . decodeStringEither . runLabel
+  where
+  char '_' = "__"
+  char c = T.singleton c
+  loneSurrogate x = "_" <> T.pack (show x) <> "_"
 
 objectType :: Type -> Maybe Type
 objectType (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Record"))) rec) = Just rec

@@ -20,9 +20,9 @@ import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Names
 import Language.PureScript.Pretty.Common
-import Language.PureScript.Pretty.Types (typeAsBox, typeAtomAsBox)
+import Language.PureScript.Pretty.Types (typeAsBox, typeAtomAsBox, prettyPrintObjectKey)
 import Language.PureScript.Types (Constraint(..))
-import Language.PureScript.PSString (PSString, renderPSString)
+import Language.PureScript.PSString (PSString, prettyPrintString)
 
 import Text.PrettyPrint.Boxes
 
@@ -106,7 +106,7 @@ prettyPrintValueAtom d expr = (text "(" <> prettyPrintValue d expr) `before` tex
 
 prettyPrintLiteralValue :: Int -> Literal Expr -> Box
 prettyPrintLiteralValue _ (NumericLiteral n) = text $ either show show n
-prettyPrintLiteralValue _ (StringLiteral s) = text $ T.unpack $ renderPSString s
+prettyPrintLiteralValue _ (StringLiteral s) = text $ T.unpack $ prettyPrintString s
 prettyPrintLiteralValue _ (CharLiteral c) = text $ show c
 prettyPrintLiteralValue _ (BooleanLiteral True) = text "true"
 prettyPrintLiteralValue _ (BooleanLiteral False) = text "false"
@@ -170,7 +170,7 @@ prettyPrintBinderAtom (BinaryNoParensBinder op b1 b2) =
 prettyPrintBinderAtom (ParensInBinder b) = parensT (prettyPrintBinder b)
 
 prettyPrintLiteralBinder :: Literal Binder -> Text
-prettyPrintLiteralBinder (StringLiteral str) = renderPSString str
+prettyPrintLiteralBinder (StringLiteral str) = prettyPrintString str
 prettyPrintLiteralBinder (CharLiteral c) = T.pack (show c)
 prettyPrintLiteralBinder (NumericLiteral num) = either (T.pack . show) (T.pack . show) num
 prettyPrintLiteralBinder (BooleanLiteral True) = "true"

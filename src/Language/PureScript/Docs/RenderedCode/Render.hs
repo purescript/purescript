@@ -26,8 +26,9 @@ import Language.PureScript.Environment
 import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.Pretty.Kinds
+import Language.PureScript.Pretty.Types
 import Language.PureScript.Types
-import Language.PureScript.Label (Label(..), renderPSLabel)
+import Language.PureScript.Label (Label)
 
 typeLiterals :: Pattern () Type RenderedCode
 typeLiterals = mkPattern match
@@ -86,7 +87,7 @@ renderHead = mintersperse (syntax "," <> sp) . map renderLabel
 renderLabel :: (Label, Type) -> RenderedCode
 renderLabel (label, ty) =
   mintersperse sp
-    [ syntax $ renderPSLabel label
+    [ syntax $ prettyPrintLabel label
     , syntax "::"
     , renderType ty
     ]
@@ -126,9 +127,9 @@ explicitParens = mkPattern match
   match _ = Nothing
 
 matchTypeAtom :: Pattern () Type RenderedCode
-matchTypeAtom = typeLiterals <+> fmap parens matchType
+matchTypeAtom = typeLiterals <+> fmap parens_ matchType
   where
-  parens x = syntax "(" <> x <> syntax ")"
+  parens_ x = syntax "(" <> x <> syntax ")"
 
 matchType :: Pattern () Type RenderedCode
 matchType = buildPrettyPrinter operators matchTypeAtom

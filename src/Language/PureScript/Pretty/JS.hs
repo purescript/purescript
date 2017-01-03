@@ -25,7 +25,7 @@ import Language.PureScript.CodeGen.JS.Common
 import Language.PureScript.Comments
 import Language.PureScript.Crash
 import Language.PureScript.Pretty.Common
-import Language.PureScript.PSString (PSString, codePoints, renderJSON)
+import Language.PureScript.PSString (PSString, decodeString, prettyPrintStringJS)
 
 -- TODO (Christoph): Get rid of T.unpack / pack
 
@@ -37,7 +37,7 @@ literals = mkPattern' match'
 
   match :: (Emit gen) => JS -> StateT PrinterState Maybe gen
   match (JSNumericLiteral _ n) = return $ emit $ T.pack $ either show show n
-  match (JSStringLiteral _ s) = return $ emit $ renderJSON s
+  match (JSStringLiteral _ s) = return $ emit $ prettyPrintStringJS s
   match (JSBooleanLiteral _ True) = return $ emit "true"
   match (JSBooleanLiteral _ False) = return $ emit "false"
   match (JSArrayLiteral _ xs) = mconcat <$> sequence
@@ -59,8 +59,11 @@ literals = mkPattern' match'
     where
     objectPropertyToString :: (Emit gen) => PSString -> gen
     objectPropertyToString s =
-      let quoted = renderJSON s in
-      emit $ either (const quoted) (\t -> if identNeedsEscaping t then quoted else t) $ codePoints s
+      emit $ case decodeString s of
+        Just s' | not (identNeedsEscaping s') ->
+          s'
+        _ ->
+          prettyPrintStringJS s
   match (JSBlock _ sts) = mconcat <$> sequence
     [ return $ emit "{\n"
     , withIndent $ prettyStatements sts
@@ -160,7 +163,7 @@ accessor :: (Emit gen) => Pattern PrinterState JS (gen, JS)
 accessor = mkPattern match
   where
   -- WARN: if `prop` does not match the `IdentifierName` grammar, this will generate invalid code; see #2513
-  match (JSAccessor _ prop val) = either (const Nothing) (\t -> Just (emit t, val)) $ codePoints prop
+  match (JSAccessor _ prop val) = Just (emit prop, val)
   match _ = Nothing
 
 indexer :: (Emit gen) => Pattern PrinterState JS (gen, JS)

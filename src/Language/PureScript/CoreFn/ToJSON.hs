@@ -17,7 +17,7 @@ import qualified Data.Text as T
 import Language.PureScript.AST.Literals
 import Language.PureScript.CoreFn
 import Language.PureScript.Names
-import Language.PureScript.PSString (PSString, codePoints)
+import Language.PureScript.PSString (PSString)
 
 literalToJSON :: (a -> Value) -> Literal a -> Value
 literalToJSON _ (NumericLiteral (Left n)) = toJSON ("IntLiteral", n)
@@ -53,7 +53,7 @@ bindToJSON (NonRec _ n e) = object [ runIdent n .= exprToJSON e ]
 bindToJSON (Rec bs) = object $ map (\((_, n), e) -> runIdent n .= exprToJSON e) bs
 
 recordToJSON :: (a -> Value) -> [(PSString, a)] -> Value
-recordToJSON f = object . map (\(key, a) -> either T.pack id (codePoints key) .= f a)
+recordToJSON f = toJSON . map (\(key, a) -> (toJSON key, f a))
 
 exprToJSON :: Expr a -> Value
 exprToJSON (Var _ i)              = toJSON ( "Var"

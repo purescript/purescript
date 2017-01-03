@@ -35,7 +35,7 @@ import Language.PureScript.Errors (ErrorMessageHint(..), SimpleErrorMessage(..),
                                    errorMessage, rethrowWithPosition, addHint)
 import Language.PureScript.Names
 import Language.PureScript.Options
-import Language.PureScript.PSString (PSString, mkString, codePoints)
+import Language.PureScript.PSString (PSString, mkString, decodeString)
 import Language.PureScript.Traversals (sndM)
 import qualified Language.PureScript.Constants as C
 
@@ -183,8 +183,11 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
 
   accessorString :: PSString -> JS -> JS
   accessorString prop =
-    let quoted = JSIndexer Nothing (JSStringLiteral Nothing prop) in
-    either (const quoted) (\t -> if identNeedsEscaping t then quoted else JSAccessor Nothing prop) $ codePoints prop
+    case decodeString prop of
+      Just s | not (identNeedsEscaping s) ->
+        JSAccessor Nothing s
+      _ ->
+        JSIndexer Nothing (JSStringLiteral Nothing prop)
 
   -- |
   -- Generate code in the simplified Javascript intermediate representation for a value or expression.
@@ -259,7 +262,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
                 (JSUnary Nothing JSNew $ JSApp Nothing (JSVar Nothing (properToJs ctor)) []) ]
   valueToJs' (Constructor _ _ (ProperName ctor) fields) =
     let constructor =
-          let body = [ JSAssignment Nothing (JSAccessor Nothing (mkString $ identToJs f) (JSVar Nothing "this")) (var f) | f <- fields ]
+          let body = [ JSAssignment Nothing (JSAccessor Nothing (identToJs f) (JSVar Nothing "this")) (var f) | f <- fields ]
           in JSFunction Nothing (Just (properToJs ctor)) (identToJs `map` fields) (JSBlock Nothing body)
         createFn =
           let body = JSUnary Nothing JSNew $ JSApp Nothing (JSVar Nothing (properToJs ctor)) (var `map` fields)
@@ -394,7 +397,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
       argVar <- freshName
       done'' <- go remain done'
       js <- binderToJs argVar done'' binder
-      return (JSVariableIntroduction Nothing argVar (Just (JSAccessor Nothing (mkString $ identToJs field) (JSVar Nothing varName))) : js)
+      return (JSVariableIntroduction Nothing argVar (Just (JSAccessor Nothing (identToJs field) (JSVar Nothing varName))) : js)
   binderToJs' _ _ ConstructorBinder{} =
     internalError "binderToJs: Invalid ConstructorBinder in binderToJs"
   binderToJs' varName done (NamedBinder _ ident binder) = do

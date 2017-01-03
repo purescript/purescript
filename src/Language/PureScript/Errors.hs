@@ -32,7 +32,6 @@ import Language.PureScript.Names
 import Language.PureScript.Pretty
 import Language.PureScript.Traversals
 import Language.PureScript.Types
-import Language.PureScript.PSString (renderPSString)
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.Pretty.Common (before, endWith)
 import qualified Language.PureScript.Bundle as Bundle
@@ -671,8 +670,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
             ]
     renderSimpleErrorMessage (CannotFindDerivingType nm) =
       line $ "Cannot derive a type class instance, because the type declaration for " <> markCode (runProperName nm) <> " could not be found."
-    renderSimpleErrorMessage (DuplicateLabel (Label l) expr) =
-      paras $ [ line $ "Label " <> T.pack (show l) <> " appears more than once in a row type." ]
+    renderSimpleErrorMessage (DuplicateLabel l expr) =
+      paras $ [ line $ "Label " <> prettyPrintLabel l <> " appears more than once in a row type." ]
                        <> foldMap (\expr' -> [ line "Relevant expression: "
                                              , markCodeBox $ indent $ prettyPrintValue valueDepth expr'
                                              ]) expr
@@ -704,10 +703,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
             , line "does not have type"
             , markCodeBox $ indent $ typeAsBox ty
             ]
-    renderSimpleErrorMessage (PropertyIsMissing (Label prop)) =
-      line $ "Type of expression lacks required label " <> T.pack (show prop) <> "."
-    renderSimpleErrorMessage (AdditionalProperty (Label prop)) =
-      line $ "Type of expression contains additional label " <> T.pack (show prop) <> "."
+    renderSimpleErrorMessage (PropertyIsMissing prop) =
+      line $ "Type of expression lacks required label " <> prettyPrintLabel prop <> "."
+    renderSimpleErrorMessage (AdditionalProperty prop) =
+      line $ "Type of expression contains additional label " <> prettyPrintLabel prop <> "."
     renderSimpleErrorMessage TypeSynonymInstance =
       line "Type class instances for type synonyms are disallowed."
     renderSimpleErrorMessage (OrphanInstance nm cnm ts) =
@@ -1264,7 +1263,7 @@ renderBox = unlines
   whiteSpace = all isSpace
 
 toTypelevelString :: Type -> Maybe Box.Box
-toTypelevelString (TypeLevelString s) = Just $ Box.text $ T.unpack $ renderPSString s
+toTypelevelString (TypeLevelString s) = Just $ Box.text $ T.unpack $ prettyPrintString s
 toTypelevelString (TypeApp (TypeConstructor f) x)
   | f == primName "TypeString" = Just $ typeAsBox x
 toTypelevelString (TypeApp (TypeApp (TypeConstructor f) x) ret)

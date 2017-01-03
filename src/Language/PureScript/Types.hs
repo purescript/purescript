@@ -2,7 +2,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 -- |
--- Data types for PureScript types and compile-time representation of PureScript terms
+-- Data types for types
 --
 module Language.PureScript.Types where
 

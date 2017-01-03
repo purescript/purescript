@@ -161,7 +161,7 @@ data JS
   -- |
   -- An object property accessor expression
   --
-  | JSAccessor (Maybe SourceSpan) PSString JS
+  | JSAccessor (Maybe SourceSpan) Text JS
   -- |
   -- A function introduction (optional name, arguments, body)
   --
