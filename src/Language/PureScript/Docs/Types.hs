@@ -10,6 +10,7 @@ import Control.Arrow (first, (***))
 import Control.Monad (when)
 import Control.Monad.Error.Class (catchError)
 
+import Data.Monoid ((<>))
 import Data.Aeson ((.=))
 import Data.Aeson.BetterErrors
 import Data.ByteString.Lazy (ByteString)
@@ -358,8 +359,6 @@ displayPackageError e = case e of
     "Invalid kind: \"" <> str <> "\""
   InvalidDataDeclType str ->
     "Invalid data declaration type: \"" <> str <> "\""
-  where
-  (<>) = T.append
 
 instance A.FromJSON a => A.FromJSON (Package a) where
   parseJSON = toAesonParser displayPackageError
@@ -468,8 +467,8 @@ asTypeArguments = eachInArray asTypeArgument
   where
   asTypeArgument = (,) <$> nth 0 asText <*> nth 1 (perhaps asKind)
 
-asKind :: Parse e P.Kind
-asKind = fromAesonParser
+asKind :: Parse PackageError P.Kind
+asKind = P.kindFromJSON .! InvalidKind
 
 asType :: Parse e P.Type
 asType = fromAesonParser
