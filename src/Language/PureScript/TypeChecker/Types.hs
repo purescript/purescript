@@ -288,10 +288,12 @@ infer' (Literal (ArrayLiteral vals)) = do
   return $ TypedValue True (Literal (ArrayLiteral ts')) (TypeApp tyArray els)
 infer' (Literal (ObjectLiteral ps)) = do
   ensureNoDuplicateProperties ps
-  ts <- traverse (infer . snd) ps
-  let fields = zipWith (\name (TypedValue _ _ t) -> (name, t)) (map fst ps) ts
-      ty = TypeApp tyRecord $ rowFromList (fields, REmpty)
-  return $ TypedValue True (Literal (ObjectLiteral (zip (map fst ps) ts))) ty
+  fields <- forM ps $ \(name, val) -> do
+    val'@(TypedValue _ _ ty) <- infer val
+    valAndType <- instantiatePolyTypeWithUnknowns val' ty
+    return (name, valAndType)
+  let ty = TypeApp tyRecord $ rowFromList (map (fmap snd) fields, REmpty)
+  return $ TypedValue True (Literal (ObjectLiteral (map (fmap (uncurry (TypedValue True))) fields))) ty
 infer' (ObjectUpdate o ps) = do
   ensureNoDuplicateProperties ps
   row <- freshType
