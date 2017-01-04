@@ -175,7 +175,7 @@ type UntypedData = [(Ident, Type)]
 -- This function also generates fresh unification variables for the types of
 -- declarations without type annotations, returned in the 'UntypedData' structure.
 typeDictionaryForBindingGroup
-  :: (MonadState CheckState m, MonadWriter MultipleErrors m)
+  :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => Maybe ModuleName
   -> [(Ident, Expr)]
   -> m ([(Ident, Expr)], [(Ident, (Expr, Type, Bool))], TypeData, UntypedData)
@@ -184,9 +184,9 @@ typeDictionaryForBindingGroup moduleName vals = do
     -- Replace type wildcards here so that the resulting dictionary of types contains the
     -- fully expanded types.
     let (untyped, typed) = partitionEithers (map isTyped vals)
-    typedDict <- for typed $ \(ident, (_, ty, _)) -> do
-                   ty' <- replaceTypeWildcards ty
-                   return (ident, ty')
+    (typedDict, typed') <- fmap unzip . for typed $ \(ident, (expr, ty, checkType)) -> do
+      ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
+      return ((ident, ty'), (ident, (expr, ty', checkType)))
     -- Create fresh unification variables for the types of untyped declarations
     untypedNames <- replicateM (length untyped) freshType
     -- Make a map of names to the unification variables of untyped declarations
@@ -196,7 +196,7 @@ typeDictionaryForBindingGroup moduleName vals = do
     let dict = M.fromList (map (\(ident, ty) ->
                  (Qualified moduleName ident,
                    (ty, Private, Undefined))) $ typedDict ++ untypedDict)
-    return (untyped, typed, dict, untypedDict)
+    return (untyped, typed', dict, untypedDict)
   where
     -- | Check if a value contains a type annotation
     isTyped :: (Ident, Expr) -> Either (Ident, Expr) (Ident, (Expr, Type, Bool))
@@ -218,13 +218,10 @@ checkTypedBindingGroupElement mn (ident, (val, ty, checkType)) dict = do
   (kind, args) <- kindOfWithScopedVars ty
   checkTypeKind ty kind
   -- Check the type with the new names in scope
-  -- No need to replace type wildcards here, since it should have been done already
-  -- in 'typeDictionaryForBindingGroup'.
-  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
   val' <- if checkType
-            then withScopedTypeVars mn args $ bindNames dict $ TypedValue True <$> check val ty <*> pure ty'
-            else return (TypedValue False val ty')
-  return (ident, (val', ty'))
+            then withScopedTypeVars mn args $ bindNames dict $ TypedValue True <$> check val ty <*> pure ty
+            else return (TypedValue False val ty)
+  return (ident, (val', ty))
 
 typeForBindingGroupElement
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
