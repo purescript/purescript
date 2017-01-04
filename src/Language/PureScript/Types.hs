@@ -20,6 +20,8 @@ import qualified Data.Text as T
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.Kinds
 import Language.PureScript.Names
+import Language.PureScript.Label (Label)
+import Language.PureScript.PSString (PSString)
 
 -- |
 -- An identifier for the scope of a skolem variable
@@ -36,7 +38,7 @@ data Type
   -- | A named type variable
   | TypeVar Text
   -- | A type-level string
-  | TypeLevelString Text
+  | TypeLevelString PSString
   -- | A type wildcard, as would appear in a partial type synonym
   | TypeWildcard SourceSpan
   -- | A type constructor
@@ -55,7 +57,7 @@ data Type
   -- | An empty row
   | REmpty
   -- | A non-empty row
-  | RCons Text Type Type
+  | RCons Label Type Type
   -- | A type with a kind annotation
   | KindedType Type Kind
   -- | A placeholder used in pretty printing
@@ -108,7 +110,7 @@ $(A.deriveJSON A.defaultOptions ''ConstraintData)
 -- |
 -- Convert a row to a list of pairs of labels and types
 --
-rowToList :: Type -> ([(Text, Type)], Type)
+rowToList :: Type -> ([(Label, Type)], Type)
 rowToList (RCons name ty row) = let (tys, rest) = rowToList row
                                 in ((name, ty):tys, rest)
 rowToList r = ([], r)
@@ -116,7 +118,7 @@ rowToList r = ([], r)
 -- |
 -- Convert a list of labels and types to a row
 --
-rowFromList :: ([(Text, Type)], Type) -> Type
+rowFromList :: ([(Label, Type)], Type) -> Type
 rowFromList ([], r) = r
 rowFromList ((name, t):ts, r) = RCons name t (rowFromList (ts, r))
 

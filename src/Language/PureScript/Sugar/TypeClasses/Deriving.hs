@@ -11,9 +11,11 @@ import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Supply.Class (MonadSupply)
 import           Data.List (foldl', find, sortBy, unzip5)
 import qualified Data.Map as M
+import           Data.Monoid ((<>))
 import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Ord (comparing)
 import           Data.Text (Text)
+import qualified Data.Text as T
 import           Language.PureScript.AST
 import qualified Language.PureScript.Constants as C
 import           Language.PureScript.Crash
@@ -22,6 +24,8 @@ import           Language.PureScript.Errors
 import           Language.PureScript.Externs
 import           Language.PureScript.Kinds
 import           Language.PureScript.Names
+import           Language.PureScript.Label (Label(..))
+import           Language.PureScript.PSString (mkString, decodeStringEither)
 import           Language.PureScript.Types
 import           Language.PureScript.TypeChecker (checkNewtype)
 import           Language.PureScript.TypeChecker.Synonyms (SynonymMap, replaceAllTypeSynonymsM)
@@ -207,7 +211,7 @@ deriveGeneric mn syns ds tyConNm dargs = do
         idents <- replicateM (length tys) freshIdent'
         tys' <- mapM (replaceAllTypeSynonymsM syns) tys
         let caseResult =
-              App (prodConstructor (Literal . StringLiteral . showQualified runProperName $ Qualified (Just mn) ctorName))
+              App (prodConstructor (Literal . StringLiteral . mkString . showQualified runProperName $ Qualified (Just mn) ctorName))
                 . Literal . ArrayLiteral
                 $ zipWith toSpineFun (map (Var . Qualified Nothing) idents) tys'
         return $ CaseAlternative [ConstructorBinder (Qualified (Just mn) ctorName) (map VarBinder idents)] (Right caseResult)
@@ -216,7 +220,7 @@ deriveGeneric mn syns ds tyConNm dargs = do
       toSpineFun i r | Just rec <- objectType r =
         lamNull . recordConstructor . Literal . ArrayLiteral
           . map
-            (\(str,typ) ->
+            (\((Label str),typ) ->
               Literal $ ObjectLiteral
                 [ ("recLabel", Literal (StringLiteral str))
                 , ("recValue", toSpineFun (Accessor str i) typ)
@@ -235,7 +239,7 @@ deriveGeneric mn syns ds tyConNm dargs = do
         App
           (App
             (Constructor (Qualified (Just dataGeneric) (ProperName "SigProd")))
-            (Literal (StringLiteral (showQualified runProperName (Qualified (Just mn) name))))
+            (Literal (StringLiteral $ mkString (showQualified runProperName (Qualified (Just mn) name))))
           )
           . Literal
           . ArrayLiteral
@@ -249,7 +253,7 @@ deriveGeneric mn syns ds tyConNm dargs = do
       mkProdClause :: (ProperName 'ConstructorName, [Type]) -> Expr
       mkProdClause (ctorName, tys) =
         Literal $ ObjectLiteral
-          [ ("sigConstructor", Literal (StringLiteral (showQualified runProperName (Qualified (Just mn) ctorName))))
+          [ ("sigConstructor", Literal (StringLiteral $ mkString (showQualified runProperName (Qualified (Just mn) ctorName))))
           , ("sigValues", Literal . ArrayLiteral . map (mkProductSignature . instantiate) $ tys)
           ]
 
@@ -260,7 +264,7 @@ deriveGeneric mn syns ds tyConNm dargs = do
                 [ ("recLabel", Literal (StringLiteral str))
                 , ("recValue", mkProductSignature typ)
                 ]
-            | (str, typ) <- decomposeRec rec
+            | ((Label str), typ) <- decomposeRec rec
             ]
       mkProductSignature typ = lamNull $ App (mkGenVar (Ident C.toSignature))
                                (TypedValue False (mkGenVar (Ident "anyProxy")) (proxy typ))
@@ -291,7 +295,7 @@ deriveGeneric mn syns ds tyConNm dargs = do
         return $
           CaseAlternative
             [ prodBinder
-                [ LiteralBinder (StringLiteral (showQualified runProperName (Qualified (Just mn) ctorName)))
+                [ LiteralBinder (StringLiteral $ mkString (showQualified runProperName (Qualified (Just mn) ctorName)))
                 , LiteralBinder (ArrayLiteral (map VarBinder idents))
                 ]
             ]
@@ -314,16 +318,16 @@ deriveGeneric mn syns ds tyConNm dargs = do
               (App e unitVal)
       fromSpineFun e _ = App (mkGenVar (Ident C.fromSpine)) (App e unitVal)
 
-      mkRecCase :: [(Text, Type)] -> CaseAlternative
+      mkRecCase :: [(Label, Type)] -> CaseAlternative
       mkRecCase rs =
         CaseAlternative
-          [ recordBinder [ LiteralBinder (ArrayLiteral (map (VarBinder . Ident . fst) rs)) ] ]
+          [ recordBinder [ LiteralBinder (ArrayLiteral (map (VarBinder . labelToIdent . fst) rs)) ] ]
           . Right
-          $ liftApplicative (mkRecFun rs) (map (\(x, y) -> fromSpineFun (Accessor "recValue" (mkVar (Ident x))) y) rs)
+          $ liftApplicative (mkRecFun rs) (map (\(x, y) -> fromSpineFun (Accessor "recValue" (mkVar $ labelToIdent x)) y) rs)
 
-      mkRecFun :: [(Text, Type)] -> Expr
-      mkRecFun xs = mkJust $ foldr (lam . Ident . fst) recLiteral xs
-         where recLiteral = Literal . ObjectLiteral $ map (\(s,_) -> (s, mkVar (Ident s))) xs
+      mkRecFun :: [(Label, Type)] -> Expr
+      mkRecFun xs = mkJust $ foldr (lam . labelToIdent . fst) recLiteral xs
+        where recLiteral = Literal . ObjectLiteral $ map (\(l@(Label s), _) -> (s, mkVar $ labelToIdent l)) xs
     mkFromSpineFunction (PositionedDeclaration _ _ d) = mkFromSpineFunction d
     mkFromSpineFunction _ = internalError "mkFromSpineFunction: expected DataDeclaration"
 
@@ -405,7 +409,7 @@ deriveGenericRep mn syns ds tyConNm tyConArgs repTy = do
         args' <- mapM (replaceAllTypeSynonymsM syns) args
         (ctorTy, matchProduct, ctorArgs, matchCtor, mkProduct) <- makeProduct args'
         return ( TypeApp (TypeApp (TypeConstructor constructor)
-                                  (TypeLevelString (runProperName ctorName)))
+                                  (TypeLevelString $ mkString (runProperName ctorName)))
                          ctorTy
                , CaseAlternative [ ConstructorBinder constructor [matchProduct] ]
                                  (Right (foldl App (Constructor (Qualified (Just mn) ctorName)) ctorArgs))
@@ -430,19 +434,19 @@ deriveGenericRep mn syns ds tyConNm tyConArgs repTy = do
     makeArg :: Type -> m (Type, Binder, Expr, Binder, Expr)
     makeArg arg | Just rec <- objectType arg = do
       let fields = decomposeRec rec
-      fieldNames <- traverse freshIdent (map fst fields)
+      fieldNames <- traverse freshIdent (map (runIdent . labelToIdent . fst) fields)
       pure ( TypeApp (TypeConstructor record)
                (foldr1 (\f -> TypeApp (TypeApp (TypeConstructor productName) f))
-                 (map (\(name, ty) ->
+                 (map (\((Label name), ty) ->
                    TypeApp (TypeApp (TypeConstructor field) (TypeLevelString name)) ty) fields))
            , ConstructorBinder record
                [ foldr1 (\b1 b2 -> ConstructorBinder productName [b1, b2])
                    (map (\ident -> ConstructorBinder field [VarBinder ident]) fieldNames)
                ]
            , Literal . ObjectLiteral $
-                zipWith (\(name, _) ident -> (name, Var (Qualified Nothing ident))) fields fieldNames
+                zipWith (\((Label name), _) ident -> (name, Var (Qualified Nothing ident))) fields fieldNames
            , LiteralBinder . ObjectLiteral $
-                 zipWith (\(name, _) ident -> (name, VarBinder ident)) fields fieldNames
+                 zipWith (\((Label name), _) ident -> (name, VarBinder ident)) fields fieldNames
            , record' $
                foldr1 (\e1 -> App (App (Constructor productName) e1))
                  (map (field' . Var . Qualified Nothing) fieldNames)
@@ -574,7 +578,7 @@ deriveEq mn syns ds tyConNm = do
     toEqTest :: Expr -> Expr -> Type -> Expr
     toEqTest l r ty | Just rec <- objectType ty =
       conjAll
-      . map (\(str, typ) -> toEqTest (Accessor str l) (Accessor str r) typ)
+      . map (\((Label str), typ) -> toEqTest (Accessor str l) (Accessor str r) typ)
       $ decomposeRec rec
     toEqTest l r _ = preludeEq l r
 
@@ -661,7 +665,7 @@ deriveOrd mn syns ds tyConNm = do
     toOrdering :: Expr -> Expr -> Type -> Expr
     toOrdering l r ty | Just rec <- objectType ty =
       appendAll
-      . map (\(str, typ) -> toOrdering (Accessor str l) (Accessor str r) typ)
+      . map (\((Label str), typ) -> toOrdering (Accessor str l) (Accessor str r) typ)
       $ decomposeRec rec
     toOrdering l r _ = ordCompare l r
 
@@ -733,11 +737,22 @@ mkVarMn mn = Var . Qualified mn
 mkVar :: Ident -> Expr
 mkVar = mkVarMn Nothing
 
+-- This function may seem a little obtuse, but it's only this way to ensure
+-- that it is injective. Injectivity is important here; without it, we can end
+-- up with accidental variable shadowing in the generated code.
+labelToIdent :: Label -> Ident
+labelToIdent =
+  Ident . foldMap (either loneSurrogate char) . decodeStringEither . runLabel
+  where
+  char '_' = "__"
+  char c = T.singleton c
+  loneSurrogate x = "_" <> T.pack (show x) <> "_"
+
 objectType :: Type -> Maybe Type
 objectType (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Record"))) rec) = Just rec
 objectType _ = Nothing
 
-decomposeRec :: Type -> [(Text, Type)]
+decomposeRec :: Type -> [(Label, Type)]
 decomposeRec = sortBy (comparing fst) . go
   where go (RCons str typ typs) = (str, typ) : decomposeRec typs
         go _ = []
@@ -790,17 +805,17 @@ deriveFunctor mn syns ds tyConNm = do
           goType recTy | Just row <- objectType recTy =
               traverse buildUpdate (decomposeRec row) >>= (traverse buildRecord . justUpdates)
             where
-              justUpdates :: [Maybe (Text, Expr)] -> Maybe [(Text, Expr)]
+              justUpdates :: [Maybe (Label, Expr)] -> Maybe [(Label, Expr)]
               justUpdates = foldMap (fmap return)
 
-              buildUpdate :: (Text, Type) -> m (Maybe (Text, Expr))
+              buildUpdate :: (Label, Type) -> m (Maybe (Label, Expr))
               buildUpdate (lbl, ty) = do upd <- goType ty
                                          return ((lbl,) <$> upd)
 
-              buildRecord :: [(Text, Expr)] -> m Expr
+              buildRecord :: [(Label, Expr)] -> m Expr
               buildRecord updates = do arg <- freshIdent "o"
                                        let argVar = mkVar arg
-                                           mkAssignment (l, x) = (l, App x (Accessor l argVar))
+                                           mkAssignment ((Label l), x) = (l, App x (Accessor l argVar))
                                        return (lam arg (ObjectUpdate argVar (mkAssignment <$> updates)))
 
           -- under a `* -> *`, just assume functor for now

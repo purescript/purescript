@@ -9,7 +9,6 @@ import Prelude.Compat
 
 import Control.Monad (when, unless)
 import Control.Applicative ((<|>))
-import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.AST.SourcePos
@@ -18,6 +17,7 @@ import Language.PureScript.Parser.Common
 import Language.PureScript.Parser.Kinds
 import Language.PureScript.Parser.Lexer
 import Language.PureScript.Types
+import Language.PureScript.Label (Label(..))
 
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
@@ -118,8 +118,8 @@ noWildcards p = do
   when (containsWildcards ty) $ P.unexpected "type wildcard"
   return ty
 
-parseNameAndType :: TokenParser t -> TokenParser (Text, t)
-parseNameAndType p = (,) <$> (indented *> (lname <|> stringLiteral) <* indented <* doubleColon) <*> p
+parseNameAndType :: TokenParser t -> TokenParser (Label, t)
+parseNameAndType p = (,) <$> (indented *> (Label <$> parseLabel) <* indented <* doubleColon) <*> p
 
 parseRowEnding :: TokenParser Type
 parseRowEnding = P.option REmpty $ indented *> pipe *> indented *> parseType

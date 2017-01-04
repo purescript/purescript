@@ -16,6 +16,7 @@ import Language.PureScript.Comments
 import Language.PureScript.Names
 import Language.PureScript.Parser.Lexer
 import Language.PureScript.Parser.State
+import Language.PureScript.PSString (PSString, mkString)
 
 import qualified Text.Parsec as P
 
@@ -71,6 +72,12 @@ parseQualified parser = part []
 --
 parseIdent :: TokenParser Ident
 parseIdent = Ident <$> identifier
+
+-- |
+-- Parse a label, which may look like an identifier or a string
+--
+parseLabel :: TokenParser PSString
+parseLabel = (mkString <$> lname) <|> stringLiteral
 
 -- |
 -- Parse an operator.

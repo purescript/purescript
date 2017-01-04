@@ -10,6 +10,8 @@ module Language.PureScript.Pretty.Types
   , prettyPrintTypeAtom
   , prettyPrintRowWith
   , prettyPrintRow
+  , prettyPrintLabel
+  , prettyPrintObjectKey
   ) where
 
 import Prelude.Compat
@@ -18,6 +20,7 @@ import Control.Arrow ((<+>))
 import Control.PatternArrows as PA
 
 import Data.Maybe (fromMaybe)
+import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.Crash
@@ -27,6 +30,8 @@ import Language.PureScript.Names
 import Language.PureScript.Pretty.Common
 import Language.PureScript.Pretty.Kinds
 import Language.PureScript.Types
+import Language.PureScript.PSString (PSString, prettyPrintString, decodeString)
+import Language.PureScript.Label (Label(..))
 
 import Text.PrettyPrint.Boxes hiding ((<+>))
 
@@ -45,22 +50,22 @@ constraintAsBox (Constraint pn tys _) = typeAsBox (foldl TypeApp (TypeConstructo
 prettyPrintRowWith :: Char -> Char -> Type -> Box
 prettyPrintRowWith open close = uncurry listToBox . toList []
   where
-  nameAndTypeToPs :: Char -> String -> Type -> Box
-  nameAndTypeToPs start name ty = text (start : ' ' : T.unpack (prettyPrintObjectKey (T.pack name)) ++ " :: ") <> typeAsBox ty
+  nameAndTypeToPs :: Char -> Label -> Type -> Box
+  nameAndTypeToPs start name ty = text (start : ' ' : T.unpack (prettyPrintLabel name) ++ " :: ") <> typeAsBox ty
 
   tailToPs :: Type -> Box
   tailToPs REmpty = nullBox
   tailToPs other = text "| " <> typeAsBox other
 
-  listToBox :: [(String, Type)] -> Type -> Box
+  listToBox :: [(Label, Type)] -> Type -> Box
   listToBox [] REmpty = text [open, close]
   listToBox [] rest = text [ open, ' ' ] <> tailToPs rest <> text [ ' ', close ]
   listToBox ts rest = vcat left $
     zipWith (\(nm, ty) i -> nameAndTypeToPs (if i == 0 then open else ',') nm ty) ts [0 :: Int ..] ++
     [ tailToPs rest, text [close] ]
 
-  toList :: [(String, Type)] -> Type -> ([(String, Type)], Type)
-  toList tys (RCons name ty row) = toList ((T.unpack name, ty):tys) row
+  toList :: [(Label, Type)] -> Type -> ([(Label, Type)], Type)
+  toList tys (RCons name ty row) = toList ((name, ty):tys) row
   toList tys r = (reverse tys, r)
 
 prettyPrintRow :: Type -> String
@@ -116,7 +121,7 @@ matchTypeAtom suggesting =
     typeLiterals = mkPattern match where
       match TypeWildcard{} = Just $ text "_"
       match (TypeVar var) = Just $ text $ T.unpack var
-      match (TypeLevelString s) = Just . text $ show s
+      match (TypeLevelString s) = Just $ text $ T.unpack $ prettyPrintString s
       match (PrettyPrintObject row) = Just $ prettyPrintRowWith '{' '}' row
       match (TypeConstructor ctor) = Just $ text $ T.unpack $ runProperName $ disqualify ctor
       match (TUnknown u)
@@ -186,3 +191,14 @@ prettyPrintType = render . typeAsBoxImpl False
 -- | Generate a pretty-printed string representing a suggested 'Type'
 prettyPrintSuggestedType :: Type -> String
 prettyPrintSuggestedType = render . typeAsBoxImpl True
+
+prettyPrintLabel :: Label -> Text
+prettyPrintLabel (Label s) =
+  case decodeString s of
+    Just s' | not (objectKeyRequiresQuoting s') ->
+      s'
+    _ ->
+      prettyPrintString s
+
+prettyPrintObjectKey :: PSString -> Text
+prettyPrintObjectKey = prettyPrintLabel . Label

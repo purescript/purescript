@@ -120,7 +120,7 @@ getPSCiState :: IO PSCiState
 getPSCiState = do
   cwd <- getCurrentDirectory
   let supportDir = cwd </> "tests" </> "support" </> "bower_components"
-  let supportFiles ext = Glob.globDir1 (Glob.compile ("purescript-*/**/*." ++ ext)) supportDir
+  let supportFiles ext = Glob.globDir1 (Glob.compile ("purescript-*/src/**/*." ++ ext)) supportDir
   pursFiles <- supportFiles "purs"
 
   modulesOrFirstError <- loadAllModules pursFiles

@@ -33,6 +33,7 @@ import Language.PureScript.Errors
 import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.Types
+import Language.PureScript.PSString (PSString, mkString)
 import Language.PureScript.Parser.Common
 import Language.PureScript.Parser.Kinds
 import Language.PureScript.Parser.Lexer
@@ -338,15 +339,15 @@ parseBooleanLiteral = BooleanLiteral <$> booleanLiteral
 parseArrayLiteral :: TokenParser a -> TokenParser (Literal a)
 parseArrayLiteral p = ArrayLiteral <$> squares (commaSep p)
 
-parseObjectLiteral :: TokenParser (Text, a) -> TokenParser (Literal a)
+parseObjectLiteral :: TokenParser (PSString, a) -> TokenParser (Literal a)
 parseObjectLiteral p = ObjectLiteral <$> braces (commaSep p)
 
-parseIdentifierAndValue :: TokenParser (Text, Expr)
+parseIdentifierAndValue :: TokenParser (PSString, Expr)
 parseIdentifierAndValue =
   do
     name <- C.indented *> lname
     b <- P.option (Var $ Qualified Nothing (Ident name)) rest
-    return (name, b)
+    return (mkString name, b)
   <|> (,) <$> (C.indented *> stringLiteral) <*> rest
   where
   rest = C.indented *> colon *> C.indented *> parseValue
@@ -428,16 +429,16 @@ parseInfixExpr
 parseHole :: TokenParser Expr
 parseHole = Hole <$> holeLit
 
-parsePropertyUpdate :: TokenParser (Text, Expr)
+parsePropertyUpdate :: TokenParser (PSString, Expr)
 parsePropertyUpdate = do
-  name <- lname <|> stringLiteral
+  name <- parseLabel
   _ <- C.indented *> equals
   value <- C.indented *> parseValue
   return (name, value)
 
 parseAccessor :: Expr -> TokenParser Expr
 parseAccessor (Constructor _) = P.unexpected "constructor"
-parseAccessor obj = P.try $ Accessor <$> (C.indented *> dot *> C.indented *> (lname <|> stringLiteral)) <*> pure obj
+parseAccessor obj = P.try $ Accessor <$> (C.indented *> dot *> C.indented *> parseLabel) <*> pure obj
 
 parseDo :: TokenParser Expr
 parseDo = do
@@ -520,11 +521,11 @@ parseVarOrNamedBinder = do
 parseNullBinder :: TokenParser Binder
 parseNullBinder = underscore *> return NullBinder
 
-parseIdentifierAndBinder :: TokenParser (Text, Binder)
+parseIdentifierAndBinder :: TokenParser (PSString, Binder)
 parseIdentifierAndBinder =
     do name <- lname
        b <- P.option (VarBinder (Ident name)) rest
-       return (name, b)
+       return (mkString name, b)
     <|> (,) <$> stringLiteral <*> rest
   where
     rest = C.indented *> colon *> C.indented *> parseBinder

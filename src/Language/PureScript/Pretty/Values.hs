@@ -20,8 +20,9 @@ import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Names
 import Language.PureScript.Pretty.Common
-import Language.PureScript.Pretty.Types (typeAsBox, typeAtomAsBox)
+import Language.PureScript.Pretty.Types (typeAsBox, typeAtomAsBox, prettyPrintObjectKey)
 import Language.PureScript.Types (Constraint(..))
+import Language.PureScript.PSString (PSString, prettyPrintString)
 
 import Text.PrettyPrint.Boxes
 
@@ -40,10 +41,10 @@ list open close f xs = vcat left (zipWith toLine [0 :: Int ..] xs ++ [ text [ cl
 ellipsis :: Box
 ellipsis = text "..."
 
-prettyPrintObject :: Int -> [(Text, Maybe Expr)] -> Box
+prettyPrintObject :: Int -> [(PSString, Maybe Expr)] -> Box
 prettyPrintObject d = list '{' '}' prettyPrintObjectProperty
   where
-  prettyPrintObjectProperty :: (Text, Maybe Expr) -> Box
+  prettyPrintObjectProperty :: (PSString, Maybe Expr) -> Box
   prettyPrintObjectProperty (key, value) = textT (prettyPrintObjectKey key Monoid.<> ": ") <> maybe (text "_") (prettyPrintValue (d - 1)) value
 
 -- | Pretty-print an expression
@@ -55,7 +56,7 @@ prettyPrintValue d (IfThenElse cond th el) =
                             , text "else " <> prettyPrintValueAtom (d - 1) el
                             ])
 prettyPrintValue d (Accessor prop val) = prettyPrintValueAtom (d - 1) val `before` textT ("." Monoid.<> prettyPrintObjectKey prop)
-prettyPrintValue d (ObjectUpdate o ps) = prettyPrintValueAtom (d - 1) o `beforeWithSpace` list '{' '}' (\(key, val) -> textT (key Monoid.<> " = ") <> prettyPrintValue (d - 1) val) ps
+prettyPrintValue d (ObjectUpdate o ps) = prettyPrintValueAtom (d - 1) o `beforeWithSpace` list '{' '}' (\(key, val) -> textT (prettyPrintObjectKey key Monoid.<> " = ") <> prettyPrintValue (d - 1) val) ps
 prettyPrintValue d (App val arg) = prettyPrintValueAtom (d - 1) val `beforeWithSpace` prettyPrintValueAtom (d - 1) arg
 prettyPrintValue d (Abs (Left arg) val) = text ('\\' : T.unpack (showIdent arg) ++ " -> ") // moveRight 2 (prettyPrintValue (d - 1) val)
 prettyPrintValue d (Abs (Right arg) val) = text ('\\' : T.unpack (prettyPrintBinder arg) ++ " -> ") // moveRight 2 (prettyPrintValue (d - 1) val)
@@ -105,7 +106,7 @@ prettyPrintValueAtom d expr = (text "(" <> prettyPrintValue d expr) `before` tex
 
 prettyPrintLiteralValue :: Int -> Literal Expr -> Box
 prettyPrintLiteralValue _ (NumericLiteral n) = text $ either show show n
-prettyPrintLiteralValue _ (StringLiteral s) = text $ show s
+prettyPrintLiteralValue _ (StringLiteral s) = text $ T.unpack $ prettyPrintString s
 prettyPrintLiteralValue _ (CharLiteral c) = text $ show c
 prettyPrintLiteralValue _ (BooleanLiteral True) = text "true"
 prettyPrintLiteralValue _ (BooleanLiteral False) = text "false"
@@ -169,7 +170,7 @@ prettyPrintBinderAtom (BinaryNoParensBinder op b1 b2) =
 prettyPrintBinderAtom (ParensInBinder b) = parensT (prettyPrintBinder b)
 
 prettyPrintLiteralBinder :: Literal Binder -> Text
-prettyPrintLiteralBinder (StringLiteral str) = T.pack (show str)
+prettyPrintLiteralBinder (StringLiteral str) = prettyPrintString str
 prettyPrintLiteralBinder (CharLiteral c) = T.pack (show c)
 prettyPrintLiteralBinder (NumericLiteral num) = either (T.pack . show) (T.pack . show) num
 prettyPrintLiteralBinder (BooleanLiteral True) = "true"
@@ -179,7 +180,7 @@ prettyPrintLiteralBinder (ObjectLiteral bs) =
   Monoid.<> T.intercalate ", " (map prettyPrintObjectPropertyBinder bs)
   Monoid.<> " }"
   where
-  prettyPrintObjectPropertyBinder :: (Text, Binder) -> Text
+  prettyPrintObjectPropertyBinder :: (PSString, Binder) -> Text
   prettyPrintObjectPropertyBinder (key, binder) = prettyPrintObjectKey key Monoid.<> ": " Monoid.<> prettyPrintBinder binder
 prettyPrintLiteralBinder (ArrayLiteral bs) =
   "[ "

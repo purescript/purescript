@@ -11,6 +11,7 @@ import Data.Text (Text)
 
 import Language.PureScript.AST (SourceSpan(..))
 import Language.PureScript.Comments
+import Language.PureScript.PSString (PSString)
 import Language.PureScript.Traversals
 
 -- |
@@ -132,7 +133,7 @@ data JS
   -- |
   -- A string literal
   --
-  | JSStringLiteral (Maybe SourceSpan) Text
+  | JSStringLiteral (Maybe SourceSpan) PSString
   -- |
   -- A boolean literal
   --
@@ -156,7 +157,7 @@ data JS
   -- |
   -- An object literal
   --
-  | JSObjectLiteral (Maybe SourceSpan) [(Text, JS)]
+  | JSObjectLiteral (Maybe SourceSpan) [(PSString, JS)]
   -- |
   -- An object property accessor expression
   --
@@ -240,7 +241,8 @@ data JS
   -- |
   -- Commented Javascript
   --
-  | JSComment (Maybe SourceSpan) [Comment] JS deriving (Show, Eq)
+  | JSComment (Maybe SourceSpan) [Comment] JS
+  deriving (Show, Eq)
 
 withSourceSpan :: SourceSpan -> JS -> JS
 withSourceSpan withSpan = go

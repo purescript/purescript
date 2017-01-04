@@ -41,7 +41,6 @@ import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Data.Text (Text)
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -60,6 +59,8 @@ import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.TypeChecker.TypeSearch
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.Types
+import Language.PureScript.Label (Label(..))
+import Language.PureScript.PSString (PSString)
 
 
 data BindingGroupType
@@ -289,22 +290,22 @@ infer' (Literal (ArrayLiteral vals)) = do
 infer' (Literal (ObjectLiteral ps)) = do
   ensureNoDuplicateProperties ps
   ts <- traverse (infer . snd) ps
-  let fields = zipWith (\name (TypedValue _ _ t) -> (name, t)) (map fst ps) ts
+  let fields = zipWith (\name (TypedValue _ _ t) -> (Label name, t)) (map fst ps) ts
       ty = TypeApp tyRecord $ rowFromList (fields, REmpty)
   return $ TypedValue True (Literal (ObjectLiteral (zip (map fst ps) ts))) ty
 infer' (ObjectUpdate o ps) = do
   ensureNoDuplicateProperties ps
   row <- freshType
   newVals <- zipWith (\(name, _) t -> (name, t)) ps <$> traverse (infer . snd) ps
-  let newTys = map (\(name, TypedValue _ _ ty) -> (name, ty)) newVals
-  oldTys <- zip (map fst ps) <$> replicateM (length ps) freshType
+  let newTys = map (\(name, TypedValue _ _ ty) -> (Label name, ty)) newVals
+  oldTys <- zip (map (Label . fst) ps) <$> replicateM (length ps) freshType
   let oldTy = TypeApp tyRecord $ rowFromList (oldTys, row)
   o' <- TypedValue True <$> check o oldTy <*> pure oldTy
   return $ TypedValue True (ObjectUpdate o' newVals) $ TypeApp tyRecord $ rowFromList (newTys, row)
 infer' (Accessor prop val) = withErrorMessageHint (ErrorCheckingAccessor val prop) $ do
   field <- freshType
   rest <- freshType
-  typed <- check val (TypeApp tyRecord (RCons prop field rest))
+  typed <- check val (TypeApp tyRecord (RCons (Label prop) field rest))
   return $ TypedValue True (Accessor prop typed) field
 infer' (Abs (Left arg) ret) = do
   ty <- freshType
@@ -442,12 +443,12 @@ inferBinder val (LiteralBinder (ObjectLiteral props)) = do
   unifyTypes val (TypeApp tyRecord row)
   return m1
   where
-  inferRowProperties :: Type -> Type -> [(Text, Binder)] -> m (M.Map Ident Type)
+  inferRowProperties :: Type -> Type -> [(PSString, Binder)] -> m (M.Map Ident Type)
   inferRowProperties nrow row [] = unifyTypes nrow row >> return M.empty
   inferRowProperties nrow row ((name, binder):binders) = do
     propTy <- freshType
     m1 <- inferBinder propTy binder
-    m2 <- inferRowProperties nrow (RCons name propTy row) binders
+    m2 <- inferRowProperties nrow (RCons (Label name) propTy row) binders
     return $ m1 `M.union` m2
 inferBinder val (LiteralBinder (ArrayLiteral binders)) = do
   el <- freshType
@@ -641,14 +642,14 @@ check' e@(ObjectUpdate obj ps) t@(TypeApp o row) | o == tyRecord = do
   -- We need to be careful to avoid duplicate labels here.
   -- We check _obj_ against the type _t_ with the types in _ps_ replaced with unknowns.
   let (propsToCheck, rest) = rowToList row
-      (removedProps, remainingProps) = partition (\(p, _) -> p `elem` map fst ps) propsToCheck
+      (removedProps, remainingProps) = partition (\(p, _) -> p `elem` map (Label . fst) ps) propsToCheck
   us <- zip (map fst removedProps) <$> replicateM (length ps) freshType
   obj' <- check obj (TypeApp tyRecord (rowFromList (us ++ remainingProps, rest)))
   ps' <- checkProperties e ps row True
   return $ TypedValue True (ObjectUpdate obj' ps') t
 check' (Accessor prop val) ty = withErrorMessageHint (ErrorCheckingAccessor val prop) $ do
   rest <- freshType
-  val' <- check val (TypeApp tyRecord (RCons prop ty rest))
+  val' <- check val (TypeApp tyRecord (RCons (Label prop) ty rest))
   return $ TypedValue True (Accessor prop val') ty
 check' v@(Constructor c) ty = do
   env <- getEnv
@@ -681,10 +682,10 @@ check' val ty = do
 checkProperties ::
   (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
   Expr ->
-  [(Text, Expr)] ->
+  [(PSString, Expr)] ->
   Type ->
   Bool ->
-  m [(Text, Expr)]
+  m [(PSString, Expr)]
 checkProperties expr ps row lax = let (ts, r') = rowToList row in go ps ts r' where
   go [] [] REmpty = return []
   go [] [] u@(TUnknown _)
@@ -694,18 +695,18 @@ checkProperties expr ps row lax = let (ts, r') = rowToList row in go ps ts r' wh
   go [] [] Skolem{} | lax = return []
   go [] ((p, _): _) _ | lax = return []
                       | otherwise = throwError . errorMessage $ PropertyIsMissing p
-  go ((p,_):_) [] REmpty = throwError . errorMessage $ AdditionalProperty p
+  go ((p,_):_) [] REmpty = throwError . errorMessage $ AdditionalProperty $ Label p
   go ((p,v):ps') ts r =
-    case lookup p ts of
+    case lookup (Label p) ts of
       Nothing -> do
         v'@(TypedValue _ _ ty) <- infer v
         rest <- freshType
-        unifyTypes r (RCons p ty rest)
+        unifyTypes r (RCons (Label p) ty rest)
         ps'' <- go ps' ts rest
         return $ (p, v') : ps''
       Just ty -> do
         v' <- check v ty
-        ps'' <- go ps' (delete (p, ty) ts) r
+        ps'' <- go ps' (delete (Label p, ty) ts) r
         return $ (p, v') : ps''
   go _ _ _ = throwError . errorMessage $ ExprDoesNotHaveType expr (TypeApp tyRecord row)
 
@@ -771,9 +772,9 @@ checkFunctionApplication' fn u arg = do
 -- |
 -- Ensure a set of property names and value does not contain duplicate labels
 --
-ensureNoDuplicateProperties :: (MonadError MultipleErrors m) => [(Text, Expr)] -> m ()
+ensureNoDuplicateProperties :: (MonadError MultipleErrors m) => [(PSString, Expr)] -> m ()
 ensureNoDuplicateProperties ps =
   let ls = map fst ps in
   case ls \\ nub ls of
-    l : _ -> throwError . errorMessage $ DuplicateLabel l Nothing
+    l : _ -> throwError . errorMessage $ DuplicateLabel (Label l) Nothing
     _ -> return ()

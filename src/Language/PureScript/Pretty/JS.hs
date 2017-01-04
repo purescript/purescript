@@ -25,8 +25,7 @@ import Language.PureScript.CodeGen.JS.Common
 import Language.PureScript.Comments
 import Language.PureScript.Crash
 import Language.PureScript.Pretty.Common
-
-import Numeric
+import Language.PureScript.PSString (PSString, decodeString, prettyPrintStringJS)
 
 -- TODO (Christoph): Get rid of T.unpack / pack
 
@@ -38,7 +37,7 @@ literals = mkPattern' match'
 
   match :: (Emit gen) => JS -> StateT PrinterState Maybe gen
   match (JSNumericLiteral _ n) = return $ emit $ T.pack $ either show show n
-  match (JSStringLiteral _ s) = return $ string s
+  match (JSStringLiteral _ s) = return $ emit $ prettyPrintStringJS s
   match (JSBooleanLiteral _ True) = return $ emit "true"
   match (JSBooleanLiteral _ False) = return $ emit "false"
   match (JSArrayLiteral _ xs) = mconcat <$> sequence
@@ -58,9 +57,13 @@ literals = mkPattern' match'
     , return $ emit "}"
     ]
     where
-    objectPropertyToString :: (Emit gen) => Text -> gen
-    objectPropertyToString s | identNeedsEscaping s = string s
-                             | otherwise = emit s
+    objectPropertyToString :: (Emit gen) => PSString -> gen
+    objectPropertyToString s =
+      emit $ case decodeString s of
+        Just s' | not (identNeedsEscaping s') ->
+          s'
+        _ ->
+          prettyPrintStringJS s
   match (JSBlock _ sts) = mconcat <$> sequence
     [ return $ emit "{\n"
     , withIndent $ prettyStatements sts
@@ -150,29 +153,6 @@ literals = mkPattern' match'
   match (JSRaw _ js) = return $ emit js
   match _ = mzero
 
-string :: (Emit gen) => Text -> gen
-string s = emit $ "\"" <> T.concatMap encodeChar s <> "\""
-  where
-  encodeChar :: Char -> Text
-  encodeChar '\b' = "\\b"
-  encodeChar '\t' = "\\t"
-  encodeChar '\n' = "\\n"
-  encodeChar '\v' = "\\v"
-  encodeChar '\f' = "\\f"
-  encodeChar '\r' = "\\r"
-  encodeChar '"'  = "\\\""
-  encodeChar '\\' = "\\\\"
-  -- PureScript strings are sequences of UTF-16 code units, so this case should never be hit.
-  -- If it is somehow hit, though, output the designated Unicode replacement character U+FFFD.
-  encodeChar c | fromEnum c > 0xFFFF = "\\uFFFD"
-  encodeChar c | fromEnum c > 0xFFF = "\\u" <> showHex' (fromEnum c) ""
-  encodeChar c | fromEnum c > 0xFF = "\\u0" <> showHex' (fromEnum c) ""
-  encodeChar c | fromEnum c < 0x10 = "\\x0" <> showHex' (fromEnum c) ""
-  encodeChar c | fromEnum c > 0x7E || fromEnum c < 0x20 = "\\x" <> showHex' (fromEnum c) ""
-  encodeChar c = T.singleton c
-
-  showHex' a b = T.pack (showHex a b)
-
 conditional :: Pattern PrinterState JS ((Maybe SourceSpan, JS, JS), JS)
 conditional = mkPattern match
   where
@@ -182,6 +162,7 @@ conditional = mkPattern match
 accessor :: (Emit gen) => Pattern PrinterState JS (gen, JS)
 accessor = mkPattern match
   where
+  -- WARN: if `prop` does not match the `IdentifierName` grammar, this will generate invalid code; see #2513
   match (JSAccessor _ prop val) = Just (emit prop, val)
   match _ = Nothing
 
@@ -189,7 +170,6 @@ indexer :: (Emit gen) => Pattern PrinterState JS (gen, JS)
 indexer = mkPattern' match
   where
   match (JSIndexer _ index val) = (,) <$> prettyPrintJS' index <*> pure val
-
   match _ = mzero
 
 lam :: Pattern PrinterState JS ((Maybe Text, [Text], Maybe SourceSpan), JS)

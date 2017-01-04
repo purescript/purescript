@@ -239,7 +239,7 @@ inlineCommonOperators = applyAll $
   isModFn _ _ = False
 
   isModFnWithDict :: (Text, Text) -> JS -> Bool
-  isModFnWithDict (m, op) (JSApp _ (JSAccessor _ op' (JSVar _ m')) [(JSVar _ _)]) = m == m' && op == op'
+  isModFnWithDict (m, op) (JSApp _ (JSAccessor _ op' (JSVar _ m')) [JSVar _ _]) = m == m' && op == op'
   isModFnWithDict _ _ = False
 
 -- (f <<< g $ x) = f (g x)

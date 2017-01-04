@@ -15,7 +15,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.AST (SourcePos(..), SourceSpan(..))
-import Language.PureScript.Parser.Lexer (reservedPsNames, isUnquotedKey)
+import Language.PureScript.Parser.Lexer (isUnquotedKey, reservedPsNames)
 
 import Text.PrettyPrint.Boxes hiding ((<>))
 import qualified Text.PrettyPrint.Boxes as Box
@@ -146,13 +146,9 @@ prettyPrintMany f xs = do
   indentString <- currentIndent
   return $ intercalate (emit "\n") $ map (mappend indentString) ss
 
--- |
--- Prints an object key, escaping reserved names.
---
-prettyPrintObjectKey :: Text -> Text
-prettyPrintObjectKey s | s `elem` reservedPsNames = T.pack (show s)
-                       | isUnquotedKey s = s
-                       | otherwise = T.pack (show s)
+objectKeyRequiresQuoting :: Text -> Bool
+objectKeyRequiresQuoting s =
+  s `elem` reservedPsNames || isUnquotedKey s
 
 -- | Place a box before another, vertically when the first box takes up multiple lines.
 before :: Box -> Box -> Box

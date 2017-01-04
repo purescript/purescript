@@ -19,6 +19,8 @@ import Language.PureScript.Externs
 import Language.PureScript.Sugar.CaseDeclarations
 import Control.Monad.Supply.Class
 import Language.PureScript.Types
+import Language.PureScript.Label (Label(..))
+import Language.PureScript.PSString (mkString)
 
 import qualified Language.PureScript.Constants as C
 
@@ -240,7 +242,7 @@ typeClassDictionaryDeclaration name args implies members =
         ]
       members' = map (first runIdent . memberToNameAndType) members
       mtys = members' ++ superclassTypes
-  in TypeSynonymDeclaration (coerceProperName name) args (TypeApp tyRecord $ rowFromList (mtys, REmpty))
+  in TypeSynonymDeclaration (coerceProperName name) args (TypeApp tyRecord $ rowFromList (map (first (Label . mkString)) mtys, REmpty))
 
 typeClassMemberToDictionaryAccessor
   :: ModuleName
@@ -297,7 +299,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
             , let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
             ]
 
-      let props = Literal $ ObjectLiteral (members ++ superclasses)
+      let props = Literal $ ObjectLiteral $ map (first mkString) (members ++ superclasses)
           dictTy = foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
           constrainedTy = quantify (if null deps then dictTy else ConstrainedType deps dictTy)
           dict = TypeClassDictionaryConstructorApp className props

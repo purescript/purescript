@@ -18,6 +18,8 @@ import Language.PureScript.AST.Literals
 import Language.PureScript.AST.Operators
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.Types
+import Language.PureScript.PSString (PSString)
+import Language.PureScript.Label (Label)
 import Language.PureScript.Names
 import Language.PureScript.Kinds
 import Language.PureScript.TypeClassDictionaries
@@ -90,7 +92,7 @@ data SimpleErrorMessage
   | CannotDerive (Qualified (ProperName 'ClassName)) [Type]
   | InvalidNewtypeInstance (Qualified (ProperName 'ClassName)) [Type]
   | CannotFindDerivingType (ProperName 'TypeName)
-  | DuplicateLabel Text (Maybe Expr)
+  | DuplicateLabel Label (Maybe Expr)
   | DuplicateValueDeclaration Ident
   | ArgListLengthsDiffer Ident
   | OverlappingArgNames (Maybe Ident)
@@ -99,8 +101,8 @@ data SimpleErrorMessage
   | ExpectedType Type Kind
   | IncorrectConstructorArity (Qualified (ProperName 'ConstructorName))
   | ExprDoesNotHaveType Expr Type
-  | PropertyIsMissing Text
-  | AdditionalProperty Text
+  | PropertyIsMissing Label
+  | AdditionalProperty Label
   | TypeSynonymInstance
   | OrphanInstance Ident (Qualified (ProperName 'ClassName)) [Type]
   | InvalidNewtype (ProperName 'TypeName)
@@ -145,7 +147,7 @@ data ErrorMessageHint
   | ErrorInModule ModuleName
   | ErrorInInstance (Qualified (ProperName 'ClassName)) [Type]
   | ErrorInSubsumption Type Type
-  | ErrorCheckingAccessor Expr Text
+  | ErrorCheckingAccessor Expr PSString
   | ErrorCheckingType Expr Type
   | ErrorCheckingKind Type
   | ErrorCheckingGuard
@@ -573,11 +575,11 @@ data Expr
   -- Anonymous arguments will be removed during desugaring and expanded
   -- into a lambda that reads a property from a record.
   --
-  | Accessor Text Expr
+  | Accessor PSString Expr
   -- |
   -- Partial record update
   --
-  | ObjectUpdate Expr [(Text, Expr)]
+  | ObjectUpdate Expr [(PSString, Expr)]
   -- |
   -- Function introduction
   --

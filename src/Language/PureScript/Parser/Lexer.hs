@@ -70,11 +70,13 @@ import Control.Monad (void, guard)
 import Control.Monad.Identity (Identity)
 import Data.Char (isSpace, isAscii, isSymbol, isAlphaNum)
 import Data.Monoid ((<>))
+import Data.String (fromString)
 import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.Comments
 import Language.PureScript.Parser.State
+import Language.PureScript.PSString (PSString)
 
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Token as PT
@@ -106,7 +108,7 @@ data Token
   | Qualifier Text
   | Symbol Text
   | CharLiteral Char
-  | StringLiteral Text
+  | StringLiteral PSString
   | Number (Either Integer Double)
   | HoleLit Text
   deriving (Show, Eq, Ord)
@@ -249,18 +251,6 @@ parseToken = P.choice
   symbolChar :: Lexer u Char
   symbolChar = P.satisfy isSymbolChar
 
-  surrogates :: Char -> (Char, Char)
-  surrogates c = (high, low)
-    where
-      (h, l) = divMod (fromEnum c - 0x10000) 0x400
-      high = toEnum (h + 0xD800)
-      low = toEnum (l + 0xDC00)
-
-  expandAstralCodePointToUTF16Surrogates :: Char -> [Char]
-  expandAstralCodePointToUTF16Surrogates c | fromEnum c > 0xFFFF = [high, low]
-    where (high, low) = surrogates c
-  expandAstralCodePointToUTF16Surrogates c = [c]
-
   parseCharLiteral :: Lexer u Char
   parseCharLiteral = P.try $ do {
     c <- PT.charLiteral tokenParser;
@@ -269,11 +259,11 @@ parseToken = P.choice
       else return c
   }
 
-  parseStringLiteral :: Lexer u Text
-  parseStringLiteral = blockString <|> T.pack <$> concatMap expandAstralCodePointToUTF16Surrogates <$> PT.stringLiteral tokenParser
+  parseStringLiteral :: Lexer u PSString
+  parseStringLiteral = fromString <$> (blockString <|> PT.stringLiteral tokenParser)
     where
     delimiter   = P.try (P.string "\"\"\"")
-    blockString = delimiter *> (T.pack <$> P.manyTill P.anyChar delimiter)
+    blockString = delimiter *> P.manyTill P.anyChar delimiter
 
   parseNumber :: Lexer u (Either Integer Double)
   parseNumber = (consumeLeadingZero *> P.parserZero) <|>
@@ -516,7 +506,7 @@ charLiteral = token go P.<?> "char literal"
   go (CharLiteral c) = Just c
   go _ = Nothing
 
-stringLiteral :: TokenParser Text
+stringLiteral :: TokenParser PSString
 stringLiteral = token go P.<?> "string literal"
   where
   go (StringLiteral s) = Just s

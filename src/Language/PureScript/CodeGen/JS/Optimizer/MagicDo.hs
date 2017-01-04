@@ -12,6 +12,7 @@ import Data.Maybe (fromJust, isJust)
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.CodeGen.JS.Optimizer.Common
 import Language.PureScript.Options
+import Language.PureScript.PSString (mkString)
 import qualified Language.PureScript.Constants as C
 
 magicDo :: Options -> JS -> JS
@@ -104,7 +105,7 @@ inlineST = everywhereOnJS convertBlock
   -- or in a more aggressive way, turning wrappers into local variables depending on the
   -- agg(ressive) parameter.
   convert agg (JSApp s1 f [arg]) | isSTFunc C.newSTRef f =
-   JSFunction s1 Nothing [] (JSBlock s1 [JSReturn s1 $ if agg then arg else JSObjectLiteral s1 [(C.stRefValue, arg)]])
+   JSFunction s1 Nothing [] (JSBlock s1 [JSReturn s1 $ if agg then arg else JSObjectLiteral s1 [(mkString C.stRefValue, arg)]])
   convert agg (JSApp _ (JSApp s1 f [ref]) []) | isSTFunc C.readSTRef f =
     if agg then ref else JSAccessor s1 C.stRefValue ref
   convert agg (JSApp _ (JSApp _ (JSApp s1 f [ref]) [arg]) []) | isSTFunc C.writeSTRef f =

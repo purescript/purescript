@@ -9,6 +9,7 @@
     "purescript-st": "2.0.0",
     "purescript-partial": "1.1.2",
     "purescript-newtype": "1.1.0",
+    "purescript-generics": "3.3.0",
     "purescript-generics-rep": "4.0.0",
     "purescript-symbols": "^2.0.0",
     "purescript-typelevel-prelude": "https://github.com/purescript/purescript-typelevel-prelude.git#29a7123a0c29c85d4b923fcf4a7df8e45ebf9bac",

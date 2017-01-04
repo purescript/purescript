@@ -11,6 +11,7 @@ import Data.Maybe (fromMaybe)
 
 import Language.PureScript.Crash
 import Language.PureScript.CodeGen.JS.AST
+import Language.PureScript.PSString (mkString)
 
 applyAll :: [a -> a] -> a -> a
 applyAll = foldl' (.) id
@@ -73,7 +74,7 @@ isFn :: (Text, Text) -> JS -> Bool
 isFn (moduleName, fnName) (JSAccessor _ x (JSVar _ y)) =
   x == fnName && y == moduleName
 isFn (moduleName, fnName) (JSIndexer _ (JSStringLiteral _ x) (JSVar _ y)) =
-  x == fnName && y == moduleName
+  x == mkString fnName && y == moduleName
 isFn _ _ = False
 
 isDict :: (Text, Text) -> JS -> Bool

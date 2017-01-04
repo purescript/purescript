@@ -54,6 +54,7 @@ extra-source-files: examples/passing/*.purs
                   , examples/passing/ResolvableScopeConflict3/*.purs
                   , examples/passing/ShadowedModuleName/*.purs
                   , examples/passing/SolvingIsSymbol/*.purs
+                  , examples/passing/StringEdgeCases/*.purs
                   , examples/passing/TransitiveImport/*.purs
                   , examples/passing/TypeOperators/*.purs
                   , examples/passing/TypeWithoutParens/*.purs
@@ -146,6 +147,7 @@ library
                    protolude >= 0.1.6,
                    regex-tdfa -any,
                    safe >= 0.3.9 && < 0.4,
+                   scientific >= 0.3.4.9 && < 0.4,
                    semigroups >= 0.16.2 && < 0.19,
                    sourcemap >= 0.1.6,
                    spdx == 0.2.*,
@@ -199,6 +201,7 @@ library
                      Language.PureScript.Errors
                      Language.PureScript.Errors.JSON
                      Language.PureScript.Kinds
+                     Language.PureScript.Label
                      Language.PureScript.Linter
                      Language.PureScript.Linter.Exhaustive
                      Language.PureScript.Linter.Imports
@@ -219,6 +222,7 @@ library
                      Language.PureScript.Pretty.Kinds
                      Language.PureScript.Pretty.Types
                      Language.PureScript.Pretty.Values
+                     Language.PureScript.PSString
                      Language.PureScript.Renamer
                      Language.PureScript.Sugar
                      Language.PureScript.Sugar.BindingGroups
