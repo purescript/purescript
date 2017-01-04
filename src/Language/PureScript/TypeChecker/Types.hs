@@ -239,11 +239,11 @@ typeForBindingGroupElement (ident, val) dict untypedDict = do
   return (ident, (TypedValue True val' ty, ty))
 
 -- | Check the kind of a type, failing if it is not of kind *.
-checkTypeKind ::
-  (MonadError MultipleErrors m) =>
-  Type ->
-  Kind ->
-  m ()
+checkTypeKind
+  :: MonadError MultipleErrors m
+  => Type
+  -> Kind
+  -> m ()
 checkTypeKind ty kind = guardWith (errorMessage (ExpectedType ty kind)) $ kind == kindType
 
 -- | Remove any ForAlls and ConstrainedType constructors in a type by introducing new unknowns
@@ -251,11 +251,11 @@ checkTypeKind ty kind = guardWith (errorMessage (ExpectedType ty kind)) $ kind =
 --
 -- This is necessary during type checking to avoid unifying a polymorphic type with a
 -- unification variable.
-instantiatePolyTypeWithUnknowns ::
-  (MonadState CheckState m, MonadError MultipleErrors m) =>
-  Expr ->
-  Type ->
-  m (Expr, Type)
+instantiatePolyTypeWithUnknowns
+  :: (MonadState CheckState m, MonadError MultipleErrors m)
+  => Expr
+  -> Type
+  -> m (Expr, Type)
 instantiatePolyTypeWithUnknowns val (ForAll ident ty _) = do
   ty' <- replaceVarWithUnknown ident ty
   instantiatePolyTypeWithUnknowns val ty'
@@ -266,17 +266,17 @@ instantiatePolyTypeWithUnknowns val (ConstrainedType constraints ty) = do
 instantiatePolyTypeWithUnknowns val ty = return (val, ty)
 
 -- | Infer a type for a value, rethrowing any error to provide a more useful error message
-infer ::
-  (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  Expr ->
-  m Expr
+infer
+  :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => Expr
+  -> m Expr
 infer val = withErrorMessageHint (ErrorInferringType val) $ infer' val
 
 -- | Infer a type for a value
-infer' ::
-  (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  Expr ->
-  m Expr
+infer'
+  :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => Expr
+  -> m Expr
 infer' v@(Literal (NumericLiteral (Left _))) = return $ TypedValue True v tyInt
 infer' v@(Literal (NumericLiteral (Right _))) = return $ TypedValue True v tyNumber
 infer' v@(Literal (StringLiteral _)) = return $ TypedValue True v tyString
