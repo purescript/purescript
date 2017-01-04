@@ -671,7 +671,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
     renderSimpleErrorMessage (CannotFindDerivingType nm) =
       line $ "Cannot derive a type class instance, because the type declaration for " <> markCode (runProperName nm) <> " could not be found."
     renderSimpleErrorMessage (DuplicateLabel l expr) =
-      paras $ [ line $ "Label " <> prettyPrintLabel l <> " appears more than once in a row type." ]
+      paras $ [ line $ "Label " <> markCode (prettyPrintLabel l) <> " appears more than once in a row type." ]
                        <> foldMap (\expr' -> [ line "Relevant expression: "
                                              , markCodeBox $ indent $ prettyPrintValue valueDepth expr'
                                              ]) expr
@@ -704,9 +704,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
             , markCodeBox $ indent $ typeAsBox ty
             ]
     renderSimpleErrorMessage (PropertyIsMissing prop) =
-      line $ "Type of expression lacks required label " <> prettyPrintLabel prop <> "."
+      line $ "Type of expression lacks required label " <> markCode (prettyPrintLabel prop) <> "."
     renderSimpleErrorMessage (AdditionalProperty prop) =
-      line $ "Type of expression contains additional label " <> prettyPrintLabel prop <> "."
+      line $ "Type of expression contains additional label " <> markCode (prettyPrintLabel prop) <> "."
     renderSimpleErrorMessage TypeSynonymInstance =
       line "Type class instances for type synonyms are disallowed."
     renderSimpleErrorMessage (OrphanInstance nm cnm ts) =
