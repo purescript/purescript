@@ -12,6 +12,7 @@ module Language.PureScript.PSString
 
 import Prelude.Compat
 import Control.Exception (try, evaluate)
+import Control.Applicative ((<|>))
 import Data.Char (chr)
 import Data.Bits (shiftR)
 import Data.List (unfoldr)
@@ -119,12 +120,19 @@ instance A.ToJSON PSString where
   toJSON = A.toJSON . toUTF16CodeUnits
 
 instance A.FromJSON PSString where
-  parseJSON a = PSString <$> parseArrayOfCodeUnits a
+  parseJSON a = currentParser <|> backwardsCompat
     where
+    currentParser = PSString <$> parseArrayOfCodeUnits a
+
     parseArrayOfCodeUnits :: A.Value -> A.Parser [Word16]
     parseArrayOfCodeUnits = A.withArray "array of UTF-16 code units" (traverse parseCodeUnit . V.toList)
+
     parseCodeUnit :: A.Value -> A.Parser Word16
     parseCodeUnit b = A.withScientific "two-byte non-negative integer" (maybe (A.typeMismatch "" b) return . toBoundedInteger) b
+
+    -- For backwards compatibility: this allows us to parse JSON produced by
+    -- 0.10.4 or earlier
+    backwardsCompat = fromString <$> A.parseJSON a
 
 -- |
 -- Pretty print a PSString, using JavaScript escape sequences. Intended for
