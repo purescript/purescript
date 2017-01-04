@@ -34,13 +34,14 @@ import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Bifunctor (bimap)
-import Data.Either (lefts, rights)
+import Data.Either (partitionEithers)
 import Data.Functor (($>))
 import Data.List (transpose, nub, (\\), partition, delete)
 import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
 import qualified Data.Map as M
 import qualified Data.Set as S
+import Data.Traversable (for)
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -61,7 +62,6 @@ import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.Types
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString)
-
 
 data BindingGroupType
   = RecursiveBindingGroup
@@ -170,30 +170,42 @@ type TypeData = M.Map (Qualified Ident) (Type, NameKind, NameVisibility)
 
 type UntypedData = [(Ident, Type)]
 
+-- | This function breaks a binding group down into two sets of declarations:
+-- those which contain type annotations, and those which don't.
+-- This function also generates fresh unification variables for the types of
+-- declarations without type annotations, returned in the 'UntypedData' structure.
 typeDictionaryForBindingGroup
-  :: (MonadState CheckState m)
+  :: (MonadState CheckState m, MonadWriter MultipleErrors m)
   => Maybe ModuleName
   -> [(Ident, Expr)]
   -> m ([(Ident, Expr)], [(Ident, (Expr, Type, Bool))], TypeData, UntypedData)
 typeDictionaryForBindingGroup moduleName vals = do
-  let
-    -- Map each declaration to a name/value pair, with an optional type, if the declaration is typed
-    es = map isTyped vals
-    -- Filter the typed and untyped declarations
-    untyped = lefts es
-    typed = rights es
-    -- Make a map of names to typed declarations
-    typedDict = map (\(ident, (_, ty, _)) -> (ident, ty)) typed
-
-  -- Create fresh unification variables for the types of untyped declarations
-  untypedNames <- replicateM (length untyped) freshType
-
-  let
+    -- Filter the typed and untyped declarations and make a map of names to typed declarations.
+    -- Replace type wildcards here so that the resulting dictionary of types contains the
+    -- fully expanded types.
+    let (untyped, typed) = partitionEithers (map isTyped vals)
+    typedDict <- for typed $ \(ident, (_, ty, _)) -> do
+                   ty' <- replaceTypeWildcards ty
+                   return (ident, ty')
+    -- Create fresh unification variables for the types of untyped declarations
+    untypedNames <- replicateM (length untyped) freshType
     -- Make a map of names to the unification variables of untyped declarations
-    untypedDict = zip (map fst untyped) untypedNames
-    -- Create the dictionary of all name/type pairs, which will be added to the environment during type checking
-    dict = M.fromList (map (\(ident, ty) -> (Qualified moduleName ident, (ty, Private, Undefined))) $ typedDict ++ untypedDict)
-  return (untyped, typed, dict, untypedDict)
+    let untypedDict = zip (map fst untyped) untypedNames
+    -- Create the dictionary of all name/type pairs, which will be added to the
+    -- environment during type checking
+    let dict = M.fromList (map (\(ident, ty) ->
+                 (Qualified moduleName ident,
+                   (ty, Private, Undefined))) $ typedDict ++ untypedDict)
+    return (untyped, typed, dict, untypedDict)
+  where
+    -- | Check if a value contains a type annotation
+    isTyped :: (Ident, Expr) -> Either (Ident, Expr) (Ident, (Expr, Type, Bool))
+    isTyped (name, TypedValue checkType value ty) = Right (name, (value, ty, checkType))
+    isTyped (name, PositionedValue pos c value) =
+      bimap (second (PositionedValue pos c))
+            (second (\(e, t, b) -> (PositionedValue pos c e, t, b)))
+            (isTyped (name, value))
+    isTyped (name, value) = Left (name, value)
 
 checkTypedBindingGroupElement
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
@@ -201,18 +213,18 @@ checkTypedBindingGroupElement
   -> (Ident, (Expr, Type, Bool))
   -> TypeData
   -> m (Ident, (Expr, Type))
-checkTypedBindingGroupElement mn (ident, (val', ty, checkType)) dict = do
-  -- Replace type wildcards
-  ty' <- replaceTypeWildcards ty
+checkTypedBindingGroupElement mn (ident, (val, ty, checkType)) dict = do
   -- Kind check
   (kind, args) <- kindOfWithScopedVars ty
   checkTypeKind ty kind
   -- Check the type with the new names in scope
-  ty'' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty'
-  val'' <- if checkType
-           then withScopedTypeVars mn args $ bindNames dict $ TypedValue True <$> check val' ty'' <*> pure ty''
-           else return (TypedValue False val' ty'')
-  return (ident, (val'', ty''))
+  -- No need to replace type wildcards here, since it should have been done already
+  -- in 'typeDictionaryForBindingGroup'.
+  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
+  val' <- if checkType
+            then withScopedTypeVars mn args $ bindNames dict $ TypedValue True <$> check val ty <*> pure ty'
+            else return (TypedValue False val ty')
+  return (ident, (val', ty'))
 
 typeForBindingGroupElement
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
@@ -225,15 +237,6 @@ typeForBindingGroupElement (ident, val) dict untypedDict = do
   TypedValue _ val' ty <- bindNames dict $ infer val
   unifyTypes ty $ fromMaybe (internalError "name not found in dictionary") (lookup ident untypedDict)
   return (ident, (TypedValue True val' ty, ty))
-
--- | Check if a value contains a type annotation
-isTyped :: (Ident, Expr) -> Either (Ident, Expr) (Ident, (Expr, Type, Bool))
-isTyped (name, TypedValue checkType value ty) = Right (name, (value, ty, checkType))
-isTyped (name, PositionedValue pos c value) =
-  bimap (second (PositionedValue pos c))
-        (second (\(e, t, b) -> (PositionedValue pos c e, t, b)))
-        (isTyped (name, value))
-isTyped (name, value) = Left (name, value)
 
 -- | Check the kind of a type, failing if it is not of kind *.
 checkTypeKind ::
@@ -370,13 +373,13 @@ infer' (PositionedValue pos c val) = warnAndRethrowWithPositionTC pos $ do
   return $ TypedValue t (PositionedValue pos c v) ty
 infer' v = internalError $ "Invalid argument to infer: " ++ show v
 
-inferLetBinding ::
-  (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  [Declaration] ->
-  [Declaration] ->
-  Expr ->
-  (Expr -> m Expr) ->
-  m ([Declaration], Expr)
+inferLetBinding
+  :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => [Declaration]
+  -> [Declaration]
+  -> Expr
+  -> (Expr -> m Expr)
+  -> m ([Declaration], Expr)
 inferLetBinding seen [] ret j = (,) seen <$> withBindingGroupVisible (j ret)
 inferLetBinding seen (ValueDeclaration ident nameKind [] (Right (tv@(TypedValue checkType val ty))) : rest) ret j = do
   Just moduleName <- checkCurrentModule <$> get
@@ -407,11 +410,12 @@ inferLetBinding seen (PositionedDeclaration pos com d : ds) ret j = warnAndRethr
 inferLetBinding _ _ _ _ = internalError "Invalid argument to inferLetBinding"
 
 -- | Infer the types of variables brought into scope by a binder
-inferBinder :: forall m.
-  (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  Type ->
-  Binder ->
-  m (M.Map Ident Type)
+inferBinder
+  :: forall m
+   . (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => Type
+  -> Binder
+  -> m (M.Map Ident Type)
 inferBinder _ NullBinder = return M.empty
 inferBinder val (LiteralBinder (StringLiteral _)) = unifyTypes val tyString >> return M.empty
 inferBinder val (LiteralBinder (CharLiteral _)) = unifyTypes val tyChar >> return M.empty
@@ -486,11 +490,11 @@ binderRequiresMonotype (PositionedBinder _ _ b) = binderRequiresMonotype b
 binderRequiresMonotype _ = True
 
 -- | Instantiate polytypes only when necessitated by a binder.
-instantiateForBinders ::
-  (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  [Expr] ->
-  [CaseAlternative] ->
-  m ([Expr], [Type])
+instantiateForBinders
+  :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => [Expr]
+  -> [CaseAlternative]
+  -> m ([Expr], [Type])
 instantiateForBinders vals cas = unzip <$> zipWithM (\val inst -> do
   TypedValue _ val' ty <- infer val
   if inst
@@ -503,12 +507,12 @@ instantiateForBinders vals cas = unzip <$> zipWithM (\val inst -> do
 -- |
 -- Check the types of the return values in a set of binders in a case statement
 --
-checkBinders ::
-  (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  [Type] ->
-  Type ->
-  [CaseAlternative] ->
-  m [CaseAlternative]
+checkBinders
+  :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => [Type]
+  -> Type
+  -> [CaseAlternative]
+  -> m [CaseAlternative]
 checkBinders _ _ [] = return []
 checkBinders nvals ret (CaseAlternative binders result : bs) = do
   guardWith (errorMessage $ OverlappingArgNames Nothing) $
@@ -532,11 +536,11 @@ checkBinders nvals ret (CaseAlternative binders result : bs) = do
 -- |
 -- Check the type of a value, rethrowing errors to provide a better error message
 --
-check ::
-  (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  Expr ->
-  Type ->
-  m Expr
+check
+  :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => Expr
+  -> Type
+  -> m Expr
 check val ty = withErrorMessageHint (ErrorCheckingType val ty) $ check' val ty
 
 -- |
@@ -679,13 +683,13 @@ check' val ty = do
 --
 -- The @lax@ parameter controls whether or not every record member has to be provided. For object updates, this is not the case.
 --
-checkProperties ::
-  (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m) =>
-  Expr ->
-  [(PSString, Expr)] ->
-  Type ->
-  Bool ->
-  m [(PSString, Expr)]
+checkProperties
+  :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => Expr
+  -> [(PSString, Expr)]
+  -> Type
+  -> Bool
+  -> m [(PSString, Expr)]
 checkProperties expr ps row lax = let (ts, r') = rowToList row in go ps ts r' where
   go [] [] REmpty = return []
   go [] [] u@(TUnknown _)
