@@ -242,7 +242,12 @@ exportType
   -> m Exports
 exportType exportMode exps name dctors mn = do
   let exTypes = exportedTypes exps
-  let exClasses = exportedTypeClasses exps
+      exClasses = exportedTypeClasses exps
+      dctorNameCounts :: [(ProperName 'ConstructorName, Int)]
+      dctorNameCounts = M.toList $ M.fromListWith (+) (map (,1) dctors)
+  forM_ dctorNameCounts $ \(dctorName, count) ->
+    when (count > 1) $
+      throwDeclConflict (DctorName dctorName) (DctorName dctorName)
   case exportMode of
     Internal -> do
       when (name `M.member` exTypes) $
