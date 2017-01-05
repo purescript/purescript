@@ -9,6 +9,7 @@ module Language.PureScript.CoreFn.ToJSON
 
 import Prelude.Compat
 
+import Data.Maybe (fromMaybe)
 import Data.Aeson
 import Data.Version (Version, showVersion)
 import Data.Text (Text)
@@ -17,7 +18,7 @@ import qualified Data.Text as T
 import Language.PureScript.AST.Literals
 import Language.PureScript.CoreFn
 import Language.PureScript.Names
-import Language.PureScript.PSString (PSString)
+import Language.PureScript.PSString (PSString, decodeString)
 
 literalToJSON :: (a -> Value) -> Literal a -> Value
 literalToJSON _ (NumericLiteral (Left n)) = toJSON ("IntLiteral", n)
@@ -52,8 +53,17 @@ bindToJSON :: Bind a -> Value
 bindToJSON (NonRec _ n e) = object [ runIdent n .= exprToJSON e ]
 bindToJSON (Rec bs) = object $ map (\((_, n), e) -> runIdent n .= exprToJSON e) bs
 
+-- If all of the labels in the record can safely be converted to JSON strings,
+-- we generate a JSON object. Otherwise the labels must be represented as
+-- arrays of integers in the JSON, and in this case we generate the record as
+-- an array of pairs.
 recordToJSON :: (a -> Value) -> [(PSString, a)] -> Value
-recordToJSON f = toJSON . map (\(key, a) -> (toJSON key, f a))
+recordToJSON f rec = fromMaybe (asArrayOfPairs rec) (asObject rec)
+  where
+  asObject = fmap object . traverse (uncurry maybePair)
+  maybePair label a = fmap (\l -> l .= f a) (decodeString label)
+
+  asArrayOfPairs = toJSON . map (\(label, a) -> (toJSON label, f a))
 
 exprToJSON :: Expr a -> Value
 exprToJSON (Var _ i)              = toJSON ( "Var"

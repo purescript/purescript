@@ -41,6 +41,11 @@ import qualified Data.Aeson.Types as A
 -- The Show instance for PSString produces a string literal which would
 -- represent the same data were it inserted into a PureScript source file.
 --
+-- Because JSON parsers vary wildly in terms of how they deal with lone
+-- surrogates in JSON strings, the ToJSON instance for PSString produces JSON
+-- strings where that would be safe (i.e. when there are no lone surrogates),
+-- and arrays of UTF-16 code units (integers) otherwise.
+--
 newtype PSString = PSString { toUTF16CodeUnits :: [Word16] }
   deriving (Eq, Ord, Monoid)
 
@@ -117,22 +122,23 @@ instance IsString PSString where
     encodeUTF16 c = [toWord $ fromEnum c]
 
 instance A.ToJSON PSString where
-  toJSON = A.toJSON . toUTF16CodeUnits
+  toJSON str =
+    case decodeString str of
+      Just t -> A.toJSON t
+      Nothing -> A.toJSON (toUTF16CodeUnits str)
 
 instance A.FromJSON PSString where
-  parseJSON a = currentParser <|> backwardsCompat
+  parseJSON a = jsonString <|> arrayOfCodeUnits
     where
-    currentParser = PSString <$> parseArrayOfCodeUnits a
+    jsonString = fromString <$> A.parseJSON a
+
+    arrayOfCodeUnits = PSString <$> parseArrayOfCodeUnits a
 
     parseArrayOfCodeUnits :: A.Value -> A.Parser [Word16]
     parseArrayOfCodeUnits = A.withArray "array of UTF-16 code units" (traverse parseCodeUnit . V.toList)
 
     parseCodeUnit :: A.Value -> A.Parser Word16
     parseCodeUnit b = A.withScientific "two-byte non-negative integer" (maybe (A.typeMismatch "" b) return . toBoundedInteger) b
-
-    -- For backwards compatibility: this allows us to parse JSON produced by
-    -- 0.10.4 or earlier
-    backwardsCompat = fromString <$> A.parseJSON a
 
 -- |
 -- Pretty print a PSString, using JavaScript escape sequences. Intended for
