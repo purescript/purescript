@@ -229,6 +229,7 @@ infer' other = (, []) <$> go other
     unifyKinds k k'
     return k'
   go TypeWildcard{} = freshKind
+  go TUnknown{} = freshKind
   go (TypeLevelString _) = return kindSymbol
   go (TypeVar v) = do
     Just moduleName <- checkCurrentModule <$> get
