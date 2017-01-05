@@ -1,4 +1,4 @@
--- @shouldFailWith TypesDoNotUnify
+-- @shouldFailWith InfiniteType
 module Main where
 
 foo :: Array Int -> Int
