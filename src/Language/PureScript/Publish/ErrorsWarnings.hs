@@ -73,6 +73,7 @@ data RepositoryFieldError
 -- | An error that probably indicates a bug in this module.
 data InternalError
   = JSONError JSONSource (ParseError BowerError)
+  | CouldntParseGitTagDate Text
   deriving (Show)
 
 data JSONSource
@@ -288,6 +289,9 @@ displayInternalError e = case e of
   JSONError src r ->
     [ "Error in JSON " ++ displayJSONSource src ++ ":"
     , T.unpack (Bower.displayError r)
+    ]
+  CouldntParseGitTagDate tag ->
+    [ "Unable to parse the date for a git tag: " ++ T.unpack tag
     ]
 
 displayJSONSource :: JSONSource -> String

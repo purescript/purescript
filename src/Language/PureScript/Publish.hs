@@ -39,12 +39,13 @@ import Data.List (stripPrefix, (\\), nubBy)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.List.Split (splitOn)
 import Data.Maybe
-import Data.Version
-import qualified Data.SPDX as SPDX
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
+import Data.Time.Clock (UTCTime)
+import Data.Version
+import qualified Data.SPDX as SPDX
 
 import Safe (headMay)
 
@@ -67,6 +68,7 @@ data PublishOptions = PublishOptions
   { -- | How to obtain the version tag and version that the data being
     -- generated will refer to.
     publishGetVersion :: PrepareM (Text, Version)
+  , publishGetTagTime :: Text -> PrepareM UTCTime
   , -- | What to do when the working tree is dirty
     publishWorkingTreeDirty :: PrepareM ()
   }
@@ -74,6 +76,7 @@ data PublishOptions = PublishOptions
 defaultPublishOptions :: PublishOptions
 defaultPublishOptions = PublishOptions
   { publishGetVersion = getVersionFromGitTag
+  , publishGetTagTime = getTagTime
   , publishWorkingTreeDirty = userError DirtyWorkingTree
   }
 
@@ -139,6 +142,7 @@ preparePackage' opts = do
   checkLicense pkgMeta
 
   (pkgVersionTag, pkgVersion) <- publishGetVersion opts
+  pkgTagTime                  <- Just <$> publishGetTagTime opts pkgVersionTag
   pkgGithub                   <- getBowerRepositoryInfo pkgMeta
   (pkgBookmarks, pkgModules)  <- getModulesAndBookmarks
 
@@ -199,6 +203,13 @@ getVersionFromGitTag = do
   parseMay str = do
     digits <- stripPrefix "v" str
     (str,) <$> D.parseVersion' digits
+
+-- | Given a git tag, get the time it was created.
+getTagTime :: Text -> PrepareM UTCTime
+getTagTime tag = do
+  out <- readProcess' "git" ["show", T.unpack tag, "--no-patch", "--format=%aI"] ""
+  let time = headMay (lines out) >>= D.parseTime
+  maybe (internalError (CouldntParseGitTagDate tag)) pure time
 
 getBowerRepositoryInfo :: PackageMeta -> PrepareM (D.GithubUser, D.GithubRepo)
 getBowerRepositoryInfo = either (userError . BadRepositoryField) return . tryExtract

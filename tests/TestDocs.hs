@@ -9,14 +9,16 @@ import Prelude ()
 import Prelude.Compat
 
 import Control.Arrow (first)
+import Control.Monad.IO.Class (liftIO)
 
-import Data.Version (Version(..))
-import Data.Monoid
-import Data.Maybe (fromMaybe)
-import Data.List ((\\))
 import Data.Foldable
+import Data.List ((\\))
+import Data.Maybe (fromMaybe)
+import Data.Monoid
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Time.Clock (getCurrentTime)
+import Data.Version (Version(..))
 import System.Exit
 
 import qualified Language.PureScript as P
@@ -32,6 +34,7 @@ import TestUtils
 publishOpts :: Publish.PublishOptions
 publishOpts = Publish.defaultPublishOptions
   { Publish.publishGetVersion = return testVersion
+  , Publish.publishGetTagTime = const (liftIO getCurrentTime)
   , Publish.publishWorkingTreeDirty = return ()
   }
   where testVersion = ("v999.0.0", Version [999,0,0] [])
