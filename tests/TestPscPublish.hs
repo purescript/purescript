@@ -4,8 +4,10 @@
 
 module TestPscPublish where
 
+import Control.Monad.IO.Class (liftIO)
 import System.Exit (exitFailure)
 import Data.ByteString.Lazy (ByteString)
+import Data.Time.Clock (getCurrentTime)
 import qualified Data.Aeson as A
 import Data.Version
 
@@ -38,6 +40,7 @@ roundTrip pkg =
 testRunOptions :: PublishOptions
 testRunOptions = defaultPublishOptions
   { publishGetVersion = return testVersion
+  , publishGetTagTime = const (liftIO getCurrentTime)
   , publishWorkingTreeDirty = return ()
   }
   where testVersion = ("v999.0.0", Version [999,0,0] [])

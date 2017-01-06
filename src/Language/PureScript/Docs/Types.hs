@@ -10,17 +10,19 @@ import Control.Arrow (first, (***))
 import Control.Monad (when)
 import Control.Monad.Error.Class (catchError)
 
-import Data.Monoid ((<>))
 import Data.Aeson ((.=))
 import Data.Aeson.BetterErrors
 import Data.ByteString.Lazy (ByteString)
 import Data.Either (isLeft, isRight)
-import Data.Maybe (mapMaybe, fromMaybe)
+import Data.Maybe (mapMaybe, fromMaybe, maybeToList)
+import Data.Monoid ((<>))
 import Data.Text (Text)
+import Data.Time.Clock (UTCTime)
+import qualified Data.Time.Format as TimeFormat
 import Data.Version
-import qualified Data.Vector as V
 import qualified Data.Aeson as A
 import qualified Data.Text as T
+import qualified Data.Vector as V
 
 import qualified Language.PureScript as P
 
@@ -40,6 +42,10 @@ data Package a = Package
   { pkgMeta                 :: PackageMeta
   , pkgVersion              :: Version
   , pkgVersionTag           :: Text
+  -- TODO: When this field was introduced, it was given the Maybe type for the
+  -- sake of backwards compatibility, as older JSON blobs will not include the
+  -- field. It should eventually be changed to just UTCTime.
+  , pkgTagTime              :: Maybe UTCTime
   , pkgModules              :: [Module]
   , pkgBookmarks            :: [Bookmark]
   , pkgResolvedDependencies :: [(PackageName, Version)]
@@ -62,6 +68,7 @@ verifyPackage verifiedUser Package{..} =
   Package pkgMeta
           pkgVersion
           pkgVersionTag
+          pkgTagTime
           pkgModules
           pkgBookmarks
           pkgResolvedDependencies
@@ -71,6 +78,29 @@ verifyPackage verifiedUser Package{..} =
 
 packageName :: Package a -> PackageName
 packageName = bowerName . pkgMeta
+
+-- |
+-- The time format used for serializing package tag times in the JSON format.
+-- This is the ISO 8601 date format which includes a time and a timezone.
+--
+jsonTimeFormat :: String
+jsonTimeFormat = "%Y-%m-%dT%H:%M:%S%z"
+
+-- |
+-- Convenience function for formatting a time in the format expected by this
+-- module.
+--
+formatTime :: UTCTime -> String
+formatTime =
+  TimeFormat.formatTime TimeFormat.defaultTimeLocale jsonTimeFormat
+
+-- |
+-- Convenience function for parsing a time in the format expected by this
+-- module.
+--
+parseTime :: String -> Maybe UTCTime
+parseTime =
+  TimeFormat.parseTimeM False TimeFormat.defaultTimeLocale jsonTimeFormat
 
 data Module = Module
   { modName         :: P.ModuleName
@@ -275,6 +305,7 @@ data PackageError
   | InvalidFixity
   | InvalidKind Text
   | InvalidDataDeclType Text
+  | InvalidTime
   deriving (Show, Eq, Ord)
 
 type Bookmark = InPackage (P.ModuleName, Text)
@@ -320,12 +351,17 @@ asPackage minimumVersion uploader = do
   Package <$> key "packageMeta" asPackageMeta .! ErrorInPackageMeta
           <*> key "version" asVersion
           <*> key "versionTag" asText
+          <*> keyMay "tagTime" (withString parseTimeEither)
           <*> key "modules" (eachInArray asModule)
           <*> key "bookmarks" asBookmarks .! ErrorInPackageMeta
           <*> key "resolvedDependencies" asResolvedDependencies
           <*> key "github" asGithub
           <*> key "uploader" uploader
           <*> pure compilerVersion
+
+parseTimeEither :: String -> Either PackageError UTCTime
+parseTimeEither =
+  maybe (Left InvalidTime) Right . parseTime
 
 asUploadedPackage :: Version -> Parse PackageError UploadedPackage
 asUploadedPackage minVersion = asPackage minVersion asNotYetKnown
@@ -359,6 +395,8 @@ displayPackageError e = case e of
     "Invalid kind: \"" <> str <> "\""
   InvalidDataDeclType str ->
     "Invalid data declaration type: \"" <> str <> "\""
+  InvalidTime ->
+    "Invalid time"
 
 instance A.FromJSON a => A.FromJSON (Package a) where
   parseJSON = toAesonParser displayPackageError
@@ -550,7 +588,7 @@ asSourceSpan = P.SourceSpan <$> key "name" asString
 
 instance A.ToJSON a => A.ToJSON (Package a) where
   toJSON Package{..} =
-    A.object
+    A.object $
       [ "packageMeta"          .= pkgMeta
       , "version"              .= showVersion pkgVersion
       , "versionTag"           .= pkgVersionTag
@@ -562,7 +600,8 @@ instance A.ToJSON a => A.ToJSON (Package a) where
       , "github"               .= pkgGithub
       , "uploader"             .= pkgUploader
       , "compilerVersion"      .= showVersion P.version
-      ]
+      ] ++
+      fmap (\t -> "tagTime" .= formatTime t) (maybeToList pkgTagTime)
 
 instance A.ToJSON NotYetKnown where
   toJSON _ = A.Null
