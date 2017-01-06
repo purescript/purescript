@@ -24,19 +24,20 @@ module Language.PureScript.Ide.Util
   , withEmptyAnn
   , valueOperatorAliasT
   , typeOperatorAliasT
-  , module Language.PureScript.Ide.Conversions
+  , prettyTypeT
+  , properNameT
+  , identT
   , module Language.PureScript.Ide.Logging
   ) where
 
 import           Protolude                           hiding (decodeUtf8,
                                                       encodeUtf8)
 
-import           Control.Lens                        ((^.))
+import           Control.Lens                        ((^.), Iso', iso)
 import           Data.Aeson
 import qualified Data.Text                           as T
 import           Data.Text.Lazy.Encoding             (decodeUtf8, encodeUtf8)
 import qualified Language.PureScript                 as P
-import           Language.PureScript.Ide.Conversions
 import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.Types
 
@@ -114,3 +115,17 @@ unwrapPositioned x = x
 unwrapPositionedRef :: P.DeclarationRef -> P.DeclarationRef
 unwrapPositionedRef (P.PositionedDeclarationRef _ _ x) = unwrapPositionedRef x
 unwrapPositionedRef x = x
+
+properNameT :: Iso' (P.ProperName a) Text
+properNameT = iso P.runProperName P.ProperName
+
+identT :: Iso' P.Ident Text
+identT = iso P.runIdent P.Ident
+
+prettyTypeT :: P.Type -> Text
+prettyTypeT =
+  T.unwords
+  . map T.strip
+  . T.lines
+  . T.pack
+  . P.prettyPrintTypeWithUnicode

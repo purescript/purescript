@@ -280,7 +280,6 @@ library
                      Language.PureScript.Ide.CaseSplit
                      Language.PureScript.Ide.Command
                      Language.PureScript.Ide.Completion
-                     Language.PureScript.Ide.Conversions
                      Language.PureScript.Ide.Externs
                      Language.PureScript.Ide.Error
                      Language.PureScript.Ide.Filter

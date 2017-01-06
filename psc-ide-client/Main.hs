@@ -35,6 +35,8 @@ main = do
 
 client :: PortID -> IO ()
 client port = do
+    hSetEncoding stdin utf8
+    hSetEncoding stdout utf8
     h <-
         connectTo "127.0.0.1" port `catch`
         (\(SomeException e) ->
