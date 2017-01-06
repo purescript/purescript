@@ -1,5 +1,5 @@
 name: purescript
-version: 0.10.4
+version: 0.10.5
 cabal-version: >=1.8
 build-type: Simple
 license: BSD3
