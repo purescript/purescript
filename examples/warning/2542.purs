@@ -1,3 +1,4 @@
+-- @shouldWarnWith MissingTypeDeclaration
 module Main where
 
 import Control.Monad.Eff.Console
