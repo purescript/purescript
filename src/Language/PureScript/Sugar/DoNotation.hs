@@ -59,6 +59,12 @@ desugarDo d =
     return $ App (App bind val) (Abs (Left ident) (Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] (Right rest')]))
   go [DoNotationLet _] = throwError . errorMessage $ InvalidDoLet
   go (DoNotationLet ds : rest) = do
+    let checkBind :: Declaration -> m ()
+        checkBind (ValueDeclaration (Ident name) _ _ _)
+          | name == C.bind = throwError . errorMessage $ CannotUseBindWithDo
+        checkBind (PositionedDeclaration pos _ decl) = rethrowWithPosition pos (checkBind decl)
+        checkBind _ = pure ()
+    mapM_ checkBind ds
     rest' <- go rest
     return $ Let ds rest'
   go (PositionedDoNotationElement pos com el : rest) = rethrowWithPosition pos $ PositionedValue pos com <$> go (el : rest)
