@@ -187,7 +187,7 @@ data SplitBindingGroup = SplitBindingGroup
 -- This function also generates fresh unification variables for the types of
 -- declarations without type annotations, returned in the 'UntypedData' structure.
 typeDictionaryForBindingGroup
-  :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  :: (MonadState CheckState m, MonadWriter MultipleErrors m)
   => Maybe ModuleName
   -> [(Ident, Expr)]
   -> m SplitBindingGroup
