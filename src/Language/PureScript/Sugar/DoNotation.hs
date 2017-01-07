@@ -9,7 +9,6 @@ import Prelude.Compat
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class
 
-
 import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Errors
@@ -49,6 +48,8 @@ desugarDo d =
     return $ App (App bind val) (Abs (Left (Ident C.__unused)) rest')
   go [DoNotationBind _ _] = throwError . errorMessage $ InvalidDoBind
   go (DoNotationBind NullBinder val : rest) = go (DoNotationValue val : rest)
+  go (DoNotationBind b _ : _) | Ident C.bind `elem` binderNames b =
+    throwError . errorMessage $ CannotUseBindWithDo
   go (DoNotationBind (VarBinder ident) val : rest) = do
     rest' <- go rest
     return $ App (App bind val) (Abs (Left ident) rest')
