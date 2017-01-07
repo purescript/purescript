@@ -197,7 +197,7 @@ typeDictionaryForBindingGroup moduleName vals = do
     -- fully expanded types.
     let (untyped, typed) = partitionEithers (map splitTypeAnnotation vals)
     (typedDict, typed') <- fmap unzip . for typed $ \(ident, (expr, ty, checkType)) -> do
-      ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
+      ty' <- replaceTypeWildcards ty
       return ((ident, ty'), (ident, (expr, ty', checkType)))
     -- Create fresh unification variables for the types of untyped declarations
     (untypedDict, untyped') <- fmap unzip . for untyped $ \(ident, expr) -> do
@@ -233,11 +233,14 @@ checkTypedBindingGroupElement mn (ident, (val, ty, checkType)) dict = do
   -- Kind check
   (kind, args) <- kindOfWithScopedVars ty
   checkTypeKind ty kind
+  -- We replace type synonyms _after_ kind-checking, since we don't want type
+  -- synonym expansion to bring type variables into scope. See #2542.
+  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
   -- Check the type with the new names in scope
   val' <- if checkType
-            then withScopedTypeVars mn args $ bindNames dict $ TypedValue True <$> check val ty <*> pure ty
+            then withScopedTypeVars mn args $ bindNames dict $ TypedValue True <$> check val ty' <*> pure ty'
             else return (TypedValue False val ty)
-  return (ident, (val', ty))
+  return (ident, (val', ty'))
 
 -- | Infer a type for a value in a binding group which lacks an annotation.
 typeForBindingGroupElement
