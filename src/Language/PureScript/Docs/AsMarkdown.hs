@@ -77,12 +77,10 @@ declAsMarkdown mn decl@Declaration{..} = do
 codeToString :: RenderedCode -> Text
 codeToString = outputWith elemAsMarkdown
   where
-  elemAsMarkdown (Syntax x)  = x
-  elemAsMarkdown (Ident x _) = x
-  elemAsMarkdown (Ctor x _)  = x
-  elemAsMarkdown (Kind x)    = x
-  elemAsMarkdown (Keyword x) = x
-  elemAsMarkdown Space       = " "
+  elemAsMarkdown (Syntax x)     = x
+  elemAsMarkdown (Keyword x)    = x
+  elemAsMarkdown Space          = " "
+  elemAsMarkdown (Symbol _ x _) = x
 
 -- fixityAsMarkdown :: P.Fixity -> Docs
 -- fixityAsMarkdown (P.Fixity associativity precedence) =
