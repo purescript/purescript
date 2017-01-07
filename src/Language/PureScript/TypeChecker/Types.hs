@@ -239,7 +239,7 @@ checkTypedBindingGroupElement mn (ident, (val, ty, checkType)) dict = do
   -- Check the type with the new names in scope
   val' <- if checkType
             then withScopedTypeVars mn args $ bindNames dict $ TypedValue True <$> check val ty' <*> pure ty'
-            else return (TypedValue False val ty)
+            else return (TypedValue False val ty')
   return (ident, (val', ty'))
 
 -- | Infer a type for a value in a binding group which lacks an annotation.
