@@ -3,16 +3,10 @@ module Language.PureScript.Docs.Convert.Single
   , collectBookmarks
   ) where
 
-import Prelude.Compat
+import Protolude
 
 import Control.Category ((>>>))
-import Control.Monad
 
-import Data.Either
-import Data.List (nub)
-import Data.Maybe (mapMaybe, fromMaybe)
-import Data.Monoid ((<>))
-import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.Docs.Types
@@ -67,7 +61,7 @@ data DeclarationAugment
 -- the type synonym IntermediateDeclaration for more information.
 augmentDeclarations :: [IntermediateDeclaration] -> [Declaration]
 augmentDeclarations (partitionEithers -> (augments, toplevels)) =
-  foldl go toplevels augments
+  foldl' go toplevels augments
   where
   go ds (parentTitles, a) =
     map (\d ->
@@ -142,14 +136,14 @@ convertDeclaration (P.TypeInstanceDeclaration _ constraints className tys _) tit
   Just (Left (classNameString : typeNameStrings, AugmentChild childDecl))
   where
   classNameString = unQual className
-  typeNameStrings = nub (concatMap (P.everythingOnTypes (++) extractProperNames) tys)
+  typeNameStrings = ordNub (concatMap (P.everythingOnTypes (++) extractProperNames) tys)
   unQual x = let (P.Qualified _ y) = x in P.runProperName y
 
   extractProperNames (P.TypeConstructor n) = [unQual n]
   extractProperNames _ = []
 
   childDecl = ChildDeclaration title Nothing Nothing (ChildInstance constraints classApp)
-  classApp = foldl P.TypeApp (P.TypeConstructor (fmap P.coerceProperName className)) tys
+  classApp = foldl' P.TypeApp (P.TypeConstructor (fmap P.coerceProperName className)) tys
 convertDeclaration (P.ValueFixityDeclaration fixity (P.Qualified mn alias) _) title =
   Just $ Right $ mkDeclaration title (AliasDeclaration fixity (P.Qualified mn (Right alias)))
 convertDeclaration (P.TypeFixityDeclaration fixity (P.Qualified mn alias) _) title =
