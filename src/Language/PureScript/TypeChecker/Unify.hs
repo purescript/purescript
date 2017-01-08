@@ -84,6 +84,10 @@ unifyTypes t1 t2 = do
   sub <- gets checkSubstitution
   withErrorMessageHint (ErrorUnifyingTypes t1 t2) $ unifyTypes' (substituteType sub t1) (substituteType sub t2)
   where
+  unifyTypes' (ExpandedSynonym before ty1) ty2 =
+    withErrorMessageHint (ErrorUnifyingTypes before ty2) $ unifyTypes' ty1 ty2
+  unifyTypes' ty1 (ExpandedSynonym before ty2) =
+    withErrorMessageHint (ErrorUnifyingTypes ty1 before) $ unifyTypes' ty1 ty2
   unifyTypes' (TUnknown u1) (TUnknown u2) | u1 == u2 = return ()
   unifyTypes' (TUnknown u) t = solveType u t
   unifyTypes' t (TUnknown u) = solveType u t

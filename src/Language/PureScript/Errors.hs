@@ -1265,6 +1265,7 @@ renderBox = unlines
   whiteSpace = all isSpace
 
 toTypelevelString :: Type -> Maybe Box.Box
+toTypelevelString (ExpandedSynonym _ ty) = toTypelevelString ty
 toTypelevelString (TypeLevelString s) = Just $ Box.text $ T.unpack $ prettyPrintString s
 toTypelevelString (TypeApp (TypeConstructor f) x)
   | f == primName "TypeString" = Just $ typeAsBox x

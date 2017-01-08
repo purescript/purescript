@@ -96,6 +96,7 @@ kinded = mkPattern match
 insertPlaceholders :: Type -> Type
 insertPlaceholders = everywhereOnTypesTopDown convertForAlls . everywhereOnTypes convert
   where
+  convert (ExpandedSynonym ty _) = ty
   convert (TypeApp (TypeApp f arg) ret) | f == tyFunction = PrettyPrintFunction arg ret
   convert (TypeApp o r) | o == tyRecord = PrettyPrintObject r
   convert other = other

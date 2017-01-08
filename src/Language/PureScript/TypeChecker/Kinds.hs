@@ -215,6 +215,7 @@ infer' (KindedType ty k) = do
   (k', args) <- infer ty
   unifyKinds k k'
   return (k', args)
+infer' (ExpandedSynonym before _) = infer' before
 infer' other = (, []) <$> go other
   where
   go :: Type -> m Kind
@@ -263,4 +264,5 @@ infer' other = (, []) <$> go other
     k <- go ty
     unifyKinds k kindType
     return kindType
+  go (ExpandedSynonym before _) = go before
   go ty = internalError $ "Invalid argument to infer: " ++ show ty

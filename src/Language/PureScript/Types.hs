@@ -75,6 +75,10 @@ data Type
   -- Note: although it seems this constructor is not used, it _is_ useful,
   -- since it prevents certain traversals from matching.
   | ParensInType Type
+  -- | An expanded type synonym. We save the type before expansion, in case we need
+  -- it later during pretty printing. The first argument is the applied synonym, and
+  -- the second is the expanded type.
+  | ExpandedSynonym Type Type
   deriving (Show, Eq, Ord)
 
 -- | Additional data relevant to type class constraints
@@ -165,6 +169,7 @@ replaceAllTypeVars = go []
   go bs m (KindedType t k) = KindedType (go bs m t) k
   go bs m (BinaryNoParensType t1 t2 t3) = BinaryNoParensType (go bs m t1) (go bs m t2) (go bs m t3)
   go bs m (ParensInType t) = ParensInType (go bs m t)
+  go bs m (ExpandedSynonym t1 t2) = ExpandedSynonym (go bs m t1) (go bs m t2)
   go _  _ ty = ty
 
   genName orig inUse = try' 0
@@ -197,6 +202,7 @@ freeTypeVariables = nub . go []
   go bound (KindedType t _) = go bound t
   go bound (BinaryNoParensType t1 t2 t3) = go bound t1 ++ go bound t2 ++ go bound t3
   go bound (ParensInType t) = go bound t
+  go bound (ExpandedSynonym t _) = go bound t
   go _ _ = []
 
 -- |
@@ -248,6 +254,7 @@ everywhereOnTypes f = go
   go (PrettyPrintForAll args t) = f (PrettyPrintForAll args (go t))
   go (BinaryNoParensType t1 t2 t3) = f (BinaryNoParensType (go t1) (go t2) (go t3))
   go (ParensInType t) = f (ParensInType (go t))
+  go (ExpandedSynonym t1 t2) = f (ExpandedSynonym (go t1) (go t2))
   go other = f other
 
 everywhereOnTypesTopDown :: (Type -> Type) -> Type -> Type
@@ -263,6 +270,7 @@ everywhereOnTypesTopDown f = go . f
   go (PrettyPrintForAll args t) = PrettyPrintForAll args (go (f t))
   go (BinaryNoParensType t1 t2 t3) = BinaryNoParensType (go (f t1)) (go (f t2)) (go (f t3))
   go (ParensInType t) = ParensInType (go (f t))
+  go (ExpandedSynonym t1 t2) = ExpandedSynonym (go (f t1)) (go (f t2))
   go other = f other
 
 everywhereOnTypesM :: Monad m => (Type -> m Type) -> Type -> m Type
@@ -278,6 +286,7 @@ everywhereOnTypesM f = go
   go (PrettyPrintForAll args t) = (PrettyPrintForAll args <$> go t) >>= f
   go (BinaryNoParensType t1 t2 t3) = (BinaryNoParensType <$> go t1 <*> go t2 <*> go t3) >>= f
   go (ParensInType t) = (ParensInType <$> go t) >>= f
+  go (ExpandedSynonym t1 t2) = (ExpandedSynonym <$> go t1 <*> go t2) >>= f
   go other = f other
 
 everywhereOnTypesTopDownM :: Monad m => (Type -> m Type) -> Type -> m Type
@@ -293,6 +302,7 @@ everywhereOnTypesTopDownM f = go <=< f
   go (PrettyPrintForAll args t) = PrettyPrintForAll args <$> (f t >>= go)
   go (BinaryNoParensType t1 t2 t3) = BinaryNoParensType <$> (f t1 >>= go) <*> (f t2 >>= go) <*> (f t3 >>= go)
   go (ParensInType t) = ParensInType <$> (f t >>= go)
+  go (ExpandedSynonym t1 t2) = ExpandedSynonym <$> (f t1 >>= go) <*> (f t2 >>= go)
   go other = f other
 
 everythingOnTypes :: (r -> r -> r) -> (Type -> r) -> Type -> r
@@ -308,6 +318,7 @@ everythingOnTypes (<+>) f = go
   go t@(PrettyPrintForAll _ t1) = f t <+> go t1
   go t@(BinaryNoParensType t1 t2 t3) = f t <+> go t1 <+> go t2 <+> go t3
   go t@(ParensInType t1) = f t <+> go t1
+  go t@(ExpandedSynonym t1 t2) = f t <+> go t1 <+> go t2
   go other = f other
 
 everythingWithContextOnTypes :: s -> r -> (r -> r -> r) -> (s -> Type -> (s, r)) -> Type -> r
@@ -324,4 +335,5 @@ everythingWithContextOnTypes s0 r0 (<+>) f = go' s0
   go s (PrettyPrintForAll _ t1) = go' s t1
   go s (BinaryNoParensType t1 t2 t3) = go' s t1 <+> go' s t2 <+> go' s t3
   go s (ParensInType t1) = go' s t1
+  go s (ExpandedSynonym t1 t2) = go' s t1 <+> go s t2
   go _ _ = r0
