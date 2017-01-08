@@ -458,9 +458,9 @@ handleEnv TypeClassEnv{..} =
     P.quantify . P.moveQuantifiersToFront . P.ConstrainedType [constraint]
 
 splitMap :: (Ord k) => Map k (v1, v2) -> (Map k v1, Map k v2)
-splitMap = foldl go (Map.empty, Map.empty) . Map.toList
+splitMap = Map.foldlWithKey' go (Map.empty, Map.empty)
   where
-  go (m1, m2) (k, (v1, v2)) =
+  go (m1, m2) k (v1, v2) =
     (Map.insert k v1 m1, Map.insert k v2 m2)
 
 -- |
