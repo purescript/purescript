@@ -9,7 +9,6 @@ import Prelude.Compat
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class
 
-
 import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Errors
@@ -49,6 +48,8 @@ desugarDo d =
     return $ App (App bind val) (Abs (Left (Ident C.__unused)) rest')
   go [DoNotationBind _ _] = throwError . errorMessage $ InvalidDoBind
   go (DoNotationBind NullBinder val : rest) = go (DoNotationValue val : rest)
+  go (DoNotationBind b _ : _) | Ident C.bind `elem` binderNames b =
+    throwError . errorMessage $ CannotUseBindWithDo
   go (DoNotationBind (VarBinder ident) val : rest) = do
     rest' <- go rest
     return $ App (App bind val) (Abs (Left ident) rest')
@@ -58,6 +59,12 @@ desugarDo d =
     return $ App (App bind val) (Abs (Left ident) (Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] (Right rest')]))
   go [DoNotationLet _] = throwError . errorMessage $ InvalidDoLet
   go (DoNotationLet ds : rest) = do
+    let checkBind :: Declaration -> m ()
+        checkBind (ValueDeclaration (Ident name) _ _ _)
+          | name == C.bind = throwError . errorMessage $ CannotUseBindWithDo
+        checkBind (PositionedDeclaration pos _ decl) = rethrowWithPosition pos (checkBind decl)
+        checkBind _ = pure ()
+    mapM_ checkBind ds
     rest' <- go rest
     return $ Let ds rest'
   go (PositionedDoNotationElement pos com el : rest) = rethrowWithPosition pos $ PositionedValue pos com <$> go (el : rest)

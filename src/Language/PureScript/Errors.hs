@@ -172,6 +172,7 @@ errorCode em = case unwrapErrorMessage em of
   CannotGeneralizeRecursiveFunction{} -> "CannotGeneralizeRecursiveFunction"
   CannotDeriveNewtypeForData{} -> "CannotDeriveNewtypeForData"
   ExpectedWildcard{} -> "ExpectedWildcard"
+  CannotUseBindWithDo{} -> "CannotUseBindWithDo"
 
 -- |
 -- A stack trace for an error
@@ -878,6 +879,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
 
     renderSimpleErrorMessage (ExpectedWildcard tyName) =
       paras [ line $ "Expected a type wildcard (_) when deriving an instance for " <> markCode (runProperName tyName) <> "."
+            ]
+
+    renderSimpleErrorMessage CannotUseBindWithDo =
+      paras [ line $ "The name " <> markCode "bind" <> " cannot be brought into scope in a do notation block, since do notation uses the same name."
             ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box

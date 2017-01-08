@@ -138,6 +138,7 @@ data SimpleErrorMessage
   | CannotGeneralizeRecursiveFunction Ident Type
   | CannotDeriveNewtypeForData (ProperName 'TypeName)
   | ExpectedWildcard (ProperName 'TypeName)
+  | CannotUseBindWithDo
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
