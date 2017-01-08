@@ -159,13 +159,6 @@ conditional = mkPattern match
   match (JSConditional ss cond th el) = Just ((ss, th, el), cond)
   match _ = Nothing
 
-accessor :: (Emit gen) => Pattern PrinterState JS (gen, JS)
-accessor = mkPattern match
-  where
-  -- WARN: if `prop` does not match the `IdentifierName` grammar, this will generate invalid code; see #2513
-  match (JSAccessor _ prop val) = Just (emit prop, val)
-  match _ = Nothing
-
 indexer :: (Emit gen) => Pattern PrinterState JS (gen, JS)
 indexer = mkPattern' match
   where
@@ -257,8 +250,7 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
   matchValue = buildPrettyPrinter operators (literals <+> fmap parensPos matchValue)
   operators :: (Emit gen) => OperatorTable PrinterState JS gen
   operators =
-    OperatorTable [ [ Wrap accessor $ \prop val -> val <> emit "." <> prop ]
-                  , [ Wrap indexer $ \index val -> val <> emit "[" <> index <> emit "]" ]
+    OperatorTable [ [ Wrap indexer $ \index val -> val <> emit "[" <> index <> emit "]" ]
                   , [ Wrap app $ \args val -> val <> emit "(" <> args <> emit ")" ]
                   , [ unary JSNew "new " ]
                   , [ Wrap lam $ \(name, args, ss) ret -> addMapping' ss <>
