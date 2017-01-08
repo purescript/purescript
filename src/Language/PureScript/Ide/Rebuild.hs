@@ -5,17 +5,19 @@ module Language.PureScript.Ide.Rebuild
   ( rebuildFileSync
   , rebuildFileAsync
   , rebuildFile
+  , specialCompletion
   ) where
 
 import           Protolude
 
+import           Data.Char
 import           "monad-logger" Control.Monad.Logger
 import qualified Data.List                       as List
 import qualified Data.Map.Lazy                   as M
 import           Data.Maybe                      (fromJust)
 import qualified Data.Set                        as S
+import qualified Data.Text                       as T
 import qualified Language.PureScript             as P
-import           Language.PureScript.Errors.JSON
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.State
@@ -44,15 +46,20 @@ rebuildFile
   -> (ReaderT IdeEnvironment (LoggingT IO) () -> m ())
   -- ^ A runner for the second build with open exports
   -> m Success
-rebuildFile path runOpenBuild = do
+rebuildFile path =
+  ideReadFile path >>= rebuildFile' path
 
-  input <- ideReadFile path
+rebuildFile'
+  :: (Ide m, MonadLogger m, MonadError PscIdeError m)
+  => FilePath
+  -> Text
+  -> m Success
+rebuildFile' path input = do
 
   m <- case snd <$> P.parseModuleFromFile identity (path, input) of
-    Left parseError -> throwError
-                       . RebuildError
-                       . toJSONErrors False P.Error
-                       $ P.MultipleErrors [P.toPositionedError parseError]
+    Left parseError ->
+      throwError (RebuildError
+                  (P.MultipleErrors [P.toPositionedError parseError]))
     Right m -> pure m
 
   -- Externs files must be sorted ahead of time, so that they get applied
@@ -64,7 +71,8 @@ rebuildFile path runOpenBuild = do
   -- For rebuilding, we want to 'RebuildAlways', but for inferring foreign
   -- modules using their file paths, we need to specify the path in the 'Map'.
   let filePathMap = M.singleton (P.getModuleName m) (Left P.RebuildAlways)
-  foreigns <- P.inferForeignModules (M.singleton (P.getModuleName m) (Right path))
+  foreigns <-
+    P.inferForeignModules (M.singleton (P.getModuleName m) (Right path))
 
   let makeEnv = MakeActionsEnv outputDirectory filePathMap foreigns False
   -- Rebuild the single module using the cached externs
@@ -74,10 +82,10 @@ rebuildFile path runOpenBuild = do
     . P.rebuildModule (buildMakeActions
                         >>= shushProgress $ makeEnv) externs $ m
   case result of
-    Left errors -> throwError (RebuildError (toJSONErrors False P.Error errors))
+    Left errors -> throwError (RebuildError errors)
     Right _ -> do
       runOpenBuild (rebuildModuleOpen makeEnv externs m)
-      pure (RebuildSuccess (toJSONErrors False P.Warning warnings))
+      pure (RebuildSuccess warnings)
 
 rebuildFileAsync
   :: forall m. (Ide m, MonadLogger m, MonadError IdeError m)
@@ -170,8 +178,7 @@ sortExterns m ex = do
            . M.elems
            . M.delete (P.getModuleName m) $ ex
   case sorted' of
-    Left err ->
-      throwError (RebuildError (toJSONErrors False P.Error err))
+    Left err -> throwError (RebuildError err)
     Right (sorted, graph) -> do
       let deps = fromJust (List.lookup (P.getModuleName m) graph)
       pure $ mapMaybe getExtern (deps `inOrderOf` map P.getModuleName sorted)
@@ -188,3 +195,55 @@ sortExterns m ex = do
 -- | Removes a modules export list.
 openModuleExports :: P.Module -> P.Module
 openModuleExports (P.Module ss cs mn decls _) = P.Module ss cs mn decls Nothing
+
+specialCompletion
+  :: (Ide m, MonadLogger m)
+  => FilePath
+  -> Int
+  -> Int
+  -> m [Text]
+specialCompletion path row col = do
+  input <- liftIO (readUTF8FileT path)
+  let withHole = traceShowId (insertHole input)
+  rebuildResult <- runExceptT (rebuildFile' path withHole)
+  traceShowM rebuildResult
+  case rebuildResult of
+    Left (RebuildError errs)
+      | Just holeError <- extractHole errs -> do
+        traceShowM holeError
+        pure (extractCompletions holeError)
+    _ -> pure []
+
+  where
+    insertHole :: Text -> Text
+    insertHole t =
+      let
+        (before, line:after) = splitAt (row - 1) (T.lines t)
+        (b, a) = T.splitAt (col - 1) line
+        (start, ident) = breakEnd (not . isSpace) b
+        withHole = start <> " ( ?magicUnicornHole " <> ident <> ") " <> T.tail a
+      in
+        T.unlines (before <> [withHole] <> after)
+
+    extractHole :: P.MultipleErrors -> Maybe P.Type
+    extractHole me = asum (map unicornTypeHole (P.runMultipleErrors me))
+
+    extractCompletions :: P.Type -> [Text]
+    extractCompletions =
+      map (P.prettyPrintStringJS . P.runLabel . fst)
+      . fst
+      . P.rowToList
+
+
+
+breakEnd :: (Char -> Bool) -> Text -> (Text, Text)
+breakEnd p t = (T.dropWhileEnd p t, T.takeWhileEnd p t)
+    
+unicornTypeHole :: P.ErrorMessage -> Maybe P.Type
+unicornTypeHole (P.ErrorMessage _
+                 (P.HoleInferredType "magicUnicornHole"
+                  (P.TypeApp (P.TypeApp t' (P.TypeApp r t)) _) _ _))
+  | t' == P.tyFunction && r == P.tyRecord = Just t
+unicornTypeHole _ = Nothing
+
+-- (TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName {runProperName = "Prim"}])) (ProperName {runProperName = "Function"}))) (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName {runProperName = "Prim"}])) (ProperName {runProperName = "Record"}))) (RCons (Label {runLabel = "x"}) (TypeConstructor (Qualified (Just (ModuleName [ProperName {runProperName = "Prim"}])) (ProperName {runProperName = "Int"}))) (RCons (Label {runLabel = "y"}) (TypeConstructor (Qualified (Just (ModuleName [ProperName {runProperName = "Prim"}])) (ProperName {runProperName = "String"}))) REmpty)))) (TUnknown 3))

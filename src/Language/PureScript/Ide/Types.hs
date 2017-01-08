@@ -238,8 +238,8 @@ data Success =
   | PursuitResult [PursuitResponse]
   | ImportList [ModuleImport]
   | ModuleList [ModuleIdent]
-  | RebuildSuccess [P.JSONError]
-  deriving (Show, Eq)
+  | RebuildSuccess P.MultipleErrors
+  deriving (Show)
 
 encodeSuccess :: (ToJSON a) => a -> Value
 encodeSuccess res =
@@ -252,7 +252,8 @@ instance ToJSON Success where
   toJSON (PursuitResult resp) = encodeSuccess resp
   toJSON (ImportList decls) = encodeSuccess decls
   toJSON (ModuleList modules) = encodeSuccess modules
-  toJSON (RebuildSuccess modules) = encodeSuccess modules
+  toJSON (RebuildSuccess modules) =
+    encodeSuccess (P.toJSONErrors False P.Warning modules)
 
 newtype PursuitQuery = PursuitQuery Text
                      deriving (Show, Eq)

@@ -17,24 +17,25 @@ module Language.PureScript.Ide.Error
        ) where
 
 import           Data.Aeson
+import qualified Language.PureScript as P
 import           Language.PureScript.Errors.JSON
 import           Language.PureScript.Ide.Types   (ModuleIdent)
 import           Protolude
-import qualified Text.Parsec.Error               as P
+import qualified Text.Parsec.Error               as Parsec
 
 data IdeError
     = GeneralError Text
     | NotFound Text
     | ModuleNotFound ModuleIdent
     | ModuleFileNotFound ModuleIdent
-    | ParseError P.ParseError Text
-    | RebuildError [JSONError]
-    deriving (Show, Eq)
+    | ParseError Parsec.ParseError Text
+    | RebuildError P.MultipleErrors
+    deriving(Show, Eq)
 
 instance ToJSON IdeError where
   toJSON (RebuildError errs) = object
     [ "resultType" .= ("error" :: Text)
-    , "result" .= errs
+    , "result" .= toJSONErrors False P.Error errs
     ]
   toJSON err = object
     [ "resultType" .= ("error" :: Text)

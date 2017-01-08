@@ -36,6 +36,11 @@ data Command
       , completeMatcher       :: Matcher IdeDeclarationAnn
       , completeCurrentModule :: Maybe P.ModuleName
       }
+    | CompleteSpecial
+      { completeSPath :: FilePath
+      , completeSRow :: Int
+      , completeSCol :: Int
+      }
     | Pursuit
       { pursuitQuery      :: PursuitQuery
       , pursuitSearchType :: PursuitSearchType
@@ -66,6 +71,7 @@ commandName c = case c of
   LoadSync{} -> "LoadSync"
   Type{} -> "Type"
   Complete{} -> "Complete"
+  CompleteSpecial{} -> "CompleteSpecial"
   Pursuit{} -> "Pursuit"
   CaseSplit{} -> "CaseSplit"
   AddClause{} -> "AddClause"
@@ -129,6 +135,12 @@ instance FromJSON Command where
           <$> params .:? "filters" .!= []
           <*> params .:? "matcher" .!= mempty
           <*> (fmap P.moduleNameFromString <$> params .:? "currentModule")
+      "completeS" -> do
+        params <- o .: "params"
+        CompleteSpecial
+          <$> params .: "path"
+          <*> params .: "row"
+          <*> params .: "column"
       "pursuit" -> do
         params <- o .: "params"
         Pursuit

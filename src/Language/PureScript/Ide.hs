@@ -58,6 +58,8 @@ handleCommand c = case c of
     findType search filters currentModule
   Complete filters matcher currentModule ->
     findCompletions filters matcher currentModule
+  CompleteSpecial path row col ->
+    MultilineTextResult <$> specialCompletion path row col
   Pursuit query Package ->
     findPursuitPackages query
   Pursuit query Identifier ->
