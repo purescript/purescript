@@ -148,7 +148,7 @@ prettyPrintMany f xs = do
 
 objectKeyRequiresQuoting :: Text -> Bool
 objectKeyRequiresQuoting s =
-  s `elem` reservedPsNames || isUnquotedKey s
+  s `elem` reservedPsNames || not (isUnquotedKey s)
 
 -- | Place a box before another, vertically when the first box takes up multiple lines.
 before :: Box -> Box -> Box
