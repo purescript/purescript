@@ -16,30 +16,23 @@ module Language.PureScript.Publish
   , checkCleanWorkingTree
   , getVersionFromGitTag
   , getBowerRepositoryInfo
-  , getModulesAndBookmarks
+  , getModules
   , getResolvedDependencies
   ) where
 
-import Prelude ()
-import Prelude.Compat hiding (userError)
+import Protolude hiding (stdin)
 
-import Control.Arrow ((***), first)
+import Control.Arrow ((***))
 import Control.Category ((>>>))
-import Control.Exception (catch, try)
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
-import Control.Monad.Writer.Strict
+import Control.Monad.Writer.Strict (MonadWriter, WriterT, runWriterT, tell)
 
 import Data.Aeson.BetterErrors
 import Data.Char (isSpace)
-import Data.Foldable (traverse_)
-import Data.Function (on)
+import Data.String (String, lines)
 import Data.List (stripPrefix, (\\), nubBy)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.List.Split (splitOn)
-import Data.Maybe
-import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
@@ -47,10 +40,7 @@ import Data.Time.Clock (UTCTime)
 import Data.Version
 import qualified Data.SPDX as SPDX
 
-import Safe (headMay)
-
 import System.Directory (doesFileExist, findExecutable)
-import System.Exit (exitFailure)
 import System.FilePath (pathSeparator)
 import System.Process (readProcess)
 import qualified System.FilePath.Glob as Glob
@@ -61,7 +51,7 @@ import qualified Web.Bower.PackageMeta as Bower
 
 import Language.PureScript.Publish.ErrorsWarnings
 import Language.PureScript.Publish.Utils
-import qualified Language.PureScript as P (version)
+import qualified Language.PureScript as P (version, ModuleName)
 import qualified Language.PureScript.Docs as D
 
 data PublishOptions = PublishOptions
@@ -129,9 +119,6 @@ otherError = throwError . OtherError
 catchLeft :: Applicative f => Either a b -> (a -> f b) -> f b
 catchLeft a f = either f pure a
 
-unlessM :: Monad m => m Bool -> m () -> m ()
-unlessM cond act = cond >>= flip unless act
-
 preparePackage' :: PublishOptions -> PrepareM D.UploadedPackage
 preparePackage' opts = do
   unlessM (liftIO (doesFileExist "bower.json")) (userError BowerJSONNotFound)
@@ -144,7 +131,7 @@ preparePackage' opts = do
   (pkgVersionTag, pkgVersion) <- publishGetVersion opts
   pkgTagTime                  <- Just <$> publishGetTagTime opts pkgVersionTag
   pkgGithub                   <- getBowerRepositoryInfo pkgMeta
-  (pkgBookmarks, pkgModules)  <- getModulesAndBookmarks
+  (pkgModules, pkgModuleMap)  <- getModules
 
   let declaredDeps = map fst (bowerDependencies pkgMeta ++
                               bowerDevDependencies pkgMeta)
@@ -155,18 +142,18 @@ preparePackage' opts = do
 
   return D.Package{..}
 
-getModulesAndBookmarks :: PrepareM ([D.Bookmark], [D.Module])
-getModulesAndBookmarks = do
+getModules :: PrepareM ([D.Module], Map P.ModuleName PackageName)
+getModules = do
   (inputFiles, depsFiles) <- liftIO getInputAndDepsFiles
-  (modules', bookmarks) <- parseAndBookmark inputFiles depsFiles
+  (modules', moduleMap) <- parseFilesInPackages inputFiles depsFiles
 
-  case runExcept (D.convertModulesInPackage modules') of
-    Right modules -> return (bookmarks, modules)
+  case runExcept (D.convertModulesInPackage modules' moduleMap) of
+    Right modules -> return (modules, moduleMap)
     Left err -> userError (CompileError err)
 
   where
-  parseAndBookmark inputFiles depsFiles = do
-    r <- liftIO . runExceptT $ D.parseAndBookmark inputFiles depsFiles
+  parseFilesInPackages inputFiles depsFiles = do
+    r <- liftIO . runExceptT $ D.parseFilesInPackages inputFiles depsFiles
     case r of
       Right r' ->
         return r'
