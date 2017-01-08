@@ -457,11 +457,8 @@ handleEnv TypeClassEnv{..} =
   addConstraint constraint =
     P.quantify . P.moveQuantifiersToFront . P.ConstrainedType [constraint]
 
-splitMap :: (Ord k) => Map k (v1, v2) -> (Map k v1, Map k v2)
-splitMap = foldl go (Map.empty, Map.empty) . Map.toList
-  where
-  go (m1, m2) (k, (v1, v2)) =
-    (Map.insert k v1 m1, Map.insert k v2 m2)
+splitMap :: Map k (v1, v2) -> (Map k v1, Map k v2)
+splitMap = fmap fst &&& fmap snd
 
 -- |
 -- Given a list of exported constructor names, remove any data constructor

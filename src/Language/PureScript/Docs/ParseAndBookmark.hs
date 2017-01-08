@@ -2,14 +2,10 @@ module Language.PureScript.Docs.ParseAndBookmark
   ( parseAndBookmark
   ) where
 
-import Prelude.Compat
-
-import Control.Arrow (first)
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.IO.Class (MonadIO(..))
+import Protolude
+import Prelude (id)
 
 import qualified Data.Map as M
-import Data.Text (Text)
 
 import Language.PureScript.Docs.Convert (collectBookmarks)
 import Language.PureScript.Docs.Types
@@ -83,7 +79,7 @@ parseAs :: (MonadIO m) => (FilePath -> a) -> FilePath -> m (a, Text)
 parseAs g = fmap (first g) . liftIO . parseFile
 
 getDepsModuleNames :: [InPackage (FilePath, P.Module)] -> M.Map P.ModuleName PackageName
-getDepsModuleNames = foldl go M.empty
+getDepsModuleNames = foldl' go M.empty
   where
   go deps p = deps # case p of
     Local _ -> id
