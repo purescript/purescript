@@ -8,13 +8,13 @@ module Language.PureScript.Docs.Convert
   , convertModulesInPackageWithEnv
   ) where
 
-import Prelude (id, String)
 import Protolude hiding (check)
 
 import Control.Arrow ((&&&))
 import Control.Category ((>>>))
 import Control.Monad.Writer.Strict (runWriterT)
 import qualified Data.Map as Map
+import Data.String (String)
 
 import Language.PureScript.Docs.Convert.ReExports (updateReExports)
 import Language.PureScript.Docs.Convert.Single (convertSingleModule)
@@ -106,7 +106,7 @@ convertSorted withPackage modules = do
   (env, convertedModules) <- second (map convertSingleModule) <$> partiallyDesugar modules
 
   modulesWithTypes <- typeCheckIfNecessary modules convertedModules
-  let moduleMap = Map.fromList (map (modName &&& id) modulesWithTypes)
+  let moduleMap = Map.fromList (map (modName &&& identity) modulesWithTypes)
 
   let traversalOrder = map P.getModuleName modules
   pure (Map.elems (updateReExports env traversalOrder withPackage moduleMap), env)
@@ -178,7 +178,7 @@ insertValueTypes env m =
     other
 
   parseIdent =
-    either (err . ("failed to parse Ident: " ++)) id . runParser P.parseIdent
+    either (err . ("failed to parse Ident: " ++)) identity . runParser P.parseIdent
 
   lookupName name =
     let key = P.Qualified (Just (modName m)) name
