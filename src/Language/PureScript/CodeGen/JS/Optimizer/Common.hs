@@ -69,12 +69,6 @@ removeFromBlock :: ([JS] -> [JS]) -> JS -> JS
 removeFromBlock go (JSBlock ss sts) = JSBlock ss (go sts)
 removeFromBlock _  js = js
 
--- TODO: this is the same function as isDict; delete one
-isFn :: (Text, PSString) -> JS -> Bool
-isFn (moduleName, fnName) (JSIndexer _ (JSStringLiteral _ x) (JSVar _ y)) =
-  x == fnName && y == moduleName
-isFn _ _ = False
-
 isDict :: (Text, PSString) -> JS -> Bool
 isDict (moduleName, dictName) (JSIndexer _ (JSStringLiteral _ x) (JSVar _ y)) =
   x == dictName && y == moduleName

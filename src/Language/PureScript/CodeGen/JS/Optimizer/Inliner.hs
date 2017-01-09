@@ -83,15 +83,15 @@ inlineCommonValues = everywhereOnJS convert
   where
   convert :: JS -> JS
   convert (JSApp ss fn [dict])
-    | isDict' [semiringNumber, semiringInt] dict && isFn fnZero fn = JSNumericLiteral ss (Left 0)
-    | isDict' [semiringNumber, semiringInt] dict && isFn fnOne fn = JSNumericLiteral ss (Left 1)
-    | isDict boundedBoolean dict && isFn fnBottom fn = JSBooleanLiteral ss False
-    | isDict boundedBoolean dict && isFn fnTop fn = JSBooleanLiteral ss True
+    | isDict' [semiringNumber, semiringInt] dict && isDict fnZero fn = JSNumericLiteral ss (Left 0)
+    | isDict' [semiringNumber, semiringInt] dict && isDict fnOne fn = JSNumericLiteral ss (Left 1)
+    | isDict boundedBoolean dict && isDict fnBottom fn = JSBooleanLiteral ss False
+    | isDict boundedBoolean dict && isDict fnTop fn = JSBooleanLiteral ss True
   convert (JSApp ss (JSApp _ (JSApp _ fn [dict]) [x]) [y])
-    | isDict semiringInt dict && isFn fnAdd fn = intOp ss Add x y
-    | isDict semiringInt dict && isFn fnMultiply fn = intOp ss Multiply x y
-    | isDict euclideanRingInt dict && isFn fnDivide fn = intOp ss Divide x y
-    | isDict ringInt dict && isFn fnSubtract fn = intOp ss Subtract x y
+    | isDict semiringInt dict && isDict fnAdd fn = intOp ss Add x y
+    | isDict semiringInt dict && isDict fnMultiply fn = intOp ss Multiply x y
+    | isDict euclideanRingInt dict && isDict fnDivide fn = intOp ss Divide x y
+    | isDict ringInt dict && isDict fnSubtract fn = intOp ss Subtract x y
   convert other = other
   fnZero = (C.dataSemiring, C.zero)
   fnOne = (C.dataSemiring, C.one)
@@ -172,25 +172,25 @@ inlineCommonOperators = applyAll $
   binary dict fns op = everywhereOnJS convert
     where
     convert :: JS -> JS
-    convert (JSApp ss (JSApp _ (JSApp _ fn [dict']) [x]) [y]) | isDict dict dict' && isFn fns fn = JSBinary ss op x y
+    convert (JSApp ss (JSApp _ (JSApp _ fn [dict']) [x]) [y]) | isDict dict dict' && isDict fns fn = JSBinary ss op x y
     convert other = other
   binary' :: Text -> PSString -> BinaryOperator -> JS -> JS
   binary' moduleName opString op = everywhereOnJS convert
     where
     convert :: JS -> JS
-    convert (JSApp ss (JSApp _ fn [x]) [y]) | isFn (moduleName, opString) fn = JSBinary ss op x y
+    convert (JSApp ss (JSApp _ fn [x]) [y]) | isDict (moduleName, opString) fn = JSBinary ss op x y
     convert other = other
   unary :: (Text, PSString) -> (Text, PSString) -> UnaryOperator -> JS -> JS
   unary dicts fns op = everywhereOnJS convert
     where
     convert :: JS -> JS
-    convert (JSApp ss (JSApp _ fn [dict']) [x]) | isDict dicts dict' && isFn fns fn = JSUnary ss op x
+    convert (JSApp ss (JSApp _ fn [dict']) [x]) | isDict dicts dict' && isDict fns fn = JSUnary ss op x
     convert other = other
   unary' :: Text -> PSString -> UnaryOperator -> JS -> JS
   unary' moduleName fnName op = everywhereOnJS convert
     where
     convert :: JS -> JS
-    convert (JSApp ss fn [x]) | isFn (moduleName, fnName) fn = JSUnary ss op x
+    convert (JSApp ss fn [x]) | isDict (moduleName, fnName) fn = JSUnary ss op x
     convert other = other
   mkFn :: Int -> JS -> JS
   mkFn 0 = everywhereOnJS convert
@@ -264,9 +264,9 @@ inlineFnComposition = everywhereOnJSTopDownM convert
         return $ JSFunction ss Nothing [arg] (JSBlock ss [JSReturn Nothing $ JSApp Nothing y [JSApp Nothing x [JSVar Nothing arg]]])
   convert other = return other
   isFnCompose :: JS -> JS -> Bool
-  isFnCompose dict' fn = isDict semigroupoidFn dict' && isFn fnCompose fn
+  isFnCompose dict' fn = isDict semigroupoidFn dict' && isDict fnCompose fn
   isFnComposeFlipped :: JS -> JS -> Bool
-  isFnComposeFlipped dict' fn = isDict semigroupoidFn dict' && isFn fnComposeFlipped fn
+  isFnComposeFlipped dict' fn = isDict semigroupoidFn dict' && isDict fnComposeFlipped fn
   fnCompose :: forall a b. (IsString a, IsString b) => (a, b)
   fnCompose = (C.controlSemigroupoid, C.compose)
   fnComposeFlipped :: forall a b. (IsString a, IsString b) => (a, b)
