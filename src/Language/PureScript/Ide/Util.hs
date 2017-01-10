@@ -47,7 +47,7 @@ identifierFromIdeDeclaration :: IdeDeclaration -> Text
 identifierFromIdeDeclaration d = case d of
   IdeDeclValue v -> v ^. ideValueIdent . identT
   IdeDeclType t -> t ^. ideTypeName . properNameT
-  IdeDeclTypeSynonym s -> s ^. ideSynonymName . properNameT
+  IdeDeclSynonym s -> s ^. ideSynonymName . properNameT
   IdeDeclDataConstructor dtor -> dtor ^. ideDtorName . properNameT
   IdeDeclTypeClass tc -> tc ^. ideTCName . properNameT
   IdeDeclValueOperator op -> op ^. ideValueOpName & P.runOpName

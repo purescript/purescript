@@ -89,7 +89,7 @@ convertExport _ = Nothing
 convertDecl :: P.ExternsDeclaration -> Maybe IdeDeclaration
 convertDecl P.EDType{..} = Just $ IdeDeclType $
   IdeType edTypeName edTypeKind
-convertDecl P.EDTypeSynonym{..} = Just $ IdeDeclTypeSynonym
+convertDecl P.EDTypeSynonym{..} = Just $ IdeDeclSynonym
   (IdeSynonym edTypeSynonymName edTypeSynonymType)
 convertDecl P.EDDataConstructor{..} = Just $ IdeDeclDataConstructor $
   IdeDataConstructor edDataCtorName edDataCtorTypeCtor edDataCtorType
@@ -131,8 +131,8 @@ annotateModule (defs, types) decls =
         annotateFunction (v ^. ideValueIdent) (IdeDeclValue v)
       IdeDeclType t ->
         annotateType (t ^. ideTypeName . properNameT) (IdeDeclType t)
-      IdeDeclTypeSynonym s ->
-        annotateType (s ^. ideSynonymName . properNameT) (IdeDeclTypeSynonym s)
+      IdeDeclSynonym s ->
+        annotateType (s ^. ideSynonymName . properNameT) (IdeDeclSynonym s)
       IdeDeclDataConstructor dtor ->
         annotateValue (dtor ^. ideDtorName . properNameT) (IdeDeclDataConstructor dtor)
       IdeDeclTypeClass tc ->

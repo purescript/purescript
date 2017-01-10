@@ -32,7 +32,7 @@ type ModuleMap a = Map P.ModuleName a
 data IdeDeclaration
   = IdeDeclValue IdeValue
   | IdeDeclType IdeType
-  | IdeDeclTypeSynonym IdeSynonym
+  | IdeDeclSynonym IdeSynonym
   | IdeDeclDataConstructor IdeDataConstructor
   | IdeDeclTypeClass IdeTypeClass
   | IdeDeclValueOperator IdeValueOperator
