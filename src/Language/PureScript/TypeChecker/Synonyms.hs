@@ -27,10 +27,11 @@ import           Language.PureScript.Types
 type SynonymMap = M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe Kind)], Type)
 
 replaceAllTypeSynonyms'
-  :: SynonymMap
+  :: Bool
+  -> SynonymMap
   -> Type
   -> Either MultipleErrors Type
-replaceAllTypeSynonyms' syns = traverseWithoutLooping try
+replaceAllTypeSynonyms' shouldExpand syns = traverseWithoutLooping try
   where
   try :: Type -> Either MultipleErrors Type
   try t = fromMaybe t <$> go 0 [] t
@@ -40,7 +41,9 @@ replaceAllTypeSynonyms' syns = traverseWithoutLooping try
     | Just (synArgs, body) <- M.lookup ctor syns
     , c == length synArgs
     = let repl = replaceAllTypeVars (zip (map fst synArgs) args) body
-      in Just . ExpandedSynonym (foldl TypeApp (TypeConstructor ctor) args) <$> try repl
+          expand | shouldExpand = ExpandedSynonym (foldl TypeApp (TypeConstructor ctor) args)
+                 | otherwise    = id
+      in Just . expand <$> try repl
     | Just (synArgs, _) <- M.lookup ctor syns
     , length synArgs > c
     = throwError . errorMessage $ PartiallyAppliedSynonym ctor
@@ -71,12 +74,13 @@ traverseWithoutLooping f = go <=< f
 replaceAllTypeSynonyms :: (e ~ MultipleErrors, MonadState CheckState m, MonadError e m) => Type -> m Type
 replaceAllTypeSynonyms d = do
   env <- getEnv
-  either throwError return $ replaceAllTypeSynonyms' (typeSynonyms env) d
+  either throwError return $ replaceAllTypeSynonyms' True (typeSynonyms env) d
 
 -- | Replace fully applied type synonyms by explicitly providing a 'SynonymMap'.
 replaceAllTypeSynonymsM
   :: MonadError MultipleErrors m
-  => SynonymMap
+  => Bool
+  -> SynonymMap
   -> Type
   -> m Type
-replaceAllTypeSynonymsM syns = either throwError pure . replaceAllTypeSynonyms' syns
+replaceAllTypeSynonymsM shouldExpand syns = either throwError pure . replaceAllTypeSynonyms' shouldExpand syns

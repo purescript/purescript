@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 
 -- |
 -- Functions and instances relating to unification
@@ -81,83 +82,88 @@ unknownsInType t = everythingOnTypes (.) go t []
 -- | Unify two types, updating the current substitution
 unifyTypes :: (MonadError MultipleErrors m, MonadState CheckState m) => Type -> Type -> m ()
 unifyTypes t1 t2 = do
-  sub <- gets checkSubstitution
-  withErrorMessageHint (ErrorUnifyingTypes t1 t2) $ unifyTypes' (substituteType sub t1) (substituteType sub t2)
+    sub <- gets checkSubstitution
+    withErrorMessageHint (ErrorUnifyingTypes t1 t2) $ go (substituteType sub t1) (substituteType sub t2)
   where
-  unifyTypes' (ExpandedSynonym before ty1) ty2 =
-    withErrorMessageHint (ErrorUnifyingTypes before ty2) $ unifyTypes' ty1 ty2
-  unifyTypes' ty1 (ExpandedSynonym before ty2) =
-    withErrorMessageHint (ErrorUnifyingTypes ty1 before) $ unifyTypes' ty1 ty2
-  unifyTypes' (TUnknown u1) (TUnknown u2) | u1 == u2 = return ()
-  unifyTypes' (TUnknown u) t = solveType u t
-  unifyTypes' t (TUnknown u) = solveType u t
-  unifyTypes' (ForAll ident1 ty1 sc1) (ForAll ident2 ty2 sc2) =
-    case (sc1, sc2) of
-      (Just sc1', Just sc2') -> do
-        sko <- newSkolemConstant
-        let sk1 = skolemize ident1 sko sc1' Nothing ty1
-        let sk2 = skolemize ident2 sko sc2' Nothing ty2
-        sk1 `unifyTypes` sk2
-      _ -> internalError "unifyTypes: unspecified skolem scope"
-  unifyTypes' (ForAll ident ty1 (Just sc)) ty2 = do
-    sko <- newSkolemConstant
-    let sk = skolemize ident sko sc Nothing ty1
-    sk `unifyTypes` ty2
-  unifyTypes' ForAll{} _ = internalError "unifyTypes: unspecified skolem scope"
-  unifyTypes' ty f@ForAll{} = f `unifyTypes` ty
-  unifyTypes' (TypeVar v1) (TypeVar v2) | v1 == v2 = return ()
-  unifyTypes' ty1@(TypeConstructor c1) ty2@(TypeConstructor c2) =
-    guardWith (errorMessage (TypesDoNotUnify ty1 ty2)) (c1 == c2)
-  unifyTypes' (TypeLevelString s1) (TypeLevelString s2) | s1 == s2 = return ()
-  unifyTypes' (TypeApp t3 t4) (TypeApp t5 t6) = do
-    t3 `unifyTypes` t5
-    t4 `unifyTypes` t6
-  unifyTypes' (Skolem _ s1 _ _) (Skolem _ s2 _ _) | s1 == s2 = return ()
-  unifyTypes' (KindedType ty1 _) ty2 = ty1 `unifyTypes` ty2
-  unifyTypes' ty1 (KindedType ty2 _) = ty1 `unifyTypes` ty2
-  unifyTypes' r1@RCons{} r2 = unifyRows r1 r2
-  unifyTypes' r1 r2@RCons{} = unifyRows r1 r2
-  unifyTypes' r1@REmpty r2 = unifyRows r1 r2
-  unifyTypes' r1 r2@REmpty = unifyRows r1 r2
-  unifyTypes' ty1@(ConstrainedType _ _) ty2 =
-    throwError . errorMessage $ ConstrainedTypeUnified ty1 ty2
-  unifyTypes' t3 t4@(ConstrainedType _ _) = unifyTypes' t4 t3
-  unifyTypes' t3 t4 =
-    throwError . errorMessage $ TypesDoNotUnify t3 t4
+    go (ExpandedSynonym before ty1) ty2 =
+      withErrorMessageHint (ErrorUnifyingTypes before ty2) $ go ty1 ty2
+    go ty1 (ExpandedSynonym before ty2) =
+      withErrorMessageHint (ErrorUnifyingTypes ty1 before) $ go ty1 ty2
+    go (TUnknown u1) (TUnknown u2) | u1 == u2 = return ()
+    go (TUnknown u) t = solveType u t
+    go t (TUnknown u) = solveType u t
+    go (ForAll ident1 ty1 sc1) (ForAll ident2 ty2 sc2) =
+      case (sc1, sc2) of
+        (Just sc1', Just sc2') -> do
+          sko <- newSkolemConstant
+          let sk1 = skolemize ident1 sko sc1' Nothing ty1
+          let sk2 = skolemize ident2 sko sc2' Nothing ty2
+          sk1 `unifyTypes` sk2
+        _ -> internalError "unifyTypes: unspecified skolem scope"
+    go (ForAll ident ty1 (Just sc)) ty2 = do
+      sko <- newSkolemConstant
+      let sk = skolemize ident sko sc Nothing ty1
+      sk `unifyTypes` ty2
+    go ForAll{} _ = internalError "unifyTypes: unspecified skolem scope"
+    go ty f@ForAll{} = f `unifyTypes` ty
+    go (TypeVar v1) (TypeVar v2) | v1 == v2 = return ()
+    go ty1@(TypeConstructor c1) ty2@(TypeConstructor c2) =
+      guardWith (errorMessage (TypesDoNotUnify ty1 ty2)) (c1 == c2)
+    go (TypeLevelString s1) (TypeLevelString s2) | s1 == s2 = return ()
+    go (TypeApp t3 t4) (TypeApp t5 t6) = do
+      t3 `unifyTypes` t5
+      t4 `unifyTypes` t6
+    go (Skolem _ s1 _ _) (Skolem _ s2 _ _) | s1 == s2 = return ()
+    go (KindedType ty1 _) ty2 = ty1 `unifyTypes` ty2
+    go ty1 (KindedType ty2 _) = ty1 `unifyTypes` ty2
+    go r1@RCons{} r2 = unifyRows r1 r2
+    go r1 r2@RCons{} = unifyRows r1 r2
+    go r1@REmpty r2 = unifyRows r1 r2
+    go r1 r2@REmpty = unifyRows r1 r2
+    go ty1@(ConstrainedType _ _) ty2 =
+      throwError . errorMessage $ ConstrainedTypeUnified ty1 ty2
+    go t3 t4@(ConstrainedType _ _) = go t4 t3
+    go t3 t4 =
+      throwError . errorMessage $ TypesDoNotUnify t3 t4
 
--- |
--- Unify two rows, updating the current substitution
+-- | Unify two rows, updating the current substitution
 --
 -- Common labels are first identified, and unified. Remaining labels and types are unified with a
 -- trailing row unification variable, if appropriate, otherwise leftover labels result in a unification
 -- error.
---
 unifyRows :: forall m. (MonadError MultipleErrors m, MonadState CheckState m) => Type -> Type -> m ()
 unifyRows r1 r2 =
-  let
-    (s1, r1') = rowToList r1
-    (s2, r2') = rowToList r2
-    int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
-    sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
-    sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
-  in do
-    forM_ int (uncurry unifyTypes)
-    unifyRows' sd1 r1' sd2 r2'
+    let
+      (s1, r1') = rowToList (unexpandSynonyms r1)
+      (s2, r2') = rowToList (unexpandSynonyms r2)
+      int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
+      sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
+      sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
+    in do
+      forM_ int (uncurry unifyTypes)
+      go sd1 r1' sd2 r2'
   where
-  unifyRows' :: [(Label, Type)] -> Type -> [(Label, Type)] -> Type -> m ()
-  unifyRows' [] (TUnknown u) sd r = solveType u (rowFromList (sd, r))
-  unifyRows' sd r [] (TUnknown u) = solveType u (rowFromList (sd, r))
-  unifyRows' sd1 (TUnknown u1) sd2 (TUnknown u2) = do
-    forM_ sd1 $ \(_, t) -> occursCheck u2 t
-    forM_ sd2 $ \(_, t) -> occursCheck u1 t
-    rest <- freshType
-    solveType u1 (rowFromList (sd2, rest))
-    solveType u2 (rowFromList (sd1, rest))
-  unifyRows' [] REmpty [] REmpty = return ()
-  unifyRows' [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
-  unifyRows' [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) | s1 == s2 = return ()
-  unifyRows' _ _ _ _ =
-    throwError . errorMessage $ TypesDoNotUnify r1 r2
+    -- Synonyms get fully expanded so that we can identify common labels.
+    -- This can lead to worse error messages in some cases involving row synonyms.
+    unexpandSynonyms :: Type -> Type
+    unexpandSynonyms = everywhereOnTypes $ \case
+      ExpandedSynonym _ ty -> ty
+      other -> other
+
+    go :: [(Label, Type)] -> Type -> [(Label, Type)] -> Type -> m ()
+    go [] (TUnknown u) sd r = solveType u (rowFromList (sd, r))
+    go sd r [] (TUnknown u) = solveType u (rowFromList (sd, r))
+    go sd1 (TUnknown u1) sd2 (TUnknown u2) = do
+      forM_ sd1 $ \(_, t) -> occursCheck u2 t
+      forM_ sd2 $ \(_, t) -> occursCheck u1 t
+      rest <- freshType
+      solveType u1 (rowFromList (sd2, rest))
+      solveType u2 (rowFromList (sd1, rest))
+    go [] REmpty [] REmpty = return ()
+    go [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
+    go [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) | s1 == s2 = return ()
+    go _ _ _ _ =
+      throwError . errorMessage $ TypesDoNotUnify r1 r2
 
 -- |
 -- Replace a single type variable with a new unification variable

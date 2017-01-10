@@ -369,14 +369,16 @@ matches deps TypeClassDictionaryInScope{..} tys = do
     -- and return a substitution from type variables to types which makes the type heads unify.
     --
     typeHeadsAreEqual :: Type -> Type -> (Bool, Matching [Type])
-    typeHeadsAreEqual (KindedType t1 _)    t2                              = typeHeadsAreEqual t1 t2
-    typeHeadsAreEqual t1                   (KindedType t2 _)               = typeHeadsAreEqual t1 t2
-    typeHeadsAreEqual (TUnknown u1)        (TUnknown u2)        | u1 == u2 = (True, M.empty)
-    typeHeadsAreEqual (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    | s1 == s2 = (True, M.empty)
-    typeHeadsAreEqual t                    (TypeVar v)                     = (True, M.singleton v [t])
-    typeHeadsAreEqual (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = (True, M.empty)
-    typeHeadsAreEqual (TypeLevelString s1) (TypeLevelString s2) | s1 == s2 = (True, M.empty)
-    typeHeadsAreEqual (TypeApp h1 t1)      (TypeApp h2 t2)                 =
+    typeHeadsAreEqual (ExpandedSynonym _ ty1) ty2                             = typeHeadsAreEqual ty1 ty2
+    typeHeadsAreEqual ty1                     (ExpandedSynonym _ ty2)         = typeHeadsAreEqual ty1 ty2
+    typeHeadsAreEqual (KindedType t1 _)       t2                              = typeHeadsAreEqual t1 t2
+    typeHeadsAreEqual t1                      (KindedType t2 _)               = typeHeadsAreEqual t1 t2
+    typeHeadsAreEqual (TUnknown u1)           (TUnknown u2)        | u1 == u2 = (True, M.empty)
+    typeHeadsAreEqual (Skolem _ s1 _ _)       (Skolem _ s2 _ _)    | s1 == s2 = (True, M.empty)
+    typeHeadsAreEqual t                       (TypeVar v)                     = (True, M.singleton v [t])
+    typeHeadsAreEqual (TypeConstructor c1)    (TypeConstructor c2) | c1 == c2 = (True, M.empty)
+    typeHeadsAreEqual (TypeLevelString s1)    (TypeLevelString s2) | s1 == s2 = (True, M.empty)
+    typeHeadsAreEqual (TypeApp h1 t1)         (TypeApp h2 t2)                 =
       both (typeHeadsAreEqual h1 h2) (typeHeadsAreEqual t1 t2)
     typeHeadsAreEqual REmpty REmpty = (True, M.empty)
     typeHeadsAreEqual r1@RCons{} r2@RCons{} =

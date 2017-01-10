@@ -139,7 +139,7 @@ deriveNewtypeInstance syns className ds tys tyConNm dargs = do
       -- type argument
       | Just wrapped' <- stripRight (takeReverse (length tyArgNames - length dargs) tyArgNames) wrapped =
           do let subst = zipWith (\(name, _) t -> (name, t)) tyArgNames dargs
-             wrapped'' <- replaceAllTypeSynonymsM syns wrapped'
+             wrapped'' <- replaceAllTypeSynonymsM False syns wrapped'
              return (DeferredDictionary className (init tys ++ [replaceAllTypeVars subst wrapped'']))
     go (PositionedDeclaration _ _ d) = go d
     go _ = throwError . errorMessage $ InvalidNewtypeInstance className tys
@@ -209,7 +209,7 @@ deriveGeneric mn syns ds tyConNm dargs = do
       mkCtorClause :: (ProperName 'ConstructorName, [Type]) -> m CaseAlternative
       mkCtorClause (ctorName, tys) = do
         idents <- replicateM (length tys) freshIdent'
-        tys' <- mapM (replaceAllTypeSynonymsM syns) tys
+        tys' <- mapM (replaceAllTypeSynonymsM False syns) tys
         let caseResult =
               App (prodConstructor (Literal . StringLiteral . mkString . showQualified runProperName $ Qualified (Just mn) ctorName))
                 . Literal . ArrayLiteral
@@ -406,7 +406,7 @@ deriveGenericRep mn syns ds tyConNm tyConArgs repTy = do
       :: (ProperName 'ConstructorName, [Type])
       -> m (Type, CaseAlternative, CaseAlternative)
     makeInst (ctorName, args) = do
-        args' <- mapM (replaceAllTypeSynonymsM syns) args
+        args' <- mapM (replaceAllTypeSynonymsM False syns) args
         (ctorTy, matchProduct, ctorArgs, matchCtor, mkProduct) <- makeProduct args'
         return ( TypeApp (TypeApp (TypeConstructor constructor)
                                   (TypeLevelString $ mkString (runProperName ctorName)))
@@ -565,7 +565,7 @@ deriveEq mn syns ds tyConNm = do
     mkCtorClause (ctorName, tys) = do
       identsL <- replicateM (length tys) (freshIdent "l")
       identsR <- replicateM (length tys) (freshIdent "r")
-      tys' <- mapM (replaceAllTypeSynonymsM syns) tys
+      tys' <- mapM (replaceAllTypeSynonymsM False syns) tys
       let tests = zipWith3 toEqTest (map (Var . Qualified Nothing) identsL) (map (Var . Qualified Nothing) identsR) tys'
       return $ CaseAlternative [caseBinder identsL, caseBinder identsR] (Right (conjAll tests))
       where
@@ -630,7 +630,7 @@ deriveOrd mn syns ds tyConNm = do
     mkCtorClauses ((ctorName, tys), isLast) = do
       identsL <- replicateM (length tys) (freshIdent "l")
       identsR <- replicateM (length tys) (freshIdent "r")
-      tys' <- mapM (replaceAllTypeSynonymsM syns) tys
+      tys' <- mapM (replaceAllTypeSynonymsM False syns) tys
       let tests = zipWith3 toOrdering (map (Var . Qualified Nothing) identsL) (map (Var . Qualified Nothing) identsR) tys'
           extras | not isLast = [ CaseAlternative [ ConstructorBinder (Qualified (Just mn) ctorName) (replicate (length tys) NullBinder)
                                                   , NullBinder
@@ -691,7 +691,7 @@ deriveNewtype mn syns ds tyConNm tyConArgs unwrappedTy = do
       wrappedIdent <- freshIdent "n"
       unwrappedIdent <- freshIdent "a"
       let (ctorName, [ty]) = head dctors
-      ty' <- replaceAllTypeSynonymsM syns ty
+      ty' <- replaceAllTypeSynonymsM False syns ty
       let inst =
             [ ValueDeclaration (Ident "wrap") Public [] $ Right $
                 Constructor (Qualified (Just mn) ctorName)
@@ -783,7 +783,7 @@ deriveFunctor mn syns ds tyConNm = do
     mkCtorClause :: Text -> Ident -> (ProperName 'ConstructorName, [Type]) -> m CaseAlternative
     mkCtorClause iTyName f (ctorName, ctorTys) = do
       idents <- replicateM (length ctorTys) (freshIdent "v")
-      ctorTys' <- mapM (replaceAllTypeSynonymsM syns) ctorTys
+      ctorTys' <- mapM (replaceAllTypeSynonymsM False syns) ctorTys
       args <- zipWithM transformArg idents ctorTys'
       let ctor = Constructor (Qualified (Just mn) ctorName)
           rebuilt = foldl App ctor args
