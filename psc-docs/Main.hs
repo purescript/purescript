@@ -60,8 +60,8 @@ docgen (PSCDocsOptions fmt inputGlob output) = do
     Etags -> dumpTags input dumpEtags
     Ctags -> dumpTags input dumpCtags
     Markdown -> do
-      ms <- runExceptT (D.parseAndBookmark input []
-                           >>= (fst >>> D.convertModulesInPackage))
+      ms <- runExceptT (D.parseFilesInPackages input []
+                           >>= uncurry D.convertModulesInPackage)
                >>= successOrExit
 
       case output of
