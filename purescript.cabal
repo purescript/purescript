@@ -543,6 +543,7 @@ test-suite tests
                    hspec-discover -any,
                    HUnit -any,
                    lens -any,
+                   monad-logger -any,
                    mtl -any,
                    optparse-applicative -any,
                    parsec -any,
@@ -567,6 +568,7 @@ test-suite tests
                    TestPsci
                    TestPscIde
                    PscIdeSpec
+                   Language.PureScript.Ide.Test
                    Language.PureScript.Ide.FilterSpec
                    Language.PureScript.Ide.ImportsSpec
                    Language.PureScript.Ide.Imports.IntegrationSpec
@@ -576,6 +578,7 @@ test-suite tests
                    Language.PureScript.Ide.ReexportsSpec
                    Language.PureScript.Ide.SourceFile.IntegrationSpec
                    Language.PureScript.Ide.SourceFileSpec
+                   Language.PureScript.Ide.SourceFile1Spec
                    Language.PureScript.Ide.StateSpec
     buildable: True
     hs-source-dirs: tests
