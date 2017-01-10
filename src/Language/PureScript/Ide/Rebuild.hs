@@ -10,15 +10,12 @@ module Language.PureScript.Ide.Rebuild
 
 import           Protolude
 
-import           Data.Char
 import           "monad-logger" Control.Monad.Logger
 import qualified Data.List                       as List
 import qualified Data.Map.Lazy                   as M
 import           Data.Maybe                      (fromJust)
 import qualified Data.Set                        as S
-import qualified Data.Text                       as T
 import qualified Language.PureScript             as P
-import           Language.PureScript.Ide.Completion
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.State
@@ -196,65 +193,3 @@ sortExterns m ex = do
 -- | Removes a modules export list.
 openModuleExports :: P.Module -> P.Module
 openModuleExports (P.Module ss cs mn decls _) = P.Module ss cs mn decls Nothing
-
-specialCompletion
-  :: (Ide m, MonadLogger m)
-  => FilePath
-  -> Int
-  -> Int
-  -> m [Completion]
-specialCompletion path row col = do
-  input <- liftIO (readUTF8FileT path)
-  let withHole = insertHole input
-  $(logDebug) withHole
-  rebuildResult <- runExceptT (rebuildFile' path withHole)
-  traceShowM rebuildResult
-  case rebuildResult of
-    Left (RebuildError errs)
-      | Just holeError <- extractHole errs
-        -> do
-          traceShowM holeError
-          pure (extractCompletions holeError)
-    _ -> pure []
-  where
-    insertHole :: Text -> Text
-    insertHole t =
-      let
-        (before, line:after) = splitAt (row - 1) (T.lines t)
-        (b, a) = T.splitAt (col - 1) line
-        (start, ident) = breakEnd (not . isSpace) b
-        withHole = start <> "(?magicUnicornHole " <> ident <> ")" <> T.tail a
-      in
-        T.unlines (before <> [withHole] <> after)
-
-    extractHole :: P.MultipleErrors -> Maybe P.Type
-    extractHole me = asum (map unicornTypeHole (P.runMultipleErrors me))
-
-    extractCompletions :: P.Type -> [Completion]
-    extractCompletions =
-      map mkCompletion
-      . map (first (P.prettyPrintStringJS . P.runLabel))
-      . fst
-      . P.rowToList
-      where
-        mkCompletion :: (Text, P.Type) -> Completion
-        mkCompletion (i, t) = Completion
-          { complModule = prettyTypeT t -- TODO: Just for demo
-          , complIdentifier = T.filter (/= '"') i
-          , complType = prettyTypeT t
-          , complExpandedType = prettyTypeT t
-          , complLocation = Nothing
-          , complDocumentation = Nothing
-          }
-
-breakEnd :: (Char -> Bool) -> Text -> (Text, Text)
-breakEnd p t = (T.dropWhileEnd p t, T.takeWhileEnd p t)
-
-unicornTypeHole :: P.ErrorMessage -> Maybe P.Type
-unicornTypeHole (P.ErrorMessage _
-                 (P.HoleInferredType "magicUnicornHole"
-                  (P.TypeApp (P.TypeApp t' (P.TypeApp r t)) _) _ _))
-  | t' == P.tyFunction && r == P.tyRecord = Just t
-unicornTypeHole _ = Nothing
-
--- (TypeApp (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName {runProperName = "Prim"}])) (ProperName {runProperName = "Function"}))) (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName {runProperName = "Prim"}])) (ProperName {runProperName = "Record"}))) (RCons (Label {runLabel = "x"}) (TypeConstructor (Qualified (Just (ModuleName [ProperName {runProperName = "Prim"}])) (ProperName {runProperName = "Int"}))) (RCons (Label {runLabel = "y"}) (TypeConstructor (Qualified (Just (ModuleName [ProperName {runProperName = "Prim"}])) (ProperName {runProperName = "String"}))) REmpty)))) (TUnknown 3))

@@ -59,7 +59,7 @@ handleCommand c = case c of
   Complete filters matcher currentModule ->
     findCompletions filters matcher currentModule
   CompleteSpecial path row col ->
-    CompletionResult <$> specialCompletion path row col
+    CompletionResult <$> completeInFile path row col
   Pursuit query Package ->
     findPursuitPackages query
   Pursuit query Identifier ->
