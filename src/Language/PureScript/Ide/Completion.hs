@@ -61,7 +61,13 @@ completeInFile' path input row col = do
         (before, line:after) = splitAt (row - 1) (T.lines t)
         (b, a) = T.splitAt (col - 1) line
         (start, ident) = breakEnd (not . isSpace) b
-        withHole = start <> "(?magicUnicornHole " <> ident <> ")" <> T.tail a
+        withHole = case ident of
+          -- in this special case we are looking at syntax sugar for a record
+          -- accessor function
+          "_" ->
+            start <> "?magicUnicornHole" <> T.tail a
+          i ->
+            start <> "(?magicUnicornHole " <> i <> ")" <> T.tail a
       in
         T.unlines (before <> [withHole] <> after)
 
