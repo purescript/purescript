@@ -1,52 +1,39 @@
--- |
--- Constants and utility functions to be used when parsing
---
+-- | Useful common functions for building parsers
 module Language.PureScript.Parser.Common where
 
-import Prelude.Compat
+import           Prelude.Compat
 
-import Control.Applicative ((<|>))
-import Control.Monad (guard)
-import Data.Monoid ((<>))
-import Data.Text (Text)
+import           Control.Applicative ((<|>))
+import           Control.Monad (guard)
+import           Data.Maybe (fromMaybe)
+import           Data.Monoid ((<>))
+import           Data.Text (Text)
 import qualified Data.Text as T
-
-import Language.PureScript.AST.SourcePos
-import Language.PureScript.Comments
-import Language.PureScript.Names
-import Language.PureScript.Parser.Lexer
-import Language.PureScript.Parser.State
-import Language.PureScript.PSString (PSString, mkString)
-
+import           Language.PureScript.AST.SourcePos
+import           Language.PureScript.Comments
+import           Language.PureScript.Names
+import           Language.PureScript.Parser.Lexer
+import           Language.PureScript.Parser.State
+import           Language.PureScript.PSString (PSString, mkString)
 import qualified Text.Parsec as P
 
--- |
--- Parse a general proper name.
---
+-- | Parse a general proper name.
 properName :: TokenParser (ProperName a)
 properName = ProperName <$> uname
 
--- |
--- Parse a proper name for a type.
---
+-- | Parse a proper name for a type.
 typeName :: TokenParser (ProperName 'TypeName)
 typeName = ProperName <$> tyname
 
--- |
--- Parse a proper name for a kind.
---
+-- | Parse a proper name for a kind.
 kindName :: TokenParser (ProperName 'KindName)
 kindName = ProperName <$> kiname
 
--- |
--- Parse a proper name for a data constructor.
---
+-- | Parse a proper name for a data constructor.
 dataConstructorName :: TokenParser (ProperName 'ConstructorName)
 dataConstructorName = ProperName <$> dconsname
 
--- |
--- Parse a module name
---
+-- | Parse a module name
 moduleName :: TokenParser ModuleName
 moduleName = part []
   where
@@ -55,9 +42,7 @@ moduleName = part []
               <|> (ModuleName . snoc path . ProperName <$> mname)
   snoc path name = path ++ [name]
 
--- |
--- Parse a qualified name, i.e. M.name or just name
---
+-- | Parse a qualified name, i.e. M.name or just name
 parseQualified :: TokenParser a -> TokenParser (Qualified a)
 parseQualified parser = part []
   where
@@ -67,42 +52,30 @@ parseQualified parser = part []
   updatePath path name = path ++ [name]
   qual path = if null path then Nothing else Just $ ModuleName path
 
--- |
--- Parse an identifier.
---
+-- | Parse an identifier.
 parseIdent :: TokenParser Ident
 parseIdent = Ident <$> identifier
 
--- |
--- Parse a label, which may look like an identifier or a string
---
+-- | Parse a label, which may look like an identifier or a string
 parseLabel :: TokenParser PSString
 parseLabel = (mkString <$> lname) <|> stringLiteral
 
--- |
--- Parse an operator.
---
+-- | Parse an operator.
 parseOperator :: TokenParser (OpName a)
 parseOperator = OpName <$> symbol
 
--- |
--- Run the first parser, then match the second if possible, applying the specified function on a successful match
---
+-- | Run the first parser, then match the second if possible, applying the specified function on a successful match
 augment :: P.Stream s m t => P.ParsecT s u m a -> P.ParsecT s u m b -> (a -> b -> a) -> P.ParsecT s u m a
 augment p q f = flip (maybe id $ flip f) <$> p <*> P.optionMaybe q
 
--- |
--- Run the first parser, then match the second zero or more times, applying the specified function for each match
---
+-- | Run the first parser, then match the second zero or more times, applying the specified function for each match
 fold :: P.ParsecT s u m a -> P.ParsecT s u m b -> (a -> b -> a) -> P.ParsecT s u m a
 fold first' more combine = do
   a <- first'
   bs <- P.many more
   return $ foldl combine a bs
 
--- |
--- Build a parser from a smaller parser and a list of parsers for postfix operators
---
+-- | Build a parser from a smaller parser and a list of parsers for postfix operators
 buildPostfixParser :: P.Stream s m t => [a -> P.ParsecT s u m a] -> P.ParsecT s u m a -> P.ParsecT s u m a
 buildPostfixParser fs first' = do
   a <- first'
@@ -114,9 +87,7 @@ buildPostfixParser fs first' = do
       Nothing -> return a
       Just a' -> go a'
 
--- |
--- Mark the current indentation level
---
+-- | Mark the current indentation level
 mark :: P.Parsec s ParseState a -> P.Parsec s ParseState a
 mark p = do
   current <- indentationLevel <$> P.getState
@@ -126,9 +97,7 @@ mark p = do
   P.modifyState $ \st -> st { indentationLevel = current }
   return a
 
--- |
--- Check that the current identation level matches a predicate
---
+-- | Check that the current identation level matches a predicate
 checkIndentation
   :: (P.Column -> Text)
   -> (P.Column -> P.Column -> Bool)
@@ -138,32 +107,39 @@ checkIndentation mkMsg rel = do
   current <- indentationLevel <$> P.getState
   guard (col `rel` current) P.<?> T.unpack (mkMsg current)
 
--- |
--- Check that the current indentation level is past the current mark
---
+-- | Check that the current indentation level is past the current mark
 indented :: P.Parsec s ParseState ()
 indented = checkIndentation (("indentation past column " <>) . (T.pack . show)) (>)
 
--- |
--- Check that the current indentation level is at the same indentation as the current mark
---
+-- | Check that the current indentation level is at the same indentation as the current mark
 same :: P.Parsec s ParseState ()
 same = checkIndentation (("indentation at column " <>) . (T.pack . show)) (==)
 
--- |
--- Read the comments from the the next token, without consuming it
---
+-- | Read the comments from the the next token, without consuming it
 readComments :: P.Parsec [PositionedToken] u [Comment]
 readComments = P.lookAhead $ ptComments <$> P.anyToken
 
--- |
--- Run a parser
---
+-- | Run a parser
 runTokenParser :: FilePath -> TokenParser a -> [PositionedToken] -> Either P.ParseError a
 runTokenParser filePath p = P.runParser p (ParseState 0) filePath
 
--- |
--- Convert from Parsec sourcepos
---
+-- | Convert from Parsec sourcepos
 toSourcePos :: P.SourcePos -> SourcePos
 toSourcePos pos = SourcePos (P.sourceLine pos) (P.sourceColumn pos)
+
+-- | Read source position information and comments
+withSourceSpan
+  :: (SourceSpan -> [Comment] -> a -> b)
+  -> P.Parsec [PositionedToken] u a
+  -> P.Parsec [PositionedToken] u b
+withSourceSpan f p = do
+  start <- P.getPosition
+  comments <- readComments
+  x <- p
+  end <- P.getPosition
+  input <- P.getInput
+  let end' = case input of
+        pt:_ -> ptPrevEndPos pt
+        _ -> Nothing
+  let sp = SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos $ fromMaybe end end')
+  return $ f sp comments x
