@@ -1,6 +1,5 @@
 module Language.PureScript.Docs.Convert.Single
   ( convertSingleModule
-  , collectBookmarks
   ) where
 
 import Protolude
@@ -184,15 +183,3 @@ convertComments cs = do
 
   dropPrefix prefix str =
     fromMaybe str (T.stripPrefix prefix str)
-
--- | Go through a PureScript module and extract a list of Bookmarks; references
--- to data types or values, to be used as a kind of index. These are used for
--- generating links in the HTML documentation, for example.
-collectBookmarks :: InPackage P.Module -> [Bookmark]
-collectBookmarks (Local m) = map Local (collectBookmarks' m)
-collectBookmarks (FromDep pkg m) = map (FromDep pkg) (collectBookmarks' m)
-
-collectBookmarks' :: P.Module -> [(P.ModuleName, Text)]
-collectBookmarks' m =
-  map (P.getModuleName m, )
-      (mapMaybe getDeclarationTitle (P.exportedDeclarations m))

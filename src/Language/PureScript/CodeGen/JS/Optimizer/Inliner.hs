@@ -87,6 +87,8 @@ inlineCommonValues = everywhereOnJS convert
     | isDict' [semiringNumber, semiringInt] dict && isDict fnOne fn = JSNumericLiteral ss (Left 1)
     | isDict boundedBoolean dict && isDict fnBottom fn = JSBooleanLiteral ss False
     | isDict boundedBoolean dict && isDict fnTop fn = JSBooleanLiteral ss True
+  convert (JSApp ss (JSApp _ fn [dict]) [x])
+    | isDict ringInt dict && isDict fnNegate fn = JSBinary ss BitwiseOr (JSUnary ss Negate x) (JSNumericLiteral ss (Left 0))
   convert (JSApp ss (JSApp _ (JSApp _ fn [dict]) [x]) [y])
     | isDict semiringInt dict && isDict fnAdd fn = intOp ss Add x y
     | isDict semiringInt dict && isDict fnMultiply fn = intOp ss Multiply x y
@@ -101,6 +103,7 @@ inlineCommonValues = everywhereOnJS convert
   fnDivide = (C.dataEuclideanRing, C.div)
   fnMultiply = (C.dataSemiring, C.mul)
   fnSubtract = (C.dataRing, C.sub)
+  fnNegate = (C.dataRing, C.negate)
   intOp ss op x y = JSBinary ss BitwiseOr (JSBinary ss op x y) (JSNumericLiteral ss (Left 0))
 
 inlineCommonOperators :: JS -> JS
@@ -110,8 +113,6 @@ inlineCommonOperators = applyAll $
 
   , binary ringNumber opSub Subtract
   , unary  ringNumber opNegate Negate
-  , binary ringInt opSub Subtract
-  , unary  ringInt opNegate Negate
 
   , binary euclideanRingNumber opDiv Divide
   , binary euclideanRingInt opMod Modulus

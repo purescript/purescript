@@ -3,27 +3,26 @@
 
 module Language.PureScript.Docs.Convert
   ( convertModules
+  , convertModulesWithEnv
   , convertModulesInPackage
-  , collectBookmarks
+  , convertModulesInPackageWithEnv
   ) where
 
-import Prelude.Compat
+import Protolude hiding (check)
 
-import Control.Arrow ((&&&), second)
+import Control.Arrow ((&&&))
 import Control.Category ((>>>))
-import Control.Monad
-import Control.Monad.Error.Class (MonadError)
-import Control.Monad.State (runStateT)
 import Control.Monad.Writer.Strict (runWriterT)
-import Data.List (find)
 import qualified Data.Map as Map
-import Data.Text (Text)
+import Data.String (String)
 
 import Language.PureScript.Docs.Convert.ReExports (updateReExports)
-import Language.PureScript.Docs.Convert.Single (convertSingleModule, collectBookmarks)
+import Language.PureScript.Docs.Convert.Single (convertSingleModule)
 import Language.PureScript.Docs.Types
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Constants as C
+
+import Web.Bower.PackageMeta (PackageName)
 
 import Text.Parsec (eof)
 
@@ -34,32 +33,36 @@ import Text.Parsec (eof)
 --
 convertModulesInPackage ::
   (MonadError P.MultipleErrors m) =>
-  [InPackage P.Module] ->
+  [P.Module] ->
+  Map P.ModuleName PackageName ->
   m [Module]
-convertModulesInPackage modules =
+convertModulesInPackage modules modulesDeps =
+  fmap fst (convertModulesInPackageWithEnv modules modulesDeps)
+
+convertModulesInPackageWithEnv ::
+  (MonadError P.MultipleErrors m) =>
+  [P.Module] ->
+  Map P.ModuleName PackageName ->
+  m ([Module], P.Env)
+convertModulesInPackageWithEnv modules modulesDeps =
   go modules
   where
-  localNames =
-    map P.getModuleName (takeLocals modules)
   go =
-    map ignorePackage
-     >>> convertModules withPackage
-     >>> fmap (filter ((`elem` localNames) . modName))
+     convertModulesWithEnv withPackage
+     >>> fmap (first (filter (isLocal . modName)))
 
   withPackage :: P.ModuleName -> InPackage P.ModuleName
   withPackage mn =
-    case find ((== mn) . P.getModuleName . ignorePackage) modules of
-      Just m ->
-        fmap P.getModuleName m
-      Nothing ->
-        P.internalError $ "withPackage: missing module:" ++
-          show (P.runModuleName mn)
+    case Map.lookup mn modulesDeps of
+      Just pkgName -> FromDep pkgName mn
+      Nothing -> Local mn
+
+  isLocal :: P.ModuleName -> Bool
+  isLocal = not . flip Map.member modulesDeps 
 
 -- |
 -- Convert a group of modules to the intermediate format, designed for
--- producing documentation from. It is also necessary to pass an Env containing
--- imports/exports information about the list of modules, which is needed for
--- documenting re-exports.
+-- producing documentation from.
 --
 -- Note that the whole module dependency graph must be included in the list; if
 -- some modules import things from other modules, then those modules must also
@@ -75,6 +78,14 @@ convertModules ::
   [P.Module] ->
   m [Module]
 convertModules withPackage =
+  fmap fst . convertModulesWithEnv withPackage
+
+convertModulesWithEnv ::
+  (MonadError P.MultipleErrors m) =>
+  (P.ModuleName -> InPackage P.ModuleName) ->
+  [P.Module] ->
+  m ([Module], P.Env)
+convertModulesWithEnv withPackage =
   P.sortModules
     >>> fmap (fst >>> map importPrim)
     >=> convertSorted withPackage
@@ -83,21 +94,22 @@ importPrim :: P.Module -> P.Module
 importPrim = P.addDefaultImport (P.ModuleName [P.ProperName C.prim])
 
 -- |
--- Convert a sorted list of modules.
+-- Convert a sorted list of modules, returning both the list of converted
+-- modules and the Env produced during desugaring.
 --
 convertSorted ::
   (MonadError P.MultipleErrors m) =>
   (P.ModuleName -> InPackage P.ModuleName) ->
   [P.Module] ->
-  m [Module]
+  m ([Module], P.Env)
 convertSorted withPackage modules = do
   (env, convertedModules) <- second (map convertSingleModule) <$> partiallyDesugar modules
 
   modulesWithTypes <- typeCheckIfNecessary modules convertedModules
-  let moduleMap = Map.fromList (map (modName &&& id) modulesWithTypes)
+  let moduleMap = Map.fromList (map (modName &&& identity) modulesWithTypes)
 
   let traversalOrder = map P.getModuleName modules
-  pure (Map.elems (updateReExports env traversalOrder withPackage moduleMap))
+  pure (Map.elems (updateReExports env traversalOrder withPackage moduleMap), env)
 
 -- |
 -- If any exported value declarations have either wildcard type signatures, or
@@ -166,7 +178,7 @@ insertValueTypes env m =
     other
 
   parseIdent =
-    either (err . ("failed to parse Ident: " ++)) id . runParser P.parseIdent
+    either (err . ("failed to parse Ident: " ++)) identity . runParser P.parseIdent
 
   lookupName name =
     let key = P.Qualified (Just (modName m)) name

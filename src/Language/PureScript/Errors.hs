@@ -168,11 +168,11 @@ errorCode em = case unwrapErrorMessage em of
   CaseBinderLengthDiffers{} -> "CaseBinderLengthDiffers"
   IncorrectAnonymousArgument -> "IncorrectAnonymousArgument"
   InvalidOperatorInBinder{} -> "InvalidOperatorInBinder"
-  DeprecatedRequirePath{} -> "DeprecatedRequirePath"
   CannotGeneralizeRecursiveFunction{} -> "CannotGeneralizeRecursiveFunction"
   CannotDeriveNewtypeForData{} -> "CannotDeriveNewtypeForData"
   ExpectedWildcard{} -> "ExpectedWildcard"
   CannotUseBindWithDo{} -> "CannotUseBindWithDo"
+  ClassInstanceArityMismatch{} -> "ClassInstanceArityMismatch"
 
 -- |
 -- A stack trace for an error
@@ -691,7 +691,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
     renderSimpleErrorMessage (ExtraneousClassMember ident className) =
       line $ "" <> markCode (showIdent ident) <> " is not a member of type class " <> markCode (showQualified runProperName className)
     renderSimpleErrorMessage (ExpectedType ty kind) =
-      paras [ line $ "In a type-annotated expression " <> markCode "x :: t" <> ", the type " <> markCode "t" <> " must have kind " <> markCode "*" <> "."
+      paras [ line $ "In a type-annotated expression " <> markCode "x :: t" <> ", the type " <> markCode "t" <> " must have kind " <> markCode (prettyPrintKind kindType) <> "."
             , line "The error arises from the type"
             , markCodeBox $ indent $ typeAsBox ty
             , line "having the kind"
@@ -863,9 +863,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
             , line "Only aliases for data constructors may be used in patterns."
             ]
 
-    renderSimpleErrorMessage DeprecatedRequirePath =
-      line "The require-path option is deprecated and will be removed in PureScript 0.9."
-
     renderSimpleErrorMessage (CannotGeneralizeRecursiveFunction ident ty) =
       paras [ line $ "Unable to generalize the type of the recursive function " <> markCode (showIdent ident) <> "."
             , line $ "The inferred type of " <> markCode (showIdent ident) <> " was:"
@@ -883,6 +880,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
 
     renderSimpleErrorMessage CannotUseBindWithDo =
       paras [ line $ "The name " <> markCode "bind" <> " cannot be brought into scope in a do notation block, since do notation uses the same name."
+            ]
+
+    renderSimpleErrorMessage (ClassInstanceArityMismatch dictName className expected actual) =
+      paras [ line $ "The type class " <> markCode (showQualified runProperName className) <>
+                     " expects " <> T.pack (show expected) <> " argument(s)."
+            , line $ "But the instance " <> markCode (showIdent dictName) <> " only provided " <>
+                     T.pack (show actual) <> "."
             ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box

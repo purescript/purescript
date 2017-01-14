@@ -4,19 +4,14 @@ module Language.PureScript.Docs.Types
   )
   where
 
-import Prelude.Compat
+import Protolude hiding (to, from)
+import Prelude (String, unlines)
 
-import Control.Arrow (first, (***))
-import Control.Monad (when)
-import Control.Monad.Error.Class (catchError)
+import Control.Arrow ((***))
 
 import Data.Aeson ((.=))
 import Data.Aeson.BetterErrors
-import Data.ByteString.Lazy (ByteString)
-import Data.Either (isLeft, isRight)
-import Data.Maybe (mapMaybe, fromMaybe, maybeToList)
-import Data.Monoid ((<>))
-import Data.Text (Text)
+import qualified Data.Map as Map
 import Data.Time.Clock (UTCTime)
 import qualified Data.Time.Format as TimeFormat
 import Data.Version
@@ -47,7 +42,7 @@ data Package a = Package
   -- field. It should eventually be changed to just UTCTime.
   , pkgTagTime              :: Maybe UTCTime
   , pkgModules              :: [Module]
-  , pkgBookmarks            :: [Bookmark]
+  , pkgModuleMap            :: Map P.ModuleName PackageName
   , pkgResolvedDependencies :: [(PackageName, Version)]
   , pkgGithub               :: (GithubUser, GithubRepo)
   , pkgUploader             :: a
@@ -70,7 +65,7 @@ verifyPackage verifiedUser Package{..} =
           pkgVersionTag
           pkgTagTime
           pkgModules
-          pkgBookmarks
+          pkgModuleMap
           pkgResolvedDependencies
           pkgGithub
           verifiedUser
@@ -308,8 +303,6 @@ data PackageError
   | InvalidTime
   deriving (Show, Eq, Ord)
 
-type Bookmark = InPackage (P.ModuleName, Text)
-
 data InPackage a
   = Local a
   | FromDep PackageName a
@@ -333,10 +326,10 @@ ignorePackage (FromDep _ x) = x
 ----------------------
 -- Parsing
 
-parseUploadedPackage :: Version -> ByteString -> Either (ParseError PackageError) UploadedPackage
+parseUploadedPackage :: Version -> LByteString -> Either (ParseError PackageError) UploadedPackage
 parseUploadedPackage minVersion = parse $ asUploadedPackage minVersion
 
-parseVerifiedPackage :: Version -> ByteString -> Either (ParseError PackageError) VerifiedPackage
+parseVerifiedPackage :: Version -> LByteString -> Either (ParseError PackageError) VerifiedPackage
 parseVerifiedPackage minVersion = parse $ asVerifiedPackage minVersion
 
 asPackage :: Version -> (forall e. Parse e a) -> Parse PackageError (Package a)
@@ -353,11 +346,15 @@ asPackage minimumVersion uploader = do
           <*> key "versionTag" asText
           <*> keyMay "tagTime" (withString parseTimeEither)
           <*> key "modules" (eachInArray asModule)
-          <*> key "bookmarks" asBookmarks .! ErrorInPackageMeta
+          <*> moduleMap
           <*> key "resolvedDependencies" asResolvedDependencies
           <*> key "github" asGithub
           <*> key "uploader" uploader
           <*> pure compilerVersion
+  where
+  moduleMap =
+    key "moduleMap" asModuleMap
+    `pOr` (key "bookmarks" bookmarksAsModuleMap .! ErrorInPackageMeta)
 
 parseTimeEither :: String -> Either PackageError UTCTime
 parseTimeEither =
@@ -444,9 +441,10 @@ asReExport =
   asReExportModuleName :: Parse PackageError (InPackage P.ModuleName)
   asReExportModuleName =
     asInPackage fromAesonParser .! ErrorInPackageMeta
-    <|> fmap Local fromAesonParser
+    `pOr` fmap Local fromAesonParser
 
-  (<|>) p q = catchError p (const q)
+pOr :: Parse e a -> Parse e a -> Parse e a
+p `pOr` q = catchError p (const q)
 
 asInPackage :: Parse BowerError a -> Parse BowerError (InPackage a)
 asInPackage inner =
@@ -559,20 +557,38 @@ asQualifiedProperName = fromAesonParser
 asQualifiedIdent :: Parse e (P.Qualified P.Ident)
 asQualifiedIdent = fromAesonParser
 
-asBookmarks :: Parse BowerError [Bookmark]
-asBookmarks = eachInArray asBookmark
+asModuleMap :: Parse PackageError (Map P.ModuleName PackageName)
+asModuleMap =
+  Map.fromList <$>
+    eachInObjectWithKey (Right . P.moduleNameFromString)
+                        (withText parsePackageName')
 
-asBookmark :: Parse BowerError Bookmark
-asBookmark =
-  asInPackage ((,) <$> nth 0 (P.moduleNameFromString <$> asText)
-                   <*> nth 1 asText)
+-- This is here to preserve backwards compatibility with compilers which used
+-- to generate a 'bookmarks' field in the JSON (i.e. up to 0.10.5). We should
+-- remove this after the next breaking change to the JSON.
+bookmarksAsModuleMap :: Parse BowerError (Map P.ModuleName PackageName)
+bookmarksAsModuleMap =
+  convert <$>
+    eachInArray (asInPackage (nth 0 (P.moduleNameFromString <$> asText)))
+
+  where
+  convert :: [InPackage P.ModuleName] -> Map P.ModuleName PackageName
+  convert = Map.fromList . mapMaybe toTuple
+
+  toTuple (Local _) = Nothing
+  toTuple (FromDep pkgName mn) = Just (mn, pkgName)
 
 asResolvedDependencies :: Parse PackageError [(PackageName, Version)]
 asResolvedDependencies =
-  eachInObjectWithKey (mapLeft ErrorInPackageMeta . parsePackageName) asVersion
-  where
-  mapLeft f (Left x) = Left (f x)
-  mapLeft _ (Right x) = Right x
+  eachInObjectWithKey parsePackageName' asVersion
+
+parsePackageName' :: Text -> Either PackageError PackageName
+parsePackageName' =
+  mapLeft ErrorInPackageMeta . parsePackageName
+
+mapLeft :: (a -> a') -> Either a b -> Either a' b
+mapLeft f (Left x) = Left (f x)
+mapLeft _ (Right x) = Right x
 
 asGithub :: Parse e (GithubUser, GithubRepo)
 asGithub = (,) <$> nth 0 (GithubUser <$> asText)
@@ -593,7 +609,9 @@ instance A.ToJSON a => A.ToJSON (Package a) where
       , "version"              .= showVersion pkgVersion
       , "versionTag"           .= pkgVersionTag
       , "modules"              .= pkgModules
-      , "bookmarks"            .= map (fmap (first P.runModuleName)) pkgBookmarks
+      , "moduleMap"            .= assocListToJSON P.runModuleName
+                                                  runPackageName
+                                                  (Map.toList pkgModuleMap)
       , "resolvedDependencies" .= assocListToJSON runPackageName
                                                   (T.pack . showVersion)
                                                   pkgResolvedDependencies
