@@ -297,6 +297,7 @@ typeCheckAll moduleName _ = traverse go
     case M.lookup className (typeClasses env) of
       Nothing -> internalError "typeCheckAll: Encountered unknown type class in instance declaration"
       Just typeClass -> do
+        checkInstanceArity dictName className typeClass tys
         sequence_ (zipWith (checkTypeClassInstance typeClass) [0..] tys)
         checkOrphanInstance dictName className typeClass tys
         _ <- traverseTypeInstanceBody checkInstanceMembers body
@@ -305,6 +306,13 @@ typeCheckAll moduleName _ = traverse go
         return d
   go (PositionedDeclaration pos com d) =
     warnAndRethrowWithPosition pos $ PositionedDeclaration pos com <$> go d
+
+  checkInstanceArity :: Ident -> Qualified (ProperName 'ClassName) -> TypeClassData -> [Type] -> m ()
+  checkInstanceArity dictName className typeClass tys = do
+    let typeClassArity = length (typeClassArguments typeClass)
+        instanceArity = length tys
+    when (typeClassArity /= instanceArity) $
+      throwError . errorMessage $ ClassInstanceArityMismatch dictName className typeClassArity instanceArity
 
   checkInstanceMembers :: [Declaration] -> m [Declaration]
   checkInstanceMembers instDecls = do

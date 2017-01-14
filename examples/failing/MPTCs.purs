@@ -1,4 +1,4 @@
--- @shouldFailWith KindsDoNotUnify
+-- @shouldFailWith ClassInstanceArityMismatch
 module Main where
 
 import Prelude
