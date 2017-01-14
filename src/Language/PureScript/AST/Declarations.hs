@@ -134,11 +134,12 @@ data SimpleErrorMessage
   | CaseBinderLengthDiffers Int [Binder]
   | IncorrectAnonymousArgument
   | InvalidOperatorInBinder (Qualified (OpName 'ValueOpName)) (Qualified Ident)
-  | DeprecatedRequirePath
   | CannotGeneralizeRecursiveFunction Ident Type
   | CannotDeriveNewtypeForData (ProperName 'TypeName)
   | ExpectedWildcard (ProperName 'TypeName)
   | CannotUseBindWithDo
+  -- | instance name, type class, expected argument count, actual argument count
+  | ClassInstanceArityMismatch Ident (Qualified (ProperName 'ClassName)) Int Int
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
