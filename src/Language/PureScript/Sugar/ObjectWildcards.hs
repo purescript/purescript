@@ -20,15 +20,35 @@ import           Language.PureScript.Label (Label(..))
 import           Language.PureScript.Names
 import           Language.PureScript.PSString (PSString)
 
+-- `PathNode` and `PathTree` are used as an intermediate form when desugaring a nested object update.
+-- For an update such as:
+--
+--  x { foo = 0
+--    , bar.baz = 1
+--    , bar.qux = 2 }
+--
+-- We represent the updates as the `PathTree`:
+--
+--  M.fromList [ ("foo", Leaf 3)
+--             , ("bar", Branch M.fromList [ ("baz", Leaf 1)
+--                                         , ("qux", Leaf 2) ]) ]
+--
+-- Which we then convert to an expression representing the following:
+--
+--   let x' = x
+--   in x' { foo = 0
+--         , bar = x'.bar { baz = 1
+--                        , qux = 2 } }
+--
+type PathTree = Map PSString PathNode
+data PathNode = Leaf Expr | Branch PathTree
+
 desugarObjectConstructors
   :: forall m
    . (MonadSupply m, MonadError MultipleErrors m)
   => Module
   -> m Module
 desugarObjectConstructors (Module ss coms mn ds exts) = Module ss coms mn <$> mapM desugarDecl ds <*> pure exts
-
-data PathNode = Leaf Expr | Branch PathTree
-type PathTree = Map PSString PathNode
 
 desugarDecl :: forall m. (MonadSupply m, MonadError MultipleErrors m) => Declaration -> m Declaration
 desugarDecl (PositionedDeclaration pos com d) = rethrowWithPosition pos $ PositionedDeclaration pos com <$> desugarDecl d
@@ -71,6 +91,8 @@ desugarDecl other = fn other
 
   transformNestedUpdate :: Expr -> [(NonEmpty PSString, Expr)] -> m Expr
   transformNestedUpdate obj ps = do
+    -- If we don't have an anonymous argument then we need to generate a let wrapper
+    -- so that the object expression isn't re-evaluated for each nested update.
     val <- freshIdent'
     if isAnonymousArgument obj
       then Abs (Left val) <$> wrapLambdaM (build val) ps
@@ -79,6 +101,10 @@ desugarDecl other = fn other
       build val xs = buildUpdates (argToExpr val) <$> foldM buildTree M.empty xs
       buildLet val = Let [ValueDeclaration val Public [] (Right obj)]
 
+      -- Here we build up the intermediate `PathTree` data structure and check that
+      -- the paths are valid relative to each other - for example, the update
+      -- `{ foo.bar = 2, foo = {bar: 3} }` is invalid because there are conflicting
+      -- paths.
       buildTree
         :: PathTree
         -> (NonEmpty PSString, Expr)
@@ -99,6 +125,8 @@ desugarDecl other = fn other
             Just (Leaf _) -> throwError . errorMessage $ DuplicateLabel (Label key) (Just (ObjectUpdateNested obj ps))
           M.insert key . Branch <$> go branch (x :| xs) <*> pure tree
 
+      -- Now we have a valid collection of updates in the form of a `PathTree`
+      -- we can recursively build up the nested `ObjectUpdate` expressions.
       buildUpdates :: Expr -> PathTree -> Expr
       buildUpdates val vs = ObjectUpdate val (goLayer [] <$> M.toList vs) where
         goLayer :: [PSString] -> (PSString, PathNode) -> (PSString, Expr)
