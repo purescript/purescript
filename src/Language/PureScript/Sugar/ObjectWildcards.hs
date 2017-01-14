@@ -30,8 +30,8 @@ import           Language.PureScript.PSString (PSString)
 -- We represent the updates as the `PathTree`:
 --
 --  M.fromList [ ("foo", Leaf 3)
---             , ("bar", Branch M.fromList [ ("baz", Leaf 1)
---                                         , ("qux", Leaf 2) ]) ]
+--             , ("bar", Branch (M.fromList [ ("baz", Leaf 1)
+--                                          , ("qux", Leaf 2) ]) ])
 --
 -- Which we then convert to an expression representing the following:
 --
@@ -39,6 +39,9 @@ import           Language.PureScript.PSString (PSString)
 --   in x' { foo = 0
 --         , bar = x'.bar { baz = 1
 --                        , qux = 2 } }
+--
+-- The `let` here is required to prevent re-evaluating the object expression `x`.
+-- However we don't generate this when using an anonymous argument for the object.
 --
 type PathTree = Map PSString PathNode
 data PathNode = Leaf Expr | Branch PathTree
