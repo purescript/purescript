@@ -3,19 +3,22 @@ module Language.PureScript.Sugar.ObjectWildcards
   , desugarDecl
   ) where
 
-import Prelude.Compat
+import           Prelude.Compat
 
-import Control.Monad (forM)
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Supply.Class
-
-import Data.List (partition)
-import Data.Maybe (catMaybes)
-
-import Language.PureScript.AST
-import Language.PureScript.Errors
-import Language.PureScript.Names
-import Language.PureScript.PSString (PSString)
+import           Control.Monad (forM, foldM)
+import           Control.Monad.Error.Class (MonadError(..))
+import           Control.Monad.Supply.Class
+import           Data.List (partition)
+import           Data.List.NonEmpty (NonEmpty(..))
+import           Data.Map (Map)
+import qualified Data.Map as M
+import           Data.Maybe (catMaybes)
+import           Language.PureScript.AST
+import           Language.PureScript.Environment (NameKind(..))
+import           Language.PureScript.Errors
+import           Language.PureScript.Label (Label(..))
+import           Language.PureScript.Names
+import           Language.PureScript.PSString (PSString)
 
 desugarObjectConstructors
   :: forall m
@@ -23,6 +26,9 @@ desugarObjectConstructors
   => Module
   -> m Module
 desugarObjectConstructors (Module ss coms mn ds exts) = Module ss coms mn <$> mapM desugarDecl ds <*> pure exts
+
+data PathNode = Leaf Expr | Branch PathTree
+type PathTree = Map PSString PathNode
 
 desugarDecl :: forall m. (MonadSupply m, MonadError MultipleErrors m) => Declaration -> m Declaration
 desugarDecl (PositionedDeclaration pos com d) = rethrowWithPosition pos $ PositionedDeclaration pos com <$> desugarDecl d
@@ -46,6 +52,7 @@ desugarDecl other = fn other
     obj <- freshIdent'
     Abs (Left obj) <$> wrapLambda (ObjectUpdate (argToExpr obj)) ps
   desugarExpr (ObjectUpdate obj ps) = wrapLambda (ObjectUpdate obj) ps
+  desugarExpr (ObjectUpdateNested obj ps) = transformNestedUpdate obj ps
   desugarExpr (Accessor prop u)
     | Just props <- peelAnonAccessorChain u = do
       arg <- freshIdent'
@@ -62,14 +69,59 @@ desugarDecl other = fn other
     return $ foldr (Abs . Left) if_ (catMaybes [u', t', f'])
   desugarExpr e = return e
 
-  wrapLambda :: ([(PSString, Expr)] -> Expr) -> [(PSString, Expr)] -> m Expr
-  wrapLambda mkVal ps =
+  transformNestedUpdate :: Expr -> [(NonEmpty PSString, Expr)] -> m Expr
+  transformNestedUpdate obj ps = do
+    val <- freshIdent'
+    if isAnonymousArgument obj
+      then Abs (Left val) <$> wrapLambdaM (build val) ps
+      else wrapLambdaM (fmap (buildLet val) . build val) ps
+    where
+      build val xs = buildUpdates (argToExpr val) <$> foldM buildTree M.empty xs
+      buildLet val = Let [ValueDeclaration val Public [] (Right obj)]
+
+      buildTree
+        :: PathTree
+        -> (NonEmpty PSString, Expr)
+        -> m PathTree
+      buildTree pathTree (path, e) = go pathTree path where
+        go tree (key :| [])
+          -- path already exists
+          | key `M.member` tree = throwError . errorMessage $ DuplicateLabel (Label key) (Just (ObjectUpdateNested obj ps))
+          -- create new path
+          | otherwise         = return (M.insert key (Leaf e) tree)
+        go tree (key :| (x : xs)) = do
+          branch <- case M.lookup key tree of
+            -- nothing at this path yet
+            Nothing -> return M.empty
+            -- already a map at this path
+            Just (Branch branch) -> return branch
+            -- sub-path already exists
+            Just (Leaf _) -> throwError . errorMessage $ DuplicateLabel (Label key) (Just (ObjectUpdateNested obj ps))
+          M.insert key . Branch <$> go branch (x :| xs) <*> pure tree
+
+      buildUpdates :: Expr -> PathTree -> Expr
+      buildUpdates val vs = ObjectUpdate val (goLayer [] <$> M.toList vs) where
+        goLayer :: [PSString] -> (PSString, PathNode) -> (PSString, Expr)
+        goLayer _ (key, Leaf expr) = (key, expr)
+        goLayer path (key, Branch branch) =
+          let path' = path ++ [key]
+              updates = goLayer path' <$> M.toList branch
+              accessor = foldr Accessor val path'
+              objectUpdate = ObjectUpdate accessor updates
+          in (key, objectUpdate)
+
+  wrapLambdaM :: forall k. ([(k, Expr)] -> m Expr) -> [(k, Expr)] -> m Expr
+  wrapLambdaM mkVal ps =
     let (args, props) = partition (isAnonymousArgument . snd) ps
     in if null args
-       then return $ mkVal props
+       then mkVal props
        else do
         (args', ps') <- unzip <$> mapM mkProp ps
-        return $ foldr (Abs . Left) (mkVal ps') (catMaybes args')
+        val <- mkVal ps'
+        return $ foldr (Abs . Left) val (catMaybes args')
+
+  wrapLambda :: forall k. ([(k, Expr)] -> Expr) -> [(k, Expr)] -> m Expr
+  wrapLambda mkVal = wrapLambdaM (return . mkVal)
 
   stripPositionInfo :: Expr -> Expr
   stripPositionInfo (PositionedValue _ _ e) = stripPositionInfo e
@@ -86,7 +138,7 @@ desugarDecl other = fn other
   isAnonymousArgument (PositionedValue _ _ e) = isAnonymousArgument e
   isAnonymousArgument _ = False
 
-  mkProp :: (PSString, Expr) -> m (Maybe Ident, (PSString, Expr))
+  mkProp :: forall k. (k, Expr) -> m (Maybe Ident, (k, Expr))
   mkProp (name, e) = do
     arg <- freshIfAnon e
     return (arg, (name, maybe e argToExpr arg))
