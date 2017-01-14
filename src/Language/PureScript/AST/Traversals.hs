@@ -48,6 +48,7 @@ everywhereOnValues f g h = (f', g', h')
   g' (TypeClassDictionaryConstructorApp name v) = g (TypeClassDictionaryConstructorApp name (g' v))
   g' (Accessor prop v) = g (Accessor prop (g' v))
   g' (ObjectUpdate obj vs) = g (ObjectUpdate (g' obj) (map (fmap g') vs))
+  g' (ObjectUpdateNested obj vs) = g (ObjectUpdateNested (g' obj) (map (fmap g') vs))
   g' (Abs name v) = g (Abs name (g' v))
   g' (App v1 v2) = g (App (g' v1) (g' v2))
   g' (IfThenElse v1 v2 v3) = g (IfThenElse (g' v1) (g' v2) (g' v3))
@@ -115,6 +116,7 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   g' (TypeClassDictionaryConstructorApp name v) = TypeClassDictionaryConstructorApp name <$> (g v >>= g')
   g' (Accessor prop v) = Accessor prop <$> (g v >>= g')
   g' (ObjectUpdate obj vs) = ObjectUpdate <$> (g obj >>= g') <*> traverse (sndM (g' <=< g)) vs
+  g' (ObjectUpdateNested obj vs) = ObjectUpdateNested <$> (g obj >>= g') <*> traverse (sndM (g' <=< g)) vs
   g' (Abs name v) = Abs name <$> (g v >>= g')
   g' (App v1 v2) = App <$> (g v1 >>= g') <*> (g v2 >>= g')
   g' (IfThenElse v1 v2 v3) = IfThenElse <$> (g v1 >>= g') <*> (g v2 >>= g') <*> (g v3 >>= g')
@@ -182,6 +184,7 @@ everywhereOnValuesM f g h = (f', g', h')
   g' (TypeClassDictionaryConstructorApp name v) = (TypeClassDictionaryConstructorApp name <$> g' v) >>= g
   g' (Accessor prop v) = (Accessor prop <$> g' v) >>= g
   g' (ObjectUpdate obj vs) = (ObjectUpdate <$> g' obj <*> traverse (sndM g') vs) >>= g
+  g' (ObjectUpdateNested obj vs) = (ObjectUpdateNested <$> g' obj <*> traverse (sndM g') vs) >>= g
   g' (Abs name v) = (Abs name <$> g' v) >>= g
   g' (App v1 v2) = (App <$> g' v1 <*> g' v2) >>= g
   g' (IfThenElse v1 v2 v3) = (IfThenElse <$> g' v1 <*> g' v2 <*> g' v3) >>= g
@@ -254,6 +257,7 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   g' v@(TypeClassDictionaryConstructorApp _ v1) = g v <> g' v1
   g' v@(Accessor _ v1) = g v <> g' v1
   g' v@(ObjectUpdate obj vs) = foldl (<>) (g v <> g' obj) (map (g' . snd) vs)
+  g' v@(ObjectUpdateNested obj vs) = foldl (<>) (g v <> g' obj) (map (g' . snd) vs)
   g' v@(Abs _ v1) = g v <> g' v1
   g' v@(App v1 v2) = g v <> g' v1 <> g' v2
   g' v@(IfThenElse v1 v2 v3) = g v <> g' v1 <> g' v2 <> g' v3
@@ -331,6 +335,7 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   g' s (TypeClassDictionaryConstructorApp _ v1) = g'' s v1
   g' s (Accessor _ v1) = g'' s v1
   g' s (ObjectUpdate obj vs) = foldl (<>) (g'' s obj) (map (g'' s . snd) vs)
+  g' s (ObjectUpdateNested obj vs) = foldl (<>) (g'' s obj) (map (g'' s . snd) vs)
   g' s (Abs _ v1) = g'' s v1
   g' s (App v1 v2) = g'' s v1 <> g'' s v2
   g' s (IfThenElse v1 v2 v3) = g'' s v1 <> g'' s v2 <> g'' s v3
@@ -410,6 +415,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   g' s (TypeClassDictionaryConstructorApp name v) = TypeClassDictionaryConstructorApp name <$> g'' s v
   g' s (Accessor prop v) = Accessor prop <$> g'' s v
   g' s (ObjectUpdate obj vs) = ObjectUpdate <$> g'' s obj <*> traverse (sndM (g'' s)) vs
+  g' s (ObjectUpdateNested obj vs) = ObjectUpdateNested <$> g'' s obj <*> traverse (sndM (g'' s)) vs
   g' s (Abs name v) = Abs name <$> g'' s v
   g' s (App v1 v2) = App <$> g'' s v1 <*> g'' s v2
   g' s (IfThenElse v1 v2 v3) = IfThenElse <$> g'' s v1 <*> g'' s v2 <*> g'' s v3
@@ -500,6 +506,7 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   g' s (TypeClassDictionaryConstructorApp _ v1) = g'' s v1
   g' s (Accessor _ v1) = g'' s v1
   g' s (ObjectUpdate obj vs) = g'' s obj <> foldMap (g'' s . snd) vs
+  g' s (ObjectUpdateNested obj vs) = g'' s obj <> foldMap (g'' s . snd) vs
   g' s (Abs (Left name) v1) =
     let s' = S.insert name s
     in g'' s' v1

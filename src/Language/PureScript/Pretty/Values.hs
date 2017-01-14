@@ -12,6 +12,7 @@ import Prelude.Compat
 import Control.Arrow (second)
 
 import qualified Data.Monoid as Monoid ((<>))
+import Data.List.NonEmpty (NonEmpty(..))
 
 import qualified Data.Text as T
 import Data.Text (Text)
@@ -47,6 +48,12 @@ prettyPrintObject d = list '{' '}' prettyPrintObjectProperty
   prettyPrintObjectProperty :: (PSString, Maybe Expr) -> Box
   prettyPrintObjectProperty (key, value) = textT (prettyPrintObjectKey key Monoid.<> ": ") <> maybe (text "_") (prettyPrintValue (d - 1)) value
 
+prettyPrintObjectUpdate :: forall k. (k -> Box) -> Int -> Expr -> [(k, Expr)] -> Box
+prettyPrintObjectUpdate printKey d o ps =
+  prettyPrintValueAtom (d - 1) o `beforeWithSpace` list '{' '}' printEntry ps
+  where
+    printEntry (key, val) = printKey key <> text " = " <> prettyPrintValue (d - 1) val
+
 -- | Pretty-print an expression
 prettyPrintValue :: Int -> Expr -> Box
 prettyPrintValue d _ | d < 0 = text "..."
@@ -56,7 +63,10 @@ prettyPrintValue d (IfThenElse cond th el) =
                             , text "else " <> prettyPrintValueAtom (d - 1) el
                             ])
 prettyPrintValue d (Accessor prop val) = prettyPrintValueAtom (d - 1) val `before` textT ("." Monoid.<> prettyPrintObjectKey prop)
-prettyPrintValue d (ObjectUpdate o ps) = prettyPrintValueAtom (d - 1) o `beforeWithSpace` list '{' '}' (\(key, val) -> textT (prettyPrintObjectKey key Monoid.<> " = ") <> prettyPrintValue (d - 1) val) ps
+prettyPrintValue d (ObjectUpdate o ps) = prettyPrintObjectUpdate (textT . prettyPrintObjectKey) d o ps
+prettyPrintValue d (ObjectUpdateNested o ps) = prettyPrintObjectUpdate printPath d o ps where
+  printPath (hd :| tl) = foldl combine (textT (prettyPrintObjectKey hd)) tl
+  combine acc key = acc <> textT ("." Monoid.<> prettyPrintObjectKey key)
 prettyPrintValue d (App val arg) = prettyPrintValueAtom (d - 1) val `beforeWithSpace` prettyPrintValueAtom (d - 1) arg
 prettyPrintValue d (Abs (Left arg) val) = text ('\\' : T.unpack (showIdent arg) ++ " -> ") // moveRight 2 (prettyPrintValue (d - 1) val)
 prettyPrintValue d (Abs (Right arg) val) = text ('\\' : T.unpack (prettyPrintBinder arg) ++ " -> ") // moveRight 2 (prettyPrintValue (d - 1) val)

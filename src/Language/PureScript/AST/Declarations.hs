@@ -12,6 +12,7 @@ import Control.Monad.Identity
 import Data.Aeson.TH
 import qualified Data.Map as M
 import Data.Text (Text)
+import Data.List.NonEmpty (NonEmpty(..))
 
 import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Literals
@@ -582,6 +583,11 @@ data Expr
   -- Partial record update
   --
   | ObjectUpdate Expr [(PSString, Expr)]
+  -- |
+  -- Object updates with nested support: `x { foo.bar = e }`
+  -- Replaced during desugaring into a `Let` and nested `ObjectUpdate`s
+  --
+  | ObjectUpdateNested Expr [(NonEmpty PSString, Expr)]
   -- |
   -- Function introduction
   --

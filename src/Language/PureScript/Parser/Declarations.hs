@@ -19,7 +19,10 @@ import           Control.Applicative
 import           Control.Arrow ((+++))
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Parallel.Strategies (withStrategy, parList, rseq)
+import           Data.Bifunctor (first)
 import           Data.Functor (($>))
+import           Data.List.NonEmpty (NonEmpty(..))
+import qualified Data.List.NonEmpty as N
 import           Data.Maybe (fromMaybe)
 import           Data.Text (Text)
 import           Language.PureScript.AST
@@ -396,12 +399,13 @@ parseInfixExpr
 parseHole :: TokenParser Expr
 parseHole = Hole <$> holeLit
 
-parsePropertyUpdate :: TokenParser (PSString, Expr)
+parsePropertyUpdate :: TokenParser (NonEmpty PSString, Expr)
 parsePropertyUpdate = do
   name <- parseLabel
+  rest <- P.many (indented *> dot *> indented *> parseLabel)
   _ <- indented *> equals
   value <- indented *> parseValue
-  return (name, value)
+  return (name :| rest, value)
 
 parseAccessor :: Expr -> TokenParser Expr
 parseAccessor (Constructor _) = P.unexpected "constructor"
@@ -452,7 +456,10 @@ parseValue = withSourceSpan PositionedValue
               ]
 
 parseUpdaterBody :: Expr -> TokenParser Expr
-parseUpdaterBody v = ObjectUpdate v <$> (indented *> braces (commaSep1 (indented *> parsePropertyUpdate)))
+parseUpdaterBody v = objectUpdate <$> (indented *> braces (commaSep1 (indented *> parsePropertyUpdate)))
+  where
+    objectUpdate xs | all (null . N.tail . fst) xs = ObjectUpdate v (map (first N.head) xs)
+                    | otherwise = ObjectUpdateNested v xs
 
 parseAnonymousArgument :: TokenParser Expr
 parseAnonymousArgument = underscore *> pure AnonymousArgument
