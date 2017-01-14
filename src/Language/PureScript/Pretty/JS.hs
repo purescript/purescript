@@ -162,8 +162,10 @@ conditional = mkPattern match
 accessor :: (Emit gen) => Pattern PrinterState JS (gen, JS)
 accessor = mkPattern match
   where
-  -- WARN: if `prop` does not match the `IdentifierName` grammar, this will generate invalid code; see #2513
-  match (JSAccessor _ prop val) = Just (emit prop, val)
+  match (JSIndexer _ (JSStringLiteral _ prop) val) =
+    case decodeString prop of
+      Just s | not (identNeedsEscaping s) -> Just (emit s, val)
+      _ -> Nothing
   match _ = Nothing
 
 indexer :: (Emit gen) => Pattern PrinterState JS (gen, JS)

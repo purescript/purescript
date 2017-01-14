@@ -35,7 +35,7 @@ import Language.PureScript.Errors (ErrorMessageHint(..), SimpleErrorMessage(..),
                                    errorMessage, rethrowWithPosition, addHint)
 import Language.PureScript.Names
 import Language.PureScript.Options
-import Language.PureScript.PSString (PSString, mkString, decodeString)
+import Language.PureScript.PSString (PSString, mkString)
 import Language.PureScript.Traversals (sndM)
 import qualified Language.PureScript.Constants as C
 
@@ -69,7 +69,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
     let standardExps = exps \\ foreignExps
     let exps' = JSObjectLiteral Nothing $ map (mkString . runIdent &&& JSVar Nothing . identToJs) standardExps
                                ++ map (mkString . runIdent &&& foreignIdent) foreignExps
-    return $ moduleBody ++ [JSAssignment Nothing (JSAccessor Nothing "exports" (JSVar Nothing "module")) exps']
+    return $ moduleBody ++ [JSAssignment Nothing (accessorString "exports" (JSVar Nothing "module")) exps']
 
   where
 
@@ -182,12 +182,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   accessor (GenIdent _ _) = internalError "GenIdent in accessor"
 
   accessorString :: PSString -> JS -> JS
-  accessorString prop =
-    case decodeString prop of
-      Just s | not (identNeedsEscaping s) ->
-        JSAccessor Nothing s
-      _ ->
-        JSIndexer Nothing (JSStringLiteral Nothing prop)
+  accessorString prop = JSIndexer Nothing (JSStringLiteral Nothing prop)
 
   -- |
   -- Generate code in the simplified Javascript intermediate representation for a value or expression.
@@ -201,9 +196,9 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   valueToJs' (Literal (pos, _, _, _) l) =
     maybe id rethrowWithPosition pos $ literalToValueJS l
   valueToJs' (Var (_, _, _, Just (IsConstructor _ [])) name) =
-    return $ JSAccessor Nothing "value" $ qualifiedToJS id name
+    return $ accessorString "value" $ qualifiedToJS id name
   valueToJs' (Var (_, _, _, Just (IsConstructor _ _)) name) =
-    return $ JSAccessor Nothing "create" $ qualifiedToJS id name
+    return $ accessorString "create" $ qualifiedToJS id name
   valueToJs' (Accessor _ prop val) =
     accessorString prop <$> valueToJs val
   valueToJs' (ObjectUpdate _ o ps) = do
@@ -258,17 +253,17 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
                     (JSBlock Nothing [JSReturn Nothing $ JSVar Nothing "value"]))])
   valueToJs' (Constructor _ _ (ProperName ctor) []) =
     return $ iife (properToJs ctor) [ JSFunction Nothing (Just (properToJs ctor)) [] (JSBlock Nothing [])
-           , JSAssignment Nothing (JSAccessor Nothing "value" (JSVar Nothing (properToJs ctor)))
+           , JSAssignment Nothing (accessorString "value" (JSVar Nothing (properToJs ctor)))
                 (JSUnary Nothing JSNew $ JSApp Nothing (JSVar Nothing (properToJs ctor)) []) ]
   valueToJs' (Constructor _ _ (ProperName ctor) fields) =
     let constructor =
-          let body = [ JSAssignment Nothing (JSAccessor Nothing (identToJs f) (JSVar Nothing "this")) (var f) | f <- fields ]
+          let body = [ JSAssignment Nothing ((accessorString $ mkString $ identToJs f) (JSVar Nothing "this")) (var f) | f <- fields ]
           in JSFunction Nothing (Just (properToJs ctor)) (identToJs `map` fields) (JSBlock Nothing body)
         createFn =
           let body = JSUnary Nothing JSNew $ JSApp Nothing (JSVar Nothing (properToJs ctor)) (var `map` fields)
           in foldr (\f inner -> JSFunction Nothing Nothing [identToJs f] (JSBlock Nothing [JSReturn Nothing inner])) body fields
     in return $ iife (properToJs ctor) [ constructor
-                          , JSAssignment Nothing (JSAccessor Nothing "create" (JSVar Nothing (properToJs ctor))) createFn
+                          , JSAssignment Nothing (accessorString "create" (JSVar Nothing (properToJs ctor))) createFn
                           ]
 
   iife :: Text -> [JS] -> JS
@@ -299,7 +294,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
       evaluate = JSVariableIntroduction Nothing evaluatedObj (Just obj)
       objAssign = JSVariableIntroduction Nothing newObj (Just $ JSObjectLiteral Nothing [])
       copy = JSForIn Nothing key jsEvaluatedObj $ JSBlock Nothing [JSIfElse Nothing cond assign Nothing]
-      cond = JSApp Nothing (JSAccessor Nothing "call" (JSAccessor Nothing "hasOwnProperty" (JSObjectLiteral Nothing []))) [jsEvaluatedObj, jsKey]
+      cond = JSApp Nothing (accessorString "call" (accessorString "hasOwnProperty" (JSObjectLiteral Nothing []))) [jsEvaluatedObj, jsKey]
       assign = JSBlock Nothing [JSAssignment Nothing (JSIndexer Nothing jsKey jsNewObj) (JSIndexer Nothing jsKey jsEvaluatedObj)]
       stToAssign (s, js) = JSAssignment Nothing (accessorString s jsNewObj) js
       extend = map stToAssign sts
@@ -356,7 +351,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
       valueError _ l@(JSNumericLiteral _ _) = l
       valueError _ l@(JSStringLiteral _ _)  = l
       valueError _ l@(JSBooleanLiteral _ _) = l
-      valueError s _                        = JSAccessor Nothing "name" . JSAccessor Nothing "constructor" $ JSVar Nothing s
+      valueError s _                        = accessorString "name" . accessorString "constructor" $ JSVar Nothing s
 
       guardsToJs :: Either [(Guard Ann, Expr Ann)] (Expr Ann) -> m [JS]
       guardsToJs (Left gs) = forM gs $ \(cond, val) -> do
@@ -397,7 +392,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
       argVar <- freshName
       done'' <- go remain done'
       js <- binderToJs argVar done'' binder
-      return (JSVariableIntroduction Nothing argVar (Just (JSAccessor Nothing (identToJs field) (JSVar Nothing varName))) : js)
+      return (JSVariableIntroduction Nothing argVar (Just $ accessorString (mkString $ identToJs field) $ JSVar Nothing varName) : js)
   binderToJs' _ _ ConstructorBinder{} =
     internalError "binderToJs: Invalid ConstructorBinder in binderToJs"
   binderToJs' varName done (NamedBinder _ ident binder) = do
@@ -426,7 +421,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
       return (JSVariableIntroduction Nothing propVar (Just (accessorString prop (JSVar Nothing varName))) : js)
   literalToBinderJS varName done (ArrayLiteral bs) = do
     js <- go done 0 bs
-    return [JSIfElse Nothing (JSBinary Nothing EqualTo (JSAccessor Nothing "length" (JSVar Nothing varName)) (JSNumericLiteral Nothing (Left (fromIntegral $ length bs)))) (JSBlock Nothing js) Nothing]
+    return [JSIfElse Nothing (JSBinary Nothing EqualTo (accessorString "length" (JSVar Nothing varName)) (JSNumericLiteral Nothing (Left (fromIntegral $ length bs)))) (JSBlock Nothing js) Nothing]
     where
     go :: [JS] -> Integer -> [Binder Ann] -> m [JS]
     go done' _ [] = return done'

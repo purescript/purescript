@@ -64,11 +64,11 @@ magicDo' = everywhereOnJS undo . everywhereOnJSTopDown convert
   isPure (JSApp _ fn [dict]) | isDict (C.eff, C.applicativeEffDictionary) dict && isPurePoly fn = True
   isPure _ = False
   -- Check if an expression represents the polymorphic >>= function
-  isBindPoly = isFn (C.controlBind, C.bind)
+  isBindPoly = isDict (C.controlBind, C.bind)
   -- Check if an expression represents the polymorphic pure or return function
-  isPurePoly = isFn (C.controlApplicative, C.pure')
+  isPurePoly = isDict (C.controlApplicative, C.pure')
   -- Check if an expression represents a function in the Eff module
-  isEffFunc name (JSAccessor _ name' (JSVar _ eff)) = eff == C.eff && name == name'
+  isEffFunc name (JSIndexer _ (JSStringLiteral _ name') (JSVar _ eff)) = eff == C.eff && name == name'
   isEffFunc _ _ = False
 
   -- Remove __do function applications which remain after desugaring
@@ -107,14 +107,14 @@ inlineST = everywhereOnJS convertBlock
   convert agg (JSApp s1 f [arg]) | isSTFunc C.newSTRef f =
    JSFunction s1 Nothing [] (JSBlock s1 [JSReturn s1 $ if agg then arg else JSObjectLiteral s1 [(mkString C.stRefValue, arg)]])
   convert agg (JSApp _ (JSApp s1 f [ref]) []) | isSTFunc C.readSTRef f =
-    if agg then ref else JSAccessor s1 C.stRefValue ref
+    if agg then ref else JSIndexer s1 (JSStringLiteral s1 C.stRefValue) ref
   convert agg (JSApp _ (JSApp _ (JSApp s1 f [ref]) [arg]) []) | isSTFunc C.writeSTRef f =
-    if agg then JSAssignment s1 ref arg else JSAssignment s1 (JSAccessor s1 C.stRefValue ref) arg
+    if agg then JSAssignment s1 ref arg else JSAssignment s1 (JSIndexer s1 (JSStringLiteral s1 C.stRefValue) ref) arg
   convert agg (JSApp _ (JSApp _ (JSApp s1 f [ref]) [func]) []) | isSTFunc C.modifySTRef f =
-    if agg then JSAssignment s1 ref (JSApp s1 func [ref]) else JSAssignment s1 (JSAccessor s1 C.stRefValue ref) (JSApp s1 func [JSAccessor s1 C.stRefValue ref])
+    if agg then JSAssignment s1 ref (JSApp s1 func [ref]) else JSAssignment s1 (JSIndexer s1 (JSStringLiteral s1 C.stRefValue) ref) (JSApp s1 func [JSIndexer s1 (JSStringLiteral s1 C.stRefValue) ref])
   convert _ other = other
   -- Check if an expression represents a function in the ST module
-  isSTFunc name (JSAccessor _ name' (JSVar _ st)) = st == C.st && name == name'
+  isSTFunc name (JSIndexer _ (JSStringLiteral _ name') (JSVar _ st)) = st == C.st && name == name'
   isSTFunc _ _ = False
   -- Find all ST Refs initialized in this block
   findSTRefsIn = everythingOnJS (++) isSTRef

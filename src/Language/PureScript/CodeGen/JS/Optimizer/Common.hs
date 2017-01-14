@@ -11,7 +11,7 @@ import Data.Maybe (fromMaybe)
 
 import Language.PureScript.Crash
 import Language.PureScript.CodeGen.JS.AST
-import Language.PureScript.PSString (mkString)
+import Language.PureScript.PSString (PSString)
 
 applyAll :: [a -> a] -> a -> a
 applyAll = foldl' (.) id
@@ -55,7 +55,6 @@ isUsed var1 = everythingOnJS (||) check
 
 targetVariable :: JS -> Text
 targetVariable (JSVar _ var) = var
-targetVariable (JSAccessor _ _ tgt) = targetVariable tgt
 targetVariable (JSIndexer _ _ tgt) = targetVariable tgt
 targetVariable _ = internalError "Invalid argument to targetVariable"
 
@@ -70,16 +69,10 @@ removeFromBlock :: ([JS] -> [JS]) -> JS -> JS
 removeFromBlock go (JSBlock ss sts) = JSBlock ss (go sts)
 removeFromBlock _  js = js
 
-isFn :: (Text, Text) -> JS -> Bool
-isFn (moduleName, fnName) (JSAccessor _ x (JSVar _ y)) =
-  x == fnName && y == moduleName
-isFn (moduleName, fnName) (JSIndexer _ (JSStringLiteral _ x) (JSVar _ y)) =
-  x == mkString fnName && y == moduleName
-isFn _ _ = False
-
-isDict :: (Text, Text) -> JS -> Bool
-isDict (moduleName, dictName) (JSAccessor _ x (JSVar _ y)) = x == dictName && y == moduleName
+isDict :: (Text, PSString) -> JS -> Bool
+isDict (moduleName, dictName) (JSIndexer _ (JSStringLiteral _ x) (JSVar _ y)) =
+  x == dictName && y == moduleName
 isDict _ _ = False
 
-isDict' :: [(Text, Text)] -> JS -> Bool
+isDict' :: [(Text, PSString)] -> JS -> Bool
 isDict' xs js = any (`isDict` js) xs
