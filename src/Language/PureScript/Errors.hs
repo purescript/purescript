@@ -890,9 +890,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
                      T.pack (show actual) <> "."
             ]
 
-    renderSimpleErrorMessage (UserDefinedWarning msg) | Just box <- toTypelevelString msg =
+    renderSimpleErrorMessage (UserDefinedWarning msgTy) =
+      let msg = fromMaybe (typeAsBox msgTy) (toTypelevelString msgTy) in
       paras [ line "A custom warning occurred while solving type class constraints:"
-            , indent box
+            , indent msg
             ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
