@@ -80,7 +80,17 @@ tco' = everywhereOnJS convert
     countSelfCallsUnderFunctions _ = 0
 
     countSelfCallsWithFnArgs :: JS -> Int
-    countSelfCallsWithFnArgs ret = if isSelfCallWithFnArgs ident ret [] then 1 else 0
+    countSelfCallsWithFnArgs = go [] where
+      go acc (JSVar _ ident')
+        | ident == ident' && any hasFunction acc = 1
+      go acc (JSApp _ fn args) = go (args ++ acc) fn
+      go _ _ = 0
+
+    hasFunction :: JS -> Bool
+    hasFunction = getAny . everythingOnJS mappend (Any . isFunction)
+      where
+      isFunction JSFunction{} = True
+      isFunction _ = False
 
   toLoop :: Text -> [Text] -> JS -> JS
   toLoop ident allArgs js = JSBlock rootSS $
@@ -108,14 +118,3 @@ tco' = everywhereOnJS convert
   isSelfCall ident (JSApp _ (JSVar _ ident') _) = ident == ident'
   isSelfCall ident (JSApp _ fn _) = isSelfCall ident fn
   isSelfCall _ _ = False
-
-  isSelfCallWithFnArgs :: Text -> JS -> [JS] -> Bool
-  isSelfCallWithFnArgs ident (JSVar _ ident') args | ident == ident' && any hasFunction args = True
-  isSelfCallWithFnArgs ident (JSApp _ fn args) acc = isSelfCallWithFnArgs ident fn (args ++ acc)
-  isSelfCallWithFnArgs _ _ _ = False
-
-  hasFunction :: JS -> Bool
-  hasFunction = getAny . everythingOnJS mappend (Any . isFunction)
-    where
-    isFunction JSFunction{} = True
-    isFunction _ = False
