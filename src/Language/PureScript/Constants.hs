@@ -447,3 +447,9 @@ dataFunctionUncurried = "Data_Function_Uncurried"
 
 dataIntBits :: forall a. (IsString a) => a
 dataIntBits = "Data_Int_Bits"
+
+partialUnsafe :: forall a. (IsString a) => a
+partialUnsafe = "Partial_Unsafe"
+
+unsafePartial :: forall a. (IsString a) => a
+unsafePartial = "unsafePartial"
