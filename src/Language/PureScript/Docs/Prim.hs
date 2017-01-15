@@ -24,6 +24,7 @@ primDocsModule = Module
       , boolean
       , partial
       , fail
+      , warn
       , typeConcat
       , typeString
       , kindType
@@ -220,6 +221,14 @@ fail = primClass "Fail" $ T.unlines
   [ "The Fail type class is part of the custom type errors feature. To provide"
   , "a custom type error when someone tries to use a particular instance,"
   , "write that instance out with a Fail constraint."
+  , ""
+  , "For more information, see"
+  , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
+  ]
+
+warn :: Declaration
+warn = primClass "Warn" $ T.unlines
+  [ "The Warn type class allows a custom compiler warning to be displayed."
   , ""
   , "For more information, see"
   , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."

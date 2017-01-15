@@ -369,6 +369,9 @@ pattern Partial = Qualified (Just Prim) (ProperName "Partial")
 pattern Fail :: Qualified (ProperName 'ClassName)
 pattern Fail = Qualified (Just Prim) (ProperName "Fail")
 
+pattern Warn :: Qualified (ProperName 'ClassName)
+pattern Warn = Qualified (Just Prim) (ProperName "Warn")
+
 typ :: forall a. (IsString a) => a
 typ = "Type"
 
