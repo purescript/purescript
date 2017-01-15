@@ -45,6 +45,8 @@ import qualified Language.PureScript.Constants as C
 data Evidence
   = NamedInstance (Qualified Ident)
   -- ^ An existing named instance
+  | WarnInstance Type
+  -- ^ Computed instance of the Warn type class with a user-defined warning message
   | IsSymbolInstance PSString
   -- ^ Computed instance of the IsSymbol type class for a given Symbol literal
   | CompareSymbolInstance
@@ -144,6 +146,8 @@ entails SolverOptions{..} constraint context hints =
     solve constraint
   where
     forClassName :: InstanceContext -> Qualified (ProperName 'ClassName) -> [Type] -> [TypeClassDict]
+    forClassName _ C.Warn [msg] =
+      [TypeClassDictionaryInScope (WarnInstance msg) [] C.Warn [msg] Nothing]
     forClassName _ C.IsSymbol [TypeLevelString sym] =
       [TypeClassDictionaryInScope (IsSymbolInstance sym) [] C.IsSymbol [TypeLevelString sym] Nothing]
     forClassName _ C.CompareSymbol [arg0@(TypeLevelString lhs), arg1@(TypeLevelString rhs), _] =
@@ -216,8 +220,9 @@ entails SolverOptions{..} constraint context hints =
                 let subst'' = fmap (substituteType currentSubst') subst'
                 -- Solve any necessary subgoals
                 args <- solveSubgoals subst'' (tcdDependencies tcd)
+                initDict <- lift . lift $ mkDictionary (tcdValue tcd) args
                 let match = foldr (\(superclassName, index) dict -> subclassDictionaryValue dict superclassName index)
-                                  (mkDictionary (tcdValue tcd) args)
+                                  initDict
                                   (tcdPath tcd)
                 return match
               Unsolved unsolved -> do
@@ -308,15 +313,18 @@ entails SolverOptions{..} constraint context hints =
               Just <$> traverse (go (work + 1) . mapConstraintArgs (map (replaceAllTypeVars (M.toList subst)))) subgoals
 
             -- Make a dictionary from subgoal dictionaries by applying the correct function
-            mkDictionary :: Evidence -> Maybe [Expr] -> Expr
-            mkDictionary (NamedInstance n) args = foldl App (Var n) (fold args)
+            mkDictionary :: Evidence -> Maybe [Expr] -> m Expr
+            mkDictionary (NamedInstance n) args = return $ foldl App (Var n) (fold args)
+            mkDictionary (WarnInstance msg) _ = do
+              tell . errorMessage $ UserDefinedWarning msg
+              return $ TypeClassDictionaryConstructorApp C.Warn (Literal (ObjectLiteral []))
             mkDictionary (IsSymbolInstance sym) _ =
               let fields = [ ("reflectSymbol", Abs (Left (Ident C.__unused)) (Literal (StringLiteral sym))) ] in
-              TypeClassDictionaryConstructorApp C.IsSymbol (Literal (ObjectLiteral fields))
+              return $ TypeClassDictionaryConstructorApp C.IsSymbol (Literal (ObjectLiteral fields))
             mkDictionary CompareSymbolInstance _ =
-              TypeClassDictionaryConstructorApp C.CompareSymbol (Literal (ObjectLiteral []))
+              return $ TypeClassDictionaryConstructorApp C.CompareSymbol (Literal (ObjectLiteral []))
             mkDictionary AppendSymbolInstance _ =
-              TypeClassDictionaryConstructorApp C.AppendSymbol (Literal (ObjectLiteral []))
+              return $ TypeClassDictionaryConstructorApp C.AppendSymbol (Literal (ObjectLiteral []))
 
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName a) -> Integer -> Expr

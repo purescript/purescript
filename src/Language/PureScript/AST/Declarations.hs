@@ -141,6 +141,8 @@ data SimpleErrorMessage
   | CannotUseBindWithDo
   -- | instance name, type class, expected argument count, actual argument count
   | ClassInstanceArityMismatch Ident (Qualified (ProperName 'ClassName)) Int Int
+  -- | a user-defined warning raised by using the Warn type class
+  | UserDefinedWarning Type
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.

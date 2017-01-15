@@ -173,6 +173,7 @@ errorCode em = case unwrapErrorMessage em of
   ExpectedWildcard{} -> "ExpectedWildcard"
   CannotUseBindWithDo{} -> "CannotUseBindWithDo"
   ClassInstanceArityMismatch{} -> "ClassInstanceArityMismatch"
+  UserDefinedWarning{} -> "UserDefinedWarning"
 
 -- |
 -- A stack trace for an error
@@ -887,6 +888,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
                      " expects " <> T.pack (show expected) <> " argument(s)."
             , line $ "But the instance " <> markCode (showIdent dictName) <> " only provided " <>
                      T.pack (show actual) <> "."
+            ]
+
+    renderSimpleErrorMessage (UserDefinedWarning msg) | Just box <- toTypelevelString msg =
+      paras [ line "A custom warning occurred while solving type class constraints:"
+            , indent box
             ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box

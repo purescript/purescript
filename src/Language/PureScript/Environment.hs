@@ -347,7 +347,7 @@ primKinds =
 
 -- |
 -- The primitive types in the external javascript environment with their
--- associated kinds. There are also pseudo `Fail` and `Partial` types
+-- associated kinds. There are also pseudo `Fail`, `Warn`, and `Partial` types
 -- that correspond to the classes with the same names.
 --
 primTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
@@ -363,20 +363,23 @@ primTypes =
     , (primName "Boolean",    (kindType, ExternData))
     , (primName "Partial",    (kindType, ExternData))
     , (primName "Fail",       (FunKind kindSymbol kindType, ExternData))
+    , (primName "Warn",       (FunKind kindSymbol kindType, ExternData))
     , (primName "TypeString", (FunKind kindType kindSymbol, ExternData))
     , (primName "TypeConcat", (FunKind kindSymbol (FunKind kindSymbol kindSymbol), ExternData))
     ]
 
 -- |
--- The primitive class map. This just contains the `Fail` and `Partial`
+-- The primitive class map. This just contains the `Fail`, `Warn`, and `Partial`
 -- classes. `Partial` is used as a kind of magic constraint for partial
--- functions. `Fail` is used for user-defined type errors.
+-- functions. `Fail` is used for user-defined type errors. `Warn` for
+-- user-defined warnings.
 --
 primClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primClasses =
   M.fromList
     [ (primName "Partial", (makeTypeClassData [] [] [] []))
     , (primName "Fail",    (makeTypeClassData [("message", Just kindSymbol)] [] [] []))
+    , (primName "Warn",    (makeTypeClassData [("message", Just kindSymbol)] [] [] []))
     ]
 
 -- |
