@@ -46,4 +46,4 @@ spec = do
       it "matches on equality" $ do
         -- ignore any position information
         (m, i, t, _) : _ <- getFlexCompletions "const"
-        (m, i, t) `shouldBe` ("MatcherSpec", "const", "forall a b. a -> b -> a")
+        (m, i, t) `shouldBe` ("MatcherSpec", "const", "∀ a b. a → b → a")

@@ -22,6 +22,7 @@ import           Control.Concurrent.STM
 import           Language.PureScript.Ide.Externs
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
+import           Language.PureScript.Ide.Util
 import           System.FilePath
 import           System.FSNotify
 
@@ -31,7 +32,7 @@ reloadFile :: TVar IdeState -> Event -> IO ()
 reloadFile _ Removed{} = pure ()
 reloadFile ref ev = do
   let fp = eventPath ev
-  ef' <- runExceptT (readExternFile fp)
+  ef' <- runLogger LogDefault (runExceptT (readExternFile fp))
   case ef' of
     Left _ -> pure ()
     Right ef -> do
@@ -40,10 +41,13 @@ reloadFile ref ev = do
 
 -- | Installs filewatchers for the given directory and reloads ExternsFiles when
 -- they change on disc
-watcher :: TVar IdeState -> FilePath -> IO ()
-watcher stateVar fp =
-  withManagerConf (defaultConfig { confDebounce = NoDebounce }) $ \mgr -> do
-    _ <- watchTree mgr fp
-      (\ev -> takeFileName (eventPath ev) == "externs.json")
-      (reloadFile stateVar)
-    forever (threadDelay 100000)
+watcher :: Bool -> TVar IdeState -> FilePath -> IO ()
+watcher polling stateVar fp =
+  withManagerConf
+    (defaultConfig { confDebounce = NoDebounce
+                   , confUsePolling = polling
+                   }) $ \mgr -> do
+      _ <- watchTree mgr fp
+        (\ev -> takeFileName (eventPath ev) == "externs.json")
+        (reloadFile stateVar)
+      forever (threadDelay 100000)

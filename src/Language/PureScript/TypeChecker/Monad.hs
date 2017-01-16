@@ -15,6 +15,7 @@ import Control.Monad.Writer.Class (MonadWriter(..), censor)
 
 import Data.Maybe
 import qualified Data.Map as M
+import Data.Text (Text)
 
 import Language.PureScript.Environment
 import Language.PureScript.Errors
@@ -93,7 +94,7 @@ bindTypes newNames action = do
 withScopedTypeVars
   :: (MonadState CheckState m, MonadWriter MultipleErrors m)
   => ModuleName
-  -> [(String, Kind)]
+  -> [(Text, Kind)]
   -> m a
   -> m a
 withScopedTypeVars mn ks ma = do
@@ -133,12 +134,12 @@ warnAndRethrowWithPositionTC pos = rethrowWithPositionTC pos . warnWithPosition 
 -- | Temporarily make a collection of type class dictionaries available
 withTypeClassDictionaries
   :: MonadState CheckState m
-  => [TypeClassDictionaryInScope]
+  => [NamedDict]
   -> m a
   -> m a
 withTypeClassDictionaries entries action = do
   orig <- get
-  let mentries = M.fromListWith (M.unionWith M.union) [ (mn, M.singleton className (M.singleton (tcdName entry) entry)) | entry@TypeClassDictionaryInScope{ tcdName = Qualified mn _, tcdClassName = className }  <- entries ]
+  let mentries = M.fromListWith (M.unionWith M.union) [ (mn, M.singleton className (M.singleton (tcdValue entry) entry)) | entry@TypeClassDictionaryInScope{ tcdValue = Qualified mn _, tcdClassName = className }  <- entries ]
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = M.unionWith (M.unionWith M.union) (typeClassDictionaries . checkEnv $ st) mentries } }
   a <- action
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = typeClassDictionaries . checkEnv $ orig } }
@@ -147,14 +148,14 @@ withTypeClassDictionaries entries action = do
 -- | Get the currently available map of type class dictionaries
 getTypeClassDictionaries
   :: (MonadState CheckState m)
-  => m (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) TypeClassDictionaryInScope)))
+  => m (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict)))
 getTypeClassDictionaries = typeClassDictionaries . checkEnv <$> get
 
 -- | Lookup type class dictionaries in a module.
 lookupTypeClassDictionaries
   :: (MonadState CheckState m)
   => Maybe ModuleName
-  -> m (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) TypeClassDictionaryInScope))
+  -> m (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict))
 lookupTypeClassDictionaries mn = fromMaybe M.empty . M.lookup mn . typeClassDictionaries . checkEnv <$> get
 
 -- | Temporarily bind a collection of names to local variables
@@ -257,11 +258,11 @@ modifyEnv f = modify (\s -> s { checkEnv = f (checkEnv s) })
 
 -- | Run a computation in the typechecking monad, starting with an empty @Environment@
 runCheck :: (Functor m) => StateT CheckState m a -> m (a, Environment)
-runCheck = runCheck' initEnvironment
+runCheck = runCheck' (emptyCheckState initEnvironment)
 
 -- | Run a computation in the typechecking monad, failing with an error, or succeeding with a return value and the final @Environment@.
-runCheck' :: (Functor m) => Environment -> StateT CheckState m a -> m (a, Environment)
-runCheck' env check = second checkEnv <$> runStateT check (emptyCheckState env)
+runCheck' :: (Functor m) => CheckState -> StateT CheckState m a -> m (a, Environment)
+runCheck' st check = second checkEnv <$> runStateT check st
 
 -- | Make an assertion, failing with an error message
 guardWith :: (MonadError e m) => e -> Bool -> m ()

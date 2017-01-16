@@ -14,11 +14,12 @@ import Data.Maybe (mapMaybe)
 import qualified Data.Set as S
 
 import Language.PureScript.AST.Binders
-import Language.PureScript.AST.Literals
 import Language.PureScript.AST.Declarations
-import Language.PureScript.Types
-import Language.PureScript.Traversals
+import Language.PureScript.AST.Literals
+import Language.PureScript.Kinds
 import Language.PureScript.Names
+import Language.PureScript.Traversals
+import Language.PureScript.Types
 
 everywhereOnValues
   :: (Declaration -> Declaration)
@@ -47,6 +48,7 @@ everywhereOnValues f g h = (f', g', h')
   g' (TypeClassDictionaryConstructorApp name v) = g (TypeClassDictionaryConstructorApp name (g' v))
   g' (Accessor prop v) = g (Accessor prop (g' v))
   g' (ObjectUpdate obj vs) = g (ObjectUpdate (g' obj) (map (fmap g') vs))
+  g' (ObjectUpdateNested obj vs) = g (ObjectUpdateNested (g' obj) (map (fmap g') vs))
   g' (Abs name v) = g (Abs name (g' v))
   g' (App v1 v2) = g (App (g' v1) (g' v2))
   g' (IfThenElse v1 v2 v3) = g (IfThenElse (g' v1) (g' v2) (g' v3))
@@ -114,6 +116,7 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   g' (TypeClassDictionaryConstructorApp name v) = TypeClassDictionaryConstructorApp name <$> (g v >>= g')
   g' (Accessor prop v) = Accessor prop <$> (g v >>= g')
   g' (ObjectUpdate obj vs) = ObjectUpdate <$> (g obj >>= g') <*> traverse (sndM (g' <=< g)) vs
+  g' (ObjectUpdateNested obj vs) = ObjectUpdateNested <$> (g obj >>= g') <*> traverse (sndM (g' <=< g)) vs
   g' (Abs name v) = Abs name <$> (g v >>= g')
   g' (App v1 v2) = App <$> (g v1 >>= g') <*> (g v2 >>= g')
   g' (IfThenElse v1 v2 v3) = IfThenElse <$> (g v1 >>= g') <*> (g v2 >>= g') <*> (g v3 >>= g')
@@ -181,6 +184,7 @@ everywhereOnValuesM f g h = (f', g', h')
   g' (TypeClassDictionaryConstructorApp name v) = (TypeClassDictionaryConstructorApp name <$> g' v) >>= g
   g' (Accessor prop v) = (Accessor prop <$> g' v) >>= g
   g' (ObjectUpdate obj vs) = (ObjectUpdate <$> g' obj <*> traverse (sndM g') vs) >>= g
+  g' (ObjectUpdateNested obj vs) = (ObjectUpdateNested <$> g' obj <*> traverse (sndM g') vs) >>= g
   g' (Abs name v) = (Abs name <$> g' v) >>= g
   g' (App v1 v2) = (App <$> g' v1 <*> g' v2) >>= g
   g' (IfThenElse v1 v2 v3) = (IfThenElse <$> g' v1 <*> g' v2 <*> g' v3) >>= g
@@ -253,6 +257,7 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   g' v@(TypeClassDictionaryConstructorApp _ v1) = g v <> g' v1
   g' v@(Accessor _ v1) = g v <> g' v1
   g' v@(ObjectUpdate obj vs) = foldl (<>) (g v <> g' obj) (map (g' . snd) vs)
+  g' v@(ObjectUpdateNested obj vs) = foldl (<>) (g v <> g' obj) (map (g' . snd) vs)
   g' v@(Abs _ v1) = g v <> g' v1
   g' v@(App v1 v2) = g v <> g' v1 <> g' v2
   g' v@(IfThenElse v1 v2 v3) = g v <> g' v1 <> g' v2 <> g' v3
@@ -330,6 +335,7 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   g' s (TypeClassDictionaryConstructorApp _ v1) = g'' s v1
   g' s (Accessor _ v1) = g'' s v1
   g' s (ObjectUpdate obj vs) = foldl (<>) (g'' s obj) (map (g'' s . snd) vs)
+  g' s (ObjectUpdateNested obj vs) = foldl (<>) (g'' s obj) (map (g'' s . snd) vs)
   g' s (Abs _ v1) = g'' s v1
   g' s (App v1 v2) = g'' s v1 <> g'' s v2
   g' s (IfThenElse v1 v2 v3) = g'' s v1 <> g'' s v2 <> g'' s v3
@@ -409,6 +415,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   g' s (TypeClassDictionaryConstructorApp name v) = TypeClassDictionaryConstructorApp name <$> g'' s v
   g' s (Accessor prop v) = Accessor prop <$> g'' s v
   g' s (ObjectUpdate obj vs) = ObjectUpdate <$> g'' s obj <*> traverse (sndM (g'' s)) vs
+  g' s (ObjectUpdateNested obj vs) = ObjectUpdateNested <$> g'' s obj <*> traverse (sndM (g'' s)) vs
   g' s (Abs name v) = Abs name <$> g'' s v
   g' s (App v1 v2) = App <$> g'' s v1 <*> g'' s v2
   g' s (IfThenElse v1 v2 v3) = IfThenElse <$> g'' s v1 <*> g'' s v2 <*> g'' s v3
@@ -474,7 +481,8 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
     in foldMap (f'' s') ds
   f' s (ValueDeclaration name _ bs (Right val)) =
     let s' = S.insert name s
-    in foldMap (h'' s') bs <> g'' s' val
+        s'' = S.union s' (S.fromList (concatMap binderNames bs))
+    in foldMap (h'' s') bs <> g'' s'' val
   f' s (ValueDeclaration name _ bs (Left gs)) =
     let s' = S.insert name s
         s'' = S.union s' (S.fromList (concatMap binderNames bs))
@@ -498,6 +506,7 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   g' s (TypeClassDictionaryConstructorApp _ v1) = g'' s v1
   g' s (Accessor _ v1) = g'' s v1
   g' s (ObjectUpdate obj vs) = g'' s obj <> foldMap (g'' s . snd) vs
+  g' s (ObjectUpdateNested obj vs) = g'' s obj <> foldMap (g'' s . snd) vs
   g' s (Abs (Left name) v1) =
     let s' = S.insert name s
     in g'' s' v1
@@ -586,6 +595,42 @@ accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (con
   forValues (DeferredDictionary _ tys) = mconcat (map f tys)
   forValues (TypedValue _ _ ty) = f ty
   forValues _ = mempty
+
+accumKinds
+  :: (Monoid r)
+  => (Kind -> r)
+  -> ( Declaration -> r
+     , Expr -> r
+     , Binder -> r
+     , CaseAlternative -> r
+     , DoNotationElement -> r
+     )
+accumKinds f = everythingOnValues mappend forDecls forValues (const mempty) (const mempty) (const mempty)
+  where
+  forDecls (DataDeclaration _ _ args dctors) =
+    foldMap (foldMap f . snd) args `mappend`
+    foldMap (foldMap forTypes . snd) dctors
+  forDecls (TypeClassDeclaration _ args implies _ _) =
+    foldMap (foldMap f . snd) args `mappend`
+    foldMap (foldMap forTypes . constraintArgs) implies
+  forDecls (TypeInstanceDeclaration _ cs _ tys _) =
+    foldMap (foldMap forTypes . constraintArgs) cs `mappend`
+    foldMap forTypes tys
+  forDecls (TypeSynonymDeclaration _ args ty) =
+    foldMap (foldMap f . snd) args `mappend`
+    forTypes ty
+  forDecls (TypeDeclaration _ ty) = forTypes ty
+  forDecls (ExternDeclaration _ ty) = forTypes ty
+  forDecls (ExternDataDeclaration _ kn) = f kn
+  forDecls _ = mempty
+
+  forValues (TypeClassDictionary c _ _) = foldMap forTypes (constraintArgs c)
+  forValues (DeferredDictionary _ tys) = foldMap forTypes tys
+  forValues (TypedValue _ _ ty) = forTypes ty
+  forValues _ = mempty
+
+  forTypes (KindedType _ k) = f k
+  forTypes _ = mempty
 
 -- |
 -- Map a function over type annotations appearing inside a value

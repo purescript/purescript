@@ -1,5 +1,5 @@
 name: purescript
-version: 0.10.1
+version: 0.10.5
 cabal-version: >=1.8
 build-type: Simple
 license: BSD3
@@ -28,6 +28,7 @@ extra-source-files: examples/passing/*.purs
                   , examples/passing/ExplicitImportReExport/*.purs
                   , examples/passing/ExportExplicit/*.purs
                   , examples/passing/ExportExplicit2/*.purs
+                  , examples/passing/ForeignKind/*.purs
                   , examples/passing/Import/*.purs
                   , examples/passing/ImportExplicit/*.purs
                   , examples/passing/ImportQualified/*.purs
@@ -39,6 +40,8 @@ extra-source-files: examples/passing/*.purs
                   , examples/passing/ModuleExportQualified/*.purs
                   , examples/passing/ModuleExportSelf/*.purs
                   , examples/passing/NonConflictingExports/*.purs
+                  , examples/passing/NonOrphanInstanceMulti/*.purs
+                  , examples/passing/NonOrphanInstanceFunDepExtra/*.purs
                   , examples/passing/OperatorAliasElsewhere/*.purs
                   , examples/passing/Operators/*.purs
                   , examples/passing/PendingConflictingImports/*.purs
@@ -50,16 +53,21 @@ extra-source-files: examples/passing/*.purs
                   , examples/passing/ResolvableScopeConflict2/*.purs
                   , examples/passing/ResolvableScopeConflict3/*.purs
                   , examples/passing/ShadowedModuleName/*.purs
+                  , examples/passing/SolvingIsSymbol/*.purs
+                  , examples/passing/StringEdgeCases/*.purs
                   , examples/passing/TransitiveImport/*.purs
                   , examples/passing/TypeOperators/*.purs
                   , examples/passing/TypeWithoutParens/*.purs
                   , examples/failing/*.purs
                   , examples/failing/1733/*.purs
+                  , examples/failing/2378/*.purs
+                  , examples/failing/2379/*.purs
                   , examples/failing/ConflictingExports/*.purs
                   , examples/failing/ConflictingImports/*.purs
                   , examples/failing/ConflictingImports2/*.purs
                   , examples/failing/ConflictingQualifiedImports/*.purs
                   , examples/failing/ConflictingQualifiedImports2/*.purs
+                  , examples/failing/DiffKindsSameName/*.purs
                   , examples/failing/DuplicateModule/*.purs
                   , examples/failing/ExportConflictClass/*.purs
                   , examples/failing/ExportConflictCtor/*.purs
@@ -75,6 +83,9 @@ extra-source-files: examples/passing/*.purs
                   , examples/failing/ImportModule/*.purs
                   , examples/failing/InstanceExport/*.purs
                   , examples/failing/OrphanInstance/*.purs
+                  , examples/failing/OrphanInstanceFunDepCycle/*.purs
+                  , examples/failing/OrphanInstanceWithDetermined/*.purs
+                  , examples/failing/OrphanInstanceNullary/*.purs
                   , examples/warning/*.purs
                   , examples/warning/*.js
                   , examples/warning/UnusedExplicitImportTypeOp/*.purs
@@ -106,7 +117,7 @@ library
                    aeson-better-errors >= 0.8,
                    ansi-terminal >= 0.6.2 && < 0.7,
                    base-compat >=0.6.0,
-                   bower-json >= 0.8,
+                   bower-json >= 1.0.0.1 && < 1.1,
                    boxes >= 0.1.4 && < 0.2.0,
                    bytestring -any,
                    containers -any,
@@ -121,7 +132,7 @@ library
                    haskeline >= 0.7.0.0,
                    http-client >= 0.4.30 && <0.5,
                    http-types -any,
-                   language-javascript == 0.6.*,
+                   language-javascript >= 0.6.0.9 && < 0.7,
                    lens == 4.*,
                    lifted-base >= 0.2.3 && < 0.2.4,
                    monad-control >= 1.0.0.0 && < 1.1,
@@ -136,6 +147,7 @@ library
                    protolude >= 0.1.6,
                    regex-tdfa -any,
                    safe >= 0.3.9 && < 0.4,
+                   scientific >= 0.3.4.9 && < 0.4,
                    semigroups >= 0.16.2 && < 0.19,
                    sourcemap >= 0.1.6,
                    spdx == 0.2.*,
@@ -191,6 +203,7 @@ library
                      Language.PureScript.Errors
                      Language.PureScript.Errors.JSON
                      Language.PureScript.Kinds
+                     Language.PureScript.Label
                      Language.PureScript.Linter
                      Language.PureScript.Linter.Exhaustive
                      Language.PureScript.Linter.Imports
@@ -211,6 +224,7 @@ library
                      Language.PureScript.Pretty.Kinds
                      Language.PureScript.Pretty.Types
                      Language.PureScript.Pretty.Values
+                     Language.PureScript.PSString
                      Language.PureScript.Renamer
                      Language.PureScript.Sugar
                      Language.PureScript.Sugar.BindingGroups
@@ -249,13 +263,14 @@ library
                      Language.PureScript.Docs.Convert
                      Language.PureScript.Docs.Convert.Single
                      Language.PureScript.Docs.Convert.ReExports
+                     Language.PureScript.Docs.Prim
                      Language.PureScript.Docs.Render
                      Language.PureScript.Docs.Types
                      Language.PureScript.Docs.RenderedCode
                      Language.PureScript.Docs.RenderedCode.Types
                      Language.PureScript.Docs.RenderedCode.Render
                      Language.PureScript.Docs.AsMarkdown
-                     Language.PureScript.Docs.ParseAndBookmark
+                     Language.PureScript.Docs.ParseInPackage
                      Language.PureScript.Docs.Utils.MonoidExtras
 
                      Language.PureScript.Publish
@@ -267,11 +282,11 @@ library
                      Language.PureScript.Ide.CaseSplit
                      Language.PureScript.Ide.Command
                      Language.PureScript.Ide.Completion
-                     Language.PureScript.Ide.Conversions
                      Language.PureScript.Ide.Externs
                      Language.PureScript.Ide.Error
-                     Language.PureScript.Ide.Imports
                      Language.PureScript.Ide.Filter
+                     Language.PureScript.Ide.Imports
+                     Language.PureScript.Ide.Logging
                      Language.PureScript.Ide.Matcher
                      Language.PureScript.Ide.Pursuit
                      Language.PureScript.Ide.Rebuild
@@ -311,6 +326,7 @@ library
                      PatternSynonyms
                      RankNTypes
                      RecordWildCards
+                     OverloadedStrings
                      ScopedTypeVariables
                      TupleSections
                      ViewPatterns
@@ -334,6 +350,7 @@ executable psc
                    mtl -any,
                    optparse-applicative >= 0.12.1,
                    parsec -any,
+                   text -any,
                    time -any,
                    transformers -any,
                    transformers-compat -any,
@@ -387,6 +404,7 @@ executable psc-docs
                    optparse-applicative >= 0.12.1,
                    process -any,
                    split -any,
+                   text -any,
                    transformers -any,
                    transformers-compat -any
     main-is: Main.hs
@@ -410,6 +428,24 @@ executable psc-publish
     hs-source-dirs: psc-publish
     ghc-options: -Wall -O2
 
+executable psc-package
+    build-depends: base >=4 && <5,
+                   purescript -any,
+                   aeson -any,
+                   aeson-pretty -any,
+                   bytestring -any,
+                   containers -any,
+                   foldl -any,
+                   optparse-applicative -any,
+                   system-filepath -any,
+                   text -any,
+                   turtle <1.3
+    main-is: Main.hs
+    other-modules: Paths_purescript
+    buildable: True
+    hs-source-dirs: psc-package
+    ghc-options: -Wall -O2
+
 executable psc-hierarchy
     build-depends: base >=4 && <5,
                    purescript -any,
@@ -419,7 +455,8 @@ executable psc-hierarchy
                    mtl -any,
                    optparse-applicative >= 0.12.1,
                    parsec -any,
-                   process -any
+                   process -any,
+                   text -any
     main-is: Main.hs
     other-modules: Paths_purescript
     buildable: True
@@ -432,14 +469,19 @@ executable psc-bundle
   other-modules:       Paths_purescript
   other-extensions:
   build-depends:       base >=4 && <5,
+                       bytestring -any,
                        purescript -any,
                        directory -any,
+                       aeson >= 0.8 && < 1.0,
                        filepath -any,
                        Glob -any,
                        mtl -any,
                        optparse-applicative >= 0.12.1,
+                       sourcemap >= 0.1.6,
                        transformers -any,
-                       transformers-compat -any
+                       transformers-compat -any,
+                       utf8-string >= 1 && < 2
+
   ghc-options:         -Wall -O2
   hs-source-dirs:      psc-bundle
 
@@ -486,6 +528,7 @@ test-suite tests
                    aeson -any,
                    aeson-better-errors -any,
                    base-compat -any,
+                   bower-json -any,
                    boxes -any,
                    bytestring -any,
                    containers -any,
@@ -515,6 +558,7 @@ test-suite tests
     other-modules: TestUtils
                    TestCompiler
                    TestDocs
+                   TestPrimDocs
                    TestPscPublish
                    TestPsci
                    TestPscIde

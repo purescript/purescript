@@ -12,8 +12,6 @@
 -- Provides functionality to manage imports
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings     #-}
-
 module Language.PureScript.Ide.Imports
        ( addImplicitImport
        , addImportForIdentifier
@@ -34,7 +32,6 @@ import           Protolude
 import           Control.Lens                       ((^.))
 import           Data.List                          (findIndex, nubBy)
 import qualified Data.Text                          as T
-import qualified Data.Text.IO                       as TIO
 import qualified Language.PureScript                as P
 import           Language.PureScript.Ide.Completion
 import           Language.PureScript.Ide.Error
@@ -42,6 +39,7 @@ import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
+import           System.IO.UTF8                     (readUTF8FileT, writeUTF8FileT)
 
 data Import = Import P.ModuleName P.ImportDeclarationType  (Maybe P.ModuleName)
               deriving (Eq, Show)
@@ -72,7 +70,7 @@ compImport (Import n i q) (Import n' i' q')
 parseImportsFromFile :: (MonadIO m, MonadError PscIdeError m) =>
                         FilePath -> m (P.ModuleName, [Text], [Import], [Text])
 parseImportsFromFile fp = do
-  file <- liftIO (TIO.readFile fp)
+  file <- liftIO (readUTF8FileT fp)
   case sliceImportSection (T.lines file) of
     Right res -> pure res
     Left err -> throwError (GeneralError err)
@@ -145,7 +143,7 @@ step (Res start end) _ = Res start end
 
 moduleParse :: [Text] -> Either Text P.Module
 moduleParse t = first show $ do
-  tokens <- (P.lex "" . T.unpack . T.unlines) t
+  tokens <- P.lex "" (T.unlines t)
   P.runTokenParser "<psc-ide>" P.parseModule tokens
 
 -- | Adds an implicit import like @import Prelude@ to a Sourcefile.
@@ -202,7 +200,7 @@ addExplicitImport' decl moduleName imports =
     refFromDeclaration (IdeDeclTypeClass n) =
       P.TypeClassRef n
     refFromDeclaration (IdeDeclDataConstructor dtor) =
-      P.TypeRef (dtor ^. ideDtorTypeName) (Just [dtor ^. ideDtorName])
+      P.TypeRef (dtor ^. ideDtorTypeName) Nothing
     refFromDeclaration (IdeDeclType t) =
       P.TypeRef (t ^. ideTypeName) (Just [])
     refFromDeclaration (IdeDeclValueOperator op) =
@@ -210,13 +208,13 @@ addExplicitImport' decl moduleName imports =
     refFromDeclaration (IdeDeclTypeOperator op) =
       P.TypeOpRef (op ^. ideTypeOpName)
     refFromDeclaration d =
-      P.ValueRef $ P.Ident $ T.unpack (identifierFromIdeDeclaration d)
+      P.ValueRef (P.Ident (identifierFromIdeDeclaration d))
 
     -- | Adds a declaration to an import:
     -- TypeDeclaration "Maybe" + Data.Maybe (maybe) -> Data.Maybe(Maybe, maybe)
     insertDeclIntoImport :: IdeDeclaration -> Import -> Import
     insertDeclIntoImport decl' (Import mn (P.Explicit refs) Nothing) =
-      Import mn (P.Explicit (insertDeclIntoRefs decl' refs)) Nothing
+      Import mn (P.Explicit (sortBy P.compDecRef (insertDeclIntoRefs decl' refs))) Nothing
     insertDeclIntoImport _ is = is
 
     insertDeclIntoRefs :: IdeDeclaration -> [P.DeclarationRef] -> [P.DeclarationRef]
@@ -228,12 +226,7 @@ addExplicitImport' decl moduleName imports =
         refs
     insertDeclIntoRefs dr refs = nubBy ((==) `on` P.prettyPrintRef) (refFromDeclaration dr : refs)
 
-    insertDtor dtor (P.TypeRef tn' dtors) =
-      case dtors of
-        Just dtors' -> P.TypeRef tn' (Just (ordNub (dtor : dtors')))
-        -- This means the import was opened. We don't add anything in this case
-        -- import Data.Maybe (Maybe(..)) -> import Data.Maybe (Maybe(Just))
-        Nothing -> P.TypeRef tn' Nothing
+    insertDtor _ (P.TypeRef tn' _) = P.TypeRef tn' Nothing
     insertDtor _ refs = refs
 
     matchType :: P.ProperName 'P.TypeName -> P.DeclarationRef -> Bool
@@ -309,9 +302,9 @@ addImportForIdentifier fp ident filters = do
 prettyPrintImport' :: Import -> Text
 -- TODO: remove this clause once P.prettyPrintImport can properly handle PositionedRefs
 prettyPrintImport' (Import mn (P.Explicit refs) qual) =
-  T.pack $ "import " ++ P.prettyPrintImport mn (P.Explicit (unwrapPositionedRef <$> refs)) qual
+  "import " <> P.prettyPrintImport mn (P.Explicit (unwrapPositionedRef <$> refs)) qual
 prettyPrintImport' (Import mn idt qual) =
-  T.pack $ "import " ++ P.prettyPrintImport mn idt qual
+  "import " <> P.prettyPrintImport mn idt qual
 
 prettyPrintImportSection :: [Import] -> [Text]
 prettyPrintImportSection imports = map prettyPrintImport' (sort imports)
@@ -322,15 +315,15 @@ prettyPrintImportSection imports = map prettyPrintImport' (sort imports)
 answerRequest :: (MonadIO m) => Maybe FilePath -> [Text] -> m Success
 answerRequest outfp rs  =
   case outfp of
-    Nothing -> pure $ MultilineTextResult rs
+    Nothing -> pure (MultilineTextResult rs)
     Just outfp' -> do
-      liftIO $ TIO.writeFile outfp' (T.unlines rs)
-      pure $ TextResult $ "Written to " <> T.pack outfp'
+      liftIO (writeUTF8FileT outfp' (T.unlines rs))
+      pure (TextResult ("Written to " <> T.pack outfp'))
 
 -- | Test and ghci helper
 parseImport :: Text -> Maybe Import
 parseImport t =
-  case P.lex "<psc-ide>" (T.unpack t)
+  case P.lex "<psc-ide>" t
        >>= P.runTokenParser "<psc-ide>" P.parseImportDeclaration' of
     Right (mn, P.Explicit refs, mmn) ->
       Just (Import mn (P.Explicit (unwrapPositionedRef <$> refs)) mmn)

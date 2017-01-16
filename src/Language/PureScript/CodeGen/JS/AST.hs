@@ -5,10 +5,13 @@ module Language.PureScript.CodeGen.JS.AST where
 
 import Prelude.Compat
 
-import Control.Monad.Identity
+import Control.Monad ((>=>))
+import Control.Monad.Identity (Identity(..), runIdentity)
+import Data.Text (Text)
 
 import Language.PureScript.AST (SourceSpan(..))
 import Language.PureScript.Comments
+import Language.PureScript.PSString (PSString)
 import Language.PureScript.Traversals
 
 -- |
@@ -130,7 +133,7 @@ data JS
   -- |
   -- A string literal
   --
-  | JSStringLiteral (Maybe SourceSpan) String
+  | JSStringLiteral (Maybe SourceSpan) PSString
   -- |
   -- A boolean literal
   --
@@ -154,15 +157,11 @@ data JS
   -- |
   -- An object literal
   --
-  | JSObjectLiteral (Maybe SourceSpan) [(String, JS)]
-  -- |
-  -- An object property accessor expression
-  --
-  | JSAccessor (Maybe SourceSpan) String JS
+  | JSObjectLiteral (Maybe SourceSpan) [(PSString, JS)]
   -- |
   -- A function introduction (optional name, arguments, body)
   --
-  | JSFunction (Maybe SourceSpan) (Maybe String) [String] JS
+  | JSFunction (Maybe SourceSpan) (Maybe Text) [Text] JS
   -- |
   -- Function application
   --
@@ -170,7 +169,7 @@ data JS
   -- |
   -- Variable
   --
-  | JSVar (Maybe SourceSpan) String
+  | JSVar (Maybe SourceSpan) Text
   -- |
   -- Conditional expression
   --
@@ -182,7 +181,7 @@ data JS
   -- |
   -- A variable introduction and optional initialization
   --
-  | JSVariableIntroduction (Maybe SourceSpan) String (Maybe JS)
+  | JSVariableIntroduction (Maybe SourceSpan) Text (Maybe JS)
   -- |
   -- A variable assignment
   --
@@ -194,11 +193,11 @@ data JS
   -- |
   -- For loop
   --
-  | JSFor (Maybe SourceSpan) String JS JS JS
+  | JSFor (Maybe SourceSpan) Text JS JS JS
   -- |
   -- ForIn loop
   --
-  | JSForIn (Maybe SourceSpan) String JS JS
+  | JSForIn (Maybe SourceSpan) Text JS JS
   -- |
   -- If-then-else statement
   --
@@ -222,23 +221,24 @@ data JS
   -- |
   -- Labelled statement
   --
-  | JSLabel (Maybe SourceSpan) String JS
+  | JSLabel (Maybe SourceSpan) Text JS
   -- |
   -- Break statement
   --
-  | JSBreak (Maybe SourceSpan) String
+  | JSBreak (Maybe SourceSpan) Text
   -- |
   -- Continue statement
   --
-  | JSContinue (Maybe SourceSpan) String
+  | JSContinue (Maybe SourceSpan) Text
   -- |
   -- Raw Javascript (generated when parsing fails for an inline foreign import declaration)
   --
-  | JSRaw (Maybe SourceSpan) String
+  | JSRaw (Maybe SourceSpan) Text
   -- |
   -- Commented Javascript
   --
-  | JSComment (Maybe SourceSpan) [Comment] JS deriving (Show, Eq)
+  | JSComment (Maybe SourceSpan) [Comment] JS
+  deriving (Show, Eq)
 
 withSourceSpan :: SourceSpan -> JS -> JS
 withSourceSpan withSpan = go
@@ -255,7 +255,6 @@ withSourceSpan withSpan = go
   go (JSArrayLiteral _ js) = JSArrayLiteral ss js
   go (JSIndexer _ j1 j2) = JSIndexer ss j1 j2
   go (JSObjectLiteral _ js) = JSObjectLiteral ss js
-  go (JSAccessor _ prop j) = JSAccessor ss prop j
   go (JSFunction _ name args j) = JSFunction ss name args j
   go (JSApp _ j js) = JSApp ss j js
   go (JSVar _ s) = JSVar ss s
@@ -289,7 +288,6 @@ getSourceSpan = go
   go (JSArrayLiteral ss _) = ss
   go (JSIndexer ss _ _) = ss
   go (JSObjectLiteral ss _) = ss
-  go (JSAccessor ss _ _) = ss
   go (JSFunction ss _ _ _) = ss
   go (JSApp ss _ _) = ss
   go (JSVar ss _) = ss
@@ -324,7 +322,6 @@ everywhereOnJS f = go
   go (JSArrayLiteral ss js) = f (JSArrayLiteral ss (map go js))
   go (JSIndexer ss j1 j2) = f (JSIndexer ss (go j1) (go j2))
   go (JSObjectLiteral ss js) = f (JSObjectLiteral ss (map (fmap go) js))
-  go (JSAccessor ss prop j) = f (JSAccessor ss prop (go j))
   go (JSFunction ss name args j) = f (JSFunction ss name args (go j))
   go (JSApp ss j js) = f (JSApp ss (go j) (map go js))
   go (JSConditional ss j1 j2 j3) = f (JSConditional ss (go j1) (go j2) (go j3))
@@ -355,7 +352,6 @@ everywhereOnJSTopDownM f = f >=> go
   go (JSArrayLiteral ss js) = JSArrayLiteral ss <$> traverse f' js
   go (JSIndexer ss j1 j2) = JSIndexer ss <$> f' j1 <*> f' j2
   go (JSObjectLiteral ss js) = JSObjectLiteral ss <$> traverse (sndM f') js
-  go (JSAccessor ss prop j) = JSAccessor ss prop <$> f' j
   go (JSFunction ss name args j) = JSFunction ss name args <$> f' j
   go (JSApp ss j js) = JSApp ss <$> f' j <*> traverse f' js
   go (JSConditional ss j1 j2 j3) = JSConditional ss <$> f' j1 <*> f' j2 <*> f' j3
@@ -382,7 +378,6 @@ everythingOnJS (<>) f = go
   go j@(JSArrayLiteral _ js) = foldl (<>) (f j) (map go js)
   go j@(JSIndexer _ j1 j2) = f j <> go j1 <> go j2
   go j@(JSObjectLiteral _ js) = foldl (<>) (f j) (map (go . snd) js)
-  go j@(JSAccessor _ _ j1) = f j <> go j1
   go j@(JSFunction _ _ _ j1) = f j <> go j1
   go j@(JSApp _ j1 js) = foldl (<>) (f j <> go j1) (map go js)
   go j@(JSConditional _ j1 j2 j3) = f j <> go j1 <> go j2 <> go j3

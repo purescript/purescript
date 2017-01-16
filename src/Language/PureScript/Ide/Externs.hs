@@ -12,8 +12,7 @@
 -- Handles externs files for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards   #-}
+{-# LANGUAGE PackageImports  #-}
 
 module Language.PureScript.Ide.Externs
   ( readExternFile
@@ -23,24 +22,37 @@ module Language.PureScript.Ide.Externs
 
 import           Protolude
 
-import           Control.Lens                  ((^.))
-import           Data.Aeson                    (decodeStrict)
-import qualified Data.ByteString               as BS
-import           Data.List                     (nub)
-import qualified Data.Map                      as Map
+import           Control.Lens ((^.))
+import           "monad-logger" Control.Monad.Logger
+import           Data.Aeson (decodeStrict)
+import qualified Data.ByteString as BS
+import qualified Data.Map as Map
+import           Data.Version (showVersion)
 import           Language.PureScript.Ide.Error (PscIdeError (..))
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 
-import qualified Language.PureScript           as P
+import qualified Language.PureScript as P
 
-readExternFile :: (MonadIO m, MonadError PscIdeError m) =>
+readExternFile :: (MonadIO m, MonadError PscIdeError m, MonadLogger m) =>
                   FilePath -> m P.ExternsFile
 readExternFile fp = do
    parseResult <- liftIO (decodeStrict <$> BS.readFile fp)
    case parseResult of
-     Nothing -> throwError . GeneralError $ "Parsing the extern at: " <> toS fp <> " failed"
+     Nothing ->
+       throwError (GeneralError
+                   ("Parsing the extern at: " <> toS fp <> " failed"))
+     Just externs
+       | P.efVersion externs /= version -> do
+           let errMsg = "Version mismatch for the externs at: " <> toS fp
+                        <> " Expected: " <> version
+                        <> " Found: " <> P.efVersion externs
+           logErrorN errMsg
+           throwError (GeneralError errMsg)
      Just externs -> pure externs
+
+     where
+       version = toS (showVersion P.version)
 
 convertExterns :: P.ExternsFile -> (Module, [(P.ModuleName, P.DeclarationRef)])
 convertExterns ef =
@@ -55,7 +67,7 @@ convertExterns ef =
     declarations = mapMaybe convertDecl (P.efDeclarations ef)
 
     typeClassFilter = foldMap removeTypeDeclarationsForClass (filter isTypeClassDeclaration declarations)
-    cleanDeclarations = nub $ appEndo typeClassFilter declarations
+    cleanDeclarations = ordNub (appEndo typeClassFilter declarations)
 
 removeTypeDeclarationsForClass :: IdeDeclaration -> Endo [IdeDeclaration]
 removeTypeDeclarationsForClass (IdeDeclTypeClass n) = Endo (filter notDuplicate)
@@ -82,6 +94,7 @@ convertDecl P.EDDataConstructor{..} = Just $ IdeDeclDataConstructor $
 convertDecl P.EDValue{..} = Just $ IdeDeclValue $
   IdeValue edValueName edValueType
 convertDecl P.EDClass{..} = Just (IdeDeclTypeClass edClassName)
+convertDecl P.EDKind{..} = Just (IdeDeclKind edKindName)
 convertDecl P.EDInstance{} = Nothing
 
 convertOperator :: P.ExternsFixity -> IdeDeclaration
@@ -120,14 +133,17 @@ annotateModule (defs, types) (moduleName, decls) =
       IdeDeclDataConstructor dtor ->
         annotateValue (dtor ^. ideDtorName . properNameT) (IdeDeclDataConstructor dtor)
       IdeDeclTypeClass i ->
-        annotateType (runProperNameT i) (IdeDeclTypeClass i)
+        annotateType (i ^. properNameT) (IdeDeclTypeClass i)
       IdeDeclValueOperator op ->
         annotateValue (op ^. ideValueOpAlias & valueOperatorAliasT) (IdeDeclValueOperator op)
       IdeDeclTypeOperator op ->
         annotateType (op ^. ideTypeOpAlias & typeOperatorAliasT) (IdeDeclTypeOperator op)
+      IdeDeclKind i ->
+        annotateKind (i ^. properNameT) (IdeDeclKind i)
       where
-        annotateFunction x = IdeDeclarationAnn (ann { annLocation = Map.lookup (Left (runIdentT x)) defs
+        annotateFunction x = IdeDeclarationAnn (ann { annLocation = Map.lookup (IdeNSValue (P.runIdent x)) defs
                                                     , annTypeAnnotation = Map.lookup x types
                                                     })
-        annotateValue x = IdeDeclarationAnn (ann {annLocation = Map.lookup (Left x) defs})
-        annotateType x = IdeDeclarationAnn (ann {annLocation = Map.lookup (Right x) defs})
+        annotateValue x = IdeDeclarationAnn (ann {annLocation = Map.lookup (IdeNSValue x) defs})
+        annotateType x = IdeDeclarationAnn (ann {annLocation = Map.lookup (IdeNSType x) defs})
+        annotateKind x = IdeDeclarationAnn (ann {annLocation = Map.lookup (IdeNSKind x) defs})

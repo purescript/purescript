@@ -1,5 +1,4 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module Language.PureScript.Publish
   ( preparePackage
@@ -17,39 +16,31 @@ module Language.PureScript.Publish
   , checkCleanWorkingTree
   , getVersionFromGitTag
   , getBowerRepositoryInfo
-  , getModulesAndBookmarks
+  , getModules
   , getResolvedDependencies
   ) where
 
-import Prelude ()
-import Prelude.Compat hiding (userError)
+import Protolude hiding (stdin)
 
 import Control.Arrow ((***))
 import Control.Category ((>>>))
-import Control.Exception (catch, try)
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
-import Control.Monad.Writer.Strict
+import Control.Monad.Writer.Strict (MonadWriter, WriterT, runWriterT, tell)
 
 import Data.Aeson.BetterErrors
 import Data.Char (isSpace)
-import Data.Foldable (traverse_)
-import Data.Function (on)
-import Data.List (stripPrefix, isSuffixOf, (\\), nubBy)
+import Data.String (String, lines)
+import Data.List (stripPrefix, (\\), nubBy)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.List.Split (splitOn)
-import Data.Maybe
-import Data.Version
-import qualified Data.SPDX as SPDX
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
-
-import Safe (headMay)
+import Data.Time.Clock (UTCTime)
+import Data.Version
+import qualified Data.SPDX as SPDX
 
 import System.Directory (doesFileExist, findExecutable)
-import System.Exit (exitFailure)
 import System.FilePath (pathSeparator)
 import System.Process (readProcess)
 import qualified System.FilePath.Glob as Glob
@@ -60,13 +51,14 @@ import qualified Web.Bower.PackageMeta as Bower
 
 import Language.PureScript.Publish.ErrorsWarnings
 import Language.PureScript.Publish.Utils
-import qualified Language.PureScript as P (version)
+import qualified Language.PureScript as P (version, ModuleName)
 import qualified Language.PureScript.Docs as D
 
 data PublishOptions = PublishOptions
   { -- | How to obtain the version tag and version that the data being
     -- generated will refer to.
-    publishGetVersion :: PrepareM (String, Version)
+    publishGetVersion :: PrepareM (Text, Version)
+  , publishGetTagTime :: Text -> PrepareM UTCTime
   , -- | What to do when the working tree is dirty
     publishWorkingTreeDirty :: PrepareM ()
   }
@@ -74,6 +66,7 @@ data PublishOptions = PublishOptions
 defaultPublishOptions :: PublishOptions
 defaultPublishOptions = PublishOptions
   { publishGetVersion = getVersionFromGitTag
+  , publishGetTagTime = getTagTime
   , publishWorkingTreeDirty = userError DirtyWorkingTree
   }
 
@@ -126,9 +119,6 @@ otherError = throwError . OtherError
 catchLeft :: Applicative f => Either a b -> (a -> f b) -> f b
 catchLeft a f = either f pure a
 
-unlessM :: Monad m => m Bool -> m () -> m ()
-unlessM cond act = cond >>= flip unless act
-
 preparePackage' :: PublishOptions -> PrepareM D.UploadedPackage
 preparePackage' opts = do
   unlessM (liftIO (doesFileExist "bower.json")) (userError BowerJSONNotFound)
@@ -139,8 +129,9 @@ preparePackage' opts = do
   checkLicense pkgMeta
 
   (pkgVersionTag, pkgVersion) <- publishGetVersion opts
+  pkgTagTime                  <- Just <$> publishGetTagTime opts pkgVersionTag
   pkgGithub                   <- getBowerRepositoryInfo pkgMeta
-  (pkgBookmarks, pkgModules)  <- getModulesAndBookmarks
+  (pkgModules, pkgModuleMap)  <- getModules
 
   let declaredDeps = map fst (bowerDependencies pkgMeta ++
                               bowerDevDependencies pkgMeta)
@@ -151,18 +142,18 @@ preparePackage' opts = do
 
   return D.Package{..}
 
-getModulesAndBookmarks :: PrepareM ([D.Bookmark], [D.Module])
-getModulesAndBookmarks = do
+getModules :: PrepareM ([D.Module], Map P.ModuleName PackageName)
+getModules = do
   (inputFiles, depsFiles) <- liftIO getInputAndDepsFiles
-  (modules', bookmarks) <- parseAndBookmark inputFiles depsFiles
+  (modules', moduleMap) <- parseFilesInPackages inputFiles depsFiles
 
-  case runExcept (D.convertModulesInPackage modules') of
-    Right modules -> return (bookmarks, modules)
+  case runExcept (D.convertModulesInPackage modules' moduleMap) of
+    Right modules -> return (modules, moduleMap)
     Left err -> userError (CompileError err)
 
   where
-  parseAndBookmark inputFiles depsFiles = do
-    r <- liftIO . runExceptT $ D.parseAndBookmark inputFiles depsFiles
+  parseFilesInPackages inputFiles depsFiles = do
+    r <- liftIO . runExceptT $ D.parseFilesInPackages inputFiles depsFiles
     case r of
       Right r' ->
         return r'
@@ -185,21 +176,27 @@ checkCleanWorkingTree opts = do
   unless (status == Clean) $
     publishWorkingTreeDirty opts
 
-getVersionFromGitTag :: PrepareM (String, Version)
+getVersionFromGitTag :: PrepareM (Text, Version)
 getVersionFromGitTag = do
   out <- readProcess' "git" ["tag", "--list", "--points-at", "HEAD"] ""
   let vs = map trimWhitespace (lines out)
   case mapMaybe parseMay vs of
     []  -> userError TagMustBeCheckedOut
-    [x] -> return x
+    [x] -> return (first T.pack x)
     xs  -> userError (AmbiguousVersions (map snd xs))
   where
   trimWhitespace =
     dropWhile isSpace >>> reverse >>> dropWhile isSpace >>> reverse
-  parseMay str =
-    (str,) <$> D.parseVersion' (dropPrefix "v" str)
-  dropPrefix prefix str =
-    fromMaybe str (stripPrefix prefix str)
+  parseMay str = do
+    digits <- stripPrefix "v" str
+    (str,) <$> D.parseVersion' digits
+
+-- | Given a git tag, get the time it was created.
+getTagTime :: Text -> PrepareM UTCTime
+getTagTime tag = do
+  out <- readProcess' "git" ["show", T.unpack tag, "--no-patch", "--format=%aI"] ""
+  let time = headMay (lines out) >>= D.parseTime
+  maybe (internalError (CouldntParseGitTagDate tag)) pure time
 
 getBowerRepositoryInfo :: PackageMeta -> PrepareM (D.GithubUser, D.GithubRepo)
 getBowerRepositoryInfo = either (userError . BadRepositoryField) return . tryExtract
@@ -218,7 +215,7 @@ checkLicense pkgMeta =
     [] ->
       userError NoLicenseSpecified
     ls ->
-      unless (any isValidSPDX ls)
+      unless (any (isValidSPDX . T.unpack) ls)
         (userError InvalidLicense)
 
 -- |
@@ -227,9 +224,9 @@ checkLicense pkgMeta =
 isValidSPDX :: String -> Bool
 isValidSPDX = (== 1) . length . SPDX.parseExpression
 
-extractGithub :: String -> Maybe (D.GithubUser, D.GithubRepo)
+extractGithub :: Text -> Maybe (D.GithubUser, D.GithubRepo)
 extractGithub = stripGitHubPrefixes
-   >>> fmap (splitOn "/")
+   >>> fmap (T.splitOn "/")
    >=> takeTwo
    >>> fmap (D.GithubUser *** (D.GithubRepo . dropDotGit))
 
@@ -238,18 +235,18 @@ extractGithub = stripGitHubPrefixes
   takeTwo [x, y] = Just (x, y)
   takeTwo _ = Nothing
 
-  stripGitHubPrefixes :: String -> Maybe String
+  stripGitHubPrefixes :: Text -> Maybe Text
   stripGitHubPrefixes = stripPrefixes [ "git://github.com/"
                                       , "https://github.com/"
                                       , "git@github.com:"
                                       ]
 
-  stripPrefixes :: [String] -> String -> Maybe String
-  stripPrefixes prefixes str = msum $ (`stripPrefix` str) <$> prefixes
+  stripPrefixes :: [Text] -> Text -> Maybe Text
+  stripPrefixes prefixes str = msum $ (`T.stripPrefix` str) <$> prefixes
 
-  dropDotGit :: String -> String
+  dropDotGit :: Text -> Text
   dropDotGit str
-    | ".git" `isSuffixOf` str = take (length str - 4) str
+    | ".git" `T.isSuffixOf` str = T.take (T.length str - 4) str
     | otherwise = str
 
 readProcess' :: String -> [String] -> String -> PrepareM String
@@ -266,12 +263,12 @@ data DependencyStatus
     -- _resolution key. This can be caused by adding the dependency using
     -- `bower link`, or simply copying it into bower_components instead of
     -- installing it normally.
-  | ResolvedOther String
-    -- ^ Resolved, but to something other than a version. The String argument
+  | ResolvedOther Text
+    -- ^ Resolved, but to something other than a version. The Text argument
     -- is the resolution type. The values it can take that I'm aware of are
     -- "commit" and "branch".
-  | ResolvedVersion String
-    -- ^ Resolved to a version. The String argument is the resolution tag (eg,
+  | ResolvedVersion Text
+    -- ^ Resolved to a version. The Text argument is the resolution tag (eg,
     -- "v0.1.0").
   deriving (Show, Eq)
 
@@ -321,8 +318,7 @@ asResolvedDependencies = nubBy ((==) `on` fst) <$> go
   go =
     fmap (fromMaybe []) $
       keyMay "dependencies" $
-        (++) <$> eachInObjectWithKey (parsePackageName . T.unpack)
-                                     asDependencyStatus
+        (++) <$> eachInObjectWithKey parsePackageName asDependencyStatus
              <*> (concatMap snd <$> eachInObject asResolvedDependencies)
 
 -- | Extracts only the top level dependency names from the output of
@@ -331,7 +327,7 @@ asToplevelDependencies :: Parse BowerError [PackageName]
 asToplevelDependencies =
   fmap (map fst) $
     key "dependencies" $
-      eachInObjectWithKey (parsePackageName . T.unpack) (return ())
+      eachInObjectWithKey parsePackageName (return ())
 
 asDependencyStatus :: Parse e DependencyStatus
 asDependencyStatus = do
@@ -342,9 +338,9 @@ asDependencyStatus = do
     else
       key "pkgMeta" $
         keyOrDefault "_resolution" NoResolution $ do
-          type_ <- key "type" asString
+          type_ <- key "type" asText
           case type_ of
-            "version" -> ResolvedVersion <$> key "tag" asString
+            "version" -> ResolvedVersion <$> key "tag" asText
             other -> return (ResolvedOther other)
 
 warnUndeclared :: [PackageName] -> [PackageName] -> PrepareM ()
@@ -372,18 +368,19 @@ handleDeps deps = do
       ResolvedOther _   -> (ms, pkgName : os, is)
       ResolvedVersion v -> (ms, os, (pkgName, v) : is)
 
-  bowerDir pkgName = "bower_components/" ++ runPackageName pkgName
+  bowerDir pkgName = T.unpack $ "bower_components/" <> runPackageName pkgName
 
   -- Try to extract a version, and warn if unsuccessful.
+  tryExtractVersion' :: (PackageName, Text) -> PrepareM (Maybe (PackageName, Version))
   tryExtractVersion' pair =
     maybe (warn (UnacceptableVersion pair) >> return Nothing)
           (return . Just)
           (tryExtractVersion pair)
 
-tryExtractVersion :: (PackageName, String) -> Maybe (PackageName, Version)
+tryExtractVersion :: (PackageName, Text) -> Maybe (PackageName, Version)
 tryExtractVersion (pkgName, tag) =
-  let tag' = fromMaybe tag (stripPrefix "v" tag)
-  in  (pkgName,) <$> D.parseVersion' tag'
+  let tag' = fromMaybe tag (T.stripPrefix "v" tag)
+  in  (pkgName,) <$> D.parseVersion' (T.unpack tag')
 
 -- | Returns whether it looks like there is a purescript package checked out
 -- in the given directory.
@@ -406,6 +403,6 @@ getPackageName fp = do
   let xs = splitOn [pathSeparator] fp
   ys <- stripPrefix ["bower_components"] xs
   y <- headMay ys
-  case Bower.mkPackageName y of
+  case Bower.mkPackageName (T.pack y) of
     Right name -> Just name
     Left _ -> Nothing

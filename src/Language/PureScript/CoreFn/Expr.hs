@@ -10,6 +10,7 @@ import Control.Arrow ((***))
 import Language.PureScript.AST.Literals
 import Language.PureScript.CoreFn.Binders
 import Language.PureScript.Names
+import Language.PureScript.PSString (PSString)
 
 -- |
 -- Data type for expressions and terms
@@ -26,11 +27,11 @@ data Expr a
   -- |
   -- A record property accessor
   --
-  | Accessor a String (Expr a)
+  | Accessor a PSString (Expr a)
   -- |
   -- Partial record update
   --
-  | ObjectUpdate a (Expr a) [(String, Expr a)]
+  | ObjectUpdate a (Expr a) [(PSString, Expr a)]
   -- |
   -- Function introduction
   --

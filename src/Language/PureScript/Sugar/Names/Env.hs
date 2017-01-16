@@ -16,6 +16,7 @@ module Language.PureScript.Sugar.Names.Env
   , exportTypeClass
   , exportValue
   , exportValueOp
+  , exportKind
   , getExports
   , checkImportConflicts
   ) where
@@ -71,27 +72,27 @@ type ImportMap a = M.Map (Qualified a) [ImportRecord a]
 data Imports = Imports
   {
   -- |
-  -- Local names for types within a module mapped to to their qualified names
+  -- Local names for types within a module mapped to their qualified names
   --
     importedTypes :: ImportMap (ProperName 'TypeName)
   -- |
-  -- Local names for type operators within a module mapped to to their qualified names
+  -- Local names for type operators within a module mapped to their qualified names
   --
   , importedTypeOps :: ImportMap (OpName 'TypeOpName)
   -- |
-  -- Local names for data constructors within a module mapped to to their qualified names
+  -- Local names for data constructors within a module mapped to their qualified names
   --
   , importedDataConstructors :: ImportMap (ProperName 'ConstructorName)
   -- |
-  -- Local names for classes within a module mapped to to their qualified names
+  -- Local names for classes within a module mapped to their qualified names
   --
   , importedTypeClasses :: ImportMap (ProperName 'ClassName)
   -- |
-  -- Local names for values within a module mapped to to their qualified names
+  -- Local names for values within a module mapped to their qualified names
   --
   , importedValues :: ImportMap Ident
   -- |
-  -- Local names for value operators within a module mapped to to their qualified names
+  -- Local names for value operators within a module mapped to their qualified names
   --
   , importedValueOps :: ImportMap (OpName 'ValueOpName)
   -- |
@@ -104,10 +105,14 @@ data Imports = Imports
   -- The "as" names of modules that have been imported qualified.
   --
   , importedQualModules :: S.Set ModuleName
+  -- |
+  -- Local names for kinds within a module mapped to their qualified names
+  --
+  , importedKinds :: ImportMap (ProperName 'KindName)
   } deriving (Show)
 
 nullImports :: Imports
-nullImports = Imports M.empty M.empty M.empty M.empty M.empty M.empty S.empty S.empty
+nullImports = Imports M.empty M.empty M.empty M.empty M.empty M.empty S.empty S.empty M.empty
 
 -- |
 -- An 'Imports' value with imports for the `Prim` module.
@@ -117,6 +122,7 @@ primImports =
   nullImports
     { importedTypes = M.fromList $ mkEntries `concatMap` M.keys primTypes
     , importedTypeClasses = M.fromList $ mkEntries `concatMap` M.keys primClasses
+    , importedKinds = M.fromList $ mkEntries `concatMap` S.toList primKinds
     }
   where
   mkEntries :: Qualified a -> [(Qualified a, [ImportRecord a])]
@@ -155,13 +161,17 @@ data Exports = Exports
   -- from.
   --
   , exportedValueOps :: M.Map (OpName 'ValueOpName) ModuleName
+  -- |
+  -- The exported kinds along with the module they originally came from.
+  --
+  , exportedKinds :: M.Map (ProperName 'KindName) ModuleName
   } deriving (Show)
 
 -- |
 -- An empty 'Exports' value.
 --
 nullExports :: Exports
-nullExports = Exports M.empty M.empty M.empty M.empty M.empty
+nullExports = Exports M.empty M.empty M.empty M.empty M.empty M.empty
 
 -- |
 -- The imports and exports for a collection of modules. The 'SourceSpan' is used
@@ -196,10 +206,12 @@ primExports =
   nullExports
     { exportedTypes = M.fromList $ mkTypeEntry `map` M.keys primTypes
     , exportedTypeClasses = M.fromList $ mkClassEntry `map` M.keys primClasses
+    , exportedKinds = M.fromList $ mkKindEntry `map` S.toList primKinds
     }
   where
   mkTypeEntry (Qualified mn name) = (name, ([], fromJust mn))
   mkClassEntry (Qualified mn name) = (name, fromJust mn)
+  mkKindEntry (Qualified mn name) = (name, fromJust mn)
 
 -- | Environment which only contains the Prim module.
 primEnv :: Env
@@ -230,7 +242,12 @@ exportType
   -> m Exports
 exportType exportMode exps name dctors mn = do
   let exTypes = exportedTypes exps
-  let exClasses = exportedTypeClasses exps
+      exClasses = exportedTypeClasses exps
+      dctorNameCounts :: [(ProperName 'ConstructorName, Int)]
+      dctorNameCounts = M.toList $ M.fromListWith (+) (map (,1) dctors)
+  forM_ dctorNameCounts $ \(dctorName, count) ->
+    when (count > 1) $
+      throwDeclConflict (DctorName dctorName) (DctorName dctorName)
   case exportMode of
     Internal -> do
       when (name `M.member` exTypes) $
@@ -315,6 +332,19 @@ exportValueOp
 exportValueOp exps op mn = do
   valueOps <- addExport ValOpName op mn (exportedValueOps exps)
   return $ exps { exportedValueOps = valueOps }
+
+-- |
+-- Safely adds a kind to some exports, returning an error if a conflict occurs.
+--
+exportKind
+  :: MonadError MultipleErrors m
+  => Exports
+  -> ProperName 'KindName
+  -> ModuleName
+  -> m Exports
+exportKind exps name mn = do
+  kinds <- addExport KiName name mn (exportedKinds exps)
+  return $ exps { exportedKinds = kinds }
 
 -- |
 -- Adds an entry to a list of exports unless it is already present, in which

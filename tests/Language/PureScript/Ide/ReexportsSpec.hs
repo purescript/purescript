@@ -2,7 +2,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Language.PureScript.Ide.ReexportsSpec where
 
-import qualified Prelude
 import           Protolude
 
 import qualified Data.Map as Map
@@ -11,7 +10,7 @@ import           Language.PureScript.Ide.Types
 import qualified Language.PureScript as P
 import           Test.Hspec
 
-m :: Prelude.String -> P.ModuleName
+m :: Text -> P.ModuleName
 m = P.moduleNameFromString
 
 d :: IdeDeclaration -> IdeDeclarationAnn
@@ -19,7 +18,7 @@ d = IdeDeclarationAnn emptyAnn
 
 valueA, typeA, classA, dtorA1, dtorA2 :: IdeDeclarationAnn
 valueA = d (IdeDeclValue (IdeValue (P.Ident "valueA") P.REmpty))
-typeA = d (IdeDeclType (IdeType(P.ProperName "TypeA") P.Star))
+typeA = d (IdeDeclType (IdeType(P.ProperName "TypeA") P.kindType))
 classA = d (IdeDeclTypeClass (P.ProperName "ClassA"))
 dtorA1 = d (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName "DtorA1") (P.ProperName "TypeA") P.REmpty))
 dtorA2 = d (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName "DtorA2") (P.ProperName "TypeA") P.REmpty))

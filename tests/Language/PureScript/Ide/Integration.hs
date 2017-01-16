@@ -50,12 +50,14 @@ import           Data.Maybe                   (fromJust)
 
 import           Data.Aeson
 import           Data.Aeson.Types
-import qualified Data.Text                    as T
+import qualified Data.Text.Encoding           as T
+import qualified Data.ByteString.Char8        as BS8
+import qualified Data.ByteString.Lazy.Char8   as BSL8
 import qualified Data.Vector                  as V
-import           Language.PureScript.Ide.Util
 import qualified Language.PureScript          as P
 import           System.Directory
 import           System.FilePath
+import           System.IO
 import           System.IO.Error              (mkIOError, userErrorType)
 import           System.Process
 
@@ -124,11 +126,16 @@ fileGlob = "\"src/**/*.purs\""
 -- Integration Testing API
 
 sendCommand :: Value -> IO Text
-sendCommand v = toS <$> readCreateProcess
-  ((shell "psc-ide-client") { std_out=CreatePipe
-                            , std_err=CreatePipe
-                            })
-  (T.unpack (encodeT v))
+sendCommand v = do
+  (Just hin, Just hout, _, _) <-
+    createProcess ((proc "psc-ide-client" []) {std_in=CreatePipe, std_out=CreatePipe})
+
+  hSetEncoding hin utf8
+  hSetEncoding hout utf8
+
+  BS8.hPutStrLn hin (BSL8.toStrict (encode v))
+  hFlush hin
+  T.decodeUtf8 <$> BS8.hGetLine hout
 
 quitServer :: IO ()
 quitServer = do

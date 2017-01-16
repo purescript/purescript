@@ -7,8 +7,9 @@ module Language.PureScript.Parser.Types
 
 import Prelude.Compat
 
-import Control.Applicative
 import Control.Monad (when, unless)
+import Control.Applicative ((<|>))
+import qualified Data.Text as T
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.Environment
@@ -16,12 +17,13 @@ import Language.PureScript.Parser.Common
 import Language.PureScript.Parser.Kinds
 import Language.PureScript.Parser.Lexer
 import Language.PureScript.Types
+import Language.PureScript.Label (Label(..))
 
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
 parseFunction :: TokenParser Type
-parseFunction = parens rarrow >> return tyFunction
+parseFunction = parens rarrow *> return tyFunction
 
 parseObject :: TokenParser Type
 parseObject = braces $ TypeApp tyRecord <$> parseRow
@@ -39,7 +41,7 @@ parseTypeWildcard = do
 parseTypeVariable :: TokenParser Type
 parseTypeVariable = do
   ident <- identifier
-  when (ident `elem` reservedTypeNames) $ P.unexpected ident
+  when (ident `elem` reservedTypeNames) $ P.unexpected (T.unpack ident)
   return $ TypeVar ident
 
 parseTypeConstructor :: TokenParser Type
@@ -87,7 +89,7 @@ parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTabl
               , [ P.Infix (P.try (parseQualified parseOperator) >>= \ident ->
                     return (BinaryNoParensType (TypeOp ident))) P.AssocRight
                 ]
-              , [ P.Infix (rarrow >> return function) P.AssocRight ]
+              , [ P.Infix (rarrow *> return function) P.AssocRight ]
               ]
   postfixTable = [ \t -> KindedType t <$> (indented *> doubleColon *> parseKind)
                  ]
@@ -116,8 +118,8 @@ noWildcards p = do
   when (containsWildcards ty) $ P.unexpected "type wildcard"
   return ty
 
-parseNameAndType :: TokenParser t -> TokenParser (String, t)
-parseNameAndType p = (,) <$> (indented *> (lname <|> stringLiteral) <* indented <* doubleColon) <*> p
+parseNameAndType :: TokenParser t -> TokenParser (Label, t)
+parseNameAndType p = (,) <$> (indented *> (Label <$> parseLabel) <* indented <* doubleColon) <*> p
 
 parseRowEnding :: TokenParser Type
 parseRowEnding = P.option REmpty $ indented *> pipe *> indented *> parseType

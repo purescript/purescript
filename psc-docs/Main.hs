@@ -7,6 +7,9 @@ import Control.Monad.Trans.Except (runExceptT)
 import Control.Arrow (first, second)
 import Control.Category ((>>>))
 import Control.Monad.Writer
+import Data.Text (Text)
+import qualified Data.Text as T
+import qualified Data.Text.IO as T
 import Data.Function (on)
 import Data.List
 import Data.Maybe (fromMaybe)
@@ -20,7 +23,7 @@ import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
 import System.Exit (exitFailure)
 import System.IO (hPutStrLn, hPrint, hSetEncoding, stderr, stdout, utf8)
-import System.IO.UTF8 (readUTF8File)
+import System.IO.UTF8 (readUTF8FileT, writeUTF8FileT)
 import System.Directory (createDirectoryIfMissing)
 import System.FilePath (takeDirectory)
 import System.FilePath.Glob (glob)
@@ -57,17 +60,17 @@ docgen (PSCDocsOptions fmt inputGlob output) = do
     Etags -> dumpTags input dumpEtags
     Ctags -> dumpTags input dumpCtags
     Markdown -> do
-      ms <- runExceptT (D.parseAndBookmark input []
-                           >>= (fst >>> D.convertModulesInPackage))
+      ms <- runExceptT (D.parseFilesInPackages input []
+                           >>= uncurry D.convertModulesInPackage)
                >>= successOrExit
 
       case output of
         EverythingToStdOut ->
-          putStrLn (D.runDocs (D.modulesAsMarkdown ms))
+          T.putStrLn (D.runDocs (D.modulesAsMarkdown ms))
         ToStdOut names -> do
           let (ms', missing) = takeByName ms names
           guardMissing missing
-          putStrLn (D.runDocs (D.modulesAsMarkdown ms'))
+          T.putStrLn (D.runDocs (D.modulesAsMarkdown ms'))
         ToFiles names -> do
           let (ms', missing) = takeByName' ms names
           guardMissing missing
@@ -76,17 +79,17 @@ docgen (PSCDocsOptions fmt inputGlob output) = do
           forM_ ms'' $ \grp -> do
             let fp = fst (head grp)
             createDirectoryIfMissing True (takeDirectory fp)
-            writeFile fp (D.runDocs (D.modulesAsMarkdown (map snd grp)))
+            writeUTF8FileT fp (D.runDocs (D.modulesAsMarkdown (map snd grp)))
 
   where
   guardMissing [] = return ()
   guardMissing [mn] = do
-    hPutStrLn stderr ("psc-docs: error: unknown module \"" ++ P.runModuleName mn ++ "\"")
+    hPutStrLn stderr ("psc-docs: error: unknown module \"" ++ T.unpack (P.runModuleName mn) ++ "\"")
     exitFailure
   guardMissing mns = do
     hPutStrLn stderr "psc-docs: error: unknown modules:"
     forM_ mns $ \mn ->
-      hPutStrLn stderr ("  * " ++ P.runModuleName mn)
+      hPutStrLn stderr ("  * " ++ T.unpack (P.runModuleName mn))
     exitFailure
 
   successOrExit :: Either P.MultipleErrors a -> IO a
@@ -139,8 +142,8 @@ dumpTags input renderTags = do
   ldump :: [String] -> IO ()
   ldump = mapM_ putStrLn
 
-parseFile :: FilePath -> IO (FilePath, String)
-parseFile input = (,) input <$> readUTF8File input
+parseFile :: FilePath -> IO (FilePath, Text)
+parseFile input = (,) input <$> readUTF8FileT input
 
 inputFile :: Parser FilePath
 inputFile = strArgument $
@@ -185,11 +188,11 @@ parseItem :: String -> DocgenOutputItem
 parseItem s = case elemIndex ':' s of
   Just i ->
     s # splitAt i
-        >>> first P.moduleNameFromString
+        >>> first (P.moduleNameFromString . T.pack)
         >>> second (drop 1)
         >>> IToFile
   Nothing ->
-    IToStdOut (P.moduleNameFromString s)
+    IToStdOut (P.moduleNameFromString (T.pack s))
 
   where
   infixr 1 #
@@ -235,16 +238,16 @@ examples =
   PP.vcat $ map PP.text
     [ "Examples:"
     , "  print documentation for Data.List to stdout:"
-    , "    psc-docs \"src/**/*.purs\" \"bower_components/*/src/**/*.purs\" \\"
+    , "    psc-docs \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\" \\"
     , "      --docgen Data.List"
     , ""
     , "  write documentation for Data.List to docs/Data.List.md:"
-    , "    psc-docs \"src/**/*.purs\" \"bower_components/*/src/**/*.purs\" \\"
+    , "    psc-docs \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\" \\"
     , "      --docgen Data.List:docs/Data.List.md"
     , ""
     , "  write documentation for Data.List to docs/Data.List.md, and"
     , "  documentation for Data.List.Lazy to docs/Data.List.Lazy.md:"
-    , "    psc-docs \"src/**/*.purs\" \"bower_components/*/src/**/*.purs\" \\"
+    , "    psc-docs \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\" \\"
     , "      --docgen Data.List:docs/Data.List.md \\"
     , "      --docgen Data.List.Lazy:docs/Data.List.Lazy.md"
     ]

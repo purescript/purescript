@@ -10,7 +10,9 @@ derive instance eqV :: Eq V
 
 derive instance ordV :: Ord V
 
-data X = X Int | Y String
+type MyString = String
+
+data X = X Int | Y MyString
 
 derive instance eqX :: Eq X
 

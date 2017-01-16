@@ -10,19 +10,25 @@ import Prelude.Compat
 import Control.Arrow (ArrowPlus(..))
 import Control.PatternArrows as PA
 
+import Data.Monoid ((<>))
 import Data.Maybe (fromMaybe)
+import qualified Data.Text as T
+import Data.Text (Text)
 
 import Language.PureScript.Crash
 import Language.PureScript.Kinds
+import Language.PureScript.Names
 import Language.PureScript.Pretty.Common
 
-typeLiterals :: Pattern () Kind String
+typeLiterals :: Pattern () Kind Text
 typeLiterals = mkPattern match
   where
-  match Star = Just "*"
-  match Bang = Just "!"
-  match Symbol = Just "Symbol"
-  match (KUnknown u) = Just $ 'u' : show u
+  match (KUnknown u) =
+    Just $ T.cons 'k' (T.pack (show u))
+  match (NamedKind name) =
+    Just $ if isQualifiedWith (moduleNameFromString "Prim") name
+      then runProperName (disqualify name)
+      else showQualified runProperName name
   match _ = Nothing
 
 matchRow :: Pattern () Kind ((), Kind)
@@ -38,15 +44,15 @@ funKind = mkPattern match
   match _ = Nothing
 
 -- | Generate a pretty-printed string representing a Kind
-prettyPrintKind :: Kind -> String
+prettyPrintKind :: Kind -> Text
 prettyPrintKind
   = fromMaybe (internalError "Incomplete pattern")
   . PA.pattern matchKind ()
   where
-  matchKind :: Pattern () Kind String
-  matchKind = buildPrettyPrinter operators (typeLiterals <+> fmap parens matchKind)
+  matchKind :: Pattern () Kind Text
+  matchKind = buildPrettyPrinter operators (typeLiterals <+> fmap parensT matchKind)
 
-  operators :: OperatorTable () Kind String
+  operators :: OperatorTable () Kind Text
   operators =
-    OperatorTable [ [ Wrap matchRow $ \_ k -> "# " ++ k]
-                  , [ AssocR funKind $ \arg ret -> arg ++ " -> " ++ ret ] ]
+    OperatorTable [ [ Wrap matchRow $ \_ k -> "# " <> k]
+                  , [ AssocR funKind $ \arg ret -> arg <> " -> " <> ret ] ]

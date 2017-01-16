@@ -5,6 +5,9 @@ module Language.PureScript.Errors.JSON where
 import Prelude.Compat
 
 import qualified Data.Aeson.TH as A
+import Data.Monoid ((<>))
+import qualified Data.Text as T
+import Data.Text (Text)
 
 import qualified Language.PureScript as P
 
@@ -16,17 +19,17 @@ data ErrorPosition = ErrorPosition
   } deriving (Show, Eq, Ord)
 
 data ErrorSuggestion = ErrorSuggestion
-  { replacement :: String
+  { replacement :: Text
   , replaceRange :: Maybe ErrorPosition
   } deriving (Show, Eq)
 
 data JSONError = JSONError
   { position :: Maybe ErrorPosition
   , message :: String
-  , errorCode :: String
-  , errorLink :: String
+  , errorCode :: Text
+  , errorLink :: Text
   , filename :: Maybe String
-  , moduleName :: Maybe String
+  , moduleName :: Maybe Text
   , suggestion :: Maybe ErrorSuggestion
   } deriving (Show, Eq)
 
@@ -49,7 +52,7 @@ toJSONError verbose level e =
   JSONError (toErrorPosition <$> sspan)
             (P.renderBox (P.prettyPrintSingleError (P.PPEOptions Nothing verbose level False) (P.stripModuleAndSpan e)))
             (P.errorCode e)
-            (P.wikiUri e)
+            (P.errorDocUri e)
             (P.spanName <$> sspan)
             (P.runModuleName <$> P.errorModule e)
             (toSuggestion e)
@@ -70,4 +73,4 @@ toJSONError verbose level e =
       Just s -> Just $ ErrorSuggestion (suggestionText s) (toErrorPosition <$> P.suggestionSpan em)
 
   -- TODO: Adding a newline because source spans chomp everything up to the next character
-  suggestionText (P.ErrorSuggestion s) = if null s then s else s ++ "\n"
+  suggestionText (P.ErrorSuggestion s) = if T.null s then s else s <> "\n"

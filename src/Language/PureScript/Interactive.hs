@@ -1,8 +1,4 @@
 {-# LANGUAGE DoAndIfThenElse #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE DataKinds #-}
 
 module Language.PureScript.Interactive
   ( handleCommand
@@ -16,9 +12,12 @@ module Language.PureScript.Interactive
 import           Prelude ()
 import           Prelude.Compat
 
-import           Data.List (intercalate, nub, sort, find, foldl')
+import           Data.List (nub, sort, find, foldl')
 import           Data.Maybe (mapMaybe)
 import qualified Data.Map as M
+import           Data.Monoid ((<>))
+import           Data.Text (Text)
+import qualified Data.Text as T
 
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.State.Class
@@ -104,7 +103,7 @@ handleCommand _ _ (KindOf typ)              = handleKindOf typ
 handleCommand _ _ (BrowseModule moduleName) = handleBrowse moduleName
 handleCommand _ _ (ShowInfo QueryLoaded)    = handleShowLoadedModules
 handleCommand _ _ (ShowInfo QueryImport)    = handleShowImportedModules
-handleCommand _ _ QuitPSCi                  = P.internalError "`handleCommand QuitPSCi` was called. This is a bug."
+handleCommand _ _ _                         = P.internalError "handleCommand: unexpected command"
 
 -- | Reset the application state
 handleResetState
@@ -165,7 +164,7 @@ handleShowLoadedModules = do
     loadedModules <- gets psciLoadedExterns
     liftIO $ putStrLn (readModules loadedModules)
   where
-    readModules = unlines . sort . nub . map (P.runModuleName . P.getModuleName . fst)
+    readModules = unlines . sort . nub . map (T.unpack . P.runModuleName . P.getModuleName . fst)
 
 -- | Show the imported modules in psci.
 handleShowImportedModules
@@ -176,38 +175,40 @@ handleShowImportedModules = do
   liftIO $ showModules importedModules >>= putStrLn
   return ()
   where
-  showModules = return . unlines . sort . map showModule
+  showModules = return . unlines . sort . map (T.unpack . showModule)
   showModule (mn, declType, asQ) =
-    "import " ++ N.runModuleName mn ++ showDeclType declType ++
-    foldMap (\mn' -> " as " ++ N.runModuleName mn') asQ
+    "import " <> N.runModuleName mn <> showDeclType declType <>
+    foldMap (\mn' -> " as " <> N.runModuleName mn') asQ
 
   showDeclType P.Implicit = ""
   showDeclType (P.Explicit refs) = refsList refs
-  showDeclType (P.Hiding refs) = " hiding " ++ refsList refs
-  refsList refs = " (" ++ commaList (mapMaybe showRef refs) ++ ")"
+  showDeclType (P.Hiding refs) = " hiding " <> refsList refs
+  refsList refs = " (" <> commaList (mapMaybe showRef refs) <> ")"
 
-  showRef :: P.DeclarationRef -> Maybe String
+  showRef :: P.DeclarationRef -> Maybe Text
   showRef (P.TypeRef pn dctors) =
-    Just $ N.runProperName pn ++ "(" ++ maybe ".." (commaList . map N.runProperName) dctors ++ ")"
+    Just $ N.runProperName pn <> "(" <> maybe ".." (commaList . map N.runProperName) dctors <> ")"
   showRef (P.TypeOpRef op) =
-    Just $ "type " ++ N.showOp op
+    Just $ "type " <> N.showOp op
   showRef (P.ValueRef ident) =
     Just $ N.runIdent ident
   showRef (P.ValueOpRef op) =
     Just $ N.showOp op
   showRef (P.TypeClassRef pn) =
-    Just $ "class " ++ N.runProperName pn
+    Just $ "class " <> N.runProperName pn
   showRef (P.TypeInstanceRef ident) =
     Just $ N.runIdent ident
   showRef (P.ModuleRef name) =
-    Just $ "module " ++ N.runModuleName name
+    Just $ "module " <> N.runModuleName name
+  showRef (P.KindRef pn) =
+    Just $ "kind " <> N.runProperName pn
   showRef (P.ReExportRef _ _) =
     Nothing
   showRef (P.PositionedDeclarationRef _ _ ref) =
     showRef ref
 
-  commaList :: [String] -> String
-  commaList = intercalate ", "
+  commaList :: [Text] -> Text
+  commaList = T.intercalate ", "
 
 -- | Imports a module, preserving the initial state on failure.
 handleImport
@@ -260,7 +261,7 @@ handleKindOf typ = do
               check sew = fst . runWriter . runExceptT . runStateT sew
           case k of
             Left err        -> printErrors err
-            Right (kind, _) -> liftIO . putStrLn . P.prettyPrintKind $ kind
+            Right (kind, _) -> liftIO . putStrLn . T.unpack . P.prettyPrintKind $ kind
         Nothing -> liftIO $ putStrLn "Could not find kind"
 
 -- | Browse a module and displays its signature
@@ -284,6 +285,6 @@ handleBrowse moduleName = do
     isModInEnv modName =
         any ((== modName) . P.getModuleName . fst) . psciLoadedExterns
     failNotInEnv modName =
-        liftIO $ putStrLn $ "Module '" ++ N.runModuleName modName ++ "' is not valid."
+        liftIO $ putStrLn $ T.unpack $ "Module '" <> N.runModuleName modName <> "' is not valid."
     lookupUnQualifiedModName quaModName st =
         (\(modName,_,_) -> modName) <$> find ( \(_, _, mayQuaName) -> mayQuaName == Just quaModName) (psciImportedModules st)

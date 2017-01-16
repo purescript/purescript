@@ -1,4 +1,4 @@
--- @shouldFailWith NoInstanceFound
+-- @shouldFailWith AmbiguousTypeVariables
 
 module Main where
 

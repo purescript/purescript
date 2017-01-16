@@ -16,11 +16,16 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), modify)
 import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Writer.Class (MonadWriter(..))
+import Control.Lens ((^..), _1, _2)
 
-import Data.Foldable (for_, traverse_)
+import Data.Foldable (for_, traverse_, toList)
 import Data.List (nub, nubBy, (\\), sort, group)
 import Data.Maybe
 import qualified Data.Map as M
+import qualified Data.Set as S
+import Data.Monoid ((<>))
+import qualified Data.Text as T
+import Data.Text (Text)
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -42,7 +47,7 @@ addDataType
   => ModuleName
   -> DataDeclType
   -> ProperName 'TypeName
-  -> [(String, Maybe Kind)]
+  -> [(Text, Maybe Kind)]
   -> [(ProperName 'ConstructorName, [Type])]
   -> Kind
   -> m ()
@@ -58,7 +63,7 @@ addDataConstructor
   => ModuleName
   -> DataDeclType
   -> ProperName 'TypeName
-  -> [String]
+  -> [Text]
   -> ProperName 'ConstructorName
   -> [Type]
   -> m ()
@@ -68,14 +73,14 @@ addDataConstructor moduleName dtype name args dctor tys = do
   let retTy = foldl TypeApp (TypeConstructor (Qualified (Just moduleName) name)) (map TypeVar args)
   let dctorTy = foldr function retTy tys
   let polyType = mkForAll args dctorTy
-  let fields = [Ident ("value" ++ show n) | n <- [0..(length tys - 1)]]
+  let fields = [Ident ("value" <> T.pack (show n)) | n <- [0..(length tys - 1)]]
   putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (dtype, name, polyType, fields) (dataConstructors env) }
 
 addTypeSynonym
   :: (MonadState CheckState m, MonadError MultipleErrors m)
   => ModuleName
   -> ProperName 'TypeName
-  -> [(String, Maybe Kind)]
+  -> [(Text, Maybe Kind)]
   -> Type
   -> Kind
   -> m ()
@@ -111,7 +116,7 @@ addTypeClass
   :: (MonadState CheckState m)
   => ModuleName
   -> ProperName 'ClassName
-  -> [(String, Maybe Kind)]
+  -> [(Text, Maybe Kind)]
   -> [Constraint]
   -> [FunctionalDependency]
   -> [Declaration]
@@ -120,12 +125,7 @@ addTypeClass moduleName pn args implies dependencies ds =
     modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) newClass (typeClasses . checkEnv $ st) } }
   where
     newClass :: TypeClassData
-    newClass =
-      TypeClassData { typeClassArguments    = args
-                    , typeClassMembers      = map toPair ds
-                    , typeClassSuperclasses = implies
-                    , typeClassDependencies = dependencies
-                    }
+    newClass = makeTypeClassData args (map toPair ds) implies dependencies
 
     toPair (TypeDeclaration ident ty) = (ident, ty)
     toPair (PositionedDeclaration _ _ d) = toPair d
@@ -134,7 +134,7 @@ addTypeClass moduleName pn args implies dependencies ds =
 addTypeClassDictionaries
   :: (MonadState CheckState m)
   => Maybe ModuleName
-  -> M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) TypeClassDictionaryInScope)
+  -> M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict)
   -> m ()
 addTypeClassDictionaries mn entries =
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = insertState st } }
@@ -142,27 +142,37 @@ addTypeClassDictionaries mn entries =
 
 checkDuplicateTypeArguments
   :: (MonadState CheckState m, MonadError MultipleErrors m)
-  => [String]
+  => [Text]
   -> m ()
 checkDuplicateTypeArguments args = for_ firstDup $ \dup ->
   throwError . errorMessage $ DuplicateTypeArgument dup
   where
-  firstDup :: Maybe String
+  firstDup :: Maybe Text
   firstDup = listToMaybe $ args \\ nub args
 
 checkTypeClassInstance
-  :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
-  => ModuleName
+  :: (MonadState CheckState m, MonadError MultipleErrors m)
+  => TypeClassData
+  -> Int -- ^ index of type class argument
   -> Type
   -> m ()
-checkTypeClassInstance _ (TypeVar _) = return ()
-checkTypeClassInstance _ (TypeLevelString _) = return ()
-checkTypeClassInstance _ (TypeConstructor ctor) = do
-  env <- getEnv
-  when (ctor `M.member` typeSynonyms env) . throwError . errorMessage $ TypeSynonymInstance
-  return ()
-checkTypeClassInstance m (TypeApp t1 t2) = checkTypeClassInstance m t1 >> checkTypeClassInstance m t2
-checkTypeClassInstance _ ty = throwError . errorMessage $ InvalidInstanceHead ty
+checkTypeClassInstance cls i = check where
+  -- If the argument is determined via fundeps then we are less restrictive in
+  -- what type is allowed. This is because the type cannot be used to influence
+  -- which instance is selected. Currently the only weakened restriction is that
+  -- row types are allowed in determined type class arguments.
+  isFunDepDetermined = S.member i (typeClassDeterminedArguments cls)
+  check = \case
+    TypeVar _ -> return ()
+    TypeLevelString _ -> return ()
+    TypeConstructor ctor -> do
+      env <- getEnv
+      when (ctor `M.member` typeSynonyms env) . throwError . errorMessage $ TypeSynonymInstance
+      return ()
+    TypeApp t1 t2 -> check t1 >> check t2
+    REmpty | isFunDepDetermined -> return ()
+    RCons _ hd tl | isFunDepDetermined -> check hd >> check tl
+    ty -> throwError . errorMessage $ InvalidInstanceHead ty
 
 -- |
 -- Check that type synonyms are fully-applied in a type
@@ -205,9 +215,10 @@ typeCheckAll moduleName _ = traverse go
       addDataType moduleName dtype name args' dctors ctorKind
     return $ DataDeclaration dtype name args dctors
   go (d@(DataBindingGroupDeclaration tys)) = do
-    warnAndRethrow (addHint ErrorInDataBindingGroup) $ do
-      let syns = mapMaybe toTypeSynonym tys
-      let dataDecls = mapMaybe toDataDecl tys
+    let syns = mapMaybe toTypeSynonym tys
+        dataDecls = mapMaybe toDataDecl tys
+        bindingGroupNames = nub ((syns^..traverse._1) ++ (dataDecls^..traverse._2))
+    warnAndRethrow (addHint (ErrorInDataBindingGroup bindingGroupNames)) $ do
       (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
       for_ (zip dataDecls data_ks) $ \((dtype, name, args, dctors), ctorKind) -> do
         when (dtype == Newtype) $ checkNewtype name dctors
@@ -263,11 +274,15 @@ typeCheckAll moduleName _ = traverse go
     env <- getEnv
     putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (kind, ExternData) (types env) }
     return d
+  go (d@(ExternKindDeclaration name)) = do
+    env <- getEnv
+    putEnv $ env { kinds = S.insert (Qualified (Just moduleName) name) (kinds env) }
+    return d
   go (d@(ExternDeclaration name ty)) = do
     warnAndRethrow (addHint (ErrorInForeignImport name)) $ do
       env <- getEnv
       kind <- kindOf ty
-      guardWith (errorMessage (ExpectedType ty kind)) $ kind == Star
+      guardWith (errorMessage (ExpectedType ty kind)) $ kind == kindType
       case M.lookup (Qualified (Just moduleName) name) (names env) of
         Just _ -> throwError . errorMessage $ RedefinedIdent name
         Nothing -> putEnv (env { names = M.insert (Qualified (Just moduleName) name) (ty, External, Defined) (names env) })
@@ -278,14 +293,26 @@ typeCheckAll moduleName _ = traverse go
     addTypeClass moduleName pn args implies deps tys
     return d
   go (d@(TypeInstanceDeclaration dictName deps className tys body)) = rethrow (addHint (ErrorInInstance className tys)) $ do
-    traverse_ (checkTypeClassInstance moduleName) tys
-    checkOrphanInstance dictName className tys
-    _ <- traverseTypeInstanceBody checkInstanceMembers body
-    let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps)
-    addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdName dict) dict
-    return d
+    env <- getEnv
+    case M.lookup className (typeClasses env) of
+      Nothing -> internalError "typeCheckAll: Encountered unknown type class in instance declaration"
+      Just typeClass -> do
+        checkInstanceArity dictName className typeClass tys
+        sequence_ (zipWith (checkTypeClassInstance typeClass) [0..] tys)
+        checkOrphanInstance dictName className typeClass tys
+        _ <- traverseTypeInstanceBody checkInstanceMembers body
+        let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps)
+        addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) dict
+        return d
   go (PositionedDeclaration pos com d) =
     warnAndRethrowWithPosition pos $ PositionedDeclaration pos com <$> go d
+
+  checkInstanceArity :: Ident -> Qualified (ProperName 'ClassName) -> TypeClassData -> [Type] -> m ()
+  checkInstanceArity dictName className typeClass tys = do
+    let typeClassArity = length (typeClassArguments typeClass)
+        instanceArity = length tys
+    when (typeClassArity /= instanceArity) $
+      throwError . errorMessage $ ClassInstanceArityMismatch dictName className typeClassArity instanceArity
 
   checkInstanceMembers :: [Declaration] -> m [Declaration]
   checkInstanceMembers instDecls = do
@@ -305,24 +332,41 @@ typeCheckAll moduleName _ = traverse go
       | otherwise = firstDuplicate xs
     firstDuplicate _ = Nothing
 
-  checkOrphanInstance :: Ident -> Qualified (ProperName 'ClassName) -> [Type] -> m ()
-  checkOrphanInstance dictName className@(Qualified (Just mn') _) tys'
-    | moduleName == mn' || any checkType tys' = return ()
+  checkOrphanInstance :: Ident -> Qualified (ProperName 'ClassName) -> TypeClassData -> [Type] -> m ()
+  checkOrphanInstance dictName className@(Qualified (Just mn') _) typeClass tys'
+    | moduleName == mn' || moduleName `S.member` nonOrphanModules = return ()
     | otherwise = throwError . errorMessage $ OrphanInstance dictName className tys'
     where
-    checkType :: Type -> Bool
-    checkType (TypeVar _) = False
-    checkType (TypeConstructor (Qualified (Just mn'') _)) = moduleName == mn''
-    checkType (TypeConstructor (Qualified Nothing _)) = internalError "Unqualified type name in checkOrphanInstance"
-    checkType (TypeApp t1 _) = checkType t1
-    checkType _ = internalError "Invalid type in instance in checkOrphanInstance"
-  checkOrphanInstance _ _ _ = internalError "Unqualified class name in checkOrphanInstance"
+    typeModule :: Type -> Maybe ModuleName
+    typeModule (TypeVar _) = Nothing
+    typeModule (TypeLevelString _) = Nothing
+    typeModule (TypeConstructor (Qualified (Just mn'') _)) = Just mn''
+    typeModule (TypeConstructor (Qualified Nothing _)) = internalError "Unqualified type name in checkOrphanInstance"
+    typeModule (TypeApp t1 _) = typeModule t1
+    typeModule _ = internalError "Invalid type in instance in checkOrphanInstance"
+
+    modulesByTypeIndex :: M.Map Int (Maybe ModuleName)
+    modulesByTypeIndex = M.fromList (zip [0 ..] (typeModule <$> tys'))
+
+    lookupModule :: Int -> S.Set ModuleName
+    lookupModule idx = case M.lookup idx modulesByTypeIndex of
+      Just ms -> S.fromList (toList ms)
+      Nothing -> internalError "Unknown type index in checkOrphanInstance"
+
+    -- If the instance is declared in a module that wouldn't be found based on a covering set
+    -- then it is considered an orphan - because we'd have a situation in which we expect an
+    -- instance but can't find it. So a valid module must be applicable across *all* covering
+    -- sets - therefore we take the intersection of covering set modules.
+    nonOrphanModules :: S.Set ModuleName
+    nonOrphanModules = foldl1 S.intersection (foldMap lookupModule `S.map` typeClassCoveringSets typeClass)
+
+  checkOrphanInstance _ _ _ _ = internalError "Unqualified class name in checkOrphanInstance"
 
   -- |
   -- This function adds the argument kinds for a type constructor so that they may appear in the externs file,
   -- extracted from the kind of the type constructor itself.
   --
-  withKinds :: [(String, Maybe Kind)] -> Kind -> [(String, Maybe Kind)]
+  withKinds :: [(Text, Maybe Kind)] -> Kind -> [(Text, Maybe Kind)]
   withKinds []                  _               = []
   withKinds (s@(_, Just _ ):ss) (FunKind _   k) = s : withKinds ss k
   withKinds (  (s, Nothing):ss) (FunKind k1 k2) = (s, Just k1) : withKinds ss k2

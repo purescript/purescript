@@ -34,7 +34,7 @@ var evaluate = function evaluate(js) {
     return buffer.join('\n');
 };
 window.onload = function() {
-    var socket = new WebSocket('ws://0.0.0.0:' + location.port);
+    var socket = new WebSocket('ws://localhost:' + location.port);
     var evalNext = function reload() {
         get('js/latest.js', function(response) {
             try {

@@ -13,6 +13,7 @@ import Language.PureScript.AST.Literals
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.AST.Traversals
 import Language.PureScript.Comments
+import qualified Language.PureScript.Constants as C
 import Language.PureScript.CoreFn.Ann
 import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Expr
@@ -23,6 +24,7 @@ import Language.PureScript.Environment
 import Language.PureScript.Names
 import Language.PureScript.Sugar.TypeClasses (typeClassMemberName, superClassDictionaryNames)
 import Language.PureScript.Types
+import Language.PureScript.PSString (mkString)
 import qualified Language.PureScript.AST as A
 
 -- |
@@ -110,13 +112,15 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
     exprToCoreFn ss com (Just ty) v
   exprToCoreFn ss com ty (A.Let ds v) =
     Let (ss, com, ty, Nothing) (concatMap (declToCoreFn ss []) ds) (exprToCoreFn ss [] Nothing v)
-  exprToCoreFn ss com _  (A.TypeClassDictionaryConstructorApp name (A.TypedValue _ (A.Literal (A.ObjectLiteral vs)) _)) =
+  exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name (A.TypedValue _ lit@(A.Literal (A.ObjectLiteral _)) _)) =
+    exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name lit)
+  exprToCoreFn ss com _ (A.TypeClassDictionaryConstructorApp name (A.Literal (A.ObjectLiteral vs))) =
     let args = map (exprToCoreFn ss [] Nothing . snd) $ sortBy (compare `on` fst) vs
         ctor = Var (ss, [], Nothing, Just IsTypeClassConstructor) (fmap properToIdent name)
     in foldl (App (ss, com, Nothing, Nothing)) ctor args
   exprToCoreFn ss com ty  (A.TypeClassDictionaryAccessor _ ident) =
     Abs (ss, com, ty, Nothing) (Ident "dict")
-      (Accessor nullAnn (runIdent ident) (Var nullAnn $ Qualified Nothing (Ident "dict")))
+      (Accessor nullAnn (mkString $ runIdent ident) (Var nullAnn $ Qualified Nothing (Ident "dict")))
   exprToCoreFn _ com ty (A.PositionedValue ss com1 v) =
     exprToCoreFn (Just ss) (com ++ com1) ty v
   exprToCoreFn _ _ _ e =
@@ -209,6 +213,11 @@ findQualModules decls =
   fqValues :: A.Expr -> [ModuleName]
   fqValues (A.Var q) = getQual' q
   fqValues (A.Constructor q) = getQual' q
+  -- IsSymbol instances for literal symbols are automatically solved and the type
+  -- class dictionaries are built inline instead of having a named instance defined
+  -- and imported.  We therefore need to import the IsSymbol constructor from
+  -- Data.Symbol if it hasn't already been imported.
+  fqValues (A.TypeClassDictionaryConstructorApp C.IsSymbol _) = getQual' C.IsSymbol
   fqValues _ = []
 
   fqBinders :: A.Binder -> [ModuleName]
@@ -257,7 +266,7 @@ mkTypeClassConstructor :: Maybe SourceSpan -> [Comment] -> [Constraint] -> [A.De
 mkTypeClassConstructor ss com [] [] = Literal (ss, com, Nothing, Just IsTypeClassConstructor) (ObjectLiteral [])
 mkTypeClassConstructor ss com supers members =
   let args@(a:as) = sort $ map typeClassMemberName members ++ superClassDictionaryNames supers
-      props = [ (arg, Var nullAnn $ Qualified Nothing (Ident arg)) | arg <- args ]
+      props = [ (mkString arg, Var nullAnn $ Qualified Nothing (Ident arg)) | arg <- args ]
       dict = Literal nullAnn (ObjectLiteral props)
   in Abs (ss, com, Nothing, Just IsTypeClassConstructor)
          (Ident a)

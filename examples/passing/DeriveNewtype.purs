@@ -4,7 +4,9 @@ import Control.Monad.Eff.Console (log)
 
 import Data.Newtype
 
-newtype Test = Test String
+type MyString = String
+
+newtype Test = Test MyString
 
 derive instance newtypeTest :: Newtype Test _
 

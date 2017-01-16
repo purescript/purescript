@@ -130,6 +130,8 @@ resolveImport importModule exps imps impQual = resolveByType
       checkImportExists TyClassName (exportedTypeClasses exps) name
     check (ModuleRef name) | isHiding =
       throwError . errorMessage $ ImportHidingModule name
+    check (KindRef name) = do
+      checkImportExists KiName (exportedKinds exps) name
     check r = internalError $ "Invalid argument to checkRefs: " ++ show r
 
   -- Check that an explicitly imported item exists in the module it is being imported from
@@ -181,6 +183,7 @@ resolveImport importModule exps imps impQual = resolveByType
       >>= flip (foldM (\m (name, _) -> importer m (ValueRef name))) (M.toList (exportedValues exps))
       >>= flip (foldM (\m (name, _) -> importer m (ValueOpRef name))) (M.toList (exportedValueOps exps))
       >>= flip (foldM (\m (name, _) -> importer m (TypeClassRef name))) (M.toList (exportedTypeClasses exps))
+      >>= flip (foldM (\m (name, _) -> importer m (KindRef name))) (M.toList (exportedKinds exps))
 
   importRef :: ImportProvenance -> Imports -> DeclarationRef -> m Imports
   importRef prov imp (PositionedDeclarationRef pos _ r) =
@@ -205,6 +208,9 @@ resolveImport importModule exps imps impQual = resolveByType
   importRef prov imp (TypeClassRef name) = do
     let typeClasses' = updateImports (importedTypeClasses imp) (exportedTypeClasses exps) id name prov
     return $ imp { importedTypeClasses = typeClasses' }
+  importRef prov imp (KindRef name) = do
+    let kinds' = updateImports (importedKinds imp) (exportedKinds exps) id name prov
+    return $ imp { importedKinds = kinds' }
   importRef _ _ TypeInstanceRef{} = internalError "TypeInstanceRef in importRef"
   importRef _ _ ModuleRef{} = internalError "ModuleRef in importRef"
   importRef _ _ ReExportRef{} = internalError "ReExportRef in importRef"

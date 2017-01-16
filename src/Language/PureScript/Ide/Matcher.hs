@@ -14,7 +14,6 @@
 
 {-# LANGUAGE FlexibleInstances          #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedStrings          #-}
 
 module Language.PureScript.Ide.Matcher
        ( Matcher

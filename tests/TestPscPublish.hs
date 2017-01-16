@@ -1,20 +1,14 @@
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
-{-# OPTIONS_GHC -fno-warn-unused-imports #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module TestPscPublish where
 
-import Control.Monad
-import Control.Applicative
-import Control.Exception
-import System.Process
-import System.Directory
-import System.IO
-import System.Exit
-import qualified Data.ByteString.Lazy as BL
+import Control.Monad.IO.Class (liftIO)
+import System.Exit (exitFailure)
 import Data.ByteString.Lazy (ByteString)
+import Data.Time.Clock (getCurrentTime)
 import qualified Data.Aeson as A
-import Data.Aeson.BetterErrors
 import Data.Version
 
 import Language.PureScript.Docs
@@ -46,6 +40,7 @@ roundTrip pkg =
 testRunOptions :: PublishOptions
 testRunOptions = defaultPublishOptions
   { publishGetVersion = return testVersion
+  , publishGetTagTime = const (liftIO getCurrentTime)
   , publishWorkingTreeDirty = return ()
   }
   where testVersion = ("v999.0.0", Version [999,0,0] [])

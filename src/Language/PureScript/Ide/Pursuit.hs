@@ -12,8 +12,6 @@
 -- Pursuit client for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings #-}
-
 module Language.PureScript.Ide.Pursuit
   ( searchPursuitForDeclarations
   , findPackagesForModuleIdent
@@ -36,7 +34,7 @@ import qualified Pipes.Prelude                 as P
 queryPursuit :: Text -> IO ByteString
 queryPursuit q = do
   let qClean = T.dropWhileEnd (== '.') q
-  req' <- parseRequest "http://pursuit.purescript.org/search"
+  req' <- parseRequest "https://pursuit.purescript.org/search"
   let req = req'
         { queryString= "q=" <> (fromString . T.unpack) qClean
         , requestHeaders=[(hAccept, "application/json")]

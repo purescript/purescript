@@ -1,6 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE DataKinds #-}
-
 module Language.PureScript.Interactive.Printer where
 
 import           Prelude.Compat
@@ -8,8 +5,15 @@ import           Prelude.Compat
 import           Data.List (intersperse)
 import qualified Data.Map as M
 import           Data.Maybe (mapMaybe)
+import           Data.Monoid ((<>))
+import qualified Data.Text as T
+import           Data.Text (Text)
 import qualified Language.PureScript as P
 import qualified Text.PrettyPrint.Boxes as Box
+
+-- TODO (Christoph): Text version of boxes
+textT :: Text -> Box.Box
+textT = Box.text . T.unpack
 
 -- Printers
 
@@ -40,7 +44,7 @@ printModuleSignatures moduleName P.Environment{..} =
         findNameType envNames m = (P.disqualify m, M.lookup m envNames)
 
         showNameType :: (P.Ident, Maybe (P.Type, P.NameKind, P.NameVisibility)) -> Box.Box
-        showNameType (mIdent, Just (mType, _, _)) = Box.text (P.showIdent mIdent ++ " :: ") Box.<> P.typeAsBox mType
+        showNameType (mIdent, Just (mType, _, _)) = textT (P.showIdent mIdent <> " :: ") Box.<> P.typeAsBox mType
         showNameType _ = P.internalError "The impossible happened in printModuleSignatures."
 
         findTypeClass
@@ -58,13 +62,13 @@ printModuleSignatures moduleName P.Environment{..} =
                     if null typeClassSuperclasses
                     then Box.text ""
                     else Box.text "("
-                         Box.<> Box.hcat Box.left (intersperse (Box.text ", ") $ map (\(P.Constraint (P.Qualified _ pn) lt _) -> Box.text (P.runProperName pn) Box.<+> Box.hcat Box.left (map P.typeAtomAsBox lt)) typeClassSuperclasses)
+                         Box.<> Box.hcat Box.left (intersperse (Box.text ", ") $ map (\(P.Constraint (P.Qualified _ pn) lt _) -> textT (P.runProperName pn) Box.<+> Box.hcat Box.left (map P.typeAtomAsBox lt)) typeClassSuperclasses)
                          Box.<> Box.text ") <= "
                 className =
-                    Box.text (P.runProperName name)
-                    Box.<> Box.text (concatMap ((' ':) . fst) typeClassArguments)
+                    textT (P.runProperName name)
+                    Box.<> textT (foldMap ((" " <>) . fst) typeClassArguments)
                 classBody =
-                    Box.vcat Box.top (map (\(i, t) -> Box.text (P.showIdent i ++ " ::") Box.<+> P.typeAsBox t) typeClassMembers)
+                    Box.vcat Box.top (map (\(i, t) -> textT (P.showIdent i <> " ::") Box.<+> P.typeAsBox t) typeClassMembers)
 
             in
               Just $
@@ -84,7 +88,7 @@ printModuleSignatures moduleName P.Environment{..} =
         showType
           :: M.Map (P.Qualified (P.ProperName 'P.ClassName)) P.TypeClassData
           -> M.Map (P.Qualified (P.ProperName 'P.ConstructorName)) (P.DataDeclType, P.ProperName 'P.TypeName, P.Type, [P.Ident])
-          -> M.Map (P.Qualified (P.ProperName 'P.TypeName)) ([(String, Maybe P.Kind)], P.Type)
+          -> M.Map (P.Qualified (P.ProperName 'P.TypeName)) ([(Text, Maybe P.Kind)], P.Type)
           -> (P.Qualified (P.ProperName 'P.TypeName), Maybe (P.Kind, P.TypeKind))
           -> Maybe Box.Box
         showType typeClassesEnv dataConstructorsEnv typeSynonymsEnv (n@(P.Qualified modul name), typ) =
@@ -95,7 +99,7 @@ printModuleSignatures moduleName P.Environment{..} =
                   Nothing
                 else
                   Just $
-                    Box.text ("type " ++ P.runProperName name ++ concatMap ((' ':) . fst) typevars)
+                    textT ("type " <> P.runProperName name <> foldMap ((" " <>) . fst) typevars)
                     Box.// Box.moveRight 2 (Box.text "=" Box.<+> P.typeAsBox dtType)
 
             (Just (_, P.DataType typevars pt), _) ->
@@ -108,7 +112,7 @@ printModuleSignatures moduleName P.Environment{..} =
                       _ -> "data"
 
               in
-                Just $ Box.text (prefix ++ " " ++ P.runProperName name ++ concatMap ((' ':) . fst) typevars) Box.// printCons pt
+                Just $ textT (prefix <> " " <> P.runProperName name <> foldMap ((" " <>) . fst) typevars) Box.// printCons pt
 
             _ ->
               Nothing
@@ -117,7 +121,7 @@ printModuleSignatures moduleName P.Environment{..} =
                     Box.moveRight 2 $
                     Box.vcat Box.left $
                     mapFirstRest (Box.text "=" Box.<+>) (Box.text "|" Box.<+>) $
-                    map (\(cons,idents) -> (Box.text (P.runProperName cons) Box.<> Box.hcat Box.left (map prettyPrintType idents))) pt
+                    map (\(cons,idents) -> (textT (P.runProperName cons) Box.<> Box.hcat Box.left (map prettyPrintType idents))) pt
 
                 prettyPrintType t = Box.text " " Box.<> P.typeAtomAsBox t
 

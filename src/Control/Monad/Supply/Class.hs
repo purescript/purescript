@@ -3,6 +3,7 @@
 --
 
 {-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Control.Monad.Supply.Class where
 
@@ -11,13 +12,14 @@ import Prelude.Compat
 import Control.Monad.Supply
 import Control.Monad.State
 import Control.Monad.Writer
+import Data.Text (Text, pack)
 
 class Monad m => MonadSupply m where
   fresh :: m Integer
   peek :: m Integer
-  default fresh :: MonadTrans t => t m Integer
+  default fresh :: (MonadTrans t, MonadSupply n, m ~ t n) => m Integer
   fresh = lift fresh
-  default peek :: MonadTrans t => t m Integer
+  default peek :: (MonadTrans t, MonadSupply n, m ~ t n) => m Integer
   peek = lift peek
 
 instance Monad m => MonadSupply (SupplyT m) where
@@ -30,5 +32,5 @@ instance Monad m => MonadSupply (SupplyT m) where
 instance MonadSupply m => MonadSupply (StateT s m)
 instance (Monoid w, MonadSupply m) => MonadSupply (WriterT w m)
 
-freshName :: MonadSupply m => m String
-freshName = fmap (('$' :) . show) fresh
+freshName :: MonadSupply m => m Text
+freshName = fmap (("$" <> ) . pack . show) fresh

@@ -12,7 +12,6 @@
 -- Interface for the psc-ide-server
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PackageImports        #-}
 {-# LANGUAGE TemplateHaskell       #-}
 
@@ -110,7 +109,7 @@ findPursuitPackages (PursuitQuery q) =
   PursuitResult <$> liftIO (findPackagesForModuleIdent q)
 
 printModules :: Ide m => m Success
-printModules = ModuleList . map runModuleNameT <$> getLoadedModulenames
+printModules = ModuleList . map P.runModuleName <$> getLoadedModulenames
 
 outputDirectory :: Ide m => m FilePath
 outputDirectory = do
@@ -142,7 +141,7 @@ findAvailableExterns = do
   liftIO $ do
     directories <- getDirectoryContents oDir
     moduleNames <- filterM (containsExterns oDir) directories
-    pure (P.moduleNameFromString <$> moduleNames)
+    pure (P.moduleNameFromString . toS <$> moduleNames)
   where
     -- Takes the output directory and a filepath like "Monad.Control.Eff" and
     -- looks up, whether that folder contains an externs.json
@@ -171,26 +170,24 @@ loadModules moduleNames = do
   -- We resolve all the modulenames to externs files and load these into memory.
   oDir <- outputDirectory
   let efPaths =
-        map (\mn -> oDir </> P.runModuleName mn </> "externs.json") moduleNames
+        map (\mn -> oDir </> toS (P.runModuleName mn) </> "externs.json") moduleNames
   efiles <- traverse readExternFile efPaths
   traverse_ insertExterns efiles
 
-  -- We parse all source files, log eventual parse failures if the debug flag
-  -- was set and insert the succesful parses into the state.
+  -- We parse all source files, log eventual parse failures and insert the
+  -- successful parses into the state.
   (failures, allModules) <-
     partitionEithers <$> (traverse parseModule =<< findAllSourceFiles)
   unless (null failures) $
-    $(logDebug) ("Failed to parse: " <> show failures)
+    $(logWarn) ("Failed to parse: " <> show failures)
   traverse_ insertModule allModules
 
   -- Finally we kick off the worker with @async@ and return the number of
   -- successfully parsed modules.
   env <- ask
-  let runLogger =
-        runStdoutLoggingT
-        . filterLogger (\_ _ -> confDebug (ideConfiguration env))
+  let ll = confLogLevel (ideConfiguration env)
   -- populateStage2 and 3 return Unit for now, so it's fine to discard this
   -- result. We might want to block on this in a benchmarking situation.
-  _ <- liftIO (async (runLogger (runReaderT (populateStage2 *> populateStage3) env)))
+  _ <- liftIO (async (runLogger ll (runReaderT (populateStage2 *> populateStage3) env)))
   pure (TextResult ("Loaded " <> show (length efiles) <> " modules and "
                     <> show (length allModules) <> " source files."))

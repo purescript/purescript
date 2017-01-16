@@ -12,9 +12,8 @@
 -- Type definitions for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE DeriveFoldable    #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
+{-# LANGUAGE DeriveFoldable  #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Language.PureScript.Ide.Types where
 
@@ -26,7 +25,6 @@ import           Data.Aeson
 import qualified Data.Map.Lazy                       as M
 import qualified Language.PureScript                 as P
 import qualified Language.PureScript.Errors.JSON     as P
-import           Language.PureScript.Ide.Conversions
 
 type ModuleIdent = Text
 
@@ -38,6 +36,7 @@ data IdeDeclaration
   | IdeDeclTypeClass (P.ProperName 'P.ClassName)
   | IdeDeclValueOperator IdeValueOperator
   | IdeDeclTypeOperator IdeTypeOperator
+  | IdeDeclKind (P.ProperName 'P.KindName)
   deriving (Show, Eq, Ord)
 
 data IdeValue = IdeValue
@@ -104,17 +103,20 @@ emptyAnn = Annotation Nothing Nothing Nothing
 
 type Module = (P.ModuleName, [IdeDeclarationAnn])
 
-type DefinitionSites a = Map (Either Text Text) a
+type DefinitionSites a = Map IdeDeclNamespace a
 type TypeAnnotations = Map P.Ident P.Type
 newtype AstData a = AstData (Map P.ModuleName (DefinitionSites a, TypeAnnotations))
   -- ^ SourceSpans for the definition sites of Values and Types aswell as type
   -- annotations found in a module
   deriving (Show, Eq, Ord, Functor, Foldable)
 
+data IdeLogLevel = LogDebug | LogPerf | LogAll | LogDefault | LogNone
+  deriving (Show, Eq)
+
 data Configuration =
   Configuration
   { confOutputPath :: FilePath
-  , confDebug      :: Bool
+  , confLogLevel   :: IdeLogLevel
   , confGlobs      :: [FilePath]
   }
 
@@ -210,9 +212,10 @@ instance ToJSON ModuleImport where
              ] ++ map (\x -> "qualifier" .= x) (maybeToList qualifier)
 
 identifierFromDeclarationRef :: P.DeclarationRef -> Text
-identifierFromDeclarationRef (P.TypeRef name _) = runProperNameT name
-identifierFromDeclarationRef (P.ValueRef ident) = runIdentT ident
-identifierFromDeclarationRef (P.TypeClassRef name) = runProperNameT name
+identifierFromDeclarationRef (P.TypeRef name _) = P.runProperName name
+identifierFromDeclarationRef (P.ValueRef ident) = P.runIdent ident
+identifierFromDeclarationRef (P.TypeClassRef name) = P.runProperName name
+identifierFromDeclarationRef (P.KindRef name) = P.runProperName name
 identifierFromDeclarationRef _ = ""
 
 data Success =
@@ -292,3 +295,12 @@ instance ToJSON PursuitResponse where
       , "package" .= package
       , "text"    .= text
       ]
+
+data IdeDeclNamespace =
+  -- | An identifier in the value namespace
+  IdeNSValue Text
+  -- | An identifier in the type namespace
+  | IdeNSType Text
+  -- | An identifier in the kind namespace
+  | IdeNSKind Text
+  deriving (Show, Eq, Ord)

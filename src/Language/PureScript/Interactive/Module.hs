@@ -6,7 +6,7 @@ import           Control.Monad
 import qualified Language.PureScript as P
 import           Language.PureScript.Interactive.Types
 import           System.FilePath (pathSeparator)
-import           System.IO.UTF8 (readUTF8File)
+import           System.IO.UTF8 (readUTF8FileT)
 
 -- * Support Module
 
@@ -25,7 +25,7 @@ supportModuleIsDefined = any ((== supportModuleName) . P.getModuleName)
 --
 loadModule :: FilePath -> IO (Either String [P.Module])
 loadModule filename = do
-  content <- readUTF8File filename
+  content <- readUTF8FileT filename
   return $ either (Left . P.prettyPrintMultipleErrors P.defaultPPEOptions) (Right . map snd) $ P.parseModulesFromFiles id [(filename, content)]
 
 -- |
@@ -34,7 +34,7 @@ loadModule filename = do
 loadAllModules :: [FilePath] -> IO (Either P.MultipleErrors [(FilePath, P.Module)])
 loadAllModules files = do
   filesAndContent <- forM files $ \filename -> do
-    content <- readUTF8File filename
+    content <- readUTF8FileT filename
     return (filename, content)
   return $ P.parseModulesFromFiles id filesAndContent
 

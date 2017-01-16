@@ -14,6 +14,7 @@ import Prelude.Compat
 
 import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
+import Data.Text (Text)
 
 import Control.Arrow ((<+>))
 import Control.PatternArrows as PA
@@ -25,7 +26,9 @@ import Language.PureScript.Environment
 import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.Pretty.Kinds
+import Language.PureScript.Pretty.Types
 import Language.PureScript.Types
+import Language.PureScript.Label (Label)
 
 typeLiterals :: Pattern () Type RenderedCode
 typeLiterals = mkPattern match
@@ -78,13 +81,13 @@ renderRow = uncurry renderRow' . rowToList
   where
   renderRow' h t = renderHead h <> renderTail t
 
-renderHead :: [(String, Type)] -> RenderedCode
+renderHead :: [(Label, Type)] -> RenderedCode
 renderHead = mintersperse (syntax "," <> sp) . map renderLabel
 
-renderLabel :: (String, Type) -> RenderedCode
+renderLabel :: (Label, Type) -> RenderedCode
 renderLabel (label, ty) =
   mintersperse sp
-    [ ident label
+    [ syntax $ prettyPrintLabel label
     , syntax "::"
     , renderType ty
     ]
@@ -124,9 +127,9 @@ explicitParens = mkPattern match
   match _ = Nothing
 
 matchTypeAtom :: Pattern () Type RenderedCode
-matchTypeAtom = typeLiterals <+> fmap parens matchType
+matchTypeAtom = typeLiterals <+> fmap parens_ matchType
   where
-  parens x = syntax "(" <> x <> syntax ")"
+  parens_ x = syntax "(" <> x <> syntax ")"
 
 matchType :: Pattern () Type RenderedCode
 matchType = buildPrettyPrinter operators matchTypeAtom
@@ -141,7 +144,7 @@ matchType = buildPrettyPrinter operators matchTypeAtom
                   , [ Wrap explicitParens $ \_ ty -> ty ]
                   ]
 
-forall_ :: Pattern () Type ([String], Type)
+forall_ :: Pattern () Type ([Text], Type)
 forall_ = mkPattern match
   where
   match (PrettyPrintForAll idents ty) = Just (idents, ty)

@@ -25,6 +25,7 @@ import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Errors
 import Language.PureScript.Externs
+import Language.PureScript.Kinds
 import Language.PureScript.Linter.Imports
 import Language.PureScript.Names
 import Language.PureScript.Sugar.Names.Env
@@ -98,6 +99,9 @@ desugarImportsWithEnv externs modules = do
     exportedRefs :: Ord a => (DeclarationRef -> Maybe a) -> M.Map a ModuleName
     exportedRefs f = M.fromList $ (, efModuleName) <$> mapMaybe f efExports
 
+    exportedKinds :: M.Map (ProperName 'KindName) ModuleName
+    exportedKinds = exportedRefs getKindRef
+
   updateEnv :: ([Module], Env) -> Module -> m ([Module], Env)
   updateEnv (ms, env) m@(Module ss _ mn _ refs) = do
     members <- findExportable m
@@ -128,6 +132,7 @@ elaborateExports exps (Module ss coms mn decls refs) =
     ++ go TypeClassRef exportedTypeClasses
     ++ go ValueRef exportedValues
     ++ go ValueOpRef exportedValueOps
+    ++ go KindRef exportedKinds
     ++ maybe [] (filter isModuleRef) refs
   where
 
@@ -165,17 +170,24 @@ renameInModule imports (Module ss coms mn decls exps) =
   updateDecl (_, bound) d@(PositionedDeclaration pos _ _) =
     return ((Just pos, bound), d)
   updateDecl (pos, bound) (DataDeclaration dtype name args dctors) =
-    (,) (pos, bound) <$> (DataDeclaration dtype name args <$> traverse (sndM (traverse (updateTypesEverywhere pos))) dctors)
+    (,) (pos, bound) <$> (DataDeclaration dtype name <$> updateTypeArguments pos args
+                                                     <*> traverse (sndM (traverse (updateTypesEverywhere pos))) dctors)
   updateDecl (pos, bound) (TypeSynonymDeclaration name ps ty) =
-    (,) (pos, bound) <$> (TypeSynonymDeclaration name ps <$> updateTypesEverywhere pos ty)
+    (,) (pos, bound) <$> (TypeSynonymDeclaration name <$> updateTypeArguments pos ps
+                                                      <*> updateTypesEverywhere pos ty)
   updateDecl (pos, bound) (TypeClassDeclaration className args implies deps ds) =
-    (,) (pos, bound) <$> (TypeClassDeclaration className args <$> updateConstraints pos implies <*> pure deps <*> pure ds)
+    (,) (pos, bound) <$> (TypeClassDeclaration className <$> updateTypeArguments pos args
+                                                         <*> updateConstraints pos implies
+                                                         <*> pure deps
+                                                         <*> pure ds)
   updateDecl (pos, bound) (TypeInstanceDeclaration name cs cn ts ds) =
     (,) (pos, bound) <$> (TypeInstanceDeclaration name <$> updateConstraints pos cs <*> updateClassName cn pos <*> traverse (updateTypesEverywhere pos) ts <*> pure ds)
   updateDecl (pos, bound) (TypeDeclaration name ty) =
     (,) (pos, bound) <$> (TypeDeclaration name <$> updateTypesEverywhere pos ty)
   updateDecl (pos, bound) (ExternDeclaration name ty) =
     (,) (pos, name : bound) <$> (ExternDeclaration name <$> updateTypesEverywhere pos ty)
+  updateDecl (pos, bound) (ExternDataDeclaration name ki) =
+    (,) (pos, bound) <$> (ExternDataDeclaration name <$> updateKindsEverywhere pos ki)
   updateDecl (pos, bound) (TypeFixityDeclaration fixity alias op) =
     (,) (pos, bound) <$> (TypeFixityDeclaration fixity <$> updateTypeName alias pos <*> pure op)
   updateDecl (pos, bound) (ValueFixityDeclaration fixity (Qualified mn' (Left alias)) op) =
@@ -238,6 +250,19 @@ renameInModule imports (Module ss coms mn decls exps) =
   letBoundVariable (PositionedDeclaration _ _ d) = letBoundVariable d
   letBoundVariable _ = Nothing
 
+  updateKindsEverywhere :: Maybe SourceSpan -> Kind -> m Kind
+  updateKindsEverywhere pos = everywhereOnKindsM updateKind
+    where
+    updateKind :: Kind -> m Kind
+    updateKind (NamedKind name) = NamedKind <$> updateKindName name pos
+    updateKind k = return k
+
+  updateTypeArguments
+    :: (Traversable f, Traversable g)
+    => Maybe SourceSpan
+    -> f (a, g Kind) -> m (f (a, g Kind))
+  updateTypeArguments pos = traverse (sndM (traverse (updateKindsEverywhere pos)))
+
   updateTypesEverywhere :: Maybe SourceSpan -> Type -> m Type
   updateTypesEverywhere pos = everywhereOnTypesM updateType
     where
@@ -245,6 +270,7 @@ renameInModule imports (Module ss coms mn decls exps) =
     updateType (TypeOp name) = TypeOp <$> updateTypeOpName name pos
     updateType (TypeConstructor name) = TypeConstructor <$> updateTypeName name pos
     updateType (ConstrainedType cs t) = ConstrainedType <$> traverse updateInConstraint cs <*> pure t
+    updateType (KindedType t k) = KindedType t <$> updateKindsEverywhere pos k
     updateType t = return t
     updateInConstraint :: Constraint -> m Constraint
     updateInConstraint (Constraint name ts info) =
@@ -289,6 +315,12 @@ renameInModule imports (Module ss coms mn decls exps) =
     -> Maybe SourceSpan
     -> m (Qualified (OpName 'ValueOpName))
   updateValueOpName = update (importedValueOps imports) ValOpName
+
+  updateKindName
+    :: Qualified (ProperName 'KindName)
+    -> Maybe SourceSpan
+    -> m (Qualified (ProperName 'KindName))
+  updateKindName = update (importedKinds imports) KiName
 
   -- Update names so unqualified references become qualified, and locally
   -- qualified references are replaced with their canoncial qualified names

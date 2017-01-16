@@ -1,16 +1,12 @@
 module Language.PureScript.Docs.Convert.Single
   ( convertSingleModule
-  , collectBookmarks
   ) where
 
-import Prelude.Compat
+import Protolude
 
 import Control.Category ((>>>))
-import Control.Monad
 
-import Data.Either
-import Data.List (nub)
-import Data.Maybe (mapMaybe)
+import qualified Data.Text as T
 
 import Language.PureScript.Docs.Types
 import qualified Language.PureScript as P
@@ -40,14 +36,14 @@ convertSingleModule m@(P.Module _ coms moduleName  _ _) =
 -- In the second pass, we go over all of the Left values and augment the
 -- relevant declarations, leaving only the augmented Right values.
 --
--- Note that in the Left case, we provide a [String] as well as augment
--- information. The [String] value should be a list of titles of declarations
+-- Note that in the Left case, we provide a [Text] as well as augment
+-- information. The [Text] value should be a list of titles of declarations
 -- that the augmentation should apply to. For example, for a type instance
 -- declaration, that would be any types or type classes mentioned in the
 -- instance. For a fixity declaration, it would be just the relevant operator's
 -- name.
 type IntermediateDeclaration
-  = Either ([String], DeclarationAugment) Declaration
+  = Either ([Text], DeclarationAugment) Declaration
 
 -- | Some data which will be used to augment a Declaration in the
 -- output.
@@ -64,7 +60,7 @@ data DeclarationAugment
 -- the type synonym IntermediateDeclaration for more information.
 augmentDeclarations :: [IntermediateDeclaration] -> [Declaration]
 augmentDeclarations (partitionEithers -> (augments, toplevels)) =
-  foldl go toplevels augments
+  foldl' go toplevels augments
   where
   go ds (parentTitles, a) =
     map (\d ->
@@ -75,21 +71,22 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
   augmentWith (AugmentChild child) d =
     d { declChildren = declChildren d ++ [child] }
 
-getDeclarationTitle :: P.Declaration -> Maybe String
+getDeclarationTitle :: P.Declaration -> Maybe Text
 getDeclarationTitle (P.ValueDeclaration name _ _ _) = Just (P.showIdent name)
 getDeclarationTitle (P.ExternDeclaration name _) = Just (P.showIdent name)
 getDeclarationTitle (P.DataDeclaration _ name _ _) = Just (P.runProperName name)
 getDeclarationTitle (P.ExternDataDeclaration name _) = Just (P.runProperName name)
+getDeclarationTitle (P.ExternKindDeclaration name) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeSynonymDeclaration name _ _) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeClassDeclaration name _ _ _ _) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeInstanceDeclaration name _ _ _ _) = Just (P.showIdent name)
-getDeclarationTitle (P.TypeFixityDeclaration _ _ op) = Just ("type " ++ P.showOp op)
+getDeclarationTitle (P.TypeFixityDeclaration _ _ op) = Just ("type " <> P.showOp op)
 getDeclarationTitle (P.ValueFixityDeclaration _ _ op) = Just (P.showOp op)
 getDeclarationTitle (P.PositionedDeclaration _ _ d) = getDeclarationTitle d
 getDeclarationTitle _ = Nothing
 
 -- | Create a basic Declaration value.
-mkDeclaration :: String -> DeclarationInfo -> Declaration
+mkDeclaration :: Text -> DeclarationInfo -> Declaration
 mkDeclaration title info =
   Declaration { declTitle      = title
               , declComments   = Nothing
@@ -98,10 +95,10 @@ mkDeclaration title info =
               , declInfo       = info
               }
 
-basicDeclaration :: String -> DeclarationInfo -> Maybe IntermediateDeclaration
+basicDeclaration :: Text -> DeclarationInfo -> Maybe IntermediateDeclaration
 basicDeclaration title info = Just $ Right $ mkDeclaration title info
 
-convertDeclaration :: P.Declaration -> String -> Maybe IntermediateDeclaration
+convertDeclaration :: P.Declaration -> Text -> Maybe IntermediateDeclaration
 convertDeclaration (P.ValueDeclaration _ _ _ (Right (P.TypedValue _ _ ty))) title =
   basicDeclaration title (ValueDeclaration ty)
 convertDeclaration P.ValueDeclaration{} title =
@@ -119,12 +116,14 @@ convertDeclaration (P.DataDeclaration dtype _ args ctors) title =
     ChildDeclaration (P.runProperName ctor') Nothing Nothing (ChildDataConstructor tys)
 convertDeclaration (P.ExternDataDeclaration _ kind') title =
   basicDeclaration title (ExternDataDeclaration kind')
+convertDeclaration (P.ExternKindDeclaration _) title =
+  basicDeclaration title ExternKindDeclaration
 convertDeclaration (P.TypeSynonymDeclaration _ args ty) title =
   basicDeclaration title (TypeSynonymDeclaration args ty)
-convertDeclaration (P.TypeClassDeclaration _ args implies _ ds) title = -- TODO: include fundep info
+convertDeclaration (P.TypeClassDeclaration _ args implies fundeps ds) title =
   Just (Right (mkDeclaration title info) { declChildren = children })
   where
-  info = TypeClassDeclaration args implies
+  info = TypeClassDeclaration args implies (convertFundepsToStrings args fundeps)
   children = map convertClassMember ds
   convertClassMember (P.PositionedDeclaration _ _ d) =
     convertClassMember d
@@ -136,14 +135,14 @@ convertDeclaration (P.TypeInstanceDeclaration _ constraints className tys _) tit
   Just (Left (classNameString : typeNameStrings, AugmentChild childDecl))
   where
   classNameString = unQual className
-  typeNameStrings = nub (concatMap (P.everythingOnTypes (++) extractProperNames) tys)
+  typeNameStrings = ordNub (concatMap (P.everythingOnTypes (++) extractProperNames) tys)
   unQual x = let (P.Qualified _ y) = x in P.runProperName y
 
   extractProperNames (P.TypeConstructor n) = [unQual n]
   extractProperNames _ = []
 
   childDecl = ChildDeclaration title Nothing Nothing (ChildInstance constraints classApp)
-  classApp = foldl P.TypeApp (P.TypeConstructor (fmap P.coerceProperName className)) tys
+  classApp = foldl' P.TypeApp (P.TypeConstructor (fmap P.coerceProperName className)) tys
 convertDeclaration (P.ValueFixityDeclaration fixity (P.Qualified mn alias) _) title =
   Just $ Right $ mkDeclaration title (AliasDeclaration fixity (P.Qualified mn (Right alias)))
 convertDeclaration (P.TypeFixityDeclaration fixity (P.Qualified mn alias) _) title =
@@ -166,35 +165,21 @@ convertDeclaration (P.PositionedDeclaration srcSpan com d') title =
   withAugmentChild f (t, AugmentChild d) = (t, AugmentChild (f d))
 convertDeclaration _ _ = Nothing
 
-convertComments :: [P.Comment] -> Maybe String
+convertComments :: [P.Comment] -> Maybe Text
 convertComments cs = do
   let raw = concatMap toLines cs
   let docs = mapMaybe stripPipe raw
   guard (not (null docs))
-  pure (unlines docs)
+  pure (T.unlines docs)
 
   where
   toLines (P.LineComment s) = [s]
-  toLines (P.BlockComment s) = lines s
+  toLines (P.BlockComment s) = T.lines s
 
-  stripPipe s' =
-    case dropWhile (== ' ') s' of
-      ('|':' ':s) ->
-        Just s
-      ('|':s) ->
-        Just s
-      _ ->
-        Nothing
+  stripPipe =
+    T.dropWhile (== ' ')
+    >>> T.stripPrefix "|"
+    >>> fmap (dropPrefix " ")
 
--- | Go through a PureScript module and extract a list of Bookmarks; references
--- to data types or values, to be used as a kind of index. These are used for
--- generating links in the HTML documentation, for example.
-collectBookmarks :: InPackage P.Module -> [Bookmark]
-collectBookmarks (Local m) = map Local (collectBookmarks' m)
-collectBookmarks (FromDep pkg m) = map (FromDep pkg) (collectBookmarks' m)
-
-collectBookmarks' :: P.Module -> [(P.ModuleName, String)]
-collectBookmarks' m =
-  map (P.getModuleName m, )
-      (mapMaybe getDeclarationTitle
-                (P.exportedDeclarations m))
+  dropPrefix prefix str =
+    fromMaybe str (T.stripPrefix prefix str)

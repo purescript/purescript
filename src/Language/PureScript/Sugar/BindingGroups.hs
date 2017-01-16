@@ -73,6 +73,7 @@ createBindingGroups moduleName = mapM f <=< handleDecls
         valueVerts = map (\d -> (d, declIdent d, usedIdents moduleName d `intersect` allIdents)) values
     bindingGroupDecls <- parU (stronglyConnComp valueVerts) (toBindingGroup moduleName)
     return $ filter isImportDecl ds ++
+             filter isExternKindDecl ds ++
              filter isExternDataDecl ds ++
              dataBindingGroupDecls ++
              filter isTypeClassDeclaration ds ++

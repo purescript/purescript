@@ -4,7 +4,7 @@ module Language.PureScript.Docs.Convert.ReExports
 
 import Prelude.Compat
 
-import Control.Arrow ((&&&), second)
+import Control.Arrow ((&&&), first, second)
 import Control.Monad
 import Control.Monad.Reader.Class (MonadReader, ask)
 import Control.Monad.State.Class (MonadState, gets, modify)
@@ -16,6 +16,8 @@ import Data.Map (Map)
 import Data.Maybe (mapMaybe)
 import Data.Monoid ((<>))
 import qualified Data.Map as Map
+import Data.Text (Text)
+import qualified Data.Text as T
 
 import Language.PureScript.Docs.Types
 import qualified Language.PureScript as P
@@ -33,9 +35,10 @@ import qualified Language.PureScript as P
 updateReExports ::
   P.Env ->
   [P.ModuleName] ->
+  (P.ModuleName -> InPackage P.ModuleName) ->
   Map P.ModuleName Module ->
   Map P.ModuleName Module
-updateReExports env order = execState action
+updateReExports env order withPackage = execState action
   where
   action =
     void (traverse go order)
@@ -43,7 +46,7 @@ updateReExports env order = execState action
   go mn = do
     mdl <- lookup' mn
     reExports <- getReExports env mn
-    let mdl' = mdl { modReExports = reExports }
+    let mdl' = mdl { modReExports = map (first withPackage) reExports }
     modify (Map.insert mn mdl')
 
   lookup' mn = do
@@ -52,7 +55,7 @@ updateReExports env order = execState action
       Just v' ->
         pure v'
       Nothing ->
-        internalError ("Module missing: " ++ P.runModuleName mn)
+        internalError ("Module missing: " ++ T.unpack (P.runModuleName mn))
 
 -- |
 -- Collect all of the re-exported declarations for a single module.
@@ -69,7 +72,7 @@ getReExports ::
 getReExports env mn =
   case Map.lookup mn env of
     Nothing ->
-      internalError ("Module missing: " ++ P.runModuleName mn)
+      internalError ("Module missing: " ++ T.unpack (P.runModuleName mn))
     Just (_, imports, exports) -> do
       allExports <- runReaderT (collectDeclarations imports exports) mn
       pure (filter notLocal allExports)
@@ -107,13 +110,14 @@ collectDeclarations imports exports = do
   typeClasses <- collect lookupTypeClassDeclaration impTCs expTCs
   types <- collect lookupTypeDeclaration impTypes expTypes
   typeOps <- collect lookupTypeOpDeclaration impTypeOps expTypeOps
+  kinds <- collect lookupKindDeclaration impKinds expKinds
 
   (vals, classes) <- handleTypeClassMembers valsAndMembers typeClasses
 
   let filteredTypes = filterDataConstructors expCtors types
   let filteredClasses = filterTypeClassMembers (Map.keys expVals) classes
 
-  pure (Map.toList (Map.unionsWith (<>) [filteredTypes, filteredClasses, vals, valOps, typeOps]))
+  pure (Map.toList (Map.unionsWith (<>) [filteredTypes, filteredClasses, vals, valOps, typeOps, kinds]))
 
   where
 
@@ -143,6 +147,9 @@ collectDeclarations imports exports = do
 
   expTCs = P.exportedTypeClasses exports
   impTCs = concat (Map.elems (P.importedTypeClasses imports))
+
+  expKinds = P.exportedKinds exports
+  impKinds = concat (Map.elems (P.importedKinds imports))
 
 -- |
 -- Given a list of imported declarations (of a particular kind, ie. type, data,
@@ -183,7 +190,7 @@ lookupValueDeclaration ::
    MonadReader P.ModuleName m) =>
   P.ModuleName ->
   P.Ident ->
-  m (P.ModuleName, [Either (String, P.Constraint, ChildDeclaration) Declaration])
+  m (P.ModuleName, [Either (Text, P.Constraint, ChildDeclaration) Declaration])
 lookupValueDeclaration importedFrom ident = do
   decls <- lookupModuleDeclarations "lookupValueDeclaration" importedFrom
   let
@@ -274,7 +281,7 @@ lookupTypeOpDeclaration
 lookupTypeOpDeclaration importedFrom tyOp = do
   decls <- lookupModuleDeclarations "lookupTypeOpDeclaration" importedFrom
   let
-    ds = filter (\d -> declTitle d == ("type " ++ P.showOp tyOp) && isTypeAlias d) decls
+    ds = filter (\d -> declTitle d == ("type " <> P.showOp tyOp) && isTypeAlias d) decls
   case ds of
     [d] ->
       pure (importedFrom, [d])
@@ -301,6 +308,24 @@ lookupTypeClassDeclaration importedFrom tyClass = do
         ("lookupTypeClassDeclaration: unexpected result: "
          ++ (unlines . map show) other)
 
+lookupKindDeclaration
+  :: (MonadState (Map P.ModuleName Module) m, MonadReader P.ModuleName m)
+  => P.ModuleName
+  -> P.ProperName 'P.KindName
+  -> m (P.ModuleName, [Declaration])
+lookupKindDeclaration importedFrom kind = do
+  decls <- lookupModuleDeclarations "lookupKindDeclaration" importedFrom
+  let
+    ds = filter (\d -> declTitle d == P.runProperName kind
+                       && isKind d)
+                decls
+  case ds of
+    [d] ->
+      pure (importedFrom, [d])
+    other ->
+      internalErrorInModule
+        ("lookupKindDeclaration: unexpected result: " ++ show other)
+
 -- |
 -- Get the full list of declarations for a particular module out of the
 -- state, or raise an internal error if it is not there.
@@ -317,13 +342,13 @@ lookupModuleDeclarations definedIn moduleName = do
     Nothing ->
       internalErrorInModule
         (definedIn ++ ": module missing: "
-         ++ P.runModuleName moduleName)
+         ++ T.unpack (P.runModuleName moduleName))
     Just mdl ->
       pure (allDeclarations mdl)
 
 handleTypeClassMembers ::
   (MonadReader P.ModuleName m) =>
-  Map P.ModuleName [Either (String, P.Constraint, ChildDeclaration) Declaration] ->
+  Map P.ModuleName [Either (Text, P.Constraint, ChildDeclaration) Declaration] ->
   Map P.ModuleName [Declaration] ->
   m (Map P.ModuleName [Declaration], Map P.ModuleName [Declaration])
 handleTypeClassMembers valsAndMembers typeClasses =
@@ -338,7 +363,7 @@ handleTypeClassMembers valsAndMembers typeClasses =
       |> fmap splitMap
 
 valsAndMembersToEnv ::
-  [Either (String, P.Constraint, ChildDeclaration) Declaration] -> TypeClassEnv
+  [Either (Text, P.Constraint, ChildDeclaration) Declaration] -> TypeClassEnv
 valsAndMembersToEnv xs =
   let (envUnhandledMembers, envValues) = partitionEithers xs
       envTypeClasses = []
@@ -359,11 +384,11 @@ typeClassesToEnv classes =
 --
 data TypeClassEnv = TypeClassEnv
   { -- |
-    -- Type class members which have not yet been dealt with. The String is the
+    -- Type class members which have not yet been dealt with. The Text is the
     -- name of the type class they belong to, and the constraint is used to
     -- make sure that they have the correct type if they get promoted.
     --
-    envUnhandledMembers :: [(String, P.Constraint, ChildDeclaration)]
+    envUnhandledMembers :: [(Text, P.Constraint, ChildDeclaration)]
     -- |
     -- A list of normal value declarations. Type class members will be added to
     -- this list if their parent type class is not available.
@@ -427,16 +452,13 @@ handleEnv TypeClassEnv{..} =
       _ ->
         internalErrorInModule
           ("handleEnv: Bad child declaration passed to promoteChild: "
-          ++ cdeclTitle)
+          ++ T.unpack cdeclTitle)
 
   addConstraint constraint =
     P.quantify . P.moveQuantifiersToFront . P.ConstrainedType [constraint]
 
-splitMap :: (Ord k) => Map k (v1, v2) -> (Map k v1, Map k v2)
-splitMap = foldl go (Map.empty, Map.empty) . Map.toList
-  where
-  go (m1, m2) (k, (v1, v2)) =
-    (Map.insert k v1 m1, Map.insert k v2 m2)
+splitMap :: Map k (v1, v2) -> (Map k v1, Map k v2)
+splitMap = fmap fst &&& fmap snd
 
 -- |
 -- Given a list of exported constructor names, remove any data constructor
@@ -464,7 +486,7 @@ filterTypeClassMembers =
 filterExportedChildren
   :: (Functor f)
   => (ChildDeclaration -> Bool)
-  -> (name -> String)
+  -> (name -> Text)
   -> [name]
   -> f [Declaration]
   -> f [Declaration]
@@ -492,7 +514,7 @@ internalErrorInModule
 internalErrorInModule msg = do
   mn <- ask
   internalError
-    ("while collecting re-exports for module: " ++ P.runModuleName mn ++
+    ("while collecting re-exports for module: " ++ T.unpack (P.runModuleName mn) ++
      ", " ++ msg)
 
 -- |
@@ -502,7 +524,7 @@ internalErrorInModule msg = do
 typeClassConstraintFor :: Declaration -> Maybe P.Constraint
 typeClassConstraintFor Declaration{..} =
   case declInfo of
-    TypeClassDeclaration tyArgs _ ->
+    TypeClassDeclaration tyArgs _ _ ->
       Just (P.Constraint (P.Qualified Nothing (P.ProperName declTitle)) (mkConstraint tyArgs) Nothing)
     _ ->
       Nothing

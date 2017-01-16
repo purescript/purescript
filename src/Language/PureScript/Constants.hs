@@ -2,397 +2,448 @@
 module Language.PureScript.Constants where
 
 import Prelude.Compat
-
+import Data.String (IsString)
 import Language.PureScript.Names
 
 -- Operators
 
-($) :: String
+($) :: forall a. (IsString a) => a
 ($) = "$"
 
-apply :: String
+apply :: forall a. (IsString a) => a
 apply = "apply"
 
-(#) :: String
+(#) :: forall a. (IsString a) => a
 (#) = "#"
 
-applyFlipped :: String
+applyFlipped :: forall a. (IsString a) => a
 applyFlipped = "applyFlipped"
 
-(<>) :: String
+(<>) :: forall a. (IsString a) => a
 (<>) = "<>"
 
-(++) :: String
+(++) :: forall a. (IsString a) => a
 (++) = "++"
 
-append :: String
+append :: forall a. (IsString a) => a
 append = "append"
 
-(>>=) :: String
+(>>=) :: forall a. (IsString a) => a
 (>>=) = ">>="
 
-bind :: String
+bind :: forall a. (IsString a) => a
 bind = "bind"
 
-(+) :: String
+(+) :: forall a. (IsString a) => a
 (+) = "+"
 
-add :: String
+add :: forall a. (IsString a) => a
 add = "add"
 
-(-) :: String
+(-) :: forall a. (IsString a) => a
 (-) = "-"
 
-sub :: String
+sub :: forall a. (IsString a) => a
 sub = "sub"
 
-(*) :: String
+(*) :: forall a. (IsString a) => a
 (*) = "*"
 
-mul :: String
+mul :: forall a. (IsString a) => a
 mul = "mul"
 
-(/) :: String
+(/) :: forall a. (IsString a) => a
 (/) = "/"
 
-div :: String
+div :: forall a. (IsString a) => a
 div = "div"
 
-(%) :: String
+(%) :: forall a. (IsString a) => a
 (%) = "%"
 
-mod :: String
+mod :: forall a. (IsString a) => a
 mod = "mod"
 
-(<) :: String
+(<) :: forall a. (IsString a) => a
 (<) = "<"
 
-lessThan :: String
+lessThan :: forall a. (IsString a) => a
 lessThan = "lessThan"
 
-(>) :: String
+(>) :: forall a. (IsString a) => a
 (>) = ">"
 
-greaterThan :: String
+greaterThan :: forall a. (IsString a) => a
 greaterThan = "greaterThan"
 
-(<=) :: String
+(<=) :: forall a. (IsString a) => a
 (<=) = "<="
 
-lessThanOrEq :: String
+lessThanOrEq :: forall a. (IsString a) => a
 lessThanOrEq = "lessThanOrEq"
 
-(>=) :: String
+(>=) :: forall a. (IsString a) => a
 (>=) = ">="
 
-greaterThanOrEq :: String
+greaterThanOrEq :: forall a. (IsString a) => a
 greaterThanOrEq = "greaterThanOrEq"
 
-(==) :: String
+(==) :: forall a. (IsString a) => a
 (==) = "=="
 
-eq :: String
+eq :: forall a. (IsString a) => a
 eq = "eq"
 
-(/=) :: String
+(/=) :: forall a. (IsString a) => a
 (/=) = "/="
 
-notEq :: String
+notEq :: forall a. (IsString a) => a
 notEq = "notEq"
 
-compare :: String
+compare :: forall a. (IsString a) => a
 compare = "compare"
 
-(&&) :: String
+(&&) :: forall a. (IsString a) => a
 (&&) = "&&"
 
-conj :: String
+conj :: forall a. (IsString a) => a
 conj = "conj"
 
-(||) :: String
+(||) :: forall a. (IsString a) => a
 (||) = "||"
 
-disj :: String
+disj :: forall a. (IsString a) => a
 disj = "disj"
 
-unsafeIndex :: String
+unsafeIndex :: forall a. (IsString a) => a
 unsafeIndex = "unsafeIndex"
 
-(.|.) :: String
-(.|.) = ".|."
+or :: forall a. (IsString a) => a
+or = "or"
 
-(.&.) :: String
-(.&.) = ".&."
+and :: forall a. (IsString a) => a
+and = "and"
 
-(.^.) :: String
-(.^.) = ".^."
+xor :: forall a. (IsString a) => a
+xor = "xor"
 
-(<<<) :: String
+(<<<) :: forall a. (IsString a) => a
 (<<<) = "<<<"
 
-compose :: String
+compose :: forall a. (IsString a) => a
 compose = "compose"
 
-(>>>) :: String
+(>>>) :: forall a. (IsString a) => a
 (>>>) = ">>>"
 
-composeFlipped :: String
+composeFlipped :: forall a. (IsString a) => a
 composeFlipped = "composeFlipped"
+
+map :: forall a. (IsString a) => a
+map = "map"
 
 -- Functions
 
-negate :: String
+negate :: forall a. (IsString a) => a
 negate = "negate"
 
-not :: String
+not :: forall a. (IsString a) => a
 not = "not"
 
-shl :: String
+shl :: forall a. (IsString a) => a
 shl = "shl"
 
-shr :: String
+shr :: forall a. (IsString a) => a
 shr = "shr"
 
-zshr :: String
+zshr :: forall a. (IsString a) => a
 zshr = "zshr"
 
-complement :: String
+complement :: forall a. (IsString a) => a
 complement = "complement"
 
 -- Prelude Values
 
-zero :: String
+zero :: forall a. (IsString a) => a
 zero = "zero"
 
-one :: String
+one :: forall a. (IsString a) => a
 one = "one"
 
-bottom :: String
+bottom :: forall a. (IsString a) => a
 bottom = "bottom"
 
-top :: String
+top :: forall a. (IsString a) => a
 top = "top"
 
-return :: String
+return :: forall a. (IsString a) => a
 return = "return"
 
-pure' :: String
+pure' :: forall a. (IsString a) => a
 pure' = "pure"
 
-returnEscaped :: String
+returnEscaped :: forall a. (IsString a) => a
 returnEscaped = "$return"
 
-untilE :: String
+untilE :: forall a. (IsString a) => a
 untilE = "untilE"
 
-whileE :: String
+whileE :: forall a. (IsString a) => a
 whileE = "whileE"
 
-runST :: String
+runST :: forall a. (IsString a) => a
 runST = "runST"
 
-stRefValue :: String
+stRefValue :: forall a. (IsString a) => a
 stRefValue = "value"
 
-newSTRef :: String
+newSTRef :: forall a. (IsString a) => a
 newSTRef = "newSTRef"
 
-readSTRef :: String
+readSTRef :: forall a. (IsString a) => a
 readSTRef = "readSTRef"
 
-writeSTRef :: String
+writeSTRef :: forall a. (IsString a) => a
 writeSTRef = "writeSTRef"
 
-modifySTRef :: String
+modifySTRef :: forall a. (IsString a) => a
 modifySTRef = "modifySTRef"
 
-mkFn :: String
+mkFn :: forall a. (IsString a) => a
 mkFn = "mkFn"
 
-runFn :: String
+runFn :: forall a. (IsString a) => a
 runFn = "runFn"
 
-unit :: String
+unit :: forall a. (IsString a) => a
 unit = "unit"
 
 -- Prim values
 
-undefined :: String
+undefined :: forall a. (IsString a) => a
 undefined = "undefined"
 
 -- Type Class Dictionary Names
 
-monadEffDictionary :: String
+monadEffDictionary :: forall a. (IsString a) => a
 monadEffDictionary = "monadEff"
 
-applicativeEffDictionary :: String
+applicativeEffDictionary :: forall a. (IsString a) => a
 applicativeEffDictionary = "applicativeEff"
 
-bindEffDictionary :: String
+bindEffDictionary :: forall a. (IsString a) => a
 bindEffDictionary = "bindEff"
 
-semiringNumber :: String
+semiringNumber :: forall a. (IsString a) => a
 semiringNumber = "semiringNumber"
 
-semiringInt :: String
+semiringInt :: forall a. (IsString a) => a
 semiringInt = "semiringInt"
 
-ringNumber :: String
+ringNumber :: forall a. (IsString a) => a
 ringNumber = "ringNumber"
 
-ringInt :: String
+ringInt :: forall a. (IsString a) => a
 ringInt = "ringInt"
 
-moduloSemiringNumber :: String
+moduloSemiringNumber :: forall a. (IsString a) => a
 moduloSemiringNumber = "moduloSemiringNumber"
 
-moduloSemiringInt :: String
+moduloSemiringInt :: forall a. (IsString a) => a
 moduloSemiringInt = "moduloSemiringInt"
 
-euclideanRingNumber :: String
+euclideanRingNumber :: forall a. (IsString a) => a
 euclideanRingNumber = "euclideanRingNumber"
 
-euclideanRingInt :: String
+euclideanRingInt :: forall a. (IsString a) => a
 euclideanRingInt = "euclideanRingInt"
 
-ordBoolean :: String
+ordBoolean :: forall a. (IsString a) => a
 ordBoolean = "ordBoolean"
 
-ordNumber :: String
+ordNumber :: forall a. (IsString a) => a
 ordNumber = "ordNumber"
 
-ordInt :: String
+ordInt :: forall a. (IsString a) => a
 ordInt = "ordInt"
 
-ordString :: String
+ordString :: forall a. (IsString a) => a
 ordString = "ordString"
 
-ordChar :: String
+ordChar :: forall a. (IsString a) => a
 ordChar = "ordChar"
 
-eqNumber :: String
+eqNumber :: forall a. (IsString a) => a
 eqNumber = "eqNumber"
 
-eqInt :: String
+eqInt :: forall a. (IsString a) => a
 eqInt = "eqInt"
 
-eqString :: String
+eqString :: forall a. (IsString a) => a
 eqString = "eqString"
 
-eqChar :: String
+eqChar :: forall a. (IsString a) => a
 eqChar = "eqChar"
 
-eqBoolean :: String
+eqBoolean :: forall a. (IsString a) => a
 eqBoolean = "eqBoolean"
 
-boundedBoolean :: String
+boundedBoolean :: forall a. (IsString a) => a
 boundedBoolean = "boundedBoolean"
 
-booleanAlgebraBoolean :: String
+booleanAlgebraBoolean :: forall a. (IsString a) => a
 booleanAlgebraBoolean = "booleanAlgebraBoolean"
 
-heytingAlgebraBoolean :: String
+heytingAlgebraBoolean :: forall a. (IsString a) => a
 heytingAlgebraBoolean = "heytingAlgebraBoolean"
 
-semigroupString :: String
+semigroupString :: forall a. (IsString a) => a
 semigroupString = "semigroupString"
 
-semigroupoidFn :: String
+semigroupoidFn :: forall a. (IsString a) => a
 semigroupoidFn = "semigroupoidFn"
 
 -- Generic Deriving
 
-generic :: String
+generic :: forall a. (IsString a) => a
 generic = "Generic"
 
-toSpine :: String
+toSpine :: forall a. (IsString a) => a
 toSpine = "toSpine"
 
-fromSpine :: String
+fromSpine :: forall a. (IsString a) => a
 fromSpine = "fromSpine"
 
-toSignature :: String
+toSignature :: forall a. (IsString a) => a
 toSignature = "toSignature"
+
+-- Data.Symbol
+
+pattern DataSymbol :: ModuleName
+pattern DataSymbol = ModuleName [ProperName "Data", ProperName "Symbol"]
+
+pattern IsSymbol :: Qualified (ProperName 'ClassName)
+pattern IsSymbol = Qualified (Just DataSymbol) (ProperName "IsSymbol")
+
+-- Type.Data.Symbol
+
+pattern TypeDataSymbol :: ModuleName
+pattern TypeDataSymbol = ModuleName [ProperName "Type", ProperName "Data", ProperName "Symbol"]
+
+pattern CompareSymbol :: Qualified (ProperName 'ClassName)
+pattern CompareSymbol = Qualified (Just TypeDataSymbol) (ProperName "CompareSymbol")
+
+pattern AppendSymbol :: Qualified (ProperName 'ClassName)
+pattern AppendSymbol = Qualified (Just TypeDataSymbol) (ProperName "AppendSymbol")
+
+-- Type.Data.Ordering
+
+typeDataOrdering :: ModuleName
+typeDataOrdering = ModuleName [ProperName "Type", ProperName "Data", ProperName "Ordering"]
+
+orderingLT :: Qualified (ProperName 'TypeName)
+orderingLT = Qualified (Just typeDataOrdering) (ProperName "LT")
+
+orderingEQ :: Qualified (ProperName 'TypeName)
+orderingEQ = Qualified (Just typeDataOrdering) (ProperName "EQ")
+
+orderingGT :: Qualified (ProperName 'TypeName)
+orderingGT = Qualified (Just typeDataOrdering) (ProperName "GT")
 
 -- Main module
 
-main :: String
+main :: forall a. (IsString a) => a
 main = "main"
 
 -- Prim
 
-partial :: String
+partial :: forall a. (IsString a) => a
 partial = "Partial"
 
+pattern Prim :: ModuleName
+pattern Prim = ModuleName [ProperName "Prim"]
+
 pattern Partial :: Qualified (ProperName 'ClassName)
-pattern Partial = Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Partial")
+pattern Partial = Qualified (Just Prim) (ProperName "Partial")
 
 pattern Fail :: Qualified (ProperName 'ClassName)
-pattern Fail = Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Fail")
+pattern Fail = Qualified (Just Prim) (ProperName "Fail")
+
+pattern Warn :: Qualified (ProperName 'ClassName)
+pattern Warn = Qualified (Just Prim) (ProperName "Warn")
+
+typ :: forall a. (IsString a) => a
+typ = "Type"
+
+effect :: forall a. (IsString a) => a
+effect = "Effect"
+
+symbol :: forall a. (IsString a) => a
+symbol = "Symbol"
 
 -- Code Generation
 
-__superclass_ :: String
+__superclass_ :: forall a. (IsString a) => a
 __superclass_ = "__superclass_"
 
-__unused :: String
+__unused :: forall a. (IsString a) => a
 __unused = "__unused"
 
 -- Modules
 
-prim :: String
+prim :: forall a. (IsString a) => a
 prim = "Prim"
 
-prelude :: String
+prelude :: forall a. (IsString a) => a
 prelude = "Prelude"
 
-dataArray :: String
+dataArray :: forall a. (IsString a) => a
 dataArray = "Data_Array"
 
-eff :: String
+eff :: forall a. (IsString a) => a
 eff = "Control_Monad_Eff"
 
-st :: String
+st :: forall a. (IsString a) => a
 st = "Control_Monad_ST"
 
-controlApplicative :: String
+controlApplicative :: forall a. (IsString a) => a
 controlApplicative = "Control_Applicative"
 
-controlSemigroupoid :: String
+controlSemigroupoid :: forall a. (IsString a) => a
 controlSemigroupoid = "Control_Semigroupoid"
 
-controlBind :: String
+controlBind :: forall a. (IsString a) => a
 controlBind = "Control_Bind"
 
-dataBounded :: String
+dataBounded :: forall a. (IsString a) => a
 dataBounded = "Data_Bounded"
 
-dataSemigroup :: String
+dataSemigroup :: forall a. (IsString a) => a
 dataSemigroup = "Data_Semigroup"
 
-dataHeytingAlgebra :: String
+dataHeytingAlgebra :: forall a. (IsString a) => a
 dataHeytingAlgebra = "Data_HeytingAlgebra"
 
-dataEq :: String
+dataEq :: forall a. (IsString a) => a
 dataEq = "Data_Eq"
 
-dataOrd :: String
+dataOrd :: forall a. (IsString a) => a
 dataOrd = "Data_Ord"
 
-dataSemiring :: String
+dataSemiring :: forall a. (IsString a) => a
 dataSemiring = "Data_Semiring"
 
-dataRing :: String
+dataRing :: forall a. (IsString a) => a
 dataRing = "Data_Ring"
 
-dataEuclideanRing :: String
+dataEuclideanRing :: forall a. (IsString a) => a
 dataEuclideanRing = "Data_EuclideanRing"
 
-dataFunction :: String
+dataFunction :: forall a. (IsString a) => a
 dataFunction = "Data_Function"
 
-dataFunctionUncurried :: String
+dataFunctionUncurried :: forall a. (IsString a) => a
 dataFunctionUncurried = "Data_Function_Uncurried"
 
-dataIntBits :: String
+dataIntBits :: forall a. (IsString a) => a
 dataIntBits = "Data_Int_Bits"

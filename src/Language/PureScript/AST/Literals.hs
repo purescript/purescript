@@ -4,6 +4,7 @@
 module Language.PureScript.AST.Literals where
 
 import Prelude.Compat
+import Language.PureScript.PSString (PSString)
 
 -- |
 -- Data type for literal values. Parameterised so it can be used for Exprs and
@@ -17,7 +18,7 @@ data Literal a
   -- |
   -- A string literal
   --
-  | StringLiteral String
+  | StringLiteral PSString
   -- |
   -- A character literal
   --
@@ -33,5 +34,5 @@ data Literal a
   -- |
   -- An object literal
   --
-  | ObjectLiteral [(String, a)]
+  | ObjectLiteral [(PSString, a)]
   deriving (Eq, Ord, Show, Functor)

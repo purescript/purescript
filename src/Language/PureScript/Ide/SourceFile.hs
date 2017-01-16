@@ -12,8 +12,6 @@
 -- Getting declarations from PureScript sourcefiles
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings #-}
-
 module Language.PureScript.Ide.SourceFile
   ( parseModule
   , getImportsForFile
@@ -30,14 +28,14 @@ import qualified Language.PureScript           as P
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
-import           System.IO.UTF8                (readUTF8File)
+import           System.IO.UTF8                (readUTF8FileT)
 
 parseModule
   :: (MonadIO m)
   => FilePath
-  -> m (Either FilePath (FilePath, P.Module) )
+  -> m (Either FilePath (FilePath, P.Module))
 parseModule path = do
-  contents <- liftIO (readUTF8File path)
+  contents <- liftIO (readUTF8FileT path)
   case P.parseModuleFromFile identity (path, contents) of
     Left _ -> pure (Left path)
     Right m -> pure (Right m)
@@ -60,9 +58,9 @@ getImportsForFile fp = do
       where
         mkModuleImport (mn, importType', qualifier) =
           ModuleImport
-          (runModuleNameT mn)
+          (P.runModuleName mn)
           importType'
-          (runModuleNameT <$> qualifier)
+          (P.runModuleName <$> qualifier)
         unwrapPositionedImport (mn, it, q) = (mn, unwrapImportType it, q)
         unwrapImportType (P.Explicit decls) = P.Explicit (map unwrapPositionedRef decls)
         unwrapImportType (P.Hiding decls)   = P.Hiding (map unwrapPositionedRef decls)
@@ -94,34 +92,35 @@ extractSpans
   -- ^ The surrounding span
   -> P.Declaration
   -- ^ The declaration to extract spans from
-  -> [(Either Text Text, P.SourceSpan)]
-  -- ^ A @Right@ corresponds to a type level declaration, and a @Left@ to a
-  -- value level one
+  -> [(IdeDeclNamespace, P.SourceSpan)]
+  -- ^ Declarations and their source locations
 extractSpans ss d = case d of
   P.PositionedDeclaration ss' _ d' ->
     extractSpans ss' d'
   P.ValueDeclaration i _ _ _ ->
-    [(Left (runIdentT i), ss)]
+    [(IdeNSValue (P.runIdent i), ss)]
   P.TypeSynonymDeclaration name _ _ ->
-    [(Right (runProperNameT name), ss)]
+    [(IdeNSType (P.runProperName name), ss)]
   P.TypeClassDeclaration name _ _ _ members ->
-    (Right (runProperNameT name), ss) : concatMap (extractSpans' ss) members
+    (IdeNSType (P.runProperName name), ss) : concatMap (extractSpans' ss) members
   P.DataDeclaration _ name _ ctors ->
-    (Right (runProperNameT name), ss)
-    : map (\(cname, _) -> (Left (runProperNameT cname), ss)) ctors
+    (IdeNSType (P.runProperName name), ss)
+    : map (\(cname, _) -> (IdeNSValue (P.runProperName cname), ss)) ctors
   P.ExternDeclaration ident _ ->
-    [(Left (runIdentT ident), ss)]
+    [(IdeNSValue (P.runIdent ident), ss)]
   P.ExternDataDeclaration name _ ->
-    [(Right (runProperNameT name), ss)]
+    [(IdeNSType (P.runProperName name), ss)]
+  P.ExternKindDeclaration name ->
+    [(IdeNSKind (P.runProperName name), ss)]
   _ -> []
   where
     -- We need this special case to be able to also get the position info for
-    -- typeclass member functions. Typedeclaratations would clash with value
+    -- typeclass member functions. Typedeclarations would clash with value
     -- declarations for non-typeclass members, which is why we can't handle them
     -- in extractSpans.
     extractSpans' ssP dP = case dP of
       P.PositionedDeclaration ssP' _ dP' ->
         extractSpans' ssP' dP'
       P.TypeDeclaration ident _ ->
-        [(Left (runIdentT ident), ssP)]
+        [(IdeNSValue (P.runIdent ident), ssP)]
       _ -> []

@@ -26,7 +26,7 @@ fi
 mkdir -p bundle/build/purescript
 
 # Strip the binaries, and copy them to the staging directory
-for BIN in psc psci psc-docs psc-publish psc-bundle psc-ide-server psc-ide-client
+for BIN in psc psci psc-docs psc-publish psc-bundle psc-ide-server psc-ide-client psc-package
 do
   FULL_BIN="$LOCAL_INSTALL_ROOT/bin/${BIN}${BIN_EXT}"
   if [ "$OS" != "win64" ]

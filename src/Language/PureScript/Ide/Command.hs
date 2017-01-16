@@ -12,9 +12,6 @@
 -- Datatypes for the commands psc-ide accepts
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE OverloadedStrings #-}
-
-
 module Language.PureScript.Ide.Command where
 
 import           Protolude
@@ -60,6 +57,21 @@ data Command
     | Cwd
     | Reset
     | Quit
+
+commandName :: Command -> Text
+commandName c = case c of
+  Load{} -> "Load"
+  Type{} -> "Type"
+  Complete{} -> "Complete"
+  Pursuit{} -> "Pursuit"
+  CaseSplit{} -> "CaseSplit"
+  AddClause{} -> "AddClause"
+  Import{} -> "Import"
+  List{} -> "List"
+  Rebuild{} -> "Rebuild"
+  Cwd{} -> "Cwd"
+  Reset{} -> "Reset"
+  Quit{} -> "Quit"
 
 data ImportCommand
   = AddImplicitImport P.ModuleName

@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Language.PureScript.Ide.Completion
        ( getCompletions
        , getExactMatches

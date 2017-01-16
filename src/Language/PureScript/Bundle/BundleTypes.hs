@@ -66,10 +66,11 @@ data ModuleElement
   | Member JSStatement Bool String JSExpression [Key]
   | ExportsList [(ExportType, String, JSExpression, [Key])]
   | Other JSStatement
+  | Skip JSStatement
   deriving (Show)
 
 -- | A module is just a list of elements of the types listed above.
-data Module = Module ModuleIdentifier [ModuleElement] deriving (Show)
+data Module = Module ModuleIdentifier (Maybe FilePath) [ModuleElement] deriving (Show)
 
 -- *Helpers for JSCommaList
 

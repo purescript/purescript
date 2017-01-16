@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 -- |
 -- Source position information
 --
@@ -9,6 +7,9 @@ import Prelude.Compat
 
 import Data.Aeson ((.=), (.:))
 import qualified Data.Aeson as A
+import Data.Monoid
+import qualified Data.Text as T
+import Data.Text (Text)
 
 -- |
 -- Source position information
@@ -24,10 +25,10 @@ data SourcePos = SourcePos
   , sourcePosColumn :: Int
   } deriving (Show, Eq, Ord)
 
-displaySourcePos :: SourcePos -> String
+displaySourcePos :: SourcePos -> Text
 displaySourcePos sp =
-  "line " ++ show (sourcePosLine sp) ++
-    ", column " ++ show (sourcePosColumn sp)
+  "line " <> T.pack (show (sourcePosLine sp)) <>
+    ", column " <> T.pack (show (sourcePosColumn sp))
 
 instance A.ToJSON SourcePos where
   toJSON SourcePos{..} =
@@ -52,14 +53,14 @@ data SourceSpan = SourceSpan
   , spanEnd :: SourcePos
   } deriving (Show, Eq, Ord)
 
-displayStartEndPos :: SourceSpan -> String
+displayStartEndPos :: SourceSpan -> Text
 displayStartEndPos sp =
-  displaySourcePos (spanStart sp) ++ " - " ++
+  displaySourcePos (spanStart sp) <> " - " <>
   displaySourcePos (spanEnd sp)
 
-displaySourceSpan :: SourceSpan -> String
+displaySourceSpan :: SourceSpan -> Text
 displaySourceSpan sp =
-  spanName sp ++ " " ++
+  T.pack (spanName sp) <> " " <>
     displayStartEndPos sp
 
 instance A.ToJSON SourceSpan where

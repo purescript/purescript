@@ -1,9 +1,11 @@
 module Tags where
 
+import Control.Arrow (first)
+import qualified Data.Text as T
 import qualified Language.PureScript as P
 
 tags :: P.Module -> [(String, Int)]
-tags = concatMap dtags . P.exportedDeclarations
+tags = map (first T.unpack) . concatMap dtags . P.exportedDeclarations
   where dtags (P.PositionedDeclaration sp _ d) = map tag $ names d
           where tag name = (name, line)
                 line = P.sourcePosLine $ P.spanStart sp
@@ -15,4 +17,5 @@ tags = concatMap dtags . P.exportedDeclarations
         names (P.TypeSynonymDeclaration name _ _) = [P.runProperName name]
         names (P.TypeClassDeclaration name _ _ _ _) = [P.runProperName name]
         names (P.TypeInstanceDeclaration name _ _ _ _) = [P.showIdent name]
+        names (P.ExternKindDeclaration name) = [P.runProperName name]
         names _ = []

@@ -9,6 +9,7 @@ import           Prelude.Compat hiding (lex)
 
 import           Data.Char (isSpace)
 import           Data.List (intercalate)
+import qualified Data.Text as T
 import           Text.Parsec hiding ((<|>))
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Interactive.Directive as D
@@ -26,7 +27,7 @@ parseCommand cmdString =
 
 parseRest :: P.TokenParser a -> String -> Either String a
 parseRest p s = either (Left . show) Right $ do
-  ts <- P.lex "" s
+  ts <- P.lex "" (T.pack s)
   P.runTokenParser "" (p <* eof) ts
 
 psciCommand :: P.TokenParser Command
@@ -62,6 +63,7 @@ parseDirective cmd =
     Help    -> return ShowHelp
     Quit    -> return QuitPSCi
     Reset   -> return ResetState
+    Paste   -> return PasteLines
     Browse  -> BrowseModule <$> parseRest P.moduleName arg
     Show    -> ShowInfo <$> parseReplQuery' (trim arg)
     Type    -> TypeOf <$> parseRest P.parseValue arg
@@ -112,6 +114,7 @@ acceptable P.ExternDeclaration{} = True
 acceptable P.ExternDataDeclaration{} = True
 acceptable P.TypeClassDeclaration{} = True
 acceptable P.TypeInstanceDeclaration{} = True
+acceptable P.ExternKindDeclaration{} = True
 acceptable _ = False
 
 parseReplQuery' :: String -> Either String ReplQuery

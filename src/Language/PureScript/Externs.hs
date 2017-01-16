@@ -17,11 +17,14 @@ module Language.PureScript.Externs
 import Prelude.Compat
 
 import Data.Aeson.TH
+import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
+import Data.List (foldl', find)
 import Data.Foldable (fold)
-import Data.List (find, foldl')
-import Data.Maybe (mapMaybe, maybeToList, fromMaybe)
+import Data.Text (Text)
+import qualified Data.Text as T
 import Data.Version (showVersion)
 import qualified Data.Map as M
+import qualified Data.Set as S
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -37,7 +40,7 @@ import Paths_purescript as Paths
 data ExternsFile = ExternsFile
   {
   -- | The externs version
-    efVersion :: String
+    efVersion :: Text
   -- | Module name
   , efModuleName :: ModuleName
   -- | List of module exports
@@ -100,7 +103,7 @@ data ExternsDeclaration =
   -- | A type synonym
   | EDTypeSynonym
       { edTypeSynonymName         :: ProperName 'TypeName
-      , edTypeSynonymArguments    :: [(String, Maybe Kind)]
+      , edTypeSynonymArguments    :: [(Text, Maybe Kind)]
       , edTypeSynonymType         :: Type
       }
   -- | A data construtor
@@ -119,7 +122,7 @@ data ExternsDeclaration =
   -- | A type class declaration
   | EDClass
       { edClassName               :: ProperName 'ClassName
-      , edClassTypeArguments      :: [(String, Maybe Kind)]
+      , edClassTypeArguments      :: [(Text, Maybe Kind)]
       , edClassMembers            :: [(Ident, Type)]
       , edClassConstraints        :: [Constraint]
       , edFunctionalDependencies  :: [FunctionalDependency]
@@ -130,6 +133,10 @@ data ExternsDeclaration =
       , edInstanceName            :: Ident
       , edInstanceTypes           :: [Type]
       , edInstanceConstraints     :: Maybe [Constraint]
+      }
+  -- | A kind declaration
+  | EDKind
+      { edKindName                :: ProperName 'KindName
       }
   deriving Show
 
@@ -142,10 +149,11 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   applyDecl env (EDTypeSynonym pn args ty) = env { typeSynonyms = M.insert (qual pn) (args, ty) (typeSynonyms env) }
   applyDecl env (EDDataConstructor pn dTy tNm ty nms) = env { dataConstructors = M.insert (qual pn) (dTy, tNm, ty, nms) (dataConstructors env) }
   applyDecl env (EDValue ident ty) = env { names = M.insert (Qualified (Just efModuleName) ident) (ty, External, Defined) (names env) }
-  applyDecl env (EDClass pn args members cs deps) = env { typeClasses = M.insert (qual pn) (TypeClassData args members cs deps) (typeClasses env) }
+  applyDecl env (EDClass pn args members cs deps) = env { typeClasses = M.insert (qual pn) (makeTypeClassData args members cs deps) (typeClasses env) }
+  applyDecl env (EDKind pn) = env { kinds = S.insert (qual pn) (kinds env) }
   applyDecl env (EDInstance className ident tys cs) = env { typeClassDictionaries = updateMap (updateMap (M.insert (qual ident) dict) className) (Just efModuleName) (typeClassDictionaries env) }
     where
-    dict :: TypeClassDictionaryInScope
+    dict :: NamedDict
     dict = TypeClassDictionaryInScope (qual ident) [] className tys cs
 
     updateMap :: (Ord k, Monoid a) => (a -> a) -> k -> M.Map k a -> M.Map k a
@@ -159,7 +167,7 @@ moduleToExternsFile :: Module -> Environment -> ExternsFile
 moduleToExternsFile (Module _ _ _ _ Nothing) _ = internalError "moduleToExternsFile: module exports were not elaborated"
 moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
   where
-  efVersion       = showVersion Paths.version
+  efVersion       = T.pack (showVersion Paths.version)
   efModuleName    = mn
   efExports       = exps
   efImports       = mapMaybe importDecl ds
@@ -180,7 +188,7 @@ moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
   typeFixityDecl _ = Nothing
 
   findOp :: (DeclarationRef -> Maybe (OpName a)) -> OpName a -> DeclarationRef -> Bool
-  findOp get op = maybe False (== op) . get
+  findOp g op = maybe False (== op) . g
 
   importDecl :: Declaration -> Maybe ExternsImport
   importDecl (ImportDeclaration m mt qmn) = Just (ExternsImport m mt qmn)
@@ -218,6 +226,9 @@ moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
       , m2 <- M.elems m1
       , TypeClassDictionaryInScope{..} <- maybeToList (M.lookup (Qualified (Just mn) ident) m2)
       ]
+  toExternsDeclaration (KindRef pn)
+    | Qualified (Just mn) pn `S.member` kinds env
+    = [ EDKind pn ]
   toExternsDeclaration _ = []
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsImport)

@@ -79,11 +79,11 @@ uncurryFunc modules entryPoints =
 
 -- | Generation of uncurried functions
 generateUncurried :: Module -> ([Module],FuncCollector) -> ([Module],FuncCollector)
-generateUncurried (Module moduleIdentifier moduleElements) (modules, funcCollector) =
+generateUncurried (Module moduleIdentifier mfp moduleElements) (modules, funcCollector) =
     let newCollector = funcCollector {adminMap = adminMap funcCollector,
                                       stats = (stats funcCollector){moduleCount = moduleCount (stats funcCollector) + 1}}
         (eles,funcCollector') = foldr (generateUncurriedEle moduleIdentifier) ([],newCollector) moduleElements
-    in (Module moduleIdentifier eles : modules, funcCollector')
+    in (Module moduleIdentifier mfp eles : modules, funcCollector')
 
 
 -- |  Generate uncurried functions from curried functions
@@ -160,12 +160,12 @@ analyzeUncurriedPrim _ _ = Nothing
 
 -- | Generation of uncurried exports
 generateUncurriedExports :: [ModuleIdentifier] -> Module -> ([Module],FuncCollector) -> ([Module],FuncCollector)
-generateUncurriedExports entryPoints (Module moduleIdentifier moduleElements) (modules, funcCollector) =
+generateUncurriedExports entryPoints (Module moduleIdentifier mfp moduleElements) (modules, funcCollector) =
     if elem moduleIdentifier entryPoints
-        then (Module moduleIdentifier moduleElements : modules, funcCollector)
+        then (Module moduleIdentifier mfp moduleElements : modules, funcCollector)
         else
             let (eles,funcCollector') = foldr (generateUncurriedExpo moduleIdentifier) ([],funcCollector) moduleElements
-            in (Module moduleIdentifier eles : modules, funcCollector')
+            in (Module moduleIdentifier mfp eles : modules, funcCollector')
 
 generateUncurriedExpo :: ModuleIdentifier -> ModuleElement -> ([ModuleElement],FuncCollector) -> ([ModuleElement],FuncCollector)
 generateUncurriedExpo mid (ExportsList l) (eles, funcCollector) =
@@ -216,10 +216,10 @@ generateUncurriedEx _mid t (eles, funcCollector) =
 
 -- | replace saturated calls to calls to uncurried functions
 generateSaturedCalls :: Module -> ([Module],FuncCollector) -> ([Module],FuncCollector)
-generateSaturedCalls (Module moduleIdentifier moduleElements) (modules, funcCollector) =
+generateSaturedCalls (Module moduleIdentifier mfp moduleElements) (modules, funcCollector) =
     {- trace ("generateSaturedCalls: " ++ show moduleIdentifier) $ -}
     let (eles,funcCollector') = foldr (generateSaturedC moduleIdentifier imports) ([],funcCollector) moduleElements
-    in (Module moduleIdentifier eles : modules, funcCollector')
+    in (Module moduleIdentifier mfp eles : modules, funcCollector')
   where
     imports :: [(String, ModuleIdentifier)]
     imports = mapMaybe toImport moduleElements

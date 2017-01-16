@@ -25,6 +25,7 @@ import Data.List (intercalate,nub,sort)
 import Data.Foldable (for_)
 import Data.Version (showVersion)
 import Data.Monoid ((<>))
+import qualified Data.Text as T
 
 import Options.Applicative (Parser)
 import qualified Options.Applicative as Opts
@@ -33,7 +34,7 @@ import System.FilePath ((</>))
 import System.FilePath.Glob (glob)
 import System.Exit (exitFailure, exitSuccess)
 import System.IO (hPutStr, stderr)
-import System.IO.UTF8 (readUTF8File)
+import System.IO.UTF8 (readUTF8FileT)
 
 import qualified Language.PureScript as P
 import qualified Paths_purescript as Paths
@@ -56,11 +57,11 @@ instance Ord SuperMap where
       getCls = either id snd
 
 runModuleName :: P.ModuleName -> String
-runModuleName (P.ModuleName pns) = intercalate "_" (P.runProperName `map` pns)
+runModuleName (P.ModuleName pns) = intercalate "_" ((T.unpack . P.runProperName) `map` pns)
 
 readInput :: [FilePath] -> IO (Either P.MultipleErrors [P.Module])
 readInput paths = do
-  content <- mapM (\path -> (path, ) <$> readUTF8File path) paths
+  content <- mapM (\path -> (path, ) <$> readUTF8FileT path) paths
   return $ map snd <$> P.parseModulesFromFiles id content
 
 compile :: HierarchyOptions -> IO ()

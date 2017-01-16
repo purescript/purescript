@@ -18,6 +18,7 @@ import Control.Monad.State.Class (MonadState(..), gets, modify)
 import Data.Functor.Identity (Identity(), runIdentity)
 import Data.List (nub, (\\))
 import Data.Monoid
+import Data.Text (Text)
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -56,7 +57,7 @@ newSkolemScope = do
 -- |
 -- Skolemize a type variable by replacing its instances with fresh skolem constants
 --
-skolemize :: String -> Int -> SkolemScope -> Maybe SourceSpan -> Type -> Type
+skolemize :: Text -> Int -> SkolemScope -> Maybe SourceSpan -> Type -> Type
 skolemize ident sko scope ss = replaceTypeVars ident (Skolem ident sko scope ss)
 
 -- |
@@ -64,25 +65,25 @@ skolemize ident sko scope ss = replaceTypeVars ident (Skolem ident sko scope ss)
 -- DeferredDictionary placeholder. These type variables are somewhat unique since they are the
 -- only example of scoped type variables.
 --
-skolemizeTypesInValue :: String -> Int -> SkolemScope -> Maybe SourceSpan -> Expr -> Expr
+skolemizeTypesInValue :: Text -> Int -> SkolemScope -> Maybe SourceSpan -> Expr -> Expr
 skolemizeTypesInValue ident sko scope ss =
   let
     (_, f, _, _, _) = everywhereWithContextOnValuesM [] defS onExpr onBinder defS defS
   in runIdentity . f
   where
-  onExpr :: [String] -> Expr -> Identity ([String], Expr)
+  onExpr :: [Text] -> Expr -> Identity ([Text], Expr)
   onExpr sco (DeferredDictionary c ts)
     | ident `notElem` sco = return (sco, DeferredDictionary c (map (skolemize ident sko scope ss) ts))
   onExpr sco (TypedValue check val ty)
     | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedValue check val (skolemize ident sko scope ss ty))
   onExpr sco other = return (sco, other)
 
-  onBinder :: [String] -> Binder -> Identity ([String], Binder)
+  onBinder :: [Text] -> Binder -> Identity ([Text], Binder)
   onBinder sco (TypedBinder ty b)
     | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedBinder (skolemize ident sko scope ss ty) b)
   onBinder sco other = return (sco, other)
 
-  peelTypeVars :: Type -> [String]
+  peelTypeVars :: Type -> [Text]
   peelTypeVars (ForAll i ty _) = i : peelTypeVars ty
   peelTypeVars _ = []
 
