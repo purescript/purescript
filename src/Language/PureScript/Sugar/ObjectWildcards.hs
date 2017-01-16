@@ -8,7 +8,7 @@ import           Prelude.Compat
 import           Control.Monad (forM, foldM)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Supply.Class
-import           Data.List (partition)
+import           Data.List (partition, foldl')
 import           Data.List.NonEmpty (NonEmpty(..))
 import           Data.Map (Map)
 import qualified Data.Map as M
@@ -137,7 +137,7 @@ desugarDecl other = fn other
         goLayer path (key, Branch branch) =
           let path' = path ++ [key]
               updates = goLayer path' <$> M.toList branch
-              accessor = foldr Accessor val path'
+              accessor = foldl' (flip Accessor) val path'
               objectUpdate = ObjectUpdate accessor updates
           in (key, objectUpdate)
 

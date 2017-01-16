@@ -17,6 +17,7 @@ import           Prelude hiding (lex)
 
 import           Control.Applicative
 import           Control.Arrow ((+++))
+import           Control.Monad (join)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Parallel.Strategies (withStrategy, parList, rseq)
 import           Data.Bifunctor (first)
@@ -399,13 +400,19 @@ parseInfixExpr
 parseHole :: TokenParser Expr
 parseHole = Hole <$> holeLit
 
-parsePropertyUpdate :: TokenParser (NonEmpty PSString, Expr)
+parsePropertyUpdate :: TokenParser [(NonEmpty PSString, Expr)]
 parsePropertyUpdate = do
   name <- parseLabel
-  rest <- P.many (indented *> dot *> indented *> parseLabel)
-  _ <- indented *> equals
-  value <- indented *> parseValue
-  return (name :| rest, value)
+  updates <- parseShallowUpdate <|> parseNestedUpdate
+  return $ map (first (name :|)) updates
+  where
+    parseShallowUpdate :: TokenParser [([PSString], Expr)]
+    parseShallowUpdate = do
+      value <- indented *> equals *> indented *> parseValue
+      return [([], value)]
+
+    parseNestedUpdate :: TokenParser [([PSString], Expr)]
+    parseNestedUpdate = map (first N.toList) <$> parseUpdaterBodyFields
 
 parseAccessor :: Expr -> TokenParser Expr
 parseAccessor (Constructor _) = P.unexpected "constructor"
@@ -455,8 +462,11 @@ parseValue = withSourceSpan PositionedValue
                 ]
               ]
 
+parseUpdaterBodyFields :: TokenParser [(NonEmpty PSString, Expr)]
+parseUpdaterBodyFields = join <$> (indented *> braces (commaSep1 (indented *> parsePropertyUpdate)))
+
 parseUpdaterBody :: Expr -> TokenParser Expr
-parseUpdaterBody v = objectUpdate <$> (indented *> braces (commaSep1 (indented *> parsePropertyUpdate)))
+parseUpdaterBody v = objectUpdate <$> parseUpdaterBodyFields
   where
     objectUpdate xs | all (null . N.tail . fst) xs = ObjectUpdate v (map (first N.head) xs)
                     | otherwise = ObjectUpdateNested v xs
