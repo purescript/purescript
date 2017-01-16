@@ -77,11 +77,11 @@ typesOf
   -> [(Ident, Expr)]
   -> m [(Ident, (Expr, Type))]
 typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
-    tys <- capturingSubstitution tidyUp $ do
-      SplitBindingGroup untyped typed dict <- typeDictionaryForBindingGroup (Just moduleName) vals
+    (tys, wInfer) <- capturingSubstitution tidyUp $ do
+      (SplitBindingGroup untyped typed dict, w) <- withoutWarnings $ typeDictionaryForBindingGroup (Just moduleName) vals
       ds1 <- parU typed $ \e -> withoutWarnings $ checkTypedBindingGroupElement moduleName e dict
       ds2 <- forM untyped $ \e -> withoutWarnings $ typeForBindingGroupElement e dict
-      return (map (False, ) ds1 ++ map (True, ) ds2)
+      return (map (False, ) ds1 ++ map (True, ) ds2, w)
 
     inferred <- forM tys $ \(shouldGeneralize, ((ident, (val, ty)), _)) -> do
       -- Replace type class dictionary placeholders with actual dictionaries
@@ -123,10 +123,13 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
     -- Show warnings here, since types in wildcards might have been solved during
     -- instance resolution (by functional dependencies).
     finalState <- get
+    let replaceTypes' = replaceTypes (checkSubstitution finalState)
+        runTypeSearch' gen = runTypeSearch (guard gen $> foldMap snd inferred) finalState
+        raisePreviousWarnings gen w = (escalateWarningWhen isHoleError . tell . onErrorMessages (runTypeSearch' gen . replaceTypes')) w
+
+    raisePreviousWarnings False wInfer
     forM_ tys $ \(shouldGeneralize, ((_, (_, _)), w)) -> do
-      let replaceTypes' = replaceTypes (checkSubstitution finalState)
-          runTypeSearch' = runTypeSearch (guard shouldGeneralize $> foldMap snd inferred) finalState
-      (escalateWarningWhen isHoleError . tell . onErrorMessages (runTypeSearch' . replaceTypes')) w
+      raisePreviousWarnings shouldGeneralize w
 
     return (map fst inferred)
   where
@@ -160,7 +163,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
     constrain cs = ConstrainedType (map (\(_, _, x) -> x) cs)
 
     -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
-    tidyUp ts sub = map (second (first (second (overTypes (substituteType sub) *** substituteType sub)))) ts
+    tidyUp ts sub = first (map (second (first (second (overTypes (substituteType sub) *** substituteType sub))))) ts
 
     isHoleError :: ErrorMessage -> Bool
     isHoleError (ErrorMessage _ HoleInferredType{}) = True
