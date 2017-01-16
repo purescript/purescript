@@ -67,6 +67,8 @@ evaluateIifes = everywhereOnJS convert
   where
   convert :: JS -> JS
   convert (JSApp _ (JSFunction _ Nothing [] (JSBlock _ [JSReturn _ ret])) []) = ret
+  convert (JSApp _ (JSFunction _ Nothing idents (JSBlock _ [JSReturn ss ret])) [])
+    | not (any (`isReassigned` ret) idents) = replaceIdents (map (, JSVar ss C.undefined) idents) ret
   convert js = js
 
 inlineVariables :: JS -> JS
@@ -275,17 +277,12 @@ inlineFnComposition = everywhereOnJSTopDownM convert where
 
 inlineUnsafePartial :: JS -> JS
 inlineUnsafePartial = everywhereOnJSTopDown convert where
-  convert (JSApp _ (JSIndexer _ (JSStringLiteral _ unsafePartial) (JSVar _ partialUnsafe))
-            [ JSFunction _ Nothing [arg] (JSBlock _ [JSReturn _ val]) ])
+  convert (JSApp ss (JSIndexer _ (JSStringLiteral _ unsafePartial) (JSVar _ partialUnsafe)) [ comp ])
     | unsafePartial == C.unsafePartial && partialUnsafe == C.partialUnsafe
-    = replace arg val
+    -- Apply to undefined here, the application should be optimized away
+    -- if it is safe to do so
+    = JSApp ss comp [ JSVar ss C.undefined ]
   convert other = other
-
-  -- Replace the Partial dictionary with @undefined@, which will be removed later
-  replace arg = everywhereOnJSTopDown go where
-    go (JSVar ss arg') | arg == arg'
-      = JSVar ss C.undefined
-    go other = other
 
 semiringNumber :: forall a b. (IsString a, IsString b) => (a, b)
 semiringNumber = (C.dataSemiring, C.semiringNumber)

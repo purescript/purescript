@@ -15,5 +15,5 @@ length = go 0 where
     else go (acc + 1) (unsafePartial P.tail arr)
 
 main = do
-  logShow (length [1, 2, 3])
+  logShow (length (1 .. 10000))
   log "Done"
