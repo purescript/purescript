@@ -17,14 +17,12 @@ import           Prelude hiding (lex)
 
 import           Control.Applicative
 import           Control.Arrow ((+++))
-import           Control.Monad (join)
+import           Control.Monad (foldM)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Parallel.Strategies (withStrategy, parList, rseq)
-import           Data.Bifunctor (first)
 import           Data.Functor (($>))
-import           Data.List.NonEmpty (NonEmpty(..))
-import qualified Data.List.NonEmpty as N
 import           Data.Maybe (fromMaybe)
+import qualified Data.Set as S
 import           Data.Text (Text)
 import           Language.PureScript.AST
 import           Language.PureScript.Environment
@@ -400,19 +398,17 @@ parseInfixExpr
 parseHole :: TokenParser Expr
 parseHole = Hole <$> holeLit
 
-parsePropertyUpdate :: TokenParser [(NonEmpty PSString, Expr)]
+parsePropertyUpdate :: TokenParser (PSString, PathNode Expr)
 parsePropertyUpdate = do
   name <- parseLabel
   updates <- parseShallowUpdate <|> parseNestedUpdate
-  return $ map (first (name :|)) updates
+  return (name, updates)
   where
-    parseShallowUpdate :: TokenParser [([PSString], Expr)]
-    parseShallowUpdate = do
-      value <- indented *> equals *> indented *> parseValue
-      return [([], value)]
+    parseShallowUpdate :: TokenParser (PathNode Expr)
+    parseShallowUpdate = Leaf <$> (indented *> equals *> indented *> parseValue)
 
-    parseNestedUpdate :: TokenParser [([PSString], Expr)]
-    parseNestedUpdate = map (first N.toList) <$> parseUpdaterBodyFields
+    parseNestedUpdate :: TokenParser (PathNode Expr)
+    parseNestedUpdate = Branch <$> parseUpdaterBodyFields
 
 parseAccessor :: Expr -> TokenParser Expr
 parseAccessor (Constructor _) = P.unexpected "constructor"
@@ -462,14 +458,18 @@ parseValue = withSourceSpan PositionedValue
                 ]
               ]
 
-parseUpdaterBodyFields :: TokenParser [(NonEmpty PSString, Expr)]
-parseUpdaterBodyFields = join <$> (indented *> braces (commaSep1 (indented *> parsePropertyUpdate)))
+parseUpdaterBodyFields :: TokenParser (PathTree Expr)
+parseUpdaterBodyFields = do
+  updates <- indented *> braces (commaSep1 (indented *> parsePropertyUpdate))
+  (_, tree) <- foldM insertUpdate (S.empty, []) updates
+  return (PathTree (AssocList (reverse tree)))
+  where
+    insertUpdate (seen, xs) (key, node)
+      | S.member key seen = P.unexpected ("Duplicate key in record update: " ++ show key)
+      | otherwise = return (S.insert key seen, (key, node) : xs)
 
 parseUpdaterBody :: Expr -> TokenParser Expr
-parseUpdaterBody v = objectUpdate <$> parseUpdaterBodyFields
-  where
-    objectUpdate xs | all (null . N.tail . fst) xs = ObjectUpdate v (map (first N.head) xs)
-                    | otherwise = ObjectUpdateNested v xs
+parseUpdaterBody v = ObjectUpdateNested v <$> parseUpdaterBodyFields
 
 parseAnonymousArgument :: TokenParser Expr
 parseAnonymousArgument = underscore *> pure AnonymousArgument
