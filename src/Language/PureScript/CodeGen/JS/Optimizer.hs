@@ -46,7 +46,7 @@ optimize js = do
 optimize' :: (MonadReader Options m, MonadSupply m) => JS -> m JS
 optimize' js = do
   opts <- ask
-  js' <- untilFixedPoint (inlineFnComposition . tidyUp . applyAll
+  js' <- untilFixedPoint (inlineFnComposition . inlineUnsafePartial . tidyUp . applyAll
     [ inlineCommonValues
     , inlineCommonOperators
     ]) js

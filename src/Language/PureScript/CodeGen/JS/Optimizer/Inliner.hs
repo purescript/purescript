@@ -6,6 +6,7 @@ module Language.PureScript.CodeGen.JS.Optimizer.Inliner
   , inlineCommonValues
   , inlineCommonOperators
   , inlineFnComposition
+  , inlineUnsafePartial
   , etaConvert
   , unThunk
   , evaluateIifes
@@ -249,10 +250,9 @@ inlineCommonOperators = applyAll $
 
 -- (f <<< g $ x) = f (g x)
 -- (f <<< g)     = \x -> f (g x)
-inlineFnComposition :: (MonadSupply m) => JS -> m JS
-inlineFnComposition = everywhereOnJSTopDownM convert
-  where
-  convert :: (MonadSupply m) => JS -> m JS
+inlineFnComposition :: forall m. MonadSupply m => JS -> m JS
+inlineFnComposition = everywhereOnJSTopDownM convert where
+  convert :: JS -> m JS
   convert (JSApp s1 (JSApp s2 (JSApp _ (JSApp _ fn [dict']) [x]) [y]) [z])
     | isFnCompose dict' fn = return $ JSApp s1 x [JSApp s2 y [z]]
     | isFnComposeFlipped dict' fn = return $ JSApp s2 y [JSApp s1 x [z]]
@@ -272,6 +272,20 @@ inlineFnComposition = everywhereOnJSTopDownM convert
   fnCompose = (C.controlSemigroupoid, C.compose)
   fnComposeFlipped :: forall a b. (IsString a, IsString b) => (a, b)
   fnComposeFlipped = (C.controlSemigroupoid, C.composeFlipped)
+
+inlineUnsafePartial :: JS -> JS
+inlineUnsafePartial = everywhereOnJSTopDown convert where
+  convert (JSApp _ (JSIndexer _ (JSStringLiteral _ unsafePartial) (JSVar _ partialUnsafe))
+            [ JSFunction _ Nothing [arg] (JSBlock _ [JSReturn _ val]) ])
+    | unsafePartial == C.unsafePartial && partialUnsafe == C.partialUnsafe
+    = replace arg val
+  convert other = other
+
+  -- Replace the Partial dictionary with @undefined@, which will be removed later
+  replace arg = everywhereOnJSTopDown go where
+    go (JSVar ss arg') | arg == arg'
+      = JSVar ss C.undefined
+    go other = other
 
 semiringNumber :: forall a b. (IsString a, IsString b) => (a, b)
 semiringNumber = (C.dataSemiring, C.semiringNumber)
