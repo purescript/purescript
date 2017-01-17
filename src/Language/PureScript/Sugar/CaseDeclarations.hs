@@ -9,7 +9,6 @@ module Language.PureScript.Sugar.CaseDeclarations
 
 import Prelude.Compat
 
-import Data.Either (isLeft)
 import Data.List (nub, groupBy, foldl1')
 import Data.Maybe (catMaybes, mapMaybe)
 
@@ -39,6 +38,186 @@ desugarCasesModule (Module ss coms name ds exps) =
       <*> pure exps
 
 -- |
+-- Desugar case with pattern guards and pattern clauses to a
+-- series of nested case expressions.
+--
+desugarCase :: (Monad m, MonadSupply m)
+            => Expr
+            -> m Expr
+desugarCase (Case scrut alternatives) =
+  let
+    -- Alternatives which do not have guards are
+    -- left as-is. Alternatives which
+    --
+    --   1) have multiple clauses of the form
+    --      binder | g_1
+    --             , g_2
+    --             , ...
+    --             , g_n
+    --             -> expr
+    --
+    --   2) and/or contain pattern guards of the form
+    --      binder | pat_bind <- e
+    --             , ...
+    --
+    -- are desugared to a sequence of nested case expressions.
+    --
+    -- Consider an example case expression:
+    --
+    --   case e of
+    --    (T s) | Just info <- Map.lookup s names
+    --          , is_used info
+    --          -> f info
+    --
+    -- We desugar this to
+    --
+    --   case e of
+    --    (T s) -> case Map.lookup s names of
+    --               Just info -> case is_used info of
+    --                              True -> f info
+    --                              (_    -> <partial>)
+    --               (_ -> <partial>)
+    --
+    -- Note that if the original case is partial the desugared
+    -- case is also partial.
+    --
+    -- Consider an exhaustive case expression:
+    --
+    --   case e of
+    --    (T s) | Just info <- Map.lookup s names
+    --          , is_used info
+    --          -> f info
+    --    _     -> Nothing
+    --
+    -- desugars to:
+    --
+    --    case e of
+    --      _ -> let
+    --                v _ = Nothing
+    --           in
+    --             case e of
+    --                (T s) -> case Map.lookup s names of
+    --                          Just info -> f info
+    --                          _ -> v true
+    --                _  -> v true
+    --
+    -- This might look strange but simplifies the algorithm a lot.
+    --
+    dsAlt :: (Monad m, MonadSupply m) => [CaseAlternative] -> m [CaseAlternative]
+    dsAlt [] = pure []
+
+    -- the trivial case: no guards
+    dsAlt (a@(CaseAlternative _ [([], _)]) : as) =
+      (a :) <$> dsAlt as
+
+    -- we make sure to clean up all single conditional clauses
+    -- as we would otherwise generate the out-of-line code for
+    -- them which is unecessary.
+    dsAlt (CaseAlternative ab ge : as)
+      | not (null cond_guards) =
+          (CaseAlternative ab cond_guards :)
+            <$> dsGrdAlt ab rest as
+      | otherwise = dsGrdAlt ab ge as
+      where
+        (cond_guards, rest) = span isSingleCondGuard ge
+
+        isSingleCondGuard ([ConditionGuard _], _) = True
+        isSingleCondGuard _ = False
+
+    dsGrdAlt :: (Monad m, MonadSupply m)
+             => [Binder]
+             -> [GuardedExpr]
+             -> [CaseAlternative]
+             -> m [CaseAlternative]
+    dsGrdAlt bs [] rem_alts = pure rem_alts
+
+    dsGrdAlt bs ((gs, e) : ge) rem_alts = do
+      rhs <- dsGAltOutOfLine bs ge rem_alts $ \alt_fail ->
+        let
+          -- if the binder is a var binder we must not add
+          -- the fail case as it results in unreachable
+          -- alternative
+          alt_fail' | all isVarBinder bs = []
+                    | otherwise = alt_fail
+
+        in Case scrut
+            (CaseAlternative bs [([], dsGrd gs e alt_fail)]
+              : alt_fail')
+
+      return [ CaseAlternative [NullBinder] [([], rhs)]]
+      where
+        isVarBinder :: Binder -> Bool
+        isVarBinder NullBinder = True
+        isVarBinder (VarBinder _) = True
+        isVarBinder (PositionedBinder _ _ b) = isVarBinder b
+        isVarBinder (TypedBinder _ b) = isVarBinder b
+        isVarBinder _ = False
+
+    dsGrd :: [Guard] -> Expr -> [CaseAlternative] -> Expr
+    dsGrd [] e _ = e
+    dsGrd (ConditionGuard c : gs) e alt_fail
+      | isTrueExpr c = dsGrd gs e alt_fail
+      | otherwise =
+        Case [c]
+          (CaseAlternative [LiteralBinder (BooleanLiteral True)]
+            [([], dsGrd gs e alt_fail)] : alt_fail)
+
+    dsGrd (PatternGuard b g : gs) e alt_fail =
+      Case [g]
+        (CaseAlternative [b] [([], dsGrd gs e alt_fail)]
+          : alt_fail)
+
+    dsGAltOutOfLine :: (Monad m, MonadSupply m)
+                    => [Binder]
+                    -> [GuardedExpr]
+                    -> [CaseAlternative]
+                    -> ([CaseAlternative] -> Expr)
+                    -> m Expr
+    dsGAltOutOfLine alt_binder rem_guarded rem_alts mk_body
+      | not (null rem_guarded) = do
+        -- we still have some guarded expressions
+        -- left to goto in case of guard failure
+        rem_guarded' <- dsGrdAlt alt_binder rem_guarded rem_alts
+        guard_fail <- freshIdent'
+        let
+          goto = Var (Qualified Nothing guard_fail) `App` Literal (BooleanLiteral True)
+          alt_fail = [CaseAlternative [NullBinder] [([], goto)]]
+
+        return $
+          Let [ ValueDeclaration guard_fail Private [NullBinder]
+                [([], Case scrut rem_guarded')]
+              ] (mk_body alt_fail)
+
+      | not (null rem_alts) = do
+        -- there are some alternatives where we must
+        -- go in case of guard failure
+        rem_alts' <- dsAlt rem_alts
+        guard_fail <- freshIdent'
+        let
+          goto = Var(Qualified Nothing guard_fail) `App` Literal (BooleanLiteral True)
+          alt_fail = [CaseAlternative [NullBinder] [([], goto)]]
+
+        return $
+          Let [ ValueDeclaration guard_fail Private [NullBinder]
+                [([], Case scrut rem_alts')]
+              ] (mk_body alt_fail)
+
+      | otherwise = do
+        -- we have nowhere to go if a match fails. this is possibly
+        -- a partial case expression.
+        pure $ mk_body []
+
+  in do
+    alts' <- dsAlt alternatives
+    pure $ case alts' of
+      [CaseAlternative [NullBinder] [([], v)]]
+        -> v
+      _
+        -> Case scrut alts'
+
+desugarCase v = pure v
+
+-- |
 -- Validates that case head and binder lengths match.
 --
 validateCases :: forall m. (MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
@@ -52,7 +231,7 @@ validateCases = flip parU f
         alts' = filter ((l /=) . length . caseAlternativeBinders) alts
     unless (null alts') $
       throwError . MultipleErrors $ fmap (altError l) (caseAlternativeBinders <$> alts')
-    return c
+    desugarCase (Case vs alts)
   validate other = return other
 
   altError :: Int -> [Binder] -> ErrorMessage
@@ -74,7 +253,7 @@ desugarAbs = flip parU f
   replace :: Expr -> m Expr
   replace (Abs (Right binder) val) = do
     ident <- freshIdent'
-    return $ Abs (Left ident) $ Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] (Right val)]
+    return $ Abs (Left ident) $ Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] [([], val)]]
   replace other = return other
 
 -- |
@@ -88,8 +267,7 @@ desugarCases = desugarRest <=< fmap join . flip parU toDecls . groupBy inSameGro
       (:) <$> (TypeInstanceDeclaration name constraints className tys <$> traverseTypeInstanceBody desugarCases ds) <*> desugarRest rest
     desugarRest (ValueDeclaration name nameKind bs result : rest) =
       let (_, f, _) = everywhereOnValuesTopDownM return go return
-          f' (Left gs) = Left <$> mapM (pairM return f) gs
-          f' (Right v) = Right <$> f v
+          f' = mapM (pairM return f)
       in (:) <$> (ValueDeclaration name nameKind bs <$> f' result) <*> desugarRest rest
       where
       go (Let ds val') = Let <$> desugarCases ds <*> pure val'
@@ -107,11 +285,11 @@ inSameGroup d1 (PositionedDeclaration _ _ d2) = inSameGroup d1 d2
 inSameGroup _ _ = False
 
 toDecls :: forall m. (MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
-toDecls [ValueDeclaration ident nameKind bs (Right val)] | all isVarBinder bs = do
+toDecls [ValueDeclaration ident nameKind bs [([], val)]] | all isVarBinder bs = do
   args <- mapM fromVarBinder bs
   let body = foldr (Abs . Left) val args
   guardWith (errorMessage (OverlappingArgNames (Just ident))) $ length (nub args) == length args
-  return [ValueDeclaration ident nameKind [] (Right body)]
+  return [ValueDeclaration ident nameKind [] [([], body)]]
   where
   isVarBinder :: Binder -> Bool
   isVarBinder NullBinder = True
@@ -126,11 +304,15 @@ toDecls [ValueDeclaration ident nameKind bs (Right val)] | all isVarBinder bs = 
   fromVarBinder (PositionedBinder _ _ b) = fromVarBinder b
   fromVarBinder (TypedBinder _ b) = fromVarBinder b
   fromVarBinder _ = internalError "fromVarBinder: Invalid argument"
-toDecls ds@(ValueDeclaration ident _ bs result : _) = do
+toDecls ds@(ValueDeclaration ident _ bs (result : _) : _) = do
   let tuples = map toTuple ds
+
+      isGuarded ([], _) = False
+      isGuarded _       = True
+
   unless (all ((== length bs) . length . fst) tuples) $
       throwError . errorMessage $ ArgListLengthsDiffer ident
-  unless (not (null bs) || isLeft result) $
+  unless (not (null bs) || isGuarded result) $
       throwError . errorMessage $ DuplicateValueDeclaration ident
   caseDecl <- makeCaseDeclaration ident tuples
   return [caseDecl]
@@ -139,12 +321,12 @@ toDecls (PositionedDeclaration pos com d : ds) = do
   return (PositionedDeclaration pos com d' : ds')
 toDecls ds = return ds
 
-toTuple :: Declaration -> ([Binder], Either [(Guard, Expr)] Expr)
+toTuple :: Declaration -> ([Binder], [GuardedExpr])
 toTuple (ValueDeclaration _ _ bs result) = (bs, result)
 toTuple (PositionedDeclaration _ _ d) = toTuple d
 toTuple _ = internalError "Not a value declaration"
 
-makeCaseDeclaration :: forall m. (MonadSupply m) => Ident -> [([Binder], Either [(Guard, Expr)] Expr)] -> m Declaration
+makeCaseDeclaration :: forall m. (MonadSupply m) => Ident -> [([Binder], [GuardedExpr])] -> m Declaration
 makeCaseDeclaration ident alternatives = do
   let namedArgs = map findName . fst <$> alternatives
       argNames = foldl1 resolveNames namedArgs
@@ -153,8 +335,10 @@ makeCaseDeclaration ident alternatives = do
             else replicateM (length argNames) freshIdent'
   let vars = map (Var . Qualified Nothing) args
       binders = [ CaseAlternative bs result | (bs, result) <- alternatives ]
-      value = foldr (Abs . Left) (Case vars binders) args
-  return $ ValueDeclaration ident Public [] (Right value)
+  case_ <- desugarCase (Case vars binders)
+  let value = foldr (Abs . Left) case_ args
+
+  return $ ValueDeclaration ident Public [] [([], value)]
   where
   -- We will construct a table of potential names.
   -- VarBinders will become Just _ which is a potential name.

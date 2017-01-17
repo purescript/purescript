@@ -35,10 +35,10 @@ desugarTypeDeclarationsModule (Module ss coms name ds exps) =
     return (PositionedDeclaration pos com d' : rest')
   desugarTypeDeclarations (TypeDeclaration name' ty : d : rest) = do
     (_, nameKind, val) <- fromValueDeclaration d
-    desugarTypeDeclarations (ValueDeclaration name' nameKind [] (Right (TypedValue True val ty)) : rest)
+    desugarTypeDeclarations (ValueDeclaration name' nameKind [] [([], TypedValue True val ty)] : rest)
     where
     fromValueDeclaration :: Declaration -> m (Ident, NameKind, Expr)
-    fromValueDeclaration (ValueDeclaration name'' nameKind [] (Right val))
+    fromValueDeclaration (ValueDeclaration name'' nameKind [] [([], val)])
       | name' == name'' = return (name'', nameKind, val)
     fromValueDeclaration (PositionedDeclaration pos com d') = do
       (ident, nameKind, val) <- rethrowWithPosition pos $ fromValueDeclaration d'
@@ -49,8 +49,7 @@ desugarTypeDeclarationsModule (Module ss coms name ds exps) =
     throwError . errorMessage $ OrphanTypeDeclaration name'
   desugarTypeDeclarations (ValueDeclaration name' nameKind bs val : rest) = do
     let (_, f, _) = everywhereOnValuesTopDownM return go return
-        f' (Left gs) = Left <$> mapM (pairM return f) gs
-        f' (Right v) = Right <$> f v
+        f' = mapM (pairM return f)
     (:) <$> (ValueDeclaration name' nameKind bs <$> f' val)
         <*> desugarTypeDeclarations rest
     where

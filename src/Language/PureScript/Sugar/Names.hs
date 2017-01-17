@@ -242,8 +242,16 @@ renameInModule imports (Module ss coms mn decls exps) =
     :: (Maybe SourceSpan, [Ident])
     -> CaseAlternative
     -> m ((Maybe SourceSpan, [Ident]), CaseAlternative)
-  updateCase (pos, bound) c@(CaseAlternative bs _) =
-    return ((pos, concatMap binderNames bs ++ bound), c)
+  updateCase (pos, bound) c@(CaseAlternative bs gs) =
+    return ((pos, concatMap binderNames bs ++ updateGuard gs ++ bound), c)
+    where
+    updateGuard :: [GuardedExpr] -> [Ident]
+    updateGuard [] = []
+    updateGuard ((g, _):xs) =
+      concatMap updatePatGuard g ++ updateGuard xs
+      where
+        updatePatGuard (PatternGuard b _) = binderNames b
+        updatePatGuard _                  = []
 
   letBoundVariable :: Declaration -> Maybe Ident
   letBoundVariable (ValueDeclaration ident _ _ _) = Just ident
@@ -326,7 +334,7 @@ renameInModule imports (Module ss coms mn decls exps) =
   -- qualified references are replaced with their canoncial qualified names
   -- (e.g. M.Map -> Data.Map.Map).
   update
-    :: (Ord a)
+    :: (Ord a, Show a)
     => M.Map (Qualified a) [ImportRecord a]
     -> (a -> Name)
     -> Qualified a

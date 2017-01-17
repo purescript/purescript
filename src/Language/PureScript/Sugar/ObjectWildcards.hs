@@ -70,7 +70,7 @@ desugarDecl other = fn other
       then Abs (Left val) <$> wrapLambda (buildUpdates valExpr) ps
       else wrapLambda (buildLet val . buildUpdates valExpr) ps
     where
-      buildLet val = Let [ValueDeclaration val Public [] (Right obj)]
+      buildLet val = Let [ValueDeclaration val Public [] [([], obj)]]
 
       -- recursively build up the nested `ObjectUpdate` expressions
       buildUpdates :: Expr -> PathTree Expr -> Expr

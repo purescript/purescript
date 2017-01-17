@@ -36,7 +36,7 @@ import Language.PureScript.Errors (ErrorMessageHint(..), SimpleErrorMessage(..),
 import Language.PureScript.Names
 import Language.PureScript.Options
 import Language.PureScript.PSString (PSString, mkString)
-import Language.PureScript.Traversals (sndM)
+import Language.PureScript.Traversals (mapAccumM, sndM)
 import qualified Language.PureScript.Constants as C
 
 import System.FilePath.Posix ((</>))
@@ -354,10 +354,24 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
       valueError s _                        = accessorString "name" . accessorString "constructor" $ JSVar Nothing s
 
       guardsToJs :: Either [(Guard Ann, Expr Ann)] (Expr Ann) -> m [JS]
-      guardsToJs (Left gs) = forM gs $ \(cond, val) -> do
-        cond' <- valueToJs cond
-        done  <- valueToJs val
-        return $ JSIfElse Nothing cond' (JSBlock Nothing [JSReturn Nothing done]) Nothing
+      guardsToJs (Left gs) = mapAccumM (\x (c, v) -> genCondVal x c v) False gs
+        where
+          -- after genCondVal encounterd a guard which is always true
+          -- it stops generating code for the rest of the guards.
+          genCondVal False cond val
+              | condIsTrue cond = do
+                  js <- JSReturn Nothing <$> valueToJs val
+                  return (js, True)
+              | otherwise = do
+                  cond' <- valueToJs cond
+                  val'  <- valueToJs val
+                  return $ (JSIfElse Nothing cond' (JSBlock Nothing [JSReturn Nothing val']) Nothing, False)
+          genCondVal True _ _ = return $ (JSRaw Nothing "", True)
+
+          -- hopefully the inliner did its job and inlined `otherwise`
+          condIsTrue (Literal _ (BooleanLiteral True)) = True
+          condIsTrue _ = False
+
       guardsToJs (Right v) = return . JSReturn Nothing <$> valueToJs v
 
   binderToJs :: Text -> [JS] -> Binder Ann -> m [JS]

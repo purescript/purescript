@@ -65,3 +65,4 @@ desugar externs =
     >=> traverse (deriveInstances externs)
     >=> desugarTypeClasses externs
     >=> traverse createBindingGroupsModule
+
