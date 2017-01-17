@@ -1,6 +1,3 @@
-{-# LANGUAGE DeriveFoldable #-}
-{-# LANGUAGE DeriveTraversable #-}
-
 module Language.PureScript.Sugar.ObjectWildcards
   ( desugarObjectConstructors
   , desugarDecl
