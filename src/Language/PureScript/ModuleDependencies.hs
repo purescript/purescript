@@ -4,17 +4,18 @@ module Language.PureScript.ModuleDependencies
   , ModuleGraph
   ) where
 
-import Prelude.Compat
+import           Prelude.Compat
 
-import Control.Monad (forM_, when)
-import Control.Monad.Error.Class (MonadError(..))
-import Data.Graph
-import Data.List (nub)
-import Data.Maybe (fromMaybe)
-import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Errors
-import Language.PureScript.Names
+import           Control.Monad (forM_, when)
+import           Control.Monad.Error.Class (MonadError(..))
+import           Data.Graph
+import           Data.List (nub)
+import           Data.Maybe (fromMaybe)
+import           Language.PureScript.AST
+import qualified Language.PureScript.Constants as C
+import           Language.PureScript.Crash
+import           Language.PureScript.Errors
+import           Language.PureScript.Names
 
 -- | A list of modules with their transitive dependencies
 type ModuleGraph = [(ModuleName, [ModuleName])]
@@ -43,7 +44,7 @@ sortModules ms = do
     toGraphNode mns m@(Module _ _ mn ds _) = do
       let deps = nub (concatMap usedModules ds)
       forM_ deps $ \dep ->
-        when (dep `notElem` mns) $
+        when (dep /= C.Prim && notElem dep mns) $
           throwError . addHint (ErrorInModule mn) . errorMessage $ ModuleNotFound dep
       pure (m, getModuleName m, deps)
 
