@@ -130,9 +130,9 @@ startServer port env = withSocketsDo $ do
   where
     loop :: (Ide m, MonadLogger m) => Socket -> m ()
     loop sock = do
-      accepted <- runExceptT $ acceptCommand sock
+      accepted <- runExceptT (acceptCommand sock)
       case accepted of
-        Left err -> $(logDebug) err
+        Left err -> $(logError) err
         Right (cmd, h) -> do
           case decodeT cmd of
             Just cmd' -> do
@@ -147,7 +147,7 @@ startServer port env = withSocketsDo $ do
                 Right r  -> liftIO $ BS8.hPutStrLn h (Aeson.encode r)
                 Left err -> liftIO $ BS8.hPutStrLn h (Aeson.encode err)
             Nothing -> do
-              $(logDebug) ("Parsing the command failed. Command: " <> cmd)
+              $(logError) ("Parsing the command failed. Command: " <> cmd)
               liftIO $ do
                 T.hPutStrLn h (encodeT (GeneralError "Error parsing Command."))
                 hFlush stdout
@@ -167,7 +167,7 @@ acceptCommand sock = do
   case cmd' of
     Nothing -> throwError "Connection was closed before any input arrived"
     Just cmd -> do
-      $(logDebug) cmd
+      $(logDebug) ("Received command: " <> cmd)
       pure (cmd, h)
   where
    acceptConnection = liftIO $ do
