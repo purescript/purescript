@@ -348,7 +348,7 @@ executable psc
                    filepath -any,
                    Glob >= 0.7 && < 0.8,
                    mtl -any,
-                   optparse-applicative >= 0.12.1,
+                   optparse-applicative >= 0.13.0,
                    parsec -any,
                    text -any,
                    time -any,
@@ -375,7 +375,7 @@ executable psci
                    haskeline >= 0.7.0.0,
                    http-types == 0.9.*,
                    mtl -any,
-                   optparse-applicative >= 0.12.1,
+                   optparse-applicative >= 0.13.0,
                    parsec -any,
                    process -any,
                    stm >= 0.2.4.0,
@@ -401,7 +401,7 @@ executable psc-docs
                    filepath -any,
                    Glob -any,
                    mtl -any,
-                   optparse-applicative >= 0.12.1,
+                   optparse-applicative >= 0.13.0,
                    process -any,
                    split -any,
                    text -any,
@@ -439,7 +439,7 @@ executable psc-package
                    optparse-applicative -any,
                    system-filepath -any,
                    text -any,
-                   turtle <1.3
+                   turtle ==1.3.*
     main-is: Main.hs
     other-modules: Paths_purescript
     buildable: True
@@ -453,7 +453,7 @@ executable psc-hierarchy
                    filepath -any,
                    Glob -any,
                    mtl -any,
-                   optparse-applicative >= 0.12.1,
+                   optparse-applicative >= 0.13.0,
                    parsec -any,
                    process -any,
                    text -any
@@ -476,7 +476,7 @@ executable psc-bundle
                        filepath -any,
                        Glob -any,
                        mtl -any,
-                       optparse-applicative >= 0.12.1,
+                       optparse-applicative >= 0.13.0,
                        sourcemap >= 0.1.6,
                        transformers -any,
                        transformers-compat -any,
@@ -499,7 +499,7 @@ executable psc-ide-server
                        monad-logger -any,
                        mtl -any,
                        network -any,
-                       optparse-applicative >= 0.12.1,
+                       optparse-applicative >= 0.13.0,
                        protolude >= 0.1.6,
                        stm -any,
                        text -any,
@@ -517,7 +517,7 @@ executable psc-ide-client
                        bytestring -any,
                        mtl -any,
                        network -any,
-                       optparse-applicative >= 0.12.1,
+                       optparse-applicative >= 0.13.0,
                        text -any
   ghc-options:         -Wall -O2
   hs-source-dirs:      psc-ide-client
