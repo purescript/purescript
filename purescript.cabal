@@ -123,6 +123,7 @@ library
                    containers -any,
                    clock -any,
                    data-ordlist >= 0.4.7.0,
+                   deepseq -any,
                    directory >= 1.2,
                    dlist -any,
                    edit-distance -any,
@@ -266,7 +267,8 @@ library
                      Language.PureScript.Docs.Types
                      Language.PureScript.Docs.RenderedCode
                      Language.PureScript.Docs.RenderedCode.Types
-                     Language.PureScript.Docs.RenderedCode.Render
+                     Language.PureScript.Docs.RenderedCode.RenderType
+                     Language.PureScript.Docs.RenderedCode.RenderKind
                      Language.PureScript.Docs.AsMarkdown
                      Language.PureScript.Docs.ParseInPackage
                      Language.PureScript.Docs.Utils.MonoidExtras

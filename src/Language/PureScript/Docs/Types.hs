@@ -28,7 +28,8 @@ import Web.Bower.PackageMeta hiding (Version, displayError)
 import Language.PureScript.Docs.RenderedCode as ReExports
   (RenderedCode, asRenderedCode,
    ContainingModule(..), asContainingModule,
-   RenderedCodeElement(..), asRenderedCodeElement)
+   RenderedCodeElement(..), asRenderedCodeElement,
+   Namespace(..), FixityAlias)
 
 --------------------
 -- Types
@@ -183,8 +184,6 @@ convertFundepsToStrings args fundeps =
       ) $ argsVec V.!? i
   toArgs from to = (map getArg from, map getArg to)
 
-type FixityAlias = P.Qualified (Either (P.ProperName 'P.TypeName) (Either P.Ident (P.ProperName 'P.ConstructorName)))
-
 declInfoToString :: DeclarationInfo -> Text
 declInfoToString (ValueDeclaration _) = "value"
 declInfoToString (DataDeclaration _ _) = "data"
@@ -193,6 +192,23 @@ declInfoToString (TypeSynonymDeclaration _ _) = "typeSynonym"
 declInfoToString (TypeClassDeclaration _ _ _) = "typeClass"
 declInfoToString (AliasDeclaration _ _) = "alias"
 declInfoToString ExternKindDeclaration = "kind"
+
+declInfoNamespace :: DeclarationInfo -> Namespace
+declInfoNamespace = \case
+  ValueDeclaration{} ->
+    ValueLevel
+  DataDeclaration{} ->
+    TypeLevel
+  ExternDataDeclaration{} ->
+    TypeLevel
+  TypeSynonymDeclaration{} ->
+    TypeLevel
+  TypeClassDeclaration{} ->
+    TypeLevel
+  AliasDeclaration _ alias ->
+    either (const TypeLevel) (const ValueLevel) (P.disqualify alias)
+  ExternKindDeclaration{} ->
+    KindLevel
 
 isTypeClass :: Declaration -> Bool
 isTypeClass Declaration{..} =
@@ -268,6 +284,20 @@ childDeclInfoToString :: ChildDeclarationInfo -> Text
 childDeclInfoToString (ChildInstance _ _)      = "instance"
 childDeclInfoToString (ChildDataConstructor _) = "dataConstructor"
 childDeclInfoToString (ChildTypeClassMember _) = "typeClassMember"
+
+childDeclInfoNamespace :: ChildDeclarationInfo -> Namespace
+childDeclInfoNamespace =
+  -- We could just write this as `const ValueLevel` but by doing it this way,
+  -- if another constructor is added, we get a warning which acts as a prompt
+  -- to update this, instead of having this function (possibly incorrectly)
+  -- just return ValueLevel for the new constructor.
+  \case
+    ChildInstance{} ->
+      ValueLevel
+    ChildDataConstructor{} ->
+      ValueLevel
+    ChildTypeClassMember{} ->
+      ValueLevel
 
 isTypeClassMember :: ChildDeclaration -> Bool
 isTypeClassMember ChildDeclaration{..} =

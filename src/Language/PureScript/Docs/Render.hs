@@ -28,7 +28,7 @@ renderDeclarationWithOptions :: RenderTypeOptions -> Declaration -> RenderedCode
 renderDeclarationWithOptions opts Declaration{..} =
   mintersperse sp $ case declInfo of
     ValueDeclaration ty ->
-      [ ident declTitle
+      [ ident' declTitle
       , syntax "::"
       , renderType' ty
       ]
@@ -70,39 +70,24 @@ renderDeclarationWithOptions opts Declaration{..} =
              [idents from <> sp <> syntax "->" <> sp <> idents to | (from, to) <- fundeps ]
            ]
         where
-          idents = mintersperse sp . map ident
+          idents = mintersperse sp . map ident'
 
-    AliasDeclaration (P.Fixity associativity precedence) for@(P.Qualified _ alias) ->
+    AliasDeclaration (P.Fixity associativity precedence) for ->
       [ keywordFixity associativity
       , syntax $ T.pack $ show precedence
-      , ident $ renderQualAlias for
-      , keyword "as"
-      , ident $ adjustAliasName alias declTitle
+      , alias for
+      , keywordAs
+      , aliasName for declTitle
       ]
 
     ExternKindDeclaration ->
       [ keywordKind
-      , renderKind (P.NamedKind (notQualified declTitle))
+      , kind (notQualified declTitle)
       ]
 
   where
   renderType' :: P.Type -> RenderedCode
   renderType' = renderTypeWithOptions opts
-
-  renderQualAlias :: FixityAlias -> Text
-  renderQualAlias (P.Qualified mn alias)
-    | mn == currentModule opts = renderAlias id alias
-    | otherwise = renderAlias (\f -> P.showQualified f . P.Qualified mn) alias
-
-  renderAlias
-    :: (forall a. (a -> Text) -> a -> Text)
-    -> Either (P.ProperName 'P.TypeName) (Either P.Ident (P.ProperName 'P.ConstructorName))
-    -> Text
-  renderAlias f
-    = either (("type " <>) . f P.runProperName)
-    $ either (f P.runIdent) (f P.runProperName)
-
-  adjustAliasName _ title = T.tail (T.init title)
 
 renderChildDeclaration :: ChildDeclaration -> RenderedCode
 renderChildDeclaration = renderChildDeclarationWithOptions defaultRenderTypeOptions
@@ -113,18 +98,17 @@ renderChildDeclarationWithOptions opts ChildDeclaration{..} =
     ChildInstance constraints ty ->
       maybeToList (renderConstraints constraints) ++ [ renderType' ty ]
     ChildDataConstructor args ->
-      [ renderType' typeApp' ]
-      where
-      typeApp' = foldl P.TypeApp ctor' args
-      ctor' = P.TypeConstructor (notQualified cdeclTitle)
+      [ dataCtor' cdeclTitle ]
+      ++ map renderTypeAtom' args
 
     ChildTypeClassMember ty ->
-      [ ident cdeclTitle
+      [ ident' cdeclTitle
       , syntax "::"
       , renderType' ty
       ]
   where
   renderType' = renderTypeWithOptions opts
+  renderTypeAtom' = renderTypeAtomWithOptions opts
 
 renderConstraint :: P.Constraint -> RenderedCode
 renderConstraint = renderConstraintWithOptions defaultRenderTypeOptions
@@ -150,6 +134,12 @@ renderConstraintsWithOptions opts constraints
 
 notQualified :: Text -> P.Qualified (P.ProperName a)
 notQualified = P.Qualified Nothing . P.ProperName
+
+ident' :: Text -> RenderedCode
+ident' = ident . P.Qualified Nothing . P.Ident
+
+dataCtor' :: Text -> RenderedCode
+dataCtor' = dataCtor . notQualified
 
 typeApp :: Text -> [(Text, Maybe P.Kind)] -> P.Type
 typeApp title typeArgs =
