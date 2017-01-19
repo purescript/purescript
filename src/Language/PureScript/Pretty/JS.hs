@@ -159,12 +159,12 @@ conditional = mkPattern match
   match (JSConditional ss cond th el) = Just ((ss, th, el), cond)
   match _ = Nothing
 
-accessor :: (Emit gen) => Pattern PrinterState JS (gen, JS)
+accessor :: Pattern PrinterState JS (Text, JS)
 accessor = mkPattern match
   where
   match (JSIndexer _ (JSStringLiteral _ prop) val) =
     case decodeString prop of
-      Just s | not (identNeedsEscaping s) -> Just (emit s, val)
+      Just s | not (identNeedsEscaping s) -> Just (s, val)
       _ -> Nothing
   match _ = Nothing
 
@@ -259,8 +259,8 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
   matchValue = buildPrettyPrinter operators (literals <+> fmap parensPos matchValue)
   operators :: (Emit gen) => OperatorTable PrinterState JS gen
   operators =
-    OperatorTable [ [ Wrap accessor $ \prop val -> val <> emit "." <> prop ]
-                  , [ Wrap indexer $ \index val -> val <> emit "[" <> index <> emit "]" ]
+    OperatorTable [ [ Wrap indexer $ \index val -> val <> emit "[" <> index <> emit "]" ]
+                  , [ Wrap accessor $ \prop val -> val <> emit "." <> emit prop ]
                   , [ Wrap app $ \args val -> val <> emit "(" <> args <> emit ")" ]
                   , [ unary JSNew "new " ]
                   , [ Wrap lam $ \(name, args, ss) ret -> addMapping' ss <>
