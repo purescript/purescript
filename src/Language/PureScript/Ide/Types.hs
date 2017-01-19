@@ -33,7 +33,7 @@ data IdeDeclaration
   | IdeDeclType IdeType
   | IdeDeclTypeSynonym IdeSynonym
   | IdeDeclDataConstructor IdeDataConstructor
-  | IdeDeclTypeClass (P.ProperName 'P.ClassName)
+  | IdeDeclTypeClass IdeTypeClass
   | IdeDeclValueOperator IdeValueOperator
   | IdeDeclTypeOperator IdeTypeOperator
   | IdeDeclKind (P.ProperName 'P.KindName)
@@ -60,6 +60,18 @@ data IdeDataConstructor = IdeDataConstructor
   , _ideDtorType     :: P.Type
   } deriving (Show, Eq, Ord)
 
+data IdeTypeClass = IdeTypeClass
+  { _ideTCName :: P.ProperName 'P.ClassName
+  , _ideTCInstances :: Maybe [IdeInstance]
+  } deriving (Show, Eq, Ord)
+
+data IdeInstance = IdeInstance
+  { _ideInstanceModule          :: P.ModuleName
+  , _ideInstanceName            :: P.Ident
+  , _ideInstanceTypes           :: [P.Type]
+  , _ideInstanceConstraints     :: Maybe [P.Constraint]
+  } deriving (Show, Eq, Ord)
+
 data IdeValueOperator = IdeValueOperator
   { _ideValueOpName          :: P.OpName 'P.ValueOpName
   , _ideValueOpAlias         :: P.Qualified (Either P.Ident (P.ProperName 'P.ConstructorName))
@@ -81,6 +93,8 @@ makeLenses ''IdeValue
 makeLenses ''IdeType
 makeLenses ''IdeSynonym
 makeLenses ''IdeDataConstructor
+makeLenses ''IdeTypeClass
+makeLenses ''IdeInstance
 makeLenses ''IdeValueOperator
 makeLenses ''IdeTypeOperator
 

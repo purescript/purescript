@@ -27,13 +27,14 @@ module Language.PureScript.Ide.Util
   , prettyTypeT
   , properNameT
   , identT
+  , lensSatisfies
   , module Language.PureScript.Ide.Logging
   ) where
 
 import           Protolude                           hiding (decodeUtf8,
                                                       encodeUtf8)
 
-import           Control.Lens                        ((^.), Iso', iso)
+import           Control.Lens                        ((^.), (^?), Iso', iso, Getting, (<&>))
 import           Data.Aeson
 import qualified Data.Text                           as T
 import           Data.Text.Lazy.Encoding             (decodeUtf8, encodeUtf8)
@@ -47,7 +48,7 @@ identifierFromIdeDeclaration d = case d of
   IdeDeclType t -> t ^. ideTypeName . properNameT
   IdeDeclTypeSynonym s -> s ^. ideSynonymName . properNameT
   IdeDeclDataConstructor dtor -> dtor ^. ideDtorName . properNameT
-  IdeDeclTypeClass name -> P.runProperName name
+  IdeDeclTypeClass tc -> tc ^. ideTCName . properNameT
   IdeDeclValueOperator op -> op ^. ideValueOpName & P.runOpName
   IdeDeclTypeOperator op -> op ^. ideTypeOpName & P.runOpName
   IdeDeclKind name -> P.runProperName name
@@ -70,7 +71,7 @@ completionFromMatch (Match (m, IdeDeclarationAnn ann decl)) =
       IdeDeclType t -> (t ^. ideTypeName . properNameT, t ^. ideTypeKind & P.prettyPrintKind & toS )
       IdeDeclTypeSynonym s -> (s ^. ideSynonymName . properNameT, s ^. ideSynonymType & prettyTypeT)
       IdeDeclDataConstructor d -> (d ^. ideDtorName . properNameT, d ^. ideDtorType & prettyTypeT)
-      IdeDeclTypeClass name -> (P.runProperName name, "class")
+      IdeDeclTypeClass d -> (d ^. ideTCName . properNameT, "class")
       IdeDeclValueOperator (IdeValueOperator op ref precedence associativity typeP) ->
         (P.runOpName op, maybe (showFixity precedence associativity (valueOperatorAliasT ref) op) prettyTypeT typeP)
       IdeDeclTypeOperator (IdeTypeOperator op ref precedence associativity kind) ->
@@ -129,3 +130,6 @@ prettyTypeT =
   . T.lines
   . T.pack
   . P.prettyPrintTypeWithUnicode
+
+lensSatisfies :: forall a s. Getting (First a) s a -> (a -> Bool) -> s -> Bool
+lensSatisfies getter predicate value = value ^? getter <&> predicate & fromMaybe False

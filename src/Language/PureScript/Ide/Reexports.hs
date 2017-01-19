@@ -22,21 +22,19 @@ module Language.PureScript.Ide.Reexports
 
 import           Protolude
 
-import           Control.Lens                  hiding ((&))
-
 import qualified Data.Map                      as Map
 import qualified Language.PureScript           as P
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 
--- | Contains the module with resolved reexports, and eventual failures
+-- | Contains the module with resolved reexports, and possible failures
 data ReexportResult a
   = ReexportResult
   { reResolved :: a
   , reFailed   :: [(P.ModuleName, P.DeclarationRef)]
   } deriving (Show, Eq, Functor)
 
--- | Uses the passed formatter to format the resolved module, and adds eventual
+-- | Uses the passed formatter to format the resolved module, and adds possible
 -- failures
 prettyPrintReexportResult
   :: (a -> Text)
@@ -78,7 +76,7 @@ resolveRef
   -> Either P.DeclarationRef [IdeDeclarationAnn]
 resolveRef decls ref = case ref of
   P.TypeRef tn mdtors ->
-    case findRef (\x -> x ^? _IdeDeclType . ideTypeName <&> (== tn) & fromMaybe False) of
+    case findRef (lensSatisfies (_IdeDeclType . ideTypeName) (== tn)) of
       Nothing -> Left ref
       Just d -> Right $ d : case mdtors of
           Nothing ->
@@ -88,13 +86,13 @@ resolveRef decls ref = case ref of
             findDtors tn
           Just dtors -> mapMaybe lookupDtor dtors
   P.ValueRef i ->
-    findWrapped (\x -> x ^? _IdeDeclValue . ideValueIdent <&> (== i) & fromMaybe False)
+    findWrapped (lensSatisfies (_IdeDeclValue . ideValueIdent) (== i))
   P.ValueOpRef name ->
-    findWrapped (\x -> x ^? _IdeDeclValueOperator . ideValueOpName <&> (== name) & fromMaybe False)
+    findWrapped (lensSatisfies (_IdeDeclValueOperator . ideValueOpName) (== name))
   P.TypeOpRef name ->
-    findWrapped (\x -> x ^? _IdeDeclTypeOperator . ideTypeOpName <&> (== name) & fromMaybe False)
+    findWrapped (lensSatisfies (_IdeDeclTypeOperator . ideTypeOpName) (== name))
   P.TypeClassRef name ->
-    findWrapped (\case IdeDeclTypeClass n -> n == name; _ -> False)
+    findWrapped (lensSatisfies (_IdeDeclTypeClass . ideTCName) (== name))
   _ ->
     Left ref
   where
@@ -102,9 +100,9 @@ resolveRef decls ref = case ref of
     findRef f = find (f . discardAnn) decls
 
     lookupDtor name =
-      findRef (\x -> x ^? _IdeDeclDataConstructor . ideDtorName <&> (== name) & fromMaybe False)
+      findRef (lensSatisfies (_IdeDeclDataConstructor . ideDtorName) (== name))
 
-    findDtors tn = filter (f . discardAnn) decls
-      where
-        f :: IdeDeclaration -> Bool
-        f decl = decl ^? _IdeDeclDataConstructor . ideDtorTypeName <&> (== tn) & fromMaybe False
+    findDtors tn = filter (lensSatisfies
+                           (idaDeclaration
+                            . _IdeDeclDataConstructor
+                            . ideDtorTypeName) (== tn)) decls

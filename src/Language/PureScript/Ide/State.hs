@@ -14,6 +14,7 @@
 
 {-# LANGUAGE PackageImports        #-}
 {-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE NamedFieldPuns        #-}
 
 module Language.PureScript.Ide.State
   ( getLoadedModulenames
@@ -208,9 +209,47 @@ populateStage3STM ref = do
            (fromMaybe m $ annotateModule <$> Map.lookup moduleName asts <*> pure m, refs)) modules
       -- resolves reexports and discards load failures for now
       result = resolveReexports (map (snd . fst) nModules) <$> Map.elems nModules
-      resultP = resolveOperators (Map.fromList (reResolved <$> result))
-  setStage3STM ref (Stage3 resultP Nothing)
+      resultP = resolveInstances externs (Map.fromList (reResolved <$> result))
+      resultPP = resolveOperators resultP
+  setStage3STM ref (Stage3 resultPP Nothing)
   pure result
+
+resolveInstances
+  :: Map P.ModuleName P.ExternsFile
+  -> Map P.ModuleName [IdeDeclarationAnn]
+  -> Map P.ModuleName [IdeDeclarationAnn]
+resolveInstances externs declarations =
+  Map.foldrWithKey
+    (\mn ef acc -> foldr (go mn) acc (efDeclarations ef))
+    declarations
+    externs
+  where
+    go ::
+      P.ModuleName
+      -> P.ExternsDeclaration
+      -> Map P.ModuleName [IdeDeclarationAnn]
+      -> Map P.ModuleName [IdeDeclarationAnn]
+    go mn P.EDInstance{..} acc' =
+      let
+        (classModule, className) = case edInstanceClassName of
+          P.Qualified (Just cm) cn -> (cm, cn)
+          -- TODO: Log something here? This shouldn't happen but isn't critical.
+          _ -> (P.moduleNameFromString "", className)
+        matchTC = lensSatisfies
+          (idaDeclaration . _IdeDeclTypeClass . ideTCName)
+          (== className)
+        updateDeclaration =
+          mapIf matchTC (idaDeclaration
+                         . _IdeDeclTypeClass
+                         . ideTCInstances
+                         %~ insertInstance)
+        newInstance =
+          IdeInstance mn edInstanceName edInstanceTypes edInstanceConstraints
+        insertInstance instances =
+          Just (newInstance : fromMaybe [] instances)
+      in
+        acc' & ix classModule %~ updateDeclaration
+    go _ _ acc' = acc'
 
 resolveOperators
   :: Map P.ModuleName [IdeDeclarationAnn]
@@ -226,9 +265,6 @@ resolveOperatorsForModule
   -> [IdeDeclarationAnn]
 resolveOperatorsForModule modules = map ((over idaDeclaration) resolveOperator)
   where
-    hasName :: Eq b => Lens' a b -> b -> a -> Bool
-    hasName l a x = x ^. l == a
-
     getDeclarations :: P.ModuleName -> [IdeDeclaration]
     getDeclarations moduleName =
       Map.lookup moduleName modules
@@ -239,14 +275,14 @@ resolveOperatorsForModule modules = map ((over idaDeclaration) resolveOperator)
       | (P.Qualified (Just mn) (Left ident)) <- op ^. ideValueOpAlias =
           let t = getDeclarations mn
                   & mapMaybe (preview _IdeDeclValue)
-                  & filter (hasName ideValueIdent ident)
+                  & filter (lensSatisfies ideValueIdent (== ident))
                   & map (view ideValueType)
                   & listToMaybe
           in IdeDeclValueOperator (op & ideValueOpType .~ t)
       | (P.Qualified (Just mn) (Right dtor)) <- op ^. ideValueOpAlias =
           let t = getDeclarations mn
                   & mapMaybe (preview _IdeDeclDataConstructor)
-                  & filter (hasName ideDtorName dtor)
+                  & filter (lensSatisfies ideDtorName (== dtor))
                   & map (view ideDtorType)
                   & listToMaybe
           in IdeDeclValueOperator (op & ideValueOpType .~ t)
@@ -254,9 +290,12 @@ resolveOperatorsForModule modules = map ((over idaDeclaration) resolveOperator)
       | P.Qualified (Just mn) properName <- op ^. ideTypeOpAlias =
           let k = getDeclarations mn
                   & mapMaybe (preview _IdeDeclType)
-                  & filter (hasName ideTypeName properName)
+                  & filter (lensSatisfies ideTypeName (== properName))
                   & map (view ideTypeKind)
                   & listToMaybe
           in IdeDeclTypeOperator (op & ideTypeOpKind .~ k)
     resolveOperator x = x
 
+
+mapIf :: Functor f => (b -> Bool) -> (b -> b) -> f b -> f b
+mapIf p f = map (\x -> if p x then f x else x)
