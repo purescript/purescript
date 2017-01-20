@@ -111,9 +111,8 @@ desugarCase (Case scrut alternatives) =
     desugarAlternatives (a@(CaseAlternative _ [MkUnguarded _]) : as) =
       (a :) <$> desugarAlternatives as
 
-    -- we make sure to clean up all single conditional clauses
-    -- as we would otherwise generate the out-of-line code for
-    -- them which is unecessary.
+    -- Special case: CoreFn understands single conditiona guards on
+    -- binders right hand side.
     desugarAlternatives (CaseAlternative ab ge : as)
       | not (null cond_guards) =
           (CaseAlternative ab cond_guards :)
