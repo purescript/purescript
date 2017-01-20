@@ -8,8 +8,8 @@ module Language.PureScript.Ide.Completion
 
 import           Protolude
 
-import Data.Char
-import "monad-logger" Control.Monad.Logger
+import           Data.Char
+import           "monad-logger" Control.Monad.Logger
 import qualified Data.Text as T
 import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.Matcher
@@ -45,15 +45,15 @@ completeInFile path row col = do
   input <- liftIO (readUTF8FileT path)
   completeInFile' path input row col
 
-completeInFile' :: (Ide m, MonadLogger m) => FilePath -> Text -> Int -> Int -> m [Completion]
+completeInFile'
+  :: (Ide m, MonadLogger m)
+  => FilePath -> Text -> Int -> Int -> m [Completion]
 completeInFile' path input row column = do
   let withHole = insertHole (row, column) input
   rebuildResult <- runExceptT (rebuildFile' path withHole)
   case rebuildResult of
     Left (RebuildError errs)
-      | Just holeError <- extractHole errs
-        -> do
-          pure (extractCompletions holeError)
+      | Just holeError <- extractHole errs -> pure (extractCompletions holeError)
     _ -> pure []
   where
 
