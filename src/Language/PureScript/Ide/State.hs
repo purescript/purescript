@@ -34,6 +34,7 @@ module Language.PureScript.Ide.State
 
 import           Protolude
 
+import           Control.Arrow
 import           Control.Concurrent.STM
 import           Control.Lens                       hiding (op, (&))
 import           "monad-logger" Control.Monad.Logger
@@ -122,7 +123,7 @@ setStage3STM ref s3 = do
 -- | Checks if the given ModuleName matches the last rebuild cache and if it
 -- does returns all loaded definitions + the definitions inside the rebuild
 -- cache
-getAllModules :: Ide m => Maybe P.ModuleName -> m [Module]
+getAllModules :: Ide m => Maybe P.ModuleName -> m [(P.ModuleName, [IdeDeclarationAnn])]
 getAllModules mmoduleName = do
   declarations <- s3Declarations <$> getStage3
   rebuild <- cachedRebuild
@@ -137,7 +138,7 @@ getAllModules mmoduleName = do
                 ast =
                   fromMaybe (Map.empty, Map.empty) (Map.lookup moduleName asts)
                 cachedModule =
-                  snd . annotateModule ast . fst . convertExterns $ ef
+                  annotateModule ast (fst (convertExterns ef))
                 tmp =
                   Map.insert moduleName cachedModule declarations
                 resolved =
@@ -193,26 +194,33 @@ populateStage3 = do
   st <- ideStateVar <$> ask
   let message duration = "Finished populating Stage3 in " <> displayTimeSpec duration
   results <- logPerf message (liftIO (atomically (populateStage3STM st)))
-  traverse_
-    (logWarnN . prettyPrintReexportResult (P.runModuleName . fst))
-    (filter reexportHasFailures results)
+  void $ Map.traverseWithKey
+    (\mn -> logWarnN . prettyPrintReexportResult (const (P.runModuleName mn)))
+    (Map.filter reexportHasFailures results)
 
 -- | STM version of populateStage3
-populateStage3STM :: TVar IdeState -> STM [ReexportResult Module]
+populateStage3STM
+  :: TVar IdeState
+  -> STM (ModuleMap (ReexportResult [IdeDeclarationAnn]))
 populateStage3STM ref = do
   externs <- s1Externs <$> getStage1STM ref
   (AstData asts) <- s2AstData <$> getStage2STM ref
-  let modules = Map.map convertExterns externs
-      nModules :: ModuleMap (Module, [(P.ModuleName, P.DeclarationRef)])
-      nModules = Map.mapWithKey
-        (\moduleName (m, refs) ->
-           (fromMaybe m $ annotateModule <$> Map.lookup moduleName asts <*> pure m, refs)) modules
-      -- resolves reexports and discards load failures for now
-      result = resolveReexports (map (snd . fst) nModules) <$> Map.elems nModules
-      resultP = resolveInstances externs (Map.fromList (reResolved <$> result))
-      resultPP = resolveOperators resultP
-  setStage3STM ref (Stage3 resultPP Nothing)
-  pure result
+  let (modules, reexportRefs) = (map fst &&& map snd) (Map.map convertExterns externs)
+      results = resolveLocations asts modules
+        & resolveInstances externs
+        & resolveOperators
+        & resolveReexports reexportRefs
+  setStage3STM ref (Stage3 (map reResolved results) Nothing)
+  pure results
+
+
+resolveLocations
+  :: ModuleMap (DefinitionSites P.SourceSpan, TypeAnnotations)
+  -> ModuleMap [IdeDeclarationAnn]
+  -> ModuleMap [IdeDeclarationAnn]
+resolveLocations asts =
+  Map.mapWithKey (\mn decls ->
+                    maybe decls (flip annotateModule decls) (Map.lookup mn asts))
 
 resolveInstances
   :: ModuleMap P.ExternsFile
@@ -239,9 +247,8 @@ resolveInstances externs declarations =
       -> ModuleMap [IdeDeclarationAnn]
     go (ideInstance, classModule, className) acc' =
       let
-        matchTC = lensSatisfies
-          (idaDeclaration . _IdeDeclTypeClass . ideTCName)
-          (== className)
+        matchTC =
+          lensSatisfies (idaDeclaration . _IdeDeclTypeClass . ideTCName) (== className)
         updateDeclaration =
           mapIf matchTC (idaDeclaration
                          . _IdeDeclTypeClass
@@ -262,7 +269,7 @@ resolveOperatorsForModule
   :: ModuleMap [IdeDeclarationAnn]
   -> [IdeDeclarationAnn]
   -> [IdeDeclarationAnn]
-resolveOperatorsForModule modules = map ((over idaDeclaration) resolveOperator)
+resolveOperatorsForModule modules = map (idaDeclaration %~ resolveOperator)
   where
     getDeclarations :: P.ModuleName -> [IdeDeclaration]
     getDeclarations moduleName =

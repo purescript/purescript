@@ -67,10 +67,10 @@ data IdeTypeClass = IdeTypeClass
   } deriving (Show, Eq, Ord)
 
 data IdeInstance = IdeInstance
-  { _ideInstanceModule          :: P.ModuleName
-  , _ideInstanceName            :: P.Ident
-  , _ideInstanceTypes           :: [P.Type]
-  , _ideInstanceConstraints     :: Maybe [P.Constraint]
+  { _ideInstanceModule      :: P.ModuleName
+  , _ideInstanceName        :: P.Ident
+  , _ideInstanceTypes       :: [P.Type]
+  , _ideInstanceConstraints :: Maybe [P.Constraint]
   } deriving (Show, Eq, Ord)
 
 data IdeValueOperator = IdeValueOperator

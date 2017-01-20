@@ -18,6 +18,8 @@ module Language.PureScript.Ide.Reexports
   , prettyPrintReexportResult
   , reexportHasFailures
   , ReexportResult(..)
+  -- for tests
+  , resolveReexports'
   ) where
 
 import           Protolude
@@ -54,16 +56,27 @@ prettyPrintReexportResult f ReexportResult{..}
 reexportHasFailures :: ReexportResult a -> Bool
 reexportHasFailures = not . null . reFailed
 
--- | Resolves Reexports for a given Module, by looking up the reexported values
--- from the passed in Map
+-- | Resolves Reexports for the given Modules, by looking up the reexported
+-- values from the passed in DeclarationRefs
 resolveReexports
-  :: ModuleMap [IdeDeclarationAnn]
+  :: ModuleMap [(P.ModuleName, P.DeclarationRef)]
+  -- ^ the references to resolve
+  -> ModuleMap [IdeDeclarationAnn]
   -- ^ Modules to search for the reexported declarations
-  -> (Module, [(P.ModuleName, P.DeclarationRef)])
-  -- ^ The module to resolve reexports for, aswell as the references to resolve
-  -> ReexportResult Module
-resolveReexports modules ((moduleName, decls), refs) =
-  ReexportResult (moduleName, decls <> concat resolvedRefs) failedRefs
+  -> ModuleMap (ReexportResult [IdeDeclarationAnn])
+resolveReexports reexportRefs modules =
+  Map.mapWithKey (\moduleName decls ->
+                    maybe (ReexportResult decls [])
+                      (resolveReexports' modules decls)
+                      (Map.lookup moduleName reexportRefs)) modules
+
+resolveReexports'
+  :: ModuleMap [IdeDeclarationAnn]
+  -> [IdeDeclarationAnn]
+  -> [(P.ModuleName, P.DeclarationRef)]
+  -> ReexportResult [IdeDeclarationAnn]
+resolveReexports' modules decls refs =
+  ReexportResult (decls <> concat resolvedRefs) failedRefs
   where
     (failedRefs, resolvedRefs) = partitionEithers (resolveRef' <$> refs)
     resolveRef' x@(mn, r) = case Map.lookup mn modules of

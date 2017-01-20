@@ -54,9 +54,9 @@ readExternFile fp = do
      where
        version = toS (showVersion P.version)
 
-convertExterns :: P.ExternsFile -> (Module, [(P.ModuleName, P.DeclarationRef)])
+convertExterns :: P.ExternsFile -> ([IdeDeclarationAnn], [(P.ModuleName, P.DeclarationRef)])
 convertExterns ef =
-  ((P.efModuleName ef, decls), exportDecls)
+  (decls, exportDecls)
   where
     decls = map
       (IdeDeclarationAnn emptyAnn)
@@ -120,10 +120,10 @@ convertTypeOperator P.ExternsTypeFixity{..} =
 
 annotateModule
   :: (DefinitionSites P.SourceSpan, TypeAnnotations)
-  -> Module
-  -> Module
-annotateModule (defs, types) (moduleName, decls) =
-  (moduleName, map convertDeclaration decls)
+  -> [IdeDeclarationAnn]
+  -> [IdeDeclarationAnn]
+annotateModule (defs, types) decls =
+  map convertDeclaration decls
   where
     convertDeclaration :: IdeDeclarationAnn -> IdeDeclarationAnn
     convertDeclaration (IdeDeclarationAnn ann d) = case d of

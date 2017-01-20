@@ -71,7 +71,7 @@ completionFromMatch (Match (m, IdeDeclarationAnn ann decl)) =
       IdeDeclType t -> (t ^. ideTypeName . properNameT, t ^. ideTypeKind & P.prettyPrintKind & toS )
       IdeDeclTypeSynonym s -> (s ^. ideSynonymName . properNameT, s ^. ideSynonymType & prettyTypeT)
       IdeDeclDataConstructor d -> (d ^. ideDtorName . properNameT, d ^. ideDtorType & prettyTypeT)
-      IdeDeclTypeClass d -> (d ^. ideTCName . properNameT, "class")
+      IdeDeclTypeClass d -> (d ^. ideTCName . properNameT, show (d ^. ideTCInstances & map (^. ideInstanceName)))
       IdeDeclValueOperator (IdeValueOperator op ref precedence associativity typeP) ->
         (P.runOpName op, maybe (showFixity precedence associativity (valueOperatorAliasT ref) op) prettyTypeT typeP)
       IdeDeclTypeOperator (IdeTypeOperator op ref precedence associativity kind) ->
