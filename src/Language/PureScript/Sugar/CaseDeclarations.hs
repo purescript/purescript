@@ -147,13 +147,6 @@ desugarCase (Case scrut alternatives) =
               : alt_fail')
 
       return [ CaseAlternative [NullBinder] [MkUnguarded rhs]]
-      where
-        isIrrefutable :: Binder -> Bool
-        isIrrefutable NullBinder = True
-        isIrrefutable (VarBinder _) = True
-        isIrrefutable (PositionedBinder _ _ b) = isIrrefutable b
-        isIrrefutable (TypedBinder _ b) = isIrrefutable b
-        isIrrefutable _ = False
 
     desugarGuard :: [Guard] -> Expr -> [CaseAlternative] -> Expr
     desugarGuard [] e _ = e
@@ -289,19 +282,12 @@ inSameGroup d1 (PositionedDeclaration _ _ d2) = inSameGroup d1 d2
 inSameGroup _ _ = False
 
 toDecls :: forall m. (MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
-toDecls [ValueDeclaration ident nameKind bs [MkUnguarded val]] | all isVarBinder bs = do
+toDecls [ValueDeclaration ident nameKind bs [MkUnguarded val]] | all isIrrefutable bs = do
   args <- mapM fromVarBinder bs
   let body = foldr (Abs . Left) val args
   guardWith (errorMessage (OverlappingArgNames (Just ident))) $ length (nub args) == length args
   return [ValueDeclaration ident nameKind [] [MkUnguarded body]]
   where
-  isVarBinder :: Binder -> Bool
-  isVarBinder NullBinder = True
-  isVarBinder (VarBinder _) = True
-  isVarBinder (PositionedBinder _ _ b) = isVarBinder b
-  isVarBinder (TypedBinder _ b) = isVarBinder b
-  isVarBinder _ = False
-
   fromVarBinder :: Binder -> m Ident
   fromVarBinder NullBinder = freshIdent'
   fromVarBinder (VarBinder name) = return name

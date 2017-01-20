@@ -207,13 +207,9 @@ isExhaustiveGuard [GuardedExpr [] _] = True
 isExhaustiveGuard gs  =
   not . null $ filter (\(GuardedExpr gs _) -> isExhaustive gs) gs
   where
-    checkPatGuard :: Binder -> Bool
-    checkPatGuard NullBinder = True
-    checkPatGuard _ = False
-
     checkGuard :: Guard -> Bool
     checkGuard (ConditionGuard cond) = isTrueExpr cond
-    checkGuard (PatternGuard bind _) = checkPatGuard bind
+    checkGuard (PatternGuard bind _) = isIrrefutable bind
 
     isExhaustive :: [Guard] -> Bool
     isExhaustive = all checkGuard
