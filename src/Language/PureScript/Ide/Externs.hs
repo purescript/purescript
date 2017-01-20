@@ -96,7 +96,7 @@ convertDecl P.EDDataConstructor{..} = Just $ IdeDeclDataConstructor $
 convertDecl P.EDValue{..} = Just $ IdeDeclValue $
   IdeValue edValueName edValueType
 convertDecl P.EDClass{..} = Just $ IdeDeclTypeClass $
-  IdeTypeClass edClassName Nothing
+  IdeTypeClass edClassName []
 convertDecl P.EDKind{..} = Just (IdeDeclKind edKindName)
 convertDecl P.EDInstance{} = Nothing
 

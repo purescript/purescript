@@ -59,7 +59,7 @@ getLoadedModulenames :: Ide m => m [P.ModuleName]
 getLoadedModulenames = Map.keys <$> getExternFiles
 
 -- | Gets all loaded ExternFiles
-getExternFiles :: Ide m => m (Map P.ModuleName ExternsFile)
+getExternFiles :: Ide m => m (ModuleMap ExternsFile)
 getExternFiles = s1Externs <$> getStage1
 
 -- | Insert a Module into Stage1 of the State
@@ -219,22 +219,26 @@ resolveInstances
   -> ModuleMap [IdeDeclarationAnn]
   -> ModuleMap [IdeDeclarationAnn]
 resolveInstances externs declarations =
-  Map.foldrWithKey
-    (\mn ef acc -> foldr (go mn) acc (efDeclarations ef))
-    declarations
-    externs
+  Map.foldr (flip (foldr go)) declarations
+  . Map.mapWithKey (\mn ef -> mapMaybe (extractInstances mn) (efDeclarations ef))
+  $ externs
   where
+    extractInstances mn P.EDInstance{..} =
+      case edInstanceClassName of
+          P.Qualified (Just classModule) className ->
+            Just (IdeInstance mn
+                  edInstanceName
+                  edInstanceTypes
+                  edInstanceConstraints, classModule, className)
+          _ -> Nothing
+    extractInstances _ _ = Nothing
+
     go ::
-      P.ModuleName
-      -> P.ExternsDeclaration
-      -> Map P.ModuleName [IdeDeclarationAnn]
-      -> Map P.ModuleName [IdeDeclarationAnn]
-    go mn P.EDInstance{..} acc' =
+      (IdeInstance, P.ModuleName, P.ProperName 'P.ClassName)
+      -> ModuleMap [IdeDeclarationAnn]
+      -> ModuleMap [IdeDeclarationAnn]
+    go (ideInstance, classModule, className) acc' =
       let
-        (classModule, className) = case edInstanceClassName of
-          P.Qualified (Just cm) cn -> (cm, cn)
-          -- TODO: Log something here? This shouldn't happen but isn't critical.
-          _ -> (P.moduleNameFromString "", className)
         matchTC = lensSatisfies
           (idaDeclaration . _IdeDeclTypeClass . ideTCName)
           (== className)
@@ -242,14 +246,9 @@ resolveInstances externs declarations =
           mapIf matchTC (idaDeclaration
                          . _IdeDeclTypeClass
                          . ideTCInstances
-                         %~ insertInstance)
-        newInstance =
-          IdeInstance mn edInstanceName edInstanceTypes edInstanceConstraints
-        insertInstance instances =
-          Just (newInstance : fromMaybe [] instances)
+                         %~ cons ideInstance)
       in
         acc' & ix classModule %~ updateDeclaration
-    go _ _ acc' = acc'
 
 resolveOperators
   :: ModuleMap [IdeDeclarationAnn]
