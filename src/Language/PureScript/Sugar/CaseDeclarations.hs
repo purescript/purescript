@@ -140,6 +140,15 @@ desugarCase (Case scrut alternatives) =
           alt_fail' | all isIrrefutable vb = []
                     | otherwise = alt_fail
 
+          -- remember we are out-of-line with the case here
+          -- in fact we are in a let-binding of the form
+          -- case scrut of
+          --   x | ...
+          --   _ -> let v _ = case scrut of -- <- we are here in the let
+          --                   ...
+          --
+          -- Thus we need to scrutinize again to pull the
+          -- needed binders in.
         in Case scrut
             (CaseAlternative vb [MkUnguarded (desugarGuard gs e alt_fail)]
               : alt_fail')
