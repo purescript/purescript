@@ -243,7 +243,7 @@ unwrapResult = withObject "result" $ \o -> do
   case rt of
     "error" -> do
       res <- o .: "result"
-      pure (Left res)
+      withArray "errors" (fmap (Left . fold) . traverse (withObject "error" (.: "message"))) res
     "success" -> do
       res <- o .: "result"
       pure (Right res)

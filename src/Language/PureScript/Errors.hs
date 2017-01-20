@@ -6,44 +6,40 @@ module Language.PureScript.Errors
   , module Language.PureScript.Errors
   ) where
 
-import Prelude.Compat
+import           Prelude.Compat
 
-import Control.Arrow ((&&&))
-import Control.Monad
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Trans.State.Lazy
-import Control.Monad.Writer
-
-import Data.Char (isSpace)
-import Data.Either (lefts, rights)
-import Data.Foldable (fold)
-import Data.Functor.Identity (Identity(..))
-import Data.List (transpose, nub, nubBy, sortBy, partition)
-import Data.Maybe (maybeToList, fromMaybe, mapMaybe)
-import Data.Ord (comparing)
+import           Control.Arrow ((&&&))
+import           Control.Monad
+import           Control.Monad.Error.Class (MonadError(..))
+import           Control.Monad.Trans.State.Lazy
+import           Control.Monad.Writer
+import           Data.Char (isSpace)
+import           Data.Either (lefts, rights)
+import           Data.Foldable (fold)
+import           Data.Functor.Identity (Identity(..))
+import           Data.List (transpose, nub, nubBy, sortBy, partition)
+import           Data.Maybe (maybeToList, fromMaybe, mapMaybe)
+import           Data.Ord (comparing)
 import qualified Data.Map as M
 import qualified Data.Text as T
-import Data.Text (Text)
-
-import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Environment
-import Language.PureScript.Names
-import Language.PureScript.Pretty
-import Language.PureScript.Traversals
-import Language.PureScript.Types
-import Language.PureScript.Label (Label(..))
-import Language.PureScript.Pretty.Common (before, endWith)
+import           Data.Text (Text)
+import           Language.PureScript.AST
 import qualified Language.PureScript.Bundle as Bundle
 import qualified Language.PureScript.Constants as C
-
+import           Language.PureScript.Crash
+import           Language.PureScript.Environment
+import           Language.PureScript.Label (Label(..))
+import           Language.PureScript.Names
+import           Language.PureScript.Pretty
+import           Language.PureScript.Pretty.Common (before, endWith)
+import           Language.PureScript.Traversals
+import           Language.PureScript.Types
+import qualified Language.PureScript.Publish.BoxesHelpers as BoxHelpers
 import qualified System.Console.ANSI as ANSI
-
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Error as PE
+import           Text.Parsec.Error (Message(..))
 import qualified Text.PrettyPrint.Boxes as Box
-import qualified Language.PureScript.Publish.BoxesHelpers as BoxHelpers
-import Text.Parsec.Error (Message(..))
 
 newtype ErrorSuggestion = ErrorSuggestion Text
 
@@ -72,11 +68,10 @@ stripModuleAndSpan (ErrorMessage hints e) = ErrorMessage (filter (not . shouldSt
   shouldStrip (PositionedError _) = True
   shouldStrip _ = False
 
--- |
--- Get the error code for a particular error type
---
+-- | Get the error code for a particular error type
 errorCode :: ErrorMessage -> Text
 errorCode em = case unwrapErrorMessage em of
+  ModuleNotFound{} -> "ModuleNotFound"
   ErrorParsingFFIModule{} -> "ErrorParsingFFIModule"
   ErrorParsingModule{} -> "ErrorParsingModule"
   MissingFFIModule{} -> "MissingFFIModule"
@@ -175,25 +170,20 @@ errorCode em = case unwrapErrorMessage em of
   ClassInstanceArityMismatch{} -> "ClassInstanceArityMismatch"
   UserDefinedWarning{} -> "UserDefinedWarning"
 
--- |
--- A stack trace for an error
---
+-- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
-  { runMultipleErrors :: [ErrorMessage] } deriving (Show, Monoid)
+  { runMultipleErrors :: [ErrorMessage]
+  } deriving (Show, Monoid)
 
 -- | Check whether a collection of errors is empty or not.
 nonEmpty :: MultipleErrors -> Bool
 nonEmpty = not . null . runMultipleErrors
 
--- |
--- Create an error set from a single simple error message
---
+-- | Create an error set from a single simple error message
 errorMessage :: SimpleErrorMessage -> MultipleErrors
 errorMessage err = MultipleErrors [ErrorMessage [] err]
 
--- |
--- Create an error set from a single error message
---
+-- | Create an error set from a single error message
 singleError :: ErrorMessage -> MultipleErrors
 singleError = MultipleErrors . pure
 
@@ -226,15 +216,12 @@ defaultUnknownMap = TypeMap M.empty M.empty 0
 -- | How critical the issue is
 data Level = Error | Warning deriving Show
 
--- |
--- Extract nested error messages from wrapper errors
---
+-- | Extract nested error messages from wrapper errors
 unwrapErrorMessage :: ErrorMessage -> SimpleErrorMessage
 unwrapErrorMessage (ErrorMessage _ se) = se
 
 replaceUnknowns :: Type -> State TypeMap Type
-replaceUnknowns = everywhereOnTypesM replaceTypes
-  where
+replaceUnknowns = everywhereOnTypesM replaceTypes where
   replaceTypes :: Type -> State TypeMap Type
   replaceTypes (TUnknown u) = do
     m <- get
@@ -387,10 +374,7 @@ defaultPPEOptions = PPEOptions
   , ppeShowDocs  = True
   }
 
-
--- |
--- Pretty print a single error, simplifying if necessary
---
+-- | Pretty print a single error, simplifying if necessary
 prettyPrintSingleError :: PPEOptions -> ErrorMessage -> Box.Box
 prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalState defaultUnknownMap $ do
   em <- onTypesInErrorMessageM replaceUnknowns (if full then e else simplifyErrorMessage e)
@@ -431,6 +415,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
       unknownInfo u = line $ markCode ("t" <> T.pack (show u)) <> " is an unknown type"
 
     renderSimpleErrorMessage :: SimpleErrorMessage -> Box.Box
+    renderSimpleErrorMessage (ModuleNotFound mn) =
+      paras [ line $ "Module " <> markCode (runModuleName mn) <> " was not found."
+            , line "Make sure the source file exists, and that it has been provided as an input to psc."
+            ]
     renderSimpleErrorMessage (CannotGetFileInfo path) =
       paras [ line "Unable to read file info: "
             , indent . lineS $ path
@@ -1176,15 +1164,11 @@ prettyPrintRef (ReExportRef _ _) =
 prettyPrintRef (PositionedDeclarationRef _ _ ref) =
   prettyPrintRef ref
 
--- |
--- Pretty print multiple errors
---
+-- | Pretty print multiple errors
 prettyPrintMultipleErrors :: PPEOptions -> MultipleErrors -> String
 prettyPrintMultipleErrors ppeOptions = unlines . map renderBox . prettyPrintMultipleErrorsBox ppeOptions
 
--- |
--- Pretty print multiple warnings
---
+-- | Pretty print multiple warnings
 prettyPrintMultipleWarnings :: PPEOptions -> MultipleErrors -> String
 prettyPrintMultipleWarnings ppeOptions = unlines . map renderBox . prettyPrintMultipleWarningsBox ppeOptions
 
@@ -1215,11 +1199,10 @@ prettyPrintMultipleErrorsWith ppeOptions _ intro (MultipleErrors es) =
 prettyPrintParseError :: P.ParseError -> Box.Box
 prettyPrintParseError = prettyPrintParseErrorMessages "or" "unknown parse error" "expecting" "unexpected" "end of input" . PE.errorMessages
 
--- |
--- Pretty print ParseError detail messages.
+-- | Pretty print 'ParseError' detail messages.
 --
--- Adapted from 'Text.Parsec.Error.showErrorMessages', see <https://github.com/aslatter/parsec/blob/v3.1.9/Text/Parsec/Error.hs#L173>.
---
+-- Adapted from 'Text.Parsec.Error.showErrorMessages'.
+-- See <https://github.com/aslatter/parsec/blob/v3.1.9/Text/Parsec/Error.hs#L173>.
 prettyPrintParseErrorMessages :: String -> String -> String -> String -> String -> [Message] -> Box.Box
 prettyPrintParseErrorMessages msgOr msgUnknown msgExpecting msgUnExpected msgEndOfInput msgs
   | null msgs = Box.text msgUnknown
@@ -1288,9 +1271,7 @@ toTypelevelString (TypeApp (TypeApp (TypeConstructor f) x) ret)
   | f == primName "TypeConcat" = before <$> (toTypelevelString x) <*> (toTypelevelString ret)
 toTypelevelString _ = Nothing
 
--- |
--- Rethrow an error with a more detailed error message in the case of failure
---
+-- | Rethrow an error with a more detailed error message in the case of failure
 rethrow :: (MonadError e m) => (e -> e) -> m a -> m a
 rethrow f = flip catchError $ \e -> throwError (f e)
 
@@ -1303,9 +1284,7 @@ reflectErrors ma = ma >>= either throwError return
 warnAndRethrow :: (MonadError e m, MonadWriter e m) => (e -> e) -> m a -> m a
 warnAndRethrow f = rethrow f . censor f
 
--- |
--- Rethrow an error with source position information
---
+-- | Rethrow an error with source position information
 rethrowWithPosition :: (MonadError MultipleErrors m) => SourceSpan -> m a -> m a
 rethrowWithPosition pos = rethrow (onErrorMessages (withPosition pos))
 
@@ -1318,10 +1297,8 @@ warnAndRethrowWithPosition pos = rethrowWithPosition pos . warnWithPosition pos
 withPosition :: SourceSpan -> ErrorMessage -> ErrorMessage
 withPosition pos (ErrorMessage hints se) = ErrorMessage (PositionedError pos : hints) se
 
--- |
--- Runs a computation listening for warnings and then escalating any warnings
+-- | Runs a computation listening for warnings and then escalating any warnings
 -- that match the predicate to error status.
---
 escalateWarningWhen
   :: (MonadWriter MultipleErrors m, MonadError MultipleErrors m)
   => (ErrorMessage -> Bool)
@@ -1334,16 +1311,20 @@ escalateWarningWhen isError ma = do
   unless (null errors) $ throwError $ MultipleErrors errors
   return a
 
--- |
--- Collect errors in in parallel
---
-parU :: (MonadError MultipleErrors m) => [a] -> (a -> m b) -> m [b]
-parU xs f = forM xs (withError . f) >>= collectErrors
+-- | Collect errors in in parallel
+parU
+  :: forall m a b
+   . MonadError MultipleErrors m
+  => [a]
+  -> (a -> m b)
+  -> m [b]
+parU xs f =
+    forM xs (withError . f) >>= collectErrors
   where
-  withError :: (MonadError MultipleErrors m) => m a -> m (Either MultipleErrors a)
-  withError u = catchError (Right <$> u) (return . Left)
+    withError :: m b -> m (Either MultipleErrors b)
+    withError u = catchError (Right <$> u) (return . Left)
 
-  collectErrors :: (MonadError MultipleErrors m) => [Either MultipleErrors a] -> m [a]
-  collectErrors es = case lefts es of
-    [] -> return $ rights es
-    errs -> throwError $ fold errs
+    collectErrors :: [Either MultipleErrors b] -> m [b]
+    collectErrors es = case lefts es of
+      [] -> return $ rights es
+      errs -> throwError $ fold errs

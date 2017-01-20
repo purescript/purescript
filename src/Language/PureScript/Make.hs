@@ -20,53 +20,51 @@ module Language.PureScript.Make
   , inferForeignModules
   ) where
 
-import Prelude.Compat
+import           Prelude.Compat
 
-import Control.Concurrent.Lifted as C
-import Control.Monad hiding (sequence)
-import Control.Monad.Base (MonadBase(..))
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.IO.Class
-import Control.Monad.Logger
-import Control.Monad.Reader (MonadReader(..), ReaderT(..), asks)
-import Control.Monad.Supply
-import Control.Monad.Trans.Class (MonadTrans(..))
-import Control.Monad.Trans.Control (MonadBaseControl(..))
-import Control.Monad.Trans.Except
-import Control.Monad.Writer.Class (MonadWriter(..))
-
-import Data.Aeson (encode, decode)
+import           Control.Concurrent.Lifted as C
+import           Control.Monad hiding (sequence)
+import           Control.Monad.Base (MonadBase(..))
+import           Control.Monad.Error.Class (MonadError(..))
+import           Control.Monad.IO.Class
+import           Control.Monad.Logger
+import           Control.Monad.Reader (MonadReader(..), ReaderT(..), asks)
+import           Control.Monad.Supply
+import           Control.Monad.Trans.Class (MonadTrans(..))
+import           Control.Monad.Trans.Control (MonadBaseControl(..))
+import           Control.Monad.Trans.Except
+import           Control.Monad.Writer.Class (MonadWriter(..))
+import           Data.Aeson (encode, decode)
 import qualified Data.Aeson as Aeson
-import Data.Either (partitionEithers)
-import Data.Function (on)
-import Data.Foldable (for_)
-import Data.List (foldl', sortBy, groupBy)
-import Data.Maybe (fromMaybe, catMaybes)
-import Data.Monoid ((<>))
-import Data.Time.Clock
-import Data.Traversable (for)
-import Data.Version (showVersion)
+import           Data.Either (partitionEithers)
+import           Data.Function (on)
+import           Data.Foldable (for_)
+import           Data.List (foldl', sortBy, groupBy)
+import           Data.Maybe (fromMaybe, catMaybes)
+import           Data.Monoid ((<>))
+import           Data.Time.Clock
+import           Data.Traversable (for)
+import           Data.Version (showVersion)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.UTF8 as BU8
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
-
-import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Environment
-import Language.PureScript.Errors
-import Language.PureScript.Externs
-import Language.PureScript.Linter
-import Language.PureScript.ModuleDependencies
-import Language.PureScript.Names
-import Language.PureScript.Options
-import Language.PureScript.Pretty
-import Language.PureScript.Pretty.Common(SMap(..))
-import Language.PureScript.Renamer
-import Language.PureScript.Sugar
-import Language.PureScript.TypeChecker
+import           Language.PureScript.AST
+import           Language.PureScript.Crash
+import           Language.PureScript.Environment
+import           Language.PureScript.Errors
+import           Language.PureScript.Externs
+import           Language.PureScript.Linter
+import           Language.PureScript.ModuleDependencies
+import           Language.PureScript.Names
+import           Language.PureScript.Options
+import           Language.PureScript.Pretty
+import           Language.PureScript.Pretty.Common(SMap(..))
+import           Language.PureScript.Renamer
+import           Language.PureScript.Sugar
+import           Language.PureScript.TypeChecker
 import qualified Language.JavaScript.Parser as JS
 import qualified Language.PureScript.Bundle as Bundle
 import qualified Language.PureScript.CodeGen.JS as J
@@ -74,21 +72,18 @@ import qualified Language.PureScript.Constants as C
 import qualified Language.PureScript.CoreFn as CF
 import qualified Language.PureScript.CoreFn.ToJSON as CFJ
 import qualified Language.PureScript.Parser as PSParser
-
 import qualified Paths_purescript as Paths
-
-import SourceMap
-import SourceMap.Types
-
-import System.Directory (doesFileExist, getModificationTime, createDirectoryIfMissing, getCurrentDirectory)
-import System.FilePath ((</>), takeDirectory, makeRelative, splitPath, normalise, replaceExtension)
-import System.IO.Error (tryIOError)
-
+import           SourceMap
+import           SourceMap.Types
+import           System.Directory (doesFileExist, getModificationTime, createDirectoryIfMissing, getCurrentDirectory)
+import           System.FilePath ((</>), takeDirectory, makeRelative, splitPath, normalise, replaceExtension)
+import           System.IO.Error (tryIOError)
 import qualified Text.Parsec as Parsec
 
 -- | Progress messages from the make process
 data ProgressMessage
   = CompilingModule ModuleName
+  -- ^ Compilation started for the specified module
   deriving (Show, Eq, Ord)
 
 -- | Render a progress message
@@ -102,7 +97,6 @@ renderProgressMessage (CompilingModule mn) = "Compiling " ++ T.unpack (runModule
 -- * The particular backend being used (Javascript, C++11, etc.)
 --
 -- * The details of how files are read/written etc.
---
 data MakeActions m = MakeActions
   { getInputTimestamp :: ModuleName -> m (Either RebuildPolicy (Maybe UTCTime))
   -- ^ Get the timestamp for the input file(s) for a module. If there are multiple
@@ -121,26 +115,26 @@ data MakeActions m = MakeActions
   -- ^ Respond to a progress update.
   }
 
--- |
--- Generated code for an externs file.
---
+-- | Generated code for an externs file.
 type Externs = B.ByteString
 
--- |
--- Determines when to rebuild a module
---
+-- | Determines when to rebuild a module
 data RebuildPolicy
   -- | Never rebuild this module
   = RebuildNever
   -- | Always rebuild this module
   | RebuildAlways deriving (Show, Eq, Ord)
 
--- | Rebuild a single module
-rebuildModule :: forall m. (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
-     => MakeActions m
-     -> [ExternsFile]
-     -> Module
-     -> m ExternsFile
+-- | Rebuild a single module.
+--
+-- This function is used for fast-rebuild workflows (PSCi and psc-ide are examples).
+rebuildModule
+  :: forall m
+   . (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => MakeActions m
+  -> [ExternsFile]
+  -> Module
+  -> m ExternsFile
 rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
   progress $ CompilingModule moduleName
   let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
@@ -157,12 +151,10 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
   evalSupplyT nextVar . codegen renamed env' . encode $ exts
   return exts
 
--- |
--- Compiles in "make" mode, compiling each module separately to a js files and an externs file
+-- | Compiles in "make" mode, compiling each module separately to a @.js@ file and an @externs.json@ file.
 --
 -- If timestamps have not changed, the externs file can be used to provide the module's types without
 -- having to typecheck the module again.
---
 make :: forall m. (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
      => MakeActions m
      -> [Module]
@@ -244,7 +236,7 @@ make ma@MakeActions{..} ms = do
       putMVar (fst $ fromMaybe (internalError "make: no barrier") $ lookup moduleName barriers) externs
       putMVar (snd $ fromMaybe (internalError "make: no barrier") $ lookup moduleName barriers) errors
 
-  maximumMaybe :: (Ord a) => [a] -> Maybe a
+  maximumMaybe :: Ord a => [a] -> Maybe a
   maximumMaybe [] = Nothing
   maximumMaybe xs = Just $ maximum xs
 
@@ -262,11 +254,10 @@ make ma@MakeActions{..} ms = do
 importPrim :: Module -> Module
 importPrim = addDefaultImport (ModuleName [ProperName C.prim])
 
--- |
--- A monad for running make actions
---
-newtype Make a = Make { unMake :: ReaderT Options (ExceptT MultipleErrors (Logger MultipleErrors)) a }
-  deriving (Functor, Applicative, Monad, MonadIO, MonadError MultipleErrors, MonadWriter MultipleErrors, MonadReader Options)
+-- | A monad for running make actions
+newtype Make a = Make
+  { unMake :: ReaderT Options (ExceptT MultipleErrors (Logger MultipleErrors)) a
+  } deriving (Functor, Applicative, Monad, MonadIO, MonadError MultipleErrors, MonadWriter MultipleErrors, MonadReader Options)
 
 instance MonadBase IO Make where
   liftBase = liftIO
@@ -276,12 +267,12 @@ instance MonadBaseControl IO Make where
   liftBaseWith f = Make $ liftBaseWith $ \q -> f (q . unMake)
   restoreM = Make . restoreM
 
--- |
--- Execute a 'Make' monad, returning either errors, or the result of the compile plus any warnings.
---
+-- | Execute a 'Make' monad, returning either errors, or the result of the compile plus any warnings.
 runMake :: Options -> Make a -> IO (Either MultipleErrors a, MultipleErrors)
 runMake opts = runLogger' . runExceptT . flip runReaderT opts . unMake
 
+-- | Run an 'IO' action in the 'Make' monad, by specifying how IO errors should
+-- be rendered as 'ErrorMessage' values.
 makeIO :: (IOError -> ErrorMessage) -> IO a -> Make a
 makeIO f io = do
   e <- liftIO $ tryIOError io
@@ -299,7 +290,8 @@ inferForeignModules
    . MonadIO m
   => M.Map ModuleName (Either RebuildPolicy FilePath)
   -> m (M.Map ModuleName FilePath)
-inferForeignModules = fmap (M.mapMaybe id) . traverse inferForeignModule
+inferForeignModules =
+    fmap (M.mapMaybe id) . traverse inferForeignModule
   where
     inferForeignModule :: Either RebuildPolicy FilePath -> m (Maybe FilePath)
     inferForeignModule (Left _) = return Nothing
@@ -310,16 +302,19 @@ inferForeignModules = fmap (M.mapMaybe id) . traverse inferForeignModule
         then return (Just jsFile)
         else return Nothing
 
--- |
--- A set of make actions that read and write modules from the given directory.
---
-buildMakeActions :: FilePath -- ^ the output directory
-                 -> M.Map ModuleName (Either RebuildPolicy FilePath) -- ^ a map between module names and paths to the file containing the PureScript module
-                 -> M.Map ModuleName FilePath -- ^ a map between module name and the file containing the foreign javascript for the module
-                 -> Bool -- ^ Generate a prefix comment?
-                 -> MakeActions Make
+-- | A set of make actions that read and write modules from the given directory.
+buildMakeActions
+  :: FilePath
+  -- ^ the output directory
+  -> M.Map ModuleName (Either RebuildPolicy FilePath)
+  -- ^ a map between module names and paths to the file containing the PureScript module
+  -> M.Map ModuleName FilePath
+  -- ^ a map between module name and the file containing the foreign javascript for the module
+  -> Bool
+  -- ^ Generate a prefix comment?
+  -> MakeActions Make
 buildMakeActions outputDir filePathMap foreigns usePrefix =
-  MakeActions getInputTimestamp getOutputTimestamp readExterns codegen progress
+    MakeActions getInputTimestamp getOutputTimestamp readExterns codegen progress
   where
 
   getInputTimestamp :: ModuleName -> Make (Either RebuildPolicy (Maybe UTCTime))
@@ -421,10 +416,8 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   progress :: ProgressMessage -> Make ()
   progress = liftIO . putStrLn . renderProgressMessage
 
--- |
--- Check that the declarations in a given PureScript module match with those
+-- | Check that the declarations in a given PureScript module match with those
 -- in its corresponding foreign module.
---
 checkForeignDecls :: CF.Module ann -> FilePath -> SupplyT Make ()
 checkForeignDecls m path = do
   jsStr <- lift $ readTextFile path
