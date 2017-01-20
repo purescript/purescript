@@ -6,6 +6,7 @@ module Language.PureScript.CodeGen.JS.Optimizer.Inliner
   , inlineCommonValues
   , inlineCommonOperators
   , inlineFnComposition
+  , inlineUnsafePartial
   , etaConvert
   , unThunk
   , evaluateIifes
@@ -66,6 +67,8 @@ evaluateIifes = everywhereOnJS convert
   where
   convert :: JS -> JS
   convert (JSApp _ (JSFunction _ Nothing [] (JSBlock _ [JSReturn _ ret])) []) = ret
+  convert (JSApp _ (JSFunction _ Nothing idents (JSBlock _ [JSReturn ss ret])) [])
+    | not (any (`isReassigned` ret) idents) = replaceIdents (map (, JSVar ss C.undefined) idents) ret
   convert js = js
 
 inlineVariables :: JS -> JS
@@ -249,10 +252,9 @@ inlineCommonOperators = applyAll $
 
 -- (f <<< g $ x) = f (g x)
 -- (f <<< g)     = \x -> f (g x)
-inlineFnComposition :: (MonadSupply m) => JS -> m JS
-inlineFnComposition = everywhereOnJSTopDownM convert
-  where
-  convert :: (MonadSupply m) => JS -> m JS
+inlineFnComposition :: forall m. MonadSupply m => JS -> m JS
+inlineFnComposition = everywhereOnJSTopDownM convert where
+  convert :: JS -> m JS
   convert (JSApp s1 (JSApp s2 (JSApp _ (JSApp _ fn [dict']) [x]) [y]) [z])
     | isFnCompose dict' fn = return $ JSApp s1 x [JSApp s2 y [z]]
     | isFnComposeFlipped dict' fn = return $ JSApp s2 y [JSApp s1 x [z]]
@@ -272,6 +274,15 @@ inlineFnComposition = everywhereOnJSTopDownM convert
   fnCompose = (C.controlSemigroupoid, C.compose)
   fnComposeFlipped :: forall a b. (IsString a, IsString b) => (a, b)
   fnComposeFlipped = (C.controlSemigroupoid, C.composeFlipped)
+
+inlineUnsafePartial :: JS -> JS
+inlineUnsafePartial = everywhereOnJSTopDown convert where
+  convert (JSApp ss (JSIndexer _ (JSStringLiteral _ unsafePartial) (JSVar _ partialUnsafe)) [ comp ])
+    | unsafePartial == C.unsafePartial && partialUnsafe == C.partialUnsafe
+    -- Apply to undefined here, the application should be optimized away
+    -- if it is safe to do so
+    = JSApp ss comp [ JSVar ss C.undefined ]
+  convert other = other
 
 semiringNumber :: forall a b. (IsString a, IsString b) => (a, b)
 semiringNumber = (C.dataSemiring, C.semiringNumber)
