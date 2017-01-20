@@ -57,7 +57,7 @@ reexportHasFailures = not . null . reFailed
 -- | Resolves Reexports for a given Module, by looking up the reexported values
 -- from the passed in Map
 resolveReexports
-  :: Map P.ModuleName [IdeDeclarationAnn]
+  :: ModuleMap [IdeDeclarationAnn]
   -- ^ Modules to search for the reexported declarations
   -> (Module, [(P.ModuleName, P.DeclarationRef)])
   -- ^ The module to resolve reexports for, aswell as the references to resolve

@@ -203,7 +203,7 @@ populateStage3STM ref = do
   externs <- s1Externs <$> getStage1STM ref
   (AstData asts) <- s2AstData <$> getStage2STM ref
   let modules = Map.map convertExterns externs
-      nModules :: Map P.ModuleName (Module, [(P.ModuleName, P.DeclarationRef)])
+      nModules :: ModuleMap (Module, [(P.ModuleName, P.DeclarationRef)])
       nModules = Map.mapWithKey
         (\moduleName (m, refs) ->
            (fromMaybe m $ annotateModule <$> Map.lookup moduleName asts <*> pure m, refs)) modules
@@ -215,9 +215,9 @@ populateStage3STM ref = do
   pure result
 
 resolveInstances
-  :: Map P.ModuleName P.ExternsFile
-  -> Map P.ModuleName [IdeDeclarationAnn]
-  -> Map P.ModuleName [IdeDeclarationAnn]
+  :: ModuleMap P.ExternsFile
+  -> ModuleMap [IdeDeclarationAnn]
+  -> ModuleMap [IdeDeclarationAnn]
 resolveInstances externs declarations =
   Map.foldrWithKey
     (\mn ef acc -> foldr (go mn) acc (efDeclarations ef))
@@ -252,15 +252,15 @@ resolveInstances externs declarations =
     go _ _ acc' = acc'
 
 resolveOperators
-  :: Map P.ModuleName [IdeDeclarationAnn]
-  -> Map P.ModuleName [IdeDeclarationAnn]
+  :: ModuleMap [IdeDeclarationAnn]
+  -> ModuleMap [IdeDeclarationAnn]
 resolveOperators modules =
   map (resolveOperatorsForModule modules) modules
 
 -- | Looks up the types and kinds for operators and assigns them to their
 -- declarations
 resolveOperatorsForModule
-  :: Map P.ModuleName [IdeDeclarationAnn]
+  :: ModuleMap [IdeDeclarationAnn]
   -> [IdeDeclarationAnn]
   -> [IdeDeclarationAnn]
 resolveOperatorsForModule modules = map ((over idaDeclaration) resolveOperator)

@@ -36,10 +36,8 @@ d = IdeDeclarationAnn emptyAnn
 mn :: Text -> P.ModuleName
 mn = P.moduleNameFromString . toS
 
-testState :: Map P.ModuleName [IdeDeclarationAnn]
-testState = Map.fromList
-  [ testModule
-  ]
+testState :: ModuleMap [IdeDeclarationAnn]
+testState = Map.fromList [testModule]
 
 spec :: Spec
 spec = describe "resolving operators" $ do

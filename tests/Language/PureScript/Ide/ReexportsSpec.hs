@@ -23,7 +23,7 @@ classA = d (IdeDeclTypeClass (IdeTypeClass (P.ProperName "ClassA") Nothing))
 dtorA1 = d (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName "DtorA1") (P.ProperName "TypeA") P.REmpty))
 dtorA2 = d (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName "DtorA2") (P.ProperName "TypeA") P.REmpty))
 
-env :: Map P.ModuleName [IdeDeclarationAnn]
+env :: ModuleMap [IdeDeclarationAnn]
 env = Map.fromList
   [ (m "A", [valueA, typeA, classA, dtorA1, dtorA2])
   ]
