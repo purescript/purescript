@@ -67,7 +67,7 @@ completeInFile' path input row column = do
     extractCompletions :: P.Type -> [Completion]
     extractCompletions =
       map mkCompletion
-      . map (first (P.prettyPrintStringJS . P.runLabel))
+      . map (first P.prettyPrintLabel)
       . fst
       . P.rowToList
       where
