@@ -5,6 +5,7 @@ module Language.PureScript.PSString
   , toUTF16CodeUnits
   , decodeString
   , decodeStringEither
+  , decodeStringWithReplacement
   , prettyPrintString
   , prettyPrintStringJS
   , mkString
@@ -52,14 +53,23 @@ newtype PSString = PSString { toUTF16CodeUnits :: [Word16] }
 instance Show PSString where
   show = show . codePoints
 
+-- |
 -- Decode a PSString to a String, representing any lone surrogates as the
 -- reserved code point with that index. Warning: if there are any lone
 -- surrogates, converting the result to Text via Data.Text.pack will result in
 -- loss of information as those lone surrogates will be replaced with U+FFFD
 -- REPLACEMENT CHARACTER. Because this function requires care to use correctly,
 -- we do not export it.
+--
 codePoints :: PSString -> String
 codePoints = map (either (chr . fromIntegral) id) . decodeStringEither
+
+-- |
+-- Decode a PSString as UTF-16 text. Lone surrogates will be replaced with
+-- U+FFFD REPLACEMENT CHARACTER
+--
+decodeStringWithReplacement :: PSString -> String
+decodeStringWithReplacement = map (either (const '\xFFFD') id) . decodeStringEither
 
 -- |
 -- Decode a PSString as UTF-16. Lone surrogates in the input are represented in

@@ -33,7 +33,7 @@ import           Language.PureScript.Label (Label(..))
 import           Language.PureScript.Names
 import           Language.PureScript.Pretty
 import           Language.PureScript.Pretty.Common (endWith)
-import           Language.PureScript.PSString (PSString, decodeStringEither)
+import           Language.PureScript.PSString (PSString, decodeStringWithReplacement)
 import           Language.PureScript.Traversals
 import           Language.PureScript.Types
 import qualified Language.PureScript.Publish.BoxesHelpers as BoxHelpers
@@ -1266,7 +1266,7 @@ renderBox = unlines
   whiteSpace = all isSpace
 
 toTypelevelString :: Type -> Maybe Box.Box
-toTypelevelString t = (Box.text . map (either (const '\xFFFD') id) . decodeStringEither) <$> toTypelevelString' t
+toTypelevelString t = (Box.text . decodeStringWithReplacement) <$> toTypelevelString' t
   where
   toTypelevelString' :: Type -> Maybe PSString
   toTypelevelString' (TypeLevelString s) = Just s
