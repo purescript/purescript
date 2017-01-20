@@ -139,7 +139,7 @@ desugarCase (Case scrut alternatives) =
           -- if the binder is a var binder we must not add
           -- the fail case as it results in unreachable
           -- alternative
-          alt_fail' | all isVarBinder bs = []
+          alt_fail' | all isIrrefutable bs = []
                     | otherwise = alt_fail
 
         in Case scrut
@@ -148,12 +148,12 @@ desugarCase (Case scrut alternatives) =
 
       return [ CaseAlternative [NullBinder] [MkUnguarded rhs]]
       where
-        isVarBinder :: Binder -> Bool
-        isVarBinder NullBinder = True
-        isVarBinder (VarBinder _) = True
-        isVarBinder (PositionedBinder _ _ b) = isVarBinder b
-        isVarBinder (TypedBinder _ b) = isVarBinder b
-        isVarBinder _ = False
+        isIrrefutable :: Binder -> Bool
+        isIrrefutable NullBinder = True
+        isIrrefutable (VarBinder _) = True
+        isIrrefutable (PositionedBinder _ _ b) = isIrrefutable b
+        isIrrefutable (TypedBinder _ b) = isIrrefutable b
+        isIrrefutable _ = False
 
     desugarGuard :: [Guard] -> Expr -> [CaseAlternative] -> Expr
     desugarGuard [] e _ = e
