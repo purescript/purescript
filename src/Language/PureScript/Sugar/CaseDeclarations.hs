@@ -103,35 +103,37 @@ desugarCase (Case scrut alternatives) =
     --
     -- This might look strange but simplifies the algorithm a lot.
     --
-    dsAlt :: (Monad m, MonadSupply m) => [CaseAlternative] -> m [CaseAlternative]
-    dsAlt [] = pure []
+    desugarAlternatives :: (Monad m, MonadSupply m)
+                        => [CaseAlternative]
+                        -> m [CaseAlternative]
+    desugarAlternatives [] = pure []
 
     -- the trivial case: no guards
-    dsAlt (a@(CaseAlternative _ [MkUnguarded _]) : as) =
-      (a :) <$> dsAlt as
+    desugarAlternatives (a@(CaseAlternative _ [MkUnguarded _]) : as) =
+      (a :) <$> desugarAlternatives as
 
     -- we make sure to clean up all single conditional clauses
     -- as we would otherwise generate the out-of-line code for
     -- them which is unecessary.
-    dsAlt (CaseAlternative ab ge : as)
+    desugarAlternatives (CaseAlternative ab ge : as)
       | not (null cond_guards) =
           (CaseAlternative ab cond_guards :)
-            <$> dsGrdAlt ab rest as
-      | otherwise = dsGrdAlt ab ge as
+            <$> desugarGuardedAlternative ab rest as
+      | otherwise = desugarGuardedAlternative ab ge as
       where
         (cond_guards, rest) = span isSingleCondGuard ge
 
         isSingleCondGuard (GuardedExpr [ConditionGuard _] _) = True
         isSingleCondGuard _ = False
 
-    dsGrdAlt :: (Monad m, MonadSupply m)
-             => [Binder]
-             -> [GuardedExpr]
-             -> [CaseAlternative]
-             -> m [CaseAlternative]
-    dsGrdAlt bs [] rem_alts = pure rem_alts
+    desugarGuardedAlternative :: (Monad m, MonadSupply m)
+                               => [Binder]
+                               -> [GuardedExpr]
+                               -> [CaseAlternative]
+                               -> m [CaseAlternative]
+    desugarGuardedAlternative bs [] rem_alts = pure rem_alts
 
-    dsGrdAlt bs (GuardedExpr gs e : ge) rem_alts = do
+    desugarGuardedAlternative bs (GuardedExpr gs e : ge) rem_alts = do
       rhs <- dsGAltOutOfLine bs ge rem_alts $ \alt_fail ->
         let
           -- if the binder is a var binder we must not add
@@ -141,7 +143,7 @@ desugarCase (Case scrut alternatives) =
                     | otherwise = alt_fail
 
         in Case scrut
-            (CaseAlternative bs [MkUnguarded (dsGrd gs e alt_fail)]
+            (CaseAlternative bs [MkUnguarded (desugarGuard gs e alt_fail)]
               : alt_fail')
 
       return [ CaseAlternative [NullBinder] [MkUnguarded rhs]]
@@ -153,18 +155,18 @@ desugarCase (Case scrut alternatives) =
         isVarBinder (TypedBinder _ b) = isVarBinder b
         isVarBinder _ = False
 
-    dsGrd :: [Guard] -> Expr -> [CaseAlternative] -> Expr
-    dsGrd [] e _ = e
-    dsGrd (ConditionGuard c : gs) e alt_fail
-      | isTrueExpr c = dsGrd gs e alt_fail
+    desugarGuard :: [Guard] -> Expr -> [CaseAlternative] -> Expr
+    desugarGuard [] e _ = e
+    desugarGuard (ConditionGuard c : gs) e alt_fail
+      | isTrueExpr c = desugarGuard gs e alt_fail
       | otherwise =
         Case [c]
           (CaseAlternative [LiteralBinder (BooleanLiteral True)]
-            [MkUnguarded (dsGrd gs e alt_fail)] : alt_fail)
+            [MkUnguarded (desugarGuard gs e alt_fail)] : alt_fail)
 
-    dsGrd (PatternGuard b g : gs) e alt_fail =
+    desugarGuard (PatternGuard b g : gs) e alt_fail =
       Case [g]
-        (CaseAlternative [b] [MkUnguarded (dsGrd gs e alt_fail)]
+        (CaseAlternative [b] [MkUnguarded (desugarGuard gs e alt_fail)]
           : alt_fail)
 
     dsGAltOutOfLine :: (Monad m, MonadSupply m)
@@ -177,10 +179,10 @@ desugarCase (Case scrut alternatives) =
       | not (null rem_guarded) = do
         -- we still have some guarded expressions
         -- left to goto in case of guard failure
-        rem_guarded' <- dsGrdAlt alt_binder rem_guarded rem_alts
+        rem_guarded' <- desugarGuardedAlternative alt_binder rem_guarded rem_alts
         guard_fail <- freshIdent'
         let
-          goto = Var (Qualified Nothing guard_fail) `App` Literal (BooleanLiteral True)
+          goto = Var (Qualified Nothing guard_fail) `App` trueLit
           alt_fail = [CaseAlternative [NullBinder] [MkUnguarded goto]]
 
         return $
@@ -191,10 +193,10 @@ desugarCase (Case scrut alternatives) =
       | not (null rem_alts) = do
         -- there are some alternatives where we must
         -- go in case of guard failure
-        rem_alts' <- dsAlt rem_alts
+        rem_alts' <- desugarAlternatives rem_alts
         guard_fail <- freshIdent'
         let
-          goto = Var(Qualified Nothing guard_fail) `App` Literal (BooleanLiteral True)
+          goto = Var(Qualified Nothing guard_fail) `App` trueLit
           alt_fail = [CaseAlternative [NullBinder] [MkUnguarded goto]]
 
         return $
@@ -207,8 +209,10 @@ desugarCase (Case scrut alternatives) =
         -- a partial case expression.
         pure $ mk_body []
 
+    trueLit = Literal (BooleanLiteral True)
+
   in do
-    alts' <- dsAlt alternatives
+    alts' <- desugarAlternatives alternatives
     pure $ case alts' of
       [CaseAlternative [NullBinder] [MkUnguarded v]]
         -> v
