@@ -131,19 +131,19 @@ desugarCase (Case scrut alternatives) =
                                -> [GuardedExpr]
                                -> [CaseAlternative]
                                -> m [CaseAlternative]
-    desugarGuardedAlternative bs [] rem_alts = pure rem_alts
+    desugarGuardedAlternative vb [] rem_alts = pure rem_alts
 
-    desugarGuardedAlternative bs (GuardedExpr gs e : ge) rem_alts = do
-      rhs <- dsGAltOutOfLine bs ge rem_alts $ \alt_fail ->
+    desugarGuardedAlternative vb (GuardedExpr gs e : ge) rem_alts = do
+      rhs <- dsGAltOutOfLine vb ge rem_alts $ \alt_fail ->
         let
           -- if the binder is a var binder we must not add
           -- the fail case as it results in unreachable
           -- alternative
-          alt_fail' | all isIrrefutable bs = []
+          alt_fail' | all isIrrefutable vb = []
                     | otherwise = alt_fail
 
         in Case scrut
-            (CaseAlternative bs [MkUnguarded (desugarGuard gs e alt_fail)]
+            (CaseAlternative vb [MkUnguarded (desugarGuard gs e alt_fail)]
               : alt_fail')
 
       return [ CaseAlternative [NullBinder] [MkUnguarded rhs]]
@@ -164,9 +164,9 @@ desugarCase (Case scrut alternatives) =
           (CaseAlternative [LiteralBinder (BooleanLiteral True)]
             [MkUnguarded (desugarGuard gs e alt_fail)] : alt_fail)
 
-    desugarGuard (PatternGuard b g : gs) e alt_fail =
+    desugarGuard (PatternGuard vb g : gs) e alt_fail =
       Case [g]
-        (CaseAlternative [b] [MkUnguarded (desugarGuard gs e alt_fail)]
+        (CaseAlternative [vb] [MkUnguarded (desugarGuard gs e alt_fail)]
           : alt_fail)
 
     dsGAltOutOfLine :: (Monad m, MonadSupply m)
