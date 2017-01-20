@@ -178,7 +178,7 @@ dataFunctor :: ModuleName
 dataFunctor = ModuleName [ ProperName "Data", ProperName "Functor" ]
 
 unguarded :: Expr -> [GuardedExpr]
-unguarded e = [([], e)]
+unguarded e = [MkUnguarded e]
 
 deriveGeneric
   :: forall m. (MonadError MultipleErrors m, MonadSupply m)
@@ -467,7 +467,7 @@ deriveGenericRep mn syns ds tyConNm tyConArgs repTy = do
     underBinder f (CaseAlternative bs e) = CaseAlternative (map f bs) e
 
     underExpr :: (Expr -> Expr) -> CaseAlternative -> CaseAlternative
-    underExpr f (CaseAlternative b [([], e)]) = CaseAlternative b (unguarded (f e))
+    underExpr f (CaseAlternative b [MkUnguarded e]) = CaseAlternative b (unguarded (f e))
     underExpr _ _ = internalError "underExpr: expected unguarded alternative"
 
     toRepTy :: [Type] -> Type

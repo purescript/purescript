@@ -107,7 +107,7 @@ desugarCase (Case scrut alternatives) =
     dsAlt [] = pure []
 
     -- the trivial case: no guards
-    dsAlt (a@(CaseAlternative _ [([], _)]) : as) =
+    dsAlt (a@(CaseAlternative _ [MkUnguarded _]) : as) =
       (a :) <$> dsAlt as
 
     -- we make sure to clean up all single conditional clauses
@@ -121,7 +121,7 @@ desugarCase (Case scrut alternatives) =
       where
         (cond_guards, rest) = span isSingleCondGuard ge
 
-        isSingleCondGuard ([ConditionGuard _], _) = True
+        isSingleCondGuard (GuardedExpr [ConditionGuard _] _) = True
         isSingleCondGuard _ = False
 
     dsGrdAlt :: (Monad m, MonadSupply m)
@@ -131,7 +131,7 @@ desugarCase (Case scrut alternatives) =
              -> m [CaseAlternative]
     dsGrdAlt bs [] rem_alts = pure rem_alts
 
-    dsGrdAlt bs ((gs, e) : ge) rem_alts = do
+    dsGrdAlt bs (GuardedExpr gs e : ge) rem_alts = do
       rhs <- dsGAltOutOfLine bs ge rem_alts $ \alt_fail ->
         let
           -- if the binder is a var binder we must not add
@@ -141,10 +141,10 @@ desugarCase (Case scrut alternatives) =
                     | otherwise = alt_fail
 
         in Case scrut
-            (CaseAlternative bs [([], dsGrd gs e alt_fail)]
+            (CaseAlternative bs [MkUnguarded (dsGrd gs e alt_fail)]
               : alt_fail')
 
-      return [ CaseAlternative [NullBinder] [([], rhs)]]
+      return [ CaseAlternative [NullBinder] [MkUnguarded rhs]]
       where
         isVarBinder :: Binder -> Bool
         isVarBinder NullBinder = True
@@ -160,11 +160,11 @@ desugarCase (Case scrut alternatives) =
       | otherwise =
         Case [c]
           (CaseAlternative [LiteralBinder (BooleanLiteral True)]
-            [([], dsGrd gs e alt_fail)] : alt_fail)
+            [MkUnguarded (dsGrd gs e alt_fail)] : alt_fail)
 
     dsGrd (PatternGuard b g : gs) e alt_fail =
       Case [g]
-        (CaseAlternative [b] [([], dsGrd gs e alt_fail)]
+        (CaseAlternative [b] [MkUnguarded (dsGrd gs e alt_fail)]
           : alt_fail)
 
     dsGAltOutOfLine :: (Monad m, MonadSupply m)
@@ -181,11 +181,11 @@ desugarCase (Case scrut alternatives) =
         guard_fail <- freshIdent'
         let
           goto = Var (Qualified Nothing guard_fail) `App` Literal (BooleanLiteral True)
-          alt_fail = [CaseAlternative [NullBinder] [([], goto)]]
+          alt_fail = [CaseAlternative [NullBinder] [MkUnguarded goto]]
 
         return $
           Let [ ValueDeclaration guard_fail Private [NullBinder]
-                [([], Case scrut rem_guarded')]
+                [MkUnguarded (Case scrut rem_guarded')]
               ] (mk_body alt_fail)
 
       | not (null rem_alts) = do
@@ -195,11 +195,11 @@ desugarCase (Case scrut alternatives) =
         guard_fail <- freshIdent'
         let
           goto = Var(Qualified Nothing guard_fail) `App` Literal (BooleanLiteral True)
-          alt_fail = [CaseAlternative [NullBinder] [([], goto)]]
+          alt_fail = [CaseAlternative [NullBinder] [MkUnguarded goto]]
 
         return $
           Let [ ValueDeclaration guard_fail Private [NullBinder]
-                [([], Case scrut rem_alts')]
+                [MkUnguarded (Case scrut rem_alts')]
               ] (mk_body alt_fail)
 
       | otherwise = do
@@ -210,7 +210,7 @@ desugarCase (Case scrut alternatives) =
   in do
     alts' <- dsAlt alternatives
     pure $ case alts' of
-      [CaseAlternative [NullBinder] [([], v)]]
+      [CaseAlternative [NullBinder] [MkUnguarded v]]
         -> v
       _
         -> Case scrut alts'
@@ -253,7 +253,7 @@ desugarAbs = flip parU f
   replace :: Expr -> m Expr
   replace (Abs (Right binder) val) = do
     ident <- freshIdent'
-    return $ Abs (Left ident) $ Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] [([], val)]]
+    return $ Abs (Left ident) $ Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] [MkUnguarded val]]
   replace other = return other
 
 -- |
@@ -267,7 +267,7 @@ desugarCases = desugarRest <=< fmap join . flip parU toDecls . groupBy inSameGro
       (:) <$> (TypeInstanceDeclaration name constraints className tys <$> traverseTypeInstanceBody desugarCases ds) <*> desugarRest rest
     desugarRest (ValueDeclaration name nameKind bs result : rest) =
       let (_, f, _) = everywhereOnValuesTopDownM return go return
-          f' = mapM (pairM return f)
+          f' = mapM (\(GuardedExpr gs e) -> GuardedExpr gs <$> f e)
       in (:) <$> (ValueDeclaration name nameKind bs <$> f' result) <*> desugarRest rest
       where
       go (Let ds val') = Let <$> desugarCases ds <*> pure val'
@@ -285,11 +285,11 @@ inSameGroup d1 (PositionedDeclaration _ _ d2) = inSameGroup d1 d2
 inSameGroup _ _ = False
 
 toDecls :: forall m. (MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
-toDecls [ValueDeclaration ident nameKind bs [([], val)]] | all isVarBinder bs = do
+toDecls [ValueDeclaration ident nameKind bs [MkUnguarded val]] | all isVarBinder bs = do
   args <- mapM fromVarBinder bs
   let body = foldr (Abs . Left) val args
   guardWith (errorMessage (OverlappingArgNames (Just ident))) $ length (nub args) == length args
-  return [ValueDeclaration ident nameKind [] [([], body)]]
+  return [ValueDeclaration ident nameKind [] [MkUnguarded body]]
   where
   isVarBinder :: Binder -> Bool
   isVarBinder NullBinder = True
@@ -307,8 +307,8 @@ toDecls [ValueDeclaration ident nameKind bs [([], val)]] | all isVarBinder bs = 
 toDecls ds@(ValueDeclaration ident _ bs (result : _) : _) = do
   let tuples = map toTuple ds
 
-      isGuarded ([], _) = False
-      isGuarded _       = True
+      isGuarded (MkUnguarded _) = False
+      isGuarded _               = True
 
   unless (all ((== length bs) . length . fst) tuples) $
       throwError . errorMessage $ ArgListLengthsDiffer ident
@@ -338,7 +338,7 @@ makeCaseDeclaration ident alternatives = do
   case_ <- desugarCase (Case vars binders)
   let value = foldr (Abs . Left) case_ args
 
-  return $ ValueDeclaration ident Public [] [([], value)]
+  return $ ValueDeclaration ident Public [] [MkUnguarded value]
   where
   -- We will construct a table of potential names.
   -- VarBinders will become Just _ which is a potential name.

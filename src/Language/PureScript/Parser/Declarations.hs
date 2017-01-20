@@ -68,9 +68,10 @@ parseValueDeclaration = do
   name <- parseIdent
   binders <- P.many parseBinderNoParens
   value <- indented *> (
-    (\v -> [([], v)]) <$> (equals *> parseValueWithWhereClause) <|>
-      P.many1 ((,) <$> parseGuard
-                   <*> (indented *> equals *> parseValueWithWhereClause))
+    (\v -> [MkUnguarded v]) <$> (equals *> parseValueWithWhereClause) <|>
+      P.many1 (GuardedExpr <$> parseGuard
+                           <*> (indented *> equals
+                                         *> parseValueWithWhereClause))
     )
   return $ ValueDeclaration name Public binders value
   where
@@ -347,9 +348,11 @@ parseCase = Case <$> P.between (reserved "case") (indented *> reserved "of") (co
 parseCaseAlternative :: TokenParser CaseAlternative
 parseCaseAlternative = CaseAlternative <$> commaSep1 parseBinder
                                        <*> (indented *> (
-                                               ((\v -> [([], v)]) <$> (rarrow *> parseValue))
-                                                 <|> (P.many1 ((,) <$> parseGuard
-                                                                   <*> (indented *> rarrow *> parseValue)
+                                               (pure . MkUnguarded) <$> (rarrow *> parseValue)
+                                                 <|> (P.many1 (GuardedExpr <$> parseGuard
+                                                                           <*> (indented
+                                                                                *> rarrow
+                                                                                *> parseValue)
                                                               ))))
                                        P.<?> "case alternative"
 

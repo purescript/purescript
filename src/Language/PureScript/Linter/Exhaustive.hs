@@ -203,8 +203,9 @@ missingCasesMultiple env mn = go
 -- It is considered that `otherwise` is defined in Prelude
 --
 isExhaustiveGuard :: [GuardedExpr] -> Bool
-isExhaustiveGuard [([], _)] = True
-isExhaustiveGuard gs  = not . null $ filter (isExhaustive . fst) gs
+isExhaustiveGuard [GuardedExpr [] _] = True
+isExhaustiveGuard gs  =
+  not . null $ filter (\(GuardedExpr gs _) -> isExhaustive gs) gs
   where
     checkPatGuard :: Binder -> Bool
     checkPatGuard NullBinder = True
@@ -292,12 +293,12 @@ checkExhaustive env mn numArgs cas expr = makeResult . first nub $ foldl' step (
       partial :: Text -> Text -> Declaration
       partial var tyVar =
         ValueDeclaration (Ident C.__unused) Private [] $
-        [( []
-         , TypedValue
+        [MkUnguarded
+          (TypedValue
            True
            (Abs (Left (Ident var)) (Var (Qualified Nothing (Ident var))))
-           (ty tyVar)
-        )]
+           (ty tyVar))
+        ]
 
       ty :: Text -> Type
       ty tyVar =
@@ -326,7 +327,7 @@ checkExhaustiveExpr env mn = onExpr
   where
   onDecl :: Declaration -> m Declaration
   onDecl (BindingGroupDeclaration bs) = BindingGroupDeclaration <$> mapM (thirdM onExpr) bs
-  onDecl (ValueDeclaration name x y [([], e)]) = ValueDeclaration name x y . mkUnguardedExpr <$> censor (addHint (ErrorInValueDeclaration name)) (onExpr e)
+  onDecl (ValueDeclaration name x y [MkUnguarded e]) = ValueDeclaration name x y . mkUnguardedExpr <$> censor (addHint (ErrorInValueDeclaration name)) (onExpr e)
   onDecl (PositionedDeclaration pos x dec) = PositionedDeclaration pos x <$> censor (addHint (PositionedError pos)) (onDecl dec)
   onDecl decl = return decl
 
@@ -349,7 +350,10 @@ checkExhaustiveExpr env mn = onExpr
   onExpr expr = return expr
 
   onCaseAlternative :: CaseAlternative -> m CaseAlternative
-  onCaseAlternative (CaseAlternative x [([], e)]) = CaseAlternative x . mkUnguardedExpr <$> onExpr e
-  onCaseAlternative (CaseAlternative x es) = CaseAlternative x <$> mapM (\(g, e) -> pure (g, e)) es
+  onCaseAlternative (CaseAlternative x [MkUnguarded e]) = CaseAlternative x . mkUnguardedExpr <$> onExpr e
+  onCaseAlternative (CaseAlternative x es) = CaseAlternative x <$> mapM onGuardedExpr es
 
-  mkUnguardedExpr v = [([], v)]
+  onGuardedExpr :: GuardedExpr -> m GuardedExpr
+  onGuardedExpr (GuardedExpr guard rhs) = GuardedExpr guard <$> onExpr rhs
+
+  mkUnguardedExpr = pure . MkUnguarded

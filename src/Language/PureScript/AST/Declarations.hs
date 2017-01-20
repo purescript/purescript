@@ -554,7 +554,14 @@ data Guard = ConditionGuard Expr
            | PatternGuard Binder Expr
            deriving (Show)
 
-type GuardedExpr = ([Guard], Expr)
+-- |
+-- The right hand side of a binder in value declarations
+-- and case expressions.
+data GuardedExpr = GuardedExpr [Guard] Expr
+                 deriving (Show)
+
+pattern MkUnguarded :: Expr -> GuardedExpr
+pattern MkUnguarded e = GuardedExpr [] e
 
 -- |
 -- Data type for expressions and terms

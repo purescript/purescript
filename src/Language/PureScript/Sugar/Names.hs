@@ -247,7 +247,7 @@ renameInModule imports (Module ss coms mn decls exps) =
     where
     updateGuard :: [GuardedExpr] -> [Ident]
     updateGuard [] = []
-    updateGuard ((g, _):xs) =
+    updateGuard (GuardedExpr g _ : xs) =
       concatMap updatePatGuard g ++ updateGuard xs
       where
         updatePatGuard (PatternGuard b _) = binderNames b

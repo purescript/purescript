@@ -99,7 +99,7 @@ basicDeclaration :: Text -> DeclarationInfo -> Maybe IntermediateDeclaration
 basicDeclaration title info = Just $ Right $ mkDeclaration title info
 
 convertDeclaration :: P.Declaration -> Text -> Maybe IntermediateDeclaration
-convertDeclaration (P.ValueDeclaration _ _ _ [([], P.TypedValue _ _ ty)]) title =
+convertDeclaration (P.ValueDeclaration _ _ _ [P.MkUnguarded (P.TypedValue _ _ ty)]) title =
   basicDeclaration title (ValueDeclaration ty)
 convertDeclaration P.ValueDeclaration{} title =
   -- If no explicit type declaration was provided, insert a wildcard, so that

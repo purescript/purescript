@@ -125,12 +125,12 @@ prettyPrintDeclaration :: Int -> Declaration -> Box
 prettyPrintDeclaration d _ | d < 0 = ellipsis
 prettyPrintDeclaration _ (TypeDeclaration ident ty) =
   text (T.unpack (showIdent ident) ++ " :: ") <> typeAsBox ty
-prettyPrintDeclaration d (ValueDeclaration ident _ [] [([], val)]) =
+prettyPrintDeclaration d (ValueDeclaration ident _ [] [GuardedExpr [] val]) =
   text (T.unpack (showIdent ident) ++ " = ") <> prettyPrintValue (d - 1) val
 prettyPrintDeclaration d (BindingGroupDeclaration ds) =
   vsep 1 left (map (prettyPrintDeclaration (d - 1) . toDecl) ds)
   where
-  toDecl (nm, t, e) = ValueDeclaration nm t [] [([], e)]
+  toDecl (nm, t, e) = ValueDeclaration nm t [] [GuardedExpr [] e]
 prettyPrintDeclaration d (PositionedDeclaration _ _ decl) = prettyPrintDeclaration d decl
 prettyPrintDeclaration _ _ = internalError "Invalid argument to prettyPrintDeclaration"
 
@@ -140,17 +140,18 @@ prettyPrintCaseAlternative d (CaseAlternative binders result) =
   text (T.unpack (T.unwords (map prettyPrintBinderAtom binders))) <> prettyPrintResult result
   where
   prettyPrintResult :: [GuardedExpr] -> Box
-  prettyPrintResult [([], v)] = text " -> " <> prettyPrintValue (d - 1) v
+  prettyPrintResult [GuardedExpr [] v] = text " -> " <> prettyPrintValue (d - 1) v
   prettyPrintResult gs =
     vcat left (map prettyPrintGuardedValue gs)
 
-  prettyPrintGuardedValue :: ([Guard], Expr) -> Box
-  prettyPrintGuardedValue ([ConditionGuard grd], val) = foldl1 before
+  prettyPrintGuardedValue :: GuardedExpr -> Box
+  prettyPrintGuardedValue (GuardedExpr [ConditionGuard grd] val) = foldl1 before
     [ text " | "
     , prettyPrintValue (d - 1) grd
     , text " -> "
     , prettyPrintValue (d - 1) val
     ]
+  prettyPrintGuardedValue _ = internalError "There should only be ConditionGuards after desugaring cases"
 
 prettyPrintDoNotationElement :: Int -> DoNotationElement -> Box
 prettyPrintDoNotationElement d _ | d < 0 = ellipsis
