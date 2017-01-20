@@ -32,6 +32,7 @@ import           Language.PureScript.Label (Label(..))
 import           Language.PureScript.Names
 import           Language.PureScript.Pretty
 import           Language.PureScript.Pretty.Common (before, endWith)
+import           Language.PureScript.PSString (decodeString)
 import           Language.PureScript.Traversals
 import           Language.PureScript.Types
 import qualified Language.PureScript.Publish.BoxesHelpers as BoxHelpers
@@ -1264,7 +1265,7 @@ renderBox = unlines
   whiteSpace = all isSpace
 
 toTypelevelString :: Type -> Maybe Box.Box
-toTypelevelString (TypeLevelString s) = Just $ Box.text $ T.unpack $ prettyPrintString s
+toTypelevelString (TypeLevelString s) = (Box.text . T.unpack) <$> decodeString s
 toTypelevelString (TypeApp (TypeConstructor f) x)
   | f == primName "TypeString" = Just $ typeAsBox x
 toTypelevelString (TypeApp (TypeApp (TypeConstructor f) x) ret)
