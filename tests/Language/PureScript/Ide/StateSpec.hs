@@ -21,7 +21,7 @@ typeOperator :: Maybe P.Kind -> IdeDeclarationAnn
 typeOperator =
   d . IdeDeclTypeOperator . IdeTypeOperator (P.OpName ":") (P.Qualified (Just (mn "Test")) (P.ProperName "List")) 2 P.Infix
 
-testModule :: Module
+testModule :: (P.ModuleName, [IdeDeclarationAnn])
 testModule = (mn "Test", [ d (IdeDeclValue (IdeValue (P.Ident "function") P.REmpty))
                          , d (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName "Cons") (P.ProperName "List") (P.REmpty)))
                          , d (IdeDeclType (IdeType (P.ProperName "List") P.kindType))

@@ -116,8 +116,6 @@ makeLenses ''IdeDeclarationAnn
 emptyAnn :: Annotation
 emptyAnn = Annotation Nothing Nothing Nothing
 
-type Module = (P.ModuleName, [IdeDeclarationAnn])
-
 type DefinitionSites a = Map IdeDeclNamespace a
 type TypeAnnotations = Map P.Ident P.Type
 newtype AstData a = AstData (ModuleMap (DefinitionSites a, TypeAnnotations))
