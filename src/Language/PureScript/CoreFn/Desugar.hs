@@ -2,7 +2,7 @@ module Language.PureScript.CoreFn.Desugar (moduleToCoreFn) where
 
 import Prelude.Compat
 
-import Control.Arrow (second, (***))
+import Control.Arrow (second)
 
 import Data.Function (on)
 import Data.List (sort, sortBy, nub)
