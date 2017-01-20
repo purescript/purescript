@@ -40,6 +40,10 @@ completionsFromModules = foldMap completionFromModule
     completionFromModule (moduleName, decls) =
       map (\x -> Match (moduleName, x)) decls
 
+-- | Attempts to complete a record accessor or record wildcard in the given file
+-- at the given position. Uses the typed hole machinery in combination with the
+-- Rebuild command, which makes this completion dependent on successful
+-- compilation of the module once the typed hole has been inserted.
 completeInFile :: (Ide m, MonadLogger m) => FilePath -> Int -> Int -> m [Completion]
 completeInFile path row col = do
   input <- liftIO (readUTF8FileT path)
