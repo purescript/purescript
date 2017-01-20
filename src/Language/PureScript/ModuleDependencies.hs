@@ -4,13 +4,10 @@ module Language.PureScript.ModuleDependencies
   , ModuleGraph
   ) where
 
-import           Prelude.Compat
+import           Protolude
 
-import           Control.Monad (forM_, when)
-import           Control.Monad.Error.Class (MonadError(..))
 import           Data.Graph
-import           Data.List (nub)
-import           Data.Maybe (fromMaybe)
+import qualified Data.Set as S
 import           Language.PureScript.AST
 import qualified Language.PureScript.Constants as C
 import           Language.PureScript.Crash
@@ -29,7 +26,7 @@ sortModules
   => [Module]
   -> m ([Module], ModuleGraph)
 sortModules ms = do
-    let mns = map getModuleName ms
+    let mns = S.fromList $ map getModuleName ms
     verts <- mapM (toGraphNode mns) ms
     ms' <- mapM toModule $ stronglyConnComp verts
     let (graph, fromVertex, toVertex) = graphFromEdges verts
@@ -40,17 +37,17 @@ sortModules ms = do
                          return (mn, filter (/= mn) (map toKey deps))
     return (ms', moduleGraph)
   where
-    toGraphNode :: [ModuleName] -> Module -> m (Module, ModuleName, [ModuleName])
+    toGraphNode :: S.Set ModuleName -> Module -> m (Module, ModuleName, [ModuleName])
     toGraphNode mns m@(Module _ _ mn ds _) = do
-      let deps = nub (concatMap usedModules ds)
+      let deps = ordNub (concatMap usedModules ds)
       forM_ deps $ \dep ->
-        when (dep /= C.Prim && notElem dep mns) $
+        when (dep /= C.Prim && S.notMember dep mns) $
           throwError . addHint (ErrorInModule mn) . errorMessage $ ModuleNotFound dep
       pure (m, getModuleName m, deps)
 
 -- | Calculate a list of used modules based on explicit imports and qualified names.
 usedModules :: Declaration -> [ModuleName]
-usedModules d = nub (f d) where
+usedModules d = f d where
   f :: Declaration -> [ModuleName]
   (f, _, _, _, _) = everythingOnValues (++) forDecls (const []) (const []) (const []) (const [])
 
@@ -61,7 +58,7 @@ usedModules d = nub (f d) where
   forDecls _ = []
 
 -- | Convert a strongly connected component of the module graph to a module
-toModule :: (MonadError MultipleErrors m) => SCC Module -> m Module
+toModule :: MonadError MultipleErrors m => SCC Module -> m Module
 toModule (AcyclicSCC m) = return m
 toModule (CyclicSCC [m]) = return m
 toModule (CyclicSCC ms) = throwError . errorMessage $ CycleInModules (map getModuleName ms)
