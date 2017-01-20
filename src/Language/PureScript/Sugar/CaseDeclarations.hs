@@ -21,7 +21,6 @@ import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Names
-import Language.PureScript.Traversals
 import Language.PureScript.TypeChecker.Monad (guardWith)
 
 -- |
@@ -131,10 +130,10 @@ desugarCase (Case scrut alternatives) =
                                -> [GuardedExpr]
                                -> [CaseAlternative]
                                -> m [CaseAlternative]
-    desugarGuardedAlternative vb [] rem_alts = pure rem_alts
+    desugarGuardedAlternative _vb [] rem_alts = pure rem_alts
 
     desugarGuardedAlternative vb (GuardedExpr gs e : ge) rem_alts = do
-      rhs <- dsGAltOutOfLine vb ge rem_alts $ \alt_fail ->
+      rhs <- desugarAltOutOfLine vb ge rem_alts $ \alt_fail ->
         let
           -- if the binder is a var binder we must not add
           -- the fail case as it results in unreachable
@@ -150,57 +149,62 @@ desugarCase (Case scrut alternatives) =
 
     desugarGuard :: [Guard] -> Expr -> [CaseAlternative] -> Expr
     desugarGuard [] e _ = e
-    desugarGuard (ConditionGuard c : gs) e alt_fail
-      | isTrueExpr c = desugarGuard gs e alt_fail
+    desugarGuard (ConditionGuard c : gs) e match_failed
+      | isTrueExpr c = desugarGuard gs e match_failed
       | otherwise =
         Case [c]
           (CaseAlternative [LiteralBinder (BooleanLiteral True)]
-            [MkUnguarded (desugarGuard gs e alt_fail)] : alt_fail)
+            [MkUnguarded (desugarGuard gs e match_failed)] : match_failed)
 
-    desugarGuard (PatternGuard vb g : gs) e alt_fail =
+    desugarGuard (PatternGuard vb g : gs) e match_failed =
       Case [g]
-        (CaseAlternative [vb] [MkUnguarded (desugarGuard gs e alt_fail)]
-          : alt_fail)
+        (CaseAlternative [vb] [MkUnguarded (desugarGuard gs e match_failed)]
+          : match_failed)
 
-    dsGAltOutOfLine :: (Monad m, MonadSupply m)
-                    => [Binder]
-                    -> [GuardedExpr]
-                    -> [CaseAlternative]
-                    -> ([CaseAlternative] -> Expr)
-                    -> m Expr
-    dsGAltOutOfLine alt_binder rem_guarded rem_alts mk_body
+    -- we generate a let-binding for the remaining guards
+    -- and alternatives. A CaseAlternative is passed (or in
+    -- fact the original case is partial non is passed) to
+    -- mk_body which branches to the generated let-binding.
+    -- This function is key to avoid duplication of case
+    -- alternatives on failed matches.
+    desugarAltOutOfLine :: (Monad m, MonadSupply m)
+                        => [Binder]
+                        -> [GuardedExpr]
+                        -> [CaseAlternative]
+                        -> ([CaseAlternative] -> Expr)
+                        -> m Expr
+    desugarAltOutOfLine alt_binder rem_guarded rem_alts mk_body
       | not (null rem_guarded) = do
         -- we still have some guarded expressions
         -- left to goto in case of guard failure
         rem_guarded' <- desugarGuardedAlternative alt_binder rem_guarded rem_alts
         guard_fail <- freshIdent'
-        let
-          goto = Var (Qualified Nothing guard_fail) `App` trueLit
-          alt_fail = [CaseAlternative [NullBinder] [MkUnguarded goto]]
-
-        return $
-          Let [ ValueDeclaration guard_fail Private [NullBinder]
-                [MkUnguarded (Case scrut rem_guarded')]
-              ] (mk_body alt_fail)
+        pure $ genOutOfLineCode guard_fail rem_guarded'
 
       | not (null rem_alts) = do
         -- there are some alternatives where we must
         -- go in case of guard failure
         rem_alts' <- desugarAlternatives rem_alts
         guard_fail <- freshIdent'
-        let
-          goto = Var(Qualified Nothing guard_fail) `App` trueLit
-          alt_fail = [CaseAlternative [NullBinder] [MkUnguarded goto]]
-
-        return $
-          Let [ ValueDeclaration guard_fail Private [NullBinder]
-                [MkUnguarded (Case scrut rem_alts')]
-              ] (mk_body alt_fail)
+        pure $ genOutOfLineCode guard_fail rem_alts'
 
       | otherwise = do
         -- we have nowhere to go if a match fails. this is possibly
         -- a partial case expression.
         pure $ mk_body []
+      where
+      genOutOfLineCode :: Ident -> [CaseAlternative] -> Expr
+      genOutOfLineCode goto_fail rem_alternatives =
+        Let [
+          ValueDeclaration goto_fail Private [NullBinder]
+            [MkUnguarded (Case scrut rem_alternatives)]
+        ] (mk_body alt_fail)
+        where
+          goto = Var (Qualified Nothing goto_fail) `App` trueLit
+          alt_fail = [CaseAlternative [NullBinder] [MkUnguarded goto]]
+
+
+
 
     trueLit = Literal (BooleanLiteral True)
 
@@ -223,7 +227,7 @@ validateCases = flip parU f
   (f, _, _) = everywhereOnValuesM return validate return
 
   validate :: Expr -> m Expr
-  validate c@(Case vs alts) = do
+  validate (Case vs alts) = do
     let l = length vs
         alts' = filter ((l /=) . length . caseAlternativeBinders) alts
     unless (null alts') $
