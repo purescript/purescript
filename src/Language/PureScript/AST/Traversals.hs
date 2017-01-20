@@ -6,7 +6,6 @@ module Language.PureScript.AST.Traversals where
 import Prelude.Compat
 
 import Control.Monad
-import Control.Arrow ((***), (+++))
 
 import Data.Foldable (fold)
 import Data.List (mapAccumL)
@@ -268,7 +267,7 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
 
   f' :: Declaration -> r
   f' d@(DataBindingGroupDeclaration ds) = foldl (<>) (f d) (map f' ds)
-  f' d@(ValueDeclaration _ _ bs val) = foldl (<>) (f d) (map h' bs ++ concatMap (\(GuardedExpr guard val) -> map k' guard ++ [g' val]) val)
+  f' d@(ValueDeclaration _ _ bs val) = foldl (<>) (f d) (map h' bs ++ concatMap (\(GuardedExpr grd v) -> map k' grd ++ [g' v]) val)
   f' d@(BindingGroupDeclaration ds) = foldl (<>) (f d) (map (\(_, _, val) -> g' val) ds)
   f' d@(TypeClassDeclaration _ _ _ _ ds) = foldl (<>) (f d) (map f' ds)
   f' d@(TypeInstanceDeclaration _ _ _ _ (ExplicitInstance ds)) = foldl (<>) (f d) (map f' ds)
@@ -311,7 +310,7 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
 
   i' :: CaseAlternative -> r
   i' ca@(CaseAlternative bs gs) =
-    foldl (<>) (i ca) (map h' bs ++ concatMap (\(GuardedExpr gs val) -> map k' gs ++ [g' val]) gs)
+    foldl (<>) (i ca) (map h' bs ++ concatMap (\(GuardedExpr grd val) -> map k' grd ++ [g' val]) gs)
 
   j' :: DoNotationElement -> r
   j' e@(DoNotationValue v) = j e <> g' v
@@ -346,7 +345,7 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
 
   f' :: s -> Declaration -> r
   f' s (DataBindingGroupDeclaration ds) = foldl (<>) r0 (map (f'' s) ds)
-  f' s (ValueDeclaration _ _ bs val) = foldl (<>) r0 (map (h'' s) bs ++ concatMap (\(GuardedExpr gs val) -> map (k' s) gs ++ [g'' s val]) val)
+  f' s (ValueDeclaration _ _ bs val) = foldl (<>) r0 (map (h'' s) bs ++ concatMap (\(GuardedExpr grd v) -> map (k' s) grd ++ [g'' s v]) val)
   f' s (BindingGroupDeclaration ds) = foldl (<>) r0 (map (\(_, _, val) -> g'' s val) ds)
   f' s (TypeClassDeclaration _ _ _ _ ds) = foldl (<>) r0 (map (f'' s) ds)
   f' s (TypeInstanceDeclaration _ _ _ _ (ExplicitInstance ds)) = foldl (<>) r0 (map (f'' s) ds)
@@ -397,7 +396,7 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   i'' s ca = let (s', r) = i s ca in r <> i' s' ca
 
   i' :: s -> CaseAlternative -> r
-  i' s (CaseAlternative bs gs) = foldl (<>) r0 (map (h'' s) bs ++ concatMap (\(GuardedExpr guard val) -> map (k' s) guard ++ [g'' s val]) gs)
+  i' s (CaseAlternative bs gs) = foldl (<>) r0 (map (h'' s) bs ++ concatMap (\(GuardedExpr grd val) -> map (k' s) grd ++ [g'' s val]) gs)
 
   j'' :: s -> DoNotationElement -> r
   j'' s e = let (s', r) = j s e in r <> j' s' e
@@ -518,9 +517,9 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   f' s (ValueDeclaration name _ bs val) =
     let s' = S.insert name s
         s'' = S.union s' (S.fromList (concatMap binderNames bs))
-    in foldMap (h'' s') bs <> foldMap (\(GuardedExpr guard val) ->
-                                         let (s''', r) = foldMap (k' s'') guard
-                                         in r <> g'' s''' val) val
+    in foldMap (h'' s') bs <> foldMap (\(GuardedExpr grd v) ->
+                                         let (s''', r) = foldMap (k' s'') grd
+                                         in r <> g'' s''' v) val
   f' s (BindingGroupDeclaration ds) =
     let s' = S.union s (S.fromList (map (\(name, _, _) -> name) ds))
     in foldMap (\(_, _, val) -> g'' s' val) ds
@@ -604,8 +603,8 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
     in (s', h'' s b <> g'' s e)
 
   l' s (GuardedExpr [] e) = g'' s e
-  l' s (GuardedExpr (g:gs) e) =
-    let (s', r) = k' s g
+  l' s (GuardedExpr (grd:gs) e) =
+    let (s', r) = k' s grd
     in r <> l' s' (GuardedExpr gs e)
 
   getDeclIdent :: Declaration -> Maybe Ident

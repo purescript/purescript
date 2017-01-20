@@ -211,9 +211,6 @@ desugarCase (Case scrut alternatives) =
           goto = Var (Qualified Nothing goto_fail) `App` trueLit
           alt_fail = [CaseAlternative [NullBinder] [MkUnguarded goto]]
 
-
-
-
     trueLit = Literal (BooleanLiteral True)
 
   in do
