@@ -75,6 +75,10 @@ subsumes'
   -> Type
   -> Type
   -> m (Coercion mode)
+subsumes' mode (ExpandedSynonym _ ty1) ty2 =
+  subsumes' mode ty1 ty2
+subsumes' mode ty1 (ExpandedSynonym _ ty2) = 
+  subsumes' mode ty1 ty2
 subsumes' mode (ForAll ident ty1 _) ty2 = do
   replaced <- replaceVarWithUnknown ident ty1
   subsumes' mode replaced ty2

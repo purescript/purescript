@@ -575,6 +575,7 @@ check'
   => Expr
   -> Type
   -> m Expr
+check' val (ExpandedSynonym _ ty) = check' val ty
 check' val (ForAll ident ty _) = do
   scope <- newSkolemScope
   sko <- newSkolemConstant
@@ -771,6 +772,8 @@ checkFunctionApplication'
   -> Type
   -> Expr
   -> m (Type, Expr)
+checkFunctionApplication' fn (ExpandedSynonym _ ty) arg = do
+  checkFunctionApplication' fn ty arg
 checkFunctionApplication' fn (TypeApp (TypeApp tyFunction' argTy) retTy) arg = do
   unifyTypes tyFunction' tyFunction
   arg' <- check arg argTy
