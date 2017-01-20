@@ -208,10 +208,9 @@ desugarCase (Case scrut alternatives) =
             [MkUnguarded (Case scrut rem_alternatives)]
         ] (mk_body alt_fail)
         where
-          goto = Var (Qualified Nothing goto_fail) `App` trueLit
+          goto = Var (Qualified Nothing goto_fail)
+            `App` Literal (BooleanLiteral True)
           alt_fail = [CaseAlternative [NullBinder] [MkUnguarded goto]]
-
-    trueLit = Literal (BooleanLiteral True)
 
   in do
     alts' <- desugarAlternatives alternatives
