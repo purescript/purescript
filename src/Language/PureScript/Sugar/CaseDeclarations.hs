@@ -124,7 +124,7 @@ desugarCase (Case scrut alternatives) =
         isSingleCondGuard (GuardedExpr [ConditionGuard _] _) = True
         isSingleCondGuard _ = False
 
-    desugarGuardedAlternative :: (Monad m, MonadSupply m)
+    desugarGuardedAlternative :: (MonadSupply m)
                                => [Binder]
                                -> [GuardedExpr]
                                -> [CaseAlternative]
