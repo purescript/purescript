@@ -519,7 +519,7 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
         s'' = S.union s' (S.fromList (concatMap binderNames bs))
     in foldMap (h'' s') bs <> foldMap (\(GuardedExpr grd v) ->
                                          let (s''', r) = foldMap (k' s'') grd
-                                         in r <> g'' s''' v) val
+                                         in r <> g'' (S.union s''' s'') v) val
   f' s (BindingGroupDeclaration ds) =
     let s' = S.union s (S.fromList (map (\(name, _, _) -> name) ds))
     in foldMap (\(_, _, val) -> g'' s' val) ds
@@ -600,7 +600,7 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   k' s (ConditionGuard e) = (s, g'' s e)
   k' s (PatternGuard b e) =
     let s' = S.union (S.fromList (binderNames b)) s
-    in (s', h'' s b <> g'' s e)
+    in (s', h'' s b <> g'' s' e)
 
   l' s (GuardedExpr [] e) = g'' s e
   l' s (GuardedExpr (grd:gs) e) =
