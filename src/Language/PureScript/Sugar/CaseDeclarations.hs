@@ -129,7 +129,8 @@ desugarCase (Case scrut alternatives) =
                                -> [GuardedExpr]
                                -> [CaseAlternative]
                                -> m [CaseAlternative]
-    desugarGuardedAlternative _vb [] rem_alts = pure rem_alts
+    desugarGuardedAlternative _vb [] rem_alts =
+      desugarAlternatives rem_alts
 
     desugarGuardedAlternative vb (GuardedExpr gs e : ge) rem_alts = do
       rhs <- desugarAltOutOfLine vb ge rem_alts $ \alt_fail ->
