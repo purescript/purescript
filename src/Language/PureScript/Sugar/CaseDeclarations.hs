@@ -40,7 +40,7 @@ desugarCasesModule (Module ss coms name ds exps) =
 -- Desugar case with pattern guards and pattern clauses to a
 -- series of nested case expressions.
 --
-desugarCase :: (Monad m, MonadSupply m)
+desugarCase :: (MonadSupply m)
             => Expr
             -> m Expr
 desugarCase (Case scrut alternatives) =
@@ -102,7 +102,7 @@ desugarCase (Case scrut alternatives) =
     --
     -- This might look strange but simplifies the algorithm a lot.
     --
-    desugarAlternatives :: (Monad m, MonadSupply m)
+    desugarAlternatives :: (MonadSupply m)
                         => [CaseAlternative]
                         -> m [CaseAlternative]
     desugarAlternatives [] = pure []
@@ -175,47 +175,39 @@ desugarCase (Case scrut alternatives) =
     -- and alternatives. A CaseAlternative is passed (or in
     -- fact the original case is partial non is passed) to
     -- mk_body which branches to the generated let-binding.
-    -- This function is key to avoid duplication of case
-    -- alternatives on failed matches.
-    desugarAltOutOfLine :: (Monad m, MonadSupply m)
+    desugarAltOutOfLine :: (MonadSupply m)
                         => [Binder]
                         -> [GuardedExpr]
                         -> [CaseAlternative]
                         -> ([CaseAlternative] -> Expr)
                         -> m Expr
     desugarAltOutOfLine alt_binder rem_guarded rem_alts mk_body
-      | not (null rem_guarded) = do
+      | Just rem_case <- mkCaseOfRemainingGuardsAndAlts = do
 
-        -- we construct a case expression from the leftover
-        -- guarded expressions and remaining alternatives and
-        -- desugar that.
-        remaining_cases <- desugarCase $
-          Case scrut (CaseAlternative alt_binder rem_guarded : rem_alts)
-        guard_fail <- freshIdent'
-        pure $ genOutOfLineCode guard_fail remaining_cases
+        desugared   <- desugarCase rem_case
+        rem_case_id <- freshIdent'
 
-      | not (null rem_alts) = do
-        -- there are some alternatives where we must
-        -- go in case of guard failure
-        remaining_cases <- desugarCase (Case scrut rem_alts)
-        guard_fail <- freshIdent'
-        pure $ genOutOfLineCode guard_fail remaining_cases
-
-      | otherwise = do
-        -- we have nowhere to go if a match fails. this is possibly
-        -- a partial case expression.
-        pure $ mk_body []
-      where
-      genOutOfLineCode :: Ident -> Expr -> Expr
-      genOutOfLineCode goto_fail ool_code =
-        Let [
-          ValueDeclaration goto_fail Private [NullBinder]
-            [MkUnguarded ool_code]
-        ] (mk_body alt_fail)
-        where
-          goto = Var (Qualified Nothing goto_fail)
+        let
+          goto_rem_case :: Expr
+          goto_rem_case = Var (Qualified Nothing rem_case_id)
             `App` Literal (BooleanLiteral True)
-          alt_fail = [CaseAlternative [NullBinder] [MkUnguarded goto]]
+          alt_fail = [CaseAlternative [NullBinder] [MkUnguarded goto_rem_case]]
+
+        pure $ Let [
+            ValueDeclaration rem_case_id Private [NullBinder]
+              [MkUnguarded desugared]
+          ] (mk_body alt_fail)
+
+      | otherwise
+      = pure $ mk_body []
+      where
+        mkCaseOfRemainingGuardsAndAlts
+          | not (null rem_guarded)
+          = Just $ Case scrut (CaseAlternative alt_binder rem_guarded : rem_alts)
+          | not (null rem_alts)
+          = Just $ Case scrut rem_alts
+          | otherwise
+          = Nothing
 
     scrut_nullbinder :: [Binder]
     scrut_nullbinder = replicate (length scrut) NullBinder
