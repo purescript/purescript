@@ -78,6 +78,7 @@ supportModules =
   , "Data.Array"
   , "Data.Array.Partial"
   , "Data.Array.ST"
+  , "Data.Array.ST.Iterator"
   , "Data.Bifoldable"
   , "Data.Bifunctor"
   , "Data.Bifunctor.Clown"
