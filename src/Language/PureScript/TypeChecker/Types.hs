@@ -411,7 +411,7 @@ inferLetBinding seen (ValueDeclaration ident nameKind [] [MkUnguarded tv@(TypedV
   let dict = M.singleton (Qualified Nothing ident) (ty, nameKind, Undefined)
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   TypedValue _ val' ty'' <- if checkType then withScopedTypeVars moduleName args (bindNames dict (check val ty')) else return tv
-  bindNames (M.singleton (Qualified Nothing ident) (ty'', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] [MkUnguarded (TypedValue checkType val' ty')]]) rest ret j
+  bindNames (M.singleton (Qualified Nothing ident) (ty'', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] [MkUnguarded (TypedValue checkType val' ty'')]]) rest ret j
 inferLetBinding seen (ValueDeclaration ident nameKind [] [MkUnguarded val] : rest) ret j = do
   valTy <- freshType
   let dict = M.singleton (Qualified Nothing ident) (valTy, nameKind, Undefined)
