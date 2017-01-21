@@ -205,7 +205,7 @@ missingCasesMultiple env mn = go
 isExhaustiveGuard :: [GuardedExpr] -> Bool
 isExhaustiveGuard [GuardedExpr [] _] = True
 isExhaustiveGuard gs  =
-  not . null $ filter (\(GuardedExpr gs _) -> isExhaustive gs) gs
+  not . null $ filter (\(GuardedExpr grd _) -> isExhaustive grd) gs
   where
     checkGuard :: Guard -> Bool
     checkGuard (ConditionGuard cond) = isTrueExpr cond
