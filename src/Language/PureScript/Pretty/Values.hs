@@ -5,6 +5,7 @@ module Language.PureScript.Pretty.Values
   ( prettyPrintValue
   , prettyPrintBinder
   , prettyPrintBinderAtom
+  , prettyPrintDeclaration
   ) where
 
 import Prelude.Compat
@@ -134,7 +135,7 @@ prettyPrintDeclaration d (BindingGroupDeclaration ds) =
   where
   toDecl (nm, t, e) = ValueDeclaration nm t [] (Right e)
 prettyPrintDeclaration d (PositionedDeclaration _ _ decl) = prettyPrintDeclaration d decl
-prettyPrintDeclaration _ _ = internalError "Invalid argument to prettyPrintDeclaration"
+prettyPrintDeclaration _ x = text ("-- " ++ show x)
 
 prettyPrintCaseAlternative :: Int -> CaseAlternative -> Box
 prettyPrintCaseAlternative d _ | d < 0 = ellipsis

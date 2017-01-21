@@ -6,6 +6,7 @@ module Language.PureScript.Make
   -- * Make API
     RebuildPolicy(..)
   , ProgressMessage(..), renderProgressMessage
+  , DumpIntermediate(..), noDumpIntermediate
   , MakeActions(..)
   , Externs()
   , rebuildModule
@@ -72,6 +73,8 @@ import qualified Language.PureScript.Constants as C
 import qualified Language.PureScript.CoreFn as CF
 import qualified Language.PureScript.CoreFn.ToJSON as CFJ
 import qualified Language.PureScript.Parser as PSParser
+import qualified Language.PureScript.Publish.BoxesHelpers as Boxes
+
 import qualified Paths_purescript as Paths
 import           SourceMap
 import           SourceMap.Types
@@ -89,6 +92,24 @@ data ProgressMessage
 -- | Render a progress message
 renderProgressMessage :: ProgressMessage -> String
 renderProgressMessage (CompilingModule mn) = "Compiling " ++ T.unpack (runModuleName mn)
+
+-- | Dump intermediate representations of the compiled source
+data DumpIntermediate m = DumpIntermediate
+  { dumpImmParsed :: Module -> m ()
+    -- ^ Dump the abstract syntax tree of a module
+  , dumpImmDesugared :: Module -> m ()
+    -- ^ Dump a desugared module
+  , dumpImmCoreFn :: CF.Module CF.Ann -> m ()
+    -- ^ Dump the core of a module
+  }
+
+noDumpIntermediate :: Applicative m => DumpIntermediate m
+noDumpIntermediate =
+  DumpIntermediate {
+    dumpImmParsed = \_ -> pure ()
+  , dumpImmDesugared = \_ -> pure ()
+  , dumpImmCoreFn = \_ -> pure ()
+  }
 
 -- | Actions that require implementations when running in "make" mode.
 --
@@ -113,6 +134,7 @@ data MakeActions m = MakeActions
   -- ^ Run the code generator for the module and write any required output files.
   , progress :: ProgressMessage -> m ()
   -- ^ Respond to a progress update.
+  , dumpIntermediate :: DumpIntermediate m
   }
 
 -- | Generated code for an externs file.
@@ -142,6 +164,7 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
   lint withPrim
   ((Module ss coms _ elaborated exps, env'), nextVar) <- runSupplyT 0 $ do
     [desugared] <- desugar externs [withPrim]
+    lift $ dumpImmDesugared dumpIntermediate desugared
     runCheck' (emptyCheckState env) $ typeCheckModule desugared
   regrouped <- createBindingGroups moduleName . collapseBindingGroups $ elaborated
   let mod' = Module ss coms moduleName regrouped exps
@@ -167,6 +190,7 @@ make ma@MakeActions{..} ms = do
   barriers <- zip (map getModuleName sorted) <$> replicateM (length ms) ((,) <$> C.newEmptyMVar <*> C.newEmptyMVar)
 
   for_ sorted $ \m -> fork $ do
+    dumpImmParsed dumpIntermediate m
     let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup (getModuleName m) graph)
     buildModule barriers (importPrim m) (deps `inOrderOf` map getModuleName sorted)
 
@@ -314,7 +338,7 @@ buildMakeActions
   -- ^ Generate a prefix comment?
   -> MakeActions Make
 buildMakeActions outputDir filePathMap foreigns usePrefix =
-    MakeActions getInputTimestamp getOutputTimestamp readExterns codegen progress
+    MakeActions getInputTimestamp getOutputTimestamp readExterns codegen progress dumpIntermediate
   where
 
   getInputTimestamp :: ModuleName -> Make (Either RebuildPolicy (Maybe UTCTime))
@@ -366,12 +390,36 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
       for_ (mn `M.lookup` foreigns) (readTextFile >=> writeTextFile foreignFile)
       writeTextFile externsFile exts
     lift $ when sourceMaps $ genSourceMap dir mapFile (length prefix) mappings
-    dumpCoreFn <- lift $ asks optionsDumpCoreFn
-    when dumpCoreFn $ do
-      let coreFnFile = outputDir </> filePath </> "corefn.json"
-      let jsonPayload = CFJ.moduleToJSON Paths.version m
-      let json = Aeson.object [  (runModuleName mn, jsonPayload) ]
-      lift $ writeTextFile coreFnFile (encode json)
+    lift $ dumpImmCoreFn dumpIntermediate m
+
+  dumpIntermediate :: DumpIntermediate Make
+  dumpIntermediate =
+    DumpIntermediate {
+      dumpImmParsed = \m@(Module _ _ moduleName _ _) -> do
+        shouldDump <- asks optionsDumpParsed
+        when shouldDump $ do
+          let filepath = T.unpack (runModuleName moduleName)
+          let astFile = outputDir </> filepath </> "parsed.dump-parsed"
+          liftBase $ writeFile astFile (show m)
+
+    , dumpImmCoreFn = \m -> do
+        shouldDump <- asks optionsDumpCoreFn
+        when shouldDump $ do
+          let mn = CF.moduleName m
+          let filePath = T.unpack (runModuleName mn)
+          let coreFnFile = outputDir </> filePath </> "corefn.json"
+          let jsonPayload = CFJ.moduleToJSON Paths.version m
+          let json = Aeson.object [  (runModuleName mn, jsonPayload) ]
+          writeTextFile coreFnFile (encode json)
+
+    , dumpImmDesugared = \(Module _ _ mn decls _) -> do
+        shouldDump <- asks optionsDumpDesugared
+        when shouldDump $ do
+          let filepath = T.unpack (runModuleName mn)
+          let dsFile = outputDir </> filepath </> "desugared.dump-desugared"
+          liftBase $ Boxes.renderToFile dsFile
+                      (Boxes.vcat (map (prettyPrintDeclaration maxBound) decls))
+    }
 
   genSourceMap :: String -> String -> Int -> [SMap] -> Make ()
   genSourceMap dir mapFile extraLines mappings = do

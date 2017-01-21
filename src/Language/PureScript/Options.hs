@@ -32,6 +32,12 @@ data Options = Options {
     -- Generate soure maps
   , optionsSourceMaps :: Bool
     -- |
+    -- Dump abstract syntax tree of source
+  , optionsDumpParsed :: Bool
+    -- |
+    -- Dump desugared source
+  , optionsDumpDesugared :: Bool
+    -- |
     -- Dump CoreFn
   , optionsDumpCoreFn :: Bool
   } deriving Show
@@ -39,4 +45,4 @@ data Options = Options {
 -- |
 -- Default make options
 defaultOptions :: Options
-defaultOptions = Options False False Nothing False False False False False
+defaultOptions = Options False False Nothing False False False False False False False
