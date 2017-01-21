@@ -117,9 +117,11 @@ library
                    aeson-better-errors >= 0.8,
                    ansi-terminal >= 0.6.2 && < 0.7,
                    base-compat >=0.6.0,
+                   blaze-html >= 0.8.1 && < 0.9,
                    bower-json >= 1.0.0.1 && < 1.1,
                    boxes >= 0.1.4 && < 0.2.0,
                    bytestring -any,
+                   cheapskate >= 0.1 && < 0.2,
                    containers -any,
                    clock -any,
                    data-ordlist >= 0.4.7.0,
@@ -270,6 +272,7 @@ library
                      Language.PureScript.Docs.RenderedCode.RenderType
                      Language.PureScript.Docs.RenderedCode.RenderKind
                      Language.PureScript.Docs.AsMarkdown
+                     Language.PureScript.Docs.AsHtml
                      Language.PureScript.Docs.ParseInPackage
                      Language.PureScript.Docs.Utils.MonoidExtras
 
