@@ -153,7 +153,7 @@ desugarCase (Case scrut alternatives) =
             (CaseAlternative vb [MkUnguarded (desugarGuard gs e alt_fail)]
               : alt_fail')
 
-      return [ CaseAlternative [NullBinder] [MkUnguarded rhs]]
+      return [ CaseAlternative scrut_nullbinder [MkUnguarded rhs]]
 
     desugarGuard :: [Guard] -> Expr -> [CaseAlternative] -> Expr
     desugarGuard [] e _ = e
@@ -183,42 +183,48 @@ desugarCase (Case scrut alternatives) =
                         -> m Expr
     desugarAltOutOfLine alt_binder rem_guarded rem_alts mk_body
       | not (null rem_guarded) = do
-        -- we still have some guarded expressions
-        -- left to goto in case of guard failure
-        rem_guarded' <- desugarGuardedAlternative alt_binder rem_guarded rem_alts
+
+        -- we construct a case expression from the leftover
+        -- guarded expressions and remaining alternatives and
+        -- desugar that.
+        remaining_cases <- desugarCase $
+          Case scrut (CaseAlternative alt_binder rem_guarded : rem_alts)
         guard_fail <- freshIdent'
-        pure $ genOutOfLineCode guard_fail rem_guarded'
+        pure $ genOutOfLineCode guard_fail remaining_cases
 
       | not (null rem_alts) = do
         -- there are some alternatives where we must
         -- go in case of guard failure
-        rem_alts' <- desugarAlternatives rem_alts
+        remaining_cases <- desugarCase (Case scrut rem_alts)
         guard_fail <- freshIdent'
-        pure $ genOutOfLineCode guard_fail rem_alts'
+        pure $ genOutOfLineCode guard_fail remaining_cases
 
       | otherwise = do
         -- we have nowhere to go if a match fails. this is possibly
         -- a partial case expression.
         pure $ mk_body []
       where
-      genOutOfLineCode :: Ident -> [CaseAlternative] -> Expr
-      genOutOfLineCode goto_fail rem_alternatives =
+      genOutOfLineCode :: Ident -> Expr -> Expr
+      genOutOfLineCode goto_fail ool_code =
         Let [
           ValueDeclaration goto_fail Private [NullBinder]
-            [MkUnguarded (Case scrut rem_alternatives)]
+            [MkUnguarded ool_code]
         ] (mk_body alt_fail)
         where
           goto = Var (Qualified Nothing goto_fail)
             `App` Literal (BooleanLiteral True)
           alt_fail = [CaseAlternative [NullBinder] [MkUnguarded goto]]
 
+    scrut_nullbinder :: [Binder]
+    scrut_nullbinder = replicate (length scrut) NullBinder
+
   in do
     alts' <- desugarAlternatives alternatives
     pure $ case alts' of
-      [CaseAlternative [NullBinder] [MkUnguarded v]]
+      [CaseAlternative vb [MkUnguarded v]]
+        | vb == scrut_nullbinder
         -> v
-      _
-        -> Case scrut alts'
+      _ -> Case scrut alts'
 
 desugarCase v = pure v
 
