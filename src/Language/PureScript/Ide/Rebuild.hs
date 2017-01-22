@@ -15,6 +15,7 @@ import qualified Data.Set                        as S
 import qualified Language.PureScript             as P
 import           Language.PureScript.Errors.JSON
 import           Language.PureScript.Ide.Error
+import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
 import           System.IO.UTF8                  (readUTF8FileT)
@@ -51,7 +52,7 @@ rebuildFile path = do
 
   -- Externs files must be sorted ahead of time, so that they get applied
   -- correctly to the 'Environment'.
-  externs <- sortExterns m =<< getExternFiles
+  externs <- logPerf (labelTimespec "Sorting externs") (sortExterns m =<< getExternFiles)
 
   outputDirectory <- confOutputPath . ideConfiguration <$> ask
 
@@ -62,25 +63,28 @@ rebuildFile path = do
 
   let makeEnv = MakeActionsEnv outputDirectory filePathMap foreigns False
   -- Rebuild the single module using the cached externs
-  (result, warnings) <- liftIO
+  (result, warnings) <- logPerf (labelTimespec "Rebuilding Module") $
+    liftIO
     . P.runMake P.defaultOptions
     . P.rebuildModule (buildMakeActions
                         >>= shushProgress $ makeEnv) externs $ m
   case result of
     Left errors -> throwError (RebuildError (toJSONErrors False P.Error errors))
     Right _ -> do
-      rebuildModuleOpen makeEnv externs m
+      env <- ask
+      let ll = confLogLevel (ideConfiguration env)
+      _ <- liftIO (async (runLogger ll (runReaderT  (rebuildModuleOpen makeEnv externs m) env)))
       pure (RebuildSuccess (toJSONErrors False P.Warning warnings))
 
 -- | Rebuilds a module but opens up its export list first and stores the result
 -- inside the rebuild cache
 rebuildModuleOpen
-  :: (Ide m, MonadLogger m, MonadError PscIdeError m)
+  :: (Ide m, MonadLogger m)
   => MakeActionsEnv
   -> [P.ExternsFile]
   -> P.Module
   -> m ()
-rebuildModuleOpen makeEnv externs m = do
+rebuildModuleOpen makeEnv externs m = void $ runExceptT $ do
   (openResult, _) <- liftIO
     . P.runMake P.defaultOptions
     . P.rebuildModule (buildMakeActions
