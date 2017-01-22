@@ -30,6 +30,7 @@ module Language.PureScript.Ide.State
   , populateStage3STM
   -- for tests
   , resolveOperatorsForModule
+  , resolveInstances
   ) where
 
 import           Protolude
@@ -206,7 +207,8 @@ populateStage3STM ref = do
   externs <- s1Externs <$> getStage1STM ref
   (AstData asts) <- s2AstData <$> getStage2STM ref
   let (modules, reexportRefs) = (map fst &&& map snd) (Map.map convertExterns externs)
-      results = resolveLocations asts modules
+      results =
+        resolveLocations asts modules
         & resolveInstances externs
         & resolveOperators
         & resolveReexports reexportRefs
