@@ -4,6 +4,7 @@ module Language.PureScript.Ide.Logging
        ( runLogger
        , logPerf
        , displayTimeSpec
+       , labelTimespec
        ) where
 
 import           Protolude
@@ -23,6 +24,9 @@ runLogger logLevel' =
                                          LogNone -> False
                                          LogDebug -> not (logLevel == LevelOther "perf")
                                          LogPerf -> logLevel == LevelOther "perf")
+
+labelTimespec :: Text -> TimeSpec -> Text
+labelTimespec label duration = label <> ": " <> displayTimeSpec duration
 
 logPerf :: (MonadIO m, MonadLogger m) => (TimeSpec -> Text) -> m t -> m t
 logPerf format f = do
