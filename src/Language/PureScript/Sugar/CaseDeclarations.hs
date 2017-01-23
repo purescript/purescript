@@ -169,7 +169,11 @@ desugarCase (Case scrut alternatives) =
     desugarGuard (PatternGuard vb g : gs) e match_failed =
       Case [g]
         (CaseAlternative [vb] [MkUnguarded (desugarGuard gs e match_failed)]
-          : match_failed)
+          : match_failed')
+      where
+        -- don't consider match_failed case if the binder is irrefutable
+        match_failed' | isIrrefutable vb = []
+                      | otherwise        = match_failed
 
     -- we generate a let-binding for the remaining guards
     -- and alternatives. A CaseAlternative is passed (or in
