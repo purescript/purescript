@@ -24,6 +24,7 @@ module Language.PureScript.Ide.Reexports
 
 import           Protolude
 
+import           Control.Lens                  hiding ((&))
 import qualified Data.Map                      as Map
 import qualified Language.PureScript           as P
 import           Language.PureScript.Ide.Types
@@ -89,7 +90,7 @@ resolveRef
   -> Either P.DeclarationRef [IdeDeclarationAnn]
 resolveRef decls ref = case ref of
   P.TypeRef tn mdtors ->
-    case findRef (lensSatisfies (_IdeDeclType . ideTypeName) (== tn)) of
+    case findRef (anyOf (_IdeDeclType . ideTypeName) (== tn)) of
       Nothing -> Left ref
       Just d -> Right $ d : case mdtors of
           Nothing ->
@@ -99,13 +100,13 @@ resolveRef decls ref = case ref of
             findDtors tn
           Just dtors -> mapMaybe lookupDtor dtors
   P.ValueRef i ->
-    findWrapped (lensSatisfies (_IdeDeclValue . ideValueIdent) (== i))
+    findWrapped (anyOf (_IdeDeclValue . ideValueIdent) (== i))
   P.ValueOpRef name ->
-    findWrapped (lensSatisfies (_IdeDeclValueOperator . ideValueOpName) (== name))
+    findWrapped (anyOf (_IdeDeclValueOperator . ideValueOpName) (== name))
   P.TypeOpRef name ->
-    findWrapped (lensSatisfies (_IdeDeclTypeOperator . ideTypeOpName) (== name))
+    findWrapped (anyOf (_IdeDeclTypeOperator . ideTypeOpName) (== name))
   P.TypeClassRef name ->
-    findWrapped (lensSatisfies (_IdeDeclTypeClass . ideTCName) (== name))
+    findWrapped (anyOf (_IdeDeclTypeClass . ideTCName) (== name))
   _ ->
     Left ref
   where
@@ -113,9 +114,9 @@ resolveRef decls ref = case ref of
     findRef f = find (f . discardAnn) decls
 
     lookupDtor name =
-      findRef (lensSatisfies (_IdeDeclDataConstructor . ideDtorName) (== name))
+      findRef (anyOf (_IdeDeclDataConstructor . ideDtorName) (== name))
 
-    findDtors tn = filter (lensSatisfies
+    findDtors tn = filter (anyOf
                            (idaDeclaration
                             . _IdeDeclDataConstructor
                             . ideDtorTypeName) (== tn)) decls

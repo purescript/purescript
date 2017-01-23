@@ -250,7 +250,7 @@ resolveInstances externs declarations =
     go (ideInstance, classModule, className) acc' =
       let
         matchTC =
-          lensSatisfies (idaDeclaration . _IdeDeclTypeClass . ideTCName) (== className)
+          anyOf (idaDeclaration . _IdeDeclTypeClass . ideTCName) (== className)
         updateDeclaration =
           mapIf matchTC (idaDeclaration
                          . _IdeDeclTypeClass
@@ -283,14 +283,14 @@ resolveOperatorsForModule modules = map (idaDeclaration %~ resolveOperator)
       | (P.Qualified (Just mn) (Left ident)) <- op ^. ideValueOpAlias =
           let t = getDeclarations mn
                   & mapMaybe (preview _IdeDeclValue)
-                  & filter (lensSatisfies ideValueIdent (== ident))
+                  & filter (anyOf ideValueIdent (== ident))
                   & map (view ideValueType)
                   & listToMaybe
           in IdeDeclValueOperator (op & ideValueOpType .~ t)
       | (P.Qualified (Just mn) (Right dtor)) <- op ^. ideValueOpAlias =
           let t = getDeclarations mn
                   & mapMaybe (preview _IdeDeclDataConstructor)
-                  & filter (lensSatisfies ideDtorName (== dtor))
+                  & filter (anyOf ideDtorName (== dtor))
                   & map (view ideDtorType)
                   & listToMaybe
           in IdeDeclValueOperator (op & ideValueOpType .~ t)
@@ -298,7 +298,7 @@ resolveOperatorsForModule modules = map (idaDeclaration %~ resolveOperator)
       | P.Qualified (Just mn) properName <- op ^. ideTypeOpAlias =
           let k = getDeclarations mn
                   & mapMaybe (preview _IdeDeclType)
-                  & filter (lensSatisfies ideTypeName (== properName))
+                  & filter (anyOf ideTypeName (== properName))
                   & map (view ideTypeKind)
                   & listToMaybe
           in IdeDeclTypeOperator (op & ideTypeOpKind .~ k)
