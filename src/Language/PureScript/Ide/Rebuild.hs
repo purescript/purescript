@@ -8,16 +8,19 @@ module Language.PureScript.Ide.Rebuild
 import           Protolude
 
 import           "monad-logger" Control.Monad.Logger
+import           Data.Aeson
 import qualified Data.List                       as List
 import qualified Data.Map.Lazy                   as M
 import           Data.Maybe                      (fromJust)
 import qualified Data.Set                        as S
+import qualified Data.Text                       as T
 import qualified Language.PureScript             as P
 import           Language.PureScript.Errors.JSON
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
+import           System.FilePath                 (replaceExtension)
 import           System.IO.UTF8                  (readUTF8FileT)
 
 -- | Given a filepath performs the following steps:
@@ -46,8 +49,8 @@ rebuildFile path = do
   m <- case snd <$> P.parseModuleFromFile identity (path, input) of
     Left parseError -> throwError
                        . RebuildError
-                       . toJSONErrors False P.Error
-                       $ P.MultipleErrors [P.toPositionedError parseError]
+                       . singleRebuildError
+                       $ P.toPositionedError parseError
     Right m -> pure m
 
   -- Externs files must be sorted ahead of time, so that they get applied
@@ -59,7 +62,8 @@ rebuildFile path = do
   -- For rebuilding, we want to 'RebuildAlways', but for inferring foreign
   -- modules using their file paths, we need to specify the path in the 'Map'.
   let filePathMap = M.singleton (P.getModuleName m) (Left P.RebuildAlways)
-  foreigns <- P.inferForeignModules (M.singleton (P.getModuleName m) (Right path))
+  foreigns <-
+    P.inferForeignModules (M.singleton (P.getModuleName m) (Right path))
 
   let makeEnv = MakeActionsEnv outputDirectory filePathMap foreigns False
   -- Rebuild the single module using the cached externs
@@ -69,7 +73,11 @@ rebuildFile path = do
     . P.rebuildModule (buildMakeActions
                         >>= shushProgress $ makeEnv) externs $ m
   case result of
-    Left errors -> throwError (RebuildError (toJSONErrors False P.Error errors))
+    Left errors -> do
+      diag <- diagnostics (P.runMultipleErrors errors)
+      -- for_ diag (logWarnN . prettyDiagnostics)
+      throwError
+        (RebuildError (bimap (toJSONError False P.Error) (fmap toJSON) <$> diag))
     Right _ -> do
       env <- ask
       let ll = confLogLevel (ideConfiguration env)
@@ -145,10 +153,10 @@ sortExterns m ex = do
            . M.delete (P.getModuleName m) $ ex
   case sorted' of
     Left err ->
-      throwError (RebuildError (toJSONErrors False P.Error err))
+      throwError (RebuildError ((, Nothing) <$> toJSONErrors False P.Error err))
     Right (sorted, graph) -> do
       let deps = fromJust (List.lookup (P.getModuleName m) graph)
-      pure $ mapMaybe getExtern (deps `inOrderOf` map P.getModuleName sorted)
+      pure (mapMaybe getExtern (deps `inOrderOf` map P.getModuleName sorted))
   where
     mkShallowModule P.ExternsFile{..} =
       P.Module (P.internalModuleSourceSpan "<rebuild>") [] efModuleName (map mkImport efImports) Nothing
@@ -162,3 +170,63 @@ sortExterns m ex = do
 -- | Removes a modules export list.
 openModuleExports :: P.Module -> P.Module
 openModuleExports (P.Module ss cs mn decls _) = P.Module ss cs mn decls Nothing
+
+data Diagnostics
+  = NotCompiledYet P.ModuleName
+  | CreateFFIFile FilePath
+  | TypeSearchResult Text P.Type [(P.Qualified P.Ident, P.Type)]
+  deriving (Show)
+
+instance ToJSON Diagnostics where
+  toJSON d = case d of
+    NotCompiledYet mn -> toJSON $
+      "Couldn't find an ExternsFile for "
+      <> P.runModuleName mn
+      <> " it does show up as a parsed module though, "
+      <> "did you try to fully compile the project yet?"
+    CreateFFIFile fp -> toJSON $
+      "A new FFI file needs to be created at: " <> T.pack fp
+    TypeSearchResult label type' matches ->
+      object [ "label" .= label
+             , "type" .= P.prettyPrintType type'
+             , "matches" .= map go matches
+             ]
+        where
+          go (ident, t) = object [ "module" .= maybe "" P.runModuleName (P.getQual ident)
+                                 , "ident" .= P.runIdent (P.disqualify ident)
+                                 , "type" .= P.prettyPrintType t
+                                 ]
+
+pattern UnknownModule :: P.ModuleName -> P.SimpleErrorMessage
+pattern UnknownModule mn = P.UnknownName (P.Qualified Nothing (P.ModName mn))
+
+diagnostics
+  :: (Ide m, MonadLogger m)
+  => [P.ErrorMessage]
+  -> m [(P.ErrorMessage, Maybe Diagnostics)]
+diagnostics errs = do
+  diags <- traverse f errs
+  pure (zip errs diags)
+  where
+    f (P.ErrorMessage _ err) = case err of
+      UnknownModule mn -> do
+        -- Unknown module was imported. Check whether a module with the given
+        -- name exists in the parsed source ASTs. If it does, this most likely
+        -- means the module wasn't compiled yet and so psc-ide didn't pick up
+        -- its Externsfile.
+        modules <- s1Modules <$> getStage1
+        pure (mn `M.lookup` modules $> NotCompiledYet mn)
+      P.HoleInferredType label type' _ (P.TSAfter matches) ->
+        pure (Just (TypeSearchResult label type' matches))
+      P.MissingFFIModule mn -> do
+        modules <- s1Modules <$> getStage1
+        case M.lookup mn modules of
+          Nothing -> do
+            logErrorN "Didn't find module that supposedly needs a new FFI file."
+            pure Nothing
+          Just (_, fp) ->
+            pure (Just (CreateFFIFile (replaceExtension fp "js")))
+      _ -> pure Nothing
+
+singleRebuildError :: P.ErrorMessage -> [(JSONError, Maybe a)]
+singleRebuildError = pure . (, Nothing) . toJSONError False P.Error

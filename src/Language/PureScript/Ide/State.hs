@@ -25,6 +25,7 @@ module Language.PureScript.Ide.State
   , insertModule
   , insertExternsSTM
   , getAllModules
+  , getStage1
   , populateStage2
   , populateStage3
   , populateStage3STM
