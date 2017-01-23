@@ -3,8 +3,6 @@ module Language.PureScript.Traversals where
 
 import Prelude.Compat
 
-import Control.Monad.State
-
 fstM :: (Functor f) => (a -> f c) -> (a, b) -> f (c, b)
 fstM f (a, b) = flip (,) b <$> f a
 
@@ -27,6 +25,3 @@ eitherM _ g (Right b) = Right <$> g b
 
 defS :: (Monad m) => st -> val -> m (st, val)
 defS s val = return (s, val)
-
-mapAccumM :: (Monad m, Traversable t) => (a -> b -> m (c, a)) -> a -> t b -> m (t c)
-mapAccumM f = flip (evalStateT . (traverse (StateT . (flip f))))

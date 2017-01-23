@@ -9,7 +9,7 @@ module Language.PureScript.CodeGen.JS
 
 import Prelude.Compat
 
-import Control.Arrow ((&&&))
+import Control.Arrow ((&&&), second)
 import Control.Monad (forM, replicateM, void)
 import Control.Monad.Except (MonadError, throwError)
 import Control.Monad.Reader (MonadReader, asks)
@@ -36,7 +36,7 @@ import Language.PureScript.Errors (ErrorMessageHint(..), SimpleErrorMessage(..),
 import Language.PureScript.Names
 import Language.PureScript.Options
 import Language.PureScript.PSString (PSString, mkString)
-import Language.PureScript.Traversals (mapAccumM, sndM)
+import Language.PureScript.Traversals (sndM)
 import qualified Language.PureScript.Constants as C
 
 import System.FilePath.Posix ((</>))
@@ -354,19 +354,21 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
       valueError s _                        = accessorString "name" . accessorString "constructor" $ JSVar Nothing s
 
       guardsToJs :: Either [(Guard Ann, Expr Ann)] (Expr Ann) -> m [JS]
-      guardsToJs (Left gs) = mapAccumM (\x (c, v) -> genCondVal x c v) False gs
+      guardsToJs (Left gs) = snd <$> F.foldrM genGuard (False, []) gs
         where
-          -- after genCondVal encounterd a guard which is always true
-          -- it stops generating code for the rest of the guards.
-          genCondVal False cond val
-              | condIsTrue cond = do
-                  js <- JSReturn Nothing <$> valueToJs val
-                  return (js, True)
-              | otherwise = do
-                  cond' <- valueToJs cond
-                  val'  <- valueToJs val
-                  return $ (JSIfElse Nothing cond' (JSBlock Nothing [JSReturn Nothing val']) Nothing, False)
-          genCondVal True _ _ = return $ (JSRaw Nothing "", True)
+          genGuard (cond, val) (False, js) = second (: js) <$> genCondVal cond val
+          genGuard _ x = pure x
+
+          genCondVal cond val
+            | condIsTrue cond = do
+                js <- JSReturn Nothing <$> valueToJs val
+                return (True, js)
+            | otherwise = do
+                cond' <- valueToJs cond
+                val'   <- valueToJs val
+                return
+                  (False, JSIfElse Nothing cond'
+                    (JSBlock Nothing [JSReturn Nothing val']) Nothing)
 
           -- hopefully the inliner did its job and inlined `otherwise`
           condIsTrue (Literal _ (BooleanLiteral True)) = True
