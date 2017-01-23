@@ -13,6 +13,7 @@ import           Language.PureScript.Ide.Types
 import           Protolude
 import           System.Directory
 import           System.FilePath
+import           System.Process
 
 import qualified Language.PureScript             as P
 
@@ -26,8 +27,8 @@ defConfig =
 runIde' :: Configuration -> IdeState -> [Command] -> IO ([Either PscIdeError Success], IdeState)
 runIde' conf s cs = do
   stateVar <- newTVarIO s
-  let env = IdeEnvironment {ideStateVar = stateVar, ideConfiguration = conf}
-  r <- runNoLoggingT (runReaderT (traverse (runExceptT . handleCommand) cs) env)
+  let env' = IdeEnvironment {ideStateVar = stateVar, ideConfiguration = conf}
+  r <- runNoLoggingT (runReaderT (traverse (runExceptT . handleCommand) cs) env')
   newState <- readTVarIO stateVar
   pure (r, newState)
 
@@ -102,9 +103,33 @@ mn = P.moduleNameFromString
 
 inProject :: IO a -> IO a
 inProject f = do
-  cwd <- getCurrentDirectory
+  cwd' <- getCurrentDirectory
   setCurrentDirectory ("." </> "tests" </> "support" </> "pscide")
   a <- f
-  setCurrentDirectory cwd
+  setCurrentDirectory cwd'
   pure a
 
+compileTestProject :: IO Bool
+compileTestProject = inProject $ do
+  (_, _, _, procHandle) <-
+    createProcess $ (shell $ "psc \"src/**/*.purs\"")
+  r <- tryNTimes 10 (getProcessExitCode procHandle)
+  pure (fromMaybe False (isSuccess <$> r))
+
+isSuccess :: ExitCode -> Bool
+isSuccess ExitSuccess = True
+isSuccess (ExitFailure _) = False
+
+tryNTimes :: Int -> IO (Maybe a) -> IO (Maybe a)
+tryNTimes 0 _ = pure Nothing
+tryNTimes n action = do
+  r <- action
+  case r of
+    Nothing -> do
+      threadDelay 500000
+      tryNTimes (n - 1) action
+    Just a -> pure (Just a)
+
+deleteOutputFolder :: IO ()
+deleteOutputFolder = inProject $
+  whenM (doesDirectoryExist "output") (removeDirectoryRecursive "output")

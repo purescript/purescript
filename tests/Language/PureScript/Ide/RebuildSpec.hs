@@ -4,19 +4,12 @@ module Language.PureScript.Ide.RebuildSpec where
 
 import           Protolude
 
-import qualified Language.PureScript.Ide.Integration as Integration
 import           Language.PureScript.Ide.Command
 import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Types
 import qualified Language.PureScript.Ide.Test as Test
 import           System.FilePath
 import           Test.Hspec
-
-shouldBeSuccess :: Text -> IO ()
-shouldBeSuccess = shouldBe True . Integration.resultIsSuccess
-
-shouldBeFailure :: Text -> IO ()
-shouldBeFailure = shouldBe False . Integration.resultIsSuccess
 
 load :: [Text] -> Command
 load = Load . map Test.mn
