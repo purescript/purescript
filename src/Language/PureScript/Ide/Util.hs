@@ -70,7 +70,7 @@ completionFromMatch (Match (m, IdeDeclarationAnn ann decl)) =
     (complIdentifier, complExpandedType) = case decl of
       IdeDeclValue v -> (v ^. ideValueIdent . identT, v ^. ideValueType & prettyTypeT)
       IdeDeclType t -> (t ^. ideTypeName . properNameT, t ^. ideTypeKind & P.prettyPrintKind)
-      IdeDeclTypeSynonym s -> (s ^. ideSynonymName . properNameT, s ^. ideSynonymType & prettyTypeT)
+      IdeDeclSynonym s -> (s ^. ideSynonymName . properNameT, s ^. ideSynonymType & prettyTypeT)
       IdeDeclDataConstructor d -> (d ^. ideDtorName . properNameT, d ^. ideDtorType & prettyTypeT)
       IdeDeclTypeClass d -> (d ^. ideTCName . properNameT, "type class")
       IdeDeclValueOperator (IdeValueOperator op ref precedence associativity typeP) ->

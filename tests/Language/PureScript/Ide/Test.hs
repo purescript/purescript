@@ -60,7 +60,7 @@ ideSynonym :: Text -> P.Type -> IdeDeclarationAnn
 ideSynonym pn ty = IdeDeclarationAnn emptyAnn (IdeDeclSynonym (IdeSynonym (P.ProperName pn) ty))
 
 ideTypeClass :: Text -> IdeDeclarationAnn
-ideTypeClass pn = IdeDeclarationAnn emptyAnn (IdeDeclTypeClass (P.ProperName pn))
+ideTypeClass pn = IdeDeclarationAnn emptyAnn (IdeDeclTypeClass (IdeTypeClass (P.ProperName pn) []))
 
 ideDtor :: Text -> Text -> Maybe P.Type -> IdeDeclarationAnn
 ideDtor pn tn ty = IdeDeclarationAnn emptyAnn (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName pn) (P.ProperName tn) (fromMaybe P.tyString ty)))

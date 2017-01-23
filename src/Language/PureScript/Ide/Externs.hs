@@ -73,7 +73,7 @@ removeTypeDeclarationsForClass :: IdeDeclaration -> Endo [IdeDeclaration]
 removeTypeDeclarationsForClass (IdeDeclTypeClass n) = Endo (filter notDuplicate)
   where notDuplicate (IdeDeclType t) =
           n ^. ideTCName . properNameT /= t ^. ideTypeName . properNameT
-        notDuplicate (IdeDeclTypeSynonym s) =
+        notDuplicate (IdeDeclSynonym s) =
           n ^. ideTCName . properNameT /= s ^. ideSynonymName . properNameT
         notDuplicate _ = True
 removeTypeDeclarationsForClass _ = mempty
