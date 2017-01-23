@@ -12,10 +12,13 @@ import           System.FilePath
 import           Test.Hspec
 
 load :: [Text] -> Command
-load = Load . map Test.mn
+load = LoadSync . map Test.mn
 
 rebuild :: FilePath -> Command
-rebuild = Rebuild . ("src" </>)
+rebuild fp = Rebuild ("src" </> fp) True
+
+rebuildSync :: FilePath -> Command
+rebuildSync fp = Rebuild ("src" </> fp) False
 
 spec :: Spec
 spec = describe "Rebuilding single modules" $ do
@@ -53,6 +56,6 @@ spec = describe "Rebuilding single modules" $ do
       result `shouldSatisfy` isLeft
     it "completes a hidden identifier after rebuilding" $ do
       ([_, (Right (CompletionResult [ result ]))], _) <- Test.inProject $
-        Test.runIde [ rebuild "RebuildSpecWithHiddenIdent.purs"
+        Test.runIde [ rebuildSync "RebuildSpecWithHiddenIdent.purs"
                     , Complete [] (flexMatcher "hid") (Just (Test.mn "RebuildSpecWithHiddenIdent"))]
       complIdentifier result `shouldBe` "hidden"

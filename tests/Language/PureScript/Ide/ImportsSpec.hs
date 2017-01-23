@@ -192,7 +192,7 @@ importShouldBe res importSection =
 
 runIdeLoaded :: Command -> IO (Either PscIdeError Success)
 runIdeLoaded c = do
-  ([_, result], _) <- Test.inProject $ Test.runIde [Command.Load [] , c]
+  ([_, result], _) <- Test.inProject $ Test.runIde [Command.LoadSync [] , c]
   pure result
 
 importFromIdeState :: Spec

@@ -38,8 +38,10 @@ import           System.IO.UTF8                  (readUTF8FileT)
 rebuildFile
   :: (Ide m, MonadLogger m, MonadError PscIdeError m)
   => FilePath
+  -> Bool
+  -- ^ Whether the open rebuild is async
   -> m Success
-rebuildFile path = do
+rebuildFile path isAsync = do
 
   input <- liftIO (readUTF8FileT path)
 
@@ -70,11 +72,16 @@ rebuildFile path = do
                         >>= shushProgress $ makeEnv) externs $ m
   case result of
     Left errors -> throwError (RebuildError (toJSONErrors False P.Error errors))
-    Right _ -> do
-      env <- ask
-      let ll = confLogLevel (ideConfiguration env)
-      _ <- liftIO (async (runLogger ll (runReaderT  (rebuildModuleOpen makeEnv externs m) env)))
-      pure (RebuildSuccess (toJSONErrors False P.Warning warnings))
+    Right _ ->
+      if isAsync then do
+        env <- ask
+        let ll = confLogLevel (ideConfiguration env)
+        _ <- liftIO (async (runLogger ll (runReaderT (rebuildModuleOpen makeEnv externs m) env)))
+        pure (RebuildSuccess (toJSONErrors False P.Warning warnings))
+      else do
+        rebuildModuleOpen makeEnv externs m
+        pure (RebuildSuccess (toJSONErrors False P.Warning warnings))
+
 
 -- | Rebuilds a module but opens up its export list first and stores the result
 -- inside the rebuild cache

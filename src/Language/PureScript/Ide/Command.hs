@@ -25,6 +25,7 @@ import           Language.PureScript.Ide.Types
 
 data Command
     = Load [P.ModuleName]
+    | LoadSync [P.ModuleName] -- used in tests
     | Type
       { typeSearch        :: Text
       , typeFilters       :: [Filter]
@@ -53,7 +54,7 @@ data Command
       -- Import InputFile OutputFile
     | Import FilePath (Maybe FilePath) [Filter] ImportCommand
     | List { listType :: ListType }
-    | Rebuild FilePath -- ^ Rebuild the specified file using the loaded externs
+    | Rebuild FilePath Bool -- ^ Rebuild the specified file using the loaded externs
     | Cwd
     | Reset
     | Quit
@@ -61,6 +62,7 @@ data Command
 commandName :: Command -> Text
 commandName c = case c of
   Load{} -> "Load"
+  LoadSync{} -> "LoadSync"
   Type{} -> "Type"
   Complete{} -> "Complete"
   Pursuit{} -> "Pursuit"
@@ -154,6 +156,7 @@ instance FromJSON Command where
         params <- o .: "params"
         Rebuild
           <$> params .: "file"
+          <*> pure True
       _ -> mzero
     where
       mkAnnotations True = explicitAnnotations

@@ -10,5 +10,4 @@ main = do
   deleteOutputFolder
   s <- compileTestProject
   unless s (fail "Failed to compile .purs sources")
-
   hspec PscIdeSpec.spec
