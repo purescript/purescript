@@ -542,6 +542,7 @@ test-suite tests
                    hspec -any,
                    hspec-discover -any,
                    HUnit -any,
+                   lens -any,
                    mtl -any,
                    optparse-applicative -any,
                    parsec -any,

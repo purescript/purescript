@@ -144,7 +144,7 @@ spec = do
         addImport imports import' = addExplicitImport' import' moduleName imports
         valueImport ident = (IdeDeclValue (IdeValue (P.Ident ident) wildcard))
         typeImport name = (IdeDeclType (IdeType (P.ProperName name) P.kindType))
-        classImport name = (IdeDeclTypeClass (P.ProperName name))
+        classImport name = (IdeDeclTypeClass (IdeTypeClass (P.ProperName name) []))
         dtorImport name typeName = (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName name) (P.ProperName typeName) wildcard))
         -- expect any list of provided identifiers, when imported, to come out as specified
         expectSorted imports expected = shouldBe

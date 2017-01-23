@@ -103,8 +103,8 @@ rebuildModuleOpen makeEnv externs m = void $ runExceptT $ do
 data MakeActionsEnv =
   MakeActionsEnv
   { maeOutputDirectory :: FilePath
-  , maeFilePathMap     :: Map P.ModuleName (Either P.RebuildPolicy FilePath)
-  , maeForeignPathMap  :: Map P.ModuleName FilePath
+  , maeFilePathMap     :: ModuleMap (Either P.RebuildPolicy FilePath)
+  , maeForeignPathMap  :: ModuleMap FilePath
   , maePrefixComment   :: Bool
   }
 
@@ -134,7 +134,7 @@ shushCodegen ma MakeActionsEnv{..} =
 sortExterns
   :: (Ide m, MonadError PscIdeError m)
   => P.Module
-  -> Map P.ModuleName P.ExternsFile
+  -> ModuleMap P.ExternsFile
   -> m [P.ExternsFile]
 sortExterns m ex = do
   sorted' <- runExceptT

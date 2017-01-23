@@ -27,15 +27,17 @@ module Language.PureScript.Ide.Util
   , prettyTypeT
   , properNameT
   , identT
+  , lensSatisfies
   , module Language.PureScript.Ide.Logging
   ) where
 
 import           Protolude                           hiding (decodeUtf8,
                                                       encodeUtf8)
 
-import           Control.Lens                        ((^.), Iso', iso)
+import           Control.Lens                        ((^.), (^?), Iso', iso, Getting, (<&>))
 import           Data.Aeson
 import qualified Data.Text                           as T
+import qualified Data.Text.Lazy                      as TL
 import           Data.Text.Lazy.Encoding             (decodeUtf8, encodeUtf8)
 import qualified Language.PureScript                 as P
 import           Language.PureScript.Ide.Logging
@@ -47,7 +49,7 @@ identifierFromIdeDeclaration d = case d of
   IdeDeclType t -> t ^. ideTypeName . properNameT
   IdeDeclTypeSynonym s -> s ^. ideSynonymName . properNameT
   IdeDeclDataConstructor dtor -> dtor ^. ideDtorName . properNameT
-  IdeDeclTypeClass name -> P.runProperName name
+  IdeDeclTypeClass tc -> tc ^. ideTCName . properNameT
   IdeDeclValueOperator op -> op ^. ideValueOpName & P.runOpName
   IdeDeclTypeOperator op -> op ^. ideTypeOpName & P.runOpName
   IdeDeclKind name -> P.runProperName name
@@ -67,14 +69,14 @@ completionFromMatch (Match (m, IdeDeclarationAnn ann decl)) =
   where
     (complIdentifier, complExpandedType) = case decl of
       IdeDeclValue v -> (v ^. ideValueIdent . identT, v ^. ideValueType & prettyTypeT)
-      IdeDeclType t -> (t ^. ideTypeName . properNameT, t ^. ideTypeKind & P.prettyPrintKind & toS )
+      IdeDeclType t -> (t ^. ideTypeName . properNameT, t ^. ideTypeKind & P.prettyPrintKind)
       IdeDeclTypeSynonym s -> (s ^. ideSynonymName . properNameT, s ^. ideSynonymType & prettyTypeT)
       IdeDeclDataConstructor d -> (d ^. ideDtorName . properNameT, d ^. ideDtorType & prettyTypeT)
-      IdeDeclTypeClass name -> (P.runProperName name, "class")
+      IdeDeclTypeClass d -> (d ^. ideTCName . properNameT, "type class")
       IdeDeclValueOperator (IdeValueOperator op ref precedence associativity typeP) ->
         (P.runOpName op, maybe (showFixity precedence associativity (valueOperatorAliasT ref) op) prettyTypeT typeP)
       IdeDeclTypeOperator (IdeTypeOperator op ref precedence associativity kind) ->
-        (P.runOpName op, maybe (showFixity precedence associativity (typeOperatorAliasT ref) op) (toS . P.prettyPrintKind) kind)
+        (P.runOpName op, maybe (showFixity precedence associativity (typeOperatorAliasT ref) op) P.prettyPrintKind kind)
       IdeDeclKind k -> (P.runProperName k, "kind")
 
     complModule = P.runModuleName m
@@ -103,10 +105,10 @@ typeOperatorAliasT i =
   P.showQualified P.runProperName i
 
 encodeT :: (ToJSON a) => a -> Text
-encodeT = toS . decodeUtf8 . encode
+encodeT = TL.toStrict . decodeUtf8 . encode
 
 decodeT :: (FromJSON a) => Text -> Maybe a
-decodeT = decode . encodeUtf8 . toS
+decodeT = decode . encodeUtf8 . TL.fromStrict
 
 unwrapPositioned :: P.Declaration -> P.Declaration
 unwrapPositioned (P.PositionedDeclaration _ _ x) = unwrapPositioned x
@@ -129,3 +131,6 @@ prettyTypeT =
   . T.lines
   . T.pack
   . P.prettyPrintTypeWithUnicode
+
+lensSatisfies :: forall a s. Getting (First a) s a -> (a -> Bool) -> s -> Bool
+lensSatisfies getter predicate value = value ^? getter <&> predicate & fromMaybe False

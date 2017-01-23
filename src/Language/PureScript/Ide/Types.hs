@@ -27,13 +27,14 @@ import qualified Language.PureScript                 as P
 import qualified Language.PureScript.Errors.JSON     as P
 
 type ModuleIdent = Text
+type ModuleMap a = Map P.ModuleName a
 
 data IdeDeclaration
   = IdeDeclValue IdeValue
   | IdeDeclType IdeType
   | IdeDeclTypeSynonym IdeSynonym
   | IdeDeclDataConstructor IdeDataConstructor
-  | IdeDeclTypeClass (P.ProperName 'P.ClassName)
+  | IdeDeclTypeClass IdeTypeClass
   | IdeDeclValueOperator IdeValueOperator
   | IdeDeclTypeOperator IdeTypeOperator
   | IdeDeclKind (P.ProperName 'P.KindName)
@@ -60,6 +61,18 @@ data IdeDataConstructor = IdeDataConstructor
   , _ideDtorType     :: P.Type
   } deriving (Show, Eq, Ord)
 
+data IdeTypeClass = IdeTypeClass
+  { _ideTCName :: P.ProperName 'P.ClassName
+  , _ideTCInstances :: [IdeInstance]
+  } deriving (Show, Eq, Ord)
+
+data IdeInstance = IdeInstance
+  { _ideInstanceModule      :: P.ModuleName
+  , _ideInstanceName        :: P.Ident
+  , _ideInstanceTypes       :: [P.Type]
+  , _ideInstanceConstraints :: Maybe [P.Constraint]
+  } deriving (Show, Eq, Ord)
+
 data IdeValueOperator = IdeValueOperator
   { _ideValueOpName          :: P.OpName 'P.ValueOpName
   , _ideValueOpAlias         :: P.Qualified (Either P.Ident (P.ProperName 'P.ConstructorName))
@@ -81,6 +94,8 @@ makeLenses ''IdeValue
 makeLenses ''IdeType
 makeLenses ''IdeSynonym
 makeLenses ''IdeDataConstructor
+makeLenses ''IdeTypeClass
+makeLenses ''IdeInstance
 makeLenses ''IdeValueOperator
 makeLenses ''IdeTypeOperator
 
@@ -101,11 +116,9 @@ makeLenses ''IdeDeclarationAnn
 emptyAnn :: Annotation
 emptyAnn = Annotation Nothing Nothing Nothing
 
-type Module = (P.ModuleName, [IdeDeclarationAnn])
-
 type DefinitionSites a = Map IdeDeclNamespace a
 type TypeAnnotations = Map P.Ident P.Type
-newtype AstData a = AstData (Map P.ModuleName (DefinitionSites a, TypeAnnotations))
+newtype AstData a = AstData (ModuleMap (DefinitionSites a, TypeAnnotations))
   -- ^ SourceSpans for the definition sites of Values and Types aswell as type
   -- annotations found in a module
   deriving (Show, Eq, Ord, Functor, Foldable)
@@ -147,8 +160,8 @@ emptyStage3 :: Stage3
 emptyStage3 = Stage3 M.empty Nothing
 
 data Stage1 = Stage1
-  { s1Externs :: M.Map P.ModuleName P.ExternsFile
-  , s1Modules :: M.Map P.ModuleName (P.Module, FilePath)
+  { s1Externs :: ModuleMap P.ExternsFile
+  , s1Modules :: ModuleMap (P.Module, FilePath)
   }
 
 data Stage2 = Stage2
@@ -156,7 +169,7 @@ data Stage2 = Stage2
   }
 
 data Stage3 = Stage3
-  { s3Declarations  :: M.Map P.ModuleName [IdeDeclarationAnn]
+  { s3Declarations  :: ModuleMap [IdeDeclarationAnn]
   , s3CachedRebuild :: Maybe (P.ModuleName, P.ExternsFile)
   }
 

@@ -32,6 +32,8 @@ import           Language.PureScript.Ide.Util
 
 newtype Filter = Filter (Endo [Module]) deriving(Monoid)
 
+type Module = (P.ModuleName, [IdeDeclarationAnn])
+
 mkFilter :: ([Module] -> [Module]) -> Filter
 mkFilter = Filter . Endo
 
