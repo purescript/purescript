@@ -5,6 +5,10 @@ module Language.PureScript.Ide.RebuildSpec where
 import           Protolude
 
 import qualified Language.PureScript.Ide.Integration as Integration
+import           Language.PureScript.Ide.Command
+import           Language.PureScript.Ide.Matcher
+import           Language.PureScript.Ide.Types
+import qualified Language.PureScript.Ide.Test as Test
 import           System.FilePath
 import           Test.Hspec
 
@@ -14,44 +18,48 @@ shouldBeSuccess = shouldBe True . Integration.resultIsSuccess
 shouldBeFailure :: Text -> IO ()
 shouldBeFailure = shouldBe False . Integration.resultIsSuccess
 
+load :: [Text] -> Command
+load = Load . map Test.mn
+
+rebuild :: FilePath -> Command
+rebuild = Rebuild . ("src" </>)
+
 spec :: Spec
-spec = before_ Integration.reset . describe "Rebuilding single modules" $ do
+spec = describe "Rebuilding single modules" $ do
     it "rebuilds a correct module without dependencies successfully" $ do
-      _ <- Integration.loadModule "RebuildSpecSingleModule"
-      pdir <- Integration.projectDirectory
-      let file = pdir </> "src" </> "RebuildSpecSingleModule.purs"
-      Integration.rebuildModule file >>= shouldBeSuccess
+      ([_, result], _) <- Test.inProject $
+        Test.runIde [ load ["RebuildSpecSingleModule"]
+                    , rebuild "RebuildSpecSingleModule.purs"
+                    ]
+      result `shouldSatisfy` isRight
     it "fails to rebuild an incorrect module without dependencies and returns the errors" $ do
-      pdir <- Integration.projectDirectory
-      let file = pdir </> "src" </> "RebuildSpecSingleModule.fail"
-      Integration.rebuildModule file >>= shouldBeFailure
+      ([result], _) <- Test.inProject $
+        Test.runIde [ rebuild "RebuildSpecSingleModule.fail" ]
+      result `shouldSatisfy` isLeft
     it "rebuilds a correct module with its dependencies successfully" $ do
-      _ <- Integration.loadModules ["RebuildSpecWithDeps", "RebuildSpecDep"]
-      pdir <- Integration.projectDirectory
-      let file = pdir </> "src" </> "RebuildSpecWithDeps.purs"
-      Integration.rebuildModule file >>= shouldBeSuccess
+      ([_, result], _) <- Test.inProject $
+        Test.runIde [ load ["RebuildSpecWithDeps", "RebuildSpecDep"]
+                    , rebuild "RebuildSpecWithDeps.purs"
+                    ]
+      result `shouldSatisfy` isRight
     it "rebuilds a correct module that has reverse dependencies" $ do
-      _ <- Integration.loadModule "RebuildSpecWithDeps"
-      pdir <- Integration.projectDirectory
-      let file = pdir </> "src" </> "RebuildSpecDep.purs"
-      Integration.rebuildModule file >>= shouldBeSuccess
+      ([_, result], _) <- Test.inProject $
+        Test.runIde [ load ["RebuildSpecWithDeps"], rebuild "RebuildSpecDep.purs" ]
+      result `shouldSatisfy` isRight
     it "fails to rebuild a module if its dependencies are not loaded" $ do
-      _ <- Integration.loadModule "RebuildSpecWithDeps"
-      pdir <- Integration.projectDirectory
-      let file = pdir </> "src" </> "RebuildSpecWithDeps.purs"
-      Integration.rebuildModule file >>= shouldBeFailure
+      ([_, result], _) <- Test.inProject $
+        Test.runIde [ load ["RebuildSpecWithDeps"], rebuild "RebuildSpecWithDeps.purs" ]
+      result `shouldSatisfy` isLeft
     it "rebuilds a correct module with a foreign file" $ do
-      _ <- Integration.loadModule "RebuildSpecWithForeign"
-      pdir <- Integration.projectDirectory
-      let file = pdir </> "src" </> "RebuildSpecWithForeign.purs"
-      Integration.rebuildModule file >>= shouldBeSuccess
+      ([_, result], _) <- Test.inProject $
+        Test.runIde [ load ["RebuildSpecWithForeign"], rebuild "RebuildSpecWithForeign.purs" ]
+      result `shouldSatisfy` isRight
     it "fails to rebuild a module with a foreign import but no file" $ do
-      pdir <- Integration.projectDirectory
-      let file = pdir </> "src" </> "RebuildSpecWithMissingForeign.fail"
-      Integration.rebuildModule file >>= shouldBeFailure
+      ([result], _) <- Test.inProject $
+        Test.runIde [ rebuild "RebuildSpecWithMissingForeign.fail" ]
+      result `shouldSatisfy` isLeft
     it "completes a hidden identifier after rebuilding" $ do
-      pdir <- Integration.projectDirectory
-      let file = pdir </> "src" </> "RebuildSpecWithHiddenIdent.purs"
-      Integration.rebuildModule file >>= shouldBeSuccess
-      res <- Integration.getFlexCompletionsInModule "hid" "RebuildSpecWithHiddenIdent"
-      shouldBe False (null res)
+      ([_, (Right (CompletionResult [ result ]))], _) <- Test.inProject $
+        Test.runIde [ rebuild "RebuildSpecWithHiddenIdent.purs"
+                    , Complete [] (flexMatcher "hid") (Just (Test.mn "RebuildSpecWithHiddenIdent"))]
+      complIdentifier result `shouldBe` "hidden"

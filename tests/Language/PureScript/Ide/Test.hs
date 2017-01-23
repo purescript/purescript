@@ -11,11 +11,17 @@ import           Language.PureScript.Ide.Command
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Types
 import           Protolude
+import           System.Directory
+import           System.FilePath
 
 import qualified Language.PureScript             as P
 
 defConfig :: Configuration
-defConfig = Configuration {confLogLevel = LogNone , confOutputPath = "", confGlobs = []}
+defConfig =
+  Configuration { confLogLevel = LogNone
+                , confOutputPath = "output/"
+                , confGlobs = ["src/*.purs"]
+                }
 
 runIde' :: Configuration -> IdeState -> [Command] -> IO ([Either PscIdeError Success], IdeState)
 runIde' conf s cs = do
@@ -90,3 +96,15 @@ ideTypeOp opName ident precedence assoc k =
 
 ideKind :: Text -> IdeDeclarationAnn
 ideKind pn = ida (IdeDeclKind (P.ProperName pn))
+
+mn :: Text -> P.ModuleName
+mn = P.moduleNameFromString
+
+inProject :: IO a -> IO a
+inProject f = do
+  cwd <- getCurrentDirectory
+  setCurrentDirectory ("." </> "tests" </> "support" </> "pscide")
+  a <- f
+  setCurrentDirectory cwd
+  pure a
+

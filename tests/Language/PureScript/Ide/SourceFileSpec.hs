@@ -82,7 +82,7 @@ getLocation s = do
          , ideDtor "SFOne" "SFData" Nothing `annLoc` typeSS
          , ideDtor "SFTwo" "SFData" Nothing `annLoc` typeSS
          , ideDtor "SFThree" "SFData" Nothing `annLoc` typeSS
-         , ideTypeClass "SFClass" `annLoc` classSS
+         , ideTypeClass "SFClass" [] `annLoc` classSS
          ])
       ]
 
