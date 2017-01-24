@@ -32,7 +32,7 @@ type ModuleMap a = Map P.ModuleName a
 data IdeDeclaration
   = IdeDeclValue IdeValue
   | IdeDeclType IdeType
-  | IdeDeclTypeSynonym IdeSynonym
+  | IdeDeclTypeSynonym IdeTypeSynonym
   | IdeDeclDataConstructor IdeDataConstructor
   | IdeDeclTypeClass IdeTypeClass
   | IdeDeclValueOperator IdeValueOperator
@@ -50,7 +50,7 @@ data IdeType = IdeType
  , _ideTypeKind :: P.Kind
  } deriving (Show, Eq, Ord)
 
-data IdeSynonym = IdeSynonym
+data IdeTypeSynonym = IdeTypeSynonym
   { _ideSynonymName :: P.ProperName 'P.TypeName
   , _ideSynonymType :: P.Type
   } deriving (Show, Eq, Ord)
@@ -92,7 +92,7 @@ data IdeTypeOperator = IdeTypeOperator
 makePrisms ''IdeDeclaration
 makeLenses ''IdeValue
 makeLenses ''IdeType
-makeLenses ''IdeSynonym
+makeLenses ''IdeTypeSynonym
 makeLenses ''IdeDataConstructor
 makeLenses ''IdeTypeClass
 makeLenses ''IdeInstance

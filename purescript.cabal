@@ -496,7 +496,6 @@ executable psc-ide-server
                        aeson >= 0.8 && < 1.0,
                        bytestring -any,
                        purescript -any,
-                       base-compat >=0.6.0,
                        directory -any,
                        filepath -any,
                        monad-logger -any,
@@ -506,8 +505,7 @@ executable psc-ide-server
                        protolude >= 0.1.6,
                        stm -any,
                        text -any,
-                       transformers -any,
-                       transformers-compat -any
+                       transformers -any
   ghc-options:         -Wall -O2 -threaded
   hs-source-dirs:      psc-ide-server
 
@@ -543,6 +541,7 @@ test-suite tests
                    hspec-discover -any,
                    HUnit -any,
                    lens -any,
+                   monad-logger -any,
                    mtl -any,
                    optparse-applicative -any,
                    parsec -any,
@@ -567,14 +566,12 @@ test-suite tests
                    TestPsci
                    TestPscIde
                    PscIdeSpec
+                   Language.PureScript.Ide.Test
                    Language.PureScript.Ide.FilterSpec
                    Language.PureScript.Ide.ImportsSpec
-                   Language.PureScript.Ide.Imports.IntegrationSpec
-                   Language.PureScript.Ide.Integration
                    Language.PureScript.Ide.MatcherSpec
                    Language.PureScript.Ide.RebuildSpec
                    Language.PureScript.Ide.ReexportsSpec
-                   Language.PureScript.Ide.SourceFile.IntegrationSpec
                    Language.PureScript.Ide.SourceFileSpec
                    Language.PureScript.Ide.StateSpec
     buildable: True

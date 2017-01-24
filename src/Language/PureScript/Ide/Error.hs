@@ -29,6 +29,7 @@ data PscIdeError
     | ModuleFileNotFound ModuleIdent
     | ParseError P.ParseError Text
     | RebuildError [JSONError]
+    deriving (Show, Eq)
 
 instance ToJSON PscIdeError where
   toJSON (RebuildError errs) = object

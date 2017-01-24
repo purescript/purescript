@@ -90,7 +90,7 @@ convertDecl :: P.ExternsDeclaration -> Maybe IdeDeclaration
 convertDecl P.EDType{..} = Just $ IdeDeclType $
   IdeType edTypeName edTypeKind
 convertDecl P.EDTypeSynonym{..} = Just $ IdeDeclTypeSynonym
-  (IdeSynonym edTypeSynonymName edTypeSynonymType)
+  (IdeTypeSynonym edTypeSynonymName edTypeSynonymType)
 convertDecl P.EDDataConstructor{..} = Just $ IdeDeclDataConstructor $
   IdeDataConstructor edDataCtorName edDataCtorTypeCtor edDataCtorType
 convertDecl P.EDValue{..} = Just $ IdeDeclValue $

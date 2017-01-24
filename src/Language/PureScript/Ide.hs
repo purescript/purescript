@@ -47,9 +47,13 @@ handleCommand :: (Ide m, MonadLogger m, MonadError PscIdeError m) =>
                  Command -> m Success
 handleCommand c = case c of
   Load [] ->
-    findAvailableExterns >>= loadModules
+    findAvailableExterns >>= loadModulesAsync
   Load modules ->
-    loadModules modules
+    loadModulesAsync modules
+  LoadSync [] ->
+    findAvailableExterns >>= loadModulesSync
+  LoadSync modules ->
+    loadModulesSync modules
   Type search filters currentModule ->
     findType search filters currentModule
   Complete filters matcher currentModule ->
@@ -78,7 +82,9 @@ handleCommand c = case c of
       Left question ->
         pure (CompletionResult (map (completionFromMatch . map withEmptyAnn) question))
   Rebuild file ->
-    rebuildFile file
+    rebuildFileAsync file
+  RebuildSync file ->
+    rebuildFileSync file
   Cwd ->
     TextResult . toS <$> liftIO getCurrentDirectory
   Reset ->
@@ -162,6 +168,31 @@ findAllSourceFiles = do
 -- server state. Then proceeds to parse all the specified sourcefiles and
 -- inserts their ASTs into the state. Finally kicks off an async worker, which
 -- populates Stage 2 and 3 of the state.
+loadModulesAsync
+  :: (Ide m, MonadError PscIdeError m, MonadLogger m)
+  => [P.ModuleName]
+  -> m Success
+loadModulesAsync moduleNames = do
+  tr <- loadModules moduleNames
+
+  -- Finally we kick off the worker with @async@ and return the number of
+  -- successfully parsed modules.
+  env <- ask
+  let ll = confLogLevel (ideConfiguration env)
+  -- populateStage2 and 3 return Unit for now, so it's fine to discard this
+  -- result. We might want to block on this in a benchmarking situation.
+  _ <- liftIO (async (runLogger ll (runReaderT (populateStage2 *> populateStage3) env)))
+  pure tr
+
+loadModulesSync
+  :: (Ide m, MonadError PscIdeError m, MonadLogger m)
+  => [P.ModuleName]
+  -> m Success
+loadModulesSync moduleNames = do
+  tr <- loadModules moduleNames
+  populateStage2 *> populateStage3
+  pure tr
+
 loadModules
   :: (Ide m, MonadError PscIdeError m, MonadLogger m)
   => [P.ModuleName]
@@ -182,12 +213,5 @@ loadModules moduleNames = do
     $(logWarn) ("Failed to parse: " <> show failures)
   traverse_ insertModule allModules
 
-  -- Finally we kick off the worker with @async@ and return the number of
-  -- successfully parsed modules.
-  env <- ask
-  let ll = confLogLevel (ideConfiguration env)
-  -- populateStage2 and 3 return Unit for now, so it's fine to discard this
-  -- result. We might want to block on this in a benchmarking situation.
-  _ <- liftIO (async (runLogger ll (runReaderT (populateStage2 *> populateStage3) env)))
   pure (TextResult ("Loaded " <> show (length efiles) <> " modules and "
                     <> show (length allModules) <> " source files."))

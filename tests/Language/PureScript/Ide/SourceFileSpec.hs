@@ -5,8 +5,10 @@ module Language.PureScript.Ide.SourceFileSpec where
 import           Protolude
 
 import qualified Language.PureScript as P
+import           Language.PureScript.Ide.Command
 import           Language.PureScript.Ide.SourceFile
 import           Language.PureScript.Ide.Types
+import           Language.PureScript.Ide.Test
 import           Test.Hspec
 
 span0, span1, span2 :: P.SourceSpan
@@ -52,3 +54,43 @@ spec = do
   describe "Type annotations" $ do
     it "extracts a type annotation" $
       extractTypeAnnotations [typeAnnotation1] `shouldBe` [(P.Ident "value1", P.REmpty)]
+  describe "Finding Source Spans for identifiers" $ do
+    it "finds a value declaration" $ do
+      Just r <- getLocation "sfValue"
+      r `shouldBe` valueSS
+    it "finds a synonym declaration" $ do
+      Just r <- getLocation "SFType"
+      r `shouldBe` synonymSS
+    it "finds a data declaration and its constructors" $ do
+      rs <- traverse getLocation ["SFData", "SFOne", "SFTwo", "SFThree"]
+      traverse_ (`shouldBe` (Just typeSS)) rs
+    it "finds a class declaration" $ do
+      Just r <- getLocation "SFClass"
+      r `shouldBe` classSS
+
+getLocation :: Text -> IO (Maybe P.SourceSpan)
+getLocation s = do
+  ([Right (CompletionResult [c])], _) <-
+    runIde' defConfig ideState [Type s [] Nothing]
+  pure (complLocation c)
+  where
+    ideState = emptyIdeState `s3`
+      [ ("Test",
+         [ ideValue "sfValue" Nothing `annLoc` valueSS
+         , ideSynonym "SFType" P.tyString `annLoc` synonymSS
+         , ideType "SFData" Nothing `annLoc` typeSS
+         , ideDtor "SFOne" "SFData" Nothing `annLoc` typeSS
+         , ideDtor "SFTwo" "SFData" Nothing `annLoc` typeSS
+         , ideDtor "SFThree" "SFData" Nothing `annLoc` typeSS
+         , ideTypeClass "SFClass" [] `annLoc` classSS
+         ])
+      ]
+
+valueSS, synonymSS, typeSS, classSS :: P.SourceSpan
+valueSS = ss 3 1
+synonymSS = ss 5 1
+typeSS = ss 7 1
+classSS = ss 8 1
+
+ss :: Int -> Int -> P.SourceSpan
+ss x y = P.SourceSpan "Test.purs" (P.SourcePos x y) (P.SourcePos x y)

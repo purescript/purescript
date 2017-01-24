@@ -2,7 +2,9 @@
 {-# LANGUAGE TemplateHaskell       #-}
 
 module Language.PureScript.Ide.Rebuild
-  ( rebuildFile
+  ( rebuildFileSync
+  , rebuildFileAsync
+  , rebuildFile
   ) where
 
 import           Protolude
@@ -38,8 +40,11 @@ import           System.IO.UTF8                  (readUTF8FileT)
 rebuildFile
   :: (Ide m, MonadLogger m, MonadError PscIdeError m)
   => FilePath
+  -- ^ The file to rebuild
+  -> (ReaderT IdeEnvironment (LoggingT IO) () -> m ())
+  -- ^ A runner for the second build with open exports
   -> m Success
-rebuildFile path = do
+rebuildFile path runOpenBuild = do
 
   input <- liftIO (readUTF8FileT path)
 
@@ -71,10 +76,31 @@ rebuildFile path = do
   case result of
     Left errors -> throwError (RebuildError (toJSONErrors False P.Error errors))
     Right _ -> do
-      env <- ask
-      let ll = confLogLevel (ideConfiguration env)
-      _ <- liftIO (async (runLogger ll (runReaderT  (rebuildModuleOpen makeEnv externs m) env)))
+      runOpenBuild (rebuildModuleOpen makeEnv externs m)
       pure (RebuildSuccess (toJSONErrors False P.Warning warnings))
+
+rebuildFileAsync
+  :: forall m. (Ide m, MonadLogger m, MonadError PscIdeError m)
+  => FilePath -> m Success
+rebuildFileAsync fp = rebuildFile fp asyncRun
+  where
+    asyncRun :: ReaderT IdeEnvironment (LoggingT IO) () -> m ()
+    asyncRun action = do
+        env <- ask
+        let ll = confLogLevel (ideConfiguration env)
+        void (liftIO (async (runLogger ll (runReaderT action env))))
+
+rebuildFileSync
+  :: forall m. (Ide m, MonadLogger m, MonadError PscIdeError m)
+  => FilePath -> m Success
+rebuildFileSync fp = rebuildFile fp syncRun
+  where
+    syncRun :: ReaderT IdeEnvironment (LoggingT IO) () -> m ()
+    syncRun action = do
+        env <- ask
+        let ll = confLogLevel (ideConfiguration env)
+        void (liftIO (runLogger ll (runReaderT action env)))
+
 
 -- | Rebuilds a module but opens up its export list first and stores the result
 -- inside the rebuild cache

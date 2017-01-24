@@ -27,14 +27,13 @@ module Language.PureScript.Ide.Util
   , prettyTypeT
   , properNameT
   , identT
-  , lensSatisfies
   , module Language.PureScript.Ide.Logging
   ) where
 
 import           Protolude                           hiding (decodeUtf8,
                                                       encodeUtf8)
 
-import           Control.Lens                        ((^.), (^?), Iso', iso, Getting, (<&>))
+import           Control.Lens                        hiding ((&), op)
 import           Data.Aeson
 import qualified Data.Text                           as T
 import qualified Data.Text.Lazy                      as TL
@@ -131,6 +130,3 @@ prettyTypeT =
   . T.lines
   . T.pack
   . P.prettyPrintTypeWithUnicode
-
-lensSatisfies :: forall a s. Getting (First a) s a -> (a -> Bool) -> s -> Bool
-lensSatisfies getter predicate value = value ^? getter <&> predicate & fromMaybe False

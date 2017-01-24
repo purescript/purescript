@@ -6,8 +6,12 @@ import           Protolude
 import           Data.Maybe                      (fromJust)
 
 import qualified Language.PureScript             as P
+import           Language.PureScript.Ide.Command as Command
+import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Imports
+import qualified Language.PureScript.Ide.Test as Test
 import           Language.PureScript.Ide.Types
+import           System.FilePath
 import           Test.Hspec
 
 simpleFile :: [Text]
@@ -22,6 +26,7 @@ splitSimpleFile :: (P.ModuleName, [Text], [Import], [Text])
 splitSimpleFile = fromRight (sliceImportSection simpleFile)
   where
     fromRight = fromJust . rightToMaybe
+
 withImports :: [Text] -> [Text]
 withImports is =
   take 2 simpleFile ++ is ++ drop 2 simpleFile
@@ -171,3 +176,63 @@ spec = do
         -- the imported names don't actually have to exist!
         (map (uncurry dtorImport) [("Just", "Maybe"), ("Nothing", "Maybe"), ("SomeOtherConstructor", "SomeDataType")])
         ["import Prelude", "import Control.Monad (Maybe(..), SomeDataType(..), ap)"]
+  describe "importing from a loaded IdeState" importFromIdeState
+
+implImport :: Text -> Command
+implImport mn =
+  Command.Import ("src" </> "ImportsSpec.purs") Nothing [] (Command.AddImplicitImport (Test.mn mn))
+
+addExplicitImport :: Text -> Command
+addExplicitImport i =
+  Command.Import ("src" </> "ImportsSpec.purs") Nothing [] (Command.AddImportForIdentifier i)
+
+importShouldBe :: [Text] -> [Text] -> Expectation
+importShouldBe res importSection =
+  res `shouldBe` [ "module ImportsSpec where" , ""] ++ importSection ++ [ "" , "myId x = x"]
+
+runIdeLoaded :: Command -> IO (Either PscIdeError Success)
+runIdeLoaded c = do
+  ([_, result], _) <- Test.inProject $ Test.runIde [Command.LoadSync [] , c]
+  pure result
+
+importFromIdeState :: Spec
+importFromIdeState = do
+  it "adds an implicit import" $ do
+    Right (MultilineTextResult result) <-
+      runIdeLoaded (implImport "ImportsSpec1")
+    result `importShouldBe` [ "import ImportsSpec1" ]
+  it "adds an explicit unqualified import" $ do
+    Right (MultilineTextResult result) <- runIdeLoaded (addExplicitImport "exportedFunction")
+    result `importShouldBe` [ "import ImportsSpec1 (exportedFunction)" ]
+  it "adds an explicit unqualified import (type)" $ do
+    Right (MultilineTextResult result) <- runIdeLoaded (addExplicitImport "MyType")
+    result `importShouldBe` [ "import ImportsSpec1 (MyType)" ]
+  it "adds an explicit unqualified import (parameterized type)" $ do
+    Right (MultilineTextResult result) <- runIdeLoaded (addExplicitImport "MyParamType")
+    result `importShouldBe` [ "import ImportsSpec1 (MyParamType)" ]
+  it "adds an explicit unqualified import (typeclass)" $ do
+    Right (MultilineTextResult result) <- runIdeLoaded (addExplicitImport "ATypeClass")
+    result `importShouldBe` [ "import ImportsSpec1 (class ATypeClass)" ]
+  it "adds an explicit unqualified import (dataconstructor)" $ do
+    Right (MultilineTextResult result) <- runIdeLoaded (addExplicitImport "MyJust")
+    result `importShouldBe` [ "import ImportsSpec1 (MyMaybe(..))" ]
+  it "adds an explicit unqualified import (newtype)" $ do
+    Right (MultilineTextResult result) <- runIdeLoaded (addExplicitImport "MyNewtype")
+    result `importShouldBe` [ "import ImportsSpec1 (MyNewtype(..))" ]
+  it "adds an explicit unqualified import (typeclass member function)" $ do
+    Right (MultilineTextResult result) <- runIdeLoaded (addExplicitImport "typeClassFun")
+    result `importShouldBe` [ "import ImportsSpec1 (typeClassFun)" ]
+  it "doesn't add a newtypes constructor if only the type is exported" $ do
+    Right (MultilineTextResult result) <-
+      runIdeLoaded (addExplicitImport "OnlyTypeExported")
+    result `importShouldBe` [ "import ImportsSpec1 (OnlyTypeExported)" ]
+  it "doesn't add an import if the identifier is defined in the module itself" $ do
+    Right (MultilineTextResult result) <- runIdeLoaded (addExplicitImport "myId")
+    result `importShouldBe` []
+  it "responds with an error if it's undecidable whether we want a type or constructor" $ do
+    result <- runIdeLoaded (addExplicitImport "SpecialCase")
+    result `shouldSatisfy` isLeft
+  it "responds with an error if the identifier cannot be found and doesn't \
+     \write to the output file" $ do
+    result <- runIdeLoaded (addExplicitImport "doesnExist")
+    result `shouldSatisfy` isLeft
