@@ -496,7 +496,6 @@ executable psc-ide-server
                        aeson >= 0.8 && < 1.0,
                        bytestring -any,
                        purescript -any,
-                       base-compat >=0.6.0,
                        directory -any,
                        filepath -any,
                        monad-logger -any,
@@ -506,8 +505,7 @@ executable psc-ide-server
                        protolude >= 0.1.6,
                        stm -any,
                        text -any,
-                       transformers -any,
-                       transformers-compat -any
+                       transformers -any
   ghc-options:         -Wall -O2 -threaded
   hs-source-dirs:      psc-ide-server
 
