@@ -15,10 +15,10 @@ load :: [Text] -> Command
 load = LoadSync . map Test.mn
 
 rebuild :: FilePath -> Command
-rebuild fp = Rebuild ("src" </> fp) True
+rebuild fp = Rebuild ("src" </> fp)
 
 rebuildSync :: FilePath -> Command
-rebuildSync fp = Rebuild ("src" </> fp) False
+rebuildSync fp = RebuildSync ("src" </> fp)
 
 spec :: Spec
 spec = describe "Rebuilding single modules" $ do

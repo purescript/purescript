@@ -81,8 +81,10 @@ handleCommand c = case c of
       Right rs' -> answerRequest outfp rs'
       Left question ->
         pure (CompletionResult (map (completionFromMatch . map withEmptyAnn) question))
-  Rebuild file isAsync ->
-    rebuildFile file isAsync
+  Rebuild file ->
+    rebuildFileAsync file
+  RebuildSync file ->
+    rebuildFileSync file
   Cwd ->
     TextResult . toS <$> liftIO getCurrentDirectory
   Reset ->
