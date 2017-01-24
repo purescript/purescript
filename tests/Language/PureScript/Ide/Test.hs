@@ -67,7 +67,7 @@ ideType :: Text -> Maybe P.Kind -> IdeDeclarationAnn
 ideType pn ki = ida (IdeDeclType (IdeType (P.ProperName pn) (fromMaybe P.kindType ki)))
 
 ideSynonym :: Text -> P.Type -> IdeDeclarationAnn
-ideSynonym pn ty = ida (IdeDeclSynonym (IdeSynonym (P.ProperName pn) ty))
+ideSynonym pn ty = ida (IdeDeclTypeSynonym (IdeTypeSynonym (P.ProperName pn) ty))
 
 ideTypeClass :: Text -> [IdeInstance] -> IdeDeclarationAnn
 ideTypeClass pn instances = ida (IdeDeclTypeClass (IdeTypeClass (P.ProperName pn) instances))

@@ -73,7 +73,7 @@ removeTypeDeclarationsForClass :: IdeDeclaration -> Endo [IdeDeclaration]
 removeTypeDeclarationsForClass (IdeDeclTypeClass n) = Endo (filter notDuplicate)
   where notDuplicate (IdeDeclType t) =
           n ^. ideTCName . properNameT /= t ^. ideTypeName . properNameT
-        notDuplicate (IdeDeclSynonym s) =
+        notDuplicate (IdeDeclTypeSynonym s) =
           n ^. ideTCName . properNameT /= s ^. ideSynonymName . properNameT
         notDuplicate _ = True
 removeTypeDeclarationsForClass _ = mempty
@@ -89,8 +89,8 @@ convertExport _ = Nothing
 convertDecl :: P.ExternsDeclaration -> Maybe IdeDeclaration
 convertDecl P.EDType{..} = Just $ IdeDeclType $
   IdeType edTypeName edTypeKind
-convertDecl P.EDTypeSynonym{..} = Just $ IdeDeclSynonym
-  (IdeSynonym edTypeSynonymName edTypeSynonymType)
+convertDecl P.EDTypeSynonym{..} = Just $ IdeDeclTypeSynonym
+  (IdeTypeSynonym edTypeSynonymName edTypeSynonymType)
 convertDecl P.EDDataConstructor{..} = Just $ IdeDeclDataConstructor $
   IdeDataConstructor edDataCtorName edDataCtorTypeCtor edDataCtorType
 convertDecl P.EDValue{..} = Just $ IdeDeclValue $
@@ -131,8 +131,8 @@ annotateModule (defs, types) decls =
         annotateFunction (v ^. ideValueIdent) (IdeDeclValue v)
       IdeDeclType t ->
         annotateType (t ^. ideTypeName . properNameT) (IdeDeclType t)
-      IdeDeclSynonym s ->
-        annotateType (s ^. ideSynonymName . properNameT) (IdeDeclSynonym s)
+      IdeDeclTypeSynonym s ->
+        annotateType (s ^. ideSynonymName . properNameT) (IdeDeclTypeSynonym s)
       IdeDeclDataConstructor dtor ->
         annotateValue (dtor ^. ideDtorName . properNameT) (IdeDeclDataConstructor dtor)
       IdeDeclTypeClass tc ->

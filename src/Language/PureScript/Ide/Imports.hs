@@ -295,7 +295,7 @@ addImportForIdentifier fp ident filters = do
     where
       decideRedundantCase d@(IdeDeclDataConstructor dtor) (IdeDeclType t) =
         if dtor ^. ideDtorTypeName == t ^. ideTypeName then Just d else Nothing
-      decideRedundantCase IdeDeclType{} ts@IdeDeclSynonym{} =
+      decideRedundantCase IdeDeclType{} ts@IdeDeclTypeSynonym{} =
         Just ts
       decideRedundantCase _ _ = Nothing
 
