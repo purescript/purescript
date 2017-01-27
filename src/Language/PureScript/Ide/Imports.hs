@@ -67,7 +67,7 @@ compImport (Import n i q) (Import n' i' q')
 
 -- | Reads a file and returns the (lines before the imports, the imports, the
 -- lines after the imports)
-parseImportsFromFile :: (MonadIO m, MonadError PscIdeError m) =>
+parseImportsFromFile :: (MonadIO m, MonadError IdeError m) =>
                         FilePath -> m (P.ModuleName, [Text], [Import], [Text])
 parseImportsFromFile fp = do
   file <- liftIO (readUTF8FileT fp)
@@ -147,7 +147,7 @@ moduleParse t = first show $ do
   P.runTokenParser "<psc-ide>" P.parseModule tokens
 
 -- | Adds an implicit import like @import Prelude@ to a Sourcefile.
-addImplicitImport :: (MonadIO m, MonadError PscIdeError m)
+addImplicitImport :: (MonadIO m, MonadError IdeError m)
                      => FilePath     -- ^ The Sourcefile read from
                      -> P.ModuleName -- ^ The module to import
                      -> m [Text]
@@ -170,7 +170,7 @@ addImplicitImport' imports mn =
 -- So @addExplicitImport "/File.purs" "bind" "Prelude"@ with an already existing
 -- @import Prelude (bind)@ in the file File.purs returns @["import Prelude
 -- (bind, unit)"]@
-addExplicitImport :: (MonadIO m, MonadError PscIdeError m) =>
+addExplicitImport :: (MonadIO m, MonadError IdeError m) =>
                      FilePath -> IdeDeclaration -> P.ModuleName -> m [Text]
 addExplicitImport fp decl moduleName = do
   (mn, pre, imports, post) <- parseImportsFromFile fp
@@ -249,7 +249,7 @@ updateAtFirstOrPrepend p t d l =
 --
 -- * If more than one possible imports are found, reports the possibilities as a
 -- list of completions.
-addImportForIdentifier :: (Ide m, MonadError PscIdeError m)
+addImportForIdentifier :: (Ide m, MonadError IdeError m)
                           => FilePath -- ^ The Sourcefile to read from
                           -> Text     -- ^ The identifier to import
                           -> [Filter] -- ^ Filters to apply before searching for

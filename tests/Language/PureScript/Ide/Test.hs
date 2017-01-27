@@ -24,7 +24,7 @@ defConfig =
                 , confGlobs = ["src/*.purs"]
                 }
 
-runIde' :: Configuration -> IdeState -> [Command] -> IO ([Either PscIdeError Success], IdeState)
+runIde' :: Configuration -> IdeState -> [Command] -> IO ([Either IdeError Success], IdeState)
 runIde' conf s cs = do
   stateVar <- newTVarIO s
   let env' = IdeEnvironment {ideStateVar = stateVar, ideConfiguration = conf}
@@ -32,7 +32,7 @@ runIde' conf s cs = do
   newState <- readTVarIO stateVar
   pure (r, newState)
 
-runIde :: [Command] -> IO ([Either PscIdeError Success], IdeState)
+runIde :: [Command] -> IO ([Either IdeError Success], IdeState)
 runIde = runIde' defConfig emptyIdeState
 
 s3 :: IdeState -> [(Text, [IdeDeclarationAnn])] -> IdeState

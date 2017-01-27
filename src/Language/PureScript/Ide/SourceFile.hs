@@ -47,7 +47,7 @@ getImports (P.Module _ _ _ declarations _) =
     isImport (P.PositionedDeclaration _ _ (P.ImportDeclaration a b c)) = Just (a, b, c)
     isImport _ = Nothing
 
-getImportsForFile :: (MonadIO m, MonadError PscIdeError m) =>
+getImportsForFile :: (MonadIO m, MonadError IdeError m) =>
                      FilePath -> m [ModuleImport]
 getImportsForFile fp = do
   moduleE <- parseModule fp

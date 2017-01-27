@@ -45,7 +45,7 @@ explicitAnnotations = WildcardAnnotations True
 noAnnotations :: WildcardAnnotations
 noAnnotations = WildcardAnnotations False
 
-caseSplit :: (Ide m, MonadError PscIdeError m) =>
+caseSplit :: (Ide m, MonadError IdeError m) =>
              Text -> m [Constructor]
 caseSplit q = do
   type' <- parseType' q
@@ -55,7 +55,7 @@ caseSplit q = do
   let appliedCtors = map (second (map applyTypeVars)) ctors
   pure appliedCtors
 
-findTypeDeclaration :: (Ide m, MonadError PscIdeError m) =>
+findTypeDeclaration :: (Ide m, MonadError IdeError m) =>
                          P.ProperName 'P.TypeName -> m ExternsDeclaration
 findTypeDeclaration q = do
   efs <- getExternFiles
@@ -73,7 +73,7 @@ findTypeDeclaration' t ExternsFile{..} =
             EDType tn _ _ -> tn == t
             _ -> False) efDeclarations
 
-splitTypeConstructor :: (MonadError PscIdeError m) =>
+splitTypeConstructor :: (MonadError IdeError m) =>
                         P.Type -> m (P.ProperName 'P.TypeName, [P.Type])
 splitTypeConstructor = go []
   where
@@ -105,7 +105,7 @@ makePattern t x y wsa = makePattern' (T.take x t) (T.drop y t)
   where
     makePattern' lhs rhs = map (\ctor -> lhs <> prettyCtor wsa ctor <> rhs)
 
-addClause :: (MonadError PscIdeError m) => Text -> WildcardAnnotations -> m [Text]
+addClause :: (MonadError IdeError m) => Text -> WildcardAnnotations -> m [Text]
 addClause s wca = do
   (fName, fType) <- parseTypeDeclaration' s
   let args = splitFunctionType fType
@@ -114,7 +114,7 @@ addClause s wca = do
         " = ?" <> (T.strip . P.runIdent $ fName)
   pure [s, template]
 
-parseType' :: (MonadError PscIdeError m) =>
+parseType' :: (MonadError IdeError m) =>
               Text -> m P.Type
 parseType' s =
   case P.lex "<psc-ide>" (toS s) >>= P.runTokenParser "<psc-ide>" (P.parseType <* Parsec.eof) of
@@ -123,7 +123,7 @@ parseType' s =
       throwError (GeneralError ("Parsing the splittype failed with:"
                                 <> show err))
 
-parseTypeDeclaration' :: (MonadError PscIdeError m) => Text -> m (P.Ident, P.Type)
+parseTypeDeclaration' :: (MonadError IdeError m) => Text -> m (P.Ident, P.Type)
 parseTypeDeclaration' s =
   let x = do
         ts <- P.lex "" (toS s)

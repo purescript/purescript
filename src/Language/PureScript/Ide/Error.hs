@@ -13,7 +13,7 @@
 -----------------------------------------------------------------------------
 
 module Language.PureScript.Ide.Error
-       ( PscIdeError(..)
+       ( IdeError(..)
        ) where
 
 import           Data.Aeson
@@ -22,7 +22,7 @@ import           Language.PureScript.Ide.Types   (ModuleIdent)
 import           Protolude
 import qualified Text.Parsec.Error               as P
 
-data PscIdeError
+data IdeError
     = GeneralError Text
     | NotFound Text
     | ModuleNotFound ModuleIdent
@@ -31,7 +31,7 @@ data PscIdeError
     | RebuildError [JSONError]
     deriving (Show, Eq)
 
-instance ToJSON PscIdeError where
+instance ToJSON IdeError where
   toJSON (RebuildError errs) = object
     [ "resultType" .= ("error" :: Text)
     , "result" .= errs
@@ -41,7 +41,7 @@ instance ToJSON PscIdeError where
     , "result" .= textError err
     ]
 
-textError :: PscIdeError -> Text
+textError :: IdeError -> Text
 textError (GeneralError msg)          = msg
 textError (NotFound ident)            = "Symbol '" <> ident <> "' not found."
 textError (ModuleNotFound ident)      = "Module '" <> ident <> "' not found."
