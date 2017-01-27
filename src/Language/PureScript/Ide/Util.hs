@@ -27,6 +27,7 @@ module Language.PureScript.Ide.Util
   , prettyTypeT
   , properNameT
   , identT
+  , opNameT
   , module Language.PureScript.Ide.Logging
   ) where
 
@@ -122,6 +123,9 @@ properNameT = iso P.runProperName P.ProperName
 
 identT :: Iso' P.Ident Text
 identT = iso P.runIdent P.Ident
+
+opNameT :: Iso' (P.OpName a) Text
+opNameT = iso P.runOpName P.OpName
 
 prettyTypeT :: P.Type -> Text
 prettyTypeT =

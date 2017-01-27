@@ -145,7 +145,7 @@ data IdeState = IdeState
   { ideStage1 :: Stage1
   , ideStage2 :: Stage2
   , ideStage3 :: Stage3
-  }
+  } deriving (Show)
 
 emptyIdeState :: IdeState
 emptyIdeState = IdeState emptyStage1 emptyStage2 emptyStage3
@@ -162,16 +162,16 @@ emptyStage3 = Stage3 M.empty Nothing
 data Stage1 = Stage1
   { s1Externs :: ModuleMap P.ExternsFile
   , s1Modules :: ModuleMap (P.Module, FilePath)
-  }
+  } deriving (Show)
 
 data Stage2 = Stage2
   { s2AstData :: AstData P.SourceSpan
-  }
+  } deriving (Show, Eq)
 
 data Stage3 = Stage3
   { s3Declarations  :: ModuleMap [IdeDeclarationAnn]
   , s3CachedRebuild :: Maybe (P.ModuleName, P.ExternsFile)
-  }
+  } deriving (Show)
 
 newtype Match a = Match (P.ModuleName, a)
            deriving (Show, Eq, Functor)
