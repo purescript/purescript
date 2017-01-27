@@ -106,6 +106,10 @@ extractSpans ss d = case d of
   P.DataDeclaration _ name _ ctors ->
     (IdeNSType (P.runProperName name), ss)
     : map (\(cname, _) -> (IdeNSValue (P.runProperName cname), ss)) ctors
+  P.FixityDeclaration (Left (P.ValueFixity _ _ opName)) ->
+    [(IdeNSValue (P.runOpName opName), ss)]
+  P.FixityDeclaration (Right (P.TypeFixity _ _ opName)) ->
+    [(IdeNSType (P.runOpName opName), ss)]
   P.ExternDeclaration ident _ ->
     [(IdeNSValue (P.runIdent ident), ss)]
   P.ExternDataDeclaration name _ ->
