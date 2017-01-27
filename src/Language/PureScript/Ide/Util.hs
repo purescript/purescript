@@ -44,7 +44,6 @@ import qualified Language.PureScript                 as P
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.Types
-import           System.Directory                (doesFileExist)
 import           System.IO.UTF8                  (readUTF8FileT)
 
 identifierFromIdeDeclaration :: IdeDeclaration -> Text
@@ -133,9 +132,11 @@ opNameT = iso P.runOpName P.OpName
 
 ideReadFile :: (MonadIO m, MonadError IdeError m) => FilePath -> m Text
 ideReadFile fp = do
-  unlessM (liftIO (doesFileExist fp))
-    (throwError (GeneralError ("Couldn't find file at: " <> T.pack fp)))
-  liftIO (readUTF8FileT fp)
+  contents :: Either IOException Text <- liftIO (try (readUTF8FileT fp))
+  either
+    (\_ -> throwError (GeneralError ("Couldn't find file at: " <> T.pack fp)))
+    pure
+    contents
 
 prettyTypeT :: P.Type -> Text
 prettyTypeT =
