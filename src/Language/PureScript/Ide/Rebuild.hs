@@ -20,7 +20,7 @@ import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
-import           System.IO.UTF8                  (readUTF8FileT)
+import           Language.PureScript.Ide.Util
 
 -- | Given a filepath performs the following steps:
 --
@@ -46,7 +46,7 @@ rebuildFile
   -> m Success
 rebuildFile path runOpenBuild = do
 
-  input <- liftIO (readUTF8FileT path)
+  input <- ideReadFile path
 
   m <- case snd <$> P.parseModuleFromFile identity (path, input) of
     Left parseError -> throwError

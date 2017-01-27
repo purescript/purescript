@@ -28,6 +28,7 @@ module Language.PureScript.Ide.Util
   , properNameT
   , identT
   , opNameT
+  , ideReadFile
   , module Language.PureScript.Ide.Logging
   ) where
 
@@ -40,8 +41,11 @@ import qualified Data.Text                           as T
 import qualified Data.Text.Lazy                      as TL
 import           Data.Text.Lazy.Encoding             (decodeUtf8, encodeUtf8)
 import qualified Language.PureScript                 as P
+import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.Types
+import           System.Directory                (doesFileExist)
+import           System.IO.UTF8                  (readUTF8FileT)
 
 identifierFromIdeDeclaration :: IdeDeclaration -> Text
 identifierFromIdeDeclaration d = case d of
@@ -126,6 +130,12 @@ identT = iso P.runIdent P.Ident
 
 opNameT :: Iso' (P.OpName a) Text
 opNameT = iso P.runOpName P.OpName
+
+ideReadFile :: (MonadIO m, MonadError IdeError m) => FilePath -> m Text
+ideReadFile fp = do
+  unlessM (liftIO (doesFileExist fp))
+    (throwError (GeneralError ("Couldn't find file at: " <> T.pack fp)))
+  liftIO (readUTF8FileT fp)
 
 prettyTypeT :: P.Type -> Text
 prettyTypeT =
