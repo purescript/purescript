@@ -43,7 +43,7 @@ import           System.FilePath.Glob (glob)
 
 -- | Accepts a Commmand and runs it against psc-ide's State. This is the main
 -- entry point for the server.
-handleCommand :: (Ide m, MonadLogger m, MonadError PscIdeError m) =>
+handleCommand :: (Ide m, MonadLogger m, MonadError IdeError m) =>
                  Command -> m Success
 handleCommand c = case c of
   Load [] ->
@@ -131,7 +131,7 @@ listAvailableModules = do
     let cleaned = filter (`notElem` [".", ".."]) contents
     return (ModuleList (map toS cleaned))
 
-caseSplit :: (Ide m, MonadError PscIdeError m) =>
+caseSplit :: (Ide m, MonadError IdeError m) =>
   Text -> Int -> Int -> CS.WildcardAnnotations -> Text -> m Success
 caseSplit l b e csa t = do
   patterns <- CS.makePattern l b e csa <$> CS.caseSplit t
@@ -139,7 +139,7 @@ caseSplit l b e csa t = do
 
 -- | Finds all the externs.json files inside the output folder and returns the
 -- corresponding Modulenames
-findAvailableExterns :: (Ide m, MonadError PscIdeError m) => m [P.ModuleName]
+findAvailableExterns :: (Ide m, MonadError IdeError m) => m [P.ModuleName]
 findAvailableExterns = do
   oDir <- outputDirectory
   unlessM (liftIO (doesDirectoryExist oDir))
@@ -169,7 +169,7 @@ findAllSourceFiles = do
 -- inserts their ASTs into the state. Finally kicks off an async worker, which
 -- populates Stage 2 and 3 of the state.
 loadModulesAsync
-  :: (Ide m, MonadError PscIdeError m, MonadLogger m)
+  :: (Ide m, MonadError IdeError m, MonadLogger m)
   => [P.ModuleName]
   -> m Success
 loadModulesAsync moduleNames = do
@@ -185,7 +185,7 @@ loadModulesAsync moduleNames = do
   pure tr
 
 loadModulesSync
-  :: (Ide m, MonadError PscIdeError m, MonadLogger m)
+  :: (Ide m, MonadError IdeError m, MonadLogger m)
   => [P.ModuleName]
   -> m Success
 loadModulesSync moduleNames = do
@@ -194,7 +194,7 @@ loadModulesSync moduleNames = do
   pure tr
 
 loadModules
-  :: (Ide m, MonadError PscIdeError m, MonadLogger m)
+  :: (Ide m, MonadError IdeError m, MonadLogger m)
   => [P.ModuleName]
   -> m Success
 loadModules moduleNames = do

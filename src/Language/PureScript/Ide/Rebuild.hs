@@ -20,7 +20,7 @@ import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
-import           System.IO.UTF8                  (readUTF8FileT)
+import           Language.PureScript.Ide.Util
 
 -- | Given a filepath performs the following steps:
 --
@@ -38,7 +38,7 @@ import           System.IO.UTF8                  (readUTF8FileT)
 -- warnings, and if rebuilding fails, returns a @RebuildError@ with the
 -- generated errors.
 rebuildFile
-  :: (Ide m, MonadLogger m, MonadError PscIdeError m)
+  :: (Ide m, MonadLogger m, MonadError IdeError m)
   => FilePath
   -- ^ The file to rebuild
   -> (ReaderT IdeEnvironment (LoggingT IO) () -> m ())
@@ -46,7 +46,7 @@ rebuildFile
   -> m Success
 rebuildFile path runOpenBuild = do
 
-  input <- liftIO (readUTF8FileT path)
+  input <- ideReadFile path
 
   m <- case snd <$> P.parseModuleFromFile identity (path, input) of
     Left parseError -> throwError
@@ -80,7 +80,7 @@ rebuildFile path runOpenBuild = do
       pure (RebuildSuccess (toJSONErrors False P.Warning warnings))
 
 rebuildFileAsync
-  :: forall m. (Ide m, MonadLogger m, MonadError PscIdeError m)
+  :: forall m. (Ide m, MonadLogger m, MonadError IdeError m)
   => FilePath -> m Success
 rebuildFileAsync fp = rebuildFile fp asyncRun
   where
@@ -91,7 +91,7 @@ rebuildFileAsync fp = rebuildFile fp asyncRun
         void (liftIO (async (runLogger ll (runReaderT action env))))
 
 rebuildFileSync
-  :: forall m. (Ide m, MonadLogger m, MonadError PscIdeError m)
+  :: forall m. (Ide m, MonadLogger m, MonadError IdeError m)
   => FilePath -> m Success
 rebuildFileSync fp = rebuildFile fp syncRun
   where
@@ -158,7 +158,7 @@ shushCodegen ma MakeActionsEnv{..} =
 -- module. Throws an error if there is a cyclic dependency within the
 -- ExternsFiles
 sortExterns
-  :: (Ide m, MonadError PscIdeError m)
+  :: (Ide m, MonadError IdeError m)
   => P.Module
   -> ModuleMap P.ExternsFile
   -> m [P.ExternsFile]

@@ -190,7 +190,7 @@ importShouldBe :: [Text] -> [Text] -> Expectation
 importShouldBe res importSection =
   res `shouldBe` [ "module ImportsSpec where" , ""] ++ importSection ++ [ "" , "myId x = x"]
 
-runIdeLoaded :: Command -> IO (Either PscIdeError Success)
+runIdeLoaded :: Command -> IO (Either IdeError Success)
 runIdeLoaded c = do
   ([_, result], _) <- Test.inProject $ Test.runIde [Command.LoadSync [] , c]
   pure result
