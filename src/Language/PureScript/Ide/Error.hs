@@ -30,7 +30,7 @@ data IdeError
     | ModuleFileNotFound ModuleIdent
     | ParseError Parsec.ParseError Text
     | RebuildError P.MultipleErrors
-    deriving(Show, Eq)
+    deriving (Show)
 
 instance ToJSON IdeError where
   toJSON (RebuildError errs) = object

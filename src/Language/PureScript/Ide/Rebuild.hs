@@ -5,7 +5,7 @@ module Language.PureScript.Ide.Rebuild
   ( rebuildFileSync
   , rebuildFileAsync
   , rebuildFile
-  , specialCompletion
+  , rebuildFile'
   ) where
 
 import           Protolude
@@ -44,15 +44,16 @@ rebuildFile
   -> (ReaderT IdeEnvironment (LoggingT IO) () -> m ())
   -- ^ A runner for the second build with open exports
   -> m Success
-rebuildFile path =
-  ideReadFile path >>= rebuildFile' path
+rebuildFile path runOpenBuild =
+  ideReadFile path >>= rebuildFile' path runOpenBuild
 
 rebuildFile'
-  :: (Ide m, MonadLogger m, MonadError PscIdeError m)
+  :: (Ide m, MonadLogger m, MonadError IdeError m)
   => FilePath
+  -> (ReaderT IdeEnvironment (LoggingT IO) () -> m ())
   -> Text
   -> m Success
-rebuildFile' path input = do
+rebuildFile' path runOpenBuild input = do
 
   m <- case snd <$> P.parseModuleFromFile identity (path, input) of
     Left parseError ->

@@ -44,9 +44,14 @@ completionsFromModules = foldMap completionFromModule
 -- at the given position. Uses the typed hole machinery in combination with the
 -- Rebuild command, which makes this completion dependent on successful
 -- compilation of the module once the typed hole has been inserted.
-completeInFile :: (Ide m, MonadLogger m) => FilePath -> Int -> Int -> m [Completion]
+completeInFile
+  :: (Ide m, MonadLogger m, MonadError IdeError m)
+  => FilePath
+  -> Int
+  -> Int
+  -> m [Completion]
 completeInFile path row col = do
-  input <- liftIO (readUTF8FileT path)
+  input <- ideReadFile path
   completeInFile' path input row col
 
 completeInFile'
@@ -54,7 +59,7 @@ completeInFile'
   => FilePath -> Text -> Int -> Int -> m [Completion]
 completeInFile' path input row column = do
   let withHole = insertHole (row, column) input
-  rebuildResult <- runExceptT (rebuildFile' path withHole)
+  rebuildResult <- runExceptT (rebuildFile' path (const (pure ())) withHole)
   case rebuildResult of
     Left (RebuildError errs)
       | Just holeError <- extractHole errs -> pure (extractCompletions holeError)
