@@ -12,7 +12,7 @@ import Prelude.Compat
 import Data.List (nub, groupBy, foldl1')
 import Data.Maybe (catMaybes, mapMaybe)
 
-import Control.Monad ((<=<), replicateM, join, unless)
+import Control.Monad ((<=<), forM, replicateM, join, unless)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class
 
@@ -43,6 +43,26 @@ desugarCasesModule (Module ss coms name ds exps) =
 desugarCase :: forall m. (MonadSupply m)
             => Expr
             -> m Expr
+desugarCase (Case scrut alternatives)
+  | any (not . isTrivialExpr) scrut = do
+    -- in case the scrutinee is non trivial (e.g. not a Var or Literal)
+    -- we may evaluate the scrutinee one than once when a guard occurrs.
+    -- We bind the scrutinee to Vars here to mitigate this case.
+    (scrut', scrut_decls) <- unzip <$> forM scrut (\e -> do
+      scrut_id <- freshIdent'
+      pure ( Var (Qualified Nothing scrut_id)
+           , ValueDeclaration scrut_id Private [] [MkUnguarded e]
+           )
+      )
+    Let scrut_decls <$> desugarCase (Case scrut' alternatives)
+  where
+    isTrivialExpr (Var _) = True
+    isTrivialExpr (Literal _) = True
+    isTrivialExpr (Accessor _ e) = isTrivialExpr e
+    isTrivialExpr (Parens e) = isTrivialExpr e
+    isTrivialExpr (PositionedValue _ _ e) = isTrivialExpr e
+    isTrivialExpr _ = False
+
 desugarCase (Case scrut alternatives) =
   let
     -- Alternatives which do not have guards are
@@ -213,13 +233,21 @@ desugarCase (Case scrut alternatives) =
     scrut_nullbinder :: [Binder]
     scrut_nullbinder = replicate (length scrut) NullBinder
 
+    -- Case expressions with a single alternative whichs has
+    -- a NullBinder. These frequently occur while desugaring
+    -- complex guards.
+    optimize :: Expr -> Expr
+    optimize (Case _ [CaseAlternative vb [MkUnguarded v]])
+      | all isNullBinder vb = v
+      where
+        isNullBinder NullBinder = True
+        isNullBinder (PositionedBinder _ _ b) = isNullBinder b
+        isNullBinder (TypedBinder _ b) = isNullBinder b
+        isNullBinder _ = False
+    optimize e = e
   in do
     alts' <- desugarAlternatives alternatives
-    pure $ case alts' of
-      [CaseAlternative vb [MkUnguarded v]]
-        | vb == scrut_nullbinder
-        -> v
-      _ -> Case scrut alts'
+    return $ optimize (Case scrut alts')
 
 desugarCase v = pure v
 
