@@ -46,7 +46,7 @@ desugarCase :: forall m. (MonadSupply m)
 desugarCase (Case scrut alternatives)
   | any (not . isTrivialExpr) scrut = do
     -- in case the scrutinee is non trivial (e.g. not a Var or Literal)
-    -- we may evaluate the scrutinee one than once when a guard occurrs.
+    -- we may evaluate the scrutinee more than once when a guard occurrs.
     -- We bind the scrutinee to Vars here to mitigate this case.
     (scrut', scrut_decls) <- unzip <$> forM scrut (\e -> do
       scrut_id <- freshIdent'
@@ -130,7 +130,7 @@ desugarCase (Case scrut alternatives) =
     desugarAlternatives (a@(CaseAlternative _ [MkUnguarded _]) : as) =
       (a :) <$> desugarAlternatives as
 
-    -- Special case: CoreFn understands single conditiona guards on
+    -- Special case: CoreFn understands single condition guards on
     -- binders right hand side.
     desugarAlternatives (CaseAlternative ab ge : as)
       | not (null cond_guards) =
@@ -233,9 +233,10 @@ desugarCase (Case scrut alternatives) =
     scrut_nullbinder :: [Binder]
     scrut_nullbinder = replicate (length scrut) NullBinder
 
-    -- Case expressions with a single alternative whichs has
-    -- a NullBinder. These frequently occur while desugaring
-    -- complex guards.
+    -- case expressions with a single alternative which have
+    -- a NullBinder occur frequently after desugaring
+    -- complex guards. This function removes these superflous
+    -- cases.
     optimize :: Expr -> Expr
     optimize (Case _ [CaseAlternative vb [MkUnguarded v]])
       | all isNullBinder vb = v
