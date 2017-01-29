@@ -138,8 +138,11 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
     go gs
       = Left [ (exprToCoreFn ss [] Nothing cond, exprToCoreFn ss [] Nothing e)
              | A.GuardedExpr g e <- gs
-             , let [A.ConditionGuard cond] = g -- TODO: check invariant
+             , let cond = guardToExpr g
              ]
+
+    guardToExpr [A.ConditionGuard cond] = cond
+    guardToExpr _ = internalError "Guard not correctly desugared"
 
   -- |
   -- Desugars case binders from AST to CoreFn representation.
