@@ -39,13 +39,13 @@ matrix:
       sudo: required
       env: BUILD_TYPE=haddock
 
-    - compiler: cc-osx-lts-normal
-      os: osx
-      env: BUILD_TYPE=normal DEPLOY=true
-
-    - compiler: cc-osx-lts-sdist
-      os: osx
-      env: BUILD_TYPE=sdist
+    # - compiler: cc-osx-lts-normal
+    #   os: osx
+    #   env: BUILD_TYPE=normal DEPLOY=true
+    
+    # - compiler: cc-osx-lts-sdist
+    #   os: osx
+    #   env: BUILD_TYPE=sdist
 addons:
   apt:
     packages:
