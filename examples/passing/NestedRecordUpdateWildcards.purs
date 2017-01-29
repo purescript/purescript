@@ -3,7 +3,7 @@ module Main where
 import Prelude
 import Control.Monad.Eff.Console
 
-update = _ { foo = _, bar.baz = _, bar.qux = _ }
+update = _ { foo = _, bar { baz = _, qux = _ } }
 
 init = { foo: 1, bar: { baz: 2, qux: 3 } }
 
