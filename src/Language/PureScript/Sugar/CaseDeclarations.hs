@@ -40,7 +40,7 @@ desugarCasesModule (Module ss coms name ds exps) =
 -- Desugar case with pattern guards and pattern clauses to a
 -- series of nested case expressions.
 --
-desugarCase :: (MonadSupply m)
+desugarCase :: forall m. (MonadSupply m)
             => Expr
             -> m Expr
 desugarCase (Case scrut alternatives) =
@@ -102,8 +102,7 @@ desugarCase (Case scrut alternatives) =
     --
     -- This might look strange but simplifies the algorithm a lot.
     --
-    desugarAlternatives :: (MonadSupply m)
-                        => [CaseAlternative]
+    desugarAlternatives :: [CaseAlternative]
                         -> m [CaseAlternative]
     desugarAlternatives [] = pure []
 
@@ -124,11 +123,10 @@ desugarCase (Case scrut alternatives) =
         isSingleCondGuard (GuardedExpr [ConditionGuard _] _) = True
         isSingleCondGuard _ = False
 
-    desugarGuardedAlternative :: (MonadSupply m)
-                               => [Binder]
-                               -> [GuardedExpr]
-                               -> [CaseAlternative]
-                               -> m [CaseAlternative]
+    desugarGuardedAlternative :: [Binder]
+                              -> [GuardedExpr]
+                              -> [CaseAlternative]
+                              -> m [CaseAlternative]
     desugarGuardedAlternative _vb [] rem_alts =
       desugarAlternatives rem_alts
 
@@ -179,8 +177,7 @@ desugarCase (Case scrut alternatives) =
     -- and alternatives. A CaseAlternative is passed (or in
     -- fact the original case is partial non is passed) to
     -- mk_body which branches to the generated let-binding.
-    desugarAltOutOfLine :: (MonadSupply m)
-                        => [Binder]
+    desugarAltOutOfLine :: [Binder]
                         -> [GuardedExpr]
                         -> [CaseAlternative]
                         -> ([CaseAlternative] -> Expr)
