@@ -497,7 +497,7 @@ parseArrayBinder = LiteralBinder <$> parseArrayLiteral (indented *> parseBinder)
 parseVarOrNamedBinder :: TokenParser Binder
 parseVarOrNamedBinder = do
   name <- parseIdent
-  let parseNamedBinder = NamedBinder name <$> (at *> indented *> parseBinderNoParens)
+  let parseNamedBinder = NamedBinder name <$> (at *> indented *> parseBinderAtom)
   parseNamedBinder <|> return (VarBinder name)
 
 parseNullBinder :: TokenParser Binder
