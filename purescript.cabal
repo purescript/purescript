@@ -353,6 +353,7 @@ executable purs
                    ansi-terminal >= 0.6.2 && < 0.7,
                    ansi-wl-pprint -any,
                    base-compat >=0.6.0,
+                   blaze-html -any,
                    boxes >= 0.1.4 && < 0.2.0,
                    bytestring -any,
                    containers -any,
@@ -392,10 +393,12 @@ executable purs
                    Command.Docs.Ctags
                    Command.Docs.Etags
                    Command.Docs.Tags
+                   Command.Docs.Html
                    Command.Hierarchy
                    Command.Ide
                    Command.Publish
                    Command.REPL
+                   Version
     ghc-options: -Wall -O2 -fno-warn-unused-do-bind -threaded -rtsopts "-with-rtsopts=-N"
 
     if flag(release)
