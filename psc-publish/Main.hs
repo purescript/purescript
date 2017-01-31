@@ -2,10 +2,12 @@
 
 module Main where
 
+import Control.Monad.IO.Class (liftIO)
 import Data.Version (Version(..), showVersion)
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy.Char8 as BL
 import Data.Monoid ((<>))
+import Data.Time.Clock (getCurrentTime)
 
 import Options.Applicative (Parser, ParseError (..))
 import qualified Options.Applicative as Opts
@@ -25,6 +27,7 @@ dryRunOptions :: PublishOptions
 dryRunOptions = defaultPublishOptions
   { publishGetVersion = return dummyVersion
   , publishWorkingTreeDirty = warn DirtyWorkingTree_Warn
+  , publishGetTagTime = const (liftIO getCurrentTime)
   }
   where dummyVersion = ("0.0.0", Version [0,0,0] [])
 
