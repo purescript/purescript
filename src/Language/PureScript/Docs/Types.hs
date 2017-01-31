@@ -10,7 +10,7 @@ import Prelude (String, unlines, lookup)
 import Control.Arrow ((***))
 
 import Data.Aeson ((.=))
-import Data.Aeson.BetterErrors
+import Data.Aeson.BetterErrors hiding ((<|>))
 import qualified Data.Map as Map
 import Data.Time.Clock (UTCTime)
 import qualified Data.Time.Format as TimeFormat
