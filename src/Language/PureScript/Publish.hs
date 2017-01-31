@@ -195,8 +195,9 @@ getVersionFromGitTag = do
 getTagTime :: Text -> PrepareM UTCTime
 getTagTime tag = do
   out <- readProcess' "git" ["show", T.unpack tag, "--no-patch", "--format=%aI"] ""
-  let time = headMay (lines out) >>= D.parseTime
-  maybe (internalError (CouldntParseGitTagDate tag)) pure time
+  case mapMaybe D.parseTime (lines out) of
+    [t] -> pure t
+    _ -> internalError (CouldntParseGitTagDate tag)
 
 getBowerRepositoryInfo :: PackageMeta -> PrepareM (D.GithubUser, D.GithubRepo)
 getBowerRepositoryInfo = either (userError . BadRepositoryField) return . tryExtract
