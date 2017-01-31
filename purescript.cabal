@@ -424,7 +424,9 @@ executable psc-publish
                    purescript -any,
                    aeson >= 0.8 && < 1.0,
                    bytestring -any,
-                   optparse-applicative -any
+                   optparse-applicative -any,
+                   time -any,
+                   transformers -any
     main-is: Main.hs
     other-modules: Paths_purescript
     buildable: True
