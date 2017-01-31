@@ -27,7 +27,7 @@ import Control.Category ((>>>))
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Writer.Strict (MonadWriter, WriterT, runWriterT, tell)
 
-import Data.Aeson.BetterErrors
+import Data.Aeson.BetterErrors (Parse, parse, keyMay, eachInObjectWithKey, eachInObject, key, keyOrDefault, asBool, asText)
 import Data.Char (isSpace)
 import Data.String (String, lines)
 import Data.List (stripPrefix, (\\), nubBy)
