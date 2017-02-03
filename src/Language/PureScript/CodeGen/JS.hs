@@ -138,8 +138,8 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   -- Generate code in the simplified Javascript intermediate representation for a declaration
   --
   bindToJs :: Bind Ann -> m [JS]
-  bindToJs (NonRec ann ident val) = return <$> nonRecToJS ann ident val
-  bindToJs (Rec vals) = forM vals (uncurry . uncurry $ nonRecToJS)
+  bindToJs (NonRec ann ident val) = nonRecToJS ann ident val
+  bindToJs (Rec vals) = concat <$> forM vals (uncurry . uncurry $ nonRecToJS)
 
   -- |
   -- Generate code in the simplified Javascript intermediate representation for a single non-recursive
@@ -147,15 +147,22 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   --
   -- The main purpose of this function is to handle code generation for comments.
   --
-  nonRecToJS :: Ann -> Ident -> Expr Ann -> m JS
+  nonRecToJS :: Ann -> Ident -> Expr Ann -> m [JS]
   nonRecToJS a i e@(extractAnn -> (_, com, _, _)) | not (null com) = do
     withoutComment <- asks optionsNoComments
     if withoutComment
        then nonRecToJS a i (modifyAnn removeComments e)
-       else JSComment Nothing com <$> nonRecToJS a i (modifyAnn removeComments e)
+       else withHead (JSComment Nothing com) <$> nonRecToJS a i (modifyAnn removeComments e)
+    where
+      withHead _ [] = []
+      withHead f (x:xs) = f x : xs
   nonRecToJS (ss, _, _, _) ident val = do
-    js <- valueToJs val
-    withPos ss $ JSVariableIntroduction Nothing (identToJs ident) (Just js)
+    case constructorToJs ident val of
+      Just jss ->
+        traverse (withPos ss) jss
+      Nothing -> do
+        js <- valueToJs val
+        return <$> (withPos ss $ JSVariableIntroduction Nothing (identToJs ident) (Just js))
 
   withPos :: Maybe SourceSpan -> JS -> m JS
   withPos (Just ss) js = do
@@ -251,23 +258,37 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
                 JSObjectLiteral Nothing [("create",
                   JSFunction Nothing Nothing ["value"]
                     (JSBlock Nothing [JSReturn Nothing $ JSVar Nothing "value"]))])
-  valueToJs' (Constructor _ _ (ProperName ctor) []) =
-    return $ iife (properToJs ctor) [ JSFunction Nothing (Just (properToJs ctor)) [] (JSBlock Nothing [])
-           , JSAssignment Nothing (accessorString "value" (JSVar Nothing (properToJs ctor)))
-                (JSUnary Nothing JSNew $ JSApp Nothing (JSVar Nothing (properToJs ctor)) []) ]
-  valueToJs' (Constructor _ _ (ProperName ctor) fields) =
-    let constructor =
-          let body = [ JSAssignment Nothing ((accessorString $ mkString $ identToJs f) (JSVar Nothing "this")) (var f) | f <- fields ]
-          in JSFunction Nothing (Just (properToJs ctor)) (identToJs `map` fields) (JSBlock Nothing body)
-        createFn =
-          let body = JSUnary Nothing JSNew $ JSApp Nothing (JSVar Nothing (properToJs ctor)) (var `map` fields)
-          in foldr (\f inner -> JSFunction Nothing Nothing [identToJs f] (JSBlock Nothing [JSReturn Nothing inner])) body fields
-    in return $ iife (properToJs ctor) [ constructor
-                          , JSAssignment Nothing (accessorString "create" (JSVar Nothing (properToJs ctor))) createFn
-                          ]
+  valueToJs' (Constructor _ _ (ProperName ctor) _) =
+    internalError $ "Unexpected constructor definition: " ++ T.unpack ctor
 
-  iife :: Text -> [JS] -> JS
-  iife v exprs = JSApp Nothing (JSFunction Nothing Nothing [] (JSBlock Nothing $ exprs ++ [JSReturn Nothing $ JSVar Nothing v])) []
+  -- |
+  -- Attempt to generate code in the simplified JS intermediate representation for a constructor definition.
+  -- If the argument is not a constructor, this returns Nothing.
+  --
+  constructorToJs :: Ident -> Expr Ann -> Maybe [JS]
+  constructorToJs ident (Constructor _ _ (ProperName ctor) fs) =
+    Just jss
+    where
+      mkAccessor name = JSAssignment Nothing (accessorString name (JSVar Nothing (identToJs ident)))
+      jss = case fs of
+        [] ->
+          [ JSVariableIntroduction Nothing (identToJs ident) (Just $
+              JSFunction Nothing (Just (properToJs ctor)) [] (JSBlock Nothing []))
+          , mkAccessor "value" $
+              JSUnary Nothing JSNew $ JSApp Nothing (JSVar Nothing (identToJs ident)) []
+          ]
+        fields ->
+          let constructor =
+                let body = [ JSAssignment Nothing ((accessorString $ mkString $ identToJs f) (JSVar Nothing "this")) (var f) | f <- fields ]
+                in JSFunction Nothing (Just (properToJs ctor)) (identToJs `map` fields) (JSBlock Nothing body)
+              createFn =
+                let body = JSUnary Nothing JSNew $ JSApp Nothing (JSVar Nothing (properToJs ctor)) (var `map` fields)
+                in foldr (\f inner -> JSFunction Nothing Nothing [identToJs f] (JSBlock Nothing [JSReturn Nothing inner])) body fields
+          in [ constructor
+             , mkAccessor "create" createFn
+             ]
+  constructorToJs _ _ =
+    Nothing
 
   literalToValueJS :: Literal (Expr Ann) -> m JS
   literalToValueJS (NumericLiteral (Left i)) = return $ JSNumericLiteral Nothing (Left i)
