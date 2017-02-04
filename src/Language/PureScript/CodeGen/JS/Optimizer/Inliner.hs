@@ -110,7 +110,7 @@ inlineCommonValues = everywhereOnJS convert
   intOp ss op x y = JSBinary ss BitwiseOr (JSBinary ss op x y) (JSNumericLiteral ss (Left 0))
 
 inlineCommonOperators :: JS -> JS
-inlineCommonOperators = applyAll $
+inlineCommonOperators = everywhereOnJSTopDown $ applyAll $
   [ binary semiringNumber opAdd Add
   , binary semiringNumber opMul Multiply
 
@@ -173,38 +173,32 @@ inlineCommonOperators = applyAll $
   [ fn | i <- [0..10], fn <- [ mkFn i, runFn i ] ]
   where
   binary :: (Text, PSString) -> (Text, PSString) -> BinaryOperator -> JS -> JS
-  binary dict fns op = everywhereOnJS convert
-    where
+  binary dict fns op = convert where
     convert :: JS -> JS
     convert (JSApp ss (JSApp _ (JSApp _ fn [dict']) [x]) [y]) | isDict dict dict' && isDict fns fn = JSBinary ss op x y
     convert other = other
   binary' :: Text -> PSString -> BinaryOperator -> JS -> JS
-  binary' moduleName opString op = everywhereOnJS convert
-    where
+  binary' moduleName opString op = convert where
     convert :: JS -> JS
     convert (JSApp ss (JSApp _ fn [x]) [y]) | isDict (moduleName, opString) fn = JSBinary ss op x y
     convert other = other
   unary :: (Text, PSString) -> (Text, PSString) -> UnaryOperator -> JS -> JS
-  unary dicts fns op = everywhereOnJS convert
-    where
+  unary dicts fns op = convert where
     convert :: JS -> JS
     convert (JSApp ss (JSApp _ fn [dict']) [x]) | isDict dicts dict' && isDict fns fn = JSUnary ss op x
     convert other = other
   unary' :: Text -> PSString -> UnaryOperator -> JS -> JS
-  unary' moduleName fnName op = everywhereOnJS convert
-    where
+  unary' moduleName fnName op = convert where
     convert :: JS -> JS
     convert (JSApp ss fn [x]) | isDict (moduleName, fnName) fn = JSUnary ss op x
     convert other = other
   mkFn :: Int -> JS -> JS
-  mkFn 0 = everywhereOnJS convert
-    where
+  mkFn 0 = convert where
     convert :: JS -> JS
     convert (JSApp _ mkFnN [JSFunction s1 Nothing [_] (JSBlock s2 js)]) | isNFn C.mkFn 0 mkFnN =
       JSFunction s1 Nothing [] (JSBlock s2 js)
     convert other = other
-  mkFn n = everywhereOnJS convert
-    where
+  mkFn n = convert where
     convert :: JS -> JS
     convert orig@(JSApp ss mkFnN [fn]) | isNFn C.mkFn n mkFnN =
       case collectArgs n [] fn of
@@ -223,8 +217,7 @@ inlineCommonOperators = applyAll $
   isNFn _ _ _ = False
 
   runFn :: Int -> JS -> JS
-  runFn n = everywhereOnJS convert
-    where
+  runFn n = convert where
     convert :: JS -> JS
     convert js = fromMaybe js $ go n [] js
 
@@ -234,8 +227,7 @@ inlineCommonOperators = applyAll $
     go _ _   _ = Nothing
 
   inlineNonClassFunction :: (JS -> Bool) -> (JS -> JS -> JS) -> JS -> JS
-  inlineNonClassFunction p f = everywhereOnJS convert
-    where
+  inlineNonClassFunction p f = convert where
     convert :: JS -> JS
     convert (JSApp _ (JSApp _ op' [x]) [y]) | p op' = f x y
     convert other = other
