@@ -45,7 +45,7 @@ data TypeSearch
 
 -- | A type of error messages
 data SimpleErrorMessage
-  = ModuleNotFound ModuleName 
+  = ModuleNotFound ModuleName
   | ErrorParsingFFIModule FilePath (Maybe Bundle.ErrorMessage)
   | ErrorParsingModule P.ParseError
   | MissingFFIModule ModuleName
@@ -83,7 +83,7 @@ data SimpleErrorMessage
   | NameIsUndefined Ident
   | UndefinedTypeVariable (ProperName 'TypeName)
   | PartiallyAppliedSynonym (Qualified (ProperName 'TypeName))
-  | EscapedSkolem (Maybe Expr)
+  | EscapedSkolem Text (Maybe SourceSpan) Type
   | TypesDoNotUnify Type Type
   | KindsDoNotUnify Kind Kind
   | ConstrainedTypeUnified Type Type

@@ -544,11 +544,16 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
       paras [ line $ "Type synonym " <> markCode (showQualified runProperName name) <> " is partially applied."
             , line "Type synonyms must be applied to all of their type arguments."
             ]
-    renderSimpleErrorMessage (EscapedSkolem binding) =
-      paras $ [ line "A type variable has escaped its scope." ]
-                     <> foldMap (\expr -> [ line "Relevant expression: "
-                                          , markCodeBox $ indent $ prettyPrintValue valueDepth expr
-                                          ]) binding
+    renderSimpleErrorMessage (EscapedSkolem name Nothing ty) =
+      paras [ line $ "The type variable " <> markCode name <> " has escaped its scope, appearing in the type"
+            , markCodeBox $ indent $ typeAsBox ty
+            ]
+    renderSimpleErrorMessage (EscapedSkolem name (Just srcSpan) ty) =
+      paras [ line $ "The type variable " <> markCode name <> ", bound at"
+            , indent $ line $ displaySourceSpan srcSpan
+            , line "has escaped its scope, appearing in the type"
+            , markCodeBox $ indent $ typeAsBox ty
+            ]
     renderSimpleErrorMessage (TypesDoNotUnify u1 u2)
       = let (sorted1, sorted2) = sortRows u1 u2
 
