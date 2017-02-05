@@ -17,7 +17,7 @@ import Prelude.Compat
 
 import Control.Exception (IOException)
 
-import Data.Aeson.BetterErrors
+import Data.Aeson.BetterErrors (ParseError, displayError)
 import Data.List (intersperse, intercalate)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe
