@@ -241,7 +241,7 @@ checkTypedBindingGroupElement mn (ident, (val, ty, checkType)) dict = do
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
   -- Check the type with the new names in scope
   val' <- if checkType
-            then withScopedTypeVars mn args $ bindNames dict $ TypedValue True <$> check val ty' <*> pure ty'
+            then withScopedTypeVars mn args $ bindNames dict $ check val ty'
             else return (TypedValue False val ty')
   return (ident, (val', ty'))
 
@@ -297,7 +297,8 @@ infer val = withErrorMessageHint (ErrorInferringType val) $ infer' val
 
 -- | Infer a type for a value
 infer'
-  :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  :: forall m
+   . (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => Expr
   -> m Expr
 infer' v@(Literal (NumericLiteral (Left _))) = return $ TypedValue True v tyInt
@@ -315,10 +316,25 @@ infer' (Literal (ArrayLiteral vals)) = do
   return $ TypedValue True (Literal (ArrayLiteral ts')) (TypeApp tyArray els)
 infer' (Literal (ObjectLiteral ps)) = do
   ensureNoDuplicateProperties ps
-  ts <- traverse (infer . snd) ps
-  let fields = zipWith (\name (TypedValue _ _ t) -> (Label name, t)) (map fst ps) ts
-      ty = TypeApp tyRecord $ rowFromList (fields, REmpty)
-  return $ TypedValue True (Literal (ObjectLiteral (zip (map fst ps) ts))) ty
+  -- We make a special case for Vars in record labels, since there are the
+  -- only types of expressions for which 'infer' can return a polymorphic type.
+  -- They need to be instantiated here.
+  let isVar :: Expr -> Bool
+      isVar Var{} = True
+      isVar (TypedValue _ e _) = isVar e
+      isVar (PositionedValue _ _ e) = isVar e
+      isVar _ = False
+
+      inferProperty :: (PSString, Expr) -> m (PSString, (Expr, Type))
+      inferProperty (name, val) = do
+        TypedValue _ val' ty <- infer val
+        valAndType <- if isVar val
+                        then instantiatePolyTypeWithUnknowns val' ty
+                        else pure (val', ty)
+        pure (name, valAndType)
+  fields <- forM ps inferProperty
+  let ty = TypeApp tyRecord $ rowFromList (map (Label *** snd) fields, REmpty)
+  return $ TypedValue True (Literal (ObjectLiteral (map (fmap (uncurry (TypedValue True))) fields))) ty
 infer' (ObjectUpdate o ps) = do
   ensureNoDuplicateProperties ps
   row <- freshType
@@ -377,7 +393,9 @@ infer' (Let ds val) = do
 infer' (DeferredDictionary className tys) = do
   dicts <- getTypeClassDictionaries
   hints <- gets checkHints
-  return $ TypeClassDictionary (Constraint className tys Nothing) dicts hints
+  return $ TypedValue False
+             (TypeClassDictionary (Constraint className tys Nothing) dicts hints)
+             (foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys)
 infer' (TypedValue checkType val ty) = do
   Just moduleName <- checkCurrentModule <$> get
   (kind, args) <- kindOfWithScopedVars ty
@@ -627,7 +645,7 @@ check' v@(Var var) ty = do
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   elaborate <- subsumes repl ty'
   return $ TypedValue True (elaborate v) ty'
-check' (DeferredDictionary className tys) _ = do
+check' (DeferredDictionary className tys) ty = do
   {-
   -- Here, we replace a placeholder for a superclass dictionary with a regular
   -- TypeClassDictionary placeholder. The reason we do this is that it is necessary to have the
@@ -636,18 +654,19 @@ check' (DeferredDictionary className tys) _ = do
   -}
   dicts <- getTypeClassDictionaries
   hints <- gets checkHints
-  return $ TypeClassDictionary (Constraint className tys Nothing) dicts hints
+  return $ TypedValue False
+             (TypeClassDictionary (Constraint className tys Nothing) dicts hints)
+             ty
 check' (TypedValue checkType val ty1) ty2 = do
-  Just moduleName <- checkCurrentModule <$> get
-  (kind, args) <- kindOfWithScopedVars ty1
+  kind <- kindOf ty1
   checkTypeKind ty1 kind
   ty1' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty1
   ty2' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty2
-  _ <- subsumes ty1' ty2'
+  elaborate <- subsumes ty1' ty2'
   val' <- if checkType
-            then withScopedTypeVars moduleName args (check val ty2')
-            else return val
-  return $ TypedValue checkType val' ty2'
+            then check val ty1'
+            else pure val
+  return $ TypedValue True (TypedValue checkType (elaborate val') ty1') ty2'
 check' (Case vals binders) ret = do
   (vals', ts) <- instantiateForBinders vals binders
   binders' <- checkBinders ts ret binders
@@ -684,8 +703,9 @@ check' v@(Constructor c) ty = do
     Nothing -> throwError . errorMessage . UnknownName . fmap DctorName $ c
     Just (_, _, ty1, _) -> do
       repl <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1
-      elaborate <- subsumes repl ty
-      return $ TypedValue True (elaborate v) ty
+      ty' <- introduceSkolemScope ty
+      elaborate <- subsumes repl ty'
+      return $ TypedValue True (elaborate v) ty'
 check' (Let ds val) ty = do
   (ds', val') <- inferLetBinding [] ds val (`check` ty)
   return $ TypedValue True (Let ds' val') ty
