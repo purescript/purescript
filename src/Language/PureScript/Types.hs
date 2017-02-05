@@ -127,6 +127,8 @@ rowFromList ((name, t):ts, r) = RCons name t (rowFromList (ts, r))
 --
 isMonoType :: Type -> Bool
 isMonoType ForAll{} = False
+isMonoType (ParensInType t) = isMonoType t
+isMonoType (KindedType t _) = isMonoType t
 isMonoType _        = True
 
 -- |
