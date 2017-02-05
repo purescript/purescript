@@ -487,15 +487,12 @@ inferBinder val (NamedBinder name binder) = do
   return $ M.insert name val m
 inferBinder val (PositionedBinder pos _ binder) =
   warnAndRethrowWithPositionTC pos $ inferBinder val binder
--- TODO: When adding support for polymorphic types, check subsumption here,
--- change the definition of `binderRequiresMonotype`,
--- and use `kindOfWithScopedVars`.
 inferBinder val (TypedBinder ty binder) = do
   kind <- kindOf ty
   checkTypeKind ty kind
-  ty1 <- replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
+  ty1 <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   unifyTypes val ty1
-  inferBinder val binder
+  inferBinder ty1 binder
 inferBinder _ OpBinder{} =
   internalError "OpBinder should have been desugared before inferBinder"
 inferBinder _ BinaryNoParensBinder{} =
@@ -510,6 +507,7 @@ binderRequiresMonotype NullBinder = False
 binderRequiresMonotype (VarBinder _) = False
 binderRequiresMonotype (NamedBinder _ b) = binderRequiresMonotype b
 binderRequiresMonotype (PositionedBinder _ _ b) = binderRequiresMonotype b
+binderRequiresMonotype (TypedBinder ty b) = isMonoType ty || binderRequiresMonotype b
 binderRequiresMonotype _ = True
 
 -- | Instantiate polytypes only when necessitated by a binder.
