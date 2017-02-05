@@ -326,10 +326,15 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 
   getOutputTimestamp :: ModuleName -> Make (Maybe UTCTime)
   getOutputTimestamp mn = do
+    dumpCoreFn <- asks optionsDumpCoreFn
     let filePath = T.unpack (runModuleName mn)
         jsFile = outputDir </> filePath </> "index.js"
         externsFile = outputDir </> filePath </> "externs.json"
-    min <$> getTimestamp jsFile <*> getTimestamp externsFile
+        coreFnFile = outputDir </> filePath </> "corefn.json"
+        min3 js exts coreFn
+          | dumpCoreFn = min (min js exts) coreFn
+          | otherwise = min js exts
+    min3 <$> getTimestamp jsFile <*> getTimestamp externsFile <*> getTimestamp coreFnFile
 
   readExterns :: ModuleName -> Make (FilePath, Externs)
   readExterns mn = do
