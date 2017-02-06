@@ -18,6 +18,7 @@ import Language.PureScript.Externs
 import Language.PureScript.Sugar.BindingGroups as S
 import Language.PureScript.Sugar.CaseDeclarations as S
 import Language.PureScript.Sugar.DoNotation as S
+import Language.PureScript.Sugar.LetPattern as S
 import Language.PureScript.Sugar.Names as S
 import Language.PureScript.Sugar.ObjectWildcards as S
 import Language.PureScript.Sugar.Operators as S
@@ -57,6 +58,7 @@ desugar externs =
   map desugarSignedLiterals
     >>> traverse desugarObjectConstructors
     >=> traverse desugarDoModule
+    >=> traverse desugarLetPatternModule
     >=> traverse desugarCasesModule
     >=> traverse desugarTypeDeclarationsModule
     >=> desugarImports externs
