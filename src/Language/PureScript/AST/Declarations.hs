@@ -390,6 +390,9 @@ data Declaration
   --
   | ValueDeclaration Ident NameKind [Binder] (Either [(Guard, Expr)] Expr)
   -- |
+  -- A binded value declaration (binder, optional guard, value)
+  | BoundValueDeclaration Binder Expr
+  -- |
   -- A minimal mutually recursive set of value declarations
   --
   | BindingGroupDeclaration [(Ident, NameKind, Expr)]

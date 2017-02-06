@@ -63,6 +63,17 @@ parseTypeSynonymDeclaration =
                          <*> many (indented *> kindedIdent)
                          <*> (indented *> equals *> noWildcards parsePolyType)
 
+parseValueWithWhereClause :: TokenParser Expr
+parseValueWithWhereClause = do
+  indented
+  value <- parseValue
+  whereClause <- P.optionMaybe $ do
+    indented
+    reserved "where"
+    indented
+    mark $ P.many1 (same *> parseLocalDeclaration)
+  return $ maybe value (`Let` value) whereClause
+
 parseValueDeclaration :: TokenParser Declaration
 parseValueDeclaration = do
   name <- parseIdent
@@ -73,17 +84,12 @@ parseValueDeclaration = do
                                ))
        <|> Right <$> (indented *> equals *> parseValueWithWhereClause)
   return $ ValueDeclaration name Public binders value
-  where
-  parseValueWithWhereClause :: TokenParser Expr
-  parseValueWithWhereClause = do
-    indented
-    value <- parseValue
-    whereClause <- P.optionMaybe $ do
-      indented
-      reserved "where"
-      indented
-      mark $ P.many1 (same *> parseLocalDeclaration)
-    return $ maybe value (`Let` value) whereClause
+
+parseBoundValueDeclaration :: TokenParser Declaration
+parseBoundValueDeclaration = do
+  binder <- parseBinderLocalDecl
+  value <- indented *> equals *> parseValueWithWhereClause
+  return $ BoundValueDeclaration binder value
 
 parseExternDeclaration :: TokenParser Declaration
 parseExternDeclaration = reserved "foreign" *> indented *> reserved "import" *> indented *> parseExternAlt where
@@ -231,6 +237,7 @@ parseLocalDeclaration :: TokenParser Declaration
 parseLocalDeclaration = positioned (P.choice
                    [ parseTypeDeclaration
                    , parseValueDeclaration
+                   , parseBoundValueDeclaration
                    ] P.<?> "local declaration")
 
 -- | Parse a module header and a collection of declarations
@@ -563,6 +570,15 @@ parseBinderNoParens = P.choice
                       , parseArrayBinder
                       , ParensInBinder <$> parens parseBinder
                       ] P.<?> "binder"
+
+parseBinderLocalDecl :: TokenParser Binder
+parseBinderLocalDecl = P.choice
+  [ parseVarOrNamedBinder
+  , parseConstructorBinder
+  , parseObjectBinder
+  , parseArrayBinder
+  , ParensInBinder <$> parens parseBinderLocalDecl
+  ] P.<?> "binder"
 
 -- | Parse a guard
 parseGuard :: TokenParser Guard
