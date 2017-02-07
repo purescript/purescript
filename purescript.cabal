@@ -360,7 +360,7 @@ executable psc
                    utf8-string >= 1 && < 2
     main-is: Main.hs
     buildable: True
-    hs-source-dirs: psc
+    hs-source-dirs: app
     other-modules: Paths_purescript
     ghc-options: -Wall -O2 -fno-warn-unused-do-bind -threaded -rtsopts "-with-rtsopts=-N"
 
