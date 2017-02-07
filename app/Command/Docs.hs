@@ -1,37 +1,34 @@
 {-# LANGUAGE TupleSections #-}
 
-module Main where
+module Command.Docs (command, infoModList) where
 
-import Control.Applicative
-import Control.Monad.Trans.Except (runExceptT)
-import Control.Arrow (first, second)
-import Control.Category ((>>>))
-import Control.Monad.Writer
-import Data.Text (Text)
+import           Command.Docs.Etags
+import           Command.Docs.Ctags
+import           Control.Applicative
+import           Control.Arrow (first, second)
+import           Control.Category ((>>>))
+import           Control.Monad.Writer
+import           Control.Monad.Trans.Except (runExceptT)
+import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
-import Data.Function (on)
-import Data.List
-import Data.Maybe (fromMaybe)
-import Data.Tuple (swap)
-import Data.Version (showVersion)
-
-import Options.Applicative
-import qualified Text.PrettyPrint.ANSI.Leijen as PP
-
+import           Data.Function (on)
+import           Data.List
+import           Data.Maybe (fromMaybe)
+import           Data.Tuple (swap)
+import           Data.Version (showVersion)
 import qualified Language.PureScript as P
-import qualified Paths_purescript as Paths
-import System.Exit (exitFailure)
-import System.IO (hPutStrLn, hPrint, hSetEncoding, stderr, stdout, utf8)
-import System.IO.UTF8 (readUTF8FileT, writeUTF8FileT)
-import System.Directory (createDirectoryIfMissing)
-import System.FilePath (takeDirectory)
-import System.FilePath.Glob (glob)
-
-import Etags
-import Ctags
 import qualified Language.PureScript.Docs as D
 import qualified Language.PureScript.Docs.AsMarkdown as D
+import qualified Options.Applicative as Opts
+import qualified Paths_purescript as Paths
+import qualified Text.PrettyPrint.ANSI.Leijen as PP
+import           System.Directory (createDirectoryIfMissing)
+import           System.Exit (exitFailure)
+import           System.FilePath (takeDirectory)
+import           System.FilePath.Glob (glob)
+import           System.IO (hPutStrLn, hPrint, stderr)
+import           System.IO.UTF8 (readUTF8FileT, writeUTF8FileT)
 
 -- Available output formats
 data Format = Markdown -- Output documentation in Markdown format
@@ -47,9 +44,9 @@ data DocgenOutput
   deriving (Show)
 
 data PSCDocsOptions = PSCDocsOptions
-  { pscdFormat :: Format
-  , pscdInputFiles  :: [FilePath]
-  , pscdDocgen :: DocgenOutput
+  { _pscdFormat :: Format
+  , _pscdInputFiles  :: [FilePath]
+  , _pscdDocgen :: DocgenOutput
   }
   deriving (Show)
 
@@ -145,10 +142,10 @@ dumpTags input renderTags = do
 parseFile :: FilePath -> IO (FilePath, Text)
 parseFile input = (,) input <$> readUTF8FileT input
 
-inputFile :: Parser FilePath
-inputFile = strArgument $
-     metavar "FILE"
-  <> help "The input .purs file(s)"
+inputFile :: Opts.Parser FilePath
+inputFile = Opts.strArgument $
+     Opts.metavar "FILE"
+  <> Opts.help "The input .purs file(s)"
 
 instance Read Format where
   readsPrec _ "etags" = [(Etags, "")]
@@ -156,18 +153,18 @@ instance Read Format where
   readsPrec _ "markdown" = [(Markdown, "")]
   readsPrec _ _ = []
 
-format :: Parser Format
-format = option auto $ value Markdown
-         <> long "format"
-         <> metavar "FORMAT"
-         <> help "Set output FORMAT (markdown | etags | ctags)"
+format :: Opts.Parser Format
+format = Opts.option Opts.auto $ Opts.value Markdown
+         <> Opts.long "format"
+         <> Opts.metavar "FORMAT"
+         <> Opts.help "Set output FORMAT (markdown | etags | ctags)"
 
-docgenModule :: Parser String
-docgenModule = strOption $
-                   long "docgen"
-                <> help "A list of module names which should appear in the output. This can optionally include file paths to write individual modules to, by separating with a colon ':'. For example, Prelude:docs/Prelude.md. This option may be specified multiple times."
+docgenModule :: Opts.Parser String
+docgenModule = Opts.strOption $
+                   Opts.long "docgen"
+                <> Opts.help "A list of module names which should appear in the output. This can optionally include file paths to write individual modules to, by separating with a colon ':'. For example, Prelude:docs/Prelude.md. This option may be specified multiple times."
 
-pscDocsOptions :: Parser (Format, [FilePath], [String])
+pscDocsOptions :: Opts.Parser (Format, [FilePath], [String])
 pscDocsOptions = (,,) <$> format <*> many inputFile <*> many docgenModule
 
 parseDocgen :: [String] -> Either String DocgenOutput
@@ -218,20 +215,15 @@ buildOptions (fmt, input, mapping) =
       hPutStrLn stderr ("  " ++ err)
       exitFailure
 
-main :: IO ()
-main = do
-  hSetEncoding stdout utf8
-  hSetEncoding stderr utf8
-  execParser opts >>= buildOptions >>= docgen
-  where
-  opts        = info (version <*> helper <*> pscDocsOptions) infoModList
-  infoModList = fullDesc <> headerInfo <> footerInfo
-  headerInfo  = header "psc-docs - Generate Markdown documentation from PureScript source files"
-  footerInfo  = footerDoc $ Just $ PP.vcat
-                  [ examples, PP.empty, PP.text ("psc-docs " ++ showVersion Paths.version) ]
+command :: Opts.Parser (IO ())
+command = (buildOptions >=> docgen) <$> (version <*> Opts.helper <*> pscDocsOptions) where
+  version :: Opts.Parser (a -> a)
+  version = Opts.abortOption (Opts.InfoMsg (showVersion Paths.version)) $ Opts.long "version" <> Opts.help "Show the version number" <> Opts.hidden
 
-  version :: Parser (a -> a)
-  version = abortOption (InfoMsg (showVersion Paths.version)) $ long "version" <> help "Show the version number" <> hidden
+infoModList :: Opts.InfoMod a
+infoModList = Opts.fullDesc <> footerInfo where
+  footerInfo = Opts.footerDoc $ Just $ PP.vcat
+                 [ examples, PP.empty, PP.text ("psc-docs " ++ showVersion Paths.version) ]
 
 examples :: PP.Doc
 examples =

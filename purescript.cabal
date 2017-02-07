@@ -343,6 +343,7 @@ executable psc
     build-depends: base >=4 && <5,
                    aeson >= 0.8 && < 1.0,
                    ansi-terminal >= 0.6.2 && < 0.7,
+                   ansi-wl-pprint -any,
                    base-compat >=0.6.0,
                    boxes >= 0.1.4 && < 0.2.0,
                    bytestring -any,
@@ -359,6 +360,7 @@ executable psc
                    process -any,
                    purescript -any,
                    sourcemap >= 0.1.6,
+                   split -any,
                    stm >= 0.2.4.0,
                    text -any,
                    time -any,
@@ -373,30 +375,14 @@ executable psc
     buildable: True
     hs-source-dirs: app
     other-modules: Paths_purescript
+                   Command.Bundle
+                   Command.Compile
+                   Command.Docs
+                   Command.Docs.Ctags
+                   Command.Docs.Etags
+                   Command.Docs.Tags
+                   Command.REPL
     ghc-options: -Wall -O2 -fno-warn-unused-do-bind -threaded -rtsopts "-with-rtsopts=-N"
-
-executable psc-docs
-    build-depends: base >=4 && <5,
-                   purescript -any,
-                   ansi-wl-pprint -any,
-                   directory -any,
-                   filepath -any,
-                   Glob -any,
-                   mtl -any,
-                   optparse-applicative >= 0.13.0,
-                   process -any,
-                   split -any,
-                   text -any,
-                   transformers -any,
-                   transformers-compat -any
-    main-is: Main.hs
-    other-modules: Paths_purescript
-    buildable: True
-    hs-source-dirs: psc-docs
-    other-modules: Ctags
-                   Etags
-                   Tags
-    ghc-options: -Wall -O2
 
 executable psc-publish
     build-depends: base >=4 && <5,
