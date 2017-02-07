@@ -354,10 +354,13 @@ executable psc
                    Glob >= 0.7 && < 0.8,
                    haskeline >= 0.7.0.0,
                    http-types == 0.9.*,
+                   monad-logger -any,
                    mtl -any,
+                   network -any,
                    optparse-applicative >= 0.13.0,
                    parsec -any,
                    process -any,
+                   protolude >= 0.1.6,
                    purescript -any,
                    sourcemap >= 0.1.6,
                    split -any,
@@ -382,30 +385,10 @@ executable psc
                    Command.Docs.Etags
                    Command.Docs.Tags
                    Command.Hierarchy
+                   Command.IDE
                    Command.Publish
                    Command.REPL
     ghc-options: -Wall -O2 -fno-warn-unused-do-bind -threaded -rtsopts "-with-rtsopts=-N"
-
-executable psc-ide-server
-  main-is:             Main.hs
-  other-modules:       Paths_purescript
-  other-extensions:
-  build-depends:       base >=4 && <5,
-                       aeson >= 0.8 && < 1.0,
-                       bytestring -any,
-                       purescript -any,
-                       directory -any,
-                       filepath -any,
-                       monad-logger -any,
-                       mtl -any,
-                       network -any,
-                       optparse-applicative >= 0.13.0,
-                       protolude >= 0.1.6,
-                       stm -any,
-                       text -any,
-                       transformers -any
-  ghc-options:         -Wall -O2 -threaded
-  hs-source-dirs:      psc-ide-server
 
 test-suite tests
     build-depends: base >=4 && <5,

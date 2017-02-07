@@ -11,6 +11,7 @@ import qualified Command.Bundle as Bundle
 import qualified Command.Compile as Compile
 import qualified Command.Docs as Docs
 import qualified Command.Hierarchy as Hierarchy
+import qualified Command.IDE as IDE
 import qualified Command.Publish as Publish
 import qualified Command.REPL as REPL
 import           Data.Foldable (fold)
@@ -40,20 +41,23 @@ main = do
     commands = (Opts.subparser . fold)
         [ Opts.command "compile"
             (Opts.info Compile.command
-            (Opts.progDesc "Compile PureScript source files"))
+              (Opts.progDesc "Compile PureScript source files"))
         , Opts.command "repl"
             (Opts.info REPL.command
-            (Opts.progDesc "Enter the interactive mode (PSCi)"))
+              (Opts.progDesc "Enter the interactive mode (PSCi)"))
         , Opts.command "bundle"
             (Opts.info Bundle.command
-            (Opts.progDesc "Bundle compiled PureScript modules for the browser"))
+              (Opts.progDesc "Bundle compiled PureScript modules for the browser"))
         , Opts.command "docs"
             (Opts.info Docs.command
-            (Opts.progDesc "Generate Markdown documentation from PureScript source files" <> Docs.infoModList))
+              (Opts.progDesc "Generate Markdown documentation from PureScript source files" <> Docs.infoModList))
         , Opts.command "hierarchy"
             (Opts.info Hierarchy.command
-            (Opts.progDesc "Generate a GraphViz directed graph of PureScript type classes"))
+              (Opts.progDesc "Generate a GraphViz directed graph of PureScript type classes"))
         , Opts.command "publish"
             (Opts.info Publish.command
-            (Opts.progDesc "Generates documentation packages for upload to Pursuit"))
+              (Opts.progDesc "Generates documentation packages for upload to Pursuit"))
+        , Opts.command "ide"
+            (Opts.info IDE.command
+              (Opts.progDesc "Start an IDE server process"))
         ]
