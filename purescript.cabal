@@ -341,60 +341,38 @@ library
 
 executable psc
     build-depends: base >=4 && <5,
-                   purescript -any,
                    aeson >= 0.8 && < 1.0,
                    ansi-terminal >= 0.6.2 && < 0.7,
-                   base-compat >=0.6.0,
-                   bytestring -any,
-                   containers -any,
-                   directory -any,
-                   filepath -any,
-                   Glob >= 0.7 && < 0.8,
-                   mtl -any,
-                   optparse-applicative >= 0.13.0,
-                   parsec -any,
-                   text -any,
-                   time -any,
-                   transformers -any,
-                   transformers-compat -any,
-                   utf8-string >= 1 && < 2
-    main-is: Main.hs
-    buildable: True
-    hs-source-dirs: app
-    other-modules: Paths_purescript
-    ghc-options: -Wall -O2 -fno-warn-unused-do-bind -threaded -rtsopts "-with-rtsopts=-N"
-
-executable psci
-    build-depends: base >=4 && <5,
-                   purescript -any,
                    base-compat >=0.6.0,
                    boxes >= 0.1.4 && < 0.2.0,
                    bytestring -any,
                    containers -any,
                    directory -any,
-                   filepath -any,
                    file-embed -any,
-                   Glob -any,
+                   filepath -any,
+                   Glob >= 0.7 && < 0.8,
                    haskeline >= 0.7.0.0,
                    http-types == 0.9.*,
                    mtl -any,
                    optparse-applicative >= 0.13.0,
                    parsec -any,
                    process -any,
+                   purescript -any,
                    stm >= 0.2.4.0,
                    text -any,
                    time -any,
                    transformers -any,
                    transformers-compat -any,
+                   utf8-string >= 1 && < 2,
                    wai == 3.*,
                    wai-websockets == 3.*,
                    warp == 3.*,
                    websockets >= 0.9 && <0.10
     main-is: Main.hs
     buildable: True
-    hs-source-dirs: psci
+    hs-source-dirs: app
     other-modules: Paths_purescript
-    ghc-options: -Wall -O2
+    ghc-options: -Wall -O2 -fno-warn-unused-do-bind -threaded -rtsopts "-with-rtsopts=-N"
 
 executable psc-docs
     build-depends: base >=4 && <5,

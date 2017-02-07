@@ -8,6 +8,7 @@
 module Main where
 
 import qualified Command.Compile as Compile
+import qualified Command.REPL as REPL
 import           Data.Foldable (fold)
 import           Data.Monoid ((<>))
 import           Data.Version (showVersion)
@@ -36,4 +37,7 @@ main = do
         [ Opts.command "compile"
             (Opts.info (Compile.command)
             (Opts.progDesc "Compile PureScript source files"))
+        , Opts.command "repl"
+            (Opts.info (REPL.command)
+            (Opts.progDesc "Enter the interactive mode (PSCi)"))
         ]

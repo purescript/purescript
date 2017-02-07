@@ -10,7 +10,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 
-module Main (main) where
+module Command.REPL (command) where
 
 import           Prelude ()
 import           Prelude.Compat
@@ -102,20 +102,6 @@ psciOptions :: Opts.Parser PSCiOptions
 psciOptions = PSCiOptions <$> many inputFile
                           <*> backend
 
-version :: Opts.Parser (a -> a)
-version = Opts.abortOption (Opts.InfoMsg (showVersion Paths.version)) $
-            Opts.long "version" <>
-            Opts.help "Show the version number" <>
-            Opts.hidden
-
-getOpt :: IO PSCiOptions
-getOpt = Opts.execParser opts
-    where
-      opts        = Opts.info (version <*> Opts.helper <*> psciOptions) infoModList
-      infoModList = Opts.fullDesc <> headerInfo <> footerInfo
-      headerInfo  = Opts.header   "psci - Interactive mode for PureScript"
-      footerInfo  = Opts.footer $ "psci " ++ showVersion Paths.version
-
 -- | Parses the input and returns either a command, or an error as a 'String'.
 getCommand :: forall m. MonadException m => InputT m (Either String (Maybe Command))
 getCommand = handleInterrupt (return (Right Nothing)) $ do
@@ -143,10 +129,10 @@ bundle = runExceptT $ do
   Bundle.bundle input [] Nothing "PSCI"
 
 indexJS :: IsString string => string
-indexJS = $(embedStringFile "psci/static/index.js")
+indexJS = $(embedStringFile "app/static/index.js")
 
 indexPage :: IsString string => string
-indexPage = $(embedStringFile "psci/static/index.html")
+indexPage = $(embedStringFile "app/static/index.html")
 
 -- | All of the functions required to implement a PSCi backend
 data Backend = forall state. Backend
@@ -321,9 +307,14 @@ nodeBackend nodePath nodeArgs = Backend setup eval reload shutdown
     shutdown :: () -> IO ()
     shutdown _ = return ()
 
+options :: Opts.Parser PSCiOptions
+options = version <*> Opts.helper <*> psciOptions where
+  version :: Opts.Parser (a -> a)
+  version = Opts.abortOption (Opts.InfoMsg (showVersion Paths.version)) $ Opts.long "version" <> Opts.help "Show the version number" <> Opts.hidden
+
 -- | Get command line options and drop into the REPL
-main :: IO ()
-main = getOpt >>= loop
+command :: Opts.Parser (IO ())
+command = loop <$> options
   where
     loop :: PSCiOptions -> IO ()
     loop PSCiOptions{..} = do
