@@ -144,6 +144,16 @@ sourceMaps = switch $
      long "source-maps"
   <> help "Generate source maps"
 
+dumpParsed :: Parser Bool
+dumpParsed = switch $
+     long "dump-parsed"
+  <> help "Dump the abstract syntax tree of the compiled code at output/*/parsed.dump-parsed"
+
+dumpDesugared :: Parser Bool
+dumpDesugared = switch $
+     long "dump-desugared"
+  <> help "Dump the desugared source of the compiled code at output/*/desugared.dump-desugared"
+
 dumpCoreFn :: Parser Bool
 dumpCoreFn = switch $
      long "dump-corefn"
@@ -158,6 +168,8 @@ options = P.Options <$> noTco
                     <*> verboseErrors
                     <*> (not <$> comments)
                     <*> sourceMaps
+                    <*> dumpParsed
+                    <*> dumpDesugared
                     <*> dumpCoreFn
 
 pscMakeOptions :: Parser PSCMakeOptions

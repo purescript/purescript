@@ -47,3 +47,6 @@ printToStderr = hPutStr stderr . Boxes.render
 
 printToStdout :: Boxes.Box -> IO ()
 printToStdout = putStr . Boxes.render
+
+renderToFile :: FilePath -> Boxes.Box -> IO ()
+renderToFile file = writeFile file . Boxes.render
