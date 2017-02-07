@@ -10,6 +10,7 @@ module Main where
 import qualified Command.Bundle as Bundle
 import qualified Command.Compile as Compile
 import qualified Command.Docs as Docs
+import qualified Command.Hierarchy as Hierarchy
 import qualified Command.REPL as REPL
 import           Data.Foldable (fold)
 import           Data.Monoid ((<>))
@@ -48,4 +49,7 @@ main = do
         , Opts.command "docs"
             (Opts.info Docs.command
             (Opts.progDesc "Generate Markdown documentation from PureScript source files" <> Docs.infoModList))
+        , Opts.command "hierarchy"
+            (Opts.info Hierarchy.command
+            (Opts.progDesc "Generate a GraphViz directed graph of PureScript type classes"))
         ]

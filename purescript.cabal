@@ -381,6 +381,7 @@ executable psc
                    Command.Docs.Ctags
                    Command.Docs.Etags
                    Command.Docs.Tags
+                   Command.Hierarchy
                    Command.REPL
     ghc-options: -Wall -O2 -fno-warn-unused-do-bind -threaded -rtsopts "-with-rtsopts=-N"
 
@@ -396,24 +397,6 @@ executable psc-publish
     other-modules: Paths_purescript
     buildable: True
     hs-source-dirs: psc-publish
-    ghc-options: -Wall -O2
-
-executable psc-hierarchy
-    build-depends: base >=4 && <5,
-                   purescript -any,
-                   directory -any,
-                   filepath -any,
-                   Glob -any,
-                   mtl -any,
-                   optparse-applicative >= 0.13.0,
-                   parsec -any,
-                   process -any,
-                   text -any
-    main-is: Main.hs
-    other-modules: Paths_purescript
-    buildable: True
-    hs-source-dirs: hierarchy
-    other-modules:
     ghc-options: -Wall -O2
 
 executable psc-ide-server
