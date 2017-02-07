@@ -92,6 +92,8 @@ extra-source-files: examples/passing/*.purs
                   , examples/docs/bower_components/purescript-prelude/src/*.purs
                   , examples/docs/bower.json
                   , examples/docs/src/*.purs
+                  , app/static/index.html
+                  , app/static/index.js
                   , tests/support/package.json
                   , tests/support/bower.json
                   , tests/support/setup-win.cmd
