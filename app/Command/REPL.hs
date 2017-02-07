@@ -34,7 +34,6 @@ import           Data.Monoid ((<>))
 import           Data.String (IsString(..))
 import           Data.Text (Text, unpack)
 import           Data.Traversable (for)
-import           Data.Version (showVersion)
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Bundle as Bundle
 import           Language.PureScript.Interactive
@@ -46,7 +45,6 @@ import qualified Network.Wai.Handler.Warp as Warp
 import qualified Network.Wai.Handler.WebSockets as WS
 import qualified Network.WebSockets as WS
 import qualified Options.Applicative as Opts
-import qualified Paths_purescript as Paths
 import           System.Console.Haskeline
 import           System.IO.UTF8 (readUTF8File)
 import           System.Exit
@@ -301,9 +299,7 @@ nodeBackend nodePath nodeArgs = Backend setup eval reload shutdown
     shutdown _ = return ()
 
 options :: Opts.Parser PSCiOptions
-options = version <*> Opts.helper <*> psciOptions where
-  version :: Opts.Parser (a -> a)
-  version = Opts.abortOption (Opts.InfoMsg (showVersion Paths.version)) $ Opts.long "version" <> Opts.help "Show the version number" <> Opts.hidden
+options = Opts.helper <*> psciOptions
 
 -- | Get command line options and drop into the REPL
 command :: Opts.Parser (IO ())

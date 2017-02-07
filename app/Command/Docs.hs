@@ -16,12 +16,10 @@ import           Data.Function (on)
 import           Data.List
 import           Data.Maybe (fromMaybe)
 import           Data.Tuple (swap)
-import           Data.Version (showVersion)
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Docs as D
 import qualified Language.PureScript.Docs.AsMarkdown as D
 import qualified Options.Applicative as Opts
-import qualified Paths_purescript as Paths
 import qualified Text.PrettyPrint.ANSI.Leijen as PP
 import           System.Directory (createDirectoryIfMissing)
 import           System.Exit (exitFailure)
@@ -216,30 +214,27 @@ buildOptions (fmt, input, mapping) =
       exitFailure
 
 command :: Opts.Parser (IO ())
-command = (buildOptions >=> docgen) <$> (version <*> Opts.helper <*> pscDocsOptions) where
-  version :: Opts.Parser (a -> a)
-  version = Opts.abortOption (Opts.InfoMsg (showVersion Paths.version)) $ Opts.long "version" <> Opts.help "Show the version number" <> Opts.hidden
+command = (buildOptions >=> docgen) <$> (Opts.helper <*> pscDocsOptions)
 
 infoModList :: Opts.InfoMod a
 infoModList = Opts.fullDesc <> footerInfo where
-  footerInfo = Opts.footerDoc $ Just $ PP.vcat
-                 [ examples, PP.empty, PP.text ("psc-docs " ++ showVersion Paths.version) ]
+  footerInfo = Opts.footerDoc $ Just examples
 
 examples :: PP.Doc
 examples =
   PP.vcat $ map PP.text
     [ "Examples:"
     , "  print documentation for Data.List to stdout:"
-    , "    psc-docs \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\" \\"
+    , "    purs docs \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\" \\"
     , "      --docgen Data.List"
     , ""
     , "  write documentation for Data.List to docs/Data.List.md:"
-    , "    psc-docs \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\" \\"
+    , "    purs docs \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\" \\"
     , "      --docgen Data.List:docs/Data.List.md"
     , ""
     , "  write documentation for Data.List to docs/Data.List.md, and"
     , "  documentation for Data.List.Lazy to docs/Data.List.Lazy.md:"
-    , "    psc-docs \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\" \\"
+    , "    purs docs \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\" \\"
     , "      --docgen Data.List:docs/Data.List.md \\"
     , "      --docgen Data.List.Lazy:docs/Data.List.Lazy.md"
     ]

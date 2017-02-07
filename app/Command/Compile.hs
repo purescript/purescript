@@ -15,12 +15,10 @@ import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.UTF8 as BU8
 import qualified Data.Map as M
 import           Data.Text (Text)
-import           Data.Version (showVersion)
 import qualified Language.PureScript as P
 import           Language.PureScript.Errors.JSON
 import           Language.PureScript.Make
 import qualified Options.Applicative as Opts
-import qualified Paths_purescript as Paths
 import qualified System.Console.ANSI as ANSI
 import           System.Exit (exitSuccess, exitFailure)
 import           System.FilePath.Glob (glob)
@@ -144,6 +142,4 @@ pscMakeOptions = PSCMakeOptions <$> many inputFile
                                 <*> jsonErrors
 
 command :: Opts.Parser (IO ())
-command = compile <$> (version <*> Opts.helper <*> pscMakeOptions) where
-  version :: Opts.Parser (a -> a)
-  version = Opts.abortOption (Opts.InfoMsg (showVersion Paths.version)) $ Opts.long "version" <> Opts.help "Show the version number" <> Opts.hidden
+command = compile <$> (Opts.helper <*> pscMakeOptions)

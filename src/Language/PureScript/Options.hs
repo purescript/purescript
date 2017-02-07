@@ -10,7 +10,7 @@ data Options = Options
   , optionsNoComments :: Bool
   -- ^ Remove the comments from the generated js
   , optionsSourceMaps :: Bool
-  -- ^ Generate soure maps
+  -- ^ Generate source maps
   , optionsDumpCoreFn :: Bool
   -- ^ Dump CoreFn
   } deriving Show

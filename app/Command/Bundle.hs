@@ -7,7 +7,6 @@
 module Command.Bundle (command) where
 
 import           Data.Traversable (for)
-import           Data.Version (showVersion)
 import           Data.Monoid ((<>))
 import           Data.Aeson (encode)
 import           Data.Maybe (isNothing)
@@ -25,9 +24,8 @@ import           System.Directory (createDirectoryIfMissing, getCurrentDirectory
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.UTF8 as BU8
 import           Language.PureScript.Bundle
-import           Options.Applicative (Parser, ParseError (..))
+import           Options.Applicative (Parser)
 import qualified Options.Applicative as Opts
-import qualified Paths_purescript as Paths
 import           SourceMap
 import           SourceMap.Types
 
@@ -111,7 +109,7 @@ options = Options <$> some inputFile
 
 -- | Make it go.
 command :: Opts.Parser (IO ())
-command = run <$> (version <*> Opts.helper <*> options) where
+command = run <$> (Opts.helper <*> options) where
   run :: Options -> IO ()
   run opts = do
     output <- runExceptT (app opts)
@@ -129,7 +127,3 @@ command = run <$> (version <*> Opts.helper <*> options) where
                 writeUTF8File (outputFile <.> "map") $ BU8.toString . B.toStrict . encode $ generate sm
               Nothing -> writeUTF8File outputFile js
           Nothing -> putStrLn js
-
-  version :: Parser (a -> a)
-  version = Opts.abortOption (InfoMsg (showVersion Paths.version)) $
-    Opts.long "version" <> Opts.help "Show the version number" <> Opts.hidden

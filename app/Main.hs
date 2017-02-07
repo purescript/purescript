@@ -11,7 +11,7 @@ import qualified Command.Bundle as Bundle
 import qualified Command.Compile as Compile
 import qualified Command.Docs as Docs
 import qualified Command.Hierarchy as Hierarchy
-import qualified Command.IDE as IDE
+import qualified Command.Ide as Ide
 import qualified Command.Publish as Publish
 import qualified Command.REPL as REPL
 import           Data.Foldable (fold)
@@ -38,26 +38,27 @@ main = do
       Opts.long "version" <> Opts.help "Show the version number" <> Opts.hidden
 
     commands :: Opts.Parser (IO ())
-    commands = (Opts.subparser . fold)
-        [ Opts.command "compile"
-            (Opts.info Compile.command
-              (Opts.progDesc "Compile PureScript source files"))
-        , Opts.command "repl"
-            (Opts.info REPL.command
-              (Opts.progDesc "Enter the interactive mode (PSCi)"))
-        , Opts.command "bundle"
+    commands =
+      (Opts.subparser . fold)
+        [ Opts.command "bundle"
             (Opts.info Bundle.command
               (Opts.progDesc "Bundle compiled PureScript modules for the browser"))
+        , Opts.command "compile"
+            (Opts.info Compile.command
+              (Opts.progDesc "Compile PureScript source files"))
         , Opts.command "docs"
             (Opts.info Docs.command
               (Opts.progDesc "Generate Markdown documentation from PureScript source files" <> Docs.infoModList))
         , Opts.command "hierarchy"
             (Opts.info Hierarchy.command
               (Opts.progDesc "Generate a GraphViz directed graph of PureScript type classes"))
+        , Opts.command "ide"
+            (Opts.info Ide.command
+              (Opts.progDesc "Start an IDE server process"))
         , Opts.command "publish"
             (Opts.info Publish.command
               (Opts.progDesc "Generates documentation packages for upload to Pursuit"))
-        , Opts.command "ide"
-            (Opts.info IDE.command
-              (Opts.progDesc "Start an IDE server process"))
+        , Opts.command "repl"
+            (Opts.info REPL.command
+              (Opts.progDesc "Enter the interactive mode (PSCi)"))
         ]

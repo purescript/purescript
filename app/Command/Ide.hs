@@ -19,7 +19,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE NoImplicitPrelude     #-}
 
-module Command.IDE (command) where
+module Command.Ide (command) where
 
 import           Protolude
 
@@ -28,7 +28,6 @@ import           Control.Concurrent.STM
 import           "monad-logger" Control.Monad.Logger
 import qualified Data.Text.IO                      as T
 import qualified Data.ByteString.Lazy.Char8        as BS8
-import           Data.Version                      (showVersion)
 import           GHC.IO.Exception                  (IOErrorType(..), IOException(..))
 import           Language.PureScript.Ide
 import           Language.PureScript.Ide.Command
@@ -40,14 +39,12 @@ import           Network                           hiding (socketPort, accept)
 import           Network.BSD                       (getProtocolNumber)
 import           Network.Socket                    hiding (PortNumber, Type,
                                                     sClose)
-import           Options.Applicative               (ParseError (..))
 import qualified Options.Applicative               as Opts
 import           System.Directory
 import           System.Info                       as SysInfo
 import           System.FilePath
 import           System.IO                         hiding (putStrLn, print)
 import           System.IO.Error                   (isEOFError)
-import qualified Paths_purescript                  as Paths
 
 listenOnLocalhost :: PortNumber -> IO Socket
 listenOnLocalhost port = do
@@ -74,7 +71,7 @@ data Options = Options
   } deriving (Show)
 
 command :: Opts.Parser (IO ())
-command = run <$> (version <*> Opts.helper <*> parser) where
+command = run <$> (Opts.helper <*> parser) where
   run :: Options -> IO ()
   run opts'@(Options dir globs outputPath port noWatch polling debug logLevel) = do
     when debug (putText "Parsed Options:" *> print opts')
@@ -118,10 +115,6 @@ command = run <$> (version <*> Opts.helper <*> parser) where
     "all" -> LogAll
     "none" -> LogNone
     _ -> LogDefault
-
-  version = Opts.abortOption
-    (InfoMsg (showVersion Paths.version))
-    (Opts.long "version" `mappend` Opts.help "Show the version number")
 
   -- polling is the default on Windows and the flag turns it off. See
   -- #2209 and #2414 for explanations

@@ -7,12 +7,11 @@ import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy.Char8 as BL
 import           Data.Monoid ((<>))
 import           Data.Time.Clock (getCurrentTime)
-import           Data.Version (Version(..), showVersion)
+import           Data.Version (Version(..))
 import           Language.PureScript.Publish
 import           Language.PureScript.Publish.ErrorsWarnings
-import           Options.Applicative (Parser, ParseError (..))
+import           Options.Applicative (Parser)
 import qualified Options.Applicative as Opts
-import qualified Paths_purescript as Paths
 
 dryRun :: Parser Bool
 dryRun = Opts.switch $
@@ -28,10 +27,7 @@ dryRunOptions = defaultPublishOptions
   where dummyVersion = ("0.0.0", Version [0,0,0] [])
 
 command :: Opts.Parser (IO ())
-command = publish <$> (version <*> Opts.helper <*> dryRun) where
-  version :: Parser (a -> a)
-  version = Opts.abortOption (InfoMsg (showVersion Paths.version)) $
-    Opts.long "version" <> Opts.help "Show the version number" <> Opts.hidden
+command = publish <$> (Opts.helper <*> dryRun)
 
 publish :: Bool -> IO ()
 publish isDryRun =
