@@ -19,7 +19,7 @@
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE NoImplicitPrelude     #-}
 
-module Main where
+module Command.IDE (command) where
 
 import           Protolude
 
@@ -63,66 +63,69 @@ listenOnLocalhost port = do
       pure sock)
 
 data Options = Options
-  { optionsDirectory  :: Maybe FilePath
-  , optionsGlobs      :: [FilePath]
-  , optionsOutputPath :: FilePath
-  , optionsPort       :: PortNumber
-  , optionsNoWatch    :: Bool
-  , optionsPolling    :: Bool
-  , optionsDebug      :: Bool
-  , optionsLoglevel   :: IdeLogLevel
+  { _optionsDirectory  :: Maybe FilePath
+  , _optionsGlobs      :: [FilePath]
+  , _optionsOutputPath :: FilePath
+  , _optionsPort       :: PortNumber
+  , _optionsNoWatch    :: Bool
+  , _optionsPolling    :: Bool
+  , _optionsDebug      :: Bool
+  , _optionsLoglevel   :: IdeLogLevel
   } deriving (Show)
 
-main :: IO ()
-main = do
-  opts'@(Options dir globs outputPath port noWatch polling debug logLevel) <- Opts.execParser opts
-  when debug (putText "Parsed Options:" *> print opts')
-  maybe (pure ()) setCurrentDirectory dir
-  ideState <- newTVarIO emptyIdeState
-  cwd <- getCurrentDirectory
-  let fullOutputPath = cwd </> outputPath
+command :: Opts.Parser (IO ())
+command = run <$> (version <*> Opts.helper <*> parser) where
+  run :: Options -> IO ()
+  run opts'@(Options dir globs outputPath port noWatch polling debug logLevel) = do
+    when debug (putText "Parsed Options:" *> print opts')
+    maybe (pure ()) setCurrentDirectory dir
+    ideState <- newTVarIO emptyIdeState
+    cwd <- getCurrentDirectory
+    let fullOutputPath = cwd </> outputPath
 
-  unlessM (doesDirectoryExist fullOutputPath) $ do
-    putStrLn ("Your output directory didn't exist. I'll create it at: " <> fullOutputPath)
-    createDirectory fullOutputPath
-    putText "This usually means you didn't compile your project yet."
-    putText "psc-ide needs you to compile your project (for example by running pulp build)"
+    unlessM (doesDirectoryExist fullOutputPath) $ do
+      putStrLn ("Your output directory didn't exist. I'll create it at: " <> fullOutputPath)
+      createDirectory fullOutputPath
+      putText "This usually means you didn't compile your project yet."
+      putText "psc-ide needs you to compile your project (for example by running pulp build)"
 
-  unless noWatch $
-    void (forkFinally (watcher polling ideState fullOutputPath) print)
-  -- TODO: deprecate and get rid of `debug`
-  let conf = Configuration {confLogLevel = if debug then LogDebug else logLevel, confOutputPath = outputPath, confGlobs = globs}
-      env = IdeEnvironment {ideStateVar = ideState, ideConfiguration = conf}
-  startServer port env
-  where
-    parser =
-      Options
-        <$> optional (Opts.strOption (Opts.long "directory" `mappend` Opts.short 'd'))
-        <*> many (Opts.argument Opts.str (Opts.metavar "Source GLOBS..."))
-        <*> Opts.strOption (Opts.long "output-directory" `mappend` Opts.value "output/")
-        <*> (fromIntegral <$>
-             Opts.option Opts.auto (Opts.long "port" `mappend` Opts.short 'p' `mappend` Opts.value (4242 :: Integer)))
-        <*> Opts.switch (Opts.long "no-watch")
-        <*> flipIfWindows (Opts.switch (Opts.long "polling"))
-        <*> Opts.switch (Opts.long "debug")
-        <*> (parseLogLevel <$> Opts.strOption
-             (Opts.long "log-level"
-              `mappend` Opts.value ""
-              `mappend` Opts.help "One of \"debug\", \"perf\", \"all\" or \"none\""))
-    opts = Opts.info (version <*> Opts.helper <*> parser) mempty
-    parseLogLevel s = case s of
-      "debug" -> LogDebug
-      "perf" -> LogPerf
-      "all" -> LogAll
-      "none" -> LogNone
-      _ -> LogDefault
-    version = Opts.abortOption
-      (InfoMsg (showVersion Paths.version))
-      (Opts.long "version" `mappend` Opts.help "Show the version number")
+    unless noWatch $
+      void (forkFinally (watcher polling ideState fullOutputPath) print)
+    -- TODO: deprecate and get rid of `debug`
+    let conf = Configuration {confLogLevel = if debug then LogDebug else logLevel, confOutputPath = outputPath, confGlobs = globs}
+        env = IdeEnvironment {ideStateVar = ideState, ideConfiguration = conf}
+    startServer port env
 
-    -- polling is the default on Windows and the flag turns it off. See
-    -- #2209 and #2414 for explanations
-    flipIfWindows = map (if SysInfo.os == "mingw32" then not else identity)
+  parser :: Opts.Parser Options
+  parser =
+    Options
+      <$> optional (Opts.strOption (Opts.long "directory" `mappend` Opts.short 'd'))
+      <*> many (Opts.argument Opts.str (Opts.metavar "Source GLOBS..."))
+      <*> Opts.strOption (Opts.long "output-directory" `mappend` Opts.value "output/")
+      <*> (fromIntegral <$>
+           Opts.option Opts.auto (Opts.long "port" `mappend` Opts.short 'p' `mappend` Opts.value (4242 :: Integer)))
+      <*> Opts.switch (Opts.long "no-watch")
+      <*> flipIfWindows (Opts.switch (Opts.long "polling"))
+      <*> Opts.switch (Opts.long "debug")
+      <*> (parseLogLevel <$> Opts.strOption
+           (Opts.long "log-level"
+            `mappend` Opts.value ""
+            `mappend` Opts.help "One of \"debug\", \"perf\", \"all\" or \"none\""))
+
+  parseLogLevel s = case s of
+    "debug" -> LogDebug
+    "perf" -> LogPerf
+    "all" -> LogAll
+    "none" -> LogNone
+    _ -> LogDefault
+
+  version = Opts.abortOption
+    (InfoMsg (showVersion Paths.version))
+    (Opts.long "version" `mappend` Opts.help "Show the version number")
+
+  -- polling is the default on Windows and the flag turns it off. See
+  -- #2209 and #2414 for explanations
+  flipIfWindows = map (if SysInfo.os == "mingw32" then not else identity)
 
 startServer :: PortNumber -> IdeEnvironment -> IO ()
 startServer port env = withSocketsDo $ do

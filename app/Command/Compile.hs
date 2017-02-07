@@ -4,12 +4,11 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 
-module Main where
+module Command.Compile (command) where
 
 import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Writer.Strict
-
 import qualified Data.Aeson as A
 import           Data.Bool (bool)
 import qualified Data.ByteString.Lazy as B
@@ -17,19 +16,15 @@ import qualified Data.ByteString.UTF8 as BU8
 import qualified Data.Map as M
 import           Data.Text (Text)
 import           Data.Version (showVersion)
-
 import qualified Language.PureScript as P
 import           Language.PureScript.Errors.JSON
 import           Language.PureScript.Make
-
-import           Options.Applicative as Opts
-
+import qualified Options.Applicative as Opts
 import qualified Paths_purescript as Paths
-
 import qualified System.Console.ANSI as ANSI
 import           System.Exit (exitSuccess, exitFailure)
 import           System.FilePath.Glob (glob)
-import           System.IO (hSetEncoding, hPutStrLn, stdout, stderr, utf8)
+import           System.IO (hPutStrLn, stderr)
 import           System.IO.UTF8 (readUTF8FileT)
 
 data PSCMakeOptions = PSCMakeOptions
@@ -89,94 +84,66 @@ globWarningOnMisses warn = concatMapM globWithWarning
 readInput :: [FilePath] -> IO [(FilePath, Text)]
 readInput inputFiles = forM inputFiles $ \inFile -> (inFile, ) <$> readUTF8FileT inFile
 
-inputFile :: Parser FilePath
-inputFile = strArgument $
-     metavar "FILE"
-  <> help "The input .purs file(s)"
+inputFile :: Opts.Parser FilePath
+inputFile = Opts.strArgument $
+     Opts.metavar "FILE"
+  <> Opts.help "The input .purs file(s)"
 
-outputDirectory :: Parser FilePath
-outputDirectory = strOption $
-     short 'o'
-  <> long "output"
+outputDirectory :: Opts.Parser FilePath
+outputDirectory = Opts.strOption $
+     Opts.short 'o'
+  <> Opts.long "output"
   <> Opts.value "output"
-  <> showDefault
-  <> help "The output directory"
+  <> Opts.showDefault
+  <> Opts.help "The output directory"
 
-noTco :: Parser Bool
-noTco = switch $
-     long "no-tco"
-  <> help "Disable tail call optimizations"
+comments :: Opts.Parser Bool
+comments = Opts.switch $
+     Opts.short 'c'
+  <> Opts.long "comments"
+  <> Opts.help "Include comments in the generated code"
 
-noMagicDo :: Parser Bool
-noMagicDo = switch $
-     long "no-magic-do"
-  <> help "Disable the optimization that overloads the do keyword to generate efficient code specifically for the Eff monad"
+verboseErrors :: Opts.Parser Bool
+verboseErrors = Opts.switch $
+     Opts.short 'v'
+  <> Opts.long "verbose-errors"
+  <> Opts.help "Display verbose error messages"
 
-noOpts :: Parser Bool
-noOpts = switch $
-     long "no-opts"
-  <> help "Skip the optimization phase"
+noPrefix :: Opts.Parser Bool
+noPrefix = Opts.switch $
+     Opts.short 'p'
+  <> Opts.long "no-prefix"
+  <> Opts.help "Do not include comment header"
 
-comments :: Parser Bool
-comments = switch $
-     short 'c'
-  <> long "comments"
-  <> help "Include comments in the generated code"
+jsonErrors :: Opts.Parser Bool
+jsonErrors = Opts.switch $
+     Opts.long "json-errors"
+  <> Opts.help "Print errors to stderr as JSON"
 
-verboseErrors :: Parser Bool
-verboseErrors = switch $
-     short 'v'
-  <> long "verbose-errors"
-  <> help "Display verbose error messages"
+sourceMaps :: Opts.Parser Bool
+sourceMaps = Opts.switch $
+     Opts.long "source-maps"
+  <> Opts.help "Generate source maps"
 
-noPrefix :: Parser Bool
-noPrefix = switch $
-     short 'p'
-  <> long "no-prefix"
-  <> help "Do not include comment header"
+dumpCoreFn :: Opts.Parser Bool
+dumpCoreFn = Opts.switch $
+     Opts.long "dump-corefn"
+  <> Opts.help "Dump the (functional) core representation of the compiled code at output/*/corefn.json"
 
-jsonErrors :: Parser Bool
-jsonErrors = switch $
-     long "json-errors"
-  <> help "Print errors to stderr as JSON"
-sourceMaps :: Parser Bool
-sourceMaps = switch $
-     long "source-maps"
-  <> help "Generate source maps"
-
-dumpCoreFn :: Parser Bool
-dumpCoreFn = switch $
-     long "dump-corefn"
-  <> help "Dump the (functional) core representation of the compiled code at output/*/corefn.json"
-
-
-options :: Parser P.Options
-options = P.Options <$> noTco
-                    <*> noMagicDo
-                    <*> pure Nothing
-                    <*> noOpts
-                    <*> verboseErrors
+options :: Opts.Parser P.Options
+options = P.Options <$> verboseErrors
                     <*> (not <$> comments)
                     <*> sourceMaps
                     <*> dumpCoreFn
 
-pscMakeOptions :: Parser PSCMakeOptions
+pscMakeOptions :: Opts.Parser PSCMakeOptions
 pscMakeOptions = PSCMakeOptions <$> many inputFile
                                 <*> outputDirectory
                                 <*> options
                                 <*> (not <$> noPrefix)
                                 <*> jsonErrors
 
-main :: IO ()
-main = do
-  hSetEncoding stdout utf8
-  hSetEncoding stderr utf8
-  execParser opts >>= compile
-  where
-  opts        = info (version <*> helper <*> pscMakeOptions) infoModList
-  infoModList = fullDesc <> headerInfo <> footerInfo
-  headerInfo  = header   "psc - Compiles PureScript to Javascript"
-  footerInfo  = footer $ "psc " ++ showVersion Paths.version
-
-  version :: Parser (a -> a)
-  version = abortOption (InfoMsg (showVersion Paths.version)) $ long "version" <> help "Show the version number" <> hidden
+command :: Opts.Parser (IO ())
+command = compile <$> (version <*> Opts.helper <*> pscMakeOptions) where
+  version :: Opts.Parser (a -> a)
+  version = Opts.abortOption (Opts.InfoMsg (showVersion Paths.version)) $ Opts.long "version" <> Opts.help "Show the version number" <> Opts.hidden

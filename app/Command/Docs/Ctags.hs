@@ -1,8 +1,8 @@
-module Ctags (dumpCtags) where
+module Command.Docs.Ctags (dumpCtags) where
 
+import           Command.Docs.Tags
+import           Data.List (sort)
 import qualified Language.PureScript as P
-import Tags
-import Data.List (sort)
 
 dumpCtags :: [(String, P.Module)] -> [String]
 dumpCtags = sort . concatMap renderModCtags
