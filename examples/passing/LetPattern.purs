@@ -8,50 +8,50 @@ import Test.Assert (ASSERT, assert')
 
 patternSimple :: Boolean
 patternSimple =
-  let (x) = 25252
+  let x = 25252
   in
    x == 25252
 
 patternDoSimple :: forall e. Eff e Boolean
 patternDoSimple = do
-  let (x) = 25252
+  let x = 25252
   pure $ x == 25252
 
 newtype X = X Int
 
 patternNewtype :: Boolean
 patternNewtype =
-  let (X a) = X 123
+  let X a = X 123
   in
    a == 123
 
 patternDoNewtype :: forall e. Eff e Boolean
 patternDoNewtype = do
-  let (X a) = X 123
+  let X a = X 123
   pure $ a == 123
 
 data Y = Y Int String Boolean
 
 patternData :: Boolean
 patternData =
-  let (Y a b c) = Y 456 "hello, world" false
+  let Y a b c = Y 456 "hello, world" false
   in
    a == 456 && b == "hello, world" && not c
 
 patternDataIgnored :: Boolean
 patternDataIgnored =
-  let (Y _ x _) = Y 789 "world, hello" true
+  let Y _ x _ = Y 789 "world, hello" true
   in
    x == "world, hello"
 
 patternDoData :: forall e. Eff e Boolean
 patternDoData = do
-  let (Y a b c) = Y 456 "hello, world" false
+  let Y a b c = Y 456 "hello, world" false
   pure $ a == 456 && b == "hello, world" && not c
 
 patternDoDataIgnored :: forall e. Eff e Boolean
 patternDoDataIgnored = do
-  let (Y _ x _) = Y 789 "world, hello" true
+  let Y _ x _ = Y 789 "world, hello" true
   pure $ x == "world, hello"
 
 patternArray :: Boolean
@@ -68,10 +68,10 @@ patternDoArray = unsafePartial do
 patternMultiple :: Boolean
 patternMultiple = unsafePartial $
   let
-    (x) = 25252
-    (X a) = X x
-    (Y b c d) = Y x "hello, world" false
-    (Y _ e _) = Y 789 "world, hello" true
+    x = 25252
+    X a = X x
+    Y b c d = Y x "hello, world" false
+    Y _ e _ = Y 789 "world, hello" true
     [f, g] = [1, 2]
   in
    x == 25252 && a == 25252 && b == 25252 && c == "hello, world" &&
@@ -80,10 +80,10 @@ patternMultiple = unsafePartial $
 patternDoMultiple :: forall e. Eff e Boolean
 patternDoMultiple = unsafePartial do
   let
-    (x) = 25252
-    (X a) = X x
-    (Y b c d) = Y x "hello, world" false
-    (Y _ e _) = Y 789 "world, hello" true
+    x = 25252
+    X a = X x
+    Y b c d = Y x "hello, world" false
+    Y _ e _ = Y 789 "world, hello" true
     [f, g] = [1, 2]
   pure $ x == 25252 && a == 25252 && b == 25252 && c == "hello, world" &&
      not d && e == "world, hello" && f == 1 && g == 2
@@ -92,9 +92,9 @@ patternMultipleWithNormal :: Boolean
 patternMultipleWithNormal = unsafePartial $
   let
     x = 25252
-    (X a) = X x
+    X a = X x
     y = 2525
-    (Y b c d) = Y y "hello, world" false
+    Y b c d = Y y "hello, world" false
   in
    x == 25252 && y == 2525 &&
      a == 25252 && b == 2525 && c == "hello, world" && not d
@@ -103,11 +103,34 @@ patternDoMultipleWithNormal :: forall e. Eff e Boolean
 patternDoMultipleWithNormal = unsafePartial do
   let
     x = 25252
-    (X a) = X x
+    X a = X x
     y = 2525
-    (Y b c d) = Y y "hello, world" false
+    Y b c d = Y y "hello, world" false
   pure $ x == 25252 && y == 2525 &&
     a == 25252 && b == 2525 && c == "hello, world" && not d
+
+patternWithParens :: Boolean
+patternWithParens = unsafePartial $
+  let
+    (x) = 25252
+    (X a) = X x
+    (Y b c d) = Y x "hello, world" false
+    (Y _ e _) = Y 789 "world, hello" true
+    ([f, g]) = [1, 2]
+  in
+   x == 25252 && a == 25252 && b == 25252 && c == "hello, world" &&
+     not d && e == "world, hello" && f == 1 && g == 2
+
+patternDoWithParens :: forall e. Eff e Boolean
+patternDoWithParens = unsafePartial do
+  let
+    (x) = 25252
+    (X a) = X x
+    (Y b c d) = Y x "hello, world" false
+    (Y _ e _) = Y 789 "world, hello" true
+    ([f, g]) = [1, 2]
+  pure $ x == 25252 && a == 25252 && b == 25252 && c == "hello, world" &&
+     not d && e == "world, hello" && f == 1 && g == 2
 
 main :: Eff (assert :: ASSERT, console :: CONSOLE) Unit
 main = do
@@ -125,4 +148,6 @@ main = do
   assert' "multiple patterns with do" =<< patternDoMultiple
   assert' "multiple patterns with normal let's" patternMultipleWithNormal
   assert' "multiple patterns with normal let's and do" =<< patternDoMultipleWithNormal
+  assert' "multiple patterns with parens" patternWithParens
+  assert' "multiple patterns with parens and do" =<< patternDoWithParens
   log "Done"
