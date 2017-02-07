@@ -358,6 +358,7 @@ executable psc
                    parsec -any,
                    process -any,
                    purescript -any,
+                   sourcemap >= 0.1.6,
                    stm >= 0.2.4.0,
                    text -any,
                    time -any,
@@ -428,27 +429,6 @@ executable psc-hierarchy
     hs-source-dirs: hierarchy
     other-modules:
     ghc-options: -Wall -O2
-
-executable psc-bundle
-  main-is:             Main.hs
-  other-modules:       Paths_purescript
-  other-extensions:
-  build-depends:       base >=4 && <5,
-                       bytestring -any,
-                       purescript -any,
-                       directory -any,
-                       aeson >= 0.8 && < 1.0,
-                       filepath -any,
-                       Glob -any,
-                       mtl -any,
-                       optparse-applicative >= 0.13.0,
-                       sourcemap >= 0.1.6,
-                       transformers -any,
-                       transformers-compat -any,
-                       utf8-string >= 1 && < 2
-
-  ghc-options:         -Wall -O2
-  hs-source-dirs:      psc-bundle
 
 executable psc-ide-server
   main-is:             Main.hs

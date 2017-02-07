@@ -7,6 +7,7 @@
 
 module Main where
 
+import qualified Command.Bundle as Bundle
 import qualified Command.Compile as Compile
 import qualified Command.REPL as REPL
 import           Data.Foldable (fold)
@@ -40,4 +41,7 @@ main = do
         , Opts.command "repl"
             (Opts.info (REPL.command)
             (Opts.progDesc "Enter the interactive mode (PSCi)"))
+        , Opts.command "bundle"
+            (Opts.info (Bundle.command)
+            (Opts.progDesc "Bundle compiled PureScript modules for the browser"))
         ]

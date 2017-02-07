@@ -14,14 +14,6 @@ module Command.REPL (command) where
 
 import           Prelude ()
 import           Prelude.Compat
-
-import           Data.FileEmbed (embedStringFile)
-import           Data.Monoid ((<>))
-import           Data.String (IsString(..))
-import           Data.Text (Text, unpack)
-import           Data.Traversable (for)
-import           Data.Version (showVersion)
-
 import           Control.Applicative (many, (<|>))
 import           Control.Concurrent (forkIO)
 import           Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar,
@@ -37,11 +29,15 @@ import           Control.Monad.Trans.Class
 import           Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import           Control.Monad.Trans.State.Strict (StateT, evalStateT)
 import           Control.Monad.Trans.Reader (ReaderT, runReaderT)
-
+import           Data.FileEmbed (embedStringFile)
+import           Data.Monoid ((<>))
+import           Data.String (IsString(..))
+import           Data.Text (Text, unpack)
+import           Data.Traversable (for)
+import           Data.Version (showVersion)
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Bundle as Bundle
 import           Language.PureScript.Interactive
-
 import           Network.HTTP.Types.Header (hContentType, hCacheControl,
                                             hPragma, hExpires)
 import           Network.HTTP.Types.Status (status200, status404, status503)
@@ -49,11 +45,8 @@ import qualified Network.Wai as Wai
 import qualified Network.Wai.Handler.Warp as Warp
 import qualified Network.Wai.Handler.WebSockets as WS
 import qualified Network.WebSockets as WS
-
 import qualified Options.Applicative as Opts
-
 import qualified Paths_purescript as Paths
-
 import           System.Console.Haskeline
 import           System.IO.UTF8 (readUTF8File)
 import           System.Exit

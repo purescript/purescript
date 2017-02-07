@@ -4,39 +4,32 @@
 {-# LANGUAGE RecordWildCards #-}
 
 -- | Bundles compiled PureScript modules for the browser.
-module Main (main) where
+module Command.Bundle (command) where
 
-import Data.Traversable (for)
-import Data.Version (showVersion)
-import Data.Monoid ((<>))
-import Data.Aeson (encode)
-import Data.Maybe (isNothing)
-
-import Control.Applicative
-import Control.Monad
-import Control.Monad.Error.Class
-import Control.Monad.Trans.Except
-import Control.Monad.IO.Class
-
-import System.FilePath (takeDirectory, (</>), (<.>), takeFileName)
-import System.FilePath.Glob (glob)
-import System.Exit (exitFailure)
-import System.IO (stderr, stdout, hPutStrLn, hSetEncoding, utf8)
-import System.IO.UTF8 (readUTF8File, writeUTF8File)
-import System.Directory (createDirectoryIfMissing, getCurrentDirectory)
-
+import           Data.Traversable (for)
+import           Data.Version (showVersion)
+import           Data.Monoid ((<>))
+import           Data.Aeson (encode)
+import           Data.Maybe (isNothing)
+import           Control.Applicative
+import           Control.Monad
+import           Control.Monad.Error.Class
+import           Control.Monad.Trans.Except
+import           Control.Monad.IO.Class
+import           System.FilePath (takeDirectory, (</>), (<.>), takeFileName)
+import           System.FilePath.Glob (glob)
+import           System.Exit (exitFailure)
+import           System.IO (stderr, hPutStrLn)
+import           System.IO.UTF8 (readUTF8File, writeUTF8File)
+import           System.Directory (createDirectoryIfMissing, getCurrentDirectory)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.UTF8 as BU8
-
-import Language.PureScript.Bundle
-
-import Options.Applicative (Parser, ParseError (..))
+import           Language.PureScript.Bundle
+import           Options.Applicative (Parser, ParseError (..))
 import qualified Options.Applicative as Opts
-
 import qualified Paths_purescript as Paths
-
-import SourceMap
-import SourceMap.Types
+import           SourceMap
+import           SourceMap.Types
 
 -- | Command line options.
 data Options = Options
@@ -117,30 +110,25 @@ options = Options <$> some inputFile
     <> Opts.help "Whether to generate source maps for the bundle (requires --output)."
 
 -- | Make it go.
-main :: IO ()
-main = do
-  hSetEncoding stdout utf8
-  hSetEncoding stderr utf8
-  opts <- Opts.execParser (Opts.info (version <*> Opts.helper <*> options) infoModList)
-  output <- runExceptT (app opts)
-  case output of
-    Left err -> do
-      hPutStrLn stderr (unlines (printErrorMessage err))
-      exitFailure
-    Right (sourcemap, js) ->
-      case optionsOutputFile opts of
-        Just outputFile -> do
-          createDirectoryIfMissing True (takeDirectory outputFile)
-          case sourcemap of
-            Just sm -> do
-              writeUTF8File outputFile $ js ++ "\n//# sourceMappingURL=" ++ (takeFileName outputFile <.> "map") ++ "\n"
-              writeUTF8File (outputFile <.> "map") $ BU8.toString . B.toStrict . encode $ generate sm
-            Nothing -> writeUTF8File outputFile js
-        Nothing -> putStrLn js
-  where
-  infoModList = Opts.fullDesc <> headerInfo <> footerInfo
-  headerInfo  = Opts.header   "psc-bundle - Bundles compiled PureScript modules for the browser"
-  footerInfo  = Opts.footer $ "psc-bundle " ++ showVersion Paths.version
+command :: Opts.Parser (IO ())
+command = run <$> (version <*> Opts.helper <*> options) where
+  run :: Options -> IO ()
+  run opts = do
+    output <- runExceptT (app opts)
+    case output of
+      Left err -> do
+        hPutStrLn stderr (unlines (printErrorMessage err))
+        exitFailure
+      Right (sourcemap, js) ->
+        case optionsOutputFile opts of
+          Just outputFile -> do
+            createDirectoryIfMissing True (takeDirectory outputFile)
+            case sourcemap of
+              Just sm -> do
+                writeUTF8File outputFile $ js ++ "\n//# sourceMappingURL=" ++ (takeFileName outputFile <.> "map") ++ "\n"
+                writeUTF8File (outputFile <.> "map") $ BU8.toString . B.toStrict . encode $ generate sm
+              Nothing -> writeUTF8File outputFile js
+          Nothing -> putStrLn js
 
   version :: Parser (a -> a)
   version = Opts.abortOption (InfoMsg (showVersion Paths.version)) $
