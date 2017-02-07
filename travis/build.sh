@@ -2,7 +2,6 @@
 set -e
 
 STACK="stack --no-terminal --jobs=1"
-$STACK setup
 
 # Set up configuration
 STACK_EXTRA_FLAGS=""
