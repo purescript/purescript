@@ -45,7 +45,7 @@ data TypeSearch
 
 -- | A type of error messages
 data SimpleErrorMessage
-  = ModuleNotFound ModuleName 
+  = ModuleNotFound ModuleName
   | ErrorParsingFFIModule FilePath (Maybe Bundle.ErrorMessage)
   | ErrorParsingModule P.ParseError
   | MissingFFIModule ModuleName
