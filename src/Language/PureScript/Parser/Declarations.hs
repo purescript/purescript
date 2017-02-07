@@ -75,7 +75,7 @@ parseValueDeclaration = do
           <|> Right <$> (indented *> equals *> parseValueWithWhereClause)
       return $ ValueDeclaration name Public binders' value
     [binder] -> BoundValueDeclaration binder <$> (indented *> equals *> parseValueWithWhereClause)
-    _ -> P.unexpected "unexpected binders in value declaration"
+    _ -> P.unexpected "patterns in value declaration"
   where
   parseValueWithWhereClause :: TokenParser Expr
   parseValueWithWhereClause = do
