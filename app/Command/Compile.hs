@@ -9,7 +9,6 @@ module Command.Compile (command) where
 import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Writer.Strict
-
 import qualified Data.Aeson as A
 import           Data.Bool (bool)
 import qualified Data.ByteString.Lazy as B
@@ -17,19 +16,15 @@ import qualified Data.ByteString.UTF8 as BU8
 import qualified Data.Map as M
 import           Data.Text (Text)
 import           Data.Version (showVersion)
-
 import qualified Language.PureScript as P
 import           Language.PureScript.Errors.JSON
 import           Language.PureScript.Make
-
 import qualified Options.Applicative as Opts
-
 import qualified Paths_purescript as Paths
-
 import qualified System.Console.ANSI as ANSI
 import           System.Exit (exitSuccess, exitFailure)
 import           System.FilePath.Glob (glob)
-import           System.IO (hSetEncoding, hPutStrLn, stdout, stderr, utf8)
+import           System.IO (hPutStrLn, stderr)
 import           System.IO.UTF8 (readUTF8FileT)
 
 data PSCMakeOptions = PSCMakeOptions
@@ -135,6 +130,7 @@ dumpCoreFn = Opts.switch $
      Opts.long "dump-corefn"
   <> Opts.help "Dump the (functional) core representation of the compiled code at output/*/corefn.json"
 
+options :: Opts.Parser P.Options
 options = P.Options <$> verboseErrors
                     <*> (not <$> comments)
                     <*> sourceMaps
