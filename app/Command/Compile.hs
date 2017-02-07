@@ -102,21 +102,6 @@ outputDirectory = Opts.strOption $
   <> Opts.showDefault
   <> Opts.help "The output directory"
 
-noTco :: Opts.Parser Bool
-noTco = Opts.switch $
-     Opts.long "no-tco"
-  <> Opts.help "Disable tail call optimizations"
-
-noMagicDo :: Opts.Parser Bool
-noMagicDo = Opts.switch $
-     Opts.long "no-magic-do"
-  <> Opts.help "Disable the optimization that overloads the do keyword to generate efficient code specifically for the Eff monad"
-
-noOpts :: Opts.Parser Bool
-noOpts = Opts.switch $
-     Opts.long "no-opts"
-  <> Opts.help "Skip the optimization phase"
-
 comments :: Opts.Parser Bool
 comments = Opts.switch $
      Opts.short 'c'
@@ -139,6 +124,7 @@ jsonErrors :: Opts.Parser Bool
 jsonErrors = Opts.switch $
      Opts.long "json-errors"
   <> Opts.help "Print errors to stderr as JSON"
+
 sourceMaps :: Opts.Parser Bool
 sourceMaps = Opts.switch $
      Opts.long "source-maps"
@@ -149,13 +135,7 @@ dumpCoreFn = Opts.switch $
      Opts.long "dump-corefn"
   <> Opts.help "Dump the (functional) core representation of the compiled code at output/*/corefn.json"
 
-
-options :: Opts.Parser P.Options
-options = P.Options <$> noTco
-                    <*> noMagicDo
-                    <*> pure Nothing
-                    <*> noOpts
-                    <*> verboseErrors
+options = P.Options <$> verboseErrors
                     <*> (not <$> comments)
                     <*> sourceMaps
                     <*> dumpCoreFn
