@@ -65,7 +65,7 @@ parseTypeSynonymDeclaration =
 
 parseValueDeclaration :: TokenParser Declaration
 parseValueDeclaration = do
-  binders <- P.many parseBinderNoParens
+  binders <- (:) <$> parseBinderAtom <*> (P.many parseBinderNoParens)
   case binders of
     VarBinder name : binders' -> do
       value <- Left <$> (indented *>
