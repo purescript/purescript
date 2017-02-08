@@ -132,6 +132,20 @@ patternDoWithParens = unsafePartial do
   pure $ x == 25252 && a == 25252 && b == 25252 && c == "hello, world" &&
      not d && e == "world, hello" && f == 1 && g == 2
 
+patternWithNamedBinder :: Boolean
+patternWithNamedBinder = unsafePartial $
+  let
+    a@{x, y} = {x: 10, y: 20}
+  in
+   a.x == 10 && x == 10 && a.y == 20 && y == 20
+
+patternDoWithNamedBinder :: forall e. Eff e Boolean
+patternDoWithNamedBinder = unsafePartial do
+  let
+    a@{x, y} = {x: 10, y: 20}
+  pure $
+    a.x == 10 && x == 10 && a.y == 20 && y == 20
+
 main :: Eff (assert :: ASSERT, console :: CONSOLE) Unit
 main = do
   assert' "simple variable pattern" patternSimple
@@ -150,4 +164,6 @@ main = do
   assert' "multiple patterns with normal let's and do" =<< patternDoMultipleWithNormal
   assert' "multiple patterns with parens" patternWithParens
   assert' "multiple patterns with parens and do" =<< patternDoWithParens
+  assert' "multiple patterns with named binder" patternWithNamedBinder
+  assert' "multiple patterns with named binder and do" =<< patternDoWithNamedBinder
   log "Done"
