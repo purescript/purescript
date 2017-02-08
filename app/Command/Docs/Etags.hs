@@ -1,7 +1,7 @@
-module Etags (dumpEtags) where
+module Command.Docs.Etags (dumpEtags) where
 
+import           Command.Docs.Tags
 import qualified Language.PureScript as P
-import Tags
 
 dumpEtags :: [(String, P.Module)] -> [String]
 dumpEtags = concatMap renderModEtags
