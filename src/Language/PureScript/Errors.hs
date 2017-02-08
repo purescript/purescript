@@ -888,7 +888,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
             ]
 
     renderSimpleErrorMessage (UnusableDeclaration ident) =
-      paras [ line $ "The declaration " <> markCode (showIdent ident) <> " is considered to be unusable."
+      paras [ line $ "The declaration " <> markCode (showIdent ident) <> " is unusable."
             , line $ "This happens when a constraint couldn't possibly have enough information to work out which instance is required."
             ]
 
