@@ -58,8 +58,8 @@ desugar externs =
   map desugarSignedLiterals
     >>> traverse desugarObjectConstructors
     >=> traverse desugarDoModule
-    >=> traverse desugarLetPatternModule
-    >=> traverse desugarCasesModule
+    >=> map desugarLetPatternModule
+    >>> traverse desugarCasesModule
     >=> traverse desugarTypeDeclarationsModule
     >=> desugarImports externs
     >=> rebracket externs
