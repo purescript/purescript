@@ -45,7 +45,6 @@ queryPursuit q = do
 
 
 handler :: HttpException -> IO [a]
-handler StatusCodeException{} = pure []
 handler _ = pure []
 
 searchPursuitForDeclarations :: Text -> IO [PursuitResponse]
