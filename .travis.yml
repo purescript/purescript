@@ -56,8 +56,21 @@ install:
   fi
 - npm install -g bower # for psc-docs / psc-publish tests
 - export OS_NAME=$(./travis/convert-os-name.sh)
+# Install 'timeout'
+- |
+  if [ "$TRAVIS_OS_NAME" == "osx" ]
+  then
+    if ! which gtimeout >/dev/null
+    then
+      brew update
+      brew install coreutils
+    fi
+    export TIMEOUT=gtimeout
+  else
+    export TIMEOUT=timeout
+  fi
 # Setup & install dependencies or abort
-- timeout 40m stack --no-terminal -j1 --install-ghc build --only-dependencies --test --haddock
+- $TIMEOUT 40m stack --no-terminal -j1 --install-ghc build --only-dependencies --test --haddock
 script:
 - travis/build.sh
 before_deploy:
