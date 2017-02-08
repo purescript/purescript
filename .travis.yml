@@ -57,7 +57,7 @@ install:
 - npm install -g bower # for psc-docs / psc-publish tests
 - export OS_NAME=$(./travis/convert-os-name.sh)
 # Setup & install dependencies or abort
-- timeout 40m stack --no-terminal -j1 --install-ghc build --only-dependencies
+- timeout 40m stack --no-terminal -j1 --install-ghc build --only-dependencies --test --haddock
 script:
 - travis/build.sh
 before_deploy:
