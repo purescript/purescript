@@ -69,8 +69,6 @@ install:
   else
     export TIMEOUT=timeout
   fi
-# Setup & install dependencies or abort
-- $TIMEOUT 40m stack --no-terminal -j1 --install-ghc build --only-dependencies --test --haddock
 script:
 - travis/build.sh
 before_deploy:

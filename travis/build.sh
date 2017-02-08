@@ -3,6 +3,24 @@ set -e
 
 STACK="stack --no-terminal --jobs=1"
 
+# Setup & install dependencies or abort
+ret=0
+$TIMEOUT 40m $STACK --install-ghc build \
+  --only-dependencies --test --haddock \
+  || ret=$?
+case "$ret" in
+  0) # continue
+    ;;
+  124)
+    echo "Timed out while installing dependencies; try restarting the build."
+    exit 1
+    ;;
+  *)
+    echo "Failed to install dependencies."
+    exit 1
+    ;;
+esac
+
 # Set up configuration
 STACK_EXTRA_FLAGS=""
 if [ -z "$TRAVIS_TAG" ]
