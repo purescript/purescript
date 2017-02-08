@@ -171,6 +171,7 @@ errorCode em = case unwrapErrorMessage em of
   CannotUseBindWithDo{} -> "CannotUseBindWithDo"
   ClassInstanceArityMismatch{} -> "ClassInstanceArityMismatch"
   UserDefinedWarning{} -> "UserDefinedWarning"
+  UnusableDeclaration{} -> "UnusableDeclaration"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -884,6 +885,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
       let msg = fromMaybe (typeAsBox msgTy) (toTypelevelString msgTy) in
       paras [ line "A custom warning occurred while solving type class constraints:"
             , indent msg
+            ]
+
+    renderSimpleErrorMessage (UnusableDeclaration ident) =
+      paras [ line $ "The declaration " <> markCode (showIdent ident) <> " is considered to be unusable."
+            , line $ "This happens when a constraint couldn't possibly have enough information to work out which instance is required."
             ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
