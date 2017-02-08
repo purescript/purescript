@@ -112,7 +112,7 @@ inProject f = do
 compileTestProject :: IO Bool
 compileTestProject = inProject $ do
   (_, _, _, procHandle) <-
-    createProcess $ (shell $ "psc compile \"src/**/*.purs\"")
+    createProcess $ (shell $ "purs compile \"src/**/*.purs\"")
   r <- tryNTimes 10 (getProcessExitCode procHandle)
   pure (fromMaybe False (isSuccess <$> r))
 
