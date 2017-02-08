@@ -43,6 +43,11 @@ cache:
   directories:
   - $HOME/.local/bin
   - $HOME/.stack
+  # Maximum amount of time in seconds spent attempting to upload a new cache
+  # before aborting. Since our cache can get rather large, increasing this
+  # value helps avoid situations where caches fail to be stored. The default
+  # value is 180 (at the time of writing).
+  timeout: 1000
 install:
 - | # Install stack.
   if test ! -f "$HOME/.local/bin/stack"
