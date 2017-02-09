@@ -1,6 +1,6 @@
-module Tags where
+module Command.Docs.Tags where
 
-import Control.Arrow (first)
+import           Control.Arrow (first)
 import qualified Data.Text as T
 import qualified Language.PureScript as P
 

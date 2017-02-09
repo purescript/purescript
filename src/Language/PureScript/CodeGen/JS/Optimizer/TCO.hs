@@ -1,26 +1,15 @@
--- |
--- This module implements tail call elimination.
---
+-- | This module implements tail call elimination.
 module Language.PureScript.CodeGen.JS.Optimizer.TCO (tco) where
 
 import Prelude.Compat
 
 import Data.Text (Text)
 import Data.Monoid ((<>), getAny, Any(..))
-
-import Language.PureScript.Options
 import Language.PureScript.CodeGen.JS.AST
 
--- |
--- Eliminate tail calls
---
-tco :: Options -> JS -> JS
-tco opts | optionsNoTco opts = id
-         | otherwise = tco'
-
-tco' :: JS -> JS
-tco' = everywhereOnJS convert
-  where
+-- | Eliminate tail calls
+tco :: JS -> JS
+tco = everywhereOnJS convert where
   tcoLabel :: Text
   tcoLabel = "tco"
 

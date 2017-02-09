@@ -50,7 +50,7 @@ import Control.DeepSeq (NFData)
 import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Monoid ((<>))
-import Data.Aeson.BetterErrors
+import Data.Aeson.BetterErrors (Parse, nth, withText, withValue, toAesonParser, perhaps, asText, eachInArray)
 import qualified Data.Aeson as A
 import Data.Text (Text)
 import qualified Data.Text as T

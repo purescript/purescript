@@ -1,5 +1,6 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -44,11 +45,12 @@ main = pushd "examples/docs" $ do
   res <- Publish.preparePackage publishOpts
   case res of
     Left e -> Publish.printErrorToStdout e >> exitFailure
-    Right Docs.Package{..} ->
+    Right pkg@Docs.Package{..} ->
       forM_ testCases $ \(P.moduleNameFromString -> mn, pragmas) ->
         let mdl = takeJust ("module not found in docs: " ++ T.unpack (P.runModuleName mn))
                           (find ((==) mn . Docs.modName) pkgModules)
-        in forM_ pragmas (`runAssertionIO` mdl)
+            linksCtx = Docs.getLinksContext pkg
+        in forM_ pragmas (\a -> runAssertionIO a linksCtx mdl)
 
 
 takeJust :: String -> Maybe a -> a
@@ -82,6 +84,11 @@ data Assertion
   -- | Assert that there should be some declarations re-exported from a
   -- particular module in a particular package.
   | ShouldHaveReExport (Docs.InPackage P.ModuleName)
+  -- | Assert that a link to some specific declaration exists within the
+  -- rendered code for a declaration. Fields are: local module, local
+  -- declaration title, title of linked declaration, namespace of linked
+  -- declaration, destination of link.
+  | ShouldHaveLink P.ModuleName Text Text Docs.Namespace Docs.LinkLocation
   deriving (Show)
 
 newtype ShowFn a = ShowFn a
@@ -119,6 +126,17 @@ data AssertionFailure
   -- | A module was missing re-exports from a particular module.
   -- Fields: module name, expected re-export, actual re-exports.
   | ReExportMissing P.ModuleName (Docs.InPackage P.ModuleName) [Docs.InPackage P.ModuleName]
+  -- | Expected to find some other declaration mentioned in this declaration's
+  -- rendered code, but did not find anything.
+  -- Fields: module name, declaration title, title of declaration which was
+  -- expected but not found in.
+  | LinkedDeclarationMissing P.ModuleName Text Text
+  -- | Expected one link location for a declaration mentioned in some other
+  -- declaration's rendered code, but found a different one. Fields: module
+  -- name, title of the local declaration which links to some other
+  -- declaration, title of the linked declaration, expected location, actual
+  -- location.
+  | BadLinkLocation P.ModuleName Text Text Docs.LinkLocation Docs.LinkLocation
   deriving (Show)
 
 data AssertionResult
@@ -126,8 +144,8 @@ data AssertionResult
   | Fail AssertionFailure
   deriving (Show)
 
-runAssertion :: Assertion -> Docs.Module -> AssertionResult
-runAssertion assertion Docs.Module{..} =
+runAssertion :: Assertion -> Docs.LinksContext -> Docs.Module -> AssertionResult
+runAssertion assertion linksCtx Docs.Module{..} =
   case assertion of
     ShouldBeDocumented mn decl children ->
       case findChildren decl (declarationsFor mn) of
@@ -214,6 +232,19 @@ runAssertion assertion Docs.Module{..} =
           then Pass
           else Fail (ReExportMissing modName reExp reExps)
 
+    ShouldHaveLink mn decl destTitle destNs expectedLoc ->
+      findDecl mn decl $ \decl' ->
+        let
+          rendered = Docs.renderDeclaration decl'
+        in
+          case extract rendered destNs destTitle of
+            Just (Docs.linkLocation -> actualLoc) ->
+              if expectedLoc == actualLoc
+                then Pass
+                else Fail (BadLinkLocation mn decl destTitle expectedLoc actualLoc)
+            Nothing ->
+              Fail (LinkedDeclarationMissing mn decl destTitle)
+
   where
   declarationsFor mn =
     if mn == modName
@@ -232,6 +263,17 @@ runAssertion assertion Docs.Module{..} =
 
   childrenTitles = map Docs.cdeclTitle . Docs.declChildren
 
+  extract :: Docs.RenderedCode -> Docs.Namespace -> Text -> Maybe Docs.DocLink
+  extract rc ns title = getFirst (Docs.outputWith (First . go) rc) >>= getLink
+    where
+      getLink =
+        Docs.getLink linksCtx (P.moduleNameFromString "$DocsTest") ns title
+      go = \case
+        Docs.Symbol ns' title' (Docs.Link containingMod)
+          | ns' == ns && title' == title -> Just containingMod
+        _ ->
+          Nothing
+
 checkConstrained :: P.Type -> Text -> Bool
 checkConstrained ty tyClass =
   -- Note that we don't recurse on ConstrainedType if none of the constraints
@@ -248,10 +290,10 @@ checkConstrained ty tyClass =
   matches className =
     (==) className . P.runProperName . P.disqualify . P.constraintClass
 
-runAssertionIO :: Assertion -> Docs.Module -> IO ()
-runAssertionIO assertion mdl = do
+runAssertionIO :: Assertion -> Docs.LinksContext -> Docs.Module -> IO ()
+runAssertionIO assertion linksCtx mdl = do
   putStrLn ("In " ++ T.unpack (P.runModuleName (Docs.modName mdl)) ++ ": " ++ show assertion)
-  case runAssertion assertion mdl of
+  case runAssertion assertion linksCtx mdl of
     Pass -> pure ()
     Fail reason -> do
       putStrLn ("Failed: " <> show reason)
@@ -276,6 +318,8 @@ testCases =
   , ("Example2",
       [ ShouldBeDocumented (n "Example2") "one" []
       , ShouldBeDocumented (n "Example2") "two" []
+
+      , ShouldHaveLink (n "Example2") "one" "Int" Docs.TypeLevel (Docs.BuiltinModule (n "Prim"))
       ])
 
   , ("UTF8",
@@ -336,7 +380,6 @@ testCases =
       [ ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "explicit" (ShowFn (hasTypeVar "something"))
       , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "anInt"    (ShowFn (P.tyInt ==))
       , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "aNumber"  (ShowFn (P.tyNumber ==))
-      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "nestedForAll" (renderedType "forall c. (forall a b. c)")
       ])
 
   , ("ConstrainedArgument",
@@ -360,7 +403,7 @@ testCases =
   ]
 
   where
-  n = P.moduleNameFromString . T.pack
+  n = P.moduleNameFromString
   pkg str = let Right p = parsePackageName str in p
 
   hasTypeVar varName =

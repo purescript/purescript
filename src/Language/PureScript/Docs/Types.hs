@@ -11,6 +11,10 @@ import Control.Arrow ((***))
 
 import Data.Aeson ((.=))
 import Data.Aeson.BetterErrors
+  (Parse, ParseError, parse, keyOrDefault, throwCustomError, key, asText,
+   keyMay, withString, eachInArray, asNull, (.!), toAesonParser, toAesonParser',
+   fromAesonParser, perhaps, withText, asIntegral, nth, eachInObjectWithKey,
+   asString)
 import qualified Data.Map as Map
 import Data.Time.Clock (UTCTime)
 import qualified Data.Time.Format as TimeFormat
@@ -393,8 +397,9 @@ data LinkLocation
   | BuiltinModule P.ModuleName
   deriving (Show, Eq, Ord)
 
--- | Given a links context, a thing to link to (either a value or a type), and
--- its containing module, attempt to create a DocLink.
+-- | Given a links context, the current module name, the namespace of a thing
+-- to link to, its title, and its containing module, attempt to create a
+-- DocLink.
 getLink :: LinksContext -> P.ModuleName -> Namespace -> Text -> ContainingModule -> Maybe DocLink
 getLink LinksContext{..} curMn namespace target containingMod = do
   location <- getLinkLocation
@@ -405,7 +410,7 @@ getLink LinksContext{..} curMn namespace target containingMod = do
     }
 
   where
-  getLinkLocation = normalLinkLocation <|> builtinLinkLocation
+  getLinkLocation = builtinLinkLocation <|> normalLinkLocation
 
   normalLinkLocation = do
     case containingMod of

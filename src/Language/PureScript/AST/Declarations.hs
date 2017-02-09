@@ -145,6 +145,9 @@ data SimpleErrorMessage
   | ClassInstanceArityMismatch Ident (Qualified (ProperName 'ClassName)) Int Int
   -- | a user-defined warning raised by using the Warn type class
   | UserDefinedWarning Type
+  -- | a declaration couldn't be used because there wouldn't be enough information
+  -- | to choose an instance
+  | UnusableDeclaration Ident
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
