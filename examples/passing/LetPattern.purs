@@ -146,6 +146,31 @@ patternDoWithNamedBinder = unsafePartial do
   pure $
     a.x == 10 && x == 10 && a.y == 20 && y == 20
 
+data List a = Nil | Cons a (List a)
+infixr 6 Cons as :
+
+instance eqList :: Eq a => Eq (List a) where
+  eq xs ys = go xs ys true
+    where
+      go _ _ false = false
+      go Nil Nil acc = acc
+      go (x : xs') (y : ys') acc = go xs' ys' $ acc && (y == x)
+      go _ _ _ = false
+
+patternWithInfixOp :: Boolean
+patternWithInfixOp = unsafePartial $
+  let
+    x : xs = 1 : 2 : 3 : 4 : Nil
+  in
+   x == 1 && xs == 2 : 3 : 4 : Nil
+
+patternDoWithInfixOp :: forall e. Eff e Boolean
+patternDoWithInfixOp = unsafePartial do
+  let
+    x : xs = 1 : 2 : 3 : 4 : Nil
+  pure $
+    x == 1 && xs == 2 : 3 : 4 : Nil
+
 main :: Eff (assert :: ASSERT, console :: CONSOLE) Unit
 main = do
   assert' "simple variable pattern" patternSimple
@@ -166,4 +191,6 @@ main = do
   assert' "multiple patterns with parens and do" =<< patternDoWithParens
   assert' "multiple patterns with named binder" patternWithNamedBinder
   assert' "multiple patterns with named binder and do" =<< patternDoWithNamedBinder
+  assert' "pattern with infix operator" patternWithInfixOp
+  assert' "pattern with infix operator and do" =<< patternDoWithInfixOp
   log "Done"
