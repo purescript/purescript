@@ -3,49 +3,38 @@ dist: trusty # because of perf issues
 sudo: required
 matrix:
   include:
-    # The 'compiler' key is a hack to get Travis to use different caches for
-    # each job in a build, in order to avoid the separate jobs stomping on each
-    # other's caches. See https://github.com/travis-ci/travis-ci/issues/4393
-    #
     # We use trusty boxes because they seem to be a bit faster.
-    - compiler: cc-linux-lts-normal
-      os: linux
+    - os: linux
       dist: trusty
       sudo: required
       env: BUILD_TYPE=normal DEPLOY=true
 
-    # - compiler: cc-linux-nightly-normal
-    #   os: linux
+    # - os: linux
     #   dist: trusty
     #   sudo: required
     #   env: BUILD_TYPE=normal STACKAGE_NIGHTLY=true
     #   allow_failures: true
 
-    - compiler: cc-linux-ghc8.0-normal
-      os: linux
+    - os: linux
       dist: trusty
       sudo: required
       env: BUILD_TYPE=normal STACK_YAML=stack-ghc-8.0.yaml
 
-    - compiler: cc-linux-lts-sdist
-      os: linux
+    - os: linux
       dist: trusty
       sudo: required
       env: BUILD_TYPE=sdist COVERAGE=true
 
-    - compiler: cc-linux-lts-haddock
-      os: linux
+    - os: linux
       dist: trusty
       sudo: required
       env: BUILD_TYPE=haddock
 
-    # - compiler: cc-osx-lts-normal
-    #   os: osx
-    #   env: BUILD_TYPE=normal DEPLOY=true
-    
-    # - compiler: cc-osx-lts-sdist
-    #   os: osx
-    #   env: BUILD_TYPE=sdist
+    - os: osx
+      env: BUILD_TYPE=normal DEPLOY=true
+
+    - os: osx
+      env: BUILD_TYPE=sdist
 addons:
   apt:
     packages:
@@ -54,6 +43,11 @@ cache:
   directories:
   - $HOME/.local/bin
   - $HOME/.stack
+  # Maximum amount of time in seconds spent attempting to upload a new cache
+  # before aborting. Since our cache can get rather large, increasing this
+  # value helps avoid situations where caches fail to be stored. The default
+  # value is 180 (at the time of writing).
+  timeout: 1000
 install:
 - | # Install stack.
   if test ! -f "$HOME/.local/bin/stack"
@@ -66,9 +60,20 @@ install:
     mv stack "$HOME/.local/bin/"
   fi
 - npm install -g bower # for psc-docs / psc-publish tests
-# Fix the CC environment variable, because Travis changes it
-- export CC=gcc
 - export OS_NAME=$(./travis/convert-os-name.sh)
+# Install 'timeout'
+- |
+  if [ "$TRAVIS_OS_NAME" == "osx" ]
+  then
+    if ! which gtimeout >/dev/null
+    then
+      brew update
+      brew install coreutils
+    fi
+    export TIMEOUT=gtimeout
+  else
+    export TIMEOUT=timeout
+  fi
 script:
 - travis/build.sh
 before_deploy:
