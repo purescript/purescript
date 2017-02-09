@@ -39,7 +39,7 @@ desugarLetPattern decl =
       BoundValueDeclaration {} -> PositionedValue pos com $ go (d:ds) e
       _ -> append pd $ go ds e
   go (BoundValueDeclaration binder boundE : ds) e =
-    Case [boundE] [CaseAlternative [binder] (Right $ go ds e)]
+    Case [boundE] [CaseAlternative [binder] [MkUnguarded $ go ds e]]
   go (d:ds) e = append d $ go ds e
 
   append :: Declaration -> Expr -> Expr
