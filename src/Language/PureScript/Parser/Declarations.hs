@@ -63,30 +63,40 @@ parseTypeSynonymDeclaration =
                          <*> many (indented *> kindedIdent)
                          <*> (indented *> equals *> noWildcards parsePolyType)
 
+parseValueWithWhereClause :: TokenParser Expr
+parseValueWithWhereClause = do
+  indented
+  value <- parseValue
+  whereClause <- P.optionMaybe $ do
+    indented
+    reserved "where"
+    indented
+    mark $ P.many1 (same *> parseLocalDeclaration)
+  return $ maybe value (`Let` value) whereClause
+
+parseValueWithIdentAndBinders :: Ident -> [Binder] -> TokenParser Declaration
+parseValueWithIdentAndBinders ident bs = do
+  value <- Left <$> (indented *>
+                      P.many1 ((,)
+                                <$> parseGuard
+                                <*> (indented *> equals *> parseValueWithWhereClause)
+                              ))
+       <|> Right <$> (indented *> equals *> parseValueWithWhereClause)
+  return $ ValueDeclaration ident Public bs value
+
 parseValueDeclaration :: TokenParser Declaration
 parseValueDeclaration = do
+  ident <- parseIdent
+  binders <- P.many parseBinderNoParens
+  parseValueWithIdentAndBinders ident binders
+
+parseLocalValueDeclaration :: TokenParser Declaration
+parseLocalValueDeclaration = do
   binders <- (:) <$> parseBinderAtom <*> (P.many parseBinderNoParens)
   case binders of
-    VarBinder name : binders' -> do
-      value <- Left <$> (indented *>
-                          P.many1 ((,) <$> parseGuard
-                                        <*> (indented *> equals *> parseValueWithWhereClause)
-                                  ))
-          <|> Right <$> (indented *> equals *> parseValueWithWhereClause)
-      return $ ValueDeclaration name Public binders' value
+    VarBinder ident : binders' -> parseValueWithIdentAndBinders ident binders'
     [binder] -> BoundValueDeclaration binder <$> (indented *> equals *> parseValueWithWhereClause)
     _ -> P.unexpected "patterns in value declaration"
-  where
-  parseValueWithWhereClause :: TokenParser Expr
-  parseValueWithWhereClause = do
-    indented
-    value <- parseValue
-    whereClause <- P.optionMaybe $ do
-      indented
-      reserved "where"
-      indented
-      mark $ P.many1 (same *> parseLocalDeclaration)
-    return $ maybe value (`Let` value) whereClause
 
 parseExternDeclaration :: TokenParser Declaration
 parseExternDeclaration = reserved "foreign" *> indented *> reserved "import" *> indented *> parseExternAlt where
@@ -233,7 +243,7 @@ parseDeclaration = positioned (P.choice
 parseLocalDeclaration :: TokenParser Declaration
 parseLocalDeclaration = positioned (P.choice
                    [ parseTypeDeclaration
-                   , parseValueDeclaration
+                   , parseLocalValueDeclaration
                    ] P.<?> "local declaration")
 
 -- | Parse a module header and a collection of declarations
