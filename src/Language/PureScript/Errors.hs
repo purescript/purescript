@@ -569,9 +569,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
               in ( rowFromList (sortBy (comparing fst) sd1 ++ map (fst &&& fst . snd) common, r1)
                  , rowFromList (sortBy (comparing fst) sd2 ++ map (fst &&& snd . snd) common, r2)
                  )
-        in paras [ line "Could not match type"
+        in paras [ line "Could not match observed type"
                  , markCodeBox $ indent $ typeAsBox sorted1
-                 , line "with type"
+                 , line "with expected type"
                  , markCodeBox $ indent $ typeAsBox sorted2
                  ]
 
