@@ -92,7 +92,8 @@ collapseBindingGroups =
   where
   go (DataBindingGroupDeclaration ds) = ds
   go (BindingGroupDeclaration ds) =
-    map (\(ident, nameKind, val) -> ValueDeclaration ident nameKind [] (Right val)) ds
+    map (\(ident, nameKind, val) ->
+      ValueDeclaration ident nameKind [] [MkUnguarded val]) ds
   go (PositionedDeclaration pos com d) =
     map (PositionedDeclaration pos com) $ go d
   go other = [other]
@@ -106,7 +107,7 @@ usedIdents moduleName = nub . usedIdents' S.empty . getValue
   where
   def _ _ = []
 
-  getValue (ValueDeclaration _ _ [] (Right val)) = val
+  getValue (ValueDeclaration _ _ [] [MkUnguarded val]) = val
   getValue ValueDeclaration{} = internalError "Binders should have been desugared"
   getValue (PositionedDeclaration _ _ d) = getValue d
   getValue _ = internalError "Expected ValueDeclaration"
@@ -195,7 +196,7 @@ toBindingGroup moduleName (CyclicSCC ds') =
 
   cycleError :: Declaration -> MultipleErrors
   cycleError (PositionedDeclaration p _ d) = onErrorMessages (withPosition p) $ cycleError d
-  cycleError (ValueDeclaration n _ _ (Right _)) = errorMessage $ CycleInDeclaration n
+  cycleError (ValueDeclaration n _ _ [MkUnguarded _]) = errorMessage $ CycleInDeclaration n
   cycleError _ = internalError "cycleError: Expected ValueDeclaration"
 
 toDataBindingGroup
@@ -216,7 +217,7 @@ isTypeSynonym (PositionedDeclaration _ _ d) = isTypeSynonym d
 isTypeSynonym _ = Nothing
 
 fromValueDecl :: Declaration -> (Ident, NameKind, Expr)
-fromValueDecl (ValueDeclaration ident nameKind [] (Right val)) = (ident, nameKind, val)
+fromValueDecl (ValueDeclaration ident nameKind [] [MkUnguarded val]) = (ident, nameKind, val)
 fromValueDecl ValueDeclaration{} = internalError "Binders should have been desugared"
 fromValueDecl (PositionedDeclaration _ _ d) = fromValueDecl d
 fromValueDecl _ = internalError "Expected ValueDeclaration"

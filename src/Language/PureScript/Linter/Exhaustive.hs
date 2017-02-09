@@ -202,17 +202,17 @@ missingCasesMultiple env mn = go
 -- The function below say whether or not a guard has an `otherwise` expression
 -- It is considered that `otherwise` is defined in Prelude
 --
-isExhaustiveGuard :: Either [(Guard, Expr)] Expr -> Bool
-isExhaustiveGuard (Left gs) = not . null $ filter (\(g, _) -> isOtherwise g) gs
+isExhaustiveGuard :: [GuardedExpr] -> Bool
+isExhaustiveGuard [GuardedExpr [] _] = True
+isExhaustiveGuard gs  =
+  not . null $ filter (\(GuardedExpr grd _) -> isExhaustive grd) gs
   where
-  isOtherwise :: Expr -> Bool
-  isOtherwise (Literal (BooleanLiteral True)) = True
-  isOtherwise (Var (Qualified (Just (ModuleName [ProperName "Prelude"])) (Ident "otherwise"))) = True
-  isOtherwise (Var (Qualified (Just (ModuleName [ProperName "Data", ProperName "Boolean"])) (Ident "otherwise"))) = True
-  isOtherwise (TypedValue _ e _) = isOtherwise e
-  isOtherwise (PositionedValue _ _ e) = isOtherwise e
-  isOtherwise _ = False
-isExhaustiveGuard (Right _) = True
+    checkGuard :: Guard -> Bool
+    checkGuard (ConditionGuard cond) = isTrueExpr cond
+    checkGuard (PatternGuard bind _) = isIrrefutable bind
+
+    isExhaustive :: [Guard] -> Bool
+    isExhaustive = all checkGuard
 
 -- |
 -- Returns the uncovered set of case alternatives
@@ -288,11 +288,13 @@ checkExhaustive env mn numArgs cas expr = makeResult . first nub $ foldl' step (
     where
       partial :: Text -> Text -> Declaration
       partial var tyVar =
-        ValueDeclaration (Ident C.__unused) Private [] $ Right $
-          TypedValue
-            True
-            (Abs (Left (Ident var)) (Var (Qualified Nothing (Ident var))))
-            (ty tyVar)
+        ValueDeclaration (Ident C.__unused) Private [] $
+        [MkUnguarded
+          (TypedValue
+           True
+           (Abs (Left (Ident var)) (Var (Qualified Nothing (Ident var))))
+           (ty tyVar))
+        ]
 
       ty :: Text -> Type
       ty tyVar =
@@ -321,7 +323,7 @@ checkExhaustiveExpr env mn = onExpr
   where
   onDecl :: Declaration -> m Declaration
   onDecl (BindingGroupDeclaration bs) = BindingGroupDeclaration <$> mapM (thirdM onExpr) bs
-  onDecl (ValueDeclaration name x y (Right e)) = ValueDeclaration name x y . Right <$> censor (addHint (ErrorInValueDeclaration name)) (onExpr e)
+  onDecl (ValueDeclaration name x y [MkUnguarded e]) = ValueDeclaration name x y . mkUnguardedExpr <$> censor (addHint (ErrorInValueDeclaration name)) (onExpr e)
   onDecl (PositionedDeclaration pos x dec) = PositionedDeclaration pos x <$> censor (addHint (PositionedError pos)) (onDecl dec)
   onDecl decl = return decl
 
@@ -344,5 +346,10 @@ checkExhaustiveExpr env mn = onExpr
   onExpr expr = return expr
 
   onCaseAlternative :: CaseAlternative -> m CaseAlternative
-  onCaseAlternative (CaseAlternative x (Left es)) = CaseAlternative x . Left <$> mapM (\(e, g) -> (,) <$> onExpr e <*> onExpr g) es
-  onCaseAlternative (CaseAlternative x (Right e)) = CaseAlternative x . Right <$> onExpr e
+  onCaseAlternative (CaseAlternative x [MkUnguarded e]) = CaseAlternative x . mkUnguardedExpr <$> onExpr e
+  onCaseAlternative (CaseAlternative x es) = CaseAlternative x <$> mapM onGuardedExpr es
+
+  onGuardedExpr :: GuardedExpr -> m GuardedExpr
+  onGuardedExpr (GuardedExpr guard rhs) = GuardedExpr guard <$> onExpr rhs
+
+  mkUnguardedExpr = pure . MkUnguarded

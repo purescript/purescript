@@ -9,7 +9,7 @@ module Language.PureScript.CodeGen.JS
 
 import Prelude.Compat
 
-import Control.Arrow ((&&&))
+import Control.Arrow ((&&&), second)
 import Control.Monad (forM, replicateM, void)
 import Control.Monad.Except (MonadError, throwError)
 import Control.Monad.Reader (MonadReader, asks)
@@ -375,10 +375,26 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
       valueError s _                        = accessorString "name" . accessorString "constructor" $ JSVar Nothing s
 
       guardsToJs :: Either [(Guard Ann, Expr Ann)] (Expr Ann) -> m [JS]
-      guardsToJs (Left gs) = forM gs $ \(cond, val) -> do
-        cond' <- valueToJs cond
-        done  <- valueToJs val
-        return $ JSIfElse Nothing cond' (JSBlock Nothing [JSReturn Nothing done]) Nothing
+      guardsToJs (Left gs) = snd <$> F.foldrM genGuard (False, []) gs
+        where
+          genGuard (cond, val) (False, js) = second (: js) <$> genCondVal cond val
+          genGuard _ x = pure x
+
+          genCondVal cond val
+            | condIsTrue cond = do
+                js <- JSReturn Nothing <$> valueToJs val
+                return (True, js)
+            | otherwise = do
+                cond' <- valueToJs cond
+                val'   <- valueToJs val
+                return
+                  (False, JSIfElse Nothing cond'
+                    (JSBlock Nothing [JSReturn Nothing val']) Nothing)
+
+          -- hopefully the inliner did its job and inlined `otherwise`
+          condIsTrue (Literal _ (BooleanLiteral True)) = True
+          condIsTrue _ = False
+
       guardsToJs (Right v) = return . JSReturn Nothing <$> valueToJs v
 
   binderToJs :: Text -> [JS] -> Binder Ann -> m [JS]

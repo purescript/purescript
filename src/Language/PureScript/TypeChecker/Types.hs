@@ -404,20 +404,20 @@ inferLetBinding
   -> (Expr -> m Expr)
   -> m ([Declaration], Expr)
 inferLetBinding seen [] ret j = (,) seen <$> withBindingGroupVisible (j ret)
-inferLetBinding seen (ValueDeclaration ident nameKind [] (Right (tv@(TypedValue checkType val ty))) : rest) ret j = do
+inferLetBinding seen (ValueDeclaration ident nameKind [] [MkUnguarded tv@(TypedValue checkType val ty)] : rest) ret j = do
   Just moduleName <- checkCurrentModule <$> get
   (kind, args) <- kindOfWithScopedVars ty
   checkTypeKind ty kind
   let dict = M.singleton (Qualified Nothing ident) (ty, nameKind, Undefined)
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   TypedValue _ val' ty'' <- if checkType then withScopedTypeVars moduleName args (bindNames dict (check val ty')) else return tv
-  bindNames (M.singleton (Qualified Nothing ident) (ty'', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] (Right (TypedValue checkType val' ty''))]) rest ret j
-inferLetBinding seen (ValueDeclaration ident nameKind [] (Right val) : rest) ret j = do
+  bindNames (M.singleton (Qualified Nothing ident) (ty'', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] [MkUnguarded (TypedValue checkType val' ty'')]]) rest ret j
+inferLetBinding seen (ValueDeclaration ident nameKind [] [MkUnguarded val] : rest) ret j = do
   valTy <- freshType
   let dict = M.singleton (Qualified Nothing ident) (valTy, nameKind, Undefined)
   TypedValue _ val' valTy' <- bindNames dict $ infer val
   unifyTypes valTy valTy'
-  bindNames (M.singleton (Qualified Nothing ident) (valTy', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] (Right val')]) rest ret j
+  bindNames (M.singleton (Qualified Nothing ident) (valTy', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] [MkUnguarded val']]) rest ret j
 inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
   Just moduleName <- checkCurrentModule <$> get
   SplitBindingGroup untyped typed dict <- typeDictionaryForBindingGroup Nothing (map (\(i, _, v) -> (i, v)) ds)
@@ -542,17 +542,27 @@ checkBinders nvals ret (CaseAlternative binders result : bs) = do
   r <- bindLocalVariables [ (name, ty, Defined) | (name, ty) <- M.toList m1 ] $
     CaseAlternative binders <$>
       case result of
-        Left gs -> do
-          gs' <- forM gs $ \(grd, val) -> do
-            grd' <- withErrorMessageHint ErrorCheckingGuard $ check grd tyBoolean
-            val' <- TypedValue True <$> check val ret <*> pure ret
-            return (grd', val')
-          return $ Left gs'
-        Right val -> do
+        [MkUnguarded val] -> do
           val' <- TypedValue True <$> check val ret <*> pure ret
-          return $ Right val'
+          return [MkUnguarded val']
+        gs -> forM gs (\ge -> checkGuardedRhs ge ret)
   rs <- checkBinders nvals ret bs
   return $ r : rs
+
+checkGuardedRhs
+  :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => GuardedExpr
+  -> Type
+  -> m GuardedExpr
+checkGuardedRhs (GuardedExpr [] rhs) ret = do
+  rhs' <- TypedValue True <$> check rhs ret <*> pure ret
+  return $ GuardedExpr [] rhs'
+checkGuardedRhs (GuardedExpr [ConditionGuard cond] rhs) ret = do
+  cond' <- withErrorMessageHint ErrorCheckingGuard $ check cond tyBoolean
+  rhs' <- TypedValue True <$> check rhs ret <*> pure ret
+  return $ GuardedExpr [ConditionGuard cond'] rhs'
+checkGuardedRhs _ _ =
+  internalError "Pattern not desugared"
 
 -- |
 -- Check the type of a value, rethrowing errors to provide a better error message
