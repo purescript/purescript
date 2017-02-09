@@ -96,7 +96,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@vkorablin](https://github.com/vkorablin) | Vladimir Korablin | MIT license |
 | [@zudov](https://github.com/zudov) | Konstantin Zudov | [MIT license](http://opensource.org/licenses/MIT) |
 
-### Contributors using Modified terms
+### Contributors using Modified Terms
 
 | Username | Name | Terms |
 | :------- | :--- | :------ |
@@ -109,4 +109,6 @@ If you would prefer to use different terms, please use the section below instead
 
 ### Companies
 
-- [@slamdata](https://github.com/slamdata) (SlamData, Inc.) Speaking on behalf of SlamData for SlamData employees, our existing contributions and all future contributions to the PureScript compiler are, until further notice, Copyright SlamData Inc., and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT). - @jdegoes
+| Username | Company | Terms |
+| :------- | :--- | :------ |
+| [@slamdata](https://github.com/slamdata) | SlamData, Inc. | Speaking on behalf of SlamData for SlamData employees, our existing contributions and all future contributions to the PureScript compiler are, until further notice, Copyright SlamData Inc., and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT). - @jdegoes |
