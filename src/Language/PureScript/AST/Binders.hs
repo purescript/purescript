@@ -81,3 +81,11 @@ binderNames = go []
   lit ns (ObjectLiteral bs) = foldl go ns (map snd bs)
   lit ns (ArrayLiteral bs) = foldl go ns bs
   lit ns _ = ns
+
+isIrrefutable :: Binder -> Bool
+isIrrefutable NullBinder = True
+isIrrefutable (VarBinder _) = True
+isIrrefutable (PositionedBinder _ _ b) = isIrrefutable b
+isIrrefutable (TypedBinder _ b) = isIrrefutable b
+isIrrefutable _ = False
+

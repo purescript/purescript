@@ -1,7 +1,5 @@
--- |
--- This module implements the "Magic Do" optimization, which inlines calls to return
+-- | This module implements the "Magic Do" optimization, which inlines calls to return
 -- and bind for the Eff monad, as well as some of its actions.
---
 module Language.PureScript.CodeGen.JS.Optimizer.MagicDo (magicDo) where
 
 import Prelude.Compat
@@ -11,16 +9,10 @@ import Data.Maybe (fromJust, isJust)
 
 import Language.PureScript.CodeGen.JS.AST
 import Language.PureScript.CodeGen.JS.Optimizer.Common
-import Language.PureScript.Options
 import Language.PureScript.PSString (mkString)
 import qualified Language.PureScript.Constants as C
 
-magicDo :: Options -> JS -> JS
-magicDo opts | optionsNoMagicDo opts = id
-             | otherwise = inlineST . magicDo'
-
--- |
--- Inline type class dictionaries for >>= and return for the Eff monad
+-- | Inline type class dictionaries for >>= and return for the Eff monad
 --
 -- E.g.
 --
@@ -34,9 +26,8 @@ magicDo opts | optionsNoMagicDo opts = id
 --    var x = m1();
 --    ...
 --  }
---
-magicDo' :: JS -> JS
-magicDo' = everywhereOnJS undo . everywhereOnJSTopDown convert
+magicDo :: JS -> JS
+magicDo = inlineST . everywhereOnJS undo . everywhereOnJSTopDown convert
   where
   -- The name of the function block which is added to denote a do block
   fnName = "__do"
@@ -85,9 +76,7 @@ magicDo' = everywhereOnJS undo . everywhereOnJSTopDown convert
   applyReturns (JSIfElse ss cond t f) = JSIfElse ss cond (applyReturns t) (applyReturns `fmap` f)
   applyReturns other = other
 
--- |
--- Inline functions in the ST module
---
+-- | Inline functions in the ST module
 inlineST :: JS -> JS
 inlineST = everywhereOnJS convertBlock
   where

@@ -56,7 +56,7 @@ desugarDo d =
   go (DoNotationBind binder val : rest) = do
     rest' <- go rest
     ident <- freshIdent'
-    return $ App (App bind val) (Abs (Left ident) (Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] (Right rest')]))
+    return $ App (App bind val) (Abs (Left ident) (Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] [MkUnguarded rest']]))
   go [DoNotationLet _] = throwError . errorMessage $ InvalidDoLet
   go (DoNotationLet ds : rest) = do
     let checkBind :: Declaration -> m ()

@@ -18,7 +18,7 @@ span2 = P.SourceSpan "" (P.SourcePos 2 2) (P.SourcePos 3 3)
 
 typeAnnotation1, value1, synonym1, class1, class2, data1, data2, valueFixity, typeFixity, foreign1, foreign2, foreign3, member1 :: P.Declaration
 typeAnnotation1 = P.TypeDeclaration (P.Ident "value1") P.REmpty
-value1 = P.ValueDeclaration (P.Ident "value1") P.Public [] (Left [])
+value1 = P.ValueDeclaration (P.Ident "value1") P.Public [] []
 synonym1 = P.TypeSynonymDeclaration (P.ProperName "Synonym1") [] P.REmpty
 class1 = P.TypeClassDeclaration (P.ProperName "Class1") [] [] [] []
 class2 = P.TypeClassDeclaration (P.ProperName "Class2") [] [] []

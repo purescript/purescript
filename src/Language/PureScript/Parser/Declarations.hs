@@ -76,12 +76,12 @@ parseValueWithWhereClause = do
 
 parseValueWithIdentAndBinders :: Ident -> [Binder] -> TokenParser Declaration
 parseValueWithIdentAndBinders ident bs = do
-  value <- Left <$> (indented *>
-                      P.many1 ((,)
-                                <$> parseGuard
-                                <*> (indented *> equals *> parseValueWithWhereClause)
-                              ))
-       <|> Right <$> (indented *> equals *> parseValueWithWhereClause)
+  value <- indented *> (
+    (\v -> [MkUnguarded v]) <$> (equals *> parseValueWithWhereClause) <|>
+      P.many1 (GuardedExpr <$> parseGuard
+                           <*> (indented *> equals
+                                         *> parseValueWithWhereClause))
+    )
   return $ ValueDeclaration ident Public bs value
 
 parseValueDeclaration :: TokenParser Declaration
@@ -360,11 +360,13 @@ parseCase = Case <$> P.between (reserved "case") (indented *> reserved "of") (co
 
 parseCaseAlternative :: TokenParser CaseAlternative
 parseCaseAlternative = CaseAlternative <$> commaSep1 parseBinder
-                                       <*> (Left <$> (indented *>
-                                                        P.many1 ((,) <$> parseGuard
-                                                                     <*> (indented *> rarrow *> parseValue)
-                                                                ))
-                                            <|> Right <$> (indented *> rarrow *> parseValue))
+                                       <*> (indented *> (
+                                               (pure . MkUnguarded) <$> (rarrow *> parseValue)
+                                                 <|> (P.many1 (GuardedExpr <$> parseGuard
+                                                                           <*> (indented
+                                                                                *> rarrow
+                                                                                *> parseValue)
+                                                              ))))
                                        P.<?> "case alternative"
 
 parseIfThenElse :: TokenParser Expr
@@ -579,5 +581,11 @@ parseBinderNoParens = P.choice
                       ] P.<?> "binder"
 
 -- | Parse a guard
-parseGuard :: TokenParser Guard
-parseGuard = pipe *> indented *> parseValue
+parseGuard :: TokenParser [Guard]
+parseGuard =
+  pipe *> indented *> P.sepBy1 (parsePatternGuard <|> parseConditionGuard) comma
+  where
+    parsePatternGuard =
+      PatternGuard <$> P.try (parseBinder <* indented <* larrow) <*> parseValue
+    parseConditionGuard =
+      ConditionGuard <$> parseValue

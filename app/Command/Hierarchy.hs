@@ -16,35 +16,30 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE DataKinds #-}
 
-module Main where
+module Command.Hierarchy (command) where
 
-import Control.Applicative (optional)
-import Control.Monad (unless)
-
-import Data.List (intercalate,nub,sort)
-import Data.Foldable (for_)
-import Data.Version (showVersion)
-import Data.Monoid ((<>))
+import           Control.Applicative (optional)
+import           Control.Monad (unless)
+import           Data.List (intercalate,nub,sort)
+import           Data.Foldable (for_)
+import           Data.Monoid ((<>))
 import qualified Data.Text as T
-
-import Options.Applicative (Parser)
+import           Options.Applicative (Parser)
 import qualified Options.Applicative as Opts
-import System.Directory (createDirectoryIfMissing)
-import System.FilePath ((</>))
-import System.FilePath.Glob (glob)
-import System.Exit (exitFailure, exitSuccess)
-import System.IO (hPutStr, stderr)
-import System.IO.UTF8 (readUTF8FileT)
-
+import           System.Directory (createDirectoryIfMissing)
+import           System.FilePath ((</>))
+import           System.FilePath.Glob (glob)
+import           System.Exit (exitFailure, exitSuccess)
+import           System.IO (hPutStr, stderr)
+import           System.IO.UTF8 (readUTF8FileT)
 import qualified Language.PureScript as P
-import qualified Paths_purescript as Paths
 
 data HierarchyOptions = HierarchyOptions
-  { hierachyInput   :: FilePath
-  , hierarchyOutput :: Maybe FilePath
+  { _hierachyInput   :: FilePath
+  , _hierarchyOutput :: Maybe FilePath
   }
 
-newtype SuperMap = SuperMap { unSuperMap :: Either (P.ProperName 'P.ClassName) (P.ProperName 'P.ClassName, P.ProperName 'P.ClassName) }
+newtype SuperMap = SuperMap { _unSuperMap :: Either (P.ProperName 'P.ClassName) (P.ProperName 'P.ClassName, P.ProperName 'P.ClassName) }
   deriving Eq
 
 instance Show SuperMap where
@@ -110,10 +105,5 @@ pscOptions :: Parser HierarchyOptions
 pscOptions = HierarchyOptions <$> inputFile
                               <*> outputFile
 
-main :: IO ()
-main = Opts.execParser opts >>= compile
-  where
-  opts        = Opts.info (Opts.helper <*> pscOptions) infoModList
-  infoModList = Opts.fullDesc <> headerInfo <> footerInfo
-  headerInfo  = Opts.header "hierarchy - Creates a GraphViz directed graph of PureScript TypeClasses"
-  footerInfo  = Opts.footer $ "hierarchy " ++ showVersion Paths.version
+command :: Opts.Parser (IO ())
+command = compile <$> (Opts.helper <*> pscOptions)

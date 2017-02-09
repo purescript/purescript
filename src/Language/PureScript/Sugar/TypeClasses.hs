@@ -190,7 +190,7 @@ desugarDecl mn exps = go
   go d@(TypeInstanceDeclaration name deps className tys (NewtypeInstanceWithDictionary dict)) = do
     let dictTy = foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
         constrainedTy = quantify (if null deps then dictTy else ConstrainedType deps dictTy)
-    return (expRef name className tys, [d, ValueDeclaration name Private [] (Right (TypedValue True dict constrainedTy))])
+    return (expRef name className tys, [d, ValueDeclaration name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]])
   go (PositionedDeclaration pos com d) = do
     (dr, ds) <- rethrowWithPosition pos $ desugarDecl mn exps d
     return (dr, map (PositionedDeclaration pos com) ds)
@@ -252,9 +252,11 @@ typeClassMemberToDictionaryAccessor
   -> Declaration
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration ident ty) =
   let className = Qualified (Just mn) name
-  in ValueDeclaration ident Private [] $ Right $
-      TypedValue False (TypeClassDictionaryAccessor className ident) $
-      moveQuantifiersToFront (quantify (ConstrainedType [Constraint className (map (TypeVar . fst) args) Nothing] ty))
+  in ValueDeclaration ident Private [] $
+    [MkUnguarded (
+     TypedValue False (TypeClassDictionaryAccessor className ident) $
+       moveQuantifiersToFront (quantify (ConstrainedType [Constraint className (map (TypeVar . fst) args) Nothing] ty))
+    )]
 typeClassMemberToDictionaryAccessor mn name args (PositionedDeclaration pos com d) =
   PositionedDeclaration pos com $ typeClassMemberToDictionaryAccessor mn name args d
 typeClassMemberToDictionaryAccessor _ _ _ _ = internalError "Invalid declaration in type class definition"
@@ -303,7 +305,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
           dictTy = foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
           constrainedTy = quantify (if null deps then dictTy else ConstrainedType deps dictTy)
           dict = TypeClassDictionaryConstructorApp className props
-          result = ValueDeclaration name Private [] (Right (TypedValue True dict constrainedTy))
+          result = ValueDeclaration name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]
       return result
 
   where
@@ -315,7 +317,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
   declName _ = Nothing
 
   memberToValue :: [(Ident, Type)] -> Declaration -> Desugar m Expr
-  memberToValue tys' (ValueDeclaration ident _ [] (Right val)) = do
+  memberToValue tys' (ValueDeclaration ident _ [] [MkUnguarded val]) = do
     _ <- maybe (throwError . errorMessage $ ExtraneousClassMember ident className) return $ lookup ident tys'
     return val
   memberToValue tys' (PositionedDeclaration pos com d) = rethrowWithPosition pos $ do

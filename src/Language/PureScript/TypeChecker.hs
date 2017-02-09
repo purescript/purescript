@@ -113,7 +113,8 @@ addValue moduleName name ty nameKind = do
   putEnv (env { names = M.insert (Qualified (Just moduleName) name) (ty, nameKind, Defined) (names env) })
 
 addTypeClass
-  :: (MonadState CheckState m)
+  :: forall m
+   . (MonadState CheckState m, MonadError MultipleErrors m)
   => ModuleName
   -> ProperName 'ClassName
   -> [(Text, Maybe Kind)]
@@ -121,15 +122,36 @@ addTypeClass
   -> [FunctionalDependency]
   -> [Declaration]
   -> m ()
-addTypeClass moduleName pn args implies dependencies ds =
-    modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) newClass (typeClasses . checkEnv $ st) } }
+addTypeClass moduleName pn args implies dependencies ds = do
+  env <- getEnv
+  traverse_ (checkMemberIsUsable (typeSynonyms env)) classMembers
+  modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert (Qualified (Just moduleName) pn) newClass (typeClasses . checkEnv $ st) } }
   where
+    classMembers :: [(Ident, Type)]
+    classMembers = map toPair ds
+
     newClass :: TypeClassData
-    newClass = makeTypeClassData args (map toPair ds) implies dependencies
+    newClass = makeTypeClassData args classMembers implies dependencies
+
+    coveringSets :: [S.Set Int]
+    coveringSets = S.toList (typeClassCoveringSets newClass)
+
+    argToIndex :: Text -> Maybe Int
+    argToIndex = flip M.lookup $ M.fromList (zipWith ((,) . fst) args [0..])
 
     toPair (TypeDeclaration ident ty) = (ident, ty)
     toPair (PositionedDeclaration _ _ d) = toPair d
     toPair _ = internalError "Invalid declaration in TypeClassDeclaration"
+
+    -- Currently we are only checking usability based on the type class currently
+    -- being defined.  If the mentioned arguments don't include a covering set,
+    -- then we won't be able to find a instance.
+    checkMemberIsUsable :: T.SynonymMap -> (Ident, Type) -> m ()
+    checkMemberIsUsable syns (ident, memberTy) = do
+      memberTy' <- T.replaceAllTypeSynonymsM syns memberTy
+      let mentionedArgIndexes = S.fromList (mapMaybe argToIndex (freeTypeVariables memberTy'))
+      unless (any (`S.isSubsetOf` mentionedArgIndexes) coveringSets) $
+        throwError . errorMessage $ UnusableDeclaration ident
 
 addTypeClassDictionaries
   :: (MonadState CheckState m)
@@ -246,14 +268,14 @@ typeCheckAll moduleName _ = traverse go
     return $ TypeSynonymDeclaration name args ty
   go TypeDeclaration{} =
     internalError "Type declarations should have been removed before typeCheckAlld"
-  go (ValueDeclaration name nameKind [] (Right val)) = do
+  go (ValueDeclaration name nameKind [] [MkUnguarded val]) = do
     env <- getEnv
     warnAndRethrow (addHint (ErrorInValueDeclaration name)) $ do
       val' <- checkExhaustiveExpr env moduleName val
       valueIsNotDefined moduleName name
       [(_, (val'', ty))] <- typesOf NonRecursiveBindingGroup moduleName [(name, val')]
       addValue moduleName name ty nameKind
-      return $ ValueDeclaration name nameKind [] $ Right val''
+      return $ ValueDeclaration name nameKind [] [MkUnguarded val'']
   go ValueDeclaration{} = internalError "Binders were not desugared"
   go BoundValueDeclaration{} = internalError "BoundValueDeclaration should be desugared"
   go (BindingGroupDeclaration vals) = do

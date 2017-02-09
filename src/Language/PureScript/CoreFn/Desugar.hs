@@ -2,7 +2,7 @@ module Language.PureScript.CoreFn.Desugar (moduleToCoreFn) where
 
 import Prelude.Compat
 
-import Control.Arrow (second, (***))
+import Control.Arrow (second)
 
 import Data.Function (on)
 import Data.List (sort, sortBy, nub)
@@ -70,7 +70,7 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
       let (_, _, _, fields) = lookupConstructor env (Qualified (Just mn) ctor)
       in NonRec (ssA ss) (properToIdent ctor) $ Constructor (ss, com, Nothing, Nothing) tyName ctor fields
   declToCoreFn ss _   (A.DataBindingGroupDeclaration ds) = concatMap (declToCoreFn ss []) ds
-  declToCoreFn ss com (A.ValueDeclaration name _ _ (Right e)) =
+  declToCoreFn ss com (A.ValueDeclaration name _ _ [A.MkUnguarded e]) =
     [NonRec (ssA ss) name (exprToCoreFn ss com Nothing e)]
   declToCoreFn ss _   (A.BindingGroupDeclaration ds) =
     [Rec $ map (\(name, _, e) -> ((ssA ss, name), exprToCoreFn ss [] Nothing e)) ds]
@@ -132,9 +132,17 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
   altToCoreFn :: Maybe SourceSpan -> A.CaseAlternative -> CaseAlternative Ann
   altToCoreFn ss (A.CaseAlternative bs vs) = CaseAlternative (map (binderToCoreFn ss []) bs) (go vs)
     where
-    go :: Either [(A.Guard, A.Expr)] A.Expr -> Either [(Guard Ann, Expr Ann)] (Expr Ann)
-    go (Left ges) = Left $ map (exprToCoreFn ss [] Nothing *** exprToCoreFn ss [] Nothing) ges
-    go (Right e) = Right (exprToCoreFn ss [] Nothing e)
+    go :: [A.GuardedExpr] -> Either [(Guard Ann, Expr Ann)] (Expr Ann)
+    go [A.MkUnguarded e]
+      = Right (exprToCoreFn ss [] Nothing e)
+    go gs
+      = Left [ (exprToCoreFn ss [] Nothing cond, exprToCoreFn ss [] Nothing e)
+             | A.GuardedExpr g e <- gs
+             , let cond = guardToExpr g
+             ]
+
+    guardToExpr [A.ConditionGuard cond] = cond
+    guardToExpr _ = internalError "Guard not correctly desugared"
 
   -- |
   -- Desugars case binders from AST to CoreFn representation.

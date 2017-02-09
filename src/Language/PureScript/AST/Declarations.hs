@@ -145,6 +145,9 @@ data SimpleErrorMessage
   | ClassInstanceArityMismatch Ident (Qualified (ProperName 'ClassName)) Int Int
   -- | a user-defined warning raised by using the Warn type class
   | UserDefinedWarning Type
+  -- | a declaration couldn't be used because there wouldn't be enough information
+  -- | to choose an instance
+  | UnusableDeclaration Ident
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
@@ -388,7 +391,7 @@ data Declaration
   -- |
   -- A value declaration (name, top-level binders, optional guard, value)
   --
-  | ValueDeclaration Ident NameKind [Binder] (Either [(Guard, Expr)] Expr)
+  | ValueDeclaration Ident NameKind [Binder] [GuardedExpr]
   -- |
   -- A declaration paired with pattern matching in let-in expression (binder, optional guard, value)
   | BoundValueDeclaration Binder Expr
@@ -553,7 +556,18 @@ flattenDecls = concatMap flattenOne
 -- |
 -- A guard is just a boolean-valued expression that appears alongside a set of binders
 --
-type Guard = Expr
+data Guard = ConditionGuard Expr
+           | PatternGuard Binder Expr
+           deriving (Show)
+
+-- |
+-- The right hand side of a binder in value declarations
+-- and case expressions.
+data GuardedExpr = GuardedExpr [Guard] Expr
+                 deriving (Show)
+
+pattern MkUnguarded :: Expr -> GuardedExpr
+pattern MkUnguarded e = GuardedExpr [] e
 
 -- |
 -- Data type for expressions and terms
@@ -685,7 +699,7 @@ data CaseAlternative = CaseAlternative
     -- |
     -- The result expression or a collect of guarded expressions
     --
-  , caseAlternativeResult :: Either [(Guard, Expr)] Expr
+  , caseAlternativeResult :: [GuardedExpr]
   } deriving (Show)
 
 -- |
@@ -745,3 +759,11 @@ newtype AssocList k t = AssocList { runAssocList :: [(k, t)] }
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''DeclarationRef)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ImportDeclarationType)
+
+isTrueExpr :: Expr -> Bool
+isTrueExpr (Literal (BooleanLiteral True)) = True
+isTrueExpr (Var (Qualified (Just (ModuleName [ProperName "Prelude"])) (Ident "otherwise"))) = True
+isTrueExpr (Var (Qualified (Just (ModuleName [ProperName "Data", ProperName "Boolean"])) (Ident "otherwise"))) = True
+isTrueExpr (TypedValue _ e _) = isTrueExpr e
+isTrueExpr (PositionedValue _ _ e) = isTrueExpr e
+isTrueExpr _ = False
