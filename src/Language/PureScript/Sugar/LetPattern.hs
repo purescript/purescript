@@ -34,11 +34,14 @@ desugarLetPattern decl =
      -- ^ The original let-in result expression
      -> Expr
   go [] e = e
-  go (PositionedDeclaration pos com (BoundValueDeclaration binder boundE) : ds) e =
-    PositionedValue pos com desugared
-    where
-    desugared :: Expr
-    desugared = Case [boundE] [CaseAlternative [binder] (Right $ go ds e)]
-  go (d:ds) e = case go ds e of
-                  Let ds' e' -> Let (d:ds') e'
-                  e' -> Let [d] e'
+  go (pd@(PositionedDeclaration pos com d) : ds) e =
+    case d of
+      BoundValueDeclaration {} -> PositionedValue pos com $ go (d:ds) e
+      _ -> append pd $ go ds e
+  go (BoundValueDeclaration binder boundE : ds) e =
+    Case [boundE] [CaseAlternative [binder] (Right $ go ds e)]
+  go (d:ds) e = append d $ go ds e
+
+  append :: Declaration -> Expr -> Expr
+  append d (Let ds e) = Let (d:ds) e
+  append d e = Let [d] e

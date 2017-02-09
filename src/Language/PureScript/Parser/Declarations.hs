@@ -17,7 +17,7 @@ import           Prelude hiding (lex)
 
 import           Control.Applicative
 import           Control.Arrow ((+++))
-import           Control.Monad (foldM)
+import           Control.Monad (foldM, join)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Parallel.Strategies (withStrategy, parList, rseq)
 import           Data.Functor (($>))
@@ -91,12 +91,13 @@ parseValueDeclaration = do
   parseValueWithIdentAndBinders ident binders
 
 parseLocalValueDeclaration :: TokenParser Declaration
-parseLocalValueDeclaration = do
-  binders <- (:) <$> parseBinderAtom <*> (P.many parseBinderNoParens)
-  case binders of
-    VarBinder ident : binders' -> parseValueWithIdentAndBinders ident binders'
-    [binder] -> BoundValueDeclaration binder <$> (indented *> equals *> parseValueWithWhereClause)
-    _ -> P.unexpected "patterns in value declaration"
+parseLocalValueDeclaration = join $ go <$> parseBinder <*> (P.many parseBinderNoParens)
+  where
+  go :: Binder -> [Binder] -> TokenParser Declaration
+  go (VarBinder ident) bs = parseValueWithIdentAndBinders ident bs
+  go (PositionedBinder _ _ (VarBinder ident)) bs = parseValueWithIdentAndBinders ident bs
+  go binder [] = BoundValueDeclaration binder <$> (indented *> equals *> parseValueWithWhereClause)
+  go _ _ = P.unexpected $ "patterns in local value declaration"
 
 parseExternDeclaration :: TokenParser Declaration
 parseExternDeclaration = reserved "foreign" *> indented *> reserved "import" *> indented *> parseExternAlt where
