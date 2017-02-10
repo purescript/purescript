@@ -18,7 +18,7 @@ import           Control.Monad.IO.Class
 import           System.FilePath (takeDirectory, (</>), (<.>), takeFileName)
 import           System.FilePath.Glob (glob)
 import           System.Exit (exitFailure)
-import           System.IO (stderr, hPutStrLn)
+import           System.IO (stderr, hPutStr, hPutStrLn)
 import           System.IO.UTF8 (readUTF8File, writeUTF8File)
 import           System.Directory (createDirectoryIfMissing, getCurrentDirectory)
 import qualified Data.ByteString.Lazy as B
@@ -115,7 +115,7 @@ command = run <$> (Opts.helper <*> options) where
     output <- runExceptT (app opts)
     case output of
       Left err -> do
-        hPutStrLn stderr (unlines (printErrorMessage err))
+        hPutStr stderr (unlines (printErrorMessage err))
         exitFailure
       Right (sourcemap, js) ->
         case optionsOutputFile opts of
