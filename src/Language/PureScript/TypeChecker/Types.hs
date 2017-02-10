@@ -316,7 +316,7 @@ infer' (Literal (ArrayLiteral vals)) = do
   return $ TypedValue True (Literal (ArrayLiteral ts')) (TypeApp tyArray els)
 infer' (Literal (ObjectLiteral ps)) = do
   ensureNoDuplicateProperties ps
-  -- We make a special case for Vars in record labels, since there are the
+  -- We make a special case for Vars in record labels, since these are the
   -- only types of expressions for which 'infer' can return a polymorphic type.
   -- They need to be instantiated here.
   let shouldInstantiate :: Expr -> Bool
