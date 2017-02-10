@@ -1,5 +1,5 @@
 -- |
--- Optimizer steps for simplifying Javascript blocks
+-- Optimizer steps for simplifying JavaScript blocks
 --
 module Language.PureScript.CodeGen.JS.Optimizer.Blocks
   ( collapseNestedBlocks

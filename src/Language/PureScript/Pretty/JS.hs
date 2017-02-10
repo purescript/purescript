@@ -1,5 +1,5 @@
 -- |
--- Pretty printer for the Javascript AST
+-- Pretty printer for the JavaScript AST
 --
 module Language.PureScript.Pretty.JS
   ( prettyPrintJS
@@ -240,13 +240,13 @@ prettyStatements sts = do
   return $ intercalate (emit "\n") $ map ((<> emit ";") . (indentString <>)) jss
 
 -- |
--- Generate a pretty-printed string representing a Javascript expression
+-- Generate a pretty-printed string representing a JavaScript expression
 --
 prettyPrintJS1 :: (Emit gen) => JS -> gen
 prettyPrintJS1 = fromMaybe (internalError "Incomplete pattern") . flip evalStateT (PrinterState 0) . prettyPrintJS'
 
 -- |
--- Generate a pretty-printed string representing a collection of Javascript expressions at the same indentation level
+-- Generate a pretty-printed string representing a collection of JavaScript expressions at the same indentation level
 --
 prettyPrintJSWithSourceMaps :: [JS] -> (Text, [SMap])
 prettyPrintJSWithSourceMaps js =
@@ -256,7 +256,7 @@ prettyPrintJSWithSourceMaps js =
 prettyPrintJS :: [JS] -> Text
 prettyPrintJS = maybe (internalError "Incomplete pattern") runPlainString . flip evalStateT (PrinterState 0) . prettyStatements
 -- |
--- Generate an indented, pretty-printed string representing a Javascript expression
+-- Generate an indented, pretty-printed string representing a JavaScript expression
 --
 prettyPrintJS' :: (Emit gen) => JS -> StateT PrinterState Maybe gen
 prettyPrintJS' = A.runKleisli $ runPattern matchValue

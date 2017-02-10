@@ -19,7 +19,7 @@ moduleNameToJs (ModuleName pns) =
   in if nameIsJsBuiltIn name then "$$" <> name else name
 
 -- |
--- Convert an Ident into a valid Javascript identifier:
+-- Convert an Ident into a valid JavaScript identifier:
 --
 --  * Alphanumeric characters are kept unmodified.
 --
@@ -73,14 +73,14 @@ identCharToText '\'' = "$prime"
 identCharToText c = '$' `T.cons` T.pack (show (ord c))
 
 -- |
--- Checks whether an identifier name is reserved in Javascript.
+-- Checks whether an identifier name is reserved in JavaScript.
 --
 nameIsJsReserved :: Text -> Bool
 nameIsJsReserved name =
   name `elem` jsAnyReserved
 
 -- |
--- Checks whether a name matches a built-in value in Javascript.
+-- Checks whether a name matches a built-in value in JavaScript.
 --
 nameIsJsBuiltIn :: Text -> Bool
 nameIsJsBuiltIn name =

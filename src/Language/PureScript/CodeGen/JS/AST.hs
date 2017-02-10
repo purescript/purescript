@@ -1,5 +1,5 @@
 -- |
--- Data types for the intermediate simplified-Javascript AST
+-- Data types for the intermediate simplified-JavaScript AST
 --
 module Language.PureScript.CodeGen.JS.AST where
 
@@ -123,7 +123,7 @@ data BinaryOperator
   deriving (Show, Eq)
 
 -- |
--- Data type for simplified Javascript expressions
+-- Data type for simplified JavaScript expressions
 --
 data JS
   -- |
@@ -231,11 +231,11 @@ data JS
   --
   | JSContinue (Maybe SourceSpan) Text
   -- |
-  -- Raw Javascript (generated when parsing fails for an inline foreign import declaration)
+  -- Raw JavaScript (generated when parsing fails for an inline foreign import declaration)
   --
   | JSRaw (Maybe SourceSpan) Text
   -- |
-  -- Commented Javascript
+  -- Commented JavaScript
   --
   | JSComment (Maybe SourceSpan) [Comment] JS
   deriving (Show, Eq)
