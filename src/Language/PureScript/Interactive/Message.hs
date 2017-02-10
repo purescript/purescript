@@ -37,7 +37,7 @@ helpMessage = "The following commands are available:\n\n    " ++
 -- | The welcome prologue.
 prologueMessage :: String
 prologueMessage = unlines
-  [ "PureScript REPL, version " ++ showVersion Paths.version
+  [ "PSCi, version " ++ showVersion Paths.version
   , "Type :? for help"
   ]
 
