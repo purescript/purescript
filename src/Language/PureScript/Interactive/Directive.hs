@@ -92,7 +92,7 @@ hasArgument _ = True
 help :: [(Directive, String, String)]
 help =
   [ (Help,    "",         "Show this help menu")
-  , (Quit,    "",         "Quit PSCi")
+  , (Quit,    "",         "Quit REPL")
   , (Reset,   "",         "Discard all imported modules and declared bindings")
   , (Browse,  "<module>", "See all functions in <module>")
   , (Type,    "<expr>",   "Show the type of <expr>")

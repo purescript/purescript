@@ -46,10 +46,10 @@ app :: (MonadError ErrorMessage m, MonadIO m) => Options -> m (Maybe SourceMappi
 app Options{..} = do
   inputFiles <- concat <$> mapM (liftIO . glob) optionsInputFiles
   when (null inputFiles) . liftIO $ do
-    hPutStrLn stderr "psc-bundle: No input files."
+    hPutStrLn stderr "purs bundle: No input files."
     exitFailure
   when (isNothing optionsOutputFile && optionsSourceMaps == True) . liftIO $ do
-    hPutStrLn stderr "psc-bundle: Source maps only supported when output file specified."
+    hPutStrLn stderr "purs bundle: Source maps only supported when output file specified."
     exitFailure
 
   input <- for inputFiles $ \filename -> do

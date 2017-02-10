@@ -55,7 +55,9 @@ compile :: PSCMakeOptions -> IO ()
 compile PSCMakeOptions{..} = do
   input <- globWarningOnMisses (unless pscmJSONErrors . warnFileTypeNotFound) pscmInput
   when (null input && not pscmJSONErrors) $ do
-    hPutStrLn stderr "psc: No input files."
+    hPutStrLn stderr $ unlines [ "purs compile: No input files."
+                               , "Usage: For basic information, try the `--help' option."
+                               ]
     exitFailure
   moduleFiles <- readInput input
   (makeErrors, makeWarnings) <- runMake pscmOpts $ do
@@ -68,7 +70,7 @@ compile PSCMakeOptions{..} = do
   exitSuccess
 
 warnFileTypeNotFound :: String -> IO ()
-warnFileTypeNotFound = hPutStrLn stderr . ("psc: No files found using pattern: " ++)
+warnFileTypeNotFound = hPutStrLn stderr . ("purs compile: No files found using pattern: " ++)
 
 globWarningOnMisses :: (String -> IO ()) -> [FilePath] -> IO [FilePath]
 globWarningOnMisses warn = concatMapM globWithWarning

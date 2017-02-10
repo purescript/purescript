@@ -26,8 +26,8 @@ if [ "$force_recompile" = "true" ] && [ -d "output" ]; then
   rm -r output
 fi
 
-stack exec psc 'tests/**/*.purs' 'bower_components/purescript-*/src/**/*.purs'
+stack exec purs compile 'tests/**/*.purs' 'bower_components/purescript-*/src/**/*.purs'
 
-stack exec psc-docs 'bower_components/purescript-*/src/**/*.purs' > core-docs.md
+stack exec purs docs 'bower_components/purescript-*/src/**/*.purs' > core-docs.md
 
 NODE_PATH=output node -e "require('Test.Main').main()"
