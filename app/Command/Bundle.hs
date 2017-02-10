@@ -18,7 +18,7 @@ import           Control.Monad.IO.Class
 import           System.FilePath (takeDirectory, (</>), (<.>), takeFileName)
 import           System.FilePath.Glob (glob)
 import           System.Exit (exitFailure)
-import           System.IO (stderr, hPutStrLn)
+import           System.IO (stderr, hPutStr, hPutStrLn)
 import           System.IO.UTF8 (readUTF8File, writeUTF8File)
 import           System.Directory (createDirectoryIfMissing, getCurrentDirectory)
 import qualified Data.ByteString.Lazy as B
@@ -46,10 +46,10 @@ app :: (MonadError ErrorMessage m, MonadIO m) => Options -> m (Maybe SourceMappi
 app Options{..} = do
   inputFiles <- concat <$> mapM (liftIO . glob) optionsInputFiles
   when (null inputFiles) . liftIO $ do
-    hPutStrLn stderr "psc-bundle: No input files."
+    hPutStrLn stderr "purs bundle: No input files."
     exitFailure
   when (isNothing optionsOutputFile && optionsSourceMaps == True) . liftIO $ do
-    hPutStrLn stderr "psc-bundle: Source maps only supported when output file specified."
+    hPutStrLn stderr "purs bundle: Source maps only supported when output file specified."
     exitFailure
 
   input <- for inputFiles $ \filename -> do
@@ -115,7 +115,7 @@ command = run <$> (Opts.helper <*> options) where
     output <- runExceptT (app opts)
     case output of
       Left err -> do
-        hPutStrLn stderr (unlines (printErrorMessage err))
+        hPutStr stderr (unlines (printErrorMessage err))
         exitFailure
       Right (sourcemap, js) ->
         case optionsOutputFile opts of

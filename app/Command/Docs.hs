@@ -79,10 +79,10 @@ docgen (PSCDocsOptions fmt inputGlob output) = do
   where
   guardMissing [] = return ()
   guardMissing [mn] = do
-    hPutStrLn stderr ("psc-docs: error: unknown module \"" ++ T.unpack (P.runModuleName mn) ++ "\"")
+    hPutStrLn stderr ("purs docs: error: unknown module \"" ++ T.unpack (P.runModuleName mn) ++ "\"")
     exitFailure
   guardMissing mns = do
-    hPutStrLn stderr "psc-docs: error: unknown modules:"
+    hPutStrLn stderr "purs docs: error: unknown modules:"
     forM_ mns $ \mn ->
       hPutStrLn stderr ("  * " ++ T.unpack (P.runModuleName mn))
     exitFailure
@@ -209,7 +209,7 @@ buildOptions (fmt, input, mapping) =
   case parseDocgen mapping of
     Right mapping' -> return (PSCDocsOptions fmt input mapping')
     Left err -> do
-      hPutStrLn stderr "psc-docs: error in --docgen option:"
+      hPutStrLn stderr "purs docs: error in --docgen option:"
       hPutStrLn stderr ("  " ++ err)
       exitFailure
 

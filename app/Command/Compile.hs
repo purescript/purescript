@@ -22,7 +22,7 @@ import qualified Options.Applicative as Opts
 import qualified System.Console.ANSI as ANSI
 import           System.Exit (exitSuccess, exitFailure)
 import           System.FilePath.Glob (glob)
-import           System.IO (hPutStrLn, stderr)
+import           System.IO (hPutStr, hPutStrLn, stderr)
 import           System.IO.UTF8 (readUTF8FileT)
 
 data PSCMakeOptions = PSCMakeOptions
@@ -55,7 +55,9 @@ compile :: PSCMakeOptions -> IO ()
 compile PSCMakeOptions{..} = do
   input <- globWarningOnMisses (unless pscmJSONErrors . warnFileTypeNotFound) pscmInput
   when (null input && not pscmJSONErrors) $ do
-    hPutStrLn stderr "psc: No input files."
+    hPutStr stderr $ unlines [ "purs compile: No input files."
+                             , "Usage: For basic information, try the `--help' option."
+                             ]
     exitFailure
   moduleFiles <- readInput input
   (makeErrors, makeWarnings) <- runMake pscmOpts $ do
@@ -68,7 +70,7 @@ compile PSCMakeOptions{..} = do
   exitSuccess
 
 warnFileTypeNotFound :: String -> IO ()
-warnFileTypeNotFound = hPutStrLn stderr . ("psc: No files found using pattern: " ++)
+warnFileTypeNotFound = hPutStrLn stderr . ("purs compile: No files found using pattern: " ++)
 
 globWarningOnMisses :: (String -> IO ()) -> [FilePath] -> IO [FilePath]
 globWarningOnMisses warn = concatMapM globWithWarning
