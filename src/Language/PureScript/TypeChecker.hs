@@ -277,6 +277,7 @@ typeCheckAll moduleName _ = traverse go
       addValue moduleName name ty nameKind
       return $ ValueDeclaration name nameKind [] [MkUnguarded val'']
   go ValueDeclaration{} = internalError "Binders were not desugared"
+  go BoundValueDeclaration{} = internalError "BoundValueDeclaration should be desugared"
   go (BindingGroupDeclaration vals) = do
     env <- getEnv
     warnAndRethrow (addHint (ErrorInBindingGroup (map (\(ident, _, _) -> ident) vals))) $ do

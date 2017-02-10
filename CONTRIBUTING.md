@@ -10,10 +10,24 @@ If you would like to contribute, please consider the issues in the current miles
 
 Please follow the following guidelines:
 
-- Add at least a test to `examples/passing/` and possibly to `examples/failing`.
+- Add at least a test to `examples/passing/` and possibly to `examples/failing/`.
 - Build the binaries and libs with `stack build`
-- Run the test suite with `stack test`. You will need `npm`, `bower` and `node` on your PATH to run the tests.
+- Make sure that all test suites are passing. Run the test suites with `stack test`.
 - Build the core libraries by running the script in `core-tests`.
+
+## Tests
+
+Run all test suites with `stack test`. You will need `npm`, `bower` and `node` on your PATH to run the tests.
+
+To build and run a specific test in `examples/passing/` or `examples/failing/`, execute the following commands.
+
+``` bash
+# Build
+stack exec psc -- 'tests/support/bower_components/purescript-*/src/**/*.purs' examples/blah/Blah.purs
+
+# Run
+node -e "require('./output/Main/').main()"
+```
 
 ## Code Review
 

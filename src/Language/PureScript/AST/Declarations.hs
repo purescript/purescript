@@ -45,7 +45,7 @@ data TypeSearch
 
 -- | A type of error messages
 data SimpleErrorMessage
-  = ModuleNotFound ModuleName 
+  = ModuleNotFound ModuleName
   | ErrorParsingFFIModule FilePath (Maybe Bundle.ErrorMessage)
   | ErrorParsingModule P.ParseError
   | MissingFFIModule ModuleName
@@ -392,6 +392,9 @@ data Declaration
   -- A value declaration (name, top-level binders, optional guard, value)
   --
   | ValueDeclaration Ident NameKind [Binder] [GuardedExpr]
+  -- |
+  -- A declaration paired with pattern matching in let-in expression (binder, optional guard, value)
+  | BoundValueDeclaration Binder Expr
   -- |
   -- A minimal mutually recursive set of value declarations
   --
