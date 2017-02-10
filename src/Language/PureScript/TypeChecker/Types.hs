@@ -319,16 +319,15 @@ infer' (Literal (ObjectLiteral ps)) = do
   -- We make a special case for Vars in record labels, since there are the
   -- only types of expressions for which 'infer' can return a polymorphic type.
   -- They need to be instantiated here.
-  let isVar :: Expr -> Bool
-      isVar Var{} = True
-      isVar (TypedValue _ e _) = isVar e
-      isVar (PositionedValue _ _ e) = isVar e
-      isVar _ = False
+  let shouldInstantiate :: Expr -> Bool
+      shouldInstantiate Var{} = True
+      shouldInstantiate (PositionedValue _ _ e) = shouldInstantiate e
+      shouldInstantiate _ = False
 
       inferProperty :: (PSString, Expr) -> m (PSString, (Expr, Type))
       inferProperty (name, val) = do
         TypedValue _ val' ty <- infer val
-        valAndType <- if isVar val
+        valAndType <- if shouldInstantiate val
                         then instantiatePolyTypeWithUnknowns val' ty
                         else pure (val', ty)
         pure (name, valAndType)
