@@ -310,6 +310,9 @@ command = loop <$> options
         inputFiles <- concat <$> traverse glob psciInputFile
         e <- runExceptT $ do
           modules <- ExceptT (loadAllModules inputFiles)
+          when (null modules) . liftIO $ do
+            putStrLn noInputMessage
+            exitFailure
           unless (supportModuleIsDefined (map snd modules)) . liftIO $ do
             putStrLn supportModuleMessage
             exitFailure

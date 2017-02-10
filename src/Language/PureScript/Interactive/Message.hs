@@ -41,9 +41,16 @@ prologueMessage = unlines
   , "Type :? for help"
   ]
 
+noInputMessage :: String
+noInputMessage = unlines
+  [ "purs repl: No input files; try running `pulp psci` instead."
+  , "For help getting started, visit " ++ guideURL
+  , "Usage: For basic information, try the `--help' option."
+  ]
+
 supportModuleMessage :: String
 supportModuleMessage = unlines
-  [ "purs repl: No input files, or no psci-support loaded; try running `pulp psci` instead."
+  [ "purs repl: psci-support is not loaded; try running `pulp psci` instead."
   , "For help getting started, visit " ++ guideURL
   , "Usage: For basic information, try the `--help' option."
   ]
