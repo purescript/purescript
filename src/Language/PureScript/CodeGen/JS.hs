@@ -1,5 +1,5 @@
 -- |
--- This module generates code in the simplified Javascript intermediate representation from Purescript code
+-- This module generates code in the simplified JavaScript intermediate representation from PureScript code
 --
 module Language.PureScript.CodeGen.JS
   ( module AST
@@ -42,7 +42,7 @@ import qualified Language.PureScript.Constants as C
 import System.FilePath.Posix ((</>))
 
 -- |
--- Generate code in the simplified Javascript intermediate representation for all declarations in a
+-- Generate code in the simplified JavaScript intermediate representation for all declarations in a
 -- module.
 --
 moduleToJs
@@ -104,7 +104,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
          else newName
 
   -- |
-  -- Generates Javascript code for a module import, binding the required module
+  -- Generates JavaScript code for a module import, binding the required module
   -- to the alternative
   --
   importToJs :: M.Map ModuleName (Ann, ModuleName) -> ModuleName -> m JS
@@ -135,14 +135,14 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
     renameQual q = q
 
   -- |
-  -- Generate code in the simplified Javascript intermediate representation for a declaration
+  -- Generate code in the simplified JavaScript intermediate representation for a declaration
   --
   bindToJs :: Bind Ann -> m [JS]
   bindToJs (NonRec ann ident val) = return <$> nonRecToJS ann ident val
   bindToJs (Rec vals) = forM vals (uncurry . uncurry $ nonRecToJS)
 
   -- |
-  -- Generate code in the simplified Javascript intermediate representation for a single non-recursive
+  -- Generate code in the simplified JavaScript intermediate representation for a single non-recursive
   -- declaration.
   --
   -- The main purpose of this function is to handle code generation for comments.
@@ -166,15 +166,15 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   withPos Nothing js = return js
 
   -- |
-  -- Generate code in the simplified Javascript intermediate representation for a variable based on a
+  -- Generate code in the simplified JavaScript intermediate representation for a variable based on a
   -- PureScript identifier.
   --
   var :: Ident -> JS
   var = JSVar Nothing . identToJs
 
   -- |
-  -- Generate code in the simplified Javascript intermediate representation for an accessor based on
-  -- a PureScript identifier. If the name is not valid in Javascript (symbol based, reserved name) an
+  -- Generate code in the simplified JavaScript intermediate representation for an accessor based on
+  -- a PureScript identifier. If the name is not valid in JavaScript (symbol based, reserved name) an
   -- indexer is returned.
   --
   accessor :: Ident -> JS -> JS
@@ -185,7 +185,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   accessorString prop = JSIndexer Nothing (JSStringLiteral Nothing prop)
 
   -- |
-  -- Generate code in the simplified Javascript intermediate representation for a value or expression.
+  -- Generate code in the simplified JavaScript intermediate representation for a value or expression.
   --
   valueToJs :: Expr Ann -> m JS
   valueToJs e =
@@ -301,7 +301,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
     return $ JSApp Nothing (JSFunction Nothing Nothing [] block) []
 
   -- |
-  -- Generate code in the simplified Javascript intermediate representation for a reference to a
+  -- Generate code in the simplified JavaScript intermediate representation for a reference to a
   -- variable.
   --
   varToJs :: Qualified Ident -> JS
@@ -309,7 +309,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   varToJs qual = qualifiedToJS id qual
 
   -- |
-  -- Generate code in the simplified Javascript intermediate representation for a reference to a
+  -- Generate code in the simplified JavaScript intermediate representation for a reference to a
   -- variable that may have a qualified name.
   --
   qualifiedToJS :: (a -> Ident) -> Qualified a -> JS
@@ -321,7 +321,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   foreignIdent ident = accessorString (mkString $ runIdent ident) (JSVar Nothing "$foreign")
 
   -- |
-  -- Generate code in the simplified Javascript intermediate representation for pattern match binders
+  -- Generate code in the simplified JavaScript intermediate representation for pattern match binders
   -- and guards.
   --
   bindersToJs :: Maybe SourceSpan -> [CaseAlternative Ann] -> [JS] -> m JS
@@ -382,7 +382,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
     traverse (withPos ss) =<< binderToJs' s done binder
 
   -- |
-  -- Generate code in the simplified Javascript intermediate representation for a pattern match
+  -- Generate code in the simplified JavaScript intermediate representation for a pattern match
   -- binder.
   --
   binderToJs' :: Text -> [JS] -> Binder Ann -> m [JS]

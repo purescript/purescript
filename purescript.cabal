@@ -8,7 +8,7 @@ copyright: (c) 2013-16 Phil Freeman, (c) 2014-16 Gary Burgess
 maintainer: Phil Freeman <paf31@cantab.net>
 stability: experimental
 synopsis: PureScript Programming Language Compiler
-description: A small strongly, statically typed programming language with expressive types, inspired by Haskell and compiling to Javascript.
+description: A small strongly, statically typed programming language with expressive types, inspired by Haskell and compiling to JavaScript.
 category: Language
 Homepage: http://www.purescript.org/
 author: Phil Freeman <paf31@cantab.net>,

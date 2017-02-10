@@ -94,7 +94,7 @@ renderProgressMessage (CompilingModule mn) = "Compiling " ++ T.unpack (runModule
 --
 -- This type exists to make two things abstract:
 --
--- * The particular backend being used (Javascript, C++11, etc.)
+-- * The particular backend being used (JavaScript, C++11, etc.)
 --
 -- * The details of how files are read/written etc.
 data MakeActions m = MakeActions

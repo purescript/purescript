@@ -3,7 +3,7 @@
 --
 -- This module takes as input the individual generated modules from 'Language.PureScript.Make' and
 -- performs dead code elimination, filters empty modules,
--- and generates the final Javascript bundle.
+-- and generates the final JavaScript bundle.
 module Language.PureScript.Bundle
   ( bundle
   , bundleSM
@@ -249,7 +249,7 @@ trailingCommaList :: JSCommaTrailingList a -> [a]
 trailingCommaList (JSCTLComma l _) = commaList l
 trailingCommaList (JSCTLNone l) = commaList l
 
--- | Attempt to create a Module from a Javascript AST.
+-- | Attempt to create a Module from a JavaScript AST.
 --
 -- Each type of module element is matched using pattern guards, and everything else is bundled into the
 -- Other constructor.
@@ -671,7 +671,7 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
 
 -- | The bundling function.
 -- This function performs dead code elimination, filters empty modules
--- and generates and prints the final Javascript bundle.
+-- and generates and prints the final JavaScript bundle.
 bundleSM :: (MonadError ErrorMessage m)
        => [(ModuleIdentifier, Maybe FilePath, String)] -- ^ The input modules.  Each module should be javascript rendered from 'Language.PureScript.Make' or @psc@.
        -> [ModuleIdentifier] -- ^ Entry points.  These module identifiers are used as the roots for dead-code elimination
@@ -700,7 +700,7 @@ bundleSM inputStrs entryPoints mainModule namespace outFilename = do
 
 -- | The bundling function.
 -- This function performs dead code elimination, filters empty modules
--- and generates and prints the final Javascript bundle.
+-- and generates and prints the final JavaScript bundle.
 bundle :: (MonadError ErrorMessage m)
        => [(ModuleIdentifier, String)] -- ^ The input modules.  Each module should be javascript rendered from 'Language.PureScript.Make' or @psc@.
        -> [ModuleIdentifier] -- ^ Entry points.  These module identifiers are used as the roots for dead-code elimination

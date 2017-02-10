@@ -250,7 +250,7 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
 
     createBundle :: BrowserState -> IO ()
     createBundle state = do
-      putStrLn "Bundling Javascript..."
+      putStrLn "Bundling JavaScript..."
       ejs <- bundle
       case ejs of
         Left err -> do

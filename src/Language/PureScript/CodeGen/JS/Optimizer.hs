@@ -1,4 +1,4 @@
--- | This module optimizes code in the simplified-Javascript intermediate representation.
+-- | This module optimizes code in the simplified-JavaScript intermediate representation.
 --
 -- The following optimizations are supported:
 --
@@ -16,7 +16,7 @@
 --
 --  * Inline Prelude.($), Prelude.(#), Prelude.(++), Prelude.(!!)
 --
---  * Inlining primitive Javascript operators
+--  * Inlining primitive JavaScript operators
 module Language.PureScript.CodeGen.JS.Optimizer (optimize) where
 
 import Prelude.Compat
@@ -30,7 +30,7 @@ import Language.PureScript.CodeGen.JS.Optimizer.MagicDo
 import Language.PureScript.CodeGen.JS.Optimizer.TCO
 import Language.PureScript.CodeGen.JS.Optimizer.Unused
 
--- | Apply a series of optimizer passes to simplified Javascript code
+-- | Apply a series of optimizer passes to simplified JavaScript code
 optimize :: MonadSupply m => JS -> m JS
 optimize js = do
   js' <- untilFixedPoint (inlineFnComposition . inlineUnsafePartial . tidyUp . applyAll
