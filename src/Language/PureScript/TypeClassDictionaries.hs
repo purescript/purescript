@@ -19,11 +19,10 @@ data TypeClassDictionaryInScope v
     -- | The name of the type class to which this type class instance applies
     , tcdClassName :: Qualified (ProperName 'ClassName)
     -- | The types to which this type class instance applies
-    , tcdInstanceTypes :: [Type]
+    , tcdInstanceTypes :: [Type ()]
     -- | Type class dependencies which must be satisfied to construct this dictionary
-    , tcdDependencies :: Maybe [Constraint]
+    , tcdDependencies :: Maybe [Constraint ()]
     }
     deriving (Show, Functor, Foldable, Traversable)
 
 type NamedDict = TypeClassDictionaryInScope (Qualified Ident)
-

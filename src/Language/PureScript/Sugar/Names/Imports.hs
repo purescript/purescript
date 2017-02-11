@@ -28,25 +28,25 @@ type ImportDef = (Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)
 -- explicitly imported declarations.
 --
 findImports
-  :: [Declaration]
+  :: [Declaration a b]
   -> M.Map ModuleName [ImportDef]
 findImports = foldl (go Nothing) M.empty
   where
-  go pos result (ImportDeclaration mn typ qual) =
+  go pos result (ImportDeclaration mn typ qual _) =
     let imp = (pos, typ, qual)
     in M.insert mn (maybe [imp] (imp :) (mn `M.lookup` result)) result
-  go _ result (PositionedDeclaration pos _ d) = go (Just pos) result d
+  go _ result (PositionedDeclaration pos _ d _) = go (Just pos) result d
   go _ result _ = result
 
 -- |
 -- Constructs a set of imports for a module.
 --
 resolveImports
-  :: forall m
+  :: forall m a b
    . MonadError MultipleErrors m
   => Env
-  -> Module
-  -> m (Module, Imports)
+  -> Module a b
+  -> m (Module a b, Imports)
 resolveImports env (Module ss coms currentModule decls exps) =
   rethrow (addHint (ErrorInModule currentModule)) $ do
     let imports = findImports decls

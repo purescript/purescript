@@ -12,27 +12,27 @@ import Language.PureScript.AST
 -- Replace every @BoundValueDeclaration@ in @Let@ expressions with @Case@
 -- expressions.
 --
-desugarLetPatternModule :: Module -> Module
+desugarLetPatternModule :: Module a b -> Module a b
 desugarLetPatternModule (Module ss coms mn ds exts) = Module ss coms mn (map desugarLetPattern ds) exts
 
 -- |
 -- Desugar a single let expression
 --
-desugarLetPattern :: Declaration -> Declaration
-desugarLetPattern (PositionedDeclaration pos com d) = PositionedDeclaration pos com $ desugarLetPattern d
+desugarLetPattern :: Declaration a b -> Declaration a b
+desugarLetPattern (PositionedDeclaration pos com d ann) = PositionedDeclaration pos com (desugarLetPattern d) ann
 desugarLetPattern decl =
   let (f, _, _) = everywhereOnValues id replace id
   in f decl
   where
-  replace :: Expr -> Expr
+  replace :: Expr a b -> Expr a b
   replace (Let ds e) = go ds e
   replace other = other
 
-  go :: [Declaration]
+  go :: [Declaration a b]
      -- ^ Declarations to desugar
-     -> Expr
+     -> Expr a b
      -- ^ The original let-in result expression
-     -> Expr
+     -> Expr a b
   go [] e = e
   go (pd@(PositionedDeclaration pos com d) : ds) e =
     case d of
@@ -42,6 +42,6 @@ desugarLetPattern decl =
     Case [boundE] [CaseAlternative [binder] [MkUnguarded $ go ds e]]
   go (d:ds) e = append d $ go ds e
 
-  append :: Declaration -> Expr -> Expr
-  append d (Let ds e) = Let (d:ds) e
+  append :: Declaration a b -> Expr a b -> Expr a b
+  append d (Let ds e ann) = Let (d:ds) e ann
   append d e = Let [d] e

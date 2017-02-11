@@ -129,7 +129,7 @@ toSourcePos pos = SourcePos (P.sourceLine pos) (P.sourceColumn pos)
 
 -- | Read source position information and comments
 withSourceSpan
-  :: (SourceSpan -> [Comment] -> a -> b)
+  :: (SourceSpan -> [Comment] -> a -> () -> b)
   -> P.Parsec [PositionedToken] u a
   -> P.Parsec [PositionedToken] u b
 withSourceSpan f p = do
@@ -142,4 +142,4 @@ withSourceSpan f p = do
         pt:_ -> ptPrevEndPos pt
         _ -> Nothing
   let sp = SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos $ fromMaybe end end')
-  return $ f sp comments x
+  return $ f sp comments x ()

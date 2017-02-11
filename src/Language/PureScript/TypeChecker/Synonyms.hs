@@ -24,19 +24,19 @@ import           Language.PureScript.TypeChecker.Monad
 import           Language.PureScript.Types
 
 -- | Type synonym information (arguments with kinds, aliased type), indexed by name
-type SynonymMap = M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe Kind)], Type)
+type SynonymMap = M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe Kind)], Type ())
 
 replaceAllTypeSynonyms'
   :: SynonymMap
-  -> Type
-  -> Either MultipleErrors Type
+  -> Type ()
+  -> Either MultipleErrors (Type ())
 replaceAllTypeSynonyms' syns = everywhereOnTypesTopDownM try
   where
-  try :: Type -> Either MultipleErrors Type
+  try :: Type () -> Either MultipleErrors (Type ())
   try t = fromMaybe t <$> go 0 [] t
 
-  go :: Int -> [Type] -> Type -> Either MultipleErrors (Maybe Type)
-  go c args (TypeConstructor ctor)
+  go :: Int -> [Type ()] -> Type () -> Either MultipleErrors (Maybe (Type ()))
+  go c args (TypeConstructor ctor _)
     | Just (synArgs, body) <- M.lookup ctor syns
     , c == length synArgs
     = let repl = replaceAllTypeVars (zip (map fst synArgs) args) body
@@ -44,11 +44,11 @@ replaceAllTypeSynonyms' syns = everywhereOnTypesTopDownM try
     | Just (synArgs, _) <- M.lookup ctor syns
     , length synArgs > c
     = throwError . errorMessage $ PartiallyAppliedSynonym ctor
-  go c args (TypeApp f arg) = go (c + 1) (arg : args) f
+  go c args (TypeApp f arg _) = go (c + 1) (arg : args) f
   go _ _ _ = return Nothing
 
 -- | Replace fully applied type synonyms
-replaceAllTypeSynonyms :: (e ~ MultipleErrors, MonadState CheckState m, MonadError e m) => Type -> m Type
+replaceAllTypeSynonyms :: (e ~ MultipleErrors, MonadState CheckState m, MonadError e m) => Type () -> m (Type ())
 replaceAllTypeSynonyms d = do
   env <- getEnv
   either throwError return $ replaceAllTypeSynonyms' (typeSynonyms env) d
@@ -57,6 +57,6 @@ replaceAllTypeSynonyms d = do
 replaceAllTypeSynonymsM
   :: MonadError MultipleErrors m
   => SynonymMap
-  -> Type
-  -> m Type
+  -> Type ()
+  -> m (Type ())
 replaceAllTypeSynonymsM syns = either throwError pure . replaceAllTypeSynonyms' syns

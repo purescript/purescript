@@ -313,21 +313,21 @@ checkExhaustive env mn numArgs cas expr = makeResult . first nub $ foldl' step (
 -- Exhaustivity checking
 --
 checkExhaustiveExpr
-  :: forall m
+  :: forall m a b
    . (MonadWriter MultipleErrors m, MonadSupply m)
    => Environment
    -> ModuleName
-   -> Expr
-   -> m Expr
+   -> (Expr a b)
+   -> m (Expr a b)
 checkExhaustiveExpr env mn = onExpr
   where
-  onDecl :: Declaration -> m Declaration
+  onDecl :: Declaration a b -> m (Declaration a b)
   onDecl (BindingGroupDeclaration bs) = BindingGroupDeclaration <$> mapM (thirdM onExpr) bs
   onDecl (ValueDeclaration name x y [MkUnguarded e]) = ValueDeclaration name x y . mkUnguardedExpr <$> censor (addHint (ErrorInValueDeclaration name)) (onExpr e)
   onDecl (PositionedDeclaration pos x dec) = PositionedDeclaration pos x <$> censor (addHint (PositionedError pos)) (onDecl dec)
   onDecl decl = return decl
 
-  onExpr :: Expr -> m Expr
+  onExpr :: Expr a b -> m (Expr a b)
   onExpr (UnaryMinus e) = UnaryMinus <$> onExpr e
   onExpr (Literal (ArrayLiteral es)) = Literal . ArrayLiteral <$> mapM onExpr es
   onExpr (Literal (ObjectLiteral es)) = Literal . ObjectLiteral <$> mapM (sndM onExpr) es
@@ -345,11 +345,11 @@ checkExhaustiveExpr env mn = onExpr
   onExpr (PositionedValue pos x e) = PositionedValue pos x <$> censor (addHint (PositionedError pos)) (onExpr e)
   onExpr expr = return expr
 
-  onCaseAlternative :: CaseAlternative -> m CaseAlternative
+  onCaseAlternative :: CaseAlternative a b -> m (CaseAlternative a b)
   onCaseAlternative (CaseAlternative x [MkUnguarded e]) = CaseAlternative x . mkUnguardedExpr <$> onExpr e
   onCaseAlternative (CaseAlternative x es) = CaseAlternative x <$> mapM onGuardedExpr es
 
-  onGuardedExpr :: GuardedExpr -> m GuardedExpr
+  onGuardedExpr :: GuardedExpr a b -> m (GuardedExpr a b)
   onGuardedExpr (GuardedExpr guard rhs) = GuardedExpr guard <$> onExpr rhs
 
   mkUnguardedExpr = pure . MkUnguarded

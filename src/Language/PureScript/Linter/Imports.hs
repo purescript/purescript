@@ -49,9 +49,9 @@ type UsedImports = M.Map ModuleName [Qualified Name]
 -- * Imports using `hiding` (this is another form of implicit importing)
 --
 lintImports
-  :: forall m
+  :: forall m a b
    . MonadWriter MultipleErrors m
-  => Module
+  => Module a b
   -> Env
   -> UsedImports
   -> m ()

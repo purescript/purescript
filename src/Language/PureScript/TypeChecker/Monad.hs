@@ -26,7 +26,7 @@ import Language.PureScript.Types
 
 -- | A substitution of unification variables for types or kinds
 data Substitution = Substitution
-  { substType :: M.Map Int Type -- ^ Type substitution
+  { substType :: M.Map Int (Type ()) -- ^ Type substitution
   , substKind :: M.Map Int Kind -- ^ Kind substitution
   }
 
@@ -67,7 +67,7 @@ type Unknown = Int
 -- | Temporarily bind a collection of names to values
 bindNames
   :: MonadState CheckState m
-  => M.Map (Qualified Ident) (Type, NameKind, NameVisibility)
+  => M.Map (Qualified Ident) (Type (), NameKind, NameVisibility)
   -> m a
   -> m a
 bindNames newNames action = do
@@ -80,7 +80,7 @@ bindNames newNames action = do
 -- | Temporarily bind a collection of names to types
 bindTypes
   :: MonadState CheckState m
-  => M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
+  => M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind ())
   -> m a
   -> m a
 bindTypes newNames action = do
@@ -161,7 +161,7 @@ lookupTypeClassDictionaries mn = fromMaybe M.empty . M.lookup mn . typeClassDict
 -- | Temporarily bind a collection of names to local variables
 bindLocalVariables
   :: (MonadState CheckState m)
-  => [(Ident, Type, NameVisibility)]
+  => [(Ident, Type (), NameVisibility)]
   -> m a
   -> m a
 bindLocalVariables bindings =
@@ -197,7 +197,7 @@ preservingNames action = do
 lookupVariable
   :: (e ~ MultipleErrors, MonadState CheckState m, MonadError e m)
   => Qualified Ident
-  -> m Type
+  -> m (Type ())
 lookupVariable qual = do
   env <- getEnv
   case M.lookup qual (names env) of

@@ -19,16 +19,16 @@ import Language.PureScript.Errors
 -- Replace all top level type declarations in a module with type annotations
 --
 desugarTypeDeclarationsModule
-  :: forall m
+  :: forall m a b
    . MonadError MultipleErrors m
-  => Module
-  -> m Module
+  => Module a b
+  -> m (Module a b)
 desugarTypeDeclarationsModule (Module ss coms name ds exps) =
   rethrow (addHint (ErrorInModule name)) $
     Module ss coms name <$> desugarTypeDeclarations ds <*> pure exps
   where
 
-  desugarTypeDeclarations :: [Declaration] -> m [Declaration]
+  desugarTypeDeclarations :: [Declaration a b] -> m [Declaration a b]
   desugarTypeDeclarations (PositionedDeclaration pos com d : rest) = do
     (d' : rest') <- rethrowWithPosition pos $ desugarTypeDeclarations (d : rest)
     return (PositionedDeclaration pos com d' : rest')
@@ -36,7 +36,7 @@ desugarTypeDeclarationsModule (Module ss coms name ds exps) =
     (_, nameKind, val) <- fromValueDeclaration d
     desugarTypeDeclarations (ValueDeclaration name' nameKind [] [MkUnguarded (TypedValue True val ty)] : rest)
     where
-    fromValueDeclaration :: Declaration -> m (Ident, NameKind, Expr)
+    fromValueDeclaration :: Declaration a b -> m (Ident, NameKind, Expr a b)
     fromValueDeclaration (ValueDeclaration name'' nameKind [] [MkUnguarded val])
       | name' == name'' = return (name'', nameKind, val)
     fromValueDeclaration (PositionedDeclaration pos com d') = do

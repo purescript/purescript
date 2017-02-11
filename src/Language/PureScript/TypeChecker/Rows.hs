@@ -17,7 +17,7 @@ import Language.PureScript.Errors
 import Language.PureScript.Types
 
 -- | Ensure rows do not contain duplicate labels
-checkDuplicateLabels :: forall m. (MonadError MultipleErrors m) => Expr -> m ()
+checkDuplicateLabels :: forall m. (MonadError MultipleErrors m) => Expr a b -> m ()
 checkDuplicateLabels =
   let (_, f, _) = everywhereOnValuesM def go def
   in void . f

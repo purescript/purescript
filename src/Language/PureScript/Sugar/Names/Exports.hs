@@ -25,11 +25,11 @@ import Language.PureScript.Sugar.Names.Common (warnDuplicateRefs)
 -- |
 -- Finds all exportable members of a module, disregarding any explicit exports.
 --
-findExportable :: forall m. (MonadError MultipleErrors m) => Module -> m Exports
+findExportable :: forall m. (MonadError MultipleErrors m) => Module a b -> m Exports
 findExportable (Module _ _ mn ds _) =
   rethrow (addHint (ErrorInModule mn)) $ foldM updateExports nullExports ds
   where
-  updateExports :: Exports -> Declaration -> m Exports
+  updateExports :: Exports -> Declaration a b -> m Exports
   updateExports exps (TypeClassDeclaration tcn _ _ _ ds') = do
     exps' <- exportTypeClass Internal exps tcn mn
     foldM go exps' ds'
