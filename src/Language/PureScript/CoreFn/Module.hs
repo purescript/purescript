@@ -19,4 +19,4 @@ data Module a = Module
   , moduleDecls :: [Bind a]
   } deriving (Show)
 
-type ForeignDecl = (Ident, Type)
+type ForeignDecl = (Ident, Type ())

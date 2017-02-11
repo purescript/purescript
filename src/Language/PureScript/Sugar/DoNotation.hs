@@ -20,13 +20,13 @@ import qualified Language.PureScript.Constants as C
 -- applications of the bind function in scope, and all @DoNotationLet@
 -- constructors with let expressions.
 --
-desugarDoModule :: forall m. (MonadSupply m, MonadError MultipleErrors m) => Module -> m Module
+desugarDoModule :: (MonadSupply m, MonadError MultipleErrors m) => Module a b -> m (Module a b)
 desugarDoModule (Module ss coms mn ds exts) = Module ss coms mn <$> parU ds desugarDo <*> pure exts
 
 -- |
 -- Desugar a single do statement
 --
-desugarDo :: forall m. (MonadSupply m, MonadError MultipleErrors m) => Declaration -> m Declaration
+desugarDo :: forall m a b. (MonadSupply m, MonadError MultipleErrors m) => Declaration a b -> m (Declaration a b)
 desugarDo (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> rethrowWithPosition pos (desugarDo d)
 desugarDo d =
   let (f, _, _) = everywhereOnValuesM return replace return

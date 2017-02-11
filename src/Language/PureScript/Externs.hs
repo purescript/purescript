@@ -98,41 +98,41 @@ data ExternsDeclaration =
     EDType
       { edTypeName                :: ProperName 'TypeName
       , edTypeKind                :: Kind
-      , edTypeDeclarationKind     :: TypeKind
+      , edTypeDeclarationKind     :: TypeKind ()
       }
   -- | A type synonym
   | EDTypeSynonym
       { edTypeSynonymName         :: ProperName 'TypeName
       , edTypeSynonymArguments    :: [(Text, Maybe Kind)]
-      , edTypeSynonymType         :: Type
+      , edTypeSynonymType         :: Type ()
       }
   -- | A data construtor
   | EDDataConstructor
       { edDataCtorName            :: ProperName 'ConstructorName
       , edDataCtorOrigin          :: DataDeclType
       , edDataCtorTypeCtor        :: ProperName 'TypeName
-      , edDataCtorType            :: Type
+      , edDataCtorType            :: Type ()
       , edDataCtorFields          :: [Ident]
       }
   -- | A value declaration
   | EDValue
       { edValueName               :: Ident
-      , edValueType               :: Type
+      , edValueType               :: Type ()
       }
   -- | A type class declaration
   | EDClass
       { edClassName               :: ProperName 'ClassName
       , edClassTypeArguments      :: [(Text, Maybe Kind)]
-      , edClassMembers            :: [(Ident, Type)]
-      , edClassConstraints        :: [Constraint]
+      , edClassMembers            :: [(Ident, Type ())]
+      , edClassConstraints        :: [Constraint ()]
       , edFunctionalDependencies  :: [FunctionalDependency]
       }
   -- | An instance declaration
   | EDInstance
       { edInstanceClassName       :: Qualified (ProperName 'ClassName)
       , edInstanceName            :: Ident
-      , edInstanceTypes           :: [Type]
-      , edInstanceConstraints     :: Maybe [Constraint]
+      , edInstanceTypes           :: [Type ()]
+      , edInstanceConstraints     :: Maybe [Constraint ()]
       }
   -- | A kind declaration
   | EDKind
@@ -163,7 +163,7 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   qual = Qualified (Just efModuleName)
 
 -- | Generate an externs file for all declarations in a module
-moduleToExternsFile :: Module -> Environment -> ExternsFile
+moduleToExternsFile :: Module a b -> Environment -> ExternsFile
 moduleToExternsFile (Module _ _ _ _ Nothing) _ = internalError "moduleToExternsFile: module exports were not elaborated"
 moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
   where
@@ -175,24 +175,24 @@ moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
   efTypeFixities  = mapMaybe typeFixityDecl ds
   efDeclarations  = concatMap toExternsDeclaration efExports
 
-  fixityDecl :: Declaration -> Maybe ExternsFixity
-  fixityDecl (ValueFixityDeclaration (Fixity assoc prec) name op) =
+  fixityDecl :: Declaration a b -> Maybe ExternsFixity
+  fixityDecl (ValueFixityDeclaration (Fixity assoc prec) name op _) =
       fmap (const (ExternsFixity assoc prec op name)) (find (findOp getValueOpRef op) exps)
-  fixityDecl (PositionedDeclaration _ _ d) = fixityDecl d
+  fixityDecl (PositionedDeclaration _ _ d _) = fixityDecl d
   fixityDecl _ = Nothing
 
-  typeFixityDecl :: Declaration -> Maybe ExternsTypeFixity
-  typeFixityDecl (TypeFixityDeclaration (Fixity assoc prec) name op) =
+  typeFixityDecl :: Declaration a b -> Maybe ExternsTypeFixity
+  typeFixityDecl (TypeFixityDeclaration (Fixity assoc prec) name op _) =
       fmap (const (ExternsTypeFixity assoc prec op name)) (find (findOp getTypeOpRef op) exps)
-  typeFixityDecl (PositionedDeclaration _ _ d) = typeFixityDecl d
+  typeFixityDecl (PositionedDeclaration _ _ d _) = typeFixityDecl d
   typeFixityDecl _ = Nothing
 
   findOp :: (DeclarationRef -> Maybe (OpName a)) -> OpName a -> DeclarationRef -> Bool
   findOp g op = maybe False (== op) . g
 
-  importDecl :: Declaration -> Maybe ExternsImport
-  importDecl (ImportDeclaration m mt qmn) = Just (ExternsImport m mt qmn)
-  importDecl (PositionedDeclaration _ _ d) = importDecl d
+  importDecl :: Declaration a b -> Maybe ExternsImport
+  importDecl (ImportDeclaration m mt qmn _) = Just (ExternsImport m mt qmn)
+  importDecl (PositionedDeclaration _ _ d _) = importDecl d
   importDecl _ = Nothing
 
   toExternsDeclaration :: DeclarationRef -> [ExternsDeclaration]

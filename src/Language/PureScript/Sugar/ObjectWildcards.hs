@@ -19,19 +19,18 @@ import           Language.PureScript.PSString (PSString)
 
 
 desugarObjectConstructors
-  :: forall m
-   . (MonadSupply m, MonadError MultipleErrors m)
-  => Module
-  -> m Module
+  :: (MonadSupply m, MonadError MultipleErrors m)
+  => Module a b
+  -> m (Module a b)
 desugarObjectConstructors (Module ss coms mn ds exts) = Module ss coms mn <$> mapM desugarDecl ds <*> pure exts
 
-desugarDecl :: forall m. (MonadSupply m, MonadError MultipleErrors m) => Declaration -> m Declaration
+desugarDecl :: forall m a b. (MonadSupply m, MonadError MultipleErrors m) => Declaration a b -> m (Declaration a b)
 desugarDecl (PositionedDeclaration pos com d) = rethrowWithPosition pos $ PositionedDeclaration pos com <$> desugarDecl d
 desugarDecl other = fn other
   where
   (fn, _, _) = everywhereOnValuesTopDownM return desugarExpr return
 
-  desugarExpr :: Expr -> m Expr
+  desugarExpr :: Expr a b -> m Expr
   desugarExpr AnonymousArgument = throwError . errorMessage $ IncorrectAnonymousArgument
   desugarExpr (Parens b)
     | b' <- stripPositionInfo b
@@ -60,7 +59,7 @@ desugarDecl other = fn other
     return $ foldr (Abs . Left) if_ (catMaybes [u', t', f'])
   desugarExpr e = return e
 
-  transformNestedUpdate :: Expr -> PathTree Expr -> m Expr
+  transformNestedUpdate :: Expr a b -> PathTree Expr -> m Expr
   transformNestedUpdate obj ps = do
     -- If we don't have an anonymous argument then we need to generate a let wrapper
     -- so that the object expression isn't re-evaluated for each nested update.
@@ -73,7 +72,7 @@ desugarDecl other = fn other
       buildLet val = Let [ValueDeclaration val Public [] [MkUnguarded obj]]
 
       -- recursively build up the nested `ObjectUpdate` expressions
-      buildUpdates :: Expr -> PathTree Expr -> Expr
+      buildUpdates :: Expr a b -> PathTree Expr -> Expr
       buildUpdates val (PathTree vs) = ObjectUpdate val (goLayer [] <$> runAssocList vs) where
         goLayer :: [PSString] -> (PSString, PathNode Expr) -> (PSString, Expr)
         goLayer _ (key, Leaf expr) = (key, expr)
@@ -89,33 +88,33 @@ desugarDecl other = fn other
     args <- traverse processExpr ps
     return $ foldr (Abs . Left) (mkVal (snd <$> args)) (catMaybes $ toList (fst <$> args))
     where
-      processExpr :: Expr -> m (Maybe Ident, Expr)
+      processExpr :: Expr a b -> m (Maybe Ident, Expr)
       processExpr e = do
         arg <- freshIfAnon e
         return (arg, maybe e argToExpr arg)
 
-  wrapLambdaAssoc :: ([(PSString, Expr)] -> Expr) -> [(PSString, Expr)] -> m Expr
+  wrapLambdaAssoc :: ([(PSString, Expr a b)] -> Expr a b) -> [(PSString, Expr a b)] -> m Expr
   wrapLambdaAssoc mkVal = wrapLambda (mkVal . runAssocList) . AssocList
 
-  stripPositionInfo :: Expr -> Expr
+  stripPositionInfo :: Expr a b -> Expr a b
   stripPositionInfo (PositionedValue _ _ e) = stripPositionInfo e
   stripPositionInfo e = e
 
-  peelAnonAccessorChain :: Expr -> Maybe [PSString]
+  peelAnonAccessorChain :: Expr a b -> Maybe [PSString]
   peelAnonAccessorChain (Accessor p e) = (p :) <$> peelAnonAccessorChain e
   peelAnonAccessorChain (PositionedValue _ _ e) = peelAnonAccessorChain e
   peelAnonAccessorChain AnonymousArgument = Just []
   peelAnonAccessorChain _ = Nothing
 
-  isAnonymousArgument :: Expr -> Bool
+  isAnonymousArgument :: Expr a b -> Bool
   isAnonymousArgument AnonymousArgument = True
   isAnonymousArgument (PositionedValue _ _ e) = isAnonymousArgument e
   isAnonymousArgument _ = False
 
-  freshIfAnon :: Expr -> m (Maybe Ident)
+  freshIfAnon :: Expr a b -> m (Maybe Ident)
   freshIfAnon u
     | isAnonymousArgument u = Just <$> freshIdent'
     | otherwise = return Nothing
 
-  argToExpr :: Ident -> Expr
+  argToExpr :: Ident -> Expr a b
   argToExpr = Var . Qualified Nothing

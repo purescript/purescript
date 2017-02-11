@@ -223,31 +223,31 @@ data Level = Error | Warning deriving Show
 unwrapErrorMessage :: ErrorMessage -> SimpleErrorMessage
 unwrapErrorMessage (ErrorMessage _ se) = se
 
-replaceUnknowns :: Type -> State TypeMap Type
+replaceUnknowns :: Type a -> State TypeMap (Type a)
 replaceUnknowns = everywhereOnTypesM replaceTypes where
-  replaceTypes :: Type -> State TypeMap Type
-  replaceTypes (TUnknown u) = do
+  replaceTypes :: Type a -> State TypeMap (Type a)
+  replaceTypes (TUnknown u ann) = do
     m <- get
     case M.lookup u (umUnknownMap m) of
       Nothing -> do
         let u' = umNextIndex m
         put $ m { umUnknownMap = M.insert u u' (umUnknownMap m), umNextIndex = u' + 1 }
-        return (TUnknown u')
-      Just u' -> return (TUnknown u')
-  replaceTypes (Skolem name s sko ss) = do
+        return (TUnknown u' ann)
+      Just u' -> return (TUnknown u' ann)
+  replaceTypes (Skolem name s sko ss ann) = do
     m <- get
     case M.lookup s (umSkolemMap m) of
       Nothing -> do
         let s' = umNextIndex m
         put $ m { umSkolemMap = M.insert s (T.unpack name, s', ss) (umSkolemMap m), umNextIndex = s' + 1 }
-        return (Skolem name s' sko ss)
-      Just (_, s', _) -> return (Skolem name s' sko ss)
+        return (Skolem name s' sko ss ann)
+      Just (_, s', _) -> return (Skolem name s' sko ss ann)
   replaceTypes other = return other
 
-onTypesInErrorMessage :: (Type -> Type) -> ErrorMessage -> ErrorMessage
+onTypesInErrorMessage :: (Type () -> Type ()) -> ErrorMessage -> ErrorMessage
 onTypesInErrorMessage f = runIdentity . onTypesInErrorMessageM (Identity . f)
 
-onTypesInErrorMessageM :: Applicative m => (Type -> m Type) -> ErrorMessage -> m ErrorMessage
+onTypesInErrorMessageM :: Applicative m => (Type () -> m (Type ())) -> ErrorMessage -> m ErrorMessage
 onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse gHint hints <*> gSimple simple
   where
   gSimple (InfiniteType t) = InfiniteType <$> f t
@@ -553,17 +553,17 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
     renderSimpleErrorMessage (TypesDoNotUnify u1 u2)
       = let (sorted1, sorted2) = sortRows u1 u2
 
-            sortRows :: Type -> Type -> (Type, Type)
+            sortRows :: Type a -> Type a -> (Type a, Type a)
             sortRows r1@RCons{} r2@RCons{} = sortRows' (rowToList r1) (rowToList r2)
             sortRows t1 t2 = (t1, t2)
 
             -- Put the common labels last
-            sortRows' :: ([(Label, Type)], Type) -> ([(Label, Type)], Type) -> (Type, Type)
+            sortRows' :: forall a. ([(Label, Type a)], Type a) -> ([(Label, Type a)], Type a) -> (Type a, Type a)
             sortRows' (s1, r1) (s2, r2) =
-              let common :: [(Label, (Type, Type))]
+              let common :: [(Label, (Type a, Type a))]
                   common = sortBy (comparing fst) [ (name, (t1, t2)) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
 
-                  sd1, sd2 :: [(Label, Type)]
+                  sd1, sd2 :: [(Label, Type a)]
                   sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
                   sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
               in ( rowFromList (sortBy (comparing fst) sd1 ++ map (fst &&& fst . snd) common, r1)
@@ -630,7 +630,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
                     ]
             ]
       where
-      containsUnknowns :: Type -> Bool
+      containsUnknowns :: Type a -> Bool
       containsUnknowns = everythingOnTypes (||) go
         where
         go TUnknown{} = True
@@ -957,7 +957,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
     renderHint (ErrorCheckingAccessor expr prop) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ line "while checking type of property accessor"
-                                 , markCodeBox $ prettyPrintValue valueDepth (Accessor prop expr)
+                                 , markCodeBox $ prettyPrintValue valueDepth (Accessor prop expr ())
                                  ]
             ]
     renderHint (ErrorInApplication f t a) detail =
@@ -1271,14 +1271,14 @@ renderBox = unlines
   dropWhileEnd p = reverse . dropWhile p . reverse
   whiteSpace = all isSpace
 
-toTypelevelString :: Type -> Maybe Box.Box
+toTypelevelString :: Type a -> Maybe Box.Box
 toTypelevelString t = (Box.text . decodeStringWithReplacement) <$> toTypelevelString' t
   where
-  toTypelevelString' :: Type -> Maybe PSString
-  toTypelevelString' (TypeLevelString s) = Just s
-  toTypelevelString' (TypeApp (TypeConstructor f) x)
+  toTypelevelString' :: Type a -> Maybe PSString
+  toTypelevelString' (TypeLevelString s _) = Just s
+  toTypelevelString' (TypeApp (TypeConstructor f _) x _)
     | f == primName "TypeString" = Just $ fromString $ prettyPrintType x
-  toTypelevelString' (TypeApp (TypeApp (TypeConstructor f) x) ret)
+  toTypelevelString' (TypeApp (TypeApp (TypeConstructor f _) x _) ret _)
     | f == primName "TypeConcat" = toTypelevelString' x <> toTypelevelString' ret
   toTypelevelString' _ = Nothing
 

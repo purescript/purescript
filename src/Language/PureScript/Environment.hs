@@ -4,6 +4,8 @@ module Language.PureScript.Environment where
 
 import Prelude.Compat
 
+import Control.Monad (void)
+
 import Data.Aeson.TH
 import qualified Data.Aeson as A
 import qualified Data.Map as M
@@ -25,14 +27,14 @@ import qualified Language.PureScript.Constants as C
 
 -- | The @Environment@ defines all values and types which are currently in scope:
 data Environment = Environment
-  { names :: M.Map (Qualified Ident) (Type, NameKind, NameVisibility)
+  { names :: M.Map (Qualified Ident) (Type (), NameKind, NameVisibility)
   -- ^ Values currently in scope
-  , types :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
+  , types :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind ())
   -- ^ Type names currently in scope
-  , dataConstructors :: M.Map (Qualified (ProperName 'ConstructorName)) (DataDeclType, ProperName 'TypeName, Type, [Ident])
+  , dataConstructors :: M.Map (Qualified (ProperName 'ConstructorName)) (DataDeclType, ProperName 'TypeName, Type (), [Ident])
   -- ^ Data constructors currently in scope, along with their associated type
   -- constructor name, argument types and return type.
-  , typeSynonyms :: M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe Kind)], Type)
+  , typeSynonyms :: M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe Kind)], Type ())
   -- ^ Type synonyms currently in scope
   , typeClassDictionaries :: M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict))
   -- ^ Available type class dictionaries
@@ -47,10 +49,10 @@ data TypeClassData = TypeClassData
   { typeClassArguments :: [(Text, Maybe Kind)]
   -- ^ A list of type argument names, and their kinds, where kind annotations
   -- were provided.
-  , typeClassMembers :: [(Ident, Type)]
+  , typeClassMembers :: [(Ident, Type ())]
   -- ^ A list of type class members and their types. Type arguments listed above
   -- are considered bound in these types.
-  , typeClassSuperclasses :: [Constraint]
+  , typeClassSuperclasses :: [Constraint ()]
   -- ^ A list of superclasses of this type class. Type arguments listed above
   -- are considered bound in the types appearing in these constraints.
   , typeClassDependencies :: [FunctionalDependency]
@@ -101,8 +103,8 @@ initEnvironment = Environment M.empty primTypes M.empty M.empty M.empty primClas
 -- in its SCC, and everything determining X is either before it in an SCC path, or in the same SCC.
 makeTypeClassData
   :: [(Text, Maybe Kind)]
-  -> [(Ident, Type)]
-  -> [Constraint]
+  -> [(Ident, Type ())]
+  -> [Constraint ()]
   -> [FunctionalDependency]
   -> TypeClassData
 makeTypeClassData args m s deps = TypeClassData args m s deps determinedArgs coveringSets
@@ -187,11 +189,11 @@ data NameKind
 -- |
 -- The kinds of a type
 --
-data TypeKind
+data TypeKind a
   -- |
   -- Data type
   --
-  = DataType [(Text, Maybe Kind)] [(ProperName 'ConstructorName, [Type])]
+  = DataType [(Text, Maybe Kind)] [(ProperName 'ConstructorName, [Type a])]
   -- |
   -- Type synonym
   --
@@ -262,78 +264,80 @@ kindSymbol = primKind C.symbol
 -- |
 -- Construct a type in the Prim module
 --
-primTy :: Text -> Type
-primTy = TypeConstructor . primName
+primTy :: Text -> Type ()
+primTy name = TypeConstructor (primName name) ()
 
 -- |
 -- Type constructor for functions
 --
-tyFunction :: Type
+tyFunction :: Type ()
 tyFunction = primTy "Function"
 
 -- |
 -- Type constructor for strings
 --
-tyString :: Type
+tyString :: Type ()
 tyString = primTy "String"
 
 -- |
 -- Type constructor for strings
 --
-tyChar :: Type
+tyChar :: Type ()
 tyChar = primTy "Char"
 
 -- |
 -- Type constructor for numbers
 --
-tyNumber :: Type
+tyNumber :: Type ()
 tyNumber = primTy "Number"
 
 -- |
 -- Type constructor for integers
 --
-tyInt :: Type
+tyInt :: Type ()
 tyInt = primTy "Int"
 
 -- |
 -- Type constructor for booleans
 --
-tyBoolean :: Type
+tyBoolean :: Type ()
 tyBoolean = primTy "Boolean"
 
 -- |
 -- Type constructor for arrays
 --
-tyArray :: Type
+tyArray :: Type ()
 tyArray = primTy "Array"
 
 -- |
 -- Type constructor for records
 --
-tyRecord :: Type
+tyRecord :: Type ()
 tyRecord = primTy "Record"
 
 -- |
 -- Check whether a type is a record
 --
-isObject :: Type -> Bool
+isObject :: Type a -> Bool
 isObject = isTypeOrApplied tyRecord
 
 -- |
 -- Check whether a type is a function
 --
-isFunction :: Type -> Bool
+isFunction :: Type a -> Bool
 isFunction = isTypeOrApplied tyFunction
 
-isTypeOrApplied :: Type -> Type -> Bool
-isTypeOrApplied t1 (TypeApp t2 _) = t1 == t2
-isTypeOrApplied t1 t2 = t1 == t2
+isTypeOrApplied :: Type a -> Type b -> Bool
+isTypeOrApplied ta tb = go (void ta) (void tb)
+  where
+  go t1 (TypeApp t2 _ _) = t1 == t2
+  go t1 t2 = t1 == t2
 
 -- |
 -- Smart constructor for function types
 --
-function :: Type -> Type -> Type
-function t1 = TypeApp (TypeApp tyFunction t1)
+function :: Type () -> Type () -> Type ()
+function t1 t2 = TypeApp (TypeApp tyFunction t1 ()) t2 ()
 
 -- |
 -- The primitive kinds
@@ -350,7 +354,7 @@ primKinds =
 -- associated kinds. There are also pseudo `Fail`, `Warn`, and `Partial` types
 -- that correspond to the classes with the same names.
 --
-primTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
+primTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind ())
 primTypes =
   M.fromList
     [ (primName "Function",   (FunKind kindType (FunKind kindType kindType), ExternData))
@@ -385,7 +389,7 @@ primClasses =
 -- |
 -- Finds information about data constructors from the current environment.
 --
-lookupConstructor :: Environment -> Qualified (ProperName 'ConstructorName) -> (DataDeclType, ProperName 'TypeName, Type, [Ident])
+lookupConstructor :: Environment -> Qualified (ProperName 'ConstructorName) -> (DataDeclType, ProperName 'TypeName, Type (), [Ident])
 lookupConstructor env ctor =
   fromMaybe (internalError "Data constructor not found") $ ctor `M.lookup` dataConstructors env
 
@@ -400,7 +404,7 @@ isNewtypeConstructor e ctor = case lookupConstructor e ctor of
 -- |
 -- Finds information about values from the current environment.
 --
-lookupValue :: Environment -> Qualified Ident -> Maybe (Type, NameKind, NameVisibility)
+lookupValue :: Environment -> Qualified Ident -> Maybe (Type (), NameKind, NameVisibility)
 lookupValue env ident = ident `M.lookup` names env
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''TypeKind)
