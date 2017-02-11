@@ -30,7 +30,8 @@ newtype SkolemScope = SkolemScope { runSkolemScope :: Int }
   deriving (Show, Eq, Ord, A.ToJSON, A.FromJSON)
 
 -- |
--- The type of types
+-- The type of types. The @a@ parameters allows for types to be annotated with
+-- extra data - source position info, for example.
 --
 data Type a
   -- | A unification variable of type Type

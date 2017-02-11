@@ -12,7 +12,12 @@ import Language.PureScript.Comments
 import Language.PureScript.Types
 
 -- |
--- Data type for binders
+-- Data type for binders.
+--
+-- The @a@ parameter allows for types to be annotated  with extra data - source
+-- position info, for example, and the @b@ parameter is for value-level
+-- annotations. Two separate annotation types are supported as not every
+-- annotation for a type would be suitable for a value, and vice-versa.
 --
 data Binder a b
   -- |

@@ -196,6 +196,11 @@ data ErrorMessage = ErrorMessage
 -- a list of declarations, and a list of the declarations that are
 -- explicitly exported. If the export list is Nothing, everything is exported.
 --
+-- The @a@ parameter allows for types to be annotated  with extra data - source
+-- position info, for example, and the @b@ parameter is for value-level
+-- annotations. Two separate annotation types are supported as not every
+-- annotation for a type would be suitable for a value, and vice-versa.
+--
 data Module a b = Module SourceSpan [Comment] ModuleName [Declaration a b] (Maybe [DeclarationRef])
   deriving (Show)
 
@@ -370,6 +375,11 @@ isExplicit _ = False
 
 -- |
 -- The data type of declarations
+--
+-- The @a@ parameter allows for types to be annotated  with extra data - source
+-- position info, for example, and the @b@ parameter is for value-level
+-- annotations. Two separate annotation types are supported as not every
+-- annotation for a type would be suitable for a value, and vice-versa.
 --
 data Declaration a b
   -- |
@@ -573,6 +583,11 @@ pattern MkUnguarded e = GuardedExpr [] e
 
 -- |
 -- Data type for expressions and terms
+--
+-- The @a@ parameter allows for types to be annotated  with extra data - source
+-- position info, for example, and the @b@ parameter is for value-level
+-- annotations. Two separate annotation types are supported as not every
+-- annotation for a type would be suitable for a value, and vice-versa.
 --
 data Expr a b
   -- |
