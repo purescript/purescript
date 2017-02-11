@@ -545,7 +545,7 @@ parseBinder =
     ]
 
   -- TODO: parsePolyType when adding support for polymorphic types
-  postfixTable = [ \b -> flip TypedBinder b <$> (indented *> doubleColon *> parseType)
+  postfixTable = [ \b -> flip TypedBinder b <$> (indented *> doubleColon *> parsePolyType)
                  ]
 
   parseOpBinder :: TokenParser Binder
