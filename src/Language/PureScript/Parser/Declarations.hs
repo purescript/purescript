@@ -531,25 +531,23 @@ parseIdentifierAndBinder =
 -- | Parse a binder
 parseBinder :: TokenParser Binder
 parseBinder =
-  withSourceSpan
-    PositionedBinder
-    ( P.buildExpressionParser operators
-    . buildPostfixParser postfixTable
-    $ parseBinderAtom
-    )
+    withSourceSpan
+      PositionedBinder
+      ( P.buildExpressionParser operators
+      . buildPostfixParser postfixTable
+      $ parseBinderAtom
+      )
   where
-  operators =
-    [ [ P.Infix (P.try (indented *> parseOpBinder P.<?> "binder operator") >>= \op ->
-          return (BinaryNoParensBinder op)) P.AssocRight
+    operators =
+      [ [ P.Infix (P.try (indented *> parseOpBinder P.<?> "binder operator") >>= \op ->
+            return (BinaryNoParensBinder op)) P.AssocRight
+        ]
       ]
-    ]
 
-  -- TODO: parsePolyType when adding support for polymorphic types
-  postfixTable = [ \b -> flip TypedBinder b <$> (indented *> doubleColon *> parsePolyType)
-                 ]
+    postfixTable = [ \b -> flip TypedBinder b <$> (indented *> doubleColon *> parsePolyType) ]
 
-  parseOpBinder :: TokenParser Binder
-  parseOpBinder = OpBinder <$> parseQualified parseOperator
+    parseOpBinder :: TokenParser Binder
+    parseOpBinder = OpBinder <$> parseQualified parseOperator
 
 parseBinderAtom :: TokenParser Binder
 parseBinderAtom = P.choice
