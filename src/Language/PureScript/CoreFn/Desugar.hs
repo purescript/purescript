@@ -102,7 +102,7 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
     Case (ss, com, ty, Nothing) [exprToCoreFn ss [] Nothing v1]
       [ CaseAlternative [LiteralBinder nullAnn $ BooleanLiteral True]
                         (Right $ exprToCoreFn Nothing [] Nothing v2)
-      , CaseAlternative [LiteralBinder nullAnn $ BooleanLiteral False]
+      , CaseAlternative [NullBinder nullAnn]
                         (Right $ exprToCoreFn Nothing [] Nothing v3) ]
   exprToCoreFn ss com ty (A.Constructor name) =
     Var (ss, com, ty, Just $ getConstructorMeta name) $ fmap properToIdent name
