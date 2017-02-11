@@ -297,7 +297,8 @@ infer val = withErrorMessageHint (ErrorInferringType val) $ infer' val
 
 -- | Infer a type for a value
 infer'
-  :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  :: forall m
+   . (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => Expr
   -> m Expr
 infer' v@(Literal (NumericLiteral (Left _))) = return $ TypedValue True v tyInt
@@ -315,10 +316,24 @@ infer' (Literal (ArrayLiteral vals)) = do
   return $ TypedValue True (Literal (ArrayLiteral ts')) (TypeApp tyArray els)
 infer' (Literal (ObjectLiteral ps)) = do
   ensureNoDuplicateProperties ps
-  ts <- traverse (infer . snd) ps
-  let fields = zipWith (\name (TypedValue _ _ t) -> (Label name, t)) (map fst ps) ts
-      ty = TypeApp tyRecord $ rowFromList (fields, REmpty)
-  return $ TypedValue True (Literal (ObjectLiteral (zip (map fst ps) ts))) ty
+  -- We make a special case for Vars in record labels, since these are the
+  -- only types of expressions for which 'infer' can return a polymorphic type.
+  -- They need to be instantiated here.
+  let shouldInstantiate :: Expr -> Bool
+      shouldInstantiate Var{} = True
+      shouldInstantiate (PositionedValue _ _ e) = shouldInstantiate e
+      shouldInstantiate _ = False
+
+      inferProperty :: (PSString, Expr) -> m (PSString, (Expr, Type))
+      inferProperty (name, val) = do
+        TypedValue _ val' ty <- infer val
+        valAndType <- if shouldInstantiate val
+                        then instantiatePolyTypeWithUnknowns val' ty
+                        else pure (val', ty)
+        pure (name, valAndType)
+  fields <- forM ps inferProperty
+  let ty = TypeApp tyRecord $ rowFromList (map (Label *** snd) fields, REmpty)
+  return $ TypedValue True (Literal (ObjectLiteral (map (fmap (uncurry (TypedValue True))) fields))) ty
 infer' (ObjectUpdate o ps) = do
   ensureNoDuplicateProperties ps
   row <- freshType
