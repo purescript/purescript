@@ -612,12 +612,19 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
                                                           _
                                                           (Just (PartialConstraintData bs b)))) =
       paras [ line "A case expression could not be determined to cover all inputs."
-            , line "The following additional cases are required to cover all inputs:\n"
+            , line "The following additional cases are required to cover all inputs:"
             , indent $ paras $
                 Box.hsep 1 Box.left
                   (map (paras . map (line . markCode)) (transpose bs))
                   : [line "..." | not b]
             , line "Alternatively, add a Partial constraint to the type of the enclosing value."
+            ]
+    renderSimpleErrorMessage (NoInstanceFound (Constraint C.Discard [ty] _)) =
+      paras [ line "A result of type"
+            , markCodeBox $ indent $ typeAsBox ty
+            , line "was implicitly discarded in a do notation block."
+            , line ("You can use " <> markCode "_ <- ..." <> " to explicitly discard the result.")
+            , line "Alternatively, add a Discard constraint to the type of the discarded value."
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint nm ts _)) =
       paras [ line "No type class instance was found for"

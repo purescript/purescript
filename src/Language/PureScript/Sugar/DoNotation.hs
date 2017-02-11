@@ -1,7 +1,5 @@
--- |
--- This module implements the desugaring pass which replaces do-notation statements with
+-- | This module implements the desugaring pass which replaces do-notation statements with
 -- appropriate calls to bind.
---
 module Language.PureScript.Sugar.DoNotation (desugarDoModule) where
 
 import Prelude.Compat
@@ -15,17 +13,13 @@ import Language.PureScript.Errors
 import Language.PureScript.Names
 import qualified Language.PureScript.Constants as C
 
--- |
--- Replace all @DoNotationBind@ and @DoNotationValue@ constructors with
+-- | Replace all @DoNotationBind@ and @DoNotationValue@ constructors with
 -- applications of the bind function in scope, and all @DoNotationLet@
 -- constructors with let expressions.
---
 desugarDoModule :: forall m. (MonadSupply m, MonadError MultipleErrors m) => Module -> m Module
 desugarDoModule (Module ss coms mn ds exts) = Module ss coms mn <$> parU ds desugarDo <*> pure exts
 
--- |
--- Desugar a single do statement
---
+-- | Desugar a single do statement
 desugarDo :: forall m. (MonadSupply m, MonadError MultipleErrors m) => Declaration -> m Declaration
 desugarDo (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> rethrowWithPosition pos (desugarDo d)
 desugarDo d =
@@ -34,6 +28,9 @@ desugarDo d =
   where
   bind :: Expr
   bind = Var (Qualified Nothing (Ident C.bind))
+
+  discard :: Expr
+  discard = Var (Qualified Nothing (Ident C.discard))
 
   replace :: Expr -> m Expr
   replace (Do els) = go els
@@ -45,7 +42,7 @@ desugarDo d =
   go [DoNotationValue val] = return val
   go (DoNotationValue val : rest) = do
     rest' <- go rest
-    return $ App (App bind val) (Abs (Left (Ident C.__unused)) rest')
+    return $ App (App discard val) (Abs (Left (Ident C.__unused)) rest')
   go [DoNotationBind _ _] = throwError . errorMessage $ InvalidDoBind
   go (DoNotationBind NullBinder val : rest) = go (DoNotationValue val : rest)
   go (DoNotationBind b _ : _) | Ident C.bind `elem` binderNames b =

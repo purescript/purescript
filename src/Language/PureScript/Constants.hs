@@ -34,6 +34,12 @@ append = "append"
 bind :: forall a. (IsString a) => a
 bind = "bind"
 
+discard :: forall a. (IsString a) => a
+discard = "discard"
+
+pattern Discard :: Qualified (ProperName 'ClassName)
+pattern Discard = Qualified (Just ControlBind) (ProperName "Discard")
+
 (+) :: forall a. (IsString a) => a
 (+) = "+"
 
@@ -411,6 +417,9 @@ controlApplicative = "Control_Applicative"
 
 controlSemigroupoid :: forall a. (IsString a) => a
 controlSemigroupoid = "Control_Semigroupoid"
+
+pattern ControlBind :: ModuleName
+pattern ControlBind = ModuleName [ProperName "Control", ProperName "Bind"]
 
 controlBind :: forall a. (IsString a) => a
 controlBind = "Control_Bind"
