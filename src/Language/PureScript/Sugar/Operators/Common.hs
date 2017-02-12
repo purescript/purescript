@@ -12,7 +12,6 @@ import qualified Text.Parsec.Expr as P
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
-import Language.PureScript.Names
 
 type Chain a = [Either a a]
 
@@ -28,36 +27,38 @@ parseValue :: P.Parsec (Chain a) () a
 parseValue = token (either Just (const Nothing)) P.<?> "expression"
 
 parseOp
-  :: (a -> Maybe (Qualified (OpName nameType)))
-  -> P.Parsec (Chain a) () (Qualified (OpName nameType))
+  :: (a -> Maybe b)
+  -> P.Parsec (Chain a) () b
 parseOp fromOp = token (either (const Nothing) fromOp) P.<?> "operator"
 
 matchOp
-  :: (a -> Maybe (Qualified (OpName nameType)))
-  -> Qualified (OpName nameType)
+  :: Eq b
+  => (a -> Maybe (b, ann))
+  -> b
   -> P.Parsec (Chain a) () ()
 matchOp fromOp op = do
-  ident <- parseOp fromOp
+  (ident, _) <- parseOp fromOp
   guard $ ident == op
 
 opTable
-  :: [[(Qualified (OpName nameType), Associativity)]]
-  -> (a -> Maybe (Qualified (OpName nameType)))
-  -> (Qualified (OpName nameType) -> a -> a -> a)
+  :: Eq b
+  => [[(b, ann, Associativity)]]
+  -> (a -> Maybe (b, ann))
+  -> (b -> ann -> a -> a -> a)
   -> [[P.Operator (Chain a) () Identity a]]
 opTable ops fromOp reapply =
-  map (map (\(name, a) -> P.Infix (P.try (matchOp fromOp name) >> return (reapply name)) (toAssoc a))) ops
-  ++ [[ P.Infix (P.try (parseOp fromOp >>= \ident -> return (reapply ident))) P.AssocLeft ]]
+  map (map (\(name, ann, a) -> P.Infix (P.try (matchOp fromOp name) >> return (reapply name ann)) (toAssoc a))) ops
+  ++ [[ P.Infix (P.try (parseOp fromOp >>= \(ident, ann) -> return (reapply ident ann))) P.AssocLeft ]]
 
 matchOperators
-  :: forall a nameType
-   . Show a
+  :: forall a b ann
+   . (Eq b, Show a)
   => (a -> Bool)
   -> (a -> Maybe (a, a, a))
-  -> (a -> Maybe (Qualified (OpName nameType)))
-  -> (Qualified (OpName nameType) -> a -> a -> a)
+  -> (a -> Maybe (b, ann))
+  -> (b -> ann -> a -> a -> a)
   -> ([[P.Operator (Chain a) () Identity a]] -> P.OperatorTable (Chain a) () Identity a)
-  -> [[(Qualified (OpName nameType), Associativity)]]
+  -> [[(b, ann, Associativity)]]
   -> a
   -> a
 matchOperators isBinOp extractOp fromOp reapply modOpTable ops = parseChains

@@ -680,9 +680,10 @@ data Expr a b
   -- at superclass implementations when searching for a dictionary, the type class name and
   -- instance type, and the type class dictionaries in scope.
   --
-  | TypeClassDictionary (Constraint a) b
+  | TypeClassDictionary (Constraint a)
                         (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict)))
                         [ErrorMessageHint]
+                        b
   -- |
   -- A typeclass dictionary accessor, the implementation is left unspecified until CoreFn desugaring.
   --
@@ -704,6 +705,32 @@ data Expr a b
   --
   | PositionedValue SourceSpan [Comment] (Expr a b) b
   deriving (Show, Functor)
+
+extractExprAnn :: Expr a b -> b
+extractExprAnn (Literal _ ann) = ann
+extractExprAnn (UnaryMinus _ ann) = ann
+extractExprAnn (BinaryNoParens _ _ _ ann) = ann
+extractExprAnn (Parens _ ann) = ann
+extractExprAnn (Accessor _ _ ann) = ann
+extractExprAnn (ObjectUpdate _ _ ann) = ann
+extractExprAnn (ObjectUpdateNested _ _ ann) = ann
+extractExprAnn (Abs _ _ ann) = ann
+extractExprAnn (App _ _ ann) = ann
+extractExprAnn (Var _ ann) = ann
+extractExprAnn (Op _ ann) = ann
+extractExprAnn (IfThenElse _ _ _ ann) = ann
+extractExprAnn (Constructor _ ann) = ann
+extractExprAnn (Case _ _ ann) = ann
+extractExprAnn (TypedValue _ _ _ ann) = ann
+extractExprAnn (Let _ _ ann) = ann
+extractExprAnn (Do _ ann) = ann
+extractExprAnn (TypeClassDictionaryConstructorApp _ _ ann) = ann
+extractExprAnn (TypeClassDictionary _ _ _ ann) = ann
+extractExprAnn (TypeClassDictionaryAccessor _ _ ann) = ann
+extractExprAnn (DeferredDictionary _ _ ann) = ann
+extractExprAnn (AnonymousArgument ann) = ann
+extractExprAnn (Hole _ ann) = ann
+extractExprAnn (PositionedValue _ _ _ ann) = ann
 
 -- |
 -- An alternative in a case statement
