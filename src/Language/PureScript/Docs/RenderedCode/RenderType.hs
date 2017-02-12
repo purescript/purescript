@@ -18,6 +18,7 @@ import Data.Text (Text)
 
 import Control.Arrow ((<+>))
 import Control.PatternArrows as PA
+import Control.Monad (void)
 
 import Language.PureScript.Crash
 import Language.PureScript.Environment
@@ -36,30 +37,30 @@ typeLiterals = mkPattern match
   where
   match TypeWildcard{} =
     Just (syntax "_")
-  match (TypeVar var) =
+  match (TypeVar var _) =
     Just (typeVar var)
-  match (PrettyPrintObject row) =
+  match (PrettyPrintObject row _) =
     Just $ mintersperse sp
               [ syntax "{"
               , renderRow row
               , syntax "}"
               ]
-  match (TypeConstructor n) =
+  match (TypeConstructor n _) =
     Just (typeCtor n)
-  match REmpty =
+  match REmpty{} =
     Just (syntax "()")
   match row@RCons{} =
     Just (syntax "(" <> renderRow row <> syntax ")")
-  match (BinaryNoParensType op l r) =
+  match (BinaryNoParensType op l r _) =
     Just $ renderTypeAtom l <> sp <> renderTypeAtom op <> sp <> renderTypeAtom r
-  match (TypeOp n) =
+  match (TypeOp n _) =
     Just (typeOp n)
   match _ =
     Nothing
 
 renderConstraint :: Constraint a -> RenderedCode
 renderConstraint (Constraint pn tys _) =
-  let instApp = foldl TypeApp (TypeConstructor (fmap coerceProperName pn)) tys
+  let instApp = foldl (\x y -> TypeApp x y ()) (TypeConstructor (fmap coerceProperName pn) ()) (void <$> tys)
   in  renderType instApp
 
 renderConstraints :: [Constraint a] -> RenderedCode -> RenderedCode
@@ -94,37 +95,37 @@ renderLabel (label, ty) =
     ]
 
 renderTail :: Type a -> RenderedCode
-renderTail REmpty = mempty
+renderTail REmpty{} = mempty
 renderTail other = sp <> syntax "|" <> sp <> renderType other
 
 typeApp :: Pattern () (Type a) (Type a, Type a)
 typeApp = mkPattern match
   where
-  match (TypeApp f x) = Just (f, x)
+  match (TypeApp f x _) = Just (f, x)
   match _ = Nothing
 
 appliedFunction :: Pattern () (Type a) (Type a, Type a)
 appliedFunction = mkPattern match
   where
-  match (PrettyPrintFunction arg ret) = Just (arg, ret)
+  match (PrettyPrintFunction arg ret _) = Just (arg, ret)
   match _ = Nothing
 
 kinded :: Pattern () (Type a) (Kind, Type a)
 kinded = mkPattern match
   where
-  match (KindedType t k) = Just (k, t)
+  match (KindedType t k _) = Just (k, t)
   match _ = Nothing
 
-constrained :: Pattern () (Type a) ([Constraint], Type a)
+constrained :: Pattern () (Type a) ([Constraint a], Type a)
 constrained = mkPattern match
   where
-  match (ConstrainedType deps ty) = Just (deps, ty)
+  match (ConstrainedType deps ty _) = Just (deps, ty)
   match _ = Nothing
 
 explicitParens :: Pattern () (Type a) ((), Type a)
 explicitParens = mkPattern match
   where
-  match (ParensInType ty) = Just ((), ty)
+  match (ParensInType ty _) = Just ((), ty)
   match _ = Nothing
 
 matchTypeAtom :: Pattern () (Type a) RenderedCode
@@ -148,7 +149,7 @@ matchType = buildPrettyPrinter operators matchTypeAtom
 forall_ :: Pattern () (Type a) ([Text], Type a)
 forall_ = mkPattern match
   where
-  match (PrettyPrintForAll idents ty) = Just (idents, ty)
+  match (PrettyPrintForAll idents ty _) = Just (idents, ty)
   match _ = Nothing
 
 insertPlaceholders :: RenderTypeOptions -> Type a -> Type a
@@ -156,15 +157,15 @@ insertPlaceholders opts =
   everywhereOnTypesTopDown convertForAlls . everywhereOnTypes (convert opts)
 
 convert :: RenderTypeOptions -> Type a -> Type a
-convert _ (TypeApp (TypeApp f arg) ret) | f == tyFunction = PrettyPrintFunction arg ret
-convert opts (TypeApp o r) | o == tyRecord && prettyPrintObjects opts = PrettyPrintObject r
+convert _ (TypeApp (TypeApp f arg _) ret ann) | void f == tyFunction = PrettyPrintFunction arg ret ann
+convert opts (TypeApp o r ann) | void o == tyRecord && prettyPrintObjects opts = PrettyPrintObject r ann
 convert _ other = other
 
 convertForAlls :: Type a -> Type a
-convertForAlls (ForAll i ty _) = go [i] ty
+convertForAlls (ForAll i ty _ ann) = go [i] ty ann
   where
-  go idents (ForAll i' ty' _) = go (i' : idents) ty'
-  go idents other = PrettyPrintForAll idents other
+  go idents (ForAll i' ty' _ ann') _ = go (i' : idents) ty' ann'
+  go idents other ann' = PrettyPrintForAll idents other ann'
 convertForAlls other = other
 
 preprocessType :: RenderTypeOptions -> Type a -> Type a
