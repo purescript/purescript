@@ -218,10 +218,10 @@ getModuleSourceSpan (Module ss _ _ _ _) = ss
 addDefaultImport :: ModuleName -> b -> Module a b -> Module a b
 addDefaultImport toImport b m@(Module ss coms mn decls exps)  =
   if isExistingImport `any` decls || mn == toImport then m
-  else Module ss coms mn (ImportDeclaration toImport Implicit Nothing b : decls) exps
+  else Module ss coms mn (ImportDeclaration b toImport Implicit Nothing : decls) exps
   where
-  isExistingImport (ImportDeclaration mn' _ _ _) | mn' == toImport = True
-  isExistingImport (PositionedDeclaration _ _ d _) = isExistingImport d
+  isExistingImport (ImportDeclaration _ mn' _ _) | mn' == toImport = True
+  isExistingImport (PositionedDeclaration _ _ _ d) = isExistingImport d
   isExistingImport _ = False
 
 -- |
@@ -385,63 +385,63 @@ data Declaration a b
   -- |
   -- A data type declaration (data or newtype, name, arguments, data constructors)
   --
-  = DataDeclaration DataDeclType (ProperName 'TypeName) [(Text, Maybe Kind)] [(ProperName 'ConstructorName, [Type a])] b
+  = DataDeclaration b DataDeclType (ProperName 'TypeName) [(Text, Maybe Kind)] [(ProperName 'ConstructorName, [Type a])]
   -- |
   -- A minimal mutually recursive set of data type declarations
   --
-  | DataBindingGroupDeclaration [Declaration a b] b
+  | DataBindingGroupDeclaration b [Declaration a b]
   -- |
   -- A type synonym declaration (name, arguments, type)
   --
-  | TypeSynonymDeclaration (ProperName 'TypeName) [(Text, Maybe Kind)] (Type a) b
+  | TypeSynonymDeclaration b (ProperName 'TypeName) [(Text, Maybe Kind)] (Type a)
   -- |
   -- A type declaration for a value (name, ty)
   --
-  | TypeDeclaration Ident (Type a) b
+  | TypeDeclaration b Ident (Type a)
   -- |
   -- A value declaration (name, top-level binders, optional guard, value)
   --
-  | ValueDeclaration Ident NameKind [Binder a b] [GuardedExpr a b] b
+  | ValueDeclaration b Ident NameKind [Binder a b] [GuardedExpr a b]
   -- |
   -- A declaration paired with pattern matching in let-in expression (binder, optional guard, value)
-  | BoundValueDeclaration (Binder a b) (Expr a b) b
+  | BoundValueDeclaration b (Binder a b) (Expr a b)
   -- |
   -- A minimal mutually recursive set of value declarations
   --
-  | BindingGroupDeclaration [(Ident, NameKind, Expr a b)] b
+  | BindingGroupDeclaration b [(Ident, NameKind, Expr a b)]
   -- |
   -- A foreign import declaration (name, type)
   --
-  | ExternDeclaration Ident (Type a) b
+  | ExternDeclaration b Ident (Type a)
   -- |
   -- A data type foreign import (name, kind)
   --
-  | ExternDataDeclaration (ProperName 'TypeName) Kind b
+  | ExternDataDeclaration b (ProperName 'TypeName) Kind
   -- |
   -- A foreign kind import (name)
   --
-  | ExternKindDeclaration (ProperName 'KindName) b
+  | ExternKindDeclaration b (ProperName 'KindName)
   -- |
   -- A fixity declaration
   --
-  | FixityDeclaration (Either ValueFixity TypeFixity) b
+  | FixityDeclaration b (Either ValueFixity TypeFixity)
   -- |
   -- A module import (module name, qualified/unqualified/hiding, optional "qualified as" name)
   --
-  | ImportDeclaration ModuleName ImportDeclarationType (Maybe ModuleName) b
+  | ImportDeclaration b ModuleName ImportDeclarationType (Maybe ModuleName)
   -- |
   -- A type class declaration (name, argument, implies, member declarations)
   --
-  | TypeClassDeclaration (ProperName 'ClassName) [(Text, Maybe Kind)] [Constraint a] [FunctionalDependency] [Declaration a b] b
+  | TypeClassDeclaration b (ProperName 'ClassName) [(Text, Maybe Kind)] [Constraint a] [FunctionalDependency] [Declaration a b]
   -- |
   -- A type instance declaration (name, dependencies, class name, instance types, member
   -- declarations)
   --
-  | TypeInstanceDeclaration Ident [Constraint a] (Qualified (ProperName 'ClassName)) [Type a] (TypeInstanceBody a b) b
+  | TypeInstanceDeclaration b Ident [Constraint a] (Qualified (ProperName 'ClassName)) [Type a] (TypeInstanceBody a b)
   -- |
   -- A declaration with source position information
   --
-  | PositionedDeclaration SourceSpan [Comment] (Declaration a b) b
+  | PositionedDeclaration b SourceSpan [Comment] (Declaration a b)
   deriving (Show, Functor)
 
 data ValueFixity = ValueFixity Fixity (Qualified (Either Ident (ProperName 'ConstructorName))) (OpName 'ValueOpName)
@@ -450,11 +450,11 @@ data ValueFixity = ValueFixity Fixity (Qualified (Either Ident (ProperName 'Cons
 data TypeFixity = TypeFixity Fixity (Qualified (ProperName 'TypeName)) (OpName 'TypeOpName)
   deriving (Eq, Ord, Show)
 
-pattern ValueFixityDeclaration :: Fixity -> Qualified (Either Ident (ProperName 'ConstructorName)) -> OpName 'ValueOpName -> b -> Declaration a b
-pattern ValueFixityDeclaration fixity name op b = FixityDeclaration (Left (ValueFixity fixity name op)) b
+pattern ValueFixityDeclaration :: b -> Fixity -> Qualified (Either Ident (ProperName 'ConstructorName)) -> OpName 'ValueOpName -> Declaration a b
+pattern ValueFixityDeclaration b fixity name op = FixityDeclaration b (Left (ValueFixity fixity name op))
 
-pattern TypeFixityDeclaration :: Fixity -> Qualified (ProperName 'TypeName) -> OpName 'TypeOpName -> b -> Declaration a b
-pattern TypeFixityDeclaration fixity name op b = FixityDeclaration (Right (TypeFixity fixity name op)) b
+pattern TypeFixityDeclaration :: b -> Fixity -> Qualified (ProperName 'TypeName) -> OpName 'TypeOpName -> Declaration a b
+pattern TypeFixityDeclaration b fixity name op = FixityDeclaration b (Right (TypeFixity fixity name op))
 
 -- | The members of a type class instance declaration
 data TypeInstanceBody a b
@@ -482,7 +482,7 @@ traverseTypeInstanceBody _ other = pure other
 --
 isValueDecl :: Declaration a b -> Bool
 isValueDecl ValueDeclaration{} = True
-isValueDecl (PositionedDeclaration _ _ d _) = isValueDecl d
+isValueDecl (PositionedDeclaration _ _ _ d) = isValueDecl d
 isValueDecl _ = False
 
 -- |
@@ -491,7 +491,7 @@ isValueDecl _ = False
 isDataDecl :: Declaration a b -> Bool
 isDataDecl DataDeclaration{} = True
 isDataDecl TypeSynonymDeclaration{} = True
-isDataDecl (PositionedDeclaration _ _ d _) = isDataDecl d
+isDataDecl (PositionedDeclaration _ _ _ d) = isDataDecl d
 isDataDecl _ = False
 
 -- |
@@ -499,7 +499,7 @@ isDataDecl _ = False
 --
 isImportDecl :: Declaration a b -> Bool
 isImportDecl ImportDeclaration{} = True
-isImportDecl (PositionedDeclaration _ _ d _) = isImportDecl d
+isImportDecl (PositionedDeclaration _ _ _ d) = isImportDecl d
 isImportDecl _ = False
 
 -- |
@@ -507,7 +507,7 @@ isImportDecl _ = False
 --
 isExternDataDecl :: Declaration a b -> Bool
 isExternDataDecl ExternDataDeclaration{} = True
-isExternDataDecl (PositionedDeclaration _ _ d _) = isExternDataDecl d
+isExternDataDecl (PositionedDeclaration _ _ _ d) = isExternDataDecl d
 isExternDataDecl _ = False
 
 -- |
@@ -515,7 +515,7 @@ isExternDataDecl _ = False
 --
 isExternKindDecl :: Declaration a b -> Bool
 isExternKindDecl ExternKindDeclaration{} = True
-isExternKindDecl (PositionedDeclaration _ _ d _) = isExternKindDecl d
+isExternKindDecl (PositionedDeclaration _ _ _ d) = isExternKindDecl d
 isExternKindDecl _ = False
 
 -- |
@@ -523,12 +523,12 @@ isExternKindDecl _ = False
 --
 isFixityDecl :: Declaration a b -> Bool
 isFixityDecl FixityDeclaration{} = True
-isFixityDecl (PositionedDeclaration _ _ d _) = isFixityDecl d
+isFixityDecl (PositionedDeclaration _ _ _ d) = isFixityDecl d
 isFixityDecl _ = False
 
 getFixityDecl :: Declaration a b -> Maybe (Either ValueFixity TypeFixity)
-getFixityDecl (FixityDeclaration fixity _) = Just fixity
-getFixityDecl (PositionedDeclaration _ _ d _) = getFixityDecl d
+getFixityDecl (FixityDeclaration _ fixity) = Just fixity
+getFixityDecl (PositionedDeclaration _ _ _ d) = getFixityDecl d
 getFixityDecl _ = Nothing
 
 -- |
@@ -536,7 +536,7 @@ getFixityDecl _ = Nothing
 --
 isExternDecl :: Declaration a b -> Bool
 isExternDecl ExternDeclaration{} = True
-isExternDecl (PositionedDeclaration _ _ d _) = isExternDecl d
+isExternDecl (PositionedDeclaration _ _ _ d) = isExternDecl d
 isExternDecl _ = False
 
 -- |
@@ -544,7 +544,7 @@ isExternDecl _ = False
 --
 isTypeClassInstanceDeclaration :: Declaration a b -> Bool
 isTypeClassInstanceDeclaration TypeInstanceDeclaration{} = True
-isTypeClassInstanceDeclaration (PositionedDeclaration _ _ d _) = isTypeClassInstanceDeclaration d
+isTypeClassInstanceDeclaration (PositionedDeclaration _ _ _ d) = isTypeClassInstanceDeclaration d
 isTypeClassInstanceDeclaration _ = False
 
 -- |
@@ -552,7 +552,7 @@ isTypeClassInstanceDeclaration _ = False
 --
 isTypeClassDeclaration :: Declaration a b -> Bool
 isTypeClassDeclaration TypeClassDeclaration{} = True
-isTypeClassDeclaration (PositionedDeclaration _ _ d _) = isTypeClassDeclaration d
+isTypeClassDeclaration (PositionedDeclaration _ _ _ d) = isTypeClassDeclaration d
 isTypeClassDeclaration _ = False
 
 -- |
@@ -560,7 +560,7 @@ isTypeClassDeclaration _ = False
 flattenDecls :: [Declaration a b] -> [Declaration a b]
 flattenDecls = concatMap flattenOne
     where flattenOne :: Declaration a b -> [Declaration a b]
-          flattenOne (DataBindingGroupDeclaration decls _) = concatMap flattenOne decls
+          flattenOne (DataBindingGroupDeclaration _ decls) = concatMap flattenOne decls
           flattenOne d = [d]
 
 -- |
@@ -593,16 +593,16 @@ data Expr a b
   -- |
   -- A literal value
   --
-  = Literal (Literal (Expr a b)) b
+  = Literal b (Literal (Expr a b))
   -- |
   -- A prefix -, will be desugared
   --
-  | UnaryMinus (Expr a b) b
+  | UnaryMinus b (Expr a b)
   -- |
   -- Binary operator application. During the rebracketing phase of desugaring, this data constructor
   -- will be removed.
   --
-  | BinaryNoParens (Expr a b) (Expr a b) (Expr a b) b
+  | BinaryNoParens b (Expr a b) (Expr a b) (Expr a b)
   -- |
   -- Explicit parentheses. During the rebracketing phase of desugaring, this data constructor
   -- will be removed.
@@ -610,69 +610,69 @@ data Expr a b
   -- Note: although it seems this constructor is not used, it _is_ useful, since it prevents
   -- certain traversals from matching.
   --
-  | Parens (Expr a b) b
+  | Parens b (Expr a b)
   -- |
   -- An record property accessor expression (e.g. `obj.x` or `_.x`).
   -- Anonymous arguments will be removed during desugaring and expanded
   -- into a lambda that reads a property from a record.
   --
-  | Accessor PSString (Expr a b) b
+  | Accessor b PSString (Expr a b)
   -- |
   -- Partial record update
   --
-  | ObjectUpdate (Expr a b) [(PSString, Expr a b)] b
+  | ObjectUpdate b (Expr a b) [(PSString, Expr a b)]
   -- |
   -- Object updates with nested support: `x { foo { bar = e } }`
   -- Replaced during desugaring into a `Let` and nested `ObjectUpdate`s
   --
-  | ObjectUpdateNested (Expr a b) (PathTree (Expr a b)) b
+  | ObjectUpdateNested b (Expr a b) (PathTree (Expr a b))
   -- |
   -- Function introduction
   --
-  | Abs (Either Ident (Binder a b)) (Expr a b) b
+  | Abs b (Either Ident (Binder a b)) (Expr a b)
   -- |
   -- Function application
   --
-  | App (Expr a b) (Expr a b) b
+  | App b (Expr a b) (Expr a b)
   -- |
   -- Variable
   --
-  | Var (Qualified Ident) b
+  | Var b (Qualified Ident)
   -- |
   -- An operator. This will be desugared into a function during the "operators"
   -- phase of desugaring.
   --
-  | Op (Qualified (OpName 'ValueOpName)) b
+  | Op b (Qualified (OpName 'ValueOpName))
   -- |
   -- Conditional (if-then-else expression)
   --
-  | IfThenElse (Expr a b) (Expr a b) (Expr a b) b
+  | IfThenElse b (Expr a b) (Expr a b) (Expr a b)
   -- |
   -- A data constructor
   --
-  | Constructor (Qualified (ProperName 'ConstructorName)) b
+  | Constructor b (Qualified (ProperName 'ConstructorName))
   -- |
   -- A case expression. During the case expansion phase of desugaring, top-level binders will get
   -- desugared into case expressions, hence the need for guards and multiple binders per branch here.
   --
-  | Case [Expr a b] [CaseAlternative a b] b
+  | Case b [Expr a b] [CaseAlternative a b]
   -- |
   -- A value with a type annotation
   --
-  | TypedValue Bool (Expr a b) (Type a) b
+  | TypedValue b Bool (Expr a b) (Type a)
   -- |
   -- A let binding
   --
-  | Let [Declaration a b] (Expr a b) b
+  | Let b [Declaration a b] (Expr a b)
   -- |
   -- A do-notation block
   --
-  | Do [DoNotationElement a b] b
+  | Do b [DoNotationElement a b]
   -- |
   -- An application of a typeclass dictionary constructor. The value should be
   -- an ObjectLiteral.
   --
-  | TypeClassDictionaryConstructorApp (Qualified (ProperName 'ClassName)) (Expr a b) b
+  | TypeClassDictionaryConstructorApp b (Qualified (ProperName 'ClassName)) (Expr a b)
   -- |
   -- A placeholder for a type class dictionary to be inserted later. At the end of type checking, these
   -- placeholders will be replaced with actual expressions representing type classes dictionaries which
@@ -680,18 +680,18 @@ data Expr a b
   -- at superclass implementations when searching for a dictionary, the type class name and
   -- instance type, and the type class dictionaries in scope.
   --
-  | TypeClassDictionary (Constraint a)
+  | TypeClassDictionary b
+                        (Constraint a)
                         (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict)))
                         [ErrorMessageHint]
-                        b
   -- |
   -- A typeclass dictionary accessor, the implementation is left unspecified until CoreFn desugaring.
   --
-  | TypeClassDictionaryAccessor (Qualified (ProperName 'ClassName)) Ident b
+  | TypeClassDictionaryAccessor b (Qualified (ProperName 'ClassName)) Ident
   -- |
   -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
   --
-  | DeferredDictionary (Qualified (ProperName 'ClassName)) [Type a] b
+  | DeferredDictionary b (Qualified (ProperName 'ClassName)) [Type a]
   -- |
   -- A placeholder for an anonymous function argument
   --
@@ -699,38 +699,38 @@ data Expr a b
   -- |
   -- A typed hole that will be turned into a hint/error duing typechecking
   --
-  | Hole Text b
+  | Hole b Text
   -- |
   -- A value with source position information
   --
-  | PositionedValue SourceSpan [Comment] (Expr a b) b
+  | PositionedValue b SourceSpan [Comment] (Expr a b)
   deriving (Show, Functor)
 
 extractExprAnn :: Expr a b -> b
-extractExprAnn (Literal _ ann) = ann
-extractExprAnn (UnaryMinus _ ann) = ann
-extractExprAnn (BinaryNoParens _ _ _ ann) = ann
-extractExprAnn (Parens _ ann) = ann
-extractExprAnn (Accessor _ _ ann) = ann
-extractExprAnn (ObjectUpdate _ _ ann) = ann
-extractExprAnn (ObjectUpdateNested _ _ ann) = ann
-extractExprAnn (Abs _ _ ann) = ann
-extractExprAnn (App _ _ ann) = ann
-extractExprAnn (Var _ ann) = ann
-extractExprAnn (Op _ ann) = ann
-extractExprAnn (IfThenElse _ _ _ ann) = ann
-extractExprAnn (Constructor _ ann) = ann
-extractExprAnn (Case _ _ ann) = ann
-extractExprAnn (TypedValue _ _ _ ann) = ann
-extractExprAnn (Let _ _ ann) = ann
-extractExprAnn (Do _ ann) = ann
-extractExprAnn (TypeClassDictionaryConstructorApp _ _ ann) = ann
-extractExprAnn (TypeClassDictionary _ _ _ ann) = ann
-extractExprAnn (TypeClassDictionaryAccessor _ _ ann) = ann
-extractExprAnn (DeferredDictionary _ _ ann) = ann
+extractExprAnn (Literal ann _) = ann
+extractExprAnn (UnaryMinus ann _) = ann
+extractExprAnn (BinaryNoParens ann _ _ _) = ann
+extractExprAnn (Parens ann _) = ann
+extractExprAnn (Accessor ann _ _) = ann
+extractExprAnn (ObjectUpdate ann _ _) = ann
+extractExprAnn (ObjectUpdateNested ann _ _) = ann
+extractExprAnn (Abs ann _ _) = ann
+extractExprAnn (App ann _ _) = ann
+extractExprAnn (Var ann _) = ann
+extractExprAnn (Op ann _) = ann
+extractExprAnn (IfThenElse ann _ _ _) = ann
+extractExprAnn (Constructor ann _) = ann
+extractExprAnn (Case ann _ _) = ann
+extractExprAnn (TypedValue ann _ _ _) = ann
+extractExprAnn (Let ann _ _) = ann
+extractExprAnn (Do ann _) = ann
+extractExprAnn (TypeClassDictionaryConstructorApp ann _ _) = ann
+extractExprAnn (TypeClassDictionary ann _ _ _) = ann
+extractExprAnn (TypeClassDictionaryAccessor ann _ _) = ann
+extractExprAnn (DeferredDictionary ann _ _) = ann
 extractExprAnn (AnonymousArgument ann) = ann
-extractExprAnn (Hole _ ann) = ann
-extractExprAnn (PositionedValue _ _ _ ann) = ann
+extractExprAnn (Hole ann _) = ann
+extractExprAnn (PositionedValue ann _ _ _) = ann
 
 -- |
 -- An alternative in a case statement
@@ -753,19 +753,19 @@ data DoNotationElement a b
   -- |
   -- A monadic value without a binder
   --
-  = DoNotationValue (Expr a b) b
+  = DoNotationValue b (Expr a b)
   -- |
   -- A monadic value with a binder
   --
-  | DoNotationBind (Binder a b) (Expr a b) b
+  | DoNotationBind b (Binder a b) (Expr a b)
   -- |
   -- A let statement, i.e. a pure value with a binder
   --
-  | DoNotationLet [Declaration a b] b
+  | DoNotationLet b [Declaration a b]
   -- |
   -- A do notation element with source position information
   --
-  | PositionedDoNotationElement SourceSpan [Comment] (DoNotationElement a b) b
+  | PositionedDoNotationElement b SourceSpan [Comment] (DoNotationElement a b)
   deriving (Show, Functor)
 
 
@@ -805,9 +805,9 @@ $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Declarat
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ImportDeclarationType)
 
 isTrueExpr :: Expr a b -> Bool
-isTrueExpr (Literal (BooleanLiteral True) _) = True
-isTrueExpr (Var (Qualified (Just (ModuleName [ProperName "Prelude"])) (Ident "otherwise")) _) = True
-isTrueExpr (Var (Qualified (Just (ModuleName [ProperName "Data", ProperName "Boolean"])) (Ident "otherwise")) _) = True
-isTrueExpr (TypedValue _ e _ _) = isTrueExpr e
-isTrueExpr (PositionedValue _ _ e _) = isTrueExpr e
+isTrueExpr (Literal _ (BooleanLiteral True)) = True
+isTrueExpr (Var _ (Qualified (Just (ModuleName [ProperName "Prelude"])) (Ident "otherwise"))) = True
+isTrueExpr (Var _ (Qualified (Just (ModuleName [ProperName "Data", ProperName "Boolean"])) (Ident "otherwise"))) = True
+isTrueExpr (TypedValue _ _ e _) = isTrueExpr e
+isTrueExpr (PositionedValue _ _ _ e) = isTrueExpr e
 isTrueExpr _ = False

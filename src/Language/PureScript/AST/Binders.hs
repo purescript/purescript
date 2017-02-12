@@ -27,25 +27,25 @@ data Binder a b
   -- |
   -- A binder which matches a literal
   --
-  | LiteralBinder (Literal (Binder a b)) b
+  | LiteralBinder b (Literal (Binder a b))
   -- |
   -- A binder which binds an identifier
   --
-  | VarBinder Ident b
+  | VarBinder b Ident
   -- |
   -- A binder which matches a data constructor
   --
-  | ConstructorBinder (Qualified (ProperName 'ConstructorName)) [Binder a b] b
+  | ConstructorBinder b (Qualified (ProperName 'ConstructorName)) [Binder a b]
   -- |
   -- A operator alias binder. During the rebracketing phase of desugaring,
   -- this data constructor will be removed.
   --
-  | OpBinder (Qualified (OpName 'ValueOpName)) b
+  | OpBinder b (Qualified (OpName 'ValueOpName))
   -- |
   -- Binary operator application. During the rebracketing phase of desugaring,
   -- this data constructor will be removed.
   --
-  | BinaryNoParensBinder (Binder a b) (Binder a b) (Binder a b) b
+  | BinaryNoParensBinder b (Binder a b) (Binder a b) (Binder a b)
   -- |
   -- Explicit parentheses. During the rebracketing phase of desugaring, this
   -- data constructor will be removed.
@@ -53,32 +53,32 @@ data Binder a b
   -- Note: although it seems this constructor is not used, it _is_ useful,
   -- since it prevents certain traversals from matching.
   --
-  | ParensInBinder (Binder a b) b
+  | ParensInBinder b (Binder a b)
   -- |
   -- A binder which binds its input to an identifier
   --
-  | NamedBinder Ident (Binder a b) b
+  | NamedBinder b Ident (Binder a b)
   -- |
   -- A binder with source position information
   --
-  | PositionedBinder SourceSpan [Comment] (Binder a b) b
+  | PositionedBinder b SourceSpan [Comment] (Binder a b)
   -- |
   -- A binder with a type annotation
   --
-  | TypedBinder (Type a) (Binder a b) b
+  | TypedBinder b (Type a) (Binder a b)
   deriving (Show, Functor)
 
 instance Eq (Binder a b) where
-  NullBinder                    _ == NullBinder                    _ = True
-  LiteralBinder        a1       _ == LiteralBinder        a2       _ = a1 == a2
-  VarBinder            a1       _ == VarBinder            a2       _ = a1 == a2
-  ConstructorBinder    a1 b1    _ == ConstructorBinder    a2 b2    _ = a1 == a2 && b1 == b2
-  OpBinder             a1       _ == OpBinder             a2       _ = a1 == a2
-  BinaryNoParensBinder a1 b1 c1 _ == BinaryNoParensBinder a2 b2 c2 _ = a1 == a2 && b1 == b2 && c1 == c2
-  ParensInBinder       a1       _ == ParensInBinder       a2       _ = a1 == a2
-  NamedBinder          a1 b1    _ == NamedBinder          a2 b2    _ = a1 == a2 && b1 == b2
-  PositionedBinder     a1 b1 c1 _ == PositionedBinder     a2 b2 c2 _ = a1 == a2 && b1 == b2 && c1 == c2
-  TypedBinder          a1 b1    _ == TypedBinder          a2 b2    _ = a1 == a2 && b1 == b2
+  NullBinder           _          == NullBinder           _          = True
+  LiteralBinder        _ a1       == LiteralBinder        _ a2       = a1 == a2
+  VarBinder            _ a1       == VarBinder            _ a2       = a1 == a2
+  ConstructorBinder    _ a1 b1    == ConstructorBinder    _ a2 b2    = a1 == a2 && b1 == b2
+  OpBinder             _ a1       == OpBinder             _ a2       = a1 == a2
+  BinaryNoParensBinder _ a1 b1 c1 == BinaryNoParensBinder _ a2 b2 c2 = a1 == a2 && b1 == b2 && c1 == c2
+  ParensInBinder       _ a1       == ParensInBinder       _ a2       = a1 == a2
+  NamedBinder          _ a1 b1    == NamedBinder          _ a2 b2    = a1 == a2 && b1 == b2
+  PositionedBinder     _ a1 b1 c1 == PositionedBinder     _ a2 b2 c2 = a1 == a2 && b1 == b2 && c1 == c2
+  TypedBinder          _ a1 b1    == TypedBinder          _ a2 b2    = a1 == a2 && b1 == b2
   _ == _ = False
 
 -- |
@@ -87,14 +87,14 @@ instance Eq (Binder a b) where
 binderNames :: Binder a b -> [Ident]
 binderNames = go []
   where
-  go ns (LiteralBinder b _) = lit ns b
-  go ns (VarBinder name _) = name : ns
-  go ns (ConstructorBinder _ bs _) = foldl go ns bs
-  go ns (BinaryNoParensBinder b1 b2 b3 _) = foldl go ns [b1, b2, b3]
-  go ns (ParensInBinder b _) = go ns b
-  go ns (NamedBinder name b _) = go (name : ns) b
-  go ns (PositionedBinder _ _ b _) = go ns b
-  go ns (TypedBinder _ b _) = go ns b
+  go ns (LiteralBinder _ b) = lit ns b
+  go ns (VarBinder _ name) = name : ns
+  go ns (ConstructorBinder _ _ bs) = foldl go ns bs
+  go ns (BinaryNoParensBinder _ b1 b2 b3) = foldl go ns [b1, b2, b3]
+  go ns (ParensInBinder _ b) = go ns b
+  go ns (NamedBinder _ name b) = go (name : ns) b
+  go ns (PositionedBinder _ _ _ b) = go ns b
+  go ns (TypedBinder _ _ b) = go ns b
   go ns _ = ns
   lit ns (ObjectLiteral bs) = foldl go ns (map snd bs)
   lit ns (ArrayLiteral bs) = foldl go ns bs
@@ -103,6 +103,6 @@ binderNames = go []
 isIrrefutable :: Binder a b -> Bool
 isIrrefutable NullBinder{} = True
 isIrrefutable VarBinder{} = True
-isIrrefutable (PositionedBinder _ _ b _) = isIrrefutable b
-isIrrefutable (TypedBinder _ b _) = isIrrefutable b
+isIrrefutable (PositionedBinder _ _ _ b) = isIrrefutable b
+isIrrefutable (TypedBinder _ _ b) = isIrrefutable b
 isIrrefutable _ = False
