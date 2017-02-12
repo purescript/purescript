@@ -287,10 +287,16 @@ desugarAbs = flip parU f
   (f, _, _) = everywhereOnValuesM return replace return
 
   replace :: Expr -> m Expr
-  replace (Abs (Right binder) val) = do
+  replace (Abs (stripPositioned -> (VarBinder i)) val) =
+    pure (Abs (VarBinder i) val)
+  replace (Abs binder val) = do
     ident <- freshIdent'
-    return $ Abs (Left ident) $ Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] [MkUnguarded val]]
+    return $ Abs (VarBinder ident) $ Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] [MkUnguarded val]]
   replace other = return other
+
+stripPositioned :: Binder -> Binder
+stripPositioned (PositionedBinder _ _ binder) = stripPositioned binder
+stripPositioned binder = binder
 
 -- |
 -- Replace all top-level binders with case expressions.
@@ -323,7 +329,7 @@ inSameGroup _ _ = False
 toDecls :: forall m. (MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
 toDecls [ValueDeclaration ident nameKind bs [MkUnguarded val]] | all isIrrefutable bs = do
   args <- mapM fromVarBinder bs
-  let body = foldr (Abs . Left) val args
+  let body = foldr (Abs . VarBinder) val args
   guardWith (errorMessage (OverlappingArgNames (Just ident))) $ length (ordNub args) == length args
   return [ValueDeclaration ident nameKind [] [MkUnguarded body]]
   where
@@ -365,7 +371,7 @@ makeCaseDeclaration ident alternatives = do
   let vars = map (Var . Qualified Nothing) args
       binders = [ CaseAlternative bs result | (bs, result) <- alternatives ]
   case_ <- desugarCase (Case vars binders)
-  let value = foldr (Abs . Left) case_ args
+  let value = foldr (Abs . VarBinder) case_ args
 
   return $ ValueDeclaration ident Public [] [MkUnguarded value]
   where

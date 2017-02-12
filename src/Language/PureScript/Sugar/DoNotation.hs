@@ -45,7 +45,7 @@ desugarDo d =
   go [DoNotationValue val] = return val
   go (DoNotationValue val : rest) = do
     rest' <- go rest
-    return $ App (App discard val) (Abs (Left (Ident C.__unused)) rest')
+    return $ App (App discard val) (Abs (VarBinder (Ident C.__unused)) rest')
   go [DoNotationBind _ _] = throwError . errorMessage $ InvalidDoBind
   go (DoNotationBind b _ : _) | First (Just ident) <- foldMap fromIdent (binderNames b) =
       throwError . errorMessage $ CannotUseBindWithDo (Ident ident)
@@ -54,11 +54,11 @@ desugarDo d =
       fromIdent _ = mempty
   go (DoNotationBind (VarBinder ident) val : rest) = do
     rest' <- go rest
-    return $ App (App bind val) (Abs (Left ident) rest')
+    return $ App (App bind val) (Abs (VarBinder ident) rest')
   go (DoNotationBind binder val : rest) = do
     rest' <- go rest
     ident <- freshIdent'
-    return $ App (App bind val) (Abs (Left ident) (Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] [MkUnguarded rest']]))
+    return $ App (App bind val) (Abs (VarBinder ident) (Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] [MkUnguarded rest']]))
   go [DoNotationLet _] = throwError . errorMessage $ InvalidDoLet
   go (DoNotationLet ds : rest) = do
     let checkBind :: Declaration -> m ()

@@ -293,7 +293,7 @@ checkExhaustive env mn numArgs cas expr = makeResult . first ordNub $ foldl' ste
         [MkUnguarded
           (TypedValue
            True
-           (Abs (Left (Ident var)) (Var (Qualified Nothing (Ident var))))
+           (Abs (VarBinder (Ident var)) (Var (Qualified Nothing (Ident var))))
            (ty tyVar))
         ]
 

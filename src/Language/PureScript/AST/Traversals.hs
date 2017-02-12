@@ -48,6 +48,7 @@ everywhereOnValues f g h = (f', g', h')
   f' :: Declaration -> Declaration
   f' (DataBindingGroupDeclaration ds) = f (DataBindingGroupDeclaration (map f' ds))
   f' (ValueDeclaration name nameKind bs val) = f (ValueDeclaration name nameKind (map h' bs) (map (mapGuardedExpr handleGuard g') val))
+  f' (BoundValueDeclaration b expr) = f (BoundValueDeclaration (h' b) (g' expr))
   f' (BindingGroupDeclaration ds) = f (BindingGroupDeclaration (map (\(name, nameKind, val) -> (name, nameKind, g' val)) ds))
   f' (TypeClassDeclaration name args implies deps ds) = f (TypeClassDeclaration name args implies deps (map f' ds))
   f' (TypeInstanceDeclaration name cs className args ds) = f (TypeInstanceDeclaration name cs className args (mapTypeInstanceBody (map f') ds))
@@ -63,7 +64,7 @@ everywhereOnValues f g h = (f', g', h')
   g' (Accessor prop v) = g (Accessor prop (g' v))
   g' (ObjectUpdate obj vs) = g (ObjectUpdate (g' obj) (map (fmap g') vs))
   g' (ObjectUpdateNested obj vs) = g (ObjectUpdateNested (g' obj) (fmap g' vs))
-  g' (Abs name v) = g (Abs name (g' v))
+  g' (Abs binder v) = g (Abs (h' binder) (g' v))
   g' (App v1 v2) = g (App (g' v1) (g' v2))
   g' (IfThenElse v1 v2 v3) = g (IfThenElse (g' v1) (g' v2) (g' v3))
   g' (Case vs alts) = g (Case (map g' vs) (map handleCaseAlternative alts))
@@ -123,6 +124,7 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   f' (BindingGroupDeclaration ds) = BindingGroupDeclaration <$> traverse (\(name, nameKind, val) -> (,,) name nameKind <$> (g val >>= g')) ds
   f' (TypeClassDeclaration name args implies deps ds) = TypeClassDeclaration name args implies deps <$> traverse (f' <=< f) ds
   f' (TypeInstanceDeclaration name cs className args ds) = TypeInstanceDeclaration name cs className args <$> traverseTypeInstanceBody (traverse (f' <=< f)) ds
+  f' (BoundValueDeclaration b expr) = BoundValueDeclaration <$> h' b <*> g' expr
   f' (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> (f d >>= f')
   f' other = f other
 
@@ -135,7 +137,7 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   g' (Accessor prop v) = Accessor prop <$> (g v >>= g')
   g' (ObjectUpdate obj vs) = ObjectUpdate <$> (g obj >>= g') <*> traverse (sndM (g' <=< g)) vs
   g' (ObjectUpdateNested obj vs) = ObjectUpdateNested <$> (g obj >>= g') <*> traverse (g' <=< g) vs
-  g' (Abs name v) = Abs name <$> (g v >>= g')
+  g' (Abs binder v) = Abs <$> (h binder >>= h') <*> (g v >>= g')
   g' (App v1 v2) = App <$> (g v1 >>= g') <*> (g v2 >>= g')
   g' (IfThenElse v1 v2 v3) = IfThenElse <$> (g v1 >>= g') <*> (g v2 >>= g') <*> (g v3 >>= g')
   g' (Case vs alts) = Case <$> traverse (g' <=< g) vs <*> traverse handleCaseAlternative alts
@@ -193,6 +195,7 @@ everywhereOnValuesM f g h = (f', g', h')
   f' (DataBindingGroupDeclaration ds) = (DataBindingGroupDeclaration <$> traverse f' ds) >>= f
   f' (ValueDeclaration name nameKind bs val) = (ValueDeclaration name nameKind <$> traverse h' bs <*> traverse (guardedExprM handleGuard g') val) >>= f
   f' (BindingGroupDeclaration ds) = (BindingGroupDeclaration <$> traverse (\(name, nameKind, val) -> (,,) name nameKind <$> g' val) ds) >>= f
+  f' (BoundValueDeclaration b expr) = (BoundValueDeclaration <$> h' b <*> g' expr) >>= f
   f' (TypeClassDeclaration name args implies deps ds) = (TypeClassDeclaration name args implies deps <$> traverse f' ds) >>= f
   f' (TypeInstanceDeclaration name cs className args ds) = (TypeInstanceDeclaration name cs className args <$> traverseTypeInstanceBody (traverse f') ds) >>= f
   f' (PositionedDeclaration pos com d) = (PositionedDeclaration pos com <$> f' d) >>= f
@@ -207,7 +210,7 @@ everywhereOnValuesM f g h = (f', g', h')
   g' (Accessor prop v) = (Accessor prop <$> g' v) >>= g
   g' (ObjectUpdate obj vs) = (ObjectUpdate <$> g' obj <*> traverse (sndM g') vs) >>= g
   g' (ObjectUpdateNested obj vs) = (ObjectUpdateNested <$> g' obj <*> traverse g' vs) >>= g
-  g' (Abs name v) = (Abs name <$> g' v) >>= g
+  g' (Abs binder v) = (Abs <$> h' binder <*> g' v) >>= g
   g' (App v1 v2) = (App <$> g' v1 <*> g' v2) >>= g
   g' (IfThenElse v1 v2 v3) = (IfThenElse <$> g' v1 <*> g' v2 <*> g' v3) >>= g
   g' (Case vs alts) = (Case <$> traverse g' vs <*> traverse handleCaseAlternative alts) >>= g
@@ -271,6 +274,7 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   f' d@(BindingGroupDeclaration ds) = foldl (<>) (f d) (map (\(_, _, val) -> g' val) ds)
   f' d@(TypeClassDeclaration _ _ _ _ ds) = foldl (<>) (f d) (map f' ds)
   f' d@(TypeInstanceDeclaration _ _ _ _ (ExplicitInstance ds)) = foldl (<>) (f d) (map f' ds)
+  f' d@(BoundValueDeclaration b expr) = f d <> h' b <> g' expr
   f' d@(PositionedDeclaration _ _ d1) = f d <> f' d1
   f' d = f d
 
@@ -283,7 +287,7 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   g' v@(Accessor _ v1) = g v <> g' v1
   g' v@(ObjectUpdate obj vs) = foldl (<>) (g v <> g' obj) (map (g' . snd) vs)
   g' v@(ObjectUpdateNested obj vs) = foldl (<>) (g v <> g' obj) (fmap g' vs)
-  g' v@(Abs _ v1) = g v <> g' v1
+  g' v@(Abs b v1) = g v <> h' b <> g' v1
   g' v@(App v1 v2) = g v <> g' v1 <> g' v2
   g' v@(IfThenElse v1 v2 v3) = g v <> g' v1 <> g' v2 <> g' v3
   g' v@(Case vs alts) = foldl (<>) (foldl (<>) (g v) (map g' vs)) (map i' alts)
@@ -364,7 +368,7 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   g' s (Accessor _ v1) = g'' s v1
   g' s (ObjectUpdate obj vs) = foldl (<>) (g'' s obj) (map (g'' s . snd) vs)
   g' s (ObjectUpdateNested obj vs) = foldl (<>) (g'' s obj) (fmap (g'' s) vs)
-  g' s (Abs _ v1) = g'' s v1
+  g' s (Abs binder v1) = h'' s binder <> g'' s v1
   g' s (App v1 v2) = g'' s v1 <> g'' s v2
   g' s (IfThenElse v1 v2 v3) = g'' s v1 <> g'' s v2 <> g'' s v3
   g' s (Case vs alts) = foldl (<>) (foldl (<>) r0 (map (g'' s) vs)) (map (i'' s) alts)
@@ -448,7 +452,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   g' s (Accessor prop v) = Accessor prop <$> g'' s v
   g' s (ObjectUpdate obj vs) = ObjectUpdate <$> g'' s obj <*> traverse (sndM (g'' s)) vs
   g' s (ObjectUpdateNested obj vs) = ObjectUpdateNested <$> g'' s obj <*> traverse (g'' s) vs
-  g' s (Abs name v) = Abs name <$> g'' s v
+  g' s (Abs binder v) = Abs <$> h' s binder <*> g'' s v
   g' s (App v1 v2) = App <$> g'' s v1 <*> g'' s v2
   g' s (IfThenElse v1 v2 v3) = IfThenElse <$> g'' s v1 <*> g'' s v2 <*> g'' s v3
   g' s (Case vs alts) = Case <$> traverse (g'' s) vs <*> traverse (i'' s) alts
@@ -538,10 +542,7 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   g' s (Accessor _ v1) = g'' s v1
   g' s (ObjectUpdate obj vs) = g'' s obj <> foldMap (g'' s . snd) vs
   g' s (ObjectUpdateNested obj vs) = g'' s obj <> foldMap (g'' s) vs
-  g' s (Abs (Left name) v1) =
-    let s' = S.insert name s
-    in g'' s' v1
-  g' s (Abs (Right b) v1) =
+  g' s (Abs b v1) =
     let s' = S.union (S.fromList (binderNames b)) s
     in h'' s b <> g'' s' v1
   g' s (App v1 v2) = g'' s v1 <> g'' s v2
