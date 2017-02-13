@@ -25,17 +25,17 @@ matchExprOperators = matchOperators isBinOp extractOp fromOp reapply modOpTable
   isBinOp _ = False
 
   extractOp :: Expr a b -> Maybe (Expr a b, Expr a b, Expr a b)
-  extractOp (BinaryNoParens op l r _)
-    | PositionedValue _ _ op' _ <- op = Just (op', l, r)
+  extractOp (BinaryNoParens _ op l r)
+    | PositionedValue _ _ _ op' <- op = Just (op', l, r)
     | otherwise = Just (op, l, r)
   extractOp _ = Nothing
 
   fromOp :: Expr a b -> Maybe (Qualified (OpName 'ValueOpName), b)
-  fromOp (Op q@(Qualified _ (OpName _)) ann) = Just (q, ann)
+  fromOp (Op ann q@(Qualified _ (OpName _))) = Just (q, ann)
   fromOp _ = Nothing
 
   reapply :: Qualified (OpName 'ValueOpName) -> b -> Expr a b -> Expr a b -> Expr a b
-  reapply op ann t1 t2 = App (App (Op op ann) t1 ann) t2 ann
+  reapply op ann = App ann . App ann (Op ann op)
 
   modOpTable
     :: [[P.Operator (Chain (Expr a b)) () Identity (Expr a b)]]
@@ -43,7 +43,7 @@ matchExprOperators = matchOperators isBinOp extractOp fromOp reapply modOpTable
   modOpTable table =
     [ P.Infix (P.try (parseTicks >>= \op ->
         let ann = extractExprAnn op
-        in return (\t1 t2 -> App (App op t1 ann) t2 ann))) P.AssocLeft ]
+        in return (\t1 t2 -> App ann (App ann op t1) t2))) P.AssocLeft ]
     : table
 
   parseTicks :: P.Parsec (Chain (Expr a b)) () (Expr a b)

@@ -21,12 +21,12 @@ matchTypeOperators = matchOperators isBinOp extractOp fromOp reapply id
   isBinOp _ = False
 
   extractOp :: Type a -> Maybe (Type a, Type a, Type a)
-  extractOp (BinaryNoParensType op l r _) = Just (op, l, r)
+  extractOp (BinaryNoParensType _ op l r) = Just (op, l, r)
   extractOp _ = Nothing
 
   fromOp :: Type a -> Maybe (Qualified (OpName 'TypeOpName), a)
-  fromOp (TypeOp q@(Qualified _ (OpName _)) ann) = Just (q, ann)
+  fromOp (TypeOp ann q@(Qualified _ (OpName _))) = Just (q, ann)
   fromOp _ = Nothing
 
   reapply :: Qualified (OpName 'TypeOpName) -> a -> Type a -> Type a -> Type a
-  reapply name ann l r = BinaryNoParensType (TypeOp name ann) l r ann
+  reapply name ann = BinaryNoParensType ann (TypeOp ann name)

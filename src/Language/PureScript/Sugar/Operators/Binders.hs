@@ -20,12 +20,12 @@ matchBinderOperators = matchOperators isBinOp extractOp fromOp reapply id
   isBinOp _ = False
 
   extractOp :: Binder a b -> Maybe (Binder a b, Binder a b, Binder a b)
-  extractOp (BinaryNoParensBinder op l r _) = Just (op, l, r)
+  extractOp (BinaryNoParensBinder _ op l r) = Just (op, l, r)
   extractOp _ = Nothing
 
   fromOp :: Binder a b -> Maybe (Qualified (OpName 'ValueOpName), b)
-  fromOp (OpBinder q@(Qualified _ (OpName _)) ann) = Just (q, ann)
+  fromOp (OpBinder ann q@(Qualified _ (OpName _))) = Just (q, ann)
   fromOp _ = Nothing
 
   reapply :: Qualified (OpName 'ValueOpName) -> b -> Binder a b -> Binder a b -> Binder a b
-  reapply name ann l r = BinaryNoParensBinder (OpBinder name ann) l r ann
+  reapply name ann = BinaryNoParensBinder ann (OpBinder ann name)

@@ -669,7 +669,7 @@ accumKinds f = everythingOnValues mappend forDecls forValues (const mempty) (con
   forValues (TypedValue _ _ _ ty) = forTypes ty
   forValues _ = mempty
 
-  forTypes (KindedType _ k _) = f k
+  forTypes (KindedType _ _ k) = f k
   forTypes _ = mempty
 
 -- |

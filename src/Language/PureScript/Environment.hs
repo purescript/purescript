@@ -129,7 +129,7 @@ makeTypeClassData args m s deps = TypeClassData args m s deps determinedArgs cov
       Nothing -> internalError "Unknown argument index in makeTypeClassData"
       Just v -> let contributesToVar = G.reachable (G.transposeG depGraph) v
                     varContributesTo = G.reachable depGraph v
-                in any (\r -> not (r `elem` varContributesTo)) contributesToVar
+                in any (`notElem` varContributesTo) contributesToVar
 
     -- find all the arguments that are determined
     determinedArgs :: S.Set Int
@@ -265,7 +265,7 @@ kindSymbol = primKind C.symbol
 -- Construct a type in the Prim module
 --
 primTy :: Text -> Type ()
-primTy name = TypeConstructor (primName name) ()
+primTy = TypeConstructor () . primName
 
 -- |
 -- Type constructor for functions
@@ -330,14 +330,14 @@ isFunction = isTypeOrApplied tyFunction
 isTypeOrApplied :: Type a -> Type b -> Bool
 isTypeOrApplied ta tb = go (void ta) (void tb)
   where
-  go t1 (TypeApp t2 _ _) = t1 == t2
+  go t1 (TypeApp _ t2 _) = t1 == t2
   go t1 t2 = t1 == t2
 
 -- |
 -- Smart constructor for function types
 --
 function :: Type () -> Type () -> Type ()
-function t1 t2 = TypeApp (TypeApp tyFunction t1 ()) t2 ()
+function = TypeApp () . TypeApp () tyFunction
 
 -- |
 -- The primitive kinds
@@ -381,9 +381,9 @@ primTypes =
 primClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primClasses =
   M.fromList
-    [ (primName "Partial", (makeTypeClassData [] [] [] []))
-    , (primName "Fail",    (makeTypeClassData [("message", Just kindSymbol)] [] [] []))
-    , (primName "Warn",    (makeTypeClassData [("message", Just kindSymbol)] [] [] []))
+    [ (primName "Partial", makeTypeClassData [] [] [] [])
+    , (primName "Fail",    makeTypeClassData [("message", Just kindSymbol)] [] [] [])
+    , (primName "Warn",    makeTypeClassData [("message", Just kindSymbol)] [] [] [])
     ]
 
 -- |
