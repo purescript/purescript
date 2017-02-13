@@ -109,11 +109,11 @@ checkIndentation mkMsg rel = do
 
 -- | Check that the current indentation level is past the current mark
 indented :: P.Parsec s ParseState ()
-indented = checkIndentation (("indentation past column " <>) . (T.pack . show)) (>)
+indented = checkIndentation (("indentation past column " <>) . T.pack . show) (>)
 
 -- | Check that the current indentation level is at the same indentation as the current mark
 same :: P.Parsec s ParseState ()
-same = checkIndentation (("indentation at column " <>) . (T.pack . show)) (==)
+same = checkIndentation (("indentation at column " <>) . T.pack . show) (==)
 
 -- | Read the comments from the the next token, without consuming it
 readComments :: P.Parsec [PositionedToken] u [Comment]
@@ -129,7 +129,7 @@ toSourcePos pos = SourcePos (P.sourceLine pos) (P.sourceColumn pos)
 
 -- | Read source position information and comments
 withSourceSpan
-  :: (SourceSpan -> [Comment] -> a -> () -> b)
+  :: (SourceSpan -> [Comment] -> () -> a -> b)
   -> P.Parsec [PositionedToken] u a
   -> P.Parsec [PositionedToken] u b
 withSourceSpan f p = do
@@ -142,4 +142,4 @@ withSourceSpan f p = do
         pt:_ -> ptPrevEndPos pt
         _ -> Nothing
   let sp = SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos $ fromMaybe end end')
-  return $ f sp comments x ()
+  return $ f sp comments () x

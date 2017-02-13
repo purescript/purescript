@@ -249,8 +249,8 @@ isMonoType _ = True
 -- |
 -- Universally quantify a type
 --
-mkForAll :: [Text] -> a -> Type a -> Type a
-mkForAll args ann ty = foldl (\t arg -> ForAll ann arg t Nothing) ty args
+mkForAll :: a -> [Text] -> Type a -> Type a
+mkForAll ann args ty = foldl (\t arg -> ForAll ann arg t Nothing) ty args
 
 -- |
 -- Replace a type variable, taking into account variable shadowing

@@ -37,30 +37,30 @@ typeLiterals = mkPattern match
   where
   match TypeWildcard{} =
     Just (syntax "_")
-  match (TypeVar var _) =
+  match (TypeVar _ var) =
     Just (typeVar var)
-  match (PrettyPrintObject row _) =
+  match (PrettyPrintObject _ row) =
     Just $ mintersperse sp
               [ syntax "{"
               , renderRow row
               , syntax "}"
               ]
-  match (TypeConstructor n _) =
+  match (TypeConstructor _ n) =
     Just (typeCtor n)
   match REmpty{} =
     Just (syntax "()")
   match row@RCons{} =
     Just (syntax "(" <> renderRow row <> syntax ")")
-  match (BinaryNoParensType op l r _) =
+  match (BinaryNoParensType _ op l r) =
     Just $ renderTypeAtom l <> sp <> renderTypeAtom op <> sp <> renderTypeAtom r
-  match (TypeOp n _) =
+  match (TypeOp _ n) =
     Just (typeOp n)
   match _ =
     Nothing
 
 renderConstraint :: Constraint a -> RenderedCode
 renderConstraint (Constraint pn tys _) =
-  let instApp = foldl (\x y -> TypeApp x y ()) (TypeConstructor (fmap coerceProperName pn) ()) (void <$> tys)
+  let instApp = foldl (TypeApp ()) (TypeConstructor () (fmap coerceProperName pn)) (void <$> tys)
   in  renderType instApp
 
 renderConstraints :: [Constraint a] -> RenderedCode -> RenderedCode
@@ -101,31 +101,31 @@ renderTail other = sp <> syntax "|" <> sp <> renderType other
 typeApp :: Pattern () (Type a) (Type a, Type a)
 typeApp = mkPattern match
   where
-  match (TypeApp f x _) = Just (f, x)
+  match (TypeApp _ f x) = Just (f, x)
   match _ = Nothing
 
 appliedFunction :: Pattern () (Type a) (Type a, Type a)
 appliedFunction = mkPattern match
   where
-  match (PrettyPrintFunction arg ret _) = Just (arg, ret)
+  match (PrettyPrintFunction _ arg ret) = Just (arg, ret)
   match _ = Nothing
 
 kinded :: Pattern () (Type a) (Kind, Type a)
 kinded = mkPattern match
   where
-  match (KindedType t k _) = Just (k, t)
+  match (KindedType _ t k) = Just (k, t)
   match _ = Nothing
 
 constrained :: Pattern () (Type a) ([Constraint a], Type a)
 constrained = mkPattern match
   where
-  match (ConstrainedType deps ty _) = Just (deps, ty)
+  match (ConstrainedType _ deps ty) = Just (deps, ty)
   match _ = Nothing
 
 explicitParens :: Pattern () (Type a) ((), Type a)
 explicitParens = mkPattern match
   where
-  match (ParensInType ty _) = Just ((), ty)
+  match (ParensInType _ ty) = Just ((), ty)
   match _ = Nothing
 
 matchTypeAtom :: Pattern () (Type a) RenderedCode
@@ -149,7 +149,7 @@ matchType = buildPrettyPrinter operators matchTypeAtom
 forall_ :: Pattern () (Type a) ([Text], Type a)
 forall_ = mkPattern match
   where
-  match (PrettyPrintForAll idents ty _) = Just (idents, ty)
+  match (PrettyPrintForAll _ idents ty) = Just (idents, ty)
   match _ = Nothing
 
 insertPlaceholders :: RenderTypeOptions -> Type a -> Type a
@@ -157,15 +157,15 @@ insertPlaceholders opts =
   everywhereOnTypesTopDown convertForAlls . everywhereOnTypes (convert opts)
 
 convert :: RenderTypeOptions -> Type a -> Type a
-convert _ (TypeApp (TypeApp f arg _) ret ann) | void f == tyFunction = PrettyPrintFunction arg ret ann
-convert opts (TypeApp o r ann) | void o == tyRecord && prettyPrintObjects opts = PrettyPrintObject r ann
+convert _ (TypeApp ann (TypeApp _ f arg) ret) | void f == tyFunction = PrettyPrintFunction ann arg ret
+convert opts (TypeApp ann o r) | void o == tyRecord && prettyPrintObjects opts = PrettyPrintObject ann r
 convert _ other = other
 
 convertForAlls :: Type a -> Type a
-convertForAlls (ForAll i ty _ ann) = go [i] ty ann
+convertForAlls (ForAll ann i ty _) = go ann [i] ty
   where
-  go idents (ForAll i' ty' _ ann') _ = go (i' : idents) ty' ann'
-  go idents other ann' = PrettyPrintForAll idents other ann'
+  go _ idents (ForAll ann' i' ty' _) = go ann' (i' : idents) ty'
+  go ann' idents other = PrettyPrintForAll ann' idents other
 convertForAlls other = other
 
 preprocessType :: RenderTypeOptions -> Type a -> Type a

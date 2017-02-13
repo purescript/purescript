@@ -47,7 +47,7 @@ constraintsAsBox tro constraints ty = case constraints of
 
 constraintAsBox :: Constraint a -> Box
 constraintAsBox (Constraint pn tys _) =
-  typeAsBox (foldl (\x y -> TypeApp x y ()) (TypeConstructor (fmap coerceProperName pn) ()) (map void tys))
+  typeAsBox (foldl (TypeApp ()) (TypeConstructor () (fmap coerceProperName pn)) (map void tys))
 
 -- |
 -- Generate a pretty-printed string representing a Row
@@ -71,7 +71,7 @@ prettyPrintRowWith tro open close = uncurry listToBox . toList []
     zipWith (\(nm, ty) i -> nameAndTypeToPs (if i == 0 then open else ',') nm ty) ts [0 :: Int ..] ++
     [ tailToPs rest, text [close] ]
   toList :: [(Label, Type a)] -> Type a -> ([(Label, Type a)], Type a)
-  toList tys (RCons name ty row _) = toList ((name, ty):tys) row
+  toList tys (RCons _ name ty row) = toList ((name, ty):tys) row
   toList tys r = (reverse tys, r)
 
 prettyPrintRow :: Type a -> String
@@ -80,43 +80,43 @@ prettyPrintRow = render . prettyPrintRowWith defaultOptions '(' ')'
 typeApp :: Pattern () (Type a) (Type a, Type a)
 typeApp = mkPattern match
   where
-  match (TypeApp f x _) = Just (f, x)
+  match (TypeApp _ f x) = Just (f, x)
   match _ = Nothing
 
 appliedFunction :: Pattern () (Type a) (Type a, Type a)
 appliedFunction = mkPattern match
   where
-  match (PrettyPrintFunction arg ret _) = Just (arg, ret)
+  match (PrettyPrintFunction _ arg ret) = Just (arg, ret)
   match _ = Nothing
 
 kinded :: Pattern () (Type a) (Kind, Type a)
 kinded = mkPattern match
   where
-  match (KindedType t k _) = Just (k, t)
+  match (KindedType _ t k) = Just (k, t)
   match _ = Nothing
 
 insertPlaceholders :: Type a -> Type a
 insertPlaceholders = everywhereOnTypesTopDown convertForAlls . everywhereOnTypes convert
   where
-  convert (TypeApp (TypeApp f arg _) ret ann) | void f == tyFunction = PrettyPrintFunction arg ret ann
-  convert (TypeApp o r ann) | void o == tyRecord = PrettyPrintObject r ann
+  convert (TypeApp ann (TypeApp _ f arg) ret) | void f == tyFunction = PrettyPrintFunction ann arg ret
+  convert (TypeApp ann o r) | void o == tyRecord = PrettyPrintObject ann r
   convert other = other
-  convertForAlls (ForAll ident ty _ ann) = go [ident] ty
+  convertForAlls (ForAll ann ident ty _) = go [ident] ty
     where
-    go idents (ForAll ident' ty' _ _) = go (ident' : idents) ty'
-    go idents other = PrettyPrintForAll idents other ann
+    go idents (ForAll _ ident' ty' _) = go (ident' : idents) ty'
+    go idents other = PrettyPrintForAll ann idents other
   convertForAlls other = other
 
 constrained :: Pattern () (Type a) ([Constraint a], Type a)
 constrained = mkPattern match
   where
-  match (ConstrainedType deps ty _) = Just (deps, ty)
+  match (ConstrainedType _ deps ty) = Just (deps, ty)
   match _ = Nothing
 
 explicitParens :: Pattern () (Type a) ((), Type a)
 explicitParens = mkPattern match
   where
-  match (ParensInType ty _) = Just ((), ty)
+  match (ParensInType _ ty) = Just ((), ty)
   match _ = Nothing
 
 matchTypeAtom :: TypeRenderOptions -> Pattern () (Type a) Box
@@ -126,21 +126,21 @@ matchTypeAtom tro@TypeRenderOptions{troSuggesting = suggesting} =
     typeLiterals :: Pattern () (Type a) Box
     typeLiterals = mkPattern match where
       match TypeWildcard{} = Just $ text "_"
-      match (TypeVar var _) = Just $ text $ T.unpack var
-      match (TypeLevelString s _) = Just $ text $ T.unpack $ prettyPrintString s
-      match (PrettyPrintObject row _) = Just $ prettyPrintRowWith tro '{' '}' row
-      match (TypeConstructor ctor _) = Just $ text $ T.unpack $ runProperName $ disqualify ctor
-      match (TUnknown u _)
+      match (TypeVar _ var) = Just $ text $ T.unpack var
+      match (TypeLevelString _ s) = Just $ text $ T.unpack $ prettyPrintString s
+      match (PrettyPrintObject _ row) = Just $ prettyPrintRowWith tro '{' '}' row
+      match (TypeConstructor _ ctor) = Just $ text $ T.unpack $ runProperName $ disqualify ctor
+      match (TUnknown _ u)
         | suggesting = Just $ text "_"
         | otherwise = Just $ text $ 't' : show u
-      match (Skolem name s _ _ _)
+      match (Skolem _ name s _ _)
         | suggesting =  Just $ text $ T.unpack name
         | otherwise = Just $ text $ T.unpack name ++ show s
       match REmpty{} = Just $ text "()"
       match row@RCons{} = Just $ prettyPrintRowWith tro '(' ')' row
-      match (BinaryNoParensType op l r _) =
+      match (BinaryNoParensType _ op l r) =
         Just $ typeAsBox l <> text " " <> typeAsBox op <> text " " <> typeAsBox r
-      match (TypeOp op _) = Just $ text $ T.unpack $ showQualified runOpName op
+      match (TypeOp _ op) = Just $ text $ T.unpack $ showQualified runOpName op
       match _ = Nothing
 
 matchType :: TypeRenderOptions -> Pattern () (Type a) Box
@@ -169,7 +169,7 @@ matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
 forall_ :: Pattern () (Type a) ([String], Type a)
 forall_ = mkPattern match
   where
-  match (PrettyPrintForAll idents ty _) = Just (map T.unpack idents, ty)
+  match (PrettyPrintForAll _ idents ty) = Just (map T.unpack idents, ty)
   match _ = Nothing
 
 typeAtomAsBox :: Type a -> Box
