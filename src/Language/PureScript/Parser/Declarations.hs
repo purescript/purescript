@@ -133,7 +133,7 @@ parseFixityDeclaration = do
       <*> (reserved "as" *> parseOperator)
   valueFixity fixity =
     ValueFixity fixity
-      <$> parseQualified ((Left <$> parseIdent) <|> (Right <$> properName))
+      <$> parseQualified ((Left <$> parseIdent) <|> (Right <$> dataConstructorName))
       <*> (reserved "as" *> parseOperator)
 
 parseImportDeclaration :: TokenParser Declaration
