@@ -31,8 +31,8 @@ test2 = \_ -> do
   Just (x + y)
 
 test3 = \_ -> do
-  Just 1.0
-  Nothing :: Maybe Number
+  _ <- Just 1.0
+  _ <- Nothing :: Maybe Number
   Just 2.0
 
 test4 mx my = do

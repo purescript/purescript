@@ -32,7 +32,7 @@ sequenceList''' = Sequence ((\val -> case val of
   Cons x xs -> Cons <$> x <*> sequence sequenceList''' xs) :: forall m a. (Monad m) => List (m a) -> m (List a))
 
 main = do
-  sequence sequenceList $ Cons (log "Done") Nil
-  sequence sequenceList' $ Cons (log "Done") Nil
-  sequence sequenceList'' $ Cons (log "Done") Nil
-  sequence sequenceList''' $ Cons (log "Done") Nil
+  void $ sequence sequenceList $ Cons (log "Done") Nil
+  void $ sequence sequenceList' $ Cons (log "Done") Nil
+  void $ sequence sequenceList'' $ Cons (log "Done") Nil
+  void $ sequence sequenceList''' $ Cons (log "Done") Nil
