@@ -1,16 +1,19 @@
 -- | This module implements the desugaring pass which replaces do-notation statements with
 -- appropriate calls to bind.
+
+{-# LANGUAGE PatternGuards #-}
+
 module Language.PureScript.Sugar.DoNotation (desugarDoModule) where
 
-import Prelude.Compat
+import           Prelude.Compat
 
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.Supply.Class
-
-import Language.PureScript.AST
-import Language.PureScript.Crash
-import Language.PureScript.Errors
-import Language.PureScript.Names
+import           Control.Monad.Error.Class (MonadError(..))
+import           Control.Monad.Supply.Class
+import           Data.Monoid (First(..))
+import           Language.PureScript.AST
+import           Language.PureScript.Crash
+import           Language.PureScript.Errors
+import           Language.PureScript.Names
 import qualified Language.PureScript.Constants as C
 
 -- | Replace all @DoNotationBind@ and @DoNotationValue@ constructors with
@@ -45,8 +48,11 @@ desugarDo d =
     return $ App (App discard val) (Abs (Left (Ident C.__unused)) rest')
   go [DoNotationBind _ _] = throwError . errorMessage $ InvalidDoBind
   go (DoNotationBind NullBinder val : rest) = go (DoNotationValue val : rest)
-  go (DoNotationBind b _ : _) | Ident C.bind `elem` binderNames b =
-    throwError . errorMessage $ CannotUseBindWithDo
+  go (DoNotationBind b _ : _) | First (Just ident) <- foldMap fromIdent (binderNames b) =
+      throwError . errorMessage $ CannotUseBindWithDo (Ident ident)
+    where
+      fromIdent (Ident i) | i `elem` [ C.bind, C.discard ] = First (Just i)
+      fromIdent _ = mempty
   go (DoNotationBind (VarBinder ident) val : rest) = do
     rest' <- go rest
     return $ App (App bind val) (Abs (Left ident) rest')
@@ -57,8 +63,8 @@ desugarDo d =
   go [DoNotationLet _] = throwError . errorMessage $ InvalidDoLet
   go (DoNotationLet ds : rest) = do
     let checkBind :: Declaration -> m ()
-        checkBind (ValueDeclaration (Ident name) _ _ _)
-          | name == C.bind = throwError . errorMessage $ CannotUseBindWithDo
+        checkBind (ValueDeclaration i@(Ident name) _ _ _)
+          | name `elem` [ C.bind, C.discard ] = throwError . errorMessage $ CannotUseBindWithDo i
         checkBind (PositionedDeclaration pos _ decl) = rethrowWithPosition pos (checkBind decl)
         checkBind _ = pure ()
     mapM_ checkBind ds

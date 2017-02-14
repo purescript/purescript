@@ -491,7 +491,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
       line $ "The type declaration for " <> markCode (showIdent nm) <> " should be followed by its definition."
     renderSimpleErrorMessage (RedefinedIdent name) =
       line $ "The value " <> markCode (showIdent name) <> " has been defined multiple times"
-    renderSimpleErrorMessage (UnknownName name@(Qualified Nothing (IdentName (Ident "bind")))) =
+    renderSimpleErrorMessage (UnknownName name@(Qualified Nothing (IdentName (Ident i)))) | i `elem` [ C.bind, C.discard ] =
       line $ "Unknown " <> printName name <> ". You're probably using do-notation, which the compiler replaces with calls to the " <> markCode "bind" <> " function. Please import " <> markCode "bind" <> " from module " <> markCode "Prelude"
     renderSimpleErrorMessage (UnknownName name) =
       line $ "Unknown " <> printName name
@@ -624,7 +624,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
             , markCodeBox $ indent $ typeAsBox ty
             , line "was implicitly discarded in a do notation block."
             , line ("You can use " <> markCode "_ <- ..." <> " to explicitly discard the result.")
-            , line "Alternatively, add a Discard constraint to the type of the discarded value."
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint nm ts _)) =
       paras [ line "No type class instance was found for"
@@ -877,8 +876,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
       paras [ line $ "Expected a type wildcard (_) when deriving an instance for " <> markCode (runProperName tyName) <> "."
             ]
 
-    renderSimpleErrorMessage CannotUseBindWithDo =
-      paras [ line $ "The name " <> markCode "bind" <> " cannot be brought into scope in a do notation block, since do notation uses the same name."
+    renderSimpleErrorMessage (CannotUseBindWithDo name@(Ident i)) =
+      paras [ line $ "The name " <> markCode (showIdent name) <> " cannot be brought into scope in a do notation block, since do notation uses the same name."
             ]
 
     renderSimpleErrorMessage (ClassInstanceArityMismatch dictName className expected actual) =

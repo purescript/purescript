@@ -140,7 +140,7 @@ data SimpleErrorMessage
   | CannotGeneralizeRecursiveFunction Ident Type
   | CannotDeriveNewtypeForData (ProperName 'TypeName)
   | ExpectedWildcard (ProperName 'TypeName)
-  | CannotUseBindWithDo
+  | CannotUseBindWithDo Ident
   -- | instance name, type class, expected argument count, actual argument count
   | ClassInstanceArityMismatch Ident (Qualified (ProperName 'ClassName)) Int Int
   -- | a user-defined warning raised by using the Warn type class

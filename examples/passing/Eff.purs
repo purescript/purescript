@@ -11,12 +11,12 @@ test1 = do
 
 test2 = runPure (runST (do
           ref <- newSTRef 0.0
-          modifySTRef ref $ \n -> n + 1.0
+          _ <- modifySTRef ref $ \n -> n + 1.0
           readSTRef ref))
 
 test3 = pureST (do
           ref <- newSTRef 0.0
-          modifySTRef ref $ \n -> n + 1.0
+          _ <- modifySTRef ref $ \n -> n + 1.0
           readSTRef ref)
 
 main = do

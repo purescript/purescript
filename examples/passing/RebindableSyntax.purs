@@ -10,7 +10,7 @@ example1 = do
   " for"
   " Semigroup"
   where
-  bind x f = x <> f unit
+  discard x f = x <> f unit
 
 applySecond :: forall f a b. (Apply f) => f a -> f b -> f b
 applySecond fa fb = const id <$> fa <*> fb
@@ -35,7 +35,7 @@ example2 = do
   Const " for"
   Const " Apply"
   where
-  bind x f = x *> f unit
+  discard x f = x *> f unit
 
 main = do
   log example1

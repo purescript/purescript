@@ -1,6 +1,6 @@
 module Main where
 
-import Prelude ((==), (/=), (<>), bind)
+import Prelude ((==), (/=), (<>), discard)
 import Test.Assert (assert, assert')
 import Control.Monad.Eff.Console (log)
 
