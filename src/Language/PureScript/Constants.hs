@@ -240,6 +240,9 @@ applicativeEffDictionary = "applicativeEff"
 bindEffDictionary :: forall a. (IsString a) => a
 bindEffDictionary = "bindEff"
 
+discardUnitDictionary :: forall a. (IsString a) => a
+discardUnitDictionary = "discardUnit"
+
 semiringNumber :: forall a. (IsString a) => a
 semiringNumber = "semiringNumber"
 

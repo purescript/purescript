@@ -33,12 +33,12 @@ magicDo = inlineST . everywhereOnJS undo . everywhereOnJSTopDown convert
   fnName = "__do"
   -- Desugar monomorphic calls to >>= and return for the Eff monad
   convert :: JS -> JS
-  -- Desugar pure & return
+  -- Desugar pure
   convert (JSApp _ (JSApp _ pure' [val]) []) | isPure pure' = val
-  -- Desugar >>
-  convert (JSApp _ (JSApp _ bind [m]) [JSFunction s1 Nothing [] (JSBlock s2 js)]) | isBind bind =
+  -- Desugar discard
+  convert (JSApp _ (JSApp _ bind [m]) [JSFunction s1 Nothing [] (JSBlock s2 js)]) | isDiscard bind =
     JSFunction s1 (Just fnName) [] $ JSBlock s2 (JSApp s2 m [] : map applyReturns js )
-  -- Desugar >>=
+  -- Desugar bind
   convert (JSApp _ (JSApp _ bind [m]) [JSFunction s1 Nothing [arg] (JSBlock s2 js)]) | isBind bind =
     JSFunction s1 (Just fnName) [] $ JSBlock s2 (JSVariableIntroduction s2 arg (Just (JSApp s2 m [])) : map applyReturns js)
   -- Desugar untilE
@@ -51,13 +51,21 @@ magicDo = inlineST . everywhereOnJS undo . everywhereOnJSTopDown convert
   -- Check if an expression represents a monomorphic call to >>= for the Eff monad
   isBind (JSApp _ fn [dict]) | isDict (C.eff, C.bindEffDictionary) dict && isBindPoly fn = True
   isBind _ = False
+  -- Check if an expression represents a call to @discard@
+  isDiscard (JSApp _ (JSApp _ fn [dict1]) [dict2])
+    | isDict (C.controlBind, C.discardUnitDictionary) dict1 &&
+      isDict (C.eff, C.bindEffDictionary) dict2 &&
+      isDiscardPoly fn = True
+  isDiscard _ = False
   -- Check if an expression represents a monomorphic call to pure or return for the Eff applicative
   isPure (JSApp _ fn [dict]) | isDict (C.eff, C.applicativeEffDictionary) dict && isPurePoly fn = True
   isPure _ = False
   -- Check if an expression represents the polymorphic >>= function
   isBindPoly = isDict (C.controlBind, C.bind)
-  -- Check if an expression represents the polymorphic pure or return function
+  -- Check if an expression represents the polymorphic pure function
   isPurePoly = isDict (C.controlApplicative, C.pure')
+  -- Check if an expression represents the polymorphic discard function
+  isDiscardPoly = isDict (C.controlBind, C.discard)
   -- Check if an expression represents a function in the Eff module
   isEffFunc name (JSIndexer _ (JSStringLiteral _ name') (JSVar _ eff)) = eff == C.eff && name == name'
   isEffFunc _ _ = False

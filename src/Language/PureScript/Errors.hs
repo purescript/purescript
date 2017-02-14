@@ -876,7 +876,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
       paras [ line $ "Expected a type wildcard (_) when deriving an instance for " <> markCode (runProperName tyName) <> "."
             ]
 
-    renderSimpleErrorMessage (CannotUseBindWithDo name@(Ident i)) =
+    renderSimpleErrorMessage (CannotUseBindWithDo name) =
       paras [ line $ "The name " <> markCode (showIdent name) <> " cannot be brought into scope in a do notation block, since do notation uses the same name."
             ]
 
