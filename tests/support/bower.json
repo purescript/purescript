@@ -2,7 +2,7 @@
   "name": "purescript-test-suite-support",
   "dependencies": {
     "purescript-assert": "2.0.0",
-    "purescript-arrays": "https://github.com/purescript/purescript-arrays.git#phil/discards",
+    "purescript-arrays": "3.2.1",
     "purescript-console": "2.0.0",
     "purescript-eff": "2.0.0",
     "purescript-functions": "2.0.0",
@@ -12,13 +12,9 @@
     "purescript-newtype": "1.1.0",
     "purescript-generics": "3.3.0",
     "purescript-generics-rep": "4.0.0",
-    "purescript-symbols": "^2.0.0",
-    "purescript-tailrec": "https://github.com/purescript/purescript-tailrec.git#phil/discards",
+    "purescript-symbols": "2.0.0",
+    "purescript-tailrec": "2.0.2",
     "purescript-typelevel-prelude": "1.0.0",
-    "purescript-unsafe-coerce": "^2.0.0"
-  },
-  "resolutions": {
-    "purescript-tailrec": "phil/discards",
-    "purescript-arrays": "phil/discards"
+    "purescript-unsafe-coerce": "2.0.0"
   }
 }
