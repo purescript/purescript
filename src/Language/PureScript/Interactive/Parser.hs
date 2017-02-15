@@ -34,10 +34,10 @@ psciCommand :: P.TokenParser Command
 psciCommand = choice (map try parsers)
   where
   parsers =
-    [ psciLet
-    , psciImport
+    [ psciImport
     , psciOtherDeclaration
     , psciExpression
+    , psciLet
     ]
 
 trim :: String -> String
