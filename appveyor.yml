@@ -29,7 +29,15 @@ build_script:
 # Override the default build script.
 - echo ""
 test_script:
-- stack -j1 --no-terminal test --pedantic
+- ps: |
+  if ($env:APPVEYOR_REPO_TAG_NAME)
+  {
+    stack -j1 --no-terminal test --pedantic --flag purescript:RELEASE
+  }
+  else
+  {
+    stack -j1 --no-terminal test --pedantic
+  }
 on_success:
 - ps: |
     function UploadFile

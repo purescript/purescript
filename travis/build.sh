@@ -28,6 +28,9 @@ if [ -z "$TRAVIS_TAG" ]
 then
   # On non-release builds, disable optimizations.
   STACK_EXTRA_FLAGS="--fast"
+else
+  # On release builds, set the 'release' cabal flag.
+  STACK_EXTRA_FLAGS="--flag purescript:RELEASE"
 fi
 
 if [ "$STACKAGE_NIGHTLY" = "true" ]
