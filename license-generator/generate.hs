@@ -6,7 +6,7 @@
 --
 -- It is recommended to run this as follows:
 --
--- stack list-dependencies | stack exec runhaskell license-generator/generate.hs > LICENSE
+-- stack list-dependencies --flag purescript:RELEASE | stack exec runhaskell license-generator/generate.hs > LICENSE
 --
 
 module Main (main) where
