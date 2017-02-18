@@ -27,16 +27,19 @@ install:
 
 build_script:
 # Override the default build script.
+# In PowerShell it seems to be necessary to redirect stderr to stdout because
+# any text sent to stderr seems to cause appveyor to think the build has
+# failed.
 - echo ""
 test_script:
 - ps: |
     if ($env:APPVEYOR_REPO_TAG_NAME)
     {
-      stack -j1 --no-terminal test --pedantic --flag purescript:RELEASE
+      stack -j1 --no-terminal test --pedantic --flag purescript:RELEASE 2>&1
     }
     else
     {
-      stack -j1 --no-terminal test --pedantic
+      stack -j1 --no-terminal test --pedantic 2>&1
     }
 on_success:
 - ps: |
