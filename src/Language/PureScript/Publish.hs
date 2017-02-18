@@ -37,6 +37,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
 import Data.Time.Clock (UTCTime)
+import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Data.Version
 import qualified Data.SPDX as SPDX
 
@@ -194,9 +195,9 @@ getVersionFromGitTag = do
 -- | Given a git tag, get the time it was created.
 getTagTime :: Text -> PrepareM UTCTime
 getTagTime tag = do
-  out <- readProcess' "git" ["show", T.unpack tag, "--no-patch", "--format=%aI"] ""
-  case mapMaybe D.parseTime (lines out) of
-    [t] -> pure t
+  out <- readProcess' "git" ["tag", "-l", T.unpack tag, "--format=%(taggerdate:unix)"] ""
+  case mapMaybe readMaybe (lines out) of
+    [t] -> pure . posixSecondsToUTCTime . fromInteger $ t
     _ -> internalError (CouldntParseGitTagDate tag)
 
 getBowerRepositoryInfo :: PackageMeta -> PrepareM (D.GithubUser, D.GithubRepo)
