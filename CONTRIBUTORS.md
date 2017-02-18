@@ -56,6 +56,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@LiamGoodacre](https://github.com/LiamGoodacre) | Liam Goodacre | [MIT license](http://opensource.org/licenses/MIT) |
 | [@lukerandall](https://github.com/lukerandall) | Luke Randall | [MIT license](http://opensource.org/licenses/MIT) |
 | [@matthewleon](https://github.com/matthewleon) | Matthew Leon | [MIT license](http://opensource.org/licenses/MIT) |
+| [@mcoffin](https://github.com/mcoffin) | Matt Coffin | [MIT license](http://opensource.org/licenses/MIT) |
 | [@mgmeier](https://github.com/mgmeier) | Michael Gilliland | [MIT license](http://opensource.org/licenses/MIT) |
 | [@michaelficarra](https://github.com/michaelficarra) | Michael Ficarra | [MIT license](http://opensource.org/licenses/MIT) |
 | [@MichaelXavier](https://github.com/MichaelXavier) | Michael Xavier | MIT license |
