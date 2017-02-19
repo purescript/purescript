@@ -1,9 +1,13 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 -- |
 -- Case binders
 --
 module Language.PureScript.AST.Binders where
 
 import Prelude.Compat
+
+import Data.Bifunctor.TH
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.AST.Literals
@@ -80,6 +84,8 @@ instance Eq (Binder a b) where
   PositionedBinder     _ a1 b1 c1 == PositionedBinder     _ a2 b2 c2 = a1 == a2 && b1 == b2 && c1 == c2
   TypedBinder          _ a1 b1    == TypedBinder          _ a2 b2    = a1 == a2 && b1 == b2
   _ == _ = False
+
+$(deriveBifunctor ''Binder)
 
 -- |
 -- Collect all names introduced in binders in an expression

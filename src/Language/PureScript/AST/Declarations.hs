@@ -12,8 +12,10 @@ import Prelude.Compat
 import Control.Monad.Identity
 
 import Data.Aeson.TH
-import qualified Data.Map as M
+import Data.Bifunctor
+import Data.Bifunctor.TH
 import Data.Text (Text)
+import qualified Data.Map as M
 
 import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Literals
@@ -732,6 +734,9 @@ extractExprAnn (AnonymousArgument ann) = ann
 extractExprAnn (Hole ann _) = ann
 extractExprAnn (PositionedValue ann _ _ _) = ann
 
+voidExpr :: Expr a b -> Expr () ()
+voidExpr = bimap (const ()) (const ())
+
 -- |
 -- An alternative in a case statement
 --
@@ -811,3 +816,11 @@ isTrueExpr (Var _ (Qualified (Just (ModuleName [ProperName "Data", ProperName "B
 isTrueExpr (TypedValue _ _ e _) = isTrueExpr e
 isTrueExpr (PositionedValue _ _ _ e) = isTrueExpr e
 isTrueExpr _ = False
+
+$(deriveBifunctor ''Declaration)
+$(deriveBifunctor ''TypeInstanceBody)
+$(deriveBifunctor ''Guard)
+$(deriveBifunctor ''GuardedExpr)
+$(deriveBifunctor ''Expr)
+$(deriveBifunctor ''CaseAlternative)
+$(deriveBifunctor ''DoNotationElement)

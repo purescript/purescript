@@ -226,22 +226,22 @@ unwrapErrorMessage (ErrorMessage _ se) = se
 replaceUnknowns :: Type a -> State TypeMap (Type a)
 replaceUnknowns = everywhereOnTypesM replaceTypes where
   replaceTypes :: Type a -> State TypeMap (Type a)
-  replaceTypes (TUnknown u ann) = do
+  replaceTypes (TUnknown ann u) = do
     m <- get
     case M.lookup u (umUnknownMap m) of
       Nothing -> do
         let u' = umNextIndex m
         put $ m { umUnknownMap = M.insert u u' (umUnknownMap m), umNextIndex = u' + 1 }
-        return (TUnknown u' ann)
-      Just u' -> return (TUnknown u' ann)
-  replaceTypes (Skolem name s sko ss ann) = do
+        return (TUnknown ann u')
+      Just u' -> return (TUnknown ann u')
+  replaceTypes (Skolem ann name s sko ss) = do
     m <- get
     case M.lookup s (umSkolemMap m) of
       Nothing -> do
         let s' = umNextIndex m
         put $ m { umSkolemMap = M.insert s (T.unpack name, s', ss) (umSkolemMap m), umNextIndex = s' + 1 }
-        return (Skolem name s' sko ss ann)
-      Just (_, s', _) -> return (Skolem name s' sko ss ann)
+        return (Skolem ann name s' sko ss)
+      Just (_, s', _) -> return (Skolem ann name s' sko ss)
   replaceTypes other = return other
 
 onTypesInErrorMessage :: (Type () -> Type ()) -> ErrorMessage -> ErrorMessage
@@ -957,7 +957,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
     renderHint (ErrorCheckingAccessor expr prop) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ line "while checking type of property accessor"
-                                 , markCodeBox $ prettyPrintValue valueDepth (Accessor prop expr ())
+                                 , markCodeBox $ prettyPrintValue valueDepth (Accessor () prop expr)
                                  ]
             ]
     renderHint (ErrorInApplication f t a) detail =
@@ -1275,10 +1275,10 @@ toTypelevelString :: Type a -> Maybe Box.Box
 toTypelevelString t = (Box.text . decodeStringWithReplacement) <$> toTypelevelString' t
   where
   toTypelevelString' :: Type a -> Maybe PSString
-  toTypelevelString' (TypeLevelString s _) = Just s
-  toTypelevelString' (TypeApp (TypeConstructor f _) x _)
+  toTypelevelString' (TypeLevelString _ s) = Just s
+  toTypelevelString' (TypeApp _ (TypeConstructor _ f) x)
     | f == primName "TypeString" = Just $ fromString $ prettyPrintType x
-  toTypelevelString' (TypeApp (TypeApp (TypeConstructor f _) x _) ret _)
+  toTypelevelString' (TypeApp _ (TypeApp _ (TypeConstructor _ f) x) ret)
     | f == primName "TypeConcat" = toTypelevelString' x <> toTypelevelString' ret
   toTypelevelString' _ = Nothing
 

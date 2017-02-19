@@ -47,14 +47,14 @@ sortModules ms = do
 
 -- | Calculate a list of used modules based on explicit imports and qualified names.
 usedModules :: Declaration a b -> [ModuleName]
-usedModules d = f d where
+usedModules = f where
   f :: Declaration a b -> [ModuleName]
   (f, _, _, _, _) = everythingOnValues (++) forDecls (const []) (const []) (const []) (const [])
 
   forDecls :: Declaration a b -> [ModuleName]
   -- Regardless of whether an imported module is qualified we still need to
   -- take into account its import to build an accurate list of dependencies.
-  forDecls (ImportDeclaration mn _ _ _) = [mn]
+  forDecls (ImportDeclaration _ mn _ _) = [mn]
   forDecls _ = []
 
 -- | Convert a strongly connected component of the module graph to a module

@@ -32,10 +32,10 @@ findImports
   -> M.Map ModuleName [ImportDef]
 findImports = foldl (go Nothing) M.empty
   where
-  go pos result (ImportDeclaration mn typ qual _) =
+  go pos result (ImportDeclaration _ mn typ qual) =
     let imp = (pos, typ, qual)
     in M.insert mn (maybe [imp] (imp :) (mn `M.lookup` result)) result
-  go _ result (PositionedDeclaration pos _ d _) = go (Just pos) result d
+  go _ result (PositionedDeclaration _ pos _ d) = go (Just pos) result d
   go _ result _ = result
 
 -- |
@@ -130,7 +130,7 @@ resolveImport importModule exps imps impQual = resolveByType
       checkImportExists TyClassName (exportedTypeClasses exps) name
     check (ModuleRef name) | isHiding =
       throwError . errorMessage $ ImportHidingModule name
-    check (KindRef name) = do
+    check (KindRef name) =
       checkImportExists KiName (exportedKinds exps) name
     check r = internalError $ "Invalid argument to checkRefs: " ++ show r
 

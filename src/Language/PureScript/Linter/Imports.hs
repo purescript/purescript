@@ -113,15 +113,15 @@ lintImports (Module ss _ mn mdecls (Just mexports)) env usedImps = do
   defQual :: ImportDef -> Maybe ModuleName
   defQual (_, _, q) = q
 
-  selfCartesianSubset :: [a] -> [(a, a)]
+  selfCartesianSubset :: [x] -> [(x, x)]
   selfCartesianSubset (x : xs) = [(x, y) | y <- xs] ++ selfCartesianSubset xs
   selfCartesianSubset [] = []
 
-  countOpenImports :: Declaration -> Int
-  countOpenImports (PositionedDeclaration _ _ d) = countOpenImports d
-  countOpenImports (ImportDeclaration mn' Implicit Nothing)
+  countOpenImports :: Declaration a b -> Int
+  countOpenImports (PositionedDeclaration _ _ _ d) = countOpenImports d
+  countOpenImports (ImportDeclaration _ mn' Implicit Nothing)
     | not (isPrim mn' || mn == mn') = 1
-  countOpenImports (ImportDeclaration mn' (Hiding _) Nothing)
+  countOpenImports (ImportDeclaration _ mn' (Hiding _) Nothing)
     | not (isPrim mn' || mn == mn') = 1
   countOpenImports _ = 0
 
@@ -171,8 +171,8 @@ lintImports (Module ss _ mn mdecls (Just mexports)) env usedImps = do
 
   extractByQual
     :: ModuleName
-    -> M.Map (Qualified a) [ImportRecord a]
-    -> (a -> Name)
+    -> M.Map (Qualified x) [ImportRecord x]
+    -> (x -> Name)
     -> [(ModuleName, Qualified Name)]
   extractByQual k m toName = mapMaybe go (M.toList m)
     where

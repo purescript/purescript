@@ -29,33 +29,33 @@ desugarTypeDeclarationsModule (Module ss coms name ds exps) =
   where
 
   desugarTypeDeclarations :: [Declaration a b] -> m [Declaration a b]
-  desugarTypeDeclarations (PositionedDeclaration pos com d : rest) = do
+  desugarTypeDeclarations (PositionedDeclaration ann pos com d : rest) = do
     (d' : rest') <- rethrowWithPosition pos $ desugarTypeDeclarations (d : rest)
-    return (PositionedDeclaration pos com d' : rest')
-  desugarTypeDeclarations (TypeDeclaration name' ty : d : rest) = do
+    return (PositionedDeclaration ann pos com d' : rest')
+  desugarTypeDeclarations (TypeDeclaration ann name' ty : d : rest) = do
     (_, nameKind, val) <- fromValueDeclaration d
-    desugarTypeDeclarations (ValueDeclaration name' nameKind [] [MkUnguarded (TypedValue True val ty)] : rest)
+    desugarTypeDeclarations (ValueDeclaration ann name' nameKind [] [MkUnguarded (TypedValue ann True val ty)] : rest)
     where
     fromValueDeclaration :: Declaration a b -> m (Ident, NameKind, Expr a b)
-    fromValueDeclaration (ValueDeclaration name'' nameKind [] [MkUnguarded val])
+    fromValueDeclaration (ValueDeclaration _ name'' nameKind [] [MkUnguarded val])
       | name' == name'' = return (name'', nameKind, val)
-    fromValueDeclaration (PositionedDeclaration pos com d') = do
+    fromValueDeclaration (PositionedDeclaration ann' pos com d') = do
       (ident, nameKind, val) <- rethrowWithPosition pos $ fromValueDeclaration d'
-      return (ident, nameKind, PositionedValue pos com val)
+      return (ident, nameKind, PositionedValue ann' pos com val)
     fromValueDeclaration _ =
       throwError . errorMessage $ OrphanTypeDeclaration name'
-  desugarTypeDeclarations [TypeDeclaration name' _] =
+  desugarTypeDeclarations [TypeDeclaration _ name' _] =
     throwError . errorMessage $ OrphanTypeDeclaration name'
-  desugarTypeDeclarations (ValueDeclaration name' nameKind bs val : rest) = do
+  desugarTypeDeclarations (ValueDeclaration ann name' nameKind bs val : rest) = do
     let (_, f, _) = everywhereOnValuesTopDownM return go return
         f' = mapM (\(GuardedExpr g e) -> GuardedExpr g <$> f e)
-    (:) <$> (ValueDeclaration name' nameKind bs <$> f' val)
+    (:) <$> (ValueDeclaration ann name' nameKind bs <$> f' val)
         <*> desugarTypeDeclarations rest
     where
-    go (Let ds' val') = Let <$> desugarTypeDeclarations ds' <*> pure val'
+    go (Let ann' ds' val') = Let ann' <$> desugarTypeDeclarations ds' <*> pure val'
     go other = return other
-  desugarTypeDeclarations (TypeInstanceDeclaration nm deps cls args (ExplicitInstance ds') : rest) =
-    (:) <$> (TypeInstanceDeclaration nm deps cls args . ExplicitInstance <$> desugarTypeDeclarations ds')
+  desugarTypeDeclarations (TypeInstanceDeclaration ann nm deps cls args (ExplicitInstance ds') : rest) =
+    (:) <$> (TypeInstanceDeclaration ann nm deps cls args . ExplicitInstance <$> desugarTypeDeclarations ds')
         <*> desugarTypeDeclarations rest
   desugarTypeDeclarations (d:rest) = (:) d <$> desugarTypeDeclarations rest
   desugarTypeDeclarations [] = return []

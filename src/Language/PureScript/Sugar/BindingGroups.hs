@@ -58,7 +58,7 @@ createBindingGroups mkAnn moduleName = mapM f <=< handleDecls
   (f, _, _) = everywhereOnValuesTopDownM return handleExprs return
 
   handleExprs :: Expr a b -> m (Expr a b)
-  handleExprs (Let ds val ann) = flip Let val <$> handleDecls ds <*> pure ann
+  handleExprs (Let ann ds val) = Let ann <$> handleDecls ds <*> pure val
   handleExprs other = return other
 
   -- |
@@ -92,16 +92,16 @@ collapseBindingGroups =
   let (f, _, _) = everywhereOnValues id collapseBindingGroupsForValue id
   in map f . concatMap go
   where
-  go (DataBindingGroupDeclaration ds _) = ds
-  go (BindingGroupDeclaration ds ann) =
+  go (DataBindingGroupDeclaration _ ds) = ds
+  go (BindingGroupDeclaration ann ds) =
     map (\(ident, nameKind, val) ->
-      ValueDeclaration ident nameKind [] [MkUnguarded val] ann) ds
-  go (PositionedDeclaration pos com d ann) =
-    map (flip (PositionedDeclaration pos com) ann) $ go d
+      ValueDeclaration ann ident nameKind [] [MkUnguarded val]) ds
+  go (PositionedDeclaration ann pos com d) =
+    map (PositionedDeclaration ann pos com) $ go d
   go other = [other]
 
 collapseBindingGroupsForValue :: Expr a b -> Expr a b
-collapseBindingGroupsForValue (Let ds val ann) = Let (collapseBindingGroups ds) val ann
+collapseBindingGroupsForValue (Let ann ds val) = Let ann (collapseBindingGroups ds) val
 collapseBindingGroupsForValue other = other
 
 usedIdents :: ModuleName -> Declaration a b -> [Ident]
@@ -109,17 +109,17 @@ usedIdents moduleName = nub . usedIdents' S.empty . getValue
   where
   def _ _ = []
 
-  getValue (ValueDeclaration _ _ [] [MkUnguarded val] _) = val
+  getValue (ValueDeclaration _ _ _ [] [MkUnguarded val]) = val
   getValue ValueDeclaration{} = internalError "Binders should have been desugared"
-  getValue (PositionedDeclaration _ _ d _) = getValue d
+  getValue (PositionedDeclaration _ _ _ d) = getValue d
   getValue _ = internalError "Expected ValueDeclaration"
 
   (_, usedIdents', _, _, _) = everythingWithScope def usedNamesE def def def
 
   usedNamesE :: S.Set Ident -> Expr a b -> [Ident]
-  usedNamesE scope (Var (Qualified Nothing name) _)
+  usedNamesE scope (Var _ (Qualified Nothing name))
     | name `S.notMember` scope = [name]
-  usedNamesE scope (Var (Qualified (Just moduleName') name) _)
+  usedNamesE scope (Var _ (Qualified (Just moduleName') name))
     | moduleName == moduleName' && name `S.notMember` scope = [name]
   usedNamesE _ _ = []
 
@@ -131,8 +131,8 @@ usedImmediateIdents moduleName =
   def s _ = (s, [])
 
   usedNamesE :: Bool -> Expr a b -> (Bool, [Ident])
-  usedNamesE True (Var (Qualified Nothing name) _) = (True, [name])
-  usedNamesE True (Var (Qualified (Just moduleName') name) _)
+  usedNamesE True (Var _ (Qualified Nothing name)) = (True, [name])
+  usedNamesE True (Var _ (Qualified (Just moduleName') name))
     | moduleName == moduleName' = (True, [name])
   usedNamesE True Abs{} = (False, [])
   usedNamesE scope _ = (scope, [])
@@ -143,24 +143,24 @@ usedTypeNames moduleName =
   in nub . f
   where
   usedNames :: Type a -> [ProperName 'TypeName]
-  usedNames (ConstrainedType constraints _ _) =
+  usedNames (ConstrainedType _ constraints _) =
     flip mapMaybe constraints $ \case
       (Constraint (Qualified (Just moduleName') name) _ _)
         | moduleName == moduleName' -> Just (coerceProperName name)
       _ -> Nothing
-  usedNames (TypeConstructor (Qualified (Just moduleName') name) _)
+  usedNames (TypeConstructor _ (Qualified (Just moduleName') name))
     | moduleName == moduleName' = [name]
   usedNames _ = []
 
 declIdent :: Declaration a b -> Ident
-declIdent (ValueDeclaration ident _ _ _ _) = ident
-declIdent (PositionedDeclaration _ _ d _) = declIdent d
+declIdent (ValueDeclaration _ ident _ _ _) = ident
+declIdent (PositionedDeclaration _ _ _ d) = declIdent d
 declIdent _ = internalError "Expected ValueDeclaration"
 
 declTypeName :: Declaration a b -> ProperName 'TypeName
-declTypeName (DataDeclaration _ pn _ _ _) = pn
-declTypeName (TypeSynonymDeclaration pn _ _ _) = pn
-declTypeName (PositionedDeclaration _ _ d _) = declTypeName d
+declTypeName (DataDeclaration _ _ pn _ _) = pn
+declTypeName (TypeSynonymDeclaration _ pn _ _) = pn
+declTypeName (PositionedDeclaration _ _ _ d) = declTypeName d
 declTypeName _ = internalError "Expected DataDeclaration"
 
 -- |
@@ -185,7 +185,7 @@ toBindingGroup mkAnn moduleName (CyclicSCC ds') =
   -- If we discover declarations that still contain mutually-recursive
   -- immediate references, we're guaranteed to get an undefined reference at
   -- runtime, so treat this as an error. See also github issue #365.
-  BindingGroupDeclaration <$> mapM toBinding (stronglyConnComp valueVerts) <*> pure (mkAnn ds')
+  BindingGroupDeclaration (mkAnn ds') <$> mapM toBinding (stronglyConnComp valueVerts)
   where
   idents :: [Ident]
   idents = map (\(_, i, _) -> i) valueVerts
@@ -198,8 +198,8 @@ toBindingGroup mkAnn moduleName (CyclicSCC ds') =
   toBinding (CyclicSCC ds) = throwError $ foldMap cycleError ds
 
   cycleError :: Declaration a b -> MultipleErrors
-  cycleError (PositionedDeclaration p _ d _) = onErrorMessages (withPosition p) $ cycleError d
-  cycleError (ValueDeclaration n _ _ [MkUnguarded _] _) = errorMessage $ CycleInDeclaration n
+  cycleError (PositionedDeclaration _ p _ d) = onErrorMessages (withPosition p) $ cycleError d
+  cycleError (ValueDeclaration _ n _ _ [MkUnguarded _]) = errorMessage $ CycleInDeclaration n
   cycleError _ = internalError "cycleError: Expected ValueDeclaration"
 
 toDataBindingGroup
@@ -213,15 +213,15 @@ toDataBindingGroup _ (CyclicSCC [d]) = case isTypeSynonym d of
   _ -> return d
 toDataBindingGroup mkAnn (CyclicSCC ds')
   | all (isJust . isTypeSynonym) ds' = throwError . errorMessage $ CycleInTypeSynonym Nothing
-  | otherwise = return $ DataBindingGroupDeclaration ds' (mkAnn ds')
+  | otherwise = return $ DataBindingGroupDeclaration (mkAnn ds') ds'
 
 isTypeSynonym :: Declaration a b -> Maybe (ProperName 'TypeName)
-isTypeSynonym (TypeSynonymDeclaration pn _ _ _) = Just pn
-isTypeSynonym (PositionedDeclaration _ _ d _) = isTypeSynonym d
+isTypeSynonym (TypeSynonymDeclaration _ pn _ _) = Just pn
+isTypeSynonym (PositionedDeclaration _ _ _ d) = isTypeSynonym d
 isTypeSynonym _ = Nothing
 
 fromValueDecl :: Declaration a b -> (Ident, NameKind, Expr a b)
-fromValueDecl (ValueDeclaration ident nameKind [] [MkUnguarded val] _) = (ident, nameKind, val)
+fromValueDecl (ValueDeclaration _ ident nameKind [] [MkUnguarded val]) = (ident, nameKind, val)
 fromValueDecl ValueDeclaration{} = internalError "Binders should have been desugared"
-fromValueDecl (PositionedDeclaration _ _ d _) = fromValueDecl d
+fromValueDecl (PositionedDeclaration _ _ _ d) = fromValueDecl d
 fromValueDecl _ = internalError "Expected ValueDeclaration"
