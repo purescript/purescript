@@ -9,7 +9,6 @@ import           Prelude.Compat hiding (lex)
 
 import           Data.Bifunctor (first)
 import           Data.Char (isSpace)
-import           Data.List (isPrefixOf, isInfixOf)
 import           Data.List (intercalate)
 import qualified Data.Text as T
 import           Text.Parsec hiding ((<|>))
@@ -28,16 +27,9 @@ parseCommand cmdString =
     _ -> parseRest psciCommand cmdString
 
 parseRest :: P.TokenParser a -> String -> Either String a
-parseRest p s = first (handleError s) $ do
+parseRest p s = first show $ do
   ts <- P.lex "" (T.pack s)
   P.runTokenParser "" (p <* eof) ts
-  where
-  handleError :: String -> ParseError -> String
-  handleError str e
-    -- If 'let' seems like being used for a declaration, suggest usage without 'let'
-    | "let " `isPrefixOf` trimStart str && "\"in\"" `isInfixOf` show e =
-      show e ++ "\nFor declarations, try without 'let'"
-    | otherwise = show e
 
 psciCommand :: P.TokenParser Command
 psciCommand = choice (map try parsers)
@@ -46,6 +38,7 @@ psciCommand = choice (map try parsers)
     [ psciImport
     , psciDeclaration
     , psciExpression
+    , psciDeprecatedLet
     ]
 
 trim :: String -> String
@@ -121,3 +114,12 @@ parseReplQuery' str =
     Nothing -> Left ("Don't know how to show " ++ str ++ ". Try one of: " ++
                       intercalate ", " replQueryStrings ++ ".")
     Just query -> Right query
+
+-- | To show error message when 'let' is used for declaration in PSCI,
+-- which is deprecated.
+psciDeprecatedLet :: P.TokenParser Command
+psciDeprecatedLet = do
+  P.reserved "let"
+  P.indented
+  _ <- mark (many1 (same *> P.parseLocalDeclaration))
+  fail "for declaration in PSCi, try without \"let\""
