@@ -387,7 +387,6 @@ executable purs
                    Command.Docs.Tags
                    Command.Hierarchy
                    Command.Ide
-                   Command.IdeClient
                    Command.Publish
                    Command.REPL
     ghc-options: -Wall -O2 -fno-warn-unused-do-bind -threaded -rtsopts "-with-rtsopts=-N"
