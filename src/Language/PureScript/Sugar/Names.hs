@@ -351,7 +351,7 @@ renameInModule imports (Module ss coms mn decls exps) =
       (Just options, _) -> do
         (mnNew, mnOrig) <- checkImportConflicts mn toName options
         modify $ \usedImports ->
-          M.insertWith ((:) . head) mnNew [fmap toName qname] usedImports
+          M.insertWith (++) mnNew [fmap toName qname] usedImports
         return $ Qualified (Just mnOrig) name
 
       -- If the name wasn't found in our imports but was qualified then we need
