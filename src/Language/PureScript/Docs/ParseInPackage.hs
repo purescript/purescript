@@ -9,7 +9,6 @@ import qualified Data.Map as M
 import Language.PureScript.Docs.Types
 import qualified Language.PureScript as P
 import System.IO.UTF8 (readUTF8FileT)
-import Web.Bower.PackageMeta (PackageName)
 
 -- |
 -- Given:
