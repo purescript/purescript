@@ -29,7 +29,7 @@ client Options{..} = do
   hSetEncoding stdin utf8
   hSetEncoding stdout utf8
   let handler (SomeException e) = do
-        putStrLn ("Couldn't connect to psc-ide-server on port " ++ show optionsPort ++ ":")
+        putStrLn ("Couldn't connect to purs ide server on port " ++ show optionsPort ++ ":")
         print e
         exitFailure
   h <- connectTo "127.0.0.1" optionsPort `catch` handler
