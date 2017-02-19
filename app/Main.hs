@@ -12,6 +12,7 @@ import qualified Command.Compile as Compile
 import qualified Command.Docs as Docs
 import qualified Command.Hierarchy as Hierarchy
 import qualified Command.Ide as Ide
+import qualified Command.IdeClient as IdeClient
 import qualified Command.Publish as Publish
 import qualified Command.REPL as REPL
 import           Data.Foldable (fold)
@@ -55,6 +56,9 @@ main = do
         , Opts.command "ide"
             (Opts.info Ide.command
               (Opts.progDesc "Start an IDE server process"))
+        , Opts.command "ide-client"
+            (Opts.info IdeClient.command
+              (Opts.progDesc "Query an IDE server process"))
         , Opts.command "publish"
             (Opts.info Publish.command
               (Opts.progDesc "Generates documentation packages for upload to Pursuit"))
