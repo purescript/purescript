@@ -4,6 +4,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE CPP #-}
 
 module Main where
 
@@ -21,6 +23,10 @@ import qualified Options.Applicative as Opts
 import qualified Paths_purescript as Paths
 import qualified System.IO as IO
 
+#ifndef RELEASE
+import qualified Development.GitRev as GitRev
+#endif
+
 main :: IO ()
 main = do
     IO.hSetEncoding IO.stdout IO.utf8
@@ -34,7 +40,7 @@ main = do
     footerInfo  = Opts.footer $ "psc " ++ showVersion Paths.version
 
     versionInfo :: Opts.Parser (a -> a)
-    versionInfo = Opts.abortOption (Opts.InfoMsg (showVersion Paths.version)) $
+    versionInfo = Opts.abortOption (Opts.InfoMsg versionString) $
       Opts.long "version" <> Opts.help "Show the version number" <> Opts.hidden
 
     commands :: Opts.Parser (IO ())
@@ -62,3 +68,15 @@ main = do
             (Opts.info REPL.command
               (Opts.progDesc "Enter the interactive mode (PSCi)"))
         ]
+
+versionString :: String
+versionString = showVersion Paths.version ++ extra
+  where
+#ifdef RELEASE
+  extra = ""
+#else
+  extra = " [development build; commit: " ++ $(GitRev.gitHash) ++ dirty ++ "]"
+  dirty
+    | $(GitRev.gitDirty) = " DIRTY"
+    | otherwise = ""
+#endif
