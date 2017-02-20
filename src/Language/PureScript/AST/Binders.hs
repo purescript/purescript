@@ -61,7 +61,7 @@ data Binder
   -- A binder with a type annotation
   --
   | TypedBinder Type Binder
-  deriving (Show, Eq)
+  deriving (Show, Eq, Ord)
 
 -- |
 -- Collect all names introduced in binders in an expression

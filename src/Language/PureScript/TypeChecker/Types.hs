@@ -25,6 +25,7 @@ module Language.PureScript.TypeChecker.Types
 -}
 
 import Prelude.Compat
+import Protolude (ordNub)
 
 import Control.Arrow (first, second, (***))
 import Control.Monad
@@ -36,7 +37,7 @@ import Control.Monad.Writer.Class (MonadWriter(..))
 import Data.Bifunctor (bimap)
 import Data.Either (partitionEithers)
 import Data.Functor (($>))
-import Data.List (transpose, nub, (\\), partition, delete)
+import Data.List (transpose, (\\), partition, delete)
 import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
 import qualified Data.Map as M
@@ -89,7 +90,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
       -- Generalize and constrain the type
       currentSubst <- gets checkSubstitution
       let ty' = substituteType currentSubst ty
-          unsolvedTypeVars = nub $ unknownsInType ty'
+          unsolvedTypeVars = ordNub $ unknownsInType ty'
           generalized = generalize unsolved ty'
 
       when shouldGeneralize $ do
@@ -110,7 +111,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           let findClass = fromMaybe (internalError "entails: type class not found in environment") . M.lookup (constraintClass con)
           TypeClassData{ typeClassDependencies } <- gets (findClass . typeClasses . checkEnv)
           let solved = foldMap (S.fromList . fdDetermined) typeClassDependencies
-          let constraintTypeVars = nub . foldMap (unknownsInType . fst) . filter ((`notElem` solved) . snd) $ zip (constraintArgs con) [0..]
+          let constraintTypeVars = ordNub . foldMap (unknownsInType . fst) . filter ((`notElem` solved) . snd) $ zip (constraintArgs con) [0..]
           when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $ do
             throwError . onErrorMessages (replaceTypes currentSubst) . errorMessage $ AmbiguousTypeVariables generalized con
 
@@ -554,7 +555,7 @@ checkBinders
 checkBinders _ _ [] = return []
 checkBinders nvals ret (CaseAlternative binders result : bs) = do
   guardWith (errorMessage $ OverlappingArgNames Nothing) $
-    let ns = concatMap binderNames binders in length (nub ns) == length ns
+    let ns = concatMap binderNames binders in length (ordNub ns) == length ns
   m1 <- M.unions <$> zipWithM inferBinder nvals binders
   r <- bindLocalVariables [ (name, ty, Defined) | (name, ty) <- M.toList m1 ] $
     CaseAlternative binders <$>
@@ -829,6 +830,6 @@ checkFunctionApplication' fn u arg = do
 ensureNoDuplicateProperties :: (MonadError MultipleErrors m) => [(PSString, Expr)] -> m ()
 ensureNoDuplicateProperties ps =
   let ls = map fst ps in
-  case ls \\ nub ls of
+  case ls \\ ordNub ls of
     l : _ -> throwError . errorMessage $ DuplicateLabel (Label l) Nothing
     _ -> return ()

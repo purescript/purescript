@@ -6,13 +6,14 @@ module Language.PureScript.Interactive.Completion
   ) where
 
 import Prelude.Compat
+import Protolude (ordNub)
 
 import           Control.Arrow (second)
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.State.Class (MonadState(..))
 import           Control.Monad.Trans.Reader (asks, runReaderT, ReaderT)
 import           Data.Function (on)
-import           Data.List (nub, nubBy, isPrefixOf, sortBy, stripPrefix)
+import           Data.List (nubBy, isPrefixOf, sortBy, stripPrefix)
 import           Data.Maybe (mapMaybe)
 import           Data.Text (Text)
 import qualified Data.Text as T
@@ -169,7 +170,7 @@ getAllQualifications :: (a -> Text) -> P.Module -> (a, P.Declaration) -> Complet
 getAllQualifications sho m (declName, decl) = do
   imports <- getAllImportsOf m
   let fullyQualified = qualifyWith (Just (P.getModuleName m))
-  let otherQuals = nub (concatMap qualificationsUsing imports)
+  let otherQuals = ordNub (concatMap qualificationsUsing imports)
   return $ fullyQualified : otherQuals
   where
   qualifyWith mMod = T.unpack (P.showQualified sho (P.Qualified mMod declName))
@@ -220,4 +221,4 @@ dctorNames = nubOnFst . concatMap go . P.exportedDeclarations
   go _ = []
 
 moduleNames :: [P.Module] -> [String]
-moduleNames = nub . map (T.unpack . P.runModuleName . P.getModuleName)
+moduleNames = ordNub . map (T.unpack . P.runModuleName . P.getModuleName)

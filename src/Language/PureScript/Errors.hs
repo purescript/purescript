@@ -7,6 +7,7 @@ module Language.PureScript.Errors
   ) where
 
 import           Prelude.Compat
+import           Protolude (ordNub)
 
 import           Control.Arrow ((&&&))
 import           Control.Monad
@@ -17,7 +18,7 @@ import           Data.Char (isSpace)
 import           Data.Either (lefts, rights)
 import           Data.Foldable (fold)
 import           Data.Functor.Identity (Identity(..))
-import           Data.List (transpose, nub, nubBy, sortBy, partition)
+import           Data.List (transpose, nubBy, sortBy, partition)
 import           Data.Maybe (maybeToList, fromMaybe, mapMaybe)
 import           Data.Ord (comparing)
 import           Data.String (fromString)
@@ -1259,7 +1260,7 @@ prettyPrintParseErrorMessages msgOr msgUnknown msgExpecting msgUnExpected msgEnd
   separate   _ [m]    = m
   separate sep (m:ms) = m ++ sep ++ separate sep ms
 
-  clean             = nub . filter (not . null)
+  clean             = ordNub . filter (not . null)
 
 -- | Indent to the right, and pad on top and bottom.
 indent :: Box.Box -> Box.Box

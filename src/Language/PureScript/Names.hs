@@ -25,7 +25,7 @@ data Name
   | TyClassName (ProperName 'ClassName)
   | ModName ModuleName
   | KiName (ProperName 'KindName)
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show)
 
 getIdentName :: Name -> Maybe Ident
 getIdentName (IdentName name) = Just name

@@ -7,11 +7,11 @@
 module Language.PureScript.Types where
 
 import Prelude.Compat
+import Protolude (ordNub)
 
 import Control.Monad ((<=<))
 import qualified Data.Aeson as A
 import qualified Data.Aeson.TH as A
-import Data.List (nub)
 import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
 import Data.Text (Text)
@@ -179,7 +179,7 @@ replaceAllTypeVars = go []
 -- Collect all type variables appearing in a type
 --
 usedTypeVariables :: Type -> [Text]
-usedTypeVariables = nub . everythingOnTypes (++) go
+usedTypeVariables = ordNub . everythingOnTypes (++) go
   where
   go (TypeVar v) = [v]
   go _ = []
@@ -188,7 +188,7 @@ usedTypeVariables = nub . everythingOnTypes (++) go
 -- Collect all free type variables appearing in a type
 --
 freeTypeVariables :: Type -> [Text]
-freeTypeVariables = nub . go []
+freeTypeVariables = ordNub . go []
   where
   go :: [Text] -> Type -> [Text]
   go bound (TypeVar v) | v `notElem` bound = [v]

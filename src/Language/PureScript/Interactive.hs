@@ -11,8 +11,9 @@ module Language.PureScript.Interactive
 
 import           Prelude ()
 import           Prelude.Compat
+import           Protolude (ordNub)
 
-import           Data.List (nub, sort, find, foldl')
+import           Data.List (sort, find, foldl')
 import           Data.Maybe (mapMaybe)
 import qualified Data.Map as M
 import           Data.Monoid ((<>))
@@ -164,7 +165,7 @@ handleShowLoadedModules = do
     loadedModules <- gets psciLoadedExterns
     liftIO $ putStrLn (readModules loadedModules)
   where
-    readModules = unlines . sort . nub . map (T.unpack . P.runModuleName . P.getModuleName . fst)
+    readModules = unlines . sort . ordNub . map (T.unpack . P.runModuleName . P.getModuleName . fst)
 
 -- | Show the imported modules in psci.
 handleShowImportedModules

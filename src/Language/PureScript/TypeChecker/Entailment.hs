@@ -12,6 +12,7 @@ module Language.PureScript.TypeChecker.Entailment
   ) where
 
 import Prelude.Compat
+import Protolude (ordNub)
 
 import Control.Arrow (second)
 import Control.Monad.Error.Class (MonadError(..))
@@ -21,7 +22,7 @@ import Control.Monad.Writer
 
 import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
-import Data.List (minimumBy, nub)
+import Data.List (minimumBy)
 import Data.Maybe (fromMaybe, maybeToList, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -160,7 +161,7 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ C.AppendSymbol [arg0@(TypeLevelString lhs), arg1@(TypeLevelString rhs), _] =
       let args = [arg0, arg1, TypeLevelString (lhs <> rhs)]
       in [TypeClassDictionaryInScope AppendSymbolInstance [] C.AppendSymbol args Nothing]
-    forClassName ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (nub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
+    forClassName ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (ordNub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
     forClassName _ _ _ = internalError "forClassName: expected qualified class name"
 
     ctorModules :: Type -> Maybe ModuleName

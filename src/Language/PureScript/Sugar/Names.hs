@@ -9,6 +9,7 @@ module Language.PureScript.Sugar.Names
   ) where
 
 import Prelude.Compat
+import Protolude (ordNub)
 
 import Control.Arrow (first)
 import Control.Monad
@@ -16,7 +17,6 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Lazy
 import Control.Monad.Writer (MonadWriter(..), censor)
 
-import Data.List (nub)
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -206,7 +206,7 @@ renameInModule imports (Module ss coms mn decls exps) =
     return ((pos, arg : bound), Abs (Left arg) val')
   updateValue (pos, bound) (Let ds val') = do
     let args = mapMaybe letBoundVariable ds
-    unless (length (nub args) == length args) $
+    unless (length (ordNub args) == length args) $
       maybe id rethrowWithPosition pos $
         throwError . errorMessage $ OverlappingNamesInLet
     return ((pos, args ++ bound), Let ds val')

@@ -3,6 +3,7 @@
 module Language.PureScript.Environment where
 
 import Prelude.Compat
+import Protolude (ordNub)
 
 import Data.Aeson.TH
 import qualified Data.Aeson as A
@@ -11,7 +12,6 @@ import qualified Data.Set as S
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.List (nub)
 import Data.Tree (Tree, rootLabel)
 import qualified Data.Graph as G
 import Data.Foldable (toList)
@@ -119,7 +119,7 @@ makeTypeClassData args m s deps = TypeClassData args m s deps determinedArgs cov
       (src, fdDetermined fd) : map (, []) (fdDetermined fd)
 
     -- build a graph of which arguments determine other arguments
-    (depGraph, fromVertex, fromKey) = G.graphFromEdges ((\(n, v) -> (n, n, nub v)) <$> M.toList contributingDeps)
+    (depGraph, fromVertex, fromKey) = G.graphFromEdges ((\(n, v) -> (n, n, ordNub v)) <$> M.toList contributingDeps)
 
     -- do there exist any arguments that contribute to `arg` that `arg` doesn't contribute to
     isFunDepDetermined :: Int -> Bool

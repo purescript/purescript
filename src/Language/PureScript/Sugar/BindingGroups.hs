@@ -10,12 +10,13 @@ module Language.PureScript.Sugar.BindingGroups
   ) where
 
 import Prelude.Compat
+import Protolude (ordNub)
 
 import Control.Monad ((<=<))
 import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Graph
-import Data.List (nub, intersect)
+import Data.List (intersect)
 import Data.Maybe (isJust, mapMaybe)
 import qualified Data.Set as S
 
@@ -103,7 +104,7 @@ collapseBindingGroupsForValue (Let ds val) = Let (collapseBindingGroups ds) val
 collapseBindingGroupsForValue other = other
 
 usedIdents :: ModuleName -> Declaration -> [Ident]
-usedIdents moduleName = nub . usedIdents' S.empty . getValue
+usedIdents moduleName = ordNub . usedIdents' S.empty . getValue
   where
   def _ _ = []
 
@@ -124,7 +125,7 @@ usedIdents moduleName = nub . usedIdents' S.empty . getValue
 usedImmediateIdents :: ModuleName -> Declaration -> [Ident]
 usedImmediateIdents moduleName =
   let (f, _, _, _, _) = everythingWithContextOnValues True [] (++) def usedNamesE def def def
-  in nub . f
+  in ordNub . f
   where
   def s _ = (s, [])
 
@@ -138,7 +139,7 @@ usedImmediateIdents moduleName =
 usedTypeNames :: ModuleName -> Declaration -> [ProperName 'TypeName]
 usedTypeNames moduleName =
   let (f, _, _, _, _) = accumTypes (everythingOnTypes (++) usedNames)
-  in nub . f
+  in ordNub . f
   where
   usedNames :: Type -> [ProperName 'TypeName]
   usedNames (ConstrainedType constraints _) =

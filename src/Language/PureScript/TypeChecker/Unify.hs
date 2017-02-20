@@ -16,13 +16,14 @@ module Language.PureScript.TypeChecker.Unify
   ) where
 
 import Prelude.Compat
+import Protolude (ordNub)
 
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets, modify)
 import Control.Monad.Writer.Class (MonadWriter(..))
 
-import Data.List (nub, sort)
+import Data.List (sort)
 import qualified Data.Map as M
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -181,7 +182,7 @@ replaceTypeWildcards = everywhereOnTypesM replace
 --
 varIfUnknown :: Type -> Type
 varIfUnknown ty =
-  let unks = nub $ unknownsInType ty
+  let unks = ordNub $ unknownsInType ty
       toName = T.cons 't' . T.pack .  show
       ty' = everywhereOnTypes typeToVar ty
       typeToVar :: Type -> Type
