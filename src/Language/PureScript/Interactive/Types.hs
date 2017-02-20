@@ -94,6 +94,7 @@ data Command
   | ShowInfo ReplQuery
   -- | Paste multiple lines
   | PasteLines
+  deriving Show
 
 data ReplQuery
   = QueryLoaded
