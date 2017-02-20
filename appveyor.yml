@@ -32,15 +32,9 @@ build_script:
 # failed.
 - echo ""
 test_script:
-- ps: |
-    if ($env:APPVEYOR_REPO_TAG_NAME)
-    {
-      stack -j1 --no-terminal test --pedantic --flag purescript:RELEASE 2>&1
-    }
-    else
-    {
-      stack -j1 --no-terminal test --pedantic 2>&1
-    }
+- if defined APPVEYOR_REPO_TAG_NAME (set stack_extra_flags="--flag purescript:RELEASE")
+- echo "stack_extra_flags=%stack_extra_flags%"
+- stack --jobs=1 --no-terminal test --pedantic %stack_extra_flags%
 on_success:
 - ps: |
     function UploadFile
