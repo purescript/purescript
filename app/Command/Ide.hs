@@ -16,6 +16,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
 {-# LANGUAGE PackageImports        #-}
+{-# LANGUAGE RecordWildCards       #-}
 {-# LANGUAGE TemplateHaskell       #-}
 {-# LANGUAGE NoImplicitPrelude     #-}
 
@@ -27,7 +28,8 @@ import qualified Data.Aeson as Aeson
 import           Control.Concurrent.STM
 import           "monad-logger" Control.Monad.Logger
 import qualified Data.Text.IO                      as T
-import qualified Data.ByteString.Lazy.Char8        as BS8
+import qualified Data.ByteString.Char8             as BS8
+import qualified Data.ByteString.Lazy.Char8        as BSL8
 import           GHC.IO.Exception                  (IOErrorType(..), IOException(..))
 import           Language.PureScript.Ide
 import           Language.PureScript.Ide.Command
@@ -59,21 +61,53 @@ listenOnLocalhost port = do
       listen sock maxListenQueue
       pure sock)
 
-data Options = Options
-  { _optionsDirectory  :: Maybe FilePath
-  , _optionsGlobs      :: [FilePath]
-  , _optionsOutputPath :: FilePath
-  , _optionsPort       :: PortNumber
-  , _optionsNoWatch    :: Bool
-  , _optionsPolling    :: Bool
-  , _optionsDebug      :: Bool
-  , _optionsLoglevel   :: IdeLogLevel
+data ServerOptions = ServerOptions
+  { _serverDirectory  :: Maybe FilePath
+  , _serverGlobs      :: [FilePath]
+  , _serverOutputPath :: FilePath
+  , _serverPort       :: PortNumber
+  , _serverNoWatch    :: Bool
+  , _serverPolling    :: Bool
+  , _serverDebug      :: Bool
+  , _serverLoglevel   :: IdeLogLevel
   } deriving (Show)
 
+data ClientOptions = ClientOptions
+  { clientPort :: PortID
+  }
+
 command :: Opts.Parser (IO ())
-command = run <$> (Opts.helper <*> parser) where
-  run :: Options -> IO ()
-  run opts'@(Options dir globs outputPath port noWatch polling debug logLevel) = do
+command = Opts.helper <*> subcommands where
+  subcommands :: Opts.Parser (IO ())
+  subcommands = (Opts.subparser . fold)
+    [ Opts.command "server"
+        (Opts.info (fmap server serverOptions)
+          (Opts.progDesc "Start a server process"))
+    , Opts.command "client"
+        (Opts.info (fmap client clientOptions)
+          (Opts.progDesc "Connect to a running server"))
+    ]
+
+  client :: ClientOptions -> IO ()
+  client ClientOptions{..} = do
+    hSetEncoding stdin utf8
+    hSetEncoding stdout utf8
+    let handler (SomeException e) = do
+          T.putStrLn ("Couldn't connect to purs ide server on port " <> show clientPort <> ":")
+          print e
+          exitFailure
+    h <- connectTo "127.0.0.1" clientPort `catch` handler
+    T.hPutStrLn h =<< T.getLine
+    BS8.putStrLn =<< BS8.hGetLine h
+    hFlush stdout
+    hClose h
+
+  clientOptions :: Opts.Parser ClientOptions
+  clientOptions = ClientOptions . PortNumber . fromIntegral <$>
+    Opts.option Opts.auto (Opts.long "port" <> Opts.short 'p' <> Opts.value (4242 :: Integer))
+
+  server :: ServerOptions -> IO ()
+  server opts'@(ServerOptions dir globs outputPath port noWatch polling debug logLevel) = do
     when debug (putText "Parsed Options:" *> print opts')
     maybe (pure ()) setCurrentDirectory dir
     ideState <- newTVarIO emptyIdeState
@@ -93,9 +127,9 @@ command = run <$> (Opts.helper <*> parser) where
         env = IdeEnvironment {ideStateVar = ideState, ideConfiguration = conf}
     startServer port env
 
-  parser :: Opts.Parser Options
-  parser =
-    Options
+  serverOptions :: Opts.Parser ServerOptions
+  serverOptions =
+    ServerOptions
       <$> optional (Opts.strOption (Opts.long "directory" `mappend` Opts.short 'd'))
       <*> many (Opts.argument Opts.str (Opts.metavar "Source GLOBS..."))
       <*> Opts.strOption (Opts.long "output-directory" `mappend` Opts.value "output/")
@@ -141,8 +175,8 @@ startServer port env = withSocketsDo $ do
               -- $(logDebug) ("Answer was: " <> T.pack (show result))
               liftIO (hFlush stdout)
               case result of
-                Right r  -> liftIO $ catchGoneHandle (BS8.hPutStrLn h (Aeson.encode r))
-                Left err -> liftIO $ catchGoneHandle (BS8.hPutStrLn h (Aeson.encode err))
+                Right r  -> liftIO $ catchGoneHandle (BSL8.hPutStrLn h (Aeson.encode r))
+                Left err -> liftIO $ catchGoneHandle (BSL8.hPutStrLn h (Aeson.encode err))
             Nothing -> do
               $(logError) ("Parsing the command failed. Command: " <> cmd)
               liftIO $ do

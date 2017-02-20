@@ -54,7 +54,7 @@ main = do
               (Opts.progDesc "Generate a GraphViz directed graph of PureScript type classes"))
         , Opts.command "ide"
             (Opts.info Ide.command
-              (Opts.progDesc "Start an IDE server process"))
+              (Opts.progDesc "Start or query an IDE server process"))
         , Opts.command "publish"
             (Opts.info Publish.command
               (Opts.progDesc "Generates documentation packages for upload to Pursuit"))
