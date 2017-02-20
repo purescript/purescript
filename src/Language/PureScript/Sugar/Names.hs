@@ -350,11 +350,8 @@ renameInModule imports (Module ss coms mn decls exps) =
       -- in scope, we throw an error.
       (Just options, _) -> do
         (mnNew, mnOrig) <- checkImportConflicts mn toName options
-        modify $ \result ->
-          M.insert
-            mnNew
-            (maybe [fmap toName qname] (fmap toName qname :) (mnNew `M.lookup` result))
-            result
+        modify $ \usedImports ->
+          M.insertWith (++) mnNew [fmap toName qname] usedImports
         return $ Qualified (Just mnOrig) name
 
       -- If the name wasn't found in our imports but was qualified then we need
