@@ -10,6 +10,7 @@ module Language.PureScript.TypeChecker
   ) where
 
 import Prelude.Compat
+import Protolude (ordNub)
 
 import Control.Monad (when, unless, void, forM)
 import Control.Monad.Error.Class (MonadError(..))
@@ -19,7 +20,7 @@ import Control.Monad.Writer.Class (MonadWriter(..))
 import Control.Lens ((^..), _1, _2)
 
 import Data.Foldable (for_, traverse_, toList)
-import Data.List (nub, nubBy, (\\), sort, group)
+import Data.List (nubBy, (\\), sort, group)
 import Data.Maybe
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -170,7 +171,7 @@ checkDuplicateTypeArguments args = for_ firstDup $ \dup ->
   throwError . errorMessage $ DuplicateTypeArgument dup
   where
   firstDup :: Maybe Text
-  firstDup = listToMaybe $ args \\ nub args
+  firstDup = listToMaybe $ args \\ ordNub args
 
 checkTypeClassInstance
   :: (MonadState CheckState m, MonadError MultipleErrors m)
@@ -239,7 +240,7 @@ typeCheckAll moduleName _ = traverse go
   go (d@(DataBindingGroupDeclaration tys)) = do
     let syns = mapMaybe toTypeSynonym tys
         dataDecls = mapMaybe toDataDecl tys
-        bindingGroupNames = nub ((syns^..traverse._1) ++ (dataDecls^..traverse._2))
+        bindingGroupNames = ordNub ((syns^..traverse._1) ++ (dataDecls^..traverse._2))
     warnAndRethrow (addHint (ErrorInDataBindingGroup bindingGroupNames)) $ do
       (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
       for_ (zip dataDecls data_ks) $ \((dtype, name, args, dctors), ctorKind) -> do

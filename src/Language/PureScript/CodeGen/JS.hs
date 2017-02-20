@@ -8,6 +8,7 @@ module Language.PureScript.CodeGen.JS
   ) where
 
 import Prelude.Compat
+import Protolude (ordNub)
 
 import Control.Arrow ((&&&), second)
 import Control.Monad (forM, replicateM, void)
@@ -15,7 +16,7 @@ import Control.Monad.Except (MonadError, throwError)
 import Control.Monad.Reader (MonadReader, asks)
 import Control.Monad.Supply.Class
 
-import Data.List ((\\), delete, intersect, nub)
+import Data.List ((\\), delete, intersect)
 import qualified Data.Foldable as F
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe, isNothing)
@@ -55,7 +56,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
     let mnLookup = renameImports usedNames imps
-    jsImports <- traverse (importToJs mnLookup) . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ nub $ map snd imps
+    jsImports <- traverse (importToJs mnLookup) . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ ordNub $ map snd imps
     let decls' = renameModules mnLookup decls
     jsDecls <- mapM bindToJs decls'
     optimized <- traverse (traverse optimize) jsDecls

@@ -18,9 +18,11 @@
 
 module Command.Hierarchy (command) where
 
+import           Protolude (ordNub)
+
 import           Control.Applicative (optional)
 import           Control.Monad (unless)
-import           Data.List (intercalate,nub,sort)
+import           Data.List (intercalate, sort)
 import           Data.Foldable (for_)
 import           Data.Monoid ((<>))
 import qualified Data.Text as T
@@ -69,7 +71,7 @@ compile (HierarchyOptions inputGlob mOutput) = do
       for_ ms $ \(P.Module _ _ moduleName decls _) ->
         let name = runModuleName moduleName
             tcs = filter P.isTypeClassDeclaration decls
-            supers = sort . nub . filter (not . null) $ fmap superClasses tcs
+            supers = sort . ordNub . filter (not . null) $ fmap superClasses tcs
             prologue = "digraph " ++ name ++ " {\n"
             body = intercalate "\n" (concatMap (fmap (\s -> "  " ++ show s ++ ";")) supers)
             epilogue = "\n}"

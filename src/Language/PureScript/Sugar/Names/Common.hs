@@ -1,12 +1,13 @@
 module Language.PureScript.Sugar.Names.Common (warnDuplicateRefs) where
 
 import Prelude.Compat
+import Protolude (ordNub)
 
 import Control.Monad.Writer (MonadWriter(..))
 
 import Data.Foldable (for_)
 import Data.Function (on)
-import Data.List (nub, nubBy, (\\))
+import Data.List (nubBy, (\\))
 import Data.Maybe (mapMaybe)
 
 import Language.PureScript.AST
@@ -52,7 +53,7 @@ warnDuplicateRefs pos toError refs = do
   extractCtors :: SourceSpan -> DeclarationRef -> Maybe [(SourceSpan, Name)]
   extractCtors _ (PositionedDeclarationRef pos' _ ref) = extractCtors pos' ref
   extractCtors pos' (TypeRef _ (Just dctors)) =
-    let dupes = dctors \\ nub dctors
+    let dupes = dctors \\ ordNub dctors
     in if null dupes then Nothing else Just $ ((pos',) . DctorName) <$> dupes
   extractCtors _ _ = Nothing
 

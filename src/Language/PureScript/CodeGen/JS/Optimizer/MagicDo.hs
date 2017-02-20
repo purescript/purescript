@@ -3,8 +3,8 @@
 module Language.PureScript.CodeGen.JS.Optimizer.MagicDo (magicDo) where
 
 import Prelude.Compat
+import Protolude (ordNub)
 
-import Data.List (nub)
 import Data.Maybe (fromJust, isJust)
 
 import Language.PureScript.CodeGen.JS.AST
@@ -92,7 +92,7 @@ inlineST = everywhereOnJS convertBlock
   -- If all STRefs are used in the scope of the same runST, only using { read, write, modify }STRef then
   -- we can be more aggressive about inlining, and actually turn STRefs into local variables.
   convertBlock (JSApp _ f [arg]) | isSTFunc C.runST f =
-    let refs = nub . findSTRefsIn $ arg
+    let refs = ordNub . findSTRefsIn $ arg
         usages = findAllSTUsagesIn arg
         allUsagesAreLocalVars = all (\u -> let v = toVar u in isJust v && fromJust v `elem` refs) usages
         localVarsDoNotEscape = all (\r -> length (r `appearingIn` arg) == length (filter (\u -> let v = toVar u in v == Just r) usages)) refs

@@ -9,6 +9,7 @@ module Language.PureScript.Linter.Exhaustive
   ) where
 
 import Prelude.Compat
+import Protolude (ordNub)
 
 import Control.Applicative
 import Control.Arrow (first, second)
@@ -17,7 +18,7 @@ import Control.Monad.Writer.Class
 import Control.Monad.Supply.Class (MonadSupply, fresh, freshName)
 
 import Data.Function (on)
-import Data.List (foldl', sortBy, nub)
+import Data.List (foldl', sortBy)
 import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
 import qualified Data.Map as M
@@ -242,12 +243,12 @@ checkExhaustive
    -> [CaseAlternative]
    -> Expr
    -> m Expr
-checkExhaustive env mn numArgs cas expr = makeResult . first nub $ foldl' step ([initialize numArgs], (pure True, [])) cas
+checkExhaustive env mn numArgs cas expr = makeResult . first ordNub $ foldl' step ([initialize numArgs], (pure True, [])) cas
   where
   step :: ([[Binder]], (Either RedundancyError Bool, [[Binder]])) -> CaseAlternative -> ([[Binder]], (Either RedundancyError Bool, [[Binder]]))
   step (uncovered, (nec, redundant)) ca =
     let (missed, pr) = unzip (map (missingAlternative env mn ca) uncovered)
-        (missed', approx) = splitAt 10000 (nub (concat missed))
+        (missed', approx) = splitAt 10000 (ordNub (concat missed))
         cond = or <$> sequenceA pr
     in (missed', ( if null approx
                      then liftA2 (&&) cond nec

@@ -8,8 +8,9 @@ module Language.PureScript.Sugar.CaseDeclarations
   ) where
 
 import Prelude.Compat
+import Protolude (ordNub)
 
-import Data.List (nub, groupBy, foldl1')
+import Data.List (groupBy, foldl1')
 import Data.Maybe (catMaybes, mapMaybe)
 
 import Control.Monad ((<=<), forM, replicateM, join, unless)
@@ -323,7 +324,7 @@ toDecls :: forall m. (MonadSupply m, MonadError MultipleErrors m) => [Declaratio
 toDecls [ValueDeclaration ident nameKind bs [MkUnguarded val]] | all isIrrefutable bs = do
   args <- mapM fromVarBinder bs
   let body = foldr (Abs . Left) val args
-  guardWith (errorMessage (OverlappingArgNames (Just ident))) $ length (nub args) == length args
+  guardWith (errorMessage (OverlappingArgNames (Just ident))) $ length (ordNub args) == length args
   return [ValueDeclaration ident nameKind [] [MkUnguarded body]]
   where
   fromVarBinder :: Binder -> m Ident
@@ -379,8 +380,8 @@ makeCaseDeclaration ident alternatives = do
 
   -- We still have to make sure the generated names are unique, or else
   -- we will end up constructing an invalid function.
-  allUnique :: (Eq a) => [a] -> Bool
-  allUnique xs = length xs == length (nub xs)
+  allUnique :: (Ord a) => [a] -> Bool
+  allUnique xs = length xs == length (ordNub xs)
 
   argName :: Maybe Ident -> m Ident
   argName (Just name) = return name

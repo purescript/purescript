@@ -1,11 +1,12 @@
 module Language.PureScript.CoreFn.Desugar (moduleToCoreFn) where
 
 import Prelude.Compat
+import Protolude (ordNub)
 
 import Control.Arrow (second)
 
 import Data.Function (on)
-import Data.List (sort, sortBy, nub)
+import Data.List (sort, sortBy)
 import Data.Maybe (mapMaybe)
 import qualified Data.Map as M
 
@@ -35,9 +36,9 @@ moduleToCoreFn _ (A.Module _ _ _ _ Nothing) =
   internalError "Module exports were not elaborated before moduleToCoreFn"
 moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
   let imports = mapMaybe importToCoreFn decls ++ findQualModules decls
-      imports' = nub $ filter (keepImp imports) imports-- TODO could be more efficient
-      exps' = nub $ concatMap exportToCoreFn exps
-      externs = nub $ mapMaybe externToCoreFn decls
+      imports' = ordNub $ filter (keepImp imports) imports-- TODO could be more efficient
+      exps' = ordNub $ concatMap exportToCoreFn exps
+      externs = ordNub $ mapMaybe externToCoreFn decls
       decls' = concatMap (declToCoreFn Nothing []) decls
   in Module coms mn imports' exps' externs decls'
 

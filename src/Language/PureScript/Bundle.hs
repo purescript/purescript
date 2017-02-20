@@ -17,6 +17,7 @@ module Language.PureScript.Bundle
   ) where
 
 import Prelude.Compat
+import Protolude (ordNub)
 
 import Control.Monad
 import Control.Monad.Error.Class
@@ -25,7 +26,7 @@ import Control.Arrow ((&&&))
 import Data.Char (chr, digitToInt)
 import Data.Generics (everything, everywhere, mkQ, mkT)
 import Data.Graph
-import Data.List (nub, stripPrefix)
+import Data.List (stripPrefix)
 import Data.Maybe (mapMaybe, catMaybes)
 import Data.Version (showVersion)
 import qualified Data.Set as S
@@ -184,10 +185,10 @@ withDeps (Module modulePath fn es) = Module modulePath fn (map expandDeps es)
 
   -- | Calculate dependencies and add them to the current element.
   expandDeps :: ModuleElement -> ModuleElement
-  expandDeps (Member n f nm decl _) = Member n f nm decl (nub $ dependencies modulePath decl)
+  expandDeps (Member n f nm decl _) = Member n f nm decl (ordNub $ dependencies modulePath decl)
   expandDeps (ExportsList exps) = ExportsList (map expand exps)
       where
-      expand (ty, nm, n1, _) = (ty, nm, n1, nub (dependencies modulePath n1))
+      expand (ty, nm, n1, _) = (ty, nm, n1, ordNub (dependencies modulePath n1))
   expandDeps other = other
 
   dependencies :: ModuleIdentifier -> JSExpression -> [(ModuleIdentifier, String)]

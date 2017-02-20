@@ -2,6 +2,8 @@
 
 module Command.Docs (command, infoModList) where
 
+import           Protolude (ordNub)
+
 import           Command.Docs.Etags
 import           Command.Docs.Ctags
 import           Control.Applicative
@@ -122,7 +124,7 @@ takeModulesByName' getModuleName modules = foldl go ([], [])
 
 dumpTags :: [FilePath] -> ([(String, P.Module)] -> [String]) -> IO ()
 dumpTags input renderTags = do
-  e <- P.parseModulesFromFiles (fromMaybe "") <$> mapM (fmap (first Just) . parseFile) (nub input)
+  e <- P.parseModulesFromFiles (fromMaybe "") <$> mapM (fmap (first Just) . parseFile) (ordNub input)
   case e of
     Left err -> do
       hPrint stderr err
