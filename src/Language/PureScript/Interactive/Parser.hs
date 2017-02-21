@@ -123,4 +123,4 @@ psciDeprecatedLet = do
   P.indented
   _ <- mark (many1 (same *> P.parseLocalDeclaration))
   notFollowedBy $ P.reserved "in"
-  fail "for declaration in PSCi, try without \"let\""
+  fail "Declarations in PSCi no longer require \"let\", as of version 0.11.0"
