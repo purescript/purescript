@@ -1,2 +1,2 @@
 #!/bin/sh
-purs publish $@
+purs publish "$@"

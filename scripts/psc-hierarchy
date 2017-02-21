@@ -1,2 +1,2 @@
 #!/bin/sh
-purs hierarchy $@
+purs hierarchy "$@"

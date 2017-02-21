@@ -1,2 +1,2 @@
 #!/bin/sh
-purs ide $@
+purs ide server "$@"

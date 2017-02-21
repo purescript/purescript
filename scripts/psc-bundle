@@ -1,2 +1,2 @@
 #!/bin/sh
-purs bundle $@
+purs bundle "$@"
