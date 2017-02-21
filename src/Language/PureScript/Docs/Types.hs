@@ -15,6 +15,7 @@ import Data.Aeson.BetterErrors
    keyMay, withString, eachInArray, asNull, (.!), toAesonParser, toAesonParser',
    fromAesonParser, perhaps, withText, asIntegral, nth, eachInObjectWithKey,
    asString)
+import qualified Data.Aeson.BetterErrors as BE
 import qualified Data.Map as Map
 import Data.Time.Clock (UTCTime)
 import qualified Data.Time.Format as TimeFormat
@@ -27,8 +28,6 @@ import qualified Language.PureScript as P
 
 import Text.ParserCombinators.ReadP (readP_to_S)
 
-import Web.Bower.PackageMeta hiding (Version, displayError)
-
 import Language.PureScript.Docs.RenderedCode as ReExports
   (RenderedCode, asRenderedCode,
    ContainingModule(..), asContainingModule,
@@ -37,6 +36,22 @@ import Language.PureScript.Docs.RenderedCode as ReExports
 
 --------------------
 -- Types
+
+newtype PackageName = PackageName { getPackageName :: Text }
+  deriving (Show, Eq, Ord)
+
+newtype VersionRange = VersionRange { getVersionRange :: Text }
+  deriving (Show, Eq, Ord)
+
+data PackageMeta = PackageMeta
+  { packageMetaName            :: PackageName
+  , packageMetaDescription     :: Text
+  , packageMetaLicense         :: [Text]
+  , packageMetaAuthors         :: [Text]
+  , packageMetaRepository      :: Text
+  , packageMetaDependencies    :: [(PackageName, Version)]
+  }
+  deriving (Show, Eq, Ord)
 
 data Package a = Package
   { pkgMeta                 :: PackageMeta
@@ -48,7 +63,6 @@ data Package a = Package
   , pkgTagTime              :: Maybe UTCTime
   , pkgModules              :: [Module]
   , pkgModuleMap            :: Map P.ModuleName PackageName
-  , pkgResolvedDependencies :: [(PackageName, Version)]
   , pkgGithub               :: (GithubUser, GithubRepo)
   , pkgUploader             :: a
   , pkgCompilerVersion      :: Version
@@ -71,13 +85,9 @@ verifyPackage verifiedUser Package{..} =
           pkgTagTime
           pkgModules
           pkgModuleMap
-          pkgResolvedDependencies
           pkgGithub
           verifiedUser
           pkgCompilerVersion
-
-packageName :: Package a -> PackageName
-packageName = bowerName . pkgMeta
 
 -- |
 -- The time format used for serializing package tag times in the JSON format.
@@ -327,7 +337,6 @@ data PackageError
   = CompilerTooOld Version Version
       -- ^ Minimum allowable version for generating data with the current
       -- parser, and actual version used.
-  | ErrorInPackageMeta BowerError
   | InvalidVersion
   | InvalidDeclarationType Text
   | InvalidChildDeclarationType Text
@@ -428,15 +437,16 @@ getLink LinksContext{..} curMn namespace target containingMod = do
     let primMn = P.moduleNameFromString "Prim"
     guard $ containingMod == OtherModule primMn
     -- TODO: ensure the declaration exists in the builtin module too
-    return $ BuiltinModule primMn
 
+    return $ BuiltinModule primMn
+    
 getLinksContext :: Package a -> LinksContext
 getLinksContext Package{..} =
   LinksContext
     { ctxGithub               = pkgGithub
     , ctxModuleMap            = pkgModuleMap
-    , ctxResolvedDependencies = pkgResolvedDependencies
-    , ctxPackageName          = bowerName pkgMeta
+    , ctxResolvedDependencies = packageMetaDependencies pkgMeta
+    , ctxPackageName          = packageMetaName pkgMeta
     , ctxVersion              = pkgVersion
     , ctxVersionTag           = pkgVersionTag
     }
@@ -450,6 +460,15 @@ parseUploadedPackage minVersion = parse $ asUploadedPackage minVersion
 parseVerifiedPackage :: Version -> LByteString -> Either (ParseError PackageError) VerifiedPackage
 parseVerifiedPackage minVersion = parse $ asVerifiedPackage minVersion
 
+asPackageMeta :: Parse PackageError PackageMeta
+asPackageMeta =
+  PackageMeta <$> key "name" (withText (Right . PackageName))
+              <*> key "description" asText
+              <*> keyOrDefault "license" [] (fmap pure asText BE.<|> eachInArray asText)
+              <*> keyOrDefault "authors" [] (eachInArray asText)
+              <*> key "repository" asText
+              <*> key "dependencies" asDependencies
+
 asPackage :: Version -> (forall e. Parse e a) -> Parse PackageError (Package a)
 asPackage minimumVersion uploader = do
   -- If the compilerVersion key is missing, we can be sure that it was produced
@@ -459,20 +478,19 @@ asPackage minimumVersion uploader = do
   when (compilerVersion < minimumVersion)
     (throwCustomError $ CompilerTooOld minimumVersion compilerVersion)
 
-  Package <$> key "packageMeta" asPackageMeta .! ErrorInPackageMeta
+  Package <$> key "packageMeta" asPackageMeta
           <*> key "version" asVersion
           <*> key "versionTag" asText
           <*> keyMay "tagTime" (withString parseTimeEither)
           <*> key "modules" (eachInArray asModule)
           <*> moduleMap
-          <*> key "resolvedDependencies" asResolvedDependencies
           <*> key "github" asGithub
           <*> key "uploader" uploader
           <*> pure compilerVersion
   where
   moduleMap =
     key "moduleMap" asModuleMap
-    `pOr` (key "bookmarks" bookmarksAsModuleMap .! ErrorInPackageMeta)
+    `pOr` (key "bookmarks" bookmarksAsModuleMap)
 
 parseTimeEither :: String -> Either PackageError UTCTime
 parseTimeEither =
@@ -496,8 +514,6 @@ displayPackageError e = case e of
     "Expecting data produced by at least version " <> T.pack (showVersion minV)
     <> " of the compiler, but it appears that " <> T.pack (showVersion usedV)
     <> " was used."
-  ErrorInPackageMeta err ->
-    "Error in package metadata: " <> showBowerError err
   InvalidVersion ->
     "Invalid version"
   InvalidDeclarationType str ->
@@ -512,6 +528,9 @@ displayPackageError e = case e of
     "Invalid data declaration type: \"" <> str <> "\""
   InvalidTime ->
     "Invalid time"
+
+instance A.FromJSON PackageMeta where
+  parseJSON = toAesonParser displayPackageError asPackageMeta
 
 instance A.FromJSON a => A.FromJSON (Package a) where
   parseJSON = toAesonParser displayPackageError
@@ -558,15 +577,15 @@ asReExport =
   -- possibly at the same time as the next breaking change to this JSON format.
   asReExportModuleName :: Parse PackageError (InPackage P.ModuleName)
   asReExportModuleName =
-    asInPackage fromAesonParser .! ErrorInPackageMeta
+    asInPackage fromAesonParser
     `pOr` fmap Local fromAesonParser
 
 pOr :: Parse e a -> Parse e a -> Parse e a
 p `pOr` q = catchError p (const q)
 
-asInPackage :: Parse BowerError a -> Parse BowerError (InPackage a)
+asInPackage :: Parse e a -> Parse e (InPackage a)
 asInPackage inner =
-  build <$> key "package" (perhaps (withText parsePackageName))
+  build <$> key "package" (perhaps (withText (Right . PackageName)))
         <*> key "item" inner
   where
   build Nothing = Local
@@ -679,12 +698,12 @@ asModuleMap :: Parse PackageError (Map P.ModuleName PackageName)
 asModuleMap =
   Map.fromList <$>
     eachInObjectWithKey (Right . P.moduleNameFromString)
-                        (withText parsePackageName')
+                        (withText (Right . PackageName))
 
 -- This is here to preserve backwards compatibility with compilers which used
 -- to generate a 'bookmarks' field in the JSON (i.e. up to 0.10.5). We should
 -- remove this after the next breaking change to the JSON.
-bookmarksAsModuleMap :: Parse BowerError (Map P.ModuleName PackageName)
+bookmarksAsModuleMap :: Parse e (Map P.ModuleName PackageName)
 bookmarksAsModuleMap =
   convert <$>
     eachInArray (asInPackage (nth 0 (P.moduleNameFromString <$> asText)))
@@ -696,17 +715,9 @@ bookmarksAsModuleMap =
   toTuple (Local _) = Nothing
   toTuple (FromDep pkgName mn) = Just (mn, pkgName)
 
-asResolvedDependencies :: Parse PackageError [(PackageName, Version)]
-asResolvedDependencies =
-  eachInObjectWithKey parsePackageName' asVersion
-
-parsePackageName' :: Text -> Either PackageError PackageName
-parsePackageName' =
-  mapLeft ErrorInPackageMeta . parsePackageName
-
-mapLeft :: (a -> a') -> Either a b -> Either a' b
-mapLeft f (Left x) = Left (f x)
-mapLeft _ (Right x) = Right x
+asDependencies :: Parse PackageError [(PackageName, Version)]
+asDependencies =
+  eachInObjectWithKey (Right . PackageName) asVersion
 
 asGithub :: Parse e (GithubUser, GithubRepo)
 asGithub = (,) <$> nth 0 (GithubUser <$> asText)
@@ -720,6 +731,20 @@ asSourceSpan = P.SourceSpan <$> key "name" asString
 ---------------------
 -- ToJSON instances
 
+instance A.ToJSON PackageName where
+  toJSON = A.toJSON . getPackageName
+
+instance A.ToJSON PackageMeta where
+  toJSON PackageMeta{..} =
+    A.object
+      [ "name"                  .= packageMetaName
+      , "description"           .= packageMetaDescription
+      -- , "license"               .=
+      -- , "authors"               .=
+      , "repository"            .= packageMetaRepository
+      -- , "dependencies"          .=
+      ]
+
 instance A.ToJSON a => A.ToJSON (Package a) where
   toJSON Package{..} =
     A.object $
@@ -728,11 +753,11 @@ instance A.ToJSON a => A.ToJSON (Package a) where
       , "versionTag"           .= pkgVersionTag
       , "modules"              .= pkgModules
       , "moduleMap"            .= assocListToJSON P.runModuleName
-                                                  runPackageName
+                                                  getPackageName
                                                   (Map.toList pkgModuleMap)
-      , "resolvedDependencies" .= assocListToJSON runPackageName
+      , "resolvedDependencies" .= assocListToJSON getPackageName
                                                   (T.pack . showVersion)
-                                                  pkgResolvedDependencies
+                                                  (packageMetaDependencies pkgMeta)
       , "github"               .= pkgGithub
       , "uploader"             .= pkgUploader
       , "compilerVersion"      .= showVersion P.version

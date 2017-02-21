@@ -27,8 +27,7 @@ import qualified Language.PureScript.Docs as Docs
 import Language.PureScript.Docs.AsMarkdown (codeToString)
 import qualified Language.PureScript.Publish as Publish
 import qualified Language.PureScript.Publish.ErrorsWarnings as Publish
-
-import Web.Bower.PackageMeta (parsePackageName)
+import Language.PureScript.Docs.Types (PackageName(..))
 
 import TestUtils
 
@@ -42,7 +41,7 @@ publishOpts = Publish.defaultPublishOptions
 
 main :: IO ()
 main = pushd "examples/docs" $ do
-  res <- Publish.preparePackage publishOpts
+  res <- Publish.preparePackage "bower.json" publishOpts
   case res of
     Left e -> Publish.printErrorToStdout e >> exitFailure
     Right pkg@Docs.Package{..} ->
@@ -311,7 +310,7 @@ testCases =
       , ShouldNotBeDocumented (n "Example2") "two"
 
         -- Re-exports
-      , ShouldHaveReExport (Docs.FromDep (pkg "purescript-prelude") (n "Prelude"))
+      , ShouldHaveReExport (Docs.FromDep (PackageName "purescript-prelude") (n "Prelude"))
       , ShouldHaveReExport (Docs.Local (n "Example2"))
       ])
 
@@ -404,7 +403,6 @@ testCases =
 
   where
   n = P.moduleNameFromString
-  pkg str = let Right p = parsePackageName str in p
 
   hasTypeVar varName =
     getAny . P.everythingOnTypes (<>) (Any . isVar varName)

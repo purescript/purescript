@@ -50,11 +50,7 @@ noInputMessage = unlines
 
 supportModuleMessage :: String
 supportModuleMessage = unlines
-  [ "purs repl: PSCi requires the psci-support package to be installed."
-  , "You can install it using Bower as follows:"
-  , ""
-  , "  bower i purescript-psci-support --save-dev"
-  , ""
+  [ "purs repl: PSCi requires the psci-support package."
   , "For help getting started, visit " ++ guideURL
   ]
 

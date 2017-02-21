@@ -22,8 +22,6 @@ import Language.PureScript.Docs.Types
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Constants as C
 
-import Web.Bower.PackageMeta (PackageName)
-
 import Text.Parsec (eof)
 
 -- |
@@ -58,7 +56,7 @@ convertModulesInPackageWithEnv modules modulesDeps =
       Nothing -> Local mn
 
   isLocal :: P.ModuleName -> Bool
-  isLocal = not . flip Map.member modulesDeps 
+  isLocal = not . flip Map.member modulesDeps
 
 -- |
 -- Convert a group of modules to the intermediate format, designed for

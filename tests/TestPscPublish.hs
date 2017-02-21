@@ -49,7 +49,7 @@ testRunOptions = defaultPublishOptions
 -- | attempt to parse it again, and ensure that it doesn't change.
 testPackage :: String -> IO ()
 testPackage dir = pushd dir $ do
-  res <- preparePackage testRunOptions
+  res <- preparePackage "bower.json" testRunOptions
   case res of
     Left e -> preparePackageError e
     Right package -> case roundTrip package of

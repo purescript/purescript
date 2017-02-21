@@ -18,7 +18,7 @@ import Prelude.Compat
 import Control.Exception (IOException)
 
 import Data.Aeson.BetterErrors (ParseError, displayError)
-import Data.List (intersperse, intercalate)
+import Data.List (intersperse)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe
 import Data.Monoid
@@ -26,12 +26,12 @@ import Data.Version
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Void (Void, absurd)
 
+import Language.PureScript.Docs.Types (PackageName(..))
+import qualified Language.PureScript.Docs.Types as D
 import Language.PureScript.Publish.BoxesHelpers
 import qualified Language.PureScript as P
-
-import Web.Bower.PackageMeta (BowerError, PackageName, runPackageName, showBowerError)
-import qualified Web.Bower.PackageMeta as Bower
 
 -- | An error which meant that it was not possible to retrieve metadata for a
 -- package.
@@ -50,9 +50,7 @@ data PackageWarning
 
 -- | An error that should be fixed by the user.
 data UserError
-  = BowerJSONNotFound
-  | BowerExecutableNotFound [String] -- list of executable names tried
-  | CouldntDecodeBowerJSON (ParseError BowerError)
+  = CouldntDecodeManifest (ParseError D.PackageError)
   | TagMustBeCheckedOut
   | AmbiguousVersions [Version] -- Invariant: should contain at least two elements
   | BadRepositoryField RepositoryFieldError
@@ -64,21 +62,18 @@ data UserError
   deriving (Show)
 
 data RepositoryFieldError
-  = RepositoryFieldMissing
-  | BadRepositoryType Text
-  | NotOnGithub
+  = NotOnGithub
   deriving (Show)
 
 
 -- | An error that probably indicates a bug in this module.
 data InternalError
-  = JSONError JSONSource (ParseError BowerError)
+  = JSONError JSONSource (ParseError Void)
   | CouldntParseGitTagDate Text
   deriving (Show)
 
 data JSONSource
   = FromFile FilePath
-  | FromBowerList
   deriving (Show)
 
 data OtherError
@@ -121,24 +116,12 @@ renderError err =
 
 displayUserError :: UserError -> Box
 displayUserError e = case e of
-  BowerJSONNotFound ->
-    para (
-      "The bower.json file was not found. Please create one, or run " ++
-      "`pulp init`."
-      )
-  BowerExecutableNotFound names ->
-    para (concat
-      [ "The Bower executable was not found (tried: ", format names, "). Please"
-      , " ensure that bower is installed and on your PATH."
-      ])
-    where
-    format = intercalate ", " . map show
-  CouldntDecodeBowerJSON err ->
+  CouldntDecodeManifest err ->
     vcat
-      [ para "There was a problem with your bower.json file:"
-      , indented (vcat (map (para . T.unpack) (displayError showBowerError err)))
+      [ para "There was a problem with your package manifest file:"
+      , indented (vcat (map (para . T.unpack) (displayError D.displayPackageError err)))
       , spacer
-      , para "Please ensure that your bower.json file is valid."
+      , para "Please ensure that the file is valid."
       ]
   TagMustBeCheckedOut ->
       vcat
@@ -174,7 +157,7 @@ displayUserError e = case e of
   NoLicenseSpecified ->
     vcat $
       [ para (concat
-          [ "No license is specified in bower.json. Please add one, using the "
+          [ "No license was specified. Please add one, using the "
           , "SPDX license expression format. For example, any of the "
           , "following would be acceptable:"
           ])
@@ -195,7 +178,7 @@ displayUserError e = case e of
   InvalidLicense ->
     vcat $
       [ para (concat
-          [ "The license specified in bower.json is not a valid SPDX license "
+          [ "The license specified is not a valid SPDX license "
           , "expression. Please use the SPDX license expression format. For "
           , "example, any of the following would be acceptable:"
           ])
@@ -207,20 +190,13 @@ displayUserError e = case e of
         pl a b = if singular then b else a
         do_          = pl "do" "does"
         dependencies = pl "dependencies" "dependency"
-        them         = pl "them" "it"
     in vcat $
       [ para (concat
-        [ "The following Bower ", dependencies, " ", do_, " not appear to be "
+        [ "The following ", dependencies, " ", do_, " not appear to be "
         , "installed:"
         ])
       ] ++
-        bulletedListT runPackageName (NonEmpty.toList pkgs)
-        ++
-      [ spacer
-      , para (concat
-        [ "Please install ", them, " first, by running `bower install`."
-        ])
-      ]
+        bulletedListT getPackageName (NonEmpty.toList pkgs)
   CompileError err ->
     vcat
       [ para "Compile error:"
@@ -244,40 +220,16 @@ spdxExamples =
 
 displayRepositoryError :: RepositoryFieldError -> Box
 displayRepositoryError err = case err of
-  RepositoryFieldMissing ->
-    vcat
-      [ para (concat
-         [ "The 'repository' field is not present in your bower.json file. "
-         , "Without this information, Pursuit would not be able to generate "
-         , "source links in your package's documentation. Please add one - like "
-         , "this, for example:"
-         ])
-      , spacer
-      , indented (vcat
-          [ para "\"repository\": {"
-          , indented (para "\"type\": \"git\",")
-          , indented (para "\"url\": \"git://github.com/purescript/purescript-prelude.git\"")
-          , para "}"
-          ]
-        )
-      ]
-  BadRepositoryType ty ->
-    para (concat
-      [ "In your bower.json file, the repository type is currently listed as "
-      , "\"" ++ T.unpack ty ++ "\". Currently, only git repositories are supported. "
-      , "Please publish your code in a git repository, and then update the "
-      , "repository type in your bower.json file to \"git\"."
-      ])
   NotOnGithub ->
     vcat
       [ para (concat
-        [ "The repository url in your bower.json file does not point to a "
+        [ "The repository url in your package manifest file does not point to a "
         , "GitHub repository. Currently, Pursuit does not support packages "
         , "which are not hosted on GitHub."
         ])
       , spacer
       , para (concat
-        [ "Please update your bower.json file to point to a GitHub repository. "
+        [ "Please update your package manifest file to point to a GitHub repository. "
         , "Alternatively, if you would prefer not to host your package on "
         , "GitHub, please open an issue:"
         ])
@@ -288,7 +240,7 @@ displayInternalError :: InternalError -> [String]
 displayInternalError e = case e of
   JSONError src r ->
     [ "Error in JSON " ++ displayJSONSource src ++ ":"
-    , T.unpack (Bower.displayError r)
+    , T.unpack (T.unlines (displayError absurd r))
     ]
   CouldntParseGitTagDate tag ->
     [ "Unable to parse the date for a git tag: " ++ T.unpack tag
@@ -298,8 +250,6 @@ displayJSONSource :: JSONSource -> String
 displayJSONSource s = case s of
   FromFile fp ->
     "in file " ++ show fp
-  FromBowerList ->
-    "in the output of `bower list --json --offline`"
 
 displayOtherError :: OtherError -> Box
 displayOtherError e = case e of
@@ -365,14 +315,13 @@ warnNoResolvedVersions pkgNames =
       ["The following ", packages, " did not appear to have a resolved "
       , "version:"])
     ] ++
-      bulletedListT runPackageName (NonEmpty.toList pkgNames)
+      bulletedListT getPackageName (NonEmpty.toList pkgNames)
       ++
     [ spacer
     , para (concat
       ["Links to types in ", anyOfThese, " ", packages, " will not work. In "
-      , "order to make links work, edit your bower.json to specify a version"
-      , " or a version range for ", these, " ", packages, ", and rerun "
-      , "`bower install`."
+      , "order to make links work, edit your package manifest to specify a version"
+      , " or a version range for ", these, " ", packages, "."
       ])
     ]
 
@@ -386,10 +335,10 @@ warnUndeclaredDependencies pkgNames =
       dependencies = pl "dependencies" "a dependency"
   in vcat $
     para (concat
-      [ "The following Bower ", packages, " ", are, " installed, but not "
-      , "declared as ", dependencies, " in your bower.json file:"
+      [ "The following ", packages, " ", are, " installed, but not "
+      , "declared as ", dependencies, " in your package manifest file:"
       ])
-    : bulletedListT runPackageName (NonEmpty.toList pkgNames)
+    : bulletedListT getPackageName (NonEmpty.toList pkgNames)
 
 warnUnacceptableVersions :: NonEmpty (PackageName, Text) -> Box
 warnUnacceptableVersions pkgs =
@@ -403,7 +352,7 @@ warnUnacceptableVersions pkgs =
       versions   = pl "versions" "version"
   in vcat $
     [ para (concat
-      [ "The following installed Bower ", packages', " ", versions, " could "
+      [ "The following installed ", packages', " ", versions, " could "
       , "not be parsed:"
       ])
     ] ++
@@ -412,13 +361,12 @@ warnUnacceptableVersions pkgs =
     [ spacer
     , para (concat
       ["Links to types in ", anyOfThese, " ", packages, " will not work. In "
-      , "order to make links work, edit your bower.json to specify an "
-      , "acceptable version or version range for ", these, " ", packages, ", "
-      , "and rerun `bower install`."
+      , "order to make links work, edit your package manifest to specify an "
+      , "acceptable version or version range for ", these, " ", packages, "."
       ])
     ]
   where
-  showTuple (pkgName, tag) = runPackageName pkgName <> "#" <> tag
+  showTuple (pkgName, tag) = getPackageName pkgName <> "#" <> tag
 
 warnDirtyWorkingTree :: Box
 warnDirtyWorkingTree =
