@@ -7,6 +7,7 @@ module Language.PureScript.Interactive.Parser
 
 import           Prelude.Compat hiding (lex)
 
+import           Data.Bifunctor (first)
 import           Data.Char (isSpace)
 import           Data.List (intercalate)
 import qualified Data.Text as T
@@ -26,7 +27,7 @@ parseCommand cmdString =
     _ -> parseRest psciCommand cmdString
 
 parseRest :: P.TokenParser a -> String -> Either String a
-parseRest p s = either (Left . show) Right $ do
+parseRest p s = first show $ do
   ts <- P.lex "" (T.pack s)
   P.runTokenParser "" (p <* eof) ts
 
@@ -37,6 +38,7 @@ psciCommand = choice (map try parsers)
     [ psciImport
     , psciDeclaration
     , psciExpression
+    , psciDeprecatedLet
     ]
 
 trim :: String -> String
@@ -112,3 +114,13 @@ parseReplQuery' str =
     Nothing -> Left ("Don't know how to show " ++ str ++ ". Try one of: " ++
                       intercalate ", " replQueryStrings ++ ".")
     Just query -> Right query
+
+-- | To show error message when 'let' is used for declaration in PSCI,
+-- which is deprecated.
+psciDeprecatedLet :: P.TokenParser Command
+psciDeprecatedLet = do
+  P.reserved "let"
+  P.indented
+  _ <- mark (many1 (same *> P.parseLocalDeclaration))
+  notFollowedBy $ P.reserved "in"
+  fail "Declarations in PSCi no longer require \"let\", as of version 0.11.0"
