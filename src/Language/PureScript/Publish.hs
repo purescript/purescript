@@ -15,7 +15,7 @@ module Language.PureScript.Publish
   , getGitWorkingTreeStatus
   , checkCleanWorkingTree
   , getVersionFromGitTag
-  , getBowerRepositoryInfo
+  , getManifestRepositoryInfo
   , getModules
   , getResolvedDependencies
   ) where
@@ -24,30 +24,24 @@ import Protolude hiding (stdin)
 
 import Control.Arrow ((***))
 import Control.Category ((>>>))
-import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Control.Monad.Writer.Strict (MonadWriter, WriterT, runWriterT, tell)
 
 import Data.Aeson.BetterErrors (Parse, parse, keyMay, eachInObjectWithKey, eachInObject, key, keyOrDefault, asBool, asText)
+import qualified Data.ByteString.Lazy as BL
 import Data.Char (isSpace)
 import Data.String (String, lines)
 import Data.List (stripPrefix, (\\), nubBy)
 import Data.List.NonEmpty (NonEmpty(..))
-import Data.List.Split (splitOn)
 import qualified Data.Text as T
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.Encoding as TL
 import Data.Time.Clock (UTCTime)
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Data.Version
 import qualified Data.SPDX as SPDX
 
-import System.Directory (doesFileExist, findExecutable)
-import System.FilePath (pathSeparator)
+import System.Directory (doesFileExist)
 import System.Process (readProcess)
-import qualified System.FilePath.Glob as Glob
-import qualified System.Info
 
-import Web.Bower.PackageMeta (PackageMeta(..), BowerError(..), PackageName, runPackageName, parsePackageName, Repository(..))
+import Web.Bower.PackageMeta (PackageMeta(..), PackageName, parsePackageName, Repository(..))
 import qualified Web.Bower.PackageMeta as Bower
 
 import Language.PureScript.Publish.ErrorsWarnings
@@ -73,14 +67,16 @@ defaultPublishOptions = PublishOptions
 
 -- | Attempt to retrieve package metadata from the current directory.
 -- Calls exitFailure if no package metadata could be retrieved.
-unsafePreparePackage :: PublishOptions -> IO D.UploadedPackage
-unsafePreparePackage opts = either (\e -> printError e >> exitFailure) pure =<< preparePackage opts
+unsafePreparePackage :: FilePath -> FilePath -> PublishOptions -> IO D.UploadedPackage
+unsafePreparePackage manifestFile resolutionsFile opts =
+  either (\e -> printError e >> exitFailure) pure
+    =<< preparePackage manifestFile resolutionsFile opts
 
 -- | Attempt to retrieve package metadata from the current directory.
 -- Returns a PackageError on failure
-preparePackage :: PublishOptions -> IO (Either PackageError D.UploadedPackage)
-preparePackage opts =
-  runPrepareM (preparePackage' opts)
+preparePackage :: FilePath -> FilePath -> PublishOptions -> IO (Either PackageError D.UploadedPackage)
+preparePackage manifestFile resolutionsFile opts =
+  runPrepareM (preparePackage' manifestFile resolutionsFile opts)
     >>= either (pure . Left) (fmap Right . handleWarnings)
 
   where
@@ -120,23 +116,23 @@ otherError = throwError . OtherError
 catchLeft :: Applicative f => Either a b -> (a -> f b) -> f b
 catchLeft a f = either f pure a
 
-preparePackage' :: PublishOptions -> PrepareM D.UploadedPackage
-preparePackage' opts = do
-  unlessM (liftIO (doesFileExist "bower.json")) (userError BowerJSONNotFound)
+preparePackage' :: FilePath -> FilePath -> PublishOptions -> PrepareM D.UploadedPackage
+preparePackage' manifestFile resolutionsFile opts = do
+  unlessM (liftIO (doesFileExist manifestFile)) (userError PackageManifestNotFound)
   checkCleanWorkingTree opts
 
-  pkgMeta <- liftIO (Bower.decodeFile "bower.json")
-                    >>= flip catchLeft (userError . CouldntDecodeBowerJSON)
+  pkgMeta <- liftIO (Bower.decodeFile manifestFile)
+                    >>= flip catchLeft (userError . CouldntDecodePackageManifest)
   checkLicense pkgMeta
 
   (pkgVersionTag, pkgVersion) <- publishGetVersion opts
   pkgTagTime                  <- Just <$> publishGetTagTime opts pkgVersionTag
-  pkgGithub                   <- getBowerRepositoryInfo pkgMeta
+  pkgGithub                   <- getManifestRepositoryInfo pkgMeta
   (pkgModules, pkgModuleMap)  <- getModules
 
   let declaredDeps = map fst (bowerDependencies pkgMeta ++
                               bowerDevDependencies pkgMeta)
-  pkgResolvedDependencies     <- getResolvedDependencies declaredDeps
+  pkgResolvedDependencies     <- getResolvedDependencies resolutionsFile declaredDeps
 
   let pkgUploader = D.NotYetKnown
   let pkgCompilerVersion = P.version
@@ -200,8 +196,8 @@ getTagTime tag = do
     [t] -> pure . posixSecondsToUTCTime . fromInteger $ t
     _ -> internalError (CouldntParseGitTagDate tag)
 
-getBowerRepositoryInfo :: PackageMeta -> PrepareM (D.GithubUser, D.GithubRepo)
-getBowerRepositoryInfo = either (userError . BadRepositoryField) return . tryExtract
+getManifestRepositoryInfo :: PackageMeta -> PrepareM (D.GithubUser, D.GithubRepo)
+getManifestRepositoryInfo = either (userError . BadRepositoryField) return . tryExtract
   where
   tryExtract pkgMeta =
     case bowerRepository pkgMeta of
@@ -259,12 +255,9 @@ readProcess' prog args stdin = do
 
 data DependencyStatus
   = Missing
-    -- ^ Listed in bower.json, but not installed.
+    -- ^ Listed in package manifest, but not installed.
   | NoResolution
-    -- ^ In the output of `bower list --json --offline`, there was no
-    -- _resolution key. This can be caused by adding the dependency using
-    -- `bower link`, or simply copying it into bower_components instead of
-    -- installing it normally.
+    -- ^ In the resolutions file, there was no _resolution key.
   | ResolvedOther Text
     -- ^ Resolved, but to something other than a version. The Text argument
     -- is the resolution type. The values it can take that I'm aware of are
@@ -274,10 +267,10 @@ data DependencyStatus
     -- "v0.1.0").
   deriving (Show, Eq)
 
--- Go through all bower dependencies which contain purescript code, and
+-- Go through all dependencies which contain purescript code, and
 -- extract their versions.
 --
--- In the case where a bower dependency is taken from a particular version,
+-- In the case where a dependency is taken from a particular version,
 -- that's easy; take that version. In any other case (eg, a branch, or a commit
 -- sha) we print a warning that documentation links will not work, and avoid
 -- linking to documentation for any types from that package.
@@ -287,10 +280,10 @@ data DependencyStatus
 -- probably for a reason. However, docs are only ever available for released
 -- versions. Therefore there will probably be no version of the docs which is
 -- appropriate to link to, and we should omit links.
-getResolvedDependencies :: [PackageName] -> PrepareM [(PackageName, Version)]
-getResolvedDependencies declaredDeps = do
-  bower <- findBowerExecutable
-  depsBS <- packUtf8 <$> readProcess' bower ["list", "--json", "--offline"] ""
+getResolvedDependencies :: FilePath -> [PackageName] -> PrepareM [(PackageName, Version)]
+getResolvedDependencies resolutionsFile declaredDeps = do
+  unlessM (liftIO (doesFileExist resolutionsFile)) (userError ResolutionsFileNotFound)
+  depsBS <- liftIO (BL.readFile resolutionsFile)
 
   -- Check for undeclared dependencies
   toplevels <- catchJSON (parse asToplevelDependencies depsBS)
@@ -300,21 +293,11 @@ getResolvedDependencies declaredDeps = do
   handleDeps deps
 
   where
-  packUtf8 = TL.encodeUtf8 . TL.pack
-  catchJSON = flip catchLeft (internalError . JSONError FromBowerList)
+  catchJSON = flip catchLeft (internalError . JSONError FromResolutions)
 
-findBowerExecutable :: PrepareM String
-findBowerExecutable = do
-  mname <- liftIO . runMaybeT . msum . map (MaybeT . findExecutable) $ names
-  maybe (userError (BowerExecutableNotFound names)) return mname
-  where
-  names = case System.Info.os of
-    "mingw32" -> ["bower", "bower.cmd"]
-    _         -> ["bower"]
-
--- | Extracts all dependencies and their versions from
---   `bower list --json --offline`
-asResolvedDependencies :: Parse BowerError [(PackageName, DependencyStatus)]
+-- | Extracts all dependencies and their versions from a "resolutions" file, which
+-- is based on the output of `bower list --json --offline`
+asResolvedDependencies :: Parse D.ManifestError [(PackageName, DependencyStatus)]
 asResolvedDependencies = nubBy ((==) `on` fst) <$> go
   where
   go =
@@ -323,9 +306,8 @@ asResolvedDependencies = nubBy ((==) `on` fst) <$> go
         (++) <$> eachInObjectWithKey parsePackageName asDependencyStatus
              <*> (concatMap snd <$> eachInObject asResolvedDependencies)
 
--- | Extracts only the top level dependency names from the output of
---   `bower list --json --offline`
-asToplevelDependencies :: Parse BowerError [PackageName]
+-- | Extracts only the top level dependency names from a resolutions file.
+asToplevelDependencies :: Parse D.ManifestError [PackageName]
 asToplevelDependencies =
   fmap (map fst) $
     key "dependencies" $
@@ -358,8 +340,7 @@ handleDeps deps = do
       userError (MissingDependencies (x :| xs))
     [] -> do
       traverse_ (warn . NoResolvedVersion) noVersion
-      withVersions <- catMaybes <$> traverse tryExtractVersion' installed
-      filterM (liftIO . isPureScript . bowerDir . fst) withVersions
+      catMaybes <$> traverse tryExtractVersion' installed
 
   where
   partitionDeps = foldr go ([], [], [])
@@ -369,8 +350,6 @@ handleDeps deps = do
       NoResolution      -> (ms, pkgName : os, is)
       ResolvedOther _   -> (ms, pkgName : os, is)
       ResolvedVersion v -> (ms, os, (pkgName, v) : is)
-
-  bowerDir pkgName = T.unpack $ "bower_components/" <> runPackageName pkgName
 
   -- Try to extract a version, and warn if unsuccessful.
   tryExtractVersion' :: (PackageName, Text) -> PrepareM (Maybe (PackageName, Version))
@@ -384,27 +363,7 @@ tryExtractVersion (pkgName, tag) =
   let tag' = fromMaybe tag (T.stripPrefix "v" tag)
   in  (pkgName,) <$> D.parseVersion' (T.unpack tag')
 
--- | Returns whether it looks like there is a purescript package checked out
--- in the given directory.
-isPureScript :: FilePath -> IO Bool
-isPureScript dir = do
-  files <- Glob.globDir1 purescriptSourceFiles dir
-  return (not (null files))
-
 getInputAndDepsFiles :: IO ([FilePath], [(PackageName, FilePath)])
 getInputAndDepsFiles = do
   inputFiles <- globRelative purescriptSourceFiles
-  depsFiles' <- globRelative purescriptDepsFiles
-  return (inputFiles, mapMaybe withPackageName depsFiles')
-
-withPackageName :: FilePath -> Maybe (PackageName, FilePath)
-withPackageName fp = (,fp) <$> getPackageName fp
-
-getPackageName :: FilePath -> Maybe PackageName
-getPackageName fp = do
-  let xs = splitOn [pathSeparator] fp
-  ys <- stripPrefix ["bower_components"] xs
-  y <- headMay ys
-  case Bower.mkPackageName (T.pack y) of
-    Right name -> Just name
-    Left _ -> Nothing
+  return (inputFiles, error "TODO")

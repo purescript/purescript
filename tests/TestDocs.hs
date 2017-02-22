@@ -42,7 +42,7 @@ publishOpts = Publish.defaultPublishOptions
 
 main :: IO ()
 main = pushd "examples/docs" $ do
-  res <- Publish.preparePackage publishOpts
+  res <- Publish.preparePackage "bower.json" "resolutions.json" publishOpts
   case res of
     Left e -> Publish.printErrorToStdout e >> exitFailure
     Right pkg@Docs.Package{..} ->

@@ -13,6 +13,18 @@ import           Language.PureScript.Publish.ErrorsWarnings
 import           Options.Applicative (Parser)
 import qualified Options.Applicative as Opts
 
+manifestPath :: Parser FilePath
+manifestPath = Opts.strOption $
+     Opts.long "manifest"
+  <> Opts.metavar "FILE"
+  <> Opts.help "The package manifest file"
+
+resolutionsPath :: Parser FilePath
+resolutionsPath = Opts.strOption $
+     Opts.long "resolutions"
+  <> Opts.metavar "FILE"
+  <> Opts.help "The resolutions file"
+
 dryRun :: Parser Bool
 dryRun = Opts.switch $
      Opts.long "dry-run"
@@ -27,14 +39,14 @@ dryRunOptions = defaultPublishOptions
   where dummyVersion = ("0.0.0", Version [0,0,0] [])
 
 command :: Opts.Parser (IO ())
-command = publish <$> (Opts.helper <*> dryRun)
+command = publish <$> manifestPath <*> resolutionsPath <*> (Opts.helper <*> dryRun)
 
-publish :: Bool -> IO ()
-publish isDryRun =
+publish :: FilePath -> FilePath -> Bool -> IO ()
+publish manifestFile resolutionsFile isDryRun =
   if isDryRun
     then do
-      _ <- unsafePreparePackage dryRunOptions
+      _ <- unsafePreparePackage manifestFile resolutionsFile dryRunOptions
       putStrLn "Dry run completed, no errors."
     else do
-      pkg <- unsafePreparePackage defaultPublishOptions
+      pkg <- unsafePreparePackage manifestFile resolutionsFile defaultPublishOptions
       BL.putStrLn (A.encode pkg)
