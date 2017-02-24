@@ -39,26 +39,25 @@ import Language.PureScript.Types
 -- modules should be topologically sorted beforehand.
 --
 desugarImports
-  :: forall m
-   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  :: (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => [ExternsFile]
-  -> [Module]
-  -> m [Module]
+  -> [Module a b]
+  -> m [Module a b]
 desugarImports externs modules =
   fmap snd (desugarImportsWithEnv externs modules)
 
 desugarImportsWithEnv
-  :: forall m
+  :: forall m a b
   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => [ExternsFile]
-  -> [Module]
-  -> m (Env, [Module])
+  -> [Module a b]
+  -> m (Env, [Module a b])
 desugarImportsWithEnv externs modules = do
   env <- silence $ foldM externsEnv primEnv externs
   (modules', env') <- first reverse <$> foldM updateEnv ([], env) modules
   (env',) <$> traverse (renameInModule' env') modules'
   where
-  silence :: m a -> m a
+  silence :: m x -> m x
   silence = censor (const mempty)
 
   -- | Create an environment from a collection of externs files
@@ -96,13 +95,13 @@ desugarImportsWithEnv externs modules = do
     exportedValueOps :: M.Map (OpName 'ValueOpName) ModuleName
     exportedValueOps = exportedRefs getValueOpRef
 
-    exportedRefs :: Ord a => (DeclarationRef -> Maybe a) -> M.Map a ModuleName
+    exportedRefs :: Ord x => (DeclarationRef -> Maybe x) -> M.Map x ModuleName
     exportedRefs f = M.fromList $ (, efModuleName) <$> mapMaybe f efExports
 
     exportedKinds :: M.Map (ProperName 'KindName) ModuleName
     exportedKinds = exportedRefs getKindRef
 
-  updateEnv :: ([Module], Env) -> Module -> m ([Module], Env)
+  updateEnv :: ([Module a b], Env) -> Module a b -> m ([Module a b], Env)
   updateEnv (ms, env) m@(Module ss _ mn _ refs) = do
     members <- findExportable m
     let env' = M.insert mn (ss, primImports, members) env
@@ -110,7 +109,7 @@ desugarImportsWithEnv externs modules = do
     exps <- maybe (return members) (resolveExports env' ss mn imps members) refs
     return (m' : ms, M.insert mn (ss, imps, exps) env)
 
-  renameInModule' :: Env -> Module -> m Module
+  renameInModule' :: Env -> Module a b -> m (Module a b)
   renameInModule' env m@(Module _ _ mn _ _) =
     warnAndRethrow (addHint (ErrorInModule mn)) $ do
       let (_, imps, exps) = fromMaybe (internalError "Module is missing in renameInModule'") $ M.lookup mn env
@@ -124,7 +123,7 @@ desugarImportsWithEnv externs modules = do
 -- have an exports list, as it will also make all data constructor exports
 -- explicit.
 --
-elaborateExports :: Exports -> Module -> Module
+elaborateExports :: Exports -> Module a b -> Module a b
 elaborateExports exps (Module ss coms mn decls refs) =
   Module ss coms mn decls $ Just
     $ elaboratedTypeRefs
@@ -152,11 +151,11 @@ elaborateExports exps (Module ss coms mn decls refs) =
 -- qualified names are valid.
 --
 renameInModule
-  :: forall m
+  :: forall m a b
    . (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadState UsedImports m)
   => Imports
-  -> Module
-  -> m Module
+  -> Module a b
+  -> m (Module a b)
 renameInModule imports (Module ss coms mn decls exps) =
   Module ss coms mn <$> parU decls go <*> pure exps
   where
@@ -165,87 +164,108 @@ renameInModule imports (Module ss coms mn decls exps) =
 
   updateDecl
     :: (Maybe SourceSpan, [Ident])
-    -> Declaration
-    -> m ((Maybe SourceSpan, [Ident]), Declaration)
-  updateDecl (_, bound) d@(PositionedDeclaration pos _ _) =
+    -> Declaration a b
+    -> m ((Maybe SourceSpan, [Ident]), Declaration a b)
+  updateDecl (_, bound) d@(PositionedDeclaration _ pos _ _) =
     return ((Just pos, bound), d)
-  updateDecl (pos, bound) (DataDeclaration dtype name args dctors) =
-    (,) (pos, bound) <$> (DataDeclaration dtype name <$> updateTypeArguments pos args
-                                                     <*> traverse (sndM (traverse (updateTypesEverywhere pos))) dctors)
-  updateDecl (pos, bound) (TypeSynonymDeclaration name ps ty) =
-    (,) (pos, bound) <$> (TypeSynonymDeclaration name <$> updateTypeArguments pos ps
-                                                      <*> updateTypesEverywhere pos ty)
-  updateDecl (pos, bound) (TypeClassDeclaration className args implies deps ds) =
-    (,) (pos, bound) <$> (TypeClassDeclaration className <$> updateTypeArguments pos args
-                                                         <*> updateConstraints pos implies
-                                                         <*> pure deps
-                                                         <*> pure ds)
-  updateDecl (pos, bound) (TypeInstanceDeclaration name cs cn ts ds) =
-    (,) (pos, bound) <$> (TypeInstanceDeclaration name <$> updateConstraints pos cs <*> updateClassName cn pos <*> traverse (updateTypesEverywhere pos) ts <*> pure ds)
-  updateDecl (pos, bound) (TypeDeclaration name ty) =
-    (,) (pos, bound) <$> (TypeDeclaration name <$> updateTypesEverywhere pos ty)
-  updateDecl (pos, bound) (ExternDeclaration name ty) =
-    (,) (pos, name : bound) <$> (ExternDeclaration name <$> updateTypesEverywhere pos ty)
-  updateDecl (pos, bound) (ExternDataDeclaration name ki) =
-    (,) (pos, bound) <$> (ExternDataDeclaration name <$> updateKindsEverywhere pos ki)
-  updateDecl (pos, bound) (TypeFixityDeclaration fixity alias op) =
-    (,) (pos, bound) <$> (TypeFixityDeclaration fixity <$> updateTypeName alias pos <*> pure op)
-  updateDecl (pos, bound) (ValueFixityDeclaration fixity (Qualified mn' (Left alias)) op) =
-    (,) (pos, bound) <$> (ValueFixityDeclaration fixity . fmap Left <$> updateValueName (Qualified mn' alias) pos <*> pure op)
-  updateDecl (pos, bound) (ValueFixityDeclaration fixity (Qualified mn' (Right alias)) op) =
-    (,) (pos, bound) <$> (ValueFixityDeclaration fixity . fmap Right <$> updateDataConstructorName (Qualified mn' alias) pos  <*> pure op)
+  updateDecl (pos, bound) (DataDeclaration ann dtype name args dctors) =
+    (,) (pos, bound) <$>
+      (DataDeclaration ann dtype name
+        <$> updateTypeArguments pos args
+        <*> traverse (sndM (traverse (updateTypesEverywhere pos))) dctors)
+  updateDecl (pos, bound) (TypeSynonymDeclaration ann name ps ty) =
+    (,) (pos, bound) <$>
+      (TypeSynonymDeclaration ann name
+        <$> updateTypeArguments pos ps
+        <*> updateTypesEverywhere pos ty)
+  updateDecl (pos, bound) (TypeClassDeclaration ann className args implies deps ds) =
+    (,) (pos, bound) <$>
+      (TypeClassDeclaration ann className
+        <$> updateTypeArguments pos args
+        <*> updateConstraints pos implies
+        <*> pure deps
+        <*> pure ds)
+  updateDecl (pos, bound) (TypeInstanceDeclaration ann name cs cn ts ds) =
+    (,) (pos, bound) <$>
+      (TypeInstanceDeclaration ann name
+        <$> updateConstraints pos cs
+        <*> updateClassName cn pos
+        <*> traverse (updateTypesEverywhere pos) ts
+        <*> pure ds)
+  updateDecl (pos, bound) (TypeDeclaration ann name ty) =
+    (,) (pos, bound) <$>
+      (TypeDeclaration ann name <$> updateTypesEverywhere pos ty)
+  updateDecl (pos, bound) (ExternDeclaration ann name ty) =
+    (,) (pos, name : bound) <$>
+      (ExternDeclaration ann name <$> updateTypesEverywhere pos ty)
+  updateDecl (pos, bound) (ExternDataDeclaration ann name ki) =
+    (,) (pos, bound) <$>
+      (ExternDataDeclaration ann name <$> updateKindsEverywhere pos ki)
+  updateDecl (pos, bound) (TypeFixityDeclaration ann fixity alias op) =
+    (,) (pos, bound) <$>
+      (TypeFixityDeclaration ann fixity
+        <$> updateTypeName alias pos
+        <*> pure op)
+  updateDecl (pos, bound) (ValueFixityDeclaration ann fixity (Qualified mn' (Left alias)) op) =
+    (,) (pos, bound) <$>
+      (ValueFixityDeclaration ann fixity . fmap Left
+        <$> updateValueName (Qualified mn' alias) pos <*> pure op)
+  updateDecl (pos, bound) (ValueFixityDeclaration ann fixity (Qualified mn' (Right alias)) op) =
+    (,) (pos, bound) <$>
+      (ValueFixityDeclaration ann fixity . fmap Right
+        <$> updateDataConstructorName (Qualified mn' alias) pos  <*> pure op)
   updateDecl s d = return (s, d)
 
   updateValue
     :: (Maybe SourceSpan, [Ident])
-    -> Expr
-    -> m ((Maybe SourceSpan, [Ident]), Expr)
-  updateValue (_, bound) v@(PositionedValue pos' _ _) =
+    -> Expr a b
+    -> m ((Maybe SourceSpan, [Ident]), Expr a b)
+  updateValue (_, bound) v@(PositionedValue _ pos' _ _) =
     return ((Just pos', bound), v)
-  updateValue (pos, bound) (Abs (Left arg) val') =
-    return ((pos, arg : bound), Abs (Left arg) val')
-  updateValue (pos, bound) (Let ds val') = do
+  updateValue (pos, bound) (Abs ann (Left arg) val') =
+    return ((pos, arg : bound), Abs ann (Left arg) val')
+  updateValue (pos, bound) (Let ann ds val') = do
     let args = mapMaybe letBoundVariable ds
     unless (length (nub args) == length args) $
       maybe id rethrowWithPosition pos $
         throwError . errorMessage $ OverlappingNamesInLet
-    return ((pos, args ++ bound), Let ds val')
-  updateValue (pos, bound) (Var name'@(Qualified Nothing ident)) | ident `notElem` bound =
-    (,) (pos, bound) <$> (Var <$> updateValueName name' pos)
-  updateValue (pos, bound) (Var name'@(Qualified (Just _) _)) =
-    (,) (pos, bound) <$> (Var <$> updateValueName name' pos)
-  updateValue (pos, bound) (Op op) =
-    (,) (pos, bound) <$> (Op <$> updateValueOpName op pos)
-  updateValue s@(pos, _) (Constructor name) =
-    (,) s <$> (Constructor <$> updateDataConstructorName name pos)
-  updateValue s@(pos, _) (TypedValue check val ty) =
-    (,) s <$> (TypedValue check val <$> updateTypesEverywhere pos ty)
+    return ((pos, args ++ bound), Let ann ds val')
+  updateValue (pos, bound) (Var ann name'@(Qualified Nothing ident)) | ident `notElem` bound =
+    (,) (pos, bound) <$> (Var ann <$> updateValueName name' pos)
+  updateValue (pos, bound) (Var ann name'@(Qualified (Just _) _)) =
+    (,) (pos, bound) <$> (Var ann <$> updateValueName name' pos)
+  updateValue (pos, bound) (Op ann op) =
+    (,) (pos, bound) <$> (Op ann <$> updateValueOpName op pos)
+  updateValue s@(pos, _) (Constructor ann name) =
+    (,) s <$> (Constructor ann <$> updateDataConstructorName name pos)
+  updateValue s@(pos, _) (TypedValue ann check val ty) =
+    (,) s <$> (TypedValue ann check val <$> updateTypesEverywhere pos ty)
   updateValue s v = return (s, v)
 
   updateBinder
     :: (Maybe SourceSpan, [Ident])
-    -> Binder
-    -> m ((Maybe SourceSpan, [Ident]), Binder)
-  updateBinder (_, bound) v@(PositionedBinder pos _ _) =
+    -> Binder a b
+    -> m ((Maybe SourceSpan, [Ident]), Binder a b)
+  updateBinder (_, bound) v@(PositionedBinder _ pos _ _) =
     return ((Just pos, bound), v)
-  updateBinder s@(pos, _) (ConstructorBinder name b) =
-    (,) s <$> (ConstructorBinder <$> updateDataConstructorName name pos <*> pure b)
-  updateBinder s@(pos, _) (OpBinder op) =
-    (,) s <$> (OpBinder <$> updateValueOpName op pos)
-  updateBinder s@(pos, _) (TypedBinder t b) = do
+  updateBinder s@(pos, _) (ConstructorBinder ann name b) =
+    (,) s <$> (ConstructorBinder ann <$> updateDataConstructorName name pos <*> pure b)
+  updateBinder s@(pos, _) (OpBinder ann op) =
+    (,) s <$> (OpBinder ann <$> updateValueOpName op pos)
+  updateBinder s@(pos, _) (TypedBinder ann t b) = do
     t' <- updateTypesEverywhere pos t
-    return (s, TypedBinder t' b)
+    return (s, TypedBinder ann t' b)
   updateBinder s v =
     return (s, v)
 
   updateCase
     :: (Maybe SourceSpan, [Ident])
-    -> CaseAlternative
-    -> m ((Maybe SourceSpan, [Ident]), CaseAlternative)
+    -> CaseAlternative a b
+    -> m ((Maybe SourceSpan, [Ident]), CaseAlternative a b)
   updateCase (pos, bound) c@(CaseAlternative bs gs) =
     return ((pos, concatMap binderNames bs ++ updateGuard gs ++ bound), c)
     where
-    updateGuard :: [GuardedExpr] -> [Ident]
+    updateGuard :: [GuardedExpr a b] -> [Ident]
     updateGuard [] = []
     updateGuard (GuardedExpr g _ : xs) =
       concatMap updatePatGuard g ++ updateGuard xs
@@ -253,9 +273,9 @@ renameInModule imports (Module ss coms mn decls exps) =
         updatePatGuard (PatternGuard b _) = binderNames b
         updatePatGuard _                  = []
 
-  letBoundVariable :: Declaration -> Maybe Ident
-  letBoundVariable (ValueDeclaration ident _ _ _) = Just ident
-  letBoundVariable (PositionedDeclaration _ _ d) = letBoundVariable d
+  letBoundVariable :: Declaration a b -> Maybe Ident
+  letBoundVariable (ValueDeclaration _ ident _ _ _) = Just ident
+  letBoundVariable (PositionedDeclaration _ _ _ d) = letBoundVariable d
   letBoundVariable _ = Nothing
 
   updateKindsEverywhere :: Maybe SourceSpan -> Kind -> m Kind
@@ -268,23 +288,23 @@ renameInModule imports (Module ss coms mn decls exps) =
   updateTypeArguments
     :: (Traversable f, Traversable g)
     => Maybe SourceSpan
-    -> f (a, g Kind) -> m (f (a, g Kind))
+    -> f (x, g Kind) -> m (f (x, g Kind))
   updateTypeArguments pos = traverse (sndM (traverse (updateKindsEverywhere pos)))
 
-  updateTypesEverywhere :: Maybe SourceSpan -> Type -> m Type
+  updateTypesEverywhere :: Maybe SourceSpan -> Type a -> m (Type a)
   updateTypesEverywhere pos = everywhereOnTypesM updateType
     where
-    updateType :: Type -> m Type
-    updateType (TypeOp name) = TypeOp <$> updateTypeOpName name pos
-    updateType (TypeConstructor name) = TypeConstructor <$> updateTypeName name pos
-    updateType (ConstrainedType cs t) = ConstrainedType <$> traverse updateInConstraint cs <*> pure t
-    updateType (KindedType t k) = KindedType t <$> updateKindsEverywhere pos k
+    updateType :: Type a -> m (Type a)
+    updateType (TypeOp ann name) = TypeOp ann <$> updateTypeOpName name pos
+    updateType (TypeConstructor ann name) = TypeConstructor ann <$> updateTypeName name pos
+    updateType (ConstrainedType ann cs t) = ConstrainedType ann <$> traverse updateInConstraint cs <*> pure t
+    updateType (KindedType ann t k) = KindedType ann t <$> updateKindsEverywhere pos k
     updateType t = return t
-    updateInConstraint :: Constraint -> m Constraint
+    updateInConstraint :: Constraint a -> m (Constraint a)
     updateInConstraint (Constraint name ts info) =
       Constraint <$> updateClassName name pos <*> pure ts <*> pure info
 
-  updateConstraints :: Maybe SourceSpan -> [Constraint] -> m [Constraint]
+  updateConstraints :: Maybe SourceSpan -> [Constraint a] -> m [Constraint a]
   updateConstraints pos = traverse $ \(Constraint name ts info) ->
     Constraint
       <$> updateClassName name pos
@@ -334,12 +354,12 @@ renameInModule imports (Module ss coms mn decls exps) =
   -- qualified references are replaced with their canoncial qualified names
   -- (e.g. M.Map -> Data.Map.Map).
   update
-    :: (Ord a)
-    => M.Map (Qualified a) [ImportRecord a]
-    -> (a -> Name)
-    -> Qualified a
+    :: Ord x
+    => M.Map (Qualified x) [ImportRecord x]
+    -> (x -> Name)
+    -> Qualified x
     -> Maybe SourceSpan
-    -> m (Qualified a)
+    -> m (Qualified x)
   update imps toName qname@(Qualified mn' name) pos = positioned $
     case (M.lookup qname imps, mn') of
 
