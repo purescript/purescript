@@ -35,14 +35,14 @@ import Language.PureScript.Label (Label(..))
 import Language.PureScript.Types
 
 -- | Generate a fresh type variable
-freshType :: (MonadState CheckState m) => m Type
+freshType :: (MonadState CheckState m) => m (Type ())
 freshType = do
   t <- gets checkNextType
   modify $ \st -> st { checkNextType = t + 1 }
-  return $ TUnknown t
+  return $ TUnknown () t
 
 -- | Update the substitution to solve a type constraint
-solveType :: (MonadError MultipleErrors m, MonadState CheckState m) => Int -> Type -> m ()
+solveType :: (MonadError MultipleErrors m, MonadState CheckState m) => Int -> Type () -> m ()
 solveType u t = do
   occursCheck u t
   modify $ \cs -> cs { checkSubstitution =
@@ -52,42 +52,42 @@ solveType u t = do
                      }
 
 -- | Apply a substitution to a type
-substituteType :: Substitution -> Type -> Type
+substituteType :: Substitution -> Type () -> Type ()
 substituteType sub = everywhereOnTypes go
   where
-  go (TUnknown u) =
+  go (TUnknown _ u) =
     case M.lookup u (substType sub) of
-      Nothing -> TUnknown u
-      Just (TUnknown u1) | u1 == u -> TUnknown u1
+      Nothing -> TUnknown () u
+      Just (TUnknown () u1) | u1 == u -> TUnknown () u1
       Just t -> substituteType sub t
   go other = other
 
 -- | Make sure that an unknown does not occur in a type
-occursCheck :: (MonadError MultipleErrors m) => Int -> Type -> m ()
+occursCheck :: (MonadError MultipleErrors m) => Int -> Type a -> m ()
 occursCheck _ TUnknown{} = return ()
 occursCheck u t = void $ everywhereOnTypesM go t
   where
-  go (TUnknown u') | u == u' = throwError . errorMessage . InfiniteType $ t
+  go (TUnknown _ u') | u == u' = throwError . errorMessage . InfiniteType $ void t
   go other = return other
 
 -- | Compute a list of all unknowns appearing in a type
-unknownsInType :: Type -> [Int]
+unknownsInType :: Type a -> [Int]
 unknownsInType t = everythingOnTypes (.) go t []
   where
-  go :: Type -> [Int] -> [Int]
-  go (TUnknown u) = (u :)
+  go :: Type a -> [Int] -> [Int]
+  go (TUnknown _ u) = (u :)
   go _ = id
 
 -- | Unify two types, updating the current substitution
-unifyTypes :: (MonadError MultipleErrors m, MonadState CheckState m) => Type -> Type -> m ()
+unifyTypes :: (MonadError MultipleErrors m, MonadState CheckState m) => Type () -> Type () -> m ()
 unifyTypes t1 t2 = do
   sub <- gets checkSubstitution
   withErrorMessageHint (ErrorUnifyingTypes t1 t2) $ unifyTypes' (substituteType sub t1) (substituteType sub t2)
   where
-  unifyTypes' (TUnknown u1) (TUnknown u2) | u1 == u2 = return ()
-  unifyTypes' (TUnknown u) t = solveType u t
-  unifyTypes' t (TUnknown u) = solveType u t
-  unifyTypes' (ForAll ident1 ty1 sc1) (ForAll ident2 ty2 sc2) =
+  unifyTypes' (TUnknown _ u1) (TUnknown _ u2) | u1 == u2 = return ()
+  unifyTypes' (TUnknown _ u) t = solveType u t
+  unifyTypes' t (TUnknown _ u) = solveType u t
+  unifyTypes' (ForAll _ ident1 ty1 sc1) (ForAll _ ident2 ty2 sc2) =
     case (sc1, sc2) of
       (Just sc1', Just sc2') -> do
         sko <- newSkolemConstant
@@ -95,29 +95,29 @@ unifyTypes t1 t2 = do
         let sk2 = skolemize ident2 sko sc2' Nothing ty2
         sk1 `unifyTypes` sk2
       _ -> internalError "unifyTypes: unspecified skolem scope"
-  unifyTypes' (ForAll ident ty1 (Just sc)) ty2 = do
+  unifyTypes' (ForAll _ ident ty1 (Just sc)) ty2 = do
     sko <- newSkolemConstant
     let sk = skolemize ident sko sc Nothing ty1
     sk `unifyTypes` ty2
   unifyTypes' ForAll{} _ = internalError "unifyTypes: unspecified skolem scope"
   unifyTypes' ty f@ForAll{} = f `unifyTypes` ty
-  unifyTypes' (TypeVar v1) (TypeVar v2) | v1 == v2 = return ()
-  unifyTypes' ty1@(TypeConstructor c1) ty2@(TypeConstructor c2) =
+  unifyTypes' (TypeVar _ v1) (TypeVar _ v2) | v1 == v2 = return ()
+  unifyTypes' ty1@(TypeConstructor _ c1) ty2@(TypeConstructor _ c2) =
     guardWith (errorMessage (TypesDoNotUnify ty1 ty2)) (c1 == c2)
-  unifyTypes' (TypeLevelString s1) (TypeLevelString s2) | s1 == s2 = return ()
-  unifyTypes' (TypeApp t3 t4) (TypeApp t5 t6) = do
+  unifyTypes' (TypeLevelString _ s1) (TypeLevelString _ s2) | s1 == s2 = return ()
+  unifyTypes' (TypeApp _ t3 t4) (TypeApp _ t5 t6) = do
     t3 `unifyTypes` t5
     t4 `unifyTypes` t6
-  unifyTypes' (Skolem _ s1 _ _) (Skolem _ s2 _ _) | s1 == s2 = return ()
-  unifyTypes' (KindedType ty1 _) ty2 = ty1 `unifyTypes` ty2
-  unifyTypes' ty1 (KindedType ty2 _) = ty1 `unifyTypes` ty2
+  unifyTypes' (Skolem _ _ s1 _ _) (Skolem _ _ s2 _ _) | s1 == s2 = return ()
+  unifyTypes' (KindedType _ ty1 _) ty2 = ty1 `unifyTypes` ty2
+  unifyTypes' ty1 (KindedType _ ty2 _) = ty1 `unifyTypes` ty2
   unifyTypes' r1@RCons{} r2 = unifyRows r1 r2
   unifyTypes' r1 r2@RCons{} = unifyRows r1 r2
-  unifyTypes' r1@REmpty r2 = unifyRows r1 r2
-  unifyTypes' r1 r2@REmpty = unifyRows r1 r2
-  unifyTypes' ty1@(ConstrainedType _ _) ty2 =
+  unifyTypes' r1@REmpty{} r2 = unifyRows r1 r2
+  unifyTypes' r1 r2@REmpty{} = unifyRows r1 r2
+  unifyTypes' ty1@ConstrainedType{} ty2 =
     throwError . errorMessage $ ConstrainedTypeUnified ty1 ty2
-  unifyTypes' t3 t4@(ConstrainedType _ _) = unifyTypes' t4 t3
+  unifyTypes' t3 t4@ConstrainedType{} = unifyTypes' t4 t3
   unifyTypes' t3 t4 =
     throwError . errorMessage $ TypesDoNotUnify t3 t4
 
@@ -128,7 +128,7 @@ unifyTypes t1 t2 = do
 -- trailing row unification variable, if appropriate, otherwise leftover labels result in a unification
 -- error.
 --
-unifyRows :: forall m. (MonadError MultipleErrors m, MonadState CheckState m) => Type -> Type -> m ()
+unifyRows :: forall m. (MonadError MultipleErrors m, MonadState CheckState m) => Type () -> Type () -> m ()
 unifyRows r1 r2 =
   let
     (s1, r1') = rowToList r1
@@ -140,25 +140,25 @@ unifyRows r1 r2 =
     forM_ int (uncurry unifyTypes)
     unifyRows' sd1 r1' sd2 r2'
   where
-  unifyRows' :: [(Label, Type)] -> Type -> [(Label, Type)] -> Type -> m ()
-  unifyRows' [] (TUnknown u) sd r = solveType u (rowFromList (sd, r))
-  unifyRows' sd r [] (TUnknown u) = solveType u (rowFromList (sd, r))
-  unifyRows' sd1 (TUnknown u1) sd2 (TUnknown u2) = do
+  unifyRows' :: [(Label, Type ())] -> Type () -> [(Label, Type ())] -> Type () -> m ()
+  unifyRows' [] (TUnknown _ u) sd r = solveType u (rowFromList (sd, r))
+  unifyRows' sd r [] (TUnknown _ u) = solveType u (rowFromList (sd, r))
+  unifyRows' sd1 (TUnknown _ u1) sd2 (TUnknown _ u2) = do
     forM_ sd1 $ \(_, t) -> occursCheck u2 t
     forM_ sd2 $ \(_, t) -> occursCheck u1 t
     rest <- freshType
     solveType u1 (rowFromList (sd2, rest))
     solveType u2 (rowFromList (sd1, rest))
-  unifyRows' [] REmpty [] REmpty = return ()
-  unifyRows' [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
-  unifyRows' [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) | s1 == s2 = return ()
+  unifyRows' [] REmpty{} [] REmpty{} = return ()
+  unifyRows' [] (TypeVar _ v1) [] (TypeVar _ v2) | v1 == v2 = return ()
+  unifyRows' [] (Skolem _ _ s1 _ _) [] (Skolem _ _ s2 _ _) | s1 == s2 = return ()
   unifyRows' _ _ _ _ =
     throwError . errorMessage $ TypesDoNotUnify r1 r2
 
 -- |
 -- Replace a single type variable with a new unification variable
 --
-replaceVarWithUnknown :: (MonadState CheckState m) => Text -> Type -> m Type
+replaceVarWithUnknown :: (MonadState CheckState m) => Text -> Type () -> m (Type ())
 replaceVarWithUnknown ident ty = do
   tu <- freshType
   return $ replaceTypeVars ident tu ty
@@ -166,10 +166,10 @@ replaceVarWithUnknown ident ty = do
 -- |
 -- Replace type wildcards with unknowns
 --
-replaceTypeWildcards :: (MonadWriter MultipleErrors m, MonadState CheckState m) => Type -> m Type
+replaceTypeWildcards :: (MonadWriter MultipleErrors m, MonadState CheckState m) => Type () -> m (Type ())
 replaceTypeWildcards = everywhereOnTypesM replace
   where
-  replace (TypeWildcard ss) = do
+  replace (TypeWildcard _ ss) = do
     t <- freshType
     ctx <- getLocalContext
     warnWithPosition ss $ tell . errorMessage $ WildcardInferredType t ctx
@@ -179,12 +179,12 @@ replaceTypeWildcards = everywhereOnTypesM replace
 -- |
 -- Replace outermost unsolved unification variables with named type variables
 --
-varIfUnknown :: Type -> Type
+varIfUnknown :: Type a -> Type a
 varIfUnknown ty =
   let unks = nub $ unknownsInType ty
       toName = T.cons 't' . T.pack .  show
       ty' = everywhereOnTypes typeToVar ty
-      typeToVar :: Type -> Type
-      typeToVar (TUnknown u) = TypeVar (toName u)
+      typeToVar :: Type a -> Type a
+      typeToVar (TUnknown ann u) = TypeVar ann (toName u)
       typeToVar t = t
-  in mkForAll (sort . map toName $ unks) ty'
+  in mkForAll (extractTypeAnn ty) (sort . map toName $ unks) ty'

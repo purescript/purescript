@@ -36,7 +36,7 @@ replaceAllTypeSynonyms' syns = everywhereOnTypesTopDownM try
   try t = fromMaybe t <$> go 0 [] t
 
   go :: Int -> [Type ()] -> Type () -> Either MultipleErrors (Maybe (Type ()))
-  go c args (TypeConstructor ctor _)
+  go c args (TypeConstructor _ ctor)
     | Just (synArgs, body) <- M.lookup ctor syns
     , c == length synArgs
     = let repl = replaceAllTypeVars (zip (map fst synArgs) args) body
@@ -44,7 +44,7 @@ replaceAllTypeSynonyms' syns = everywhereOnTypesTopDownM try
     | Just (synArgs, _) <- M.lookup ctor syns
     , length synArgs > c
     = throwError . errorMessage $ PartiallyAppliedSynonym ctor
-  go c args (TypeApp f arg _) = go (c + 1) (arg : args) f
+  go c args (TypeApp _ f arg) = go (c + 1) (arg : args) f
   go _ _ _ = return Nothing
 
 -- | Replace fully applied type synonyms
