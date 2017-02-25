@@ -7,6 +7,7 @@ module Language.PureScript.AST.Binders where
 
 import Prelude.Compat
 
+import Data.Bifunctor
 import Data.Bifunctor.TH
 
 import Language.PureScript.AST.SourcePos
@@ -86,6 +87,9 @@ instance Eq (Binder a b) where
   _ == _ = False
 
 $(deriveBifunctor ''Binder)
+
+voidBinder :: Binder a b -> Binder () ()
+voidBinder = bimap (const ()) (const ())
 
 -- |
 -- Collect all names introduced in binders in an expression
