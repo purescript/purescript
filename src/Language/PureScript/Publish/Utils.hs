@@ -18,7 +18,8 @@ globRelative pat = do
   currentDir <- getCurrentDirectory
   glob pat currentDir
 
--- | Glob relative to the specified directory, and produce relative pathnames.
+-- | Glob relative to the specified directory, and produce paths relative to the
+-- current directory.
 glob :: Glob.Pattern -> FilePath -> IO [FilePath]
 glob pat target = do
   currentDir <- getCurrentDirectory
