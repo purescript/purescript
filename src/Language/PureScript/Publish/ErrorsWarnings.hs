@@ -47,6 +47,7 @@ data PackageWarning
   | UndeclaredDependency PackageName
   | UnacceptableVersion (PackageName, Text)
   | DirtyWorkingTree_Warn
+  | MissingPath PackageName
   deriving (Show)
 
 -- | An error that should be fixed by the user.
@@ -306,23 +307,25 @@ data CollectedWarnings = CollectedWarnings
   , undeclaredDependencies :: [PackageName]
   , unacceptableVersions   :: [(PackageName, Text)]
   , dirtyWorkingTree       :: Any
+  , missingPaths           :: [PackageName]
   }
   deriving (Show, Eq, Ord)
 
 instance Monoid CollectedWarnings where
-  mempty = CollectedWarnings mempty mempty mempty mempty
-  mappend (CollectedWarnings as bs cs d)
-          (CollectedWarnings as' bs' cs' d') =
-    CollectedWarnings (as <> as') (bs <> bs') (cs <> cs') (d <> d')
+  mempty = CollectedWarnings mempty mempty mempty mempty mempty
+  mappend (CollectedWarnings as bs cs d es)
+          (CollectedWarnings as' bs' cs' d' es') =
+    CollectedWarnings (as <> as') (bs <> bs') (cs <> cs') (d <> d') (es <> es')
 
 collectWarnings :: [PackageWarning] -> CollectedWarnings
 collectWarnings = foldMap singular
   where
   singular w = case w of
-    NoResolvedVersion    pn -> CollectedWarnings [pn] mempty mempty mempty
-    UndeclaredDependency pn -> CollectedWarnings mempty [pn] mempty mempty
-    UnacceptableVersion t   -> CollectedWarnings mempty mempty [t] mempty
-    DirtyWorkingTree_Warn   -> CollectedWarnings mempty mempty mempty (Any True)
+    NoResolvedVersion    pn -> CollectedWarnings [pn] mempty mempty mempty mempty
+    UndeclaredDependency pn -> CollectedWarnings mempty [pn] mempty mempty mempty
+    UnacceptableVersion t   -> CollectedWarnings mempty mempty [t] mempty mempty
+    DirtyWorkingTree_Warn   -> CollectedWarnings mempty mempty mempty (Any True) mempty
+    MissingPath pn          -> CollectedWarnings mempty mempty mempty mempty [pn]
 
 renderWarnings :: [PackageWarning] -> Box
 renderWarnings warns =
@@ -334,6 +337,7 @@ renderWarnings warns =
                , if getAny dirtyWorkingTree
                    then Just warnDirtyWorkingTree
                    else Nothing
+               , go warnMissingPaths           missingPaths
                ]
   in case catMaybes mboxes of
        []    -> nullBox
@@ -413,6 +417,19 @@ warnDirtyWorkingTree =
     "Your working tree is dirty. (Note: this would be an error if it "
     ++ "were not a dry run)"
     )
+
+warnMissingPaths :: NonEmpty PackageName -> Box
+warnMissingPaths pkgs =
+  let singular = NonEmpty.length pkgs == 1
+      pl a b = if singular then b else a
+
+      packages   = pl "packages" "package"
+  in vcat $
+    para (concat
+      [ "The following installed ", packages, " were "
+      , "missing path information in the resolutions file:"
+      ])
+    : bulletedListT runPackageName (NonEmpty.toList pkgs)
 
 printWarnings :: [PackageWarning] -> IO ()
 printWarnings = printToStderr . renderWarnings

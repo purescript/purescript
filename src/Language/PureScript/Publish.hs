@@ -26,7 +26,7 @@ import Control.Arrow ((***))
 import Control.Category ((>>>))
 import Control.Monad.Writer.Strict (MonadWriter, WriterT, runWriterT, tell)
 
-import Data.Aeson.BetterErrors (Parse, parse, keyMay, eachInObjectWithKey, eachInObject, key, keyOrDefault, asBool, asText)
+import Data.Aeson.BetterErrors (Parse, parse, keyMay, eachInObjectWithKey, eachInObject, key, keyOrDefault, asBool, asString, asText)
 import qualified Data.ByteString.Lazy as BL
 import Data.Char (isSpace)
 import Data.String (String, lines)
@@ -128,20 +128,24 @@ preparePackage' manifestFile resolutionsFile opts = do
   (pkgVersionTag, pkgVersion) <- publishGetVersion opts
   pkgTagTime                  <- Just <$> publishGetTagTime opts pkgVersionTag
   pkgGithub                   <- getManifestRepositoryInfo pkgMeta
-  (pkgModules, pkgModuleMap)  <- getModules
 
   let declaredDeps = map fst (bowerDependencies pkgMeta ++
                               bowerDevDependencies pkgMeta)
-  pkgResolvedDependencies     <- getResolvedDependencies resolutionsFile declaredDeps
+  resolvedDeps                <- getResolvedDependencies resolutionsFile declaredDeps
+
+  (pkgModules, pkgModuleMap)  <- getModules (map (second fst) resolvedDeps)
 
   let pkgUploader = D.NotYetKnown
   let pkgCompilerVersion = P.version
+  let pkgResolvedDependencies = map (second snd) resolvedDeps
 
   return D.Package{..}
 
-getModules :: PrepareM ([D.Module], Map P.ModuleName PackageName)
-getModules = do
-  (inputFiles, depsFiles) <- liftIO getInputAndDepsFiles
+getModules
+  :: [(PackageName, FilePath)]
+  -> PrepareM ([D.Module], Map P.ModuleName PackageName)
+getModules paths = do
+  (inputFiles, depsFiles) <- liftIO (getInputAndDepsFiles paths)
   (modules', moduleMap) <- parseFilesInPackages inputFiles depsFiles
 
   case runExcept (D.convertModulesInPackage modules' moduleMap) of
@@ -280,7 +284,7 @@ data DependencyStatus
 -- probably for a reason. However, docs are only ever available for released
 -- versions. Therefore there will probably be no version of the docs which is
 -- appropriate to link to, and we should omit links.
-getResolvedDependencies :: FilePath -> [PackageName] -> PrepareM [(PackageName, Version)]
+getResolvedDependencies :: FilePath -> [PackageName] -> PrepareM [(PackageName, (FilePath, Version))]
 getResolvedDependencies resolutionsFile declaredDeps = do
   unlessM (liftIO (doesFileExist resolutionsFile)) (userError ResolutionsFileNotFound)
   depsBS <- liftIO (BL.readFile resolutionsFile)
@@ -297,13 +301,13 @@ getResolvedDependencies resolutionsFile declaredDeps = do
 
 -- | Extracts all dependencies and their versions from a "resolutions" file, which
 -- is based on the output of `bower list --json --offline`
-asResolvedDependencies :: Parse D.ManifestError [(PackageName, DependencyStatus)]
+asResolvedDependencies :: Parse D.ManifestError [(PackageName, (Maybe FilePath, DependencyStatus))]
 asResolvedDependencies = nubBy ((==) `on` fst) <$> go
   where
   go =
     fmap (fromMaybe []) $
       keyMay "dependencies" $
-        (++) <$> eachInObjectWithKey parsePackageName asDependencyStatus
+        (++) <$> eachInObjectWithKey parsePackageName asDirectoryAndDependencyStatus
              <*> (concatMap snd <$> eachInObject asResolvedDependencies)
 
 -- | Extracts only the top level dependency names from a resolutions file.
@@ -313,57 +317,73 @@ asToplevelDependencies =
     key "dependencies" $
       eachInObjectWithKey parsePackageName (return ())
 
-asDependencyStatus :: Parse e DependencyStatus
-asDependencyStatus = do
+asDirectoryAndDependencyStatus :: Parse e (Maybe FilePath, DependencyStatus)
+asDirectoryAndDependencyStatus = do
   isMissing <- keyOrDefault "missing" False asBool
   if isMissing
     then
-      return Missing
-    else
-      key "pkgMeta" $
+      return (Nothing, Missing)
+    else do
+      directory <- key "canonicalDir" asString
+      status <- key "pkgMeta" $
         keyOrDefault "_resolution" NoResolution $ do
           type_ <- key "type" asText
           case type_ of
             "version" -> ResolvedVersion <$> key "tag" asText
             other -> return (ResolvedOther other)
+      return (Just directory, status)
 
 warnUndeclared :: [PackageName] -> [PackageName] -> PrepareM ()
 warnUndeclared declared actual =
   traverse_ (warn . UndeclaredDependency) (actual \\ declared)
 
-handleDeps ::
-  [(PackageName, DependencyStatus)] -> PrepareM [(PackageName, Version)]
+handleDeps
+  :: [(PackageName, (Maybe FilePath, DependencyStatus))]
+  -> PrepareM [(PackageName, (FilePath, Version))]
 handleDeps deps = do
-  let (missing, noVersion, installed) = partitionDeps deps
+  let (missing, noVersion, installed, missingPath) = partitionDeps deps
   case missing of
     (x:xs) ->
       userError (MissingDependencies (x :| xs))
     [] -> do
       traverse_ (warn . NoResolvedVersion) noVersion
+      traverse_ (warn . MissingPath) missingPath
       catMaybes <$> traverse tryExtractVersion' installed
 
   where
-  partitionDeps = foldr go ([], [], [])
-  go (pkgName, d) (ms, os, is) =
+  partitionDeps = foldr go ([], [], [], [])
+  go (pkgName, (Nothing, _)) (ms, os, is, mp) =
+    (ms, os, is, pkgName : mp)
+  go (pkgName, (Just path, d)) (ms, os, is, mp) =
     case d of
-      Missing           -> (pkgName : ms, os, is)
-      NoResolution      -> (ms, pkgName : os, is)
-      ResolvedOther _   -> (ms, pkgName : os, is)
-      ResolvedVersion v -> (ms, os, (pkgName, v) : is)
+      Missing           -> (pkgName : ms, os, is, mp)
+      NoResolution      -> (ms, pkgName : os, is, mp)
+      ResolvedOther _   -> (ms, pkgName : os, is, mp)
+      ResolvedVersion v -> (ms, os, (pkgName, (path, v)) : is, mp)
 
   -- Try to extract a version, and warn if unsuccessful.
-  tryExtractVersion' :: (PackageName, Text) -> PrepareM (Maybe (PackageName, Version))
+  tryExtractVersion'
+    :: (PackageName, (extra, Text))
+    -> PrepareM (Maybe (PackageName, (extra, Version)))
   tryExtractVersion' pair =
-    maybe (warn (UnacceptableVersion pair) >> return Nothing)
+    maybe (warn (UnacceptableVersion (fmap snd pair)) >> return Nothing)
           (return . Just)
           (tryExtractVersion pair)
 
-tryExtractVersion :: (PackageName, Text) -> Maybe (PackageName, Version)
-tryExtractVersion (pkgName, tag) =
+tryExtractVersion
+  :: (PackageName, (extra, Text))
+  -> Maybe (PackageName, (extra, Version))
+tryExtractVersion (pkgName, (extra, tag)) =
   let tag' = fromMaybe tag (T.stripPrefix "v" tag)
-  in  (pkgName,) <$> D.parseVersion' (T.unpack tag')
+  in  (pkgName,) . (extra,) <$> D.parseVersion' (T.unpack tag')
 
-getInputAndDepsFiles :: IO ([FilePath], [(PackageName, FilePath)])
-getInputAndDepsFiles = do
+getInputAndDepsFiles
+  :: [(PackageName, FilePath)]
+  -> IO ([FilePath], [(PackageName, FilePath)])
+getInputAndDepsFiles depPaths = do
   inputFiles <- globRelative purescriptSourceFiles
-  return (inputFiles, error "TODO")
+  let handleDep (pkgName, path) = do
+        depFiles <- glob purescriptSourceFiles path
+        return (map (pkgName,) depFiles)
+  depFiles <- concat <$> traverse handleDep depPaths
+  return (inputFiles, depFiles)

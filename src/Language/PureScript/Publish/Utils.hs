@@ -16,14 +16,20 @@ import qualified System.FilePath.Glob as Glob
 globRelative :: Glob.Pattern -> IO [FilePath]
 globRelative pat = do
   currentDir <- getCurrentDirectory
-  filesAbsolute <- Glob.globDir1 pat currentDir
+  glob pat currentDir
+
+-- | Glob relative to the specified directory, and produce relative pathnames.
+glob :: Glob.Pattern -> FilePath -> IO [FilePath]
+glob pat target = do
+  currentDir <- getCurrentDirectory
+  filesAbsolute <- Glob.globDir1 pat target
   let prefix = currentDir ++ [pathSeparator]
   let (fails, paths) = partitionEithers . map (stripPrefix' prefix) $ filesAbsolute
   if null fails
     then return paths
     else do
       let p = hPutStrLn stderr
-      p "Internal error in Language.PureScript.Publish.Utils.globRelative"
+      p "Internal error in Language.PureScript.Publish.Utils.glob"
       p "Unmatched files:"
       mapM_ p fails
       exitFailure
