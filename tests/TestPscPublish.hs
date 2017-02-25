@@ -49,6 +49,7 @@ testRunOptions = defaultPublishOptions
 -- | attempt to parse it again, and ensure that it doesn't change.
 testPackage :: String -> IO ()
 testPackage dir = pushd dir $ do
+  generateResolutionsFile "resolutions.json"
   res <- preparePackage "bower.json" "resolutions.json" testRunOptions
   case res of
     Left e -> preparePackageError e
