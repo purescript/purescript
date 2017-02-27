@@ -39,6 +39,7 @@ import Data.Version
 import qualified Data.SPDX as SPDX
 
 import System.Directory (doesFileExist)
+import System.FilePath.Glob (globDir1)
 import System.Process (readProcess)
 
 import Web.Bower.PackageMeta (PackageMeta(..), PackageName, parsePackageName, Repository(..))
@@ -383,7 +384,7 @@ getInputAndDepsFiles
 getInputAndDepsFiles depPaths = do
   inputFiles <- globRelative purescriptSourceFiles
   let handleDep (pkgName, path) = do
-        depFiles <- glob purescriptSourceFiles path
+        depFiles <- globDir1 purescriptSourceFiles path
         return (map (pkgName,) depFiles)
   depFiles <- concat <$> traverse handleDep depPaths
   return (inputFiles, depFiles)

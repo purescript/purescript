@@ -165,8 +165,3 @@ pushd dir act = do
   result <- try act :: IO (Either IOException a)
   setCurrentDirectory original
   either throwIO return result
-
-generateResolutionsFile :: FilePath -> IO ()
-generateResolutionsFile fp =
-  readProcess "bower" ["list", "--offline", "--json"] "" >>=
-    writeFile fp
