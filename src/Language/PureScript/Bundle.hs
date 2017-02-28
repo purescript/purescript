@@ -114,8 +114,8 @@ printErrorMessage :: ErrorMessage -> [String]
 printErrorMessage (UnsupportedModulePath s) =
   [ "A CommonJS module has an unsupported name (" ++ show s ++ ")."
   , "The following file names are supported:"
-  , "  1) index.js (psc native modules)"
-  , "  2) foreign.js (psc foreign modules)"
+  , "  1) index.js (PureScript native modules)"
+  , "  2) foreign.js (PureScript foreign modules)"
   ]
 printErrorMessage InvalidTopLevel =
   [ "Expected a list of source elements at the top level." ]

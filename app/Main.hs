@@ -37,7 +37,7 @@ main = do
     opts        = Opts.info (versionInfo <*> Opts.helper <*> commands) infoModList
     infoModList = Opts.fullDesc <> headerInfo <> footerInfo
     headerInfo  = Opts.progDesc "The PureScript compiler and tools"
-    footerInfo  = Opts.footer $ "psc " ++ showVersion Paths.version
+    footerInfo  = Opts.footer $ "purs " ++ showVersion Paths.version
 
     versionInfo :: Opts.Parser (a -> a)
     versionInfo = Opts.abortOption (Opts.InfoMsg versionString) $
