@@ -18,7 +18,7 @@ import Prelude.Compat
 import Control.Exception (IOException)
 
 import Data.Aeson.BetterErrors (ParseError, displayError)
-import Data.List (intersperse, intercalate)
+import Data.List (intersperse)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe
 import Data.Monoid
@@ -27,10 +27,11 @@ import qualified Data.List.NonEmpty as NonEmpty
 import Data.Text (Text)
 import qualified Data.Text as T
 
+import Language.PureScript.Docs.Types (ManifestError)
 import Language.PureScript.Publish.BoxesHelpers
 import qualified Language.PureScript as P
 
-import Web.Bower.PackageMeta (BowerError, PackageName, runPackageName, showBowerError)
+import Web.Bower.PackageMeta (PackageName, runPackageName, showBowerError)
 import qualified Web.Bower.PackageMeta as Bower
 
 -- | An error which meant that it was not possible to retrieve metadata for a
@@ -46,13 +47,14 @@ data PackageWarning
   | UndeclaredDependency PackageName
   | UnacceptableVersion (PackageName, Text)
   | DirtyWorkingTree_Warn
+  | MissingPath PackageName
   deriving (Show)
 
 -- | An error that should be fixed by the user.
 data UserError
-  = BowerJSONNotFound
-  | BowerExecutableNotFound [String] -- list of executable names tried
-  | CouldntDecodeBowerJSON (ParseError BowerError)
+  = PackageManifestNotFound
+  | ResolutionsFileNotFound
+  | CouldntDecodePackageManifest (ParseError ManifestError)
   | TagMustBeCheckedOut
   | AmbiguousVersions [Version] -- Invariant: should contain at least two elements
   | BadRepositoryField RepositoryFieldError
@@ -72,13 +74,13 @@ data RepositoryFieldError
 
 -- | An error that probably indicates a bug in this module.
 data InternalError
-  = JSONError JSONSource (ParseError BowerError)
+  = JSONError JSONSource (ParseError ManifestError)
   | CouldntParseGitTagDate Text
   deriving (Show)
 
 data JSONSource
   = FromFile FilePath
-  | FromBowerList
+  | FromResolutions
   deriving (Show)
 
 data OtherError
@@ -121,24 +123,19 @@ renderError err =
 
 displayUserError :: UserError -> Box
 displayUserError e = case e of
-  BowerJSONNotFound ->
+  PackageManifestNotFound ->
     para (
-      "The bower.json file was not found. Please create one, or run " ++
+      "The package manifest file was not found. Please create one, or run " ++
       "`pulp init`."
       )
-  BowerExecutableNotFound names ->
-    para (concat
-      [ "The Bower executable was not found (tried: ", format names, "). Please"
-      , " ensure that bower is installed and on your PATH."
-      ])
-    where
-    format = intercalate ", " . map show
-  CouldntDecodeBowerJSON err ->
+  ResolutionsFileNotFound ->
+    para "The resolutions file was not found."
+  CouldntDecodePackageManifest err ->
     vcat
-      [ para "There was a problem with your bower.json file:"
+      [ para "There was a problem with your package manifest file:"
       , indented (vcat (map (para . T.unpack) (displayError showBowerError err)))
       , spacer
-      , para "Please ensure that your bower.json file is valid."
+      , para "Please ensure that your package manifest file is valid."
       ]
   TagMustBeCheckedOut ->
       vcat
@@ -174,7 +171,7 @@ displayUserError e = case e of
   NoLicenseSpecified ->
     vcat $
       [ para (concat
-          [ "No license is specified in bower.json. Please add one, using the "
+          [ "No license is specified in package manifest. Please add one, using the "
           , "SPDX license expression format. For example, any of the "
           , "following would be acceptable:"
           ])
@@ -195,7 +192,7 @@ displayUserError e = case e of
   InvalidLicense ->
     vcat $
       [ para (concat
-          [ "The license specified in bower.json is not a valid SPDX license "
+          [ "The license specified in package manifest is not a valid SPDX license "
           , "expression. Please use the SPDX license expression format. For "
           , "example, any of the following would be acceptable:"
           ])
@@ -207,20 +204,13 @@ displayUserError e = case e of
         pl a b = if singular then b else a
         do_          = pl "do" "does"
         dependencies = pl "dependencies" "dependency"
-        them         = pl "them" "it"
     in vcat $
       [ para (concat
-        [ "The following Bower ", dependencies, " ", do_, " not appear to be "
+        [ "The following ", dependencies, " ", do_, " not appear to be "
         , "installed:"
         ])
       ] ++
         bulletedListT runPackageName (NonEmpty.toList pkgs)
-        ++
-      [ spacer
-      , para (concat
-        [ "Please install ", them, " first, by running `bower install`."
-        ])
-      ]
   CompileError err ->
     vcat
       [ para "Compile error:"
@@ -247,7 +237,7 @@ displayRepositoryError err = case err of
   RepositoryFieldMissing ->
     vcat
       [ para (concat
-         [ "The 'repository' field is not present in your bower.json file. "
+         [ "The 'repository' field is not present in your package manifest file. "
          , "Without this information, Pursuit would not be able to generate "
          , "source links in your package's documentation. Please add one - like "
          , "this, for example:"
@@ -263,21 +253,21 @@ displayRepositoryError err = case err of
       ]
   BadRepositoryType ty ->
     para (concat
-      [ "In your bower.json file, the repository type is currently listed as "
+      [ "In your package manifest file, the repository type is currently listed as "
       , "\"" ++ T.unpack ty ++ "\". Currently, only git repositories are supported. "
       , "Please publish your code in a git repository, and then update the "
-      , "repository type in your bower.json file to \"git\"."
+      , "repository type in your package manifest file to \"git\"."
       ])
   NotOnGithub ->
     vcat
       [ para (concat
-        [ "The repository url in your bower.json file does not point to a "
+        [ "The repository url in your package manifest file does not point to a "
         , "GitHub repository. Currently, Pursuit does not support packages "
         , "which are not hosted on GitHub."
         ])
       , spacer
       , para (concat
-        [ "Please update your bower.json file to point to a GitHub repository. "
+        [ "Please update your package manifest file to point to a GitHub repository. "
         , "Alternatively, if you would prefer not to host your package on "
         , "GitHub, please open an issue:"
         ])
@@ -298,8 +288,8 @@ displayJSONSource :: JSONSource -> String
 displayJSONSource s = case s of
   FromFile fp ->
     "in file " ++ show fp
-  FromBowerList ->
-    "in the output of `bower list --json --offline`"
+  FromResolutions ->
+    "in resolutions file"
 
 displayOtherError :: OtherError -> Box
 displayOtherError e = case e of
@@ -317,23 +307,25 @@ data CollectedWarnings = CollectedWarnings
   , undeclaredDependencies :: [PackageName]
   , unacceptableVersions   :: [(PackageName, Text)]
   , dirtyWorkingTree       :: Any
+  , missingPaths           :: [PackageName]
   }
   deriving (Show, Eq, Ord)
 
 instance Monoid CollectedWarnings where
-  mempty = CollectedWarnings mempty mempty mempty mempty
-  mappend (CollectedWarnings as bs cs d)
-          (CollectedWarnings as' bs' cs' d') =
-    CollectedWarnings (as <> as') (bs <> bs') (cs <> cs') (d <> d')
+  mempty = CollectedWarnings mempty mempty mempty mempty mempty
+  mappend (CollectedWarnings as bs cs d es)
+          (CollectedWarnings as' bs' cs' d' es') =
+    CollectedWarnings (as <> as') (bs <> bs') (cs <> cs') (d <> d') (es <> es')
 
 collectWarnings :: [PackageWarning] -> CollectedWarnings
 collectWarnings = foldMap singular
   where
   singular w = case w of
-    NoResolvedVersion    pn -> CollectedWarnings [pn] mempty mempty mempty
-    UndeclaredDependency pn -> CollectedWarnings mempty [pn] mempty mempty
-    UnacceptableVersion t   -> CollectedWarnings mempty mempty [t] mempty
-    DirtyWorkingTree_Warn   -> CollectedWarnings mempty mempty mempty (Any True)
+    NoResolvedVersion    pn -> CollectedWarnings [pn] mempty mempty mempty mempty
+    UndeclaredDependency pn -> CollectedWarnings mempty [pn] mempty mempty mempty
+    UnacceptableVersion t   -> CollectedWarnings mempty mempty [t] mempty mempty
+    DirtyWorkingTree_Warn   -> CollectedWarnings mempty mempty mempty (Any True) mempty
+    MissingPath pn          -> CollectedWarnings mempty mempty mempty mempty [pn]
 
 renderWarnings :: [PackageWarning] -> Box
 renderWarnings warns =
@@ -345,6 +337,7 @@ renderWarnings warns =
                , if getAny dirtyWorkingTree
                    then Just warnDirtyWorkingTree
                    else Nothing
+               , go warnMissingPaths           missingPaths
                ]
   in case catMaybes mboxes of
        []    -> nullBox
@@ -370,9 +363,8 @@ warnNoResolvedVersions pkgNames =
     [ spacer
     , para (concat
       ["Links to types in ", anyOfThese, " ", packages, " will not work. In "
-      , "order to make links work, edit your bower.json to specify a version"
-      , " or a version range for ", these, " ", packages, ", and rerun "
-      , "`bower install`."
+      , "order to make links work, edit your package manifest to specify a version"
+      , " or a version range for ", these, " ", packages, "."
       ])
     ]
 
@@ -386,8 +378,8 @@ warnUndeclaredDependencies pkgNames =
       dependencies = pl "dependencies" "a dependency"
   in vcat $
     para (concat
-      [ "The following Bower ", packages, " ", are, " installed, but not "
-      , "declared as ", dependencies, " in your bower.json file:"
+      [ "The following ", packages, " ", are, " installed, but not "
+      , "declared as ", dependencies, " in your package manifest file:"
       ])
     : bulletedListT runPackageName (NonEmpty.toList pkgNames)
 
@@ -403,7 +395,7 @@ warnUnacceptableVersions pkgs =
       versions   = pl "versions" "version"
   in vcat $
     [ para (concat
-      [ "The following installed Bower ", packages', " ", versions, " could "
+      [ "The following installed ", packages', " ", versions, " could "
       , "not be parsed:"
       ])
     ] ++
@@ -412,9 +404,8 @@ warnUnacceptableVersions pkgs =
     [ spacer
     , para (concat
       ["Links to types in ", anyOfThese, " ", packages, " will not work. In "
-      , "order to make links work, edit your bower.json to specify an "
-      , "acceptable version or version range for ", these, " ", packages, ", "
-      , "and rerun `bower install`."
+      , "order to make links work, edit your package manifest to specify an "
+      , "acceptable version or version range for ", these, " ", packages, "."
       ])
     ]
   where
@@ -426,6 +417,19 @@ warnDirtyWorkingTree =
     "Your working tree is dirty. (Note: this would be an error if it "
     ++ "were not a dry run)"
     )
+
+warnMissingPaths :: NonEmpty PackageName -> Box
+warnMissingPaths pkgs =
+  let singular = NonEmpty.length pkgs == 1
+      pl a b = if singular then b else a
+
+      packages   = pl "packages" "package"
+  in vcat $
+    para (concat
+      [ "The following installed ", packages, " were "
+      , "missing path information in the resolutions file:"
+      ])
+    : bulletedListT runPackageName (NonEmpty.toList pkgs)
 
 printWarnings :: [PackageWarning] -> IO ()
 printWarnings = printToStderr . renderWarnings

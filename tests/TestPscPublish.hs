@@ -18,7 +18,9 @@ import Language.PureScript.Publish.ErrorsWarnings as Publish
 import TestUtils
 
 main :: IO ()
-main = testPackage "tests/support/bower_components/purescript-prelude"
+main = testPackage
+         "tests/support/bower_components/purescript-prelude"
+         "../../prelude-resolutions.json"
 
 data TestResult
   = ParseFailed String
@@ -47,9 +49,9 @@ testRunOptions = defaultPublishOptions
 
 -- | Given a directory which contains a package, produce JSON from it, and then
 -- | attempt to parse it again, and ensure that it doesn't change.
-testPackage :: String -> IO ()
-testPackage dir = pushd dir $ do
-  res <- preparePackage testRunOptions
+testPackage :: FilePath -> FilePath -> IO ()
+testPackage dir resolutionsFile = pushd dir $ do
+  res <- preparePackage "bower.json" resolutionsFile testRunOptions
   case res of
     Left e -> preparePackageError e
     Right package -> case roundTrip package of

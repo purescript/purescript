@@ -63,6 +63,8 @@ data NotYetKnown = NotYetKnown
 type UploadedPackage = Package NotYetKnown
 type VerifiedPackage = Package GithubUser
 
+type ManifestError = BowerError
+
 verifyPackage :: GithubUser -> UploadedPackage -> VerifiedPackage
 verifyPackage verifiedUser Package{..} =
   Package pkgMeta
@@ -327,7 +329,7 @@ data PackageError
   = CompilerTooOld Version Version
       -- ^ Minimum allowable version for generating data with the current
       -- parser, and actual version used.
-  | ErrorInPackageMeta BowerError
+  | ErrorInPackageMeta ManifestError
   | InvalidVersion
   | InvalidDeclarationType Text
   | InvalidChildDeclarationType Text
@@ -564,7 +566,7 @@ asReExport =
 pOr :: Parse e a -> Parse e a -> Parse e a
 p `pOr` q = catchError p (const q)
 
-asInPackage :: Parse BowerError a -> Parse BowerError (InPackage a)
+asInPackage :: Parse ManifestError a -> Parse ManifestError (InPackage a)
 asInPackage inner =
   build <$> key "package" (perhaps (withText parsePackageName))
         <*> key "item" inner
@@ -684,7 +686,7 @@ asModuleMap =
 -- This is here to preserve backwards compatibility with compilers which used
 -- to generate a 'bookmarks' field in the JSON (i.e. up to 0.10.5). We should
 -- remove this after the next breaking change to the JSON.
-bookmarksAsModuleMap :: Parse BowerError (Map P.ModuleName PackageName)
+bookmarksAsModuleMap :: Parse ManifestError (Map P.ModuleName PackageName)
 bookmarksAsModuleMap =
   convert <$>
     eachInArray (asInPackage (nth 0 (P.moduleNameFromString <$> asText)))

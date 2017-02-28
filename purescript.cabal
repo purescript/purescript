@@ -92,6 +92,7 @@ extra-source-files: examples/passing/*.purs
                   , examples/docs/bower_components/purescript-prelude/src/*.purs
                   , examples/docs/bower.json
                   , examples/docs/src/*.purs
+                  , examples/docs/resolutions.json
                   , app/static/index.html
                   , app/static/index.js
                   , tests/support/package.json
@@ -101,6 +102,7 @@ extra-source-files: examples/passing/*.purs
                   , tests/support/pscide/src/*.purs
                   , tests/support/pscide/src/*.js
                   , tests/support/pscide/src/*.fail
+                  , tests/support/prelude-resolutions.json
                   , stack.yaml
                   , README.md
                   , INSTALL.md
