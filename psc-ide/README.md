@@ -24,7 +24,6 @@ It supports the following options:
   directory or the directory specified by `-d`.
 - `--polling`: Uses polling instead of file system events to watch the externs
   files. This flag is reversed on Windows and polling is the default.
-- `--debug`: DEPRECATED: use --log-level="debug"
 - `--log-level`: Can be set to one of "all", "none", "debug" and "perf"
 - `--no-watch`: Disables the filewatcher
 - `--version`: Output psc-ide version
