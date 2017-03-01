@@ -115,9 +115,7 @@ command = Opts.helper <*> subcommands where
     let fullOutputPath = cwd </> outputPath
 
     unlessM (doesDirectoryExist fullOutputPath) $ do
-      putStrLn ("Your output directory didn't exist. I'll create it at: " <> fullOutputPath)
-      createDirectory fullOutputPath
-      putText "This usually means you didn't compile your project yet."
+      putText "Your output directory didn't exist. This usually means you didn't compile your project yet."
       putText "psc-ide needs you to compile your project (for example by running pulp build)"
 
     unless noWatch $
