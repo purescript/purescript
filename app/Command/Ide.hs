@@ -107,7 +107,8 @@ command = Opts.helper <*> subcommands where
 
   server :: ServerOptions -> IO ()
   server opts'@(ServerOptions dir globs outputPath port noWatch polling logLevel) = do
-    when debug (putText "Parsed Options:" *> print opts')
+    when (logLevel == LogDebug || logLevel == LogAll)
+      (putText "Parsed Options:" *> print opts')
     maybe (pure ()) setCurrentDirectory dir
     ideState <- newTVarIO emptyIdeState
     cwd <- getCurrentDirectory
