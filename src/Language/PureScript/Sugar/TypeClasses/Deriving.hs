@@ -220,7 +220,8 @@ deriveGeneric mn syns ds tyConNm dargs = do
         return $ CaseAlternative [ConstructorBinder (Qualified (Just mn) ctorName) (map VarBinder idents)] (unguarded caseResult)
 
       toSpineFun :: Expr -> Type -> Expr
-      toSpineFun i r | Just rec <- objectType r =
+      toSpineFun i r | Just rec <- objectType r
+                     , Just fields <- decomposeRec rec =
         lamNull . recordConstructor . Literal . ArrayLiteral
           . map
             (\((Label str),typ) ->
@@ -229,7 +230,7 @@ deriveGeneric mn syns ds tyConNm dargs = do
                 , ("recValue", toSpineFun (Accessor str i) typ)
                 ]
             )
-          $ decomposeRec rec
+          $ fields
       toSpineFun i _ = lamNull $ App (mkGenVar (Ident C.toSpine)) i
     mkSpineFunction (PositionedDeclaration _ _ d) = mkSpineFunction d
     mkSpineFunction _ = internalError "mkSpineFunction: expected DataDeclaration"
@@ -261,13 +262,14 @@ deriveGeneric mn syns ds tyConNm dargs = do
           ]
 
       mkProductSignature :: Type -> Expr
-      mkProductSignature r | Just rec <- objectType r =
+      mkProductSignature r | Just rec <- objectType r
+                           , Just fields <- decomposeRec rec =
           lamNull . mkSigRec $
             [ Literal $ ObjectLiteral
                 [ ("recLabel", Literal (StringLiteral str))
                 , ("recValue", mkProductSignature typ)
                 ]
-            | ((Label str), typ) <- decomposeRec rec
+            | ((Label str), typ) <- fields
             ]
       mkProductSignature typ = lamNull $ App (mkGenVar (Ident C.toSignature))
                                (TypedValue False (mkGenVar (Ident "anyProxy")) (proxy typ))
@@ -315,7 +317,8 @@ deriveGeneric mn syns ds tyConNm dargs = do
       fromSpineFun :: Expr -> Type -> Expr
       fromSpineFun e r
         | Just rec <- objectType r
-        = App (lamCase (Ident "r") [ mkRecCase (decomposeRec rec)
+        , Just fields <- decomposeRec rec
+        = App (lamCase (Ident "r") [ mkRecCase fields
                                    , CaseAlternative [NullBinder] (unguarded mkNothing)
                                    ])
               (App e unitVal)
@@ -435,8 +438,8 @@ deriveGenericRep mn syns ds tyConNm tyConArgs repTy = do
            )
 
     makeArg :: Type -> m (Type, Binder, Expr, Binder, Expr)
-    makeArg arg | Just rec <- objectType arg = do
-      let fields = decomposeRec rec
+    makeArg arg | Just rec <- objectType arg
+                , Just fields <- decomposeRec rec = do
       fieldNames <- traverse freshIdent (map (runIdent . labelToIdent . fst) fields)
       pure ( TypeApp (TypeConstructor record)
                (foldr1 (\f -> TypeApp (TypeApp (TypeConstructor productName) f))
@@ -579,10 +582,11 @@ deriveEq mn syns ds tyConNm = do
     conjAll xs = foldl1 preludeConj xs
 
     toEqTest :: Expr -> Expr -> Type -> Expr
-    toEqTest l r ty | Just rec <- objectType ty =
+    toEqTest l r ty | Just rec <- objectType ty
+                    , Just fields <- decomposeRec rec =
       conjAll
       . map (\((Label str), typ) -> toEqTest (Accessor str l) (Accessor str r) typ)
-      $ decomposeRec rec
+      $ fields
     toEqTest l r _ = preludeEq l r
 
 deriveOrd ::
@@ -666,10 +670,11 @@ deriveOrd mn syns ds tyConNm = do
                                   ]
 
     toOrdering :: Expr -> Expr -> Type -> Expr
-    toOrdering l r ty | Just rec <- objectType ty =
+    toOrdering l r ty | Just rec <- objectType ty
+                      , Just fields <- decomposeRec rec =
       appendAll
       . map (\((Label str), typ) -> toOrdering (Accessor str l) (Accessor str r) typ)
-      $ decomposeRec rec
+      $ fields
     toOrdering l r _ = ordCompare l r
 
 deriveNewtype
@@ -755,9 +760,15 @@ objectType :: Type -> Maybe Type
 objectType (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Record"))) rec) = Just rec
 objectType _ = Nothing
 
-decomposeRec :: Type -> [(Label, Type)]
-decomposeRec = sortBy (comparing fst) . go
-  where go (RCons str typ typs) = (str, typ) : decomposeRec typs
+decomposeRec :: Type -> Maybe [(Label, Type)]
+decomposeRec = fmap (sortBy (comparing fst)) . go
+  where go (RCons str typ typs) = fmap ((str, typ) :) (go typs)
+        go REmpty = Just []
+        go _ = Nothing
+
+decomposeRec' :: Type -> [(Label, Type)]
+decomposeRec' = sortBy (comparing fst) . go
+  where go (RCons str typ typs) = (str, typ) : go typs
         go _ = []
 
 deriveFunctor
@@ -806,7 +817,7 @@ deriveFunctor mn syns ds tyConNm = do
 
           -- records
           goType recTy | Just row <- objectType recTy =
-              traverse buildUpdate (decomposeRec row) >>= (traverse buildRecord . justUpdates)
+              traverse buildUpdate (decomposeRec' row) >>= (traverse buildRecord . justUpdates)
             where
               justUpdates :: [Maybe (Label, Expr)] -> Maybe [(Label, Expr)]
               justUpdates = foldMap (fmap return)
