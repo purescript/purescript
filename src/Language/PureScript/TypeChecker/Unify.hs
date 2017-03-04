@@ -10,6 +10,7 @@ module Language.PureScript.TypeChecker.Unify
   , unknownsInType
   , unifyTypes
   , unifyRows
+  , alignRowsWith
   , replaceVarWithUnknown
   , replaceTypeWildcards
   , varIfUnknown
@@ -123,38 +124,50 @@ unifyTypes t1 t2 = do
   unifyTypes' t3 t4 =
     throwError . errorMessage $ TypesDoNotUnify t3 t4
 
--- |
--- Unify two rows, updating the current substitution
+-- | Align two rows of types, splitting them into three parts:
 --
--- Common labels are first identified, and unified. Remaining labels and types are unified with a
--- trailing row unification variable, if appropriate, otherwise leftover labels result in a unification
--- error.
+-- * Those types which appear in both rows
+-- * Those which appear only on the left
+-- * Those which appear only on the right
 --
+-- Note: importantly, we preserve the order of the types with a given label.
+alignRowsWith
+  :: (Type -> Type -> a)
+  -> Type
+  -> Type
+  -> ([a], (([(Label, Type)], Type), ([(Label, Type)], Type)))
+alignRowsWith f ty1 ty2 = go s1 s2 where
+  (s1, tail1) = rowToSortedList ty1
+  (s2, tail2) = rowToSortedList ty2
+
+  go [] r = ([], (([], tail1), (r, tail2)))
+  go r [] = ([], ((r, tail1), ([], tail2)))
+  go lhs@((l1, t1) : r1) rhs@((l2, t2) : r2)
+    | l1 < l2 = (second . first . first) ((l1, t1) :) (go r1 rhs)
+    | l2 < l1 = (second . second . first) ((l2, t2) :) (go lhs r2)
+    | otherwise = first (f t1 t2 :) (go r1 r2)
+
+-- | Unify two rows, updating the current substitution
+--
+-- Common labels are identified and unified. Remaining labels and types are unified with a
+-- trailing row unification variable, if appropriate.
 unifyRows :: forall m. (MonadError MultipleErrors m, MonadState CheckState m) => Type -> Type -> m ()
-unifyRows r1 r2 = match s1 s2 >>= \(ls, rs) -> unifyTails ls r1' rs r2' where
-  (s1, r1') = rowToSortedList r1
-  (s2, r2') = rowToSortedList r2
+unifyRows r1 r2 = sequence_ matches *> uncurry unifyTails rest where
+  (matches, rest) = alignRowsWith unifyTypes r1 r2
 
-  match [] r = pure ([], r)
-  match r [] = pure (r, [])
-  match lhs@((l1, t1) : r1) rhs@((l2, t2) : r2)
-    | l1 < l2 = fmap (first ((l1, t1) :)) (match r1 rhs)
-    | l2 < l1 = fmap (second ((l2, t2) :)) (match lhs r2)
-    | otherwise = unifyTypes t1 t2 *> match r1 r2
-
-  unifyTails :: [(Label, Type)] -> Type -> [(Label, Type)] -> Type -> m ()
-  unifyTails [] (TUnknown u) sd r = solveType u (rowFromList (sd, r))
-  unifyTails sd r [] (TUnknown u) = solveType u (rowFromList (sd, r))
-  unifyTails sd1 (TUnknown u1) sd2 (TUnknown u2) = do
+  unifyTails :: ([(Label, Type)], Type) -> ([(Label, Type)], Type) -> m ()
+  unifyTails ([], TUnknown u)      (sd, r)               = solveType u (rowFromList (sd, r))
+  unifyTails (sd, r)               ([], TUnknown u)      = solveType u (rowFromList (sd, r))
+  unifyTails ([], REmpty)          ([], REmpty)          = return ()
+  unifyTails ([], TypeVar v1)      ([], TypeVar v2)      | v1 == v2 = return ()
+  unifyTails ([], Skolem _ s1 _ _) ([], Skolem _ s2 _ _) | s1 == s2 = return ()
+  unifyTails (sd1, TUnknown u1)    (sd2, TUnknown u2)    = do
     forM_ sd1 $ \(_, t) -> occursCheck u2 t
     forM_ sd2 $ \(_, t) -> occursCheck u1 t
-    rest <- freshType
-    solveType u1 (rowFromList (sd2, rest))
-    solveType u2 (rowFromList (sd1, rest))
-  unifyTails [] REmpty [] REmpty = return ()
-  unifyTails [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
-  unifyTails [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) | s1 == s2 = return ()
-  unifyTails _ _ _ _ =
+    rest' <- freshType
+    solveType u1 (rowFromList (sd2, rest'))
+    solveType u2 (rowFromList (sd1, rest'))
+  unifyTails _ _  =
     throwError . errorMessage $ TypesDoNotUnify r1 r2
 
 -- |
