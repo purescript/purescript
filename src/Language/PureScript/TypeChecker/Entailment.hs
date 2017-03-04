@@ -404,7 +404,7 @@ matches deps TypeClassDictionaryInScope{..} tys = do
         go ([], TypeVar v1)       ([], TypeVar v2)       | v1 == v2   = (True, M.empty)
         go ([], Skolem _ sk1 _ _) ([], Skolem _ sk2 _ _) | sk1 == sk2 = (True, M.empty)
         go (sd, r)                ([], TypeVar v)                     = (True, M.singleton v [rowFromList (sd, r)])
-        go _ _                                                       = (False, M.empty)
+        go _ _                                                        = (False, M.empty)
     typeHeadsAreEqual _ _ = (False, M.empty)
 
     both :: (Bool, Matching [Type]) -> (Bool, Matching [Type]) -> (Bool, Matching [Type])
