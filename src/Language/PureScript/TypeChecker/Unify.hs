@@ -18,6 +18,7 @@ module Language.PureScript.TypeChecker.Unify
 import Prelude.Compat
 import Protolude (ordNub)
 
+import Control.Arrow (first, second)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets, modify)
@@ -130,30 +131,30 @@ unifyTypes t1 t2 = do
 -- error.
 --
 unifyRows :: forall m. (MonadError MultipleErrors m, MonadState CheckState m) => Type -> Type -> m ()
-unifyRows r1 r2 =
-  let
-    (s1, r1') = rowToList r1
-    (s2, r2') = rowToList r2
-    int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
-    sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
-    sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
-  in do
-    forM_ int (uncurry unifyTypes)
-    unifyRows' sd1 r1' sd2 r2'
-  where
-  unifyRows' :: [(Label, Type)] -> Type -> [(Label, Type)] -> Type -> m ()
-  unifyRows' [] (TUnknown u) sd r = solveType u (rowFromList (sd, r))
-  unifyRows' sd r [] (TUnknown u) = solveType u (rowFromList (sd, r))
-  unifyRows' sd1 (TUnknown u1) sd2 (TUnknown u2) = do
+unifyRows r1 r2 = match s1 s2 >>= \(ls, rs) -> unifyTails ls r1' rs r2' where
+  (s1, r1') = rowToSortedList r1
+  (s2, r2') = rowToSortedList r2
+
+  match [] r = pure ([], r)
+  match r [] = pure (r, [])
+  match lhs@((l1, t1) : r1) rhs@((l2, t2) : r2)
+    | l1 < l2 = fmap (first ((l1, t1) :)) (match r1 rhs)
+    | l2 < l1 = fmap (second ((l2, t2) :)) (match lhs r2)
+    | otherwise = unifyTypes t1 t2 *> match r1 r2
+
+  unifyTails :: [(Label, Type)] -> Type -> [(Label, Type)] -> Type -> m ()
+  unifyTails [] (TUnknown u) sd r = solveType u (rowFromList (sd, r))
+  unifyTails sd r [] (TUnknown u) = solveType u (rowFromList (sd, r))
+  unifyTails sd1 (TUnknown u1) sd2 (TUnknown u2) = do
     forM_ sd1 $ \(_, t) -> occursCheck u2 t
     forM_ sd2 $ \(_, t) -> occursCheck u1 t
     rest <- freshType
     solveType u1 (rowFromList (sd2, rest))
     solveType u2 (rowFromList (sd1, rest))
-  unifyRows' [] REmpty [] REmpty = return ()
-  unifyRows' [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
-  unifyRows' [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) | s1 == s2 = return ()
-  unifyRows' _ _ _ _ =
+  unifyTails [] REmpty [] REmpty = return ()
+  unifyTails [] (TypeVar v1) [] (TypeVar v2) | v1 == v2 = return ()
+  unifyTails [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) | s1 == s2 = return ()
+  unifyTails _ _ _ _ =
     throwError . errorMessage $ TypesDoNotUnify r1 r2
 
 -- |

@@ -18,10 +18,10 @@ hasX = RProxy
 
 test1 = subtractX (subtractX hasX)
 
--- test2
---   :: forall r a b
---    . RProxy (x :: a, x :: b, x :: Int | r)
---   -> Proxy Int
--- test2 x = extractX (subtractX (subtractX x))
+test2
+  :: forall r a b
+   . RProxy (x :: a, x :: b, x :: Int | r)
+  -> Proxy Int
+test2 x = extractX (subtractX (subtractX x))
 
 main = log "Done"
