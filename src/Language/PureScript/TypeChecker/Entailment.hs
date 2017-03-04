@@ -392,24 +392,19 @@ matches deps TypeClassDictionaryInScope{..} tys = do
       both (typeHeadsAreEqual h1 h2) (typeHeadsAreEqual t1 t2)
     typeHeadsAreEqual REmpty REmpty = (True, M.empty)
     typeHeadsAreEqual r1@RCons{} r2@RCons{} =
-        foldr both (go sd1 r1' sd2 r2') (map (uncurry typeHeadsAreEqual) int)
+        foldr both (uncurry go rest) common
       where
-        (s1, r1') = rowToList r1
-        (s2, r2') = rowToList r2
+        (common, rest) = alignRowsWith typeHeadsAreEqual r1 r2
 
-        int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
-        sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
-        sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
-
-        go :: [(Label, Type)] -> Type -> [(Label, Type)] -> Type -> (Bool, Matching [Type])
-        go l  (KindedType t1 _)  r  t2                 = go l t1 r t2
-        go l  t1                 r  (KindedType t2 _)  = go l t1 r t2
-        go [] REmpty             [] REmpty             = (True, M.empty)
-        go [] (TUnknown u1)      [] (TUnknown u2)      | u1 == u2 = (True, M.empty)
-        go [] (TypeVar v1)       [] (TypeVar v2)       | v1 == v2 = (True, M.empty)
-        go [] (Skolem _ sk1 _ _) [] (Skolem _ sk2 _ _) | sk1 == sk2 = (True, M.empty)
-        go sd r                  [] (TypeVar v)        = (True, M.singleton v [rowFromList (sd, r)])
-        go _  _                  _  _                  = (False, M.empty)
+        go :: ([(Label, Type)], Type) -> ([(Label, Type)], Type) -> (Bool, Matching [Type])
+        go (l,  KindedType t1 _)  (r,  t2)                            = go (l, t1) (r, t2)
+        go (l,  t1)               (r,  KindedType t2 _)               = go (l, t1) (r, t2)
+        go ([], REmpty)           ([], REmpty)                        = (True, M.empty)
+        go ([], TUnknown u1)      ([], TUnknown u2)      | u1 == u2   = (True, M.empty)
+        go ([], TypeVar v1)       ([], TypeVar v2)       | v1 == v2   = (True, M.empty)
+        go ([], Skolem _ sk1 _ _) ([], Skolem _ sk2 _ _) | sk1 == sk2 = (True, M.empty)
+        go (sd, r)                ([], TypeVar v)                     = (True, M.singleton v [rowFromList (sd, r)])
+        go _ _                                                        = (False, M.empty)
     typeHeadsAreEqual _ _ = (False, M.empty)
 
     both :: (Bool, Matching [Type]) -> (Bool, Matching [Type]) -> (Bool, Matching [Type])
@@ -435,23 +430,18 @@ matches deps TypeClassDictionaryInScope{..} tys = do
       typesAreEqual (TypeApp h1 t1)      (TypeApp h2 t2)      = typesAreEqual h1 h2 && typesAreEqual t1 t2
       typesAreEqual REmpty               REmpty               = True
       typesAreEqual r1                   r2                   | isRCons r1 || isRCons r2 =
-          let (s1, r1') = rowToList r1
-              (s2, r2') = rowToList r2
-
-              int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
-              sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
-              sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
-          in all (uncurry typesAreEqual) int && go sd1 r1' sd2 r2'
+          let (common, rest) = alignRowsWith typesAreEqual r1 r2
+          in and common && uncurry go rest
         where
-          go :: [(Label, Type)] -> Type -> [(Label, Type)] -> Type -> Bool
-          go l  (KindedType t1 _) r  t2                = go l t1 r t2
-          go l  t1                r  (KindedType t2 _) = go l t1 r t2
-          go [] (TUnknown u1)     [] (TUnknown u2)     | u1 == u2 = True
-          go [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) = s1 == s2
-          go [] REmpty            [] REmpty            = True
-          go [] (TypeVar v1)      [] (TypeVar v2)      = v1 == v2
-          go _  _                 _  _                 = False
-      typesAreEqual _ _ = False
+          go :: ([(Label, Type)], Type) -> ([(Label, Type)], Type) -> Bool
+          go (l, KindedType t1 _)  (r, t2)                          = go (l, t1) (r, t2)
+          go (l, t1)               (r, KindedType t2 _)             = go (l, t1) (r, t2)
+          go ([], TUnknown u1)     ([], TUnknown u2)     | u1 == u2 = True
+          go ([], Skolem _ s1 _ _) ([], Skolem _ s2 _ _)            = s1 == s2
+          go ([], REmpty)          ([], REmpty)                     = True
+          go ([], TypeVar v1)      ([], TypeVar v2)                 = v1 == v2
+          go _  _                                                   = False
+      typesAreEqual _ _                                             = False
 
       isRCons :: Type -> Bool
       isRCons RCons{}    = True

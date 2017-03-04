@@ -258,7 +258,6 @@ library
                      Language.PureScript.TypeChecker.Entailment
                      Language.PureScript.TypeChecker.Kinds
                      Language.PureScript.TypeChecker.Monad
-                     Language.PureScript.TypeChecker.Rows
                      Language.PureScript.TypeChecker.Skolems
                      Language.PureScript.TypeChecker.Subsumption
                      Language.PureScript.TypeChecker.Synonyms

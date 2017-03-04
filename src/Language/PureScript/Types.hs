@@ -9,9 +9,12 @@ module Language.PureScript.Types where
 import Prelude.Compat
 import Protolude (ordNub)
 
+import Control.Arrow (first)
 import Control.Monad ((<=<))
 import qualified Data.Aeson as A
 import qualified Data.Aeson.TH as A
+import Data.List (sortBy)
+import Data.Ord (comparing)
 import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
 import Data.Text (Text)
@@ -107,24 +110,22 @@ $(A.deriveJSON A.defaultOptions ''Type)
 $(A.deriveJSON A.defaultOptions ''Constraint)
 $(A.deriveJSON A.defaultOptions ''ConstraintData)
 
--- |
--- Convert a row to a list of pairs of labels and types
---
+-- | Convert a row to a list of pairs of labels and types
 rowToList :: Type -> ([(Label, Type)], Type)
-rowToList (RCons name ty row) = let (tys, rest) = rowToList row
-                                in ((name, ty):tys, rest)
-rowToList r = ([], r)
+rowToList = go where
+  go (RCons name ty row) =
+    first ((name, ty) :) (rowToList row)
+  go r = ([], r)
 
--- |
--- Convert a list of labels and types to a row
---
+-- | Convert a row to a list of pairs of labels and types, sorted by the labels.
+rowToSortedList :: Type -> ([(Label, Type)], Type)
+rowToSortedList = first (sortBy (comparing fst)) . rowToList
+
+-- | Convert a list of labels and types to a row
 rowFromList :: ([(Label, Type)], Type) -> Type
-rowFromList ([], r) = r
-rowFromList ((name, t):ts, r) = RCons name t (rowFromList (ts, r))
+rowFromList (xs, r) = foldr (uncurry RCons) r xs
 
--- |
--- Check whether a type is a monotype
---
+-- | Check whether a type is a monotype
 isMonoType :: Type -> Bool
 isMonoType ForAll{} = False
 isMonoType (ParensInType t) = isMonoType t

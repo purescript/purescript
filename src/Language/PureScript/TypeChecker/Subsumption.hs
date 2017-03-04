@@ -13,7 +13,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets)
 
 import Data.Foldable (for_)
-import Data.List (sortBy, uncons)
+import Data.List (uncons)
 import Data.List.Ordered (minusBy')
 import Data.Ord (comparing)
 
@@ -103,11 +103,7 @@ subsumes' SElaborate (ConstrainedType constraints ty1) ty2 = do
   let addDicts val = foldl App val (map (\cs -> TypeClassDictionary cs dicts hints) constraints)
   return (elaborate . addDicts)
 subsumes' mode (TypeApp f1 r1) (TypeApp f2 r2) | f1 == tyRecord && f2 == tyRecord = do
-    let
-      (ts1, r1') = rowToList r1
-      (ts2, r2') = rowToList r2
-      ts1' = sortBy (comparing fst) ts1
-      ts2' = sortBy (comparing fst) ts2
+    let (common, ((ts1', r1'), (ts2', r2'))) = alignRowsWith (subsumes' SNoElaborate) r1 r2
     -- For { ts1 | r1 } to subsume { ts2 | r2 } when r1 is empty (= we're working with a closed row),
     -- every property in ts2 must appear in ts1. If not, then the candidate expression is missing a required property.
     -- Conversely, when r2 is empty, every property in ts1 must appear in ts2, or else the expression has
@@ -116,25 +112,12 @@ subsumes' mode (TypeApp f1 r1) (TypeApp f2 r2) | f1 == tyRecord && f2 == tyRecor
       (for_ (firstMissingProp ts2' ts1') (throwError . errorMessage . PropertyIsMissing . fst))
     when (r2' == REmpty)
       (for_ (firstMissingProp ts1' ts2') (throwError . errorMessage . AdditionalProperty . fst))
-    go ts1' ts2' r1' r2'
+    -- Check subsumption for common labels
+    sequence_ common
+    unifyTypes (rowFromList (ts1', r1')) (rowFromList (ts2', r2'))
     -- Nothing was elaborated, return the default coercion
     return (defaultCoercion mode)
   where
-    go [] ts2 r1' r2' = unifyTypes r1' (rowFromList (ts2, r2'))
-    go ts1 [] r1' r2' = unifyTypes r2' (rowFromList (ts1, r1'))
-    go ((p1, ty1) : ts1) ((p2, ty2) : ts2) r1' r2'
-      | p1 == p2 = do subsumes' SNoElaborate ty1 ty2
-                      go ts1 ts2 r1' r2'
-      | p1 < p2 = do rest <- freshType
-                     -- What happens next is a bit of a hack.
-                     -- TODO: in the new type checker, object properties will probably be restricted to being monotypes
-                     -- in which case, this branch of the subsumes function should not even be necessary.
-                     unifyTypes r2' (RCons p1 ty1 rest)
-                     go ts1 ((p2, ty2) : ts2) r1' rest
-      | otherwise = do rest <- freshType
-                       unifyTypes r1' (RCons p2 ty2 rest)
-                       go ((p1, ty1) : ts1) ts2 rest r2'
-
     -- Find the first property that's in the first list (of tuples) but not in the second
     firstMissingProp t1 t2 = fst <$> uncons (minusBy' (comparing fst) t1 t2)
 subsumes' mode ty1 ty2@(TypeApp obj _) | obj == tyRecord =
