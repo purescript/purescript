@@ -10,29 +10,26 @@ module Language.PureScript.Sugar.TypeClasses
 
 import Prelude.Compat
 
-import Language.PureScript.Crash
-import Language.PureScript.Environment
-import Language.PureScript.Errors hiding (isExported)
-import Language.PureScript.Kinds
-import Language.PureScript.Names
-import Language.PureScript.Externs
-import Language.PureScript.Sugar.CaseDeclarations
-import Control.Monad.Supply.Class
-import Language.PureScript.Types
-import Language.PureScript.Label (Label(..))
-import Language.PureScript.PSString (mkString)
-
-import qualified Language.PureScript.Constants as C
-
-import Control.Arrow (first, second)
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State
-import Data.List ((\\), find, sortBy)
-import Data.Maybe (catMaybes, mapMaybe, isJust)
+import           Control.Arrow (first, second)
+import           Control.Monad.Error.Class (MonadError(..))
+import           Control.Monad.State
+import           Control.Monad.Supply.Class
+import           Data.List ((\\), find, sortBy)
 import qualified Data.Map as M
-import Data.Monoid ((<>))
-import Data.Text (Text)
-import qualified Data.Text as T
+import           Data.Maybe (catMaybes, mapMaybe, isJust)
+import           Data.Text (Text)
+import qualified Language.PureScript.Constants as C
+import           Language.PureScript.Crash
+import           Language.PureScript.Environment
+import           Language.PureScript.Errors hiding (isExported)
+import           Language.PureScript.Externs
+import           Language.PureScript.Kinds
+import           Language.PureScript.Label (Label(..))
+import           Language.PureScript.Names
+import           Language.PureScript.PSString (mkString)
+import           Language.PureScript.Sugar.CaseDeclarations
+import           Language.PureScript.Types
+import           Language.PureScript.TypeClassDictionaries (superclassName)
 
 type MemberMap = M.Map (ModuleName, ProperName 'ClassName) TypeClassData
 
@@ -126,7 +123,7 @@ desugarModule _ = internalError "Exports should have been elaborated in name des
 --   <TypeClassDeclaration Sub ...>
 --
 --   type Sub a = { sub :: a
---                , "__superclass_Foo_0" :: {} -> Foo a
+--                , "Foo0" :: {} -> Foo a
 --                }
 --
 --   -- As with `foo` above, this type is unchecked at the declaration
@@ -135,7 +132,7 @@ desugarModule _ = internalError "Exports should have been elaborated in name des
 --
 --   subString :: {} -> Sub String
 --   subString _ = { sub: "",
---                 , "__superclass_Foo_0": \_ -> <DeferredDictionary Foo String>
+--                 , "Foo0": \_ -> <DeferredDictionary Foo String>
 --                 }
 --
 -- and finally as the generated javascript:
@@ -158,8 +155,8 @@ desugarModule _ = internalError "Exports should have been elaborated in name des
 --       return new Foo(map(foo(__dict_Foo_15)));
 --   };
 --
---   function Sub(__superclass_Foo_0, sub) {
---       this["__superclass_Foo_0"] = __superclass_Foo_0;
+--   function Sub(Foo0, sub) {
+--       this["Foo0"] = Foo0;
 --       this.sub = sub;
 --   };
 --
@@ -333,6 +330,6 @@ typeClassMemberName _ = internalError "typeClassMemberName: Invalid declaration 
 
 superClassDictionaryNames :: [Constraint] -> [Text]
 superClassDictionaryNames supers =
-  [ C.__superclass_ <> showQualified runProperName pn <> "_" <> T.pack (show (index :: Integer))
+  [ superclassName pn index
   | (index, Constraint pn _ _) <- zip [0..] supers
   ]

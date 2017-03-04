@@ -392,9 +392,6 @@ symbol = "Symbol"
 
 -- Code Generation
 
-__superclass_ :: forall a. (IsString a) => a
-__superclass_ = "__superclass_"
-
 __unused :: forall a. (IsString a) => a
 __unused = "__unused"
 
