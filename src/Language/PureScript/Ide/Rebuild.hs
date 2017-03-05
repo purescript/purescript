@@ -5,6 +5,7 @@ module Language.PureScript.Ide.Rebuild
   ( rebuildFileSync
   , rebuildFileAsync
   , rebuildFile
+  , rebuildFile'
   ) where
 
 import           Protolude
@@ -15,7 +16,6 @@ import qualified Data.Map.Lazy                   as M
 import           Data.Maybe                      (fromJust)
 import qualified Data.Set                        as S
 import qualified Language.PureScript             as P
-import           Language.PureScript.Errors.JSON
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.State
@@ -44,15 +44,21 @@ rebuildFile
   -> (ReaderT IdeEnvironment (LoggingT IO) () -> m ())
   -- ^ A runner for the second build with open exports
   -> m Success
-rebuildFile path runOpenBuild = do
+rebuildFile path runOpenBuild =
+  ideReadFile path >>= rebuildFile' path runOpenBuild
 
-  input <- ideReadFile path
+rebuildFile'
+  :: (Ide m, MonadLogger m, MonadError IdeError m)
+  => FilePath
+  -> (ReaderT IdeEnvironment (LoggingT IO) () -> m ())
+  -> Text
+  -> m Success
+rebuildFile' path runOpenBuild input = do
 
   m <- case snd <$> P.parseModuleFromFile identity (path, input) of
-    Left parseError -> throwError
-                       . RebuildError
-                       . toJSONErrors False P.Error
-                       $ P.MultipleErrors [P.toPositionedError parseError]
+    Left parseError ->
+      throwError (RebuildError
+                  (P.MultipleErrors [P.toPositionedError parseError]))
     Right m -> pure m
 
   -- Externs files must be sorted ahead of time, so that they get applied
@@ -64,7 +70,8 @@ rebuildFile path runOpenBuild = do
   -- For rebuilding, we want to 'RebuildAlways', but for inferring foreign
   -- modules using their file paths, we need to specify the path in the 'Map'.
   let filePathMap = M.singleton (P.getModuleName m) (Left P.RebuildAlways)
-  foreigns <- P.inferForeignModules (M.singleton (P.getModuleName m) (Right path))
+  foreigns <-
+    P.inferForeignModules (M.singleton (P.getModuleName m) (Right path))
 
   let makeEnv = MakeActionsEnv outputDirectory filePathMap foreigns False
   -- Rebuild the single module using the cached externs
@@ -74,10 +81,10 @@ rebuildFile path runOpenBuild = do
     . P.rebuildModule (buildMakeActions
                         >>= shushProgress $ makeEnv) externs $ m
   case result of
-    Left errors -> throwError (RebuildError (toJSONErrors False P.Error errors))
+    Left errors -> throwError (RebuildError errors)
     Right _ -> do
       runOpenBuild (rebuildModuleOpen makeEnv externs m)
-      pure (RebuildSuccess (toJSONErrors False P.Warning warnings))
+      pure (RebuildSuccess warnings)
 
 rebuildFileAsync
   :: forall m. (Ide m, MonadLogger m, MonadError IdeError m)
@@ -170,8 +177,7 @@ sortExterns m ex = do
            . M.elems
            . M.delete (P.getModuleName m) $ ex
   case sorted' of
-    Left err ->
-      throwError (RebuildError (toJSONErrors False P.Error err))
+    Left err -> throwError (RebuildError err)
     Right (sorted, graph) -> do
       let deps = fromJust (List.lookup (P.getModuleName m) graph)
       pure $ mapMaybe getExtern (deps `inOrderOf` map P.getModuleName sorted)

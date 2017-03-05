@@ -18,6 +18,7 @@ import Language.PureScript.Environment as P
 import Language.PureScript.Errors as P hiding (indent)
 import Language.PureScript.Externs as P
 import Language.PureScript.Kinds as P
+import Language.PureScript.Label as P
 import Language.PureScript.Linter as P
 import Language.PureScript.Make as P
 import Language.PureScript.ModuleDependencies as P
@@ -25,6 +26,7 @@ import Language.PureScript.Names as P
 import Language.PureScript.Options as P
 import Language.PureScript.Parser as P
 import Language.PureScript.Pretty as P
+import Language.PureScript.PSString as P
 import Language.PureScript.Renamer as P
 import Language.PureScript.Sugar as P
 import Language.PureScript.TypeChecker as P
