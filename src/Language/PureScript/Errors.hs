@@ -748,7 +748,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
     renderSimpleErrorMessage (ShadowedTypeVar tv) =
       line $ "Type variable " <> markCode tv <> " was shadowed."
     renderSimpleErrorMessage (UnusedTypeVar tv) =
-      line $ "Type variable " <> markCode tv <> " was declared but not used."
+      line $ "Type variable " <> markCode tv <> " is ambiguous, since it is unused in the polymorphic type which introduces it."
     renderSimpleErrorMessage (MisleadingEmptyTypeImport mn name) =
       line $ "Importing type " <> markCode (runProperName name <> "(..)") <> " from " <> markCode (runModuleName mn) <> " is misleading as it has no exported data constructors."
     renderSimpleErrorMessage (ImportHidingModule name) =
