@@ -54,6 +54,7 @@ data Evidence
   -- ^ Computed instance of CompareSymbol
   | AppendSymbolInstance
   -- ^ Computed instance of AppendSymbol
+  | RowUnionInstance
   deriving (Eq)
 
 -- | Extract the identifier of a named instance
@@ -129,6 +130,13 @@ data SolverOptions = SolverOptions
   -- ^ Should the solver be allowed to defer errors by skipping constraints?
   }
 
+-- Left biased union of two row types
+unionRows :: Type -> Type -> Type
+unionRows a b =
+    let (xs, _) = rowToList a
+        (ys, _) = rowToList b
+    in rowFromList (M.toList $ M.union (M.fromList xs) (M.fromList ys), REmpty)
+
 -- | Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
 entails
@@ -147,6 +155,8 @@ entails SolverOptions{..} constraint context hints =
     solve constraint
   where
     forClassName :: InstanceContext -> Qualified (ProperName 'ClassName) -> [Type] -> [TypeClassDict]
+    forClassName _ C.RowUnion [a, b, _] =
+      [TypeClassDictionaryInScope RowUnionInstance [] C.RowUnion [a, b, unionRows a b] Nothing]
     forClassName _ C.Warn [msg] =
       [TypeClassDictionaryInScope (WarnInstance msg) [] C.Warn [msg] Nothing]
     forClassName _ C.IsSymbol [TypeLevelString sym] =
@@ -316,6 +326,7 @@ entails SolverOptions{..} constraint context hints =
             -- Make a dictionary from subgoal dictionaries by applying the correct function
             mkDictionary :: Evidence -> Maybe [Expr] -> m Expr
             mkDictionary (NamedInstance n) args = return $ foldl App (Var n) (fold args)
+            mkDictionary RowUnionInstance _ = return $ Literal (ObjectLiteral [])
             mkDictionary (WarnInstance msg) _ = do
               tell . errorMessage $ UserDefinedWarning msg
               -- We cannot call the type class constructor here because Warn is declared in Prim.

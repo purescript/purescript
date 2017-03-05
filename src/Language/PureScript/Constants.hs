@@ -326,6 +326,14 @@ fromSpine = "fromSpine"
 toSignature :: forall a. (IsString a) => a
 toSignature = "toSignature"
 
+-- Data.Record
+
+pattern DataRecord :: ModuleName
+pattern DataRecord = ModuleName [ProperName "Data", ProperName "Record"]
+
+pattern RowUnion :: Qualified (ProperName 'ClassName)
+pattern RowUnion = Qualified (Just DataRecord) (ProperName "RowUnion")
+
 -- Data.Symbol
 
 pattern DataSymbol :: ModuleName
