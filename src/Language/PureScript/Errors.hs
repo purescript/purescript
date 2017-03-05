@@ -668,6 +668,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
                 [ line (showQualified runProperName nm)
                 , Box.vcat Box.left (map typeAtomAsBox ts)
                 ]
+            , line "since instances of this type class are not derivable."
             ]
     renderSimpleErrorMessage (InvalidNewtypeInstance nm ts) =
       paras [ line "Cannot derive newtype instance for"
