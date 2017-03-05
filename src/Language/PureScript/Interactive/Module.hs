@@ -5,7 +5,8 @@ import           Prelude.Compat
 import           Control.Monad
 import qualified Language.PureScript as P
 import           Language.PureScript.Interactive.Types
-import           System.FilePath (pathSeparator)
+import           System.Directory (getCurrentDirectory)
+import           System.FilePath (pathSeparator, makeRelative)
 import           System.IO.UTF8 (readUTF8FileT)
 
 -- * Support Module
@@ -20,23 +21,23 @@ supportModuleIsDefined = any ((== supportModuleName) . P.getModuleName)
 
 -- * Module Management
 
--- |
--- Loads a file for use with imports.
---
+-- | Loads a file for use with imports.
 loadModule :: FilePath -> IO (Either String [P.Module])
 loadModule filename = do
+  pwd <- getCurrentDirectory
   content <- readUTF8FileT filename
-  return $ either (Left . P.prettyPrintMultipleErrors P.defaultPPEOptions) (Right . map snd) $ P.parseModulesFromFiles id [(filename, content)]
+  return $
+    either (Left . P.prettyPrintMultipleErrors P.defaultPPEOptions) (Right . map snd) $
+      P.parseModulesFromFiles (makeRelative pwd) [(filename, content)]
 
--- |
--- Load all modules.
---
+-- | Load all modules.
 loadAllModules :: [FilePath] -> IO (Either P.MultipleErrors [(FilePath, P.Module)])
 loadAllModules files = do
+  pwd <- getCurrentDirectory
   filesAndContent <- forM files $ \filename -> do
     content <- readUTF8FileT filename
     return (filename, content)
-  return $ P.parseModulesFromFiles id filesAndContent
+  return $ P.parseModulesFromFiles (makeRelative pwd) filesAndContent
 
 -- |
 -- Makes a volatile module to execute the current expression.

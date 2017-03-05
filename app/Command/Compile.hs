@@ -21,6 +21,8 @@ import           Language.PureScript.Make
 import qualified Options.Applicative as Opts
 import qualified System.Console.ANSI as ANSI
 import           System.Exit (exitSuccess, exitFailure)
+import           System.Directory (getCurrentDirectory)
+import           System.FilePath (makeRelative)
 import           System.FilePath.Glob (glob)
 import           System.IO (hPutStr, hPutStrLn, stderr)
 import           System.IO.UTF8 (readUTF8FileT)
@@ -53,6 +55,7 @@ printWarningsAndErrors verbose True warnings errors = do
 
 compile :: PSCMakeOptions -> IO ()
 compile PSCMakeOptions{..} = do
+  pwd <- getCurrentDirectory
   input <- globWarningOnMisses (unless pscmJSONErrors . warnFileTypeNotFound) pscmInput
   when (null input && not pscmJSONErrors) $ do
     hPutStr stderr $ unlines [ "purs compile: No input files."
@@ -61,7 +64,7 @@ compile PSCMakeOptions{..} = do
     exitFailure
   moduleFiles <- readInput input
   (makeErrors, makeWarnings) <- runMake pscmOpts $ do
-    ms <- P.parseModulesFromFiles id moduleFiles
+    ms <- P.parseModulesFromFiles (makeRelative pwd) moduleFiles
     let filePathMap = M.fromList $ map (\(fp, P.Module _ _ mn _ _) -> (mn, Right fp)) ms
     foreigns <- inferForeignModules filePathMap
     let makeActions = buildMakeActions pscmOutputDir filePathMap foreigns pscmUsePrefix
