@@ -192,7 +192,7 @@ deriveGeneric mn syns ds tyConNm dargs = do
   tyCon <- findTypeDecl tyConNm ds
   toSpine <- mkSpineFunction tyCon
   fromSpine <- mkFromSpineFunction tyCon
-  let toSignature = mkSignatureFunction tyCon dargs
+  toSignature <- mkSignatureFunction tyCon dargs
   return [ ValueDeclaration (Ident C.toSpine) Public [] (unguarded toSpine)
          , ValueDeclaration (Ident C.fromSpine) Public [] (unguarded fromSpine)
          , ValueDeclaration (Ident C.toSignature) Public [] (unguarded toSignature)
@@ -235,8 +235,8 @@ deriveGeneric mn syns ds tyConNm dargs = do
     mkSpineFunction (PositionedDeclaration _ _ d) = mkSpineFunction d
     mkSpineFunction _ = internalError "mkSpineFunction: expected DataDeclaration"
 
-    mkSignatureFunction :: Declaration -> [Type] -> Expr
-    mkSignatureFunction (DataDeclaration _ name tyArgs args) classArgs = lamNull . mkSigProd $ map mkProdClause args
+    mkSignatureFunction :: Declaration -> [Type] -> m Expr
+    mkSignatureFunction (DataDeclaration _ name tyArgs args) classArgs = lamNull . mkSigProd <$> mapM mkProdClause args
       where
       mkSigProd :: [Expr] -> Expr
       mkSigProd =
@@ -254,11 +254,12 @@ deriveGeneric mn syns ds tyConNm dargs = do
       proxy :: Type -> Type
       proxy = TypeApp (TypeConstructor (Qualified (Just typesProxy) (ProperName "Proxy")))
 
-      mkProdClause :: (ProperName 'ConstructorName, [Type]) -> Expr
-      mkProdClause (ctorName, tys) =
-        Literal $ ObjectLiteral
+      mkProdClause :: (ProperName 'ConstructorName, [Type]) -> m Expr
+      mkProdClause (ctorName, tys) = do
+        tys' <- mapM (replaceAllTypeSynonymsM syns) tys
+        return $ Literal $ ObjectLiteral
           [ ("sigConstructor", Literal (StringLiteral $ mkString (showQualified runProperName (Qualified (Just mn) ctorName))))
-          , ("sigValues", Literal . ArrayLiteral . map (mkProductSignature . instantiate) $ tys)
+          , ("sigValues", Literal . ArrayLiteral . map (mkProductSignature . instantiate) $ tys')
           ]
 
       mkProductSignature :: Type -> Expr
@@ -297,6 +298,7 @@ deriveGeneric mn syns ds tyConNm dargs = do
       mkAlternative :: (ProperName 'ConstructorName, [Type]) -> m CaseAlternative
       mkAlternative (ctorName, tys) = do
         idents <- replicateM (length tys) freshIdent'
+        tys' <- mapM (replaceAllTypeSynonymsM syns) tys
         return $
           CaseAlternative
             [ prodBinder
@@ -307,7 +309,7 @@ deriveGeneric mn syns ds tyConNm dargs = do
             . unguarded
             $ liftApplicative
                 (mkJust $ Constructor (Qualified (Just mn) ctorName))
-                (zipWith fromSpineFun (map (Var . Qualified Nothing) idents) tys)
+                (zipWith fromSpineFun (map (Var . Qualified Nothing) idents) tys')
 
       addCatch :: [CaseAlternative] -> [CaseAlternative]
       addCatch = (++ [catchAll])
