@@ -16,6 +16,7 @@ import           Control.Monad.Supply                        as P
 import           Language.PureScript.AST                     as P
 import           Language.PureScript.Environment             as P
 import           Language.PureScript.Errors                  as P
+import           Language.PureScript.Label
 import           Language.PureScript.Names                   as P
 import           Language.PureScript.TypeChecker.Skolems     as Skolem
 import           Language.PureScript.TypeChecker.Synonyms    as P
@@ -76,6 +77,30 @@ checkSubsume unsolved env st userT envT = checkInEnvironment env st $ do
   -- Finally, check any constraints which were found during elaboration
   Entailment.replaceTypeClassDictionaries (isJust unsolved) expP
 
+accessorSearch
+  :: P.Environment
+  -- ^ The Environment which contains the relevant definitions and typeclasses
+  -> TC.CheckState
+  -- ^ The typechecker state
+  -> P.Type
+  -- ^ The user supplied type
+  -> Maybe (Type, Environment)
+accessorSearch env st userT = checkInEnvironment env st $ do
+  let initializeSkolems =
+        Skolem.introduceSkolemScope
+        <=< P.replaceAllTypeSynonyms
+        <=< P.replaceTypeWildcards
+
+  userT' <- initializeSkolems userT
+
+  rowType <- freshType
+  resultType <- freshType
+  let recordFunction = TypeApp (TypeApp tyFunction (TypeApp tyRecord rowType)) resultType
+  _ <- subsumes recordFunction userT'
+  subst <- gets TC.checkSubstitution
+  let solvedRow = substituteType subst rowType
+  pure solvedRow
+
 typeSearch
   :: Maybe [(P.Ident, Entailment.InstanceContext, P.Constraint)]
   -- ^ Additional constraints we need to satisfy
@@ -85,6 +110,9 @@ typeSearch
   -- ^ The typechecker state
   -> P.Type
   -- ^ The type we are looking for
-  -> Map (P.Qualified P.Ident) P.Type
+  -> ([(P.Qualified P.Ident, P.Type)], Maybe [(Label, Type)])
 typeSearch unsolved env st type' =
-  Map.mapMaybe (\(x, _, _) -> checkSubsume unsolved env st type' x $> x) (P.names env)
+  let
+    resultMap = Map.mapMaybe (\(x, _, _) -> checkSubsume unsolved env st type' x $> x) (P.names env)
+  in
+    (Map.toList resultMap, fst . rowToList . fst <$> accessorSearch env st type')

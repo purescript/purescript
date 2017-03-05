@@ -38,10 +38,20 @@ type Context = [(Ident, Type)]
 data TypeSearch
   = TSBefore Environment
   -- ^ An Environment captured for later consumption by type directed search
-  | TSAfter [(Qualified Ident, Type)]
+  | TSAfter
+    { tsAfterIdentifiers :: [(Qualified Ident, Type)]
+    , tsAfterRecordFields :: Maybe [(Label, Type)]
+    }
   -- ^ Results of applying type directed search to the previously captured
   -- Environment
   deriving Show
+
+onTypeSearchTypes :: (Type -> Type) -> TypeSearch -> TypeSearch
+onTypeSearchTypes f = runIdentity . onTypeSearchTypesM (Identity . f)
+
+onTypeSearchTypesM :: (Applicative m) => (Type -> m Type) -> TypeSearch -> m TypeSearch
+onTypeSearchTypesM f (TSAfter i r) = TSAfter <$> (traverse (traverse f) i) <*> (traverse (traverse (traverse f)) r)
+onTypeSearchTypesM _ (TSBefore env) = pure (TSBefore env)
 
 -- | A type of error messages
 data SimpleErrorMessage
