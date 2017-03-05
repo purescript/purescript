@@ -14,6 +14,7 @@
 
 module Language.PureScript.Ide.Error
        ( IdeError(..)
+       , prettyPrintTypeSingleLine
        ) where
 
 import           Data.Aeson
@@ -52,3 +53,6 @@ textError (ParseError parseError msg) = let escape = show
                                             -- over the socket as a single line
                                         in msg <> ": " <> escape parseError
 textError (RebuildError err)          = show err
+
+prettyPrintTypeSingleLine :: P.Type -> Text
+prettyPrintTypeSingleLine = T.unwords . map T.strip . T.lines . T.pack . P.prettyPrintTypeWithUnicode

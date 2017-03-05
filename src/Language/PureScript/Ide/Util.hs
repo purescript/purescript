@@ -24,7 +24,6 @@ module Language.PureScript.Ide.Util
   , withEmptyAnn
   , valueOperatorAliasT
   , typeOperatorAliasT
-  , prettyTypeT
   , properNameT
   , identT
   , opNameT
@@ -41,10 +40,10 @@ import qualified Data.Text                           as T
 import qualified Data.Text.Lazy                      as TL
 import           Data.Text.Lazy.Encoding             (decodeUtf8, encodeUtf8)
 import qualified Language.PureScript                 as P
-import           Language.PureScript.Ide.Error
+import           Language.PureScript.Ide.Error       (prettyPrintTypeSingleLine, IdeError(..))
 import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.Types
-import           System.IO.UTF8                  (readUTF8FileT)
+import           System.IO.UTF8                      (readUTF8FileT)
 
 identifierFromIdeDeclaration :: IdeDeclaration -> Text
 identifierFromIdeDeclaration d = case d of
@@ -71,20 +70,20 @@ completionFromMatch (Match (m, IdeDeclarationAnn ann decl)) =
   Completion {..}
   where
     (complIdentifier, complExpandedType) = case decl of
-      IdeDeclValue v -> (v ^. ideValueIdent . identT, v ^. ideValueType & prettyTypeT)
+      IdeDeclValue v -> (v ^. ideValueIdent . identT, v ^. ideValueType & prettyPrintTypeSingleLine)
       IdeDeclType t -> (t ^. ideTypeName . properNameT, t ^. ideTypeKind & P.prettyPrintKind)
-      IdeDeclTypeSynonym s -> (s ^. ideSynonymName . properNameT, s ^. ideSynonymType & prettyTypeT)
-      IdeDeclDataConstructor d -> (d ^. ideDtorName . properNameT, d ^. ideDtorType & prettyTypeT)
+      IdeDeclTypeSynonym s -> (s ^. ideSynonymName . properNameT, s ^. ideSynonymType & prettyPrintTypeSingleLine)
+      IdeDeclDataConstructor d -> (d ^. ideDtorName . properNameT, d ^. ideDtorType & prettyPrintTypeSingleLine)
       IdeDeclTypeClass d -> (d ^. ideTCName . properNameT, "type class")
       IdeDeclValueOperator (IdeValueOperator op ref precedence associativity typeP) ->
-        (P.runOpName op, maybe (showFixity precedence associativity (valueOperatorAliasT ref) op) prettyTypeT typeP)
+        (P.runOpName op, maybe (showFixity precedence associativity (valueOperatorAliasT ref) op) prettyPrintTypeSingleLine typeP)
       IdeDeclTypeOperator (IdeTypeOperator op ref precedence associativity kind) ->
         (P.runOpName op, maybe (showFixity precedence associativity (typeOperatorAliasT ref) op) P.prettyPrintKind kind)
       IdeDeclKind k -> (P.runProperName k, "kind")
 
     complModule = P.runModuleName m
 
-    complType = maybe complExpandedType prettyTypeT (annTypeAnnotation ann)
+    complType = maybe complExpandedType prettyPrintTypeSingleLine (annTypeAnnotation ann)
 
     complLocation = annLocation ann
 
@@ -137,11 +136,3 @@ ideReadFile fp = do
     (\_ -> throwError (GeneralError ("Couldn't find file at: " <> T.pack fp)))
     pure
     contents
-
-prettyTypeT :: P.Type -> Text
-prettyTypeT =
-  T.unwords
-  . map T.strip
-  . T.lines
-  . T.pack
-  . P.prettyPrintTypeWithUnicode
