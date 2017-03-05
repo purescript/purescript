@@ -4,6 +4,9 @@ module Language.PureScript.TypeClassDictionaries where
 
 import Prelude.Compat
 
+import Data.Monoid ((<>))
+import Data.Text (Text, pack)
+
 import Language.PureScript.Names
 import Language.PureScript.Types
 
@@ -27,3 +30,7 @@ data TypeClassDictionaryInScope v
 
 type NamedDict = TypeClassDictionaryInScope (Qualified Ident)
 
+-- | Generate a name for a superclass reference which can be used in
+-- generated code.
+superclassName :: Qualified (ProperName 'ClassName) -> Integer -> Text
+superclassName pn index = runProperName (disqualify pn) <> pack (show index)

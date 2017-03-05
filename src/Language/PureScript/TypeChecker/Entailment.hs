@@ -26,7 +26,6 @@ import Data.List (minimumBy)
 import Data.Maybe (fromMaybe, maybeToList, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
-import qualified Data.Text as T
 import Data.Text (Text)
 
 import Language.PureScript.AST
@@ -222,7 +221,7 @@ entails SolverOptions{..} constraint context hints =
                 -- Solve any necessary subgoals
                 args <- solveSubgoals subst'' (tcdDependencies tcd)
                 initDict <- lift . lift $ mkDictionary (tcdValue tcd) args
-                let match = foldr (\(superclassName, index) dict -> subclassDictionaryValue dict superclassName index)
+                let match = foldr (\(className, index) dict -> subclassDictionaryValue dict className index)
                                   initDict
                                   (tcdPath tcd)
                 return match
@@ -331,11 +330,9 @@ entails SolverOptions{..} constraint context hints =
               return $ TypeClassDictionaryConstructorApp C.AppendSymbol (Literal (ObjectLiteral []))
 
         -- Turn a DictionaryValue into a Expr
-        subclassDictionaryValue :: Expr -> Qualified (ProperName a) -> Integer -> Expr
-        subclassDictionaryValue dict superclassName index =
-          App (Accessor (mkString (C.__superclass_ <> showQualified runProperName superclassName <> "_" <> T.pack (show index)))
-                        dict)
-              valUndefined
+        subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr
+        subclassDictionaryValue dict className index =
+          App (Accessor (mkString (superclassName className index)) dict) valUndefined
 
 -- Check if an instance matches our list of types, allowing for types
 -- to be solved via functional dependencies. If the types match, we return a
