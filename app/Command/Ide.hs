@@ -68,7 +68,6 @@ data ServerOptions = ServerOptions
   , _serverPort       :: PortNumber
   , _serverNoWatch    :: Bool
   , _serverPolling    :: Bool
-  , _serverDebug      :: Bool
   , _serverLoglevel   :: IdeLogLevel
   } deriving (Show)
 
@@ -107,8 +106,9 @@ command = Opts.helper <*> subcommands where
     Opts.option Opts.auto (Opts.long "port" <> Opts.short 'p' <> Opts.value (4242 :: Integer))
 
   server :: ServerOptions -> IO ()
-  server opts'@(ServerOptions dir globs outputPath port noWatch polling debug logLevel) = do
-    when debug (putText "Parsed Options:" *> print opts')
+  server opts'@(ServerOptions dir globs outputPath port noWatch polling logLevel) = do
+    when (logLevel == LogDebug || logLevel == LogAll)
+      (putText "Parsed Options:" *> print opts')
     maybe (pure ()) setCurrentDirectory dir
     ideState <- newTVarIO emptyIdeState
     cwd <- getCurrentDirectory
@@ -120,8 +120,7 @@ command = Opts.helper <*> subcommands where
 
     unless noWatch $
       void (forkFinally (watcher polling ideState fullOutputPath) print)
-    -- TODO: deprecate and get rid of `debug`
-    let conf = Configuration {confLogLevel = if debug then LogDebug else logLevel, confOutputPath = outputPath, confGlobs = globs}
+    let conf = Configuration {confLogLevel = logLevel, confOutputPath = outputPath, confGlobs = globs}
         env = IdeEnvironment {ideStateVar = ideState, ideConfiguration = conf}
     startServer port env
 
@@ -135,7 +134,6 @@ command = Opts.helper <*> subcommands where
            Opts.option Opts.auto (Opts.long "port" `mappend` Opts.short 'p' `mappend` Opts.value (4242 :: Integer)))
       <*> Opts.switch (Opts.long "no-watch")
       <*> flipIfWindows (Opts.switch (Opts.long "polling"))
-      <*> Opts.switch (Opts.long "debug")
       <*> (parseLogLevel <$> Opts.strOption
            (Opts.long "log-level"
             `mappend` Opts.value ""
