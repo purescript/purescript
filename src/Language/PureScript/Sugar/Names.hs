@@ -65,12 +65,11 @@ desugarImportsWithEnv externs modules = do
   externsEnv :: Env -> ExternsFile -> m Env
   externsEnv env ExternsFile{..} = do
     let members = Exports{..}
-        ss = internalModuleSourceSpan "<Externs>"
-        env' = M.insert efModuleName (ss, primImports, members) env
+        env' = M.insert efModuleName (efSourceSpan, primImports, members) env
         fromEFImport (ExternsImport mn mt qmn) = (mn, [(Nothing, Just mt, qmn)])
     imps <- foldM (resolveModuleImport env') primImports (map fromEFImport efImports)
-    exps <- resolveExports env' ss efModuleName imps members efExports
-    return $ M.insert efModuleName (ss, imps, exps) env
+    exps <- resolveExports env' efSourceSpan efModuleName imps members efExports
+    return $ M.insert efModuleName (efSourceSpan, imps, exps) env
     where
 
     exportedTypes :: M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ModuleName)
