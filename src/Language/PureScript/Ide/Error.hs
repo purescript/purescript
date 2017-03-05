@@ -18,29 +18,55 @@ module Language.PureScript.Ide.Error
        ) where
 
 import           Data.Aeson
+import qualified Data.Aeson.Types as Aeson
+import qualified Data.HashMap.Lazy as HM
+import qualified Data.Text as T
+import qualified Language.PureScript as P
 import           Language.PureScript.Errors.JSON
-import           Language.PureScript.Ide.Types   (ModuleIdent)
+import           Language.PureScript.Ide.Types   (ModuleIdent, Completion(..))
 import           Protolude
-import qualified Text.Parsec.Error               as P
+import qualified Text.Parsec.Error               as Parsec
 
 data IdeError
     = GeneralError Text
     | NotFound Text
     | ModuleNotFound ModuleIdent
     | ModuleFileNotFound ModuleIdent
-    | ParseError P.ParseError Text
-    | RebuildError [JSONError]
-    deriving (Show, Eq)
+    | ParseError Parsec.ParseError Text
+    | RebuildError P.MultipleErrors
+    deriving (Show)
 
 instance ToJSON IdeError where
   toJSON (RebuildError errs) = object
     [ "resultType" .= ("error" :: Text)
-    , "result" .= errs
+    , "result" .= encodeRebuildErrors errs
     ]
   toJSON err = object
     [ "resultType" .= ("error" :: Text)
     , "result" .= textError err
     ]
+
+getTypeSearch :: P.SimpleErrorMessage -> Maybe P.TypeSearch
+getTypeSearch (P.HoleInferredType _ _ _ ts) = Just ts
+getTypeSearch _ = Nothing
+
+encodeRebuildErrors :: P.MultipleErrors -> Value
+encodeRebuildErrors = toJSON . map encodeRebuildError . P.runMultipleErrors
+  where
+    encodeRebuildError err = case err of
+      (P.ErrorMessage _ (getTypeSearch -> Just (P.TSAfter{tsAfterIdentifiers=idents, tsAfterRecordFields=fields}))) ->
+        insertTSCompletions idents (fromMaybe [] fields) (toJSON (toJSONError False P.Error err))
+      _ ->
+        (toJSON . toJSONError False P.Error) err
+
+    insertTSCompletions idents fields (Aeson.Object value) =
+      Aeson.Object (HM.insert "pursIde" (toJSON (map identCompletion idents ++ map fieldCompletion fields)) value)
+    insertTSCompletions _ _ v = v
+
+    identCompletion (P.Qualified mn i, ty) =
+      Completion (maybe "" P.runModuleName mn) (P.runIdent i) (prettyPrintTypeSingleLine ty) (prettyPrintTypeSingleLine ty) Nothing Nothing
+    fieldCompletion (label, ty) =
+      Completion "" ("_." <> P.prettyPrintLabel label) (prettyPrintTypeSingleLine ty) (prettyPrintTypeSingleLine ty) Nothing Nothing
 
 textError :: IdeError -> Text
 textError (GeneralError msg)          = msg
