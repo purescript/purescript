@@ -133,7 +133,7 @@ parseFixityDeclaration = do
       <*> (reserved "as" *> parseOperator)
   valueFixity fixity =
     ValueFixity fixity
-      <$> parseQualified ((Left <$> parseIdent) <|> (Right <$> properName))
+      <$> parseQualified ((Left <$> parseIdent) <|> (Right <$> dataConstructorName))
       <*> (reserved "as" *> parseOperator)
 
 parseImportDeclaration :: TokenParser Declaration
@@ -168,7 +168,7 @@ parseDeclarationRef =
   where
   parseTypeRef = do
     name <- typeName
-    dctors <- P.optionMaybe $ parens (symbol' ".." *> pure Nothing <|> Just <$> commaSep properName)
+    dctors <- P.optionMaybe $ parens (symbol' ".." *> pure Nothing <|> Just <$> commaSep dataConstructorName)
     return $ TypeRef name (fromMaybe (Just []) dctors)
 
 parseTypeClassDeclaration :: TokenParser Declaration
