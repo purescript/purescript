@@ -27,8 +27,8 @@ sortModules
   -> m ([Module], ModuleGraph)
 sortModules ms = do
     let mns = S.fromList $ map getModuleName ms
-    verts <- mapM (toGraphNode mns) ms
-    ms' <- mapM toModule $ stronglyConnComp verts
+    verts <- parU ms (toGraphNode mns)
+    ms' <- parU (stronglyConnComp verts) toModule
     let (graph, fromVertex, toVertex) = graphFromEdges verts
         moduleGraph = do (_, mn, _) <- verts
                          let v       = fromMaybe (internalError "sortModules: vertex not found") (toVertex mn)
@@ -39,23 +39,23 @@ sortModules ms = do
   where
     toGraphNode :: S.Set ModuleName -> Module -> m (Module, ModuleName, [ModuleName])
     toGraphNode mns m@(Module _ _ mn ds _) = do
-      let deps = ordNub (concatMap usedModules ds)
-      forM_ deps $ \dep ->
+      let deps = ordNub (mapMaybe usedModules ds)
+      void . parU deps $ \(dep, pos) ->
         when (dep /= C.Prim && S.notMember dep mns) $
-          throwError . addHint (ErrorInModule mn) . errorMessage $ ModuleNotFound dep
-      pure (m, getModuleName m, deps)
+          throwError
+            . addHint (ErrorInModule mn)
+            . maybe identity (addHint . PositionedError) pos
+            . errorMessage
+            $ ModuleNotFound dep
+      pure (m, getModuleName m, map fst deps)
 
 -- | Calculate a list of used modules based on explicit imports and qualified names.
-usedModules :: Declaration -> [ModuleName]
-usedModules d = f d where
-  f :: Declaration -> [ModuleName]
-  (f, _, _, _, _) = everythingOnValues (++) forDecls (const []) (const []) (const []) (const [])
-
-  forDecls :: Declaration -> [ModuleName]
-  -- Regardless of whether an imported module is qualified we still need to
-  -- take into account its import to build an accurate list of dependencies.
-  forDecls (ImportDeclaration mn _ _) = [mn]
-  forDecls _ = []
+usedModules :: Declaration -> Maybe (ModuleName, Maybe SourceSpan)
+-- Regardless of whether an imported module is qualified we still need to
+-- take into account its import to build an accurate list of dependencies.
+usedModules (ImportDeclaration mn _ _) = pure (mn, Nothing)
+usedModules (PositionedDeclaration ss _ d) = fmap (second (const (Just ss))) (usedModules d)
+usedModules _ = Nothing
 
 -- | Convert a strongly connected component of the module graph to a module
 toModule :: MonadError MultipleErrors m => SCC Module -> m Module
