@@ -46,22 +46,24 @@ instance ToJSON IdeError where
     , "result" .= textError err
     ]
 
-getTypeSearch :: P.SimpleErrorMessage -> Maybe P.TypeSearch
-getTypeSearch (P.HoleInferredType _ _ _ ts) = Just ts
-getTypeSearch _ = Nothing
-
 encodeRebuildErrors :: P.MultipleErrors -> Value
 encodeRebuildErrors = toJSON . map encodeRebuildError . P.runMultipleErrors
   where
     encodeRebuildError err = case err of
-      (P.ErrorMessage _ (getTypeSearch -> Just (P.TSAfter{tsAfterIdentifiers=idents, tsAfterRecordFields=fields}))) ->
-        insertTSCompletions idents (fromMaybe [] fields) (toJSON (toJSONError False P.Error err))
+      (P.ErrorMessage _
+       ((P.HoleInferredType name _ _
+         (P.TSAfter{tsAfterIdentifiers=idents, tsAfterRecordFields=fields})))) ->
+        insertTSCompletions name idents (fromMaybe [] fields) (toJSON (toJSONError False P.Error err))
       _ ->
         (toJSON . toJSONError False P.Error) err
 
-    insertTSCompletions idents fields (Aeson.Object value) =
-      Aeson.Object (HM.insert "pursIde" (toJSON (map identCompletion idents ++ map fieldCompletion fields)) value)
-    insertTSCompletions _ _ v = v
+    insertTSCompletions name idents fields (Aeson.Object value) =
+      Aeson.Object
+        (HM.insert "pursIde"
+         (object [ "name" .= name
+                 , "completions" .= (map identCompletion idents ++ map fieldCompletion fields)
+                 ]) value)
+    insertTSCompletions _ _ _ v = v
 
     identCompletion (P.Qualified mn i, ty) =
       Completion (maybe "" P.runModuleName mn) (P.runIdent i) (prettyPrintTypeSingleLine ty) (prettyPrintTypeSingleLine ty) Nothing Nothing
