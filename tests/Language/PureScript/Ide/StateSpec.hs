@@ -67,6 +67,8 @@ ef = P.ExternsFile
       mempty
  --     }
     ]
+  --, efSourceSpan =
+    (P.internalModuleSourceSpan "<tests>")
  -- }
 
 moduleMap :: ModuleMap [IdeDeclarationAnn]
