@@ -37,7 +37,6 @@ import Control.Monad.Writer.Class (MonadWriter(..))
 import Data.Bifunctor (bimap)
 import Data.Either (partitionEithers)
 import Data.Functor (($>))
-import Control.Monad.Identity
 import Data.List (transpose, (\\), partition, delete)
 import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
