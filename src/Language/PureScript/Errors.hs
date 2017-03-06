@@ -123,6 +123,8 @@ errorCode em = case unwrapErrorMessage em of
   PossiblyInfiniteInstance{} -> "PossiblyInfiniteInstance"
   CannotDerive{} -> "CannotDerive"
   InvalidNewtypeInstance{} -> "InvalidNewtypeInstance"
+  InvalidDerivedInstance{} -> "InvalidDerivedInstance"
+  ExpectedTypeConstructor{} -> "ExpectedTypeConstructor"
   CannotFindDerivingType{} -> "CannotFindDerivingType"
   DuplicateLabel{} -> "DuplicateLabel"
   DuplicateValueDeclaration{} -> "DuplicateValueDeclaration"
@@ -262,6 +264,8 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
   gSimple (CannotDerive cl ts) = CannotDerive cl <$> traverse f ts
   gSimple (InvalidNewtypeInstance cl ts) = InvalidNewtypeInstance cl <$> traverse f ts
+  gSimple (InvalidDerivedInstance cl ts n) = InvalidDerivedInstance cl <$> traverse f ts <*> pure n
+  gSimple (ExpectedTypeConstructor cl ts ty) = ExpectedTypeConstructor cl <$> traverse f ts <*> f ty
   gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
   gSimple (OrphanInstance nm cl ts) = OrphanInstance nm cl <$> traverse f ts
   gSimple (WildcardInferredType ty ctx) = WildcardInferredType <$> f ty <*> traverse (sndM f) ctx
@@ -666,6 +670,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
                 [ line (showQualified runProperName nm)
                 , Box.vcat Box.left (map typeAtomAsBox ts)
                 ]
+            , line "since instances of this type class are not derivable."
             ]
     renderSimpleErrorMessage (InvalidNewtypeInstance nm ts) =
       paras [ line "Cannot derive newtype instance for"
@@ -674,6 +679,32 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
                 , Box.vcat Box.left (map typeAtomAsBox ts)
                 ]
             , line "Make sure this is a newtype."
+            ]
+    renderSimpleErrorMessage (InvalidDerivedInstance nm ts argCount) =
+      paras [ line "Cannot derive the type class instance"
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName nm)
+                , Box.vcat Box.left (map typeAtomAsBox ts)
+                ]
+            , line $ fold $
+                [ "because the "
+                , markCode (showQualified runProperName nm)
+                , " type class has "
+                , T.pack (show argCount)
+                , " type "
+                , if argCount == 1 then "argument" else "arguments"
+                , ", but the declaration specifies " <> T.pack (show (length ts)) <> "."
+                ]
+            ]
+    renderSimpleErrorMessage (ExpectedTypeConstructor nm ts ty) =
+      paras [ line "Cannot derive the type class instance"
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName nm)
+                , Box.vcat Box.left (map typeAtomAsBox ts)
+                ]
+            , "because the type"
+            , markCodeBox $ indent $ typeAsBox ty
+            , line "is not of the required form T a_1 ... a_n, where T is a type constructor defined in the same module."
             ]
     renderSimpleErrorMessage (CannotFindDerivingType nm) =
       line $ "Cannot derive a type class instance, because the type declaration for " <> markCode (runProperName nm) <> " could not be found."

@@ -93,6 +93,8 @@ data SimpleErrorMessage
   | UnknownClass (Qualified (ProperName 'ClassName))
   | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [Type]
   | CannotDerive (Qualified (ProperName 'ClassName)) [Type]
+  | InvalidDerivedInstance (Qualified (ProperName 'ClassName)) [Type] Int
+  | ExpectedTypeConstructor (Qualified (ProperName 'ClassName)) [Type] Type
   | InvalidNewtypeInstance (Qualified (ProperName 'ClassName)) [Type]
   | CannotFindDerivingType (ProperName 'TypeName)
   | DuplicateLabel Label (Maybe Expr)
