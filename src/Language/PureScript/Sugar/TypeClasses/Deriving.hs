@@ -72,7 +72,11 @@ deriveInstance mn syns ds (TypeInstanceDeclaration nm deps className tys@[ty] De
   | className == Qualified (Just dataEq) (ProperName "Eq")
   , Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
   , mn == fromMaybe mn mn'
-  = TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveEq mn syns ds tyCon
+  = TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveEq (Ident C.eq) mn syns ds tyCon deps
+  | className == Qualified (Just dataEq) (ProperName "Eq1")
+  , Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
+  , mn == fromMaybe mn mn'
+  = TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveEq (Ident C.eq1) mn syns ds tyCon deps
   | className == Qualified (Just dataOrd) (ProperName "Ord")
   , Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
   , mn == fromMaybe mn mn'
@@ -538,15 +542,17 @@ checkIsWildcard tyConNm _ =
 
 deriveEq ::
   forall m. (MonadError MultipleErrors m, MonadSupply m)
-  => ModuleName
+  => Ident
+  -> ModuleName
   -> SynonymMap
   -> [Declaration]
   -> ProperName 'TypeName
+  -> [Constraint]
   -> m [Declaration]
-deriveEq mn syns ds tyConNm = do
+deriveEq valueName mn syns ds tyConNm deps = do
   tyCon <- findTypeDecl tyConNm ds
   eqFun <- mkEqFunction tyCon
-  return [ ValueDeclaration (Ident C.eq) Public [] (unguarded eqFun) ]
+  return [ ValueDeclaration valueName Public [] (unguarded eqFun) ]
   where
     mkEqFunction :: Declaration -> m Expr
     mkEqFunction (DataDeclaration _ _ _ args) = do
@@ -561,6 +567,9 @@ deriveEq mn syns ds tyConNm = do
 
     preludeEq :: Expr -> Expr -> Expr
     preludeEq = App . App (Var (Qualified (Just dataEq) (Ident C.eq)))
+
+    preludeEq1 :: Expr -> Expr -> Expr
+    preludeEq1 = App . App (Var (Qualified (Just dataEq) (Ident C.eq1)))
 
     addCatch :: [CaseAlternative] -> [CaseAlternative]
     addCatch xs
@@ -589,7 +598,12 @@ deriveEq mn syns ds tyConNm = do
       conjAll
       . map (\((Label str), typ) -> toEqTest (Accessor str l) (Accessor str r) typ)
       $ fields
-    toEqTest l r _ = preludeEq l r
+    toEqTest l r ty
+      | isEq1Constrained ty = preludeEq1 l r
+      | otherwise = preludeEq l r
+
+    isEq1Constrained (TypeApp f _) = any (\Constraint{..} -> constraintArgs == [f]) deps
+    isEq1Constrained _ = False
 
 deriveOrd ::
   forall m. (MonadError MultipleErrors m, MonadSupply m)
