@@ -70,25 +70,29 @@ deriveInstance mn syns ds (TypeInstanceDeclaration nm deps className tys Derived
       [ty] | Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor ty
            , mn == fromMaybe mn mn'
            -> TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveGeneric mn syns ds tyCon args
-      _ -> throwError . errorMessage $ InvalidDerivedInstance className tys
+           | otherwise -> throwError . errorMessage $ ExpectedTypeConstructor className tys ty
+      _ -> throwError . errorMessage $ InvalidDerivedInstance className tys 1
   | className == Qualified (Just dataEq) (ProperName "Eq")
   = case tys of
       [ty] | Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
            , mn == fromMaybe mn mn'
            -> TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveEq mn syns ds tyCon
-      _ -> throwError . errorMessage $ InvalidDerivedInstance className tys
+           | otherwise -> throwError . errorMessage $ ExpectedTypeConstructor className tys ty
+      _ -> throwError . errorMessage $ InvalidDerivedInstance className tys 1
   | className == Qualified (Just dataOrd) (ProperName "Ord")
   = case tys of
       [ty] | Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
            , mn == fromMaybe mn mn'
            -> TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveOrd mn syns ds tyCon
-      _ -> throwError . errorMessage $ InvalidDerivedInstance className tys
+           | otherwise -> throwError . errorMessage $ ExpectedTypeConstructor className tys ty
+      _ -> throwError . errorMessage $ InvalidDerivedInstance className tys 1
   | className == Qualified (Just dataFunctor) (ProperName "Functor")
   = case tys of
       [ty] | Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
            , mn == fromMaybe mn mn'
            -> TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveFunctor mn syns ds tyCon
-      _ -> throwError . errorMessage $ InvalidDerivedInstance className tys
+           | otherwise -> throwError . errorMessage $ ExpectedTypeConstructor className tys ty
+      _ -> throwError . errorMessage $ InvalidDerivedInstance className tys 1
   | className == Qualified (Just dataNewtype) (ProperName "Newtype")
   = case tys of
       [wrappedTy, unwrappedTy]
@@ -96,7 +100,8 @@ deriveInstance mn syns ds (TypeInstanceDeclaration nm deps className tys Derived
         , mn == fromMaybe mn mn'
         -> do (inst, actualUnwrappedTy) <- deriveNewtype mn syns ds tyCon args unwrappedTy
               return $ TypeInstanceDeclaration nm deps className [wrappedTy, actualUnwrappedTy] (ExplicitInstance inst)
-      _ -> throwError . errorMessage $ InvalidDerivedInstance className tys
+        | otherwise -> throwError . errorMessage $ ExpectedTypeConstructor className tys wrappedTy
+      _ -> throwError . errorMessage $ InvalidDerivedInstance className tys 2
   | className == Qualified (Just dataGenericRep) (ProperName C.generic)
   = case tys of
       [actualTy, repTy]
@@ -104,13 +109,15 @@ deriveInstance mn syns ds (TypeInstanceDeclaration nm deps className tys Derived
         , mn == fromMaybe mn mn'
         -> do (inst, inferredRepTy) <- deriveGenericRep mn syns ds tyCon args repTy
               return $ TypeInstanceDeclaration nm deps className [actualTy, inferredRepTy] (ExplicitInstance inst)
-      _ -> throwError . errorMessage $ InvalidDerivedInstance className tys
+        | otherwise -> throwError . errorMessage $ ExpectedTypeConstructor className tys actualTy
+      _ -> throwError . errorMessage $ InvalidDerivedInstance className tys 2
   | otherwise = throwError . errorMessage $ CannotDerive className tys
 deriveInstance mn syns ds (TypeInstanceDeclaration nm deps className tys NewtypeInstance) =
   case tys of
     _ : _ | Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor (last tys)
           , mn == fromMaybe mn mn'
           -> TypeInstanceDeclaration nm deps className tys . NewtypeInstanceWithDictionary <$> deriveNewtypeInstance syns className ds tys tyCon args
+          | otherwise -> throwError . errorMessage $ ExpectedTypeConstructor className tys (last tys)
     _ -> throwError . errorMessage $ InvalidNewtypeInstance className tys
 deriveInstance mn syns ds (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> deriveInstance mn syns ds d
 deriveInstance _ _ _ e = return e
