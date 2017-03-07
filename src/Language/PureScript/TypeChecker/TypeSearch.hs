@@ -83,7 +83,7 @@ accessorSearch
   -> P.Environment
   -> TC.CheckState
   -> P.Type
-  -> ([(Label, Type)], [(Label, Type)])
+  -> ([(Label, P.Type)], [(Label, P.Type)])
   -- ^ (all accessors we found, all accessors we found that match the result type)
 accessorSearch unsolved env st userT = maybe ([], []) fst $ checkInEnvironment env st $ do
   let initializeSkolems =
@@ -113,7 +113,7 @@ typeSearch
   -- ^ The typechecker state
   -> P.Type
   -- ^ The type we are looking for
-  -> ([(P.Qualified P.Ident, P.Type)], Maybe [(Label, Type)])
+  -> ([(P.Qualified P.Ident, P.Type)], Maybe [(Label, P.Type)])
 typeSearch unsolved env st type' =
   let
     resultMap = Map.mapMaybe (\(x, _, _) -> checkSubsume unsolved env st type' x $> x) (P.names env)
