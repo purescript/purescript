@@ -4,7 +4,7 @@ module Language.PureScript.TypeChecker.TypeSearch
 
 import           Protolude
 
-import           Control.Monad.Writer
+import           Control.Monad.Writer (WriterT, runWriterT)
 import qualified Data.Map                                    as Map
 import qualified Language.PureScript.TypeChecker.Entailment  as Entailment
 
