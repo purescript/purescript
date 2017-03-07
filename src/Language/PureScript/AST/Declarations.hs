@@ -39,8 +39,11 @@ data TypeSearch
   = TSBefore Environment
   -- ^ An Environment captured for later consumption by type directed search
   | TSAfter
-    { tsAfterIdentifiers :: [(Qualified Ident, Type)]
+    { tsAfterIdentifiers :: [(Qualified Text, Type)]
+    -- ^ The identifiers that fully satisfy the subsumption check
     , tsAfterRecordFields :: Maybe [(Label, Type)]
+    -- ^ Record fields that are available on the first argument to the typed
+    -- hole
     }
   -- ^ Results of applying type directed search to the previously captured
   -- Environment

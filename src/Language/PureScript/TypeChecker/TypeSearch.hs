@@ -113,11 +113,11 @@ typeSearch
   -- ^ The typechecker state
   -> P.Type
   -- ^ The type we are looking for
-  -> ([(P.Qualified P.Ident, P.Type)], Maybe [(Label, P.Type)])
+  -> ([(P.Qualified Text, P.Type)], Maybe [(Label, P.Type)])
 typeSearch unsolved env st type' =
   let
     resultMap = Map.mapMaybe (\(x, _, _) -> checkSubsume unsolved env st type' x $> x) (P.names env)
     (allLabels, solvedLabels) = accessorSearch unsolved env st type'
-    solvedLabels' = first (P.Qualified Nothing . P.Ident . ("_." <>) . P.prettyPrintLabel) <$> solvedLabels
+    solvedLabels' = first (P.Qualified Nothing . ("_." <>) . P.prettyPrintLabel) <$> solvedLabels
   in
-    (solvedLabels' <> Map.toList resultMap, if null allLabels then Nothing else Just allLabels)
+    (solvedLabels' <> (first (map P.runIdent) <$> Map.toList resultMap), if null allLabels then Nothing else Just allLabels)
