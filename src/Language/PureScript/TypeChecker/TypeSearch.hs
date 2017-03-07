@@ -18,6 +18,7 @@ import           Language.PureScript.Environment             as P
 import           Language.PureScript.Errors                  as P
 import           Language.PureScript.Label
 import           Language.PureScript.Names                   as P
+import           Language.PureScript.Pretty.Types            as P
 import           Language.PureScript.TypeChecker.Skolems     as Skolem
 import           Language.PureScript.TypeChecker.Synonyms    as P
 import           Language.PureScript.Types                   as P
@@ -78,14 +79,13 @@ checkSubsume unsolved env st userT envT = checkInEnvironment env st $ do
   Entailment.replaceTypeClassDictionaries (isJust unsolved) expP
 
 accessorSearch
-  :: P.Environment
-  -- ^ The Environment which contains the relevant definitions and typeclasses
+  :: Maybe [(P.Ident, Entailment.InstanceContext, P.Constraint)]
+  -> P.Environment
   -> TC.CheckState
-  -- ^ The typechecker state
   -> P.Type
-  -- ^ The user supplied type
-  -> Maybe (Type, Environment)
-accessorSearch env st userT = checkInEnvironment env st $ do
+  -> ([(Label, Type)], [(Label, Type)])
+  -- ^ (all accessors we found, all accessors we found that match the result type)
+accessorSearch unsolved env st userT = maybe ([], []) fst $ checkInEnvironment env st $ do
   let initializeSkolems =
         Skolem.introduceSkolemScope
         <=< P.replaceAllTypeSynonyms
@@ -98,8 +98,11 @@ accessorSearch env st userT = checkInEnvironment env st $ do
   let recordFunction = TypeApp (TypeApp tyFunction (TypeApp tyRecord rowType)) resultType
   _ <- subsumes recordFunction userT'
   subst <- gets TC.checkSubstitution
-  let solvedRow = substituteType subst rowType
-  pure solvedRow
+  let solvedRow = fst (rowToList (substituteType subst rowType))
+  tcS <- get
+  pure (solvedRow, filter (\x -> checkAccessor tcS (substituteType subst resultType) x) solvedRow)
+  where
+    checkAccessor tcs x (_, type') = isJust (checkSubsume unsolved env tcs x type')
 
 typeSearch
   :: Maybe [(P.Ident, Entailment.InstanceContext, P.Constraint)]
@@ -114,5 +117,7 @@ typeSearch
 typeSearch unsolved env st type' =
   let
     resultMap = Map.mapMaybe (\(x, _, _) -> checkSubsume unsolved env st type' x $> x) (P.names env)
+    (allLabels, solvedLabels) = accessorSearch unsolved env st type'
+    solvedLabels' = first (P.Qualified Nothing . P.Ident . ("_." <>) . P.prettyPrintLabel) <$> solvedLabels
   in
-    (Map.toList resultMap, fst . rowToList . fst <$> accessorSearch env st type')
+    (solvedLabels' <> Map.toList resultMap, if null allLabels then Nothing else Just allLabels)

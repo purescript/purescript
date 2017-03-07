@@ -61,7 +61,7 @@ encodeRebuildErrors = toJSON . map encodeRebuildError . P.runMultipleErrors
       Aeson.Object
         (HM.insert "pursIde"
          (object [ "name" .= name
-                 , "completions" .= (map identCompletion idents ++ map fieldCompletion fields)
+                 , "completions" .= (ordNub (map identCompletion idents ++ map fieldCompletion fields))
                  ]) value)
     insertTSCompletions _ _ _ v = v
 

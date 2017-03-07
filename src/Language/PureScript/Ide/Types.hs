@@ -184,7 +184,7 @@ data Completion = Completion
   , complExpandedType  :: Text
   , complLocation      :: Maybe P.SourceSpan
   , complDocumentation :: Maybe Text
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Ord)
 
 instance ToJSON Completion where
   toJSON (Completion {..}) =
