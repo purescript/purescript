@@ -15,7 +15,6 @@ import Language.PureScript.AST.Literals
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.AST.Traversals
 import Language.PureScript.Comments
-import qualified Language.PureScript.Constants as C
 import Language.PureScript.CoreFn.Ann
 import Language.PureScript.CoreFn.Binders
 import Language.PureScript.CoreFn.Expr
@@ -211,11 +210,10 @@ findQualModules decls =
   fqValues :: A.Expr -> [ModuleName]
   fqValues (A.Var q) = getQual' q
   fqValues (A.Constructor q) = getQual' q
-  -- 'IsSymbol' instances for literal symbols are automatically solved and the type
-  -- class dictionaries are built inline instead of having a named instance defined
-  -- and imported.  We therefore need to import the 'IsSymbol' constructor from
-  -- Data.Symbol if it hasn't already been imported.
-  fqValues (A.TypeClassDictionaryConstructorApp C.IsSymbol _) = getQual' C.IsSymbol
+  -- Some instances are automatically solved and have their class dictionaries
+  -- built inline instead of having a named instance defined and imported.
+  -- We therefore need to import these constructors if they aren't already.
+  fqValues (A.TypeClassDictionaryConstructorApp c _) = getQual' c
   fqValues _ = []
 
   fqBinders :: A.Binder -> [ModuleName]
