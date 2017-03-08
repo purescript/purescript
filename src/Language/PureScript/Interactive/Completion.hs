@@ -121,7 +121,7 @@ completeDirective ws w =
 directiveArg :: String -> Directive -> [CompletionContext]
 directiveArg _ Browse      = [CtxModule]
 directiveArg _ Quit        = []
-directiveArg _ Reset       = []
+directiveArg _ Clear       = []
 directiveArg _ Help        = []
 directiveArg _ Paste       = []
 directiveArg _ Show        = map CtxFixed replQueryStrings

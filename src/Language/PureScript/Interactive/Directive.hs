@@ -25,7 +25,7 @@ directiveStrings :: [(Directive, [String])]
 directiveStrings =
     [ (Help   , ["?", "help"])
     , (Quit   , ["quit"])
-    , (Reset  , ["reset"])
+    , (Clear  , ["clear"])
     , (Browse , ["browse"])
     , (Type   , ["type"])
     , (Kind   , ["kind"])
@@ -82,7 +82,7 @@ parseDirective = listToMaybe . directivesFor
 hasArgument :: Directive -> Bool
 hasArgument Help = False
 hasArgument Quit = False
-hasArgument Reset = False
+hasArgument Clear = False
 hasArgument Paste = False
 hasArgument _ = True
 
@@ -93,7 +93,7 @@ help :: [(Directive, String, String)]
 help =
   [ (Help,    "",         "Show this help menu")
   , (Quit,    "",         "Quit PSCi")
-  , (Reset,   "",         "Discard all imported modules and declared bindings")
+  , (Clear,   "",         "Discard all imported modules and declared bindings")
   , (Browse,  "<module>", "See all functions in <module>")
   , (Type,    "<expr>",   "Show the type of <expr>")
   , (Kind,    "<type>",   "Show the kind of <type>")
