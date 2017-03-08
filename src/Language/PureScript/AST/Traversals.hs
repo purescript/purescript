@@ -543,7 +543,7 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
     in g'' s' v1
   g' s (Abs (Right b) v1) =
     let s' = S.union (S.fromList (binderNames b)) s
-    in g'' s' v1
+    in h'' s b <> g'' s' v1
   g' s (App v1 v2) = g'' s v1 <> g'' s v2
   g' s (IfThenElse v1 v2 v3) = g'' s v1 <> g'' s v2 <> g'' s v3
   g' s (Case vs alts) = foldMap (g'' s) vs <> foldMap (i'' s) alts
