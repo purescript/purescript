@@ -29,16 +29,12 @@ tco = everywhereOnJS convert where
   tcoResult = tcoVar "result"
 
   convert :: JS -> JS
-  convert js@(JSVariableIntroduction ss name (Just fn@JSFunction {})) =
-    let
+  convert (JSVariableIntroduction ss name (Just fn@JSFunction {}))
+      | isTailRecursive name body'
+      = JSVariableIntroduction ss name (Just (replace (toLoop name allArgs body')))
+    where
       (argss, body', replace) = collectAllFunctionArgs [] id fn
-    in case () of
-      _ | isTailCall name body' ->
-            let
-              allArgs = concat $ reverse argss
-            in
-              JSVariableIntroduction ss name (Just (replace (toLoop name allArgs body')))
-        | otherwise -> js
+      allArgs = concat $ reverse argss
   convert js = js
 
   collectAllFunctionArgs :: [[Text]] -> (JS -> JS) -> JS -> ([[Text]], JS, JS -> JS)
@@ -52,28 +48,30 @@ tco = everywhereOnJS convert where
     (args : allArgs, body, f . JSReturn s1 . JSFunction s2 ident (map copyVar args))
   collectAllFunctionArgs allArgs f body = (allArgs, body, f)
 
-  isTailCall :: Text -> JS -> Bool
-  isTailCall ident js =
-    let
-      numSelfCalls = everythingOnJS (+) countSelfCalls js
-      numSelfCallsInTailPosition = everythingOnJS (+) countSelfCallsInTailPosition js
-      numSelfCallsUnderFunctions = everythingOnJS (+) countSelfCallsUnderFunctions js
-    in
-      numSelfCalls > 0
-      && numSelfCalls == numSelfCallsInTailPosition
-      && numSelfCallsUnderFunctions == 0
-    where
-    countSelfCalls :: JS -> Int
-    countSelfCalls (JSApp _ (JSVar _ ident') _) | ident == ident' = 1
-    countSelfCalls _ = 0
+  isTailRecursive :: Text -> JS -> Bool
+  isTailRecursive ident js = countSelfReferences js > 0 && allInTailPosition js where
+    countSelfReferences = everythingOnJS (+) match where
+      match :: JS -> Int
+      match (JSVar _ ident') | ident == ident' = 1
+      match _ = 0
 
-    countSelfCallsInTailPosition :: JS -> Int
-    countSelfCallsInTailPosition (JSReturn _ ret) | isSelfCall ident ret = 1
-    countSelfCallsInTailPosition _ = 0
-
-    countSelfCallsUnderFunctions :: JS -> Int
-    countSelfCallsUnderFunctions (JSFunction _ _ _ js') = everythingOnJS (+) countSelfCalls js'
-    countSelfCallsUnderFunctions _ = 0
+    allInTailPosition (JSReturn _ expr)
+      | isSelfCall ident expr = countSelfReferences expr == 1
+      | otherwise = countSelfReferences expr == 0
+    allInTailPosition (JSWhile _ js1 body)
+      = countSelfReferences js1 == 0 && allInTailPosition body
+    allInTailPosition (JSFor _ _ js1 js2 body)
+      = countSelfReferences js1 == 0 && countSelfReferences js2 == 0 && allInTailPosition body
+    allInTailPosition (JSForIn _ _ js1 body)
+      = countSelfReferences js1 == 0 && allInTailPosition body
+    allInTailPosition (JSIfElse _ js1 body el)
+      = countSelfReferences js1 == 0 && allInTailPosition body && all allInTailPosition el
+    allInTailPosition (JSBlock _ body)
+      = all allInTailPosition body
+    allInTailPosition (JSLabel _ _ body)
+      = allInTailPosition body
+    allInTailPosition _
+      = False
 
   toLoop :: Text -> [Text] -> JS -> JS
   toLoop ident allArgs js =
