@@ -82,6 +82,8 @@ data Command
   | BrowseModule P.ModuleName
   -- | Exit PSCI
   | QuitPSCi
+  -- | Reload all the imported modules of the REPL
+  | ReloadState
   -- | Clear the state of the REPL
   | ClearState
   -- | Add some declarations to the current evaluation context
@@ -120,6 +122,7 @@ parseReplQuery _ = Nothing
 data Directive
   = Help
   | Quit
+  | Reload
   | Clear
   | Browse
   | Type

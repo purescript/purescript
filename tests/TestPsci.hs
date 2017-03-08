@@ -48,6 +48,7 @@ completionTestData :: [(String, [String])]
 completionTestData =
   -- basic directives
   [ (":h",  [":help"])
+  , (":r",  [":reload"])
   , (":c",  [":clear"])
   , (":q",  [":quit"])
   , (":b",  [":browse"])
@@ -60,9 +61,10 @@ completionTestData =
   , ("import Control.Monad.E",    map ("import Control.Monad.Eff" ++) ["", ".Unsafe", ".Class", ".Console"])
   , ("import Control.Monad.Eff.", map ("import Control.Monad.Eff" ++) [".Unsafe", ".Class", ".Console"])
 
-  -- :quit, :help, :clear should not complete
+  -- :quit, :help, :reload, :clear should not complete
   , (":help ", [])
   , (":quit ", [])
+  , (":reload ", [])
   , (":clear ", [])
 
   -- :show should complete to "loaded" and "import"

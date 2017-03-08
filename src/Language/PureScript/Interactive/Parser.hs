@@ -63,6 +63,7 @@ parseDirective cmd =
   commandFor d = case d of
     Help    -> return ShowHelp
     Quit    -> return QuitPSCi
+    Reload  -> return ReloadState
     Clear   -> return ClearState
     Paste   -> return PasteLines
     Browse  -> BrowseModule <$> parseRest P.moduleName arg
