@@ -141,8 +141,8 @@ data Backend = forall state. Backend
 data BrowserCommand
   = Eval (MVar String)
   -- ^ Evaluate the latest JS
-  | Reload
-  -- ^ Reload the page
+  | Refresh
+  -- ^ Refresh the page
 
 -- | State for the browser backend
 data BrowserState = BrowserState
@@ -185,7 +185,7 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
                 -- With many connected clients, all but one of
                 -- these attempts will fail.
                 tryPutMVar resultVar (unpack result)
-              Reload ->
+              Refresh ->
                 WS.sendTextData conn ("reload" :: Text)
 
         shutdownHandler :: IO () -> IO ()
@@ -262,7 +262,7 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
     reload :: BrowserState -> IO ()
     reload state = do
       createBundle state
-      atomically $ writeTChan (browserCommands state) Reload
+      atomically $ writeTChan (browserCommands state) Refresh
 
     shutdown :: BrowserState -> IO ()
     shutdown state = putMVar (browserShutdownNotice state) ()
