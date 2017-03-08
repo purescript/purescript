@@ -4,7 +4,7 @@ module Language.PureScript.CodeGen.JS.Optimizer.TCO (tco) where
 import Prelude.Compat
 
 import Data.Text (Text)
-import Data.Monoid ((<>), getAny, Any(..))
+import Data.Monoid ((<>))
 import Language.PureScript.CodeGen.JS.AST
 
 -- | Eliminate tail calls
@@ -18,6 +18,15 @@ tco = everywhereOnJS convert where
 
   copyVar :: Text -> Text
   copyVar arg = "__copy_" <> arg
+
+  tcoDone :: Text
+  tcoDone = tcoVar "done"
+
+  tcoLoop :: Text
+  tcoLoop = tcoVar "loop"
+
+  tcoResult :: Text
+  tcoResult = tcoVar "result"
 
   convert :: JS -> JS
   convert js@(JSVariableIntroduction ss name (Just fn@JSFunction {})) =
@@ -49,12 +58,10 @@ tco = everywhereOnJS convert where
       numSelfCalls = everythingOnJS (+) countSelfCalls js
       numSelfCallsInTailPosition = everythingOnJS (+) countSelfCallsInTailPosition js
       numSelfCallsUnderFunctions = everythingOnJS (+) countSelfCallsUnderFunctions js
-      numSelfCallWithFnArgs = everythingOnJS (+) countSelfCallsWithFnArgs js
     in
       numSelfCalls > 0
       && numSelfCalls == numSelfCallsInTailPosition
       && numSelfCallsUnderFunctions == 0
-      && numSelfCallWithFnArgs == 0
     where
     countSelfCalls :: JS -> Int
     countSelfCalls (JSApp _ (JSVar _ ident') _) | ident == ident' = 1
@@ -68,40 +75,51 @@ tco = everywhereOnJS convert where
     countSelfCallsUnderFunctions (JSFunction _ _ _ js') = everythingOnJS (+) countSelfCalls js'
     countSelfCallsUnderFunctions _ = 0
 
-    countSelfCallsWithFnArgs :: JS -> Int
-    countSelfCallsWithFnArgs = go [] where
-      go acc (JSVar _ ident')
-        | ident == ident' && any hasFunction acc = 1
-      go acc (JSApp _ fn args) = go (args ++ acc) fn
-      go _ _ = 0
-
-    hasFunction :: JS -> Bool
-    hasFunction = getAny . everythingOnJS mappend (Any . isFunction)
-      where
-      isFunction JSFunction{} = True
-      isFunction _ = False
-
   toLoop :: Text -> [Text] -> JS -> JS
-  toLoop ident allArgs js = JSBlock rootSS $
+  toLoop ident allArgs js =
+      JSBlock rootSS $
         map (\arg -> JSVariableIntroduction rootSS arg (Just (JSVar rootSS (copyVar arg)))) allArgs ++
-        [ JSLabel rootSS tcoLabel $ JSWhile rootSS (JSBooleanLiteral rootSS True) (JSBlock rootSS [ everywhereOnJS loopify js ]) ]
+        [ JSVariableIntroduction rootSS tcoDone (Just (JSBooleanLiteral rootSS False))
+        , JSVariableIntroduction rootSS tcoResult Nothing
+        ] ++
+        map (\arg ->
+          JSVariableIntroduction rootSS (tcoVar arg) Nothing) allArgs ++
+        [ JSFunction rootSS (Just tcoLoop) allArgs (JSBlock rootSS [loopify js])
+        , JSLabel rootSS tcoLabel $
+            JSWhile rootSS (JSUnary rootSS Not (JSVar rootSS tcoDone))
+              (JSBlock rootSS
+                (JSAssignment rootSS (JSVar rootSS tcoResult) (JSApp rootSS (JSVar rootSS tcoLoop) (map (JSVar rootSS) allArgs))
+                : map (\arg ->
+                    JSAssignment rootSS (JSVar rootSS arg) (JSVar rootSS (tcoVar arg))) allArgs))
+        , JSReturn rootSS (JSVar rootSS tcoResult)
+        ]
     where
     rootSS = Nothing
 
     loopify :: JS -> JS
-    loopify (JSReturn ss ret) | isSelfCall ident ret =
-      let
-        allArgumentValues = concat $ collectSelfCallArgs [] ret
-      in
-        JSBlock ss $ zipWith (\val arg ->
-                    JSVariableIntroduction ss (tcoVar arg) (Just val)) allArgumentValues allArgs
-                  ++ map (\arg ->
-                    JSAssignment ss (JSVar ss arg) (JSVar ss (tcoVar arg))) allArgs
-                  ++ [ JSContinue ss tcoLabel ]
+    loopify (JSReturn ss ret)
+      | isSelfCall ident ret =
+        let
+          allArgumentValues = concat $ collectArgs [] ret
+        in
+          JSBlock ss $
+            zipWith (\val arg ->
+              JSAssignment ss (JSVar ss (tcoVar arg)) val) allArgumentValues allArgs
+              ++ [ JSReturn ss (JSVar ss "undefined") ]
+      | otherwise = JSBlock ss [ JSAssignment ss (JSVar ss tcoDone) (JSBooleanLiteral ss True)
+                               , JSReturn ss ret
+                               ]
+    loopify (JSWhile ss cond body) = JSWhile ss cond (loopify body)
+    loopify (JSFor ss i js1 js2 body) = JSFor ss i js1 js2 (loopify body)
+    loopify (JSForIn ss i js1 body) = JSForIn ss i js1 (loopify body)
+    loopify (JSIfElse ss cond body el) = JSIfElse ss cond (loopify body) (fmap loopify el)
+    loopify (JSBlock ss body) = JSBlock ss (map loopify body)
+    loopify (JSLabel ss l body) = JSLabel ss l (loopify body)
     loopify other = other
-    collectSelfCallArgs :: [[JS]] -> JS -> [[JS]]
-    collectSelfCallArgs allArgumentValues (JSApp _ fn args') = collectSelfCallArgs (args' : allArgumentValues) fn
-    collectSelfCallArgs allArgumentValues _ = allArgumentValues
+
+    collectArgs :: [[JS]] -> JS -> [[JS]]
+    collectArgs acc (JSApp _ fn args') = collectArgs (args' : acc) fn
+    collectArgs acc _ = acc
 
   isSelfCall :: Text -> JS -> Bool
   isSelfCall ident (JSApp _ (JSVar _ ident') _) = ident == ident'
