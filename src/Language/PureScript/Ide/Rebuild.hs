@@ -15,7 +15,6 @@ import qualified Data.Map.Lazy                   as M
 import           Data.Maybe                      (fromJust)
 import qualified Data.Set                        as S
 import qualified Language.PureScript             as P
-import           Language.PureScript.Errors.JSON
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.State
@@ -52,10 +51,8 @@ rebuildFile path runOpenBuild = do
   pwd <- liftIO getCurrentDirectory
 
   m <- case snd <$> P.parseModuleFromFile (makeRelative pwd) (path, input) of
-    Left parseError -> throwError
-                       . RebuildError
-                       . toJSONErrors False P.Error
-                       $ P.MultipleErrors [P.toPositionedError parseError]
+    Left parseError ->
+      throwError (RebuildError (P.MultipleErrors [P.toPositionedError parseError]))
     Right m -> pure m
 
   -- Externs files must be sorted ahead of time, so that they get applied
@@ -77,10 +74,10 @@ rebuildFile path runOpenBuild = do
     . P.rebuildModule (buildMakeActions
                         >>= shushProgress $ makeEnv) externs $ m
   case result of
-    Left errors -> throwError (RebuildError (toJSONErrors False P.Error errors))
+    Left errors -> throwError (RebuildError errors)
     Right _ -> do
       runOpenBuild (rebuildModuleOpen makeEnv externs m)
-      pure (RebuildSuccess (toJSONErrors False P.Warning warnings))
+      pure (RebuildSuccess warnings)
 
 rebuildFileAsync
   :: forall m. (Ide m, MonadLogger m, MonadError IdeError m)
@@ -174,7 +171,7 @@ sortExterns m ex = do
            . M.delete (P.getModuleName m) $ ex
   case sorted' of
     Left err ->
-      throwError (RebuildError (toJSONErrors False P.Error err))
+      throwError (RebuildError err)
     Right (sorted, graph) -> do
       let deps = fromJust (List.lookup (P.getModuleName m) graph)
       pure $ mapMaybe getExtern (deps `inOrderOf` map P.getModuleName sorted)

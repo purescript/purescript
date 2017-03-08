@@ -269,7 +269,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
   gSimple (OrphanInstance nm cl ts) = OrphanInstance nm cl <$> traverse f ts
   gSimple (WildcardInferredType ty ctx) = WildcardInferredType <$> f ty <*> traverse (sndM f) ctx
-  gSimple (HoleInferredType name ty ctx env) = HoleInferredType name <$> f ty <*> traverse (sndM f) ctx  <*> gTypeSearch env
+  gSimple (HoleInferredType name ty ctx env) = HoleInferredType name <$> f ty <*> traverse (sndM f) ctx  <*> onTypeSearchTypesM f env
   gSimple (MissingTypeDeclaration nm ty) = MissingTypeDeclaration nm <$> f ty
   gSimple (CannotGeneralizeRecursiveFunction nm ty) = CannotGeneralizeRecursiveFunction nm <$> f ty
   gSimple other = pure other
@@ -282,9 +282,6 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gHint (ErrorInInstance cl ts) = ErrorInInstance cl <$> traverse f ts
   gHint (ErrorSolvingConstraint con) = ErrorSolvingConstraint <$> overConstraintArgs (traverse f) con
   gHint other = pure other
-
-  gTypeSearch (TSBefore env) = pure (TSBefore env)
-  gTypeSearch (TSAfter result) = TSAfter <$> traverse (traverse f) result
 
 errorDocUri :: ErrorMessage -> Text
 errorDocUri e = "https://github.com/purescript/documentation/blob/master/errors/" <> errorCode e <> ".md"
@@ -794,11 +791,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
       let
         maxTSResults = 15
         tsResult = case ts of
-          (TSAfter idents) | not (null idents) ->
+          (TSAfter{tsAfterIdentifiers=idents}) | not (null idents) ->
             let
               formatTS (names, types) =
                 let
-                  idBoxes = Box.text . T.unpack . showQualified runIdent <$> names
+                  idBoxes = Box.text . T.unpack . showQualified id <$> names
                   tyBoxes = (\t -> BoxHelpers.indented
                               (Box.text ":: " Box.<> typeAsBox t)) <$> types
                   longestId = maximum (map Box.cols idBoxes)

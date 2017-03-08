@@ -148,9 +148,10 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
     runTypeSearch cons st = \case
       ErrorMessage hints (HoleInferredType x ty y (TSBefore env)) ->
         let subst = checkSubstitution st
-            searchResult = (fmap . fmap) (substituteType subst)
-                             (M.toList (typeSearch cons env st (substituteType subst ty)))
-        in ErrorMessage hints (HoleInferredType x ty y (TSAfter searchResult))
+            searchResult = onTypeSearchTypes
+              (substituteType subst)
+              (uncurry TSAfter (typeSearch cons env st (substituteType subst ty)))
+        in ErrorMessage hints (HoleInferredType x ty y searchResult)
       other -> other
 
     -- | Generalize type vars using forall and add inferred constraints
