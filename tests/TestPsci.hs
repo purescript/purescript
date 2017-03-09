@@ -134,7 +134,7 @@ initTestPSCi = do
     Right modules -> do
       resultOrErrors <- runMake . make $ modules
       case resultOrErrors of
-        Left errors -> print errors >> exitFailure
+        Left errs -> putStrLn (P.prettyPrintMultipleErrors P.defaultPPEOptions errs) >> exitFailure
         Right (externs, env) ->
           return (PSCiState [] [] (zip (map snd modules) externs), PSCiConfig pursFiles env)
 
