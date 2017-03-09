@@ -6,6 +6,7 @@ import Prelude.Compat
 import Data.Text (Text)
 import Data.Monoid ((<>))
 import Language.PureScript.CodeGen.JS.AST
+import Language.PureScript.AST.SourcePos (SourceSpan)
 
 -- | Eliminate tail calls
 tco :: JS -> JS
@@ -65,8 +66,6 @@ tco = everywhereOnJS convert where
       = countSelfReferences js1 == 0 && allInTailPosition body && all allInTailPosition el
     allInTailPosition (JSBlock _ body)
       = all allInTailPosition body
-    allInTailPosition (JSLabel _ _ body)
-      = allInTailPosition body
     allInTailPosition _
       = False
 
@@ -99,17 +98,18 @@ tco = everywhereOnJS convert where
           JSBlock ss $
             zipWith (\val arg ->
               JSAssignment ss (JSVar ss (tcoVar arg)) val) allArgumentValues allArgs
-              ++ [ JSReturn ss (JSVar ss "undefined") ]
-      | otherwise = JSBlock ss [ JSAssignment ss (JSVar ss tcoDone) (JSBooleanLiteral ss True)
-                               , JSReturn ss ret
-                               ]
+            ++ [ JSReturnNoResult ss ]
+      | otherwise = JSBlock ss [ markDone ss, JSReturn ss ret ]
+    loopify (JSReturnNoResult ss) = JSBlock ss [ markDone ss, JSReturnNoResult ss ]
     loopify (JSWhile ss cond body) = JSWhile ss cond (loopify body)
     loopify (JSFor ss i js1 js2 body) = JSFor ss i js1 js2 (loopify body)
     loopify (JSForIn ss i js1 body) = JSForIn ss i js1 (loopify body)
     loopify (JSIfElse ss cond body el) = JSIfElse ss cond (loopify body) (fmap loopify el)
     loopify (JSBlock ss body) = JSBlock ss (map loopify body)
-    loopify (JSLabel ss l body) = JSLabel ss l (loopify body)
     loopify other = other
+
+    markDone :: Maybe SourceSpan -> JS
+    markDone ss = JSAssignment ss (JSVar ss tcoDone) (JSBooleanLiteral ss True)
 
     collectArgs :: [[JS]] -> JS -> [[JS]]
     collectArgs acc (JSApp _ fn args') = collectArgs (args' : acc) fn

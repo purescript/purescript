@@ -1,6 +1,4 @@
--- |
--- Pretty printer for the JavaScript AST
---
+-- | Pretty printer for the JavaScript AST
 module Language.PureScript.Pretty.JS
   ( prettyPrintJS
   , prettyPrintJSWithSourceMaps
@@ -112,21 +110,15 @@ literals = mkPattern' match'
     [ return $ emit "return "
     , prettyPrintJS' value
     ]
+  match (JSReturnNoResult _) = return $ emit "return"
   match (JSThrow _ value) = mconcat <$> sequence
     [ return $ emit "throw "
     , prettyPrintJS' value
-    ]
-  match (JSBreak _ lbl) = return $ emit $ "break " <> lbl
-  match (JSContinue _ lbl) = return $ emit $ "continue " <> lbl
-  match (JSLabel _ lbl js) = mconcat <$> sequence
-    [ return $ emit $ lbl <> ": "
-    , prettyPrintJS' js
     ]
   match (JSComment _ com js) = mconcat <$> sequence
     [ mconcat <$> forM com comment
     , prettyPrintJS' js
     ]
-  match (JSRaw _ js) = return $ emit js
   match _ = mzero
 
   comment :: (Emit gen) => Comment -> StateT PrinterState Maybe gen
@@ -158,12 +150,6 @@ literals = mkPattern' match'
         Nothing -> case T.uncons t of
           Just (x, xs) -> x `T.cons` removeComments xs
           Nothing -> ""
-
-conditional :: Pattern PrinterState JS ((Maybe SourceSpan, JS, JS), JS)
-conditional = mkPattern match
-  where
-  match (JSConditional ss cond th el) = Just ((ss, th, el), cond)
-  match _ = Nothing
 
 accessor :: Pattern PrinterState JS (Text, JS)
 accessor = mkPattern match
@@ -239,15 +225,7 @@ prettyStatements sts = do
   indentString <- currentIndent
   return $ intercalate (emit "\n") $ map ((<> emit ";") . (indentString <>)) jss
 
--- |
--- Generate a pretty-printed string representing a JavaScript expression
---
-prettyPrintJS1 :: (Emit gen) => JS -> gen
-prettyPrintJS1 = fromMaybe (internalError "Incomplete pattern") . flip evalStateT (PrinterState 0) . prettyPrintJS'
-
--- |
--- Generate a pretty-printed string representing a collection of JavaScript expressions at the same indentation level
---
+-- | Generate a pretty-printed string representing a collection of JavaScript expressions at the same indentation level
 prettyPrintJSWithSourceMaps :: [JS] -> (Text, [SMap])
 prettyPrintJSWithSourceMaps js =
   let StrPos (_, s, mp) = (fromMaybe (internalError "Incomplete pattern") . flip evalStateT (PrinterState 0) . prettyStatements) js
@@ -255,9 +233,8 @@ prettyPrintJSWithSourceMaps js =
 
 prettyPrintJS :: [JS] -> Text
 prettyPrintJS = maybe (internalError "Incomplete pattern") runPlainString . flip evalStateT (PrinterState 0) . prettyStatements
--- |
--- Generate an indented, pretty-printed string representing a JavaScript expression
---
+
+-- | Generate an indented, pretty-printed string representing a JavaScript expression
 prettyPrintJS' :: (Emit gen) => JS -> StateT PrinterState Maybe gen
 prettyPrintJS' = A.runKleisli $ runPattern matchValue
   where
@@ -299,5 +276,4 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
                   , [ binary    BitwiseOr            "|" ]
                   , [ binary    And                  "&&" ]
                   , [ binary    Or                   "||" ]
-                  , [ Wrap conditional $ \(ss, th, el) cond -> cond <> addMapping' ss <> emit " ? " <> prettyPrintJS1 th <> addMapping' ss <> emit " : " <> prettyPrintJS1 el ]
                     ]
