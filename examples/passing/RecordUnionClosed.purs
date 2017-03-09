@@ -5,13 +5,13 @@ import Data.Record (class RowUnion, merge)
 import Control.Monad.Eff.Console (log, CONSOLE)
 import Control.Monad.Eff (Eff)
 
-type Mand r = (title :: String | r)
+type Mand r = {title :: String | r}
 type Opt eff = (onClick :: Unit -> Eff eff Unit)
 
 defaultValues :: forall eff. {|Opt eff}
 defaultValues = {onClick: \_ -> pure unit }
 
-withDefaults :: forall o eff. RowUnion (Mand o) (Opt eff) (Mand (Opt eff)) => {|Mand o} -> {|Mand (Opt eff)}
+withDefaults :: forall o eff. RowUnion (Opt eff) o (Opt eff) => Mand o -> Mand (Opt eff)
 withDefaults = merge defaultValues
 
 main :: Eff (console::CONSOLE) Unit

@@ -35,6 +35,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@davidchambers](https://github.com/davidchambers) | David Chambers | [MIT license](http://opensource.org/licenses/MIT) |
 | [@DavidLindbom](https://github.com/DavidLindbom) | David Lindbom | [MIT license](http://opensource.org/licenses/MIT) |
 | [@dckc](https://github.com/dckc) | Dan Connolly | [MIT license](http://opensource.org/licenses/MIT) |
+| [@doolse2](https://github.com/doolse) | Jolse Maginnis | [MIT license](http://opensource.org/licenses/MIT) |
 | [@eamelink](https://github.com/eamelink) | Erik Bakker | MIT license |
 | [@epost](https://github.com/epost) | Erik Post | MIT license |
 | [@erdeszt](https://github.com/erdeszt) | Tibor Erdesz | [MIT license](http://opensource.org/licenses/MIT) |
