@@ -95,7 +95,8 @@ handleCommand
   -> Command
   -> m ()
 handleCommand _ _ ShowHelp                  = liftIO $ putStrLn helpMessage
-handleCommand _ r ResetState                = handleResetState r
+handleCommand _ r ReloadState               = handleReloadState r
+handleCommand _ r ClearState                = handleClearState r
 handleCommand c _ (Expression val)          = handleExpression c val
 handleCommand _ _ (Import im)               = handleImport im
 handleCommand _ _ (Decls l)                 = handleDecls l
@@ -106,14 +107,13 @@ handleCommand _ _ (ShowInfo QueryLoaded)    = handleShowLoadedModules
 handleCommand _ _ (ShowInfo QueryImport)    = handleShowImportedModules
 handleCommand _ _ _                         = P.internalError "handleCommand: unexpected command"
 
--- | Reset the application state
-handleResetState
+-- | Reload the application state
+handleReloadState
   :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
   => m ()
   -> m ()
-handleResetState reload = do
-  modify $ updateImportedModules (const [])
-         . updateLets (const [])
+handleReloadState reload = do
+  modify $ updateLets (const [])
   files <- asks psciLoadedFiles
   e <- runExceptT $ do
     modules <- ExceptT . liftIO $ loadAllModules files
@@ -124,6 +124,15 @@ handleResetState reload = do
     Right (modules, externs) -> do
       modify (updateLoadedExterns (const (zip modules externs)))
       reload
+
+-- | Clear the application state
+handleClearState
+  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
+  => m ()
+  -> m ()
+handleClearState reload = do
+  modify $ updateImportedModules (const [])
+  handleReloadState reload
 
 -- | Takes a value expression and evaluates it with the current state.
 handleExpression

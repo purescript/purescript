@@ -6,7 +6,9 @@ module TestPsci where
 import Prelude ()
 import Prelude.Compat
 
+import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.State.Strict (evalStateT)
+import Control.Monad.Trans.RWS.Strict (evalRWST, RWST, get)
 import Control.Monad (when)
 
 import Data.List (sort)
@@ -22,9 +24,7 @@ import Test.HUnit
 
 import qualified Language.PureScript as P
 
-import Language.PureScript.Interactive.Module (loadAllModules)
-import Language.PureScript.Interactive.Completion
-import Language.PureScript.Interactive.Types
+import Language.PureScript.Interactive
 
 import TestUtils (supportModules)
 
@@ -34,7 +34,9 @@ main = do
   when (errors + failures > 0) exitFailure
 
 allTests :: Test
-allTests = completionTests
+allTests = TestList [ completionTests
+                    , commandTests
+                    ]
 
 completionTests :: Test
 completionTests =
@@ -48,7 +50,8 @@ completionTestData :: [(String, [String])]
 completionTestData =
   -- basic directives
   [ (":h",  [":help"])
-  , (":re", [":reset"])
+  , (":r",  [":reload"])
+  , (":c",  [":clear"])
   , (":q",  [":quit"])
   , (":b",  [":browse"])
 
@@ -60,10 +63,11 @@ completionTestData =
   , ("import Control.Monad.E",    map ("import Control.Monad.Eff" ++) ["", ".Unsafe", ".Class", ".Console"])
   , ("import Control.Monad.Eff.", map ("import Control.Monad.Eff" ++) [".Unsafe", ".Class", ".Console"])
 
-  -- :quit, :help, :reset should not complete
+  -- :quit, :help, :reload, :clear should not complete
   , (":help ", [])
   , (":quit ", [])
-  , (":reset ", [])
+  , (":reload ", [])
+  , (":clear ", [])
 
   -- :show should complete to "loaded" and "import"
   , (":show ", [":show import", ":show loaded"])
@@ -113,11 +117,11 @@ assertCompletedOk (line, expecteds) = do
 
 runCM :: CompletionM a -> IO a
 runCM act = do
-  psciState <- getPSCiState
+  psciState <- getPSCiStateForCompletion
   evalStateT (liftCompletionM act) psciState
 
-getPSCiState :: IO PSCiState
-getPSCiState = do
+initTestPSCi :: IO (PSCiState, PSCiConfig)
+initTestPSCi = do
   cwd <- getCurrentDirectory
   let supportDir = cwd </> "tests" </> "support" </> "bower_components"
   let supportFiles ext = Glob.globDir1 (Glob.compile ("purescript-*/src/**/*." ++ ext)) supportDir
@@ -127,12 +131,61 @@ getPSCiState = do
   case modulesOrFirstError of
     Left err ->
       print err >> exitFailure
-    Right modules ->
-      let imports = [controlMonadSTasST, (P.ModuleName [P.ProperName (T.pack "Prelude")], P.Implicit, Nothing)]
-          dummyExterns = P.internalError "TestPsci: dummyExterns should not be used"
-      in  return (PSCiState imports [] (zip (map snd modules) (repeat dummyExterns)))
+    Right modules -> do
+      resultOrErrors <- runMake . make $ modules
+      case resultOrErrors of
+        Left errs -> putStrLn (P.prettyPrintMultipleErrors P.defaultPPEOptions errs) >> exitFailure
+        Right (externs, env) ->
+          return (PSCiState [] [] (zip (map snd modules) externs), PSCiConfig pursFiles env)
+
+getPSCiStateForCompletion :: IO PSCiState
+getPSCiStateForCompletion = do
+  (PSCiState _ bs es, _) <- initTestPSCi
+  let imports = [controlMonadSTasST, (P.ModuleName [P.ProperName (T.pack "Prelude")], P.Implicit, Nothing)]
+  return $ PSCiState imports bs es
 
 controlMonadSTasST :: ImportedModule
 controlMonadSTasST = (s "Control.Monad.ST", P.Implicit, Just (s "ST"))
   where
   s = P.moduleNameFromString . T.pack
+
+type TestPSCi a = RWST PSCiConfig () PSCiState IO a
+
+runTestPSCi :: TestPSCi a -> IO a
+runTestPSCi i = do
+  (s, c) <- initTestPSCi
+  fst <$> evalRWST i c s
+
+testEval :: String -> TestPSCi ()
+testEval = const $ return () -- not yet actually eval expr command
+
+testReload :: TestPSCi ()
+testReload = return ()
+
+run :: String -> TestPSCi ()
+run s = case parseCommand s of
+          Left errStr -> liftIO $ putStrLn errStr >> exitFailure
+          Right command ->
+            handleCommand testEval testReload command
+
+commandTests :: Test
+commandTests = TestLabel "commandTests" $ TestList $ map (TestCase . runTestPSCi)
+  [ do
+      run "import Prelude"
+      run "import Data.Functor"
+      run "import Control.Monad"
+      before <- psciImportedModules <$> get
+      liftIO $ length before @?= 3
+      run ":clear"
+      after <- psciImportedModules <$> get
+      liftIO $ length after @?= 0
+  , do
+      run "import Prelude"
+      run "import Data.Functor"
+      run "import Control.Monad"
+      before <- psciImportedModules <$> get
+      liftIO $ length before @?= 3
+      run ":reload"
+      after <- psciImportedModules <$> get
+      liftIO $ length after @?= 3
+  ]
