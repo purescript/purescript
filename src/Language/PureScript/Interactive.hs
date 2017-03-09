@@ -13,7 +13,7 @@ import           Prelude ()
 import           Prelude.Compat
 import           Protolude (ordNub)
 
-import           Data.List (sort, find, foldl', delete)
+import           Data.List (sort, find, foldl')
 import           Data.Maybe (mapMaybe)
 import qualified Data.Map as M
 import           Data.Monoid ((<>))
@@ -226,15 +226,12 @@ handleImport
   => ImportedModule
   -> m ()
 handleImport im = do
-   st <- gets (updateImportedModules (renew im))
+   st <- gets (updateImportedModules (im :))
    let m = createTemporaryModuleForImports st
    e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
    case e of
      Left errs -> printErrors errs
      Right _  -> put st
-   where
-   renew :: ImportedModule -> [ImportedModule] -> [ImportedModule]
-   renew m ms = m : delete m ms
 
 -- | Takes a value and prints its type
 handleTypeOf
