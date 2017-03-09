@@ -172,20 +172,24 @@ commandTests :: Test
 commandTests = TestLabel "commandTests" $ TestList $ map (TestCase . runTestPSCi)
   [ do
       run "import Prelude"
+      run "import Prelude as P"
       run "import Data.Functor"
+      run "import Control.Monad (bind)"
       run "import Control.Monad"
       before <- psciImportedModules <$> get
-      liftIO $ length before @?= 3
+      liftIO $ length before @?= 5
       run ":clear"
       after <- psciImportedModules <$> get
       liftIO $ length after @?= 0
   , do
       run "import Prelude"
+      run "import Prelude as P"
       run "import Data.Functor"
+      run "import Control.Monad (bind)"
       run "import Control.Monad"
       before <- psciImportedModules <$> get
-      liftIO $ length before @?= 3
+      liftIO $ length before @?= 5
       run ":reload"
       after <- psciImportedModules <$> get
-      liftIO $ length after @?= 3
+      liftIO $ length after @?= 5
   ]

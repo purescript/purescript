@@ -13,7 +13,7 @@ import           Prelude ()
 import           Prelude.Compat
 import           Protolude (ordNub)
 
-import           Data.List (sort, find, foldl', deleteBy)
+import           Data.List (sort, find, foldl', delete)
 import           Data.Maybe (mapMaybe)
 import qualified Data.Map as M
 import           Data.Monoid ((<>))
@@ -234,7 +234,7 @@ handleImport im = do
      Right _  -> put st
    where
    renew :: ImportedModule -> [ImportedModule] -> [ImportedModule]
-   renew m ms = m : deleteBy (\ (name, _, _) (name', _, _) -> name == name') m ms
+   renew m ms = m : delete m ms
 
 -- | Takes a value and prints its type
 handleTypeOf
