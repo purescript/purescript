@@ -10,9 +10,6 @@ import Language.PureScript.CodeGen.JS.AST
 -- | Eliminate tail calls
 tco :: JS -> JS
 tco = everywhereOnJS convert where
-  tcoLabel :: Text
-  tcoLabel = "tco"
-
   tcoVar :: Text -> Text
   tcoVar arg = "__tco_" <> arg
 
@@ -83,12 +80,11 @@ tco = everywhereOnJS convert where
         map (\arg ->
           JSVariableIntroduction rootSS (tcoVar arg) Nothing) allArgs ++
         [ JSFunction rootSS (Just tcoLoop) allArgs (JSBlock rootSS [loopify js])
-        , JSLabel rootSS tcoLabel $
-            JSWhile rootSS (JSUnary rootSS Not (JSVar rootSS tcoDone))
-              (JSBlock rootSS
-                (JSAssignment rootSS (JSVar rootSS tcoResult) (JSApp rootSS (JSVar rootSS tcoLoop) (map (JSVar rootSS) allArgs))
-                : map (\arg ->
-                    JSAssignment rootSS (JSVar rootSS arg) (JSVar rootSS (tcoVar arg))) allArgs))
+        , JSWhile rootSS (JSUnary rootSS Not (JSVar rootSS tcoDone))
+            (JSBlock rootSS
+              (JSAssignment rootSS (JSVar rootSS tcoResult) (JSApp rootSS (JSVar rootSS tcoLoop) (map (JSVar rootSS) allArgs))
+              : map (\arg ->
+                  JSAssignment rootSS (JSVar rootSS arg) (JSVar rootSS (tcoVar arg))) allArgs))
         , JSReturn rootSS (JSVar rootSS tcoResult)
         ]
     where
