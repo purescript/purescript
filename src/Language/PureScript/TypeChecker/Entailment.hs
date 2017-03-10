@@ -23,7 +23,7 @@ import Control.Monad.Writer
 import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
 import Data.List (minimumBy)
-import Data.Maybe (fromMaybe, maybeToList, mapMaybe)
+import Data.Maybe (fromMaybe, maybeToList, mapMaybe, catMaybes)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -149,9 +149,10 @@ entails SolverOptions{..} constraint context hints =
     solve constraint
   where
     forClassName :: InstanceContext -> Qualified (ProperName 'ClassName) -> [Type] -> [TypeClassDict]
-    forClassName ctx cn@C.RowUnion [l, r, o] | not solverDeferErrors =
-      (findDicts ctx cn Nothing) <>
-        (toList $ (\(oOut, cst) -> TypeClassDictionaryInScope RowUnionInstance [] C.RowUnion [l, r, oOut] cst) <$> unionRows l r o)
+    forClassName ctx cn@C.RowUnion [l, r, o] =
+      concatMap (findDicts ctx cn) (ordNub [Nothing, Just C.DataRecord])
+      <> (toList $ (\(lOut, rOut, oOut, cst) -> TypeClassDictionaryInScope RowUnionInstance [] C.RowUnion [lOut, rOut, oOut] cst) <$> unionRows l r o)
+--       <> [ TypeClassDictionaryInScope RowUnionInstance [] C.RowUnion [REmpty, REmpty, REmpty] Nothing ]
     forClassName _ C.Warn [msg] =
       [TypeClassDictionaryInScope (WarnInstance msg) [] C.Warn [msg] Nothing]
     forClassName _ C.IsSymbol [TypeLevelString sym] =
@@ -169,35 +170,30 @@ entails SolverOptions{..} constraint context hints =
     forClassName ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (ordNub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
     forClassName _ _ _ = internalError "forClassName: expected qualified class name"
 
-    -- Right biased union of two row types
-    unionRows :: Type -> Type -> Type -> Maybe (Type, Maybe [Constraint])
-    unionRows l r o =
+    -- Left biased union of two row types
+    unionRows :: Type -> Type -> Type -> Maybe (Type, Type, Type, Maybe [Constraint])
+    unionRows l r o = if solverDeferErrors || not (hasKnown l || hasKnown r) then Nothing
+      else
         let (ls, lEnd) = rowToList l
             (rs, rEnd) = rowToList r
-            (os, oEnd) = rowToList o
-            lm = M.fromList ls
-            rm = M.fromList rs
-            lrUnion = M.toList $ M.union rm lm
-            unioned = rowFromList (lrUnion, oEnd)
-            constraintDiff a b m = Just $ [ Constraint C.RowUnion [a, b, rowFromList (M.toList $ M.difference (M.fromList os) m, oEnd)] Nothing ]
-        in case (isClosedRow lEnd, isClosedRow rEnd) of
-            -- (l) (r) ? -> (l | r)
-            (True, True) -> Just $ (rowFromList (lrUnion, REmpty), Nothing)
-            -- (l) (r | re) (? | re) -> (l | r | re)
-            (True, _) | rEnd == oEnd -> Just (unioned, Nothing)
-            -- (l | le) (r) (? | le) -> (l | r | le)
-            (_, True) | lEnd == oEnd -> Just (unioned, Nothing)
-            -- (l) (r|re) (o | oe) -> (l) re (o &~ r | oe) => (l | r | oe)
-            (True, _) | not $ null rs -> Just $ (unioned, constraintDiff l rEnd rm)
-            -- (l|le) (r) (o | oe) -> (r) le (o &~ l | oe) => (l | r | oe)
-            (_, True) | not $ null ls -> Just $ (unioned, constraintDiff r lEnd lm)
-            -- (l|le) (r|re) (?|oe) -> le re oe => (l | r | oe)
-            _ | not $ null ls && null rs -> Just $ (unioned, Just $ [ Constraint C.RowUnion [lEnd, rEnd, oEnd] Nothing ])
-            _ -> Nothing
+            (_, oEnd) = rowToList o
+            lrUnion = ordNub (ls <> rs)
+            (ending,constraints) = case (lEnd, rEnd) of
+                (REmpty, REmpty) -> (REmpty, [])
+                _ -> (oEnd, catMaybes [
+                            if rEnd == oEnd || null rs
+                                then Nothing
+                                else Just $ Constraint C.RowUnion [l, rEnd, rowFromList (ls, oEnd)] Nothing
+                          , if lEnd == oEnd || null ls
+                                then Nothing
+                                else Just $ Constraint C.RowUnion [lEnd, r, rowFromList (rs, oEnd)] Nothing
+                          ])
+        in  Just (l, r, rowFromList (lrUnion, ending), if null constraints then Nothing else Just constraints)
       where
-        isClosedRow :: Type -> Bool
-        isClosedRow REmpty = True
-        isClosedRow _ = False
+        hasKnown :: Type -> Bool
+        hasKnown (RCons _ _ _) = True
+        hasKnown REmpty = True
+        hasKnown _ = False
 
     ctorModules :: Type -> Maybe ModuleName
     ctorModules (TypeConstructor (Qualified (Just mn) _)) = Just mn

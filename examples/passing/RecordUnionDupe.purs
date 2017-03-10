@@ -4,9 +4,7 @@ import Prelude
 import Data.Record (merge)
 import Control.Monad.Eff.Console (log, CONSOLE)
 import Control.Monad.Eff (Eff)
-import Unsafe.Coerce (unsafeCoerce)
 
-main :: Eff (console::CONSOLE) Unit
+main :: forall eff. Eff (console::CONSOLE|eff) Unit
 main = do
-  let result = (merge {left:1} {left:"Done"}).left
-  log $ unsafeCoerce result
+  log (merge {same:1} {same:"Done"}).same

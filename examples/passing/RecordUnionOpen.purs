@@ -21,7 +21,7 @@ leftClosed = merge
 rightClosed :: forall l. {|l} -> {right::Int} -> {right::Int|l}
 rightClosed = merge
 
-bothOpen :: forall l r b. RowUnion l r b => {left::Int|l} -> {right::Int|r} -> {left::Int,right::Int|b}
+bothOpen :: forall l r b. RowUnion r l b => {left::Int|l} -> {right::Int|r} -> {left::Int,right::Int|b}
 bothOpen = merge
 
 main :: Eff (console::CONSOLE) Unit
@@ -34,6 +34,6 @@ main = do
         p -> log $ unsafeCoerce p
   compare leftClosed {left:1} {right:2, three:3, four:4}
   compare rightClosed {left:1, three:3, four:4} {right:2}
-  compare bothOpen {left:1, three:0, four:""} {four:4, right:2, three:3}
+  compare bothOpen {left:1, three:0, four:1} {four:4, right:2, three:3}
   withoutClick.onClick unit
   withClick.onClick unit
