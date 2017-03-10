@@ -188,15 +188,8 @@ library
                      Language.PureScript.Externs
                      Language.PureScript.CodeGen
                      Language.PureScript.CodeGen.JS
-                     Language.PureScript.CodeGen.JS.AST
                      Language.PureScript.CodeGen.JS.Common
-                     Language.PureScript.CodeGen.JS.Optimizer
-                     Language.PureScript.CodeGen.JS.Optimizer.Blocks
-                     Language.PureScript.CodeGen.JS.Optimizer.Common
-                     Language.PureScript.CodeGen.JS.Optimizer.Inliner
-                     Language.PureScript.CodeGen.JS.Optimizer.MagicDo
-                     Language.PureScript.CodeGen.JS.Optimizer.TCO
-                     Language.PureScript.CodeGen.JS.Optimizer.Unused
+                     Language.PureScript.CodeGen.JS.Printer
                      Language.PureScript.Constants
                      Language.PureScript.CoreFn
                      Language.PureScript.CoreFn.Ann
@@ -207,6 +200,15 @@ library
                      Language.PureScript.CoreFn.Module
                      Language.PureScript.CoreFn.Traversals
                      Language.PureScript.CoreFn.ToJSON
+                     Language.PureScript.CoreImp
+                     Language.PureScript.CoreImp.AST
+                     Language.PureScript.CoreImp.Optimizer
+                     Language.PureScript.CoreImp.Optimizer.Blocks
+                     Language.PureScript.CoreImp.Optimizer.Common
+                     Language.PureScript.CoreImp.Optimizer.Inliner
+                     Language.PureScript.CoreImp.Optimizer.MagicDo
+                     Language.PureScript.CoreImp.Optimizer.TCO
+                     Language.PureScript.CoreImp.Optimizer.Unused
                      Language.PureScript.Comments
                      Language.PureScript.Environment
                      Language.PureScript.Errors
@@ -229,7 +231,6 @@ library
                      Language.PureScript.Parser.Types
                      Language.PureScript.Pretty
                      Language.PureScript.Pretty.Common
-                     Language.PureScript.Pretty.JS
                      Language.PureScript.Pretty.Kinds
                      Language.PureScript.Pretty.Types
                      Language.PureScript.Pretty.Values
