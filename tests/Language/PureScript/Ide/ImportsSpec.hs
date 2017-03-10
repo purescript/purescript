@@ -58,6 +58,14 @@ spec = do
                                          , "                   cons)"
                                          ]))
         (moduleSkeleton [preludeImport, arrayImport])
+    it "allows multiline import statements with hanging parens" $
+      shouldBe
+        (sliceImportSection (withImports [ "import Data.Array ("
+                                         , "  head,"
+                                         , "  cons"
+                                         , ")"
+                                         ]))
+        (moduleSkeleton [preludeImport, arrayImport])
   describe "pretty printing imports" $ do
     it "pretty prints a simple import" $
       shouldBe (prettyPrintImport' preludeImport) "import Prelude"
