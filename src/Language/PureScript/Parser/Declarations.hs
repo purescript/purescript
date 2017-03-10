@@ -1,6 +1,7 @@
 -- | Parsers for module definitions and declarations
 module Language.PureScript.Parser.Declarations
   ( parseDeclaration
+  , parseDeclarationRef
   , parseModule
   , parseModulesFromFiles
   , parseModuleFromFile
