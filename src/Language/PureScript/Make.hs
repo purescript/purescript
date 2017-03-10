@@ -60,8 +60,7 @@ import           Language.PureScript.Linter
 import           Language.PureScript.ModuleDependencies
 import           Language.PureScript.Names
 import           Language.PureScript.Options
-import           Language.PureScript.Pretty
-import           Language.PureScript.Pretty.Common(SMap(..))
+import           Language.PureScript.Pretty.Common (SMap(..))
 import           Language.PureScript.Renamer
 import           Language.PureScript.Sugar
 import           Language.PureScript.TypeChecker
