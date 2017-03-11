@@ -1,3 +1,5 @@
+{-# LANGUAGE GADTs #-}
+
 -- | Common functions used by the various optimizer phases
 module Language.PureScript.CoreImp.Optimizer.Common where
 
@@ -14,22 +16,21 @@ import Language.PureScript.PSString (PSString)
 applyAll :: [a -> a] -> a -> a
 applyAll = foldl' (.) id
 
-replaceIdent :: Text -> AST -> AST -> AST
-replaceIdent var1 js = everywhere replace
-  where
+replaceIdent :: forall ty ann. Text -> AST 'Expression ann -> AST ty ann -> AST ty ann
+replaceIdent var1 js = everywhere replace where
+  replace :: AST ty1 ann -> AST ty1 ann
   replace (Var _ var2) | var1 == var2 = js
   replace other = other
 
-replaceIdents :: [(Text, AST)] -> AST -> AST
-replaceIdents vars = everywhere replace
-  where
+replaceIdents :: forall ty ann. [(Text, AST 'Expression ann)] -> AST ty ann -> AST ty ann
+replaceIdents vars = everywhere replace where
+  replace :: AST ty1 ann -> AST ty1 ann
   replace v@(Var _ var) = fromMaybe v $ lookup var vars
   replace other = other
 
-isReassigned :: Text -> AST -> Bool
-isReassigned var1 = everything (||) check
-  where
-  check :: AST -> Bool
+isReassigned :: Text -> AST ty ann -> Bool
+isReassigned var1 = everything (||) check where
+  check :: AST ty ann -> Bool
   check (Function _ _ args _) | var1 `elem` args = True
   check (VariableIntroduction _ arg _) | var1 == arg = True
   check (Assignment _ (Var _ arg) _) | var1 == arg = True
@@ -37,40 +38,38 @@ isReassigned var1 = everything (||) check
   check (ForIn _ arg _ _) | var1 == arg = True
   check _ = False
 
-isRebound :: AST -> AST -> Bool
-isRebound js d = any (\v -> isReassigned v d || isUpdated v d) (everything (++) variablesOf js)
-  where
+isRebound :: AST ty1 ann -> AST ty ann -> Bool
+isRebound js d = any (\v -> isReassigned v d || isUpdated v d) (everything (++) variablesOf js) where
+  variablesOf :: AST ty ann -> [Text]
   variablesOf (Var _ var) = [var]
   variablesOf _ = []
 
-isUsed :: Text -> AST -> Bool
-isUsed var1 = everything (||) check
-  where
-  check :: AST -> Bool
+isUsed :: Text -> AST ty ann -> Bool
+isUsed var1 = everything (||) check where
+  check :: AST ty ann -> Bool
   check (Var _ var2) | var1 == var2 = True
   check (Assignment _ target _) | var1 == targetVariable target = True
   check _ = False
 
-targetVariable :: AST -> Text
+targetVariable :: AST ty ann -> Text
 targetVariable (Var _ var) = var
 targetVariable (Indexer _ _ tgt) = targetVariable tgt
 targetVariable _ = internalError "Invalid argument to targetVariable"
 
-isUpdated :: Text -> AST -> Bool
-isUpdated var1 = everything (||) check
-  where
-  check :: AST -> Bool
+isUpdated :: Text -> AST ty ann -> Bool
+isUpdated var1 = everything (||) check where
+  check :: AST ty ann -> Bool
   check (Assignment _ target _) | var1 == targetVariable target = True
   check _ = False
 
-removeFromBlock :: ([AST] -> [AST]) -> AST -> AST
+removeFromBlock :: ([AST ty ann] -> [AST ty ann]) -> AST ty ann -> AST ty ann
 removeFromBlock go (Block ss sts) = Block ss (go sts)
 removeFromBlock _  js = js
 
-isDict :: (Text, PSString) -> AST -> Bool
+isDict :: (Text, PSString) -> AST ty ann -> Bool
 isDict (moduleName, dictName) (Indexer _ (StringLiteral _ x) (Var _ y)) =
   x == dictName && y == moduleName
 isDict _ _ = False
 
-isDict' :: [(Text, PSString)] -> AST -> Bool
+isDict' :: [(Text, PSString)] -> AST ty ann -> Bool
 isDict' xs js = any (`isDict` js) xs
