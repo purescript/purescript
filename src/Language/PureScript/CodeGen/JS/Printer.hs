@@ -180,12 +180,6 @@ app = mkPattern' match
     return (intercalate (emit ", ") jss, val)
   match _ = mzero
 
-typeOf :: Pattern PrinterState AST ((), AST)
-typeOf = mkPattern match
-  where
-  match (TypeOf _ val) = Just ((), val)
-  match _ = Nothing
-
 instanceOf :: Pattern PrinterState AST (AST, AST)
 instanceOf = mkPattern match
   where
@@ -251,7 +245,6 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
                         <> fromMaybe "" name
                         <> "(" <> intercalate ", " args <> ") ")
                         <> ret ]
-                  , [ Wrap typeOf $ \_ s -> emit "typeof " <> s ]
                   , [ unary     Not                  "!"
                     , unary     BitwiseNot           "~"
                     , unary     Positive             "+"
