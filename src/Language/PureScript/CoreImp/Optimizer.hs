@@ -31,7 +31,7 @@ import Language.PureScript.CoreImp.Optimizer.TCO
 import Language.PureScript.CoreImp.Optimizer.Unused
 
 -- | Apply a series of optimizer passes to simplified JavaScript code
-optimize :: MonadSupply m => AST -> m AST
+optimize :: (MonadSupply m, Eq ann) => AST ty (Maybe ann) -> m (AST ty (Maybe ann))
 optimize js = do
     js' <- untilFixedPoint (inlineFnComposition . inlineUnsafePartial . tidyUp . applyAll
       [ inlineCommonValues
@@ -39,7 +39,7 @@ optimize js = do
       ]) js
     untilFixedPoint (return . tidyUp) . tco . magicDo $ js'
   where
-    tidyUp :: AST -> AST
+    tidyUp :: AST ty (Maybe ann) -> AST ty (Maybe ann)
     tidyUp = applyAll
       [ collapseNestedBlocks
       , collapseNestedIfs

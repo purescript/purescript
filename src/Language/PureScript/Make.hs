@@ -358,8 +358,11 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     rawJs <- J.moduleToJs m foreignInclude
     dir <- lift $ makeIO (const (ErrorMessage [] $ CannotGetFileInfo ".")) getCurrentDirectory
     sourceMaps <- lift $ asks optionsSourceMaps
-    let (pjs, mappings) = if sourceMaps then prettyPrintJSWithSourceMaps rawJs else (prettyPrintJS rawJs, [])
-    let filePath = T.unpack (runModuleName mn)
+    let (pjs, mappings) =
+          if sourceMaps
+            then prettyPrintStatementsWithSourceMaps rawJs
+            else (prettyPrintStatementsAsText rawJs, [])
+        filePath = T.unpack (runModuleName mn)
         jsFile = outputDir </> filePath </> "index.js"
         mapFile = outputDir </> filePath </> "index.js.map"
         externsFile = outputDir </> filePath </> "externs.json"
