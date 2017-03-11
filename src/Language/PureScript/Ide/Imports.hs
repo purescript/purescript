@@ -86,11 +86,7 @@ data ImportParse = ImportParse
 parseModuleHeader :: P.TokenParser ImportParse
 parseModuleHeader = do
   _ <- P.readComments
-  P.reserved "module"
-  P.indented
-  mn <- P.moduleName
-  _ <- Parsec.optionMaybe $ P.parens $ P.commaSep1 P.parseDeclarationRef
-  P.reserved "where"
+  (mn, _) <- P.parseModuleDeclaration
   (ipStart, ipEnd, decls) <- P.withSourceSpan (\(P.SourceSpan _ start end) _ -> (start, end,))
     (P.mark (Parsec.many (P.same *> P.parseImportDeclaration')))
   return $ ImportParse mn ipStart ipEnd (map mkImport decls)
