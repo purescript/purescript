@@ -20,6 +20,7 @@ removeCodeAfterReturnStatements = everywhereOnJS (removeFromBlock go)
   go jss | not (any isJSReturn jss) = jss
          | otherwise = let (body, ret : _) = break isJSReturn jss in body ++ [ret]
   isJSReturn (JSReturn _ _) = True
+  isJSReturn (JSReturnNoResult _) = True
   isJSReturn _ = False
 
 removeUnusedArg :: JS -> JS
