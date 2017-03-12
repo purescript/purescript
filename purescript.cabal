@@ -96,6 +96,7 @@ extra-source-files: examples/passing/*.purs
                   , examples/docs/resolutions.json
                   , app/static/index.html
                   , app/static/index.js
+                  , app/static/*.css
                   , tests/support/package.json
                   , tests/support/bower.json
                   , tests/support/setup-win.cmd
