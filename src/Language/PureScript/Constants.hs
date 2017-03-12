@@ -384,9 +384,6 @@ pattern Warn = Qualified (Just Prim) (ProperName "Warn")
 typ :: forall a. (IsString a) => a
 typ = "Type"
 
-effect :: forall a. (IsString a) => a
-effect = "Effect"
-
 symbol :: forall a. (IsString a) => a
 symbol = "Symbol"
 

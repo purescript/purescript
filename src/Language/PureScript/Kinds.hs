@@ -52,8 +52,6 @@ kindFromJSON = do
       KUnknown <$> key "contents" (nth 0 asIntegral)
     "Star" ->
       pure kindType
-    "Bang" ->
-      pure kindEffect
     "Row" ->
       Row <$> key "contents" kindFromJSON
     "FunKind" ->
@@ -78,7 +76,6 @@ kindFromJSON = do
   primKind = NamedKind . primName
 
   kindType = primKind "Type"
-  kindEffect = primKind "Effect"
   kindSymbol = primKind "Symbol"
 
 instance A.FromJSON Kind where

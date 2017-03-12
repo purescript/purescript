@@ -28,7 +28,6 @@ primDocsModule = Module
       , typeConcat
       , typeString
       , kindType
-      , kindEffect
       , kindSymbol
       ]
   , modReExports = []
@@ -93,11 +92,6 @@ kindType = primKind "Type" $ T.unlines
   [ "`Type` (also known as `*`) is the kind of all proper types: those that"
   , "classify value-level terms."
   , "For example the type `Boolean` has kind `Type`; denoted by `Boolean :: Type`."
-  ]
-
-kindEffect :: Declaration
-kindEffect = primKind "Effect" $ T.unlines
-  [ "`Effect` (also known as `!`) is the kind of all effect types."
   ]
 
 kindSymbol :: Declaration

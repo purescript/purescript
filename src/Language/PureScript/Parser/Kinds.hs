@@ -13,20 +13,12 @@ import Language.PureScript.Parser.Lexer
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
-parseStar :: TokenParser Kind
-parseStar = const kindType <$> symbol' "*"
-
-parseBang :: TokenParser Kind
-parseBang = const kindEffect <$> symbol' "!"
-
 parseNamedKind :: TokenParser Kind
 parseNamedKind = NamedKind <$> parseQualified kindName
 
 parseKindAtom :: TokenParser Kind
 parseKindAtom = indented *> P.choice
-            [ parseStar
-            , parseBang
-            , parseNamedKind
+            [ parseNamedKind
             , parens parseKind
             ]
 
