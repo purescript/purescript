@@ -444,6 +444,9 @@ test-suite tests
                    TestPrimDocs
                    TestPscPublish
                    TestPsci
+                   TestPsci.CommandTest
+                   TestPsci.CompletionTest
+                   TestPsci.TestEnv
                    TestPscIde
                    PscIdeSpec
                    Language.PureScript.Ide.Test
