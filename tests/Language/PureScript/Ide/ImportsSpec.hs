@@ -29,6 +29,14 @@ simpleFile =
   , "myFunc x y = x + y"
   ]
 
+syntaxErrorFile :: [Text]
+syntaxErrorFile =
+  [ "module Main where"
+  , "import Prelude"
+  , ""
+  , "myFunc ="
+  ]
+
 splitSimpleFile :: (P.ModuleName, [Text], [Import], [Text])
 splitSimpleFile = fromRight (sliceImportSection simpleFile)
   where
@@ -59,6 +67,10 @@ spec = do
     it "slices a file without imports and adds a newline after the module declaration" $
       shouldBe (sliceImportSection noImportsFile)
           (Right (P.moduleNameFromString "Main", take 1 noImportsFile ++ [""], [], drop 1 noImportsFile))
+
+    it "handles a file with syntax errors just fine" $
+      shouldBe (sliceImportSection syntaxErrorFile)
+      (Right (P.moduleNameFromString "Main", take 1 syntaxErrorFile, [preludeImport], drop 2 syntaxErrorFile))
 
     it "finds a simple import" $
       shouldBe (sliceImportSection simpleFile) (moduleSkeleton [preludeImport])

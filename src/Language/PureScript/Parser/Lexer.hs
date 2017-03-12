@@ -175,7 +175,7 @@ parseTokens :: Lexer u [PositionedToken]
 parseTokens = whitespace *> P.many parsePositionedToken <* P.skipMany parseComment <* P.eof
 
 -- | Lexes the given file, and on encountering a parse error, returns the
--- progress made up to that point, instead of returning an error.
+-- progress made up to that point, instead of returning an error
 lexLenient :: FilePath -> Text -> Either P.ParseError [PositionedToken]
 lexLenient f s = updatePositions <$> P.parse parseTokensLenient f s
 
