@@ -1,6 +1,4 @@
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 
 module Command.Docs (command, infoModList) where
 
@@ -260,4 +258,3 @@ examples =
     , "      --docgen Data.List:docs/Data.List.md \\"
     , "      --docgen Data.List.Lazy:docs/Data.List.Lazy.md"
     ]
-
