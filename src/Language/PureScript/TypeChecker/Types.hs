@@ -283,7 +283,7 @@ instantiatePolyTypeWithUnknowns val (ForAll ident ty _) = do
   instantiatePolyTypeWithUnknowns val ty'
 instantiatePolyTypeWithUnknowns val (ConstrainedType constraints ty) = do
    dicts <- getTypeClassDictionaries
-   hints <- gets checkHints
+   hints <- getHints
    instantiatePolyTypeWithUnknowns (foldl App val (map (\cs -> TypeClassDictionary cs dicts hints) constraints)) ty
 instantiatePolyTypeWithUnknowns val ty = return (val, ty)
 
@@ -363,7 +363,7 @@ infer' (Var var) = do
   case ty of
     ConstrainedType constraints ty' -> do
       dicts <- getTypeClassDictionaries
-      hints <- gets checkHints
+      hints <- getHints
       return $ TypedValue True (foldl App (Var var) (map (\cs -> TypeClassDictionary cs dicts hints) constraints)) ty'
     _ -> return $ TypedValue True (Var var) ty
 infer' v@(Constructor c) = do
@@ -390,7 +390,7 @@ infer' (Let ds val) = do
   return $ TypedValue True (Let ds' val') valTy
 infer' (DeferredDictionary className tys) = do
   dicts <- getTypeClassDictionaries
-  hints <- gets checkHints
+  hints <- getHints
   return $ TypedValue False
              (TypeClassDictionary (Constraint className tys Nothing) dicts hints)
              (foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys)
@@ -659,7 +659,7 @@ check' (DeferredDictionary className tys) ty = do
   -- declaration gets desugared.
   -}
   dicts <- getTypeClassDictionaries
-  hints <- gets checkHints
+  hints <- getHints
   return $ TypedValue False
              (TypeClassDictionary (Constraint className tys Nothing) dicts hints)
              ty
@@ -808,7 +808,7 @@ checkFunctionApplication' fn (KindedType ty _) arg =
   checkFunctionApplication fn ty arg
 checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg = do
   dicts <- getTypeClassDictionaries
-  hints <- gets checkHints
+  hints <- getHints
   checkFunctionApplication' (foldl App fn (map (\cs -> TypeClassDictionary cs dicts hints) constraints)) fnTy arg
 checkFunctionApplication' fn fnTy dict@TypeClassDictionary{} =
   return (fnTy, App fn dict)

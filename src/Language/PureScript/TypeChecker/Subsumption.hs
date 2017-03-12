@@ -10,7 +10,7 @@ import Prelude.Compat
 
 import Control.Monad (when)
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State.Class (MonadState(..), gets)
+import Control.Monad.State.Class (MonadState(..))
 
 import Data.Foldable (for_)
 import Data.List (uncons)
@@ -98,7 +98,7 @@ subsumes' mode ty1 (KindedType ty2 _) =
 -- Otherwise fall back to unification.
 subsumes' SElaborate (ConstrainedType constraints ty1) ty2 = do
   dicts <- getTypeClassDictionaries
-  hints <- gets checkHints
+  hints <- getHints
   elaborate <- subsumes' SElaborate ty1 ty2
   let addDicts val = foldl App val (map (\cs -> TypeClassDictionary cs dicts hints) constraints)
   return (elaborate . addDicts)
