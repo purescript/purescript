@@ -1,3 +1,7 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE StandaloneDeriving #-}
+
 -- | Data types for the imperative core AST
 module Language.PureScript.CoreImp.AST where
 
@@ -7,7 +11,6 @@ import Control.Monad ((>=>))
 import Control.Monad.Identity (Identity(..), runIdentity)
 import Data.Text (Text)
 
-import Language.PureScript.AST (SourceSpan(..))
 import Language.PureScript.Comments
 import Language.PureScript.PSString (PSString)
 import Language.PureScript.Traversals
@@ -44,62 +47,65 @@ data BinaryOperator
   | ZeroFillShiftRight
   deriving (Show, Eq)
 
+data NodeType = Expression | Statement
+
 -- | Data type for simplified JavaScript expressions
-data AST
-  = NumericLiteral (Maybe SourceSpan) (Either Integer Double)
+data AST (ty :: NodeType) ann where
+  NumericLiteral :: ann -> Either Integer Double -> AST 'Expression ann
   -- ^ A numeric literal
-  | StringLiteral (Maybe SourceSpan) PSString
+  StringLiteral :: ann -> PSString -> AST 'Expression ann
   -- ^ A string literal
-  | BooleanLiteral (Maybe SourceSpan) Bool
+  BooleanLiteral :: ann -> Bool -> AST 'Expression ann
   -- ^ A boolean literal
-  | Unary (Maybe SourceSpan) UnaryOperator AST
+  Unary :: ann -> UnaryOperator -> AST 'Expression ann -> AST 'Expression ann
   -- ^ A unary operator application
-  | Binary (Maybe SourceSpan) BinaryOperator AST AST
+  Binary :: ann -> BinaryOperator -> AST 'Expression ann -> AST 'Expression ann -> AST 'Expression ann
   -- ^ A binary operator application
-  | ArrayLiteral (Maybe SourceSpan) [AST]
+  ArrayLiteral :: ann -> [AST 'Expression ann] -> AST 'Expression ann
   -- ^ An array literal
-  | Indexer (Maybe SourceSpan) AST AST
+  Indexer :: ann -> AST 'Expression ann -> AST 'Expression ann -> AST 'Expression ann
   -- ^ An array indexer expression
-  | ObjectLiteral (Maybe SourceSpan) [(PSString, AST)]
+  ObjectLiteral :: ann -> [(PSString, AST 'Expression ann)] -> AST 'Expression ann
   -- ^ An object literal
-  | Function (Maybe SourceSpan) (Maybe Text) [Text] AST
+  Function :: ann -> Maybe Text -> [Text] -> AST 'Statement ann -> AST 'Expression ann
   -- ^ A function introduction (optional name, arguments, body)
-  | App (Maybe SourceSpan) AST [AST]
+  App :: ann -> AST 'Expression ann -> [AST 'Expression ann] -> AST 'Expression ann
   -- ^ Function application
-  | Var (Maybe SourceSpan) Text
+  Var :: ann -> Text -> AST 'Expression ann
   -- ^ Variable
-  | Block (Maybe SourceSpan) [AST]
-  -- ^ A block of expressions in braces
-  | VariableIntroduction (Maybe SourceSpan) Text (Maybe AST)
-  -- ^ A variable introduction and optional initialization
-  | Assignment (Maybe SourceSpan) AST AST
-  -- ^ A variable assignment
-  | While (Maybe SourceSpan) AST AST
-  -- ^ While loop
-  | For (Maybe SourceSpan) Text AST AST AST
-  -- ^ For loop
-  | ForIn (Maybe SourceSpan) Text AST AST
-  -- ^ ForIn loop
-  | IfElse (Maybe SourceSpan) AST AST (Maybe AST)
-  -- ^ If-then-else statement
-  | Return (Maybe SourceSpan) AST
-  -- ^ Return statement
-  | ReturnNoResult (Maybe SourceSpan)
-  -- ^ Return statement with no return value
-  | Throw (Maybe SourceSpan) AST
-  -- ^ Throw statement
-  | InstanceOf (Maybe SourceSpan) AST AST
+  InstanceOf :: ann -> AST 'Expression ann -> AST 'Expression ann -> AST 'Expression ann
   -- ^ instanceof check
-  | Comment (Maybe SourceSpan) [Comment] AST
+  Block :: ann -> [AST 'Statement ann] -> AST 'Statement ann
+  -- ^ A block of expressions in braces
+  VariableIntroduction :: ann -> Text -> Maybe (AST 'Expression ann) -> AST 'Statement ann
+  -- ^ A variable introduction and optional initialization
+  Assignment :: ann -> AST 'Expression ann -> AST 'Expression ann -> AST 'Statement ann
+  -- ^ A variable assignment
+  MethodCall :: ann -> AST 'Expression ann -> AST 'Statement ann
+  -- ^ Run an expression for its effects
+  While :: ann -> AST 'Expression ann -> AST 'Statement ann -> AST 'Statement ann
+  -- ^ While loop
+  For :: ann -> Text -> AST 'Expression ann -> AST 'Expression ann -> AST 'Statement ann -> AST 'Statement ann
+  -- ^ For loop
+  ForIn :: ann -> Text -> AST 'Expression ann -> AST 'Statement ann -> AST 'Statement ann
+  -- ^ ForIn loop
+  IfElse :: ann -> AST 'Expression ann -> AST 'Statement ann -> Maybe (AST 'Statement ann) -> AST 'Statement ann
+  -- ^ If-then-else statement
+  Return :: ann -> AST 'Expression ann -> AST 'Statement ann
+  -- ^ Return statement
+  ReturnNoResult :: ann -> AST 'Statement ann
+  -- ^ Return statement with no return value
+  Throw :: ann -> AST 'Expression ann -> AST 'Statement ann
+  -- ^ Throw statement
+  Comment :: ann -> [Comment] -> AST 'Statement ann -> AST 'Statement ann
   -- ^ Commented JavaScript
-  deriving (Show, Eq)
 
-withSourceSpan :: SourceSpan -> AST -> AST
-withSourceSpan withSpan = go where
-  ss :: Maybe SourceSpan
-  ss = Just withSpan
+deriving instance Show ann => Show (AST ty ann)
+deriving instance Eq ann => Eq (AST ty ann)
 
-  go :: AST -> AST
+withSourceSpan :: forall ty ann. ann -> AST ty ann -> AST ty ann
+withSourceSpan ss = go where
+  go :: forall ty1. AST ty1 ann -> AST ty1 ann
   go (NumericLiteral _ n) = NumericLiteral ss n
   go (StringLiteral _ s) = StringLiteral ss s
   go (BooleanLiteral _ b) = BooleanLiteral ss b
@@ -113,6 +119,7 @@ withSourceSpan withSpan = go where
   go (Var _ s) = Var ss s
   go (Block _ js) = Block ss js
   go (VariableIntroduction _ name j) = VariableIntroduction ss name j
+  go (MethodCall _ j) = MethodCall ss j
   go (Assignment _ j1 j2) = Assignment ss j1 j2
   go (While _ j1 j2) = While ss j1 j2
   go (For _ name j1 j2 j3) = For ss name j1 j2 j3
@@ -124,9 +131,9 @@ withSourceSpan withSpan = go where
   go (InstanceOf _ j1 j2) = InstanceOf ss j1 j2
   go (Comment _ com j) = Comment ss com j
 
-getSourceSpan :: AST -> Maybe SourceSpan
+getSourceSpan :: forall ty ann. AST ty ann -> ann
 getSourceSpan = go where
-  go :: AST -> Maybe SourceSpan
+  go :: forall ty1. AST ty1 ann -> ann
   go (NumericLiteral ss _) = ss
   go (StringLiteral ss _) = ss
   go (BooleanLiteral ss _) = ss
@@ -141,6 +148,7 @@ getSourceSpan = go where
   go (Block ss _) = ss
   go (VariableIntroduction ss _ _) = ss
   go (Assignment ss _ _) = ss
+  go (MethodCall ss _) = ss
   go (While ss _ _) = ss
   go (For ss _ _ _ _) = ss
   go (ForIn ss _ _ _) = ss
@@ -151,9 +159,13 @@ getSourceSpan = go where
   go (InstanceOf ss _ _) = ss
   go (Comment ss _ _) = ss
 
-everywhere :: (AST -> AST) -> AST -> AST
+everywhere
+  :: forall ty ann
+   . (forall ty1. AST ty1 ann -> AST ty1 ann)
+  -> AST ty ann
+  -> AST ty ann
 everywhere f = go where
-  go :: AST -> AST
+  go :: forall ty1. AST ty1 ann -> AST ty1 ann
   go (Unary ss op j) = f (Unary ss op (go j))
   go (Binary ss op j1 j2) = f (Binary ss op (go j1) (go j2))
   go (ArrayLiteral ss js) = f (ArrayLiteral ss (map go js))
@@ -163,6 +175,7 @@ everywhere f = go where
   go (App ss j js) = f (App ss (go j) (map go js))
   go (Block ss js) = f (Block ss (map go js))
   go (VariableIntroduction ss name j) = f (VariableIntroduction ss name (fmap go j))
+  go (MethodCall ss j) = f (MethodCall ss (go j))
   go (Assignment ss j1 j2) = f (Assignment ss (go j1) (go j2))
   go (While ss j1 j2) = f (While ss (go j1) (go j2))
   go (For ss name j1 j2 j3) = f (For ss name (go j1) (go j2) (go j3))
@@ -174,12 +187,20 @@ everywhere f = go where
   go (Comment ss com j) = f (Comment ss com (go j))
   go other = f other
 
-everywhereTopDown :: (AST -> AST) -> AST -> AST
+everywhereTopDown :: (forall ty1. AST ty1 ann -> AST ty1 ann) -> AST ty ann -> AST ty ann
 everywhereTopDown f = runIdentity . everywhereTopDownM (Identity . f)
 
-everywhereTopDownM :: (Monad m) => (AST -> m AST) -> AST -> m AST
+everywhereTopDownM
+  :: forall m ty ann
+   . Monad m
+  => (forall ty1. AST ty1 ann -> m (AST ty1 ann))
+  -> AST ty ann
+  -> m (AST ty ann)
 everywhereTopDownM f = f >=> go where
+  f' :: forall ty1. AST ty1 ann -> m (AST ty1 ann)
   f' = f >=> go
+
+  go :: forall ty1. AST ty1 ann -> m (AST ty1 ann)
   go (Unary ss op j) = Unary ss op <$> f' j
   go (Binary ss op j1 j2) = Binary ss op <$> f' j1 <*> f' j2
   go (ArrayLiteral ss js) = ArrayLiteral ss <$> traverse f' js
@@ -189,6 +210,7 @@ everywhereTopDownM f = f >=> go where
   go (App ss j js) = App ss <$> f' j <*> traverse f' js
   go (Block ss js) = Block ss <$> traverse f' js
   go (VariableIntroduction ss name j) = VariableIntroduction ss name <$> traverse f' j
+  go (MethodCall ss j) = MethodCall ss <$> f' j
   go (Assignment ss j1 j2) = Assignment ss <$> f' j1 <*> f' j2
   go (While ss j1 j2) = While ss <$> f' j1 <*> f' j2
   go (For ss name j1 j2 j3) = For ss name <$> f' j1 <*> f' j2 <*> f' j3
@@ -200,8 +222,14 @@ everywhereTopDownM f = f >=> go where
   go (Comment ss com j) = Comment ss com <$> f' j
   go other = f other
 
-everything :: (r -> r -> r) -> (AST -> r) -> AST -> r
+everything
+  :: forall ty ann r
+   . (r -> r -> r)
+  -> (forall ty1. AST ty1 ann -> r)
+  -> AST ty ann
+  -> r
 everything (<>) f = go where
+  go :: forall ty1. AST ty1 ann -> r
   go j@(Unary _ _ j1) = f j <> go j1
   go j@(Binary _ _ j1 j2) = f j <> go j1 <> go j2
   go j@(ArrayLiteral _ js) = foldl (<>) (f j) (map go js)
@@ -211,6 +239,7 @@ everything (<>) f = go where
   go j@(App _ j1 js) = foldl (<>) (f j <> go j1) (map go js)
   go j@(Block _ js) = foldl (<>) (f j) (map go js)
   go j@(VariableIntroduction _ _ (Just j1)) = f j <> go j1
+  go j@(MethodCall _ j1) = f j <> go j1
   go j@(Assignment _ j1 j2) = f j <> go j1 <> go j2
   go j@(While _ j1 j2) = f j <> go j1 <> go j2
   go j@(For _ _ j1 j2 j3) = f j <> go j1 <> go j2 <> go j3
