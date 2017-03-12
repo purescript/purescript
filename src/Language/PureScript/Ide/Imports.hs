@@ -76,11 +76,18 @@ parseImportsFromFile fp = do
     Right res -> pure res
     Left err -> throwError (GeneralError err)
 
+-- | @ImportParse@ holds the data we extract out of a partial parse of the
+-- sourcefile
 data ImportParse = ImportParse
   { ipModuleName :: P.ModuleName
+  -- ^ the module name we parse
   , ipStart :: P.SourcePos
+  -- ^ the beginning of the import section. If `import Prelude` was the first
+  -- import, this would point at `i`
   , ipEnd :: P.SourcePos
+  -- ^ the end of the import section
   , ipImports :: [Import]
+  -- ^ the extracted import declarations
   }
 
 parseModuleHeader :: P.TokenParser ImportParse
@@ -89,7 +96,7 @@ parseModuleHeader = do
   (mn, _) <- P.parseModuleDeclaration
   (ipStart, ipEnd, decls) <- P.withSourceSpan (\(P.SourceSpan _ start end) _ -> (start, end,))
     (P.mark (Parsec.many (P.same *> P.parseImportDeclaration')))
-  return $ ImportParse mn ipStart ipEnd (map mkImport decls)
+  pure (ImportParse mn ipStart ipEnd (map mkImport decls))
   where
     mkImport (mn, (P.Explicit refs), qual) = Import mn (P.Explicit (unwrapPositionedRef <$> refs)) qual
     mkImport (mn, it, qual) = Import mn it qual
@@ -102,7 +109,7 @@ sliceImportSection fileLines = first show $ do
        , sliceFile (P.SourcePos 1 1) (prevPos ipStart)
        , ipImports
        -- Not sure why I need to drop 1 here, but it makes the tests pass
-       , drop 1 $ sliceFile (nextPos ipEnd) (P.SourcePos (length fileLines) (lineLength (length fileLines)))
+       , drop 1 (sliceFile (nextPos ipEnd) (P.SourcePos (length fileLines) (lineLength (length fileLines))))
        )
   where
     prevPos (P.SourcePos l c)
@@ -129,7 +136,7 @@ addImplicitImport :: (MonadIO m, MonadError IdeError m)
 addImplicitImport fp mn = do
   (_, pre, imports, post) <- parseImportsFromFile fp
   let newImportSection = addImplicitImport' imports mn
-  pure $ pre ++ newImportSection ++ post
+  pure (pre ++ newImportSection ++ post)
 
 addImplicitImport' :: [Import] -> P.ModuleName -> [Text]
 addImplicitImport' imports mn =
