@@ -354,7 +354,7 @@ command = loop <$> options
 
                     loadUserConfig :: state -> StateT PSCiState (ReaderT PSCiConfig IO) ()
                     loadUserConfig state = do
-                      configFile <- (</> ".psci") <$> liftIO getCurrentDirectory
+                      configFile <- (</> ".purs-repl") <$> liftIO getCurrentDirectory
                       exists <- liftIO $ doesFileExist configFile
                       when exists $ do
                         ls <- lines <$> liftIO (readUTF8File configFile)
@@ -363,7 +363,7 @@ command = loop <$> options
                           case parseCommand l of
                             Left err -> liftIO (putStrLn err >> exitFailure)
                             Right cmd@Import{} -> handleCommand' state cmd
-                            Right _ -> liftIO (putStrLn "The .psci file only supports import declarations")
+                            Right _ -> liftIO (putStrLn "The .purs-repl file only supports import declarations")
 
                     handleCommandWithInterrupts
                       :: state
