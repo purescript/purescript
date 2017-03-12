@@ -363,7 +363,7 @@ command = loop <$> options
                           case parseCommand l of
                             Left err -> liftIO (putStrLn err >> exitFailure)
                             Right cmd@Import{} -> handleCommand' state cmd
-                            Right _ -> liftIO (putStrLn "Only import declarations are supported in the .psci file" >> exitFailure)
+                            Right _ -> liftIO (putStrLn "The .psci file only supports import declarations")
 
                     handleCommandWithInterrupts
                       :: state
