@@ -5,7 +5,6 @@ module Language.PureScript.Parser.Kinds (parseKind) where
 
 import Prelude.Compat
 
-import Language.PureScript.Environment
 import Language.PureScript.Kinds
 import Language.PureScript.Parser.Common
 import Language.PureScript.Parser.Lexer

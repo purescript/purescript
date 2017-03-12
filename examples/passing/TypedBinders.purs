@@ -32,7 +32,7 @@ instance monadStateState :: MonadState s (State s) where
   get = State (\s -> Tuple s s)
   put s = State (\_ -> Tuple s unit)
 
-modify :: forall m s. (Monad m, MonadState s m) => (s -> s) -> m Unit
+modify :: forall m s. Monad m => MonadState s m => (s -> s) -> m Unit
 modify f = do
   s <- get
   put (f s)

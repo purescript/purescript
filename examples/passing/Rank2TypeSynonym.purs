@@ -3,7 +3,7 @@ module Main where
 import Prelude
 import Control.Monad.Eff.Console (log, logShow)
 
-type Foo a = forall f. (Monad f) => f a
+type Foo a = forall f. Monad f => f a
 
 foo :: forall a. a -> Foo a
 foo x = pure x
