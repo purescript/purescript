@@ -60,17 +60,18 @@ import           Language.PureScript.Linter
 import           Language.PureScript.ModuleDependencies
 import           Language.PureScript.Names
 import           Language.PureScript.Options
-import           Language.PureScript.Pretty
-import           Language.PureScript.Pretty.Common(SMap(..))
+import           Language.PureScript.Pretty.Common (SMap(..))
 import           Language.PureScript.Renamer
 import           Language.PureScript.Sugar
 import           Language.PureScript.TypeChecker
 import qualified Language.JavaScript.Parser as JS
 import qualified Language.PureScript.Bundle as Bundle
 import qualified Language.PureScript.CodeGen.JS as J
+import           Language.PureScript.CodeGen.JS.Printer
 import qualified Language.PureScript.Constants as C
 import qualified Language.PureScript.CoreFn as CF
 import qualified Language.PureScript.CoreFn.ToJSON as CFJ
+import qualified Language.PureScript.CoreImp.AST as Imp
 import qualified Language.PureScript.Parser as PSParser
 import qualified Paths_purescript as Paths
 import           SourceMap
@@ -351,7 +352,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
             return Nothing
         | otherwise -> do
             checkForeignDecls m path
-            return $ Just $ J.JSApp Nothing (J.JSVar Nothing "require") [J.JSStringLiteral Nothing "./foreign"]
+            return $ Just $ Imp.App Nothing (Imp.Var Nothing "require") [Imp.StringLiteral Nothing "./foreign"]
       Nothing | requiresForeign m -> throwError . errorMessage $ MissingFFIModule mn
               | otherwise -> return Nothing
     rawJs <- J.moduleToJs m foreignInclude
