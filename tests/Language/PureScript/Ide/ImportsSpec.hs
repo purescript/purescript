@@ -14,6 +14,13 @@ import           Language.PureScript.Ide.Types
 import           System.FilePath
 import           Test.Hspec
 
+noImportsFile :: [Text]
+noImportsFile =
+  [ "module Main where"
+  , ""
+  , "myFunc x y = x + y"
+  ]
+
 simpleFile :: [Text]
 simpleFile =
   [ "module Main where"
@@ -49,6 +56,10 @@ spec = do
   describe "determining the importsection" $ do
     let moduleSkeleton imports =
           Right (P.moduleNameFromString "Main", take 1 simpleFile, imports, drop 2 simpleFile)
+    it "slices a file without imports and adds a newline after the module declaration" $
+      shouldBe (sliceImportSection noImportsFile)
+          (Right (P.moduleNameFromString "Main", take 1 noImportsFile ++ [""], [], drop 1 noImportsFile))
+
     it "finds a simple import" $
       shouldBe (sliceImportSection simpleFile) (moduleSkeleton [preludeImport])
 
@@ -88,12 +99,20 @@ spec = do
           prettyPrintImportSection (addExplicitImport' (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName i) t wildcard)) mn is)
         addTypeImport i mn is =
           prettyPrintImportSection (addExplicitImport' (IdeDeclType (IdeType (P.ProperName i) P.kindType)) mn is)
+    it "adds an implicit unqualified import to a file without any imports" $
+      shouldBe
+        (addImplicitImport' [] (P.moduleNameFromString "Data.Map"))
+        ["import Data.Map"]
     it "adds an implicit unqualified import" $
       shouldBe
         (addImplicitImport' simpleFileImports (P.moduleNameFromString "Data.Map"))
         [ "import Prelude"
         , "import Data.Map"
         ]
+    it "adds an explicit unqualified import to a file without any imports" $
+      shouldBe
+        (addValueImport "head" (P.moduleNameFromString "Data.Array") [])
+        ["import Data.Array (head)"]
     it "adds an explicit unqualified import" $
       shouldBe
         (addValueImport "head" (P.moduleNameFromString "Data.Array") simpleFileImports)
