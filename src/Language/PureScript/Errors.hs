@@ -7,7 +7,7 @@ module Language.PureScript.Errors
   ) where
 
 import           Prelude.Compat
-import           Protolude (ordNub, traceShow)
+import           Protolude (ordNub)
 
 import           Control.Arrow ((&&&))
 import           Control.Monad
@@ -1120,7 +1120,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
 
   -- | Simplify an error message
   simplifyErrorMessage :: ErrorMessage -> ErrorMessage
-  simplifyErrorMessage (ErrorMessage hints simple) = ErrorMessage (traceShow (filter ((PositionHint == ) . hintCategory) hints) $ simplifyHints hints) simple
+  simplifyErrorMessage (ErrorMessage hints simple) = ErrorMessage (simplifyHints hints) simple
     where
     -- Take the last instance of each "hint category"
     simplifyHints :: [ErrorMessageHint] -> [ErrorMessageHint]
