@@ -30,6 +30,7 @@ import           Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import           Control.Monad.Trans.State.Strict (StateT, evalStateT)
 import           Control.Monad.Trans.Reader (ReaderT, runReaderT)
 import           Data.FileEmbed (embedStringFile)
+import           Data.Foldable (for_)
 import           Data.Monoid ((<>))
 import           Data.String (IsString(..))
 import           Data.Text (Text, unpack)
@@ -48,6 +49,7 @@ import qualified Options.Applicative as Opts
 import           System.Console.Haskeline
 import           System.IO.UTF8 (readUTF8File)
 import           System.Exit
+import           System.Directory (doesFileExist, getCurrentDirectory)
 import           System.FilePath ((</>))
 import           System.FilePath.Glob (glob)
 import           System.Process (readProcessWithExitCode)
@@ -331,6 +333,9 @@ command = loop <$> options
                              . flip evalStateT initialState
                              . runInputT (setComplete completion settings)
 
+                    handleCommand' :: state -> Command -> StateT PSCiState (ReaderT PSCiConfig IO) ()
+                    handleCommand' state = handleCommand (liftIO . eval state) (liftIO (reload state))
+
                     go :: state -> InputT (StateT PSCiState (ReaderT PSCiConfig IO)) ()
                     go state = do
                       c <- getCommand
@@ -347,14 +352,28 @@ command = loop <$> options
                           liftIO $ shutdown state
                         Right (Just c') -> handleCommandWithInterrupts state c'
 
+                    loadUserConfig :: state -> StateT PSCiState (ReaderT PSCiConfig IO) ()
+                    loadUserConfig state = do
+                      configFile <- (</> ".purs-repl") <$> liftIO getCurrentDirectory
+                      exists <- liftIO $ doesFileExist configFile
+                      when exists $ do
+                        ls <- lines <$> liftIO (readUTF8File configFile)
+                        for_ ls $ \l -> do
+                          liftIO (putStrLn l)
+                          case parseCommand l of
+                            Left err -> liftIO (putStrLn err >> exitFailure)
+                            Right cmd@Import{} -> handleCommand' state cmd
+                            Right _ -> liftIO (putStrLn "The .purs-repl file only supports import declarations")
+
                     handleCommandWithInterrupts
                       :: state
                       -> Command
                       -> InputT (StateT PSCiState (ReaderT PSCiConfig IO)) ()
                     handleCommandWithInterrupts state cmd = do
                       handleInterrupt (outputStrLn "Interrupted.")
-                                      (withInterrupt (lift (handleCommand (liftIO . eval state) (liftIO (reload state)) cmd)))
+                                      (withInterrupt (lift (handleCommand' state cmd)))
                       go state
 
                 putStrLn prologueMessage
-                setup >>= runner . go
+                backendState <- setup
+                runner (lift (loadUserConfig backendState) >> go backendState)
