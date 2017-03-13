@@ -16,6 +16,7 @@ module Language.PureScript.Ide.Imports
        ( addImplicitImport
        , addImportForIdentifier
        , answerRequest
+       , parseImportsFromFile
          -- for tests
        , parseImport
        , prettyPrintImportSection
@@ -42,7 +43,7 @@ import           Language.PureScript.Ide.Util
 import           System.IO.UTF8                     (writeUTF8FileT)
 import qualified Text.Parsec as Parsec
 
-data Import = Import P.ModuleName P.ImportDeclarationType  (Maybe P.ModuleName)
+data Import = Import P.ModuleName P.ImportDeclarationType (Maybe P.ModuleName)
               deriving (Eq, Show)
 
 instance Ord Import where
@@ -66,11 +67,24 @@ compImport (Import n i q) (Import n' i' q')
   | not (P.isExplicit i) && isNothing q' = GT
   | otherwise = compare n n'
 
+-- | Reads a file and returns the parsed modulename as well as the parsed
+-- imports, while ignoring eventual parse errors that aren't relevant to the
+-- import section
+parseImportsFromFile
+  :: (MonadIO m, MonadError IdeError m)
+  => FilePath
+  -> m (P.ModuleName, [(P.ModuleName, P.ImportDeclarationType, Maybe P.ModuleName)])
+parseImportsFromFile file = do
+  (mn, _, imports, _) <- parseImportsFromFile' file
+  pure (mn, unwrapImport <$> imports)
+  where
+    unwrapImport (Import a b c) = (a, b, c)
+
 -- | Reads a file and returns the (lines before the imports, the imports, the
 -- lines after the imports)
-parseImportsFromFile :: (MonadIO m, MonadError IdeError m) =>
+parseImportsFromFile' :: (MonadIO m, MonadError IdeError m) =>
                         FilePath -> m (P.ModuleName, [Text], [Import], [Text])
-parseImportsFromFile fp = do
+parseImportsFromFile' fp = do
   file <- ideReadFile fp
   case sliceImportSection (T.lines file) of
     Right res -> pure res
@@ -134,7 +148,7 @@ addImplicitImport :: (MonadIO m, MonadError IdeError m)
                      -> P.ModuleName -- ^ The module to import
                      -> m [Text]
 addImplicitImport fp mn = do
-  (_, pre, imports, post) <- parseImportsFromFile fp
+  (_, pre, imports, post) <- parseImportsFromFile' fp
   let newImportSection = addImplicitImport' imports mn
   pure (pre ++ newImportSection ++ post)
 
@@ -155,7 +169,7 @@ addImplicitImport' imports mn =
 addExplicitImport :: (MonadIO m, MonadError IdeError m) =>
                      FilePath -> IdeDeclaration -> P.ModuleName -> m [Text]
 addExplicitImport fp decl moduleName = do
-  (mn, pre, imports, post) <- parseImportsFromFile fp
+  (mn, pre, imports, post) <- parseImportsFromFile' fp
   let newImportSection =
         -- TODO: Open an issue when this PR is merged, we should optimise this
         -- so that this case does not write to disc

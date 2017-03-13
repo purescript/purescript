@@ -14,7 +14,6 @@
 
 module Language.PureScript.Ide.SourceFile
   ( parseModule
-  , getImportsForFile
   , extractAstInformation
   -- for tests
   , extractSpans
@@ -41,32 +40,6 @@ parseModule path = do
   case P.parseModuleFromFile (makeRelative pwd) (path, contents) of
     Left _ -> pure (Left path)
     Right m -> pure (Right m)
-
-getImports :: P.Module -> [(P.ModuleName, P.ImportDeclarationType, Maybe P.ModuleName)]
-getImports (P.Module _ _ _ declarations _) =
-  mapMaybe isImport declarations
-  where
-    isImport (P.PositionedDeclaration _ _ (P.ImportDeclaration a b c)) = Just (a, b, c)
-    isImport _ = Nothing
-
-getImportsForFile :: (MonadIO m, MonadError IdeError m) =>
-                     FilePath -> m [ModuleImport]
-getImportsForFile fp = do
-  moduleE <- parseModule fp
-  case moduleE of
-    Left _ -> throwError (GeneralError "Failed to parse sourcefile.")
-    Right (_, module') ->
-      pure (mkModuleImport . unwrapPositionedImport <$> getImports module')
-      where
-        mkModuleImport (mn, importType', qualifier) =
-          ModuleImport
-          (P.runModuleName mn)
-          importType'
-          (P.runModuleName <$> qualifier)
-        unwrapPositionedImport (mn, it, q) = (mn, unwrapImportType it, q)
-        unwrapImportType (P.Explicit decls) = P.Explicit (map unwrapPositionedRef decls)
-        unwrapImportType (P.Hiding decls)   = P.Hiding (map unwrapPositionedRef decls)
-        unwrapImportType P.Implicit         = P.Implicit
 
 -- | Extracts AST information from a parsed module
 extractAstInformation

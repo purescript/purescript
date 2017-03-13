@@ -379,73 +379,73 @@ The list commmand can also list the imports for a given file.
 
 #### Response:
 
-The list import command returns a list of imports where imports are of the following form:
+The list import command returns the parse module name as well as a list of
+imports like so:
+
+```json
+
+{
+  "moduleName": "MyModule",
+  "imports": [Import]
+}
+
+The different kind of imports are returned like so:
+
+```
 
 Implicit Import (`import Data.Array`):
 ```json
-[
-  {
+{
   "module": "Data.Array",
   "importType": "implicit"
-  }
-]
+}
 ```
 
 Implicit qualified Import (`import Data.Array as A`):
 ```json
-[
-  {
+{
   "module": "Data.Array",
   "importType": "implicit",
   "qualifier": "A"
-  }
-]
+}
 ```
 
 Explicit Import (`import Data.Array (filter, filterM, join)`):
 ```json
-[
-  {
+{
   "module": "Data.Array",
   "importType": "explicit",
   "identifiers": ["filter", "filterM", "join"]
-  }
-]
+}
 ```
 
 Explicit qualified Import (`import Data.Array (filter, filterM, join) as A`):
 ```json
-[
-  {
+{
   "module": "Data.Array",
   "importType": "explicit",
   "identifiers": ["filter", "filterM", "join"],
   "qualifier": "A"
-  }
-]
+}
 ```
 
 Hiding Import (`import Data.Array hiding (filter, filterM, join)`):
 ```json
-[
-  {
+{
   "module": "Data.Array",
   "importType": "hiding",
   "identifiers": ["filter", "filterM", "join"]
-  }
-]
+}
 ```
 
 Qualified Hiding Import (`import Data.Array hiding (filter, filterM, join) as A`):
 ```json
-[
-  {
+{
   "module": "Data.Array",
   "importType": "hiding",
   "identifiers": ["filter", "filterM", "join"],
   "qualifier": "A"
-  }
-]
+}
 ```
 
 ### Cwd/Quit/Reset
