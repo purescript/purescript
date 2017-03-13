@@ -451,7 +451,7 @@ parseDoNotationBind :: TokenParser DoNotationElement
 parseDoNotationBind = DoNotationBind <$> P.try (parseBinder <* indented <* larrow) <*> parseValue
 
 parseDoNotationElement :: TokenParser DoNotationElement
-parseDoNotationElement = P.choice
+parseDoNotationElement = withSourceSpan PositionedDoNotationElement $ P.choice
             [ parseDoNotationBind
             , parseDoNotationLet
             , DoNotationValue <$> parseValue

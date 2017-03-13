@@ -117,6 +117,11 @@ withErrorMessageHint hint action = do
   modify $ \st -> st { checkHints = checkHints orig }
   return a
 
+-- | These hints are added at the front, so the most nested hint occurs
+-- at the front, but the simplifier assumes the reverse order.
+getHints :: MonadState CheckState m => m [ErrorMessageHint]
+getHints = gets (reverse . checkHints)
+
 rethrowWithPositionTC
   :: (MonadState CheckState m, MonadError MultipleErrors m)
   => SourceSpan
