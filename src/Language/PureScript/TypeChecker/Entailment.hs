@@ -322,7 +322,7 @@ entails SolverOptions{..} constraint context hints =
               -- So pass an empty object instead.
               return $ Literal (ObjectLiteral [])
             mkDictionary (IsSymbolInstance sym) _ =
-              let fields = [ ("reflectSymbol", Abs (Left (Ident C.__unused)) (Literal (StringLiteral sym))) ] in
+              let fields = [ ("reflectSymbol", Abs (VarBinder (Ident C.__unused)) (Literal (StringLiteral sym))) ] in
               return $ TypeClassDictionaryConstructorApp C.IsSymbol (Literal (ObjectLiteral fields))
             mkDictionary CompareSymbolInstance _ =
               return $ TypeClassDictionaryConstructorApp C.CompareSymbol (Literal (ObjectLiteral []))

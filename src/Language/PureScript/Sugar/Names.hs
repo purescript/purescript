@@ -201,8 +201,8 @@ renameInModule imports (Module ss coms mn decls exps) =
     -> m ((Maybe SourceSpan, [Ident]), Expr)
   updateValue (_, bound) v@(PositionedValue pos' _ _) =
     return ((Just pos', bound), v)
-  updateValue (pos, bound) (Abs (Left arg) val') =
-    return ((pos, arg : bound), Abs (Left arg) val')
+  updateValue (pos, bound) (Abs (VarBinder arg) val') =
+    return ((pos, arg : bound), Abs (VarBinder arg) val')
   updateValue (pos, bound) (Let ds val') = do
     let args = mapMaybe letBoundVariable ds
     unless (length (ordNub args) == length args) $

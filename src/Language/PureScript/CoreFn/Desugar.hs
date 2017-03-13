@@ -89,7 +89,7 @@ moduleToCoreFn env (A.Module _ coms mn decls (Just exps)) =
     Accessor (ss, com, ty, Nothing) name (exprToCoreFn ss [] Nothing v)
   exprToCoreFn ss com ty (A.ObjectUpdate obj vs) =
     ObjectUpdate (ss, com, ty, Nothing) (exprToCoreFn ss [] Nothing obj) $ map (second (exprToCoreFn ss [] Nothing)) vs
-  exprToCoreFn ss com ty (A.Abs (Left name) v) =
+  exprToCoreFn ss com ty (A.Abs (A.VarBinder name) v) =
     Abs (ss, com, ty, Nothing) name (exprToCoreFn ss [] Nothing v)
   exprToCoreFn _ _ _ (A.Abs _ _) =
     internalError "Abs with Binder argument was not desugared before exprToCoreFn mn"

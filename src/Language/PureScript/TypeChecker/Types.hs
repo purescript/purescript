@@ -116,7 +116,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
 
       -- Check skolem variables did not escape their scope
       skolemEscapeCheck val'
-      return ((ident, (foldr (Abs . Left . (\(x, _, _) -> x)) val' unsolved, generalized)), unsolved)
+      return ((ident, (foldr (Abs . VarBinder . (\(x, _, _) -> x)) val' unsolved, generalized)), unsolved)
 
     -- Show warnings here, since types in wildcards might have been solved during
     -- instance resolution (by functional dependencies).
@@ -347,12 +347,13 @@ infer' (Accessor prop val) = withErrorMessageHint (ErrorCheckingAccessor val pro
   rest <- freshType
   typed <- check val (TypeApp tyRecord (RCons (Label prop) field rest))
   return $ TypedValue True (Accessor prop typed) field
-infer' (Abs (Left arg) ret) = do
-  ty <- freshType
-  withBindingGroupVisible $ bindLocalVariables [(arg, ty, Defined)] $ do
-    body@(TypedValue _ _ bodyTy) <- infer' ret
-    return $ TypedValue True (Abs (Left arg) body) $ function ty bodyTy
-infer' (Abs (Right _) _) = internalError "Binder was not desugared"
+infer' (Abs binder ret)
+  | VarBinder arg <- binder = do
+      ty <- freshType
+      withBindingGroupVisible $ bindLocalVariables [(arg, ty, Defined)] $ do
+        body@(TypedValue _ _ bodyTy) <- infer' ret
+        return $ TypedValue True (Abs (VarBinder arg) body) $ function ty bodyTy
+  | otherwise = internalError "Binder was not desugared"
 infer' (App f arg) = do
   f'@(TypedValue _ _ ft) <- infer f
   (ret, app) <- checkFunctionApplication f' ft arg
@@ -614,7 +615,7 @@ check' val t@(ConstrainedType constraints ty) = do
     freshIdent ("dict" <> className)
   dicts <- join <$> zipWithM (newDictionaries []) (map (Qualified Nothing) dictNames) constraints
   val' <- withBindingGroupVisible $ withTypeClassDictionaries dicts $ check val ty
-  return $ TypedValue True (foldr (Abs . Left) val' dictNames) t
+  return $ TypedValue True (foldr (Abs . VarBinder) val' dictNames) t
 check' val u@(TUnknown _) = do
   val'@(TypedValue _ _ ty) <- infer val
   -- Don't unify an unknown with an inferred polytype
@@ -635,11 +636,12 @@ check' (Literal (ArrayLiteral vals)) t@(TypeApp a ty) = do
   unifyTypes a tyArray
   array <- Literal . ArrayLiteral <$> forM vals (`check` ty)
   return $ TypedValue True array t
-check' (Abs (Left arg) ret) ty@(TypeApp (TypeApp t argTy) retTy) = do
-  unifyTypes t tyFunction
-  ret' <- withBindingGroupVisible $ bindLocalVariables [(arg, argTy, Defined)] $ check ret retTy
-  return $ TypedValue True (Abs (Left arg) ret') ty
-check' (Abs (Right _) _) _ = internalError "Binder was not desugared"
+check' (Abs binder ret) ty@(TypeApp (TypeApp t argTy) retTy)
+  | VarBinder arg <- binder = do
+      unifyTypes t tyFunction
+      ret' <- withBindingGroupVisible $ bindLocalVariables [(arg, argTy, Defined)] $ check ret retTy
+      return $ TypedValue True (Abs (VarBinder arg) ret') ty
+  | otherwise = internalError "Binder was not desugared"
 check' (App f arg) ret = do
   f'@(TypedValue _ _ ft) <- infer f
   (retTy, app) <- checkFunctionApplication f' ft arg

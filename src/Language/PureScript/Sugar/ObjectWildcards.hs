@@ -37,27 +37,27 @@ desugarDecl other = fn other
     | b' <- stripPositionInfo b
     , BinaryNoParens op val u <- b'
     , isAnonymousArgument u = do arg <- freshIdent'
-                                 return $ Abs (Left arg) $ App (App op val) (Var (Qualified Nothing arg))
+                                 return $ Abs (VarBinder arg) $ App (App op val) (Var (Qualified Nothing arg))
     | b' <- stripPositionInfo b
     , BinaryNoParens op u val <- b'
     , isAnonymousArgument u = do arg <- freshIdent'
-                                 return $ Abs (Left arg) $ App (App op (Var (Qualified Nothing arg))) val
+                                 return $ Abs (VarBinder arg) $ App (App op (Var (Qualified Nothing arg))) val
   desugarExpr (Literal (ObjectLiteral ps)) = wrapLambdaAssoc (Literal . ObjectLiteral) ps
   desugarExpr (ObjectUpdateNested obj ps) = transformNestedUpdate obj ps
   desugarExpr (Accessor prop u)
     | Just props <- peelAnonAccessorChain u = do
       arg <- freshIdent'
-      return $ Abs (Left arg) $ foldr Accessor (argToExpr arg) (prop:props)
+      return $ Abs (VarBinder arg) $ foldr Accessor (argToExpr arg) (prop:props)
   desugarExpr (Case args cas) | any isAnonymousArgument args = do
     argIdents <- forM args freshIfAnon
     let args' = zipWith (`maybe` argToExpr) args argIdents
-    return $ foldr (Abs . Left) (Case args' cas) (catMaybes argIdents)
+    return $ foldr (Abs . VarBinder) (Case args' cas) (catMaybes argIdents)
   desugarExpr (IfThenElse u t f) | any isAnonymousArgument [u, t, f] = do
     u' <- freshIfAnon u
     t' <- freshIfAnon t
     f' <- freshIfAnon f
     let if_ = IfThenElse (maybe u argToExpr u') (maybe t argToExpr t') (maybe f argToExpr f')
-    return $ foldr (Abs . Left) if_ (catMaybes [u', t', f'])
+    return $ foldr (Abs . VarBinder) if_ (catMaybes [u', t', f'])
   desugarExpr e = return e
 
   transformNestedUpdate :: Expr -> PathTree Expr -> m Expr
@@ -67,7 +67,7 @@ desugarDecl other = fn other
     val <- freshIdent'
     let valExpr = argToExpr val
     if isAnonymousArgument obj
-      then Abs (Left val) <$> wrapLambda (buildUpdates valExpr) ps
+      then Abs (VarBinder val) <$> wrapLambda (buildUpdates valExpr) ps
       else wrapLambda (buildLet val . buildUpdates valExpr) ps
     where
       buildLet val = Let [ValueDeclaration val Public [] [MkUnguarded obj]]
@@ -87,7 +87,7 @@ desugarDecl other = fn other
   wrapLambda :: forall t. Traversable t => (t Expr -> Expr) -> t Expr -> m Expr
   wrapLambda mkVal ps = do
     args <- traverse processExpr ps
-    return $ foldr (Abs . Left) (mkVal (snd <$> args)) (catMaybes $ toList (fst <$> args))
+    return $ foldr (Abs . VarBinder) (mkVal (snd <$> args)) (catMaybes $ toList (fst <$> args))
     where
       processExpr :: Expr -> m (Maybe Ident, Expr)
       processExpr e = do

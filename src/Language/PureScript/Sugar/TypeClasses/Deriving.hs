@@ -748,7 +748,7 @@ findTypeDecl tyConNm = maybe (throwError . errorMessage $ CannotFindDerivingType
   isTypeDecl _ = False
 
 lam :: Ident -> Expr -> Expr
-lam = Abs . Left
+lam = Abs . VarBinder
 
 lamNull :: Expr -> Expr
 lamNull = lam (Ident "$q") -- TODO: use GenIdent

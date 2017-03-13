@@ -627,7 +627,7 @@ data Expr
   -- |
   -- Function introduction
   --
-  | Abs (Either Ident Binder) Expr
+  | Abs Binder Expr
   -- |
   -- Function application
   --

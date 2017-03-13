@@ -79,10 +79,10 @@ parseValueWithWhereClause = do
 parseValueWithIdentAndBinders :: Ident -> [Binder] -> TokenParser Declaration
 parseValueWithIdentAndBinders ident bs = do
   value <- indented *> (
-    (\v -> [MkUnguarded v]) <$> (equals *> parseValueWithWhereClause) <|>
+    (\v -> [MkUnguarded v]) <$> (equals *> withSourceSpan PositionedValue parseValueWithWhereClause) <|>
       P.many1 (GuardedExpr <$> parseGuard
                            <*> (indented *> equals
-                                         *> parseValueWithWhereClause))
+                                         *> withSourceSpan PositionedValue parseValueWithWhereClause))
     )
   return $ ValueDeclaration ident Public bs value
 
@@ -97,7 +97,7 @@ parseLocalValueDeclaration = join $ go <$> parseBinder <*> (P.many parseBinderNo
   where
   go :: Binder -> [Binder] -> TokenParser Declaration
   go (VarBinder ident) bs = parseValueWithIdentAndBinders ident bs
-  go (PositionedBinder _ _ (VarBinder ident)) bs = parseValueWithIdentAndBinders ident bs
+  go (PositionedBinder _ _ b) bs = go b bs
   go binder [] = BoundValueDeclaration binder <$> (indented *> equals *> parseValueWithWhereClause)
   go _ _ = P.unexpected $ "patterns in local value declaration"
 
@@ -348,7 +348,7 @@ parseIdentifierAndValue =
 parseAbs :: TokenParser Expr
 parseAbs = do
   symbol' "\\"
-  args <- P.many1 (indented *> (Abs <$> (Left <$> parseIdent <|> Right <$> parseBinderNoParens)))
+  args <- P.many1 (indented *> (Abs <$> parseBinderNoParens))
   indented *> rarrow
   value <- parseValue
   return $ toFunction args value
@@ -558,33 +558,35 @@ parseBinder =
     parseOpBinder = OpBinder <$> parseQualified parseOperator
 
 parseBinderAtom :: TokenParser Binder
-parseBinderAtom = P.choice
-  [ parseNullBinder
-  , LiteralBinder <$> parseCharLiteral
-  , LiteralBinder <$> parseStringLiteral
-  , LiteralBinder <$> parseBooleanLiteral
-  , parseNumberLiteral
-  , parseVarOrNamedBinder
-  , parseConstructorBinder
-  , parseObjectBinder
-  , parseArrayBinder
-  , ParensInBinder <$> parens parseBinder
-  ] P.<?> "binder"
+parseBinderAtom = withSourceSpan PositionedBinder
+  (P.choice
+   [ parseNullBinder
+   , LiteralBinder <$> parseCharLiteral
+   , LiteralBinder <$> parseStringLiteral
+   , LiteralBinder <$> parseBooleanLiteral
+   , parseNumberLiteral
+   , parseVarOrNamedBinder
+   , parseConstructorBinder
+   , parseObjectBinder
+   , parseArrayBinder
+   , ParensInBinder <$> parens parseBinder
+   ] P.<?> "binder")
 
 -- | Parse a binder as it would appear in a top level declaration
 parseBinderNoParens :: TokenParser Binder
-parseBinderNoParens = P.choice
-                      [ parseNullBinder
-                      , LiteralBinder <$> parseCharLiteral
-                      , LiteralBinder <$> parseStringLiteral
-                      , LiteralBinder <$> parseBooleanLiteral
-                      , parseNumberLiteral
-                      , parseVarOrNamedBinder
-                      , parseNullaryConstructorBinder
-                      , parseObjectBinder
-                      , parseArrayBinder
-                      , ParensInBinder <$> parens parseBinder
-                      ] P.<?> "binder"
+parseBinderNoParens = withSourceSpan PositionedBinder
+  (P.choice
+    [ parseNullBinder
+    , LiteralBinder <$> parseCharLiteral
+    , LiteralBinder <$> parseStringLiteral
+    , LiteralBinder <$> parseBooleanLiteral
+    , parseNumberLiteral
+    , parseVarOrNamedBinder
+    , parseNullaryConstructorBinder
+    , parseObjectBinder
+    , parseArrayBinder
+    , ParensInBinder <$> parens parseBinder
+    ] P.<?> "binder")
 
 -- | Parse a guard
 parseGuard :: TokenParser [Guard]
