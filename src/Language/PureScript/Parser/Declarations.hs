@@ -1,7 +1,9 @@
 -- | Parsers for module definitions and declarations
 module Language.PureScript.Parser.Declarations
   ( parseDeclaration
+  , parseDeclarationRef
   , parseModule
+  , parseModuleDeclaration
   , parseModulesFromFiles
   , parseModuleFromFile
   , parseValue
@@ -247,16 +249,22 @@ parseLocalDeclaration = positioned (P.choice
                    , parseLocalValueDeclaration
                    ] P.<?> "local declaration")
 
--- | Parse a module header and a collection of declarations
-parseModule :: TokenParser Module
-parseModule = do
-  comments <- readComments
-  start <- P.getPosition
+-- | Parse a module declaration and its export declarations
+parseModuleDeclaration :: TokenParser (ModuleName, Maybe [DeclarationRef])
+parseModuleDeclaration = do
   reserved "module"
   indented
   name <- moduleName
   exports <- P.optionMaybe $ parens $ commaSep1 parseDeclarationRef
   reserved "where"
+  pure (name, exports)
+
+-- | Parse a module header and a collection of declarations
+parseModule :: TokenParser Module
+parseModule = do
+  comments <- readComments
+  start <- P.getPosition
+  (name, exports) <- parseModuleDeclaration
   decls <- mark $ do
     -- TODO: extract a module header structure here, and provide a
     -- parseModuleHeader function. This should allow us to speed up rebuilds
