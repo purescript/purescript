@@ -916,10 +916,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
 
     renderSimpleErrorMessage (ClassInstanceArityMismatch dictName className expected actual) =
       paras [ line $ "The type class " <> markCode (showQualified runProperName className) <>
-                     " expects " <> T.pack (show expected) <> " argument(s)."
-            , line $ "But the instance " <> markCode (showIdent dictName) <> " only provided " <>
-                     T.pack (show actual) <> "."
+                     " expects " <> T.pack (show expected) <> " " <> argsMsg <> "."
+            , line $ "But the instance " <> markCode (showIdent dictName) <> mismatchMsg <> T.pack (show actual) <> "."
             ]
+        where
+          mismatchMsg = if actual > expected then " provided " else " only provided "
+          argsMsg = if expected > 1 then "arguments" else "argument"
 
     renderSimpleErrorMessage (UserDefinedWarning msgTy) =
       let msg = fromMaybe (typeAsBox msgTy) (toTypelevelString msgTy) in
