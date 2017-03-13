@@ -136,7 +136,8 @@ step (ModuleHeader mi) (ix, l)
   | T.isPrefixOf "import " l = ImportSection ix ix
   | otherwise = ModuleHeader mi
 step (ImportSection start lastImportLine) (ix, l)
-  | any (`T.isPrefixOf` l) ["import", " "] = ImportSection start ix
+  | any (`T.isPrefixOf` l) ["import", " "]
+    || l == ")"                            = ImportSection start ix
   | T.isPrefixOf "--" l || l == ""         = ImportSection start lastImportLine
   | otherwise                              = Res start lastImportLine
 step (Res start end) _ = Res start end
