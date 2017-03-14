@@ -282,9 +282,6 @@ addImportForIdentifier fp ident filters = do
       decideRedundantCase _ _ = Nothing
 
 prettyPrintImport' :: Import -> Text
--- TODO: remove this clause once P.prettyPrintImport can properly handle PositionedRefs
-prettyPrintImport' (Import mn (P.Explicit refs) qual) =
-  "import " <> P.prettyPrintImport mn (P.Explicit (unwrapPositionedRef <$> refs)) qual
 prettyPrintImport' (Import mn idt qual) =
   "import " <> P.prettyPrintImport mn idt qual
 
