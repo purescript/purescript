@@ -23,7 +23,7 @@ import Control.Monad.Writer
 import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
 import Data.List (minimumBy)
-import Data.Maybe (fromMaybe, maybeToList, mapMaybe)
+import Data.Maybe (fromMaybe, maybeToList, mapMaybe, catMaybes)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Text (Text)
@@ -53,6 +53,8 @@ data Evidence
   -- ^ Computed instance of CompareSymbol
   | AppendSymbolInstance
   -- ^ Computed instance of AppendSymbol
+  | RowUnionInstance
+  -- ^ Computed instance of RowUnion
   deriving (Eq)
 
 -- | Extract the identifier of a named instance
@@ -146,6 +148,10 @@ entails SolverOptions{..} constraint context hints =
     solve constraint
   where
     forClassName :: InstanceContext -> Qualified (ProperName 'ClassName) -> [Type] -> [TypeClassDict]
+    forClassName ctx cn@C.RowUnion [l, r, o] =
+      concatMap (findDicts ctx cn) (ordNub [Nothing, Just C.DataRecord])
+      <> (toList $ (\(lOut, rOut, oOut, cst) -> TypeClassDictionaryInScope RowUnionInstance [] C.RowUnion [lOut, rOut, oOut] cst) <$> unionRows l r o)
+--       <> [ TypeClassDictionaryInScope RowUnionInstance [] C.RowUnion [REmpty, REmpty, REmpty] Nothing ]
     forClassName _ C.Warn [msg] =
       [TypeClassDictionaryInScope (WarnInstance msg) [] C.Warn [msg] Nothing]
     forClassName _ C.IsSymbol [TypeLevelString sym] =
@@ -162,6 +168,31 @@ entails SolverOptions{..} constraint context hints =
       in [TypeClassDictionaryInScope AppendSymbolInstance [] C.AppendSymbol args Nothing]
     forClassName ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (ordNub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
     forClassName _ _ _ = internalError "forClassName: expected qualified class name"
+
+    -- Left biased union of two row types
+    unionRows :: Type -> Type -> Type -> Maybe (Type, Type, Type, Maybe [Constraint])
+    unionRows l r o = if solverDeferErrors || not (hasKnown l || hasKnown r) then Nothing
+      else
+        let (ls, lEnd) = rowToList l
+            (rs, rEnd) = rowToList r
+            (_, oEnd) = rowToList o
+            lrUnion = ordNub (ls <> rs)
+            (ending,constraints) = case (lEnd, rEnd) of
+                (REmpty, REmpty) -> (REmpty, [])
+                _ -> (oEnd, catMaybes [
+                            if rEnd == oEnd || null rs
+                                then Nothing
+                                else Just $ Constraint C.RowUnion [l, rEnd, rowFromList (ls, oEnd)] Nothing
+                          , if lEnd == oEnd || null ls
+                                then Nothing
+                                else Just $ Constraint C.RowUnion [lEnd, r, rowFromList (rs, oEnd)] Nothing
+                          ])
+        in  Just (l, r, rowFromList (lrUnion, ending), if null constraints then Nothing else Just constraints)
+      where
+        hasKnown :: Type -> Bool
+        hasKnown (RCons _ _ _) = True
+        hasKnown REmpty = True
+        hasKnown _ = False
 
     ctorModules :: Type -> Maybe ModuleName
     ctorModules (TypeConstructor (Qualified (Just mn) _)) = Just mn
@@ -315,6 +346,7 @@ entails SolverOptions{..} constraint context hints =
             -- Make a dictionary from subgoal dictionaries by applying the correct function
             mkDictionary :: Evidence -> Maybe [Expr] -> m Expr
             mkDictionary (NamedInstance n) args = return $ foldl App (Var n) (fold args)
+            mkDictionary RowUnionInstance _ = return $ Literal (ObjectLiteral [])
             mkDictionary (WarnInstance msg) _ = do
               tell . errorMessage $ UserDefinedWarning msg
               -- We cannot call the type class constructor here because Warn is declared in Prim.

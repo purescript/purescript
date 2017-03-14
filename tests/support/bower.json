@@ -15,6 +15,7 @@
     "purescript-symbols": "2.0.0",
     "purescript-tailrec": "2.0.2",
     "purescript-typelevel-prelude": "1.0.0",
-    "purescript-unsafe-coerce": "2.0.0"
+    "purescript-unsafe-coerce": "2.0.0",
+    "purescript-records": "0.0.2"
   }
 }
