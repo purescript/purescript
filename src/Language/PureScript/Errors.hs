@@ -15,10 +15,10 @@ import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Trans.State.Lazy
 import           Control.Monad.Writer
 import           Data.Char (isSpace)
-import           Data.Either (lefts, rights)
+import           Data.Either (partitionEithers)
 import           Data.Foldable (fold)
 import           Data.Functor.Identity (Identity(..))
-import           Data.List (transpose, nubBy, sortBy, partition)
+import           Data.List (transpose, nubBy, sortBy, partition, dropWhileEnd)
 import           Data.Maybe (maybeToList, fromMaybe, mapMaybe)
 import           Data.Ord (comparing)
 import           Data.String (fromString)
@@ -1310,7 +1310,6 @@ renderBox = unlines
             . lines
             . Box.render
   where
-  dropWhileEnd p = reverse . dropWhile p . reverse
   whiteSpace = all isSpace
 
 toTypelevelString :: Type -> Maybe Box.Box
@@ -1326,7 +1325,7 @@ toTypelevelString t = (Box.text . decodeStringWithReplacement) <$> toTypelevelSt
 
 -- | Rethrow an error with a more detailed error message in the case of failure
 rethrow :: (MonadError e m) => (e -> e) -> m a -> m a
-rethrow f = flip catchError $ \e -> throwError (f e)
+rethrow f = flip catchError (throwError . f)
 
 reifyErrors :: (MonadError e m) => m a -> m (Either e a)
 reifyErrors ma = catchError (fmap Right ma) (return . Left)
@@ -1378,6 +1377,6 @@ parU xs f =
     withError u = catchError (Right <$> u) (return . Left)
 
     collectErrors :: [Either MultipleErrors b] -> m [b]
-    collectErrors es = case lefts es of
-      [] -> return $ rights es
-      errs -> throwError $ fold errs
+    collectErrors es = case partitionEithers es of
+      ([], rs) -> return rs
+      (errs, _) -> throwError $ fold errs
