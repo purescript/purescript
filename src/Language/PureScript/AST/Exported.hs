@@ -108,7 +108,7 @@ typeInstanceConstituents (TypeInstanceDeclaration _ constraints className tys _)
   -- Note that type synonyms are disallowed in instance declarations, so
   -- we don't need to handle them here.
   go (TypeConstructor n) = [Right n]
-  go (ConstrainedType cs _) = concatMap fromConstraint cs
+  go (ConstrainedType c _) = fromConstraint c
   go _ = []
 
 typeInstanceConstituents (PositionedDeclaration _ _ d) = typeInstanceConstituents d

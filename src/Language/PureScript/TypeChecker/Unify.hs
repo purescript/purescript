@@ -118,9 +118,9 @@ unifyTypes t1 t2 = do
   unifyTypes' r1 r2@RCons{} = unifyRows r1 r2
   unifyTypes' r1@REmpty r2 = unifyRows r1 r2
   unifyTypes' r1 r2@REmpty = unifyRows r1 r2
-  unifyTypes' ty1@(ConstrainedType _ _) ty2 =
+  unifyTypes' ty1@ConstrainedType{} ty2 =
     throwError . errorMessage $ ConstrainedTypeUnified ty1 ty2
-  unifyTypes' t3 t4@(ConstrainedType _ _) = unifyTypes' t4 t3
+  unifyTypes' t3 t4@ConstrainedType{} = unifyTypes' t4 t3
   unifyTypes' t3 t4 =
     throwError . errorMessage $ TypesDoNotUnify t3 t4
 

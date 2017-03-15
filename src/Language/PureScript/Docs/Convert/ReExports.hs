@@ -455,7 +455,7 @@ handleEnv TypeClassEnv{..} =
           ++ T.unpack cdeclTitle)
 
   addConstraint constraint =
-    P.quantify . P.moveQuantifiersToFront . P.ConstrainedType [constraint]
+    P.quantify . P.moveQuantifiersToFront . P.ConstrainedType constraint
 
 splitMap :: Map k (v1, v2) -> (Map k v1, Map k v2)
 splitMap = fmap fst &&& fmap snd

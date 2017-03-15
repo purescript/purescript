@@ -301,7 +301,7 @@ checkExhaustive env mn numArgs cas expr = makeResult . first ordNub $ foldl' ste
       ty tyVar =
         ForAll tyVar
           ( ConstrainedType
-              [ Constraint C.Partial [] (Just constraintData) ]
+              (Constraint C.Partial [] (Just constraintData))
               $ TypeApp (TypeApp tyFunction (TypeVar tyVar)) (TypeVar tyVar)
           )
           Nothing

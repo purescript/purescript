@@ -62,17 +62,13 @@ renderConstraint (Constraint pn tys _) =
   let instApp = foldl TypeApp (TypeConstructor (fmap coerceProperName pn)) tys
   in  renderType instApp
 
-renderConstraints :: [Constraint] -> RenderedCode -> RenderedCode
-renderConstraints deps ty =
+renderConstraints :: Constraint -> RenderedCode -> RenderedCode
+renderConstraints con ty =
   mintersperse sp
-    [ if length deps == 1
-         then constraints
-         else syntax "(" <> constraints <> syntax ")"
+    [ renderConstraint con
     , syntax "=>"
     , ty
     ]
-  where
-    constraints = mintersperse (syntax "," <> sp) (map renderConstraint deps)
 
 -- |
 -- Render code representing a Row
@@ -115,10 +111,10 @@ kinded = mkPattern match
   match (KindedType t k) = Just (k, t)
   match _ = Nothing
 
-constrained :: Pattern () Type ([Constraint], Type)
+constrained :: Pattern () Type (Constraint, Type)
 constrained = mkPattern match
   where
-  match (ConstrainedType deps ty) = Just (deps, ty)
+  match (ConstrainedType con ty) = Just (con, ty)
   match _ = Nothing
 
 explicitParens :: Pattern () Type ((), Type)
