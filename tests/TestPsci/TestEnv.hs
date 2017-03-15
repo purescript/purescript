@@ -58,12 +58,12 @@ runWithEval comm eval =
 run :: String -> TestPSCi ()
 run = flip runWithEval $ () <$ psciEval
 
-(@?==) :: (Eq a, Show a) => a -> a -> TestPSCi ()
-x @?== y = liftIO $ x @?= y
+equalsTo :: (Eq a, Show a) => a -> a -> TestPSCi ()
+equalsTo x y = liftIO $ x @?= y
 
-(@?=>) :: String -> String -> TestPSCi ()
-l @?=> r = runWithEval l $ do
+evaluatesTo :: String -> String -> TestPSCi ()
+evaluatesTo l r = runWithEval l $ do
   actual <- psciEval
   runWithEval r $ do
     expected <- psciEval
-    actual @?== expected
+    actual `equalsTo` expected
