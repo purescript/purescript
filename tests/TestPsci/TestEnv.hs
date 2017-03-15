@@ -62,8 +62,6 @@ equalsTo :: (Eq a, Show a) => a -> a -> TestPSCi ()
 equalsTo x y = liftIO $ x @?= y
 
 evaluatesTo :: String -> String -> TestPSCi ()
-evaluatesTo l r = runWithEval l $ do
+evaluatesTo command expected = runWithEval command $ do
   actual <- psciEval
-  runWithEval r $ do
-    expected <- psciEval
-    actual `equalsTo` expected
+  actual `equalsTo` (expected ++ "\n")
