@@ -8,9 +8,10 @@ import           Control.Monad.Trans.RWS.Strict (evalRWST, RWST)
 import qualified Language.PureScript as P
 import           Language.PureScript.Interactive
 import           System.Directory (getCurrentDirectory)
-import           System.Exit (exitFailure)
+import           System.Exit
 import           System.FilePath ((</>))
 import qualified System.FilePath.Glob as Glob
+import           System.Process (readProcessWithExitCode)
 import           Test.HUnit ((@?=))
 
 type TestPSCi a = RWST PSCiConfig () PSCiState IO a
@@ -38,17 +39,31 @@ runTestPSCi i = do
   (s, c) <- initTestPSCi
   fst <$> evalRWST i c s
 
-testEval :: String -> TestPSCi ()
-testEval = const $ return () -- not yet actually eval expr command
+psciEval :: TestPSCi String
+psciEval = liftIO $ do
+  writeFile indexFile "require('$PSCI')['$main']();"
+  process <- findNodeProcess
+  result <- traverse (\node -> readProcessWithExitCode node [indexFile] "") process
+  case result of
+    Just (ExitSuccess, out, _)   -> return out
+    Just (ExitFailure _, _, err) -> putStrLn err >> exitFailure
+    Nothing                      -> putStrLn "Couldn't find node.js" >> exitFailure
 
-testReload :: TestPSCi ()
-testReload = return ()
+runWithEval :: String -> TestPSCi () -> TestPSCi ()
+runWithEval comm eval =
+  case parseCommand comm of
+    Left errStr -> liftIO $ putStrLn errStr >> exitFailure
+    Right command -> handleCommand (\_ -> eval) (return ()) command
 
 run :: String -> TestPSCi ()
-run s = case parseCommand s of
-          Left errStr -> liftIO $ putStrLn errStr >> exitFailure
-          Right command ->
-            handleCommand testEval testReload command
+run = flip runWithEval $ () <$ psciEval
 
 (@?==) :: (Eq a, Show a) => a -> a -> TestPSCi ()
 x @?== y = liftIO $ x @?= y
+
+(@?=>) :: String -> String -> TestPSCi ()
+l @?=> r = runWithEval l $ do
+  actual <- psciEval
+  runWithEval r $ do
+    expected <- psciEval
+    actual @?== expected

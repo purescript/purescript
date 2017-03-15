@@ -28,4 +28,8 @@ commandTests = TestLabel "commandTests" $ TestList $ map (TestCase . runTestPSCi
       run ":reload"
       after <- psciImportedModules <$> get
       length after @?== 3
+  , do
+      run "import Prelude"
+      run "import Data.Array"
+      "let fac n = foldl mul 1 (1..n) in fac 10" @?=> "3628800"
   ]
