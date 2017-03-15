@@ -158,7 +158,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
     generalize unsolved = varIfUnknown . constrain unsolved
 
     -- | Add any unsolved constraints
-    constrain cs ty = foldl (flip ConstrainedType) ty (map (\(_, _, x) -> x) cs)
+    constrain cs ty = foldr ConstrainedType ty (map (\(_, _, x) -> x) cs)
 
     -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
     tidyUp ts sub = first (map (second (first (second (overTypes (substituteType sub) *** substituteType sub))))) ts

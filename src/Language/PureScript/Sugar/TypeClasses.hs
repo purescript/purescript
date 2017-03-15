@@ -186,7 +186,7 @@ desugarDecl mn exps = go
     return (expRef name className tys, [d, dictDecl])
   go d@(TypeInstanceDeclaration name deps className tys (NewtypeInstanceWithDictionary dict)) = do
     let dictTy = foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
-        constrainedTy = quantify (if null deps then dictTy else foldl (flip ConstrainedType) dictTy deps)
+        constrainedTy = quantify (foldr ConstrainedType dictTy deps)
     return (expRef name className tys, [d, ValueDeclaration name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]])
   go (PositionedDeclaration pos com d) = do
     (dr, ds) <- rethrowWithPosition pos $ desugarDecl mn exps d
@@ -300,7 +300,7 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
 
       let props = Literal $ ObjectLiteral $ map (first mkString) (members ++ superclasses)
           dictTy = foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
-          constrainedTy = quantify (if null deps then dictTy else foldl (flip ConstrainedType) dictTy deps)
+          constrainedTy = quantify (foldr ConstrainedType dictTy deps)
           dict = TypeClassDictionaryConstructorApp className props
           result = ValueDeclaration name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]
       return result
