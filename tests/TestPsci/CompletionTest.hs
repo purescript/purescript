@@ -11,7 +11,7 @@ import qualified Data.Text as T
 import qualified Language.PureScript as P
 import           Language.PureScript.Interactive
 import           System.Console.Haskeline
-import           TestPsci.TestEnv (initTestPSCi)
+import           TestPsci.TestEnv (initTestPSCiEnv)
 import           TestUtils (supportModules)
 
 completionTests :: Test
@@ -98,7 +98,7 @@ runCM act = do
 
 getPSCiStateForCompletion :: IO PSCiState
 getPSCiStateForCompletion = do
-  (PSCiState _ bs es, _) <- initTestPSCi
+  (PSCiState _ bs es, _) <- initTestPSCiEnv
   let imports = [controlMonadSTasST, (P.ModuleName [P.ProperName (T.pack "Prelude")], P.Implicit, Nothing)]
   return $ PSCiState imports bs es
 

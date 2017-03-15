@@ -9,7 +9,7 @@ import Test.HUnit
 import TestPsci.TestEnv
 
 commandTests :: Test
-commandTests = TestLabel "commandTests" $ TestList $ map (TestCase . runTestPSCi)
+commandTests = TestLabel "commandTests" $ TestList $ map (TestCase . execTestPSCi)
   [ do
       run "import Prelude"
       run "import Data.Functor"
