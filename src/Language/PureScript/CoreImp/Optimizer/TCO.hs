@@ -66,6 +66,8 @@ tco = everywhere convert where
       = countSelfReferences js1 == 0 && allInTailPosition body && all allInTailPosition el
     allInTailPosition (Block _ body)
       = all allInTailPosition body
+    allInTailPosition (Throw _ js1)
+      = countSelfReferences js1 == 0
     allInTailPosition _
       = False
 
