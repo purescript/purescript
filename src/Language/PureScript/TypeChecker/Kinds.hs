@@ -256,11 +256,10 @@ infer' other = (, []) <$> go other
     k2 <- go row
     unifyKinds k2 (Row k1)
     return $ Row k1
-  go (ConstrainedType deps ty) = do
-    forM_ deps $ \(Constraint className tys _) -> do
-      k <- go $ foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
-      unifyKinds k kindType
-    k <- go ty
-    unifyKinds k kindType
+  go (ConstrainedType (Constraint className tys _) ty) = do
+    k1 <- go $ foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
+    unifyKinds k1 kindType
+    k2 <- go ty
+    unifyKinds k2 kindType
     return kindType
   go ty = internalError $ "Invalid argument to infer: " ++ show ty

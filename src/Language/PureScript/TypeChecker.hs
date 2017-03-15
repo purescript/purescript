@@ -482,11 +482,11 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     findClasses :: Type -> [DeclarationRef]
     findClasses = everythingOnTypes (++) go
       where
-      go (ConstrainedType cs _) = mapMaybe (fmap TypeClassRef . extractCurrentModuleClass . constraintClass) cs
+      go (ConstrainedType c _) = (fmap TypeClassRef . extractCurrentModuleClass . constraintClass) c
       go _ = []
-    extractCurrentModuleClass :: Qualified (ProperName 'ClassName) -> Maybe (ProperName 'ClassName)
-    extractCurrentModuleClass (Qualified (Just mn') name) | mn == mn' = Just name
-    extractCurrentModuleClass _ = Nothing
+    extractCurrentModuleClass :: Qualified (ProperName 'ClassName) -> [ProperName 'ClassName]
+    extractCurrentModuleClass (Qualified (Just mn') name) | mn == mn' = [name]
+    extractCurrentModuleClass _ = []
 
   checkClassMembersAreExported :: DeclarationRef -> m ()
   checkClassMembersAreExported dr@(TypeClassRef name) = do

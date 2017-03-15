@@ -70,11 +70,11 @@ parseTypeAtom = indented *> P.choice
 
 parseConstrainedType :: TokenParser Type
 parseConstrainedType = do
-  constraints <- return <$> parseConstraint
+  constraint <- parseConstraint
   _ <- rfatArrow
   indented
   ty <- parseType
-  return $ ConstrainedType constraints ty
+  return $ ConstrainedType constraint ty
   where
   parseConstraint = do
     className <- parseQualified properName

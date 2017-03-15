@@ -158,8 +158,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
     generalize unsolved = varIfUnknown . constrain unsolved
 
     -- | Add any unsolved constraints
-    constrain [] = id
-    constrain cs = ConstrainedType (map (\(_, _, x) -> x) cs)
+    constrain cs ty = foldr ConstrainedType ty (map (\(_, _, x) -> x) cs)
 
     -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
     tidyUp ts sub = first (map (second (first (second (overTypes (substituteType sub) *** substituteType sub))))) ts
@@ -281,10 +280,10 @@ instantiatePolyTypeWithUnknowns
 instantiatePolyTypeWithUnknowns val (ForAll ident ty _) = do
   ty' <- replaceVarWithUnknown ident ty
   instantiatePolyTypeWithUnknowns val ty'
-instantiatePolyTypeWithUnknowns val (ConstrainedType constraints ty) = do
+instantiatePolyTypeWithUnknowns val (ConstrainedType con ty) = do
    dicts <- getTypeClassDictionaries
    hints <- getHints
-   instantiatePolyTypeWithUnknowns (foldl App val (map (\cs -> TypeClassDictionary cs dicts hints) constraints)) ty
+   instantiatePolyTypeWithUnknowns (App val (TypeClassDictionary con dicts hints)) ty
 instantiatePolyTypeWithUnknowns val ty = return (val, ty)
 
 -- | Infer a type for a value, rethrowing any error to provide a more useful error message
@@ -362,10 +361,10 @@ infer' (Var var) = do
   checkVisibility var
   ty <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards <=< lookupVariable $ var
   case ty of
-    ConstrainedType constraints ty' -> do
+    ConstrainedType con ty' -> do
       dicts <- getTypeClassDictionaries
       hints <- getHints
-      return $ TypedValue True (foldl App (Var var) (map (\cs -> TypeClassDictionary cs dicts hints) constraints)) ty'
+      return $ TypedValue True (App (Var var) (TypeClassDictionary con dicts hints)) ty'
     _ -> return $ TypedValue True (Var var) ty
 infer' v@(Constructor c) = do
   env <- getEnv
@@ -610,12 +609,11 @@ check' val (ForAll ident ty _) = do
       skVal = skolemizeTypesInValue ident sko scope ss val
   val' <- check skVal sk
   return $ TypedValue True val' (ForAll ident ty (Just scope))
-check' val t@(ConstrainedType constraints ty) = do
-  dictNames <- forM constraints $ \(Constraint (Qualified _ (ProperName className)) _ _) ->
-    freshIdent ("dict" <> className)
-  dicts <- join <$> zipWithM (newDictionaries []) (map (Qualified Nothing) dictNames) constraints
+check' val t@(ConstrainedType con@(Constraint (Qualified _ (ProperName className)) _ _) ty) = do
+  dictName <- freshIdent ("dict" <> className)
+  dicts <- newDictionaries [] (Qualified Nothing dictName) con
   val' <- withBindingGroupVisible $ withTypeClassDictionaries dicts $ check val ty
-  return $ TypedValue True (foldr (Abs . VarBinder) val' dictNames) t
+  return $ TypedValue True (Abs (VarBinder dictName) val') t
 check' val u@(TUnknown _) = do
   val'@(TypedValue _ _ ty) <- infer val
   -- Don't unify an unknown with an inferred polytype
@@ -808,10 +806,10 @@ checkFunctionApplication' fn (ForAll ident ty _) arg = do
   checkFunctionApplication fn replaced arg
 checkFunctionApplication' fn (KindedType ty _) arg =
   checkFunctionApplication fn ty arg
-checkFunctionApplication' fn (ConstrainedType constraints fnTy) arg = do
+checkFunctionApplication' fn (ConstrainedType con fnTy) arg = do
   dicts <- getTypeClassDictionaries
   hints <- getHints
-  checkFunctionApplication' (foldl App fn (map (\cs -> TypeClassDictionary cs dicts hints) constraints)) fnTy arg
+  checkFunctionApplication' (App fn (TypeClassDictionary con dicts hints)) fnTy arg
 checkFunctionApplication' fn fnTy dict@TypeClassDictionary{} =
   return (fnTy, App fn dict)
 checkFunctionApplication' fn u arg = do

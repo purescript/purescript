@@ -276,12 +276,10 @@ runAssertion assertion linksCtx Docs.Module{..} =
 
 checkConstrained :: P.Type -> Text -> Bool
 checkConstrained ty tyClass =
-  -- Note that we don't recurse on ConstrainedType if none of the constraints
-  -- match; this is by design, as constraints should be moved to the front
-  -- anyway.
   case ty of
-    P.ConstrainedType cs _ | any (matches tyClass) cs ->
-      True
+    P.ConstrainedType c ty'
+      | matches tyClass c -> True
+      | otherwise -> checkConstrained ty' tyClass
     P.ForAll _ ty' _ ->
       checkConstrained ty' tyClass
     _ ->

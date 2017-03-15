@@ -37,10 +37,9 @@ import Text.PrettyPrint.Boxes hiding ((<+>))
 
 -- TODO(Christoph): get rid of T.unpack s
 
-constraintsAsBox :: TypeRenderOptions -> [Constraint] -> Box -> Box
-constraintsAsBox tro constraints ty = case constraints of
-  [con] -> text "(" <> constraintAsBox con `before` (") " <> text doubleRightArrow <> " " <> ty)
-  xs -> vcat left (zipWith (\i con -> text (if i == 0 then "( " else ", ") <> constraintAsBox con) [0 :: Int ..] xs) `before` (") " <> text doubleRightArrow <> " " <> ty)
+constraintsAsBox :: TypeRenderOptions -> Constraint -> Box -> Box
+constraintsAsBox tro con ty =
+    constraintAsBox con `before` (" " <> text doubleRightArrow <> " " <> ty)
   where
     doubleRightArrow = if troUnicode tro then "⇒" else "=>"
 
@@ -105,7 +104,7 @@ insertPlaceholders = everywhereOnTypesTopDown convertForAlls . everywhereOnTypes
     go idents other = PrettyPrintForAll idents other
   convertForAlls other = other
 
-constrained :: Pattern () Type ([Constraint], Type)
+constrained :: Pattern () Type (Constraint, Type)
 constrained = mkPattern match
   where
   match (ConstrainedType deps ty) = Just (deps, ty)
