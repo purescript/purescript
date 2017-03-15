@@ -11,6 +11,7 @@
     "purescript-newtype": "ps-0.11",
     "purescript-partial": "1.2.0",
     "purescript-prelude": "ps-0.11",
+    "purescript-psci-support": "ps-0.11",
     "purescript-st": "ps-0.11",
     "purescript-symbols": "ps-0.11",
     "purescript-tailrec": "ps-0.11",

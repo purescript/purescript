@@ -147,6 +147,7 @@ supportModules =
   , "Data.Unfoldable"
   , "Data.Unit"
   , "Data.Void"
+  , "PSCI.Support"
   , "Partial"
   , "Partial.Unsafe"
   , "Prelude"
