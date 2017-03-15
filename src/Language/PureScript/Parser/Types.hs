@@ -70,7 +70,7 @@ parseTypeAtom = indented *> P.choice
 
 parseConstrainedType :: TokenParser Type
 parseConstrainedType = do
-  constraints <- P.try (return <$> parseConstraint) <|> parens (commaSep1 parseConstraint)
+  constraints <- return <$> parseConstraint
   _ <- rfatArrow
   indented
   ty <- parseType

@@ -105,6 +105,7 @@ supportModules =
   , "Data.Functor.Invariant"
   , "Data.Generic"
   , "Data.Generic.Rep"
+  , "Data.Generic.Rep.Bounded"
   , "Data.Generic.Rep.Eq"
   , "Data.Generic.Rep.Monoid"
   , "Data.Generic.Rep.Ord"

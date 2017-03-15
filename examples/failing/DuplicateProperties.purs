@@ -3,7 +3,7 @@ module DuplicateProperties where
 
 import Prelude
 
-foreign import data Test :: # * -> *
+foreign import data Test :: # Type -> Type
 
 foreign import subtractX :: forall r. Test (x :: Unit | r) -> Test r
 

@@ -14,7 +14,7 @@ instance st :: T s (S s) where
 test1 :: forall r . S { foo :: String | r } Unit
 test1 = state $ \o -> o { foo = o.foo <> "!" }
 
-test2 :: forall m r . (T { foo :: String | r } m) => m Unit
+test2 :: forall m r . T { foo :: String | r } m => m Unit
 test2 = state $ \o -> o { foo = o.foo <> "!" }
 
 main = do

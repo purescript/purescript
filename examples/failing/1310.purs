@@ -12,7 +12,7 @@ class Inject f g where
 instance inject :: Inject f f where
   inj x = x
 
-foreign import data Oops :: !
+foreign import data Oops :: Effect
 
 main :: forall eff. Eff (oops :: Oops | eff) Unit
 main = inj (log "Oops")

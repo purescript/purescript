@@ -4,7 +4,7 @@ import Prelude
 import Control.Monad.Eff.Console (log, logShow)
 import Data.Function (on)
 
-comparing :: forall a b. (Ord b) => (a -> b) -> a -> a -> Ordering
+comparing :: forall a b. Ord b => (a -> b) -> a -> a -> Ordering
 comparing f = compare `on` f
 
 null [] = true

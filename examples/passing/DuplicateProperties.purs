@@ -3,9 +3,9 @@ module Main where
 import Prelude
 import Control.Monad.Eff.Console (log)
 
-data RProxy (r :: # *) = RProxy
+data RProxy (r :: # Type) = RProxy
 
-data Proxy (a :: *) = Proxy
+data Proxy (a :: Type) = Proxy
 
 subtractX :: forall r a. RProxy (x :: a | r) -> RProxy r
 subtractX RProxy = RProxy

@@ -11,7 +11,7 @@ op1 x _ = x
 
 infix 4 op1 as ?!
 
-test1 :: forall n. (Semiring n) => n -> n -> (n -> n -> n) -> n
+test1 :: forall n. Semiring n => n -> n -> (n -> n -> n) -> n
 test1 x y z = x * y + z x y
 
 test2 = (\x -> x.foo false) { foo : \_ -> 1.0 }

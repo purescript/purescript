@@ -15,7 +15,7 @@ instance suNumber :: Su Number where
 instance clNumber :: Cl Number where
   cl n m = n + m
 
-test :: forall a. (Cl a) => a -> a
+test :: forall a. Cl a => a -> a
 test a = su (cl a a)
 
 main = do

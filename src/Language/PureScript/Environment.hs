@@ -253,9 +253,6 @@ primKind = NamedKind . primName
 kindType :: Kind
 kindType = primKind C.typ
 
-kindEffect :: Kind
-kindEffect = primKind C.effect
-
 kindSymbol :: Kind
 kindSymbol = primKind C.symbol
 
@@ -341,7 +338,6 @@ primKinds :: S.Set (Qualified (ProperName 'KindName))
 primKinds =
   S.fromList
     [ primName C.typ
-    , primName C.effect
     , primName C.symbol
     ]
 

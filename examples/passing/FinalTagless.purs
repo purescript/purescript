@@ -7,7 +7,7 @@ class E e where
   num :: Number -> e Number
   add :: e Number -> e Number -> e Number
 
-type Expr a = forall e. (E e) => e a
+type Expr a = forall e. E e => e a
 
 data Id a = Id a
 

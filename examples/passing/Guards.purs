@@ -12,11 +12,11 @@ collatz2 = \x y -> case x of
   z | y > 0.0 -> z / 2.0
   z -> z * 3.0 + 1.0
 
-min :: forall a. (Ord a) => a -> a -> a
+min :: forall a. Ord a => a -> a -> a
 min n m | n < m     = n
         | otherwise = m
 
-max :: forall a. (Ord a) => a -> a -> a
+max :: forall a. Ord a => a -> a -> a
 max n m = case unit of
   _ | m < n     -> n
     | otherwise -> m
