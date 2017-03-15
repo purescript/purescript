@@ -196,34 +196,6 @@ instance ToJSON Completion where
            , "documentation" .= complDocumentation
            ]
 
-data ModuleImport =
-  ModuleImport
-  { importModuleName :: ModuleIdent
-  , importType       :: P.ImportDeclarationType
-  , importQualifier  :: Maybe Text
-  } deriving(Show)
-
-instance Eq ModuleImport where
-  mi1 == mi2 =
-    importModuleName mi1 == importModuleName mi2
-    && importQualifier mi1 == importQualifier mi2
-
-instance ToJSON ModuleImport where
-  toJSON (ModuleImport mn P.Implicit qualifier) =
-    object $ [ "module" .= mn
-             , "importType" .= ("implicit" :: Text)
-             ] ++ map (\x -> "qualifier" .= x) (maybeToList qualifier)
-  toJSON (ModuleImport mn (P.Explicit refs) qualifier) =
-    object $ [ "module" .= mn
-             , "importType" .= ("explicit" :: Text)
-             , "identifiers" .= (identifierFromDeclarationRef <$> refs)
-             ] ++ map (\x -> "qualifier" .= x) (maybeToList qualifier)
-  toJSON (ModuleImport mn (P.Hiding refs) qualifier) =
-    object $ [ "module" .= mn
-             , "importType" .= ("hiding" :: Text)
-             , "identifiers" .= (identifierFromDeclarationRef <$> refs)
-             ] ++ map (\x -> "qualifier" .= x) (maybeToList qualifier)
-
 identifierFromDeclarationRef :: P.DeclarationRef -> Text
 identifierFromDeclarationRef (P.TypeRef name _) = P.runProperName name
 identifierFromDeclarationRef (P.ValueRef ident) = P.runIdent ident
@@ -238,7 +210,7 @@ data Success =
   | TextResult Text
   | MultilineTextResult [Text]
   | PursuitResult [PursuitResponse]
-  | ImportList [ModuleImport]
+  | ImportList (P.ModuleName, [(P.ModuleName, P.ImportDeclarationType, Maybe P.ModuleName)])
   | ModuleList [ModuleIdent]
   | RebuildSuccess P.MultipleErrors
   deriving (Show)
@@ -252,9 +224,28 @@ instance ToJSON Success where
   toJSON (TextResult t) = encodeSuccess t
   toJSON (MultilineTextResult ts) = encodeSuccess ts
   toJSON (PursuitResult resp) = encodeSuccess resp
-  toJSON (ImportList decls) = encodeSuccess decls
+  toJSON (ImportList (moduleName, imports)) = object [ "resultType" .= ("success" :: Text)
+                                                     , "result" .= object [ "imports" .= map encodeImport imports
+                                                                          , "moduleName" .= moduleName]]
   toJSON (ModuleList modules) = encodeSuccess modules
   toJSON (RebuildSuccess warnings) = encodeSuccess (P.toJSONErrors False P.Warning warnings)
+
+encodeImport :: (P.ModuleName, P.ImportDeclarationType, Maybe P.ModuleName) -> Value
+encodeImport (P.runModuleName -> mn, importType, map P.runModuleName -> qualifier) = case importType of
+  P.Implicit ->
+    object $ [ "module" .= mn
+             , "importType" .= ("implicit" :: Text)
+             ] ++ map (\x -> "qualifier" .= x) (maybeToList qualifier)
+  P.Explicit refs ->
+    object $ [ "module" .= mn
+             , "importType" .= ("explicit" :: Text)
+             , "identifiers" .= (identifierFromDeclarationRef <$> refs)
+             ] ++ map (\x -> "qualifier" .= x) (maybeToList qualifier)
+  P.Hiding refs ->
+    object $ [ "module" .= mn
+             , "importType" .= ("hiding" :: Text)
+             , "identifiers" .= (identifierFromDeclarationRef <$> refs)
+             ] ++ map (\x -> "qualifier" .= x) (maybeToList qualifier)
 
 newtype PursuitQuery = PursuitQuery Text
                      deriving (Show, Eq)

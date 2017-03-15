@@ -67,7 +67,7 @@ handleCommand c = case c of
   List AvailableModules ->
     listAvailableModules
   List (Imports fp) ->
-    ImportList <$> getImportsForFile fp
+    ImportList <$> parseImportsFromFile fp
   CaseSplit l b e wca t ->
     caseSplit l b e wca t
   AddClause l wca ->
