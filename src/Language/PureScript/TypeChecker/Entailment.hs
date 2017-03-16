@@ -23,8 +23,8 @@ import Control.Monad.Writer
 import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
 import Data.Functor (($>))
-import Data.List (minimumBy)
-import Data.Maybe (fromMaybe, maybeToList, mapMaybe)
+import Data.List (minimumBy, groupBy)
+import Data.Maybe (fromMaybe, maybeToList, mapMaybe, listToMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Text (Text)
@@ -54,8 +54,8 @@ data Evidence
   -- ^ Computed instance of CompareSymbol
   | AppendSymbolInstance
   -- ^ Computed instance of AppendSymbol
-  | UnionInstance
-  -- ^ Computed instance of RowUnion
+  | EmptyInstance
+  -- ^ Empty computed instance
   deriving (Show, Eq)
 
 -- | Extract the identifier of a named instance
@@ -164,9 +164,12 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ C.AppendSymbol [arg0@(TypeLevelString lhs), arg1@(TypeLevelString rhs), _] =
       let args = [arg0, arg1, TypeLevelString (lhs <> rhs)]
       in [TypeClassDictionaryInScope AppendSymbolInstance [] C.AppendSymbol args Nothing]
+    forClassName _ C.Normalised [r, _]
+      | Just (oOut, cst) <- normaliseRow r
+      = [ TypeClassDictionaryInScope EmptyInstance [] C.Normalised [r, oOut] cst ]
     forClassName _ C.Union [l, r, u]
       | Just (lOut, rOut, uOut, cst) <- unionRows l r u
-      = [ TypeClassDictionaryInScope UnionInstance [] C.Union [lOut, rOut, uOut] cst ]
+      = [ TypeClassDictionaryInScope EmptyInstance [] C.Union [lOut, rOut, uOut] cst ]
     forClassName ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (ordNub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
     forClassName _ _ _ = internalError "forClassName: expected qualified class name"
 
@@ -322,10 +325,10 @@ entails SolverOptions{..} constraint context hints =
             -- Make a dictionary from subgoal dictionaries by applying the correct function
             mkDictionary :: Evidence -> Maybe [Expr] -> m Expr
             mkDictionary (NamedInstance n) args = return $ foldl App (Var n) (fold args)
-            mkDictionary UnionInstance (Just [e]) =
+            mkDictionary EmptyInstance (Just [e]) =
               -- We need the subgoal dictionary to appear in the term somewhere
               return $ App (Abs (VarBinder (Ident C.__unused)) (Literal (ObjectLiteral []))) e
-            mkDictionary UnionInstance _ = return $ Literal (ObjectLiteral [])
+            mkDictionary EmptyInstance _ = return $ Literal (ObjectLiteral [])
             mkDictionary (WarnInstance msg) _ = do
               tell . errorMessage $ UserDefinedWarning msg
               -- We cannot call the type class constructor here because Warn is declared in Prim.
@@ -344,6 +347,31 @@ entails SolverOptions{..} constraint context hints =
         subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr
         subclassDictionaryValue dict className index =
           App (Accessor (mkString (superclassName className index)) dict) valUndefined
+
+    -- | Compute a normalised row
+    -- A normalised row can only be computed if all the types for any given label are the same
+    normaliseRow :: Type -> Maybe (Type, Maybe [Constraint])
+    normaliseRow r = guard (not solverDeferErrors) *> normalType
+      where
+        (rl, tailR) = rowToSortedList r
+
+        perLabel = groupBy (\(a,_) (b,_) -> a == b) rl
+        firstTypes = mapMaybe listToMaybe perLabel
+        allConstraints = mapMaybe labelConstraint perLabel
+
+        labelConstraint (x : t) | not (null others) = Just $ Constraint C.Normalised [rowFromList (others, REmpty), rowFromList ([x],REmpty)] Nothing
+            where others = filter ((/=) x) t
+        labelConstraint _ = Nothing
+
+        unionVar = TypeVar "u"
+        outVar = TypeVar "n"
+        normalType = case tailR of
+            REmpty -> Just (rowFromList (firstTypes, REmpty), Just allConstraints)
+            _      -> guard (firstTypes /= rl) $> (outVar, Just cts)
+               where cts = [ Constraint C.Union [rowFromList (firstTypes, REmpty), tailR, unionVar] Nothing,
+                             Constraint C.Normalised [unionVar, outVar] Nothing
+                           ] ++ allConstraints
+
 
     -- | Left biased union of two row types
     unionRows :: Type -> Type -> Type -> Maybe (Type, Type, Type, Maybe [Constraint])
