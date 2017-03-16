@@ -22,6 +22,7 @@ import Control.Monad.Writer
 
 import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
+import Data.Functor (($>))
 import Data.List (minimumBy)
 import Data.Maybe (fromMaybe, maybeToList, mapMaybe)
 import qualified Data.Map as M
@@ -53,7 +54,9 @@ data Evidence
   -- ^ Computed instance of CompareSymbol
   | AppendSymbolInstance
   -- ^ Computed instance of AppendSymbol
-  deriving (Eq)
+  | UnionInstance
+  -- ^ Computed instance of RowUnion
+  deriving (Show, Eq)
 
 -- | Extract the identifier of a named instance
 namedInstanceIdentifier :: Evidence -> Maybe (Qualified Ident)
@@ -119,6 +122,7 @@ data EntailsResult a
   -- ^ We couldn't solve this constraint right now, it will be generalized
   | Deferred
   -- ^ We couldn't solve this constraint right now, so it has been deferred
+  deriving Show
 
 -- | Options for the constraint solver
 data SolverOptions = SolverOptions
@@ -160,6 +164,9 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ C.AppendSymbol [arg0@(TypeLevelString lhs), arg1@(TypeLevelString rhs), _] =
       let args = [arg0, arg1, TypeLevelString (lhs <> rhs)]
       in [TypeClassDictionaryInScope AppendSymbolInstance [] C.AppendSymbol args Nothing]
+    forClassName _ C.Union [l, r, u]
+      | Just (lOut, rOut, uOut, cst) <- unionRows l r u
+      = [ TypeClassDictionaryInScope UnionInstance [] C.Union [lOut, rOut, uOut] cst ]
     forClassName ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (ordNub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
     forClassName _ _ _ = internalError "forClassName: expected qualified class name"
 
@@ -315,6 +322,10 @@ entails SolverOptions{..} constraint context hints =
             -- Make a dictionary from subgoal dictionaries by applying the correct function
             mkDictionary :: Evidence -> Maybe [Expr] -> m Expr
             mkDictionary (NamedInstance n) args = return $ foldl App (Var n) (fold args)
+            mkDictionary UnionInstance (Just [e]) =
+              -- We need the subgoal dictionary to appear in the term somewhere
+              return $ App (Abs (VarBinder (Ident C.__unused)) (Literal (ObjectLiteral []))) e
+            mkDictionary UnionInstance _ = return $ Literal (ObjectLiteral [])
             mkDictionary (WarnInstance msg) _ = do
               tell . errorMessage $ UserDefinedWarning msg
               -- We cannot call the type class constructor here because Warn is declared in Prim.
@@ -333,6 +344,33 @@ entails SolverOptions{..} constraint context hints =
         subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr
         subclassDictionaryValue dict className index =
           App (Accessor (mkString (superclassName className index)) dict) valUndefined
+
+    -- | Left biased union of two row types
+    unionRows :: Type -> Type -> Type -> Maybe (Type, Type, Type, Maybe [Constraint])
+    unionRows l r _ =
+        guard canMakeProgress $> (l, r, rowFromList (merged, tail3), cons)
+      where
+        canMakeProgress = not (null s1 && null s2)
+
+        (s1, tail1) = rowToSortedList l
+        (s2, tail2) = rowToSortedList r
+
+        tailVar = TypeVar "r"
+
+        (tail3, cons) =
+          case (tail1, tail2) of
+            (REmpty, _) -> (tail2, Nothing)
+            (_, REmpty) -> (tail1, Nothing)
+            _ -> (tailVar, Just [ Constraint C.Union [tail1, tail2, tailVar] Nothing ])
+
+        merged = merge s1 s2
+
+        merge xs [] = xs
+        merge [] xs = xs
+        merge lhs@((l1, t1) : r1) rhs@((l2, t2) : r2)
+          | l1 < l2 = (l1, t1) : merge r1 rhs
+          | l2 < l1 = (l2, t2) : merge lhs r2
+          | otherwise = (l1, t1) : (l2, t2) : merge r1 r2
 
 -- Check if an instance matches our list of types, allowing for types
 -- to be solved via functional dependencies. If the types match, we return a
