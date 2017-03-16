@@ -16,6 +16,6 @@
     "purescript-tailrec": "ps-0.11",
     "purescript-typelevel-prelude": "ps-0.11",
     "purescript-unsafe-coerce": "ps-0.11",
-    "purescript-records": "0.0.3"
+    "purescript-records": "ps-0.11"
   }
 }

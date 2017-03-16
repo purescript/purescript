@@ -20,11 +20,14 @@ leftClosed = merge
 rightClosed :: forall l. Normalised (right::Int|l) (right::Int|l) => {|l} -> {right::Int} -> {right::Int|l}
 rightClosed = merge
 
-bothOpen :: forall l r b c
-   . Union r l b
-  => Normalised b c
-  => Normalised (left::Int, right::Int|b) (left::Int,right::Int|c)
-  => {left::Int|l} -> {right::Int|r} -> {left::Int,right::Int|c}
+bothOpen :: forall l r u1 u2 c
+   .
+   Union r l u1
+  => Union l r u2
+  => Normalised (left::Int, right::Int|u1) (left::Int,right::Int|c)
+  => Normalised (left::Int, right::Int|u2) (left::Int,right::Int|c)
+  =>
+  {left::Int|l} -> {right::Int|r} -> {left::Int,right::Int|c}
 bothOpen = merge
 
 main :: Eff (console::CONSOLE) Unit

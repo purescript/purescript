@@ -348,29 +348,20 @@ entails SolverOptions{..} constraint context hints =
         subclassDictionaryValue dict className index =
           App (Accessor (mkString (superclassName className index)) dict) valUndefined
 
-    -- | Compute a normalised row
-    -- A normalised row can only be computed if all the types for any given label are the same
+    -- | Pick the first type for each label
     normaliseRow :: Type -> Maybe (Type, Maybe [Constraint])
     normaliseRow r = guard (not solverDeferErrors) *> normalType
       where
         (rl, tailR) = rowToSortedList r
-
-        perLabel = groupBy (\(a,_) (b,_) -> a == b) rl
-        firstTypes = mapMaybe listToMaybe perLabel
-        allConstraints = mapMaybe labelConstraint perLabel
-
-        labelConstraint (x : t) | not (null others) = Just $ Constraint C.Normalised [rowFromList (others, REmpty), rowFromList ([x],REmpty)] Nothing
-            where others = filter ((/=) x) t
-        labelConstraint _ = Nothing
-
+        firstTypes = mapMaybe listToMaybe $ groupBy (\(a,_) (b,_) -> a == b) rl
         unionVar = TypeVar "u"
         outVar = TypeVar "n"
         normalType = case tailR of
-            REmpty -> Just (rowFromList (firstTypes, REmpty), Just allConstraints)
+            REmpty -> Just (rowFromList (firstTypes, REmpty), Nothing)
             _      -> guard (firstTypes /= rl) $> (outVar, Just cts)
                where cts = [ Constraint C.Union [rowFromList (firstTypes, REmpty), tailR, unionVar] Nothing,
                              Constraint C.Normalised [unionVar, outVar] Nothing
-                           ] ++ allConstraints
+                           ]
 
 
     -- | Left biased union of two row types
