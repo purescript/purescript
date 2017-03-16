@@ -106,11 +106,12 @@ data IdeDeclarationAnn = IdeDeclarationAnn
 
 data Annotation
   = Annotation
-  { annLocation       :: Maybe P.SourceSpan
-  , annExportedFrom   :: Maybe P.ModuleName
-  , annTypeAnnotation :: Maybe P.Type
+  { _annLocation       :: Maybe P.SourceSpan
+  , _annExportedFrom   :: Maybe P.ModuleName
+  , _annTypeAnnotation :: Maybe P.Type
   } deriving (Show, Eq, Ord)
 
+makeLenses ''Annotation
 makeLenses ''IdeDeclarationAnn
 
 emptyAnn :: Annotation

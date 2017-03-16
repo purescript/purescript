@@ -68,21 +68,24 @@ resolveReexports
 resolveReexports reexportRefs modules =
   Map.mapWithKey (\moduleName decls ->
                     maybe (ReexportResult decls [])
-                      (resolveReexports' modules decls)
+                      (map (decls <>) . resolveReexports' modules)
                       (Map.lookup moduleName reexportRefs)) modules
 
 resolveReexports'
   :: ModuleMap [IdeDeclarationAnn]
-  -> [IdeDeclarationAnn]
   -> [(P.ModuleName, P.DeclarationRef)]
   -> ReexportResult [IdeDeclarationAnn]
-resolveReexports' modules decls refs =
-  ReexportResult (decls <> concat resolvedRefs) failedRefs
+resolveReexports' modules refs =
+  ReexportResult (concat resolvedRefs) failedRefs
   where
     (failedRefs, resolvedRefs) = partitionEithers (resolveRef' <$> refs)
     resolveRef' x@(mn, r) = case Map.lookup mn modules of
       Nothing -> Left x
-      Just decls' -> first (mn,) (resolveRef decls' r)
+      Just decls' ->
+        let
+          setExportedFrom = set (idaAnnotation.annExportedFrom) . Just
+        in
+          bimap (mn,) (map (setExportedFrom mn)) (resolveRef decls' r)
 
 resolveRef
   :: [IdeDeclarationAnn]

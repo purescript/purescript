@@ -18,6 +18,9 @@ m = P.moduleNameFromString
 d :: IdeDeclaration -> IdeDeclarationAnn
 d = IdeDeclarationAnn emptyAnn
 
+exportedFrom :: Text -> IdeDeclarationAnn -> IdeDeclarationAnn
+exportedFrom mn (IdeDeclarationAnn ann decl) = IdeDeclarationAnn (ann {_annExportedFrom = Just (m mn)}) decl
+
 valueA, typeA, classA, dtorA1, dtorA2 :: IdeDeclarationAnn
 valueA = d (IdeDeclValue (IdeValue (P.Ident "valueA") P.REmpty))
 typeA = d (IdeDeclType (IdeType(P.ProperName "TypeA") P.kindType))
@@ -32,34 +35,34 @@ env = Map.fromList
 
 type Refs = [(P.ModuleName, P.DeclarationRef)]
 
-succTestCases :: [(Text, [IdeDeclarationAnn], Refs, [IdeDeclarationAnn])]
+succTestCases :: [(Text, Refs, [IdeDeclarationAnn])]
 succTestCases =
-  [ ("resolves a value reexport", [], [(m "A", P.ValueRef (P.Ident "valueA"))], [valueA])
+  [ ("resolves a value reexport", [(m "A", P.ValueRef (P.Ident "valueA"))], [exportedFrom "A" valueA])
   , ("resolves a type reexport with explicit data constructors"
-    , [], [(m "A", P.TypeRef (P.ProperName "TypeA") (Just [P.ProperName "DtorA1"]))], [typeA, dtorA1])
+    , [(m "A", P.TypeRef (P.ProperName "TypeA") (Just [P.ProperName "DtorA1"]))], [exportedFrom "A" typeA, exportedFrom "A" dtorA1])
   , ("resolves a type reexport with implicit data constructors"
-    , [], [(m "A", P.TypeRef (P.ProperName "TypeA") Nothing)], [typeA, dtorA1, dtorA2])
-  , ("resolves a class reexport", [], [(m "A", P.TypeClassRef (P.ProperName "ClassA"))], [classA])
+    , [(m "A", P.TypeRef (P.ProperName "TypeA") Nothing)], map (exportedFrom "A") [typeA, dtorA1, dtorA2])
+  , ("resolves a class reexport", [(m "A", P.TypeClassRef (P.ProperName "ClassA"))], [exportedFrom "A" classA])
   ]
 
-failTestCases :: [(Text, [IdeDeclarationAnn], Refs)]
+failTestCases :: [(Text, Refs)]
 failTestCases =
-  [ ("fails to resolve a non existing value", [], [(m "A", P.ValueRef (P.Ident "valueB"))])
-  , ("fails to resolve a non existing type reexport" , [], [(m "A", P.TypeRef (P.ProperName "TypeB") Nothing)])
-  , ("fails to resolve a non existing class reexport", [], [(m "A", P.TypeClassRef (P.ProperName "ClassB"))])
+  [ ("fails to resolve a non existing value", [(m "A", P.ValueRef (P.Ident "valueB"))])
+  , ("fails to resolve a non existing type reexport" , [(m "A", P.TypeRef (P.ProperName "TypeB") Nothing)])
+  , ("fails to resolve a non existing class reexport", [(m "A", P.TypeClassRef (P.ProperName "ClassB"))])
   ]
 
 spec :: Spec
 spec = do
   describe "Successful Reexports" $
-    for_ succTestCases $ \(desc, initial, refs, result) ->
+    for_ succTestCases $ \(desc, refs, result) ->
       it (toS desc) $ do
-        let reResult = resolveReexports' env initial refs
+        let reResult = resolveReexports' env refs
         reResolved reResult `shouldBe` result
         reResult `shouldSatisfy` not . reexportHasFailures
   describe "Failed Reexports" $
-    for_ failTestCases $ \(desc, initial, refs) ->
+    for_ failTestCases $ \(desc, refs) ->
       it (toS desc) $ do
-        let reResult = resolveReexports'  env initial refs
+        let reResult = resolveReexports'  env refs
         reFailed reResult `shouldBe` refs
         reResult `shouldSatisfy` reexportHasFailures
