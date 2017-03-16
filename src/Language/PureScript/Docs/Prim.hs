@@ -25,6 +25,7 @@ primDocsModule = Module
       , partial
       , fail
       , warn
+      , union
       , typeConcat
       , typeString
       , kindType
@@ -226,6 +227,14 @@ warn = primClass "Warn" $ T.unlines
   , ""
   , "For more information, see"
   , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
+  ]
+
+union :: Declaration
+union = primClass "Union" $ T.unlines
+  [ "The Union type class is used to compute the union of two rows of types"
+  , "(left-biased, including duplicates)."
+  , ""
+  , "The third type argument represents the union of the first two."
   ]
 
 typeConcat :: Declaration
