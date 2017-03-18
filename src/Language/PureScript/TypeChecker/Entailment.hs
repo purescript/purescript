@@ -348,22 +348,25 @@ entails SolverOptions{..} constraint context hints =
     -- | Left biased union of two row types
     unionRows :: Type -> Type -> Type -> Maybe (Type, Type, Type, Maybe [Constraint])
     unionRows l r _ =
-        guard canMakeProgress $> (l, r, rowFromList (merged, tail3), cons)
+        guard canMakeProgress $> (l, r, rowFromList out, cons)
       where
-        canMakeProgress = not (null s1 && null s2)
-
         (s1, tail1) = rowToSortedList l
         (s2, tail2) = rowToSortedList r
 
         tailVar = TypeVar "r"
 
-        (tail3, cons) =
-          case (tail1, tail2) of
-            (REmpty, _) -> (tail2, Nothing)
-            (_, REmpty) -> (tail1, Nothing)
-            _ -> (tailVar, Just [ Constraint C.Union [tail1, tail2, tailVar] Nothing ])
-
-        merged = merge s1 s2
+        (canMakeProgress, out, cons) =
+          case tail1 of
+            -- If the left hand side is a closed row, then we can merge
+            -- its labels into the right and side.
+            REmpty -> (not (null s1 && null s2), (merge s1 s2, tail2), Nothing)
+            -- If the left hand side is not definitely closed, then the only way we
+            -- can safely make progress is to move any known labels from the left
+            -- input into the output, and add a constraint for any remaining labels.
+            -- Otherwise, the left hand tail might contain the same labels as on
+            -- the right hand side, and we can't be certain we won't reorder the
+            -- types for such labels.
+            _ -> (not (null s1), (s1, tailVar), Just [ Constraint C.Union [tail1, r, tailVar] Nothing ])
 
         merge xs [] = xs
         merge [] xs = xs
