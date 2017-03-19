@@ -143,3 +143,8 @@ withSourceSpan f p = do
         _ -> Nothing
   let sp = SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos $ fromMaybe end end')
   return $ f sp comments x
+
+featureWasRemoved :: String -> P.Parsec s ParseState a
+featureWasRemoved err = do
+  pos <- P.getPosition
+  error $ "It looks like you are trying to use a feature from a previous version of the compiler:\n" ++ err ++ "\nat " ++ show pos
