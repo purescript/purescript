@@ -6,6 +6,7 @@ import           Protolude (ordNub)
 
 import           Command.Docs.Etags
 import           Command.Docs.Ctags
+import           Command.Docs.Html
 import           Control.Applicative
 import           Control.Arrow (first, second)
 import           Control.Category ((>>>))
@@ -30,11 +31,13 @@ import           System.FilePath.Glob (glob)
 import           System.IO (hPutStrLn, hPrint, stderr)
 import           System.IO.UTF8 (readUTF8FileT, writeUTF8FileT)
 
--- Available output formats
-data Format = Markdown -- Output documentation in Markdown format
-               | Ctags -- Output ctags symbol index suitable for use with vi
-               | Etags -- Output etags symbol index suitable for use with emacs
-               deriving (Show, Eq, Ord)
+-- | Available output formats
+data Format
+  = Markdown
+  | Html
+  | Ctags -- Output ctags symbol index suitable for use with vi
+  | Etags -- Output etags symbol index suitable for use with emacs
+  deriving (Show, Eq, Ord)
 
 -- | Available methods of outputting Markdown documentation
 data DocgenOutput
@@ -53,13 +56,22 @@ data PSCDocsOptions = PSCDocsOptions
 docgen :: PSCDocsOptions -> IO ()
 docgen (PSCDocsOptions fmt inputGlob output) = do
   input <- concat <$> mapM glob inputGlob
+  when (null input) $ do
+    hPutStrLn stderr "purs docs: no input files."
+    exitFailure
+
   case fmt of
     Etags -> dumpTags input dumpEtags
     Ctags -> dumpTags input dumpCtags
+    Html -> do
+      let outputDir = "./generated-docs" -- TODO: make this configurable
+      ms <- parseAndConvert input
+      let msHtml = map asHtml (D.primDocsModule : ms)
+      createDirectoryIfMissing False outputDir
+      writeHtmlModules outputDir msHtml
+
     Markdown -> do
-      ms <- runExceptT (D.parseFilesInPackages input []
-                           >>= uncurry D.convertModulesInPackage)
-               >>= successOrExit
+      ms <- parseAndConvert input
 
       case output of
         EverythingToStdOut ->
@@ -100,6 +112,11 @@ docgen (PSCDocsOptions fmt inputGlob output) = do
 
   takeByName = takeModulesByName D.modName
   takeByName' = takeModulesByName' D.modName
+
+  parseAndConvert input =
+    runExceptT (D.parseFilesInPackages input []
+               >>= uncurry D.convertModulesInPackage)
+    >>= successOrExit
 
 -- |
 -- Given a list of module names and a list of modules, return a list of modules
@@ -151,13 +168,14 @@ instance Read Format where
   readsPrec _ "etags" = [(Etags, "")]
   readsPrec _ "ctags" = [(Ctags, "")]
   readsPrec _ "markdown" = [(Markdown, "")]
+  readsPrec _ "html" = [(Html, "")]
   readsPrec _ _ = []
 
 format :: Opts.Parser Format
 format = Opts.option Opts.auto $ Opts.value Markdown
          <> Opts.long "format"
          <> Opts.metavar "FORMAT"
-         <> Opts.help "Set output FORMAT (markdown | etags | ctags)"
+         <> Opts.help "Set output FORMAT (markdown | html | etags | ctags)"
 
 docgenModule :: Opts.Parser String
 docgenModule = Opts.strOption $

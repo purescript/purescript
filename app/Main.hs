@@ -4,8 +4,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE CPP #-}
 
 module Main where
 
@@ -18,14 +16,10 @@ import qualified Command.Publish as Publish
 import qualified Command.REPL as REPL
 import           Data.Foldable (fold)
 import           Data.Monoid ((<>))
-import           Data.Version (showVersion)
 import qualified Options.Applicative as Opts
-import qualified Paths_purescript as Paths
 import qualified System.IO as IO
+import           Version (versionString)
 
-#ifndef RELEASE
-import qualified Development.GitRev as GitRev
-#endif
 
 main :: IO ()
 main = do
@@ -37,7 +31,7 @@ main = do
     opts        = Opts.info (versionInfo <*> Opts.helper <*> commands) infoModList
     infoModList = Opts.fullDesc <> headerInfo <> footerInfo
     headerInfo  = Opts.progDesc "The PureScript compiler and tools"
-    footerInfo  = Opts.footer $ "purs " ++ showVersion Paths.version
+    footerInfo  = Opts.footer $ "purs " ++ versionString
 
     versionInfo :: Opts.Parser (a -> a)
     versionInfo = Opts.abortOption (Opts.InfoMsg versionString) $
@@ -68,15 +62,3 @@ main = do
             (Opts.info REPL.command
               (Opts.progDesc "Enter the interactive mode (PSCi)"))
         ]
-
-versionString :: String
-versionString = showVersion Paths.version ++ extra
-  where
-#ifdef RELEASE
-  extra = ""
-#else
-  extra = " [development build; commit: " ++ $(GitRev.gitHash) ++ dirty ++ "]"
-  dirty
-    | $(GitRev.gitDirty) = " DIRTY"
-    | otherwise = ""
-#endif
