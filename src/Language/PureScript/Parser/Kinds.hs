@@ -14,11 +14,11 @@ import qualified Text.Parsec.Expr as P
 
 parseStar :: TokenParser Kind
 parseStar = symbol' "*" *>
-  featureWasRemoved "The `*` kind symbol is no longer used, the new equivalent is the named kind `Type`."
+  P.parserFail "The `*` symbol is no longer used for type kinds.\n  The new equivalent is the named kind `Type`."
 
 parseBang :: TokenParser Kind
 parseBang = symbol' "!" *>
-  featureWasRemoved "The `!` kind is no longer built in to the language.\nThe new equivalent is the named kind `Effect`, defined in `Control.Monad.Eff` in the `purescript-eff` library."
+  P.parserFail "The `!` symbol is no longer used for effect kinds.\n  The new equivalent is the named kind `Effect`, defined in `Control.Monad.Eff` in the `purescript-eff` library."
 
 parseNamedKind :: TokenParser Kind
 parseNamedKind = NamedKind <$> parseQualified kindName
