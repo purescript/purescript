@@ -70,7 +70,7 @@ parseTypeAtom = indented *> P.choice
 
 parseConstrainedType :: TokenParser Type
 parseConstrainedType = do
-  constraint <- parens parseConstraint <|> parseConstraint
+  constraint <- parseConstraint <|> parens (parseConstraint <* oldComma)
   _ <- rfatArrow
   indented
   ty <- parseType
@@ -81,9 +81,11 @@ parseConstrainedType = do
     indented
     ty <- P.many parseTypeAtom
     return (Constraint className ty Nothing)
+  oldComma = comma *>
+    P.parserFail "Class constraints in type annotations can no longer be grouped in parentheses.\n  Each constraint should now be separated by `=>`, for example:\n    `(Applicative f, Semigroup a) => a -> f a -> f a`\n  would now be written as:\n    `Applicative f => Seimgroup a => a -> f a -> f a`."
 
 parseAnyType :: TokenParser Type
-parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTable (P.try parseConstrainedType <|> parseTypeAtom)) P.<?> "type"
+parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTable (P.try parseConstrainedType <|> P.try parseTypeAtom <|> parseConstrainedType)) P.<?> "type"
   where
   operators = [ [ P.Infix (return TypeApp) P.AssocLeft ]
               , [ P.Infix (P.try (parseQualified parseOperator) >>= \ident ->
