@@ -350,30 +350,22 @@ entails SolverOptions{..} constraint context hints =
     unionRows l r _ =
         guard canMakeProgress $> (l, r, rowFromList out, cons)
       where
-        (s1, tail1) = rowToSortedList l
-        (s2, tail2) = rowToSortedList r
+        (fixed, rest) = rowToList l
 
-        tailVar = TypeVar "r"
+        rowVar = TypeVar "r"
 
         (canMakeProgress, out, cons) =
-          case tail1 of
+          case rest of
             -- If the left hand side is a closed row, then we can merge
-            -- its labels into the right and side.
-            REmpty -> (not (null s1 && null s2), (merge s1 s2, tail2), Nothing)
+            -- its labels into the right hand side.
+            REmpty -> (True, (fixed, r), Nothing)
             -- If the left hand side is not definitely closed, then the only way we
             -- can safely make progress is to move any known labels from the left
             -- input into the output, and add a constraint for any remaining labels.
             -- Otherwise, the left hand tail might contain the same labels as on
             -- the right hand side, and we can't be certain we won't reorder the
             -- types for such labels.
-            _ -> (not (null s1), (s1, tailVar), Just [ Constraint C.Union [tail1, r, tailVar] Nothing ])
-
-        merge xs [] = xs
-        merge [] xs = xs
-        merge lhs@((l1, t1) : r1) rhs@((l2, t2) : r2)
-          | l1 < l2 = (l1, t1) : merge r1 rhs
-          | l2 < l1 = (l2, t2) : merge lhs r2
-          | otherwise = (l1, t1) : (l2, t2) : merge r1 r2
+            _ -> (not (null fixed), (fixed, rowVar), Just [ Constraint C.Union [rest, r, rowVar] Nothing ])
 
 -- Check if an instance matches our list of types, allowing for types
 -- to be solved via functional dependencies. If the types match, we return a

@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Control.Monad.Eff
 import Control.Monad.Eff.Console
 
 foreign import merge
@@ -22,20 +23,30 @@ mergeWithExtras
  -> { x :: Int, y :: Boolean | r3}
 mergeWithExtras = merge
 
-test3 x = merge { x: 1 } x :: { x :: Int, y :: Boolean }
+test3 x = merge { x: 1 } x
+test3' x = merge x { x: 1 }
 
 type Mandatory r = (x :: Int | r)
 type Optional r = (x :: Int, y :: Int, z :: Int | r)
 
 withDefaults
-  :: forall r
-   . Union r (y :: Int, z :: Int) (y :: Int, z :: Int | r)
+  :: forall r s
+   . Union r (y :: Int, z :: Int) (y :: Int, z :: Int | s)
   => Record (Mandatory r)
-  -> Record (Optional r)
+  -> Record (Optional s)
 withDefaults p = merge p { y: 1, z: 1 }
+
+withDefaultsClosed
+  :: forall r s t
+   . Union r (y :: Int, z :: Int) (y :: Int, z :: Int | s)
+  => Union s t (y :: Int, z :: Int)
+  => Record (Mandatory r)
+  -> Record (Optional s)
+withDefaultsClosed p = merge p { y: 1, z: 1 }
 
 test4 = withDefaults { x: 1, y: 2 }
 
+main :: Eff (console :: CONSOLE) Unit
 main = do
   logShow test1.x
   logShow test1.y
@@ -43,6 +54,11 @@ main = do
   logShow (mergeWithExtras { x: 1 } { x: 0, y: true, z: 42.0 }).x
   logShow (withDefaults { x: 1 }).x
   logShow (withDefaults { x: 1 }).y
+  logShow (withDefaults { x: 1 }).z
   logShow (withDefaults { x: 1, y: 2 }).x
   logShow (withDefaults { x: 1, y: 2 }).y
+  logShow (withDefaults { x: 1, y: 2 }).z
+  logShow (withDefaultsClosed { x: 1, y: 2 }).x
+  logShow (withDefaultsClosed { x: 1, y: 2 }).y
+  logShow (withDefaultsClosed { x: 1, y: 2 }).z
   log "Done"
