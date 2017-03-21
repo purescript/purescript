@@ -359,6 +359,7 @@ primTypes =
     , (primName "Boolean",    (kindType, ExternData))
     , (primName "Partial",    (kindType, ExternData))
     , (primName "Union",      (FunKind (Row kindType) (FunKind (Row kindType) (FunKind (Row kindType) kindType)), ExternData))
+    , (primName "Normalised", (FunKind (Row kindType) (FunKind (Row kindType) kindType), ExternData))
     , (primName "Fail",       (FunKind kindSymbol kindType, ExternData))
     , (primName "Warn",       (FunKind kindSymbol kindType, ExternData))
     , (primName "TypeString", (FunKind kindType kindSymbol, ExternData))
@@ -383,6 +384,11 @@ primClasses =
                              , ("u", Just (Row kindType))
                              ] [] []
                              [ FunctionalDependency [0, 1] [2] ]))
+    , (primName "Normalised",   (makeTypeClassData
+                             [ ("r", Just (Row kindType))
+                             , ("o", Just (Row kindType))
+                             ] [] []
+                             [ FunctionalDependency [0] [1] ]))
     ]
 
 -- |
