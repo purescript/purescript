@@ -461,22 +461,31 @@ deriveGenericRep mn syns ds tyConNm tyConArgs repTy = do
     makeArg arg | Just rec <- objectType arg
                 , Just fields <- decomposeRec rec = do
       fieldNames <- traverse freshIdent (map (runIdent . labelToIdent . fst) fields)
-      pure ( TypeApp (TypeConstructor record)
-               (foldr1 (\f -> TypeApp (TypeApp (TypeConstructor productName) f))
-                 (map (\((Label name), ty) ->
-                   TypeApp (TypeApp (TypeConstructor field) (TypeLevelString name)) ty) fields))
-           , ConstructorBinder record
-               [ foldr1 (\b1 b2 -> ConstructorBinder productName [b1, b2])
-                   (map (\ident -> ConstructorBinder field [VarBinder ident]) fieldNames)
-               ]
-           , Literal . ObjectLiteral $
-                zipWith (\((Label name), _) ident -> (name, Var (Qualified Nothing ident))) fields fieldNames
-           , LiteralBinder . ObjectLiteral $
-                 zipWith (\((Label name), _) ident -> (name, VarBinder ident)) fields fieldNames
-           , record' $
-               foldr1 (\e1 -> App (App (Constructor productName) e1))
-                 (map (field' . Var . Qualified Nothing) fieldNames)
-           )
+      case fieldNames of
+        [] ->
+          pure ( TypeApp (TypeConstructor record) noArgs
+               , ConstructorBinder record [ NullBinder ]
+               , Literal (ObjectLiteral [])
+               , LiteralBinder (ObjectLiteral [])
+               , record' noArgs'
+               )
+        _ ->
+          pure ( TypeApp (TypeConstructor record)
+                   (foldr1 (\f -> TypeApp (TypeApp (TypeConstructor productName) f))
+                     (map (\((Label name), ty) ->
+                       TypeApp (TypeApp (TypeConstructor field) (TypeLevelString name)) ty) fields))
+               , ConstructorBinder record
+                   [ foldr1 (\b1 b2 -> ConstructorBinder productName [b1, b2])
+                       (map (\ident -> ConstructorBinder field [VarBinder ident]) fieldNames)
+                   ]
+               , Literal . ObjectLiteral $
+                    zipWith (\((Label name), _) ident -> (name, Var (Qualified Nothing ident))) fields fieldNames
+               , LiteralBinder . ObjectLiteral $
+                     zipWith (\((Label name), _) ident -> (name, VarBinder ident)) fields fieldNames
+               , record' $
+                   foldr1 (\e1 -> App (App (Constructor productName) e1))
+                     (map (field' . Var . Qualified Nothing) fieldNames)
+               )
     makeArg arg = do
       argName <- freshIdent "arg"
       pure ( TypeApp (TypeConstructor argument) arg
