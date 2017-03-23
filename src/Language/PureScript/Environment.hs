@@ -382,7 +382,10 @@ primClasses =
                              , ("r", Just (Row kindType))
                              , ("u", Just (Row kindType))
                              ] [] []
-                             [ FunctionalDependency [0, 1] [2] ]))
+                             [ FunctionalDependency [0, 1] [2]
+                             , FunctionalDependency [1, 2] [0]
+                             , FunctionalDependency [2, 0] [1]
+                             ]))
     ]
 
 -- |

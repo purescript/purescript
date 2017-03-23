@@ -37,14 +37,18 @@ withDefaults
 withDefaults p = merge p { y: 1, z: 1 }
 
 withDefaultsClosed
-  :: forall r s t
+  :: forall r s
    . Union r (y :: Int, z :: Int) (y :: Int, z :: Int | s)
-  => Union s t (y :: Int, z :: Int)
+  => Subrow s (y :: Int, z :: Int)
   => Record (Mandatory r)
   -> Record (Optional s)
 withDefaultsClosed p = merge p { y: 1, z: 1 }
 
 test4 = withDefaults { x: 1, y: 2 }
+
+-- r is a subrow of s if Union r t s for some t.
+class Subrow (r :: # Type) (s :: # Type)
+instance subrow :: Union r t s => Subrow r s
 
 main :: Eff (console :: CONSOLE) Unit
 main = do
