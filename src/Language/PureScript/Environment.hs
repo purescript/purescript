@@ -152,9 +152,9 @@ makeTypeClassData args m s deps = TypeClassData args m s deps determinedArgs cov
 data NameVisibility
   = Undefined
   -- ^ The name is defined in the current binding group, but is not visible
-  | Defined deriving (Show, Eq)
+  | Defined
   -- ^ The name is defined in the another binding group, or has been made visible by a function binder
-
+  deriving (Show, Eq)
 -- | A flag for whether a name is for an private or public value - only public values will be
 -- included in a generated externs file.
 data NameKind
