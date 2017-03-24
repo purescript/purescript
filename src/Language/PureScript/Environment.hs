@@ -1,26 +1,24 @@
-{-# LANGUAGE TemplateHaskell #-}
-
 module Language.PureScript.Environment where
 
-import Prelude.Compat
-import Protolude (ordNub)
+import           Prelude.Compat
+import           Protolude (ordNub)
 
-import Data.Aeson.TH
+import           Data.Aeson ((.=), (.:))
 import qualified Data.Aeson as A
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Data.Maybe (fromMaybe, mapMaybe)
-import Data.Text (Text)
+import           Data.Maybe (fromMaybe, mapMaybe)
+import           Data.Text (Text)
 import qualified Data.Text as T
-import Data.Tree (Tree, rootLabel)
+import           Data.Tree (Tree, rootLabel)
 import qualified Data.Graph as G
-import Data.Foldable (toList)
+import           Data.Foldable (toList)
 
-import Language.PureScript.Crash
-import Language.PureScript.Kinds
-import Language.PureScript.Names
-import Language.PureScript.TypeClassDictionaries
-import Language.PureScript.Types
+import           Language.PureScript.Crash
+import           Language.PureScript.Kinds
+import           Language.PureScript.Names
+import           Language.PureScript.TypeClassDictionaries
+import           Language.PureScript.Types
 import qualified Language.PureScript.Constants as C
 
 -- | The @Environment@ defines all values and types which are currently in scope:
@@ -71,6 +69,18 @@ data FunctionalDependency = FunctionalDependency
   , fdDetermined  :: [Int]
   -- ^ the determined type arguments
   } deriving Show
+
+instance A.FromJSON FunctionalDependency where
+  parseJSON = A.withObject "FunctionalDependency" $ \o ->
+    FunctionalDependency
+      <$> o .: "determiners"
+      <*> o .: "determined"
+
+instance A.ToJSON FunctionalDependency where
+  toJSON FunctionalDependency{..} =
+    A.object [ "determiners" .= fdDeterminers
+             , "determined" .= fdDetermined
+             ]
 
 -- | The initial environment with no values and only the default javascript types defined
 initEnvironment :: Environment
@@ -155,6 +165,7 @@ data NameVisibility
   | Defined
   -- ^ The name is defined in the another binding group, or has been made visible by a function binder
   deriving (Show, Eq)
+
 -- | A flag for whether a name is for an private or public value - only public values will be
 -- included in a generated externs file.
 data NameKind
@@ -180,6 +191,29 @@ data TypeKind
   | ScopedTypeVar
   -- ^ A scoped type variable
   deriving (Show, Eq)
+
+instance A.ToJSON TypeKind where
+  toJSON (DataType args ctors) =
+    A.object [ T.pack "DataType" .= A.object ["args" .= args, "ctors" .= ctors] ]
+  toJSON TypeSynonym       = A.toJSON (T.pack "TypeSynonym")
+  toJSON ExternData        = A.toJSON (T.pack "ExternData")
+  toJSON LocalTypeVariable = A.toJSON (T.pack "LocalTypeVariable")
+  toJSON ScopedTypeVar     = A.toJSON (T.pack "ScopedTypeVar")
+
+instance A.FromJSON TypeKind where
+  parseJSON (A.Object o) = do
+    args <- o .: "DataType"
+    A.withObject "args" (\o1 ->
+      DataType <$> o1 .: "args"
+               <*> o1 .: "ctors") args
+  parseJSON (A.String s) =
+    case s of
+      "TypeSynonym"       -> pure TypeSynonym
+      "ExternData"        -> pure ExternData
+      "LocalTypeVariable" -> pure LocalTypeVariable
+      "ScopedTypeVar"     -> pure ScopedTypeVar
+      _ -> fail "Unknown TypeKind"
+  parseJSON _ = fail "Invalid TypeKind"
 
 -- | The type ('data' or 'newtype') of a data type declaration
 data DataDeclType
@@ -337,6 +371,3 @@ isNewtypeConstructor e ctor = case lookupConstructor e ctor of
 -- | Finds information about values from the current environment.
 lookupValue :: Environment -> Qualified Ident -> Maybe (Type, NameKind, NameVisibility)
 lookupValue env ident = ident `M.lookup` names env
-
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''TypeKind)
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''FunctionalDependency)
