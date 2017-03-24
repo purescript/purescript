@@ -72,14 +72,11 @@ data FunctionalDependency = FunctionalDependency
   -- ^ the determined type arguments
   } deriving Show
 
--- |
--- The initial environment with no values and only the default javascript types defined
---
+-- | The initial environment with no values and only the default javascript types defined
 initEnvironment :: Environment
 initEnvironment = Environment M.empty primTypes M.empty M.empty M.empty primClasses primKinds
 
--- |
--- A constructor for TypeClassData that computes which type class arguments are fully determined
+-- | A constructor for TypeClassData that computes which type class arguments are fully determined
 -- and argument covering sets.
 -- Fully determined means that this argument cannot be used when selecting a type class instance.
 -- A covering set is a minimal collection of arguments that can be used to find an instance and
@@ -151,77 +148,45 @@ makeTypeClassData args m s deps = TypeClassData args m s deps determinedArgs cov
     coveringSets = let funDepSets = sequence (mapMaybe sccNonDetermined (G.scc depGraph))
                    in S.fromList (S.fromList <$> funDepSets)
 
--- |
--- The visibility of a name in scope
---
+-- | The visibility of a name in scope
 data NameVisibility
-  -- |
-  -- The name is defined in the current binding group, but is not visible
-  --
   = Undefined
-  -- |
-  -- The name is defined in the another binding group, or has been made visible by a function binder
-  --
-  | Defined deriving (Show, Eq)
-
--- |
--- A flag for whether a name is for an private or public value - only public values will be
+  -- ^ The name is defined in the current binding group, but is not visible
+  | Defined
+  -- ^ The name is defined in the another binding group, or has been made visible by a function binder
+  deriving (Show, Eq)
+-- | A flag for whether a name is for an private or public value - only public values will be
 -- included in a generated externs file.
---
 data NameKind
-  -- |
-  -- A private value introduced as an artifact of code generation (class instances, class member
-  -- accessors, etc.)
-  --
   = Private
-  -- |
-  -- A public value for a module member or foreing import declaration
-  --
+  -- ^ A private value introduced as an artifact of code generation (class instances, class member
+  -- accessors, etc.)
   | Public
-  -- |
-  -- A name for member introduced by foreign import
-  --
+  -- ^ A public value for a module member or foreing import declaration
   | External
+  -- ^ A name for member introduced by foreign import
   deriving (Show, Eq)
 
--- |
--- The kinds of a type
---
+-- | The kinds of a type
 data TypeKind
-  -- |
-  -- Data type
-  --
   = DataType [(Text, Maybe Kind)] [(ProperName 'ConstructorName, [Type])]
-  -- |
-  -- Type synonym
-  --
+  -- ^ Data type
   | TypeSynonym
-  -- |
-  -- Foreign data
-  --
+  -- ^ Type synonym
   | ExternData
-  -- |
-  -- A local type variable
-  --
+  -- ^ Foreign data
   | LocalTypeVariable
-  -- |
-  -- A scoped type variable
-  --
+  -- ^ A local type variable
   | ScopedTypeVar
+  -- ^ A scoped type variable
   deriving (Show, Eq)
 
--- |
--- The type ('data' or 'newtype') of a data type declaration
---
+-- | The type ('data' or 'newtype') of a data type declaration
 data DataDeclType
-  -- |
-  -- A standard data constructor
-  --
   = Data
-  -- |
-  -- A newtype constructor
-  --
+  -- ^ A standard data constructor
   | Newtype
+  -- ^ A newtype constructor
   deriving (Show, Eq, Ord)
 
 showDataDeclType :: DataDeclType -> Text
@@ -238,87 +203,61 @@ instance A.FromJSON DataDeclType where
       "newtype" -> return Newtype
       other -> fail $ "invalid type: '" ++ T.unpack other ++ "'"
 
--- |
--- Construct a ProperName in the Prim module
---
+-- | Construct a ProperName in the Prim module
 primName :: Text -> Qualified (ProperName a)
 primName = Qualified (Just $ ModuleName [ProperName C.prim]) . ProperName
 
 primKind :: Text -> Kind
 primKind = NamedKind . primName
 
--- |
--- Kinds in prim
---
+-- | Kind of ground types
 kindType :: Kind
 kindType = primKind C.typ
 
 kindSymbol :: Kind
 kindSymbol = primKind C.symbol
 
--- |
--- Construct a type in the Prim module
---
+-- | Construct a type in the Prim module
 primTy :: Text -> Type
 primTy = TypeConstructor . primName
 
--- |
--- Type constructor for functions
---
+-- | Type constructor for functions
 tyFunction :: Type
 tyFunction = primTy "Function"
 
--- |
--- Type constructor for strings
---
+-- | Type constructor for strings
 tyString :: Type
 tyString = primTy "String"
 
--- |
--- Type constructor for strings
---
+-- | Type constructor for strings
 tyChar :: Type
 tyChar = primTy "Char"
 
--- |
--- Type constructor for numbers
---
+-- | Type constructor for numbers
 tyNumber :: Type
 tyNumber = primTy "Number"
 
--- |
--- Type constructor for integers
---
+-- | Type constructor for integers
 tyInt :: Type
 tyInt = primTy "Int"
 
--- |
--- Type constructor for booleans
---
+-- | Type constructor for booleans
 tyBoolean :: Type
 tyBoolean = primTy "Boolean"
 
--- |
--- Type constructor for arrays
---
+-- | Type constructor for arrays
 tyArray :: Type
 tyArray = primTy "Array"
 
--- |
--- Type constructor for records
---
+-- | Type constructor for records
 tyRecord :: Type
 tyRecord = primTy "Record"
 
--- |
--- Check whether a type is a record
---
+-- | Check whether a type is a record
 isObject :: Type -> Bool
 isObject = isTypeOrApplied tyRecord
 
--- |
--- Check whether a type is a function
---
+-- | Check whether a type is a function
 isFunction :: Type -> Bool
 isFunction = isTypeOrApplied tyFunction
 
@@ -326,14 +265,11 @@ isTypeOrApplied :: Type -> Type -> Bool
 isTypeOrApplied t1 (TypeApp t2 _) = t1 == t2
 isTypeOrApplied t1 t2 = t1 == t2
 
--- |
--- Smart constructor for function types
---
+-- | Smart constructor for function types
 function :: Type -> Type -> Type
 function t1 = TypeApp (TypeApp tyFunction t1)
 
--- |
--- The primitive kinds
+-- | The primitive kinds
 primKinds :: S.Set (Qualified (ProperName 'KindName))
 primKinds =
   S.fromList
@@ -341,11 +277,9 @@ primKinds =
     , primName C.symbol
     ]
 
--- |
--- The primitive types in the external javascript environment with their
+-- | The primitive types in the external javascript environment with their
 -- associated kinds. There are also pseudo `Fail`, `Warn`, and `Partial` types
 -- that correspond to the classes with the same names.
---
 primTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
 primTypes =
   M.fromList
@@ -358,44 +292,49 @@ primTypes =
     , (primName "Int",        (kindType, ExternData))
     , (primName "Boolean",    (kindType, ExternData))
     , (primName "Partial",    (kindType, ExternData))
+    , (primName "Union",      (FunKind (Row kindType) (FunKind (Row kindType) (FunKind (Row kindType) kindType)), ExternData))
     , (primName "Fail",       (FunKind kindSymbol kindType, ExternData))
     , (primName "Warn",       (FunKind kindSymbol kindType, ExternData))
     , (primName "TypeString", (FunKind kindType kindSymbol, ExternData))
     , (primName "TypeConcat", (FunKind kindSymbol (FunKind kindSymbol kindSymbol), ExternData))
     ]
 
--- |
--- The primitive class map. This just contains the `Fail`, `Warn`, and `Partial`
+-- | The primitive class map. This just contains the `Fail`, `Warn`, and `Partial`
 -- classes. `Partial` is used as a kind of magic constraint for partial
 -- functions. `Fail` is used for user-defined type errors. `Warn` for
 -- user-defined warnings.
---
 primClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primClasses =
   M.fromList
     [ (primName "Partial", (makeTypeClassData [] [] [] []))
+    -- class Fail (message :: Symbol)
     , (primName "Fail",    (makeTypeClassData [("message", Just kindSymbol)] [] [] []))
+    -- class Warn (message :: Symbol)
     , (primName "Warn",    (makeTypeClassData [("message", Just kindSymbol)] [] [] []))
+    -- class Union (l :: # Type) (r :: # Type) (u :: # Type) | l r -> u, r u -> l, u l -> r
+    , (primName "Union",   (makeTypeClassData
+                             [ ("l", Just (Row kindType))
+                             , ("r", Just (Row kindType))
+                             , ("u", Just (Row kindType))
+                             ] [] []
+                             [ FunctionalDependency [0, 1] [2]
+                             , FunctionalDependency [1, 2] [0]
+                             , FunctionalDependency [2, 0] [1]
+                             ]))
     ]
 
--- |
--- Finds information about data constructors from the current environment.
---
+-- | Finds information about data constructors from the current environment.
 lookupConstructor :: Environment -> Qualified (ProperName 'ConstructorName) -> (DataDeclType, ProperName 'TypeName, Type, [Ident])
 lookupConstructor env ctor =
   fromMaybe (internalError "Data constructor not found") $ ctor `M.lookup` dataConstructors env
 
--- |
--- Checks whether a data constructor is for a newtype.
---
+-- | Checks whether a data constructor is for a newtype.
 isNewtypeConstructor :: Environment -> Qualified (ProperName 'ConstructorName) -> Bool
 isNewtypeConstructor e ctor = case lookupConstructor e ctor of
   (Newtype, _, _, _) -> True
   (Data, _, _, _) -> False
 
--- |
--- Finds information about values from the current environment.
---
+-- | Finds information about values from the current environment.
 lookupValue :: Environment -> Qualified Ident -> Maybe (Type, NameKind, NameVisibility)
 lookupValue env ident = ident `M.lookup` names env
 

@@ -22,6 +22,7 @@ import Control.Monad.Writer
 
 import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
+import Data.Functor (($>))
 import Data.List (minimumBy)
 import Data.Maybe (fromMaybe, maybeToList, mapMaybe)
 import qualified Data.Map as M
@@ -53,7 +54,9 @@ data Evidence
   -- ^ Computed instance of CompareSymbol
   | AppendSymbolInstance
   -- ^ Computed instance of AppendSymbol
-  deriving (Eq)
+  | UnionInstance
+  -- ^ Computed instance of RowUnion
+  deriving (Show, Eq)
 
 -- | Extract the identifier of a named instance
 namedInstanceIdentifier :: Evidence -> Maybe (Qualified Ident)
@@ -119,6 +122,7 @@ data EntailsResult a
   -- ^ We couldn't solve this constraint right now, it will be generalized
   | Deferred
   -- ^ We couldn't solve this constraint right now, so it has been deferred
+  deriving Show
 
 -- | Options for the constraint solver
 data SolverOptions = SolverOptions
@@ -160,6 +164,9 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ C.AppendSymbol [arg0@(TypeLevelString lhs), arg1@(TypeLevelString rhs), _] =
       let args = [arg0, arg1, TypeLevelString (lhs <> rhs)]
       in [TypeClassDictionaryInScope AppendSymbolInstance [] C.AppendSymbol args Nothing]
+    forClassName _ C.Union [l, r, u]
+      | Just (lOut, rOut, uOut, cst) <- unionRows l r u
+      = [ TypeClassDictionaryInScope UnionInstance [] C.Union [lOut, rOut, uOut] cst ]
     forClassName ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (ordNub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
     forClassName _ _ _ = internalError "forClassName: expected qualified class name"
 
@@ -315,12 +322,16 @@ entails SolverOptions{..} constraint context hints =
             -- Make a dictionary from subgoal dictionaries by applying the correct function
             mkDictionary :: Evidence -> Maybe [Expr] -> m Expr
             mkDictionary (NamedInstance n) args = return $ foldl App (Var n) (fold args)
+            mkDictionary UnionInstance (Just [e]) =
+              -- We need the subgoal dictionary to appear in the term somewhere
+              return $ App (Abs (VarBinder (Ident C.__unused)) valUndefined) e
+            mkDictionary UnionInstance _ = return valUndefined
             mkDictionary (WarnInstance msg) _ = do
               tell . errorMessage $ UserDefinedWarning msg
               -- We cannot call the type class constructor here because Warn is declared in Prim.
               -- This means that it doesn't have a definition that we can import.
-              -- So pass an empty object instead.
-              return $ Literal (ObjectLiteral [])
+              -- So pass an empty placeholder (undefined) instead.
+              return valUndefined
             mkDictionary (IsSymbolInstance sym) _ =
               let fields = [ ("reflectSymbol", Abs (VarBinder (Ident C.__unused)) (Literal (StringLiteral sym))) ] in
               return $ TypeClassDictionaryConstructorApp C.IsSymbol (Literal (ObjectLiteral fields))
@@ -333,6 +344,28 @@ entails SolverOptions{..} constraint context hints =
         subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr
         subclassDictionaryValue dict className index =
           App (Accessor (mkString (superclassName className index)) dict) valUndefined
+
+    -- | Left biased union of two row types
+    unionRows :: Type -> Type -> Type -> Maybe (Type, Type, Type, Maybe [Constraint])
+    unionRows l r _ =
+        guard canMakeProgress $> (l, r, rowFromList out, cons)
+      where
+        (fixed, rest) = rowToList l
+
+        rowVar = TypeVar "r"
+
+        (canMakeProgress, out, cons) =
+          case rest of
+            -- If the left hand side is a closed row, then we can merge
+            -- its labels into the right hand side.
+            REmpty -> (True, (fixed, r), Nothing)
+            -- If the left hand side is not definitely closed, then the only way we
+            -- can safely make progress is to move any known labels from the left
+            -- input into the output, and add a constraint for any remaining labels.
+            -- Otherwise, the left hand tail might contain the same labels as on
+            -- the right hand side, and we can't be certain we won't reorder the
+            -- types for such labels.
+            _ -> (not (null fixed), (fixed, rowVar), Just [ Constraint C.Union [rest, r, rowVar] Nothing ])
 
 -- Check if an instance matches our list of types, allowing for types
 -- to be solved via functional dependencies. If the types match, we return a
