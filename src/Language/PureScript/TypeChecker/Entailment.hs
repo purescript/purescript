@@ -324,14 +324,14 @@ entails SolverOptions{..} constraint context hints =
             mkDictionary (NamedInstance n) args = return $ foldl App (Var n) (fold args)
             mkDictionary UnionInstance (Just [e]) =
               -- We need the subgoal dictionary to appear in the term somewhere
-              return $ App (Abs (VarBinder (Ident C.__unused)) (Literal (ObjectLiteral []))) e
-            mkDictionary UnionInstance _ = return $ Literal (ObjectLiteral [])
+              return $ App (Abs (VarBinder (Ident C.__unused)) valUndefined) e
+            mkDictionary UnionInstance _ = return valUndefined
             mkDictionary (WarnInstance msg) _ = do
               tell . errorMessage $ UserDefinedWarning msg
               -- We cannot call the type class constructor here because Warn is declared in Prim.
               -- This means that it doesn't have a definition that we can import.
-              -- So pass an empty object instead.
-              return $ Literal (ObjectLiteral [])
+              -- So pass an empty placeholder (undefined) instead.
+              return valUndefined
             mkDictionary (IsSymbolInstance sym) _ =
               let fields = [ ("reflectSymbol", Abs (VarBinder (Ident C.__unused)) (Literal (StringLiteral sym))) ] in
               return $ TypeClassDictionaryConstructorApp C.IsSymbol (Literal (ObjectLiteral fields))
