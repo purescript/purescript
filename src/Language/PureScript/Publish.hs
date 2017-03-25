@@ -196,7 +196,7 @@ getVersionFromGitTag = do
 -- | Given a git tag, get the time it was created.
 getTagTime :: Text -> PrepareM UTCTime
 getTagTime tag = do
-  out <- readProcess' "git" ["tag", "-l", T.unpack tag, "--format=%(taggerdate:unix)"] ""
+  out <- readProcess' "git" ["log", "-1", "--format=%ct", T.unpack tag] ""
   case mapMaybe readMaybe (lines out) of
     [t] -> pure . posixSecondsToUTCTime . fromInteger $ t
     _ -> internalError (CouldntParseGitTagDate tag)
