@@ -83,9 +83,9 @@ completionFromMatch (Match (m, IdeDeclarationAnn ann decl)) =
 
     complModule = P.runModuleName m
 
-    complType = maybe complExpandedType prettyPrintTypeSingleLine (annTypeAnnotation ann)
+    complType = maybe complExpandedType prettyPrintTypeSingleLine (_annTypeAnnotation ann)
 
-    complLocation = annLocation ann
+    complLocation = _annLocation ann
 
     complDocumentation = Nothing
 

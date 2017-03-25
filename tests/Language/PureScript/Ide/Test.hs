@@ -47,13 +47,13 @@ ann :: IdeDeclarationAnn -> Annotation -> IdeDeclarationAnn
 ann (IdeDeclarationAnn _ d) a = IdeDeclarationAnn a d
 
 annLoc :: IdeDeclarationAnn -> P.SourceSpan -> IdeDeclarationAnn
-annLoc (IdeDeclarationAnn a d) loc = IdeDeclarationAnn a {annLocation = Just loc} d
+annLoc (IdeDeclarationAnn a d) loc = IdeDeclarationAnn a {_annLocation = Just loc} d
 
 annExp :: IdeDeclarationAnn -> P.ModuleName -> IdeDeclarationAnn
-annExp (IdeDeclarationAnn a d) e = IdeDeclarationAnn a {annExportedFrom = Just e} d
+annExp (IdeDeclarationAnn a d) e = IdeDeclarationAnn a {_annExportedFrom = Just e} d
 
 annTyp :: IdeDeclarationAnn -> P.Type -> IdeDeclarationAnn
-annTyp (IdeDeclarationAnn a d) ta = IdeDeclarationAnn a {annTypeAnnotation = Just ta} d
+annTyp (IdeDeclarationAnn a d) ta = IdeDeclarationAnn a {_annTypeAnnotation = Just ta} d
 
 
 ida :: IdeDeclaration -> IdeDeclarationAnn

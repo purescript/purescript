@@ -144,9 +144,9 @@ annotateModule (defs, types) decls =
       IdeDeclKind i ->
         annotateKind (i ^. properNameT) (IdeDeclKind i)
       where
-        annotateFunction x = IdeDeclarationAnn (ann { annLocation = Map.lookup (IdeNSValue (P.runIdent x)) defs
-                                                    , annTypeAnnotation = Map.lookup x types
+        annotateFunction x = IdeDeclarationAnn (ann { _annLocation = Map.lookup (IdeNSValue (P.runIdent x)) defs
+                                                    , _annTypeAnnotation = Map.lookup x types
                                                     })
-        annotateValue x = IdeDeclarationAnn (ann {annLocation = Map.lookup (IdeNSValue x) defs})
-        annotateType x = IdeDeclarationAnn (ann {annLocation = Map.lookup (IdeNSType x) defs})
-        annotateKind x = IdeDeclarationAnn (ann {annLocation = Map.lookup (IdeNSKind x) defs})
+        annotateValue x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNSValue x) defs})
+        annotateType x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNSType x) defs})
+        annotateKind x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNSKind x) defs})
