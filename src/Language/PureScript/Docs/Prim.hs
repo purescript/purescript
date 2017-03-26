@@ -237,6 +237,12 @@ union = primClass "Union" $ T.unlines
   , "The third type argument represents the union of the first two."
   ]
 
+lookup :: Declaration
+lookup = primClass "Lookup" $ T.unlines
+  [ "The Lookup type class is used to lookup a type in a row of types"
+  , "corresponding to a label."
+  ]
+
 typeConcat :: Declaration
 typeConcat = primType "TypeConcat" $ T.unlines
   [ "The TypeConcat type constructor concatenates two Symbols in a custom type"
