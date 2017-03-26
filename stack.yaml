@@ -1,4 +1,4 @@
-resolver: lts-8.0
+resolver: lts-8.5
 packages:
 - '.'
 extra-deps:
