@@ -68,8 +68,16 @@ tco = everywhere convert where
       = all allInTailPosition body
     allInTailPosition (Throw _ js1)
       = countSelfReferences js1 == 0
-    allInTailPosition _
+    allInTailPosition (ReturnNoResult _)
       = True
+    allInTailPosition (VariableIntroduction _ _ js1)
+      = all ((== 0) . countSelfReferences) js1
+    allInTailPosition (Assignment _ _ js1)
+      = countSelfReferences js1 == 0
+    allInTailPosition (Comment _ _ js1)
+      = allInTailPosition js1
+    allInTailPosition _
+      = False
 
   toLoop :: Text -> [Text] -> AST -> AST
   toLoop ident allArgs js =
