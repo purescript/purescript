@@ -1,5 +1,0 @@
-resolver: lts-8.0
-packages:
-- '.'
-extra-deps:
-- pipes-http-1.0.5
