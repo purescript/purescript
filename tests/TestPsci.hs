@@ -10,6 +10,7 @@ import System.Exit (exitFailure)
 import Test.HUnit
 import TestPsci.CommandTest (commandTests)
 import TestPsci.CompletionTest (completionTests)
+import TestPsci.EvalTest (evalTests)
 
 main :: IO ()
 main = do
@@ -19,4 +20,5 @@ main = do
 allTests :: Test
 allTests = TestList [ completionTests
                     , commandTests
+                    , evalTests
                     ]

@@ -439,7 +439,8 @@ test-suite tests
                    transformers -any,
                    transformers-compat -any,
                    utf8-string -any,
-                   vector -any
+                   vector -any,
+                   split -any
     ghc-options: -Wall
     type: exitcode-stdio-1.0
     main-is: Main.hs
@@ -451,6 +452,7 @@ test-suite tests
                    TestPsci
                    TestPsci.CommandTest
                    TestPsci.CompletionTest
+                   TestPsci.EvalTest
                    TestPsci.TestEnv
                    TestPscIde
                    PscIdeSpec
