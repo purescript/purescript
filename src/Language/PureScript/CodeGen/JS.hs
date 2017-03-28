@@ -9,7 +9,7 @@ module Language.PureScript.CodeGen.JS
 import Prelude.Compat
 import Protolude (ordNub)
 
-import Control.Arrow ((&&&), second)
+import Control.Arrow ((&&&))
 import Control.Monad (forM, replicateM, void)
 import Control.Monad.Except (MonadError, throwError)
 import Control.Monad.Reader (MonadReader, asks)
@@ -329,25 +329,13 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
       valueError s _                        = accessorString "name" . accessorString "constructor" $ AST.Var Nothing s
 
       guardsToJs :: Either [(Guard Ann, Expr Ann)] (Expr Ann) -> m [AST]
-      guardsToJs (Left gs) = snd <$> F.foldrM genGuard (False, []) gs
-        where
-          genGuard (cond, val) (False, js) = second (: js) <$> genCondVal cond val
-          genGuard _ x = pure x
-
-          genCondVal cond val
-            | condIsTrue cond = do
-                js <- AST.Return Nothing <$> valueToJs val
-                return (True, js)
-            | otherwise = do
-                cond' <- valueToJs cond
-                val'   <- valueToJs val
-                return
-                  (False, AST.IfElse Nothing cond'
-                    (AST.Block Nothing [AST.Return Nothing val']) Nothing)
-
-          -- hopefully the inliner did its job and inlined `otherwise`
-          condIsTrue (Literal _ (BooleanLiteral True)) = True
-          condIsTrue _ = False
+      guardsToJs (Left gs) = traverse genGuard gs where
+        genGuard (cond, val) = do
+          cond' <- valueToJs cond
+          val'   <- valueToJs val
+          return
+            (AST.IfElse Nothing cond'
+              (AST.Block Nothing [AST.Return Nothing val']) Nothing)
 
       guardsToJs (Right v) = return . AST.Return Nothing <$> valueToJs v
 
