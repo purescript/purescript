@@ -126,7 +126,7 @@ declAsHtml r d@Declaration{..} = do
   H.div ! A.class_ "decl" ! A.id (v (T.drop 1 declFragment)) $ do
     h3 ! A.class_ "decl__title clearfix" $ do
       a ! A.class_ "decl__anchor" ! A.href (v declFragment) $ "#"
-      text declTitle
+      H.span $ text declTitle
       for_ declSourceSpan (linkToSource r)
 
     H.div ! A.class_ "decl__body" $ do
