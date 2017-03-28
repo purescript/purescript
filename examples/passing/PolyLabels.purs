@@ -19,19 +19,19 @@ foreign import unsafeSet
   -> Record r2
 
 get
-  :: forall r l a
+  :: forall r r' l a
    . IsSymbol l
-  => Lookup l r a
+  => RowCons l a r' r
   => SProxy l
   -> Record r
   -> a
 get l = unsafeGet (reflectSymbol l)
 
 set
-  :: forall r1 r2 l a b
+  :: forall r1 r2 r l a b
    . IsSymbol l
-  => Lookup l r1 a
-  => Lookup l r2 b
+  => RowCons l a r r1
+  => RowCons l b r r2
   => SProxy l
   -> b
   -> Record r1
@@ -39,10 +39,10 @@ set
 set l = unsafeSet (reflectSymbol l)
 
 lens 
-  :: forall l f r1 r2 a b
+  :: forall l f r1 r2 r a b
    . IsSymbol l
-  => Lookup l r1 a
-  => Lookup l r2 b
+  => RowCons l a r r1
+  => RowCons l b r r2
   => Functor f
   => SProxy l
   -> (a -> f b)
@@ -61,5 +61,5 @@ fooLens = lens (SProxy :: SProxy "foo")
 
 main :: Eff (console :: CONSOLE) Unit
 main = do
-  _.foo <$> fooLens logShow { foo: 1 }
+  _ <- fooLens logShow { foo: 1 }
   log (getFoo (setFoo "Done" { foo: 1 }))

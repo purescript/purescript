@@ -26,7 +26,7 @@ primDocsModule = Module
       , fail
       , warn
       , union
-      , rowLookup
+      , rowCons
       , typeConcat
       , typeString
       , kindType
@@ -238,10 +238,11 @@ union = primClass "Union" $ T.unlines
   , "The third type argument represents the union of the first two."
   ]
 
-rowLookup :: Declaration
-rowLookup = primClass "Lookup" $ T.unlines
-  [ "The Lookup type class is used to lookup a type in a row of types"
-  , "corresponding to a label."
+rowCons :: Declaration
+rowCons = primClass "RowCons" $ T.unlines
+  [ "The RowCons type class is a 4-way relation which asserts that one row of"
+  , "types can be obtained from another by inserting a new label/type pair on"
+  , "the left."
   ]
 
 typeConcat :: Declaration
