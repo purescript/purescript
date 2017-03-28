@@ -18,7 +18,7 @@ matrix:
     - os: linux
       dist: trusty
       sudo: required
-      env: BUILD_TYPE=normal STACK_YAML=stack-ghc-8.0.yaml
+      env: BUILD_TYPE=normal
 
     - os: linux
       dist: trusty

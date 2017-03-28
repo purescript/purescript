@@ -1,21 +1,21 @@
 {
   "name": "purescript-test-suite-support",
   "dependencies": {
-    "purescript-arrays": "ps-0.11",
-    "purescript-assert": "ps-0.11",
-    "purescript-console": "ps-0.11",
-    "purescript-eff": "ps-0.11",
-    "purescript-functions": "ps-0.11",
-    "purescript-generics": "ps-0.11",
-    "purescript-generics-rep": "ps-0.11",
-    "purescript-newtype": "ps-0.11",
+    "purescript-arrays": "4.0.0",
+    "purescript-assert": "3.0.0",
+    "purescript-console": "3.0.0",
+    "purescript-eff": "3.0.0",
+    "purescript-functions": "3.0.0",
+    "purescript-generics": "4.0.0",
+    "purescript-generics-rep": "5.0.0",
+    "purescript-newtype": "2.0.0",
     "purescript-partial": "1.2.0",
-    "purescript-prelude": "ps-0.11",
-    "purescript-psci-support": "ps-0.11",
-    "purescript-st": "ps-0.11",
-    "purescript-symbols": "ps-0.11",
-    "purescript-tailrec": "ps-0.11",
-    "purescript-typelevel-prelude": "ps-0.11",
-    "purescript-unsafe-coerce": "ps-0.11"
+    "purescript-prelude": "3.0.0",
+    "purescript-psci-support": "3.0.0",
+    "purescript-st": "3.0.0",
+    "purescript-symbols": "3.0.0",
+    "purescript-tailrec": "3.0.0",
+    "purescript-typelevel-prelude": "2.0.0",
+    "purescript-unsafe-coerce": "3.0.0"
   }
 }
