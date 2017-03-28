@@ -5,6 +5,7 @@ import Prelude.Compat
 
 import           Control.Monad (forM_)
 import           Data.Char (isSpace)
+import           Data.List (dropWhileEnd)
 import           Data.List.Split (splitOn)
 import           System.Directory (getCurrentDirectory)
 import           System.IO.UTF8 (readUTF8File)
@@ -35,8 +36,7 @@ evalTest f = do
       _ -> run line
 
 trim :: String -> String
-trim = f . f
-  where f = reverse . dropWhile isSpace
+trim = dropWhile isSpace . dropWhileEnd isSpace
 
 trimAndFilter :: [String] -> [String]
 trimAndFilter = filter (not . null) . map trim
