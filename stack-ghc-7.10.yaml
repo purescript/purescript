@@ -1,0 +1,7 @@
+resolver: lts-6.25
+packages:
+- '.'
+extra-deps:
+- aeson-better-errors-0.9.1.0
+- bower-json-1.0.0.1
+- optparse-applicative-0.13.0.0

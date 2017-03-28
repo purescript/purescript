@@ -1,7 +1,5 @@
-resolver: lts-6.25
+resolver: lts-8.5
 packages:
 - '.'
 extra-deps:
-- aeson-better-errors-0.9.1.0
-- bower-json-1.0.0.1
-- optparse-applicative-0.13.0.0
+- pipes-http-1.0.5
