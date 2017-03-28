@@ -1,3 +1,5 @@
+{-# LANGUAGE GADTs #-}
+
 -- | This module implements tail call elimination.
 module Language.PureScript.CoreImp.Optimizer.TCO (tco) where
 
@@ -6,10 +8,9 @@ import Prelude.Compat
 import Data.Text (Text)
 import Data.Monoid ((<>))
 import Language.PureScript.CoreImp.AST
-import Language.PureScript.AST.SourcePos (SourceSpan)
 
 -- | Eliminate tail calls
-tco :: AST -> AST
+tco :: AST ty ann -> AST ty ann
 tco = everywhere convert where
   tcoVar :: Text -> Text
   tcoVar arg = "__tco_" <> arg
@@ -26,33 +27,34 @@ tco = everywhere convert where
   tcoResult :: Text
   tcoResult = tcoVar "result"
 
-  convert :: AST -> AST
-  convert (VariableIntroduction ss name (Just fn@Function {}))
+  convert :: AST ty ann -> AST ty ann
+  convert (VariableIntroduction ss name (Just fn@Function{}))
       | isTailRecursive name body'
-      = VariableIntroduction ss name (Just (replace (toLoop name allArgs body')))
+      = VariableIntroduction ss name (Just (replace (toLoop ss name allArgs body')))
     where
-      (argss, body', replace) = collectAllFunctionArgs [] id fn
+      (argss, body', replace) = collectAllFunctionArgs fn
       allArgs = concat $ reverse argss
   convert js = js
 
-  collectAllFunctionArgs :: [[Text]] -> (AST -> AST) -> AST -> ([[Text]], AST, AST -> AST)
-  collectAllFunctionArgs allArgs f (Function s1 ident args (Block s2 (body@(Return _ _):_))) =
-    collectAllFunctionArgs (args : allArgs) (\b -> f (Function s1 ident (map copyVar args) (Block s2 [b]))) body
-  collectAllFunctionArgs allArgs f (Function ss ident args body@(Block _ _)) =
-    (args : allArgs, body, f . Function ss ident (map copyVar args))
-  collectAllFunctionArgs allArgs f (Return s1 (Function s2 ident args (Block s3 [body]))) =
-    collectAllFunctionArgs (args : allArgs) (\b -> f (Return s1 (Function s2 ident (map copyVar args) (Block s3 [b])))) body
-  collectAllFunctionArgs allArgs f (Return s1 (Function s2 ident args body@(Block _ _))) =
-    (args : allArgs, body, f . Return s1 . Function s2 ident (map copyVar args))
-  collectAllFunctionArgs allArgs f body = (allArgs, body, f)
+  collectAllFunctionArgs
+    :: AST 'Expression ann
+    -> ([[Text]], AST 'Statement ann, AST 'Statement ann -> AST 'Expression ann)
+  collectAllFunctionArgs (Function s1 ident args (Block s2 [Return s3 fn@Function{}])) =
+    let (argss, body, replace) = collectAllFunctionArgs fn
+    in (argss ++ [args], body, \b -> Function s1 ident (map copyVar args) (Block s2 [Return s3 (replace b)]))
+  collectAllFunctionArgs (Function ss ident args body) =
+    ([args], body, Function ss ident (map copyVar args))
+  collectAllFunctionArgs _ = error "collectAllFunctionArgs: expected Function"
 
-  isTailRecursive :: Text -> AST -> Bool
+  isTailRecursive :: forall ty ann. Text -> AST ty ann -> Bool
   isTailRecursive ident js = countSelfReferences js > 0 && allInTailPosition js where
+    countSelfReferences :: forall ty1. AST ty1 ann -> Int
     countSelfReferences = everything (+) match where
-      match :: AST -> Int
+      match :: forall ty2. AST ty2 ann -> Int
       match (Var _ ident') | ident == ident' = 1
       match _ = 0
 
+    allInTailPosition :: forall ty1. AST ty1 ann -> Bool
     allInTailPosition (Return _ expr)
       | isSelfCall ident expr = countSelfReferences expr == 1
       | otherwise = countSelfReferences expr == 0
@@ -79,8 +81,8 @@ tco = everywhere convert where
     allInTailPosition _
       = False
 
-  toLoop :: Text -> [Text] -> AST -> AST
-  toLoop ident allArgs js =
+  toLoop :: ann -> Text -> [Text] -> AST 'Statement ann -> AST 'Statement ann
+  toLoop rootSS ident allArgs js =
       Block rootSS $
         map (\arg -> VariableIntroduction rootSS arg (Just (Var rootSS (copyVar arg)))) allArgs ++
         [ VariableIntroduction rootSS tcoDone (Just (BooleanLiteral rootSS False))
@@ -88,7 +90,9 @@ tco = everywhere convert where
         ] ++
         map (\arg ->
           VariableIntroduction rootSS (tcoVar arg) Nothing) allArgs ++
-        [ Function rootSS (Just tcoLoop) allArgs (Block rootSS [loopify js])
+        [ VariableIntroduction rootSS tcoLoop
+            (Just (Function rootSS (Just tcoLoop) allArgs
+              (Block rootSS [loopify js])))
         , While rootSS (Unary rootSS Not (Var rootSS tcoDone))
             (Block rootSS
               (Assignment rootSS (Var rootSS tcoResult) (App rootSS (Var rootSS tcoLoop) (map (Var rootSS) allArgs))
@@ -97,35 +101,33 @@ tco = everywhere convert where
         , Return rootSS (Var rootSS tcoResult)
         ]
     where
-    rootSS = Nothing
+      loopify :: AST ty ann -> AST ty ann
+      loopify (Return ss ret)
+        | isSelfCall ident ret =
+          let
+            allArgumentValues = concat $ collectArgs [] ret
+          in
+            Block ss $
+              zipWith (\val arg ->
+                Assignment ss (Var ss (tcoVar arg)) val) allArgumentValues allArgs
+              ++ [ ReturnNoResult ss ]
+        | otherwise = Block ss [ markDone ss, Return ss ret ]
+      loopify (ReturnNoResult ss) = Block ss [ markDone ss, ReturnNoResult ss ]
+      loopify (While ss cond body) = While ss cond (loopify body)
+      loopify (For ss i js1 js2 body) = For ss i js1 js2 (loopify body)
+      loopify (ForIn ss i js1 body) = ForIn ss i js1 (loopify body)
+      loopify (IfElse ss cond body el) = IfElse ss cond (loopify body) (fmap loopify el)
+      loopify (Block ss body) = Block ss (map loopify body)
+      loopify other = other
 
-    loopify :: AST -> AST
-    loopify (Return ss ret)
-      | isSelfCall ident ret =
-        let
-          allArgumentValues = concat $ collectArgs [] ret
-        in
-          Block ss $
-            zipWith (\val arg ->
-              Assignment ss (Var ss (tcoVar arg)) val) allArgumentValues allArgs
-            ++ [ ReturnNoResult ss ]
-      | otherwise = Block ss [ markDone ss, Return ss ret ]
-    loopify (ReturnNoResult ss) = Block ss [ markDone ss, ReturnNoResult ss ]
-    loopify (While ss cond body) = While ss cond (loopify body)
-    loopify (For ss i js1 js2 body) = For ss i js1 js2 (loopify body)
-    loopify (ForIn ss i js1 body) = ForIn ss i js1 (loopify body)
-    loopify (IfElse ss cond body el) = IfElse ss cond (loopify body) (fmap loopify el)
-    loopify (Block ss body) = Block ss (map loopify body)
-    loopify other = other
+      markDone :: ann -> AST 'Statement ann
+      markDone ss = Assignment ss (Var ss tcoDone) (BooleanLiteral ss True)
 
-    markDone :: Maybe SourceSpan -> AST
-    markDone ss = Assignment ss (Var ss tcoDone) (BooleanLiteral ss True)
+      collectArgs :: [[AST ty ann]] -> AST ty ann -> [[AST ty ann]]
+      collectArgs acc (App _ fn args') = collectArgs (args' : acc) fn
+      collectArgs acc _ = acc
 
-    collectArgs :: [[AST]] -> AST -> [[AST]]
-    collectArgs acc (App _ fn args') = collectArgs (args' : acc) fn
-    collectArgs acc _ = acc
-
-  isSelfCall :: Text -> AST -> Bool
+  isSelfCall :: Text -> AST ty ann -> Bool
   isSelfCall ident (App _ (Var _ ident') _) = ident == ident'
   isSelfCall ident (App _ fn _) = isSelfCall ident fn
   isSelfCall _ _ = False
