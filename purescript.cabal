@@ -433,14 +433,14 @@ test-suite tests
                    process -any,
                    protolude >= 0.1.6,
                    silently -any,
+                   split -any,
                    stm -any,
                    text -any,
                    time -any,
                    transformers -any,
                    transformers-compat -any,
                    utf8-string -any,
-                   vector -any,
-                   split -any
+                   vector -any
     ghc-options: -Wall
     type: exitcode-stdio-1.0
     main-is: Main.hs
