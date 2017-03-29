@@ -384,6 +384,9 @@ pattern Warn = Qualified (Just Prim) (ProperName "Warn")
 pattern Union :: Qualified (ProperName 'ClassName)
 pattern Union = Qualified (Just Prim) (ProperName "Union")
 
+pattern RowCons :: Qualified (ProperName 'ClassName)
+pattern RowCons = Qualified (Just Prim) (ProperName "RowCons")
+
 typ :: forall a. (IsString a) => a
 typ = "Type"
 

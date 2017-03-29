@@ -327,6 +327,7 @@ primTypes =
     , (primName "Boolean",    (kindType, ExternData))
     , (primName "Partial",    (kindType, ExternData))
     , (primName "Union",      (FunKind (Row kindType) (FunKind (Row kindType) (FunKind (Row kindType) kindType)), ExternData))
+    , (primName "RowCons",    (FunKind kindSymbol (FunKind kindType (FunKind (Row kindType) (FunKind (Row kindType) kindType))), ExternData))
     , (primName "Fail",       (FunKind kindSymbol kindType, ExternData))
     , (primName "Warn",       (FunKind kindSymbol kindType, ExternData))
     , (primName "TypeString", (FunKind kindType kindSymbol, ExternData))
@@ -354,6 +355,16 @@ primClasses =
                              [ FunctionalDependency [0, 1] [2]
                              , FunctionalDependency [1, 2] [0]
                              , FunctionalDependency [2, 0] [1]
+                             ]))
+    -- class RowCons (l :: Symbol) (a :: Type) (i :: # Type) (o :: # Type) | l i a -> o, l o -> a i
+    , (primName "RowCons", (makeTypeClassData
+                             [ ("l", Just kindSymbol)
+                             , ("a", Just (Row kindType))
+                             , ("i", Just kindType)
+                             , ("o", Just kindType)
+                             ] [] []
+                             [ FunctionalDependency [0, 1, 2] [3]
+                             , FunctionalDependency [0, 3] [1, 2]
                              ]))
     ]
 

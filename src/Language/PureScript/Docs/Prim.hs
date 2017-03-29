@@ -26,6 +26,7 @@ primDocsModule = Module
       , fail
       , warn
       , union
+      , rowCons
       , typeConcat
       , typeString
       , kindType
@@ -235,6 +236,13 @@ union = primClass "Union" $ T.unlines
   , "(left-biased, including duplicates)."
   , ""
   , "The third type argument represents the union of the first two."
+  ]
+
+rowCons :: Declaration
+rowCons = primClass "RowCons" $ T.unlines
+  [ "The RowCons type class is a 4-way relation which asserts that one row of"
+  , "types can be obtained from another by inserting a new label/type pair on"
+  , "the left."
   ]
 
 typeConcat :: Declaration

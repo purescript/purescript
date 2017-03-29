@@ -55,7 +55,9 @@ data Evidence
   | AppendSymbolInstance
   -- ^ Computed instance of AppendSymbol
   | UnionInstance
-  -- ^ Computed instance of RowUnion
+  -- ^ Computed instance of Union
+  | ConsInstance
+  -- ^ Computed instance of RowCons
   deriving (Show, Eq)
 
 -- | Extract the identifier of a named instance
@@ -167,6 +169,8 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ C.Union [l, r, u]
       | Just (lOut, rOut, uOut, cst) <- unionRows l r u
       = [ TypeClassDictionaryInScope UnionInstance [] C.Union [lOut, rOut, uOut] cst ]
+    forClassName _ C.RowCons [TypeLevelString sym, ty, r, _]
+      = [ TypeClassDictionaryInScope ConsInstance [] C.RowCons [TypeLevelString sym, ty, r, RCons (Label sym) ty r] Nothing ]
     forClassName ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (ordNub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
     forClassName _ _ _ = internalError "forClassName: expected qualified class name"
 
@@ -326,6 +330,7 @@ entails SolverOptions{..} constraint context hints =
               -- We need the subgoal dictionary to appear in the term somewhere
               return $ App (Abs (VarBinder (Ident C.__unused)) valUndefined) e
             mkDictionary UnionInstance _ = return valUndefined
+            mkDictionary ConsInstance _ = return valUndefined
             mkDictionary (WarnInstance msg) _ = do
               tell . errorMessage $ UserDefinedWarning msg
               -- We cannot call the type class constructor here because Warn is declared in Prim.
