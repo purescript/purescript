@@ -5,8 +5,7 @@ import Prelude.Compat
 
 import           Control.Monad (forM_, foldM_)
 import           Control.Monad.IO.Class (liftIO)
-import           Data.Char (isSpace)
-import           Data.List (dropWhileEnd, isPrefixOf, intercalate)
+import           Data.List (isPrefixOf, intercalate)
 import           Data.List.Split (splitOn)
 import           System.Directory (getCurrentDirectory)
 import           System.Exit (exitFailure)
@@ -28,28 +27,37 @@ evalTestFiles = do
   let psciExamples = cwd </> "examples" </> "psci"
   Glob.globDir1 (Glob.compile "**/*.purs") psciExamples
 
+data EvalLine = Line String
+              | Comment EvalContext
+              | Empty
+              | Invalid String
+              deriving (Show)
+
+data EvalContext = ShouldEvaluateTo String
+                 | None
+                 deriving (Show)
+
+evalCommentPrefix :: String
+evalCommentPrefix = "-- @"
+
+parseEvalLine :: String -> EvalLine
+parseEvalLine "" = Empty
+parseEvalLine line
+  | evalCommentPrefix `isPrefixOf` line =
+    case splitOn " " $ drop (length evalCommentPrefix) line of
+      "shouldEvaluateTo" : args -> Comment (ShouldEvaluateTo $ intercalate " " args)
+      _ -> Invalid line
+  | otherwise = Line line
+
 evalTest :: FilePath -> IO ()
 evalTest f = do
   putStrLn $ "  " ++ takeFileName f
-  ls <- trimAndFilter . lines <$> readUTF8File f
-  execTestPSCi $ foldM_ go Nothing ls
-  where
-  go :: Maybe String -> String -> TestPSCi (Maybe String)
-  go (Just expected) line = line `evaluatesTo` expected >> pure Nothing
-  go Nothing         line =
-    if "-- @" `isPrefixOf` line
-    then
-      case trimAndFilter $ splitOn " " $ drop 4 line of
-        "shouldEvaluateTo" : results ->
-          pure . Just $ intercalate " " results
-        _ -> liftIO $ do
-          putStrLn $ "invalid comment: " ++ line
-          exitFailure
-    else
-      run line >> pure Nothing
+  evalLines <- map parseEvalLine . lines <$> readUTF8File f
+  execTestPSCi $ foldM_ handleLine None evalLines
 
-trim :: String -> String
-trim = dropWhile isSpace . dropWhileEnd isSpace
-
-trimAndFilter :: [String] -> [String]
-trimAndFilter = filter (not . null) . map trim
+handleLine :: EvalContext -> EvalLine -> TestPSCi EvalContext
+handleLine context Empty = pure context
+handleLine None (Line stmt) = run stmt >> pure None
+handleLine None (Comment context) = pure context
+handleLine (ShouldEvaluateTo expected) (Line expr) = expr `evaluatesTo` expected >> pure None
+handleLine _ line = liftIO $ putStrLn ("unexpected: " ++ show line) >> exitFailure
