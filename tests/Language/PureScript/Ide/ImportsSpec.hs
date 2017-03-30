@@ -56,9 +56,6 @@ listImport = testParseImport "import Data.List as List"
 consoleImport = testParseImport "import Control.Monad.Eff.Console (log) as Console"
 maybeImport = testParseImport "import Data.Maybe (Maybe(Just))"
 
-wildcard :: P.Type
-wildcard = P.TypeWildcard $ P.SourceSpan "" (P.SourcePos 0 0) (P.SourcePos 0 0)
-
 spec :: Spec
 spec = do
   describe "determining the importsection" $ do
@@ -104,13 +101,13 @@ spec = do
   describe "import commands" $ do
     let simpleFileImports = let (_, _, i, _) = splitSimpleFile in i
         addValueImport i mn is =
-          prettyPrintImportSection (addExplicitImport' (IdeDeclValue (IdeValue (P.Ident i) wildcard)) mn is)
+          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideValue i Nothing)) mn is)
         addOpImport op mn is =
-          prettyPrintImportSection (addExplicitImport' (IdeDeclValueOperator (IdeValueOperator op (P.Qualified Nothing (Left (P.Ident ""))) 2 P.Infix Nothing)) mn is)
+          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideValueOp op (P.Qualified Nothing (Left "")) 2 Nothing Nothing)) mn is)
         addDtorImport i t mn is =
-          prettyPrintImportSection (addExplicitImport' (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName i) t wildcard)) mn is)
+          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideDtor i t Nothing)) mn is)
         addTypeImport i mn is =
-          prettyPrintImportSection (addExplicitImport' (IdeDeclType (IdeType (P.ProperName i) P.kindType)) mn is)
+          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideType i Nothing)) mn is)
     it "adds an implicit unqualified import to a file without any imports" $
       shouldBe
         (addImplicitImport' [] (P.moduleNameFromString "Data.Map"))
@@ -144,7 +141,7 @@ spec = do
         ]
     it "adds an operator to an explicit import list" $
       shouldBe
-        (addOpImport (P.OpName "<~>") (P.moduleNameFromString "Data.Array") explicitImports)
+        (addOpImport "<~>" (P.moduleNameFromString "Data.Array") explicitImports)
         [ "import Prelude"
         , "import Data.Array (tail, (<~>))"
         ]
@@ -156,21 +153,21 @@ spec = do
           ]
     it "adds the type for a given DataConstructor" $
         shouldBe
-          (addDtorImport "Just" (P.ProperName "Maybe") (P.moduleNameFromString "Data.Maybe") simpleFileImports)
+          (addDtorImport "Just" "Maybe" (P.moduleNameFromString "Data.Maybe") simpleFileImports)
           [ "import Prelude"
           , "import Data.Maybe (Maybe(..))"
           ]
     it "adds a dataconstructor to an existing type import" $ do
       let Right (_, _, typeImports, _) = sliceImportSection (withImports ["import Data.Maybe (Maybe)"])
       shouldBe
-        (addDtorImport "Just" (P.ProperName "Maybe") (P.moduleNameFromString "Data.Maybe") typeImports)
+        (addDtorImport "Just" "Maybe" (P.moduleNameFromString "Data.Maybe") typeImports)
         [ "import Prelude"
         , "import Data.Maybe (Maybe(..))"
         ]
     it "doesn't add a dataconstructor to an existing type import with open dtors" $ do
       let Right (_, _, typeImports, _) = sliceImportSection (withImports ["import Data.Maybe (Maybe(..))"])
       shouldBe
-        (addDtorImport "Just" (P.ProperName "Maybe") (P.moduleNameFromString "Data.Maybe") typeImports)
+        (addDtorImport "Just" "Maybe" (P.moduleNameFromString "Data.Maybe") typeImports)
         [ "import Prelude"
         , "import Data.Maybe (Maybe(..))"
         ]
@@ -186,10 +183,10 @@ spec = do
     let Right (_, _, baseImports, _) = sliceImportSection $ withImports ["import Control.Monad (ap)"]
         moduleName = (P.moduleNameFromString "Control.Monad")
         addImport imports import' = addExplicitImport' import' moduleName imports
-        valueImport ident = (IdeDeclValue (IdeValue (P.Ident ident) wildcard))
-        typeImport name = (IdeDeclType (IdeType (P.ProperName name) P.kindType))
-        classImport name = (IdeDeclTypeClass (IdeTypeClass (P.ProperName name) []))
-        dtorImport name typeName = (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName name) (P.ProperName typeName) wildcard))
+        valueImport ident = _idaDeclaration (Test.ideValue ident Nothing)
+        typeImport name = _idaDeclaration (Test.ideType name Nothing)
+        classImport name = _idaDeclaration (Test.ideTypeClass name P.kindType [])
+        dtorImport name typeName = _idaDeclaration (Test.ideDtor name typeName Nothing)
         -- expect any list of provided identifiers, when imported, to come out as specified
         expectSorted imports expected = shouldBe
           (ordNub $ map
