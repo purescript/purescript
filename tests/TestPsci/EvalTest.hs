@@ -34,6 +34,7 @@ data EvalLine = Line String
               deriving (Show)
 
 data EvalContext = ShouldEvaluateTo String
+                 | Paste [String]
                  | None
                  deriving (Show)
 
@@ -46,6 +47,7 @@ parseEvalLine line
   | evalCommentPrefix `isPrefixOf` line =
     case splitOn " " $ drop (length evalCommentPrefix) line of
       "shouldEvaluateTo" : args -> Comment (ShouldEvaluateTo $ intercalate " " args)
+      "paste" : [] -> Comment (Paste [])
       _ -> Invalid line
   | otherwise = Line line
 
@@ -60,4 +62,6 @@ handleLine context Empty = pure context
 handleLine None (Line stmt) = run stmt >> pure None
 handleLine None (Comment context) = pure context
 handleLine (ShouldEvaluateTo expected) (Line expr) = expr `evaluatesTo` expected >> pure None
+handleLine (Paste ls) (Line l) = pure . Paste $ ls ++ [l]
+handleLine (Paste ls) (Comment (Paste _)) = run (intercalate "\n" ls) >> pure None
 handleLine _ line = liftIO $ putStrLn ("unexpected: " ++ show line) >> exitFailure
