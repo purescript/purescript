@@ -5,7 +5,7 @@ import Prelude.Compat
 
 import           Control.Monad (forM_, foldM_)
 import           Control.Monad.IO.Class (liftIO)
-import           Data.List (isPrefixOf, intercalate)
+import           Data.List (stripPrefix, intercalate)
 import           Data.List.Split (splitOn)
 import           System.Directory (getCurrentDirectory)
 import           System.Exit (exitFailure)
@@ -42,13 +42,14 @@ evalCommentPrefix = "-- @"
 
 parseEvalLine :: String -> EvalLine
 parseEvalLine "" = Empty
-parseEvalLine line
-  | evalCommentPrefix `isPrefixOf` line =
-    case splitOn " " $ drop (length evalCommentPrefix) line of
-      "shouldEvaluateTo" : args -> Comment (ShouldEvaluateTo $ intercalate " " args)
-      "paste" : [] -> Comment (Paste [])
-      _ -> Invalid line
-  | otherwise = Line line
+parseEvalLine line =
+  case stripPrefix evalCommentPrefix line of
+    Just rest ->
+      case splitOn " " rest of
+        "shouldEvaluateTo" : args -> Comment (ShouldEvaluateTo $ intercalate " " args)
+        "paste" : [] -> Comment (Paste [])
+        _ -> Invalid line
+    Nothing -> Line line
 
 evalTest :: FilePath -> Spec
 evalTest f = specify (takeFileName f) $ do
