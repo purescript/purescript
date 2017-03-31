@@ -1,0 +1,155 @@
+name: purescript
+version: '0.11.1'
+synopsis: PureScript Programming Language Compiler
+description: A small strongly, statically typed programming language with expressive
+  types, inspired by Haskell and compiling to JavaScript.
+category: Language
+author: >
+  Phil Freeman <paf31@cantab.net>,
+  Gary Burgess <gary.burgess@gmail.com>,
+  Hardy Jones <jones3.hardy@gmail.com>,
+  Harry Garrood <harry@garrood.me>,
+  Christoph Hegemann <christoph.hegemann1337@gmail.com>
+maintainer: Phil Freeman <paf31@cantab.net>
+copyright: (c) 2013-16 Phil Freeman, (c) 2014-16 Gary Burgess
+license: BSD3
+github: purescript/purescript.git
+homepage: http://www.purescript.org/
+extra-source-files:
+  - examples/**/*.js
+  - examples/**/*.purs
+  - examples/**/*.json
+  - app/static/*
+  - tests/support/*.json
+  - tests/support/setup-win.cmd
+  - tests/support/psci/*.purs
+  - tests/support/pscide/src/*.purs
+  - tests/support/pscide/src/*.js
+  - tests/support/pscide/src/*.fail
+  - stack.yaml
+  - README.md
+  - INSTALL.md
+  - CONTRIBUTORS.md
+  - CONTRIBUTING.md
+dependencies:
+  - aeson >=0.8 && <1.1
+  - aeson-better-errors >=0.8
+  - ansi-terminal >=0.6.2 && <0.7
+  - base >=4.8 && <5
+  - base-compat >=0.6.0
+  - blaze-html >=0.8.1 && <0.9
+  - bower-json >=1.0.0.1 && <1.1
+  - boxes >=0.1.4 && <0.2.0
+  - bytestring
+  - cheapskate >=0.1 && <0.2
+  - clock
+  - containers
+  - data-ordlist >=0.4.7.0
+  - deepseq
+  - directory >=1.2
+  - dlist
+  - edit-distance
+  - filepath
+  - fsnotify >=0.2.1
+  - Glob >=0.7 && <0.8
+  - haskeline >=0.7.0.0
+  - http-client >=0.4.30 && <0.6.0
+  - http-types
+  - language-javascript >=0.6.0.9 && <0.7
+  - lens ==4.*
+  - lifted-base >=0.2.3 && <0.2.4
+  - monad-control >=1.0.0.0 && <1.1
+  - monad-logger >=0.3 && <0.4
+  - mtl >=2.1.0 && <2.3.0
+  - parallel >=3.2 && <3.3
+  - parsec >=3.1.10
+  - pattern-arrows >=0.0.2 && <0.1
+  - pipes >=4.0.0 && <4.4.0
+  - pipes-http
+  - process >=1.2.0 && <1.5
+  - protolude >=0.1.6
+  - regex-tdfa
+  - safe >=0.3.9 && <0.4
+  - scientific >=0.3.4.9 && <0.4
+  - semigroups >=0.16.2 && <0.19
+  - sourcemap >=0.1.6
+  - spdx ==0.2.*
+  - split
+  - stm >=0.2.4.0
+  - syb
+  - text
+  - time
+  - transformers >=0.3.0 && <0.6
+  - transformers-base >=0.4.0 && <0.5
+  - transformers-compat >=0.3.0
+  - unordered-containers
+  - utf8-string >=1 && <2
+  - vector
+
+library:
+  source-dirs: src
+  ghc-options: -Wall -O2
+  other-modules: Paths_purescript
+  default-extensions:
+    - ConstraintKinds
+    - DataKinds
+    - DeriveFunctor
+    - EmptyDataDecls
+    - FlexibleContexts
+    - KindSignatures
+    - LambdaCase
+    - MultiParamTypeClasses
+    - NoImplicitPrelude
+    - PatternGuards
+    - PatternSynonyms
+    - RankNTypes
+    - RecordWildCards
+    - OverloadedStrings
+    - ScopedTypeVariables
+    - TupleSections
+    - ViewPatterns
+
+executables:
+  purs:
+    main: Main.hs
+    source-dirs: app
+    ghc-options: -Wall -O2 -fno-warn-unused-do-bind -threaded -rtsopts -with-rtsopts=-N
+    dependencies:
+      - ansi-wl-pprint
+      - file-embed
+      - network
+      - optparse-applicative >=0.13.0
+      - purescript
+      - wai ==3.*
+      - wai-websockets ==3.*
+      - warp ==3.*
+      - websockets >=0.9 && <0.11
+    when:
+    - condition: flag(release)
+      then:
+        cpp-options: -DRELEASE
+      else:
+        dependencies:
+        - gitrev >=1.2.0 && <1.3
+
+tests:
+  tests:
+    main: Main.hs
+    source-dirs: tests
+    ghc-options: -Wall
+    dependencies:
+    - purescript
+    - hspec
+    - hspec-discover
+    - HUnit
+    - silently
+
+flags:
+  release:
+    description: >
+        Mark this build as a release build: prevents inclusion of extra
+        info e.g. commit SHA in --version output)
+    manual: false
+    default: false
+
+stability: experimental
