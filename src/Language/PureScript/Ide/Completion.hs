@@ -3,11 +3,14 @@ module Language.PureScript.Ide.Completion
        , getExactMatches
        ) where
 
-import           Protolude
+import           Protolude hiding ((&), to, from)
 
+import           Control.Lens
+import qualified Data.Map.Strict as Map
 import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Types
+import           Language.PureScript.Ide.Util
 import qualified Language.PureScript as P
 
 type Module = (P.ModuleName, [IdeDeclarationAnn])

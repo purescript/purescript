@@ -26,6 +26,7 @@ import qualified Language.PureScript                as P
 import qualified Language.PureScript.Ide.CaseSplit  as CS
 import           Language.PureScript.Ide.Command
 import           Language.PureScript.Ide.Completion
+import           Language.PureScript.Ide.Completion.Formatter
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Externs
 import           Language.PureScript.Ide.Filter
@@ -56,8 +57,8 @@ handleCommand c = case c of
     loadModulesSync modules
   Type search filters currentModule ->
     findType search filters currentModule
-  Complete filters matcher currentModule ->
-    findCompletions filters matcher currentModule
+  Complete filters matcher formatter currentModule ->
+    findCompletions filters matcher formatter currentModule
   Pursuit query Package ->
     findPursuitPackages query
   Pursuit query Identifier ->
@@ -80,7 +81,7 @@ handleCommand c = case c of
     case rs of
       Right rs' -> answerRequest outfp rs'
       Left question ->
-        pure (CompletionResult (map (completionFromMatch . map withEmptyAnn) question))
+        pure (CompletionResult (runFormatter defaultFormatter (map (map withEmptyAnn) question)))
   Rebuild file ->
     rebuildFileAsync file
   RebuildSync file ->
@@ -92,17 +93,26 @@ handleCommand c = case c of
   Quit ->
     liftIO exitSuccess
 
-findCompletions :: Ide m =>
-                   [Filter] -> Matcher IdeDeclarationAnn -> Maybe P.ModuleName -> m Success
-findCompletions filters matcher currentModule = do
+findCompletions
+  :: (Ide m, MonadError IdeError m)
+  => [Filter]
+  -> Matcher IdeDeclarationAnn
+  -> CompletionFormatter
+  -> Maybe P.ModuleName
+  -> m Success
+findCompletions filters matcher formatter currentModule = do
   modules <- getAllModules currentModule
-  pure . CompletionResult . map completionFromMatch . getCompletions filters matcher $ modules
+  pure . CompletionResult . runFormatter formatter . getCompletions filters matcher $ modules
 
-findType :: Ide m =>
-            Text -> [Filter] -> Maybe P.ModuleName -> m Success
+findType
+  :: Ide m
+  => Text
+  -> [Filter]
+  -> Maybe P.ModuleName
+  -> m Success
 findType search filters currentModule = do
   modules <- getAllModules currentModule
-  pure . CompletionResult . map completionFromMatch . getExactMatches search filters $ modules
+  pure . CompletionResult . runFormatter defaultFormatter . getExactMatches search filters $ modules
 
 findPursuitCompletions :: MonadIO m =>
                           PursuitQuery -> m Success

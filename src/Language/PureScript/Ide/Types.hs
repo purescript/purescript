@@ -182,6 +182,7 @@ newtype Match a = Match (P.ModuleName, a)
 -- | A completion as it gets sent to the editors
 data Completion = Completion
   { complModule        :: Text
+  , complReexports     :: Maybe [Text]
   , complIdentifier    :: Text
   , complType          :: Text
   , complExpandedType  :: Text
@@ -192,6 +193,7 @@ data Completion = Completion
 instance ToJSON Completion where
   toJSON (Completion {..}) =
     object [ "module" .= complModule
+           , "reexports" .= complReexports
            , "identifier" .= complIdentifier
            , "type" .= complType
            , "expandedType" .= complExpandedType
