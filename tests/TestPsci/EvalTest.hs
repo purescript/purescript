@@ -12,13 +12,12 @@ import           System.Exit (exitFailure)
 import           System.FilePath ((</>), takeFileName)
 import qualified System.FilePath.Glob as Glob
 import           System.IO.UTF8 (readUTF8File)
-import           Test.HUnit
+import           Test.Hspec
 import           TestPsci.TestEnv
 
-evalTests :: Test
-evalTests = TestLabel "evalTests" . TestCase $ do
-  putStrLn "\nPSCi eval test suites"
-  testFiles <- evalTestFiles
+evalTests :: Spec
+evalTests = context "evalTests" $ do
+  testFiles <- runIO evalTestFiles
   forM_ testFiles evalTest
 
 evalTestFiles :: IO [FilePath]
@@ -51,16 +50,15 @@ parseEvalLine line
       _ -> Invalid line
   | otherwise = Line line
 
-evalTest :: FilePath -> IO ()
-evalTest f = do
-  putStrLn $ "  " ++ takeFileName f
+evalTest :: FilePath -> Spec
+evalTest f = specify (takeFileName f) $ do
   evalLines <- map parseEvalLine . lines <$> readUTF8File f
   execTestPSCi $ foldM_ handleLine None evalLines
 
 handleLine :: EvalContext -> EvalLine -> TestPSCi EvalContext
-handleLine context Empty = pure context
+handleLine ctx Empty = pure ctx
 handleLine None (Line stmt) = run stmt >> pure None
-handleLine None (Comment context) = pure context
+handleLine None (Comment ctx) = pure ctx
 handleLine (ShouldEvaluateTo expected) (Line expr) = expr `evaluatesTo` expected >> pure None
 handleLine (Paste ls) (Line l) = pure . Paste $ ls ++ [l]
 handleLine (Paste ls) (Comment (Paste _)) = run (intercalate "\n" ls) >> pure None
