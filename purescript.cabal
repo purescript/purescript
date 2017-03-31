@@ -433,6 +433,7 @@ test-suite tests
                    process -any,
                    protolude >= 0.1.6,
                    silently -any,
+                   split -any,
                    stm -any,
                    text -any,
                    time -any,
@@ -451,6 +452,7 @@ test-suite tests
                    TestPsci
                    TestPsci.CommandTest
                    TestPsci.CompletionTest
+                   TestPsci.EvalTest
                    TestPsci.TestEnv
                    TestPscIde
                    PscIdeSpec

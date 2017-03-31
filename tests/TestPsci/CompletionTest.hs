@@ -3,8 +3,9 @@ module TestPsci.CompletionTest where
 import Prelude ()
 import Prelude.Compat
 
-import Test.HUnit
+import Test.Hspec
 
+import           Control.Monad (mapM_)
 import           Control.Monad.Trans.State.Strict (evalStateT)
 import           Data.List (sort)
 import qualified Data.Text as T
@@ -14,10 +15,9 @@ import           System.Console.Haskeline
 import           TestPsci.TestEnv (initTestPSCiEnv)
 import           TestUtils (supportModules)
 
-completionTests :: Test
-completionTests =
-  TestLabel "completionTests"
-    (TestList (map (TestCase . assertCompletedOk) completionTestData))
+completionTests :: Spec
+completionTests = context "completionTests" $
+  mapM_ assertCompletedOk completionTestData
 
 -- If the cursor is at the right end of the line, with the 1st element of the
 -- pair as the text in the line, then pressing tab should offer all the
@@ -84,12 +84,12 @@ completionTestData =
   , ("Control.Monad.ST.new", ["Control.Monad.ST.newSTRef"])
   ]
 
-assertCompletedOk :: (String, [String]) -> Assertion
-assertCompletedOk (line, expecteds) = do
+assertCompletedOk :: (String, [String]) -> Spec
+assertCompletedOk (line, expecteds) = specify line $ do
   (unusedR, completions) <- runCM (completion' (reverse line, ""))
   let unused = reverse unusedR
   let actuals = map ((unused ++) . replacement) completions
-  sort expecteds @=? sort actuals
+  sort expecteds `shouldBe` sort actuals
 
 runCM :: CompletionM a -> IO a
 runCM act = do

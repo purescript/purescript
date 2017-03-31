@@ -12,7 +12,7 @@ import           System.Exit
 import           System.FilePath ((</>))
 import qualified System.FilePath.Glob as Glob
 import           System.Process (readProcessWithExitCode)
-import           Test.HUnit ((@?=))
+import           Test.Hspec (shouldBe)
 
 -- | A monad transformer for handle PSCi actions in tests
 type TestPSCi a = RWST PSCiConfig () PSCiState IO a
@@ -70,9 +70,9 @@ runAndEval comm eval =
 run :: String -> TestPSCi ()
 run comm = runAndEval comm $ jsEval *> return ()
 
--- | A lifted evaluation of HUnit '@?=' for the TestPSCi
+-- | A lifted evaluation of Hspec 'shouldBe' for the TestPSCi
 equalsTo :: (Eq a, Show a) => a -> a -> TestPSCi ()
-equalsTo x y = liftIO $ x @?= y
+equalsTo x y = liftIO $ x `shouldBe` y
 
 -- | An assertion to check if a command evaluates to a string
 evaluatesTo :: String -> String -> TestPSCi ()
