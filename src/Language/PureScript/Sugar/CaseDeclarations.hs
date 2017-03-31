@@ -5,6 +5,7 @@
 module Language.PureScript.Sugar.CaseDeclarations
   ( desugarCases
   , desugarCasesModule
+  , desugarCaseGuards
   ) where
 
 import Prelude.Compat
@@ -37,14 +38,23 @@ desugarCasesModule (Module ss coms name ds exps) =
       <$> (desugarCases <=< desugarAbs <=< validateCases $ ds)
       <*> pure exps
 
+desugarCaseGuards
+  :: forall m. (MonadSupply m, MonadError MultipleErrors m)
+  => [Declaration]
+  -> m [Declaration]
+desugarCaseGuards declarations = parU declarations f
+  where
+    (f, _, _) = everywhereOnValuesM return desugarGuardedExprs return
+
 -- |
 -- Desugar case with pattern guards and pattern clauses to a
 -- series of nested case expressions.
 --
-desugarCase :: forall m. (MonadSupply m)
-            => Expr
-            -> m Expr
-desugarCase (Case scrut alternatives)
+desugarGuardedExprs
+  :: forall m. (MonadSupply m)
+  => Expr
+  -> m Expr
+desugarGuardedExprs (Case scrut alternatives)
   | any (not . isTrivialExpr) scrut = do
     -- in case the scrutinee is non trivial (e.g. not a Var or Literal)
     -- we may evaluate the scrutinee more than once when a guard occurrs.
@@ -55,16 +65,17 @@ desugarCase (Case scrut alternatives)
            , ValueDeclaration scrut_id Private [] [MkUnguarded e]
            )
       )
-    Let scrut_decls <$> desugarCase (Case scrut' alternatives)
+    Let scrut_decls <$> desugarGuardedExprs (Case scrut' alternatives)
   where
     isTrivialExpr (Var _) = True
     isTrivialExpr (Literal _) = True
     isTrivialExpr (Accessor _ e) = isTrivialExpr e
     isTrivialExpr (Parens e) = isTrivialExpr e
     isTrivialExpr (PositionedValue _ _ e) = isTrivialExpr e
+    isTrivialExpr (TypedValue _ e _) = isTrivialExpr e
     isTrivialExpr _ = False
 
-desugarCase (Case scrut alternatives) =
+desugarGuardedExprs (Case scrut alternatives) =
   let
     -- Alternatives which do not have guards are
     -- left as-is. Alternatives which
@@ -206,8 +217,9 @@ desugarCase (Case scrut alternatives) =
     desugarAltOutOfLine alt_binder rem_guarded rem_alts mk_body
       | Just rem_case <- mkCaseOfRemainingGuardsAndAlts = do
 
-        desugared   <- desugarCase rem_case
-        rem_case_id <- freshIdent'
+        desugared     <- desugarGuardedExprs rem_case
+        rem_case_id   <- freshIdent'
+        unused_binder <- freshIdent'
 
         let
           goto_rem_case :: Expr
@@ -216,8 +228,8 @@ desugarCase (Case scrut alternatives) =
           alt_fail = [CaseAlternative [NullBinder] [MkUnguarded goto_rem_case]]
 
         pure $ Let [
-            ValueDeclaration rem_case_id Private [NullBinder]
-              [MkUnguarded desugared]
+          ValueDeclaration rem_case_id Private []
+            [MkUnguarded (Abs (VarBinder unused_binder) desugared)]
           ] (mk_body alt_fail)
 
       | otherwise
@@ -251,7 +263,13 @@ desugarCase (Case scrut alternatives) =
     alts' <- desugarAlternatives alternatives
     return $ optimize (Case scrut alts')
 
-desugarCase v = pure v
+desugarGuardedExprs (TypedValue infered e ty) =
+  TypedValue infered <$> desugarGuardedExprs e <*> pure ty
+
+desugarGuardedExprs (PositionedValue ss comms e) =
+  PositionedValue ss comms <$> desugarGuardedExprs e
+
+desugarGuardedExprs v = pure v
 
 -- |
 -- Validates that case head and binder lengths match.
@@ -262,12 +280,12 @@ validateCases = flip parU f
   (f, _, _) = everywhereOnValuesM return validate return
 
   validate :: Expr -> m Expr
-  validate (Case vs alts) = do
+  validate c@(Case vs alts) = do
     let l = length vs
         alts' = filter ((l /=) . length . caseAlternativeBinders) alts
     unless (null alts') $
       throwError . MultipleErrors $ fmap (altError l) (caseAlternativeBinders <$> alts')
-    desugarCase (Case vs alts)
+    return c
   validate other = return other
 
   altError :: Int -> [Binder] -> ErrorMessage
@@ -370,8 +388,7 @@ makeCaseDeclaration ident alternatives = do
             else replicateM (length argNames) freshIdent'
   let vars = map (Var . Qualified Nothing) args
       binders = [ CaseAlternative bs result | (bs, result) <- alternatives ]
-  case_ <- desugarCase (Case vars binders)
-  let value = foldr (Abs . VarBinder) case_ args
+  let value = foldr (Abs . VarBinder) (Case vars binders) args
 
   return $ ValueDeclaration ident Public [] [MkUnguarded value]
   where

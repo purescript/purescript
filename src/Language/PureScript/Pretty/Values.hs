@@ -141,16 +141,34 @@ prettyPrintCaseAlternative d (CaseAlternative binders result) =
   prettyPrintResult :: [GuardedExpr] -> Box
   prettyPrintResult [GuardedExpr [] v] = text " -> " <> prettyPrintValue (d - 1) v
   prettyPrintResult gs =
-    vcat left (map prettyPrintGuardedValue gs)
+    vcat left (map (prettyPrintGuardedValueSep (text " | ")) gs)
 
-  prettyPrintGuardedValue :: GuardedExpr -> Box
-  prettyPrintGuardedValue (GuardedExpr [ConditionGuard grd] val) = foldl1 before
-    [ text " | "
-    , prettyPrintValue (d - 1) grd
-    , text " -> "
+  prettyPrintGuardedValueSep :: Box -> GuardedExpr -> Box
+  prettyPrintGuardedValueSep _ (GuardedExpr [] val) =
+    text " -> " <> prettyPrintValue (d - 1) val
+
+  prettyPrintGuardedValueSep sep (GuardedExpr [guard] val) =
+    foldl1 before [ sep
+                  , prettyPrintGuard guard
+                  , prettyPrintGuardedValueSep sep (GuardedExpr [] val)
+                  ]
+
+  prettyPrintGuardedValueSep sep (GuardedExpr (guard : guards) val) =
+    vcat left [ foldl1 before
+                [ sep
+                , prettyPrintGuard guard
+                ]
+              , prettyPrintGuardedValueSep (text " , ") (GuardedExpr guards val)
+              ]
+
+  prettyPrintGuard (ConditionGuard cond) =
+    prettyPrintValue (d - 1) cond
+  prettyPrintGuard (PatternGuard binder val) =
+    foldl1 before
+    [ text (T.unpack (prettyPrintBinder binder))
+    , text " <- "
     , prettyPrintValue (d - 1) val
     ]
-  prettyPrintGuardedValue _ = internalError "There should only be ConditionGuards after desugaring cases"
 
 prettyPrintDoNotationElement :: Int -> DoNotationElement -> Box
 prettyPrintDoNotationElement d _ | d < 0 = ellipsis
