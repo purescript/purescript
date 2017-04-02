@@ -556,12 +556,7 @@ checkBinders nvals ret (CaseAlternative binders result : bs) = do
     let ns = concatMap binderNames binders in length (ordNub ns) == length ns
   m1 <- M.unions <$> zipWithM inferBinder nvals binders
   r <- bindLocalVariables [ (name, ty, Defined) | (name, ty) <- M.toList m1 ] $
-    CaseAlternative binders <$>
-      case result of
-        [MkUnguarded val] -> do
-          val' <- TypedValue True <$> check val ret <*> pure ret
-          return [MkUnguarded val']
-        gs -> forM gs (\ge -> checkGuardedRhs ge ret)
+       CaseAlternative binders <$> forM result (\ge -> checkGuardedRhs ge ret)
   rs <- checkBinders nvals ret bs
   return $ r : rs
 
@@ -573,12 +568,18 @@ checkGuardedRhs
 checkGuardedRhs (GuardedExpr [] rhs) ret = do
   rhs' <- TypedValue True <$> check rhs ret <*> pure ret
   return $ GuardedExpr [] rhs'
-checkGuardedRhs (GuardedExpr [ConditionGuard cond] rhs) ret = do
+checkGuardedRhs (GuardedExpr (ConditionGuard cond : guards) rhs) ret = do
   cond' <- withErrorMessageHint ErrorCheckingGuard $ check cond tyBoolean
-  rhs' <- TypedValue True <$> check rhs ret <*> pure ret
-  return $ GuardedExpr [ConditionGuard cond'] rhs'
-checkGuardedRhs _ _ =
-  internalError "Pattern not desugared"
+  GuardedExpr guards' rhs' <- checkGuardedRhs (GuardedExpr guards rhs) ret
+  return $ GuardedExpr (ConditionGuard cond' : guards') rhs'
+checkGuardedRhs (GuardedExpr (PatternGuard binder expr : guards) rhs) ret = do
+  expr'@(TypedValue _ _ ty) <- infer expr
+  variables <- inferBinder ty binder
+  GuardedExpr guards' rhs' <- bindLocalVariables [ (name, bty, Defined)
+                                                 | (name, bty) <- M.toList variables
+                                                 ] $
+    checkGuardedRhs (GuardedExpr guards rhs) ret
+  return $ GuardedExpr (PatternGuard binder expr' : guards') rhs'
 
 -- |
 -- Check the type of a value, rethrowing errors to provide a better error message

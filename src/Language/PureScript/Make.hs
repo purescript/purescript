@@ -144,12 +144,19 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
   ((Module ss coms _ elaborated exps, env'), nextVar) <- runSupplyT 0 $ do
     [desugared] <- desugar externs [withPrim]
     runCheck' (emptyCheckState env) $ typeCheckModule desugared
-  regrouped <- createBindingGroups moduleName . collapseBindingGroups $ elaborated
+
+  -- desugar case declarations *after* type- and exhaustiveness checking
+  -- since pattern guards introduces cases which the exhaustiveness checker
+  -- reports as not-exhaustive.
+  (deguarded, nextVar') <- runSupplyT nextVar $ do
+    desugarCaseGuards elaborated
+
+  regrouped <- createBindingGroups moduleName . collapseBindingGroups $ deguarded
   let mod' = Module ss coms moduleName regrouped exps
       corefn = CF.moduleToCoreFn env' mod'
       [renamed] = renameInModules [corefn]
       exts = moduleToExternsFile mod' env'
-  evalSupplyT nextVar . codegen renamed env' . encode $ exts
+  evalSupplyT nextVar' . codegen renamed env' . encode $ exts
   return exts
 
 -- | Compiles in "make" mode, compiling each module separately to a @.js@ file and an @externs.json@ file.
