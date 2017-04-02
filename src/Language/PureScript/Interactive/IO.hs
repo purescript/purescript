@@ -4,7 +4,9 @@ import Prelude.Compat
 
 import Control.Monad (msum)
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
-import System.Directory (createDirectoryIfMissing, getHomeDirectory, findExecutable)
+import System.Directory (XdgDirectory (..), createDirectoryIfMissing,
+                         getAppUserDataDirectory, getXdgDirectory,
+                         findExecutable, doesFileExist)
 import System.FilePath (takeDirectory, (</>))
 
 mkdirp :: FilePath -> IO ()
@@ -28,7 +30,12 @@ findNodeProcess = onFirstFileMatching findExecutable names
 --
 getHistoryFilename :: IO FilePath
 getHistoryFilename = do
-  home <- getHomeDirectory
-  let filename = home </> ".purescript" </> "psci_history"
-  mkdirp filename
-  return filename
+  appuserdata <- getAppUserDataDirectory "purescript"
+  olddirbool <- doesFileExist (appuserdata </> "psci_history")
+  if olddirbool
+      then return (appuserdata </> "psci_history")
+      else do
+        datadir <- getXdgDirectory XdgData "purescript"
+        let filename = datadir </> "psci_history"
+        mkdirp filename
+        return filename

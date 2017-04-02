@@ -53,6 +53,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@kika](https://github.com/kika) | Kirill Pertsev | MIT license |
 | [@kRITZCREEK](https://github.com/kRITZCREEK) | Christoph Hegemann | MIT license |
 | [@L8D](https://github.com/L8D) | Tenor Biel | [MIT license](http://opensource.org/licenses/MIT) |
+| [@legrostdg](https://github.com/legrostdg) | Félix Sipma | [MIT license](http://opensource.org/licenses/MIT) |
 | [@LiamGoodacre](https://github.com/LiamGoodacre) | Liam Goodacre | [MIT license](http://opensource.org/licenses/MIT) |
 | [@lukerandall](https://github.com/lukerandall) | Luke Randall | [MIT license](http://opensource.org/licenses/MIT) |
 | [@matthewleon](https://github.com/matthewleon) | Matthew Leon | [MIT license](http://opensource.org/licenses/MIT) |
