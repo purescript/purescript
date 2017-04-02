@@ -139,7 +139,7 @@ getAllModules mmoduleName = do
                 ast =
                   fromMaybe (Map.empty, Map.empty) (Map.lookup moduleName asts)
                 cachedModule =
-                  annotateModule ast (fst (convertExterns ef))
+                  resolveLocationsForModule ast (fst (convertExterns ef))
                 tmp =
                   Map.insert moduleName cachedModule declarations
                 resolved =
@@ -222,7 +222,40 @@ resolveLocations
   -> ModuleMap [IdeDeclarationAnn]
 resolveLocations asts =
   Map.mapWithKey (\mn decls ->
-                    maybe decls (flip annotateModule decls) (Map.lookup mn asts))
+                    maybe decls (flip resolveLocationsForModule decls) (Map.lookup mn asts))
+
+resolveLocationsForModule
+  :: (DefinitionSites P.SourceSpan, TypeAnnotations)
+  -> [IdeDeclarationAnn]
+  -> [IdeDeclarationAnn]
+resolveLocationsForModule (defs, types) decls =
+  map convertDeclaration decls
+  where
+    convertDeclaration :: IdeDeclarationAnn -> IdeDeclarationAnn
+    convertDeclaration (IdeDeclarationAnn ann d) = case d of
+      IdeDeclValue v ->
+        annotateFunction (v ^. ideValueIdent) (IdeDeclValue v)
+      IdeDeclType t ->
+        annotateType (t ^. ideTypeName . properNameT) (IdeDeclType t)
+      IdeDeclTypeSynonym s ->
+        annotateType (s ^. ideSynonymName . properNameT) (IdeDeclTypeSynonym s)
+      IdeDeclDataConstructor dtor ->
+        annotateValue (dtor ^. ideDtorName . properNameT) (IdeDeclDataConstructor dtor)
+      IdeDeclTypeClass tc ->
+        annotateType (tc ^. ideTCName . properNameT) (IdeDeclTypeClass tc)
+      IdeDeclValueOperator operator ->
+        annotateValue (operator ^. ideValueOpName . opNameT) (IdeDeclValueOperator operator)
+      IdeDeclTypeOperator operator ->
+        annotateType (operator ^. ideTypeOpName . opNameT) (IdeDeclTypeOperator operator)
+      IdeDeclKind i ->
+        annotateKind (i ^. properNameT) (IdeDeclKind i)
+      where
+        annotateFunction x = IdeDeclarationAnn (ann { _annLocation = Map.lookup (IdeNSValue (P.runIdent x)) defs
+                                                    , _annTypeAnnotation = Map.lookup x types
+                                                    })
+        annotateValue x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNSValue x) defs})
+        annotateType x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNSType x) defs})
+        annotateKind x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNSKind x) defs})
 
 resolveInstances
   :: ModuleMap P.ExternsFile

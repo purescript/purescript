@@ -49,8 +49,8 @@ ann (IdeDeclarationAnn _ d) a = IdeDeclarationAnn a d
 annLoc :: IdeDeclarationAnn -> P.SourceSpan -> IdeDeclarationAnn
 annLoc (IdeDeclarationAnn a d) loc = IdeDeclarationAnn a {_annLocation = Just loc} d
 
-annExp :: IdeDeclarationAnn -> P.ModuleName -> IdeDeclarationAnn
-annExp (IdeDeclarationAnn a d) e = IdeDeclarationAnn a {_annExportedFrom = Just e} d
+annExp :: IdeDeclarationAnn -> Text -> IdeDeclarationAnn
+annExp (IdeDeclarationAnn a d) e = IdeDeclarationAnn a {_annExportedFrom = Just (mn e)} d
 
 annTyp :: IdeDeclarationAnn -> P.Type -> IdeDeclarationAnn
 annTyp (IdeDeclarationAnn a d) ta = IdeDeclarationAnn a {_annTypeAnnotation = Just ta} d
@@ -66,11 +66,11 @@ ideValue i ty = ida (IdeDeclValue (IdeValue (P.Ident i) (fromMaybe P.tyString ty
 ideType :: Text -> Maybe P.Kind -> IdeDeclarationAnn
 ideType pn ki = ida (IdeDeclType (IdeType (P.ProperName pn) (fromMaybe P.kindType ki)))
 
-ideSynonym :: Text -> P.Type -> IdeDeclarationAnn
-ideSynonym pn ty = ida (IdeDeclTypeSynonym (IdeTypeSynonym (P.ProperName pn) ty))
+ideSynonym :: Text -> P.Type -> P.Kind -> IdeDeclarationAnn
+ideSynonym pn ty kind = ida (IdeDeclTypeSynonym (IdeTypeSynonym (P.ProperName pn) ty kind))
 
-ideTypeClass :: Text -> [IdeInstance] -> IdeDeclarationAnn
-ideTypeClass pn instances = ida (IdeDeclTypeClass (IdeTypeClass (P.ProperName pn) instances))
+ideTypeClass :: Text -> P.Kind -> [IdeInstance] -> IdeDeclarationAnn
+ideTypeClass pn kind instances = ida (IdeDeclTypeClass (IdeTypeClass (P.ProperName pn) kind instances))
 
 ideDtor :: Text -> Text -> Maybe P.Type -> IdeDeclarationAnn
 ideDtor pn tn ty = ida (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName pn) (P.ProperName tn) (fromMaybe P.tyString ty)))

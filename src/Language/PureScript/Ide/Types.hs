@@ -53,6 +53,7 @@ data IdeType = IdeType
 data IdeTypeSynonym = IdeTypeSynonym
   { _ideSynonymName :: P.ProperName 'P.TypeName
   , _ideSynonymType :: P.Type
+  , _ideSynonymKind :: P.Kind
   } deriving (Show, Eq, Ord)
 
 data IdeDataConstructor = IdeDataConstructor
@@ -63,6 +64,7 @@ data IdeDataConstructor = IdeDataConstructor
 
 data IdeTypeClass = IdeTypeClass
   { _ideTCName :: P.ProperName 'P.ClassName
+  , _ideTCKind :: P.Kind
   , _ideTCInstances :: [IdeInstance]
   } deriving (Show, Eq, Ord)
 

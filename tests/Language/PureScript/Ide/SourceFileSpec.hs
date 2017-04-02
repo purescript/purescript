@@ -97,12 +97,12 @@ getLocation s = do
     ideState = emptyIdeState `s3`
       [ ("Test",
          [ ideValue "sfValue" Nothing `annLoc` valueSS
-         , ideSynonym "SFType" P.tyString `annLoc` synonymSS
+         , ideSynonym "SFType" P.tyString P.kindType `annLoc` synonymSS
          , ideType "SFData" Nothing `annLoc` typeSS
          , ideDtor "SFOne" "SFData" Nothing `annLoc` typeSS
          , ideDtor "SFTwo" "SFData" Nothing `annLoc` typeSS
          , ideDtor "SFThree" "SFData" Nothing `annLoc` typeSS
-         , ideTypeClass "SFClass" [] `annLoc` classSS
+         , ideTypeClass "SFClass" P.kindType [] `annLoc` classSS
          , ideValueOp "<$>" (P.Qualified Nothing (Left "")) 0 Nothing Nothing
            `annLoc` valueOpSS
          , ideTypeOp "~>" (P.Qualified Nothing "") 0 Nothing Nothing
