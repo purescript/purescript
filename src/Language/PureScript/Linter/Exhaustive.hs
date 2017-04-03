@@ -200,20 +200,25 @@ missingCasesMultiple env mn = go
 --       | otherwise = 1
 --   is exhaustive, whereas `f x | x < 0` is not
 --
+-- or in case of a pattern guard if the pattern is exhaustive.
+--
 -- The function below say whether or not a guard has an `otherwise` expression
 -- It is considered that `otherwise` is defined in Prelude
 --
-isExhaustiveGuard :: [GuardedExpr] -> Bool
-isExhaustiveGuard [GuardedExpr [] _] = True
-isExhaustiveGuard gs  =
+isExhaustiveGuard :: Environment -> ModuleName -> [GuardedExpr] -> Bool
+isExhaustiveGuard _ _ [MkUnguarded _] = True
+isExhaustiveGuard env moduleName gs   =
   not . null $ filter (\(GuardedExpr grd _) -> isExhaustive grd) gs
   where
-    checkGuard :: Guard -> Bool
-    checkGuard (ConditionGuard cond) = isTrueExpr cond
-    checkGuard (PatternGuard bind _) = isIrrefutable bind
-
     isExhaustive :: [Guard] -> Bool
     isExhaustive = all checkGuard
+
+    checkGuard :: Guard -> Bool
+    checkGuard (ConditionGuard cond)   = isTrueExpr cond
+    checkGuard (PatternGuard binder _) =
+      case missingCasesMultiple env moduleName [NullBinder] [binder] of
+        ([], _) -> True -- there are no missing pattern for this guard
+        _       -> False
 
 -- |
 -- Returns the uncovered set of case alternatives
@@ -223,7 +228,7 @@ missingCases env mn uncovered ca = missingCasesMultiple env mn uncovered (caseAl
 
 missingAlternative :: Environment -> ModuleName -> CaseAlternative -> [Binder] -> ([[Binder]], Either RedundancyError Bool)
 missingAlternative env mn ca uncovered
-  | isExhaustiveGuard (caseAlternativeResult ca) = mcases
+  | isExhaustiveGuard env mn (caseAlternativeResult ca) = mcases
   | otherwise = ([uncovered], snd mcases)
   where
   mcases = missingCases env mn uncovered ca
