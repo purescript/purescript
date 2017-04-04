@@ -334,7 +334,7 @@ command = loop <$> options
                              . runInputT (setComplete completion settings)
 
                     handleCommand' :: state -> Command -> StateT PSCiState (ReaderT PSCiConfig IO) ()
-                    handleCommand' state = handleCommand (liftIO . eval state) (liftIO (reload state))
+                    handleCommand' state = handleCommand (liftIO . eval state) (liftIO (reload state)) (liftIO . putStrLn)
 
                     go :: state -> InputT (StateT PSCiState (ReaderT PSCiConfig IO)) ()
                     go state = do
