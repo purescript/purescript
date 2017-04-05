@@ -1,3 +1,6 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 -- |
 -- Type declarations and associated basic functions for PSCI.
 --
@@ -5,6 +8,12 @@ module Language.PureScript.Interactive.Types where
 
 import Prelude.Compat
 
+import           Control.Applicative (liftA2)
+import           Control.Monad (liftM2)
+import           Control.Monad.IO.Class (MonadIO(..))
+import           Control.Monad.Reader.Class (MonadReader(..))
+import           Control.Monad.State.Class (MonadState(..))
+import           Control.Monad.Trans.Class (MonadTrans(..))
 import qualified Language.PureScript as P
 
 -- | The PSCI configuration.
@@ -130,3 +139,47 @@ data Directive
   | Show
   | Paste
   deriving (Eq, Show)
+
+-- | A list of functions used in PSCi
+data PSCiFns = PSCiFns { _evalJS :: String -> IO ()
+                       , _reload :: IO ()
+                       , _print :: String -> IO ()
+                       }
+
+-- | A monad transformer to use PSCi functions
+newtype PSCiT m a = PSCiT { runPSCiT :: PSCiFns -> m a }
+
+instance Functor f => Functor (PSCiT f) where
+  fmap f (PSCiT m) = PSCiT $ fmap (fmap f) m
+
+instance Applicative f => Applicative (PSCiT f) where
+  pure = PSCiT . const . pure
+  PSCiT f <*> PSCiT a = PSCiT $ liftA2 (<*>) f a
+
+instance Monad m => Monad (PSCiT m) where
+  return = pure
+  PSCiT m >>= f = PSCiT $ liftM2 (>>=) m $ flip (runPSCiT . f)
+
+instance MonadTrans PSCiT where
+  lift = PSCiT . const
+
+instance MonadIO m => MonadIO (PSCiT m) where
+  liftIO = lift . liftIO
+
+instance MonadReader r m => MonadReader r (PSCiT m) where
+  ask = lift ask
+  local f = PSCiT . fmap (local f) . runPSCiT
+
+instance MonadState s m => MonadState s (PSCiT m) where
+  state = lift . state
+
+-- | A monadic type class for PSCiT
+class MonadPSCi m where
+  psciEvalJS :: String -> m ()
+  psciReload :: m ()
+  psciPrint :: String -> m ()
+
+instance MonadIO m => MonadPSCi (PSCiT m) where
+  psciEvalJS js = PSCiT $ \ (PSCiFns e _ _) -> liftIO $ e js
+  psciReload = PSCiT $ \ (PSCiFns _ r _) -> liftIO r
+  psciPrint str = PSCiT $ \ (PSCiFns _ _ p) -> liftIO $ p str

@@ -89,31 +89,27 @@ make ms = do
 
 -- | Performs a PSCi command
 handleCommand
-  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
-  => (String -> m ()) -- ^ evaluate JS
-  -> m () -- ^ reload
-  -> (String -> m ()) -- ^ print into console
-  -> Command
+  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m, MonadPSCi m)
+  => Command
   -> m ()
-handleCommand _ _ p ShowHelp                  = p helpMessage
-handleCommand _ r _ ReloadState               = handleReloadState r
-handleCommand _ r _ ClearState                = handleClearState r
-handleCommand e _ _ (Expression val)          = handleExpression e val
-handleCommand _ _ _ (Import im)               = handleImport im
-handleCommand _ _ _ (Decls l)                 = handleDecls l
-handleCommand _ _ p (TypeOf val)              = handleTypeOf p val
-handleCommand _ _ p (KindOf typ)              = handleKindOf p typ
-handleCommand _ _ p (BrowseModule moduleName) = handleBrowse p moduleName
-handleCommand _ _ p (ShowInfo QueryLoaded)    = handleShowLoadedModules p
-handleCommand _ _ p (ShowInfo QueryImport)    = handleShowImportedModules p
-handleCommand _ _ _ _                         = P.internalError "handleCommand: unexpected command"
+handleCommand ShowHelp                  = psciPrint helpMessage
+handleCommand ReloadState               = handleReloadState
+handleCommand ClearState                = handleClearState
+handleCommand (Expression val)          = handleExpression val
+handleCommand (Import im)               = handleImport im
+handleCommand (Decls l)                 = handleDecls l
+handleCommand (TypeOf val)              = handleTypeOf val
+handleCommand (KindOf typ)              = handleKindOf typ
+handleCommand (BrowseModule moduleName) = handleBrowse moduleName
+handleCommand (ShowInfo QueryLoaded)    = handleShowLoadedModules
+handleCommand (ShowInfo QueryImport)    = handleShowImportedModules
+handleCommand _                         = P.internalError "handleCommand: unexpected command"
 
 -- | Reload the application state
 handleReloadState
-  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
+  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m, MonadPSCi m)
   => m ()
-  -> m ()
-handleReloadState reload = do
+handleReloadState = do
   modify $ updateLets (const [])
   files <- asks psciLoadedFiles
   e <- runExceptT $ do
@@ -124,24 +120,22 @@ handleReloadState reload = do
     Left errs -> printErrors errs
     Right (modules, externs) -> do
       modify (updateLoadedExterns (const (zip modules externs)))
-      reload
+      psciReload
 
 -- | Clear the application state
 handleClearState
-  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
+  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m, MonadPSCi m)
   => m ()
-  -> m ()
-handleClearState reload = do
+handleClearState = do
   modify $ updateImportedModules (const [])
-  handleReloadState reload
+  handleReloadState
 
 -- | Takes a value expression and evaluates it with the current state.
 handleExpression
-  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
-  => (String -> m ())
-  -> P.Expr
+  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m, MonadPSCi m)
+  => P.Expr
   -> m ()
-handleExpression evaluate val = do
+handleExpression val = do
   st <- get
   let m = createTemporaryModule True st val
   e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
@@ -149,7 +143,7 @@ handleExpression evaluate val = do
     Left errs -> printErrors errs
     Right _ -> do
       js <- liftIO $ readFile (modulesDir </> "$PSCI" </> "index.js")
-      evaluate js
+      psciEvalJS js
 
 -- |
 -- Takes a list of declarations and updates the environment, then run a make. If the declaration fails,
@@ -169,23 +163,21 @@ handleDecls ds = do
 
 -- | Show actual loaded modules in psci.
 handleShowLoadedModules
-  :: (MonadState PSCiState m, MonadIO m)
-  => (String -> m ())
-  -> m ()
-handleShowLoadedModules print' = do
+  :: (MonadState PSCiState m, MonadIO m, MonadPSCi m)
+  => m ()
+handleShowLoadedModules = do
     loadedModules <- gets psciLoadedExterns
-    print' $ readModules loadedModules
+    psciPrint $ readModules loadedModules
   where
     readModules = unlines . sort . ordNub . map (T.unpack . P.runModuleName . P.getModuleName . fst)
 
 -- | Show the imported modules in psci.
 handleShowImportedModules
-  :: (MonadState PSCiState m, MonadIO m)
-  => (String -> m ())
-  -> m ()
-handleShowImportedModules print' = do
+  :: (MonadState PSCiState m, MonadIO m, MonadPSCi m)
+  => m ()
+handleShowImportedModules = do
   PSCiState { psciImportedModules = importedModules } <- get
-  print' $ showModules importedModules
+  psciPrint $ showModules importedModules
   return ()
   where
   showModules = unlines . sort . map (T.unpack . showModule)
@@ -238,11 +230,10 @@ handleImport im = do
 
 -- | Takes a value and prints its type
 handleTypeOf
-  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
-  => (String -> m ())
-  -> P.Expr
+  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m, MonadPSCi m)
+  => P.Expr
   -> m ()
-handleTypeOf print' val = do
+handleTypeOf val = do
   st <- get
   let m = createTemporaryModule False st val
   e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
@@ -250,16 +241,15 @@ handleTypeOf print' val = do
     Left errs -> printErrors errs
     Right (_, env') ->
       case M.lookup (P.mkQualified (P.Ident "it") (P.ModuleName [P.ProperName "$PSCI"])) (P.names env') of
-        Just (ty, _, _) -> print' . P.prettyPrintType $ ty
-        Nothing -> print' "Could not find type"
+        Just (ty, _, _) -> psciPrint . P.prettyPrintType $ ty
+        Nothing -> psciPrint "Could not find type"
 
 -- | Takes a type and prints its kind
 handleKindOf
-  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
-  => (String -> m ())
-  -> P.Type
+  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m, MonadPSCi m)
+  => P.Type
   -> m ()
-handleKindOf print' typ = do
+handleKindOf typ = do
   st <- get
   let m = createTemporaryModuleForKind st typ
       mName = P.ModuleName [P.ProperName "$PSCI"]
@@ -276,24 +266,23 @@ handleKindOf print' typ = do
               check sew = fst . runWriter . runExceptT . runStateT sew
           case k of
             Left err        -> printErrors err
-            Right (kind, _) -> print' . T.unpack . P.prettyPrintKind $ kind
-        Nothing -> print' "Could not find kind"
+            Right (kind, _) -> psciPrint . T.unpack . P.prettyPrintKind $ kind
+        Nothing -> psciPrint "Could not find kind"
 
 -- | Browse a module and displays its signature
 handleBrowse
-  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
-  => (String -> m ())
-  -> P.ModuleName
+  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m, MonadPSCi m)
+  => P.ModuleName
   -> m ()
-handleBrowse print' moduleName = do
+handleBrowse moduleName = do
   st <- get
   env <- asks psciEnvironment
   if isModInEnv moduleName st
-    then print' $ printModuleSignatures moduleName env
+    then psciPrint $ printModuleSignatures moduleName env
     else case lookupUnQualifiedModName moduleName st of
       Just unQualifiedName ->
         if isModInEnv unQualifiedName st
-          then print' $ printModuleSignatures unQualifiedName env
+          then psciPrint $ printModuleSignatures unQualifiedName env
           else failNotInEnv moduleName
       Nothing ->
         failNotInEnv moduleName
@@ -301,6 +290,6 @@ handleBrowse print' moduleName = do
     isModInEnv modName =
         any ((== modName) . P.getModuleName . fst) . psciLoadedExterns
     failNotInEnv modName =
-        print' $ T.unpack $ "Module '" <> N.runModuleName modName <> "' is not valid."
+        psciPrint $ T.unpack $ "Module '" <> N.runModuleName modName <> "' is not valid."
     lookupUnQualifiedModName quaModName st =
         (\(modName,_,_) -> modName) <$> find ( \(_, _, mayQuaName) -> mayQuaName == Just quaModName) (psciImportedModules st)
