@@ -46,8 +46,8 @@ execTestPSCi i = do
 -- | Evaluate JS to which a PSCi input is compiled. The actual JS input is not
 -- needed as an argument, as it is already written in the file during the
 -- command evaluation.
-jsEval :: IO String
-jsEval = do
+jsEval :: TestPSCi String
+jsEval = liftIO $ do
   writeFile indexFile "require('$PSCI')['$main']();"
   process <- findNodeProcess
   result <- traverse (\node -> readProcessWithExitCode node [indexFile] "") process
@@ -57,15 +57,14 @@ jsEval = do
     Nothing                      -> putStrLn "Couldn't find node.js" >> exitFailure
 
 -- | Run a PSCi command and evaluate the output with 'eval'.
-runAndEval :: String -> IO () -> TestPSCi ()
+runAndEval :: String -> TestPSCi () -> TestPSCi ()
 runAndEval comm eval =
   case parseCommand comm of
     Left errStr -> liftIO $ putStrLn errStr >> exitFailure
-    Right command -> do
+    Right command ->
       -- the JS result can be ignored, as it's already written in a source file
       -- for the detail, please refer to Interactive.hs
-      let fns = PSCiFns (\_ -> eval) (return ()) (\_ -> return ())
-      runPSCiT (handleCommand command) fns
+      handleCommand (\_ -> eval) (return ()) (\_ -> return ()) command
 
 -- | Run a PSCi command and ignore the output
 run :: String -> TestPSCi ()
@@ -79,4 +78,4 @@ equalsTo x y = liftIO $ x `shouldBe` y
 evaluatesTo :: String -> String -> TestPSCi ()
 evaluatesTo command expected = runAndEval command $ do
   actual <- jsEval
-  actual `shouldBe` (expected ++ "\n")
+  actual `equalsTo` (expected ++ "\n")
