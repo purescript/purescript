@@ -32,14 +32,15 @@ import                System.FilePath
 -- was deleted we don't do anything.
 reloadFile :: IdeLogLevel -> TVar IdeState -> Event -> IO ()
 reloadFile _ _ Removed{} = pure ()
-reloadFile logLevel ref ev = do
+reloadFile logLevel ref ev = runLogger logLevel $ do
   let fp = eventPath ev
-  ef' <- runLogger logLevel (runExceptT (readExternFile fp))
+  ef' <- runExceptT (readExternFile fp)
   case ef' of
-    Left _ -> pure ()
+    Left err ->
+      logErrorN ("Failed to reload file at: " <> toS fp <> " with error: " <> show err)
     Right ef -> do
-      void $ atomically (insertExternsSTM ref ef *> populateStage3STM ref)
-      runLogger logLevel (logDebugN ("Reloaded File at: " <> toS fp))
+      lift $ void $ atomically (insertExternsSTM ref ef *> populateStage3STM ref)
+      logDebugN ("Reloaded File at: " <> toS fp)
 
 -- | Installs filewatchers for the given directory and reloads ExternsFiles when
 -- they change on disc
