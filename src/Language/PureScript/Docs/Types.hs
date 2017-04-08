@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module Language.PureScript.Docs.Types
   ( module Language.PureScript.Docs.Types
   , module ReExports
@@ -7,6 +9,8 @@ module Language.PureScript.Docs.Types
 import Protolude hiding (to, from)
 import Prelude (String, unlines, lookup)
 
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
 import Control.Arrow ((***))
 
 import Data.Aeson ((.=))
@@ -55,10 +59,14 @@ data Package a = Package
     -- ^ The version of the PureScript compiler which was used to generate
     -- this data. We store this in order to reject packages which are too old.
   }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData a => NFData (Package a)
 
 data NotYetKnown = NotYetKnown
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData NotYetKnown
 
 type UploadedPackage = Package NotYetKnown
 type VerifiedPackage = Package GithubUser
@@ -111,7 +119,9 @@ data Module = Module
   -- Re-exported values from other modules
   , modReExports    :: [(InPackage P.ModuleName, [Declaration])]
   }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData Module
 
 data Declaration = Declaration
   { declTitle      :: Text
@@ -120,7 +130,9 @@ data Declaration = Declaration
   , declChildren   :: [ChildDeclaration]
   , declInfo       :: DeclarationInfo
   }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData Declaration
 
 -- |
 -- A value of this type contains information that is specific to a particular
@@ -170,7 +182,9 @@ data DeclarationInfo
   -- A kind declaration
   --
   | ExternKindDeclaration
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData DeclarationInfo
 
 convertFundepsToStrings :: [(Text, Maybe P.Kind)] -> [P.FunctionalDependency] -> [([Text], [Text])]
 convertFundepsToStrings args fundeps =
@@ -265,7 +279,9 @@ data ChildDeclaration = ChildDeclaration
   , cdeclSourceSpan :: Maybe P.SourceSpan
   , cdeclInfo       :: ChildDeclarationInfo
   }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData ChildDeclaration
 
 data ChildDeclarationInfo
   -- |
@@ -284,7 +300,9 @@ data ChildDeclarationInfo
   -- example, `pure` from `Applicative` would be `forall a. a -> f a`.
   --
   | ChildTypeClassMember P.Type
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData ChildDeclarationInfo
 
 childDeclInfoToString :: ChildDeclarationInfo -> Text
 childDeclInfoToString (ChildInstance _ _)      = "instance"
@@ -319,11 +337,15 @@ isDataConstructor ChildDeclaration{..} =
 
 newtype GithubUser
   = GithubUser { runGithubUser :: Text }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData GithubUser
 
 newtype GithubRepo
   = GithubRepo { runGithubRepo :: Text }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData GithubRepo
 
 data PackageError
   = CompilerTooOld Version Version
@@ -337,12 +359,16 @@ data PackageError
   | InvalidKind Text
   | InvalidDataDeclType Text
   | InvalidTime
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData PackageError
 
 data InPackage a
   = Local a
   | FromDep PackageName a
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData a => NFData (InPackage a)
 
 instance Functor InPackage where
   fmap f (Local x) = Local (f x)
@@ -370,14 +396,18 @@ data LinksContext = LinksContext
   , ctxVersion              :: Version
   , ctxVersionTag           :: Text
   }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData LinksContext
 
 data DocLink = DocLink
   { linkLocation  :: LinkLocation
   , linkTitle     :: Text
   , linkNamespace :: Namespace
   }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData DocLink
 
 data LinkLocation
   -- | A link to a declaration in the same module.
@@ -397,7 +427,9 @@ data LinkLocation
   -- module. In this case we only need to store the module that the builtin
   -- comes from (at the time of writing, this will only ever be "Prim").
   | BuiltinModule P.ModuleName
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData LinkLocation
 
 -- | Given a links context, the current module name, the namespace of a thing
 -- to link to, its title, and its containing module, attempt to create a

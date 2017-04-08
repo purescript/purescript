@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 -- |
 -- Data types for types
@@ -10,6 +11,7 @@ import Prelude.Compat
 import Protolude (ordNub)
 
 import Control.Arrow (first)
+import Control.DeepSeq (NFData)
 import Control.Monad ((<=<))
 import qualified Data.Aeson as A
 import qualified Data.Aeson.TH as A
@@ -19,6 +21,7 @@ import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
+import GHC.Generics (Generic)
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.Kinds
@@ -30,7 +33,9 @@ import Language.PureScript.PSString (PSString)
 -- An identifier for the scope of a skolem variable
 --
 newtype SkolemScope = SkolemScope { runSkolemScope :: Int }
-  deriving (Show, Eq, Ord, A.ToJSON, A.FromJSON)
+  deriving (Show, Eq, Ord, A.ToJSON, A.FromJSON, Generic)
+
+instance NFData SkolemScope
 
 -- |
 -- The type of types
@@ -78,7 +83,9 @@ data Type
   -- Note: although it seems this constructor is not used, it _is_ useful,
   -- since it prevents certain traversals from matching.
   | ParensInType Type
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData Type
 
 -- | Additional data relevant to type class constraints
 data ConstraintData
@@ -88,7 +95,9 @@ data ConstraintData
   -- not matched, and a flag indicating whether the list was truncated or not.
   -- Note: we use 'Text' here because using 'Binder' would introduce a cyclic
   -- dependency in the module graph.
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData ConstraintData
 
 -- | A typeclass constraint
 data Constraint = Constraint
@@ -98,7 +107,9 @@ data Constraint = Constraint
   -- ^ type arguments
   , constraintData  :: Maybe ConstraintData
   -- ^ additional data relevant to this constraint
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic)
+
+instance NFData Constraint
 
 mapConstraintArgs :: ([Type] -> [Type]) -> Constraint -> Constraint
 mapConstraintArgs f c = c { constraintArgs = f (constraintArgs c) }
