@@ -119,7 +119,7 @@ command = Opts.helper <*> subcommands where
       putText "psc-ide needs you to compile your project (for example by running pulp build)"
 
     unless noWatch $
-      void (forkFinally (watcher polling ideState fullOutputPath) print)
+      void (forkFinally (watcher polling logLevel ideState fullOutputPath) print)
     let conf = Configuration {confLogLevel = logLevel, confOutputPath = outputPath, confGlobs = globs}
         env = IdeEnvironment {ideStateVar = ideState, ideConfiguration = conf}
     startServer port env
