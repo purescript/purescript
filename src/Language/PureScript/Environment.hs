@@ -1,8 +1,12 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module Language.PureScript.Environment where
 
 import           Prelude.Compat
 import           Protolude (ordNub)
 
+import           GHC.Generics (Generic)
+import           Control.DeepSeq (NFData)
 import           Data.Aeson ((.=), (.:))
 import qualified Data.Aeson as A
 import qualified Data.Map as M
@@ -38,7 +42,9 @@ data Environment = Environment
   -- ^ Type classes
   , kinds :: S.Set (Qualified (ProperName 'KindName))
   -- ^ Kinds in scope
-  } deriving Show
+  } deriving (Show, Generic)
+
+instance NFData Environment
 
 -- | Information about a type class
 data TypeClassData = TypeClassData
@@ -59,7 +65,9 @@ data TypeClassData = TypeClassData
   -- typeClassArguments and typeClassDependencies.
   , typeClassCoveringSets :: S.Set (S.Set Int)
   -- ^ A sets of arguments that can be used to infer all other arguments.
-  } deriving Show
+  } deriving (Show, Generic)
+
+instance NFData TypeClassData
 
 -- | A functional dependency indicates a relationship between two sets of
 -- type arguments in a class declaration.
@@ -68,7 +76,9 @@ data FunctionalDependency = FunctionalDependency
   -- ^ the type arguments which determine the determined type arguments
   , fdDetermined  :: [Int]
   -- ^ the determined type arguments
-  } deriving Show
+  } deriving (Show, Generic)
+
+instance NFData FunctionalDependency
 
 instance A.FromJSON FunctionalDependency where
   parseJSON = A.withObject "FunctionalDependency" $ \o ->
@@ -164,7 +174,9 @@ data NameVisibility
   -- ^ The name is defined in the current binding group, but is not visible
   | Defined
   -- ^ The name is defined in the another binding group, or has been made visible by a function binder
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
+
+instance NFData NameVisibility
 
 -- | A flag for whether a name is for an private or public value - only public values will be
 -- included in a generated externs file.
@@ -176,7 +188,9 @@ data NameKind
   -- ^ A public value for a module member or foreing import declaration
   | External
   -- ^ A name for member introduced by foreign import
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
+
+instance NFData NameKind
 
 -- | The kinds of a type
 data TypeKind
@@ -190,7 +204,9 @@ data TypeKind
   -- ^ A local type variable
   | ScopedTypeVar
   -- ^ A scoped type variable
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
+
+instance NFData TypeKind
 
 instance A.ToJSON TypeKind where
   toJSON (DataType args ctors) =
@@ -221,7 +237,9 @@ data DataDeclType
   -- ^ A standard data constructor
   | Newtype
   -- ^ A newtype constructor
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData DataDeclType
 
 showDataDeclType :: DataDeclType -> Text
 showDataDeclType Data = "data"

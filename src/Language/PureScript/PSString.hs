@@ -1,5 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveGeneric #-}
+
 module Language.PureScript.PSString
   ( PSString
   , toUTF16CodeUnits
@@ -12,6 +14,8 @@ module Language.PureScript.PSString
   ) where
 
 import Prelude.Compat
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
 import Control.Exception (try, evaluate)
 import Control.Applicative ((<|>))
 import Data.Char (chr)
@@ -48,7 +52,9 @@ import qualified Data.Aeson.Types as A
 -- and arrays of UTF-16 code units (integers) otherwise.
 --
 newtype PSString = PSString { toUTF16CodeUnits :: [Word16] }
-  deriving (Eq, Ord, Monoid)
+  deriving (Eq, Ord, Monoid, Generic)
+
+instance NFData PSString
 
 instance Show PSString where
   show = show . codePoints
