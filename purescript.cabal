@@ -3,7 +3,7 @@
 -- see: https://github.com/sol/hpack
 
 name:           purescript
-version:        0.11.2
+version:        0.11.3
 cabal-version:  >= 1.10
 build-type:     Simple
 license:        BSD3
@@ -83,6 +83,7 @@ extra-source-files:
       examples/failing/2567.purs
       examples/failing/2601.purs
       examples/failing/2616.purs
+      examples/failing/2806.purs
       examples/failing/365.purs
       examples/failing/438.purs
       examples/failing/881.purs
@@ -306,6 +307,7 @@ extra-source-files:
       examples/passing/2756.purs
       examples/passing/2787.purs
       examples/passing/2795.purs
+      examples/passing/2806.purs
       examples/passing/652.purs
       examples/passing/810.purs
       examples/passing/862.purs
@@ -657,7 +659,7 @@ library
         , containers
         , data-ordlist >=0.4.7.0
         , deepseq
-        , directory >=1.2.3.0
+        , directory >=1.2
         , dlist
         , edit-distance
         , filepath
