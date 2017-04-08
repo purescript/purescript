@@ -64,7 +64,7 @@ runAndEval comm eval =
     Right command ->
       -- the JS result can be ignored, as it's already written in a source file
       -- for the detail, please refer to Interactive.hs
-      handleCommand (\_ -> eval) (return ()) command
+      handleCommand (\_ -> eval) (return ()) (\_ -> return ()) command
 
 -- | Run a PSCi command and ignore the output
 run :: String -> TestPSCi ()
