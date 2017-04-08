@@ -657,7 +657,7 @@ library
         , containers
         , data-ordlist >=0.4.7.0
         , deepseq
-        , directory >=1.2
+        , directory >=1.2.3.0
         , dlist
         , edit-distance
         , filepath
