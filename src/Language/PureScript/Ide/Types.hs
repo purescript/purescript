@@ -229,7 +229,7 @@ instance ToJSON Success where
   toJSON (PursuitResult resp) = encodeSuccess resp
   toJSON (ImportList (moduleName, imports)) = object [ "resultType" .= ("success" :: Text)
                                                      , "result" .= object [ "imports" .= map encodeImport imports
-                                                                          , "moduleName" .= moduleName]]
+                                                                          , "moduleName" .= P.runModuleName moduleName]]
   toJSON (ModuleList modules) = encodeSuccess modules
   toJSON (RebuildSuccess warnings) = encodeSuccess (P.toJSONErrors False P.Warning warnings)
 
