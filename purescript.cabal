@@ -1,4 +1,4 @@
--- This file has been generated from package.yaml by hpack version 0.15.0.
+-- This file has been generated from package.yaml by hpack version 0.17.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -59,6 +59,7 @@ extra-source-files:
       examples/docs/src/TypeClassWithFunDeps.purs
       examples/docs/src/TypeClassWithoutMembers.purs
       examples/docs/src/TypeClassWithoutMembersIntermediate.purs
+      examples/docs/src/TypeLevelString.purs
       examples/docs/src/TypeOpAliases.purs
       examples/docs/src/UTF8.purs
       examples/docs/src/Virtual.purs

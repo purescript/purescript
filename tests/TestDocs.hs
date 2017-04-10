@@ -398,6 +398,10 @@ testCases =
   , ("DocComments",
       [ ShouldHaveDocComment (n "DocComments") "example" "    example == 0"
       ])
+
+  , ("TypeLevelString",
+      [ ShouldBeDocumented (n "TypeLevelString") "Foo" ["fooBar"]
+      ])
   ]
 
   where
