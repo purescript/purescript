@@ -646,7 +646,7 @@ flag release
 
 library
     build-depends:
-          aeson >=0.8 && <1.1
+          aeson >=1.0 && <1.1
         , aeson-better-errors >=0.8
         , ansi-terminal >=0.6.2 && <0.7
         , base >=4.8 && <5
@@ -854,7 +854,7 @@ library
 
 executable purs
     build-depends:
-          aeson >=0.8 && <1.1
+          aeson >=1.0 && <1.1
         , aeson-better-errors >=0.8
         , ansi-terminal >=0.6.2 && <0.7
         , base >=4.8 && <5
@@ -942,7 +942,7 @@ executable purs
 
 test-suite tests
     build-depends:
-          aeson >=0.8 && <1.1
+          aeson >=1.0 && <1.1
         , aeson-better-errors >=0.8
         , ansi-terminal >=0.6.2 && <0.7
         , base >=4.8 && <5

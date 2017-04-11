@@ -32,7 +32,7 @@ extra-source-files:
   - CONTRIBUTORS.md
   - CONTRIBUTING.md
 dependencies:
-  - aeson >=0.8 && <1.1
+  - aeson >=1.0 && <1.1
   - aeson-better-errors >=0.8
   - ansi-terminal >=0.6.2 && <0.7
   - base >=4.8 && <5
