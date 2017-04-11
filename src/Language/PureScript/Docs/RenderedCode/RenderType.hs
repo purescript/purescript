@@ -26,6 +26,7 @@ import Language.PureScript.Names
 import Language.PureScript.Pretty.Types
 import Language.PureScript.Types
 import Language.PureScript.Label (Label)
+import Language.PureScript.PSString (prettyPrintString)
 
 import Language.PureScript.Docs.RenderedCode.Types
 import Language.PureScript.Docs.Utils.MonoidExtras
@@ -54,6 +55,8 @@ typeLiterals = mkPattern match
     Just $ renderTypeAtom l <> sp <> renderTypeAtom op <> sp <> renderTypeAtom r
   match (TypeOp n) =
     Just (typeOp n)
+  match (TypeLevelString str) =
+    Just (syntax (prettyPrintString str))
   match _ =
     Nothing
 
