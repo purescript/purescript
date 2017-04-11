@@ -82,18 +82,13 @@ tco = everywhere convert where
   toLoop :: Text -> [Text] -> AST -> AST
   toLoop ident allArgs js =
       Block rootSS $
-        map (\arg -> VariableIntroduction rootSS arg (Just (Var rootSS (copyVar arg)))) allArgs ++
+        map (\arg -> VariableIntroduction rootSS (tcoVar arg) (Just (Var rootSS (copyVar arg)))) allArgs ++
         [ VariableIntroduction rootSS tcoDone (Just (BooleanLiteral rootSS False))
         , VariableIntroduction rootSS tcoResult Nothing
-        ] ++
-        map (\arg ->
-          VariableIntroduction rootSS (tcoVar arg) Nothing) allArgs ++
-        [ Function rootSS (Just tcoLoop) allArgs (Block rootSS [loopify js])
+        , Function rootSS (Just tcoLoop) allArgs (Block rootSS [loopify js])
         , While rootSS (Unary rootSS Not (Var rootSS tcoDone))
             (Block rootSS
-              (Assignment rootSS (Var rootSS tcoResult) (App rootSS (Var rootSS tcoLoop) (map (Var rootSS) allArgs))
-              : map (\arg ->
-                  Assignment rootSS (Var rootSS arg) (Var rootSS (tcoVar arg))) allArgs))
+              [(Assignment rootSS (Var rootSS tcoResult) (App rootSS (Var rootSS tcoLoop) (map (Var rootSS . tcoVar) allArgs)))])
         , Return rootSS (Var rootSS tcoResult)
         ]
     where
