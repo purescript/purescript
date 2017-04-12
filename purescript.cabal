@@ -236,6 +236,9 @@ extra-source-files:
       examples/failing/ProgrammableTypeErrors.purs
       examples/failing/ProgrammableTypeErrorsTypeString.purs
       examples/failing/Rank2Types.purs
+      examples/failing/RequalifyErrors.purs
+      examples/failing/RequalifyErrors/M1.purs
+      examples/failing/RequalifyErrors/M2.purs
       examples/failing/RequiredHiddenType.purs
       examples/failing/Reserved.purs
       examples/failing/RowConstructors1.purs
