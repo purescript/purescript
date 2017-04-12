@@ -152,7 +152,9 @@ entails SolverOptions{..} constraint context hints =
     solve constraint
   where
     forClassName :: InstanceContext -> Qualified (ProperName 'ClassName) -> [Type] -> [TypeClassDict]
-    forClassName _ C.Warn [msg] =
+    forClassName ctx cn@C.Warn [msg] | [] <- findDicts ctx cn Nothing =
+      -- Only generate a warning dictionary if there is not already one in scope.
+      -- This allows us to defer a warning by propagating the constraint.
       [TypeClassDictionaryInScope (WarnInstance msg) [] C.Warn [msg] Nothing]
     forClassName _ C.IsSymbol [TypeLevelString sym] =
       [TypeClassDictionaryInScope (IsSymbolInstance sym) [] C.IsSymbol [TypeLevelString sym] Nothing]
