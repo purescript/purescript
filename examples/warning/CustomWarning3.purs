@@ -1,4 +1,5 @@
 -- @shouldWarnWith UserDefinedWarning
+-- @shouldWarnWith UserDefinedWarning
 module Main where
 
 foo :: Warn "foo" => Int -> Int
