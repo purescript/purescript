@@ -38,6 +38,7 @@ import           Language.PureScript.PSString (PSString, decodeStringWithReplace
 import           Language.PureScript.Traversals
 import           Language.PureScript.Types
 import qualified Language.PureScript.Publish.BoxesHelpers as BoxHelpers
+import           Safe (initMay)
 import qualified System.Console.ANSI as ANSI
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Error as PE
@@ -1318,7 +1319,7 @@ toTypelevelString t = (Box.text . decodeStringWithReplacement) <$> toTypelevelSt
   toTypelevelString' :: Type -> Maybe PSString
   toTypelevelString' (TypeLevelString s) = Just s
   toTypelevelString' (TypeApp (TypeConstructor f) x)
-    | f == primName "TypeString" = Just $ fromString $ prettyPrintType x
+    | f == primName "TypeString" = fromString <$> (initMay . Box.render $ typeAsBox x)
   toTypelevelString' (TypeApp (TypeApp (TypeConstructor f) x) ret)
     | f == primName "TypeConcat" = toTypelevelString' x <> toTypelevelString' ret
   toTypelevelString' _ = Nothing
