@@ -62,7 +62,7 @@ data PSCiOptions = PSCiOptions
 
 inputFile :: Opts.Parser FilePath
 inputFile = Opts.strArgument $
-     Opts.metavar "FILE"
+     Opts.metavar "FILES"
   <> Opts.help "Optional .purs files to load on start"
 
 nodePathOption :: Opts.Parser (Maybe FilePath)
