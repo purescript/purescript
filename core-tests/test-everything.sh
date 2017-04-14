@@ -25,8 +25,8 @@ if [ "$force_recompile" = "true" ] && [ -d "output" ]; then
   rm -r output
 fi
 
-stack exec purs compile 'tests/**/*.purs' '.psc-package/psc-0.11.1/*/*/src/**/*.purs'
+stack exec psc-package build
 
-stack exec purs docs '.psc-package/psc-0.11.1/*/*/src/**/*.purs' > core-docs.md
+stack exec purs docs $(psc-package sources) > core-docs.md
 
 NODE_PATH=output node -e "require('Test.Main').main()"
