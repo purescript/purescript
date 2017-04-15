@@ -21,7 +21,6 @@ import           Data.Functor.Identity (Identity(..))
 import           Data.List (transpose, nubBy, sortBy, partition, dropWhileEnd)
 import           Data.Maybe (maybeToList, fromMaybe, mapMaybe)
 import           Data.Ord (comparing)
-import           Data.String (fromString)
 import qualified Data.Map as M
 import qualified Data.Text as T
 import           Data.Text (Text)
@@ -34,7 +33,7 @@ import           Language.PureScript.Label (Label(..))
 import           Language.PureScript.Names
 import           Language.PureScript.Pretty
 import           Language.PureScript.Pretty.Common (endWith)
-import           Language.PureScript.PSString (PSString, decodeStringWithReplacement)
+import           Language.PureScript.PSString (decodeStringWithReplacement)
 import           Language.PureScript.Traversals
 import           Language.PureScript.Types
 import qualified Language.PureScript.Publish.BoxesHelpers as BoxHelpers
@@ -1313,15 +1312,14 @@ renderBox = unlines
   whiteSpace = all isSpace
 
 toTypelevelString :: Type -> Maybe Box.Box
-toTypelevelString t = (Box.text . decodeStringWithReplacement) <$> toTypelevelString' t
-  where
-  toTypelevelString' :: Type -> Maybe PSString
-  toTypelevelString' (TypeLevelString s) = Just s
-  toTypelevelString' (TypeApp (TypeConstructor f) x)
-    | f == primName "TypeString" = Just $ fromString $ prettyPrintType x
-  toTypelevelString' (TypeApp (TypeApp (TypeConstructor f) x) ret)
-    | f == primName "TypeConcat" = toTypelevelString' x <> toTypelevelString' ret
-  toTypelevelString' _ = Nothing
+toTypelevelString (TypeLevelString s) =
+  Just . Box.text $ decodeStringWithReplacement s
+toTypelevelString (TypeApp (TypeConstructor f) x)
+  | f == primName "TypeString" = Just (typeAsBox x)
+toTypelevelString (TypeApp (TypeApp (TypeConstructor f) x) ret)
+  | f == primName "TypeConcat" =
+    (Box.<>) <$> toTypelevelString x <*> toTypelevelString ret
+toTypelevelString _ = Nothing
 
 -- | Rethrow an error with a more detailed error message in the case of failure
 rethrow :: (MonadError e m) => (e -> e) -> m a -> m a
