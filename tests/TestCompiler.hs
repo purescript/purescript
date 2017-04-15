@@ -53,10 +53,11 @@ import System.IO.Silently
 import qualified System.FilePath.Glob as Glob
 
 import TestUtils
-import Test.Hspec
+import Test.Tasty
+import Test.Tasty.Hspec
 
-main :: IO ()
-main = hspec spec
+main :: IO TestTree
+main = testSpec "compiler" spec
 
 spec :: Spec
 spec = do

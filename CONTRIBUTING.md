@@ -17,6 +17,8 @@ Please follow the following guidelines:
 
 Run all test suites with `stack test`. You will need `npm`, `bower` and `node` on your PATH to run the tests.
 
+You can run individual test suites using `stack test --test-arguments="-p PATTERN"` where `PATTERN` is one of `compiler`, `repl` or `ide`.
+
 To build and run a specific test in `examples/passing/` or `examples/failing/`, execute the following commands.
 
 ``` bash
