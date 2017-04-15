@@ -118,6 +118,7 @@ parseAnyType :: TokenParser Type
 parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTable typeOrConstrainedType) P.<?> "type"
   where
   operators = [ [ P.Infix (return TypeApp) P.AssocLeft ]
+              , [ P.Prefix (reserved "proxy" *> return ProxyType) ]
               , [ P.Infix (P.try (parseQualified parseOperator) >>= \ident ->
                     return (BinaryNoParensType (TypeOp ident))) P.AssocRight
                 ]

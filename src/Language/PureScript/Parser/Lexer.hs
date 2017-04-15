@@ -575,6 +575,7 @@ reservedPsNames = [ "data"
                   , "false"
                   , "in"
                   , "where"
+                  , "proxy"
                   ]
 
 reservedTypeNames :: [Text]
