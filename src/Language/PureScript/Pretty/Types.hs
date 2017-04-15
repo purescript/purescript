@@ -37,9 +37,6 @@ import Text.PrettyPrint.Boxes hiding ((<+>))
 
 -- TODO(Christoph): get rid of T.unpack s
 
-proxyAsBox :: Box -> Box
-proxyAsBox ty = text "proxy " <> ty
-
 constraintsAsBox :: TypeRenderOptions -> Constraint -> Box -> Box
 constraintsAsBox tro con ty =
     constraintAsBox con `before` (" " <> text doubleRightArrow <> " " <> ty)
@@ -107,12 +104,6 @@ insertPlaceholders = everywhereOnTypesTopDown convertForAlls . everywhereOnTypes
     go idents other = PrettyPrintForAll idents other
   convertForAlls other = other
 
-proxy :: Pattern () Type ((), Type)
-proxy = mkPattern match
-  where
-  match (ProxyType ty) = Just ((), ty)
-  match _ = Nothing
-
 constrained :: Pattern () Type (Constraint, Type)
 constrained = mkPattern match
   where
@@ -144,6 +135,7 @@ matchTypeAtom tro@TypeRenderOptions{troSuggesting = suggesting} =
         | otherwise = Just $ text $ T.unpack name ++ show s
       match REmpty = Just $ text "()"
       match row@RCons{} = Just $ prettyPrintRowWith tro '(' ')' row
+      match (ProxyType t) = Just $ text "proxy " <> typeAtomAsBox t
       match (BinaryNoParensType op l r) =
         Just $ typeAsBox l <> text " " <> typeAsBox op <> text " " <> typeAsBox r
       match (TypeOp op) = Just $ text $ T.unpack $ showQualified runOpName op
@@ -155,7 +147,6 @@ matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
   operators =
     OperatorTable [ [ AssocL typeApp $ \f x -> keepSingleLinesOr (moveRight 2) f x ]
                   , [ AssocR appliedFunction $ \arg ret -> keepSingleLinesOr id arg (text rightArrow <> " " <> ret) ]
-                  , [ Wrap proxy $ \_ ty -> proxyAsBox ty ]
                   , [ Wrap constrained $ \deps ty -> constraintsAsBox tro deps ty ]
                   , [ Wrap forall_ $ \idents ty -> keepSingleLinesOr (moveRight 2) (text (forall' ++ " " ++ unwords idents ++ ".")) ty ]
                   , [ Wrap kinded $ \k ty -> keepSingleLinesOr (moveRight 2) ty (text (doubleColon ++ " " ++ T.unpack (prettyPrintKind k))) ]

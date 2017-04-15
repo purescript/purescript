@@ -49,6 +49,9 @@ parseTypeVariable = do
 parseTypeConstructor :: TokenParser Type
 parseTypeConstructor = TypeConstructor <$> parseQualified typeName
 
+parseProxyType :: TokenParser Type
+parseProxyType = ProxyType <$> (reserved "proxy" *> parseTypeAtom)
+
 parseForAll :: TokenParser Type
 parseForAll = mkForAll <$> ((reserved "forall" <|> reserved "∀") *> P.many1 (indented *> identifier) <* indented <* dot)
                        <*> parseType
@@ -75,6 +78,7 @@ parseTypeAtom = indented *> P.choice
             , parseForAll
             , parseTypeVariable
             , parseTypeConstructor
+            , parseProxyType
             -- This try is needed due to some unfortunate ambiguities between rows and kinded types
             , P.try (parens parseRow)
             , ParensInType <$> parens parsePolyType
@@ -118,7 +122,6 @@ parseAnyType :: TokenParser Type
 parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTable typeOrConstrainedType) P.<?> "type"
   where
   operators = [ [ P.Infix (return TypeApp) P.AssocLeft ]
-              , [ P.Prefix (reserved "proxy" *> return ProxyType) ]
               , [ P.Infix (P.try (parseQualified parseOperator) >>= \ident ->
                     return (BinaryNoParensType (TypeOp ident))) P.AssocRight
                 ]
