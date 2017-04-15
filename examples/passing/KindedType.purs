@@ -15,10 +15,10 @@ f s = s
 
 test2 = f "test"
 
-data FProxy (f :: Type -> Type) = FProxy
+data Proxy (f :: Type -> Type) = Proxy
 
-test3 :: FProxy Array
-test3 = FProxy
+test3 :: Proxy Array
+test3 = Proxy
 
 type Test (f :: Type -> Type) = f String
 
