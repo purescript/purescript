@@ -7,6 +7,7 @@ import Data.Text (Text)
 import Data.Monoid ((<>))
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.AST.SourcePos (SourceSpan)
+import Safe (headDef, tailSafe)
 
 -- | Eliminate tail calls
 tco :: AST -> AST
@@ -29,10 +30,11 @@ tco = everywhere convert where
   convert :: AST -> AST
   convert (VariableIntroduction ss name (Just fn@Function {}))
       | isTailRecursive name body'
-      = VariableIntroduction ss name (Just (replace (toLoop name allArgs body')))
+      = VariableIntroduction ss name (Just (replace (toLoop name outerArgs innerArgs body')))
     where
+      innerArgs = headDef [] argss
+      outerArgs = concat . reverse $ tailSafe argss
       (argss, body', replace) = collectAllFunctionArgs [] id fn
-      allArgs = concat $ reverse argss
   convert js = js
 
   collectAllFunctionArgs :: [[Text]] -> (AST -> AST) -> AST -> ([[Text]], AST, AST -> AST)
@@ -79,21 +81,16 @@ tco = everywhere convert where
     allInTailPosition _
       = False
 
-  toLoop :: Text -> [Text] -> AST -> AST
-  toLoop ident allArgs js =
+  toLoop :: Text -> [Text] -> [Text] -> AST -> AST
+  toLoop ident outerArgs innerArgs js =
       Block rootSS $
-        map (\arg -> VariableIntroduction rootSS arg (Just (Var rootSS (copyVar arg)))) allArgs ++
+        map (\arg -> VariableIntroduction rootSS (tcoVar arg) (Just (Var rootSS (copyVar arg)))) outerArgs ++
         [ VariableIntroduction rootSS tcoDone (Just (BooleanLiteral rootSS False))
         , VariableIntroduction rootSS tcoResult Nothing
-        ] ++
-        map (\arg ->
-          VariableIntroduction rootSS (tcoVar arg) Nothing) allArgs ++
-        [ Function rootSS (Just tcoLoop) allArgs (Block rootSS [loopify js])
+        , Function rootSS (Just tcoLoop) (outerArgs ++ innerArgs) (Block rootSS [loopify js])
         , While rootSS (Unary rootSS Not (Var rootSS tcoDone))
             (Block rootSS
-              (Assignment rootSS (Var rootSS tcoResult) (App rootSS (Var rootSS tcoLoop) (map (Var rootSS) allArgs))
-              : map (\arg ->
-                  Assignment rootSS (Var rootSS arg) (Var rootSS (tcoVar arg))) allArgs))
+              [(Assignment rootSS (Var rootSS tcoResult) (App rootSS (Var rootSS tcoLoop) ((map (Var rootSS . tcoVar) outerArgs) ++ (map (Var rootSS . copyVar) innerArgs))))])
         , Return rootSS (Var rootSS tcoResult)
         ]
     where
@@ -107,7 +104,9 @@ tco = everywhere convert where
         in
           Block ss $
             zipWith (\val arg ->
-              Assignment ss (Var ss (tcoVar arg)) val) allArgumentValues allArgs
+              Assignment ss (Var ss (tcoVar arg)) val) allArgumentValues outerArgs
+            ++ zipWith (\val arg ->
+              Assignment ss (Var ss (copyVar arg)) val) (drop (length outerArgs) allArgumentValues) innerArgs
             ++ [ ReturnNoResult ss ]
       | otherwise = Block ss [ markDone ss, Return ss ret ]
     loopify (ReturnNoResult ss) = Block ss [ markDone ss, ReturnNoResult ss ]
