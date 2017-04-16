@@ -18,3 +18,4 @@ output
 examples/docs/docs/
 core-tests/full-core-docs.md
 .psc-ide-port
+.psc-package/

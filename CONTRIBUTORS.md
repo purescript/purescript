@@ -88,6 +88,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@sebastiaanvisser](https://github.com/sebastiaanvisser) | Sebastiaan Visser | MIT license |
 | [@senju](https://github.com/senju) | senju | [MIT license](http://opensource.org/licenses/MIT) |
 | [@seungha-kim](https://github.com/seungha-kim) | Seungha Kim | [MIT license](http://opensource.org/licenses/MIT) |
+| [@simonyangme](https://github.com/simonyangme) | Simon Yang | [MIT license](http://opensource.org/licenses/MIT) |
 | [@sharkdp](https://github.com/sharkdp) | David Peter | [MIT license](http://opensource.org/licenses/MIT) |
 | [@soupi](https://github.com/soupi) | Gil Mizrahi | [MIT license](http://opensource.org/licenses/MIT) |
 | [@sztupi](https://github.com/sztupi) | Attila Sztupak | [MIT license](http://opensource.org/licenses/MIT) |

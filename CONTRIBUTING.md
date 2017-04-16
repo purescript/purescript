@@ -4,7 +4,7 @@ Pull requests are encouraged.
 
 ## Finding Issues to Work On
 
-If you would like to contribute, please consider the issues in the current milestone first. If you are a new contributor, you may want to have a go at the ["easy" issues](https://github.com/purescript/purescript/labels/easy) to get started.
+If you would like to contribute, please consider the issues in the current milestone first. If you are a new contributor, you may want to have a go at the ["new contributor" issues](https://github.com/purescript/purescript/labels/new%20contributor) to get started.
 
 ## Pull Requests
 
