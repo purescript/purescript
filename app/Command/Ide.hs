@@ -80,10 +80,10 @@ command = Opts.helper <*> subcommands where
   subcommands :: Opts.Parser (IO ())
   subcommands = (Opts.subparser . fold)
     [ Opts.command "server"
-        (Opts.info (fmap server serverOptions)
+        (Opts.info (fmap server serverOptions <**> Opts.helper)
           (Opts.progDesc "Start a server process"))
     , Opts.command "client"
-        (Opts.info (fmap client clientOptions)
+        (Opts.info (fmap client clientOptions <**> Opts.helper)
           (Opts.progDesc "Connect to a running server"))
     ]
 
