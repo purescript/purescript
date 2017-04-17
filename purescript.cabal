@@ -3,7 +3,7 @@
 -- see: https://github.com/sol/hpack
 
 name:           purescript
-version:        0.11.3
+version:        0.11.4
 cabal-version:  >= 1.10
 build-type:     Simple
 license:        BSD3
