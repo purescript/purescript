@@ -17,6 +17,7 @@ import qualified Command.REPL as REPL
 import           Data.Foldable (fold)
 import           Data.Monoid ((<>))
 import qualified Options.Applicative as Opts
+import           System.Environment (getArgs)
 import qualified System.IO as IO
 import           Version (versionString)
 
@@ -25,13 +26,19 @@ main :: IO ()
 main = do
     IO.hSetEncoding IO.stdout IO.utf8
     IO.hSetEncoding IO.stderr IO.utf8
-    cmd <- Opts.execParser opts
+    cmd <- Opts.handleParseResult . execParserPure opts =<< getArgs
     cmd
   where
     opts        = Opts.info (versionInfo <*> Opts.helper <*> commands) infoModList
     infoModList = Opts.fullDesc <> headerInfo <> footerInfo
     headerInfo  = Opts.progDesc "The PureScript compiler and tools"
     footerInfo  = Opts.footer $ "purs " ++ versionString
+
+    -- | Displays full command help when invoked with no arguments.
+    execParserPure :: Opts.ParserInfo a -> [String] -> Opts.ParserResult a
+    execParserPure pinfo [] = Opts.Failure $
+      Opts.parserFailure Opts.defaultPrefs pinfo Opts.ShowHelpText mempty
+    execParserPure pinfo args = Opts.execParserPure Opts.defaultPrefs pinfo args
 
     versionInfo :: Opts.Parser (a -> a)
     versionInfo = Opts.abortOption (Opts.InfoMsg versionString) $
