@@ -20,10 +20,10 @@ matrix:
       sudo: required
       env: BUILD_TYPE=normal
 
-    - os: linux
-      dist: trusty
-      sudo: required
-      env: BUILD_TYPE=sdist COVERAGE=true
+    # - os: linux
+    #   dist: trusty
+    #   sudo: required
+    #   env: BUILD_TYPE=sdist COVERAGE=true
 
     - os: linux
       dist: trusty
