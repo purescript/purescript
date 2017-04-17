@@ -575,11 +575,10 @@ reservedPsNames = [ "data"
                   , "false"
                   , "in"
                   , "where"
-                  , "proxy"
                   ]
 
 reservedTypeNames :: [Text]
-reservedTypeNames = [ "forall", "where" ]
+reservedTypeNames = [ "forall", "where", "proxy" ]
 
 -- |
 -- The characters allowed for use in operators
