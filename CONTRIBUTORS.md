@@ -95,6 +95,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@taktoa](https://github.com/taktoa) | Remy Goldschmidt | [MIT license](http://opensource.org/licenses/MIT) |
 | [@taku0](https://github.com/taku0) | taku0 | [MIT license](http://opensource.org/licenses/MIT) |
 | [@tfausak](https://github.com/tfausak) | Taylor Fausak | [MIT license](http://opensource.org/licenses/MIT) |
+| [@thoradam](https://github.com/thoradam) | Thor Adam | [MIT license](http://opensource.org/licenses/MIT) |
 | [@tmcgilchrist](https://github.com/tmcgilchrist) | Tim McGilchrist | [MIT license](http://opensource.org/licenses/MIT) |
 | [@trofi](https://github.com/trofi) | Sergei Trofimovich | [MIT license](http://opensource.org/licenses/MIT) |
 | [@utkarshkukreti](https://github.com/utkarshkukreti) | Utkarsh Kukreti | [MIT license](http://opensource.org/licenses/MIT) |

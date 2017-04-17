@@ -18,9 +18,8 @@ import           Data.Char (isSpace)
 import           Data.Either (partitionEithers)
 import           Data.Foldable (fold)
 import           Data.Functor.Identity (Identity(..))
-import           Data.List (transpose, nubBy, sortBy, partition, dropWhileEnd)
+import           Data.List (transpose, nubBy, sort, partition, dropWhileEnd)
 import           Data.Maybe (maybeToList, fromMaybe, mapMaybe)
-import           Data.Ord (comparing)
 import qualified Data.Map as M
 import qualified Data.Text as T
 import           Data.Text (Text)
@@ -566,15 +565,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
             -- Put the common labels last
             sortRows' :: ([(Label, Type)], Type) -> ([(Label, Type)], Type) -> (Type, Type)
             sortRows' (s1, r1) (s2, r2) =
-              let common :: [(Label, (Type, Type))]
-                  common = sortBy (comparing fst) [ (name, (t1, t2)) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
-
-                  sd1, sd2 :: [(Label, Type)]
-                  sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
-                  sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
-              in ( rowFromList (sortBy (comparing fst) sd1 ++ map (fst &&& fst . snd) common, r1)
-                 , rowFromList (sortBy (comparing fst) sd2 ++ map (fst &&& snd . snd) common, r2)
-                 )
+                  let (common1, unique1) = partition (flip elem s2) s1
+                      (common2, unique2) = partition (flip elem s1) s2
+                  in ( rowFromList (sort unique1 ++ sort common1, r1)
+                     , rowFromList (sort unique2 ++ sort common2, r2)
+                     )
         in paras [ line "Could not match type"
                  , markCodeBox $ indent $ typeAsBox sorted1
                  , line "with type"
