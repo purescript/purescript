@@ -586,6 +586,8 @@ extra-source-files:
       examples/warning/2411.purs
       examples/warning/2542.purs
       examples/warning/CustomWarning.purs
+      examples/warning/CustomWarning2.purs
+      examples/warning/CustomWarning3.purs
       examples/warning/DuplicateExportRef.purs
       examples/warning/DuplicateImport.purs
       examples/warning/DuplicateImportRef.purs
