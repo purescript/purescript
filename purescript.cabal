@@ -12,7 +12,7 @@ copyright:      (c) 2013-17 Phil Freeman, (c) 2014-17 Gary Burgess
 maintainer:     Phil Freeman <paf31@cantab.net>
 stability:      experimental
 homepage:       http://www.purescript.org/
-bug-reports:    https://github.com/purescript/purescript.git/issues
+bug-reports:    https://github.com/purescript/purescript/issues
 synopsis:       PureScript Programming Language Compiler
 description:    A small strongly, statically typed programming language with expressive types, inspired by Haskell and compiling to JavaScript.
 category:       Language
@@ -638,7 +638,7 @@ extra-source-files:
 
 source-repository head
     type: git
-    location: https://github.com/purescript/purescript.git
+    location: https://github.com/purescript/purescript
 
 flag release
     description: Mark this build as a release build: prevents inclusion of extra info e.g. commit SHA in --version output)
