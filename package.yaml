@@ -11,7 +11,7 @@ author: >
   Harry Garrood <harry@garrood.me>,
   Christoph Hegemann <christoph.hegemann1337@gmail.com>
 maintainer: Phil Freeman <paf31@cantab.net>
-copyright: (c) 2013-16 Phil Freeman, (c) 2014-16 Gary Burgess
+copyright: (c) 2013-17 Phil Freeman, (c) 2014-17 Gary Burgess
 license: BSD3
 github: purescript/purescript.git
 homepage: http://www.purescript.org/
