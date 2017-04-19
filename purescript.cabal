@@ -662,7 +662,7 @@ library
         , containers
         , data-ordlist >=0.4.7.0
         , deepseq
-        , directory >=1.2
+        , directory >=1.2.3
         , dlist
         , edit-distance
         , filepath
@@ -870,7 +870,7 @@ executable purs
         , containers
         , data-ordlist >=0.4.7.0
         , deepseq
-        , directory >=1.2
+        , directory >=1.2.3
         , dlist
         , edit-distance
         , filepath
@@ -958,7 +958,7 @@ test-suite tests
         , containers
         , data-ordlist >=0.4.7.0
         , deepseq
-        , directory >=1.2
+        , directory >=1.2.3
         , dlist
         , edit-distance
         , filepath
