@@ -108,6 +108,8 @@ spec = do
           prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideDtor i t Nothing)) mn is)
         addTypeImport i mn is =
           prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideType i Nothing)) mn is)
+        addKindImport i mn is =
+          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideKind i)) mn is)
     it "adds an implicit unqualified import to a file without any imports" $
       shouldBe
         (addImplicitImport' [] (P.moduleNameFromString "Data.Map"))
@@ -138,6 +140,12 @@ spec = do
         (addValueImport "head" (P.moduleNameFromString "Data.Array") explicitImports)
         [ "import Prelude"
         , "import Data.Array (head, tail)"
+        ]
+    it "adds a kind to an explicit import list" $
+      shouldBe
+        (addKindImport "Effect" (P.moduleNameFromString "Control.Monad.Eff") simpleFileImports)
+        [ "import Prelude"
+        , "import Control.Monad.Eff (kind Effect)"
         ]
     it "adds an operator to an explicit import list" $
       shouldBe
