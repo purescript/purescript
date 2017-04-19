@@ -203,6 +203,8 @@ addExplicitImport' decl moduleName imports =
       P.ValueOpRef (op ^. ideValueOpName)
     refFromDeclaration (IdeDeclTypeOperator op) =
       P.TypeOpRef (op ^. ideTypeOpName)
+    refFromDeclaration (IdeDeclKind kn) =
+      P.KindRef kn
     refFromDeclaration d =
       P.ValueRef (P.Ident (identifierFromIdeDeclaration d))
 
