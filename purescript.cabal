@@ -8,7 +8,7 @@ cabal-version:  >= 1.10
 build-type:     Simple
 license:        BSD3
 license-file:   LICENSE
-copyright:      (c) 2013-16 Phil Freeman, (c) 2014-16 Gary Burgess
+copyright:      (c) 2013-17 Phil Freeman, (c) 2014-17 Gary Burgess
 maintainer:     Phil Freeman <paf31@cantab.net>
 stability:      experimental
 homepage:       http://www.purescript.org/
@@ -586,6 +586,8 @@ extra-source-files:
       examples/warning/2411.purs
       examples/warning/2542.purs
       examples/warning/CustomWarning.purs
+      examples/warning/CustomWarning2.purs
+      examples/warning/CustomWarning3.purs
       examples/warning/DuplicateExportRef.purs
       examples/warning/DuplicateImport.purs
       examples/warning/DuplicateImportRef.purs
