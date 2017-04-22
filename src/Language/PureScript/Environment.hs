@@ -377,9 +377,9 @@ primClasses =
     -- class RowCons (l :: Symbol) (a :: Type) (i :: # Type) (o :: # Type) | l i a -> o, l o -> a i
     , (primName "RowCons", (makeTypeClassData
                              [ ("l", Just kindSymbol)
-                             , ("a", Just (Row kindType))
-                             , ("i", Just kindType)
-                             , ("o", Just kindType)
+                             , ("a", Just kindType)
+                             , ("i", Just (Row kindType))
+                             , ("o", Just (Row kindType))
                              ] [] []
                              [ FunctionalDependency [0, 1, 2] [3]
                              , FunctionalDependency [0, 3] [1, 2]
