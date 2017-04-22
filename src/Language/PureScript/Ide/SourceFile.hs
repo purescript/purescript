@@ -27,17 +27,14 @@ import qualified Language.PureScript           as P
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
-import           System.Directory (getCurrentDirectory)
-import           System.FilePath (makeRelative)
 
 parseModule
   :: (MonadIO m, MonadError IdeError m)
   => FilePath
   -> m (Either FilePath (FilePath, P.Module))
 parseModule path = do
-  pwd <- liftIO getCurrentDirectory
   contents <- ideReadFile path
-  case P.parseModuleFromFile (makeRelative pwd) (path, contents) of
+  case P.parseModuleFromFile identity (path, contents) of
     Left _ -> pure (Left path)
     Right m -> pure (Right m)
 

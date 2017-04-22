@@ -27,8 +27,8 @@ loadModule filename = do
   pwd <- getCurrentDirectory
   content <- readUTF8FileT filename
   return $
-    either (Left . P.prettyPrintMultipleErrors P.defaultPPEOptions) (Right . map snd) $
-      P.parseModulesFromFiles (makeRelative pwd) [(filename, content)]
+    either (Left . P.prettyPrintMultipleErrors P.defaultPPEOptions {P.ppeRelativeDirectory = pwd}) (Right . map snd) $
+      P.parseModulesFromFiles id [(filename, content)]
 
 -- | Load all modules.
 loadAllModules :: [FilePath] -> IO (Either P.MultipleErrors [(FilePath, P.Module)])

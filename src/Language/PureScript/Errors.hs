@@ -362,24 +362,26 @@ defaultCodeColor = (ANSI.Dull, ANSI.Yellow)
 
 -- | `prettyPrintSingleError` Options
 data PPEOptions = PPEOptions
-  { ppeCodeColor :: Maybe (ANSI.ColorIntensity, ANSI.Color) -- ^ Color code with this color... or not
-  , ppeFull      :: Bool -- ^ Should write a full error message?
-  , ppeLevel     :: Level -- ^ Should this report an error or a warning?
-  , ppeShowDocs  :: Bool -- ^ Should show a link to error message's doc page?
+  { ppeCodeColor         :: Maybe (ANSI.ColorIntensity, ANSI.Color) -- ^ Color code with this color... or not
+  , ppeFull              :: Bool -- ^ Should write a full error message?
+  , ppeLevel             :: Level -- ^ Should this report an error or a warning?
+  , ppeShowDocs          :: Bool -- ^ Should show a link to error message's doc page?
+  , ppeRelativeDirectory :: FilePath -- ^ FilePath to which the errors are relative
   }
 
 -- | Default options for PPEOptions
 defaultPPEOptions :: PPEOptions
 defaultPPEOptions = PPEOptions
-  { ppeCodeColor = Just defaultCodeColor
-  , ppeFull      = False
-  , ppeLevel     = Error
-  , ppeShowDocs  = True
+  { ppeCodeColor         = Just defaultCodeColor
+  , ppeFull              = False
+  , ppeLevel             = Error
+  , ppeShowDocs          = True
+  , ppeRelativeDirectory = mempty
   }
 
 -- | Pretty print a single error, simplifying if necessary
 prettyPrintSingleError :: PPEOptions -> ErrorMessage -> Box.Box
-prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalState defaultUnknownMap $ do
+prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = flip evalState defaultUnknownMap $ do
   em <- onTypesInErrorMessageM replaceUnknowns (if full then e else simplifyErrorMessage e)
   um <- get
   return (prettyPrintErrorMessage um em)
@@ -522,7 +524,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
       line $ "Export for " <> printName new <> " conflicts with " <> runName existing
     renderSimpleErrorMessage (DuplicateModule mn ss) =
       paras [ line ("Module " <> markCode (runModuleName mn) <> " has been defined multiple times:")
-            , indent . paras $ map (line . displaySourceSpan) ss
+            , indent . paras $ map (line . displaySourceSpan relPath) ss
             ]
     renderSimpleErrorMessage (CycleInDeclaration nm) =
       line $ "The value of " <> markCode (showIdent nm) <> " is undefined here, so this reference is not allowed."
@@ -551,7 +553,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
             ]
     renderSimpleErrorMessage (EscapedSkolem name (Just srcSpan) ty) =
       paras [ line $ "The type variable " <> markCode name <> ", bound at"
-            , indent $ line $ displaySourceSpan srcSpan
+            , indent $ line $ displaySourceSpan relPath srcSpan
             , line "has escaped its scope, appearing in the type"
             , markCodeBox $ indent $ typeAsBox ty
             ]
@@ -1053,7 +1055,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
                 ]
             ]
     renderHint (PositionedError srcSpan) detail =
-      paras [ line $ "at " <> displaySourceSpan srcSpan
+      paras [ line $ "at " <> displaySourceSpan relPath srcSpan
             , detail
             ]
 
