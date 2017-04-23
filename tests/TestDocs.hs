@@ -402,6 +402,10 @@ testCases =
   , ("TypeLevelString",
       [ ShouldBeDocumented (n "TypeLevelString") "Foo" ["fooBar"]
       ])
+
+  , ("Desugar",
+      [ ValueShouldHaveTypeSignature (n "Desugar") "test" (renderedType "forall a b. X (a -> b) a -> b")
+      ])
   ]
 
   where
