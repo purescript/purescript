@@ -4,8 +4,9 @@ module Language.PureScript.Sugar.TypeClasses.Deriving (deriveInstances) where
 import           Prelude.Compat
 
 import           Control.Arrow (second)
-import           Control.Monad (replicateM, zipWithM, unless)
+import           Control.Monad (replicateM, zipWithM, unless, when)
 import           Control.Monad.Error.Class (MonadError(..))
+import           Control.Monad.Writer.Class (MonadWriter(..))
 import           Control.Monad.Supply.Class (MonadSupply)
 import           Data.Foldable (for_)
 import           Data.List (foldl', find, sortBy, unzip5)
@@ -65,7 +66,7 @@ extractNewtypeName mn xs = go (last xs) where
 -- | Elaborates deriving instance declarations by code generation.
 deriveInstances
   :: forall m
-   . (MonadError MultipleErrors m, MonadSupply m)
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
   => [ExternsFile]
   -> Module
   -> m Module
@@ -107,7 +108,7 @@ deriveInstances externs (Module ss coms mn ds exts) =
 -- | Takes a declaration, and if the declaration is a deriving TypeInstanceDeclaration,
 -- elaborates that into an instance declaration via code generation.
 deriveInstance
-  :: (MonadError MultipleErrors m, MonadSupply m)
+  :: (MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
   => ModuleName
   -> SynonymMap
   -> NewtypeDerivedInstances
@@ -183,7 +184,7 @@ unwrapTypeConstructor = fmap (second reverse) . go
 
 deriveNewtypeInstance
   :: forall m
-   . MonadError MultipleErrors m
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
   -> SynonymMap
   -> NewtypeDerivedInstances
@@ -228,14 +229,15 @@ deriveNewtypeInstance mn syns ndis className ds tys tyConNm dargs = do
     verifySuperclasses =
       for_ (M.lookup (qualify mn className) (ndiSuperclasses ndis)) $ \(args, superclasses) ->
         for_ superclasses $ \Constraint{..} -> do
-          case constraintArgs of
-            _ : _ -> do
-              unless (constraintArgs == map TypeVar args) $
-                throwError . errorMessage $ InvalidNewtypeInstanceSuperclass constraintClass className tys
-            _ -> pure ()
-          for_ (extractNewtypeName mn tys) $ \nm ->
-            unless ((qualify (error "verifySuperclasses: unknown class module") constraintClass, nm) `S.member` ndiDerivedInstances ndis) $
-              throwError . errorMessage $ MissingNewtypeSuperclassInstance constraintClass className tys
+          -- We need to check whether the newtype is mentioned, because of classes like MonadWriter
+          -- with its Monoid superclass constraint.
+          when (not (null args) && not (null constraintArgs) && TypeVar (last args) == last constraintArgs) $ do
+            -- Now make sure that a superclass instance was derived. Again, this is not a complete
+            -- check, since the superclass might have multiple type arguments, so overlaps might still
+            -- be possible, so we warn again.
+            for_ (extractNewtypeName mn tys) $ \nm ->
+              unless ((qualify (error "verifySuperclasses: unknown class module") constraintClass, nm) `S.member` ndiDerivedInstances ndis) $
+                tell . errorMessage $ MissingNewtypeSuperclassInstance constraintClass className tys
 
 dataGeneric :: ModuleName
 dataGeneric = ModuleName [ ProperName "Data", ProperName "Generic" ]

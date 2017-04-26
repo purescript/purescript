@@ -121,7 +121,6 @@ errorCode em = case unwrapErrorMessage em of
   PossiblyInfiniteInstance{} -> "PossiblyInfiniteInstance"
   CannotDerive{} -> "CannotDerive"
   InvalidNewtypeInstance{} -> "InvalidNewtypeInstance"
-  InvalidNewtypeInstanceSuperclass{} -> "InvalidNewtypeInstanceSuperclass"
   MissingNewtypeSuperclassInstance{} -> "MissingNewtypeSuperclassInstance"
   InvalidDerivedInstance{} -> "InvalidDerivedInstance"
   ExpectedTypeConstructor{} -> "ExpectedTypeConstructor"
@@ -264,7 +263,6 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
   gSimple (CannotDerive cl ts) = CannotDerive cl <$> traverse f ts
   gSimple (InvalidNewtypeInstance cl ts) = InvalidNewtypeInstance cl <$> traverse f ts
-  gSimple (InvalidNewtypeInstanceSuperclass cl1 cl2 ts) = InvalidNewtypeInstanceSuperclass cl1 cl2 <$> traverse f ts
   gSimple (MissingNewtypeSuperclassInstance cl1 cl2 ts) = MissingNewtypeSuperclassInstance cl1 cl2 <$> traverse f ts
   gSimple (InvalidDerivedInstance cl ts n) = InvalidDerivedInstance cl <$> traverse f ts <*> pure n
   gSimple (ExpectedTypeConstructor cl ts ty) = ExpectedTypeConstructor cl <$> traverse f ts <*> f ty
@@ -675,33 +673,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs) e = flip evalS
                 ]
             , line "Make sure this is a newtype."
             ]
-    renderSimpleErrorMessage (InvalidNewtypeInstanceSuperclass su cl ts) =
-      paras [ line "Cannot derive newtype instance for"
-            , markCodeBox $ indent $ Box.hsep 1 Box.left
-                [ line (showQualified runProperName cl)
-                , Box.vcat Box.left (map typeAtomAsBox ts)
-                ]
-            , line "because the superclass constraint"
-            , markCodeBox $ indent $ Box.hsep 1 Box.left
-                [ line (showQualified runProperName su)
-                , Box.vcat Box.left (map typeAtomAsBox ts)
-                ]
-            , line "could not be verified."
-            , line "A superclass constraint for a newtype instance must not modify its type arguments:"
-            , markCodeBox $ indent $ line "class Super t_1 ... t_n <= Class t_1 ... t_n"
-            ]
     renderSimpleErrorMessage (MissingNewtypeSuperclassInstance su cl ts) =
-      paras [ line "Cannot derive newtype instance for"
+      paras [ line "The derived newtype instance for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName cl)
                 , Box.vcat Box.left (map typeAtomAsBox ts)
                 ]
-            , line "because the superclass instance"
-            , markCodeBox $ indent $ Box.hsep 1 Box.left
-                [ line (showQualified runProperName su)
-                , Box.vcat Box.left (map typeAtomAsBox ts)
-                ]
-            , line "must also be derived as a newtype instance in this module."
+            , line $ "does not include a derived superclass instance for " <> markCode (showQualified runProperName su) <> "."
             ]
     renderSimpleErrorMessage (InvalidDerivedInstance nm ts argCount) =
       paras [ line "Cannot derive the type class instance"
