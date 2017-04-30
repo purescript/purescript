@@ -4,7 +4,7 @@
     "purescript-arrays": "4.0.0",
     "purescript-assert": "3.0.0",
     "purescript-console": "3.0.0",
-    "purescript-eff": "3.0.0",
+    "purescript-eff": "3.1.0",
     "purescript-functions": "3.0.0",
     "purescript-generics": "4.0.0",
     "purescript-generics-rep": "5.0.0",
