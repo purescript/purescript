@@ -20,8 +20,6 @@ import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
-import           System.Directory (getCurrentDirectory)
-import           System.FilePath (makeRelative)
 
 -- | Given a filepath performs the following steps:
 --
@@ -48,9 +46,8 @@ rebuildFile
 rebuildFile path runOpenBuild = do
 
   input <- ideReadFile path
-  pwd <- liftIO getCurrentDirectory
 
-  m <- case snd <$> P.parseModuleFromFile (makeRelative pwd) (path, input) of
+  m <- case snd <$> P.parseModuleFromFile identity (path, input) of
     Left parseError ->
       throwError (RebuildError (P.MultipleErrors [P.toPositionedError parseError]))
     Right m -> pure m
