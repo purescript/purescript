@@ -13,6 +13,7 @@ import qualified Data.Aeson as A
 import Data.Monoid
 import qualified Data.Text as T
 import Data.Text (Text)
+import System.FilePath (makeRelative)
 
 -- |
 -- Source position information
@@ -65,9 +66,9 @@ displayStartEndPos sp =
   displaySourcePos (spanStart sp) <> " - " <>
   displaySourcePos (spanEnd sp)
 
-displaySourceSpan :: SourceSpan -> Text
-displaySourceSpan sp =
-  T.pack (spanName sp) <> " " <>
+displaySourceSpan :: FilePath -> SourceSpan -> Text
+displaySourceSpan relPath sp =
+  T.pack (makeRelative relPath (spanName sp)) <> " " <>
     displayStartEndPos sp
 
 instance A.ToJSON SourceSpan where

@@ -38,11 +38,14 @@ import           Language.PureScript.Interactive.Parser       as Interactive
 import           Language.PureScript.Interactive.Printer      as Interactive
 import           Language.PureScript.Interactive.Types        as Interactive
 
+import           System.Directory (getCurrentDirectory)
 import           System.FilePath ((</>))
 
 -- | Pretty-print errors
 printErrors :: MonadIO m => P.MultipleErrors -> m ()
-printErrors = liftIO . putStrLn . P.prettyPrintMultipleErrors P.defaultPPEOptions
+printErrors errs = liftIO $ do
+  pwd <- getCurrentDirectory
+  putStrLn $ P.prettyPrintMultipleErrors P.defaultPPEOptions {P.ppeRelativeDirectory = pwd} errs
 
 -- | This is different than the runMake in 'Language.PureScript.Make' in that it specifies the
 -- options and ignores the warning messages.
