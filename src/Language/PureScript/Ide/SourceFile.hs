@@ -14,7 +14,6 @@
 
 module Language.PureScript.Ide.SourceFile
   ( parseModule
-  , getImportsForFile
   , extractAstInformation
   -- for tests
   , extractSpans
@@ -28,43 +27,16 @@ import qualified Language.PureScript           as P
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
-import           System.IO.UTF8                (readUTF8FileT)
 
 parseModule
-  :: (MonadIO m)
+  :: (MonadIO m, MonadError IdeError m)
   => FilePath
   -> m (Either FilePath (FilePath, P.Module))
 parseModule path = do
-  contents <- liftIO (readUTF8FileT path)
+  contents <- ideReadFile path
   case P.parseModuleFromFile identity (path, contents) of
     Left _ -> pure (Left path)
     Right m -> pure (Right m)
-
-getImports :: P.Module -> [(P.ModuleName, P.ImportDeclarationType, Maybe P.ModuleName)]
-getImports (P.Module _ _ _ declarations _) =
-  mapMaybe isImport declarations
-  where
-    isImport (P.PositionedDeclaration _ _ (P.ImportDeclaration a b c)) = Just (a, b, c)
-    isImport _ = Nothing
-
-getImportsForFile :: (MonadIO m, MonadError PscIdeError m) =>
-                     FilePath -> m [ModuleImport]
-getImportsForFile fp = do
-  moduleE <- parseModule fp
-  case moduleE of
-    Left _ -> throwError (GeneralError "Failed to parse sourcefile.")
-    Right (_, module') ->
-      pure (mkModuleImport . unwrapPositionedImport <$> getImports module')
-      where
-        mkModuleImport (mn, importType', qualifier) =
-          ModuleImport
-          (P.runModuleName mn)
-          importType'
-          (P.runModuleName <$> qualifier)
-        unwrapPositionedImport (mn, it, q) = (mn, unwrapImportType it, q)
-        unwrapImportType (P.Explicit decls) = P.Explicit (map unwrapPositionedRef decls)
-        unwrapImportType (P.Hiding decls)   = P.Hiding (map unwrapPositionedRef decls)
-        unwrapImportType P.Implicit         = P.Implicit
 
 -- | Extracts AST information from a parsed module
 extractAstInformation
@@ -106,6 +78,10 @@ extractSpans ss d = case d of
   P.DataDeclaration _ name _ ctors ->
     (IdeNSType (P.runProperName name), ss)
     : map (\(cname, _) -> (IdeNSValue (P.runProperName cname), ss)) ctors
+  P.FixityDeclaration (Left (P.ValueFixity _ _ opName)) ->
+    [(IdeNSValue (P.runOpName opName), ss)]
+  P.FixityDeclaration (Right (P.TypeFixity _ _ opName)) ->
+    [(IdeNSType (P.runOpName opName), ss)]
   P.ExternDeclaration ident _ ->
     [(IdeNSValue (P.runIdent ident), ss)]
   P.ExternDataDeclaration name _ ->

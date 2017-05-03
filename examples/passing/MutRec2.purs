@@ -7,7 +7,7 @@ data A = A B
 
 data B = B A
 
-foreign import data S :: *
+foreign import data S :: Type
 
 f :: A -> S
 f a = case a of A b -> g b

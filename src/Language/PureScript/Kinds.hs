@@ -1,7 +1,11 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module Language.PureScript.Kinds where
 
 import Prelude.Compat
 
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Aeson.BetterErrors (Parse, key, asText, asIntegral, nth, fromAesonParser, toAesonParser, throwCustomError)
@@ -21,7 +25,9 @@ data Kind
   | FunKind Kind Kind
   -- | A named kind
   | NamedKind (Qualified (ProperName 'KindName))
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData Kind
 
 -- This is equivalent to the derived Aeson ToJSON instance, except that we
 -- write it out manually so that we can define a parser which is
@@ -52,8 +58,6 @@ kindFromJSON = do
       KUnknown <$> key "contents" (nth 0 asIntegral)
     "Star" ->
       pure kindType
-    "Bang" ->
-      pure kindEffect
     "Row" ->
       Row <$> key "contents" kindFromJSON
     "FunKind" ->
@@ -78,7 +82,6 @@ kindFromJSON = do
   primKind = NamedKind . primName
 
   kindType = primKind "Type"
-  kindEffect = primKind "Effect"
   kindSymbol = primKind "Symbol"
 
 instance A.FromJSON Kind where

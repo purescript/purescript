@@ -1,8 +1,14 @@
 {-# LANGUAGE DeriveFoldable    #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE DeriveGeneric     #-}
 module Language.PureScript.TypeClassDictionaries where
 
 import Prelude.Compat
+
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
+import Data.Monoid ((<>))
+import Data.Text (Text, pack)
 
 import Language.PureScript.Names
 import Language.PureScript.Types
@@ -23,7 +29,13 @@ data TypeClassDictionaryInScope v
     -- | Type class dependencies which must be satisfied to construct this dictionary
     , tcdDependencies :: Maybe [Constraint]
     }
-    deriving (Show, Functor, Foldable, Traversable)
+    deriving (Show, Functor, Foldable, Traversable, Generic)
+
+instance NFData v => NFData (TypeClassDictionaryInScope v)
 
 type NamedDict = TypeClassDictionaryInScope (Qualified Ident)
 
+-- | Generate a name for a superclass reference which can be used in
+-- generated code.
+superclassName :: Qualified (ProperName 'ClassName) -> Integer -> Text
+superclassName pn index = runProperName (disqualify pn) <> pack (show index)

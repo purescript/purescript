@@ -8,7 +8,7 @@ type T' = T Unit
 
 data T'' = TP
 
-foreign import data T''' ∷ *
+foreign import data T''' ∷ Type
 
 instance eqT ∷ Eq T'' where
   eq _ _ = true

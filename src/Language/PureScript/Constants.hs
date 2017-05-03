@@ -34,6 +34,12 @@ append = "append"
 bind :: forall a. (IsString a) => a
 bind = "bind"
 
+discard :: forall a. (IsString a) => a
+discard = "discard"
+
+pattern Discard :: Qualified (ProperName 'ClassName)
+pattern Discard = Qualified (Just ControlBind) (ProperName "Discard")
+
 (+) :: forall a. (IsString a) => a
 (+) = "+"
 
@@ -234,6 +240,9 @@ applicativeEffDictionary = "applicativeEff"
 bindEffDictionary :: forall a. (IsString a) => a
 bindEffDictionary = "bindEff"
 
+discardUnitDictionary :: forall a. (IsString a) => a
+discardUnitDictionary = "discardUnit"
+
 semiringNumber :: forall a. (IsString a) => a
 semiringNumber = "semiringNumber"
 
@@ -372,19 +381,19 @@ pattern Fail = Qualified (Just Prim) (ProperName "Fail")
 pattern Warn :: Qualified (ProperName 'ClassName)
 pattern Warn = Qualified (Just Prim) (ProperName "Warn")
 
+pattern Union :: Qualified (ProperName 'ClassName)
+pattern Union = Qualified (Just Prim) (ProperName "Union")
+
+pattern RowCons :: Qualified (ProperName 'ClassName)
+pattern RowCons = Qualified (Just Prim) (ProperName "RowCons")
+
 typ :: forall a. (IsString a) => a
 typ = "Type"
-
-effect :: forall a. (IsString a) => a
-effect = "Effect"
 
 symbol :: forall a. (IsString a) => a
 symbol = "Symbol"
 
 -- Code Generation
-
-__superclass_ :: forall a. (IsString a) => a
-__superclass_ = "__superclass_"
 
 __unused :: forall a. (IsString a) => a
 __unused = "__unused"
@@ -411,6 +420,9 @@ controlApplicative = "Control_Applicative"
 
 controlSemigroupoid :: forall a. (IsString a) => a
 controlSemigroupoid = "Control_Semigroupoid"
+
+pattern ControlBind :: ModuleName
+pattern ControlBind = ModuleName [ProperName "Control", ProperName "Bind"]
 
 controlBind :: forall a. (IsString a) => a
 controlBind = "Control_Bind"
@@ -447,3 +459,9 @@ dataFunctionUncurried = "Data_Function_Uncurried"
 
 dataIntBits :: forall a. (IsString a) => a
 dataIntBits = "Data_Int_Bits"
+
+partialUnsafe :: forall a. (IsString a) => a
+partialUnsafe = "Partial_Unsafe"
+
+unsafePartial :: forall a. (IsString a) => a
+unsafePartial = "unsafePartial"

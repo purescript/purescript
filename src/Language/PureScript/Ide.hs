@@ -43,13 +43,17 @@ import           System.FilePath.Glob (glob)
 
 -- | Accepts a Commmand and runs it against psc-ide's State. This is the main
 -- entry point for the server.
-handleCommand :: (Ide m, MonadLogger m, MonadError PscIdeError m) =>
+handleCommand :: (Ide m, MonadLogger m, MonadError IdeError m) =>
                  Command -> m Success
 handleCommand c = case c of
   Load [] ->
-    findAvailableExterns >>= loadModules
+    findAvailableExterns >>= loadModulesAsync
   Load modules ->
-    loadModules modules
+    loadModulesAsync modules
+  LoadSync [] ->
+    findAvailableExterns >>= loadModulesSync
+  LoadSync modules ->
+    loadModulesSync modules
   Type search filters currentModule ->
     findType search filters currentModule
   Complete filters matcher currentModule ->
@@ -63,7 +67,7 @@ handleCommand c = case c of
   List AvailableModules ->
     listAvailableModules
   List (Imports fp) ->
-    ImportList <$> getImportsForFile fp
+    ImportList <$> parseImportsFromFile fp
   CaseSplit l b e wca t ->
     caseSplit l b e wca t
   AddClause l wca ->
@@ -78,7 +82,9 @@ handleCommand c = case c of
       Left question ->
         pure (CompletionResult (map (completionFromMatch . map withEmptyAnn) question))
   Rebuild file ->
-    rebuildFile file
+    rebuildFileAsync file
+  RebuildSync file ->
+    rebuildFileSync file
   Cwd ->
     TextResult . toS <$> liftIO getCurrentDirectory
   Reset ->
@@ -125,7 +131,7 @@ listAvailableModules = do
     let cleaned = filter (`notElem` [".", ".."]) contents
     return (ModuleList (map toS cleaned))
 
-caseSplit :: (Ide m, MonadError PscIdeError m) =>
+caseSplit :: (Ide m, MonadError IdeError m) =>
   Text -> Int -> Int -> CS.WildcardAnnotations -> Text -> m Success
 caseSplit l b e csa t = do
   patterns <- CS.makePattern l b e csa <$> CS.caseSplit t
@@ -133,7 +139,7 @@ caseSplit l b e csa t = do
 
 -- | Finds all the externs.json files inside the output folder and returns the
 -- corresponding Modulenames
-findAvailableExterns :: (Ide m, MonadError PscIdeError m) => m [P.ModuleName]
+findAvailableExterns :: (Ide m, MonadError IdeError m) => m [P.ModuleName]
 findAvailableExterns = do
   oDir <- outputDirectory
   unlessM (liftIO (doesDirectoryExist oDir))
@@ -162,8 +168,33 @@ findAllSourceFiles = do
 -- server state. Then proceeds to parse all the specified sourcefiles and
 -- inserts their ASTs into the state. Finally kicks off an async worker, which
 -- populates Stage 2 and 3 of the state.
+loadModulesAsync
+  :: (Ide m, MonadError IdeError m, MonadLogger m)
+  => [P.ModuleName]
+  -> m Success
+loadModulesAsync moduleNames = do
+  tr <- loadModules moduleNames
+
+  -- Finally we kick off the worker with @async@ and return the number of
+  -- successfully parsed modules.
+  env <- ask
+  let ll = confLogLevel (ideConfiguration env)
+  -- populateStage2 and 3 return Unit for now, so it's fine to discard this
+  -- result. We might want to block on this in a benchmarking situation.
+  _ <- liftIO (async (runLogger ll (runReaderT (populateStage2 *> populateStage3) env)))
+  pure tr
+
+loadModulesSync
+  :: (Ide m, MonadError IdeError m, MonadLogger m)
+  => [P.ModuleName]
+  -> m Success
+loadModulesSync moduleNames = do
+  tr <- loadModules moduleNames
+  populateStage2 *> populateStage3
+  pure tr
+
 loadModules
-  :: (Ide m, MonadError PscIdeError m, MonadLogger m)
+  :: (Ide m, MonadError IdeError m, MonadLogger m)
   => [P.ModuleName]
   -> m Success
 loadModules moduleNames = do
@@ -182,12 +213,5 @@ loadModules moduleNames = do
     $(logWarn) ("Failed to parse: " <> show failures)
   traverse_ insertModule allModules
 
-  -- Finally we kick off the worker with @async@ and return the number of
-  -- successfully parsed modules.
-  env <- ask
-  let ll = confLogLevel (ideConfiguration env)
-  -- populateStage2 and 3 return Unit for now, so it's fine to discard this
-  -- result. We might want to block on this in a benchmarking situation.
-  _ <- liftIO (async (runLogger ll (runReaderT (populateStage2 *> populateStage3) env)))
   pure (TextResult ("Loaded " <> show (length efiles) <> " modules and "
                     <> show (length allModules) <> " source files."))

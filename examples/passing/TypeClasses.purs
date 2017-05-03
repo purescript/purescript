@@ -5,19 +5,19 @@ import Control.Monad.Eff.Console (log)
 
 test1 = \_ -> show "testing"
 
-f :: forall a. (Show a) => a -> String
+f :: forall a. Show a => a -> String
 f x = show x
 
 test2 = \_ -> f "testing"
 
-test7 :: forall a. (Show a) => a -> String
+test7 :: forall a. Show a => a -> String
 test7 = show
 
 test8 = \_ -> show $ "testing"
 
 data Data a = Data a
 
-instance showData :: (Show a) => Show (Data a) where
+instance showData :: Show a => Show (Data a) where
   show (Data a) = "Data (" <> show a <> ")"
 
 test3 = \_ -> show (Data "testing")
@@ -53,7 +53,7 @@ instance bindMaybe :: Bind Maybe where
 
 instance monadMaybe :: Monad Maybe
 
-test4 :: forall a m. (Monad m) => a -> m Number
+test4 :: forall a m. Monad m => a -> m Number
 test4 = \_ -> pure 1.0
 
 test5 = \_ -> Just 1.0 >>= \n -> pure (n + 1.0)

@@ -9,6 +9,7 @@ module Language.PureScript.Linter.Exhaustive
   ) where
 
 import Prelude.Compat
+import Protolude (ordNub)
 
 import Control.Applicative
 import Control.Arrow (first, second)
@@ -17,7 +18,7 @@ import Control.Monad.Writer.Class
 import Control.Monad.Supply.Class (MonadSupply, fresh, freshName)
 
 import Data.Function (on)
-import Data.List (foldl', sortBy, nub)
+import Data.List (foldl', sortBy)
 import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
 import qualified Data.Map as M
@@ -199,20 +200,25 @@ missingCasesMultiple env mn = go
 --       | otherwise = 1
 --   is exhaustive, whereas `f x | x < 0` is not
 --
+-- or in case of a pattern guard if the pattern is exhaustive.
+--
 -- The function below say whether or not a guard has an `otherwise` expression
 -- It is considered that `otherwise` is defined in Prelude
 --
-isExhaustiveGuard :: Either [(Guard, Expr)] Expr -> Bool
-isExhaustiveGuard (Left gs) = not . null $ filter (\(g, _) -> isOtherwise g) gs
+isExhaustiveGuard :: Environment -> ModuleName -> [GuardedExpr] -> Bool
+isExhaustiveGuard _ _ [MkUnguarded _] = True
+isExhaustiveGuard env moduleName gs   =
+  not . null $ filter (\(GuardedExpr grd _) -> isExhaustive grd) gs
   where
-  isOtherwise :: Expr -> Bool
-  isOtherwise (Literal (BooleanLiteral True)) = True
-  isOtherwise (Var (Qualified (Just (ModuleName [ProperName "Prelude"])) (Ident "otherwise"))) = True
-  isOtherwise (Var (Qualified (Just (ModuleName [ProperName "Data", ProperName "Boolean"])) (Ident "otherwise"))) = True
-  isOtherwise (TypedValue _ e _) = isOtherwise e
-  isOtherwise (PositionedValue _ _ e) = isOtherwise e
-  isOtherwise _ = False
-isExhaustiveGuard (Right _) = True
+    isExhaustive :: [Guard] -> Bool
+    isExhaustive = all checkGuard
+
+    checkGuard :: Guard -> Bool
+    checkGuard (ConditionGuard cond)   = isTrueExpr cond
+    checkGuard (PatternGuard binder _) =
+      case missingCasesMultiple env moduleName [NullBinder] [binder] of
+        ([], _) -> True -- there are no missing pattern for this guard
+        _       -> False
 
 -- |
 -- Returns the uncovered set of case alternatives
@@ -222,7 +228,7 @@ missingCases env mn uncovered ca = missingCasesMultiple env mn uncovered (caseAl
 
 missingAlternative :: Environment -> ModuleName -> CaseAlternative -> [Binder] -> ([[Binder]], Either RedundancyError Bool)
 missingAlternative env mn ca uncovered
-  | isExhaustiveGuard (caseAlternativeResult ca) = mcases
+  | isExhaustiveGuard env mn (caseAlternativeResult ca) = mcases
   | otherwise = ([uncovered], snd mcases)
   where
   mcases = missingCases env mn uncovered ca
@@ -242,12 +248,12 @@ checkExhaustive
    -> [CaseAlternative]
    -> Expr
    -> m Expr
-checkExhaustive env mn numArgs cas expr = makeResult . first nub $ foldl' step ([initialize numArgs], (pure True, [])) cas
+checkExhaustive env mn numArgs cas expr = makeResult . first ordNub $ foldl' step ([initialize numArgs], (pure True, [])) cas
   where
   step :: ([[Binder]], (Either RedundancyError Bool, [[Binder]])) -> CaseAlternative -> ([[Binder]], (Either RedundancyError Bool, [[Binder]]))
   step (uncovered, (nec, redundant)) ca =
     let (missed, pr) = unzip (map (missingAlternative env mn ca) uncovered)
-        (missed', approx) = splitAt 10000 (nub (concat missed))
+        (missed', approx) = splitAt 10000 (ordNub (concat missed))
         cond = or <$> sequenceA pr
     in (missed', ( if null approx
                      then liftA2 (&&) cond nec
@@ -288,17 +294,19 @@ checkExhaustive env mn numArgs cas expr = makeResult . first nub $ foldl' step (
     where
       partial :: Text -> Text -> Declaration
       partial var tyVar =
-        ValueDeclaration (Ident C.__unused) Private [] $ Right $
-          TypedValue
-            True
-            (Abs (Left (Ident var)) (Var (Qualified Nothing (Ident var))))
-            (ty tyVar)
+        ValueDeclaration (Ident C.__unused) Private [] $
+        [MkUnguarded
+          (TypedValue
+           True
+           (Abs (VarBinder (Ident var)) (Var (Qualified Nothing (Ident var))))
+           (ty tyVar))
+        ]
 
       ty :: Text -> Type
       ty tyVar =
         ForAll tyVar
           ( ConstrainedType
-              [ Constraint C.Partial [] (Just constraintData) ]
+              (Constraint C.Partial [] (Just constraintData))
               $ TypeApp (TypeApp tyFunction (TypeVar tyVar)) (TypeVar tyVar)
           )
           Nothing
@@ -321,7 +329,7 @@ checkExhaustiveExpr env mn = onExpr
   where
   onDecl :: Declaration -> m Declaration
   onDecl (BindingGroupDeclaration bs) = BindingGroupDeclaration <$> mapM (thirdM onExpr) bs
-  onDecl (ValueDeclaration name x y (Right e)) = ValueDeclaration name x y . Right <$> censor (addHint (ErrorInValueDeclaration name)) (onExpr e)
+  onDecl (ValueDeclaration name x y [MkUnguarded e]) = ValueDeclaration name x y . mkUnguardedExpr <$> censor (addHint (ErrorInValueDeclaration name)) (onExpr e)
   onDecl (PositionedDeclaration pos x dec) = PositionedDeclaration pos x <$> censor (addHint (PositionedError pos)) (onDecl dec)
   onDecl decl = return decl
 
@@ -344,5 +352,10 @@ checkExhaustiveExpr env mn = onExpr
   onExpr expr = return expr
 
   onCaseAlternative :: CaseAlternative -> m CaseAlternative
-  onCaseAlternative (CaseAlternative x (Left es)) = CaseAlternative x . Left <$> mapM (\(e, g) -> (,) <$> onExpr e <*> onExpr g) es
-  onCaseAlternative (CaseAlternative x (Right e)) = CaseAlternative x . Right <$> onExpr e
+  onCaseAlternative (CaseAlternative x [MkUnguarded e]) = CaseAlternative x . mkUnguardedExpr <$> onExpr e
+  onCaseAlternative (CaseAlternative x es) = CaseAlternative x <$> mapM onGuardedExpr es
+
+  onGuardedExpr :: GuardedExpr -> m GuardedExpr
+  onGuardedExpr (GuardedExpr guard rhs) = GuardedExpr guard <$> onExpr rhs
+
+  mkUnguardedExpr = pure . MkUnguarded

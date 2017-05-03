@@ -82,8 +82,10 @@ data Command
   | BrowseModule P.ModuleName
   -- | Exit PSCI
   | QuitPSCi
-  -- | Reset the state of the REPL
-  | ResetState
+  -- | Reload all the imported modules of the REPL
+  | ReloadState
+  -- | Clear the state of the REPL
+  | ClearState
   -- | Add some declarations to the current evaluation context
   | Decls [P.Declaration]
   -- | Find the type of an expression
@@ -94,6 +96,7 @@ data Command
   | ShowInfo ReplQuery
   -- | Paste multiple lines
   | PasteLines
+  deriving Show
 
 data ReplQuery
   = QueryLoaded
@@ -119,7 +122,8 @@ parseReplQuery _ = Nothing
 data Directive
   = Help
   | Quit
-  | Reset
+  | Reload
+  | Clear
   | Browse
   | Type
   | Kind

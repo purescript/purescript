@@ -58,7 +58,7 @@ convertModulesInPackageWithEnv modules modulesDeps =
       Nothing -> Local mn
 
   isLocal :: P.ModuleName -> Bool
-  isLocal = not . flip Map.member modulesDeps 
+  isLocal = not . flip Map.member modulesDeps
 
 -- |
 -- Convert a group of modules to the intermediate format, designed for
@@ -208,7 +208,8 @@ partiallyDesugar = P.evalSupplyT 0 . desugar'
   where
   desugar' =
     traverse P.desugarDoModule
-      >=> traverse P.desugarCasesModule
+      >=> map P.desugarLetPatternModule
+      >>> traverse P.desugarCasesModule
       >=> traverse P.desugarTypeDeclarationsModule
       >=> ignoreWarnings . P.desugarImportsWithEnv []
 

@@ -19,7 +19,7 @@ instance ordA :: Ord A where
   compare B A = GT
   compare _ _ = EQ
 
-test :: forall a. (Ord a) => a -> a -> String
+test :: forall a. Ord a => a -> a -> String
 test x y = show $ x == y
 
 main = do

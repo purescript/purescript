@@ -15,6 +15,7 @@
     "output"
   ],
   "dependencies": {
+    "purescript-prelude": "./bower_components/purescript-prelude"
   },
   "license": "MIT"
 }

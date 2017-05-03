@@ -25,6 +25,7 @@ import           Language.PureScript.Ide.Types
 
 data Command
     = Load [P.ModuleName]
+    | LoadSync [P.ModuleName] -- used in tests
     | Type
       { typeSearch        :: Text
       , typeFilters       :: [Filter]
@@ -54,6 +55,7 @@ data Command
     | Import FilePath (Maybe FilePath) [Filter] ImportCommand
     | List { listType :: ListType }
     | Rebuild FilePath -- ^ Rebuild the specified file using the loaded externs
+    | RebuildSync FilePath -- ^ Rebuild the specified file using the loaded externs
     | Cwd
     | Reset
     | Quit
@@ -61,6 +63,7 @@ data Command
 commandName :: Command -> Text
 commandName c = case c of
   Load{} -> "Load"
+  LoadSync{} -> "LoadSync"
   Type{} -> "Type"
   Complete{} -> "Complete"
   Pursuit{} -> "Pursuit"
@@ -69,6 +72,7 @@ commandName c = case c of
   Import{} -> "Import"
   List{} -> "List"
   Rebuild{} -> "Rebuild"
+  RebuildSync{} -> "RebuildSync"
   Cwd{} -> "Cwd"
   Reset{} -> "Reset"
   Quit{} -> "Quit"

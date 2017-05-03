@@ -1,4 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 -- |
 -- Data types for modules and declarations
@@ -12,7 +14,6 @@ import Control.Monad.Identity
 import Data.Aeson.TH
 import qualified Data.Map as M
 import Data.Text (Text)
-import Data.List.NonEmpty (NonEmpty(..))
 
 import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Literals
@@ -37,14 +38,28 @@ type Context = [(Ident, Type)]
 data TypeSearch
   = TSBefore Environment
   -- ^ An Environment captured for later consumption by type directed search
-  | TSAfter [(Qualified Ident, Type)]
+  | TSAfter
+    { tsAfterIdentifiers :: [(Qualified Text, Type)]
+    -- ^ The identifiers that fully satisfy the subsumption check
+    , tsAfterRecordFields :: Maybe [(Label, Type)]
+    -- ^ Record fields that are available on the first argument to the typed
+    -- hole
+    }
   -- ^ Results of applying type directed search to the previously captured
   -- Environment
   deriving Show
 
+onTypeSearchTypes :: (Type -> Type) -> TypeSearch -> TypeSearch
+onTypeSearchTypes f = runIdentity . onTypeSearchTypesM (Identity . f)
+
+onTypeSearchTypesM :: (Applicative m) => (Type -> m Type) -> TypeSearch -> m TypeSearch
+onTypeSearchTypesM f (TSAfter i r) = TSAfter <$> traverse (traverse f) i <*> traverse (traverse (traverse f)) r
+onTypeSearchTypesM _ (TSBefore env) = pure (TSBefore env)
+
 -- | A type of error messages
 data SimpleErrorMessage
-  = ErrorParsingFFIModule FilePath (Maybe Bundle.ErrorMessage)
+  = ModuleNotFound ModuleName
+  | ErrorParsingFFIModule FilePath (Maybe Bundle.ErrorMessage)
   | ErrorParsingModule P.ParseError
   | MissingFFIModule ModuleName
   | MultipleFFIModules ModuleName [FilePath]
@@ -81,7 +96,7 @@ data SimpleErrorMessage
   | NameIsUndefined Ident
   | UndefinedTypeVariable (ProperName 'TypeName)
   | PartiallyAppliedSynonym (Qualified (ProperName 'TypeName))
-  | EscapedSkolem (Maybe Expr)
+  | EscapedSkolem Text (Maybe SourceSpan) Type
   | TypesDoNotUnify Type Type
   | KindsDoNotUnify Kind Kind
   | ConstrainedTypeUnified Type Type
@@ -91,6 +106,8 @@ data SimpleErrorMessage
   | UnknownClass (Qualified (ProperName 'ClassName))
   | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [Type]
   | CannotDerive (Qualified (ProperName 'ClassName)) [Type]
+  | InvalidDerivedInstance (Qualified (ProperName 'ClassName)) [Type] Int
+  | ExpectedTypeConstructor (Qualified (ProperName 'ClassName)) [Type] Type
   | InvalidNewtypeInstance (Qualified (ProperName 'ClassName)) [Type]
   | CannotFindDerivingType (ProperName 'TypeName)
   | DuplicateLabel Label (Maybe Expr)
@@ -138,11 +155,14 @@ data SimpleErrorMessage
   | CannotGeneralizeRecursiveFunction Ident Type
   | CannotDeriveNewtypeForData (ProperName 'TypeName)
   | ExpectedWildcard (ProperName 'TypeName)
-  | CannotUseBindWithDo
+  | CannotUseBindWithDo Ident
   -- | instance name, type class, expected argument count, actual argument count
   | ClassInstanceArityMismatch Ident (Qualified (ProperName 'ClassName)) Int Int
   -- | a user-defined warning raised by using the Warn type class
   | UserDefinedWarning Type
+  -- | a declaration couldn't be used because there wouldn't be enough information
+  -- | to choose an instance
+  | UnusableDeclaration Ident
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
@@ -386,7 +406,10 @@ data Declaration
   -- |
   -- A value declaration (name, top-level binders, optional guard, value)
   --
-  | ValueDeclaration Ident NameKind [Binder] (Either [(Guard, Expr)] Expr)
+  | ValueDeclaration Ident NameKind [Binder] [GuardedExpr]
+  -- |
+  -- A declaration paired with pattern matching in let-in expression (binder, optional guard, value)
+  | BoundValueDeclaration Binder Expr
   -- |
   -- A minimal mutually recursive set of value declarations
   --
@@ -548,7 +571,18 @@ flattenDecls = concatMap flattenOne
 -- |
 -- A guard is just a boolean-valued expression that appears alongside a set of binders
 --
-type Guard = Expr
+data Guard = ConditionGuard Expr
+           | PatternGuard Binder Expr
+           deriving (Show)
+
+-- |
+-- The right hand side of a binder in value declarations
+-- and case expressions.
+data GuardedExpr = GuardedExpr [Guard] Expr
+                 deriving (Show)
+
+pattern MkUnguarded :: Expr -> GuardedExpr
+pattern MkUnguarded e = GuardedExpr [] e
 
 -- |
 -- Data type for expressions and terms
@@ -586,14 +620,14 @@ data Expr
   --
   | ObjectUpdate Expr [(PSString, Expr)]
   -- |
-  -- Object updates with nested support: `x { foo.bar = e }`
+  -- Object updates with nested support: `x { foo { bar = e } }`
   -- Replaced during desugaring into a `Let` and nested `ObjectUpdate`s
   --
-  | ObjectUpdateNested Expr [(NonEmpty PSString, Expr)]
+  | ObjectUpdateNested Expr (PathTree Expr)
   -- |
   -- Function introduction
   --
-  | Abs (Either Ident Binder) Expr
+  | Abs Binder Expr
   -- |
   -- Function application
   --
@@ -680,7 +714,7 @@ data CaseAlternative = CaseAlternative
     -- |
     -- The result expression or a collect of guarded expressions
     --
-  , caseAlternativeResult :: Either [(Guard, Expr)] Expr
+  , caseAlternativeResult :: [GuardedExpr]
   } deriving (Show)
 
 -- |
@@ -705,5 +739,46 @@ data DoNotationElement
   | PositionedDoNotationElement SourceSpan [Comment] DoNotationElement
   deriving (Show)
 
+
+-- For a record update such as:
+--
+--  x { foo = 0
+--    , bar { baz = 1
+--          , qux = 2 } }
+--
+-- We represent the updates as the `PathTree`:
+--
+--  [ ("foo", Leaf 3)
+--  , ("bar", Branch [ ("baz", Leaf 1)
+--                   , ("qux", Leaf 2) ]) ]
+--
+-- Which we then convert to an expression representing the following:
+--
+--   let x' = x
+--   in x' { foo = 0
+--         , bar = x'.bar { baz = 1
+--                        , qux = 2 } }
+--
+-- The `let` here is required to prevent re-evaluating the object expression `x`.
+-- However we don't generate this when using an anonymous argument for the object.
+--
+
+newtype PathTree t = PathTree (AssocList PSString (PathNode t))
+  deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
+
+data PathNode t = Leaf t | Branch (PathTree t)
+  deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
+
+newtype AssocList k t = AssocList { runAssocList :: [(k, t)] }
+  deriving (Show, Eq, Ord, Foldable, Functor, Traversable)
+
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''DeclarationRef)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ImportDeclarationType)
+
+isTrueExpr :: Expr -> Bool
+isTrueExpr (Literal (BooleanLiteral True)) = True
+isTrueExpr (Var (Qualified (Just (ModuleName [ProperName "Prelude"])) (Ident "otherwise"))) = True
+isTrueExpr (Var (Qualified (Just (ModuleName [ProperName "Data", ProperName "Boolean"])) (Ident "otherwise"))) = True
+isTrueExpr (TypedValue _ e _) = isTrueExpr e
+isTrueExpr (PositionedValue _ _ e) = isTrueExpr e
+isTrueExpr _ = False

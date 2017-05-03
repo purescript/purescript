@@ -7,7 +7,7 @@ data Tuple a b = Tuple a b
 
 class MonadState s m where
   get :: m s
-  put :: s -> m {}
+  put :: s -> m Unit
 
 data State s a = State (s -> Tuple s a)
 
@@ -30,9 +30,9 @@ instance monadState :: Monad (State s)
 
 instance monadStateState :: MonadState s (State s) where
   get = State (\s -> Tuple s s)
-  put s = State (\_ -> Tuple s {})
+  put s = State (\_ -> Tuple s unit)
 
-modify :: forall m s. (Monad m, MonadState s m) => (s -> s) -> m {}
+modify :: forall m s. Monad m => MonadState s m => (s -> s) -> m Unit
 modify f = do
   s <- get
   put (f s)

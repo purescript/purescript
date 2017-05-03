@@ -8,7 +8,7 @@
 Installation Instructions
 -------------------------
 
-This bundle contains the following executables:
+This bundle contains the combined purs executable, and the following scripts:
 
 - psc            The PureScript compiler
 - psci           The PureScript interactive REPL (requires NodeJS)
@@ -16,10 +16,7 @@ This bundle contains the following executables:
 - psc-bundle     Bundles together CommonJS modules produced by `psc` into a
                  single JavaScript file; useful for running in the browser.
 - psc-publish    Generates documentation packages for uploading to Pursuit
-- psc-ide-server Provides Editor Support in the form of type information and
+- psc-ide-server Provides editor support in the form of type information and
                  autocompletion
-- psc-ide-client Utility to query psc-ide-server
-- psc-package    Package manager for PureScript packages
 
 Copy these files anywhere on your PATH.
-

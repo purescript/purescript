@@ -10,13 +10,14 @@ module Language.PureScript.Sugar.BindingGroups
   ) where
 
 import Prelude.Compat
+import Protolude (ordNub)
 
 import Control.Monad ((<=<))
 import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Graph
-import Data.List (nub, intersect)
-import Data.Maybe (isJust, mapMaybe)
+import Data.List (intersect)
+import Data.Maybe (isJust)
 import qualified Data.Set as S
 
 import Language.PureScript.AST
@@ -92,7 +93,8 @@ collapseBindingGroups =
   where
   go (DataBindingGroupDeclaration ds) = ds
   go (BindingGroupDeclaration ds) =
-    map (\(ident, nameKind, val) -> ValueDeclaration ident nameKind [] (Right val)) ds
+    map (\(ident, nameKind, val) ->
+      ValueDeclaration ident nameKind [] [MkUnguarded val]) ds
   go (PositionedDeclaration pos com d) =
     map (PositionedDeclaration pos com) $ go d
   go other = [other]
@@ -102,11 +104,11 @@ collapseBindingGroupsForValue (Let ds val) = Let (collapseBindingGroups ds) val
 collapseBindingGroupsForValue other = other
 
 usedIdents :: ModuleName -> Declaration -> [Ident]
-usedIdents moduleName = nub . usedIdents' S.empty . getValue
+usedIdents moduleName = ordNub . usedIdents' S.empty . getValue
   where
   def _ _ = []
 
-  getValue (ValueDeclaration _ _ [] (Right val)) = val
+  getValue (ValueDeclaration _ _ [] [MkUnguarded val]) = val
   getValue ValueDeclaration{} = internalError "Binders should have been desugared"
   getValue (PositionedDeclaration _ _ d) = getValue d
   getValue _ = internalError "Expected ValueDeclaration"
@@ -123,7 +125,7 @@ usedIdents moduleName = nub . usedIdents' S.empty . getValue
 usedImmediateIdents :: ModuleName -> Declaration -> [Ident]
 usedImmediateIdents moduleName =
   let (f, _, _, _, _) = everythingWithContextOnValues True [] (++) def usedNamesE def def def
-  in nub . f
+  in ordNub . f
   where
   def s _ = (s, [])
 
@@ -137,14 +139,14 @@ usedImmediateIdents moduleName =
 usedTypeNames :: ModuleName -> Declaration -> [ProperName 'TypeName]
 usedTypeNames moduleName =
   let (f, _, _, _, _) = accumTypes (everythingOnTypes (++) usedNames)
-  in nub . f
+  in ordNub . f
   where
   usedNames :: Type -> [ProperName 'TypeName]
-  usedNames (ConstrainedType constraints _) =
-    flip mapMaybe constraints $ \case
+  usedNames (ConstrainedType con _) =
+    case con of
       (Constraint (Qualified (Just moduleName') name) _ _)
-        | moduleName == moduleName' -> Just (coerceProperName name)
-      _ -> Nothing
+        | moduleName == moduleName' -> [coerceProperName name]
+      _ -> []
   usedNames (TypeConstructor (Qualified (Just moduleName') name))
     | moduleName == moduleName' = [name]
   usedNames _ = []
@@ -195,7 +197,7 @@ toBindingGroup moduleName (CyclicSCC ds') =
 
   cycleError :: Declaration -> MultipleErrors
   cycleError (PositionedDeclaration p _ d) = onErrorMessages (withPosition p) $ cycleError d
-  cycleError (ValueDeclaration n _ _ (Right _)) = errorMessage $ CycleInDeclaration n
+  cycleError (ValueDeclaration n _ _ [MkUnguarded _]) = errorMessage $ CycleInDeclaration n
   cycleError _ = internalError "cycleError: Expected ValueDeclaration"
 
 toDataBindingGroup
@@ -216,7 +218,7 @@ isTypeSynonym (PositionedDeclaration _ _ d) = isTypeSynonym d
 isTypeSynonym _ = Nothing
 
 fromValueDecl :: Declaration -> (Ident, NameKind, Expr)
-fromValueDecl (ValueDeclaration ident nameKind [] (Right val)) = (ident, nameKind, val)
+fromValueDecl (ValueDeclaration ident nameKind [] [MkUnguarded val]) = (ident, nameKind, val)
 fromValueDecl ValueDeclaration{} = internalError "Binders should have been desugared"
 fromValueDecl (PositionedDeclaration _ _ d) = fromValueDecl d
 fromValueDecl _ = internalError "Expected ValueDeclaration"

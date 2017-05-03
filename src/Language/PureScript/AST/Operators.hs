@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 -- |
 -- Operators fixity and associativity
 --
@@ -5,6 +6,8 @@ module Language.PureScript.AST.Operators where
 
 import Prelude.Compat
 
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
 import Data.Aeson ((.=))
 import qualified Data.Aeson as A
 
@@ -19,7 +22,9 @@ type Precedence = Integer
 -- Associativity for infix operators
 --
 data Associativity = Infixl | Infixr | Infix
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData Associativity
 
 showAssoc :: Associativity -> String
 showAssoc Infixl = "infixl"
@@ -42,7 +47,9 @@ instance A.FromJSON Associativity where
 -- Fixity data for infix operators
 --
 data Fixity = Fixity Associativity Precedence
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData Fixity
 
 instance A.ToJSON Fixity where
   toJSON (Fixity associativity precedence) =

@@ -1,6 +1,4 @@
--- |
--- Common code generation utility functions
---
+-- | Common code generation utility functions
 module Language.PureScript.CodeGen.JS.Common where
 
 import Prelude.Compat
@@ -18,15 +16,13 @@ moduleNameToJs (ModuleName pns) =
   let name = T.intercalate "_" (runProperName `map` pns)
   in if nameIsJsBuiltIn name then "$$" <> name else name
 
--- |
--- Convert an Ident into a valid Javascript identifier:
+-- | Convert an 'Ident' into a valid JavaScript identifier:
 --
 --  * Alphanumeric characters are kept unmodified.
 --
 --  * Reserved javascript identifiers are prefixed with '$$'.
 --
 --  * Symbols are prefixed with '$' followed by a symbol name or their ordinal value.
---
 identToJs :: Ident -> Text
 identToJs (Ident name) = properToJs name
 identToJs (GenIdent _ _) = internalError "GenIdent in identToJs"
@@ -36,16 +32,12 @@ properToJs name
   | nameIsJsReserved name || nameIsJsBuiltIn name = "$$" <> name
   | otherwise = T.concatMap identCharToText name
 
--- |
--- Test if a string is a valid JS identifier without escaping.
---
+-- | Test if a string is a valid AST identifier without escaping.
 identNeedsEscaping :: Text -> Bool
 identNeedsEscaping s = s /= properToJs s || T.null s
 
--- |
--- Attempts to find a human-readable name for a symbol, if none has been specified returns the
+-- | Attempts to find a human-readable name for a symbol, if none has been specified returns the
 -- ordinal value.
---
 identCharToText :: Char -> Text
 identCharToText c | isAlphaNum c = T.singleton c
 identCharToText '_' = "_"
@@ -72,16 +64,12 @@ identCharToText '@' = "$at"
 identCharToText '\'' = "$prime"
 identCharToText c = '$' `T.cons` T.pack (show (ord c))
 
--- |
--- Checks whether an identifier name is reserved in Javascript.
---
+-- | Checks whether an identifier name is reserved in JavaScript.
 nameIsJsReserved :: Text -> Bool
 nameIsJsReserved name =
   name `elem` jsAnyReserved
 
--- |
--- Checks whether a name matches a built-in value in Javascript.
---
+-- | Checks whether a name matches a built-in value in JavaScript.
 nameIsJsBuiltIn :: Text -> Bool
 nameIsJsBuiltIn name =
   name `elem`

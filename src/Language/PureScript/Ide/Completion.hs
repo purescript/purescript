@@ -8,6 +8,9 @@ import           Protolude
 import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Types
+import qualified Language.PureScript as P
+
+type Module = (P.ModuleName, [IdeDeclarationAnn])
 
 -- | Applies the CompletionFilters and the Matcher to the given Modules
 --   and sorts the found Completions according to the Matching Score

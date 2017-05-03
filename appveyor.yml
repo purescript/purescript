@@ -3,7 +3,7 @@ version: '{build}'
 environment:
   # Keep the path as short as possible, just in case.
   STACK_ROOT: c:\s
-  STACK_VER: 1.2.0
+  STACK_VER: 1.3.2
   RELEASE_USER: purescript
   RELEASE_REPO: purescript
 cache:
@@ -27,9 +27,14 @@ install:
 
 build_script:
 # Override the default build script.
+# In PowerShell it seems to be necessary to redirect stderr to stdout because
+# any text sent to stderr seems to cause appveyor to think the build has
+# failed.
 - echo ""
 test_script:
-- stack -j1 --no-terminal test --pedantic
+- if defined APPVEYOR_REPO_TAG_NAME (set stack_extra_flags="--flag purescript:RELEASE")
+- echo "stack_extra_flags=%stack_extra_flags%"
+- stack --jobs=1 --no-terminal test --pedantic %stack_extra_flags%
 on_success:
 - ps: |
     function UploadFile

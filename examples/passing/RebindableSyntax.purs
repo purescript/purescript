@@ -10,9 +10,9 @@ example1 = do
   " for"
   " Semigroup"
   where
-  bind x f = x <> f unit
+  discard x f = x <> f unit
 
-applySecond :: forall f a b. (Apply f) => f a -> f b -> f b
+applySecond :: forall f a b. Apply f => f a -> f b -> f b
 applySecond fa fb = const id <$> fa <*> fb
 
 infixl 4 applySecond as *>
@@ -25,7 +25,7 @@ runConst (Const a) = a
 instance functorConst :: Functor (Const a) where
   map _ (Const a) = Const a
 
-instance applyConst :: (Semigroup a) => Apply (Const a) where
+instance applyConst :: Semigroup a => Apply (Const a) where
   apply (Const a1) (Const a2) = Const (a1 <> a2)
 
 example2 :: Const String Unit
@@ -35,7 +35,7 @@ example2 = do
   Const " for"
   Const " Apply"
   where
-  bind x f = x *> f unit
+  discard x f = x *> f unit
 
 main = do
   log example1

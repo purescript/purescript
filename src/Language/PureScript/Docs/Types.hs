@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveGeneric #-}
+
 module Language.PureScript.Docs.Types
   ( module Language.PureScript.Docs.Types
   , module ReExports
@@ -5,12 +7,18 @@ module Language.PureScript.Docs.Types
   where
 
 import Protolude hiding (to, from)
-import Prelude (String, unlines)
+import Prelude (String, unlines, lookup)
 
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
 import Control.Arrow ((***))
 
 import Data.Aeson ((.=))
 import Data.Aeson.BetterErrors
+  (Parse, ParseError, parse, keyOrDefault, throwCustomError, key, asText,
+   keyMay, withString, eachInArray, asNull, (.!), toAesonParser, toAesonParser',
+   fromAesonParser, perhaps, withText, asIntegral, nth, eachInObjectWithKey,
+   asString)
 import qualified Data.Map as Map
 import Data.Time.Clock (UTCTime)
 import qualified Data.Time.Format as TimeFormat
@@ -28,7 +36,8 @@ import Web.Bower.PackageMeta hiding (Version, displayError)
 import Language.PureScript.Docs.RenderedCode as ReExports
   (RenderedCode, asRenderedCode,
    ContainingModule(..), asContainingModule,
-   RenderedCodeElement(..), asRenderedCodeElement)
+   RenderedCodeElement(..), asRenderedCodeElement,
+   Namespace(..), FixityAlias)
 
 --------------------
 -- Types
@@ -50,13 +59,19 @@ data Package a = Package
     -- ^ The version of the PureScript compiler which was used to generate
     -- this data. We store this in order to reject packages which are too old.
   }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData a => NFData (Package a)
 
 data NotYetKnown = NotYetKnown
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData NotYetKnown
 
 type UploadedPackage = Package NotYetKnown
 type VerifiedPackage = Package GithubUser
+
+type ManifestError = BowerError
 
 verifyPackage :: GithubUser -> UploadedPackage -> VerifiedPackage
 verifyPackage verifiedUser Package{..} =
@@ -104,7 +119,9 @@ data Module = Module
   -- Re-exported values from other modules
   , modReExports    :: [(InPackage P.ModuleName, [Declaration])]
   }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData Module
 
 data Declaration = Declaration
   { declTitle      :: Text
@@ -113,7 +130,9 @@ data Declaration = Declaration
   , declChildren   :: [ChildDeclaration]
   , declInfo       :: DeclarationInfo
   }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData Declaration
 
 -- |
 -- A value of this type contains information that is specific to a particular
@@ -163,7 +182,9 @@ data DeclarationInfo
   -- A kind declaration
   --
   | ExternKindDeclaration
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData DeclarationInfo
 
 convertFundepsToStrings :: [(Text, Maybe P.Kind)] -> [P.FunctionalDependency] -> [([Text], [Text])]
 convertFundepsToStrings args fundeps =
@@ -183,8 +204,6 @@ convertFundepsToStrings args fundeps =
       ) $ argsVec V.!? i
   toArgs from to = (map getArg from, map getArg to)
 
-type FixityAlias = P.Qualified (Either (P.ProperName 'P.TypeName) (Either P.Ident (P.ProperName 'P.ConstructorName)))
-
 declInfoToString :: DeclarationInfo -> Text
 declInfoToString (ValueDeclaration _) = "value"
 declInfoToString (DataDeclaration _ _) = "data"
@@ -193,6 +212,23 @@ declInfoToString (TypeSynonymDeclaration _ _) = "typeSynonym"
 declInfoToString (TypeClassDeclaration _ _ _) = "typeClass"
 declInfoToString (AliasDeclaration _ _) = "alias"
 declInfoToString ExternKindDeclaration = "kind"
+
+declInfoNamespace :: DeclarationInfo -> Namespace
+declInfoNamespace = \case
+  ValueDeclaration{} ->
+    ValueLevel
+  DataDeclaration{} ->
+    TypeLevel
+  ExternDataDeclaration{} ->
+    TypeLevel
+  TypeSynonymDeclaration{} ->
+    TypeLevel
+  TypeClassDeclaration{} ->
+    TypeLevel
+  AliasDeclaration _ alias ->
+    either (const TypeLevel) (const ValueLevel) (P.disqualify alias)
+  ExternKindDeclaration{} ->
+    KindLevel
 
 isTypeClass :: Declaration -> Bool
 isTypeClass Declaration{..} =
@@ -243,7 +279,9 @@ data ChildDeclaration = ChildDeclaration
   , cdeclSourceSpan :: Maybe P.SourceSpan
   , cdeclInfo       :: ChildDeclarationInfo
   }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData ChildDeclaration
 
 data ChildDeclarationInfo
   -- |
@@ -262,12 +300,28 @@ data ChildDeclarationInfo
   -- example, `pure` from `Applicative` would be `forall a. a -> f a`.
   --
   | ChildTypeClassMember P.Type
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData ChildDeclarationInfo
 
 childDeclInfoToString :: ChildDeclarationInfo -> Text
 childDeclInfoToString (ChildInstance _ _)      = "instance"
 childDeclInfoToString (ChildDataConstructor _) = "dataConstructor"
 childDeclInfoToString (ChildTypeClassMember _) = "typeClassMember"
+
+childDeclInfoNamespace :: ChildDeclarationInfo -> Namespace
+childDeclInfoNamespace =
+  -- We could just write this as `const ValueLevel` but by doing it this way,
+  -- if another constructor is added, we get a warning which acts as a prompt
+  -- to update this, instead of having this function (possibly incorrectly)
+  -- just return ValueLevel for the new constructor.
+  \case
+    ChildInstance{} ->
+      ValueLevel
+    ChildDataConstructor{} ->
+      ValueLevel
+    ChildTypeClassMember{} ->
+      ValueLevel
 
 isTypeClassMember :: ChildDeclaration -> Bool
 isTypeClassMember ChildDeclaration{..} =
@@ -283,17 +337,21 @@ isDataConstructor ChildDeclaration{..} =
 
 newtype GithubUser
   = GithubUser { runGithubUser :: Text }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData GithubUser
 
 newtype GithubRepo
   = GithubRepo { runGithubRepo :: Text }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData GithubRepo
 
 data PackageError
   = CompilerTooOld Version Version
       -- ^ Minimum allowable version for generating data with the current
       -- parser, and actual version used.
-  | ErrorInPackageMeta BowerError
+  | ErrorInPackageMeta ManifestError
   | InvalidVersion
   | InvalidDeclarationType Text
   | InvalidChildDeclarationType Text
@@ -301,12 +359,16 @@ data PackageError
   | InvalidKind Text
   | InvalidDataDeclType Text
   | InvalidTime
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData PackageError
 
 data InPackage a
   = Local a
   | FromDep PackageName a
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData a => NFData (InPackage a)
 
 instance Functor InPackage where
   fmap f (Local x) = Local (f x)
@@ -322,6 +384,96 @@ takeLocals = mapMaybe takeLocal
 ignorePackage :: InPackage a -> a
 ignorePackage (Local x) = x
 ignorePackage (FromDep _ x) = x
+
+----------------------------------------------------
+-- Types for links between declarations
+
+data LinksContext = LinksContext
+  { ctxGithub               :: (GithubUser, GithubRepo)
+  , ctxModuleMap            :: Map P.ModuleName PackageName
+  , ctxResolvedDependencies :: [(PackageName, Version)]
+  , ctxPackageName          :: PackageName
+  , ctxVersion              :: Version
+  , ctxVersionTag           :: Text
+  }
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData LinksContext
+
+data DocLink = DocLink
+  { linkLocation  :: LinkLocation
+  , linkTitle     :: Text
+  , linkNamespace :: Namespace
+  }
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData DocLink
+
+data LinkLocation
+  -- | A link to a declaration in the same module.
+  = SameModule
+
+  -- | A link to a declaration in a different module, but still in the current
+  -- package; we need to store the current module and the other declaration's
+  -- module.
+  | LocalModule P.ModuleName P.ModuleName
+
+  -- | A link to a declaration in a different package. We store: current module
+  -- name, name of the other package, version of the other package, and name of
+  -- the module in the other package that the declaration is in.
+  | DepsModule P.ModuleName PackageName Version P.ModuleName
+
+  -- | A link to a declaration that is built in to the compiler, e.g. the Prim
+  -- module. In this case we only need to store the module that the builtin
+  -- comes from (at the time of writing, this will only ever be "Prim").
+  | BuiltinModule P.ModuleName
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData LinkLocation
+
+-- | Given a links context, the current module name, the namespace of a thing
+-- to link to, its title, and its containing module, attempt to create a
+-- DocLink.
+getLink :: LinksContext -> P.ModuleName -> Namespace -> Text -> ContainingModule -> Maybe DocLink
+getLink LinksContext{..} curMn namespace target containingMod = do
+  location <- getLinkLocation
+  return DocLink
+    { linkLocation = location
+    , linkTitle = target
+    , linkNamespace = namespace
+    }
+
+  where
+  getLinkLocation = builtinLinkLocation <|> normalLinkLocation
+
+  normalLinkLocation = do
+    case containingMod of
+      ThisModule ->
+        return SameModule
+      OtherModule destMn ->
+        case Map.lookup destMn ctxModuleMap of
+          Nothing ->
+            return $ LocalModule curMn destMn
+          Just pkgName -> do
+            pkgVersion <- lookup pkgName ctxResolvedDependencies
+            return $ DepsModule curMn pkgName pkgVersion destMn
+
+  builtinLinkLocation = do
+    let primMn = P.moduleNameFromString "Prim"
+    guard $ containingMod == OtherModule primMn
+    -- TODO: ensure the declaration exists in the builtin module too
+    return $ BuiltinModule primMn
+
+getLinksContext :: Package a -> LinksContext
+getLinksContext Package{..} =
+  LinksContext
+    { ctxGithub               = pkgGithub
+    , ctxModuleMap            = pkgModuleMap
+    , ctxResolvedDependencies = pkgResolvedDependencies
+    , ctxPackageName          = bowerName pkgMeta
+    , ctxVersion              = pkgVersion
+    , ctxVersionTag           = pkgVersionTag
+    }
 
 ----------------------
 -- Parsing
@@ -446,7 +598,7 @@ asReExport =
 pOr :: Parse e a -> Parse e a -> Parse e a
 p `pOr` q = catchError p (const q)
 
-asInPackage :: Parse BowerError a -> Parse BowerError (InPackage a)
+asInPackage :: Parse ManifestError a -> Parse ManifestError (InPackage a)
 asInPackage inner =
   build <$> key "package" (perhaps (withText parsePackageName))
         <*> key "item" inner
@@ -566,7 +718,7 @@ asModuleMap =
 -- This is here to preserve backwards compatibility with compilers which used
 -- to generate a 'bookmarks' field in the JSON (i.e. up to 0.10.5). We should
 -- remove this after the next breaking change to the JSON.
-bookmarksAsModuleMap :: Parse BowerError (Map P.ModuleName PackageName)
+bookmarksAsModuleMap :: Parse ManifestError (Map P.ModuleName PackageName)
 bookmarksAsModuleMap =
   convert <$>
     eachInArray (asInPackage (nth 0 (P.moduleNameFromString <$> asText)))

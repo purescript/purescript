@@ -24,7 +24,8 @@ foldPair f (Pair a b) = f a <> f b
 
 ala
   :: forall f t a
-   . (Functor f, Newtype t a)
+   . Functor f
+  => Newtype t a
   => (a -> t)
   -> ((a -> t) -> f t)
   -> f a

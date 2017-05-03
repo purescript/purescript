@@ -25,6 +25,13 @@ convertSingleModule m@(P.Module _ coms moduleName  _ _) =
     >>> mapMaybe (\d -> getDeclarationTitle d >>= convertDeclaration d)
     >>> augmentDeclarations
 
+-- | Different declarations we can augment
+data AugmentType
+  = AugmentClass
+  -- ^ Augment documentation for a type class
+  | AugmentType
+  -- ^ Augment documentation for a type constructor
+
 -- | The data type for an intermediate stage which we go through during
 -- converting.
 --
@@ -43,7 +50,7 @@ convertSingleModule m@(P.Module _ coms moduleName  _ _) =
 -- instance. For a fixity declaration, it would be just the relevant operator's
 -- name.
 type IntermediateDeclaration
-  = Either ([Text], DeclarationAugment) Declaration
+  = Either ([(Text, AugmentType)], DeclarationAugment) Declaration
 
 -- | Some data which will be used to augment a Declaration in the
 -- output.
@@ -64,9 +71,12 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
   where
   go ds (parentTitles, a) =
     map (\d ->
-      if declTitle d `elem` parentTitles
+      if any (matches d) parentTitles
         then augmentWith a d
         else d) ds
+
+  matches d (name, AugmentType) = isType d && declTitle d == name
+  matches d (name, AugmentClass) = isTypeClass d && declTitle d == name
 
   augmentWith (AugmentChild child) d =
     d { declChildren = declChildren d ++ [child] }
@@ -99,7 +109,7 @@ basicDeclaration :: Text -> DeclarationInfo -> Maybe IntermediateDeclaration
 basicDeclaration title info = Just $ Right $ mkDeclaration title info
 
 convertDeclaration :: P.Declaration -> Text -> Maybe IntermediateDeclaration
-convertDeclaration (P.ValueDeclaration _ _ _ (Right (P.TypedValue _ _ ty))) title =
+convertDeclaration (P.ValueDeclaration _ _ _ [P.MkUnguarded (P.TypedValue _ _ ty)]) title =
   basicDeclaration title (ValueDeclaration ty)
 convertDeclaration P.ValueDeclaration{} title =
   -- If no explicit type declaration was provided, insert a wildcard, so that
@@ -132,7 +142,7 @@ convertDeclaration (P.TypeClassDeclaration _ args implies fundeps ds) title =
   convertClassMember _ =
     P.internalError "convertDeclaration: Invalid argument to convertClassMember."
 convertDeclaration (P.TypeInstanceDeclaration _ constraints className tys _) title =
-  Just (Left (classNameString : typeNameStrings, AugmentChild childDecl))
+  Just (Left ((classNameString, AugmentClass) : map (, AugmentType) typeNameStrings, AugmentChild childDecl))
   where
   classNameString = unQual className
   typeNameStrings = ordNub (concatMap (P.everythingOnTypes (++) extractProperNames) tys)

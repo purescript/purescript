@@ -13,34 +13,64 @@
 -----------------------------------------------------------------------------
 
 module Language.PureScript.Ide.Error
-       ( PscIdeError(..)
+       ( IdeError(..)
+       , prettyPrintTypeSingleLine
        ) where
 
 import           Data.Aeson
+import qualified Data.Aeson.Types as Aeson
+import qualified Data.HashMap.Lazy as HM
+import qualified Data.Text as T
+import qualified Language.PureScript as P
 import           Language.PureScript.Errors.JSON
-import           Language.PureScript.Ide.Types   (ModuleIdent)
+import           Language.PureScript.Ide.Types   (ModuleIdent, Completion(..))
 import           Protolude
-import qualified Text.Parsec.Error               as P
+import qualified Text.Parsec.Error               as Parsec
 
-data PscIdeError
+data IdeError
     = GeneralError Text
     | NotFound Text
     | ModuleNotFound ModuleIdent
     | ModuleFileNotFound ModuleIdent
-    | ParseError P.ParseError Text
-    | RebuildError [JSONError]
+    | ParseError Parsec.ParseError Text
+    | RebuildError P.MultipleErrors
+    deriving (Show)
 
-instance ToJSON PscIdeError where
+instance ToJSON IdeError where
   toJSON (RebuildError errs) = object
     [ "resultType" .= ("error" :: Text)
-    , "result" .= errs
+    , "result" .= encodeRebuildErrors errs
     ]
   toJSON err = object
     [ "resultType" .= ("error" :: Text)
     , "result" .= textError err
     ]
 
-textError :: PscIdeError -> Text
+encodeRebuildErrors :: P.MultipleErrors -> Value
+encodeRebuildErrors = toJSON . map encodeRebuildError . P.runMultipleErrors
+  where
+    encodeRebuildError err = case err of
+      (P.ErrorMessage _
+       ((P.HoleInferredType name _ _
+         (P.TSAfter{tsAfterIdentifiers=idents, tsAfterRecordFields=fields})))) ->
+        insertTSCompletions name idents (fromMaybe [] fields) (toJSON (toJSONError False P.Error err))
+      _ ->
+        (toJSON . toJSONError False P.Error) err
+
+    insertTSCompletions name idents fields (Aeson.Object value) =
+      Aeson.Object
+        (HM.insert "pursIde"
+         (object [ "name" .= name
+                 , "completions" .= (ordNub (map identCompletion idents ++ map fieldCompletion fields))
+                 ]) value)
+    insertTSCompletions _ _ _ v = v
+
+    identCompletion (P.Qualified mn i, ty) =
+      Completion (maybe "" P.runModuleName mn) i (prettyPrintTypeSingleLine ty) (prettyPrintTypeSingleLine ty) Nothing Nothing
+    fieldCompletion (label, ty) =
+      Completion "" ("_." <> P.prettyPrintLabel label) (prettyPrintTypeSingleLine ty) (prettyPrintTypeSingleLine ty) Nothing Nothing
+
+textError :: IdeError -> Text
 textError (GeneralError msg)          = msg
 textError (NotFound ident)            = "Symbol '" <> ident <> "' not found."
 textError (ModuleNotFound ident)      = "Module '" <> ident <> "' not found."
@@ -51,3 +81,6 @@ textError (ParseError parseError msg) = let escape = show
                                             -- over the socket as a single line
                                         in msg <> ": " <> escape parseError
 textError (RebuildError err)          = show err
+
+prettyPrintTypeSingleLine :: P.Type -> Text
+prettyPrintTypeSingleLine = T.unwords . map T.strip . T.lines . T.pack . P.prettyPrintTypeWithUnicode

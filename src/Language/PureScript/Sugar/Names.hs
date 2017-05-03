@@ -9,6 +9,7 @@ module Language.PureScript.Sugar.Names
   ) where
 
 import Prelude.Compat
+import Protolude (ordNub)
 
 import Control.Arrow (first)
 import Control.Monad
@@ -16,7 +17,6 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Lazy
 import Control.Monad.Writer (MonadWriter(..), censor)
 
-import Data.List (nub)
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -65,12 +65,11 @@ desugarImportsWithEnv externs modules = do
   externsEnv :: Env -> ExternsFile -> m Env
   externsEnv env ExternsFile{..} = do
     let members = Exports{..}
-        ss = internalModuleSourceSpan "<Externs>"
-        env' = M.insert efModuleName (ss, primImports, members) env
+        env' = M.insert efModuleName (efSourceSpan, primImports, members) env
         fromEFImport (ExternsImport mn mt qmn) = (mn, [(Nothing, Just mt, qmn)])
     imps <- foldM (resolveModuleImport env') primImports (map fromEFImport efImports)
-    exps <- resolveExports env' ss efModuleName imps members efExports
-    return $ M.insert efModuleName (ss, imps, exps) env
+    exps <- resolveExports env' efSourceSpan efModuleName imps members efExports
+    return $ M.insert efModuleName (efSourceSpan, imps, exps) env
     where
 
     exportedTypes :: M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ModuleName)
@@ -202,11 +201,11 @@ renameInModule imports (Module ss coms mn decls exps) =
     -> m ((Maybe SourceSpan, [Ident]), Expr)
   updateValue (_, bound) v@(PositionedValue pos' _ _) =
     return ((Just pos', bound), v)
-  updateValue (pos, bound) (Abs (Left arg) val') =
-    return ((pos, arg : bound), Abs (Left arg) val')
+  updateValue (pos, bound) (Abs (VarBinder arg) val') =
+    return ((pos, arg : bound), Abs (VarBinder arg) val')
   updateValue (pos, bound) (Let ds val') = do
     let args = mapMaybe letBoundVariable ds
-    unless (length (nub args) == length args) $
+    unless (length (ordNub args) == length args) $
       maybe id rethrowWithPosition pos $
         throwError . errorMessage $ OverlappingNamesInLet
     return ((pos, args ++ bound), Let ds val')
@@ -242,8 +241,16 @@ renameInModule imports (Module ss coms mn decls exps) =
     :: (Maybe SourceSpan, [Ident])
     -> CaseAlternative
     -> m ((Maybe SourceSpan, [Ident]), CaseAlternative)
-  updateCase (pos, bound) c@(CaseAlternative bs _) =
-    return ((pos, concatMap binderNames bs ++ bound), c)
+  updateCase (pos, bound) c@(CaseAlternative bs gs) =
+    return ((pos, concatMap binderNames bs ++ updateGuard gs ++ bound), c)
+    where
+    updateGuard :: [GuardedExpr] -> [Ident]
+    updateGuard [] = []
+    updateGuard (GuardedExpr g _ : xs) =
+      concatMap updatePatGuard g ++ updateGuard xs
+      where
+        updatePatGuard (PatternGuard b _) = binderNames b
+        updatePatGuard _                  = []
 
   letBoundVariable :: Declaration -> Maybe Ident
   letBoundVariable (ValueDeclaration ident _ _ _) = Just ident
@@ -269,7 +276,7 @@ renameInModule imports (Module ss coms mn decls exps) =
     updateType :: Type -> m Type
     updateType (TypeOp name) = TypeOp <$> updateTypeOpName name pos
     updateType (TypeConstructor name) = TypeConstructor <$> updateTypeName name pos
-    updateType (ConstrainedType cs t) = ConstrainedType <$> traverse updateInConstraint cs <*> pure t
+    updateType (ConstrainedType c t) = ConstrainedType <$> updateInConstraint c <*> pure t
     updateType (KindedType t k) = KindedType t <$> updateKindsEverywhere pos k
     updateType t = return t
     updateInConstraint :: Constraint -> m Constraint
@@ -342,11 +349,8 @@ renameInModule imports (Module ss coms mn decls exps) =
       -- in scope, we throw an error.
       (Just options, _) -> do
         (mnNew, mnOrig) <- checkImportConflicts mn toName options
-        modify $ \result ->
-          M.insert
-            mnNew
-            (maybe [fmap toName qname] (fmap toName qname :) (mnNew `M.lookup` result))
-            result
+        modify $ \usedImports ->
+          M.insertWith (++) mnNew [fmap toName qname] usedImports
         return $ Qualified (Just mnOrig) name
 
       -- If the name wasn't found in our imports but was qualified then we need

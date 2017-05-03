@@ -29,14 +29,11 @@ import           Network.HTTP.Types.Header     (hAccept)
 import           Pipes.HTTP
 import qualified Pipes.Prelude                 as P
 
--- We need to remove trailing dots because Pursuit will return a 400 otherwise
--- TODO: remove this when the issue is fixed at Pursuit
 queryPursuit :: Text -> IO ByteString
 queryPursuit q = do
-  let qClean = T.dropWhileEnd (== '.') q
   req' <- parseRequest "https://pursuit.purescript.org/search"
   let req = req'
-        { queryString= "q=" <> (fromString . T.unpack) qClean
+        { queryString= "q=" <> (fromString . T.unpack) q
         , requestHeaders=[(hAccept, "application/json")]
         }
   m <- newManager tlsManagerSettings
@@ -45,7 +42,6 @@ queryPursuit q = do
 
 
 handler :: HttpException -> IO [a]
-handler StatusCodeException{} = pure []
 handler _ = pure []
 
 searchPursuitForDeclarations :: Text -> IO [PursuitResponse]

@@ -5,7 +5,8 @@ import           Prelude.Compat
 import           Control.Monad
 import qualified Language.PureScript as P
 import           Language.PureScript.Interactive.Types
-import           System.FilePath (pathSeparator)
+import           System.Directory (getCurrentDirectory)
+import           System.FilePath (pathSeparator, makeRelative)
 import           System.IO.UTF8 (readUTF8FileT)
 
 -- * Support Module
@@ -20,23 +21,23 @@ supportModuleIsDefined = any ((== supportModuleName) . P.getModuleName)
 
 -- * Module Management
 
--- |
--- Loads a file for use with imports.
---
+-- | Loads a file for use with imports.
 loadModule :: FilePath -> IO (Either String [P.Module])
 loadModule filename = do
+  pwd <- getCurrentDirectory
   content <- readUTF8FileT filename
-  return $ either (Left . P.prettyPrintMultipleErrors P.defaultPPEOptions) (Right . map snd) $ P.parseModulesFromFiles id [(filename, content)]
+  return $
+    either (Left . P.prettyPrintMultipleErrors P.defaultPPEOptions {P.ppeRelativeDirectory = pwd}) (Right . map snd) $
+      P.parseModulesFromFiles id [(filename, content)]
 
--- |
--- Load all modules.
---
+-- | Load all modules.
 loadAllModules :: [FilePath] -> IO (Either P.MultipleErrors [(FilePath, P.Module)])
 loadAllModules files = do
+  pwd <- getCurrentDirectory
   filesAndContent <- forM files $ \filename -> do
     content <- readUTF8FileT filename
     return (filename, content)
-  return $ P.parseModulesFromFiles id filesAndContent
+  return $ P.parseModulesFromFiles (makeRelative pwd) filesAndContent
 
 -- |
 -- Makes a volatile module to execute the current expression.
@@ -50,7 +51,7 @@ createTemporaryModule exec PSCiState{psciImportedModules = imports, psciLetBindi
     supportImport = (supportModuleName, P.Implicit, Just (P.ModuleName [P.ProperName "$Support"]))
     eval          = P.Var (P.Qualified (Just (P.ModuleName [P.ProperName "$Support"])) (P.Ident "eval"))
     mainValue     = P.App eval (P.Var (P.Qualified Nothing (P.Ident "it")))
-    itDecl        = P.ValueDeclaration (P.Ident "it") P.Public [] $ Right val
+    itDecl        = P.ValueDeclaration (P.Ident "it") P.Public [] [P.MkUnguarded val]
     typeDecl      = P.TypeDeclaration (P.Ident "$main")
                       (P.TypeApp
                         (P.TypeApp
@@ -58,7 +59,7 @@ createTemporaryModule exec PSCiState{psciImportedModules = imports, psciLetBindi
                             (P.Qualified (Just (P.ModuleName [P.ProperName "$Eff"])) (P.ProperName "Eff")))
                               (P.TypeWildcard internalSpan))
                                 (P.TypeWildcard internalSpan))
-    mainDecl      = P.ValueDeclaration (P.Ident "$main") P.Public [] $ Right mainValue
+    mainDecl      = P.ValueDeclaration (P.Ident "$main") P.Public [] [P.MkUnguarded mainValue]
     decls         = if exec then [itDecl, typeDecl, mainDecl] else [itDecl]
     internalSpan  = P.internalModuleSourceSpan "<internal>"
   in

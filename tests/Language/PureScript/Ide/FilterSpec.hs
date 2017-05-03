@@ -8,6 +8,8 @@ import           Language.PureScript.Ide.Types
 import qualified Language.PureScript as P
 import           Test.Hspec
 
+type Module = (P.ModuleName, [IdeDeclarationAnn])
+
 value :: Text -> IdeDeclarationAnn
 value s = IdeDeclarationAnn emptyAnn (IdeDeclValue (IdeValue (P.Ident (toS s)) P.REmpty))
 

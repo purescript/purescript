@@ -2,7 +2,25 @@
 set -e
 
 STACK="stack --no-terminal --jobs=1"
-$STACK setup
+
+# Setup & install dependencies or abort
+ret=0
+$TIMEOUT 40m $STACK --install-ghc build \
+  --only-dependencies --test --haddock \
+  || ret=$?
+case "$ret" in
+  0) # continue
+    ;;
+  124)
+    echo "Timed out while installing dependencies."
+    echo "Try pushing a new commit to build again."
+    exit 1
+    ;;
+  *)
+    echo "Failed to install dependencies."
+    exit 1
+    ;;
+esac
 
 # Set up configuration
 STACK_EXTRA_FLAGS=""
@@ -10,6 +28,9 @@ if [ -z "$TRAVIS_TAG" ]
 then
   # On non-release builds, disable optimizations.
   STACK_EXTRA_FLAGS="--fast"
+else
+  # On release builds, set the 'release' cabal flag.
+  STACK_EXTRA_FLAGS="--flag purescript:RELEASE"
 fi
 
 if [ "$STACKAGE_NIGHTLY" = "true" ]

@@ -38,21 +38,22 @@ import Paths_purescript as Paths
 
 -- | The data which will be serialized to an externs file
 data ExternsFile = ExternsFile
-  {
-  -- | The externs version
-    efVersion :: Text
-  -- | Module name
+  { efVersion :: Text
+  -- ^ The externs version
   , efModuleName :: ModuleName
-  -- | List of module exports
+  -- ^ Module name
   , efExports :: [DeclarationRef]
-  -- | List of module imports
+  -- ^ List of module exports
   , efImports :: [ExternsImport]
-  -- | List of operators and their fixities
+  -- ^ List of module imports
   , efFixities :: [ExternsFixity]
-  -- | List of type operators and their fixities
+  -- ^ List of operators and their fixities
   , efTypeFixities :: [ExternsTypeFixity]
-  -- | List of type and value declaration
+  -- ^ List of type operators and their fixities
   , efDeclarations :: [ExternsDeclaration]
+  -- ^ List of type and value declaration
+  , efSourceSpan :: SourceSpan
+  -- ^ Source span for error reporting
   } deriving (Show)
 
 -- | A module import in an externs file
@@ -165,7 +166,7 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
 -- | Generate an externs file for all declarations in a module
 moduleToExternsFile :: Module -> Environment -> ExternsFile
 moduleToExternsFile (Module _ _ _ _ Nothing) _ = internalError "moduleToExternsFile: module exports were not elaborated"
-moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
+moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
   where
   efVersion       = T.pack (showVersion Paths.version)
   efModuleName    = mn
@@ -174,6 +175,7 @@ moduleToExternsFile (Module _ _ mn ds (Just exps)) env = ExternsFile{..}
   efFixities      = mapMaybe fixityDecl ds
   efTypeFixities  = mapMaybe typeFixityDecl ds
   efDeclarations  = concatMap toExternsDeclaration efExports
+  efSourceSpan    = ss
 
   fixityDecl :: Declaration -> Maybe ExternsFixity
   fixityDecl (ValueFixityDeclaration (Fixity assoc prec) name op) =

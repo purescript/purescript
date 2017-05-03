@@ -2,7 +2,9 @@
 {-# LANGUAGE TemplateHaskell       #-}
 
 module Language.PureScript.Ide.Rebuild
-  ( rebuildFile
+  ( rebuildFileSync
+  , rebuildFileAsync
+  , rebuildFile
   ) where
 
 import           Protolude
@@ -13,11 +15,11 @@ import qualified Data.Map.Lazy                   as M
 import           Data.Maybe                      (fromJust)
 import qualified Data.Set                        as S
 import qualified Language.PureScript             as P
-import           Language.PureScript.Errors.JSON
 import           Language.PureScript.Ide.Error
+import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
-import           System.IO.UTF8                  (readUTF8FileT)
+import           Language.PureScript.Ide.Util
 
 -- | Given a filepath performs the following steps:
 --
@@ -35,23 +37,24 @@ import           System.IO.UTF8                  (readUTF8FileT)
 -- warnings, and if rebuilding fails, returns a @RebuildError@ with the
 -- generated errors.
 rebuildFile
-  :: (Ide m, MonadLogger m, MonadError PscIdeError m)
+  :: (Ide m, MonadLogger m, MonadError IdeError m)
   => FilePath
+  -- ^ The file to rebuild
+  -> (ReaderT IdeEnvironment (LoggingT IO) () -> m ())
+  -- ^ A runner for the second build with open exports
   -> m Success
-rebuildFile path = do
+rebuildFile path runOpenBuild = do
 
-  input <- liftIO (readUTF8FileT path)
+  input <- ideReadFile path
 
   m <- case snd <$> P.parseModuleFromFile identity (path, input) of
-    Left parseError -> throwError
-                       . RebuildError
-                       . toJSONErrors False P.Error
-                       $ P.MultipleErrors [P.toPositionedError parseError]
+    Left parseError ->
+      throwError (RebuildError (P.MultipleErrors [P.toPositionedError parseError]))
     Right m -> pure m
 
   -- Externs files must be sorted ahead of time, so that they get applied
   -- correctly to the 'Environment'.
-  externs <- sortExterns m =<< getExternFiles
+  externs <- logPerf (labelTimespec "Sorting externs") (sortExterns m =<< getExternFiles)
 
   outputDirectory <- confOutputPath . ideConfiguration <$> ask
 
@@ -62,25 +65,49 @@ rebuildFile path = do
 
   let makeEnv = MakeActionsEnv outputDirectory filePathMap foreigns False
   -- Rebuild the single module using the cached externs
-  (result, warnings) <- liftIO
+  (result, warnings) <- logPerf (labelTimespec "Rebuilding Module") $
+    liftIO
     . P.runMake P.defaultOptions
     . P.rebuildModule (buildMakeActions
                         >>= shushProgress $ makeEnv) externs $ m
   case result of
-    Left errors -> throwError (RebuildError (toJSONErrors False P.Error errors))
+    Left errors -> throwError (RebuildError errors)
     Right _ -> do
-      rebuildModuleOpen makeEnv externs m
-      pure (RebuildSuccess (toJSONErrors False P.Warning warnings))
+      runOpenBuild (rebuildModuleOpen makeEnv externs m)
+      pure (RebuildSuccess warnings)
+
+rebuildFileAsync
+  :: forall m. (Ide m, MonadLogger m, MonadError IdeError m)
+  => FilePath -> m Success
+rebuildFileAsync fp = rebuildFile fp asyncRun
+  where
+    asyncRun :: ReaderT IdeEnvironment (LoggingT IO) () -> m ()
+    asyncRun action = do
+        env <- ask
+        let ll = confLogLevel (ideConfiguration env)
+        void (liftIO (async (runLogger ll (runReaderT action env))))
+
+rebuildFileSync
+  :: forall m. (Ide m, MonadLogger m, MonadError IdeError m)
+  => FilePath -> m Success
+rebuildFileSync fp = rebuildFile fp syncRun
+  where
+    syncRun :: ReaderT IdeEnvironment (LoggingT IO) () -> m ()
+    syncRun action = do
+        env <- ask
+        let ll = confLogLevel (ideConfiguration env)
+        void (liftIO (runLogger ll (runReaderT action env)))
+
 
 -- | Rebuilds a module but opens up its export list first and stores the result
 -- inside the rebuild cache
 rebuildModuleOpen
-  :: (Ide m, MonadLogger m, MonadError PscIdeError m)
+  :: (Ide m, MonadLogger m)
   => MakeActionsEnv
   -> [P.ExternsFile]
   -> P.Module
   -> m ()
-rebuildModuleOpen makeEnv externs m = do
+rebuildModuleOpen makeEnv externs m = void $ runExceptT $ do
   (openResult, _) <- liftIO
     . P.runMake P.defaultOptions
     . P.rebuildModule (buildMakeActions
@@ -99,8 +126,8 @@ rebuildModuleOpen makeEnv externs m = do
 data MakeActionsEnv =
   MakeActionsEnv
   { maeOutputDirectory :: FilePath
-  , maeFilePathMap     :: Map P.ModuleName (Either P.RebuildPolicy FilePath)
-  , maeForeignPathMap  :: Map P.ModuleName FilePath
+  , maeFilePathMap     :: ModuleMap (Either P.RebuildPolicy FilePath)
+  , maeForeignPathMap  :: ModuleMap FilePath
   , maePrefixComment   :: Bool
   }
 
@@ -128,9 +155,9 @@ shushCodegen ma MakeActionsEnv{..} =
 -- module. Throws an error if there is a cyclic dependency within the
 -- ExternsFiles
 sortExterns
-  :: (Ide m, MonadError PscIdeError m)
+  :: (Ide m, MonadError IdeError m)
   => P.Module
-  -> Map P.ModuleName P.ExternsFile
+  -> ModuleMap P.ExternsFile
   -> m [P.ExternsFile]
 sortExterns m ex = do
   sorted' <- runExceptT
@@ -141,7 +168,7 @@ sortExterns m ex = do
            . M.delete (P.getModuleName m) $ ex
   case sorted' of
     Left err ->
-      throwError (RebuildError (toJSONErrors False P.Error err))
+      throwError (RebuildError err)
     Right (sorted, graph) -> do
       let deps = fromJust (List.lookup (P.getModuleName m) graph)
       pure $ mapMaybe getExtern (deps `inOrderOf` map P.getModuleName sorted)

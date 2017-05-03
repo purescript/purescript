@@ -10,6 +10,10 @@ import           Language.PureScript.Interactive.Types
 
 -- Messages
 
+-- | The guide URL
+guideURL :: String
+guideURL = "https://github.com/purescript/documentation/blob/master/guides/PSCi.md"
+
 -- | The help message.
 helpMessage :: String
 helpMessage = "The following commands are available:\n\n    " ++
@@ -28,7 +32,7 @@ helpMessage = "The following commands are available:\n\n    " ++
 
   extraHelp =
     "Further information is available on the PureScript documentation repository:\n" ++
-    " --> https://github.com/purescript/documentation/blob/master/PSCi.md"
+    " --> " ++ guideURL
 
 -- | The welcome prologue.
 prologueMessage :: String
@@ -37,18 +41,17 @@ prologueMessage = unlines
   , "Type :? for help"
   ]
 
+noInputMessage :: String
+noInputMessage = unlines
+  [ "purs repl: No input files; try running `pulp psci` instead."
+  , "For help getting started, visit " ++ guideURL
+  , "Usage: For basic information, try the `--help' option."
+  ]
+
 supportModuleMessage :: String
 supportModuleMessage = unlines
-  [ "PSCi requires the psci-support package to be installed."
-  , "You can install it using Bower as follows:"
-  , ""
-  , "  bower i purescript-psci-support --save-dev"
-  , ""
-  , "Or using psc-package:"
-  , ""
-  , "  psc-package install psci-support"
-  , ""
-  , "For help getting started, visit https://github.com/purescript/documentation/blob/master/PSCi.md"
+  [ "purs repl: PSCi requires the psci-support package."
+  , "For help getting started, visit " ++ guideURL
   ]
 
 -- | The quit message.

@@ -5,13 +5,14 @@ module Language.PureScript.Linter.Imports
   ) where
 
 import Prelude.Compat
+import Protolude (ordNub)
 
 import Control.Monad (join, unless, foldM, (<=<))
 import Control.Monad.Writer.Class
 
 import Data.Function (on)
 import Data.Foldable (for_)
-import Data.List (find, intersect, nub, groupBy, sortBy, (\\))
+import Data.List (find, intersect, groupBy, sortBy, (\\))
 import Data.Maybe (mapMaybe, fromMaybe)
 import Data.Monoid (Sum(..))
 import Data.Traversable (forM)
@@ -71,16 +72,16 @@ lintImports (Module ss _ mn mdecls (Just mexports)) env usedImps = do
     unless (isPrim mni) $
       for_ decls $ \(ss', declType, qualifierName) ->
         maybe id warnWithPosition ss' $ do
-          let names = nub $ M.findWithDefault [] mni usedImps'
+          let names = ordNub $ M.findWithDefault [] mni usedImps'
           lintImportDecl env mni qualifierName names declType allowImplicit
 
   for_ (M.toAscList (byQual imports)) $ \(mnq, entries) -> do
-    let mnis = nub $ map (\(_, _, mni) -> mni) entries
+    let mnis = ordNub $ map (\(_, _, mni) -> mni) entries
     unless (length mnis == 1) $ do
       let implicits = filter (\(_, declType, _) -> not $ isExplicit declType) entries
       for_ implicits $ \(ss', _, mni) ->
         maybe id warnWithPosition ss' $ do
-          let names = nub $ M.findWithDefault [] mni usedImps'
+          let names = ordNub $ M.findWithDefault [] mni usedImps'
               usedRefs = findUsedRefs env mni (Just mnq) names
           unless (null usedRefs) $
             tell $ errorMessage $ ImplicitQualifiedImport mni mnq usedRefs
@@ -147,7 +148,7 @@ lintImports (Module ss _ mn mdecls (Just mexports)) env usedImps = do
   -- The list of modules that are being re-exported by the current module. Any
   -- module that appears in this list is always considered to be used.
   exportedModules :: [ModuleName]
-  exportedModules = nub $ mapMaybe extractModule mexports
+  exportedModules = ordNub $ mapMaybe extractModule mexports
     where
     extractModule (PositionedDeclarationRef _ _ r) = extractModule r
     extractModule (ModuleRef mne) = Just mne
@@ -231,7 +232,7 @@ lintImportDecl env mni qualifierName names declType allowImplicit =
     :: [DeclarationRef]
     -> m Bool
   checkExplicit declrefs = do
-    let idents = nub (mapMaybe runDeclRef declrefs)
+    let idents = ordNub (mapMaybe runDeclRef declrefs)
         dctors = mapMaybe (getDctorName <=< disqualifyFor qualifierName) names
         usedNames = mapMaybe (matchName (typeForDCtor mni) <=< disqualifyFor qualifierName) names
         diff = idents \\ usedNames

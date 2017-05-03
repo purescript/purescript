@@ -12,6 +12,7 @@ module Language.PureScript.TypeChecker.Entailment
   ) where
 
 import Prelude.Compat
+import Protolude (ordNub)
 
 import Control.Arrow (second)
 import Control.Monad.Error.Class (MonadError(..))
@@ -21,11 +22,11 @@ import Control.Monad.Writer
 
 import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
-import Data.List (minimumBy, nub)
+import Data.Functor (($>))
+import Data.List (minimumBy)
 import Data.Maybe (fromMaybe, maybeToList, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
-import qualified Data.Text as T
 import Data.Text (Text)
 
 import Language.PureScript.AST
@@ -53,7 +54,11 @@ data Evidence
   -- ^ Computed instance of CompareSymbol
   | AppendSymbolInstance
   -- ^ Computed instance of AppendSymbol
-  deriving (Eq)
+  | UnionInstance
+  -- ^ Computed instance of Union
+  | ConsInstance
+  -- ^ Computed instance of RowCons
+  deriving (Show, Eq)
 
 -- | Extract the identifier of a named instance
 namedInstanceIdentifier :: Evidence -> Maybe (Qualified Ident)
@@ -119,6 +124,7 @@ data EntailsResult a
   -- ^ We couldn't solve this constraint right now, it will be generalized
   | Deferred
   -- ^ We couldn't solve this constraint right now, so it has been deferred
+  deriving Show
 
 -- | Options for the constraint solver
 data SolverOptions = SolverOptions
@@ -146,8 +152,10 @@ entails SolverOptions{..} constraint context hints =
     solve constraint
   where
     forClassName :: InstanceContext -> Qualified (ProperName 'ClassName) -> [Type] -> [TypeClassDict]
-    forClassName _ C.Warn [msg] =
-      [TypeClassDictionaryInScope (WarnInstance msg) [] C.Warn [msg] Nothing]
+    forClassName ctx cn@C.Warn [msg] =
+      -- Prefer a warning dictionary in scope if there is one available.
+      -- This allows us to defer a warning by propagating the constraint.
+      findDicts ctx cn Nothing ++ [TypeClassDictionaryInScope (WarnInstance msg) [] C.Warn [msg] Nothing]
     forClassName _ C.IsSymbol [TypeLevelString sym] =
       [TypeClassDictionaryInScope (IsSymbolInstance sym) [] C.IsSymbol [TypeLevelString sym] Nothing]
     forClassName _ C.CompareSymbol [arg0@(TypeLevelString lhs), arg1@(TypeLevelString rhs), _] =
@@ -160,7 +168,12 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ C.AppendSymbol [arg0@(TypeLevelString lhs), arg1@(TypeLevelString rhs), _] =
       let args = [arg0, arg1, TypeLevelString (lhs <> rhs)]
       in [TypeClassDictionaryInScope AppendSymbolInstance [] C.AppendSymbol args Nothing]
-    forClassName ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (nub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
+    forClassName _ C.Union [l, r, u]
+      | Just (lOut, rOut, uOut, cst) <- unionRows l r u
+      = [ TypeClassDictionaryInScope UnionInstance [] C.Union [lOut, rOut, uOut] cst ]
+    forClassName _ C.RowCons [TypeLevelString sym, ty, r, _]
+      = [ TypeClassDictionaryInScope ConsInstance [] C.RowCons [TypeLevelString sym, ty, r, RCons (Label sym) ty r] Nothing ]
+    forClassName ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (ordNub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
     forClassName _ _ _ = internalError "forClassName: expected qualified class name"
 
     ctorModules :: Type -> Maybe ModuleName
@@ -221,7 +234,7 @@ entails SolverOptions{..} constraint context hints =
                 -- Solve any necessary subgoals
                 args <- solveSubgoals subst'' (tcdDependencies tcd)
                 initDict <- lift . lift $ mkDictionary (tcdValue tcd) args
-                let match = foldr (\(superclassName, index) dict -> subclassDictionaryValue dict superclassName index)
+                let match = foldr (\(className, index) dict -> subclassDictionaryValue dict className index)
                                   initDict
                                   (tcdPath tcd)
                 return match
@@ -315,11 +328,19 @@ entails SolverOptions{..} constraint context hints =
             -- Make a dictionary from subgoal dictionaries by applying the correct function
             mkDictionary :: Evidence -> Maybe [Expr] -> m Expr
             mkDictionary (NamedInstance n) args = return $ foldl App (Var n) (fold args)
+            mkDictionary UnionInstance (Just [e]) =
+              -- We need the subgoal dictionary to appear in the term somewhere
+              return $ App (Abs (VarBinder (Ident C.__unused)) valUndefined) e
+            mkDictionary UnionInstance _ = return valUndefined
+            mkDictionary ConsInstance _ = return valUndefined
             mkDictionary (WarnInstance msg) _ = do
               tell . errorMessage $ UserDefinedWarning msg
-              return $ TypeClassDictionaryConstructorApp C.Warn (Literal (ObjectLiteral []))
+              -- We cannot call the type class constructor here because Warn is declared in Prim.
+              -- This means that it doesn't have a definition that we can import.
+              -- So pass an empty placeholder (undefined) instead.
+              return valUndefined
             mkDictionary (IsSymbolInstance sym) _ =
-              let fields = [ ("reflectSymbol", Abs (Left (Ident C.__unused)) (Literal (StringLiteral sym))) ] in
+              let fields = [ ("reflectSymbol", Abs (VarBinder (Ident C.__unused)) (Literal (StringLiteral sym))) ] in
               return $ TypeClassDictionaryConstructorApp C.IsSymbol (Literal (ObjectLiteral fields))
             mkDictionary CompareSymbolInstance _ =
               return $ TypeClassDictionaryConstructorApp C.CompareSymbol (Literal (ObjectLiteral []))
@@ -327,11 +348,31 @@ entails SolverOptions{..} constraint context hints =
               return $ TypeClassDictionaryConstructorApp C.AppendSymbol (Literal (ObjectLiteral []))
 
         -- Turn a DictionaryValue into a Expr
-        subclassDictionaryValue :: Expr -> Qualified (ProperName a) -> Integer -> Expr
-        subclassDictionaryValue dict superclassName index =
-          App (Accessor (mkString (C.__superclass_ <> showQualified runProperName superclassName <> "_" <> T.pack (show index)))
-                        dict)
-              valUndefined
+        subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr
+        subclassDictionaryValue dict className index =
+          App (Accessor (mkString (superclassName className index)) dict) valUndefined
+
+    -- | Left biased union of two row types
+    unionRows :: Type -> Type -> Type -> Maybe (Type, Type, Type, Maybe [Constraint])
+    unionRows l r _ =
+        guard canMakeProgress $> (l, r, rowFromList out, cons)
+      where
+        (fixed, rest) = rowToList l
+
+        rowVar = TypeVar "r"
+
+        (canMakeProgress, out, cons) =
+          case rest of
+            -- If the left hand side is a closed row, then we can merge
+            -- its labels into the right hand side.
+            REmpty -> (True, (fixed, r), Nothing)
+            -- If the left hand side is not definitely closed, then the only way we
+            -- can safely make progress is to move any known labels from the left
+            -- input into the output, and add a constraint for any remaining labels.
+            -- Otherwise, the left hand tail might contain the same labels as on
+            -- the right hand side, and we can't be certain we won't reorder the
+            -- types for such labels.
+            _ -> (not (null fixed), (fixed, rowVar), Just [ Constraint C.Union [rest, r, rowVar] Nothing ])
 
 -- Check if an instance matches our list of types, allowing for types
 -- to be solved via functional dependencies. If the types match, we return a
@@ -388,24 +429,19 @@ matches deps TypeClassDictionaryInScope{..} tys = do
       both (typeHeadsAreEqual h1 h2) (typeHeadsAreEqual t1 t2)
     typeHeadsAreEqual REmpty REmpty = (True, M.empty)
     typeHeadsAreEqual r1@RCons{} r2@RCons{} =
-        foldr both (go sd1 r1' sd2 r2') (map (uncurry typeHeadsAreEqual) int)
+        foldr both (uncurry go rest) common
       where
-        (s1, r1') = rowToList r1
-        (s2, r2') = rowToList r2
+        (common, rest) = alignRowsWith typeHeadsAreEqual r1 r2
 
-        int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
-        sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
-        sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
-
-        go :: [(Label, Type)] -> Type -> [(Label, Type)] -> Type -> (Bool, Matching [Type])
-        go l  (KindedType t1 _)  r  t2                 = go l t1 r t2
-        go l  t1                 r  (KindedType t2 _)  = go l t1 r t2
-        go [] REmpty             [] REmpty             = (True, M.empty)
-        go [] (TUnknown u1)      [] (TUnknown u2)      | u1 == u2 = (True, M.empty)
-        go [] (TypeVar v1)       [] (TypeVar v2)       | v1 == v2 = (True, M.empty)
-        go [] (Skolem _ sk1 _ _) [] (Skolem _ sk2 _ _) | sk1 == sk2 = (True, M.empty)
-        go sd r                  [] (TypeVar v)        = (True, M.singleton v [rowFromList (sd, r)])
-        go _  _                  _  _                  = (False, M.empty)
+        go :: ([(Label, Type)], Type) -> ([(Label, Type)], Type) -> (Bool, Matching [Type])
+        go (l,  KindedType t1 _)  (r,  t2)                            = go (l, t1) (r, t2)
+        go (l,  t1)               (r,  KindedType t2 _)               = go (l, t1) (r, t2)
+        go ([], REmpty)           ([], REmpty)                        = (True, M.empty)
+        go ([], TUnknown u1)      ([], TUnknown u2)      | u1 == u2   = (True, M.empty)
+        go ([], TypeVar v1)       ([], TypeVar v2)       | v1 == v2   = (True, M.empty)
+        go ([], Skolem _ sk1 _ _) ([], Skolem _ sk2 _ _) | sk1 == sk2 = (True, M.empty)
+        go (sd, r)                ([], TypeVar v)                     = (True, M.singleton v [rowFromList (sd, r)])
+        go _ _                                                        = (False, M.empty)
     typeHeadsAreEqual _ _ = (False, M.empty)
 
     both :: (Bool, Matching [Type]) -> (Bool, Matching [Type]) -> (Bool, Matching [Type])
@@ -431,23 +467,18 @@ matches deps TypeClassDictionaryInScope{..} tys = do
       typesAreEqual (TypeApp h1 t1)      (TypeApp h2 t2)      = typesAreEqual h1 h2 && typesAreEqual t1 t2
       typesAreEqual REmpty               REmpty               = True
       typesAreEqual r1                   r2                   | isRCons r1 || isRCons r2 =
-          let (s1, r1') = rowToList r1
-              (s2, r2') = rowToList r2
-
-              int = [ (t1, t2) | (name, t1) <- s1, (name', t2) <- s2, name == name' ]
-              sd1 = [ (name, t1) | (name, t1) <- s1, name `notElem` map fst s2 ]
-              sd2 = [ (name, t2) | (name, t2) <- s2, name `notElem` map fst s1 ]
-          in all (uncurry typesAreEqual) int && go sd1 r1' sd2 r2'
+          let (common, rest) = alignRowsWith typesAreEqual r1 r2
+          in and common && uncurry go rest
         where
-          go :: [(Label, Type)] -> Type -> [(Label, Type)] -> Type -> Bool
-          go l  (KindedType t1 _) r  t2                = go l t1 r t2
-          go l  t1                r  (KindedType t2 _) = go l t1 r t2
-          go [] (TUnknown u1)     [] (TUnknown u2)     | u1 == u2 = True
-          go [] (Skolem _ s1 _ _) [] (Skolem _ s2 _ _) = s1 == s2
-          go [] REmpty            [] REmpty            = True
-          go [] (TypeVar v1)      [] (TypeVar v2)      = v1 == v2
-          go _  _                 _  _                 = False
-      typesAreEqual _ _ = False
+          go :: ([(Label, Type)], Type) -> ([(Label, Type)], Type) -> Bool
+          go (l, KindedType t1 _)  (r, t2)                          = go (l, t1) (r, t2)
+          go (l, t1)               (r, KindedType t2 _)             = go (l, t1) (r, t2)
+          go ([], TUnknown u1)     ([], TUnknown u2)     | u1 == u2 = True
+          go ([], Skolem _ s1 _ _) ([], Skolem _ s2 _ _)            = s1 == s2
+          go ([], REmpty)          ([], REmpty)                     = True
+          go ([], TypeVar v1)      ([], TypeVar v2)                 = v1 == v2
+          go _  _                                                   = False
+      typesAreEqual _ _                                             = False
 
       isRCons :: Type -> Bool
       isRCons RCons{}    = True

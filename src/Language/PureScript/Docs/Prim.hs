@@ -25,10 +25,11 @@ primDocsModule = Module
       , partial
       , fail
       , warn
+      , union
+      , rowCons
       , typeConcat
       , typeString
       , kindType
-      , kindEffect
       , kindSymbol
       ]
   , modReExports = []
@@ -93,11 +94,6 @@ kindType = primKind "Type" $ T.unlines
   [ "`Type` (also known as `*`) is the kind of all proper types: those that"
   , "classify value-level terms."
   , "For example the type `Boolean` has kind `Type`; denoted by `Boolean :: Type`."
-  ]
-
-kindEffect :: Declaration
-kindEffect = primKind "Effect" $ T.unlines
-  [ "`Effect` (also known as `!`) is the kind of all effect types."
   ]
 
 kindSymbol :: Declaration
@@ -232,6 +228,21 @@ warn = primClass "Warn" $ T.unlines
   , ""
   , "For more information, see"
   , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
+  ]
+
+union :: Declaration
+union = primClass "Union" $ T.unlines
+  [ "The Union type class is used to compute the union of two rows of types"
+  , "(left-biased, including duplicates)."
+  , ""
+  , "The third type argument represents the union of the first two."
+  ]
+
+rowCons :: Declaration
+rowCons = primClass "RowCons" $ T.unlines
+  [ "The RowCons type class is a 4-way relation which asserts that one row of"
+  , "types can be obtained from another by inserting a new label/type pair on"
+  , "the left."
   ]
 
 typeConcat :: Declaration

@@ -16,6 +16,7 @@ module Language.PureScript.Ide.Imports
        ( addImplicitImport
        , addImportForIdentifier
        , answerRequest
+       , parseImportsFromFile
          -- for tests
        , parseImport
        , prettyPrintImportSection
@@ -29,7 +30,7 @@ module Language.PureScript.Ide.Imports
 
 import           Protolude
 
-import           Control.Lens                       ((^.))
+import           Control.Lens                       ((^.), (%~), ix)
 import           Data.List                          (findIndex, nubBy)
 import qualified Data.Text                          as T
 import qualified Language.PureScript                as P
@@ -39,9 +40,10 @@ import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
-import           System.IO.UTF8                     (readUTF8FileT, writeUTF8FileT)
+import           System.IO.UTF8                     (writeUTF8FileT)
+import qualified Text.Parsec as Parsec
 
-data Import = Import P.ModuleName P.ImportDeclarationType  (Maybe P.ModuleName)
+data Import = Import P.ModuleName P.ImportDeclarationType (Maybe P.ModuleName)
               deriving (Eq, Show)
 
 instance Ord Import where
@@ -65,96 +67,90 @@ compImport (Import n i q) (Import n' i' q')
   | not (P.isExplicit i) && isNothing q' = GT
   | otherwise = compare n n'
 
+-- | Reads a file and returns the parsed modulename as well as the parsed
+-- imports, while ignoring eventual parse errors that aren't relevant to the
+-- import section
+parseImportsFromFile
+  :: (MonadIO m, MonadError IdeError m)
+  => FilePath
+  -> m (P.ModuleName, [(P.ModuleName, P.ImportDeclarationType, Maybe P.ModuleName)])
+parseImportsFromFile file = do
+  (mn, _, imports, _) <- parseImportsFromFile' file
+  pure (mn, unwrapImport <$> imports)
+  where
+    unwrapImport (Import a b c) = (a, b, c)
+
 -- | Reads a file and returns the (lines before the imports, the imports, the
 -- lines after the imports)
-parseImportsFromFile :: (MonadIO m, MonadError PscIdeError m) =>
+parseImportsFromFile' :: (MonadIO m, MonadError IdeError m) =>
                         FilePath -> m (P.ModuleName, [Text], [Import], [Text])
-parseImportsFromFile fp = do
-  file <- liftIO (readUTF8FileT fp)
+parseImportsFromFile' fp = do
+  file <- ideReadTextFile fp
   case sliceImportSection (T.lines file) of
     Right res -> pure res
     Left err -> throwError (GeneralError err)
 
-parseImportsWithModuleName :: [Text] -> Either Text (P.ModuleName, [Import])
-parseImportsWithModuleName ls = do
-  (P.Module _ _ mn decls _) <- moduleParse ls
-  pure (mn, concatMap mkImport (unwrapPositioned <$> decls))
+-- | @ImportParse@ holds the data we extract out of a partial parse of the
+-- sourcefile
+data ImportParse = ImportParse
+  { ipModuleName :: P.ModuleName
+  -- ^ the module name we parse
+  , ipStart :: P.SourcePos
+  -- ^ the beginning of the import section. If `import Prelude` was the first
+  -- import, this would point at `i`
+  , ipEnd :: P.SourcePos
+  -- ^ the end of the import section
+  , ipImports :: [Import]
+  -- ^ the extracted import declarations
+  }
+
+parseModuleHeader :: P.TokenParser ImportParse
+parseModuleHeader = do
+  _ <- P.readComments
+  (mn, _) <- P.parseModuleDeclaration
+  (ipStart, ipEnd, decls) <- P.withSourceSpan (\(P.SourceSpan _ start end) _ -> (start, end,))
+    (P.mark (Parsec.many (P.same *> P.parseImportDeclaration')))
+  pure (ImportParse mn ipStart ipEnd (map mkImport decls))
   where
-    mkImport (P.ImportDeclaration mn (P.Explicit refs) qual) =
-      [Import mn (P.Explicit (unwrapPositionedRef <$> refs)) qual]
-    mkImport (P.ImportDeclaration mn it qual) = [Import mn it qual]
-    mkImport _ = []
+    mkImport (mn, (P.Explicit refs), qual) = Import mn (P.Explicit (unwrapPositionedRef <$> refs)) qual
+    mkImport (mn, it, qual) = Import mn it qual
 
 sliceImportSection :: [Text] -> Either Text (P.ModuleName, [Text], [Import], [Text])
-sliceImportSection ts =
-  case foldl step (ModuleHeader 0) (zip [0..] ts) of
-    Res start end ->
-      let
-        (moduleHeader, (importSection, remainingFile)) =
-          splitAt (succ (end - start)) `second` splitAt start ts
-      in
-        (\(mn, is) -> (mn, moduleHeader, is, remainingFile)) <$>
-          parseImportsWithModuleName (moduleHeader <> importSection)
-
-    -- If we don't find any imports, we insert a newline after the module
-    -- declaration and begin a new importsection
-    ModuleHeader ix ->
-      let (moduleHeader, remainingFile) = splitAt (succ ix) ts
-      in
-        (\(mn, is) -> (mn, moduleHeader ++ [""], is, remainingFile)) <$>
-          parseImportsWithModuleName moduleHeader
-    _ -> Left "Failed to detect the import section"
-
-data ImportStateMachine = ModuleHeader Int | ImportSection Int Int | Res Int Int
-
--- | We start in the
---
--- * ModuleHeader state.
---
--- We skip every line we encounter, that doesn't start with "import". If we find
--- a line that starts with module we store that linenumber. Once we find a line
--- with "import" we store its linenumber as the start of the import section and
--- change into the
---
--- * ImportSection state
---
--- For any line that starts with import or whitespace(is thus indented) we
--- expand the end of the import section to that line and continue. If we
--- encounter a commented or empty line, we continue moving forward in the
--- ImportSection state but don't expand the import section end yet. This allows
--- us to exclude newlines or comments that directly follow the import section.
--- Once we encounter a line that is not a comment, newline, indentation or
--- import we switch into the
---
--- * Res state
---
--- , which just shortcuts to the end of the file and carries the detected import
--- section boundaries
-step :: ImportStateMachine -> (Int, Text) -> ImportStateMachine
-step (ModuleHeader mi) (ix, l)
-  | T.isPrefixOf "module " l = ModuleHeader ix
-  | T.isPrefixOf "import " l = ImportSection ix ix
-  | otherwise = ModuleHeader mi
-step (ImportSection start lastImportLine) (ix, l)
-  | any (`T.isPrefixOf` l) ["import", " "] = ImportSection start ix
-  | T.isPrefixOf "--" l || l == ""         = ImportSection start lastImportLine
-  | otherwise                              = Res start lastImportLine
-step (Res start end) _ = Res start end
-
-moduleParse :: [Text] -> Either Text P.Module
-moduleParse t = first show $ do
-  tokens <- P.lex "" (T.unlines t)
-  P.runTokenParser "<psc-ide>" P.parseModule tokens
+sliceImportSection fileLines = first show $ do
+  tokens <- P.lexLenient "<psc-ide>" file
+  ImportParse{..} <- P.runTokenParser "<psc-ide>" parseModuleHeader tokens
+  pure ( ipModuleName
+       , sliceFile (P.SourcePos 1 1) (prevPos ipStart)
+       , ipImports
+       -- Not sure why I need to drop 1 here, but it makes the tests pass
+       , drop 1 (sliceFile (nextPos ipEnd) (P.SourcePos (length fileLines) (lineLength (length fileLines))))
+       )
+  where
+    prevPos (P.SourcePos l c)
+      | l == 1 && c == 1 = P.SourcePos l c
+      | c == 1 = P.SourcePos (l - 1) (lineLength (l - 1))
+      | otherwise = P.SourcePos l (c - 1)
+    nextPos (P.SourcePos l c)
+      | c == lineLength l = P.SourcePos (l + 1) 1
+      | otherwise = P.SourcePos l (c + 1)
+    file = T.unlines fileLines
+    lineLength l = T.length (fileLines ^. ix (l - 1))
+    sliceFile (P.SourcePos l1 c1) (P.SourcePos l2 c2) =
+      fileLines
+      & drop (l1 - 1)
+      & take (l2 - l1 + 1)
+      & ix 0 %~ T.drop (c1 - 1)
+      & ix (l2 - l1) %~ T.take c2
 
 -- | Adds an implicit import like @import Prelude@ to a Sourcefile.
-addImplicitImport :: (MonadIO m, MonadError PscIdeError m)
+addImplicitImport :: (MonadIO m, MonadError IdeError m)
                      => FilePath     -- ^ The Sourcefile read from
                      -> P.ModuleName -- ^ The module to import
                      -> m [Text]
 addImplicitImport fp mn = do
-  (_, pre, imports, post) <- parseImportsFromFile fp
+  (_, pre, imports, post) <- parseImportsFromFile' fp
   let newImportSection = addImplicitImport' imports mn
-  pure $ pre ++ newImportSection ++ post
+  pure (pre ++ newImportSection ++ post)
 
 addImplicitImport' :: [Import] -> P.ModuleName -> [Text]
 addImplicitImport' imports mn =
@@ -170,10 +166,10 @@ addImplicitImport' imports mn =
 -- So @addExplicitImport "/File.purs" "bind" "Prelude"@ with an already existing
 -- @import Prelude (bind)@ in the file File.purs returns @["import Prelude
 -- (bind, unit)"]@
-addExplicitImport :: (MonadIO m, MonadError PscIdeError m) =>
+addExplicitImport :: (MonadIO m, MonadError IdeError m) =>
                      FilePath -> IdeDeclaration -> P.ModuleName -> m [Text]
 addExplicitImport fp decl moduleName = do
-  (mn, pre, imports, post) <- parseImportsFromFile fp
+  (mn, pre, imports, post) <- parseImportsFromFile' fp
   let newImportSection =
         -- TODO: Open an issue when this PR is merged, we should optimise this
         -- so that this case does not write to disc
@@ -197,8 +193,8 @@ addExplicitImport' decl moduleName imports =
     then imports
     else updateAtFirstOrPrepend matches (insertDeclIntoImport decl) freshImport imports
   where
-    refFromDeclaration (IdeDeclTypeClass n) =
-      P.TypeClassRef n
+    refFromDeclaration (IdeDeclTypeClass tc) =
+      P.TypeClassRef (tc ^. ideTCName)
     refFromDeclaration (IdeDeclDataConstructor dtor) =
       P.TypeRef (dtor ^. ideDtorTypeName) Nothing
     refFromDeclaration (IdeDeclType t) =
@@ -207,6 +203,8 @@ addExplicitImport' decl moduleName imports =
       P.ValueOpRef (op ^. ideValueOpName)
     refFromDeclaration (IdeDeclTypeOperator op) =
       P.TypeOpRef (op ^. ideTypeOpName)
+    refFromDeclaration (IdeDeclKind kn) =
+      P.KindRef kn
     refFromDeclaration d =
       P.ValueRef (P.Ident (identifierFromIdeDeclaration d))
 
@@ -237,8 +235,8 @@ updateAtFirstOrPrepend :: (a -> Bool) -> (a -> a) -> a -> [a] -> [a]
 updateAtFirstOrPrepend p t d l =
   case findIndex p l of
     Nothing -> d : l
-    Just ix ->
-      let (x, a : y) = splitAt ix l
+    Just i ->
+      let (x, a : y) = splitAt i l
       in x ++ [t a] ++ y
 
 -- | Looks up the given identifier in the currently loaded modules.
@@ -249,7 +247,7 @@ updateAtFirstOrPrepend p t d l =
 --
 -- * If more than one possible imports are found, reports the possibilities as a
 -- list of completions.
-addImportForIdentifier :: (Ide m, MonadError PscIdeError m)
+addImportForIdentifier :: (Ide m, MonadError IdeError m)
                           => FilePath -- ^ The Sourcefile to read from
                           -> Text     -- ^ The identifier to import
                           -> [Filter] -- ^ Filters to apply before searching for
@@ -300,9 +298,6 @@ addImportForIdentifier fp ident filters = do
       decideRedundantCase _ _ = Nothing
 
 prettyPrintImport' :: Import -> Text
--- TODO: remove this clause once P.prettyPrintImport can properly handle PositionedRefs
-prettyPrintImport' (Import mn (P.Explicit refs) qual) =
-  "import " <> P.prettyPrintImport mn (P.Explicit (unwrapPositionedRef <$> refs)) qual
 prettyPrintImport' (Import mn idt qual) =
   "import " <> P.prettyPrintImport mn idt qual
 

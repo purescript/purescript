@@ -6,9 +6,20 @@ import           Protolude
 import           Data.Maybe                      (fromJust)
 
 import qualified Language.PureScript             as P
+import           Language.PureScript.Ide.Command as Command
+import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Imports
+import qualified Language.PureScript.Ide.Test as Test
 import           Language.PureScript.Ide.Types
+import           System.FilePath
 import           Test.Hspec
+
+noImportsFile :: [Text]
+noImportsFile =
+  [ "module Main where"
+  , ""
+  , "myFunc x y = x + y"
+  ]
 
 simpleFile :: [Text]
 simpleFile =
@@ -18,10 +29,19 @@ simpleFile =
   , "myFunc x y = x + y"
   ]
 
+syntaxErrorFile :: [Text]
+syntaxErrorFile =
+  [ "module Main where"
+  , "import Prelude"
+  , ""
+  , "myFunc ="
+  ]
+
 splitSimpleFile :: (P.ModuleName, [Text], [Import], [Text])
 splitSimpleFile = fromRight (sliceImportSection simpleFile)
   where
     fromRight = fromJust . rightToMaybe
+
 withImports :: [Text] -> [Text]
 withImports is =
   take 2 simpleFile ++ is ++ drop 2 simpleFile
@@ -36,14 +56,19 @@ listImport = testParseImport "import Data.List as List"
 consoleImport = testParseImport "import Control.Monad.Eff.Console (log) as Console"
 maybeImport = testParseImport "import Data.Maybe (Maybe(Just))"
 
-wildcard :: P.Type
-wildcard = P.TypeWildcard $ P.SourceSpan "" (P.SourcePos 0 0) (P.SourcePos 0 0)
-
 spec :: Spec
 spec = do
   describe "determining the importsection" $ do
     let moduleSkeleton imports =
           Right (P.moduleNameFromString "Main", take 1 simpleFile, imports, drop 2 simpleFile)
+    it "slices a file without imports and adds a newline after the module declaration" $
+      shouldBe (sliceImportSection noImportsFile)
+          (Right (P.moduleNameFromString "Main", take 1 noImportsFile ++ [""], [], drop 1 noImportsFile))
+
+    it "handles a file with syntax errors just fine" $
+      shouldBe (sliceImportSection syntaxErrorFile)
+      (Right (P.moduleNameFromString "Main", take 1 syntaxErrorFile, [preludeImport], drop 2 syntaxErrorFile))
+
     it "finds a simple import" $
       shouldBe (sliceImportSection simpleFile) (moduleSkeleton [preludeImport])
 
@@ -51,6 +76,14 @@ spec = do
       shouldBe
         (sliceImportSection (withImports [ "import Data.Array (head,"
                                          , "                   cons)"
+                                         ]))
+        (moduleSkeleton [preludeImport, arrayImport])
+    it "allows multiline import statements with hanging parens" $
+      shouldBe
+        (sliceImportSection (withImports [ "import Data.Array ("
+                                         , "  head,"
+                                         , "  cons"
+                                         , ")"
                                          ]))
         (moduleSkeleton [preludeImport, arrayImport])
   describe "pretty printing imports" $ do
@@ -68,19 +101,29 @@ spec = do
   describe "import commands" $ do
     let simpleFileImports = let (_, _, i, _) = splitSimpleFile in i
         addValueImport i mn is =
-          prettyPrintImportSection (addExplicitImport' (IdeDeclValue (IdeValue (P.Ident i) wildcard)) mn is)
+          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideValue i Nothing)) mn is)
         addOpImport op mn is =
-          prettyPrintImportSection (addExplicitImport' (IdeDeclValueOperator (IdeValueOperator op (P.Qualified Nothing (Left (P.Ident ""))) 2 P.Infix Nothing)) mn is)
+          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideValueOp op (P.Qualified Nothing (Left "")) 2 Nothing Nothing)) mn is)
         addDtorImport i t mn is =
-          prettyPrintImportSection (addExplicitImport' (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName i) t wildcard)) mn is)
+          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideDtor i t Nothing)) mn is)
         addTypeImport i mn is =
-          prettyPrintImportSection (addExplicitImport' (IdeDeclType (IdeType (P.ProperName i) P.kindType)) mn is)
+          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideType i Nothing)) mn is)
+        addKindImport i mn is =
+          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideKind i)) mn is)
+    it "adds an implicit unqualified import to a file without any imports" $
+      shouldBe
+        (addImplicitImport' [] (P.moduleNameFromString "Data.Map"))
+        ["import Data.Map"]
     it "adds an implicit unqualified import" $
       shouldBe
         (addImplicitImport' simpleFileImports (P.moduleNameFromString "Data.Map"))
         [ "import Prelude"
         , "import Data.Map"
         ]
+    it "adds an explicit unqualified import to a file without any imports" $
+      shouldBe
+        (addValueImport "head" (P.moduleNameFromString "Data.Array") [])
+        ["import Data.Array (head)"]
     it "adds an explicit unqualified import" $
       shouldBe
         (addValueImport "head" (P.moduleNameFromString "Data.Array") simpleFileImports)
@@ -98,9 +141,15 @@ spec = do
         [ "import Prelude"
         , "import Data.Array (head, tail)"
         ]
+    it "adds a kind to an explicit import list" $
+      shouldBe
+        (addKindImport "Effect" (P.moduleNameFromString "Control.Monad.Eff") simpleFileImports)
+        [ "import Prelude"
+        , "import Control.Monad.Eff (kind Effect)"
+        ]
     it "adds an operator to an explicit import list" $
       shouldBe
-        (addOpImport (P.OpName "<~>") (P.moduleNameFromString "Data.Array") explicitImports)
+        (addOpImport "<~>" (P.moduleNameFromString "Data.Array") explicitImports)
         [ "import Prelude"
         , "import Data.Array (tail, (<~>))"
         ]
@@ -112,21 +161,21 @@ spec = do
           ]
     it "adds the type for a given DataConstructor" $
         shouldBe
-          (addDtorImport "Just" (P.ProperName "Maybe") (P.moduleNameFromString "Data.Maybe") simpleFileImports)
+          (addDtorImport "Just" "Maybe" (P.moduleNameFromString "Data.Maybe") simpleFileImports)
           [ "import Prelude"
           , "import Data.Maybe (Maybe(..))"
           ]
     it "adds a dataconstructor to an existing type import" $ do
       let Right (_, _, typeImports, _) = sliceImportSection (withImports ["import Data.Maybe (Maybe)"])
       shouldBe
-        (addDtorImport "Just" (P.ProperName "Maybe") (P.moduleNameFromString "Data.Maybe") typeImports)
+        (addDtorImport "Just" "Maybe" (P.moduleNameFromString "Data.Maybe") typeImports)
         [ "import Prelude"
         , "import Data.Maybe (Maybe(..))"
         ]
     it "doesn't add a dataconstructor to an existing type import with open dtors" $ do
       let Right (_, _, typeImports, _) = sliceImportSection (withImports ["import Data.Maybe (Maybe(..))"])
       shouldBe
-        (addDtorImport "Just" (P.ProperName "Maybe") (P.moduleNameFromString "Data.Maybe") typeImports)
+        (addDtorImport "Just" "Maybe" (P.moduleNameFromString "Data.Maybe") typeImports)
         [ "import Prelude"
         , "import Data.Maybe (Maybe(..))"
         ]
@@ -142,10 +191,10 @@ spec = do
     let Right (_, _, baseImports, _) = sliceImportSection $ withImports ["import Control.Monad (ap)"]
         moduleName = (P.moduleNameFromString "Control.Monad")
         addImport imports import' = addExplicitImport' import' moduleName imports
-        valueImport ident = (IdeDeclValue (IdeValue (P.Ident ident) wildcard))
-        typeImport name = (IdeDeclType (IdeType (P.ProperName name) P.kindType))
-        classImport name = (IdeDeclTypeClass (P.ProperName name))
-        dtorImport name typeName = (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName name) (P.ProperName typeName) wildcard))
+        valueImport ident = _idaDeclaration (Test.ideValue ident Nothing)
+        typeImport name = _idaDeclaration (Test.ideType name Nothing)
+        classImport name = _idaDeclaration (Test.ideTypeClass name P.kindType [])
+        dtorImport name typeName = _idaDeclaration (Test.ideDtor name typeName Nothing)
         -- expect any list of provided identifiers, when imported, to come out as specified
         expectSorted imports expected = shouldBe
           (ordNub $ map
@@ -171,3 +220,63 @@ spec = do
         -- the imported names don't actually have to exist!
         (map (uncurry dtorImport) [("Just", "Maybe"), ("Nothing", "Maybe"), ("SomeOtherConstructor", "SomeDataType")])
         ["import Prelude", "import Control.Monad (Maybe(..), SomeDataType(..), ap)"]
+  describe "importing from a loaded IdeState" importFromIdeState
+
+implImport :: Text -> Command
+implImport mn =
+  Command.Import ("src" </> "ImportsSpec.purs") Nothing [] (Command.AddImplicitImport (Test.mn mn))
+
+addExplicitImport :: Text -> Command
+addExplicitImport i =
+  Command.Import ("src" </> "ImportsSpec.purs") Nothing [] (Command.AddImportForIdentifier i)
+
+importShouldBe :: [Text] -> [Text] -> Expectation
+importShouldBe res importSection =
+  res `shouldBe` [ "module ImportsSpec where" , ""] ++ importSection ++ [ "" , "myId x = x"]
+
+runIdeLoaded :: Command -> IO (Either IdeError Success)
+runIdeLoaded c = do
+  ([_, result], _) <- Test.inProject $ Test.runIde [Command.LoadSync [] , c]
+  pure result
+
+importFromIdeState :: Spec
+importFromIdeState = do
+  it "adds an implicit import" $ do
+    Right (MultilineTextResult result) <-
+      runIdeLoaded (implImport "ImportsSpec1")
+    result `importShouldBe` [ "import ImportsSpec1" ]
+  it "adds an explicit unqualified import" $ do
+    Right (MultilineTextResult result) <- runIdeLoaded (addExplicitImport "exportedFunction")
+    result `importShouldBe` [ "import ImportsSpec1 (exportedFunction)" ]
+  it "adds an explicit unqualified import (type)" $ do
+    Right (MultilineTextResult result) <- runIdeLoaded (addExplicitImport "MyType")
+    result `importShouldBe` [ "import ImportsSpec1 (MyType)" ]
+  it "adds an explicit unqualified import (parameterized type)" $ do
+    Right (MultilineTextResult result) <- runIdeLoaded (addExplicitImport "MyParamType")
+    result `importShouldBe` [ "import ImportsSpec1 (MyParamType)" ]
+  it "adds an explicit unqualified import (typeclass)" $ do
+    Right (MultilineTextResult result) <- runIdeLoaded (addExplicitImport "ATypeClass")
+    result `importShouldBe` [ "import ImportsSpec1 (class ATypeClass)" ]
+  it "adds an explicit unqualified import (dataconstructor)" $ do
+    Right (MultilineTextResult result) <- runIdeLoaded (addExplicitImport "MyJust")
+    result `importShouldBe` [ "import ImportsSpec1 (MyMaybe(..))" ]
+  it "adds an explicit unqualified import (newtype)" $ do
+    Right (MultilineTextResult result) <- runIdeLoaded (addExplicitImport "MyNewtype")
+    result `importShouldBe` [ "import ImportsSpec1 (MyNewtype(..))" ]
+  it "adds an explicit unqualified import (typeclass member function)" $ do
+    Right (MultilineTextResult result) <- runIdeLoaded (addExplicitImport "typeClassFun")
+    result `importShouldBe` [ "import ImportsSpec1 (typeClassFun)" ]
+  it "doesn't add a newtypes constructor if only the type is exported" $ do
+    Right (MultilineTextResult result) <-
+      runIdeLoaded (addExplicitImport "OnlyTypeExported")
+    result `importShouldBe` [ "import ImportsSpec1 (OnlyTypeExported)" ]
+  it "doesn't add an import if the identifier is defined in the module itself" $ do
+    Right (MultilineTextResult result) <- runIdeLoaded (addExplicitImport "myId")
+    result `importShouldBe` []
+  it "responds with an error if it's undecidable whether we want a type or constructor" $ do
+    result <- runIdeLoaded (addExplicitImport "SpecialCase")
+    result `shouldSatisfy` isLeft
+  it "responds with an error if the identifier cannot be found and doesn't \
+     \write to the output file" $ do
+    result <- runIdeLoaded (addExplicitImport "doesnExist")
+    result `shouldSatisfy` isLeft

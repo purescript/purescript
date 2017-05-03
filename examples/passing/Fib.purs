@@ -12,7 +12,7 @@ main = do
     whileE ((>) 1000.0 <$> readSTRef n1) $ do
       n1' <- readSTRef n1
       n2' <- readSTRef n2
-      writeSTRef n2 $ n1' + n2'
-      writeSTRef n1 n2'
+      _ <- writeSTRef n2 $ n1' + n2'
+      _ <- writeSTRef n1 n2'
       logShow n2'
   log "Done"

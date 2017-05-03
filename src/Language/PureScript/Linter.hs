@@ -4,10 +4,11 @@
 module Language.PureScript.Linter (lint, module L) where
 
 import Prelude.Compat
+import Protolude (ordNub)
 
 import Control.Monad.Writer.Class
 
-import Data.List (nub, (\\))
+import Data.List ((\\))
 import Data.Maybe (mapMaybe)
 import Data.Monoid
 import qualified Data.Set as S
@@ -28,7 +29,7 @@ lint :: forall m. (MonadWriter MultipleErrors m) => Module -> m ()
 lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDeclaration ds
   where
   moduleNames :: S.Set Ident
-  moduleNames = S.fromList (nub (mapMaybe getDeclIdent ds))
+  moduleNames = S.fromList (ordNub (mapMaybe getDeclIdent ds))
 
   getDeclIdent :: Declaration -> Maybe Ident
   getDeclIdent (PositionedDeclaration _ _ d) = getDeclIdent d
@@ -55,7 +56,7 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
     f' s dec = warningsInDecl moduleNames dec <> checkTypeVarsInDecl s dec
 
     stepE :: S.Set Ident -> Expr -> MultipleErrors
-    stepE s (Abs (Left name) _) | name `S.member` s = errorMessage (ShadowedName name)
+    stepE s (Abs (VarBinder name) _) | name `S.member` s = errorMessage (ShadowedName name)
     stepE s (Let ds' _) = foldMap go ds'
       where
       go d | Just i <- getDeclIdent d
@@ -91,7 +92,7 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
     findUnused ty' =
       let used = usedTypeVariables ty'
           declared = everythingOnTypes (++) go ty'
-          unused = nub declared \\ nub used
+          unused = ordNub declared \\ ordNub used
       in foldl (<>) mempty $ map (errorMessage . UnusedTypeVar) unused
       where
       go :: Type -> [Text]

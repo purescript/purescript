@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 -- |
 -- Data types for names
@@ -8,7 +9,9 @@ module Language.PureScript.Names where
 import Prelude.Compat
 
 import Control.Monad.Supply.Class
+import Control.DeepSeq (NFData)
 
+import GHC.Generics (Generic)
 import Data.Aeson
 import Data.Aeson.TH
 import Data.Monoid ((<>))
@@ -25,7 +28,9 @@ data Name
   | TyClassName (ProperName 'ClassName)
   | ModName ModuleName
   | KiName (ProperName 'KindName)
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show, Generic)
+
+instance NFData Name
 
 getIdentName :: Name -> Maybe Ident
 getIdentName (IdentName name) = Just name
@@ -67,7 +72,9 @@ data Ident
   -- A generated name for an identifier
   --
   | GenIdent (Maybe Text) Integer
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData Ident
 
 runIdent :: Ident -> Text
 runIdent (Ident i) = i
@@ -87,7 +94,9 @@ freshIdent' = GenIdent Nothing <$> fresh
 -- Operator alias names.
 --
 newtype OpName (a :: OpNameType) = OpName { runOpName :: Text }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData (OpName a)
 
 instance ToJSON (OpName a) where
   toJSON = toJSON . runOpName
@@ -107,7 +116,9 @@ data OpNameType = ValueOpName | TypeOpName
 -- Proper names, i.e. capitalized names for e.g. module names, type//data constructors.
 --
 newtype ProperName (a :: ProperNameType) = ProperName { runProperName :: Text }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData (ProperName a)
 
 instance ToJSON (ProperName a) where
   toJSON = toJSON . runProperName
@@ -137,7 +148,9 @@ coerceProperName = ProperName . runProperName
 -- Module names
 --
 newtype ModuleName = ModuleName [ProperName 'Namespace]
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic)
+
+instance NFData ModuleName
 
 runModuleName :: ModuleName -> Text
 runModuleName (ModuleName pns) = T.intercalate "." (runProperName <$> pns)
@@ -154,7 +167,9 @@ moduleNameFromString = ModuleName . splitProperNames
 -- A qualified name, i.e. a name with an optional module name
 --
 data Qualified a = Qualified (Maybe ModuleName) a
-  deriving (Show, Eq, Ord, Functor)
+  deriving (Show, Eq, Ord, Functor, Generic)
+
+instance NFData a => NFData (Qualified a)
 
 showQualified :: (a -> Text) -> Qualified a -> Text
 showQualified f (Qualified Nothing a) = f a
