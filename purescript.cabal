@@ -35,7 +35,7 @@ extra-source-files:
       examples/docs/src/Clash2.purs
       examples/docs/src/Clash2a.purs
       examples/docs/src/ConstrainedArgument.purs
-      examples/docs/src/DesugarLet.purs
+      examples/docs/src/Desugar.purs
       examples/docs/src/DocComments.purs
       examples/docs/src/DuplicateNames.purs
       examples/docs/src/Example.purs

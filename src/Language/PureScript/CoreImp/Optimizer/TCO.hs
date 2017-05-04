@@ -13,19 +13,19 @@ import Safe (headDef, tailSafe)
 tco :: AST -> AST
 tco = everywhere convert where
   tcoVar :: Text -> Text
-  tcoVar arg = "__tco_" <> arg
+  tcoVar arg = "$tco_var_" <> arg
 
   copyVar :: Text -> Text
-  copyVar arg = "__copy_" <> arg
+  copyVar arg = "$copy_" <> arg
 
   tcoDone :: Text
-  tcoDone = tcoVar "done"
+  tcoDone = "$tco_done"
 
   tcoLoop :: Text
-  tcoLoop = tcoVar "loop"
+  tcoLoop = "$tco_loop"
 
   tcoResult :: Text
-  tcoResult = tcoVar "result"
+  tcoResult = "$tco_result"
 
   convert :: AST -> AST
   convert (VariableIntroduction ss name (Just fn@Function {}))

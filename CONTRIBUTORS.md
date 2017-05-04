@@ -45,6 +45,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@FrigoEU](https://github.com/FrigoEU) | Simon Van Casteren | [MIT license](http://opensource.org/licenses/MIT) |
 | [@garyb](https://github.com/garyb) | Gary Burgess | [MIT license](http://opensource.org/licenses/MIT) |
 | [@hdgarrood](https://github.com/hdgarrood) | Harry Garrood | [MIT license](http://opensource.org/licenses/MIT) |
+| [@houli](https://github.com/houli) | Eoin Houlihan | [MIT license](http://opensource.org/licenses/MIT) |
 | [@ianbollinger](https://github.com/ianbollinger) | Ian D. Bollinger | [MIT license](http://opensource.org/licenses/MIT) |
 | [@ilovezfs](https://github.com/ilovezfs) | ilovezfs | MIT license |
 | [@izgzhen](https://github.com/izgzhen) | Zhen Zhang | [MIT license](http://opensource.org/licenses/MIT) |
