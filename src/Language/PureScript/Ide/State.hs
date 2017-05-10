@@ -250,12 +250,12 @@ resolveLocationsForModule (defs, types) decls =
       IdeDeclKind i ->
         annotateKind (i ^. properNameT) (IdeDeclKind i)
       where
-        annotateFunction x = IdeDeclarationAnn (ann { _annLocation = Map.lookup (IdeNSValue (P.runIdent x)) defs
+        annotateFunction x = IdeDeclarationAnn (ann { _annLocation = Map.lookup (IdeNamespaced IdeNSValue (P.runIdent x)) defs
                                                     , _annTypeAnnotation = Map.lookup x types
                                                     })
-        annotateValue x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNSValue x) defs})
-        annotateType x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNSType x) defs})
-        annotateKind x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNSKind x) defs})
+        annotateValue x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSValue x) defs})
+        annotateType x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSType x) defs})
+        annotateKind x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSKind x) defs})
 
 resolveInstances
   :: ModuleMap P.ExternsFile

@@ -64,30 +64,30 @@ extractSpans
   -- ^ The surrounding span
   -> P.Declaration
   -- ^ The declaration to extract spans from
-  -> [(IdeDeclNamespace, P.SourceSpan)]
+  -> [(IdeNamespaced, P.SourceSpan)]
   -- ^ Declarations and their source locations
 extractSpans ss d = case d of
   P.PositionedDeclaration ss' _ d' ->
     extractSpans ss' d'
   P.ValueDeclaration i _ _ _ ->
-    [(IdeNSValue (P.runIdent i), ss)]
+    [(IdeNamespaced IdeNSValue (P.runIdent i), ss)]
   P.TypeSynonymDeclaration name _ _ ->
-    [(IdeNSType (P.runProperName name), ss)]
+    [(IdeNamespaced IdeNSType (P.runProperName name), ss)]
   P.TypeClassDeclaration name _ _ _ members ->
-    (IdeNSType (P.runProperName name), ss) : concatMap (extractSpans' ss) members
+    (IdeNamespaced IdeNSType (P.runProperName name), ss) : concatMap (extractSpans' ss) members
   P.DataDeclaration _ name _ ctors ->
-    (IdeNSType (P.runProperName name), ss)
-    : map (\(cname, _) -> (IdeNSValue (P.runProperName cname), ss)) ctors
+    (IdeNamespaced IdeNSType (P.runProperName name), ss)
+    : map (\(cname, _) -> (IdeNamespaced IdeNSValue (P.runProperName cname), ss)) ctors
   P.FixityDeclaration (Left (P.ValueFixity _ _ opName)) ->
-    [(IdeNSValue (P.runOpName opName), ss)]
+    [(IdeNamespaced IdeNSValue (P.runOpName opName), ss)]
   P.FixityDeclaration (Right (P.TypeFixity _ _ opName)) ->
-    [(IdeNSType (P.runOpName opName), ss)]
+    [(IdeNamespaced IdeNSType (P.runOpName opName), ss)]
   P.ExternDeclaration ident _ ->
-    [(IdeNSValue (P.runIdent ident), ss)]
+    [(IdeNamespaced IdeNSValue (P.runIdent ident), ss)]
   P.ExternDataDeclaration name _ ->
-    [(IdeNSType (P.runProperName name), ss)]
+    [(IdeNamespaced IdeNSType (P.runProperName name), ss)]
   P.ExternKindDeclaration name ->
-    [(IdeNSKind (P.runProperName name), ss)]
+    [(IdeNamespaced IdeNSKind (P.runProperName name), ss)]
   _ -> []
   where
     -- We need this special case to be able to also get the position info for
@@ -98,5 +98,5 @@ extractSpans ss d = case d of
       P.PositionedDeclaration ssP' _ dP' ->
         extractSpans' ssP' dP'
       P.TypeDeclaration ident _ ->
-        [(IdeNSValue (P.runIdent ident), ssP)]
+        [(IdeNamespaced IdeNSValue (P.runIdent ident), ssP)]
       _ -> []
