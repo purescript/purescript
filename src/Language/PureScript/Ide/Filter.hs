@@ -26,11 +26,12 @@ import           Protolude                     hiding (isPrefixOf)
 
 import           Data.Aeson
 import           Data.Text                     (isPrefixOf)
-import qualified Language.PureScript           as P
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
+import qualified Language.PureScript           as P
 
-newtype Filter = Filter (Endo [Module]) deriving(Monoid)
+newtype Filter = Filter (Endo [Module])
+  deriving (Monoid)
 
 type Module = (P.ModuleName, [IdeDeclarationAnn])
 
@@ -48,21 +49,23 @@ moduleFilter' moduleIdents = filter (flip elem moduleIdents . fst)
 -- | Only keeps Identifiers that start with the given prefix
 prefixFilter :: Text -> Filter
 prefixFilter "" = mkFilter identity
-prefixFilter t = mkFilter $ identFilter prefix t
+prefixFilter t =
+  mkFilter $ identFilter prefix t
   where
     prefix :: IdeDeclaration -> Text -> Bool
     prefix ed search = search `isPrefixOf` identifierFromIdeDeclaration ed
 
 -- | Only keeps Identifiers that are equal to the search string
 equalityFilter :: Text -> Filter
-equalityFilter = mkFilter . identFilter equality
+equalityFilter =
+  mkFilter . identFilter equality
   where
     equality :: IdeDeclaration -> Text -> Bool
     equality ed search = identifierFromIdeDeclaration ed == search
 
 identFilter :: (IdeDeclaration -> Text -> Bool) -> Text -> [Module] -> [Module]
 identFilter predicate search =
-    filter (not . null . snd) . fmap filterModuleDecls
+  filter (not . null . snd) . fmap filterModuleDecls
   where
     filterModuleDecls :: Module -> Module
     filterModuleDecls (moduleIdent, decls) =

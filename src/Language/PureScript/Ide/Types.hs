@@ -119,7 +119,7 @@ makeLenses ''IdeDeclarationAnn
 emptyAnn :: Annotation
 emptyAnn = Annotation Nothing Nothing Nothing
 
-type DefinitionSites a = Map IdeDeclNamespace a
+type DefinitionSites a = Map IdeNamespaced a
 type TypeAnnotations = Map P.Ident P.Type
 newtype AstData a = AstData (ModuleMap (DefinitionSites a, TypeAnnotations))
   -- ^ SourceSpans for the definition sites of Values and Types aswell as type
@@ -305,11 +305,10 @@ instance ToJSON PursuitResponse where
       , "text"    .= text
       ]
 
-data IdeDeclNamespace =
-  -- | An identifier in the value namespace
-  IdeNSValue Text
-  -- | An identifier in the type namespace
-  | IdeNSType Text
-  -- | An identifier in the kind namespace
-  | IdeNSKind Text
+-- | Denotes the different namespaces a name in PureScript can reside in.
+data IdeNamespace = IdeNSValue | IdeNSType | IdeNSKind
+  deriving (Show, Eq, Ord)
+
+-- | A name tagged with a namespace
+data IdeNamespaced = IdeNamespaced IdeNamespace Text
   deriving (Show, Eq, Ord)
