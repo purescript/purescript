@@ -28,7 +28,6 @@ module Language.PureScript.Ide.Util
   , identT
   , opNameT
   , ideReadFile
-  , ideReadTextFile
   , module Language.PureScript.Ide.Logging
   ) where
 
@@ -144,11 +143,3 @@ ideReadFile' fileReader fp = do
 
 ideReadFile :: (MonadIO m, MonadError IdeError m) => FilePath -> m Text
 ideReadFile = ideReadFile' readUTF8FileT
-
--- | This function is to be used over @ideReadFile@ when the result is not just
--- passed on to the PureScript parser, but also needs to be treated as lines of
--- Text. Because @ideReadFile@ reads the file as ByteString line endings get
--- mangled on Windows otherwise. This is irrelevant for parsing, because the
--- Lexer strips the additional @\r@s as whitespace.
-ideReadTextFile :: (MonadIO m, MonadError IdeError m) => FilePath -> m Text
-ideReadTextFile fp = T.replace "\r\n" "\n" <$> ideReadFile fp

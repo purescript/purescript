@@ -693,6 +693,7 @@ library
         , spdx ==0.2.*
         , split
         , stm >=0.2.4.0
+        , stringsearch
         , syb
         , text
         , time
@@ -901,6 +902,7 @@ executable purs
         , spdx ==0.2.*
         , split
         , stm >=0.2.4.0
+        , stringsearch
         , syb
         , text
         , time
@@ -989,6 +991,7 @@ test-suite tests
         , spdx ==0.2.*
         , split
         , stm >=0.2.4.0
+        , stringsearch
         , syb
         , text
         , time
