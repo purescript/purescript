@@ -25,9 +25,8 @@ module Language.PureScript.Ide.State
   , insertModule
   , insertExternsSTM
   , getAllModules
-  , populateStage2
-  , populateStage3
-  , populateStage3STM
+  , populateVolatileState
+  , populateVolatileStateSTM
   -- for tests
   , resolveOperatorsForModule
   , resolveInstances
@@ -52,9 +51,7 @@ import           Language.PureScript.Ide.Util
 resetIdeState :: Ide m => m ()
 resetIdeState = do
   ideVar <- ideStateVar <$> ask
-  liftIO . atomically $ do
-    writeTVar ideVar emptyIdeState
-    setStage3STM ideVar emptyStage3
+  liftIO (atomically (writeTVar ideVar emptyIdeState))
 
 -- | Gets the loaded Modulenames
 getLoadedModulenames :: Ide m => m [P.ModuleName]
@@ -62,7 +59,7 @@ getLoadedModulenames = Map.keys <$> getExternFiles
 
 -- | Gets all loaded ExternFiles
 getExternFiles :: Ide m => m (ModuleMap ExternsFile)
-getExternFiles = s1Externs <$> getStage1
+getExternFiles = fsExterns <$> getFileState
 
 -- | Insert a Module into Stage1 of the State
 insertModule :: Ide m => (FilePath, P.Module) -> m ()
@@ -74,51 +71,35 @@ insertModule module' = do
 insertModuleSTM :: TVar IdeState -> (FilePath, P.Module) -> STM ()
 insertModuleSTM ref (fp, module') =
   modifyTVar ref $ \x ->
-    x { ideStage1 = (ideStage1 x) {
-          s1Modules = Map.insert
+    x { ideFileState = (ideFileState x) {
+          fsModules = Map.insert
             (P.getModuleName module')
             (module', fp)
-            (s1Modules (ideStage1 x))}}
+            (fsModules (ideFileState x))}}
 
--- | Retrieves Stage1 from the State.
---  This includes loaded Externfiles
-getStage1 :: Ide m => m Stage1
-getStage1 = do
+-- | Retrieves the FileState from the State. This includes loaded Externfiles
+-- and parsed Modules
+getFileState :: Ide m => m IdeFileState
+getFileState = do
   st <- ideStateVar <$> ask
-  fmap ideStage1 . liftIO . readTVarIO $ st
+  fmap ideFileState . liftIO . readTVarIO $ st
 
--- | STM version of getStage1
-getStage1STM :: TVar IdeState -> STM Stage1
-getStage1STM ref = ideStage1 <$> readTVar ref
+-- | STM version of getFileState
+getFileStateSTM :: TVar IdeState -> STM IdeFileState
+getFileStateSTM ref = ideFileState <$> readTVar ref
 
--- | Retrieves Stage2 from the State.
-getStage2 :: Ide m => m Stage2
-getStage2 = do
-  st <- ideStateVar <$> ask
-  liftIO (atomically (getStage2STM st))
-
-getStage2STM ::  TVar IdeState -> STM Stage2
-getStage2STM ref = ideStage2 <$> readTVar ref
-
--- | STM version of setStage2
-setStage2STM :: TVar IdeState -> Stage2 -> STM ()
-setStage2STM ref s2 = do
-  modifyTVar ref $ \x ->
-    x {ideStage2 = s2}
-  pure ()
-
--- | Retrieves Stage3 from the State.
+-- | Retrieves VolatileState from the State.
 -- This includes the denormalized Declarations and cached rebuilds
-getStage3 :: Ide m => m Stage3
-getStage3 = do
+getVolatileState :: Ide m => m IdeVolatileState
+getVolatileState = do
   st <- ideStateVar <$> ask
-  fmap ideStage3 . liftIO . readTVarIO $ st
+  fmap ideVolatileState . liftIO . readTVarIO $ st
 
--- | Sets Stage3 inside the compiler
-setStage3STM :: TVar IdeState -> Stage3 -> STM ()
-setStage3STM ref s3 = do
+-- | Sets the VolatileState inside Ide's state
+setVolatileStateSTM :: TVar IdeState -> IdeVolatileState -> STM ()
+setVolatileStateSTM ref vs = do
   modifyTVar ref $ \x ->
-    x {ideStage3 = s3}
+    x {ideVolatileState = vs}
   pure ()
 
 -- | Checks if the given ModuleName matches the last rebuild cache and if it
@@ -126,7 +107,7 @@ setStage3STM ref s3 = do
 -- cache
 getAllModules :: Ide m => Maybe P.ModuleName -> m [(P.ModuleName, [IdeDeclarationAnn])]
 getAllModules mmoduleName = do
-  declarations <- s3Declarations <$> getStage3
+  declarations <- vsDeclarations <$> getVolatileState
   rebuild <- cachedRebuild
   case mmoduleName of
     Nothing -> pure (Map.toList declarations)
@@ -134,7 +115,7 @@ getAllModules mmoduleName = do
       case rebuild of
         Just (cachedModulename, ef)
           | cachedModulename == moduleName -> do
-              (AstData asts) <- s2AstData <$> getStage2
+              AstData asts <- vsAstData <$> getVolatileState
               let
                 ast =
                   fromMaybe (Map.empty, Map.empty) (Map.lookup moduleName asts)
@@ -148,9 +129,9 @@ getAllModules mmoduleName = do
               pure (Map.toList resolved)
         _ -> pure (Map.toList declarations)
 
--- | Adds an ExternsFile into psc-ide's State Stage1. This does not populate the
--- following Stages, which needs to be done after all the necessary Exterms have
--- been loaded.
+-- | Adds an ExternsFile into psc-ide's FileState. This does not populate the
+-- VolatileState, which needs to be done after all the necessary Externs and
+-- SourceFiles have been loaded.
 insertExterns :: Ide m => ExternsFile -> m ()
 insertExterns ef = do
   st <- ideStateVar <$> ask
@@ -160,61 +141,46 @@ insertExterns ef = do
 insertExternsSTM :: TVar IdeState -> ExternsFile -> STM ()
 insertExternsSTM ref ef =
   modifyTVar ref $ \x ->
-    x { ideStage1 = (ideStage1 x) {
-          s1Externs = Map.insert (efModuleName ef) ef (s1Externs (ideStage1 x))}}
+    x { ideFileState = (ideFileState x) {
+          fsExterns = Map.insert (efModuleName ef) ef (fsExterns (ideFileState x))}}
 
 -- | Sets rebuild cache to the given ExternsFile
 cacheRebuild :: Ide m => ExternsFile -> m ()
 cacheRebuild ef = do
   st <- ideStateVar <$> ask
   liftIO . atomically . modifyTVar st $ \x ->
-    x { ideStage3 = (ideStage3 x) {
-          s3CachedRebuild = Just (efModuleName ef, ef)}}
+    x { ideVolatileState = (ideVolatileState x) {
+          vsCachedRebuild = Just (efModuleName ef, ef)}}
 
 -- | Retrieves the rebuild cache
 cachedRebuild :: Ide m => m (Maybe (P.ModuleName, ExternsFile))
-cachedRebuild = s3CachedRebuild <$> getStage3
+cachedRebuild = vsCachedRebuild <$> getVolatileState
 
--- | Extracts source spans from the parsed ASTs
-populateStage2 :: (Ide m, MonadLogger m) => m ()
-populateStage2 = do
-  st <- ideStateVar <$> ask
-  let message duration = "Finished populating Stage2 in " <> displayTimeSpec duration
-  logPerf message (liftIO (atomically (populateStage2STM st)))
-
--- | STM version of populateStage2
-populateStage2STM :: TVar IdeState -> STM ()
-populateStage2STM ref = do
-  modules <- s1Modules <$> getStage1STM ref
-  let astData = map (extractAstInformation . fst) modules
-  setStage2STM ref (Stage2 (AstData astData))
-
--- | Resolves reexports and populates Stage3 with data to be used in queries.
-populateStage3 :: (Ide m, MonadLogger m) => m ()
-populateStage3 = do
+-- | Resolves reexports and populates VolatileState with data to be used in queries.
+populateVolatileState :: (Ide m, MonadLogger m) => m ()
+populateVolatileState = do
   st <- ideStateVar <$> ask
   let message duration = "Finished populating Stage3 in " <> displayTimeSpec duration
-  results <- logPerf message (liftIO (atomically (populateStage3STM st)))
+  results <- logPerf message (liftIO (atomically (populateVolatileStateSTM st)))
   void $ Map.traverseWithKey
     (\mn -> logWarnN . prettyPrintReexportResult (const (P.runModuleName mn)))
     (Map.filter reexportHasFailures results)
 
--- | STM version of populateStage3
-populateStage3STM
+-- | STM version of populateVolatileState
+populateVolatileStateSTM
   :: TVar IdeState
   -> STM (ModuleMap (ReexportResult [IdeDeclarationAnn]))
-populateStage3STM ref = do
-  externs <- s1Externs <$> getStage1STM ref
-  (AstData asts) <- s2AstData <$> getStage2STM ref
-  let (modules, reexportRefs) = (map fst &&& map snd) (Map.map convertExterns externs)
+populateVolatileStateSTM ref = do
+  IdeFileState{fsExterns = externs, fsModules = modules} <- getFileStateSTM ref
+  let asts = map (extractAstInformation . fst) modules
+  let (moduleDeclarations, reexportRefs) = (map fst &&& map snd) (Map.map convertExterns externs)
       results =
-        resolveLocations asts modules
+        resolveLocations asts moduleDeclarations
         & resolveInstances externs
         & resolveOperators
         & resolveReexports reexportRefs
-  setStage3STM ref (Stage3 (map reResolved results) Nothing)
+  setVolatileStateSTM ref (IdeVolatileState (AstData asts) (map reResolved results) Nothing)
   pure results
-
 
 resolveLocations
   :: ModuleMap (DefinitionSites P.SourceSpan, TypeAnnotations)
@@ -276,8 +242,8 @@ resolveInstances externs declarations =
           _ -> Nothing
     extractInstances _ _ = Nothing
 
-    go ::
-      (IdeInstance, P.ModuleName, P.ProperName 'P.ClassName)
+    go
+      :: (IdeInstance, P.ModuleName, P.ProperName 'P.ClassName)
       -> ModuleMap [IdeDeclarationAnn]
       -> ModuleMap [IdeDeclarationAnn]
     go (ideInstance, classModule, className) acc' =
