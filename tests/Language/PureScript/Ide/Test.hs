@@ -17,14 +17,14 @@ import           System.Process
 
 import qualified Language.PureScript             as P
 
-defConfig :: Configuration
+defConfig :: IdeConfiguration
 defConfig =
-  Configuration { confLogLevel = LogNone
+  IdeConfiguration { confLogLevel = LogNone
                 , confOutputPath = "output/"
                 , confGlobs = ["src/*.purs"]
                 }
 
-runIde' :: Configuration -> IdeState -> [Command] -> IO ([Either IdeError Success], IdeState)
+runIde' :: IdeConfiguration -> IdeState -> [Command] -> IO ([Either IdeError Success], IdeState)
 runIde' conf s cs = do
   stateVar <- newTVarIO s
   let env' = IdeEnvironment {ideStateVar = stateVar, ideConfiguration = conf}

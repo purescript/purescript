@@ -120,7 +120,7 @@ command = Opts.helper <*> subcommands where
 
     unless noWatch $
       void (forkFinally (watcher polling logLevel ideState fullOutputPath) print)
-    let conf = Configuration {confLogLevel = logLevel, confOutputPath = outputPath, confGlobs = globs}
+    let conf = IdeConfiguration {confLogLevel = logLevel, confOutputPath = outputPath, confGlobs = globs}
         env = IdeEnvironment {ideStateVar = ideState, ideConfiguration = conf}
     startServer port env
 

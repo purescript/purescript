@@ -129,8 +129,8 @@ newtype AstData a = AstData (ModuleMap (DefinitionSites a, TypeAnnotations))
 data IdeLogLevel = LogDebug | LogPerf | LogAll | LogDefault | LogNone
   deriving (Show, Eq)
 
-data Configuration =
-  Configuration
+data IdeConfiguration =
+  IdeConfiguration
   { confOutputPath :: FilePath
   , confLogLevel   :: IdeLogLevel
   , confGlobs      :: [FilePath]
@@ -139,7 +139,7 @@ data Configuration =
 data IdeEnvironment =
   IdeEnvironment
   { ideStateVar      :: TVar IdeState
-  , ideConfiguration :: Configuration
+  , ideConfiguration :: IdeConfiguration
   }
 
 type Ide m = (MonadIO m, MonadReader IdeEnvironment m)
