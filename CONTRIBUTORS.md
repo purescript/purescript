@@ -92,6 +92,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@simonyangme](https://github.com/simonyangme) | Simon Yang | [MIT license](http://opensource.org/licenses/MIT) |
 | [@sharkdp](https://github.com/sharkdp) | David Peter | [MIT license](http://opensource.org/licenses/MIT) |
 | [@soupi](https://github.com/soupi) | Gil Mizrahi | [MIT license](http://opensource.org/licenses/MIT) |
+| [@stefanholzmueller](https://github.com/stefanholzmueller) | Stefan Holzmüller | [MIT license](http://opensource.org/licenses/MIT) |
 | [@sztupi](https://github.com/sztupi) | Attila Sztupak | [MIT license](http://opensource.org/licenses/MIT) |
 | [@taktoa](https://github.com/taktoa) | Remy Goldschmidt | [MIT license](http://opensource.org/licenses/MIT) |
 | [@taku0](https://github.com/taku0) | taku0 | [MIT license](http://opensource.org/licenses/MIT) |
