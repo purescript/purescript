@@ -85,7 +85,7 @@ parseImportsFromFile file = do
 parseImportsFromFile' :: (MonadIO m, MonadError IdeError m) =>
                         FilePath -> m (P.ModuleName, [Text], [Import], [Text])
 parseImportsFromFile' fp = do
-  file <- ideReadTextFile fp
+  file <- ideReadFile fp
   case sliceImportSection (T.lines file) of
     Right res -> pure res
     Left err -> throwError (GeneralError err)
