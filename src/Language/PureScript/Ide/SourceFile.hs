@@ -14,6 +14,7 @@
 
 module Language.PureScript.Ide.SourceFile
   ( parseModule
+  , parseModulesFromFiles
   , extractAstInformation
   -- for tests
   , extractSpans
@@ -22,6 +23,7 @@ module Language.PureScript.Ide.SourceFile
 
 import           Protolude
 
+import           Control.Parallel.Strategies (withStrategy, parList, rseq)
 import qualified Data.Map                      as Map
 import qualified Language.PureScript           as P
 import           Language.PureScript.Ide.Error
@@ -34,9 +36,24 @@ parseModule
   -> m (Either FilePath (FilePath, P.Module))
 parseModule path = do
   contents <- ideReadFile path
-  case P.parseModuleFromFile identity (path, contents) of
-    Left _ -> pure (Left path)
-    Right m -> pure (Right m)
+  pure (parseModule' path contents)
+
+parseModule' :: FilePath -> Text -> Either FilePath (FilePath, P.Module)
+parseModule' path file =
+  case P.parseModuleFromFile identity (path, file) of
+    Left _ -> Left path
+    Right m -> Right m
+
+parseModulesFromFiles
+  :: (MonadIO m, MonadError IdeError m)
+  => [FilePath]
+  -> m [Either FilePath (FilePath, P.Module)]
+parseModulesFromFiles paths = do
+  files <- traverse (\p -> (p,) <$> ideReadFile p) paths
+  pure (inParallel (map (uncurry parseModule') files))
+  where
+    inParallel :: [Either e (k, a)] -> [Either e (k, a)]
+    inParallel = withStrategy (parList rseq)
 
 -- | Extracts AST information from a parsed module
 extractAstInformation
