@@ -426,6 +426,7 @@ parseValueAtom = withSourceSpan PositionedValue $ P.choice
                  , parseCase
                  , parseIfThenElse
                  , parseDo
+                 , parseAdo
                  , parseLet
                  , parseProxy
                  , P.try $ Parens <$> parens parseValue
@@ -463,6 +464,14 @@ parseDo = do
   reserved "do"
   indented
   Do <$> mark (P.many1 (same *> mark parseDoNotationElement))
+
+parseAdo :: TokenParser Expr
+parseAdo = do
+  reserved "ado"
+  indented
+  elements <- mark (P.many (same *> mark parseDoNotationElement))
+  yield <- mark (reserved "in" *> parseValue)
+  pure $ Ado elements yield
 
 parseDoNotationLet :: TokenParser DoNotationElement
 parseDoNotationLet = DoNotationLet <$> (reserved "let" *> indented *> mark (P.many1 (same *> parseLocalDeclaration)))

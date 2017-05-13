@@ -29,6 +29,7 @@
     "purescript-prelude": "3.1.0",
     "purescript-proxy": "2.1.0",
     "purescript-psci-support": "3.0.0",
+    "purescript-refs": "3.0.0",
     "purescript-st": "3.0.0",
     "purescript-strings": "3.3.0",
     "purescript-symbols": "3.0.0",

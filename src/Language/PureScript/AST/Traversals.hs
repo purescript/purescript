@@ -77,6 +77,7 @@ everywhereOnValues f g h = (f', g', h')
   g' (TypedValue check v ty) = g (TypedValue check (g' v) ty)
   g' (Let ds v) = g (Let (fmap f' ds) (g' v))
   g' (Do es) = g (Do (fmap handleDoNotationElement es))
+  g' (Ado es v) = g (Ado (fmap handleDoNotationElement es) (g' v))
   g' (PositionedValue pos com v) = g (PositionedValue pos com (g' v))
   g' other = g other
 
@@ -150,6 +151,7 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   g' (TypedValue check v ty) = TypedValue check <$> (g v >>= g') <*> pure ty
   g' (Let ds v) = Let <$> traverse (f' <=< f) ds <*> (g v >>= g')
   g' (Do es) = Do <$> traverse handleDoNotationElement es
+  g' (Ado es v) = Ado <$> traverse handleDoNotationElement es <*> (g v >>= g')
   g' (PositionedValue pos com v) = PositionedValue pos com <$> (g v >>= g')
   g' other = g other
 
@@ -194,7 +196,7 @@ everywhereOnValuesM f g h = (f', g', h')
 
   f' :: Declaration -> m Declaration
   f' (DataBindingGroupDeclaration ds) = (DataBindingGroupDeclaration <$> traverse f' ds) >>= f
-  f' (ValueDecl sa name nameKind bs val) = 
+  f' (ValueDecl sa name nameKind bs val) =
     ValueDecl sa name nameKind <$> traverse h' bs <*> traverse (guardedExprM handleGuard g') val >>= f
   f' (BindingGroupDeclaration ds) = (BindingGroupDeclaration <$> traverse (\(name, nameKind, val) -> (,,) name nameKind <$> g' val) ds) >>= f
   f' (BoundValueDeclaration sa b expr) = (BoundValueDeclaration sa <$> h' b <*> g' expr) >>= f
@@ -218,6 +220,7 @@ everywhereOnValuesM f g h = (f', g', h')
   g' (TypedValue check v ty) = (TypedValue check <$> g' v <*> pure ty) >>= g
   g' (Let ds v) = (Let <$> traverse f' ds <*> g' v) >>= g
   g' (Do es) = (Do <$> traverse handleDoNotationElement es) >>= g
+  g' (Ado es v) = (Ado <$> traverse handleDoNotationElement es <*> g' v) >>= g
   g' (PositionedValue pos com v) = (PositionedValue pos com <$> g' v) >>= g
   g' other = g other
 
@@ -289,6 +292,7 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   g' v@(TypedValue _ v1 _) = g v <> g' v1
   g' v@(Let ds v1) = foldl (<>) (g v) (fmap f' ds) <> g' v1
   g' v@(Do es) = foldl (<>) (g v) (fmap j' es)
+  g' v@(Ado es v1) = foldl (<>) (g v) (fmap j' es) <> g' v1
   g' v@(PositionedValue _ _ v1) = g v <> g' v1
   g' v = g v
 
@@ -369,6 +373,7 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   g' s (TypedValue _ v1 _) = g'' s v1
   g' s (Let ds v1) = foldl (<>) r0 (fmap (f'' s) ds) <> g'' s v1
   g' s (Do es) = foldl (<>) r0 (fmap (j'' s) es)
+  g' s (Ado es v1) = foldl (<>) r0 (fmap (j'' s) es) <> g'' s v1
   g' s (PositionedValue _ _ v1) = g'' s v1
   g' _ _ = r0
 
@@ -453,6 +458,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   g' s (TypedValue check v ty) = TypedValue check <$> g'' s v <*> pure ty
   g' s (Let ds v) = Let <$> traverse (f'' s) ds <*> g'' s v
   g' s (Do es) = Do <$> traverse (j'' s) es
+  g' s (Ado es v) = Ado <$> traverse (j'' s) es <*> g'' s v
   g' s (PositionedValue pos com v) = PositionedValue pos com <$> g'' s v
   g' _ other = return other
 
@@ -546,6 +552,9 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
     let s' = S.union s (S.fromList (mapMaybe getDeclIdent ds))
     in foldMap (f'' s') ds <> g'' s' v1
   g' s (Do es) = fold . snd . mapAccumL j'' s $ es
+  g' s (Ado es v1) =
+    let s' = S.union s (foldMap (fst . j'' s) es)
+    in g'' s' v1
   g' s (PositionedValue _ _ v1) = g'' s v1
   g' _ _ = mempty
 

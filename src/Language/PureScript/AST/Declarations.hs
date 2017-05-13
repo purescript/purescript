@@ -171,6 +171,7 @@ data SimpleErrorMessage
   -- | a declaration couldn't be used because there wouldn't be enough information
   -- | to choose an instance
   | UnusableDeclaration Ident
+  | AdoLetNotYetSupported
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
@@ -451,7 +452,7 @@ getValueDeclaration (ValueDeclaration d) = Just d
 getValueDeclaration _ = Nothing
 
 pattern ValueDecl :: SourceAnn -> Ident -> NameKind -> [Binder] -> [GuardedExpr] -> Declaration
-pattern ValueDecl sann ident name binders expr 
+pattern ValueDecl sann ident name binders expr
   = ValueDeclaration (ValueDeclarationData sann ident name binders expr)
 
 -- |
@@ -763,6 +764,9 @@ data Expr
   -- A proxy value
   --
   | Proxy Type
+  -- An ado-notation block
+  --
+  | Ado [DoNotationElement] Expr
   -- |
   -- An application of a typeclass dictionary constructor. The value should be
   -- an ObjectLiteral.
