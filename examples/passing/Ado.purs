@@ -66,6 +66,12 @@ test10 _ = ado
   in f 10.0
 -}
 
+test11 = \_ -> ado
+  x <- pure 1
+  y <- pure "A"
+  z <- pure []
+  in show (x :: Int) <> y <> show (z :: Array Int)
+
 main = do
   r <- newRef "X"
   log =<< ado
