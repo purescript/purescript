@@ -208,7 +208,7 @@ loadModules moduleNames = do
   -- We parse all source files, log eventual parse failures and insert the
   -- successful parses into the state.
   (failures, allModules) <-
-    partitionEithers <$> (traverse parseModule =<< findAllSourceFiles)
+    partitionEithers <$> (parseModulesFromFiles =<< findAllSourceFiles)
   unless (null failures) $
     $(logWarn) ("Failed to parse: " <> show failures)
   traverse_ insertModule allModules
