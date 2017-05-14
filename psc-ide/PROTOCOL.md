@@ -502,6 +502,19 @@ The Module filter only keeps identifiers that appear in the listed modules.
 }
 ```
 
+### Namespace filter
+The Namespace filter only keeps identifiers that appear in the listed namespaces.
+Valid namespaces are `value`, `type` and `kind`.
+
+```json
+{
+   "filter": "namespace",
+   "params": {
+     "namespaces": ["value", "type", "kind"]
+   }
+}
+```
+
 ### Dependency filter
 The Dependency filter only keeps identifiers that appear in the listed modules
 and in any of their dependencies/imports.
