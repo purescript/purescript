@@ -20,12 +20,14 @@ module Language.PureScript.Ide.Filter
        , prefixFilter
        , equalityFilter
        , applyFilters
+       , namespaceFilter
        ) where
 
 import           Protolude                     hiding (isPrefixOf)
 
 import           Data.Aeson
 import           Data.Text                     (isPrefixOf)
+import           Data.List.NonEmpty            (NonEmpty)
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 import qualified Language.PureScript           as P
@@ -63,6 +65,25 @@ equalityFilter =
     equality :: IdeDeclaration -> Text -> Bool
     equality ed search = identifierFromIdeDeclaration ed == search
 
+-- | Keeps Identifiers only, that are equal to a given namespace
+namespaceFilter :: NonEmpty IdeNamespace -> Filter
+namespaceFilter =
+  mkFilter . namespaceFilter'
+
+namespaceFilter' :: NonEmpty IdeNamespace -> [Module] -> [Module]
+namespaceFilter' nss modules =
+  filter (not . null . snd) $
+    foldl (\modules' ns -> modules' `mappend` fmap (filterModuleDecls ns) modules) [] nss
+  where
+    filterModuleDecls :: IdeNamespace -> Module -> Module
+    filterModuleDecls ns' (moduleIdent, decls) =
+      (moduleIdent, filter (filterNsByDecl ns') decls)
+    filterNsByDecl :: IdeNamespace -> IdeDeclarationAnn -> Bool
+    filterNsByDecl IdeNSType decl = isIdeNSType decl
+    filterNsByDecl IdeNSValue decl = isIdeNSValue decl
+    filterNsByDecl IdeNSKind decl = isIdeNSKind decl
+    filterNsByDecl _ _ = False
+
 identFilter :: (IdeDeclaration -> Text -> Bool) -> Text -> [Module] -> [Module]
 identFilter predicate search =
   filter (not . null . snd) . fmap filterModuleDecls
@@ -91,6 +112,10 @@ instance FromJSON Filter where
         return $ prefixFilter search
       "modules" -> do
         params <- o .: "params"
-        modules <- map P.moduleNameFromString <$> params .: "modules"
+        modules <- fmap P.moduleNameFromString <$> params .: "modules"
         return $ moduleFilter modules
+      "namespace" -> do
+        params <- o .: "params"
+        nss <- fmap ideNamespaceFromString <$> params .: "namespaces"
+        return $ namespaceFilter nss
       _ -> mzero

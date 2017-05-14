@@ -21,6 +21,7 @@ import           Protolude
 
 import           Control.Concurrent.STM
 import           Control.Lens.TH
+import           Control.Lens                       ((^.))
 import           Data.Aeson
 import qualified Data.Map.Lazy                       as M
 import qualified Language.PureScript                 as P
@@ -306,8 +307,33 @@ instance ToJSON PursuitResponse where
       ]
 
 -- | Denotes the different namespaces a name in PureScript can reside in.
-data IdeNamespace = IdeNSValue | IdeNSType | IdeNSKind
+data IdeNamespace = IdeNSValue | IdeNSType | IdeNSKind | IdeNSUnknown
   deriving (Show, Eq, Ord)
+
+-- | Decodes IdeNamespace by a given string
+ideNamespaceFromString :: Text -> IdeNamespace
+ideNamespaceFromString "value" = IdeNSValue
+ideNamespaceFromString "type" = IdeNSType
+ideNamespaceFromString "kind" = IdeNSKind
+ideNamespaceFromString _ = IdeNSUnknown
+
+isIdeNSValue :: IdeDeclarationAnn -> Bool
+isIdeNSValue decl =
+    case decl ^. idaDeclaration of
+        IdeDeclValue _ -> True
+        _ -> False
+
+isIdeNSType :: IdeDeclarationAnn -> Bool
+isIdeNSType decl =
+    case decl ^. idaDeclaration of
+        IdeDeclType _ -> True
+        _ -> False
+
+isIdeNSKind :: IdeDeclarationAnn -> Bool
+isIdeNSKind decl =
+    case decl ^. idaDeclaration of
+        IdeDeclKind _ -> True
+        _ -> False
 
 -- | A name tagged with a namespace
 data IdeNamespaced = IdeNamespaced IdeNamespace Text
