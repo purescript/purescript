@@ -54,5 +54,9 @@ desugarAdo d =
     return (abs, val : args)
   go (yield, args) (DoNotationLet ds) = do
     return (Let ds yield, args)
-  go acc (PositionedDoNotationElement pos _ el) =
-    rethrowWithPosition pos $ go acc el
+  go acc (PositionedDoNotationElement pos com el) =
+    rethrowWithPosition pos $ do
+      (yield, args) <- go acc el
+      return $ case args of
+        [] -> (PositionedValue pos com yield, args)
+        (a : as) -> (yield, PositionedValue pos com a : as)
