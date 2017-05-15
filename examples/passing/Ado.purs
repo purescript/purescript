@@ -35,22 +35,18 @@ test4 mx my = ado
   y <- my
   in x + y + 1.0
 
-{-
 test5 mx my mz = ado
   x <- mx
   y <- my
   let sum = x + y
   z <- mz
   in z + sum + 1.0
--}
 
-{-
 test6 mx = \_ -> ado
   let
     f :: forall a. Maybe a -> a
     f (Just x) = x
   in f mx
--}
 
 test8 = \_ -> ado
   in (ado
@@ -58,13 +54,11 @@ test8 = \_ -> ado
 
 test9 = \_ -> (+) <$> Just 1.0 <*> Just 2.0
 
-{-
 test10 _ = ado
   let
     f x = g x * 3.0
     g x = f x / 2.0
   in f 10.0
--}
 
 test11 = \_ -> ado
   x <- pure 1
@@ -78,6 +72,6 @@ main = do
     _ <- writeRef r "D"
     a <- readRef r
     b <- pure "o"
-    c <- pure "n"
+    let c = "n"
     d <- pure "e"
     in a <> b <> c <> d

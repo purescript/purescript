@@ -176,7 +176,6 @@ errorCode em = case unwrapErrorMessage em of
   ClassInstanceArityMismatch{} -> "ClassInstanceArityMismatch"
   UserDefinedWarning{} -> "UserDefinedWarning"
   UnusableDeclaration{} -> "UnusableDeclaration"
-  AdoLetNotYetSupported{} -> "AdoLetNotYetSupported"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -954,10 +953,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (UnusableDeclaration ident) =
       paras [ line $ "The declaration " <> markCode (showIdent ident) <> " is unusable."
             , line $ "This happens when a constraint couldn't possibly have enough information to work out which instance is required."
-            ]
-
-    renderSimpleErrorMessage AdoLetNotYetSupported =
-      paras [ line $ "Let bindings are not yet supported with ado-notation."
             ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box

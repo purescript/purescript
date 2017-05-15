@@ -52,7 +52,7 @@ desugarAdo d =
                   (Case [Var (Qualified Nothing ident)]
                         [CaseAlternative [binder] [MkUnguarded yield]])
     return (abs, val : args)
-  go (_, _) (DoNotationLet _) = do
-    throwError . errorMessage $ AdoLetNotYetSupported
+  go (yield, args) (DoNotationLet ds) = do
+    return (Let ds yield, args)
   go acc (PositionedDoNotationElement pos _ el) =
     rethrowWithPosition pos $ go acc el
