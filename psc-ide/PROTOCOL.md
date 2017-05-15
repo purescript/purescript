@@ -515,6 +515,19 @@ and in any of their dependencies/imports.
 }
 ```
 
+### Namespace filter
+The Namespace filter only keeps identifiers that appear in the listed namespaces.
+Valid namespaces are `value`, `type` and `kind`.
+
+```json
+{
+   "filter": "namespace",
+   "params": {
+     "namespaces": ["value", "type", "kind"]
+   }
+}
+```
+
 ## Matcher:
 
 ### Flex matcher
