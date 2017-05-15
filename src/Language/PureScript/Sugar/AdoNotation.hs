@@ -31,13 +31,18 @@ desugarAdo d =
   pure' :: Expr
   pure' = Var (Qualified Nothing (Ident C.pure'))
 
+  map' :: Expr
+  map' = Var (Qualified Nothing (Ident C.map))
+
   apply :: Expr
   apply = Var (Qualified Nothing (Ident C.apply))
 
   replace :: Expr -> m Expr
   replace (Ado els yield) = do
     (func, args) <- foldM go (yield, []) (reverse els)
-    return $ foldl' (\a b -> App (App apply a) b) (App pure' func) args
+    return $ case args of
+      [] -> App pure' func
+      hd : tl -> foldl' (\a b -> App (App apply a) b) (App (App map' func) hd) tl
   replace (PositionedValue pos com v) = PositionedValue pos com <$> rethrowWithPosition pos (replace v)
   replace other = return other
 
