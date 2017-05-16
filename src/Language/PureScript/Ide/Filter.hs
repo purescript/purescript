@@ -16,6 +16,7 @@
 
 module Language.PureScript.Ide.Filter
        ( Filter
+       , namespaceFilter
        , moduleFilter
        , prefixFilter
        , equalityFilter
@@ -25,6 +26,7 @@ module Language.PureScript.Ide.Filter
 import           Protolude                     hiding (isPrefixOf)
 
 import           Data.Aeson
+import           Data.List.NonEmpty            (NonEmpty)
 import           Data.Text                     (isPrefixOf)
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
@@ -38,6 +40,23 @@ type Module = (P.ModuleName, [IdeDeclarationAnn])
 mkFilter :: ([Module] -> [Module]) -> Filter
 mkFilter = Filter . Endo
 
+-- | Only keeps Identifiers in the given Namespaces
+namespaceFilter :: NonEmpty IdeNamespace -> Filter
+namespaceFilter namespaces =
+  mkFilter (filterModuleDecls filterNamespaces)
+  where
+    filterNamespaces :: IdeDeclaration -> Bool
+    filterNamespaces decl = elem (namespace decl) namespaces
+    namespace :: IdeDeclaration -> IdeNamespace
+    namespace (IdeDeclValue _)           = IdeNSValue
+    namespace (IdeDeclType _)            = IdeNSType
+    namespace (IdeDeclTypeSynonym _)     = IdeNSType
+    namespace (IdeDeclDataConstructor _) = IdeNSValue
+    namespace (IdeDeclTypeClass _)       = IdeNSType
+    namespace (IdeDeclValueOperator _)   = IdeNSValue
+    namespace (IdeDeclTypeOperator _)    = IdeNSType
+    namespace (IdeDeclKind _)            = IdeNSKind
+
 -- | Only keeps the given Modules
 moduleFilter :: [P.ModuleName] -> Filter
 moduleFilter =
@@ -50,7 +69,7 @@ moduleFilter' moduleIdents = filter (flip elem moduleIdents . fst)
 prefixFilter :: Text -> Filter
 prefixFilter "" = mkFilter identity
 prefixFilter t =
-  mkFilter $ identFilter prefix t
+  mkFilter $ declarationFilter prefix t
   where
     prefix :: IdeDeclaration -> Text -> Bool
     prefix ed search = search `isPrefixOf` identifierFromIdeDeclaration ed
@@ -58,18 +77,20 @@ prefixFilter t =
 -- | Only keeps Identifiers that are equal to the search string
 equalityFilter :: Text -> Filter
 equalityFilter =
-  mkFilter . identFilter equality
+  mkFilter . declarationFilter equality
   where
     equality :: IdeDeclaration -> Text -> Bool
     equality ed search = identifierFromIdeDeclaration ed == search
 
-identFilter :: (IdeDeclaration -> Text -> Bool) -> Text -> [Module] -> [Module]
-identFilter predicate search =
-  filter (not . null . snd) . fmap filterModuleDecls
+declarationFilter :: (IdeDeclaration -> Text -> Bool) -> Text -> [Module] -> [Module]
+declarationFilter predicate search =
+  filterModuleDecls (flip predicate search)
+
+filterModuleDecls :: (IdeDeclaration -> Bool) -> [Module] -> [Module]
+filterModuleDecls predicate =
+  filter (not . null . snd) . fmap filterDecls
   where
-    filterModuleDecls :: Module -> Module
-    filterModuleDecls (moduleIdent, decls) =
-        (moduleIdent, filter (flip predicate search . discardAnn) decls)
+    filterDecls (moduleIdent, decls) = (moduleIdent, filter (predicate . discardAnn) decls)
 
 runFilter :: Filter -> [Module] -> [Module]
 runFilter (Filter f) = appEndo f
@@ -93,4 +114,8 @@ instance FromJSON Filter where
         params <- o .: "params"
         modules <- map P.moduleNameFromString <$> params .: "modules"
         return $ moduleFilter modules
+      "namespace" -> do
+        params <- o .: "params"
+        namespaces <- params .: "namespaces"
+        return $ namespaceFilter namespaces
       _ -> mzero

@@ -87,11 +87,13 @@ If you would prefer to use different terms, please use the section below instead
 | [@rvion](https://github.com/rvion) | Rémi Vion | [MIT license](http://opensource.org/licenses/MIT) |
 | [@RyanGlScott](https://github.com/RyanGlScott) | Ryan Scott | [MIT license](http://opensource.org/licenses/MIT) |
 | [@sebastiaanvisser](https://github.com/sebastiaanvisser) | Sebastiaan Visser | MIT license |
+| [@sectore](https://github.com/sectore) | Jens Krause | [MIT license](http://opensource.org/licenses/MIT) |
 | [@senju](https://github.com/senju) | senju | [MIT license](http://opensource.org/licenses/MIT) |
 | [@seungha-kim](https://github.com/seungha-kim) | Seungha Kim | [MIT license](http://opensource.org/licenses/MIT) |
 | [@simonyangme](https://github.com/simonyangme) | Simon Yang | [MIT license](http://opensource.org/licenses/MIT) |
 | [@sharkdp](https://github.com/sharkdp) | David Peter | [MIT license](http://opensource.org/licenses/MIT) |
 | [@soupi](https://github.com/soupi) | Gil Mizrahi | [MIT license](http://opensource.org/licenses/MIT) |
+| [@stefanholzmueller](https://github.com/stefanholzmueller) | Stefan Holzmüller | [MIT license](http://opensource.org/licenses/MIT) |
 | [@sztupi](https://github.com/sztupi) | Attila Sztupak | [MIT license](http://opensource.org/licenses/MIT) |
 | [@taktoa](https://github.com/taktoa) | Remy Goldschmidt | [MIT license](http://opensource.org/licenses/MIT) |
 | [@taku0](https://github.com/taku0) | taku0 | [MIT license](http://opensource.org/licenses/MIT) |

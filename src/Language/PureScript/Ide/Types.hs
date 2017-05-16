@@ -309,6 +309,14 @@ instance ToJSON PursuitResponse where
 data IdeNamespace = IdeNSValue | IdeNSType | IdeNSKind
   deriving (Show, Eq, Ord)
 
+instance FromJSON IdeNamespace where
+  parseJSON (String s) = case s of
+    "value" -> pure IdeNSValue
+    "type"  -> pure IdeNSType
+    "kind"  -> pure IdeNSKind
+    _       -> mzero
+  parseJSON _ = mzero
+
 -- | A name tagged with a namespace
 data IdeNamespaced = IdeNamespaced IdeNamespace Text
   deriving (Show, Eq, Ord)
