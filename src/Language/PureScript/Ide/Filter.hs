@@ -21,6 +21,7 @@ module Language.PureScript.Ide.Filter
        , prefixFilter
        , equalityFilter
        , applyFilters
+       , mkFilter
        ) where
 
 import           Protolude                     hiding (isPrefixOf)

@@ -765,6 +765,7 @@ library
           Language.PureScript.Ide.CaseSplit
           Language.PureScript.Ide.Command
           Language.PureScript.Ide.Completion
+          Language.PureScript.Ide.Completion.Formatter
           Language.PureScript.Ide.Error
           Language.PureScript.Ide.Externs
           Language.PureScript.Ide.Filter
@@ -1010,6 +1011,7 @@ test-suite tests
     type: exitcode-stdio-1.0
     main-is: Main.hs
     other-modules:
+          Language.PureScript.Ide.CompletionSpec
           Language.PureScript.Ide.FilterSpec
           Language.PureScript.Ide.ImportsSpec
           Language.PureScript.Ide.MatcherSpec

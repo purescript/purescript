@@ -6,6 +6,7 @@ import           Protolude
 
 import           Language.PureScript.Ide.Command
 import           Language.PureScript.Ide.Matcher
+import           Language.PureScript.Ide.Completion.Formatter
 import           Language.PureScript.Ide.Types
 import qualified Language.PureScript.Ide.Test as Test
 import           System.FilePath
@@ -57,5 +58,5 @@ spec = describe "Rebuilding single modules" $ do
     it "completes a hidden identifier after rebuilding" $ do
       ([_, (Right (CompletionResult [ result ]))], _) <- Test.inProject $
         Test.runIde [ rebuildSync "RebuildSpecWithHiddenIdent.purs"
-                    , Complete [] (flexMatcher "hid") (Just (Test.mn "RebuildSpecWithHiddenIdent"))]
+                    , Complete [] (flexMatcher "hid") defaultFormatter (Just (Test.mn "RebuildSpecWithHiddenIdent"))]
       complIdentifier result `shouldBe` "hidden"

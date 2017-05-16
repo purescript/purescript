@@ -22,6 +22,7 @@ import           Language.PureScript.Ide.CaseSplit
 import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Types
+import           Language.PureScript.Ide.Completion.Formatter
 
 data Command
     = Load [P.ModuleName]
@@ -34,6 +35,7 @@ data Command
     | Complete
       { completeFilters       :: [Filter]
       , completeMatcher       :: Matcher IdeDeclarationAnn
+      , completeFormatter     :: CompletionFormatter
       , completeCurrentModule :: Maybe P.ModuleName
       }
     | Pursuit
@@ -128,6 +130,7 @@ instance FromJSON Command where
         Complete
           <$> params .:? "filters" .!= []
           <*> params .:? "matcher" .!= mempty
+          <*> params .:? "formatter" .!= defaultFormatter
           <*> (fmap P.moduleNameFromString <$> params .:? "currentModule")
       "pursuit" -> do
         params <- o .: "params"
