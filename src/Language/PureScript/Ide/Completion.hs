@@ -1,10 +1,14 @@
 module Language.PureScript.Ide.Completion
        ( getCompletions
        , getExactMatches
+       , CompletionOptions(..)
+       , defaultCompletionOptions
+       , applyCompletionOptions
        ) where
 
 import           Protolude
 
+import           Data.Aeson
 import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Types
@@ -17,10 +21,15 @@ type Module = (P.ModuleName, [IdeDeclarationAnn])
 getCompletions
   :: [Filter]
   -> Matcher IdeDeclarationAnn
+  -> CompletionOptions
   -> [Module]
   -> [Match IdeDeclarationAnn]
-getCompletions filters matcher modules =
-  runMatcher matcher (completionsFromModules (applyFilters filters modules))
+getCompletions filters matcher options modules =
+  modules
+  & applyFilters filters
+  & completionsFromModules
+  & runMatcher matcher
+  & applyCompletionOptions options
 
 getExactMatches :: Text -> [Filter] -> [Module] -> [Match IdeDeclarationAnn]
 getExactMatches search filters modules =
@@ -31,3 +40,20 @@ completionsFromModules = foldMap completionFromModule
   where
     completionFromModule (moduleName, decls) =
       map (\x -> Match (moduleName, x)) decls
+
+data CompletionOptions = CompletionOptions
+  { coMaxResults :: Maybe Int
+  }
+
+defaultCompletionOptions :: CompletionOptions
+defaultCompletionOptions = CompletionOptions { coMaxResults = Nothing }
+
+applyCompletionOptions :: CompletionOptions -> [a] -> [a]
+applyCompletionOptions co =
+  maybe identity take (coMaxResults co)
+
+instance FromJSON CompletionOptions where
+  parseJSON = withObject "CompletionOptions" $ \o -> do
+    maxResults <- o .:? "maxResults"
+    pure (CompletionOptions { coMaxResults = maxResults })
+

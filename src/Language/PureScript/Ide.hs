@@ -56,8 +56,8 @@ handleCommand c = case c of
     loadModulesSync modules
   Type search filters currentModule ->
     findType search filters currentModule
-  Complete filters matcher currentModule ->
-    findCompletions filters matcher currentModule
+  Complete filters matcher currentModule complOptions ->
+    findCompletions filters matcher currentModule complOptions
   Pursuit query Package ->
     findPursuitPackages query
   Pursuit query Identifier ->
@@ -92,11 +92,16 @@ handleCommand c = case c of
   Quit ->
     liftIO exitSuccess
 
-findCompletions :: Ide m =>
-                   [Filter] -> Matcher IdeDeclarationAnn -> Maybe P.ModuleName -> m Success
-findCompletions filters matcher currentModule = do
+findCompletions
+  :: Ide m
+  => [Filter]
+  -> Matcher IdeDeclarationAnn
+  -> Maybe P.ModuleName
+  -> CompletionOptions
+  -> m Success
+findCompletions filters matcher currentModule complOptions = do
   modules <- getAllModules currentModule
-  pure . CompletionResult . map completionFromMatch . getCompletions filters matcher $ modules
+  pure . CompletionResult . map completionFromMatch . getCompletions filters matcher complOptions $ modules
 
 findType :: Ide m =>
             Text -> [Filter] -> Maybe P.ModuleName -> m Success

@@ -1010,6 +1010,7 @@ test-suite tests
     type: exitcode-stdio-1.0
     main-is: Main.hs
     other-modules:
+          Language.PureScript.Ide.CompletionSpec
           Language.PureScript.Ide.FilterSpec
           Language.PureScript.Ide.ImportsSpec
           Language.PureScript.Ide.MatcherSpec

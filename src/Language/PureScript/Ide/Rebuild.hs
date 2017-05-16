@@ -53,7 +53,7 @@ rebuildFile path runOpenBuild = do
     Right m -> pure m
 
   -- Externs files must be sorted ahead of time, so that they get applied
-  -- correctly to the 'Environment'.
+  -- in the right order (bottom up) to the 'Environment'.
   externs <- logPerf (labelTimespec "Sorting externs") (sortExterns m =<< getExternFiles)
 
   outputDirectory <- confOutputPath . ideConfiguration <$> ask
