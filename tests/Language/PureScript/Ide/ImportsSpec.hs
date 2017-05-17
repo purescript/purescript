@@ -44,7 +44,7 @@ splitSimpleFile = fromRight (sliceImportSection simpleFile)
 
 withImports :: [Text] -> [Text]
 withImports is =
-  take 2 simpleFile ++ is ++ drop 2 simpleFile
+  take 2 simpleFile ++ [""] ++ is ++ drop 2 simpleFile
 
 testParseImport :: Text -> Import
 testParseImport = fromJust . parseImport
@@ -117,8 +117,8 @@ spec = do
     it "adds an implicit unqualified import" $
       shouldBe
         (addImplicitImport' simpleFileImports (P.moduleNameFromString "Data.Map"))
-        [ "import Prelude"
-        , "import Data.Map"
+        [ "import Data.Map"
+        , "import Prelude"
         ]
     it "adds an explicit unqualified import to a file without any imports" $
       shouldBe
@@ -128,6 +128,7 @@ spec = do
       shouldBe
         (addValueImport "head" (P.moduleNameFromString "Data.Array") simpleFileImports)
         [ "import Prelude"
+        , ""
         , "import Data.Array (head)"
         ]
     it "doesn't add an import if the containing module is imported implicitly" $
@@ -139,30 +140,35 @@ spec = do
       shouldBe
         (addValueImport "head" (P.moduleNameFromString "Data.Array") explicitImports)
         [ "import Prelude"
+        , ""
         , "import Data.Array (head, tail)"
         ]
     it "adds a kind to an explicit import list" $
       shouldBe
         (addKindImport "Effect" (P.moduleNameFromString "Control.Monad.Eff") simpleFileImports)
         [ "import Prelude"
+        , ""
         , "import Control.Monad.Eff (kind Effect)"
         ]
     it "adds an operator to an explicit import list" $
       shouldBe
         (addOpImport "<~>" (P.moduleNameFromString "Data.Array") explicitImports)
         [ "import Prelude"
+        , ""
         , "import Data.Array (tail, (<~>))"
         ]
     it "adds a type with constructors without automatically adding an open import of said constructors " $
         shouldBe
           (addTypeImport "Maybe" (P.moduleNameFromString "Data.Maybe") simpleFileImports)
           [ "import Prelude"
+          , ""
           , "import Data.Maybe (Maybe)"
           ]
     it "adds the type for a given DataConstructor" $
         shouldBe
           (addDtorImport "Just" "Maybe" (P.moduleNameFromString "Data.Maybe") simpleFileImports)
           [ "import Prelude"
+          , ""
           , "import Data.Maybe (Maybe(..))"
           ]
     it "adds a dataconstructor to an existing type import" $ do
@@ -170,6 +176,7 @@ spec = do
       shouldBe
         (addDtorImport "Just" "Maybe" (P.moduleNameFromString "Data.Maybe") typeImports)
         [ "import Prelude"
+        , ""
         , "import Data.Maybe (Maybe(..))"
         ]
     it "doesn't add a dataconstructor to an existing type import with open dtors" $ do
@@ -177,12 +184,14 @@ spec = do
       shouldBe
         (addDtorImport "Just" "Maybe" (P.moduleNameFromString "Data.Maybe") typeImports)
         [ "import Prelude"
+        , ""
         , "import Data.Maybe (Maybe(..))"
         ]
     it "doesn't add an identifier to an explicit import list if it's already imported" $
       shouldBe
       (addValueImport "tail" (P.moduleNameFromString "Data.Array") explicitImports)
       [ "import Prelude"
+      , ""
       , "import Data.Array (tail)"
       ]
 
@@ -203,23 +212,23 @@ spec = do
           [expected]
     it "sorts class" $
       expectSorted (map classImport ["Applicative", "Bind"])
-        ["import Prelude", "import Control.Monad (class Applicative, class Bind, ap)"]
+        ["import Prelude", "", "import Control.Monad (class Applicative, class Bind, ap)"]
     it "sorts value" $
       expectSorted (map valueImport ["unless", "where"])
-        ["import Prelude", "import Control.Monad (ap, unless, where)"]
+        ["import Prelude", "", "import Control.Monad (ap, unless, where)"]
     it "sorts type, value" $
       expectSorted
         ((map valueImport ["unless", "where"]) ++ (map typeImport ["Foo", "Bar"]))
-        ["import Prelude", "import Control.Monad (Bar, Foo, ap, unless, where)"]
+        ["import Prelude", "", "import Control.Monad (Bar, Foo, ap, unless, where)"]
     it "sorts class, type, value" $
       expectSorted
         ((map valueImport ["unless", "where"]) ++ (map typeImport ["Foo", "Bar"]) ++ (map classImport ["Applicative", "Bind"]))
-        ["import Prelude", "import Control.Monad (class Applicative, class Bind, Bar, Foo, ap, unless, where)"]
+        ["import Prelude", "", "import Control.Monad (class Applicative, class Bind, Bar, Foo, ap, unless, where)"]
     it "sorts types with constructors, using open imports for the constructors" $
       expectSorted
         -- the imported names don't actually have to exist!
         (map (uncurry dtorImport) [("Just", "Maybe"), ("Nothing", "Maybe"), ("SomeOtherConstructor", "SomeDataType")])
-        ["import Prelude", "import Control.Monad (Maybe(..), SomeDataType(..), ap)"]
+        ["import Prelude", "", "import Control.Monad (Maybe(..), SomeDataType(..), ap)"]
   describe "importing from a loaded IdeState" importFromIdeState
 
 implImport :: Text -> Command
