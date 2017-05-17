@@ -31,7 +31,7 @@ module Language.PureScript.Ide.Imports
 import           Protolude
 
 import           Control.Lens                       ((^.), (%~), ix)
-import           Data.List                          (findIndex, nubBy)
+import           Data.List                          (findIndex, nubBy, partition)
 import qualified Data.Text                          as T
 import qualified Language.PureScript                as P
 import           Language.PureScript.Ide.Completion
@@ -45,27 +45,6 @@ import qualified Text.Parsec as Parsec
 
 data Import = Import P.ModuleName P.ImportDeclarationType (Maybe P.ModuleName)
               deriving (Eq, Show)
-
-instance Ord Import where
-  compare = compImport
-
-compImportType :: P.ImportDeclarationType -> P.ImportDeclarationType -> Ordering
-compImportType P.Implicit P.Implicit = EQ
-compImportType P.Implicit _ = LT
-compImportType (P.Explicit _) (P.Hiding _) = LT
-compImportType (P.Explicit _) (P.Explicit _) = EQ
-compImportType (P.Explicit _) P.Implicit = GT
-compImportType (P.Hiding _) (P.Hiding _) = EQ
-compImportType (P.Hiding _) _ = GT
-
-compImport :: Import -> Import -> Ordering
-compImport (Import n i q) (Import n' i' q')
-  | compImportType i i' /= EQ = compImportType i i'
-    -- This means that for a stable sort, the first implicit import will stay
-    -- the first implicit import
-  | not (P.isExplicit i) && isNothing q = LT
-  | not (P.isExplicit i) && isNothing q' = GT
-  | otherwise = compare n n'
 
 -- | Reads a file and returns the parsed modulename as well as the parsed
 -- imports, while ignoring eventual parse errors that aren't relevant to the
@@ -154,10 +133,7 @@ addImplicitImport fp mn = do
 
 addImplicitImport' :: [Import] -> P.ModuleName -> [Text]
 addImplicitImport' imports mn =
-  -- We need to append the new import, because there could already be implicit
-  -- imports and we need to preserve the order on these, as the first implicit
-  -- import is the one that doesn't generate warnings.
-  prettyPrintImportSection ( imports ++ [Import mn P.Implicit Nothing])
+  prettyPrintImportSection (Import mn P.Implicit Nothing : imports)
 
 -- | Adds an explicit import like @import Prelude (unit)@ to a Sourcefile. If an
 -- explicit import already exists for the given module, it adds the identifier
@@ -274,7 +250,7 @@ addImportForIdentifier fp ident filters = do
       if m1 /= m2
          -- If the modules don't line up we just ask the user to specify the
          -- module
-      then pure $ Left ms
+      then pure (Left ms)
       else case decideRedundantCase d1 d2 <|> decideRedundantCase d2 d1 of
         -- If dataconstructor and type line up we just import the
         -- dataconstructor as that will give us an unnecessary import warning at
@@ -283,13 +259,16 @@ addImportForIdentifier fp ident filters = do
           Right <$> addExplicitImport fp decl m1
         -- Here we need the user to specify whether he wanted a dataconstructor
         -- or a type
+
+        -- TODO: With the new namespace filter, this can actually be a
+        -- request for the user to specify which of the two was wanted.
         Nothing ->
           throwError (GeneralError "Undecidable between type and dataconstructor")
 
     -- Multiple matches were found so we need to ask the user to clarify which
     -- module he meant
     xs ->
-      pure $ Left xs
+      pure (Left xs)
     where
       decideRedundantCase d@(IdeDeclDataConstructor dtor) (IdeDeclType t) =
         if dtor ^. ideDtorTypeName == t ^. ideTypeName then Just d else Nothing
@@ -302,7 +281,21 @@ prettyPrintImport' (Import mn idt qual) =
   "import " <> P.prettyPrintImport mn idt qual
 
 prettyPrintImportSection :: [Import] -> [Text]
-prettyPrintImportSection imports = map prettyPrintImport' (sort imports)
+prettyPrintImportSection imports =
+  let
+    (implicitImports, explicitImports) = partition isImplicitImport imports
+  in
+    sort (map prettyPrintImport' implicitImports)
+      -- Only add the extra spacing if both implicit as well as
+      -- explicit/qualified imports exist
+      <> (guard (not (null explicitImports || null implicitImports)) $> "")
+      <> sort (map prettyPrintImport' explicitImports)
+  where
+    isImplicitImport :: Import -> Bool
+    isImplicitImport i = case i of
+      Import _ P.Implicit Nothing -> True
+      _ -> False
+
 
 -- | Writes a list of lines to @Just filepath@ and responds with a @TextResult@,
 -- or returns the lines as a @MultilineTextResult@ if @Nothing@ was given as the
