@@ -59,23 +59,30 @@ The `complete` command looks up possible completions/corrections.
 **Params**:
  - `filters :: [Filter]`: The same as for the `type` command. A candidate must
   match all filters.
+
  - `matcher :: (optional) Matcher`: The strategy used for matching candidates
   after filtering. Results are scored internally and will be returned in the
   descending order where the nth element is better then the n+1-th.
+  If no matcher is given every candidate, that passes the filters, is returned
+  in no particular order.
+
  - `currentModule :: (optional) String`: The current modules name. If it matches
    with the rebuild cache non-exported modules will also be completed. You can
    fill the rebuild cache by using the "Rebuild" command.
 
-  If no matcher is given every candidate, that passes the filters, is returned
-  in no particular order.
+ - `options :: (optional) CompletionOptions`: The CompletionOptions to apply to
+   the completion results
 
 ```json
 {
   "command": "complete",
   "params": {
     "filters": [{..}, {..}],
-    "matcher": {..}
-    "currentModule": "Main"
+    "matcher": {..},
+    "currentModule": "Main",
+    "options": {
+      "maxResults": 50
+    }
   }
 }
 ```
@@ -574,6 +581,15 @@ All Responses are wrapped in the following format:
   "result": Result|Error
 }
 ```
+
+## CompletionOptions
+
+Completion options allow to configure the number of returned completion results.
+
+- maxResults :: Maybe Int 
+
+If specified limits the number of completion results, otherwise return all
+results.
 
 ### Error
 

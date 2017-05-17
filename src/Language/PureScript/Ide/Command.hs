@@ -19,6 +19,7 @@ import           Protolude
 import           Data.Aeson
 import qualified Language.PureScript               as P
 import           Language.PureScript.Ide.CaseSplit
+import           Language.PureScript.Ide.Completion
 import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Types
@@ -35,6 +36,7 @@ data Command
       { completeFilters       :: [Filter]
       , completeMatcher       :: Matcher IdeDeclarationAnn
       , completeCurrentModule :: Maybe P.ModuleName
+      , completeOptions       :: CompletionOptions
       }
     | Pursuit
       { pursuitQuery      :: PursuitQuery
@@ -129,6 +131,7 @@ instance FromJSON Command where
           <$> params .:? "filters" .!= []
           <*> params .:? "matcher" .!= mempty
           <*> (fmap P.moduleNameFromString <$> params .:? "currentModule")
+          <*> params .:? "options" .!= defaultCompletionOptions
       "pursuit" -> do
         params <- o .: "params"
         Pursuit
