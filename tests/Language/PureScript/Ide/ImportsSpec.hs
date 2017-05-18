@@ -120,6 +120,13 @@ spec = do
         [ "import Data.Map"
         , "import Prelude"
         ]
+    it "adds a qualified import" $
+      shouldBe
+        (addQualifiedImport' simpleFileImports (Test.mn "Data.Map") (Test.mn "Map"))
+        [ "import Prelude"
+        , ""
+        , "import Data.Map as Map"
+        ]
     it "adds an explicit unqualified import to a file without any imports" $
       shouldBe
         (addValueImport "head" (P.moduleNameFromString "Data.Array") [])

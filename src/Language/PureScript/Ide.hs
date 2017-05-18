@@ -75,6 +75,9 @@ handleCommand c = case c of
   Import fp outfp _ (AddImplicitImport mn) -> do
     rs <- addImplicitImport fp mn
     answerRequest outfp rs
+  Import fp outfp _ (AddQualifiedImport mn qual) -> do
+    rs <- addQualifiedImport fp mn qual
+    answerRequest outfp rs
   Import fp outfp filters (AddImportForIdentifier ident) -> do
     rs <- addImportForIdentifier fp ident filters
     case rs of

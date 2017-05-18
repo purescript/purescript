@@ -14,6 +14,7 @@
 
 module Language.PureScript.Ide.Imports
        ( addImplicitImport
+       , addQualifiedImport
        , addImportForIdentifier
        , answerRequest
        , parseImportsFromFile
@@ -21,6 +22,7 @@ module Language.PureScript.Ide.Imports
        , parseImport
        , prettyPrintImportSection
        , addImplicitImport'
+       , addQualifiedImport'
        , addExplicitImport'
        , sliceImportSection
        , prettyPrintImport'
@@ -122,10 +124,11 @@ sliceImportSection fileLines = first show $ do
       & ix (l2 - l1) %~ T.take c2
 
 -- | Adds an implicit import like @import Prelude@ to a Sourcefile.
-addImplicitImport :: (MonadIO m, MonadError IdeError m)
-                     => FilePath     -- ^ The Sourcefile read from
-                     -> P.ModuleName -- ^ The module to import
-                     -> m [Text]
+addImplicitImport
+  :: (MonadIO m, MonadError IdeError m)
+  => FilePath     -- ^ The source file read from
+  -> P.ModuleName -- ^ The module to import
+  -> m [Text]
 addImplicitImport fp mn = do
   (_, pre, imports, post) <- parseImportsFromFile' fp
   let newImportSection = addImplicitImport' imports mn
@@ -134,6 +137,25 @@ addImplicitImport fp mn = do
 addImplicitImport' :: [Import] -> P.ModuleName -> [Text]
 addImplicitImport' imports mn =
   prettyPrintImportSection (Import mn P.Implicit Nothing : imports)
+
+-- | Adds a qualified import like @import Data.Map as Map@ to a source file.
+addQualifiedImport
+  :: (MonadIO m, MonadError IdeError m)
+  => FilePath
+  -- ^ The sourcefile read from
+  -> P.ModuleName
+  -- ^ The module to import
+  -> P.ModuleName
+  -- ^ The qualifier under which to import
+  -> m [Text]
+addQualifiedImport fp mn qualifier = do
+  (_, pre, imports, post) <- parseImportsFromFile' fp
+  let newImportSection = addQualifiedImport' imports mn qualifier
+  pure (pre ++ newImportSection ++ post)
+
+addQualifiedImport' :: [Import] -> P.ModuleName -> P.ModuleName -> [Text]
+addQualifiedImport' imports mn qualifier =
+  prettyPrintImportSection (Import mn P.Implicit (Just qualifier) : imports)
 
 -- | Adds an explicit import like @import Prelude (unit)@ to a Sourcefile. If an
 -- explicit import already exists for the given module, it adds the identifier
