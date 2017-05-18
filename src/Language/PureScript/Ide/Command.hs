@@ -81,6 +81,7 @@ commandName c = case c of
 
 data ImportCommand
   = AddImplicitImport P.ModuleName
+  | AddQualifiedImport P.ModuleName P.ModuleName
   | AddImportForIdentifier Text
   deriving (Show, Eq)
 
@@ -90,6 +91,10 @@ instance FromJSON ImportCommand where
     case command of
       "addImplicitImport" ->
         AddImplicitImport <$> (P.moduleNameFromString <$> o .: "module")
+      "addQualifiedImport" ->
+        AddQualifiedImport
+          <$> (P.moduleNameFromString <$> o .: "module")
+          <*> (P.moduleNameFromString <$> o .: "qualifier")
       "addImport" ->
         AddImportForIdentifier <$> o .: "identifier"
       _ -> mzero

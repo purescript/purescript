@@ -231,6 +231,29 @@ Example:
   }
 }
 ```
+
+#### Subcommand `addQualifiedImport`
+
+This command adds an import for the given modulename and qualifier.
+
+Arguments:
+- `moduleName :: String`
+
+Example:
+```json
+{
+  "command": "import",
+  "params": {
+    "file": "/home/creek/Documents/chromacannon/src/Main.purs",
+    "importCommand": {
+      "importCommand": "addQualifiedImport",
+      "module": "Data.Array",
+      "qualifier": "Array"
+    }
+  }
+}
+```
+
 #### Subcommand `addImport`
 
 This command takes an identifier and searches the currently loaded modules for
