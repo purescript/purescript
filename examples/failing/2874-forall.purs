@@ -1,5 +1,5 @@
--- @shouldFailWith "forall"
-module A where
+-- @shouldFailWith ErrorParsingModule
+module Main where
 
 class T a b | a -> b
 instance tT :: (T Int (forall a. a)) => T Int String

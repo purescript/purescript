@@ -1,4 +1,5 @@
-module B where
+-- @shouldFailWith ErrorParsingModule
+module Main where
 
 class X a b | a -> b
 class X a (forall t. t) <= Y a b | a -> b

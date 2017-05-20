@@ -1,8 +1,5 @@
--- @shouldFailWith "type wildcard"
-
-module Lib where
-
-import Prelude
+-- @shouldFailWith ErrorParsingModule
+module Main where
 
 class Foo a where
   foo :: a
