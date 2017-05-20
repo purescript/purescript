@@ -216,6 +216,13 @@ containsWildcards = everythingOnTypes (||) go where
   go TypeWildcard{} = True
   go _ = False
 
+-- | Check if a type contains `forall`
+containsForAll :: Type -> Bool
+containsForAll = everythingOnTypes (||) go where
+  go :: Type -> Bool
+  go ForAll{} = True
+  go _ = False
+
 everywhereOnTypes :: (Type -> Type) -> Type -> Type
 everywhereOnTypes f = go where
   go (TypeApp t1 t2) = f (TypeApp (go t1) (go t2))
