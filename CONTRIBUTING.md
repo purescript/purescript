@@ -23,7 +23,7 @@ To build and run a specific test in `examples/passing/` or `examples/failing/`, 
 
 ``` bash
 # Build
-stack exec psc -- 'tests/support/bower_components/purescript-*/src/**/*.purs' examples/blah/Blah.purs
+stack exec purs -- compile 'tests/support/bower_components/purescript-*/src/**/*.purs' examples/blah/Blah.purs
 
 # Run
 node -e "require('./output/Main/').main()"
