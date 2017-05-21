@@ -122,15 +122,15 @@ emptyAnn = Annotation Nothing Nothing Nothing
 type DefinitionSites a = Map IdeNamespaced a
 type TypeAnnotations = Map P.Ident P.Type
 newtype AstData a = AstData (ModuleMap (DefinitionSites a, TypeAnnotations))
-  -- ^ SourceSpans for the definition sites of Values and Types aswell as type
+  -- ^ SourceSpans for the definition sites of values and types as well as type
   -- annotations found in a module
   deriving (Show, Eq, Ord, Functor, Foldable)
 
 data IdeLogLevel = LogDebug | LogPerf | LogAll | LogDefault | LogNone
   deriving (Show, Eq)
 
-data Configuration =
-  Configuration
+data IdeConfiguration =
+  IdeConfiguration
   { confOutputPath :: FilePath
   , confLogLevel   :: IdeLogLevel
   , confGlobs      :: [FilePath]
@@ -139,41 +139,47 @@ data Configuration =
 data IdeEnvironment =
   IdeEnvironment
   { ideStateVar      :: TVar IdeState
-  , ideConfiguration :: Configuration
+  , ideConfiguration :: IdeConfiguration
   }
 
 type Ide m = (MonadIO m, MonadReader IdeEnvironment m)
 
 data IdeState = IdeState
-  { ideStage1 :: Stage1
-  , ideStage2 :: Stage2
-  , ideStage3 :: Stage3
+  { ideFileState     :: IdeFileState
+  , ideVolatileState :: IdeVolatileState
   } deriving (Show)
 
 emptyIdeState :: IdeState
-emptyIdeState = IdeState emptyStage1 emptyStage2 emptyStage3
+emptyIdeState = IdeState emptyFileState emptyVolatileState
 
-emptyStage1 :: Stage1
-emptyStage1 = Stage1 M.empty M.empty
+emptyFileState :: IdeFileState
+emptyFileState = IdeFileState M.empty M.empty
 
-emptyStage2 :: Stage2
-emptyStage2 = Stage2 (AstData M.empty)
+emptyVolatileState :: IdeVolatileState
+emptyVolatileState = IdeVolatileState (AstData M.empty) M.empty Nothing
 
-emptyStage3 :: Stage3
-emptyStage3 = Stage3 M.empty Nothing
 
-data Stage1 = Stage1
-  { s1Externs :: ModuleMap P.ExternsFile
-  , s1Modules :: ModuleMap (P.Module, FilePath)
+-- | @IdeFileState@ holds data that corresponds 1-to-1 to an entity on the
+-- filesystem. Externs correspond to the ExternsFiles the compiler emits into
+-- the output folder, and modules are parsed ASTs from source files. This means,
+-- that we can update single modules or ExternsFiles inside this state whenever
+-- the corresponding entity changes on the file system.
+data IdeFileState = IdeFileState
+  { fsExterns :: ModuleMap P.ExternsFile
+  , fsModules :: ModuleMap (P.Module, FilePath)
   } deriving (Show)
 
-data Stage2 = Stage2
-  { s2AstData :: AstData P.SourceSpan
-  } deriving (Show, Eq)
-
-data Stage3 = Stage3
-  { s3Declarations  :: ModuleMap [IdeDeclarationAnn]
-  , s3CachedRebuild :: Maybe (P.ModuleName, P.ExternsFile)
+-- | @IdeVolatileState@ is derived from the @IdeFileState@ and needs to be
+-- invalidated and refreshed carefully. It holds @AstData@, which is the data we
+-- extract from the parsed ASTs, as well as the IdeDeclarations, which contain
+-- lots of denormalized data, so they need to fully rebuilt whenever
+-- @IdeFileState@ changes. The vsCachedRebuild field can hold a rebuild result
+-- with open imports which is used to provide completions for module private
+-- declarations
+data IdeVolatileState = IdeVolatileState
+  { vsAstData       :: AstData P.SourceSpan
+  , vsDeclarations  :: ModuleMap [IdeDeclarationAnn]
+  , vsCachedRebuild :: Maybe (P.ModuleName, P.ExternsFile)
   } deriving (Show)
 
 newtype Match a = Match (P.ModuleName, a)

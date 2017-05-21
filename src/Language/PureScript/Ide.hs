@@ -175,7 +175,7 @@ findAllSourceFiles = do
 -- | Looks up the ExternsFiles for the given Modulenames and loads them into the
 -- server state. Then proceeds to parse all the specified sourcefiles and
 -- inserts their ASTs into the state. Finally kicks off an async worker, which
--- populates Stage 2 and 3 of the state.
+-- populates the VolatileState.
 loadModulesAsync
   :: (Ide m, MonadError IdeError m, MonadLogger m)
   => [P.ModuleName]
@@ -187,9 +187,9 @@ loadModulesAsync moduleNames = do
   -- successfully parsed modules.
   env <- ask
   let ll = confLogLevel (ideConfiguration env)
-  -- populateStage2 and 3 return Unit for now, so it's fine to discard this
+  -- populateVolatileState return Unit for now, so it's fine to discard this
   -- result. We might want to block on this in a benchmarking situation.
-  _ <- liftIO (async (runLogger ll (runReaderT (populateStage2 *> populateStage3) env)))
+  _ <- liftIO (async (runLogger ll (runReaderT populateVolatileState env)))
   pure tr
 
 loadModulesSync
@@ -198,7 +198,7 @@ loadModulesSync
   -> m Success
 loadModulesSync moduleNames = do
   tr <- loadModules moduleNames
-  populateStage2 *> populateStage3
+  populateVolatileState
   pure tr
 
 loadModules

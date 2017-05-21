@@ -94,7 +94,7 @@ getLocation s = do
     runIde' defConfig ideState [Type s [] Nothing]
   pure (complLocation c)
   where
-    ideState = emptyIdeState `s3`
+    ideState = emptyIdeState `volatileState`
       [ ("Test",
          [ ideValue "sfValue" Nothing `annLoc` valueSS
          , ideSynonym "SFType" P.tyString P.kindType `annLoc` synonymSS

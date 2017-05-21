@@ -39,7 +39,7 @@ reloadFile logLevel ref ev = runLogger logLevel $ do
     Left err ->
       logErrorN ("Failed to reload file at: " <> toS fp <> " with error: " <> show err)
     Right ef -> do
-      lift $ void $ atomically (insertExternsSTM ref ef *> populateStage3STM ref)
+      lift $ void $ atomically (insertExternsSTM ref ef *> populateVolatileStateSTM ref)
       logDebugN ("Reloaded File at: " <> toS fp)
 
 -- | Installs filewatchers for the given directory and reloads ExternsFiles when
