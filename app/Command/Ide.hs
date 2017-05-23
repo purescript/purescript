@@ -170,9 +170,9 @@ startServer port env = withSocketsDo $ do
                       <> displayTimeSpec duration
               logPerf message $ do
                 result <- runExceptT (handleCommand cmd')
-                case result of
-                  Right r  -> liftIO $ catchGoneHandle (BSL8.hPutStrLn h (Aeson.encode r))
-                  Left err -> liftIO $ catchGoneHandle (BSL8.hPutStrLn h (Aeson.encode err))
+                liftIO $ catchGoneHandle $ BSL8.hPutStrLn h $ case result of
+                  Right r  -> Aeson.encode r
+                  Left err -> Aeson.encode err
               liftIO (hFlush stdout)
             Nothing -> do
               $(logError) ("Parsing the command failed. Command: " <> cmd)
