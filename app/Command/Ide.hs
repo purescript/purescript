@@ -164,15 +164,16 @@ startServer port env = withSocketsDo $ do
           case decodeT cmd of
             Just cmd' -> do
               let message duration =
-                    "Command " <> commandName cmd'
-                    <> " took "
-                    <> displayTimeSpec duration
-              result <- logPerf message (runExceptT (handleCommand cmd'))
-              -- $(logDebug) ("Answer was: " <> T.pack (show result))
+                    "Command "
+                      <> commandName cmd'
+                      <> " took "
+                      <> displayTimeSpec duration
+              logPerf message $ do
+                result <- runExceptT (handleCommand cmd')
+                liftIO $ catchGoneHandle $ BSL8.hPutStrLn h $ case result of
+                  Right r  -> Aeson.encode r
+                  Left err -> Aeson.encode err
               liftIO (hFlush stdout)
-              case result of
-                Right r  -> liftIO $ catchGoneHandle (BSL8.hPutStrLn h (Aeson.encode r))
-                Left err -> liftIO $ catchGoneHandle (BSL8.hPutStrLn h (Aeson.encode err))
             Nothing -> do
               $(logError) ("Parsing the command failed. Command: " <> cmd)
               liftIO $ do
