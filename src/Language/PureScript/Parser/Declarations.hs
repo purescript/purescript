@@ -216,8 +216,14 @@ parseTypeInstanceDeclaration = do
   instanceDecl <- parseInstanceDeclaration
   members <- P.option [] $ do
     indented *> reserved "where"
-    mark (P.many (same *> positioned parseValueDeclaration))
+    mark (P.many (same *> positioned declsInInstance))
   return $ instanceDecl (ExplicitInstance members)
+  where
+    declsInInstance :: TokenParser Declaration
+    declsInInstance = P.choice
+      [ parseTypeDeclaration
+      , parseValueDeclaration
+      ] P.<?> "type declaration or value declaration in instance"
 
 parseDerivingInstanceDeclaration :: TokenParser Declaration
 parseDerivingInstanceDeclaration = do
