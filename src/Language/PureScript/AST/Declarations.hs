@@ -110,6 +110,7 @@ data SimpleErrorMessage
   | ExpectedTypeConstructor (Qualified (ProperName 'ClassName)) [Type] Type
   | InvalidNewtypeInstance (Qualified (ProperName 'ClassName)) [Type]
   | MissingNewtypeSuperclassInstance (Qualified (ProperName 'ClassName)) (Qualified (ProperName 'ClassName)) [Type]
+  | UnverifiableSuperclassInstance (Qualified (ProperName 'ClassName)) (Qualified (ProperName 'ClassName)) [Type]
   | CannotFindDerivingType (ProperName 'TypeName)
   | DuplicateLabel Label (Maybe Expr)
   | DuplicateValueDeclaration Ident

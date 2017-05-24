@@ -231,13 +231,20 @@ deriveNewtypeInstance mn syns ndis className ds tys tyConNm dargs = do
         for_ superclasses $ \Constraint{..} -> do
           -- We need to check whether the newtype is mentioned, because of classes like MonadWriter
           -- with its Monoid superclass constraint.
-          when (not (null args) && not (null constraintArgs) && TypeVar (last args) == last constraintArgs) $ do
-            -- Now make sure that a superclass instance was derived. Again, this is not a complete
-            -- check, since the superclass might have multiple type arguments, so overlaps might still
-            -- be possible, so we warn again.
-            for_ (extractNewtypeName mn tys) $ \nm ->
-              unless ((qualify (error "verifySuperclasses: unknown class module") constraintClass, nm) `S.member` ndiDerivedInstances ndis) $
-                tell . errorMessage $ MissingNewtypeSuperclassInstance constraintClass className tys
+          when (not (null args) && any ((last args `elem`) . usedTypeVariables) constraintArgs) $ do
+            -- For now, we only verify superclasses where the newtype is the only argument.
+            -- Everything else raises a UnverifiableSuperclassInstance warning.
+            -- This covers pretty much all cases we're interested in, but later we might want to do
+            -- more work to extend this to other superclass relationships.
+            if (constraintArgs == [TypeVar (last args)])
+              then do
+                -- Now make sure that a superclass instance was derived. Again, this is not a complete
+                -- check, since the superclass might have multiple type arguments, so overlaps might still
+                -- be possible, so we warn again.
+                for_ (extractNewtypeName mn tys) $ \nm ->
+                  unless ((qualify (error "verifySuperclasses: unknown class module") constraintClass, nm) `S.member` ndiDerivedInstances ndis) $
+                    tell . errorMessage $ MissingNewtypeSuperclassInstance constraintClass className tys
+              else tell . errorMessage $ UnverifiableSuperclassInstance constraintClass className tys
 
 dataGeneric :: ModuleName
 dataGeneric = ModuleName [ ProperName "Data", ProperName "Generic" ]
