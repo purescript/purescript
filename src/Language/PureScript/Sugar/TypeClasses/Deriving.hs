@@ -2,6 +2,7 @@
 module Language.PureScript.Sugar.TypeClasses.Deriving (deriveInstances) where
 
 import           Prelude.Compat
+import           Protolude (ordNub)
 
 import           Control.Arrow (second)
 import           Control.Monad (replicateM, zipWithM, unless, when)
@@ -35,7 +36,7 @@ import           Language.PureScript.TypeChecker.Synonyms (SynonymMap, replaceAl
 -- instances were derived in the same way. This data structure is used to ensure
 -- this property.
 data NewtypeDerivedInstances = NewtypeDerivedInstances
-  { ndiSuperclasses :: M.Map (ModuleName, ProperName 'ClassName) ([Text], [Constraint])
+  { ndiClasses :: M.Map (ModuleName, ProperName 'ClassName) ([Text], [Constraint], [FunctionalDependency])
   -- ^ A list of superclass constraints for each type class. Since type classes
   -- have not been desugared here, we need to track this.
   , ndiDerivedInstances :: S.Set ((ModuleName, ProperName 'ClassName), (ModuleName, ProperName 'TypeName))
@@ -45,7 +46,7 @@ data NewtypeDerivedInstances = NewtypeDerivedInstances
 instance Monoid NewtypeDerivedInstances where
   mempty = NewtypeDerivedInstances mempty mempty
   mappend x y =
-    NewtypeDerivedInstances { ndiSuperclasses     = ndiSuperclasses     x <> ndiSuperclasses     y
+    NewtypeDerivedInstances { ndiClasses          = ndiClasses          x <> ndiClasses          y
                             , ndiDerivedInstances = ndiDerivedInstances x <> ndiDerivedInstances y
                             }
 
@@ -93,13 +94,13 @@ deriveInstances externs (Module ss coms mn ds exts) =
         foldMap (\ExternsFile{..} -> foldMap (fromExternsDecl efModuleName) efDeclarations) externs <> foldMap fromLocalDecl ds
       where
         fromExternsDecl mn' EDClass{..} =
-          NewtypeDerivedInstances (M.singleton (mn', edClassName) (map fst edClassTypeArguments, edClassConstraints)) mempty
+          NewtypeDerivedInstances (M.singleton (mn', edClassName) (map fst edClassTypeArguments, edClassConstraints, edFunctionalDependencies)) mempty
         fromExternsDecl mn' EDInstance{..} =
           foldMap (\nm -> NewtypeDerivedInstances mempty (S.singleton (qualify mn' edInstanceClassName, nm))) (extractNewtypeName mn' edInstanceTypes)
         fromExternsDecl _ _ = mempty
 
-        fromLocalDecl (TypeClassDeclaration cl args cons _ _) =
-          NewtypeDerivedInstances (M.singleton (mn, cl) (map fst args, cons)) mempty
+        fromLocalDecl (TypeClassDeclaration cl args cons deps _) =
+          NewtypeDerivedInstances (M.singleton (mn, cl) (map fst args, cons, deps)) mempty
         fromLocalDecl (TypeInstanceDeclaration _ _ cl tys _) =
           foldMap (\nm -> NewtypeDerivedInstances mempty (S.singleton (qualify mn cl, nm))) (extractNewtypeName mn tys)
         fromLocalDecl (PositionedDeclaration _ _ d) = fromLocalDecl d
@@ -227,24 +228,28 @@ deriveNewtypeInstance mn syns ndis className ds tys tyConNm dargs = do
 
     verifySuperclasses :: m ()
     verifySuperclasses =
-      for_ (M.lookup (qualify mn className) (ndiSuperclasses ndis)) $ \(args, superclasses) ->
+      for_ (M.lookup (qualify mn className) (ndiClasses ndis)) $ \(args, superclasses, _) ->
         for_ superclasses $ \Constraint{..} -> do
-          -- We need to check whether the newtype is mentioned, because of classes like MonadWriter
-          -- with its Monoid superclass constraint.
-          when (not (null args) && any ((last args `elem`) . usedTypeVariables) constraintArgs) $ do
-            -- For now, we only verify superclasses where the newtype is the only argument.
-            -- Everything else raises a UnverifiableSuperclassInstance warning.
-            -- This covers pretty much all cases we're interested in, but later we might want to do
-            -- more work to extend this to other superclass relationships.
-            if (constraintArgs == [TypeVar (last args)])
-              then do
-                -- Now make sure that a superclass instance was derived. Again, this is not a complete
-                -- check, since the superclass might have multiple type arguments, so overlaps might still
-                -- be possible, so we warn again.
-                for_ (extractNewtypeName mn tys) $ \nm ->
-                  unless ((qualify (error "verifySuperclasses: unknown class module") constraintClass, nm) `S.member` ndiDerivedInstances ndis) $
-                    tell . errorMessage $ MissingNewtypeSuperclassInstance constraintClass className tys
-              else tell . errorMessage $ UnverifiableSuperclassInstance constraintClass className tys
+          let constraintClass' = qualify (error "verifySuperclasses: unknown class module") constraintClass
+          for_ (M.lookup constraintClass' (ndiClasses ndis)) $ \(_, _, deps) ->
+            -- We need to check whether the newtype is mentioned, because of classes like MonadWriter
+            -- with its Monoid superclass constraint.
+            when (not (null args) && any ((last args `elem`) . usedTypeVariables) constraintArgs) $ do
+              -- For now, we only verify superclasses where the newtype is the only argument,
+              -- or for which all other arguments are determined by functional dependencies.
+              -- Everything else raises a UnverifiableSuperclassInstance warning.
+              -- This covers pretty much all cases we're interested in, but later we might want to do
+              -- more work to extend this to other superclass relationships.
+              let determined = map (TypeVar . (args !!)) . ordNub . concatMap fdDetermined . filter ((== [length args - 1]) . fdDeterminers) $ deps
+              if last constraintArgs == TypeVar (last args) && all (`elem` determined) (init constraintArgs)
+                then do
+                  -- Now make sure that a superclass instance was derived. Again, this is not a complete
+                  -- check, since the superclass might have multiple type arguments, so overlaps might still
+                  -- be possible, so we warn again.
+                  for_ (extractNewtypeName mn tys) $ \nm ->
+                    unless ((constraintClass', nm) `S.member` ndiDerivedInstances ndis) $
+                      tell . errorMessage $ MissingNewtypeSuperclassInstance constraintClass className tys
+                else tell . errorMessage $ UnverifiableSuperclassInstance constraintClass className tys
 
 dataGeneric :: ModuleName
 dataGeneric = ModuleName [ ProperName "Data", ProperName "Generic" ]
