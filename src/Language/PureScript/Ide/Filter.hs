@@ -46,16 +46,7 @@ namespaceFilter namespaces =
   mkFilter (filterModuleDecls filterNamespaces)
   where
     filterNamespaces :: IdeDeclaration -> Bool
-    filterNamespaces decl = elem (namespace decl) namespaces
-    namespace :: IdeDeclaration -> IdeNamespace
-    namespace (IdeDeclValue _)           = IdeNSValue
-    namespace (IdeDeclType _)            = IdeNSType
-    namespace (IdeDeclTypeSynonym _)     = IdeNSType
-    namespace (IdeDeclDataConstructor _) = IdeNSValue
-    namespace (IdeDeclTypeClass _)       = IdeNSType
-    namespace (IdeDeclValueOperator _)   = IdeNSValue
-    namespace (IdeDeclTypeOperator _)    = IdeNSType
-    namespace (IdeDeclKind _)            = IdeNSKind
+    filterNamespaces decl = elem (namespaceForDeclaration decl) namespaces
 
 -- | Only keeps the given Modules
 moduleFilter :: [P.ModuleName] -> Filter

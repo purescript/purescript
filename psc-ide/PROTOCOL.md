@@ -82,6 +82,7 @@ The `complete` command looks up possible completions/corrections.
     "currentModule": "Main",
     "options": {
       "maxResults": 50
+      "groupReexports": ["Prelude", "Data.Array", "Data.List"]
     }
   }
 }
@@ -613,6 +614,12 @@ Completion options allow to configure the number of returned completion results.
 
 If specified limits the number of completion results, otherwise return all
 results.
+
+- groupReexports :: Maybe (Array String)
+
+If specified groups reexports under their original module and prefers the
+specified set of modules.
+
 
 ### Error
 

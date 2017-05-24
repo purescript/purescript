@@ -18,6 +18,7 @@ module Language.PureScript.Ide.Util
   , unwrapPositioned
   , unwrapPositionedRef
   , completionFromMatch
+  , namespaceForDeclaration
   , encodeT
   , decodeT
   , discardAnn
@@ -55,6 +56,17 @@ identifierFromIdeDeclaration d = case d of
   IdeDeclValueOperator op -> op ^. ideValueOpName & P.runOpName
   IdeDeclTypeOperator op -> op ^. ideTypeOpName & P.runOpName
   IdeDeclKind name -> P.runProperName name
+
+namespaceForDeclaration :: IdeDeclaration -> IdeNamespace
+namespaceForDeclaration d = case d of
+  IdeDeclValue _ -> IdeNSValue
+  IdeDeclType _ -> IdeNSType
+  IdeDeclTypeSynonym _ -> IdeNSType
+  IdeDeclDataConstructor _ -> IdeNSValue
+  IdeDeclTypeClass _ -> IdeNSType
+  IdeDeclValueOperator _ -> IdeNSValue
+  IdeDeclTypeOperator _ -> IdeNSType
+  IdeDeclKind _ -> IdeNSKind
 
 discardAnn :: IdeDeclarationAnn -> IdeDeclaration
 discardAnn (IdeDeclarationAnn _ d) = d
