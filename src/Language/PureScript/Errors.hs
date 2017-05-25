@@ -21,6 +21,7 @@ import           Data.Functor.Identity (Identity(..))
 import           Data.List (transpose, nubBy, sort, partition, dropWhileEnd)
 import           Data.Maybe (maybeToList, fromMaybe, mapMaybe)
 import qualified Data.Map as M
+import qualified Data.Set as S
 import qualified Data.Text as T
 import           Data.Text (Text)
 import           Language.PureScript.AST
@@ -800,14 +801,61 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                       zipWith (Box.<>)
                       (Box.alignHoriz Box.left longestId <$> idBoxes)
                       tyBoxes
-            in [ line "You could substitute the hole with one of these values:"
-               , markCodeBox (indent (formatTS (unzip (take maxTSResults idents))))
-               ]
+              (xs, ys) = partition conditions idents
+              makeCodeBox = markCodeBox . indent . formatTS . unzip . take maxTSResults
+              normalSuggestions = case xs of
+                [] -> [ line "There were no good substitutions for the hole." ]
+                _ ->
+                  [ line "You could substitute the hole with one of these values:"
+                  , makeCodeBox xs
+                  ]
+              lessDesirables = case ys of
+                [] -> []
+                _ ->
+                  [ line "You may also want these, but these may be less useful:"
+                  , makeCodeBox ys
+                  ]
+            in
+              normalSuggestions <> lessDesirables
           _ -> []
       in
         paras $ [ line $ "Hole '" <> markCode name <> "' has the inferred type "
                 , markCodeBox (indent (typeAsBox ty))
                 ] ++ tsResult ++ renderContext ctx
+          where
+            conditions (_, t) =
+              case split of
+                rhs : lhs ->
+                  let
+                    lhs' = S.fromList (concat lhs)
+                    rhs' = S.fromList rhs
+                    cvars' = S.fromList cvars
+                  in
+                    resultVariablesInConstraints cvars' rhs' ||
+                      rightSideAppearsElsewhere lhs' rhs'
+                [] -> True
+              where
+                cvars = getConstrainedVariables t
+                split = usedTypeVariables <$> reverse (splitFunctionType t)
+            rightSideAppearsElsewhere lhs rhs =
+              not . S.null $ S.intersection lhs rhs
+            resultVariablesInConstraints cvars rhs =
+              not . S.null $ S.intersection cvars rhs
+            getConstrainedVariables :: Type -> [Text]
+            getConstrainedVariables t = go t
+              where
+                go (ForAll _ t' _) = go t'
+                go (ConstrainedType (Constraint{constraintArgs=args}) t') =
+                  (concat $ usedTypeVariables <$> args) <> go t'
+                go _ = []
+            splitFunctionType :: Type -> [Type]
+            splitFunctionType t = go t
+              where
+                go (ForAll _ t' _) = go t'
+                go (ConstrainedType _ t') = go t'
+                go (TypeApp (TypeApp t' lhs) rhs)
+                      | isFunction t' = lhs : go rhs
+                go t' = [t']
     renderSimpleErrorMessage (MissingTypeDeclaration ident ty) =
       paras [ line $ "No type declaration was provided for the top-level declaration of " <> markCode (showIdent ident) <> "."
             , line "It is good practice to provide type declarations as a form of documentation."
