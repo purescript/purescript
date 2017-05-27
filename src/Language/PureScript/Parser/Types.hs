@@ -1,6 +1,7 @@
 module Language.PureScript.Parser.Types
   ( parseType
   , parsePolyType
+  , noForAll
   , noWildcards
   , parseTypeAtom
   ) where
@@ -51,6 +52,16 @@ parseTypeConstructor = TypeConstructor <$> parseQualified typeName
 parseForAll :: TokenParser Type
 parseForAll = mkForAll <$> ((reserved "forall" <|> reserved "∀") *> P.many1 (indented *> identifier) <* indented <* dot)
                        <*> parseType
+
+
+-- |
+-- Parse an atomic type with no `forall`
+--
+noForAll :: TokenParser Type -> TokenParser Type
+noForAll p = do
+ ty <- p
+ when (containsForAll ty) $ P.unexpected "forall"
+ return ty
 
 -- |
 -- Parse a type as it appears in e.g. a data constructor

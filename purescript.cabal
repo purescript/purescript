@@ -86,6 +86,9 @@ extra-source-files:
       examples/failing/2601.purs
       examples/failing/2616.purs
       examples/failing/2806.purs
+      examples/failing/2874-forall.purs
+      examples/failing/2874-forall2.purs
+      examples/failing/2874-wildcard.purs
       examples/failing/365.purs
       examples/failing/438.purs
       examples/failing/881.purs
