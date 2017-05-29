@@ -176,7 +176,7 @@ makeActions foreigns = (P.buildMakeActions modulesDir (P.internalError "makeActi
   where
   getInputTimestamp :: P.ModuleName -> P.Make (Either P.RebuildPolicy (Maybe UTCTime))
   getInputTimestamp mn
-    | isSupportModule (T.unpack (P.runModuleName mn)) = return (Left P.RebuildNever)
+    | isSupportModule (P.runModuleName mn) = return (Left P.RebuildNever)
     | otherwise = return (Left P.RebuildAlways)
     where
     isSupportModule = flip elem supportModules

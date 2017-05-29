@@ -59,14 +59,14 @@ updateSupportCode = do
 -- The support modules that should be cached between test cases, to avoid
 -- excessive rebuilding.
 --
-supportModules :: [String]
+supportModules :: [T.Text]
 supportModules = unsafePerformIO $ do
   cd <- getCurrentDirectory
   let supportDir = cd </> "tests" </> "support" </> "bower_components"
   supportPurs <- Glob.globDir1 (Glob.compile "purescript-*/src/**/*.purs") supportDir
   supportPursFiles <- readInput supportPurs
   Right modules <- runExceptT $ ExceptT . return $ P.parseModulesFromFiles id supportPursFiles
-  return $ sort $ map (T.unpack . P.runModuleName . P.getModuleName . snd) modules
+  return $ sort $ map (P.runModuleName . P.getModuleName . snd) modules
   where
   readInput :: [FilePath] -> IO [(FilePath, T.Text)]
   readInput inputFiles = forM inputFiles $ \inputFile -> do

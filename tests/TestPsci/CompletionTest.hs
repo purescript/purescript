@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module TestPsci.CompletionTest where
 
 import Prelude ()
@@ -65,7 +66,7 @@ completionTestData =
 
   -- a few other import tests
   , ("impor", ["import"])
-  , ("import ", map ("import " ++) supportModules)
+  , ("import ", map (T.unpack . mappend "import ") supportModules)
   , ("import Prelude ", [])
 
   -- String and number literals should not be completed
@@ -99,10 +100,10 @@ runCM act = do
 getPSCiStateForCompletion :: IO PSCiState
 getPSCiStateForCompletion = do
   (PSCiState _ bs es, _) <- initTestPSCiEnv
-  let imports = [controlMonadSTasST, (P.ModuleName [P.ProperName (T.pack "Prelude")], P.Implicit, Nothing)]
+  let imports = [controlMonadSTasST, (P.ModuleName [P.ProperName "Prelude"], P.Implicit, Nothing)]
   return $ PSCiState imports bs es
 
 controlMonadSTasST :: ImportedModule
 controlMonadSTasST = (s "Control.Monad.ST", P.Implicit, Just (s "ST"))
   where
-  s = P.moduleNameFromString . T.pack
+  s = P.moduleNameFromString
