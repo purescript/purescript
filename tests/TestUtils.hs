@@ -98,6 +98,7 @@ supportModules =
   , "Data.Char"
   , "Data.Char.Gen"
   , "Data.CommutativeRing"
+  , "Data.Distributive"
   , "Data.Either"
   , "Data.Either.Nested"
   , "Data.Eq"
