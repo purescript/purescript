@@ -38,7 +38,7 @@ getCompletions filters matcher options modules =
   & matchesFromModules
   & runMatcher matcher
   & applyCompletionOptions options
-  & map completionFromMatch
+  <&> completionFromMatch
 
 getExactMatches :: Text -> [Filter] -> [Module] -> [Match IdeDeclarationAnn]
 getExactMatches search filters modules =
@@ -50,8 +50,8 @@ getExactCompletions :: Text -> [Filter] -> [Module] -> [Completion]
 getExactCompletions search filters modules =
   modules
   & getExactMatches search filters
-  & map simpleExport
-  & map completionFromMatch
+  <&> simpleExport
+  <&> completionFromMatch
 
 matchesFromModules :: [Module] -> [Match IdeDeclarationAnn]
 matchesFromModules = foldMap completionFromModule
