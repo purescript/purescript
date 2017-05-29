@@ -108,7 +108,8 @@ couldn't be extracted from a source file.
     "start": [1, 3],
     "end": [3, 1]
     },
-  "documentation": "A filtering function"
+  "documentation": "A filtering function",
+  "exportedFrom": ["Data.Array"]
   }
 ]
 ```
@@ -615,11 +616,12 @@ Completion options allow to configure the number of returned completion results.
 If specified limits the number of completion results, otherwise return all
 results.
 
-- groupReexports :: Maybe (Array String)
+- groupReexports :: Maybe Boolean (defaults to False)
 
-If specified groups reexports under their original module and prefers the
-specified set of modules.
-
+If set to True, groups all reexports of an identifier under the module it
+originated from (the original export is also treated as a "reexport"). These
+reexports then populate the `exportedFrom` field in their completion results and
+the `module` field contains the originating module.
 
 ### Error
 
