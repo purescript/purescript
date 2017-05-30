@@ -61,26 +61,23 @@ main = hspec spec
 spec :: Spec
 spec = do
 
-  (supportExterns, supportForeigns, passingTestCases, warningTestCases, failingTestCases) <- runIO $ do
+  (supportModules, supportExterns, supportForeigns, passingTestCases, warningTestCases, failingTestCases) <- runIO $ do
     cwd <- getCurrentDirectory
     let passing = cwd </> "examples" </> "passing"
     let warning = cwd </> "examples" </> "warning"
     let failing = cwd </> "examples" </> "failing"
-    let supportDir = cwd </> "tests" </> "support" </> "bower_components"
-    let supportFiles ext = Glob.globDir1 (Glob.compile ("purescript-*/src/**/*." ++ ext)) supportDir
     passingFiles <- getTestFiles passing <$> testGlob passing
     warningFiles <- getTestFiles warning <$> testGlob warning
     failingFiles <- getTestFiles failing <$> testGlob failing
-    supportPurs <- supportFiles "purs"
-    supportPursFiles <- readInput supportPurs
+    ms <- getSupportModuleTuples
+    let modules = map snd ms
     supportExterns <- runExceptT $ do
-      modules <- ExceptT . return $ P.parseModulesFromFiles id supportPursFiles
-      foreigns <- inferForeignModules modules
-      externs <- ExceptT . fmap fst . runTest $ P.make (makeActions foreigns) (map snd modules)
-      return (zip (map snd modules) externs, foreigns)
+      foreigns <- inferForeignModules ms
+      externs <- ExceptT . fmap fst . runTest $ P.make (makeActions modules foreigns) modules
+      return (externs, foreigns)
     case supportExterns of
       Left errs -> fail (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
-      Right (externs, foreigns) -> return (externs, foreigns, passingFiles, warningFiles, failingFiles)
+      Right (externs, foreigns) -> return (modules, externs, foreigns, passingFiles, warningFiles, failingFiles)
 
   outputFile <- runIO $ do
     tmp <- getTemporaryDirectory
@@ -90,21 +87,21 @@ spec = do
   context "Passing examples" $
     forM_ passingTestCases $ \testPurs ->
       it ("'" <> takeFileName (getTestMain testPurs) <> "' should compile and run without error") $
-        assertCompiles supportExterns supportForeigns testPurs outputFile
+        assertCompiles supportModules supportExterns supportForeigns testPurs outputFile
 
   context "Warning examples" $
     forM_ warningTestCases $ \testPurs -> do
       let mainPath = getTestMain testPurs
       expectedWarnings <- runIO $ getShouldWarnWith mainPath
       it ("'" <> takeFileName mainPath <> "' should compile with warning(s) '" <> intercalate "', '" expectedWarnings <> "'") $
-        assertCompilesWithWarnings supportExterns supportForeigns testPurs expectedWarnings
+        assertCompilesWithWarnings supportModules supportExterns supportForeigns testPurs expectedWarnings
 
   context "Failing examples" $
     forM_ failingTestCases $ \testPurs -> do
       let mainPath = getTestMain testPurs
       expectedFailures <- runIO $ getShouldFailWith mainPath
       it ("'" <> takeFileName mainPath <> "' should fail with '" <> intercalate "', '" expectedFailures <> "'") $
-        assertDoesNotCompile supportExterns supportForeigns testPurs expectedFailures
+        assertDoesNotCompile supportModules supportExterns supportForeigns testPurs expectedFailures
 
   where
 
@@ -168,18 +165,18 @@ trim = dropWhile isSpace >>> reverse >>> dropWhile isSpace >>> reverse
 modulesDir :: FilePath
 modulesDir = ".test_modules" </> "node_modules"
 
-makeActions :: M.Map P.ModuleName FilePath -> P.MakeActions P.Make
-makeActions foreigns = (P.buildMakeActions modulesDir (P.internalError "makeActions: input file map was read.") foreigns False)
-                         { P.getInputTimestamp = getInputTimestamp
-                         , P.getOutputTimestamp = getOutputTimestamp
-                         }
+makeActions :: [P.Module] -> M.Map P.ModuleName FilePath -> P.MakeActions P.Make
+makeActions modules foreigns = (P.buildMakeActions modulesDir (P.internalError "makeActions: input file map was read.") foreigns False)
+                               { P.getInputTimestamp = getInputTimestamp
+                               , P.getOutputTimestamp = getOutputTimestamp
+                               }
   where
   getInputTimestamp :: P.ModuleName -> P.Make (Either P.RebuildPolicy (Maybe UTCTime))
   getInputTimestamp mn
-    | isSupportModule (T.unpack (P.runModuleName mn)) = return (Left P.RebuildNever)
+    | isSupportModule (P.runModuleName mn) = return (Left P.RebuildNever)
     | otherwise = return (Left P.RebuildAlways)
     where
-    isSupportModule = flip elem supportModules
+    isSupportModule = flip elem (map (P.runModuleName . P.getModuleName) modules)
 
   getOutputTimestamp :: P.ModuleName -> P.Make (Maybe UTCTime)
   getOutputTimestamp mn = do
@@ -187,39 +184,36 @@ makeActions foreigns = (P.buildMakeActions modulesDir (P.internalError "makeActi
     exists <- liftIO $ doesDirectoryExist filePath
     return (if exists then Just (P.internalError "getOutputTimestamp: read timestamp") else Nothing)
 
-readInput :: [FilePath] -> IO [(FilePath, T.Text)]
-readInput inputFiles = forM inputFiles $ \inputFile -> do
-  text <- readUTF8FileT inputFile
-  return (inputFile, text)
-
 runTest :: P.Make a -> IO (Either P.MultipleErrors a, P.MultipleErrors)
 runTest = P.runMake P.defaultOptions
 
 compile
-  :: [(P.Module, P.ExternsFile)]
+  :: [P.Module]
+  -> [P.ExternsFile]
   -> M.Map P.ModuleName FilePath
   -> [FilePath]
   -> ([P.Module] -> IO ())
   -> IO (Either P.MultipleErrors [P.ExternsFile], P.MultipleErrors)
-compile supportExterns supportForeigns inputFiles check = silence $ runTest $ do
+compile supportModules supportExterns supportForeigns inputFiles check = silence $ runTest $ do
   fs <- liftIO $ readInput inputFiles
   ms <- P.parseModulesFromFiles id fs
   foreigns <- inferForeignModules ms
   liftIO (check (map snd ms))
-  let actions = makeActions (foreigns `M.union` supportForeigns)
+  let actions = makeActions supportModules (foreigns `M.union` supportForeigns)
   case ms of
-    [singleModule] -> pure <$> P.rebuildModule actions (map snd supportExterns) (snd singleModule)
-    _ -> P.make actions (map fst supportExterns ++ map snd ms)
+    [singleModule] -> pure <$> P.rebuildModule actions supportExterns (snd singleModule)
+    _ -> P.make actions (supportModules ++ map snd ms)
 
 assert
-  :: [(P.Module, P.ExternsFile)]
+  :: [P.Module]
+  -> [P.ExternsFile]
   -> M.Map P.ModuleName FilePath
   -> [FilePath]
   -> ([P.Module] -> IO ())
   -> (Either P.MultipleErrors P.MultipleErrors -> IO (Maybe String))
   -> Expectation
-assert supportExterns supportForeigns inputFiles check f = do
-  (e, w) <- compile supportExterns supportForeigns inputFiles check
+assert supportModules supportExterns supportForeigns inputFiles check f = do
+  (e, w) <- compile supportModules supportExterns supportForeigns inputFiles check
   maybeErr <- f (const w <$> e)
   maybe (return ()) expectationFailure maybeErr
 
@@ -236,13 +230,14 @@ checkShouldFailWith expected errs =
     else Just $ "Expected these errors: " ++ show expected ++ ", but got these: " ++ show actual
 
 assertCompiles
-  :: [(P.Module, P.ExternsFile)]
+  :: [P.Module]
+  -> [P.ExternsFile]
   -> M.Map P.ModuleName FilePath
   -> [FilePath]
   -> Handle
   -> Expectation
-assertCompiles supportExterns supportForeigns inputFiles outputFile =
-  assert supportExterns supportForeigns inputFiles checkMain $ \e ->
+assertCompiles supportModules supportExterns supportForeigns inputFiles outputFile =
+  assert supportModules supportExterns supportForeigns inputFiles checkMain $ \e ->
     case e of
       Left errs -> return . Just . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
       Right _ -> do
@@ -262,13 +257,14 @@ assertCompiles supportExterns supportForeigns inputFiles outputFile =
           Nothing -> return $ Just "Couldn't find node.js executable"
 
 assertCompilesWithWarnings
-  :: [(P.Module, P.ExternsFile)]
+  :: [P.Module]
+  -> [P.ExternsFile]
   -> M.Map P.ModuleName FilePath
   -> [FilePath]
   -> [String]
   -> Expectation
-assertCompilesWithWarnings supportExterns supportForeigns inputFiles shouldWarnWith =
-  assert supportExterns supportForeigns inputFiles checkMain $ \e ->
+assertCompilesWithWarnings supportModules supportExterns supportForeigns inputFiles shouldWarnWith =
+  assert supportModules supportExterns supportForeigns inputFiles checkMain $ \e ->
     case e of
       Left errs ->
         return . Just . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
@@ -282,13 +278,14 @@ assertCompilesWithWarnings supportExterns supportForeigns inputFiles shouldWarnW
     (<> "\n\n" <> P.prettyPrintMultipleErrors P.defaultPPEOptions warnings)
 
 assertDoesNotCompile
-  :: [(P.Module, P.ExternsFile)]
+  :: [P.Module]
+  -> [P.ExternsFile]
   -> M.Map P.ModuleName FilePath
   -> [FilePath]
   -> [String]
   -> Expectation
-assertDoesNotCompile supportExterns supportForeigns inputFiles shouldFailWith =
-  assert supportExterns supportForeigns inputFiles noPreCheck $ \e ->
+assertDoesNotCompile supportModules supportExterns supportForeigns inputFiles shouldFailWith =
+  assert supportModules supportExterns supportForeigns inputFiles noPreCheck $ \e ->
     case e of
       Left errs ->
         return $ if null shouldFailWith

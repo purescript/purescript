@@ -5,14 +5,21 @@ module TestUtils where
 import Prelude ()
 import Prelude.Compat
 
+import qualified Language.PureScript as P
+
 import Control.Monad
+import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
 import Control.Exception
-
+import Data.List (sort)
+import qualified Data.Text as T
 import System.Process
 import System.Directory
 import System.Info
+import System.IO.UTF8 (readUTF8FileT)
 import System.Exit (exitFailure)
+import System.FilePath ((</>))
+import qualified System.FilePath.Glob as Glob
 import System.IO (stderr, hPutStrLn)
 
 findNodeProcess :: IO (Maybe String)
@@ -47,139 +54,28 @@ updateSupportCode = do
     hPutStrLn stderr "Cannot find node (or nodejs) executable"
     exitFailure
 
+readInput :: [FilePath] -> IO [(FilePath, T.Text)]
+readInput inputFiles = forM inputFiles $ \inputFile -> do
+  text <- readUTF8FileT inputFile
+  return (inputFile, text)
+
 -- |
 -- The support modules that should be cached between test cases, to avoid
 -- excessive rebuilding.
 --
-supportModules :: [String]
-supportModules =
-  [ "Control.Alt"
-  , "Control.Alternative"
-  , "Control.Applicative"
-  , "Control.Apply"
-  , "Control.Biapplicative"
-  , "Control.Biapply"
-  , "Control.Bind"
-  , "Control.Category"
-  , "Control.Comonad"
-  , "Control.Extend"
-  , "Control.Lazy"
-  , "Control.Monad"
-  , "Control.Monad.Eff"
-  , "Control.Monad.Eff.Class"
-  , "Control.Monad.Eff.Console"
-  , "Control.Monad.Eff.Uncurried"
-  , "Control.Monad.Eff.Unsafe"
-  , "Control.Monad.Gen"
-  , "Control.Monad.Gen.Class"
-  , "Control.Monad.Gen.Common"
-  , "Control.Monad.Rec.Class"
-  , "Control.Monad.ST"
-  , "Control.MonadPlus"
-  , "Control.MonadZero"
-  , "Control.Plus"
-  , "Control.Semigroupoid"
-  , "Data.Array"
-  , "Data.Array.Partial"
-  , "Data.Array.ST"
-  , "Data.Array.ST.Iterator"
-  , "Data.Bifoldable"
-  , "Data.Bifunctor"
-  , "Data.Bifunctor.Clown"
-  , "Data.Bifunctor.Flip"
-  , "Data.Bifunctor.Join"
-  , "Data.Bifunctor.Joker"
-  , "Data.Bifunctor.Product"
-  , "Data.Bifunctor.Wrap"
-  , "Data.Bitraversable"
-  , "Data.Boolean"
-  , "Data.BooleanAlgebra"
-  , "Data.Bounded"
-  , "Data.Char"
-  , "Data.Char.Gen"
-  , "Data.CommutativeRing"
-  , "Data.Either"
-  , "Data.Either.Nested"
-  , "Data.Eq"
-  , "Data.EuclideanRing"
-  , "Data.Field"
-  , "Data.Foldable"
-  , "Data.Function"
-  , "Data.Function.Uncurried"
-  , "Data.Functor"
-  , "Data.Functor.Invariant"
-  , "Data.Generic"
-  , "Data.Generic.Rep"
-  , "Data.Generic.Rep.Bounded"
-  , "Data.Generic.Rep.Eq"
-  , "Data.Generic.Rep.Monoid"
-  , "Data.Generic.Rep.Ord"
-  , "Data.Generic.Rep.Semigroup"
-  , "Data.Generic.Rep.Show"
-  , "Data.HeytingAlgebra"
-  , "Data.Identity"
-  , "Data.Int"
-  , "Data.Int.Bits"
-  , "Data.Lazy"
-  , "Data.List"
-  , "Data.List.Lazy"
-  , "Data.List.Lazy.NonEmpty"
-  , "Data.List.Lazy.Types"
-  , "Data.List.NonEmpty"
-  , "Data.List.Partial"
-  , "Data.List.Types"
-  , "Data.List.ZipList"
-  , "Data.Maybe"
-  , "Data.Maybe.First"
-  , "Data.Maybe.Last"
-  , "Data.Monoid"
-  , "Data.Monoid.Additive"
-  , "Data.Monoid.Alternate"
-  , "Data.Monoid.Conj"
-  , "Data.Monoid.Disj"
-  , "Data.Monoid.Dual"
-  , "Data.Monoid.Endo"
-  , "Data.Monoid.Multiplicative"
-  , "Data.NaturalTransformation"
-  , "Data.Newtype"
-  , "Data.NonEmpty"
-  , "Data.Ord"
-  , "Data.Ord.Unsafe"
-  , "Data.Ordering"
-  , "Data.Ring"
-  , "Data.Semigroup"
-  , "Data.Semiring"
-  , "Data.Show"
-  , "Data.String"
-  , "Data.String.CaseInsensitive"
-  , "Data.String.Gen"
-  , "Data.String.Regex"
-  , "Data.String.Regex.Flags"
-  , "Data.String.Regex.Unsafe"
-  , "Data.String.Unsafe"
-  , "Data.Symbol"
-  , "Data.Traversable"
-  , "Data.Tuple"
-  , "Data.Tuple.Nested"
-  , "Data.Unfoldable"
-  , "Data.Unit"
-  , "Data.Void"
-  , "Global"
-  , "Global.Unsafe"
-  , "Math"
-  , "PSCI.Support"
-  , "Partial"
-  , "Partial.Unsafe"
-  , "Prelude"
-  , "Test.Assert"
-  , "Type.Data.Ordering"
-  , "Type.Data.Symbol"
-  , "Type.Equality"
-  , "Type.Row.Effect.Equality"
-  , "Type.Prelude"
-  , "Type.Proxy"
-  , "Unsafe.Coerce"
-  ]
+getSupportModuleTuples :: IO [(FilePath, P.Module)]
+getSupportModuleTuples = do
+  cd <- getCurrentDirectory
+  let supportDir = cd </> "tests" </> "support" </> "bower_components"
+  supportPurs <- Glob.globDir1 (Glob.compile "purescript-*/src/**/*.purs") supportDir
+  supportPursFiles <- readInput supportPurs
+  modules <- runExceptT $ ExceptT . return $ P.parseModulesFromFiles id supportPursFiles
+  case modules of
+    Right ms -> return ms
+    Left errs -> fail (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
+
+getSupportModuleNames :: IO [T.Text]
+getSupportModuleNames = sort . map (P.runModuleName . P.getModuleName . snd) <$> getSupportModuleTuples
 
 pushd :: forall a. FilePath -> IO a -> IO a
 pushd dir act = do
