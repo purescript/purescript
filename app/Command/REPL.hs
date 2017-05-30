@@ -233,7 +233,7 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
                   respond $ Wai.responseLBS status503 [] "Service not available"
                 Just js ->
                   respond $ Wai.responseLBS status200
-                                            [ (hContentType, "application/javascript;")]
+                                            [ (hContentType, "application/javascript")]
                                             (U.fromString js)
             _ -> respond $ Wai.responseLBS status404 [] "Not found"
 
