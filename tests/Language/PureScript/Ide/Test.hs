@@ -66,8 +66,8 @@ ideValue i ty = ida (IdeDeclValue (IdeValue (P.Ident i) (fromMaybe P.tyString ty
 ideType :: Text -> Maybe P.Kind -> IdeDeclarationAnn
 ideType pn ki = ida (IdeDeclType (IdeType (P.ProperName pn) (fromMaybe P.kindType ki)))
 
-ideSynonym :: Text -> P.Type -> P.Kind -> IdeDeclarationAnn
-ideSynonym pn ty kind = ida (IdeDeclTypeSynonym (IdeTypeSynonym (P.ProperName pn) ty kind))
+ideSynonym :: Text -> Maybe P.Type -> Maybe P.Kind -> IdeDeclarationAnn
+ideSynonym pn ty kind = ida (IdeDeclTypeSynonym (IdeTypeSynonym (P.ProperName pn) (fromMaybe P.tyString ty) (fromMaybe P.kindType kind)))
 
 ideTypeClass :: Text -> P.Kind -> [IdeInstance] -> IdeDeclarationAnn
 ideTypeClass pn kind instances = ida (IdeDeclTypeClass (IdeTypeClass (P.ProperName pn) kind instances))

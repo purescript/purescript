@@ -11,16 +11,18 @@ import           Language.PureScript.Ide.Test
 import qualified Language.PureScript as P
 import           Test.Hspec
 
-valueA, typeA, classA, dtorA1, dtorA2 :: IdeDeclarationAnn
+valueA, typeA, synonymA, classA, dtorA1, dtorA2, kindA :: IdeDeclarationAnn
 valueA = ideValue "valueA" Nothing
 typeA = ideType "TypeA" Nothing
+synonymA = ideSynonym "SynonymA" Nothing Nothing
 classA = ideTypeClass "ClassA" P.kindType []
 dtorA1 = ideDtor "DtorA1" "TypeA" Nothing
 dtorA2 = ideDtor "DtorA2" "TypeA" Nothing
+kindA = ideKind "KindA"
 
 env :: ModuleMap [IdeDeclarationAnn]
 env = Map.fromList
-  [ (mn "A", [valueA, typeA, classA, dtorA1, dtorA2])
+  [ (mn "A", [valueA, typeA, synonymA, classA, dtorA1, dtorA2, kindA])
   ]
 
 type Refs = [(P.ModuleName, P.DeclarationRef)]
@@ -32,7 +34,10 @@ succTestCases =
     , [(mn "A", P.TypeRef (P.ProperName "TypeA") (Just [P.ProperName "DtorA1"]))], [typeA `annExp` "A", dtorA1 `annExp` "A"])
   , ("resolves a type reexport with implicit data constructors"
     , [(mn "A", P.TypeRef (P.ProperName "TypeA") Nothing)], map (`annExp` "A") [typeA, dtorA1, dtorA2])
+  , ("resolves a synonym reexport"
+    , [(mn "A", P.TypeRef (P.ProperName "SynonymA") Nothing)], [synonymA `annExp` "A"])
   , ("resolves a class reexport", [(mn "A", P.TypeClassRef (P.ProperName "ClassA"))], [classA `annExp` "A"])
+  , ("resolves a kind reexport", [(mn "A", P.KindRef (P.ProperName "KindA"))], [kindA `annExp` "A"])
   ]
 
 failTestCases :: [(Text, Refs)]

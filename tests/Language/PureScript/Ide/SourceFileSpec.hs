@@ -97,7 +97,7 @@ getLocation s = do
     ideState = emptyIdeState `volatileState`
       [ ("Test",
          [ ideValue "sfValue" Nothing `annLoc` valueSS
-         , ideSynonym "SFType" P.tyString P.kindType `annLoc` synonymSS
+         , ideSynonym "SFType" Nothing Nothing `annLoc` synonymSS
          , ideType "SFData" Nothing `annLoc` typeSS
          , ideDtor "SFOne" "SFData" Nothing `annLoc` typeSS
          , ideDtor "SFTwo" "SFData" Nothing `annLoc` typeSS
