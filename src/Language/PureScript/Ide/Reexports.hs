@@ -93,8 +93,10 @@ resolveRef
   -> Either P.DeclarationRef [IdeDeclarationAnn]
 resolveRef decls ref = case ref of
   P.TypeRef tn mdtors ->
-    case findRef (anyOf (_IdeDeclType . ideTypeName) (== tn)) of
-      Nothing -> Left ref
+    case findRef (anyOf (_IdeDeclType . ideTypeName) (== tn))
+         <|> findRef (anyOf (_IdeDeclTypeSynonym . ideSynonymName) (== tn)) of
+      Nothing ->
+        Left ref
       Just d -> Right $ d : case mdtors of
           Nothing ->
             -- If the dataconstructor field inside the TypeRef is Nothing, that
@@ -110,6 +112,8 @@ resolveRef decls ref = case ref of
     findWrapped (anyOf (_IdeDeclTypeOperator . ideTypeOpName) (== name))
   P.TypeClassRef name ->
     findWrapped (anyOf (_IdeDeclTypeClass . ideTCName) (== name))
+  P.KindRef name ->
+    findWrapped (anyOf _IdeDeclKind (== name))
   _ ->
     Left ref
   where
