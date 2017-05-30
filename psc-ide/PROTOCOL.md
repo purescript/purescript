@@ -81,8 +81,8 @@ The `complete` command looks up possible completions/corrections.
     "matcher": {..},
     "currentModule": "Main",
     "options": {
-      "maxResults": 50
-      "groupReexports": ["Prelude", "Data.Array", "Data.List"]
+      "maxResults": 50,
+      "groupReexports": true
     }
   }
 }
