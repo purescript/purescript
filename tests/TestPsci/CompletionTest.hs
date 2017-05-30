@@ -14,17 +14,18 @@ import qualified Language.PureScript as P
 import           Language.PureScript.Interactive
 import           System.Console.Haskeline
 import           TestPsci.TestEnv (initTestPSCiEnv)
-import           TestUtils (supportModules)
+import           TestUtils (getSupportModuleNames)
 
 completionTests :: Spec
-completionTests = context "completionTests" $
-  mapM_ assertCompletedOk completionTestData
+completionTests = context "completionTests" $ do
+  mns <- runIO $ getSupportModuleNames
+  mapM_ assertCompletedOk (completionTestData mns)
 
 -- If the cursor is at the right end of the line, with the 1st element of the
 -- pair as the text in the line, then pressing tab should offer all the
 -- elements of the list (which is the 2nd element) as completions.
-completionTestData :: [(String, [String])]
-completionTestData =
+completionTestData :: [T.Text] -> [(String, [String])]
+completionTestData supportModuleNames =
   -- basic directives
   [ (":h",  [":help"])
   , (":r",  [":reload"])
@@ -66,7 +67,7 @@ completionTestData =
 
   -- a few other import tests
   , ("impor", ["import"])
-  , ("import ", map (T.unpack . mappend "import ") supportModules)
+  , ("import ", map (T.unpack . mappend "import ") supportModuleNames)
   , ("import Prelude ", [])
 
   -- String and number literals should not be completed

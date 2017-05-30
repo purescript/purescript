@@ -21,7 +21,6 @@ import System.Exit (exitFailure)
 import System.FilePath ((</>))
 import qualified System.FilePath.Glob as Glob
 import System.IO (stderr, hPutStrLn)
-import System.IO.Unsafe (unsafePerformIO)
 
 findNodeProcess :: IO (Maybe String)
 findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
@@ -55,23 +54,28 @@ updateSupportCode = do
     hPutStrLn stderr "Cannot find node (or nodejs) executable"
     exitFailure
 
+readInput :: [FilePath] -> IO [(FilePath, T.Text)]
+readInput inputFiles = forM inputFiles $ \inputFile -> do
+  text <- readUTF8FileT inputFile
+  return (inputFile, text)
+
 -- |
 -- The support modules that should be cached between test cases, to avoid
 -- excessive rebuilding.
 --
-supportModules :: [T.Text]
-supportModules = unsafePerformIO $ do
+getSupportModuleTuples :: IO [(FilePath, P.Module)]
+getSupportModuleTuples = do
   cd <- getCurrentDirectory
   let supportDir = cd </> "tests" </> "support" </> "bower_components"
   supportPurs <- Glob.globDir1 (Glob.compile "purescript-*/src/**/*.purs") supportDir
   supportPursFiles <- readInput supportPurs
-  Right modules <- runExceptT $ ExceptT . return $ P.parseModulesFromFiles id supportPursFiles
-  return $ sort $ map (P.runModuleName . P.getModuleName . snd) modules
-  where
-  readInput :: [FilePath] -> IO [(FilePath, T.Text)]
-  readInput inputFiles = forM inputFiles $ \inputFile -> do
-    text <- readUTF8FileT inputFile
-    return (inputFile, text)
+  modules <- runExceptT $ ExceptT . return $ P.parseModulesFromFiles id supportPursFiles
+  case modules of
+    Right ms -> return ms
+    Left errs -> fail (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
+
+getSupportModuleNames :: IO [T.Text]
+getSupportModuleNames = sort . map (P.runModuleName . P.getModuleName . snd) <$> getSupportModuleTuples
 
 pushd :: forall a. FilePath -> IO a -> IO a
 pushd dir act = do
