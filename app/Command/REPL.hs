@@ -53,6 +53,7 @@ import           System.Directory (doesFileExist, getCurrentDirectory)
 import           System.FilePath ((</>))
 import           System.FilePath.Glob (glob)
 import           System.Process (readProcessWithExitCode)
+import qualified Data.ByteString.Lazy.UTF8 as U
 
 -- | Command line options
 data PSCiOptions = PSCiOptions
@@ -206,12 +207,12 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
           case Wai.pathInfo req of
             [] ->
               respond $ Wai.responseLBS status200
-                                        [(hContentType, "text/html")]
-                                        indexPage
+                                        [(hContentType, "text/html; charset=UTF-8")]
+                                        (U.fromString indexPage)
             ["js", "index.js"] ->
               respond $ Wai.responseLBS status200
                                         [(hContentType, "application/javascript")]
-                                        indexJS
+                                        (U.fromString indexJS)
             ["js", "latest.js"] -> do
               may <- readTVarIO indexJs
               case may of
@@ -224,7 +225,7 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
                                             , (hPragma, "no-cache")
                                             , (hExpires, "0")
                                             ]
-                                            (fromString js)
+                                            (U.fromString js)
             ["js", "bundle.js"] -> do
               may <- readTVarIO bundleJs
               case may of
@@ -233,7 +234,7 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
                 Just js ->
                   respond $ Wai.responseLBS status200
                                             [ (hContentType, "application/javascript")]
-                                            (fromString js)
+                                            (U.fromString js)
             _ -> respond $ Wai.responseLBS status404 [] "Not found"
 
       let browserState = BrowserState cmdChan shutdownVar indexJs bundleJs
