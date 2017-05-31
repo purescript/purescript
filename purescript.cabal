@@ -188,6 +188,10 @@ extra-source-files:
       examples/failing/InfiniteType.purs
       examples/failing/InstanceExport.purs
       examples/failing/InstanceExport/InstanceExport.purs
+      examples/failing/InstanceSigsBodyIncorrect.purs
+      examples/failing/InstanceSigsDifferentTypes.purs
+      examples/failing/InstanceSigsIncorrectType.purs
+      examples/failing/InstanceSigsOrphanTypeDeclaration.purs
       examples/failing/IntOutOfRange.purs
       examples/failing/InvalidDerivedInstance.purs
       examples/failing/InvalidDerivedInstance2.purs
@@ -402,6 +406,8 @@ extra-source-files:
       examples/passing/ImportQualified/M1.purs
       examples/passing/InferRecFunWithConstrainedArgument.purs
       examples/passing/InstanceBeforeClass.purs
+      examples/passing/InstanceSigs.purs
+      examples/passing/InstanceSigsGeneral.purs
       examples/passing/IntAndChar.purs
       examples/passing/iota.purs
       examples/passing/JSReserved.purs
