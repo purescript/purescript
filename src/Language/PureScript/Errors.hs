@@ -121,6 +121,8 @@ errorCode em = case unwrapErrorMessage em of
   PossiblyInfiniteInstance{} -> "PossiblyInfiniteInstance"
   CannotDerive{} -> "CannotDerive"
   InvalidNewtypeInstance{} -> "InvalidNewtypeInstance"
+  MissingNewtypeSuperclassInstance{} -> "MissingNewtypeSuperclassInstance"
+  UnverifiableSuperclassInstance{} -> "UnverifiableSuperclassInstance"
   InvalidDerivedInstance{} -> "InvalidDerivedInstance"
   ExpectedTypeConstructor{} -> "ExpectedTypeConstructor"
   CannotFindDerivingType{} -> "CannotFindDerivingType"
@@ -262,6 +264,8 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
   gSimple (CannotDerive cl ts) = CannotDerive cl <$> traverse f ts
   gSimple (InvalidNewtypeInstance cl ts) = InvalidNewtypeInstance cl <$> traverse f ts
+  gSimple (MissingNewtypeSuperclassInstance cl1 cl2 ts) = MissingNewtypeSuperclassInstance cl1 cl2 <$> traverse f ts
+  gSimple (UnverifiableSuperclassInstance cl1 cl2 ts) = UnverifiableSuperclassInstance cl1 cl2 <$> traverse f ts
   gSimple (InvalidDerivedInstance cl ts n) = InvalidDerivedInstance cl <$> traverse f ts <*> pure n
   gSimple (ExpectedTypeConstructor cl ts ty) = ExpectedTypeConstructor cl <$> traverse f ts <*> f ty
   gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
@@ -672,6 +676,22 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 , Box.vcat Box.left (map typeAtomAsBox ts)
                 ]
             , line "Make sure this is a newtype."
+            ]
+    renderSimpleErrorMessage (MissingNewtypeSuperclassInstance su cl ts) =
+      paras [ line "The derived newtype instance for"
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName cl)
+                , Box.vcat Box.left (map typeAtomAsBox ts)
+                ]
+            , line $ "does not include a derived superclass instance for " <> markCode (showQualified runProperName su) <> "."
+            ]
+    renderSimpleErrorMessage (UnverifiableSuperclassInstance su cl ts) =
+      paras [ line "The derived newtype instance for"
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName cl)
+                , Box.vcat Box.left (map typeAtomAsBox ts)
+                ]
+            , line $ "implies an superclass instance for " <> markCode (showQualified runProperName su) <> " which could not be verified."
             ]
     renderSimpleErrorMessage (InvalidDerivedInstance nm ts argCount) =
       paras [ line "Cannot derive the type class instance"
