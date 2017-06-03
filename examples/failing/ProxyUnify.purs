@@ -5,7 +5,7 @@ module Main where
 import Prelude
 import Control.Monad.Eff (Eff)
 
-a :: proxy "a"
+a :: @"a"
 a = @"b"
 
 main :: Eff _ _

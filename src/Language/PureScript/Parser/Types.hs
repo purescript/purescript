@@ -50,7 +50,7 @@ parseTypeConstructor :: TokenParser Type
 parseTypeConstructor = TypeConstructor <$> parseQualified typeName
 
 parseProxyType :: TokenParser Type
-parseProxyType = ProxyType <$> (reserved "proxy" *> parseTypeAtom)
+parseProxyType = ProxyType <$> (at *> parseTypeAtom)
 
 parseForAll :: TokenParser Type
 parseForAll = mkForAll <$> ((reserved "forall" <|> reserved "∀") *> P.many1 (indented *> identifier) <* indented <* dot)
