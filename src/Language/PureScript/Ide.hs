@@ -83,7 +83,7 @@ handleCommand c = case c of
     case rs of
       Right rs' -> answerRequest outfp rs'
       Left question ->
-        pure (CompletionResult (map (completionFromMatch . map withEmptyAnn) question))
+        pure (CompletionResult (map (completionFromMatch . simpleExport . map withEmptyAnn) question))
   Rebuild file ->
     rebuildFileAsync file
   RebuildSync file ->
@@ -104,13 +104,13 @@ findCompletions
   -> m Success
 findCompletions filters matcher currentModule complOptions = do
   modules <- getAllModules currentModule
-  pure . CompletionResult . map completionFromMatch . getCompletions filters matcher complOptions $ modules
+  pure (CompletionResult (getCompletions filters matcher complOptions modules))
 
 findType :: Ide m =>
             Text -> [Filter] -> Maybe P.ModuleName -> m Success
 findType search filters currentModule = do
   modules <- getAllModules currentModule
-  pure . CompletionResult . map completionFromMatch . getExactMatches search filters $ modules
+  pure (CompletionResult (getExactCompletions search filters modules))
 
 findPursuitCompletions :: MonadIO m =>
                           PursuitQuery -> m Success

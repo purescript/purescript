@@ -22,9 +22,9 @@ import           Protolude
 import           Control.Concurrent.STM
 import           Control.Lens.TH
 import           Data.Aeson
-import qualified Data.Map.Lazy                       as M
-import qualified Language.PureScript                 as P
-import qualified Language.PureScript.Errors.JSON     as P
+import qualified Data.Map.Lazy as M
+import qualified Language.PureScript as P
+import qualified Language.PureScript.Errors.JSON as P
 
 type ModuleIdent = Text
 type ModuleMap a = Map P.ModuleName a
@@ -193,6 +193,7 @@ data Completion = Completion
   , complExpandedType  :: Text
   , complLocation      :: Maybe P.SourceSpan
   , complDocumentation :: Maybe Text
+  , complExportedFrom  :: [P.ModuleName]
   } deriving (Show, Eq, Ord)
 
 instance ToJSON Completion where
@@ -203,6 +204,7 @@ instance ToJSON Completion where
            , "expandedType" .= complExpandedType
            , "definedAt" .= complLocation
            , "documentation" .= complDocumentation
+           , "exportedFrom" .= complExportedFrom
            ]
 
 identifierFromDeclarationRef :: P.DeclarationRef -> Text
