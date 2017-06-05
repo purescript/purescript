@@ -126,7 +126,7 @@ matchTypeAtom tro@TypeRenderOptions{troSuggesting = suggesting} =
       match (TypeVar var) = Just $ text $ T.unpack var
       match (TypeLevelString s) = Just $ text $ T.unpack $ prettyPrintString s
       match (PrettyPrintObject row) = Just $ prettyPrintRowWith tro '{' '}' row
-      match (TypeConstructor ctor) = Just $ text $ T.unpack $ runProperName $ disqualify ctor
+      match (TypeConstructor ctor) = Just $ text $ T.unpack $ showQualified runProperName ctor
       match (TUnknown u)
         | suggesting = Just $ text "_"
         | otherwise = Just $ text $ 't' : show u

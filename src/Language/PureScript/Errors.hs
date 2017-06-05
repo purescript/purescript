@@ -9,6 +9,7 @@ module Language.PureScript.Errors
 import           Prelude.Compat
 import           Protolude (ordNub)
 
+import           Control.Applicative ((<|>))
 import           Control.Arrow ((&&&))
 import           Control.Monad
 import           Control.Monad.Error.Class (MonadError(..))
@@ -1229,6 +1230,44 @@ prettyPrintRef (ReExportRef _ _) =
   Nothing
 prettyPrintRef (PositionedDeclarationRef _ _ ref) =
   prettyPrintRef ref
+
+-- | Unqualify names based on the imports in the current module
+withUnqualifiedNames :: [Declaration] -> Type -> Type
+withUnqualifiedNames decls = everywhereOnTypes go where
+  go (TypeConstructor tyName) = TypeConstructor (findImportFor tyName)
+  go other = other
+
+  findImportFor :: Qualified (ProperName 'TypeName) -> Qualified (ProperName 'TypeName)
+  findImportFor tyName = fromMaybe tyName (foldr (<|>) Nothing (map (matchImport tyName) decls))
+
+  matchImport
+    :: Qualified (ProperName 'TypeName)
+    -> Declaration
+    -> Maybe (Qualified (ProperName 'TypeName))
+  matchImport (Qualified (Just mn) tyName) (ImportDeclaration mn' impTy qualName)
+    | mn == mn'
+    , matchesImportType impTy tyName
+    = Just (Qualified qualName tyName)
+  matchImport tyName (PositionedDeclaration _ _ decl) = matchImport tyName decl
+  matchImport _ _ = Nothing
+
+  matchesImportType :: ImportDeclarationType -> ProperName 'TypeName -> Bool
+  matchesImportType Implicit        _      = True
+  matchesImportType (Explicit refs) tyName = any (exportsType tyName) refs
+  matchesImportType (Hiding refs)   tyName = not (any (exportsType tyName) refs)
+
+  exportsType :: ProperName 'TypeName -> DeclarationRef -> Bool
+  exportsType tyName (TypeRef tyName' _) = tyName == tyName'
+  exportsType tyName (PositionedDeclarationRef _ _ ref) = exportsType tyName ref
+  exportsType _ _ = False
+
+rethrowUnqualified
+  :: (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => [Declaration]
+  -> m a
+  -> m a
+rethrowUnqualified decls =
+  warnAndRethrow ((onErrorMessages . onTypesInErrorMessage) (withUnqualifiedNames decls))
 
 -- | Pretty print multiple errors
 prettyPrintMultipleErrors :: PPEOptions -> MultipleErrors -> String

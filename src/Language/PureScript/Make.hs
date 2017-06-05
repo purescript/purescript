@@ -136,7 +136,7 @@ rebuildModule
   -> [ExternsFile]
   -> Module
   -> m ExternsFile
-rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
+rebuildModule MakeActions{..} externs m@(Module _ _ moduleName decls _) = rethrowUnqualified decls $ do
   progress $ CompilingModule moduleName
   let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
       withPrim = importPrim m
