@@ -8,13 +8,14 @@
     "purescript-functions": "3.0.0",
     "purescript-generics": "4.0.0",
     "purescript-generics-rep": "5.0.0",
+    "purescript-lists": "4.6.0",
     "purescript-newtype": "2.0.0",
     "purescript-partial": "1.2.0",
     "purescript-prelude": "3.0.0",
     "purescript-psci-support": "3.0.0",
     "purescript-st": "3.0.0",
     "purescript-symbols": "3.0.0",
-    "purescript-tailrec": "3.0.0",
+    "purescript-tailrec": "3.3.0",
     "purescript-typelevel-prelude": "2.0.0",
     "purescript-unsafe-coerce": "3.0.0"
   }
