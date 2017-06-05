@@ -3,7 +3,7 @@
 -- see: https://github.com/sol/hpack
 
 name:           purescript
-version:        0.11.4
+version:        0.11.5
 cabal-version:  >= 1.10
 build-type:     Simple
 license:        BSD3
@@ -606,6 +606,10 @@ extra-source-files:
       examples/warning/ImplicitImport.purs
       examples/warning/ImplicitQualifiedImport.purs
       examples/warning/MissingTypeDeclaration.purs
+      examples/warning/NewtypeInstance.purs
+      examples/warning/NewtypeInstance2.purs
+      examples/warning/NewtypeInstance3.purs
+      examples/warning/NewtypeInstance4.purs
       examples/warning/OverlappingInstances.purs
       examples/warning/OverlappingPattern.purs
       examples/warning/ScopeShadowing.purs
