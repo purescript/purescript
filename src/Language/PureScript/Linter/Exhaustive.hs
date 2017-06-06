@@ -235,21 +235,33 @@ missingAlternative env mn ca uncovered
 
 -- |
 -- Main exhaustivity checking function
--- Starting with the set `uncovered = { _ }` (nothing covered, one `_` for each function argument),
--- it partitions that set with the new uncovered cases, until it consumes the whole set of clauses.
--- Then, returns the uncovered set of case alternatives.
+-- If there are no cases, check that at least one argument is of an empty type.
+-- Otherwise, starting with the set `uncovered = { _ }` (nothing covered, one
+-- `_` for each function argument), it partitions that set with the new
+-- uncovered cases, until it consumes the whole set of clauses. Then, returns
+-- the uncovered set of case alternatives.
 --
 checkExhaustive
   :: forall m
    . (MonadWriter MultipleErrors m, MonadSupply m)
    => Environment
    -> ModuleName
-   -> Int
+   -> [Expr]
    -> [CaseAlternative]
    -> Expr
    -> m Expr
-checkExhaustive env mn numArgs cas expr = makeResult . first ordNub $ foldl' step ([initialize numArgs], (pure True, [])) cas
+checkExhaustive env mn args cas expr =
+  makeResult . first ordNub $
+    if null cas
+      then checkArgsOfEmptyType
+      else foldl' step ([initialize numArgs], (pure True, [])) cas
   where
+  numArgs :: Int
+  numArgs = length args
+
+  checkArgsOfEmptyType :: ([[Binder]], (Either RedundancyError Bool, [[Binder]]))
+  checkArgsOfEmptyType = ([], (Right (any (const True) args), []))
+
   step :: ([[Binder]], (Either RedundancyError Bool, [[Binder]])) -> CaseAlternative -> ([[Binder]], (Either RedundancyError Bool, [[Binder]]))
   step (uncovered, (nec, redundant)) ca =
     let (missed, pr) = unzip (map (missingAlternative env mn ca) uncovered)
@@ -345,7 +357,7 @@ checkExhaustiveExpr env mn = onExpr
   onExpr (IfThenElse e1 e2 e3) = IfThenElse <$> onExpr e1 <*> onExpr e2 <*> onExpr e3
   onExpr (Case es cas) = do
     case' <- Case <$> mapM onExpr es <*> mapM onCaseAlternative cas
-    checkExhaustive env mn (length es) cas case'
+    checkExhaustive env mn es cas case'
   onExpr (TypedValue x e y) = TypedValue x <$> onExpr e <*> pure y
   onExpr (Let ds e) = Let <$> mapM onDecl ds <*> onExpr e
   onExpr (PositionedValue pos x e) = PositionedValue pos x <$> censor (addHint (PositionedError pos)) (onExpr e)

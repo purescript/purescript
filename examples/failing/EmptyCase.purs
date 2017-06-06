@@ -1,4 +1,7 @@
--- @shouldFailWith ErrorParsingModule
+-- @shouldFailWith NoInstanceFound
 module Main where
 
-error err = case err of \_ -> 1
+data Unit = Unit
+
+f :: ∀ a. Unit -> a
+f = case _

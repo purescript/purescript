@@ -369,8 +369,12 @@ parseConstructor :: TokenParser Expr
 parseConstructor = Constructor <$> parseQualified dataConstructorName
 
 parseCase :: TokenParser Expr
-parseCase = Case <$> P.between (reserved "case") (indented *> reserved "of") (commaSep1 parseValue)
-                 <*> (indented *> mark (P.many1 (same *> mark parseCaseAlternative)))
+parseCase = do
+  values <- reserved "case" *> commaSep1 parseValue
+  binders <- P.optionMaybe (indented *> reserved "of") >>= \case
+    Just _ -> indented *> mark (P.many1 (same *> mark parseCaseAlternative))
+    Nothing -> pure []
+  pure $ Case values binders
 
 parseCaseAlternative :: TokenParser CaseAlternative
 parseCaseAlternative = CaseAlternative <$> commaSep1 parseBinder
