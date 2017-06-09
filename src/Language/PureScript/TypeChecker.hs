@@ -163,6 +163,16 @@ addTypeClassDictionaries mn entries =
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = insertState st } }
   where insertState st = M.insertWith (M.unionWith M.union) mn entries (typeClassDictionaries . checkEnv $ st)
 
+checkTypeConstructorAlias
+  :: (MonadState CheckState m, MonadWriter MultipleErrors m)
+  => ProperName 'TypeName
+  -> [(Text, Maybe Kind)]
+  -> Type
+  -> m ()
+checkTypeConstructorAlias name args ty@(TypeConstructor _) = do
+  tell . errorMessage $ TypeConstructorAlias name args ty
+checkTypeConstructorAlias _ _ _ = return ()
+
 checkDuplicateTypeArguments
   :: (MonadState CheckState m, MonadError MultipleErrors m)
   => [Text]
@@ -262,6 +272,7 @@ typeCheckAll moduleName _ = traverse go
     toDataDecl _ = Nothing
   go (TypeSynonymDeclaration name args ty) = do
     warnAndRethrow (addHint (ErrorInTypeSynonym name)) $ do
+      checkTypeConstructorAlias name args ty
       checkDuplicateTypeArguments $ map fst args
       kind <- kindsOf False moduleName name args [ty]
       let args' = args `withKinds` kind

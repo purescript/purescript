@@ -7,6 +7,7 @@ module Language.PureScript.Pretty.Types
   , prettyPrintType
   , prettyPrintTypeWithUnicode
   , prettyPrintSuggestedType
+  , prettyPrintNewtypeForType
   , typeAtomAsBox
   , prettyPrintTypeAtom
   , prettyPrintRow
@@ -217,6 +218,17 @@ prettyPrintTypeWithUnicode = prettyPrintType' unicodeOptions
 -- | Generate a pretty-printed string representing a suggested 'Type'
 prettyPrintSuggestedType :: Type -> String
 prettyPrintSuggestedType = prettyPrintType' suggestingOptions
+
+-- | Generate a pretty-printed string newtype
+prettyPrintNewtypeForType :: ProperName 'TypeName -> [(Text, Maybe Kind)] -> Type -> String
+prettyPrintNewtypeForType (ProperName name) args ty =
+  "newtype " ++ name' ++ args' ++ " = " ++ name' ++ " " ++ ctr
+  where
+    name' = T.unpack name
+    args' = (" " ++) . T.unpack . fst =<< args
+    ctr = case ty of
+      TypeConstructor (Qualified _ (ProperName tn)) -> T.unpack tn
+      _ -> error "Type constructor was expected here."
 
 prettyPrintType' :: TypeRenderOptions -> Type -> String
 prettyPrintType' tro = render . typeAsBoxImpl tro
