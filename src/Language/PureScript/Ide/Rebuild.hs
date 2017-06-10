@@ -176,7 +176,7 @@ sortExterns m ex = do
     mkShallowModule P.ExternsFile{..} =
       P.Module (P.internalModuleSourceSpan "<rebuild>") [] efModuleName (map mkImport efImports) Nothing
     mkImport (P.ExternsImport mn it iq) =
-      P.ImportDeclaration mn it iq
+      P.ImportDeclaration (P.internalModuleSourceSpan "<rebuild>", []) mn it iq
     getExtern mn = M.lookup mn ex
     -- Sort a list so its elements appear in the same order as in another list.
     inOrderOf :: (Ord a) => [a] -> [a] -> [a]

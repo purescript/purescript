@@ -139,9 +139,9 @@ parseFixityDeclaration = do
       <*> (reserved "as" *> parseOperator)
 
 parseImportDeclaration :: TokenParser Declaration
-parseImportDeclaration = withSourceSpan PositionedDeclaration $ do
+parseImportDeclaration = withSourceAnn (\sa -> ($ ImportDeclaration sa)) $ do
   (mn, declType, asQ) <- parseImportDeclaration'
-  return $ ImportDeclaration mn declType asQ
+  return $ \f -> f mn declType asQ
 
 parseImportDeclaration' :: TokenParser (ModuleName, ImportDeclarationType, Maybe ModuleName)
 parseImportDeclaration' = do
@@ -159,19 +159,18 @@ parseImportDeclaration' = do
 
 parseDeclarationRef :: TokenParser DeclarationRef
 parseDeclarationRef =
-  withSourceSpan PositionedDeclarationRef
-    $ (KindRef <$> P.try (reserved "kind" *> kindName))
-    <|> (ValueRef <$> parseIdent)
-    <|> (ValueOpRef <$> parens parseOperator)
-    <|> parseTypeRef
-    <|> (TypeClassRef <$> (reserved "class" *> properName))
-    <|> (ModuleRef <$> (indented *> reserved "module" *> moduleName))
-    <|> (TypeOpRef <$> (indented *> reserved "type" *> parens parseOperator))
+    withSourceSpan' KindRef (P.try (reserved "kind" *> kindName))
+    <|> withSourceSpan' ValueRef parseIdent
+    <|> withSourceSpan' ValueOpRef (parens parseOperator)
+    <|> withSourceSpan' (\sa -> ($ TypeRef sa)) parseTypeRef
+    <|> withSourceSpan' TypeClassRef (reserved "class" *> properName)
+    <|> withSourceSpan' ModuleRef (indented *> reserved "module" *> moduleName)
+    <|> withSourceSpan' TypeOpRef (indented *> reserved "type" *> parens parseOperator)
   where
   parseTypeRef = do
     name <- typeName
     dctors <- P.optionMaybe $ parens (symbol' ".." *> pure Nothing <|> Just <$> commaSep dataConstructorName)
-    return $ TypeRef name (fromMaybe (Just []) dctors)
+    return $ \f -> f name (fromMaybe (Just []) dctors)
 
 parseTypeClassDeclaration :: TokenParser Declaration
 parseTypeClassDeclaration = do

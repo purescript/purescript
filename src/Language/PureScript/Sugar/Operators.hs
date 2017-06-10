@@ -367,23 +367,21 @@ checkFixityExports m@(Module ss _ mn ds (Just exps)) =
   where
 
   checkRef :: DeclarationRef -> m ()
-  checkRef (PositionedDeclarationRef pos _ d) =
-    rethrowWithPosition pos $ checkRef d
-  checkRef dr@(ValueOpRef op) =
+  checkRef dr@(ValueOpRef ss' op) =
     for_ (getValueOpAlias op) $ \case
       Left ident ->
-        unless (ValueRef ident `elem` exps)
-          . throwError . errorMessage
-          $ TransitiveExportError dr [ValueRef ident]
+        unless (ValueRef ss' ident `elem` exps)
+          . throwError . errorMessage' ss'
+          $ TransitiveExportError dr [ValueRef ss' ident]
       Right ctor ->
         unless (anyTypeRef (maybe False (elem ctor) . snd))
-          . throwError . errorMessage
+          . throwError . errorMessage' ss
           $ TransitiveDctorExportError dr ctor
-  checkRef dr@(TypeOpRef op) =
+  checkRef dr@(TypeOpRef ss' op) =
     for_ (getTypeOpAlias op) $ \ty ->
       unless (anyTypeRef ((== ty) . fst))
-        . throwError . errorMessage
-        $ TransitiveExportError dr [TypeRef ty Nothing]
+        . throwError . errorMessage' ss'
+        $ TransitiveExportError dr [TypeRef ss' ty Nothing]
   checkRef _ = return ()
 
   -- Finds the name associated with a type operator when that type is also

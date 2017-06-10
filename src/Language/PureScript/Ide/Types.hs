@@ -208,12 +208,12 @@ instance ToJSON Completion where
            ]
 
 identifierFromDeclarationRef :: P.DeclarationRef -> Text
-identifierFromDeclarationRef (P.TypeRef name _) = P.runProperName name
-identifierFromDeclarationRef (P.ValueRef ident) = P.runIdent ident
-identifierFromDeclarationRef (P.TypeClassRef name) = P.runProperName name
-identifierFromDeclarationRef (P.KindRef name) = P.runProperName name
-identifierFromDeclarationRef (P.ValueOpRef op) = P.showOp op
-identifierFromDeclarationRef (P.TypeOpRef op) = P.showOp op
+identifierFromDeclarationRef (P.TypeRef _ name _) = P.runProperName name
+identifierFromDeclarationRef (P.ValueRef _ ident) = P.runIdent ident
+identifierFromDeclarationRef (P.TypeClassRef _ name) = P.runProperName name
+identifierFromDeclarationRef (P.KindRef _ name) = P.runProperName name
+identifierFromDeclarationRef (P.ValueOpRef _ op) = P.showOp op
+identifierFromDeclarationRef (P.TypeOpRef _ op) = P.showOp op
 identifierFromDeclarationRef _ = ""
 
 data Success =

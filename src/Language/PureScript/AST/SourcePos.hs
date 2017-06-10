@@ -6,27 +6,25 @@ module Language.PureScript.AST.SourcePos where
 
 import Prelude.Compat
 
-import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
 import Data.Aeson ((.=), (.:))
-import qualified Data.Aeson as A
 import Data.Monoid
-import qualified Data.Text as T
 import Data.Text (Text)
+import GHC.Generics (Generic)
+import Language.PureScript.Comments
+import qualified Data.Aeson as A
+import qualified Data.Text as T
 import System.FilePath (makeRelative)
 
--- |
--- Source position information
---
+-- | Source annotation - position information and comments.
+type SourceAnn = (SourceSpan, [Comment])
+
+-- | Source position information
 data SourcePos = SourcePos
-  { -- |
-    -- Line number
-    --
-    sourcePosLine :: Int
-    -- |
-    -- Column number
-    --
+  { sourcePosLine :: Int
+    -- ^ Line number
   , sourcePosColumn :: Int
+    -- ^ Column number
   } deriving (Show, Eq, Ord, Generic)
 
 instance NFData SourcePos
@@ -46,17 +44,12 @@ instance A.FromJSON SourcePos where
     return $ SourcePos line col
 
 data SourceSpan = SourceSpan
-  { -- |
-    -- Source name
-    --
-    spanName :: String
-    -- |
-    -- Start of the span
-    --
+  { spanName :: String
+    -- ^ Source name
   , spanStart :: SourcePos
-    -- End of the span
-    --
+    -- ^ Start of the span
   , spanEnd :: SourcePos
+    -- ^ End of the span
   } deriving (Show, Eq, Ord, Generic)
 
 instance NFData SourceSpan

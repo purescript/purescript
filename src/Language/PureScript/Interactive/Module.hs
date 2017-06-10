@@ -61,7 +61,6 @@ createTemporaryModule exec PSCiState{psciImportedModules = imports, psciLetBindi
                                 (P.TypeWildcard internalSpan))
     mainDecl      = P.ValueDeclaration (P.Ident "$main") P.Public [] [P.MkUnguarded mainValue]
     decls         = if exec then [itDecl, typeDecl, mainDecl] else [itDecl]
-    internalSpan  = P.internalModuleSourceSpan "<internal>"
   in
     P.Module internalSpan
              [] moduleName
@@ -78,7 +77,7 @@ createTemporaryModuleForKind PSCiState{psciImportedModules = imports, psciLetBin
     moduleName = P.ModuleName [P.ProperName "$PSCI"]
     itDecl = P.TypeSynonymDeclaration (P.ProperName "IT") [] typ
   in
-    P.Module (P.internalModuleSourceSpan "<internal>") [] moduleName ((importDecl `map` imports) ++ lets ++ [itDecl]) Nothing
+    P.Module internalSpan [] moduleName ((importDecl `map` imports) ++ lets ++ [itDecl]) Nothing
 
 -- |
 -- Makes a volatile module to execute the current imports.
@@ -88,13 +87,16 @@ createTemporaryModuleForImports PSCiState{psciImportedModules = imports} =
   let
     moduleName = P.ModuleName [P.ProperName "$PSCI"]
   in
-    P.Module (P.internalModuleSourceSpan "<internal>") [] moduleName (importDecl `map` imports) Nothing
+    P.Module internalSpan [] moduleName (importDecl `map` imports) Nothing
 
 importDecl :: ImportedModule -> P.Declaration
-importDecl (mn, declType, asQ) = P.ImportDeclaration mn declType asQ
+importDecl (mn, declType, asQ) = P.ImportDeclaration (internalSpan, []) mn declType asQ
 
 indexFile :: FilePath
 indexFile = ".psci_modules" ++ pathSeparator : "index.js"
 
 modulesDir :: FilePath
 modulesDir = ".psci_modules" ++ pathSeparator : "node_modules"
+
+internalSpan :: P.SourceSpan
+internalSpan = P.internalModuleSourceSpan "<internal>"

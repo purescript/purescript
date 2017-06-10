@@ -195,11 +195,11 @@ desugarDecl mn exps = go
 
   expRef :: Ident -> Qualified (ProperName 'ClassName) -> [Type] -> Maybe DeclarationRef
   expRef name className tys
-    | isExportedClass className && all isExportedType (getConstructors `concatMap` tys) = Just $ TypeInstanceRef name
+    | isExportedClass className && all isExportedType (getConstructors `concatMap` tys) = Just $ TypeInstanceRef genSpan name
     | otherwise = Nothing
 
   isExportedClass :: Qualified (ProperName 'ClassName) -> Bool
-  isExportedClass = isExported (elem . TypeClassRef)
+  isExportedClass = isExported (elem . TypeClassRef genSpan)
 
   isExportedType :: Qualified (ProperName 'TypeName) -> Bool
   isExportedType = isExported $ \pn -> isJust . find (matchesTypeRef pn)
@@ -212,7 +212,7 @@ desugarDecl mn exps = go
   isExported _ _ = internalError "Names should have been qualified in name desugaring"
 
   matchesTypeRef :: ProperName 'TypeName -> DeclarationRef -> Bool
-  matchesTypeRef pn (TypeRef pn' _) = pn == pn'
+  matchesTypeRef pn (TypeRef _ pn' _) = pn == pn'
   matchesTypeRef _ _ = False
 
   getConstructors :: Type -> [Qualified (ProperName 'TypeName)]
@@ -220,6 +220,9 @@ desugarDecl mn exps = go
     where
     getConstructor (TypeConstructor tcname) = [tcname]
     getConstructor _ = []
+
+  genSpan :: SourceSpan
+  genSpan = internalModuleSourceSpan "<generated>"
 
 memberToNameAndType :: Declaration -> (Ident, Type)
 memberToNameAndType (TypeDeclaration ident ty) = (ident, ty)

@@ -225,7 +225,7 @@ findQualModules decls =
 
 -- | Desugars import declarations from AST to CoreFn representation.
 importToCoreFn :: A.Declaration -> Maybe (Ann, ModuleName)
-importToCoreFn (A.ImportDeclaration name _ _) = Just (nullAnn, name)
+importToCoreFn (A.ImportDeclaration _ name _ _) = Just (nullAnn, name)
 importToCoreFn (A.PositionedDeclaration ss _ d) =
   ((,) (Just ss, [], Nothing, Nothing) . snd) <$> importToCoreFn d
 importToCoreFn _ = Nothing
@@ -240,11 +240,10 @@ externToCoreFn _ = Nothing
 -- CoreFn modules only export values, so all data constructors, class
 -- constructor, instances and values are flattened into one list.
 exportToCoreFn :: A.DeclarationRef -> [Ident]
-exportToCoreFn (A.TypeRef _ (Just dctors)) = map properToIdent dctors
-exportToCoreFn (A.ValueRef name) = [name]
-exportToCoreFn (A.TypeClassRef name) = [properToIdent name]
-exportToCoreFn (A.TypeInstanceRef name) = [name]
-exportToCoreFn (A.PositionedDeclarationRef _ _ d) = exportToCoreFn d
+exportToCoreFn (A.TypeRef _ _ (Just dctors)) = map properToIdent dctors
+exportToCoreFn (A.ValueRef _ name) = [name]
+exportToCoreFn (A.TypeClassRef _ name) = [properToIdent name]
+exportToCoreFn (A.TypeInstanceRef _ name) = [name]
 exportToCoreFn _ = []
 
 -- | Makes a typeclass dictionary constructor function. The returned expression
