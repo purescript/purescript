@@ -76,11 +76,11 @@ defaultCompletionOptions :: CompletionOptions
 defaultCompletionOptions = CompletionOptions { coMaxResults = Nothing, coGroupReexports = False }
 
 applyCompletionOptions :: CompletionOptions -> [Match IdeDeclarationAnn] -> [(Match IdeDeclarationAnn, [P.ModuleName])]
-applyCompletionOptions co decls =
-  maybe identity take (coMaxResults co) decls
-  & if coGroupReexports co
-    then groupCompletionReexports
-    else map simpleExport
+applyCompletionOptions co decls =  decls
+  & (if coGroupReexports co
+      then groupCompletionReexports
+      else map simpleExport)
+  & maybe identity take (coMaxResults co)
 
 simpleExport :: Match a -> (Match a, [P.ModuleName])
 simpleExport match@(Match (moduleName, _)) = (match, [moduleName])
