@@ -13,7 +13,7 @@ import Control.Monad.Writer.Class
 import Data.Function (on)
 import Data.Foldable (for_)
 import Data.List (find, intersect, groupBy, sortBy, (\\))
-import Data.Maybe (mapMaybe, fromMaybe)
+import Data.Maybe (mapMaybe)
 import Data.Monoid (Sum(..))
 import Data.Traversable (forM)
 import qualified Data.Text as T
@@ -58,7 +58,7 @@ lintImports
   -> m ()
 lintImports (Module _ _ _ _ Nothing) _ _ =
   internalError "lintImports needs desugared exports"
-lintImports (Module ss _ mn mdecls (Just mexports)) env usedImps = do
+lintImports (Module _ _ mn mdecls (Just mexports)) env usedImps = do
 
   -- TODO: this needs some work to be easier to understand
 
@@ -70,15 +70,15 @@ lintImports (Module ss _ mn mdecls (Just mexports)) env usedImps = do
 
   for_ imports $ \(mni, decls) ->
     unless (isPrim mni) .
-      for_ decls $ \(ss', declType, qualifierName) -> do
+      for_ decls $ \(ss, declType, qualifierName) -> do
         let names = ordNub $ M.findWithDefault [] mni usedImps'
-        lintImportDecl env mni qualifierName names ss' declType allowImplicit
+        lintImportDecl env mni qualifierName names ss declType allowImplicit
 
   for_ (M.toAscList (byQual imports)) $ \(mnq, entries) -> do
     let mnis = ordNub $ map (\(_, _, mni) -> mni) entries
     unless (length mnis == 1) $ do
       let implicits = filter (\(_, declType, _) -> not $ isExplicit declType) entries
-      for_ implicits $ \(ss', _, mni) -> do
+      for_ implicits $ \(ss, _, mni) -> do
         let names = ordNub $ M.findWithDefault [] mni usedImps'
             usedRefs = findUsedRefs env mni (Just mnq) names
         unless (null usedRefs) .
