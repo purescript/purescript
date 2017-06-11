@@ -80,7 +80,7 @@ lintImports (Module _ _ mn mdecls (Just mexports)) env usedImps = do
       let implicits = filter (\(_, declType, _) -> not $ isExplicit declType) entries
       for_ implicits $ \(ss, _, mni) -> do
         let names = ordNub $ M.findWithDefault [] mni usedImps'
-            usedRefs = findUsedRefs env mni (Just mnq) names
+            usedRefs = findUsedRefs ss env mni (Just mnq) names
         unless (null usedRefs) .
           tell . errorMessage' ss $ ImplicitQualifiedImport mni mnq usedRefs
 
@@ -269,7 +269,7 @@ lintImportDecl env mni qualifierName names ss declType allowImplicit =
   unless' True _ = return False
 
   allRefs :: [DeclarationRef]
-  allRefs = findUsedRefs env mni qualifierName names
+  allRefs = findUsedRefs ss env mni qualifierName names
 
   dtys
     :: ModuleName
@@ -289,24 +289,25 @@ lintImportDecl env mni qualifierName names ss declType allowImplicit =
   typeForDCtor mn pn = fst <$> find (elem pn . fst . snd) (M.toList (dtys mn))
 
 findUsedRefs
-  :: Env
+  :: SourceSpan
+  -> Env
   -> ModuleName
   -> Maybe ModuleName
   -> [Qualified Name]
   -> [DeclarationRef]
-findUsedRefs env mni qn names =
+findUsedRefs ss env mni qn names =
   let
-    classRefs = TypeClassRef (internalModuleSourceSpan "<TODO>") <$> mapMaybe (getClassName <=< disqualifyFor qn) names
-    valueRefs = ValueRef (internalModuleSourceSpan "<TODO>") <$> mapMaybe (getIdentName <=< disqualifyFor qn) names
-    valueOpRefs = ValueOpRef (internalModuleSourceSpan "<TODO>") <$> mapMaybe (getValOpName <=< disqualifyFor qn) names
-    typeOpRefs = TypeOpRef (internalModuleSourceSpan "<TODO>") <$> mapMaybe (getTypeOpName <=< disqualifyFor qn) names
+    classRefs = TypeClassRef ss <$> mapMaybe (getClassName <=< disqualifyFor qn) names
+    valueRefs = ValueRef ss <$> mapMaybe (getIdentName <=< disqualifyFor qn) names
+    valueOpRefs = ValueOpRef ss <$> mapMaybe (getValOpName <=< disqualifyFor qn) names
+    typeOpRefs = TypeOpRef ss <$> mapMaybe (getTypeOpName <=< disqualifyFor qn) names
     types = mapMaybe (getTypeName <=< disqualifyFor qn) names
     dctors = mapMaybe (getDctorName <=< disqualifyFor qn) names
     typesWithDctors = reconstructTypeRefs dctors
     typesWithoutDctors = filter (`M.notMember` typesWithDctors) types
     typesRefs
-      = map (flip (TypeRef (internalModuleSourceSpan "<TODO>")) (Just [])) typesWithoutDctors
-      ++ map (\(ty, ds) -> TypeRef (internalModuleSourceSpan "<TODO>") ty (Just ds)) (M.toList typesWithDctors)
+      = map (flip (TypeRef ss) (Just [])) typesWithoutDctors
+      ++ map (\(ty, ds) -> TypeRef ss ty (Just ds)) (M.toList typesWithDctors)
   in sortBy compDecRef $ classRefs ++ typeOpRefs ++ typesRefs ++ valueRefs ++ valueOpRefs
 
   where
