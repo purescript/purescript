@@ -204,7 +204,7 @@ instance ToJSON Completion where
            , "expandedType" .= complExpandedType
            , "definedAt" .= complLocation
            , "documentation" .= complDocumentation
-           , "exportedFrom" .= complExportedFrom
+           , "exportedFrom" .= map P.runModuleName complExportedFrom
            ]
 
 identifierFromDeclarationRef :: P.DeclarationRef -> Text
