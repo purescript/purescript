@@ -191,7 +191,7 @@ errorMessage err = MultipleErrors [ErrorMessage [] err]
 
 -- | Create an error set from a single simple error message and source annotation
 errorMessage' :: SourceSpan -> SimpleErrorMessage -> MultipleErrors
-errorMessage' ss err = MultipleErrors [ErrorMessage [] err]
+errorMessage' ss err = MultipleErrors [ErrorMessage [PositionedError ss] err]
 
 -- | Create an error set from a single error message
 singleError :: ErrorMessage -> MultipleErrors
