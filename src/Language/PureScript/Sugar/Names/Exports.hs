@@ -268,12 +268,11 @@ filterModule mn exps refs = do
   -- listing for the last ref would be used.
   combineTypeRefs :: [DeclarationRef] -> [DeclarationRef]
   combineTypeRefs
-    -- = fmap (uncurry TypeRef)
-    -- . map (foldr1 $ \(tc, dcs1) (_, dcs2) -> (tc, liftM2 (++) dcs1 dcs2))
-    -- . groupBy ((==) `on` fst)
-    -- . sortBy (compare `on` fst)
-    -- . mapMaybe getTypeRef
-    = id
+    = fmap (\(ss', (tc, dcs)) -> TypeRef ss' tc dcs)
+    . fmap (foldr1 $ \(ss, (tc, dcs1)) (_, (_, dcs2)) -> (ss, (tc, liftM2 (++) dcs1 dcs2)))
+    . groupBy ((==) `on` (fst . snd))
+    . sortBy (compare `on` (fst . snd))
+    . mapMaybe (\ref -> (declRefSourceSpan ref,) <$> getTypeRef ref)
 
   filterTypes
     :: M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ModuleName)
