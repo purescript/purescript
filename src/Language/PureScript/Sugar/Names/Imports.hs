@@ -21,7 +21,7 @@ import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.Sugar.Names.Env
 
-type ImportDef = (Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)
+type ImportDef = (SourceSpan, ImportDeclarationType, Maybe ModuleName)
 
 -- |
 -- Finds the imports within a module, mapping the imported module name to an optional set of
@@ -30,13 +30,12 @@ type ImportDef = (Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)
 findImports
   :: [Declaration]
   -> M.Map ModuleName [ImportDef]
-findImports = foldl (go Nothing) M.empty
+findImports = foldr go M.empty
   where
-  go pos result (ImportDeclaration mn typ qual) =
+  go (ImportDeclaration (pos, _) mn typ qual) result =
     let imp = (pos, typ, qual)
     in M.insert mn (maybe [imp] (imp :) (mn `M.lookup` result)) result
-  go _ result (PositionedDeclaration pos _ d) = go (Just pos) result d
-  go _ result _ = result
+  go _ result = result
 
 -- |
 -- Constructs a set of imports for a module.
@@ -51,7 +50,7 @@ resolveImports env (Module ss coms currentModule decls exps) =
   rethrow (addHint (ErrorInModule currentModule)) $ do
     let imports = findImports decls
         imports' = M.map (map (\(ss', dt, mmn) -> (ss', Just dt, mmn))) imports
-        scope = M.insert currentModule [(Nothing, Nothing, Nothing)] imports'
+        scope = M.insert currentModule [(internalModuleSourceSpan "<module>", Nothing, Nothing)] imports'
     (Module ss coms currentModule decls exps,) <$>
       foldM (resolveModuleImport env) primImports (M.toList scope)
 
@@ -61,17 +60,17 @@ resolveModuleImport
    . MonadError MultipleErrors m
   => Env
   -> Imports
-  -> (ModuleName, [(Maybe SourceSpan, Maybe ImportDeclarationType, Maybe ModuleName)])
+  -> (ModuleName, [(SourceSpan, Maybe ImportDeclarationType, Maybe ModuleName)])
   -> m Imports
 resolveModuleImport env ie (mn, imps) = foldM go ie imps
   where
   go :: Imports
-     -> (Maybe SourceSpan, Maybe ImportDeclarationType, Maybe ModuleName)
+     -> (SourceSpan, Maybe ImportDeclarationType, Maybe ModuleName)
      -> m Imports
-  go ie' (pos, typ, impQual) = do
+  go ie' (ss, typ, impQual) = do
     modExports <-
-      positioned $ maybe
-        (throwError . errorMessage . UnknownName . Qualified Nothing $ ModName mn)
+      maybe
+        (throwError . errorMessage' ss . UnknownName . Qualified Nothing $ ModName mn)
         (return . envModuleExports)
         (mn `M.lookup` env)
     let impModules = importedModules ie'
@@ -79,11 +78,7 @@ resolveModuleImport env ie (mn, imps) = foldM go ie imps
         ie'' = ie' { importedModules = maybe (S.insert mn impModules) (const impModules) impQual
                    , importedQualModules = maybe qualModules (`S.insert` qualModules) impQual
                    }
-    positioned $ resolveImport mn modExports ie'' impQual typ
-    where
-    positioned err = case pos of
-      Nothing -> err
-      Just pos' -> rethrowWithPosition pos' err
+    resolveImport mn modExports ie'' impQual ss typ
 
 -- |
 -- Extends the local environment for a module by resolving an import of another module.
@@ -95,67 +90,68 @@ resolveImport
   -> Exports
   -> Imports
   -> Maybe ModuleName
+  -> SourceSpan
   -> Maybe ImportDeclarationType
   -> m Imports
 resolveImport importModule exps imps impQual = resolveByType
   where
 
-  resolveByType :: Maybe ImportDeclarationType -> m Imports
-  resolveByType Nothing =
-    importAll (importRef Local)
-  resolveByType (Just Implicit) =
-    importAll (importRef FromImplicit)
-  resolveByType (Just (Explicit refs)) =
+  resolveByType :: SourceSpan -> Maybe ImportDeclarationType -> m Imports
+  resolveByType ss Nothing =
+    importAll ss (importRef Local)
+  resolveByType ss (Just Implicit) =
+    importAll ss (importRef FromImplicit)
+  resolveByType _ (Just (Explicit refs)) =
     checkRefs False refs >> foldM (importRef FromExplicit) imps refs
-  resolveByType (Just (Hiding refs)) =
-    checkRefs True refs >> importAll (importNonHidden refs)
+  resolveByType ss (Just (Hiding refs)) =
+    checkRefs True refs >> importAll ss (importNonHidden refs)
 
   -- Check that a 'DeclarationRef' refers to an importable symbol
   checkRefs :: Bool -> [DeclarationRef] -> m ()
   checkRefs isHiding = traverse_ check
     where
-    check (PositionedDeclarationRef pos _ r) =
-      rethrowWithPosition pos $ check r
-    check (ValueRef name) =
-      checkImportExists IdentName (exportedValues exps) name
-    check (ValueOpRef op) =
-      checkImportExists ValOpName (exportedValueOps exps) op
-    check (TypeRef name dctors) = do
-      checkImportExists TyName (exportedTypes exps) name
+    check (ValueRef ss name) =
+      checkImportExists ss IdentName (exportedValues exps) name
+    check (ValueOpRef ss op) =
+      checkImportExists ss ValOpName (exportedValueOps exps) op
+    check (TypeRef ss name dctors) = do
+      checkImportExists ss TyName (exportedTypes exps) name
       let (allDctors, _) = allExportedDataConstructors name
-      for_ dctors $ traverse_ (checkDctorExists name allDctors)
-    check (TypeOpRef name) =
-      checkImportExists TyOpName (exportedTypeOps exps) name
-    check (TypeClassRef name) =
-      checkImportExists TyClassName (exportedTypeClasses exps) name
-    check (ModuleRef name) | isHiding =
-      throwError . errorMessage $ ImportHidingModule name
-    check (KindRef name) = do
-      checkImportExists KiName (exportedKinds exps) name
+      for_ dctors $ traverse_ (checkDctorExists ss name allDctors)
+    check (TypeOpRef ss name) =
+      checkImportExists ss TyOpName (exportedTypeOps exps) name
+    check (TypeClassRef ss name) =
+      checkImportExists ss TyClassName (exportedTypeClasses exps) name
+    check (ModuleRef ss name) | isHiding =
+      throwError . errorMessage' ss $ ImportHidingModule name
+    check (KindRef ss name) =
+      checkImportExists ss KiName (exportedKinds exps) name
     check r = internalError $ "Invalid argument to checkRefs: " ++ show r
 
   -- Check that an explicitly imported item exists in the module it is being imported from
   checkImportExists
     :: Ord a
-    => (a -> Name)
+    => SourceSpan
+    -> (a -> Name)
     -> M.Map a b
     -> a
     -> m ()
-  checkImportExists toName exports item
+  checkImportExists ss toName exports item
     = when (item `M.notMember` exports)
-    . throwError . errorMessage
+    . throwError . errorMessage' ss
     $ UnknownImport importModule (toName item)
 
   -- Ensure that an explicitly imported data constructor exists for the type it is being imported
   -- from
   checkDctorExists
-    :: ProperName 'TypeName
+    :: SourceSpan
+    -> ProperName 'TypeName
     -> [ProperName 'ConstructorName]
     -> ProperName 'ConstructorName
     -> m ()
-  checkDctorExists tcon exports dctor
+  checkDctorExists ss tcon exports dctor
     = when (dctor `notElem` exports)
-    . throwError . errorMessage
+    . throwError . errorMessage' ss
     $ UnknownImportDataConstructor importModule tcon dctor
 
   importNonHidden :: [DeclarationRef] -> Imports -> DeclarationRef -> m Imports
@@ -164,51 +160,47 @@ resolveImport importModule exps imps impQual = resolveByType
     where
     -- TODO: rework this to be not confusing
     isHidden :: DeclarationRef -> Bool
-    isHidden ref'@(TypeRef _ _) = foldl (checkTypeRef ref') False hidden
+    isHidden ref'@TypeRef{} = foldl (checkTypeRef ref') False hidden
     isHidden ref' = ref' `elem` hidden
     checkTypeRef :: DeclarationRef -> Bool -> DeclarationRef -> Bool
     checkTypeRef _ True _ = True
-    checkTypeRef r acc (PositionedDeclarationRef _ _ h) = checkTypeRef r acc h
-    checkTypeRef (TypeRef _ Nothing) acc (TypeRef _ (Just _)) = acc
-    checkTypeRef (TypeRef name (Just dctor)) _ (TypeRef name' (Just dctor')) = name == name' && dctor == dctor'
-    checkTypeRef (TypeRef name _) _ (TypeRef name' Nothing) = name == name'
-    checkTypeRef (PositionedDeclarationRef _ _ r) acc hiddenRef = checkTypeRef r acc hiddenRef
+    checkTypeRef (TypeRef _ _ Nothing) acc (TypeRef _ _ (Just _)) = acc
+    checkTypeRef (TypeRef _ name (Just dctor)) _ (TypeRef _ name' (Just dctor')) = name == name' && dctor == dctor'
+    checkTypeRef (TypeRef _ name _) _ (TypeRef _ name' Nothing) = name == name'
     checkTypeRef _ acc _ = acc
 
   -- Import all symbols
-  importAll :: (Imports -> DeclarationRef -> m Imports) -> m Imports
-  importAll importer =
-    foldM (\m (name, (dctors, _)) -> importer m (TypeRef name (Just dctors))) imps (M.toList (exportedTypes exps))
-      >>= flip (foldM (\m (name, _) -> importer m (TypeOpRef name))) (M.toList (exportedTypeOps exps))
-      >>= flip (foldM (\m (name, _) -> importer m (ValueRef name))) (M.toList (exportedValues exps))
-      >>= flip (foldM (\m (name, _) -> importer m (ValueOpRef name))) (M.toList (exportedValueOps exps))
-      >>= flip (foldM (\m (name, _) -> importer m (TypeClassRef name))) (M.toList (exportedTypeClasses exps))
-      >>= flip (foldM (\m (name, _) -> importer m (KindRef name))) (M.toList (exportedKinds exps))
+  importAll :: SourceSpan -> (Imports -> DeclarationRef -> m Imports) -> m Imports
+  importAll ss importer =
+    foldM (\m (name, (dctors, _)) -> importer m (TypeRef ss name (Just dctors))) imps (M.toList (exportedTypes exps))
+      >>= flip (foldM (\m (name, _) -> importer m (TypeOpRef ss name))) (M.toList (exportedTypeOps exps))
+      >>= flip (foldM (\m (name, _) -> importer m (ValueRef ss name))) (M.toList (exportedValues exps))
+      >>= flip (foldM (\m (name, _) -> importer m (ValueOpRef ss name))) (M.toList (exportedValueOps exps))
+      >>= flip (foldM (\m (name, _) -> importer m (TypeClassRef ss name))) (M.toList (exportedTypeClasses exps))
+      >>= flip (foldM (\m (name, _) -> importer m (KindRef ss name))) (M.toList (exportedKinds exps))
 
   importRef :: ImportProvenance -> Imports -> DeclarationRef -> m Imports
-  importRef prov imp (PositionedDeclarationRef pos _ r) =
-    rethrowWithPosition pos $ importRef prov imp r
-  importRef prov imp (ValueRef name) = do
+  importRef prov imp (ValueRef _ name) = do
     let values' = updateImports (importedValues imp) (exportedValues exps) id name prov
     return $ imp { importedValues = values' }
-  importRef prov imp (ValueOpRef name) = do
+  importRef prov imp (ValueOpRef _ name) = do
     let valueOps' = updateImports (importedValueOps imp) (exportedValueOps exps) id name prov
     return $ imp { importedValueOps = valueOps' }
-  importRef prov imp (TypeRef name dctors) = do
+  importRef prov imp (TypeRef ss name dctors) = do
     let types' = updateImports (importedTypes imp) (exportedTypes exps) snd name prov
     let (dctorNames, mn) = allExportedDataConstructors name
         dctorLookup :: M.Map (ProperName 'ConstructorName) ModuleName
         dctorLookup = M.fromList $ map (, mn) dctorNames
-    traverse_ (traverse_ $ checkDctorExists name dctorNames) dctors
+    traverse_ (traverse_ $ checkDctorExists ss name dctorNames) dctors
     let dctors' = foldl (\m d -> updateImports m dctorLookup id d prov) (importedDataConstructors imp) (fromMaybe dctorNames dctors)
     return $ imp { importedTypes = types', importedDataConstructors = dctors' }
-  importRef prov imp (TypeOpRef name) = do
+  importRef prov imp (TypeOpRef _ name) = do
     let ops' = updateImports (importedTypeOps imp) (exportedTypeOps exps) id name prov
     return $ imp { importedTypeOps = ops' }
-  importRef prov imp (TypeClassRef name) = do
+  importRef prov imp (TypeClassRef _ name) = do
     let typeClasses' = updateImports (importedTypeClasses imp) (exportedTypeClasses exps) id name prov
     return $ imp { importedTypeClasses = typeClasses' }
-  importRef prov imp (KindRef name) = do
+  importRef prov imp (KindRef _ name) = do
     let kinds' = updateImports (importedKinds imp) (exportedKinds exps) id name prov
     return $ imp { importedKinds = kinds' }
   importRef _ _ TypeInstanceRef{} = internalError "TypeInstanceRef in importRef"

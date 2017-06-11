@@ -6,8 +6,7 @@ import Protolude (ordNub)
 import Control.Monad.Writer (MonadWriter(..))
 
 import Data.Foldable (for_)
-import Data.Function (on)
-import Data.List (nubBy, (\\))
+import Data.List (nub, (\\))
 import Data.Maybe (mapMaybe)
 
 import Language.PureScript.AST
@@ -25,7 +24,7 @@ warnDuplicateRefs
   -> m ()
 warnDuplicateRefs pos toError refs = do
   let withoutCtors = deleteCtors `map` refs
-      dupeRefs = mapMaybe (refToName pos) $ withoutCtors \\ nubBy ((==) `on` withoutPosInfo) withoutCtors
+      dupeRefs = mapMaybe (refToName pos) $ withoutCtors \\ nub withoutCtors
       dupeCtors = concat $ mapMaybe (extractCtors pos) refs
 
   for_ (dupeRefs ++ dupeCtors) $ \(pos', name) ->
@@ -33,37 +32,26 @@ warnDuplicateRefs pos toError refs = do
 
   where
 
-  -- Returns a DeclarationRef unwrapped from any PositionedDeclarationRef
-  -- constructor(s) it may be wrapped within. Used so position info is ignored
-  -- when making the comparison for duplicates.
-  withoutPosInfo :: DeclarationRef -> DeclarationRef
-  withoutPosInfo (PositionedDeclarationRef _ _ ref) = withoutPosInfo ref
-  withoutPosInfo other = other
-
   -- Deletes the constructor information from TypeRefs so that only the
   -- referenced type is used in the duplicate check - constructors are handled
   -- separately
   deleteCtors :: DeclarationRef -> DeclarationRef
-  deleteCtors (PositionedDeclarationRef ss com ref) =
-    PositionedDeclarationRef ss com (deleteCtors ref)
-  deleteCtors (TypeRef pn _) = TypeRef pn Nothing
+  deleteCtors (TypeRef sa pn _) = TypeRef sa pn Nothing
   deleteCtors other = other
 
   -- Extracts the names of duplicate constructor references from TypeRefs.
   extractCtors :: SourceSpan -> DeclarationRef -> Maybe [(SourceSpan, Name)]
-  extractCtors _ (PositionedDeclarationRef pos' _ ref) = extractCtors pos' ref
-  extractCtors pos' (TypeRef _ (Just dctors)) =
+  extractCtors pos' (TypeRef _ _ (Just dctors)) =
     let dupes = dctors \\ ordNub dctors
     in if null dupes then Nothing else Just $ ((pos',) . DctorName) <$> dupes
   extractCtors _ _ = Nothing
 
   -- Converts a DeclarationRef into a name for an error message.
   refToName :: SourceSpan -> DeclarationRef -> Maybe (SourceSpan, Name)
-  refToName pos' (TypeRef name _) = Just (pos', TyName name)
-  refToName pos' (TypeOpRef op) = Just (pos', TyOpName op)
-  refToName pos' (ValueRef name) = Just (pos', IdentName name)
-  refToName pos' (ValueOpRef op) = Just (pos', ValOpName op)
-  refToName pos' (TypeClassRef name) = Just (pos', TyClassName name)
-  refToName pos' (ModuleRef name) = Just (pos', ModName name)
-  refToName _ (PositionedDeclarationRef pos' _ ref) = refToName pos' ref
+  refToName pos' (TypeRef _ name _) = Just (pos', TyName name)
+  refToName pos' (TypeOpRef _ op) = Just (pos', TyOpName op)
+  refToName pos' (ValueRef _ name) = Just (pos', IdentName name)
+  refToName pos' (ValueOpRef _ op) = Just (pos', ValOpName op)
+  refToName pos' (TypeClassRef _ name) = Just (pos', TyClassName name)
+  refToName pos' (ModuleRef _ name) = Just (pos', ModName name)
   refToName _ _ = Nothing

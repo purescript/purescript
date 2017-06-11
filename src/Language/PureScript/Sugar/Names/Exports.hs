@@ -84,9 +84,7 @@ resolveExports env ss mn imps exps refs =
   -- `DeclarationRef` for an explicit export. When the ref refers to another
   -- module, export anything from the imports that matches for that module.
   elaborateModuleExports :: Exports -> DeclarationRef -> m Exports
-  elaborateModuleExports result (PositionedDeclarationRef pos _ r) =
-    warnAndRethrowWithPosition pos $ elaborateModuleExports result r
-  elaborateModuleExports result (ModuleRef name) | name == mn = do
+  elaborateModuleExports result (ModuleRef _ name) | name == mn = do
     let types' = exportedTypes result `M.union` exportedTypes exps
     let typeOps' = exportedTypeOps result `M.union` exportedTypeOps exps
     let classes' = exportedTypeClasses result `M.union` exportedTypeClasses exps
@@ -101,10 +99,10 @@ resolveExports env ss mn imps exps refs =
       , exportedValueOps = valueOps'
       , exportedKinds = kinds'
       }
-  elaborateModuleExports result (ModuleRef name) = do
+  elaborateModuleExports result (ModuleRef ss' name) = do
     let isPseudo = isPseudoModule name
     when (not isPseudo && not (isImportedModule name))
-      . throwError . errorMessage . UnknownExport $ ModName name
+      . throwError . errorMessage' ss' . UnknownExport $ ModName name
     reTypes <- extract isPseudo name TyName (importedTypes imps)
     reTypeOps <- extract isPseudo name TyOpName (importedTypeOps imps)
     reDctors <- extract isPseudo name DctorName (importedDataConstructors imps)
@@ -270,21 +268,19 @@ filterModule mn exps refs = do
   -- listing for the last ref would be used.
   combineTypeRefs :: [DeclarationRef] -> [DeclarationRef]
   combineTypeRefs
-    = fmap (uncurry TypeRef)
-    . map (foldr1 $ \(tc, dcs1) (_, dcs2) -> (tc, liftM2 (++) dcs1 dcs2))
-    . groupBy ((==) `on` fst)
-    . sortBy (compare `on` fst)
-    . mapMaybe getTypeRef
+    = fmap (\(ss', (tc, dcs)) -> TypeRef ss' tc dcs)
+    . fmap (foldr1 $ \(ss, (tc, dcs1)) (_, (_, dcs2)) -> (ss, (tc, liftM2 (++) dcs1 dcs2)))
+    . groupBy ((==) `on` (fst . snd))
+    . sortBy (compare `on` (fst . snd))
+    . mapMaybe (\ref -> (declRefSourceSpan ref,) <$> getTypeRef ref)
 
   filterTypes
     :: M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ModuleName)
     -> DeclarationRef
     -> m (M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ModuleName))
-  filterTypes result (PositionedDeclarationRef pos _ r) =
-    rethrowWithPosition pos $ filterTypes result r
-  filterTypes result (TypeRef name expDcons) =
+  filterTypes result (TypeRef ss name expDcons) =
     case name `M.lookup` exportedTypes exps of
-      Nothing -> throwError . errorMessage . UnknownExport $ TyName name
+      Nothing -> throwError . errorMessage' ss . UnknownExport $ TyName name
       Just (dcons, _) -> do
         let expDcons' = fromMaybe dcons expDcons
         traverse_ (checkDcon name dcons) expDcons'
@@ -299,8 +295,8 @@ filterModule mn exps refs = do
       -> ProperName 'ConstructorName
       -> m ()
     checkDcon tcon dcons dcon =
-      unless (dcon `elem` dcons) $
-        throwError . errorMessage $ UnknownExportDataConstructor tcon dcon
+      unless (dcon `elem` dcons) .
+        throwError . errorMessage' ss $ UnknownExportDataConstructor tcon dcon
   filterTypes result _ = return result
 
   filterExport
@@ -311,12 +307,10 @@ filterModule mn exps refs = do
     -> M.Map a ModuleName
     -> DeclarationRef
     -> m (M.Map a ModuleName)
-  filterExport toName get fromExps result (PositionedDeclarationRef pos _ r) =
-    rethrowWithPosition pos $ filterExport toName get fromExps result r
   filterExport toName get fromExps result ref
     | Just name <- get ref =
         case name `M.lookup` fromExps exps of
           -- TODO: I'm not sure if we actually need to check mn == mn' here -gb
           Just mn' | mn == mn' -> return $ M.insert name mn result
-          _ -> throwError . errorMessage . UnknownExport $ toName name
+          _ -> throwError . errorMessage' (declRefSourceSpan ref) . UnknownExport $ toName name
   filterExport _ _ _ result _ = return result

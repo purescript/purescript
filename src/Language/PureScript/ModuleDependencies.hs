@@ -53,7 +53,7 @@ sortModules ms = do
 usedModules :: Declaration -> Maybe (ModuleName, Maybe SourceSpan)
 -- Regardless of whether an imported module is qualified we still need to
 -- take into account its import to build an accurate list of dependencies.
-usedModules (ImportDeclaration mn _ _) = pure (mn, Nothing)
+usedModules (ImportDeclaration _ mn _ _) = pure (mn, Nothing)
 usedModules (PositionedDeclaration ss _ d) = fmap (second (const (Just ss))) (usedModules d)
 usedModules _ = Nothing
 

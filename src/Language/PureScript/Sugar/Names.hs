@@ -66,7 +66,7 @@ desugarImportsWithEnv externs modules = do
   externsEnv env ExternsFile{..} = do
     let members = Exports{..}
         env' = M.insert efModuleName (efSourceSpan, primImports, members) env
-        fromEFImport (ExternsImport mn mt qmn) = (mn, [(Nothing, Just mt, qmn)])
+        fromEFImport (ExternsImport mn mt qmn) = (mn, [(efSourceSpan, Just mt, qmn)])
     imps <- foldM (resolveModuleImport env') primImports (map fromEFImport efImports)
     exps <- resolveExports env' efSourceSpan efModuleName imps members efExports
     return $ M.insert efModuleName (efSourceSpan, imps, exps) env
@@ -75,12 +75,11 @@ desugarImportsWithEnv externs modules = do
     exportedTypes :: M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ModuleName)
     exportedTypes = M.fromList $ mapMaybe toExportedType efExports
       where
-      toExportedType (TypeRef tyCon dctors) = Just (tyCon, (fromMaybe (mapMaybe forTyCon efDeclarations) dctors, efModuleName))
+      toExportedType (TypeRef _ tyCon dctors) = Just (tyCon, (fromMaybe (mapMaybe forTyCon efDeclarations) dctors, efModuleName))
         where
         forTyCon :: ExternsDeclaration -> Maybe (ProperName 'ConstructorName)
         forTyCon (EDDataConstructor pn _ tNm _ _) | tNm == tyCon = Just pn
         forTyCon _ = Nothing
-      toExportedType (PositionedDeclarationRef _ _ r) = toExportedType r
       toExportedType _ = Nothing
 
     exportedTypeOps :: M.Map (OpName 'TypeOpName) ModuleName
@@ -127,24 +126,24 @@ elaborateExports :: Exports -> Module -> Module
 elaborateExports exps (Module ss coms mn decls refs) =
   Module ss coms mn decls $ Just
     $ elaboratedTypeRefs
-    ++ go TypeOpRef exportedTypeOps
-    ++ go TypeClassRef exportedTypeClasses
-    ++ go ValueRef exportedValues
-    ++ go ValueOpRef exportedValueOps
-    ++ go KindRef exportedKinds
+    ++ go (TypeOpRef ss) exportedTypeOps
+    ++ go (TypeClassRef ss) exportedTypeClasses
+    ++ go (ValueRef ss) exportedValues
+    ++ go (ValueOpRef ss) exportedValueOps
+    ++ go (KindRef ss) exportedKinds
     ++ maybe [] (filter isModuleRef) refs
   where
 
   elaboratedTypeRefs :: [DeclarationRef]
   elaboratedTypeRefs =
     flip map (M.toList (exportedTypes exps)) $ \(tctor, (dctors, mn')) ->
-      let ref = TypeRef tctor (Just dctors)
-      in if mn == mn' then ref else ReExportRef mn' ref
+      let ref = TypeRef ss tctor (Just dctors)
+      in if mn == mn' then ref else ReExportRef ss mn' ref
 
   go :: (a -> DeclarationRef) -> (Exports -> M.Map a ModuleName) -> [DeclarationRef]
   go toRef select =
     flip map (M.toList (select exps)) $ \(export, mn') ->
-      if mn == mn' then toRef export else ReExportRef mn' (toRef export)
+      if mn == mn' then toRef export else ReExportRef ss mn' (toRef export)
 
 -- |
 -- Replaces all local names with qualified names within a module and checks that all existing

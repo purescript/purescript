@@ -85,13 +85,11 @@ filterInstances mn (Just exps) =
   checkQual q = isQualified q && not (isQualifiedWith mn q)
 
   typeName :: DeclarationRef -> Maybe (ProperName 'TypeName)
-  typeName (TypeRef n _) = Just n
-  typeName (PositionedDeclarationRef _ _ r) = typeName r
+  typeName (TypeRef _ n _) = Just n
   typeName _ = Nothing
 
   typeClassName :: DeclarationRef -> Maybe (ProperName 'ClassName)
-  typeClassName (TypeClassRef n) = Just n
-  typeClassName (PositionedDeclarationRef _ _ r) = typeClassName r
+  typeClassName (TypeClassRef _ n) = Just n
   typeClassName _ = Nothing
 
 -- |
@@ -127,18 +125,17 @@ isExported _ TypeInstanceDeclaration{} = True
 isExported exps (PositionedDeclaration _ _ d) = isExported exps d
 isExported (Just exps) decl = any (matches decl) exps
   where
-  matches (TypeDeclaration ident _) (ValueRef ident') = ident == ident'
-  matches (ValueDeclaration ident _ _ _) (ValueRef ident') = ident == ident'
-  matches (ExternDeclaration ident _) (ValueRef ident') = ident == ident'
-  matches (DataDeclaration _ ident _ _) (TypeRef ident' _) = ident == ident'
-  matches (ExternDataDeclaration ident _) (TypeRef ident' _) = ident == ident'
-  matches (ExternKindDeclaration ident) (KindRef ident') = ident == ident'
-  matches (TypeSynonymDeclaration ident _ _) (TypeRef ident' _) = ident == ident'
-  matches (TypeClassDeclaration ident _ _ _ _) (TypeClassRef ident') = ident == ident'
-  matches (ValueFixityDeclaration _ _ op) (ValueOpRef op') = op == op'
-  matches (TypeFixityDeclaration _ _ op) (TypeOpRef op') = op == op'
+  matches (TypeDeclaration ident _) (ValueRef _ ident') = ident == ident'
+  matches (ValueDeclaration ident _ _ _) (ValueRef _ ident') = ident == ident'
+  matches (ExternDeclaration ident _) (ValueRef _ ident') = ident == ident'
+  matches (DataDeclaration _ ident _ _) (TypeRef _ ident' _) = ident == ident'
+  matches (ExternDataDeclaration ident _) (TypeRef _ ident' _) = ident == ident'
+  matches (ExternKindDeclaration ident) (KindRef _ ident') = ident == ident'
+  matches (TypeSynonymDeclaration ident _ _) (TypeRef _ ident' _) = ident == ident'
+  matches (TypeClassDeclaration ident _ _ _ _) (TypeClassRef _ ident') = ident == ident'
+  matches (ValueFixityDeclaration _ _ op) (ValueOpRef _ op') = op == op'
+  matches (TypeFixityDeclaration _ _ op) (TypeOpRef _ op') = op == op'
   matches (PositionedDeclaration _ _ d) r = d `matches` r
-  matches d (PositionedDeclarationRef _ _ r) = d `matches` r
   matches _ _ = False
 
 -- |
@@ -149,7 +146,6 @@ isDctorExported :: ProperName 'TypeName -> Maybe [DeclarationRef] -> ProperName 
 isDctorExported _ Nothing _ = True
 isDctorExported ident (Just exps) ctor = test `any` exps
   where
-  test (PositionedDeclarationRef _ _ d) = test d
-  test (TypeRef ident' Nothing) = ident == ident'
-  test (TypeRef ident' (Just ctors)) = ident == ident' && ctor `elem` ctors
+  test (TypeRef _ ident' Nothing) = ident == ident'
+  test (TypeRef _ ident' (Just ctors)) = ident == ident' && ctor `elem` ctors
   test _ = False

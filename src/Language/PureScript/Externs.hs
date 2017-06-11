@@ -193,13 +193,12 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
   findOp g op = maybe False (== op) . g
 
   importDecl :: Declaration -> Maybe ExternsImport
-  importDecl (ImportDeclaration m mt qmn) = Just (ExternsImport m mt qmn)
+  importDecl (ImportDeclaration _ m mt qmn) = Just (ExternsImport m mt qmn)
   importDecl (PositionedDeclaration _ _ d) = importDecl d
   importDecl _ = Nothing
 
   toExternsDeclaration :: DeclarationRef -> [ExternsDeclaration]
-  toExternsDeclaration (PositionedDeclarationRef _ _ r) = toExternsDeclaration r
-  toExternsDeclaration (TypeRef pn dctors) =
+  toExternsDeclaration (TypeRef _ pn dctors) =
     case Qualified (Just mn) pn `M.lookup` types env of
       Nothing -> internalError "toExternsDeclaration: no kind in toExternsDeclaration"
       Just (kind, TypeSynonym)
@@ -211,10 +210,10 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
                             , (dty, _, ty, args) <- maybeToList (Qualified (Just mn) dctor `M.lookup` dataConstructors env)
                             ]
       _ -> internalError "toExternsDeclaration: Invalid input"
-  toExternsDeclaration (ValueRef ident)
+  toExternsDeclaration (ValueRef _ ident)
     | Just (ty, _, _) <- Qualified (Just mn) ident `M.lookup` names env
     = [ EDValue ident ty ]
-  toExternsDeclaration (TypeClassRef className)
+  toExternsDeclaration (TypeClassRef _ className)
     | Just TypeClassData{..} <- Qualified (Just mn) className `M.lookup` typeClasses env
     , Just (kind, TypeSynonym) <- Qualified (Just mn) (coerceProperName className) `M.lookup` types env
     , Just (_, synTy) <- Qualified (Just mn) (coerceProperName className) `M.lookup` typeSynonyms env
@@ -222,13 +221,13 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
       , EDTypeSynonym (coerceProperName className) typeClassArguments synTy
       , EDClass className typeClassArguments typeClassMembers typeClassSuperclasses typeClassDependencies
       ]
-  toExternsDeclaration (TypeInstanceRef ident)
+  toExternsDeclaration (TypeInstanceRef _ ident)
     = [ EDInstance tcdClassName ident tcdInstanceTypes tcdDependencies
       | m1 <- maybeToList (M.lookup (Just mn) (typeClassDictionaries env))
       , m2 <- M.elems m1
       , TypeClassDictionaryInScope{..} <- maybeToList (M.lookup (Qualified (Just mn) ident) m2)
       ]
-  toExternsDeclaration (KindRef pn)
+  toExternsDeclaration (KindRef _ pn)
     | Qualified (Just mn) pn `S.member` kinds env
     = [ EDKind pn ]
   toExternsDeclaration _ = []

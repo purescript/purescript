@@ -16,7 +16,6 @@ module Language.PureScript.Ide.Util
   ( identifierFromIdeDeclaration
   , unwrapMatch
   , unwrapPositioned
-  , unwrapPositionedRef
   , namespaceForDeclaration
   , encodeT
   , decodeT
@@ -95,10 +94,6 @@ decodeT = decode . TLE.encodeUtf8 . TL.fromStrict
 unwrapPositioned :: P.Declaration -> P.Declaration
 unwrapPositioned (P.PositionedDeclaration _ _ x) = unwrapPositioned x
 unwrapPositioned x = x
-
-unwrapPositionedRef :: P.DeclarationRef -> P.DeclarationRef
-unwrapPositionedRef (P.PositionedDeclarationRef _ _ x) = unwrapPositionedRef x
-unwrapPositionedRef x = x
 
 properNameT :: Iso' (P.ProperName a) Text
 properNameT = iso P.runProperName P.ProperName

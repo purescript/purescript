@@ -28,7 +28,6 @@ import qualified Data.ByteString as BS
 import           Data.Version (showVersion)
 import           Language.PureScript.Ide.Error (IdeError (..))
 import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Util
 
 import qualified Language.PureScript as P
 
@@ -59,7 +58,7 @@ convertExterns ef =
     decls = map
       (IdeDeclarationAnn emptyAnn)
       (resolvedDeclarations ++ operatorDecls ++ tyOperatorDecls)
-    exportDecls = mapMaybe (convertExport . unwrapPositionedRef) (P.efExports ef)
+    exportDecls = mapMaybe convertExport (P.efExports ef)
     operatorDecls = convertOperator <$> P.efFixities ef
     tyOperatorDecls = convertTypeOperator <$> P.efTypeFixities ef
     (toResolve, declarations) =
@@ -114,7 +113,7 @@ data ToResolve
   | SynonymToResolve (P.ProperName 'P.TypeName) P.Type
 
 convertExport :: P.DeclarationRef -> Maybe (P.ModuleName, P.DeclarationRef)
-convertExport (P.ReExportRef m r) = Just (m, r)
+convertExport (P.ReExportRef _ m r) = Just (m, r)
 convertExport _ = Nothing
 
 convertDecl :: P.ExternsDeclaration -> Either ToResolve (Maybe IdeDeclaration)

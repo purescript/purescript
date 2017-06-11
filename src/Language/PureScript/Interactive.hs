@@ -202,26 +202,24 @@ handleShowImportedModules print' = do
   refsList refs = " (" <> commaList (mapMaybe showRef refs) <> ")"
 
   showRef :: P.DeclarationRef -> Maybe Text
-  showRef (P.TypeRef pn dctors) =
+  showRef (P.TypeRef _ pn dctors) =
     Just $ N.runProperName pn <> "(" <> maybe ".." (commaList . map N.runProperName) dctors <> ")"
-  showRef (P.TypeOpRef op) =
+  showRef (P.TypeOpRef _ op) =
     Just $ "type " <> N.showOp op
-  showRef (P.ValueRef ident) =
+  showRef (P.ValueRef _ ident) =
     Just $ N.runIdent ident
-  showRef (P.ValueOpRef op) =
+  showRef (P.ValueOpRef _ op) =
     Just $ N.showOp op
-  showRef (P.TypeClassRef pn) =
+  showRef (P.TypeClassRef _ pn) =
     Just $ "class " <> N.runProperName pn
-  showRef (P.TypeInstanceRef ident) =
+  showRef (P.TypeInstanceRef _ ident) =
     Just $ N.runIdent ident
-  showRef (P.ModuleRef name) =
+  showRef (P.ModuleRef _ name) =
     Just $ "module " <> N.runModuleName name
-  showRef (P.KindRef pn) =
+  showRef (P.KindRef _ pn) =
     Just $ "kind " <> N.runProperName pn
-  showRef (P.ReExportRef _ _) =
+  showRef (P.ReExportRef _ _ _) =
     Nothing
-  showRef (P.PositionedDeclarationRef _ _ ref) =
-    showRef ref
 
   commaList :: [Text] -> Text
   commaList = T.intercalate ", "

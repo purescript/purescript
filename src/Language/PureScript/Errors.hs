@@ -189,6 +189,10 @@ nonEmpty = not . null . runMultipleErrors
 errorMessage :: SimpleErrorMessage -> MultipleErrors
 errorMessage err = MultipleErrors [ErrorMessage [] err]
 
+-- | Create an error set from a single simple error message and source annotation
+errorMessage' :: SourceSpan -> SimpleErrorMessage -> MultipleErrors
+errorMessage' ss err = MultipleErrors [ErrorMessage [PositionedError ss] err]
+
 -- | Create an error set from a single error message
 singleError :: ErrorMessage -> MultipleErrors
 singleError = MultipleErrors . pure
@@ -1190,7 +1194,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
 
 -- Pretty print and export declaration
 prettyPrintExport :: DeclarationRef -> Text
-prettyPrintExport (TypeRef pn _) = runProperName pn
+prettyPrintExport (TypeRef _ pn _) = runProperName pn
 prettyPrintExport ref =
   fromMaybe
     (internalError "prettyPrintRef returned Nothing in prettyPrintExport")
@@ -1205,30 +1209,28 @@ prettyPrintImport mn idt qual =
   in i <> maybe "" (\q -> " as " <> runModuleName q) qual
 
 prettyPrintRef :: DeclarationRef -> Maybe Text
-prettyPrintRef (TypeRef pn Nothing) =
+prettyPrintRef (TypeRef _ pn Nothing) =
   Just $ runProperName pn <> "(..)"
-prettyPrintRef (TypeRef pn (Just [])) =
+prettyPrintRef (TypeRef _ pn (Just [])) =
   Just $ runProperName pn
-prettyPrintRef (TypeRef pn (Just dctors)) =
+prettyPrintRef (TypeRef _ pn (Just dctors)) =
   Just $ runProperName pn <> "(" <> T.intercalate ", " (map runProperName dctors) <> ")"
-prettyPrintRef (TypeOpRef op) =
+prettyPrintRef (TypeOpRef _ op) =
   Just $ "type " <> showOp op
-prettyPrintRef (ValueRef ident) =
+prettyPrintRef (ValueRef _ ident) =
   Just $ showIdent ident
-prettyPrintRef (ValueOpRef op) =
+prettyPrintRef (ValueOpRef _ op) =
   Just $ showOp op
-prettyPrintRef (TypeClassRef pn) =
+prettyPrintRef (TypeClassRef _ pn) =
   Just $ "class " <> runProperName pn
-prettyPrintRef (TypeInstanceRef ident) =
+prettyPrintRef (TypeInstanceRef _ ident) =
   Just $ showIdent ident
-prettyPrintRef (ModuleRef name) =
+prettyPrintRef (ModuleRef _ name) =
   Just $ "module " <> runModuleName name
-prettyPrintRef (KindRef pn) =
+prettyPrintRef (KindRef _ pn) =
   Just $ "kind " <> runProperName pn
-prettyPrintRef (ReExportRef _ _) =
+prettyPrintRef ReExportRef{} =
   Nothing
-prettyPrintRef (PositionedDeclarationRef _ _ ref) =
-  prettyPrintRef ref
 
 -- | Pretty print multiple errors
 prettyPrintMultipleErrors :: PPEOptions -> MultipleErrors -> String

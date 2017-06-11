@@ -13,7 +13,7 @@ import Control.Monad.Writer.Class
 import Data.Function (on)
 import Data.Foldable (for_)
 import Data.List (find, intersect, groupBy, sortBy, (\\))
-import Data.Maybe (mapMaybe, fromMaybe)
+import Data.Maybe (mapMaybe)
 import Data.Monoid (Sum(..))
 import Data.Traversable (forM)
 import qualified Data.Text as T
@@ -58,7 +58,7 @@ lintImports
   -> m ()
 lintImports (Module _ _ _ _ Nothing) _ _ =
   internalError "lintImports needs desugared exports"
-lintImports (Module ss _ mn mdecls (Just mexports)) env usedImps = do
+lintImports (Module _ _ mn mdecls (Just mexports)) env usedImps = do
 
   -- TODO: this needs some work to be easier to understand
 
@@ -69,22 +69,20 @@ lintImports (Module ss _ mn mdecls (Just mexports)) env usedImps = do
       imports = M.toAscList (findImports mdecls)
 
   for_ imports $ \(mni, decls) ->
-    unless (isPrim mni) $
-      for_ decls $ \(ss', declType, qualifierName) ->
-        maybe id warnWithPosition ss' $ do
-          let names = ordNub $ M.findWithDefault [] mni usedImps'
-          lintImportDecl env mni qualifierName names declType allowImplicit
+    unless (isPrim mni) .
+      for_ decls $ \(ss, declType, qualifierName) -> do
+        let names = ordNub $ M.findWithDefault [] mni usedImps'
+        lintImportDecl env mni qualifierName names ss declType allowImplicit
 
   for_ (M.toAscList (byQual imports)) $ \(mnq, entries) -> do
     let mnis = ordNub $ map (\(_, _, mni) -> mni) entries
     unless (length mnis == 1) $ do
       let implicits = filter (\(_, declType, _) -> not $ isExplicit declType) entries
-      for_ implicits $ \(ss', _, mni) ->
-        maybe id warnWithPosition ss' $ do
-          let names = ordNub $ M.findWithDefault [] mni usedImps'
-              usedRefs = findUsedRefs env mni (Just mnq) names
-          unless (null usedRefs) $
-            tell $ errorMessage $ ImplicitQualifiedImport mni mnq usedRefs
+      for_ implicits $ \(ss, _, mni) -> do
+        let names = ordNub $ M.findWithDefault [] mni usedImps'
+            usedRefs = findUsedRefs ss env mni (Just mnq) names
+        unless (null usedRefs) .
+          tell . errorMessage' ss $ ImplicitQualifiedImport mni mnq usedRefs
 
   for_ imports $ \(mnq, imps) -> do
 
@@ -100,11 +98,10 @@ lintImports (Module ss _ mn mdecls (Just mexports)) env usedImps = do
           $ unwarned
 
     for_ duplicates $ \(pos, _, _) ->
-      maybe id warnWithPosition pos $
-        tell $ errorMessage $ DuplicateSelectiveImport mnq
+      tell . errorMessage' pos $ DuplicateSelectiveImport mnq
 
     for_ (imps \\ (warned ++ duplicates)) $ \(pos, typ, _) ->
-      warnDuplicateRefs (fromMaybe ss pos) DuplicateImportRef $ case typ of
+      warnDuplicateRefs pos DuplicateImportRef $ case typ of
         Explicit refs -> refs
         Hiding refs -> refs
         _ -> []
@@ -120,9 +117,9 @@ lintImports (Module ss _ mn mdecls (Just mexports)) env usedImps = do
 
   countOpenImports :: Declaration -> Int
   countOpenImports (PositionedDeclaration _ _ d) = countOpenImports d
-  countOpenImports (ImportDeclaration mn' Implicit Nothing)
+  countOpenImports (ImportDeclaration _ mn' Implicit Nothing)
     | not (isPrim mn' || mn == mn') = 1
-  countOpenImports (ImportDeclaration mn' (Hiding _) Nothing)
+  countOpenImports (ImportDeclaration _ mn' (Hiding _) Nothing)
     | not (isPrim mn' || mn == mn') = 1
   countOpenImports _ = 0
 
@@ -135,8 +132,8 @@ lintImports (Module ss _ mn mdecls (Just mexports)) env usedImps = do
   -- import to that module, with the corresponding source span, import type,
   -- and module being imported
   byQual
-    :: [(ModuleName, [(Maybe SourceSpan, ImportDeclarationType, Maybe ModuleName)])]
-    -> M.Map ModuleName [(Maybe SourceSpan, ImportDeclarationType, ModuleName)]
+    :: [(ModuleName, [(SourceSpan, ImportDeclarationType, Maybe ModuleName)])]
+    -> M.Map ModuleName [(SourceSpan, ImportDeclarationType, ModuleName)]
   byQual = foldr goImp M.empty
     where
     goImp (mni, xs) acc = foldr (goDecl mni) acc xs
@@ -150,8 +147,7 @@ lintImports (Module ss _ mn mdecls (Just mexports)) env usedImps = do
   exportedModules :: [ModuleName]
   exportedModules = ordNub $ mapMaybe extractModule mexports
     where
-    extractModule (PositionedDeclarationRef _ _ r) = extractModule r
-    extractModule (ModuleRef mne) = Just mne
+    extractModule (ModuleRef _ mne) = Just mne
     extractModule _ = Nothing
 
   -- Elaborates the UsedImports to include values from modules that are being
@@ -195,10 +191,11 @@ lintImportDecl
   -> ModuleName
   -> Maybe ModuleName
   -> [Qualified Name]
+  -> SourceSpan
   -> ImportDeclarationType
   -> Bool
   -> m Bool
-lintImportDecl env mni qualifierName names declType allowImplicit =
+lintImportDecl env mni qualifierName names ss declType allowImplicit =
   case declType of
     Implicit -> case qualifierName of
       Nothing ->
@@ -224,8 +221,8 @@ lintImportDecl env mni qualifierName names declType allowImplicit =
     -- used constructors explicity `T(X, Y, [...])` to `T(..)` for suggestion
     -- message.
     simplifyTypeRef :: DeclarationRef -> DeclarationRef
-    simplifyTypeRef (TypeRef name (Just dctors))
-      | not (null dctors) = TypeRef name Nothing
+    simplifyTypeRef (TypeRef ss' name (Just dctors))
+      | not (null dctors) = TypeRef ss' name Nothing
     simplifyTypeRef other = other
 
   checkExplicit
@@ -250,7 +247,7 @@ lintImportDecl env mni qualifierName names declType allowImplicit =
           (_, []) | c /= Just [] -> warn (UnusedDctorImport mni tn qualifierName allRefs)
           (Just ctors, dctors') ->
             let ddiff = ctors \\ dctors'
-            in unless' (null ddiff) $ warn $ UnusedDctorExplicitImport mni tn ddiff qualifierName allRefs
+            in unless' (null ddiff) . warn $ UnusedDctorExplicitImport mni tn ddiff qualifierName allRefs
           _ -> return False
 
     return (didWarn || or didWarn')
@@ -259,7 +256,7 @@ lintImportDecl env mni qualifierName names declType allowImplicit =
   unused = warn (UnusedImport mni)
 
   warn :: SimpleErrorMessage -> m Bool
-  warn err = tell (errorMessage err) >> return True
+  warn err = tell (errorMessage' ss err) >> return True
 
   -- Unless the boolean is true, run the action. Return false when the action is
   -- not run, otherwise return whatever the action does.
@@ -272,7 +269,7 @@ lintImportDecl env mni qualifierName names declType allowImplicit =
   unless' True _ = return False
 
   allRefs :: [DeclarationRef]
-  allRefs = findUsedRefs env mni qualifierName names
+  allRefs = findUsedRefs ss env mni qualifierName names
 
   dtys
     :: ModuleName
@@ -292,24 +289,25 @@ lintImportDecl env mni qualifierName names declType allowImplicit =
   typeForDCtor mn pn = fst <$> find (elem pn . fst . snd) (M.toList (dtys mn))
 
 findUsedRefs
-  :: Env
+  :: SourceSpan
+  -> Env
   -> ModuleName
   -> Maybe ModuleName
   -> [Qualified Name]
   -> [DeclarationRef]
-findUsedRefs env mni qn names =
+findUsedRefs ss env mni qn names =
   let
-    classRefs = TypeClassRef <$> mapMaybe (getClassName <=< disqualifyFor qn) names
-    valueRefs = ValueRef <$> mapMaybe (getIdentName <=< disqualifyFor qn) names
-    valueOpRefs = ValueOpRef <$> mapMaybe (getValOpName <=< disqualifyFor qn) names
-    typeOpRefs = TypeOpRef <$> mapMaybe (getTypeOpName <=< disqualifyFor qn) names
+    classRefs = TypeClassRef ss <$> mapMaybe (getClassName <=< disqualifyFor qn) names
+    valueRefs = ValueRef ss <$> mapMaybe (getIdentName <=< disqualifyFor qn) names
+    valueOpRefs = ValueOpRef ss <$> mapMaybe (getValOpName <=< disqualifyFor qn) names
+    typeOpRefs = TypeOpRef ss <$> mapMaybe (getTypeOpName <=< disqualifyFor qn) names
     types = mapMaybe (getTypeName <=< disqualifyFor qn) names
     dctors = mapMaybe (getDctorName <=< disqualifyFor qn) names
     typesWithDctors = reconstructTypeRefs dctors
     typesWithoutDctors = filter (`M.notMember` typesWithDctors) types
     typesRefs
-      = map (flip TypeRef (Just [])) typesWithoutDctors
-      ++ map (\(ty, ds) -> TypeRef ty (Just ds)) (M.toList typesWithDctors)
+      = map (flip (TypeRef ss) (Just [])) typesWithoutDctors
+      ++ map (\(ty, ds) -> TypeRef ss ty (Just ds)) (M.toList typesWithDctors)
   in sortBy compDecRef $ classRefs ++ typeOpRefs ++ typesRefs ++ valueRefs ++ valueOpRefs
 
   where
@@ -343,12 +341,11 @@ matchName _ ModName{} = Nothing
 matchName _ name = Just name
 
 runDeclRef :: DeclarationRef -> Maybe Name
-runDeclRef (PositionedDeclarationRef _ _ ref) = runDeclRef ref
-runDeclRef (ValueRef ident) = Just $ IdentName ident
-runDeclRef (ValueOpRef op) = Just $ ValOpName op
-runDeclRef (TypeRef pn _) = Just $ TyName pn
-runDeclRef (TypeOpRef op) = Just $ TyOpName op
-runDeclRef (TypeClassRef pn) = Just $ TyClassName pn
+runDeclRef (ValueRef _ ident) = Just $ IdentName ident
+runDeclRef (ValueOpRef _ op) = Just $ ValOpName op
+runDeclRef (TypeRef _ pn _) = Just $ TyName pn
+runDeclRef (TypeOpRef _ op) = Just $ TyOpName op
+runDeclRef (TypeClassRef _ pn) = Just $ TyClassName pn
 runDeclRef _ = Nothing
 
 checkDuplicateImports
@@ -360,7 +357,6 @@ checkDuplicateImports
 checkDuplicateImports mn xs ((_, t1, q1), (pos, t2, q2)) =
   if t1 == t2 && q1 == q2
   then do
-    maybe id warnWithPosition pos $
-      tell $ errorMessage $ DuplicateImport mn t2 q2
+    tell . errorMessage' pos $ DuplicateImport mn t2 q2
     return $ (pos, t2, q2) : xs
   else return xs

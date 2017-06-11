@@ -92,7 +92,7 @@ resolveRef
   -> P.DeclarationRef
   -> Either P.DeclarationRef [IdeDeclarationAnn]
 resolveRef decls ref = case ref of
-  P.TypeRef tn mdtors ->
+  P.TypeRef _ tn mdtors ->
     case findRef (anyOf (_IdeDeclType . ideTypeName) (== tn))
          <|> findRef (anyOf (_IdeDeclTypeSynonym . ideSynonymName) (== tn)) of
       Nothing ->
@@ -104,15 +104,15 @@ resolveRef decls ref = case ref of
             -- those up ourselfes
             findDtors tn
           Just dtors -> mapMaybe lookupDtor dtors
-  P.ValueRef i ->
+  P.ValueRef _ i ->
     findWrapped (anyOf (_IdeDeclValue . ideValueIdent) (== i))
-  P.ValueOpRef name ->
+  P.ValueOpRef _ name ->
     findWrapped (anyOf (_IdeDeclValueOperator . ideValueOpName) (== name))
-  P.TypeOpRef name ->
+  P.TypeOpRef _ name ->
     findWrapped (anyOf (_IdeDeclTypeOperator . ideTypeOpName) (== name))
-  P.TypeClassRef name ->
+  P.TypeClassRef _ name ->
     findWrapped (anyOf (_IdeDeclTypeClass . ideTCName) (== name))
-  P.KindRef name ->
+  P.KindRef _ name ->
     findWrapped (anyOf _IdeDeclKind (== name))
   _ ->
     Left ref

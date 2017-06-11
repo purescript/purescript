@@ -93,7 +93,7 @@ parseModuleHeader = do
     (P.mark (Parsec.many (P.same *> P.parseImportDeclaration')))
   pure (ImportParse mn ipStart ipEnd (map mkImport decls))
   where
-    mkImport (mn, (P.Explicit refs), qual) = Import mn (P.Explicit (unwrapPositionedRef <$> refs)) qual
+    mkImport (mn, (P.Explicit refs), qual) = Import mn (P.Explicit refs) qual
     mkImport (mn, it, qual) = Import mn it qual
 
 sliceImportSection :: [Text] -> Either Text (P.ModuleName, [Text], [Import], [Text])
@@ -192,19 +192,19 @@ addExplicitImport' decl moduleName imports =
     else updateAtFirstOrPrepend matches (insertDeclIntoImport decl) freshImport imports
   where
     refFromDeclaration (IdeDeclTypeClass tc) =
-      P.TypeClassRef (tc ^. ideTCName)
+      P.TypeClassRef ideSpan (tc ^. ideTCName)
     refFromDeclaration (IdeDeclDataConstructor dtor) =
-      P.TypeRef (dtor ^. ideDtorTypeName) Nothing
+      P.TypeRef ideSpan (dtor ^. ideDtorTypeName) Nothing
     refFromDeclaration (IdeDeclType t) =
-      P.TypeRef (t ^. ideTypeName) (Just [])
+      P.TypeRef ideSpan (t ^. ideTypeName) (Just [])
     refFromDeclaration (IdeDeclValueOperator op) =
-      P.ValueOpRef (op ^. ideValueOpName)
+      P.ValueOpRef ideSpan (op ^. ideValueOpName)
     refFromDeclaration (IdeDeclTypeOperator op) =
-      P.TypeOpRef (op ^. ideTypeOpName)
+      P.TypeOpRef ideSpan (op ^. ideTypeOpName)
     refFromDeclaration (IdeDeclKind kn) =
-      P.KindRef kn
+      P.KindRef ideSpan kn
     refFromDeclaration d =
-      P.ValueRef (P.Ident (identifierFromIdeDeclaration d))
+      P.ValueRef ideSpan (P.Ident (identifierFromIdeDeclaration d))
 
     -- | Adds a declaration to an import:
     -- TypeDeclaration "Maybe" + Data.Maybe (maybe) -> Data.Maybe(Maybe, maybe)
@@ -222,12 +222,15 @@ addExplicitImport' decl moduleName imports =
         refs
     insertDeclIntoRefs dr refs = nubBy ((==) `on` P.prettyPrintRef) (refFromDeclaration dr : refs)
 
-    insertDtor _ (P.TypeRef tn' _) = P.TypeRef tn' Nothing
+    insertDtor _ (P.TypeRef ss tn' _) = P.TypeRef ss tn' Nothing
     insertDtor _ refs = refs
 
     matchType :: P.ProperName 'P.TypeName -> P.DeclarationRef -> Bool
-    matchType tn (P.TypeRef n _) = tn == n
+    matchType tn (P.TypeRef _ n _) = tn == n
     matchType _ _ = False
+
+ideSpan :: P.SourceSpan
+ideSpan = P.internalModuleSourceSpan "<psc-ide>"
 
 updateAtFirstOrPrepend :: (a -> Bool) -> (a -> a) -> a -> [a] -> [a]
 updateAtFirstOrPrepend p t d l =
@@ -336,6 +339,6 @@ parseImport t =
   case P.lex "<psc-ide>" t
        >>= P.runTokenParser "<psc-ide>" P.parseImportDeclaration' of
     Right (mn, P.Explicit refs, mmn) ->
-      Just (Import mn (P.Explicit (unwrapPositionedRef <$> refs)) mmn)
+      Just (Import mn (P.Explicit refs) mmn)
     Right (mn, idt, mmn) -> Just (Import mn idt mmn)
     Left _ -> Nothing

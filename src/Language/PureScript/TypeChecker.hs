@@ -428,7 +428,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
   where
 
   checkMemberExport :: (Type -> [DeclarationRef]) -> DeclarationRef -> m ()
-  checkMemberExport extract dr@(TypeRef name dctors) = do
+  checkMemberExport extract dr@(TypeRef _ name dctors) = do
     env <- getEnv
     case M.lookup (Qualified (Just mn) name) (typeSynonyms env) of
       Nothing -> return ()
@@ -440,7 +440,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
           Nothing -> return ()
           Just (_, _, ty, _) -> checkExport dr extract ty
     return ()
-  checkMemberExport extract dr@(ValueRef name) = do
+  checkMemberExport extract dr@(ValueRef _ name) = do
     ty <- lookupVariable (Qualified (Just mn) name)
     checkExport dr extract ty
   checkMemberExport _ _ = return ()
@@ -448,51 +448,50 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
   checkExport :: DeclarationRef -> (Type -> [DeclarationRef]) -> Type -> m ()
   checkExport dr extract ty = case filter (not . exported) (extract ty) of
     [] -> return ()
-    hidden -> throwError . errorMessage $ TransitiveExportError dr (nubBy nubEq hidden)
+    hidden -> throwError . errorMessage' (declRefSourceSpan dr) $ TransitiveExportError dr (nubBy nubEq hidden)
     where
     exported e = any (exports e) exps
-    exports (TypeRef pn1 _) (TypeRef pn2 _) = pn1 == pn2
-    exports (ValueRef id1) (ValueRef id2) = id1 == id2
-    exports (TypeClassRef pn1) (TypeClassRef pn2) = pn1 == pn2
-    exports (PositionedDeclarationRef _ _ r1) r2 = exports r1 r2
-    exports r1 (PositionedDeclarationRef _ _ r2) = exports r1 r2
+    exports (TypeRef _ pn1 _) (TypeRef _ pn2 _) = pn1 == pn2
+    exports (ValueRef _ id1) (ValueRef _ id2) = id1 == id2
+    exports (TypeClassRef _ pn1) (TypeClassRef _ pn2) = pn1 == pn2
     exports _ _ = False
     -- We avoid Eq for `nub`bing as the dctor part of `TypeRef` evaluates to
     -- `error` for the values generated here (we don't need them anyway)
-    nubEq (TypeRef pn1 _) (TypeRef pn2 _) = pn1 == pn2
+    nubEq (TypeRef _ pn1 _) (TypeRef _ pn2 _) = pn1 == pn2
     nubEq r1 r2 = r1 == r2
 
 
   -- Check that all the type constructors defined in the current module that appear in member types
   -- have also been exported from the module
   checkTypesAreExported :: DeclarationRef -> m ()
-  checkTypesAreExported = checkMemberExport findTcons
+  checkTypesAreExported ref = checkMemberExport findTcons ref
     where
     findTcons :: Type -> [DeclarationRef]
     findTcons = everythingOnTypes (++) go
       where
-      go (TypeConstructor (Qualified (Just mn') name)) | mn' == mn = [TypeRef name (internalError "Data constructors unused in checkTypesAreExported")]
+      go (TypeConstructor (Qualified (Just mn') name)) | mn' == mn =
+        [TypeRef (declRefSourceSpan ref) name (internalError "Data constructors unused in checkTypesAreExported")]
       go _ = []
 
   -- Check that all the classes defined in the current module that appear in member types have also
   -- been exported from the module
   checkClassesAreExported :: DeclarationRef -> m ()
-  checkClassesAreExported = checkMemberExport findClasses
+  checkClassesAreExported ref = checkMemberExport findClasses ref
     where
     findClasses :: Type -> [DeclarationRef]
     findClasses = everythingOnTypes (++) go
       where
-      go (ConstrainedType c _) = (fmap TypeClassRef . extractCurrentModuleClass . constraintClass) c
+      go (ConstrainedType c _) = (fmap (TypeClassRef (declRefSourceSpan ref)) . extractCurrentModuleClass . constraintClass) c
       go _ = []
     extractCurrentModuleClass :: Qualified (ProperName 'ClassName) -> [ProperName 'ClassName]
     extractCurrentModuleClass (Qualified (Just mn') name) | mn == mn' = [name]
     extractCurrentModuleClass _ = []
 
   checkClassMembersAreExported :: DeclarationRef -> m ()
-  checkClassMembersAreExported dr@(TypeClassRef name) = do
-    let members = ValueRef `map` head (mapMaybe findClassMembers decls)
+  checkClassMembersAreExported dr@(TypeClassRef ss' name) = do
+    let members = ValueRef ss' `map` head (mapMaybe findClassMembers decls)
     let missingMembers = members \\ exps
-    unless (null missingMembers) $ throwError . errorMessage $ TransitiveExportError dr members
+    unless (null missingMembers) . throwError . errorMessage' ss' $ TransitiveExportError dr members
     where
     findClassMembers :: Declaration -> Maybe [Ident]
     findClassMembers (TypeClassDeclaration name' _ _ _ ds) | name == name' = Just $ map extractMemberName ds
