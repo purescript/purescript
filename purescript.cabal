@@ -781,6 +781,7 @@ library
           Language.PureScript.Ide.Error
           Language.PureScript.Ide.Externs
           Language.PureScript.Ide.Filter
+          Language.PureScript.Ide.Filter.Declaration
           Language.PureScript.Ide.Imports
           Language.PureScript.Ide.Logging
           Language.PureScript.Ide.Matcher
