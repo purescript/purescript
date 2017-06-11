@@ -69,6 +69,8 @@ prettyPrintValue d (App val arg) = prettyPrintValueAtom (d - 1) val `beforeWithS
 prettyPrintValue d (Abs arg val) = text ('\\' : T.unpack (prettyPrintBinder arg) ++ " -> ") // moveRight 2 (prettyPrintValue (d - 1) val)
 prettyPrintValue d (TypeClassDictionaryConstructorApp className ps) =
   text (T.unpack (runProperName (disqualify className)) ++ " ") <> prettyPrintValueAtom (d - 1) ps
+prettyPrintValue d (Case values []) =
+  text "case " <> foldr1 beforeWithSpace (map (prettyPrintValueAtom (d - 1)) values)
 prettyPrintValue d (Case values binders) =
   (text "case " <> foldr beforeWithSpace (text "of") (map (prettyPrintValueAtom (d - 1)) values)) //
     moveRight 2 (vcat left (map (prettyPrintCaseAlternative (d - 1)) binders))

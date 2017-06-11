@@ -361,6 +361,7 @@ extra-source-files:
       examples/passing/Dollar.purs
       examples/passing/DuplicateProperties.purs
       examples/passing/Eff.purs
+      examples/passing/EmptyCase.purs
       examples/passing/EmptyDataDecls.purs
       examples/passing/EmptyRow.purs
       examples/passing/EmptyTypeClass.purs
