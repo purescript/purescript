@@ -229,7 +229,6 @@ getModuleSourceSpan (Module ss _ _ _ _) = ss
 --
 addDefaultImport :: ModuleName -> Module -> Module
 addDefaultImport toImport m@(Module ss coms mn decls exps) =
-  -- TODO: probably not the best annotation to use on ss here?
   if isExistingImport `any` decls || mn == toImport then m
   else Module ss coms mn (ImportDeclaration (ss, []) toImport Implicit Nothing : decls) exps
   where

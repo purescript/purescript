@@ -221,8 +221,8 @@ lintImportDecl env mni qualifierName names ss declType allowImplicit =
     -- used constructors explicity `T(X, Y, [...])` to `T(..)` for suggestion
     -- message.
     simplifyTypeRef :: DeclarationRef -> DeclarationRef
-    simplifyTypeRef (TypeRef sa name (Just dctors))
-      | not (null dctors) = TypeRef sa name Nothing
+    simplifyTypeRef (TypeRef ss' name (Just dctors))
+      | not (null dctors) = TypeRef ss' name Nothing
     simplifyTypeRef other = other
 
   checkExplicit

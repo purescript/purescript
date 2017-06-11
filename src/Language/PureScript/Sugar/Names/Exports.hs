@@ -99,10 +99,10 @@ resolveExports env ss mn imps exps refs =
       , exportedValueOps = valueOps'
       , exportedKinds = kinds'
       }
-  elaborateModuleExports result (ModuleRef ss name) = do
+  elaborateModuleExports result (ModuleRef ss' name) = do
     let isPseudo = isPseudoModule name
     when (not isPseudo && not (isImportedModule name))
-      . throwError . errorMessage' ss . UnknownExport $ ModName name
+      . throwError . errorMessage' ss' . UnknownExport $ ModName name
     reTypes <- extract isPseudo name TyName (importedTypes imps)
     reTypeOps <- extract isPseudo name TyOpName (importedTypeOps imps)
     reDctors <- extract isPseudo name DctorName (importedDataConstructors imps)

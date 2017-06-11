@@ -222,7 +222,7 @@ addExplicitImport' decl moduleName imports =
         refs
     insertDeclIntoRefs dr refs = nubBy ((==) `on` P.prettyPrintRef) (refFromDeclaration dr : refs)
 
-    insertDtor _ (P.TypeRef sa tn' _) = P.TypeRef sa tn' Nothing
+    insertDtor _ (P.TypeRef ss tn' _) = P.TypeRef ss tn' Nothing
     insertDtor _ refs = refs
 
     matchType :: P.ProperName 'P.TypeName -> P.DeclarationRef -> Bool
