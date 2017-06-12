@@ -70,6 +70,7 @@ data SimpleErrorMessage
   | CannotGetFileInfo FilePath
   | CannotReadFile FilePath
   | CannotWriteFile FilePath
+  | TypeConstructorAlias (ProperName 'TypeName) [(Text, Maybe Kind)] Type
   | InfiniteType Type
   | InfiniteKind Kind
   | MultipleValueOpFixities (OpName 'ValueOpName)

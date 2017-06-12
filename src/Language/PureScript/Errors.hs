@@ -84,6 +84,7 @@ errorCode em = case unwrapErrorMessage em of
   CannotGetFileInfo{} -> "CannotGetFileInfo"
   CannotReadFile{} -> "CannotReadFile"
   CannotWriteFile{} -> "CannotWriteFile"
+  TypeConstructorAlias{} -> "TypeConstructorAlias"
   InfiniteType{} -> "InfiniteType"
   InfiniteKind{} -> "InfiniteKind"
   MultipleValueOpFixities{} -> "MultipleValueOpFixities"
@@ -308,6 +309,7 @@ errorSuggestion err =
       HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
       MissingTypeDeclaration ident ty -> suggest $ showIdent ident <> " :: " <> T.pack (prettyPrintSuggestedType ty)
       WildcardInferredType ty _ -> suggest $ T.pack (prettyPrintSuggestedType ty)
+      TypeConstructorAlias name args ty -> suggest $ T.pack (prettyPrintNewtypeForType name args ty)
       _ -> Nothing
   where
     emptySuggestion = Just $ ErrorSuggestion ""
@@ -485,6 +487,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line "The last statement in a 'do' block must be an expression, but this block ends with a let binding."
     renderSimpleErrorMessage OverlappingNamesInLet =
       line "The same name was used more than once in a let binding."
+    renderSimpleErrorMessage (TypeConstructorAlias _ _ _) =
+      line "This type synonym aliases a type constructor. Consider using a newtype or using the original type instead."
     renderSimpleErrorMessage (InfiniteType ty) =
       paras [ line "An infinite type was inferred for an expression: "
             , markCodeBox $ indent $ typeAsBox ty

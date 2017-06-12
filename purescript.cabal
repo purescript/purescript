@@ -616,6 +616,7 @@ extra-source-files:
       examples/warning/ShadowedBinderPatternGuard.purs
       examples/warning/ShadowedNameParens.purs
       examples/warning/ShadowedTypeVar.purs
+      examples/warning/TypeConstructorAlias.purs
       examples/warning/UnnecessaryFFIModule.js
       examples/warning/UnnecessaryFFIModule.purs
       examples/warning/UnusedDctorExplicitImport.purs
