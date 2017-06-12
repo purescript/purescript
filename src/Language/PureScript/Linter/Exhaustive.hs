@@ -294,7 +294,7 @@ checkExhaustive env mn numArgs cas expr = makeResult . first ordNub $ foldl' ste
     where
       partial :: Text -> Text -> Declaration
       partial var tyVar =
-        ValueDeclaration (Ident C.__unused) Private [] $
+        ValueDeclaration todoAnn (Ident C.__unused) Private [] $
         [MkUnguarded
           (TypedValue
            True
@@ -328,9 +328,9 @@ checkExhaustiveExpr
 checkExhaustiveExpr env mn = onExpr
   where
   onDecl :: Declaration -> m Declaration
-  onDecl (BindingGroupDeclaration bs) = BindingGroupDeclaration <$> mapM (thirdM onExpr) bs
-  onDecl (ValueDeclaration name x y [MkUnguarded e]) = ValueDeclaration name x y . mkUnguardedExpr <$> censor (addHint (ErrorInValueDeclaration name)) (onExpr e)
-  onDecl (PositionedDeclaration pos x dec) = PositionedDeclaration pos x <$> censor (addHint (PositionedError pos)) (onDecl dec)
+  onDecl (BindingGroupDeclaration sa bs) = BindingGroupDeclaration sa <$> mapM (thirdM onExpr) bs
+  onDecl (ValueDeclaration sa name x y [MkUnguarded e]) = ValueDeclaration sa name x y . mkUnguardedExpr <$> censor (addHint (ErrorInValueDeclaration name)) (onExpr e)
+  -- TODO-gb: onDecl (PositionedDeclaration pos x dec) = PositionedDeclaration pos x <$> censor (addHint (PositionedError pos)) (onDecl dec)
   onDecl decl = return decl
 
   onExpr :: Expr -> m Expr

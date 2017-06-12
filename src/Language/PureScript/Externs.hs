@@ -178,15 +178,13 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
   efSourceSpan    = ss
 
   fixityDecl :: Declaration -> Maybe ExternsFixity
-  fixityDecl (ValueFixityDeclaration (Fixity assoc prec) name op) =
-      fmap (const (ExternsFixity assoc prec op name)) (find (findOp getValueOpRef op) exps)
-  fixityDecl (PositionedDeclaration _ _ d) = fixityDecl d
+  fixityDecl (ValueFixityDeclaration _ (Fixity assoc prec) name op) =
+    fmap (const (ExternsFixity assoc prec op name)) (find (findOp getValueOpRef op) exps)
   fixityDecl _ = Nothing
 
   typeFixityDecl :: Declaration -> Maybe ExternsTypeFixity
-  typeFixityDecl (TypeFixityDeclaration (Fixity assoc prec) name op) =
-      fmap (const (ExternsTypeFixity assoc prec op name)) (find (findOp getTypeOpRef op) exps)
-  typeFixityDecl (PositionedDeclaration _ _ d) = typeFixityDecl d
+  typeFixityDecl (TypeFixityDeclaration _ (Fixity assoc prec) name op) =
+    fmap (const (ExternsTypeFixity assoc prec op name)) (find (findOp getTypeOpRef op) exps)
   typeFixityDecl _ = Nothing
 
   findOp :: (DeclarationRef -> Maybe (OpName a)) -> OpName a -> DeclarationRef -> Bool
@@ -194,7 +192,6 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
 
   importDecl :: Declaration -> Maybe ExternsImport
   importDecl (ImportDeclaration _ m mt qmn) = Just (ExternsImport m mt qmn)
-  importDecl (PositionedDeclaration _ _ d) = importDecl d
   importDecl _ = Nothing
 
   toExternsDeclaration :: DeclarationRef -> [ExternsDeclaration]

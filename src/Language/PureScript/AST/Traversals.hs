@@ -46,13 +46,12 @@ everywhereOnValues
 everywhereOnValues f g h = (f', g', h')
   where
   f' :: Declaration -> Declaration
-  f' (DataBindingGroupDeclaration ds) = f (DataBindingGroupDeclaration (map f' ds))
-  f' (ValueDeclaration name nameKind bs val) = f (ValueDeclaration name nameKind (map h' bs) (map (mapGuardedExpr handleGuard g') val))
-  f' (BoundValueDeclaration b expr) = f (BoundValueDeclaration (h' b) (g' expr))
-  f' (BindingGroupDeclaration ds) = f (BindingGroupDeclaration (map (\(name, nameKind, val) -> (name, nameKind, g' val)) ds))
-  f' (TypeClassDeclaration name args implies deps ds) = f (TypeClassDeclaration name args implies deps (map f' ds))
-  f' (TypeInstanceDeclaration name cs className args ds) = f (TypeInstanceDeclaration name cs className args (mapTypeInstanceBody (map f') ds))
-  f' (PositionedDeclaration pos com d) = f (PositionedDeclaration pos com (f' d))
+  f' (DataBindingGroupDeclaration sa ds) = f (DataBindingGroupDeclaration sa (map f' ds))
+  f' (ValueDeclaration sa name nameKind bs val) = f (ValueDeclaration sa name nameKind (map h' bs) (map (mapGuardedExpr handleGuard g') val))
+  f' (BoundValueDeclaration sa b expr) = f (BoundValueDeclaration sa (h' b) (g' expr))
+  f' (BindingGroupDeclaration sa ds) = f (BindingGroupDeclaration sa (map (\(name, nameKind, val) -> (name, nameKind, g' val)) ds))
+  f' (TypeClassDeclaration sa name args implies deps ds) = f (TypeClassDeclaration sa name args implies deps (map f' ds))
+  f' (TypeInstanceDeclaration sa name cs className args ds) = f (TypeInstanceDeclaration sa name cs className args (mapTypeInstanceBody (map f') ds))
   f' other = f other
 
   g' :: Expr -> Expr
@@ -119,13 +118,12 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   where
 
   f' :: Declaration -> m Declaration
-  f' (DataBindingGroupDeclaration ds) = DataBindingGroupDeclaration <$> traverse (f' <=< f) ds
-  f' (ValueDeclaration name nameKind bs val) = ValueDeclaration name nameKind <$> traverse (h' <=< h) bs <*> traverse (guardedExprM handleGuard (g' <=< g)) val
-  f' (BindingGroupDeclaration ds) = BindingGroupDeclaration <$> traverse (\(name, nameKind, val) -> (,,) name nameKind <$> (g val >>= g')) ds
-  f' (TypeClassDeclaration name args implies deps ds) = TypeClassDeclaration name args implies deps <$> traverse (f' <=< f) ds
-  f' (TypeInstanceDeclaration name cs className args ds) = TypeInstanceDeclaration name cs className args <$> traverseTypeInstanceBody (traverse (f' <=< f)) ds
-  f' (BoundValueDeclaration b expr) = BoundValueDeclaration <$> h' b <*> g' expr
-  f' (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> (f d >>= f')
+  f' (DataBindingGroupDeclaration sa ds) = DataBindingGroupDeclaration sa <$> traverse (f' <=< f) ds
+  f' (ValueDeclaration sa name nameKind bs val) = ValueDeclaration sa name nameKind <$> traverse (h' <=< h) bs <*> traverse (guardedExprM handleGuard (g' <=< g)) val
+  f' (BindingGroupDeclaration sa ds) = BindingGroupDeclaration sa <$> traverse (\(name, nameKind, val) -> (,,) name nameKind <$> (g val >>= g')) ds
+  f' (TypeClassDeclaration sa name args implies deps ds) = TypeClassDeclaration sa name args implies deps <$> traverse (f' <=< f) ds
+  f' (TypeInstanceDeclaration sa name cs className args ds) = TypeInstanceDeclaration sa name cs className args <$> traverseTypeInstanceBody (traverse (f' <=< f)) ds
+  f' (BoundValueDeclaration sa b expr) = BoundValueDeclaration sa <$> h' b <*> g' expr
   f' other = f other
 
   g' :: Expr -> m Expr
@@ -192,13 +190,12 @@ everywhereOnValuesM f g h = (f', g', h')
   where
 
   f' :: Declaration -> m Declaration
-  f' (DataBindingGroupDeclaration ds) = (DataBindingGroupDeclaration <$> traverse f' ds) >>= f
-  f' (ValueDeclaration name nameKind bs val) = (ValueDeclaration name nameKind <$> traverse h' bs <*> traverse (guardedExprM handleGuard g') val) >>= f
-  f' (BindingGroupDeclaration ds) = (BindingGroupDeclaration <$> traverse (\(name, nameKind, val) -> (,,) name nameKind <$> g' val) ds) >>= f
-  f' (BoundValueDeclaration b expr) = (BoundValueDeclaration <$> h' b <*> g' expr) >>= f
-  f' (TypeClassDeclaration name args implies deps ds) = (TypeClassDeclaration name args implies deps <$> traverse f' ds) >>= f
-  f' (TypeInstanceDeclaration name cs className args ds) = (TypeInstanceDeclaration name cs className args <$> traverseTypeInstanceBody (traverse f') ds) >>= f
-  f' (PositionedDeclaration pos com d) = (PositionedDeclaration pos com <$> f' d) >>= f
+  f' (DataBindingGroupDeclaration sa ds) = (DataBindingGroupDeclaration sa <$> traverse f' ds) >>= f
+  f' (ValueDeclaration sa name nameKind bs val) = (ValueDeclaration sa name nameKind <$> traverse h' bs <*> traverse (guardedExprM handleGuard g') val) >>= f
+  f' (BindingGroupDeclaration sa ds) = (BindingGroupDeclaration sa <$> traverse (\(name, nameKind, val) -> (,,) name nameKind <$> g' val) ds) >>= f
+  f' (BoundValueDeclaration sa b expr) = (BoundValueDeclaration sa <$> h' b <*> g' expr) >>= f
+  f' (TypeClassDeclaration sa name args implies deps ds) = (TypeClassDeclaration sa name args implies deps <$> traverse f' ds) >>= f
+  f' (TypeInstanceDeclaration sa name cs className args ds) = (TypeInstanceDeclaration sa name cs className args <$> traverseTypeInstanceBody (traverse f') ds) >>= f
   f' other = f other
 
   g' :: Expr -> m Expr
@@ -269,13 +266,12 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   where
 
   f' :: Declaration -> r
-  f' d@(DataBindingGroupDeclaration ds) = foldl (<>) (f d) (map f' ds)
-  f' d@(ValueDeclaration _ _ bs val) = foldl (<>) (f d) (map h' bs ++ concatMap (\(GuardedExpr grd v) -> map k' grd ++ [g' v]) val)
-  f' d@(BindingGroupDeclaration ds) = foldl (<>) (f d) (map (\(_, _, val) -> g' val) ds)
-  f' d@(TypeClassDeclaration _ _ _ _ ds) = foldl (<>) (f d) (map f' ds)
-  f' d@(TypeInstanceDeclaration _ _ _ _ (ExplicitInstance ds)) = foldl (<>) (f d) (map f' ds)
-  f' d@(BoundValueDeclaration b expr) = f d <> h' b <> g' expr
-  f' d@(PositionedDeclaration _ _ d1) = f d <> f' d1
+  f' d@(DataBindingGroupDeclaration _ ds) = foldl (<>) (f d) (map f' ds)
+  f' d@(ValueDeclaration _ _ _ bs val) = foldl (<>) (f d) (map h' bs ++ concatMap (\(GuardedExpr grd v) -> map k' grd ++ [g' v]) val)
+  f' d@(BindingGroupDeclaration _ ds) = foldl (<>) (f d) (map (\(_, _, val) -> g' val) ds)
+  f' d@(TypeClassDeclaration _ _ _ _ _ ds) = foldl (<>) (f d) (map f' ds)
+  f' d@(TypeInstanceDeclaration _ _ _ _ _ (ExplicitInstance ds)) = foldl (<>) (f d) (map f' ds)
+  f' d@(BoundValueDeclaration _ b expr) = f d <> h' b <> g' expr
   f' d = f d
 
   g' :: Expr -> r
@@ -348,12 +344,11 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   f'' s d = let (s', r) = f s d in r <> f' s' d
 
   f' :: s -> Declaration -> r
-  f' s (DataBindingGroupDeclaration ds) = foldl (<>) r0 (map (f'' s) ds)
-  f' s (ValueDeclaration _ _ bs val) = foldl (<>) r0 (map (h'' s) bs ++ concatMap (\(GuardedExpr grd v) -> map (k' s) grd ++ [g'' s v]) val)
-  f' s (BindingGroupDeclaration ds) = foldl (<>) r0 (map (\(_, _, val) -> g'' s val) ds)
-  f' s (TypeClassDeclaration _ _ _ _ ds) = foldl (<>) r0 (map (f'' s) ds)
-  f' s (TypeInstanceDeclaration _ _ _ _ (ExplicitInstance ds)) = foldl (<>) r0 (map (f'' s) ds)
-  f' s (PositionedDeclaration _ _ d1) = f'' s d1
+  f' s (DataBindingGroupDeclaration _ ds) = foldl (<>) r0 (map (f'' s) ds)
+  f' s (ValueDeclaration _ _ _ bs val) = foldl (<>) r0 (map (h'' s) bs ++ concatMap (\(GuardedExpr grd v) -> map (k' s) grd ++ [g'' s v]) val)
+  f' s (BindingGroupDeclaration _ ds) = foldl (<>) r0 (map (\(_, _, val) -> g'' s val) ds)
+  f' s (TypeClassDeclaration _ _ _ _ _ ds) = foldl (<>) r0 (map (f'' s) ds)
+  f' s (TypeInstanceDeclaration _ _ _ _ _ (ExplicitInstance ds)) = foldl (<>) r0 (map (f'' s) ds)
   f' _ _ = r0
 
   g'' :: s -> Expr -> r
@@ -434,12 +429,11 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   where
   f'' s = uncurry f' <=< f s
 
-  f' s (DataBindingGroupDeclaration ds) = DataBindingGroupDeclaration <$> traverse (f'' s) ds
-  f' s (ValueDeclaration name nameKind bs val) = ValueDeclaration name nameKind <$> traverse (h'' s) bs <*> traverse (guardedExprM (k' s) (g'' s)) val
-  f' s (BindingGroupDeclaration ds) = BindingGroupDeclaration <$> traverse (thirdM (g'' s)) ds
-  f' s (TypeClassDeclaration name args implies deps ds) = TypeClassDeclaration name args implies deps <$> traverse (f'' s) ds
-  f' s (TypeInstanceDeclaration name cs className args ds) = TypeInstanceDeclaration name cs className args <$> traverseTypeInstanceBody (traverse (f'' s)) ds
-  f' s (PositionedDeclaration pos com d1) = PositionedDeclaration pos com <$> f'' s d1
+  f' s (DataBindingGroupDeclaration sa ds) = DataBindingGroupDeclaration sa <$> traverse (f'' s) ds
+  f' s (ValueDeclaration sa name nameKind bs val) = ValueDeclaration sa name nameKind <$> traverse (h'' s) bs <*> traverse (guardedExprM (k' s) (g'' s)) val
+  f' s (BindingGroupDeclaration sa ds) = BindingGroupDeclaration sa <$> traverse (thirdM (g'' s)) ds
+  f' s (TypeClassDeclaration sa name args implies deps ds) = TypeClassDeclaration sa name args implies deps <$> traverse (f'' s) ds
+  f' s (TypeInstanceDeclaration sa name cs className args ds) = TypeInstanceDeclaration sa name cs className args <$> traverseTypeInstanceBody (traverse (f'' s)) ds
   f' _ other = return other
 
   g'' s = uncurry g' <=< g s
@@ -515,19 +509,18 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   f'' s a = f s a <> f' s a
 
   f' :: S.Set Ident -> Declaration -> r
-  f' s (DataBindingGroupDeclaration ds) =
+  f' s (DataBindingGroupDeclaration _ ds) =
     let s' = S.union s (S.fromList (mapMaybe getDeclIdent ds))
     in foldMap (f'' s') ds
-  f' s (ValueDeclaration name _ bs val) =
+  f' s (ValueDeclaration _ name _ bs val) =
     let s' = S.insert name s
         s'' = S.union s' (S.fromList (concatMap binderNames bs))
     in foldMap (h'' s') bs <> foldMap (l' s'') val
-  f' s (BindingGroupDeclaration ds) =
+  f' s (BindingGroupDeclaration _ ds) =
     let s' = S.union s (S.fromList (map (\(name, _, _) -> name) ds))
     in foldMap (\(_, _, val) -> g'' s' val) ds
-  f' s (TypeClassDeclaration _ _ _ _ ds) = foldMap (f'' s) ds
-  f' s (TypeInstanceDeclaration _ _ _ _ (ExplicitInstance ds)) = foldMap (f'' s) ds
-  f' s (PositionedDeclaration _ _ d) = f'' s d
+  f' s (TypeClassDeclaration _ _ _ _ _ ds) = foldMap (f'' s) ds
+  f' s (TypeInstanceDeclaration _ _ _ _ _ (ExplicitInstance ds)) = foldMap (f'' s) ds
   f' _ _ = mempty
 
   g'' :: S.Set Ident -> Expr -> r
@@ -607,9 +600,8 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
     in r <> l' s' (GuardedExpr gs e)
 
   getDeclIdent :: Declaration -> Maybe Ident
-  getDeclIdent (PositionedDeclaration _ _ d) = getDeclIdent d
-  getDeclIdent (ValueDeclaration ident _ _ _) = Just ident
-  getDeclIdent (TypeDeclaration ident _) = Just ident
+  getDeclIdent (ValueDeclaration _ ident _ _ _) = Just ident
+  getDeclIdent (TypeDeclaration _ ident _) = Just ident
   getDeclIdent _ = Nothing
 
 accumTypes
@@ -623,12 +615,12 @@ accumTypes
      )
 accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (const mempty) (const mempty)
   where
-  forDecls (DataDeclaration _ _ _ dctors) = mconcat (concatMap (map f . snd) dctors)
-  forDecls (ExternDeclaration _ ty) = f ty
-  forDecls (TypeClassDeclaration _ _ implies _ _) = mconcat (concatMap (map f . constraintArgs) implies)
-  forDecls (TypeInstanceDeclaration _ cs _ tys _) = mconcat (concatMap (map f . constraintArgs) cs) `mappend` mconcat (map f tys)
-  forDecls (TypeSynonymDeclaration _ _ ty) = f ty
-  forDecls (TypeDeclaration _ ty) = f ty
+  forDecls (DataDeclaration _ _ _ _ dctors) = mconcat (concatMap (map f . snd) dctors)
+  forDecls (ExternDeclaration _ _ ty) = f ty
+  forDecls (TypeClassDeclaration _ _ _ implies _ _) = mconcat (concatMap (map f . constraintArgs) implies)
+  forDecls (TypeInstanceDeclaration _ _ cs _ tys _) = mconcat (concatMap (map f . constraintArgs) cs) `mappend` mconcat (map f tys)
+  forDecls (TypeSynonymDeclaration _ _ _ ty) = f ty
+  forDecls (TypeDeclaration _ _ ty) = f ty
   forDecls _ = mempty
 
   forValues (TypeClassDictionary c _ _) = mconcat (map f (constraintArgs c))
@@ -647,21 +639,21 @@ accumKinds
      )
 accumKinds f = everythingOnValues mappend forDecls forValues (const mempty) (const mempty) (const mempty)
   where
-  forDecls (DataDeclaration _ _ args dctors) =
+  forDecls (DataDeclaration _ _ _ args dctors) =
     foldMap (foldMap f . snd) args `mappend`
     foldMap (foldMap forTypes . snd) dctors
-  forDecls (TypeClassDeclaration _ args implies _ _) =
+  forDecls (TypeClassDeclaration _ _ args implies _ _) =
     foldMap (foldMap f . snd) args `mappend`
     foldMap (foldMap forTypes . constraintArgs) implies
-  forDecls (TypeInstanceDeclaration _ cs _ tys _) =
+  forDecls (TypeInstanceDeclaration _ _ cs _ tys _) =
     foldMap (foldMap forTypes . constraintArgs) cs `mappend`
     foldMap forTypes tys
-  forDecls (TypeSynonymDeclaration _ args ty) =
+  forDecls (TypeSynonymDeclaration _ _ args ty) =
     foldMap (foldMap f . snd) args `mappend`
     forTypes ty
-  forDecls (TypeDeclaration _ ty) = forTypes ty
-  forDecls (ExternDeclaration _ ty) = forTypes ty
-  forDecls (ExternDataDeclaration _ kn) = f kn
+  forDecls (TypeDeclaration _ _ ty) = forTypes ty
+  forDecls (ExternDeclaration _ _ ty) = forTypes ty
+  forDecls (ExternDataDeclaration _ _ kn) = f kn
   forDecls _ = mempty
 
   forValues (TypeClassDictionary c _ _) = foldMap forTypes (constraintArgs c)

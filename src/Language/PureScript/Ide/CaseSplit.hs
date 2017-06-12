@@ -30,7 +30,6 @@ import           Language.PureScript.Externs
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Util
 
 import           Text.Parsec                   as Parsec
 import qualified Text.PrettyPrint.Boxes        as Box
@@ -129,8 +128,8 @@ parseTypeDeclaration' s =
         ts <- P.lex "" (toS s)
         P.runTokenParser "" (P.parseDeclaration <* Parsec.eof) ts
   in
-    case unwrapPositioned <$> x of
-      Right (P.TypeDeclaration i t) -> pure (i, t)
+    case x of
+      Right (P.TypeDeclaration _ i t) -> pure (i, t)
       Right _ -> throwError (GeneralError "Found a non-type-declaration")
       Left err ->
         throwError (GeneralError ("Parsing the type signature failed with: "

@@ -84,10 +84,9 @@ compile (HierarchyOptions inputGlob mOutput) = do
       exitSuccess
 
 superClasses :: P.Declaration -> [SuperMap]
-superClasses (P.TypeClassDeclaration sub _ supers@(_:_) _ _) =
+superClasses (P.TypeClassDeclaration _ sub _ supers@(_:_) _ _) =
   fmap (\(P.Constraint (P.Qualified _ super) _ _) -> SuperMap (Right (super, sub))) supers
-superClasses (P.TypeClassDeclaration sub _ _ _ _) = [SuperMap (Left sub)]
-superClasses (P.PositionedDeclaration _ _ decl) = superClasses decl
+superClasses (P.TypeClassDeclaration _ sub _ _ _ _) = [SuperMap (Left sub)]
 superClasses _ = []
 
 inputFile :: Parser FilePath

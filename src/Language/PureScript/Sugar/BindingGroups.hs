@@ -91,12 +91,11 @@ collapseBindingGroups =
   let (f, _, _) = everywhereOnValues id collapseBindingGroupsForValue id
   in map f . concatMap go
   where
-  go (DataBindingGroupDeclaration ds) = ds
-  go (BindingGroupDeclaration ds) =
+  go (DataBindingGroupDeclaration _ ds) = ds
+  go (BindingGroupDeclaration sa ds) =
     map (\(ident, nameKind, val) ->
-      ValueDeclaration ident nameKind [] [MkUnguarded val]) ds
-  go (PositionedDeclaration pos com d) =
-    map (PositionedDeclaration pos com) $ go d
+      -- TODO-gb: not the best sa here
+      ValueDeclaration sa ident nameKind [] [MkUnguarded val]) ds
   go other = [other]
 
 collapseBindingGroupsForValue :: Expr -> Expr
@@ -108,9 +107,8 @@ usedIdents moduleName = ordNub . usedIdents' S.empty . getValue
   where
   def _ _ = []
 
-  getValue (ValueDeclaration _ _ [] [MkUnguarded val]) = val
+  getValue (ValueDeclaration _ _ _ [] [MkUnguarded val]) = val
   getValue ValueDeclaration{} = internalError "Binders should have been desugared"
-  getValue (PositionedDeclaration _ _ d) = getValue d
   getValue _ = internalError "Expected ValueDeclaration"
 
   (_, usedIdents', _, _, _) = everythingWithScope def usedNamesE def def def
@@ -152,14 +150,12 @@ usedTypeNames moduleName =
   usedNames _ = []
 
 declIdent :: Declaration -> Ident
-declIdent (ValueDeclaration ident _ _ _) = ident
-declIdent (PositionedDeclaration _ _ d) = declIdent d
+declIdent (ValueDeclaration _ ident _ _ _) = ident
 declIdent _ = internalError "Expected ValueDeclaration"
 
 declTypeName :: Declaration -> ProperName 'TypeName
-declTypeName (DataDeclaration _ pn _ _) = pn
-declTypeName (TypeSynonymDeclaration pn _ _) = pn
-declTypeName (PositionedDeclaration _ _ d) = declTypeName d
+declTypeName (DataDeclaration _ _ pn _ _) = pn
+declTypeName (TypeSynonymDeclaration _ pn _ _) = pn
 declTypeName _ = internalError "Expected DataDeclaration"
 
 -- |
@@ -183,7 +179,7 @@ toBindingGroup moduleName (CyclicSCC ds') =
   -- If we discover declarations that still contain mutually-recursive
   -- immediate references, we're guaranteed to get an undefined reference at
   -- runtime, so treat this as an error. See also github issue #365.
-  BindingGroupDeclaration <$> mapM toBinding (stronglyConnComp valueVerts)
+  BindingGroupDeclaration todoAnn <$> mapM toBinding (stronglyConnComp valueVerts)
   where
   idents :: [Ident]
   idents = map (\(_, i, _) -> i) valueVerts
@@ -196,8 +192,7 @@ toBindingGroup moduleName (CyclicSCC ds') =
   toBinding (CyclicSCC ds) = throwError $ foldMap cycleError ds
 
   cycleError :: Declaration -> MultipleErrors
-  cycleError (PositionedDeclaration p _ d) = onErrorMessages (withPosition p) $ cycleError d
-  cycleError (ValueDeclaration n _ _ [MkUnguarded _]) = errorMessage $ CycleInDeclaration n
+  cycleError (ValueDeclaration (ss, _) n _ _ [MkUnguarded _]) = errorMessage' ss $ CycleInDeclaration n
   cycleError _ = internalError "cycleError: Expected ValueDeclaration"
 
 toDataBindingGroup
@@ -210,15 +205,13 @@ toDataBindingGroup (CyclicSCC [d]) = case isTypeSynonym d of
   _ -> return d
 toDataBindingGroup (CyclicSCC ds')
   | all (isJust . isTypeSynonym) ds' = throwError . errorMessage $ CycleInTypeSynonym Nothing
-  | otherwise = return $ DataBindingGroupDeclaration ds'
+  | otherwise = return $ DataBindingGroupDeclaration todoAnn ds'
 
 isTypeSynonym :: Declaration -> Maybe (ProperName 'TypeName)
-isTypeSynonym (TypeSynonymDeclaration pn _ _) = Just pn
-isTypeSynonym (PositionedDeclaration _ _ d) = isTypeSynonym d
+isTypeSynonym (TypeSynonymDeclaration _ pn _ _) = Just pn
 isTypeSynonym _ = Nothing
 
 fromValueDecl :: Declaration -> (Ident, NameKind, Expr)
-fromValueDecl (ValueDeclaration ident nameKind [] [MkUnguarded val]) = (ident, nameKind, val)
+fromValueDecl (ValueDeclaration _ ident nameKind [] [MkUnguarded val]) = (ident, nameKind, val)
 fromValueDecl ValueDeclaration{} = internalError "Binders should have been desugared"
-fromValueDecl (PositionedDeclaration _ _ d) = fromValueDecl d
 fromValueDecl _ = internalError "Expected ValueDeclaration"

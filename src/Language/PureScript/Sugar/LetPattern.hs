@@ -19,7 +19,6 @@ desugarLetPatternModule (Module ss coms mn ds exts) = Module ss coms mn (map des
 -- Desugar a single let expression
 --
 desugarLetPattern :: Declaration -> Declaration
-desugarLetPattern (PositionedDeclaration pos com d) = PositionedDeclaration pos com $ desugarLetPattern d
 desugarLetPattern decl =
   let (f, _, _) = everywhereOnValues id replace id
   in f decl
@@ -34,12 +33,8 @@ desugarLetPattern decl =
      -- ^ The original let-in result expression
      -> Expr
   go [] e = e
-  go (pd@(PositionedDeclaration pos com d) : ds) e =
-    case d of
-      BoundValueDeclaration {} -> PositionedValue pos com $ go (d:ds) e
-      _ -> append pd $ go ds e
-  go (BoundValueDeclaration binder boundE : ds) e =
-    Case [boundE] [CaseAlternative [binder] [MkUnguarded $ go ds e]]
+  go (BoundValueDeclaration (pos, com) binder boundE : ds) e =
+    PositionedValue pos com $ Case [boundE] [CaseAlternative [binder] [MkUnguarded $ go ds e]]
   go (d:ds) e = append d $ go ds e
 
   append :: Declaration -> Expr -> Expr

@@ -150,6 +150,12 @@ withSourceAnn
   -> P.Parsec [PositionedToken] u b
 withSourceAnn = withSourceSpan . curry
 
+withSourceAnnF
+  :: (SourceAnn -> a)
+  -> P.Parsec [PositionedToken] u (a -> b)
+  -> P.Parsec [PositionedToken] u b
+withSourceAnnF f = withSourceAnn (\sa -> ($ f sa))
+
 withSourceSpan'
   :: (SourceSpan -> a -> b)
   -> P.Parsec [PositionedToken] u a

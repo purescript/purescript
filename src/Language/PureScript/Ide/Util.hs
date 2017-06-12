@@ -15,7 +15,6 @@
 module Language.PureScript.Ide.Util
   ( identifierFromIdeDeclaration
   , unwrapMatch
-  , unwrapPositioned
   , namespaceForDeclaration
   , encodeT
   , decodeT
@@ -90,10 +89,6 @@ encodeT = TL.toStrict . TLE.decodeUtf8 . encode
 
 decodeT :: (FromJSON a) => Text -> Maybe a
 decodeT = decode . TLE.encodeUtf8 . TL.fromStrict
-
-unwrapPositioned :: P.Declaration -> P.Declaration
-unwrapPositioned (P.PositionedDeclaration _ _ x) = unwrapPositioned x
-unwrapPositioned x = x
 
 properNameT :: Iso' (P.ProperName a) Text
 properNameT = iso P.runProperName P.ProperName

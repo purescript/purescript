@@ -140,8 +140,7 @@ addTypeClass moduleName pn args implies dependencies ds = do
     argToIndex :: Text -> Maybe Int
     argToIndex = flip M.lookup $ M.fromList (zipWith ((,) . fst) args [0..])
 
-    toPair (TypeDeclaration ident ty) = (ident, ty)
-    toPair (PositionedDeclaration _ _ d) = toPair d
+    toPair (TypeDeclaration _ ident ty) = (ident, ty)
     toPair _ = internalError "Invalid declaration in TypeClassDeclaration"
 
     -- Currently we are only checking usability based on the type class currently
@@ -229,19 +228,19 @@ typeCheckAll
 typeCheckAll moduleName _ = traverse go
   where
   go :: Declaration -> m Declaration
-  go (DataDeclaration dtype name args dctors) = do
-    warnAndRethrow (addHint (ErrorInTypeConstructor name)) $ do
+  go (DataDeclaration sa@(ss, _) dtype name args dctors) = do
+    warnAndRethrow (addHint (ErrorInTypeConstructor name) . addHint (PositionedError ss)) $ do
       when (dtype == Newtype) $ checkNewtype name dctors
       checkDuplicateTypeArguments $ map fst args
       ctorKind <- kindsOf True moduleName name args (concatMap snd dctors)
       let args' = args `withKinds` ctorKind
       addDataType moduleName dtype name args' dctors ctorKind
-    return $ DataDeclaration dtype name args dctors
-  go (d@(DataBindingGroupDeclaration tys)) = do
+    return $ DataDeclaration sa dtype name args dctors
+  go (d@(DataBindingGroupDeclaration (ss, _) tys)) = do
     let syns = mapMaybe toTypeSynonym tys
         dataDecls = mapMaybe toDataDecl tys
         bindingGroupNames = ordNub ((syns^..traverse._1) ++ (dataDecls^..traverse._2))
-    warnAndRethrow (addHint (ErrorInDataBindingGroup bindingGroupNames)) $ do
+    warnAndRethrow (addHint (ErrorInDataBindingGroup bindingGroupNames) . addHint (PositionedError ss)) $ do
       (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
       for_ (zip dataDecls data_ks) $ \((dtype, name, args, dctors), ctorKind) -> do
         when (dtype == Newtype) $ checkNewtype name dctors
@@ -254,34 +253,32 @@ typeCheckAll moduleName _ = traverse go
         addTypeSynonym moduleName name args' ty kind
     return d
     where
-    toTypeSynonym (TypeSynonymDeclaration nm args ty) = Just (nm, args, ty)
-    toTypeSynonym (PositionedDeclaration _ _ d') = toTypeSynonym d'
+    toTypeSynonym (TypeSynonymDeclaration _ nm args ty) = Just (nm, args, ty)
     toTypeSynonym _ = Nothing
-    toDataDecl (DataDeclaration dtype nm args dctors) = Just (dtype, nm, args, dctors)
-    toDataDecl (PositionedDeclaration _ _ d') = toDataDecl d'
+    toDataDecl (DataDeclaration _ dtype nm args dctors) = Just (dtype, nm, args, dctors)
     toDataDecl _ = Nothing
-  go (TypeSynonymDeclaration name args ty) = do
-    warnAndRethrow (addHint (ErrorInTypeSynonym name)) $ do
+  go (TypeSynonymDeclaration sa@(ss, _) name args ty) = do
+    warnAndRethrow (addHint (ErrorInTypeSynonym name) . addHint (PositionedError ss) ) $ do
       checkDuplicateTypeArguments $ map fst args
       kind <- kindsOf False moduleName name args [ty]
       let args' = args `withKinds` kind
       addTypeSynonym moduleName name args' ty kind
-    return $ TypeSynonymDeclaration name args ty
+    return $ TypeSynonymDeclaration sa name args ty
   go TypeDeclaration{} =
     internalError "Type declarations should have been removed before typeCheckAlld"
-  go (ValueDeclaration name nameKind [] [MkUnguarded val]) = do
+  go (ValueDeclaration sa@(ss, _) name nameKind [] [MkUnguarded val]) = do
     env <- getEnv
-    warnAndRethrow (addHint (ErrorInValueDeclaration name)) $ do
+    warnAndRethrow (addHint (ErrorInValueDeclaration name) . addHint (PositionedError ss)) $ do
       val' <- checkExhaustiveExpr env moduleName val
       valueIsNotDefined moduleName name
       [(_, (val'', ty))] <- typesOf NonRecursiveBindingGroup moduleName [(name, val')]
       addValue moduleName name ty nameKind
-      return $ ValueDeclaration name nameKind [] [MkUnguarded val'']
+      return $ ValueDeclaration sa name nameKind [] [MkUnguarded val'']
   go ValueDeclaration{} = internalError "Binders were not desugared"
   go BoundValueDeclaration{} = internalError "BoundValueDeclaration should be desugared"
-  go (BindingGroupDeclaration vals) = do
+  go (BindingGroupDeclaration sa@(ss, _) vals) = do
     env <- getEnv
-    warnAndRethrow (addHint (ErrorInBindingGroup (map (\(ident, _, _) -> ident) vals))) $ do
+    warnAndRethrow (addHint (ErrorInBindingGroup (map (\(ident, _, _) -> ident) vals)) . addHint (PositionedError ss)) $ do
       for_ vals $ \(ident, _, _) ->
         valueIsNotDefined moduleName ident
       vals' <- mapM (thirdM (checkExhaustiveExpr env moduleName)) vals
@@ -293,17 +290,17 @@ typeCheckAll moduleName _ = traverse go
                      ] $ \(name, val, nameKind, ty) -> do
         addValue moduleName name ty nameKind
         return (name, nameKind, val)
-      return $ BindingGroupDeclaration vals''
-  go (d@(ExternDataDeclaration name kind)) = do
+      return $ BindingGroupDeclaration sa vals''
+  go (d@(ExternDataDeclaration _ name kind)) = do
     env <- getEnv
     putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (kind, ExternData) (types env) }
     return d
-  go (d@(ExternKindDeclaration name)) = do
+  go (d@(ExternKindDeclaration _ name)) = do
     env <- getEnv
     putEnv $ env { kinds = S.insert (Qualified (Just moduleName) name) (kinds env) }
     return d
-  go (d@(ExternDeclaration name ty)) = do
-    warnAndRethrow (addHint (ErrorInForeignImport name)) $ do
+  go (d@(ExternDeclaration (ss, _) name ty)) = do
+    warnAndRethrow (addHint (ErrorInForeignImport name) . addHint (PositionedError ss)) $ do
       env <- getEnv
       kind <- kindOf ty
       guardWith (errorMessage (ExpectedType ty kind)) $ kind == kindType
@@ -313,23 +310,22 @@ typeCheckAll moduleName _ = traverse go
     return d
   go d@FixityDeclaration{} = return d
   go d@ImportDeclaration{} = return d
-  go d@(TypeClassDeclaration pn args implies deps tys) = do
+  go d@(TypeClassDeclaration _ pn args implies deps tys) = do
     addTypeClass moduleName pn args implies deps tys
     return d
-  go (d@(TypeInstanceDeclaration dictName deps className tys body)) = rethrow (addHint (ErrorInInstance className tys)) $ do
-    env <- getEnv
-    case M.lookup className (typeClasses env) of
-      Nothing -> internalError "typeCheckAll: Encountered unknown type class in instance declaration"
-      Just typeClass -> do
-        checkInstanceArity dictName className typeClass tys
-        sequence_ (zipWith (checkTypeClassInstance typeClass) [0..] tys)
-        checkOrphanInstance dictName className typeClass tys
-        _ <- traverseTypeInstanceBody checkInstanceMembers body
-        let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps)
-        addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) dict
-        return d
-  go (PositionedDeclaration pos com d) =
-    warnAndRethrowWithPosition pos $ PositionedDeclaration pos com <$> go d
+  go (d@(TypeInstanceDeclaration (ss, _) dictName deps className tys body)) =
+    rethrow (addHint (ErrorInInstance className tys) . addHint (PositionedError ss)) $ do
+      env <- getEnv
+      case M.lookup className (typeClasses env) of
+        Nothing -> internalError "typeCheckAll: Encountered unknown type class in instance declaration"
+        Just typeClass -> do
+          checkInstanceArity dictName className typeClass tys
+          sequence_ (zipWith (checkTypeClassInstance typeClass) [0..] tys)
+          checkOrphanInstance dictName className typeClass tys
+          _ <- traverseTypeInstanceBody checkInstanceMembers body
+          let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps)
+          addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) dict
+          return d
 
   checkInstanceArity :: Ident -> Qualified (ProperName 'ClassName) -> TypeClassData -> [Type] -> m ()
   checkInstanceArity dictName className typeClass tys = do
@@ -346,8 +342,7 @@ typeCheckAll moduleName _ = traverse go
     return instDecls
     where
     memberName :: Declaration -> Ident
-    memberName (ValueDeclaration ident _ _ _) = ident
-    memberName (PositionedDeclaration _ _ d) = memberName d
+    memberName (ValueDeclaration _ ident _ _ _) = ident
     memberName _ = internalError "checkInstanceMembers: Invalid declaration in type instance definition"
 
     firstDuplicate :: (Eq a) => [a] -> Maybe a
@@ -494,11 +489,9 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     unless (null missingMembers) . throwError . errorMessage' ss' $ TransitiveExportError dr members
     where
     findClassMembers :: Declaration -> Maybe [Ident]
-    findClassMembers (TypeClassDeclaration name' _ _ _ ds) | name == name' = Just $ map extractMemberName ds
-    findClassMembers (PositionedDeclaration _ _ d) = findClassMembers d
+    findClassMembers (TypeClassDeclaration _ name' _ _ _ ds) | name == name' = Just $ map extractMemberName ds
     findClassMembers _ = Nothing
     extractMemberName :: Declaration -> Ident
-    extractMemberName (PositionedDeclaration _ _ d) = extractMemberName d
-    extractMemberName (TypeDeclaration memberName _) = memberName
+    extractMemberName (TypeDeclaration _ memberName _) = memberName
     extractMemberName _ = internalError "Unexpected declaration in typeclass member list"
   checkClassMembersAreExported _ = return ()

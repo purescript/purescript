@@ -27,34 +27,34 @@ import Language.PureScript.Sugar.Names.Common (warnDuplicateRefs)
 --
 findExportable :: forall m. (MonadError MultipleErrors m) => Module -> m Exports
 findExportable (Module _ _ mn ds _) =
-  rethrow (addHint (ErrorInModule mn)) $ foldM updateExports nullExports ds
+  rethrow (addHint (ErrorInModule mn)) $ foldM updateExports' nullExports ds
   where
+  updateExports' :: Exports -> Declaration -> m Exports
+  updateExports' exps decl = rethrowWithPosition (declSourceSpan decl) $ updateExports exps decl
+
   updateExports :: Exports -> Declaration -> m Exports
-  updateExports exps (TypeClassDeclaration tcn _ _ _ ds') = do
-    exps' <- exportTypeClass Internal exps tcn mn
+  updateExports exps (TypeClassDeclaration (ss, _) tcn _ _ _ ds') = do
+    exps' <- rethrowWithPosition ss $ exportTypeClass Internal exps tcn mn
     foldM go exps' ds'
     where
-    go exps'' (TypeDeclaration name _) = exportValue exps'' name mn
-    go exps'' (PositionedDeclaration pos _ d) = rethrowWithPosition pos $ go exps'' d
+    go exps'' (TypeDeclaration (ss', _) name _) = rethrowWithPosition ss' $ exportValue exps'' name mn
     go _ _ = internalError "Invalid declaration in TypeClassDeclaration"
-  updateExports exps (DataDeclaration _ tn _ dcs) =
+  updateExports exps (DataDeclaration _ _ tn _ dcs) =
     exportType Internal exps tn (map fst dcs) mn
-  updateExports exps (TypeSynonymDeclaration tn _ _) =
+  updateExports exps (TypeSynonymDeclaration _ tn _ _) =
     exportType Internal exps tn [] mn
-  updateExports exps (ExternDataDeclaration tn _) =
+  updateExports exps (ExternDataDeclaration _ tn _) =
     exportType Internal exps tn [] mn
-  updateExports exps (ValueDeclaration name _ _ _) =
+  updateExports exps (ValueDeclaration _ name _ _ _) =
     exportValue exps name mn
-  updateExports exps (ValueFixityDeclaration _ _ op) =
+  updateExports exps (ValueFixityDeclaration _ _ _ op) =
     exportValueOp exps op mn
-  updateExports exps (TypeFixityDeclaration _ _ op) =
+  updateExports exps (TypeFixityDeclaration _ _ _ op) =
     exportTypeOp exps op mn
-  updateExports exps (ExternDeclaration name _) =
+  updateExports exps (ExternDeclaration _ name _) =
     exportValue exps name mn
-  updateExports exps (ExternKindDeclaration pn) =
+  updateExports exps (ExternKindDeclaration _ pn) =
     exportKind exps pn mn
-  updateExports exps (PositionedDeclaration pos _ d) =
-    rethrowWithPosition pos $ updateExports exps d
   updateExports exps _ = return exps
 
 -- |

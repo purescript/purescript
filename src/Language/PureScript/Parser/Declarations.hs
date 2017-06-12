@@ -45,25 +45,29 @@ kindedIdent = (, Nothing) <$> identifier
           <|> parens ((,) <$> identifier <*> (Just <$> (indented *> doubleColon *> indented *> parseKind)))
 
 parseDataDeclaration :: TokenParser Declaration
-parseDataDeclaration = do
+parseDataDeclaration = withSourceAnnF DataDeclaration $ do
   dtype <- (reserved "data" *> return Data) <|> (reserved "newtype" *> return Newtype)
   name <- indented *> typeName
   tyArgs <- many (indented *> kindedIdent)
   ctors <- P.option [] $ do
     indented *> equals
     P.sepBy1 ((,) <$> dataConstructorName <*> P.many (indented *> noWildcards parseTypeAtom)) pipe
-  return $ DataDeclaration dtype name tyArgs ctors
+  return $ \f -> f dtype name tyArgs ctors
 
 parseTypeDeclaration :: TokenParser Declaration
 parseTypeDeclaration =
-  TypeDeclaration <$> P.try (parseIdent <* indented <* doubleColon)
-                  <*> parsePolyType
+  withSourceAnnF TypeDeclaration $
+    (\n t f -> f n t)
+      <$> P.try (parseIdent <* indented <* doubleColon)
+      <*> parsePolyType
 
 parseTypeSynonymDeclaration :: TokenParser Declaration
 parseTypeSynonymDeclaration =
-  TypeSynonymDeclaration <$> (reserved "type" *> indented *> typeName)
-                         <*> many (indented *> kindedIdent)
-                         <*> (indented *> equals *> noWildcards parsePolyType)
+  withSourceAnnF TypeSynonymDeclaration $
+    (\n vs t f -> f n vs t)
+      <$> (reserved "type" *> indented *> typeName)
+      <*> many (indented *> kindedIdent)
+      <*> (indented *> equals *> noWildcards parsePolyType)
 
 parseValueWithWhereClause :: TokenParser Expr
 parseValueWithWhereClause = do
@@ -78,13 +82,14 @@ parseValueWithWhereClause = do
 
 parseValueWithIdentAndBinders :: Ident -> [Binder] -> TokenParser Declaration
 parseValueWithIdentAndBinders ident bs = do
-  value <- indented *> (
-    (\v -> [MkUnguarded v]) <$> (equals *> withSourceSpan PositionedValue parseValueWithWhereClause) <|>
-      P.many1 (GuardedExpr <$> parseGuard
-                           <*> (indented *> equals
-                                         *> withSourceSpan PositionedValue parseValueWithWhereClause))
-    )
-  return $ ValueDeclaration ident Public bs value
+  undefined
+  -- value <- indented *> (
+  --   (\v -> [MkUnguarded v]) <$> (equals *> withSourceSpan PositionedValue parseValueWithWhereClause) <|>
+  --     P.many1 (GuardedExpr <$> parseGuard
+  --                          <*> (indented *> equals
+  --                                        *> withSourceSpan PositionedValue parseValueWithWhereClause))
+  --   )
+  -- return $ ValueDeclaration ident Public bs value
 
 parseValueDeclaration :: TokenParser Declaration
 parseValueDeclaration = do
@@ -93,25 +98,27 @@ parseValueDeclaration = do
   parseValueWithIdentAndBinders ident binders
 
 parseLocalValueDeclaration :: TokenParser Declaration
-parseLocalValueDeclaration = join $ go <$> parseBinder <*> (P.many parseBinderNoParens)
-  where
-  go :: Binder -> [Binder] -> TokenParser Declaration
-  go (VarBinder ident) bs = parseValueWithIdentAndBinders ident bs
-  go (PositionedBinder _ _ b) bs = go b bs
-  go binder [] = BoundValueDeclaration binder <$> (indented *> equals *> parseValueWithWhereClause)
-  go _ _ = P.unexpected $ "patterns in local value declaration"
+parseLocalValueDeclaration = undefined
+-- parseLocalValueDeclaration = join $ go <$> parseBinder <*> (P.many parseBinderNoParens)
+--   where
+--   go :: Binder -> [Binder] -> TokenParser Declaration
+--   go (VarBinder ident) bs = parseValueWithIdentAndBinders ident bs
+--   go (PositionedBinder _ _ b) bs = go b bs
+--   go binder [] = BoundValueDeclaration binder <$> (indented *> equals *> parseValueWithWhereClause)
+--   go _ _ = P.unexpected $ "patterns in local value declaration"
 
 parseExternDeclaration :: TokenParser Declaration
-parseExternDeclaration = reserved "foreign" *> indented *> reserved "import" *> indented *> parseExternAlt where
-  parseExternAlt = parseExternData <|> P.try parseExternKind <|> parseExternTerm
-
-  parseExternData = ExternDataDeclaration <$> (reserved "data" *> indented *> typeName)
-                                          <*> (indented *> doubleColon *> parseKind)
-
-  parseExternKind = ExternKindDeclaration <$> (reserved "kind" *> indented *> kindName)
-
-  parseExternTerm = ExternDeclaration <$> parseIdent
-                                      <*> (indented *> doubleColon *> noWildcards parsePolyType)
+parseExternDeclaration = undefined
+-- parseExternDeclaration = reserved "foreign" *> indented *> reserved "import" *> indented *> parseExternAlt where
+--   parseExternAlt = parseExternData <|> P.try parseExternKind <|> parseExternTerm
+--
+--   parseExternData = ExternDataDeclaration <$> (reserved "data" *> indented *> typeName)
+--                                           <*> (indented *> doubleColon *> parseKind)
+--
+--   parseExternKind = ExternKindDeclaration <$> (reserved "kind" *> indented *> kindName)
+--
+--   parseExternTerm = ExternDeclaration <$> parseIdent
+--                                       <*> (indented *> doubleColon *> noWildcards parsePolyType)
 
 parseAssociativity :: TokenParser Associativity
 parseAssociativity =
@@ -124,19 +131,20 @@ parseFixity = Fixity <$> parseAssociativity <*> (indented *> natural)
 
 parseFixityDeclaration :: TokenParser Declaration
 parseFixityDeclaration = do
-  fixity <- parseFixity
-  indented
-  FixityDeclaration
-    <$> ((Right <$> typeFixity fixity) <|> (Left <$> valueFixity fixity))
-  where
-  typeFixity fixity =
-    TypeFixity fixity
-      <$> (reserved "type" *> parseQualified typeName)
-      <*> (reserved "as" *> parseOperator)
-  valueFixity fixity =
-    ValueFixity fixity
-      <$> parseQualified ((Left <$> parseIdent) <|> (Right <$> dataConstructorName))
-      <*> (reserved "as" *> parseOperator)
+  undefined
+  -- fixity <- parseFixity
+  -- indented
+  -- FixityDeclaration
+  --   <$> ((Right <$> typeFixity fixity) <|> (Left <$> valueFixity fixity))
+  -- where
+  -- typeFixity fixity =
+  --   TypeFixity fixity
+  --     <$> (reserved "type" *> parseQualified typeName)
+  --     <*> (reserved "as" *> parseOperator)
+  -- valueFixity fixity =
+  --   ValueFixity fixity
+  --     <$> parseQualified ((Left <$> parseIdent) <|> (Right <$> dataConstructorName))
+  --     <*> (reserved "as" *> parseOperator)
 
 parseImportDeclaration :: TokenParser Declaration
 parseImportDeclaration = withSourceAnn (\sa -> ($ ImportDeclaration sa)) $ do
@@ -174,23 +182,24 @@ parseDeclarationRef =
 
 parseTypeClassDeclaration :: TokenParser Declaration
 parseTypeClassDeclaration = do
-  reserved "class"
-  implies <- P.option [] . P.try $ do
-    indented
-    implies <- (return <$> parseConstraint) <|> parens (commaSep1 parseConstraint)
-    lfatArrow
-    return implies
-  className <- indented *> properName
-  idents <- P.many (indented *> kindedIdent)
-  let parseNamedIdent = foldl (<|>) empty (zipWith (\(name, _) index -> lname' name $> index) idents [0..])
-      parseFunctionalDependency =
-        FunctionalDependency <$> P.many parseNamedIdent <* rarrow
-                             <*> P.many parseNamedIdent
-  dependencies <- P.option [] (indented *> pipe *> commaSep1 parseFunctionalDependency)
-  members <- P.option [] $ do
-    indented *> reserved "where"
-    indented *> mark (P.many (same *> positioned parseTypeDeclaration))
-  return $ TypeClassDeclaration className idents implies dependencies members
+  undefined
+  -- reserved "class"
+  -- implies <- P.option [] . P.try $ do
+  --   indented
+  --   implies <- (return <$> parseConstraint) <|> parens (commaSep1 parseConstraint)
+  --   lfatArrow
+  --   return implies
+  -- className <- indented *> properName
+  -- idents <- P.many (indented *> kindedIdent)
+  -- let parseNamedIdent = foldl (<|>) empty (zipWith (\(name, _) index -> lname' name $> index) idents [0..])
+  --     parseFunctionalDependency =
+  --       FunctionalDependency <$> P.many parseNamedIdent <* rarrow
+  --                            <*> P.many parseNamedIdent
+  -- dependencies <- P.option [] (indented *> pipe *> commaSep1 parseFunctionalDependency)
+  -- members <- P.option [] $ do
+  --   indented *> reserved "where"
+  --   indented *> mark (P.many (same *> positioned parseTypeDeclaration))
+  -- return $ TypeClassDeclaration className idents implies dependencies members
 
 parseConstraint :: TokenParser Constraint
 parseConstraint = Constraint <$> parseQualified properName
@@ -199,16 +208,17 @@ parseConstraint = Constraint <$> parseQualified properName
 
 parseInstanceDeclaration :: TokenParser (TypeInstanceBody -> Declaration)
 parseInstanceDeclaration = do
-  reserved "instance"
-  name <- parseIdent <* indented <* doubleColon
-  deps <- P.optionMaybe $ P.try $ do
-    deps <- (return <$> parseConstraint) <|> parens (commaSep1 parseConstraint)
-    indented
-    rfatArrow
-    return deps
-  className <- indented *> parseQualified properName
-  ty <- P.many (indented *> parseTypeAtom)
-  return $ TypeInstanceDeclaration name (fromMaybe [] deps) className ty
+  undefined
+  -- reserved "instance"
+  -- name <- parseIdent <* indented <* doubleColon
+  -- deps <- P.optionMaybe $ P.try $ do
+  --   deps <- (return <$> parseConstraint) <|> parens (commaSep1 parseConstraint)
+  --   indented
+  --   rfatArrow
+  --   return deps
+  -- className <- indented *> parseQualified properName
+  -- ty <- P.many (indented *> parseTypeAtom)
+  -- return $ TypeInstanceDeclaration name (fromMaybe [] deps) className ty
 
 parseTypeInstanceDeclaration :: TokenParser Declaration
 parseTypeInstanceDeclaration = do
@@ -232,7 +242,7 @@ parseDerivingInstanceDeclaration = do
   return $ instanceDecl ty
 
 positioned :: TokenParser Declaration -> TokenParser Declaration
-positioned = withSourceSpan PositionedDeclaration
+positioned = undefined -- withSourceSpan PositionedDeclaration
 
 -- | Parse a single declaration
 parseDeclaration :: TokenParser Declaration

@@ -176,21 +176,18 @@ desugarDecl
   -> Desugar m (Maybe DeclarationRef, [Declaration])
 desugarDecl mn exps = go
   where
-  go d@(TypeClassDeclaration name args implies deps members) = do
+  go d@(TypeClassDeclaration sa name args implies deps members) = do
     modify (M.insert (mn, name) (makeTypeClassData args (map memberToNameAndType members) implies deps))
-    return (Nothing, d : typeClassDictionaryDeclaration name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
-  go (TypeInstanceDeclaration _ _ _ _ DerivedInstance) = internalError "Derived instanced should have been desugared"
-  go d@(TypeInstanceDeclaration name deps className tys (ExplicitInstance members)) = do
+    return (Nothing, d : typeClassDictionaryDeclaration sa name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
+  go (TypeInstanceDeclaration _ _ _ _ _ DerivedInstance) = internalError "Derived instanced should have been desugared"
+  go d@(TypeInstanceDeclaration sa name deps className tys (ExplicitInstance members)) = do
     desugared <- desugarCases members
-    dictDecl <- typeInstanceDictionaryDeclaration name mn deps className tys desugared
+    dictDecl <- typeInstanceDictionaryDeclaration sa name mn deps className tys desugared
     return (expRef name className tys, [d, dictDecl])
-  go d@(TypeInstanceDeclaration name deps className tys (NewtypeInstanceWithDictionary dict)) = do
+  go d@(TypeInstanceDeclaration sa name deps className tys (NewtypeInstanceWithDictionary dict)) = do
     let dictTy = foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
         constrainedTy = quantify (foldr ConstrainedType dictTy deps)
-    return (expRef name className tys, [d, ValueDeclaration name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]])
-  go (PositionedDeclaration pos com d) = do
-    (dr, ds) <- rethrowWithPosition pos $ desugarDecl mn exps d
-    return (dr, map (PositionedDeclaration pos com) ds)
+    return (expRef name className tys, [d, ValueDeclaration sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]])
   go other = return (Nothing, [other])
 
   expRef :: Ident -> Qualified (ProperName 'ClassName) -> [Type] -> Maybe DeclarationRef
@@ -225,24 +222,24 @@ desugarDecl mn exps = go
   genSpan = internalModuleSourceSpan "<generated>"
 
 memberToNameAndType :: Declaration -> (Ident, Type)
-memberToNameAndType (TypeDeclaration ident ty) = (ident, ty)
-memberToNameAndType (PositionedDeclaration _ _ d) = memberToNameAndType d
+memberToNameAndType (TypeDeclaration _ ident ty) = (ident, ty)
 memberToNameAndType _ = internalError "Invalid declaration in type class definition"
 
 typeClassDictionaryDeclaration
-  :: ProperName 'ClassName
+  :: SourceAnn
+  -> ProperName 'ClassName
   -> [(Text, Maybe Kind)]
   -> [Constraint]
   -> [Declaration]
   -> Declaration
-typeClassDictionaryDeclaration name args implies members =
+typeClassDictionaryDeclaration sa name args implies members =
   let superclassTypes = superClassDictionaryNames implies `zip`
         [ function unit (foldl TypeApp (TypeConstructor (fmap coerceProperName superclass)) tyArgs)
         | (Constraint superclass tyArgs _) <- implies
         ]
       members' = map (first runIdent . memberToNameAndType) members
       mtys = members' ++ superclassTypes
-  in TypeSynonymDeclaration (coerceProperName name) args (TypeApp tyRecord $ rowFromList (map (first (Label . mkString)) mtys, REmpty))
+  in TypeSynonymDeclaration sa (coerceProperName name) args (TypeApp tyRecord $ rowFromList (map (first (Label . mkString)) mtys, REmpty))
 
 typeClassMemberToDictionaryAccessor
   :: ModuleName
@@ -250,15 +247,13 @@ typeClassMemberToDictionaryAccessor
   -> [(Text, Maybe Kind)]
   -> Declaration
   -> Declaration
-typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration ident ty) =
+typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration sa ident ty) =
   let className = Qualified (Just mn) name
-  in ValueDeclaration ident Private [] $
+  in ValueDeclaration sa ident Private [] $
     [MkUnguarded (
      TypedValue False (TypeClassDictionaryAccessor className ident) $
        moveQuantifiersToFront (quantify (ConstrainedType (Constraint className (map (TypeVar . fst) args) Nothing) ty))
     )]
-typeClassMemberToDictionaryAccessor mn name args (PositionedDeclaration pos com d) =
-  PositionedDeclaration pos com $ typeClassMemberToDictionaryAccessor mn name args d
 typeClassMemberToDictionaryAccessor _ _ _ _ = internalError "Invalid declaration in type class definition"
 
 unit :: Type
@@ -267,14 +262,15 @@ unit = TypeApp tyRecord REmpty
 typeInstanceDictionaryDeclaration
   :: forall m
    . (MonadSupply m, MonadError MultipleErrors m)
-  => Ident
+  => SourceAnn
+  -> Ident
   -> ModuleName
   -> [Constraint]
   -> Qualified (ProperName 'ClassName)
   -> [Type]
   -> [Declaration]
   -> Desugar m Declaration
-typeInstanceDictionaryDeclaration name mn deps className tys decls =
+typeInstanceDictionaryDeclaration sa name mn deps className tys decls =
   rethrow (addHint (ErrorInInstance className tys)) $ do
   m <- get
 
@@ -305,30 +301,25 @@ typeInstanceDictionaryDeclaration name mn deps className tys decls =
           dictTy = foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
           constrainedTy = quantify (foldr ConstrainedType dictTy deps)
           dict = TypeClassDictionaryConstructorApp className props
-          result = ValueDeclaration name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]
+          result = ValueDeclaration sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]
       return result
 
   where
 
   declName :: Declaration -> Maybe Ident
-  declName (PositionedDeclaration _ _ d) = declName d
-  declName (ValueDeclaration ident _ _ _) = Just ident
-  declName (TypeDeclaration ident _) = Just ident
+  declName (ValueDeclaration _ ident _ _ _) = Just ident
+  declName (TypeDeclaration _ ident _) = Just ident
   declName _ = Nothing
 
   memberToValue :: [(Ident, Type)] -> Declaration -> Desugar m Expr
-  memberToValue tys' (ValueDeclaration ident _ [] [MkUnguarded val]) = do
+  memberToValue tys' (ValueDeclaration _ ident _ [] [MkUnguarded val]) = do
     _ <- maybe (throwError . errorMessage $ ExtraneousClassMember ident className) return $ lookup ident tys'
     return val
-  memberToValue tys' (PositionedDeclaration pos com d) = rethrowWithPosition pos $ do
-    val <- memberToValue tys' d
-    return (PositionedValue pos com val)
   memberToValue _ _ = internalError "Invalid declaration in type instance definition"
 
 typeClassMemberName :: Declaration -> Text
-typeClassMemberName (TypeDeclaration ident _) = runIdent ident
-typeClassMemberName (ValueDeclaration ident _ _ _) = runIdent ident
-typeClassMemberName (PositionedDeclaration _ _ d) = typeClassMemberName d
+typeClassMemberName (TypeDeclaration _ ident _) = runIdent ident
+typeClassMemberName (ValueDeclaration _ ident _ _ _) = runIdent ident
 typeClassMemberName _ = internalError "typeClassMemberName: Invalid declaration in type class definition"
 
 superClassDictionaryNames :: [Constraint] -> [Text]

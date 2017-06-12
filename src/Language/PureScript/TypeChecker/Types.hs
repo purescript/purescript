@@ -420,32 +420,32 @@ inferLetBinding
   -> (Expr -> m Expr)
   -> m ([Declaration], Expr)
 inferLetBinding seen [] ret j = (,) seen <$> withBindingGroupVisible (j ret)
-inferLetBinding seen (ValueDeclaration ident nameKind [] [MkUnguarded tv@(TypedValue checkType val ty)] : rest) ret j = do
-  Just moduleName <- checkCurrentModule <$> get
-  (kind, args) <- kindOfWithScopedVars ty
-  checkTypeKind ty kind
-  let dict = M.singleton (Qualified Nothing ident) (ty, nameKind, Undefined)
-  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
-  TypedValue _ val' ty'' <- if checkType then withScopedTypeVars moduleName args (bindNames dict (check val ty')) else return tv
-  bindNames (M.singleton (Qualified Nothing ident) (ty'', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] [MkUnguarded (TypedValue checkType val' ty'')]]) rest ret j
-inferLetBinding seen (ValueDeclaration ident nameKind [] [MkUnguarded val] : rest) ret j = do
-  valTy <- freshType
-  let dict = M.singleton (Qualified Nothing ident) (valTy, nameKind, Undefined)
-  TypedValue _ val' valTy' <- bindNames dict $ infer val
-  unifyTypes valTy valTy'
-  bindNames (M.singleton (Qualified Nothing ident) (valTy', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] [MkUnguarded val']]) rest ret j
-inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
-  Just moduleName <- checkCurrentModule <$> get
-  SplitBindingGroup untyped typed dict <- typeDictionaryForBindingGroup Nothing (map (\(i, _, v) -> (i, v)) ds)
-  ds1' <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
-  ds2' <- forM untyped $ \e -> typeForBindingGroupElement e dict
-  let ds' = [(ident, Private, val') | (ident, (val', _)) <- ds1' ++ ds2']
-  bindNames dict $ do
-    makeBindingGroupVisible
-    inferLetBinding (seen ++ [BindingGroupDeclaration ds']) rest ret j
-inferLetBinding seen (PositionedDeclaration pos com d : ds) ret j = warnAndRethrowWithPositionTC pos $ do
-  (d' : ds', val') <- inferLetBinding seen (d : ds) ret j
-  return (PositionedDeclaration pos com d' : ds', val')
+inferLetBinding seen (ValueDeclaration sa@(ss, _) ident nameKind [] [MkUnguarded tv@(TypedValue checkType val ty)] : rest) ret j =
+  warnAndRethrowWithPositionTC ss $ do
+    Just moduleName <- checkCurrentModule <$> get
+    (kind, args) <- kindOfWithScopedVars ty
+    checkTypeKind ty kind
+    let dict = M.singleton (Qualified Nothing ident) (ty, nameKind, Undefined)
+    ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
+    TypedValue _ val' ty'' <- if checkType then withScopedTypeVars moduleName args (bindNames dict (check val ty')) else return tv
+    bindNames (M.singleton (Qualified Nothing ident) (ty'', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration sa ident nameKind [] [MkUnguarded (TypedValue checkType val' ty'')]]) rest ret j
+inferLetBinding seen (ValueDeclaration sa@(ss, _) ident nameKind [] [MkUnguarded val] : rest) ret j =
+  warnAndRethrowWithPositionTC ss $ do
+    valTy <- freshType
+    let dict = M.singleton (Qualified Nothing ident) (valTy, nameKind, Undefined)
+    TypedValue _ val' valTy' <- bindNames dict $ infer val
+    unifyTypes valTy valTy'
+    bindNames (M.singleton (Qualified Nothing ident) (valTy', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration sa ident nameKind [] [MkUnguarded val']]) rest ret j
+inferLetBinding seen (BindingGroupDeclaration sa@(ss, _) ds : rest) ret j =
+  warnAndRethrowWithPositionTC ss $ do
+    Just moduleName <- checkCurrentModule <$> get
+    SplitBindingGroup untyped typed dict <- typeDictionaryForBindingGroup Nothing (map (\(i, _, v) -> (i, v)) ds)
+    ds1' <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
+    ds2' <- forM untyped $ \e -> typeForBindingGroupElement e dict
+    let ds' = [(ident, Private, val') | (ident, (val', _)) <- ds1' ++ ds2']
+    bindNames dict $ do
+      makeBindingGroupVisible
+      inferLetBinding (seen ++ [BindingGroupDeclaration sa ds']) rest ret j
 inferLetBinding _ _ _ _ = internalError "Invalid argument to inferLetBinding"
 
 -- | Infer the types of variables brought into scope by a binder
