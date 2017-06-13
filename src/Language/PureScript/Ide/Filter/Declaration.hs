@@ -10,7 +10,6 @@ module Language.PureScript.Ide.Filter.Declaration
 
 import           Protolude                     hiding (isPrefixOf)
 
-import           Control.Lens.TH
 import           Data.Aeson
 import qualified Language.PureScript.Ide.Types as PI
 
@@ -40,8 +39,6 @@ instance FromJSON DeclarationType where
 data IdeDeclaration = IdeDeclaration
   { _declarationtype :: DeclarationType
   } deriving (Show, Eq, Ord)
-
-makeLenses ''IdeDeclaration
 
 instance FromJSON IdeDeclaration where
   parseJSON (Object o) =
