@@ -13,7 +13,7 @@ import           Test.Hspec
 
 type Module = (P.ModuleName, [IdeDeclarationAnn])
 
-moduleA, moduleB, moduleC, moduleD :: Module
+moduleA, moduleB, moduleC, moduleD, moduleE, moduleF, moduleG, moduleH, moduleI :: Module
 moduleA = (P.moduleNameFromString "Module.A", [T.ideValue "function1" Nothing])
 moduleB = (P.moduleNameFromString "Module.B", [T.ideValue "data1" Nothing])
 moduleC = (P.moduleNameFromString "Module.C", [T.ideType "List" Nothing])
