@@ -24,6 +24,7 @@ import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Parallel.Strategies (withStrategy, parList, rseq)
 import           Data.Functor (($>))
 import           Data.Maybe (fromMaybe)
+import           Data.Monoid ((<>))
 import qualified Data.Set as S
 import           Data.Text (Text)
 import           Language.PureScript.AST
@@ -45,29 +46,27 @@ kindedIdent = (, Nothing) <$> identifier
           <|> parens ((,) <$> identifier <*> (Just <$> (indented *> doubleColon *> indented *> parseKind)))
 
 parseDataDeclaration :: TokenParser Declaration
-parseDataDeclaration = withSourceAnnF DataDeclaration $ do
+parseDataDeclaration = withSourceAnnF $ do
   dtype <- (reserved "data" *> return Data) <|> (reserved "newtype" *> return Newtype)
   name <- indented *> typeName
   tyArgs <- many (indented *> kindedIdent)
   ctors <- P.option [] $ do
     indented *> equals
     P.sepBy1 ((,) <$> dataConstructorName <*> P.many (indented *> noWildcards parseTypeAtom)) pipe
-  return $ \f -> f dtype name tyArgs ctors
+  return $ \sa -> DataDeclaration sa dtype name tyArgs ctors
 
 parseTypeDeclaration :: TokenParser Declaration
-parseTypeDeclaration =
-  withSourceAnnF TypeDeclaration $
-    (\n t f -> f n t)
-      <$> P.try (parseIdent <* indented <* doubleColon)
-      <*> parsePolyType
+parseTypeDeclaration = withSourceAnnF $ do
+  name <- P.try (parseIdent <* indented <* doubleColon)
+  ty <- parsePolyType
+  return $ \sa -> TypeDeclaration sa name ty
 
 parseTypeSynonymDeclaration :: TokenParser Declaration
-parseTypeSynonymDeclaration =
-  withSourceAnnF TypeSynonymDeclaration $
-    (\n vs t f -> f n vs t)
-      <$> (reserved "type" *> indented *> typeName)
-      <*> many (indented *> kindedIdent)
-      <*> (indented *> equals *> noWildcards parsePolyType)
+parseTypeSynonymDeclaration = withSourceAnnF $ do
+  name <- reserved "type" *> indented *> typeName
+  vars <- many (indented *> kindedIdent)
+  ty <- indented *> equals *> noWildcards parsePolyType
+  return $ \sa -> TypeSynonymDeclaration sa name vars ty
 
 parseValueWithWhereClause :: TokenParser Expr
 parseValueWithWhereClause = do
@@ -81,15 +80,14 @@ parseValueWithWhereClause = do
   return $ maybe value (`Let` value) whereClause
 
 parseValueWithIdentAndBinders :: Ident -> [Binder] -> TokenParser Declaration
-parseValueWithIdentAndBinders ident bs = do
-  undefined
-  -- value <- indented *> (
-  --   (\v -> [MkUnguarded v]) <$> (equals *> withSourceSpan PositionedValue parseValueWithWhereClause) <|>
-  --     P.many1 (GuardedExpr <$> parseGuard
-  --                          <*> (indented *> equals
-  --                                        *> withSourceSpan PositionedValue parseValueWithWhereClause))
-  --   )
-  -- return $ ValueDeclaration ident Public bs value
+parseValueWithIdentAndBinders ident bs = withSourceAnnF $ do
+  value <- indented *> (
+    (\v -> [MkUnguarded v]) <$> (equals *> withSourceSpan PositionedValue parseValueWithWhereClause) <|>
+      P.many1 (GuardedExpr <$> parseGuard
+                           <*> (indented *> equals
+                                         *> withSourceSpan PositionedValue parseValueWithWhereClause))
+    )
+  return $ \sa -> ValueDeclaration sa ident Public bs value
 
 parseValueDeclaration :: TokenParser Declaration
 parseValueDeclaration = do
@@ -98,27 +96,34 @@ parseValueDeclaration = do
   parseValueWithIdentAndBinders ident binders
 
 parseLocalValueDeclaration :: TokenParser Declaration
-parseLocalValueDeclaration = undefined
--- parseLocalValueDeclaration = join $ go <$> parseBinder <*> (P.many parseBinderNoParens)
---   where
---   go :: Binder -> [Binder] -> TokenParser Declaration
---   go (VarBinder ident) bs = parseValueWithIdentAndBinders ident bs
---   go (PositionedBinder _ _ b) bs = go b bs
---   go binder [] = BoundValueDeclaration binder <$> (indented *> equals *> parseValueWithWhereClause)
---   go _ _ = P.unexpected $ "patterns in local value declaration"
+parseLocalValueDeclaration = withSourceAnnF .
+    join $ go <$> parseBinder <*> P.many parseBinderNoParens
+  where
+  go :: Binder -> [Binder] -> TokenParser (SourceAnn -> Declaration)
+  go (VarBinder ident) bs = const <$> parseValueWithIdentAndBinders ident bs
+  go (PositionedBinder _ _ b) bs = go b bs
+  go binder [] = do
+    boot <- indented *> equals *> parseValueWithWhereClause
+    return $ \sa -> BoundValueDeclaration sa binder boot
+  go _ _ = P.unexpected "patterns in local value declaration"
 
 parseExternDeclaration :: TokenParser Declaration
-parseExternDeclaration = undefined
--- parseExternDeclaration = reserved "foreign" *> indented *> reserved "import" *> indented *> parseExternAlt where
---   parseExternAlt = parseExternData <|> P.try parseExternKind <|> parseExternTerm
---
---   parseExternData = ExternDataDeclaration <$> (reserved "data" *> indented *> typeName)
---                                           <*> (indented *> doubleColon *> parseKind)
---
---   parseExternKind = ExternKindDeclaration <$> (reserved "kind" *> indented *> kindName)
---
---   parseExternTerm = ExternDeclaration <$> parseIdent
---                                       <*> (indented *> doubleColon *> noWildcards parsePolyType)
+parseExternDeclaration = withSourceAnnF $
+  reserved "foreign" *>
+  indented *> reserved "import" *>
+  indented *> (parseExternData <|> P.try parseExternKind <|> parseExternTerm)
+  where
+  parseExternData =
+    (\name kind sa -> ExternDataDeclaration sa name kind)
+      <$> (reserved "data" *> indented *> typeName)
+      <*> (indented *> doubleColon *> parseKind)
+  parseExternKind =
+    flip ExternKindDeclaration
+      <$> (reserved "kind" *> indented *> kindName)
+  parseExternTerm =
+    (\name ty sa -> ExternDeclaration sa name ty)
+      <$> parseIdent
+      <*> (indented *> doubleColon *> noWildcards parsePolyType)
 
 parseAssociativity :: TokenParser Associativity
 parseAssociativity =
@@ -130,26 +135,25 @@ parseFixity :: TokenParser Fixity
 parseFixity = Fixity <$> parseAssociativity <*> (indented *> natural)
 
 parseFixityDeclaration :: TokenParser Declaration
-parseFixityDeclaration = do
-  undefined
-  -- fixity <- parseFixity
-  -- indented
-  -- FixityDeclaration
-  --   <$> ((Right <$> typeFixity fixity) <|> (Left <$> valueFixity fixity))
-  -- where
-  -- typeFixity fixity =
-  --   TypeFixity fixity
-  --     <$> (reserved "type" *> parseQualified typeName)
-  --     <*> (reserved "as" *> parseOperator)
-  -- valueFixity fixity =
-  --   ValueFixity fixity
-  --     <$> parseQualified ((Left <$> parseIdent) <|> (Right <$> dataConstructorName))
-  --     <*> (reserved "as" *> parseOperator)
+parseFixityDeclaration = withSourceAnnF $ do
+  fixity <- parseFixity
+  indented
+  def <- (Right <$> typeFixity fixity) <|> (Left <$> valueFixity fixity)
+  return $ \sa -> FixityDeclaration sa def
+  where
+  typeFixity fixity =
+    TypeFixity fixity
+      <$> (reserved "type" *> parseQualified typeName)
+      <*> (reserved "as" *> parseOperator)
+  valueFixity fixity =
+    ValueFixity fixity
+      <$> parseQualified ((Left <$> parseIdent) <|> (Right <$> dataConstructorName))
+      <*> (reserved "as" *> parseOperator)
 
 parseImportDeclaration :: TokenParser Declaration
-parseImportDeclaration = withSourceAnn (\sa -> ($ ImportDeclaration sa)) $ do
+parseImportDeclaration = withSourceAnnF $ do
   (mn, declType, asQ) <- parseImportDeclaration'
-  return $ \f -> f mn declType asQ
+  return $ \sa -> ImportDeclaration sa mn declType asQ
 
 parseImportDeclaration' :: TokenParser (ModuleName, ImportDeclarationType, Maybe ModuleName)
 parseImportDeclaration' = do
@@ -181,25 +185,24 @@ parseDeclarationRef =
     return $ \f -> f name (fromMaybe (Just []) dctors)
 
 parseTypeClassDeclaration :: TokenParser Declaration
-parseTypeClassDeclaration = do
-  undefined
-  -- reserved "class"
-  -- implies <- P.option [] . P.try $ do
-  --   indented
-  --   implies <- (return <$> parseConstraint) <|> parens (commaSep1 parseConstraint)
-  --   lfatArrow
-  --   return implies
-  -- className <- indented *> properName
-  -- idents <- P.many (indented *> kindedIdent)
-  -- let parseNamedIdent = foldl (<|>) empty (zipWith (\(name, _) index -> lname' name $> index) idents [0..])
-  --     parseFunctionalDependency =
-  --       FunctionalDependency <$> P.many parseNamedIdent <* rarrow
-  --                            <*> P.many parseNamedIdent
-  -- dependencies <- P.option [] (indented *> pipe *> commaSep1 parseFunctionalDependency)
-  -- members <- P.option [] $ do
-  --   indented *> reserved "where"
-  --   indented *> mark (P.many (same *> positioned parseTypeDeclaration))
-  -- return $ TypeClassDeclaration className idents implies dependencies members
+parseTypeClassDeclaration = withSourceAnnF $ do
+  reserved "class"
+  implies <- P.option [] . P.try $ do
+    indented
+    implies <- (return <$> parseConstraint) <|> parens (commaSep1 parseConstraint)
+    lfatArrow
+    return implies
+  className <- indented *> properName
+  idents <- P.many (indented *> kindedIdent)
+  let parseNamedIdent = foldl (<|>) empty (zipWith (\(name, _) index -> lname' name $> index) idents [0..])
+      parseFunctionalDependency =
+        FunctionalDependency <$> P.many parseNamedIdent <* rarrow
+                             <*> P.many parseNamedIdent
+  dependencies <- P.option [] (indented *> pipe *> commaSep1 parseFunctionalDependency)
+  members <- P.option [] $ do
+    indented *> reserved "where"
+    indented *> mark (P.many (same *> parseTypeDeclaration))
+  return $ \sa -> TypeClassDeclaration sa className idents implies dependencies members
 
 parseConstraint :: TokenParser Constraint
 parseConstraint = Constraint <$> parseQualified properName
@@ -207,25 +210,24 @@ parseConstraint = Constraint <$> parseQualified properName
                              <*> pure Nothing
 
 parseInstanceDeclaration :: TokenParser (TypeInstanceBody -> Declaration)
-parseInstanceDeclaration = do
-  undefined
-  -- reserved "instance"
-  -- name <- parseIdent <* indented <* doubleColon
-  -- deps <- P.optionMaybe $ P.try $ do
-  --   deps <- (return <$> parseConstraint) <|> parens (commaSep1 parseConstraint)
-  --   indented
-  --   rfatArrow
-  --   return deps
-  -- className <- indented *> parseQualified properName
-  -- ty <- P.many (indented *> parseTypeAtom)
-  -- return $ TypeInstanceDeclaration name (fromMaybe [] deps) className ty
+parseInstanceDeclaration = withSourceAnnF $ do
+  reserved "instance"
+  name <- parseIdent <* indented <* doubleColon
+  deps <- P.optionMaybe . P.try $ do
+    deps <- (return <$> parseConstraint) <|> parens (commaSep1 parseConstraint)
+    indented
+    rfatArrow
+    return deps
+  className <- indented *> parseQualified properName
+  ty <- P.many (indented *> parseTypeAtom)
+  return $ \sa -> TypeInstanceDeclaration sa name (fromMaybe [] deps) className ty
 
 parseTypeInstanceDeclaration :: TokenParser Declaration
 parseTypeInstanceDeclaration = do
   instanceDecl <- parseInstanceDeclaration
   members <- P.option [] $ do
     indented *> reserved "where"
-    mark (P.many (same *> positioned declsInInstance))
+    mark (P.many (same *> declsInInstance))
   return $ instanceDecl (ExplicitInstance members)
   where
     declsInInstance :: TokenParser Declaration
@@ -241,28 +243,27 @@ parseDerivingInstanceDeclaration = do
   instanceDecl <- parseInstanceDeclaration
   return $ instanceDecl ty
 
-positioned :: TokenParser Declaration -> TokenParser Declaration
-positioned = undefined -- withSourceSpan PositionedDeclaration
-
 -- | Parse a single declaration
 parseDeclaration :: TokenParser Declaration
-parseDeclaration = positioned (P.choice
-                   [ parseDataDeclaration
-                   , parseTypeDeclaration
-                   , parseTypeSynonymDeclaration
-                   , parseValueDeclaration
-                   , parseExternDeclaration
-                   , parseFixityDeclaration
-                   , parseTypeClassDeclaration
-                   , parseTypeInstanceDeclaration
-                   , parseDerivingInstanceDeclaration
-                   ]) P.<?> "declaration"
+parseDeclaration =
+  P.choice
+    [ parseDataDeclaration
+    , parseTypeDeclaration
+    , parseTypeSynonymDeclaration
+    , parseValueDeclaration
+    , parseExternDeclaration
+    , parseFixityDeclaration
+    , parseTypeClassDeclaration
+    , parseTypeInstanceDeclaration
+    , parseDerivingInstanceDeclaration
+    ] P.<?> "declaration"
 
 parseLocalDeclaration :: TokenParser Declaration
-parseLocalDeclaration = positioned (P.choice
-                   [ parseTypeDeclaration
-                   , parseLocalValueDeclaration
-                   ] P.<?> "local declaration")
+parseLocalDeclaration =
+  P.choice
+    [ parseTypeDeclaration
+    , parseLocalValueDeclaration
+    ] P.<?> "local declaration"
 
 -- | Parse a module declaration and its export declarations
 parseModuleDeclaration :: TokenParser (ModuleName, Maybe [DeclarationRef])
@@ -270,7 +271,7 @@ parseModuleDeclaration = do
   reserved "module"
   indented
   name <- moduleName
-  exports <- P.optionMaybe $ parens $ commaSep1 parseDeclarationRef
+  exports <- P.optionMaybe . parens $ commaSep1 parseDeclarationRef
   reserved "where"
   pure (name, exports)
 
@@ -286,7 +287,7 @@ parseModule = do
     -- by only parsing as far as the module header. See PR #2054.
     imports <- P.many (same *> parseImportDeclaration)
     decls   <- P.many (same *> parseDeclaration)
-    return (imports ++ decls)
+    return (imports <> decls)
   _ <- P.eof
   end <- P.getPosition
   let ss = SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos end)
@@ -300,7 +301,7 @@ parseModulesFromFiles
   -> [(k, Text)]
   -> m [(k, Module)]
 parseModulesFromFiles toFilePath input =
-  flip parU wrapError . inParallel . flip map input $ parseModuleFromFile toFilePath
+  flip parU wrapError . inParallel . flip fmap input $ parseModuleFromFile toFilePath
   where
   wrapError :: Either P.ParseError a -> m a
   wrapError = either (throwError . MultipleErrors . pure . toPositionedError) return
@@ -504,7 +505,7 @@ parseUpdaterBodyFields = do
   return (PathTree (AssocList (reverse tree)))
   where
     insertUpdate (seen, xs) (key, node)
-      | S.member key seen = P.unexpected ("Duplicate key in record update: " ++ show key)
+      | S.member key seen = P.unexpected ("Duplicate key in record update: " <> show key)
       | otherwise = return (S.insert key seen, (key, node) : xs)
 
 parseUpdaterBody :: Expr -> TokenParser Expr

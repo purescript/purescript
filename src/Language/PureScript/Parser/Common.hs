@@ -144,17 +144,10 @@ withSourceSpan f p = do
   let sp = SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos $ fromMaybe end end')
   return $ f sp comments x
 
-withSourceAnn
-  :: (SourceAnn -> a -> b)
-  -> P.Parsec [PositionedToken] u a
-  -> P.Parsec [PositionedToken] u b
-withSourceAnn = withSourceSpan . curry
-
 withSourceAnnF
-  :: (SourceAnn -> a)
-  -> P.Parsec [PositionedToken] u (a -> b)
-  -> P.Parsec [PositionedToken] u b
-withSourceAnnF f = withSourceAnn (\sa -> ($ f sa))
+  :: P.Parsec [PositionedToken] u (SourceAnn -> a)
+  -> P.Parsec [PositionedToken] u a
+withSourceAnnF = withSourceSpan (\ss com f -> f (ss, com))
 
 withSourceSpan'
   :: (SourceSpan -> a -> b)
