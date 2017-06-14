@@ -114,7 +114,7 @@ instance FromJSON Filter where
         return $ prefixFilter search
       "modules" -> do
         params <- o .: "params"
-        modules <- fmap P.moduleNameFromString <$> params .: "modules"
+        modules <- map P.moduleNameFromString <$> params .: "modules"
         return $ moduleFilter modules
       "namespace" -> do
         params <- o .: "params"

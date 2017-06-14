@@ -562,7 +562,7 @@ Valid namespaces are `value`, `type` and `kind`.
 
 ### Declaration type filter
 A filter which allows to filter type declarations. Valid type declarations are
-`value`, `type`, `synonym`, `constructor`, `typeclass`, `valueoperator`,
+`value`, `type`, `synonym`, `dataconstructor`, `typeclass`, `valueoperator`,
 `typeoperator` and `kind`.
 
 ```json
@@ -579,7 +579,7 @@ A filter which allows to filter type declarations. Valid type declarations are
       "declarationtype": "synonym"
     },
     {
-      "declarationtype": "constructor"
+      "declarationtype": "dataconstructor"
     }
     {
       "declarationtype": "typeclass"

@@ -1,5 +1,3 @@
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE DeriveFoldable  #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Language.PureScript.Ide.Filter.Declaration
@@ -24,20 +22,20 @@ data DeclarationType = Value
   deriving (Show, Eq, Ord)
 
 instance FromJSON DeclarationType where
-  parseJSON (String s) = case s of
-    "value"         -> pure Value
-    "type"          -> pure Type
-    "synonym"       -> pure Synonym
-    "constructor"   -> pure DataConstructor
-    "typeclass"     -> pure TypeClass
-    "valueoperator" -> pure ValueOperator
-    "typeoperator"  -> pure TypeOperator
-    "kind"          -> pure Kind
-    _               -> mzero
-  parseJSON _ = mzero
+  parseJSON = withText "Declaration type tag" $ \str ->
+    case str of
+      "value"             -> pure Value
+      "type"              -> pure Type
+      "synonym"           -> pure Synonym
+      "dataconstructor"   -> pure DataConstructor
+      "typeclass"         -> pure TypeClass
+      "valueoperator"     -> pure ValueOperator
+      "typeoperator"      -> pure TypeOperator
+      "kind"              -> pure Kind
+      _                   -> mzero
 
-data IdeDeclaration = IdeDeclaration
-  { _declarationtype :: DeclarationType
+newtype IdeDeclaration = IdeDeclaration
+  { declarationtype :: DeclarationType
   } deriving (Show, Eq, Ord)
 
 instance FromJSON IdeDeclaration where
