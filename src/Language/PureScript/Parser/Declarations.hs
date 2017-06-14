@@ -79,8 +79,8 @@ parseValueWithWhereClause = do
     mark $ P.many1 (same *> parseLocalDeclaration)
   return $ maybe value (`Let` value) whereClause
 
-parseValueWithIdentAndBinders :: Ident -> [Binder] -> TokenParser Declaration
-parseValueWithIdentAndBinders ident bs = withSourceAnnF $ do
+parseValueWithIdentAndBinders :: Ident -> [Binder] -> TokenParser (SourceAnn -> Declaration)
+parseValueWithIdentAndBinders ident bs = do
   value <- indented *> (
     (\v -> [MkUnguarded v]) <$> (equals *> withSourceSpan PositionedValue parseValueWithWhereClause) <|>
       P.many1 (GuardedExpr <$> parseGuard
@@ -90,7 +90,7 @@ parseValueWithIdentAndBinders ident bs = withSourceAnnF $ do
   return $ \sa -> ValueDeclaration sa ident Public bs value
 
 parseValueDeclaration :: TokenParser Declaration
-parseValueDeclaration = do
+parseValueDeclaration = withSourceAnnF $ do
   ident <- parseIdent
   binders <- P.many parseBinderNoParens
   parseValueWithIdentAndBinders ident binders
@@ -100,7 +100,7 @@ parseLocalValueDeclaration = withSourceAnnF .
     join $ go <$> parseBinder <*> P.many parseBinderNoParens
   where
   go :: Binder -> [Binder] -> TokenParser (SourceAnn -> Declaration)
-  go (VarBinder ident) bs = const <$> parseValueWithIdentAndBinders ident bs
+  go (VarBinder ident) bs = parseValueWithIdentAndBinders ident bs
   go (PositionedBinder _ _ b) bs = go b bs
   go binder [] = do
     boot <- indented *> equals *> parseValueWithWhereClause
