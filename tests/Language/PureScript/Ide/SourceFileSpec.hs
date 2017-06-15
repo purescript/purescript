@@ -49,7 +49,6 @@ member1 = P.TypeDeclaration ann2 (P.Ident "member1") P.REmpty
 spec :: Spec
 spec = do
   describe "Extracting Spans" $ do
-    --TODO-gb: is this worth testing now? the spans part not so much, but returning the appropriate IdeNSValue/IdeNSType is useful perhaps?
     it "extracts a span for a value declaration" $
       extractSpans value1 `shouldBe` [(IdeNamespaced IdeNSValue "value1", span1)]
     it "extracts a span for a type synonym declaration" $
