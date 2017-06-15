@@ -269,7 +269,7 @@ typeCheckAll moduleName _ = traverse go
   go (ValueDeclaration sa@(ss, _) name nameKind [] [MkUnguarded val]) = do
     env <- getEnv
     warnAndRethrow (addHint (ErrorInValueDeclaration name) . addHint (PositionedError ss)) $ do
-      val' <- checkExhaustiveExpr env moduleName val
+      val' <- checkExhaustiveExpr ss env moduleName val
       valueIsNotDefined moduleName name
       [(_, (val'', ty))] <- typesOf NonRecursiveBindingGroup moduleName [((sa, name), val')]
       addValue moduleName name ty nameKind
@@ -281,7 +281,7 @@ typeCheckAll moduleName _ = traverse go
     warnAndRethrow (addHint (ErrorInBindingGroup (map (\((_, ident), _, _) -> ident) vals)) . addHint (PositionedError ss)) $ do
       for_ vals $ \((_, ident), _, _) ->
         valueIsNotDefined moduleName ident
-      vals' <- mapM (thirdM (checkExhaustiveExpr env moduleName)) vals
+      vals' <- mapM (thirdM (checkExhaustiveExpr ss env moduleName)) vals
       tys <- typesOf RecursiveBindingGroup moduleName $ map (\(sai, _, ty) -> (sai, ty)) vals'
       vals'' <- forM [ (sai, val, nameKind, ty)
                      | (sai@(_, name), nameKind, _) <- vals'
