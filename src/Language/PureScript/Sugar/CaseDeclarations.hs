@@ -42,9 +42,11 @@ desugarCaseGuards
   :: forall m. (MonadSupply m, MonadError MultipleErrors m)
   => [Declaration]
   -> m [Declaration]
-desugarCaseGuards declarations = parU declarations f
+desugarCaseGuards declarations = parU declarations go
   where
-    (f, _, _) = everywhereOnValuesM return desugarGuardedExprs return
+    go d =
+      let (f, _, _) = everywhereOnValuesM return (desugarGuardedExprs (declSourceSpan d)) return
+      in f d
 
 -- |
 -- Desugar case with pattern guards and pattern clauses to a
@@ -52,9 +54,10 @@ desugarCaseGuards declarations = parU declarations f
 --
 desugarGuardedExprs
   :: forall m. (MonadSupply m)
-  => Expr
+  => SourceSpan
+  -> Expr
   -> m Expr
-desugarGuardedExprs (Case scrut alternatives)
+desugarGuardedExprs ss (Case scrut alternatives)
   | any (not . isTrivialExpr) scrut = do
     -- in case the scrutinee is non trivial (e.g. not a Var or Literal)
     -- we may evaluate the scrutinee more than once when a guard occurrs.
@@ -62,10 +65,10 @@ desugarGuardedExprs (Case scrut alternatives)
     (scrut', scrut_decls) <- unzip <$> forM scrut (\e -> do
       scrut_id <- freshIdent'
       pure ( Var (Qualified Nothing scrut_id)
-           , ValueDeclaration todoAnn scrut_id Private [] [MkUnguarded e]
+           , ValueDeclaration (ss, []) scrut_id Private [] [MkUnguarded e]
            )
       )
-    Let scrut_decls <$> desugarGuardedExprs (Case scrut' alternatives)
+    Let scrut_decls <$> desugarGuardedExprs ss (Case scrut' alternatives)
   where
     isTrivialExpr (Var _) = True
     isTrivialExpr (Literal _) = True
@@ -75,7 +78,7 @@ desugarGuardedExprs (Case scrut alternatives)
     isTrivialExpr (TypedValue _ e _) = isTrivialExpr e
     isTrivialExpr _ = False
 
-desugarGuardedExprs (Case scrut alternatives) =
+desugarGuardedExprs ss (Case scrut alternatives) =
   let
     -- Alternatives which do not have guards are
     -- left as-is. Alternatives which
@@ -217,7 +220,7 @@ desugarGuardedExprs (Case scrut alternatives) =
     desugarAltOutOfLine alt_binder rem_guarded rem_alts mk_body
       | Just rem_case <- mkCaseOfRemainingGuardsAndAlts = do
 
-        desugared     <- desugarGuardedExprs rem_case
+        desugared     <- desugarGuardedExprs ss rem_case
         rem_case_id   <- freshIdent'
         unused_binder <- freshIdent'
 
@@ -228,7 +231,7 @@ desugarGuardedExprs (Case scrut alternatives) =
           alt_fail = [CaseAlternative [NullBinder] [MkUnguarded goto_rem_case]]
 
         pure $ Let [
-          ValueDeclaration todoAnn rem_case_id Private []
+          ValueDeclaration (ss, []) rem_case_id Private []
             [MkUnguarded (Abs (VarBinder unused_binder) desugared)]
           ] (mk_body alt_fail)
 
@@ -263,13 +266,13 @@ desugarGuardedExprs (Case scrut alternatives) =
     alts' <- desugarAlternatives alternatives
     return $ optimize (Case scrut alts')
 
-desugarGuardedExprs (TypedValue infered e ty) =
-  TypedValue infered <$> desugarGuardedExprs e <*> pure ty
+desugarGuardedExprs ss (TypedValue infered e ty) =
+  TypedValue infered <$> desugarGuardedExprs ss e <*> pure ty
 
-desugarGuardedExprs (PositionedValue ss comms e) =
-  PositionedValue ss comms <$> desugarGuardedExprs e
+desugarGuardedExprs _ (PositionedValue ss comms e) =
+  PositionedValue ss comms <$> desugarGuardedExprs ss e
 
-desugarGuardedExprs v = pure v
+desugarGuardedExprs _ v = pure v
 
 -- |
 -- Validates that case head and binder lengths match.
@@ -362,7 +365,7 @@ toDecls ds@(ValueDeclaration (ss, _) ident _ bs (result : _) : _) = do
     throwError . errorMessage' ss $ ArgListLengthsDiffer ident
   unless (not (null bs) || isGuarded result) .
     throwError . errorMessage' ss $ DuplicateValueDeclaration ident
-  caseDecl <- makeCaseDeclaration ident tuples
+  caseDecl <- makeCaseDeclaration ss ident tuples
   return [caseDecl]
 toDecls ds = return ds
 
@@ -370,8 +373,8 @@ toTuple :: Declaration -> ([Binder], [GuardedExpr])
 toTuple (ValueDeclaration _ _ _ bs result) = (bs, result)
 toTuple _ = internalError "Not a value declaration"
 
-makeCaseDeclaration :: forall m. (MonadSupply m) => Ident -> [([Binder], [GuardedExpr])] -> m Declaration
-makeCaseDeclaration ident alternatives = do
+makeCaseDeclaration :: forall m. (MonadSupply m) => SourceSpan -> Ident -> [([Binder], [GuardedExpr])] -> m Declaration
+makeCaseDeclaration ss ident alternatives = do
   let namedArgs = map findName . fst <$> alternatives
       argNames = foldl1 resolveNames namedArgs
   args <- if allUnique (catMaybes argNames)
@@ -381,7 +384,7 @@ makeCaseDeclaration ident alternatives = do
       binders = [ CaseAlternative bs result | (bs, result) <- alternatives ]
   let value = foldr (Abs . VarBinder) (Case vars binders) args
 
-  return $ ValueDeclaration todoAnn ident Public [] [MkUnguarded value]
+  return $ ValueDeclaration (ss, []) ident Public [] [MkUnguarded value]
   where
   -- We will construct a table of potential names.
   -- VarBinders will become Just _ which is a potential name.

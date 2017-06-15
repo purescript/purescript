@@ -19,9 +19,6 @@ import System.FilePath (makeRelative)
 -- | Source annotation - position information and comments.
 type SourceAnn = (SourceSpan, [Comment])
 
-todoAnn :: SourceAnn
-todoAnn = (internalModuleSourceSpan "<TODO>", [])
-
 -- | Source position information
 data SourcePos = SourcePos
   { sourcePosLine :: Int
