@@ -92,7 +92,7 @@ collapseBindingGroups =
   let (f, _, _) = everywhereOnValues id collapseBindingGroupsForValue id
   in fmap f . concatMap go
   where
-  go (DataBindingGroupDeclaration _ ds) = ds
+  go (DataBindingGroupDeclaration ds) = NEL.toList ds
   go (BindingGroupDeclaration ds) =
     NEL.toList $ fmap (\((sa, ident), nameKind, val) ->
       ValueDeclaration sa ident nameKind [] [MkUnguarded val]) ds
@@ -205,7 +205,7 @@ toDataBindingGroup (CyclicSCC [d]) = case isTypeSynonym d of
   _ -> return d
 toDataBindingGroup (CyclicSCC ds')
   | all (isJust . isTypeSynonym) ds' = throwError . errorMessage' (declSourceSpan (head ds')) $ CycleInTypeSynonym Nothing
-  | otherwise = return $ DataBindingGroupDeclaration todoAnn ds'
+  | otherwise = return . DataBindingGroupDeclaration $ NEL.fromList ds'
 
 isTypeSynonym :: Declaration -> Maybe (ProperName 'TypeName)
 isTypeSynonym (TypeSynonymDeclaration _ pn _ _) = Just pn

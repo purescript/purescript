@@ -52,7 +52,7 @@ everywhereOnValues
 everywhereOnValues f g h = (f', g', h')
   where
   f' :: Declaration -> Declaration
-  f' (DataBindingGroupDeclaration sa ds) = f (DataBindingGroupDeclaration sa (fmap f' ds))
+  f' (DataBindingGroupDeclaration ds) = f (DataBindingGroupDeclaration (fmap f' ds))
   f' (ValueDeclaration sa name nameKind bs val) = f (ValueDeclaration sa name nameKind (fmap h' bs) (fmap (mapGuardedExpr handleGuard g') val))
   f' (BoundValueDeclaration sa b expr) = f (BoundValueDeclaration sa (h' b) (g' expr))
   f' (BindingGroupDeclaration ds) = f (BindingGroupDeclaration (fmap (\(name, nameKind, val) -> (name, nameKind, g' val)) ds))
@@ -124,7 +124,7 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   where
 
   f' :: Declaration -> m Declaration
-  f' (DataBindingGroupDeclaration sa ds) = DataBindingGroupDeclaration sa <$> traverse (f' <=< f) ds
+  f' (DataBindingGroupDeclaration ds) = DataBindingGroupDeclaration <$> traverse (f' <=< f) ds
   f' (ValueDeclaration sa name nameKind bs val) = ValueDeclaration sa name nameKind <$> traverse (h' <=< h) bs <*> traverse (guardedExprM handleGuard (g' <=< g)) val
   f' (BindingGroupDeclaration ds) = BindingGroupDeclaration <$> traverse (\(name, nameKind, val) -> (,,) name nameKind <$> (g val >>= g')) ds
   f' (TypeClassDeclaration sa name args implies deps ds) = TypeClassDeclaration sa name args implies deps <$> traverse (f' <=< f) ds
@@ -191,7 +191,7 @@ everywhereOnValuesM f g h = (f', g', h')
   where
 
   f' :: Declaration -> m Declaration
-  f' (DataBindingGroupDeclaration sa ds) = (DataBindingGroupDeclaration sa <$> traverse f' ds) >>= f
+  f' (DataBindingGroupDeclaration ds) = (DataBindingGroupDeclaration <$> traverse f' ds) >>= f
   f' (ValueDeclaration sa name nameKind bs val) = (ValueDeclaration sa name nameKind <$> traverse h' bs <*> traverse (guardedExprM handleGuard g') val) >>= f
   f' (BindingGroupDeclaration ds) = (BindingGroupDeclaration <$> traverse (\(name, nameKind, val) -> (,,) name nameKind <$> g' val) ds) >>= f
   f' (BoundValueDeclaration sa b expr) = (BoundValueDeclaration sa <$> h' b <*> g' expr) >>= f
@@ -262,7 +262,7 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   where
 
   f' :: Declaration -> r
-  f' d@(DataBindingGroupDeclaration _ ds) = foldl (<>) (f d) (fmap f' ds)
+  f' d@(DataBindingGroupDeclaration ds) = foldl (<>) (f d) (fmap f' ds)
   f' d@(ValueDeclaration _ _ _ bs val) = foldl (<>) (f d) (fmap h' bs ++ concatMap (\(GuardedExpr grd v) -> fmap k' grd ++ [g' v]) val)
   f' d@(BindingGroupDeclaration ds) = foldl (<>) (f d) (fmap (\(_, _, val) -> g' val) ds)
   f' d@(TypeClassDeclaration _ _ _ _ _ ds) = foldl (<>) (f d) (fmap f' ds)
@@ -340,7 +340,7 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   f'' s d = let (s', r) = f s d in r <> f' s' d
 
   f' :: s -> Declaration -> r
-  f' s (DataBindingGroupDeclaration _ ds) = foldl (<>) r0 (fmap (f'' s) ds)
+  f' s (DataBindingGroupDeclaration ds) = foldl (<>) r0 (fmap (f'' s) ds)
   f' s (ValueDeclaration _ _ _ bs val) = foldl (<>) r0 (fmap (h'' s) bs ++ concatMap (\(GuardedExpr grd v) -> fmap (k' s) grd ++ [g'' s v]) val)
   f' s (BindingGroupDeclaration ds) = foldl (<>) r0 (fmap (\(_, _, val) -> g'' s val) ds)
   f' s (TypeClassDeclaration _ _ _ _ _ ds) = foldl (<>) r0 (fmap (f'' s) ds)
@@ -425,7 +425,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   where
   f'' s = uncurry f' <=< f s
 
-  f' s (DataBindingGroupDeclaration sa ds) = DataBindingGroupDeclaration sa <$> traverse (f'' s) ds
+  f' s (DataBindingGroupDeclaration ds) = DataBindingGroupDeclaration <$> traverse (f'' s) ds
   f' s (ValueDeclaration sa name nameKind bs val) = ValueDeclaration sa name nameKind <$> traverse (h'' s) bs <*> traverse (guardedExprM (k' s) (g'' s)) val
   f' s (BindingGroupDeclaration ds) = BindingGroupDeclaration <$> traverse (thirdM (g'' s)) ds
   f' s (TypeClassDeclaration sa name args implies deps ds) = TypeClassDeclaration sa name args implies deps <$> traverse (f'' s) ds
@@ -505,8 +505,8 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   f'' s a = f s a <> f' s a
 
   f' :: S.Set Ident -> Declaration -> r
-  f' s (DataBindingGroupDeclaration _ ds) =
-    let s' = S.union s (S.fromList (mapMaybe getDeclIdent ds))
+  f' s (DataBindingGroupDeclaration ds) =
+    let s' = S.union s (S.fromList (mapMaybe getDeclIdent (NEL.toList ds)))
     in foldMap (f'' s') ds
   f' s (ValueDeclaration _ name _ bs val) =
     let s' = S.insert name s

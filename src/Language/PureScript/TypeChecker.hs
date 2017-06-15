@@ -36,7 +36,6 @@ import Language.PureScript.Errors
 import Language.PureScript.Kinds
 import Language.PureScript.Linter
 import Language.PureScript.Names
-import Language.PureScript.Traversals
 import Language.PureScript.TypeChecker.Kinds as T
 import Language.PureScript.TypeChecker.Monad as T
 import Language.PureScript.TypeChecker.Synonyms as T
@@ -237,11 +236,12 @@ typeCheckAll moduleName _ = traverse go
       let args' = args `withKinds` ctorKind
       addDataType moduleName dtype name args' dctors ctorKind
     return $ DataDeclaration sa dtype name args dctors
-  go (d@(DataBindingGroupDeclaration (ss, _) tys)) = do
-    let syns = mapMaybe toTypeSynonym tys
-        dataDecls = mapMaybe toDataDecl tys
+  go (d@(DataBindingGroupDeclaration tys)) = do
+    let tysList = NEL.toList tys
+        syns = mapMaybe toTypeSynonym tysList
+        dataDecls = mapMaybe toDataDecl tysList
         bindingGroupNames = ordNub ((syns^..traverse._1) ++ (dataDecls^..traverse._2))
-    warnAndRethrow (addHint (ErrorInDataBindingGroup bindingGroupNames) . addHint (PositionedError ss)) $ do
+    warnAndRethrow (addHint (ErrorInDataBindingGroup bindingGroupNames)) $ do
       (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
       for_ (zip dataDecls data_ks) $ \((dtype, name, args, dctors), ctorKind) -> do
         when (dtype == Newtype) $ checkNewtype name dctors

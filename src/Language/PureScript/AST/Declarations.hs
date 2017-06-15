@@ -392,7 +392,7 @@ data Declaration
   -- |
   -- A minimal mutually recursive set of data type declarations
   --
-  | DataBindingGroupDeclaration SourceAnn [Declaration]
+  | DataBindingGroupDeclaration (NEL.NonEmpty Declaration)
   -- |
   -- A type synonym declaration (name, arguments, type)
   --
@@ -478,7 +478,7 @@ traverseTypeInstanceBody _ other = pure other
 
 declSourceAnn :: Declaration -> SourceAnn
 declSourceAnn (DataDeclaration sa _ _ _ _) = sa
-declSourceAnn (DataBindingGroupDeclaration sa _) = sa
+declSourceAnn (DataBindingGroupDeclaration ds) = declSourceAnn (NEL.head ds)
 declSourceAnn (TypeSynonymDeclaration sa _ _ _) = sa
 declSourceAnn (TypeDeclaration sa _ _) = sa
 declSourceAnn (ValueDeclaration sa _ _ _ _) = sa
@@ -568,7 +568,7 @@ isTypeClassDeclaration _ = False
 flattenDecls :: [Declaration] -> [Declaration]
 flattenDecls = concatMap flattenOne
     where flattenOne :: Declaration -> [Declaration]
-          flattenOne (DataBindingGroupDeclaration _ decls) = concatMap flattenOne decls
+          flattenOne (DataBindingGroupDeclaration decls) = concatMap flattenOne decls
           flattenOne d = [d]
 
 -- |
