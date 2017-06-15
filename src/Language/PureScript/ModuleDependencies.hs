@@ -4,9 +4,10 @@ module Language.PureScript.ModuleDependencies
   , ModuleGraph
   ) where
 
-import           Protolude
+import           Protolude hiding (head)
 
 import           Data.Graph
+import           Data.List (head)
 import qualified Data.Set as S
 import           Language.PureScript.AST
 import qualified Language.PureScript.Constants as C
@@ -59,4 +60,7 @@ usedModules _ = Nothing
 toModule :: MonadError MultipleErrors m => SCC Module -> m Module
 toModule (AcyclicSCC m) = return m
 toModule (CyclicSCC [m]) = return m
-toModule (CyclicSCC ms) = throwError . errorMessage $ CycleInModules (map getModuleName ms)
+toModule (CyclicSCC ms) =
+  throwError
+    . errorMessage' (getModuleSourceSpan (head ms))
+    $ CycleInModules (map getModuleName ms)
