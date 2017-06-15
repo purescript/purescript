@@ -133,8 +133,8 @@ withSourceSpan
   -> P.Parsec [PositionedToken] u a
   -> P.Parsec [PositionedToken] u b
 withSourceSpan f p = do
-  start <- P.getPosition
   comments <- readComments
+  start <- P.getPosition
   x <- p
   end <- P.getPosition
   input <- P.getInput
