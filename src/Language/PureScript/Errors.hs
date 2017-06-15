@@ -19,6 +19,7 @@ import           Data.Either (partitionEithers)
 import           Data.Foldable (fold)
 import           Data.Functor.Identity (Identity(..))
 import           Data.List (transpose, nubBy, sort, partition, dropWhileEnd)
+import qualified Data.List.NonEmpty as NEL
 import           Data.Maybe (maybeToList, fromMaybe, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Text as T
@@ -1044,7 +1045,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
     renderHint (ErrorInBindingGroup nms) detail =
       paras [ detail
-            , line $ "in binding group " <> T.intercalate ", " (map showIdent nms)
+            , line $ "in binding group " <> T.intercalate ", " (NEL.toList (fmap showIdent nms))
             ]
     renderHint (ErrorInDataBindingGroup nms) detail =
       paras [ detail

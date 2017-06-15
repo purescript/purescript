@@ -14,6 +14,7 @@ import Control.Monad.Identity
 import Data.Aeson.TH
 import qualified Data.Map as M
 import Data.Text (Text)
+import qualified Data.List.NonEmpty as NEL
 
 import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Literals
@@ -182,7 +183,7 @@ data ErrorMessageHint
   | ErrorInApplication Expr Type Expr
   | ErrorInDataConstructor (ProperName 'ConstructorName)
   | ErrorInTypeConstructor (ProperName 'TypeName)
-  | ErrorInBindingGroup [Ident]
+  | ErrorInBindingGroup (NEL.NonEmpty Ident)
   | ErrorInDataBindingGroup [ProperName 'TypeName]
   | ErrorInTypeSynonym (ProperName 'TypeName)
   | ErrorInValueDeclaration Ident
@@ -410,7 +411,7 @@ data Declaration
   -- |
   -- A minimal mutually recursive set of value declarations
   --
-  | BindingGroupDeclaration SourceAnn [((SourceAnn, Ident), NameKind, Expr)]
+  | BindingGroupDeclaration (NEL.NonEmpty ((SourceAnn, Ident), NameKind, Expr))
   -- |
   -- A foreign import declaration (name, type)
   --
@@ -482,7 +483,7 @@ declSourceAnn (TypeSynonymDeclaration sa _ _ _) = sa
 declSourceAnn (TypeDeclaration sa _ _) = sa
 declSourceAnn (ValueDeclaration sa _ _ _ _) = sa
 declSourceAnn (BoundValueDeclaration sa _ _) = sa
-declSourceAnn (BindingGroupDeclaration sa _) = sa
+declSourceAnn (BindingGroupDeclaration ds) = let ((sa, _), _, _) = NEL.head ds in sa
 declSourceAnn (ExternDeclaration sa _ _) = sa
 declSourceAnn (ExternDataDeclaration sa _ _) = sa
 declSourceAnn (ExternKindDeclaration sa _) = sa

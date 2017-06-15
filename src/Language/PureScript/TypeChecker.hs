@@ -22,11 +22,12 @@ import Control.Lens ((^..), _1, _2)
 import Data.Foldable (for_, traverse_, toList)
 import Data.List (nubBy, (\\), sort, group)
 import Data.Maybe
+import Data.Monoid ((<>))
+import Data.Text (Text)
+import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Data.Monoid ((<>))
 import qualified Data.Text as T
-import Data.Text (Text)
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -276,13 +277,12 @@ typeCheckAll moduleName _ = traverse go
       return $ ValueDeclaration sa name nameKind [] [MkUnguarded val'']
   go ValueDeclaration{} = internalError "Binders were not desugared"
   go BoundValueDeclaration{} = internalError "BoundValueDeclaration should be desugared"
-  go (BindingGroupDeclaration sa@(ss, _) vals) = do
+  go (BindingGroupDeclaration vals) = do
     env <- getEnv
-    warnAndRethrow (addHint (ErrorInBindingGroup (map (\((_, ident), _, _) -> ident) vals)) . addHint (PositionedError ss)) $ do
-      for_ vals $ \((_, ident), _, _) ->
-        valueIsNotDefined moduleName ident
-      vals' <- mapM (thirdM (checkExhaustiveExpr ss env moduleName)) vals
-      tys <- typesOf RecursiveBindingGroup moduleName $ map (\(sai, _, ty) -> (sai, ty)) vals'
+    warnAndRethrow (addHint (ErrorInBindingGroup (fmap (\((_, ident), _, _) -> ident) vals))) $ do
+      for_ vals $ \((_, ident), _, _) -> valueIsNotDefined moduleName ident
+      vals' <- NEL.toList <$> traverse (\(sai@((ss, _), _), nk, expr) -> (sai, nk,) <$> checkExhaustiveExpr ss env moduleName expr) vals
+      tys <- typesOf RecursiveBindingGroup moduleName $ fmap (\(sai, _, ty) -> (sai, ty)) vals'
       vals'' <- forM [ (sai, val, nameKind, ty)
                      | (sai@(_, name), nameKind, _) <- vals'
                      , ((_, name'), (val, ty)) <- tys
@@ -290,7 +290,7 @@ typeCheckAll moduleName _ = traverse go
                      ] $ \(sai@(_, name), val, nameKind, ty) -> do
         addValue moduleName name ty nameKind
         return (sai, nameKind, val)
-      return $ BindingGroupDeclaration sa vals''
+      return . BindingGroupDeclaration $ NEL.fromList vals''
   go (d@(ExternDataDeclaration _ name kind)) = do
     env <- getEnv
     putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (kind, ExternData) (types env) }

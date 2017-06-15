@@ -40,9 +40,10 @@ import Data.Functor (($>))
 import Data.List (transpose, (\\), partition, delete)
 import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
+import Data.Traversable (for)
+import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Data.Traversable (for)
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -441,16 +442,15 @@ inferLetBinding seen (ValueDeclaration sa@(ss, _) ident nameKind [] [MkUnguarded
     TypedValue _ val' valTy' <- bindNames dict $ infer val
     unifyTypes valTy valTy'
     bindNames (M.singleton (Qualified Nothing ident) (valTy', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration sa ident nameKind [] [MkUnguarded val']]) rest ret j
-inferLetBinding seen (BindingGroupDeclaration sa@(ss, _) ds : rest) ret j =
-  warnAndRethrowWithPositionTC ss $ do
-    Just moduleName <- checkCurrentModule <$> get
-    SplitBindingGroup untyped typed dict <- typeDictionaryForBindingGroup Nothing (map (\(i, _, v) -> (i, v)) ds)
-    ds1' <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
-    ds2' <- forM untyped $ \e -> typeForBindingGroupElement e dict
-    let ds' = [(ident, Private, val') | (ident, (val', _)) <- ds1' ++ ds2']
-    bindNames dict $ do
-      makeBindingGroupVisible
-      inferLetBinding (seen ++ [BindingGroupDeclaration sa ds']) rest ret j
+inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
+  Just moduleName <- checkCurrentModule <$> get
+  SplitBindingGroup untyped typed dict <- typeDictionaryForBindingGroup Nothing . NEL.toList $ fmap (\(i, _, v) -> (i, v)) ds
+  ds1' <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
+  ds2' <- forM untyped $ \e -> typeForBindingGroupElement e dict
+  let ds' = NEL.fromList [(ident, Private, val') | (ident, (val', _)) <- ds1' ++ ds2']
+  bindNames dict $ do
+    makeBindingGroupVisible
+    inferLetBinding (seen ++ [BindingGroupDeclaration ds']) rest ret j
 inferLetBinding _ _ _ _ = internalError "Invalid argument to inferLetBinding"
 
 -- | Infer the types of variables brought into scope by a binder

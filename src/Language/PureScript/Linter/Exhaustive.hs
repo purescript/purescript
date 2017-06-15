@@ -330,7 +330,7 @@ checkExhaustiveExpr
 checkExhaustiveExpr initSS env mn = onExpr initSS
   where
   onDecl :: Declaration -> m Declaration
-  onDecl (BindingGroupDeclaration sa bs) = BindingGroupDeclaration sa <$> mapM (\(sai@((ss, _), _), nk, expr) -> (sai, nk,) <$> onExpr ss expr) bs
+  onDecl (BindingGroupDeclaration bs) = BindingGroupDeclaration <$> mapM (\(sai@((ss, _), _), nk, expr) -> (sai, nk,) <$> onExpr ss expr) bs
   onDecl (ValueDeclaration sa@(ss, _) name x y [MkUnguarded e]) = ValueDeclaration sa name x y . mkUnguardedExpr <$> censor (addHint (ErrorInValueDeclaration name)) (onExpr ss e)
   onDecl decl = return decl
 

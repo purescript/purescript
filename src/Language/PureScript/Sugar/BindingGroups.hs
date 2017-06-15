@@ -18,6 +18,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Data.Graph
 import Data.List (intersect)
 import Data.Maybe (isJust)
+import qualified Data.List.NonEmpty as NEL
 import qualified Data.Set as S
 
 import Language.PureScript.AST
@@ -42,7 +43,7 @@ createBindingGroupsModule (Module ss coms name ds exps) =
 --
 collapseBindingGroupsModule :: [Module] -> [Module]
 collapseBindingGroupsModule =
-  map $ \(Module ss coms name ds exps) ->
+  fmap $ \(Module ss coms name ds exps) ->
     Module ss coms name (collapseBindingGroups ds) exps
 
 createBindingGroups
@@ -67,11 +68,11 @@ createBindingGroups moduleName = mapM f <=< handleDecls
   handleDecls ds = do
     let values = filter isValueDecl ds
         dataDecls = filter isDataDecl ds
-        allProperNames = map declTypeName dataDecls
-        dataVerts = map (\d -> (d, declTypeName d, usedTypeNames moduleName d `intersect` allProperNames)) dataDecls
+        allProperNames = fmap declTypeName dataDecls
+        dataVerts = fmap (\d -> (d, declTypeName d, usedTypeNames moduleName d `intersect` allProperNames)) dataDecls
     dataBindingGroupDecls <- parU (stronglyConnComp dataVerts) toDataBindingGroup
-    let allIdents = map declIdent values
-        valueVerts = map (\d -> (d, declIdent d, usedIdents moduleName d `intersect` allIdents)) values
+    let allIdents = fmap declIdent values
+        valueVerts = fmap (\d -> (d, declIdent d, usedIdents moduleName d `intersect` allIdents)) values
     bindingGroupDecls <- parU (stronglyConnComp valueVerts) (toBindingGroup moduleName)
     return $ filter isImportDecl ds ++
              filter isExternKindDecl ds ++
@@ -89,11 +90,11 @@ createBindingGroups moduleName = mapM f <=< handleDecls
 collapseBindingGroups :: [Declaration] -> [Declaration]
 collapseBindingGroups =
   let (f, _, _) = everywhereOnValues id collapseBindingGroupsForValue id
-  in map f . concatMap go
+  in fmap f . concatMap go
   where
   go (DataBindingGroupDeclaration _ ds) = ds
-  go (BindingGroupDeclaration _ ds) =
-    map (\((sa, ident), nameKind, val) ->
+  go (BindingGroupDeclaration ds) =
+    NEL.toList $ fmap (\((sa, ident), nameKind, val) ->
       ValueDeclaration sa ident nameKind [] [MkUnguarded val]) ds
   go other = [other]
 
@@ -168,7 +169,7 @@ toBindingGroup
    -> SCC Declaration
    -> m Declaration
 toBindingGroup _ (AcyclicSCC d) = return d
-toBindingGroup moduleName (CyclicSCC ds') =
+toBindingGroup moduleName (CyclicSCC ds') = do
   -- Once we have a mutually-recursive group of declarations, we need to sort
   -- them further by their immediate dependencies (those outside function
   -- bodies). In particular, this is relevant for type instance dictionaries
@@ -178,13 +179,13 @@ toBindingGroup moduleName (CyclicSCC ds') =
   -- If we discover declarations that still contain mutually-recursive
   -- immediate references, we're guaranteed to get an undefined reference at
   -- runtime, so treat this as an error. See also github issue #365.
-  BindingGroupDeclaration todoAnn <$> mapM toBinding (stronglyConnComp valueVerts)
+  BindingGroupDeclaration . NEL.fromList <$> mapM toBinding (stronglyConnComp valueVerts)
   where
   idents :: [Ident]
-  idents = map (\(_, i, _) -> i) valueVerts
+  idents = fmap (\(_, i, _) -> i) valueVerts
 
   valueVerts :: [(Declaration, Ident, [Ident])]
-  valueVerts = map (\d -> (d, declIdent d, usedImmediateIdents moduleName d `intersect` idents)) ds'
+  valueVerts = fmap (\d -> (d, declIdent d, usedImmediateIdents moduleName d `intersect` idents)) ds'
 
   toBinding :: SCC Declaration -> m ((SourceAnn, Ident), NameKind, Expr)
   toBinding (AcyclicSCC d) = return $ fromValueDecl d

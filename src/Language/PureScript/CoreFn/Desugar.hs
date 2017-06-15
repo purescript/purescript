@@ -9,6 +9,7 @@ import Data.Function (on)
 import Data.List (sort, sortBy)
 import Data.Maybe (mapMaybe)
 import Data.Tuple (swap)
+import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as M
 
 import Language.PureScript.AST.Literals
@@ -44,7 +45,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
 
   -- | Remove duplicate imports
   dedupeImports :: [(Ann, ModuleName)] -> [(Ann, ModuleName)]
-  dedupeImports = map swap . M.toList . M.fromListWith const . map swap
+  dedupeImports = fmap swap . M.toList . M.fromListWith const . fmap swap
 
   ssA :: SourceSpan -> Ann
   ssA ss = (ss, [], Nothing, Nothing)
@@ -57,15 +58,15 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   declToCoreFn d@(A.DataDeclaration _ Newtype _ _ _) =
     error $ "Found newtype with multiple constructors: " ++ show d
   declToCoreFn (A.DataDeclaration (ss, com) Data tyName _ ctors) =
-    flip map ctors $ \(ctor, _) ->
+    flip fmap ctors $ \(ctor, _) ->
       let (_, _, _, fields) = lookupConstructor env (Qualified (Just mn) ctor)
       in NonRec (ssA ss) (properToIdent ctor) $ Constructor (ss, com, Nothing, Nothing) tyName ctor fields
   declToCoreFn (A.DataBindingGroupDeclaration _ ds) =
     concatMap declToCoreFn ds
   declToCoreFn (A.ValueDeclaration (ss, com) name _ _ [A.MkUnguarded e]) =
     [NonRec (ssA ss) name (exprToCoreFn ss com Nothing e)]
-  declToCoreFn (A.BindingGroupDeclaration _ ds) =
-    [Rec $ map (\(((ss, com), name), _, e) -> ((ssA ss, name), exprToCoreFn ss com Nothing e)) ds]
+  declToCoreFn (A.BindingGroupDeclaration ds) =
+    [Rec . NEL.toList $ fmap (\(((ss, com), name), _, e) -> ((ssA ss, name), exprToCoreFn ss com Nothing e)) ds]
   declToCoreFn (A.TypeClassDeclaration sa@(ss, _) name _ supers _ members) =
     [NonRec (ssA ss) (properToIdent name) $ mkTypeClassConstructor sa supers members]
   declToCoreFn _ = []
@@ -77,7 +78,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   exprToCoreFn ss com ty (A.Accessor name v) =
     Accessor (ss, com, ty, Nothing) name (exprToCoreFn ss [] Nothing v)
   exprToCoreFn ss com ty (A.ObjectUpdate obj vs) =
-    ObjectUpdate (ss, com, ty, Nothing) (exprToCoreFn ss [] Nothing obj) $ map (second (exprToCoreFn ss [] Nothing)) vs
+    ObjectUpdate (ss, com, ty, Nothing) (exprToCoreFn ss [] Nothing obj) $ fmap (second (exprToCoreFn ss [] Nothing)) vs
   exprToCoreFn ss com ty (A.Abs (A.VarBinder name) v) =
     Abs (ss, com, ty, Nothing) name (exprToCoreFn ss [] Nothing v)
   exprToCoreFn _ _ _ (A.Abs _ _) =
@@ -95,7 +96,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   exprToCoreFn ss com ty (A.Constructor name) =
     Var (ss, com, ty, Just $ getConstructorMeta name) $ fmap properToIdent name
   exprToCoreFn ss com ty (A.Case vs alts) =
-    Case (ss, com, ty, Nothing) (map (exprToCoreFn ss [] Nothing) vs) (map (altToCoreFn ss) alts)
+    Case (ss, com, ty, Nothing) (fmap (exprToCoreFn ss [] Nothing) vs) (fmap (altToCoreFn ss) alts)
   exprToCoreFn ss com _ (A.TypedValue _ v ty) =
     exprToCoreFn ss com (Just ty) v
   exprToCoreFn ss com ty (A.Let ds v) =
@@ -103,7 +104,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name (A.TypedValue _ lit@(A.Literal (A.ObjectLiteral _)) _)) =
     exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name lit)
   exprToCoreFn ss com _ (A.TypeClassDictionaryConstructorApp name (A.Literal (A.ObjectLiteral vs))) =
-    let args = map (exprToCoreFn ss [] Nothing . snd) $ sortBy (compare `on` fst) vs
+    let args = fmap (exprToCoreFn ss [] Nothing . snd) $ sortBy (compare `on` fst) vs
         ctor = Var (ss, [], Nothing, Just IsTypeClassConstructor) (fmap properToIdent name)
     in foldl (App (ss, com, Nothing, Nothing)) ctor args
   exprToCoreFn ss com ty  (A.TypeClassDictionaryAccessor _ ident) =
@@ -140,7 +141,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     VarBinder (ss, com, Nothing, Nothing) name
   binderToCoreFn ss com (A.ConstructorBinder dctor@(Qualified mn' _) bs) =
     let (_, tctor, _, _) = lookupConstructor env dctor
-    in ConstructorBinder (ss, com, Nothing, Just $ getConstructorMeta dctor) (Qualified mn' tctor) dctor (map (binderToCoreFn ss []) bs)
+    in ConstructorBinder (ss, com, Nothing, Just $ getConstructorMeta dctor) (Qualified mn' tctor) dctor (fmap (binderToCoreFn ss []) bs)
   binderToCoreFn ss com (A.NamedBinder name b) =
     NamedBinder (ss, com, Nothing, Nothing) name (binderToCoreFn ss [] b)
   binderToCoreFn _ com (A.PositionedBinder ss com1 b) =
@@ -226,7 +227,7 @@ externToCoreFn _ = Nothing
 -- CoreFn modules only export values, so all data constructors, class
 -- constructor, instances and values are flattened into one list.
 exportToCoreFn :: A.DeclarationRef -> [Ident]
-exportToCoreFn (A.TypeRef _ _ (Just dctors)) = map properToIdent dctors
+exportToCoreFn (A.TypeRef _ _ (Just dctors)) = fmap properToIdent dctors
 exportToCoreFn (A.ValueRef _ name) = [name]
 exportToCoreFn (A.TypeClassRef _ name) = [properToIdent name]
 exportToCoreFn (A.TypeInstanceRef _ name) = [name]
@@ -238,7 +239,7 @@ exportToCoreFn _ = []
 mkTypeClassConstructor :: SourceAnn -> [Constraint] -> [A.Declaration] -> Expr Ann
 mkTypeClassConstructor (ss, com) [] [] = Literal (ss, com, Nothing, Just IsTypeClassConstructor) (ObjectLiteral [])
 mkTypeClassConstructor (ss, com) supers members =
-  let args@(a:as) = sort $ map typeClassMemberName members ++ superClassDictionaryNames supers
+  let args@(a:as) = sort $ fmap typeClassMemberName members ++ superClassDictionaryNames supers
       props = [ (mkString arg, Var (ssAnn ss) $ Qualified Nothing (Ident arg)) | arg <- args ]
       dict = Literal (ssAnn ss) (ObjectLiteral props)
   in Abs (ss, com, Nothing, Just IsTypeClassConstructor)
