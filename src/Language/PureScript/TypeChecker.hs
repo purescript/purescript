@@ -271,25 +271,25 @@ typeCheckAll moduleName _ = traverse go
     warnAndRethrow (addHint (ErrorInValueDeclaration name) . addHint (PositionedError ss)) $ do
       val' <- checkExhaustiveExpr env moduleName val
       valueIsNotDefined moduleName name
-      [(_, (val'', ty))] <- typesOf NonRecursiveBindingGroup moduleName [(name, val')]
+      [(_, (val'', ty))] <- typesOf NonRecursiveBindingGroup moduleName [((sa, name), val')]
       addValue moduleName name ty nameKind
       return $ ValueDeclaration sa name nameKind [] [MkUnguarded val'']
   go ValueDeclaration{} = internalError "Binders were not desugared"
   go BoundValueDeclaration{} = internalError "BoundValueDeclaration should be desugared"
   go (BindingGroupDeclaration sa@(ss, _) vals) = do
     env <- getEnv
-    warnAndRethrow (addHint (ErrorInBindingGroup (map (\(ident, _, _) -> ident) vals)) . addHint (PositionedError ss)) $ do
-      for_ vals $ \(ident, _, _) ->
+    warnAndRethrow (addHint (ErrorInBindingGroup (map (\((_, ident), _, _) -> ident) vals)) . addHint (PositionedError ss)) $ do
+      for_ vals $ \((_, ident), _, _) ->
         valueIsNotDefined moduleName ident
       vals' <- mapM (thirdM (checkExhaustiveExpr env moduleName)) vals
-      tys <- typesOf RecursiveBindingGroup moduleName $ map (\(ident, _, ty) -> (ident, ty)) vals'
-      vals'' <- forM [ (name, val, nameKind, ty)
-                     | (name, nameKind, _) <- vals'
-                     , (name', (val, ty)) <- tys
+      tys <- typesOf RecursiveBindingGroup moduleName $ map (\(sai, _, ty) -> (sai, ty)) vals'
+      vals'' <- forM [ (sai, val, nameKind, ty)
+                     | (sai@(_, name), nameKind, _) <- vals'
+                     , ((_, name'), (val, ty)) <- tys
                      , name == name'
-                     ] $ \(name, val, nameKind, ty) -> do
+                     ] $ \(sai@(_, name), val, nameKind, ty) -> do
         addValue moduleName name ty nameKind
-        return (name, nameKind, val)
+        return (sai, nameKind, val)
       return $ BindingGroupDeclaration sa vals''
   go (d@(ExternDataDeclaration _ name kind)) = do
     env <- getEnv

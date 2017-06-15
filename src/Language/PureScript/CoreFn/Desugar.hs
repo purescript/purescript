@@ -64,8 +64,8 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     concatMap declToCoreFn ds
   declToCoreFn (A.ValueDeclaration (ss, com) name _ _ [A.MkUnguarded e]) =
     [NonRec (ssA ss) name (exprToCoreFn ss com Nothing e)]
-  declToCoreFn (A.BindingGroupDeclaration (ss, com) ds) =
-    [Rec $ map (\(name, _, e) -> ((ssA ss, name), exprToCoreFn ss [] Nothing e)) ds]
+  declToCoreFn (A.BindingGroupDeclaration _ ds) =
+    [Rec $ map (\(((ss, com), name), _, e) -> ((ssA ss, name), exprToCoreFn ss com Nothing e)) ds]
   declToCoreFn (A.TypeClassDeclaration sa@(ss, _) name _ supers _ members) =
     [NonRec (ssA ss) (properToIdent name) $ mkTypeClassConstructor sa supers members]
   declToCoreFn _ = []

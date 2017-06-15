@@ -517,7 +517,7 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
         s'' = S.union s' (S.fromList (concatMap binderNames bs))
     in foldMap (h'' s') bs <> foldMap (l' s'') val
   f' s (BindingGroupDeclaration _ ds) =
-    let s' = S.union s (S.fromList (map (\(name, _, _) -> name) ds))
+    let s' = S.union s (S.fromList (map (\((_, name), _, _) -> name) ds))
     in foldMap (\(_, _, val) -> g'' s' val) ds
   f' s (TypeClassDeclaration _ _ _ _ _ ds) = foldMap (f'' s) ds
   f' s (TypeInstanceDeclaration _ _ _ _ _ (ExplicitInstance ds)) = foldMap (f'' s) ds

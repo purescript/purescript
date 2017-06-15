@@ -410,7 +410,7 @@ data Declaration
   -- |
   -- A minimal mutually recursive set of value declarations
   --
-  | BindingGroupDeclaration SourceAnn [(Ident, NameKind, Expr)]
+  | BindingGroupDeclaration SourceAnn [((SourceAnn, Ident), NameKind, Expr)]
   -- |
   -- A foreign import declaration (name, type)
   --

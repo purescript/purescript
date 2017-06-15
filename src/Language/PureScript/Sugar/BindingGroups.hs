@@ -92,9 +92,8 @@ collapseBindingGroups =
   in map f . concatMap go
   where
   go (DataBindingGroupDeclaration _ ds) = ds
-  go (BindingGroupDeclaration sa ds) =
-    map (\(ident, nameKind, val) ->
-      -- TODO-gb: not the best sa here
+  go (BindingGroupDeclaration _ ds) =
+    map (\((sa, ident), nameKind, val) ->
       ValueDeclaration sa ident nameKind [] [MkUnguarded val]) ds
   go other = [other]
 
@@ -187,7 +186,7 @@ toBindingGroup moduleName (CyclicSCC ds') =
   valueVerts :: [(Declaration, Ident, [Ident])]
   valueVerts = map (\d -> (d, declIdent d, usedImmediateIdents moduleName d `intersect` idents)) ds'
 
-  toBinding :: SCC Declaration -> m (Ident, NameKind, Expr)
+  toBinding :: SCC Declaration -> m ((SourceAnn, Ident), NameKind, Expr)
   toBinding (AcyclicSCC d) = return $ fromValueDecl d
   toBinding (CyclicSCC ds) = throwError $ foldMap cycleError ds
 
@@ -211,7 +210,7 @@ isTypeSynonym :: Declaration -> Maybe (ProperName 'TypeName)
 isTypeSynonym (TypeSynonymDeclaration _ pn _ _) = Just pn
 isTypeSynonym _ = Nothing
 
-fromValueDecl :: Declaration -> (Ident, NameKind, Expr)
-fromValueDecl (ValueDeclaration _ ident nameKind [] [MkUnguarded val]) = (ident, nameKind, val)
+fromValueDecl :: Declaration -> ((SourceAnn, Ident), NameKind, Expr)
+fromValueDecl (ValueDeclaration sa ident nameKind [] [MkUnguarded val]) = ((sa, ident), nameKind, val)
 fromValueDecl ValueDeclaration{} = internalError "Binders should have been desugared"
 fromValueDecl _ = internalError "Expected ValueDeclaration"

@@ -126,10 +126,10 @@ prettyPrintDeclaration _ (TypeDeclaration _ ident ty) =
   text (T.unpack (showIdent ident) ++ " :: ") <> typeAsBox ty
 prettyPrintDeclaration d (ValueDeclaration _ ident _ [] [GuardedExpr [] val]) =
   text (T.unpack (showIdent ident) ++ " = ") <> prettyPrintValue (d - 1) val
-prettyPrintDeclaration d (BindingGroupDeclaration sa ds) =
+prettyPrintDeclaration d (BindingGroupDeclaration _ ds) =
   vsep 1 left (map (prettyPrintDeclaration (d - 1) . toDecl) ds)
   where
-  toDecl (nm, t, e) = ValueDeclaration sa nm t [] [GuardedExpr [] e]
+  toDecl ((sa, nm), t, e) = ValueDeclaration sa nm t [] [GuardedExpr [] e]
 prettyPrintDeclaration _ _ = internalError "Invalid argument to prettyPrintDeclaration"
 
 prettyPrintCaseAlternative :: Int -> CaseAlternative -> Box
