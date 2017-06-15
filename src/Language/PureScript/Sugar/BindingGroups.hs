@@ -200,10 +200,10 @@ toDataBindingGroup
   -> m Declaration
 toDataBindingGroup (AcyclicSCC d) = return d
 toDataBindingGroup (CyclicSCC [d]) = case isTypeSynonym d of
-  Just pn -> throwError . errorMessage $ CycleInTypeSynonym (Just pn)
+  Just pn -> throwError . errorMessage' (declSourceSpan d) $ CycleInTypeSynonym (Just pn)
   _ -> return d
 toDataBindingGroup (CyclicSCC ds')
-  | all (isJust . isTypeSynonym) ds' = throwError . errorMessage $ CycleInTypeSynonym Nothing
+  | all (isJust . isTypeSynonym) ds' = throwError . errorMessage' (declSourceSpan (head ds')) $ CycleInTypeSynonym Nothing
   | otherwise = return $ DataBindingGroupDeclaration todoAnn ds'
 
 isTypeSynonym :: Declaration -> Maybe (ProperName 'TypeName)
