@@ -205,6 +205,7 @@ extra-source-files:
       examples/failing/LetPatterns2.purs
       examples/failing/LetPatterns3.purs
       examples/failing/LetPatterns4.purs
+      examples/failing/Match.purs
       examples/failing/MissingClassExport.purs
       examples/failing/MissingClassMemberExport.purs
       examples/failing/MissingRecordField.purs

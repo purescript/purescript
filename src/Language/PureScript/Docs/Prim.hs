@@ -27,6 +27,7 @@ primDocsModule = Module
       , warn
       , union
       , rowCons
+      , match
       , typeConcat
       , typeString
       , kindType
@@ -243,6 +244,11 @@ rowCons = primClass "RowCons" $ T.unlines
   [ "The RowCons type class is a 4-way relation which asserts that one row of"
   , "types can be obtained from another by inserting a new label/type pair on"
   , "the left."
+  ]
+
+match :: Declaration
+match = primClass "Match" $ T.unlines
+  [ "The Match type class is used to match a symbol against a regex."
   ]
 
 typeConcat :: Declaration

@@ -1,3 +1,4 @@
+-- @shouldFailWith NoInstanceFound
 module Main where
 
 import Prelude
@@ -12,6 +13,5 @@ lit = Lowercase <<< reflectSymbol
 
 main :: Eff (console :: CONSOLE) Unit
 main = do
-  _ <- pure <<< lit $ SProxy :: SProxy ""
-  _ <- pure <<< lit $ SProxy :: SProxy "foo bar baz"
+  _ <- pure <<< lit $ SProxy :: SProxy "foo BAR baz"
   log "Done"

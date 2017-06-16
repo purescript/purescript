@@ -29,6 +29,8 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Text (Text)
 
+import Text.Regex.TDFA ((=~))
+
 import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Environment
@@ -39,7 +41,7 @@ import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 import Language.PureScript.Label (Label(..))
-import Language.PureScript.PSString (PSString, mkString)
+import Language.PureScript.PSString (PSString, mkString, decodeStringWithReplacement)
 import qualified Language.PureScript.Constants as C
 
 -- | Describes what sort of dictionary to generate for type class instances
@@ -58,6 +60,8 @@ data Evidence
   -- ^ Computed instance of Union
   | ConsInstance
   -- ^ Computed instance of RowCons
+  | MatchInstance
+  -- ^ Computed instance of Match
   deriving (Show, Eq)
 
 -- | Extract the identifier of a named instance
@@ -173,6 +177,9 @@ entails SolverOptions{..} constraint context hints =
       = [ TypeClassDictionaryInScope UnionInstance [] C.Union [lOut, rOut, uOut] cst ]
     forClassName _ C.RowCons [TypeLevelString sym, ty, r, _]
       = [ TypeClassDictionaryInScope ConsInstance [] C.RowCons [TypeLevelString sym, ty, r, RCons (Label sym) ty r] Nothing ]
+    forClassName _ C.Match [p'@(TypeLevelString p), s'@(TypeLevelString s)]
+      | matchesPattern p s
+      = [ TypeClassDictionaryInScope MatchInstance [] C.Match [p', s'] Nothing ]
     forClassName ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (ordNub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
     forClassName _ _ _ = internalError "forClassName: expected qualified class name"
 
@@ -332,6 +339,7 @@ entails SolverOptions{..} constraint context hints =
               -- We need the subgoal dictionary to appear in the term somewhere
               return $ App (Abs (VarBinder (Ident C.__unused)) valUndefined) e
             mkDictionary UnionInstance _ = return valUndefined
+            mkDictionary MatchInstance _ = return valUndefined
             mkDictionary ConsInstance _ = return valUndefined
             mkDictionary (WarnInstance msg) _ = do
               tell . errorMessage $ UserDefinedWarning msg
@@ -373,6 +381,12 @@ entails SolverOptions{..} constraint context hints =
             -- the right hand side, and we can't be certain we won't reorder the
             -- types for such labels.
             _ -> (not (null fixed), (fixed, rowVar), Just [ Constraint C.Union [rest, r, rowVar] Nothing ])
+
+    -- | Check that a symbol matches a pattern
+    matchesPattern :: PSString -> PSString -> Bool
+    matchesPattern p s = s' =~ p'
+      where p' = decodeStringWithReplacement p
+            s' = decodeStringWithReplacement s
 
 -- Check if an instance matches our list of types, allowing for types
 -- to be solved via functional dependencies. If the types match, we return a
