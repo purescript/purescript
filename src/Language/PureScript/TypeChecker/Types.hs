@@ -764,9 +764,22 @@ checkProperties expr ps row lax = let (ts, r') = rowToList row in go ps ts r' wh
         ps'' <- go ps' ts rest
         return $ (p, v') : ps''
       Just ty -> do
-        v' <- check v ty
+        v' <- case isTypedProperty v of
+                Just ty' -> do
+                  Just moduleName <- checkCurrentModule <$> get
+                  (kind, args) <- kindOfWithScopedVars ty'
+                  checkTypeKind ty' kind
+                  withScopedTypeVars moduleName args (check v ty)
+                Nothing -> check v ty
         ps'' <- go ps' (delete (Label p, ty) ts) r
         return $ (p, v') : ps''
+        where
+          -- | Desugared typeclass instances with signatures will result
+          --   in typed properties.
+          isTypedProperty :: Expr -> Maybe Type
+          isTypedProperty (PositionedValue _ _ pv) = isTypedProperty pv
+          isTypedProperty (TypedValue True _ t) = Just t
+          isTypedProperty _                     = Nothing
   go _ _ _ = throwError . errorMessage $ ExprDoesNotHaveType expr (TypeApp tyRecord row)
 
 -- | Check the type of a function application, rethrowing errors to provide a better error message.
