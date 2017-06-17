@@ -14,6 +14,7 @@ import Control.Monad.Identity
 import Data.Aeson.TH
 import qualified Data.Map as M
 import Data.Text (Text)
+import qualified Data.List.NonEmpty as NEL
 
 import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Literals
@@ -182,7 +183,7 @@ data ErrorMessageHint
   | ErrorInApplication Expr Type Expr
   | ErrorInDataConstructor (ProperName 'ConstructorName)
   | ErrorInTypeConstructor (ProperName 'TypeName)
-  | ErrorInBindingGroup [Ident]
+  | ErrorInBindingGroup (NEL.NonEmpty Ident)
   | ErrorInDataBindingGroup [ProperName 'TypeName]
   | ErrorInTypeSynonym (ProperName 'TypeName)
   | ErrorInValueDeclaration Ident
@@ -233,7 +234,6 @@ addDefaultImport toImport m@(Module ss coms mn decls exps) =
   else Module ss coms mn (ImportDeclaration (ss, []) toImport Implicit Nothing : decls) exps
   where
   isExistingImport (ImportDeclaration _ mn' _ _) | mn' == toImport = True
-  isExistingImport (PositionedDeclaration _ _ d) = isExistingImport d
   isExistingImport _ = False
 
 -- |
@@ -388,46 +388,46 @@ data Declaration
   -- |
   -- A data type declaration (data or newtype, name, arguments, data constructors)
   --
-  = DataDeclaration DataDeclType (ProperName 'TypeName) [(Text, Maybe Kind)] [(ProperName 'ConstructorName, [Type])]
+  = DataDeclaration SourceAnn DataDeclType (ProperName 'TypeName) [(Text, Maybe Kind)] [(ProperName 'ConstructorName, [Type])]
   -- |
   -- A minimal mutually recursive set of data type declarations
   --
-  | DataBindingGroupDeclaration [Declaration]
+  | DataBindingGroupDeclaration (NEL.NonEmpty Declaration)
   -- |
   -- A type synonym declaration (name, arguments, type)
   --
-  | TypeSynonymDeclaration (ProperName 'TypeName) [(Text, Maybe Kind)] Type
+  | TypeSynonymDeclaration SourceAnn (ProperName 'TypeName) [(Text, Maybe Kind)] Type
   -- |
   -- A type declaration for a value (name, ty)
   --
-  | TypeDeclaration Ident Type
+  | TypeDeclaration SourceAnn Ident Type
   -- |
   -- A value declaration (name, top-level binders, optional guard, value)
   --
-  | ValueDeclaration Ident NameKind [Binder] [GuardedExpr]
+  | ValueDeclaration SourceAnn Ident NameKind [Binder] [GuardedExpr]
   -- |
   -- A declaration paired with pattern matching in let-in expression (binder, optional guard, value)
-  | BoundValueDeclaration Binder Expr
+  | BoundValueDeclaration SourceAnn Binder Expr
   -- |
   -- A minimal mutually recursive set of value declarations
   --
-  | BindingGroupDeclaration [(Ident, NameKind, Expr)]
+  | BindingGroupDeclaration (NEL.NonEmpty ((SourceAnn, Ident), NameKind, Expr))
   -- |
   -- A foreign import declaration (name, type)
   --
-  | ExternDeclaration Ident Type
+  | ExternDeclaration SourceAnn Ident Type
   -- |
   -- A data type foreign import (name, kind)
   --
-  | ExternDataDeclaration (ProperName 'TypeName) Kind
+  | ExternDataDeclaration SourceAnn (ProperName 'TypeName) Kind
   -- |
   -- A foreign kind import (name)
   --
-  | ExternKindDeclaration (ProperName 'KindName)
+  | ExternKindDeclaration SourceAnn (ProperName 'KindName)
   -- |
   -- A fixity declaration
   --
-  | FixityDeclaration (Either ValueFixity TypeFixity)
+  | FixityDeclaration SourceAnn (Either ValueFixity TypeFixity)
   -- |
   -- A module import (module name, qualified/unqualified/hiding, optional "qualified as" name)
   --
@@ -435,16 +435,12 @@ data Declaration
   -- |
   -- A type class declaration (name, argument, implies, member declarations)
   --
-  | TypeClassDeclaration (ProperName 'ClassName) [(Text, Maybe Kind)] [Constraint] [FunctionalDependency] [Declaration]
+  | TypeClassDeclaration SourceAnn (ProperName 'ClassName) [(Text, Maybe Kind)] [Constraint] [FunctionalDependency] [Declaration]
   -- |
   -- A type instance declaration (name, dependencies, class name, instance types, member
   -- declarations)
   --
-  | TypeInstanceDeclaration Ident [Constraint] (Qualified (ProperName 'ClassName)) [Type] TypeInstanceBody
-  -- |
-  -- A declaration with source position information
-  --
-  | PositionedDeclaration SourceSpan [Comment] Declaration
+  | TypeInstanceDeclaration SourceAnn Ident [Constraint] (Qualified (ProperName 'ClassName)) [Type] TypeInstanceBody
   deriving (Show)
 
 data ValueFixity = ValueFixity Fixity (Qualified (Either Ident (ProperName 'ConstructorName))) (OpName 'ValueOpName)
@@ -453,11 +449,11 @@ data ValueFixity = ValueFixity Fixity (Qualified (Either Ident (ProperName 'Cons
 data TypeFixity = TypeFixity Fixity (Qualified (ProperName 'TypeName)) (OpName 'TypeOpName)
   deriving (Eq, Ord, Show)
 
-pattern ValueFixityDeclaration :: Fixity -> Qualified (Either Ident (ProperName 'ConstructorName)) -> OpName 'ValueOpName -> Declaration
-pattern ValueFixityDeclaration fixity name op = FixityDeclaration (Left (ValueFixity fixity name op))
+pattern ValueFixityDeclaration :: SourceAnn -> Fixity -> Qualified (Either Ident (ProperName 'ConstructorName)) -> OpName 'ValueOpName -> Declaration
+pattern ValueFixityDeclaration sa fixity name op = FixityDeclaration sa (Left (ValueFixity fixity name op))
 
-pattern TypeFixityDeclaration :: Fixity -> Qualified (ProperName 'TypeName) -> OpName 'TypeOpName -> Declaration
-pattern TypeFixityDeclaration fixity name op = FixityDeclaration (Right (TypeFixity fixity name op))
+pattern TypeFixityDeclaration :: SourceAnn -> Fixity -> Qualified (ProperName 'TypeName) -> OpName 'TypeOpName -> Declaration
+pattern TypeFixityDeclaration sa fixity name op = FixityDeclaration sa (Right (TypeFixity fixity name op))
 
 -- | The members of a type class instance declaration
 data TypeInstanceBody
@@ -480,12 +476,30 @@ traverseTypeInstanceBody :: (Applicative f) => ([Declaration] -> f [Declaration]
 traverseTypeInstanceBody f (ExplicitInstance ds) = ExplicitInstance <$> f ds
 traverseTypeInstanceBody _ other = pure other
 
+declSourceAnn :: Declaration -> SourceAnn
+declSourceAnn (DataDeclaration sa _ _ _ _) = sa
+declSourceAnn (DataBindingGroupDeclaration ds) = declSourceAnn (NEL.head ds)
+declSourceAnn (TypeSynonymDeclaration sa _ _ _) = sa
+declSourceAnn (TypeDeclaration sa _ _) = sa
+declSourceAnn (ValueDeclaration sa _ _ _ _) = sa
+declSourceAnn (BoundValueDeclaration sa _ _) = sa
+declSourceAnn (BindingGroupDeclaration ds) = let ((sa, _), _, _) = NEL.head ds in sa
+declSourceAnn (ExternDeclaration sa _ _) = sa
+declSourceAnn (ExternDataDeclaration sa _ _) = sa
+declSourceAnn (ExternKindDeclaration sa _) = sa
+declSourceAnn (FixityDeclaration sa _) = sa
+declSourceAnn (ImportDeclaration sa _ _ _) = sa
+declSourceAnn (TypeClassDeclaration sa _ _ _ _ _) = sa
+declSourceAnn (TypeInstanceDeclaration sa _ _ _ _ _) = sa
+
+declSourceSpan :: Declaration -> SourceSpan
+declSourceSpan = fst . declSourceAnn
+
 -- |
 -- Test if a declaration is a value declaration
 --
 isValueDecl :: Declaration -> Bool
 isValueDecl ValueDeclaration{} = True
-isValueDecl (PositionedDeclaration _ _ d) = isValueDecl d
 isValueDecl _ = False
 
 -- |
@@ -494,7 +508,6 @@ isValueDecl _ = False
 isDataDecl :: Declaration -> Bool
 isDataDecl DataDeclaration{} = True
 isDataDecl TypeSynonymDeclaration{} = True
-isDataDecl (PositionedDeclaration _ _ d) = isDataDecl d
 isDataDecl _ = False
 
 -- |
@@ -502,7 +515,6 @@ isDataDecl _ = False
 --
 isImportDecl :: Declaration -> Bool
 isImportDecl ImportDeclaration{} = True
-isImportDecl (PositionedDeclaration _ _ d) = isImportDecl d
 isImportDecl _ = False
 
 -- |
@@ -510,7 +522,6 @@ isImportDecl _ = False
 --
 isExternDataDecl :: Declaration -> Bool
 isExternDataDecl ExternDataDeclaration{} = True
-isExternDataDecl (PositionedDeclaration _ _ d) = isExternDataDecl d
 isExternDataDecl _ = False
 
 -- |
@@ -518,7 +529,6 @@ isExternDataDecl _ = False
 --
 isExternKindDecl :: Declaration -> Bool
 isExternKindDecl ExternKindDeclaration{} = True
-isExternKindDecl (PositionedDeclaration _ _ d) = isExternKindDecl d
 isExternKindDecl _ = False
 
 -- |
@@ -526,12 +536,10 @@ isExternKindDecl _ = False
 --
 isFixityDecl :: Declaration -> Bool
 isFixityDecl FixityDeclaration{} = True
-isFixityDecl (PositionedDeclaration _ _ d) = isFixityDecl d
 isFixityDecl _ = False
 
 getFixityDecl :: Declaration -> Maybe (Either ValueFixity TypeFixity)
-getFixityDecl (FixityDeclaration fixity) = Just fixity
-getFixityDecl (PositionedDeclaration _ _ d) = getFixityDecl d
+getFixityDecl (FixityDeclaration _ fixity) = Just fixity
 getFixityDecl _ = Nothing
 
 -- |
@@ -539,7 +547,6 @@ getFixityDecl _ = Nothing
 --
 isExternDecl :: Declaration -> Bool
 isExternDecl ExternDeclaration{} = True
-isExternDecl (PositionedDeclaration _ _ d) = isExternDecl d
 isExternDecl _ = False
 
 -- |
@@ -547,7 +554,6 @@ isExternDecl _ = False
 --
 isTypeClassInstanceDeclaration :: Declaration -> Bool
 isTypeClassInstanceDeclaration TypeInstanceDeclaration{} = True
-isTypeClassInstanceDeclaration (PositionedDeclaration _ _ d) = isTypeClassInstanceDeclaration d
 isTypeClassInstanceDeclaration _ = False
 
 -- |
@@ -555,7 +561,6 @@ isTypeClassInstanceDeclaration _ = False
 --
 isTypeClassDeclaration :: Declaration -> Bool
 isTypeClassDeclaration TypeClassDeclaration{} = True
-isTypeClassDeclaration (PositionedDeclaration _ _ d) = isTypeClassDeclaration d
 isTypeClassDeclaration _ = False
 
 -- |

@@ -11,10 +11,10 @@ import Prelude.Compat
 
 import Control.Arrow (second)
 
-import qualified Data.Monoid as Monoid ((<>))
-
-import qualified Data.Text as T
 import Data.Text (Text)
+import qualified Data.List.NonEmpty as NEL
+import qualified Data.Monoid as Monoid ((<>))
+import qualified Data.Text as T
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -122,15 +122,14 @@ prettyPrintLiteralValue d (ObjectLiteral ps) = prettyPrintObject (d - 1) $ secon
 
 prettyPrintDeclaration :: Int -> Declaration -> Box
 prettyPrintDeclaration d _ | d < 0 = ellipsis
-prettyPrintDeclaration _ (TypeDeclaration ident ty) =
+prettyPrintDeclaration _ (TypeDeclaration _ ident ty) =
   text (T.unpack (showIdent ident) ++ " :: ") <> typeAsBox ty
-prettyPrintDeclaration d (ValueDeclaration ident _ [] [GuardedExpr [] val]) =
+prettyPrintDeclaration d (ValueDeclaration _ ident _ [] [GuardedExpr [] val]) =
   text (T.unpack (showIdent ident) ++ " = ") <> prettyPrintValue (d - 1) val
 prettyPrintDeclaration d (BindingGroupDeclaration ds) =
-  vsep 1 left (map (prettyPrintDeclaration (d - 1) . toDecl) ds)
+  vsep 1 left (NEL.toList (fmap (prettyPrintDeclaration (d - 1) . toDecl) ds))
   where
-  toDecl (nm, t, e) = ValueDeclaration nm t [] [GuardedExpr [] e]
-prettyPrintDeclaration d (PositionedDeclaration _ _ decl) = prettyPrintDeclaration d decl
+  toDecl ((sa, nm), t, e) = ValueDeclaration sa nm t [] [GuardedExpr [] e]
 prettyPrintDeclaration _ _ = internalError "Invalid argument to prettyPrintDeclaration"
 
 prettyPrintCaseAlternative :: Int -> CaseAlternative -> Box

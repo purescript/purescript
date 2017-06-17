@@ -40,9 +40,10 @@ import Data.Functor (($>))
 import Data.List (transpose, (\\), partition, delete)
 import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
+import Data.Traversable (for)
+import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Data.Traversable (for)
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -74,8 +75,8 @@ typesOf
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => BindingGroupType
   -> ModuleName
-  -> [(Ident, Expr)]
-  -> m [(Ident, (Expr, Type))]
+  -> [((SourceAnn, Ident), Expr)]
+  -> m [((SourceAnn, Ident), (Expr, Type))]
 typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
     (tys, wInfer) <- capturingSubstitution tidyUp $ do
       (SplitBindingGroup untyped typed dict, w) <- withoutWarnings $ typeDictionaryForBindingGroup (Just moduleName) vals
@@ -83,7 +84,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
       ds2 <- forM untyped $ \e -> withoutWarnings $ typeForBindingGroupElement e dict
       return (map (False, ) ds1 ++ map (True, ) ds2, w)
 
-    inferred <- forM tys $ \(shouldGeneralize, ((ident, (val, ty)), _)) -> do
+    inferred <- forM tys $ \(shouldGeneralize, ((sai@((ss, _), ident), (val, ty)), _)) -> do
       -- Replace type class dictionary placeholders with actual dictionaries
       (val', unsolved) <- replaceTypeClassDictionaries shouldGeneralize val
       -- Generalize and constrain the type
@@ -94,12 +95,14 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
 
       when shouldGeneralize $ do
         -- Show the inferred type in a warning
-        tell . errorMessage $ MissingTypeDeclaration ident generalized
+        tell
+          . errorMessage' ss
+          $ MissingTypeDeclaration ident generalized
         -- For non-recursive binding groups, can generalize over constraints.
         -- For recursive binding groups, we throw an error here for now.
         when (bindingGroupType == RecursiveBindingGroup && not (null unsolved))
           . throwError
-          . errorMessage
+          . errorMessage' ss
           $ CannotGeneralizeRecursiveFunction ident generalized
         -- Make sure any unsolved type constraints only use type variables which appear
         -- unknown in the inferred type.
@@ -111,22 +114,25 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           TypeClassData{ typeClassDependencies } <- gets (findClass . typeClasses . checkEnv)
           let solved = foldMap (S.fromList . fdDetermined) typeClassDependencies
           let constraintTypeVars = ordNub . foldMap (unknownsInType . fst) . filter ((`notElem` solved) . snd) $ zip (constraintArgs con) [0..]
-          when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $ do
-            throwError . onErrorMessages (replaceTypes currentSubst) . errorMessage $ AmbiguousTypeVariables generalized con
+          when (any (`notElem` unsolvedTypeVars) constraintTypeVars) .
+            throwError
+              . onErrorMessages (replaceTypes currentSubst)
+              . errorMessage' ss
+              $ AmbiguousTypeVariables generalized con
 
       -- Check skolem variables did not escape their scope
       skolemEscapeCheck val'
-      return ((ident, (foldr (Abs . VarBinder . (\(x, _, _) -> x)) val' unsolved, generalized)), unsolved)
+      return ((sai, (foldr (Abs . VarBinder . (\(x, _, _) -> x)) val' unsolved, generalized)), unsolved)
 
     -- Show warnings here, since types in wildcards might have been solved during
     -- instance resolution (by functional dependencies).
     finalState <- get
     let replaceTypes' = replaceTypes (checkSubstitution finalState)
         runTypeSearch' gen = runTypeSearch (guard gen $> foldMap snd inferred) finalState
-        raisePreviousWarnings gen w = (escalateWarningWhen isHoleError . tell . onErrorMessages (runTypeSearch' gen . replaceTypes')) w
+        raisePreviousWarnings gen = (escalateWarningWhen isHoleError . tell . onErrorMessages (runTypeSearch' gen . replaceTypes'))
 
     raisePreviousWarnings False wInfer
-    forM_ tys $ \(shouldGeneralize, ((_, (_, _)), w)) -> do
+    forM_ tys $ \(shouldGeneralize, ((_, (_, _)), w)) ->
       raisePreviousWarnings shouldGeneralize w
 
     return (map fst inferred)
@@ -172,9 +178,9 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
 --
 -- This structure breaks down a binding group into typed and untyped parts.
 data SplitBindingGroup = SplitBindingGroup
-  { _splitBindingGroupUntyped :: [(Ident, (Expr, Type))]
+  { _splitBindingGroupUntyped :: [((SourceAnn, Ident), (Expr, Type))]
   -- ^ The untyped expressions
-  , _splitBindingGroupTyped :: [(Ident, (Expr, Type, Bool))]
+  , _splitBindingGroupTyped :: [((SourceAnn, Ident), (Expr, Type, Bool))]
   -- ^ The typed expressions, along with their type annotations
   , _splitBindingGroupNames :: M.Map (Qualified Ident) (Type, NameKind, NameVisibility)
   -- ^ A map containing all expressions and their assigned types (which might be
@@ -190,46 +196,46 @@ data SplitBindingGroup = SplitBindingGroup
 typeDictionaryForBindingGroup
   :: (MonadState CheckState m, MonadWriter MultipleErrors m)
   => Maybe ModuleName
-  -> [(Ident, Expr)]
+  -> [((SourceAnn, Ident), Expr)]
   -> m SplitBindingGroup
 typeDictionaryForBindingGroup moduleName vals = do
     -- Filter the typed and untyped declarations and make a map of names to typed declarations.
     -- Replace type wildcards here so that the resulting dictionary of types contains the
     -- fully expanded types.
     let (untyped, typed) = partitionEithers (map splitTypeAnnotation vals)
-    (typedDict, typed') <- fmap unzip . for typed $ \(ident, (expr, ty, checkType)) -> do
+    (typedDict, typed') <- fmap unzip . for typed $ \(sai, (expr, ty, checkType)) -> do
       ty' <- replaceTypeWildcards ty
-      return ((ident, ty'), (ident, (expr, ty', checkType)))
+      return ((sai, ty'), (sai, (expr, ty', checkType)))
     -- Create fresh unification variables for the types of untyped declarations
-    (untypedDict, untyped') <- fmap unzip . for untyped $ \(ident, expr) -> do
+    (untypedDict, untyped') <- fmap unzip . for untyped $ \(sai, expr) -> do
       ty <- freshType
-      return ((ident, ty), (ident, (expr, ty)))
+      return ((sai, ty), (sai, (expr, ty)))
     -- Create the dictionary of all name/type pairs, which will be added to the
     -- environment during type checking
     let dict = M.fromList [ (Qualified moduleName ident, (ty, Private, Undefined))
-                          | (ident, ty) <- typedDict <> untypedDict
+                          | ((_, ident), ty) <- typedDict <> untypedDict
                           ]
     return (SplitBindingGroup untyped' typed' dict)
   where
     -- | Check if a value contains a type annotation, and if so, separate it
     -- from the value itself.
-    splitTypeAnnotation :: (Ident, Expr) -> Either (Ident, Expr) (Ident, (Expr, Type, Bool))
-    splitTypeAnnotation (name, TypedValue checkType value ty) = Right (name, (value, ty, checkType))
-    splitTypeAnnotation (name, PositionedValue pos c value) =
+    splitTypeAnnotation :: (a, Expr) -> Either (a, Expr) (a, (Expr, Type, Bool))
+    splitTypeAnnotation (a, TypedValue checkType value ty) = Right (a, (value, ty, checkType))
+    splitTypeAnnotation (a, PositionedValue pos c value) =
       bimap (second (PositionedValue pos c))
             (second (\(e, t, b) -> (PositionedValue pos c e, t, b)))
-            (splitTypeAnnotation (name, value))
-    splitTypeAnnotation (name, value) = Left (name, value)
+            (splitTypeAnnotation (a, value))
+    splitTypeAnnotation (a, value) = Left (a, value)
 
 -- | Check the type annotation of a typed value in a binding group.
 checkTypedBindingGroupElement
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
-  -> (Ident, (Expr, Type, Bool))
+  -> ((SourceAnn, Ident), (Expr, Type, Bool))
   -- ^ The identifier we are trying to define, along with the expression and its type annotation
   -> M.Map (Qualified Ident) (Type, NameKind, NameVisibility)
   -- ^ Names brought into scope in this binding group
-  -> m (Ident, (Expr, Type))
+  -> m ((SourceAnn, Ident), (Expr, Type))
 checkTypedBindingGroupElement mn (ident, (val, ty, checkType)) dict = do
   -- Kind check
   (kind, args) <- kindOfWithScopedVars ty
@@ -246,12 +252,12 @@ checkTypedBindingGroupElement mn (ident, (val, ty, checkType)) dict = do
 -- | Infer a type for a value in a binding group which lacks an annotation.
 typeForBindingGroupElement
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
-  => (Ident, (Expr, Type))
+  => ((SourceAnn, Ident), (Expr, Type))
   -- ^ The identifier we are trying to define, along with the expression and its assigned type
   -- (at this point, this should be a unification variable)
   -> M.Map (Qualified Ident) (Type, NameKind, NameVisibility)
   -- ^ Names brought into scope in this binding group
-  -> m (Ident, (Expr, Type))
+  -> m ((SourceAnn, Ident), (Expr, Type))
 typeForBindingGroupElement (ident, (val, ty)) dict = do
   -- Infer the type with the new names in scope
   TypedValue _ val' ty' <- bindNames dict $ infer val
@@ -420,32 +426,31 @@ inferLetBinding
   -> (Expr -> m Expr)
   -> m ([Declaration], Expr)
 inferLetBinding seen [] ret j = (,) seen <$> withBindingGroupVisible (j ret)
-inferLetBinding seen (ValueDeclaration ident nameKind [] [MkUnguarded tv@(TypedValue checkType val ty)] : rest) ret j = do
-  Just moduleName <- checkCurrentModule <$> get
-  (kind, args) <- kindOfWithScopedVars ty
-  checkTypeKind ty kind
-  let dict = M.singleton (Qualified Nothing ident) (ty, nameKind, Undefined)
-  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
-  TypedValue _ val' ty'' <- if checkType then withScopedTypeVars moduleName args (bindNames dict (check val ty')) else return tv
-  bindNames (M.singleton (Qualified Nothing ident) (ty'', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] [MkUnguarded (TypedValue checkType val' ty'')]]) rest ret j
-inferLetBinding seen (ValueDeclaration ident nameKind [] [MkUnguarded val] : rest) ret j = do
-  valTy <- freshType
-  let dict = M.singleton (Qualified Nothing ident) (valTy, nameKind, Undefined)
-  TypedValue _ val' valTy' <- bindNames dict $ infer val
-  unifyTypes valTy valTy'
-  bindNames (M.singleton (Qualified Nothing ident) (valTy', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration ident nameKind [] [MkUnguarded val']]) rest ret j
+inferLetBinding seen (ValueDeclaration sa@(ss, _) ident nameKind [] [MkUnguarded tv@(TypedValue checkType val ty)] : rest) ret j =
+  warnAndRethrowWithPositionTC ss $ do
+    Just moduleName <- checkCurrentModule <$> get
+    (kind, args) <- kindOfWithScopedVars ty
+    checkTypeKind ty kind
+    let dict = M.singleton (Qualified Nothing ident) (ty, nameKind, Undefined)
+    ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
+    TypedValue _ val' ty'' <- if checkType then withScopedTypeVars moduleName args (bindNames dict (check val ty')) else return tv
+    bindNames (M.singleton (Qualified Nothing ident) (ty'', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration sa ident nameKind [] [MkUnguarded (TypedValue checkType val' ty'')]]) rest ret j
+inferLetBinding seen (ValueDeclaration sa@(ss, _) ident nameKind [] [MkUnguarded val] : rest) ret j =
+  warnAndRethrowWithPositionTC ss $ do
+    valTy <- freshType
+    let dict = M.singleton (Qualified Nothing ident) (valTy, nameKind, Undefined)
+    TypedValue _ val' valTy' <- bindNames dict $ infer val
+    unifyTypes valTy valTy'
+    bindNames (M.singleton (Qualified Nothing ident) (valTy', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration sa ident nameKind [] [MkUnguarded val']]) rest ret j
 inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
   Just moduleName <- checkCurrentModule <$> get
-  SplitBindingGroup untyped typed dict <- typeDictionaryForBindingGroup Nothing (map (\(i, _, v) -> (i, v)) ds)
+  SplitBindingGroup untyped typed dict <- typeDictionaryForBindingGroup Nothing . NEL.toList $ fmap (\(i, _, v) -> (i, v)) ds
   ds1' <- parU typed $ \e -> checkTypedBindingGroupElement moduleName e dict
   ds2' <- forM untyped $ \e -> typeForBindingGroupElement e dict
-  let ds' = [(ident, Private, val') | (ident, (val', _)) <- ds1' ++ ds2']
+  let ds' = NEL.fromList [(ident, Private, val') | (ident, (val', _)) <- ds1' ++ ds2']
   bindNames dict $ do
     makeBindingGroupVisible
     inferLetBinding (seen ++ [BindingGroupDeclaration ds']) rest ret j
-inferLetBinding seen (PositionedDeclaration pos com d : ds) ret j = warnAndRethrowWithPositionTC pos $ do
-  (d' : ds', val') <- inferLetBinding seen (d : ds) ret j
-  return (PositionedDeclaration pos com d' : ds', val')
 inferLetBinding _ _ _ _ = internalError "Invalid argument to inferLetBinding"
 
 -- | Infer the types of variables brought into scope by a binder

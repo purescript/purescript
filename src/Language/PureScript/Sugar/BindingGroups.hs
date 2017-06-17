@@ -18,6 +18,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Data.Graph
 import Data.List (intersect)
 import Data.Maybe (isJust)
+import qualified Data.List.NonEmpty as NEL
 import qualified Data.Set as S
 
 import Language.PureScript.AST
@@ -42,7 +43,7 @@ createBindingGroupsModule (Module ss coms name ds exps) =
 --
 collapseBindingGroupsModule :: [Module] -> [Module]
 collapseBindingGroupsModule =
-  map $ \(Module ss coms name ds exps) ->
+  fmap $ \(Module ss coms name ds exps) ->
     Module ss coms name (collapseBindingGroups ds) exps
 
 createBindingGroups
@@ -67,11 +68,11 @@ createBindingGroups moduleName = mapM f <=< handleDecls
   handleDecls ds = do
     let values = filter isValueDecl ds
         dataDecls = filter isDataDecl ds
-        allProperNames = map declTypeName dataDecls
-        dataVerts = map (\d -> (d, declTypeName d, usedTypeNames moduleName d `intersect` allProperNames)) dataDecls
+        allProperNames = fmap declTypeName dataDecls
+        dataVerts = fmap (\d -> (d, declTypeName d, usedTypeNames moduleName d `intersect` allProperNames)) dataDecls
     dataBindingGroupDecls <- parU (stronglyConnComp dataVerts) toDataBindingGroup
-    let allIdents = map declIdent values
-        valueVerts = map (\d -> (d, declIdent d, usedIdents moduleName d `intersect` allIdents)) values
+    let allIdents = fmap declIdent values
+        valueVerts = fmap (\d -> (d, declIdent d, usedIdents moduleName d `intersect` allIdents)) values
     bindingGroupDecls <- parU (stronglyConnComp valueVerts) (toBindingGroup moduleName)
     return $ filter isImportDecl ds ++
              filter isExternKindDecl ds ++
@@ -89,14 +90,12 @@ createBindingGroups moduleName = mapM f <=< handleDecls
 collapseBindingGroups :: [Declaration] -> [Declaration]
 collapseBindingGroups =
   let (f, _, _) = everywhereOnValues id collapseBindingGroupsForValue id
-  in map f . concatMap go
+  in fmap f . concatMap go
   where
-  go (DataBindingGroupDeclaration ds) = ds
+  go (DataBindingGroupDeclaration ds) = NEL.toList ds
   go (BindingGroupDeclaration ds) =
-    map (\(ident, nameKind, val) ->
-      ValueDeclaration ident nameKind [] [MkUnguarded val]) ds
-  go (PositionedDeclaration pos com d) =
-    map (PositionedDeclaration pos com) $ go d
+    NEL.toList $ fmap (\((sa, ident), nameKind, val) ->
+      ValueDeclaration sa ident nameKind [] [MkUnguarded val]) ds
   go other = [other]
 
 collapseBindingGroupsForValue :: Expr -> Expr
@@ -108,9 +107,8 @@ usedIdents moduleName = ordNub . usedIdents' S.empty . getValue
   where
   def _ _ = []
 
-  getValue (ValueDeclaration _ _ [] [MkUnguarded val]) = val
+  getValue (ValueDeclaration _ _ _ [] [MkUnguarded val]) = val
   getValue ValueDeclaration{} = internalError "Binders should have been desugared"
-  getValue (PositionedDeclaration _ _ d) = getValue d
   getValue _ = internalError "Expected ValueDeclaration"
 
   (_, usedIdents', _, _, _) = everythingWithScope def usedNamesE def def def
@@ -152,14 +150,12 @@ usedTypeNames moduleName =
   usedNames _ = []
 
 declIdent :: Declaration -> Ident
-declIdent (ValueDeclaration ident _ _ _) = ident
-declIdent (PositionedDeclaration _ _ d) = declIdent d
+declIdent (ValueDeclaration _ ident _ _ _) = ident
 declIdent _ = internalError "Expected ValueDeclaration"
 
 declTypeName :: Declaration -> ProperName 'TypeName
-declTypeName (DataDeclaration _ pn _ _) = pn
-declTypeName (TypeSynonymDeclaration pn _ _) = pn
-declTypeName (PositionedDeclaration _ _ d) = declTypeName d
+declTypeName (DataDeclaration _ _ pn _ _) = pn
+declTypeName (TypeSynonymDeclaration _ pn _ _) = pn
 declTypeName _ = internalError "Expected DataDeclaration"
 
 -- |
@@ -173,7 +169,7 @@ toBindingGroup
    -> SCC Declaration
    -> m Declaration
 toBindingGroup _ (AcyclicSCC d) = return d
-toBindingGroup moduleName (CyclicSCC ds') =
+toBindingGroup moduleName (CyclicSCC ds') = do
   -- Once we have a mutually-recursive group of declarations, we need to sort
   -- them further by their immediate dependencies (those outside function
   -- bodies). In particular, this is relevant for type instance dictionaries
@@ -183,21 +179,20 @@ toBindingGroup moduleName (CyclicSCC ds') =
   -- If we discover declarations that still contain mutually-recursive
   -- immediate references, we're guaranteed to get an undefined reference at
   -- runtime, so treat this as an error. See also github issue #365.
-  BindingGroupDeclaration <$> mapM toBinding (stronglyConnComp valueVerts)
+  BindingGroupDeclaration . NEL.fromList <$> mapM toBinding (stronglyConnComp valueVerts)
   where
   idents :: [Ident]
-  idents = map (\(_, i, _) -> i) valueVerts
+  idents = fmap (\(_, i, _) -> i) valueVerts
 
   valueVerts :: [(Declaration, Ident, [Ident])]
-  valueVerts = map (\d -> (d, declIdent d, usedImmediateIdents moduleName d `intersect` idents)) ds'
+  valueVerts = fmap (\d -> (d, declIdent d, usedImmediateIdents moduleName d `intersect` idents)) ds'
 
-  toBinding :: SCC Declaration -> m (Ident, NameKind, Expr)
+  toBinding :: SCC Declaration -> m ((SourceAnn, Ident), NameKind, Expr)
   toBinding (AcyclicSCC d) = return $ fromValueDecl d
   toBinding (CyclicSCC ds) = throwError $ foldMap cycleError ds
 
   cycleError :: Declaration -> MultipleErrors
-  cycleError (PositionedDeclaration p _ d) = onErrorMessages (withPosition p) $ cycleError d
-  cycleError (ValueDeclaration n _ _ [MkUnguarded _]) = errorMessage $ CycleInDeclaration n
+  cycleError (ValueDeclaration (ss, _) n _ _ [MkUnguarded _]) = errorMessage' ss $ CycleInDeclaration n
   cycleError _ = internalError "cycleError: Expected ValueDeclaration"
 
 toDataBindingGroup
@@ -206,19 +201,17 @@ toDataBindingGroup
   -> m Declaration
 toDataBindingGroup (AcyclicSCC d) = return d
 toDataBindingGroup (CyclicSCC [d]) = case isTypeSynonym d of
-  Just pn -> throwError . errorMessage $ CycleInTypeSynonym (Just pn)
+  Just pn -> throwError . errorMessage' (declSourceSpan d) $ CycleInTypeSynonym (Just pn)
   _ -> return d
 toDataBindingGroup (CyclicSCC ds')
-  | all (isJust . isTypeSynonym) ds' = throwError . errorMessage $ CycleInTypeSynonym Nothing
-  | otherwise = return $ DataBindingGroupDeclaration ds'
+  | all (isJust . isTypeSynonym) ds' = throwError . errorMessage' (declSourceSpan (head ds')) $ CycleInTypeSynonym Nothing
+  | otherwise = return . DataBindingGroupDeclaration $ NEL.fromList ds'
 
 isTypeSynonym :: Declaration -> Maybe (ProperName 'TypeName)
-isTypeSynonym (TypeSynonymDeclaration pn _ _) = Just pn
-isTypeSynonym (PositionedDeclaration _ _ d) = isTypeSynonym d
+isTypeSynonym (TypeSynonymDeclaration _ pn _ _) = Just pn
 isTypeSynonym _ = Nothing
 
-fromValueDecl :: Declaration -> (Ident, NameKind, Expr)
-fromValueDecl (ValueDeclaration ident nameKind [] [MkUnguarded val]) = (ident, nameKind, val)
+fromValueDecl :: Declaration -> ((SourceAnn, Ident), NameKind, Expr)
+fromValueDecl (ValueDeclaration sa ident nameKind [] [MkUnguarded val]) = ((sa, ident), nameKind, val)
 fromValueDecl ValueDeclaration{} = internalError "Binders should have been desugared"
-fromValueDecl (PositionedDeclaration _ _ d) = fromValueDecl d
 fromValueDecl _ = internalError "Expected ValueDeclaration"

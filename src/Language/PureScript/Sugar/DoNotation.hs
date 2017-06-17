@@ -24,10 +24,9 @@ desugarDoModule (Module ss coms mn ds exts) = Module ss coms mn <$> parU ds desu
 
 -- | Desugar a single do statement
 desugarDo :: forall m. (MonadSupply m, MonadError MultipleErrors m) => Declaration -> m Declaration
-desugarDo (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> rethrowWithPosition pos (desugarDo d)
 desugarDo d =
   let (f, _, _) = everywhereOnValuesM return replace return
-  in f d
+  in rethrowWithPosition (declSourceSpan d) $ f d
   where
   bind :: Expr
   bind = Var (Qualified Nothing (Ident C.bind))
@@ -62,9 +61,8 @@ desugarDo d =
   go [DoNotationLet _] = throwError . errorMessage $ InvalidDoLet
   go (DoNotationLet ds : rest) = do
     let checkBind :: Declaration -> m ()
-        checkBind (ValueDeclaration i@(Ident name) _ _ _)
-          | name `elem` [ C.bind, C.discard ] = throwError . errorMessage $ CannotUseBindWithDo i
-        checkBind (PositionedDeclaration pos _ decl) = rethrowWithPosition pos (checkBind decl)
+        checkBind (ValueDeclaration (ss, _) i@(Ident name) _ _ _)
+          | name `elem` [ C.bind, C.discard ] = throwError . errorMessage' ss $ CannotUseBindWithDo i
         checkBind _ = pure ()
     mapM_ checkBind ds
     rest' <- go rest

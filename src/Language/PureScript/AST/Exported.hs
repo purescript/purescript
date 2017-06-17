@@ -38,11 +38,9 @@ exportedDeclarations (Module _ _ mn decls exps) = go decls
 -- it unchanged.
 --
 filterDataConstructors :: Maybe [DeclarationRef] -> Declaration -> Declaration
-filterDataConstructors exps (DataDeclaration dType tyName tyArgs dctors) =
-  DataDeclaration dType tyName tyArgs $
+filterDataConstructors exps (DataDeclaration sa dType tyName tyArgs dctors) =
+  DataDeclaration sa dType tyName tyArgs $
     filter (isDctorExported tyName exps . fst) dctors
-filterDataConstructors exps (PositionedDeclaration srcSpan coms d) =
-  PositionedDeclaration srcSpan coms (filterDataConstructors exps d)
 filterDataConstructors _ other = other
 
 -- |
@@ -96,7 +94,7 @@ filterInstances mn (Just exps) =
 -- Get all type and type class names referenced by a type instance declaration.
 --
 typeInstanceConstituents :: Declaration -> [Either (Qualified (ProperName 'ClassName)) (Qualified (ProperName 'TypeName))]
-typeInstanceConstituents (TypeInstanceDeclaration _ constraints className tys _) =
+typeInstanceConstituents (TypeInstanceDeclaration _ _ constraints className tys _) =
   Left className : (concatMap fromConstraint constraints ++ concatMap fromType tys)
   where
 
@@ -109,7 +107,6 @@ typeInstanceConstituents (TypeInstanceDeclaration _ constraints className tys _)
   go (ConstrainedType c _) = fromConstraint c
   go _ = []
 
-typeInstanceConstituents (PositionedDeclaration _ _ d) = typeInstanceConstituents d
 typeInstanceConstituents _ = []
 
 
@@ -122,20 +119,18 @@ typeInstanceConstituents _ = []
 isExported :: Maybe [DeclarationRef] -> Declaration -> Bool
 isExported Nothing _ = True
 isExported _ TypeInstanceDeclaration{} = True
-isExported exps (PositionedDeclaration _ _ d) = isExported exps d
 isExported (Just exps) decl = any (matches decl) exps
   where
-  matches (TypeDeclaration ident _) (ValueRef _ ident') = ident == ident'
-  matches (ValueDeclaration ident _ _ _) (ValueRef _ ident') = ident == ident'
-  matches (ExternDeclaration ident _) (ValueRef _ ident') = ident == ident'
-  matches (DataDeclaration _ ident _ _) (TypeRef _ ident' _) = ident == ident'
-  matches (ExternDataDeclaration ident _) (TypeRef _ ident' _) = ident == ident'
-  matches (ExternKindDeclaration ident) (KindRef _ ident') = ident == ident'
-  matches (TypeSynonymDeclaration ident _ _) (TypeRef _ ident' _) = ident == ident'
-  matches (TypeClassDeclaration ident _ _ _ _) (TypeClassRef _ ident') = ident == ident'
-  matches (ValueFixityDeclaration _ _ op) (ValueOpRef _ op') = op == op'
-  matches (TypeFixityDeclaration _ _ op) (TypeOpRef _ op') = op == op'
-  matches (PositionedDeclaration _ _ d) r = d `matches` r
+  matches (TypeDeclaration _ ident _) (ValueRef _ ident') = ident == ident'
+  matches (ValueDeclaration _ ident _ _ _) (ValueRef _ ident') = ident == ident'
+  matches (ExternDeclaration _ ident _) (ValueRef _ ident') = ident == ident'
+  matches (DataDeclaration _ _ ident _ _) (TypeRef _ ident' _) = ident == ident'
+  matches (ExternDataDeclaration _ ident _) (TypeRef _ ident' _) = ident == ident'
+  matches (ExternKindDeclaration _ ident) (KindRef _ ident') = ident == ident'
+  matches (TypeSynonymDeclaration _ ident _ _) (TypeRef _ ident' _) = ident == ident'
+  matches (TypeClassDeclaration _ ident _ _ _ _) (TypeClassRef _ ident') = ident == ident'
+  matches (ValueFixityDeclaration _ _ _ op) (ValueOpRef _ op') = op == op'
+  matches (TypeFixityDeclaration _ _ _ op) (TypeOpRef _ op') = op == op'
   matches _ _ = False
 
 -- |

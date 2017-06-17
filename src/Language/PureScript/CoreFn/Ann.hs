@@ -10,13 +10,13 @@ import Language.PureScript.Types
 -- |
 -- Type alias for basic annotations
 --
-type Ann = (Maybe SourceSpan, [Comment], Maybe Type, Maybe Meta)
+type Ann = (SourceSpan, [Comment], Maybe Type, Maybe Meta)
 
 -- |
--- Initial annotation with no metadata
+-- An annotation empty of metadata aside from a source span.
 --
-nullAnn :: Ann
-nullAnn = (Nothing, [], Nothing, Nothing)
+ssAnn :: SourceSpan -> Ann
+ssAnn ss = (ss, [], Nothing, Nothing)
 
 -- |
 -- Remove the comments from an annotation

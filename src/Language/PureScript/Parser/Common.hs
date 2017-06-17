@@ -133,8 +133,8 @@ withSourceSpan
   -> P.Parsec [PositionedToken] u a
   -> P.Parsec [PositionedToken] u b
 withSourceSpan f p = do
-  start <- P.getPosition
   comments <- readComments
+  start <- P.getPosition
   x <- p
   end <- P.getPosition
   input <- P.getInput
@@ -144,11 +144,10 @@ withSourceSpan f p = do
   let sp = SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos $ fromMaybe end end')
   return $ f sp comments x
 
-withSourceAnn
-  :: (SourceAnn -> a -> b)
+withSourceAnnF
+  :: P.Parsec [PositionedToken] u (SourceAnn -> a)
   -> P.Parsec [PositionedToken] u a
-  -> P.Parsec [PositionedToken] u b
-withSourceAnn = withSourceSpan . curry
+withSourceAnnF = withSourceSpan (\ss com f -> f (ss, com))
 
 withSourceSpan'
   :: (SourceSpan -> a -> b)

@@ -82,66 +82,63 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
     d { declChildren = declChildren d ++ [child] }
 
 getDeclarationTitle :: P.Declaration -> Maybe Text
-getDeclarationTitle (P.ValueDeclaration name _ _ _) = Just (P.showIdent name)
-getDeclarationTitle (P.ExternDeclaration name _) = Just (P.showIdent name)
-getDeclarationTitle (P.DataDeclaration _ name _ _) = Just (P.runProperName name)
-getDeclarationTitle (P.ExternDataDeclaration name _) = Just (P.runProperName name)
-getDeclarationTitle (P.ExternKindDeclaration name) = Just (P.runProperName name)
-getDeclarationTitle (P.TypeSynonymDeclaration name _ _) = Just (P.runProperName name)
-getDeclarationTitle (P.TypeClassDeclaration name _ _ _ _) = Just (P.runProperName name)
-getDeclarationTitle (P.TypeInstanceDeclaration name _ _ _ _) = Just (P.showIdent name)
-getDeclarationTitle (P.TypeFixityDeclaration _ _ op) = Just ("type " <> P.showOp op)
-getDeclarationTitle (P.ValueFixityDeclaration _ _ op) = Just (P.showOp op)
-getDeclarationTitle (P.PositionedDeclaration _ _ d) = getDeclarationTitle d
+getDeclarationTitle (P.ValueDeclaration _ name _ _ _) = Just (P.showIdent name)
+getDeclarationTitle (P.ExternDeclaration _ name _) = Just (P.showIdent name)
+getDeclarationTitle (P.DataDeclaration _ _ name _ _) = Just (P.runProperName name)
+getDeclarationTitle (P.ExternDataDeclaration _ name _) = Just (P.runProperName name)
+getDeclarationTitle (P.ExternKindDeclaration _ name) = Just (P.runProperName name)
+getDeclarationTitle (P.TypeSynonymDeclaration _ name _ _) = Just (P.runProperName name)
+getDeclarationTitle (P.TypeClassDeclaration _ name _ _ _ _) = Just (P.runProperName name)
+getDeclarationTitle (P.TypeInstanceDeclaration _ name _ _ _ _) = Just (P.showIdent name)
+getDeclarationTitle (P.TypeFixityDeclaration _ _ _ op) = Just ("type " <> P.showOp op)
+getDeclarationTitle (P.ValueFixityDeclaration _ _ _ op) = Just (P.showOp op)
 getDeclarationTitle _ = Nothing
 
 -- | Create a basic Declaration value.
-mkDeclaration :: Text -> DeclarationInfo -> Declaration
-mkDeclaration title info =
+mkDeclaration :: P.SourceAnn -> Text -> DeclarationInfo -> Declaration
+mkDeclaration (ss, com) title info =
   Declaration { declTitle      = title
-              , declComments   = Nothing
-              , declSourceSpan = Nothing
+              , declComments   = convertComments com
+              , declSourceSpan = Just ss -- TODO: make this non-optional when we next break the format
               , declChildren   = []
               , declInfo       = info
               }
 
-basicDeclaration :: Text -> DeclarationInfo -> Maybe IntermediateDeclaration
-basicDeclaration title info = Just $ Right $ mkDeclaration title info
+basicDeclaration :: P.SourceAnn -> Text -> DeclarationInfo -> Maybe IntermediateDeclaration
+basicDeclaration sa title = Just . Right . mkDeclaration sa title
 
 convertDeclaration :: P.Declaration -> Text -> Maybe IntermediateDeclaration
-convertDeclaration (P.ValueDeclaration _ _ _ [P.MkUnguarded (P.TypedValue _ _ ty)]) title =
-  basicDeclaration title (ValueDeclaration ty)
-convertDeclaration P.ValueDeclaration{} title =
+convertDeclaration (P.ValueDeclaration sa _ _ _ [P.MkUnguarded (P.TypedValue _ _ ty)]) title =
+  basicDeclaration sa title (ValueDeclaration ty)
+convertDeclaration (P.ValueDeclaration sa _ _ _ _) title =
   -- If no explicit type declaration was provided, insert a wildcard, so that
   -- the actual type will be added during type checking.
-  basicDeclaration title (ValueDeclaration P.TypeWildcard{})
-convertDeclaration (P.ExternDeclaration _ ty) title =
-  basicDeclaration title (ValueDeclaration ty)
-convertDeclaration (P.DataDeclaration dtype _ args ctors) title =
-  Just (Right (mkDeclaration title info) { declChildren = children })
+  basicDeclaration sa title (ValueDeclaration P.TypeWildcard{})
+convertDeclaration (P.ExternDeclaration sa _ ty) title =
+  basicDeclaration sa title (ValueDeclaration ty)
+convertDeclaration (P.DataDeclaration sa dtype _ args ctors) title =
+  Just (Right (mkDeclaration sa title info) { declChildren = children })
   where
   info = DataDeclaration dtype args
   children = map convertCtor ctors
   convertCtor (ctor', tys) =
     ChildDeclaration (P.runProperName ctor') Nothing Nothing (ChildDataConstructor tys)
-convertDeclaration (P.ExternDataDeclaration _ kind') title =
-  basicDeclaration title (ExternDataDeclaration kind')
-convertDeclaration (P.ExternKindDeclaration _) title =
-  basicDeclaration title ExternKindDeclaration
-convertDeclaration (P.TypeSynonymDeclaration _ args ty) title =
-  basicDeclaration title (TypeSynonymDeclaration args ty)
-convertDeclaration (P.TypeClassDeclaration _ args implies fundeps ds) title =
-  Just (Right (mkDeclaration title info) { declChildren = children })
+convertDeclaration (P.ExternDataDeclaration sa _ kind') title =
+  basicDeclaration sa title (ExternDataDeclaration kind')
+convertDeclaration (P.ExternKindDeclaration sa _) title =
+  basicDeclaration sa title ExternKindDeclaration
+convertDeclaration (P.TypeSynonymDeclaration sa _ args ty) title =
+  basicDeclaration sa title (TypeSynonymDeclaration args ty)
+convertDeclaration (P.TypeClassDeclaration sa _ args implies fundeps ds) title =
+  Just (Right (mkDeclaration sa title info) { declChildren = children })
   where
   info = TypeClassDeclaration args implies (convertFundepsToStrings args fundeps)
   children = map convertClassMember ds
-  convertClassMember (P.PositionedDeclaration _ _ d) =
-    convertClassMember d
-  convertClassMember (P.TypeDeclaration ident' ty) =
-    ChildDeclaration (P.showIdent ident') Nothing Nothing (ChildTypeClassMember ty)
+  convertClassMember (P.TypeDeclaration (ss, com) ident' ty) =
+    ChildDeclaration (P.showIdent ident') (convertComments com) (Just ss) (ChildTypeClassMember ty)
   convertClassMember _ =
     P.internalError "convertDeclaration: Invalid argument to convertClassMember."
-convertDeclaration (P.TypeInstanceDeclaration _ constraints className tys _) title =
+convertDeclaration (P.TypeInstanceDeclaration (ss, com) _ constraints className tys _) title =
   Just (Left ((classNameString, AugmentClass) : map (, AugmentType) typeNameStrings, AugmentChild childDecl))
   where
   classNameString = unQual className
@@ -151,28 +148,12 @@ convertDeclaration (P.TypeInstanceDeclaration _ constraints className tys _) tit
   extractProperNames (P.TypeConstructor n) = [unQual n]
   extractProperNames _ = []
 
-  childDecl = ChildDeclaration title Nothing Nothing (ChildInstance constraints classApp)
+  childDecl = ChildDeclaration title (convertComments com) (Just ss) (ChildInstance constraints classApp)
   classApp = foldl' P.TypeApp (P.TypeConstructor (fmap P.coerceProperName className)) tys
-convertDeclaration (P.ValueFixityDeclaration fixity (P.Qualified mn alias) _) title =
-  Just $ Right $ mkDeclaration title (AliasDeclaration fixity (P.Qualified mn (Right alias)))
-convertDeclaration (P.TypeFixityDeclaration fixity (P.Qualified mn alias) _) title =
-  Just $ Right $ mkDeclaration title (AliasDeclaration fixity (P.Qualified mn (Left alias)))
-convertDeclaration (P.PositionedDeclaration srcSpan com d') title =
-  fmap (addComments . addSourceSpan) (convertDeclaration d' title)
-  where
-  addComments (Right d) =
-    Right (d { declComments = convertComments com })
-  addComments (Left augment) =
-    Left (withAugmentChild (\d -> d { cdeclComments = convertComments com })
-                           augment)
-
-  addSourceSpan (Right d) =
-    Right (d { declSourceSpan = Just srcSpan })
-  addSourceSpan (Left augment) =
-    Left (withAugmentChild (\d -> d { cdeclSourceSpan = Just srcSpan })
-                           augment)
-
-  withAugmentChild f (t, AugmentChild d) = (t, AugmentChild (f d))
+convertDeclaration (P.ValueFixityDeclaration sa fixity (P.Qualified mn alias) _) title =
+  Just . Right $ mkDeclaration sa title (AliasDeclaration fixity (P.Qualified mn (Right alias)))
+convertDeclaration (P.TypeFixityDeclaration sa fixity (P.Qualified mn alias) _) title =
+  Just . Right $ mkDeclaration sa title (AliasDeclaration fixity (P.Qualified mn (Left alias)))
 convertDeclaration _ _ = Nothing
 
 convertComments :: [P.Comment] -> Maybe Text

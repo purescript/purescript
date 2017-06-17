@@ -146,13 +146,12 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
     js <- valueToJs val
     withPos ss $ AST.VariableIntroduction Nothing (identToJs ident) (Just js)
 
-  withPos :: Maybe SourceSpan -> AST -> m AST
-  withPos (Just ss) js = do
+  withPos :: SourceSpan -> AST -> m AST
+  withPos ss js = do
     withSM <- asks optionsSourceMaps
     return $ if withSM
       then withSourceSpan ss js
       else js
-  withPos Nothing js = return js
 
   -- | Generate code in the simplified JavaScript intermediate representation for a variable based on a
   -- PureScript identifier.
@@ -177,7 +176,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
 
   valueToJs' :: Expr Ann -> m AST
   valueToJs' (Literal (pos, _, _, _) l) =
-    maybe id rethrowWithPosition pos $ literalToValueJS l
+    rethrowWithPosition pos $ literalToValueJS l
   valueToJs' (Var (_, _, _, Just (IsConstructor _ [])) name) =
     return $ accessorString "value" $ qualifiedToJS id name
   valueToJs' (Var (_, _, _, Just (IsConstructor _ _)) name) =
@@ -222,9 +221,9 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
   valueToJs' (Var (_, _, _, Just IsForeign) ident) =
     internalError $ "Encountered an unqualified reference to a foreign ident " ++ T.unpack (showQualified showIdent ident)
   valueToJs' (Var _ ident) = return $ varToJs ident
-  valueToJs' (Case (maybeSpan, _, _, _) values binders) = do
+  valueToJs' (Case (ss, _, _, _) values binders) = do
     vals <- mapM valueToJs values
-    bindersToJs maybeSpan binders vals
+    bindersToJs ss binders vals
   valueToJs' (Let _ ds val) = do
     ds' <- concat <$> mapM bindToJs ds
     ret <- valueToJs val
@@ -299,8 +298,8 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
 
   -- | Generate code in the simplified JavaScript intermediate representation for pattern match binders
   -- and guards.
-  bindersToJs :: Maybe SourceSpan -> [CaseAlternative Ann] -> [AST] -> m AST
-  bindersToJs maybeSpan binders vals = do
+  bindersToJs :: SourceSpan -> [CaseAlternative Ann] -> [AST] -> m AST
+  bindersToJs ss binders vals = do
     valNames <- replicateM (length vals) freshName
     let assignments = zipWith (AST.VariableIntroduction Nothing) valNames (map Just vals)
     jss <- forM binders $ \(CaseAlternative bs result) -> do
@@ -320,7 +319,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
       failedPatternError names = AST.Unary Nothing AST.New $ AST.App Nothing (AST.Var Nothing "Error") [AST.Binary Nothing AST.Add (AST.StringLiteral Nothing $ mkString failedPatternMessage) (AST.ArrayLiteral Nothing $ zipWith valueError names vals)]
 
       failedPatternMessage :: Text
-      failedPatternMessage = "Failed pattern match" <> maybe "" (((" at " <> runModuleName mn <> " ") <>) . displayStartEndPos) maybeSpan <> ": "
+      failedPatternMessage = "Failed pattern match at " <> runModuleName mn <> " " <> displayStartEndPos ss <> ": "
 
       valueError :: Text -> AST -> AST
       valueError _ l@(AST.NumericLiteral _ _) = l

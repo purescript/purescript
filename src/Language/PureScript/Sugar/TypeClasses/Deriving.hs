@@ -84,9 +84,8 @@ deriveInstances externs (Module ss coms mn ds exts) =
         fromExternsDecl mn' (EDTypeSynonym name args ty) = Just (Qualified (Just mn') name, (args, ty))
         fromExternsDecl _ _ = Nothing
 
-        fromLocalDecl (TypeSynonymDeclaration name args ty) = do
+        fromLocalDecl (TypeSynonymDeclaration _ name args ty) =
           Just (Qualified (Just mn) name, (args, ty))
-        fromLocalDecl (PositionedDeclaration _ _ d) = fromLocalDecl d
         fromLocalDecl _ = Nothing
 
     instanceData :: NewtypeDerivedInstances
@@ -99,11 +98,10 @@ deriveInstances externs (Module ss coms mn ds exts) =
           foldMap (\nm -> NewtypeDerivedInstances mempty (S.singleton (qualify mn' edInstanceClassName, nm))) (extractNewtypeName mn' edInstanceTypes)
         fromExternsDecl _ _ = mempty
 
-        fromLocalDecl (TypeClassDeclaration cl args cons deps _) =
+        fromLocalDecl (TypeClassDeclaration _ cl args cons deps _) =
           NewtypeDerivedInstances (M.singleton (mn, cl) (map fst args, cons, deps)) mempty
-        fromLocalDecl (TypeInstanceDeclaration _ _ cl tys _) =
+        fromLocalDecl (TypeInstanceDeclaration _ _ _ cl tys _) =
           foldMap (\nm -> NewtypeDerivedInstances mempty (S.singleton (qualify mn cl, nm))) (extractNewtypeName mn tys)
-        fromLocalDecl (PositionedDeclaration _ _ d) = fromLocalDecl d
         fromLocalDecl _ = mempty
 
 -- | Takes a declaration, and if the declaration is a deriving TypeInstanceDeclaration,
@@ -116,62 +114,61 @@ deriveInstance
   -> [Declaration]
   -> Declaration
   -> m Declaration
-deriveInstance mn syns _ ds (TypeInstanceDeclaration nm deps className tys DerivedInstance)
+deriveInstance mn syns _ ds (TypeInstanceDeclaration sa@(ss, _) nm deps className tys DerivedInstance)
   | className == Qualified (Just dataGeneric) (ProperName C.generic)
   = case tys of
       [ty] | Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor ty
            , mn == fromMaybe mn mn'
-           -> TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveGeneric mn syns ds tyCon args
-           | otherwise -> throwError . errorMessage $ ExpectedTypeConstructor className tys ty
-      _ -> throwError . errorMessage $ InvalidDerivedInstance className tys 1
+           -> TypeInstanceDeclaration sa nm deps className tys . ExplicitInstance <$> deriveGeneric ss mn syns ds tyCon args
+           | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty
+      _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 1
   | className == Qualified (Just dataEq) (ProperName "Eq")
   = case tys of
       [ty] | Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
            , mn == fromMaybe mn mn'
-           -> TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveEq mn syns ds tyCon
-           | otherwise -> throwError . errorMessage $ ExpectedTypeConstructor className tys ty
-      _ -> throwError . errorMessage $ InvalidDerivedInstance className tys 1
+           -> TypeInstanceDeclaration sa nm deps className tys . ExplicitInstance <$> deriveEq ss mn syns ds tyCon
+           | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty
+      _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 1
   | className == Qualified (Just dataOrd) (ProperName "Ord")
   = case tys of
       [ty] | Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
            , mn == fromMaybe mn mn'
-           -> TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveOrd mn syns ds tyCon
-           | otherwise -> throwError . errorMessage $ ExpectedTypeConstructor className tys ty
-      _ -> throwError . errorMessage $ InvalidDerivedInstance className tys 1
+           -> TypeInstanceDeclaration sa nm deps className tys . ExplicitInstance <$> deriveOrd ss mn syns ds tyCon
+           | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty
+      _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 1
   | className == Qualified (Just dataFunctor) (ProperName "Functor")
   = case tys of
       [ty] | Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
            , mn == fromMaybe mn mn'
-           -> TypeInstanceDeclaration nm deps className tys . ExplicitInstance <$> deriveFunctor mn syns ds tyCon
-           | otherwise -> throwError . errorMessage $ ExpectedTypeConstructor className tys ty
-      _ -> throwError . errorMessage $ InvalidDerivedInstance className tys 1
+           -> TypeInstanceDeclaration sa nm deps className tys . ExplicitInstance <$> deriveFunctor ss mn syns ds tyCon
+           | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty
+      _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 1
   | className == Qualified (Just dataNewtype) (ProperName "Newtype")
   = case tys of
       [wrappedTy, unwrappedTy]
         | Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor wrappedTy
         , mn == fromMaybe mn mn'
         -> do (inst, actualUnwrappedTy) <- deriveNewtype mn syns ds tyCon args unwrappedTy
-              return $ TypeInstanceDeclaration nm deps className [wrappedTy, actualUnwrappedTy] (ExplicitInstance inst)
-        | otherwise -> throwError . errorMessage $ ExpectedTypeConstructor className tys wrappedTy
-      _ -> throwError . errorMessage $ InvalidDerivedInstance className tys 2
+              return $ TypeInstanceDeclaration sa nm deps className [wrappedTy, actualUnwrappedTy] (ExplicitInstance inst)
+        | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys wrappedTy
+      _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 2
   | className == Qualified (Just dataGenericRep) (ProperName C.generic)
   = case tys of
       [actualTy, repTy]
         | Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor actualTy
         , mn == fromMaybe mn mn'
         -> do (inst, inferredRepTy) <- deriveGenericRep mn syns ds tyCon args repTy
-              return $ TypeInstanceDeclaration nm deps className [actualTy, inferredRepTy] (ExplicitInstance inst)
-        | otherwise -> throwError . errorMessage $ ExpectedTypeConstructor className tys actualTy
-      _ -> throwError . errorMessage $ InvalidDerivedInstance className tys 2
-  | otherwise = throwError . errorMessage $ CannotDerive className tys
-deriveInstance mn syns ndis ds (TypeInstanceDeclaration nm deps className tys NewtypeInstance) =
+              return $ TypeInstanceDeclaration sa nm deps className [actualTy, inferredRepTy] (ExplicitInstance inst)
+        | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys actualTy
+      _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 2
+  | otherwise = throwError . errorMessage' ss $ CannotDerive className tys
+deriveInstance mn syns ndis ds (TypeInstanceDeclaration sa@(ss, _) nm deps className tys NewtypeInstance) =
   case tys of
     _ : _ | Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor (last tys)
           , mn == fromMaybe mn mn'
-          -> TypeInstanceDeclaration nm deps className tys . NewtypeInstanceWithDictionary <$> deriveNewtypeInstance mn syns ndis className ds tys tyCon args
-          | otherwise -> throwError . errorMessage $ ExpectedTypeConstructor className tys (last tys)
-    _ -> throwError . errorMessage $ InvalidNewtypeInstance className tys
-deriveInstance mn syns ndis ds (PositionedDeclaration pos com d) = PositionedDeclaration pos com <$> deriveInstance mn syns ndis ds d
+          -> TypeInstanceDeclaration sa nm deps className tys . NewtypeInstanceWithDictionary <$> deriveNewtypeInstance ss mn syns ndis className ds tys tyCon args
+          | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys (last tys)
+    _ -> throwError . errorMessage' ss $ InvalidNewtypeInstance className tys
 deriveInstance _ _ _ _ e = return e
 
 unwrapTypeConstructor :: Type -> Maybe (Qualified (ProperName 'TypeName), [Type])
@@ -186,7 +183,8 @@ unwrapTypeConstructor = fmap (second reverse) . go
 deriveNewtypeInstance
   :: forall m
    . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
-  => ModuleName
+  => SourceSpan
+  -> ModuleName
   -> SynonymMap
   -> NewtypeDerivedInstances
   -> Qualified (ProperName 'ClassName)
@@ -195,12 +193,12 @@ deriveNewtypeInstance
   -> ProperName 'TypeName
   -> [Type]
   -> m Expr
-deriveNewtypeInstance mn syns ndis className ds tys tyConNm dargs = do
+deriveNewtypeInstance ss mn syns ndis className ds tys tyConNm dargs = do
     verifySuperclasses
     tyCon <- findTypeDecl tyConNm ds
     go tyCon
   where
-    go (DataDeclaration Newtype _ tyArgNames [(_, [wrapped])])
+    go (DataDeclaration _ Newtype _ tyArgNames [(_, [wrapped])])
       -- The newtype might not be applied to all type arguments.
       -- This is okay as long as the newtype wraps something which ends with
       -- sufficiently many type applications to variables.
@@ -214,8 +212,7 @@ deriveNewtypeInstance mn syns ndis className ds tys tyConNm dargs = do
           do let subst = zipWith (\(name, _) t -> (name, t)) tyArgNames dargs
              wrapped'' <- replaceAllTypeSynonymsM syns wrapped'
              return (DeferredDictionary className (init tys ++ [replaceAllTypeVars subst wrapped'']))
-    go (PositionedDeclaration _ _ d) = go d
-    go _ = throwError . errorMessage $ InvalidNewtypeInstance className tys
+    go _ = throwError . errorMessage' ss $ InvalidNewtypeInstance className tys
 
     takeReverse :: Int -> [a] -> [a]
     takeReverse n = take n . reverse
@@ -248,8 +245,8 @@ deriveNewtypeInstance mn syns ndis className ds tys tyConNm dargs = do
                   -- be possible, so we warn again.
                   for_ (extractNewtypeName mn tys) $ \nm ->
                     unless ((constraintClass', nm) `S.member` ndiDerivedInstances ndis) $
-                      tell . errorMessage $ MissingNewtypeSuperclassInstance constraintClass className tys
-                else tell . errorMessage $ UnverifiableSuperclassInstance constraintClass className tys
+                      tell . errorMessage' ss $ MissingNewtypeSuperclassInstance constraintClass className tys
+                else tell . errorMessage' ss $ UnverifiableSuperclassInstance constraintClass className tys
 
 dataGeneric :: ModuleName
 dataGeneric = ModuleName [ ProperName "Data", ProperName "Generic" ]
@@ -280,24 +277,25 @@ unguarded e = [MkUnguarded e]
 
 deriveGeneric
   :: forall m. (MonadError MultipleErrors m, MonadSupply m)
-  => ModuleName
+  => SourceSpan
+  -> ModuleName
   -> SynonymMap
   -> [Declaration]
   -> ProperName 'TypeName
   -> [Type]
   -> m [Declaration]
-deriveGeneric mn syns ds tyConNm dargs = do
+deriveGeneric ss mn syns ds tyConNm dargs = do
   tyCon <- findTypeDecl tyConNm ds
   toSpine <- mkSpineFunction tyCon
   fromSpine <- mkFromSpineFunction tyCon
   toSignature <- mkSignatureFunction tyCon dargs
-  return [ ValueDeclaration (Ident C.toSpine) Public [] (unguarded toSpine)
-         , ValueDeclaration (Ident C.fromSpine) Public [] (unguarded fromSpine)
-         , ValueDeclaration (Ident C.toSignature) Public [] (unguarded toSignature)
+  return [ ValueDeclaration (ss, []) (Ident C.toSpine) Public [] (unguarded toSpine)
+         , ValueDeclaration (ss, []) (Ident C.fromSpine) Public [] (unguarded fromSpine)
+         , ValueDeclaration (ss, []) (Ident C.toSignature) Public [] (unguarded toSignature)
          ]
   where
     mkSpineFunction :: Declaration -> m Expr
-    mkSpineFunction (DataDeclaration _ _ _ args) = do
+    mkSpineFunction (DataDeclaration _ _ _ _ args) = do
       x <- freshIdent'
       lamCase x <$> mapM mkCtorClause args
       where
@@ -330,11 +328,10 @@ deriveGeneric mn syns ds tyConNm dargs = do
             )
           $ fields
       toSpineFun i _ = lamNull $ App (mkGenVar (Ident C.toSpine)) i
-    mkSpineFunction (PositionedDeclaration _ _ d) = mkSpineFunction d
     mkSpineFunction _ = internalError "mkSpineFunction: expected DataDeclaration"
 
     mkSignatureFunction :: Declaration -> [Type] -> m Expr
-    mkSignatureFunction (DataDeclaration _ name tyArgs args) classArgs = lamNull . mkSigProd <$> mapM mkProdClause args
+    mkSignatureFunction (DataDeclaration _ _ name tyArgs args) classArgs = lamNull . mkSigProd <$> mapM mkProdClause args
       where
       mkSigProd :: [Expr] -> Expr
       mkSigProd =
@@ -373,11 +370,10 @@ deriveGeneric mn syns ds tyConNm dargs = do
       mkProductSignature typ = lamNull $ App (mkGenVar (Ident C.toSignature))
                                (TypedValue False (mkGenVar (Ident "anyProxy")) (proxy typ))
       instantiate = replaceAllTypeVars (zipWith (\(arg, _) ty -> (arg, ty)) tyArgs classArgs)
-    mkSignatureFunction (PositionedDeclaration _ _ d) classArgs = mkSignatureFunction d classArgs
     mkSignatureFunction _ _ = internalError "mkSignatureFunction: expected DataDeclaration"
 
     mkFromSpineFunction :: Declaration -> m Expr
-    mkFromSpineFunction (DataDeclaration _ _ _ args) = do
+    mkFromSpineFunction (DataDeclaration _ _ _ _ args) = do
       x <- freshIdent'
       lamCase x <$> (addCatch <$> mapM mkAlternative args)
       where
@@ -434,7 +430,6 @@ deriveGeneric mn syns ds tyConNm dargs = do
       mkRecFun :: [(Label, Type)] -> Expr
       mkRecFun xs = mkJust $ foldr (lam . labelToIdent . fst) recLiteral xs
         where recLiteral = Literal . ObjectLiteral $ map (\(l@(Label s), _) -> (s, mkVar $ labelToIdent l)) xs
-    mkFromSpineFunction (PositionedDeclaration _ _ d) = mkFromSpineFunction d
     mkFromSpineFunction _ = internalError "mkFromSpineFunction: expected DataDeclaration"
 
     -- Helpers
@@ -466,31 +461,30 @@ deriveGenericRep mn syns ds tyConNm tyConArgs repTy = do
     go =<< findTypeDecl tyConNm ds
   where
     go :: Declaration -> m ([Declaration], Type)
-    go (DataDeclaration _ _ args dctors) = do
+    go (DataDeclaration (ss, _) _ _ args dctors) = do
       x <- freshIdent "x"
       (reps, to, from) <- unzip3 <$> traverse makeInst dctors
       let rep = toRepTy reps
           inst | null reps =
                    -- If there are no cases, spin
-                   [ ValueDeclaration (Ident "to") Public [] $ unguarded $
+                   [ ValueDeclaration (ss, []) (Ident "to") Public [] $ unguarded $
                        lamCase x [ CaseAlternative [NullBinder]
                                                    (unguarded (App toName (Var (Qualified Nothing x))))
                                  ]
-                   , ValueDeclaration (Ident "from") Public [] $ unguarded $
+                   , ValueDeclaration (ss, []) (Ident "from") Public [] $ unguarded $
                        lamCase x [ CaseAlternative [NullBinder]
                                                    (unguarded (App fromName (Var (Qualified Nothing x))))
                                  ]
                    ]
                | otherwise =
-                   [ ValueDeclaration (Ident "to") Public [] $ unguarded $
+                   [ ValueDeclaration (ss, []) (Ident "to") Public [] $ unguarded $
                        lamCase x (zipWith ($) (map underBinder (sumBinders (length dctors))) to)
-                   , ValueDeclaration (Ident "from") Public [] $ unguarded $
+                   , ValueDeclaration (ss, []) (Ident "from") Public [] $ unguarded $
                        lamCase x (zipWith ($) (map underExpr (sumExprs (length dctors))) from)
                    ]
 
           subst = zipWith ((,) . fst) args tyConArgs
       return (inst, replaceAllTypeVars subst rep)
-    go (PositionedDeclaration _ _ d) = go d
     go _ = internalError "deriveGenericRep go: expected DataDeclaration"
 
     select :: (a -> a) -> (a -> a) -> Int -> [a -> a]
@@ -643,24 +637,25 @@ checkIsWildcard _ (TypeWildcard _) = return ()
 checkIsWildcard tyConNm _ =
   throwError . errorMessage $ ExpectedWildcard tyConNm
 
-deriveEq ::
-  forall m. (MonadError MultipleErrors m, MonadSupply m)
-  => ModuleName
+deriveEq
+  :: forall m
+   . (MonadError MultipleErrors m, MonadSupply m)
+  => SourceSpan
+  -> ModuleName
   -> SynonymMap
   -> [Declaration]
   -> ProperName 'TypeName
   -> m [Declaration]
-deriveEq mn syns ds tyConNm = do
+deriveEq ss mn syns ds tyConNm = do
   tyCon <- findTypeDecl tyConNm ds
   eqFun <- mkEqFunction tyCon
-  return [ ValueDeclaration (Ident C.eq) Public [] (unguarded eqFun) ]
+  return [ ValueDeclaration (ss, []) (Ident C.eq) Public [] (unguarded eqFun) ]
   where
     mkEqFunction :: Declaration -> m Expr
-    mkEqFunction (DataDeclaration _ _ _ args) = do
+    mkEqFunction (DataDeclaration _ _ _ _ args) = do
       x <- freshIdent "x"
       y <- freshIdent "y"
       lamCase2 x y <$> (addCatch <$> mapM mkCtorClause args)
-    mkEqFunction (PositionedDeclaration _ _ d) = mkEqFunction d
     mkEqFunction _ = internalError "mkEqFunction: expected DataDeclaration"
 
     preludeConj :: Expr -> Expr -> Expr
@@ -698,24 +693,25 @@ deriveEq mn syns ds tyConNm = do
       $ fields
     toEqTest l r _ = preludeEq l r
 
-deriveOrd ::
-  forall m. (MonadError MultipleErrors m, MonadSupply m)
-  => ModuleName
+deriveOrd
+  :: forall m
+   . (MonadError MultipleErrors m, MonadSupply m)
+  => SourceSpan
+  -> ModuleName
   -> SynonymMap
   -> [Declaration]
   -> ProperName 'TypeName
   -> m [Declaration]
-deriveOrd mn syns ds tyConNm = do
+deriveOrd ss mn syns ds tyConNm = do
   tyCon <- findTypeDecl tyConNm ds
   compareFun <- mkCompareFunction tyCon
-  return [ ValueDeclaration (Ident C.compare) Public [] (unguarded compareFun) ]
+  return [ ValueDeclaration (ss, []) (Ident C.compare) Public [] (unguarded compareFun) ]
   where
     mkCompareFunction :: Declaration -> m Expr
-    mkCompareFunction (DataDeclaration _ _ _ args) = do
+    mkCompareFunction (DataDeclaration _ _ _ _ args) = do
       x <- freshIdent "x"
       y <- freshIdent "y"
       lamCase2 x y <$> (addCatch . concat <$> mapM mkCtorClauses (splitLast args))
-    mkCompareFunction (PositionedDeclaration _ _ d) = mkCompareFunction d
     mkCompareFunction _ = internalError "mkCompareFunction: expected DataDeclaration"
 
     splitLast :: [a] -> [(a, Bool)]
@@ -801,18 +797,18 @@ deriveNewtype mn syns ds tyConNm tyConArgs unwrappedTy = do
     go =<< findTypeDecl tyConNm ds
   where
     go :: Declaration -> m ([Declaration], Type)
-    go (DataDeclaration Data name _ _) =
-      throwError . errorMessage $ CannotDeriveNewtypeForData name
-    go (DataDeclaration Newtype name args dctors) = do
+    go (DataDeclaration (ss, _) Data name _ _) =
+      throwError . errorMessage' ss $ CannotDeriveNewtypeForData name
+    go (DataDeclaration (ss, _) Newtype name args dctors) = do
       checkNewtype name dctors
       wrappedIdent <- freshIdent "n"
       unwrappedIdent <- freshIdent "a"
       let (ctorName, [ty]) = head dctors
       ty' <- replaceAllTypeSynonymsM syns ty
       let inst =
-            [ ValueDeclaration (Ident "wrap") Public [] $ unguarded $
+            [ ValueDeclaration (ss, []) (Ident "wrap") Public [] $ unguarded $
                 Constructor (Qualified (Just mn) ctorName)
-            , ValueDeclaration (Ident "unwrap") Public [] $ unguarded $
+            , ValueDeclaration (ss, []) (Ident "unwrap") Public [] $ unguarded $
                 lamCase wrappedIdent
                   [ CaseAlternative
                       [ConstructorBinder (Qualified (Just mn) ctorName) [VarBinder unwrappedIdent]]
@@ -821,7 +817,6 @@ deriveNewtype mn syns ds tyConNm tyConArgs unwrappedTy = do
             ]
           subst = zipWith ((,) . fst) args tyConArgs
       return (inst, replaceAllTypeVars subst ty')
-    go (PositionedDeclaration _ _ d) = go d
     go _ = internalError "deriveNewtype go: expected DataDeclaration"
 
 findTypeDecl
@@ -832,8 +827,7 @@ findTypeDecl
 findTypeDecl tyConNm = maybe (throwError . errorMessage $ CannotFindDerivingType tyConNm) return . find isTypeDecl
   where
   isTypeDecl :: Declaration -> Bool
-  isTypeDecl (DataDeclaration _ nm _ _) | nm == tyConNm = True
-  isTypeDecl (PositionedDeclaration _ _ d) = isTypeDecl d
+  isTypeDecl (DataDeclaration _ _ nm _ _) | nm == tyConNm = True
   isTypeDecl _ = False
 
 lam :: Ident -> Expr -> Expr
@@ -883,24 +877,24 @@ decomposeRec' = sortBy (comparing fst) . go
 deriveFunctor
   :: forall m
    . (MonadError MultipleErrors m, MonadSupply m)
-  => ModuleName
+  => SourceSpan
+  -> ModuleName
   -> SynonymMap
   -> [Declaration]
   -> ProperName 'TypeName
   -> m [Declaration]
-deriveFunctor mn syns ds tyConNm = do
+deriveFunctor ss mn syns ds tyConNm = do
   tyCon <- findTypeDecl tyConNm ds
   mapFun <- mkMapFunction tyCon
-  return [ ValueDeclaration (Ident C.map) Public [] (unguarded mapFun) ]
+  return [ ValueDeclaration (ss, []) (Ident C.map) Public [] (unguarded mapFun) ]
   where
     mkMapFunction :: Declaration -> m Expr
-    mkMapFunction (DataDeclaration _ _ tys ctors) = case reverse tys of
-      [] -> throwError . errorMessage $ KindsDoNotUnify (FunKind kindType kindType) kindType
+    mkMapFunction (DataDeclaration (ss', _) _ _ tys ctors) = case reverse tys of
+      [] -> throwError . errorMessage' ss' $ KindsDoNotUnify (FunKind kindType kindType) kindType
       ((iTy, _) : _) -> do
         f <- freshIdent "f"
         m <- freshIdent "m"
         lam f . lamCase m <$> mapM (mkCtorClause iTy f) ctors
-    mkMapFunction (PositionedDeclaration _ _ d) = mkMapFunction d
     mkMapFunction _ = internalError "mkMapFunction: expected DataDeclaration"
 
     mkCtorClause :: Text -> Ident -> (ProperName 'ConstructorName, [Type]) -> m CaseAlternative

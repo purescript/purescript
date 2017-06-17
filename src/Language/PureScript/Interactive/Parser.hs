@@ -88,14 +88,10 @@ psciImport = do
 -- (like import declarations).
 psciDeclaration :: P.TokenParser Command
 psciDeclaration = fmap Decls $ mark $ many1 $ same *> do
-  decl <- discardPositionInfo <$> P.parseDeclaration
+  decl <- P.parseDeclaration
   if acceptable decl
     then return decl
     else fail "this kind of declaration is not supported in psci"
-
-discardPositionInfo :: P.Declaration -> P.Declaration
-discardPositionInfo (P.PositionedDeclaration _ _ d) = d
-discardPositionInfo d = d
 
 acceptable :: P.Declaration -> Bool
 acceptable P.DataDeclaration{} = True

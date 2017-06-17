@@ -32,11 +32,10 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
   moduleNames = S.fromList (ordNub (mapMaybe getDeclIdent ds))
 
   getDeclIdent :: Declaration -> Maybe Ident
-  getDeclIdent (PositionedDeclaration _ _ d) = getDeclIdent d
-  getDeclIdent (ValueDeclaration ident _ _ _) = Just ident
-  getDeclIdent (ExternDeclaration ident _) = Just ident
-  getDeclIdent (TypeInstanceDeclaration ident _ _ _ _) = Just ident
-  getDeclIdent (BindingGroupDeclaration _) = internalError "lint: binding groups should not be desugared yet."
+  getDeclIdent (ValueDeclaration _ ident _ _ _) = Just ident
+  getDeclIdent (ExternDeclaration _ ident _) = Just ident
+  getDeclIdent (TypeInstanceDeclaration _ ident _ _ _ _) = Just ident
+  getDeclIdent BindingGroupDeclaration{} = internalError "lint: binding groups should not be desugared yet."
   getDeclIdent _ = Nothing
 
   lintDeclaration :: Declaration -> m ()
@@ -45,14 +44,12 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
     (warningsInDecl, _, _, _, _) = everythingWithScope (\_ _ -> mempty) stepE stepB (\_ _ -> mempty) stepDo
 
     f :: Declaration -> MultipleErrors
-    f (PositionedDeclaration pos _ dec) = addHint (PositionedError pos) (f dec)
-    f (TypeClassDeclaration name args _ _ decs) = addHint (ErrorInTypeClassDeclaration name) (foldMap (f' (S.fromList $ fst <$> args)) decs)
+    f (TypeClassDeclaration _ name args _ _ decs) = addHint (ErrorInTypeClassDeclaration name) (foldMap (f' (S.fromList $ fst <$> args)) decs)
     f dec = f' S.empty dec
 
     f' :: S.Set Text -> Declaration -> MultipleErrors
-    f' s (PositionedDeclaration pos _ dec) = addHint (PositionedError pos) (f' s dec)
-    f' s dec@(ValueDeclaration name _ _ _) = addHint (ErrorInValueDeclaration name) (warningsInDecl moduleNames dec <> checkTypeVarsInDecl s dec)
-    f' s (TypeDeclaration name ty) = addHint (ErrorInTypeDeclaration name) (checkTypeVars s ty)
+    f' s dec@(ValueDeclaration _ name _ _ _) = addHint (ErrorInValueDeclaration name) (warningsInDecl moduleNames dec <> checkTypeVarsInDecl s dec)
+    f' s (TypeDeclaration _ name ty) = addHint (ErrorInTypeDeclaration name) (checkTypeVars s ty)
     f' s dec = warningsInDecl moduleNames dec <> checkTypeVarsInDecl s dec
 
     stepE :: S.Set Ident -> Expr -> MultipleErrors

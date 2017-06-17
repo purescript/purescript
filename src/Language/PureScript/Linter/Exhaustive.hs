@@ -242,13 +242,14 @@ missingAlternative env mn ca uncovered
 checkExhaustive
   :: forall m
    . (MonadWriter MultipleErrors m, MonadSupply m)
-   => Environment
+   => SourceSpan
+   -> Environment
    -> ModuleName
    -> Int
    -> [CaseAlternative]
    -> Expr
    -> m Expr
-checkExhaustive env mn numArgs cas expr = makeResult . first ordNub $ foldl' step ([initialize numArgs], (pure True, [])) cas
+checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' step ([initialize numArgs], (pure True, [])) cas
   where
   step :: ([[Binder]], (Either RedundancyError Bool, [[Binder]])) -> CaseAlternative -> ([[Binder]], (Either RedundancyError Bool, [[Binder]]))
   step (uncovered, (nec, redundant)) ca =
@@ -274,8 +275,8 @@ checkExhaustive env mn numArgs cas expr = makeResult . first ordNub $ foldl' ste
          then return expr
          else addPartialConstraint (second null (splitAt 5 bss)) expr
     where
-      tellRedundant = tell . errorMessage . uncurry OverlappingPattern . second null . splitAt 5 $ bss'
-      tellIncomplete = tell . errorMessage $ IncompleteExhaustivityCheck
+      tellRedundant = tell . errorMessage' ss . uncurry OverlappingPattern . second null . splitAt 5 $ bss'
+      tellIncomplete = tell . errorMessage' ss $ IncompleteExhaustivityCheck
 
   -- | We add a Partial constraint by adding a call to the following identity function:
   --
@@ -294,7 +295,7 @@ checkExhaustive env mn numArgs cas expr = makeResult . first ordNub $ foldl' ste
     where
       partial :: Text -> Text -> Declaration
       partial var tyVar =
-        ValueDeclaration (Ident C.__unused) Private [] $
+        ValueDeclaration (ss, []) (Ident C.__unused) Private [] $
         [MkUnguarded
           (TypedValue
            True
@@ -321,41 +322,41 @@ checkExhaustive env mn numArgs cas expr = makeResult . first ordNub $ foldl' ste
 checkExhaustiveExpr
   :: forall m
    . (MonadWriter MultipleErrors m, MonadSupply m)
-   => Environment
+   => SourceSpan
+   -> Environment
    -> ModuleName
    -> Expr
    -> m Expr
-checkExhaustiveExpr env mn = onExpr
+checkExhaustiveExpr initSS env mn = onExpr initSS
   where
   onDecl :: Declaration -> m Declaration
-  onDecl (BindingGroupDeclaration bs) = BindingGroupDeclaration <$> mapM (thirdM onExpr) bs
-  onDecl (ValueDeclaration name x y [MkUnguarded e]) = ValueDeclaration name x y . mkUnguardedExpr <$> censor (addHint (ErrorInValueDeclaration name)) (onExpr e)
-  onDecl (PositionedDeclaration pos x dec) = PositionedDeclaration pos x <$> censor (addHint (PositionedError pos)) (onDecl dec)
+  onDecl (BindingGroupDeclaration bs) = BindingGroupDeclaration <$> mapM (\(sai@((ss, _), _), nk, expr) -> (sai, nk,) <$> onExpr ss expr) bs
+  onDecl (ValueDeclaration sa@(ss, _) name x y [MkUnguarded e]) = ValueDeclaration sa name x y . mkUnguardedExpr <$> censor (addHint (ErrorInValueDeclaration name)) (onExpr ss e)
   onDecl decl = return decl
 
-  onExpr :: Expr -> m Expr
-  onExpr (UnaryMinus e) = UnaryMinus <$> onExpr e
-  onExpr (Literal (ArrayLiteral es)) = Literal . ArrayLiteral <$> mapM onExpr es
-  onExpr (Literal (ObjectLiteral es)) = Literal . ObjectLiteral <$> mapM (sndM onExpr) es
-  onExpr (TypeClassDictionaryConstructorApp x e) = TypeClassDictionaryConstructorApp x <$> onExpr e
-  onExpr (Accessor x e) = Accessor x <$> onExpr e
-  onExpr (ObjectUpdate o es) = ObjectUpdate <$> onExpr o <*> mapM (sndM onExpr) es
-  onExpr (Abs x e) = Abs x <$> onExpr e
-  onExpr (App e1 e2) = App <$> onExpr e1 <*> onExpr e2
-  onExpr (IfThenElse e1 e2 e3) = IfThenElse <$> onExpr e1 <*> onExpr e2 <*> onExpr e3
-  onExpr (Case es cas) = do
-    case' <- Case <$> mapM onExpr es <*> mapM onCaseAlternative cas
-    checkExhaustive env mn (length es) cas case'
-  onExpr (TypedValue x e y) = TypedValue x <$> onExpr e <*> pure y
-  onExpr (Let ds e) = Let <$> mapM onDecl ds <*> onExpr e
-  onExpr (PositionedValue pos x e) = PositionedValue pos x <$> censor (addHint (PositionedError pos)) (onExpr e)
-  onExpr expr = return expr
+  onExpr :: SourceSpan -> Expr -> m Expr
+  onExpr ss (UnaryMinus e) = UnaryMinus <$> onExpr ss e
+  onExpr ss (Literal (ArrayLiteral es)) = Literal . ArrayLiteral <$> mapM (onExpr ss) es
+  onExpr ss (Literal (ObjectLiteral es)) = Literal . ObjectLiteral <$> mapM (sndM (onExpr ss)) es
+  onExpr ss (TypeClassDictionaryConstructorApp x e) = TypeClassDictionaryConstructorApp x <$> onExpr ss e
+  onExpr ss (Accessor x e) = Accessor x <$> onExpr ss e
+  onExpr ss (ObjectUpdate o es) = ObjectUpdate <$> onExpr ss o <*> mapM (sndM (onExpr ss)) es
+  onExpr ss (Abs x e) = Abs x <$> onExpr ss e
+  onExpr ss (App e1 e2) = App <$> onExpr ss e1 <*> onExpr ss e2
+  onExpr ss (IfThenElse e1 e2 e3) = IfThenElse <$> onExpr ss e1 <*> onExpr ss e2 <*> onExpr ss e3
+  onExpr ss (Case es cas) = do
+    case' <- Case <$> mapM (onExpr ss) es <*> mapM (onCaseAlternative ss) cas
+    checkExhaustive ss env mn (length es) cas case'
+  onExpr ss (TypedValue x e y) = TypedValue x <$> onExpr ss e <*> pure y
+  onExpr ss (Let ds e) = Let <$> mapM onDecl ds <*> onExpr ss e
+  onExpr _ (PositionedValue ss x e) = PositionedValue ss x <$> onExpr ss e
+  onExpr _ expr = return expr
 
-  onCaseAlternative :: CaseAlternative -> m CaseAlternative
-  onCaseAlternative (CaseAlternative x [MkUnguarded e]) = CaseAlternative x . mkUnguardedExpr <$> onExpr e
-  onCaseAlternative (CaseAlternative x es) = CaseAlternative x <$> mapM onGuardedExpr es
+  onCaseAlternative :: SourceSpan -> CaseAlternative -> m CaseAlternative
+  onCaseAlternative ss (CaseAlternative x [MkUnguarded e]) = CaseAlternative x . mkUnguardedExpr <$> onExpr ss e
+  onCaseAlternative ss (CaseAlternative x es) = CaseAlternative x <$> mapM (onGuardedExpr ss) es
 
-  onGuardedExpr :: GuardedExpr -> m GuardedExpr
-  onGuardedExpr (GuardedExpr guard rhs) = GuardedExpr guard <$> onExpr rhs
+  onGuardedExpr :: SourceSpan -> GuardedExpr -> m GuardedExpr
+  onGuardedExpr ss (GuardedExpr guard rhs) = GuardedExpr guard <$> onExpr ss rhs
 
   mkUnguardedExpr = pure . MkUnguarded

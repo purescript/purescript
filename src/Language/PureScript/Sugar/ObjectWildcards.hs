@@ -26,8 +26,7 @@ desugarObjectConstructors
 desugarObjectConstructors (Module ss coms mn ds exts) = Module ss coms mn <$> mapM desugarDecl ds <*> pure exts
 
 desugarDecl :: forall m. (MonadSupply m, MonadError MultipleErrors m) => Declaration -> m Declaration
-desugarDecl (PositionedDeclaration pos com d) = rethrowWithPosition pos $ PositionedDeclaration pos com <$> desugarDecl d
-desugarDecl other = fn other
+desugarDecl d = rethrowWithPosition (declSourceSpan d) $ fn d
   where
   (fn, _, _) = everywhereOnValuesTopDownM return desugarExpr return
 
@@ -70,7 +69,7 @@ desugarDecl other = fn other
       then Abs (VarBinder val) <$> wrapLambda (buildUpdates valExpr) ps
       else wrapLambda (buildLet val . buildUpdates valExpr) ps
     where
-      buildLet val = Let [ValueDeclaration val Public [] [MkUnguarded obj]]
+      buildLet val = Let [ValueDeclaration (declSourceSpan d, []) val Public [] [MkUnguarded obj]]
 
       -- recursively build up the nested `ObjectUpdate` expressions
       buildUpdates :: Expr -> PathTree Expr -> Expr

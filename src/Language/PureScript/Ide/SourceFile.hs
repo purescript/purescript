@@ -59,8 +59,8 @@ parseModulesFromFiles paths = do
 extractAstInformation
   :: P.Module
   -> (DefinitionSites P.SourceSpan, TypeAnnotations)
-extractAstInformation (P.Module ss _ _ decls _) =
-  let definitions = Map.fromList (concatMap (extractSpans ss) decls)
+extractAstInformation (P.Module _ _ _ decls _) =
+  let definitions = Map.fromList (concatMap extractSpans decls)
       typeAnnotations = Map.fromList (extractTypeAnnotations decls)
   in (definitions, typeAnnotations)
 
@@ -70,40 +70,35 @@ extractTypeAnnotations
   -> [(P.Ident, P.Type)]
 extractTypeAnnotations = mapMaybe extract
   where
-    extract d = case unwrapPositioned d of
-      P.TypeDeclaration ident ty -> Just (ident, ty)
-      _ -> Nothing
+    extract (P.TypeDeclaration _ ident ty) = Just (ident, ty)
+    extract _ = Nothing
 
 -- | Given a surrounding Sourcespan and a Declaration from the PS AST, extracts
 -- definition sites inside that Declaration.
 extractSpans
-  :: P.SourceSpan
-  -- ^ The surrounding span
-  -> P.Declaration
+  :: P.Declaration
   -- ^ The declaration to extract spans from
   -> [(IdeNamespaced, P.SourceSpan)]
   -- ^ Declarations and their source locations
-extractSpans ss d = case d of
-  P.PositionedDeclaration ss' _ d' ->
-    extractSpans ss' d'
-  P.ValueDeclaration i _ _ _ ->
+extractSpans d = case d of
+  P.ValueDeclaration (ss, _) i _ _ _ ->
     [(IdeNamespaced IdeNSValue (P.runIdent i), ss)]
-  P.TypeSynonymDeclaration name _ _ ->
+  P.TypeSynonymDeclaration (ss, _) name _ _ ->
     [(IdeNamespaced IdeNSType (P.runProperName name), ss)]
-  P.TypeClassDeclaration name _ _ _ members ->
-    (IdeNamespaced IdeNSType (P.runProperName name), ss) : concatMap (extractSpans' ss) members
-  P.DataDeclaration _ name _ ctors ->
+  P.TypeClassDeclaration (ss, _) name _ _ _ members ->
+    (IdeNamespaced IdeNSType (P.runProperName name), ss) : concatMap extractSpans' members
+  P.DataDeclaration (ss, _) _ name _ ctors ->
     (IdeNamespaced IdeNSType (P.runProperName name), ss)
     : map (\(cname, _) -> (IdeNamespaced IdeNSValue (P.runProperName cname), ss)) ctors
-  P.FixityDeclaration (Left (P.ValueFixity _ _ opName)) ->
+  P.FixityDeclaration (ss, _) (Left (P.ValueFixity _ _ opName)) ->
     [(IdeNamespaced IdeNSValue (P.runOpName opName), ss)]
-  P.FixityDeclaration (Right (P.TypeFixity _ _ opName)) ->
+  P.FixityDeclaration (ss, _) (Right (P.TypeFixity _ _ opName)) ->
     [(IdeNamespaced IdeNSType (P.runOpName opName), ss)]
-  P.ExternDeclaration ident _ ->
+  P.ExternDeclaration (ss, _) ident _ ->
     [(IdeNamespaced IdeNSValue (P.runIdent ident), ss)]
-  P.ExternDataDeclaration name _ ->
+  P.ExternDataDeclaration (ss, _) name _ ->
     [(IdeNamespaced IdeNSType (P.runProperName name), ss)]
-  P.ExternKindDeclaration name ->
+  P.ExternKindDeclaration (ss, _) name ->
     [(IdeNamespaced IdeNSKind (P.runProperName name), ss)]
   _ -> []
   where
@@ -111,9 +106,7 @@ extractSpans ss d = case d of
     -- typeclass member functions. Typedeclarations would clash with value
     -- declarations for non-typeclass members, which is why we can't handle them
     -- in extractSpans.
-    extractSpans' ssP dP = case dP of
-      P.PositionedDeclaration ssP' _ dP' ->
-        extractSpans' ssP' dP'
-      P.TypeDeclaration ident _ ->
-        [(IdeNamespaced IdeNSValue (P.runIdent ident), ssP)]
+    extractSpans' dP = case dP of
+      P.TypeDeclaration (ss', _) ident _ ->
+        [(IdeNamespaced IdeNSValue (P.runIdent ident), ss')]
       _ -> []

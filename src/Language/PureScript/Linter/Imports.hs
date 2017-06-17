@@ -116,7 +116,6 @@ lintImports (Module _ _ mn mdecls (Just mexports)) env usedImps = do
   selfCartesianSubset [] = []
 
   countOpenImports :: Declaration -> Int
-  countOpenImports (PositionedDeclaration _ _ d) = countOpenImports d
   countOpenImports (ImportDeclaration _ mn' Implicit Nothing)
     | not (isPrim mn' || mn == mn') = 1
   countOpenImports (ImportDeclaration _ mn' (Hiding _) Nothing)

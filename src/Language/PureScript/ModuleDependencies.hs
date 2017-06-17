@@ -4,9 +4,10 @@ module Language.PureScript.ModuleDependencies
   , ModuleGraph
   ) where
 
-import           Protolude
+import           Protolude hiding (head)
 
 import           Data.Graph
+import           Data.List (head)
 import qualified Data.Set as S
 import           Language.PureScript.AST
 import qualified Language.PureScript.Constants as C
@@ -41,24 +42,25 @@ sortModules ms = do
     toGraphNode mns m@(Module _ _ mn ds _) = do
       let deps = ordNub (mapMaybe usedModules ds)
       void . parU deps $ \(dep, pos) ->
-        when (dep /= C.Prim && S.notMember dep mns) $
+        when (dep /= C.Prim && S.notMember dep mns) .
           throwError
             . addHint (ErrorInModule mn)
-            . maybe identity (addHint . PositionedError) pos
-            . errorMessage
+            . errorMessage' pos
             $ ModuleNotFound dep
       pure (m, getModuleName m, map fst deps)
 
 -- | Calculate a list of used modules based on explicit imports and qualified names.
-usedModules :: Declaration -> Maybe (ModuleName, Maybe SourceSpan)
+usedModules :: Declaration -> Maybe (ModuleName, SourceSpan)
 -- Regardless of whether an imported module is qualified we still need to
 -- take into account its import to build an accurate list of dependencies.
-usedModules (ImportDeclaration _ mn _ _) = pure (mn, Nothing)
-usedModules (PositionedDeclaration ss _ d) = fmap (second (const (Just ss))) (usedModules d)
+usedModules (ImportDeclaration (ss, _) mn _ _) = pure (mn, ss)
 usedModules _ = Nothing
 
 -- | Convert a strongly connected component of the module graph to a module
 toModule :: MonadError MultipleErrors m => SCC Module -> m Module
 toModule (AcyclicSCC m) = return m
 toModule (CyclicSCC [m]) = return m
-toModule (CyclicSCC ms) = throwError . errorMessage $ CycleInModules (map getModuleName ms)
+toModule (CyclicSCC ms) =
+  throwError
+    . errorMessage' (getModuleSourceSpan (head ms))
+    $ CycleInModules (map getModuleName ms)
