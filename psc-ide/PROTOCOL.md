@@ -560,6 +560,43 @@ Valid namespaces are `value`, `type` and `kind`.
 }
 ```
 
+### Declaration type filter
+A filter which allows to filter type declarations. Valid type declarations are
+`value`, `type`, `synonym`, `dataconstructor`, `typeclass`, `valueoperator`,
+`typeoperator` and `kind`.
+
+```json
+{
+  "filter": "declarations",
+  "params": [
+    {
+      "declarationtype": "value"
+    },
+    {
+      "declarationtype": "type"
+    },
+    {
+      "declarationtype": "synonym"
+    },
+    {
+      "declarationtype": "dataconstructor"
+    }
+    {
+      "declarationtype": "typeclass"
+    },
+    {
+      "declarationtype": "valueoperator"
+    },
+    {
+      "declarationtype": "typeoperator"
+    },
+    {
+      "declarationtype": "kind"
+    }
+  ]
+}
+```
+
 ## Matcher:
 
 ### Flex matcher
@@ -611,7 +648,7 @@ All Responses are wrapped in the following format:
 
 Completion options allow to configure the number of returned completion results.
 
-- maxResults :: Maybe Int 
+- maxResults :: Maybe Int
 
 If specified limits the number of completion results, otherwise return all
 results.

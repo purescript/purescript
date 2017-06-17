@@ -16,6 +16,7 @@
 
 module Language.PureScript.Ide.Filter
        ( Filter
+       , declarationTypeFilter
        , namespaceFilter
        , moduleFilter
        , prefixFilter
@@ -28,6 +29,7 @@ import           Protolude                     hiding (isPrefixOf)
 import           Data.Aeson
 import           Data.List.NonEmpty            (NonEmpty)
 import           Data.Text                     (isPrefixOf)
+import qualified Language.PureScript.Ide.Filter.Declaration as D
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 import qualified Language.PureScript           as P
@@ -77,6 +79,15 @@ declarationFilter :: (IdeDeclaration -> Text -> Bool) -> Text -> [Module] -> [Mo
 declarationFilter predicate search =
   filterModuleDecls (flip predicate search)
 
+-- | Only keeps Identifiers in the given type declarations
+declarationTypeFilter :: [D.IdeDeclaration] -> Filter
+declarationTypeFilter [] = mkFilter identity
+declarationTypeFilter decls =
+    mkFilter $ filterModuleDecls filterDecls
+    where
+      filterDecls :: IdeDeclaration -> Bool
+      filterDecls decl = D.typeDeclarationForDeclaration decl `elem` decls
+
 filterModuleDecls :: (IdeDeclaration -> Bool) -> [Module] -> [Module]
 filterModuleDecls predicate =
   filter (not . null . snd) . fmap filterDecls
@@ -109,4 +120,7 @@ instance FromJSON Filter where
         params <- o .: "params"
         namespaces <- params .: "namespaces"
         return $ namespaceFilter namespaces
+      "declarations" -> do
+        declarations <- o.: "params"
+        return $ declarationTypeFilter declarations
       _ -> mzero
