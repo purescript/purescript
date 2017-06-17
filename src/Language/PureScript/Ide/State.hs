@@ -40,11 +40,9 @@ import           Control.Lens                       hiding (op, (&))
 import           "monad-logger" Control.Monad.Logger
 import qualified Data.Map.Lazy                      as Map
 import qualified Language.PureScript                as P
-import qualified Language.PureScript.Constants      as C
 import           Language.PureScript.Externs
 import           Language.PureScript.Ide.Externs
 import           Language.PureScript.Ide.Reexports
-import           Language.PureScript.Ide.Prim
 import           Language.PureScript.Ide.SourceFile
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
@@ -186,8 +184,7 @@ populateVolatileStateSTM ref = do
         & resolveInstances externs
         & resolveOperators
         & resolveReexports reexportRefs
-  let insertPrim = Map.insert C.Prim idePrimDeclarations
-  setVolatileStateSTM ref (IdeVolatileState (AstData asts) (insertPrim (map reResolved results)) rebuildCache)
+  setVolatileStateSTM ref (IdeVolatileState (AstData asts) (map reResolved results) rebuildCache)
   pure results
 
 resolveLocations
