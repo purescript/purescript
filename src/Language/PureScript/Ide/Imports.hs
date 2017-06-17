@@ -36,6 +36,7 @@ import           Control.Lens                       ((^.), (%~), ix)
 import           Data.List                          (findIndex, nubBy, partition)
 import qualified Data.Text                          as T
 import qualified Language.PureScript                as P
+import qualified Language.PureScript.Constants      as C
 import           Language.PureScript.Ide.Completion
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Filter
@@ -154,8 +155,9 @@ addQualifiedImport fp mn qualifier = do
   pure (pre ++ newImportSection ++ post)
 
 addQualifiedImport' :: [Import] -> P.ModuleName -> P.ModuleName -> [Text]
-addQualifiedImport' imports mn qualifier =
-  prettyPrintImportSection (Import mn P.Implicit (Just qualifier) : imports)
+addQualifiedImport' imports mn qualifier
+  | mn == C.Prim = prettyPrintImportSection imports
+  | otherwise = prettyPrintImportSection (Import mn P.Implicit (Just qualifier) : imports)
 
 -- | Adds an explicit import like @import Prelude (unit)@ to a Sourcefile. If an
 -- explicit import already exists for the given module, it adds the identifier
@@ -171,7 +173,7 @@ addExplicitImport fp decl moduleName = do
   let newImportSection =
         -- TODO: Open an issue when this PR is merged, we should optimise this
         -- so that this case does not write to disc
-        if mn == moduleName
+        if mn == moduleName || moduleName == C.Prim
         then imports
         else addExplicitImport' decl moduleName imports
   pure (pre ++ prettyPrintImportSection newImportSection ++ post)
