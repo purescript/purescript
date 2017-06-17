@@ -43,6 +43,7 @@ import qualified Language.PureScript                as P
 import           Language.PureScript.Externs
 import           Language.PureScript.Ide.Externs
 import           Language.PureScript.Ide.Reexports
+import           Language.PureScript.Ide.Prim
 import           Language.PureScript.Ide.SourceFile
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
@@ -184,7 +185,8 @@ populateVolatileStateSTM ref = do
         & resolveInstances externs
         & resolveOperators
         & resolveReexports reexportRefs
-  setVolatileStateSTM ref (IdeVolatileState (AstData asts) (map reResolved results) rebuildCache)
+  let insertPrim = Map.insert (P.moduleNameFromString "Prim") idePrimDeclarations
+  setVolatileStateSTM ref (IdeVolatileState (AstData asts) (insertPrim (map reResolved results)) rebuildCache)
   pure results
 
 resolveLocations
