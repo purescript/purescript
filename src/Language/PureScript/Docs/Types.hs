@@ -699,7 +699,7 @@ asSourcePos = P.SourcePos <$> nth 0 asIntegral
                           <*> nth 1 asIntegral
 
 asConstraint :: Parse PackageError P.Constraint
-asConstraint = P.Constraint <$> key "constraintClass" asQualifiedProperName
+asConstraint = P.Constraint <$> key "constraintClass" asType
                             <*> key "constraintArgs" (eachInArray asType)
                             <*> pure Nothing
 

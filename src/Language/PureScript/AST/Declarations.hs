@@ -101,11 +101,11 @@ data SimpleErrorMessage
   | TypesDoNotUnify Type Type
   | KindsDoNotUnify Kind Kind
   | ConstrainedTypeUnified Type Type
-  | OverlappingInstances (Qualified (ProperName 'ClassName)) [Type] [Qualified Ident]
+  | OverlappingInstances Type [Type] [Qualified Ident]
   | NoInstanceFound Constraint
   | AmbiguousTypeVariables Type Constraint
   | UnknownClass (Qualified (ProperName 'ClassName))
-  | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [Type]
+  | PossiblyInfiniteInstance Type [Type]
   | CannotDerive (Qualified (ProperName 'ClassName)) [Type]
   | InvalidDerivedInstance (Qualified (ProperName 'ClassName)) [Type] Int
   | ExpectedTypeConstructor (Qualified (ProperName 'ClassName)) [Type] Type
@@ -682,7 +682,7 @@ data Expr
   -- instance type, and the type class dictionaries in scope.
   --
   | TypeClassDictionary Constraint
-                        (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict)))
+                        (M.Map (Maybe ModuleName) (M.Map Type (M.Map (Qualified Ident) NamedDict)))
                         [ErrorMessageHint]
   -- |
   -- A typeclass dictionary accessor, the implementation is left unspecified until CoreFn desugaring.
@@ -691,7 +691,7 @@ data Expr
   -- |
   -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
   --
-  | DeferredDictionary (Qualified (ProperName 'ClassName)) [Type]
+  | DeferredDictionary Type [Type]
   -- |
   -- A placeholder for an anonymous function argument
   --

@@ -44,7 +44,7 @@ constraintsAsBox tro con ty =
     doubleRightArrow = if troUnicode tro then "⇒" else "=>"
 
 constraintAsBox :: Constraint -> Box
-constraintAsBox (Constraint pn tys _) = typeAsBox (foldl TypeApp (TypeConstructor (fmap coerceProperName pn)) tys)
+constraintAsBox (Constraint cl tys _) = typeAsBox (foldl TypeApp cl tys)
 
 -- |
 -- Generate a pretty-printed string representing a Row

@@ -309,13 +309,13 @@ renameInModule imports (Module modSS coms mn decls exps) =
     updateType (KindedType t k) = KindedType t <$> updateKindsEverywhere pos k
     updateType t = return t
     updateInConstraint :: Constraint -> m Constraint
-    updateInConstraint (Constraint name ts info) =
-      Constraint <$> updateClassName name pos <*> pure ts <*> pure info
+    updateInConstraint (Constraint cl ts info) =
+      Constraint <$> updateTypesEverywhere pos cl <*> pure ts <*> pure info
 
   updateConstraints :: SourceSpan -> [Constraint] -> m [Constraint]
-  updateConstraints pos = traverse $ \(Constraint name ts info) ->
+  updateConstraints pos = traverse $ \(Constraint  cl ts info) ->
     Constraint
-      <$> updateClassName name pos
+      <$> updateTypesEverywhere pos cl
       <*> traverse (updateTypesEverywhere pos) ts
       <*> pure info
 

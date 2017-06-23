@@ -110,9 +110,12 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           -- We need information about functional dependencies, since we allow
           -- ambiguous types to be inferred if they can be solved by some functional
           -- dependency.
-          let findClass = fromMaybe (internalError "entails: type class not found in environment") . M.lookup (constraintClass con)
-          TypeClassData{ typeClassDependencies } <- gets (findClass . typeClasses . checkEnv)
-          let solved = foldMap (S.fromList . fdDetermined) typeClassDependencies
+          fundeps <- case constraintClass con of
+            TypeConstructor className -> do
+              let findClass = fromMaybe (internalError "entails: type class not found in environment") . M.lookup (fmap coerceProperName className)
+              gets (typeClassDependencies . findClass . typeClasses . checkEnv)
+            _ -> pure []
+          let solved = foldMap (S.fromList . fdDetermined) fundeps
           let constraintTypeVars = ordNub . foldMap (unknownsInType . fst) . filter ((`notElem` solved) . snd) $ zip (constraintArgs con) [0..]
           when (any (`notElem` unsolvedTypeVars) constraintTypeVars) .
             throwError
@@ -394,12 +397,12 @@ infer' (IfThenElse cond th el) = do
 infer' (Let ds val) = do
   (ds', val'@(TypedValue _ _ valTy)) <- inferLetBinding [] ds val infer
   return $ TypedValue True (Let ds' val') valTy
-infer' (DeferredDictionary className tys) = do
+infer' (DeferredDictionary cls tys) = do
   dicts <- getTypeClassDictionaries
   hints <- getHints
   return $ TypedValue False
-             (TypeClassDictionary (Constraint className tys Nothing) dicts hints)
-             (foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys)
+             (TypeClassDictionary (Constraint cls tys Nothing) dicts hints)
+             (foldl TypeApp cls tys)
 infer' (TypedValue checkType val ty) = do
   Just moduleName <- checkCurrentModule <$> get
   (kind, args) <- kindOfWithScopedVars ty
@@ -615,8 +618,8 @@ check' val (ForAll ident ty _) = do
       skVal = skolemizeTypesInValue ident sko scope ss val
   val' <- check skVal sk
   return $ TypedValue True val' (ForAll ident ty (Just scope))
-check' val t@(ConstrainedType con@(Constraint (Qualified _ (ProperName className)) _ _) ty) = do
-  dictName <- freshIdent ("dict" <> className)
+check' val t@(ConstrainedType con@(Constraint cls _ _) ty) = do
+  dictName <- freshDictName cls
   dicts <- newDictionaries [] (Qualified Nothing dictName) con
   val' <- withBindingGroupVisible $ withTypeClassDictionaries dicts $ check val ty
   return $ TypedValue True (Abs (VarBinder dictName) val') t

@@ -308,10 +308,10 @@ updateTypes goType = (goDecl, goExpr, goBinder)
   goDecl (ExternDeclaration sa@(ss, _) name ty) =
     ExternDeclaration sa name <$> goType'' ss ty
   goDecl (TypeClassDeclaration sa@(ss, _) name args implies deps decls) = do
-    implies' <- traverse (overConstraintArgs (traverse (goType'' ss))) implies
+    implies' <- traverse (overConstraintTypes (goType'' ss)) implies
     return $ TypeClassDeclaration sa name args implies' deps decls
   goDecl (TypeInstanceDeclaration sa@(ss, _) name cs className tys impls) = do
-    cs' <- traverse (overConstraintArgs (traverse (goType'' ss))) cs
+    cs' <- traverse (overConstraintTypes (goType'' ss)) cs
     tys' <- traverse (goType'' ss) tys
     return $ TypeInstanceDeclaration sa name cs' className tys' impls
   goDecl (TypeSynonymDeclaration sa@(ss, _) name args ty) =

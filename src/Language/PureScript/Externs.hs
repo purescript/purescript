@@ -152,13 +152,21 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   applyDecl env (EDValue ident ty) = env { names = M.insert (Qualified (Just efModuleName) ident) (ty, External, Defined) (names env) }
   applyDecl env (EDClass pn args members cs deps) = env { typeClasses = M.insert (qual pn) (makeTypeClassData args members cs deps) (typeClasses env) }
   applyDecl env (EDKind pn) = env { kinds = S.insert (qual pn) (kinds env) }
-  applyDecl env (EDInstance className ident tys cs) = env { typeClassDictionaries = updateMap (updateMap (M.insert (qual ident) dict) className) (Just efModuleName) (typeClassDictionaries env) }
+  applyDecl env (EDInstance className ident tys cs) =
+      env { typeClassDictionaries =
+              updateMap
+                (updateMap
+                  (M.insert (qual ident) dict)
+                  (TypeConstructor (fmap coerceProperName className)))
+                (Just efModuleName)
+                (typeClassDictionaries env)
+          }
     where
-    dict :: NamedDict
-    dict = TypeClassDictionaryInScope (qual ident) [] className tys cs
+      dict :: NamedDict
+      dict = TypeClassDictionaryInScope (qual ident) [] (TypeConstructor (fmap coerceProperName className)) tys cs
 
-    updateMap :: (Ord k, Monoid a) => (a -> a) -> k -> M.Map k a -> M.Map k a
-    updateMap f = M.alter (Just . f . fold)
+      updateMap :: (Ord k, Monoid a) => (a -> a) -> k -> M.Map k a -> M.Map k a
+      updateMap f = M.alter (Just . f . fold)
 
   qual :: a -> Qualified a
   qual = Qualified (Just efModuleName)
@@ -219,10 +227,11 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
       , EDClass className typeClassArguments typeClassMembers typeClassSuperclasses typeClassDependencies
       ]
   toExternsDeclaration (TypeInstanceRef _ ident)
-    = [ EDInstance tcdClassName ident tcdInstanceTypes tcdDependencies
+    = [ EDInstance (fmap coerceProperName className) ident tcdInstanceTypes tcdDependencies
       | m1 <- maybeToList (M.lookup (Just mn) (typeClassDictionaries env))
       , m2 <- M.elems m1
       , TypeClassDictionaryInScope{..} <- maybeToList (M.lookup (Qualified (Just mn) ident) m2)
+      , let TypeConstructor className = tcdClassName
       ]
   toExternsDeclaration (KindRef _ pn)
     | Qualified (Just mn) pn `S.member` kinds env

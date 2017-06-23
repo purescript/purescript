@@ -84,8 +84,11 @@ compile (HierarchyOptions inputGlob mOutput) = do
       exitSuccess
 
 superClasses :: P.Declaration -> [SuperMap]
-superClasses (P.TypeClassDeclaration _ sub _ supers@(_:_) _ _) =
-  fmap (\(P.Constraint (P.Qualified _ super) _ _) -> SuperMap (Right (super, sub))) supers
+superClasses (P.TypeClassDeclaration _ sub _ supers@(_:_) _ _) = concatMap fromConstraint supers where
+  fromConstraint :: P.Constraint -> [SuperMap]
+  fromConstraint (P.Constraint (P.TypeConstructor (P.Qualified _ super)) _ _) =
+    [SuperMap (Right (P.coerceProperName super, sub))]
+  fromConstraint _ = []
 superClasses (P.TypeClassDeclaration _ sub _ _ _ _) = [SuperMap (Left sub)]
 superClasses _ = []
 

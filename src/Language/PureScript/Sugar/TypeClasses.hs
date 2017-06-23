@@ -234,8 +234,8 @@ typeClassDictionaryDeclaration
   -> Declaration
 typeClassDictionaryDeclaration sa name args implies members =
   let superclassTypes = superClassDictionaryNames implies `zip`
-        [ function unit (foldl TypeApp (TypeConstructor (fmap coerceProperName superclass)) tyArgs)
-        | (Constraint superclass tyArgs _) <- implies
+        [ function unit (foldl TypeApp superclass tyArgs)
+        | Constraint superclass tyArgs _ <- implies
         ]
       members' = map (first runIdent . memberToNameAndType) members
       mtys = members' ++ superclassTypes
@@ -252,7 +252,7 @@ typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration sa ident ty) =
   in ValueDeclaration sa ident Private [] $
     [MkUnguarded (
      TypedValue False (TypeClassDictionaryAccessor className ident) $
-       moveQuantifiersToFront (quantify (ConstrainedType (Constraint className (map (TypeVar . fst) args) Nothing) ty))
+       moveQuantifiersToFront (quantify (ConstrainedType (Constraint (TypeConstructor (fmap coerceProperName className)) (map (TypeVar . fst) args) Nothing) ty))
     )]
 typeClassMemberToDictionaryAccessor _ _ _ _ = internalError "Invalid declaration in type class definition"
 

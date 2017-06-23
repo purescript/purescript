@@ -62,7 +62,7 @@ printModuleSignatures moduleName P.Environment{..} =
                     if null typeClassSuperclasses
                     then Box.text ""
                     else Box.text "("
-                         Box.<> Box.hcat Box.left (intersperse (Box.text ", ") $ map (\(P.Constraint (P.Qualified _ pn) lt _) -> textT (P.runProperName pn) Box.<+> Box.hcat Box.left (map P.typeAtomAsBox lt)) typeClassSuperclasses)
+                         Box.<> Box.hcat Box.left (intersperse (Box.text ", ") $ map (\(P.Constraint cl lt _) -> Box.hcat Box.left (map P.typeAtomAsBox (cl : lt))) typeClassSuperclasses)
                          Box.<> Box.text ") <= "
                 className =
                     textT (P.runProperName name)

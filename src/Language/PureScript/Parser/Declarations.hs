@@ -189,7 +189,7 @@ parseTypeClassDeclaration = withSourceAnnF $ do
   reserved "class"
   implies <- P.option [] . P.try $ do
     indented
-    implies <- (return <$> parseConstraint) <|> parens (commaSep1 parseConstraint)
+    implies <- (return <$> P.try parseConstraint) <|> parens (commaSep1 parseConstraint)
     lfatArrow
     return implies
   className <- indented *> properName
@@ -205,7 +205,7 @@ parseTypeClassDeclaration = withSourceAnnF $ do
   return $ \sa -> TypeClassDeclaration sa className idents implies dependencies members
 
 parseConstraint :: TokenParser Constraint
-parseConstraint = Constraint <$> parseQualified properName
+parseConstraint = Constraint <$> parseTypeAtom
                              <*> P.many (noWildcards $ noForAll parseTypeAtom)
                              <*> pure Nothing
 
@@ -214,7 +214,7 @@ parseInstanceDeclaration = withSourceAnnF $ do
   reserved "instance"
   name <- parseIdent <* indented <* doubleColon
   deps <- P.optionMaybe . P.try $ do
-    deps <- (return <$> parseConstraint) <|> parens (commaSep1 parseConstraint)
+    deps <- (return <$> P.try parseConstraint) <|> parens (commaSep1 parseConstraint)
     indented
     rfatArrow
     return deps

@@ -80,51 +80,24 @@ parseTypeAtom = indented *> P.choice
             , ParensInType <$> parens parsePolyType
             ]
 
-parseConstrainedType :: TokenParser ([Constraint], Type)
-parseConstrainedType = do
-  constraints <- parens (commaSep1 parseConstraint) <|> pure <$> parseConstraint
-  _ <- rfatArrow
-  indented
-  ty <- parseType
-  return (constraints, ty)
-  where
-  parseConstraint = do
-    className <- parseQualified properName
-    indented
-    ty <- P.many parseTypeAtom
-    return (Constraint className ty Nothing)
-
--- This is here to improve the error message when the user
--- tries to use the old style constraint contexts.
--- TODO: Remove this before 1.0
-typeOrConstrainedType :: TokenParser Type
-typeOrConstrainedType = do
-  e <- P.try (Left <$> parseConstrainedType) <|> Right <$> parseTypeAtom
-  case e of
-    Left ([c], ty) -> pure (ConstrainedType c ty)
-    Left _ ->
-      P.unexpected $
-        unlines [ "comma in constraints."
-                , ""
-                , "Class constraints in type annotations can no longer be grouped in parentheses."
-                , "Each constraint should now be separated by `=>`, for example:"
-                , "    `(Applicative f, Semigroup a) => a -> f a -> f a`"
-                , "  would now be written as:"
-                , "    `Applicative f => Semigroup a => a -> f a -> f a`."
-                ]
-    Right ty -> pure ty
-
 parseAnyType :: TokenParser Type
-parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTable typeOrConstrainedType) P.<?> "type"
+parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTable parseTypeAtom) P.<?> "type"
   where
   operators = [ [ P.Infix (return TypeApp) P.AssocLeft ]
               , [ P.Infix (P.try (parseQualified parseOperator) >>= \ident ->
                     return (BinaryNoParensType (TypeOp ident))) P.AssocRight
                 ]
+              , [ P.Infix (rfatArrow $> constrained) P.AssocRight ]
               , [ P.Infix (rarrow $> function) P.AssocRight ]
               ]
   postfixTable = [ \t -> KindedType t <$> (indented *> doubleColon *> parseKind)
                  ]
+
+constrained :: Type -> Type -> Type
+constrained = ConstrainedType . toConstraint [] where
+  toConstraint :: [Type] -> Type -> Constraint
+  toConstraint args (TypeApp con arg) = toConstraint (arg : args) con
+  toConstraint args con = Constraint con args Nothing
 
 -- |
 -- Parse a monotype

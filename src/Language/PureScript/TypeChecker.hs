@@ -156,7 +156,7 @@ addTypeClass moduleName pn args implies dependencies ds = do
 addTypeClassDictionaries
   :: (MonadState CheckState m)
   => Maybe ModuleName
-  -> M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict)
+  -> M.Map Type (M.Map (Qualified Ident) NamedDict)
   -> m ()
 addTypeClassDictionaries mn entries =
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = insertState st } }
@@ -323,8 +323,9 @@ typeCheckAll moduleName _ = traverse go
           sequence_ (zipWith (checkTypeClassInstance typeClass) [0..] tys)
           checkOrphanInstance dictName className typeClass tys
           _ <- traverseTypeInstanceBody checkInstanceMembers body
-          let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps)
-          addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) dict
+          let cls = TypeConstructor (fmap coerceProperName className)
+              dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] cls tys (Just deps)
+          addTypeClassDictionaries (Just moduleName) . M.singleton cls $ M.singleton (tcdValue dict) dict
           return d
 
   checkInstanceArity :: Ident -> Qualified (ProperName 'ClassName) -> TypeClassData -> [Type] -> m ()
@@ -476,7 +477,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     findClasses :: Type -> [DeclarationRef]
     findClasses = everythingOnTypes (++) go
       where
-      go (ConstrainedType c _) = (fmap (TypeClassRef (declRefSourceSpan ref)) . extractCurrentModuleClass . constraintClass) c
+      go (ConstrainedType (Constraint (TypeConstructor c) _ _) _) = (fmap (TypeClassRef (declRefSourceSpan ref)) . extractCurrentModuleClass . fmap coerceProperName) c
       go _ = []
     extractCurrentModuleClass :: Qualified (ProperName 'ClassName) -> [ProperName 'ClassName]
     extractCurrentModuleClass (Qualified (Just mn') name) | mn == mn' = [name]

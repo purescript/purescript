@@ -525,7 +525,7 @@ typeClassConstraintFor :: Declaration -> Maybe P.Constraint
 typeClassConstraintFor Declaration{..} =
   case declInfo of
     TypeClassDeclaration tyArgs _ _ ->
-      Just (P.Constraint (P.Qualified Nothing (P.ProperName declTitle)) (mkConstraint tyArgs) Nothing)
+      Just (P.Constraint (P.TypeConstructor (P.Qualified Nothing (P.ProperName declTitle))) (mkConstraint tyArgs) Nothing)
     _ ->
       Nothing
   where

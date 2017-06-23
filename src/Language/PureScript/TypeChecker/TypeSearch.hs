@@ -67,7 +67,7 @@ checkSubsume unsolved env st userT envT = checkInEnvironment env st $ do
 
   -- Now check that any unsolved constraints have not become impossible
   (traverse_ . traverse_) (\(_, context, constraint) -> do
-    let constraint' = P.mapConstraintArgs (map (P.substituteType subst)) constraint
+    let constraint' = P.mapConstraintTypes (P.substituteType subst) constraint
     flip evalStateT Map.empty . evalWriterT $
       Entailment.entails
         (Entailment.SolverOptions

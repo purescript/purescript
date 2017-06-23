@@ -256,9 +256,9 @@ infer' other = (, []) <$> go other
     k2 <- go row
     unifyKinds k2 (Row k1)
     return $ Row k1
-  go (ConstrainedType (Constraint className tys _) ty) = do
-    k1 <- go $ foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
-    unifyKinds k1 kindType
+  go (ConstrainedType (Constraint cl tys _) ty) = do
+    k1 <- go $ foldl TypeApp cl tys
+    unifyKinds k1 kindConstraint
     k2 <- go ty
     unifyKinds k2 kindType
     return kindType

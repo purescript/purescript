@@ -101,7 +101,7 @@ instance NFData ConstraintData
 
 -- | A typeclass constraint
 data Constraint = Constraint
-  { constraintClass :: Qualified (ProperName 'ClassName)
+  { constraintClass :: Type
   -- ^ constraint class name
   , constraintArgs  :: [Type]
   -- ^ type arguments
@@ -111,11 +111,15 @@ data Constraint = Constraint
 
 instance NFData Constraint
 
-mapConstraintArgs :: ([Type] -> [Type]) -> Constraint -> Constraint
-mapConstraintArgs f c = c { constraintArgs = f (constraintArgs c) }
+mapConstraintTypes :: (Type -> Type) -> Constraint -> Constraint
+mapConstraintTypes f c = c { constraintClass = f (constraintClass c)
+                           , constraintArgs = map f (constraintArgs c)
+                           }
 
-overConstraintArgs :: Functor f => ([Type] -> f [Type]) -> Constraint -> f Constraint
-overConstraintArgs f c = (\args -> c { constraintArgs = args }) <$> f (constraintArgs c)
+overConstraintTypes :: Applicative f => (Type -> f Type) -> Constraint -> f Constraint
+overConstraintTypes f c = (\cl args -> c { constraintClass = cl
+                                         , constraintArgs = args
+                                         }) <$> f (constraintClass c) <*> traverse f (constraintArgs c)
 
 $(A.deriveJSON A.defaultOptions ''Type)
 $(A.deriveJSON A.defaultOptions ''Constraint)
@@ -166,7 +170,7 @@ replaceAllTypeVars = go [] where
     where
       keys = map fst m
       usedVars = concatMap (usedTypeVariables . snd) m
-  go bs m (ConstrainedType c t) = ConstrainedType (mapConstraintArgs (map (go bs m)) c) (go bs m t)
+  go bs m (ConstrainedType c t) = ConstrainedType (mapConstraintTypes (go bs m) c) (go bs m t)
   go bs m (RCons name' t r) = RCons name' (go bs m t) (go bs m r)
   go bs m (KindedType t k) = KindedType (go bs m t) k
   go bs m (BinaryNoParensType t1 t2 t3) = BinaryNoParensType (go bs m t1) (go bs m t2) (go bs m t3)
@@ -227,7 +231,7 @@ everywhereOnTypes :: (Type -> Type) -> Type -> Type
 everywhereOnTypes f = go where
   go (TypeApp t1 t2) = f (TypeApp (go t1) (go t2))
   go (ForAll arg ty sco) = f (ForAll arg (go ty) sco)
-  go (ConstrainedType c ty) = f (ConstrainedType (mapConstraintArgs (map go) c) (go ty))
+  go (ConstrainedType c ty) = f (ConstrainedType (mapConstraintTypes go c) (go ty))
   go (RCons name ty rest) = f (RCons name (go ty) (go rest))
   go (KindedType ty k) = f (KindedType (go ty) k)
   go (PrettyPrintFunction t1 t2) = f (PrettyPrintFunction (go t1) (go t2))
@@ -241,7 +245,7 @@ everywhereOnTypesTopDown :: (Type -> Type) -> Type -> Type
 everywhereOnTypesTopDown f = go . f where
   go (TypeApp t1 t2) = TypeApp (go (f t1)) (go (f t2))
   go (ForAll arg ty sco) = ForAll arg (go (f ty)) sco
-  go (ConstrainedType c ty) = ConstrainedType (mapConstraintArgs (map (go . f)) c) (go (f ty))
+  go (ConstrainedType c ty) = ConstrainedType (mapConstraintTypes (go . f) c) (go (f ty))
   go (RCons name ty rest) = RCons name (go (f ty)) (go (f rest))
   go (KindedType ty k) = KindedType (go (f ty)) k
   go (PrettyPrintFunction t1 t2) = PrettyPrintFunction (go (f t1)) (go (f t2))
@@ -255,7 +259,7 @@ everywhereOnTypesM :: Monad m => (Type -> m Type) -> Type -> m Type
 everywhereOnTypesM f = go where
   go (TypeApp t1 t2) = (TypeApp <$> go t1 <*> go t2) >>= f
   go (ForAll arg ty sco) = (ForAll arg <$> go ty <*> pure sco) >>= f
-  go (ConstrainedType c ty) = (ConstrainedType <$> overConstraintArgs (mapM go) c <*> go ty) >>= f
+  go (ConstrainedType c ty) = (ConstrainedType <$> overConstraintTypes go c <*> go ty) >>= f
   go (RCons name ty rest) = (RCons name <$> go ty <*> go rest) >>= f
   go (KindedType ty k) = (KindedType <$> go ty <*> pure k) >>= f
   go (PrettyPrintFunction t1 t2) = (PrettyPrintFunction <$> go t1 <*> go t2) >>= f
@@ -269,7 +273,7 @@ everywhereOnTypesTopDownM :: Monad m => (Type -> m Type) -> Type -> m Type
 everywhereOnTypesTopDownM f = go <=< f where
   go (TypeApp t1 t2) = TypeApp <$> (f t1 >>= go) <*> (f t2 >>= go)
   go (ForAll arg ty sco) = ForAll arg <$> (f ty >>= go) <*> pure sco
-  go (ConstrainedType c ty) = ConstrainedType <$> overConstraintArgs (mapM (go <=< f)) c <*> (f ty >>= go)
+  go (ConstrainedType c ty) = ConstrainedType <$> overConstraintTypes (go <=< f) c <*> (f ty >>= go)
   go (RCons name ty rest) = RCons name <$> (f ty >>= go) <*> (f rest >>= go)
   go (KindedType ty k) = KindedType <$> (f ty >>= go) <*> pure k
   go (PrettyPrintFunction t1 t2) = PrettyPrintFunction <$> (f t1 >>= go) <*> (f t2 >>= go)

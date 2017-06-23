@@ -95,17 +95,16 @@ filterInstances mn (Just exps) =
 --
 typeInstanceConstituents :: Declaration -> [Either (Qualified (ProperName 'ClassName)) (Qualified (ProperName 'TypeName))]
 typeInstanceConstituents (TypeInstanceDeclaration _ _ constraints className tys _) =
-  Left className : (concatMap fromConstraint constraints ++ concatMap fromType tys)
+    Left className : (concatMap fromConstraint constraints ++ concatMap fromType tys)
   where
+    fromConstraint c = fromType (constraintClass c) ++ concatMap fromType (constraintArgs c)
+    fromType = everythingOnTypes (++) go
 
-  fromConstraint c = Left (constraintClass c) : concatMap fromType (constraintArgs c)
-  fromType = everythingOnTypes (++) go
-
-  -- Note that type synonyms are disallowed in instance declarations, so
-  -- we don't need to handle them here.
-  go (TypeConstructor n) = [Right n]
-  go (ConstrainedType c _) = fromConstraint c
-  go _ = []
+    -- Note that type synonyms are disallowed in instance declarations, so
+    -- we don't need to handle them here.
+    go (TypeConstructor n) = [Right n]
+    go (ConstrainedType c _) = fromConstraint c
+    go _ = []
 
 typeInstanceConstituents _ = []
 

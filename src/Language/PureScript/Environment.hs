@@ -36,7 +36,7 @@ data Environment = Environment
   -- constructor name, argument types and return type.
   , typeSynonyms :: M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe Kind)], Type)
   -- ^ Type synonyms currently in scope
-  , typeClassDictionaries :: M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict))
+  , typeClassDictionaries :: M.Map (Maybe ModuleName) (M.Map Type (M.Map (Qualified Ident) NamedDict))
   -- ^ Available type class dictionaries
   , typeClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
   -- ^ Type classes
@@ -266,6 +266,10 @@ primKind = NamedKind . primName
 kindType :: Kind
 kindType = primKind C.typ
 
+-- | Kind of constraints
+kindConstraint :: Kind
+kindConstraint = primKind C.constraint
+
 kindSymbol :: Kind
 kindSymbol = primKind C.symbol
 
@@ -276,6 +280,10 @@ primTy = TypeConstructor . primName
 -- | Type constructor for functions
 tyFunction :: Type
 tyFunction = primTy "Function"
+
+-- | Type constructor for dictionaries
+tyDict :: Type
+tyDict = primTy "Dict"
 
 -- | Type constructor for strings
 tyString :: Type
@@ -321,11 +329,16 @@ isTypeOrApplied t1 t2 = t1 == t2
 function :: Type -> Type -> Type
 function t1 = TypeApp (TypeApp tyFunction t1)
 
+-- | Smart constructor for dictionary types
+dict :: Type -> Type
+dict = TypeApp tyDict
+
 -- | The primitive kinds
 primKinds :: S.Set (Qualified (ProperName 'KindName))
 primKinds =
   S.fromList
     [ primName C.typ
+    , primName C.constraint
     , primName C.symbol
     ]
 
@@ -344,6 +357,7 @@ primTypes =
     , (primName "Int",        (kindType, ExternData))
     , (primName "Boolean",    (kindType, ExternData))
     , (primName "Partial",    (kindType, ExternData))
+    , (primName "Dict",       (FunKind kindConstraint kindType, ExternData))
     , (primName "Union",      (FunKind (Row kindType) (FunKind (Row kindType) (FunKind (Row kindType) kindType)), ExternData))
     , (primName "RowCons",    (FunKind kindSymbol (FunKind kindType (FunKind (Row kindType) (FunKind (Row kindType) kindType))), ExternData))
     , (primName "Fail",       (FunKind kindSymbol kindType, ExternData))

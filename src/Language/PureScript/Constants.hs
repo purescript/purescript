@@ -37,7 +37,7 @@ bind = "bind"
 discard :: forall a. (IsString a) => a
 discard = "discard"
 
-pattern Discard :: Qualified (ProperName 'ClassName)
+pattern Discard :: Qualified (ProperName ty)
 pattern Discard = Qualified (Just ControlBind) (ProperName "Discard")
 
 (+) :: forall a. (IsString a) => a
@@ -331,7 +331,7 @@ toSignature = "toSignature"
 pattern DataSymbol :: ModuleName
 pattern DataSymbol = ModuleName [ProperName "Data", ProperName "Symbol"]
 
-pattern IsSymbol :: Qualified (ProperName 'ClassName)
+pattern IsSymbol :: Qualified (ProperName ty)
 pattern IsSymbol = Qualified (Just DataSymbol) (ProperName "IsSymbol")
 
 -- Type.Data.Symbol
@@ -339,10 +339,10 @@ pattern IsSymbol = Qualified (Just DataSymbol) (ProperName "IsSymbol")
 pattern TypeDataSymbol :: ModuleName
 pattern TypeDataSymbol = ModuleName [ProperName "Type", ProperName "Data", ProperName "Symbol"]
 
-pattern CompareSymbol :: Qualified (ProperName 'ClassName)
+pattern CompareSymbol :: Qualified (ProperName ty)
 pattern CompareSymbol = Qualified (Just TypeDataSymbol) (ProperName "CompareSymbol")
 
-pattern AppendSymbol :: Qualified (ProperName 'ClassName)
+pattern AppendSymbol :: Qualified (ProperName ty)
 pattern AppendSymbol = Qualified (Just TypeDataSymbol) (ProperName "AppendSymbol")
 
 -- Type.Data.Ordering
@@ -372,23 +372,26 @@ partial = "Partial"
 pattern Prim :: ModuleName
 pattern Prim = ModuleName [ProperName "Prim"]
 
-pattern Partial :: Qualified (ProperName 'ClassName)
+pattern Partial :: Qualified (ProperName ty)
 pattern Partial = Qualified (Just Prim) (ProperName "Partial")
 
-pattern Fail :: Qualified (ProperName 'ClassName)
+pattern Fail :: Qualified (ProperName ty)
 pattern Fail = Qualified (Just Prim) (ProperName "Fail")
 
-pattern Warn :: Qualified (ProperName 'ClassName)
+pattern Warn :: Qualified (ProperName ty)
 pattern Warn = Qualified (Just Prim) (ProperName "Warn")
 
-pattern Union :: Qualified (ProperName 'ClassName)
+pattern Union :: Qualified (ProperName ty)
 pattern Union = Qualified (Just Prim) (ProperName "Union")
 
-pattern RowCons :: Qualified (ProperName 'ClassName)
+pattern RowCons :: Qualified (ProperName ty)
 pattern RowCons = Qualified (Just Prim) (ProperName "RowCons")
 
 typ :: forall a. (IsString a) => a
 typ = "Type"
+
+constraint :: IsString a => a
+constraint = "Constraint"
 
 symbol :: forall a. (IsString a) => a
 symbol = "Symbol"

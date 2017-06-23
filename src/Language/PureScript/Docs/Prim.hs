@@ -30,6 +30,7 @@ primDocsModule = Module
       , typeConcat
       , typeString
       , kindType
+      , kindConstraint
       , kindSymbol
       ]
   , modReExports = []
@@ -94,6 +95,12 @@ kindType = primKind "Type" $ T.unlines
   [ "`Type` (also known as `*`) is the kind of all proper types: those that"
   , "classify value-level terms."
   , "For example the type `Boolean` has kind `Type`; denoted by `Boolean :: Type`."
+  ]
+
+kindConstraint :: Declaration
+kindConstraint = primKind "Constraint" $ T.unlines
+  [ "`Constraint` is the kind of constraints, which can appear to the left of `=>`."
+  , "Examples of constraint types include `Prim.Partial` and `Prelude.Eq a` for any type `a`."
   ]
 
 kindSymbol :: Declaration

@@ -211,7 +211,7 @@ deriveNewtypeInstance ss mn syns ndis className ds tys tyConNm dargs = do
       | Just wrapped' <- stripRight (takeReverse (length tyArgNames - length dargs) tyArgNames) wrapped =
           do let subst = zipWith (\(name, _) t -> (name, t)) tyArgNames dargs
              wrapped'' <- replaceAllTypeSynonymsM syns wrapped'
-             return (DeferredDictionary className (init tys ++ [replaceAllTypeVars subst wrapped'']))
+             return (DeferredDictionary (TypeConstructor (fmap coerceProperName className)) (init tys ++ [replaceAllTypeVars subst wrapped'']))
     go _ = throwError . errorMessage' ss $ InvalidNewtypeInstance className tys
 
     takeReverse :: Int -> [a] -> [a]
@@ -227,26 +227,30 @@ deriveNewtypeInstance ss mn syns ndis className ds tys tyConNm dargs = do
     verifySuperclasses =
       for_ (M.lookup (qualify mn className) (ndiClasses ndis)) $ \(args, superclasses, _) ->
         for_ superclasses $ \Constraint{..} -> do
-          let constraintClass' = qualify (error "verifySuperclasses: unknown class module") constraintClass
-          for_ (M.lookup constraintClass' (ndiClasses ndis)) $ \(_, _, deps) ->
-            -- We need to check whether the newtype is mentioned, because of classes like MonadWriter
-            -- with its Monoid superclass constraint.
-            when (not (null args) && any ((last args `elem`) . usedTypeVariables) constraintArgs) $ do
-              -- For now, we only verify superclasses where the newtype is the only argument,
-              -- or for which all other arguments are determined by functional dependencies.
-              -- Everything else raises a UnverifiableSuperclassInstance warning.
-              -- This covers pretty much all cases we're interested in, but later we might want to do
-              -- more work to extend this to other superclass relationships.
-              let determined = map (TypeVar . (args !!)) . ordNub . concatMap fdDetermined . filter ((== [length args - 1]) . fdDeterminers) $ deps
-              if last constraintArgs == TypeVar (last args) && all (`elem` determined) (init constraintArgs)
-                then do
-                  -- Now make sure that a superclass instance was derived. Again, this is not a complete
-                  -- check, since the superclass might have multiple type arguments, so overlaps might still
-                  -- be possible, so we warn again.
-                  for_ (extractNewtypeName mn tys) $ \nm ->
-                    unless ((constraintClass', nm) `S.member` ndiDerivedInstances ndis) $
-                      tell . errorMessage' ss $ MissingNewtypeSuperclassInstance constraintClass className tys
-                else tell . errorMessage' ss $ UnverifiableSuperclassInstance constraintClass className tys
+          case constraintClass of
+            TypeConstructor superclass -> do
+              let superclass' = fmap coerceProperName superclass
+                  constraintClass' = qualify (error "verifySuperclasses: unknown class module") superclass'
+              for_ (M.lookup constraintClass' (ndiClasses ndis)) $ \(_, _, deps) ->
+                -- We need to check whether the newtype is mentioned, because of classes like MonadWriter
+                -- with its Monoid superclass constraint.
+                when (not (null args) && any ((last args `elem`) . usedTypeVariables) constraintArgs) $ do
+                  -- For now, we only verify superclasses where the newtype is the only argument,
+                  -- or for which all other arguments are determined by functional dependencies.
+                  -- Everything else raises a UnverifiableSuperclassInstance warning.
+                  -- This covers pretty much all cases we're interested in, but later we might want to do
+                  -- more work to extend this to other superclass relationships.
+                  let determined = map (TypeVar . (args !!)) . ordNub . concatMap fdDetermined . filter ((== [length args - 1]) . fdDeterminers) $ deps
+                  if last constraintArgs == TypeVar (last args) && all (`elem` determined) (init constraintArgs)
+                    then do
+                      -- Now make sure that a superclass instance was derived. Again, this is not a complete
+                      -- check, since the superclass might have multiple type arguments, so overlaps might still
+                      -- be possible, so we warn again.
+                      for_ (extractNewtypeName mn tys) $ \nm ->
+                        unless ((constraintClass', nm) `S.member` ndiDerivedInstances ndis) $
+                          tell . errorMessage' ss $ MissingNewtypeSuperclassInstance superclass' className tys
+                    else tell . errorMessage' ss $ UnverifiableSuperclassInstance superclass' className tys
+            _ -> pure ()
 
 dataGeneric :: ModuleName
 dataGeneric = ModuleName [ ProperName "Data", ProperName "Generic" ]

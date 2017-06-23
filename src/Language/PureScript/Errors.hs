@@ -263,10 +263,10 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ConstrainedTypeUnified t1 t2) = ConstrainedTypeUnified <$> f t1 <*> f t2
   gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
-  gSimple (NoInstanceFound con) = NoInstanceFound <$> overConstraintArgs (traverse f) con
+  gSimple (NoInstanceFound con) = NoInstanceFound <$> overConstraintTypes f con
   gSimple (AmbiguousTypeVariables t con) = AmbiguousTypeVariables <$> f t <*> pure con
-  gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> pure insts
-  gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
+  gSimple (OverlappingInstances cl ts insts) = OverlappingInstances <$> f cl <*> traverse f ts <*> pure insts
+  gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance <$> f cl <*> traverse f ts
   gSimple (CannotDerive cl ts) = CannotDerive cl <$> traverse f ts
   gSimple (InvalidNewtypeInstance cl ts) = InvalidNewtypeInstance cl <$> traverse f ts
   gSimple (MissingNewtypeSuperclassInstance cl1 cl2 ts) = MissingNewtypeSuperclassInstance cl1 cl2 <$> traverse f ts
@@ -287,7 +287,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gHint (ErrorCheckingKind t) = ErrorCheckingKind <$> f t
   gHint (ErrorInApplication e1 t1 e2) = ErrorInApplication e1 <$> f t1 <*> pure e2
   gHint (ErrorInInstance cl ts) = ErrorInInstance cl <$> traverse f ts
-  gHint (ErrorSolvingConstraint con) = ErrorSolvingConstraint <$> overConstraintArgs (traverse f) con
+  gHint (ErrorSolvingConstraint con) = ErrorSolvingConstraint <$> overConstraintTypes f con
   gHint other = pure other
 
 errorDocUri :: ErrorMessage -> Text
@@ -599,12 +599,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , line "with type"
             , markCodeBox $ indent $ typeAsBox t2
             ]
-    renderSimpleErrorMessage (OverlappingInstances nm ts (d : ds)) =
+    renderSimpleErrorMessage (OverlappingInstances cl ts (d : ds)) =
       paras [ line "Overlapping type class instances found for"
-            , markCodeBox $ indent $ Box.hsep 1 Box.left
-                [ line (showQualified runProperName nm)
-                , Box.vcat Box.left (map typeAtomAsBox ts)
-                ]
+            , markCodeBox $ indent $ typeAsBox (foldl TypeApp cl ts)
             , line "The following instances were found:"
             , indent $ paras (line (showQualified showIdent d <> " (chosen)") : map (line . showQualified showIdent) ds)
             , line "Overlapping type class instances can lead to different behavior based on the order of module imports, and for that reason are not recommended."
@@ -616,12 +613,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , markCodeBox $ indent $ line (showQualified runProperName nm)
             , line "because the class was not in scope. Perhaps it was not exported."
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint C.Fail [ ty ] _)) | Just box <- toTypelevelString ty =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint (TypeConstructor C.Fail) [ty] _)) | Just box <- toTypelevelString ty =
       paras [ line "A custom type error occurred while solving type class constraints:"
             , indent box
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint C.Partial
-                                                          _
+    renderSimpleErrorMessage (NoInstanceFound (Constraint (TypeConstructor C.Partial) []
                                                           (Just (PartialConstraintData bs b)))) =
       paras [ line "A case expression could not be determined to cover all inputs."
             , line "The following additional cases are required to cover all inputs:"
@@ -631,20 +627,17 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                   : [line "..." | not b]
             , line "Alternatively, add a Partial constraint to the type of the enclosing value."
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint C.Discard [ty] _)) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint (TypeConstructor C.Discard) [ty] _)) =
       paras [ line "A result of type"
             , markCodeBox $ indent $ typeAsBox ty
             , line "was implicitly discarded in a do notation block."
             , line ("You can use " <> markCode "_ <- ..." <> " to explicitly discard the result.")
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint nm ts _)) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint cl ts _)) =
       paras [ line "No type class instance was found for"
-            , markCodeBox $ indent $ Box.hsep 1 Box.left
-                [ line (showQualified runProperName nm)
-                , Box.vcat Box.left (map typeAtomAsBox ts)
-                ]
+            , markCodeBox $ indent $ typeAsBox (foldl TypeApp cl ts)
             , paras [ line "The instance head contains unknown type variables. Consider adding a type annotation."
-                    | any containsUnknowns ts
+                    | any containsUnknowns (cl : ts)
                     ]
             ]
       where
@@ -658,12 +651,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , markCodeBox $ indent $ typeAsBox t
             , line "has type variables which are not mentioned in the body of the type. Consider adding a type annotation."
             ]
-    renderSimpleErrorMessage (PossiblyInfiniteInstance nm ts) =
+    renderSimpleErrorMessage (PossiblyInfiniteInstance cl ts) =
       paras [ line "Type class instance for"
-            , markCodeBox $ indent $ Box.hsep 1 Box.left
-                [ line (showQualified runProperName nm)
-                , Box.vcat Box.left (map typeAtomAsBox ts)
-                ]
+            , markCodeBox $ indent $ typeAsBox (foldl TypeApp cl ts)
             , line "is possibly infinite."
             ]
     renderSimpleErrorMessage (CannotDerive nm ts) =
@@ -1071,13 +1061,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ detail
             , line $ "in foreign import " <> markCode (showIdent nm)
             ]
-    renderHint (ErrorSolvingConstraint (Constraint nm ts _)) detail =
+    renderHint (ErrorSolvingConstraint (Constraint cl ts _)) detail =
       paras [ detail
             , line "while solving type class constraint"
-            , markCodeBox $ indent $ Box.hsep 1 Box.left
-                [ line (showQualified runProperName nm)
-                , Box.vcat Box.left (map typeAtomAsBox ts)
-                ]
+            , markCodeBox $ indent $ typeAsBox (foldl TypeApp cl ts)
             ]
     renderHint (PositionedError srcSpan) detail =
       paras [ line $ "at " <> displaySourceSpan relPath srcSpan

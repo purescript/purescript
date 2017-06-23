@@ -140,11 +140,6 @@ usedTypeNames moduleName =
   in ordNub . f
   where
   usedNames :: Type -> [ProperName 'TypeName]
-  usedNames (ConstrainedType con _) =
-    case con of
-      (Constraint (Qualified (Just moduleName') name) _ _)
-        | moduleName == moduleName' -> [coerceProperName name]
-      _ -> []
   usedNames (TypeConstructor (Qualified (Just moduleName') name))
     | moduleName == moduleName' = [name]
   usedNames _ = []

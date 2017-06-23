@@ -285,8 +285,9 @@ checkConstrained ty tyClass =
     _ ->
       False
   where
-  matches className =
-    (==) className . P.runProperName . P.disqualify . P.constraintClass
+  matches className (P.Constraint (P.TypeConstructor con) _ _) =
+    (==) className . P.runProperName . P.disqualify $ con
+  matches _ _ = False
 
 runAssertionIO :: Assertion -> Docs.LinksContext -> Docs.Module -> IO ()
 runAssertionIO assertion linksCtx mdl = do

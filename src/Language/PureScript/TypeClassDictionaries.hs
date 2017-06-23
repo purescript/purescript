@@ -21,9 +21,9 @@ data TypeClassDictionaryInScope v
     -- | The value with which the dictionary can be accessed at runtime
       tcdValue :: v
     -- | How to obtain this instance via superclass relationships
-    , tcdPath :: [(Qualified (ProperName 'ClassName), Integer)]
+    , tcdPath :: [(Type, Integer)]
     -- | The name of the type class to which this type class instance applies
-    , tcdClassName :: Qualified (ProperName 'ClassName)
+    , tcdClassName :: Type
     -- | The types to which this type class instance applies
     , tcdInstanceTypes :: [Type]
     -- | Type class dependencies which must be satisfied to construct this dictionary
@@ -37,5 +37,7 @@ type NamedDict = TypeClassDictionaryInScope (Qualified Ident)
 
 -- | Generate a name for a superclass reference which can be used in
 -- generated code.
-superclassName :: Qualified (ProperName 'ClassName) -> Integer -> Text
-superclassName pn index = runProperName (disqualify pn) <> pack (show index)
+superclassName :: Type -> Integer -> Text
+superclassName (TypeConstructor pn) index = runProperName (disqualify pn) <> pack (show index)
+superclassName (TypeVar nm) index = nm <> pack (show index)
+superclassName _ index = "arg" <> pack (show index)
