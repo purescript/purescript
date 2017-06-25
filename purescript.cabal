@@ -408,6 +408,7 @@ extra-source-files:
       examples/passing/InstanceBeforeClass.purs
       examples/passing/InstanceSigs.purs
       examples/passing/InstanceSigsGeneral.purs
+      examples/passing/InstanceSigsScopedTypeVariables.purs
       examples/passing/IntAndChar.purs
       examples/passing/iota.purs
       examples/passing/JSReserved.purs
