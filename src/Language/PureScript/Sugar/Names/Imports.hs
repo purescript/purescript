@@ -52,7 +52,7 @@ resolveImports env (Module ss coms currentModule decls exps) =
         imports' = M.map (map (\(ss', dt, mmn) -> (ss', Just dt, mmn))) imports
         scope = M.insert currentModule [(internalModuleSourceSpan "<module>", Nothing, Nothing)] imports'
     (Module ss coms currentModule decls exps,) <$>
-      foldM (resolveModuleImport env) primImports (M.toList scope)
+      foldM (resolveModuleImport env) nullImports (M.toList scope)
 
 -- | Constructs a set of imports for a single module import.
 resolveModuleImport

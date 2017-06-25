@@ -2,7 +2,7 @@ module Language.PureScript.Sugar.Names.Env
   ( ImportRecord(..)
   , ImportProvenance(..)
   , Imports(..)
-  , primImports
+  , nullImports
   , Exports(..)
   , nullExports
   , Env
@@ -115,26 +115,6 @@ nullImports :: Imports
 nullImports = Imports M.empty M.empty M.empty M.empty M.empty M.empty S.empty S.empty M.empty
 
 -- |
--- An 'Imports' value with imports for the `Prim` module.
---
-primImports :: Imports
-primImports =
-  nullImports
-    { importedTypes = M.fromList $ mkEntries `concatMap` M.keys primTypes
-    , importedTypeClasses = M.fromList $ mkEntries `concatMap` M.keys primClasses
-    , importedKinds = M.fromList $ mkEntries `concatMap` S.toList primKinds
-    }
-  where
-  mkEntries :: Qualified a -> [(Qualified a, [ImportRecord a])]
-  mkEntries fullName@(Qualified _ name) =
-    [ (fullName, [ImportRecord fullName primModuleName Prim])
-    , (Qualified Nothing name, [ImportRecord fullName primModuleName Prim])
-    ]
-
-primModuleName :: ModuleName
-primModuleName = ModuleName [ProperName "Prim"]
-
--- |
 -- The exported declarations from a module.
 --
 data Exports = Exports
@@ -216,7 +196,7 @@ primExports =
 -- | Environment which only contains the Prim module.
 primEnv :: Env
 primEnv = M.singleton
-  primModuleName
+  (ModuleName [ProperName "Prim"])
   (internalModuleSourceSpan "<Prim>", nullImports, primExports)
 
 -- |

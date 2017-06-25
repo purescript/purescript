@@ -20,7 +20,6 @@ import Language.PureScript.Docs.Convert.ReExports (updateReExports)
 import Language.PureScript.Docs.Convert.Single (convertSingleModule)
 import Language.PureScript.Docs.Types
 import qualified Language.PureScript as P
-import qualified Language.PureScript.Constants as C
 
 import Web.Bower.PackageMeta (PackageName)
 
@@ -87,11 +86,8 @@ convertModulesWithEnv ::
   m ([Module], P.Env)
 convertModulesWithEnv withPackage =
   P.sortModules
-    >>> fmap (fst >>> map importPrim)
+    >>> fmap (fst >>> map P.importPrim)
     >=> convertSorted withPackage
-
-importPrim :: P.Module -> P.Module
-importPrim = P.addDefaultImport (P.ModuleName [P.ProperName C.prim])
 
 -- |
 -- Convert a sorted list of modules, returning both the list of converted

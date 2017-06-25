@@ -65,9 +65,9 @@ desugarImportsWithEnv externs modules = do
   externsEnv :: Env -> ExternsFile -> m Env
   externsEnv env ExternsFile{..} = do
     let members = Exports{..}
-        env' = M.insert efModuleName (efSourceSpan, primImports, members) env
+        env' = M.insert efModuleName (efSourceSpan, nullImports, members) env
         fromEFImport (ExternsImport mn mt qmn) = (mn, [(efSourceSpan, Just mt, qmn)])
-    imps <- foldM (resolveModuleImport env') primImports (map fromEFImport efImports)
+    imps <- foldM (resolveModuleImport env') nullImports (map fromEFImport efImports)
     exps <- resolveExports env' efSourceSpan efModuleName imps members efExports
     return $ M.insert efModuleName (efSourceSpan, imps, exps) env
     where
@@ -103,7 +103,7 @@ desugarImportsWithEnv externs modules = do
   updateEnv :: ([Module], Env) -> Module -> m ([Module], Env)
   updateEnv (ms, env) m@(Module ss _ mn _ refs) = do
     members <- findExportable m
-    let env' = M.insert mn (ss, primImports, members) env
+    let env' = M.insert mn (ss, nullImports, members) env
     (m', imps) <- resolveImports env' m
     exps <- maybe (return members) (resolveExports env' ss mn imps members) refs
     return (m' : ms, M.insert mn (ss, imps, exps) env)

@@ -29,6 +29,7 @@ import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Comments
 import Language.PureScript.Environment
 import qualified Language.PureScript.Bundle as Bundle
+import qualified Language.PureScript.Constants as C
 
 import qualified Text.Parsec as P
 
@@ -228,13 +229,23 @@ getModuleSourceSpan (Module ss _ _ _ _) = ss
 -- |
 -- Add an import declaration for a module if it does not already explicitly import it.
 --
-addDefaultImport :: ModuleName -> Module -> Module
-addDefaultImport toImport m@(Module ss coms mn decls exps) =
+addDefaultImport :: Qualified ModuleName -> Module -> Module
+addDefaultImport (Qualified toImportAs toImport) m@(Module ss coms mn decls exps) =
   if isExistingImport `any` decls || mn == toImport then m
-  else Module ss coms mn (ImportDeclaration (ss, []) toImport Implicit Nothing : decls) exps
+  else Module ss coms mn (ImportDeclaration (ss, []) toImport Implicit toImportAs : decls) exps
   where
-  isExistingImport (ImportDeclaration _ mn' _ _) | mn' == toImport = True
+  isExistingImport (ImportDeclaration _ mn' _ as') | mn' == toImport && as' == toImportAs = True
   isExistingImport _ = False
+
+-- | Adds import declarations to a module for an implicit Prim import and Prim
+-- | qualified as Prim, as necessary.
+importPrim :: Module -> Module
+importPrim =
+  let
+    primModName = ModuleName [ProperName C.prim]
+  in
+    addDefaultImport (Qualified Nothing primModName)
+      . addDefaultImport (Qualified (Just primModName) primModName)
 
 -- |
 -- An item in a list of explicit imports or exports
