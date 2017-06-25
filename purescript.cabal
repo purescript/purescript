@@ -785,6 +785,7 @@ library
           Language.PureScript.Ide.Imports
           Language.PureScript.Ide.Logging
           Language.PureScript.Ide.Matcher
+          Language.PureScript.Ide.Prim
           Language.PureScript.Ide.Pursuit
           Language.PureScript.Ide.Rebuild
           Language.PureScript.Ide.Reexports

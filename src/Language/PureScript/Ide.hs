@@ -23,6 +23,7 @@ import           Protolude
 
 import           "monad-logger" Control.Monad.Logger
 import qualified Language.PureScript                as P
+import qualified Language.PureScript.Constants      as C
 import qualified Language.PureScript.Ide.CaseSplit  as CS
 import           Language.PureScript.Ide.Command
 import           Language.PureScript.Ide.Completion
@@ -31,6 +32,7 @@ import           Language.PureScript.Ide.Externs
 import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.Imports    hiding (Import)
 import           Language.PureScript.Ide.Matcher
+import           Language.PureScript.Ide.Prim
 import           Language.PureScript.Ide.Pursuit
 import           Language.PureScript.Ide.Rebuild
 import           Language.PureScript.Ide.SourceFile
@@ -104,13 +106,15 @@ findCompletions
   -> m Success
 findCompletions filters matcher currentModule complOptions = do
   modules <- getAllModules currentModule
-  pure (CompletionResult (getCompletions filters matcher complOptions modules))
+  let insertPrim = (:) (C.Prim, idePrimDeclarations)
+  pure (CompletionResult (getCompletions filters matcher complOptions (insertPrim modules)))
 
 findType :: Ide m =>
             Text -> [Filter] -> Maybe P.ModuleName -> m Success
 findType search filters currentModule = do
   modules <- getAllModules currentModule
-  pure (CompletionResult (getExactCompletions search filters modules))
+  let insertPrim = (:) (C.Prim, idePrimDeclarations)
+  pure (CompletionResult (getExactCompletions search filters (insertPrim modules)))
 
 findPursuitCompletions :: MonadIO m =>
                           PursuitQuery -> m Success
