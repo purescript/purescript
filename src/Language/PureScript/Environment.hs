@@ -350,6 +350,7 @@ primTypes =
     , (primName "Warn",       (FunKind kindSymbol kindType, ExternData))
     , (primName "TypeString", (FunKind kindType kindSymbol, ExternData))
     , (primName "TypeConcat", (FunKind kindSymbol (FunKind kindSymbol kindSymbol), ExternData))
+    , (primName "Match",      (FunKind kindSymbol (FunKind kindSymbol kindType), ExternData))
     ]
 
 -- | The primitive class map. This just contains the `Fail`, `Warn`, and `Partial`
@@ -384,6 +385,12 @@ primClasses =
                              [ FunctionalDependency [0, 1, 2] [3]
                              , FunctionalDependency [0, 3] [1, 2]
                              ]))
+    -- class Match (p :: Symbol) (a :: Symbol)
+    , (primName "Match",   (makeTypeClassData
+                             [ ("p", Just kindSymbol)
+                             , ("s", Just kindSymbol)
+                             ] [] []
+                             []))
     ]
 
 -- | Finds information about data constructors from the current environment.
