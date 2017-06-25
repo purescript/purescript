@@ -48,13 +48,13 @@ printModuleSignatures moduleName P.Environment{..} =
         showNameType _ = P.internalError "The impossible happened in printModuleSignatures."
 
         findTypeClass
-          :: M.Map (P.Qualified (P.ProperName 'P.ClassName)) P.TypeClassData
-          -> P.Qualified (P.ProperName 'P.ClassName)
-          -> (P.Qualified (P.ProperName 'P.ClassName), Maybe P.TypeClassData)
+          :: M.Map (P.Qualified (P.ProperName 'P.TypeName)) P.TypeClassData
+          -> P.Qualified (P.ProperName 'P.TypeName)
+          -> (P.Qualified (P.ProperName 'P.TypeName), Maybe P.TypeClassData)
         findTypeClass envTypeClasses name = (name, M.lookup name envTypeClasses)
 
         showTypeClass
-          :: (P.Qualified (P.ProperName 'P.ClassName), Maybe P.TypeClassData)
+          :: (P.Qualified (P.ProperName 'P.TypeName), Maybe P.TypeClassData)
           -> Maybe Box.Box
         showTypeClass (_, Nothing) = Nothing
         showTypeClass (P.Qualified _ name, Just P.TypeClassData{..}) =
@@ -86,7 +86,7 @@ printModuleSignatures moduleName P.Environment{..} =
         findType envTypes name = (name, M.lookup name envTypes)
 
         showType
-          :: M.Map (P.Qualified (P.ProperName 'P.ClassName)) P.TypeClassData
+          :: M.Map (P.Qualified (P.ProperName 'P.TypeName)) P.TypeClassData
           -> M.Map (P.Qualified (P.ProperName 'P.ConstructorName)) (P.DataDeclType, P.ProperName 'P.TypeName, P.Type, [P.Ident])
           -> M.Map (P.Qualified (P.ProperName 'P.TypeName)) ([(Text, Maybe P.Kind)], P.Type)
           -> (P.Qualified (P.ProperName 'P.TypeName), Maybe (P.Kind, P.TypeKind))

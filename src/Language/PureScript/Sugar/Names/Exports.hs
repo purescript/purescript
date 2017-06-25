@@ -87,14 +87,12 @@ resolveExports env ss mn imps exps refs =
   elaborateModuleExports result (ModuleRef _ name) | name == mn = do
     let types' = exportedTypes result `M.union` exportedTypes exps
     let typeOps' = exportedTypeOps result `M.union` exportedTypeOps exps
-    let classes' = exportedTypeClasses result `M.union` exportedTypeClasses exps
     let values' = exportedValues result `M.union` exportedValues exps
     let valueOps' = exportedValueOps result `M.union` exportedValueOps exps
     let kinds' = exportedKinds result `M.union` exportedKinds exps
     return result
       { exportedTypes = types'
       , exportedTypeOps = typeOps'
-      , exportedTypeClasses = classes'
       , exportedValues = values'
       , exportedValueOps = valueOps'
       , exportedKinds = kinds'
@@ -106,13 +104,12 @@ resolveExports env ss mn imps exps refs =
     reTypes <- extract isPseudo name TyName (importedTypes imps)
     reTypeOps <- extract isPseudo name TyOpName (importedTypeOps imps)
     reDctors <- extract isPseudo name DctorName (importedDataConstructors imps)
-    reClasses <- extract isPseudo name TyClassName (importedTypeClasses imps)
     reValues <- extract isPseudo name IdentName (importedValues imps)
     reValueOps <- extract isPseudo name ValOpName (importedValueOps imps)
     reKinds <- extract isPseudo name KiName (importedKinds imps)
     foldM (\exps' ((tctor, dctors), mn') -> exportType ReExport exps' tctor dctors mn') result (resolveTypeExports reTypes reDctors)
       >>= flip (foldM (uncurry . exportTypeOp)) (map resolveTypeOp reTypeOps)
-      >>= flip (foldM (uncurry . exportTypeClass ReExport)) (map resolveClass reClasses)
+      >>= flip (foldM (uncurry . exportTypeClass ReExport)) (map resolveClass reTypes)
       >>= flip (foldM (uncurry . exportValue)) (map resolveValue reValues)
       >>= flip (foldM (uncurry . exportValueOp)) (map resolveValueOp reValueOps)
       >>= flip (foldM (uncurry . exportKind)) (map resolveKind reKinds)
@@ -147,7 +144,6 @@ resolveExports env ss mn imps exps refs =
     testQuals :: (forall a b. M.Map (Qualified a) b -> [Qualified a]) -> ModuleName -> Bool
     testQuals f mn' = any (isQualifiedWith mn') (f (importedTypes imps))
                    || any (isQualifiedWith mn') (f (importedDataConstructors imps))
-                   || any (isQualifiedWith mn') (f (importedTypeClasses imps))
                    || any (isQualifiedWith mn') (f (importedValues imps))
                    || any (isQualifiedWith mn') (f (importedValueOps imps))
                    || any (isQualifiedWith mn') (f (importedKinds imps))
@@ -184,14 +180,6 @@ resolveExports env ss mn imps exps refs =
     . fromMaybe (internalError "Missing value in resolveValue")
     $ resolve exportedTypeOps op
 
-  -- Looks up an imported class and re-qualifies it with the original module it
-  -- came from.
-  resolveClass :: Qualified (ProperName 'ClassName) -> (ProperName 'ClassName, ModuleName)
-  resolveClass className
-    = splitQual
-    . fromMaybe (internalError "Missing value in resolveClass")
-    $ resolve exportedTypeClasses className
-
   -- Looks up an imported value and re-qualifies it with the original module it
   -- came from.
   resolveValue :: Qualified Ident -> (Ident, ModuleName)
@@ -199,6 +187,9 @@ resolveExports env ss mn imps exps refs =
     = splitQual
     . fromMaybe (internalError "Missing value in resolveValue")
     $ resolve exportedValues ident
+
+  resolveClass :: Qualified (ProperName 'TypeName) -> (ProperName 'TypeName, ModuleName)
+  resolveClass ident = error "todo: resolveClass"
 
   -- Looks up an imported operator and re-qualifies it with the original
   -- module it came from.
@@ -247,14 +238,12 @@ filterModule
 filterModule mn exps refs = do
   types <- foldM filterTypes M.empty (combineTypeRefs refs)
   typeOps <- foldM (filterExport TyOpName getTypeOpRef exportedTypeOps) M.empty refs
-  classes <- foldM (filterExport TyClassName getTypeClassRef exportedTypeClasses) M.empty refs
   values <- foldM (filterExport IdentName getValueRef exportedValues) M.empty refs
   valueOps <- foldM (filterExport ValOpName getValueOpRef exportedValueOps) M.empty refs
   kinds <- foldM (filterExport KiName getKindRef exportedKinds) M.empty refs
   return Exports
     { exportedTypes = types
     , exportedTypeOps = typeOps
-    , exportedTypeClasses = classes
     , exportedValues = values
     , exportedValueOps = valueOps
     , exportedKinds = kinds

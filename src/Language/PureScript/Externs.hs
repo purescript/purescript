@@ -122,7 +122,7 @@ data ExternsDeclaration =
       }
   -- | A type class declaration
   | EDClass
-      { edClassName               :: ProperName 'ClassName
+      { edClassName               :: ProperName 'TypeName
       , edClassTypeArguments      :: [(Text, Maybe Kind)]
       , edClassMembers            :: [(Ident, Type)]
       , edClassConstraints        :: [Constraint]
@@ -130,7 +130,7 @@ data ExternsDeclaration =
       }
   -- | An instance declaration
   | EDInstance
-      { edInstanceClassName       :: Qualified (ProperName 'ClassName)
+      { edInstanceClassName       :: Qualified (ProperName 'TypeName)
       , edInstanceName            :: Ident
       , edInstanceTypes           :: [Type]
       , edInstanceConstraints     :: Maybe [Constraint]
@@ -203,6 +203,14 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
   importDecl _ = Nothing
 
   toExternsDeclaration :: DeclarationRef -> [ExternsDeclaration]
+  toExternsDeclaration (TypeRef _ className _)
+    | Just TypeClassData{..} <- Qualified (Just mn) className `M.lookup` typeClasses env
+    , Just (kind, TypeSynonym) <- Qualified (Just mn) (coerceProperName className) `M.lookup` types env
+    , Just (_, synTy) <- Qualified (Just mn) (coerceProperName className) `M.lookup` typeSynonyms env
+    = [ EDType (coerceProperName className) kind TypeSynonym
+      , EDTypeSynonym (coerceProperName className) typeClassArguments synTy
+      , EDClass className typeClassArguments typeClassMembers typeClassSuperclasses typeClassDependencies
+      ]
   toExternsDeclaration (TypeRef _ pn dctors) =
     case Qualified (Just mn) pn `M.lookup` types env of
       Nothing -> internalError "toExternsDeclaration: no kind in toExternsDeclaration"
@@ -218,14 +226,6 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
   toExternsDeclaration (ValueRef _ ident)
     | Just (ty, _, _) <- Qualified (Just mn) ident `M.lookup` names env
     = [ EDValue ident ty ]
-  toExternsDeclaration (TypeClassRef _ className)
-    | Just TypeClassData{..} <- Qualified (Just mn) className `M.lookup` typeClasses env
-    , Just (kind, TypeSynonym) <- Qualified (Just mn) (coerceProperName className) `M.lookup` types env
-    , Just (_, synTy) <- Qualified (Just mn) (coerceProperName className) `M.lookup` typeSynonyms env
-    = [ EDType (coerceProperName className) kind TypeSynonym
-      , EDTypeSynonym (coerceProperName className) typeClassArguments synTy
-      , EDClass className typeClassArguments typeClassMembers typeClassSuperclasses typeClassDependencies
-      ]
   toExternsDeclaration (TypeInstanceRef _ ident)
     = [ EDInstance (fmap coerceProperName className) ident tcdInstanceTypes tcdDependencies
       | m1 <- maybeToList (M.lookup (Just mn) (typeClassDictionaries env))

@@ -248,7 +248,7 @@ resolveInstances externs declarations =
     extractInstances _ _ = Nothing
 
     go
-      :: (IdeInstance, P.ModuleName, P.ProperName 'P.ClassName)
+      :: (IdeInstance, P.ModuleName, P.ProperName 'P.TypeName)
       -> ModuleMap [IdeDeclarationAnn]
       -> ModuleMap [IdeDeclarationAnn]
     go (ideInstance, classModule, className) acc' =

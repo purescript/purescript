@@ -104,28 +104,28 @@ data SimpleErrorMessage
   | OverlappingInstances Type [Type] [Qualified Ident]
   | NoInstanceFound Constraint
   | AmbiguousTypeVariables Type Constraint
-  | UnknownClass (Qualified (ProperName 'ClassName))
+  | UnknownClass (Qualified (ProperName 'TypeName))
   | PossiblyInfiniteInstance Type [Type]
-  | CannotDerive (Qualified (ProperName 'ClassName)) [Type]
-  | InvalidDerivedInstance (Qualified (ProperName 'ClassName)) [Type] Int
-  | ExpectedTypeConstructor (Qualified (ProperName 'ClassName)) [Type] Type
-  | InvalidNewtypeInstance (Qualified (ProperName 'ClassName)) [Type]
-  | MissingNewtypeSuperclassInstance (Qualified (ProperName 'ClassName)) (Qualified (ProperName 'ClassName)) [Type]
-  | UnverifiableSuperclassInstance (Qualified (ProperName 'ClassName)) (Qualified (ProperName 'ClassName)) [Type]
+  | CannotDerive (Qualified (ProperName 'TypeName)) [Type]
+  | InvalidDerivedInstance (Qualified (ProperName 'TypeName)) [Type] Int
+  | ExpectedTypeConstructor (Qualified (ProperName 'TypeName)) [Type] Type
+  | InvalidNewtypeInstance (Qualified (ProperName 'TypeName)) [Type]
+  | MissingNewtypeSuperclassInstance (Qualified (ProperName 'TypeName)) (Qualified (ProperName 'TypeName)) [Type]
+  | UnverifiableSuperclassInstance (Qualified (ProperName 'TypeName)) (Qualified (ProperName 'TypeName)) [Type]
   | CannotFindDerivingType (ProperName 'TypeName)
   | DuplicateLabel Label (Maybe Expr)
   | DuplicateValueDeclaration Ident
   | ArgListLengthsDiffer Ident
   | OverlappingArgNames (Maybe Ident)
   | MissingClassMember Ident
-  | ExtraneousClassMember Ident (Qualified (ProperName 'ClassName))
+  | ExtraneousClassMember Ident (Qualified (ProperName 'TypeName))
   | ExpectedType Type Kind
   | IncorrectConstructorArity (Qualified (ProperName 'ConstructorName))
   | ExprDoesNotHaveType Expr Type
   | PropertyIsMissing Label
   | AdditionalProperty Label
   | TypeSynonymInstance
-  | OrphanInstance Ident (Qualified (ProperName 'ClassName)) [Type]
+  | OrphanInstance Ident (Qualified (ProperName 'TypeName)) [Type]
   | InvalidNewtype (ProperName 'TypeName)
   | InvalidInstanceHead Type
   | TransitiveExportError DeclarationRef [DeclarationRef]
@@ -160,7 +160,7 @@ data SimpleErrorMessage
   | ExpectedWildcard (ProperName 'TypeName)
   | CannotUseBindWithDo Ident
   -- | instance name, type class, expected argument count, actual argument count
-  | ClassInstanceArityMismatch Ident (Qualified (ProperName 'ClassName)) Int Int
+  | ClassInstanceArityMismatch Ident (Qualified (ProperName 'TypeName)) Int Int
   -- | a user-defined warning raised by using the Warn type class
   | UserDefinedWarning Type
   -- | a declaration couldn't be used because there wouldn't be enough information
@@ -173,7 +173,7 @@ data ErrorMessageHint
   = ErrorUnifyingTypes Type Type
   | ErrorInExpression Expr
   | ErrorInModule ModuleName
-  | ErrorInInstance (Qualified (ProperName 'ClassName)) [Type]
+  | ErrorInInstance (Qualified (ProperName 'TypeName)) [Type]
   | ErrorInSubsumption Type Type
   | ErrorCheckingAccessor Expr PSString
   | ErrorCheckingType Expr Type
@@ -188,7 +188,7 @@ data ErrorMessageHint
   | ErrorInTypeSynonym (ProperName 'TypeName)
   | ErrorInValueDeclaration Ident
   | ErrorInTypeDeclaration Ident
-  | ErrorInTypeClassDeclaration (ProperName 'ClassName)
+  | ErrorInTypeClassDeclaration (ProperName 'TypeName)
   | ErrorInForeignImport Ident
   | ErrorSolvingConstraint Constraint
   | PositionedError SourceSpan
@@ -257,10 +257,6 @@ data DeclarationRef
   --
   | ValueOpRef SourceSpan (OpName 'ValueOpName)
   -- |
-  -- A type class
-  --
-  | TypeClassRef SourceSpan (ProperName 'ClassName)
-  -- |
   -- A type class instance, created during typeclass desugaring (name, class name, instance types)
   --
   | TypeInstanceRef SourceSpan Ident
@@ -284,7 +280,6 @@ instance Eq DeclarationRef where
   (TypeOpRef _ name) == (TypeOpRef _ name') = name == name'
   (ValueRef _ name) == (ValueRef _ name') = name == name'
   (ValueOpRef _ name) == (ValueOpRef _ name') = name == name'
-  (TypeClassRef _ name) == (TypeClassRef _ name') = name == name'
   (TypeInstanceRef _ name) == (TypeInstanceRef _ name') = name == name'
   (ModuleRef _ name) == (ModuleRef _ name') = name == name'
   (KindRef _ name) == (KindRef _ name') = name == name'
@@ -299,7 +294,6 @@ compDecRef (TypeRef _ name _) (TypeRef _ name' _) = compare name name'
 compDecRef (TypeOpRef _ name) (TypeOpRef _ name') = compare name name'
 compDecRef (ValueRef _ ident) (ValueRef _ ident') = compare ident ident'
 compDecRef (ValueOpRef _ name) (ValueOpRef _ name') = compare name name'
-compDecRef (TypeClassRef _ name) (TypeClassRef _ name') = compare name name'
 compDecRef (TypeInstanceRef _ ident) (TypeInstanceRef _ ident') = compare ident ident'
 compDecRef (ModuleRef _ name) (ModuleRef _ name') = compare name name'
 compDecRef (KindRef _ name) (KindRef _ name') = compare name name'
@@ -308,7 +302,6 @@ compDecRef ref ref' = compare
   (orderOf ref) (orderOf ref')
     where
       orderOf :: DeclarationRef -> Int
-      orderOf TypeClassRef{} = 0
       orderOf TypeOpRef{} = 1
       orderOf TypeRef{} = 2
       orderOf ValueRef{} = 3
@@ -321,7 +314,6 @@ declRefSourceSpan (TypeRef ss _ _) = ss
 declRefSourceSpan (TypeOpRef ss _) = ss
 declRefSourceSpan (ValueRef ss _) = ss
 declRefSourceSpan (ValueOpRef ss _) = ss
-declRefSourceSpan (TypeClassRef ss _) = ss
 declRefSourceSpan (TypeInstanceRef ss _) = ss
 declRefSourceSpan (ModuleRef ss _) = ss
 declRefSourceSpan (KindRef ss _) = ss
@@ -342,10 +334,6 @@ getValueRef _ = Nothing
 getValueOpRef :: DeclarationRef -> Maybe (OpName 'ValueOpName)
 getValueOpRef (ValueOpRef _ op) = Just op
 getValueOpRef _ = Nothing
-
-getTypeClassRef :: DeclarationRef -> Maybe (ProperName 'ClassName)
-getTypeClassRef (TypeClassRef _ name) = Just name
-getTypeClassRef _ = Nothing
 
 getKindRef :: DeclarationRef -> Maybe (ProperName 'KindName)
 getKindRef (KindRef _ name) = Just name
@@ -435,12 +423,12 @@ data Declaration
   -- |
   -- A type class declaration (name, argument, implies, member declarations)
   --
-  | TypeClassDeclaration SourceAnn (ProperName 'ClassName) [(Text, Maybe Kind)] [Constraint] [FunctionalDependency] [Declaration]
+  | TypeClassDeclaration SourceAnn (ProperName 'TypeName) [(Text, Maybe Kind)] [Constraint] [FunctionalDependency] [Declaration]
   -- |
   -- A type instance declaration (name, dependencies, class name, instance types, member
   -- declarations)
   --
-  | TypeInstanceDeclaration SourceAnn Ident [Constraint] (Qualified (ProperName 'ClassName)) [Type] TypeInstanceBody
+  | TypeInstanceDeclaration SourceAnn Ident [Constraint] (Qualified (ProperName 'TypeName)) [Type] TypeInstanceBody
   deriving (Show)
 
 data ValueFixity = ValueFixity Fixity (Qualified (Either Ident (ProperName 'ConstructorName))) (OpName 'ValueOpName)
@@ -673,7 +661,7 @@ data Expr
   -- An application of a typeclass dictionary constructor. The value should be
   -- an ObjectLiteral.
   --
-  | TypeClassDictionaryConstructorApp (Qualified (ProperName 'ClassName)) Expr
+  | TypeClassDictionaryConstructorApp (Qualified (ProperName 'TypeName)) Expr
   -- |
   -- A placeholder for a type class dictionary to be inserted later. At the end of type checking, these
   -- placeholders will be replaced with actual expressions representing type classes dictionaries which
@@ -687,7 +675,7 @@ data Expr
   -- |
   -- A typeclass dictionary accessor, the implementation is left unspecified until CoreFn desugaring.
   --
-  | TypeClassDictionaryAccessor (Qualified (ProperName 'ClassName)) Ident
+  | TypeClassDictionaryAccessor (Qualified (ProperName 'TypeName)) Ident
   -- |
   -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
   --

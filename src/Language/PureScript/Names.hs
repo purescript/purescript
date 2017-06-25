@@ -25,7 +25,6 @@ data Name
   | TyName (ProperName 'TypeName)
   | TyOpName (OpName 'TypeOpName)
   | DctorName (ProperName 'ConstructorName)
-  | TyClassName (ProperName 'ClassName)
   | ModName ModuleName
   | KiName (ProperName 'KindName)
   deriving (Eq, Ord, Show, Generic)
@@ -51,10 +50,6 @@ getTypeOpName _ = Nothing
 getDctorName :: Name -> Maybe (ProperName 'ConstructorName)
 getDctorName (DctorName name) = Just name
 getDctorName _ = Nothing
-
-getClassName :: Name -> Maybe (ProperName 'ClassName)
-getClassName (TyClassName name) = Just name
-getClassName _ = Nothing
 
 getModName :: Name -> Maybe ModuleName
 getModName (ModName name) = Just name
@@ -132,7 +127,6 @@ instance FromJSON (ProperName a) where
 data ProperNameType
   = TypeName
   | ConstructorName
-  | ClassName
   | KindName
   | Namespace
 

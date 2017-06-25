@@ -155,8 +155,7 @@ lintImports (Module _ _ mn mdecls (Just mexports)) env usedImps = do
   elaborateUsed :: Imports -> ModuleName -> UsedImports -> UsedImports
   elaborateUsed scope mne used =
     foldr go used
-      $ extractByQual mne (importedTypeClasses scope) TyClassName
-      ++ extractByQual mne (importedTypeOps scope) TyOpName
+      $ extractByQual mne (importedTypeOps scope) TyOpName
       ++ extractByQual mne (importedTypes scope) TyName
       ++ extractByQual mne (importedDataConstructors scope) DctorName
       ++ extractByQual mne (importedValues scope) IdentName
@@ -296,7 +295,6 @@ findUsedRefs
   -> [DeclarationRef]
 findUsedRefs ss env mni qn names =
   let
-    classRefs = TypeClassRef ss <$> mapMaybe (getClassName <=< disqualifyFor qn) names
     valueRefs = ValueRef ss <$> mapMaybe (getIdentName <=< disqualifyFor qn) names
     valueOpRefs = ValueOpRef ss <$> mapMaybe (getValOpName <=< disqualifyFor qn) names
     typeOpRefs = TypeOpRef ss <$> mapMaybe (getTypeOpName <=< disqualifyFor qn) names
@@ -307,7 +305,7 @@ findUsedRefs ss env mni qn names =
     typesRefs
       = map (flip (TypeRef ss) (Just [])) typesWithoutDctors
       ++ map (\(ty, ds) -> TypeRef ss ty (Just ds)) (M.toList typesWithDctors)
-  in sortBy compDecRef $ classRefs ++ typeOpRefs ++ typesRefs ++ valueRefs ++ valueOpRefs
+  in sortBy compDecRef $ typeOpRefs ++ typesRefs ++ valueRefs ++ valueOpRefs
 
   where
 
@@ -344,7 +342,6 @@ runDeclRef (ValueRef _ ident) = Just $ IdentName ident
 runDeclRef (ValueOpRef _ op) = Just $ ValOpName op
 runDeclRef (TypeRef _ pn _) = Just $ TyName pn
 runDeclRef (TypeOpRef _ op) = Just $ TyOpName op
-runDeclRef (TypeClassRef _ pn) = Just $ TyClassName pn
 runDeclRef _ = Nothing
 
 checkDuplicateImports

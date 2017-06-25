@@ -36,10 +36,10 @@ import           Language.PureScript.TypeChecker.Synonyms (SynonymMap, replaceAl
 -- instances were derived in the same way. This data structure is used to ensure
 -- this property.
 data NewtypeDerivedInstances = NewtypeDerivedInstances
-  { ndiClasses :: M.Map (ModuleName, ProperName 'ClassName) ([Text], [Constraint], [FunctionalDependency])
+  { ndiClasses :: M.Map (ModuleName, ProperName 'TypeName) ([Text], [Constraint], [FunctionalDependency])
   -- ^ A list of superclass constraints for each type class. Since type classes
   -- have not been desugared here, we need to track this.
-  , ndiDerivedInstances :: S.Set ((ModuleName, ProperName 'ClassName), (ModuleName, ProperName 'TypeName))
+  , ndiDerivedInstances :: S.Set ((ModuleName, ProperName 'TypeName), (ModuleName, ProperName 'TypeName))
   -- ^ A list of newtype instances which were derived in this module.
   } deriving Show
 
@@ -187,7 +187,7 @@ deriveNewtypeInstance
   -> ModuleName
   -> SynonymMap
   -> NewtypeDerivedInstances
-  -> Qualified (ProperName 'ClassName)
+  -> Qualified (ProperName 'TypeName)
   -> [Declaration]
   -> [Type]
   -> ProperName 'TypeName

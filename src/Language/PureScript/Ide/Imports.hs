@@ -192,7 +192,7 @@ addExplicitImport' decl moduleName imports =
     else updateAtFirstOrPrepend matches (insertDeclIntoImport decl) freshImport imports
   where
     refFromDeclaration (IdeDeclTypeClass tc) =
-      P.TypeClassRef ideSpan (tc ^. ideTCName)
+      P.TypeRef ideSpan (tc ^. ideTCName) Nothing
     refFromDeclaration (IdeDeclDataConstructor dtor) =
       P.TypeRef ideSpan (dtor ^. ideDtorTypeName) Nothing
     refFromDeclaration (IdeDeclType t) =

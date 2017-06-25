@@ -63,7 +63,7 @@ data IdeDataConstructor = IdeDataConstructor
   } deriving (Show, Eq, Ord)
 
 data IdeTypeClass = IdeTypeClass
-  { _ideTCName :: P.ProperName 'P.ClassName
+  { _ideTCName :: P.ProperName 'P.TypeName
   , _ideTCKind :: P.Kind
   , _ideTCInstances :: [IdeInstance]
   } deriving (Show, Eq, Ord)
@@ -210,7 +210,6 @@ instance ToJSON Completion where
 identifierFromDeclarationRef :: P.DeclarationRef -> Text
 identifierFromDeclarationRef (P.TypeRef _ name _) = P.runProperName name
 identifierFromDeclarationRef (P.ValueRef _ ident) = P.runIdent ident
-identifierFromDeclarationRef (P.TypeClassRef _ name) = P.runProperName name
 identifierFromDeclarationRef (P.KindRef _ name) = P.runProperName name
 identifierFromDeclarationRef (P.ValueOpRef _ op) = P.showOp op
 identifierFromDeclarationRef (P.TypeOpRef _ op) = P.showOp op

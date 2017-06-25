@@ -39,7 +39,7 @@ succTestCases =
     , [(mn "A", P.TypeRef testSpan (P.ProperName "TypeA") Nothing)], map (`annExp` "A") [typeA, dtorA1, dtorA2])
   , ("resolves a synonym reexport"
     , [(mn "A", P.TypeRef testSpan (P.ProperName "SynonymA") Nothing)], [synonymA `annExp` "A"])
-  , ("resolves a class reexport", [(mn "A", P.TypeClassRef testSpan (P.ProperName "ClassA"))], [classA `annExp` "A"])
+  , ("resolves a class reexport", [(mn "A", P.TypeRef testSpan (P.ProperName "ClassA") Nothing)], [classA `annExp` "A"])
   , ("resolves a kind reexport", [(mn "A", P.KindRef testSpan (P.ProperName "KindA"))], [kindA `annExp` "A"])
   ]
 
@@ -47,7 +47,7 @@ failTestCases :: [(Text, Refs)]
 failTestCases =
   [ ("fails to resolve a non existing value", [(mn "A", P.ValueRef testSpan (P.Ident "valueB"))])
   , ("fails to resolve a non existing type reexport" , [(mn "A", P.TypeRef testSpan (P.ProperName "TypeB") Nothing)])
-  , ("fails to resolve a non existing class reexport", [(mn "A", P.TypeClassRef testSpan (P.ProperName "ClassB"))])
+  , ("fails to resolve a non existing class reexport", [(mn "A", P.TypeRef testSpan (P.ProperName "ClassB") Nothing)])
   ]
 
 spec :: Spec

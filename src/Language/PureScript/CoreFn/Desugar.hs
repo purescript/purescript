@@ -229,7 +229,6 @@ externToCoreFn _ = Nothing
 exportToCoreFn :: A.DeclarationRef -> [Ident]
 exportToCoreFn (A.TypeRef _ _ (Just dctors)) = fmap properToIdent dctors
 exportToCoreFn (A.ValueRef _ name) = [name]
-exportToCoreFn (A.TypeClassRef _ name) = [properToIdent name]
 exportToCoreFn (A.TypeInstanceRef _ name) = [name]
 exportToCoreFn _ = []
 

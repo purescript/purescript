@@ -109,7 +109,7 @@ findSynonym :: P.ProperName 'P.TypeName -> [IdeDeclaration] -> Maybe IdeTypeSyno
 -- EDTypeSynonym declarations. For type classes there are three declarations
 -- involved. We collect these and resolve them at the end of the conversion process.
 data ToResolve
-  = TypeClassToResolve (P.ProperName 'P.ClassName)
+  = TypeClassToResolve (P.ProperName 'P.TypeName)
   | SynonymToResolve (P.ProperName 'P.TypeName) P.Type
 
 convertExport :: P.DeclarationRef -> Maybe (P.ModuleName, P.DeclarationRef)

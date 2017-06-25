@@ -1092,7 +1092,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     nameType (TyName _) = "type"
     nameType (TyOpName _) = "type operator"
     nameType (DctorName _) = "data constructor"
-    nameType (TyClassName _) = "type class"
     nameType (ModName _) = "module"
     nameType (KiName _) = "kind"
 
@@ -1106,8 +1105,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     runName (Qualified mn (TyOpName op)) =
       showQualified showOp (Qualified mn op)
     runName (Qualified mn (DctorName name)) =
-      showQualified runProperName (Qualified mn name)
-    runName (Qualified mn (TyClassName name)) =
       showQualified runProperName (Qualified mn name)
     runName (Qualified mn (KiName name)) =
       showQualified runProperName (Qualified mn name)
@@ -1209,8 +1206,6 @@ prettyPrintRef (ValueRef _ ident) =
   Just $ showIdent ident
 prettyPrintRef (ValueOpRef _ op) =
   Just $ showOp op
-prettyPrintRef (TypeClassRef _ pn) =
-  Just $ "class " <> runProperName pn
 prettyPrintRef (TypeInstanceRef _ ident) =
   Just $ showIdent ident
 prettyPrintRef (ModuleRef _ name) =

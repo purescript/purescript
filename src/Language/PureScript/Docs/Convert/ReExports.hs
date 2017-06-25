@@ -107,17 +107,17 @@ collectDeclarations :: forall m.
 collectDeclarations imports exports = do
   valsAndMembers <- collect lookupValueDeclaration impVals expVals
   valOps <- collect lookupValueOpDeclaration impValOps expValOps
-  typeClasses <- collect lookupTypeClassDeclaration impTCs expTCs
+  -- typeClasses <- collect lookupTypeClassDeclaration impTCs expTCs
   types <- collect lookupTypeDeclaration impTypes expTypes
   typeOps <- collect lookupTypeOpDeclaration impTypeOps expTypeOps
   kinds <- collect lookupKindDeclaration impKinds expKinds
 
-  (vals, classes) <- handleTypeClassMembers valsAndMembers typeClasses
+  (vals, classes) <- handleTypeClassMembers valsAndMembers {- typeClasses -} mempty
 
   let filteredTypes = filterDataConstructors expCtors types
-  let filteredClasses = filterTypeClassMembers (Map.keys expVals) classes
+  -- let filteredClasses = filterTypeClassMembers (Map.keys expVals) classes
 
-  pure (Map.toList (Map.unionsWith (<>) [filteredTypes, filteredClasses, vals, valOps, typeOps, kinds]))
+  pure (Map.toList (Map.unionsWith (<>) [filteredTypes, {-filteredClasses, -} vals, valOps, typeOps, kinds]))
 
   where
 
@@ -145,8 +145,8 @@ collectDeclarations imports exports = do
 
   expCtors = concatMap fst (Map.elems (P.exportedTypes exports))
 
-  expTCs = P.exportedTypeClasses exports
-  impTCs = concat (Map.elems (P.importedTypeClasses imports))
+  -- expTCs = P.exportedTypeClasses exports
+  -- impTCs = concat (Map.elems (P.importedTypeClasses imports))
 
   expKinds = P.exportedKinds exports
   impKinds = concat (Map.elems (P.importedKinds imports))
@@ -292,7 +292,7 @@ lookupTypeOpDeclaration importedFrom tyOp = do
 lookupTypeClassDeclaration
   :: (MonadState (Map P.ModuleName Module) m, MonadReader P.ModuleName m)
   => P.ModuleName
-  -> P.ProperName 'P.ClassName
+  -> P.ProperName 'P.TypeName
   -> m (P.ModuleName, [Declaration])
 lookupTypeClassDeclaration importedFrom tyClass = do
   decls <- lookupModuleDeclarations "lookupTypeClassDeclaration" importedFrom

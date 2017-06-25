@@ -52,6 +52,5 @@ warnDuplicateRefs pos toError refs = do
   refToName pos' (TypeOpRef _ op) = Just (pos', TyOpName op)
   refToName pos' (ValueRef _ name) = Just (pos', IdentName name)
   refToName pos' (ValueOpRef _ op) = Just (pos', ValOpName op)
-  refToName pos' (TypeClassRef _ name) = Just (pos', TyClassName name)
   refToName pos' (ModuleRef _ name) = Just (pos', ModName name)
   refToName _ _ = Nothing

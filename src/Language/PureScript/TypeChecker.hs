@@ -117,7 +117,7 @@ addTypeClass
   :: forall m
    . (MonadState CheckState m, MonadError MultipleErrors m)
   => ModuleName
-  -> ProperName 'ClassName
+  -> ProperName 'TypeName
   -> [(Text, Maybe Kind)]
   -> [Constraint]
   -> [FunctionalDependency]
@@ -328,7 +328,7 @@ typeCheckAll moduleName _ = traverse go
           addTypeClassDictionaries (Just moduleName) . M.singleton cls $ M.singleton (tcdValue dict) dict
           return d
 
-  checkInstanceArity :: Ident -> Qualified (ProperName 'ClassName) -> TypeClassData -> [Type] -> m ()
+  checkInstanceArity :: Ident -> Qualified (ProperName 'TypeName) -> TypeClassData -> [Type] -> m ()
   checkInstanceArity dictName className typeClass tys = do
     let typeClassArity = length (typeClassArguments typeClass)
         instanceArity = length tys
@@ -352,7 +352,7 @@ typeCheckAll moduleName _ = traverse go
       | otherwise = firstDuplicate xs
     firstDuplicate _ = Nothing
 
-  checkOrphanInstance :: Ident -> Qualified (ProperName 'ClassName) -> TypeClassData -> [Type] -> m ()
+  checkOrphanInstance :: Ident -> Qualified (ProperName 'TypeName) -> TypeClassData -> [Type] -> m ()
   checkOrphanInstance dictName className@(Qualified (Just mn') _) typeClass tys'
     | moduleName == mn' || moduleName `S.member` nonOrphanModules = return ()
     | otherwise = throwError . errorMessage $ OrphanInstance dictName className tys'
@@ -449,7 +449,6 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     exported e = any (exports e) exps
     exports (TypeRef _ pn1 _) (TypeRef _ pn2 _) = pn1 == pn2
     exports (ValueRef _ id1) (ValueRef _ id2) = id1 == id2
-    exports (TypeClassRef _ pn1) (TypeClassRef _ pn2) = pn1 == pn2
     exports _ _ = False
     -- We avoid Eq for `nub`bing as the dctor part of `TypeRef` evaluates to
     -- `error` for the values generated here (we don't need them anyway)
@@ -477,14 +476,14 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     findClasses :: Type -> [DeclarationRef]
     findClasses = everythingOnTypes (++) go
       where
-      go (ConstrainedType (Constraint (TypeConstructor c) _ _) _) = (fmap (TypeClassRef (declRefSourceSpan ref)) . extractCurrentModuleClass . fmap coerceProperName) c
+      go (ConstrainedType (Constraint (TypeConstructor c) _ _) _) = (fmap (flip (TypeRef (declRefSourceSpan ref)) Nothing) . extractCurrentModuleClass . fmap coerceProperName) c
       go _ = []
-    extractCurrentModuleClass :: Qualified (ProperName 'ClassName) -> [ProperName 'ClassName]
+    extractCurrentModuleClass :: Qualified (ProperName 'TypeName) -> [ProperName 'TypeName]
     extractCurrentModuleClass (Qualified (Just mn') name) | mn == mn' = [name]
     extractCurrentModuleClass _ = []
 
   checkClassMembersAreExported :: DeclarationRef -> m ()
-  checkClassMembersAreExported dr@(TypeClassRef ss' name) = do
+  checkClassMembersAreExported dr@(TypeRef ss' name _) = do
     let members = ValueRef ss' `map` head (mapMaybe findClassMembers decls)
     let missingMembers = members \\ exps
     unless (null missingMembers) . throwError . errorMessage' ss' $ TransitiveExportError dr members

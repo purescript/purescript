@@ -110,8 +110,6 @@ resolveRef decls ref = case ref of
     findWrapped (anyOf (_IdeDeclValueOperator . ideValueOpName) (== name))
   P.TypeOpRef _ name ->
     findWrapped (anyOf (_IdeDeclTypeOperator . ideTypeOpName) (== name))
-  P.TypeClassRef _ name ->
-    findWrapped (anyOf (_IdeDeclTypeClass . ideTCName) (== name))
   P.KindRef _ name ->
     findWrapped (anyOf _IdeDeclKind (== name))
   _ ->

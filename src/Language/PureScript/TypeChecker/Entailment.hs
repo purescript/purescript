@@ -518,7 +518,7 @@ newDictionaries path name (Constraint cl instanceTy _) = do
 freshDictName :: MonadSupply m => Type -> m Ident
 freshDictName cls = freshIdent ("dict" <> maybe "" (runProperName . disqualify) (classNameMaybe cls))
 
-classNameMaybe :: Type -> Maybe (Qualified (ProperName 'ClassName))
+classNameMaybe :: Type -> Maybe (Qualified (ProperName 'TypeName))
 classNameMaybe (TypeConstructor cl) = Just (fmap coerceProperName cl)
 classNameMaybe _ = Nothing
 

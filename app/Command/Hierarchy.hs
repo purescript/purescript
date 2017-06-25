@@ -41,7 +41,7 @@ data HierarchyOptions = HierarchyOptions
   , _hierarchyOutput :: Maybe FilePath
   }
 
-newtype SuperMap = SuperMap { _unSuperMap :: Either (P.ProperName 'P.ClassName) (P.ProperName 'P.ClassName, P.ProperName 'P.ClassName) }
+newtype SuperMap = SuperMap { _unSuperMap :: Either (P.ProperName 'P.TypeName) (P.ProperName 'P.TypeName, P.ProperName 'P.TypeName) }
   deriving Eq
 
 instance Show SuperMap where

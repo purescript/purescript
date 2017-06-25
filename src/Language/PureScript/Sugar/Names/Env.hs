@@ -84,10 +84,6 @@ data Imports = Imports
   --
   , importedDataConstructors :: ImportMap (ProperName 'ConstructorName)
   -- |
-  -- Local names for classes within a module mapped to their qualified names
-  --
-  , importedTypeClasses :: ImportMap (ProperName 'ClassName)
-  -- |
   -- Local names for values within a module mapped to their qualified names
   --
   , importedValues :: ImportMap Ident
@@ -112,7 +108,7 @@ data Imports = Imports
   } deriving (Show)
 
 nullImports :: Imports
-nullImports = Imports M.empty M.empty M.empty M.empty M.empty M.empty S.empty S.empty M.empty
+nullImports = Imports M.empty M.empty M.empty M.empty M.empty S.empty S.empty M.empty
 
 -- |
 -- An 'Imports' value with imports for the `Prim` module.
@@ -121,7 +117,7 @@ primImports :: Imports
 primImports =
   nullImports
     { importedTypes = M.fromList $ mkEntries `concatMap` M.keys primTypes
-    , importedTypeClasses = M.fromList $ mkEntries `concatMap` M.keys primClasses
+    -- , importedTypeClasses = M.fromList $ mkEntries `concatMap` M.keys primClasses
     , importedKinds = M.fromList $ mkEntries `concatMap` S.toList primKinds
     }
   where
@@ -149,10 +145,6 @@ data Exports = Exports
   --
   , exportedTypeOps :: M.Map (OpName 'TypeOpName) ModuleName
   -- |
-  -- The exported classes along with the module they originally came from.
-  --
-  , exportedTypeClasses :: M.Map (ProperName 'ClassName) ModuleName
-  -- |
   -- The exported values along with the module they originally came from.
   --
   , exportedValues :: M.Map Ident ModuleName
@@ -171,7 +163,7 @@ data Exports = Exports
 -- An empty 'Exports' value.
 --
 nullExports :: Exports
-nullExports = Exports M.empty M.empty M.empty M.empty M.empty M.empty
+nullExports = Exports M.empty M.empty M.empty M.empty M.empty
 
 -- |
 -- The imports and exports for a collection of modules. The 'SourceSpan' is used
@@ -205,7 +197,7 @@ primExports :: Exports
 primExports =
   nullExports
     { exportedTypes = M.fromList $ mkTypeEntry `map` M.keys primTypes
-    , exportedTypeClasses = M.fromList $ mkClassEntry `map` M.keys primClasses
+    -- , exportedTypeClasses = M.fromList $ mkClassEntry `map` M.keys primClasses
     , exportedKinds = M.fromList $ mkKindEntry `map` S.toList primKinds
     }
   where
@@ -242,7 +234,6 @@ exportType
   -> m Exports
 exportType exportMode exps name dctors mn = do
   let exTypes = exportedTypes exps
-      exClasses = exportedTypeClasses exps
       dctorNameCounts :: [(ProperName 'ConstructorName, Int)]
       dctorNameCounts = M.toList $ M.fromListWith (+) (map (,1) dctors)
   forM_ dctorNameCounts $ \(dctorName, count) ->
@@ -252,13 +243,9 @@ exportType exportMode exps name dctors mn = do
     Internal -> do
       when (name `M.member` exTypes) $
         throwDeclConflict (TyName name) (TyName name)
-      when (coerceProperName name `M.member` exClasses) $
-        throwDeclConflict (TyName name) (TyClassName (coerceProperName name))
       forM_ dctors $ \dctor -> do
         when ((elem dctor . fst) `any` exTypes) $
           throwDeclConflict (DctorName dctor) (DctorName dctor)
-        when (coerceProperName dctor `M.member` exClasses) $
-          throwDeclConflict (DctorName dctor) (TyClassName (coerceProperName dctor))
     ReExport -> do
       forM_ (name `M.lookup` exTypes) $ \(_, mn') ->
         when (mn /= mn') $
@@ -293,18 +280,11 @@ exportTypeClass
   :: MonadError MultipleErrors m
   => ExportMode
   -> Exports
-  -> ProperName 'ClassName
+  -> ProperName 'TypeName
   -> ModuleName
   -> m Exports
-exportTypeClass exportMode exps name mn = do
-  let exTypes = exportedTypes exps
-  when (exportMode == Internal) $ do
-    when (coerceProperName name `M.member` exTypes) $
-      throwDeclConflict (TyClassName name) (TyName (coerceProperName name))
-    when ((elem (coerceProperName name) . fst) `any` exTypes) $
-      throwDeclConflict (TyClassName name) (DctorName (coerceProperName name))
-  classes <- addExport TyClassName name mn (exportedTypeClasses exps)
-  return $ exps { exportedTypeClasses = classes }
+exportTypeClass exportMode exps name mn =
+  exportType exportMode exps name [] mn
 
 -- |
 -- Safely adds a value to some exports, returning an error if a conflict occurs.

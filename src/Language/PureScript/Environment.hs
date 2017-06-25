@@ -38,7 +38,7 @@ data Environment = Environment
   -- ^ Type synonyms currently in scope
   , typeClassDictionaries :: M.Map (Maybe ModuleName) (M.Map Type (M.Map (Qualified Ident) NamedDict))
   -- ^ Available type class dictionaries
-  , typeClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
+  , typeClasses :: M.Map (Qualified (ProperName 'TypeName)) TypeClassData
   -- ^ Type classes
   , kinds :: S.Set (Qualified (ProperName 'KindName))
   -- ^ Kinds in scope
@@ -370,7 +370,7 @@ primTypes =
 -- classes. `Partial` is used as a kind of magic constraint for partial
 -- functions. `Fail` is used for user-defined type errors. `Warn` for
 -- user-defined warnings.
-primClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
+primClasses :: M.Map (Qualified (ProperName 'TypeName)) TypeClassData
 primClasses =
   M.fromList
     [ (primName "Partial", (makeTypeClassData [] [] [] []))

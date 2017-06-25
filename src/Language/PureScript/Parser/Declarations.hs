@@ -175,7 +175,7 @@ parseDeclarationRef =
     <|> withSourceSpan' ValueRef parseIdent
     <|> withSourceSpan' ValueOpRef (parens parseOperator)
     <|> withSourceSpan' (\sa -> ($ TypeRef sa)) parseTypeRef
-    <|> withSourceSpan' TypeClassRef (reserved "class" *> properName)
+    <|> withSourceSpan' (\sa a -> TypeRef sa a Nothing) (reserved "class" *> properName)
     <|> withSourceSpan' ModuleRef (indented *> reserved "module" *> moduleName)
     <|> withSourceSpan' TypeOpRef (indented *> reserved "type" *> parens parseOperator)
   where

@@ -85,9 +85,6 @@ desugarImportsWithEnv externs modules = do
     exportedTypeOps :: M.Map (OpName 'TypeOpName) ModuleName
     exportedTypeOps = exportedRefs getTypeOpRef
 
-    exportedTypeClasses :: M.Map (ProperName 'ClassName) ModuleName
-    exportedTypeClasses = exportedRefs getTypeClassRef
-
     exportedValues :: M.Map Ident ModuleName
     exportedValues = exportedRefs getValueRef
 
@@ -127,7 +124,6 @@ elaborateExports exps (Module ss coms mn decls refs) =
   Module ss coms mn decls $ Just
     $ elaboratedTypeRefs
     ++ go (TypeOpRef ss) exportedTypeOps
-    ++ go (TypeClassRef ss) exportedTypeClasses
     ++ go (ValueRef ss) exportedValues
     ++ go (ValueOpRef ss) exportedValueOps
     ++ go (KindRef ss) exportedKinds
@@ -193,7 +189,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
     fmap (bound,) $
       TypeInstanceDeclaration sa name
         <$> updateConstraints ss cs
-        <*> updateClassName cn ss
+        <*> updateTypeName cn ss
         <*> traverse (updateTypesEverywhere ss) ts
         <*> pure ds
   updateDecl bound (TypeDeclaration sa@(ss, _) name ty) =
@@ -305,12 +301,8 @@ renameInModule imports (Module modSS coms mn decls exps) =
     updateType :: Type -> m Type
     updateType (TypeOp name) = TypeOp <$> updateTypeOpName name pos
     updateType (TypeConstructor name) = TypeConstructor <$> updateTypeName name pos
-    updateType (ConstrainedType c t) = ConstrainedType <$> updateInConstraint c <*> pure t
     updateType (KindedType t k) = KindedType t <$> updateKindsEverywhere pos k
     updateType t = return t
-    updateInConstraint :: Constraint -> m Constraint
-    updateInConstraint (Constraint cl ts info) =
-      Constraint <$> updateTypesEverywhere pos cl <*> pure ts <*> pure info
 
   updateConstraints :: SourceSpan -> [Constraint] -> m [Constraint]
   updateConstraints pos = traverse $ \(Constraint  cl ts info) ->
@@ -336,12 +328,6 @@ renameInModule imports (Module modSS coms mn decls exps) =
     -> SourceSpan
     -> m (Qualified (ProperName 'ConstructorName))
   updateDataConstructorName = update (importedDataConstructors imports) DctorName
-
-  updateClassName
-    :: Qualified (ProperName 'ClassName)
-    -> SourceSpan
-    -> m (Qualified (ProperName 'ClassName))
-  updateClassName = update (importedTypeClasses imports) TyClassName
 
   updateValueName :: Qualified Ident -> SourceSpan -> m (Qualified Ident)
   updateValueName = update (importedValues imports) IdentName

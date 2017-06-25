@@ -31,7 +31,7 @@ import           Language.PureScript.Sugar.CaseDeclarations
 import           Language.PureScript.Types
 import           Language.PureScript.TypeClassDictionaries (superclassName)
 
-type MemberMap = M.Map (ModuleName, ProperName 'ClassName) TypeClassData
+type MemberMap = M.Map (ModuleName, ProperName 'TypeName) TypeClassData
 
 type Desugar = StateT MemberMap
 
@@ -54,7 +54,7 @@ desugarTypeClasses externs = flip evalStateT initialState . traverse desugarModu
   fromExternsDecl
     :: ModuleName
     -> ExternsDeclaration
-    -> Maybe ((ModuleName, ProperName 'ClassName), TypeClassData)
+    -> Maybe ((ModuleName, ProperName 'TypeName), TypeClassData)
   fromExternsDecl mn (EDClass name args members implies deps) = Just ((mn, name), typeClass) where
     typeClass = makeTypeClassData args members implies deps
   fromExternsDecl _ _ = Nothing
@@ -190,13 +190,15 @@ desugarDecl mn exps = go
     return (expRef name className tys, [d, ValueDeclaration sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]])
   go other = return (Nothing, [other])
 
-  expRef :: Ident -> Qualified (ProperName 'ClassName) -> [Type] -> Maybe DeclarationRef
+  expRef :: Ident -> Qualified (ProperName 'TypeName) -> [Type] -> Maybe DeclarationRef
   expRef name className tys
     | isExportedClass className && all isExportedType (getConstructors `concatMap` tys) = Just $ TypeInstanceRef genSpan name
     | otherwise = Nothing
 
-  isExportedClass :: Qualified (ProperName 'ClassName) -> Bool
-  isExportedClass = isExported (elem . TypeClassRef genSpan)
+  isExportedClass :: Qualified (ProperName 'TypeName) -> Bool
+  isExportedClass = isExported $ \pn -> any $ \case
+    TypeRef _ pn' _ -> pn == pn'
+    _ -> False
 
   isExportedType :: Qualified (ProperName 'TypeName) -> Bool
   isExportedType = isExported $ \pn -> isJust . find (matchesTypeRef pn)
@@ -227,7 +229,7 @@ memberToNameAndType _ = internalError "Invalid declaration in type class definit
 
 typeClassDictionaryDeclaration
   :: SourceAnn
-  -> ProperName 'ClassName
+  -> ProperName 'TypeName
   -> [(Text, Maybe Kind)]
   -> [Constraint]
   -> [Declaration]
@@ -243,7 +245,7 @@ typeClassDictionaryDeclaration sa name args implies members =
 
 typeClassMemberToDictionaryAccessor
   :: ModuleName
-  -> ProperName 'ClassName
+  -> ProperName 'TypeName
   -> [(Text, Maybe Kind)]
   -> Declaration
   -> Declaration
@@ -266,7 +268,7 @@ typeInstanceDictionaryDeclaration
   -> Ident
   -> ModuleName
   -> [Constraint]
-  -> Qualified (ProperName 'ClassName)
+  -> Qualified (ProperName 'TypeName)
   -> [Type]
   -> [Declaration]
   -> Desugar m Declaration
@@ -276,7 +278,7 @@ typeInstanceDictionaryDeclaration sa name mn deps className tys decls =
 
   -- Lookup the type arguments and member types for the type class
   TypeClassData{..} <-
-    maybe (throwError . errorMessage . UnknownName $ fmap TyClassName className) return $
+    maybe (throwError . errorMessage . UnknownName $ fmap TyName className) return $
       M.lookup (qualify mn className) m
 
   case map fst typeClassMembers \\ mapMaybe declName decls of
