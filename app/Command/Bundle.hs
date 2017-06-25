@@ -61,7 +61,7 @@ app Options{..} = do
 
   currentDir <- liftIO getCurrentDirectory
   let outFile = if optionsSourceMaps then fmap (currentDir </>) optionsOutputFile else Nothing
-  bundleSM input entryIds optionsMainModule optionsNamespace outFile
+  bundleSM input entryIds optionsMainModule optionsNamespace outFile True
 
 -- | Command line options parser.
 options :: Parser Options

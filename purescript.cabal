@@ -730,6 +730,8 @@ library
           Language.PureScript.AST.SourcePos
           Language.PureScript.AST.Traversals
           Language.PureScript.Bundle
+          Language.PureScript.Bundle.BundleOpt
+          Language.PureScript.Bundle.BundleTypes          
           Language.PureScript.CodeGen
           Language.PureScript.CodeGen.JS
           Language.PureScript.CodeGen.JS.Common
