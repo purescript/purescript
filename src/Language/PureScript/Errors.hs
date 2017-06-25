@@ -1333,7 +1333,7 @@ renderBox = unlines
 
 toTypelevelString :: Type -> Maybe Box.Box
 toTypelevelString (TypeLevelString s) =
-  Just . Box.text $ decodeStringWithReplacement s
+  Just . line . T.strip $ decodeStringWithReplacement s
 toTypelevelString (TypeApp (TypeConstructor f) x)
   | f == primName "TypeString" = Just (typeAsBox x)
 toTypelevelString (TypeApp (TypeApp (TypeConstructor f) x) ret)
