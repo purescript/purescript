@@ -12,6 +12,7 @@ import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Foldable (for_, traverse_)
 import Data.Maybe (fromMaybe)
+import Data.Monoid ((<>))
 import qualified Data.Map as M
 import qualified Data.Set as S
 
@@ -49,7 +50,7 @@ resolveImports
 resolveImports env (Module ss coms currentModule decls exps) =
   rethrow (addHint (ErrorInModule currentModule)) $ do
     let imports = findImports decls
-        imports' = M.map (map (\(ss', dt, mmn) -> (ss', Just dt, mmn))) imports
+        imports' = M.map (fmap (\(ss', dt, mmn) -> (ss', Just dt, mmn))) imports
         scope = M.insert currentModule [(internalModuleSourceSpan "<module>", Nothing, Nothing)] imports'
     (Module ss coms currentModule decls exps,) <$>
       foldM (resolveModuleImport env) nullImports (M.toList scope)
@@ -114,6 +115,8 @@ resolveImport importModule exps imps impQual = resolveByType
       checkImportExists ss IdentName (exportedValues exps) name
     check (ValueOpRef ss op) =
       checkImportExists ss ValOpName (exportedValueOps exps) op
+    check (TypeRef ss name (Just [])) =
+      checkImportExists ss TyName (exportedTypes exps <> fmap ([],) (M.mapKeys coerceProperName $ exportedTypeClasses exps)) name
     check (TypeRef ss name dctors) = do
       checkImportExists ss TyName (exportedTypes exps) name
       let (allDctors, _) = allExportedDataConstructors name
@@ -126,7 +129,7 @@ resolveImport importModule exps imps impQual = resolveByType
       throwError . errorMessage' ss $ ImportHidingModule name
     check (KindRef ss name) =
       checkImportExists ss KiName (exportedKinds exps) name
-    check r = internalError $ "Invalid argument to checkRefs: " ++ show r
+    check r = internalError $ "Invalid argument to checkRefs: " <> show r
 
   -- Check that an explicitly imported item exists in the module it is being imported from
   checkImportExists
@@ -186,14 +189,17 @@ resolveImport importModule exps imps impQual = resolveByType
   importRef prov imp (ValueOpRef _ name) = do
     let valueOps' = updateImports (importedValueOps imp) (exportedValueOps exps) id name prov
     return $ imp { importedValueOps = valueOps' }
-  importRef prov imp (TypeRef ss name dctors) = do
-    let types' = updateImports (importedTypes imp) (exportedTypes exps) snd name prov
-    let (dctorNames, mn) = allExportedDataConstructors name
-        dctorLookup :: M.Map (ProperName 'ConstructorName) ModuleName
-        dctorLookup = M.fromList $ map (, mn) dctorNames
-    traverse_ (traverse_ $ checkDctorExists ss name dctorNames) dctors
-    let dctors' = foldl (\m d -> updateImports m dctorLookup id d prov) (importedDataConstructors imp) (fromMaybe dctorNames dctors)
-    return $ imp { importedTypes = types', importedDataConstructors = dctors' }
+  importRef prov imp (TypeRef ss name dctors)
+    | dctors == Just [] && typeIsClass name =
+        importRef prov imp (TypeClassRef ss (coerceProperName name))
+    | otherwise = do
+        let types' = updateImports (importedTypes imp) (exportedTypes exps) snd name prov
+        let (dctorNames, mn) = allExportedDataConstructors name
+            dctorLookup :: M.Map (ProperName 'ConstructorName) ModuleName
+            dctorLookup = M.fromList $ fmap (, mn) dctorNames
+        traverse_ (traverse_ $ checkDctorExists ss name dctorNames) dctors
+        let dctors' = foldl (\m d -> updateImports m dctorLookup id d prov) (importedDataConstructors imp) (fromMaybe dctorNames dctors)
+        return $ imp { importedTypes = types', importedDataConstructors = dctors' }
   importRef prov imp (TypeOpRef _ name) = do
     let ops' = updateImports (importedTypeOps imp) (exportedTypeOps exps) id name prov
     return $ imp { importedTypeOps = ops' }
@@ -206,6 +212,10 @@ resolveImport importModule exps imps impQual = resolveByType
   importRef _ _ TypeInstanceRef{} = internalError "TypeInstanceRef in importRef"
   importRef _ _ ModuleRef{} = internalError "ModuleRef in importRef"
   importRef _ _ ReExportRef{} = internalError "ReExportRef in importRef"
+
+  -- Check whether a TypeRef is actually for a class
+  typeIsClass :: ProperName 'TypeName -> Bool
+  typeIsClass name = M.member (coerceProperName name) (exportedTypeClasses exps)
 
   -- Find all exported data constructors for a given type
   allExportedDataConstructors
