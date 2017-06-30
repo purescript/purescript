@@ -391,8 +391,8 @@ testCases =
       , ValueShouldHaveTypeSignature (n "TypeOpAliases") "test3" (renderedType "forall a b c d. a ~> (b ~> c) ~> d")
       , ValueShouldHaveTypeSignature (n "TypeOpAliases") "test4" (renderedType "forall a b c d. ((a ~> b) ~> c) ~> d")
       , ValueShouldHaveTypeSignature (n "TypeOpAliases") "third" (renderedType "forall a b c. a × b × c -> c")
-      , ShouldBeDocumented (n "TypeOpAliases") "Boop" ["Nope","Welp"]
-      , ShouldBeDocumented (n "TypeOpAliases") "Narp" ["narp","narpBoop"]
+      , ShouldBeDocumented (n "TypeOpAliases") "BaseType" ["Con1","Con2","tC_ABaseType"]
+      , ShouldBeDocumented (n "TypeOpAliases") "TC_A" ["tC_AFn","tC_ABaseType"]
       ])
 
   , ("DocComments",
