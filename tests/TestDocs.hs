@@ -13,7 +13,6 @@ import Control.Arrow (first)
 import Control.Monad.IO.Class (liftIO)
 
 import Data.Foldable
-import Data.List ((\\))
 import Data.Maybe (fromMaybe)
 import Data.Monoid
 import Data.Text (Text)
@@ -100,7 +99,7 @@ data AssertionFailure
   -- | A declaration was not documented, but should have been
   = NotDocumented P.ModuleName Text
   -- | A child declaration was not documented, but should have been
-  | ChildrenNotDocumented P.ModuleName Text [Text]
+  | ChildrenNotDocumented P.ModuleName Text [Text] [Text]
   -- | A declaration was documented, but should not have been
   | Documented P.ModuleName Text
   -- | A child declaration was documented, but should not have been
@@ -152,9 +151,8 @@ runAssertion assertion linksCtx Docs.Module{..} =
         Nothing ->
           Fail (NotDocumented mn decl)
         Just actualChildren ->
-          case children \\ actualChildren of
-            [] -> Pass
-            cs -> Fail (ChildrenNotDocumented mn decl cs)
+          if children == actualChildren then Pass
+          else Fail (ChildrenNotDocumented mn decl children actualChildren)
 
     ShouldNotBeDocumented mn decl ->
       case findChildren decl (declarationsFor mn) of
@@ -388,11 +386,13 @@ testCases =
       ])
 
   , ("TypeOpAliases",
-      [ ValueShouldHaveTypeSignature (n "TypeOpAliases") "test1" (renderedType "forall a b. AltFn a b")
-      , ValueShouldHaveTypeSignature (n "TypeOpAliases") "test2" (renderedType "forall a b c. AltFn a (AltFn b c)")
-      , ValueShouldHaveTypeSignature (n "TypeOpAliases") "test3" (renderedType "forall a b c d. AltFn a (AltFn (AltFn b c) d)")
-      , ValueShouldHaveTypeSignature (n "TypeOpAliases") "test4" (renderedType "forall a b c d. AltFn (AltFn (AltFn a b) c) d")
-      , ValueShouldHaveTypeSignature (n "TypeOpAliases") "third" (renderedType "forall a b c. Tuple (Tuple a b) c -> c")
+      [ ValueShouldHaveTypeSignature (n "TypeOpAliases") "test1" (renderedType "forall a b. a ~> b")
+      , ValueShouldHaveTypeSignature (n "TypeOpAliases") "test2" (renderedType "forall a b c. a ~> b ~> c")
+      , ValueShouldHaveTypeSignature (n "TypeOpAliases") "test3" (renderedType "forall a b c d. a ~> (b ~> c) ~> d")
+      , ValueShouldHaveTypeSignature (n "TypeOpAliases") "test4" (renderedType "forall a b c d. ((a ~> b) ~> c) ~> d")
+      , ValueShouldHaveTypeSignature (n "TypeOpAliases") "third" (renderedType "forall a b c. a × b × c -> c")
+      , ShouldBeDocumented (n "TypeOpAliases") "Boop" ["Nope","Welp"]
+      , ShouldBeDocumented (n "TypeOpAliases") "Narp" ["narp","narpBoop"]
       ])
 
   , ("DocComments",

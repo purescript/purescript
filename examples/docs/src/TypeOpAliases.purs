@@ -16,3 +16,17 @@ infixl 6 type Tuple as ×
 
 third ∷ ∀ a b c. a × b × c → c
 third (a × b × c) = c
+
+data Boop a b
+  = Nope a
+  | Welp b
+
+infixr 6 type Boop as </>
+
+class Narp a where
+  narp :: a -> String
+
+instance narpBoop :: (Narp a, Narp b) => Narp (a </> b) where
+  narp (Nope a) = narp a
+  narp (Welp b) = narp b
+
