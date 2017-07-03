@@ -266,9 +266,10 @@ typeCheckAll moduleName _ = traverse go
       addTypeSynonym moduleName name args' ty kind
     return $ TypeSynonymDeclaration sa name args ty
   go TypeDeclaration{} =
-    internalError "Type declarations should have been removed before typeCheckAlld"
+    internalError "Type declarations should have been removed before typeCheckAll"
   go (ValueDeclaration sa@(ss, _) name nameKind [] [MkUnguarded val]) = do
     env <- getEnv
+
     warnAndRethrow (addHint (ErrorInValueDeclaration name) . addHint (PositionedError ss)) $ do
       val' <- checkExhaustiveExpr ss env moduleName val
       valueIsNotDefined moduleName name
