@@ -28,8 +28,8 @@ import Language.PureScript.Types
 lint :: forall m. (MonadWriter MultipleErrors m) => Module -> m ()
 lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDeclaration ds
   where
-  moduleNames :: S.Set Ident
-  moduleNames = S.fromList (ordNub (mapMaybe getDeclIdent ds))
+  moduleNames :: S.Set (Qualified Ident)
+  moduleNames = S.fromList (mkUnqualified <$> ordNub (mapMaybe getDeclIdent ds))
 
   getDeclIdent :: Declaration -> Maybe Ident
   getDeclIdent (ValueDeclaration _ ident _ _ _) = Just ident
@@ -41,7 +41,7 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
   lintDeclaration :: Declaration -> m ()
   lintDeclaration = tell . f
     where
-    (warningsInDecl, _, _, _, _) = everythingWithScope (\_ _ -> mempty) stepE stepB (\_ _ -> mempty) stepDo
+    (warningsInDecl, _, _, _, _) = everythingWithScope mn (\_ _ -> mempty) stepE stepB (\_ _ -> mempty) stepDo
 
     f :: Declaration -> MultipleErrors
     f (TypeClassDeclaration _ name args _ _ decs) = addHint (ErrorInTypeClassDeclaration name) (foldMap (f' (S.fromList $ fst <$> args)) decs)
@@ -52,25 +52,25 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
     f' s (TypeDeclaration _ name ty) = addHint (ErrorInTypeDeclaration name) (checkTypeVars s ty)
     f' s dec = warningsInDecl moduleNames dec <> checkTypeVarsInDecl s dec
 
-    stepE :: S.Set Ident -> Expr -> MultipleErrors
-    stepE s (Abs (VarBinder name) _) | name `S.member` s = errorMessage (ShadowedName name)
+    stepE :: S.Set (Qualified Ident) -> Expr -> MultipleErrors
+    stepE s (Abs (VarBinder name) _) | mkUnqualified name `S.member` s = errorMessage (ShadowedName name)
     stepE s (Let ds' _) = foldMap go ds'
       where
       go d | Just i <- getDeclIdent d
-           , i `S.member` s = errorMessage (ShadowedName i)
+           , mkUnqualified i `S.member` s = errorMessage (ShadowedName i)
            | otherwise = mempty
     stepE _ _ = mempty
 
-    stepB :: S.Set Ident -> Binder -> MultipleErrors
-    stepB s (VarBinder name) | name `S.member` s = errorMessage (ShadowedName name)
-    stepB s (NamedBinder name _) | name `S.member` s = errorMessage (ShadowedName name)
+    stepB :: S.Set (Qualified Ident) -> Binder -> MultipleErrors
+    stepB s (VarBinder name) | mkUnqualified name `S.member` s = errorMessage (ShadowedName name)
+    stepB s (NamedBinder name _) | mkUnqualified name `S.member` s = errorMessage (ShadowedName name)
     stepB _ _ = mempty
 
-    stepDo :: S.Set Ident -> DoNotationElement -> MultipleErrors
+    stepDo :: S.Set (Qualified Ident) -> DoNotationElement -> MultipleErrors
     stepDo s (DoNotationLet ds') = foldMap go ds'
       where
       go d | Just i <- getDeclIdent d
-           , i `S.member` s = errorMessage (ShadowedName i)
+           , mkUnqualified i `S.member` s = errorMessage (ShadowedName i)
            | otherwise = mempty
     stepDo _ _ = mempty
 

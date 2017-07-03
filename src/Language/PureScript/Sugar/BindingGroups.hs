@@ -53,7 +53,6 @@ createBindingGroups
   -> [Declaration]
   -> m [Declaration]
 createBindingGroups moduleName = mapM f <=< handleDecls
-
   where
   (f, _, _) = everywhereOnValuesTopDownM return handleExprs return
 
@@ -111,13 +110,13 @@ usedIdents moduleName = ordNub . usedIdents' S.empty . getValue
   getValue ValueDeclaration{} = internalError "Binders should have been desugared"
   getValue _ = internalError "Expected ValueDeclaration"
 
-  (_, usedIdents', _, _, _) = everythingWithScope def usedNamesE def def def
+  (_, usedIdents', _, _, _) = everythingWithScope moduleName def usedNamesE def def def
 
-  usedNamesE :: S.Set Ident -> Expr -> [Ident]
-  usedNamesE scope (Var (Qualified Nothing name))
-    | name `S.notMember` scope = [name]
-  usedNamesE scope (Var (Qualified (Just moduleName') name))
-    | moduleName == moduleName' && name `S.notMember` scope = [name]
+  usedNamesE :: S.Set (Qualified Ident) -> Expr -> [Ident]
+  usedNamesE scope (Var qual@(Qualified Nothing name))
+    | qual `S.notMember` scope = [name]
+  usedNamesE scope (Var qual@(Qualified (Just moduleName') name))
+    | moduleName == moduleName' && qual `S.notMember` scope = [name]
   usedNamesE _ _ = []
 
 usedImmediateIdents :: ModuleName -> Declaration -> [Ident]
