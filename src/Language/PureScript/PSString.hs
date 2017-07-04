@@ -74,8 +74,8 @@ codePoints = map (either (chr . fromIntegral) id) . decodeStringEither
 -- Decode a PSString as UTF-16 text. Lone surrogates will be replaced with
 -- U+FFFD REPLACEMENT CHARACTER
 --
-decodeStringWithReplacement :: PSString -> String
-decodeStringWithReplacement = map (either (const '\xFFFD') id) . decodeStringEither
+decodeStringWithReplacement :: PSString -> Text
+decodeStringWithReplacement = T.pack . map (either (const '\xFFFD') id) . decodeStringEither
 
 -- |
 -- Decode a PSString as UTF-16. Lone surrogates in the input are represented in
