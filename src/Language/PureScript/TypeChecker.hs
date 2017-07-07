@@ -323,7 +323,8 @@ typeCheckAll moduleName _ = traverse go
           sequence_ (zipWith (checkTypeClassInstance typeClass) [0..] tys)
           checkOrphanInstance dictName className typeClass tys
           _ <- traverseTypeInstanceBody checkInstanceMembers body
-          let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps)
+          deps' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms deps
+          let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps')
           addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) dict
           return d
 
