@@ -13,27 +13,26 @@ import qualified Data.Map as Map
 
 valueOperator :: Maybe P.Type -> IdeDeclarationAnn
 valueOperator =
-  d . IdeDeclValueOperator . IdeValueOperator (P.OpName "<$>") (P.Qualified (Just (mn "Test")) (Left (P.Ident "function"))) 2 P.Infix
+  ideValueOp "<$>" (P.Qualified (Just (mn "Test")) (Left "function")) 2 Nothing
 
 ctorOperator :: Maybe P.Type -> IdeDeclarationAnn
 ctorOperator =
-  d . IdeDeclValueOperator . IdeValueOperator (P.OpName ":") (P.Qualified (Just (mn "Test")) (Right (P.ProperName "Cons"))) 2 P.Infix
+  ideValueOp ":" (P.Qualified (Just (mn "Test")) (Right "Cons")) 2 Nothing
 
 typeOperator :: Maybe P.Kind -> IdeDeclarationAnn
 typeOperator =
-  d . IdeDeclTypeOperator . IdeTypeOperator (P.OpName ":") (P.Qualified (Just (mn "Test")) (P.ProperName "List")) 2 P.Infix
+  ideTypeOp ":" (P.Qualified (Just (mn "Test")) "List") 2 Nothing
 
 testModule :: (P.ModuleName, [IdeDeclarationAnn])
-testModule = (mn "Test", [ d (IdeDeclValue (IdeValue (P.Ident "function") P.REmpty))
-                         , d (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName "Cons") (P.ProperName "List") (P.REmpty)))
-                         , d (IdeDeclType (IdeType (P.ProperName "List") P.kindType))
-                         , valueOperator Nothing
-                         , ctorOperator Nothing
-                         , typeOperator Nothing
-                         ])
-
-d :: IdeDeclaration -> IdeDeclarationAnn
-d = IdeDeclarationAnn emptyAnn
+testModule =
+  (mn "Test",
+    [ ideValue "function" (Just P.REmpty)
+    , ideDtor "Cons" "List" (Just P.tyString)
+    , ideType "List" Nothing []
+    , valueOperator Nothing
+    , ctorOperator Nothing
+    , typeOperator Nothing
+    ])
 
 testState :: ModuleMap [IdeDeclarationAnn]
 testState = Map.fromList [testModule]
@@ -81,7 +80,7 @@ spec = do
     it "resolves the type for a value operator" $
       resolveOperatorsForModule testState (snd testModule) `shouldSatisfy` elem (valueOperator (Just P.REmpty))
     it "resolves the type for a constructor operator" $
-      resolveOperatorsForModule testState (snd testModule) `shouldSatisfy` elem (ctorOperator (Just P.REmpty))
+      resolveOperatorsForModule testState (snd testModule) `shouldSatisfy` elem (ctorOperator (Just P.tyString))
     it "resolves the kind for a type operator" $
       resolveOperatorsForModule testState (snd testModule) `shouldSatisfy` elem (typeOperator (Just P.kindType))
   describe "resolving instances for type classes" $ do
@@ -89,3 +88,8 @@ spec = do
       resolveInstances (Map.singleton (mn "InstanceModule") ef) moduleMap
         `shouldSatisfy`
         elemOf (ix (mn "ClassModule") . ix 0 . idaDeclaration . _IdeDeclTypeClass . ideTCInstances . folded) ideInstance
+  describe "resolving data constructors" $ do
+    it "resolves a constructor" $ do
+      resolveDataConstructorsForModule (snd testModule)
+        `shouldSatisfy`
+        elem (ideType "List" Nothing [(P.ProperName "Cons", P.tyString)])

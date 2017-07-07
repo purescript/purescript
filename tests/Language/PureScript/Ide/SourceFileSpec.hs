@@ -104,7 +104,7 @@ getLocation s = do
       [ ("Test",
          [ ideValue "sfValue" Nothing `annLoc` valueSS
          , ideSynonym "SFType" Nothing Nothing `annLoc` synonymSS
-         , ideType "SFData" Nothing `annLoc` typeSS
+         , ideType "SFData" Nothing [] `annLoc` typeSS
          , ideDtor "SFOne" "SFData" Nothing `annLoc` typeSS
          , ideDtor "SFTwo" "SFData" Nothing `annLoc` typeSS
          , ideDtor "SFThree" "SFData" Nothing `annLoc` typeSS

@@ -48,6 +48,7 @@ data IdeValue = IdeValue
 data IdeType = IdeType
  { _ideTypeName :: P.ProperName 'P.TypeName
  , _ideTypeKind :: P.Kind
+ , _ideTypeDtors :: [(P.ProperName 'P.ConstructorName, P.Type)]
  } deriving (Show, Eq, Ord)
 
 data IdeTypeSynonym = IdeTypeSynonym

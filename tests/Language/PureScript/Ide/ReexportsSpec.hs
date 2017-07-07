@@ -13,7 +13,7 @@ import           Test.Hspec
 
 valueA, typeA, synonymA, classA, dtorA1, dtorA2, kindA :: IdeDeclarationAnn
 valueA = ideValue "valueA" Nothing
-typeA = ideType "TypeA" Nothing
+typeA = ideType "TypeA" Nothing []
 synonymA = ideSynonym "SynonymA" Nothing Nothing
 classA = ideTypeClass "ClassA" P.kindType []
 dtorA1 = ideDtor "DtorA1" "TypeA" Nothing

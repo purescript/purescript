@@ -19,7 +19,7 @@ reexportMatches =
     moduleB = [ideKind "Kind" `annExp` "A"]
 
 matches :: [(Match IdeDeclarationAnn, [P.ModuleName])]
-matches = map (\d -> (Match (mn "Main", d), [mn "Main"])) [ ideKind "Kind", ideType "Type" Nothing ]
+matches = map (\d -> (Match (mn "Main", d), [mn "Main"])) [ ideKind "Kind", ideType "Type" Nothing [] ]
 
 spec :: Spec
 spec = describe "Applying completion options" $ do

@@ -1,6 +1,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PackageImports    #-}
+{-# LANGUAGE DataKinds         #-}
 module Language.PureScript.Ide.Test where
 
 import           Control.Concurrent.STM
@@ -63,8 +64,8 @@ ida = IdeDeclarationAnn emptyAnn
 ideValue :: Text -> Maybe P.Type -> IdeDeclarationAnn
 ideValue i ty = ida (IdeDeclValue (IdeValue (P.Ident i) (fromMaybe P.tyString ty)))
 
-ideType :: Text -> Maybe P.Kind -> IdeDeclarationAnn
-ideType pn ki = ida (IdeDeclType (IdeType (P.ProperName pn) (fromMaybe P.kindType ki)))
+ideType :: Text -> Maybe P.Kind -> [(P.ProperName 'P.ConstructorName, P.Type)] -> IdeDeclarationAnn
+ideType pn ki dtors = ida (IdeDeclType (IdeType (P.ProperName pn) (fromMaybe P.kindType ki) dtors))
 
 ideSynonym :: Text -> Maybe P.Type -> Maybe P.Kind -> IdeDeclarationAnn
 ideSynonym pn ty kind = ida (IdeDeclTypeSynonym (IdeTypeSynonym (P.ProperName pn) (fromMaybe P.tyString ty) (fromMaybe P.kindType kind)))
