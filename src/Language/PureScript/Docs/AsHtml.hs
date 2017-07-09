@@ -163,11 +163,16 @@ declAsHtml r d@Declaration{..} = do
 
 renderChildren :: HtmlRenderContext -> [ChildDeclaration] -> Html
 renderChildren _ [] = return ()
-renderChildren r xs = ul $ mapM_ go xs
+renderChildren r xs = ul $ mapM_ item xs
   where
-  go decl = item decl . code . codeAsHtml r . Render.renderChildDeclaration $ decl
-  item decl = let fragment = makeFragment (childDeclInfoNamespace (cdeclInfo decl)) (cdeclTitle decl)
-              in  li ! A.id (v (T.drop 1 fragment))
+  item decl =
+    li ! A.id (v (T.drop 1 (fragment decl))) $ do
+      renderCode decl
+      for_ (cdeclComments decl) $ \coms ->
+        H.div ! A.class_ "decl__child_comments" $ renderMarkdown coms
+
+  fragment decl = makeFragment (childDeclInfoNamespace (cdeclInfo decl)) (cdeclTitle decl)
+  renderCode = code . codeAsHtml r . Render.renderChildDeclaration
 
 codeAsHtml :: HtmlRenderContext -> RenderedCode -> Html
 codeAsHtml r = outputWith elemAsHtml
