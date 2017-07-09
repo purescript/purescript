@@ -57,7 +57,7 @@ import qualified Data.ByteString.Lazy.UTF8 as U
 
 -- | Command line options
 data PSCiOptions = PSCiOptions
-  { psciInputFile         :: [FilePath]
+  { psciInputGlob         :: [String]
   , psciBackend           :: Backend
   }
 
@@ -310,7 +310,7 @@ command = loop <$> options
   where
     loop :: PSCiOptions -> IO ()
     loop PSCiOptions{..} = do
-        inputFiles <- concat <$> traverse glob psciInputFile
+        inputFiles <- concat <$> traverse glob psciInputGlob
         e <- runExceptT $ do
           modules <- ExceptT (loadAllModules inputFiles)
           when (null modules) . liftIO $ do
@@ -331,7 +331,7 @@ command = loop <$> options
                 historyFilename <- getHistoryFilename
                 let settings = defaultSettings { historyFile = Just historyFilename }
                     initialState = PSCiState [] [] (zip (map snd modules) externs)
-                    config = PSCiConfig inputFiles env
+                    config = PSCiConfig psciInputGlob env
                     runner = flip runReaderT config
                              . flip evalStateT initialState
                              . runInputT (setComplete completion settings)

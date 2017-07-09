@@ -40,6 +40,7 @@ import           Language.PureScript.Interactive.Types        as Interactive
 
 import           System.Directory (getCurrentDirectory)
 import           System.FilePath ((</>))
+import           System.FilePath.Glob (glob)
 
 -- | Pretty-print errors
 printErrors :: MonadIO m => P.MultipleErrors -> m ()
@@ -118,7 +119,8 @@ handleReloadState
   -> m ()
 handleReloadState reload = do
   modify $ updateLets (const [])
-  files <- asks psciLoadedFiles
+  globs <- asks psciFileGlobs
+  files <- liftIO $ concat <$> traverse glob globs
   e <- runExceptT $ do
     modules <- ExceptT . liftIO $ loadAllModules files
     (externs, _) <- ExceptT . liftIO . runMake . make $ modules

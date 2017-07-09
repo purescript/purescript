@@ -12,7 +12,7 @@ import qualified Language.PureScript as P
 -- These configuration values do not change during execution.
 --
 data PSCiConfig = PSCiConfig
-  { psciLoadedFiles         :: [FilePath]
+  { psciFileGlobs           :: [String]
   , psciEnvironment         :: P.Environment
   } deriving Show
 
