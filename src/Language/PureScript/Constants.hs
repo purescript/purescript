@@ -359,6 +359,20 @@ orderingEQ = Qualified (Just typeDataOrdering) (ProperName "EQ")
 orderingGT :: Qualified (ProperName 'TypeName)
 orderingGT = Qualified (Just typeDataOrdering) (ProperName "GT")
 
+-- Type.Row
+
+pattern TypeRow :: ModuleName
+pattern TypeRow = ModuleName [ProperName "Type", ProperName "Row"]
+
+pattern RowToList :: Qualified (ProperName 'ClassName)
+pattern RowToList = Qualified (Just TypeRow) (ProperName "RowToList")
+
+pattern RowListNil :: Qualified (ProperName 'TypeName)
+pattern RowListNil = Qualified (Just TypeRow) (ProperName "Nil")
+
+pattern RowListCons :: Qualified (ProperName 'TypeName)
+pattern RowListCons = Qualified (Just TypeRow) (ProperName "Cons")
+
 -- Main module
 
 main :: forall a. (IsString a) => a

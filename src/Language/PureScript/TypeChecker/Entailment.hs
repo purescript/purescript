@@ -44,20 +44,17 @@ import qualified Language.PureScript.Constants as C
 
 -- | Describes what sort of dictionary to generate for type class instances
 data Evidence
+  -- | An existing named instance
   = NamedInstance (Qualified Ident)
-  -- ^ An existing named instance
-  | WarnInstance Type
-  -- ^ Computed instance of the Warn type class with a user-defined warning message
-  | IsSymbolInstance PSString
-  -- ^ Computed instance of the IsSymbol type class for a given Symbol literal
+
+  -- | Computed instances
+  | WarnInstance Type         -- ^ Warn type class with a user-defined warning message
+  | IsSymbolInstance PSString -- ^ The IsSymbol type class for a given Symbol literal
   | CompareSymbolInstance
-  -- ^ Computed instance of CompareSymbol
   | AppendSymbolInstance
-  -- ^ Computed instance of AppendSymbol
   | UnionInstance
-  -- ^ Computed instance of Union
   | ConsInstance
-  -- ^ Computed instance of RowCons
+  | RowToListInstance
   deriving (Show, Eq)
 
 -- | Extract the identifier of a named instance
@@ -173,6 +170,9 @@ entails SolverOptions{..} constraint context hints =
       = [ TypeClassDictionaryInScope UnionInstance [] C.Union [lOut, rOut, uOut] cst ]
     forClassName _ C.RowCons [TypeLevelString sym, ty, r, _]
       = [ TypeClassDictionaryInScope ConsInstance [] C.RowCons [TypeLevelString sym, ty, r, RCons (Label sym) ty r] Nothing ]
+    forClassName _ C.RowToList [r, _]
+      | Just entries <- solveRowToList r
+      = [ TypeClassDictionaryInScope RowToListInstance [] C.RowToList [r, entries] Nothing ]
     forClassName ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (ordNub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
     forClassName _ _ _ = internalError "forClassName: expected qualified class name"
 
@@ -333,6 +333,7 @@ entails SolverOptions{..} constraint context hints =
               return $ App (Abs (VarBinder (Ident C.__unused)) valUndefined) e
             mkDictionary UnionInstance _ = return valUndefined
             mkDictionary ConsInstance _ = return valUndefined
+            mkDictionary RowToListInstance _ = return valUndefined
             mkDictionary (WarnInstance msg) _ = do
               tell . errorMessage $ UserDefinedWarning msg
               -- We cannot call the type class constructor here because Warn is declared in Prim.
@@ -373,6 +374,18 @@ entails SolverOptions{..} constraint context hints =
             -- the right hand side, and we can't be certain we won't reorder the
             -- types for such labels.
             _ -> (not (null fixed), (fixed, rowVar), Just [ Constraint C.Union [rest, r, rowVar] Nothing ])
+
+    -- | Convert a closed row to a sorted list of entries
+    solveRowToList :: Type -> Maybe Type
+    solveRowToList r =
+        guard (REmpty == rest) $>
+        foldr rowListCons (TypeConstructor C.RowListNil) fixed
+      where
+        (fixed, rest) = rowToSortedList r
+        rowListCons (lbl, ty) tl = foldl TypeApp (TypeConstructor C.RowListCons)
+                                     [ TypeLevelString (runLabel lbl)
+                                     , ty
+                                     , tl ]
 
 -- Check if an instance matches our list of types, allowing for types
 -- to be solved via functional dependencies. If the types match, we return a
