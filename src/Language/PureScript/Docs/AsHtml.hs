@@ -184,8 +184,9 @@ codeAsHtml r = outputWith elemAsHtml
         Link mn ->
           let
             class_ = if startsWithUpper name then "ctor" else "ident"
+            target = if ns == TypeLevel then "type (" <> name <> ")" else name
           in
-            linkToDecl ns name mn (withClass class_ (text name))
+            linkToDecl ns target mn (withClass class_ (text name))
         NoLink ->
           text name
 
