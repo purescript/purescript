@@ -31,8 +31,10 @@ import           Language.PureScript.Ide.Types
 
 import qualified Language.PureScript as P
 
-readExternFile :: (MonadIO m, MonadError IdeError m, MonadLogger m) =>
-                  FilePath -> m P.ExternsFile
+readExternFile
+  :: (MonadIO m, MonadError IdeError m, MonadLogger m)
+  => FilePath
+  -> m P.ExternsFile
 readExternFile fp = do
    parseResult <- liftIO (decodeStrict <$> BS.readFile fp)
    case parseResult of
@@ -57,7 +59,7 @@ convertExterns ef =
   where
     decls = map
       (IdeDeclarationAnn emptyAnn)
-      (resolvedDeclarations ++ operatorDecls ++ tyOperatorDecls)
+      (resolvedDeclarations <> operatorDecls <> tyOperatorDecls)
     exportDecls = mapMaybe convertExport (P.efExports ef)
     operatorDecls = convertOperator <$> P.efFixities ef
     tyOperatorDecls = convertTypeOperator <$> P.efTypeFixities ef
@@ -117,31 +119,41 @@ convertExport (P.ReExportRef _ m r) = Just (m, r)
 convertExport _ = Nothing
 
 convertDecl :: P.ExternsDeclaration -> Either ToResolve (Maybe IdeDeclaration)
-convertDecl P.EDType{..} = Right $ Just $ IdeDeclType $
-  IdeType edTypeName edTypeKind
-convertDecl P.EDTypeSynonym{..} = Left (SynonymToResolve edTypeSynonymName edTypeSynonymType)
-convertDecl P.EDDataConstructor{..} = Right $ Just $ IdeDeclDataConstructor $
-  IdeDataConstructor edDataCtorName edDataCtorTypeCtor edDataCtorType
-convertDecl P.EDValue{..} = Right $ Just $ IdeDeclValue $
-  IdeValue edValueName edValueType
-convertDecl P.EDClass{..} = Left (TypeClassToResolve edClassName)
-convertDecl P.EDKind{..} = Right (Just (IdeDeclKind edKindName))
-convertDecl P.EDInstance{} = Right Nothing
+convertDecl ed = case ed of
+  P.EDType{..} ->
+    Right (Just (IdeDeclType (IdeType edTypeName edTypeKind [])))
+  P.EDTypeSynonym{..} ->
+    Left (SynonymToResolve edTypeSynonymName edTypeSynonymType)
+  P.EDDataConstructor{..} ->
+    Right
+      (Just
+        (IdeDeclDataConstructor
+          (IdeDataConstructor edDataCtorName edDataCtorTypeCtor edDataCtorType)))
+  P.EDValue{..} ->
+    Right (Just (IdeDeclValue (IdeValue edValueName edValueType)))
+  P.EDClass{..} ->
+    Left (TypeClassToResolve edClassName)
+  P.EDKind{..} ->
+    Right (Just (IdeDeclKind edKindName))
+  P.EDInstance{} ->
+    Right Nothing
 
 convertOperator :: P.ExternsFixity -> IdeDeclaration
 convertOperator P.ExternsFixity{..} =
-  IdeDeclValueOperator $ IdeValueOperator
-    efOperator
-    efAlias
-    efPrecedence
-    efAssociativity
-    Nothing
+  IdeDeclValueOperator
+    (IdeValueOperator
+      efOperator
+      efAlias
+      efPrecedence
+      efAssociativity
+      Nothing)
 
 convertTypeOperator :: P.ExternsTypeFixity -> IdeDeclaration
 convertTypeOperator P.ExternsTypeFixity{..} =
-  IdeDeclTypeOperator $ IdeTypeOperator
-    efTypeOperator
-    efTypeAlias
-    efTypePrecedence
-    efTypeAssociativity
-    Nothing
+  IdeDeclTypeOperator
+    (IdeTypeOperator
+      efTypeOperator
+      efTypeAlias
+      efTypePrecedence
+      efTypeAssociativity
+      Nothing)

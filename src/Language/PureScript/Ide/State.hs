@@ -30,6 +30,7 @@ module Language.PureScript.Ide.State
   -- for tests
   , resolveOperatorsForModule
   , resolveInstances
+  , resolveDataConstructorsForModule
   ) where
 
 import           Protolude
@@ -180,7 +181,9 @@ populateVolatileStateSTM ref = do
   let asts = map (extractAstInformation . fst) modules
   let (moduleDeclarations, reexportRefs) = (map fst &&& map snd) (Map.map convertExterns externs)
       results =
-        resolveLocations asts moduleDeclarations
+        moduleDeclarations
+        & map resolveDataConstructorsForModule
+        & resolveLocations asts
         & resolveInstances externs
         & resolveOperators
         & resolveReexports reexportRefs
@@ -311,3 +314,22 @@ resolveOperatorsForModule modules = map (idaDeclaration %~ resolveOperator)
 
 mapIf :: Functor f => (b -> Bool) -> (b -> b) -> f b -> f b
 mapIf p f = map (\x -> if p x then f x else x)
+
+resolveDataConstructorsForModule
+  :: [IdeDeclarationAnn]
+  -> [IdeDeclarationAnn]
+resolveDataConstructorsForModule decls =
+  map (idaDeclaration %~ resolveDataConstructors) decls
+  where
+    resolveDataConstructors :: IdeDeclaration -> IdeDeclaration
+    resolveDataConstructors decl = case decl of
+      IdeDeclType ty ->
+        IdeDeclType (ty & ideTypeDtors .~ fromMaybe [] (Map.lookup (ty^.ideTypeName) dtors))
+      _ ->
+        decl
+
+    dtors =
+      decls
+      & mapMaybe (preview (idaDeclaration._IdeDeclDataConstructor))
+      & foldr (\(IdeDataConstructor name typeName type') ->
+                  Map.insertWith (<>) typeName [(name, type')]) Map.empty

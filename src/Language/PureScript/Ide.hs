@@ -12,8 +12,7 @@
 -- Interface for the psc-ide-server
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE PackageImports        #-}
-{-# LANGUAGE TemplateHaskell       #-}
+{-# LANGUAGE PackageImports #-}
 
 module Language.PureScript.Ide
        ( handleCommand
@@ -45,8 +44,10 @@ import           System.FilePath.Glob (glob)
 
 -- | Accepts a Commmand and runs it against psc-ide's State. This is the main
 -- entry point for the server.
-handleCommand :: (Ide m, MonadLogger m, MonadError IdeError m) =>
-                 Command -> m Success
+handleCommand
+  :: (Ide m, MonadLogger m, MonadError IdeError m)
+  => Command
+  -> m Success
 handleCommand c = case c of
   Load [] ->
     findAvailableExterns >>= loadModulesAsync
@@ -222,7 +223,7 @@ loadModules moduleNames = do
   (failures, allModules) <-
     partitionEithers <$> (parseModulesFromFiles =<< findAllSourceFiles)
   unless (null failures) $
-    $(logWarn) ("Failed to parse: " <> show failures)
+    logWarnN ("Failed to parse: " <> show failures)
   traverse_ insertModule allModules
 
   pure (TextResult ("Loaded " <> show (length efiles) <> " modules and "

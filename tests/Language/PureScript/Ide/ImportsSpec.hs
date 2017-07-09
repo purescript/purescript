@@ -107,7 +107,7 @@ spec = do
         addDtorImport i t mn is =
           prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideDtor i t Nothing)) mn is)
         addTypeImport i mn is =
-          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideType i Nothing)) mn is)
+          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideType i Nothing [])) mn is)
         addKindImport i mn is =
           prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideKind i)) mn is)
     it "adds an implicit unqualified import to a file without any imports" $
@@ -208,7 +208,7 @@ spec = do
         moduleName = (P.moduleNameFromString "Control.Monad")
         addImport imports import' = addExplicitImport' import' moduleName imports
         valueImport ident = _idaDeclaration (Test.ideValue ident Nothing)
-        typeImport name = _idaDeclaration (Test.ideType name Nothing)
+        typeImport name = _idaDeclaration (Test.ideType name Nothing [])
         classImport name = _idaDeclaration (Test.ideTypeClass name P.kindType [])
         dtorImport name typeName = _idaDeclaration (Test.ideDtor name typeName Nothing)
         -- expect any list of provided identifiers, when imported, to come out as specified

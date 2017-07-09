@@ -12,7 +12,7 @@ idePrimDeclarations =
   primTypes <> primKinds <> primClasses
   where
     primTypes = foreach (Map.toList PEnv.primTypes) $ \(tn, (kind, _)) ->
-      IdeDeclarationAnn emptyAnn (IdeDeclType (IdeType (P.disqualify tn) kind))
+      IdeDeclarationAnn emptyAnn (IdeDeclType (IdeType (P.disqualify tn) kind []))
     primKinds = foreach (Set.toList PEnv.primKinds) $ \kn ->
       IdeDeclarationAnn emptyAnn (IdeDeclKind (P.disqualify kn))
     primClasses = foreach (Map.toList PEnv.primClasses) $ \(cn, _) ->
