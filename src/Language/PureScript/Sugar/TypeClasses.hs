@@ -88,15 +88,11 @@ desugarModule _ = internalError "Exports should have been elaborated in name des
 --
 --   instance fooString :: Foo String where
 --     foo s = s ++ s
---
---   instance fooArray :: (Foo a) => Foo [a] where
+--   instance fooArray :: Foo a => Foo (Array a) where
 --     foo = map foo
 --
---   {- Superclasses -}
---
---   class (Foo a) <= Sub a where
+--   class Foo a <= Sub a where
 --     sub :: a
---
 --   instance subString :: Sub String where
 --     sub = ""
 --
@@ -109,16 +105,20 @@ desugarModule _ = internalError "Exports should have been elaborated in name des
 --   -- this following type is marked as not needing to be checked so a new Abs
 --   -- is not introduced around the definition in type checking, but when
 --   -- called the dictionary value is still passed in for the `dict` argument
---   foo :: forall a. (Foo a) => a -> a
+--   foo :: forall a. Foo a => a -> a
 --   foo dict = dict.foo
 --
 --   fooString :: {} -> Foo String
---   fooString _ = <TypeClassDictionaryConstructorApp Foo { foo: \s -> s ++ s }>
+--   fooString _ =
+--     let foo_1 :: String -> String
+--         foo_1 = \s -> s ++ s
+--     in <TypeClassDictionaryConstructorApp Foo { foo: foo_1 }>
 --
---   fooArray :: forall a. (Foo a) => Foo [a]
---   fooArray = <TypeClassDictionaryConstructorApp Foo { foo: map foo }>
---
---   {- Superclasses -}
+--   fooArray :: forall a. Foo a => Foo (Array a)
+--   fooArray =
+--     let foo_1 :: Array a -> Array a
+--         foo_1 = map foo
+--     in <TypeClassDictionaryConstructorApp Foo { foo: foo_1 }>
 --
 --   <TypeClassDeclaration Sub ...>
 --
@@ -131,43 +131,14 @@ desugarModule _ = internalError "Exports should have been elaborated in name des
 --   sub dict = dict.sub
 --
 --   subString :: {} -> Sub String
---   subString _ = { sub: "",
---                 , "Foo0": \_ -> <DeferredDictionary Foo String>
---                 }
---
--- and finally as the generated javascript:
---
---   function Foo(foo) {
---       this.foo = foo;
---   };
---
---   var foo = function (dict) {
---       return dict.foo;
---   };
---
---   var fooString = function (_) {
---       return new Foo(function (s) {
---           return s + s;
---       });
---   };
---
---   var fooArray = function (__dict_Foo_15) {
---       return new Foo(map(foo(__dict_Foo_15)));
---   };
---
---   function Sub(Foo0, sub) {
---       this["Foo0"] = Foo0;
---       this.sub = sub;
---   };
---
---   var sub = function (dict) {
---       return dict.sub;
---   };
---
---   var subString = function (_) {
---       return new Sub(fooString, "");
---   };
--}
+--   subString _ =
+--     let sub_1 :: String
+--         sub_1 = ""
+--     in <TypeClassDictionaryConstructorApp Sub
+--          { sub: sub_1,
+--          , "Foo0": \_ -> <DeferredDictionary Foo String>
+--          }>
+--}
 desugarDecl
   :: (MonadSupply m, MonadError MultipleErrors m)
   => ModuleName
