@@ -208,5 +208,9 @@ partiallyDesugar = P.evalSupplyT 0 . desugar'
       >>> traverse P.desugarCasesModule
       >=> traverse P.desugarTypeDeclarationsModule
       >=> ignoreWarnings . P.desugarImportsWithEnv []
+      >>> fmap desugarTypeClassTypeOps
+
+  desugarTypeClassTypeOps (e, ms) =
+    (e, map P.desugarTypeClassTypeOpsForModule ms)
 
   ignoreWarnings = fmap fst . runWriterT

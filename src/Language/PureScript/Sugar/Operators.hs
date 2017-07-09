@@ -7,6 +7,7 @@
 --
 module Language.PureScript.Sugar.Operators
   ( desugarSignedLiterals
+    , desugarTypeClassTypeOpsForModule
   , rebracket
   , checkFixityExports
   ) where
@@ -57,6 +58,9 @@ type FixityRecord op alias = (Qualified op, SourceSpan, Fixity, Qualified alias)
 type ValueFixityRecord = FixityRecord (OpName 'ValueOpName) (Either Ident (ProperName 'ConstructorName))
 type TypeFixityRecord = FixityRecord (OpName 'TypeOpName) (ProperName 'TypeName)
 
+makeLookupEntry :: FixityRecord op alias -> (Qualified op, Qualified alias)
+makeLookupEntry (qname, _, _, alias) = (qname, alias)
+
 -- |
 -- Remove explicit parentheses and reorder binary operator applications.
 --
@@ -72,7 +76,7 @@ rebracket externs modules = do
   let (valueFixities, typeFixities) =
         partitionEithers
           $ concatMap externsFixities externs
-          ++ concatMap collectFixities modules
+          ++ concatMap collectFixitiesFromModule modules
 
   ensureNoDuplicates' MultipleValueOpFixities valueFixities
   ensureNoDuplicates' MultipleTypeOpFixities typeFixities
@@ -100,9 +104,6 @@ rebracket externs modules = do
     :: [FixityRecord op alias]
     -> [[(Qualified op, Associativity)]]
   customOperatorTable' = customOperatorTable . map (\(i, _, f, _) -> (i, f))
-
-  makeLookupEntry :: FixityRecord op alias -> (Qualified op, Qualified alias)
-  makeLookupEntry (qname, _, _, alias) = (qname, alias)
 
   renameAliasedOperators
     :: M.Map (Qualified (OpName 'ValueOpName)) (Qualified (Either Ident (ProperName 'ConstructorName)))
@@ -249,9 +250,38 @@ externsFixities ExternsFile{..} =
       , Fixity assoc prec
       , name
       )
+desugarTypeClassTypeOpsForModule
+  :: Module
+  -> Module
+desugarTypeClassTypeOpsForModule (Module a b mName ds c) =
+  (Module a b mName (desugarTypeOperatorsInInstanceDecls mName ds) c)
 
-collectFixities :: Module -> [Either ValueFixityRecord TypeFixityRecord]
-collectFixities (Module _ _ moduleName ds _) = concatMap collect ds
+desugarTypeOperatorsInInstanceDecls
+  :: ModuleName
+  -> [Declaration]
+  -> [Declaration]
+desugarTypeOperatorsInInstanceDecls mName decls =
+  let
+    (_, typeFixities) = partitionEithers $ collectFixities mName decls
+    typeAliased = M.fromList (map makeLookupEntry typeFixities)
+
+    f (TypeInstanceDeclaration srcAnn ident constraints className tys bdy) =
+      let newTys = map (everywhereOnTypes go) tys
+      in TypeInstanceDeclaration srcAnn ident constraints className newTys bdy
+    f d = d
+
+    go t@(BinaryNoParensType (TypeOp op) lhs rhs) = maybe t
+      (\alias -> TypeApp (TypeApp (TypeConstructor alias) lhs) rhs)
+      (M.lookup op typeAliased)
+    go other = other
+  in
+    map f decls
+
+collectFixitiesFromModule :: Module -> [Either ValueFixityRecord TypeFixityRecord]
+collectFixitiesFromModule (Module _ _ moduleName ds _) = collectFixities moduleName ds
+
+collectFixities :: ModuleName -> [Declaration] -> [Either ValueFixityRecord TypeFixityRecord]
+collectFixities moduleName ds = concatMap collect ds
   where
   collect :: Declaration -> [Either ValueFixityRecord TypeFixityRecord]
   collect (ValueFixityDeclaration (ss, _) fixity name op) =
