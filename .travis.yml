@@ -1,6 +1,12 @@
 language: c
 dist: trusty # because of perf issues
 sudo: required
+branches:
+  # Only build master and tagged versions, i.e. not feature branches; feature
+  # branches already get built after opening a pull request.
+  only:
+    - master
+    - /^v\d+\.\d+(\.\d+)?(-\S*)?$/
 matrix:
   include:
     # We use trusty boxes because they seem to be a bit faster.
