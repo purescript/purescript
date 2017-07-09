@@ -79,7 +79,7 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
   matches d (name, AugmentClass) = isTypeClass d && declTitle d == name
 
   augmentWith (AugmentChild child) d =
-    d { declChildren = declChildren d ++ [child] }
+    d { declChildren = child : declChildren d }
 
 getDeclarationTitle :: P.Declaration -> Maybe Text
 getDeclarationTitle (P.ValueDeclaration _ name _ _ _) = Just (P.showIdent name)
