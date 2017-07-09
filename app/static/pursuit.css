@@ -413,6 +413,10 @@ ol li {
 .decl__body .syntax {
   color: #0B71B4;
 }
+.decl__child_comments {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
 /* Component: Dependency Link
  * -------------------------------------------------------------------------- */
 .deplink {
