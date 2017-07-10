@@ -21,6 +21,7 @@ module Language.PureScript.Ide.State
   , getExternFiles
   , resetIdeState
   , cacheRebuild
+  , cachedRebuild
   , insertExterns
   , insertModule
   , insertExternsSTM
