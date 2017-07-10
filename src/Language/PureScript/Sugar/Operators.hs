@@ -8,6 +8,7 @@
 module Language.PureScript.Sugar.Operators
   ( desugarSignedLiterals
   , rebracket
+  , rebracketFiltered
   , checkFixityExports
   ) where
 
@@ -68,7 +69,24 @@ rebracket
   => [ExternsFile]
   -> [Module]
   -> m [Module]
-rebracket externs modules = do
+rebracket =
+  rebracketFiltered (const True)
+
+-- |
+-- A version of `rebracket` which allows you to choose which declarations
+-- should be affected. This is used in docs generation, where we want to
+-- desugar type operators in instance declarations to ensure that instances are
+-- paired up with their types correctly, but we don't want to desugar type
+-- operators in value declarations.
+--
+rebracketFiltered
+  :: forall m
+   . MonadError MultipleErrors m
+  => (Declaration -> Bool)
+  -> [ExternsFile]
+  -> [Module]
+  -> m [Module]
+rebracketFiltered pred_ externs modules = do
   let (valueFixities, typeFixities) =
         partitionEithers
           $ concatMap externsFixities externs
@@ -84,7 +102,7 @@ rebracket externs modules = do
 
   for modules
     $ renameAliasedOperators valueAliased typeAliased
-    <=< rebracketModule valueOpTable typeOpTable
+    <=< rebracketModule pred_ valueOpTable typeOpTable
 
   where
 
@@ -110,7 +128,7 @@ rebracket externs modules = do
     -> Module
     -> m Module
   renameAliasedOperators valueAliased typeAliased (Module ss coms mn ds exts) =
-    Module ss coms mn <$> mapM f' ds <*> pure exts
+    Module ss coms mn <$> mapM (usingPredicate pred_ f') ds <*> pure exts
     where
     (goDecl', goExpr', goBinder') = updateTypes goType
     (f', _, _, _, _) =
@@ -167,13 +185,19 @@ rebracket externs modules = do
 rebracketModule
   :: forall m
    . (MonadError MultipleErrors m)
-  => [[(Qualified (OpName 'ValueOpName), Associativity)]]
+  => (Declaration -> Bool)
+  -> [[(Qualified (OpName 'ValueOpName), Associativity)]]
   -> [[(Qualified (OpName 'TypeOpName), Associativity)]]
   -> Module
   -> m Module
-rebracketModule valueOpTable typeOpTable (Module ss coms mn ds exts) =
-  Module ss coms mn <$> (map removeParens <$> parU ds f) <*> pure exts
+rebracketModule pred_ valueOpTable typeOpTable (Module ss coms mn ds exts) =
+  Module ss coms mn <$> f' ds <*> pure exts
   where
+  f' :: [Declaration] -> m [Declaration]
+  f' =
+    fmap (map (\d -> if pred_ d then removeParens d else d)) .
+    flip parU (usingPredicate pred_ f)
+
   (f, _, _) =
       everywhereOnValuesTopDownM
         goDecl
@@ -405,3 +429,12 @@ checkFixityExports m@(Module ss _ mn ds (Just exps)) =
     :: ((ProperName 'TypeName, Maybe [ProperName 'ConstructorName]) -> Bool)
     -> Bool
   anyTypeRef f = any (maybe False f . getTypeRef) exps
+
+usingPredicate
+  :: forall f a
+   . Applicative f
+  => (a -> Bool)
+  -> (a -> f a)
+  -> (a -> f a)
+usingPredicate p f x =
+  if p x then f x else pure x
