@@ -19,6 +19,7 @@ import Control.Arrow (second)
 import Control.Category ((>>>))
 import Control.Monad (unless)
 import Data.Char (isUpper)
+import Data.Either (isRight)
 import Data.Monoid ((<>))
 import Data.Foldable (for_)
 import Data.String (fromString)
@@ -29,6 +30,7 @@ import qualified Data.Text as T
 import Text.Blaze.Html5 as H hiding (map)
 import qualified Text.Blaze.Html5.Attributes as A
 import qualified Cheapskate
+import Text.Parsec (eof)
 
 import qualified Language.PureScript as P
 
@@ -188,8 +190,14 @@ codeAsHtml r = outputWith elemAsHtml
       case link_ of
         Link mn ->
           let
-            class_ = if startsWithUpper name then "ctor" else "ident"
-            target = if ns == TypeLevel then "type (" <> name <> ")" else name
+            class_ =
+              if startsWithUpper name then "ctor" else "ident"
+            target
+              | isOp name =
+                  if ns == TypeLevel
+                    then "type (" <> name <> ")"
+                    else "(" <> name <> ")"
+              | otherwise = name
           in
             linkToDecl ns target mn (withClass class_ (text name))
         NoLink ->
@@ -202,6 +210,13 @@ codeAsHtml r = outputWith elemAsHtml
     if T.null str
       then False
       else isUpper (T.index str 0)
+
+  isOp = isRight . runParser P.symbol
+
+  runParser :: P.TokenParser a -> Text -> Either String a
+  runParser p' s = either (Left . show) Right $ do
+    ts <- P.lex "" s
+    P.runTokenParser "" (p' <* eof) ts
 
 renderLink :: HtmlRenderContext -> DocLink -> Html -> Html
 renderLink r link_@DocLink{..} =
