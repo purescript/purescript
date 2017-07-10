@@ -208,5 +208,9 @@ partiallyDesugar = P.evalSupplyT 0 . desugar'
       >>> traverse P.desugarCasesModule
       >=> traverse P.desugarTypeDeclarationsModule
       >=> ignoreWarnings . P.desugarImportsWithEnv []
+      >=> traverse (P.rebracketFiltered isInstanceDecl [])
 
   ignoreWarnings = fmap fst . runWriterT
+
+  isInstanceDecl (P.TypeInstanceDeclaration {}) = True
+  isInstanceDecl _ = False
