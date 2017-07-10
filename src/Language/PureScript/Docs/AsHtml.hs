@@ -299,10 +299,13 @@ withClass className content = H.span ! A.class_ (fromString className) $ content
 partitionChildren ::
   [ChildDeclaration] ->
   ([ChildDeclaration], [ChildDeclaration], [ChildDeclaration])
-partitionChildren = foldl go ([], [], [])
+partitionChildren =
+  reverseAll . foldl go ([], [], [])
   where
   go (instances, dctors, members) rcd =
     case cdeclInfo rcd of
       ChildInstance _ _      -> (rcd : instances, dctors, members)
       ChildDataConstructor _ -> (instances, rcd : dctors, members)
       ChildTypeClassMember _ -> (instances, dctors, rcd : members)
+
+  reverseAll (xs, ys, zs) = (reverse xs, reverse ys, reverse zs)

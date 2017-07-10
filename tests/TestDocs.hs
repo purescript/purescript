@@ -13,7 +13,6 @@ import Control.Arrow (first)
 import Control.Monad.IO.Class (liftIO)
 
 import Data.Foldable
-import Data.List ((\\))
 import Data.Maybe (fromMaybe)
 import Data.Monoid
 import Data.Text (Text)
@@ -99,7 +98,7 @@ instance Show (ShowFn a) where
 data AssertionFailure
   -- | A declaration was not documented, but should have been
   = NotDocumented P.ModuleName Text
-  -- | A child declaration was not documented, but should have been
+  -- | The expected list of child declarations did not match the actual list
   | ChildrenNotDocumented P.ModuleName Text [Text]
   -- | A declaration was documented, but should not have been
   | Documented P.ModuleName Text
@@ -152,9 +151,9 @@ runAssertion assertion linksCtx Docs.Module{..} =
         Nothing ->
           Fail (NotDocumented mn decl)
         Just actualChildren ->
-          case children \\ actualChildren of
-            [] -> Pass
-            cs -> Fail (ChildrenNotDocumented mn decl cs)
+          if children == actualChildren
+            then Pass
+            else Fail (ChildrenNotDocumented mn decl actualChildren)
 
     ShouldNotBeDocumented mn decl ->
       case findChildren decl (declarationsFor mn) of
@@ -405,6 +404,11 @@ testCases =
 
   , ("Desugar",
       [ ValueShouldHaveTypeSignature (n "Desugar") "test" (renderedType "forall a b. X (a -> b) a -> b")
+      ])
+
+  , ("ChildDeclOrder",
+      [ ShouldBeDocumented (n "ChildDeclOrder") "Two" ["First", "Second", "showTwo", "fooTwo"]
+      , ShouldBeDocumented (n "ChildDeclOrder") "Foo" ["foo1", "foo2", "fooTwo", "fooInt"]
       ])
   ]
 
