@@ -202,15 +202,16 @@ getTagTime tag = do
     _ -> internalError (CouldntParseGitTagDate tag)
 
 getManifestRepositoryInfo :: PackageMeta -> PrepareM (D.GithubUser, D.GithubRepo)
-getManifestRepositoryInfo = either (userError . BadRepositoryField) return . tryExtract
-  where
-  tryExtract pkgMeta =
-    case bowerRepository pkgMeta of
-      Nothing -> Left RepositoryFieldMissing
-      Just Repository{..} -> do
-        unless (repositoryType == "git")
-          (Left (BadRepositoryType repositoryType))
-        maybe (Left NotOnGithub) Right (extractGithub repositoryUrl)
+getManifestRepositoryInfo pkgMeta =
+  case bowerRepository pkgMeta of
+    Nothing -> do
+      giturl <- catchError (Just . T.strip . T.pack <$> readProcess' "git" ["config", "remote.origin.url"] "")
+                  (const (return Nothing))
+      userError (BadRepositoryField (RepositoryFieldMissing giturl))
+    Just Repository{..} -> do
+      unless (repositoryType == "git")
+        (userError (BadRepositoryField (BadRepositoryType repositoryType)))
+      maybe (userError (BadRepositoryField NotOnGithub)) return (extractGithub repositoryUrl)
 
 checkLicense :: PackageMeta -> PrepareM ()
 checkLicense pkgMeta =
