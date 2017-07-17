@@ -36,7 +36,7 @@ writeHtmlModules outputDir modules = do
   mapM_ (writeHtmlModule outputDir . (fst &&& layout moduleList)) modules
 
 asHtml :: D.Module -> (P.ModuleName, D.HtmlOutputModule Html)
-asHtml m = D.moduleAsHtml (getHtmlRenderContext (D.modName m)) m
+asHtml m = D.moduleAsHtml (const $ Just $ getHtmlRenderContext (D.modName m)) m
 
 writeHtmlModule :: FilePath -> (P.ModuleName, Html) -> IO ()
 writeHtmlModule outputDir (mn, html) = do
