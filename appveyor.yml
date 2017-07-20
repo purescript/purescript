@@ -6,6 +6,12 @@ environment:
   STACK_VER: 1.3.2
   RELEASE_USER: purescript
   RELEASE_REPO: purescript
+branches:
+  # Only build master and tagged versions, i.e. not feature branches; feature
+  # branches already get built after opening a pull request.
+  only:
+    - master
+    - /^v\d+\.\d+(\.\d+)?(-\S*)?$/
 cache:
 - c:\s -> appveyor/cache-buster.txt
 install:
