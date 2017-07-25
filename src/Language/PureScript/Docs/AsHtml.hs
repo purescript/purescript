@@ -138,6 +138,8 @@ declAsHtml r d@Declaration{..} = do
     h3 ! A.class_ "decl__title clearfix" $ do
       a ! A.class_ "decl__anchor" ! A.href (v declFragment) $ "#"
       H.span $ text declTitle
+      text " " -- prevent browser from treating
+               -- declTitle + linkToSource as one word
       for_ declSourceSpan (linkToSource r)
 
     H.div ! A.class_ "decl__body" $ do
