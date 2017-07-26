@@ -4,10 +4,12 @@ module Language.PureScript.AST.Exported
   ) where
 
 import Prelude.Compat
+import Protolude (sortBy, on)
 
 import Control.Category ((>>>))
 
 import Data.Maybe (mapMaybe)
+import qualified Data.Map as M
 
 import Language.PureScript.AST.Declarations
 import Language.PureScript.Types
@@ -24,6 +26,10 @@ import Language.PureScript.Names
 -- produce incorrect results if this is not the case - for example, type class
 -- instances will be incorrectly removed in some cases.
 --
+-- The returned declarations are in the same order as they appear in the export
+-- list, unless there is no export list, in which case they appear in the same
+-- order as they do in the source file.
+--
 exportedDeclarations :: Module -> [Declaration]
 exportedDeclarations (Module _ _ mn decls exps) = go decls
   where
@@ -31,6 +37,7 @@ exportedDeclarations (Module _ _ mn decls exps) = go decls
         >>> filter (isExported exps)
         >>> map (filterDataConstructors exps)
         >>> filterInstances mn exps
+        >>> maybe id reorder exps
 
 -- |
 -- Filter out all data constructors from a declaration which are not exported.
@@ -119,19 +126,9 @@ typeInstanceConstituents _ = []
 isExported :: Maybe [DeclarationRef] -> Declaration -> Bool
 isExported Nothing _ = True
 isExported _ TypeInstanceDeclaration{} = True
-isExported (Just exps) decl = any (matches decl) exps
+isExported (Just exps) decl = any matches exps
   where
-  matches (TypeDeclaration _ ident _) (ValueRef _ ident') = ident == ident'
-  matches (ValueDeclaration _ ident _ _ _) (ValueRef _ ident') = ident == ident'
-  matches (ExternDeclaration _ ident _) (ValueRef _ ident') = ident == ident'
-  matches (DataDeclaration _ _ ident _ _) (TypeRef _ ident' _) = ident == ident'
-  matches (ExternDataDeclaration _ ident _) (TypeRef _ ident' _) = ident == ident'
-  matches (ExternKindDeclaration _ ident) (KindRef _ ident') = ident == ident'
-  matches (TypeSynonymDeclaration _ ident _ _) (TypeRef _ ident' _) = ident == ident'
-  matches (TypeClassDeclaration _ ident _ _ _ _) (TypeClassRef _ ident') = ident == ident'
-  matches (ValueFixityDeclaration _ _ _ op) (ValueOpRef _ op') = op == op'
-  matches (TypeFixityDeclaration _ _ _ op) (TypeOpRef _ op') = op == op'
-  matches _ _ = False
+  matches declRef = declName decl == Just (declRefName declRef)
 
 -- |
 -- Test if a data constructor for a given type is exported, given a module's
@@ -144,3 +141,16 @@ isDctorExported ident (Just exps) ctor = test `any` exps
   test (TypeRef _ ident' Nothing) = ident == ident'
   test (TypeRef _ ident' (Just ctors)) = ident == ident' && ctor `elem` ctors
   test _ = False
+
+-- |
+-- Reorder declarations based on the order they appear in the given export
+-- list.
+--
+reorder :: [DeclarationRef] -> [Declaration] -> [Declaration]
+reorder refs =
+  sortBy (compare `on` refIndex)
+  where
+  refIndices =
+    M.fromList $ zip (map declRefName refs) [(0::Int)..]
+  refIndex decl =
+    declName decl >>= flip M.lookup refIndices
