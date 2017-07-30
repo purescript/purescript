@@ -171,7 +171,7 @@ rebracketFiltered pred_ externs modules = do
     goBinder pos other = return (pos, other)
 
     goType :: Maybe SourceSpan -> Type -> m Type
-    goType pos = maybe id rethrowWithPosition pos . everywhereOnTypesM go
+    goType pos = maybe id rethrowWithPosition pos . go
       where
       go :: Type -> m Type
       go (BinaryNoParensType (TypeOp op) lhs rhs) =
@@ -321,7 +321,7 @@ updateTypes goType = (goDecl, goExpr, goBinder)
   where
 
   goType' :: Maybe SourceSpan -> Type -> m Type
-  goType' = everywhereOnTypesM . goType
+  goType' = everywhereOnTypesTopDownM . goType
 
   goType'' :: SourceSpan -> Type -> m Type
   goType'' = goType' . Just
