@@ -72,9 +72,16 @@ rebuildFile path runOpenBuild = do
                         >>= shushProgress $ makeEnv) externs $ m
   case result of
     Left errors -> throwError (RebuildError errors)
-    Right _ -> do
+    Right newExterns -> do
+      whenM isEditorMode $ do
+        insertModule (path, m)
+        insertExterns newExterns
+        void populateVolatileState
       runOpenBuild (rebuildModuleOpen makeEnv externs m)
       pure (RebuildSuccess warnings)
+
+isEditorMode :: Ide m => m Bool
+isEditorMode = asks (confEditorMode . ideConfiguration)
 
 rebuildFileAsync
   :: forall m. (Ide m, MonadLogger m, MonadError IdeError m)
