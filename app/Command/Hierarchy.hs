@@ -44,14 +44,16 @@ data HierarchyOptions = HierarchyOptions
 newtype SuperMap = SuperMap { _unSuperMap :: Either (P.ProperName 'P.ClassName) (P.ProperName 'P.ClassName, P.ProperName 'P.ClassName) }
   deriving Eq
 
-instance Show SuperMap where
-  show (SuperMap (Left sub)) = show sub
-  show (SuperMap (Right (super, sub))) = show super ++ " -> " ++ show sub
-
 instance Ord SuperMap where
   compare (SuperMap s) (SuperMap s') = getCls s `compare` getCls s'
     where
       getCls = either id snd
+
+prettyPrint :: SuperMap -> String
+prettyPrint (SuperMap (Left sub)) =
+  T.unpack (P.runProperName sub)
+prettyPrint (SuperMap (Right (super, sub))) =
+  T.unpack (P.runProperName super) <> " -> " <> T.unpack (P.runProperName sub)
 
 runModuleName :: P.ModuleName -> String
 runModuleName (P.ModuleName pns) = intercalate "_" ((T.unpack . P.runProperName) `map` pns)
@@ -73,7 +75,7 @@ compile (HierarchyOptions inputGlob mOutput) = do
             tcs = filter P.isTypeClassDeclaration decls
             supers = sort . ordNub . filter (not . null) $ fmap superClasses tcs
             prologue = "digraph " ++ name ++ " {\n"
-            body = intercalate "\n" (concatMap (fmap (\s -> "  " ++ show s ++ ";")) supers)
+            body = intercalate "\n" (concatMap (fmap (\s -> "  " ++ prettyPrint s ++ ";")) supers)
             epilogue = "\n}"
             hier = prologue ++ body ++ epilogue
         in unless (null supers) $ case mOutput of
