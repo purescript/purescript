@@ -27,6 +27,7 @@ module Language.PureScript.Ide.State
   , insertExternsSTM
   , getAllModules
   , populateVolatileState
+  , populateVolatileStateSync
   , populateVolatileStateSTM
   -- for tests
   , resolveOperatorsForModule
@@ -163,14 +164,22 @@ cachedRebuild :: Ide m => m (Maybe (P.ModuleName, ExternsFile))
 cachedRebuild = vsCachedRebuild <$> getVolatileState
 
 -- | Resolves reexports and populates VolatileState with data to be used in queries.
-populateVolatileState :: (Ide m, MonadLogger m) => m ()
-populateVolatileState = do
+populateVolatileStateSync :: (Ide m, MonadLogger m) => m ()
+populateVolatileStateSync = do
   st <- ideStateVar <$> ask
   let message duration = "Finished populating Stage3 in " <> displayTimeSpec duration
   results <- logPerf message (liftIO (atomically (populateVolatileStateSTM st)))
   void $ Map.traverseWithKey
     (\mn -> logWarnN . prettyPrintReexportResult (const (P.runModuleName mn)))
     (Map.filter reexportHasFailures results)
+
+populateVolatileState :: (Ide m, MonadLogger m) => m (Async ())
+populateVolatileState = do
+  env <- ask
+  let ll = confLogLevel (ideConfiguration env)
+  -- populateVolatileState return Unit for now, so it's fine to discard this
+  -- result. We might want to block on this in a benchmarking situation.
+  liftIO (async (runLogger ll (runReaderT populateVolatileStateSync env)))
 
 -- | STM version of populateVolatileState
 populateVolatileStateSTM

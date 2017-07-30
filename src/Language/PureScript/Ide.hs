@@ -187,14 +187,7 @@ loadModulesAsync
   -> m Success
 loadModulesAsync moduleNames = do
   tr <- loadModules moduleNames
-
-  -- Finally we kick off the worker with @async@ and return the number of
-  -- successfully parsed modules.
-  env <- ask
-  let ll = confLogLevel (ideConfiguration env)
-  -- populateVolatileState return Unit for now, so it's fine to discard this
-  -- result. We might want to block on this in a benchmarking situation.
-  _ <- liftIO (async (runLogger ll (runReaderT populateVolatileState env)))
+  _ <- populateVolatileState
   pure tr
 
 loadModulesSync
@@ -203,7 +196,7 @@ loadModulesSync
   -> m Success
 loadModulesSync moduleNames = do
   tr <- loadModules moduleNames
-  populateVolatileState
+  populateVolatileStateSync
   pure tr
 
 loadModules
