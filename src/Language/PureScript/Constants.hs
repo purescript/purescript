@@ -420,6 +420,9 @@ prim = "Prim"
 prelude :: forall a. (IsString a) => a
 prelude = "Prelude"
 
+pattern Prelude :: ModuleName
+pattern Prelude = ModuleName [ProperName "Prelude"]
+
 dataArray :: forall a. (IsString a) => a
 dataArray = "Data_Array"
 
@@ -443,6 +446,9 @@ controlBind = "Control_Bind"
 
 dataBounded :: forall a. (IsString a) => a
 dataBounded = "Data_Bounded"
+
+pattern DataBoolean :: ModuleName
+pattern DataBoolean = ModuleName [ProperName "Data", ProperName "Boolean"]
 
 dataSemigroup :: forall a. (IsString a) => a
 dataSemigroup = "Data_Semigroup"

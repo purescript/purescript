@@ -1020,7 +1020,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderHint (ErrorCheckingAccessor expr prop) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ line "while checking type of property accessor"
-                                 , markCodeBox $ prettyPrintValue valueDepth (Accessor prop expr)
+                                 , markCodeBox $ prettyPrintValue valueDepth (Accessor (internalError "temporary Accessor SourceAnn was read") prop expr)
                                  ]
             ]
     renderHint (ErrorInApplication f t a) detail =

@@ -80,3 +80,16 @@ instance A.FromJSON SourceSpan where
 
 internalModuleSourceSpan :: String -> SourceSpan
 internalModuleSourceSpan name = SourceSpan name (SourcePos 0 0) (SourcePos 0 0)
+
+todoSourceSpan :: SourceSpan
+todoSourceSpan = internalModuleSourceSpan "<TODO>"
+
+todoSourceAnn :: SourceAnn
+todoSourceAnn = (todoSourceSpan, [])
+
+-- | Creates a source span that encompasses the full range of two other source
+-- spans. If the name of the spans mismatches the left side is returned instead.
+mergeSourceSpan :: SourceSpan -> SourceSpan -> SourceSpan
+mergeSourceSpan (SourceSpan nameA startA endA) (SourceSpan nameB startB endB)
+  | nameA == nameB = SourceSpan nameA (min startA startB) (max endA endB)
+  | otherwise = SourceSpan nameA startA endA

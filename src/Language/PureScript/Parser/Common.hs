@@ -149,6 +149,11 @@ withSourceAnnF
   -> P.Parsec [PositionedToken] u a
 withSourceAnnF = withSourceSpan (\ss com f -> f (ss, com))
 
+withSourceSpanF
+  :: P.Parsec [PositionedToken] u (SourceSpan -> a)
+  -> P.Parsec [PositionedToken] u a
+withSourceSpanF = withSourceSpan (\ss _ f -> f ss)
+
 withSourceSpan'
   :: (SourceSpan -> a -> b)
   -> P.Parsec [PositionedToken] u a
