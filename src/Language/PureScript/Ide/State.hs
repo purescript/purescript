@@ -12,9 +12,10 @@
 -- Functions to access psc-ide's state
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE PackageImports        #-}
-{-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE NamedFieldPuns        #-}
+{-# LANGUAGE PackageImports  #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE NamedFieldPuns  #-}
+{-# LANGUAGE BangPatterns    #-}
 
 module Language.PureScript.Ide.State
   ( getLoadedModulenames
@@ -167,8 +168,10 @@ cachedRebuild = vsCachedRebuild <$> getVolatileState
 populateVolatileStateSync :: (Ide m, MonadLogger m) => m ()
 populateVolatileStateSync = do
   st <- ideStateVar <$> ask
-  let message duration = "Finished populating Stage3 in " <> displayTimeSpec duration
-  results <- logPerf message (liftIO (atomically (populateVolatileStateSTM st)))
+  let message duration = "Finished populating volatile state in: " <> displayTimeSpec duration
+  results <- logPerf message $ do
+    !r <- liftIO (atomically (populateVolatileStateSTM st))
+    pure r
   void $ Map.traverseWithKey
     (\mn -> logWarnN . prettyPrintReexportResult (const (P.runModuleName mn)))
     (Map.filter reexportHasFailures results)
@@ -187,6 +190,8 @@ populateVolatileStateSTM
   -> STM (ModuleMap (ReexportResult [IdeDeclarationAnn]))
 populateVolatileStateSTM ref = do
   IdeFileState{fsExterns = externs, fsModules = modules} <- getFileStateSTM ref
+  -- We're not using the cached rebuild for anything other than preserving it
+  -- through the repopulation
   rebuildCache <- vsCachedRebuild <$> getVolatileStateSTM ref
   let asts = map (extractAstInformation . fst) modules
   let (moduleDeclarations, reexportRefs) = (map fst &&& map snd) (Map.map convertExterns externs)
@@ -198,7 +203,7 @@ populateVolatileStateSTM ref = do
         & resolveOperators
         & resolveReexports reexportRefs
   setVolatileStateSTM ref (IdeVolatileState (AstData asts) (map reResolved results) rebuildCache)
-  pure results
+  pure (force results)
 
 resolveLocations
   :: ModuleMap (DefinitionSites P.SourceSpan, TypeAnnotations)
