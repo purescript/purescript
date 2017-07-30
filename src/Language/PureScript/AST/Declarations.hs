@@ -1,6 +1,8 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 -- |
 -- Data types for modules and declarations
@@ -9,12 +11,14 @@ module Language.PureScript.AST.Declarations where
 
 import Prelude.Compat
 
+import Control.DeepSeq (NFData)
 import Control.Monad.Identity
 
 import Data.Aeson.TH
 import qualified Data.Map as M
 import Data.Text (Text)
 import qualified Data.List.NonEmpty as NEL
+import GHC.Generics (Generic)
 
 import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Literals
@@ -288,7 +292,7 @@ data DeclarationRef
   -- elaboration in name desugaring.
   --
   | ReExportRef SourceSpan ModuleName DeclarationRef
-  deriving (Show)
+  deriving (Show, Generic, NFData)
 
 instance Eq DeclarationRef where
   (TypeRef _ name dctors) == (TypeRef _ name' dctors') = name == name' && dctors == dctors'

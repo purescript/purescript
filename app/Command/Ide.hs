@@ -69,6 +69,7 @@ data ServerOptions = ServerOptions
   , _serverNoWatch    :: Bool
   , _serverPolling    :: Bool
   , _serverLoglevel   :: IdeLogLevel
+  , _serverEditorMode :: Bool
   } deriving (Show)
 
 data ClientOptions = ClientOptions
@@ -106,7 +107,7 @@ command = Opts.helper <*> subcommands where
     Opts.option Opts.auto (Opts.long "port" <> Opts.short 'p' <> Opts.value (4242 :: Integer))
 
   server :: ServerOptions -> IO ()
-  server opts'@(ServerOptions dir globs outputPath port noWatch polling logLevel) = do
+  server opts'@(ServerOptions dir globs outputPath port noWatch polling logLevel editorMode) = do
     when (logLevel == LogDebug || logLevel == LogAll)
       (putText "Parsed Options:" *> print opts')
     maybe (pure ()) setCurrentDirectory dir
@@ -118,10 +119,16 @@ command = Opts.helper <*> subcommands where
       putText "Your output directory didn't exist. This usually means you didn't compile your project yet."
       putText "psc-ide needs you to compile your project (for example by running pulp build)"
 
-    unless noWatch $
+    unless (noWatch || editorMode) $
       void (forkFinally (watcher polling logLevel ideState fullOutputPath) print)
-    let conf = IdeConfiguration {confLogLevel = logLevel, confOutputPath = outputPath, confGlobs = globs}
-        env = IdeEnvironment {ideStateVar = ideState, ideConfiguration = conf}
+    let
+      conf = IdeConfiguration
+        { confLogLevel = logLevel
+        , confOutputPath = outputPath
+        , confGlobs = globs
+        , confEditorMode = editorMode
+        }
+    let env = IdeEnvironment {ideStateVar = ideState, ideConfiguration = conf}
     startServer port env
 
   serverOptions :: Opts.Parser ServerOptions
@@ -138,6 +145,7 @@ command = Opts.helper <*> subcommands where
            (Opts.long "log-level"
             `mappend` Opts.value ""
             `mappend` Opts.help "One of \"debug\", \"perf\", \"all\" or \"none\""))
+      <*> Opts.switch (Opts.long "editor-mode")
 
   parseLogLevel s = case s of
     "debug" -> LogDebug
