@@ -18,14 +18,11 @@
 
 module Command.Hierarchy (command) where
 
-import           Protolude (ordNub)
+import           Protolude (catMaybes)
 
 import           Control.Applicative (optional)
-import           Control.Monad (unless)
-import           Data.List (intercalate, sort)
 import           Data.Foldable (for_)
 import           Data.Monoid ((<>))
-import qualified Data.Text as T
 import           Options.Applicative (Parser)
 import qualified Options.Applicative as Opts
 import           System.Directory (createDirectoryIfMissing)
@@ -35,28 +32,12 @@ import           System.Exit (exitFailure, exitSuccess)
 import           System.IO (hPutStr, stderr)
 import           System.IO.UTF8 (readUTF8FileT)
 import qualified Language.PureScript as P
+import           Language.PureScript.Hierarchy (typeClasses)
 
 data HierarchyOptions = HierarchyOptions
   { _hierachyInput   :: FilePath
   , _hierarchyOutput :: Maybe FilePath
   }
-
-newtype SuperMap = SuperMap { _unSuperMap :: Either (P.ProperName 'P.ClassName) (P.ProperName 'P.ClassName, P.ProperName 'P.ClassName) }
-  deriving Eq
-
-instance Ord SuperMap where
-  compare (SuperMap s) (SuperMap s') = getCls s `compare` getCls s'
-    where
-      getCls = either id snd
-
-prettyPrint :: SuperMap -> String
-prettyPrint (SuperMap (Left sub)) =
-  T.unpack (P.runProperName sub)
-prettyPrint (SuperMap (Right (super, sub))) =
-  T.unpack (P.runProperName super) <> " -> " <> T.unpack (P.runProperName sub)
-
-runModuleName :: P.ModuleName -> String
-runModuleName (P.ModuleName pns) = intercalate "_" ((T.unpack . P.runProperName) `map` pns)
 
 readInput :: [FilePath] -> IO (Either P.MultipleErrors [P.Module])
 readInput paths = do
@@ -70,26 +51,13 @@ compile (HierarchyOptions inputGlob mOutput) = do
   case modules of
     Left errs -> hPutStr stderr (P.prettyPrintMultipleErrors P.defaultPPEOptions errs) >> exitFailure
     Right ms -> do
-      for_ ms $ \(P.Module _ _ moduleName decls _) ->
-        let name = runModuleName moduleName
-            tcs = filter P.isTypeClassDeclaration decls
-            supers = sort . ordNub . filter (not . null) $ fmap superClasses tcs
-            prologue = "digraph " ++ name ++ " {\n"
-            body = intercalate "\n" (concatMap (fmap (\s -> "  " ++ prettyPrint s ++ ";")) supers)
-            epilogue = "\n}"
-            hier = prologue ++ body ++ epilogue
-        in unless (null supers) $ case mOutput of
+      for_ (catMaybes $ typeClasses ms) $ \(name, hier) ->
+        case mOutput of
           Just output -> do
             createDirectoryIfMissing True output
             writeFile (output </> name) hier
           Nothing -> putStrLn hier
       exitSuccess
-
-superClasses :: P.Declaration -> [SuperMap]
-superClasses (P.TypeClassDeclaration _ sub _ supers@(_:_) _ _) =
-  fmap (\(P.Constraint (P.Qualified _ super) _ _) -> SuperMap (Right (super, sub))) supers
-superClasses (P.TypeClassDeclaration _ sub _ _ _ _) = [SuperMap (Left sub)]
-superClasses _ = []
 
 inputFile :: Parser FilePath
 inputFile = Opts.strArgument $
