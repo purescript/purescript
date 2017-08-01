@@ -13,12 +13,16 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript.Hierarchy (typeClasses) where
+module Language.PureScript.Hierarchy
+       ( Graph(..)
+       , GraphName(..)
+       , typeClasses
+       ) where
 
 import           Prelude.Compat
 import           Protolude (ordNub)
 
-import           Data.List (intercalate, sort)
+import           Data.List (sort)
 import           Data.Monoid ((<>))
 import qualified Data.Text as T
 import qualified Language.PureScript as P
@@ -33,26 +37,43 @@ instance Ord SuperMap where
     where
       getCls = either id snd
 
-prettyPrint :: SuperMap -> String
-prettyPrint (SuperMap (Left sub)) =
-  T.unpack (P.runProperName sub)
+newtype Graph = Graph
+  { _unGraph :: T.Text
+  }
+
+newtype GraphName = GraphName
+  { _unGraphName :: T.Text
+  }
+
+prettyPrint :: SuperMap -> T.Text
+prettyPrint (SuperMap (Left sub)) = "  " <> P.runProperName sub <> ";"
 prettyPrint (SuperMap (Right (super, sub))) =
-  T.unpack (P.runProperName super) <> " -> " <> T.unpack (P.runProperName sub)
+  "  " <> P.runProperName super <> " -> " <> P.runProperName sub <> ";"
 
-runModuleName :: P.ModuleName -> String
-runModuleName (P.ModuleName pns) = intercalate "_" ((T.unpack . P.runProperName) `map` pns)
+runModuleName :: P.ModuleName -> GraphName
+runModuleName (P.ModuleName pns) =
+  GraphName $ T.intercalate "_" (P.runProperName <$> pns)
 
-typeClasses :: Functor f => f P.Module -> f (Maybe (String, String))
-typeClasses ms =
-  flip fmap ms $ \(P.Module _ _ moduleName decls _) ->
-    let name = runModuleName moduleName
-        tcs = filter P.isTypeClassDeclaration decls
-        supers = sort . ordNub . filter (not . null) $ fmap superClasses tcs
-        prologue = "digraph " ++ name ++ " {\n"
-        body = intercalate "\n" (concatMap (fmap (\s -> "  " ++ prettyPrint s ++ ";")) supers)
-        epilogue = "\n}"
-        hier = prologue ++ body ++ epilogue
-    in if null supers then Nothing else Just (name, hier)
+typeClasses :: Functor f => f P.Module -> f (Maybe (GraphName, Graph))
+typeClasses =
+  fmap typeClassGraph
+
+typeClassGraph :: P.Module -> Maybe (GraphName, Graph)
+typeClassGraph (P.Module _ _ moduleName decls _) =
+  if null supers then Nothing else Just (name, graph)
+    where
+      name = runModuleName moduleName
+      supers = sort . ordNub $ concatMap superClasses decls
+      graph = Graph $ typeClassPrologue name <> typeClassBody supers <> typeClassEpilogue
+
+typeClassPrologue :: GraphName -> T.Text
+typeClassPrologue (GraphName name) = "digraph " <> name <> " {\n"
+
+typeClassBody :: [SuperMap] -> T.Text
+typeClassBody supers = T.intercalate "\n" (prettyPrint <$> supers)
+
+typeClassEpilogue :: T.Text
+typeClassEpilogue = "\n}"
 
 superClasses :: P.Declaration -> [SuperMap]
 superClasses (P.TypeClassDeclaration _ sub _ supers@(_:_) _ _) =

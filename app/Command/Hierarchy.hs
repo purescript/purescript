@@ -23,6 +23,8 @@ import           Protolude (catMaybes)
 import           Control.Applicative (optional)
 import           Data.Foldable (for_)
 import           Data.Monoid ((<>))
+import qualified Data.Text as T
+import qualified Data.Text.IO as T
 import           Options.Applicative (Parser)
 import qualified Options.Applicative as Opts
 import           System.Directory (createDirectoryIfMissing)
@@ -32,7 +34,7 @@ import           System.Exit (exitFailure, exitSuccess)
 import           System.IO (hPutStr, stderr)
 import           System.IO.UTF8 (readUTF8FileT)
 import qualified Language.PureScript as P
-import           Language.PureScript.Hierarchy (typeClasses)
+import           Language.PureScript.Hierarchy (_unGraph, _unGraphName, typeClasses)
 
 data HierarchyOptions = HierarchyOptions
   { _hierachyInput   :: FilePath
@@ -55,8 +57,8 @@ compile (HierarchyOptions inputGlob mOutput) = do
         case mOutput of
           Just output -> do
             createDirectoryIfMissing True output
-            writeFile (output </> name) hier
-          Nothing -> putStrLn hier
+            T.writeFile (output </> T.unpack (_unGraphName name)) (_unGraph hier)
+          Nothing -> T.putStrLn (_unGraph hier)
       exitSuccess
 
 inputFile :: Parser FilePath
