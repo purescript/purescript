@@ -503,4 +503,4 @@ testCases =
     ShowFn $ \ty -> codeToString (Docs.renderType ty) == expected
 
   shouldBeOrdered mn declNames =
-    map (uncurry (ShouldComeBefore mn)) (zip declNames (tail declNames))
+    zipWith (ShouldComeBefore mn) declNames (tail declNames)
