@@ -528,11 +528,15 @@ declName (ValueDeclaration _ n _ _ _) = Just (IdentName n)
 declName (ExternDeclaration _ n _) = Just (IdentName n)
 declName (ExternDataDeclaration _ n _) = Just (TyName n)
 declName (ExternKindDeclaration _ n) = Just (KiName n)
-declName (ValueFixityDeclaration _ _ _ n) = Just (ValOpName n)
-declName (TypeFixityDeclaration _ _ _ n) = Just (TyOpName n)
+declName (FixityDeclaration _ (Left (ValueFixity _ _ n))) = Just (ValOpName n)
+declName (FixityDeclaration _ (Right (TypeFixity _ _ n))) = Just (TyOpName n)
 declName (TypeClassDeclaration _ n _ _ _ _) = Just (TyClassName n)
 declName (TypeInstanceDeclaration _ n _ _ _ _) = Just (IdentName n)
-declName _ = Nothing
+declName ImportDeclaration{} = Nothing
+declName BindingGroupDeclaration{} = Nothing
+declName DataBindingGroupDeclaration{} = Nothing
+declName BoundValueDeclaration{} = Nothing
+declName TypeDeclaration{} = Nothing
 
 -- |
 -- Test if a declaration is a value declaration
