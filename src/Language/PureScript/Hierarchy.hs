@@ -13,11 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Language.PureScript.Hierarchy
-       ( Graph(..)
-       , GraphName(..)
-       , typeClasses
-       ) where
+module Language.PureScript.Hierarchy where
 
 import           Prelude.Compat
 import           Protolude (ordNub)
@@ -40,10 +36,12 @@ instance Ord SuperMap where
 newtype Graph = Graph
   { _unGraph :: T.Text
   }
+  deriving (Eq, Show)
 
 newtype GraphName = GraphName
   { _unGraphName :: T.Text
   }
+  deriving (Eq, Show)
 
 prettyPrint :: SuperMap -> T.Text
 prettyPrint (SuperMap (Left sub)) = "  " <> P.runProperName sub <> ";"
