@@ -33,13 +33,19 @@ instance Ord SuperMap where
     where
       getCls = either id snd
 
-newtype Graph = Graph
-  { _unGraph :: T.Text
+data Graph = Graph
+  { graphName :: GraphName
+  , digraph :: Digraph
   }
   deriving (Eq, Show)
 
 newtype GraphName = GraphName
   { _unGraphName :: T.Text
+  }
+  deriving (Eq, Show)
+
+newtype Digraph = Digraph
+  { _unDigraph :: T.Text
   }
   deriving (Eq, Show)
 
@@ -52,17 +58,17 @@ runModuleName :: P.ModuleName -> GraphName
 runModuleName (P.ModuleName pns) =
   GraphName $ T.intercalate "_" (P.runProperName <$> pns)
 
-typeClasses :: Functor f => f P.Module -> f (Maybe (GraphName, Graph))
+typeClasses :: Functor f => f P.Module -> f (Maybe Graph)
 typeClasses =
   fmap typeClassGraph
 
-typeClassGraph :: P.Module -> Maybe (GraphName, Graph)
+typeClassGraph :: P.Module -> Maybe Graph
 typeClassGraph (P.Module _ _ moduleName decls _) =
-  if null supers then Nothing else Just (name, graph)
+  if null supers then Nothing else Just (Graph name graph)
     where
       name = runModuleName moduleName
       supers = sort . ordNub $ concatMap superClasses decls
-      graph = Graph $ typeClassPrologue name <> typeClassBody supers <> typeClassEpilogue
+      graph = Digraph $ typeClassPrologue name <> typeClassBody supers <> typeClassEpilogue
 
 typeClassPrologue :: GraphName -> T.Text
 typeClassPrologue (GraphName name) = "digraph " <> name <> " {\n"

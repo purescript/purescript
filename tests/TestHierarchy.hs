@@ -62,4 +62,4 @@ main = hspec $ do
 
         let graph = typeClassGraph mainModule
 
-        graph `shouldBe` Just (GraphName "Main", Graph "digraph Main {\n  A;\n  A -> B;\n}")
+        graph `shouldBe` Just (Graph (GraphName "Main") (Digraph "digraph Main {\n  A;\n  A -> B;\n}"))

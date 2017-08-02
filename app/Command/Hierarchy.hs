@@ -34,7 +34,7 @@ import           System.Exit (exitFailure, exitSuccess)
 import           System.IO (hPutStr, stderr)
 import           System.IO.UTF8 (readUTF8FileT)
 import qualified Language.PureScript as P
-import           Language.PureScript.Hierarchy (_unGraph, _unGraphName, typeClasses)
+import           Language.PureScript.Hierarchy (Graph(..), _unDigraph, _unGraphName, typeClasses)
 
 data HierarchyOptions = HierarchyOptions
   { _hierachyInput   :: FilePath
@@ -53,12 +53,12 @@ compile (HierarchyOptions inputGlob mOutput) = do
   case modules of
     Left errs -> hPutStr stderr (P.prettyPrintMultipleErrors P.defaultPPEOptions errs) >> exitFailure
     Right ms -> do
-      for_ (catMaybes $ typeClasses ms) $ \(name, hier) ->
+      for_ (catMaybes $ typeClasses ms) $ \(Graph name graph) ->
         case mOutput of
           Just output -> do
             createDirectoryIfMissing True output
-            T.writeFile (output </> T.unpack (_unGraphName name)) (_unGraph hier)
-          Nothing -> T.putStrLn (_unGraph hier)
+            T.writeFile (output </> T.unpack (_unGraphName name)) (_unDigraph graph)
+          Nothing -> T.putStrLn (_unDigraph graph)
       exitSuccess
 
 inputFile :: Parser FilePath
