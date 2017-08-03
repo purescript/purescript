@@ -49,6 +49,7 @@ dependencies:
   - directory >=1.2.3
   - dlist
   - edit-distance
+  - file-embed
   - filepath
   - fsnotify >=0.2.1
   - Glob >=0.7 && <0.8
