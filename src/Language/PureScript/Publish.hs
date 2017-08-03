@@ -215,7 +215,7 @@ getManifestRepositoryInfo pkgMeta =
 
   where
     format :: (D.GithubUser, D.GithubRepo) -> Text
-    format (user, repo) = "https://github.com/" <> (D.runGithubUser user) <> "/" <> (D.runGithubRepo repo) <> ".git"
+    format (user, repo) = "https://github.com/" <> D.runGithubUser user <> "/" <> D.runGithubRepo repo <> ".git"
 
 checkLicense :: PackageMeta -> PrepareM ()
 checkLicense pkgMeta =

@@ -239,7 +239,8 @@ displayRepositoryError err = case err of
       [ para (concat
          [ "The 'repository' field is not present in your package manifest file. "
          , "Without this information, Pursuit would not be able to generate "
-         , "source links in your package's documentation. Please add "
+         , "source links in your package's documentation. Please add one - like "
+         , "this, for example:"
          ])
       , spacer
       , indented (vcat
