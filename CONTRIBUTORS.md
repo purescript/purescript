@@ -33,6 +33,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@chrisdone](https://github.com/chrisdone) | Chris Done | MIT license |
 | [@cmdv](https://github.com/cmdv) | Vincent Orr | MIT license |
 | [@codedmart](https://github.com/codedmart) | Brandon Martin | [MIT license](http://opensource.org/licenses/MIT) |
+| [@coot](https://github.com/coot) | Marcin Szamotulski | [MIT license](http://opensource.org/licenses/MIT) |
 | [@davidchambers](https://github.com/davidchambers) | David Chambers | [MIT license](http://opensource.org/licenses/MIT) |
 | [@DavidLindbom](https://github.com/DavidLindbom) | David Lindbom | [MIT license](http://opensource.org/licenses/MIT) |
 | [@dckc](https://github.com/dckc) | Dan Connolly | [MIT license](http://opensource.org/licenses/MIT) |

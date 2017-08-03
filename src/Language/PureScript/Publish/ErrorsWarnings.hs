@@ -66,7 +66,7 @@ data UserError
   deriving (Show)
 
 data RepositoryFieldError
-  = RepositoryFieldMissing
+  = RepositoryFieldMissing (Maybe Text)
   | BadRepositoryType Text
   | NotOnGithub
   deriving (Show)
@@ -234,7 +234,7 @@ spdxExamples =
 
 displayRepositoryError :: RepositoryFieldError -> Box
 displayRepositoryError err = case err of
-  RepositoryFieldMissing ->
+  RepositoryFieldMissing giturl ->
     vcat
       [ para (concat
          [ "The 'repository' field is not present in your package manifest file. "
@@ -246,7 +246,7 @@ displayRepositoryError err = case err of
       , indented (vcat
           [ para "\"repository\": {"
           , indented (para "\"type\": \"git\",")
-          , indented (para "\"url\": \"git://github.com/purescript/purescript-prelude.git\"")
+          , indented (para ("\"url\": \"" ++ T.unpack (fromMaybe "https://github.com/USER/REPO.git" giturl) ++ "\""))
           , para "}"
           ]
         )
