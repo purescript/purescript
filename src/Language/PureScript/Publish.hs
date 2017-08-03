@@ -207,11 +207,15 @@ getManifestRepositoryInfo pkgMeta =
     Nothing -> do
       giturl <- catchError (Just . T.strip . T.pack <$> readProcess' "git" ["config", "remote.origin.url"] "")
                   (const (return Nothing))
-      userError (BadRepositoryField (RepositoryFieldMissing giturl))
+      userError (BadRepositoryField (RepositoryFieldMissing (giturl >>= extractGithub >>= return . format)))
     Just Repository{..} -> do
       unless (repositoryType == "git")
         (userError (BadRepositoryField (BadRepositoryType repositoryType)))
       maybe (userError (BadRepositoryField NotOnGithub)) return (extractGithub repositoryUrl)
+
+  where
+    format :: (D.GithubUser, D.GithubRepo) -> Text
+    format (user, repo) = "https://github.com/" <> (D.runGithubUser user) <> "/" <> (D.runGithubRepo repo) <> ".git"
 
 checkLicense :: PackageMeta -> PrepareM ()
 checkLicense pkgMeta =
