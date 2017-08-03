@@ -44,6 +44,10 @@ getTypeName :: Name -> Maybe (ProperName 'TypeName)
 getTypeName (TyName name) = Just name
 getTypeName _ = Nothing
 
+getKindName :: Name -> Maybe (ProperName 'KindName)
+getKindName (KiName name) = Just name
+getKindName _ = Nothing
+
 getTypeOpName :: Name -> Maybe (OpName 'TypeOpName)
 getTypeOpName (TyOpName name) = Just name
 getTypeOpName _ = Nothing
