@@ -12,6 +12,7 @@ import Prelude.Compat
 import Control.Arrow (first)
 import Control.Monad.IO.Class (liftIO)
 
+import Data.List (findIndex)
 import Data.Foldable
 import Safe (headMay)
 import Data.Maybe (fromMaybe, mapMaybe)
@@ -41,9 +42,14 @@ publishOpts = Publish.defaultPublishOptions
   }
   where testVersion = ("v999.0.0", Version [999,0,0] [])
 
+getPackage :: IO (Either Publish.PackageError (Docs.Package Docs.NotYetKnown))
+getPackage =
+  pushd "examples/docs" $
+    Publish.preparePackage "bower.json" "resolutions.json" publishOpts
+
 main :: IO ()
-main = pushd "examples/docs" $ do
-  res <- Publish.preparePackage "bower.json" "resolutions.json" publishOpts
+main = do
+  res <- getPackage
   case res of
     Left e -> Publish.printErrorToStdout e >> exitFailure
     Right pkg@Docs.Package{..} ->
@@ -52,7 +58,6 @@ main = pushd "examples/docs" $ do
                           (find ((==) mn . Docs.modName) pkgModules)
             linksCtx = Docs.getLinksContext pkg
         in forM_ pragmas (\a -> runAssertionIO a linksCtx mdl)
-
 
 takeJust :: String -> Maybe a -> a
 takeJust msg = fromMaybe (error msg)
@@ -93,6 +98,8 @@ data Assertion
   -- declaration title, title of linked declaration, namespace of linked
   -- declaration, destination of link.
   | ShouldHaveLink P.ModuleName Text Text Docs.Namespace Docs.LinkLocation
+  -- | Assert that a given declaration comes before another in the output
+  | ShouldComeBefore P.ModuleName Text Text
   deriving (Show)
 
 newtype ShowFn a = ShowFn a
@@ -141,12 +148,16 @@ data AssertionFailure
   -- declaration, title of the linked declaration, expected location, actual
   -- location.
   | BadLinkLocation P.ModuleName Text Text Docs.LinkLocation Docs.LinkLocation
+  -- | Declarations were in the wrong order
+  | WrongOrder P.ModuleName Text Text
   deriving (Show)
 
 displayAssertionFailure :: AssertionFailure -> Text
 displayAssertionFailure = \case
   DeclarationWrongType mn title actual ->
     P.runModuleName mn <> "." <> title <> " had the wrong type; got " <> T.pack (P.prettyPrintType actual)
+  WrongOrder mn before after ->
+    "In " <> P.runModuleName mn <> ": expected to see " <> before <> " before " <> after
   -- TODO: deal with the other constructors nicely
   other ->
     T.pack (show other)
@@ -277,6 +288,23 @@ runAssertion assertion linksCtx Docs.Module{..} =
                 else Fail (BadLinkLocation mn decl destTitle expectedLoc actualLoc)
             Nothing ->
               Fail (LinkedDeclarationMissing mn decl destTitle)
+
+    ShouldComeBefore mn before after ->
+      let
+        decls = declarationsFor mn
+
+        indexOf :: Text -> Maybe Int
+        indexOf title = findIndex ((==) title . Docs.declTitle) decls
+      in
+        case (indexOf before, indexOf after) of
+          (Just i, Just j) ->
+            if i < j
+              then Pass
+              else Fail (WrongOrder mn before after)
+          (Nothing, _) ->
+            Fail (NotDocumented mn before)
+          (_, Nothing) ->
+            Fail (NotDocumented mn after)
 
   where
   declarationsFor mn =
@@ -451,6 +479,14 @@ testCases =
       [ ShouldBeDocumented (n "ChildDeclOrder") "Two" ["First", "Second", "showTwo", "fooTwo"]
       , ShouldBeDocumented (n "ChildDeclOrder") "Foo" ["foo1", "foo2", "fooTwo", "fooInt"]
       ])
+
+  , ("DeclOrder",
+      shouldBeOrdered (n "DeclOrder")
+        ["A", "x1", "X2", "x3", "X4", "B"])
+
+  , ("DeclOrderNoExportList",
+      shouldBeOrdered (n "DeclOrderNoExportList")
+        [ "x1", "x3", "X2", "X4", "A", "B" ])
   ]
 
   where
@@ -465,3 +501,6 @@ testCases =
 
   renderedType expected =
     ShowFn $ \ty -> codeToString (Docs.renderType ty) == expected
+
+  shouldBeOrdered mn declNames =
+    zipWith (ShouldComeBefore mn) declNames (tail declNames)

@@ -342,6 +342,17 @@ declRefSourceSpan (ModuleRef ss _) = ss
 declRefSourceSpan (KindRef ss _) = ss
 declRefSourceSpan (ReExportRef ss _ _) = ss
 
+declRefName :: DeclarationRef -> Name
+declRefName (TypeRef _ n _) = TyName n
+declRefName (TypeOpRef _ n) = TyOpName n
+declRefName (ValueRef _ n) = IdentName n
+declRefName (ValueOpRef _ n) = ValOpName n
+declRefName (TypeClassRef _ n) = TyClassName n
+declRefName (TypeInstanceRef _ n) = IdentName n
+declRefName (ModuleRef _ n) = ModName n
+declRefName (KindRef _ n) = KiName n
+declRefName (ReExportRef _ _ ref) = declRefName ref
+
 getTypeRef :: DeclarationRef -> Maybe (ProperName 'TypeName, Maybe [ProperName 'ConstructorName])
 getTypeRef (TypeRef _ name dctors) = Just (name, dctors)
 getTypeRef _ = Nothing
@@ -509,6 +520,23 @@ declSourceAnn (TypeInstanceDeclaration sa _ _ _ _ _) = sa
 
 declSourceSpan :: Declaration -> SourceSpan
 declSourceSpan = fst . declSourceAnn
+
+declName :: Declaration -> Maybe Name
+declName (DataDeclaration _ _ n _ _) = Just (TyName n)
+declName (TypeSynonymDeclaration _ n _ _) = Just (TyName n)
+declName (ValueDeclaration _ n _ _ _) = Just (IdentName n)
+declName (ExternDeclaration _ n _) = Just (IdentName n)
+declName (ExternDataDeclaration _ n _) = Just (TyName n)
+declName (ExternKindDeclaration _ n) = Just (KiName n)
+declName (FixityDeclaration _ (Left (ValueFixity _ _ n))) = Just (ValOpName n)
+declName (FixityDeclaration _ (Right (TypeFixity _ _ n))) = Just (TyOpName n)
+declName (TypeClassDeclaration _ n _ _ _ _) = Just (TyClassName n)
+declName (TypeInstanceDeclaration _ n _ _ _ _) = Just (IdentName n)
+declName ImportDeclaration{} = Nothing
+declName BindingGroupDeclaration{} = Nothing
+declName DataBindingGroupDeclaration{} = Nothing
+declName BoundValueDeclaration{} = Nothing
+declName TypeDeclaration{} = Nothing
 
 -- |
 -- Test if a declaration is a value declaration

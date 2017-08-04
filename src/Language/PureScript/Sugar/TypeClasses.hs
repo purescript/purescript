@@ -279,7 +279,7 @@ typeInstanceDictionaryDeclaration sa name mn deps className tys decls =
     maybe (throwError . errorMessage . UnknownName $ fmap TyClassName className) return $
       M.lookup (qualify mn className) m
 
-  case map fst typeClassMembers \\ mapMaybe declName decls of
+  case map fst typeClassMembers \\ mapMaybe declIdent decls of
     member : _ -> throwError . errorMessage $ MissingClassMember member
     [] -> do
       -- Replace the type arguments with the appropriate types in the member types
@@ -306,10 +306,10 @@ typeInstanceDictionaryDeclaration sa name mn deps className tys decls =
 
   where
 
-  declName :: Declaration -> Maybe Ident
-  declName (ValueDeclaration _ ident _ _ _) = Just ident
-  declName (TypeDeclaration _ ident _) = Just ident
-  declName _ = Nothing
+  declIdent :: Declaration -> Maybe Ident
+  declIdent (ValueDeclaration _ ident _ _ _) = Just ident
+  declIdent (TypeDeclaration _ ident _) = Just ident
+  declIdent _ = Nothing
 
   memberToValue :: [(Ident, Type)] -> Declaration -> Desugar m Expr
   memberToValue tys' (ValueDeclaration _ ident _ [] [MkUnguarded val]) = do
