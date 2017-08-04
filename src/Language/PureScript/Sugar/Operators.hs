@@ -22,7 +22,7 @@ import Language.PureScript.Names
 import Language.PureScript.Sugar.Operators.Binders
 import Language.PureScript.Sugar.Operators.Expr
 import Language.PureScript.Sugar.Operators.Types
-import Language.PureScript.Traversals (defS, sndM)
+import Language.PureScript.Traversals (sndM)
 import Language.PureScript.Types
 
 import Control.Monad (unless, (<=<))
@@ -43,11 +43,11 @@ import qualified Language.PureScript.Constants as C
 -- Removes unary negation operators and replaces them with calls to `negate`.
 --
 desugarSignedLiterals :: Module -> Module
-desugarSignedLiterals (Module ss coms mn ds exts) =
-  Module ss coms mn (map f' ds) exts
+desugarSignedLiterals (Module modSS coms mn ds exts) =
+  Module modSS coms mn (fmap f' ds) exts
   where
   (f', _, _) = everywhereOnValues id go id
-  go (UnaryMinus val) = App (Var (Qualified Nothing (Ident C.negate))) val
+  go (UnaryMinus ss val) = App ss (Var ss (Qualified Nothing (Ident C.negate))) val
   go other = other
 
 -- |
@@ -96,9 +96,9 @@ rebracketFiltered pred_ externs modules = do
   ensureNoDuplicates' MultipleTypeOpFixities typeFixities
 
   let valueOpTable = customOperatorTable' valueFixities
-  let valueAliased = M.fromList (map makeLookupEntry valueFixities)
+  let valueAliased = M.fromList (fmap makeLookupEntry valueFixities)
   let typeOpTable = customOperatorTable' typeFixities
-  let typeAliased = M.fromList (map makeLookupEntry typeFixities)
+  let typeAliased = M.fromList (fmap makeLookupEntry typeFixities)
 
   for modules
     $ renameAliasedOperators valueAliased typeAliased
@@ -112,12 +112,12 @@ rebracketFiltered pred_ externs modules = do
     -> [FixityRecord op alias]
     -> m ()
   ensureNoDuplicates' toError =
-    ensureNoDuplicates toError . map (\(i, pos, _, _) -> (i, pos))
+    ensureNoDuplicates toError . fmap (\(i, pos, _, _) -> (i, pos))
 
   customOperatorTable'
     :: [FixityRecord op alias]
     -> [[(Qualified op, Associativity)]]
-  customOperatorTable' = customOperatorTable . map (\(i, _, f, _) -> (i, f))
+  customOperatorTable' = customOperatorTable . fmap (\(i, _, f, _) -> (i, f))
 
   makeLookupEntry :: FixityRecord op alias -> (Qualified op, Qualified alias)
   makeLookupEntry (qname, _, _, alias) = (qname, alias)
@@ -127,51 +127,42 @@ rebracketFiltered pred_ externs modules = do
     -> M.Map (Qualified (OpName 'TypeOpName)) (Qualified (ProperName 'TypeName))
     -> Module
     -> m Module
-  renameAliasedOperators valueAliased typeAliased (Module ss coms mn ds exts) =
-    Module ss coms mn <$> mapM (usingPredicate pred_ f') ds <*> pure exts
+  renameAliasedOperators valueAliased typeAliased (Module modSS coms mn ds exts) =
+    Module modSS coms mn <$> mapM (usingPredicate pred_ f') ds <*> pure exts
     where
     (goDecl', goExpr', goBinder') = updateTypes goType
-    (f', _, _, _, _) =
-      everywhereWithContextOnValuesM
-        Nothing
-        (\_ d -> (Just (declSourceSpan d),) <$> goDecl' d)
-        (\pos -> uncurry goExpr <=< goExpr' pos)
-        (\pos -> uncurry goBinder <=< goBinder' pos)
-        defS
-        defS
+    (f', _, _) =
+      everywhereOnValuesM
+        goDecl'
+        (goExpr <=< goExpr')
+        (goBinder <=< goBinder')
 
-    goExpr :: Maybe SourceSpan -> Expr -> m (Maybe SourceSpan, Expr)
-    goExpr _ e@(PositionedValue pos _ _) = return (Just pos, e)
-    goExpr pos (Op op) =
-      (pos, ) <$> case op `M.lookup` valueAliased of
-        Just (Qualified mn' (Left alias)) ->
-          return $ Var (Qualified mn' alias)
-        Just (Qualified mn' (Right alias)) ->
-          return $ Constructor (Qualified mn' alias)
-        Nothing ->
-          maybe id rethrowWithPosition pos $
-            throwError . errorMessage . UnknownName $ fmap ValOpName op
-    goExpr pos other = return (pos, other)
-
-    goBinder :: Maybe SourceSpan -> Binder -> m (Maybe SourceSpan, Binder)
-    goBinder _ b@(PositionedBinder pos _ _) = return (Just pos, b)
-    goBinder pos (BinaryNoParensBinder (OpBinder op) lhs rhs) =
+    goExpr :: Expr -> m Expr
+    goExpr (Op sa@(ss', _) op) =
       case op `M.lookup` valueAliased of
         Just (Qualified mn' (Left alias)) ->
-          maybe id rethrowWithPosition pos $
-            throwError . errorMessage $
-              InvalidOperatorInBinder op (Qualified mn' alias)
+          return $ Var sa (Qualified mn' alias)
         Just (Qualified mn' (Right alias)) ->
-          return (pos, ConstructorBinder (Qualified mn' alias) [lhs, rhs])
+          return $ Constructor sa (Qualified mn' alias)
         Nothing ->
-          maybe id rethrowWithPosition pos $
-            throwError . errorMessage . UnknownName $ fmap ValOpName op
-    goBinder _ BinaryNoParensBinder{} =
-      internalError "BinaryNoParensBinder has no OpBinder"
-    goBinder pos other = return (pos, other)
+          throwError . errorMessage' ss' . UnknownName $ fmap ValOpName op
+    goExpr other = return other
 
-    goType :: Maybe SourceSpan -> Type -> m Type
-    goType pos = maybe id rethrowWithPosition pos . everywhereOnTypesM go
+    goBinder :: Binder -> m Binder
+    goBinder (BinaryNoParensBinder _ (OpBinder ss' op) lhs rhs) =
+      case op `M.lookup` valueAliased of
+        Just (Qualified mn' (Left alias)) ->
+          throwError . errorMessage' ss' $ InvalidOperatorInBinder op (Qualified mn' alias)
+        Just (Qualified mn' (Right alias)) ->
+          return (ConstructorBinder ss' (Qualified mn' alias) [lhs, rhs])
+        Nothing ->
+          throwError . errorMessage' ss' . UnknownName $ fmap ValOpName op
+    goBinder BinaryNoParensBinder{} =
+      internalError "BinaryNoParensBinder has no OpBinder"
+    goBinder other = return other
+
+    goType :: SourceSpan -> Type -> m Type
+    goType ss' = everywhereOnTypesM go
       where
       go :: Type -> m Type
       go (BinaryNoParensType (TypeOp op) lhs rhs) =
@@ -179,7 +170,7 @@ rebracketFiltered pred_ externs modules = do
           Just alias ->
             return $ TypeApp (TypeApp (TypeConstructor alias) lhs) rhs
           Nothing ->
-            throwError . errorMessage $ UnknownName $ fmap TyOpName op
+            throwError . errorMessage' ss' . UnknownName $ fmap TyOpName op
       go other = return other
 
 rebracketModule
@@ -190,19 +181,19 @@ rebracketModule
   -> [[(Qualified (OpName 'TypeOpName), Associativity)]]
   -> Module
   -> m Module
-rebracketModule pred_ valueOpTable typeOpTable (Module ss coms mn ds exts) =
-  Module ss coms mn <$> f' ds <*> pure exts
+rebracketModule pred_ valueOpTable typeOpTable (Module modSS coms mn ds exts) =
+  Module modSS coms mn <$> f' ds <*> pure exts
   where
   f' :: [Declaration] -> m [Declaration]
   f' =
-    fmap (map (\d -> if pred_ d then removeParens d else d)) .
+    fmap (fmap (\d -> if pred_ d then removeParens d else d)) .
     flip parU (usingPredicate pred_ f)
 
   (f, _, _) =
       everywhereOnValuesTopDownM
         goDecl
-        (goExpr <=< decontextify goExpr')
-        (goBinder <=< decontextify goBinder')
+        (goExpr <=< goExpr')
+        (goBinder <=< goBinder')
 
   (goDecl, goExpr', goBinder') = updateTypes (const goType)
 
@@ -215,41 +206,32 @@ rebracketModule pred_ valueOpTable typeOpTable (Module ss coms mn ds exts) =
   goType :: Type -> m Type
   goType = return . matchTypeOperators typeOpTable
 
-  decontextify :: (Maybe SourceSpan -> a -> m (Maybe SourceSpan, a)) -> a -> m a
-  decontextify ctxf = fmap snd . ctxf Nothing
-
 removeParens :: Declaration -> Declaration
 removeParens = f
   where
   (f, _, _) =
       everywhereOnValues
         (runIdentity . goDecl)
-        (goExpr . decontextify goExpr')
-        (goBinder . decontextify goBinder')
+        (goExpr . runIdentity . goExpr')
+        (goBinder . runIdentity . goBinder')
 
   (goDecl, goExpr', goBinder') = updateTypes (\_ -> return . goType)
 
   goExpr :: Expr -> Expr
-  goExpr (Parens val) = val
+  goExpr (Parens _ val) = val
   goExpr val = val
 
   goBinder :: Binder -> Binder
-  goBinder (ParensInBinder b) = b
+  goBinder (ParensInBinder _ b) = b
   goBinder b = b
 
   goType :: Type -> Type
   goType (ParensInType t) = t
   goType t = t
 
-  decontextify
-    :: (Maybe SourceSpan -> a -> Identity (Maybe SourceSpan, a))
-    -> a
-    -> a
-  decontextify ctxf = snd . runIdentity . ctxf Nothing
-
 externsFixities :: ExternsFile -> [Either ValueFixityRecord TypeFixityRecord]
 externsFixities ExternsFile{..} =
-  map fromFixity efFixities ++ map fromTypeFixity efTypeFixities
+  fmap fromFixity efFixities ++ fmap fromTypeFixity efTypeFixities
   where
 
   fromFixity
@@ -293,9 +275,9 @@ ensureNoDuplicates toError m = go $ sortBy (compare `on` fst) m
   where
   go [] = return ()
   go [_] = return ()
-  go ((x@(Qualified (Just mn) op), _) : (y, pos) : _) | x == y =
-    rethrow (addHint (ErrorInModule mn)) $
-      rethrowWithPosition pos $ throwError . errorMessage $ toError op
+  go ((x@(Qualified (Just mn) op), _) : (y, ss) : _) | x == y =
+    rethrow (addHint (ErrorInModule mn)) .
+      throwError . errorMessage' ss $ toError op
   go (_ : rest) = go rest
 
 customOperatorTable
@@ -303,67 +285,58 @@ customOperatorTable
   -> [[(Qualified op, Associativity)]]
 customOperatorTable fixities =
   let
-    userOps = map (\(name, Fixity a p) -> (name, p, a)) fixities
+    userOps = fmap (\(name, Fixity a p) -> (name, p, a)) fixities
     sorted = sortBy (flip compare `on` (\(_, p, _) -> p)) userOps
     groups = groupBy ((==) `on` (\(_, p, _) -> p)) sorted
   in
-    map (map (\(name, _, a) -> (name, a))) groups
+    fmap (fmap (\(name, _, a) -> (name, a))) groups
 
 updateTypes
   :: forall m
    . Monad m
-  => (Maybe SourceSpan -> Type -> m Type)
+  => (SourceSpan -> Type -> m Type)
   -> ( Declaration -> m Declaration
-     , Maybe SourceSpan -> Expr -> m (Maybe SourceSpan, Expr)
-     , Maybe SourceSpan -> Binder -> m (Maybe SourceSpan, Binder)
+     , Expr -> m Expr
+     , Binder -> m Binder
      )
 updateTypes goType = (goDecl, goExpr, goBinder)
   where
 
-  goType' :: Maybe SourceSpan -> Type -> m Type
-  goType' = everywhereOnTypesM . goType
-
-  goType'' :: SourceSpan -> Type -> m Type
-  goType'' = goType' . Just
-
   goDecl :: Declaration -> m Declaration
   goDecl (DataDeclaration sa@(ss, _) ddt name args dctors) =
-    DataDeclaration sa ddt name args <$> traverse (sndM (traverse (goType'' ss))) dctors
+    DataDeclaration sa ddt name args <$> traverse (sndM (traverse (goType ss))) dctors
   goDecl (ExternDeclaration sa@(ss, _) name ty) =
-    ExternDeclaration sa name <$> goType'' ss ty
+    ExternDeclaration sa name <$> goType ss ty
   goDecl (TypeClassDeclaration sa@(ss, _) name args implies deps decls) = do
-    implies' <- traverse (overConstraintArgs (traverse (goType'' ss))) implies
+    implies' <- traverse (overConstraintArgs (traverse (goType ss))) implies
     return $ TypeClassDeclaration sa name args implies' deps decls
   goDecl (TypeInstanceDeclaration sa@(ss, _) name cs className tys impls) = do
-    cs' <- traverse (overConstraintArgs (traverse (goType'' ss))) cs
-    tys' <- traverse (goType'' ss) tys
+    cs' <- traverse (overConstraintArgs (traverse (goType ss))) cs
+    tys' <- traverse (goType ss) tys
     return $ TypeInstanceDeclaration sa name cs' className tys' impls
   goDecl (TypeSynonymDeclaration sa@(ss, _) name args ty) =
-    TypeSynonymDeclaration sa name args <$> goType'' ss ty
+    TypeSynonymDeclaration sa name args <$> goType ss ty
   goDecl (TypeDeclaration sa@(ss, _) expr ty) =
-    TypeDeclaration sa expr <$> goType'' ss ty
+    TypeDeclaration sa expr <$> goType ss ty
   goDecl other =
     return other
 
-  goExpr :: Maybe SourceSpan -> Expr -> m (Maybe SourceSpan, Expr)
-  goExpr _ e@(PositionedValue pos _ _) = return (Just pos, e)
-  goExpr pos (TypeClassDictionary (Constraint name tys info) dicts hints) = do
-    tys' <- traverse (goType' pos) tys
-    return (pos, TypeClassDictionary (Constraint name tys' info) dicts hints)
-  goExpr pos (DeferredDictionary cls tys) = do
-    tys' <- traverse (goType' pos) tys
-    return (pos, DeferredDictionary cls tys')
-  goExpr pos (TypedValue check v ty) = do
-    ty' <- goType' pos ty
-    return (pos, TypedValue check v ty')
-  goExpr pos other = return (pos, other)
+  goExpr :: Expr -> m Expr
+  goExpr (TypeClassDictionary sa@(ss, _) (Constraint name tys info) dicts hints) = do
+    tys' <- traverse (goType ss) tys
+    return (TypeClassDictionary sa (Constraint name tys' info) dicts hints)
+  goExpr (DeferredDictionary sa@(ss, _) cls tys) =
+    DeferredDictionary sa cls <$> traverse (goType ss) tys
+  goExpr (TypedValue sa@(ss, _) check v ty) =
+    TypedValue sa check v <$> goType ss ty
+  goExpr other =
+    return other
 
-  goBinder :: Maybe SourceSpan -> Binder -> m (Maybe SourceSpan, Binder)
-  goBinder _ e@(PositionedBinder pos _ _) = return (Just pos, e)
-  goBinder pos (TypedBinder ty b) = do
-    ty' <- goType' pos ty
-    return (pos, TypedBinder ty' b)
-  goBinder pos other = return (pos, other)
+  goBinder :: Binder -> m Binder
+  goBinder (TypedBinder ss ty b) =
+    TypedBinder ss <$> goType ss ty <*> pure b
+  goBinder other =
+    return other
 
 -- |
 -- Checks all the fixity exports within a module to ensure that members aliased
@@ -378,28 +351,26 @@ checkFixityExports
   -> m Module
 checkFixityExports (Module _ _ _ _ Nothing) =
   internalError "exports should have been elaborated before checkFixityExports"
-checkFixityExports m@(Module ss _ mn ds (Just exps)) =
-  rethrow (addHint (ErrorInModule mn))
-    $ rethrowWithPosition ss (traverse_ checkRef exps)
-    *> return m
+checkFixityExports m@(Module _ _ mn ds (Just exps)) =
+  rethrow (addHint (ErrorInModule mn)) $ traverse_ checkRef exps *> return m
   where
 
   checkRef :: DeclarationRef -> m ()
-  checkRef dr@(ValueOpRef ss' op) =
+  checkRef dr@(ValueOpRef ss op) =
     for_ (getValueOpAlias op) $ \case
       Left ident ->
-        unless (ValueRef ss' ident `elem` exps)
-          . throwError . errorMessage' ss'
-          $ TransitiveExportError dr [ValueRef ss' ident]
+        unless (ValueRef ss ident `elem` exps)
+          . throwError . errorMessage' ss
+          $ TransitiveExportError dr [ValueRef ss ident]
       Right ctor ->
         unless (anyTypeRef (maybe False (elem ctor) . snd))
           . throwError . errorMessage' ss
           $ TransitiveDctorExportError dr ctor
-  checkRef dr@(TypeOpRef ss' op) =
+  checkRef dr@(TypeOpRef ss op) =
     for_ (getTypeOpAlias op) $ \ty ->
       unless (anyTypeRef ((== ty) . fst))
-        . throwError . errorMessage' ss'
-        $ TransitiveExportError dr [TypeRef ss' ty Nothing]
+        . throwError . errorMessage' ss
+        $ TransitiveExportError dr [TypeRef ss ty Nothing]
   checkRef _ = return ()
 
   -- Finds the name associated with a type operator when that type is also
