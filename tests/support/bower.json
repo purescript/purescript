@@ -35,7 +35,7 @@
     "purescript-tailrec": "3.3.0",
     "purescript-tuples": "4.1.0",
     "purescript-type-equality": "2.1.0",
-    "purescript-typelevel-prelude": "2.3.0",
+    "purescript-typelevel-prelude": "#phil/append-symbol",
     "purescript-unfoldable": "3.0.0",
     "purescript-unsafe-coerce": "3.0.0"
   }
