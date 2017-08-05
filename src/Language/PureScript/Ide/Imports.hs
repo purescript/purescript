@@ -165,27 +165,27 @@ addQualifiedImport' imports mn qualifier =
 -- @import Prelude (bind)@ in the file File.purs returns @["import Prelude
 -- (bind, unit)"]@
 addExplicitImport :: (MonadIO m, MonadError IdeError m) =>
-                     FilePath -> IdeDeclaration -> P.ModuleName -> m [Text]
-addExplicitImport fp decl moduleName = do
+                     FilePath -> IdeDeclaration -> P.ModuleName -> Maybe P.ModuleName -> m [Text]
+addExplicitImport fp decl moduleName qualifier = do
   (mn, pre, imports, post) <- parseImportsFromFile' fp
   let newImportSection =
         -- TODO: Open an issue when this PR is merged, we should optimise this
         -- so that this case does not write to disc
         if mn == moduleName
         then imports
-        else addExplicitImport' decl moduleName imports
+        else addExplicitImport' decl moduleName qualifier imports
   pure (pre ++ prettyPrintImportSection newImportSection ++ post)
 
-addExplicitImport' :: IdeDeclaration -> P.ModuleName -> [Import] -> [Import]
-addExplicitImport' decl moduleName imports =
+addExplicitImport' :: IdeDeclaration -> P.ModuleName -> Maybe P.ModuleName -> [Import] -> [Import]
+addExplicitImport' decl moduleName qualifier imports =
   let
     isImplicitlyImported =
       not . null $ filter (\case
-                              (Import mn P.Implicit Nothing) -> mn == moduleName
+                              (Import mn P.Implicit qualifier') -> mn == moduleName && qualifier == qualifier'
                               _ -> False) imports
-    matches (Import mn (P.Explicit _) Nothing) = mn == moduleName
+    matches (Import mn (P.Explicit _) qualifier') = mn == moduleName && qualifier == qualifier'
     matches _ = False
-    freshImport = Import moduleName (P.Explicit [refFromDeclaration decl]) Nothing
+    freshImport = Import moduleName (P.Explicit [refFromDeclaration decl]) qualifier
   in
     if isImplicitlyImported
     then imports
@@ -209,8 +209,8 @@ addExplicitImport' decl moduleName imports =
     -- | Adds a declaration to an import:
     -- TypeDeclaration "Maybe" + Data.Maybe (maybe) -> Data.Maybe(Maybe, maybe)
     insertDeclIntoImport :: IdeDeclaration -> Import -> Import
-    insertDeclIntoImport decl' (Import mn (P.Explicit refs) Nothing) =
-      Import mn (P.Explicit (sortBy P.compDecRef (insertDeclIntoRefs decl' refs))) Nothing
+    insertDeclIntoImport decl' (Import mn (P.Explicit refs) qual) =
+      Import mn (P.Explicit (sortBy P.compDecRef (insertDeclIntoRefs decl' refs))) qual
     insertDeclIntoImport _ is = is
 
     insertDeclIntoRefs :: IdeDeclaration -> [P.DeclarationRef] -> [P.DeclarationRef]
@@ -251,10 +251,11 @@ updateAtFirstOrPrepend p t d l =
 addImportForIdentifier :: (Ide m, MonadError IdeError m)
                           => FilePath -- ^ The Sourcefile to read from
                           -> Text     -- ^ The identifier to import
+                          -> Maybe P.ModuleName  -- ^ The optional qualifier under which to import
                           -> [Filter] -- ^ Filters to apply before searching for
                                       -- the identifier
                           -> m (Either [Match IdeDeclaration] [Text])
-addImportForIdentifier fp ident filters = do
+addImportForIdentifier fp ident qual filters = do
   modules <- getAllModules Nothing
   case map (fmap discardAnn) (getExactMatches ident filters modules) of
     [] ->
@@ -264,7 +265,7 @@ addImportForIdentifier fp ident filters = do
     -- Only one match was found for the given identifier, so we can insert it
     -- right away
     [Match (m, decl)] ->
-      Right <$> addExplicitImport fp decl m
+      Right <$> addExplicitImport fp decl m qual
 
     -- This case comes up for newtypes and dataconstructors. Because values and
     -- types don't share a namespace we can get multiple matches from the same
@@ -281,7 +282,7 @@ addImportForIdentifier fp ident filters = do
         -- dataconstructor as that will give us an unnecessary import warning at
         -- worst
         Just decl ->
-          Right <$> addExplicitImport fp decl m1
+          Right <$> addExplicitImport fp decl m1 qual
         -- Here we need the user to specify whether he wanted a dataconstructor
         -- or a type
 
