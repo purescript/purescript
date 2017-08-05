@@ -81,8 +81,8 @@ handleCommand c = case c of
   Import fp outfp _ (AddQualifiedImport mn qual) -> do
     rs <- addQualifiedImport fp mn qual
     answerRequest outfp rs
-  Import fp outfp filters (AddImportForIdentifier ident) -> do
-    rs <- addImportForIdentifier fp ident filters
+  Import fp outfp filters (AddImportForIdentifier ident qual) -> do
+    rs <- addImportForIdentifier fp ident qual filters
     case rs of
       Right rs' -> answerRequest outfp rs'
       Left question ->

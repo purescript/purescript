@@ -82,7 +82,7 @@ commandName c = case c of
 data ImportCommand
   = AddImplicitImport P.ModuleName
   | AddQualifiedImport P.ModuleName P.ModuleName
-  | AddImportForIdentifier Text
+  | AddImportForIdentifier Text (Maybe P.ModuleName)
   deriving (Show, Eq)
 
 instance FromJSON ImportCommand where
@@ -96,7 +96,10 @@ instance FromJSON ImportCommand where
           <$> (P.moduleNameFromString <$> o .: "module")
           <*> (P.moduleNameFromString <$> o .: "qualifier")
       "addImport" ->
-        AddImportForIdentifier <$> o .: "identifier"
+        AddImportForIdentifier
+          <$> (o .: "identifier")
+          <*> (fmap P.moduleNameFromString <$> o .:? "qualifier")
+
       _ -> mzero
 
 data ListType = LoadedModules | Imports FilePath | AvailableModules

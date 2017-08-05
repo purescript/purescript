@@ -1,10 +1,16 @@
 # Protocol
 
-Encode the following JSON formats into a single line string and pass them to
-`psc-ide-client`s stdin. You can then read the result from `psc-ide-client`s
-stdout as a single line. The result needs to be unwrapped from the "wrapper"
-which separates success from failure. This wrapper is described at the end of
-this document.
+Communication with `purs ide server` is via a JSON protocol over a TCP connection:
+the server listens on a particular (configurable) port, and will accept a single line
+of JSON input in the format described below, terminated by a newline, before giving 
+a JSON response and closing the connection.
+
+The `purs ide client` command can be used as a wrapper for the TCP connection, but
+otherwise behaves the same, accepting a line of JSON on stdin and exiting after
+giving a result on stdout.
+
+The result needs to be unwrapped from the "wrapper" which separates success
+from failure. This wrapper is described at the end of this document.
 
 ## Command:
 ### Load
@@ -218,7 +224,7 @@ Example:
 This command just adds an unqualified import for the given modulename.
 
 Arguments:
-- `moduleName :: String`
+- `module :: String`
 
 Example:
 ```json
@@ -239,7 +245,8 @@ Example:
 This command adds an import for the given modulename and qualifier.
 
 Arguments:
-- `moduleName :: String`
+- `module :: String`
+- `qualifier :: String`
 
 Example:
 ```json
@@ -264,13 +271,14 @@ match it adds the import and returns. If it finds more than one match it
 responds with a list of the found matches as completions like the complete
 command.
 
-You can also supply a list of filters like the ones for completion. This way you
-can narrow down the search to a certain module and resolve the case in which
+You can also supply a list of filters like the ones for completion. These are
+specified as part of the top level command rather than within the `importCommand`.
+This way you can narrow down the search to a certain module and resolve the case in which
 more then one match was found.
 
 Arguments:
-- `moduleName :: String`
-- `filters :: [Filter]`
+- `identifier :: String`
+- `qualifier :: String` (optional)
 
 Example:
 ```json
@@ -283,6 +291,28 @@ Example:
       "importCommand": "addImport",
       "identifier": "bind"
     }
+  }
+}
+```
+
+Example with qualifier and filter:
+```json
+{
+  "command": "import",
+  "params": {
+    "file": "/home/creek/Documents/chromacannon/src/Demo.purs",
+    "outfile": "/home/creek/Documents/chromacannon/src/Demo.purs",
+    "importCommand": {
+      "importCommand": "addImport",
+      "identifier": "length",
+      "qualifier": "Array"
+    },
+    "filters": [{
+      "filter": "modules",
+      "params": {
+        "modules": ["Data.Array"]
+      }
+    }]
   }
 }
 ```
