@@ -220,7 +220,6 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
     collectArgs _ _   _ = Nothing
 
   isNFn :: Text -> Text -> Int -> AST -> Bool
-  isNFn _ prefix n (Var _ name) = name == (prefix <> T.pack (show n))
   isNFn expectMod prefix n (Indexer _ (StringLiteral _ name) (Var _ modName)) | modName == expectMod =
     name == fromString (T.unpack prefix <> show n)
   isNFn _ _ _ _ = False
