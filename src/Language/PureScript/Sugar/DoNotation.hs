@@ -28,43 +28,48 @@ desugarDo d =
   let (f, _, _) = everywhereOnValuesM return replace return
   in rethrowWithPosition (declSourceSpan d) $ f d
   where
-  bind :: Expr
-  bind = Var (Qualified Nothing (Ident C.bind))
+  bind :: SourceAnn -> Expr
+  bind sa = Var sa (Qualified Nothing (Ident C.bind))
 
-  discard :: Expr
-  discard = Var (Qualified Nothing (Ident C.discard))
+  discard :: SourceAnn -> Expr
+  discard sa = Var sa (Qualified Nothing (Ident C.discard))
 
   replace :: Expr -> m Expr
-  replace (Do els) = go els
-  replace (PositionedValue pos com v) = PositionedValue pos com <$> rethrowWithPosition pos (replace v)
+  replace (Do _ els) = go els
   replace other = return other
 
   go :: [DoNotationElement] -> m Expr
   go [] = internalError "The impossible happened in desugarDo"
-  go [DoNotationValue val] = return val
-  go (DoNotationValue val : rest) = do
+  go [DoNotationValue _ val] = return val
+  go (DoNotationValue ss@(sa, _) val : rest) = do
     rest' <- go rest
-    return $ App (App discard val) (Abs (VarBinder (Ident C.__unused)) rest')
-  go [DoNotationBind _ _] = throwError . errorMessage $ InvalidDoBind
-  go (DoNotationBind b _ : _) | First (Just ident) <- foldMap fromIdent (binderNames b) =
-      throwError . errorMessage $ CannotUseBindWithDo (Ident ident)
+    return $ App ss (App ss (discard sa) val) (Abs ss (VarBinder sa (Ident C.__unused)) rest')
+  go [DoNotationBind (sa, _) _ _] = throwError . errorMessage' sa $ InvalidDoBind
+  go (DoNotationBind (sa, _) b _ : _) | First (Just ident) <- foldMap fromIdent (binderNames b) =
+      throwError . errorMessage' sa $ CannotUseBindWithDo (Ident ident)
     where
       fromIdent (Ident i) | i `elem` [ C.bind, C.discard ] = First (Just i)
       fromIdent _ = mempty
-  go (DoNotationBind (VarBinder ident) val : rest) = do
+  go (DoNotationBind ss1 (VarBinder ss2 ident) val : rest) = do
     rest' <- go rest
-    return $ App (App bind val) (Abs (VarBinder ident) rest')
-  go (DoNotationBind binder val : rest) = do
+    return $ App ss1 (App ss1 bind val) (Abs ss1 (VarBinder ss2 ident) rest')
+  go (DoNotationBind ss@(sa, _) binder val : rest) = do
     rest' <- go rest
     ident <- freshIdent'
-    return $ App (App bind val) (Abs (VarBinder ident) (Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] [MkUnguarded rest']]))
-  go [DoNotationLet _] = throwError . errorMessage $ InvalidDoLet
-  go (DoNotationLet ds : rest) = do
+    return $
+      App sa
+        (App sa bind val)
+        (Abs sa
+          (VarBinder sa ident)
+          (Case sa
+            [Var sa (Qualified Nothing ident)]
+            [CaseAlternative sa [binder] [MkUnguarded sa rest']]))
+  go [DoNotationLet (sa, _) _] = throwError . errorMessage' sa $ InvalidDoLet
+  go (DoNotationLet ss ds : rest) = do
     let checkBind :: Declaration -> m ()
-        checkBind (ValueDeclaration (ss, _) i@(Ident name) _ _ _)
-          | name `elem` [ C.bind, C.discard ] = throwError . errorMessage' ss $ CannotUseBindWithDo i
+        checkBind (ValueDeclaration (sa, _) i@(Ident name) _ _ _)
+          | name `elem` [ C.bind, C.discard ] = throwError . errorMessage' sa $ CannotUseBindWithDo i
         checkBind _ = pure ()
     mapM_ checkBind ds
     rest' <- go rest
-    return $ Let ds rest'
-  go (PositionedDoNotationElement pos com el : rest) = rethrowWithPosition pos $ PositionedValue pos com <$> go (el : rest)
+    return $ Let ss ds rest'
