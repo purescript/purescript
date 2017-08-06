@@ -73,6 +73,8 @@ magicDo = inlineST . everywhere undo . everywhereTopDown convert
   -- Remove __do function applications which remain after desugaring
   undo :: AST -> AST
   undo (Return _ (App _ (Function _ (Just ident) [] body) [])) | ident == fnName = body
+  undo (App _ (App s1 (Function s2 Nothing [] (Block ss body)) []) []) =
+    App s1 (Function s2 Nothing [] (Block ss (applyReturns `fmap` body))) []
   undo other = other
 
   applyReturns :: AST -> AST
