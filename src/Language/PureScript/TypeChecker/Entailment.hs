@@ -27,7 +27,7 @@ import Data.List (minimumBy)
 import Data.Maybe (fromMaybe, maybeToList, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Data.Text (Text, stripPrefix, stripSuffix)
+import Data.Text (Text)
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -39,7 +39,7 @@ import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 import Language.PureScript.Label (Label(..))
-import Language.PureScript.PSString (PSString, mkString, decodeString)
+import Language.PureScript.PSString (PSString, mkString)
 import qualified Language.PureScript.Constants as C
 
 -- | Describes what sort of dictionary to generate for type class instances
@@ -162,9 +162,8 @@ entails SolverOptions{..} constraint context hints =
                   GT -> C.orderingGT
           args = [arg0, arg1, TypeConstructor ordering]
       in [TypeClassDictionaryInScope CompareSymbolInstance [] C.CompareSymbol args Nothing]
-    forClassName _ C.AppendSymbol [arg0, arg1, arg2]
-      | Just (arg0', arg1', arg2') <- appendSymbols arg0 arg1 arg2 =
-      let args = [arg0', arg1', arg2']
+    forClassName _ C.AppendSymbol [arg0@(TypeLevelString lhs), arg1@(TypeLevelString rhs), _] =
+      let args = [arg0, arg1, TypeLevelString (lhs <> rhs)]
       in [TypeClassDictionaryInScope AppendSymbolInstance [] C.AppendSymbol args Nothing]
     forClassName _ C.Union [l, r, u]
       | Just (lOut, rOut, uOut, cst) <- unionRows l r u
@@ -353,21 +352,6 @@ entails SolverOptions{..} constraint context hints =
         subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr
         subclassDictionaryValue dict className index =
           App (Accessor (mkString (superclassName className index)) dict) valUndefined
-
-    -- | Append type level symbols, or, run backwards, strip a prefix or suffix
-    appendSymbols :: Type -> Type -> Type -> Maybe (Type, Type, Type)
-    appendSymbols arg0@(TypeLevelString lhs) arg1@(TypeLevelString rhs) _ = Just (arg0, arg1, TypeLevelString (lhs <> rhs))
-    appendSymbols arg0@(TypeLevelString lhs) _ arg2@(TypeLevelString out) = do
-      lhs' <- decodeString lhs
-      out' <- decodeString out
-      rhs <- stripPrefix lhs' out'
-      pure (arg0, TypeLevelString (mkString rhs), arg2)
-    appendSymbols _ arg1@(TypeLevelString rhs) arg2@(TypeLevelString out) = do
-      rhs' <- decodeString rhs
-      out' <- decodeString out
-      lhs <- stripSuffix rhs' out'
-      pure (TypeLevelString (mkString lhs), arg1, arg2)
-    appendSymbols _ _ _ = Nothing
 
     -- | Left biased union of two row types
     unionRows :: Type -> Type -> Type -> Maybe (Type, Type, Type, Maybe [Constraint])
