@@ -102,8 +102,8 @@ genericMerge :: Ord a =>
   [(a, c)] ->
   [d]
 genericMerge _ [] [] = []
-genericMerge f bs [] = map (\(s, b) -> f s (Just b) Nothing) bs
-genericMerge f [] bs = map (\(s, b) -> f s Nothing (Just b)) bs
+genericMerge f bs [] = fmap (\(s, b) -> f s (Just b) Nothing) bs
+genericMerge f [] bs = fmap (\(s, b) -> f s Nothing (Just b)) bs
 genericMerge f bsl@((s, b):bs) bsr@((s', b'):bs')
   | s < s' = f s (Just b) Nothing : genericMerge f bs bsr
   | s > s' = f s' Nothing (Just b') : genericMerge f bsl bs'
@@ -126,12 +126,12 @@ missingCasesSingle env mn NullBinder{} cb@(ConstructorBinder sa con _) =
 missingCasesSingle env mn cb@(ConstructorBinder sa con bs) (ConstructorBinder _ con' bs')
   | con == con' = let (bs'', pr) = missingCasesMultiple env mn bs bs' in (fmap (ConstructorBinder sa con) bs'', pr)
   | otherwise = ([cb], return False)
-missingCasesSingle env mn NullBinder{} (LiteralBinder sa (ObjectLiteral bs)) =
-  (fmap (LiteralBinder sa . ObjectLiteral . zip (fmap fst bs)) allMisses, pr)
+missingCasesSingle env mn NullBinder{} (LiteralBinder ss (ObjectLiteral bs)) =
+  (fmap (LiteralBinder ss . ObjectLiteral . zip (fmap fst bs)) allMisses, pr)
   where
-  (allMisses, pr) = missingCasesMultiple env mn (initialize $ length bs) (fmap snd bs)
-missingCasesSingle env mn (LiteralBinder sa (ObjectLiteral bs)) (LiteralBinder _ (ObjectLiteral bs')) =
-  (fmap (LiteralBinder sa . ObjectLiteral . zip sortedNames) allMisses, pr)
+  (allMisses, pr) = missingCasesMultiple env mn (initialize ss $ length bs) (fmap snd bs)
+missingCasesSingle env mn (LiteralBinder ss (ObjectLiteral bs)) (LiteralBinder _ (ObjectLiteral bs')) =
+  (fmap (LiteralBinder ss . ObjectLiteral . zip sortedNames) allMisses, pr)
   where
   (allMisses, pr) = uncurry (missingCasesMultiple env mn) (unzip binders)
 
@@ -147,8 +147,9 @@ missingCasesSingle env mn (LiteralBinder sa (ObjectLiteral bs)) (LiteralBinder _
   compBS :: b -> a -> Maybe b -> Maybe b -> (a, (b, b))
   compBS e s b b' = (s, compB e b b')
 
-  (sortedNames, binders) = unzip $ genericMerge (compBS NullBinder) sbs sbs'
-missingCasesSingle _ _ NullBinder{} (LiteralBinder _ (BooleanLiteral b)) = ([LiteralBinder . BooleanLiteral $ not b], return True)
+  (sortedNames, binders) = unzip $ genericMerge (compBS (NullBinder ss)) sbs sbs'
+missingCasesSingle _ _ NullBinder{} (LiteralBinder ss (BooleanLiteral b)) =
+  ([LiteralBinder ss . BooleanLiteral $ not b], return True)
 missingCasesSingle _ _ (LiteralBinder ss (BooleanLiteral bl)) (LiteralBinder _ (BooleanLiteral br))
   | bl == br = ([], return True)
   | otherwise = ([LiteralBinder ss (BooleanLiteral bl)], return False)
@@ -184,7 +185,7 @@ missingCasesSingle _ _ b _ = ([b], Left Unknown)
 missingCasesMultiple :: Environment -> ModuleName -> [Binder] -> [Binder] -> ([[Binder]], Either RedundancyError Bool)
 missingCasesMultiple env mn = go
   where
-  go (x:xs) (y:ys) = (map (: xs) miss1 ++ map (x :) miss2, liftA2 (&&) pr1 pr2)
+  go (x:xs) (y:ys) = (fmap (: xs) miss1 ++ fmap (x :) miss2, liftA2 (&&) pr1 pr2)
     where
     (miss1, pr1) = missingCasesSingle env mn x y
     (miss2, pr2) = go xs ys
@@ -214,8 +215,8 @@ isExhaustiveGuard env moduleName gs =
 
     checkGuard :: Guard -> Bool
     checkGuard (ConditionGuard _ cond) = isTrueExpr cond
-    checkGuard (PatternGuard _ binder _) =
-      case missingCasesMultiple env moduleName [NullBinder] [binder] of
+    checkGuard (PatternGuard ss binder _) =
+      case missingCasesMultiple env moduleName [NullBinder ss] [binder] of
         ([], _) -> True -- there are no missing pattern for this guard
         _       -> False
 
@@ -241,18 +242,19 @@ missingAlternative env mn ca uncovered
 checkExhaustive
   :: forall m
    . (MonadWriter MultipleErrors m, MonadSupply m)
-   => SourceSpan
-   -> Environment
+   => Environment
    -> ModuleName
    -> Int
    -> [CaseAlternative]
    -> Expr
    -> m Expr
-checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' step ([initialize numArgs], (pure True, [])) cas
+checkExhaustive env mn numArgs cas expr =
+  let ss = exprSourceSpan expr
+  in makeResult ss . first ordNub $ foldl' step ([initialize ss numArgs], (pure True, [])) cas
   where
   step :: ([[Binder]], (Either RedundancyError Bool, [[Binder]])) -> CaseAlternative -> ([[Binder]], (Either RedundancyError Bool, [[Binder]]))
   step (uncovered, (nec, redundant)) ca =
-    let (missed, pr) = unzip (map (missingAlternative env mn ca) uncovered)
+    let (missed, pr) = unzip (fmap (missingAlternative env mn ca) uncovered)
         (missed', approx) = splitAt 10000 (ordNub (concat missed))
         cond = or <$> sequenceA pr
     in (missed', ( if null approx
@@ -264,8 +266,8 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
                  )
        )
 
-  makeResult :: ([[Binder]], (Either RedundancyError Bool, [[Binder]])) -> m Expr
-  makeResult (bss, (rr, bss')) =
+  makeResult :: SourceSpan -> ([[Binder]], (Either RedundancyError Bool, [[Binder]])) -> m Expr
+  makeResult ss (bss, (rr, bss')) =
     do unless (null bss') tellRedundant
        case rr of
          Left Incomplete -> tellIncomplete
@@ -287,19 +289,19 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
   addPartialConstraint (bss, complete) e = do
     tyVar <- ("p" <>) . T.pack . show <$> fresh
     var <- freshName
+    let sa = (exprSourceSpan e, [])
     return .
-      Let
-        [ partial var tyVar ]
-        $ App (Var (Qualified Nothing (Ident C.__unused))) e
+      Let sa
+        [ partial sa var tyVar ]
+        $ App sa (Var sa (Qualified Nothing (Ident C.__unused))) e
     where
-      partial :: Text -> Text -> Declaration
-      partial var tyVar =
-        ValueDeclaration (ss, []) (Ident C.__unused) Private []
-        [MkUnguarded
-          (TypedValue
-           True
-           (Abs (VarBinder (Ident var)) (Var (Qualified Nothing (Ident var))))
-           (ty tyVar))
+      partial :: SourceAnn -> Text -> Text -> Declaration
+      partial sa@(ss, _) var tyVar =
+        ValueDeclaration sa (Ident C.__unused) Private []
+        [MkUnguarded ss
+          (TypedValue sa True
+            (Abs sa (VarBinder ss (Ident var)) (Var sa (Qualified Nothing (Ident var))))
+            (ty tyVar))
         ]
 
       ty :: Text -> Type
@@ -313,7 +315,7 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
 
       constraintData :: ConstraintData
       constraintData =
-        PartialConstraintData (map (map prettyPrintBinderAtom) bss) complete
+        PartialConstraintData (fmap (fmap prettyPrintBinderAtom) bss) complete
 
 -- |
 -- Exhaustivity checking
@@ -321,40 +323,55 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
 checkExhaustiveExpr
   :: forall m
    . (MonadWriter MultipleErrors m, MonadSupply m)
-   => SourceSpan
-   -> Environment
+   => Environment
    -> ModuleName
    -> Expr
    -> m Expr
-checkExhaustiveExpr initSS env mn = onExpr initSS
+checkExhaustiveExpr env mn = onExpr
   where
   onDecl :: Declaration -> m Declaration
-  onDecl (BindingGroupDeclaration bs) = BindingGroupDeclaration <$> mapM (\(sai@((ss, _), _), nk, expr) -> (sai, nk,) <$> onExpr ss expr) bs
-  onDecl (ValueDeclaration sa@(ss, _) name x y [MkUnguarded ss' e]) = ValueDeclaration sa name x y . mkUnguardedExpr ss' <$> censor (addHint (ErrorInValueDeclaration name)) (onExpr ss e)
+  onDecl (BindingGroupDeclaration bs) =
+    BindingGroupDeclaration <$> mapM (\(sai, nk, expr) -> (sai, nk,) <$> onExpr expr) bs
+  onDecl (ValueDeclaration sa name x y [MkUnguarded ss e]) =
+    ValueDeclaration sa name x y . mkUnguardedExpr ss
+      <$> censor (addHint (ErrorInValueDeclaration name)) (onExpr e)
   onDecl decl = return decl
 
-  onExpr :: SourceSpan -> Expr -> m Expr
-  onExpr ss (UnaryMinus e) = UnaryMinus <$> onExpr ss e
-  onExpr ss (Literal (ArrayLiteral es)) = Literal . ArrayLiteral <$> mapM (onExpr ss) es
-  onExpr ss (Literal (ObjectLiteral es)) = Literal . ObjectLiteral <$> mapM (sndM (onExpr ss)) es
-  onExpr ss (TypeClassDictionaryConstructorApp x e) = TypeClassDictionaryConstructorApp x <$> onExpr ss e
-  onExpr ss (Accessor x e) = Accessor x <$> onExpr ss e
-  onExpr ss (ObjectUpdate o es) = ObjectUpdate <$> onExpr ss o <*> mapM (sndM (onExpr ss)) es
-  onExpr ss (Abs x e) = Abs x <$> onExpr ss e
-  onExpr ss (App e1 e2) = App <$> onExpr ss e1 <*> onExpr ss e2
-  onExpr ss (IfThenElse e1 e2 e3) = IfThenElse <$> onExpr ss e1 <*> onExpr ss e2 <*> onExpr ss e3
-  onExpr ss (Case es cas) = do
-    case' <- Case <$> mapM (onExpr ss) es <*> mapM (onCaseAlternative ss) cas
-    checkExhaustive ss env mn (length es) cas case'
-  onExpr ss (TypedValue x e y) = TypedValue x <$> onExpr ss e <*> pure y
-  onExpr ss (Let ds e) = Let <$> mapM onDecl ds <*> onExpr ss e
-  onExpr _ expr = return expr
+  onExpr :: Expr -> m Expr
+  onExpr (UnaryMinus ss e) =
+    UnaryMinus ss <$> onExpr e
+  onExpr (Literal ss (ArrayLiteral es)) =
+    Literal ss . ArrayLiteral <$> mapM onExpr es
+  onExpr (Literal ss (ObjectLiteral es)) =
+    Literal ss . ObjectLiteral <$> mapM (sndM onExpr) es
+  onExpr (TypeClassDictionaryConstructorApp ss x e) =
+    TypeClassDictionaryConstructorApp ss x <$> onExpr e
+  onExpr (Accessor ss x e) =
+    Accessor ss x <$> onExpr e
+  onExpr (ObjectUpdate ss o es) =
+    ObjectUpdate ss <$> onExpr o <*> mapM (sndM onExpr) es
+  onExpr (Abs ss x e) =
+    Abs ss x <$> onExpr e
+  onExpr (App ss e1 e2) =
+    App ss <$> onExpr e1 <*> onExpr e2
+  onExpr (IfThenElse ss e1 e2 e3) =
+    IfThenElse ss <$> onExpr e1 <*> onExpr e2 <*> onExpr e3
+  onExpr (Case ss es cas) = do
+    case' <- Case ss <$> mapM onExpr es <*> mapM onCaseAlternative cas
+    checkExhaustive env mn (length es) cas case'
+  onExpr (TypedValue ss x e y) =
+    TypedValue ss x <$> onExpr e <*> pure y
+  onExpr (Let ss ds e) =
+    Let ss <$> mapM onDecl ds <*> onExpr e
+  onExpr expr = return expr
 
-  onCaseAlternative :: SourceSpan -> CaseAlternative -> m CaseAlternative
-  onCaseAlternative ss (CaseAlternative x [MkUnguarded e]) = CaseAlternative x . mkUnguardedExpr <$> onExpr ss e
-  onCaseAlternative ss (CaseAlternative x es) = CaseAlternative x <$> mapM (onGuardedExpr ss) es
+  onCaseAlternative :: CaseAlternative -> m CaseAlternative
+  onCaseAlternative (CaseAlternative ss x [MkUnguarded ss' e]) =
+    CaseAlternative ss x . mkUnguardedExpr ss' <$> onExpr e
+  onCaseAlternative (CaseAlternative ss x es) =
+    CaseAlternative ss x <$> mapM onGuardedExpr es
 
-  onGuardedExpr :: SourceSpan -> GuardedExpr -> m GuardedExpr
-  onGuardedExpr ss (GuardedExpr guard rhs) = GuardedExpr guard <$> onExpr ss rhs
+  onGuardedExpr :: GuardedExpr -> m GuardedExpr
+  onGuardedExpr (GuardedExpr ss guard rhs) = GuardedExpr ss guard <$> onExpr rhs
 
-  mkUnguardedExpr = pure . MkUnguarded
+  mkUnguardedExpr ss = pure . MkUnguarded ss

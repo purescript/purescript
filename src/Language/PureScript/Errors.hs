@@ -212,7 +212,7 @@ addHints hints = onErrorMessages $ \(ErrorMessage hints' se) -> ErrorMessage (hi
 
 -- | A map from rigid type variable name/unknown variable pairs to new variables.
 data TypeMap = TypeMap
-  { umSkolemMap   :: M.Map Int (String, Int, Maybe SourceSpan)
+  { umSkolemMap   :: M.Map Int (String, Int, SourceSpan)
   -- ^ a map from skolems to their new names, including source and naming info
   , umUnknownMap  :: M.Map Int Int
   -- ^ a map from unification variables to their new names
@@ -419,11 +419,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       types = map skolemInfo  (M.elems (umSkolemMap typeMap)) ++
               map unknownInfo (M.elems (umUnknownMap typeMap))
 
-      skolemInfo :: (String, Int, Maybe SourceSpan) -> Box.Box
+      skolemInfo :: (String, Int, SourceSpan) -> Box.Box
       skolemInfo (name, s, ss) =
         paras $
           line (markCode (T.pack (name <> show s)) <> " is a rigid type variable")
-          : foldMap (return . line . ("  bound at " <>) . displayStartEndPos) ss
+          : (return . line . ("  bound at " <>) $ displayStartEndPos ss)
 
       unknownInfo :: Int -> Box.Box
       unknownInfo u = line $ markCode ("t" <> T.pack (show u)) <> " is an unknown type"

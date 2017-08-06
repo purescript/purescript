@@ -58,7 +58,7 @@ createBindingGroups moduleName = mapM f <=< handleDecls
   (f, _, _) = everywhereOnValuesTopDownM return handleExprs return
 
   handleExprs :: Expr -> m Expr
-  handleExprs (Let ds val) = flip Let val <$> handleDecls ds
+  handleExprs (Let sa ds val) = flip (Let sa) val <$> handleDecls ds
   handleExprs other = return other
 
   -- |
@@ -94,12 +94,12 @@ collapseBindingGroups =
   where
   go (DataBindingGroupDeclaration ds) = NEL.toList ds
   go (BindingGroupDeclaration ds) =
-    NEL.toList $ fmap (\((sa, ident), nameKind, val) ->
-      ValueDeclaration sa ident nameKind [] [MkUnguarded val]) ds
+    NEL.toList $ fmap (\((sa@(ss, _), ident), nameKind, val) ->
+      ValueDeclaration sa ident nameKind [] [MkUnguarded ss val]) ds
   go other = [other]
 
 collapseBindingGroupsForValue :: Expr -> Expr
-collapseBindingGroupsForValue (Let ds val) = Let (collapseBindingGroups ds) val
+collapseBindingGroupsForValue (Let sa ds val) = Let sa (collapseBindingGroups ds) val
 collapseBindingGroupsForValue other = other
 
 usedIdents :: ModuleName -> Declaration -> [Ident]
@@ -107,16 +107,16 @@ usedIdents moduleName = ordNub . usedIdents' S.empty . getValue
   where
   def _ _ = []
 
-  getValue (ValueDeclaration _ _ _ [] [MkUnguarded val]) = val
+  getValue (ValueDeclaration _ _ _ [] [MkUnguarded _ val]) = val
   getValue ValueDeclaration{} = internalError "Binders should have been desugared"
   getValue _ = internalError "Expected ValueDeclaration"
 
   (_, usedIdents', _, _, _) = everythingWithScope def usedNamesE def def def
 
   usedNamesE :: S.Set Ident -> Expr -> [Ident]
-  usedNamesE scope (Var (Qualified Nothing name))
+  usedNamesE scope (Var _ (Qualified Nothing name))
     | name `S.notMember` scope = [name]
-  usedNamesE scope (Var (Qualified (Just moduleName') name))
+  usedNamesE scope (Var _ (Qualified (Just moduleName') name))
     | moduleName == moduleName' && name `S.notMember` scope = [name]
   usedNamesE _ _ = []
 
@@ -128,10 +128,10 @@ usedImmediateIdents moduleName =
   def s _ = (s, [])
 
   usedNamesE :: Bool -> Expr -> (Bool, [Ident])
-  usedNamesE True (Var (Qualified Nothing name)) = (True, [name])
-  usedNamesE True (Var (Qualified (Just moduleName') name))
+  usedNamesE True (Var _ (Qualified Nothing name)) = (True, [name])
+  usedNamesE True (Var _ (Qualified (Just moduleName') name))
     | moduleName == moduleName' = (True, [name])
-  usedNamesE True (Abs _ _) = (False, [])
+  usedNamesE True Abs{} = (False, [])
   usedNamesE scope _ = (scope, [])
 
 usedTypeNames :: ModuleName -> Declaration -> [ProperName 'TypeName]
@@ -164,12 +164,12 @@ declTypeName _ = internalError "Expected DataDeclaration"
 --
 toBindingGroup
   :: forall m
-   . (MonadError MultipleErrors m)
+   . MonadError MultipleErrors m
    => ModuleName
    -> SCC Declaration
    -> m Declaration
 toBindingGroup _ (AcyclicSCC d) = return d
-toBindingGroup moduleName (CyclicSCC ds') = do
+toBindingGroup moduleName (CyclicSCC ds') =
   -- Once we have a mutually-recursive group of declarations, we need to sort
   -- them further by their immediate dependencies (those outside function
   -- bodies). In particular, this is relevant for type instance dictionaries
@@ -192,7 +192,7 @@ toBindingGroup moduleName (CyclicSCC ds') = do
   toBinding (CyclicSCC ds) = throwError $ foldMap cycleError ds
 
   cycleError :: Declaration -> MultipleErrors
-  cycleError (ValueDeclaration (ss, _) n _ _ [MkUnguarded _]) = errorMessage' ss $ CycleInDeclaration n
+  cycleError (ValueDeclaration (ss, _) n _ _ [MkUnguarded _ _]) = errorMessage' ss $ CycleInDeclaration n
   cycleError _ = internalError "cycleError: Expected ValueDeclaration"
 
 toDataBindingGroup
@@ -212,6 +212,6 @@ isTypeSynonym (TypeSynonymDeclaration _ pn _ _) = Just pn
 isTypeSynonym _ = Nothing
 
 fromValueDecl :: Declaration -> ((SourceAnn, Ident), NameKind, Expr)
-fromValueDecl (ValueDeclaration sa ident nameKind [] [MkUnguarded val]) = ((sa, ident), nameKind, val)
+fromValueDecl (ValueDeclaration sa ident nameKind [] [MkUnguarded _ val]) = ((sa, ident), nameKind, val)
 fromValueDecl ValueDeclaration{} = internalError "Binders should have been desugared"
 fromValueDecl _ = internalError "Expected ValueDeclaration"

@@ -46,13 +46,13 @@ newSkolemScope = do
   return $ SkolemScope s
 
 -- | Skolemize a type variable by replacing its instances with fresh skolem constants
-skolemize :: Text -> Int -> SkolemScope -> Maybe SourceSpan -> Type -> Type
+skolemize :: Text -> Int -> SkolemScope -> SourceSpan -> Type -> Type
 skolemize ident sko scope ss = replaceTypeVars ident (Skolem ident sko scope ss)
 
 -- | This function skolemizes type variables appearing in any type signatures or
 -- 'DeferredDictionary' placeholders. These type variables are the only places
 -- where scoped type variables can appear in expressions.
-skolemizeTypesInValue :: Text -> Int -> SkolemScope -> Maybe SourceSpan -> Expr -> Expr
+skolemizeTypesInValue :: Text -> Int -> SkolemScope -> SourceSpan -> Expr -> Expr
 skolemizeTypesInValue ident sko scope ss =
     runIdentity . onExpr'
   where
@@ -60,15 +60,15 @@ skolemizeTypesInValue ident sko scope ss =
     (_, onExpr', _, _, _) = everywhereWithContextOnValuesM [] defS onExpr onBinder defS defS
 
     onExpr :: [Text] -> Expr -> Identity ([Text], Expr)
-    onExpr sco (DeferredDictionary c ts)
-      | ident `notElem` sco = return (sco, DeferredDictionary c (map (skolemize ident sko scope ss) ts))
-    onExpr sco (TypedValue check val ty)
-      | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedValue check val (skolemize ident sko scope ss ty))
+    onExpr sco (DeferredDictionary sa c ts)
+      | ident `notElem` sco = return (sco, DeferredDictionary sa c (fmap (skolemize ident sko scope ss) ts))
+    onExpr sco (TypedValue sa check val ty)
+      | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedValue sa check val (skolemize ident sko scope ss ty))
     onExpr sco other = return (sco, other)
 
     onBinder :: [Text] -> Binder -> Identity ([Text], Binder)
-    onBinder sco (TypedBinder ty b)
-      | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedBinder (skolemize ident sko scope ss ty) b)
+    onBinder sco (TypedBinder ss ty b)
+      | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedBinder ss (skolemize ident sko scope ss ty) b)
     onBinder sco other = return (sco, other)
 
     peelTypeVars :: Type -> [Text]
@@ -85,23 +85,21 @@ skolemizeTypesInValue ident sko scope ss =
 -- introduced by 'ForAll's. If a 'Skolem' is encountered whose 'SkolemScope' is
 -- not in the current list, then we have found an escaped skolem variable.
 skolemEscapeCheck :: MonadError MultipleErrors m => Expr -> m ()
-skolemEscapeCheck (TypedValue False _ _) = return ()
+skolemEscapeCheck (TypedValue _ False _ _) = return ()
 skolemEscapeCheck expr@TypedValue{} =
     traverse_ (throwError . singleError) (toSkolemErrors expr)
   where
     toSkolemErrors :: Expr -> [ErrorMessage]
-    (_, toSkolemErrors, _, _, _) = everythingWithContextOnValues (mempty, Nothing) [] (<>) def go def def def
+    (_, toSkolemErrors, _, _, _) = everythingWithContextOnValues mempty [] (<>) def go def def def
 
     def s _ = (s, [])
 
-    go :: (Set SkolemScope, Maybe SourceSpan)
+    go :: Set SkolemScope
        -> Expr
-       -> ((Set SkolemScope, Maybe SourceSpan), [ErrorMessage])
-    go (scopes, _) (PositionedValue ss _ _) = ((scopes, Just ss), [])
-    go (scopes, ssUsed) val@(TypedValue _ _ ty) =
-        ( (allScopes, ssUsed)
-        , [ ErrorMessage (maybe id ((:) . PositionedError) ssUsed [ ErrorInExpression val ]) $
-              EscapedSkolem name ssBound ty
+       -> (Set SkolemScope, [ErrorMessage])
+    go scopes val@(TypedValue (ss, _) _ _ ty) =
+        ( allScopes
+        , [ ErrorMessage [ErrorInExpression val, PositionedError ss] (EscapedSkolem name ssBound ty)
           | (name, scope, ssBound) <- collectSkolems ty
           , notMember scope allScopes
           ]

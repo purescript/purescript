@@ -740,6 +740,9 @@ exprSourceAnn (DeferredDictionary sa _ _) = sa
 exprSourceAnn (AnonymousArgument sa) = sa
 exprSourceAnn (Hole sa _) = sa
 
+exprSourceSpan :: Expr -> SourceSpan
+exprSourceSpan = fst . exprSourceAnn
+
 -- |
 -- An alternative in a case statement
 --

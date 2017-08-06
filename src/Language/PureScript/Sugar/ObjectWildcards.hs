@@ -31,27 +31,28 @@ desugarDecl d = rethrowWithPosition (declSourceSpan d) $ fn d
   (fn, _, _) = everywhereOnValuesTopDownM return desugarExpr return
 
   desugarExpr :: Expr -> m Expr
-  desugarExpr AnonymousArgument = throwError . errorMessage $ IncorrectAnonymousArgument
-  desugarExpr (Parens b)
-    | b' <- stripPositionInfo b
-    , BinaryNoParens op val u <- b'
-    , isAnonymousArgument u = do arg <- freshIdent'
-                                 return $ Abs (VarBinder arg) $ App (App op val) (Var (Qualified Nothing arg))
-    | b' <- stripPositionInfo b
-    , BinaryNoParens op u val <- b'
-    , isAnonymousArgument u = do arg <- freshIdent'
-                                 return $ Abs (VarBinder arg) $ App (App op (Var (Qualified Nothing arg))) val
-  desugarExpr (Literal (ObjectLiteral ps)) = wrapLambdaAssoc (Literal . ObjectLiteral) ps
-  desugarExpr (ObjectUpdateNested obj ps) = transformNestedUpdate obj ps
-  desugarExpr (Accessor prop u)
+  desugarExpr (AnonymousArgument (ss, _)) =
+    throwError $ errorMessage' ss IncorrectAnonymousArgument
+  desugarExpr (Parens sa b)
+    | BinaryNoParens sa' op val u <- b
+    , isAnonymousArgument u = do
+        arg <- freshIdent'
+        return . Abs (VarBinder arg) $ App (App op val) (Var (Qualified Nothing arg))
+    | BinaryNoParens sa' op u val <- b
+    , isAnonymousArgument u = do
+        arg <- freshIdent'
+        return . Abs (VarBinder arg) $ App (App op (Var (Qualified Nothing arg))) val
+  desugarExpr (Literal sa (ObjectLiteral ps)) = wrapLambdaAssoc (Literal . ObjectLiteral) ps
+  desugarExpr (ObjectUpdateNested sa obj ps) = transformNestedUpdate obj ps
+  desugarExpr (Accessor sa prop u)
     | Just props <- peelAnonAccessorChain u = do
       arg <- freshIdent'
-      return $ Abs (VarBinder arg) $ foldr Accessor (argToExpr arg) (prop:props)
-  desugarExpr (Case args cas) | any isAnonymousArgument args = do
+      return . Abs (VarBinder arg) $ foldr Accessor (argToExpr arg) (prop:props)
+  desugarExpr (Case sa args cas) | any isAnonymousArgument args = do
     argIdents <- forM args freshIfAnon
     let args' = zipWith (`maybe` argToExpr) args argIdents
     return $ foldr (Abs . VarBinder) (Case args' cas) (catMaybes argIdents)
-  desugarExpr (IfThenElse u t f) | any isAnonymousArgument [u, t, f] = do
+  desugarExpr (IfThenElse sa u t f) | any isAnonymousArgument [u, t, f] = do
     u' <- freshIfAnon u
     t' <- freshIfAnon t
     f' <- freshIfAnon f
@@ -96,19 +97,13 @@ desugarDecl d = rethrowWithPosition (declSourceSpan d) $ fn d
   wrapLambdaAssoc :: ([(PSString, Expr)] -> Expr) -> [(PSString, Expr)] -> m Expr
   wrapLambdaAssoc mkVal = wrapLambda (mkVal . runAssocList) . AssocList
 
-  stripPositionInfo :: Expr -> Expr
-  stripPositionInfo (PositionedValue _ _ e) = stripPositionInfo e
-  stripPositionInfo e = e
-
   peelAnonAccessorChain :: Expr -> Maybe [PSString]
-  peelAnonAccessorChain (Accessor p e) = (p :) <$> peelAnonAccessorChain e
-  peelAnonAccessorChain (PositionedValue _ _ e) = peelAnonAccessorChain e
-  peelAnonAccessorChain AnonymousArgument = Just []
+  peelAnonAccessorChain (Accessor _ p e) = (p :) <$> peelAnonAccessorChain e
+  peelAnonAccessorChain AnonymousArgument{} = Just []
   peelAnonAccessorChain _ = Nothing
 
   isAnonymousArgument :: Expr -> Bool
-  isAnonymousArgument AnonymousArgument = True
-  isAnonymousArgument (PositionedValue _ _ e) = isAnonymousArgument e
+  isAnonymousArgument AnonymousArgument{} = True
   isAnonymousArgument _ = False
 
   freshIfAnon :: Expr -> m (Maybe Ident)
