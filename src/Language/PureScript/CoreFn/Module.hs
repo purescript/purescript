@@ -10,13 +10,17 @@ import Language.PureScript.Types
 -- |
 -- The CoreFn module representation
 --
-data Module a = Module
+data ModuleT t a = Module
   { moduleComments :: [Comment]
   , moduleName :: ModuleName
   , moduleImports :: [(a, ModuleName)]
   , moduleExports :: [Ident]
-  , moduleForeign :: [ForeignDecl]
+  , moduleForeign :: [ForeignDeclT t]
   , moduleDecls :: [Bind a]
   } deriving (Show)
 
-type ForeignDecl = (Ident, Type)
+type Module a = ModuleT Type a
+
+type ForeignDeclT t = (Ident, t)
+
+type ForeignDecl = ForeignDeclT Type
