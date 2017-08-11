@@ -222,7 +222,7 @@ desugarDecl mn exps = go
   genSpan = internalModuleSourceSpan "<generated>"
 
 memberToNameAndType :: Declaration -> (Ident, Type)
-memberToNameAndType (TypeDeclaration td) = (tydeclIdent td, tydeclType td)
+memberToNameAndType (TypeDeclaration td) = unwrapTypeDeclaration td
 memberToNameAndType _ = internalError "Invalid declaration in type class definition"
 
 typeClassDictionaryDeclaration

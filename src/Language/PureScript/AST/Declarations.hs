@@ -420,6 +420,9 @@ getTypeDeclaration :: Declaration -> Maybe TypeDeclarationData
 getTypeDeclaration (TypeDeclaration d) = Just d
 getTypeDeclaration _ = Nothing
 
+unwrapTypeDeclaration :: TypeDeclarationData -> (Ident, Type)
+unwrapTypeDeclaration td = (tydeclIdent td, tydeclType td)
+
 -- |
 -- The data type of declarations
 --
