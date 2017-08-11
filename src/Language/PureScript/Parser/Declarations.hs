@@ -59,7 +59,7 @@ parseTypeDeclaration :: TokenParser Declaration
 parseTypeDeclaration = withSourceAnnF $ do
   name <- P.try (parseIdent <* indented <* doubleColon)
   ty <- parsePolyType
-  return $ \sa -> TypeDeclaration sa name ty
+  return $ \sa -> TypeDeclaration (TypeDeclarationData sa name ty)
 
 parseTypeSynonymDeclaration :: TokenParser Declaration
 parseTypeSynonymDeclaration = withSourceAnnF $ do

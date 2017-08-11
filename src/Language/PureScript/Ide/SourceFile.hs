@@ -70,8 +70,7 @@ extractTypeAnnotations
   -> [(P.Ident, P.Type)]
 extractTypeAnnotations = mapMaybe extract
   where
-    extract (P.TypeDeclaration _ ident ty) = Just (ident, ty)
-    extract _ = Nothing
+    extract = map (\td -> (P.tydeclIdent td, P.tydeclType td)) . P.getTypeDeclaration
 
 -- | Given a surrounding Sourcespan and a Declaration from the PS AST, extracts
 -- definition sites inside that Declaration.
@@ -107,6 +106,6 @@ extractSpans d = case d of
     -- declarations for non-typeclass members, which is why we can't handle them
     -- in extractSpans.
     extractSpans' dP = case dP of
-      P.TypeDeclaration (ss', _) ident _ ->
+      P.TypeDeclaration (P.TypeDeclarationData (ss', _) ident _) ->
         [(IdeNamespaced IdeNSValue (P.runIdent ident), ss')]
       _ -> []

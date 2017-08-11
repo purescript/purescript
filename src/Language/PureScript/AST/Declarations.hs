@@ -407,6 +407,19 @@ isExplicit :: ImportDeclarationType -> Bool
 isExplicit (Explicit _) = True
 isExplicit _ = False
 
+data TypeDeclarationData = TypeDeclarationData
+  { tydeclSourceAnn :: !SourceAnn
+  , tydeclIdent :: !Ident
+  , tydeclType :: !Type
+  } deriving (Show, Eq)
+
+onTypeDeclaration :: (TypeDeclarationData -> TypeDeclarationData) -> Declaration -> Declaration
+onTypeDeclaration f d = maybe d (TypeDeclaration . f) (getTypeDeclaration d)
+
+getTypeDeclaration :: Declaration -> Maybe TypeDeclarationData
+getTypeDeclaration (TypeDeclaration d) = Just d
+getTypeDeclaration _ = Nothing
+
 -- |
 -- The data type of declarations
 --
@@ -426,7 +439,7 @@ data Declaration
   -- |
   -- A type declaration for a value (name, ty)
   --
-  | TypeDeclaration SourceAnn Ident Type
+  | TypeDeclaration {-# UNPACK #-} !TypeDeclarationData
   -- |
   -- A value declaration (name, top-level binders, optional guard, value)
   --
@@ -506,7 +519,7 @@ declSourceAnn :: Declaration -> SourceAnn
 declSourceAnn (DataDeclaration sa _ _ _ _) = sa
 declSourceAnn (DataBindingGroupDeclaration ds) = declSourceAnn (NEL.head ds)
 declSourceAnn (TypeSynonymDeclaration sa _ _ _) = sa
-declSourceAnn (TypeDeclaration sa _ _) = sa
+declSourceAnn (TypeDeclaration td) = tydeclSourceAnn td
 declSourceAnn (ValueDeclaration sa _ _ _ _) = sa
 declSourceAnn (BoundValueDeclaration sa _ _) = sa
 declSourceAnn (BindingGroupDeclaration ds) = let ((sa, _), _, _) = NEL.head ds in sa

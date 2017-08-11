@@ -22,7 +22,7 @@ ann1 = (span1, [])
 ann2 = (span2, [])
 
 typeAnnotation1, value1, synonym1, class1, class2, data1, data2, valueFixity, typeFixity, foreign1, foreign2, foreign3, member1 :: P.Declaration
-typeAnnotation1 = P.TypeDeclaration ann1 (P.Ident "value1") P.REmpty
+typeAnnotation1 = P.TypeDeclaration (P.TypeDeclarationData ann1 (P.Ident "value1") P.REmpty)
 value1 = P.ValueDeclaration ann1 (P.Ident "value1") P.Public [] []
 synonym1 = P.TypeSynonymDeclaration ann1 (P.ProperName "Synonym1") [] P.REmpty
 class1 = P.TypeClassDeclaration ann1 (P.ProperName "Class1") [] [] [] []
@@ -44,7 +44,7 @@ typeFixity =
 foreign1 = P.ExternDeclaration ann1 (P.Ident "foreign1") P.REmpty
 foreign2 = P.ExternDataDeclaration ann1 (P.ProperName "Foreign2") P.kindType
 foreign3 = P.ExternKindDeclaration ann1 (P.ProperName "Foreign3")
-member1 = P.TypeDeclaration ann2 (P.Ident "member1") P.REmpty
+member1 = P.TypeDeclaration (P.TypeDeclarationData ann2 (P.Ident "member1") P.REmpty)
 
 spec :: Spec
 spec = do

@@ -597,7 +597,7 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
 
   getDeclIdent :: Declaration -> Maybe Ident
   getDeclIdent (ValueDeclaration _ ident _ _ _) = Just ident
-  getDeclIdent (TypeDeclaration _ ident _) = Just ident
+  getDeclIdent (TypeDeclaration td) = Just (tydeclIdent td)
   getDeclIdent _ = Nothing
 
 accumTypes
@@ -616,7 +616,7 @@ accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (con
   forDecls (TypeClassDeclaration _ _ _ implies _ _) = mconcat (concatMap (fmap f . constraintArgs) implies)
   forDecls (TypeInstanceDeclaration _ _ cs _ tys _) = mconcat (concatMap (fmap f . constraintArgs) cs) `mappend` mconcat (fmap f tys)
   forDecls (TypeSynonymDeclaration _ _ _ ty) = f ty
-  forDecls (TypeDeclaration _ _ ty) = f ty
+  forDecls (TypeDeclaration td) = f (tydeclType td)
   forDecls _ = mempty
 
   forValues (TypeClassDictionary c _ _) = mconcat (fmap f (constraintArgs c))
@@ -647,7 +647,7 @@ accumKinds f = everythingOnValues mappend forDecls forValues (const mempty) (con
   forDecls (TypeSynonymDeclaration _ _ args ty) =
     foldMap (foldMap f . snd) args `mappend`
     forTypes ty
-  forDecls (TypeDeclaration _ _ ty) = forTypes ty
+  forDecls (TypeDeclaration td) = forTypes (tydeclType td)
   forDecls (ExternDeclaration _ _ ty) = forTypes ty
   forDecls (ExternDataDeclaration _ _ kn) = f kn
   forDecls _ = mempty
