@@ -485,44 +485,45 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
 everythingWithScope
   :: forall r
    . (Monoid r)
-  => (S.Set Ident -> Declaration -> r)
-  -> (S.Set Ident -> Expr -> r)
-  -> (S.Set Ident -> Binder -> r)
-  -> (S.Set Ident -> CaseAlternative -> r)
-  -> (S.Set Ident -> DoNotationElement -> r)
-  -> ( S.Set Ident -> Declaration -> r
-     , S.Set Ident -> Expr -> r
-     , S.Set Ident -> Binder -> r
-     , S.Set Ident -> CaseAlternative -> r
-     , S.Set Ident -> DoNotationElement -> r
+  => ModuleName
+  -> (S.Set (Qualified Ident) -> Declaration -> r)
+  -> (S.Set (Qualified Ident) -> Expr -> r)
+  -> (S.Set (Qualified Ident) -> Binder -> r)
+  -> (S.Set (Qualified Ident) -> CaseAlternative -> r)
+  -> (S.Set (Qualified Ident) -> DoNotationElement -> r)
+  -> ( S.Set (Qualified Ident) -> Declaration -> r
+     , S.Set (Qualified Ident) -> Expr -> r
+     , S.Set (Qualified Ident) -> Binder -> r
+     , S.Set (Qualified Ident) -> CaseAlternative -> r
+     , S.Set (Qualified Ident) -> DoNotationElement -> r
      )
-everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
+everythingWithScope moduleName f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   where
   -- Avoid importing Data.Monoid and getting shadowed names above
   (<>) = mappend
 
-  f'' :: S.Set Ident -> Declaration -> r
+  f'' :: S.Set (Qualified Ident) -> Declaration -> r
   f'' s a = f s a <> f' s a
 
-  f' :: S.Set Ident -> Declaration -> r
+  f' :: S.Set (Qualified Ident) -> Declaration -> r
   f' s (DataBindingGroupDeclaration ds) =
-    let s' = S.union s (S.fromList (mapMaybe getDeclIdent (NEL.toList ds)))
+    let s' = S.union s (S.fromList (mapMaybe getTopLevelDeclIdent (NEL.toList ds)))
     in foldMap (f'' s') ds
   f' s (ValueDeclaration _ name _ bs val) =
-    let s' = S.insert name s
-        s'' = S.union s' (S.fromList (concatMap binderNames bs))
+    let s' = S.insert (mkQualified name moduleName) s 
+        s'' = S.union s' (S.fromList (mkUnqualified <$> concatMap binderNames bs))
     in foldMap (h'' s') bs <> foldMap (l' s'') val
   f' s (BindingGroupDeclaration ds) =
-    let s' = S.union s (S.fromList (NEL.toList (fmap (\((_, name), _, _) -> name) ds)))
+    let s' = S.union s (S.fromList (NEL.toList (fmap (\((_, name), _, _) -> mkQualified name moduleName) ds)))
     in foldMap (\(_, _, val) -> g'' s' val) ds
   f' s (TypeClassDeclaration _ _ _ _ _ ds) = foldMap (f'' s) ds
   f' s (TypeInstanceDeclaration _ _ _ _ _ (ExplicitInstance ds)) = foldMap (f'' s) ds
   f' _ _ = mempty
 
-  g'' :: S.Set Ident -> Expr -> r
+  g'' :: S.Set (Qualified Ident) -> Expr -> r
   g'' s a = g s a <> g' s a
 
-  g' :: S.Set Ident -> Expr -> r
+  g' :: S.Set (Qualified Ident) -> Expr -> r
   g' s (Literal l) = lit g'' s l
   g' s (UnaryMinus v1) = g'' s v1
   g' s (BinaryNoParens op v1 v2) = g'' s op <> g'' s v1 <> g'' s v2
@@ -532,7 +533,7 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   g' s (ObjectUpdate obj vs) = g'' s obj <> foldMap (g'' s . snd) vs
   g' s (ObjectUpdateNested obj vs) = g'' s obj <> foldMap (g'' s) vs
   g' s (Abs b v1) =
-    let s' = S.union (S.fromList (binderNames b)) s
+    let s' = S.union (S.fromList (mkUnqualified <$> binderNames b)) s
     in h'' s b <> g'' s' v1
   g' s (App v1 v2) = g'' s v1 <> g'' s v2
   g' s (IfThenElse v1 v2 v3) = g'' s v1 <> g'' s v2 <> g'' s v3
@@ -545,49 +546,49 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   g' s (PositionedValue _ _ v1) = g'' s v1
   g' _ _ = mempty
 
-  h'' :: S.Set Ident -> Binder -> r
+  h'' :: S.Set (Qualified Ident) -> Binder -> r
   h'' s a = h s a <> h' s a
 
-  h' :: S.Set Ident -> Binder -> r
+  h' :: S.Set (Qualified Ident) -> Binder -> r
   h' s (LiteralBinder l) = lit h'' s l
   h' s (ConstructorBinder _ bs) = foldMap (h'' s) bs
   h' s (BinaryNoParensBinder b1 b2 b3) = foldMap (h'' s) [b1, b2, b3]
   h' s (ParensInBinder b) = h'' s b
-  h' s (NamedBinder name b1) = h'' (S.insert name s) b1
+  h' s (NamedBinder name b1) = h'' (S.insert (mkUnqualified name) s) b1
   h' s (PositionedBinder _ _ b1) = h'' s b1
   h' s (TypedBinder _ b1) = h'' s b1
   h' _ _ = mempty
 
-  lit :: (S.Set Ident -> a -> r) -> S.Set Ident -> Literal a -> r
+  lit :: (S.Set (Qualified Ident) -> a -> r) -> S.Set (Qualified Ident) -> Literal a -> r
   lit go s (ArrayLiteral as) = foldMap (go s) as
   lit go s (ObjectLiteral as) = foldMap (go s . snd) as
   lit _ _ _ = mempty
 
-  i'' :: S.Set Ident -> CaseAlternative -> r
+  i'' :: S.Set (Qualified Ident) -> CaseAlternative -> r
   i'' s a = i s a <> i' s a
 
-  i' :: S.Set Ident -> CaseAlternative -> r
+  i' :: S.Set (Qualified Ident) -> CaseAlternative -> r
   i' s (CaseAlternative bs gs) =
-    let s' = S.union s (S.fromList (concatMap binderNames bs))
+    let s' = S.union s (S.fromList (mkUnqualified <$> concatMap binderNames bs))
     in foldMap (h'' s) bs <> foldMap (l' s') gs
 
-  j'' :: S.Set Ident -> DoNotationElement -> (S.Set Ident, r)
+  j'' :: S.Set (Qualified Ident) -> DoNotationElement -> (S.Set (Qualified Ident), r)
   j'' s a = let (s', r) = j' s a in (s', j s a <> r)
 
-  j' :: S.Set Ident -> DoNotationElement -> (S.Set Ident, r)
+  j' :: S.Set (Qualified Ident) -> DoNotationElement -> (S.Set (Qualified Ident), r)
   j' s (DoNotationValue v) = (s, g'' s v)
   j' s (DoNotationBind b v) =
-    let s' = S.union (S.fromList (binderNames b)) s
+    let s' = S.union (S.fromList (mkUnqualified <$> binderNames b)) s
     in (s', h'' s b <> g'' s v)
   j' s (DoNotationLet ds) =
     let s' = S.union s (S.fromList (mapMaybe getDeclIdent ds))
     in (s', foldMap (f'' s') ds)
   j' s (PositionedDoNotationElement _ _ e1) = j'' s e1
 
-  k' :: S.Set Ident -> Guard -> (S.Set Ident, r)
+  k' :: S.Set (Qualified Ident) -> Guard -> (S.Set (Qualified Ident), r)
   k' s (ConditionGuard e) = (s, g'' s e)
   k' s (PatternGuard b e) =
-    let s' = S.union (S.fromList (binderNames b)) s
+    let s' = S.union (S.fromList (mkUnqualified <$> binderNames b)) s
     in (s', h'' s b <> g'' s' e)
 
   l' s (GuardedExpr [] e) = g'' s e
@@ -595,10 +596,19 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
     let (s', r) = k' s grd
     in r <> l' s' (GuardedExpr gs e)
 
-  getDeclIdent :: Declaration -> Maybe Ident
-  getDeclIdent (ValueDeclaration _ ident _ _ _) = Just ident
-  getDeclIdent (TypeDeclaration _ ident _) = Just ident
+  getDeclIdent :: Declaration -> Maybe (Qualified Ident)
+  getDeclIdent (ValueDeclaration _ ident _ _ _)
+    = Just $ mkUnqualified ident
+  getDeclIdent (TypeDeclaration _ ident _)
+    = Just $ mkUnqualified ident
   getDeclIdent _ = Nothing
+
+  getTopLevelDeclIdent :: Declaration -> Maybe (Qualified Ident)
+  getTopLevelDeclIdent (ValueDeclaration _ ident _ _ _)
+    = Just $ mkQualified ident moduleName
+  getTopLevelDeclIdent (TypeDeclaration _ ident _)
+    = Just $ mkQualified ident moduleName
+  getTopLevelDeclIdent _ = Nothing
 
 accumTypes
   :: (Monoid r)
