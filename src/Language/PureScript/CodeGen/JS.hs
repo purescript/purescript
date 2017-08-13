@@ -45,9 +45,9 @@ import System.FilePath.Posix ((</>))
 -- | Generate code in the simplified JavaScript intermediate representation for all declarations in a
 -- module.
 moduleToJs
-  :: forall m
+  :: forall m t
    . (Monad m, MonadReader Options m, MonadSupply m, MonadError MultipleErrors m)
-  => Module Ann
+  => ModuleT t Ann
   -> Maybe AST
   -> m [AST]
 moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =

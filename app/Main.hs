@@ -9,6 +9,7 @@ module Main where
 
 import qualified Command.Bundle as Bundle
 import qualified Command.Compile as Compile
+import qualified Command.DCE as DCE
 import qualified Command.Docs as Docs
 import qualified Command.Hierarchy as Hierarchy
 import qualified Command.Ide as Ide
@@ -53,6 +54,9 @@ main = do
         , Opts.command "compile"
             (Opts.info Compile.command
               (Opts.progDesc "Compile PureScript source files"))
+        , Opts.command "dce"
+            (Opts.info DCE.command
+              (Opts.progDesc "Dead code elimination of CoreFn represantaion"))
         , Opts.command "docs"
             (Opts.info Docs.command
               (Opts.progDesc "Generate Markdown documentation from PureScript source files" <> Docs.infoModList))
