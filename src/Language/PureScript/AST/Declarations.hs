@@ -407,14 +407,19 @@ isExplicit :: ImportDeclarationType -> Bool
 isExplicit (Explicit _) = True
 isExplicit _ = False
 
+-- | A type declaration assigns a type to an identifier, eg:
+--
+-- @identity :: forall a. a -> a@
+--
+-- In this example @identity@ is the identifier and @forall a. a -> a@ the type.
 data TypeDeclarationData = TypeDeclarationData
   { tydeclSourceAnn :: !SourceAnn
   , tydeclIdent :: !Ident
   , tydeclType :: !Type
   } deriving (Show, Eq)
 
-onTypeDeclaration :: (TypeDeclarationData -> TypeDeclarationData) -> Declaration -> Declaration
-onTypeDeclaration f d = maybe d (TypeDeclaration . f) (getTypeDeclaration d)
+overTypeDeclaration :: (TypeDeclarationData -> TypeDeclarationData) -> Declaration -> Declaration
+overTypeDeclaration f d = maybe d (TypeDeclaration . f) (getTypeDeclaration d)
 
 getTypeDeclaration :: Declaration -> Maybe TypeDeclarationData
 getTypeDeclaration (TypeDeclaration d) = Just d
