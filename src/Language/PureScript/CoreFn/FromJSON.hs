@@ -23,13 +23,20 @@ import qualified Data.Vector as V
 import Data.Vector ((!?))
 import Data.Version (Version, parseVersion)
 
+import Language.PureScript.AST.SourcePos (SourceSpan)
 import Language.PureScript.AST.Literals
+import Language.PureScript.CoreFn.Ann
 import Language.PureScript.CoreFn
 import Language.PureScript.Names
 import Language.PureScript.PSString (PSString, mkString)
 
 parseArray :: (Value -> Parser a) -> Array -> Parser [a]
 parseArray p = sequence . foldr (\a as -> p a : as) []
+
+annFromJSON :: Value -> Parser Ann
+annFromJSON v = modifyFailure (("addFromJSON error: " ++ show v ++ " ") ++) $ do
+  ("Ann", ss) <- parseJSON v :: Parser (String, SourceSpan)
+  return (ssAnn ss)
 
 literalFromJSON :: (Value -> Parser a) -> Value -> Parser (Literal a)
 literalFromJSON t v =
@@ -88,7 +95,7 @@ qualifiedFromJSON f = parseJSON >=> parseQualified
                   | otherwise     -> return $ Qualified Nothing (f a)
     Nothing                       -> fail "qualifiedFromJSON: absurd"
 
-moduleFromJSON :: Value -> Parser (Version, ModuleT () ())
+moduleFromJSON :: Value -> Parser (Version, ModuleT () Ann)
 moduleFromJSON = withObject "Module" $
       \o -> case HM.foldrWithKey (curry ((:) . (moduleNameFromString *** id))) [] o of
               (mn, m):[] -> (,) <$> versionFromJSON m <*> moduleFromJSON' mn m
@@ -104,10 +111,17 @@ moduleFromJSON = withObject "Module" $
   parseIdent :: Value -> Parser Ident
   parseIdent = fmap Ident . parseJSON
 
-  moduleFromJSON' :: ModuleName -> Value -> Parser (ModuleT () ())
+  importFromJSON :: Value -> Parser (Ann, ModuleName)
+  importFromJSON v = do
+    (annJ, mn) <- parseJSON v :: Parser (Value, Text)
+    ann <- annFromJSON annJ
+    return (ann, moduleNameFromString mn)
+
+  moduleFromJSON' :: ModuleName -> Value -> Parser (ModuleT () Ann)
   moduleFromJSON' moduleName v = do
     o <- parseJSON v
-    moduleImports <- fmap (((),) . moduleNameFromString) <$> o .: "imports"
+    moduleImports <- o .: "imports"
+      >>= withArray "imports" (parseArray importFromJSON)
     me <- o .: "exports"
     let moduleExports = Ident <$> me
     moduleDecls <- o .: "decls"
@@ -118,20 +132,24 @@ moduleFromJSON = withObject "Module" $
     let moduleComments = []
     return $ Module {..}
 
-bindFromJSON :: Value -> Parser (Bind ())
+bindFromJSON :: Value -> Parser (Bind Ann)
 bindFromJSON = withObject "Bind" parseBind
   where
+  parseAnnExpr v = do
+    (ann, e) <- parseJSON v :: Parser (Value, Value)
+    (,) <$> annFromJSON ann <*> exprFromJSON e
+
   parseBind o = do
-    o' <- traverse exprFromJSON o
-    let l = HM.foldrWithKey (\k e t -> (((), Ident k), e) : t) [] o'
+    o' <- traverse parseAnnExpr o
+    let l = HM.foldrWithKey (\k (ann, e) t -> ((ann, Ident k), e) : t) [] o'
     case l of
-      ((_, i), e) : []  -> pure (NonRec () i e)
-      _                 -> pure $ Rec l
+      ((ann, i), e) : []  -> pure (NonRec ann i e)
+      _                   -> pure $ Rec l
 
 tag :: Value -> Parser (Maybe Text)
 tag = withArray "tag" (sequence . fmap parseJSON . (!? 0))
 
-exprFromJSON :: Value -> Parser (Expr ())
+exprFromJSON :: Value -> Parser (Expr Ann)
 exprFromJSON v = do
   -- explicitly pull the tag so we get errors from the correct parser
   t <- tag v
@@ -150,45 +168,62 @@ exprFromJSON v = do
 
   where
   varFromJSON = do
-    (_, i) <- parseJSON v :: Parser (Text, Value)
-    Var () <$> qualifiedFromJSON Ident i
+    (_, ann, i) <- parseJSON v :: Parser (Text, Value, Value)
+    Var <$> annFromJSON ann <*> qualifiedFromJSON Ident i
 
   literalExprFromJSON = do
-    (_, l) <- parseJSON v :: Parser (Text, Value)
-    Literal () <$> literalFromJSON exprFromJSON l
+    (_, ann, l) <- parseJSON v :: Parser (Text, Value, Value)
+    Literal <$> annFromJSON ann <*> literalFromJSON exprFromJSON l
 
   constructorFromJSON = do
-    (_, d, c, is) <- parseJSON v :: Parser (Text, Value, Value, [Text])
-    Constructor () <$> properNameFromJSON d <*> properNameFromJSON c <*> return (Ident <$> is)
+    (_, ann, d, c, is) <- parseJSON v :: Parser (Text, Value, Value, Value, [Text])
+    Constructor
+      <$> annFromJSON ann
+      <*> properNameFromJSON d
+      <*> properNameFromJSON c
+      <*> return (Ident <$> is)
 
   accessorFromJSON = do
-    (_, t, e) <- parseJSON v :: Parser (Text, PSString, Value)
-    Accessor () t <$> exprFromJSON e
+    (_, ann, t, e) <- parseJSON v :: Parser (Text, Value, Value, Value)
+    Accessor
+      <$> annFromJSON ann
+      <*> parseJSON t
+      <*> exprFromJSON e
 
   objectUpdateFromJSON = do
-    (_, r, fs) <- parseJSON v :: Parser (Text, Value, Object)
-    ObjectUpdate ()
-      <$> exprFromJSON r
+    (_, ann, r, fs) <- parseJSON v :: Parser (Text, Value, Value, Object)
+    ObjectUpdate
+      <$> annFromJSON ann
+      <*> exprFromJSON r
       <*> for (HM.toList fs) (sequence . (mkString *** exprFromJSON))
 
   absFromJSON = do
-    (_, i, e) <- parseJSON v :: Parser (Text, Text, Value)
-    Abs () (Ident i) <$> exprFromJSON e
+    (_, annJ, i, e) <- parseJSON v :: Parser (Text, Value, Text, Value)
+    ann <- annFromJSON annJ
+    Abs ann (Ident i) <$> exprFromJSON e
 
   appFromJSON = do
-    (_, e, e') <- parseJSON v :: Parser (Text, Value, Value)
-    App () <$> exprFromJSON e <*> exprFromJSON e'
+    (_, ann, e, e') <- parseJSON v :: Parser (Text, Value, Value, Value)
+    App
+      <$> annFromJSON ann
+      <*> exprFromJSON e
+      <*> exprFromJSON e'
 
   caseFromJSON = do
-    (_, ss, cs) <- parseJSON v :: Parser (Text, Array, Array)
-    _ <- parseArray exprFromJSON ss
-    Case () <$> parseArray exprFromJSON ss <*> parseArray caseAlternativeFromJSON cs
+    (_, ann, ss, cs) <- parseJSON v :: Parser (Text, Value, Array, Array)
+    Case
+      <$> annFromJSON ann
+      <*> parseArray exprFromJSON ss
+      <*> parseArray caseAlternativeFromJSON cs
 
   letFromJSON = do
-    (_, bs, e) <- parseJSON v :: Parser (Text, Array, Value)
-    Let () <$> parseArray bindFromJSON bs <*> exprFromJSON e
+    (_, ann, bs, e) <- parseJSON v :: Parser (Text, Value, Array, Value)
+    Let
+      <$> annFromJSON ann
+      <*> parseArray bindFromJSON bs
+      <*> exprFromJSON e
 
-caseAlternativeFromJSON :: Value -> Parser (CaseAlternative ())
+caseAlternativeFromJSON :: Value -> Parser (CaseAlternative Ann)
 caseAlternativeFromJSON v = do
   (bs, r) <- parseJSON v :: Parser ((Array, Value))
   CaseAlternative
@@ -199,7 +234,7 @@ caseAlternativeFromJSON v = do
         <|> Right <$> exprFromJSON r
       )
   where
-    parseResultWithGuards :: Value -> Parser (Guard (), Expr ())
+    parseResultWithGuards :: Value -> Parser (Guard Ann, Expr Ann)
     parseResultWithGuards =
       (parseJSON :: Value -> Parser (Value, Value))
       >=> traverseT . (exprFromJSON *** exprFromJSON)
@@ -207,12 +242,12 @@ caseAlternativeFromJSON v = do
     traverseT :: Applicative m => (m a, m b) -> m (a, b)
     traverseT (ma, mb) = (,) <$> ma <*> mb
       
-binderFromJSON :: Value -> Parser (Binder ())
+binderFromJSON :: Value -> Parser (Binder Ann)
 binderFromJSON v = do
   -- null binder is encoded as a String
   t <- tag v <|> Just <$> parseJSON v
   case t of
-    Just "NullBinder"         -> return $ NullBinder ()
+    Just "NullBinder"         -> modifyFailure ("binderFromJSON (NullBinder):" ++) nullBinderFromJSON
     Just "VarBinder"          -> modifyFailure ("binderFromJSON (VarBinder): " ++) varBinderFromJSON
     Just "LiteralBinder"      -> modifyFailure ("binderFromJSON (LiteralBinder): " ++) literalBinderFromJSON
     Just "ConstructorBinder"  -> modifyFailure ("binderFromJSON (ConstructorBinder): " ++) constructorBinderFromJSON
@@ -221,21 +256,28 @@ binderFromJSON v = do
     Nothing                   -> fail $ "binderFromJSON: error parsing binder: " ++ show v
 
   where
+  nullBinderFromJSON = do
+    (_, ann) <- parseJSON v :: Parser (Text, Value)
+    NullBinder <$> annFromJSON ann
+
   varBinderFromJSON = do
-    (_, i) <- parseJSON v :: Parser (Text, Text)
-    return $ VarBinder () (Ident i)
+    (_, annJ, i) <- parseJSON v :: Parser (Text, Value, Text)
+    ann <- annFromJSON annJ
+    return $ VarBinder ann (Ident i)
 
   literalBinderFromJSON = do
-    (_, l) <- parseJSON v :: Parser (Text, Value)
-    LiteralBinder () <$> literalFromJSON binderFromJSON l
+    (_, ann, l) <- parseJSON v :: Parser (Text, Value, Value)
+    LiteralBinder <$> annFromJSON ann <*> literalFromJSON binderFromJSON l
 
   constructorBinderFromJSON = do
-    (_, d, c, bs) <- parseJSON v :: Parser (Text, Value, Value, Array)
-    ConstructorBinder ()
-      <$> qualifiedFromJSON ProperName d
+    (_, ann, d, c, bs) <- parseJSON v :: Parser (Text, Value, Value, Value, Array)
+    ConstructorBinder
+      <$> annFromJSON ann
+      <*> qualifiedFromJSON ProperName d
       <*> qualifiedFromJSON ProperName c
       <*> parseArray binderFromJSON bs
 
   namedBinderFromJSON = do
-    (_, n, b) <- parseJSON v :: Parser (Text, Text, Value)
-    NamedBinder () (Ident n) <$> binderFromJSON b
+    (_, annJ, n, b) <- parseJSON v :: Parser (Text, Value, Text, Value)
+    ann <- annFromJSON annJ
+    NamedBinder ann (Ident n) <$> binderFromJSON b
