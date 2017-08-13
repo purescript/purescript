@@ -38,7 +38,7 @@ readExternFile
   -> m P.ExternsFile
 readExternFile fp = do
    externsFile <- liftIO (BS.readFile fp)
-   case (decodeStrict externsFile) of
+   case decodeStrict externsFile of
      Nothing ->
        let parser = withObject "ExternsFileVersion" $ \o -> o .: "efVersion"
            maybeEFVersion = parseMaybe parser =<< decodeStrict externsFile

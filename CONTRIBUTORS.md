@@ -53,6 +53,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@izgzhen](https://github.com/izgzhen) | Zhen Zhang | [MIT license](http://opensource.org/licenses/MIT) |
 | [@jacereda](https://github.com/jacereda) | Jorge Acereda | [MIT license](http://opensource.org/licenses/MIT) |
 | [@japesinator](https://github.com/japesinator) | JP Smith | [MIT license](http://opensource.org/licenses/MIT) |
+| [@jkachmar](https://github.com/jkachmar) | Joe Kachmar | MIT license |
 | [@joneshf](https://github.com/joneshf) | Hardy Jones | MIT license |
 | [@kika](https://github.com/kika) | Kirill Pertsev | MIT license |
 | [@kRITZCREEK](https://github.com/kRITZCREEK) | Christoph Hegemann | MIT license |
