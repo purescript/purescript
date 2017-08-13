@@ -29,7 +29,7 @@ desugarTypeDeclarationsModule (Module modSS coms name ds exps) =
   where
 
   desugarTypeDeclarations :: [Declaration] -> m [Declaration]
-  desugarTypeDeclarations (TypeDeclaration sa name' ty : d : rest) = do
+  desugarTypeDeclarations (TypeDeclaration (TypeDeclarationData sa name' ty) : d : rest) = do
     (_, nameKind, val) <- fromValueDeclaration d
     desugarTypeDeclarations (ValueDeclaration sa name' nameKind [] [MkUnguarded (TypedValue True val ty)] : rest)
     where
@@ -38,7 +38,7 @@ desugarTypeDeclarationsModule (Module modSS coms name ds exps) =
       | name' == name'' = return (name'', nameKind, val)
     fromValueDeclaration d' =
       throwError . errorMessage' (declSourceSpan d') $ OrphanTypeDeclaration name'
-  desugarTypeDeclarations [TypeDeclaration (ss, _) name' _] =
+  desugarTypeDeclarations [TypeDeclaration (TypeDeclarationData (ss, _) name' _)] =
     throwError . errorMessage' ss $ OrphanTypeDeclaration name'
   desugarTypeDeclarations (ValueDeclaration sa name' nameKind bs val : rest) = do
     let (_, f, _) = everywhereOnValuesTopDownM return go return
