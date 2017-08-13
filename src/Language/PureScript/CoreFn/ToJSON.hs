@@ -41,7 +41,7 @@ qualifiedToJSON f = toJSON . showQualified f
 moduleNameToJSON :: ModuleName -> Value
 moduleNameToJSON = toJSON . runModuleName
 
-moduleToJSON :: Version -> Module a -> Value
+moduleToJSON :: Version -> ModuleT a b -> Value
 moduleToJSON v m = object [ T.pack "imports"   .= map (moduleNameToJSON . snd) (moduleImports m)
                           , T.pack "exports"   .= map identToJSON (moduleExports m)
                           , T.pack "foreign"   .= map (identToJSON . fst) (moduleForeign m)
