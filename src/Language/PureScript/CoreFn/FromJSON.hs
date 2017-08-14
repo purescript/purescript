@@ -33,10 +33,36 @@ import Language.PureScript.PSString (PSString, mkString)
 parseArray :: (Value -> Parser a) -> Array -> Parser [a]
 parseArray p = sequence . foldr (\a as -> p a : as) []
 
+constructorTypeFromJSON :: Value -> Parser ConstructorType
+constructorTypeFromJSON v = do
+  t <- parseJSON v
+  case t of
+    "ProductType" -> return ProductType
+    "SumType"     -> return SumType
+    _             -> fail ("not regonized ConstructorType: " ++ T.unpack t)
+
+metaFromJSON :: Value -> Parser (Maybe Meta)
+metaFromJSON Null = return Nothing
+metaFromJSON v = Just <$> (isConstructorFromJSON <|> isOtherFromJSON)
+  where
+    isConstructorFromJSON = do
+      ("IsConstructor", ctJ, is) <- parseJSON v :: Parser (Text, Value, [Text])
+      ct <- constructorTypeFromJSON ctJ
+      return $ IsConstructor ct (Ident <$> is)
+
+    isOtherFromJSON = do
+      t <- parseJSON v
+      case t of
+        "IsNewtype"               -> return IsNewtype
+        "IsTypeClassConstructor"  -> return IsTypeClassConstructor
+        "IsForeign"               -> return IsForeign
+        _                         -> fail ("not regonized Meta: " ++ T.unpack t)
+
 annFromJSON :: Value -> Parser Ann
 annFromJSON v = modifyFailure (("addFromJSON error: " ++ show v ++ " ") ++) $ do
-  ("Ann", ss) <- parseJSON v :: Parser (String, SourceSpan)
-  return (ssAnn ss)
+  ("Ann", ss, metaJ) <- parseJSON v :: Parser (String, SourceSpan, Value)
+  meta <- metaFromJSON metaJ
+  return (ss, [], Nothing, meta)
 
 literalFromJSON :: (Value -> Parser a) -> Value -> Parser (Literal a)
 literalFromJSON t v =
