@@ -3,7 +3,7 @@ module Language.PureScript.Interactive.Completion
   , liftCompletionM
   , completion
   , completion'
-  , replacement
+  , formatCompletions
   ) where
 
 import Prelude.Compat
@@ -85,6 +85,14 @@ findCompletions prev word = do
       go (':' : _) _ = LT
       go _ (':' : _) = GT
       go xs ys = compare xs ys
+
+-- |
+-- Convert Haskeline completion result to results as they would be displayed
+formatCompletions :: (String, [Completion]) -> [String]
+formatCompletions (unusedR, completions) = actuals
+  where
+    unused = reverse unusedR
+    actuals = map ((unused ++) . replacement) completions
 
 data CompletionContext
   = CtxDirective String

@@ -87,9 +87,8 @@ completionTestData supportModuleNames =
 
 assertCompletedOk :: (String, [String]) -> Spec
 assertCompletedOk (line, expecteds) = specify line $ do
-  (unusedR, completions) <- runCM (completion' (reverse line, ""))
-  let unused = reverse unusedR
-  let actuals = map ((unused ++) . replacement) completions
+  results <- runCM (completion' (reverse line, ""))
+  let actuals = formatCompletions results
   sort expecteds `shouldBe` sort actuals
 
 runCM :: CompletionM a -> IO a

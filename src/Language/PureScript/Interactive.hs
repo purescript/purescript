@@ -318,7 +318,5 @@ handleComplete
 handleComplete print' semiExpr = do
   st <- get
   let act = liftCompletionM (completion' (reverse semiExpr, ""))
-  (unusedR, completions) <- evalStateT act st
-  let unused = reverse unusedR
-  let actuals = map ((unused ++) . replacement) completions
-  print' $ unlines actuals
+  results <- evalStateT act st
+  print' $ unlines (formatCompletions results)
