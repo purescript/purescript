@@ -12,7 +12,6 @@ import           Data.List (sort)
 import qualified Data.Text as T
 import qualified Language.PureScript as P
 import           Language.PureScript.Interactive
-import           System.Console.Haskeline
 import           TestPsci.TestEnv (initTestPSCiEnv)
 import           TestUtils (getSupportModuleNames)
 
@@ -29,7 +28,7 @@ completionTestData supportModuleNames =
   -- basic directives
   [ (":h",  [":help"])
   , (":r",  [":reload"])
-  , (":c",  [":clear"])
+  , (":c",  [":clear", ":complete"])
   , (":q",  [":quit"])
   , (":b",  [":browse"])
 

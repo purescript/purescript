@@ -3,6 +3,7 @@ module Language.PureScript.Interactive.Completion
   , liftCompletionM
   , completion
   , completion'
+  , replacement
   ) where
 
 import Prelude.Compat
@@ -128,6 +129,7 @@ directiveArg _ Paste       = []
 directiveArg _ Show        = map CtxFixed replQueryStrings
 directiveArg _ Type        = [CtxIdentifier]
 directiveArg _ Kind        = [CtxType]
+directiveArg _ Complete    = []
 
 completeImport :: [String] -> String -> [CompletionContext]
 completeImport ws w' =
