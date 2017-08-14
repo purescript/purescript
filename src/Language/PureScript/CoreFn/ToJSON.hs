@@ -10,7 +10,7 @@ module Language.PureScript.CoreFn.ToJSON
 import Prelude.Compat
 
 import Control.Arrow ((***))
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, maybe)
 import Data.Aeson
 import Data.Version (Version, showVersion)
 import Data.Text (Text)
@@ -30,8 +30,18 @@ literalToJSON _ (BooleanLiteral b) = toJSON ("BooleanLiteral", b)
 literalToJSON t (ArrayLiteral xs) = toJSON ("ArrayLiteral", map t xs)
 literalToJSON t (ObjectLiteral xs) = toJSON ("ObjectLiteral", recordToJSON t xs)
 
+constructorTypeToJSON :: ConstructorType -> Value
+constructorTypeToJSON ProductType = toJSON "ProductType"
+constructorTypeToJSON SumType = toJSON "SumType"
+
+metaToJSON :: Meta -> Value
+metaToJSON (IsConstructor t is)   = toJSON ( "IsConstructor", constructorTypeToJSON t, toJSON (map runIdent is) )
+metaToJSON IsNewtype              = toJSON "IsNewtype"
+metaToJSON IsTypeClassConstructor = toJSON "IsTypeClassConstructor"
+metaToJSON IsForeign              = toJSON "IsForeign"
+
 annToJSON :: Ann -> Value
-annToJSON (ss, _, _, _) = toJSON ( "Ann", toJSON ss )
+annToJSON (ss, _, _, m) = toJSON ( "Ann", toJSON ss, maybe Null metaToJSON m )
 
 identToJSON :: Ident -> Value
 identToJSON = toJSON . runIdent
