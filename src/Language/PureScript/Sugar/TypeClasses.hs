@@ -16,7 +16,7 @@ import           Control.Monad.State
 import           Control.Monad.Supply.Class
 import           Data.List ((\\), find, sortBy)
 import qualified Data.Map as M
-import           Data.Maybe (catMaybes, mapMaybe, isJust)
+import           Data.Maybe (catMaybes, mapMaybe, isJust, fromMaybe)
 import           Data.Text (Text)
 import qualified Language.PureScript.Constants as C
 import           Language.PureScript.Crash
@@ -222,7 +222,7 @@ desugarDecl mn exps = go
   genSpan = internalModuleSourceSpan "<generated>"
 
 memberToNameAndType :: Declaration -> (Ident, Type)
-memberToNameAndType (TypeDeclaration _ ident ty) = (ident, ty)
+memberToNameAndType (TypeDeclaration td) = unwrapTypeDeclaration td
 memberToNameAndType _ = internalError "Invalid declaration in type class definition"
 
 typeClassDictionaryDeclaration
@@ -247,7 +247,7 @@ typeClassMemberToDictionaryAccessor
   -> [(Text, Maybe Kind)]
   -> Declaration
   -> Declaration
-typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration sa ident ty) =
+typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarationData sa ident ty)) =
   let className = Qualified (Just mn) name
   in ValueDeclaration sa ident Private [] $
     [MkUnguarded (
@@ -306,21 +306,19 @@ typeInstanceDictionaryDeclaration sa name mn deps className tys decls =
 
   where
 
-  declIdent :: Declaration -> Maybe Ident
-  declIdent (ValueDeclaration _ ident _ _ _) = Just ident
-  declIdent (TypeDeclaration _ ident _) = Just ident
-  declIdent _ = Nothing
-
   memberToValue :: [(Ident, Type)] -> Declaration -> Desugar m Expr
   memberToValue tys' (ValueDeclaration _ ident _ [] [MkUnguarded val]) = do
     _ <- maybe (throwError . errorMessage $ ExtraneousClassMember ident className) return $ lookup ident tys'
     return val
   memberToValue _ _ = internalError "Invalid declaration in type instance definition"
 
+declIdent :: Declaration -> Maybe Ident
+declIdent (ValueDeclaration _ ident _ _ _) = Just ident
+declIdent (TypeDeclaration td) = Just (tydeclIdent td)
+declIdent _ = Nothing
+
 typeClassMemberName :: Declaration -> Text
-typeClassMemberName (TypeDeclaration _ ident _) = runIdent ident
-typeClassMemberName (ValueDeclaration _ ident _ _ _) = runIdent ident
-typeClassMemberName _ = internalError "typeClassMemberName: Invalid declaration in type class definition"
+typeClassMemberName = fromMaybe (internalError "typeClassMemberName: Invalid declaration in type class definition") . fmap runIdent . declIdent
 
 superClassDictionaryNames :: [Constraint] -> [Text]
 superClassDictionaryNames supers =

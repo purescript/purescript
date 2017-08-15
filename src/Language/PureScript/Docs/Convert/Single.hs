@@ -134,7 +134,7 @@ convertDeclaration (P.TypeClassDeclaration sa _ args implies fundeps ds) title =
   where
   info = TypeClassDeclaration args implies (convertFundepsToStrings args fundeps)
   children = map convertClassMember ds
-  convertClassMember (P.TypeDeclaration (ss, com) ident' ty) =
+  convertClassMember (P.TypeDeclaration (P.TypeDeclarationData (ss, com) ident' ty)) =
     ChildDeclaration (P.showIdent ident') (convertComments com) (Just ss) (ChildTypeClassMember ty)
   convertClassMember _ =
     P.internalError "convertDeclaration: Invalid argument to convertClassMember."

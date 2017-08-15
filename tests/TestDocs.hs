@@ -18,7 +18,6 @@ import Safe (headMay)
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Monoid
 import Data.Text (Text)
-import qualified Data.Text.IO as TIO
 import qualified Data.Text as T
 import Data.Time.Clock (getCurrentTime)
 import Data.Version (Version(..))
@@ -30,9 +29,10 @@ import Language.PureScript.Docs.AsMarkdown (codeToString)
 import qualified Language.PureScript.Publish as Publish
 import qualified Language.PureScript.Publish.ErrorsWarnings as Publish
 
-import Web.Bower.PackageMeta (parsePackageName)
+import Web.Bower.PackageMeta (parsePackageName, runPackageName)
 
 import TestUtils
+import Test.Hspec (Spec, it, context, expectationFailure, runIO, hspec)
 
 publishOpts :: Publish.PublishOptions
 publishOpts = Publish.defaultPublishOptions
@@ -48,21 +48,48 @@ getPackage =
     Publish.preparePackage "bower.json" "resolutions.json" publishOpts
 
 main :: IO ()
-main = do
-  res <- getPackage
-  case res of
-    Left e -> Publish.printErrorToStdout e >> exitFailure
-    Right pkg@Docs.Package{..} ->
-      forM_ testCases $ \(P.moduleNameFromString -> mn, pragmas) ->
-        let mdl = takeJust ("module not found in docs: " ++ T.unpack (P.runModuleName mn))
-                          (find ((==) mn . Docs.modName) pkgModules)
-            linksCtx = Docs.getLinksContext pkg
-        in forM_ pragmas (\a -> runAssertionIO a linksCtx mdl)
+main = hspec spec
+
+spec :: Spec
+spec = do
+  pkg@Docs.Package{..} <- runIO $ do
+    res <- getPackage
+    case res of
+      Left e ->
+        Publish.printErrorToStdout e >> exitFailure
+      Right p ->
+        pure p
+
+  let linksCtx = Docs.getLinksContext pkg
+
+  context "Language.PureScript.Docs" $
+    forM_ testCases $ \(mnString, assertions) -> do
+      let mn = P.moduleNameFromString mnString
+          mdl = find ((==) mn . Docs.modName) pkgModules
+
+      context ("in module " ++ T.unpack mnString) $ do
+        case mdl of
+          Nothing ->
+            it "exists in docs output" $
+              expectationFailure ("module not found in docs: " ++ T.unpack mnString)
+          Just mdl' ->
+            toHspec linksCtx mdl' assertions
+
+  where
+  toHspec :: Docs.LinksContext -> Docs.Module -> [DocsAssertion] -> Spec
+  toHspec linksCtx mdl assertions =
+    forM_ assertions $ \a ->
+      it (T.unpack (displayAssertion a)) $ do
+        case runAssertion a linksCtx mdl of
+          Pass ->
+            pure ()
+          Fail reason ->
+            expectationFailure (T.unpack (displayAssertionFailure reason))
 
 takeJust :: String -> Maybe a -> a
 takeJust msg = fromMaybe (error msg)
 
-data Assertion
+data DocsAssertion
   -- | Assert that a particular declaration is documented with the given
   -- children
   = ShouldBeDocumented P.ModuleName Text [Text]
@@ -79,10 +106,10 @@ data Assertion
   | ShouldHaveFunDeps P.ModuleName Text [([Text],[Text])]
   -- | Assert that a particular value declaration exists, and its type
   -- satisfies the given predicate.
-  | ValueShouldHaveTypeSignature P.ModuleName Text (ShowFn (P.Type -> Bool))
+  | ValueShouldHaveTypeSignature P.ModuleName Text (P.Type -> Bool)
   -- | Assert that a particular instance declaration exists under some class or
   -- type declaration, and that its type satisfies the given predicate.
-  | InstanceShouldHaveTypeSignature P.ModuleName Text Text (ShowFn (P.Type -> Bool))
+  | InstanceShouldHaveTypeSignature P.ModuleName Text Text (P.Type -> Bool)
   -- | Assert that a particular type alias exists, and its corresponding
   -- type, when rendered, matches a given string exactly
   -- fields: module, type synonym name, expected type
@@ -100,14 +127,45 @@ data Assertion
   | ShouldHaveLink P.ModuleName Text Text Docs.Namespace Docs.LinkLocation
   -- | Assert that a given declaration comes before another in the output
   | ShouldComeBefore P.ModuleName Text Text
-  deriving (Show)
 
-newtype ShowFn a = ShowFn a
+displayAssertion :: DocsAssertion -> Text
+displayAssertion = \case
+  ShouldBeDocumented mn decl children ->
+    showQual mn decl <> " should be documented" <>
+    (if not (null children)
+       then " with children: " <> T.pack (show children)
+       else "")
+  ShouldNotBeDocumented mn decl ->
+    showQual mn decl <> " should not be documented"
+  ChildShouldNotBeDocumented mn decl child ->
+    showQual mn decl <> " should not have " <> child <> " as a child declaration"
+  ShouldBeConstrained mn decl constraint ->
+    showQual mn decl <> " should have a " <> constraint <> " constraint"
+  ShouldHaveFunDeps mn decl fundeps ->
+    showQual mn decl <> " should have fundeps: " <> T.pack (show fundeps)
+  ValueShouldHaveTypeSignature mn decl _ ->
+    "the type signature for " <> showQual mn decl <>
+    " should satisfy the given predicate"
+  InstanceShouldHaveTypeSignature _ parent instName _ ->
+    "the instance " <> instName <> " (under " <> parent <> ") should have" <>
+    " a type signature satisfying the given predicate"
+  TypeSynonymShouldRenderAs mn synName code ->
+    "the RHS of the type synonym " <> showQual mn synName <>
+    " should be rendered as " <> code
+  ShouldHaveDocComment mn decl excerpt ->
+    "the string " <> T.pack (show excerpt) <> " should appear in the" <>
+    " doc-comments for " <> showQual mn decl
+  ShouldHaveReExport inPkg ->
+    "there should be some re-exports from " <>
+    showInPkg P.runModuleName inPkg
+  ShouldHaveLink mn decl targetTitle targetNs _ ->
+    "the rendered code for " <> showQual mn decl <> " should contain a link" <>
+    " to " <> targetTitle <> " (" <> T.pack (show targetNs) <> ")"
+  ShouldComeBefore mn declA declB ->
+    showQual mn declA <> " should come before " <> showQual mn declB <>
+    " in the docs"
 
-instance Show (ShowFn a) where
-  show _ = "<function>"
-
-data AssertionFailure
+data DocsAssertionFailure
   -- | A declaration was not documented, but should have been
   = NotDocumented P.ModuleName Text
   -- | The expected list of child declarations did not match the actual list
@@ -132,7 +190,7 @@ data AssertionFailure
   -- Fields: module name, declaration name, expected rendering, actual rendering
   | TypeSynonymMismatch P.ModuleName Text Text Text
   -- | A doc comment was not found or did not match what was expected
-  -- Fields: module name, expected substring, actual comments
+  -- Fields: module name, declaration, actual comments
   | DocCommentMissing P.ModuleName Text (Maybe Text)
   -- | A module was missing re-exports from a particular module.
   -- Fields: module name, expected re-export, actual re-exports.
@@ -150,24 +208,52 @@ data AssertionFailure
   | BadLinkLocation P.ModuleName Text Text Docs.LinkLocation Docs.LinkLocation
   -- | Declarations were in the wrong order
   | WrongOrder P.ModuleName Text Text
-  deriving (Show)
 
-displayAssertionFailure :: AssertionFailure -> Text
+displayAssertionFailure :: DocsAssertionFailure -> Text
 displayAssertionFailure = \case
-  DeclarationWrongType mn title actual ->
-    P.runModuleName mn <> "." <> title <> " had the wrong type; got " <> T.pack (P.prettyPrintType actual)
-  WrongOrder mn before after ->
-    "In " <> P.runModuleName mn <> ": expected to see " <> before <> " before " <> after
-  -- TODO: deal with the other constructors nicely
-  other ->
-    T.pack (show other)
+  NotDocumented _ decl ->
+    decl <> " was not documented, but should have been"
+  ChildrenNotDocumented _ decl children ->
+    decl <> " had the wrong children; got " <> T.pack (show children)
+  Documented _ decl ->
+    decl <> " was documented, but should not have been"
+  ChildDocumented _ decl child ->
+    decl <> " had " <> child <> " as a child"
+  ConstraintMissing _ decl constraint ->
+    decl <> " did not have a " <> constraint <> " constraint"
+  FunDepMissing _ decl fundeps ->
+    decl <> " had the wrong fundeps; got " <> T.pack (show fundeps)
+  WrongDeclarationType _ decl expected actual ->
+    "expected " <> decl <> " to be a " <> expected <> " declaration, but it" <>
+    " was a " <> actual <> " declaration"
+  DeclarationWrongType _ decl actual ->
+    decl <> " had the wrong type; got " <> T.pack (P.prettyPrintType actual)
+  TypeSynonymMismatch _ decl expected actual ->
+    "expected the RHS of " <> decl <> " to be " <> expected <>
+    "; got " <> actual
+  DocCommentMissing _ decl actual ->
+    "the doc-comment for " <> decl <> " did not contain the expected substring;" <>
+    " got " <> T.pack (show actual)
+  ReExportMissing _ expected actuals ->
+    "expected to see some re-exports from " <>
+    showInPkg P.runModuleName expected <>
+    "; instead only saw re-exports from " <>
+    T.pack (show (map (showInPkg P.runModuleName) actuals))
+  LinkedDeclarationMissing _ decl target ->
+    "expected to find a link to " <> target <> " within the rendered code" <>
+    " for " <> decl <> ", but no such link was found"
+  BadLinkLocation _ decl target expected actual ->
+    "in rendered code for " <> decl <> ", bad link location for " <> target <>
+    ": expected " <> T.pack (show expected) <>
+    " got " <> T.pack (show actual)
+  WrongOrder _ before after ->
+    "expected to see " <> before <> " before " <> after
 
-data AssertionResult
+data DocsAssertionResult
   = Pass
-  | Fail AssertionFailure
-  deriving (Show)
+  | Fail DocsAssertionFailure
 
-runAssertion :: Assertion -> Docs.LinksContext -> Docs.Module -> AssertionResult
+runAssertion :: DocsAssertion -> Docs.LinksContext -> Docs.Module -> DocsAssertionResult
 runAssertion assertion linksCtx Docs.Module{..} =
   case assertion of
     ShouldBeDocumented mn decl children ->
@@ -217,7 +303,7 @@ runAssertion assertion linksCtx Docs.Module{..} =
             Fail (WrongDeclarationType mn decl "value"
                    (Docs.declInfoToString declInfo))
 
-    ValueShouldHaveTypeSignature mn decl (ShowFn tyPredicate) ->
+    ValueShouldHaveTypeSignature mn decl tyPredicate ->
       findDecl mn decl $ \Docs.Declaration{..} ->
         case declInfo of
           Docs.ValueDeclaration ty ->
@@ -228,7 +314,7 @@ runAssertion assertion linksCtx Docs.Module{..} =
             Fail (WrongDeclarationType mn decl "value"
                    (Docs.declInfoToString declInfo))
 
-    InstanceShouldHaveTypeSignature mn parent decl (ShowFn tyPredicate) ->
+    InstanceShouldHaveTypeSignature mn parent decl tyPredicate ->
       case find ((==) parent . Docs.declTitle) (declarationsFor mn) >>= findTarget of
         Just ty ->
           if tyPredicate ty
@@ -349,16 +435,7 @@ checkConstrained ty tyClass =
   matches className =
     (==) className . P.runProperName . P.disqualify . P.constraintClass
 
-runAssertionIO :: Assertion -> Docs.LinksContext -> Docs.Module -> IO ()
-runAssertionIO assertion linksCtx mdl = do
-  putStrLn ("In " ++ T.unpack (P.runModuleName (Docs.modName mdl)) ++ ": " ++ show assertion)
-  case runAssertion assertion linksCtx mdl of
-    Pass -> pure ()
-    Fail reason -> do
-      TIO.putStrLn ("Failed: " <> displayAssertionFailure reason)
-      exitFailure
-
-testCases :: [(Text, [Assertion])]
+testCases :: [(Text, [DocsAssertion])]
 testCases =
   [ ("Example",
       [ -- From dependencies
@@ -436,9 +513,9 @@ testCases =
       ])
 
   , ("ExplicitTypeSignatures",
-      [ ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "explicit" (ShowFn (hasTypeVar "something"))
-      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "anInt"    (ShowFn (P.tyInt ==))
-      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "aNumber"  (ShowFn (P.tyNumber ==))
+      [ ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "explicit" (hasTypeVar "something")
+      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "anInt"    (P.tyInt ==)
+      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "aNumber"  (P.tyNumber ==)
       ])
 
   , ("ConstrainedArgument",
@@ -499,8 +576,19 @@ testCases =
   isVar varName (P.TypeVar name) | varName == T.unpack name = True
   isVar _ _ = False
 
-  renderedType expected =
-    ShowFn $ \ty -> codeToString (Docs.renderType ty) == expected
+  renderedType expected ty =
+    codeToString (Docs.renderType ty) == expected
 
   shouldBeOrdered mn declNames =
     zipWith (ShouldComeBefore mn) declNames (tail declNames)
+
+showQual :: P.ModuleName -> Text -> Text
+showQual mn decl =
+  P.runModuleName mn <> "." <> decl
+
+showInPkg :: (a -> Text) -> Docs.InPackage a -> Text
+showInPkg f = \case
+  Docs.Local x ->
+    f x <> " (local)"
+  Docs.FromDep pkgName x ->
+    f x <> " (from dep: " <> runPackageName pkgName <> ")"

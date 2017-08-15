@@ -340,8 +340,8 @@ updateTypes goType = (goDecl, goExpr, goBinder)
     return $ TypeInstanceDeclaration sa name cs' className tys' impls
   goDecl (TypeSynonymDeclaration sa@(ss, _) name args ty) =
     TypeSynonymDeclaration sa name args <$> goType'' ss ty
-  goDecl (TypeDeclaration sa@(ss, _) expr ty) =
-    TypeDeclaration sa expr <$> goType'' ss ty
+  goDecl (TypeDeclaration (TypeDeclarationData sa@(ss, _) expr ty)) =
+    TypeDeclaration . TypeDeclarationData sa expr <$> goType'' ss ty
   goDecl other =
     return other
 

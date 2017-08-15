@@ -140,7 +140,7 @@ addTypeClass moduleName pn args implies dependencies ds = do
     argToIndex :: Text -> Maybe Int
     argToIndex = flip M.lookup $ M.fromList (zipWith ((,) . fst) args [0..])
 
-    toPair (TypeDeclaration _ ident ty) = (ident, ty)
+    toPair (TypeDeclaration (TypeDeclarationData _ ident ty)) = (ident, ty)
     toPair _ = internalError "Invalid declaration in TypeClassDeclaration"
 
     -- Currently we are only checking usability based on the type class currently
@@ -493,6 +493,6 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     findClassMembers (TypeClassDeclaration _ name' _ _ _ ds) | name == name' = Just $ map extractMemberName ds
     findClassMembers _ = Nothing
     extractMemberName :: Declaration -> Ident
-    extractMemberName (TypeDeclaration _ memberName _) = memberName
+    extractMemberName (TypeDeclaration td) = tydeclIdent td
     extractMemberName _ = internalError "Unexpected declaration in typeclass member list"
   checkClassMembersAreExported _ = return ()
