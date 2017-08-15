@@ -64,8 +64,8 @@ moduleToJSON v m = object [ T.pack "imports"   .= map (annToJSON *** moduleNameT
                           ]
 
 bindToJSON :: Bind Ann -> Value
-bindToJSON (NonRec ann n e) = object [ runIdent n .= ( annToJSON ann, exprToJSON e ) ]
-bindToJSON (Rec bs) = object $ map (\((ann, n), e) -> runIdent n .= ( annToJSON ann, exprToJSON e ) ) bs
+bindToJSON (NonRec ann n e) = toJSON [(runIdent n, annToJSON ann, exprToJSON e)]
+bindToJSON (Rec bs) = toJSON $ map (\((ann, n), e) -> (runIdent n, annToJSON ann, exprToJSON e)) bs
 
 -- If all of the labels in the record can safely be converted to JSON strings,
 -- we generate a JSON object. Otherwise the labels must be represented as
