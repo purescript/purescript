@@ -159,18 +159,17 @@ moduleFromJSON = withObject "Module" $
     return $ Module {..}
 
 bindFromJSON :: Value -> Parser (Bind Ann)
-bindFromJSON = withObject "Bind" parseBind
+bindFromJSON = fmap toBind <$> withArray "Binds" (parseArray parseBind)
   where
-  parseAnnExpr v = do
-    (ann, e) <- parseJSON v :: Parser (Value, Value)
-    (,) <$> annFromJSON ann <*> exprFromJSON e
+  parseBind :: Value -> Parser (Ident, Ann, Expr Ann)
+  parseBind v = do
+    (t, ann, e) <- parseJSON v :: Parser (Text, Value, Value)
+    (Ident t,,) <$> annFromJSON ann <*> exprFromJSON e
 
-  parseBind o = do
-    o' <- traverse parseAnnExpr o
-    let l = HM.foldrWithKey (\k (ann, e) t -> ((ann, Ident k), e) : t) [] o'
-    case l of
-      ((ann, i), e) : []  -> pure (NonRec ann i e)
-      _                   -> pure $ Rec l
+  toBind :: [(Ident, Ann, Expr Ann)] -> Bind Ann
+  toBind [] = Rec []
+  toBind [(i, ann, e)] = NonRec ann i e
+  toBind l = Rec (map (\(i, ann, e) -> ((ann, i), e)) l)
 
 tag :: Value -> Parser (Maybe Text)
 tag = withArray "tag" (sequence . fmap parseJSON . (!? 0))
