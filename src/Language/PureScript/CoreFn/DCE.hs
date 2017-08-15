@@ -8,7 +8,6 @@ import           Data.Graph
 import           Data.List (any, elem, filter, groupBy, sortBy)
 import           Data.Maybe (catMaybes, mapMaybe)
 import qualified Data.Set as S
-import qualified Data.Text as T
 
 import           Language.PureScript.CoreFn
 import           Language.PureScript.Names
