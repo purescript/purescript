@@ -8,11 +8,16 @@ import           Data.Graph
 import           Data.List (any, elem, filter, groupBy, sortBy)
 import           Data.Maybe (catMaybes, mapMaybe)
 import qualified Data.Set as S
+import qualified Data.Text as T
 
 import           Language.PureScript.CoreFn
 import           Language.PureScript.Names
 
 type Key = Qualified Ident
+
+data DCEVertex a
+  = BindVertex (Bind a)
+  | ForeignVertex (Qualified Ident)
 
 dce :: forall t a. [ModuleT t a] -> [Qualified Ident] -> [ModuleT t a]
 dce modules [] = modules
@@ -21,12 +26,16 @@ dce modules entryPoints = do
     Module {..} <- modules
     guard (getModuleName vs == Just moduleName)
     let
-        -- | filter declarations preserving the same order
+        -- | filter declarations preserving the order
         decls :: [Bind a]
         decls = filter filterByIdents moduleDecls
           where
           declIdents :: [Ident]
-          declIdents = concatMap (\(b, _, _) -> bindIdents b) vs
+          declIdents = concatMap toIdents vs
+
+          toIdents :: (DCEVertex a, Key, [Key]) -> [Ident]
+          toIdents (BindVertex b, _, _) = bindIdents b
+          toIdents _                    = []
 
           filterByIdents :: Bind a -> Bool
           filterByIdents = any (`elem` declIdents) . bindIdents
@@ -35,7 +44,7 @@ dce modules entryPoints = do
         idents = concatMap getBindIdents decls
 
         exports :: [Ident]
-        exports = filter (`elem` idents) moduleExports
+        exports = filter (`elem` (idents ++ fst `map` foreigns)) moduleExports
 
         mods :: [ModuleName]
         mods = mapMaybe getQual (concatMap (\(_, _, ks) -> ks) vs)
@@ -44,9 +53,9 @@ dce modules entryPoints = do
         imports = filter ((`elem` mods) . snd) moduleImports
 
         foreigns :: [ForeignDeclT t]
-        foreigns = filter (\(i, _) -> mkQualified i moduleName `S.member` reachableSet) moduleForeign
+        foreigns = filter ((`S.member` reachableSet) . Qualified (Just moduleName) . fst) moduleForeign
           where
-            reachableSet = foldr (\(_, k, ks) s -> S.insert k s `S.union` S.fromList ks)  S.empty vs
+            reachableSet = foldr (\(_, k, ks) s -> S.insert k s `S.union` S.fromList ks) S.empty vs
 
     return $ Module moduleComments moduleName imports exports foreigns decls
   where
@@ -57,19 +66,19 @@ dce modules entryPoints = do
   bindIdents (Rec l) = map (\((_, i), _) -> i) l
 
   -- | The Vertex set
-  verts :: [(Bind a, Key, [Key])]
+  verts :: [(DCEVertex a, Key, [Key])]
   verts = do
-      Module _ mn _ _ _ ds <- modules
-      concatMap (toVertices mn) ds
+      Module _ mn _ _ mf ds <- modules
+      concatMap (toVertices mn) ds ++ ((\q -> (ForeignVertex q, q, [])) . flip mkQualified mn . fst) `map` mf
     where
-    toVertices :: ModuleName -> Bind a -> [(Bind a, Key, [Key])]
-    toVertices mn b@(NonRec _ i e) = [(b, mkQualified i mn, deps e)]
+    toVertices :: ModuleName -> Bind a -> [(DCEVertex a, Key, [Key])]
+    toVertices mn b@(NonRec _ i e) = [(BindVertex b, mkQualified i mn, deps e)]
     toVertices mn b@(Rec bs) = 
       -- assuming that `Constructor` expressions are not defined in a recursive
       -- binding
       let ks :: [(Key, [Key])]
           ks = map (\((_, i), e) -> (mkQualified i mn, deps e)) bs
-      in map (\(k, ks') -> (b, k, map fst ks ++ ks')) ks
+      in map (\(k, ks') -> (BindVertex b, k, map fst ks ++ ks')) ks
 
     -- | Find dependencies of an expression
     deps :: Expr a -> [Key]
@@ -98,20 +107,16 @@ dce modules entryPoints = do
     return (vertexForKey k)
 
   -- | The list of reachable vertices grouped by module name
-  reachableList :: [[(Bind a, Key, [Key])]]
+  reachableList :: [[(DCEVertex a, Key, [Key])]]
   reachableList
     = groupBy (\(_, k1, _) (_, k2, _) -> getQual k1 == getQual k2)
     $ sortBy (\(_, k1, _) (_, k2, _) -> getQual k1 `compare` getQual k2) 
     $ map keyForVertex (concatMap (reachable graph) entryPointVertices)
 
-  getModuleName :: [(Bind a, Key, [Key])] -> Maybe ModuleName
+  getModuleName :: [(DCEVertex a, Key, [Key])] -> Maybe ModuleName
   getModuleName [] = Nothing
   getModuleName ((_, k, _) : _) = getQual k
 
   getBindIdents :: Bind a -> [Ident]
   getBindIdents (NonRec _ i _) = [i]
   getBindIdents (Rec is) = map (\((_, i), _) -> i) is
-
-dceLetExpr :: Expr a -> Expr a
-dceLetExpr (Let a bs e) = Let a bs e
-dceLetExpr e = e
