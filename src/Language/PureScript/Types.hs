@@ -51,6 +51,8 @@ data Type
   | TypeWildcard SourceSpan
   -- | A type constructor
   | TypeConstructor (Qualified (ProperName 'TypeName))
+  -- | A type-level proxy for a (fully-applied) constraint
+  | ConstraintProxy (Qualified (ProperName 'ClassName))
   -- | A type operator. This will be desugared into a type constructor during the
   -- "operators" phase of desugaring.
   | TypeOp (Qualified (OpName 'TypeOpName))

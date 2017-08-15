@@ -325,6 +325,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
     updateType :: Type -> m Type
     updateType (TypeOp name) = TypeOp <$> updateTypeOpName name pos
     updateType (TypeConstructor name) = TypeConstructor <$> updateTypeName name pos
+    updateType (ConstraintProxy cls) = ConstraintProxy <$> updateClassName cls pos
     updateType (ConstrainedType c t) = ConstrainedType <$> updateInConstraint c <*> pure t
     updateType (KindedType t k) = KindedType t <$> updateKindsEverywhere pos k
     updateType t = return t

@@ -179,6 +179,8 @@ entails SolverOptions{..} constraint context hints =
     ctorModules :: Type -> Maybe ModuleName
     ctorModules (TypeConstructor (Qualified (Just mn) _)) = Just mn
     ctorModules (TypeConstructor (Qualified Nothing _)) = internalError "ctorModules: unqualified type name"
+    ctorModules (ConstraintProxy (Qualified (Just mn) _)) = Just mn
+    ctorModules (ConstraintProxy (Qualified Nothing _)) = internalError "ctorModules: unqualified class name"
     ctorModules (TypeApp ty _) = ctorModules ty
     ctorModules (KindedType ty _) = ctorModules ty
     ctorModules _ = Nothing
@@ -438,6 +440,7 @@ matches deps TypeClassDictionaryInScope{..} tys = do
     typeHeadsAreEqual t                    (TypeVar v)                     = (True, M.singleton v [t])
     typeHeadsAreEqual (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = (True, M.empty)
     typeHeadsAreEqual (TypeLevelString s1) (TypeLevelString s2) | s1 == s2 = (True, M.empty)
+    typeHeadsAreEqual (ConstraintProxy c1) (ConstraintProxy c2) | c1 == c2 = (True, M.empty)
     typeHeadsAreEqual (TypeApp h1 t1)      (TypeApp h2 t2)                 =
       both (typeHeadsAreEqual h1 h2) (typeHeadsAreEqual t1 t2)
     typeHeadsAreEqual REmpty REmpty = (True, M.empty)
@@ -477,6 +480,7 @@ matches deps TypeClassDictionaryInScope{..} tys = do
       typesAreEqual (TypeVar v1)         (TypeVar v2)         = v1 == v2
       typesAreEqual (TypeLevelString s1) (TypeLevelString s2) = s1 == s2
       typesAreEqual (TypeConstructor c1) (TypeConstructor c2) = c1 == c2
+      typesAreEqual (ConstraintProxy c1) (ConstraintProxy c2) = c1 == c2
       typesAreEqual (TypeApp h1 t1)      (TypeApp h2 t2)      = typesAreEqual h1 h2 && typesAreEqual t1 t2
       typesAreEqual REmpty               REmpty               = True
       typesAreEqual r1                   r2                   | isRCons r1 || isRCons r2 =

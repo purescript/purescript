@@ -47,6 +47,12 @@ typeLiterals = mkPattern match
               ]
   match (TypeConstructor n) =
     Just (typeCtor n)
+  match (ConstraintProxy cls) =
+    Just $ mintersperse sp
+              [ keywordClass
+              , sp
+              , typeCtor (fmap coerceProperName cls)
+              ]
   match REmpty =
     Just (syntax "()")
   match row@RCons{} =

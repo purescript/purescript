@@ -230,6 +230,17 @@ infer' other = (, []) <$> go other
     return k'
   go TypeWildcard{} = freshKind
   go TUnknown{} = freshKind
+  go (ConstraintProxy cls) = do
+    env <- gets checkEnv
+    case M.lookup (fmap coerceProperName cls) (types env) of
+      Just (k, _) -> do
+        let fixKind :: Kind -> Maybe Kind
+            fixKind (FunKind k1 k2) = FunKind k1 <$> fixKind k2
+            fixKind (NamedKind (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Type"))) =
+              Just kindConstraint
+            fixKind _ = Nothing
+        maybe (internalError "infer: class type had an invalid kind") pure (fixKind k)
+      _ -> throwError (errorMessage (UnknownName (fmap TyClassName cls)))
   go (TypeLevelString _) = return kindSymbol
   go (TypeVar v) = do
     Just moduleName <- checkCurrentModule <$> get

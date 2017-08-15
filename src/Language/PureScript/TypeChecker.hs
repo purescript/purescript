@@ -187,6 +187,7 @@ checkTypeClassInstance cls i = check where
   check = \case
     TypeVar _ -> return ()
     TypeLevelString _ -> return ()
+    ConstraintProxy _ -> return ()
     TypeConstructor ctor -> do
       env <- getEnv
       when (ctor `M.member` typeSynonyms env) . throwError . errorMessage $ TypeSynonymInstance
@@ -362,6 +363,8 @@ typeCheckAll moduleName _ = traverse go
     typeModule (TypeLevelString _) = Nothing
     typeModule (TypeConstructor (Qualified (Just mn'') _)) = Just mn''
     typeModule (TypeConstructor (Qualified Nothing _)) = internalError "Unqualified type name in checkOrphanInstance"
+    typeModule (ConstraintProxy (Qualified (Just mn'') _)) = Just mn''
+    typeModule (ConstraintProxy (Qualified Nothing _)) = internalError "Unqualified class name in checkOrphanInstance"
     typeModule (TypeApp t1 _) = typeModule t1
     typeModule _ = internalError "Invalid type in instance in checkOrphanInstance"
 

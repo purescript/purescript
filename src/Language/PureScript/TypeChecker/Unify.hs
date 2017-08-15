@@ -107,6 +107,7 @@ unifyTypes t1 t2 = do
   unifyTypes' (TypeVar v1) (TypeVar v2) | v1 == v2 = return ()
   unifyTypes' ty1@(TypeConstructor c1) ty2@(TypeConstructor c2) =
     guardWith (errorMessage (TypesDoNotUnify ty1 ty2)) (c1 == c2)
+  unifyTypes' (ConstraintProxy c1) (ConstraintProxy c2) | c1 == c2 = return ()
   unifyTypes' (TypeLevelString s1) (TypeLevelString s2) | s1 == s2 = return ()
   unifyTypes' (TypeApp t3 t4) (TypeApp t5 t6) = do
     t3 `unifyTypes` t5

@@ -53,6 +53,8 @@ parseForAll :: TokenParser Type
 parseForAll = mkForAll <$> ((reserved "forall" <|> reserved "∀") *> P.many1 (indented *> identifier) <* indented <* dot)
                        <*> parseType
 
+parseConstraintProxy :: TokenParser Type
+parseConstraintProxy = ConstraintProxy <$> (reserved "class" *> indented *> parseQualified properName)
 
 -- |
 -- Parse an atomic type with no `forall`
@@ -73,6 +75,7 @@ parseTypeAtom = indented *> P.choice
             , parseObject
             , parseTypeWildcard
             , parseForAll
+            , parseConstraintProxy
             , parseTypeVariable
             , parseTypeConstructor
             -- This try is needed due to some unfortunate ambiguities between rows and kinded types

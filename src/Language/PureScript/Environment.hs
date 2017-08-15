@@ -269,6 +269,9 @@ kindType = primKind C.typ
 kindSymbol :: Kind
 kindSymbol = primKind C.symbol
 
+kindConstraint :: Kind
+kindConstraint = primKind "Constraint"
+
 -- | Construct a type in the Prim module
 primTy :: Text -> Type
 primTy = TypeConstructor . primName
@@ -276,6 +279,10 @@ primTy = TypeConstructor . primName
 -- | Type constructor for functions
 tyFunction :: Type
 tyFunction = primTy "Function"
+
+-- | Type constructor for dictionaries
+tyDict :: Type
+tyDict = primTy "Dict"
 
 -- | Type constructor for strings
 tyString :: Type
@@ -344,6 +351,7 @@ primTypes =
     , (primName "Int",        (kindType, ExternData))
     , (primName "Boolean",    (kindType, ExternData))
     , (primName "Partial",    (kindType, ExternData))
+    , (primName "Dict",       (FunKind kindConstraint kindType, ExternData))
     , (primName "Union",      (FunKind (Row kindType) (FunKind (Row kindType) (FunKind (Row kindType) kindType)), ExternData))
     , (primName "RowCons",    (FunKind kindSymbol (FunKind kindType (FunKind (Row kindType) (FunKind (Row kindType) kindType))), ExternData))
     , (primName "Fail",       (FunKind kindSymbol kindType, ExternData))
