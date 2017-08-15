@@ -131,8 +131,8 @@ moduleFromJSON = withObject "Module" $
   versionFromJSON v = do
     ver <- parseJSON v >>= (.: "builtWith")
     case readP_to_S parseVersion ver of
-      (r, _) : _ -> return r
-      _ -> fail "failed parsing purs version"
+      l | length l > 0  -> return . fst . last $ l
+        | otherwise     -> fail "failed parsing purs version"
 
   parseIdent :: Value -> Parser Ident
   parseIdent = fmap Ident . parseJSON

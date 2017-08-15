@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 -- | Dead code elimination command based on `Language.PureScript.CoreFn.DCE`.
 module Command.DCE
@@ -10,7 +11,10 @@ module Command.DCE
 
 import           Control.Applicative
 import           Control.Monad
+import           Control.Monad.Error.Class (MonadError(..))
+import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Trans.Class (MonadTrans(..))
+import           Control.Monad.Trans.Except
 import           Control.Monad.Supply
 import           Command.Compile (printWarningsAndErrors)
 import qualified Data.Aeson as Aeson
@@ -29,7 +33,7 @@ import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import           Data.Text.Lazy.Encoding (encodeUtf8)
 import           Data.Text.IO (hPutStrLn)
-import           Data.Version (Version)
+import           Data.Version (Version, showVersion)
 import           Language.PureScript.AST.Declarations (ErrorMessage(..), SimpleErrorMessage(CannotReadFile, CannotWriteFile))
 import qualified Language.PureScript.CodeGen.JS as J
 import           Language.PureScript.CodeGen.JS.Printer
@@ -45,7 +49,7 @@ import           Language.PureScript.Options
 import qualified Options.Applicative as Opts
 import qualified Paths_purescript as Paths
 import           System.Directory (copyFile, createDirectoryIfMissing)
-import           System.Exit (exitFailure)
+import           System.Exit (exitFailure, exitSuccess)
 import           System.FilePath ((</>), takeDirectory)
 import           System.FilePath.Glob (compile, globDir1)
 import           System.IO (stderr)
@@ -116,7 +120,7 @@ dceOptions = DCEOptions <$> inputDirectory
                         <*> dumpCoreFn
                         <*> verbose
 
-readInput :: [FilePath] -> IO [Either (FilePath, JSONPath, String) (FilePath, Version, ModuleT () Ann)]
+readInput :: [FilePath] -> IO [Either (FilePath, JSONPath, String) (Version, ModuleT () Ann)]
 readInput inputFiles = forM inputFiles (\f -> addPath f . decodeCoreFn <$> B.readFile f)
   where
   decodeCoreFn :: B.ByteString -> Either (JSONPath, String) (Version, ModuleT () Ann)
@@ -125,35 +129,44 @@ readInput inputFiles = forM inputFiles (\f -> addPath f . decodeCoreFn <$> B.rea
   addPath
     :: FilePath
     -> Either (JSONPath, String) (Version, ModuleT () Ann)
-    -> Either (FilePath, JSONPath, String) (FilePath, Version, ModuleT () Ann)
-  addPath f = either (Left . incl) (Right . incl)
+    -> Either (FilePath, JSONPath, String) (Version, ModuleT () Ann)
+  addPath f = either (Left . incl) Right
     where incl (l,r) = (f,l,r)
 
+data DCEError
+  = DCEParseErrors [Text]
+  | DCEVersionError Version
 
-dceCommand :: DCEOptions -> IO ()
+formatDCEError :: DCEError -> Text
+formatDCEError (DCEParseErrors errs)
+  = "purs dce: failed parsing:\n  " <> (T.intercalate "\n  " errs)
+formatDCEError (DCEVersionError v)
+  = "purs dce: corefn dump built with " <> (T.pack $ showVersion v) <> ", purs " <> (T.pack $ showVersion Paths.version)
+
+dceCommand :: DCEOptions -> ExceptT DCEError IO ()
 dceCommand opts = do
     let entryPoints = runEntryPoint <$> (dceEntryPoints opts)
         cfnGlb = compile "**/corefn.json"
-    fps <- globDir1 cfnGlb (dceInputDir opts)
-    inpts <- readInput fps
+    inpts <- liftIO $ globDir1 cfnGlb (dceInputDir opts) >>= readInput
     let errs = lefts inpts
-    if not (null errs)
-      then do
-        hPutStrLn stderr $ "purs dce: failed parsing:\n  " <> (T.intercalate "\n  " (map formatErr errs))
-        exitFailure
-      else do
-        -- todo check version
-        let mods = dce (map (\(_,_,m) -> m) $ rights inpts) entryPoints
-        if dceDumpCoreFn opts
-          then runDumpCoreFn mods (dceOutputDir opts)
-          else runCodegen mods (dceInputDir opts) (dceOutputDir opts)
-      
+    when (not . null $ errs) $
+      throwError (DCEParseErrors $ formatErr `map` errs)
+
+    let verMismatches = filter ((/= showVersion Paths.version) . showVersion . fst) . rights $ inpts
+    when (not $ null $ verMismatches) $
+      throwError (DCEVersionError (fst $ head verMismatches))
+
+    let mods = dce (snd `map` rights inpts) entryPoints
+    if dceDumpCoreFn opts
+      then liftIO $ runDumpCoreFn mods (dceOutputDir opts)
+      else liftIO $ runCodegen mods (dceInputDir opts) (dceOutputDir opts)
+
   where
     runCodegen :: [ModuleT () Ann] -> FilePath -> FilePath -> IO ()
     runCodegen mods inputDir outputDir = do
       -- I need to run `codegen` from `MakeActions` directly
       -- runMake opts (make ...) accepts `PureScript.AST.Declarations.Module`
-      (makeErrors, makeWarnings) <- runMake (Options True False False False) $ runSupplyT 0 (forM mods (\m -> codegen m))
+      (makeErrors, makeWarnings) <- runMake (Options True False False False) $ runSupplyT 0 (forM mods codegen)
       printWarningsAndErrors False False makeWarnings makeErrors
       where
       codegen :: ModuleT () Ann -> SupplyT Make ()
@@ -204,4 +217,11 @@ dceCommand opts = do
 
 
 command :: Opts.Parser (IO ())
-command = dceCommand <$> (Opts.helper <*> dceOptions)
+command =  runDCECommand <$> (Opts.helper <*> dceOptions)
+  where
+  runDCECommand :: DCEOptions -> IO ()
+  runDCECommand opts = do
+    res <- runExceptT (dceCommand opts)
+    case res of
+      Left e  -> (hPutStrLn stderr . formatDCEError $ e) *> exitFailure
+      Right _ -> exitSuccess
