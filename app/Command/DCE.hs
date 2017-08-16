@@ -34,7 +34,8 @@ import qualified Data.Text.Encoding as TE
 import           Data.Text.Lazy.Encoding (encodeUtf8)
 import           Data.Text.IO (hPutStrLn)
 import           Data.Version (Version, showVersion)
-import           Language.PureScript.AST.Declarations (ErrorMessage(..), SimpleErrorMessage(CannotReadFile, CannotWriteFile))
+import qualified Language.JavaScript.Parser as JS
+import           Language.PureScript.AST.Declarations (ErrorMessage(..), SimpleErrorMessage(CannotReadFile, CannotWriteFile, CannotCopyFile, ErrorParsingFFIModule))
 import qualified Language.PureScript.CodeGen.JS as J
 import           Language.PureScript.CodeGen.JS.Printer
 import           Language.PureScript.CoreFn.Ann (Ann)
@@ -43,6 +44,7 @@ import           Language.PureScript.CoreFn.FromJSON
 import           Language.PureScript.CoreFn.Module
 import           Language.PureScript.CoreFn.ToJSON
 import qualified Language.PureScript.CoreImp.AST as Imp
+import           Language.PureScript.Errors (errorMessage)
 import           Language.PureScript.Make (Make, makeIO, runMake)
 import           Language.PureScript.Names
 import           Language.PureScript.Options
@@ -60,6 +62,7 @@ data DCEOptions = DCEOptions
   , dceEntryPoints :: [EntryPoint]
   , dceDumpCoreFn :: Bool
   , dceVerbose :: Bool
+  , dceOptimize :: Int
   }
 
 inputDirectory :: Opts.Parser FilePath
@@ -113,12 +116,20 @@ verbose = Opts.switch $
   <> Opts.showDefault
   <> Opts.help "Verbose parser CoreFn errors."
 
+optimizeLevel :: Opts.Parser Int
+optimizeLevel = Opts.option Opts.auto $
+     Opts.short 'O'
+  <> Opts.value 0
+  <> Opts.showDefault
+  <> Opts.help "Optimizer level, with -O1 unused exports of foreign modules will be removed (without checking if they are used elsewhere in the foreign module)."
+
 dceOptions :: Opts.Parser DCEOptions
 dceOptions = DCEOptions <$> inputDirectory
                         <*> outputDirectory
                         <*> many entryPoint
                         <*> dumpCoreFn
                         <*> verbose
+                        <*> optimizeLevel
 
 readInput :: [FilePath] -> IO [Either (FilePath, JSONPath, String) (Version, ModuleT () Ann)]
 readInput inputFiles = forM inputFiles (\f -> addPath f . decodeCoreFn <$> B.readFile f)
@@ -183,9 +194,26 @@ dceCommand opts = do
             foreignOutFile = outputDir </> filePath </> "foreign.js"
         -- todo: error message
         when (isJust foreignInclude) $ do
-          lift $ makeIO (const (ErrorMessage [] $ CannotReadFile foreignInFile)) $ do
-            createDirectoryIfMissing True (outputDir </> filePath)
-            copyFile foreignInFile foreignOutFile
+          lift $ makeIO
+            (const (ErrorMessage [] $ CannotReadFile foreignInFile))
+            (createDirectoryIfMissing True (outputDir </> filePath))
+          if dceOptimize opts >= 1
+            then do
+              jsCode <- lift $ makeIO
+                (const $ ErrorMessage [] $ CannotReadFile foreignInFile)
+                (B.unpack <$> B.readFile foreignInFile)
+              case JS.parse jsCode foreignInFile of
+                Right (JS.JSAstProgram ss ann) -> do
+                  let ss' = dceForeignModule (fst <$> mf) ss
+                      jsAst' = JS.JSAstProgram ss' ann
+                  lift $ makeIO
+                    (const $ ErrorMessage [] $ CannotWriteFile foreignOutFile)
+                    (B.writeFile foreignOutFile (encodeUtf8 $ JS.renderToText jsAst'))
+                _ -> throwError (errorMessage $ ErrorParsingFFIModule foreignInFile Nothing)
+            else
+              lift $ makeIO
+                (const (ErrorMessage [] (CannotCopyFile foreignInFile foreignOutFile)))
+                (copyFile foreignInFile foreignOutFile)
         lift $ writeTextFile jsFile (B.fromStrict $ TE.encodeUtf8 pjs)
       
     formatErr :: (FilePath, JSONPath, String) -> Text

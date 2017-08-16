@@ -85,6 +85,7 @@ errorCode em = case unwrapErrorMessage em of
   CannotGetFileInfo{} -> "CannotGetFileInfo"
   CannotReadFile{} -> "CannotReadFile"
   CannotWriteFile{} -> "CannotWriteFile"
+  CannotCopyFile{} -> "CannotCopyFile"
   InfiniteType{} -> "InfiniteType"
   InfiniteKind{} -> "InfiniteKind"
   MultipleValueOpFixities{} -> "MultipleValueOpFixities"
@@ -444,6 +445,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (CannotWriteFile path) =
       paras [ line "Unable to write file: "
             , indent . lineS $ path
+            ]
+    renderSimpleErrorMessage (CannotCopyFile fromPath toPath) =
+      paras [ line "Unable to copy file: "
+            , indent . lineS $ fromPath
+            , line "to"
+            , indent . lineS $ toPath
             ]
     renderSimpleErrorMessage (ErrorParsingFFIModule path extra) =
       paras $ [ line "Unable to parse foreign module:"

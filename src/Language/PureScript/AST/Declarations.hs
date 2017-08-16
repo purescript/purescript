@@ -76,6 +76,7 @@ data SimpleErrorMessage
   | CannotGetFileInfo FilePath
   | CannotReadFile FilePath
   | CannotWriteFile FilePath
+  | CannotCopyFile FilePath FilePath
   | InfiniteType Type
   | InfiniteKind Kind
   | MultipleValueOpFixities (OpName 'ValueOpName)

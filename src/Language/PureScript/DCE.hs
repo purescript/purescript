@@ -1,6 +1,8 @@
 -- Dead Code Elimination for CoreFn
 module Language.PureScript.DCE
-  ( dce ) where
+  ( dce
+  , dceForeignModule
+  ) where
 
 import           Prelude.Compat
 import           Control.Monad
@@ -8,6 +10,8 @@ import           Data.Graph
 import           Data.List (any, elem, filter, groupBy, sortBy)
 import           Data.Maybe (catMaybes, mapMaybe)
 import qualified Data.Set as S
+import qualified Data.Text as T
+import           Language.JavaScript.Parser.AST (JSStatement(..), JSExpression(..))
 
 import           Language.PureScript.CoreFn
 import           Language.PureScript.Names
@@ -119,3 +123,14 @@ dce modules entryPoints = do
   getBindIdents :: Bind a -> [Ident]
   getBindIdents (NonRec _ i _) = [i]
   getBindIdents (Rec is) = map (\((_, i), _) -> i) is
+
+-- | Filter export statements in foreign module.  This is not safe.  It might
+-- remove declarations that are used eleswhere in the foreign module.
+dceForeignModule :: [Ident] -> [JSStatement] -> [JSStatement]
+dceForeignModule is ss = filter filterExports ss
+  where
+  ns = T.unpack . runIdent <$> is
+
+  filterExports :: JSStatement -> Bool
+  filterExports (JSAssignStatement (JSMemberDot (JSIdentifier _ "exports") _ (JSIdentifier _ x)) _ _ _) = x `elem` ns
+  filterExports _ = True
