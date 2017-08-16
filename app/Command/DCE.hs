@@ -38,7 +38,7 @@ import           Language.PureScript.AST.Declarations (ErrorMessage(..), SimpleE
 import qualified Language.PureScript.CodeGen.JS as J
 import           Language.PureScript.CodeGen.JS.Printer
 import           Language.PureScript.CoreFn.Ann (Ann)
-import           Language.PureScript.CoreFn.DCE
+import           Language.PureScript.DCE
 import           Language.PureScript.CoreFn.FromJSON
 import           Language.PureScript.CoreFn.Module
 import           Language.PureScript.CoreFn.ToJSON

@@ -1,5 +1,5 @@
 -- Dead Code Elimination for CoreFn
-module Language.PureScript.CoreFn.DCE
+module Language.PureScript.DCE
   ( dce ) where
 
 import           Prelude.Compat
