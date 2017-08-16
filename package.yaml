@@ -52,7 +52,7 @@ dependencies:
   - file-embed
   - filepath
   - fsnotify >=0.2.1
-  - Glob >=0.7 && <0.8
+  - Glob >=0.7 && <0.9
   - haskeline >=0.7.0.0
   - http-client >=0.4.30 && <0.6.0
   - http-types
