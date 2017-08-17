@@ -313,7 +313,7 @@ typeCheckAll moduleName _ = traverse go
   go d@(TypeClassDeclaration _ pn args implies deps tys) = do
     addTypeClass moduleName pn args implies deps tys
     return d
-  go (d@(TypeInstanceDeclaration (ss, _) dictName deps className tys body)) =
+  go (d@(TypeInstanceDeclaration (ss, _) ch idx dictName deps className tys body)) =
     rethrow (addHint (ErrorInInstance className tys) . addHint (PositionedError ss)) $ do
       env <- getEnv
       case M.lookup className (typeClasses env) of
@@ -324,7 +324,7 @@ typeCheckAll moduleName _ = traverse go
           checkOrphanInstance dictName className typeClass tys
           _ <- traverseTypeInstanceBody checkInstanceMembers body
           deps' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms deps
-          let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps')
+          let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) <$> ch) idx (Qualified (Just moduleName) dictName) [] className tys (Just deps')
           addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) dict
           return d
 

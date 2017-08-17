@@ -7,6 +7,7 @@ module Language.PureScript.Interactive.Parser
 
 import           Prelude.Compat hiding (lex)
 
+import           Control.Monad (join)
 import           Data.Bifunctor (first)
 import           Data.Char (isSpace)
 import           Data.List (intercalate)
@@ -87,11 +88,12 @@ psciImport = do
 -- | Any declaration that we don't need a 'special case' parser for
 -- (like import declarations).
 psciDeclaration :: P.TokenParser Command
-psciDeclaration = fmap Decls $ mark $ many1 $ same *> do
-  decl <- P.parseDeclaration
-  if acceptable decl
-    then return decl
-    else fail "this kind of declaration is not supported in psci"
+psciDeclaration = fmap Decls $ mark $ fmap join (many1 $ same *>
+  (traverse accept =<< P.parseDeclaration))
+  where
+  accept decl
+    | acceptable decl = return decl
+    | otherwise = fail "this kind of declaration is not supported in psci"
 
 acceptable :: P.Declaration -> Bool
 acceptable P.DataDeclaration{} = True

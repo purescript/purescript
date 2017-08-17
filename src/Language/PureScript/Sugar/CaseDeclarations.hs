@@ -326,8 +326,8 @@ desugarCases :: forall m. (MonadSupply m, MonadError MultipleErrors m) => [Decla
 desugarCases = desugarRest <=< fmap join . flip parU toDecls . groupBy inSameGroup
   where
     desugarRest :: [Declaration] -> m [Declaration]
-    desugarRest (TypeInstanceDeclaration sa name constraints className tys ds : rest) =
-      (:) <$> (TypeInstanceDeclaration sa name constraints className tys <$> traverseTypeInstanceBody desugarCases ds) <*> desugarRest rest
+    desugarRest (TypeInstanceDeclaration sa cd idx name constraints className tys ds : rest) =
+      (:) <$> (TypeInstanceDeclaration sa cd idx name constraints className tys <$> traverseTypeInstanceBody desugarCases ds) <*> desugarRest rest
     desugarRest (ValueDecl sa name nameKind bs result : rest) =
       let (_, f, _) = everywhereOnValuesTopDownM return go return
           f' = mapM (\(GuardedExpr gs e) -> GuardedExpr gs <$> f e)
