@@ -45,7 +45,7 @@ import           Language.PureScript.CoreFn.Module
 import           Language.PureScript.CoreFn.ToJSON
 import qualified Language.PureScript.CoreImp.AST as Imp
 import           Language.PureScript.DCE
-import           Language.PureScript.Errors (addHint, errorMessage)
+import           Language.PureScript.Errors (errorMessage)
 import           Language.PureScript.Make (Make, makeIO, runMake)
 import           Language.PureScript.Names
 import           Language.PureScript.Options
