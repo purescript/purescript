@@ -36,15 +36,16 @@ import           Data.Text.IO (hPutStrLn)
 import           Data.Version (Version, showVersion)
 import qualified Language.JavaScript.Parser as JS
 import           Language.PureScript.AST.Declarations (ErrorMessage(..), SimpleErrorMessage(CannotReadFile, CannotWriteFile, CannotCopyFile, ErrorParsingFFIModule))
+import           Language.PureScript.Bundle (ErrorMessage(InvalidTopLevel))
 import qualified Language.PureScript.CodeGen.JS as J
 import           Language.PureScript.CodeGen.JS.Printer
 import           Language.PureScript.CoreFn.Ann (Ann)
-import           Language.PureScript.DCE
 import           Language.PureScript.CoreFn.FromJSON
 import           Language.PureScript.CoreFn.Module
 import           Language.PureScript.CoreFn.ToJSON
 import qualified Language.PureScript.CoreImp.AST as Imp
-import           Language.PureScript.Errors (errorMessage)
+import           Language.PureScript.DCE
+import           Language.PureScript.Errors (addHint, errorMessage)
 import           Language.PureScript.Make (Make, makeIO, runMake)
 import           Language.PureScript.Names
 import           Language.PureScript.Options
@@ -209,6 +210,7 @@ dceCommand opts = do
                   lift $ makeIO
                     (const $ ErrorMessage [] $ CannotWriteFile foreignOutFile)
                     (B.writeFile foreignOutFile (encodeUtf8 $ JS.renderToText jsAst'))
+                Right _ -> throwError (errorMessage $ ErrorParsingFFIModule foreignInFile (Just InvalidTopLevel))
                 _ -> throwError (errorMessage $ ErrorParsingFFIModule foreignInFile Nothing)
             else
               lift $ makeIO
