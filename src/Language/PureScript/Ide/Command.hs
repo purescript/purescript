@@ -131,7 +131,7 @@ instance FromJSON Command where
         params <- o .: "params"
         Type
           <$> params .: "search"
-          <*> params .: "filters"
+          <*> params .:? "filters" .!= []
           <*> (fmap P.moduleNameFromString <$> params .:? "currentModule")
       "complete" -> do
         params <- o .: "params"
