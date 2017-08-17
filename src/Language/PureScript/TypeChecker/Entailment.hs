@@ -324,9 +324,8 @@ entails SolverOptions{..} constraint context hints =
               | otherwise = throwError . errorMessage $ NoInstanceFound (Constraint className' tyArgs conInfo)
             unique _      [(a, dict)] = return $ Solved a dict
             unique tyArgs tcds
-              | pairwiseAny overlapping (map snd tcds) = do
-                  tell . errorMessage $ OverlappingInstances className' tyArgs (tcds >>= (toList . namedInstanceIdentifier . tcdValue . snd))
-                  return $ uncurry Solved (head tcds)
+              | pairwiseAny overlapping (map snd tcds) =
+                  throwError . errorMessage $ OverlappingInstances className' tyArgs (tcds >>= (toList . namedInstanceIdentifier . tcdValue . snd))
               | otherwise = return $ uncurry Solved (minimumBy (compare `on` length . tcdPath . snd) tcds)
 
             canBeGeneralized :: Type -> Bool
