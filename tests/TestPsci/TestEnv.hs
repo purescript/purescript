@@ -57,18 +57,21 @@ jsEval = liftIO $ do
     Nothing                      -> putStrLn "Couldn't find node.js" >> exitFailure
 
 -- | Run a PSCi command and evaluate the output with 'eval'.
-runAndEval :: String -> TestPSCi () -> TestPSCi ()
-runAndEval comm eval =
+runAndEval :: String -> TestPSCi () -> (String -> TestPSCi ()) -> TestPSCi ()
+runAndEval comm eval evalPrinted =
   case parseCommand comm of
     Left errStr -> liftIO $ putStrLn errStr >> exitFailure
     Right command ->
       -- the JS result can be ignored, as it's already written in a source file
       -- for the detail, please refer to Interactive.hs
-      handleCommand (\_ -> eval) (return ()) (\_ -> return ()) command
+      handleCommand (\_ -> eval) (return ()) evalPrinted command
 
 -- | Run a PSCi command and ignore the output
 run :: String -> TestPSCi ()
-run comm = runAndEval comm $ jsEval *> return ()
+run comm = runAndEval comm eval evalPrinted
+  where
+    eval = jsEval *> return ()
+    evalPrinted _ = return ()
 
 -- | A lifted evaluation of Hspec 'shouldBe' for the TestPSCi
 equalsTo :: (Eq a, Show a) => a -> a -> TestPSCi ()
@@ -76,6 +79,16 @@ equalsTo x y = liftIO $ x `shouldBe` y
 
 -- | An assertion to check if a command evaluates to a string
 evaluatesTo :: String -> String -> TestPSCi ()
-evaluatesTo command expected = runAndEval command $ do
-  actual <- jsEval
-  actual `equalsTo` (expected ++ "\n")
+evaluatesTo command expected = runAndEval command eval evalPrinted
+  where
+    eval = do
+      actual <- jsEval
+      actual `equalsTo` (expected ++ "\n")
+    evalPrinted _ = return ()
+
+prints :: String -> [String] -> TestPSCi ()
+prints command expected = runAndEval command eval evalPrinted
+  where
+    eval = return ()
+    evalPrinted s = s `equalsTo` (unlines (map (" " ++) expected))
+
