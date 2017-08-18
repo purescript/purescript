@@ -45,11 +45,11 @@ rebuildFile
   -> (ReaderT IdeEnvironment (LoggingT IO) () -> m ())
   -- ^ A runner for the second build with open exports
   -> m Success
-rebuildFile path actualPath runOpenBuild = do
+rebuildFile file actualFile runOpenBuild = do
 
-  input <- ideReadFile path
+  input <- ideReadFile file
 
-  m <- case snd <$> P.parseModuleFromFile (maybe identity const actualPath) (path, input) of
+  m <- case snd <$> P.parseModuleFromFile (maybe identity const actualFile) (file, input) of
     Left parseError ->
       throwError (RebuildError (P.MultipleErrors [P.toPositionedError parseError]))
     Right m -> pure m
@@ -63,7 +63,7 @@ rebuildFile path actualPath runOpenBuild = do
   -- For rebuilding, we want to 'RebuildAlways', but for inferring foreign
   -- modules using their file paths, we need to specify the path in the 'Map'.
   let filePathMap = M.singleton (P.getModuleName m) (Left P.RebuildAlways)
-  foreigns <- P.inferForeignModules (M.singleton (P.getModuleName m) (Right path))
+  foreigns <- P.inferForeignModules (M.singleton (P.getModuleName m) (Right file))
 
   let makeEnv = MakeActionsEnv outputDirectory filePathMap foreigns False
   -- Rebuild the single module using the cached externs
@@ -76,7 +76,7 @@ rebuildFile path actualPath runOpenBuild = do
     Left errors -> throwError (RebuildError errors)
     Right newExterns -> do
       whenM isEditorMode $ do
-        insertModule (fromMaybe path actualPath, m)
+        insertModule (fromMaybe file actualFile, m)
         insertExterns newExterns
         void populateVolatileState
       runOpenBuild (rebuildModuleOpen makeEnv externs m)

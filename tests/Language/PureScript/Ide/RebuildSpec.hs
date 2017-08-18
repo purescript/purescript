@@ -61,12 +61,12 @@ spec = describe "Rebuilding single modules" $ do
         Test.runIde [ rebuildSync "RebuildSpecWithHiddenIdent.purs"
                     , Complete [] (flexMatcher "hid") (Just (Test.mn "RebuildSpecWithHiddenIdent")) defaultCompletionOptions]
       complIdentifier result `shouldBe` "hidden"
-    it "uses the specified `actualPath` for location information (in editor mode)" $ do
+    it "uses the specified `actualFile` for location information (in editor mode)" $ do
       let editorConfig = Test.defConfig { confEditorMode = True }
       ([_, (Right (CompletionResult [ result ]))], _) <- Test.inProject $
         Test.runIde'
           editorConfig
           emptyIdeState
-          [ RebuildSync ("src" </> "RebuildSpecWithHiddenIdent.purs") (Just "actualPath")
+          [ RebuildSync ("src" </> "RebuildSpecWithHiddenIdent.purs") (Just "actualFile")
           , Complete [] (flexMatcher "hid") (Just (Test.mn "RebuildSpecWithHiddenIdent")) defaultCompletionOptions]
-      map spanName (complLocation result) `shouldBe` Just "actualPath"
+      map spanName (complLocation result) `shouldBe` Just "actualFile"
