@@ -32,7 +32,7 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
   moduleNames = S.fromList (ordNub (mapMaybe getDeclIdent ds))
 
   getDeclIdent :: Declaration -> Maybe Ident
-  getDeclIdent (ValueDeclaration _ ident _ _ _) = Just ident
+  getDeclIdent (ValueDeclaration vd) = Just (valdeclIdent vd)
   getDeclIdent (ExternDeclaration _ ident _) = Just ident
   getDeclIdent (TypeInstanceDeclaration _ ident _ _ _ _) = Just ident
   getDeclIdent BindingGroupDeclaration{} = internalError "lint: binding groups should not be desugared yet."
@@ -48,7 +48,7 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
     f dec = f' S.empty dec
 
     f' :: S.Set Text -> Declaration -> MultipleErrors
-    f' s dec@(ValueDeclaration _ name _ _ _) = addHint (ErrorInValueDeclaration name) (warningsInDecl moduleNames dec <> checkTypeVarsInDecl s dec)
+    f' s dec@(ValueDeclaration vd) = addHint (ErrorInValueDeclaration (valdeclIdent vd)) (warningsInDecl moduleNames dec <> checkTypeVarsInDecl s dec)
     f' s (TypeDeclaration td) = addHint (ErrorInTypeDeclaration (tydeclIdent td)) (checkTypeVars s (tydeclType td))
     f' s dec = warningsInDecl moduleNames dec <> checkTypeVarsInDecl s dec
 

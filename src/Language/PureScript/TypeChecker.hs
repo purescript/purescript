@@ -267,14 +267,14 @@ typeCheckAll moduleName _ = traverse go
     return $ TypeSynonymDeclaration sa name args ty
   go TypeDeclaration{} =
     internalError "Type declarations should have been removed before typeCheckAlld"
-  go (ValueDeclaration sa@(ss, _) name nameKind [] [MkUnguarded val]) = do
+  go (ValueDeclaration (ValueDeclarationData sa@(ss, _) name nameKind [] [MkUnguarded val])) = do
     env <- getEnv
     warnAndRethrow (addHint (ErrorInValueDeclaration name) . addHint (PositionedError ss)) $ do
       val' <- checkExhaustiveExpr ss env moduleName val
       valueIsNotDefined moduleName name
       [(_, (val'', ty))] <- typesOf NonRecursiveBindingGroup moduleName [((sa, name), val')]
       addValue moduleName name ty nameKind
-      return $ ValueDeclaration sa name nameKind [] [MkUnguarded val'']
+      return $ ValueDeclaration $ ValueDeclarationData sa name nameKind [] [MkUnguarded val'']
   go ValueDeclaration{} = internalError "Binders were not desugared"
   go BoundValueDeclaration{} = internalError "BoundValueDeclaration should be desugared"
   go (BindingGroupDeclaration vals) = do
@@ -343,7 +343,7 @@ typeCheckAll moduleName _ = traverse go
     return instDecls
     where
     memberName :: Declaration -> Ident
-    memberName (ValueDeclaration _ ident _ _ _) = ident
+    memberName (ValueDeclaration vd) = valdeclIdent vd
     memberName _ = internalError "checkInstanceMembers: Invalid declaration in type instance definition"
 
     firstDuplicate :: (Eq a) => [a] -> Maybe a

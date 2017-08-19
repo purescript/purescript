@@ -82,7 +82,7 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
     d { declChildren = declChildren d ++ [child] }
 
 getDeclarationTitle :: P.Declaration -> Maybe Text
-getDeclarationTitle (P.ValueDeclaration _ name _ _ _) = Just (P.showIdent name)
+getDeclarationTitle (P.ValueDeclaration vd) = Just (P.showIdent (P.valdeclIdent vd))
 getDeclarationTitle (P.ExternDeclaration _ name _) = Just (P.showIdent name)
 getDeclarationTitle (P.DataDeclaration _ _ name _ _) = Just (P.runProperName name)
 getDeclarationTitle (P.ExternDataDeclaration _ name _) = Just (P.runProperName name)
@@ -108,9 +108,9 @@ basicDeclaration :: P.SourceAnn -> Text -> DeclarationInfo -> Maybe Intermediate
 basicDeclaration sa title = Just . Right . mkDeclaration sa title
 
 convertDeclaration :: P.Declaration -> Text -> Maybe IntermediateDeclaration
-convertDeclaration (P.ValueDeclaration sa _ _ _ [P.MkUnguarded (P.TypedValue _ _ ty)]) title =
+convertDeclaration (P.ValueDeclaration (P.ValueDeclarationData sa _ _ _ [P.MkUnguarded (P.TypedValue _ _ ty)])) title =
   basicDeclaration sa title (ValueDeclaration ty)
-convertDeclaration (P.ValueDeclaration sa _ _ _ _) title =
+convertDeclaration (P.ValueDeclaration (P.ValueDeclarationData sa _ _ _ _)) title =
   -- If no explicit type declaration was provided, insert a wildcard, so that
   -- the actual type will be added during type checking.
   basicDeclaration sa title (ValueDeclaration P.TypeWildcard{})

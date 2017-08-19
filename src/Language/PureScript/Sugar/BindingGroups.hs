@@ -95,7 +95,7 @@ collapseBindingGroups =
   go (DataBindingGroupDeclaration ds) = NEL.toList ds
   go (BindingGroupDeclaration ds) =
     NEL.toList $ fmap (\((sa, ident), nameKind, val) ->
-      ValueDeclaration sa ident nameKind [] [MkUnguarded val]) ds
+      ValueDeclaration (ValueDeclarationData sa ident nameKind [] [MkUnguarded val])) ds
   go other = [other]
 
 collapseBindingGroupsForValue :: Expr -> Expr
@@ -107,7 +107,7 @@ usedIdents moduleName = ordNub . usedIdents' S.empty . getValue
   where
   def _ _ = []
 
-  getValue (ValueDeclaration _ _ _ [] [MkUnguarded val]) = val
+  getValue (ValueDeclaration (ValueDeclarationData _ _ _ [] [MkUnguarded val])) = val
   getValue ValueDeclaration{} = internalError "Binders should have been desugared"
   getValue _ = internalError "Expected ValueDeclaration"
 
@@ -150,7 +150,7 @@ usedTypeNames moduleName =
   usedNames _ = []
 
 declIdent :: Declaration -> Ident
-declIdent (ValueDeclaration _ ident _ _ _) = ident
+declIdent (ValueDeclaration vd) = valdeclIdent vd
 declIdent _ = internalError "Expected ValueDeclaration"
 
 declTypeName :: Declaration -> ProperName 'TypeName
@@ -192,7 +192,7 @@ toBindingGroup moduleName (CyclicSCC ds') = do
   toBinding (CyclicSCC ds) = throwError $ foldMap cycleError ds
 
   cycleError :: Declaration -> MultipleErrors
-  cycleError (ValueDeclaration (ss, _) n _ _ [MkUnguarded _]) = errorMessage' ss $ CycleInDeclaration n
+  cycleError (ValueDeclaration (ValueDeclarationData (ss, _) n _ _ [MkUnguarded _])) = errorMessage' ss $ CycleInDeclaration n
   cycleError _ = internalError "cycleError: Expected ValueDeclaration"
 
 toDataBindingGroup
@@ -212,6 +212,6 @@ isTypeSynonym (TypeSynonymDeclaration _ pn _ _) = Just pn
 isTypeSynonym _ = Nothing
 
 fromValueDecl :: Declaration -> ((SourceAnn, Ident), NameKind, Expr)
-fromValueDecl (ValueDeclaration sa ident nameKind [] [MkUnguarded val]) = ((sa, ident), nameKind, val)
+fromValueDecl (ValueDeclaration (ValueDeclarationData sa ident nameKind [] [MkUnguarded val])) = ((sa, ident), nameKind, val)
 fromValueDecl ValueDeclaration{} = internalError "Binders should have been desugared"
 fromValueDecl _ = internalError "Expected ValueDeclaration"

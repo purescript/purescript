@@ -23,7 +23,7 @@ ann2 = (span2, [])
 
 typeAnnotation1, value1, synonym1, class1, class2, data1, data2, valueFixity, typeFixity, foreign1, foreign2, foreign3, member1 :: P.Declaration
 typeAnnotation1 = P.TypeDeclaration (P.TypeDeclarationData ann1 (P.Ident "value1") P.REmpty)
-value1 = P.ValueDeclaration ann1 (P.Ident "value1") P.Public [] []
+value1 = P.ValueDeclaration $ P.ValueDeclarationData ann1 (P.Ident "value1") P.Public [] []
 synonym1 = P.TypeSynonymDeclaration ann1 (P.ProperName "Synonym1") [] P.REmpty
 class1 = P.TypeClassDeclaration ann1 (P.ProperName "Class1") [] [] [] []
 class2 = P.TypeClassDeclaration ann1 (P.ProperName "Class2") [] [] [] [member1]

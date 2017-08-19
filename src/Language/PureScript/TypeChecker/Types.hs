@@ -426,7 +426,7 @@ inferLetBinding
   -> (Expr -> m Expr)
   -> m ([Declaration], Expr)
 inferLetBinding seen [] ret j = (,) seen <$> withBindingGroupVisible (j ret)
-inferLetBinding seen (ValueDeclaration sa@(ss, _) ident nameKind [] [MkUnguarded tv@(TypedValue checkType val ty)] : rest) ret j =
+inferLetBinding seen (ValueDeclaration (ValueDeclarationData sa@(ss, _) ident nameKind [] [MkUnguarded tv@(TypedValue checkType val ty)]) : rest) ret j =
   warnAndRethrowWithPositionTC ss $ do
     Just moduleName <- checkCurrentModule <$> get
     (kind, args) <- kindOfWithScopedVars ty
@@ -434,14 +434,16 @@ inferLetBinding seen (ValueDeclaration sa@(ss, _) ident nameKind [] [MkUnguarded
     let dict = M.singleton (Qualified Nothing ident) (ty, nameKind, Undefined)
     ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
     TypedValue _ val' ty'' <- if checkType then withScopedTypeVars moduleName args (bindNames dict (check val ty')) else return tv
-    bindNames (M.singleton (Qualified Nothing ident) (ty'', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration sa ident nameKind [] [MkUnguarded (TypedValue checkType val' ty'')]]) rest ret j
-inferLetBinding seen (ValueDeclaration sa@(ss, _) ident nameKind [] [MkUnguarded val] : rest) ret j =
+    bindNames (M.singleton (Qualified Nothing ident) (ty'', nameKind, Defined)) 
+      $ inferLetBinding (seen ++ [ValueDeclaration $ ValueDeclarationData sa ident nameKind [] [MkUnguarded (TypedValue checkType val' ty'')]]) rest ret j
+inferLetBinding seen (ValueDeclaration (ValueDeclarationData sa@(ss, _) ident nameKind [] [MkUnguarded val]) : rest) ret j =
   warnAndRethrowWithPositionTC ss $ do
     valTy <- freshType
     let dict = M.singleton (Qualified Nothing ident) (valTy, nameKind, Undefined)
     TypedValue _ val' valTy' <- bindNames dict $ infer val
     unifyTypes valTy valTy'
-    bindNames (M.singleton (Qualified Nothing ident) (valTy', nameKind, Defined)) $ inferLetBinding (seen ++ [ValueDeclaration sa ident nameKind [] [MkUnguarded val']]) rest ret j
+    bindNames (M.singleton (Qualified Nothing ident) (valTy', nameKind, Defined)) 
+      $ inferLetBinding (seen ++ [ValueDeclaration $ ValueDeclarationData sa ident nameKind [] [MkUnguarded val']]) rest ret j
 inferLetBinding seen (BindingGroupDeclaration ds : rest) ret j = do
   Just moduleName <- checkCurrentModule <$> get
   SplitBindingGroup untyped typed dict <- typeDictionaryForBindingGroup Nothing . NEL.toList $ fmap (\(i, _, v) -> (i, v)) ds

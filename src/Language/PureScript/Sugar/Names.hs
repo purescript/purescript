@@ -303,8 +303,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
         updatePatGuard _                  = []
 
   letBoundVariable :: Declaration -> Maybe Ident
-  letBoundVariable (ValueDeclaration _ ident _ _ _) = Just ident
-  letBoundVariable _ = Nothing
+  letBoundVariable = fmap valdeclIdent . getValueDeclaration
 
   updateKindsEverywhere :: SourceSpan -> Kind -> m Kind
   updateKindsEverywhere pos = everywhereOnKindsM updateKind
