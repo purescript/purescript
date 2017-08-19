@@ -56,8 +56,8 @@ data Command
       -- Import InputFile OutputFile
     | Import FilePath (Maybe FilePath) [Filter] ImportCommand
     | List { listType :: ListType }
-    | Rebuild FilePath -- ^ Rebuild the specified file using the loaded externs
-    | RebuildSync FilePath -- ^ Rebuild the specified file using the loaded externs
+    | Rebuild FilePath (Maybe FilePath)
+    | RebuildSync FilePath (Maybe FilePath)
     | Cwd
     | Reset
     | Quit
@@ -169,6 +169,7 @@ instance FromJSON Command where
         params <- o .: "params"
         Rebuild
           <$> params .: "file"
+          <*> params .:? "actualFile"
       _ -> mzero
     where
       mkAnnotations True = explicitAnnotations

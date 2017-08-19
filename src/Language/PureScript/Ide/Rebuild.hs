@@ -40,14 +40,16 @@ rebuildFile
   :: (Ide m, MonadLogger m, MonadError IdeError m)
   => FilePath
   -- ^ The file to rebuild
+  -> Maybe FilePath
+  -- ^ The file to use as the location for parsing and errors
   -> (ReaderT IdeEnvironment (LoggingT IO) () -> m ())
   -- ^ A runner for the second build with open exports
   -> m Success
-rebuildFile path runOpenBuild = do
+rebuildFile file actualFile runOpenBuild = do
 
-  input <- ideReadFile path
+  input <- ideReadFile file
 
-  m <- case snd <$> P.parseModuleFromFile identity (path, input) of
+  m <- case snd <$> P.parseModuleFromFile (maybe identity const actualFile) (file, input) of
     Left parseError ->
       throwError (RebuildError (P.MultipleErrors [P.toPositionedError parseError]))
     Right m -> pure m
@@ -61,7 +63,7 @@ rebuildFile path runOpenBuild = do
   -- For rebuilding, we want to 'RebuildAlways', but for inferring foreign
   -- modules using their file paths, we need to specify the path in the 'Map'.
   let filePathMap = M.singleton (P.getModuleName m) (Left P.RebuildAlways)
-  foreigns <- P.inferForeignModules (M.singleton (P.getModuleName m) (Right path))
+  foreigns <- P.inferForeignModules (M.singleton (P.getModuleName m) (Right file))
 
   let makeEnv = MakeActionsEnv outputDirectory filePathMap foreigns False
   -- Rebuild the single module using the cached externs
@@ -74,7 +76,7 @@ rebuildFile path runOpenBuild = do
     Left errors -> throwError (RebuildError errors)
     Right newExterns -> do
       whenM isEditorMode $ do
-        insertModule (path, m)
+        insertModule (fromMaybe file actualFile, m)
         insertExterns newExterns
         void populateVolatileState
       runOpenBuild (rebuildModuleOpen makeEnv externs m)
@@ -85,8 +87,8 @@ isEditorMode = asks (confEditorMode . ideConfiguration)
 
 rebuildFileAsync
   :: forall m. (Ide m, MonadLogger m, MonadError IdeError m)
-  => FilePath -> m Success
-rebuildFileAsync fp = rebuildFile fp asyncRun
+  => FilePath -> Maybe FilePath -> m Success
+rebuildFileAsync fp fp' = rebuildFile fp fp' asyncRun
   where
     asyncRun :: ReaderT IdeEnvironment (LoggingT IO) () -> m ()
     asyncRun action = do
@@ -96,8 +98,8 @@ rebuildFileAsync fp = rebuildFile fp asyncRun
 
 rebuildFileSync
   :: forall m. (Ide m, MonadLogger m, MonadError IdeError m)
-  => FilePath -> m Success
-rebuildFileSync fp = rebuildFile fp syncRun
+  => FilePath -> Maybe FilePath -> m Success
+rebuildFileSync fp fp' = rebuildFile fp fp' syncRun
   where
     syncRun :: ReaderT IdeEnvironment (LoggingT IO) () -> m ()
     syncRun action = do
