@@ -9,7 +9,8 @@ module Language.PureScript.CoreFn.ToJSON
 
 import Prelude.Compat
 
-import Data.Maybe (fromMaybe)
+import Control.Arrow ((***))
+import Data.Maybe (fromMaybe, maybe)
 import Data.Aeson
 import Data.Version (Version, showVersion)
 import Data.Text (Text)
@@ -29,6 +30,19 @@ literalToJSON _ (BooleanLiteral b) = toJSON ("BooleanLiteral", b)
 literalToJSON t (ArrayLiteral xs) = toJSON ("ArrayLiteral", map t xs)
 literalToJSON t (ObjectLiteral xs) = toJSON ("ObjectLiteral", recordToJSON t xs)
 
+constructorTypeToJSON :: ConstructorType -> Value
+constructorTypeToJSON ProductType = toJSON "ProductType"
+constructorTypeToJSON SumType = toJSON "SumType"
+
+metaToJSON :: Meta -> Value
+metaToJSON (IsConstructor t is)   = toJSON ( "IsConstructor", constructorTypeToJSON t, toJSON (map runIdent is) )
+metaToJSON IsNewtype              = toJSON "IsNewtype"
+metaToJSON IsTypeClassConstructor = toJSON "IsTypeClassConstructor"
+metaToJSON IsForeign              = toJSON "IsForeign"
+
+annToJSON :: Ann -> Value
+annToJSON (ss, _, _, m) = toJSON ( "Ann", toJSON ss, maybe Null metaToJSON m )
+
 identToJSON :: Ident -> Value
 identToJSON = toJSON . runIdent
 
@@ -41,17 +55,17 @@ qualifiedToJSON f = toJSON . showQualified f
 moduleNameToJSON :: ModuleName -> Value
 moduleNameToJSON = toJSON . runModuleName
 
-moduleToJSON :: Version -> Module a -> Value
-moduleToJSON v m = object [ T.pack "imports"   .= map (moduleNameToJSON . snd) (moduleImports m)
+moduleToJSON :: Version -> ModuleT a Ann -> Value
+moduleToJSON v m = object [ T.pack "imports"   .= map (annToJSON *** moduleNameToJSON) (moduleImports m)
                           , T.pack "exports"   .= map identToJSON (moduleExports m)
                           , T.pack "foreign"   .= map (identToJSON . fst) (moduleForeign m)
                           , T.pack "decls"     .= map bindToJSON (moduleDecls m)
                           , T.pack "builtWith" .= toJSON (showVersion v)
                           ]
 
-bindToJSON :: Bind a -> Value
-bindToJSON (NonRec _ n e) = object [ runIdent n .= exprToJSON e ]
-bindToJSON (Rec bs) = object $ map (\((_, n), e) -> runIdent n .= exprToJSON e) bs
+bindToJSON :: Bind Ann -> Value
+bindToJSON (NonRec ann n e) = toJSON [(runIdent n, annToJSON ann, exprToJSON e)]
+bindToJSON (Rec bs) = toJSON $ map (\((ann, n), e) -> (runIdent n, annToJSON ann, exprToJSON e)) bs
 
 -- If all of the labels in the record can safely be converted to JSON strings,
 -- we generate a JSON object. Otherwise the labels must be represented as
@@ -65,44 +79,53 @@ recordToJSON f rec = fromMaybe (asArrayOfPairs rec) (asObject rec)
 
   asArrayOfPairs = toJSON . map (\(label, a) -> (toJSON label, f a))
 
-exprToJSON :: Expr a -> Value
-exprToJSON (Var _ i)              = toJSON ( "Var"
-                                           , qualifiedToJSON runIdent i
-                                           )
-exprToJSON (Literal _ l)          = toJSON ( "Literal"
-                                           , literalToJSON (exprToJSON) l
-                                           )
-exprToJSON (Constructor _ d c is) = toJSON ( "Constructor"
-                                           , properNameToJSON d
-                                           , properNameToJSON c
-                                           , map identToJSON is
-                                           )
-exprToJSON (Accessor _ f r)       = toJSON ( "Accessor"
-                                           , f
-                                           , exprToJSON r
-                                           )
-exprToJSON (ObjectUpdate _ r fs)  = toJSON ( "ObjectUpdate"
-                                           , exprToJSON r
-                                           , recordToJSON exprToJSON fs
-                                           )
-exprToJSON (Abs _ p b)            = toJSON ( "Abs"
-                                           , identToJSON p
-                                           , exprToJSON b
-                                           )
-exprToJSON (App _ f x)            = toJSON ( "App"
-                                           , exprToJSON f
-                                           , exprToJSON x
-                                           )
-exprToJSON (Case _ ss cs)         = toJSON ( "Case"
-                                           , map exprToJSON ss
-                                           , map caseAlternativeToJSON cs
-                                           )
-exprToJSON (Let _ bs e)           = toJSON ( "Let"
-                                           , map bindToJSON bs
-                                           , exprToJSON e
-                                           )
+exprToJSON :: Expr Ann -> Value
+exprToJSON (Var ann i)              = toJSON ( "Var"
+                                             , annToJSON ann
+                                             , qualifiedToJSON runIdent i
+                                             )
+exprToJSON (Literal ann l)          = toJSON ( "Literal"
+                                             , annToJSON ann
+                                             , literalToJSON (exprToJSON) l
+                                             )
+exprToJSON (Constructor ann d c is) = toJSON ( "Constructor"
+                                             , annToJSON ann
+                                             , properNameToJSON d
+                                             , properNameToJSON c
+                                             , map identToJSON is
+                                             )
+exprToJSON (Accessor ann f r)       = toJSON ( "Accessor"
+                                             , annToJSON ann
+                                             , f
+                                             , exprToJSON r
+                                             )
+exprToJSON (ObjectUpdate ann r fs)  = toJSON ( "ObjectUpdate"
+                                             , annToJSON ann
+                                             , exprToJSON r
+                                             , recordToJSON exprToJSON fs
+                                             )
+exprToJSON (Abs ann p b)            = toJSON ( "Abs"
+                                             , annToJSON ann
+                                             , identToJSON p
+                                             , exprToJSON b
+                                             )
+exprToJSON (App ann f x)            = toJSON ( "App"
+                                             , annToJSON ann
+                                             , exprToJSON f
+                                             , exprToJSON x
+                                             )
+exprToJSON (Case ann ss cs)         = toJSON ( "Case"
+                                             , annToJSON ann
+                                             , map exprToJSON ss
+                                             , map caseAlternativeToJSON cs
+                                             )
+exprToJSON (Let ann bs e)           = toJSON ( "Let"
+                                             , annToJSON ann
+                                             , map bindToJSON bs
+                                             , exprToJSON e
+                                             )
 
-caseAlternativeToJSON :: CaseAlternative a -> Value
+caseAlternativeToJSON :: CaseAlternative Ann -> Value
 caseAlternativeToJSON (CaseAlternative bs r') =
   toJSON [ toJSON (map binderToJSON bs)
          , case r' of
@@ -110,20 +133,26 @@ caseAlternativeToJSON (CaseAlternative bs r') =
              Right r -> exprToJSON r
          ]
 
-binderToJSON :: Binder a -> Value
-binderToJSON (VarBinder _ v)              = toJSON ( "VarBinder"
-                                                   , identToJSON v
-                                                   )
-binderToJSON (NullBinder _)               = toJSON "NullBinder"
-binderToJSON (LiteralBinder _ l)          = toJSON ( "LiteralBinder"
-                                                   , literalToJSON binderToJSON l
-                                                   )
-binderToJSON (ConstructorBinder _ d c bs) = toJSON ( "ConstructorBinder"
-                                                   , qualifiedToJSON runProperName d
-                                                   , qualifiedToJSON runProperName c
-                                                   , map binderToJSON bs
-                                                   )
-binderToJSON (NamedBinder _ n b)          = toJSON ( "NamedBinder"
-                                                   , identToJSON n
-                                                   , binderToJSON b
-                                                   )
+binderToJSON :: Binder Ann -> Value
+binderToJSON (VarBinder ann v)              = toJSON ( "VarBinder"
+                                                     , annToJSON ann
+                                                     , identToJSON v
+                                                     )
+binderToJSON (NullBinder ann)               = toJSON ( "NullBinder"
+                                                     , annToJSON ann
+                                                     )
+binderToJSON (LiteralBinder ann l)          = toJSON ( "LiteralBinder"
+                                                     , annToJSON ann
+                                                     , literalToJSON binderToJSON l
+                                                     )
+binderToJSON (ConstructorBinder ann d c bs) = toJSON ( "ConstructorBinder"
+                                                     , annToJSON ann
+                                                     , qualifiedToJSON runProperName d
+                                                     , qualifiedToJSON runProperName c
+                                                     , map binderToJSON bs
+                                                     )
+binderToJSON (NamedBinder ann n b)          = toJSON ( "NamedBinder"
+                                                     , annToJSON ann
+                                                     , identToJSON n
+                                                     , binderToJSON b
+                                                     )

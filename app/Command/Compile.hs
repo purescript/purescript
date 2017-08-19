@@ -4,7 +4,10 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 
-module Command.Compile (command) where
+module Command.Compile
+  ( command
+  , printWarningsAndErrors
+  ) where
 
 import           Control.Applicative
 import           Control.Monad

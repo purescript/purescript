@@ -9,6 +9,8 @@ import Prelude ()
 import Prelude.Compat
 
 import qualified TestCompiler
+import qualified TestCoreFn
+import qualified TestDCE
 import qualified TestDocs
 import qualified TestHierarchy
 import qualified TestPrimDocs
@@ -28,6 +30,10 @@ main = do
   TestUtils.updateSupportCode
   heading "Main compiler test suite"
   TestCompiler.main
+  heading "CoreFn test suite"
+  TestCoreFn.main
+  heading "DCE test suite"
+  TestDCE.main
   heading "Documentation test suite"
   TestDocs.main
   heading "Hierarchy test suite"
