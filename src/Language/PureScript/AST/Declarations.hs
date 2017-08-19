@@ -443,10 +443,6 @@ data ValueDeclarationData a = ValueDeclarationData
   , valdeclExpression :: !a
   } deriving (Show)
 
-  -- |
-  -- A value declaration (name, top-level binders, optional guard, value)
-  --
-
 overValueDeclaration :: (ValueDeclarationData [GuardedExpr] -> ValueDeclarationData [GuardedExpr]) -> Declaration -> Declaration
 overValueDeclaration f d = maybe d (ValueDeclaration . f) (getValueDeclaration d)
 
