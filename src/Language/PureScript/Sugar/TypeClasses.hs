@@ -88,15 +88,11 @@ desugarModule _ = internalError "Exports should have been elaborated in name des
 --
 --   instance fooString :: Foo String where
 --     foo s = s ++ s
---
---   instance fooArray :: (Foo a) => Foo [a] where
+--   instance fooArray :: Foo a => Foo (Array a) where
 --     foo = map foo
 --
---   {- Superclasses -}
---
---   class (Foo a) <= Sub a where
+--   class Foo a <= Sub a where
 --     sub :: a
---
 --   instance subString :: Sub String where
 --     sub = ""
 --
@@ -109,16 +105,20 @@ desugarModule _ = internalError "Exports should have been elaborated in name des
 --   -- this following type is marked as not needing to be checked so a new Abs
 --   -- is not introduced around the definition in type checking, but when
 --   -- called the dictionary value is still passed in for the `dict` argument
---   foo :: forall a. (Foo a) => a -> a
+--   foo :: forall a. Foo a => a -> a
 --   foo dict = dict.foo
 --
 --   fooString :: {} -> Foo String
---   fooString _ = <TypeClassDictionaryConstructorApp Foo { foo: \s -> s ++ s }>
+--   fooString _ =
+--     let foo_1 :: String -> String
+--         foo_1 = \s -> s ++ s
+--     in <TypeClassDictionaryConstructorApp Foo { foo: foo_1 }>
 --
---   fooArray :: forall a. (Foo a) => Foo [a]
---   fooArray = <TypeClassDictionaryConstructorApp Foo { foo: map foo }>
---
---   {- Superclasses -}
+--   fooArray :: forall a. Foo a => Foo (Array a)
+--   fooArray =
+--     let foo_1 :: Array a -> Array a
+--         foo_1 = map foo
+--     in <TypeClassDictionaryConstructorApp Foo { foo: foo_1 }>
 --
 --   <TypeClassDeclaration Sub ...>
 --
@@ -131,43 +131,14 @@ desugarModule _ = internalError "Exports should have been elaborated in name des
 --   sub dict = dict.sub
 --
 --   subString :: {} -> Sub String
---   subString _ = { sub: "",
---                 , "Foo0": \_ -> <DeferredDictionary Foo String>
---                 }
---
--- and finally as the generated javascript:
---
---   function Foo(foo) {
---       this.foo = foo;
---   };
---
---   var foo = function (dict) {
---       return dict.foo;
---   };
---
---   var fooString = function (_) {
---       return new Foo(function (s) {
---           return s + s;
---       });
---   };
---
---   var fooArray = function (__dict_Foo_15) {
---       return new Foo(map(foo(__dict_Foo_15)));
---   };
---
---   function Sub(Foo0, sub) {
---       this["Foo0"] = Foo0;
---       this.sub = sub;
---   };
---
---   var sub = function (dict) {
---       return dict.sub;
---   };
---
---   var subString = function (_) {
---       return new Sub(fooString, "");
---   };
--}
+--   subString _ =
+--     let sub_1 :: String
+--         sub_1 = ""
+--     in <TypeClassDictionaryConstructorApp Sub
+--          { sub: sub_1,
+--          , "Foo0": \_ -> <DeferredDictionary Foo String>
+--          }>
+--}
 desugarDecl
   :: (MonadSupply m, MonadError MultipleErrors m)
   => ModuleName
@@ -287,20 +258,25 @@ typeInstanceDictionaryDeclaration sa name mn deps className tys decls =
 
       -- Create values for the type instance members
       members <- zip (map typeClassMemberName decls) <$> traverse (memberToValue memberTypes) decls
+      memberNames <- traverse (freshIdent . fst) members
+      let memberRefs = zipWith ((\(x, _) y -> (mkString x, (Var . Qualified Nothing) y))) members memberNames
 
       -- Create the type of the dictionary
       -- The type is a record type, but depending on type instance dependencies, may be constrained.
       -- The dictionary itself is a record literal.
-      let superclasses = superClassDictionaryNames typeClassSuperclasses `zip`
+      let superclasses = map mkString (superClassDictionaryNames typeClassSuperclasses) `zip`
             [ Abs (VarBinder (Ident C.__unused)) (DeferredDictionary superclass tyArgs)
             | (Constraint superclass suTyArgs _) <- typeClassSuperclasses
             , let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
             ]
 
-      let props = Literal $ ObjectLiteral $ map (first mkString) (members ++ superclasses)
+      let dict = Let (zipWith (\(_, e) nm -> ValueDeclaration sa nm Private [] [MkUnguarded e]) members memberNames)
+                   $ TypeClassDictionaryConstructorApp className
+                   $ Literal
+                   $ ObjectLiteral
+                   $ memberRefs ++ superclasses
           dictTy = foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
           constrainedTy = quantify (foldr ConstrainedType dictTy deps)
-          dict = TypeClassDictionaryConstructorApp className props
           result = ValueDeclaration sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]
       return result
 
@@ -308,8 +284,8 @@ typeInstanceDictionaryDeclaration sa name mn deps className tys decls =
 
   memberToValue :: [(Ident, Type)] -> Declaration -> Desugar m Expr
   memberToValue tys' (ValueDeclaration _ ident _ [] [MkUnguarded val]) = do
-    _ <- maybe (throwError . errorMessage $ ExtraneousClassMember ident className) return $ lookup ident tys'
-    return val
+    ty <- maybe (throwError . errorMessage $ ExtraneousClassMember ident className) return $ lookup ident tys'
+    return (TypedValue True val ty)
   memberToValue _ _ = internalError "Invalid declaration in type instance definition"
 
 declIdent :: Declaration -> Maybe Ident
