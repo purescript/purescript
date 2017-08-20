@@ -30,7 +30,7 @@ main :: IO ()
 main = hspec spec
 
 modToJSON :: Version -> Module Ann -> Value
-modToJSON v m = object [ moduleNameToText (moduleName m) .= moduleToJSON v m ] 
+modToJSON v m = object [ moduleNameToText (moduleName m) .= moduleToJSON v m ]
   where
   moduleNameToText :: ModuleName -> Text
   moduleNameToText (ModuleName ps) = T.intercalate "." (map runProperName ps)
@@ -111,7 +111,7 @@ spec = context "CoreFnFromJsonTest" $ do
                     [(mkString "field", Literal ann (StringLiteral (mkString "xyz")))]
               ]
     parseMod m `shouldSatisfy` isSuccess
-                  
+
   specify "should parse Abs" $ do
     let m = Module [] mn [] [] []
               [ NonRec ann (Ident "abs")
@@ -121,7 +121,7 @@ spec = context "CoreFnFromJsonTest" $ do
 
   specify "should parse App" $ do
     let m = Module [] mn [] [] []
-              [ NonRec ann (Ident "app") 
+              [ NonRec ann (Ident "app")
                   $ App ann
                       (Abs ann (Ident "x") (Var ann (Qualified Nothing (Ident "x"))))
                       (Literal ann (CharLiteral 'c'))
@@ -132,7 +132,7 @@ spec = context "CoreFnFromJsonTest" $ do
     let m = Module [] mn [] [] []
               [ NonRec ann (Ident "case") $
                   Case ann [Var ann (Qualified Nothing (Ident "x"))]
-                    [ CaseAlternative 
+                    [ CaseAlternative
                       [ LiteralBinder ann (BooleanLiteral True)
                       , ConstructorBinder ann (Qualified (Just (ModuleName [ProperName "Data", ProperName "Either"])) (ProperName "Either")) (Qualified Nothing (ProperName "Left")) [VarBinder ann (Ident "z")]
                       , NamedBinder ann (Ident "w") (NullBinder ann)
