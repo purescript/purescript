@@ -66,7 +66,7 @@ createBindingGroups moduleName = mapM f <=< handleDecls
   --
   handleDecls :: [Declaration] -> m [Declaration]
   handleDecls ds = do
-    let values = mapMaybe getValueDeclaration ds
+    let values = mapMaybe (fmap (fmap extractGuardedExpr) . getValueDeclaration) ds
         dataDecls = filter isDataDecl ds
         allProperNames = fmap declTypeName dataDecls
         dataVerts = fmap (\d -> (d, declTypeName d, usedTypeNames moduleName d `intersect` allProperNames)) dataDecls
@@ -83,6 +83,9 @@ createBindingGroups moduleName = mapM f <=< handleDecls
              filter isFixityDecl ds ++
              filter isExternDecl ds ++
              bindingGroupDecls
+    where
+      extractGuardedExpr [MkUnguarded expr] = expr
+      extractGuardedExpr _ = internalError "Expected Guards to have been desugared in handleDecls."
 
 -- |
 -- Collapse all binding groups to individual declarations
@@ -102,13 +105,10 @@ collapseBindingGroupsForValue :: Expr -> Expr
 collapseBindingGroupsForValue (Let ds val) = Let (collapseBindingGroups ds) val
 collapseBindingGroupsForValue other = other
 
-usedIdents :: ModuleName -> ValueDeclarationData [GuardedExpr] -> [Ident]
-usedIdents moduleName = ordNub . usedIdents' S.empty . getValue
+usedIdents :: ModuleName -> ValueDeclarationData Expr -> [Ident]
+usedIdents moduleName = ordNub . usedIdents' S.empty . valdeclExpression
   where
   def _ _ = []
-
-  getValue (ValueDeclarationData _ _ _ [] [MkUnguarded val]) = val
-  getValue ValueDeclarationData{} = internalError "Binders should have been desugared"
 
   (_, usedIdents', _, _, _) = everythingWithScope def usedNamesE def def def
 
@@ -161,9 +161,9 @@ toBindingGroup
   :: forall m
    . (MonadError MultipleErrors m)
    => ModuleName
-   -> SCC (ValueDeclarationData [GuardedExpr])
+   -> SCC (ValueDeclarationData Expr)
    -> m Declaration
-toBindingGroup _ (AcyclicSCC d) = return (ValueDeclaration d)
+toBindingGroup _ (AcyclicSCC d) = return (mkDeclaration d)
 toBindingGroup moduleName (CyclicSCC ds') = do
   -- Once we have a mutually-recursive group of declarations, we need to sort
   -- them further by their immediate dependencies (those outside function
@@ -179,16 +179,15 @@ toBindingGroup moduleName (CyclicSCC ds') = do
   idents :: [Ident]
   idents = fmap (\(_, i, _) -> i) valueVerts
 
-  valueVerts :: [(ValueDeclarationData [GuardedExpr], Ident, [Ident])]
-  valueVerts = fmap (\d -> (d, valdeclIdent d, usedImmediateIdents moduleName (ValueDeclaration d) `intersect` idents)) ds'
+  valueVerts :: [(ValueDeclarationData Expr, Ident, [Ident])]
+  valueVerts = fmap (\d -> (d, valdeclIdent d, usedImmediateIdents moduleName (mkDeclaration d) `intersect` idents)) ds'
 
-  toBinding :: SCC (ValueDeclarationData [GuardedExpr]) -> m ((SourceAnn, Ident), NameKind, Expr)
+  toBinding :: SCC (ValueDeclarationData Expr) -> m ((SourceAnn, Ident), NameKind, Expr)
   toBinding (AcyclicSCC d) = return $ fromValueDecl d
   toBinding (CyclicSCC ds) = throwError $ foldMap cycleError ds
 
-  cycleError :: ValueDeclarationData [GuardedExpr] -> MultipleErrors
-  cycleError (ValueDeclarationData (ss, _) n _ _ [MkUnguarded _]) = errorMessage' ss $ CycleInDeclaration n
-  cycleError _ = internalError "ValueDeclarationData should've been desugared in cycleError."
+  cycleError :: ValueDeclarationData Expr -> MultipleErrors
+  cycleError (ValueDeclarationData (ss, _) n _ _ _) = errorMessage' ss $ CycleInDeclaration n
 
 toDataBindingGroup
   :: MonadError MultipleErrors m
@@ -206,6 +205,9 @@ isTypeSynonym :: Declaration -> Maybe (ProperName 'TypeName)
 isTypeSynonym (TypeSynonymDeclaration _ pn _ _) = Just pn
 isTypeSynonym _ = Nothing
 
-fromValueDecl :: ValueDeclarationData [GuardedExpr] -> ((SourceAnn, Ident), NameKind, Expr)
-fromValueDecl (ValueDeclarationData sa ident nameKind [] [MkUnguarded val]) = ((sa, ident), nameKind, val)
+mkDeclaration :: ValueDeclarationData Expr -> Declaration
+mkDeclaration = ValueDeclaration . fmap (pure . MkUnguarded)
+
+fromValueDecl :: ValueDeclarationData Expr -> ((SourceAnn, Ident), NameKind, Expr)
+fromValueDecl (ValueDeclarationData sa ident nameKind [] val) = ((sa, ident), nameKind, val)
 fromValueDecl ValueDeclarationData{} = internalError "Binders should have been desugared"

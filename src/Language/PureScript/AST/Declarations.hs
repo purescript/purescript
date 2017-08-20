@@ -441,7 +441,7 @@ data ValueDeclarationData a = ValueDeclarationData
   -- ^ Whether or not this value is exported/visible
   , valdeclBinders :: ![Binder]
   , valdeclExpression :: !a
-  } deriving (Show)
+  } deriving (Show, Functor, Foldable, Traversable)
 
 overValueDeclaration :: (ValueDeclarationData [GuardedExpr] -> ValueDeclarationData [GuardedExpr]) -> Declaration -> Declaration
 overValueDeclaration f d = maybe d (ValueDeclaration . f) (getValueDeclaration d)
