@@ -428,6 +428,28 @@ getTypeDeclaration _ = Nothing
 unwrapTypeDeclaration :: TypeDeclarationData -> (Ident, Type)
 unwrapTypeDeclaration td = (tydeclIdent td, tydeclType td)
 
+-- | A value declaration assigns a name and potential binders, to an expression (or multiple guarded expressions).
+--
+-- @double x = x + x@
+--
+-- In this example @double@ is the identifier, @x@ is a binder and @x + x@ is the expression.
+data ValueDeclarationData a = ValueDeclarationData
+  { valdeclSourceAnn :: !SourceAnn
+  , valdeclIdent :: !Ident
+  -- ^ The declared value's name
+  , valdeclName :: !NameKind
+  -- ^ Whether or not this value is exported/visible
+  , valdeclBinders :: ![Binder]
+  , valdeclExpression :: !a
+  } deriving (Show, Functor, Foldable, Traversable)
+
+overValueDeclaration :: (ValueDeclarationData [GuardedExpr] -> ValueDeclarationData [GuardedExpr]) -> Declaration -> Declaration
+overValueDeclaration f d = maybe d (ValueDeclaration . f) (getValueDeclaration d)
+
+getValueDeclaration :: Declaration -> Maybe (ValueDeclarationData [GuardedExpr])
+getValueDeclaration (ValueDeclaration d) = Just d
+getValueDeclaration _ = Nothing
+
 -- |
 -- The data type of declarations
 --
@@ -451,7 +473,7 @@ data Declaration
   -- |
   -- A value declaration (name, top-level binders, optional guard, value)
   --
-  | ValueDeclaration SourceAnn Ident NameKind [Binder] [GuardedExpr]
+  | ValueDeclaration {-# UNPACK #-} !(ValueDeclarationData [GuardedExpr])
   -- |
   -- A declaration paired with pattern matching in let-in expression (binder, optional guard, value)
   | BoundValueDeclaration SourceAnn Binder Expr
@@ -528,7 +550,7 @@ declSourceAnn (DataDeclaration sa _ _ _ _) = sa
 declSourceAnn (DataBindingGroupDeclaration ds) = declSourceAnn (NEL.head ds)
 declSourceAnn (TypeSynonymDeclaration sa _ _ _) = sa
 declSourceAnn (TypeDeclaration td) = tydeclSourceAnn td
-declSourceAnn (ValueDeclaration sa _ _ _ _) = sa
+declSourceAnn (ValueDeclaration vd) = valdeclSourceAnn vd
 declSourceAnn (BoundValueDeclaration sa _ _) = sa
 declSourceAnn (BindingGroupDeclaration ds) = let ((sa, _), _, _) = NEL.head ds in sa
 declSourceAnn (ExternDeclaration sa _ _) = sa
@@ -545,7 +567,7 @@ declSourceSpan = fst . declSourceAnn
 declName :: Declaration -> Maybe Name
 declName (DataDeclaration _ _ n _ _) = Just (TyName n)
 declName (TypeSynonymDeclaration _ n _ _) = Just (TyName n)
-declName (ValueDeclaration _ n _ _ _) = Just (IdentName n)
+declName (ValueDeclaration vd) = Just (IdentName (valdeclIdent vd))
 declName (ExternDeclaration _ n _) = Just (IdentName n)
 declName (ExternDataDeclaration _ n _) = Just (TyName n)
 declName (ExternKindDeclaration _ n) = Just (KiName n)

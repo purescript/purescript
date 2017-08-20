@@ -187,7 +187,7 @@ desugarDecl mn exps = go
   go d@(TypeInstanceDeclaration sa name deps className tys (NewtypeInstanceWithDictionary dict)) = do
     let dictTy = foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
         constrainedTy = quantify (foldr ConstrainedType dictTy deps)
-    return (expRef name className tys, [d, ValueDeclaration sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]])
+    return (expRef name className tys, [d, ValueDeclaration $ ValueDeclarationData sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]])
   go other = return (Nothing, [other])
 
   expRef :: Ident -> Qualified (ProperName 'ClassName) -> [Type] -> Maybe DeclarationRef
@@ -249,7 +249,7 @@ typeClassMemberToDictionaryAccessor
   -> Declaration
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarationData sa ident ty)) =
   let className = Qualified (Just mn) name
-  in ValueDeclaration sa ident Private [] $
+  in ValueDeclaration $ ValueDeclarationData sa ident Private [] $
     [MkUnguarded (
      TypedValue False (TypeClassDictionaryAccessor className ident) $
        moveQuantifiersToFront (quantify (ConstrainedType (Constraint className (map (TypeVar . fst) args) Nothing) ty))
@@ -301,19 +301,19 @@ typeInstanceDictionaryDeclaration sa name mn deps className tys decls =
           dictTy = foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
           constrainedTy = quantify (foldr ConstrainedType dictTy deps)
           dict = TypeClassDictionaryConstructorApp className props
-          result = ValueDeclaration sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]
+          result = ValueDeclaration (ValueDeclarationData sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)])
       return result
 
   where
 
   memberToValue :: [(Ident, Type)] -> Declaration -> Desugar m Expr
-  memberToValue tys' (ValueDeclaration _ ident _ [] [MkUnguarded val]) = do
+  memberToValue tys' (ValueDeclaration (ValueDeclarationData _ ident _ [] [MkUnguarded val])) = do
     _ <- maybe (throwError . errorMessage $ ExtraneousClassMember ident className) return $ lookup ident tys'
     return val
   memberToValue _ _ = internalError "Invalid declaration in type instance definition"
 
 declIdent :: Declaration -> Maybe Ident
-declIdent (ValueDeclaration _ ident _ _ _) = Just ident
+declIdent (ValueDeclaration vd) = Just (valdeclIdent vd)
 declIdent (TypeDeclaration td) = Just (tydeclIdent td)
 declIdent _ = Nothing
 

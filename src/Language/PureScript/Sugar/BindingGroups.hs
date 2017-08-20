@@ -17,7 +17,7 @@ import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Graph
 import Data.List (intersect)
-import Data.Maybe (isJust)
+import Data.Maybe (isJust, mapMaybe)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Set as S
 
@@ -66,13 +66,13 @@ createBindingGroups moduleName = mapM f <=< handleDecls
   --
   handleDecls :: [Declaration] -> m [Declaration]
   handleDecls ds = do
-    let values = filter isValueDecl ds
+    let values = mapMaybe (fmap (fmap extractGuardedExpr) . getValueDeclaration) ds
         dataDecls = filter isDataDecl ds
         allProperNames = fmap declTypeName dataDecls
         dataVerts = fmap (\d -> (d, declTypeName d, usedTypeNames moduleName d `intersect` allProperNames)) dataDecls
     dataBindingGroupDecls <- parU (stronglyConnComp dataVerts) toDataBindingGroup
-    let allIdents = fmap declIdent values
-        valueVerts = fmap (\d -> (d, declIdent d, usedIdents moduleName d `intersect` allIdents)) values
+    let allIdents = fmap valdeclIdent values
+        valueVerts = fmap (\d -> (d, valdeclIdent d, usedIdents moduleName d `intersect` allIdents)) values
     bindingGroupDecls <- parU (stronglyConnComp valueVerts) (toBindingGroup moduleName)
     return $ filter isImportDecl ds ++
              filter isExternKindDecl ds ++
@@ -83,6 +83,9 @@ createBindingGroups moduleName = mapM f <=< handleDecls
              filter isFixityDecl ds ++
              filter isExternDecl ds ++
              bindingGroupDecls
+    where
+      extractGuardedExpr [MkUnguarded expr] = expr
+      extractGuardedExpr _ = internalError "Expected Guards to have been desugared in handleDecls."
 
 -- |
 -- Collapse all binding groups to individual declarations
@@ -95,21 +98,17 @@ collapseBindingGroups =
   go (DataBindingGroupDeclaration ds) = NEL.toList ds
   go (BindingGroupDeclaration ds) =
     NEL.toList $ fmap (\((sa, ident), nameKind, val) ->
-      ValueDeclaration sa ident nameKind [] [MkUnguarded val]) ds
+      ValueDeclaration (ValueDeclarationData sa ident nameKind [] [MkUnguarded val])) ds
   go other = [other]
 
 collapseBindingGroupsForValue :: Expr -> Expr
 collapseBindingGroupsForValue (Let ds val) = Let (collapseBindingGroups ds) val
 collapseBindingGroupsForValue other = other
 
-usedIdents :: ModuleName -> Declaration -> [Ident]
-usedIdents moduleName = ordNub . usedIdents' S.empty . getValue
+usedIdents :: ModuleName -> ValueDeclarationData Expr -> [Ident]
+usedIdents moduleName = ordNub . usedIdents' S.empty . valdeclExpression
   where
   def _ _ = []
-
-  getValue (ValueDeclaration _ _ _ [] [MkUnguarded val]) = val
-  getValue ValueDeclaration{} = internalError "Binders should have been desugared"
-  getValue _ = internalError "Expected ValueDeclaration"
 
   (_, usedIdents', _, _, _) = everythingWithScope def usedNamesE def def def
 
@@ -149,10 +148,6 @@ usedTypeNames moduleName =
     | moduleName == moduleName' = [name]
   usedNames _ = []
 
-declIdent :: Declaration -> Ident
-declIdent (ValueDeclaration _ ident _ _ _) = ident
-declIdent _ = internalError "Expected ValueDeclaration"
-
 declTypeName :: Declaration -> ProperName 'TypeName
 declTypeName (DataDeclaration _ _ pn _ _) = pn
 declTypeName (TypeSynonymDeclaration _ pn _ _) = pn
@@ -166,9 +161,9 @@ toBindingGroup
   :: forall m
    . (MonadError MultipleErrors m)
    => ModuleName
-   -> SCC Declaration
+   -> SCC (ValueDeclarationData Expr)
    -> m Declaration
-toBindingGroup _ (AcyclicSCC d) = return d
+toBindingGroup _ (AcyclicSCC d) = return (mkDeclaration d)
 toBindingGroup moduleName (CyclicSCC ds') = do
   -- Once we have a mutually-recursive group of declarations, we need to sort
   -- them further by their immediate dependencies (those outside function
@@ -184,16 +179,15 @@ toBindingGroup moduleName (CyclicSCC ds') = do
   idents :: [Ident]
   idents = fmap (\(_, i, _) -> i) valueVerts
 
-  valueVerts :: [(Declaration, Ident, [Ident])]
-  valueVerts = fmap (\d -> (d, declIdent d, usedImmediateIdents moduleName d `intersect` idents)) ds'
+  valueVerts :: [(ValueDeclarationData Expr, Ident, [Ident])]
+  valueVerts = fmap (\d -> (d, valdeclIdent d, usedImmediateIdents moduleName (mkDeclaration d) `intersect` idents)) ds'
 
-  toBinding :: SCC Declaration -> m ((SourceAnn, Ident), NameKind, Expr)
+  toBinding :: SCC (ValueDeclarationData Expr) -> m ((SourceAnn, Ident), NameKind, Expr)
   toBinding (AcyclicSCC d) = return $ fromValueDecl d
   toBinding (CyclicSCC ds) = throwError $ foldMap cycleError ds
 
-  cycleError :: Declaration -> MultipleErrors
-  cycleError (ValueDeclaration (ss, _) n _ _ [MkUnguarded _]) = errorMessage' ss $ CycleInDeclaration n
-  cycleError _ = internalError "cycleError: Expected ValueDeclaration"
+  cycleError :: ValueDeclarationData Expr -> MultipleErrors
+  cycleError (ValueDeclarationData (ss, _) n _ _ _) = errorMessage' ss $ CycleInDeclaration n
 
 toDataBindingGroup
   :: MonadError MultipleErrors m
@@ -211,7 +205,9 @@ isTypeSynonym :: Declaration -> Maybe (ProperName 'TypeName)
 isTypeSynonym (TypeSynonymDeclaration _ pn _ _) = Just pn
 isTypeSynonym _ = Nothing
 
-fromValueDecl :: Declaration -> ((SourceAnn, Ident), NameKind, Expr)
-fromValueDecl (ValueDeclaration sa ident nameKind [] [MkUnguarded val]) = ((sa, ident), nameKind, val)
-fromValueDecl ValueDeclaration{} = internalError "Binders should have been desugared"
-fromValueDecl _ = internalError "Expected ValueDeclaration"
+mkDeclaration :: ValueDeclarationData Expr -> Declaration
+mkDeclaration = ValueDeclaration . fmap (pure . MkUnguarded)
+
+fromValueDecl :: ValueDeclarationData Expr -> ((SourceAnn, Ident), NameKind, Expr)
+fromValueDecl (ValueDeclarationData sa ident nameKind [] val) = ((sa, ident), nameKind, val)
+fromValueDecl ValueDeclarationData{} = internalError "Binders should have been desugared"
