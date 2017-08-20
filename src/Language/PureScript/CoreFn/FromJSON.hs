@@ -266,7 +266,7 @@ caseAlternativeFromJSON v = do
 
     traverseT :: Applicative m => (m a, m b) -> m (a, b)
     traverseT (ma, mb) = (,) <$> ma <*> mb
-      
+
 binderFromJSON :: Value -> Parser (Binder Ann)
 binderFromJSON v = do
   -- null binder is encoded as a String
