@@ -289,9 +289,9 @@ deriveGeneric ss mn syns ds tyConNm dargs = do
   toSpine <- mkSpineFunction tyCon
   fromSpine <- mkFromSpineFunction tyCon
   toSignature <- mkSignatureFunction tyCon dargs
-  return [ ValueDeclaration $ ValueDeclarationData (ss, []) (Ident C.toSpine) Public [] (unguarded toSpine)
-         , ValueDeclaration $ ValueDeclarationData (ss, []) (Ident C.fromSpine) Public [] (unguarded fromSpine)
-         , ValueDeclaration $ ValueDeclarationData (ss, []) (Ident C.toSignature) Public [] (unguarded toSignature)
+  return [ ValueDecl (ss, []) (Ident C.toSpine) Public [] (unguarded toSpine)
+         , ValueDecl (ss, []) (Ident C.fromSpine) Public [] (unguarded fromSpine)
+         , ValueDecl (ss, []) (Ident C.toSignature) Public [] (unguarded toSignature)
          ]
   where
     mkSpineFunction :: Declaration -> m Expr
@@ -467,19 +467,19 @@ deriveGenericRep mn syns ds tyConNm tyConArgs repTy = do
       let rep = toRepTy reps
           inst | null reps =
                    -- If there are no cases, spin
-                   [ ValueDeclaration $ ValueDeclarationData (ss, []) (Ident "to") Public [] $ unguarded $
+                   [ ValueDecl (ss, []) (Ident "to") Public [] $ unguarded $
                        lamCase x [ CaseAlternative [NullBinder]
                                                    (unguarded (App toName (Var (Qualified Nothing x))))
                                  ]
-                   , ValueDeclaration $ ValueDeclarationData (ss, []) (Ident "from") Public [] $ unguarded $
+                   , ValueDecl (ss, []) (Ident "from") Public [] $ unguarded $
                        lamCase x [ CaseAlternative [NullBinder]
                                                    (unguarded (App fromName (Var (Qualified Nothing x))))
                                  ]
                    ]
                | otherwise =
-                   [ ValueDeclaration $ ValueDeclarationData (ss, []) (Ident "to") Public [] $ unguarded $
+                   [ ValueDecl (ss, []) (Ident "to") Public [] $ unguarded $
                        lamCase x (zipWith ($) (map underBinder (sumBinders (length dctors))) to)
-                   , ValueDeclaration $ ValueDeclarationData (ss, []) (Ident "from") Public [] $ unguarded $
+                   , ValueDecl (ss, []) (Ident "from") Public [] $ unguarded $
                        lamCase x (zipWith ($) (map underExpr (sumExprs (length dctors))) from)
                    ]
 
@@ -649,7 +649,7 @@ deriveEq
 deriveEq ss mn syns ds tyConNm = do
   tyCon <- findTypeDecl tyConNm ds
   eqFun <- mkEqFunction tyCon
-  return [ ValueDeclaration $ ValueDeclarationData (ss, []) (Ident C.eq) Public [] (unguarded eqFun) ]
+  return [ ValueDecl (ss, []) (Ident C.eq) Public [] (unguarded eqFun) ]
   where
     mkEqFunction :: Declaration -> m Expr
     mkEqFunction (DataDeclaration _ _ _ _ args) = do
@@ -705,7 +705,7 @@ deriveOrd
 deriveOrd ss mn syns ds tyConNm = do
   tyCon <- findTypeDecl tyConNm ds
   compareFun <- mkCompareFunction tyCon
-  return [ ValueDeclaration $ ValueDeclarationData (ss, []) (Ident C.compare) Public [] (unguarded compareFun) ]
+  return [ ValueDecl (ss, []) (Ident C.compare) Public [] (unguarded compareFun) ]
   where
     mkCompareFunction :: Declaration -> m Expr
     mkCompareFunction (DataDeclaration _ _ _ _ args) = do
@@ -806,9 +806,9 @@ deriveNewtype mn syns ds tyConNm tyConArgs unwrappedTy = do
       let (ctorName, [ty]) = head dctors
       ty' <- replaceAllTypeSynonymsM syns ty
       let inst =
-            [ ValueDeclaration $ ValueDeclarationData (ss, []) (Ident "wrap") Public [] $ unguarded $
+            [ ValueDecl (ss, []) (Ident "wrap") Public [] $ unguarded $
                 Constructor (Qualified (Just mn) ctorName)
-            , ValueDeclaration $ ValueDeclarationData (ss, []) (Ident "unwrap") Public [] $ unguarded $
+            , ValueDecl (ss, []) (Ident "unwrap") Public [] $ unguarded $
                 lamCase wrappedIdent
                   [ CaseAlternative
                       [ConstructorBinder (Qualified (Just mn) ctorName) [VarBinder unwrappedIdent]]
@@ -886,7 +886,7 @@ deriveFunctor
 deriveFunctor ss mn syns ds tyConNm = do
   tyCon <- findTypeDecl tyConNm ds
   mapFun <- mkMapFunction tyCon
-  return [ ValueDeclaration $ ValueDeclarationData (ss, []) (Ident C.map) Public [] (unguarded mapFun) ]
+  return [ ValueDecl (ss, []) (Ident C.map) Public [] (unguarded mapFun) ]
   where
     mkMapFunction :: Declaration -> m Expr
     mkMapFunction (DataDeclaration (ss', _) _ _ tys ctors) = case reverse tys of

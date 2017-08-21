@@ -295,7 +295,7 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
     where
       partial :: Text -> Text -> Declaration
       partial var tyVar =
-        ValueDeclaration $ ValueDeclarationData (ss, []) (Ident C.__unused) Private [] $
+        ValueDecl (ss, []) (Ident C.__unused) Private [] $
         [MkUnguarded
           (TypedValue
            True
@@ -331,8 +331,8 @@ checkExhaustiveExpr initSS env mn = onExpr initSS
   where
   onDecl :: Declaration -> m Declaration
   onDecl (BindingGroupDeclaration bs) = BindingGroupDeclaration <$> mapM (\(sai@((ss, _), _), nk, expr) -> (sai, nk,) <$> onExpr ss expr) bs
-  onDecl (ValueDeclaration (ValueDeclarationData sa@(ss, _) name x y [MkUnguarded e])) =
-     ValueDeclaration <$> ValueDeclarationData sa name x y . mkUnguardedExpr <$> censor (addHint (ErrorInValueDeclaration name)) (onExpr ss e)
+  onDecl (ValueDecl sa@(ss, _) name x y [MkUnguarded e]) =
+     ValueDecl sa name x y . mkUnguardedExpr <$> censor (addHint (ErrorInValueDeclaration name)) (onExpr ss e)
   onDecl decl = return decl
 
   onExpr :: SourceSpan -> Expr -> m Expr

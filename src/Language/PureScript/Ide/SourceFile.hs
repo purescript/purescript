@@ -76,7 +76,7 @@ extractSpans
   -> [(IdeNamespaced, P.SourceSpan)]
   -- ^ Declarations and their source locations
 extractSpans d = case d of
-  P.ValueDeclaration (P.ValueDeclarationData (ss, _) i _ _ _) ->
+  P.ValueDecl (ss, _) i _ _ _ ->
     [(IdeNamespaced IdeNSValue (P.runIdent i), ss)]
   P.TypeSynonymDeclaration (ss, _) name _ _ ->
     [(IdeNamespaced IdeNSType (P.runProperName name), ss)]

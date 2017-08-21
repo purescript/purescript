@@ -63,7 +63,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
       in NonRec (ssA ss) (properToIdent ctor) $ Constructor (ss, com, Nothing, Nothing) tyName ctor fields
   declToCoreFn (A.DataBindingGroupDeclaration ds) =
     concatMap declToCoreFn ds
-  declToCoreFn (A.ValueDeclaration (A.ValueDeclarationData (ss, com) name _ _ [A.MkUnguarded e])) =
+  declToCoreFn (A.ValueDecl (ss, com) name _ _ [A.MkUnguarded e]) =
     [NonRec (ssA ss) name (exprToCoreFn ss com Nothing e)]
   declToCoreFn (A.BindingGroupDeclaration ds) =
     [Rec . NEL.toList $ fmap (\(((ss, com), name), _, e) -> ((ssA ss, name), exprToCoreFn ss com Nothing e)) ds]

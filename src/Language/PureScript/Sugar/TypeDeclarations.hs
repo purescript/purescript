@@ -31,19 +31,19 @@ desugarTypeDeclarationsModule (Module modSS coms name ds exps) =
   desugarTypeDeclarations :: [Declaration] -> m [Declaration]
   desugarTypeDeclarations (TypeDeclaration (TypeDeclarationData sa name' ty) : d : rest) = do
     (_, nameKind, val) <- fromValueDeclaration d
-    desugarTypeDeclarations (ValueDeclaration (ValueDeclarationData sa name' nameKind [] [MkUnguarded (TypedValue True val ty)]) : rest)
+    desugarTypeDeclarations (ValueDecl sa name' nameKind [] [MkUnguarded (TypedValue True val ty)] : rest)
     where
     fromValueDeclaration :: Declaration -> m (Ident, NameKind, Expr)
-    fromValueDeclaration (ValueDeclaration (ValueDeclarationData _ name'' nameKind [] [MkUnguarded val]))
+    fromValueDeclaration (ValueDecl _ name'' nameKind [] [MkUnguarded val])
       | name' == name'' = return (name'', nameKind, val)
     fromValueDeclaration d' =
       throwError . errorMessage' (declSourceSpan d') $ OrphanTypeDeclaration name'
   desugarTypeDeclarations [TypeDeclaration (TypeDeclarationData (ss, _) name' _)] =
     throwError . errorMessage' ss $ OrphanTypeDeclaration name'
-  desugarTypeDeclarations (ValueDeclaration (ValueDeclarationData sa name' nameKind bs val) : rest) = do
+  desugarTypeDeclarations (ValueDecl sa name' nameKind bs val : rest) = do
     let (_, f, _) = everywhereOnValuesTopDownM return go return
         f' = mapM (\(GuardedExpr g e) -> GuardedExpr g <$> f e)
-    (:) <$> (ValueDeclaration <$> (ValueDeclarationData sa name' nameKind bs <$> f' val))
+    (:) <$> (ValueDecl sa name' nameKind bs <$> f' val)
         <*> desugarTypeDeclarations rest
     where
     go (Let ds' val') = Let <$> desugarTypeDeclarations ds' <*> pure val'
