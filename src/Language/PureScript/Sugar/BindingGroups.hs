@@ -98,7 +98,7 @@ collapseBindingGroups =
   go (DataBindingGroupDeclaration ds) = NEL.toList ds
   go (BindingGroupDeclaration ds) =
     NEL.toList $ fmap (\((sa, ident), nameKind, val) ->
-      ValueDeclaration (ValueDeclarationData sa ident nameKind [] [MkUnguarded val])) ds
+      ValueDecl sa ident nameKind [] [MkUnguarded val]) ds
   go other = [other]
 
 collapseBindingGroupsForValue :: Expr -> Expr

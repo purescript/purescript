@@ -450,6 +450,10 @@ getValueDeclaration :: Declaration -> Maybe (ValueDeclarationData [GuardedExpr])
 getValueDeclaration (ValueDeclaration d) = Just d
 getValueDeclaration _ = Nothing
 
+pattern ValueDecl :: SourceAnn -> Ident -> NameKind -> [Binder] -> [GuardedExpr] -> Declaration
+pattern ValueDecl sann ident name binders expr 
+  = ValueDeclaration (ValueDeclarationData sann ident name binders expr)
+
 -- |
 -- The data type of declarations
 --

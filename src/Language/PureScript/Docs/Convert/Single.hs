@@ -108,9 +108,9 @@ basicDeclaration :: P.SourceAnn -> Text -> DeclarationInfo -> Maybe Intermediate
 basicDeclaration sa title = Just . Right . mkDeclaration sa title
 
 convertDeclaration :: P.Declaration -> Text -> Maybe IntermediateDeclaration
-convertDeclaration (P.ValueDeclaration (P.ValueDeclarationData sa _ _ _ [P.MkUnguarded (P.TypedValue _ _ ty)])) title =
+convertDeclaration (P.ValueDecl sa _ _ _ [P.MkUnguarded (P.TypedValue _ _ ty)]) title =
   basicDeclaration sa title (ValueDeclaration ty)
-convertDeclaration (P.ValueDeclaration (P.ValueDeclarationData sa _ _ _ _)) title =
+convertDeclaration (P.ValueDecl sa _ _ _ _) title =
   -- If no explicit type declaration was provided, insert a wildcard, so that
   -- the actual type will be added during type checking.
   basicDeclaration sa title (ValueDeclaration P.TypeWildcard{})

@@ -205,7 +205,7 @@ identNames :: P.Module -> [(N.Ident, P.Declaration)]
 identNames = nubOnFst . concatMap getDeclNames . P.exportedDeclarations
   where
   getDeclNames :: P.Declaration -> [(P.Ident, P.Declaration)]
-  getDeclNames d@(P.ValueDeclaration (P.ValueDeclarationData _ ident _ _ _))  = [(ident, d)]
+  getDeclNames d@(P.ValueDecl _ ident _ _ _)  = [(ident, d)]
   getDeclNames d@(P.TypeDeclaration td) = [(P.tydeclIdent td, d)]
   getDeclNames d@(P.ExternDeclaration _ ident _) = [(ident, d)]
   getDeclNames d@(P.TypeClassDeclaration _ _ _ _ _ ds) = map (second (const d)) $ concatMap getDeclNames ds
