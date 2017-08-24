@@ -49,7 +49,7 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
 
     f' :: S.Set Text -> Declaration -> MultipleErrors
     f' s dec@(ValueDeclaration vd) = addHint (ErrorInValueDeclaration (valdeclIdent vd)) (warningsInDecl moduleNames dec <> checkTypeVarsInDecl s dec)
-    f' s (TypeDeclaration td) = addHint (ErrorInTypeDeclaration (tydeclIdent td)) (checkTypeVars s (tydeclType td))
+    f' s dec@(TypeDeclaration td) = addHint (ErrorInTypeDeclaration (tydeclIdent td)) (checkTypeVars (declSourceSpan dec) s (tydeclType td))
     f' s dec = warningsInDecl moduleNames dec <> checkTypeVarsInDecl s dec
 
     stepE :: S.Set Ident -> Expr -> MultipleErrors
@@ -75,10 +75,10 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
     stepDo _ _ = mempty
 
   checkTypeVarsInDecl :: S.Set Text -> Declaration -> MultipleErrors
-  checkTypeVarsInDecl s d = let (f, _, _, _, _) = accumTypes (checkTypeVars s) in f d
+  checkTypeVarsInDecl s d = let (f, _, _, _, _) = accumTypes (checkTypeVars (declSourceSpan d) s) in f d
 
-  checkTypeVars :: S.Set Text -> Type -> MultipleErrors
-  checkTypeVars set ty = everythingWithContextOnTypes set mempty mappend step ty <> findUnused ty
+  checkTypeVars :: SourceSpan -> S.Set Text -> Type -> MultipleErrors
+  checkTypeVars ss set ty = everythingWithContextOnTypes set mempty mappend step ty <> findUnused ty
     where
     step :: S.Set Text -> Type -> (S.Set Text, MultipleErrors)
     step s (ForAll tv _ _) = bindVar s tv
@@ -90,13 +90,13 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
       let used = usedTypeVariables ty'
           declared = everythingOnTypes (++) go ty'
           unused = ordNub declared \\ ordNub used
-      in foldl (<>) mempty $ fmap (errorMessage' . UnusedTypeVar) unused
+      in foldl (<>) mempty $ fmap (errorMessage' ss . UnusedTypeVar) unused
       where
       go :: Type -> [Text]
       go (ForAll tv _ _) = [tv]
       go _ = []
 
-  bind :: Ord a => (a -> SimpleErrorMessage) -> S.Set a -> a -> (S.Set a, MultipleErrors)
-  bind mkError s name
-    | name `S.member` s = (s, errorMessage' (mkError name))
-    | otherwise = (S.insert name s, mempty)
+    bind :: Ord a => (a -> SimpleErrorMessage) -> S.Set a -> a -> (S.Set a, MultipleErrors)
+    bind mkError s name
+      | name `S.member` s = (s, errorMessage' ss (mkError name))
+      | otherwise = (S.insert name s, mempty)

@@ -300,8 +300,9 @@ checkExhaustive env mn numArgs cas expr =
         ValueDecl sa (Ident C.__unused) Private [] $
           [MkUnguarded ss
             (TypedValue
+            sa
             True
-            (Abs (VarBinder ss (Ident var)) (Var sa (Qualified Nothing (Ident var))))
+            (Abs sa (VarBinder ss (Ident var)) (Var sa (Qualified Nothing (Ident var))))
             (ty tyVar))
           ]
 
@@ -333,8 +334,8 @@ checkExhaustiveExpr env mn = onExpr
   onDecl :: Declaration -> m Declaration
   onDecl (BindingGroupDeclaration bs) =
     BindingGroupDeclaration <$> mapM (\(sai, nk, expr) -> (sai, nk,) <$> onExpr expr) bs
-  onDecl (ValueDecl sa@(ss, _) name x y [MkUnguarded e]) =
-     ValueDecl sa name x y . mkUnguardedExpr <$> censor (addHint (ErrorInValueDeclaration name)) (onExpr e)
+  onDecl (ValueDecl sa name x y [MkUnguarded ss e]) =
+     ValueDecl sa name x y . mkUnguardedExpr ss <$> censor (addHint (ErrorInValueDeclaration name)) (onExpr e)
   onDecl decl = return decl
 
   onExpr :: Expr -> m Expr

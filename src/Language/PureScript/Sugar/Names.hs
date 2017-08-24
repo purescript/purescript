@@ -181,8 +181,8 @@ renameInModule imports (Module modSS coms mn decls exps) =
 
   (go, _, _, _, _) =
     everywhereWithContextOnValuesM
-      (modSS, [])
-      (\(_, bound) d -> (\(bound', d') -> ((declSourceSpan d', bound'), d')) <$> updateDecl bound d)
+      []
+      updateDecl
       updateValue
       updateBinder
       updateCase
@@ -247,59 +247,55 @@ renameInModule imports (Module modSS coms mn decls exps) =
     return (b, d)
 
   updateValue
-    :: (SourceSpan, [Ident])
+    :: [Ident]
     -> Expr
-    -> m ((SourceSpan, [Ident]), Expr)
-  updateValue (_, bound) v@(PositionedValue pos' _ _) =
-    return ((pos', bound), v)
-  updateValue (pos, bound) (Abs (VarBinder arg) val') =
-    return ((pos, arg : bound), Abs (VarBinder arg) val')
-  updateValue (pos, bound) (Let ds val') = do
+    -> m ([Ident], Expr)
+  updateValue bound (Abs pos (VarBinder sa arg) val') =
+    return (arg : bound, Abs pos (VarBinder sa arg) val')
+  updateValue bound (Let sa ds val') = do
     let args = mapMaybe letBoundVariable ds
     unless (length (ordNub args) == length args) .
-      throwError . errorMessage' pos $ OverlappingNamesInLet
-    return ((pos, args ++ bound), Let ds val')
-  updateValue (pos, bound) (Var name'@(Qualified Nothing ident)) | ident `notElem` bound =
-    (,) (pos, bound) <$> (Var <$> updateValueName name' pos)
-  updateValue (pos, bound) (Var name'@(Qualified (Just _) _)) =
-    (,) (pos, bound) <$> (Var <$> updateValueName name' pos)
-  updateValue (pos, bound) (Op op) =
-    (,) (pos, bound) <$> (Op <$> updateValueOpName op pos)
-  updateValue s@(pos, _) (Constructor name) =
-    (,) s <$> (Constructor <$> updateDataConstructorName name pos)
-  updateValue s@(pos, _) (TypedValue check val ty) =
-    (,) s <$> (TypedValue check val <$> updateTypesEverywhere pos ty)
+      throwError . errorMessage' (fst sa) $ OverlappingNamesInLet
+    return (args ++ bound, Let sa ds val')
+  updateValue bound (Var sa name'@(Qualified Nothing ident)) | ident `notElem` bound =
+    (,) bound <$> (Var sa <$> updateValueName name' (fst sa))
+  updateValue bound (Var sa name'@(Qualified (Just _) _)) =
+    (,) bound <$> (Var sa <$> updateValueName name' (fst sa))
+  updateValue bound (Op sa op) =
+    (,) bound <$> (Op sa <$> updateValueOpName op (fst sa))
+  updateValue bound (Constructor sa name) =
+    (,) bound <$> (Constructor sa <$> updateDataConstructorName name (fst sa))
+  updateValue bound (TypedValue sa check val ty) =
+    (,) bound <$> (TypedValue sa check val <$> updateTypesEverywhere (fst sa) ty)
   updateValue s v = return (s, v)
 
   updateBinder
-    :: (SourceSpan, [Ident])
+    :: [Ident]
     -> Binder
-    -> m ((SourceSpan, [Ident]), Binder)
-  updateBinder (_, bound) v@(PositionedBinder pos _ _) =
-    return ((pos, bound), v)
-  updateBinder s@(pos, _) (ConstructorBinder name b) =
-    (,) s <$> (ConstructorBinder <$> updateDataConstructorName name pos <*> pure b)
-  updateBinder s@(pos, _) (OpBinder op) =
-    (,) s <$> (OpBinder <$> updateValueOpName op pos)
-  updateBinder s@(pos, _) (TypedBinder t b) = do
-    t' <- updateTypesEverywhere pos t
-    return (s, TypedBinder t' b)
+    -> m ([Ident], Binder)
+  updateBinder bound (ConstructorBinder s name b) =
+    (,) bound <$> (ConstructorBinder s <$> updateDataConstructorName name s <*> pure b)
+  updateBinder bound (OpBinder s op) =
+    (,) bound <$> (OpBinder s <$> updateValueOpName op s)
+  updateBinder bound (TypedBinder s t b) = do
+    t' <- updateTypesEverywhere s t
+    return (bound, TypedBinder s t' b)
   updateBinder s v =
     return (s, v)
 
   updateCase
-    :: (SourceSpan, [Ident])
+    :: [Ident]
     -> CaseAlternative
-    -> m ((SourceSpan, [Ident]), CaseAlternative)
-  updateCase (pos, bound) c@(CaseAlternative bs gs) =
-    return ((pos, concatMap binderNames bs ++ updateGuard gs ++ bound), c)
+    -> m ([Ident], CaseAlternative)
+  updateCase bound c@(CaseAlternative _ bs gs) =
+    return (concatMap binderNames bs ++ updateGuard gs ++ bound, c)
     where
     updateGuard :: [GuardedExpr] -> [Ident]
     updateGuard [] = []
-    updateGuard (GuardedExpr g _ : xs) =
+    updateGuard (GuardedExpr _ g _ : xs) =
       concatMap updatePatGuard g ++ updateGuard xs
       where
-        updatePatGuard (PatternGuard b _) = binderNames b
+        updatePatGuard (PatternGuard _ b _) = binderNames b
         updatePatGuard _                  = []
 
   letBoundVariable :: Declaration -> Maybe Ident
