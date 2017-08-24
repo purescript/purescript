@@ -140,7 +140,7 @@ addTypeClass moduleName pn args implies dependencies ds = do
     argToIndex :: Text -> Maybe Int
     argToIndex = flip M.lookup $ M.fromList (zipWith ((,) . fst) args [0..])
 
-    toPair (TypeDeclaration _ ident ty) = (ident, ty)
+    toPair (TypeDeclaration (TypeDeclarationData _ ident ty)) = (ident, ty)
     toPair _ = internalError "Invalid declaration in TypeClassDeclaration"
 
     -- Currently we are only checking usability based on the type class currently
@@ -267,14 +267,14 @@ typeCheckAll moduleName _ = traverse go
     return $ TypeSynonymDeclaration sa name args ty
   go TypeDeclaration{} =
     internalError "Type declarations should have been removed before typeCheckAlld"
-  go (ValueDeclaration sa@(ss, _) name nameKind [] [MkUnguarded val]) = do
+  go (ValueDecl sa@(ss, _) name nameKind [] [MkUnguarded val]) = do
     env <- getEnv
     warnAndRethrow (addHint (ErrorInValueDeclaration name) . addHint (PositionedError ss)) $ do
       val' <- checkExhaustiveExpr ss env moduleName val
       valueIsNotDefined moduleName name
       [(_, (val'', ty))] <- typesOf NonRecursiveBindingGroup moduleName [((sa, name), val')]
       addValue moduleName name ty nameKind
-      return $ ValueDeclaration sa name nameKind [] [MkUnguarded val'']
+      return $ ValueDecl sa name nameKind [] [MkUnguarded val'']
   go ValueDeclaration{} = internalError "Binders were not desugared"
   go BoundValueDeclaration{} = internalError "BoundValueDeclaration should be desugared"
   go (BindingGroupDeclaration vals) = do
@@ -343,7 +343,7 @@ typeCheckAll moduleName _ = traverse go
     return instDecls
     where
     memberName :: Declaration -> Ident
-    memberName (ValueDeclaration _ ident _ _ _) = ident
+    memberName (ValueDeclaration vd) = valdeclIdent vd
     memberName _ = internalError "checkInstanceMembers: Invalid declaration in type instance definition"
 
     firstDuplicate :: (Eq a) => [a] -> Maybe a
@@ -493,6 +493,6 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     findClassMembers (TypeClassDeclaration _ name' _ _ _ ds) | name == name' = Just $ map extractMemberName ds
     findClassMembers _ = Nothing
     extractMemberName :: Declaration -> Ident
-    extractMemberName (TypeDeclaration _ memberName _) = memberName
+    extractMemberName (TypeDeclaration td) = tydeclIdent td
     extractMemberName _ = internalError "Unexpected declaration in typeclass member list"
   checkClassMembersAreExported _ = return ()

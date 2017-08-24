@@ -4,6 +4,7 @@ module Language.PureScript.Ide.RebuildSpec where
 
 import           Protolude
 
+import           Language.PureScript.AST.SourcePos (spanName)
 import           Language.PureScript.Ide.Command
 import           Language.PureScript.Ide.Completion
 import           Language.PureScript.Ide.Matcher
@@ -16,10 +17,10 @@ load :: [Text] -> Command
 load = LoadSync . map Test.mn
 
 rebuild :: FilePath -> Command
-rebuild fp = Rebuild ("src" </> fp)
+rebuild fp = Rebuild ("src" </> fp) Nothing
 
 rebuildSync :: FilePath -> Command
-rebuildSync fp = RebuildSync ("src" </> fp)
+rebuildSync fp = RebuildSync ("src" </> fp) Nothing
 
 spec :: Spec
 spec = describe "Rebuilding single modules" $ do
@@ -60,3 +61,12 @@ spec = describe "Rebuilding single modules" $ do
         Test.runIde [ rebuildSync "RebuildSpecWithHiddenIdent.purs"
                     , Complete [] (flexMatcher "hid") (Just (Test.mn "RebuildSpecWithHiddenIdent")) defaultCompletionOptions]
       complIdentifier result `shouldBe` "hidden"
+    it "uses the specified `actualFile` for location information (in editor mode)" $ do
+      let editorConfig = Test.defConfig { confEditorMode = True }
+      ([_, (Right (CompletionResult [ result ]))], _) <- Test.inProject $
+        Test.runIde'
+          editorConfig
+          emptyIdeState
+          [ RebuildSync ("src" </> "RebuildSpecWithHiddenIdent.purs") (Just "actualFile")
+          , Complete [] (flexMatcher "hid") (Just (Test.mn "RebuildSpecWithHiddenIdent")) defaultCompletionOptions]
+      map spanName (complLocation result) `shouldBe` Just "actualFile"

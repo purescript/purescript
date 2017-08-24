@@ -10,10 +10,11 @@ import Prelude.Compat
 
 import qualified TestCompiler
 import qualified TestDocs
+import qualified TestHierarchy
+import qualified TestPrimDocs
 import qualified TestPsci
 import qualified TestPscIde
 import qualified TestPscPublish
-import qualified TestPrimDocs
 import qualified TestUtils
 
 import System.IO (hSetEncoding, stdout, stderr, utf8)
@@ -29,6 +30,9 @@ main = do
   TestCompiler.main
   heading "Documentation test suite"
   TestDocs.main
+  heading "Hierarchy test suite"
+  TestHierarchy.main
+  heading "Prim documentation test suite"
   TestPrimDocs.main
   heading "psc-publish test suite"
   TestPscPublish.main

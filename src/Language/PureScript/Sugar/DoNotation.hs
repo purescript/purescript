@@ -67,8 +67,8 @@ desugarDo d =
   go [DoNotationLet (sa, _) _] = throwError . errorMessage' sa $ InvalidDoLet
   go (DoNotationLet ss ds : rest) = do
     let checkBind :: Declaration -> m ()
-        checkBind (ValueDeclaration (sa, _) i@(Ident name) _ _ _)
-          | name `elem` [ C.bind, C.discard ] = throwError . errorMessage' sa $ CannotUseBindWithDo i
+        checkBind (ValueDecl (ss, _) i@(Ident name) _ _ _)
+          | name `elem` [ C.bind, C.discard ] = throwError . errorMessage' ss $ CannotUseBindWithDo i
         checkBind _ = pure ()
     mapM_ checkBind ds
     rest' <- go rest

@@ -86,10 +86,10 @@ unifyKinds k1 k2 = do
   go (KUnknown u) k = solveKind u k
   go k (KUnknown u) = solveKind u k
   go (NamedKind k1') (NamedKind k2') | k1' == k2' = return ()
-  go (Row k1') (Row k2') = go k1' k2'
+  go (Row k1') (Row k2') = unifyKinds k1' k2'
   go (FunKind k1' k2') (FunKind k3 k4) = do
-    go k1' k3
-    go k2' k4
+    unifyKinds k1' k3
+    unifyKinds k2' k4
   go k1' k2' = throwError . errorMessage $ KindsDoNotUnify k1' k2'
 
 -- | Infer the kind of a single type

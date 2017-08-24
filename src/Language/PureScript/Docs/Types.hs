@@ -488,7 +488,7 @@ asPackage :: Version -> (forall e. Parse e a) -> Parse PackageError (Package a)
 asPackage minimumVersion uploader = do
   -- If the compilerVersion key is missing, we can be sure that it was produced
   -- with 0.7.0.0, since that is the only released version that included the
-  -- psc-publish tool before this key was added.
+  -- `psc-publish` tool (now `purs publish`) before this key was added.
   compilerVersion <- keyOrDefault "compilerVersion" (Version [0,7,0,0] []) asVersion
   when (compilerVersion < minimumVersion)
     (throwCustomError $ CompilerTooOld minimumVersion compilerVersion)

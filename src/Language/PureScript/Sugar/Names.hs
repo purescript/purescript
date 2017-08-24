@@ -9,7 +9,7 @@ module Language.PureScript.Sugar.Names
   ) where
 
 import Prelude.Compat
-import Protolude (ordNub)
+import Protolude (ordNub, sortBy, on)
 
 import Control.Arrow (first)
 import Control.Monad
@@ -118,13 +118,17 @@ desugarImportsWithEnv externs modules = do
       return m''
 
 -- |
--- Make all exports for a module explicit. This may still effect modules that
+-- Make all exports for a module explicit. This may still affect modules that
 -- have an exports list, as it will also make all data constructor exports
 -- explicit.
 --
+-- The exports will appear in the same order as they do in the existing exports
+-- list, or if there is no export list, declarations are order based on their
+-- order of appearance in the module.
+--
 elaborateExports :: Exports -> Module -> Module
 elaborateExports exps (Module ss coms mn decls refs) =
-  Module ss coms mn decls $ Just
+  Module ss coms mn decls $ Just $ reorderExports decls refs
     $ elaboratedTypeRefs
     ++ go (TypeOpRef ss) exportedTypeOps
     ++ go (TypeClassRef ss) exportedTypeClasses
@@ -144,6 +148,22 @@ elaborateExports exps (Module ss coms mn decls refs) =
   go toRef select =
     flip map (M.toList (select exps)) $ \(export, mn') ->
       if mn == mn' then toRef export else ReExportRef ss mn' (toRef export)
+
+-- |
+-- Given a list of declarations, an original exports list, and an elaborated
+-- exports list, reorder the elaborated list so that it matches the original
+-- order. If there is no original exports list, reorder declarations based on
+-- their order in the source file.
+reorderExports :: [Declaration] -> Maybe [DeclarationRef] -> [DeclarationRef] -> [DeclarationRef]
+reorderExports decls originalRefs =
+  sortBy (compare `on` originalIndex)
+  where
+  names =
+    maybe (mapMaybe declName decls) (map declRefName) originalRefs
+  namesMap =
+    M.fromList $ zip names [(0::Int)..]
+  originalIndex ref =
+    M.lookup (declRefName ref) namesMap
 
 -- |
 -- Replaces all local names with qualified names within a module and checks that all existing
@@ -196,9 +216,9 @@ renameInModule imports (Module modSS coms mn decls exps) =
         <*> updateClassName cn ss
         <*> traverse (updateTypesEverywhere ss) ts
         <*> pure ds
-  updateDecl bound (TypeDeclaration sa@(ss, _) name ty) =
+  updateDecl bound (TypeDeclaration (TypeDeclarationData sa@(ss, _) name ty)) =
     fmap (bound,) $
-      TypeDeclaration sa name
+      TypeDeclaration . TypeDeclarationData sa name
         <$> updateTypesEverywhere ss ty
   updateDecl bound (ExternDeclaration sa@(ss, _) name ty) =
     fmap (name : bound,) $
@@ -283,8 +303,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
         updatePatGuard _                  = []
 
   letBoundVariable :: Declaration -> Maybe Ident
-  letBoundVariable (ValueDeclaration _ ident _ _ _) = Just ident
-  letBoundVariable _ = Nothing
+  letBoundVariable = fmap valdeclIdent . getValueDeclaration
 
   updateKindsEverywhere :: SourceSpan -> Kind -> m Kind
   updateKindsEverywhere pos = everywhereOnKindsM updateKind

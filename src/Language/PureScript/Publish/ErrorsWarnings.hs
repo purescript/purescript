@@ -66,7 +66,7 @@ data UserError
   deriving (Show)
 
 data RepositoryFieldError
-  = RepositoryFieldMissing
+  = RepositoryFieldMissing (Maybe Text)
   | BadRepositoryType Text
   | NotOnGithub
   deriving (Show)
@@ -140,7 +140,7 @@ displayUserError e = case e of
   TagMustBeCheckedOut ->
       vcat
         [ para (concat
-            [ "psc-publish requires a tagged version to be checked out in "
+            [ "purs publish requires a tagged version to be checked out in "
             , "order to build documentation, and no suitable tag was found. "
             , "Please check out a previously tagged version, or tag a new "
             , "version."
@@ -152,7 +152,7 @@ displayUserError e = case e of
         , para (concat
            [ "If the version you are publishing is not yet tagged, you might "
            , "want to use the --dry-run flag instead, which removes this "
-           , "requirement. Run psc-publish --help for more details."
+           , "requirement. Run `purs publish --help` for more details."
            ])
         ]
   AmbiguousVersions vs ->
@@ -234,7 +234,7 @@ spdxExamples =
 
 displayRepositoryError :: RepositoryFieldError -> Box
 displayRepositoryError err = case err of
-  RepositoryFieldMissing ->
+  RepositoryFieldMissing giturl ->
     vcat
       [ para (concat
          [ "The 'repository' field is not present in your package manifest file. "
@@ -246,7 +246,7 @@ displayRepositoryError err = case err of
       , indented (vcat
           [ para "\"repository\": {"
           , indented (para "\"type\": \"git\",")
-          , indented (para "\"url\": \"git://github.com/purescript/purescript-prelude.git\"")
+          , indented (para ("\"url\": \"" ++ T.unpack (fromMaybe "https://github.com/USER/REPO.git" giturl) ++ "\""))
           , para "}"
           ]
         )
