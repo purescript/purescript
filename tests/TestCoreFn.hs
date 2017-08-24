@@ -11,8 +11,6 @@ import Prelude.Compat
 
 import Data.Aeson
 import Data.Aeson.Types
-import Data.Text (Text)
-import qualified Data.Text as T
 import Data.Version
 
 import Language.PureScript.AST.Literals
@@ -29,12 +27,6 @@ import Test.Hspec
 main :: IO ()
 main = hspec spec
 
-modToJSON :: Version -> Module Ann -> Value
-modToJSON v m = object [ moduleNameToText (moduleName m) .= moduleToJSON v m ]
-  where
-  moduleNameToText :: ModuleName -> Text
-  moduleNameToText (ModuleName ps) = T.intercalate "." (map runProperName ps)
-
 parseModule :: Value -> Result (Version, ModuleT () Ann)
 parseModule = parse moduleFromJSON
 
@@ -42,7 +34,7 @@ parseModule = parse moduleFromJSON
 parseMod :: Module Ann -> Result (ModuleT () Ann)
 parseMod m =
   let v = Version [0] []
-  in snd <$> parseModule (modToJSON v m)
+  in snd <$> parseModule (moduleToJSON v m)
 
 isSuccess :: Result a -> Bool
 isSuccess (Success _) = True
@@ -51,7 +43,8 @@ isSuccess _           = False
 spec :: Spec
 spec = context "CoreFnFromJsonTest" $ do
   let mn = ModuleName [ProperName "Example", ProperName "Main"]
-      ann = ssAnn (SourceSpan "" (SourcePos 0 0) (SourcePos 0 0))
+      ss = SourceSpan "" (SourcePos 0 0) (SourcePos 0 0)
+      ann = ssAnn ss
   specify "should parse an empty module" $ do
     let r = parseMod $ Module [] mn [] [] [] []
     r `shouldSatisfy` isSuccess
@@ -80,73 +73,150 @@ spec = context "CoreFnFromJsonTest" $ do
       Error _   -> return ()
       Success m -> moduleForeign m `shouldBe` [(Ident "exp", ())]
 
-  specify "should parse literals" $ do
-    let m = Module [] mn [] [] []
-              [ NonRec ann (Ident "x1") $ Literal ann (NumericLiteral (Left 1))
-              , NonRec ann (Ident "x2") $ Literal ann (NumericLiteral (Right 1.0))
-              , NonRec ann (Ident "x3") $ Literal ann (StringLiteral (mkString "abc"))
-              , NonRec ann (Ident "x4") $ Literal ann (CharLiteral 'c')
-              , NonRec ann (Ident "x5") $ Literal ann (BooleanLiteral True)
-              , NonRec ann (Ident "x6") $ Literal ann (ArrayLiteral [Literal ann (CharLiteral 'a')])
-              , NonRec ann (Ident "x7") $ Literal ann (ObjectLiteral [(mkString "a", Literal ann (CharLiteral 'a'))])
-              ]
-    parseMod m `shouldSatisfy` isSuccess
+  context "Expr" $ do
+    specify "should parse literals" $ do
+      let m = Module [] mn [] [] []
+                [ NonRec ann (Ident "x1") $ Literal ann (NumericLiteral (Left 1))
+                , NonRec ann (Ident "x2") $ Literal ann (NumericLiteral (Right 1.0))
+                , NonRec ann (Ident "x3") $ Literal ann (StringLiteral (mkString "abc"))
+                , NonRec ann (Ident "x4") $ Literal ann (CharLiteral 'c')
+                , NonRec ann (Ident "x5") $ Literal ann (BooleanLiteral True)
+                , NonRec ann (Ident "x6") $ Literal ann (ArrayLiteral [Literal ann (CharLiteral 'a')])
+                , NonRec ann (Ident "x7") $ Literal ann (ObjectLiteral [(mkString "a", Literal ann (CharLiteral 'a'))])
+                ]
+      parseMod m `shouldSatisfy` isSuccess
 
-  specify "should parse Constructor" $ do
-    let m = Module [] mn [] [] []
-              [ NonRec ann (Ident "constructor") $ Constructor ann (ProperName "Either") (ProperName "Left") [Ident "value0"] ]
-    parseMod m `shouldSatisfy` isSuccess
+    specify "should parse Constructor" $ do
+      let m = Module [] mn [] [] []
+                [ NonRec ann (Ident "constructor") $ Constructor ann (ProperName "Either") (ProperName "Left") [Ident "value0"] ]
+      parseMod m `shouldSatisfy` isSuccess
 
-  specify "should parse Accessor" $ do
-    let m = Module [] mn [] [] []
-              [ NonRec ann (Ident "x") $
-                  Accessor ann (mkString "field") (Literal ann $ ObjectLiteral [(mkString "field", Literal ann (NumericLiteral (Left 1)))]) ]
-    parseMod m `shouldSatisfy` isSuccess
+    specify "should parse Accessor" $ do
+      let m = Module [] mn [] [] []
+                [ NonRec ann (Ident "x") $
+                    Accessor ann (mkString "field") (Literal ann $ ObjectLiteral [(mkString "field", Literal ann (NumericLiteral (Left 1)))]) ]
+      parseMod m `shouldSatisfy` isSuccess
 
-  specify "should parse ObjectUpdate" $ do
-    let m = Module [] mn [] [] []
-              [ NonRec ann (Ident "objectUpdate") $
-                  ObjectUpdate ann
-                    (Literal ann $ ObjectLiteral [(mkString "field", Literal ann (StringLiteral (mkString "abc")))])
-                    [(mkString "field", Literal ann (StringLiteral (mkString "xyz")))]
-              ]
-    parseMod m `shouldSatisfy` isSuccess
+    specify "should parse ObjectUpdate" $ do
+      let m = Module [] mn [] [] []
+                [ NonRec ann (Ident "objectUpdate") $
+                    ObjectUpdate ann
+                      (Literal ann $ ObjectLiteral [(mkString "field", Literal ann (StringLiteral (mkString "abc")))])
+                      [(mkString "field", Literal ann (StringLiteral (mkString "xyz")))]
+                ]
+      parseMod m `shouldSatisfy` isSuccess
 
-  specify "should parse Abs" $ do
-    let m = Module [] mn [] [] []
-              [ NonRec ann (Ident "abs")
-                  $ Abs ann (Ident "x") (Var ann (Qualified Nothing (Ident "x")))
-              ]
-    parseMod m `shouldSatisfy` isSuccess
+    specify "should parse Abs" $ do
+      let m = Module [] mn [] [] []
+                [ NonRec ann (Ident "abs")
+                    $ Abs ann (Ident "x") (Var ann (Qualified (Just mn) (Ident "x")))
+                ]
+      parseMod m `shouldSatisfy` isSuccess
 
-  specify "should parse App" $ do
-    let m = Module [] mn [] [] []
-              [ NonRec ann (Ident "app")
-                  $ App ann
-                      (Abs ann (Ident "x") (Var ann (Qualified Nothing (Ident "x"))))
-                      (Literal ann (CharLiteral 'c'))
-              ]
-    parseMod m `shouldSatisfy` isSuccess
+    specify "should parse App" $ do
+      let m = Module [] mn [] [] []
+                [ NonRec ann (Ident "app")
+                    $ App ann
+                        (Abs ann (Ident "x") (Var ann (Qualified Nothing (Ident "x"))))
+                        (Literal ann (CharLiteral 'c'))
+                ]
+      parseMod m `shouldSatisfy` isSuccess
 
-  specify "should parse Case" $ do
-    let m = Module [] mn [] [] []
-              [ NonRec ann (Ident "case") $
-                  Case ann [Var ann (Qualified Nothing (Ident "x"))]
-                    [ CaseAlternative
-                      [ LiteralBinder ann (BooleanLiteral True)
-                      , ConstructorBinder ann (Qualified (Just (ModuleName [ProperName "Data", ProperName "Either"])) (ProperName "Either")) (Qualified Nothing (ProperName "Left")) [VarBinder ann (Ident "z")]
-                      , NamedBinder ann (Ident "w") (NullBinder ann)
+    specify "should parse Case" $ do
+      let m = Module [] mn [] [] []
+                [ NonRec ann (Ident "case") $
+                    Case ann [Var ann (Qualified Nothing (Ident "x"))]
+                      [ CaseAlternative
+                        [ NullBinder ann ]
+                        (Right (Literal ann (CharLiteral 'a')))
                       ]
-                      (Left [(Literal ann (BooleanLiteral True), Literal ann (CharLiteral 'a'))])
-                    ]
-              ]
-    parseMod m `shouldSatisfy` isSuccess
+                ]
+      parseMod m `shouldSatisfy` isSuccess
 
-  specify "should parse Let" $ do
-    let m = Module [] mn [] [] []
-              [ NonRec ann (Ident "case") $
-                  Let ann
-                    [ Rec [((ann, Ident "a"), Var ann (Qualified Nothing (Ident "x")))] ]
-                    (Literal ann (BooleanLiteral True))
-              ]
-    parseMod m `shouldSatisfy` isSuccess
+    specify "should parse Case with guards" $ do
+      let m = Module [] mn [] [] []
+                [ NonRec ann (Ident "case") $
+                    Case ann [Var ann (Qualified Nothing (Ident "x"))]
+                      [ CaseAlternative
+                        [ NullBinder ann ]
+                        (Left [(Literal ann (BooleanLiteral True), Literal ann (CharLiteral 'a'))])
+                      ]
+                ]
+      parseMod m `shouldSatisfy` isSuccess
+
+    specify "should parse Let" $ do
+      let m = Module [] mn [] [] []
+                [ NonRec ann (Ident "case") $
+                    Let ann
+                      [ Rec [((ann, Ident "a"), Var ann (Qualified Nothing (Ident "x")))] ]
+                      (Literal ann (BooleanLiteral True))
+                ]
+      parseMod m `shouldSatisfy` isSuccess
+
+  context "Meta" $ do
+    specify "should parse IsConstructor" $ do
+      let m = Module [] mn [] [] []
+                [ NonRec (ss, [], Nothing, Just (IsConstructor ProductType [Ident "x"])) (Ident "x") $
+                  Literal (ss, [], Nothing, Just (IsConstructor SumType [])) (CharLiteral 'a')
+                ]
+      parseMod m `shouldSatisfy` isSuccess
+
+    specify "should parse IsNewtype" $ do
+      let m = Module [] mn [] [] []
+                [ NonRec (ss, [], Nothing, Just IsNewtype) (Ident "x") $
+                  Literal ann (CharLiteral 'a')
+                ]
+      parseMod m `shouldSatisfy` isSuccess
+
+    specify "should parse IsTypeClassConstructor" $ do
+      let m = Module [] mn [] [] []
+                [ NonRec (ss, [], Nothing, Just IsTypeClassConstructor) (Ident "x") $
+                  Literal ann (CharLiteral 'a')
+                ]
+      parseMod m `shouldSatisfy` isSuccess
+
+    specify "should parse IsForeign" $ do
+      let m = Module [] mn [] [] []
+                [ NonRec (ss, [], Nothing, Just IsForeign) (Ident "x") $
+                  Literal ann (CharLiteral 'a')
+                ]
+      parseMod m `shouldSatisfy` isSuccess
+
+  context "Binders" $ do
+    specify "should parse LiteralBinder" $ do
+      let m = Module [] mn [] [] []
+                [ NonRec ann (Ident "case") $
+                    Case ann [Var ann (Qualified Nothing (Ident "x"))]
+                      [ CaseAlternative
+                        [ LiteralBinder ann (BooleanLiteral True) ]
+                        (Right (Literal ann (CharLiteral 'a')))
+                      ]
+                ]
+      parseMod m `shouldSatisfy` isSuccess
+
+    specify "should parse VarBinder" $ do
+      let m = Module [] mn [] [] []
+                [ NonRec ann (Ident "case") $
+                    Case ann [Var ann (Qualified Nothing (Ident "x"))]
+                      [ CaseAlternative
+                        [ ConstructorBinder
+                            ann
+                            (Qualified (Just (ModuleName [ProperName "Data", ProperName "Either"])) (ProperName "Either"))
+                            (Qualified Nothing (ProperName "Left"))
+                            [VarBinder ann (Ident "z")]
+                        ]
+                        (Right (Literal ann (CharLiteral 'a')))
+                      ]
+                ]
+      parseMod m `shouldSatisfy` isSuccess
+
+    specify "should parse NamedBinder" $ do
+      let m = Module [] mn [] [] []
+                [ NonRec ann (Ident "case") $
+                    Case ann [Var ann (Qualified Nothing (Ident "x"))]
+                      [ CaseAlternative
+                        [ NamedBinder ann (Ident "w") (NamedBinder ann (Ident "w'") (VarBinder ann (Ident "w''"))) ]
+                        (Right (Literal ann (CharLiteral 'a')))
+                      ]
+                ]
+      parseMod m `shouldSatisfy` isSuccess
