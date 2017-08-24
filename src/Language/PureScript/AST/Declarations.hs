@@ -102,7 +102,7 @@ data SimpleErrorMessage
   | NameIsUndefined Ident
   | UndefinedTypeVariable (ProperName 'TypeName)
   | PartiallyAppliedSynonym (Qualified (ProperName 'TypeName))
-  | EscapedSkolem Text (Maybe SourceSpan) Type
+  | EscapedSkolem Text SourceSpan Type
   | TypesDoNotUnify Type Type
   | KindsDoNotUnify Kind Kind
   | ConstrainedTypeUnified Type Type

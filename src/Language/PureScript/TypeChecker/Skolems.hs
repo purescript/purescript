@@ -67,8 +67,8 @@ skolemizeTypesInValue ident sko scope ss =
     onExpr sco other = return (sco, other)
 
     onBinder :: [Text] -> Binder -> Identity ([Text], Binder)
-    onBinder sco (TypedBinder ss ty b)
-      | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedBinder ss (skolemize ident sko scope ss ty) b)
+    onBinder sco (TypedBinder sa ty b)
+      | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedBinder sa (skolemize ident sko scope sa ty) b)
     onBinder sco other = return (sco, other)
 
     peelTypeVars :: Type -> [Text]
@@ -120,7 +120,7 @@ skolemEscapeCheck expr@TypedValue{} =
         collectScopes _ = []
 
         -- Collect any skolem variables appearing in a type
-        collectSkolems :: Type -> [(Text, SkolemScope, Maybe SourceSpan)]
+        collectSkolems :: Type -> [(Text, SkolemScope, SourceSpan)]
         collectSkolems = everythingOnTypes (++) collect where
           collect (Skolem name _ scope srcSpan) = [(name, scope, srcSpan)]
           collect _ = []

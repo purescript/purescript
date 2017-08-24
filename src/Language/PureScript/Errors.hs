@@ -556,11 +556,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line $ "Type synonym " <> markCode (showQualified runProperName name) <> " is partially applied."
             , line "Type synonyms must be applied to all of their type arguments."
             ]
-    renderSimpleErrorMessage (EscapedSkolem name Nothing ty) =
-      paras [ line $ "The type variable " <> markCode name <> " has escaped its scope, appearing in the type"
-            , markCodeBox $ indent $ typeAsBox ty
-            ]
-    renderSimpleErrorMessage (EscapedSkolem name (Just srcSpan) ty) =
+    renderSimpleErrorMessage (EscapedSkolem name srcSpan ty) =
       paras [ line $ "The type variable " <> markCode name <> ", bound at"
             , indent $ line $ displaySourceSpan relPath srcSpan
             , line "has escaped its scope, appearing in the type"
