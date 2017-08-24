@@ -101,6 +101,7 @@ moduleToJSON v m = object [ T.pack "moduleName" .= moduleNameToJSON (moduleName 
                           , T.pack "foreign"    .= map (identToJSON . fst) (moduleForeign m)
                           , T.pack "decls"      .= map bindToJSON (moduleDecls m)
                           , T.pack "builtWith"  .= toJSON (showVersion v)
+                          , T.pack "comments"   .= map toJSON (moduleComments m)
                           ]
 
   where

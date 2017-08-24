@@ -109,8 +109,7 @@ moduleFromJSON = withObject "Module" moduleFromObj
     moduleExports <- o .: "exports" >>= listParser identFromJSON
     moduleDecls <- o .: "decls" >>= listParser bindFromJSON
     moduleForeign <- o .: "foreign" >>= listParser (fmap (flip (,) ()) . identFromJSON)
-    -- moduleComments are not in the CoreFn json representation
-    let moduleComments = []
+    moduleComments <- o .: "comments" >>= listParser parseJSON
     return (version, Module {..})
 
   versionFromJSON :: String -> Parser Version

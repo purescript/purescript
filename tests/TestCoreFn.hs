@@ -15,6 +15,7 @@ import Data.Version
 
 import Language.PureScript.AST.Literals
 import Language.PureScript.AST.SourcePos
+import Language.PureScript.Comments
 import Language.PureScript.CoreFn
 import Language.PureScript.CoreFn.FromJSON
 import Language.PureScript.CoreFn.ToJSON
@@ -219,4 +220,13 @@ spec = context "CoreFnFromJsonTest" $ do
                         (Right (Literal ann (CharLiteral 'a')))
                       ]
                 ]
+      parseMod m `shouldSatisfy` isSuccess
+
+  context "Comments" $ do
+    specify "should parse LineComment" $ do
+      let m = Module [ LineComment "line" ] mn [] [] [] []
+      parseMod m `shouldSatisfy` isSuccess
+
+    specify "should parse BlockComment" $ do
+      let m = Module [ BlockComment "block" ] mn [] [] [] []
       parseMod m `shouldSatisfy` isSuccess
