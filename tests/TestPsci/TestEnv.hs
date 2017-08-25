@@ -56,7 +56,8 @@ jsEval = liftIO $ do
     Just (ExitFailure _, _, err) -> putStrLn err >> exitFailure
     Nothing                      -> putStrLn "Couldn't find node.js" >> exitFailure
 
--- | Run a PSCi command and evaluate the output with 'eval'.
+-- | Run a PSCi command and evaluate the output with 'eval', and the
+-- printed-to-console output with 'evalPrinted'
 runAndEval :: String -> TestPSCi () -> (String -> TestPSCi ()) -> TestPSCi ()
 runAndEval comm eval evalPrinted =
   case parseCommand comm of
