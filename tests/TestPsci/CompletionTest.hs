@@ -89,7 +89,7 @@ assertCompletedOk :: (String, [String]) -> Spec
 assertCompletedOk (line, expecteds) = specify line $ do
   results <- runCM (completion' (reverse line, ""))
   let actuals = formatCompletions results
-  sort expecteds `shouldBe` sort actuals
+  sort actuals `shouldBe` sort expecteds
 
 runCM :: CompletionM a -> IO a
 runCM act = do
