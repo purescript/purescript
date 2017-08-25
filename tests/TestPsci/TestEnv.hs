@@ -86,9 +86,9 @@ evaluatesTo command expected = runAndEval command eval evalPrinted
       actual `equalsTo` (expected ++ "\n")
     evalPrinted _ = return ()
 
-prints :: String -> [String] -> TestPSCi ()
+prints :: String -> String -> TestPSCi ()
 prints command expected = runAndEval command eval evalPrinted
   where
     eval = return ()
-    evalPrinted s = s `equalsTo` (unlines (map (" " ++) expected))
+    evalPrinted s = s `equalsTo` expected
 

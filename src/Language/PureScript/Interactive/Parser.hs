@@ -70,7 +70,7 @@ parseDirective cmd =
     Show     -> ShowInfo <$> parseReplQuery' (trim arg)
     Type     -> TypeOf <$> parseRest P.parseValue arg
     Kind     -> KindOf <$> parseRest P.parseType arg
-    Complete -> CompleteStr <$> Right arg
+    Complete -> CompleteStr <$> Right (trim arg)
 -- |
 -- Parses expressions entered at the PSCI repl.
 --

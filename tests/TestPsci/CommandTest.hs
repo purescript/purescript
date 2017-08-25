@@ -35,6 +35,6 @@ commandTests = context "commandTests" $ do
 
   specPSCi ":complete" $ do
     ":complete ma" `prints` []
-    ":complete Data.Functor.ma" `prints` (map ("Data.Functor." ++ ) ["map", "mapFlipped"])
+    ":complete Data.Functor.ma" `prints` (unlines (map ("Data.Functor." ++ ) ["map", "mapFlipped"]))
     run "import Data.Functor"
-    ":complete ma" `prints` ["map", "mapFlipped"]
+    ":complete ma" `prints` (unlines ["map", "mapFlipped"])
