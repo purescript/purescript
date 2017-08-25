@@ -35,7 +35,20 @@ metaToJSON (IsConstructor t is)
     , T.pack "identifiers"      .= identToJSON `map` is
     ]
 metaToJSON IsNewtype              = object [ T.pack "metaType"  .= "IsNewtype" ]
-metaToJSON IsTypeClassConstructor = object [ T.pack "metaType"  .= "IsTypeClassConstructor" ]
+metaToJSON (IsTypeClassConstructor m)
+  = object
+  [ T.pack "metaType" .= "IsTypeClassConstructor"
+  , T.pack "names"    .= toJSON (fn `map` m)
+  ]
+  where
+    fn :: (Text, Maybe (Qualified (ProperName 'ClassName))) -> Value
+    fn (t, Nothing) = toJSON (t, Null)
+    fn (t, Just qn) = toJSON (t, qualifiedToJSON runProperName qn)
+metaToJSON (IsTypeClassConstructorApp n)
+  = object
+  [ T.pack "metaType"   .= "IsTypeClassConstructorApp"
+  , T.pack "className"  .= qualifiedToJSON runProperName n
+  ]
 metaToJSON IsForeign              = object [ T.pack "metaType"  .= "IsForeign" ]
 
 sourceSpanToJSON :: SourceSpan -> Value

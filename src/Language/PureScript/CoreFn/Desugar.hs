@@ -6,7 +6,7 @@ import Protolude (ordNub)
 import Control.Arrow (second)
 
 import Data.Function (on)
-import Data.List (sort, sortBy)
+import Data.List (sortBy)
 import Data.Maybe (mapMaybe)
 import Data.Tuple (swap)
 import qualified Data.List.NonEmpty as NEL
@@ -107,7 +107,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name lit)
   exprToCoreFn ss com _ (A.TypeClassDictionaryConstructorApp name (A.Literal (A.ObjectLiteral vs))) =
     let args = fmap (exprToCoreFn ss [] Nothing . snd) $ sortBy (compare `on` fst) vs
-        ctor = Var (ss, [], Nothing, Just IsTypeClassConstructor) (fmap properToIdent name)
+        ctor = Var (ss, [], Nothing, Just (IsTypeClassConstructorApp name)) (fmap properToIdent name)
     in foldl (App (ss, com, Nothing, Nothing)) ctor args
   exprToCoreFn ss com ty  (A.TypeClassDictionaryAccessor _ ident) =
     Abs (ss, com, ty, Nothing) (Ident "dict")
@@ -239,14 +239,14 @@ exportToCoreFn _ = []
 -- is a function that accepts the superclass instances and member
 -- implementations and returns a record for the instance dictionary.
 mkTypeClassConstructor :: SourceAnn -> [Constraint] -> [A.Declaration] -> Expr Ann
-mkTypeClassConstructor (ss, com) [] [] = Literal (ss, com, Nothing, Just IsTypeClassConstructor) (ObjectLiteral [])
+mkTypeClassConstructor (ss, com) [] [] = Literal (ss, com, Nothing, Just (IsTypeClassConstructor [])) (ObjectLiteral [])
 mkTypeClassConstructor (ss, com) supers members =
-  let args@(a:as) = sort $ fmap typeClassMemberName members ++ superClassDictionaryNames supers
-      props = [ (mkString arg, Var (ssAnn ss) $ Qualified Nothing (Ident arg)) | arg <- args ]
+  let args@(a:as) = sortBy (compare `on` fst) $ fmap ((,Nothing) . typeClassMemberName) members ++ (map (fmap Just) $ superClassDictionaryNames supers)
+      props = [ (mkString arg, Var (ssAnn ss) $ Qualified Nothing (Ident arg)) | (arg, _) <- args ]
       dict = Literal (ssAnn ss) (ObjectLiteral props)
-  in Abs (ss, com, Nothing, Just IsTypeClassConstructor)
-         (Ident a)
-         (foldr (Abs (ssAnn ss) . Ident) dict as)
+  in Abs (ss, com, Nothing, Just (IsTypeClassConstructor args))
+         (Ident (fst a))
+         (foldr (Abs (ssAnn ss) . Ident) dict (fst `map` as))
 
 -- | Converts a ProperName to an Ident.
 properToIdent :: ProperName a -> Ident

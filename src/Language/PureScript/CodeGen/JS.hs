@@ -187,7 +187,7 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
     obj <- valueToJs o
     sts <- mapM (sndM valueToJs) ps
     extendObj obj sts
-  valueToJs' e@(Abs (_, _, _, Just IsTypeClassConstructor) _ _) =
+  valueToJs' e@(Abs (_, _, _, Just m) _ _) | metaIsTypeClass m =
     let args = unAbs e
     in return $ AST.Function Nothing Nothing (map identToJs args) (AST.Block Nothing $ map assign args)
     where
@@ -207,7 +207,7 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
       Var (_, _, _, Just IsNewtype) _ -> return (head args')
       Var (_, _, _, Just (IsConstructor _ fields)) name | length args == length fields ->
         return $ AST.Unary Nothing AST.New $ AST.App Nothing (qualifiedToJS id name) args'
-      Var (_, _, _, Just IsTypeClassConstructor) name ->
+      Var (_, _, _, Just m) name | metaIsTypeClass m ->
         return $ AST.Unary Nothing AST.New $ AST.App Nothing (qualifiedToJS id name) args'
       _ -> flip (foldl (\fn a -> AST.App Nothing fn [a])) args' <$> valueToJs f
     where

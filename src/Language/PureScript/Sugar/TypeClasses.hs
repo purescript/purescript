@@ -233,7 +233,7 @@ typeClassDictionaryDeclaration
   -> [Declaration]
   -> Declaration
 typeClassDictionaryDeclaration sa name args implies members =
-  let superclassTypes = superClassDictionaryNames implies `zip`
+  let superclassTypes = (fst `map` superClassDictionaryNames implies) `zip`
         [ function unit (foldl TypeApp (TypeConstructor (fmap coerceProperName superclass)) tyArgs)
         | (Constraint superclass tyArgs _) <- implies
         ]
@@ -291,7 +291,7 @@ typeInstanceDictionaryDeclaration sa name mn deps className tys decls =
       -- Create the type of the dictionary
       -- The type is a record type, but depending on type instance dependencies, may be constrained.
       -- The dictionary itself is a record literal.
-      let superclasses = superClassDictionaryNames typeClassSuperclasses `zip`
+      let superclasses = (fst `map` superClassDictionaryNames typeClassSuperclasses) `zip`
             [ Abs (VarBinder (Ident C.__unused)) (DeferredDictionary superclass tyArgs)
             | (Constraint superclass suTyArgs _) <- typeClassSuperclasses
             , let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
@@ -320,8 +320,8 @@ declIdent _ = Nothing
 typeClassMemberName :: Declaration -> Text
 typeClassMemberName = fromMaybe (internalError "typeClassMemberName: Invalid declaration in type class definition") . fmap runIdent . declIdent
 
-superClassDictionaryNames :: [Constraint] -> [Text]
+superClassDictionaryNames :: [Constraint] -> [(Text, Qualified (ProperName 'ClassName))]
 superClassDictionaryNames supers =
-  [ superclassName pn index
+  [ (superclassName pn index, pn)
   | (index, Constraint pn _ _) <- zip [0..] supers
   ]

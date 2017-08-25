@@ -4,6 +4,7 @@
 module Language.PureScript.CoreFn.Meta where
 
 import Prelude.Compat
+import Data.Text (Text)
 
 import Language.PureScript.Names
 
@@ -22,11 +23,19 @@ data Meta
   -- |
   -- The contained value is a typeclass dictionary constructor
   --
-  | IsTypeClassConstructor
+  | IsTypeClassConstructor [(Text, Maybe (Qualified (ProperName 'ClassName)))]
+  -- |
+  -- Application of type class constructor
+  | IsTypeClassConstructorApp (Qualified (ProperName 'ClassName))
   -- |
   -- The contained reference is for a foreign member
   --
   | IsForeign deriving (Show, Eq, Ord)
+
+metaIsTypeClass :: Meta -> Bool
+metaIsTypeClass (IsTypeClassConstructor _) = True
+metaIsTypeClass (IsTypeClassConstructorApp _) = True
+metaIsTypeClass _ = False
 
 -- |
 -- Data constructor metadata

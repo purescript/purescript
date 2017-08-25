@@ -178,7 +178,14 @@ spec = context "CoreFnFromJsonTest" $ do
 
     specify "should parse IsTypeClassConstructor" $ do
       let m = Module [] mn mp [] [] []
-                [ NonRec (ss, [], Nothing, Just IsTypeClassConstructor) (Ident "x") $
+                [ NonRec (ss, [], Nothing, Just (IsTypeClassConstructor [("arg", Just $ (Qualified (Just mn) (ProperName "Functor")))])) (Ident "x") $
+                  Literal ann (CharLiteral 'a')
+                ]
+      parseMod m `shouldSatisfy` isSuccess
+
+    specify "should parse IsTypeClassConstructorApp" $ do
+      let m = Module [] mn mp [] [] []
+                [ NonRec (ss, [], Nothing, Just (IsTypeClassConstructorApp (Qualified (Just mn) (ProperName "Functor")))) (Ident "x") $
                   Literal ann (CharLiteral 'a')
                 ]
       parseMod m `shouldSatisfy` isSuccess
