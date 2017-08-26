@@ -14,7 +14,7 @@ module Language.PureScript.TypeChecker.Entailment
 import Prelude.Compat
 import Protolude (ordNub)
 
-import Control.Arrow (second)
+import Control.Arrow ((***), second)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 import Control.Monad.Supply.Class (MonadSupply(..))
@@ -28,6 +28,7 @@ import Data.Maybe (fromMaybe, maybeToList, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Text (Text)
+import qualified Data.Text as T
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -39,7 +40,7 @@ import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 import Language.PureScript.Label (Label(..))
-import Language.PureScript.PSString (PSString, mkString)
+import Language.PureScript.PSString (PSString, mkString, decodeString)
 import qualified Language.PureScript.Constants as C
 
 -- | Describes what sort of dictionary to generate for type class instances
@@ -51,6 +52,7 @@ data Evidence
   | WarnInstance Type         -- ^ Warn type class with a user-defined warning message
   | IsSymbolInstance PSString -- ^ The IsSymbol type class for a given Symbol literal
   | CompareSymbolInstance
+  | ConsSymbolInstance
   | AppendSymbolInstance
   | UnionInstance
   | ConsInstance
@@ -165,6 +167,10 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ C.AppendSymbol [arg0@(TypeLevelString lhs), arg1@(TypeLevelString rhs), _] =
       let args = [arg0, arg1, TypeLevelString (lhs <> rhs)]
       in [TypeClassDictionaryInScope AppendSymbolInstance [] C.AppendSymbol args Nothing]
+    forClassName _ C.ConsSymbol [arg0, arg1, arg2]
+      | Just (arg0', arg1', arg2') <- (consSymbol arg0 arg1 arg2) =
+      let args = [arg0', arg1', arg2']
+      in [TypeClassDictionaryInScope ConsSymbolInstance [] C.ConsSymbol args Nothing]
     forClassName _ C.Union [l, r, u]
       | Just (lOut, rOut, uOut, cst) <- unionRows l r u
       = [ TypeClassDictionaryInScope UnionInstance [] C.Union [lOut, rOut, uOut] cst ]
@@ -345,6 +351,8 @@ entails SolverOptions{..} constraint context hints =
               return $ TypeClassDictionaryConstructorApp C.IsSymbol (Literal (ObjectLiteral fields))
             mkDictionary CompareSymbolInstance _ =
               return $ TypeClassDictionaryConstructorApp C.CompareSymbol (Literal (ObjectLiteral []))
+            mkDictionary ConsSymbolInstance _ =
+              return $ TypeClassDictionaryConstructorApp C.ConsSymbol (Literal (ObjectLiteral []))
             mkDictionary AppendSymbolInstance _ =
               return $ TypeClassDictionaryConstructorApp C.AppendSymbol (Literal (ObjectLiteral []))
 
@@ -352,6 +360,19 @@ entails SolverOptions{..} constraint context hints =
         subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr
         subclassDictionaryValue dict className index =
           App (Accessor (mkString (superclassName className index)) dict) valUndefined
+
+    consSymbol :: Type -> Type -> Type -> Maybe (Type, Type, Type)
+    consSymbol _ _ arg@(TypeLevelString s) = do
+      (h, t) <- (mkTLString . T.singleton *** mkTLString) <$> (T.uncons =<< decodeString s)
+      pure (h, t, arg)
+      where mkTLString = TypeLevelString . mkString
+    consSymbol arg1@(TypeLevelString h) arg2@(TypeLevelString t) _ = do
+      h' <- decodeString h
+      t' <- decodeString t
+      if (T.length h' == 1)
+        then pure (arg1, arg2, TypeLevelString (mkString $ h' <> t'))
+        else Nothing
+    consSymbol _ _ _ = Nothing
 
     -- | Left biased union of two row types
     unionRows :: Type -> Type -> Type -> Maybe (Type, Type, Type, Maybe [Constraint])
