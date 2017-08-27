@@ -1,6 +1,8 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE DeriveAnyClass #-}
 
 -- |
 -- Data types for modules and declarations
@@ -9,12 +11,14 @@ module Language.PureScript.AST.Declarations where
 
 import Prelude.Compat
 
+import Control.DeepSeq (NFData)
 import Control.Monad.Identity
 
 import Data.Aeson.TH
 import qualified Data.Map as M
 import Data.Text (Text)
 import qualified Data.List.NonEmpty as NEL
+import GHC.Generics (Generic)
 
 import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Literals
@@ -98,7 +102,7 @@ data SimpleErrorMessage
   | NameIsUndefined Ident
   | UndefinedTypeVariable (ProperName 'TypeName)
   | PartiallyAppliedSynonym (Qualified (ProperName 'TypeName))
-  | EscapedSkolem Text (Maybe SourceSpan) Type
+  | EscapedSkolem Text SourceSpan Type
   | TypesDoNotUnify Type Type
   | KindsDoNotUnify Kind Kind
   | ConstrainedTypeUnified Type Type
@@ -288,7 +292,7 @@ data DeclarationRef
   -- elaboration in name desugaring.
   --
   | ReExportRef SourceSpan ModuleName DeclarationRef
-  deriving (Show)
+  deriving (Show, Generic, NFData)
 
 instance Eq DeclarationRef where
   (TypeRef _ name dctors) == (TypeRef _ name' dctors') = name == name' && dctors == dctors'
@@ -337,6 +341,17 @@ declRefSourceSpan (TypeInstanceRef ss _) = ss
 declRefSourceSpan (ModuleRef ss _) = ss
 declRefSourceSpan (KindRef ss _) = ss
 declRefSourceSpan (ReExportRef ss _ _) = ss
+
+declRefName :: DeclarationRef -> Name
+declRefName (TypeRef _ n _) = TyName n
+declRefName (TypeOpRef _ n) = TyOpName n
+declRefName (ValueRef _ n) = IdentName n
+declRefName (ValueOpRef _ n) = ValOpName n
+declRefName (TypeClassRef _ n) = TyClassName n
+declRefName (TypeInstanceRef _ n) = IdentName n
+declRefName (ModuleRef _ n) = ModName n
+declRefName (KindRef _ n) = KiName n
+declRefName (ReExportRef _ _ ref) = declRefName ref
 
 getTypeRef :: DeclarationRef -> Maybe (ProperName 'TypeName, Maybe [ProperName 'ConstructorName])
 getTypeRef (TypeRef _ name dctors) = Just (name, dctors)
@@ -392,6 +407,53 @@ isExplicit :: ImportDeclarationType -> Bool
 isExplicit (Explicit _) = True
 isExplicit _ = False
 
+-- | A type declaration assigns a type to an identifier, eg:
+--
+-- @identity :: forall a. a -> a@
+--
+-- In this example @identity@ is the identifier and @forall a. a -> a@ the type.
+data TypeDeclarationData = TypeDeclarationData
+  { tydeclSourceAnn :: !SourceAnn
+  , tydeclIdent :: !Ident
+  , tydeclType :: !Type
+  } deriving (Show, Eq)
+
+overTypeDeclaration :: (TypeDeclarationData -> TypeDeclarationData) -> Declaration -> Declaration
+overTypeDeclaration f d = maybe d (TypeDeclaration . f) (getTypeDeclaration d)
+
+getTypeDeclaration :: Declaration -> Maybe TypeDeclarationData
+getTypeDeclaration (TypeDeclaration d) = Just d
+getTypeDeclaration _ = Nothing
+
+unwrapTypeDeclaration :: TypeDeclarationData -> (Ident, Type)
+unwrapTypeDeclaration td = (tydeclIdent td, tydeclType td)
+
+-- | A value declaration assigns a name and potential binders, to an expression (or multiple guarded expressions).
+--
+-- @double x = x + x@
+--
+-- In this example @double@ is the identifier, @x@ is a binder and @x + x@ is the expression.
+data ValueDeclarationData a = ValueDeclarationData
+  { valdeclSourceAnn :: !SourceAnn
+  , valdeclIdent :: !Ident
+  -- ^ The declared value's name
+  , valdeclName :: !NameKind
+  -- ^ Whether or not this value is exported/visible
+  , valdeclBinders :: ![Binder]
+  , valdeclExpression :: !a
+  } deriving (Show, Functor, Foldable, Traversable)
+
+overValueDeclaration :: (ValueDeclarationData [GuardedExpr] -> ValueDeclarationData [GuardedExpr]) -> Declaration -> Declaration
+overValueDeclaration f d = maybe d (ValueDeclaration . f) (getValueDeclaration d)
+
+getValueDeclaration :: Declaration -> Maybe (ValueDeclarationData [GuardedExpr])
+getValueDeclaration (ValueDeclaration d) = Just d
+getValueDeclaration _ = Nothing
+
+pattern ValueDecl :: SourceAnn -> Ident -> NameKind -> [Binder] -> [GuardedExpr] -> Declaration
+pattern ValueDecl sann ident name binders expr 
+  = ValueDeclaration (ValueDeclarationData sann ident name binders expr)
+
 -- |
 -- The data type of declarations
 --
@@ -411,11 +473,11 @@ data Declaration
   -- |
   -- A type declaration for a value (name, ty)
   --
-  | TypeDeclaration SourceAnn Ident Type
+  | TypeDeclaration {-# UNPACK #-} !TypeDeclarationData
   -- |
   -- A value declaration (name, top-level binders, optional guard, value)
   --
-  | ValueDeclaration SourceAnn Ident NameKind [Binder] [GuardedExpr]
+  | ValueDeclaration {-# UNPACK #-} !(ValueDeclarationData [GuardedExpr])
   -- |
   -- A declaration paired with pattern matching in let-in expression (binder, optional guard, value)
   | BoundValueDeclaration SourceAnn Binder Expr
@@ -491,8 +553,8 @@ declSourceAnn :: Declaration -> SourceAnn
 declSourceAnn (DataDeclaration sa _ _ _ _) = sa
 declSourceAnn (DataBindingGroupDeclaration ds) = declSourceAnn (NEL.head ds)
 declSourceAnn (TypeSynonymDeclaration sa _ _ _) = sa
-declSourceAnn (TypeDeclaration sa _ _) = sa
-declSourceAnn (ValueDeclaration sa _ _ _ _) = sa
+declSourceAnn (TypeDeclaration td) = tydeclSourceAnn td
+declSourceAnn (ValueDeclaration vd) = valdeclSourceAnn vd
 declSourceAnn (BoundValueDeclaration sa _ _) = sa
 declSourceAnn (BindingGroupDeclaration ds) = let ((sa, _), _, _) = NEL.head ds in sa
 declSourceAnn (ExternDeclaration sa _ _) = sa
@@ -505,6 +567,23 @@ declSourceAnn (TypeInstanceDeclaration sa _ _ _ _ _) = sa
 
 declSourceSpan :: Declaration -> SourceSpan
 declSourceSpan = fst . declSourceAnn
+
+declName :: Declaration -> Maybe Name
+declName (DataDeclaration _ _ n _ _) = Just (TyName n)
+declName (TypeSynonymDeclaration _ n _ _) = Just (TyName n)
+declName (ValueDeclaration vd) = Just (IdentName (valdeclIdent vd))
+declName (ExternDeclaration _ n _) = Just (IdentName n)
+declName (ExternDataDeclaration _ n _) = Just (TyName n)
+declName (ExternKindDeclaration _ n) = Just (KiName n)
+declName (FixityDeclaration _ (Left (ValueFixity _ _ n))) = Just (ValOpName n)
+declName (FixityDeclaration _ (Right (TypeFixity _ _ n))) = Just (TyOpName n)
+declName (TypeClassDeclaration _ n _ _ _ _) = Just (TyClassName n)
+declName (TypeInstanceDeclaration _ n _ _ _ _) = Just (IdentName n)
+declName ImportDeclaration{} = Nothing
+declName BindingGroupDeclaration{} = Nothing
+declName DataBindingGroupDeclaration{} = Nothing
+declName BoundValueDeclaration{} = Nothing
+declName TypeDeclaration{} = Nothing
 
 -- |
 -- Test if a declaration is a value declaration

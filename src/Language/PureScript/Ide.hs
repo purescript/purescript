@@ -81,16 +81,16 @@ handleCommand c = case c of
   Import fp outfp _ (AddQualifiedImport mn qual) -> do
     rs <- addQualifiedImport fp mn qual
     answerRequest outfp rs
-  Import fp outfp filters (AddImportForIdentifier ident) -> do
-    rs <- addImportForIdentifier fp ident filters
+  Import fp outfp filters (AddImportForIdentifier ident qual) -> do
+    rs <- addImportForIdentifier fp ident qual filters
     case rs of
       Right rs' -> answerRequest outfp rs'
       Left question ->
         pure (CompletionResult (map (completionFromMatch . simpleExport . map withEmptyAnn) question))
-  Rebuild file ->
-    rebuildFileAsync file
-  RebuildSync file ->
-    rebuildFileSync file
+  Rebuild file actualFile ->
+    rebuildFileAsync file actualFile
+  RebuildSync file actualFile ->
+    rebuildFileSync file actualFile
   Cwd ->
     TextResult . toS <$> liftIO getCurrentDirectory
   Reset ->
@@ -187,14 +187,7 @@ loadModulesAsync
   -> m Success
 loadModulesAsync moduleNames = do
   tr <- loadModules moduleNames
-
-  -- Finally we kick off the worker with @async@ and return the number of
-  -- successfully parsed modules.
-  env <- ask
-  let ll = confLogLevel (ideConfiguration env)
-  -- populateVolatileState return Unit for now, so it's fine to discard this
-  -- result. We might want to block on this in a benchmarking situation.
-  _ <- liftIO (async (runLogger ll (runReaderT populateVolatileState env)))
+  _ <- populateVolatileState
   pure tr
 
 loadModulesSync
@@ -203,7 +196,7 @@ loadModulesSync
   -> m Success
 loadModulesSync moduleNames = do
   tr <- loadModules moduleNames
-  populateVolatileState
+  populateVolatileStateSync
   pure tr
 
 loadModules

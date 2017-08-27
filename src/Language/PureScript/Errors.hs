@@ -431,7 +431,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage :: SimpleErrorMessage -> Box.Box
     renderSimpleErrorMessage (ModuleNotFound mn) =
       paras [ line $ "Module " <> markCode (runModuleName mn) <> " was not found."
-            , line "Make sure the source file exists, and that it has been provided as an input to psc."
+            , line "Make sure the source file exists, and that it has been provided as an input to the compiler."
             ]
     renderSimpleErrorMessage (CannotGetFileInfo path) =
       paras [ line "Unable to read file info: "
@@ -556,11 +556,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line $ "Type synonym " <> markCode (showQualified runProperName name) <> " is partially applied."
             , line "Type synonyms must be applied to all of their type arguments."
             ]
-    renderSimpleErrorMessage (EscapedSkolem name Nothing ty) =
-      paras [ line $ "The type variable " <> markCode name <> " has escaped its scope, appearing in the type"
-            , markCodeBox $ indent $ typeAsBox ty
-            ]
-    renderSimpleErrorMessage (EscapedSkolem name (Just srcSpan) ty) =
+    renderSimpleErrorMessage (EscapedSkolem name srcSpan ty) =
       paras [ line $ "The type variable " <> markCode name <> ", bound at"
             , indent $ line $ displaySourceSpan relPath srcSpan
             , line "has escaped its scope, appearing in the type"

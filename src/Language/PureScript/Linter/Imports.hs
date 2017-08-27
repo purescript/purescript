@@ -301,13 +301,14 @@ findUsedRefs ss env mni qn names =
     valueOpRefs = ValueOpRef ss <$> mapMaybe (getValOpName <=< disqualifyFor qn) names
     typeOpRefs = TypeOpRef ss <$> mapMaybe (getTypeOpName <=< disqualifyFor qn) names
     types = mapMaybe (getTypeName <=< disqualifyFor qn) names
+    kindRefs = KindRef ss <$> mapMaybe (getKindName <=< disqualifyFor qn) names
     dctors = mapMaybe (getDctorName <=< disqualifyFor qn) names
     typesWithDctors = reconstructTypeRefs dctors
     typesWithoutDctors = filter (`M.notMember` typesWithDctors) types
     typesRefs
       = map (flip (TypeRef ss) (Just [])) typesWithoutDctors
       ++ map (\(ty, ds) -> TypeRef ss ty (Just ds)) (M.toList typesWithDctors)
-  in sortBy compDecRef $ classRefs ++ typeOpRefs ++ typesRefs ++ valueRefs ++ valueOpRefs
+  in sortBy compDecRef $ classRefs ++ typeOpRefs ++ typesRefs ++ kindRefs ++ valueRefs ++ valueOpRefs
 
   where
 

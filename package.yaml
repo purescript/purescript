@@ -37,7 +37,7 @@ dependencies:
   - ansi-terminal >=0.6.2 && <0.7
   - base >=4.8 && <5
   - base-compat >=0.6.0
-  - blaze-html >=0.8.1 && <0.9
+  - blaze-html >=0.8.1 && <0.10
   - bower-json >=1.0.0.1 && <1.1
   - boxes >=0.1.4 && <0.2.0
   - bytestring
@@ -49,9 +49,10 @@ dependencies:
   - directory >=1.2.3
   - dlist
   - edit-distance
+  - file-embed
   - filepath
   - fsnotify >=0.2.1
-  - Glob >=0.7 && <0.8
+  - Glob >=0.7 && <0.9
   - haskeline >=0.7.0.0
   - http-client >=0.4.30 && <0.6.0
   - http-types

@@ -4,6 +4,7 @@ module Language.PureScript.CoreImp.Optimizer.Inliner
   , inlineCommonValues
   , inlineCommonOperators
   , inlineFnComposition
+  , inlineUnsafeCoerce
   , inlineUnsafePartial
   , etaConvert
   , unThunk
@@ -264,6 +265,13 @@ inlineFnComposition = everywhereTopDownM convert where
   fnCompose = (C.controlSemigroupoid, C.compose)
   fnComposeFlipped :: forall a b. (IsString a, IsString b) => (a, b)
   fnComposeFlipped = (C.controlSemigroupoid, C.composeFlipped)
+
+inlineUnsafeCoerce :: AST -> AST
+inlineUnsafeCoerce = everywhereTopDown convert where
+  convert (App _ (Indexer _ (StringLiteral _ unsafeCoerceFn) (Var _ unsafeCoerce)) [ comp ])
+    | unsafeCoerceFn == C.unsafeCoerceFn && unsafeCoerce == C.unsafeCoerce
+    = comp
+  convert other = other
 
 inlineUnsafePartial :: AST -> AST
 inlineUnsafePartial = everywhereTopDown convert where

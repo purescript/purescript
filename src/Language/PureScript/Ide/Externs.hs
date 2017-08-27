@@ -24,6 +24,7 @@ import           Protolude hiding (to, from, (&))
 import           Control.Lens
 import           "monad-logger" Control.Monad.Logger
 import           Data.Aeson (decodeStrict)
+import           Data.Aeson.Types (withObject, parseMaybe, (.:))
 import qualified Data.ByteString as BS
 import           Data.Version (showVersion)
 import           Language.PureScript.Ide.Error (IdeError (..))
@@ -36,16 +37,19 @@ readExternFile
   => FilePath
   -> m P.ExternsFile
 readExternFile fp = do
-   parseResult <- liftIO (decodeStrict <$> BS.readFile fp)
-   case parseResult of
+   externsFile <- liftIO (BS.readFile fp)
+   case decodeStrict externsFile of
      Nothing ->
-       throwError (GeneralError
-                   ("Parsing the extern at: " <> toS fp <> " failed"))
-     Just externs
-       | P.efVersion externs /= version -> do
+       let parser = withObject "ExternsFileVersion" $ \o -> o .: "efVersion"
+           maybeEFVersion = parseMaybe parser =<< decodeStrict externsFile
+       in case maybeEFVersion of
+         Nothing ->
+            throwError (GeneralError
+                        ("Parsing the extern at: " <> toS fp <> " failed"))
+         Just efVersion -> do
            let errMsg = "Version mismatch for the externs at: " <> toS fp
                         <> " Expected: " <> version
-                        <> " Found: " <> P.efVersion externs
+                        <> " Found: " <> efVersion
            logErrorN errMsg
            throwError (GeneralError errMsg)
      Just externs -> pure externs
