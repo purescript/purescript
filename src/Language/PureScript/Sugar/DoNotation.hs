@@ -43,7 +43,7 @@ desugarDo d =
   go [DoNotationValue _ val] = return val
   go (DoNotationValue ss@(sa, _) val : rest) = do
     rest' <- go rest
-    return $ App ss (App ss (discard sa) val) (Abs ss (VarBinder sa (Ident C.__unused)) rest')
+    return $ App ss (App ss (discard ss) val) (Abs ss (VarBinder sa (Ident C.__unused)) rest')
   go [DoNotationBind (sa, _) _ _] = throwError . errorMessage' sa $ InvalidDoBind
   go (DoNotationBind (sa, _) b _ : _) | First (Just ident) <- foldMap fromIdent (binderNames b) =
       throwError . errorMessage' sa $ CannotUseBindWithDo (Ident ident)
@@ -52,23 +52,23 @@ desugarDo d =
       fromIdent _ = mempty
   go (DoNotationBind ss1 (VarBinder ss2 ident) val : rest) = do
     rest' <- go rest
-    return $ App ss1 (App ss1 bind val) (Abs ss1 (VarBinder ss2 ident) rest')
-  go (DoNotationBind ss@(sa, _) binder val : rest) = do
+    return $ App ss1 (App ss1 (bind ss1) val) (Abs ss1 (VarBinder ss2 ident) rest')
+  go (DoNotationBind sa@(ss, _) binder val : rest) = do
     rest' <- go rest
     ident <- freshIdent'
     return $
       App sa
-        (App sa bind val)
+        (App sa (bind sa) val)
         (Abs sa
-          (VarBinder sa ident)
+          (VarBinder (binderSourceSpan binder) ident)
           (Case sa
             [Var sa (Qualified Nothing ident)]
-            [CaseAlternative sa [binder] [MkUnguarded sa rest']]))
+            [CaseAlternative ss [binder] [MkUnguarded ss rest']]))
   go [DoNotationLet (sa, _) _] = throwError . errorMessage' sa $ InvalidDoLet
   go (DoNotationLet ss ds : rest) = do
     let checkBind :: Declaration -> m ()
-        checkBind (ValueDecl (ss, _) i@(Ident name) _ _ _)
-          | name `elem` [ C.bind, C.discard ] = throwError . errorMessage' ss $ CannotUseBindWithDo i
+        checkBind (ValueDecl (ss', _) i@(Ident name) _ _ _)
+          | name `elem` [ C.bind, C.discard ] = throwError . errorMessage' ss' $ CannotUseBindWithDo i
         checkBind _ = pure ()
     mapM_ checkBind ds
     rest' <- go rest
