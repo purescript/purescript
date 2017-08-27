@@ -14,6 +14,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets, modify)
 import Data.Foldable (traverse_)
 import Data.Functor.Identity (Identity(), runIdentity)
+import Data.Maybe (fromMaybe)
 import Data.Monoid
 import Data.Set (Set, fromList, notMember)
 import Data.Text (Text)
@@ -46,7 +47,7 @@ newSkolemScope = do
   return $ SkolemScope s
 
 -- | Skolemize a type variable by replacing its instances with fresh skolem constants
-skolemize :: Text -> Int -> SkolemScope -> SourceSpan -> Type -> Type
+skolemize :: Text -> Int -> SkolemScope -> Maybe SourceSpan -> Type -> Type
 skolemize ident sko scope ss = replaceTypeVars ident (Skolem ident sko scope ss)
 
 -- | This function skolemizes type variables appearing in any type signatures or
@@ -61,14 +62,14 @@ skolemizeTypesInValue ident sko scope ss =
 
     onExpr :: [Text] -> Expr -> Identity ([Text], Expr)
     onExpr sco (DeferredDictionary sa c ts)
-      | ident `notElem` sco = return (sco, DeferredDictionary sa c (fmap (skolemize ident sko scope ss) ts))
+      | ident `notElem` sco = return (sco, DeferredDictionary sa c (fmap (skolemize ident sko scope (Just ss)) ts))
     onExpr sco (TypedValue sa check val ty)
-      | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedValue sa check val (skolemize ident sko scope ss ty))
+      | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedValue sa check val (skolemize ident sko scope (Just ss) ty))
     onExpr sco other = return (sco, other)
 
     onBinder :: [Text] -> Binder -> Identity ([Text], Binder)
     onBinder sco (TypedBinder sa ty b)
-      | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedBinder sa (skolemize ident sko scope sa ty) b)
+      | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedBinder sa (skolemize ident sko scope (Just sa) ty) b)
     onBinder sco other = return (sco, other)
 
     peelTypeVars :: Type -> [Text]
@@ -99,7 +100,7 @@ skolemEscapeCheck expr@TypedValue{} =
        -> (Set SkolemScope, [ErrorMessage])
     go scopes val@(TypedValue (ss, _) _ _ ty) =
         ( allScopes
-        , [ ErrorMessage [ErrorInExpression val, PositionedError ss] (EscapedSkolem name ssBound ty)
+        , [ ErrorMessage [ErrorInExpression val, PositionedError ss] (EscapedSkolem name (fromMaybe ss ssBound) ty)
           | (name, scope, ssBound) <- collectSkolems ty
           , notMember scope allScopes
           ]
@@ -120,7 +121,7 @@ skolemEscapeCheck expr@TypedValue{} =
         collectScopes _ = []
 
         -- Collect any skolem variables appearing in a type
-        collectSkolems :: Type -> [(Text, SkolemScope, SourceSpan)]
+        collectSkolems :: Type -> [(Text, SkolemScope, Maybe SourceSpan)]
         collectSkolems = everythingOnTypes (++) collect where
           collect (Skolem name _ scope srcSpan) = [(name, scope, srcSpan)]
           collect _ = []

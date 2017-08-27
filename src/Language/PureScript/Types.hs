@@ -61,7 +61,7 @@ data Type
   -- | A type with a set of type class constraints
   | ConstrainedType Constraint Type
   -- | A skolem constant
-  | Skolem Text Int SkolemScope SourceSpan
+  | Skolem Text Int SkolemScope (Maybe SourceSpan)
   -- | An empty row
   | REmpty
   -- | A non-empty row

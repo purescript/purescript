@@ -100,7 +100,9 @@ subsumes' SElaborate (ConstrainedType con ty1) ty2 = do
   dicts <- getTypeClassDictionaries
   hints <- getHints
   elaborate <- subsumes' SElaborate ty1 ty2
-  let addDicts val = App val (TypeClassDictionary con dicts hints)
+  let addDicts val =
+        let sa = (exprSourceAnn val)
+        in App sa val (TypeClassDictionary sa con dicts hints)
   return (elaborate . addDicts)
 subsumes' mode (TypeApp f1 r1) (TypeApp f2 r2) | f1 == tyRecord && f2 == tyRecord = do
     let (common, ((ts1', r1'), (ts2', r2'))) = alignRowsWith (subsumes' SNoElaborate) r1 r2
