@@ -72,8 +72,9 @@ annFromJSON modulePath = withObject "Ann" annFromObj
   where
   annFromObj o = do
     ss <- o .: "sourceSpan" >>= sourceSpanFromJSON
+    ty <- o .: "type"
     mm <- o .: "meta" >>= metaFromJSON
-    return (ss, [], Nothing, mm)
+    return (ss, [], ty, mm)
 
   sourceSpanFromJSON = withObject "SourceSpan" $ \o ->
     SourceSpan modulePath
