@@ -14,7 +14,7 @@ module Language.PureScript.TypeChecker.Entailment
 import Prelude.Compat
 import Protolude (ordNub)
 
-import Control.Arrow ((***), second)
+import Control.Arrow (second)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 import Control.Monad.Supply.Class (MonadSupply(..))
@@ -168,7 +168,7 @@ entails SolverOptions{..} constraint context hints =
       let args = [arg0, arg1, TypeLevelString (lhs <> rhs)]
       in [TypeClassDictionaryInScope AppendSymbolInstance [] C.AppendSymbol args Nothing]
     forClassName _ C.ConsSymbol [arg0, arg1, arg2]
-      | Just (arg0', arg1', arg2') <- (consSymbol arg0 arg1 arg2) =
+      | Just (arg0', arg1', arg2') <- consSymbol arg0 arg1 arg2 =
       let args = [arg0', arg1', arg2']
       in [TypeClassDictionaryInScope ConsSymbolInstance [] C.ConsSymbol args Nothing]
     forClassName _ C.Union [l, r, u]
@@ -363,15 +363,14 @@ entails SolverOptions{..} constraint context hints =
 
     consSymbol :: Type -> Type -> Type -> Maybe (Type, Type, Type)
     consSymbol _ _ arg@(TypeLevelString s) = do
-      (h, t) <- (mkTLString . T.singleton *** mkTLString) <$> (T.uncons =<< decodeString s)
-      pure (h, t, arg)
+      (h, t) <- T.uncons =<< decodeString s
+      pure (mkTLString (T.singleton h), mkTLString t, arg)
       where mkTLString = TypeLevelString . mkString
     consSymbol arg1@(TypeLevelString h) arg2@(TypeLevelString t) _ = do
       h' <- decodeString h
       t' <- decodeString t
-      if (T.length h' == 1)
-        then pure (arg1, arg2, TypeLevelString (mkString $ h' <> t'))
-        else Nothing
+      guard (T.length h' == 1)
+      pure (arg1, arg2, TypeLevelString (mkString $ h' <> t'))
     consSymbol _ _ _ = Nothing
 
     -- | Left biased union of two row types
