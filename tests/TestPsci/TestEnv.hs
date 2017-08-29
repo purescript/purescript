@@ -90,7 +90,7 @@ evaluatesTo command expected = runAndEval command evalJsAndCompare ignorePrinted
 
 -- | An assertion to check command PSCi printed output against a given string
 prints :: String -> String -> TestPSCi ()
-prints command expected = runAndEval command skipEval evalPrinted
+prints command expected = runAndEval command evalJsAndIgnore evalPrinted
   where
-    skipEval = return ()
+    evalJsAndIgnore = jsEval *> return ()
     evalPrinted s = s `equalsTo` expected
