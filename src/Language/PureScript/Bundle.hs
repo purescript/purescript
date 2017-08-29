@@ -512,7 +512,7 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
   rendered = renderToString (JSAstProgram (prelude : concatMap fst modulesJS ++ maybe [] runMain optionsMainModule) JSNoAnnot)
 
   isValidJavaScriptIdentifier :: String -> Bool
-  isValidJavaScriptIdentifier str = case parse str mempty of
+  isValidJavaScriptIdentifier string = case parse string mempty of
     Right (JSAstProgram [JSExpressionStatement (JSIdentifier _ _) _] _)  -> True
     Right _ -> False
     Left _ -> False
