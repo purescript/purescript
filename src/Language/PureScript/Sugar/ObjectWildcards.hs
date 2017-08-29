@@ -37,59 +37,59 @@ desugarDecl d = rethrowWithPosition (declSourceSpan d) $ fn d
     | BinaryNoParens sa' op val u <- b
     , isAnonymousArgument u = do
         arg <- freshIdent'
-        return . Abs (VarBinder arg) $ App (App op val) (Var (Qualified Nothing arg))
-    | BinaryNoParens sa' op u val <- b
-    , isAnonymousArgument u = do
-        arg <- freshIdent'
-        return . Abs (VarBinder arg) $ App (App op (Var (Qualified Nothing arg))) val
-  desugarExpr (Literal sa (ObjectLiteral ps)) = wrapLambdaAssoc (Literal . ObjectLiteral) ps
-  desugarExpr (ObjectUpdateNested sa obj ps) = transformNestedUpdate obj ps
+        return $
+          Abs sa (VarBinder (exprSourceSpan u) arg) $
+            App sa' (App sa' op val) (Var (exprSourceAnn u) (Qualified Nothing arg))
+  desugarExpr (Literal sa (ObjectLiteral ps)) = wrapLambdaAssoc (Literal sa . ObjectLiteral) ps
+  desugarExpr (ObjectUpdateNested sa obj ps) = transformNestedUpdate sa obj ps
   desugarExpr (Accessor sa prop u)
     | Just props <- peelAnonAccessorChain u = do
       arg <- freshIdent'
-      return . Abs (VarBinder arg) $ foldr Accessor (argToExpr arg) (prop:props)
+      let argAnn = exprSourceAnn u
+      return . Abs sa (VarBinder (fst argAnn) arg) $ foldr (Accessor sa) (argToExpr (argAnn, arg)) (prop:props)
   desugarExpr (Case sa args cas) | any isAnonymousArgument args = do
     argIdents <- forM args freshIfAnon
     let args' = zipWith (`maybe` argToExpr) args argIdents
-    return $ foldr (Abs . VarBinder) (Case args' cas) (catMaybes argIdents)
+    return $ foldr (\((ss, _), i) -> Abs sa (VarBinder ss i)) (Case sa args' cas) (catMaybes argIdents)
   desugarExpr (IfThenElse sa u t f) | any isAnonymousArgument [u, t, f] = do
     u' <- freshIfAnon u
     t' <- freshIfAnon t
     f' <- freshIfAnon f
-    let if_ = IfThenElse (maybe u argToExpr u') (maybe t argToExpr t') (maybe f argToExpr f')
-    return $ foldr (Abs . VarBinder) if_ (catMaybes [u', t', f'])
+    let if_ = IfThenElse sa (maybe u argToExpr u') (maybe t argToExpr t') (maybe f argToExpr f')
+    return $ foldr (\(sa', i) -> Abs sa (VarBinder (fst sa') i)) if_ (catMaybes [u', t', f'])
   desugarExpr e = return e
 
-  transformNestedUpdate :: Expr -> PathTree Expr -> m Expr
-  transformNestedUpdate obj ps = do
+  transformNestedUpdate :: SourceAnn -> Expr -> PathTree Expr -> m Expr
+  transformNestedUpdate sa obj ps = do
     -- If we don't have an anonymous argument then we need to generate a let wrapper
     -- so that the object expression isn't re-evaluated for each nested update.
     val <- freshIdent'
-    let valExpr = argToExpr val
+    let valExpr = argToExpr (valAnn, val)
     if isAnonymousArgument obj
-      then Abs (VarBinder val) <$> wrapLambda (buildUpdates valExpr) ps
+      then Abs sa (VarBinder valSpan val) <$> wrapLambda (buildUpdates valExpr) ps
       else wrapLambda (buildLet val . buildUpdates valExpr) ps
     where
-      buildLet val = Let [ValueDecl (declSourceSpan d, []) val Public [] [MkUnguarded obj]]
+      valAnn@(valSpan, _) = exprSourceAnn obj
+
+      buildLet val = Let (declSourceSpan d, []) [ValueDecl (declSourceSpan d, []) val Public [] [MkUnguarded valSpan obj]]
 
       -- recursively build up the nested `ObjectUpdate` expressions
       buildUpdates :: Expr -> PathTree Expr -> Expr
-      buildUpdates val (PathTree vs) = ObjectUpdate val (goLayer [] <$> runAssocList vs) where
+      buildUpdates val (PathTree vs) = ObjectUpdate sa val (goLayer [] <$> runAssocList vs) where
         goLayer :: [PSString] -> (PSString, PathNode Expr) -> (PSString, Expr)
         goLayer _ (key, Leaf expr) = (key, expr)
         goLayer path (key, Branch (PathTree branch)) =
           let path' = path ++ [key]
               updates = goLayer path' <$> runAssocList branch
-              accessor = foldl' (flip Accessor) val path'
-              objectUpdate = ObjectUpdate accessor updates
-          in (key, objectUpdate)
+              accessor = foldl' (flip (Accessor (exprSourceAnn val))) val path'
+          in (key, ObjectUpdate sa accessor updates)
 
   wrapLambda :: forall t. Traversable t => (t Expr -> Expr) -> t Expr -> m Expr
   wrapLambda mkVal ps = do
     args <- traverse processExpr ps
-    return $ foldr (Abs . VarBinder) (mkVal (snd <$> args)) (catMaybes $ toList (fst <$> args))
+    return $ foldr (\(sa, i) -> Abs sa $ VarBinder (fst sa) i) (mkVal (snd <$> args)) (catMaybes $ toList (fst <$> args))
     where
-      processExpr :: Expr -> m (Maybe Ident, Expr)
+      processExpr :: Expr -> m (Maybe (SourceAnn, Ident), Expr)
       processExpr e = do
         arg <- freshIfAnon e
         return (arg, maybe e argToExpr arg)
@@ -106,10 +106,12 @@ desugarDecl d = rethrowWithPosition (declSourceSpan d) $ fn d
   isAnonymousArgument AnonymousArgument{} = True
   isAnonymousArgument _ = False
 
-  freshIfAnon :: Expr -> m (Maybe Ident)
+  freshIfAnon :: Expr -> m (Maybe (SourceAnn, Ident))
   freshIfAnon u
-    | isAnonymousArgument u = Just <$> freshIdent'
+    | isAnonymousArgument u = do
+        i <- freshIdent'
+        pure (Just (exprSourceAnn u, i))
     | otherwise = return Nothing
 
-  argToExpr :: Ident -> Expr
-  argToExpr = Var . Qualified Nothing
+  argToExpr :: (SourceAnn, Ident) -> Expr
+  argToExpr (sa, i) = Var sa (Qualified Nothing i)
