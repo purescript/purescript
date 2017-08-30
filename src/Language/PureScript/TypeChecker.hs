@@ -267,21 +267,21 @@ typeCheckAll moduleName _ = traverse go
     return $ TypeSynonymDeclaration sa name args ty
   go TypeDeclaration{} =
     internalError "Type declarations should have been removed before typeCheckAlld"
-  go (ValueDecl sa@(ss, _) name nameKind [] [MkUnguarded val]) = do
+  go (ValueDecl sa@(ss, _) name nameKind [] [MkUnguarded ss' val]) = do
     env <- getEnv
     warnAndRethrow (addHint (ErrorInValueDeclaration name) . addHint (PositionedError ss)) $ do
-      val' <- checkExhaustiveExpr ss env moduleName val
+      val' <- checkExhaustiveExpr env moduleName val
       valueIsNotDefined moduleName name
       [(_, (val'', ty))] <- typesOf NonRecursiveBindingGroup moduleName [((sa, name), val')]
       addValue moduleName name ty nameKind
-      return $ ValueDecl sa name nameKind [] [MkUnguarded val'']
+      return $ ValueDecl sa name nameKind [] [MkUnguarded ss' val'']
   go ValueDeclaration{} = internalError "Binders were not desugared"
   go BoundValueDeclaration{} = internalError "BoundValueDeclaration should be desugared"
   go (BindingGroupDeclaration vals) = do
     env <- getEnv
     warnAndRethrow (addHint (ErrorInBindingGroup (fmap (\((_, ident), _, _) -> ident) vals))) $ do
       for_ vals $ \((_, ident), _, _) -> valueIsNotDefined moduleName ident
-      vals' <- NEL.toList <$> traverse (\(sai@((ss, _), _), nk, expr) -> (sai, nk,) <$> checkExhaustiveExpr ss env moduleName expr) vals
+      vals' <- NEL.toList <$> traverse (\(sai, nk, expr) -> (sai, nk,) <$> checkExhaustiveExpr env moduleName expr) vals
       tys <- typesOf RecursiveBindingGroup moduleName $ fmap (\(sai, _, ty) -> (sai, ty)) vals'
       vals'' <- forM [ (sai, val, nameKind, ty)
                      | (sai@(_, name), nameKind, _) <- vals'
