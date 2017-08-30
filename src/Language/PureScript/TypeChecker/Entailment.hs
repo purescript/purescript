@@ -109,8 +109,8 @@ replaceTypeClassDictionaries shouldGeneralize expr = flip evalStateT M.empty $ d
       (_, f, _) = everywhereOnValuesTopDownM return (go False) return
 
     go :: Bool -> Expr -> WriterT (Any, [(Ident, InstanceContext, Constraint)]) (StateT InstanceContext m) Expr
-    go deferErrors (TypeClassDictionary constraint context hints) =
-      rethrow (addHints hints) $ entails (SolverOptions shouldGeneralize deferErrors) constraint context hints
+    go deferErrors (TypeClassDictionary sa constraint context hints) =
+      rethrow (addHints hints) $ entails (SolverOptions shouldGeneralize deferErrors) constraint context hints sa
     go _ other = return other
 
 -- | Three options for how we can handle a constraint, depending on the mode we're in.
@@ -144,8 +144,10 @@ entails
   -- ^ The contexts in which to solve the constraint
   -> [ErrorMessageHint]
   -- ^ Error message hints to apply to any instance errors
+  -> SourceAnn
+  -- ^ Source position at which the dictionary will be inserted
   -> WriterT (Any, [(Ident, InstanceContext, Constraint)]) (StateT InstanceContext m) Expr
-entails SolverOptions{..} constraint context hints =
+entails SolverOptions{..} constraint context hints sa@(ss, _) =
     solve constraint
   where
     forClassName :: InstanceContext -> Qualified (ProperName 'ClassName) -> [Type] -> [TypeClassDict]
@@ -187,7 +189,7 @@ entails SolverOptions{..} constraint context hints =
     findDicts ctx cn = fmap (fmap NamedInstance) . maybe [] M.elems . (>>= M.lookup cn) . flip M.lookup ctx
 
     valUndefined :: Expr
-    valUndefined = Var (Qualified (Just (ModuleName [ProperName C.prim])) (Ident C.undefined))
+    valUndefined = Var sa (Qualified (Just (ModuleName [ProperName C.prim])) (Ident C.undefined))
 
     solve :: Constraint -> WriterT (Any, [(Ident, InstanceContext, Constraint)]) (StateT InstanceContext m) Expr
     solve con = go 0 con
@@ -249,11 +251,11 @@ entails SolverOptions{..} constraint context hints =
                 modify (combineContexts newContext)
                 -- Mark this constraint for generalization
                 tell (mempty, [(ident, context, unsolved)])
-                return (Var qident)
+                return (Var sa qident)
               Deferred ->
                 -- Constraint was deferred, just return the dictionary unchanged,
                 -- with no unsolved constraints. Hopefully, we can solve this later.
-                return (TypeClassDictionary (Constraint className' tys'' conInfo) context hints)
+                return (TypeClassDictionary sa (Constraint className' tys'' conInfo) context hints)
           where
             -- | When checking functional dependencies, we need to use unification to make
             -- sure it is safe to use the selected instance. We will unify the solved type with
@@ -327,10 +329,10 @@ entails SolverOptions{..} constraint context hints =
 
             -- Make a dictionary from subgoal dictionaries by applying the correct function
             mkDictionary :: Evidence -> Maybe [Expr] -> m Expr
-            mkDictionary (NamedInstance n) args = return $ foldl App (Var n) (fold args)
+            mkDictionary (NamedInstance n) args = return $ foldl (App sa) (Var sa n) (fold args)
             mkDictionary UnionInstance (Just [e]) =
               -- We need the subgoal dictionary to appear in the term somewhere
-              return $ App (Abs (VarBinder (Ident C.__unused)) valUndefined) e
+              return $ App sa (Abs sa (VarBinder ss (Ident C.__unused)) valUndefined) e
             mkDictionary UnionInstance _ = return valUndefined
             mkDictionary ConsInstance _ = return valUndefined
             mkDictionary RowToListInstance _ = return valUndefined
@@ -341,17 +343,17 @@ entails SolverOptions{..} constraint context hints =
               -- So pass an empty placeholder (undefined) instead.
               return valUndefined
             mkDictionary (IsSymbolInstance sym) _ =
-              let fields = [ ("reflectSymbol", Abs (VarBinder (Ident C.__unused)) (Literal (StringLiteral sym))) ] in
-              return $ TypeClassDictionaryConstructorApp C.IsSymbol (Literal (ObjectLiteral fields))
+              let fields = [ ("reflectSymbol", Abs sa (VarBinder ss (Ident C.__unused)) (Literal sa (StringLiteral sym))) ] in
+              return $ TypeClassDictionaryConstructorApp sa C.IsSymbol (Literal sa (ObjectLiteral fields))
             mkDictionary CompareSymbolInstance _ =
-              return $ TypeClassDictionaryConstructorApp C.CompareSymbol (Literal (ObjectLiteral []))
+              return $ TypeClassDictionaryConstructorApp sa C.CompareSymbol (Literal sa (ObjectLiteral []))
             mkDictionary AppendSymbolInstance _ =
-              return $ TypeClassDictionaryConstructorApp C.AppendSymbol (Literal (ObjectLiteral []))
+              return $ TypeClassDictionaryConstructorApp sa C.AppendSymbol (Literal sa (ObjectLiteral []))
 
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr
         subclassDictionaryValue dict className index =
-          App (Accessor (mkString (superclassName className index)) dict) valUndefined
+          App sa (Accessor sa (mkString (superclassName className index)) dict) valUndefined
 
     -- | Left biased union of two row types
     unionRows :: Type -> Type -> Type -> Maybe (Type, Type, Type, Maybe [Constraint])

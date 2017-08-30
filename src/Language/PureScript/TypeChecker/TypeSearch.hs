@@ -59,7 +59,8 @@ checkSubsume unsolved env st userT envT = checkInEnvironment env st $ do
   userT' <- initializeSkolems userT
   envT' <- initializeSkolems envT
 
-  let dummyExpression = P.Var (P.Qualified Nothing (P.Ident "x"))
+  let dummySpan = (P.SourceSpan "" (P.SourcePos 0 0) (P.SourcePos 0 0), [])
+  let dummyExpression = P.Var (P.SourceSpan "" (P.SourcePos 0 0) (P.SourcePos 0 0) , []) (P.Qualified Nothing (P.Ident "dummy"))
 
   elab <- subsumes envT' userT'
   subst <- gets TC.checkSubstitution
@@ -73,7 +74,7 @@ checkSubsume unsolved env st userT envT = checkInEnvironment env st $ do
         (Entailment.SolverOptions
           { solverShouldGeneralize = True
           , solverDeferErrors      = False
-          }) constraint' context []) unsolved
+          }) constraint' context [] dummySpan) unsolved
 
   -- Finally, check any constraints which were found during elaboration
   Entailment.replaceTypeClassDictionaries (isJust unsolved) expP
