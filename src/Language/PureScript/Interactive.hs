@@ -110,7 +110,7 @@ handleCommand _ _ p (KindOf typ)              = handleKindOf p typ
 handleCommand _ _ p (BrowseModule moduleName) = handleBrowse p moduleName
 handleCommand _ _ p (ShowInfo QueryLoaded)    = handleShowLoadedModules p
 handleCommand _ _ p (ShowInfo QueryImport)    = handleShowImportedModules p
-handleCommand _ _ p (CompleteStr semiExpr)    = handleComplete p semiExpr
+handleCommand _ _ p (CompleteStr prefix)      = handleComplete p prefix
 handleCommand _ _ _ _                         = P.internalError "handleCommand: unexpected command"
 
 -- | Reload the application state
@@ -315,8 +315,8 @@ handleComplete
   => (String -> m ())
   -> String
   -> m ()
-handleComplete print' semiExpr = do
+handleComplete print' prefix = do
   st <- get
-  let act = liftCompletionM (completion' (reverse semiExpr, ""))
+  let act = liftCompletionM (completion' (reverse prefix, ""))
   results <- evalStateT act st
   print' $ unlines (formatCompletions results)

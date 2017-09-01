@@ -104,6 +104,6 @@ help =
   , (Show,     "import",    "Show all imported modules")
   , (Show,     "loaded",    "Show all loaded modules")
   , (Paste,    "paste",     "Enter multiple lines, terminated by ^D")
-  , (Complete, "<(expr?)>", "Show completion output as if pressing tab")
+  , (Complete, "<prefix>",  "Show completions for <prefix> as if pressing tab")
   ]
 
