@@ -32,3 +32,9 @@ commandTests = context "commandTests" $ do
     run ":reload"
     ms' <- psciImportedModules <$> get
     length ms' `equalsTo` 3
+
+  specPSCi ":complete" $ do
+    ":complete ma" `prints` []
+    ":complete Data.Functor.ma" `prints` (unlines (map ("Data.Functor." ++ ) ["map", "mapFlipped"]))
+    run "import Data.Functor"
+    ":complete ma" `prints` (unlines ["map", "mapFlipped"])

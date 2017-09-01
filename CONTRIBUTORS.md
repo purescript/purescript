@@ -15,6 +15,7 @@ If you would prefer to use different terms, please use the section below instead
 | Username | Name | License |
 | :------- | :--- | :------ |
 | [@5outh](https://github.com/5outh) | Benjamin Kovach | MIT license |
+| [@actionshrimp](https://github.com/actionshrimp) | David Aitken | [MIT license](http://opensource.org/licenses/MIT) |
 | [@alexbiehl](https://github.com/alexbiehl) | Alexander Biehl | [MIT license](http://opensource.org/licenses/MIT) |
 | [@andreypopp](https://github.com/andreypopp) | Andrey Popp | MIT license |
 | [@andyarvanitis](https://github.com/andyarvanitis) | Andy Arvanitis | [MIT license](http://opensource.org/licenses/MIT) |

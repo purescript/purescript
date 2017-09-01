@@ -3,6 +3,7 @@ module Language.PureScript.Interactive.Completion
   , liftCompletionM
   , completion
   , completion'
+  , formatCompletions
   ) where
 
 import Prelude.Compat
@@ -85,6 +86,14 @@ findCompletions prev word = do
       go _ (':' : _) = GT
       go xs ys = compare xs ys
 
+-- |
+-- Convert Haskeline completion result to results as they would be displayed
+formatCompletions :: (String, [Completion]) -> [String]
+formatCompletions (unusedR, completions) = actuals
+  where
+    unused = reverse unusedR
+    actuals = map ((unused ++) . replacement) completions
+
 data CompletionContext
   = CtxDirective String
   | CtxFilePath String
@@ -128,6 +137,7 @@ directiveArg _ Paste       = []
 directiveArg _ Show        = map CtxFixed replQueryStrings
 directiveArg _ Type        = [CtxIdentifier]
 directiveArg _ Kind        = [CtxType]
+directiveArg _ Complete    = []
 
 completeImport :: [String] -> String -> [CompletionContext]
 completeImport ws w' =

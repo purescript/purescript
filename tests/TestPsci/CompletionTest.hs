@@ -12,7 +12,6 @@ import           Data.List (sort)
 import qualified Data.Text as T
 import qualified Language.PureScript as P
 import           Language.PureScript.Interactive
-import           System.Console.Haskeline
 import           TestPsci.TestEnv (initTestPSCiEnv)
 import           TestUtils (getSupportModuleNames)
 
@@ -29,7 +28,7 @@ completionTestData supportModuleNames =
   -- basic directives
   [ (":h",  [":help"])
   , (":r",  [":reload"])
-  , (":c",  [":clear"])
+  , (":c",  [":clear", ":complete"])
   , (":q",  [":quit"])
   , (":b",  [":browse"])
 
@@ -88,10 +87,9 @@ completionTestData supportModuleNames =
 
 assertCompletedOk :: (String, [String]) -> Spec
 assertCompletedOk (line, expecteds) = specify line $ do
-  (unusedR, completions) <- runCM (completion' (reverse line, ""))
-  let unused = reverse unusedR
-  let actuals = map ((unused ++) . replacement) completions
-  sort expecteds `shouldBe` sort actuals
+  results <- runCM (completion' (reverse line, ""))
+  let actuals = formatCompletions results
+  sort actuals `shouldBe` sort expecteds
 
 runCM :: CompletionM a -> IO a
 runCM act = do
