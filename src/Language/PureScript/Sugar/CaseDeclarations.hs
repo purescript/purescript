@@ -301,6 +301,7 @@ desugarAbs = flip parU f
   (f, _, _) = everywhereOnValuesM return replace return
 
   replace :: Expr -> m Expr
+  replace e@(Abs _ VarBinder{} _) = pure e
   replace (Abs sa binder val) = do
     ident <- freshIdent'
     let
@@ -340,7 +341,7 @@ toDecls :: forall m. (MonadSupply m, MonadError MultipleErrors m) => [Declaratio
 toDecls [ValueDecl sa@(ss, _) ident nameKind bs [MkUnguarded _ val]] | all isIrrefutable bs = do
   args <- mapM fromVarBinder bs
   let body = foldr (Abs sa . uncurry VarBinder) val args
-  guardWith (errorMessage' ss (OverlappingArgNames (Just ident))) $ length (ordNub args) == length args
+  guardWith (errorMessage' ss (OverlappingArgNames (Just ident))) $ length (ordNub (map snd args)) == length args
   return [ValueDecl sa ident nameKind [] [mkUnguarded body]]
   where
   fromVarBinder :: Binder -> m (SourceSpan, Ident)

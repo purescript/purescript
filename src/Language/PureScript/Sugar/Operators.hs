@@ -299,8 +299,10 @@ updateTypes
      , Expr -> m Expr
      , Binder -> m Binder
      )
-updateTypes goType = (goDecl, goExpr, goBinder)
+updateTypes goType' = (goDecl, goExpr, goBinder)
   where
+
+  goType = everywhereOnTypesTopDownM . goType'
 
   goDecl :: Declaration -> m Declaration
   goDecl (DataDeclaration sa@(ss, _) ddt name args dctors) =

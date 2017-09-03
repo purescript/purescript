@@ -40,6 +40,12 @@ desugarDecl d = rethrowWithPosition (declSourceSpan d) $ fn d
         return $
           Abs sa (VarBinder (exprSourceSpan u) arg) $
             App sa' (App sa' op val) (Var (exprSourceAnn u) (Qualified Nothing arg))
+    | BinaryNoParens sa' op u val <- b
+    , isAnonymousArgument u = do
+        arg <- freshIdent'
+        return $
+          Abs sa' (VarBinder (exprSourceSpan u) arg) $
+            App sa' (App sa' op (Var (exprSourceAnn u) (Qualified Nothing arg))) val
   desugarExpr (Literal sa (ObjectLiteral ps)) = wrapLambdaAssoc (Literal sa . ObjectLiteral) ps
   desugarExpr (ObjectUpdateNested sa obj ps) = transformNestedUpdate sa obj ps
   desugarExpr (Accessor sa prop u)

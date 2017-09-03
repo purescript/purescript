@@ -63,6 +63,8 @@ import Language.PureScript.Types
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString)
 
+import Debug.Trace
+
 data BindingGroupType
   = RecursiveBindingGroup
   | NonRecursiveBindingGroup
@@ -413,7 +415,7 @@ infer' v@(Hole sa name) = do
   env <- getEnv
   tell . errorMessage $ HoleInferredType name ty ctx (TSBefore env)
   return $ TypedValue sa True v ty
-infer' v = internalError $ "Invalid argument to infer: " ++ show v
+infer' v = traceShow v $ internalError $ "Invalid argument to infer: " ++ show v
 
 inferLetBinding
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
@@ -553,7 +555,7 @@ checkBinders
   -> m [CaseAlternative]
 checkBinders _ _ [] = return []
 checkBinders nvals ret (CaseAlternative sa binders result : bs) = do
-  guardWith (errorMessage $ OverlappingArgNames Nothing) $
+  guardWith (errorMessage' sa $ OverlappingArgNames Nothing) $
     let ns = concatMap binderNames binders in length (ordNub ns) == length ns
   m1 <- M.unions <$> zipWithM inferBinder nvals binders
   r <- bindLocalVariables [ (name, ty, Defined) | (name, ty) <- M.toList m1 ] $

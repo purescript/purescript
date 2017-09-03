@@ -297,7 +297,7 @@ deriveGeneric ss mn syns ds tyConNm dargs = do
 
     sa = (ss, [])
     mkSpineFunction :: Declaration -> m Expr
-    mkSpineFunction (DataDeclaration sa'@(ss', []) _ _ _ args) = do
+    mkSpineFunction (DataDeclaration sa'@(ss', _) _ _ _ args) = do
       x <- freshIdent'
       lamCase sa' x <$> mapM mkCtorClause args
       where
