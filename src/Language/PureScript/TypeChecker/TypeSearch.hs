@@ -116,8 +116,14 @@ typeSearch
   -> ([(P.Qualified Text, P.Type)], Maybe [(Label, P.Type)])
 typeSearch unsolved env st type' =
   let
-    resultMap = Map.mapMaybe (\(x, _, _) -> checkSubsume unsolved env st type' x $> x) (P.names env)
-    (allLabels, solvedLabels) = accessorSearch unsolved env st type'
-    solvedLabels' = first (P.Qualified Nothing . ("_." <>) . P.prettyPrintLabel) <$> solvedLabels
+    runTypeSearch :: Map k P.Type -> Map k P.Type
+    runTypeSearch = Map.mapMaybe (\ty -> checkSubsume unsolved env st type' ty $> ty)
+
+    matchingNames = runTypeSearch (Map.map (\(ty, _, _) -> ty) (P.names env))
+    matchingConstructors = runTypeSearch (Map.map (\(_, _, ty, _) -> ty) (P.dataConstructors env))
+    (allLabels, matchingLabels) = accessorSearch unsolved env st type'
   in
-    (solvedLabels' <> (first (map P.runIdent) <$> Map.toList resultMap), if null allLabels then Nothing else Just allLabels)
+    ( (first (P.Qualified Nothing . ("_." <>) . P.prettyPrintLabel) <$> matchingLabels)
+      <> (first (map P.runIdent) <$> Map.toList matchingNames)
+      <> (first (map P.runProperName) <$> Map.toList matchingConstructors)
+    , if null allLabels then Nothing else Just allLabels)

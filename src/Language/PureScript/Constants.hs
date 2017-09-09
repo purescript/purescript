@@ -479,3 +479,9 @@ partialUnsafe = "Partial_Unsafe"
 
 unsafePartial :: forall a. (IsString a) => a
 unsafePartial = "unsafePartial"
+
+unsafeCoerce :: forall a. (IsString a) => a
+unsafeCoerce = "Unsafe_Coerce"
+
+unsafeCoerceFn :: forall a. (IsString a) => a
+unsafeCoerceFn = "unsafeCoerce"

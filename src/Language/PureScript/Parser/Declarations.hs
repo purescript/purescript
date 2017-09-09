@@ -59,7 +59,7 @@ parseTypeDeclaration :: TokenParser Declaration
 parseTypeDeclaration = withSourceAnnF $ do
   name <- P.try (parseIdent <* indented <* doubleColon)
   ty <- parsePolyType
-  return $ \sa -> TypeDeclaration sa name ty
+  return $ \sa -> TypeDeclaration (TypeDeclarationData sa name ty)
 
 parseTypeSynonymDeclaration :: TokenParser Declaration
 parseTypeSynonymDeclaration = withSourceAnnF $ do
@@ -87,7 +87,7 @@ parseValueWithIdentAndBinders ident bs = do
                            <*> (indented *> equals
                                          *> withSourceSpan PositionedValue parseValueWithWhereClause))
     )
-  return $ \sa -> ValueDeclaration sa ident Public bs value
+  return $ \sa -> ValueDecl sa ident Public bs value
 
 parseValueDeclaration :: TokenParser Declaration
 parseValueDeclaration = withSourceAnnF $ do

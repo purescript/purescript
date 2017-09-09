@@ -171,7 +171,7 @@ rebracketFiltered pred_ externs modules = do
     goBinder pos other = return (pos, other)
 
     goType :: Maybe SourceSpan -> Type -> m Type
-    goType pos = maybe id rethrowWithPosition pos . everywhereOnTypesM go
+    goType pos = maybe id rethrowWithPosition pos . go
       where
       go :: Type -> m Type
       go (BinaryNoParensType (TypeOp op) lhs rhs) =
@@ -321,7 +321,7 @@ updateTypes goType = (goDecl, goExpr, goBinder)
   where
 
   goType' :: Maybe SourceSpan -> Type -> m Type
-  goType' = everywhereOnTypesM . goType
+  goType' = everywhereOnTypesTopDownM . goType
 
   goType'' :: SourceSpan -> Type -> m Type
   goType'' = goType' . Just
@@ -340,8 +340,8 @@ updateTypes goType = (goDecl, goExpr, goBinder)
     return $ TypeInstanceDeclaration sa name cs' className tys' impls
   goDecl (TypeSynonymDeclaration sa@(ss, _) name args ty) =
     TypeSynonymDeclaration sa name args <$> goType'' ss ty
-  goDecl (TypeDeclaration sa@(ss, _) expr ty) =
-    TypeDeclaration sa expr <$> goType'' ss ty
+  goDecl (TypeDeclaration (TypeDeclarationData sa@(ss, _) expr ty)) =
+    TypeDeclaration . TypeDeclarationData sa expr <$> goType'' ss ty
   goDecl other =
     return other
 

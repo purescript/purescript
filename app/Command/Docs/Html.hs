@@ -15,7 +15,6 @@ import           Data.List (sort)
 import           Data.Text (Text)
 import           Data.Text.Lazy (toStrict)
 import qualified Data.Text as T
-import           Data.FileEmbed (embedStringFile)
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Docs as D
 import qualified Language.PureScript.Docs.AsHtml as D
@@ -133,9 +132,9 @@ basicLayout title inner =
       H.link ! A.href "https://fonts.googleapis.com/css?family=Roboto+Mono|Roboto:300,400,400i,700,700i"
              ! A.type_ "text/css" ! A.rel "stylesheet"
       H.style ! A.type_ "text/css" $
-        toMarkup normalize_css
+        toMarkup D.normalizeCssT
       H.style ! A.type_ "text/css" $
-        toMarkup pursuit_css
+        toMarkup D.pursuitCssT
     H.body $ do
       H.div ! A.class_ "everything-except-footer" $ do
         H.div ! A.class_ "top-banner clearfix" $ do
@@ -173,9 +172,3 @@ renderModuleList moduleList =
   listItem mn = H.li $
     H.a ! A.href (H.toValue (P.runModuleName mn <> ".html")) $
       toMarkup (P.runModuleName mn)
-
-normalize_css :: Text
-normalize_css = $(embedStringFile "app/static/normalize.css")
-
-pursuit_css :: Text
-pursuit_css = $(embedStringFile "app/static/pursuit.css")

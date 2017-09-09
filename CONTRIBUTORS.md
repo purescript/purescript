@@ -15,6 +15,7 @@ If you would prefer to use different terms, please use the section below instead
 | Username | Name | License |
 | :------- | :--- | :------ |
 | [@5outh](https://github.com/5outh) | Benjamin Kovach | MIT license |
+| [@actionshrimp](https://github.com/actionshrimp) | David Aitken | [MIT license](http://opensource.org/licenses/MIT) |
 | [@alexbiehl](https://github.com/alexbiehl) | Alexander Biehl | [MIT license](http://opensource.org/licenses/MIT) |
 | [@andreypopp](https://github.com/andreypopp) | Andrey Popp | MIT license |
 | [@andyarvanitis](https://github.com/andyarvanitis) | Andy Arvanitis | [MIT license](http://opensource.org/licenses/MIT) |
@@ -33,6 +34,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@chrisdone](https://github.com/chrisdone) | Chris Done | MIT license |
 | [@cmdv](https://github.com/cmdv) | Vincent Orr | MIT license |
 | [@codedmart](https://github.com/codedmart) | Brandon Martin | [MIT license](http://opensource.org/licenses/MIT) |
+| [@coot](https://github.com/coot) | Marcin Szamotulski | [MIT license](http://opensource.org/licenses/MIT) |
 | [@davidchambers](https://github.com/davidchambers) | David Chambers | [MIT license](http://opensource.org/licenses/MIT) |
 | [@DavidLindbom](https://github.com/DavidLindbom) | David Lindbom | [MIT license](http://opensource.org/licenses/MIT) |
 | [@dckc](https://github.com/dckc) | Dan Connolly | [MIT license](http://opensource.org/licenses/MIT) |
@@ -52,6 +54,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@izgzhen](https://github.com/izgzhen) | Zhen Zhang | [MIT license](http://opensource.org/licenses/MIT) |
 | [@jacereda](https://github.com/jacereda) | Jorge Acereda | [MIT license](http://opensource.org/licenses/MIT) |
 | [@japesinator](https://github.com/japesinator) | JP Smith | [MIT license](http://opensource.org/licenses/MIT) |
+| [@jkachmar](https://github.com/jkachmar) | Joe Kachmar | MIT license |
 | [@joneshf](https://github.com/joneshf) | Hardy Jones | MIT license |
 | [@kika](https://github.com/kika) | Kirill Pertsev | MIT license |
 | [@kRITZCREEK](https://github.com/kRITZCREEK) | Christoph Hegemann | MIT license |
@@ -106,6 +109,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@utkarshkukreti](https://github.com/utkarshkukreti) | Utkarsh Kukreti | [MIT license](http://opensource.org/licenses/MIT) |
 | [@vkorablin](https://github.com/vkorablin) | Vladimir Korablin | MIT license |
 | [@zudov](https://github.com/zudov) | Konstantin Zudov | [MIT license](http://opensource.org/licenses/MIT) |
+| [@b123400](https://github.com/b123400) | b123400 | [MIT license](https://opensource.org/licenses/MIT) |
 
 ### Contributors using Modified Terms
 

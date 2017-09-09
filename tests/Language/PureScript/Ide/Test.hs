@@ -20,10 +20,12 @@ import qualified Language.PureScript             as P
 
 defConfig :: IdeConfiguration
 defConfig =
-  IdeConfiguration { confLogLevel = LogNone
-                , confOutputPath = "output/"
-                , confGlobs = ["src/*.purs"]
-                }
+  IdeConfiguration
+    { confLogLevel = LogNone
+    , confOutputPath = "output/"
+    , confGlobs = ["src/*.purs"]
+    , confEditorMode = False
+    }
 
 runIde' :: IdeConfiguration -> IdeState -> [Command] -> IO ([Either IdeError Success], IdeState)
 runIde' conf s cs = do

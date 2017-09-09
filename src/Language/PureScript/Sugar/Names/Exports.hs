@@ -37,7 +37,7 @@ findExportable (Module _ _ mn ds _) =
     exps' <- rethrowWithPosition ss $ exportTypeClass Internal exps tcn mn
     foldM go exps' ds'
     where
-    go exps'' (TypeDeclaration (ss', _) name _) = rethrowWithPosition ss' $ exportValue exps'' name mn
+    go exps'' (TypeDeclaration (TypeDeclarationData (ss', _) name _)) = rethrowWithPosition ss' $ exportValue exps'' name mn
     go _ _ = internalError "Invalid declaration in TypeClassDeclaration"
   updateExports exps (DataDeclaration _ _ tn _ dcs) =
     exportType Internal exps tn (map fst dcs) mn
@@ -45,8 +45,8 @@ findExportable (Module _ _ mn ds _) =
     exportType Internal exps tn [] mn
   updateExports exps (ExternDataDeclaration _ tn _) =
     exportType Internal exps tn [] mn
-  updateExports exps (ValueDeclaration _ name _ _ _) =
-    exportValue exps name mn
+  updateExports exps (ValueDeclaration vd) =
+    exportValue exps (valdeclIdent vd) mn
   updateExports exps (ValueFixityDeclaration _ _ _ op) =
     exportValueOp exps op mn
   updateExports exps (TypeFixityDeclaration _ _ _ op) =

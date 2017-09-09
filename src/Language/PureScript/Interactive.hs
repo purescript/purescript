@@ -24,7 +24,7 @@ import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.State.Class
 import           Control.Monad.Reader.Class
 import           Control.Monad.Trans.Except (ExceptT(..), runExceptT)
-import           Control.Monad.Trans.State.Strict (StateT, runStateT)
+import           Control.Monad.Trans.State.Strict (StateT, runStateT, evalStateT)
 import           Control.Monad.Writer.Strict (Writer(), runWriter)
 
 import qualified Language.PureScript as P
@@ -110,6 +110,7 @@ handleCommand _ _ p (KindOf typ)              = handleKindOf p typ
 handleCommand _ _ p (BrowseModule moduleName) = handleBrowse p moduleName
 handleCommand _ _ p (ShowInfo QueryLoaded)    = handleShowLoadedModules p
 handleCommand _ _ p (ShowInfo QueryImport)    = handleShowImportedModules p
+handleCommand _ _ p (CompleteStr prefix)      = handleComplete p prefix
 handleCommand _ _ _ _                         = P.internalError "handleCommand: unexpected command"
 
 -- | Reload the application state
@@ -307,3 +308,15 @@ handleBrowse print' moduleName = do
         print' $ T.unpack $ "Module '" <> N.runModuleName modName <> "' is not valid."
     lookupUnQualifiedModName quaModName st =
         (\(modName,_,_) -> modName) <$> find ( \(_, _, mayQuaName) -> mayQuaName == Just quaModName) (psciImportedModules st)
+
+-- | Return output as would be returned by tab completion, for tools integration etc.
+handleComplete
+  :: (MonadState PSCiState m, MonadIO m)
+  => (String -> m ())
+  -> String
+  -> m ()
+handleComplete print' prefix = do
+  st <- get
+  let act = liftCompletionM (completion' (reverse prefix, ""))
+  results <- evalStateT act st
+  print' $ unlines (formatCompletions results)

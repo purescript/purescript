@@ -58,19 +58,19 @@ parseDirective cmd =
     ds       -> Left ("Ambiguous directive. Possible matches: " ++
                   intercalate ", " (map snd ds) ++ ". Type :? for help.")
   where
-  (dstr, arg) = break isSpace cmd
+  (dstr, arg) = trim <$> break isSpace cmd
 
   commandFor d = case d of
-    Help    -> return ShowHelp
-    Quit    -> return QuitPSCi
-    Reload  -> return ReloadState
-    Clear   -> return ClearState
-    Paste   -> return PasteLines
-    Browse  -> BrowseModule <$> parseRest P.moduleName arg
-    Show    -> ShowInfo <$> parseReplQuery' (trim arg)
-    Type    -> TypeOf <$> parseRest P.parseValue arg
-    Kind    -> KindOf <$> parseRest P.parseType arg
-
+    Help     -> return ShowHelp
+    Quit     -> return QuitPSCi
+    Reload   -> return ReloadState
+    Clear    -> return ClearState
+    Paste    -> return PasteLines
+    Browse   -> BrowseModule <$> parseRest P.moduleName arg
+    Show     -> ShowInfo <$> parseReplQuery' arg
+    Type     -> TypeOf <$> parseRest P.parseValue arg
+    Kind     -> KindOf <$> parseRest P.parseType arg
+    Complete -> return (CompleteStr arg)
 -- |
 -- Parses expressions entered at the PSCI repl.
 --

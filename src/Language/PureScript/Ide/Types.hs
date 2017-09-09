@@ -12,6 +12,8 @@
 -- Type definitions for psc-ide
 -----------------------------------------------------------------------------
 
+{-# LANGUAGE DeriveGeneric   #-}
+{-# LANGUAGE DeriveAnyClass  #-}
 {-# LANGUAGE DeriveFoldable  #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -38,43 +40,43 @@ data IdeDeclaration
   | IdeDeclValueOperator IdeValueOperator
   | IdeDeclTypeOperator IdeTypeOperator
   | IdeDeclKind (P.ProperName 'P.KindName)
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeValue = IdeValue
   { _ideValueIdent :: P.Ident
   , _ideValueType  :: P.Type
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeType = IdeType
  { _ideTypeName :: P.ProperName 'P.TypeName
  , _ideTypeKind :: P.Kind
  , _ideTypeDtors :: [(P.ProperName 'P.ConstructorName, P.Type)]
- } deriving (Show, Eq, Ord)
+ } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeTypeSynonym = IdeTypeSynonym
   { _ideSynonymName :: P.ProperName 'P.TypeName
   , _ideSynonymType :: P.Type
   , _ideSynonymKind :: P.Kind
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeDataConstructor = IdeDataConstructor
   { _ideDtorName     :: P.ProperName 'P.ConstructorName
   , _ideDtorTypeName :: P.ProperName 'P.TypeName
   , _ideDtorType     :: P.Type
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeTypeClass = IdeTypeClass
   { _ideTCName :: P.ProperName 'P.ClassName
   , _ideTCKind :: P.Kind
   , _ideTCInstances :: [IdeInstance]
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeInstance = IdeInstance
   { _ideInstanceModule      :: P.ModuleName
   , _ideInstanceName        :: P.Ident
   , _ideInstanceTypes       :: [P.Type]
   , _ideInstanceConstraints :: Maybe [P.Constraint]
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeValueOperator = IdeValueOperator
   { _ideValueOpName          :: P.OpName 'P.ValueOpName
@@ -82,7 +84,7 @@ data IdeValueOperator = IdeValueOperator
   , _ideValueOpPrecedence    :: P.Precedence
   , _ideValueOpAssociativity :: P.Associativity
   , _ideValueOpType          :: Maybe P.Type
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeTypeOperator = IdeTypeOperator
   { _ideTypeOpName          :: P.OpName 'P.TypeOpName
@@ -90,7 +92,7 @@ data IdeTypeOperator = IdeTypeOperator
   , _ideTypeOpPrecedence    :: P.Precedence
   , _ideTypeOpAssociativity :: P.Associativity
   , _ideTypeOpKind          :: Maybe P.Kind
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic, NFData)
 
 makePrisms ''IdeDeclaration
 makeLenses ''IdeValue
@@ -105,14 +107,14 @@ makeLenses ''IdeTypeOperator
 data IdeDeclarationAnn = IdeDeclarationAnn
   { _idaAnnotation  :: Annotation
   , _idaDeclaration :: IdeDeclaration
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic, NFData)
 
 data Annotation
   = Annotation
   { _annLocation       :: Maybe P.SourceSpan
   , _annExportedFrom   :: Maybe P.ModuleName
   , _annTypeAnnotation :: Maybe P.Type
-  } deriving (Show, Eq, Ord)
+  } deriving (Show, Eq, Ord, Generic, NFData)
 
 makeLenses ''Annotation
 makeLenses ''IdeDeclarationAnn
@@ -125,7 +127,7 @@ type TypeAnnotations = Map P.Ident P.Type
 newtype AstData a = AstData (ModuleMap (DefinitionSites a, TypeAnnotations))
   -- ^ SourceSpans for the definition sites of values and types as well as type
   -- annotations found in a module
-  deriving (Show, Eq, Ord, Functor, Foldable)
+  deriving (Show, Eq, Ord, Generic, NFData, Functor, Foldable)
 
 data IdeLogLevel = LogDebug | LogPerf | LogAll | LogDefault | LogNone
   deriving (Show, Eq)
@@ -135,6 +137,7 @@ data IdeConfiguration =
   { confOutputPath :: FilePath
   , confLogLevel   :: IdeLogLevel
   , confGlobs      :: [FilePath]
+  , confEditorMode :: Bool
   }
 
 data IdeEnvironment =
@@ -316,7 +319,7 @@ instance ToJSON PursuitResponse where
 
 -- | Denotes the different namespaces a name in PureScript can reside in.
 data IdeNamespace = IdeNSValue | IdeNSType | IdeNSKind
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 instance FromJSON IdeNamespace where
   parseJSON (String s) = case s of
@@ -328,4 +331,4 @@ instance FromJSON IdeNamespace where
 
 -- | A name tagged with a namespace
 data IdeNamespaced = IdeNamespaced IdeNamespace Text
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic, NFData)

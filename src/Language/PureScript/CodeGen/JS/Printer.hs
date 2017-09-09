@@ -49,7 +49,7 @@ literals = mkPattern' match'
     , withIndent $ do
         jss <- forM ps $ \(key, value) -> fmap ((objectPropertyToString key <> emit ": ") <>) . prettyPrintJS' $ value
         indentString <- currentIndent
-        return $ intercalate (emit ", \n") $ map (indentString <>) jss
+        return $ intercalate (emit ",\n") $ map (indentString <>) jss
     , return $ emit "\n"
     , currentIndent
     , return $ emit "}"
