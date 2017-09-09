@@ -135,6 +135,7 @@ matchTypeAtom tro@TypeRenderOptions{troSuggesting = suggesting} =
         | otherwise = Just $ text $ T.unpack name ++ show s
       match REmpty = Just $ text "()"
       match row@RCons{} = Just $ prettyPrintRowWith tro '(' ')' row
+      match (ProxyType t) = Just $ text "@" <> typeAtomAsBox t
       match (BinaryNoParensType op l r) =
         Just $ typeAsBox l <> text " " <> typeAsBox op <> text " " <> typeAsBox r
       match (TypeOp op) = Just $ text $ T.unpack $ showQualified runOpName op

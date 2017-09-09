@@ -408,6 +408,9 @@ parseLet = do
   result <- parseValue
   return $ Let ds result
 
+parseProxy :: TokenParser Expr
+parseProxy = Proxy <$> (at *> parseTypeAtom)
+
 parseValueAtom :: TokenParser Expr
 parseValueAtom = withSourceSpan PositionedValue $ P.choice
                  [ parseAnonymousArgument
@@ -424,6 +427,7 @@ parseValueAtom = withSourceSpan PositionedValue $ P.choice
                  , parseIfThenElse
                  , parseDo
                  , parseLet
+                 , parseProxy
                  , P.try $ Parens <$> parens parseValue
                  , Op <$> parseQualified (parens parseOperator)
                  , parseHole

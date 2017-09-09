@@ -760,6 +760,10 @@ data Expr
   --
   | Do [DoNotationElement]
   -- |
+  -- A proxy value
+  --
+  | Proxy Type
+  -- |
   -- An application of a typeclass dictionary constructor. The value should be
   -- an ObjectLiteral.
   --
