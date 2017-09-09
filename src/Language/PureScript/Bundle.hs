@@ -511,6 +511,12 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
   where
   rendered = renderToString (JSAstProgram (prelude : concatMap fst modulesJS ++ maybe [] runMain optionsMainModule) JSNoAnnot)
 
+  isValidJavaScriptIdentifier :: String -> Bool
+  isValidJavaScriptIdentifier string = case parse string mempty of
+    Right (JSAstProgram [JSExpressionStatement (JSIdentifier _ _) _] _)  -> True
+    Right _ -> False
+    Left _ -> False
+
   sourceMapping :: String -> SourceMapping
   sourceMapping outFile = SourceMapping {
       smFile = outFile,
@@ -574,9 +580,16 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
 
       toExport :: (ExportType, String, JSExpression, [Key]) -> JSStatement
       toExport (_, nm, val, _) =
+        let jsMemberExpression = if isValidJavaScriptIdentifier nm
+            then
+              JSMemberDot (JSIdentifier lfsp "exports") JSNoAnnot
+                (JSIdentifier JSNoAnnot nm)
+            else
+              JSMemberSquare (JSIdentifier lfsp "exports") JSNoAnnot
+                (str nm) JSNoAnnot
+        in
         JSAssignStatement
-          (JSMemberSquare (JSIdentifier lfsp "exports") JSNoAnnot
-            (str nm) JSNoAnnot)
+          jsMemberExpression
           (JSAssign sp)
           val
           (JSSemi JSNoAnnot)
@@ -617,9 +630,14 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
     JSMemberExpression (JSIdentifier JSNoAnnot "require") JSNoAnnot (cList [ str mn ]) JSNoAnnot
 
   moduleReference :: JSAnnot -> String -> JSExpression
-  moduleReference a mn =
-    JSMemberSquare (JSIdentifier a optionsNamespace) JSNoAnnot
-      (str mn) JSNoAnnot
+  moduleReference a mn = if isValidJavaScriptIdentifier mn
+    then
+      JSMemberDot (JSIdentifier a optionsNamespace) JSNoAnnot
+        (JSIdentifier JSNoAnnot mn)
+    else
+      JSMemberSquare (JSIdentifier a optionsNamespace) JSNoAnnot
+        (str mn) JSNoAnnot
+
 
   str :: String -> JSExpression
   str s = JSStringLiteral JSNoAnnot $ "\"" ++ s ++ "\""
