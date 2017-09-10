@@ -28,6 +28,7 @@ import Data.Maybe (fromMaybe, maybeToList, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Text (Text, stripPrefix, stripSuffix)
+import qualified Data.Text as T
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -51,6 +52,7 @@ data Evidence
   | WarnInstance Type         -- ^ Warn type class with a user-defined warning message
   | IsSymbolInstance PSString -- ^ The IsSymbol type class for a given Symbol literal
   | CompareSymbolInstance
+  | ConsSymbolInstance
   | AppendSymbolInstance
   | UnionInstance
   | ConsInstance
@@ -166,6 +168,10 @@ entails SolverOptions{..} constraint context hints =
       | Just (arg0', arg1', arg2') <- appendSymbols arg0 arg1 arg2 =
       let args = [arg0', arg1', arg2']
       in [TypeClassDictionaryInScope AppendSymbolInstance [] C.AppendSymbol args Nothing]
+    forClassName _ C.ConsSymbol [arg0, arg1, arg2]
+      | Just (arg0', arg1', arg2') <- consSymbol arg0 arg1 arg2 =
+      let args = [arg0', arg1', arg2']
+      in [TypeClassDictionaryInScope ConsSymbolInstance [] C.ConsSymbol args Nothing]
     forClassName _ C.Union [l, r, u]
       | Just (lOut, rOut, uOut, cst) <- unionRows l r u
       = [ TypeClassDictionaryInScope UnionInstance [] C.Union [lOut, rOut, uOut] cst ]
@@ -346,6 +352,8 @@ entails SolverOptions{..} constraint context hints =
               return $ TypeClassDictionaryConstructorApp C.IsSymbol (Literal (ObjectLiteral fields))
             mkDictionary CompareSymbolInstance _ =
               return $ TypeClassDictionaryConstructorApp C.CompareSymbol (Literal (ObjectLiteral []))
+            mkDictionary ConsSymbolInstance _ =
+              return $ TypeClassDictionaryConstructorApp C.ConsSymbol (Literal (ObjectLiteral []))
             mkDictionary AppendSymbolInstance _ =
               return $ TypeClassDictionaryConstructorApp C.AppendSymbol (Literal (ObjectLiteral []))
 
@@ -368,6 +376,18 @@ entails SolverOptions{..} constraint context hints =
       lhs <- stripSuffix rhs' out'
       pure (TypeLevelString (mkString lhs), arg1, arg2)
     appendSymbols _ _ _ = Nothing
+    
+    consSymbol :: Type -> Type -> Type -> Maybe (Type, Type, Type)
+    consSymbol _ _ arg@(TypeLevelString s) = do
+      (h, t) <- T.uncons =<< decodeString s
+      pure (mkTLString (T.singleton h), mkTLString t, arg)
+      where mkTLString = TypeLevelString . mkString
+    consSymbol arg1@(TypeLevelString h) arg2@(TypeLevelString t) _ = do
+      h' <- decodeString h
+      t' <- decodeString t
+      guard (T.length h' == 1)
+      pure (arg1, arg2, TypeLevelString (mkString $ h' <> t'))
+    consSymbol _ _ _ = Nothing
 
     -- | Left biased union of two row types
     unionRows :: Type -> Type -> Type -> Maybe (Type, Type, Type, Maybe [Constraint])

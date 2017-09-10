@@ -326,12 +326,16 @@ identifiers.
 
 Arguments:
   - `file :: String` the path to the module to rebuild
+  - `actualFile :: Maybe String` Specifies the path to be used for location
+    information and parse errors. This is useful in case a temp file is used as
+    the source for a rebuild.
 
 ```json
 {
   "command": "rebuild",
   "params": {
     "file": "/path/to/file.purs"
+    "actualFile": "/path/to/actualFile.purs"
   }
 }
 ```

@@ -345,6 +345,9 @@ pattern CompareSymbol = Qualified (Just TypeDataSymbol) (ProperName "CompareSymb
 pattern AppendSymbol :: Qualified (ProperName 'ClassName)
 pattern AppendSymbol = Qualified (Just TypeDataSymbol) (ProperName "AppendSymbol")
 
+pattern ConsSymbol :: Qualified (ProperName 'ClassName)
+pattern ConsSymbol = Qualified (Just TypeDataSymbol) (ProperName "ConsSymbol")
+
 -- Type.Data.Ordering
 
 typeDataOrdering :: ModuleName
@@ -479,3 +482,9 @@ partialUnsafe = "Partial_Unsafe"
 
 unsafePartial :: forall a. (IsString a) => a
 unsafePartial = "unsafePartial"
+
+unsafeCoerce :: forall a. (IsString a) => a
+unsafeCoerce = "Unsafe_Coerce"
+
+unsafeCoerceFn :: forall a. (IsString a) => a
+unsafeCoerceFn = "unsafeCoerce"

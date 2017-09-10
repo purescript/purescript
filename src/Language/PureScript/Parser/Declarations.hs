@@ -59,7 +59,7 @@ parseTypeDeclaration :: TokenParser Declaration
 parseTypeDeclaration = withSourceAnnF $ do
   name <- P.try (parseIdent <* indented <* doubleColon)
   ty <- parsePolyType
-  return $ \sa -> TypeDeclaration sa name ty
+  return $ \sa -> TypeDeclaration (TypeDeclarationData sa name ty)
 
 parseTypeSynonymDeclaration :: TokenParser Declaration
 parseTypeSynonymDeclaration = withSourceAnnF $ do
@@ -87,7 +87,7 @@ parseValueWithIdentAndBinders ident bs = do
                            <*> (indented *> equals
                                          *> withSourceSpan PositionedValue parseValueWithWhereClause))
     )
-  return $ \sa -> ValueDeclaration sa ident Public bs value
+  return $ \sa -> ValueDecl sa ident Public bs value
 
 parseValueDeclaration :: TokenParser Declaration
 parseValueDeclaration = withSourceAnnF $ do
@@ -408,6 +408,9 @@ parseLet = do
   result <- parseValue
   return $ Let ds result
 
+parseProxy :: TokenParser Expr
+parseProxy = Proxy <$> (at *> parseTypeAtom)
+
 parseValueAtom :: TokenParser Expr
 parseValueAtom = withSourceSpan PositionedValue $ P.choice
                  [ parseAnonymousArgument
@@ -423,7 +426,9 @@ parseValueAtom = withSourceSpan PositionedValue $ P.choice
                  , parseCase
                  , parseIfThenElse
                  , parseDo
+                 , parseAdo
                  , parseLet
+                 , parseProxy
                  , P.try $ Parens <$> parens parseValue
                  , Op <$> parseQualified (parens parseOperator)
                  , parseHole
@@ -459,6 +464,14 @@ parseDo = do
   reserved "do"
   indented
   Do <$> mark (P.many1 (same *> mark parseDoNotationElement))
+
+parseAdo :: TokenParser Expr
+parseAdo = do
+  reserved "ado"
+  indented
+  elements <- mark (P.many (same *> mark parseDoNotationElement))
+  yield <- mark (reserved "in" *> parseValue)
+  pure $ Ado elements yield
 
 parseDoNotationLet :: TokenParser DoNotationElement
 parseDoNotationLet = DoNotationLet <$> (reserved "let" *> indented *> mark (P.many1 (same *> parseLocalDeclaration)))
