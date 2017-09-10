@@ -18,6 +18,7 @@ import Language.PureScript.Externs
 import Language.PureScript.Sugar.BindingGroups as S
 import Language.PureScript.Sugar.CaseDeclarations as S
 import Language.PureScript.Sugar.DoNotation as S
+import Language.PureScript.Sugar.AdoNotation as S
 import Language.PureScript.Sugar.LetPattern as S
 import Language.PureScript.Sugar.Names as S
 import Language.PureScript.Sugar.ObjectWildcards as S
@@ -36,6 +37,8 @@ import Language.PureScript.Sugar.TypeDeclarations as S
 --  * Desugar operator sections
 --
 --  * Desugar do-notation
+--
+--  * Desugar ado-notation
 --
 --  * Desugar top-level case declarations into explicit case expressions
 --
@@ -58,6 +61,7 @@ desugar externs =
   map desugarSignedLiterals
     >>> traverse desugarObjectConstructors
     >=> traverse desugarDoModule
+    >=> traverse desugarAdoModule
     >=> map desugarLetPatternModule
     >>> traverse desugarCasesModule
     >=> traverse desugarTypeDeclarationsModule
