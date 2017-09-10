@@ -27,7 +27,7 @@ import Data.List (minimumBy)
 import Data.Maybe (fromMaybe, maybeToList, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Data.Text (Text)
+import Data.Text (Text, stripPrefix, stripSuffix)
 import qualified Data.Text as T
 
 import Language.PureScript.AST
@@ -164,8 +164,9 @@ entails SolverOptions{..} constraint context hints =
                   GT -> C.orderingGT
           args = [arg0, arg1, TypeConstructor ordering]
       in [TypeClassDictionaryInScope CompareSymbolInstance [] C.CompareSymbol args Nothing]
-    forClassName _ C.AppendSymbol [arg0@(TypeLevelString lhs), arg1@(TypeLevelString rhs), _] =
-      let args = [arg0, arg1, TypeLevelString (lhs <> rhs)]
+    forClassName _ C.AppendSymbol [arg0, arg1, arg2]
+      | Just (arg0', arg1', arg2') <- appendSymbols arg0 arg1 arg2 =
+      let args = [arg0', arg1', arg2']
       in [TypeClassDictionaryInScope AppendSymbolInstance [] C.AppendSymbol args Nothing]
     forClassName _ C.ConsSymbol [arg0, arg1, arg2]
       | Just (arg0', arg1', arg2') <- consSymbol arg0 arg1 arg2 =
@@ -361,6 +362,21 @@ entails SolverOptions{..} constraint context hints =
         subclassDictionaryValue dict className index =
           App (Accessor (mkString (superclassName className index)) dict) valUndefined
 
+    -- | Append type level symbols, or, run backwards, strip a prefix or suffix
+    appendSymbols :: Type -> Type -> Type -> Maybe (Type, Type, Type)
+    appendSymbols arg0@(TypeLevelString lhs) arg1@(TypeLevelString rhs) _ = Just (arg0, arg1, TypeLevelString (lhs <> rhs))
+    appendSymbols arg0@(TypeLevelString lhs) _ arg2@(TypeLevelString out) = do
+      lhs' <- decodeString lhs
+      out' <- decodeString out
+      rhs <- stripPrefix lhs' out'
+      pure (arg0, TypeLevelString (mkString rhs), arg2)
+    appendSymbols _ arg1@(TypeLevelString rhs) arg2@(TypeLevelString out) = do
+      rhs' <- decodeString rhs
+      out' <- decodeString out
+      lhs <- stripSuffix rhs' out'
+      pure (TypeLevelString (mkString lhs), arg1, arg2)
+    appendSymbols _ _ _ = Nothing
+    
     consSymbol :: Type -> Type -> Type -> Maybe (Type, Type, Type)
     consSymbol _ _ arg@(TypeLevelString s) = do
       (h, t) <- T.uncons =<< decodeString s
