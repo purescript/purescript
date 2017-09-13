@@ -89,7 +89,7 @@ getDeclarationTitle (P.ExternDataDeclaration _ name _) = Just (P.runProperName n
 getDeclarationTitle (P.ExternKindDeclaration _ name) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeSynonymDeclaration _ name _ _) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeClassDeclaration _ name _ _ _ _) = Just (P.runProperName name)
-getDeclarationTitle (P.TypeInstanceDeclaration _ name _ _ _ _) = Just (P.showIdent name)
+getDeclarationTitle (P.TypeInstanceDeclaration _ _ _ name _ _ _ _) = Just (P.showIdent name)
 getDeclarationTitle (P.TypeFixityDeclaration _ _ _ op) = Just ("type " <> P.showOp op)
 getDeclarationTitle (P.ValueFixityDeclaration _ _ _ op) = Just (P.showOp op)
 getDeclarationTitle _ = Nothing
@@ -138,7 +138,7 @@ convertDeclaration (P.TypeClassDeclaration sa _ args implies fundeps ds) title =
     ChildDeclaration (P.showIdent ident') (convertComments com) (Just ss) (ChildTypeClassMember ty)
   convertClassMember _ =
     P.internalError "convertDeclaration: Invalid argument to convertClassMember."
-convertDeclaration (P.TypeInstanceDeclaration (ss, com) _ constraints className tys _) title =
+convertDeclaration (P.TypeInstanceDeclaration (ss, com) _ _ _ constraints className tys _) title =
   Just (Left ((classNameString, AugmentClass) : map (, AugmentType) typeNameStrings, AugmentChild childDecl))
   where
   classNameString = unQual className

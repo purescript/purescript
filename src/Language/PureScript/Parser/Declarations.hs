@@ -16,10 +16,11 @@ module Language.PureScript.Parser.Declarations
   ) where
 
 import           Prelude hiding (lex)
+import           Protolude (ordNub)
 
 import           Control.Applicative
 import           Control.Arrow ((+++))
-import           Control.Monad (foldM, join)
+import           Control.Monad (foldM, join, zipWithM)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Parallel.Strategies (withStrategy, parList, rseq)
 import           Data.Functor (($>))
@@ -220,7 +221,7 @@ parseInstanceDeclaration = withSourceAnnF $ do
     return deps
   className <- indented *> parseQualified properName
   ty <- P.many (indented *> parseTypeAtom)
-  return $ \sa -> TypeInstanceDeclaration sa name (fromMaybe [] deps) className ty
+  return $ \sa -> TypeInstanceDeclaration sa [] 0 name (fromMaybe [] deps) className ty
 
 parseTypeInstanceDeclaration :: TokenParser Declaration
 parseTypeInstanceDeclaration = do
@@ -236,6 +237,32 @@ parseTypeInstanceDeclaration = do
       , parseValueDeclaration
       ] P.<?> "type declaration or value declaration in instance"
 
+parseTypeInstanceChainDeclaration :: TokenParser [Declaration]
+parseTypeInstanceChainDeclaration = do
+  instances <- P.sepBy1 parseTypeInstanceDeclaration (reserved "else")
+  ensureSameTypeClass instances
+  chainId <- traverse getTypeInstanceName instances
+  zipWithM (setTypeInstanceChain chainId) instances [0..]
+  where
+    getTypeInstanceName :: Declaration -> TokenParser Ident
+    getTypeInstanceName (TypeInstanceDeclaration _ _ _ name _ _ _ _) = return name
+    getTypeInstanceName _ = P.unexpected "Found non-instance in chain declaration."
+
+    setTypeInstanceChain :: [Ident] -> Declaration -> Integer -> TokenParser Declaration
+    setTypeInstanceChain chain (TypeInstanceDeclaration sa _ _ n d c t b) index = return (TypeInstanceDeclaration sa chain index n d c t b)
+    setTypeInstanceChain _ _ _ = P.unexpected "Found non-instance in chain declaration."
+
+    getTypeInstanceClass :: Declaration -> TokenParser (Qualified (ProperName 'ClassName))
+    getTypeInstanceClass (TypeInstanceDeclaration _ _ _ _ _ tc _ _) = return tc
+    getTypeInstanceClass _ = P.unexpected "Found non-instance in chain declaration."
+
+    ensureSameTypeClass :: [Declaration] -> TokenParser ()
+    ensureSameTypeClass xs = do
+      classNames <- ordNub <$> traverse getTypeInstanceClass xs
+      case classNames of
+        [_] -> return ()
+        _   -> P.unexpected "All instances in a chain must implement the same type class."
+
 parseDerivingInstanceDeclaration :: TokenParser Declaration
 parseDerivingInstanceDeclaration = do
   reserved "derive"
@@ -243,19 +270,19 @@ parseDerivingInstanceDeclaration = do
   instanceDecl <- parseInstanceDeclaration
   return $ instanceDecl ty
 
--- | Parse a single declaration
-parseDeclaration :: TokenParser Declaration
+-- | Parse a single declaration.  May include a collection of instances in a chain.
+parseDeclaration :: TokenParser [Declaration]
 parseDeclaration =
   P.choice
-    [ parseDataDeclaration
-    , parseTypeDeclaration
-    , parseTypeSynonymDeclaration
-    , parseValueDeclaration
-    , parseExternDeclaration
-    , parseFixityDeclaration
-    , parseTypeClassDeclaration
-    , parseTypeInstanceDeclaration
-    , parseDerivingInstanceDeclaration
+    [ pure <$> parseDataDeclaration
+    , pure <$> parseTypeDeclaration
+    , pure <$> parseTypeSynonymDeclaration
+    , pure <$> parseValueDeclaration
+    , pure <$> parseExternDeclaration
+    , pure <$> parseFixityDeclaration
+    , pure <$> parseTypeClassDeclaration
+    , parseTypeInstanceChainDeclaration
+    , pure <$> parseDerivingInstanceDeclaration
     ] P.<?> "declaration"
 
 parseLocalDeclaration :: TokenParser Declaration
@@ -286,7 +313,7 @@ parseModule = do
     -- parseModuleHeader function. This should allow us to speed up rebuilds
     -- by only parsing as far as the module header. See PR #2054.
     imports <- P.many (same *> parseImportDeclaration)
-    decls   <- P.many (same *> parseDeclaration)
+    decls   <- join <$> P.many (same *> parseDeclaration)
     return (imports <> decls)
   _ <- P.eof
   end <- P.getPosition

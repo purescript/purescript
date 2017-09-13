@@ -34,7 +34,7 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
   getDeclIdent :: Declaration -> Maybe Ident
   getDeclIdent (ValueDeclaration vd) = Just (valdeclIdent vd)
   getDeclIdent (ExternDeclaration _ ident _) = Just ident
-  getDeclIdent (TypeInstanceDeclaration _ ident _ _ _ _) = Just ident
+  getDeclIdent (TypeInstanceDeclaration _ _ _ ident _ _ _ _) = Just ident
   getDeclIdent BindingGroupDeclaration{} = internalError "lint: binding groups should not be desugared yet."
   getDeclIdent _ = Nothing
 

@@ -62,6 +62,10 @@ ef = P.ExternsFile
       mempty
       -- , edInstanceConstraints =
       mempty
+      -- , edInstanceChain =
+      mempty
+      -- , edInstanceChainIndex =
+      0
  --     }
     ]
   --, efSourceSpan =
