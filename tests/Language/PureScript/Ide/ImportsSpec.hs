@@ -29,6 +29,15 @@ simpleFile =
   , "myFunc x y = x + y"
   ]
 
+hidingFile :: [Text]
+hidingFile =
+  [ "module Main where"
+  , "import Prelude"
+  , "import Data.Maybe hiding (maybe)"
+  , ""
+  , "myFunc x y = x + y"
+  ]
+
 syntaxErrorFile :: [Text]
 syntaxErrorFile =
   [ "module Main where"
@@ -37,8 +46,8 @@ syntaxErrorFile =
   , "myFunc ="
   ]
 
-splitSimpleFile :: (P.ModuleName, [Text], [Import], [Text])
-splitSimpleFile = fromRight (sliceImportSection simpleFile)
+testSliceImportSection :: [Text] -> (P.ModuleName, [Text], [Import], [Text])
+testSliceImportSection = fromRight . sliceImportSection
   where
     fromRight = fromJust . rightToMaybe
 
@@ -99,7 +108,8 @@ spec = do
       shouldBe (prettyPrintImport' maybeImport) "import Data.Maybe (Maybe(Just))"
 
   describe "import commands" $ do
-    let simpleFileImports = let (_, _, i, _) = splitSimpleFile in i
+    let simpleFileImports = let (_, _, i, _) = testSliceImportSection simpleFile in i
+        hidingFileImports = let (_, _, i, _) = testSliceImportSection hidingFile in i
         addValueImport i mn q is =
           prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideValue i Nothing)) mn q is)
         addOpImport op mn q is =
@@ -125,6 +135,14 @@ spec = do
       shouldBe
         (addQualifiedImport' simpleFileImports (Test.mn "Data.Map") (Test.mn "Map"))
         [ "import Prelude"
+        , ""
+        , "import Data.Map as Map"
+        ]
+    it "adds a qualified import and maintains proper grouping for implicit hiding imports" $
+      shouldBe
+        (addQualifiedImport' hidingFileImports (Test.mn "Data.Map") (Test.mn "Map"))
+        [ "import Data.Maybe hiding (maybe)"
+        , "import Prelude"
         , ""
         , "import Data.Map as Map"
         ]
