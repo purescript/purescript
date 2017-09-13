@@ -116,6 +116,21 @@ executables:
     main: Main.hs
     source-dirs: app
     ghc-options: -Wall -O2 -fno-warn-unused-do-bind -threaded -rtsopts -with-rtsopts=-N
+    other-modules:
+      - Command.Bundle
+      - Command.Compile
+      - Command.Docs
+      - Command.Docs.Ctags
+      - Command.Docs.Etags
+      - Command.Docs.Html
+      - Command.Docs.Tags
+      - Command.Hierarchy
+      - Command.Ide
+      - Command.Publish
+      - Command.REPL
+      - Paths_purescript
+      - Version
+
     dependencies:
       - ansi-wl-pprint
       - file-embed
