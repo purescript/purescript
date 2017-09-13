@@ -1,5 +1,6 @@
-resolver: lts-8.5
+resolver: nightly-2017-09-10
 packages:
 - '.'
 extra-deps:
 - pipes-http-1.0.5
+- Win32-notify-0.3.0.3
