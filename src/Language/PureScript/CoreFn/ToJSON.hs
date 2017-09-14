@@ -18,6 +18,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 
 import           Language.PureScript.AST.Literals
+import           Language.PureScript.AST.SourcePos (SourceSpan(SourceSpan))
 import           Language.PureScript.CoreFn
 import           Language.PureScript.Names
 import           Language.PureScript.PSString (PSString)
@@ -37,8 +38,14 @@ metaToJSON IsNewtype              = object [ T.pack "metaType"  .= "IsNewtype" ]
 metaToJSON IsTypeClassConstructor = object [ T.pack "metaType"  .= "IsTypeClassConstructor" ]
 metaToJSON IsForeign              = object [ T.pack "metaType"  .= "IsForeign" ]
 
+sourceSpanToJSON :: SourceSpan -> Value
+sourceSpanToJSON (SourceSpan _ spanStart spanEnd) =
+  object [ T.pack "start" .= spanStart
+         , T.pack "end"   .= spanEnd
+         ]
+
 annToJSON :: Ann -> Value
-annToJSON (ss, _, _, m) = object [ T.pack "sourceSpan"  .= toJSON ss
+annToJSON (ss, _, _, m) = object [ T.pack "sourceSpan"  .= sourceSpanToJSON ss
                                  , T.pack "meta"        .= maybe Null metaToJSON m
                                  ]
 
@@ -95,14 +102,16 @@ moduleNameToJSON :: ModuleName -> Value
 moduleNameToJSON (ModuleName pns) = toJSON $ properNameToJSON `map` pns
 
 moduleToJSON :: Version -> ModuleT a Ann -> Value
-moduleToJSON v m = object [ T.pack "moduleName" .= moduleNameToJSON (moduleName m)
-                          , T.pack "imports"    .= map importToJSON (moduleImports m)
-                          , T.pack "exports"    .= map identToJSON (moduleExports m)
-                          , T.pack "foreign"    .= map (identToJSON . fst) (moduleForeign m)
-                          , T.pack "decls"      .= map bindToJSON (moduleDecls m)
-                          , T.pack "builtWith"  .= toJSON (showVersion v)
-                          , T.pack "comments"   .= map toJSON (moduleComments m)
-                          ]
+moduleToJSON v m = object
+  [ T.pack "moduleName" .= moduleNameToJSON (moduleName m)
+  , T.pack "modulePath" .= toJSON (modulePath m)
+  , T.pack "imports"    .= map importToJSON (moduleImports m)
+  , T.pack "exports"    .= map identToJSON (moduleExports m)
+  , T.pack "foreign"    .= map (identToJSON . fst) (moduleForeign m)
+  , T.pack "decls"      .= map bindToJSON (moduleDecls m)
+  , T.pack "builtWith"  .= toJSON (showVersion v)
+  , T.pack "comments"   .= map toJSON (moduleComments m)
+  ]
 
   where
   importToJSON (ann,mn) = object

@@ -13,6 +13,7 @@ import Language.PureScript.Types
 data ModuleT t a = Module
   { moduleComments :: [Comment]
   , moduleName :: ModuleName
+  , modulePath :: FilePath
   , moduleImports :: [(a, ModuleName)]
   , moduleExports :: [Ident]
   , moduleForeign :: [ForeignDeclT t]
