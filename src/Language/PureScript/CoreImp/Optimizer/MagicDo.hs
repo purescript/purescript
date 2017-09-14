@@ -1,6 +1,6 @@
 -- | This module implements the "Magic Do" optimization, which inlines calls to return
 -- and bind for the Eff monad, as well as some of its actions.
-module Language.PureScript.CoreImp.Optimizer.MagicDo (magicDo) where
+module Language.PureScript.CoreImp.Optimizer.MagicDo (magicDo, inlineST) where
 
 import Prelude.Compat
 import Protolude (ordNub)
@@ -27,7 +27,7 @@ import qualified Language.PureScript.Constants as C
 --    ...
 --  }
 magicDo :: AST -> AST
-magicDo = inlineST . everywhere undo . everywhereTopDown convert
+magicDo = everywhereTopDown convert
   where
   -- The name of the function block which is added to denote a do block
   fnName = "__do"
@@ -47,6 +47,11 @@ magicDo = inlineST . everywhere undo . everywhereTopDown convert
   -- Desugar whileE
   convert (App _ (App _ (App s1 f [arg1]) [arg2]) []) | isEffFunc C.whileE f =
     App s1 (Function s1 Nothing [] (Block s1 [ While s1 (App s1 arg1 []) (Block s1 [ App s1 arg2 [] ]), Return s1 $ ObjectLiteral s1 []])) []
+  -- Inline __do returns
+  convert (Return _ (App _ (Function _ (Just ident) [] body) [])) | ident == fnName = body
+  -- Inline double applications
+  convert (App _ (App s1 (Function s2 Nothing [] (Block ss body)) []) []) =
+    App s1 (Function s2 Nothing [] (Block ss (applyReturns `fmap` body))) []
   convert other = other
   -- Check if an expression represents a monomorphic call to >>= for the Eff monad
   isBind (App _ fn [dict]) | isDict (C.eff, C.bindEffDictionary) dict && isBindPoly fn = True
@@ -69,11 +74,6 @@ magicDo = inlineST . everywhere undo . everywhereTopDown convert
   -- Check if an expression represents a function in the Eff module
   isEffFunc name (Indexer _ (StringLiteral _ name') (Var _ eff)) = eff == C.eff && name == name'
   isEffFunc _ _ = False
-
-  -- Remove __do function applications which remain after desugaring
-  undo :: AST -> AST
-  undo (Return _ (App _ (Function _ (Just ident) [] body) [])) | ident == fnName = body
-  undo other = other
 
   applyReturns :: AST -> AST
   applyReturns (Return ss ret) = Return ss (App ss ret [])
