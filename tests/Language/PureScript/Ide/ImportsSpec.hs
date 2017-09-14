@@ -29,6 +29,15 @@ simpleFile =
   , "myFunc x y = x + y"
   ]
 
+hidingFile :: [Text]
+hidingFile =
+  [ "module Main where"
+  , "import Prelude"
+  , "import Data.Maybe hiding (maybe)"
+  , ""
+  , "myFunc x y = x + y"
+  ]
+
 syntaxErrorFile :: [Text]
 syntaxErrorFile =
   [ "module Main where"
@@ -37,8 +46,8 @@ syntaxErrorFile =
   , "myFunc ="
   ]
 
-splitSimpleFile :: (P.ModuleName, [Text], [Import], [Text])
-splitSimpleFile = fromRight (sliceImportSection simpleFile)
+testSliceImportSection :: [Text] -> (P.ModuleName, [Text], [Import], [Text])
+testSliceImportSection = fromRight . sliceImportSection
   where
     fromRight = fromJust . rightToMaybe
 
@@ -99,17 +108,19 @@ spec = do
       shouldBe (prettyPrintImport' maybeImport) "import Data.Maybe (Maybe(Just))"
 
   describe "import commands" $ do
-    let simpleFileImports = let (_, _, i, _) = splitSimpleFile in i
-        addValueImport i mn is =
-          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideValue i Nothing)) mn is)
-        addOpImport op mn is =
-          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideValueOp op (P.Qualified Nothing (Left "")) 2 Nothing Nothing)) mn is)
-        addDtorImport i t mn is =
-          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideDtor i t Nothing)) mn is)
-        addTypeImport i mn is =
-          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideType i Nothing [])) mn is)
-        addKindImport i mn is =
-          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideKind i)) mn is)
+    let simpleFileImports = let (_, _, i, _) = testSliceImportSection simpleFile in i
+        hidingFileImports = let (_, _, i, _) = testSliceImportSection hidingFile in i
+        addValueImport i mn q is =
+          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideValue i Nothing)) mn q is)
+        addOpImport op mn q is =
+          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideValueOp op (P.Qualified q (Left "")) 2 Nothing Nothing)) mn q is)
+        addDtorImport i t mn q is =
+          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideDtor i t Nothing)) mn q is)
+        addTypeImport i mn q is =
+          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideType i Nothing [])) mn q is)
+        addKindImport i mn q is =
+          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideKind i)) mn q is)
+        qualify s = Just (Test.mn s)
     it "adds an implicit unqualified import to a file without any imports" $
       shouldBe
         (addImplicitImport' [] (P.moduleNameFromString "Data.Map"))
@@ -127,86 +138,156 @@ spec = do
         , ""
         , "import Data.Map as Map"
         ]
+    it "adds a qualified import and maintains proper grouping for implicit hiding imports" $
+      shouldBe
+        (addQualifiedImport' hidingFileImports (Test.mn "Data.Map") (Test.mn "Map"))
+        [ "import Data.Maybe hiding (maybe)"
+        , "import Prelude"
+        , ""
+        , "import Data.Map as Map"
+        ]
     it "adds an explicit unqualified import to a file without any imports" $
       shouldBe
-        (addValueImport "head" (P.moduleNameFromString "Data.Array") [])
+        (addValueImport "head" (P.moduleNameFromString "Data.Array") Nothing [])
         ["import Data.Array (head)"]
+    it "adds an explicit qualified import to a file without any imports" $
+      shouldBe
+        (addValueImport "head" (P.moduleNameFromString "Data.Array") (qualify "Array") [])
+        ["import Data.Array (head) as Array"]
     it "adds an explicit unqualified import" $
       shouldBe
-        (addValueImport "head" (P.moduleNameFromString "Data.Array") simpleFileImports)
+        (addValueImport "head" (P.moduleNameFromString "Data.Array") Nothing simpleFileImports)
         [ "import Prelude"
         , ""
         , "import Data.Array (head)"
         ]
+    it "adds an explicit qualified import" $
+      shouldBe
+        (addValueImport "head" (P.moduleNameFromString "Data.Array") (qualify "Array") simpleFileImports)
+        [ "import Prelude"
+        , ""
+        , "import Data.Array (head) as Array"
+        ]
     it "doesn't add an import if the containing module is imported implicitly" $
       shouldBe
-      (addValueImport "const" (P.moduleNameFromString "Prelude") simpleFileImports)
+      (addValueImport "const" (P.moduleNameFromString "Prelude") Nothing simpleFileImports)
       ["import Prelude"]
+    let Right (_, _, qualifiedImports, _) = sliceImportSection (withImports ["import Data.Array as Array"])
+    it "doesn't add a qualified explicit import if the containing module is imported qualified" $
+      shouldBe
+      (addValueImport "length" (P.moduleNameFromString "Data.Array") (qualify "Array") qualifiedImports)
+      ["import Prelude"
+      , ""
+      , "import Data.Array as Array"]
     let Right (_, _, explicitImports, _) = sliceImportSection (withImports ["import Data.Array (tail)"])
     it "adds an identifier to an explicit import list" $
       shouldBe
-        (addValueImport "head" (P.moduleNameFromString "Data.Array") explicitImports)
+        (addValueImport "head" (P.moduleNameFromString "Data.Array") Nothing explicitImports)
         [ "import Prelude"
         , ""
         , "import Data.Array (head, tail)"
         ]
+    let Right (_, _, explicitQualImports, _) = sliceImportSection (withImports ["import Data.Array (tail) as Array"])
+    it "adds an identifier to an explicit qualified import list" $
+      shouldBe
+        (addValueImport "head" (P.moduleNameFromString "Data.Array") (qualify "Array") explicitQualImports)
+        [ "import Prelude"
+        , ""
+        , "import Data.Array (head, tail) as Array"
+        ]
     it "adds a kind to an explicit import list" $
       shouldBe
-        (addKindImport "Effect" (P.moduleNameFromString "Control.Monad.Eff") simpleFileImports)
+        (addKindImport "Effect" (P.moduleNameFromString "Control.Monad.Eff") Nothing simpleFileImports)
         [ "import Prelude"
         , ""
         , "import Control.Monad.Eff (kind Effect)"
         ]
+    it "adds a kind to an explicit qualified import list" $
+      shouldBe
+        (addKindImport "Effect" (P.moduleNameFromString "Control.Monad.Eff") (qualify "Eff") simpleFileImports)
+        [ "import Prelude"
+        , ""
+        , "import Control.Monad.Eff (kind Effect) as Eff"
+        ]
     it "adds an operator to an explicit import list" $
       shouldBe
-        (addOpImport "<~>" (P.moduleNameFromString "Data.Array") explicitImports)
+        (addOpImport "<~>" (P.moduleNameFromString "Data.Array") Nothing explicitImports)
         [ "import Prelude"
         , ""
         , "import Data.Array (tail, (<~>))"
         ]
+    it "adds an operator to an explicit qualified import list" $
+      shouldBe
+        (addOpImport "<~>" (P.moduleNameFromString "Data.Array") (qualify "Array") explicitQualImports)
+        [ "import Prelude"
+        , ""
+        , "import Data.Array (tail, (<~>)) as Array"
+        ]
     it "adds a type with constructors without automatically adding an open import of said constructors " $
         shouldBe
-          (addTypeImport "Maybe" (P.moduleNameFromString "Data.Maybe") simpleFileImports)
+          (addTypeImport "Maybe" (P.moduleNameFromString "Data.Maybe") Nothing simpleFileImports)
           [ "import Prelude"
           , ""
           , "import Data.Maybe (Maybe)"
           ]
     it "adds the type for a given DataConstructor" $
         shouldBe
-          (addDtorImport "Just" "Maybe" (P.moduleNameFromString "Data.Maybe") simpleFileImports)
+          (addDtorImport "Just" "Maybe" (P.moduleNameFromString "Data.Maybe") Nothing simpleFileImports)
           [ "import Prelude"
           , ""
           , "import Data.Maybe (Maybe(..))"
           ]
+    it "adds the type for a given DataConstructor qualified" $
+        shouldBe
+          (addDtorImport "Just" "Maybe" (P.moduleNameFromString "Data.Maybe") (qualify "M") simpleFileImports)
+          [ "import Prelude"
+          , ""
+          , "import Data.Maybe (Maybe(..)) as M"
+          ]
     it "adds a dataconstructor to an existing type import" $ do
       let Right (_, _, typeImports, _) = sliceImportSection (withImports ["import Data.Maybe (Maybe)"])
       shouldBe
-        (addDtorImport "Just" "Maybe" (P.moduleNameFromString "Data.Maybe") typeImports)
+        (addDtorImport "Just" "Maybe" (P.moduleNameFromString "Data.Maybe") Nothing typeImports)
         [ "import Prelude"
         , ""
         , "import Data.Maybe (Maybe(..))"
         ]
+    it "adds a dataconstructor to an existing qualified type import" $ do
+      let Right (_, _, typeImports, _) = sliceImportSection (withImports ["import Data.Maybe (Maybe) as M"])
+      shouldBe
+        (addDtorImport "Just" "Maybe" (P.moduleNameFromString "Data.Maybe") (qualify "M") typeImports)
+        [ "import Prelude"
+        , ""
+        , "import Data.Maybe (Maybe(..)) as M"
+        ]
     it "doesn't add a dataconstructor to an existing type import with open dtors" $ do
       let Right (_, _, typeImports, _) = sliceImportSection (withImports ["import Data.Maybe (Maybe(..))"])
       shouldBe
-        (addDtorImport "Just" "Maybe" (P.moduleNameFromString "Data.Maybe") typeImports)
+        (addDtorImport "Just" "Maybe" (P.moduleNameFromString "Data.Maybe") Nothing typeImports)
         [ "import Prelude"
         , ""
         , "import Data.Maybe (Maybe(..))"
         ]
     it "doesn't add an identifier to an explicit import list if it's already imported" $
       shouldBe
-      (addValueImport "tail" (P.moduleNameFromString "Data.Array") explicitImports)
+      (addValueImport "tail" (P.moduleNameFromString "Data.Array") Nothing explicitImports)
       [ "import Prelude"
       , ""
       , "import Data.Array (tail)"
+      ]
+    it "doesn't add an identifier to an explicit qualified import list if it's already imported qualified" $
+      shouldBe
+      (addValueImport "tail" (P.moduleNameFromString "Data.Array") (qualify "Array") explicitQualImports)
+      [ "import Prelude"
+      , ""
+      , "import Data.Array (tail) as Array"
       ]
 
   describe "explicit import sorting" $ do
     -- given some basic import skeleton
     let Right (_, _, baseImports, _) = sliceImportSection $ withImports ["import Control.Monad (ap)"]
         moduleName = (P.moduleNameFromString "Control.Monad")
-        addImport imports import' = addExplicitImport' import' moduleName imports
+        addImport imports import' = addExplicitImport' import' moduleName Nothing imports
         valueImport ident = _idaDeclaration (Test.ideValue ident Nothing)
         typeImport name = _idaDeclaration (Test.ideType name Nothing [])
         classImport name = _idaDeclaration (Test.ideTypeClass name P.kindType [])
@@ -244,7 +325,7 @@ implImport mn =
 
 addExplicitImport :: Text -> Command
 addExplicitImport i =
-  Command.Import ("src" </> "ImportsSpec.purs") Nothing [] (Command.AddImportForIdentifier i)
+  Command.Import ("src" </> "ImportsSpec.purs") Nothing [] (Command.AddImportForIdentifier i Nothing)
 
 importShouldBe :: [Text] -> [Text] -> Expectation
 importShouldBe res importSection =

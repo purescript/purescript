@@ -131,7 +131,7 @@ parseTypeDeclaration' s =
         P.runTokenParser "" (P.parseDeclaration <* Parsec.eof) ts
   in
     case x of
-      Right (P.TypeDeclaration _ i t) -> pure (i, t)
+      Right (P.TypeDeclaration td : _) -> pure (P.unwrapTypeDeclaration td)
       Right _ -> throwError (GeneralError "Found a non-type-declaration")
       Left err ->
         throwError (GeneralError ("Parsing the type signature failed with: "

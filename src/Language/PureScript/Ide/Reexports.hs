@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 -----------------------------------------------------------------------------
 --
 -- Module      : Language.PureScript.Ide.Reexports
@@ -35,7 +36,9 @@ data ReexportResult a
   = ReexportResult
   { reResolved :: a
   , reFailed   :: [(P.ModuleName, P.DeclarationRef)]
-  } deriving (Show, Eq, Functor)
+  } deriving (Show, Eq, Functor, Generic)
+
+instance NFData a => NFData (ReexportResult a)
 
 -- | Uses the passed formatter to format the resolved module, and adds possible
 -- failures

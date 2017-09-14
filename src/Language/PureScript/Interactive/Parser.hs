@@ -7,6 +7,7 @@ module Language.PureScript.Interactive.Parser
 
 import           Prelude.Compat hiding (lex)
 
+import           Control.Monad (join)
 import           Data.Bifunctor (first)
 import           Data.Char (isSpace)
 import           Data.List (intercalate)
@@ -58,19 +59,19 @@ parseDirective cmd =
     ds       -> Left ("Ambiguous directive. Possible matches: " ++
                   intercalate ", " (map snd ds) ++ ". Type :? for help.")
   where
-  (dstr, arg) = break isSpace cmd
+  (dstr, arg) = trim <$> break isSpace cmd
 
   commandFor d = case d of
-    Help    -> return ShowHelp
-    Quit    -> return QuitPSCi
-    Reload  -> return ReloadState
-    Clear   -> return ClearState
-    Paste   -> return PasteLines
-    Browse  -> BrowseModule <$> parseRest P.moduleName arg
-    Show    -> ShowInfo <$> parseReplQuery' (trim arg)
-    Type    -> TypeOf <$> parseRest P.parseValue arg
-    Kind    -> KindOf <$> parseRest P.parseType arg
-
+    Help     -> return ShowHelp
+    Quit     -> return QuitPSCi
+    Reload   -> return ReloadState
+    Clear    -> return ClearState
+    Paste    -> return PasteLines
+    Browse   -> BrowseModule <$> parseRest P.moduleName arg
+    Show     -> ShowInfo <$> parseReplQuery' arg
+    Type     -> TypeOf <$> parseRest P.parseValue arg
+    Kind     -> KindOf <$> parseRest P.parseType arg
+    Complete -> return (CompleteStr arg)
 -- |
 -- Parses expressions entered at the PSCI repl.
 --
@@ -87,11 +88,12 @@ psciImport = do
 -- | Any declaration that we don't need a 'special case' parser for
 -- (like import declarations).
 psciDeclaration :: P.TokenParser Command
-psciDeclaration = fmap Decls $ mark $ many1 $ same *> do
-  decl <- P.parseDeclaration
-  if acceptable decl
-    then return decl
-    else fail "this kind of declaration is not supported in psci"
+psciDeclaration = fmap Decls $ mark $ fmap join (many1 $ same *>
+  (traverse accept =<< P.parseDeclaration))
+  where
+  accept decl
+    | acceptable decl = return decl
+    | otherwise = fail "this kind of declaration is not supported in psci"
 
 acceptable :: P.Declaration -> Bool
 acceptable P.DataDeclaration{} = True

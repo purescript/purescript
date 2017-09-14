@@ -1,17 +1,18 @@
-psc-ide
+purs ide
 ===
 
-A tool which provides editor support for the PureScript programming language.
+Editor and tooling support for the PureScript programming language.
 
-## Editor Integration
-* [@epost](https://github.com/epost) wrote a plugin to integrate psc-ide with Emacs at https://github.com/epost/psc-ide-emacs.
-* Atom integration is available with https://github.com/nwolverson/atom-ide-purescript.
-* Visual Studio Code integration is available with https://github.com/nwolverson/vscode-ide-purescript.
-* Vim integration is available here: https://github.com/FrigoEU/psc-ide-vim.
+## Setting up your editor
+
+This document will describe how to run `purs ide` as an editor plugin creator.
+If you're looking to set up your PureScript development environment consult
+the
+[documentation repository](https://github.com/purescript/documentation/blob/master/ecosystem/Editor-and-tool-support.md) instead.
 
 ## Running the Server
 
-Start the server by running the `psc-ide-server [SOURCEGLOBS]` executable, where
+Start the server by running the `purs ide server [SOURCEGLOBS]` executable, where
 `SOURCEGLOBS` are (optional) globs that match your PureScript sourcefiles.
 
 It supports the following options:
@@ -26,21 +27,22 @@ It supports the following options:
   files. This flag is reversed on Windows and polling is the default.
 - `--log-level`: Can be set to one of "all", "none", "debug" and "perf"
 - `--no-watch`: Disables the filewatcher
+- `--editor-mode`: Only reload on source file changes reported by the editor
 - `--version`: Output psc-ide version
 
 ## Issuing queries
 
 After you started the server you can start issuing requests using
-`psc-ide-client`. Make sure you start by loading the modules before you try to
+`purs ide client`. Make sure you start by loading the modules before you try to
 query them.
 
-`psc-ide-server` expects the build externs.purs inside the `output/` folder of
-your project after running `pulp build` or `psc-make` respectively.
+`purs ide` expects the built externs.json inside the output folder of your
+project after running `pulp build` or `purs compile` respectively.
 
 (If you changed the port of the server you can change the port for
-`psc-ide-client` by using the -p option accordingly)
+`purs ide client` by using the -p option accordingly)
 
 ## Protocol
 
-For documentation about the protocol have a look at:
-[PROTOCOL.md](PROTOCOL.md)
+If you want to know how to send commands/queries to `purs ide` take a look
+at [PROTOCOL.md](PROTOCOL.md)

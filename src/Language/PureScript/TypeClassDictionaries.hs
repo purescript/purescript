@@ -18,8 +18,12 @@ import Language.PureScript.Types
 --
 data TypeClassDictionaryInScope v
   = TypeClassDictionaryInScope {
+    -- | The instance chain
+      tcdChain :: [Qualified Ident]
+    -- | Index of the instance chain
+    , tcdIndex :: Integer
     -- | The value with which the dictionary can be accessed at runtime
-      tcdValue :: v
+    , tcdValue :: v
     -- | How to obtain this instance via superclass relationships
     , tcdPath :: [(Qualified (ProperName 'ClassName), Integer)]
     -- | The name of the type class to which this type class instance applies

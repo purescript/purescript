@@ -23,15 +23,16 @@ directives = map fst directiveStrings
 --
 directiveStrings :: [(Directive, [String])]
 directiveStrings =
-    [ (Help   , ["?", "help"])
-    , (Quit   , ["quit"])
-    , (Reload , ["reload"])
-    , (Clear  , ["clear"])
-    , (Browse , ["browse"])
-    , (Type   , ["type"])
-    , (Kind   , ["kind"])
-    , (Show   , ["show"])
-    , (Paste  , ["paste"])
+    [ (Help      , ["?", "help"])
+    , (Quit      , ["quit"])
+    , (Reload    , ["reload"])
+    , (Clear     , ["clear"])
+    , (Browse    , ["browse"])
+    , (Type      , ["type"])
+    , (Kind      , ["kind"])
+    , (Show      , ["show"])
+    , (Paste     , ["paste"])
+    , (Complete  , ["complete"])
     ]
 
 -- |
@@ -93,14 +94,16 @@ hasArgument _ = True
 --
 help :: [(Directive, String, String)]
 help =
-  [ (Help,    "",         "Show this help menu")
-  , (Quit,    "",         "Quit PSCi")
-  , (Reload,  "",         "Reload all imported modules while discarding bindings")
-  , (Clear,   "",         "Discard all imported modules and declared bindings")
-  , (Browse,  "<module>", "See all functions in <module>")
-  , (Type,    "<expr>",   "Show the type of <expr>")
-  , (Kind,    "<type>",   "Show the kind of <type>")
-  , (Show,    "import",   "Show all imported modules")
-  , (Show,    "loaded",   "Show all loaded modules")
-  , (Paste,   "paste",    "Enter multiple lines, terminated by ^D")
+  [ (Help,     "",          "Show this help menu")
+  , (Quit,     "",          "Quit PSCi")
+  , (Reload,   "",          "Reload all imported modules while discarding bindings")
+  , (Clear,    "",          "Discard all imported modules and declared bindings")
+  , (Browse,   "<module>",  "See all functions in <module>")
+  , (Type,     "<expr>",    "Show the type of <expr>")
+  , (Kind,     "<type>",    "Show the kind of <type>")
+  , (Show,     "import",    "Show all imported modules")
+  , (Show,     "loaded",    "Show all loaded modules")
+  , (Paste,    "paste",     "Enter multiple lines, terminated by ^D")
+  , (Complete, "<prefix>",  "Show completions for <prefix> as if pressing tab")
   ]
+

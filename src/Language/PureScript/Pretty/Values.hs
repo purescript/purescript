@@ -78,6 +78,11 @@ prettyPrintValue d (Let ds val) =
     (text "in " <> prettyPrintValue (d - 1) val)
 prettyPrintValue d (Do els) =
   text "do " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els)
+prettyPrintValue _ (Proxy ty) =
+  text "@" <> typeAtomAsBox ty
+prettyPrintValue d (Ado els yield) =
+  text "ado " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els) //
+  (text "in " <> prettyPrintValue (d - 1) yield)
 prettyPrintValue _ (TypeClassDictionary (Constraint name tys _) _ _) = foldl1 beforeWithSpace $ text ("#dict " ++ T.unpack (runProperName (disqualify name))) : map typeAtomAsBox tys
 prettyPrintValue _ (DeferredDictionary name _) = text $ "#dict " ++ T.unpack (runProperName (disqualify name))
 prettyPrintValue _ (TypeClassDictionaryAccessor className ident) =
@@ -122,14 +127,14 @@ prettyPrintLiteralValue d (ObjectLiteral ps) = prettyPrintObject (d - 1) $ secon
 
 prettyPrintDeclaration :: Int -> Declaration -> Box
 prettyPrintDeclaration d _ | d < 0 = ellipsis
-prettyPrintDeclaration _ (TypeDeclaration _ ident ty) =
-  text (T.unpack (showIdent ident) ++ " :: ") <> typeAsBox ty
-prettyPrintDeclaration d (ValueDeclaration _ ident _ [] [GuardedExpr [] val]) =
+prettyPrintDeclaration _ (TypeDeclaration td) =
+  text (T.unpack (showIdent (tydeclIdent td)) ++ " :: ") <> typeAsBox (tydeclType td)
+prettyPrintDeclaration d (ValueDecl _ ident _ [] [GuardedExpr [] val]) =
   text (T.unpack (showIdent ident) ++ " = ") <> prettyPrintValue (d - 1) val
 prettyPrintDeclaration d (BindingGroupDeclaration ds) =
   vsep 1 left (NEL.toList (fmap (prettyPrintDeclaration (d - 1) . toDecl) ds))
   where
-  toDecl ((sa, nm), t, e) = ValueDeclaration sa nm t [] [GuardedExpr [] e]
+  toDecl ((sa, nm), t, e) = ValueDecl sa nm t [] [GuardedExpr [] e]
 prettyPrintDeclaration _ _ = internalError "Invalid argument to prettyPrintDeclaration"
 
 prettyPrintCaseAlternative :: Int -> CaseAlternative -> Box
