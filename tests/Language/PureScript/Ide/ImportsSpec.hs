@@ -2,7 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Language.PureScript.Ide.ImportsSpec where
 
-import           Protolude
+import           Protolude hiding (moduleName)
 import           Data.Maybe                      (fromJust)
 
 import qualified Language.PureScript             as P
