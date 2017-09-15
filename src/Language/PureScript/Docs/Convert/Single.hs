@@ -2,7 +2,7 @@ module Language.PureScript.Docs.Convert.Single
   ( convertSingleModule
   ) where
 
-import Protolude
+import Protolude hiding (moduleName)
 
 import Control.Category ((>>>))
 

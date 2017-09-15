@@ -36,7 +36,7 @@ module Language.PureScript.Ide.State
   , resolveDataConstructorsForModule
   ) where
 
-import           Protolude
+import           Protolude hiding (moduleName)
 
 import           Control.Arrow
 import           Control.Concurrent.STM

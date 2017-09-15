@@ -147,6 +147,7 @@ command = Opts.helper <*> subcommands where
             `mappend` Opts.help "One of \"debug\", \"perf\", \"all\" or \"none\""))
       <*> Opts.switch (Opts.long "editor-mode")
 
+  parseLogLevel :: Text -> IdeLogLevel
   parseLogLevel s = case s of
     "debug" -> LogDebug
     "perf" -> LogPerf
