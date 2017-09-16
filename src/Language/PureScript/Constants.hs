@@ -361,6 +361,9 @@ pattern CompareNat = Qualified (Just TypeDataNat) (ProperName "CompareNat")
 pattern AddNat :: Qualified (ProperName 'ClassName)
 pattern AddNat = Qualified (Just TypeDataNat) (ProperName "AddNat")
 
+pattern MultNat :: Qualified (ProperName 'ClassName)
+pattern MultNat = Qualified (Just TypeDataNat) (ProperName "MultNat")
+
 
 -- Type.Data.Symbol
 

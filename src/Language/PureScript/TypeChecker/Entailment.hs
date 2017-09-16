@@ -56,6 +56,7 @@ data Evidence
   | CompareSymbolInstance
   | ConsSymbolInstance
   | AddNatInstance
+  | MultNatInstance
   | AppendSymbolInstance
   | UnionInstance
   | ConsInstance
@@ -193,6 +194,11 @@ entails SolverOptions{..} constraint context hints =
       = case addNat arg0 arg1 arg2 of
           Just (arg0', arg1', arg2') ->
             [TypeClassDictionaryInScope [] 0 AddNatInstance [] C.AddNat [arg0', arg1', arg2'] Nothing]
+          Nothing -> []
+    forClassName _ C.MultNat [arg0, arg1, arg2]
+      = case multNat arg0 arg1 arg2 of
+          Just (arg0', arg1', arg2') ->
+            [TypeClassDictionaryInScope [] 0 MultNatInstance [] C.MultNat [arg0', arg1', arg2'] Nothing]
           Nothing -> []
     forClassName _ C.Union [l, r, u]
       | Just (lOut, rOut, uOut, cst) <- unionRows l r u
@@ -391,6 +397,8 @@ entails SolverOptions{..} constraint context hints =
               return $ TypeClassDictionaryConstructorApp C.AppendSymbol (Literal (ObjectLiteral []))
             mkDictionary AddNatInstance _ =
               return $ TypeClassDictionaryConstructorApp C.AddNat (Literal (ObjectLiteral []))
+            mkDictionary MultNatInstance _ =
+              return $ TypeClassDictionaryConstructorApp C.MultNat (Literal (ObjectLiteral []))
 
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr
@@ -434,6 +442,20 @@ entails SolverOptions{..} constraint context hints =
       guard (a <= c)
       pure (arg1, TypeLevelNat (c - a), arg3)
     addNat _ _ _ = Nothing
+
+    multNat :: Type -> Type -> Type -> Maybe (Type, Type, Type)
+    multNat arg1@(TypeLevelNat a) arg2@(TypeLevelNat b) _
+      = pure (arg1, arg2, TypeLevelNat (a * b))
+    multNat _ arg2@(TypeLevelNat b) arg3@(TypeLevelNat c) = do
+      guard (0 < b)
+      guard (c `mod` b == 0)
+      pure (TypeLevelNat (c `div` b), arg2, arg3)
+    multNat arg1@(TypeLevelNat a) _ arg3@(TypeLevelNat c) = do
+      guard (0 < a)
+      guard (c `mod` a == 0)
+      pure (arg1, TypeLevelNat (c `div` a), arg3)
+    multNat _ _ _ = Nothing
+
 
     -- | Left biased union of two row types
     unionRows :: Type -> Type -> Type -> Maybe (Type, Type, Type, Maybe [Constraint])
