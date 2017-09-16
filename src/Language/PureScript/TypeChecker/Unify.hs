@@ -109,6 +109,7 @@ unifyTypes t1 t2 = do
   unifyTypes' ty1@(TypeConstructor c1) ty2@(TypeConstructor c2) =
     guardWith (errorMessage (TypesDoNotUnify ty1 ty2)) (c1 == c2)
   unifyTypes' (TypeLevelString s1) (TypeLevelString s2) | s1 == s2 = return ()
+  unifyTypes' (TypeLevelNat n1) (TypeLevelNat n2) | n1 == n2 = return ()
   unifyTypes' (TypeApp t3 t4) (TypeApp t5 t6) = do
     t3 `unifyTypes` t5
     t4 `unifyTypes` t6

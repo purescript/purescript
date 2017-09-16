@@ -14,7 +14,7 @@ import Prelude.Compat
 
 import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
-import Data.Text (Text)
+import Data.Text (Text, pack)
 
 import Control.Arrow ((<+>))
 import Control.PatternArrows as PA
@@ -57,6 +57,8 @@ typeLiterals = mkPattern match
     Just (typeOp n)
   match (TypeLevelString str) =
     Just (syntax (prettyPrintString str))
+  match (TypeLevelNat nat) =
+    Just (syntax (pack (show nat)))
   match _ =
     Nothing
 

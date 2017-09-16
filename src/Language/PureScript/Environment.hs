@@ -269,6 +269,9 @@ kindType = primKind C.typ
 kindSymbol :: Kind
 kindSymbol = primKind C.symbol
 
+kindNat :: Kind
+kindNat = primKind C.nat
+
 -- | Construct a type in the Prim module
 primTy :: Text -> Type
 primTy = TypeConstructor . primName
@@ -327,6 +330,7 @@ primKinds =
   S.fromList
     [ primName C.typ
     , primName C.symbol
+    , primName C.nat
     ]
 
 -- | The primitive types in the external javascript environment with their

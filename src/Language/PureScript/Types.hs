@@ -47,6 +47,8 @@ data Type
   | TypeVar Text
   -- | A type-level string
   | TypeLevelString PSString
+  -- | A type-level natural
+  | TypeLevelNat Integer
   -- | A type wildcard, as would appear in a partial type synonym
   | TypeWildcard SourceSpan
   -- | A type constructor

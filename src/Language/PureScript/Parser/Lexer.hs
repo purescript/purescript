@@ -108,6 +108,7 @@ data Token
   | UName Text
   | Qualifier Text
   | Symbol Text
+  | Nat Integer
   | CharLiteral Char
   | StringLiteral PSString
   | Number (Either Integer Double)
@@ -140,6 +141,7 @@ prettyPrintToken (LName s)         = T.pack (show s)
 prettyPrintToken (UName s)         = T.pack (show s)
 prettyPrintToken (Qualifier _)     = "qualifier"
 prettyPrintToken (Symbol s)        = s
+prettyPrintToken (Nat n)           = T.pack (show n)
 prettyPrintToken (CharLiteral c)   = T.pack (show c)
 prettyPrintToken (StringLiteral s) = T.pack (show s)
 prettyPrintToken (Number n)        = T.pack (either show show n)
@@ -239,6 +241,7 @@ parseToken = P.choice
   , CharLiteral   <$> parseCharLiteral
   , StringLiteral <$> parseStringLiteral
   , Number        <$> parseNumber
+  , Nat           <$> parseNat
   ]
 
   where
@@ -250,6 +253,9 @@ parseToken = P.choice
 
   parseSymbol :: Lexer u Text
   parseSymbol = T.pack <$> P.many1 symbolChar
+
+  parseNat :: Lexer u Integer
+  parseNat = PT.natural tokenParser
 
   identStart :: Lexer u Char
   identStart = P.lower <|> P.oneOf "_"

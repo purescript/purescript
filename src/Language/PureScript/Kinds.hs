@@ -67,6 +67,8 @@ kindFromJSON = do
         FunKind <$> kindAt 0 <*> kindAt 1
     "Symbol" ->
       pure kindSymbol
+    "Nat" ->
+      pure kindNat
     "NamedKind" ->
       NamedKind <$> key "contents" fromAesonParser
     other ->
@@ -83,6 +85,7 @@ kindFromJSON = do
 
   kindType = primKind "Type"
   kindSymbol = primKind "Symbol"
+  kindNat = primKind "Nat"
 
 instance A.FromJSON Kind where
   parseJSON = toAesonParser id kindFromJSON

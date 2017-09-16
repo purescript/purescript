@@ -342,6 +342,26 @@ pattern DataSymbol = ModuleName [ProperName "Data", ProperName "Symbol"]
 pattern IsSymbol :: Qualified (ProperName 'ClassName)
 pattern IsSymbol = Qualified (Just DataSymbol) (ProperName "IsSymbol")
 
+-- Data.Nat
+
+pattern DataNat :: ModuleName
+pattern DataNat = ModuleName [ProperName "Data", ProperName "Nat"]
+
+pattern IsNat :: Qualified (ProperName 'ClassName)
+pattern IsNat = Qualified (Just DataNat) (ProperName "IsNat")
+
+-- Type.Data.Nat
+
+pattern TypeDataNat :: ModuleName
+pattern TypeDataNat = ModuleName [ProperName "Type", ProperName "Data", ProperName "Nat"]
+
+pattern CompareNat :: Qualified (ProperName 'ClassName)
+pattern CompareNat = Qualified (Just TypeDataNat) (ProperName "CompareNat")
+
+pattern AddNat :: Qualified (ProperName 'ClassName)
+pattern AddNat = Qualified (Just TypeDataNat) (ProperName "AddNat")
+
+
 -- Type.Data.Symbol
 
 pattern TypeDataSymbol :: ModuleName
@@ -417,6 +437,9 @@ typ = "Type"
 
 symbol :: forall a. (IsString a) => a
 symbol = "Symbol"
+
+nat :: forall a. (IsString a) => a
+nat = "Nat"
 
 -- Code Generation
 

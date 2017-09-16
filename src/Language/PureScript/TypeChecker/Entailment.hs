@@ -52,8 +52,10 @@ data Evidence
   -- | Computed instances
   | WarnInstance Type         -- ^ Warn type class with a user-defined warning message
   | IsSymbolInstance PSString -- ^ The IsSymbol type class for a given Symbol literal
+  | IsNatInstance Integer    -- ^ The IsNat type class for a given Nat literal
   | CompareSymbolInstance
   | ConsSymbolInstance
+  | AddNatInstance
   | AppendSymbolInstance
   | UnionInstance
   | ConsInstance
@@ -170,6 +172,8 @@ entails SolverOptions{..} constraint context hints =
       findDicts ctx cn Nothing ++ [TypeClassDictionaryInScope [] 0 (WarnInstance msg) [] C.Warn [msg] Nothing]
     forClassName _ C.IsSymbol [TypeLevelString sym] =
       [TypeClassDictionaryInScope [] 0 (IsSymbolInstance sym) [] C.IsSymbol [TypeLevelString sym] Nothing]
+    forClassName _ C.IsNat [TypeLevelNat nat] =
+      [TypeClassDictionaryInScope [] 0 (IsNatInstance nat) [] C.IsNat [TypeLevelNat nat] Nothing]
     forClassName _ C.CompareSymbol [arg0@(TypeLevelString lhs), arg1@(TypeLevelString rhs), _] =
       let ordering = case compare lhs rhs of
                   LT -> C.orderingLT
@@ -185,6 +189,11 @@ entails SolverOptions{..} constraint context hints =
       | Just (arg0', arg1', arg2') <- consSymbol arg0 arg1 arg2 =
       let args = [arg0', arg1', arg2']
       in [TypeClassDictionaryInScope [] 0 ConsSymbolInstance [] C.ConsSymbol args Nothing]
+    forClassName _ C.AddNat [arg0, arg1, arg2]
+      = case addNat arg0 arg1 arg2 of
+          Just (arg0', arg1', arg2') ->
+            [TypeClassDictionaryInScope [] 0 AddNatInstance [] C.AddNat [arg0', arg1', arg2'] Nothing]
+          Nothing -> []
     forClassName _ C.Union [l, r, u]
       | Just (lOut, rOut, uOut, cst) <- unionRows l r u
       = [ TypeClassDictionaryInScope [] 0 UnionInstance [] C.Union [lOut, rOut, uOut] cst ]
@@ -371,12 +380,17 @@ entails SolverOptions{..} constraint context hints =
             mkDictionary (IsSymbolInstance sym) _ =
               let fields = [ ("reflectSymbol", Abs (VarBinder (Ident C.__unused)) (Literal (StringLiteral sym))) ] in
               return $ TypeClassDictionaryConstructorApp C.IsSymbol (Literal (ObjectLiteral fields))
+            mkDictionary (IsNatInstance num) _ =
+              let fields = [ ("reflectNat", Abs (VarBinder (Ident C.__unused)) (Literal (NumericLiteral (Left num)))) ] in
+              return $ TypeClassDictionaryConstructorApp C.IsNat (Literal (ObjectLiteral fields))
             mkDictionary CompareSymbolInstance _ =
               return $ TypeClassDictionaryConstructorApp C.CompareSymbol (Literal (ObjectLiteral []))
             mkDictionary ConsSymbolInstance _ =
               return $ TypeClassDictionaryConstructorApp C.ConsSymbol (Literal (ObjectLiteral []))
             mkDictionary AppendSymbolInstance _ =
               return $ TypeClassDictionaryConstructorApp C.AppendSymbol (Literal (ObjectLiteral []))
+            mkDictionary AddNatInstance _ =
+              return $ TypeClassDictionaryConstructorApp C.AddNat (Literal (ObjectLiteral []))
 
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr
@@ -397,7 +411,7 @@ entails SolverOptions{..} constraint context hints =
       lhs <- stripSuffix rhs' out'
       pure (TypeLevelString (mkString lhs), arg1, arg2)
     appendSymbols _ _ _ = Nothing
-    
+
     consSymbol :: Type -> Type -> Type -> Maybe (Type, Type, Type)
     consSymbol _ _ arg@(TypeLevelString s) = do
       (h, t) <- T.uncons =<< decodeString s
@@ -409,6 +423,17 @@ entails SolverOptions{..} constraint context hints =
       guard (T.length h' == 1)
       pure (arg1, arg2, TypeLevelString (mkString $ h' <> t'))
     consSymbol _ _ _ = Nothing
+
+    addNat :: Type -> Type -> Type -> Maybe (Type, Type, Type)
+    addNat arg1@(TypeLevelNat a) arg2@(TypeLevelNat b) _
+      = pure (arg1, arg2, TypeLevelNat (a + b))
+    addNat _ arg2@(TypeLevelNat b) arg3@(TypeLevelNat c) = do
+      guard (b <= c)
+      pure (TypeLevelNat (c - b), arg2, arg3)
+    addNat arg1@(TypeLevelNat a) _ arg3@(TypeLevelNat c) = do
+      guard (a <= c)
+      pure (arg1, TypeLevelNat (c - a), arg3)
+    addNat _ _ _ = Nothing
 
     -- | Left biased union of two row types
     unionRows :: Type -> Type -> Type -> Maybe (Type, Type, Type, Maybe [Constraint])
@@ -496,6 +521,7 @@ matches deps TypeClassDictionaryInScope{..} tys =
     typeHeadsAreEqual t                    (TypeVar v)                     = (Match (), M.singleton v [t])
     typeHeadsAreEqual (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = (Match (), M.empty)
     typeHeadsAreEqual (TypeLevelString s1) (TypeLevelString s2) | s1 == s2 = (Match (), M.empty)
+    typeHeadsAreEqual (TypeLevelNat n1)    (TypeLevelNat n2)    | n1 == n2 = (Match (), M.empty)
     typeHeadsAreEqual (TypeApp h1 t1)      (TypeApp h2 t2)                 =
       both (typeHeadsAreEqual h1 h2) (typeHeadsAreEqual t1 t2)
     typeHeadsAreEqual REmpty REmpty = (Match (), M.empty)
@@ -536,6 +562,7 @@ matches deps TypeClassDictionaryInScope{..} tys =
       typesAreEqual (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    = s1 == s2
       typesAreEqual (TypeVar v1)         (TypeVar v2)         = v1 == v2
       typesAreEqual (TypeLevelString s1) (TypeLevelString s2) = s1 == s2
+      typesAreEqual (TypeLevelNat n1)    (TypeLevelNat n2)    = n1 == n2
       typesAreEqual (TypeConstructor c1) (TypeConstructor c2) = c1 == c2
       typesAreEqual (TypeApp h1 t1)      (TypeApp h2 t2)      = typesAreEqual h1 h2 && typesAreEqual t1 t2
       typesAreEqual REmpty               REmpty               = True

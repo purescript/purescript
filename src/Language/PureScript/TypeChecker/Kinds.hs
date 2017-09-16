@@ -231,6 +231,7 @@ infer' other = (, []) <$> go other
   go TypeWildcard{} = freshKind
   go TUnknown{} = freshKind
   go (TypeLevelString _) = return kindSymbol
+  go (TypeLevelNat _) = return kindNat
   go (TypeVar v) = do
     Just moduleName <- checkCurrentModule <$> get
     lookupTypeVariable moduleName (Qualified Nothing (ProperName v))

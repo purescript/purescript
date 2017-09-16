@@ -33,6 +33,9 @@ parseObject = braces $ TypeApp tyRecord <$> parseRow
 parseTypeLevelString :: TokenParser Type
 parseTypeLevelString = TypeLevelString <$> stringLiteral
 
+parseTypeLevelNat :: TokenParser Type
+parseTypeLevelNat = TypeLevelNat <$> natural
+
 parseTypeWildcard :: TokenParser Type
 parseTypeWildcard = do
   start <- P.getPosition
@@ -73,6 +76,7 @@ parseTypeAtom :: TokenParser Type
 parseTypeAtom = indented *> P.choice
             [ P.try parseFunction
             , parseTypeLevelString
+            , parseTypeLevelNat
             , parseObject
             , parseTypeWildcard
             , parseForAll
