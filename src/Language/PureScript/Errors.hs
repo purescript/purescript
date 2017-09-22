@@ -608,7 +608,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 ]
             , line "The following instances were found:"
             , indent $ paras (map (line . showQualified showIdent) ds)
-            , line "Overlapping type class instances can lead to different behavior based on the order of module imports, and for that reason are disallowed."
             ]
     renderSimpleErrorMessage (UnknownClass nm) =
       paras [ line "No type class instance was found for class"
