@@ -230,15 +230,15 @@ removeParens = f
   (goDecl, goExpr', goBinder') = updateTypes (\_ -> return . goType)
 
   goExpr :: Expr -> Expr
-  goExpr (Parens val) = val
+  goExpr (Parens val) = goExpr val
   goExpr val = val
 
   goBinder :: Binder -> Binder
-  goBinder (ParensInBinder b) = b
+  goBinder (ParensInBinder b) = goBinder b
   goBinder b = b
 
   goType :: Type -> Type
-  goType (ParensInType t) = t
+  goType (ParensInType t) = goType t
   goType t = t
 
   decontextify
