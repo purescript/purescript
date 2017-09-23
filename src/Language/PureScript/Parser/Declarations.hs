@@ -202,8 +202,14 @@ parseTypeClassDeclaration = withSourceAnnF $ do
   dependencies <- P.option [] (indented *> pipe *> commaSep1 parseFunctionalDependency)
   members <- P.option [] $ do
     indented *> reserved "where"
-    indented *> mark (P.many (same *> parseTypeDeclaration))
+    indented *> mark (P.many (same *> declsInClass))
   return $ \sa -> TypeClassDeclaration sa className idents implies dependencies members
+  where
+    declsInClass:: TokenParser Declaration
+    declsInClass= P.choice
+      [ parseTypeDeclaration
+      , parseValueDeclaration
+      ] P.<?> "type declaration or value declaration in class"
 
 parseConstraint :: TokenParser Constraint
 parseConstraint = Constraint <$> parseQualified properName
