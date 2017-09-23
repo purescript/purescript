@@ -12,7 +12,7 @@ import qualified Language.PureScript as P
 primDocsModule :: Module
 primDocsModule = Module
   { modName = P.moduleNameFromString "Prim"
-  , modComments = Just "The Prim module is embedded in the PureScript compiler in order to provide compiler support for certain types &mdash; for example, value literals, or syntax sugar."
+  , modComments = Just "The Prim module is embedded in the PureScript compiler in order to provide compiler support for certain types &mdash; for example, value literals, or syntax sugar. It is implicitly imported unqualified in every module except those that list it as a qualified import."
   , modDeclarations =
       [ function
       , array

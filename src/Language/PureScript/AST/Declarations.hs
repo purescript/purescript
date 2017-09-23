@@ -233,12 +233,19 @@ getModuleSourceSpan (Module ss _ _ _ _) = ss
 -- |
 -- Add an import declaration for a module if it does not already explicitly import it.
 --
+-- Will not import an unqualified module if that module has already been imported qualified.
+-- (See #2197)
+--
 addDefaultImport :: Qualified ModuleName -> Module -> Module
 addDefaultImport (Qualified toImportAs toImport) m@(Module ss coms mn decls exps) =
   if isExistingImport `any` decls || mn == toImport then m
   else Module ss coms mn (ImportDeclaration (ss, []) toImport Implicit toImportAs : decls) exps
   where
-  isExistingImport (ImportDeclaration _ mn' _ as') | mn' == toImport && as' == toImportAs = True
+  isExistingImport (ImportDeclaration _ mn' _ as')
+    | mn' == toImport =
+        case toImportAs of
+          Nothing -> True
+          _ -> as' == toImportAs
   isExistingImport _ = False
 
 -- | Adds import declarations to a module for an implicit Prim import and Prim
@@ -248,8 +255,8 @@ importPrim =
   let
     primModName = ModuleName [ProperName C.prim]
   in
-    addDefaultImport (Qualified Nothing primModName)
-      . addDefaultImport (Qualified (Just primModName) primModName)
+    addDefaultImport (Qualified (Just primModName) primModName)
+      . addDefaultImport (Qualified Nothing primModName)
 
 -- |
 -- An item in a list of explicit imports or exports
