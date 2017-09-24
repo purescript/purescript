@@ -113,6 +113,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@zudov](https://github.com/zudov) | Konstantin Zudov | [MIT license](http://opensource.org/licenses/MIT) |
 | [@b123400](https://github.com/b123400) | b123400 | [MIT license](https://opensource.org/licenses/MIT) |
 | [@kcsongor](https://github.com/kcsongor) | Csongor Kiss | [MIT license](http://opensource.org/licenses/MIT) |
+| [@drets](https://github.com/drets) | Dmytro Rets | [MIT license](http://opensource.org/licenses/MIT) |
 
 ### Contributors using Modified Terms
 
