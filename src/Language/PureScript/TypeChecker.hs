@@ -20,7 +20,7 @@ import Control.Monad.Writer.Class (MonadWriter(..))
 import Control.Lens ((^..), _1, _2)
 
 import Data.Foldable (for_, traverse_, toList)
-import Data.List (nubBy, (\\), sort, group)
+import Data.List (nub, nubBy, (\\), sort, group)
 import Data.Maybe
 import Data.Monoid ((<>))
 import Data.Text (Text)
@@ -150,8 +150,13 @@ addTypeClass moduleName pn args implies dependencies ds = do
     checkMemberIsUsable syns (ident, memberTy) = do
       memberTy' <- T.replaceAllTypeSynonymsM syns memberTy
       let mentionedArgIndexes = S.fromList (mapMaybe argToIndex (freeTypeVariables memberTy'))
-      unless (any (`S.isSubsetOf` mentionedArgIndexes) coveringSets) $
-        throwError . errorMessage $ UnusableDeclaration ident
+      let leftovers = map (`S.difference` mentionedArgIndexes) coveringSets
+
+      unless (any null leftovers) . throwError . errorMessage $
+        let
+          solutions = map (map (fst . (args !!)) . S.toList) leftovers
+        in
+          UnusableDeclaration ident (nub solutions)
 
 addTypeClassDictionaries
   :: (MonadState CheckState m)
