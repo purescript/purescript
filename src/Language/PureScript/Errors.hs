@@ -950,9 +950,20 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , indent msg
             ]
 
-    renderSimpleErrorMessage (UnusableDeclaration ident) =
-      paras [ line $ "The declaration " <> markCode (showIdent ident) <> " is unusable."
-            , line $ "This happens when a constraint couldn't possibly have enough information to work out which instance is required."
+    renderSimpleErrorMessage (UnusableDeclaration ident unexplained) =
+      paras $
+        [ line $ "The declaration " <> markCode (showIdent ident) <> " contains arguments that couldn't be determined."
+        ] <>
+
+        case unexplained of
+          [required] ->
+            [ line $ "These arguments are: { " <> T.intercalate "," required <> "}"
+            ]
+
+          options  ->
+            [ line "To fix this, one of the following sets of variables must be determined:"
+            , Box.moveRight 2 . Box.vsep 0 Box.top $
+                map (\set -> line $ "{ " <> T.intercalate ", " set <> " }") options
             ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box

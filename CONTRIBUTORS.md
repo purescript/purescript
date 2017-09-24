@@ -51,6 +51,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@houli](https://github.com/houli) | Eoin Houlihan | [MIT license](http://opensource.org/licenses/MIT) |
 | [@ianbollinger](https://github.com/ianbollinger) | Ian D. Bollinger | [MIT license](http://opensource.org/licenses/MIT) |
 | [@ilovezfs](https://github.com/ilovezfs) | ilovezfs | MIT license |
+| [@i-am-tom](https://github.com/i-am-tom) | i-am-tom | [MIT license](http://opensource.org/licenses/MIT)  |
 | [@izgzhen](https://github.com/izgzhen) | Zhen Zhang | [MIT license](http://opensource.org/licenses/MIT) |
 | [@jacereda](https://github.com/jacereda) | Jorge Acereda | [MIT license](http://opensource.org/licenses/MIT) |
 | [@japesinator](https://github.com/japesinator) | JP Smith | [MIT license](http://opensource.org/licenses/MIT) |
