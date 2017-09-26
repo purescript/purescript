@@ -1,6 +1,4 @@
-An introductory overview of the compiler is available [here](https://www.youtube.com/watch?v=Y3P1dxqwFiE).
-
-Pull requests are encouraged.
+Pull requests are encouraged, but please open issues before starting to work on something that you intend to make into a PR, so that we can decide if it is a good fit or not.
 
 ## Finding Issues to Work On
 
