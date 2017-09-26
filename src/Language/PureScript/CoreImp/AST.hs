@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 -- | Data types for the imperative core AST
 module Language.PureScript.CoreImp.AST where
 
@@ -5,7 +6,9 @@ import Prelude.Compat
 
 import Control.Monad ((>=>))
 import Control.Monad.Identity (Identity(..), runIdentity)
+import Data.Aeson
 import Data.Text (Text)
+import GHC.Generics (Generic)
 
 import Language.PureScript.AST (SourceSpan(..))
 import Language.PureScript.Comments
@@ -19,7 +22,7 @@ data UnaryOperator
   | BitwiseNot
   | Positive
   | New
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
 
 -- | Built-in binary operators
 data BinaryOperator
@@ -42,7 +45,7 @@ data BinaryOperator
   | ShiftLeft
   | ShiftRight
   | ZeroFillShiftRight
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
 
 -- | Data type for simplified JavaScript expressions
 data AST
@@ -92,7 +95,11 @@ data AST
   -- ^ instanceof check
   | Comment (Maybe SourceSpan) [Comment] AST
   -- ^ Commented JavaScript
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
+
+instance ToJSON UnaryOperator
+instance ToJSON BinaryOperator
+instance ToJSON AST
 
 withSourceSpan :: SourceSpan -> AST -> AST
 withSourceSpan withSpan = go where
