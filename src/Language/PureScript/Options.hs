@@ -13,8 +13,10 @@ data Options = Options
   -- ^ Generate source maps
   , optionsDumpCoreFn :: Bool
   -- ^ Dump CoreFn
+  , optionsDumpCoreImp :: Bool
+  -- ^ Dump CoreImp
   } deriving Show
 
 -- Default make options
 defaultOptions :: Options
-defaultOptions = Options False False False False
+defaultOptions = Options False False False False False
