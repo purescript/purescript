@@ -339,6 +339,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
         coreFnFile = outputDir </> filePath </> "corefn.json"
         coreImpFile = outputDir </> filePath </> "coreimp.json"
         min3 js exts coreFn coreImp
+          | dumpCoreFn && dumpCoreImp = min (min js exts) (min coreFn coreImp)
           | dumpCoreFn = min (min js exts) coreFn
           | dumpCoreImp = min (min js exts) coreImp
           | otherwise = min js exts
