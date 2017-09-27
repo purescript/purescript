@@ -23,9 +23,10 @@ import Language.PureScript.PSString
 
 
 
-moduleToJSON :: Version -> Module a -> [AST] -> Value
-moduleToJSON v m a = object [ T.pack "body"      .= map (astToJSON) a
-                            , T.pack "corefn"    .= CoreFnToJSON.moduleToJSON v m
+moduleToJSON :: (Show a) => Version -> Module a -> [AST] -> Value
+moduleToJSON v m a = object [ T.pack "body"    .= map (astToJSON) a
+                            , T.pack "corefn"  .= CoreFnToJSON.moduleToJSON v m -- might be good to "keep a snapshot of the original FP logic of the module" depending on coreimp-processing use-case (others can ignore it)
+                            , T.pack "modraw"  .= toJSON (show m) -- only way to capture type/ctors info without rewriting corefn, good enough for those needing it badly enough, others can ignore it
                             ]
 
 astToJSON :: AST -> Value
