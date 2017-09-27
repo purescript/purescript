@@ -142,7 +142,7 @@ subASTsListToJSON name maybeSrcSpan asts =
             T.pack name         .= map astToJSON asts
             ]
 
-subASTsLeftRightToJSON :: String -> (Maybe SourceSpan) -> AST -> AST -> Value
+subASTsLeftRightToJSON :: String -> Maybe SourceSpan -> AST -> AST -> Value
 subASTsLeftRightToJSON name maybeSrcSpan astLeft astRight =
     object [T.pack "sourceSpan" .= toJSON maybeSrcSpan,
             T.pack name         .= astToJSON astLeft,
