@@ -4,7 +4,7 @@
 -- by third-party code generators
 --
 module Language.PureScript.CoreImp.ToJSON
-  ( Language.PureScript.CoreImp.ToJSON.moduleToJSON
+  ( moduleToJSON
   ) where
 
 
@@ -12,23 +12,28 @@ import Prelude.Compat
 
 import Data.Aeson
 import qualified Data.Text as T
-import Data.Version (Version)
+import Data.Version (Version, showVersion)
 
 import Language.PureScript.AST (SourceSpan)
-import Language.PureScript.CoreFn (Module)
-import Language.PureScript.CoreFn.ToJSON as CoreFnToJSON
+import Language.PureScript.CoreFn (Module, moduleExports, moduleImports, moduleForeign)
 import Language.PureScript.CoreImp.AST
+import Language.PureScript.Names
 import Language.PureScript.PSString
 
 
+moduleNameToJSON :: ModuleName -> Value
+moduleNameToJSON = toJSON . runModuleName
 
+identToJSON :: Ident -> Value
+identToJSON = toJSON . runIdent
 
 moduleToJSON :: (Show a) => Version -> Module a -> [AST] -> Value
-moduleToJSON v m a = object [ T.pack "body"    .= map (astToJSON) a
-                            , T.pack "corefn"  .= CoreFnToJSON.moduleToJSON v m -- might be good to "keep a snapshot of the original FP logic of the module" depending on coreimp-processing use-case (others can ignore it)
-                            , T.pack "modraw"  .= toJSON (show m) -- only way to capture type/ctors info without rewriting corefn, good enough for those needing it badly enough, others can ignore it
+moduleToJSON v m a = object [ T.pack "imports"   .= map (moduleNameToJSON . snd) (moduleImports m)
+                            , T.pack "exports"   .= map identToJSON (moduleExports m)
+                            , T.pack "foreign"   .= map (identToJSON . fst) (moduleForeign m)
+                            , T.pack "builtWith" .= toJSON (showVersion v)
+                            , T.pack "body"      .= map (astToJSON) a
                             ]
-
 astToJSON :: AST -> Value
 astToJSON (StringLiteral maybeSrcSpan psStr) =
     object [T.pack "sourceSpan"    .= toJSON maybeSrcSpan,
