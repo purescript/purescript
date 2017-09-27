@@ -97,34 +97,33 @@ astToJSON (ForIn maybeSrcSpan forname astInExpr astBody) =
     object [T.pack "sourceSpan" .= toJSON maybeSrcSpan,
             T.pack "tag"        .= "ForIn",
             T.pack "ForIn"      .= forname,
-            T.pack "in"         .= astToJSON astInExpr,
+            T.pack "for1"       .= astToJSON astInExpr,
             T.pack "body"       .= astToJSON astBody ]
 astToJSON (For maybeSrcSpan forname astCond astStep astBody) =
     object [T.pack "sourceSpan" .= toJSON maybeSrcSpan,
             T.pack "tag"        .= "For",
             T.pack "For"        .= forname,
-            T.pack "cond"       .= astToJSON astCond,
-            T.pack "step"       .= astToJSON astStep,
+            T.pack "for1"       .= astToJSON astCond,
+            T.pack "for2"       .= astToJSON astStep,
             T.pack "body"       .= astToJSON astBody ]
 astToJSON (IfElse maybeSrcSpan astIf astThen astElse) =
     object [T.pack "sourceSpan" .= toJSON maybeSrcSpan,
             T.pack "tag"        .= "IfElse",
             T.pack "IfElse"     .= astToJSON astIf,
             T.pack "then"       .= astToJSON astThen,
-            T.pack "else"       .= subAstToJSONMaybe astElse ]
+            T.pack "else"       .= subAstToJSON astElse ]
 astToJSON (VariableIntroduction maybeSrcSpan text maybeAST) =
     object [T.pack "sourceSpan"           .= toJSON maybeSrcSpan,
             T.pack "tag"                  .= "VariableIntroduction",
             T.pack "VariableIntroduction" .= toJSON text,
-            T.pack "rhs"                  .= subAstToJSONMaybe maybeAST ]
+            T.pack "rhs"                  .= subAstToJSON maybeAST ]
 astToJSON (ObjectLiteral maybeSrcSpan psStrASTs) =
     object [T.pack "sourceSpan"    .= toJSON maybeSrcSpan,
             T.pack "tag"           .= "ObjectLiteral",
             T.pack "ObjectLiteral" .= map psStrASTToJson psStrASTs ]
 astToJSON (ReturnNoResult maybeSrcSpan) =
     object [T.pack "sourceSpan"     .= toJSON maybeSrcSpan,
-            T.pack "tag"            .= "ReturnNoResult",
-            T.pack "ReturnNoResult" .= Null ]
+            T.pack "tag"            .= "ReturnNoResult" ]
 astToJSON (Return maybeSrcSpan ast) =
     subASTSingleToJSON "Return" maybeSrcSpan ast
 astToJSON (Throw maybeSrcSpan ast) =
@@ -142,10 +141,10 @@ psStrASTToJson :: (PSString, AST) -> Value
 psStrASTToJson (psStr, ast) =
     object [T.pack (decodeStringWithReplacement psStr) .= astToJSON ast]
 
-subAstToJSONMaybe :: Maybe AST -> Value
-subAstToJSONMaybe (Just ast) =
+subAstToJSON :: Maybe AST -> Value
+subAstToJSON (Just ast) =
     astToJSON ast
-subAstToJSONMaybe Nothing =
+subAstToJSON Nothing =
     Null
 
 subASTSingleToJSON :: String -> Maybe SourceSpan -> AST -> Value
