@@ -338,12 +338,12 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
         externsFile = outputDir </> filePath </> "externs.json"
         coreFnFile = outputDir </> filePath </> "corefn.json"
         coreImpFile = outputDir </> filePath </> "coreimp.json"
-        min3 js exts coreFn coreImp
+        min4 js exts coreFn coreImp
           | dumpCoreFn && dumpCoreImp = min (min js exts) (min coreFn coreImp)
           | dumpCoreFn = min (min js exts) coreFn
           | dumpCoreImp = min (min js exts) coreImp
           | otherwise = min js exts
-    min3 <$> getTimestamp jsFile <*> getTimestamp externsFile <*> getTimestamp coreFnFile <*> getTimestamp coreImpFile
+    min4 <$> getTimestamp jsFile <*> getTimestamp externsFile <*> getTimestamp coreFnFile <*> getTimestamp coreImpFile
 
   readExterns :: ModuleName -> Make (FilePath, Externs)
   readExterns mn = do

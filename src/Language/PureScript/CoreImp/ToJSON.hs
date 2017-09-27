@@ -130,13 +130,13 @@ subAstToJSONMaybe (Just ast) =
 subAstToJSONMaybe Nothing =
     Null
 
-subASTSingleToJSON :: String -> (Maybe SourceSpan) -> AST -> Value
+subASTSingleToJSON :: String -> Maybe SourceSpan -> AST -> Value
 subASTSingleToJSON name maybeSrcSpan ast =
     object [T.pack "sourceSpan" .= toJSON maybeSrcSpan,
             T.pack name         .= astToJSON ast
             ]
 
-subASTsListToJSON :: String -> (Maybe SourceSpan) -> [AST] -> Value
+subASTsListToJSON :: String -> Maybe SourceSpan -> [AST] -> Value
 subASTsListToJSON name maybeSrcSpan asts =
     object [T.pack "sourceSpan" .= toJSON maybeSrcSpan,
             T.pack name         .= map astToJSON asts
