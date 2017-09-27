@@ -4,7 +4,7 @@
 -- by third-party code generators
 --
 module Language.PureScript.CoreImp.ToJSON
-  ( moduleToJSON
+  ( Language.PureScript.CoreImp.ToJSON.moduleToJSON
   ) where
 
 
@@ -12,28 +12,20 @@ import Prelude.Compat
 
 import Data.Aeson
 import qualified Data.Text as T
-import Data.Version (Version, showVersion)
+import Data.Version (Version)
 
 import Language.PureScript.AST (SourceSpan)
-import Language.PureScript.CoreFn (Module, moduleImports, moduleExports, moduleForeign)
+import Language.PureScript.CoreFn (Module)
+import Language.PureScript.CoreFn.ToJSON as CoreFnToJSON
 import Language.PureScript.CoreImp.AST
-import Language.PureScript.Names
 import Language.PureScript.PSString
 
 
 
-identToJSON :: Ident -> Value
-identToJSON = toJSON . runIdent
-
-moduleNameToJSON :: ModuleName -> Value
-moduleNameToJSON = toJSON . runModuleName
 
 moduleToJSON :: Version -> Module a -> [AST] -> Value
-moduleToJSON v m a = object [ T.pack "imports"   .= map (moduleNameToJSON . snd) (moduleImports m)
-                            , T.pack "exports"   .= map identToJSON (moduleExports m)
-                            , T.pack "foreign"   .= map (identToJSON . fst) (moduleForeign m)
-                            , T.pack "builtWith" .= toJSON (showVersion v)
-                            , T.pack "body"      .= map (astToJSON) a
+moduleToJSON v m a = object [ T.pack "body"      .= map (astToJSON) a
+                            , T.pack "corefn"    .= CoreFnToJSON.moduleToJSON v m
                             ]
 
 astToJSON :: AST -> Value
