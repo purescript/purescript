@@ -56,26 +56,41 @@ jsEval = liftIO $ do
     Just (ExitFailure _, _, err) -> putStrLn err >> exitFailure
     Nothing                      -> putStrLn "Couldn't find node.js" >> exitFailure
 
--- | Run a PSCi command and evaluate the output with 'eval'.
-runAndEval :: String -> TestPSCi () -> TestPSCi ()
-runAndEval comm eval =
+-- | Run a PSCi command and evaluate its outputs:
+-- * jsOutputEval is used to evaluate compiled JS output by PSCi
+-- * printedOutputEval is used to evaluate text printed directly by PSCi itself
+runAndEval :: String -> TestPSCi () -> (String -> TestPSCi ()) -> TestPSCi ()
+runAndEval comm jsOutputEval textOutputEval =
   case parseCommand comm of
     Left errStr -> liftIO $ putStrLn errStr >> exitFailure
     Right command ->
-      -- the JS result can be ignored, as it's already written in a source file
-      -- for the detail, please refer to Interactive.hs
-      handleCommand (\_ -> eval) (return ()) (\_ -> return ()) command
+      -- The JS result is ignored, as it's already written in a JS source file.
+      -- For the detail, please refer to Interactive.hs
+      handleCommand (\_ -> jsOutputEval) (return ()) textOutputEval command
 
--- | Run a PSCi command and ignore the output
+-- | Run a PSCi command, evaluate compiled JS, and ignore evaluation output and printed output
 run :: String -> TestPSCi ()
-run comm = runAndEval comm $ jsEval *> return ()
+run comm = runAndEval comm evalJsAndIgnore ignorePrinted
+  where
+    evalJsAndIgnore = jsEval *> return ()
+    ignorePrinted _ = return ()
 
 -- | A lifted evaluation of Hspec 'shouldBe' for the TestPSCi
 equalsTo :: (Eq a, Show a) => a -> a -> TestPSCi ()
 equalsTo x y = liftIO $ x `shouldBe` y
 
--- | An assertion to check if a command evaluates to a string
+-- | An assertion to check command evaluated javascript output against a given string
 evaluatesTo :: String -> String -> TestPSCi ()
-evaluatesTo command expected = runAndEval command $ do
-  actual <- jsEval
-  actual `equalsTo` (expected ++ "\n")
+evaluatesTo command expected = runAndEval command evalJsAndCompare ignorePrinted
+  where
+    evalJsAndCompare = do
+      actual <- jsEval
+      actual `equalsTo` (expected ++ "\n")
+    ignorePrinted _ = return ()
+
+-- | An assertion to check command PSCi printed output against a given string
+prints :: String -> String -> TestPSCi ()
+prints command expected = runAndEval command evalJsAndIgnore evalPrinted
+  where
+    evalJsAndIgnore = jsEval *> return ()
+    evalPrinted s = s `equalsTo` expected

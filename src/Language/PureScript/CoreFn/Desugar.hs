@@ -63,7 +63,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
       in NonRec (ssA ss) (properToIdent ctor) $ Constructor (ss, com, Nothing, Nothing) tyName ctor fields
   declToCoreFn (A.DataBindingGroupDeclaration ds) =
     concatMap declToCoreFn ds
-  declToCoreFn (A.ValueDeclaration (ss, com) name _ _ [A.MkUnguarded e]) =
+  declToCoreFn (A.ValueDecl (ss, com) name _ _ [A.MkUnguarded e]) =
     [NonRec (ssA ss) name (exprToCoreFn ss com Nothing e)]
   declToCoreFn (A.BindingGroupDeclaration ds) =
     [Rec . NEL.toList $ fmap (\(((ss, com), name), _, e) -> ((ssA ss, name), exprToCoreFn ss com Nothing e)) ds]
@@ -101,6 +101,8 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     exprToCoreFn ss com (Just ty) v
   exprToCoreFn ss com ty (A.Let ds v) =
     Let (ss, com, ty, Nothing) (concatMap declToCoreFn ds) (exprToCoreFn ss [] Nothing v)
+  exprToCoreFn ss com ty (A.Proxy _) =
+    Literal (ss, com, ty, Nothing) (ObjectLiteral [])
   exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name (A.TypedValue _ lit@(A.Literal (A.ObjectLiteral _)) _)) =
     exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name lit)
   exprToCoreFn ss com _ (A.TypeClassDictionaryConstructorApp name (A.Literal (A.ObjectLiteral vs))) =
@@ -192,7 +194,7 @@ findQualModules decls =
   in f `concatMap` decls
   where
   fqDecls :: A.Declaration -> [ModuleName]
-  fqDecls (A.TypeInstanceDeclaration _ _ _ q _ _) = getQual' q
+  fqDecls (A.TypeInstanceDeclaration _ _ _ _ _ q _ _) = getQual' q
   fqDecls (A.ValueFixityDeclaration _ _ q _) = getQual' q
   fqDecls (A.TypeFixityDeclaration _ _ q _) = getQual' q
   fqDecls _ = []

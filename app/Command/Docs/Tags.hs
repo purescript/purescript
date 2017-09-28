@@ -14,7 +14,7 @@ tags = map (first T.unpack) . concatMap dtags . P.exportedDeclarations
     dtags (P.ExternDeclaration (ss, _) ident _) = [(P.showIdent ident, pos ss)]
     dtags (P.TypeSynonymDeclaration (ss, _) name _ _) = [(P.runProperName name, pos ss)]
     dtags (P.TypeClassDeclaration (ss, _) name _ _ _ _) = [(P.runProperName name, pos ss)]
-    dtags (P.TypeInstanceDeclaration (ss, _) name _ _ _ _) = [(P.showIdent name, pos ss)]
+    dtags (P.TypeInstanceDeclaration (ss, _) _ _ name _ _ _ _) = [(P.showIdent name, pos ss)]
     dtags (P.ExternKindDeclaration (ss, _) name) = [(P.runProperName name, pos ss)]
     dtags _ = []
     pos :: P.SourceSpan -> Int

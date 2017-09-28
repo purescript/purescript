@@ -599,18 +599,16 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , line "with type"
             , markCodeBox $ indent $ typeAsBox t2
             ]
-    renderSimpleErrorMessage (OverlappingInstances nm ts (d : ds)) =
+    renderSimpleErrorMessage (OverlappingInstances _ _ []) = internalError "OverlappingInstances: empty instance list"
+    renderSimpleErrorMessage (OverlappingInstances nm ts ds) =
       paras [ line "Overlapping type class instances found for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
                 , Box.vcat Box.left (map typeAtomAsBox ts)
                 ]
             , line "The following instances were found:"
-            , indent $ paras (line (showQualified showIdent d <> " (chosen)") : map (line . showQualified showIdent) ds)
-            , line "Overlapping type class instances can lead to different behavior based on the order of module imports, and for that reason are not recommended."
-            , line "They may be disallowed completely in a future version of the compiler."
+            , indent $ paras (map (line . showQualified showIdent) ds)
             ]
-    renderSimpleErrorMessage OverlappingInstances{} = internalError "OverlappingInstances: empty instance list"
     renderSimpleErrorMessage (UnknownClass nm) =
       paras [ line "No type class instance was found for class"
             , markCodeBox $ indent $ line (showQualified runProperName nm)
@@ -950,9 +948,20 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , indent msg
             ]
 
-    renderSimpleErrorMessage (UnusableDeclaration ident) =
-      paras [ line $ "The declaration " <> markCode (showIdent ident) <> " is unusable."
-            , line $ "This happens when a constraint couldn't possibly have enough information to work out which instance is required."
+    renderSimpleErrorMessage (UnusableDeclaration ident unexplained) =
+      paras $
+        [ line $ "The declaration " <> markCode (showIdent ident) <> " contains arguments that couldn't be determined."
+        ] <>
+
+        case unexplained of
+          [required] ->
+            [ line $ "These arguments are: { " <> T.intercalate "," required <> "}"
+            ]
+
+          options  ->
+            [ line "To fix this, one of the following sets of variables must be determined:"
+            , Box.moveRight 2 . Box.vsep 0 Box.top $
+                map (\set -> line $ "{ " <> T.intercalate ", " set <> " }") options
             ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box

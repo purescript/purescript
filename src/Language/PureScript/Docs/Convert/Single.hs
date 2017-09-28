@@ -2,7 +2,7 @@ module Language.PureScript.Docs.Convert.Single
   ( convertSingleModule
   ) where
 
-import Protolude
+import Protolude hiding (moduleName)
 
 import Control.Category ((>>>))
 
@@ -82,14 +82,14 @@ augmentDeclarations (partitionEithers -> (augments, toplevels)) =
     d { declChildren = declChildren d ++ [child] }
 
 getDeclarationTitle :: P.Declaration -> Maybe Text
-getDeclarationTitle (P.ValueDeclaration _ name _ _ _) = Just (P.showIdent name)
+getDeclarationTitle (P.ValueDeclaration vd) = Just (P.showIdent (P.valdeclIdent vd))
 getDeclarationTitle (P.ExternDeclaration _ name _) = Just (P.showIdent name)
 getDeclarationTitle (P.DataDeclaration _ _ name _ _) = Just (P.runProperName name)
 getDeclarationTitle (P.ExternDataDeclaration _ name _) = Just (P.runProperName name)
 getDeclarationTitle (P.ExternKindDeclaration _ name) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeSynonymDeclaration _ name _ _) = Just (P.runProperName name)
 getDeclarationTitle (P.TypeClassDeclaration _ name _ _ _ _) = Just (P.runProperName name)
-getDeclarationTitle (P.TypeInstanceDeclaration _ name _ _ _ _) = Just (P.showIdent name)
+getDeclarationTitle (P.TypeInstanceDeclaration _ _ _ name _ _ _ _) = Just (P.showIdent name)
 getDeclarationTitle (P.TypeFixityDeclaration _ _ _ op) = Just ("type " <> P.showOp op)
 getDeclarationTitle (P.ValueFixityDeclaration _ _ _ op) = Just (P.showOp op)
 getDeclarationTitle _ = Nothing
@@ -108,9 +108,9 @@ basicDeclaration :: P.SourceAnn -> Text -> DeclarationInfo -> Maybe Intermediate
 basicDeclaration sa title = Just . Right . mkDeclaration sa title
 
 convertDeclaration :: P.Declaration -> Text -> Maybe IntermediateDeclaration
-convertDeclaration (P.ValueDeclaration sa _ _ _ [P.MkUnguarded (P.TypedValue _ _ ty)]) title =
+convertDeclaration (P.ValueDecl sa _ _ _ [P.MkUnguarded (P.TypedValue _ _ ty)]) title =
   basicDeclaration sa title (ValueDeclaration ty)
-convertDeclaration (P.ValueDeclaration sa _ _ _ _) title =
+convertDeclaration (P.ValueDecl sa _ _ _ _) title =
   -- If no explicit type declaration was provided, insert a wildcard, so that
   -- the actual type will be added during type checking.
   basicDeclaration sa title (ValueDeclaration P.TypeWildcard{})
@@ -138,7 +138,7 @@ convertDeclaration (P.TypeClassDeclaration sa _ args implies fundeps ds) title =
     ChildDeclaration (P.showIdent ident') (convertComments com) (Just ss) (ChildTypeClassMember ty)
   convertClassMember _ =
     P.internalError "convertDeclaration: Invalid argument to convertClassMember."
-convertDeclaration (P.TypeInstanceDeclaration (ss, com) _ constraints className tys _) title =
+convertDeclaration (P.TypeInstanceDeclaration (ss, com) _ _ _ constraints className tys _) title =
   Just (Left ((classNameString, AugmentClass) : map (, AugmentType) typeNameStrings, AugmentChild childDecl))
   where
   classNameString = unQual className

@@ -209,9 +209,9 @@ renameInModule imports (Module modSS coms mn decls exps) =
         <*> updateConstraints ss implies
         <*> pure deps
         <*> pure ds
-  updateDecl bound (TypeInstanceDeclaration sa@(ss, _) name cs cn ts ds) =
+  updateDecl bound (TypeInstanceDeclaration sa@(ss, _) ch idx name cs cn ts ds) =
     fmap (bound,) $
-      TypeInstanceDeclaration sa name
+      TypeInstanceDeclaration sa ch idx name
         <$> updateConstraints ss cs
         <*> updateClassName cn ss
         <*> traverse (updateTypesEverywhere ss) ts
@@ -303,8 +303,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
         updatePatGuard _                  = []
 
   letBoundVariable :: Declaration -> Maybe Ident
-  letBoundVariable (ValueDeclaration _ ident _ _ _) = Just ident
-  letBoundVariable _ = Nothing
+  letBoundVariable = fmap valdeclIdent . getValueDeclaration
 
   updateKindsEverywhere :: SourceSpan -> Kind -> m Kind
   updateKindsEverywhere pos = everywhereOnKindsM updateKind

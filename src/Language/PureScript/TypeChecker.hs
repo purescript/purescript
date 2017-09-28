@@ -20,7 +20,7 @@ import Control.Monad.Writer.Class (MonadWriter(..))
 import Control.Lens ((^..), _1, _2)
 
 import Data.Foldable (for_, traverse_, toList)
-import Data.List (nubBy, (\\), sort, group)
+import Data.List (nub, nubBy, (\\), sort, group)
 import Data.Maybe
 import Data.Monoid ((<>))
 import Data.Text (Text)
@@ -150,8 +150,13 @@ addTypeClass moduleName pn args implies dependencies ds = do
     checkMemberIsUsable syns (ident, memberTy) = do
       memberTy' <- T.replaceAllTypeSynonymsM syns memberTy
       let mentionedArgIndexes = S.fromList (mapMaybe argToIndex (freeTypeVariables memberTy'))
-      unless (any (`S.isSubsetOf` mentionedArgIndexes) coveringSets) $
-        throwError . errorMessage $ UnusableDeclaration ident
+      let leftovers = map (`S.difference` mentionedArgIndexes) coveringSets
+
+      unless (any null leftovers) . throwError . errorMessage $
+        let
+          solutions = map (map (fst . (args !!)) . S.toList) leftovers
+        in
+          UnusableDeclaration ident (nub solutions)
 
 addTypeClassDictionaries
   :: (MonadState CheckState m)
@@ -267,14 +272,14 @@ typeCheckAll moduleName _ = traverse go
     return $ TypeSynonymDeclaration sa name args ty
   go TypeDeclaration{} =
     internalError "Type declarations should have been removed before typeCheckAlld"
-  go (ValueDeclaration sa@(ss, _) name nameKind [] [MkUnguarded val]) = do
+  go (ValueDecl sa@(ss, _) name nameKind [] [MkUnguarded val]) = do
     env <- getEnv
     warnAndRethrow (addHint (ErrorInValueDeclaration name) . addHint (PositionedError ss)) $ do
       val' <- checkExhaustiveExpr ss env moduleName val
       valueIsNotDefined moduleName name
       [(_, (val'', ty))] <- typesOf NonRecursiveBindingGroup moduleName [((sa, name), val')]
       addValue moduleName name ty nameKind
-      return $ ValueDeclaration sa name nameKind [] [MkUnguarded val'']
+      return $ ValueDecl sa name nameKind [] [MkUnguarded val'']
   go ValueDeclaration{} = internalError "Binders were not desugared"
   go BoundValueDeclaration{} = internalError "BoundValueDeclaration should be desugared"
   go (BindingGroupDeclaration vals) = do
@@ -313,7 +318,7 @@ typeCheckAll moduleName _ = traverse go
   go d@(TypeClassDeclaration _ pn args implies deps tys) = do
     addTypeClass moduleName pn args implies deps tys
     return d
-  go (d@(TypeInstanceDeclaration (ss, _) dictName deps className tys body)) =
+  go (d@(TypeInstanceDeclaration (ss, _) ch idx dictName deps className tys body)) =
     rethrow (addHint (ErrorInInstance className tys) . addHint (PositionedError ss)) $ do
       env <- getEnv
       case M.lookup className (typeClasses env) of
@@ -324,7 +329,7 @@ typeCheckAll moduleName _ = traverse go
           checkOrphanInstance dictName className typeClass tys
           _ <- traverseTypeInstanceBody checkInstanceMembers body
           deps' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms deps
-          let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) dictName) [] className tys (Just deps')
+          let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) <$> ch) idx (Qualified (Just moduleName) dictName) [] className tys (Just deps')
           addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) dict
           return d
 
@@ -343,7 +348,7 @@ typeCheckAll moduleName _ = traverse go
     return instDecls
     where
     memberName :: Declaration -> Ident
-    memberName (ValueDeclaration _ ident _ _ _) = ident
+    memberName (ValueDeclaration vd) = valdeclIdent vd
     memberName _ = internalError "checkInstanceMembers: Invalid declaration in type instance definition"
 
     firstDuplicate :: (Eq a) => [a] -> Maybe a

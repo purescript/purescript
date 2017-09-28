@@ -4,6 +4,7 @@ module Language.PureScript.CoreImp.Optimizer.Inliner
   , inlineCommonValues
   , inlineCommonOperators
   , inlineFnComposition
+  , inlineUnsafeCoerce
   , inlineUnsafePartial
   , etaConvert
   , unThunk
@@ -23,6 +24,7 @@ import qualified Data.Text as T
 import Language.PureScript.PSString (PSString)
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.CoreImp.Optimizer.Common
+import Language.PureScript.AST (SourceSpan(..))
 import qualified Language.PureScript.Constants as C
 
 -- TODO: Potential bug:
@@ -168,7 +170,8 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
   , inlineNonClassFunction (isModFn (C.dataFunction, C.applyFlipped)) $ \x f -> App Nothing f [x]
   , inlineNonClassFunction (isModFnWithDict (C.dataArray, C.unsafeIndex)) $ flip (Indexer Nothing)
   ] ++
-  [ fn | i <- [0..10], fn <- [ mkFn i, runFn i ] ]
+  [ fn | i <- [0..10], fn <- [ mkFn i, runFn i ] ] ++
+  [ fn | i <- [0..10], fn <- [ mkEffFn i, runEffFn i ] ]
   where
   binary :: (Text, PSString) -> (Text, PSString) -> BinaryOperator -> AST -> AST
   binary dict fns op = convert where
@@ -190,37 +193,53 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
     convert :: AST -> AST
     convert (App ss fn [x]) | isDict (moduleName, fnName) fn = Unary ss op x
     convert other = other
+
   mkFn :: Int -> AST -> AST
-  mkFn 0 = convert where
+  mkFn = mkFn' C.dataFunctionUncurried C.mkFn $ \ss1 ss2 ss3 args js ->
+    Function ss1 Nothing args (Block ss2 [Return ss3 js])
+
+  mkEffFn :: Int -> AST -> AST
+  mkEffFn = mkFn' C.controlMonadEffUncurried C.mkEffFn $ \ss1 ss2 ss3 args js ->
+    Function ss1 Nothing args (Block ss2 [Return ss3 (App ss3 js [])])
+
+  mkFn' :: Text -> Text -> (Maybe SourceSpan -> Maybe SourceSpan -> Maybe SourceSpan -> [Text] -> AST -> AST) -> Int -> AST -> AST
+  mkFn' modName fnName res 0 = convert where
     convert :: AST -> AST
-    convert (App _ mkFnN [Function s1 Nothing [_] (Block s2 js)]) | isNFn C.mkFn 0 mkFnN =
-      Function s1 Nothing [] (Block s2 js)
+    convert (App _ mkFnN [Function s1 Nothing [_] (Block s2 [Return s3 js])]) | isNFn modName fnName 0 mkFnN =
+      res s1 s2 s3 [] js
     convert other = other
-  mkFn n = convert where
+  mkFn' modName fnName res n = convert where
     convert :: AST -> AST
-    convert orig@(App ss mkFnN [fn]) | isNFn C.mkFn n mkFnN =
+    convert orig@(App ss mkFnN [fn]) | isNFn modName fnName n mkFnN =
       case collectArgs n [] fn of
-        Just (args, js) -> Function ss Nothing args (Block ss js)
-        Nothing -> orig
+        Just (args, [Return ss' ret]) -> res ss ss ss' args ret
+        _ -> orig
     convert other = other
     collectArgs :: Int -> [Text] -> AST -> Maybe ([Text], [AST])
     collectArgs 1 acc (Function _ Nothing [oneArg] (Block _ js)) | length acc == n - 1 = Just (reverse (oneArg : acc), js)
     collectArgs m acc (Function _ Nothing [oneArg] (Block _ [Return _ ret])) = collectArgs (m - 1) (oneArg : acc) ret
     collectArgs _ _   _ = Nothing
 
-  isNFn :: Text -> Int -> AST -> Bool
-  isNFn prefix n (Var _ name) = name == (prefix <> T.pack (show n))
-  isNFn prefix n (Indexer _ (StringLiteral _ name) (Var _ dataFunctionUncurried)) | dataFunctionUncurried == C.dataFunctionUncurried =
+  isNFn :: Text -> Text -> Int -> AST -> Bool
+  isNFn expectMod prefix n (Indexer _ (StringLiteral _ name) (Var _ modName)) | modName == expectMod =
     name == fromString (T.unpack prefix <> show n)
-  isNFn _ _ _ = False
+  isNFn _ _ _ _ = False
 
   runFn :: Int -> AST -> AST
-  runFn n = convert where
+  runFn = runFn' C.dataFunctionUncurried C.runFn App
+
+  runEffFn :: Int -> AST -> AST
+  runEffFn = runFn' C.controlMonadEffUncurried C.runEffFn $ \ss fn acc ->
+    Function ss Nothing [] (Block ss [Return ss (App ss fn acc)])
+
+  runFn' :: Text -> Text -> (Maybe SourceSpan -> AST -> [AST] -> AST) -> Int -> AST -> AST
+  runFn' modName runFnName res n = convert where
     convert :: AST -> AST
     convert js = fromMaybe js $ go n [] js
 
     go :: Int -> [AST] -> AST -> Maybe AST
-    go 0 acc (App ss runFnN [fn]) | isNFn C.runFn n runFnN && length acc == n = Just (App ss fn acc)
+    go 0 acc (App ss runFnN [fn]) | isNFn modName runFnName n runFnN && length acc == n =
+      Just $ res ss fn acc
     go m acc (App _ lhs [arg]) = go (m - 1) (arg : acc) lhs
     go _ _   _ = Nothing
 
@@ -264,6 +283,13 @@ inlineFnComposition = everywhereTopDownM convert where
   fnCompose = (C.controlSemigroupoid, C.compose)
   fnComposeFlipped :: forall a b. (IsString a, IsString b) => (a, b)
   fnComposeFlipped = (C.controlSemigroupoid, C.composeFlipped)
+
+inlineUnsafeCoerce :: AST -> AST
+inlineUnsafeCoerce = everywhereTopDown convert where
+  convert (App _ (Indexer _ (StringLiteral _ unsafeCoerceFn) (Var _ unsafeCoerce)) [ comp ])
+    | unsafeCoerceFn == C.unsafeCoerceFn && unsafeCoerce == C.unsafeCoerce
+    = comp
+  convert other = other
 
 inlineUnsafePartial :: AST -> AST
 inlineUnsafePartial = everywhereTopDown convert where

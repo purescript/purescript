@@ -30,7 +30,7 @@ module Language.PureScript.Ide.Imports
        )
        where
 
-import           Protolude
+import           Protolude hiding (moduleName)
 
 import           Control.Lens                       ((^.), (%~), ix)
 import           Data.List                          (findIndex, nubBy, partition)
@@ -320,6 +320,7 @@ prettyPrintImportSection imports =
     isImplicitImport :: Import -> Bool
     isImplicitImport i = case i of
       Import _ P.Implicit Nothing -> True
+      Import _ (P.Hiding _) Nothing -> True
       _ -> False
 
 

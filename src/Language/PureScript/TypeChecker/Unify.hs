@@ -85,7 +85,8 @@ unknownsInType t = everythingOnTypes (.) go t []
 unifyTypes :: (MonadError MultipleErrors m, MonadState CheckState m) => Type -> Type -> m ()
 unifyTypes t1 t2 = do
   sub <- gets checkSubstitution
-  withErrorMessageHint (ErrorUnifyingTypes t1 t2) $ unifyTypes' (substituteType sub t1) (substituteType sub t2)
+  withErrorMessageHint (ErrorUnifyingTypes t1 t2) $
+    unifyTypes' (substituteType sub t1) (substituteType sub t2)
   where
   unifyTypes' (TUnknown u1) (TUnknown u2) | u1 == u2 = return ()
   unifyTypes' (TUnknown u) t = solveType u t
@@ -118,6 +119,8 @@ unifyTypes t1 t2 = do
   unifyTypes' r1 r2@RCons{} = unifyRows r1 r2
   unifyTypes' r1@REmpty r2 = unifyRows r1 r2
   unifyTypes' r1 r2@REmpty = unifyRows r1 r2
+  unifyTypes' (ProxyType ty1) (ProxyType ty2) =
+    ty1 `unifyTypes` ty2
   unifyTypes' ty1@ConstrainedType{} ty2 =
     throwError . errorMessage $ ConstrainedTypeUnified ty1 ty2
   unifyTypes' t3 t4@ConstrainedType{} = unifyTypes' t4 t3
