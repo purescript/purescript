@@ -71,6 +71,7 @@ import           Language.PureScript.CodeGen.JS.Printer
 import qualified Language.PureScript.CoreFn as CF
 import qualified Language.PureScript.CoreFn.ToJSON as CFJ
 import qualified Language.PureScript.CoreImp.AST as Imp
+import qualified Language.PureScript.CoreImp.ToJSON as CIJ
 import qualified Language.PureScript.Parser as PSParser
 import qualified Paths_purescript as Paths
 import           SourceMap
@@ -331,14 +332,18 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   getOutputTimestamp :: ModuleName -> Make (Maybe UTCTime)
   getOutputTimestamp mn = do
     dumpCoreFn <- asks optionsDumpCoreFn
+    dumpCoreImp <- asks optionsDumpCoreImp
     let filePath = T.unpack (runModuleName mn)
         jsFile = outputDir </> filePath </> "index.js"
         externsFile = outputDir </> filePath </> "externs.json"
         coreFnFile = outputDir </> filePath </> "corefn.json"
-        min3 js exts coreFn
+        coreImpFile = outputDir </> filePath </> "coreimp.json"
+        min4 js exts coreFn coreImp
+          | dumpCoreFn && dumpCoreImp = min (min js exts) (min coreFn coreImp)
           | dumpCoreFn = min (min js exts) coreFn
+          | dumpCoreImp = min (min js exts) coreImp
           | otherwise = min js exts
-    min3 <$> getTimestamp jsFile <*> getTimestamp externsFile <*> getTimestamp coreFnFile
+    min4 <$> getTimestamp jsFile <*> getTimestamp externsFile <*> getTimestamp coreFnFile <*> getTimestamp coreImpFile
 
   readExterns :: ModuleName -> Make (FilePath, Externs)
   readExterns mn = do
@@ -376,11 +381,21 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
       writeTextFile externsFile exts
     lift $ when sourceMaps $ genSourceMap dir mapFile (length prefix) mappings
     dumpCoreFn <- lift $ asks optionsDumpCoreFn
+    dumpCoreImp <- lift $ asks optionsDumpCoreImp
+    -- when dumpCoreFn $ do
+    --   let coreFnFile = outputDir </> filePath </> "corefn.json"
+    --   let jsonPayload = CFJ.moduleToJSON Paths.version m
+    --   let json = Aeson.object [  (runModuleName mn, jsonPayload) ]
+    --   lift $ writeTextFile coreFnFile (encode json)
     when dumpCoreFn $ do
       let coreFnFile = outputDir </> filePath </> "corefn.json"
-      let jsonPayload = CFJ.moduleToJSON Paths.version m
-      let json = Aeson.object [  (runModuleName mn, jsonPayload) ]
+      let json = CFJ.moduleToJSON Paths.version m
       lift $ writeTextFile coreFnFile (encode json)
+    when dumpCoreImp $ do
+      let coreImpFile = outputDir </> filePath </> "coreimp.json"
+      let jsonPayload = CIJ.moduleToJSON Paths.version m rawJs
+      let json = Aeson.object [  (runModuleName mn, jsonPayload) ]
+      lift $ writeTextFile coreImpFile (encode json)
 
   genSourceMap :: String -> String -> Int -> [SMap] -> Make ()
   genSourceMap dir mapFile extraLines mappings = do
