@@ -90,7 +90,7 @@ dependencies:
 
 library:
   source-dirs: src
-  ghc-options: -Wall -O2
+  ghc-options: -Wall -O0
   other-modules: Paths_purescript
   default-extensions:
     - ConstraintKinds
@@ -115,7 +115,7 @@ executables:
   purs:
     main: Main.hs
     source-dirs: app
-    ghc-options: -Wall -O2 -fno-warn-unused-do-bind -threaded -rtsopts -with-rtsopts=-N
+    ghc-options: -Wall -O0 -fno-warn-unused-do-bind -threaded -rtsopts -with-rtsopts=-N
     other-modules:
       - Command.Bundle
       - Command.Compile

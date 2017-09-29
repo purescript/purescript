@@ -382,10 +382,14 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     lift $ when sourceMaps $ genSourceMap dir mapFile (length prefix) mappings
     dumpCoreFn <- lift $ asks optionsDumpCoreFn
     dumpCoreImp <- lift $ asks optionsDumpCoreImp
+    -- when dumpCoreFn $ do
+    --   let coreFnFile = outputDir </> filePath </> "corefn.json"
+    --   let jsonPayload = CFJ.moduleToJSON Paths.version m
+    --   let json = Aeson.object [  (runModuleName mn, jsonPayload) ]
+    --   lift $ writeTextFile coreFnFile (encode json)
     when dumpCoreFn $ do
       let coreFnFile = outputDir </> filePath </> "corefn.json"
-      let jsonPayload = CFJ.moduleToJSON Paths.version m
-      let json = Aeson.object [  (runModuleName mn, jsonPayload) ]
+      let json = CFJ.moduleToJSON Paths.version m
       lift $ writeTextFile coreFnFile (encode json)
     when dumpCoreImp $ do
       let coreImpFile = outputDir </> filePath </> "coreimp.json"
