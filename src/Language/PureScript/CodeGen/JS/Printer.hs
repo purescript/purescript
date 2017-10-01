@@ -116,20 +116,19 @@ literals = mkPattern' match'
     , prettyPrintJS' value
     ]
   match (Comment _ com js) = mconcat <$> sequence
-    [ mconcat <$> forM com comment
+    [ return $ emit "\n"
+    , mconcat <$> forM com comment
     , prettyPrintJS' js
     ]
   match _ = mzero
 
   comment :: (Emit gen) => Comment -> StateT PrinterState Maybe gen
   comment (LineComment com) = fmap mconcat $ sequence $
-    [ return $ emit "\n"
-    , currentIndent
+    [ currentIndent
     , return $ emit "//" <> emit com <> emit "\n"
     ]
   comment (BlockComment com) = fmap mconcat $ sequence $
-    [ return $ emit "\n"
-    , currentIndent
+    [ currentIndent
     , return $ emit "/**\n"
     ] ++
     map asLine (T.lines com) ++
