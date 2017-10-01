@@ -29,7 +29,7 @@ constructorTypeFromJSON v = do
   case t of
     "ProductType" -> return ProductType
     "SumType"     -> return SumType
-    _             -> fail ("not regonized ConstructorType: " ++ T.unpack t)
+    _             -> fail ("not recognized ConstructorType: " ++ T.unpack t)
 
 metaFromJSON :: Value -> Parser (Maybe Meta)
 metaFromJSON Null = return Nothing
@@ -138,7 +138,7 @@ bindFromJSON modulePath = withObject "Bind" bindFromObj
   bindFromObj o = do
     type_ <- o .: "bindType" :: Parser Text
     case type_ of
-      "NonRec"  -> (uncurry . uncurry $ NonRec) <$> bindFromObj' o
+      "NonRec"  -> (uncurry . uncurry) NonRec <$> bindFromObj' o
       "Rec"     -> Rec <$> (o .: "binds" >>= listParser (withObject "Bind" bindFromObj'))
       _         -> fail ("not recognized bind type \"" ++ T.unpack type_ ++ "\"")
         

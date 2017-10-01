@@ -10,6 +10,9 @@ import Language.PureScript.Types
 -- |
 -- The CoreFn module representation
 --
+-- The json CoreFn representation does not contain type information.  When
+-- parsing it one gets back `ModuleT () Ann` rathern than `ModuleT Type Ann`,
+-- which is enough for `moduleToJs`.
 data ModuleT t a = Module
   { moduleComments :: [Comment]
   , moduleName :: ModuleName
