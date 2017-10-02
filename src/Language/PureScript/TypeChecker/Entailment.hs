@@ -69,9 +69,7 @@ namedInstanceIdentifier _ = Nothing
 type TypeClassDict = TypeClassDictionaryInScope Evidence
 
 -- | The 'InstanceContext' tracks those constraints which can be satisfied.
-type InstanceContext = M.Map (Maybe ModuleName)
-                         (M.Map (Qualified (ProperName 'ClassName))
-                           (M.Map (Qualified Ident) NamedDict))
+type InstanceContext = M.Map (Maybe ModuleName) TypeClassDictionaryMap
 
 -- | A type substitution which makes an instance head match a list of types.
 --

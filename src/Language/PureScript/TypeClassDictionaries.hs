@@ -7,6 +7,7 @@ import Prelude.Compat
 
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
+import Data.Map (Map)
 import Data.Monoid ((<>))
 import Data.Text (Text, pack)
 
@@ -38,6 +39,10 @@ data TypeClassDictionaryInScope v
 instance NFData v => NFData (TypeClassDictionaryInScope v)
 
 type NamedDict = TypeClassDictionaryInScope (Qualified Ident)
+
+-- | A map from type class name to implementing instances
+type TypeClassDictionaryMap = Map (Qualified (ProperName 'ClassName))
+                               (Map (Qualified Ident) NamedDict)
 
 -- | Generate a name for a superclass reference which can be used in
 -- generated code.
