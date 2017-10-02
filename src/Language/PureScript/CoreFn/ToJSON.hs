@@ -101,13 +101,13 @@ qualifiedToJSON f (Qualified mn a) = object
 moduleNameToJSON :: ModuleName -> Value
 moduleNameToJSON (ModuleName pns) = toJSON $ properNameToJSON `map` pns
 
-moduleToJSON :: Version -> ModuleT a Ann -> Value
+moduleToJSON :: Version -> Module Ann -> Value
 moduleToJSON v m = object
   [ T.pack "moduleName" .= moduleNameToJSON (moduleName m)
   , T.pack "modulePath" .= toJSON (modulePath m)
   , T.pack "imports"    .= map importToJSON (moduleImports m)
   , T.pack "exports"    .= map identToJSON (moduleExports m)
-  , T.pack "foreign"    .= map (identToJSON . fst) (moduleForeign m)
+  , T.pack "foreign"    .= map identToJSON (moduleForeign m)
   , T.pack "decls"      .= map bindToJSON (moduleDecls m)
   , T.pack "builtWith"  .= toJSON (showVersion v)
   , T.pack "comments"   .= map toJSON (moduleComments m)

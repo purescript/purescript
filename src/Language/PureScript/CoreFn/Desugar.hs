@@ -221,8 +221,8 @@ importToCoreFn (A.ImportDeclaration (ss, com) name _ _) = Just ((ss, com, Nothin
 importToCoreFn _ = Nothing
 
 -- | Desugars foreign declarations from AST to CoreFn representation.
-externToCoreFn :: A.Declaration -> Maybe ForeignDecl
-externToCoreFn (A.ExternDeclaration _ name ty) = Just (name, ty)
+externToCoreFn :: A.Declaration -> Maybe Ident
+externToCoreFn (A.ExternDeclaration _ name _) = Just name
 externToCoreFn _ = Nothing
 
 -- | Desugars export declarations references from AST to CoreFn representation.
