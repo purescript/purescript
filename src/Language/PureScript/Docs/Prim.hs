@@ -31,6 +31,7 @@ primDocsModule = Module
       , typeString
       , kindType
       , kindSymbol
+      , kindNat
       ]
   , modReExports = []
   }
@@ -103,6 +104,15 @@ kindSymbol = primKind "Symbol" $ T.unlines
   , "Construct types of this kind using the same literal syntax as documented"
   , "for strings."
   ]
+
+kindNat :: Declaration
+kindNat = primKind "Nat" $ T.unlines
+  [ "`Nat` is the kind of type-level natural numbers."
+  , ""
+  , "Construct types of this kind using the same literal syntax as documented"
+  , "for integers, but only non-negative values are allowed."
+  ]
+
 
 function :: Declaration
 function = primType "Function" $ T.unlines
