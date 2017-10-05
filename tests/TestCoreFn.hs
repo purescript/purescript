@@ -19,7 +19,6 @@ import Language.PureScript.CoreFn
 import Language.PureScript.CoreFn.FromJSON
 import Language.PureScript.CoreFn.ToJSON
 import Language.PureScript.Names
-import Language.PureScript.Types
 import Language.PureScript.PSString
 
 import Test.Hspec
@@ -27,11 +26,11 @@ import Test.Hspec
 main :: IO ()
 main = hspec spec
 
-parseModule :: Value -> Result (Version, ModuleT () Ann)
+parseModule :: Value -> Result (Version, Module Ann)
 parseModule = parse moduleFromJSON
 
 -- convert a module to its json CoreFn representation and back
-parseMod :: Module Ann -> Result (ModuleT () Ann)
+parseMod :: Module Ann -> Result (Module Ann)
 parseMod m =
   let v = Version [0] []
   in snd <$> parseModule (moduleToJSON v m)
@@ -76,11 +75,11 @@ spec = context "CoreFnFromJsonTest" $ do
       Success m -> moduleExports m `shouldBe` [Ident "exp"]
 
   specify "should parse foreign" $ do
-    let r = parseMod $ Module [] mn mp [] [] [(Ident "exp", TUnknown 0)] []
+    let r = parseMod $ Module [] mn mp [] [] [Ident "exp"] []
     r `shouldSatisfy` isSuccess
     case r of
       Error _   -> return ()
-      Success m -> moduleForeign m `shouldBe` [(Ident "exp", ())]
+      Success m -> moduleForeign m `shouldBe` [Ident "exp"]
 
   context "Expr" $ do
     specify "should parse literals" $ do

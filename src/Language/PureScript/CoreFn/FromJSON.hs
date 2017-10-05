@@ -104,7 +104,7 @@ qualifiedFromJSON f = withObject "Qualified" qualifiedFromObj
 moduleNameFromJSON :: Value -> Parser ModuleName
 moduleNameFromJSON v = ModuleName <$> listParser properNameFromJSON v
 
-moduleFromJSON :: Value -> Parser (Version, ModuleT () Ann)
+moduleFromJSON :: Value -> Parser (Version, Module Ann)
 moduleFromJSON = withObject "Module" moduleFromObj
   where
   moduleFromObj o = do
@@ -114,7 +114,7 @@ moduleFromJSON = withObject "Module" moduleFromObj
     moduleImports <- o .: "imports" >>= listParser (importFromJSON modulePath)
     moduleExports <- o .: "exports" >>= listParser identFromJSON
     moduleDecls <- o .: "decls" >>= listParser (bindFromJSON modulePath)
-    moduleForeign <- o .: "foreign" >>= listParser (fmap (flip (,) ()) . identFromJSON)
+    moduleForeign <- o .: "foreign" >>= listParser identFromJSON
     moduleComments <- o .: "comments" >>= listParser parseJSON
     return (version, Module {..})
 
