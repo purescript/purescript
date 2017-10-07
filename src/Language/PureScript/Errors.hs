@@ -774,9 +774,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 [] -> [ line "There is nowhere this instance can be placed without being an orphan."
                       , line "A newtype wrapper can be used to avoid this problem."
                       ]
-                _  -> [ Box.text $ "This instance must be declared in "
+                _  -> [ Box.text $ "This problem can be resolved by declaring the instance in "
                           <> T.unpack formattedModules
-                          <> ", or be defined for a newtype wrapper."
+                          <> ", or by defining the instance on a newtype wrapper."
                       ]
                 ]
       where
