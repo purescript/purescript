@@ -771,12 +771,16 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 , Box.vcat Box.left (map typeAtomAsBox ts)
                 ]
             , line "is an orphan instance."
-            , line "To avoid this error, declare the instance in one of the following modules if possible:"
-            , markCodeBox $ indent $ Box.hsep 1 Box.left $ (line . runModuleName) <$> nonOrphans
-            , line "Otherwise, consider adding a newtype wrapper."
+            , suggestion
             ]
       where
-        nonOrphans = S.toList $ S.delete (moduleNameFromString "Prim") nonOrphanModules
+        suggestion = Box.vcat Box.left $
+          case S.toList $ S.delete (moduleNameFromString "Prim") nonOrphanModules of
+            [] -> [ line "There is nowhere this instance can be placed without being an orphan. A newtype wrapper can be used to avoid this problem." ]
+            xs -> [ line "This instance must be declared in one of the following modules:"
+                  , Box.vcat Box.left $ (line . runModuleName) <$> xs
+                  , line "Otherwise, a newtype wrapper can be used to solve this problem."
+                  ]
     renderSimpleErrorMessage (InvalidNewtype name) =
       paras [ line $ "Newtype " <> markCode (runProperName name) <> " is invalid."
             , line "Newtypes must define a single constructor with a single argument."
