@@ -765,22 +765,23 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage TypeSynonymInstance =
       line "Type class instances for type synonyms are disallowed."
     renderSimpleErrorMessage (OrphanInstance nm cnm nonOrphanModules ts) =
-      paras [ line $ "Type class instance " <> markCode (showIdent nm) <> " for "
+      paras [ line $ "Orphan instance " <> markCode (showIdent nm) <> " found for "
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName cnm)
                 , Box.vcat Box.left (map typeAtomAsBox ts)
                 ]
-            , line "is an orphan instance."
-            , suggestion
-            ]
+            , Box.vcat Box.left $ case modulesToList of
+                [] -> [ line "There is nowhere this instance can be placed without being an orphan."
+                      , line "A newtype wrapper can be used to avoid this problem."
+                      ]
+                _  -> [ Box.text $ "This instance must be declared in "
+                          <> T.unpack formattedModules
+                          <> ", or be defined for a newtype wrapper."
+                      ]
+                ]
       where
-        suggestion = Box.vcat Box.left $
-          case S.toList $ S.delete (moduleNameFromString "Prim") nonOrphanModules of
-            [] -> [ line "There is nowhere this instance can be placed without being an orphan. A newtype wrapper can be used to avoid this problem." ]
-            xs -> [ line "This instance must be declared in one of the following modules:"
-                  , Box.vcat Box.left $ (line . runModuleName) <$> xs
-                  , line "Otherwise, a newtype wrapper can be used to solve this problem."
-                  ]
+        modulesToList = S.toList $ S.delete (moduleNameFromString "Prim") nonOrphanModules
+        formattedModules = T.intercalate " or " ((markCode . runModuleName) <$> modulesToList)
     renderSimpleErrorMessage (InvalidNewtype name) =
       paras [ line $ "Newtype " <> markCode (runProperName name) <> " is invalid."
             , line "Newtypes must define a single constructor with a single argument."
