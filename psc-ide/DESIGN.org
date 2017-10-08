@@ -220,3 +220,16 @@
 ** PureScript's package story involves downloading all the source
 - Great for us, because we get go-to-definition and docstrings without having to
   query some external resource
+** Keeping everything in memory
+*** Pros
+- All data is regenerated on starting ide = no cache invalidation necessary
+- Things are fast, without any effort spent on optimizing things
+- Simple model, keeps complexity low
+- We don't polute projects with ide artifacts
+*** Cons
+- Imposes a limit on how big of a project we can handle
+- Means we need to be careful about what information we denormalize, since it
+  can blow up on us
+- All data is regenerated on starting ide = slower startup then (maybe?) necessary
+- Impossible to share information between projects (for shared dependencies)
+
