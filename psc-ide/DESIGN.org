@@ -184,3 +184,39 @@
 * Tips and Tricks
 ** Running only =ide='s test suite
    ~stack test --test-arguments "-m Language.PureScript.Ide"~
+* Thoughts to be assigned
+** Using externs files as source of truth
+*** Pros
+- Everything has types, because it went through the compiler
+- Module visibility is respected, because everything went through the compiler
+- Works even when the source file has syntax errors/doesn't compile
+- Easy plug-and-play, people rarely change the `output/` directory (as
+  opposed to the file structure)
+- Decoding JSON is fast! (As opposed to parsing source code)
+*** Cons
+- All type synonyms are expanded (Just something the compiler does)
+- Means non-exported values are unaccessible (They should be in scope while
+  editing the corresponding module though)
+- Can serve stale declaration information, eg. a declaration might've been
+  removed from a module, but the module doesn't compile yet, so the externs
+  hasn't been overridden and we still suggest the declaration
+- Can serve stale module information, when a source file gets deleted, the
+  corresponding externs file does not. Which means we can't detect whether a
+  module still exists.
+- No source positions or docstrings
+** When source globs are added
+*** New features enabled
+- Enables go-to-definition by allowing us to grab source spans for declarations
+- Enables us to recover type signatures without synonyms expanded
+- Enables us to grab docstrings (We don't do that yet, unfortunately)
+*** Cons
+- Slower startup (Actually the load command takes longer, but because the server
+  is useless until load has been run I count that as startup). Startup on
+  slamdata is at around 5-6seconds.
+- Higher memory footprint. We hold the ASTs for all the modules and add
+  additional information to the declarations TODO: quantify this for slamdata
+- It's harder to watch source files for changes, because they aren't collected
+  in a single directory (which is why we don't do it)
+** PureScript's package story involves downloading all the source
+- Great for us, because we get go-to-definition and docstrings without having to
+  query some external resource
