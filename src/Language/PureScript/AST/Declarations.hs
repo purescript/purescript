@@ -16,6 +16,7 @@ import Control.Monad.Identity
 
 import Data.Aeson.TH
 import qualified Data.Map as M
+import Data.Set (Set)
 import Data.Text (Text)
 import qualified Data.List.NonEmpty as NEL
 import GHC.Generics (Generic)
@@ -130,7 +131,7 @@ data SimpleErrorMessage
   | PropertyIsMissing Label
   | AdditionalProperty Label
   | TypeSynonymInstance
-  | OrphanInstance Ident (Qualified (ProperName 'ClassName)) [Type]
+  | OrphanInstance Ident (Qualified (ProperName 'ClassName)) (Set ModuleName) [Type]
   | InvalidNewtype (ProperName 'TypeName)
   | InvalidInstanceHead Type
   | TransitiveExportError DeclarationRef [DeclarationRef]

@@ -22,6 +22,7 @@ import           Data.List (transpose, nubBy, sort, partition, dropWhileEnd)
 import qualified Data.List.NonEmpty as NEL
 import           Data.Maybe (maybeToList, fromMaybe, mapMaybe)
 import qualified Data.Map as M
+import qualified Data.Set as S
 import qualified Data.Text as T
 import           Data.Text (Text)
 import           Language.PureScript.AST
@@ -274,7 +275,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (InvalidDerivedInstance cl ts n) = InvalidDerivedInstance cl <$> traverse f ts <*> pure n
   gSimple (ExpectedTypeConstructor cl ts ty) = ExpectedTypeConstructor cl <$> traverse f ts <*> f ty
   gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
-  gSimple (OrphanInstance nm cl ts) = OrphanInstance nm cl <$> traverse f ts
+  gSimple (OrphanInstance nm cl noms ts) = OrphanInstance nm cl noms <$> traverse f ts
   gSimple (WildcardInferredType ty ctx) = WildcardInferredType <$> f ty <*> traverse (sndM f) ctx
   gSimple (HoleInferredType name ty ctx env) = HoleInferredType name <$> f ty <*> traverse (sndM f) ctx  <*> onTypeSearchTypesM f env
   gSimple (MissingTypeDeclaration nm ty) = MissingTypeDeclaration nm <$> f ty
@@ -765,16 +766,24 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line $ "Type of expression contains additional label " <> markCode (prettyPrintLabel prop) <> "."
     renderSimpleErrorMessage TypeSynonymInstance =
       line "Type class instances for type synonyms are disallowed."
-    renderSimpleErrorMessage (OrphanInstance nm cnm ts) =
-      paras [ line $ "Type class instance " <> markCode (showIdent nm) <> " for "
+    renderSimpleErrorMessage (OrphanInstance nm cnm nonOrphanModules ts) =
+      paras [ line $ "Orphan instance " <> markCode (showIdent nm) <> " found for "
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName cnm)
                 , Box.vcat Box.left (map typeAtomAsBox ts)
                 ]
-            , line "is an orphan instance."
-            , line "An orphan instance is one which is defined in a module that is unrelated to either the class or the collection of data types that the instance is defined for."
-            , line "Consider moving the instance, if possible, or using a newtype wrapper."
-            ]
+            , Box.vcat Box.left $ case modulesToList of
+                [] -> [ line "There is nowhere this instance can be placed without being an orphan."
+                      , line "A newtype wrapper can be used to avoid this problem."
+                      ]
+                _  -> [ Box.text $ "This problem can be resolved by declaring the instance in "
+                          <> T.unpack formattedModules
+                          <> ", or by defining the instance on a newtype wrapper."
+                      ]
+                ]
+      where
+        modulesToList = S.toList $ S.delete (moduleNameFromString "Prim") nonOrphanModules
+        formattedModules = T.intercalate " or " ((markCode . runModuleName) <$> modulesToList)
     renderSimpleErrorMessage (InvalidNewtype name) =
       paras [ line $ "Newtype " <> markCode (runProperName name) <> " is invalid."
             , line "Newtypes must define a single constructor with a single argument."

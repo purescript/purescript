@@ -359,15 +359,19 @@ typeCheckAll moduleName _ = traverse go
 
   checkOrphanInstance :: Ident -> Qualified (ProperName 'ClassName) -> TypeClassData -> [Type] -> m ()
   checkOrphanInstance dictName className@(Qualified (Just mn') _) typeClass tys'
-    | moduleName == mn' || moduleName `S.member` nonOrphanModules = return ()
-    | otherwise = throwError . errorMessage $ OrphanInstance dictName className tys'
+    | moduleName `S.member` nonOrphanModules' = return ()
+    | otherwise = throwError . errorMessage $ OrphanInstance dictName className nonOrphanModules' tys'
     where
+    nonOrphanModules' :: S.Set ModuleName
+    nonOrphanModules' = S.insert mn' nonOrphanModules
+
     typeModule :: Type -> Maybe ModuleName
     typeModule (TypeVar _) = Nothing
     typeModule (TypeLevelString _) = Nothing
     typeModule (TypeConstructor (Qualified (Just mn'') _)) = Just mn''
     typeModule (TypeConstructor (Qualified Nothing _)) = internalError "Unqualified type name in checkOrphanInstance"
     typeModule (TypeApp t1 _) = typeModule t1
+    typeModule (ProxyType _) = Nothing
     typeModule _ = internalError "Invalid type in instance in checkOrphanInstance"
 
     modulesByTypeIndex :: M.Map Int (Maybe ModuleName)
