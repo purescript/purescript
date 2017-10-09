@@ -582,9 +582,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                   in ( rowFromList (sort unique1 ++ sort common1, r1)
                      , rowFromList (sort unique2 ++ sort common2, r2)
                      )
-        in paras [ line "Could not match type"
+        in paras [ line "But excpected to match type"
                  , markCodeBox $ indent $ typeAsBox sorted1
-                 , line "with type"
+                 , line "Found type"
                  , markCodeBox $ indent $ typeAsBox sorted2
                  ]
 
