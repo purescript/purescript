@@ -177,9 +177,39 @@
 
    TODO: To be documented
 ** Rebuilding
-   Import Files: Ide.Rebuild
+   Important Files: Ide.Rebuild
 
-   TODO: To be documented
+*** The rebuild command acts on a single file input
+Unlike the compiler which gets paths to all the modules in our program, the
+Rebuild command only gets handed the path to a single module.
+
+*** IDE's rebuilds are fast
+There are two reasons why ide's rebuilds are an order of magnitude faster than
+the compilers incremental builds.
+**** Rebuild ONLY respects downstream modules
+**** All the externs data is already held in RAM
+
+*** Steps rebuilding takes
+**** Parse input model
+**** Check if FFI file exists and also load that
+**** Grab the Externsfiles out of IDE's state
+**** Delete the Externsfile corresponding to the module to be rebuilt
+**** Convert all the externs files into "shallow modules" which only hold their dependency information
+**** Run the compilers topo-sort to figure out all the transitive dependencies of the module we just parsed
+**** Rebuild the Environment against the set of externs files we just figured out
+*** Extra Rebuild with open imports (only when the first Rebuild succeeds)
+This is so that we can mitigate the fact that Externsfiles only give us access
+to exported declarations. We rebuild the file a second time, but this time we
+remove all the export restrictions before doing so, and store the resulting
+Externsfile inside IDE's cache. It's important! that we do not write this file
+to disc, because it's incorrect when used by a normal compile or rebuild.
+**** The caller gets to decide how the extra Rebuild is run
+The primary motivation for this is that we don't need the second build to run to
+detect all the compiler errors, so in the usual mode of operation we want to run
+it asynchronously and just return the errors/warnings to the editors
+immediately. In a test setting however, we might want to test that the rebuild
+cache was filled properly and serves completions for private members. (Examples:
+Language.PureScript.Ide.RebuildSpec)
 ** Everything else
 * Tips and Tricks
 ** Running only =ide='s test suite
@@ -230,6 +260,5 @@
 - Imposes a limit on how big of a project we can handle
 - Means we need to be careful about what information we denormalize, since it
   can blow up on us
-- All data is regenerated on starting ide = slower startup then (maybe?) necessary
+- All data is regenerated on starting ide = slower startup than (maybe?) necessary
 - Impossible to share information between projects (for shared dependencies)
-
