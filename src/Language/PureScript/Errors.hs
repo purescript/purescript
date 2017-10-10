@@ -584,7 +584,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                      )
         in paras [ line "Found type"
                  , markCodeBox $ indent $ typeAsBox sorted1
-                 , line "But excpected type"
+                 , line "But expected type"
                  , markCodeBox $ indent $ typeAsBox sorted2
                  ]
 
