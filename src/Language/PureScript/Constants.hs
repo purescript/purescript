@@ -350,20 +350,19 @@ pattern DataNat = ModuleName [ProperName "Data", ProperName "Nat"]
 pattern IsNat :: Qualified (ProperName 'ClassName)
 pattern IsNat = Qualified (Just DataNat) (ProperName "IsNat")
 
--- Prim.Nat
+-- Nat in Prim
 
-pattern TypeDataNat :: ModuleName
-pattern TypeDataNat = ModuleName [ProperName "Prim", ProperName "Nat"]
+--pattern PrimNat :: ModuleName
+--pattern PrimNat = ModuleName [ProperName "Prim"]
 
 pattern CompareNat :: Qualified (ProperName 'ClassName)
-pattern CompareNat = Qualified (Just TypeDataNat) (ProperName "CompareNat")
+pattern CompareNat = Qualified (Just Prim) (ProperName "CompareNat")
 
 pattern AddNat :: Qualified (ProperName 'ClassName)
-pattern AddNat = Qualified (Just TypeDataNat) (ProperName "AddNat")
+pattern AddNat = Qualified (Just Prim) (ProperName "AddNat")
 
 pattern MultNat :: Qualified (ProperName 'ClassName)
-pattern MultNat = Qualified (Just TypeDataNat) (ProperName "MultNat")
-
+pattern MultNat = Qualified (Just Prim) (ProperName "MultNat")
 
 -- Type.Data.Symbol
 

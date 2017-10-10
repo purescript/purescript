@@ -9,6 +9,7 @@ import           GHC.Generics (Generic)
 import           Control.DeepSeq (NFData)
 import           Data.Aeson ((.=), (.:))
 import qualified Data.Aeson as A
+import           Data.Coerce (coerce)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import           Data.Maybe (fromMaybe, mapMaybe)
@@ -272,6 +273,9 @@ kindSymbol = primKind C.symbol
 kindNat :: Kind
 kindNat = primKind C.nat
 
+kindOrdering :: Kind
+kindOrdering = NamedKind (Qualified (Just C.typeDataOrdering) (ProperName "Ordering"))
+
 -- | Construct a type in the Prim module
 primTy :: Text -> Type
 primTy = TypeConstructor . primName
@@ -354,6 +358,9 @@ primTypes =
     , (primName "Warn",       (FunKind kindSymbol kindType, ExternData))
     , (primName "TypeString", (FunKind kindType kindSymbol, ExternData))
     , (primName "TypeConcat", (FunKind kindSymbol (FunKind kindSymbol kindSymbol), ExternData))
+    , (coerce C.AddNat,     (FunKind kindNat (FunKind kindNat (FunKind kindNat kindType)), ExternData))
+    , (coerce C.MultNat,    (FunKind kindNat (FunKind kindNat (FunKind kindNat kindType)), ExternData))
+    , (coerce C.CompareNat, (FunKind kindNat (FunKind kindNat (FunKind kindOrdering kindType)), ExternData))
     ]
 
 -- | The primitive class map. This just contains the `Fail`, `Warn`, and `Partial`
@@ -388,6 +395,34 @@ primClasses =
                              [ FunctionalDependency [0, 1, 2] [3]
                              , FunctionalDependency [0, 3] [1, 2]
                              ]))
+    -- class AddNat (a :: Nat) (b :: Nat) (c :: Nat) | a b -> c, a c -> b, b c -> a
+    , (C.AddNat, (makeTypeClassData
+                            [ ("a", Just kindNat)
+                            , ("b", Just kindNat)
+                            , ("c", Just kindNat)
+                            ] [] []
+                            [ FunctionalDependency [0, 1] [2]
+                            , FunctionalDependency [0, 2] [1]
+                            , FunctionalDependency [1, 2] [0]
+                            ]))
+    -- class MultNat (a :: Nat) (b :: Nat) (c :: Nat) | a b -> c, a c -> b, b c -> a
+    , (C.MultNat, (makeTypeClassData
+                            [ ("a", Just kindNat)
+                            , ("b", Just kindNat)
+                            , ("c", Just kindNat)
+                            ] [] []
+                            [ FunctionalDependency [0, 1] [2]
+                            , FunctionalDependency [0, 2] [1]
+                            , FunctionalDependency [1, 2] [0]
+                            ]))
+    -- class CompareNat (lhs :: Nat) (rhs :: Nat) (out :: Ordering) | lhs rhs -> out
+    , (C.CompareNat, (makeTypeClassData
+                            [ ("lhs", Just kindNat)
+                            , ("rhs", Just kindNat)
+                            , ("out", Just kindOrdering)
+                            ] [] []
+                            [ FunctionalDependency [0, 1] [2]
+                            ]))
     ]
 
 -- | Finds information about data constructors from the current environment.

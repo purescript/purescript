@@ -52,11 +52,12 @@ data Evidence
   -- | Computed instances
   | WarnInstance Type         -- ^ Warn type class with a user-defined warning message
   | IsSymbolInstance PSString -- ^ The IsSymbol type class for a given Symbol literal
-  | IsNatInstance Integer    -- ^ The IsNat type class for a given Nat literal
   | CompareSymbolInstance
   | ConsSymbolInstance
+  | IsNatInstance Integer    -- ^ The IsNat type class for a given Nat literal
   | AddNatInstance
   | MultNatInstance
+  | CompareNatInstance
   | AppendSymbolInstance
   | UnionInstance
   | ConsInstance
@@ -173,8 +174,6 @@ entails SolverOptions{..} constraint context hints =
       findDicts ctx cn Nothing ++ [TypeClassDictionaryInScope [] 0 (WarnInstance msg) [] C.Warn [msg] Nothing]
     forClassName _ C.IsSymbol [TypeLevelString sym] =
       [TypeClassDictionaryInScope [] 0 (IsSymbolInstance sym) [] C.IsSymbol [TypeLevelString sym] Nothing]
-    forClassName _ C.IsNat [TypeLevelNat nat] =
-      [TypeClassDictionaryInScope [] 0 (IsNatInstance nat) [] C.IsNat [TypeLevelNat nat] Nothing]
     forClassName _ C.CompareSymbol [arg0@(TypeLevelString lhs), arg1@(TypeLevelString rhs), _] =
       let ordering = case compare lhs rhs of
                   LT -> C.orderingLT
@@ -190,6 +189,15 @@ entails SolverOptions{..} constraint context hints =
       | Just (arg0', arg1', arg2') <- consSymbol arg0 arg1 arg2 =
       let args = [arg0', arg1', arg2']
       in [TypeClassDictionaryInScope [] 0 ConsSymbolInstance [] C.ConsSymbol args Nothing]
+    forClassName _ C.IsNat [TypeLevelNat nat] =
+      [TypeClassDictionaryInScope [] 0 (IsNatInstance nat) [] C.IsNat [TypeLevelNat nat] Nothing]
+    forClassName _ C.CompareNat [arg0@(TypeLevelNat lhs), arg1@(TypeLevelNat rhs), _] =
+      let ordering = case compare lhs rhs of
+                  LT -> C.orderingLT
+                  EQ -> C.orderingEQ
+                  GT -> C.orderingGT
+          args = [arg0, arg1, TypeConstructor ordering]
+      in [TypeClassDictionaryInScope [] 0 CompareNatInstance [] C.CompareNat args Nothing]
     forClassName _ C.AddNat [arg0, arg1, arg2]
       = case addNat arg0 arg1 arg2 of
           Just (arg0', arg1', arg2') ->
@@ -399,6 +407,8 @@ entails SolverOptions{..} constraint context hints =
               return $ TypeClassDictionaryConstructorApp C.AddNat (Literal (ObjectLiteral []))
             mkDictionary MultNatInstance _ =
               return $ TypeClassDictionaryConstructorApp C.MultNat (Literal (ObjectLiteral []))
+            mkDictionary CompareNatInstance _ =
+              return $ TypeClassDictionaryConstructorApp C.CompareNat (Literal (ObjectLiteral []))
 
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr
