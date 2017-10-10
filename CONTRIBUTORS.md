@@ -38,6 +38,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@davidchambers](https://github.com/davidchambers) | David Chambers | [MIT license](http://opensource.org/licenses/MIT) |
 | [@DavidLindbom](https://github.com/DavidLindbom) | David Lindbom | [MIT license](http://opensource.org/licenses/MIT) |
 | [@dckc](https://github.com/dckc) | Dan Connolly | [MIT license](http://opensource.org/licenses/MIT) |
+| [@dwhitney](https://github.com/dwhitney) | Dustin Whitney | [MIT license](http://opensource.org/licenses/MIT) |
 | [@kleeneplus](https://github.com/dgendill) | Dominick Gendill | [MIT license](http://opensource.org/licenses/MIT) |
 | [@eamelink](https://github.com/eamelink) | Erik Bakker | MIT license |
 | [@epost](https://github.com/epost) | Erik Post | MIT license |
