@@ -582,16 +582,16 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                   in ( rowFromList (sort unique1 ++ sort common1, r1)
                      , rowFromList (sort unique2 ++ sort common2, r2)
                      )
-        in paras [ line "Could not match type"
+        in paras [ line "Found type"
                  , markCodeBox $ indent $ typeAsBox sorted1
-                 , line "with type"
+                 , line "But expected type"
                  , markCodeBox $ indent $ typeAsBox sorted2
                  ]
 
     renderSimpleErrorMessage (KindsDoNotUnify k1 k2) =
-      paras [ line "Could not match kind"
+      paras [ line "Found kind"
             , indent $ line $ markCode $ prettyPrintKind k1
-            , line "with kind"
+            , line "But expected kind"
             , indent $ line $ markCode $ prettyPrintKind k2
             ]
     renderSimpleErrorMessage (ConstrainedTypeUnified t1 t2) =
