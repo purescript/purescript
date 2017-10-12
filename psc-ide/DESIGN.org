@@ -174,8 +174,24 @@
     assign a score to every result, which is a simple Double.
 ** Adding Imports
    Important Files: Ide.Imports
+*** We pretty print the entire import section on every import command instead of patching the existing section
+**** Pros
+- Small diffs if you use =ide= all the time
+- Uniform formatting
+- Simplifies the implementation
+**** Cons
+- Big diff on first use
+- Makes it hard to maintain comments in between imports, so we just remove them
 
-   TODO: To be documented
+*** Formatting Rules for imports
+1. Unqualified imports
+2. Space divider
+3. All the other imports in alphabetic ordering
+
+**** Pro
+- Easy enough to achieve without using =ide= by just sorting the imports linewise
+**** Cons
+- Can lead to very long import lines
 ** Rebuilding
    Important Files: Ide.Rebuild
 
