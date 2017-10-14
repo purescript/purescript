@@ -20,6 +20,7 @@
 module Language.PureScript.Ide.State
   ( getLoadedModulenames
   , getExternFiles
+  , getFileState
   , resetIdeState
   , cacheRebuild
   , cachedRebuild
@@ -27,6 +28,9 @@ module Language.PureScript.Ide.State
   , insertModule
   , insertExternsSTM
   , getAllModules
+  -- | Functions related to DeclarationIds
+  , modifyAtDeclarationId
+  -- | Populating the caches
   , populateVolatileState
   , populateVolatileStateSync
   , populateVolatileStateSTM
@@ -50,6 +54,7 @@ import           Language.PureScript.Ide.Externs
 import           Language.PureScript.Ide.Reexports
 import           Language.PureScript.Ide.SourceFile
 import           Language.PureScript.Ide.Types
+import           Language.PureScript.Ide.Usages (Usage(..), collectUsages)
 import           Language.PureScript.Ide.Util
 
 -- | Resets all State inside psc-ide
@@ -110,6 +115,25 @@ setVolatileStateSTM ref vs = do
   modifyTVar ref $ \x ->
     x {ideVolatileState = vs}
   pure ()
+
+modifyAtDeclarationId
+  :: Ide m
+  => IdeDeclarationId
+  -> (IdeDeclarationAnn -> IdeDeclarationAnn)
+  -> m ()
+modifyAtDeclarationId declarationId f = do
+  st <- ideStateVar <$> ask
+  liftIO $ atomically $ do
+    vState <- getVolatileStateSTM st
+    let newState = Map.update (Just . map update) (declarationId ^. ididModule) (vsDeclarations vState)
+    setVolatileStateSTM st vState { vsDeclarations = newState }
+  where
+     update :: IdeDeclarationAnn -> IdeDeclarationAnn
+     update d =
+        if (namespaceForDeclaration (discardAnn d) == declarationId ^. ididNamespace
+             && identifierFromIdeDeclaration (discardAnn d) == declarationId ^. ididIdentifier)
+          then f d
+          else d
 
 -- | Checks if the given ModuleName matches the last rebuild cache and if it
 -- does returns all loaded definitions + the definitions inside the rebuild
@@ -181,9 +205,10 @@ populateVolatileState :: (Ide m, MonadLogger m) => m (Async ())
 populateVolatileState = do
   env <- ask
   let ll = confLogLevel (ideConfiguration env)
-  -- populateVolatileState return Unit for now, so it's fine to discard this
+  let message duration = "Finished resolving usages in: " <> displayTimeSpec duration
+  -- populateVolatileState returns Unit for now, so it's fine to discard this
   -- result. We might want to block on this in a benchmarking situation.
-  liftIO (async (runLogger ll (runReaderT populateVolatileStateSync env)))
+  liftIO (async (runLogger ll (runReaderT (populateVolatileStateSync *> logPerf message resolveUsages) env)))
 
 -- | STM version of populateVolatileState
 populateVolatileStateSTM
@@ -399,3 +424,24 @@ resolveDataConstructorsForModule decls =
       & mapMaybe (preview (idaDeclaration._IdeDeclDataConstructor))
       & foldr (\(IdeDataConstructor name typeName type') ->
                   Map.insertWith (<>) typeName [(name, type')]) Map.empty
+
+insertUsage :: Ide m => Usage -> m ()
+insertUsage Usage{..} =
+  modifyAtDeclarationId usageOriginId (over idaAnnotation updateAnnotation)
+  where
+    updateAnnotation = over annUsages (map ((:) (usageSiteModule, usageSiteLocation)))
+
+resolveUsagesForModule :: Ide m => P.Module -> m ()
+resolveUsagesForModule m = for_ (collectUsages m) insertUsage
+
+resolveUsages :: Ide m => m ()
+resolveUsages = do
+  modules <- map fsModules getFileState
+  traverse_ (resolveUsagesForModule . fst) modules
+
+forceVolatile :: Ide m => m ()
+forceVolatile = do
+  st <- ideStateVar <$> ask
+  liftIO $ atomically $ do
+    s <- getVolatileStateSTM st
+    setVolatileStateSTM st (s { vsDeclarations = force (vsDeclarations s) })

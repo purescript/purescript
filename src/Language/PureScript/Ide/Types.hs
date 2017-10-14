@@ -31,6 +31,13 @@ import qualified Language.PureScript.Errors.JSON as P
 type ModuleIdent = Text
 type ModuleMap a = Map P.ModuleName a
 
+-- | This datatype can be used to uniquely identify a declaration in our State
+data IdeDeclarationId = IdeDeclarationId
+  { _ididModule     :: !P.ModuleName
+  , _ididNamespace  :: !IdeNamespace
+  , _ididIdentifier :: !Text
+  } deriving (Show, Eq, Ord)
+
 data IdeDeclaration
   = IdeDeclValue IdeValue
   | IdeDeclType IdeType
@@ -48,8 +55,8 @@ data IdeValue = IdeValue
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeType = IdeType
- { _ideTypeName :: P.ProperName 'P.TypeName
- , _ideTypeKind :: P.Kind
+ { _ideTypeName  :: P.ProperName 'P.TypeName
+ , _ideTypeKind  :: P.Kind
  , _ideTypeDtors :: [(P.ProperName 'P.ConstructorName, P.Type)]
  } deriving (Show, Eq, Ord, Generic, NFData)
 
@@ -94,16 +101,6 @@ data IdeTypeOperator = IdeTypeOperator
   , _ideTypeOpKind          :: Maybe P.Kind
   } deriving (Show, Eq, Ord, Generic, NFData)
 
-makePrisms ''IdeDeclaration
-makeLenses ''IdeValue
-makeLenses ''IdeType
-makeLenses ''IdeTypeSynonym
-makeLenses ''IdeDataConstructor
-makeLenses ''IdeTypeClass
-makeLenses ''IdeInstance
-makeLenses ''IdeValueOperator
-makeLenses ''IdeTypeOperator
-
 data IdeDeclarationAnn = IdeDeclarationAnn
   { _idaAnnotation  :: Annotation
   , _idaDeclaration :: IdeDeclaration
@@ -115,10 +112,8 @@ data Annotation
   , _annExportedFrom   :: Maybe P.ModuleName
   , _annTypeAnnotation :: Maybe P.Type
   , _annDocumentation  :: Maybe Text
+  , _annUsages         :: Maybe [(P.ModuleName, P.SourceSpan)]
   } deriving (Show, Eq, Ord, Generic, NFData)
-
-makeLenses ''Annotation
-makeLenses ''IdeDeclarationAnn
 
 emptyAnn :: Annotation
 emptyAnn = Annotation Nothing Nothing Nothing Nothing
@@ -333,3 +328,17 @@ instance FromJSON IdeNamespace where
 -- | A name tagged with a namespace
 data IdeNamespaced = IdeNamespaced IdeNamespace Text
   deriving (Show, Eq, Ord, Generic, NFData)
+
+makePrisms ''IdeDeclaration
+makeLenses ''IdeValue
+makeLenses ''IdeType
+makeLenses ''IdeTypeSynonym
+makeLenses ''IdeDataConstructor
+makeLenses ''IdeTypeClass
+makeLenses ''IdeInstance
+makeLenses ''IdeValueOperator
+makeLenses ''IdeTypeOperator
+
+makeLenses ''Annotation
+makeLenses ''IdeDeclarationAnn
+makeLenses ''IdeDeclarationId
