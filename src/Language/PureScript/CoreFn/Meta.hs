@@ -1,3 +1,4 @@
+{-# LANGUAGE TemplateHaskell #-}
 -- |
 -- Metadata annotations for core functional representation
 --
@@ -6,6 +7,8 @@ module Language.PureScript.CoreFn.Meta where
 import Prelude.Compat
 
 import Language.PureScript.Names
+
+import Data.Aeson.TH
 
 -- |
 -- Metadata annotations
@@ -40,3 +43,8 @@ data ConstructorType
   -- The constructor is for a type with multiple construcors
   --
   | SumType deriving (Show, Eq, Ord)
+
+
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ConstructorType)
+
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Meta)

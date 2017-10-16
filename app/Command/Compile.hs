@@ -132,11 +132,17 @@ dumpCoreFn = Opts.switch $
      Opts.long "dump-corefn"
   <> Opts.help "Dump the (functional) core representation of the compiled code at output/*/corefn.json"
 
+dumpCoreImp :: Opts.Parser Bool
+dumpCoreImp = Opts.switch $
+     Opts.long "dump-coreimp"
+  <> Opts.help "Dump the (imperative) core representation of the compiled code at output/*/coreimp.json"
+
 options :: Opts.Parser P.Options
 options = P.Options <$> verboseErrors
                     <*> (not <$> comments)
                     <*> sourceMaps
                     <*> dumpCoreFn
+                    <*> dumpCoreImp
 
 pscMakeOptions :: Opts.Parser PSCMakeOptions
 pscMakeOptions = PSCMakeOptions <$> many inputFile
