@@ -8,21 +8,6 @@ import qualified Language.PureScript as P
 import           Language.PureScript.Ide.Imports.Helpers
 import           Language.PureScript.Ide.Types
 
-testModule :: P.Module
-testModule =
-  either (panic "") snd $ P.parseModuleFromFile (const "") $ ("" :: [Char], ) $ T.unlines
-    [ "module Test where"
-    , ""
-    , "import Prelude"
-    , ""
-    , "import Data.Array (filter)"
-    , "import Globals (globalList)"
-    , ""
-    , "id x = x"
-    , "killer y = filter isEven y"
-    , "rofl = map killer globalList"
-    ]
-
 -- | The usage of an identifier inside some other declaration
 data Usage = Usage
   { usageSiteModule :: P.ModuleName
