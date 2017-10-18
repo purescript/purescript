@@ -16,7 +16,7 @@ import Data.Version (Version, showVersion)
 
 import Language.PureScript.AST (SourceSpan)
 import Language.PureScript.CoreFn (Ann, Module, moduleComments, moduleDecls, moduleExports, moduleImports, moduleForeign, moduleName, modulePath)
-import qualified Language.PureScript.CoreFn.Expr as CoreFnExpr
+import qualified Language.PureScript.CoreFn.Expr as CFnExpr
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.Names
 import Language.PureScript.PSString
@@ -31,9 +31,6 @@ identToJSON = toJSON . runIdent
 properNameToJSON :: ProperName a -> Value
 properNameToJSON = toJSON . runProperName
 
-qualifiedToJSON :: (a -> T.Text) -> Qualified a -> Value
-qualifiedToJSON f = toJSON . showQualified f
-
 moduleToJSON :: Version -> Module Ann -> [AST] -> Value
 moduleToJSON v m ast = object
   [ T.pack "moduleName" .= moduleNameToJSON (moduleName m)
@@ -47,35 +44,33 @@ moduleToJSON v m ast = object
   , T.pack "body"       .= map (astToJSON) ast
   ]
 
-bindToJSON :: (ToJSON a) => CoreFnExpr.Bind a -> Value
-bindToJSON (CoreFnExpr.NonRec _ n e) = object [ runIdent n .= exprToJSON e ]
-bindToJSON (CoreFnExpr.Rec bs) = object $ map (\((_, n), e) -> runIdent n .= exprToJSON e) bs
+bindToJSON :: (ToJSON a) => CFnExpr.Bind a -> Value
+bindToJSON (CFnExpr.NonRec _ n e) = object [ runIdent n .= exprToJSON e ]
+bindToJSON (CFnExpr.Rec bs) = object $ map (\((_, n), e) -> runIdent n .= exprToJSON e) bs
 
-exprToJSON :: (ToJSON a) => CoreFnExpr.Expr a -> Value
-exprToJSON (CoreFnExpr.Var ann i)              = object [T.pack "Var" .= object
-                                                          [ T.pack "ann"   .= toJSON ann
-                                                          , T.pack "ident" .= qualifiedToJSON runIdent i]]
-exprToJSON (CoreFnExpr.Literal ann _)          = object [T.pack "Literal" .= object
-                                                          [ T.pack "ann" .= toJSON ann]]
-exprToJSON (CoreFnExpr.Constructor ann d c is) = object [T.pack "Constructor" .= object
-                                                          [ T.pack "ann"   .= toJSON ann
-                                                          , T.pack "dName" .= properNameToJSON d
-                                                          , T.pack "cName" .= properNameToJSON c
-                                                          , T.pack "ident" .= map identToJSON is]]
-exprToJSON (CoreFnExpr.Abs ann p _)            = object [T.pack "Abs" .= object
-                                                          [ T.pack "ann" .= toJSON ann
-                                                          , T.pack "p"   .= identToJSON p]]
-exprToJSON (CoreFnExpr.App ann f x)            = object [T.pack "App" .= object
-                                                          [ T.pack "ann" .= toJSON ann
-                                                          , T.pack "f"   .= exprToJSON f
-                                                          , T.pack "x"   .= exprToJSON x]]
--- these below aren't wanted for the declAnns use-case. but we want exhaustive-pattern-match here;
--- and such named-empty-objects are potentially slightly nicer to have in the output than just nulls or entirely-empty-objects
--- though from what I can tell these paths are never entered into anyway via the above cases
-exprToJSON (CoreFnExpr.Accessor _ _ _)         = object [T.pack "Accessor" .= object []]
-exprToJSON (CoreFnExpr.ObjectUpdate _ _ _)     = object [T.pack "ObjectUpdate" .= object []]
-exprToJSON (CoreFnExpr.Case _ _ _)             = object [T.pack "Case" .= object []]
-exprToJSON (CoreFnExpr.Let _ _ _)              = object [T.pack "Let" .= object []]
+exprToJSON :: (ToJSON a) => CFnExpr.Expr a -> Value
+exprToJSON (CFnExpr.Var ann _)              = object [ T.pack "type"             .= "Var"
+                                                     , T.pack "annotation"       .= toJSON ann]
+exprToJSON (CFnExpr.Literal ann _)          = object [ T.pack "type"             .= "Literal"
+                                                     , T.pack "annotation"       .= toJSON ann]
+exprToJSON (CFnExpr.Accessor ann _ _)       = object [ T.pack "type"             .= "Accessor"
+                                                     , T.pack "annotation"       .= toJSON ann]
+exprToJSON (CFnExpr.ObjectUpdate ann _ _)   = object [ T.pack "type"             .= "ObjectUpdate"
+                                                     , T.pack "annotation"       .= toJSON ann]
+exprToJSON (CFnExpr.Abs ann _ _)            = object [ T.pack "type"             .= "Abs"
+                                                     , T.pack "annotation"       .= toJSON ann]
+exprToJSON (CFnExpr.App ann _ _)            = object [ T.pack "type"             .= "App"
+                                                     , T.pack "annotation"       .= toJSON ann]
+exprToJSON (CFnExpr.Case ann _ _)           = object [ T.pack "type"             .= "Case"
+                                                     , T.pack "annotation"       .= toJSON ann]
+exprToJSON (CFnExpr.Let ann _ _)            = object [ T.pack "type"             .= "Let"
+                                                     , T.pack "annotation"       .= toJSON ann]
+exprToJSON (CFnExpr.Constructor ann d c is) = object [ T.pack "type"             .= "Constructor"
+                                                     , T.pack "annotation"       .= toJSON ann
+                                                     , T.pack "typeName"         .= properNameToJSON d
+                                                     , T.pack "constructorName"  .= properNameToJSON c
+                                                     , T.pack "fieldNames"       .= map identToJSON is
+                                                     ]
 
 
 astToJSON :: AST -> Value
