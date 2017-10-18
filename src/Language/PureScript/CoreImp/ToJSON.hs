@@ -84,6 +84,7 @@ exprToJSON (CoreFnExpr.App ann f x)            = object [T.pack "App" .= object
                                                           , T.pack "x"   .= exprToJSON x]]
 -- these below aren't wanted for the declAnns use-case. but we want exhaustive-pattern-match here;
 -- and such named-empty-objects are potentially slightly nicer to have in the output than just nulls or entirely-empty-objects
+-- though from what I can tell these paths are never entered into anyway via the above cases
 exprToJSON (CoreFnExpr.Accessor _ _ _)         = object [T.pack "Accessor" .= object []]
 exprToJSON (CoreFnExpr.ObjectUpdate _ _ _)     = object [T.pack "ObjectUpdate" .= object []]
 exprToJSON (CoreFnExpr.Case _ _ _)             = object [T.pack "Case" .= object []]
