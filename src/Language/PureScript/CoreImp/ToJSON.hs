@@ -11,14 +11,11 @@ module Language.PureScript.CoreImp.ToJSON
 import Prelude.Compat
 
 import Data.Aeson
-import Data.Maybe
 import qualified Data.Text as T
 import Data.Version (Version, showVersion)
 
 import Language.PureScript.AST (SourceSpan)
-import qualified Language.PureScript.AST.Literals as ASTL
 import Language.PureScript.CoreFn (Ann, Module, moduleComments, moduleDecls, moduleExports, moduleImports, moduleForeign, moduleName, modulePath)
-import Language.PureScript.CoreFn.Binders
 import qualified Language.PureScript.CoreFn.Expr as CoreFnExpr
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.Environment
@@ -28,15 +25,6 @@ import Language.PureScript.PSString
 
 moduleNameToJSON :: ModuleName -> Value
 moduleNameToJSON = toJSON . runModuleName
-
-literalToJSON :: (a -> Value) -> ASTL.Literal a -> Value
-literalToJSON _ (ASTL.NumericLiteral (Left n)) = toJSON ("IntLiteral", n)
-literalToJSON _ (ASTL.NumericLiteral (Right n)) = toJSON ("NumberLiteral", n)
-literalToJSON _ (ASTL.StringLiteral s) = toJSON ("StringLiteral", s)
-literalToJSON _ (ASTL.CharLiteral c) = toJSON ("CharLiteral", c)
-literalToJSON _ (ASTL.BooleanLiteral b) = toJSON ("BooleanLiteral", b)
-literalToJSON t (ASTL.ArrayLiteral xs) = toJSON ("ArrayLiteral", map t xs)
-literalToJSON t (ASTL.ObjectLiteral xs) = toJSON ("ObjectLiteral", recordToJSON t xs)
 
 identToJSON :: Ident -> Value
 identToJSON = toJSON . runIdent
@@ -56,7 +44,7 @@ moduleToJSON v m env ast = object
   , T.pack "foreign"    .= map identToJSON (moduleForeign m)
   , T.pack "builtWith"  .= toJSON (showVersion v)
   , T.pack "comments"   .= map toJSON (moduleComments m)
-  , T.pack "declAnns"   .= map bindToJSON (moduleDecls m) -- kinda like the `decls` in --dump-corefn, but only the annotations (types & meta)
+  , T.pack "declAnns"   .= map bindToJSON (moduleDecls m) -- all top-level decls (not just the exporteds as in externs.json) --- anns/meta/types
   , T.pack "body"       .= map (astToJSON) ast
   , T.pack "env"        .= envToJSON env
   ]
@@ -76,94 +64,30 @@ bindToJSON :: (ToJSON a) => CoreFnExpr.Bind a -> Value
 bindToJSON (CoreFnExpr.NonRec _ n e) = object [ runIdent n .= exprToJSON e ]
 bindToJSON (CoreFnExpr.Rec bs) = object $ map (\((_, n), e) -> runIdent n .= exprToJSON e) bs
 
-recordToJSON :: (a -> Value) -> [(PSString, a)] -> Value
-recordToJSON f rec = fromMaybe (asArrayOfPairs rec) (asObject rec)
-  where
-  asObject = fmap object . traverse (uncurry maybePair)
-  maybePair label a = fmap (\l -> l .= f a) (decodeString label)
-
-  asArrayOfPairs = toJSON . map (\(label, a) -> (toJSON label, f a))
-
 exprToJSON :: (ToJSON a) => CoreFnExpr.Expr a -> Value
-exprToJSON (CoreFnExpr.Var ann i)              = toJSON ( "Var"
-                                               , qualifiedToJSON runIdent i
-                                               , ann
-                                               )
-exprToJSON (CoreFnExpr.Literal ann l)          = toJSON ( "Literal"
-                                               , literalToJSON (exprToJSON) l
-                                               , ann
-                                               )
-exprToJSON (CoreFnExpr.Constructor ann d c is) = toJSON ( "Constructor"
-                                               , properNameToJSON d
-                                               , properNameToJSON c
-                                               , map identToJSON is
-                                               , ann
-                                               )
-exprToJSON (CoreFnExpr.Accessor ann f r)       = toJSON ( "Accessor"
-                                               , f
-                                               , exprToJSON r
-                                               , ann
-                                               )
-exprToJSON (CoreFnExpr.ObjectUpdate ann r fs)  = toJSON ( "ObjectUpdate"
-                                               , exprToJSON r
-                                               , recordToJSON exprToJSON fs
-                                               , ann
-                                               )
-exprToJSON (CoreFnExpr.Abs ann p b)            = toJSON ( "Abs"
-                                               , identToJSON p
-                                               , exprToJSON b
-                                               , ann
-                                               )
-exprToJSON (CoreFnExpr.App ann f x)            = toJSON ( "App"
-                                               , exprToJSON f
-                                               , exprToJSON x
-                                               , ann
-                                               )
-exprToJSON (CoreFnExpr.Case ann ss cs)         = toJSON ( "Case"
-                                               , map exprToJSON ss
-                                               , map caseAlternativeToJSON cs
-                                               , ann
-                                               )
-exprToJSON (CoreFnExpr.Let ann bs e)           = toJSON ( "Let"
-                                               , map bindToJSON bs
-                                               , exprToJSON e
-                                               , ann
-                                               )
-
-caseAlternativeToJSON :: (ToJSON a) => CoreFnExpr.CaseAlternative a -> Value
-caseAlternativeToJSON (CoreFnExpr.CaseAlternative bs r') =
-  toJSON [ toJSON (map binderToJSON bs)
-         , case r' of
-             Left rs -> toJSON $ map (\(g, e) -> (exprToJSON g, exprToJSON e)) rs
-             Right r -> exprToJSON r
-         ]
-
-binderToJSON :: (ToJSON a) => Binder a -> Value
-binderToJSON (VarBinder ann v)              = toJSON ( "VarBinder"
-                                                     , identToJSON v
-                                                     , ann
-                                                     )
-binderToJSON (NullBinder ann)               = toJSON ( "NullBinder"
-                                                     , ann
-                                                     )
-binderToJSON (LiteralBinder ann l)          = toJSON ( "LiteralBinder"
-                                                     , literalToJSON binderToJSON l
-                                                     , ann
-                                                     )
-binderToJSON (ConstructorBinder ann d c bs) = toJSON ( "ConstructorBinder"
-                                                     , qualifiedToJSON runProperName d
-                                                     , qualifiedToJSON runProperName c
-                                                     , map binderToJSON bs
-                                                     , ann
-                                                     )
-binderToJSON (NamedBinder ann n b)          = toJSON ( "NamedBinder"
-                                                     , identToJSON n
-                                                     , binderToJSON b
-                                                     , ann
-                                                     )
-
-
-
+exprToJSON (CoreFnExpr.Var ann i)              = object [T.pack "Var" .= object
+                                                          [ T.pack "ann"   .= toJSON ann
+                                                          , T.pack "ident" .= qualifiedToJSON runIdent i]]
+exprToJSON (CoreFnExpr.Literal ann _)          = object [T.pack "Literal" .= object
+                                                          [ T.pack "ann" .= toJSON ann]]
+exprToJSON (CoreFnExpr.Constructor ann d c is) = object [T.pack "Constructor" .= object
+                                                          [ T.pack "ann"   .= toJSON ann
+                                                          , T.pack "dName" .= properNameToJSON d
+                                                          , T.pack "cName" .= properNameToJSON c
+                                                          , T.pack "ident" .= map identToJSON is]]
+exprToJSON (CoreFnExpr.Abs ann p _)            = object [T.pack "Abs" .= object
+                                                          [ T.pack "ann" .= toJSON ann
+                                                          , T.pack "p"   .= identToJSON p]]
+exprToJSON (CoreFnExpr.App ann f x)            = object [T.pack "App" .= object
+                                                          [ T.pack "ann" .= toJSON ann
+                                                          , T.pack "f"   .= exprToJSON f
+                                                          , T.pack "x"   .= exprToJSON x]]
+-- these below aren't wanted for the declAnns use-case. but we want exhaustive-pattern-match here;
+-- and such named-empty-objects are potentially slightly nicer to have in the output than just nulls or entirely-empty-objects
+exprToJSON (CoreFnExpr.Accessor _ _ _)         = object [T.pack "Accessor" .= object []]
+exprToJSON (CoreFnExpr.ObjectUpdate _ _ _)     = object [T.pack "ObjectUpdate" .= object []]
+exprToJSON (CoreFnExpr.Case _ _ _)             = object [T.pack "Case" .= object []]
+exprToJSON (CoreFnExpr.Let _ _ _)              = object [T.pack "Let" .= object []]
 
 
 astToJSON :: AST -> Value
