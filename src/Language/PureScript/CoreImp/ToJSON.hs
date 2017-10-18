@@ -18,7 +18,6 @@ import Language.PureScript.AST (SourceSpan)
 import Language.PureScript.CoreFn (Ann, Module, moduleComments, moduleDecls, moduleExports, moduleImports, moduleForeign, moduleName, modulePath)
 import qualified Language.PureScript.CoreFn.Expr as CoreFnExpr
 import Language.PureScript.CoreImp.AST
-import Language.PureScript.Environment
 import Language.PureScript.Names
 import Language.PureScript.PSString
 
@@ -35,8 +34,8 @@ properNameToJSON = toJSON . runProperName
 qualifiedToJSON :: (a -> T.Text) -> Qualified a -> Value
 qualifiedToJSON f = toJSON . showQualified f
 
-moduleToJSON :: Version -> Module Ann -> Environment -> [AST] -> Value
-moduleToJSON v m env ast = object
+moduleToJSON :: Version -> Module Ann -> [AST] -> Value
+moduleToJSON v m ast = object
   [ T.pack "moduleName" .= moduleNameToJSON (moduleName m)
   , T.pack "modulePath" .= toJSON (modulePath m)
   , T.pack "imports"    .= map (moduleNameToJSON . snd) (moduleImports m)
@@ -46,18 +45,6 @@ moduleToJSON v m env ast = object
   , T.pack "comments"   .= map toJSON (moduleComments m)
   , T.pack "declAnns"   .= map bindToJSON (moduleDecls m) -- all top-level decls (not just the exporteds as in externs.json) --- anns/meta/types
   , T.pack "body"       .= map (astToJSON) ast
-  , T.pack "env"        .= envToJSON env
-  ]
-
-envToJSON :: Environment -> Value
-envToJSON env = object
-  [ T.pack "kinds" .= toJSON (kinds env)
-  , T.pack "typeClasses" .= toJSON (typeClasses env)
-  , T.pack "typeClassDictionaries" .= toJSON (typeClassDictionaries env)
-  , T.pack "typeSynonyms" .= toJSON (typeSynonyms env)
-  , T.pack "dataConstructors" .= toJSON (dataConstructors env)
-  , T.pack "types" .= toJSON (types env)
-  , T.pack "names" .= toJSON (names env)
   ]
 
 bindToJSON :: (ToJSON a) => CoreFnExpr.Bind a -> Value

@@ -1,5 +1,4 @@
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE TemplateHaskell #-}
 
 module Language.PureScript.Environment where
 
@@ -10,7 +9,6 @@ import           GHC.Generics (Generic)
 import           Control.DeepSeq (NFData)
 import           Data.Aeson ((.=), (.:))
 import qualified Data.Aeson as A
-import           Data.Aeson.TH
 import qualified Data.Map as M
 import qualified Data.Set as S
 import           Data.Maybe (fromMaybe, mapMaybe)
@@ -70,7 +68,6 @@ data TypeClassData = TypeClassData
   } deriving (Show, Generic)
 
 instance NFData TypeClassData
-instance A.ToJSON TypeClassData
 
 -- | A functional dependency indicates a relationship between two sets of
 -- type arguments in a class declaration.
@@ -403,9 +400,3 @@ isNewtypeConstructor e ctor = case lookupConstructor e ctor of
 -- | Finds information about values from the current environment.
 lookupValue :: Environment -> Qualified Ident -> Maybe (Type, NameKind, NameVisibility)
 lookupValue env ident = ident `M.lookup` names env
-
-
-
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''NameVisibility)
-
-$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''NameKind)
