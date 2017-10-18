@@ -70,6 +70,7 @@ data TypeClassData = TypeClassData
   } deriving (Show, Generic)
 
 instance NFData TypeClassData
+instance A.ToJSON TypeClassData
 
 -- | A functional dependency indicates a relationship between two sets of
 -- type arguments in a class declaration.
@@ -408,5 +409,3 @@ lookupValue env ident = ident `M.lookup` names env
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''NameVisibility)
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''NameKind)
-
-$(deriveJSON (defaultOptions) ''TypeClassData)
