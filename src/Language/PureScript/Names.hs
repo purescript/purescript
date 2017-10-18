@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 -- |
 -- Data types for names
@@ -79,6 +80,7 @@ data Ident
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData Ident
+instance ToJSONKey Ident
 
 runIdent :: Ident -> Text
 runIdent (Ident i) = i
@@ -155,6 +157,7 @@ newtype ModuleName = ModuleName [ProperName 'Namespace]
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData ModuleName
+instance ToJSONKey (Maybe ModuleName)
 
 runModuleName :: ModuleName -> Text
 runModuleName (ModuleName pns) = T.intercalate "." (runProperName <$> pns)
@@ -174,6 +177,10 @@ data Qualified a = Qualified (Maybe ModuleName) a
   deriving (Show, Eq, Ord, Functor, Generic)
 
 instance NFData a => NFData (Qualified a)
+instance ToJSONKey (Qualified Ident)
+instance ToJSONKey (Qualified (ProperName 'TypeName))
+instance ToJSONKey (Qualified (ProperName 'ConstructorName))
+instance ToJSONKey (Qualified (ProperName 'ClassName))
 
 showQualified :: (a -> Text) -> Qualified a -> Text
 showQualified f (Qualified Nothing a) = f a

@@ -350,7 +350,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     (path, ) <$> readTextFile path
 
   codegen :: CF.Module CF.Ann -> Environment -> Externs -> SupplyT Make ()
-  codegen m _ exts = do
+  codegen m env exts = do
     let mn = CF.moduleName m
     foreignInclude <- case mn `M.lookup` foreigns of
       Just path
@@ -387,7 +387,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
       lift $ writeTextFile coreFnFile (encode json)
     when dumpCoreImp $ do
       let coreImpFile = outputDir </> filePath </> "coreimp.json"
-      let json = CIJ.moduleToJSON Paths.version m rawJs
+      let json = CIJ.moduleToJSON Paths.version m env rawJs
       lift $ writeTextFile coreImpFile (encode json)
 
   genSourceMap :: String -> String -> Int -> [SMap] -> Make ()
