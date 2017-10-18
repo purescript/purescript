@@ -17,7 +17,7 @@ import Data.Version (Version, showVersion)
 
 import Language.PureScript.AST (SourceSpan)
 import qualified Language.PureScript.AST.Literals as ASTL
-import Language.PureScript.CoreFn (Module, moduleDecls, moduleExports, moduleImports, moduleForeign)
+import Language.PureScript.CoreFn (Module, moduleComments, moduleDecls, moduleExports, moduleImports, moduleForeign, moduleName, modulePath)
 import Language.PureScript.CoreFn.Binders
 import qualified Language.PureScript.CoreFn.Expr as CoreFnExpr
 import Language.PureScript.CoreImp.AST
@@ -47,13 +47,17 @@ qualifiedToJSON :: (a -> T.Text) -> Qualified a -> Value
 qualifiedToJSON f = toJSON . showQualified f
 
 moduleToJSON :: (ToJSON a) => Version -> Module a -> [AST] -> Value
-moduleToJSON v m ast = object [ T.pack "imports"   .= map (moduleNameToJSON . snd) (moduleImports m)
-                              , T.pack "exports"   .= map identToJSON (moduleExports m)
-                              , T.pack "foreign"   .= map identToJSON (moduleForeign m)
-                              , T.pack "builtWith" .= toJSON (showVersion v)
-                              , T.pack "decls"     .= map bindToJSON (moduleDecls m) -- unlike the `decls` in --dump-corefn, here we only dump annotations (types & meta)
-                              , T.pack "body"      .= map (astToJSON) ast
-                              ]
+moduleToJSON v m ast = object
+  [ T.pack "moduleName" .= moduleNameToJSON (moduleName m)
+  , T.pack "modulePath" .= toJSON (modulePath m)
+  , T.pack "imports"   .= map (moduleNameToJSON . snd) (moduleImports m)
+  , T.pack "exports"   .= map identToJSON (moduleExports m)
+  , T.pack "foreign"   .= map toJSON (moduleForeign m)
+  , T.pack "builtWith" .= toJSON (showVersion v)
+  , T.pack "comments"   .= map toJSON (moduleComments m)
+  , T.pack "decls"     .= map bindToJSON (moduleDecls m) -- unlike the `decls` in --dump-corefn, here we only dump annotations (types & meta)
+  , T.pack "body"      .= map (astToJSON) ast
+  ]
 
 bindToJSON :: (ToJSON a) => CoreFnExpr.Bind a -> Value
 bindToJSON (CoreFnExpr.NonRec _ n e) = object [ runIdent n .= exprToJSON e ]
