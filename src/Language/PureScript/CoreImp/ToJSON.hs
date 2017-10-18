@@ -56,7 +56,7 @@ moduleToJSON v m env ast = object
   , T.pack "foreign"    .= map identToJSON (moduleForeign m)
   , T.pack "builtWith"  .= toJSON (showVersion v)
   , T.pack "comments"   .= map toJSON (moduleComments m)
-  , T.pack "decls"      .= map bindToJSON (moduleDecls m) -- unlike the `decls` in --dump-corefn, here we only dump annotations (types & meta)
+  , T.pack "declAnns"   .= map bindToJSON (moduleDecls m) -- kinda like the `decls` in --dump-corefn, but only the annotations (types & meta)
   , T.pack "body"       .= map (astToJSON) ast
   , T.pack "env"        .= envToJSON env
   ]
