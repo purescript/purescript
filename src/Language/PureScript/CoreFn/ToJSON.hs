@@ -4,7 +4,7 @@
 -- by third-party code generators
 --
 module Language.PureScript.CoreFn.ToJSON
-  ( moduleToJSON
+  ( moduleToJSON, sourceSpanToJSON, metaToJSON, moduleNameToJSON, identToJSON, properNameToJSON
   ) where
 
 import           Prelude.Compat
@@ -183,7 +183,7 @@ exprToJSON (Case ann ss cs)         = object [ T.pack "type"        .= "Case"
                                              , T.pack "caseAlternatives"
                                                                     .= map caseAlternativeToJSON cs
                                              ]
-exprToJSON (Let ann bs e)           = object [ T.pack "type"        .= "Let" 
+exprToJSON (Let ann bs e)           = object [ T.pack "type"        .= "Let"
                                              , T.pack "annotation"  .= annToJSON ann
                                              , T.pack "binds"       .= map bindToJSON bs
                                              , T.pack "expression"  .= exprToJSON e
