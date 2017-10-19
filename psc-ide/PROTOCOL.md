@@ -72,7 +72,8 @@ The `complete` command looks up possible completions/corrections.
   If no matcher is given every candidate, that passes the filters, is returned
   in no particular order.
 
- - `currentModule :: (optional) String`: The current modules name. If it matches
+ - `currentModule :: (optional) String`: The current modules name. Allows you 
+   to see module-private functions after a successful rebuild. If it matches
    with the rebuild cache non-exported modules will also be completed. You can
    fill the rebuild cache by using the "Rebuild" command.
 
