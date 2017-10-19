@@ -204,7 +204,6 @@ There are two reasons why ide's rebuilds are an order of magnitude faster than
 the compilers incremental builds.
 **** Rebuild ONLY respects downstream modules
 **** All the externs data is already held in RAM
-
 *** Steps rebuilding takes
 **** Parse input model
 **** Check if FFI file exists and also load that
@@ -230,7 +229,7 @@ Language.PureScript.Ide.RebuildSpec)
 * Tips and Tricks
 ** Running only =ide='s test suite
    ~stack test --test-arguments "-m Language.PureScript.Ide"~
-* Thoughts to be assigned
+* Facts and thoughts without a good place yet
 ** Using externs files as source of truth
 *** Pros
 - Everything has types, because it went through the compiler
