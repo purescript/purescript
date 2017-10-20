@@ -23,6 +23,7 @@ import Language.PureScript.CoreFn.ToJSON (sourceSpanToJSON, metaToJSON, moduleNa
 import Language.PureScript.Environment
 import Language.PureScript.Names
 import Language.PureScript.PSString
+import Language.PureScript.Types
 import Language.PureScript.TypeClassDictionaries
 
 moduleToJSON :: Version -> Module Ann -> Environment -> [AST] -> Value
@@ -186,8 +187,8 @@ ownEnvToJSON mname env = object
   , T.pack "types" .= typesToJSON (types env)
   , T.pack "dataConstructors" .= ctorsToJSON (dataConstructors env)
   , T.pack "typeSynonyms" .= typeSynsToJSON (typeSynonyms env)
-  , T.pack "typeClasses" .= typeClassesToJSON (typeClasses env)
-  , T.pack "typeClassDictionaries" .= typeClassDictsToJSON (typeClassDictionaries env)
+  , T.pack "typeClasses" .= tcsToJSON (typeClasses env)
+  , T.pack "typeClassDictionaries" .= tcDictsToJSON (typeClassDictionaries env)
   -- , T.pack "kinds" .= toJSON (kinds env) -- skip this work as for now doesn't seem useful for coreimp consumers
   ]
   where
@@ -198,50 +199,63 @@ ownEnvToJSON mname env = object
 
     typesToJSON = toObj p2j where
       p2j (Qualified _ pn, (kind,tkind)) =
-        runProperName pn .= object [ T.pack "kind"      .= toJSON kind
-                                   , T.pack "typeKind"  .= toJSON tkind ]
+        let typeKindToJSON (DataType args ctors) =
+              object [ T.pack "DataType" .= object
+                     [ T.pack "args" .= object (map (\(t,k) -> t.=k) args)
+                     , T.pack "ctors" .= object (map (\(n,t) -> runProperName n .= map toJSON t) ctors) ]]
+            typeKindToJSON other =
+              object [ T.pack (show other) .= True ]
+        in runProperName pn .= object [ T.pack "tKind" .= toJSON kind
+                                      , T.pack "tDecl" .= typeKindToJSON tkind ]
     typeSynsToJSON = toObj p2j where
       p2j (Qualified _ pn, (typeargs,typetag)) =
         let vp2jp (vn, vk) = vn .= toJSON vk
-        in runProperName pn .= object [ T.pack "type" .= toJSON typetag
-                                      , T.pack "vars" .= object (map vp2jp typeargs) ]
+        in runProperName pn .= object [ T.pack "tsType" .= toJSON typetag
+                                      , T.pack "tsArgs" .= object (map vp2jp typeargs) ]
     namesToJSON = toObj p2j where
       p2j (Qualified _ ident, (nametype, namekind, namevis)) =
-        showIdent ident .= object [ T.pack "nameType" .= toJSON nametype
-                                  , T.pack "nameKind" .= show namekind
-                                  , T.pack "nameVis" .= show namevis]
+        showIdent ident .= object [ T.pack "nType" .= toJSON nametype
+                                  , T.pack "nKind" .= show namekind
+                                  , T.pack "nVis"  .= show namevis]
     ctorsToJSON = toObj p2j where
       p2j (Qualified _ pn, (ddecltype, dptypename, dtype, didents)) =
-        runProperName pn .= object [ T.pack "dataDeclType" .= toJSON ddecltype
-                                   , T.pack "dataTypeName" .= runProperName dptypename
-                                   , T.pack "dataType" .= toJSON dtype
-                                   , T.pack "dataIdents" .= map showIdent didents ]
-    typeClassesToJSON = toObj p2j where
+        runProperName pn .= object [ T.pack "cDecl" .= toJSON ddecltype
+                                   , T.pack "cType" .= runProperName dptypename
+                                   , T.pack "cCtor" .= toJSON dtype
+                                   , T.pack "cArgs" .= map showIdent didents ]
+    tcsToJSON = toObj p2j where
       p2j (Qualified _ pn, tcdata) =
-        let tcm2jp (tcmi,tcmt) = showIdent tcmi .= toJSON tcmt
-        in runProperName pn .= object [ T.pack "tcCoveringSets" .= toJSON (typeClassCoveringSets tcdata)
-                                      , T.pack "tcDeterminedArguments" .= toJSON (typeClassDeterminedArguments tcdata)
-                                      , T.pack "tcArguments" .= toJSON (typeClassArguments tcdata)
-                                      , T.pack "tcMembers" .= object (map tcm2jp (typeClassMembers tcdata))
-                                      , T.pack "tcSuperclasses" .= map toJSON (typeClassSuperclasses tcdata)
-                                      , T.pack "tcDependencies" .= map toJSON (typeClassDependencies tcdata) ]
-    typeClassDictsToJSON =
+        let tcm2jp (tcmi,tcmt) =
+              showIdent tcmi .= toJSON tcmt
+        in runProperName pn .= object [ T.pack "tcCoveringSets"   .= toJSON (typeClassCoveringSets tcdata)
+                                      , T.pack "tcDeterminedArgs" .= toJSON (typeClassDeterminedArguments tcdata)
+                                      , T.pack "tcArgs"           .= object (map (\(t,k) -> t .= toJSON k) (typeClassArguments tcdata))
+                                      , T.pack "tcMembers"        .= object (map tcm2jp (typeClassMembers tcdata))
+                                      , T.pack "tcSuperclasses"   .= map tcConstraintToJSON (typeClassSuperclasses tcdata)
+                                      , T.pack "tcDependencies"   .= map toJSON (typeClassDependencies tcdata) ]
+    tcDictsToJSON =
       toJSON . (map (object . (map p2j) . M.toList . snd)) . (filter (isown.fst)) . M.toList
       where
         p2j (qn, m) =
           qkey qn .= object (map id2jp (M.toList m))
-        qkey (Qualified Nothing pn) =
-          runProperName pn
-        qkey (Qualified (Just (ModuleName pns)) pn) =
-          T.intercalate (T.pack ".") ((map runProperName pns) ++ [runProperName pn])
         id2jp (Qualified _ ident, dict) =
-          showIdent ident .= object [ T.pack "tcdChain" .= toJSON (tcdChain dict)
-                                    , T.pack "tcdIndex" .= toJSON (tcdIndex dict)
-                                    , T.pack "tcdValue" .= toJSON (tcdValue dict)
-                                    , T.pack "tcdPath" .= toJSON (tcdPath dict)
-                                    , T.pack "tcdClassName" .= toJSON (tcdClassName dict)
+          showIdent ident .= object [ T.pack "tcdChain"         .= map ikey (tcdChain dict)
+                                    , T.pack "tcdIndex"         .= toJSON (tcdIndex dict)
+                                    , T.pack "tcdValue"         .= ikey (tcdValue dict)
+                                    , T.pack "tcdPath"          .= object (map (\(n,i) -> qkey n .= i) (tcdPath dict))
+                                    , T.pack "tcdClassName"     .= qkey (tcdClassName dict)
                                     , T.pack "tcdInstanceTypes" .= toJSON (tcdInstanceTypes dict)
-                                    , T.pack "tcdDependencies" .= maybe Null toJSON (tcdDependencies dict) ]
+                                    , T.pack "tcdDependencies"  .= maybe [] (map tcConstraintToJSON) (tcdDependencies dict) ]
+    tcConstraintToJSON c =
+      object [ T.pack "constraintClass" .= qkey (constraintClass c)
+             , T.pack "constraintData"  .= constraintData c
+             , T.pack "constraintArgs"  .= constraintArgs c ]
+    ikey (Qualified _ ident) =
+      showIdent ident
+    qkey (Qualified Nothing pn) =
+      runProperName pn
+    qkey (Qualified (Just (ModuleName pns)) pn) =
+      T.intercalate (T.pack ".") ((map runProperName pns) ++ [runProperName pn])
 
 
 -- EVERYTHING BELOW: FOLLOWING FROM CoreFn/ToJSON, with tweaks
