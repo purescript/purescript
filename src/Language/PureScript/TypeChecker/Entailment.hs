@@ -138,13 +138,15 @@ data Matched t
   = Match t
   | Apart
   | Unknown
-  deriving (Eq, Show)
+  deriving (Eq, Show, Functor)
 
-bothMatched :: Matched () -> Matched () -> Matched ()
-bothMatched (Match _) (Match _) = Match ()
-bothMatched Unknown r = r
-bothMatched l Unknown = l
-bothMatched _ _ = Apart
+instance Monoid t => Monoid (Matched t) where
+  mempty = Match mempty
+
+  mappend (Match l) (Match r) = Match (l <> r)
+  mappend Apart     _         = Apart
+  mappend _         Apart     = Apart
+  mappend _         _         = Unknown
 
 -- | Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
@@ -457,7 +459,7 @@ matches deps TypeClassDictionaryInScope{..} tys =
        else -- Verify that any repeated type variables are unifiable
             let determinedSet = foldMap (S.fromList . fdDetermined) deps
                 solved = map snd . filter ((`S.notMember` determinedSet) . fst) $ zipWith (\(_, ts) i -> (i, ts)) matched [0..]
-            in maybe Apart Match $ verifySubstitution (M.unionsWith (++) solved)
+            in verifySubstitution (M.unionsWith (++) solved)
   where
     -- | Find the closure of a set of functional dependencies.
     covers :: [(Matched (), subst)] -> Bool
@@ -518,42 +520,46 @@ matches deps TypeClassDictionaryInScope{..} tys =
     typeHeadsAreEqual (TUnknown _) _ = (Unknown, M.empty)
     typeHeadsAreEqual _ _ = (Apart, M.empty)
 
+
     both :: (Matched (), Matching [Type]) -> (Matched (), Matching [Type]) -> (Matched (), Matching [Type])
-    both (b1, m1) (b2, m2) = (bothMatched b1 b2, M.unionWith (++) m1 m2)
+    both (b1, m1) (b2, m2) = (b1 <> b2, M.unionWith (++) m1 m2)
 
     -- Ensure that a substitution is valid
-    verifySubstitution :: Matching [Type] -> Maybe (Matching [Type])
-    verifySubstitution = traverse meet where
-      meet ts | pairwiseAll typesAreEqual ts = Just ts
-              | otherwise = Nothing
+    verifySubstitution :: Matching [Type] -> Matched (Matching [Type])
+    verifySubstitution mts = foldMap meet mts $> mts where
+      meet = pairwiseAll typesAreEqual
 
       -- Note that unknowns are only allowed to unify if they came from a type
       -- which was _not_ solved, i.e. one which was inferred by a functional
       -- dependency.
-      typesAreEqual :: Type -> Type -> Bool
+      typesAreEqual :: Type -> Type -> Matched ()
       typesAreEqual (KindedType t1 _)    t2                   = typesAreEqual t1 t2
       typesAreEqual t1                   (KindedType t2 _)    = typesAreEqual t1 t2
-      typesAreEqual (TUnknown u1)        (TUnknown u2)        | u1 == u2 = True
-      typesAreEqual (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    = s1 == s2
-      typesAreEqual (TypeVar v1)         (TypeVar v2)         = v1 == v2
-      typesAreEqual (TypeLevelString s1) (TypeLevelString s2) = s1 == s2
-      typesAreEqual (TypeConstructor c1) (TypeConstructor c2) = c1 == c2
-      typesAreEqual (TypeApp h1 t1)      (TypeApp h2 t2)      = typesAreEqual h1 h2 && typesAreEqual t1 t2
+      typesAreEqual (TUnknown u1)        (TUnknown u2)        | u1 == u2 = Match ()
+      typesAreEqual (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    | s1 == s2 = Match ()
+      typesAreEqual (Skolem _ _ _ _)     _                    = Unknown
+      typesAreEqual _                    (Skolem _ _ _ _)     = Unknown
+      typesAreEqual (TypeVar v1)         (TypeVar v2)         | v1 == v2 = Match ()
+      typesAreEqual (TypeLevelString s1) (TypeLevelString s2) | s1 == s2 = Match ()
+      typesAreEqual (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Match ()
+      typesAreEqual (TypeApp h1 t1)      (TypeApp h2 t2)      = typesAreEqual h1 h2 <> typesAreEqual t1 t2
       typesAreEqual (ProxyType t1)       (ProxyType t2)       = typesAreEqual t1 t2
-      typesAreEqual REmpty               REmpty               = True
+      typesAreEqual REmpty               REmpty               = Match ()
       typesAreEqual r1                   r2                   | isRCons r1 || isRCons r2 =
           let (common, rest) = alignRowsWith typesAreEqual r1 r2
-          in and common && uncurry go rest
+          in fold common <> uncurry go rest
         where
-          go :: ([(Label, Type)], Type) -> ([(Label, Type)], Type) -> Bool
+          go :: ([(Label, Type)], Type) -> ([(Label, Type)], Type) -> Matched ()
           go (l, KindedType t1 _)  (r, t2)                          = go (l, t1) (r, t2)
           go (l, t1)               (r, KindedType t2 _)             = go (l, t1) (r, t2)
-          go ([], TUnknown u1)     ([], TUnknown u2)     | u1 == u2 = True
-          go ([], Skolem _ s1 _ _) ([], Skolem _ s2 _ _)            = s1 == s2
-          go ([], REmpty)          ([], REmpty)                     = True
-          go ([], TypeVar v1)      ([], TypeVar v2)                 = v1 == v2
-          go _  _                                                   = False
-      typesAreEqual _ _                                             = False
+          go ([], TUnknown u1)     ([], TUnknown u2)     | u1 == u2 = Match ()
+          go ([], Skolem _ s1 _ _) ([], Skolem _ s2 _ _) | s1 == s2 = Match ()
+          go ([], Skolem _ _ _ _)  _                                = Unknown
+          go _                     ([], Skolem _ _ _ _)             = Unknown
+          go ([], REmpty)          ([], REmpty)                     = Match ()
+          go ([], TypeVar v1)      ([], TypeVar v2)      | v1 == v2 = Match ()
+          go _  _                                                   = Apart
+      typesAreEqual _                    _                    = Apart
 
       isRCons :: Type -> Bool
       isRCons RCons{}    = True
@@ -585,10 +591,10 @@ mkContext = foldr combineContexts M.empty . map fromDict where
   fromDict d = M.singleton Nothing (M.singleton (tcdClassName d) (M.singleton (tcdValue d) d))
 
 -- | Check all pairs of values in a list match a predicate
-pairwiseAll :: (a -> a -> Bool) -> [a] -> Bool
-pairwiseAll _ [] = True
-pairwiseAll _ [_] = True
-pairwiseAll p (x : xs) = all (p x) xs && pairwiseAll p xs
+pairwiseAll :: Monoid m => (a -> a -> m) -> [a] -> m
+pairwiseAll _ [] = mempty
+pairwiseAll _ [_] = mempty
+pairwiseAll p (x : xs) = foldMap (p x) xs <> pairwiseAll p xs
 
 -- | Check any pair of values in a list match a predicate
 pairwiseAny :: (a -> a -> Bool) -> [a] -> Bool
