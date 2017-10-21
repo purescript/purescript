@@ -315,9 +315,10 @@ typeCheckAll moduleName _ = traverse go
     return d
   go d@FixityDeclaration{} = return d
   go d@ImportDeclaration{} = return d
-  go d@(TypeClassDeclaration _ pn args implies deps tys) = do
-    addTypeClass moduleName pn args implies deps tys
-    return d
+  go d@(TypeClassDeclaration (ss, _) pn args implies deps tys) = do
+    warnAndRethrow (addHint (ErrorInTypeClassDeclaration pn) . addHint (PositionedError ss)) $ do
+      addTypeClass moduleName pn args implies deps tys
+      return d
   go (d@(TypeInstanceDeclaration (ss, _) dictName deps className tys body)) =
     rethrow (addHint (ErrorInInstance className tys) . addHint (PositionedError ss)) $ do
       env <- getEnv
