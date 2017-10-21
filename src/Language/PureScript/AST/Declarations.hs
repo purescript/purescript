@@ -94,6 +94,8 @@ data SimpleErrorMessage
   | DeclConflict Name Name
   | ExportConflict (Qualified Name) (Qualified Name)
   | DuplicateModule ModuleName [SourceSpan]
+  | DuplicateTypeClass (ProperName 'ClassName) SourceSpan
+  | DuplicateInstance Ident SourceSpan
   | DuplicateTypeArgument Text
   | InvalidDoBind
   | InvalidDoLet
