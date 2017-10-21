@@ -103,6 +103,8 @@ errorCode em = case unwrapErrorMessage em of
   DeclConflict{} -> "DeclConflict"
   ExportConflict{} -> "ExportConflict"
   DuplicateModule{} -> "DuplicateModule"
+  DuplicateTypeClass{} -> "DuplicateTypeClass"
+  DuplicateInstance{} -> "DuplicateInstance"
   DuplicateTypeArgument{} -> "DuplicateTypeArgument"
   InvalidDoBind -> "InvalidDoBind"
   InvalidDoLet -> "InvalidDoLet"
@@ -535,6 +537,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (DuplicateModule mn ss) =
       paras [ line ("Module " <> markCode (runModuleName mn) <> " has been defined multiple times:")
             , indent . paras $ map (line . displaySourceSpan relPath) ss
+            ]
+    renderSimpleErrorMessage (DuplicateTypeClass pn ss) =
+      paras [ line ("Type class " <> markCode (runProperName pn) <> " has been defined multiple times:")
+            , indent $ line $ displaySourceSpan relPath ss
+            ]
+    renderSimpleErrorMessage (DuplicateInstance pn ss) =
+      paras [ line ("Instance " <> markCode (showIdent pn) <> " has been defined multiple times:")
+            , indent $ line $ displaySourceSpan relPath ss
             ]
     renderSimpleErrorMessage (CycleInDeclaration nm) =
       line $ "The value of " <> markCode (showIdent nm) <> " is undefined here, so this reference is not allowed."
