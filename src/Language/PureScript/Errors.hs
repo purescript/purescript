@@ -592,22 +592,22 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                   in ( rowFromList (sort unique1 ++ sort common1, r1)
                      , rowFromList (sort unique2 ++ sort common2, r2)
                      )
-        in paras [ line "Could not match type"
+        in paras [ line "Could not match expected type"
                  , markCodeBox $ indent $ typeAsBox sorted1
-                 , line "with type"
+                 , line "with actual type"
                  , markCodeBox $ indent $ typeAsBox sorted2
                  ]
 
     renderSimpleErrorMessage (KindsDoNotUnify k1 k2) =
-      paras [ line "Could not match kind"
+      paras [ line "Could not match expected kind"
             , indent $ line $ markCode $ prettyPrintKind k1
-            , line "with kind"
+            , line "with actual kind"
             , indent $ line $ markCode $ prettyPrintKind k2
             ]
     renderSimpleErrorMessage (ConstrainedTypeUnified t1 t2) =
-      paras [ line "Could not match constrained type"
+      paras [ line "Could not match expected constrained type"
             , markCodeBox $ indent $ typeAsBox t1
-            , line "with type"
+            , line "with actual type"
             , markCodeBox $ indent $ typeAsBox t2
             ]
     renderSimpleErrorMessage (OverlappingInstances _ _ []) = internalError "OverlappingInstances: empty instance list"
