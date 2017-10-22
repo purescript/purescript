@@ -28,10 +28,12 @@ testModule =
 
 shouldFindUsage :: [Usage] -> (IdeDeclarationId, P.SourcePos, P.SourcePos) -> Expectation
 shouldFindUsage us (id, start, end) =
-  shouldSatisfy us
+  let
+    matchingIds = filter (\u -> id == usageOriginId u) us
+  in
+    shouldSatisfy matchingIds
     (any (\u ->
-      id == usageOriginId u
-      && start == P.spanStart (usageSiteLocation u)
+      start == P.spanStart (usageSiteLocation u)
       && end == P.spanEnd (usageSiteLocation u)))
 
 spec :: Spec
@@ -53,3 +55,8 @@ spec = do
         ( IdeDeclarationId (Test.mn "Test") IdeNSValue "localFn"
         , P.SourcePos 10 12
         , P.SourcePos 10 19)
+    it "should find a usage in the import section" $
+      usages `shouldFindUsage`
+        ( IdeDeclarationId (Test.mn "Data.Array") IdeNSValue "filter"
+        , P.SourcePos 5 20
+        , P.SourcePos 5 26)
