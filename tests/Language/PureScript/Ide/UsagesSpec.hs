@@ -19,11 +19,13 @@ testModule =
     , "import Prelude"
     , ""
     , "import Data.Array (filter)"
+    , "import Data.List as List"
     , "import Globals (globalList)"
     , ""
     , "id x = x"
     , "localFn y = filter isEven y"
     , "rofl = map localFn globalList"
+    , "anotherTest = List.map localFn globalList"
     ]
 
 shouldFindUsage :: [Usage] -> (IdeDeclarationId, P.SourcePos, P.SourcePos) -> Expectation
@@ -43,18 +45,23 @@ spec = do
     it "should find an explicitly imported value" $
       usages `shouldFindUsage`
         ( IdeDeclarationId (Test.mn "Data.Array") IdeNSValue "filter"
-        , P.SourcePos 9 13
-        , P.SourcePos 9 19)
+        , P.SourcePos 10 13
+        , P.SourcePos 10 19)
     it "should find an implicitly imported value" $
       usages `shouldFindUsage`
         ( IdeDeclarationId (Test.mn "Prelude") IdeNSValue "map"
-        , P.SourcePos 10 8
-        , P.SourcePos 10 11)
+        , P.SourcePos 11 8
+        , P.SourcePos 11 11)
+    it "should find a qualified usage" $
+      usages `shouldFindUsage`
+        ( IdeDeclarationId (Test.mn "Data.List") IdeNSValue "map"
+        , P.SourcePos 12 15
+        , P.SourcePos 12 23)
     it "should find a locally defined value" $
       usages `shouldFindUsage`
         ( IdeDeclarationId (Test.mn "Test") IdeNSValue "localFn"
-        , P.SourcePos 10 12
-        , P.SourcePos 10 19)
+        , P.SourcePos 11 12
+        , P.SourcePos 11 19)
     it "should find a usage in the import section" $
       usages `shouldFindUsage`
         ( IdeDeclarationId (Test.mn "Data.Array") IdeNSValue "filter"

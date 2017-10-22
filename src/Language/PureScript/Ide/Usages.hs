@@ -45,25 +45,26 @@ getUsagesFromImport usageModule (Import originModule it _) = case it of
    -- we'll need to handle this case
   _ -> []
   where
+    mkUsage ss ns ident = Just (Usage usageModule ss (IdeDeclarationId originModule ns ident))
     usagesFromRef = \case
       P.TypeRef ss tn _ctors ->
         --TODO(Christoph): This means we're currently throwing away usages for
         --explicitly imported dtors. For a proper rename refactoring this will
         --need to change, but the current AST format doesn't record the
         --necessary SourceSpans anyway
-        Just (Usage usageModule ss (IdeDeclarationId originModule IdeNSType (P.runProperName tn)))
+        mkUsage ss IdeNSType (P.runProperName tn)
       P.TypeOpRef ss opname ->
-        Just (Usage usageModule ss (IdeDeclarationId originModule IdeNSType (P.runOpName opname)))
+        mkUsage ss IdeNSType (P.runOpName opname)
       P.ValueRef ss ident ->
-        Just (Usage usageModule ss (IdeDeclarationId originModule IdeNSValue (P.runIdent ident)))
+        mkUsage ss IdeNSValue (P.runIdent ident)
       P.ValueOpRef ss opname ->
-        Just (Usage usageModule ss (IdeDeclarationId originModule IdeNSValue (P.runOpName opname)))
+        mkUsage ss IdeNSValue (P.runOpName opname)
       P.TypeClassRef ss className ->
-        Just (Usage usageModule ss (IdeDeclarationId originModule IdeNSType (P.runProperName className)))
+        mkUsage ss IdeNSType (P.runProperName className)
       P.TypeInstanceRef ss ident ->
-        Just (Usage usageModule ss (IdeDeclarationId originModule IdeNSValue (P.runIdent ident)))
+        mkUsage ss IdeNSValue (P.runIdent ident)
       P.KindRef ss name ->
-        Just (Usage usageModule ss (IdeDeclarationId originModule IdeNSKind (P.runProperName name)))
+        mkUsage ss IdeNSKind (P.runProperName name)
       P.ReExportRef{} -> Nothing
       -- Module references can never appear inside an import declaration
       P.ModuleRef{} -> Nothing
@@ -82,30 +83,43 @@ resolveFreeName imports topLevelNames currentModule name = case name of
     -- Is the value imported explicitly?
     <|> head (mapMaybe (resolveAgainstExplicitImport i) imports)
     -- Falling back to implicit imports
-    <|> resolveAgainstSingleImplicitImport imports
+    <|> resolveAgainstSingleImplicitImport i imports
+  (IdeNSValue, P.Qualified (Just qualifier) i, _) ->
+     head (mapMaybe (resolveAgainstQualifiedImport qualifier i) imports)
   _ ->
     -- TODO(Christoph): Handle more cases
     Nothing
 
-resolveAgainstSingleImplicitImport :: [Import] -> Maybe P.ModuleName
-resolveAgainstSingleImplicitImport imports = case mapMaybe isImplicit imports of
+resolveAgainstQualifiedImport :: P.ModuleName -> P.Ident -> Import ->  Maybe P.ModuleName
+resolveAgainstQualifiedImport qual ident = \case
+  Import mn it (Just qual') | qual == qual' ->
+    case it of
+      P.Implicit -> Just mn
+      P.Explicit refs -> guard (any (refMatchesIdent ident) refs) $> mn
+      P.Hiding refs -> guard (not (any (refMatchesIdent ident) refs)) $> mn
+  _ ->
+    Nothing
+
+resolveAgainstSingleImplicitImport :: P.Ident -> [Import] -> Maybe P.ModuleName
+resolveAgainstSingleImplicitImport ident imports = case mapMaybe isImplicit imports of
   [implicit] -> Just implicit
   _ -> Nothing
   where
     isImplicit = \case
       Import mn P.Implicit Nothing -> Just mn
-      Import mn (P.Hiding _) Nothing -> Just mn
+      Import mn (P.Hiding refs) Nothing -> guard (not (any (refMatchesIdent ident) refs)) $> mn
       _ -> Nothing
 
 resolveAgainstExplicitImport :: P.Ident -> Import -> Maybe P.ModuleName
 resolveAgainstExplicitImport ident i = case i of
   Import mn (P.Explicit refs) Nothing ->
-    guard (any refMatchesIdent refs) $> mn
+    guard (any (refMatchesIdent ident) refs) $> mn
   _ -> Nothing
-  where
-    refMatchesIdent = \case
-      P.ValueRef _ refIdent -> refIdent == ident
-      _ -> False
+
+refMatchesIdent :: P.Ident -> P.DeclarationRef -> Bool
+refMatchesIdent ident = \case
+  P.ValueRef _ refIdent -> refIdent == ident
+  _ -> False
 
 toIdeImport :: P.Declaration -> Maybe Import
 toIdeImport d = case d of
@@ -133,5 +147,6 @@ collectFreeNames =
       P.PositionedValue ss _ (P.Var v)
         | P.Qualified Nothing i <- v
         , not (i `elem` scope) -> [(IdeNSValue, v, ss)]
-        -- TODO(Christoph): Handle qualified identifiers
+      P.PositionedValue ss _ (P.Var v) ->
+        [(IdeNSValue, v, ss)]
       _ -> []
