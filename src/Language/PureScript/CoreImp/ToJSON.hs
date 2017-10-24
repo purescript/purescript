@@ -212,9 +212,9 @@ ownEnvToJSON ourmodname env = object
     typeSynsToJSON = toJSONObj pair2json where
       pair2json (Qualified _ pn, (typeargs, typetag)) =
         runProperName pn .= object [ T.pack "tsType" .= toJSON typetag
-                                   , T.pack "tsArgs" .= object (map argp2jsonp typeargs) ]
-      argp2jsonp (argname, argkind) =
-        argname .= toJSON argkind
+                                   , T.pack "tsArgs" .= map argp2json typeargs ]
+      argp2json (argname, argkind) =
+        object [T.pack "tsaName" .= argname, T.pack "tsaKind" .= toJSON argkind]
 
     typesToJSON = toJSONObj pair2json where
       pair2json (Qualified _ pn, (kind, tkind)) =
@@ -222,23 +222,27 @@ ownEnvToJSON ourmodname env = object
                                    , T.pack "tDecl" .= typekind2json tkind ]
       typekind2json (DataType args ctors) =
         object [ T.pack "DataType" .= object
-               [ T.pack "args" .= object (map (\(t,k) -> t.=k) args)
-               , T.pack "ctors" .= object (map (\(n,t) -> runProperName n .= map toJSON t) ctors) ]]
+               [ T.pack "dtArgs" .= map argp2json args
+               , T.pack "dtCtors" .= map ctorp2json ctors ]]
       typekind2json other =
         object [ T.pack (show other) .= True ] -- this way tDecl has always an object instead of polymorphic -- decodes way better usually
+      ctorp2json (pn, types) =
+        object [ T.pack "dtcName" .= runProperName pn, T.pack "dtcTypes" .= map toJSON types]
+      argp2json (argname, argkind) =
+        object [ T.pack "dtaName" .= argname, T.pack "dtaKind" .= argkind ]
 
     typeClassesToJSON = toJSONObj pair2json where
       pair2json (Qualified _ pn, tcdata) =
         runProperName pn .= object [ T.pack "tcCoveringSets"   .= toJSON (typeClassCoveringSets tcdata)
                                    , T.pack "tcDeterminedArgs" .= toJSON (typeClassDeterminedArguments tcdata)
-                                   , T.pack "tcArgs"           .= object (map tcargp2jsonp (typeClassArguments tcdata))
-                                   , T.pack "tcMembers"        .= object (map tcmemberp2jsonp (typeClassMembers tcdata))
+                                   , T.pack "tcArgs"           .= map tcargp2json (typeClassArguments tcdata)
+                                   , T.pack "tcMembers"        .= map tcmemberp2json (typeClassMembers tcdata)
                                    , T.pack "tcSuperclasses"   .= map tcConstraintToJSON (typeClassSuperclasses tcdata)
                                    , T.pack "tcDependencies"   .= map toJSON (typeClassDependencies tcdata) ]
-      tcmemberp2jsonp (tcmident, tcmtype) =
-        showIdent tcmident .= toJSON tcmtype
-      tcargp2jsonp (argname,argkind) =
-        argname .= toJSON argkind
+      tcmemberp2json (tcmident, tcmtype) =
+        object [T.pack "tcmIdent" .= showIdent tcmident , T.pack "tcmType" .= toJSON tcmtype]
+      tcargp2json (argname,argkind) =
+        object [T.pack "tcaName" .= argname, T.pack "tcaKind" .= toJSON argkind]
 
     typeClassDictsToJSON =
       toJSON . (map (object . (map pair2json) . M.toList . snd)) . (filter $ isown.fst) . M.toList
@@ -249,12 +253,12 @@ ownEnvToJSON ourmodname env = object
           showIdent ident .= object [ T.pack "tcdChain"         .= map ikey (tcdChain dict)
                                     , T.pack "tcdIndex"         .= toJSON (tcdIndex dict)
                                     , T.pack "tcdValue"         .= ikey (tcdValue dict)
-                                    , T.pack "tcdPath"          .= object (map tcpath2jsonp (tcdPath dict))
+                                    , T.pack "tcdPath"          .= map tcpath2json (tcdPath dict)
                                     , T.pack "tcdClassName"     .= qkey (tcdClassName dict)
                                     , T.pack "tcdInstanceTypes" .= toJSON (tcdInstanceTypes dict)
                                     , T.pack "tcdDependencies"  .= maybe [] (map tcConstraintToJSON) (tcdDependencies dict) ]
-        tcpath2jsonp (qn, i) =
-          qkey qn .= i
+        tcpath2json (qn, i) =
+          object [T.pack "tcdpClass" .= qkey qn, T.pack "tcdpInt" .= i]
 
     tcConstraintToJSON c = -- almost on-par with existing ToJSON except for qkey (for more tractable decoding)
       object [ T.pack "constraintClass" .= qkey (constraintClass c)
