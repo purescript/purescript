@@ -57,6 +57,12 @@ handleCommand c = case c of
     findAvailableExterns >>= loadModulesSync
   LoadSync modules ->
     loadModulesSync modules
+  Info id -> do
+    getAtDeclarationId id >>= \case
+      Nothing ->
+        throwError (NotFound ("Couldn't find declaration for id: " <> printIdeDeclarationId id))
+      Just decl ->
+        pure (InfoResult decl)
   Type search filters currentModule ->
     findType search filters currentModule
   Complete filters matcher currentModule complOptions ->

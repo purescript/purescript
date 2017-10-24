@@ -29,6 +29,7 @@ module Language.PureScript.Ide.State
   , insertExternsSTM
   , getAllModules
   -- | Functions related to DeclarationIds
+  , getAtDeclarationId
   , modifyAtDeclarationId
   -- | Populating the caches
   , populateVolatileState
@@ -116,6 +117,18 @@ setVolatileStateSTM ref vs = do
     x {ideVolatileState = vs}
   pure ()
 
+declarationMatchesId :: IdeDeclarationId -> IdeDeclarationAnn -> Bool
+declarationMatchesId declarationId d =
+  namespaceForDeclaration (discardAnn d) == declarationId ^. ididNamespace
+             && identifierFromIdeDeclaration (discardAnn d) == declarationId ^. ididIdentifier
+
+getAtDeclarationId :: Ide m => IdeDeclarationId -> m (Maybe IdeDeclarationAnn)
+getAtDeclarationId id = do
+  decls <- vsDeclarations <$> getVolatileState
+  pure $
+    Map.lookup (id ^. ididModule) decls
+    >>= find (declarationMatchesId id)
+
 modifyAtDeclarationId
   :: Ide m
   => IdeDeclarationId
@@ -130,8 +143,7 @@ modifyAtDeclarationId declarationId f = do
   where
      update :: IdeDeclarationAnn -> IdeDeclarationAnn
      update d =
-        if (namespaceForDeclaration (discardAnn d) == declarationId ^. ididNamespace
-             && identifierFromIdeDeclaration (discardAnn d) == declarationId ^. ididIdentifier)
+        if declarationMatchesId declarationId d
           then f d
           else d
 
@@ -197,6 +209,7 @@ populateVolatileStateSync = do
   results <- logPerf message $ do
     !r <- liftIO (atomically (populateVolatileStateSTM st))
     pure r
+  logPerf message resolveUsages
   void $ Map.traverseWithKey
     (\mn -> logWarnN . prettyPrintReexportResult (const (P.runModuleName mn)))
     (Map.filter reexportHasFailures results)
@@ -205,10 +218,9 @@ populateVolatileState :: (Ide m, MonadLogger m) => m (Async ())
 populateVolatileState = do
   env <- ask
   let ll = confLogLevel (ideConfiguration env)
-  let message duration = "Finished resolving usages in: " <> displayTimeSpec duration
   -- populateVolatileState returns Unit for now, so it's fine to discard this
   -- result. We might want to block on this in a benchmarking situation.
-  liftIO (async (runLogger ll (runReaderT (populateVolatileStateSync *> logPerf message resolveUsages) env)))
+  liftIO (async (runLogger ll (runReaderT populateVolatileStateSync env)))
 
 -- | STM version of populateVolatileState
 populateVolatileStateSTM
@@ -429,7 +441,7 @@ insertUsage :: Ide m => Usage -> m ()
 insertUsage Usage{..} =
   modifyAtDeclarationId usageOriginId (over idaAnnotation updateAnnotation)
   where
-    updateAnnotation = over annUsages (map ((:) (usageSiteModule, usageSiteLocation)))
+    updateAnnotation = over annUsages (Just . (:) (usageSiteModule, usageSiteLocation) . fromMaybe [])
 
 resolveUsagesForModule :: Ide m => P.Module -> m ()
 resolveUsagesForModule m = for_ (collectUsages m) insertUsage

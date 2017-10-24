@@ -24,6 +24,7 @@ import           Protolude hiding (moduleName)
 import           Control.Concurrent.STM
 import           Control.Lens.TH
 import           Data.Aeson
+import qualified Data.Text as T
 import qualified Data.Map.Lazy as M
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Errors.JSON as P
@@ -37,6 +38,28 @@ data IdeDeclarationId = IdeDeclarationId
   , _ididNamespace  :: !IdeNamespace
   , _ididIdentifier :: !Text
   } deriving (Show, Eq, Ord)
+
+printIdeDeclarationId :: IdeDeclarationId -> Text
+printIdeDeclarationId IdeDeclarationId{..} =
+  P.runModuleName _ididModule <> ":" <> printNS _ididNamespace <> ":" <> _ididIdentifier
+  where
+    printNS ns = case ns of
+      IdeNSValue -> "V"
+      IdeNSType -> "T"
+      IdeNSKind -> "K"
+
+parseIdeDeclarationId :: Text -> Maybe IdeDeclarationId
+parseIdeDeclarationId t = do
+  guard (t /= "")
+  let (mn, rest) = bimap P.moduleNameFromString T.tail (T.breakOn ":" t)
+  let (ns, ident) = bimap parseNS T.tail (T.breakOn ":" rest)
+  IdeDeclarationId mn <$> ns <*> pure ident
+  where
+    parseNS c = case c of
+      "V" -> Just IdeNSValue
+      "T" -> Just IdeNSType
+      "K" -> Just IdeNSKind
+      _ -> Nothing
 
 data IdeDeclaration
   = IdeDeclValue IdeValue
@@ -219,6 +242,7 @@ identifierFromDeclarationRef _ = ""
 data Success =
   CompletionResult [Completion]
   | TextResult Text
+  | InfoResult IdeDeclarationAnn
   | MultilineTextResult [Text]
   | PursuitResult [PursuitResponse]
   | ImportList (P.ModuleName, [(P.ModuleName, P.ImportDeclarationType, Maybe P.ModuleName)])
@@ -232,6 +256,8 @@ encodeSuccess res =
 
 instance ToJSON Success where
   toJSON (CompletionResult cs) = encodeSuccess cs
+  toJSON (InfoResult d) =
+    object ["resultType" .= ("success" :: Text), "result" .= encodeDeclarationAnn d]
   toJSON (TextResult t) = encodeSuccess t
   toJSON (MultilineTextResult ts) = encodeSuccess ts
   toJSON (PursuitResult resp) = encodeSuccess resp
@@ -257,6 +283,71 @@ encodeImport (P.runModuleName -> mn, importType, map P.runModuleName -> qualifie
              , "importType" .= ("hiding" :: Text)
              , "identifiers" .= (identifierFromDeclarationRef <$> refs)
              ] ++ map (\x -> "qualifier" .= x) (maybeToList qualifier)
+
+encodeDeclarationAnn :: IdeDeclarationAnn -> Value
+encodeDeclarationAnn IdeDeclarationAnn{_idaAnnotation = annotation, _idaDeclaration = declaration} =
+  object
+    [ "ann" .= object
+      [ "location" .= _annLocation annotation
+      , "exportedFrom".= map P.runModuleName (_annExportedFrom annotation)
+      , "typeAnnotation" .= _annTypeAnnotation annotation
+      , "usages" .= _annUsages annotation
+      ]
+    , "declaration" .= encodeDeclaration declaration
+    ]
+
+encodeDeclaration :: IdeDeclaration -> Value
+encodeDeclaration = \case
+  IdeDeclValue value -> object
+    [ "tag" .= ("value" :: Text)
+    , "params" .= object
+      [ "identifier" .= _ideValueIdent value
+      , "type" .= _ideValueType value
+      ]
+    ]
+  IdeDeclType type' -> object
+    [ "tag" .= ("type" :: Text)
+    , "params" .= object
+      [ "name" .= P.runProperName (_ideTypeName type')
+      , "kind" .= _ideTypeKind type'
+      , "constructors" .= _ideTypeDtors type'
+      ]
+    ]
+  IdeDeclTypeSynonym synonym -> object
+    [ "tag" .= ("typesynonym" :: Text)
+    , "params" .= object
+      [ "name" .= P.runProperName (_ideSynonymName synonym)
+      , "type" .= _ideSynonymType synonym
+      , "kind" .= _ideSynonymKind synonym
+      ]
+    ]
+  IdeDeclDataConstructor constructor -> object
+    [ "tag" .= ("dataconstructor" :: Text)
+    , "params" .= object
+      [ "name" .= P.runProperName (_ideDtorName constructor)
+      -- TODO(Christoph): Maybe there is a better name than typeName here
+      , "typeName" .= _ideDtorTypeName constructor
+      , "type" .= _ideDtorType constructor
+      ]
+    ]
+  IdeDeclTypeClass typeclass -> object
+    [ "tag" .= ("typeclass" :: Text)
+    , "params" .= object
+      [ "name" .= P.runProperName (_ideTCName typeclass)
+      , "kind" .= _ideTCKind typeclass
+      , "instances" .= (map show (_ideTCInstances typeclass) :: [Text])
+      ]
+    ]
+  IdeDeclValueOperator operator -> object
+    [ "tag" .= ("valueoperator" :: Text)
+    , "params" .= object
+      [ "name" .= P.runOpName (_ideValueOpName operator)
+      , "alias" .= _ideValueOpAlias operator
+      , "kind" .= _ideTCKind typeclass
+      , "instances" .= (map show (_ideTCInstances typeclass) :: [Text])
+      ]
+    ]
+  _ -> object [ "tag" .= ("NotImplemented" :: Text) ]
 
 newtype PursuitQuery = PursuitQuery Text
                      deriving (Show, Eq)

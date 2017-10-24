@@ -31,7 +31,6 @@ collectUsages m@(P.Module _ _ mn decls _) =
     freeNames = foldMap collectFreeNames decls
     topLevelNames = collectTopLevelValues m
     imports = mapMaybe toIdeImport decls
-    importUsages :: [Usage]
     importUsages = foldMap (getUsagesFromImport mn) imports
   in
     importUsages <> (flip mapMaybe freeNames $ \n@(ns, ident, ss) -> do

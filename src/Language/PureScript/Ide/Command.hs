@@ -32,6 +32,7 @@ data Command
       , typeFilters       :: [Filter]
       , typeCurrentModule :: Maybe P.ModuleName
       }
+    | Info IdeDeclarationId
     | Complete
       { completeFilters       :: [Filter]
       , completeMatcher       :: Matcher IdeDeclarationAnn
@@ -127,6 +128,12 @@ instance FromJSON Command where
           Nothing -> pure (Load [])
           Just params ->
             Load <$> (map P.moduleNameFromString <$> params .:? "modules" .!= [])
+      "info" -> do
+        params <- o .: "params"
+        id <- params .:  "id"
+        case parseIdeDeclarationId id of
+          Nothing -> mzero
+          Just declarationId -> pure (Info declarationId)
       "type" -> do
         params <- o .: "params"
         Type

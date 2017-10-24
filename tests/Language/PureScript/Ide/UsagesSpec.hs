@@ -5,7 +5,9 @@ module Language.PureScript.Ide.UsagesSpec where
 
 import           Protolude
 import qualified Data.Text as T
+import           Control.Lens ((^.))
 import           Language.PureScript.Ide.Usages (Usage(..), collectUsages)
+import qualified Language.PureScript.Ide.Command as Command
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Test as Test
 import qualified Language.PureScript as P
@@ -67,3 +69,8 @@ spec = do
         ( IdeDeclarationId (Test.mn "Data.Array") IdeNSValue "filter"
         , P.SourcePos 5 20
         , P.SourcePos 5 26)
+  describe "retrieving usages" $ do
+    it "returns a simple value usage" $ do
+      ([_, Right (InfoResult da)], _) <- Test.inProject $
+        Test.runIde [Command.LoadSync [], Command.Info (IdeDeclarationId (Test.mn "RebuildSpecDep") IdeNSValue "dep")]
+      print (da ^. idaAnnotation . annUsages)
