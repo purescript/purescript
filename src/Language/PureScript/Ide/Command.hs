@@ -68,6 +68,7 @@ commandName c = case c of
   Load{} -> "Load"
   LoadSync{} -> "LoadSync"
   Type{} -> "Type"
+  Info{} -> "Info"
   Complete{} -> "Complete"
   Pursuit{} -> "Pursuit"
   CaseSplit{} -> "CaseSplit"

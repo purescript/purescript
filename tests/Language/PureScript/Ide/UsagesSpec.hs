@@ -3,7 +3,7 @@
 {-# LANGUAGE TupleSections     #-}
 module Language.PureScript.Ide.UsagesSpec where
 
-import           Protolude
+import           Protolude hiding (moduleName)
 import qualified Data.Text as T
 import           Control.Lens ((^.))
 import           Language.PureScript.Ide.Usages (Usage(..), collectUsages)
@@ -12,6 +12,7 @@ import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Test as Test
 import qualified Language.PureScript as P
 import           Test.Hspec
+import           Data.Text.Read (decimal)
 
 testModule :: P.Module
 testModule =
@@ -29,6 +30,26 @@ testModule =
     , "rofl = map localFn globalList"
     , "anotherTest = List.map localFn globalList"
     ]
+
+shouldBeUsage :: Text -> (P.ModuleName, P.SourceSpan) -> Expectation
+shouldBeUsage test usage =
+  let
+    [ moduleName, start, end] = T.splitOn "-" test
+    unsafeReadInt = fst . either (panic "") identity . decimal
+    [ startLine, startColumn ] = map unsafeReadInt (T.splitOn ":" start)
+    [ endLine, endColumn ] = map unsafeReadInt (T.splitOn ":" end)
+  in
+    do
+      moduleName `shouldBe` P.runModuleName (fst usage)
+
+      (startLine, startColumn)
+        `shouldBe`
+          ( P.sourcePosLine (P.spanStart (snd usage))
+          , P.sourcePosColumn (P.spanStart (snd usage)))
+      (endLine, endColumn)
+        `shouldBe`
+          ( P.sourcePosLine (P.spanEnd (snd usage))
+          , P.sourcePosColumn (P.spanEnd (snd usage)))
 
 shouldFindUsage :: [Usage] -> (IdeDeclarationId, P.SourcePos, P.SourcePos) -> Expectation
 shouldFindUsage us (id, start, end) =
@@ -73,4 +94,6 @@ spec = do
     it "returns a simple value usage" $ do
       ([_, Right (InfoResult da)], _) <- Test.inProject $
         Test.runIde [Command.LoadSync [], Command.Info (IdeDeclarationId (Test.mn "RebuildSpecDep") IdeNSValue "dep")]
-      print (da ^. idaAnnotation . annUsages)
+      let Just usages = da ^. idaAnnotation . annUsages
+      let cases = zip ["RebuildSpecWithDeps-5:5-5:5", "RebuildSpecWithDeps-3:24-3:27"] usages
+      for_ cases (uncurry shouldBeUsage)

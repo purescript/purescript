@@ -335,6 +335,7 @@ encodeDeclaration = \case
     , "params" .= object
       [ "name" .= P.runProperName (_ideTCName typeclass)
       , "kind" .= _ideTCKind typeclass
+      -- TODO(Christoph): A proper encoder for instances
       , "instances" .= (map show (_ideTCInstances typeclass) :: [Text])
       ]
     ]
@@ -343,11 +344,26 @@ encodeDeclaration = \case
     , "params" .= object
       [ "name" .= P.runOpName (_ideValueOpName operator)
       , "alias" .= _ideValueOpAlias operator
-      , "kind" .= _ideTCKind typeclass
-      , "instances" .= (map show (_ideTCInstances typeclass) :: [Text])
+      , "precedence" .= _ideValueOpPrecedence operator
+      , "associativity" .= _ideValueOpAssociativity operator
+      , "type" .= _ideValueOpType operator
       ]
     ]
-  _ -> object [ "tag" .= ("NotImplemented" :: Text) ]
+  IdeDeclTypeOperator operator -> object
+    [ "tag" .= ("typeoperator" :: Text)
+    , "params" .= object
+      [ "name" .= P.runOpName (_ideTypeOpName operator)
+      , "alias" .= _ideTypeOpAlias operator
+      , "precedence" .= _ideTypeOpPrecedence operator
+      , "associativity" .= _ideTypeOpAssociativity operator
+      , "kind" .= _ideTypeOpKind operator
+      ]
+    ]
+  IdeDeclKind kind -> object
+    [ "tag" .= ("kind" :: Text)
+    , "params" .= object
+      [ "name" .= P.runProperName kind ]
+    ]
 
 newtype PursuitQuery = PursuitQuery Text
                      deriving (Show, Eq)
