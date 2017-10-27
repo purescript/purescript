@@ -1,5 +1,6 @@
 module Language.PureScript.Docs.Convert.Single
   ( convertSingleModule
+  , convertComments
   ) where
 
 import Protolude hiding (moduleName)
