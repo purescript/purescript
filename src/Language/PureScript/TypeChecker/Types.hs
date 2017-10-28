@@ -357,7 +357,8 @@ infer' (Abs binder ret)
       ty <- freshType
       withBindingGroupVisible $ bindLocalVariables [(arg, ty, Defined)] $ do
         body@(TypedValue _ _ bodyTy) <- infer' ret
-        return $ TypedValue True (Abs (VarBinder arg) body) $ function ty bodyTy
+        (body', bodyTy') <- instantiatePolyTypeWithUnknowns body bodyTy
+        return $ TypedValue True (Abs (VarBinder arg) body') (function ty bodyTy')
   | otherwise = internalError "Binder was not desugared"
 infer' (App f arg) = do
   f'@(TypedValue _ _ ft) <- infer f
