@@ -48,6 +48,8 @@ printIdeDeclarationId IdeDeclarationId{..} =
       IdeNSType -> "T"
       IdeNSKind -> "K"
 
+-- | Parses DeclarationId strings of the form:
+-- "Module.Name:Namespace:identifier" where Namespace is one of V, T, or K.
 parseIdeDeclarationId :: Text -> Maybe IdeDeclarationId
 parseIdeDeclarationId t = do
   guard (t /= "")
