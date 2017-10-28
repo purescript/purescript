@@ -220,6 +220,11 @@ addExplicitImport' decl moduleName qualifier imports =
         (insertDtor (dtor ^. ideDtorName))
         (refFromDeclaration d)
         refs
+    insertDeclIntoRefs (IdeDeclType t) refs
+      | any matches refs = refs
+      where
+        matches (P.TypeRef _ typeName _) = _ideTypeName t == typeName
+        matches _ = False
     insertDeclIntoRefs dr refs = nubBy ((==) `on` P.prettyPrintRef) (refFromDeclaration dr : refs)
 
     insertDtor _ (P.TypeRef ss tn' _) = P.TypeRef ss tn' Nothing

@@ -252,6 +252,22 @@ spec = do
         , ""
         , "import Data.Maybe (Maybe(..))"
         ]
+    it "adding a type to an existing import of that type is noop" $ do
+        let Right (_, _, typeImports, _) = sliceImportSection (withImports ["import Data.Maybe (Maybe)"])
+        shouldBe
+          (addTypeImport "Maybe" (P.moduleNameFromString "Data.Maybe") Nothing typeImports)
+          [ "import Prelude"
+          , ""
+          , "import Data.Maybe (Maybe)"
+          ]
+    it "adding a type to an existing import of that type with its constructors is noop" $ do
+      let Right (_, _, typeImports, _) = sliceImportSection (withImports ["import Data.Maybe (Maybe (..))"])
+      shouldBe
+        (addTypeImport "Maybe" (P.moduleNameFromString "Data.Maybe") Nothing typeImports)
+        [ "import Prelude"
+        , ""
+        , "import Data.Maybe (Maybe(..))"
+        ]
     it "adds a dataconstructor to an existing qualified type import" $ do
       let Right (_, _, typeImports, _) = sliceImportSection (withImports ["import Data.Maybe (Maybe) as M"])
       shouldBe
