@@ -335,8 +335,7 @@ encodeDeclaration = \case
     , "params" .= object
       [ "name" .= P.runProperName (_ideTCName typeclass)
       , "kind" .= _ideTCKind typeclass
-      -- TODO(Christoph): A proper encoder for instances
-      , "instances" .= (map show (_ideTCInstances typeclass) :: [Text])
+      , "instances" .= map encodeIdeInstance (_ideTCInstances typeclass)
       ]
     ]
   IdeDeclValueOperator operator -> object
@@ -364,6 +363,17 @@ encodeDeclaration = \case
     , "params" .= object
       [ "name" .= P.runProperName kind ]
     ]
+
+encodeIdeInstance :: IdeInstance -> Value
+encodeIdeInstance IdeInstance{..} = object
+  [ "tag" .= ("instance" :: Text)
+  , "params" .= object
+    [ "module" .= P.runModuleName _ideInstanceModule
+    , "name" .= P.runIdent _ideInstanceName
+    , "types" .= _ideInstanceTypes
+    , "constraints" .= _ideInstanceConstraints
+    ]
+  ]
 
 newtype PursuitQuery = PursuitQuery Text
                      deriving (Show, Eq)
