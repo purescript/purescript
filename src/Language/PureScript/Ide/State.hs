@@ -206,10 +206,11 @@ populateVolatileStateSync :: (Ide m, MonadLogger m) => m ()
 populateVolatileStateSync = do
   st <- ideStateVar <$> ask
   let message duration = "Finished populating volatile state in: " <> displayTimeSpec duration
+  let usageMessage duration = "Finished populating usages in: " <> displayTimeSpec duration
   results <- logPerf message $ do
     !r <- liftIO (atomically (populateVolatileStateSTM st))
     pure r
-  logPerf message resolveUsages
+  logPerf usageMessage (resolveUsages *> forceVolatile)
   void $ Map.traverseWithKey
     (\mn -> logWarnN . prettyPrintReexportResult (const (P.runModuleName mn)))
     (Map.filter reexportHasFailures results)
