@@ -44,6 +44,7 @@ import           Control.Lens                       hiding (op, (&))
 import           "monad-logger" Control.Monad.Logger
 import qualified Data.Map.Lazy                      as Map
 import qualified Language.PureScript                as P
+import           Language.PureScript.Docs.Convert.Single (convertComments)
 import           Language.PureScript.Externs
 import           Language.PureScript.Ide.Externs
 import           Language.PureScript.Ide.Reexports
@@ -199,6 +200,7 @@ populateVolatileStateSTM ref = do
         moduleDeclarations
         & map resolveDataConstructorsForModule
         & resolveLocations asts
+        & resolveDocumentation (map fst modules)
         & resolveInstances externs
         & resolveOperators
         & resolveReexports reexportRefs
@@ -221,23 +223,7 @@ resolveLocationsForModule (defs, types) decls =
   map convertDeclaration decls
   where
     convertDeclaration :: IdeDeclarationAnn -> IdeDeclarationAnn
-    convertDeclaration (IdeDeclarationAnn ann d) = case d of
-      IdeDeclValue v ->
-        annotateFunction (v ^. ideValueIdent) (IdeDeclValue v)
-      IdeDeclType t ->
-        annotateType (t ^. ideTypeName . properNameT) (IdeDeclType t)
-      IdeDeclTypeSynonym s ->
-        annotateType (s ^. ideSynonymName . properNameT) (IdeDeclTypeSynonym s)
-      IdeDeclDataConstructor dtor ->
-        annotateValue (dtor ^. ideDtorName . properNameT) (IdeDeclDataConstructor dtor)
-      IdeDeclTypeClass tc ->
-        annotateType (tc ^. ideTCName . properNameT) (IdeDeclTypeClass tc)
-      IdeDeclValueOperator operator ->
-        annotateValue (operator ^. ideValueOpName . opNameT) (IdeDeclValueOperator operator)
-      IdeDeclTypeOperator operator ->
-        annotateType (operator ^. ideTypeOpName . opNameT) (IdeDeclTypeOperator operator)
-      IdeDeclKind i ->
-        annotateKind (i ^. properNameT) (IdeDeclKind i)
+    convertDeclaration (IdeDeclarationAnn ann d) = convertDeclaration' annotateFunction annotateValue annotateType annotateKind d
       where
         annotateFunction x = IdeDeclarationAnn (ann { _annLocation = Map.lookup (IdeNamespaced IdeNSValue (P.runIdent x)) defs
                                                     , _annTypeAnnotation = Map.lookup x types
@@ -245,6 +231,71 @@ resolveLocationsForModule (defs, types) decls =
         annotateValue x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSValue x) defs})
         annotateType x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSType x) defs})
         annotateKind x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSKind x) defs})
+
+convertDeclaration'
+  :: (P.Ident -> IdeDeclaration -> IdeDeclarationAnn)
+  -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
+  -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
+  -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
+  -> IdeDeclaration
+  -> IdeDeclarationAnn
+convertDeclaration' annotateFunction annotateValue annotateType annotateKind d =
+  case d of
+    IdeDeclValue v ->
+      annotateFunction (v ^. ideValueIdent) d
+    IdeDeclType t ->
+      annotateType (t ^. ideTypeName . properNameT) d
+    IdeDeclTypeSynonym s ->
+      annotateType (s ^. ideSynonymName . properNameT) d
+    IdeDeclDataConstructor dtor ->
+      annotateValue (dtor ^. ideDtorName . properNameT) d
+    IdeDeclTypeClass tc ->
+      annotateType (tc ^. ideTCName . properNameT) d
+    IdeDeclValueOperator operator ->
+      annotateValue (operator ^. ideValueOpName . opNameT) d
+    IdeDeclTypeOperator operator ->
+      annotateType (operator ^. ideTypeOpName . opNameT) d
+    IdeDeclKind i ->
+      annotateKind (i ^. properNameT) d
+
+resolveDocumentation
+  :: ModuleMap P.Module
+  -> ModuleMap [IdeDeclarationAnn]
+  -> ModuleMap [IdeDeclarationAnn]
+resolveDocumentation modules =
+  Map.mapWithKey (\mn decls ->
+    maybe decls (flip resolveDocumentationForModule decls) (Map.lookup mn modules))
+
+resolveDocumentationForModule
+  :: P.Module
+    -> [IdeDeclarationAnn]
+    -> [IdeDeclarationAnn]
+resolveDocumentationForModule (P.Module _ _ _ sdecls _) decls = map convertDecl decls
+  where 
+  comments :: Map P.Name [P.Comment]
+  comments = Map.fromListWith (flip (<>)) $ mapMaybe (\d -> 
+    case name d of 
+      Just name' -> Just (name', snd $ P.declSourceAnn d)
+      _ -> Nothing)
+    sdecls 
+
+  name :: P.Declaration -> Maybe P.Name
+  name (P.TypeDeclaration d) = Just $ P.IdentName $ P.tydeclIdent d
+  name decl = P.declName decl
+
+  convertDecl :: IdeDeclarationAnn -> IdeDeclarationAnn
+  convertDecl (IdeDeclarationAnn ann d) = 
+    convertDeclaration'
+      (annotateValue . P.IdentName)
+      (annotateValue . P.IdentName . P.Ident) 
+      (annotateValue . P.TyName . P.ProperName)
+      (annotateValue . P.KiName . P.ProperName)
+      d
+    where
+      docs :: P.Name -> Text
+      docs ident = fromMaybe "" $ convertComments =<< Map.lookup ident comments
+
+      annotateValue ident = IdeDeclarationAnn (ann { _annDocumentation = Just $ docs ident })
 
 resolveInstances
   :: ModuleMap P.ExternsFile
