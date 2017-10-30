@@ -114,13 +114,14 @@ data Annotation
   { _annLocation       :: Maybe P.SourceSpan
   , _annExportedFrom   :: Maybe P.ModuleName
   , _annTypeAnnotation :: Maybe P.Type
+  , _annDocumentation  :: Maybe Text
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 makeLenses ''Annotation
 makeLenses ''IdeDeclarationAnn
 
 emptyAnn :: Annotation
-emptyAnn = Annotation Nothing Nothing Nothing
+emptyAnn = Annotation Nothing Nothing Nothing Nothing
 
 type DefinitionSites a = Map IdeNamespaced a
 type TypeAnnotations = Map P.Ident P.Type
