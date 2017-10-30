@@ -214,15 +214,17 @@ lintImportDecl env mni qualifierName names ss declType allowImplicit =
   checkImplicit warning =
     if null allRefs
     then unused
-    else warn (warning mni (map simplifyTypeRef allRefs))
-    where
-    -- Replace explicit type refs with data constructor lists from listing the
-    -- used constructors explicity `T(X, Y, [...])` to `T(..)` for suggestion
-    -- message.
-    simplifyTypeRef :: DeclarationRef -> DeclarationRef
-    simplifyTypeRef (TypeRef ss' name (Just dctors))
-      | not (null dctors) = TypeRef ss' name Nothing
-    simplifyTypeRef other = other
+    else warn (warning mni (map (simplifyTypeRef $ const True) allRefs))
+
+  -- Replace explicit type refs with data constructor lists from listing the
+  -- used constructors explicity `T(X, Y, [...])` to `T(..)` for suggestion
+  -- message.
+  -- Done everywhere when suggesting a completely new explicit imports list, otherwise
+  -- maintain the existing form.
+  simplifyTypeRef :: (ProperName 'TypeName -> Bool) -> DeclarationRef -> DeclarationRef
+  simplifyTypeRef shouldOpen (TypeRef ss' name (Just dctors))
+    | not (null dctors) && shouldOpen name = TypeRef ss' name Nothing
+  simplifyTypeRef _ other = other
 
   checkExplicit
     :: [DeclarationRef]
@@ -236,20 +238,27 @@ lintImportDecl env mni qualifierName names ss declType allowImplicit =
     didWarn <- case (length diff, length idents) of
       (0, _) -> return False
       (n, m) | n == m -> unused
-      _ -> warn (UnusedExplicitImport mni diff qualifierName allRefs)
+      _ -> warn (UnusedExplicitImport mni diff qualifierName $ map simplifyTypeRef' allRefs)
 
     didWarn' <- forM (mapMaybe getTypeRef declrefs) $ \(tn, c) -> do
       let allCtors = dctorsForType mni tn
       -- If we've not already warned a type is unused, check its data constructors
       unless' (TyName tn `notElem` usedNames) $
         case (c, dctors `intersect` allCtors) of
-          (_, []) | c /= Just [] -> warn (UnusedDctorImport mni tn qualifierName allRefs)
+          (_, []) | c /= Just [] -> warn (UnusedDctorImport mni tn qualifierName $ map simplifyTypeRef' allRefs)
           (Just ctors, dctors') ->
             let ddiff = ctors \\ dctors'
-            in unless' (null ddiff) . warn $ UnusedDctorExplicitImport mni tn ddiff qualifierName allRefs
+            in unless' (null ddiff) . warn $ UnusedDctorExplicitImport mni tn ddiff qualifierName $ map simplifyTypeRef' allRefs
           _ -> return False
 
     return (didWarn || or didWarn')
+
+    where
+      simplifyTypeRef' :: DeclarationRef -> DeclarationRef
+      simplifyTypeRef' = simplifyTypeRef (\name -> any (isMatch name) declrefs)
+        where
+          isMatch name (TypeRef _ name' Nothing) = name == name'
+          isMatch _ _ = False
 
   unused :: m Bool
   unused = warn (UnusedImport mni)
