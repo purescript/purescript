@@ -148,6 +148,12 @@ record = primType "Record" $ T.unlines
   , "The syntactic sugar with curly braces `{ }` is generally preferred, though:"
   , ""
   , "    type Person = { name :: String, age :: Number }"
+  , ""
+  , "The row associates a type to each label which appears in the record."
+  , ""
+  , "_Technical note_: PureScript allows duplicate labels in rows, and the"
+  , "meaning of `Record r` is based on the _first_ occurrence of each label in"
+  , "the row `r`."
   ]
 
 number :: Declaration
