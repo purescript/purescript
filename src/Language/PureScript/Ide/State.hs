@@ -439,10 +439,32 @@ insertUsage
   -> ModuleMap [IdeDeclarationAnn]
   -> ModuleMap [IdeDeclarationAnn]
 insertUsage Usage{..} decls =
-  modifyAtDeclarationId usageOriginId (over idaAnnotation updateAnnotation) decls
+  modifyAtDeclarationId usageId (over (idaAnnotation.annUsages) updateUsages) decls
   where
-    updateAnnotation = over annUsages (Just . (:) (usageSiteModule, usageSiteLocation) . fromMaybe [])
+    -- We first need to check if the Usage we found is actually a reexport
+    reexportedFrom = do
+      ds <- Map.lookup (usageOriginId ^. ididModule) decls
+      d <- find (declarationMatchesId usageOriginId) ds
+      d ^. idaAnnotation.annExportedFrom
 
+    usageId = case reexportedFrom of
+      Just originalModule ->
+        -- If we're looking at a reexport, we associate the usage with the
+        -- defining module instead
+        usageOriginId { _ididModule = originalModule }
+      Nothing ->
+        usageOriginId
+
+    updateUsages = \case
+      Nothing ->
+        Just [(usageSiteModule, usageSiteLocation)]
+      Just prev ->
+        Just ((usageSiteModule, usageSiteLocation) : prev)
+
+-- | Collects uses in all the parsed modules and inserts them into the
+-- Annotation for the originating declaration. Expects Reexports to have been
+-- resolved beforehand, so it can associate a usage with the original
+-- declaration.
 resolveUsages
   :: ModuleMap P.Module
   -> ModuleMap [IdeDeclarationAnn]
