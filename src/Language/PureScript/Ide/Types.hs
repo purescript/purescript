@@ -244,7 +244,7 @@ identifierFromDeclarationRef _ = ""
 data Success =
   CompletionResult [Completion]
   | TextResult Text
-  | InfoResult IdeDeclarationAnn
+  | QueryResult [(P.ModuleName, [IdeDeclarationAnn])]
   | MultilineTextResult [Text]
   | PursuitResult [PursuitResponse]
   | ImportList (P.ModuleName, [(P.ModuleName, P.ImportDeclarationType, Maybe P.ModuleName)])
@@ -258,8 +258,11 @@ encodeSuccess res =
 
 instance ToJSON Success where
   toJSON (CompletionResult cs) = encodeSuccess cs
-  toJSON (InfoResult d) =
-    object ["resultType" .= ("success" :: Text), "result" .= encodeDeclarationAnn d]
+  toJSON (QueryResult r) =
+    object
+      [ "resultType" .= ("success" :: Text)
+      , "result" .= map (bimap P.runModuleName (map encodeDeclarationAnn)) r
+      ]
   toJSON (TextResult t) = encodeSuccess t
   toJSON (MultilineTextResult ts) = encodeSuccess ts
   toJSON (PursuitResult resp) = encodeSuccess resp
