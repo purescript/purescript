@@ -2,10 +2,12 @@ module Language.PureScript.Ide.Usages where
 
 import           Protolude
 
-import           Control.Lens ((^.))
+import           Control.Lens ((^.), over)
+import qualified Data.Map as Map
 import qualified Language.PureScript as P
 import           Language.PureScript.Ide.Imports.Helpers
 import           Language.PureScript.Ide.Types
+import           Language.PureScript.Ide.Util
 
 -- | The usage of an identifier inside some other declaration
 data Usage = Usage
@@ -149,3 +151,63 @@ collectFreeNames =
       P.PositionedValue ss _ (P.Var v) ->
         [(IdeNSValue, v, ss)]
       _ -> []
+
+insertUsage
+  :: Usage
+  -> ModuleMap [IdeDeclarationAnn]
+  -> ModuleMap [IdeDeclarationAnn]
+insertUsage Usage{..} decls =
+  modifyAtDeclarationId usageId (over (idaAnnotation.annUsages) updateUsages) decls
+  where
+    -- We first need to check if the Usage we found is actually a reexport
+    reexportedFrom = do
+      ds <- Map.lookup (usageOriginId ^. ididModule) decls
+      d <- find (declarationMatchesId usageOriginId) ds
+      d ^. idaAnnotation.annExportedFrom
+
+    usageId = case reexportedFrom of
+      Just originalModule ->
+        -- If we're looking at a reexport, we associate the usage with the
+        -- defining module instead
+        usageOriginId { _ididModule = originalModule }
+      Nothing ->
+        usageOriginId
+
+    updateUsages = \case
+      Nothing ->
+        Just [(usageSiteModule, usageSiteLocation)]
+      Just prev ->
+        Just ((usageSiteModule, usageSiteLocation) : prev)
+
+-- | Collects uses in all the parsed modules and inserts them into the
+-- Annotation for the originating declaration. Expects Reexports to have been
+-- resolved beforehand, so it can associate a usage with the original
+-- declaration.
+resolveUsages
+  :: ModuleMap P.Module
+  -> ModuleMap [IdeDeclarationAnn]
+  -> ModuleMap [IdeDeclarationAnn]
+resolveUsages modules decls =
+  foldr resolveUsagesForModule decls modules
+  where
+    resolveUsagesForModule module' decls' =
+      foldr insertUsage decls' (collectUsages module')
+
+modifyAtDeclarationId
+  :: IdeDeclarationId
+  -> (IdeDeclarationAnn -> IdeDeclarationAnn)
+  -> ModuleMap [IdeDeclarationAnn]
+  -> ModuleMap [IdeDeclarationAnn]
+modifyAtDeclarationId declarationId f decls = do
+  Map.update (Just . map update) (declarationId ^. ididModule) decls
+  where
+    update :: IdeDeclarationAnn -> IdeDeclarationAnn
+    update d =
+        if declarationMatchesId declarationId d
+          then f d
+          else d
+
+declarationMatchesId :: IdeDeclarationId -> IdeDeclarationAnn -> Bool
+declarationMatchesId declarationId d =
+  namespaceForDeclaration (discardAnn d) == declarationId ^. ididNamespace
+             && identifierFromIdeDeclaration (discardAnn d) == declarationId ^. ididIdentifier

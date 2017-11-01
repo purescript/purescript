@@ -28,9 +28,6 @@ module Language.PureScript.Ide.State
   , insertModule
   , insertExternsSTM
   , getAllModules
-  -- | Functions related to DeclarationIds
-  , getAtDeclarationId
-  , modifyAtDeclarationId
   -- | Populating the caches
   , populateVolatileState
   , populateVolatileStateSync
@@ -55,7 +52,7 @@ import           Language.PureScript.Ide.Externs
 import           Language.PureScript.Ide.Reexports
 import           Language.PureScript.Ide.SourceFile
 import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Usages (Usage(..), collectUsages)
+import           Language.PureScript.Ide.Usages (resolveUsages)
 import           Language.PureScript.Ide.Util
 
 -- | Resets all State inside psc-ide
@@ -116,32 +113,6 @@ setVolatileStateSTM ref vs = do
   modifyTVar ref $ \x ->
     x {ideVolatileState = vs}
   pure ()
-
-declarationMatchesId :: IdeDeclarationId -> IdeDeclarationAnn -> Bool
-declarationMatchesId declarationId d =
-  namespaceForDeclaration (discardAnn d) == declarationId ^. ididNamespace
-             && identifierFromIdeDeclaration (discardAnn d) == declarationId ^. ididIdentifier
-
-getAtDeclarationId :: Ide m => IdeDeclarationId -> m (Maybe IdeDeclarationAnn)
-getAtDeclarationId id = do
-  decls <- vsDeclarations <$> getVolatileState
-  pure $
-    Map.lookup (id ^. ididModule) decls
-    >>= find (declarationMatchesId id)
-
-modifyAtDeclarationId
-  :: IdeDeclarationId
-  -> (IdeDeclarationAnn -> IdeDeclarationAnn)
-  -> ModuleMap [IdeDeclarationAnn]
-  -> ModuleMap [IdeDeclarationAnn]
-modifyAtDeclarationId declarationId f decls = do
-  Map.update (Just . map update) (declarationId ^. ididModule) decls
-  where
-     update :: IdeDeclarationAnn -> IdeDeclarationAnn
-     update d =
-        if declarationMatchesId declarationId d
-          then f d
-          else d
 
 -- | Checks if the given ModuleName matches the last rebuild cache and if it
 -- does returns all loaded definitions + the definitions inside the rebuild
@@ -433,44 +404,3 @@ resolveDataConstructorsForModule decls =
       & mapMaybe (preview (idaDeclaration._IdeDeclDataConstructor))
       & foldr (\(IdeDataConstructor name typeName type') ->
                   Map.insertWith (<>) typeName [(name, type')]) Map.empty
-
-insertUsage
-  :: Usage
-  -> ModuleMap [IdeDeclarationAnn]
-  -> ModuleMap [IdeDeclarationAnn]
-insertUsage Usage{..} decls =
-  modifyAtDeclarationId usageId (over (idaAnnotation.annUsages) updateUsages) decls
-  where
-    -- We first need to check if the Usage we found is actually a reexport
-    reexportedFrom = do
-      ds <- Map.lookup (usageOriginId ^. ididModule) decls
-      d <- find (declarationMatchesId usageOriginId) ds
-      d ^. idaAnnotation.annExportedFrom
-
-    usageId = case reexportedFrom of
-      Just originalModule ->
-        -- If we're looking at a reexport, we associate the usage with the
-        -- defining module instead
-        usageOriginId { _ididModule = originalModule }
-      Nothing ->
-        usageOriginId
-
-    updateUsages = \case
-      Nothing ->
-        Just [(usageSiteModule, usageSiteLocation)]
-      Just prev ->
-        Just ((usageSiteModule, usageSiteLocation) : prev)
-
--- | Collects uses in all the parsed modules and inserts them into the
--- Annotation for the originating declaration. Expects Reexports to have been
--- resolved beforehand, so it can associate a usage with the original
--- declaration.
-resolveUsages
-  :: ModuleMap P.Module
-  -> ModuleMap [IdeDeclarationAnn]
-  -> ModuleMap [IdeDeclarationAnn]
-resolveUsages modules decls =
-  foldr resolveUsagesForModule decls modules
-  where
-    resolveUsagesForModule module' decls' =
-      foldr insertUsage decls' (collectUsages module')
