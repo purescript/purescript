@@ -24,7 +24,6 @@ import           Protolude hiding (moduleName)
 import           Control.Concurrent.STM
 import           Control.Lens.TH
 import           Data.Aeson
-import qualified Data.Text as T
 import qualified Data.Map.Lazy as M
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Errors.JSON as P
@@ -38,30 +37,6 @@ data IdeDeclarationId = IdeDeclarationId
   , _ididNamespace  :: !IdeNamespace
   , _ididIdentifier :: !Text
   } deriving (Show, Eq, Ord)
-
-printIdeDeclarationId :: IdeDeclarationId -> Text
-printIdeDeclarationId IdeDeclarationId{..} =
-  P.runModuleName _ididModule <> ":" <> printNS _ididNamespace <> ":" <> _ididIdentifier
-  where
-    printNS ns = case ns of
-      IdeNSValue -> "V"
-      IdeNSType -> "T"
-      IdeNSKind -> "K"
-
--- | Parses DeclarationId strings of the form:
--- "Module.Name:Namespace:identifier" where Namespace is one of V, T, or K.
-parseIdeDeclarationId :: Text -> Maybe IdeDeclarationId
-parseIdeDeclarationId t = do
-  guard (t /= "")
-  let (mn, rest) = bimap P.moduleNameFromString T.tail (T.breakOn ":" t)
-  let (ns, ident) = bimap parseNS T.tail (T.breakOn ":" rest)
-  IdeDeclarationId mn <$> ns <*> pure ident
-  where
-    parseNS c = case c of
-      "V" -> Just IdeNSValue
-      "T" -> Just IdeNSType
-      "K" -> Just IdeNSKind
-      _ -> Nothing
 
 data IdeDeclaration
   = IdeDeclValue IdeValue
