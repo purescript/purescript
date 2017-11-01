@@ -59,8 +59,7 @@ handleCommand c = case c of
     loadModulesSync modules
   Query filters currentModule -> do
     modules <- getAllModules currentModule
-    let decls = applyFilters filters modules
-    pure (QueryResult decls)
+    pure (QueryResult (applyFilters filters modules))
   Type search filters currentModule ->
     findType search filters currentModule
   Complete filters matcher currentModule complOptions ->
