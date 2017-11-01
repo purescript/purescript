@@ -130,16 +130,12 @@ getAtDeclarationId id = do
     >>= find (declarationMatchesId id)
 
 modifyAtDeclarationId
-  :: Ide m
-  => IdeDeclarationId
+  :: IdeDeclarationId
   -> (IdeDeclarationAnn -> IdeDeclarationAnn)
-  -> m ()
-modifyAtDeclarationId declarationId f = do
-  st <- ideStateVar <$> ask
-  liftIO $ atomically $ do
-    vState <- getVolatileStateSTM st
-    let newState = Map.update (Just . map update) (declarationId ^. ididModule) (vsDeclarations vState)
-    setVolatileStateSTM st vState { vsDeclarations = newState }
+  -> ModuleMap [IdeDeclarationAnn]
+  -> ModuleMap [IdeDeclarationAnn]
+modifyAtDeclarationId declarationId f decls = do
+  Map.update (Just . map update) (declarationId ^. ididModule) decls
   where
      update :: IdeDeclarationAnn -> IdeDeclarationAnn
      update d =
@@ -206,11 +202,9 @@ populateVolatileStateSync :: (Ide m, MonadLogger m) => m ()
 populateVolatileStateSync = do
   st <- ideStateVar <$> ask
   let message duration = "Finished populating volatile state in: " <> displayTimeSpec duration
-  let usageMessage duration = "Finished populating usages in: " <> displayTimeSpec duration
   results <- logPerf message $ do
     !r <- liftIO (atomically (populateVolatileStateSTM st))
     pure r
-  logPerf usageMessage (resolveUsages *> forceVolatile)
   void $ Map.traverseWithKey
     (\mn -> logWarnN . prettyPrintReexportResult (const (P.runModuleName mn)))
     (Map.filter reexportHasFailures results)
@@ -234,16 +228,18 @@ populateVolatileStateSTM ref = do
   rebuildCache <- vsCachedRebuild <$> getVolatileStateSTM ref
   let asts = map (extractAstInformation . fst) modules
   let (moduleDeclarations, reexportRefs) = (map fst &&& map snd) (Map.map convertExterns externs)
-      results =
-        moduleDeclarations
-        & map resolveDataConstructorsForModule
-        & resolveLocations asts
-        & resolveDocumentation (map fst modules)
-        & resolveInstances externs
-        & resolveOperators
-        & resolveReexports reexportRefs
-  setVolatileStateSTM ref (IdeVolatileState (AstData asts) (map reResolved results) rebuildCache)
-  pure (force results)
+  let
+    reexportResults =
+      moduleDeclarations
+      & map resolveDataConstructorsForModule
+      & resolveLocations asts
+      & resolveDocumentation (map fst modules)
+      & resolveInstances externs
+      & resolveOperators
+      & resolveReexports reexportRefs
+  let results = map reResolved reexportResults & resolveUsages (Map.map fst modules)
+  setVolatileStateSTM ref (IdeVolatileState (AstData asts) (force results) rebuildCache)
+  pure reexportResults
 
 resolveLocations
   :: ModuleMap (DefinitionSites P.SourceSpan, TypeAnnotations)
@@ -438,23 +434,21 @@ resolveDataConstructorsForModule decls =
       & foldr (\(IdeDataConstructor name typeName type') ->
                   Map.insertWith (<>) typeName [(name, type')]) Map.empty
 
-insertUsage :: Ide m => Usage -> m ()
-insertUsage Usage{..} =
-  modifyAtDeclarationId usageOriginId (over idaAnnotation updateAnnotation)
+insertUsage
+  :: Usage
+  -> ModuleMap [IdeDeclarationAnn]
+  -> ModuleMap [IdeDeclarationAnn]
+insertUsage Usage{..} decls =
+  modifyAtDeclarationId usageOriginId (over idaAnnotation updateAnnotation) decls
   where
     updateAnnotation = over annUsages (Just . (:) (usageSiteModule, usageSiteLocation) . fromMaybe [])
 
-resolveUsagesForModule :: Ide m => P.Module -> m ()
-resolveUsagesForModule m = for_ (collectUsages m) insertUsage
-
-resolveUsages :: Ide m => m ()
-resolveUsages = do
-  modules <- map fsModules getFileState
-  traverse_ (resolveUsagesForModule . fst) modules
-
-forceVolatile :: Ide m => m ()
-forceVolatile = do
-  st <- ideStateVar <$> ask
-  liftIO $ atomically $ do
-    s <- getVolatileStateSTM st
-    setVolatileStateSTM st (s { vsDeclarations = force (vsDeclarations s) })
+resolveUsages
+  :: ModuleMap P.Module
+  -> ModuleMap [IdeDeclarationAnn]
+  -> ModuleMap [IdeDeclarationAnn]
+resolveUsages modules decls =
+  foldr resolveUsagesForModule decls modules
+  where
+    resolveUsagesForModule module' decls' =
+      foldr insertUsage decls' (collectUsages module')

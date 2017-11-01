@@ -95,5 +95,5 @@ spec = do
       ([_, Right (InfoResult da)], _) <- Test.inProject $
         Test.runIde [Command.LoadSync [], Command.Info (IdeDeclarationId (Test.mn "RebuildSpecDep") IdeNSValue "dep")]
       let Just usages = da ^. idaAnnotation . annUsages
-      let cases = zip ["RebuildSpecWithDeps-5:5-5:5", "RebuildSpecWithDeps-3:24-3:27"] usages
+      let cases = zip ["RebuildSpecWithDeps-3:24-3:27", "RebuildSpecWithDeps-5:5-5:5"] usages
       for_ cases (uncurry shouldBeUsage)
