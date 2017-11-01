@@ -5,8 +5,9 @@ module Language.PureScript.Ide.UsagesSpec where
 
 import           Protolude hiding (moduleName)
 import qualified Data.Text as T
-import           Control.Lens ((^.))
-import           Language.PureScript.Ide.Usages (Usage(..), collectUsages)
+import qualified Data.Map as Map
+import           Control.Lens
+import           Language.PureScript.Ide.Usages (Usage(..), collectUsages, insertUsage)
 import qualified Language.PureScript.Ide.Command as Command
 import qualified Language.PureScript.Ide.Filter as Filter
 import           Language.PureScript.Ide.Types
@@ -99,6 +100,20 @@ spec = do
         ( IdeDeclarationId (Test.mn "Data.Array") IdeNSValue "filter"
         , P.SourcePos 5 20
         , P.SourcePos 5 26)
+  describe "resolving usages" $ do
+    it "resolves a reexported value usage" $ do
+      let
+        ms = Map.fromList
+          [ (Test.mn "A", [Test.ideValue "hello" Nothing])
+          , (Test.mn "B", [Test.ideValue "hello" Nothing `Test.annExp` "A"])
+          ]
+        usage = Usage
+          { usageOriginId = IdeDeclarationId (Test.mn "B") IdeNSValue "hello"
+          , usageSiteModule = Test.mn "C"
+          , usageSiteLocation = Test.ss 1 1
+          }
+        resolved = insertUsage usage ms
+      resolved ^. ix (Test.mn "A") . ix 0 . idaAnnotation . annUsages `shouldBe` Just [ (Test.mn "C", Test.ss 1 1) ]
   describe "retrieving usages" $ do
     it "returns a simple value usage" $ do
       ([_, Right (QueryResult [(_, [da])])], _) <- Test.inProject $
