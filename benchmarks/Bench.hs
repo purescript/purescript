@@ -7,44 +7,23 @@ import Protolude
 import System.Directory
 import System.FilePath
 import System.Process
-import System.Exit
 
 import Criterion.Main
-
--- 1. Update all the packages
--- 2. Compile all the packages
--- 3. Load all files without source globs
--- 4. Load all files with source globs
-
--- The function we're benchmarking.
-fib m | m < 0     = panic "negative!"
-      | otherwise = go m
-  where
-    go 0 = 0
-    go 1 = 1
-    go n = go (n-1) + go (n-2)
-
-updatePackages :: IO ()
-updatePackages = do
-  undefined
-
-compilePackages :: IO ()
-compilePackages = do
-  undefined
 
 inProject :: IO a -> IO a
 inProject f = do
   cwd' <- getCurrentDirectory
-  setCurrentDirectory ("." </> "benchmarks" </> "project")
+  print cwd'
+  setCurrentDirectory ("benchmarks" </> "project")
   a <- f
   setCurrentDirectory cwd'
   pure a
 
-compileTestProject :: IO Bool
-compileTestProject = inProject $ do
+compileProject :: IO Bool
+compileProject = inProject $ do
   (_, _, _, procHandle) <-
-    createProcess (shell "purs compile \"src/**/*.purs\"")
-  r <- tryNTimes 10 (getProcessExitCode procHandle)
+    createProcess (shell "psc-package build")
+  r <- tryNTimes 20 (getProcessExitCode procHandle)
   pure (fromMaybe False (isSuccess <$> r))
 
 isSuccess :: ExitCode -> Bool
@@ -61,12 +40,13 @@ tryNTimes n action = do
       tryNTimes (n - 1) action
     Just a -> pure (Just a)
 
-
 -- Our benchmark harness.
-main = defaultMain [
-  bgroup "fib" [ bench "1"  $ whnf fib 1
-               , bench "5"  $ whnf fib 5
-               , bench "9"  $ whnf fib 9
-               , bench "11" $ whnf fib 11
-               ]
-  ]
+main = do
+  hasCompiled <- compileProject
+  if hasCompiled
+    then
+      defaultMain [
+        bgroup "ide" [ bench "Without sourceglobs" $ nfIO (pure ())
+                     , bench "With sourceglobs" $ nfIO (pure ()) ]]
+    else
+      panic "Couldn't compile the benchmark project"
