@@ -161,6 +161,13 @@ tests:
     - HUnit
     - silently
 
+benchmarks:
+  ide-benchmark:
+    main: Bench.hs
+    source-dirs: benchmarks
+    dependencies: criterion
+    ghc-options: -Wall
+
 flags:
   release:
     description: >
