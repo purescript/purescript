@@ -10,17 +10,20 @@ import System.Process
 
 import Criterion.Main
 
+import Ide.Helper (runIde', defConfig)
+import qualified Language.PureScript.Ide.Command as Command
+import Language.PureScript.Ide.Types
+
 inProject :: IO a -> IO a
 inProject f = do
   cwd' <- getCurrentDirectory
-  print cwd'
   setCurrentDirectory ("benchmarks" </> "project")
   a <- f
   setCurrentDirectory cwd'
   pure a
 
 compileProject :: IO Bool
-compileProject = inProject $ do
+compileProject = do
   (_, _, _, procHandle) <-
     createProcess (shell "psc-package build")
   r <- tryNTimes 20 (getProcessExitCode procHandle)
@@ -40,13 +43,27 @@ tryNTimes n action = do
       tryNTimes (n - 1) action
     Just a -> pure (Just a)
 
+loadWithoutGlobs :: IO (ModuleMap [IdeDeclarationAnn])
+loadWithoutGlobs = do
+   (results, st) <- runIde' (defConfig { confGlobs = [], confLogLevel = LogPerf }) emptyIdeState [Command.LoadSync []]
+   pure (vsDeclarations (ideVolatileState st))
+
+loadWithGlobs :: IO (ModuleMap [IdeDeclarationAnn])
+loadWithGlobs = do
+   (results, st) <-
+     runIde' (defConfig { confGlobs = [ ".psc-package/psc-0.11.6-09272017/*/*/src/**/*.purs" ], confLogLevel = LogPerf })
+     emptyIdeState [Command.LoadSync []]
+   pure (vsDeclarations (ideVolatileState st))
+
 -- Our benchmark harness.
-main = do
+main = inProject $ do
   hasCompiled <- compileProject
   if hasCompiled
     then
       defaultMain [
-        bgroup "ide" [ bench "Without sourceglobs" $ nfIO (pure ())
-                     , bench "With sourceglobs" $ nfIO (pure ()) ]]
+        bgroup "ide"
+          [ bench "Without sourceglobs" $ nfIO loadWithoutGlobs
+          , bench "With sourceglobs" $ nfIO loadWithGlobs
+          ]]
     else
       panic "Couldn't compile the benchmark project"

@@ -165,7 +165,9 @@ benchmarks:
   ide-benchmark:
     main: Bench.hs
     source-dirs: benchmarks
-    dependencies: criterion
+    dependencies:
+      - criterion
+      - purescript
     ghc-options: -Wall
 
 flags:
