@@ -3,6 +3,8 @@
 --
 module Language.PureScript.Sugar (desugar, module S) where
 
+import Prelude
+
 import Control.Category ((>>>))
 import Control.Monad
 import Control.Monad.Error.Class (MonadError())
@@ -25,6 +27,9 @@ import Language.PureScript.Sugar.Operators as S
 import Language.PureScript.Sugar.TypeClasses as S
 import Language.PureScript.Sugar.TypeClasses.Deriving as S
 import Language.PureScript.Sugar.TypeDeclarations as S
+
+import Debug.Trace
+import Text.Show.Pretty
 
 -- |
 -- The desugaring pipeline proceeds as follows:
@@ -67,4 +72,4 @@ desugar externs =
     >=> traverse (deriveInstances externs)
     >=> desugarTypeClasses externs
     >=> traverse createBindingGroupsModule
-
+    -- >=> (\ms -> trace (ppShow ms) (pure ms))

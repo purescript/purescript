@@ -58,7 +58,7 @@ createBindingGroups moduleName = mapM f <=< handleDecls
   (f, _, _) = everywhereOnValuesTopDownM return handleExprs return
 
   handleExprs :: Expr -> m Expr
-  handleExprs (Let ds val) = flip Let val <$> handleDecls ds
+  handleExprs (Let sa ds val) = flip (Let sa) val <$> handleDecls ds
   handleExprs other = return other
 
   -- |
@@ -84,7 +84,7 @@ createBindingGroups moduleName = mapM f <=< handleDecls
              filter isExternDecl ds ++
              bindingGroupDecls
     where
-      extractGuardedExpr [MkUnguarded expr] = expr
+      extractGuardedExpr [MkUnguarded _ expr] = expr
       extractGuardedExpr _ = internalError "Expected Guards to have been desugared in handleDecls."
 
 -- |
@@ -97,12 +97,12 @@ collapseBindingGroups =
   where
   go (DataBindingGroupDeclaration ds) = NEL.toList ds
   go (BindingGroupDeclaration ds) =
-    NEL.toList $ fmap (\((sa, ident), nameKind, val) ->
-      ValueDecl sa ident nameKind [] [MkUnguarded val]) ds
+    NEL.toList $ fmap (\((sa@(ss, _), ident), nameKind, val) ->
+      ValueDecl sa ident nameKind [] [MkUnguarded ss val]) ds
   go other = [other]
 
 collapseBindingGroupsForValue :: Expr -> Expr
-collapseBindingGroupsForValue (Let ds val) = Let (collapseBindingGroups ds) val
+collapseBindingGroupsForValue (Let sa ds val) = Let sa (collapseBindingGroups ds) val
 collapseBindingGroupsForValue other = other
 
 usedIdents :: ModuleName -> ValueDeclarationData Expr -> [Ident]
@@ -113,9 +113,9 @@ usedIdents moduleName = ordNub . usedIdents' S.empty . valdeclExpression
   (_, usedIdents', _, _, _) = everythingWithScope def usedNamesE def def def
 
   usedNamesE :: S.Set Ident -> Expr -> [Ident]
-  usedNamesE scope (Var (Qualified Nothing name))
+  usedNamesE scope (Var _ (Qualified Nothing name))
     | name `S.notMember` scope = [name]
-  usedNamesE scope (Var (Qualified (Just moduleName') name))
+  usedNamesE scope (Var _ (Qualified (Just moduleName') name))
     | moduleName == moduleName' && name `S.notMember` scope = [name]
   usedNamesE _ _ = []
 
@@ -127,10 +127,10 @@ usedImmediateIdents moduleName =
   def s _ = (s, [])
 
   usedNamesE :: Bool -> Expr -> (Bool, [Ident])
-  usedNamesE True (Var (Qualified Nothing name)) = (True, [name])
-  usedNamesE True (Var (Qualified (Just moduleName') name))
+  usedNamesE True (Var _ (Qualified Nothing name)) = (True, [name])
+  usedNamesE True (Var _ (Qualified (Just moduleName') name))
     | moduleName == moduleName' = (True, [name])
-  usedNamesE True (Abs _ _) = (False, [])
+  usedNamesE True Abs{} = (False, [])
   usedNamesE scope _ = (scope, [])
 
 usedTypeNames :: ModuleName -> Declaration -> [ProperName 'TypeName]
@@ -159,7 +159,7 @@ declTypeName _ = internalError "Expected DataDeclaration"
 --
 toBindingGroup
   :: forall m
-   . (MonadError MultipleErrors m)
+   . MonadError MultipleErrors m
    => ModuleName
    -> SCC (ValueDeclarationData Expr)
    -> m Declaration
@@ -206,7 +206,7 @@ isTypeSynonym (TypeSynonymDeclaration _ pn _ _) = Just pn
 isTypeSynonym _ = Nothing
 
 mkDeclaration :: ValueDeclarationData Expr -> Declaration
-mkDeclaration = ValueDeclaration . fmap (pure . MkUnguarded)
+mkDeclaration vd = ValueDeclaration (fmap (\expr -> [ MkUnguarded (exprSourceSpan expr) expr ]) vd)
 
 fromValueDecl :: ValueDeclarationData Expr -> ((SourceAnn, Ident), NameKind, Expr)
 fromValueDecl (ValueDeclarationData sa ident nameKind [] val) = ((sa, ident), nameKind, val)

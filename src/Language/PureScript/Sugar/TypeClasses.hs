@@ -187,7 +187,9 @@ desugarDecl mn exps = go
   go d@(TypeInstanceDeclaration sa name deps className tys (NewtypeInstanceWithDictionary dict)) = do
     let dictTy = foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
         constrainedTy = quantify (foldr ConstrainedType dictTy deps)
-    return (expRef name className tys, [d, ValueDecl sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]])
+        sa'@(ss, _) = exprSourceAnn dict
+        expr = TypedValue sa' True dict constrainedTy
+    return (expRef name className tys, [d, ValueDecl sa name Private [] [MkUnguarded ss expr]])
   go other = return (Nothing, [other])
 
   expRef :: Ident -> Qualified (ProperName 'ClassName) -> [Type] -> Maybe DeclarationRef
@@ -247,11 +249,11 @@ typeClassMemberToDictionaryAccessor
   -> [(Text, Maybe Kind)]
   -> Declaration
   -> Declaration
-typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarationData sa ident ty)) =
+typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarationData sa@(ss, _) ident ty)) =
   let className = Qualified (Just mn) name
   in ValueDecl sa ident Private [] $
-    [MkUnguarded (
-     TypedValue False (TypeClassDictionaryAccessor className ident) $
+    [MkUnguarded ss (
+     TypedValue sa False (TypeClassDictionaryAccessor sa className ident) $
        moveQuantifiersToFront (quantify (ConstrainedType (Constraint className (map (TypeVar . fst) args) Nothing) ty))
     )]
 typeClassMemberToDictionaryAccessor _ _ _ _ = internalError "Invalid declaration in type class definition"
@@ -270,7 +272,7 @@ typeInstanceDictionaryDeclaration
   -> [Type]
   -> [Declaration]
   -> Desugar m Declaration
-typeInstanceDictionaryDeclaration sa name mn deps className tys decls =
+typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
   rethrow (addHint (ErrorInInstance className tys)) $ do
   m <- get
 
@@ -292,22 +294,22 @@ typeInstanceDictionaryDeclaration sa name mn deps className tys decls =
       -- The type is a record type, but depending on type instance dependencies, may be constrained.
       -- The dictionary itself is a record literal.
       let superclasses = superClassDictionaryNames typeClassSuperclasses `zip`
-            [ Abs (VarBinder (Ident C.__unused)) (DeferredDictionary superclass tyArgs)
+            [ Abs sa (VarBinder ss (Ident C.__unused)) (DeferredDictionary sa superclass tyArgs)
             | (Constraint superclass suTyArgs _) <- typeClassSuperclasses
             , let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
             ]
 
-      let props = Literal $ ObjectLiteral $ map (first mkString) (members ++ superclasses)
+      let props = Literal sa $ ObjectLiteral $ map (first mkString) (members ++ superclasses)
           dictTy = foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
           constrainedTy = quantify (foldr ConstrainedType dictTy deps)
-          dict = TypeClassDictionaryConstructorApp className props
-          result = ValueDecl sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]
+          dict = TypeClassDictionaryConstructorApp sa className props
+          result = ValueDecl sa name Private [] [MkUnguarded ss (TypedValue sa True dict constrainedTy)]
       return result
 
   where
 
   memberToValue :: [(Ident, Type)] -> Declaration -> Desugar m Expr
-  memberToValue tys' (ValueDecl _ ident _ [] [MkUnguarded val]) = do
+  memberToValue tys' (ValueDecl _ ident _ [] [MkUnguarded _ val]) = do
     _ <- maybe (throwError . errorMessage $ ExtraneousClassMember ident className) return $ lookup ident tys'
     return val
   memberToValue _ _ = internalError "Invalid declaration in type instance definition"

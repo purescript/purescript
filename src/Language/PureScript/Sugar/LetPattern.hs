@@ -5,15 +5,19 @@
 module Language.PureScript.Sugar.LetPattern (desugarLetPatternModule) where
 
 import Prelude.Compat
+import Data.Function
+import Data.List
 
 import Language.PureScript.AST
+import Language.PureScript.Crash
 
 -- |
 -- Replace every @BoundValueDeclaration@ in @Let@ expressions with @Case@
 -- expressions.
 --
 desugarLetPatternModule :: Module -> Module
-desugarLetPatternModule (Module ss coms mn ds exts) = Module ss coms mn (map desugarLetPattern ds) exts
+desugarLetPatternModule (Module ss coms mn ds exts) =
+  Module ss coms mn (fmap desugarLetPattern ds) exts
 
 -- |
 -- Desugar a single let expression
@@ -24,19 +28,29 @@ desugarLetPattern decl =
   in f decl
   where
   replace :: Expr -> Expr
-  replace (Let ds e) = go ds e
+  replace (Let _ ds e) = go (partitionDecls ds) e
   replace other = other
 
-  go :: [Declaration]
+  go :: [Either [Declaration] (SourceAnn, Binder, Expr)]
      -- ^ Declarations to desugar
      -> Expr
      -- ^ The original let-in result expression
      -> Expr
   go [] e = e
-  go (BoundValueDeclaration (pos, com) binder boundE : ds) e =
-    PositionedValue pos com $ Case [boundE] [CaseAlternative [binder] [MkUnguarded $ go ds e]]
-  go (d:ds) e = append d $ go ds e
+  go (Right (sa@(ss, _), binder, boundE) : ds) e =
+    Case sa [boundE] [CaseAlternative ss [binder] [MkUnguarded ss $ go ds e]]
+  go (Left d:ds) e = Let (declSourceAnn (head d)) d (go ds e)
 
-  append :: Declaration -> Expr -> Expr
-  append d (Let ds e) = Let (d:ds) e
-  append d e = Let [d] e
+partitionDecls :: [Declaration] -> [Either [Declaration] (SourceAnn, Binder, Expr)]
+partitionDecls = concatMap f . groupBy ((==) `on` isBoundValueDeclaration)
+  where
+    f ds@(d:_)
+      | isBoundValueDeclaration d = map (Right . g) ds
+    f ds = [Left ds]
+
+    g (BoundValueDeclaration sa binder expr) = (sa, binder, expr)
+    g _ = internalError "partitionDecls: the impossible happened."
+
+isBoundValueDeclaration :: Declaration -> Bool
+isBoundValueDeclaration BoundValueDeclaration{} = True
+isBoundValueDeclaration _ = False

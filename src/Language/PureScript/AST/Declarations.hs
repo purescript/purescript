@@ -102,7 +102,7 @@ data SimpleErrorMessage
   | NameIsUndefined Ident
   | UndefinedTypeVariable (ProperName 'TypeName)
   | PartiallyAppliedSynonym (Qualified (ProperName 'TypeName))
-  | EscapedSkolem Text (Maybe SourceSpan) Type
+  | EscapedSkolem Text SourceSpan Type
   | TypesDoNotUnify Type Type
   | KindsDoNotUnify Kind Kind
   | ConstrainedTypeUnified Type Type
@@ -664,18 +664,20 @@ flattenDecls = concatMap flattenOne
 -- |
 -- A guard is just a boolean-valued expression that appears alongside a set of binders
 --
-data Guard = ConditionGuard Expr
-           | PatternGuard Binder Expr
-           deriving (Show)
+data Guard
+  = ConditionGuard SourceSpan Expr
+  | PatternGuard SourceSpan Binder Expr
+  deriving (Show)
 
 -- |
 -- The right hand side of a binder in value declarations
 -- and case expressions.
-data GuardedExpr = GuardedExpr [Guard] Expr
-                 deriving (Show)
+data GuardedExpr
+  = GuardedExpr SourceSpan [Guard] Expr
+  deriving (Show)
 
-pattern MkUnguarded :: Expr -> GuardedExpr
-pattern MkUnguarded e = GuardedExpr [] e
+pattern MkUnguarded :: SourceSpan -> Expr -> GuardedExpr
+pattern MkUnguarded ss e = GuardedExpr ss [] e
 
 -- |
 -- Data type for expressions and terms
@@ -684,16 +686,16 @@ data Expr
   -- |
   -- A literal value
   --
-  = Literal (Literal Expr)
+  = Literal SourceAnn (Literal Expr)
   -- |
   -- A prefix -, will be desugared
   --
-  | UnaryMinus Expr
+  | UnaryMinus SourceAnn Expr
   -- |
   -- Binary operator application. During the rebracketing phase of desugaring, this data constructor
   -- will be removed.
   --
-  | BinaryNoParens Expr Expr Expr
+  | BinaryNoParens SourceAnn Expr Expr Expr
   -- |
   -- Explicit parentheses. During the rebracketing phase of desugaring, this data constructor
   -- will be removed.
@@ -701,69 +703,69 @@ data Expr
   -- Note: although it seems this constructor is not used, it _is_ useful, since it prevents
   -- certain traversals from matching.
   --
-  | Parens Expr
+  | Parens SourceAnn Expr
   -- |
   -- An record property accessor expression (e.g. `obj.x` or `_.x`).
   -- Anonymous arguments will be removed during desugaring and expanded
   -- into a lambda that reads a property from a record.
   --
-  | Accessor PSString Expr
+  | Accessor SourceAnn PSString Expr
   -- |
   -- Partial record update
   --
-  | ObjectUpdate Expr [(PSString, Expr)]
+  | ObjectUpdate SourceAnn Expr [(PSString, Expr)]
   -- |
   -- Object updates with nested support: `x { foo { bar = e } }`
   -- Replaced during desugaring into a `Let` and nested `ObjectUpdate`s
   --
-  | ObjectUpdateNested Expr (PathTree Expr)
+  | ObjectUpdateNested SourceAnn Expr (PathTree Expr)
   -- |
   -- Function introduction
   --
-  | Abs Binder Expr
+  | Abs SourceAnn Binder Expr
   -- |
   -- Function application
   --
-  | App Expr Expr
+  | App SourceAnn Expr Expr
   -- |
   -- Variable
   --
-  | Var (Qualified Ident)
+  | Var SourceAnn (Qualified Ident)
   -- |
   -- An operator. This will be desugared into a function during the "operators"
   -- phase of desugaring.
   --
-  | Op (Qualified (OpName 'ValueOpName))
+  | Op SourceAnn (Qualified (OpName 'ValueOpName))
   -- |
   -- Conditional (if-then-else expression)
   --
-  | IfThenElse Expr Expr Expr
+  | IfThenElse SourceAnn Expr Expr Expr
   -- |
   -- A data constructor
   --
-  | Constructor (Qualified (ProperName 'ConstructorName))
+  | Constructor SourceAnn (Qualified (ProperName 'ConstructorName))
   -- |
   -- A case expression. During the case expansion phase of desugaring, top-level binders will get
   -- desugared into case expressions, hence the need for guards and multiple binders per branch here.
   --
-  | Case [Expr] [CaseAlternative]
+  | Case SourceAnn [Expr] [CaseAlternative]
   -- |
   -- A value with a type annotation
   --
-  | TypedValue Bool Expr Type
+  | TypedValue SourceAnn Bool Expr Type
   -- |
   -- A let binding
   --
-  | Let [Declaration] Expr
+  | Let SourceAnn [Declaration] Expr
   -- |
   -- A do-notation block
   --
-  | Do [DoNotationElement]
+  | Do SourceAnn [DoNotationElement]
   -- |
   -- An application of a typeclass dictionary constructor. The value should be
   -- an ObjectLiteral.
   --
-  | TypeClassDictionaryConstructorApp (Qualified (ProperName 'ClassName)) Expr
+  | TypeClassDictionaryConstructorApp SourceAnn (Qualified (ProperName 'ClassName)) Expr
   -- |
   -- A placeholder for a type class dictionary to be inserted later. At the end of type checking, these
   -- placeholders will be replaced with actual expressions representing type classes dictionaries which
@@ -771,39 +773,64 @@ data Expr
   -- at superclass implementations when searching for a dictionary, the type class name and
   -- instance type, and the type class dictionaries in scope.
   --
-  | TypeClassDictionary Constraint
+  | TypeClassDictionary SourceAnn Constraint
                         (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict)))
                         [ErrorMessageHint]
   -- |
   -- A typeclass dictionary accessor, the implementation is left unspecified until CoreFn desugaring.
   --
-  | TypeClassDictionaryAccessor (Qualified (ProperName 'ClassName)) Ident
+  | TypeClassDictionaryAccessor SourceAnn (Qualified (ProperName 'ClassName)) Ident
   -- |
   -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
   --
-  | DeferredDictionary (Qualified (ProperName 'ClassName)) [Type]
+  | DeferredDictionary SourceAnn (Qualified (ProperName 'ClassName)) [Type]
   -- |
   -- A placeholder for an anonymous function argument
   --
-  | AnonymousArgument
+  | AnonymousArgument SourceAnn
   -- |
   -- A typed hole that will be turned into a hint/error duing typechecking
   --
-  | Hole Text
-  -- |
-  -- A value with source position information
-  --
-  | PositionedValue SourceSpan [Comment] Expr
+  | Hole SourceAnn Text
   deriving (Show)
+
+exprSourceAnn :: Expr -> SourceAnn
+exprSourceAnn (Literal sa _) = sa
+exprSourceAnn (UnaryMinus sa _) = sa
+exprSourceAnn (BinaryNoParens sa _ _ _) = sa
+exprSourceAnn (Parens sa _) = sa
+exprSourceAnn (Accessor sa _ _) = sa
+exprSourceAnn (ObjectUpdate sa _ _) = sa
+exprSourceAnn (ObjectUpdateNested sa _ _) = sa
+exprSourceAnn (Abs sa _ _) = sa
+exprSourceAnn (App sa _ _) = sa
+exprSourceAnn (Var sa _) = sa
+exprSourceAnn (Op sa _) = sa
+exprSourceAnn (IfThenElse sa _ _ _) = sa
+exprSourceAnn (Constructor sa _) = sa
+exprSourceAnn (Case sa _ _) = sa
+exprSourceAnn (TypedValue sa _ _ _) = sa
+exprSourceAnn (Let sa _ _) = sa
+exprSourceAnn (Do sa _) = sa
+exprSourceAnn (TypeClassDictionaryConstructorApp sa _ _) = sa
+exprSourceAnn (TypeClassDictionary sa _ _ _) = sa
+exprSourceAnn (TypeClassDictionaryAccessor sa _ _) = sa
+exprSourceAnn (DeferredDictionary sa _ _) = sa
+exprSourceAnn (AnonymousArgument sa) = sa
+exprSourceAnn (Hole sa _) = sa
+
+exprSourceSpan :: Expr -> SourceSpan
+exprSourceSpan = fst . exprSourceAnn
 
 -- |
 -- An alternative in a case statement
 --
 data CaseAlternative = CaseAlternative
-  { -- |
+  { caseAlternativeSourceSpan :: SourceSpan
+    -- |
     -- A collection of binders with which to match the inputs
     --
-    caseAlternativeBinders :: [Binder]
+  , caseAlternativeBinders :: [Binder]
     -- |
     -- The result expression or a collect of guarded expressions
     --
@@ -817,19 +844,15 @@ data DoNotationElement
   -- |
   -- A monadic value without a binder
   --
-  = DoNotationValue Expr
+  = DoNotationValue SourceAnn Expr
   -- |
   -- A monadic value with a binder
   --
-  | DoNotationBind Binder Expr
+  | DoNotationBind SourceAnn Binder Expr
   -- |
   -- A let statement, i.e. a pure value with a binder
   --
-  | DoNotationLet [Declaration]
-  -- |
-  -- A do notation element with source position information
-  --
-  | PositionedDoNotationElement SourceSpan [Comment] DoNotationElement
+  | DoNotationLet SourceAnn [Declaration]
   deriving (Show)
 
 
@@ -869,9 +892,8 @@ $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Declarat
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ImportDeclarationType)
 
 isTrueExpr :: Expr -> Bool
-isTrueExpr (Literal (BooleanLiteral True)) = True
-isTrueExpr (Var (Qualified (Just (ModuleName [ProperName "Prelude"])) (Ident "otherwise"))) = True
-isTrueExpr (Var (Qualified (Just (ModuleName [ProperName "Data", ProperName "Boolean"])) (Ident "otherwise"))) = True
-isTrueExpr (TypedValue _ e _) = isTrueExpr e
-isTrueExpr (PositionedValue _ _ e) = isTrueExpr e
+isTrueExpr (Literal _ (BooleanLiteral True)) = True
+isTrueExpr (Var _ (Qualified (Just C.Prelude) (Ident "otherwise"))) = True
+isTrueExpr (Var _ (Qualified (Just C.DataBoolean) (Ident "otherwise"))) = True
+isTrueExpr (TypedValue _ _ e _) = isTrueExpr e
 isTrueExpr _ = False

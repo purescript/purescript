@@ -49,9 +49,9 @@ createTemporaryModule exec PSCiState{psciImportedModules = imports, psciLetBindi
     effModuleName = P.moduleNameFromString "Control.Monad.Eff"
     effImport     = (effModuleName, P.Implicit, Just (P.ModuleName [P.ProperName "$Eff"]))
     supportImport = (supportModuleName, P.Implicit, Just (P.ModuleName [P.ProperName "$Support"]))
-    eval          = P.Var (P.Qualified (Just (P.ModuleName [P.ProperName "$Support"])) (P.Ident "eval"))
-    mainValue     = P.App eval (P.Var (P.Qualified Nothing (P.Ident "it")))
-    itDecl        = P.ValueDecl (internalSpan, []) (P.Ident "it") P.Public [] [P.MkUnguarded val]
+    eval          = P.Var internalAnn (P.Qualified (Just (P.ModuleName [P.ProperName "$Support"])) (P.Ident "eval"))
+    mainValue     = P.App internalAnn eval (P.Var internalAnn (P.Qualified Nothing (P.Ident "it")))
+    itDecl        = P.ValueDecl (internalSpan, []) (P.Ident "it") P.Public [] [P.MkUnguarded internalSpan val]
     typeDecl      = P.TypeDeclaration
                       (P.TypeDeclarationData (internalSpan, []) (P.Ident "$main")
                         (P.TypeApp
@@ -60,7 +60,7 @@ createTemporaryModule exec PSCiState{psciImportedModules = imports, psciLetBindi
                               (P.Qualified (Just (P.ModuleName [P.ProperName "$Eff"])) (P.ProperName "Eff")))
                                 (P.TypeWildcard internalSpan))
                                   (P.TypeWildcard internalSpan)))
-    mainDecl      = P.ValueDecl (internalSpan, []) (P.Ident "$main") P.Public [] [P.MkUnguarded mainValue]
+    mainDecl      = P.ValueDecl (internalSpan, []) (P.Ident "$main") P.Public [] [P.MkUnguarded internalSpan mainValue]
     decls         = if exec then [itDecl, typeDecl, mainDecl] else [itDecl]
   in
     P.Module internalSpan
@@ -98,6 +98,9 @@ indexFile = ".psci_modules" ++ pathSeparator : "index.js"
 
 modulesDir :: FilePath
 modulesDir = ".psci_modules" ++ pathSeparator : "node_modules"
+
+internalAnn :: P.SourceAnn
+internalAnn = (P.internalModuleSourceSpan "<internal>", [])
 
 internalSpan :: P.SourceSpan
 internalSpan = P.internalModuleSourceSpan "<internal>"

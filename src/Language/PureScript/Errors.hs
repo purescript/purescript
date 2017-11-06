@@ -423,7 +423,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       skolemInfo (name, s, ss) =
         paras $
           line (markCode (T.pack (name <> show s)) <> " is a rigid type variable")
-          : foldMap (return . line . ("  bound at " <>) . displayStartEndPos) ss
+          : maybeToList (line . ("  bound at " <>) . displayStartEndPos <$> ss)
 
       unknownInfo :: Int -> Box.Box
       unknownInfo u = line $ markCode ("t" <> T.pack (show u)) <> " is an unknown type"
@@ -556,11 +556,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line $ "Type synonym " <> markCode (showQualified runProperName name) <> " is partially applied."
             , line "Type synonyms must be applied to all of their type arguments."
             ]
-    renderSimpleErrorMessage (EscapedSkolem name Nothing ty) =
-      paras [ line $ "The type variable " <> markCode name <> " has escaped its scope, appearing in the type"
-            , markCodeBox $ indent $ typeAsBox ty
-            ]
-    renderSimpleErrorMessage (EscapedSkolem name (Just srcSpan) ty) =
+    renderSimpleErrorMessage (EscapedSkolem name srcSpan ty) =
       paras [ line $ "The type variable " <> markCode name <> ", bound at"
             , indent $ line $ displaySourceSpan relPath srcSpan
             , line "has escaped its scope, appearing in the type"
@@ -1020,7 +1016,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderHint (ErrorCheckingAccessor expr prop) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ line "while checking type of property accessor"
-                                 , markCodeBox $ prettyPrintValue valueDepth (Accessor prop expr)
+                                 , markCodeBox $ prettyPrintValue valueDepth (Accessor (internalError "temporary Accessor SourceAnn was read") prop expr)
                                  ]
             ]
     renderHint (ErrorInApplication f t a) detail =

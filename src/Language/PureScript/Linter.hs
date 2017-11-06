@@ -49,36 +49,36 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
 
     f' :: S.Set Text -> Declaration -> MultipleErrors
     f' s dec@(ValueDeclaration vd) = addHint (ErrorInValueDeclaration (valdeclIdent vd)) (warningsInDecl moduleNames dec <> checkTypeVarsInDecl s dec)
-    f' s (TypeDeclaration td) = addHint (ErrorInTypeDeclaration (tydeclIdent td)) (checkTypeVars s (tydeclType td))
+    f' s dec@(TypeDeclaration td) = addHint (ErrorInTypeDeclaration (tydeclIdent td)) (checkTypeVars (declSourceSpan dec) s (tydeclType td))
     f' s dec = warningsInDecl moduleNames dec <> checkTypeVarsInDecl s dec
 
     stepE :: S.Set Ident -> Expr -> MultipleErrors
-    stepE s (Abs (VarBinder name) _) | name `S.member` s = errorMessage (ShadowedName name)
-    stepE s (Let ds' _) = foldMap go ds'
+    stepE s (Abs _ (VarBinder ss name) _) | name `S.member` s = errorMessage' ss (ShadowedName name)
+    stepE s (Let (ss, _) ds' _) = foldMap go ds'
       where
       go d | Just i <- getDeclIdent d
-           , i `S.member` s = errorMessage (ShadowedName i)
+           , i `S.member` s = errorMessage' ss (ShadowedName i)
            | otherwise = mempty
     stepE _ _ = mempty
 
     stepB :: S.Set Ident -> Binder -> MultipleErrors
-    stepB s (VarBinder name) | name `S.member` s = errorMessage (ShadowedName name)
-    stepB s (NamedBinder name _) | name `S.member` s = errorMessage (ShadowedName name)
+    stepB s (VarBinder ss name) | name `S.member` s = errorMessage' ss (ShadowedName name)
+    stepB s (NamedBinder ss name _) | name `S.member` s = errorMessage' ss (ShadowedName name)
     stepB _ _ = mempty
 
     stepDo :: S.Set Ident -> DoNotationElement -> MultipleErrors
-    stepDo s (DoNotationLet ds') = foldMap go ds'
+    stepDo s (DoNotationLet (ss, _) ds') = foldMap go ds'
       where
       go d | Just i <- getDeclIdent d
-           , i `S.member` s = errorMessage (ShadowedName i)
+           , i `S.member` s = errorMessage' ss (ShadowedName i)
            | otherwise = mempty
     stepDo _ _ = mempty
 
   checkTypeVarsInDecl :: S.Set Text -> Declaration -> MultipleErrors
-  checkTypeVarsInDecl s d = let (f, _, _, _, _) = accumTypes (checkTypeVars s) in f d
+  checkTypeVarsInDecl s d = let (f, _, _, _, _) = accumTypes (checkTypeVars (declSourceSpan d) s) in f d
 
-  checkTypeVars :: S.Set Text -> Type -> MultipleErrors
-  checkTypeVars set ty = everythingWithContextOnTypes set mempty mappend step ty <> findUnused ty
+  checkTypeVars :: SourceSpan -> S.Set Text -> Type -> MultipleErrors
+  checkTypeVars ss set ty = everythingWithContextOnTypes set mempty mappend step ty <> findUnused ty
     where
     step :: S.Set Text -> Type -> (S.Set Text, MultipleErrors)
     step s (ForAll tv _ _) = bindVar s tv
@@ -90,12 +90,13 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
       let used = usedTypeVariables ty'
           declared = everythingOnTypes (++) go ty'
           unused = ordNub declared \\ ordNub used
-      in foldl (<>) mempty $ map (errorMessage . UnusedTypeVar) unused
+      in foldl (<>) mempty $ fmap (errorMessage' ss . UnusedTypeVar) unused
       where
       go :: Type -> [Text]
       go (ForAll tv _ _) = [tv]
       go _ = []
 
-  bind :: (Ord a) => (a -> SimpleErrorMessage) -> S.Set a -> a -> (S.Set a, MultipleErrors)
-  bind mkError s name | name `S.member` s = (s, errorMessage (mkError name))
-                      | otherwise = (S.insert name s, mempty)
+    bind :: Ord a => (a -> SimpleErrorMessage) -> S.Set a -> a -> (S.Set a, MultipleErrors)
+    bind mkError s name
+      | name `S.member` s = (s, errorMessage' ss (mkError name))
+      | otherwise = (S.insert name s, mempty)

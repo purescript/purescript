@@ -211,7 +211,7 @@ deriveNewtypeInstance ss mn syns ndis className ds tys tyConNm dargs = do
       | Just wrapped' <- stripRight (takeReverse (length tyArgNames - length dargs) tyArgNames) wrapped =
           do let subst = zipWith (\(name, _) t -> (name, t)) tyArgNames dargs
              wrapped'' <- replaceAllTypeSynonymsM syns wrapped'
-             return (DeferredDictionary className (init tys ++ [replaceAllTypeVars subst wrapped'']))
+             return (DeferredDictionary (ss, []) className (init tys ++ [replaceAllTypeVars subst wrapped'']))
     go _ = throwError . errorMessage' ss $ InvalidNewtypeInstance className tys
 
     takeReverse :: Int -> [a] -> [a]
@@ -273,7 +273,7 @@ dataFunctor :: ModuleName
 dataFunctor = ModuleName [ ProperName "Data", ProperName "Functor" ]
 
 unguarded :: Expr -> [GuardedExpr]
-unguarded e = [MkUnguarded e]
+unguarded e = [MkUnguarded (exprSourceSpan e) e]
 
 deriveGeneric
   :: forall m. (MonadError MultipleErrors m, MonadSupply m)
@@ -294,57 +294,59 @@ deriveGeneric ss mn syns ds tyConNm dargs = do
          , ValueDecl (ss, []) (Ident C.toSignature) Public [] (unguarded toSignature)
          ]
   where
+
+    sa = (ss, [])
     mkSpineFunction :: Declaration -> m Expr
-    mkSpineFunction (DataDeclaration _ _ _ _ args) = do
+    mkSpineFunction (DataDeclaration sa'@(ss', _) _ _ _ args) = do
       x <- freshIdent'
-      lamCase x <$> mapM mkCtorClause args
+      lamCase sa' x <$> mapM mkCtorClause args
       where
       prodConstructor :: Expr -> Expr
-      prodConstructor = App (Constructor (Qualified (Just dataGeneric) (ProperName "SProd")))
+      prodConstructor = App sa' (Constructor sa' (Qualified (Just dataGeneric) (ProperName "SProd")))
 
       recordConstructor :: Expr -> Expr
-      recordConstructor = App (Constructor (Qualified (Just dataGeneric) (ProperName "SRecord")))
+      recordConstructor = App sa' (Constructor sa' (Qualified (Just dataGeneric) (ProperName "SRecord")))
 
       mkCtorClause :: (ProperName 'ConstructorName, [Type]) -> m CaseAlternative
       mkCtorClause (ctorName, tys) = do
         idents <- replicateM (length tys) freshIdent'
         tys' <- mapM (replaceAllTypeSynonymsM syns) tys
         let caseResult =
-              App (prodConstructor (Literal . StringLiteral . mkString . showQualified runProperName $ Qualified (Just mn) ctorName))
-                . Literal . ArrayLiteral
-                $ zipWith toSpineFun (map (Var . Qualified Nothing) idents) tys'
-        return $ CaseAlternative [ConstructorBinder (Qualified (Just mn) ctorName) (map VarBinder idents)] (unguarded caseResult)
+              App sa' (prodConstructor (Literal sa' . StringLiteral . mkString . showQualified runProperName $ Qualified (Just mn) ctorName))
+                . Literal sa' . ArrayLiteral
+                $ zipWith toSpineFun (map (Var sa' . Qualified Nothing) idents) tys'
+        return $ CaseAlternative ss' [ConstructorBinder ss' (Qualified (Just mn) ctorName) (map (VarBinder ss') idents)] (unguarded caseResult)
 
       toSpineFun :: Expr -> Type -> Expr
       toSpineFun i r | Just rec <- objectType r
                      , Just fields <- decomposeRec rec =
-        lamNull . recordConstructor . Literal . ArrayLiteral
+        lamNull . recordConstructor . Literal sa' . ArrayLiteral
           . map
             (\((Label str),typ) ->
-              Literal $ ObjectLiteral
-                [ ("recLabel", Literal (StringLiteral str))
-                , ("recValue", toSpineFun (Accessor str i) typ)
+              Literal sa $ ObjectLiteral
+                [ ("recLabel", Literal sa' (StringLiteral str))
+                , ("recValue", toSpineFun (Accessor sa' str i) typ)
                 ]
             )
           $ fields
-      toSpineFun i _ = lamNull $ App (mkGenVar (Ident C.toSpine)) i
+      toSpineFun i _ = lamNull $ App sa' (mkGenVar (Ident C.toSpine)) i
     mkSpineFunction _ = internalError "mkSpineFunction: expected DataDeclaration"
 
     mkSignatureFunction :: Declaration -> [Type] -> m Expr
-    mkSignatureFunction (DataDeclaration _ _ name tyArgs args) classArgs = lamNull . mkSigProd <$> mapM mkProdClause args
+    mkSignatureFunction (DataDeclaration sa' _ name tyArgs args) classArgs = lamNull . mkSigProd <$> mapM mkProdClause args
       where
       mkSigProd :: [Expr] -> Expr
       mkSigProd =
-        App
-          (App
-            (Constructor (Qualified (Just dataGeneric) (ProperName "SigProd")))
-            (Literal (StringLiteral $ mkString (showQualified runProperName (Qualified (Just mn) name))))
+        App sa'
+          (App sa'
+            (Constructor sa (Qualified (Just dataGeneric) (ProperName "SigProd")))
+            (Literal sa' (StringLiteral $ mkString (showQualified runProperName (Qualified (Just mn) name))))
           )
-          . Literal
+          . Literal sa'
           . ArrayLiteral
 
       mkSigRec :: [Expr] -> Expr
-      mkSigRec = App (Constructor (Qualified (Just dataGeneric) (ProperName "SigRecord"))) . Literal . ArrayLiteral
+      mkSigRec = App sa' (Constructor sa' (Qualified (Just dataGeneric) (ProperName "SigRecord"))) . Literal sa' . ArrayLiteral
 
       proxy :: Type -> Type
       proxy = TypeApp (TypeConstructor (Qualified (Just typesProxy) (ProperName "Proxy")))
@@ -352,99 +354,99 @@ deriveGeneric ss mn syns ds tyConNm dargs = do
       mkProdClause :: (ProperName 'ConstructorName, [Type]) -> m Expr
       mkProdClause (ctorName, tys) = do
         tys' <- mapM (replaceAllTypeSynonymsM syns) tys
-        return $ Literal $ ObjectLiteral
-          [ ("sigConstructor", Literal (StringLiteral $ mkString (showQualified runProperName (Qualified (Just mn) ctorName))))
-          , ("sigValues", Literal . ArrayLiteral . map (mkProductSignature . instantiate) $ tys')
+        return $ Literal sa' $ ObjectLiteral
+          [ ("sigConstructor", Literal sa' (StringLiteral $ mkString (showQualified runProperName (Qualified (Just mn) ctorName))))
+          , ("sigValues", Literal sa' . ArrayLiteral . map (mkProductSignature . instantiate) $ tys')
           ]
 
       mkProductSignature :: Type -> Expr
       mkProductSignature r | Just rec <- objectType r
                            , Just fields <- decomposeRec rec =
           lamNull . mkSigRec $
-            [ Literal $ ObjectLiteral
-                [ ("recLabel", Literal (StringLiteral str))
+            [ Literal sa' $ ObjectLiteral
+                [ ("recLabel", Literal sa' (StringLiteral str))
                 , ("recValue", mkProductSignature typ)
                 ]
             | ((Label str), typ) <- fields
             ]
-      mkProductSignature typ = lamNull $ App (mkGenVar (Ident C.toSignature))
-                               (TypedValue False (mkGenVar (Ident "anyProxy")) (proxy typ))
+      mkProductSignature typ = lamNull $ App sa' (mkGenVar (Ident C.toSignature))
+                               (TypedValue sa' False (mkGenVar (Ident "anyProxy")) (proxy typ))
       instantiate = replaceAllTypeVars (zipWith (\(arg, _) ty -> (arg, ty)) tyArgs classArgs)
     mkSignatureFunction _ _ = internalError "mkSignatureFunction: expected DataDeclaration"
 
     mkFromSpineFunction :: Declaration -> m Expr
-    mkFromSpineFunction (DataDeclaration _ _ _ _ args) = do
+    mkFromSpineFunction (DataDeclaration sa'@(ss', _) _ _ _ args) = do
       x <- freshIdent'
-      lamCase x <$> (addCatch <$> mapM mkAlternative args)
+      lamCase sa' x <$> (addCatch <$> mapM mkAlternative args)
       where
       mkJust :: Expr -> Expr
-      mkJust = App (Constructor (Qualified (Just dataMaybe) (ProperName "Just")))
+      mkJust = App sa' (Constructor sa' (Qualified (Just dataMaybe) (ProperName "Just")))
 
       mkNothing :: Expr
-      mkNothing = Constructor (Qualified (Just dataMaybe) (ProperName "Nothing"))
+      mkNothing = Constructor sa' (Qualified (Just dataMaybe) (ProperName "Nothing"))
 
       prodBinder :: [Binder] -> Binder
-      prodBinder = ConstructorBinder (Qualified (Just dataGeneric) (ProperName "SProd"))
+      prodBinder = ConstructorBinder ss' (Qualified (Just dataGeneric) (ProperName "SProd"))
 
       recordBinder :: [Binder] -> Binder
-      recordBinder = ConstructorBinder (Qualified (Just dataGeneric) (ProperName "SRecord"))
+      recordBinder = ConstructorBinder ss' (Qualified (Just dataGeneric) (ProperName "SRecord"))
 
       mkAlternative :: (ProperName 'ConstructorName, [Type]) -> m CaseAlternative
       mkAlternative (ctorName, tys) = do
         idents <- replicateM (length tys) freshIdent'
         tys' <- mapM (replaceAllTypeSynonymsM syns) tys
         return $
-          CaseAlternative
+          CaseAlternative ss'
             [ prodBinder
-                [ LiteralBinder (StringLiteral $ mkString (showQualified runProperName (Qualified (Just mn) ctorName)))
-                , LiteralBinder (ArrayLiteral (map VarBinder idents))
+                [ LiteralBinder ss' (StringLiteral $ mkString (showQualified runProperName (Qualified (Just mn) ctorName)))
+                , LiteralBinder ss' (ArrayLiteral (map (VarBinder ss) idents))
                 ]
             ]
             . unguarded
             $ liftApplicative
-                (mkJust $ Constructor (Qualified (Just mn) ctorName))
-                (zipWith fromSpineFun (map (Var . Qualified Nothing) idents) tys')
+                (mkJust $ Constructor sa' (Qualified (Just mn) ctorName))
+                (zipWith fromSpineFun (map (Var sa' . Qualified Nothing) idents) tys')
 
       addCatch :: [CaseAlternative] -> [CaseAlternative]
       addCatch = (++ [catchAll])
         where
-        catchAll = CaseAlternative [NullBinder] (unguarded mkNothing)
+        catchAll = CaseAlternative ss [NullBinder ss] (unguarded mkNothing)
 
       fromSpineFun :: Expr -> Type -> Expr
       fromSpineFun e r
         | Just rec <- objectType r
         , Just fields <- decomposeRec rec
-        = App (lamCase (Ident "r") [ mkRecCase fields
-                                   , CaseAlternative [NullBinder] (unguarded mkNothing)
-                                   ])
-              (App e unitVal)
-      fromSpineFun e _ = App (mkGenVar (Ident C.fromSpine)) (App e unitVal)
+        = App sa (lamCase sa (Ident "r") [ mkRecCase fields
+                                         , CaseAlternative ss [NullBinder ss] (unguarded mkNothing)
+                                         ])
+              (App sa e unitVal)
+      fromSpineFun e _ = App sa (mkGenVar (Ident C.fromSpine)) (App sa e unitVal)
 
       mkRecCase :: [(Label, Type)] -> CaseAlternative
       mkRecCase rs =
-        CaseAlternative
-          [ recordBinder [ LiteralBinder (ArrayLiteral (map (VarBinder . labelToIdent . fst) rs)) ] ]
+        CaseAlternative ss
+          [ recordBinder [ LiteralBinder ss (ArrayLiteral (map (VarBinder ss . labelToIdent . fst) rs)) ] ]
           . unguarded
-          $ liftApplicative (mkRecFun rs) (map (\(x, y) -> fromSpineFun (Accessor "recValue" (mkVar $ labelToIdent x)) y) rs)
+          $ liftApplicative (mkRecFun rs) (map (\(x, y) -> fromSpineFun (Accessor sa "recValue" (mkVar sa $ labelToIdent x)) y) rs)
 
       mkRecFun :: [(Label, Type)] -> Expr
       mkRecFun xs = mkJust $ foldr (lam . labelToIdent . fst) recLiteral xs
-        where recLiteral = Literal . ObjectLiteral $ map (\(l@(Label s), _) -> (s, mkVar $ labelToIdent l)) xs
+        where recLiteral = Literal sa . ObjectLiteral $ map (\(l@(Label s), _) -> (s, mkVar sa $ labelToIdent l)) xs
     mkFromSpineFunction _ = internalError "mkFromSpineFunction: expected DataDeclaration"
 
     -- Helpers
 
     liftApplicative :: Expr -> [Expr] -> Expr
-    liftApplicative = foldl' (\x e -> App (App applyFn x) e)
+    liftApplicative = foldl' (\x e -> App sa (App sa applyFn x) e)
 
     unitVal :: Expr
-    unitVal = mkVarMn (Just (ModuleName [ProperName "Data", ProperName "Unit"])) (Ident "unit")
+    unitVal = mkVarMn sa (Just (ModuleName [ProperName "Data", ProperName "Unit"])) (Ident "unit")
 
     applyFn :: Expr
-    applyFn = mkVarMn (Just (ModuleName [ProperName "Control", ProperName "Apply"])) (Ident "apply")
+    applyFn = mkVarMn sa (Just (ModuleName [ProperName "Control", ProperName "Apply"])) (Ident "apply")
 
     mkGenVar :: Ident -> Expr
-    mkGenVar = mkVarMn (Just (ModuleName [ProperName "Data", ProperName C.generic]))
+    mkGenVar = mkVarMn sa (Just (ModuleName [ProperName "Data", ProperName C.generic]))
 
 deriveGenericRep
   :: forall m
@@ -461,176 +463,179 @@ deriveGenericRep mn syns ds tyConNm tyConArgs repTy = do
     go =<< findTypeDecl tyConNm ds
   where
     go :: Declaration -> m ([Declaration], Type)
-    go (DataDeclaration (ss, _) _ _ args dctors) = do
-      x <- freshIdent "x"
-      (reps, to, from) <- unzip3 <$> traverse makeInst dctors
-      let rep = toRepTy reps
-          inst | null reps =
-                   -- If there are no cases, spin
-                   [ ValueDecl (ss, []) (Ident "to") Public [] $ unguarded $
-                       lamCase x [ CaseAlternative [NullBinder]
-                                                   (unguarded (App toName (Var (Qualified Nothing x))))
-                                 ]
-                   , ValueDecl (ss, []) (Ident "from") Public [] $ unguarded $
-                       lamCase x [ CaseAlternative [NullBinder]
-                                                   (unguarded (App fromName (Var (Qualified Nothing x))))
-                                 ]
-                   ]
-               | otherwise =
-                   [ ValueDecl (ss, []) (Ident "to") Public [] $ unguarded $
-                       lamCase x (zipWith ($) (map underBinder (sumBinders (length dctors))) to)
-                   , ValueDecl (ss, []) (Ident "from") Public [] $ unguarded $
-                       lamCase x (zipWith ($) (map underExpr (sumExprs (length dctors))) from)
-                   ]
+    go d = case d of
+      DataDeclaration _ _ _ args dctors -> do
+        x <- freshIdent "x"
+        (reps, to, from) <- unzip3 <$> traverse makeInst dctors
+        let rep = toRepTy reps
+            inst | null reps =
+                    -- If there are no cases, spin
+                    [ ValueDecl (ss, []) (Ident "to") Public [] $ unguarded $
+                        lamCase sa x [ CaseAlternative ss [NullBinder ss]
+                                                       (unguarded (App sa toName (Var sa (Qualified Nothing x))))
+                                     ]
+                    , ValueDecl (ss, []) (Ident "from") Public [] $ unguarded $
+                        lamCase sa x [ CaseAlternative ss [NullBinder ss]
+                                                       (unguarded (App sa fromName (Var sa (Qualified Nothing x))))
+                                     ]
+                    ]
+                | otherwise =
+                    [ ValueDecl sa (Ident "to") Public [] $ unguarded $
+                        lamCase sa x (zipWith ($) (map underBinder (sumBinders (length dctors))) to)
+                    , ValueDecl sa (Ident "from") Public [] $ unguarded $
+                        lamCase sa x (zipWith ($) (map underExpr (sumExprs (length dctors))) from)
+                    ]
 
-          subst = zipWith ((,) . fst) args tyConArgs
-      return (inst, replaceAllTypeVars subst rep)
-    go _ = internalError "deriveGenericRep go: expected DataDeclaration"
+            subst = zipWith ((,) . fst) args tyConArgs
+        return (inst, replaceAllTypeVars subst rep)
+      _ -> internalError "deriveGenericRep go: expected DataDeclaration"
+      where
+        sa@(ss, _) = declSourceAnn d
 
-    select :: (a -> a) -> (a -> a) -> Int -> [a -> a]
-    select _ _ 0 = []
-    select _ _ 1 = [id]
-    select l r n = take (n - 1) (iterate (r .) l) ++ [compN (n - 1) r]
+        select :: (a -> a) -> (a -> a) -> Int -> [a -> a]
+        select _ _ 0 = []
+        select _ _ 1 = [id]
+        select l r n = take (n - 1) (iterate (r .) l) ++ [compN (n - 1) r]
 
-    sumBinders :: Int -> [Binder -> Binder]
-    sumBinders = select (ConstructorBinder inl . pure) (ConstructorBinder inr . pure)
+        sumBinders :: Int -> [Binder -> Binder]
+        sumBinders = select (ConstructorBinder ss inl . pure) (ConstructorBinder ss inr . pure)
 
-    sumExprs :: Int -> [Expr -> Expr]
-    sumExprs = select (App (Constructor inl)) (App (Constructor inr))
+        sumExprs :: Int -> [Expr -> Expr]
+        sumExprs = select (App sa (Constructor sa inl)) (App sa (Constructor sa inr))
 
-    compN :: Int -> (a -> a) -> a -> a
-    compN 0 _ = id
-    compN n f = f . compN (n - 1) f
+        compN :: Int -> (a -> a) -> a -> a
+        compN 0 _ = id
+        compN n f = f . compN (n - 1) f
 
-    makeInst
-      :: (ProperName 'ConstructorName, [Type])
-      -> m (Type, CaseAlternative, CaseAlternative)
-    makeInst (ctorName, args) = do
-        args' <- mapM (replaceAllTypeSynonymsM syns) args
-        (ctorTy, matchProduct, ctorArgs, matchCtor, mkProduct) <- makeProduct args'
-        return ( TypeApp (TypeApp (TypeConstructor constructor)
-                                  (TypeLevelString $ mkString (runProperName ctorName)))
-                         ctorTy
-               , CaseAlternative [ ConstructorBinder constructor [matchProduct] ]
-                                 (unguarded (foldl App (Constructor (Qualified (Just mn) ctorName)) ctorArgs))
-               , CaseAlternative [ ConstructorBinder (Qualified (Just mn) ctorName) matchCtor ]
-                                 (unguarded (constructor' mkProduct))
-               )
+        makeInst
+          :: (ProperName 'ConstructorName, [Type])
+          -> m (Type, CaseAlternative, CaseAlternative)
+        makeInst (ctorName, args) = do
+            args' <- mapM (replaceAllTypeSynonymsM syns) args
+            (ctorTy, matchProduct, ctorArgs, matchCtor, mkProduct) <- makeProduct args'
+            return ( TypeApp (TypeApp (TypeConstructor constructor)
+                                      (TypeLevelString $ mkString (runProperName ctorName)))
+                            ctorTy
+                  , CaseAlternative ss [ ConstructorBinder ss constructor [matchProduct] ]
+                                        (unguarded (foldl (App sa) (Constructor sa (Qualified (Just mn) ctorName)) ctorArgs))
+                  , CaseAlternative ss [ ConstructorBinder ss (Qualified (Just mn) ctorName) matchCtor ]
+                                        (unguarded (constructor' mkProduct))
+                  )
 
-    makeProduct
-      :: [Type]
-      -> m (Type, Binder, [Expr], [Binder], Expr)
-    makeProduct [] =
-      pure (noArgs, NullBinder, [], [], noArgs')
-    makeProduct args = do
-      (tys, bs1, es1, bs2, es2) <- unzip5 <$> traverse makeArg args
-      pure ( foldr1 (\f -> TypeApp (TypeApp (TypeConstructor productName) f)) tys
-           , foldr1 (\b1 b2 -> ConstructorBinder productName [b1, b2]) bs1
-           , es1
-           , bs2
-           , foldr1 (\e1 -> App (App (Constructor productName) e1)) es2
-           )
+        makeProduct
+          :: [Type]
+          -> m (Type, Binder, [Expr], [Binder], Expr)
+        makeProduct [] =
+          pure (noArgs, NullBinder ss, [], [], noArgs')
+        makeProduct args = do
+          (tys, bs1, es1, bs2, es2) <- unzip5 <$> traverse makeArg args
+          pure ( foldr1 (\f -> TypeApp (TypeApp (TypeConstructor productName) f)) tys
+              , foldr1 (\b1 b2 -> ConstructorBinder ss productName [b1, b2]) bs1
+              , es1
+              , bs2
+              , foldr1 (\e1 -> App sa (App sa (Constructor sa productName) e1)) es2
+              )
 
-    makeArg :: Type -> m (Type, Binder, Expr, Binder, Expr)
-    makeArg arg | Just rec <- objectType arg
-                , Just fields <- decomposeRec rec = do
-      fieldNames <- traverse freshIdent (map (runIdent . labelToIdent . fst) fields)
-      case fieldNames of
-        [] ->
-          pure ( TypeApp (TypeConstructor record) noArgs
-               , ConstructorBinder record [ NullBinder ]
-               , Literal (ObjectLiteral [])
-               , LiteralBinder (ObjectLiteral [])
-               , record' noArgs'
-               )
-        _ ->
-          pure ( TypeApp (TypeConstructor record)
-                   (foldr1 (\f -> TypeApp (TypeApp (TypeConstructor productName) f))
-                     (map (\((Label name), ty) ->
-                       TypeApp (TypeApp (TypeConstructor field) (TypeLevelString name)) ty) fields))
-               , ConstructorBinder record
-                   [ foldr1 (\b1 b2 -> ConstructorBinder productName [b1, b2])
-                       (map (\ident -> ConstructorBinder field [VarBinder ident]) fieldNames)
-                   ]
-               , Literal . ObjectLiteral $
-                    zipWith (\((Label name), _) ident -> (name, Var (Qualified Nothing ident))) fields fieldNames
-               , LiteralBinder . ObjectLiteral $
-                     zipWith (\((Label name), _) ident -> (name, VarBinder ident)) fields fieldNames
-               , record' $
-                   foldr1 (\e1 -> App (App (Constructor productName) e1))
-                     (map (field' . Var . Qualified Nothing) fieldNames)
-               )
-    makeArg arg = do
-      argName <- freshIdent "arg"
-      pure ( TypeApp (TypeConstructor argument) arg
-           , ConstructorBinder argument [ VarBinder argName ]
-           , Var (Qualified Nothing argName)
-           , VarBinder argName
-           , argument' (Var (Qualified Nothing argName))
-           )
+        makeArg :: Type -> m (Type, Binder, Expr, Binder, Expr)
+        makeArg arg | Just rec <- objectType arg
+                    , Just fields <- decomposeRec rec = do
+          fieldNames <- traverse freshIdent (map (runIdent . labelToIdent . fst) fields)
+          case fieldNames of
+            [] ->
+              pure ( TypeApp (TypeConstructor record) noArgs
+                  , ConstructorBinder ss record [ NullBinder ss ]
+                  , Literal sa (ObjectLiteral [])
+                  , LiteralBinder ss (ObjectLiteral [])
+                  , record' noArgs'
+                  )
+            _ ->
+              pure ( TypeApp (TypeConstructor record)
+                      (foldr1 (\f -> TypeApp (TypeApp (TypeConstructor productName) f))
+                        (map (\((Label name), ty) ->
+                          TypeApp (TypeApp (TypeConstructor field) (TypeLevelString name)) ty) fields))
+                  , ConstructorBinder ss record
+                      [ foldr1 (\b1 b2 -> ConstructorBinder ss productName [b1, b2])
+                          (map (\ident -> ConstructorBinder ss field [VarBinder ss ident]) fieldNames)
+                      ]
+                  , Literal sa . ObjectLiteral $
+                        zipWith (\((Label name), _) ident -> (name, Var sa (Qualified Nothing ident))) fields fieldNames
+                  , LiteralBinder ss . ObjectLiteral $
+                        zipWith (\((Label name), _) ident -> (name, VarBinder ss ident)) fields fieldNames
+                  , record' $
+                      foldr1 (\e1 -> App sa (App sa (Constructor sa productName) e1))
+                        (map (field' . Var sa . Qualified Nothing) fieldNames)
+                  )
+        makeArg arg = do
+          argName <- freshIdent "arg"
+          pure ( TypeApp (TypeConstructor argument) arg
+              , ConstructorBinder ss argument [ VarBinder ss argName ]
+              , Var sa (Qualified Nothing argName)
+              , VarBinder ss argName
+              , argument' (Var sa (Qualified Nothing argName))
+              )
 
-    underBinder :: (Binder -> Binder) -> CaseAlternative -> CaseAlternative
-    underBinder f (CaseAlternative bs e) = CaseAlternative (map f bs) e
+        underBinder :: (Binder -> Binder) -> CaseAlternative -> CaseAlternative
+        underBinder f (CaseAlternative _ bs e) = CaseAlternative ss (map f bs) e
 
-    underExpr :: (Expr -> Expr) -> CaseAlternative -> CaseAlternative
-    underExpr f (CaseAlternative b [MkUnguarded e]) = CaseAlternative b (unguarded (f e))
-    underExpr _ _ = internalError "underExpr: expected unguarded alternative"
+        underExpr :: (Expr -> Expr) -> CaseAlternative -> CaseAlternative
+        underExpr f (CaseAlternative _ b [MkUnguarded _ e]) = CaseAlternative ss b (unguarded (f e))
+        underExpr _ _ = internalError "underExpr: expected unguarded alternative"
 
-    toRepTy :: [Type] -> Type
-    toRepTy [] = noCtors
-    toRepTy [only] = only
-    toRepTy ctors = foldr1 (\f -> TypeApp (TypeApp sumCtor f)) ctors
+        toRepTy :: [Type] -> Type
+        toRepTy [] = noCtors
+        toRepTy [only] = only
+        toRepTy ctors = foldr1 (\f -> TypeApp (TypeApp sumCtor f)) ctors
 
-    toName :: Expr
-    toName = Var (Qualified (Just dataGenericRep) (Ident "to"))
+        toName :: Expr
+        toName = Var sa (Qualified (Just dataGenericRep) (Ident "to"))
 
-    fromName :: Expr
-    fromName = Var (Qualified (Just dataGenericRep) (Ident "from"))
+        fromName :: Expr
+        fromName = Var sa (Qualified (Just dataGenericRep) (Ident "from"))
 
-    noCtors :: Type
-    noCtors = TypeConstructor (Qualified (Just dataGenericRep) (ProperName "NoConstructors"))
+        noCtors :: Type
+        noCtors = TypeConstructor (Qualified (Just dataGenericRep) (ProperName "NoConstructors"))
 
-    noArgs :: Type
-    noArgs = TypeConstructor (Qualified (Just dataGenericRep) (ProperName "NoArguments"))
+        noArgs :: Type
+        noArgs = TypeConstructor (Qualified (Just dataGenericRep) (ProperName "NoArguments"))
 
-    noArgs' :: Expr
-    noArgs' = Constructor (Qualified (Just dataGenericRep) (ProperName "NoArguments"))
+        noArgs' :: Expr
+        noArgs' = Constructor sa (Qualified (Just dataGenericRep) (ProperName "NoArguments"))
 
-    sumCtor :: Type
-    sumCtor = TypeConstructor (Qualified (Just dataGenericRep) (ProperName "Sum"))
+        sumCtor :: Type
+        sumCtor = TypeConstructor (Qualified (Just dataGenericRep) (ProperName "Sum"))
 
-    inl :: Qualified (ProperName 'ConstructorName)
-    inl = Qualified (Just dataGenericRep) (ProperName "Inl")
+        inl :: Qualified (ProperName 'ConstructorName)
+        inl = Qualified (Just dataGenericRep) (ProperName "Inl")
 
-    inr :: Qualified (ProperName 'ConstructorName)
-    inr = Qualified (Just dataGenericRep) (ProperName "Inr")
+        inr :: Qualified (ProperName 'ConstructorName)
+        inr = Qualified (Just dataGenericRep) (ProperName "Inr")
 
-    productName :: Qualified (ProperName ty)
-    productName = Qualified (Just dataGenericRep) (ProperName "Product")
+        productName :: Qualified (ProperName ty)
+        productName = Qualified (Just dataGenericRep) (ProperName "Product")
 
-    constructor :: Qualified (ProperName ty)
-    constructor = Qualified (Just dataGenericRep) (ProperName "Constructor")
+        constructor :: Qualified (ProperName ty)
+        constructor = Qualified (Just dataGenericRep) (ProperName "Constructor")
 
-    constructor' :: Expr -> Expr
-    constructor' = App (Constructor constructor)
+        constructor' :: Expr -> Expr
+        constructor' = App sa (Constructor sa constructor)
 
-    argument :: Qualified (ProperName ty)
-    argument = Qualified (Just dataGenericRep) (ProperName "Argument")
+        argument :: Qualified (ProperName ty)
+        argument = Qualified (Just dataGenericRep) (ProperName "Argument")
 
-    argument' :: Expr -> Expr
-    argument' = App (Constructor argument)
+        argument' :: Expr -> Expr
+        argument' = App sa (Constructor sa argument)
 
-    record :: Qualified (ProperName ty)
-    record = Qualified (Just dataGenericRep) (ProperName "Rec")
+        record :: Qualified (ProperName ty)
+        record = Qualified (Just dataGenericRep) (ProperName "Rec")
 
-    record' :: Expr -> Expr
-    record' = App (Constructor record)
+        record' :: Expr -> Expr
+        record' = App sa (Constructor sa record)
 
-    field :: Qualified (ProperName ty)
-    field = Qualified (Just dataGenericRep) (ProperName "Field")
+        field :: Qualified (ProperName ty)
+        field = Qualified (Just dataGenericRep) (ProperName "Field")
 
-    field' :: Expr -> Expr
-    field' = App (Constructor field)
+        field' :: Expr -> Expr
+        field' = App sa (Constructor sa field)
 
 checkIsWildcard :: MonadError MultipleErrors m => ProperName 'TypeName -> Type -> m ()
 checkIsWildcard _ (TypeWildcard _) = return ()
@@ -651,45 +656,47 @@ deriveEq ss mn syns ds tyConNm = do
   eqFun <- mkEqFunction tyCon
   return [ ValueDecl (ss, []) (Ident C.eq) Public [] (unguarded eqFun) ]
   where
+    sa = (ss, [])
+
     mkEqFunction :: Declaration -> m Expr
     mkEqFunction (DataDeclaration _ _ _ _ args) = do
       x <- freshIdent "x"
       y <- freshIdent "y"
-      lamCase2 x y <$> (addCatch <$> mapM mkCtorClause args)
+      lamCase2 sa x y <$> (addCatch <$> mapM mkCtorClause args)
     mkEqFunction _ = internalError "mkEqFunction: expected DataDeclaration"
 
     preludeConj :: Expr -> Expr -> Expr
-    preludeConj = App . App (Var (Qualified (Just (ModuleName [ProperName "Data", ProperName "HeytingAlgebra"])) (Ident C.conj)))
+    preludeConj = App sa . App sa (Var sa (Qualified (Just (ModuleName [ProperName "Data", ProperName "HeytingAlgebra"])) (Ident C.conj)))
 
     preludeEq :: Expr -> Expr -> Expr
-    preludeEq = App . App (Var (Qualified (Just dataEq) (Ident C.eq)))
+    preludeEq = App sa . App sa (Var sa (Qualified (Just dataEq) (Ident C.eq)))
 
     addCatch :: [CaseAlternative] -> [CaseAlternative]
     addCatch xs
       | length xs /= 1 = xs ++ [catchAll]
       | otherwise = xs -- Avoid redundant case
       where
-      catchAll = CaseAlternative [NullBinder, NullBinder] (unguarded (Literal (BooleanLiteral False)))
+      catchAll = CaseAlternative ss [NullBinder ss, NullBinder ss] (unguarded (Literal sa (BooleanLiteral False)))
 
     mkCtorClause :: (ProperName 'ConstructorName, [Type]) -> m CaseAlternative
     mkCtorClause (ctorName, tys) = do
       identsL <- replicateM (length tys) (freshIdent "l")
       identsR <- replicateM (length tys) (freshIdent "r")
       tys' <- mapM (replaceAllTypeSynonymsM syns) tys
-      let tests = zipWith3 toEqTest (map (Var . Qualified Nothing) identsL) (map (Var . Qualified Nothing) identsR) tys'
-      return $ CaseAlternative [caseBinder identsL, caseBinder identsR] (unguarded (conjAll tests))
+      let tests = zipWith3 toEqTest (map (Var sa . Qualified Nothing) identsL) (map (Var sa . Qualified Nothing) identsR) tys'
+      return $ CaseAlternative ss [caseBinder identsL, caseBinder identsR] (unguarded (conjAll tests))
       where
-      caseBinder idents = ConstructorBinder (Qualified (Just mn) ctorName) (map VarBinder idents)
+      caseBinder idents = ConstructorBinder ss (Qualified (Just mn) ctorName) (map (VarBinder ss) idents)
 
     conjAll :: [Expr] -> Expr
-    conjAll [] = Literal (BooleanLiteral True)
+    conjAll [] = Literal sa (BooleanLiteral True)
     conjAll xs = foldl1 preludeConj xs
 
     toEqTest :: Expr -> Expr -> Type -> Expr
     toEqTest l r ty | Just rec <- objectType ty
                     , Just fields <- decomposeRec rec =
       conjAll
-      . map (\((Label str), typ) -> toEqTest (Accessor str l) (Accessor str r) typ)
+      . map (\((Label str), typ) -> toEqTest (Accessor sa str l) (Accessor sa str r) typ)
       $ fields
     toEqTest l r _ = preludeEq l r
 
@@ -707,11 +714,13 @@ deriveOrd ss mn syns ds tyConNm = do
   compareFun <- mkCompareFunction tyCon
   return [ ValueDecl (ss, []) (Ident C.compare) Public [] (unguarded compareFun) ]
   where
+    sa = (ss, [])
+
     mkCompareFunction :: Declaration -> m Expr
     mkCompareFunction (DataDeclaration _ _ _ _ args) = do
       x <- freshIdent "x"
       y <- freshIdent "y"
-      lamCase2 x y <$> (addCatch . concat <$> mapM mkCtorClauses (splitLast args))
+      lamCase2 sa x y <$> (addCatch . concat <$> mapM mkCtorClauses (splitLast args))
     mkCompareFunction _ = internalError "mkCompareFunction: expected DataDeclaration"
 
     splitLast :: [a] -> [(a, Bool)]
@@ -724,61 +733,61 @@ deriveOrd ss mn syns ds tyConNm = do
       | null xs = [catchAll] -- No type constructors
       | otherwise = xs
       where
-      catchAll = CaseAlternative [NullBinder, NullBinder] (unguarded (orderingCtor "EQ"))
+      catchAll = CaseAlternative ss [NullBinder ss, NullBinder ss] (unguarded (orderingCtor "EQ"))
 
     orderingName :: Text -> Qualified (ProperName a)
     orderingName = Qualified (Just (ModuleName [ProperName "Data", ProperName "Ordering"])) . ProperName
 
     orderingCtor :: Text -> Expr
-    orderingCtor = Constructor . orderingName
+    orderingCtor = Constructor sa . orderingName
 
     orderingBinder :: Text -> Binder
-    orderingBinder name = ConstructorBinder (orderingName name) []
+    orderingBinder name = ConstructorBinder ss (orderingName name) []
 
     ordCompare :: Expr -> Expr -> Expr
-    ordCompare = App . App (Var (Qualified (Just dataOrd) (Ident C.compare)))
+    ordCompare = App sa . App sa (Var sa (Qualified (Just dataOrd) (Ident C.compare)))
 
     mkCtorClauses :: ((ProperName 'ConstructorName, [Type]), Bool) -> m [CaseAlternative]
     mkCtorClauses ((ctorName, tys), isLast) = do
       identsL <- replicateM (length tys) (freshIdent "l")
       identsR <- replicateM (length tys) (freshIdent "r")
       tys' <- mapM (replaceAllTypeSynonymsM syns) tys
-      let tests = zipWith3 toOrdering (map (Var . Qualified Nothing) identsL) (map (Var . Qualified Nothing) identsR) tys'
-          extras | not isLast = [ CaseAlternative [ ConstructorBinder (Qualified (Just mn) ctorName) (replicate (length tys) NullBinder)
-                                                  , NullBinder
-                                                  ]
-                                                  (unguarded (orderingCtor "LT"))
-                                , CaseAlternative [ NullBinder
-                                                  , ConstructorBinder (Qualified (Just mn) ctorName) (replicate (length tys) NullBinder)
-                                                  ]
-                                                  (unguarded (orderingCtor "GT"))
+      let tests = zipWith3 toOrdering (map (Var sa . Qualified Nothing) identsL) (map (Var sa . Qualified Nothing) identsR) tys'
+          extras | not isLast = [ CaseAlternative ss
+                                    [ ConstructorBinder ss (Qualified (Just mn) ctorName) (replicate (length tys) (NullBinder ss))
+                                    , NullBinder ss
+                                    ]
+                                    (unguarded (orderingCtor "LT"))
+                                , CaseAlternative ss
+                                    [ NullBinder ss
+                                    , ConstructorBinder ss (Qualified (Just mn) ctorName) (replicate (length tys) (NullBinder ss))
+                                    ]
+                                    (unguarded (orderingCtor "GT"))
                                 ]
                  | otherwise = []
-      return $ CaseAlternative [ caseBinder identsL
-                               , caseBinder identsR
-                               ]
-                               (unguarded (appendAll tests))
-             : extras
+      return $ CaseAlternative ss
+        [ caseBinder identsL
+        , caseBinder identsR
+        ]
+        (unguarded (appendAll tests)) : extras
 
       where
-      caseBinder idents = ConstructorBinder (Qualified (Just mn) ctorName) (map VarBinder idents)
+      caseBinder idents = ConstructorBinder ss (Qualified (Just mn) ctorName) (map (VarBinder ss) idents)
 
     appendAll :: [Expr] -> Expr
     appendAll [] = orderingCtor "EQ"
     appendAll [x] = x
-    appendAll (x : xs) = Case [x] [ CaseAlternative [orderingBinder "LT"]
-                                                    (unguarded (orderingCtor "LT"))
-                                  , CaseAlternative [orderingBinder "GT"]
-                                                    (unguarded (orderingCtor "GT"))
-                                  , CaseAlternative [ NullBinder ]
-                                                    (unguarded (appendAll xs))
-                                  ]
+    appendAll (x : xs) = Case sa [x]
+      [ CaseAlternative ss [orderingBinder "LT"] (unguarded (orderingCtor "LT"))
+      , CaseAlternative ss [orderingBinder "GT"] (unguarded (orderingCtor "GT"))
+      , CaseAlternative ss [ NullBinder ss ] (unguarded (appendAll xs))
+      ]
 
     toOrdering :: Expr -> Expr -> Type -> Expr
     toOrdering l r ty | Just rec <- objectType ty
                       , Just fields <- decomposeRec rec =
       appendAll
-      . map (\((Label str), typ) -> toOrdering (Accessor str l) (Accessor str r) typ)
+      . map (\((Label str), typ) -> toOrdering (Accessor sa str l) (Accessor sa str r) typ)
       $ fields
     toOrdering l r _ = ordCompare l r
 
@@ -799,20 +808,20 @@ deriveNewtype mn syns ds tyConNm tyConArgs unwrappedTy = do
     go :: Declaration -> m ([Declaration], Type)
     go (DataDeclaration (ss, _) Data name _ _) =
       throwError . errorMessage' ss $ CannotDeriveNewtypeForData name
-    go (DataDeclaration (ss, _) Newtype name args dctors) = do
+    go (DataDeclaration sa@(ss, _) Newtype name args dctors) = do
       checkNewtype name dctors
       wrappedIdent <- freshIdent "n"
       unwrappedIdent <- freshIdent "a"
       let (ctorName, [ty]) = head dctors
       ty' <- replaceAllTypeSynonymsM syns ty
       let inst =
-            [ ValueDecl (ss, []) (Ident "wrap") Public [] $ unguarded $
-                Constructor (Qualified (Just mn) ctorName)
-            , ValueDecl (ss, []) (Ident "unwrap") Public [] $ unguarded $
-                lamCase wrappedIdent
-                  [ CaseAlternative
-                      [ConstructorBinder (Qualified (Just mn) ctorName) [VarBinder unwrappedIdent]]
-                      (unguarded (Var (Qualified Nothing unwrappedIdent)))
+            [ ValueDecl sa (Ident "wrap") Public [] $ unguarded $
+                Constructor sa (Qualified (Just mn) ctorName)
+            , ValueDecl sa (Ident "unwrap") Public [] $ unguarded $
+                lamCase sa wrappedIdent
+                  [ CaseAlternative ss
+                      [ConstructorBinder ss (Qualified (Just mn) ctorName) [VarBinder ss unwrappedIdent]]
+                      (unguarded (Var sa (Qualified Nothing unwrappedIdent)))
                   ]
             ]
           subst = zipWith ((,) . fst) args tyConArgs
@@ -831,22 +840,22 @@ findTypeDecl tyConNm = maybe (throwError . errorMessage $ CannotFindDerivingType
   isTypeDecl _ = False
 
 lam :: Ident -> Expr -> Expr
-lam = Abs . VarBinder
+lam i e = Abs (exprSourceSpan e, []) (VarBinder (exprSourceSpan e) i) e
 
 lamNull :: Expr -> Expr
 lamNull = lam (Ident "$q") -- TODO: use GenIdent
 
-lamCase :: Ident -> [CaseAlternative] -> Expr
-lamCase s = lam s . Case [mkVar s]
+lamCase :: SourceAnn -> Ident -> [CaseAlternative] -> Expr
+lamCase sa s = lam s . Case sa [mkVar sa s]
 
-lamCase2 :: Ident -> Ident -> [CaseAlternative] -> Expr
-lamCase2 s t = lam s . lam t . Case [mkVar s, mkVar t]
+lamCase2 :: SourceAnn -> Ident -> Ident -> [CaseAlternative] -> Expr
+lamCase2 sa s t = lam s . lam t . Case sa [mkVar sa s, mkVar sa t]
 
-mkVarMn :: Maybe ModuleName -> Ident -> Expr
-mkVarMn mn = Var . Qualified mn
+mkVarMn :: SourceAnn -> Maybe ModuleName -> Ident -> Expr
+mkVarMn sa mn = Var sa . Qualified mn
 
-mkVar :: Ident -> Expr
-mkVar = mkVarMn Nothing
+mkVar :: SourceAnn -> Ident -> Expr
+mkVar sa = mkVarMn sa Nothing
 
 -- This function may seem a little obtuse, but it's only this way to ensure
 -- that it is injective. Injectivity is important here; without it, we can end
@@ -888,13 +897,15 @@ deriveFunctor ss mn syns ds tyConNm = do
   mapFun <- mkMapFunction tyCon
   return [ ValueDecl (ss, []) (Ident C.map) Public [] (unguarded mapFun) ]
   where
+    sa = (ss, [])
+
     mkMapFunction :: Declaration -> m Expr
     mkMapFunction (DataDeclaration (ss', _) _ _ tys ctors) = case reverse tys of
       [] -> throwError . errorMessage' ss' $ KindsDoNotUnify (FunKind kindType kindType) kindType
       ((iTy, _) : _) -> do
         f <- freshIdent "f"
         m <- freshIdent "m"
-        lam f . lamCase m <$> mapM (mkCtorClause iTy f) ctors
+        lam f . lamCase (ss, []) m <$> mapM (mkCtorClause iTy f) ctors
     mkMapFunction _ = internalError "mkMapFunction: expected DataDeclaration"
 
     mkCtorClause :: Text -> Ident -> (ProperName 'ConstructorName, [Type]) -> m CaseAlternative
@@ -902,17 +913,17 @@ deriveFunctor ss mn syns ds tyConNm = do
       idents <- replicateM (length ctorTys) (freshIdent "v")
       ctorTys' <- mapM (replaceAllTypeSynonymsM syns) ctorTys
       args <- zipWithM transformArg idents ctorTys'
-      let ctor = Constructor (Qualified (Just mn) ctorName)
-          rebuilt = foldl App ctor args
-          caseBinder = ConstructorBinder (Qualified (Just mn) ctorName) (VarBinder <$> idents)
-      return $ CaseAlternative [caseBinder] (unguarded rebuilt)
+      let ctor = Constructor sa (Qualified (Just mn) ctorName)
+          rebuilt = foldl (App sa) ctor args
+          caseBinder = ConstructorBinder ss (Qualified (Just mn) ctorName) (VarBinder ss <$> idents)
+      return $ CaseAlternative ss [caseBinder] (unguarded rebuilt)
       where
-        fVar = mkVar f
-        mapVar = mkVarMn (Just dataFunctor) (Ident C.map)
+        fVar = mkVar sa f
+        mapVar = mkVarMn sa (Just dataFunctor) (Ident C.map)
 
         -- TODO: deal with type synonyms, ala https://github.com/purescript/purescript/pull/2516
         transformArg :: Ident -> Type -> m Expr
-        transformArg ident = fmap (foldr App (mkVar ident)) . goType where
+        transformArg ident = fmap (foldr (App sa) (mkVar sa ident)) . goType where
 
           goType :: Type -> m (Maybe Expr)
           -- argument matches the index type
@@ -931,12 +942,12 @@ deriveFunctor ss mn syns ds tyConNm = do
 
               buildRecord :: [(Label, Expr)] -> m Expr
               buildRecord updates = do arg <- freshIdent "o"
-                                       let argVar = mkVar arg
-                                           mkAssignment ((Label l), x) = (l, App x (Accessor l argVar))
-                                       return (lam arg (ObjectUpdate argVar (mkAssignment <$> updates)))
+                                       let argVar = mkVar sa arg
+                                           mkAssignment ((Label l), x) = (l, App sa x (Accessor sa l argVar))
+                                       return (lam arg (ObjectUpdate sa argVar (mkAssignment <$> updates)))
 
           -- under a `* -> *`, just assume functor for now
-          goType (TypeApp _ t) = fmap (App mapVar) <$> goType t
+          goType (TypeApp _ t) = fmap (App sa mapVar) <$> goType t
 
           -- otherwise do nothing - will fail type checking if type does actually contain index
           goType _ = return Nothing

@@ -39,6 +39,7 @@ dependencies:
   - base-compat >=0.6.0
   - blaze-html >=0.8.1 && <0.10
   - bower-json >=1.0.0.1 && <1.1
+  - pretty-show
   - boxes >=0.1.4 && <0.2.0
   - bytestring
   - cheapskate >=0.1 && <0.2
