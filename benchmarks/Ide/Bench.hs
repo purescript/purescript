@@ -46,13 +46,13 @@ tryNTimes n action = do
 
 loadWithoutGlobs :: IO (ModuleMap [IdeDeclarationAnn])
 loadWithoutGlobs = do
-   (_, st) <- runIde' (defConfig { confGlobs = [], confLogLevel = LogPerf }) emptyIdeState [Command.LoadSync []]
+   (_, st) <- runIde' (defConfig { confGlobs = [] }) emptyIdeState [Command.LoadSync []]
    pure (vsDeclarations (ideVolatileState st))
 
 loadWithGlobs :: IO (ModuleMap [IdeDeclarationAnn])
 loadWithGlobs = do
    (_, st) <-
-     runIde' (defConfig { confGlobs = [ ".psc-package/psc-0.11.6-09272017/*/*/src/**/*.purs" ], confLogLevel = LogPerf })
+     runIde' (defConfig { confGlobs = [ ".psc-package/psc-0.11.6-09272017/*/*/src/**/*.purs" ] })
      emptyIdeState [Command.LoadSync []]
    pure (vsDeclarations (ideVolatileState st))
 
