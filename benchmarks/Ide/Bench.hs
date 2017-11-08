@@ -6,12 +6,13 @@ import           Protolude
 
 import           Criterion.Main (bench, bgroup, Benchmark, nfIO)
 import qualified Criterion.Main as Crit
+import qualified Data.Text as T
 import           Ide.Helper (runIde', defConfig)
 import qualified Language.PureScript.Ide.Command as Command
 import           Language.PureScript.Ide.Types
 import           System.Directory (getCurrentDirectory, setCurrentDirectory)
 import           System.FilePath ((</>))
-import           System.Process (createProcess, shell, getProcessExitCode)
+import           System.Process.Typed (readProcess, runProcess)
 
 inProject :: IO a -> IO a
 inProject f = do
@@ -23,24 +24,12 @@ inProject f = do
 
 compileProject :: IO Bool
 compileProject = do
-  (_, _, _, procHandle) <-
-    createProcess (shell "psc-package build")
-  r <- tryNTimes 20 (getProcessExitCode procHandle)
-  pure (fromMaybe False (isSuccess <$> r))
+  exitCode <- runProcess "psc-package build"
+  pure (isSuccess exitCode)
 
 isSuccess :: ExitCode -> Bool
 isSuccess ExitSuccess = True
 isSuccess (ExitFailure _) = False
-
-tryNTimes :: Int -> IO (Maybe a) -> IO (Maybe a)
-tryNTimes 0 _ = pure Nothing
-tryNTimes n action = do
-  r <- action
-  case r of
-    Nothing -> do
-      threadDelay 500000
-      tryNTimes (n - 1) action
-    Just a -> pure (Just a)
 
 loadWithGlobs :: [FilePath] -> IO (ModuleMap [IdeDeclarationAnn])
 loadWithGlobs globs = do

@@ -14,7 +14,7 @@ import           Language.PureScript.Ide.Types
 import           Protolude
 import           System.Directory
 import           System.FilePath
-import           System.Process
+import           System.Process.Typed (runProcess)
 
 import qualified Language.PureScript             as P
 
@@ -125,24 +125,12 @@ inProject f = do
 
 compileTestProject :: IO Bool
 compileTestProject = inProject $ do
-  (_, _, _, procHandle) <-
-    createProcess (shell "purs compile \"src/**/*.purs\"")
-  r <- tryNTimes 10 (getProcessExitCode procHandle)
-  pure (fromMaybe False (isSuccess <$> r))
+  exitCode <- runProcess "purs compile \"src/**/*.purs\""
+  pure (isSuccess exitCode)
 
 isSuccess :: ExitCode -> Bool
 isSuccess ExitSuccess = True
 isSuccess (ExitFailure _) = False
-
-tryNTimes :: Int -> IO (Maybe a) -> IO (Maybe a)
-tryNTimes 0 _ = pure Nothing
-tryNTimes n action = do
-  r <- action
-  case r of
-    Nothing -> do
-      threadDelay 500000
-      tryNTimes (n - 1) action
-    Just a -> pure (Just a)
 
 deleteOutputFolder :: IO ()
 deleteOutputFolder = inProject $
