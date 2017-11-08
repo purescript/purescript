@@ -371,7 +371,6 @@ typeCheckAll moduleName _ = traverse go
     typeModule (TypeConstructor (Qualified (Just mn'') _)) = Just mn''
     typeModule (TypeConstructor (Qualified Nothing _)) = internalError "Unqualified type name in checkOrphanInstance"
     typeModule (TypeApp t1 _) = typeModule t1
-    typeModule (ProxyType _) = Nothing
     typeModule _ = internalError "Invalid type in instance in checkOrphanInstance"
 
     modulesByTypeIndex :: M.Map Int (Maybe ModuleName)
