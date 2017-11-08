@@ -1,5 +1,5 @@
 name: purescript
-version: '0.11.6'
+version: '0.11.7'
 synopsis: PureScript Programming Language Compiler
 description: A small strongly, statically typed programming language with expressive
   types, inspired by Haskell and compiling to JavaScript.
