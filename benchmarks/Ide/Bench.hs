@@ -40,12 +40,21 @@ loadWithGlobs globs = do
       [Command.LoadSync []]
    pure (vsDeclarations (ideVolatileState st))
 
+getSourceGlobs :: IO [FilePath]
+getSourceGlobs = do
+  (_, out, _) <- readProcess "psc-package sources"
+  pure (map toS (T.lines (toS out)))
+
 ideBench :: Benchmark
 ideBench =
   Crit.env (inProject compileProject) $ \_ ->
-    bgroup "ide"
-      [ bench "Without sourceglobs" $ nfIO $ inProject
-          $ loadWithGlobs []
-      , bench "With sourceglobs" $ nfIO $ inProject
-          $ loadWithGlobs [ ".psc-package/psc-0.11.6-09272017/*/*/src/**/*.purs" ]
+    bgroup "Ide Benchmarks"
+      [ bgroup "Loading declarations"
+        [ bench "Without sourceglobs" $ nfIO $ inProject
+            $ loadWithGlobs []
+        , Crit.env (inProject getSourceGlobs) $ \globs ->
+            bench "With sourceglobs" $ nfIO $ inProject $ loadWithGlobs globs
+        , bench "With compact sourceglobs" $ nfIO $ inProject
+            $ loadWithGlobs [ ".psc-package/psc-0.11.6-09272017/*/*/src/**/*.purs" ]
+        ]
       ]
