@@ -41,7 +41,9 @@ metaFromJSON v = withObject "Meta" metaFromObj v
         "IsConstructor" -> isConstructorFromJSON o
         "IsNewtype"     -> return $ Just IsNewtype
         "IsTypeClassConstructor"
-                        -> return $ Just IsTypeClassConstructor
+                        -> Just <$> isTypeClassConstructorFromJSON o
+        "IsTypeClassConstructorApp"
+                        -> Just <$> isTypeClassConstructorAppFromJSON o
         "IsForeign"     -> return $ Just IsForeign
         _               -> fail ("not recognized Meta: " ++ T.unpack type_)
 
@@ -50,18 +52,34 @@ metaFromJSON v = withObject "Meta" metaFromObj v
       is <- o .: "identifiers" >>= listParser identFromJSON
       return $ Just (IsConstructor ct is)
 
+    isTypeClassConstructorFromJSON o = do
+      ns <- o .: "names" >>= listParser fn
+      return (IsTypeClassConstructor ns)
+      where
+        fn :: Value -> Parser (Text, Maybe (Qualified (ProperName 'ClassName)))
+        fn v' = do
+          (t, q) <- parseJSON v'
+          case q of
+            Null -> return (t, Nothing)
+            q'   -> (t,) . Just <$> qualifiedFromJSON ProperName q'
+
+    isTypeClassConstructorAppFromJSON o = do
+      n <- o .: "className" >>= qualifiedFromJSON ProperName
+      return (IsTypeClassConstructorApp n)
+
 annFromJSON :: FilePath -> Value -> Parser Ann
 annFromJSON modulePath = withObject "Ann" annFromObj
   where
   annFromObj o = do
     ss <- o .: "sourceSpan" >>= sourceSpanFromJSON
+    ty <- o .: "type"
     mm <- o .: "meta" >>= metaFromJSON
-    return (ss, [], Nothing, mm)
+    return (ss, [], ty, mm)
 
   sourceSpanFromJSON = withObject "SourceSpan" $ \o ->
-    SourceSpan modulePath <$>
-      o .: "start" <*>
-      o .: "end"
+    SourceSpan modulePath
+      <$> o .: "start"
+      <*> o .: "end"
 
 literalFromJSON :: (Value -> Parser a) -> Value -> Parser (Literal a)
 literalFromJSON t = withObject "Literal" literalFromObj
