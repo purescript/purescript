@@ -6,7 +6,8 @@ import Protolude
 
 import Criterion.Main (defaultMain)
 import Ide.Bench (ideBench)
+import Compiler.Bench (compilerBench)
 
 main :: IO ()
 main =
-  defaultMain [ ideBench ]
+  defaultMain [ ideBench, compilerBench ]
