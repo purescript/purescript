@@ -115,6 +115,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@kcsongor](https://github.com/kcsongor) | Csongor Kiss | [MIT license](http://opensource.org/licenses/MIT) |
 | [@drets](https://github.com/drets) | Dmytro Rets | [MIT license](http://opensource.org/licenses/MIT) |
 | [@bjornmelgaaard](https://github.com/BjornMelgaard) | Sergey Homa | [MIT license](http://opensource.org/licenses/MIT) |
+| [@sloosch](https://github.com/sloosch) | Simon Looschen | [MIT license](http://opensource.org/licenses/MIT) |
 
 ### Contributors using Modified Terms
 
