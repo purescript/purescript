@@ -1,4 +1,4 @@
-resolver: nightly-2017-09-10
+resolver: nightly-2017-11-20
 packages:
 - '.'
 extra-deps:
