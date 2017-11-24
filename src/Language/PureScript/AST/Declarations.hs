@@ -454,7 +454,7 @@ getValueDeclaration (ValueDeclaration d) = Just d
 getValueDeclaration _ = Nothing
 
 pattern ValueDecl :: SourceAnn -> Ident -> NameKind -> [Binder] -> [GuardedExpr] -> Declaration
-pattern ValueDecl sann ident name binders expr 
+pattern ValueDecl sann ident name binders expr
   = ValueDeclaration (ValueDeclarationData sann ident name binders expr)
 
 -- |
@@ -513,10 +513,10 @@ data Declaration
   --
   | TypeClassDeclaration SourceAnn (ProperName 'ClassName) [(Text, Maybe Kind)] [Constraint] [FunctionalDependency] [Declaration]
   -- |
-  -- A type instance declaration (name, dependencies, class name, instance types, member
-  -- declarations)
+  -- A type instance declaration (instance chain, chain index, name,
+  -- dependencies, class name, instance types, member declarations)
   --
-  | TypeInstanceDeclaration SourceAnn Ident [Constraint] (Qualified (ProperName 'ClassName)) [Type] TypeInstanceBody
+  | TypeInstanceDeclaration SourceAnn [Ident] Integer Ident [Constraint] (Qualified (ProperName 'ClassName)) [Type] TypeInstanceBody
   deriving (Show)
 
 data ValueFixity = ValueFixity Fixity (Qualified (Either Ident (ProperName 'ConstructorName))) (OpName 'ValueOpName)
@@ -566,7 +566,7 @@ declSourceAnn (ExternKindDeclaration sa _) = sa
 declSourceAnn (FixityDeclaration sa _) = sa
 declSourceAnn (ImportDeclaration sa _ _ _) = sa
 declSourceAnn (TypeClassDeclaration sa _ _ _ _ _) = sa
-declSourceAnn (TypeInstanceDeclaration sa _ _ _ _ _) = sa
+declSourceAnn (TypeInstanceDeclaration sa _ _ _ _ _ _ _) = sa
 
 declSourceSpan :: Declaration -> SourceSpan
 declSourceSpan = fst . declSourceAnn
@@ -581,7 +581,7 @@ declName (ExternKindDeclaration _ n) = Just (KiName n)
 declName (FixityDeclaration _ (Left (ValueFixity _ _ n))) = Just (ValOpName n)
 declName (FixityDeclaration _ (Right (TypeFixity _ _ n))) = Just (TyOpName n)
 declName (TypeClassDeclaration _ n _ _ _ _) = Just (TyClassName n)
-declName (TypeInstanceDeclaration _ n _ _ _ _) = Just (IdentName n)
+declName (TypeInstanceDeclaration _ _ _ n _ _ _ _) = Just (IdentName n)
 declName ImportDeclaration{} = Nothing
 declName BindingGroupDeclaration{} = Nothing
 declName DataBindingGroupDeclaration{} = Nothing
@@ -762,6 +762,13 @@ data Expr
   -- A do-notation block
   --
   | Do [DoNotationElement]
+  -- |
+  -- A proxy value
+  --
+  | Proxy Type
+  -- An ado-notation block
+  --
+  | Ado [DoNotationElement] Expr
   -- |
   -- An application of a typeclass dictionary constructor. The value should be
   -- an ObjectLiteral.

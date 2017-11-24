@@ -555,6 +555,10 @@ testCases =
   , ("DeclOrderNoExportList",
       shouldBeOrdered (n "DeclOrderNoExportList")
         [ "x1", "x3", "X2", "X4", "A", "B" ])
+
+  , ("Proxy",
+    [ ValueShouldHaveTypeSignature (n "Proxy") "foo" (renderedType "@Int")
+    ])
   ]
 
   where

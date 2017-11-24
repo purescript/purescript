@@ -203,9 +203,9 @@ renameInModule imports (Module modSS coms mn decls exps) =
         <*> updateConstraints ss implies
         <*> pure deps
         <*> pure ds
-  updateDecl bound (TypeInstanceDeclaration sa@(ss, _) name cs cn ts ds) =
+  updateDecl bound (TypeInstanceDeclaration sa@(ss, _) ch idx name cs cn ts ds) =
     fmap (bound,) $
-      TypeInstanceDeclaration sa name
+      TypeInstanceDeclaration sa ch idx name
         <$> updateConstraints ss cs
         <*> updateClassName cn ss
         <*> traverse (updateTypesEverywhere ss) ts
@@ -263,6 +263,8 @@ renameInModule imports (Module modSS coms mn decls exps) =
     (,) s <$> (Constructor <$> updateDataConstructorName name pos)
   updateValue s@(pos, _) (TypedValue check val ty) =
     (,) s <$> (TypedValue check val <$> updateTypesEverywhere pos ty)
+  updateValue s@(pos, _) (Proxy ty) =
+    (,) s <$> (Proxy <$> updateTypesEverywhere pos ty)
   updateValue s v = return (s, v)
 
   updateBinder

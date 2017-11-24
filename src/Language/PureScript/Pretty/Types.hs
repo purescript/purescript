@@ -88,6 +88,15 @@ prettyPrintRowWith tro open close = uncurry listToBox . toLst []
 prettyPrintRow :: Type -> Text
 prettyPrintRow = renderT . prettyPrintRowWith defaultOptions '(' ')'
 
+-- Treat `ProxyType t` in a similar way to the application of a type
+-- constructor `@` to `t`, i.e: `@ t`, except that we don't render the unneeded
+-- space. So we end up with `@t`.
+proxyType :: Pattern () Type (Type, Type)
+proxyType = mkPattern match
+  where
+  match (ProxyType t) = Just (TypeConstructor (Qualified Nothing (ProperName "@")), t)
+  match _ = Nothing
+
 typeApp :: Pattern () Type (Type, Type)
 typeApp = mkPattern match
   where
@@ -158,8 +167,9 @@ matchType :: TypeRenderOptions -> Pattern () Type Box
 matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
   operators :: OperatorTable () Type Box
   operators =
-    OperatorTable [ [ AssocL typeApp $ \f x -> keepSingleLinesOr (moveRight 2) f x ]
-                  , [ AssocR appliedFunction $ \arg ret -> keepSingleLinesOr id arg (text rightArrow B.<> " " B.<> ret) ]
+    OperatorTable [ [ AssocL proxyType $ \p ty -> p <> ty ]
+                  , [ AssocL typeApp $ \f x -> keepSingleLinesOr (moveRight 2) f x ]
+                  , [ AssocR appliedFunction $ \arg ret -> keepSingleLinesOr id arg (textT rightArrow B.<> " " B.<> ret) ]
                   , [ Wrap constrained $ \deps ty -> constraintsAsBox tro deps ty ]
                   , [ Wrap forall_ $ \idents ty -> keepSingleLinesOr (moveRight 2) (textT (forall' <> " " <> T.unwords idents <> ".")) ty ]
                   , [ Wrap kinded $ \k ty -> keepSingleLinesOr (moveRight 2) ty (textT (doubleColon <> " " <> prettyPrintKind k)) ]

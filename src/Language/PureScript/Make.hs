@@ -370,8 +370,8 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     dumpCoreFn <- lift $ asks optionsDumpCoreFn
     when dumpCoreFn $ do
       let coreFnFile = outputPath "corefn.json"
-      let jsonPayload = CFJ.moduleToJSON Paths.version m
-      let json = Aeson.object [  (runModuleName mn, jsonPayload) ]
+      let jsonPayload = CFJ.moduleToJSON Paths.version m          
+      let json = ACFJ.moduleToJSON Paths.version m
       lift $ writeTextFile coreFnFile (encode json)
 
   genSourceMap :: FilePath -> Int -> [SMap] -> Make ()
@@ -429,7 +429,7 @@ checkForeignDecls m path = do
                      errorInvalidForeignIdentifiers
                      (pure . S.fromList)
                      (parseIdents foreignIdentsStrs)
-  let importedIdents = S.fromList $ map fst (CF.moduleForeign m)
+  let importedIdents = S.fromList (CF.moduleForeign m)
 
   let unusedFFI = foreignIdents S.\\ importedIdents
   unless (null unusedFFI) $
