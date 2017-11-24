@@ -29,8 +29,7 @@ module Language.PureScript.Ide.Util
   , module Language.PureScript.Ide.Logging
   ) where
 
-import           Protolude                           hiding (decodeUtf8,
-                                                      encodeUtf8)
+import           PSPrelude
 
 import           Control.Lens                        hiding ((&), op)
 import           Data.Aeson

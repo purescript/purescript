@@ -3,11 +3,10 @@
 --
 module Language.PureScript.Interactive.Directive where
 
-import Prelude.Compat
+import PSPrelude
 
-import Data.Maybe (fromJust, listToMaybe)
-import Data.List (isPrefixOf)
-import Data.Tuple (swap)
+import Data.List (lookup)
+import qualified Data.Text as T
 
 import Language.PureScript.Interactive.Types
 
@@ -21,7 +20,7 @@ directives = map fst directiveStrings
 -- A mapping of directives to the different strings that can be used to invoke
 -- them.
 --
-directiveStrings :: [(Directive, [String])]
+directiveStrings :: [(Directive, [Text])]
 directiveStrings =
     [ (Help      , ["?", "help"])
     , (Quit      , ["quit"])
@@ -38,7 +37,7 @@ directiveStrings =
 -- |
 -- Like directiveStrings, but the other way around.
 --
-directiveStrings' :: [(String, Directive)]
+directiveStrings' :: [(Text, Directive)]
 directiveStrings' = concatMap go directiveStrings
   where
   go (dir, strs) = map (\s -> (s, dir)) strs
@@ -46,37 +45,37 @@ directiveStrings' = concatMap go directiveStrings
 -- |
 -- List of all directive strings.
 --
-strings :: [String]
+strings :: [Text]
 strings = concatMap snd directiveStrings
 
 -- |
 -- Returns all possible string representations of a directive.
 --
-stringsFor :: Directive -> [String]
-stringsFor d = fromJust (lookup d directiveStrings)
+stringsFor :: Directive -> [Text]
+stringsFor d = unsafeFromJust (lookup d directiveStrings)
 
 -- |
 -- Returns the default string representation of a directive.
 --
-stringFor :: Directive -> String
-stringFor = head . stringsFor
+stringFor :: Directive -> Text
+stringFor = unsafeHead . stringsFor
 
 -- |
 -- Returns the list of directives which could be expanded from the string
 -- argument, together with the string alias that matched.
 --
-directivesFor' :: String -> [(Directive, String)]
+directivesFor' :: Text -> [(Directive, Text)]
 directivesFor' str = go directiveStrings'
   where
-  go = map swap . filter ((str `isPrefixOf`) . fst)
+  go = map swap . filter ((str `T.isPrefixOf`) . fst)
 
-directivesFor :: String -> [Directive]
+directivesFor :: Text -> [Directive]
 directivesFor = map fst . directivesFor'
 
-directiveStringsFor :: String -> [String]
+directiveStringsFor :: Text -> [Text]
 directiveStringsFor = map snd . directivesFor'
 
-parseDirective :: String -> Maybe Directive
+parseDirective :: Text -> Maybe Directive
 parseDirective = listToMaybe . directivesFor
 
 -- |
@@ -92,7 +91,7 @@ hasArgument _ = True
 -- |
 -- The help menu.
 --
-help :: [(Directive, String, String)]
+help :: [(Directive, Text, Text)]
 help =
   [ (Help,     "",          "Show this help menu")
   , (Quit,     "",          "Quit PSCi")

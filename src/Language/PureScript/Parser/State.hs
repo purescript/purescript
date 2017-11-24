@@ -3,7 +3,7 @@
 --
 module Language.PureScript.Parser.State where
 
-import Prelude.Compat
+import PSPrelude
 
 import qualified Text.Parsec as P
 

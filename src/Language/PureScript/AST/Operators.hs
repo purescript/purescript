@@ -4,10 +4,8 @@
 --
 module Language.PureScript.AST.Operators where
 
-import Prelude.Compat
+import PSPrelude
 
-import GHC.Generics (Generic)
-import Control.DeepSeq (NFData)
 import Data.Aeson ((.=))
 import qualified Data.Aeson as A
 
@@ -26,12 +24,12 @@ data Associativity = Infixl | Infixr | Infix
 
 instance NFData Associativity
 
-showAssoc :: Associativity -> String
+showAssoc :: Associativity -> Text
 showAssoc Infixl = "infixl"
 showAssoc Infixr = "infixr"
 showAssoc Infix  = "infix"
 
-readAssoc :: String -> Associativity
+readAssoc :: Text -> Associativity
 readAssoc "infixl" = Infixl
 readAssoc "infixr" = Infixr
 readAssoc "infix"  = Infix

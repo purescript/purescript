@@ -15,18 +15,12 @@ module Language.PureScript.Parser.Declarations
   , toPositionedError
   ) where
 
-import           Prelude hiding (lex)
+import           PSPrelude
 
-import           Control.Applicative
 import           Control.Arrow ((+++))
-import           Control.Monad (foldM, join)
-import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Parallel.Strategies (withStrategy, parList, rseq)
 import           Data.Functor (($>))
-import           Data.Maybe (fromMaybe)
-import           Data.Monoid ((<>))
 import qualified Data.Set as S
-import           Data.Text (Text)
 import           Language.PureScript.AST
 import           Language.PureScript.Environment
 import           Language.PureScript.Errors
@@ -326,7 +320,7 @@ parseModuleFromFile toFilePath (k, content) = do
 toPositionedError :: P.ParseError -> ErrorMessage
 toPositionedError perr = ErrorMessage [ PositionedError (SourceSpan name start end) ] (ErrorParsingModule perr)
   where
-  name   = (P.sourceName  . P.errorPos) perr
+  name   = (P.sourceName . P.errorPos) perr
   start  = (toSourcePos . P.errorPos) perr
   end    = start
 

@@ -9,11 +9,8 @@
 
 module Language.PureScript.Docs.Render where
 
-import Prelude.Compat
+import PSPrelude hiding (from, to, for)
 
-import Data.Maybe (maybeToList)
-import Data.Monoid ((<>))
-import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.Docs.RenderedCode

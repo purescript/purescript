@@ -3,7 +3,7 @@
 --
 module Language.PureScript.Parser.Kinds (parseKind) where
 
-import Prelude.Compat
+import PSPrelude
 
 import Language.PureScript.Kinds
 import Language.PureScript.Parser.Common

@@ -1,8 +1,6 @@
 module Language.PureScript.Sugar.Operators.Expr where
 
-import Prelude.Compat
-
-import Data.Functor.Identity
+import PSPrelude
 
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P

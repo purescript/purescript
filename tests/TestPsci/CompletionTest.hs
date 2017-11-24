@@ -1,8 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module TestPsci.CompletionTest where
 
-import Prelude ()
-import Prelude.Compat
+import PSPrelude hiding (evalStateT)
 
 import Test.Hspec
 
@@ -23,7 +22,7 @@ completionTests = context "completionTests" $ do
 -- If the cursor is at the right end of the line, with the 1st element of the
 -- pair as the text in the line, then pressing tab should offer all the
 -- elements of the list (which is the 2nd element) as completions.
-completionTestData :: [T.Text] -> [(String, [String])]
+completionTestData :: [T.Text] -> [(Text, [Text])]
 completionTestData supportModuleNames =
   -- basic directives
   [ (":h",  [":help"])
@@ -33,12 +32,12 @@ completionTestData supportModuleNames =
   , (":b",  [":browse"])
 
   -- :browse should complete module names
-  , (":b Control.Monad.E",    map (":b Control.Monad.Eff" ++) ["", ".Unsafe", ".Class", ".Console", ".Uncurried"])
-  , (":b Control.Monad.Eff.", map (":b Control.Monad.Eff" ++) [".Unsafe", ".Class", ".Console", ".Uncurried"])
+  , (":b Control.Monad.E",    map (":b Control.Monad.Eff" <>) ["", ".Unsafe", ".Class", ".Console", ".Uncurried"])
+  , (":b Control.Monad.Eff.", map (":b Control.Monad.Eff" <>) [".Unsafe", ".Class", ".Console", ".Uncurried"])
 
   -- import should complete module names
-  , ("import Control.Monad.E",    map ("import Control.Monad.Eff" ++) ["", ".Unsafe", ".Class", ".Console", ".Uncurried"])
-  , ("import Control.Monad.Eff.", map ("import Control.Monad.Eff" ++) [".Unsafe", ".Class", ".Console", ".Uncurried"])
+  , ("import Control.Monad.E",    map ("import Control.Monad.Eff" <>) ["", ".Unsafe", ".Class", ".Console", ".Uncurried"])
+  , ("import Control.Monad.Eff.", map ("import Control.Monad.Eff" <>) [".Unsafe", ".Class", ".Console", ".Uncurried"])
 
   -- :quit, :help, :reload, :clear should not complete
   , (":help ", [])
@@ -66,7 +65,7 @@ completionTestData supportModuleNames =
 
   -- a few other import tests
   , ("impor", ["import"])
-  , ("import ", map (T.unpack . mappend "import ") supportModuleNames)
+  , ("import ", map (mappend "import ") supportModuleNames)
   , ("import Prelude ", [])
 
   -- String and number literals should not be completed
@@ -85,9 +84,9 @@ completionTestData supportModuleNames =
   , ("Control.Monad.ST.new", ["Control.Monad.ST.newSTRef"])
   ]
 
-assertCompletedOk :: (String, [String]) -> Spec
-assertCompletedOk (line, expecteds) = specify line $ do
-  results <- runCM (completion' (reverse line, ""))
+assertCompletedOk :: (Text, [Text]) -> Spec
+assertCompletedOk (line, expecteds) = specify (toS line) $ do
+  results <- runCM (completion' (T.reverse line, ""))
   let actuals = formatCompletions results
   sort actuals `shouldBe` sort expecteds
 

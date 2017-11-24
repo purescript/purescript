@@ -11,7 +11,7 @@ import           Language.PureScript.Ide
 import           Language.PureScript.Ide.Command
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Types
-import           Protolude
+import           PSPrelude
 import           System.Directory
 import           System.FilePath
 import           System.Process

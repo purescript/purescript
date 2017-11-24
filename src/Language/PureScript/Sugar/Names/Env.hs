@@ -21,16 +21,11 @@ module Language.PureScript.Sugar.Names.Env
   , checkImportConflicts
   ) where
 
-import Prelude.Compat
+import PSPrelude
 
-import Control.Monad
-import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Writer.Class (MonadWriter(..))
 
-import Data.Function (on)
-import Data.Foldable (find)
 import Data.List (groupBy, sortBy, delete)
-import Data.Maybe (fromJust, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
@@ -189,9 +184,9 @@ primExports =
     , exportedKinds = M.fromList $ mkKindEntry `map` S.toList primKinds
     }
   where
-  mkTypeEntry (Qualified mn name) = (name, ([], fromJust mn))
-  mkClassEntry (Qualified mn name) = (name, fromJust mn)
-  mkKindEntry (Qualified mn name) = (name, fromJust mn)
+  mkTypeEntry (Qualified mn name) = (name, ([], unsafeFromJust mn))
+  mkClassEntry (Qualified mn name) = (name, unsafeFromJust mn)
+  mkKindEntry (Qualified mn name) = (name, unsafeFromJust mn)
 
 -- | Environment which only contains the Prim module.
 primEnv :: Env
@@ -395,8 +390,8 @@ checkImportConflicts currentModule toName xs =
     byOrig = sortBy (compare `on` importSourceModule) xs
     groups = groupBy ((==) `on` importSourceModule) byOrig
     nonImplicit = filter ((/= FromImplicit) . importProvenance) xs
-    name = toName . disqualify . importName $ head xs
-    conflictModules = mapMaybe (getQual . importName . head) groups
+    name = toName . disqualify . importName $ unsafeHead xs
+    conflictModules = mapMaybe (getQual . importName . unsafeHead) groups
   in
     if length groups > 1
     then case nonImplicit of
@@ -406,5 +401,5 @@ checkImportConflicts currentModule toName xs =
         return (mnNew, mnOrig)
       _ -> throwError . errorMessage $ ScopeConflict name conflictModules
     else
-      let ImportRecord (Qualified (Just mnNew) _) mnOrig _ = head byOrig
+      let ImportRecord (Qualified (Just mnNew) _) mnOrig _ = unsafeHead byOrig
       in return (mnNew, mnOrig)

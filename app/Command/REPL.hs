@@ -12,28 +12,16 @@
 
 module Command.REPL (command) where
 
-import           Prelude ()
-import           Prelude.Compat
-import           Control.Applicative (many, (<|>))
-import           Control.Concurrent (forkIO)
-import           Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar,
-                                         tryPutMVar)
+import           PSPrelude hiding (evalStateT, StateT, onException, state, evaluate)
+
 import           Control.Concurrent.STM (TVar, atomically, newTVarIO, writeTVar,
                                         readTVarIO,
                                         TChan, newBroadcastTChanIO, dupTChan,
                                         readTChan, writeTChan)
 import           Control.Exception (fromException)
-import           Control.Monad
-import           Control.Monad.IO.Class (liftIO)
-import           Control.Monad.Trans.Class
-import           Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import           Control.Monad.Trans.State.Strict (StateT, evalStateT)
-import           Control.Monad.Trans.Reader (ReaderT, runReaderT)
 import           Data.FileEmbed (embedStringFile)
-import           Data.Foldable (for_)
-import           Data.Monoid ((<>))
-import           Data.String (IsString(..))
-import           Data.Text (Text, unpack)
+import qualified Data.Text as T
 import           Data.Traversable (for)
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Bundle as Bundle
@@ -47,17 +35,14 @@ import qualified Network.Wai.Handler.WebSockets as WS
 import qualified Network.WebSockets as WS
 import qualified Options.Applicative as Opts
 import           System.Console.Haskeline
-import           System.IO.UTF8 (readUTF8File)
-import           System.Exit
 import           System.Directory (doesFileExist, getCurrentDirectory)
 import           System.FilePath ((</>))
 import           System.FilePath.Glob (glob)
 import           System.Process (readProcessWithExitCode)
-import qualified Data.ByteString.Lazy.UTF8 as U
 
 -- | Command line options
 data PSCiOptions = PSCiOptions
-  { psciInputGlob         :: [String]
+  { psciInputGlob         :: [FilePath]
   , psciBackend           :: Backend
   }
 
@@ -72,14 +57,14 @@ nodePathOption = Opts.optional . Opts.strOption $
   <> Opts.long "node-path"
   <> Opts.help "Path to the Node executable"
 
-nodeFlagsOption :: Opts.Parser [String]
+nodeFlagsOption :: Opts.Parser [Text]
 nodeFlagsOption = Opts.option parser $
      Opts.long "node-opts"
   <> Opts.metavar "OPTS"
   <> Opts.value []
   <> Opts.help "Flags to pass to node, separated by spaces"
   where
-    parser = words <$> Opts.str
+    parser = T.words <$> Opts.str
 
 port :: Opts.Parser Int
 port = Opts.option Opts.auto $
@@ -96,43 +81,43 @@ psciOptions :: Opts.Parser PSCiOptions
 psciOptions = PSCiOptions <$> many inputFile
                           <*> backend
 
--- | Parses the input and returns either a command, or an error as a 'String'.
-getCommand :: forall m. MonadException m => InputT m (Either String (Maybe Command))
+-- | Parses the input and returns either a command, or an error as a 'Text'.
+getCommand :: forall m. MonadException m => InputT m (Either Text (Maybe Command))
 getCommand = handleInterrupt (return (Right Nothing)) $ do
   line <- withInterrupt $ getInputLine "> "
   case line of
     Nothing -> return (Right (Just QuitPSCi)) -- Ctrl-D when input is empty
     Just "" -> return (Right Nothing)
-    Just s  -> return . fmap Just $ parseCommand s
+    Just s  -> return . fmap Just $ parseCommand $ toS s
 
-pasteMode :: forall m. MonadException m => InputT m (Either String Command)
+pasteMode :: forall m. MonadException m => InputT m (Either Text Command)
 pasteMode =
     parseCommand <$> go []
   where
-    go :: [String] -> InputT m String
-    go ls = maybe (return . unlines $ reverse ls) (go . (:ls)) =<< getInputLine "… "
+    go :: [Text] -> InputT m Text
+    go ls = maybe (return . T.unlines $ reverse ls) (go . (:ls) . toS) =<< getInputLine "… "
 
 -- | Make a JavaScript bundle for the browser.
-bundle :: IO (Either Bundle.ErrorMessage String)
+bundle :: IO (Either Bundle.ErrorMessage Text)
 bundle = runExceptT $ do
   inputFiles <- liftIO (glob (".psci_modules" </> "node_modules" </> "*" </> "*.js"))
   input <- for inputFiles $ \filename -> do
-    js <- liftIO (readUTF8File filename)
+    js <- liftIO (readFile filename)
     mid <- Bundle.guessModuleIdentifier filename
-    length js `seq` return (mid, js)
+    T.length js `seq` return (mid, js)
   Bundle.bundle input [] Nothing "PSCI"
 
-indexJS :: IsString string => string
+indexJS :: Text -- IsString string => string
 indexJS = $(embedStringFile "app/static/index.js")
 
-indexPage :: IsString string => string
+indexPage :: Text -- IsString string => string
 indexPage = $(embedStringFile "app/static/index.html")
 
 -- | All of the functions required to implement a PSCi backend
 data Backend = forall state. Backend
   { _backendSetup :: IO state
   -- ^ Initialize, and call the continuation when the backend is ready
-  , _backendEval :: state -> String -> IO ()
+  , _backendEval :: state -> Text -> IO ()
   -- ^ Evaluate JavaScript code
   , _backendReload :: state -> IO ()
   -- ^ Reload the compiled code
@@ -142,7 +127,7 @@ data Backend = forall state. Backend
 
 -- | Commands which can be sent to the browser
 data BrowserCommand
-  = Eval (MVar String)
+  = Eval (MVar Text)
   -- ^ Evaluate the latest JS
   | Refresh
   -- ^ Refresh the page
@@ -154,9 +139,9 @@ data BrowserState = BrowserState
   -- been updated
   , browserShutdownNotice :: MVar ()
   -- ^ An MVar which becomes full when the server should shut down
-  , browserIndexJS        :: TVar (Maybe String)
+  , browserIndexJS        :: TVar (Maybe Text)
   -- ^ A TVar holding the latest compiled JS
-  , browserBundleJS       :: TVar (Maybe String)
+  , browserBundleJS       :: TVar (Maybe Text)
   -- ^ A TVar holding the latest bundled JS
   }
 
@@ -167,8 +152,8 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
     setup = do
       shutdownVar <- newEmptyMVar
       cmdChan <- newBroadcastTChanIO
-      indexJs <- newTVarIO Nothing
-      bundleJs <- newTVarIO Nothing
+      indexJs <- newTVarIO Nothing :: IO (TVar (Maybe Text))
+      bundleJs <- newTVarIO Nothing :: IO (TVar (Maybe Text))
 
       let
         handleWebsocket :: WS.PendingConnection -> IO ()
@@ -187,7 +172,7 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
                 result <- WS.receiveData conn
                 -- With many connected clients, all but one of
                 -- these attempts will fail.
-                tryPutMVar resultVar (unpack result)
+                tryPutMVar resultVar result
               Refresh ->
                 WS.sendTextData conn ("reload" :: Text)
 
@@ -208,11 +193,11 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
             [] ->
               respond $ Wai.responseLBS status200
                                         [(hContentType, "text/html; charset=UTF-8")]
-                                        (U.fromString indexPage)
+                                        (toS indexPage)
             ["js", "index.js"] ->
               respond $ Wai.responseLBS status200
                                         [(hContentType, "application/javascript")]
-                                        (U.fromString indexJS)
+                                        (toS indexJS)
             ["js", "latest.js"] -> do
               may <- readTVarIO indexJs
               case may of
@@ -225,7 +210,7 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
                                             , (hPragma, "no-cache")
                                             , (hExpires, "0")
                                             ]
-                                            (U.fromString js)
+                                            (toS js)
             ["js", "bundle.js"] -> do
               may <- readTVarIO bundleJs
               case may of
@@ -234,13 +219,12 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
                 Just js ->
                   respond $ Wai.responseLBS status200
                                             [ (hContentType, "application/javascript")]
-                                            (U.fromString js)
+                                            (toS js)
             _ -> respond $ Wai.responseLBS status404 [] "Not found"
 
       let browserState = BrowserState cmdChan shutdownVar indexJs bundleJs
       createBundle browserState
-
-      putStrLn $ "Serving http://localhost:" <> show serverPort <> "/. Waiting for connections..."
+      putText $ "Serving http://localhost:" <> show serverPort <> "/. Waiting for connections..."
       _ <- forkIO $ Warp.runSettings ( Warp.setInstallShutdownHandler shutdownHandler
                                      . Warp.setPort serverPort
                                      . Warp.setOnException onException
@@ -253,11 +237,11 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
 
     createBundle :: BrowserState -> IO ()
     createBundle state = do
-      putStrLn "Bundling JavaScript..."
+      putText "Bundling JavaScript..."
       ejs <- bundle
       case ejs of
         Left err -> do
-          putStrLn (unlines (Bundle.printErrorMessage err))
+          putTextLines (Bundle.printErrorMessage err)
           exitFailure
         Right js ->
           atomically $ writeTVar (browserBundleJS state) (Just js)
@@ -270,7 +254,7 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
     shutdown :: BrowserState -> IO ()
     shutdown state = putMVar (browserShutdownNotice state) ()
 
-    evaluate :: BrowserState -> String -> IO ()
+    evaluate :: BrowserState -> Text -> IO ()
     evaluate state js = liftIO $ do
       resultVar <- newEmptyMVar
       atomically $ do
@@ -279,21 +263,21 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
       result <- takeMVar resultVar
       putStrLn result
 
-nodeBackend :: Maybe FilePath -> [String] -> Backend
+nodeBackend :: Maybe FilePath -> [Text] -> Backend
 nodeBackend nodePath nodeArgs = Backend setup eval reload shutdown
   where
     setup :: IO ()
     setup = return ()
 
-    eval :: () -> String -> IO ()
+    eval :: () -> Text -> IO ()
     eval _ _ = do
       writeFile indexFile "require('$PSCI')['$main']();"
       process <- maybe findNodeProcess (pure . pure) nodePath
-      result <- traverse (\node -> readProcessWithExitCode node (nodeArgs ++ [indexFile]) "") process
+      result <- traverse (\node -> readProcessWithExitCode node (map toS nodeArgs <> [indexFile]) "") process
       case result of
         Just (ExitSuccess, out, _)   -> putStrLn out
         Just (ExitFailure _, _, err) -> putStrLn err
-        Nothing                      -> putStrLn "Couldn't find node.js"
+        Nothing                      -> putText "Couldn't find node.js"
 
     reload :: () -> IO ()
     reload _ = return ()
@@ -343,30 +327,31 @@ command = loop <$> options
                     go state = do
                       c <- getCommand
                       case c of
-                        Left err -> outputStrLn err >> go state
+                        Left err -> out err >> go state
                         Right Nothing -> go state
                         Right (Just PasteLines) -> do
                           c' <- pasteMode
                           case c' of
-                            Left err -> outputStrLn err >> go state
+                            Left err -> out err >> go state
                             Right c'' -> handleCommandWithInterrupts state c''
                         Right (Just QuitPSCi) -> do
-                          outputStrLn quitMessage
+                          out quitMessage
                           liftIO $ shutdown state
                         Right (Just c') -> handleCommandWithInterrupts state c'
+                        where out = outputStrLn . toS
 
                     loadUserConfig :: state -> StateT PSCiState (ReaderT PSCiConfig IO) ()
                     loadUserConfig state = do
                       configFile <- (</> ".purs-repl") <$> liftIO getCurrentDirectory
                       exists <- liftIO $ doesFileExist configFile
                       when exists $ do
-                        ls <- lines <$> liftIO (readUTF8File configFile)
+                        ls <- T.lines <$> liftIO (readFile configFile)
                         for_ ls $ \l -> do
                           liftIO (putStrLn l)
                           case parseCommand l of
                             Left err -> liftIO (putStrLn err >> exitFailure)
                             Right cmd@Import{} -> handleCommand' state cmd
-                            Right _ -> liftIO (putStrLn "The .purs-repl file only supports import declarations")
+                            Right _ -> liftIO (putText "The .purs-repl file only supports import declarations")
 
                     handleCommandWithInterrupts
                       :: state

@@ -3,7 +3,7 @@
 
 module Language.PureScript.Ide.MatcherSpec where
 
-import           Protolude
+import           PSPrelude
 
 import qualified Language.PureScript                 as P
 import           Language.PureScript.Ide.Matcher

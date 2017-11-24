@@ -6,16 +6,11 @@
 --
 module Language.PureScript.TypeChecker.Monad where
 
-import Prelude.Compat
+import PSPrelude
 
-import Control.Arrow (second)
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State
 import Control.Monad.Writer.Class (MonadWriter(..), censor)
 
-import Data.Maybe
 import qualified Data.Map as M
-import Data.Text (Text)
 
 import Language.PureScript.Environment
 import Language.PureScript.Errors

@@ -6,7 +6,7 @@ module Language.PureScript.Ide.Filter.Declaration
        , typeDeclarationForDeclaration
        ) where
 
-import           Protolude                     hiding (isPrefixOf)
+import           PSPrelude
 
 import           Data.Aeson
 import qualified Language.PureScript.Ide.Types as PI

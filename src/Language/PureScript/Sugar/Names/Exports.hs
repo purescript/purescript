@@ -3,16 +3,12 @@ module Language.PureScript.Sugar.Names.Exports
   , resolveExports
   ) where
 
-import Prelude.Compat
+import PSPrelude hiding (get)
 
-import Control.Monad
 import Control.Monad.Writer.Class (MonadWriter(..))
-import Control.Monad.Error.Class (MonadError(..))
 
-import Data.Function (on)
-import Data.Foldable (traverse_)
+import Data.Foldable (foldr1)
 import Data.List (intersect, groupBy, sortBy)
-import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
 
 import Language.PureScript.AST
@@ -126,7 +122,7 @@ resolveExports env ss mn imps exps refs =
     -> (a -> Name)
     -> M.Map (Qualified a) [ImportRecord a]
     -> m [Qualified a]
-  extract useQual name toName = fmap (map (importName . head . snd)) . go . M.toList
+  extract useQual name toName = fmap (map (importName . unsafeHead . snd)) . go . M.toList
     where
     go = filterM $ \(name', options) -> do
       let isMatch = if useQual then isQualifiedWith name name' else any (checkUnqual name') options

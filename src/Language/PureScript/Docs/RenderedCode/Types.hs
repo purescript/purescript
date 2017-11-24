@@ -43,19 +43,12 @@ module Language.PureScript.Docs.RenderedCode.Types
  , aliasName
  ) where
 
-import Prelude.Compat
-import GHC.Generics (Generic)
+import PSPrelude hiding (for)
 
-import Control.DeepSeq (NFData)
-import Control.Monad.Error.Class (MonadError(..))
-
-import Data.Monoid ((<>))
 import Data.Aeson.BetterErrors (Parse, nth, withText, withValue, toAesonParser, perhaps, asText, eachInArray)
 import qualified Data.Aeson as A
-import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.ByteString.Lazy as BS
-import qualified Data.Text.Encoding as TE
 
 import Language.PureScript.Names
 import Language.PureScript.AST (Associativity(..))
@@ -83,7 +76,7 @@ tryParse msg =
   fullMsg = "Invalid " <> msg <> ": "
 
   showJSON :: A.Value -> Text
-  showJSON = TE.decodeUtf8 . BS.toStrict . A.encode
+  showJSON = decodeUtf8 . BS.toStrict . A.encode
 
 -- |
 -- This type is isomorphic to 'Maybe' 'ModuleName'. It makes code a bit
@@ -177,7 +170,7 @@ data Namespace
 instance NFData Namespace
 
 instance A.ToJSON Namespace where
-  toJSON = A.toJSON . show
+  toJSON = A.toJSON . (show :: Namespace -> Text)
 
 asNamespace :: Parse Text Namespace
 asNamespace =

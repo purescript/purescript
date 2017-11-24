@@ -64,15 +64,11 @@ module Language.PureScript.Parser.Lexer
   )
   where
 
-import Prelude.Compat hiding (lex)
+import PSPrelude
 
-import Control.Applicative ((<|>))
-import Control.Monad (void, guard)
-import Control.Monad.Identity (Identity)
 import Data.Char (isSpace, isAscii, isSymbol, isAlphaNum)
-import Data.Monoid ((<>))
 import Data.String (fromString)
-import Data.Text (Text)
+import qualified Text.Show (show)
 import qualified Data.Text as T
 
 import Language.PureScript.Comments
@@ -135,7 +131,7 @@ prettyPrintToken Comma             = ","
 prettyPrintToken Semi              = ";"
 prettyPrintToken At                = "@"
 prettyPrintToken Underscore        = "_"
-prettyPrintToken (Indent n)        = "indentation at level " <> T.pack (show n)
+prettyPrintToken (Indent n)        = "indentation at level " <> show n
 prettyPrintToken (LName s)         = T.pack (show s)
 prettyPrintToken (UName s)         = T.pack (show s)
 prettyPrintToken (Qualifier _)     = "qualifier"
@@ -156,9 +152,12 @@ data PositionedToken = PositionedToken
   , ptComments  :: [Comment]
   } deriving (Eq)
 
+showPositionedToken :: PositionedToken -> Text
+showPositionedToken = prettyPrintToken . ptToken
+
 -- Parsec requires this instance for various token-level combinators
 instance Show PositionedToken where
-  show = T.unpack . prettyPrintToken . ptToken
+  show = T.unpack . showPositionedToken
 
 type Lexer u a = P.Parsec Text u a
 

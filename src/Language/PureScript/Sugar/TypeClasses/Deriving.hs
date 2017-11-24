@@ -1,22 +1,14 @@
 -- | This module implements the generic deriving elaboration that takes place during desugaring.
 module Language.PureScript.Sugar.TypeClasses.Deriving (deriveInstances) where
 
-import           Prelude.Compat
-import           Protolude (ordNub)
+import           PSPrelude hiding (to, from)
 
-import           Control.Arrow (second)
-import           Control.Monad (replicateM, zipWithM, unless, when)
-import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
 import           Control.Monad.Supply.Class (MonadSupply)
-import           Data.Foldable (for_)
-import           Data.List (foldl', find, sortBy, unzip5)
+import           Data.Foldable (foldr1, foldl1)
+import           Data.List (foldl', find, sortBy, unzip5, unzip3, zipWith3)
 import qualified Data.Map as M
-import           Data.Monoid ((<>))
-import           Data.Maybe (fromMaybe, mapMaybe)
-import           Data.Ord (comparing)
 import qualified Data.Set as S
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Language.PureScript.AST
 import qualified Language.PureScript.Constants as C
@@ -59,7 +51,7 @@ instance Monoid NewtypeDerivedInstances where
 -- we just match the newtype name.
 extractNewtypeName :: ModuleName -> [Type] -> Maybe (ModuleName, ProperName 'TypeName)
 extractNewtypeName _ [] = Nothing
-extractNewtypeName mn xs = go (last xs) where
+extractNewtypeName mn xs = go (unsafeLast xs) where
   go (TypeApp ty (TypeVar _)) = go ty
   go (TypeConstructor name) = Just (qualify mn name)
   go _ = Nothing
@@ -164,10 +156,10 @@ deriveInstance mn syns _ ds (TypeInstanceDeclaration sa@(ss, _) nm deps classNam
   | otherwise = throwError . errorMessage' ss $ CannotDerive className tys
 deriveInstance mn syns ndis ds (TypeInstanceDeclaration sa@(ss, _) nm deps className tys NewtypeInstance) =
   case tys of
-    _ : _ | Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor (last tys)
+    _ : _ | Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor (unsafeLast tys)
           , mn == fromMaybe mn mn'
           -> TypeInstanceDeclaration sa nm deps className tys . NewtypeInstanceWithDictionary <$> deriveNewtypeInstance ss mn syns ndis className ds tys tyCon args
-          | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys (last tys)
+          | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys (unsafeLast tys)
     _ -> throwError . errorMessage' ss $ InvalidNewtypeInstance className tys
 deriveInstance _ _ _ _ e = return e
 
@@ -211,7 +203,7 @@ deriveNewtypeInstance ss mn syns ndis className ds tys tyConNm dargs = do
       | Just wrapped' <- stripRight (takeReverse (length tyArgNames - length dargs) tyArgNames) wrapped =
           do let subst = zipWith (\(name, _) t -> (name, t)) tyArgNames dargs
              wrapped'' <- replaceAllTypeSynonymsM syns wrapped'
-             return (DeferredDictionary className (init tys ++ [replaceAllTypeVars subst wrapped'']))
+             return (DeferredDictionary className (unsafeInit tys ++ [replaceAllTypeVars subst wrapped'']))
     go _ = throwError . errorMessage' ss $ InvalidNewtypeInstance className tys
 
     takeReverse :: Int -> [a] -> [a]
@@ -231,14 +223,14 @@ deriveNewtypeInstance ss mn syns ndis className ds tys tyConNm dargs = do
           for_ (M.lookup constraintClass' (ndiClasses ndis)) $ \(_, _, deps) ->
             -- We need to check whether the newtype is mentioned, because of classes like MonadWriter
             -- with its Monoid superclass constraint.
-            when (not (null args) && any ((last args `elem`) . usedTypeVariables) constraintArgs) $ do
+            when (not (null args) && any ((unsafeLast args `elem`) . usedTypeVariables) constraintArgs) $ do
               -- For now, we only verify superclasses where the newtype is the only argument,
               -- or for which all other arguments are determined by functional dependencies.
               -- Everything else raises a UnverifiableSuperclassInstance warning.
               -- This covers pretty much all cases we're interested in, but later we might want to do
               -- more work to extend this to other superclass relationships.
-              let determined = map (TypeVar . (args !!)) . ordNub . concatMap fdDetermined . filter ((== [length args - 1]) . fdDeterminers) $ deps
-              if last constraintArgs == TypeVar (last args) && all (`elem` determined) (init constraintArgs)
+              let determined = map (TypeVar . (args `unsafeIndex`)) . ordNub . concatMap fdDetermined . filter ((== [length args - 1]) . fdDeterminers) $ deps
+              if unsafeLast constraintArgs == TypeVar (unsafeLast args) && all (`elem` determined) (unsafeInit constraintArgs)
                 then do
                   -- Now make sure that a superclass instance was derived. Again, this is not a complete
                   -- check, since the superclass might have multiple type arguments, so overlaps might still
@@ -803,7 +795,7 @@ deriveNewtype mn syns ds tyConNm tyConArgs unwrappedTy = do
       checkNewtype name dctors
       wrappedIdent <- freshIdent "n"
       unwrappedIdent <- freshIdent "a"
-      let (ctorName, [ty]) = head dctors
+      let (ctorName, [ty]) = unsafeHead dctors
       ty' <- replaceAllTypeSynonymsM syns ty
       let inst =
             [ ValueDecl (ss, []) (Ident "wrap") Public [] $ unguarded $

@@ -8,16 +8,11 @@ module Language.PureScript.Sugar.TypeClasses
   , superClassDictionaryNames
   ) where
 
-import Prelude.Compat
+import PSPrelude
 
-import           Control.Arrow (first, second)
-import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.State
 import           Control.Monad.Supply.Class
-import           Data.List ((\\), find, sortBy)
+import           Data.List ((\\), find, sortBy, lookup)
 import qualified Data.Map as M
-import           Data.Maybe (catMaybes, mapMaybe, isJust, fromMaybe)
-import           Data.Text (Text)
 import qualified Language.PureScript.Constants as C
 import           Language.PureScript.Crash
 import           Language.PureScript.Environment

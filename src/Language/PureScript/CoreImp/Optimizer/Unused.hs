@@ -5,7 +5,7 @@ module Language.PureScript.CoreImp.Optimizer.Unused
   , removeUndefinedApp
   ) where
 
-import Prelude.Compat
+import PSPrelude
 
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.CoreImp.Optimizer.Common

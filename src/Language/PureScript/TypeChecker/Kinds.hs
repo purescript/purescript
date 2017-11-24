@@ -10,15 +10,9 @@ module Language.PureScript.TypeChecker.Kinds
   , kindsOfAll
   ) where
 
-import Prelude.Compat
-
-import Control.Arrow (second)
-import Control.Monad
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State
+import PSPrelude
 
 import qualified Data.Map as M
-import Data.Text (Text)
 
 import Language.PureScript.Crash
 import Language.PureScript.Environment
@@ -183,7 +177,7 @@ solveTypes isData ts kargs tyCon = do
     unifyKinds tyCon (foldr FunKind kindType kargs)
     forM_ ks $ \k -> unifyKinds k kindType
   unless isData $
-    unifyKinds tyCon (foldr FunKind (head ks) kargs)
+    unifyKinds tyCon (foldr FunKind (unsafeHead ks) kargs)
   return tyCon
 
 -- | Default all unknown kinds to the kindType kind of types
@@ -262,4 +256,4 @@ infer' other = (, []) <$> go other
     k2 <- go ty
     unifyKinds k2 kindType
     return kindType
-  go ty = internalError $ "Invalid argument to infer: " ++ show ty
+  go ty = internalError $ "Invalid argument to infer: " <> show ty

@@ -14,13 +14,10 @@ module Language.PureScript.Externs
   , applyExternsFileToEnvironment
   ) where
 
-import Prelude.Compat
+import PSPrelude
 
 import Data.Aeson.TH
-import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.List (foldl', find)
-import Data.Foldable (fold)
-import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Version (showVersion)
 import qualified Data.Map as M

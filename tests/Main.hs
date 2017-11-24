@@ -5,8 +5,9 @@
 
 module Main (main) where
 
-import Prelude ()
-import Prelude.Compat
+import PSPrelude
+
+import qualified Data.Text as T
 
 import qualified TestCompiler
 import qualified TestDocs
@@ -43,8 +44,8 @@ main = do
 
   where
   heading msg = do
-    putStrLn ""
-    putStrLn $ replicate 79 '#'
-    putStrLn $ "# " ++ msg
-    putStrLn $ replicate 79 '#'
-    putStrLn ""
+    putText ""
+    putText $ T.replicate 79 "#"
+    putText $ "# " <> msg
+    putText $ T.replicate 79 "#"
+    putText ""

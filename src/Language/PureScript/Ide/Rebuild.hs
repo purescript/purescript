@@ -7,12 +7,11 @@ module Language.PureScript.Ide.Rebuild
   , rebuildFile
   ) where
 
-import           Protolude
+import           PSPrelude
 
 import           "monad-logger" Control.Monad.Logger
 import qualified Data.List                       as List
 import qualified Data.Map.Lazy                   as M
-import           Data.Maybe                      (fromJust)
 import qualified Data.Set                        as S
 import qualified Language.PureScript             as P
 import           Language.PureScript.Ide.Error
@@ -179,7 +178,7 @@ sortExterns m ex = do
     Left err ->
       throwError (RebuildError err)
     Right (sorted, graph) -> do
-      let deps = fromJust (List.lookup (P.getModuleName m) graph)
+      let deps = unsafeFromJust (List.lookup (P.getModuleName m) graph)
       pure $ mapMaybe getExtern (deps `inOrderOf` map P.getModuleName sorted)
   where
     mkShallowModule P.ExternsFile{..} =

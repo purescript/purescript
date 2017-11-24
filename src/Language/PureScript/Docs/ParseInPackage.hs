@@ -2,7 +2,7 @@ module Language.PureScript.Docs.ParseInPackage
   ( parseFilesInPackages
   ) where
 
-import Protolude
+import PSPrelude
 
 import qualified Data.Map as M
 

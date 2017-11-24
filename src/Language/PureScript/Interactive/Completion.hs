@@ -6,17 +6,9 @@ module Language.PureScript.Interactive.Completion
   , formatCompletions
   ) where
 
-import Prelude.Compat
-import Protolude (ordNub)
+import PSPrelude
 
-import           Control.Arrow (second)
-import           Control.Monad.IO.Class (MonadIO(..))
-import           Control.Monad.State.Class (MonadState(..))
-import           Control.Monad.Trans.Reader (asks, runReaderT, ReaderT)
-import           Data.Function (on)
-import           Data.List (nubBy, isPrefixOf, sortBy, stripPrefix)
-import           Data.Maybe (mapMaybe)
-import           Data.Text (Text)
+import           Data.List (nubBy, sortBy)
 import qualified Data.Text as T
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Interactive.Directive as D
@@ -40,42 +32,48 @@ liftCompletionM act = do
 
 -- | Loads module, function, and file completions.
 completion
-  :: (MonadState PSCiState m, MonadIO m)
+  ::  (MonadState PSCiState m, MonadIO m)
   => CompletionFunc m
-completion = liftCompletionM . completion'
+completion = liftCompletionM . completion''
 
-completion' :: CompletionFunc CompletionM
-completion' = completeWordWithPrev Nothing " \t\n\r" findCompletions
+completion'' :: CompletionFunc CompletionM
+completion'' = completeWordWithPrev Nothing " \t\n\r" (\a b -> findCompletions (toS a) (toS b))
+
+completion' :: (Text, Text) -> CompletionM (Text, [Completion])
+completion' (p,c) = do
+  r <- completion'' (toS p, toS c)
+  pure $ first T.pack $ r
+
 
 -- | Callback for Haskeline's `completeWordWithPrev`.
 -- Expects:
 --   * Line contents to the left of the word, reversed
 --   * Word to be completed
-findCompletions :: String -> String -> CompletionM [Completion]
+findCompletions :: Text -> Text -> CompletionM [Completion]
 findCompletions prev word = do
-    let ctx = completionContext (words (reverse prev)) word
+    let ctx = completionContext (T.words (T.reverse prev)) word
     completions <- concat <$> traverse getCompletions ctx
     return $ sortBy directivesFirst completions
   where
     getCompletions :: CompletionContext -> CompletionM [Completion]
     getCompletions = fmap (mapMaybe (either (prefixedBy word) Just)) . getCompletion
 
-    getCompletion :: CompletionContext -> CompletionM [Either String Completion]
+    getCompletion :: CompletionContext -> CompletionM [Either Text Completion]
     getCompletion ctx =
       case ctx of
-        CtxFilePath f        -> map Right <$> listFiles f
+        CtxFilePath f        -> map Right <$> listFiles (toS f)
         CtxModule            -> map Left <$> getModuleNames
         CtxIdentifier        -> map Left <$> ((++) <$> getIdentNames <*> getDctorNames)
         CtxType              -> map Left <$> getTypeNames
         CtxFixed str         -> return [Left str]
         CtxDirective d       -> return (map Left (completeDirectives d))
 
-    completeDirectives :: String -> [String]
-    completeDirectives = map (':' :) . D.directiveStringsFor
+    completeDirectives :: Text -> [Text]
+    completeDirectives = map (T.cons ':') . D.directiveStringsFor
 
-    prefixedBy :: String -> String -> Maybe Completion
-    prefixedBy w cand = if w `isPrefixOf` cand
-                          then Just (simpleCompletion cand)
+    prefixedBy :: Text -> Text -> Maybe Completion
+    prefixedBy w cand = if w `T.isPrefixOf` cand
+                          then Just (simpleCompletion $ toS cand)
                           else Nothing
 
     directivesFirst :: Completion -> Completion -> Ordering
@@ -88,36 +86,36 @@ findCompletions prev word = do
 
 -- |
 -- Convert Haskeline completion result to results as they would be displayed
-formatCompletions :: (String, [Completion]) -> [String]
+formatCompletions :: (Text, [Completion]) -> [Text]
 formatCompletions (unusedR, completions) = actuals
   where
-    unused = reverse unusedR
-    actuals = map ((unused ++) . replacement) completions
+    unused = T.reverse unusedR
+    actuals = map ((unused <>) . toS . replacement) completions
 
 data CompletionContext
-  = CtxDirective String
-  | CtxFilePath String
+  = CtxDirective Text
+  | CtxFilePath Text
   | CtxModule
   | CtxIdentifier
   | CtxType
-  | CtxFixed String
+  | CtxFixed Text
   deriving (Show)
 
 -- |
 -- Decide what kind of completion we need based on input. This function expects
 -- a list of complete words (to the left of the cursor) as the first argument,
 -- and the current word as the second argument.
-completionContext :: [String] -> String -> [CompletionContext]
+completionContext :: [Text] -> Text -> [CompletionContext]
 completionContext [] _ = [CtxDirective "", CtxIdentifier, CtxFixed "import"]
-completionContext ws w | headSatisfies (":" `isPrefixOf`) ws = completeDirective ws w
+completionContext ws w | headSatisfies (":" `T.isPrefixOf`) ws = completeDirective ws w
 completionContext ws w | headSatisfies (== "import") ws = completeImport ws w
 completionContext _ _ = [CtxIdentifier]
 
-completeDirective :: [String] -> String -> [CompletionContext]
+completeDirective :: [Text] -> Text -> [CompletionContext]
 completeDirective ws w =
   case ws of
     []    -> [CtxDirective w]
-    [dir] -> case D.directivesFor <$> stripPrefix ":" dir of
+    [dir] -> case D.directivesFor <$> T.stripPrefix ":" dir of
                 -- only offer completions if the directive is unambiguous
                 Just [dir'] -> directiveArg w dir'
                 _           -> []
@@ -127,7 +125,7 @@ completeDirective ws w =
     -- any others.
     _     -> []
 
-directiveArg :: String -> Directive -> [CompletionContext]
+directiveArg :: Text -> Directive -> [CompletionContext]
 directiveArg _ Browse      = [CtxModule]
 directiveArg _ Quit        = []
 directiveArg _ Reload      = []
@@ -139,7 +137,7 @@ directiveArg _ Type        = [CtxIdentifier]
 directiveArg _ Kind        = [CtxType]
 directiveArg _ Complete    = []
 
-completeImport :: [String] -> String -> [CompletionContext]
+completeImport :: [Text] -> Text -> [CompletionContext]
 completeImport ws w' =
   case (ws, w') of
     (["import"], _) -> [CtxModule]
@@ -154,10 +152,10 @@ headSatisfies p str =
 getLoadedModules :: CompletionM [P.Module]
 getLoadedModules = asks (map fst . psciLoadedExterns)
 
-getModuleNames :: CompletionM [String]
+getModuleNames :: CompletionM [Text]
 getModuleNames = moduleNames <$> getLoadedModules
 
-mapLoadedModulesAndQualify :: (a -> Text) -> (P.Module -> [(a, P.Declaration)]) -> CompletionM [String]
+mapLoadedModulesAndQualify :: (a -> Text) -> (P.Module -> [(a, P.Declaration)]) -> CompletionM [Text]
 mapLoadedModulesAndQualify sho f = do
   ms <- getLoadedModules
   let argPairs = do m <- ms
@@ -165,26 +163,26 @@ mapLoadedModulesAndQualify sho f = do
                     return (m, fm)
   concat <$> traverse (uncurry (getAllQualifications sho)) argPairs
 
-getIdentNames :: CompletionM [String]
+getIdentNames :: CompletionM [Text]
 getIdentNames = mapLoadedModulesAndQualify P.showIdent identNames
 
-getDctorNames :: CompletionM [String]
+getDctorNames :: CompletionM [Text]
 getDctorNames = mapLoadedModulesAndQualify P.runProperName dctorNames
 
-getTypeNames :: CompletionM [String]
+getTypeNames :: CompletionM [Text]
 getTypeNames = mapLoadedModulesAndQualify P.runProperName typeDecls
 
 -- | Given a module and a declaration in that module, return all possible ways
 -- it could have been referenced given the current PSCiState - including fully
 -- qualified, qualified using an alias, and unqualified.
-getAllQualifications :: (a -> Text) -> P.Module -> (a, P.Declaration) -> CompletionM [String]
+getAllQualifications :: (a -> Text) -> P.Module -> (a, P.Declaration) -> CompletionM [Text]
 getAllQualifications sho m (declName, decl) = do
   imports <- getAllImportsOf m
   let fullyQualified = qualifyWith (Just (P.getModuleName m))
   let otherQuals = ordNub (concatMap qualificationsUsing imports)
   return $ fullyQualified : otherQuals
   where
-  qualifyWith mMod = T.unpack (P.showQualified sho (P.Qualified mMod declName))
+  qualifyWith mMod = P.showQualified sho (P.Qualified mMod declName)
   referencedBy refs = P.isExported (Just refs) decl
 
   qualificationsUsing (_, importType, asQ') =
@@ -228,5 +226,5 @@ dctorNames = nubOnFst . concatMap go . P.exportedDeclarations
   go decl@(P.DataDeclaration _ _ _ _ ctors) = map ((\n -> (n, decl)) . fst) ctors
   go _ = []
 
-moduleNames :: [P.Module] -> [String]
-moduleNames = ordNub . map (T.unpack . P.runModuleName . P.getModuleName)
+moduleNames :: [P.Module] -> [Text]
+moduleNames = ordNub . map (P.runModuleName . P.getModuleName)

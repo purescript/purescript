@@ -3,9 +3,9 @@
 --
 module Language.PureScript.CoreFn.Traversals where
 
-import Prelude.Compat
+import PSPrelude hiding ((<>))
 
-import Control.Arrow (second, (***), (+++))
+import Control.Arrow ((***), (+++))
 
 import Language.PureScript.AST.Literals
 import Language.PureScript.CoreFn.Binders

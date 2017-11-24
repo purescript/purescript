@@ -8,11 +8,10 @@ module Command.Docs.Html
   , writeHtmlModules
   ) where
 
-import           Control.Applicative
+import           PSPrelude
+
 import           Control.Arrow ((&&&))
-import           Control.Monad.Writer
 import           Data.List (sort)
-import           Data.Text (Text)
 import           Data.Text.Lazy (toStrict)
 import qualified Data.Text as T
 import qualified Language.PureScript as P

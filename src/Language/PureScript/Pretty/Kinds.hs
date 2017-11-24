@@ -5,15 +5,12 @@ module Language.PureScript.Pretty.Kinds
   ( prettyPrintKind
   ) where
 
-import Prelude.Compat
+import PSPrelude
 
 import Control.Arrow (ArrowPlus(..))
 import Control.PatternArrows as PA
 
-import Data.Monoid ((<>))
-import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
-import Data.Text (Text)
 
 import Language.PureScript.Crash
 import Language.PureScript.Kinds
@@ -50,7 +47,7 @@ prettyPrintKind
   . PA.pattern matchKind ()
   where
   matchKind :: Pattern () Kind Text
-  matchKind = buildPrettyPrinter operators (typeLiterals <+> fmap parensT matchKind)
+  matchKind = buildPrettyPrinter operators (typeLiterals <+> fmap parens matchKind)
 
   operators :: OperatorTable () Kind Text
   operators =

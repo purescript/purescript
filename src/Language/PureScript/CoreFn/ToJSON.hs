@@ -7,12 +7,10 @@ module Language.PureScript.CoreFn.ToJSON
   ( moduleToJSON
   ) where
 
-import Prelude.Compat
+import PSPrelude
 
-import Data.Maybe (fromMaybe)
 import Data.Aeson
 import Data.Version (Version, showVersion)
-import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.AST.Literals

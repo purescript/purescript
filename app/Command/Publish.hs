@@ -2,10 +2,9 @@
 
 module Command.Publish (command) where
 
-import           Control.Monad.IO.Class (liftIO)
+import           PSPrelude
+
 import qualified Data.Aeson as A
-import qualified Data.ByteString.Lazy.Char8 as BL
-import           Data.Monoid ((<>))
 import           Data.Time.Clock (getCurrentTime)
 import           Data.Version (Version(..))
 import           Language.PureScript.Publish
@@ -46,7 +45,7 @@ publish manifestFile resolutionsFile isDryRun =
   if isDryRun
     then do
       _ <- unsafePreparePackage manifestFile resolutionsFile dryRunOptions
-      putStrLn "Dry run completed, no errors."
+      putText "Dry run completed, no errors."
     else do
       pkg <- unsafePreparePackage manifestFile resolutionsFile defaultPublishOptions
-      BL.putStrLn (A.encode pkg)
+      putStrLn (A.encode pkg)

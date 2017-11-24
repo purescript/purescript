@@ -8,16 +8,10 @@ module Language.PureScript.Sugar.Names
   , Exports(..)
   ) where
 
-import Prelude.Compat
-import Protolude (ordNub, sortBy, on)
+import PSPrelude
 
-import Control.Arrow (first)
-import Control.Monad
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State.Lazy
 import Control.Monad.Writer (MonadWriter(..), censor)
 
-import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 

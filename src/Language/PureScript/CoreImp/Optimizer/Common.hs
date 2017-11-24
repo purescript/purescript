@@ -1,11 +1,9 @@
 -- | Common functions used by the various optimizer phases
 module Language.PureScript.CoreImp.Optimizer.Common where
 
-import Prelude.Compat
+import PSPrelude
 
-import Data.Text (Text)
-import Data.List (foldl')
-import Data.Maybe (fromMaybe)
+import Data.List (foldl', lookup)
 
 import Language.PureScript.Crash
 import Language.PureScript.CoreImp.AST

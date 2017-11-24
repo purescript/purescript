@@ -2,21 +2,12 @@ module Language.PureScript.Docs.Convert.ReExports
   ( updateReExports
   ) where
 
-import Prelude.Compat
+import PSPrelude hiding (execState)
 
-import Control.Arrow ((&&&), first, second)
-import Control.Monad
-import Control.Monad.Reader.Class (MonadReader, ask)
-import Control.Monad.State.Class (MonadState, gets, modify)
-import Control.Monad.Trans.Reader (runReaderT)
+import Control.Arrow ((&&&))
 import Control.Monad.Trans.State.Strict (execState)
 
-import Data.Either
-import Data.Map (Map)
-import Data.Maybe (mapMaybe)
-import Data.Monoid ((<>))
 import qualified Data.Map as Map
-import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.Docs.Types
@@ -55,7 +46,7 @@ updateReExports env order withPackage = execState action
       Just v' ->
         pure v'
       Nothing ->
-        internalError ("Module missing: " ++ T.unpack (P.runModuleName mn))
+        internalError ("Module missing: " <> P.runModuleName mn)
 
 -- |
 -- Collect all of the re-exported declarations for a single module.
@@ -72,7 +63,7 @@ getReExports ::
 getReExports env mn =
   case Map.lookup mn env of
     Nothing ->
-      internalError ("Module missing: " ++ T.unpack (P.runModuleName mn))
+      internalError ("Module missing: " <> P.runModuleName mn)
     Just (_, imports, exports) -> do
       allExports <- runReaderT (collectDeclarations imports exports) mn
       pure (filter notLocal allExports)
@@ -183,7 +174,7 @@ findImport imps (name, orig) =
       (importedFrom:_) ->
         pure (importedFrom, name)
       [] ->
-        internalErrorInModule ("findImport: not found: " ++ show (name, orig))
+        internalErrorInModule ("findImport: not found: " <> show (name, orig))
 
 lookupValueDeclaration ::
   (MonadState (Map P.ModuleName Module) m,
@@ -199,10 +190,10 @@ lookupValueDeclaration importedFrom ident = do
                     && (isValue d || isValueAlias d)) decls
     errOther other =
       internalErrorInModule
-        ("lookupValueDeclaration: unexpected result:\n" ++
-          "other: " ++ show other ++ "\n" ++
-          "ident: " ++ show ident ++ "\n" ++
-          "decls: " ++ show decls)
+        ("lookupValueDeclaration: unexpected result:\n" <>
+          "other: " <> show other <> "\n" <>
+          "ident: " <> show ident <> "\n" <>
+          "decls: " <> show decls)
 
   case rs of
     [r] ->
@@ -250,7 +241,7 @@ lookupValueOpDeclaration importedFrom op = do
       pure (importedFrom, [d])
     other ->
       internalErrorInModule
-        ("lookupValueOpDeclaration: unexpected result for: " ++ show other)
+        ("lookupValueOpDeclaration: unexpected result for: " <> show other)
 
 -- |
 -- Extract a particular type declaration. For data declarations, constructors
@@ -271,7 +262,7 @@ lookupTypeDeclaration importedFrom ty = do
       pure (importedFrom, [d])
     other ->
       internalErrorInModule
-        ("lookupTypeDeclaration: unexpected result: " ++ show other)
+        ("lookupTypeDeclaration: unexpected result: " <> show other)
 
 lookupTypeOpDeclaration
   :: (MonadState (Map P.ModuleName Module) m,MonadReader P.ModuleName m)
@@ -287,7 +278,7 @@ lookupTypeOpDeclaration importedFrom tyOp = do
       pure (importedFrom, [d])
     other ->
       internalErrorInModule
-        ("lookupTypeOpDeclaration: unexpected result: " ++ show other)
+        ("lookupTypeOpDeclaration: unexpected result: " <> show other)
 
 lookupTypeClassDeclaration
   :: (MonadState (Map P.ModuleName Module) m, MonadReader P.ModuleName m)
@@ -306,7 +297,7 @@ lookupTypeClassDeclaration importedFrom tyClass = do
     other ->
       internalErrorInModule
         ("lookupTypeClassDeclaration: unexpected result: "
-         ++ (unlines . map show) other)
+         <> (T.unlines . map show) other)
 
 lookupKindDeclaration
   :: (MonadState (Map P.ModuleName Module) m, MonadReader P.ModuleName m)
@@ -324,7 +315,7 @@ lookupKindDeclaration importedFrom kind = do
       pure (importedFrom, [d])
     other ->
       internalErrorInModule
-        ("lookupKindDeclaration: unexpected result: " ++ show other)
+        ("lookupKindDeclaration: unexpected result: " <> show other)
 
 -- |
 -- Get the full list of declarations for a particular module out of the
@@ -333,7 +324,7 @@ lookupKindDeclaration importedFrom kind = do
 lookupModuleDeclarations ::
   (MonadState (Map P.ModuleName Module) m,
    MonadReader P.ModuleName m) =>
-  String ->
+  Text ->
   P.ModuleName ->
   m [Declaration]
 lookupModuleDeclarations definedIn moduleName = do
@@ -341,8 +332,8 @@ lookupModuleDeclarations definedIn moduleName = do
   case mmdl of
     Nothing ->
       internalErrorInModule
-        (definedIn ++ ": module missing: "
-         ++ T.unpack (P.runModuleName moduleName))
+        (definedIn <> ": module missing: "
+         <> P.runModuleName moduleName)
     Just mdl ->
       pure (allDeclarations mdl)
 
@@ -452,7 +443,7 @@ handleEnv TypeClassEnv{..} =
       _ ->
         internalErrorInModule
           ("handleEnv: Bad child declaration passed to promoteChild: "
-          ++ T.unpack cdeclTitle)
+          <> cdeclTitle)
 
   addConstraint constraint =
     P.quantify . P.moveQuantifiersToFront . P.ConstrainedType constraint
@@ -504,18 +495,18 @@ allDeclarations Module{..} =
 (|>) :: a -> (a -> b) -> b
 x |> f = f x
 
-internalError :: String -> a
-internalError = P.internalError . ("Docs.Convert.ReExports: " ++)
+internalError :: Text -> a
+internalError = P.internalError . ("Docs.Convert.ReExports: " <>)
 
 internalErrorInModule
   :: (MonadReader P.ModuleName m)
-  => String
+  => Text
   -> m a
 internalErrorInModule msg = do
   mn <- ask
   internalError
-    ("while collecting re-exports for module: " ++ T.unpack (P.runModuleName mn) ++
-     ", " ++ msg)
+    ("while collecting re-exports for module: " <> P.runModuleName mn <>
+     ", " <> msg)
 
 -- |
 -- If the provided Declaration is a TypeClassDeclaration, construct an

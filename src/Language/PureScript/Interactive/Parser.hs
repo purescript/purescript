@@ -5,11 +5,9 @@ module Language.PureScript.Interactive.Parser
   ( parseCommand
   ) where
 
-import           Prelude.Compat hiding (lex)
+import           PSPrelude hiding (try)
 
-import           Data.Bifunctor (first)
 import           Data.Char (isSpace)
-import           Data.List (intercalate)
 import qualified Data.Text as T
 import           Text.Parsec hiding ((<|>))
 import qualified Language.PureScript as P
@@ -20,15 +18,15 @@ import           Language.PureScript.Parser.Common (mark, same)
 -- |
 -- Parses PSCI metacommands or expressions input from the user.
 --
-parseCommand :: String -> Either String Command
+parseCommand :: Text -> Either Text Command
 parseCommand cmdString =
-  case cmdString of
-    (':' : cmd) -> parseDirective cmd
+  case T.uncons cmdString of
+    Just (':', cmd) -> parseDirective cmd
     _ -> parseRest psciCommand cmdString
 
-parseRest :: P.TokenParser a -> String -> Either String a
+parseRest :: P.TokenParser a -> Text -> Either Text a
 parseRest p s = first show $ do
-  ts <- P.lex "" (T.pack s)
+  ts <- P.lex "" s
   P.runTokenParser "" (p <* eof) ts
 
 psciCommand :: P.TokenParser Command
@@ -41,24 +39,15 @@ psciCommand = choice (map try parsers)
     , psciDeprecatedLet
     ]
 
-trim :: String -> String
-trim = trimEnd . trimStart
-
-trimStart :: String -> String
-trimStart = dropWhile isSpace
-
-trimEnd :: String -> String
-trimEnd = reverse . trimStart . reverse
-
-parseDirective :: String -> Either String Command
+parseDirective :: Text -> Either Text Command
 parseDirective cmd =
   case D.directivesFor' dstr of
     [(d, _)] -> commandFor d
     []       -> Left "Unrecognized directive. Type :? for help."
-    ds       -> Left ("Ambiguous directive. Possible matches: " ++
-                  intercalate ", " (map snd ds) ++ ". Type :? for help.")
+    ds       -> Left ("Ambiguous directive. Possible matches: " <>
+                  T.intercalate ", " (map snd ds) <> ". Type :? for help.")
   where
-  (dstr, arg) = trim <$> break isSpace cmd
+  (dstr, arg) = T.strip <$> T.break isSpace cmd
 
   commandFor d = case d of
     Help     -> return ShowHelp
@@ -105,11 +94,11 @@ acceptable P.TypeDeclaration{} = True
 acceptable P.ValueDeclaration{} = True
 acceptable _ = False
 
-parseReplQuery' :: String -> Either String ReplQuery
+parseReplQuery' :: Text -> Either Text ReplQuery
 parseReplQuery' str =
   case parseReplQuery str of
-    Nothing -> Left ("Don't know how to show " ++ str ++ ". Try one of: " ++
-                      intercalate ", " replQueryStrings ++ ".")
+    Nothing -> Left ("Don't know how to show " <> str <> ". Try one of: " <>
+                      T.intercalate ", " replQueryStrings <> ".")
     Just query -> Right query
 
 -- | To show error message when 'let' is used for declaration in PSCI,

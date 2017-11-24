@@ -6,16 +6,9 @@ module Language.PureScript.TypeChecker.Subsumption
   ( subsumes
   ) where
 
-import Prelude.Compat
+import PSPrelude
 
-import Control.Monad (when)
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State.Class (MonadState(..))
-
-import Data.Foldable (for_)
-import Data.List (uncons)
 import Data.List.Ordered (minusBy')
-import Data.Ord (comparing)
 
 import Language.PureScript.AST
 import Language.PureScript.Crash

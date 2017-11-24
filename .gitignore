@@ -7,6 +7,8 @@ cabal.sandbox.config
 *.chi
 *.chs.h
 *.lksh*
+*~
+*#
 .virthualenv
 .psci_modules/
 .test_modules/

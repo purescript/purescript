@@ -3,14 +3,10 @@
 --
 module Language.PureScript.Renamer (renameInModules) where
 
-import Prelude.Compat
-
-import Control.Monad.State
+import PSPrelude
 
 import Data.List (find)
-import Data.Maybe (fromJust, fromMaybe)
 import qualified Data.Map as M
-import Data.Monoid ((<>))
 import qualified Data.Set as S
 import qualified Data.Text as T
 
@@ -80,7 +76,7 @@ updateScope ident =
     return name'
   getNewName :: S.Set Ident -> Ident -> Ident
   getNewName usedNames name =
-    fromJust $ find
+    unsafeFromJust $ find
       (`S.notMember` usedNames)
       [ Ident (runIdent name <> T.pack (show (i :: Int))) | i <- [1..] ]
 
@@ -93,7 +89,7 @@ lookupIdent name = do
   name' <- gets $ M.lookup name . rsBoundNames
   case name' of
     Just name'' -> return name''
-    Nothing -> error $ "Rename scope is missing ident '" ++ T.unpack (showIdent name) ++ "'"
+    Nothing -> error $ "Rename scope is missing ident '" <> showIdent name <> "'"
 
 -- |
 -- Finds idents introduced by declarations.

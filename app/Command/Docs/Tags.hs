@@ -1,11 +1,11 @@
 module Command.Docs.Tags where
 
-import           Control.Arrow (first)
-import qualified Data.Text as T
+import           PSPrelude
+
 import qualified Language.PureScript as P
 
-tags :: P.Module -> [(String, Int)]
-tags = map (first T.unpack) . concatMap dtags . P.exportedDeclarations
+tags :: P.Module -> [(Text, Int)]
+tags = map (first toS) . concatMap dtags . P.exportedDeclarations
   where
     dtags :: P.Declaration -> [(P.Text, Int)]
     dtags (P.DataDeclaration (ss, _) _ name _ dcons) = (P.runProperName name, pos ss) : consNames

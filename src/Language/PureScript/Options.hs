@@ -1,7 +1,7 @@
 -- | The data type of compiler options
 module Language.PureScript.Options where
 
-import Prelude.Compat
+import PSPrelude
 
 -- | The data type of compiler options
 data Options = Options

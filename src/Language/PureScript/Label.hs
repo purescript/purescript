@@ -3,10 +3,8 @@
 
 module Language.PureScript.Label (Label(..)) where
 
-import Prelude.Compat hiding (lex)
-import GHC.Generics (Generic)
-import Control.DeepSeq (NFData)
-import Data.Monoid ()
+import PSPrelude
+
 import Data.String (IsString(..))
 import qualified Data.Aeson as A
 

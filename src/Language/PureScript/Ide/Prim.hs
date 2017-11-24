@@ -1,6 +1,6 @@
 module Language.PureScript.Ide.Prim (idePrimDeclarations) where
 
-import           Protolude
+import           PSPrelude
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Language.PureScript as P

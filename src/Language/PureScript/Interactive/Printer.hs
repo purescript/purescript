@@ -1,13 +1,10 @@
 module Language.PureScript.Interactive.Printer where
 
-import           Prelude.Compat
+import           PSPrelude
 
 import           Data.List (intersperse)
 import qualified Data.Map as M
-import           Data.Maybe (mapMaybe)
-import           Data.Monoid ((<>))
 import qualified Data.Text as T
-import           Data.Text (Text)
 import qualified Language.PureScript as P
 import qualified Text.PrettyPrint.Boxes as Box
 
@@ -20,7 +17,7 @@ textT = Box.text . T.unpack
 -- |
 -- Pretty print a module's signatures
 --
-printModuleSignatures :: P.ModuleName -> P.Environment -> String
+printModuleSignatures :: P.ModuleName -> P.Environment -> Text
 printModuleSignatures moduleName P.Environment{..} =
     -- get relevant components of a module from environment
     let moduleNamesIdent = byModuleName names
@@ -30,7 +27,7 @@ printModuleSignatures moduleName P.Environment{..} =
 
   in
     -- print each component
-    (unlines . map trimEnd . lines . Box.render . Box.vsep 1 Box.left)
+    (T.unlines . map T.stripEnd . T.lines . toS . Box.render . Box.vsep 1 Box.left)
       [ printModule's (mapMaybe (showTypeClass . findTypeClass typeClasses)) moduleTypeClasses -- typeClasses
       , printModule's (mapMaybe (showType typeClasses dataConstructors typeSynonyms . findType types)) moduleTypes -- types
       , printModule's (map (showNameType . findNameType names)) moduleNamesIdent -- functions
@@ -128,4 +125,3 @@ printModuleSignatures moduleName P.Environment{..} =
                 mapFirstRest _ _ [] = []
                 mapFirstRest f g (x:xs) = f x : map g xs
 
-        trimEnd = reverse . dropWhile (== ' ') . reverse

@@ -2,7 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Language.PureScript.Ide.StateSpec where
 
-import           Protolude
+import           PSPrelude
 import           Control.Lens hiding ((&))
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.State

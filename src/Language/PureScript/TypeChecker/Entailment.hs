@@ -11,23 +11,15 @@ module Language.PureScript.TypeChecker.Entailment
   , entails
   ) where
 
-import Prelude.Compat
-import Protolude (ordNub)
+import PSPrelude hiding (sym)
 
-import Control.Arrow (second)
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State
 import Control.Monad.Supply.Class (MonadSupply(..))
 import Control.Monad.Writer
 
-import Data.Foldable (for_, fold, toList)
-import Data.Function (on)
 import Data.Functor (($>))
 import Data.List (minimumBy)
-import Data.Maybe (fromMaybe, maybeToList, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Data.Text (Text)
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -223,7 +215,7 @@ entails SolverOptions{..} constraint context hints =
                 -- Now enforce any functional dependencies, using unification
                 -- Note: we need to generate fresh types for any unconstrained
                 -- type variables before unifying.
-                let subst = fmap head substs
+                let subst = fmap unsafeHead substs
                 currentSubst <- lift . lift $ gets checkSubstitution
                 subst' <- lift . lift $ withFreshTypes tcd (fmap (substituteType currentSubst) subst)
                 lift . lift $ zipWithM_ (\t1 t2 -> do
@@ -297,7 +289,7 @@ entails SolverOptions{..} constraint context hints =
             unique tyArgs tcds
               | pairwiseAny overlapping (map snd tcds) = do
                   tell . errorMessage $ OverlappingInstances className' tyArgs (tcds >>= (toList . namedInstanceIdentifier . tcdValue . snd))
-                  return $ uncurry Solved (head tcds)
+                  return $ uncurry Solved (unsafeHead tcds)
               | otherwise = return $ uncurry Solved (minimumBy (compare `on` length . tcdPath . snd) tcds)
 
             canBeGeneralized :: Type -> Bool

@@ -9,22 +9,13 @@ module Language.PureScript.Interactive
   , runMake
   ) where
 
-import           Prelude ()
-import           Prelude.Compat
-import           Protolude (ordNub)
+import           PSPrelude
 
 import           Data.List (sort, find, foldl')
-import           Data.Maybe (mapMaybe)
 import qualified Data.Map as M
-import           Data.Monoid ((<>))
-import           Data.Text (Text)
 import qualified Data.Text as T
 
-import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Control.Monad.State.Class
-import           Control.Monad.Reader.Class
-import           Control.Monad.Trans.Except (ExceptT(..), runExceptT)
-import           Control.Monad.Trans.State.Strict (StateT, runStateT, evalStateT)
+import qualified Control.Monad.Trans.State.Strict as SS
 import           Control.Monad.Writer.Strict (Writer(), runWriter)
 
 import qualified Language.PureScript as P
@@ -94,9 +85,9 @@ make ms = do
 -- | Performs a PSCi command
 handleCommand
   :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
-  => (String -> m ()) -- ^ evaluate JS
+  => (Text -> m ()) -- ^ evaluate JS
   -> m () -- ^ reload
-  -> (String -> m ()) -- ^ print into console
+  -> (Text -> m ()) -- ^ print into console
   -> Command
   -> m ()
 handleCommand _ _ p ShowHelp                  = p helpMessage
@@ -107,7 +98,7 @@ handleCommand _ _ _ (Import im)               = handleImport im
 handleCommand _ _ _ (Decls l)                 = handleDecls l
 handleCommand _ _ p (TypeOf val)              = handleTypeOf p val
 handleCommand _ _ p (KindOf typ)              = handleKindOf p typ
-handleCommand _ _ p (BrowseModule moduleName) = handleBrowse p moduleName
+handleCommand _ _ p (BrowseModule moduleName)    = handleBrowse p moduleName
 handleCommand _ _ p (ShowInfo QueryLoaded)    = handleShowLoadedModules p
 handleCommand _ _ p (ShowInfo QueryImport)    = handleShowImportedModules p
 handleCommand _ _ p (CompleteStr prefix)      = handleComplete p prefix
@@ -121,7 +112,7 @@ handleReloadState
 handleReloadState reload = do
   modify $ updateLets (const [])
   globs <- asks psciFileGlobs
-  files <- liftIO $ concat <$> traverse glob globs
+  files <- liftIO $ concat <$> traverse (glob . toS) globs
   e <- runExceptT $ do
     modules <- ExceptT . liftIO $ loadAllModules files
     (externs, _) <- ExceptT . liftIO . runMake . make $ modules
@@ -144,10 +135,10 @@ handleClearState reload = do
 -- | Takes a value expression and evaluates it with the current state.
 handleExpression
   :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
-  => (String -> m ())
+  => (Text -> m ())
   -> P.Expr
   -> m ()
-handleExpression evaluate val = do
+handleExpression eval val = do
   st <- get
   let m = createTemporaryModule True st val
   e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
@@ -155,7 +146,7 @@ handleExpression evaluate val = do
     Left errs -> printErrors errs
     Right _ -> do
       js <- liftIO $ readFile (modulesDir </> "$PSCI" </> "index.js")
-      evaluate js
+      eval js
 
 -- |
 -- Takes a list of declarations and updates the environment, then run a make. If the declaration fails,
@@ -176,25 +167,25 @@ handleDecls ds = do
 -- | Show actual loaded modules in psci.
 handleShowLoadedModules
   :: (MonadState PSCiState m, MonadIO m)
-  => (String -> m ())
+  => (Text -> m ())
   -> m ()
 handleShowLoadedModules print' = do
     loadedModules <- gets psciLoadedExterns
     print' $ readModules loadedModules
   where
-    readModules = unlines . sort . ordNub . map (T.unpack . P.runModuleName . P.getModuleName . fst)
+    readModules = T.unlines . sort . ordNub . map (P.runModuleName . P.getModuleName . fst)
 
 -- | Show the imported modules in psci.
 handleShowImportedModules
   :: (MonadState PSCiState m, MonadIO m)
-  => (String -> m ())
+  => (Text -> m ())
   -> m ()
 handleShowImportedModules print' = do
   PSCiState { psciImportedModules = importedModules } <- get
   print' $ showModules importedModules
   return ()
   where
-  showModules = unlines . sort . map (T.unpack . showModule)
+  showModules = T.unlines . sort . map (showModule)
   showModule (mn, declType, asQ) =
     "import " <> N.runModuleName mn <> showDeclType declType <>
     foldMap (\mn' -> " as " <> N.runModuleName mn') asQ
@@ -243,7 +234,7 @@ handleImport im = do
 -- | Takes a value and prints its type
 handleTypeOf
   :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
-  => (String -> m ())
+  => (Text -> m ())
   -> P.Expr
   -> m ()
 handleTypeOf print' val = do
@@ -260,7 +251,7 @@ handleTypeOf print' val = do
 -- | Takes a type and prints its kind
 handleKindOf
   :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
-  => (String -> m ())
+  => (Text -> m ())
   -> P.Type
   -> m ()
 handleKindOf print' typ = do
@@ -274,19 +265,19 @@ handleKindOf print' typ = do
       case M.lookup (P.Qualified (Just mName) $ P.ProperName "IT") (P.typeSynonyms env') of
         Just (_, typ') -> do
           let chk = (P.emptyCheckState env') { P.checkCurrentModule = Just mName }
-              k   = check (P.kindOf typ') chk
+              k   = check' (P.kindOf typ') chk
 
-              check :: StateT P.CheckState (ExceptT P.MultipleErrors (Writer P.MultipleErrors)) a -> P.CheckState -> Either P.MultipleErrors (a, P.CheckState)
-              check sew = fst . runWriter . runExceptT . runStateT sew
+              check' :: StateT P.CheckState (ExceptT P.MultipleErrors (Writer P.MultipleErrors)) a -> P.CheckState -> Either P.MultipleErrors (a, P.CheckState)
+              check' sew = fst . runWriter . runExceptT . runStateT sew
           case k of
             Left err        -> printErrors err
-            Right (kind, _) -> print' . T.unpack . P.prettyPrintKind $ kind
+            Right (kind, _) -> print' . P.prettyPrintKind $ kind
         Nothing -> print' "Could not find kind"
 
 -- | Browse a module and displays its signature
 handleBrowse
   :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
-  => (String -> m ())
+  => (Text -> m ())
   -> P.ModuleName
   -> m ()
 handleBrowse print' moduleName = do
@@ -305,18 +296,20 @@ handleBrowse print' moduleName = do
     isModInEnv modName =
         any ((== modName) . P.getModuleName . fst) . psciLoadedExterns
     failNotInEnv modName =
-        print' $ T.unpack $ "Module '" <> N.runModuleName modName <> "' is not valid."
+        print' $ "Module '" <> N.runModuleName modName <> "' is not valid."
     lookupUnQualifiedModName quaModName st =
         (\(modName,_,_) -> modName) <$> find ( \(_, _, mayQuaName) -> mayQuaName == Just quaModName) (psciImportedModules st)
 
 -- | Return output as would be returned by tab completion, for tools integration etc.
 handleComplete
   :: (MonadState PSCiState m, MonadIO m)
-  => (String -> m ())
-  -> String
+  => (Text -> m ())
+  -> Text
   -> m ()
 handleComplete print' prefix = do
   st <- get
-  let act = liftCompletionM (completion' (reverse prefix, ""))
-  results <- evalStateT act st
-  print' $ unlines (formatCompletions results)
+  let pref = T.reverse prefix
+      act = liftCompletionM (completion' (pref, ""))
+  results <- SS.evalStateT act st
+  let results' = (\(x,y) -> (toS x, y)) results
+  print' $ T.unlines (formatCompletions results')

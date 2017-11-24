@@ -1,8 +1,7 @@
 module Language.PureScript.Interactive.Module where
 
-import           Prelude.Compat
+import           PSPrelude
 
-import           Control.Monad
 import qualified Language.PureScript as P
 import           Language.PureScript.Interactive.Types
 import           System.Directory (getCurrentDirectory)
@@ -22,7 +21,7 @@ supportModuleIsDefined = any ((== supportModuleName) . P.getModuleName)
 -- * Module Management
 
 -- | Loads a file for use with imports.
-loadModule :: FilePath -> IO (Either String [P.Module])
+loadModule :: FilePath -> IO (Either Text [P.Module])
 loadModule filename = do
   pwd <- getCurrentDirectory
   content <- readUTF8FileT filename

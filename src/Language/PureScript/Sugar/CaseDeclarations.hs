@@ -8,14 +8,10 @@ module Language.PureScript.Sugar.CaseDeclarations
   , desugarCaseGuards
   ) where
 
-import Prelude.Compat
-import Protolude (ordNub)
+import PSPrelude
 
-import Data.List (groupBy, foldl1')
-import Data.Maybe (catMaybes, mapMaybe)
+import Data.List (groupBy, foldl1', foldl1, span)
 
-import Control.Monad ((<=<), forM, replicateM, join, unless)
-import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.Supply.Class
 
 import Language.PureScript.AST

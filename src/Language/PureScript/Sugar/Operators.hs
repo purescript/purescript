@@ -12,7 +12,7 @@ module Language.PureScript.Sugar.Operators
   , checkFixityExports
   ) where
 
-import Prelude.Compat
+import PSPrelude
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -25,15 +25,7 @@ import Language.PureScript.Sugar.Operators.Types
 import Language.PureScript.Traversals (defS, sndM)
 import Language.PureScript.Types
 
-import Control.Monad (unless, (<=<))
-import Control.Monad.Error.Class (MonadError(..))
-
-import Data.Either (partitionEithers)
-import Data.Foldable (for_, traverse_)
-import Data.Function (on)
-import Data.Functor.Identity (Identity(..), runIdentity)
 import Data.List (groupBy, sortBy)
-import Data.Maybe (mapMaybe, listToMaybe)
 import Data.Traversable (for)
 import qualified Data.Map as M
 

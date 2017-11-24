@@ -2,7 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Language.PureScript.Ide.CompletionSpec where
 
-import Protolude
+import PSPrelude
 
 import Language.PureScript as P
 import Language.PureScript.Ide.Test as Test

@@ -4,7 +4,7 @@ module Language.PureScript.CoreImp.Optimizer.Blocks
   , collapseNestedIfs
   ) where
 
-import Prelude.Compat
+import PSPrelude
 
 import Language.PureScript.CoreImp.AST
 

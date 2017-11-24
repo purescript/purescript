@@ -13,18 +13,15 @@ module Language.PureScript.Publish.ErrorsWarnings
   , renderWarnings
   ) where
 
-import Prelude.Compat
+import PSPrelude
 
 import Control.Exception (IOException)
 
 import Data.Aeson.BetterErrors (ParseError, displayError)
-import Data.List (intersperse)
-import Data.List.NonEmpty (NonEmpty(..))
-import Data.Maybe
-import Data.Monoid
+import Data.List (intersperse, unwords)
+import Data.String (String)
 import Data.Version
-import qualified Data.List.NonEmpty as NonEmpty
-import Data.Text (Text)
+import qualified Data.List.NonEmpty as NEL
 import qualified Data.Text as T
 
 import Language.PureScript.Docs.Types (ManifestError)
@@ -200,7 +197,7 @@ displayUserError e = case e of
       ] ++
       spdxExamples
   MissingDependencies pkgs ->
-    let singular = NonEmpty.length pkgs == 1
+    let singular = NEL.length pkgs == 1
         pl a b = if singular then b else a
         do_          = pl "do" "does"
         dependencies = pl "dependencies" "dependency"
@@ -210,7 +207,7 @@ displayUserError e = case e of
         , "installed:"
         ])
       ] ++
-        bulletedListT runPackageName (NonEmpty.toList pkgs)
+        bulletedListT runPackageName (NEL.toList pkgs)
   CompileError err ->
     vcat
       [ para "Compile error:"
@@ -330,7 +327,7 @@ collectWarnings = foldMap singular
 renderWarnings :: [PackageWarning] -> Box
 renderWarnings warns =
   let CollectedWarnings{..} = collectWarnings warns
-      go toBox warns' = toBox <$> NonEmpty.nonEmpty warns'
+      go toBox warns' = toBox <$> NEL.nonEmpty warns'
       mboxes = [ go warnNoResolvedVersions     noResolvedVersions
                , go warnUndeclaredDependencies undeclaredDependencies
                , go warnUnacceptableVersions   unacceptableVersions
@@ -347,7 +344,7 @@ renderWarnings warns =
 
 warnNoResolvedVersions :: NonEmpty PackageName -> Box
 warnNoResolvedVersions pkgNames =
-  let singular = NonEmpty.length pkgNames == 1
+  let singular = NEL.length pkgNames == 1
       pl a b = if singular then b else a
 
       packages   = pl "packages" "package"
@@ -358,7 +355,7 @@ warnNoResolvedVersions pkgNames =
       ["The following ", packages, " did not appear to have a resolved "
       , "version:"])
     ] ++
-      bulletedListT runPackageName (NonEmpty.toList pkgNames)
+      bulletedListT runPackageName (NEL.toList pkgNames)
       ++
     [ spacer
     , para (concat
@@ -370,7 +367,7 @@ warnNoResolvedVersions pkgNames =
 
 warnUndeclaredDependencies :: NonEmpty PackageName -> Box
 warnUndeclaredDependencies pkgNames =
-  let singular = NonEmpty.length pkgNames == 1
+  let singular = NEL.length pkgNames == 1
       pl a b = if singular then b else a
 
       packages     = pl "packages" "package"
@@ -381,11 +378,11 @@ warnUndeclaredDependencies pkgNames =
       [ "The following ", packages, " ", are, " installed, but not "
       , "declared as ", dependencies, " in your package manifest file:"
       ])
-    : bulletedListT runPackageName (NonEmpty.toList pkgNames)
+    : bulletedListT runPackageName (NEL.toList pkgNames)
 
 warnUnacceptableVersions :: NonEmpty (PackageName, Text) -> Box
 warnUnacceptableVersions pkgs =
-  let singular = NonEmpty.length pkgs == 1
+  let singular = NEL.length pkgs == 1
       pl a b = if singular then b else a
 
       packages'  = pl "packages'" "package's"
@@ -399,7 +396,7 @@ warnUnacceptableVersions pkgs =
       , "not be parsed:"
       ])
     ] ++
-      bulletedListT showTuple (NonEmpty.toList pkgs)
+      bulletedListT showTuple (NEL.toList pkgs)
       ++
     [ spacer
     , para (concat
@@ -420,7 +417,7 @@ warnDirtyWorkingTree =
 
 warnMissingPaths :: NonEmpty PackageName -> Box
 warnMissingPaths pkgs =
-  let singular = NonEmpty.length pkgs == 1
+  let singular = NEL.length pkgs == 1
       pl a b = if singular then b else a
 
       packages   = pl "packages" "package"
@@ -429,7 +426,7 @@ warnMissingPaths pkgs =
       [ "The following installed ", packages, " were "
       , "missing path information in the resolutions file:"
       ])
-    : bulletedListT runPackageName (NonEmpty.toList pkgs)
+    : bulletedListT runPackageName (NEL.toList pkgs)
 
 printWarnings :: [PackageWarning] -> IO ()
 printWarnings = printToStderr . renderWarnings

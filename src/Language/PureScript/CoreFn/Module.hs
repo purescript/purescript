@@ -1,6 +1,6 @@
 module Language.PureScript.CoreFn.Module where
 
-import Prelude.Compat
+import PSPrelude
 
 import Language.PureScript.Comments
 import Language.PureScript.CoreFn.Expr

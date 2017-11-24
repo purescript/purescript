@@ -1,13 +1,10 @@
 module Language.PureScript.Sugar.Names.Common (warnDuplicateRefs) where
 
-import Prelude.Compat
-import Protolude (ordNub)
+import PSPrelude
 
 import Control.Monad.Writer (MonadWriter(..))
 
-import Data.Foldable (for_)
 import Data.List (nub, (\\))
-import Data.Maybe (mapMaybe)
 
 import Language.PureScript.AST
 import Language.PureScript.Errors

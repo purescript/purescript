@@ -23,7 +23,7 @@ module Language.PureScript.Ide.Reexports
   , resolveReexports'
   ) where
 
-import           Protolude hiding (moduleName)
+import           PSPrelude
 
 import           Control.Lens                  hiding ((&))
 import qualified Data.Map                      as Map

@@ -1,13 +1,15 @@
 module Command.Docs.Ctags (dumpCtags) where
 
+import           PSPrelude
+
 import           Command.Docs.Tags
 import           Data.List (sort)
 import qualified Language.PureScript as P
 
-dumpCtags :: [(String, P.Module)] -> [String]
+dumpCtags :: [(FilePath, P.Module)] -> [Text]
 dumpCtags = sort . concatMap renderModCtags
 
-renderModCtags :: (String, P.Module) -> [String]
+renderModCtags :: (FilePath, P.Module) -> [Text]
 renderModCtags (path, mdl) = sort tagLines
   where tagLines = map tagLine $ tags mdl
-        tagLine (name, line) = name ++ "\t" ++ path ++ "\t" ++ show line
+        tagLine (name, line) = name <> "\t" <> toS path <> "\t" <> show line

@@ -6,22 +6,13 @@
 
 module TestDocs where
 
-import Prelude ()
-import Prelude.Compat
+import PSPrelude
 
-import Control.Arrow (first)
-import Control.Monad.IO.Class (liftIO)
-
-import Data.List (findIndex)
-import Data.Foldable
+import Data.List (findIndex, lookup, tail)
 import Safe (headMay)
-import Data.Maybe (fromMaybe, mapMaybe)
-import Data.Monoid
-import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time.Clock (getCurrentTime)
 import Data.Version (Version(..))
-import System.Exit
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Docs as Docs
@@ -86,8 +77,8 @@ spec = do
           Fail reason ->
             expectationFailure (T.unpack (displayAssertionFailure reason))
 
-takeJust :: String -> Maybe a -> a
-takeJust msg = fromMaybe (error msg)
+--takeJust :: String -> Maybe a -> a
+--takeJust msg = fromMaybe (error msg)
 
 data DocsAssertion
   -- | Assert that a particular declaration is documented with the given
@@ -227,25 +218,25 @@ displayAssertionFailure = \case
     "expected " <> decl <> " to be a " <> expected <> " declaration, but it" <>
     " was a " <> actual <> " declaration"
   DeclarationWrongType _ decl actual ->
-    decl <> " had the wrong type; got " <> T.pack (P.prettyPrintType actual)
+    decl <> " had the wrong type; got " <> P.prettyPrintType actual
   TypeSynonymMismatch _ decl expected actual ->
     "expected the RHS of " <> decl <> " to be " <> expected <>
     "; got " <> actual
   DocCommentMissing _ decl actual ->
     "the doc-comment for " <> decl <> " did not contain the expected substring;" <>
-    " got " <> T.pack (show actual)
+    " got " <> show actual
   ReExportMissing _ expected actuals ->
     "expected to see some re-exports from " <>
     showInPkg P.runModuleName expected <>
     "; instead only saw re-exports from " <>
-    T.pack (show (map (showInPkg P.runModuleName) actuals))
+    show (map (showInPkg P.runModuleName) actuals)
   LinkedDeclarationMissing _ decl target ->
     "expected to find a link to " <> target <> " within the rendered code" <>
     " for " <> decl <> ", but no such link was found"
   BadLinkLocation _ decl target expected actual ->
     "in rendered code for " <> decl <> ", bad link location for " <> target <>
-    ": expected " <> T.pack (show expected) <>
-    " got " <> T.pack (show actual)
+    ": expected " <> show expected <>
+    " got " <> show actual
   WrongOrder _ before after ->
     "expected to see " <> before <> " before " <> after
 

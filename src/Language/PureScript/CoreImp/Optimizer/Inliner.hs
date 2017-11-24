@@ -11,14 +11,11 @@ module Language.PureScript.CoreImp.Optimizer.Inliner
   , evaluateIifes
   ) where
 
-import Prelude.Compat
+import PSPrelude
 
 import Control.Monad.Supply.Class (MonadSupply, freshName)
 
-import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
 import Data.String (IsString, fromString)
-import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.PSString (PSString)
@@ -56,8 +53,8 @@ unThunk = everywhere convert
   convert :: AST -> AST
   convert (Block ss []) = Block ss []
   convert (Block ss jss) =
-    case last jss of
-      Return _ (App _ (Function _ Nothing [] (Block _ body)) []) -> Block ss $ init jss ++ body
+    case unsafeLast jss of
+      Return _ (App _ (Function _ Nothing [] (Block _ body)) []) -> Block ss $ unsafeInit jss ++ body
       _ -> Block ss jss
   convert js = js
 

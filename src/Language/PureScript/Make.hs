@@ -20,28 +20,18 @@ module Language.PureScript.Make
   , inferForeignModules
   ) where
 
-import           Prelude.Compat
+import           PSPrelude
 
-import           Control.Concurrent.Lifted as C
-import           Control.Monad hiding (sequence)
+import qualified Control.Concurrent.Lifted as C
 import           Control.Monad.Base (MonadBase(..))
-import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.IO.Class
 import           Control.Monad.Logger
-import           Control.Monad.Reader (MonadReader(..), ReaderT(..), asks)
 import           Control.Monad.Supply
 import           Control.Monad.Trans.Class (MonadTrans(..))
 import           Control.Monad.Trans.Control (MonadBaseControl(..))
-import           Control.Monad.Trans.Except
 import           Control.Monad.Writer.Class (MonadWriter(..))
 import           Data.Aeson (encode, decode)
 import qualified Data.Aeson as Aeson
-import           Data.Either (partitionEithers)
-import           Data.Function (on)
-import           Data.Foldable (for_)
-import           Data.List (foldl', sortBy, groupBy)
-import           Data.Maybe (fromMaybe, catMaybes)
-import           Data.Monoid ((<>))
+import           Data.List (foldl', sortBy, groupBy, lookup)
 import           Data.Time.Clock
 import           Data.Traversable (for)
 import           Data.Version (showVersion)
@@ -50,7 +40,6 @@ import qualified Data.ByteString.UTF8 as BU8
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T
-import qualified Data.Text.Encoding as TE
 import           Language.PureScript.AST
 import           Language.PureScript.Crash
 import           Language.PureScript.Environment
@@ -76,8 +65,8 @@ import qualified Paths_purescript as Paths
 import           SourceMap
 import           SourceMap.Types
 import           System.Directory (doesFileExist, getModificationTime, createDirectoryIfMissing, getCurrentDirectory)
-import           System.FilePath ((</>), takeDirectory, makeRelative, splitPath, normalise, replaceExtension)
-import           System.IO.Error (tryIOError)
+import           System.FilePath ((</>), takeDirectory, makeRelative, replaceExtension)
+import           System.IO.Error (IOError, tryIOError)
 import qualified Text.Parsec as Parsec
 
 -- | Progress messages from the make process
@@ -87,8 +76,8 @@ data ProgressMessage
   deriving (Show, Eq, Ord)
 
 -- | Render a progress message
-renderProgressMessage :: ProgressMessage -> String
-renderProgressMessage (CompilingModule mn) = "Compiling " ++ T.unpack (runModuleName mn)
+renderProgressMessage :: ProgressMessage -> Text
+renderProgressMessage (CompilingModule mn) = "Compiling " <> runModuleName mn
 
 -- | Actions that require implementations when running in "make" mode.
 --
@@ -116,7 +105,7 @@ data MakeActions m = MakeActions
   }
 
 -- | Generated code for an externs file.
-type Externs = B.ByteString
+type Externs = LByteString
 
 -- | Determines when to rebuild a module
 data RebuildPolicy
@@ -173,18 +162,18 @@ make ma@MakeActions{..} ms = do
 
   barriers <- zip (map getModuleName sorted) <$> replicateM (length ms) ((,) <$> C.newEmptyMVar <*> C.newEmptyMVar)
 
-  for_ sorted $ \m -> fork $ do
+  for_ sorted $ \m -> C.fork $ do
     let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup (getModuleName m) graph)
     buildModule barriers (importPrim m) (deps `inOrderOf` map getModuleName sorted)
 
   -- Wait for all threads to complete, and collect errors.
-  errors <- catMaybes <$> for barriers (takeMVar . snd . snd)
+  errors <- catMaybes <$> for barriers (C.takeMVar . snd . snd)
 
   -- All threads have completed, rethrow any caught errors.
   unless (null errors) $ throwError (mconcat errors)
 
   -- Bundle up all the externs and return them as an Environment
-  (_, externs) <- unzip . fromMaybe (internalError "make: externs were missing but no errors reported.") . sequence <$> for barriers (takeMVar . fst . snd)
+  (_, externs) <- unzip . fromMaybe (internalError "make: externs were missing but no errors reported.") . sequence <$> for barriers (C.takeMVar . fst . snd)
   return externs
 
   where
@@ -192,7 +181,7 @@ make ma@MakeActions{..} ms = do
   checkModuleNamesAreUnique =
     for_ (findDuplicates getModuleName ms) $ \mss ->
       throwError . flip foldMap mss $ \ms' ->
-        let mn = getModuleName (head ms')
+        let mn = getModuleName (unsafeHead ms')
         in errorMessage $ DuplicateModule mn (map getModuleSourceSpan ms')
 
   -- Find all groups of duplicate values in a list based on a projection.
@@ -211,7 +200,7 @@ make ma@MakeActions{..} ms = do
     -- We need to wait for dependencies to be built, before checking if the current
     -- module should be rebuilt, so the first thing to do is to wait on the
     -- MVars for the module's dependencies.
-    mexterns <- fmap unzip . sequence <$> traverse (readMVar . fst . fromMaybe (internalError "make: no barrier") . flip lookup barriers) deps
+    mexterns <- fmap unzip . sequence <$> traverse (C.readMVar . fst . fromMaybe (internalError "make: no barrier") . flip lookup barriers) deps
 
     case mexterns of
       Just (_, externs) -> do
@@ -240,8 +229,8 @@ make ma@MakeActions{..} ms = do
     where
     markComplete :: Maybe (MultipleErrors, ExternsFile) -> Maybe MultipleErrors -> m ()
     markComplete externs errors = do
-      putMVar (fst $ fromMaybe (internalError "make: no barrier") $ lookup moduleName barriers) externs
-      putMVar (snd $ fromMaybe (internalError "make: no barrier") $ lookup moduleName barriers) errors
+      C.putMVar (fst $ fromMaybe (internalError "make: no barrier") $ lookup moduleName barriers) externs
+      C.putMVar (snd $ fromMaybe (internalError "make: no barrier") $ lookup moduleName barriers) errors
 
   maximumMaybe :: Ord a => [a] -> Maybe a
   maximumMaybe [] = Nothing
@@ -284,7 +273,7 @@ makeIO f io = do
 
 -- | Read a text file in the 'Make' monad, capturing any errors using the
 -- 'MonadError' instance.
-readTextFile :: FilePath -> Make B.ByteString
+readTextFile :: FilePath -> Make LByteString
 readTextFile path = makeIO (const (ErrorMessage [] $ CannotReadFile path)) $ B.readFile path
 
 -- | Infer the module name for a module by looking for the same filename with
@@ -321,6 +310,10 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     MakeActions getInputTimestamp getOutputTimestamp readExterns codegen progress
   where
 
+  outputPathForMod :: ModuleName -> FilePath -> FilePath
+  outputPathForMod mn = ((outputDir </> moduleName) </>)
+    where moduleName = toS (runModuleName mn)
+
   getInputTimestamp :: ModuleName -> Make (Either RebuildPolicy (Maybe UTCTime))
   getInputTimestamp mn = do
     let path = fromMaybe (internalError "Module has no filename in 'make'") $ M.lookup mn filePathMap
@@ -331,10 +324,10 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   getOutputTimestamp :: ModuleName -> Make (Maybe UTCTime)
   getOutputTimestamp mn = do
     dumpCoreFn <- asks optionsDumpCoreFn
-    let filePath = T.unpack (runModuleName mn)
-        jsFile = outputDir </> filePath </> "index.js"
-        externsFile = outputDir </> filePath </> "externs.json"
-        coreFnFile = outputDir </> filePath </> "corefn.json"
+    let outputPath = outputPathForMod mn
+        jsFile = outputPath "index.js"
+        externsFile = outputPath "externs.json"
+        coreFnFile = outputPath "corefn.json"
         min3 js exts coreFn
           | dumpCoreFn = min (min js exts) coreFn
           | otherwise = min js exts
@@ -359,34 +352,33 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
       Nothing | requiresForeign m -> throwError . errorMessage $ MissingFFIModule mn
               | otherwise -> return Nothing
     rawJs <- J.moduleToJs m foreignInclude
-    dir <- lift $ makeIO (const (ErrorMessage [] $ CannotGetFileInfo ".")) getCurrentDirectory
     sourceMaps <- lift $ asks optionsSourceMaps
     let (pjs, mappings) = if sourceMaps then prettyPrintJSWithSourceMaps rawJs else (prettyPrintJS rawJs, [])
-    let filePath = T.unpack (runModuleName mn)
-        jsFile = outputDir </> filePath </> "index.js"
-        mapFile = outputDir </> filePath </> "index.js.map"
-        externsFile = outputDir </> filePath </> "externs.json"
-        foreignFile = outputDir </> filePath </> "foreign.js"
+    let outputPath = outputPathForMod mn
+        jsFile = outputPath "index.js"
+        mapFile = outputPath "index.js.map"
+        externsFile = outputPath "externs.json"
+        foreignFile = outputPath "foreign.js"
         prefix = ["Generated by purs version " <> T.pack (showVersion Paths.version) | usePrefix]
         js = T.unlines $ map ("// " <>) prefix ++ [pjs]
         mapRef = if sourceMaps then "//# sourceMappingURL=index.js.map\n" else ""
     lift $ do
-      writeTextFile jsFile (B.fromStrict $ TE.encodeUtf8 $ js <> mapRef)
+      writeTextFile jsFile (B.fromStrict $ encodeUtf8 $ js <> mapRef)
       for_ (mn `M.lookup` foreigns) (readTextFile >=> writeTextFile foreignFile)
       writeTextFile externsFile exts
-    lift $ when sourceMaps $ genSourceMap dir mapFile (length prefix) mappings
+    lift $ when sourceMaps $ genSourceMap mapFile (length prefix) mappings
     dumpCoreFn <- lift $ asks optionsDumpCoreFn
     when dumpCoreFn $ do
-      let coreFnFile = outputDir </> filePath </> "corefn.json"
+      let coreFnFile = outputPath "corefn.json"
       let jsonPayload = CFJ.moduleToJSON Paths.version m
       let json = Aeson.object [  (runModuleName mn, jsonPayload) ]
       lift $ writeTextFile coreFnFile (encode json)
 
-  genSourceMap :: String -> String -> Int -> [SMap] -> Make ()
-  genSourceMap dir mapFile extraLines mappings = do
-    let pathToDir = iterate (".." </>) ".." !! length (splitPath $ normalise outputDir)
-        sourceFile = case mappings of
-                      (SMap file _ _ : _) -> Just $ pathToDir </> makeRelative dir (T.unpack file)
+  genSourceMap :: FilePath -> Int -> [SMap] -> Make ()
+  genSourceMap mapFile extraLines mappings = do
+    dir <- makeIO (const (ErrorMessage [] $ CannotGetFileInfo ".")) getCurrentDirectory
+    let sourceFile = case mappings of
+                      (SMap file _ _ : _) -> Just $ makeRelative dir (toS file)
                       _ -> Nothing
     let rawMapping = SourceMapping { smFile = "index.js", smSourceRoot = Nothing, smMappings =
       map (\(SMap _ orig gen) -> Mapping {
@@ -414,7 +406,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     exists <- doesFileExist path
     traverse (const $ getModificationTime path) $ guard exists
 
-  writeTextFile :: FilePath -> B.ByteString -> Make ()
+  writeTextFile :: FilePath -> LByteString -> Make ()
   writeTextFile path text = makeIO (const (ErrorMessage [] $ CannotWriteFile path)) $ do
     mkdirp path
     B.writeFile path text
@@ -430,7 +422,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 checkForeignDecls :: CF.Module ann -> FilePath -> SupplyT Make ()
 checkForeignDecls m path = do
   jsStr <- lift $ readTextFile path
-  js <- either (errorParsingModule . Bundle.UnableToParseModule) pure $ JS.parse (BU8.toString (B.toStrict jsStr)) path
+  js <- either (errorParsingModule . Bundle.UnableToParseModule . toS) pure $ JS.parse (BU8.toString (B.toStrict jsStr)) path
 
   foreignIdentsStrs <- either errorParsingModule pure $ getExps js
   foreignIdents <- either
@@ -455,14 +447,14 @@ checkForeignDecls m path = do
   errorParsingModule :: Bundle.ErrorMessage -> SupplyT Make a
   errorParsingModule = throwError . errorMessage . ErrorParsingFFIModule path . Just
 
-  getExps :: JS.JSAST -> Either Bundle.ErrorMessage [String]
-  getExps = Bundle.getExportedIdentifiers (T.unpack (runModuleName mname))
+  getExps :: JS.JSAST -> Either Bundle.ErrorMessage [Text]
+  getExps = Bundle.getExportedIdentifiers (runModuleName mname)
 
-  errorInvalidForeignIdentifiers :: [String] -> SupplyT Make a
+  errorInvalidForeignIdentifiers :: [Text] -> SupplyT Make a
   errorInvalidForeignIdentifiers =
-    throwError . mconcat . map (errorMessage . InvalidFFIIdentifier mname . T.pack)
+    throwError . mconcat . map (errorMessage . InvalidFFIIdentifier mname)
 
-  parseIdents :: [String] -> Either [String] [Ident]
+  parseIdents :: [Text] -> Either [Text] [Ident]
   parseIdents strs =
     case partitionEithers (map parseIdent strs) of
       ([], idents) ->
@@ -472,9 +464,8 @@ checkForeignDecls m path = do
 
   -- We ignore the error message here, just being told it's an invalid
   -- identifier should be enough.
-  parseIdent :: String -> Either String Ident
-  parseIdent str = try (T.pack str)
-    where
-    try s = either (const (Left str)) Right $ do
+  parseIdent :: Text -> Either Text Ident  
+  parseIdent s =
+    either (const (Left s)) Right $ do
       ts <- PSParser.lex "" s
       PSParser.runTokenParser "" (PSParser.parseIdent <* Parsec.eof) ts

@@ -6,16 +6,12 @@ module Language.PureScript.Docs.AsMarkdown
   , codeToString
   ) where
 
-import Prelude.Compat
+import PSPrelude hiding (First)
 
-import Control.Monad (unless, zipWithM_)
 import Control.Monad.Error.Class (MonadError)
 import Control.Monad.Writer (Writer, tell, execWriter)
 
-import Data.Foldable (for_)
-import Data.Monoid ((<>))
 import Data.List (partition)
-import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.Docs.RenderedCode

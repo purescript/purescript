@@ -2,25 +2,19 @@
 
 module TestUtils where
 
-import Prelude ()
-import Prelude.Compat
+import PSPrelude
 
 import qualified Language.PureScript as P
 
-import Control.Monad
-import Control.Monad.Trans.Except
-import Control.Monad.Trans.Maybe
-import Control.Exception
+import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import Data.List (sort)
+import Data.String (String)
 import qualified Data.Text as T
 import System.Process
 import System.Directory
 import System.Info
-import System.IO.UTF8 (readUTF8FileT)
-import System.Exit (exitFailure)
 import System.FilePath ((</>))
 import qualified System.FilePath.Glob as Glob
-import System.IO (stderr, hPutStrLn)
 
 findNodeProcess :: IO (Maybe String)
 findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
@@ -51,12 +45,11 @@ updateSupportCode = do
   where
   cannotFindNode :: IO a
   cannotFindNode = do
-    hPutStrLn stderr "Cannot find node (or nodejs) executable"
-    exitFailure
+    fatal "Cannot find node (or nodejs) executable"
 
 readInput :: [FilePath] -> IO [(FilePath, T.Text)]
 readInput inputFiles = forM inputFiles $ \inputFile -> do
-  text <- readUTF8FileT inputFile
+  text <- readFile inputFile
   return (inputFile, text)
 
 -- |
@@ -72,7 +65,7 @@ getSupportModuleTuples = do
   modules <- runExceptT $ ExceptT . return $ P.parseModulesFromFiles id supportPursFiles
   case modules of
     Right ms -> return ms
-    Left errs -> fail (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
+    Left errs -> failT (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
 
 getSupportModuleNames :: IO [T.Text]
 getSupportModuleNames = sort . map (P.runModuleName . P.getModuleName . snd) <$> getSupportModuleTuples

@@ -1,11 +1,7 @@
 -- | Data types for the imperative core AST
 module Language.PureScript.CoreImp.AST where
 
-import Prelude.Compat
-
-import Control.Monad ((>=>))
-import Control.Monad.Identity (Identity(..), runIdentity)
-import Data.Text (Text)
+import PSPrelude hiding ((<>))
 
 import Language.PureScript.AST (SourceSpan(..))
 import Language.PureScript.Comments

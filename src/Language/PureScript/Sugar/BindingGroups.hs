@@ -9,15 +9,10 @@ module Language.PureScript.Sugar.BindingGroups
   , collapseBindingGroupsModule
   ) where
 
-import Prelude.Compat
-import Protolude (ordNub)
-
-import Control.Monad ((<=<))
-import Control.Monad.Error.Class (MonadError(..))
+import PSPrelude
 
 import Data.Graph
 import Data.List (intersect)
-import Data.Maybe (isJust, mapMaybe)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Set as S
 
@@ -198,7 +193,7 @@ toDataBindingGroup (CyclicSCC [d]) = case isTypeSynonym d of
   Just pn -> throwError . errorMessage' (declSourceSpan d) $ CycleInTypeSynonym (Just pn)
   _ -> return d
 toDataBindingGroup (CyclicSCC ds')
-  | all (isJust . isTypeSynonym) ds' = throwError . errorMessage' (declSourceSpan (head ds')) $ CycleInTypeSynonym Nothing
+  | all (isJust . isTypeSynonym) ds' = throwError . errorMessage' (declSourceSpan (unsafeHead ds')) $ CycleInTypeSynonym Nothing
   | otherwise = return . DataBindingGroupDeclaration $ NEL.fromList ds'
 
 isTypeSynonym :: Declaration -> Maybe (ProperName 'TypeName)

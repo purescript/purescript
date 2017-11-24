@@ -1,17 +1,11 @@
 module TestPsci.EvalTest where
 
-import Prelude ()
-import Prelude.Compat
+import PSPrelude
 
-import           Control.Monad (forM_, foldM_)
-import           Control.Monad.IO.Class (liftIO)
-import           Data.List (stripPrefix, intercalate)
-import           Data.List.Split (splitOn)
+import qualified Data.Text as T
 import           System.Directory (getCurrentDirectory)
-import           System.Exit (exitFailure)
 import           System.FilePath ((</>), takeFileName)
 import qualified System.FilePath.Glob as Glob
-import           System.IO.UTF8 (readUTF8File)
 import           Test.Hspec
 import           TestPsci.TestEnv
 
@@ -26,34 +20,34 @@ evalTestFiles = do
   let psciExamples = cwd </> "examples" </> "psci"
   Glob.globDir1 (Glob.compile "**/*.purs") psciExamples
 
-data EvalLine = Line String
+data EvalLine = Line Text
               | Comment EvalContext
               | Empty
-              | Invalid String
+              | Invalid Text
               deriving (Show)
 
-data EvalContext = ShouldEvaluateTo String
-                 | Paste [String]
+data EvalContext = ShouldEvaluateTo Text
+                 | Paste [Text]
                  | None
                  deriving (Show)
 
-evalCommentPrefix :: String
+evalCommentPrefix :: Text
 evalCommentPrefix = "-- @"
 
-parseEvalLine :: String -> EvalLine
+parseEvalLine :: Text -> EvalLine
 parseEvalLine "" = Empty
 parseEvalLine line =
-  case stripPrefix evalCommentPrefix line of
+  case T.stripPrefix evalCommentPrefix line of
     Just rest ->
-      case splitOn " " rest of
-        "shouldEvaluateTo" : args -> Comment (ShouldEvaluateTo $ intercalate " " args)
+      case T.splitOn " " rest of
+        "shouldEvaluateTo" : args -> Comment (ShouldEvaluateTo $ T.intercalate " " args)
         "paste" : [] -> Comment (Paste [])
         _ -> Invalid line
     Nothing -> Line line
 
 evalTest :: FilePath -> Spec
 evalTest f = specify (takeFileName f) $ do
-  evalLines <- map parseEvalLine . lines <$> readUTF8File f
+  evalLines <- map parseEvalLine . T.lines <$> readFile f
   execTestPSCi $ foldM_ handleLine None evalLines
 
 handleLine :: EvalContext -> EvalLine -> TestPSCi EvalContext
@@ -61,6 +55,6 @@ handleLine ctx Empty = pure ctx
 handleLine None (Line stmt) = run stmt >> pure None
 handleLine None (Comment ctx) = pure ctx
 handleLine (ShouldEvaluateTo expected) (Line expr) = expr `evaluatesTo` expected >> pure None
-handleLine (Paste ls) (Line l) = pure . Paste $ ls ++ [l]
-handleLine (Paste ls) (Comment (Paste _)) = run (intercalate "\n" ls) >> pure None
-handleLine _ line = liftIO $ putStrLn ("unexpected: " ++ show line) >> exitFailure
+handleLine (Paste ls) (Line l) = pure . Paste $ ls <> [l]
+handleLine (Paste ls) (Comment (Paste _)) = run (T.intercalate "\n" ls) >> pure None
+handleLine _ line = liftIO $ putText ("unexpected: " <> show line) >> exitFailure

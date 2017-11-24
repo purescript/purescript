@@ -5,11 +5,9 @@
 
 module Language.PureScript.Sugar.DoNotation (desugarDoModule) where
 
-import           Prelude.Compat
+import           PSPrelude
 
-import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Supply.Class
-import           Data.Monoid (First(..))
 import           Language.PureScript.AST
 import           Language.PureScript.Crash
 import           Language.PureScript.Errors

@@ -1,7 +1,8 @@
 -- | Various constants which refer to things in the Prelude
 module Language.PureScript.Constants where
 
-import Prelude.Compat
+import PSPrelude
+
 import Data.String (IsString)
 import Language.PureScript.Names
 

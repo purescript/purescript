@@ -6,10 +6,8 @@ module Language.PureScript.Parser.Types
   , parseTypeAtom
   ) where
 
-import Prelude.Compat
+import PSPrelude
 
-import Control.Monad (when, unless)
-import Control.Applicative ((<|>))
 import Data.Functor (($>))
 import qualified Data.Text as T
 
@@ -103,15 +101,15 @@ typeOrConstrainedType = do
   case e of
     Left ([c], ty) -> pure (ConstrainedType c ty)
     Left _ ->
-      P.unexpected $
-        unlines [ "comma in constraints."
-                , ""
-                , "Class constraints in type annotations can no longer be grouped in parentheses."
-                , "Each constraint should now be separated by `=>`, for example:"
-                , "    `(Applicative f, Semigroup a) => a -> f a -> f a`"
-                , "  would now be written as:"
-                , "    `Applicative f => Semigroup a => a -> f a -> f a`."
-                ]
+      P.unexpected $ toS $
+        T.unlines [ "comma in constraints."
+                  , ""
+                  , "Class constraints in type annotations can no longer be grouped in parentheses."
+                  , "Each constraint should now be separated by `=>`, for example:"
+                  , "    `(Applicative f, Semigroup a) => a -> f a -> f a`"
+                  , "  would now be written as:"
+                  , "    `Applicative f => Semigroup a => a -> f a -> f a`."
+                  ]
     Right ty -> pure ty
 
 parseAnyType :: TokenParser Type

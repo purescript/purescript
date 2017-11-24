@@ -2,7 +2,7 @@ module Language.PureScript.TypeChecker.TypeSearch
   ( typeSearch
   ) where
 
-import           Protolude
+import           PSPrelude
 
 import           Control.Monad.Writer (WriterT, runWriterT)
 import qualified Data.Map                                    as Map

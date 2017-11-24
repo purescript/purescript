@@ -24,11 +24,11 @@ module Language.PureScript.Ide.Filter
        , applyFilters
        ) where
 
-import           Protolude                     hiding (isPrefixOf)
+import           PSPrelude hiding (filter)
 
 import           Data.Aeson
-import           Data.List.NonEmpty            (NonEmpty)
-import           Data.Text                     (isPrefixOf)
+import           Data.List (filter, null)
+import qualified Data.Text                     as T
 import qualified Language.PureScript.Ide.Filter.Declaration as D
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
@@ -65,7 +65,7 @@ prefixFilter t =
   mkFilter $ declarationFilter prefix t
   where
     prefix :: IdeDeclaration -> Text -> Bool
-    prefix ed search = search `isPrefixOf` identifierFromIdeDeclaration ed
+    prefix ed search = search `T.isPrefixOf` identifierFromIdeDeclaration ed
 
 -- | Only keeps Identifiers that are equal to the search string
 equalityFilter :: Text -> Filter

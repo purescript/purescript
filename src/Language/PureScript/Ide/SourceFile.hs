@@ -21,7 +21,7 @@ module Language.PureScript.Ide.SourceFile
   , extractTypeAnnotations
   ) where
 
-import           Protolude
+import           PSPrelude
 
 import           Control.Parallel.Strategies (withStrategy, parList, rseq)
 import qualified Data.Map                      as Map

@@ -4,8 +4,8 @@
 
 module TestPscPublish where
 
-import Control.Monad.IO.Class (liftIO)
-import System.Exit (exitFailure)
+import PSPrelude hiding (ByteString)
+
 import Data.ByteString.Lazy (ByteString)
 import Data.Time.Clock (getCurrentTime)
 import qualified Data.Aeson as A
@@ -23,7 +23,7 @@ main = testPackage
          "../../prelude-resolutions.json"
 
 data TestResult
-  = ParseFailed String
+  = ParseFailed Text
   | Mismatch ByteString ByteString -- ^ encoding before, encoding after
   | Pass ByteString
   deriving (Show)
@@ -32,7 +32,7 @@ roundTrip :: UploadedPackage -> TestResult
 roundTrip pkg =
   let before = A.encode pkg
   in case A.eitherDecode before of
-       Left err -> ParseFailed err
+       Left err -> ParseFailed $ toS err
        Right parsed -> do
          let after = A.encode (parsed :: UploadedPackage)
          if before == after

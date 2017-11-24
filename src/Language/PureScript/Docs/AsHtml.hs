@@ -14,17 +14,11 @@ module Language.PureScript.Docs.AsHtml (
   renderMarkdown
 ) where
 
-import Prelude
-import Control.Category ((>>>))
-import Control.Monad (unless)
-import Data.Char (isUpper)
-import Data.Either (isRight)
-import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
-import Data.Foldable (for_)
-import Data.String (fromString)
+import PSPrelude
 
-import Data.Text (Text)
+import Control.Category ((>>>))
+import Data.Char (isUpper)
+
 import qualified Data.Text as T
 
 import Text.Blaze.Html5 as H hiding (map)
@@ -224,7 +218,7 @@ codeAsHtml r = outputWith elemAsHtml
 
   isOp = isRight . runParser P.symbol
 
-  runParser :: P.TokenParser a -> Text -> Either String a
+  runParser :: P.TokenParser a -> Text -> Either Text a
   runParser p' s = either (Left . show) Right $ do
     ts <- P.lex "" s
     P.runTokenParser "" (p' <* eof) ts
@@ -319,8 +313,8 @@ removeRelativeLinks = Cheapskate.walk go
 v :: Text -> AttributeValue
 v = toValue
 
-withClass :: String -> Html -> Html
-withClass className content = H.span ! A.class_ (fromString className) $ content
+withClass :: Text -> Html -> Html
+withClass className content = H.span ! A.class_ (textValue className) $ content
 
 partitionChildren ::
   [ChildDeclaration] ->

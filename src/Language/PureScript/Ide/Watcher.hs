@@ -17,7 +17,7 @@ module Language.PureScript.Ide.Watcher
  ( watcher
  ) where
 
-import                Protolude
+import                PSPrelude
 
 import                Control.Concurrent.STM
 import "monad-logger" Control.Monad.Logger

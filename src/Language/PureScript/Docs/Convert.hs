@@ -8,13 +8,12 @@ module Language.PureScript.Docs.Convert
   , convertModulesInPackageWithEnv
   ) where
 
-import Protolude hiding (check)
+import PSPrelude
 
 import Control.Arrow ((&&&))
 import Control.Category ((>>>))
 import Control.Monad.Writer.Strict (runWriterT)
 import qualified Data.Map as Map
-import Data.String (String)
 
 import Language.PureScript.Docs.Convert.ReExports (updateReExports)
 import Language.PureScript.Docs.Convert.Single (convertSingleModule)
@@ -174,7 +173,7 @@ insertValueTypes env m =
     other
 
   parseIdent =
-    either (err . ("failed to parse Ident: " ++)) identity . runParser P.parseIdent
+    either (err . ("failed to parse Ident: " <>) . toS) identity . runParser P.parseIdent
 
   lookupName name =
     let key = P.Qualified (Just (modName m)) name
@@ -182,12 +181,12 @@ insertValueTypes env m =
       Just (ty, _, _) ->
         ty
       Nothing ->
-        err ("name not found: " ++ show key)
+        err ("name not found: " <> show key)
 
   err msg =
-    P.internalError ("Docs.Convert.insertValueTypes: " ++ msg)
+    P.internalError ("Docs.Convert.insertValueTypes: " <> msg)
 
-runParser :: P.TokenParser a -> Text -> Either String a
+runParser :: P.TokenParser a -> Text -> Either Text a
 runParser p s = either (Left . show) Right $ do
   ts <- P.lex "" s
   P.runTokenParser "" (p <* eof) ts

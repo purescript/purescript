@@ -68,7 +68,7 @@ dependencies:
   - pipes >=4.0.0 && <4.4.0
   - pipes-http
   - process >=1.2.0 && <1.7
-  - protolude >=0.1.6
+  - protolude >=0.1.10
   - regex-tdfa
   - safe >=0.3.9 && <0.4
   - scientific >=0.3.4.9 && <0.4
@@ -88,34 +88,35 @@ dependencies:
   - utf8-string >=1 && <2
   - vector
 
+default-extensions:
+  - ConstraintKinds
+  - DataKinds
+  - DeriveFunctor
+  - EmptyDataDecls
+  - FlexibleContexts
+  - KindSignatures
+  - LambdaCase
+  - MultiParamTypeClasses
+  - NoImplicitPrelude
+  - PatternGuards
+  - PatternSynonyms
+  - RankNTypes
+  - RecordWildCards
+  - OverloadedStrings
+  - ScopedTypeVariables
+  - TupleSections
+  - ViewPatterns
+
 library:
   source-dirs: src
-  ghc-options: -Wall -O2
+  ghc-options: -Werror -Wall -O2
   other-modules: Paths_purescript
-  default-extensions:
-    - ConstraintKinds
-    - DataKinds
-    - DeriveFunctor
-    - EmptyDataDecls
-    - FlexibleContexts
-    - KindSignatures
-    - LambdaCase
-    - MultiParamTypeClasses
-    - NoImplicitPrelude
-    - PatternGuards
-    - PatternSynonyms
-    - RankNTypes
-    - RecordWildCards
-    - OverloadedStrings
-    - ScopedTypeVariables
-    - TupleSections
-    - ViewPatterns
 
 executables:
   purs:
     main: Main.hs
     source-dirs: app
-    ghc-options: -Wall -O2 -fno-warn-unused-do-bind -threaded -rtsopts -with-rtsopts=-N
+    ghc-options: -Werror -Wall -O2 -threaded -rtsopts -with-rtsopts=-N
     other-modules:
       - Command.Bundle
       - Command.Compile
@@ -153,7 +154,7 @@ tests:
   tests:
     main: Main.hs
     source-dirs: tests
-    ghc-options: -Wall
+    ghc-options: -Werror -Wall
     dependencies:
     - purescript
     - hspec

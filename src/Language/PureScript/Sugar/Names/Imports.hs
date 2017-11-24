@@ -5,13 +5,9 @@ module Language.PureScript.Sugar.Names.Imports
   , findImports
   ) where
 
-import Prelude.Compat
-
-import Control.Monad
-import Control.Monad.Error.Class (MonadError(..))
+import PSPrelude
 
 import Data.Foldable (for_, traverse_)
-import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
@@ -126,7 +122,7 @@ resolveImport importModule exps imps impQual = resolveByType
       throwError . errorMessage' ss $ ImportHidingModule name
     check (KindRef ss name) =
       checkImportExists ss KiName (exportedKinds exps) name
-    check r = internalError $ "Invalid argument to checkRefs: " ++ show r
+    check r = internalError $ "Invalid argument to checkRefs: " <> show r
 
   -- Check that an explicitly imported item exists in the module it is being imported from
   checkImportExists

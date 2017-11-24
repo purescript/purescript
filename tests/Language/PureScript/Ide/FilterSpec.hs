@@ -2,7 +2,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Language.PureScript.Ide.FilterSpec where
 
-import           Protolude
+import           PSPrelude
+
 import           Data.List.NonEmpty
 import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.Filter.Declaration as D

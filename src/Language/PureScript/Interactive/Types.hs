@@ -3,7 +3,7 @@
 --
 module Language.PureScript.Interactive.Types where
 
-import Prelude.Compat
+import PSPrelude
 
 import qualified Language.PureScript as P
 
@@ -12,7 +12,7 @@ import qualified Language.PureScript as P
 -- These configuration values do not change during execution.
 --
 data PSCiConfig = PSCiConfig
-  { psciFileGlobs           :: [String]
+  { psciFileGlobs           :: [FilePath]
   , psciEnvironment         :: P.Environment
   } deriving Show
 
@@ -97,7 +97,7 @@ data Command
   -- | Paste multiple lines
   | PasteLines
   -- | Return auto-completion output as if pressing <tab>
-  | CompleteStr String
+  | CompleteStr Text
   deriving Show
 
 data ReplQuery
@@ -109,14 +109,14 @@ data ReplQuery
 replQueries :: [ReplQuery]
 replQueries = [QueryLoaded, QueryImport]
 
-replQueryStrings :: [String]
+replQueryStrings :: [Text]
 replQueryStrings = map showReplQuery replQueries
 
-showReplQuery :: ReplQuery -> String
+showReplQuery :: ReplQuery -> Text
 showReplQuery QueryLoaded = "loaded"
 showReplQuery QueryImport = "import"
 
-parseReplQuery :: String -> Maybe ReplQuery
+parseReplQuery :: Text -> Maybe ReplQuery
 parseReplQuery "loaded" = Just QueryLoaded
 parseReplQuery "import" = Just QueryImport
 parseReplQuery _ = Nothing

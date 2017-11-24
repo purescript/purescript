@@ -10,11 +10,8 @@ module Language.PureScript.Docs.RenderedCode.RenderType
   , renderTypeAtomWithOptions
   ) where
 
-import Prelude.Compat
+import PSPrelude
 
-import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
-import Data.Text (Text)
 
 import Control.Arrow ((<+>))
 import Control.PatternArrows as PA

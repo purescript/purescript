@@ -1,9 +1,9 @@
 module Language.PureScript.Interactive.IO (findNodeProcess, getHistoryFilename) where
 
-import Prelude.Compat
+import PSPrelude
 
-import Control.Monad (msum)
 import Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
+import Data.String(String)
 import System.Directory (XdgDirectory (..), createDirectoryIfMissing,
                          getAppUserDataDirectory, getXdgDirectory,
                          findExecutable, doesFileExist)
