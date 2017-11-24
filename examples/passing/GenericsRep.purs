@@ -6,8 +6,8 @@ import Control.Monad.Eff.Console (CONSOLE, log, logShow)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 
-data X a = X a 
-	 
+data X a = X a
+
 derive instance genericX :: Generic (X a) _
 
 instance eqX :: Eq a => Eq (X a) where
@@ -33,23 +33,6 @@ newtype W = W { x :: Int, y :: MyString }
 
 derive instance genericW :: Generic W _
 
-instance eqW :: Eq W where
-  eq x y = genericEq x y
-
-data V = V { x :: Int } { x :: Int }
- 
-derive instance genericV :: Generic V _
-
-instance eqV :: Eq V where
-  eq x y = genericEq x y
-
-newtype U = U {}
-
-derive instance genericU :: Generic U _
-
-instance eqU :: Eq U where
-  eq x y = genericEq x y
-
 main :: Eff (console :: CONSOLE) Unit
 main = do
   logShow (X 0 == X 1)
@@ -57,7 +40,4 @@ main = do
   logShow (Z 1 Y == Z 1 Y)
   logShow (Z 1 Y == Y)
   logShow (Y == Y :: Y Z)
-  logShow (W { x: 0, y: "A" } == W { x: 0, y: "A" })
-  logShow (V { x: 0 } { x: 0 } == V { x: 0 } { x: 0 })
-  logShow (U {} == U {})
   log "Done"

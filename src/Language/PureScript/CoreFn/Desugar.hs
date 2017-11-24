@@ -39,7 +39,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
       exps' = ordNub $ concatMap exportToCoreFn exps
       externs = ordNub $ mapMaybe externToCoreFn decls
       decls' = concatMap declToCoreFn decls
-  in Module coms mn imports' exps' externs decls'
+  in Module coms mn (spanName modSS) imports' exps' externs decls'
 
   where
 
@@ -101,6 +101,8 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     exprToCoreFn ss com (Just ty) v
   exprToCoreFn ss com ty (A.Let ds v) =
     Let (ss, com, ty, Nothing) (concatMap declToCoreFn ds) (exprToCoreFn ss [] Nothing v)
+  exprToCoreFn ss com ty (A.Proxy _) =
+    Literal (ss, com, ty, Nothing) (ObjectLiteral [])
   exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name (A.TypedValue _ lit@(A.Literal (A.ObjectLiteral _)) _)) =
     exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name lit)
   exprToCoreFn ss com _ (A.TypeClassDictionaryConstructorApp name (A.Literal (A.ObjectLiteral vs))) =
@@ -192,7 +194,7 @@ findQualModules decls =
   in f `concatMap` decls
   where
   fqDecls :: A.Declaration -> [ModuleName]
-  fqDecls (A.TypeInstanceDeclaration _ _ _ q _ _) = getQual' q
+  fqDecls (A.TypeInstanceDeclaration _ _ _ _ _ q _ _) = getQual' q
   fqDecls (A.ValueFixityDeclaration _ _ q _) = getQual' q
   fqDecls (A.TypeFixityDeclaration _ _ q _) = getQual' q
   fqDecls _ = []
@@ -219,8 +221,8 @@ importToCoreFn (A.ImportDeclaration (ss, com) name _ _) = Just ((ss, com, Nothin
 importToCoreFn _ = Nothing
 
 -- | Desugars foreign declarations from AST to CoreFn representation.
-externToCoreFn :: A.Declaration -> Maybe ForeignDecl
-externToCoreFn (A.ExternDeclaration _ name ty) = Just (name, ty)
+externToCoreFn :: A.Declaration -> Maybe Ident
+externToCoreFn (A.ExternDeclaration _ name _) = Just name
 externToCoreFn _ = Nothing
 
 -- | Desugars export declarations references from AST to CoreFn representation.

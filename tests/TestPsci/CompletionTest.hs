@@ -33,12 +33,12 @@ completionTestData supportModuleNames =
   , (":b",  [":browse"])
 
   -- :browse should complete module names
-  , (":b Control.Monad.E",    map (":b Control.Monad.Eff" ++) ["", ".Unsafe", ".Class", ".Console", ".Uncurried"])
-  , (":b Control.Monad.Eff.", map (":b Control.Monad.Eff" ++) [".Unsafe", ".Class", ".Console", ".Uncurried"])
+  , (":b Control.Monad.E",    map (":b Control.Monad.Eff" ++) ["", ".Unsafe", ".Class", ".Console", ".Uncurried", ".Ref", ".Ref.Unsafe"])
+  , (":b Control.Monad.Eff.", map (":b Control.Monad.Eff" ++) [".Unsafe", ".Class", ".Console", ".Uncurried", ".Ref", ".Ref.Unsafe"])
 
   -- import should complete module names
-  , ("import Control.Monad.E",    map ("import Control.Monad.Eff" ++) ["", ".Unsafe", ".Class", ".Console", ".Uncurried"])
-  , ("import Control.Monad.Eff.", map ("import Control.Monad.Eff" ++) [".Unsafe", ".Class", ".Console", ".Uncurried"])
+  , ("import Control.Monad.E",    map ("import Control.Monad.Eff" ++) ["", ".Unsafe", ".Class", ".Console", ".Uncurried", ".Ref", ".Ref.Unsafe"])
+  , ("import Control.Monad.Eff.", map ("import Control.Monad.Eff" ++) [".Unsafe", ".Class", ".Console", ".Uncurried", ".Ref", ".Ref.Unsafe"])
 
   -- :quit, :help, :reload, :clear should not complete
   , (":help ", [])

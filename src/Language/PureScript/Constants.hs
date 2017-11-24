@@ -191,6 +191,11 @@ pure' = "pure"
 returnEscaped :: forall a. (IsString a) => a
 returnEscaped = "$return"
 
+unit :: forall a. (IsString a) => a
+unit = "unit"
+
+-- Core lib values
+
 untilE :: forall a. (IsString a) => a
 untilE = "untilE"
 
@@ -221,8 +226,11 @@ mkFn = "mkFn"
 runFn :: forall a. (IsString a) => a
 runFn = "runFn"
 
-unit :: forall a. (IsString a) => a
-unit = "unit"
+mkEffFn :: forall a. (IsString a) => a
+mkEffFn = "mkEffFn"
+
+runEffFn :: forall a. (IsString a) => a
+runEffFn = "runEffFn"
 
 -- Prim values
 
@@ -345,6 +353,9 @@ pattern CompareSymbol = Qualified (Just TypeDataSymbol) (ProperName "CompareSymb
 pattern AppendSymbol :: Qualified (ProperName 'ClassName)
 pattern AppendSymbol = Qualified (Just TypeDataSymbol) (ProperName "AppendSymbol")
 
+pattern ConsSymbol :: Qualified (ProperName 'ClassName)
+pattern ConsSymbol = Qualified (Just TypeDataSymbol) (ProperName "ConsSymbol")
+
 -- Type.Data.Ordering
 
 typeDataOrdering :: ModuleName
@@ -440,6 +451,9 @@ pattern ControlBind = ModuleName [ProperName "Control", ProperName "Bind"]
 
 controlBind :: forall a. (IsString a) => a
 controlBind = "Control_Bind"
+
+controlMonadEffUncurried :: forall a. (IsString a) => a
+controlMonadEffUncurried = "Control_Monad_Eff_Uncurried"
 
 dataBounded :: forall a. (IsString a) => a
 dataBounded = "Data_Bounded"

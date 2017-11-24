@@ -50,7 +50,7 @@ moduleToJs
   => Module Ann
   -> Maybe AST
   -> m [AST]
-moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
+moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
     let mnLookup = renameImports usedNames imps
@@ -64,7 +64,7 @@ moduleToJs (Module coms mn imps exps foreigns decls) foreign_ =
     let header = if comments && not (null coms) then AST.Comment Nothing coms strict else strict
     let foreign' = [AST.VariableIntroduction Nothing "$foreign" foreign_ | not $ null foreigns || isNothing foreign_]
     let moduleBody = header : foreign' ++ jsImports ++ concat optimized
-    let foreignExps = exps `intersect` (fst `map` foreigns)
+    let foreignExps = exps `intersect` foreigns
     let standardExps = exps \\ foreignExps
     let exps' = AST.ObjectLiteral Nothing $ map (mkString . runIdent &&& AST.Var Nothing . identToJs) standardExps
                                ++ map (mkString . runIdent &&& foreignIdent) foreignExps

@@ -64,6 +64,8 @@ skolemizeTypesInValue ident sko scope ss =
       | ident `notElem` sco = return (sco, DeferredDictionary c (map (skolemize ident sko scope ss) ts))
     onExpr sco (TypedValue check val ty)
       | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedValue check val (skolemize ident sko scope ss ty))
+    onExpr sco (Proxy ty)
+      | ident `notElem` sco = return (sco ++ peelTypeVars ty, Proxy (skolemize ident sko scope ss ty))
     onExpr sco other = return (sco, other)
 
     onBinder :: [Text] -> Binder -> Identity ([Text], Binder)

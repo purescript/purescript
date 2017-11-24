@@ -198,6 +198,7 @@ checkTypeClassInstance cls i = check where
     TypeApp t1 t2 -> check t1 >> check t2
     REmpty | isFunDepDetermined -> return ()
     RCons _ hd tl | isFunDepDetermined -> check hd >> check tl
+    ProxyType ty -> check ty
     ty -> throwError . errorMessage $ InvalidInstanceHead ty
 
 -- |
@@ -322,7 +323,7 @@ typeCheckAll moduleName _ = traverse go
         not (M.member qualifiedClassName (typeClasses env))
       addTypeClass qualifiedClassName args implies deps tys
       return d
-  go (d@(TypeInstanceDeclaration (ss, _) dictName deps className tys body)) =
+  go (d@(TypeInstanceDeclaration (ss, _) ch idx dictName deps className tys body)) =
     rethrow (addHint (ErrorInInstance className tys) . addHint (PositionedError ss)) $ do
       env <- getEnv
       let qualifiedDictName = Qualified (Just moduleName) dictName
@@ -337,7 +338,7 @@ typeCheckAll moduleName _ = traverse go
           checkOrphanInstance dictName className typeClass tys
           _ <- traverseTypeInstanceBody checkInstanceMembers body
           deps' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms deps
-          let dict = TypeClassDictionaryInScope qualifiedDictName [] className tys (Just deps')
+          let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) <$> ch) idx qualifiedDictName [] className tys (Just deps')
           addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) dict
           return d
 
@@ -379,6 +380,7 @@ typeCheckAll moduleName _ = traverse go
     typeModule (TypeConstructor (Qualified (Just mn'') _)) = Just mn''
     typeModule (TypeConstructor (Qualified Nothing _)) = internalError "Unqualified type name in checkOrphanInstance"
     typeModule (TypeApp t1 _) = typeModule t1
+    typeModule (ProxyType _) = Nothing
     typeModule _ = internalError "Invalid type in instance in checkOrphanInstance"
 
     modulesByTypeIndex :: M.Map Int (Maybe ModuleName)

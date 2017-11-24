@@ -35,7 +35,6 @@ import           Control.Monad.Trans.Control (MonadBaseControl(..))
 import           Control.Monad.Trans.Except
 import           Control.Monad.Writer.Class (MonadWriter(..))
 import           Data.Aeson (encode, decode)
-import qualified Data.Aeson as Aeson
 import           Data.Either (partitionEithers)
 import           Data.Function (on)
 import           Data.Foldable (for_)
@@ -378,8 +377,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     dumpCoreFn <- lift $ asks optionsDumpCoreFn
     when dumpCoreFn $ do
       let coreFnFile = outputDir </> filePath </> "corefn.json"
-      let jsonPayload = CFJ.moduleToJSON Paths.version m
-      let json = Aeson.object [  (runModuleName mn, jsonPayload) ]
+      let json = CFJ.moduleToJSON Paths.version m
       lift $ writeTextFile coreFnFile (encode json)
 
   genSourceMap :: String -> String -> Int -> [SMap] -> Make ()
@@ -437,7 +435,7 @@ checkForeignDecls m path = do
                      errorInvalidForeignIdentifiers
                      (pure . S.fromList)
                      (parseIdents foreignIdentsStrs)
-  let importedIdents = S.fromList $ map fst (CF.moduleForeign m)
+  let importedIdents = S.fromList (CF.moduleForeign m)
 
   let unusedFFI = foreignIdents S.\\ importedIdents
   unless (null unusedFFI) $
