@@ -9,7 +9,6 @@ import           Data.Foldable (foldr1, foldl1)
 import           Data.List (foldl', find, sortBy, unzip5, unzip3, zipWith3)
 import qualified Data.Map as M
 import qualified Data.Set as S
-import qualified Data.Text as T
 import           Language.PureScript.AST
 import qualified Language.PureScript.Constants as C
 import           Language.PureScript.Crash

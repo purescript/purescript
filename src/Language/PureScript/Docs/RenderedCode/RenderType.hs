@@ -15,6 +15,7 @@ import PSPrelude
 
 import Control.Arrow ((<+>))
 import Control.PatternArrows as PA
+import Data.Monoid.Extra
 
 import Language.PureScript.Crash
 import Language.PureScript.Environment
@@ -26,7 +27,6 @@ import Language.PureScript.Label (Label)
 import Language.PureScript.PSString (prettyPrintString)
 
 import Language.PureScript.Docs.RenderedCode.Types
-import Language.PureScript.Docs.Utils.MonoidExtras
 import Language.PureScript.Docs.RenderedCode.RenderKind (renderKind)
 
 typeLiterals :: Pattern () Type RenderedCode

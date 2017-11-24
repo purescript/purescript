@@ -1,5 +1,6 @@
 module PSPrelude ( module X
                  , F.id
+                 , L.groupBy
                  , Monad.fail
                  , error
                  , failT
@@ -23,6 +24,7 @@ import Protolude as X hiding ( Associativity
                              , Fixity
                              , Infix
                              , Meta
+                             , Proxy
                              , check
                              , link
                              , moduleName

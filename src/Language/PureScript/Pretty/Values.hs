@@ -75,14 +75,14 @@ prettyPrintValue d (Let ds val) =
 prettyPrintValue d (Do els) =
   text "do " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els)
 prettyPrintValue _ (Proxy ty) =
-  text "@" <> typeAtomAsBox ty
+  textT "@" <> typeAtomAsBox ty
 prettyPrintValue d (Ado els yield) =
-  text "ado " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els) //
+  textT "ado " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els) //
   (text "in " <> prettyPrintValue (d - 1) yield)
 prettyPrintValue _ (TypeClassDictionary (Constraint name tys _) _ _) = foldl1 beforeWithSpace $ textT ("#dict " Monoid.<> runProperName (disqualify name)) : map typeAtomAsBox tys
-prettyPrintValue _ (DeferredDictionary name _) = textT $ "#dict " <> runProperName (disqualify name)
+prettyPrintValue _ (DeferredDictionary name _) = textT $ "#dict " Monoid.<> runProperName (disqualify name)
 prettyPrintValue _ (TypeClassDictionaryAccessor className ident) =
-    text "#dict-accessor " <> textT (runProperName (disqualify className)) <> text "." <> textT (showIdent ident) <> text ">"
+    textT "#dict-accessor " <> textT (runProperName (disqualify className)) <> textT "." <> textT (showIdent ident) <> textT ">"
 prettyPrintValue d (TypedValue _ val _) = prettyPrintValue d val
 prettyPrintValue d (PositionedValue _ _ val) = prettyPrintValue d val
 prettyPrintValue d (Literal l) = prettyPrintLiteralValue d l

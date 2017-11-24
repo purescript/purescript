@@ -6,13 +6,12 @@ module Language.PureScript.CodeGen.JS.Printer
 
 import PSPrelude
 
-import Control.Arrow ((<+>))
+import Control.Arrow ((<+>), runKleisli)
 import Control.PatternArrows
-import qualified Control.Arrow as A
 
+import Data.Monoid.Extra (mintercalate)
 import qualified Data.Text as T
 
-import Language.PureScript.Docs.Utils.MonoidExtras (mintercalate)
 import Language.PureScript.AST (SourceSpan(..))
 import Language.PureScript.CodeGen.JS.Common
 import Language.PureScript.CoreImp.AST
@@ -225,7 +224,7 @@ prettyPrintJS = maybe (internalError "Incomplete pattern") runPlainString . flip
 
 -- | Generate an indented, pretty-printed string representing a JavaScript expression
 prettyPrintJS' :: (Emit gen) => AST -> StateT PrinterState Maybe gen
-prettyPrintJS' = A.runKleisli $ runPattern matchValue
+prettyPrintJS' = runKleisli $ runPattern matchValue
   where
   matchValue :: (Emit gen) => Pattern PrinterState AST gen
   matchValue = buildPrettyPrinter operators (literals <+> fmap parensPos matchValue)

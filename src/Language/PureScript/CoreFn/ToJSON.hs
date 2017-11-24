@@ -9,8 +9,9 @@ module Language.PureScript.CoreFn.ToJSON
 
 import PSPrelude
 
-import Data.Aeson
-import Data.Version (Version, showVersion)
+import           Control.Arrow ((***))
+import           Data.Aeson
+import           Data.Version (Version, showVersion)
 import qualified Data.Text as T
 
 import           Language.PureScript.AST.Literals

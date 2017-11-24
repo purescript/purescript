@@ -13,6 +13,7 @@ module Language.PureScript.TypeChecker.Entailment
 
 import PSPrelude hiding (sym)
 
+import Control.Arrow ((&&&))
 import Control.Monad.Supply.Class (MonadSupply(..))
 import Control.Monad.Writer
 
@@ -382,12 +383,12 @@ entails SolverOptions{..} constraint context hints =
     appendSymbols arg0@(TypeLevelString lhs) _ arg2@(TypeLevelString out) = do
       lhs' <- decodeString lhs
       out' <- decodeString out
-      rhs <- stripPrefix lhs' out'
+      rhs <- T.stripPrefix lhs' out'
       pure (arg0, TypeLevelString (mkString rhs), arg2)
     appendSymbols _ arg1@(TypeLevelString rhs) arg2@(TypeLevelString out) = do
       rhs' <- decodeString rhs
       out' <- decodeString out
-      lhs <- stripSuffix rhs' out'
+      lhs <- T.stripSuffix rhs' out'
       pure (TypeLevelString (mkString lhs), arg1, arg2)
     appendSymbols _ _ _ = Nothing
     

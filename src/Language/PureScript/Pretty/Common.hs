@@ -10,10 +10,10 @@ import PSPrelude
 import Data.List (elemIndices)
 import qualified Data.Text as T
 import Data.Char (isUpper)
+import Data.Monoid.Extra (mintercalate)
 
 import Language.PureScript.AST (SourcePos(..), SourceSpan(..))
 import Language.PureScript.Parser.Lexer (isUnquotedKey, reservedPsNames)
-import Language.PureScript.Docs.Utils.MonoidExtras (mintercalate)
 
 import Text.PrettyPrint.Boxes hiding ((<>))
 import qualified Text.PrettyPrint.Boxes as Box

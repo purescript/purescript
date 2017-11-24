@@ -30,7 +30,6 @@ import           Control.Monad.Trans.Class (MonadTrans(..))
 import           Control.Monad.Trans.Control (MonadBaseControl(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
 import           Data.Aeson (encode, decode)
-import qualified Data.Aeson as Aeson
 import           Data.List (foldl', sortBy, groupBy, lookup)
 import           Data.Time.Clock
 import           Data.Traversable (for)
@@ -370,8 +369,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     dumpCoreFn <- lift $ asks optionsDumpCoreFn
     when dumpCoreFn $ do
       let coreFnFile = outputPath "corefn.json"
-      let jsonPayload = CFJ.moduleToJSON Paths.version m          
-      let json = ACFJ.moduleToJSON Paths.version m
+      let json = CFJ.moduleToJSON Paths.version m
       lift $ writeTextFile coreFnFile (encode json)
 
   genSourceMap :: FilePath -> Int -> [SMap] -> Make ()

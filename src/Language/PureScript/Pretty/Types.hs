@@ -167,7 +167,7 @@ matchType :: TypeRenderOptions -> Pattern () Type Box
 matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
   operators :: OperatorTable () Type Box
   operators =
-    OperatorTable [ [ AssocL proxyType $ \p ty -> p <> ty ]
+    OperatorTable [ [ AssocL proxyType $ \p ty -> p B.<> ty ]
                   , [ AssocL typeApp $ \f x -> keepSingleLinesOr (moveRight 2) f x ]
                   , [ AssocR appliedFunction $ \arg ret -> keepSingleLinesOr id arg (textT rightArrow B.<> " " B.<> ret) ]
                   , [ Wrap constrained $ \deps ty -> constraintsAsBox tro deps ty ]

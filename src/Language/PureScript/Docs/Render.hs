@@ -11,11 +11,11 @@ module Language.PureScript.Docs.Render where
 
 import PSPrelude hiding (from, to, for)
 
+import Data.Monoid.Extra (mintersperse)
 import qualified Data.Text as T
 
 import Language.PureScript.Docs.RenderedCode
 import Language.PureScript.Docs.Types
-import Language.PureScript.Docs.Utils.MonoidExtras
 import qualified Language.PureScript as P
 
 renderDeclaration :: Declaration -> RenderedCode
