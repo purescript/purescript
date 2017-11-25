@@ -84,6 +84,7 @@ dependencies:
   - transformers >=0.3.0 && <0.6
   - transformers-base >=0.4.0 && <0.5
   - transformers-compat >=0.3.0
+  - typed-process >= 0.1.1 && <= 0.2
   - unordered-containers
   - utf8-string >=1 && <2
   - vector
@@ -160,6 +161,15 @@ tests:
     - hspec-discover
     - HUnit
     - silently
+
+benchmarks:
+  ide-benchmark:
+    main: Bench.hs
+    source-dirs: benchmarks
+    dependencies:
+      - criterion
+      - purescript
+    ghc-options: -Wall
 
 flags:
   release:

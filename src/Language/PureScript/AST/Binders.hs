@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 -- |
 -- Case binders
 --
@@ -5,6 +7,8 @@ module Language.PureScript.AST.Binders where
 
 import Prelude.Compat
 
+import Control.DeepSeq (NFData)
+import GHC.Generics (Generic)
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.AST.Literals
 import Language.PureScript.Names
@@ -61,7 +65,7 @@ data Binder
   -- A binder with a type annotation
   --
   | TypedBinder Type Binder
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic, NFData)
 
 -- |
 -- Collect all names introduced in binders in an expression

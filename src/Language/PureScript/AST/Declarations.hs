@@ -199,7 +199,7 @@ data ErrorMessageHint
   | ErrorInForeignImport Ident
   | ErrorSolvingConstraint Constraint
   | PositionedError SourceSpan
-  deriving (Show)
+  deriving (Show, Generic, NFData)
 
 -- | Categories of hints
 data HintCategory
@@ -222,7 +222,7 @@ data ErrorMessage = ErrorMessage
 -- explicitly exported. If the export list is Nothing, everything is exported.
 --
 data Module = Module SourceSpan [Comment] ModuleName [Declaration] (Maybe [DeclarationRef])
-  deriving (Show)
+  deriving (Show, Generic, NFData)
 
 -- | Return a module's name.
 getModuleName :: Module -> ModuleName
@@ -406,7 +406,7 @@ data ImportDeclarationType
   -- An import with a list of references to hide: `import M hiding (foo)`
   --
   | Hiding [DeclarationRef]
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic, NFData)
 
 isImplicit :: ImportDeclarationType -> Bool
 isImplicit Implicit = True
@@ -425,7 +425,7 @@ data TypeDeclarationData = TypeDeclarationData
   { tydeclSourceAnn :: !SourceAnn
   , tydeclIdent :: !Ident
   , tydeclType :: !Type
-  } deriving (Show, Eq)
+  } deriving (Show, Eq, Generic, NFData)
 
 overTypeDeclaration :: (TypeDeclarationData -> TypeDeclarationData) -> Declaration -> Declaration
 overTypeDeclaration f d = maybe d (TypeDeclaration . f) (getTypeDeclaration d)
@@ -450,7 +450,7 @@ data ValueDeclarationData a = ValueDeclarationData
   -- ^ Whether or not this value is exported/visible
   , valdeclBinders :: ![Binder]
   , valdeclExpression :: !a
-  } deriving (Show, Functor, Foldable, Traversable)
+  } deriving (Show, Functor, Foldable, Traversable, Generic, NFData)
 
 overValueDeclaration :: (ValueDeclarationData [GuardedExpr] -> ValueDeclarationData [GuardedExpr]) -> Declaration -> Declaration
 overValueDeclaration f d = maybe d (ValueDeclaration . f) (getValueDeclaration d)
@@ -523,13 +523,13 @@ data Declaration
   -- dependencies, class name, instance types, member declarations)
   --
   | TypeInstanceDeclaration SourceAnn [Ident] Integer Ident [Constraint] (Qualified (ProperName 'ClassName)) [Type] TypeInstanceBody
-  deriving (Show)
+  deriving (Show, Generic, NFData)
 
 data ValueFixity = ValueFixity Fixity (Qualified (Either Ident (ProperName 'ConstructorName))) (OpName 'ValueOpName)
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic, NFData)
 
 data TypeFixity = TypeFixity Fixity (Qualified (ProperName 'TypeName)) (OpName 'TypeOpName)
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic, NFData)
 
 pattern ValueFixityDeclaration :: SourceAnn -> Fixity -> Qualified (Either Ident (ProperName 'ConstructorName)) -> OpName 'ValueOpName -> Declaration
 pattern ValueFixityDeclaration sa fixity name op = FixityDeclaration sa (Left (ValueFixity fixity name op))
@@ -548,7 +548,7 @@ data TypeInstanceBody
   -- dictionary for the type under the newtype.
   | ExplicitInstance [Declaration]
   -- ^ This is a regular (explicit) instance
-  deriving (Show)
+  deriving (Show, Generic, NFData)
 
 mapTypeInstanceBody :: ([Declaration] -> [Declaration]) -> TypeInstanceBody -> TypeInstanceBody
 mapTypeInstanceBody f = runIdentity . traverseTypeInstanceBody (Identity . f)
@@ -675,13 +675,13 @@ flattenDecls = concatMap flattenOne
 --
 data Guard = ConditionGuard Expr
            | PatternGuard Binder Expr
-           deriving (Show)
+           deriving (Show, Generic, NFData)
 
 -- |
 -- The right hand side of a binder in value declarations
 -- and case expressions.
 data GuardedExpr = GuardedExpr [Guard] Expr
-                 deriving (Show)
+                 deriving (Show, Generic, NFData)
 
 pattern MkUnguarded :: Expr -> GuardedExpr
 pattern MkUnguarded e = GuardedExpr [] e
@@ -810,7 +810,7 @@ data Expr
   -- A value with source position information
   --
   | PositionedValue SourceSpan [Comment] Expr
-  deriving (Show)
+  deriving (Show, Generic, NFData)
 
 -- |
 -- An alternative in a case statement
@@ -824,7 +824,7 @@ data CaseAlternative = CaseAlternative
     -- The result expression or a collect of guarded expressions
     --
   , caseAlternativeResult :: [GuardedExpr]
-  } deriving (Show)
+  } deriving (Show, Generic, NFData)
 
 -- |
 -- A statement in a do-notation block
@@ -846,7 +846,7 @@ data DoNotationElement
   -- A do notation element with source position information
   --
   | PositionedDoNotationElement SourceSpan [Comment] DoNotationElement
-  deriving (Show)
+  deriving (Show, Generic, NFData)
 
 
 -- For a record update such as:
@@ -873,13 +873,13 @@ data DoNotationElement
 --
 
 newtype PathTree t = PathTree (AssocList PSString (PathNode t))
-  deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
+  deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic, NFData)
 
 data PathNode t = Leaf t | Branch (PathTree t)
-  deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
+  deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic, NFData)
 
 newtype AssocList k t = AssocList { runAssocList :: [(k, t)] }
-  deriving (Show, Eq, Ord, Foldable, Functor, Traversable)
+  deriving (Show, Eq, Ord, Foldable, Functor, Traversable, Generic, NFData)
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''DeclarationRef)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ImportDeclarationType)
