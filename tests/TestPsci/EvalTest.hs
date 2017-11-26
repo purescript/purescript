@@ -6,6 +6,7 @@ import qualified Data.Text as T
 import           System.Directory (getCurrentDirectory)
 import           System.FilePath ((</>), takeFileName)
 import qualified System.FilePath.Glob as Glob
+import           System.IO.UTF8 (withUTF8FileContentsT)
 import           Test.Hspec
 import           TestPsci.TestEnv
 
@@ -47,7 +48,7 @@ parseEvalLine line =
 
 evalTest :: FilePath -> Spec
 evalTest f = specify (takeFileName f) $ do
-  evalLines <- map parseEvalLine . T.lines <$> readFile f
+  evalLines <- withUTF8FileContentsT f $ \contents -> map parseEvalLine $ T.lines contents
   execTestPSCi $ foldM_ handleLine None evalLines
 
 handleLine :: EvalContext -> EvalLine -> TestPSCi EvalContext

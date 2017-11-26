@@ -19,6 +19,8 @@ import qualified Text.PrettyPrint.ANSI.Leijen as PP
 import           System.Directory (createDirectoryIfMissing)
 import           System.FilePath (takeDirectory)
 import           System.FilePath.Glob (glob)
+import           System.IO.UTF8 (withUTF8FileContentsT, writeUTF8FileT)
+
 
 -- | Available output formats
 data Format
@@ -75,7 +77,7 @@ docgen (PSCDocsOptions fmt inputGlob output) = do
           forM_ ms'' $ \grp -> do
             let fp = fst (unsafeHead grp)
             createDirectoryIfMissing True (takeDirectory fp)
-            writeFile fp (D.runDocs (D.modulesAsMarkdown (map snd grp)))
+            writeUTF8FileT fp (D.runDocs (D.modulesAsMarkdown (map snd grp)))
 
   where
   guardMissing [] = return ()
@@ -138,7 +140,7 @@ dumpTags input renderTags = do
   ldump = mapM_ putText
 
 parseFile :: FilePath -> IO (FilePath, Text)
-parseFile input = (,) input <$> readFile input
+parseFile input = withUTF8FileContentsT input (input,)
 
 inputFile :: Opts.Parser FilePath
 inputFile = Opts.strArgument $

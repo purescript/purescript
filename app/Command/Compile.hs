@@ -19,6 +19,7 @@ import qualified Options.Applicative as Opts
 import qualified System.Console.ANSI as ANSI
 import           System.Directory (getCurrentDirectory)
 import           System.FilePath.Glob (glob)
+import           System.IO.UTF8 (withUTF8FileContentsT)
 
 data PSCMakeOptions = PSCMakeOptions
   { pscmInput        :: [FilePath]
@@ -77,7 +78,7 @@ globWarningOnMisses warn = concatMapM globWithWarning
     return paths
 
 readInput :: [FilePath] -> IO [(FilePath, Text)]
-readInput inputFiles = forM inputFiles $ \inFile -> (inFile, ) <$> readFile inFile
+readInput inputFiles = forM inputFiles $ \inFile -> withUTF8FileContentsT inFile (inFile, )
 
 inputFile :: Opts.Parser FilePath
 inputFile = Opts.strArgument $

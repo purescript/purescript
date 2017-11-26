@@ -27,6 +27,7 @@ import qualified Options.Applicative as Opts
 import           System.Directory (createDirectoryIfMissing)
 import           System.FilePath ((</>))
 import           System.FilePath.Glob (glob)
+import           System.IO.UTF8 (withUTF8FileContentsT)
 import qualified Language.PureScript as P
 import           Language.PureScript.Hierarchy (Graph(..), _unDigraph, _unGraphName, typeClasses)
 
@@ -37,7 +38,7 @@ data HierarchyOptions = HierarchyOptions
 
 readInput :: [FilePath] -> IO (Either P.MultipleErrors [P.Module])
 readInput paths = do
-  content <- mapM (\path -> (path, ) <$> readFile path) paths
+  content <- mapM (\path -> withUTF8FileContentsT path (path, )) paths
   return $ map snd <$> P.parseModulesFromFiles id content
 
 compile :: HierarchyOptions -> IO ()

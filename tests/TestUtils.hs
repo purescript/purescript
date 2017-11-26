@@ -13,6 +13,7 @@ import qualified Data.Text as T
 import System.Process
 import System.Directory
 import System.Info
+import System.IO.UTF8 (withUTF8FileContentsT)
 import System.FilePath ((</>))
 import qualified System.FilePath.Glob as Glob
 
@@ -48,9 +49,7 @@ updateSupportCode = do
     fatal "Cannot find node (or nodejs) executable"
 
 readInput :: [FilePath] -> IO [(FilePath, T.Text)]
-readInput inputFiles = forM inputFiles $ \inputFile -> do
-  text <- readFile inputFile
-  return (inputFile, text)
+readInput inputFiles = forM inputFiles $ \inputFile -> withUTF8FileContentsT inputFile $ (inputFile, )
 
 -- |
 -- The support modules that should be cached between test cases, to avoid

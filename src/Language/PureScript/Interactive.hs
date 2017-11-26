@@ -32,6 +32,7 @@ import           Language.PureScript.Interactive.Types        as Interactive
 import           System.Directory (getCurrentDirectory)
 import           System.FilePath ((</>))
 import           System.FilePath.Glob (glob)
+import           System.IO.UTF8 (readUTF8FileT)
 
 -- | Pretty-print errors
 printErrors :: MonadIO m => P.MultipleErrors -> m ()
@@ -145,7 +146,7 @@ handleExpression eval val = do
   case e of
     Left errs -> printErrors errs
     Right _ -> do
-      js <- liftIO $ readFile (modulesDir </> "$PSCI" </> "index.js")
+      js <- liftIO $ readUTF8FileT (modulesDir </> "$PSCI" </> "index.js")
       eval js
 
 -- |

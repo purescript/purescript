@@ -11,10 +11,10 @@ import           PSPrelude hiding ((<.>))
 import           Data.Aeson (encode)
 import           Data.List (concat, null)
 
-import qualified Data.Text as T
 import           Data.Traversable (for)
 import           System.FilePath (takeDirectory, (</>), (<.>), takeFileName)
 import           System.FilePath.Glob (glob)
+import           System.IO.UTF8 (withUTF8FileContentsT, writeUTF8FileT, writeUTF8FileBSL, writeUTF8FileT)
 import           System.Directory (createDirectoryIfMissing, getCurrentDirectory)
 import           Language.PureScript.Bundle
 import           Options.Applicative (Parser)
@@ -45,9 +45,8 @@ app Options{..} = do
     fatal "purs bundle: Source maps only supported when output file specified."
 
   input <- for inputFiles $ \filename -> do
-    js <- liftIO (readFile filename)
     mid <- guessModuleIdentifier filename
-    T.length js `seq` return (mid, Just filename, js)                                            -- evaluate readFile till EOF before returning, not to exhaust file handles
+    withUTF8FileContentsT filename (mid, Just filename, )
 
   let entryIds = map (`ModuleIdentifier` Regular) optionsEntryPoints
 
@@ -115,7 +114,7 @@ command = run <$> (Opts.helper <*> options) where
             createDirectoryIfMissing True (takeDirectory outputFile)
             case sourcemap of
               Just sm -> do
-                writeFile outputFile $ js <> "\n//# sourceMappingURL=" <> (toS (takeFileName outputFile <.> "map")) <> "\n"
-                writeFile (outputFile <.> "map") $ toS . encode $ generate sm
-              Nothing -> writeFile outputFile js
+                writeUTF8FileT outputFile $ js <> "\n//# sourceMappingURL=" <> toS (takeFileName outputFile <.> "map") <> "\n"
+                writeUTF8FileBSL (outputFile <.> "map") $ encode $ generate sm
+              Nothing -> writeUTF8FileT outputFile js
           Nothing -> putStrLn js

@@ -25,6 +25,8 @@ import Protolude as X hiding ( Associativity
                              , Infix
                              , Meta
                              , Proxy
+                             , readFile
+                             , writeFile
                              , check
                              , link
                              , moduleName

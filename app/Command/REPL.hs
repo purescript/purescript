@@ -35,6 +35,7 @@ import qualified Network.Wai.Handler.WebSockets as WS
 import qualified Network.WebSockets as WS
 import qualified Options.Applicative as Opts
 import           System.Console.Haskeline
+import           System.IO.UTF8 (withUTF8FileContentsT, runWithUTF8FileContentsT, writeUTF8FileT)
 import           System.Directory (doesFileExist, getCurrentDirectory)
 import           System.FilePath ((</>))
 import           System.FilePath.Glob (glob)
@@ -102,9 +103,8 @@ bundle :: IO (Either Bundle.ErrorMessage Text)
 bundle = runExceptT $ do
   inputFiles <- liftIO (glob (".psci_modules" </> "node_modules" </> "*" </> "*.js"))
   input <- for inputFiles $ \filename -> do
-    js <- liftIO (readFile filename)
     mid <- Bundle.guessModuleIdentifier filename
-    T.length js `seq` return (mid, js)
+    withUTF8FileContentsT filename (mid, )
   Bundle.bundle input [] Nothing "PSCI"
 
 indexJS :: Text -- IsString string => string
@@ -271,7 +271,7 @@ nodeBackend nodePath nodeArgs = Backend setup eval reload shutdown
 
     eval :: () -> Text -> IO ()
     eval _ _ = do
-      writeFile indexFile "require('$PSCI')['$main']();"
+      writeUTF8FileT indexFile "require('$PSCI')['$main']();"
       process <- maybe findNodeProcess (pure . pure) nodePath
       result <- traverse (\node -> readProcessWithExitCode node (map toS nodeArgs <> [indexFile]) "") process
       case result of
@@ -344,9 +344,9 @@ command = loop <$> options
                     loadUserConfig state = do
                       configFile <- (</> ".purs-repl") <$> liftIO getCurrentDirectory
                       exists <- liftIO $ doesFileExist configFile
-                      when exists $ do
-                        ls <- T.lines <$> liftIO (readFile configFile)
-                        for_ ls $ \l -> do
+                      let runner' = flip runReaderT config . flip evalStateT initialState
+                      when exists $ runWithUTF8FileContentsT runner' configFile $ \contents -> do
+                        for_ (T.lines contents) $ \l -> do
                           liftIO (putStrLn l)
                           case parseCommand l of
                             Left err -> liftIO (putStrLn err >> exitFailure)

@@ -8,6 +8,7 @@ import           Language.PureScript.Interactive
 import           System.Directory (getCurrentDirectory)
 import           System.FilePath ((</>))
 import qualified System.FilePath.Glob as Glob
+import           System.IO.UTF8 (writeUTF8FileT)
 import           System.Process (readProcessWithExitCode)
 import           Test.Hspec (shouldBe)
 
@@ -45,7 +46,7 @@ execTestPSCi i = do
 -- command evaluation.
 jsEval :: TestPSCi Text
 jsEval = liftIO $ do
-  writeFile indexFile "require('$PSCI')['$main']();"
+  writeUTF8FileT indexFile "require('$PSCI')['$main']();"
   process <- findNodeProcess
   result <- traverse (\node -> readProcessWithExitCode node [indexFile] "") process
   case result of

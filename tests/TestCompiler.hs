@@ -38,6 +38,7 @@ import Control.Arrow ((***), (>>>))
 import System.Process hiding (cwd)
 import System.FilePath
 import System.Directory
+import System.IO.UTF8 (withUTF8FileContentsT, writeUTF8FileT)
 import System.IO.Silently
 import qualified System.FilePath.Glob as Glob
 
@@ -135,7 +136,7 @@ spec = do
   getShouldWarnWith = extractPragma "shouldWarnWith"
 
   extractPragma :: Text -> FilePath -> IO [String]
-  extractPragma pragma = fmap go . readFile
+  extractPragma pragma fp = withUTF8FileContentsT fp go
     where
     go = T.lines >>> mapMaybe (T.stripPrefix ("-- @" <> pragma <> " ")) >>> map T.strip >>> map toS
 
@@ -232,7 +233,7 @@ assertCompiles supportModules supportExterns supportForeigns inputFiles outputFi
       Right _ -> do
         process <- findNodeProcess
         let entryPoint = modulesDir </> "index.js"
-        writeFile entryPoint "require('Main').main()"
+        writeUTF8FileT entryPoint "require('Main').main()"
         result <- traverse (\node -> readProcessWithExitCode node [entryPoint] "") process
         hPutStrLn outputFile $ "\n" <> takeFileName (last inputFiles) ++ ":"
         case result of

@@ -109,14 +109,14 @@ default-extensions:
 
 library:
   source-dirs: src
-  ghc-options: -Werror -Wall -O2
+  ghc-options: -Wall -O
   other-modules: Paths_purescript
 
 executables:
   purs:
     main: Main.hs
     source-dirs: app
-    ghc-options: -Werror -Wall -O2 -threaded -rtsopts -with-rtsopts=-N
+    ghc-options: -Wall -O -fno-warn-unused-do-bind -threaded -rtsopts -with-rtsopts=-N
     other-modules:
       - Command.Bundle
       - Command.Compile
@@ -154,7 +154,7 @@ tests:
   tests:
     main: Main.hs
     source-dirs: tests
-    ghc-options: -Werror -Wall
+    ghc-options: -Wall
     dependencies:
     - purescript
     - hspec
