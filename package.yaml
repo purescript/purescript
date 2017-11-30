@@ -109,14 +109,14 @@ default-extensions:
 
 library:
   source-dirs: src
-  ghc-options: -Wall -O
+  ghc-options: -Wall
   other-modules: Paths_purescript
 
 executables:
   purs:
     main: Main.hs
     source-dirs: app
-    ghc-options: -Wall -O -fno-warn-unused-do-bind -threaded -rtsopts -with-rtsopts=-N
+    ghc-options: -Wall -fno-warn-unused-do-bind -threaded -rtsopts -with-rtsopts=-N
     other-modules:
       - Command.Bundle
       - Command.Compile
