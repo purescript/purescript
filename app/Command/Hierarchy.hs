@@ -18,11 +18,8 @@
 
 module Command.Hierarchy (command) where
 
-import           Protolude (catMaybes)
+import           PSPrelude
 
-import           Control.Applicative (optional)
-import           Data.Foldable (for_)
-import           Data.Monoid ((<>))
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Options.Applicative (Parser)
@@ -30,9 +27,7 @@ import qualified Options.Applicative as Opts
 import           System.Directory (createDirectoryIfMissing)
 import           System.FilePath ((</>))
 import           System.FilePath.Glob (glob)
-import           System.Exit (exitFailure, exitSuccess)
-import           System.IO (hPutStr, stderr)
-import           System.IO.UTF8 (readUTF8FileT)
+import           System.IO.UTF8 (withUTF8FileContentsT)
 import qualified Language.PureScript as P
 import           Language.PureScript.Hierarchy (Graph(..), _unDigraph, _unGraphName, typeClasses)
 
@@ -43,7 +38,7 @@ data HierarchyOptions = HierarchyOptions
 
 readInput :: [FilePath] -> IO (Either P.MultipleErrors [P.Module])
 readInput paths = do
-  content <- mapM (\path -> (path, ) <$> readUTF8FileT path) paths
+  content <- mapM (\path -> withUTF8FileContentsT path (path, )) paths
   return $ map snd <$> P.parseModulesFromFiles id content
 
 compile :: HierarchyOptions -> IO ()
@@ -51,14 +46,14 @@ compile (HierarchyOptions inputGlob mOutput) = do
   input <- glob inputGlob
   modules <- readInput input
   case modules of
-    Left errs -> hPutStr stderr (P.prettyPrintMultipleErrors P.defaultPPEOptions errs) >> exitFailure
+    Left errs -> putErrText' (P.prettyPrintMultipleErrors P.defaultPPEOptions errs) >> exitFailure
     Right ms -> do
       for_ (catMaybes $ typeClasses ms) $ \(Graph name graph) ->
         case mOutput of
           Just output -> do
             createDirectoryIfMissing True output
             T.writeFile (output </> T.unpack (_unGraphName name)) (_unDigraph graph)
-          Nothing -> T.putStrLn (_unDigraph graph)
+          Nothing -> putText (_unDigraph graph)
       exitSuccess
 
 inputFile :: Parser FilePath

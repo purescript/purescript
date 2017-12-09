@@ -20,7 +20,7 @@ module Language.PureScript.Publish
   , getResolvedDependencies
   ) where
 
-import Protolude hiding (stdin)
+import PSPrelude
 
 import Control.Arrow ((***))
 import Control.Category ((>>>))
@@ -31,7 +31,6 @@ import qualified Data.ByteString.Lazy as BL
 import Data.Char (isSpace)
 import Data.String (String, lines)
 import Data.List (stripPrefix, (\\), nubBy)
-import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Text as T
 import Data.Time.Clock (UTCTime)
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
@@ -258,8 +257,8 @@ extractGithub = stripGitHubPrefixes
     | otherwise = str
 
 readProcess' :: String -> [String] -> String -> PrepareM String
-readProcess' prog args stdin = do
-  out <- liftIO (catch (Right <$> readProcess prog args stdin)
+readProcess' prog args input = do
+  out <- liftIO (catch (Right <$> readProcess prog args input)
                        (return . Left))
   either (otherError . ProcessFailed prog args) return out
 

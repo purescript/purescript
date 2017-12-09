@@ -2,21 +2,15 @@
 
 module Language.PureScript.Environment where
 
-import           Prelude.Compat
-import           Protolude (ordNub)
+import           PSPrelude
 
-import           GHC.Generics (Generic)
-import           Control.DeepSeq (NFData)
 import           Data.Aeson ((.=), (.:))
 import qualified Data.Aeson as A
 import qualified Data.Map as M
 import qualified Data.Set as S
-import           Data.Maybe (fromMaybe, mapMaybe)
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Tree (Tree, rootLabel)
 import qualified Data.Graph as G
-import           Data.Foldable (toList)
 
 import           Language.PureScript.Crash
 import           Language.PureScript.Kinds

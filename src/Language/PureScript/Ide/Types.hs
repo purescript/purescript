@@ -19,7 +19,7 @@
 
 module Language.PureScript.Ide.Types where
 
-import           Protolude hiding (moduleName)
+import           PSPrelude
 
 import           Control.Concurrent.STM
 import           Control.Lens.TH

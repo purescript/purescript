@@ -6,25 +6,20 @@
 
 module Command.Compile (command) where
 
-import           Control.Applicative
-import           Control.Monad
-import           Control.Monad.Writer.Strict
+import           PSPrelude
+
 import qualified Data.Aeson as A
-import           Data.Bool (bool)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.UTF8 as BU8
 import qualified Data.Map as M
-import           Data.Text (Text)
 import qualified Language.PureScript as P
 import           Language.PureScript.Errors.JSON
 import           Language.PureScript.Make
 import qualified Options.Applicative as Opts
 import qualified System.Console.ANSI as ANSI
-import           System.Exit (exitSuccess, exitFailure)
 import           System.Directory (getCurrentDirectory)
 import           System.FilePath.Glob (glob)
-import           System.IO (hPutStr, hPutStrLn, stderr)
-import           System.IO.UTF8 (readUTF8FileT)
+import           System.IO.UTF8 (withUTF8FileContentsT)
 
 data PSCMakeOptions = PSCMakeOptions
   { pscmInput        :: [FilePath]
@@ -41,10 +36,10 @@ printWarningsAndErrors verbose False warnings errors = do
   cc <- bool Nothing (Just P.defaultCodeColor) <$> ANSI.hSupportsANSI stderr
   let ppeOpts = P.defaultPPEOptions { P.ppeCodeColor = cc, P.ppeFull = verbose, P.ppeRelativeDirectory = pwd }
   when (P.nonEmpty warnings) $
-    hPutStrLn stderr (P.prettyPrintMultipleWarnings ppeOpts warnings)
+    putErrText (P.prettyPrintMultipleWarnings ppeOpts warnings)
   case errors of
     Left errs -> do
-      hPutStrLn stderr (P.prettyPrintMultipleErrors ppeOpts errs)
+      putErrText (P.prettyPrintMultipleErrors ppeOpts errs)
       exitFailure
     Right _ -> return ()
 printWarningsAndErrors verbose True warnings errors = do
@@ -57,9 +52,9 @@ compile :: PSCMakeOptions -> IO ()
 compile PSCMakeOptions{..} = do
   input <- globWarningOnMisses (unless pscmJSONErrors . warnFileTypeNotFound) pscmInput
   when (null input && not pscmJSONErrors) $ do
-    hPutStr stderr $ unlines [ "purs compile: No input files."
-                             , "Usage: For basic information, try the `--help' option."
-                             ]
+    putErrTextLines [ "purs compile: No input files."
+                    , "Usage: For basic information, try the `--help' option."
+                    ]
     exitFailure
   moduleFiles <- readInput input
   (makeErrors, makeWarnings) <- runMake pscmOpts $ do
@@ -71,20 +66,19 @@ compile PSCMakeOptions{..} = do
   printWarningsAndErrors (P.optionsVerboseErrors pscmOpts) pscmJSONErrors makeWarnings makeErrors
   exitSuccess
 
-warnFileTypeNotFound :: String -> IO ()
-warnFileTypeNotFound = hPutStrLn stderr . ("purs compile: No files found using pattern: " ++)
+warnFileTypeNotFound :: Text -> IO ()
+warnFileTypeNotFound = putErrText . ("purs compile: No files found using pattern: " <>)
 
-globWarningOnMisses :: (String -> IO ()) -> [FilePath] -> IO [FilePath]
+globWarningOnMisses :: (Text -> IO ()) -> [FilePath] -> IO [FilePath]
 globWarningOnMisses warn = concatMapM globWithWarning
   where
   globWithWarning pattern' = do
     paths <- glob pattern'
-    when (null paths) $ warn pattern'
+    when (null paths) $ warn $ toS pattern'
     return paths
-  concatMapM f = fmap concat . mapM f
 
 readInput :: [FilePath] -> IO [(FilePath, Text)]
-readInput inputFiles = forM inputFiles $ \inFile -> (inFile, ) <$> readUTF8FileT inFile
+readInput inputFiles = forM inputFiles $ \inFile -> withUTF8FileContentsT inFile (inFile, )
 
 inputFile :: Opts.Parser FilePath
 inputFile = Opts.strArgument $

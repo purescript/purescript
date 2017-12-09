@@ -1,8 +1,8 @@
 -- | This module provides documentation for the builtin Prim module.
 module Language.PureScript.Docs.Prim (primDocsModule) where
 
-import Prelude.Compat hiding (fail)
-import Data.Text (Text)
+import PSPrelude hiding (fail)
+
 import qualified Data.Text as T
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -36,13 +36,13 @@ primDocsModule = Module
   }
 
 unsafeLookup :: forall v (a :: P.ProperNameType).
-  Map.Map (P.Qualified (P.ProperName a)) v -> String -> Text -> v
+  Map.Map (P.Qualified (P.ProperName a)) v -> Text -> Text -> v
 unsafeLookup m errorMsg name = go name
   where
   go = fromJust' . flip Map.lookup m . P.primName
 
   fromJust' (Just x) = x
-  fromJust' _ = P.internalError $ errorMsg ++ show name
+  fromJust' _ = P.internalError $ errorMsg <> show name
 
 primKind :: Text -> Text -> Declaration
 primKind title comments =
@@ -54,7 +54,7 @@ primKind title comments =
           , declChildren = []
           , declInfo = ExternKindDeclaration
           }
-    else P.internalError $ "Docs.Prim: No such Prim kind: " ++ T.unpack title
+    else P.internalError $ "Docs.Prim: No such Prim kind: " <> title
 
 lookupPrimTypeKind :: Text -> P.Kind
 lookupPrimTypeKind = fst . unsafeLookup P.primTypes "Docs.Prim: No such Prim type: "

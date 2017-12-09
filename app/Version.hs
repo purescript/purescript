@@ -3,6 +3,8 @@
 
 module Version where
 
+import PSPrelude
+
 import Data.Version (showVersion)
 import Paths_purescript as Paths
 
@@ -10,13 +12,13 @@ import Paths_purescript as Paths
 import qualified Development.GitRev as GitRev
 #endif
 
-versionString :: String
-versionString = showVersion Paths.version ++ extra
+versionString :: Text
+versionString = toS (showVersion Paths.version) <> extra
   where
 #ifdef RELEASE
   extra = ""
 #else
-  extra = " [development build; commit: " ++ $(GitRev.gitHash) ++ dirty ++ "]"
+  extra = " [development build; commit: " <> $(GitRev.gitHash) <> dirty <> "]"
   dirty
     | $(GitRev.gitDirty) = " DIRTY"
     | otherwise = ""

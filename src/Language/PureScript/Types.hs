@@ -7,21 +7,12 @@
 --
 module Language.PureScript.Types where
 
-import Prelude.Compat
-import Protolude (ordNub)
+import PSPrelude
 
-import Control.Arrow (first)
-import Control.DeepSeq (NFData)
-import Control.Monad ((<=<))
 import qualified Data.Aeson as A
 import qualified Data.Aeson.TH as A
-import Data.List (sortBy)
-import Data.Ord (comparing)
-import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
-import Data.Text (Text)
+import Data.List (sortBy, lookup)
 import qualified Data.Text as T
-import GHC.Generics (Generic)
 
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.Kinds

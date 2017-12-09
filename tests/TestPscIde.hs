@@ -1,6 +1,7 @@
 module TestPscIde where
 
-import           Control.Monad                       (unless)
+import           PSPrelude
+
 import qualified PscIdeSpec
 import           Language.PureScript.Ide.Test
 import           Test.Hspec

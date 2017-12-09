@@ -6,22 +6,14 @@ module Language.PureScript.CodeGen.JS
   , moduleToJs
   ) where
 
-import Prelude.Compat
-import Protolude (ordNub)
+import PSPrelude hiding (evaluate, minInt, maxInt)
 
 import Control.Arrow ((&&&))
-import Control.Monad (forM, replicateM, void)
-import Control.Monad.Except (MonadError, throwError)
-import Control.Monad.Reader (MonadReader, asks)
 import Control.Monad.Supply.Class
 
 import Data.List ((\\), delete, intersect)
-import qualified Data.Foldable as F
 import qualified Data.Map as M
-import Data.Maybe (fromMaybe, isNothing)
-import Data.Monoid ((<>))
 import Data.String (fromString)
-import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.AST.SourcePos
@@ -58,7 +50,7 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
     let decls' = renameModules mnLookup decls
     jsDecls <- mapM bindToJs decls'
     optimized <- traverse (traverse optimize) jsDecls
-    F.traverse_ (F.traverse_ checkIntegers) optimized
+    traverse_ (traverse_ checkIntegers) optimized
     comments <- not <$> asks optionsNoComments
     let strict = AST.StringLiteral Nothing "use strict"
     let header = if comments && not (null coms) then AST.Comment Nothing coms strict else strict
@@ -93,7 +85,7 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
 
     freshModuleName :: Integer -> ModuleName -> [Ident] -> ModuleName
     freshModuleName i mn'@(ModuleName pns) used =
-      let newName = ModuleName $ init pns ++ [ProperName $ runProperName (last pns) <> "_" <> T.pack (show i)]
+      let newName = ModuleName $ unsafeInit pns ++ [ProperName $ runProperName (unsafeLast pns) <> "_" <> T.pack (show i)]
       in if Ident (runModuleName newName) `elem` used
          then freshModuleName (i + 1) mn' used
          else newName
@@ -204,7 +196,7 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
     let (f, args) = unApp e []
     args' <- mapM valueToJs args
     case f of
-      Var (_, _, _, Just IsNewtype) _ -> return (head args')
+      Var (_, _, _, Just IsNewtype) _ -> return (unsafeHead args')
       Var (_, _, _, Just (IsConstructor _ fields)) name | length args == length fields ->
         return $ AST.Unary Nothing AST.New $ AST.App Nothing (qualifiedToJS id name) args'
       Var (_, _, _, Just IsTypeClassConstructor) name ->
@@ -219,7 +211,7 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
              then foreignIdent ident
              else varToJs qi
   valueToJs' (Var (_, _, _, Just IsForeign) ident) =
-    internalError $ "Encountered an unqualified reference to a foreign ident " ++ T.unpack (showQualified showIdent ident)
+    internalError $ "Encountered an unqualified reference to a foreign ident " <> showQualified showIdent ident
   valueToJs' (Var _ ident) = return $ varToJs ident
   valueToJs' (Case (ss, _, _, _) values binders) = do
     vals <- mapM valueToJs values

@@ -3,12 +3,9 @@
 {-# LANGUAGE DeriveGeneric     #-}
 module Language.PureScript.TypeClassDictionaries where
 
-import Prelude.Compat
+import PSPrelude
 
-import GHC.Generics (Generic)
-import Control.DeepSeq (NFData)
-import Data.Monoid ((<>))
-import Data.Text (Text, pack)
+import Data.Text(pack)
 
 import Language.PureScript.Names
 import Language.PureScript.Types

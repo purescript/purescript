@@ -4,17 +4,12 @@ module Language.PureScript.CodeGen.JS.Printer
   , prettyPrintJSWithSourceMaps
   ) where
 
-import Prelude.Compat
+import PSPrelude
 
-import Control.Arrow ((<+>))
-import Control.Monad (forM, mzero)
-import Control.Monad.State (StateT, evalStateT)
+import Control.Arrow ((<+>), runKleisli)
 import Control.PatternArrows
-import qualified Control.Arrow as A
 
-import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
-import Data.Text (Text)
+import Data.Monoid.Extra (mintercalate)
 import qualified Data.Text as T
 
 import Language.PureScript.AST (SourceSpan(..))
@@ -40,7 +35,7 @@ literals = mkPattern' match'
   match (BooleanLiteral _ False) = return $ emit "false"
   match (ArrayLiteral _ xs) = mconcat <$> sequence
     [ return $ emit "[ "
-    , intercalate (emit ", ") <$> forM xs prettyPrintJS'
+    , mintercalate (emit ", ") <$> forM xs prettyPrintJS'
     , return $ emit " ]"
     ]
   match (ObjectLiteral _ []) = return $ emit "{}"
@@ -49,7 +44,7 @@ literals = mkPattern' match'
     , withIndent $ do
         jss <- forM ps $ \(key, value) -> fmap ((objectPropertyToString key <> emit ": ") <>) . prettyPrintJS' $ value
         indentString <- currentIndent
-        return $ intercalate (emit ",\n") $ map (indentString <>) jss
+        return $ mintercalate (emit ",\n") $ map (indentString <>) jss
     , return $ emit "\n"
     , currentIndent
     , return $ emit "}"
@@ -176,7 +171,7 @@ app = mkPattern' match
   where
   match (App _ val args) = do
     jss <- traverse prettyPrintJS' args
-    return (intercalate (emit ", ") jss, val)
+    return (mintercalate (emit ", ") jss, val)
   match _ = mzero
 
 instanceOf :: Pattern PrinterState AST (AST, AST)
@@ -216,7 +211,7 @@ prettyStatements :: (Emit gen) => [AST] -> StateT PrinterState Maybe gen
 prettyStatements sts = do
   jss <- forM sts prettyPrintJS'
   indentString <- currentIndent
-  return $ intercalate (emit "\n") $ map ((<> emit ";") . (indentString <>)) jss
+  return $ mintercalate (emit "\n") $ map ((<> emit ";") . (indentString <>)) jss
 
 -- | Generate a pretty-printed string representing a collection of JavaScript expressions at the same indentation level
 prettyPrintJSWithSourceMaps :: [AST] -> (Text, [SMap])
@@ -229,7 +224,7 @@ prettyPrintJS = maybe (internalError "Incomplete pattern") runPlainString . flip
 
 -- | Generate an indented, pretty-printed string representing a JavaScript expression
 prettyPrintJS' :: (Emit gen) => AST -> StateT PrinterState Maybe gen
-prettyPrintJS' = A.runKleisli $ runPattern matchValue
+prettyPrintJS' = runKleisli $ runPattern matchValue
   where
   matchValue :: (Emit gen) => Pattern PrinterState AST gen
   matchValue = buildPrettyPrinter operators (literals <+> fmap parensPos matchValue)
@@ -242,7 +237,7 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
                   , [ Wrap lam $ \(name, args, ss) ret -> addMapping' ss <>
                       emit ("function "
                         <> fromMaybe "" name
-                        <> "(" <> intercalate ", " args <> ") ")
+                        <> "(" <> mintercalate ", " args <> ") ")
                         <> ret ]
                   , [ unary     Not                  "!"
                     , unary     BitwiseNot           "~"

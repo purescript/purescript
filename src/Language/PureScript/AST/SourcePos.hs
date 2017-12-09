@@ -4,13 +4,9 @@
 --
 module Language.PureScript.AST.SourcePos where
 
-import Prelude.Compat
+import PSPrelude
 
-import Control.DeepSeq (NFData)
 import Data.Aeson ((.=), (.:))
-import Data.Monoid
-import Data.Text (Text)
-import GHC.Generics (Generic)
 import Language.PureScript.Comments
 import qualified Data.Aeson as A
 import qualified Data.Text as T
@@ -44,7 +40,7 @@ instance A.FromJSON SourcePos where
     return $ SourcePos line col
 
 data SourceSpan = SourceSpan
-  { spanName :: String
+  { spanName :: FilePath
     -- ^ Source name
   , spanStart :: SourcePos
     -- ^ Start of the span
@@ -78,5 +74,5 @@ instance A.FromJSON SourceSpan where
       o .: "start" <*>
       o .: "end"
 
-internalModuleSourceSpan :: String -> SourceSpan
+internalModuleSourceSpan :: FilePath -> SourceSpan
 internalModuleSourceSpan name = SourceSpan name (SourcePos 0 0) (SourcePos 0 0)

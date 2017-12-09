@@ -1,16 +1,14 @@
 module TestPsci.TestEnv where
 
-import Prelude ()
-import Prelude.Compat
+import PSPrelude
 
-import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Trans.RWS.Strict (evalRWST, RWST)
 import qualified Language.PureScript as P
 import           Language.PureScript.Interactive
 import           System.Directory (getCurrentDirectory)
-import           System.Exit
 import           System.FilePath ((</>))
 import qualified System.FilePath.Glob as Glob
+import           System.IO.UTF8 (writeUTF8FileT)
 import           System.Process (readProcessWithExitCode)
 import           Test.Hspec (shouldBe)
 
@@ -46,20 +44,20 @@ execTestPSCi i = do
 -- | Evaluate JS to which a PSCi input is compiled. The actual JS input is not
 -- needed as an argument, as it is already written in the file during the
 -- command evaluation.
-jsEval :: TestPSCi String
+jsEval :: TestPSCi Text
 jsEval = liftIO $ do
-  writeFile indexFile "require('$PSCI')['$main']();"
+  writeUTF8FileT indexFile "require('$PSCI')['$main']();"
   process <- findNodeProcess
   result <- traverse (\node -> readProcessWithExitCode node [indexFile] "") process
   case result of
-    Just (ExitSuccess, out, _)   -> return out
+    Just (ExitSuccess, out, _)   -> return $ toS out
     Just (ExitFailure _, _, err) -> putStrLn err >> exitFailure
-    Nothing                      -> putStrLn "Couldn't find node.js" >> exitFailure
+    Nothing                      -> putText "Couldn't find node.js" >> exitFailure
 
 -- | Run a PSCi command and evaluate its outputs:
 -- * jsOutputEval is used to evaluate compiled JS output by PSCi
 -- * printedOutputEval is used to evaluate text printed directly by PSCi itself
-runAndEval :: String -> TestPSCi () -> (String -> TestPSCi ()) -> TestPSCi ()
+runAndEval :: Text -> TestPSCi () -> (Text -> TestPSCi ()) -> TestPSCi ()
 runAndEval comm jsOutputEval textOutputEval =
   case parseCommand comm of
     Left errStr -> liftIO $ putStrLn errStr >> exitFailure
@@ -69,7 +67,7 @@ runAndEval comm jsOutputEval textOutputEval =
       handleCommand (\_ -> jsOutputEval) (return ()) textOutputEval command
 
 -- | Run a PSCi command, evaluate compiled JS, and ignore evaluation output and printed output
-run :: String -> TestPSCi ()
+run :: Text -> TestPSCi ()
 run comm = runAndEval comm evalJsAndIgnore ignorePrinted
   where
     evalJsAndIgnore = jsEval *> return ()
@@ -80,16 +78,16 @@ equalsTo :: (Eq a, Show a) => a -> a -> TestPSCi ()
 equalsTo x y = liftIO $ x `shouldBe` y
 
 -- | An assertion to check command evaluated javascript output against a given string
-evaluatesTo :: String -> String -> TestPSCi ()
+evaluatesTo :: Text -> Text -> TestPSCi ()
 evaluatesTo command expected = runAndEval command evalJsAndCompare ignorePrinted
   where
     evalJsAndCompare = do
       actual <- jsEval
-      actual `equalsTo` (expected ++ "\n")
+      actual `equalsTo` (expected <> "\n")
     ignorePrinted _ = return ()
 
 -- | An assertion to check command PSCi printed output against a given string
-prints :: String -> String -> TestPSCi ()
+prints :: Text -> Text -> TestPSCi ()
 prints command expected = runAndEval command evalJsAndIgnore evalPrinted
   where
     evalJsAndIgnore = jsEval *> return ()

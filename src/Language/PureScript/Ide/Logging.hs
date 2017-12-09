@@ -7,7 +7,7 @@ module Language.PureScript.Ide.Logging
        , labelTimespec
        ) where
 
-import           Protolude
+import           PSPrelude
 
 import           "monad-logger" Control.Monad.Logger
 import qualified Data.Text as T

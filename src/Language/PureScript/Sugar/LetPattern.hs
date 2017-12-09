@@ -4,7 +4,7 @@
 --
 module Language.PureScript.Sugar.LetPattern (desugarLetPatternModule) where
 
-import Prelude.Compat
+import PSPrelude
 
 import Language.PureScript.AST
 

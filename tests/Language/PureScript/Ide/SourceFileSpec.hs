@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Language.PureScript.Ide.SourceFileSpec where
 
-import           Protolude
+import           PSPrelude
 
 import qualified Language.PureScript as P
 import           Language.PureScript.Ide.Command

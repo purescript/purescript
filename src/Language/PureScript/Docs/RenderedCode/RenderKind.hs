@@ -7,13 +7,11 @@ module Language.PureScript.Docs.RenderedCode.RenderKind
 -- TODO: This is pretty much copied from Language.PureScript.Pretty.Kinds.
 -- Ideally we would unify the two.
 
-import Prelude.Compat
+import PSPrelude
 
 import Control.Arrow (ArrowPlus(..))
 import Control.PatternArrows as PA
 
-import Data.Monoid ((<>))
-import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 
 import Language.PureScript.Crash

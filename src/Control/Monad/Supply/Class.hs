@@ -7,12 +7,11 @@
 
 module Control.Monad.Supply.Class where
 
-import Prelude.Compat
+import PSPrelude
 
 import Control.Monad.Supply
-import Control.Monad.State
 import Control.Monad.Writer
-import Data.Text (Text, pack)
+import Data.Text (pack)
 
 class Monad m => MonadSupply m where
   fresh :: m Integer

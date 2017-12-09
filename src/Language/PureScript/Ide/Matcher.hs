@@ -22,11 +22,10 @@ module Language.PureScript.Ide.Matcher
        , flexMatcher
        ) where
 
-import           Protolude
+import           PSPrelude
 
 import           Data.Aeson
 import qualified Data.Text                     as T
-import qualified Data.Text.Encoding            as TE
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 import           Text.EditDistance
@@ -103,7 +102,7 @@ flexScore pat str =
   case T.uncons pat of
     Nothing -> Nothing
     Just (first', p) ->
-      case TE.encodeUtf8 str =~ TE.encodeUtf8 pat' :: (Int, Int) of
+      case encodeUtf8 str =~ encodeUtf8 pat' :: (Int, Int) of
         (-1,0) -> Nothing
         (start,len) -> Just $ calcScore start (start + len)
       where

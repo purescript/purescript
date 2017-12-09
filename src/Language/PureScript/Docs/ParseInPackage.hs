@@ -2,13 +2,13 @@ module Language.PureScript.Docs.ParseInPackage
   ( parseFilesInPackages
   ) where
 
-import Protolude
+import PSPrelude
 
 import qualified Data.Map as M
 
 import Language.PureScript.Docs.Types
 import qualified Language.PureScript as P
-import System.IO.UTF8 (readUTF8FileT)
+import System.IO.UTF8 (withUTF8FileContentsT)
 import Web.Bower.PackageMeta (PackageName)
 
 -- |
@@ -69,5 +69,5 @@ fileInfoToString :: FileInfo -> FilePath
 fileInfoToString (Local fn) = fn
 fileInfoToString (FromDep _ fn) = fn
 
-readFileAs :: (MonadIO m) => FileInfo -> m (FileInfo, Text)
-readFileAs fi = liftIO . fmap ((fi,)) $ readUTF8FileT (ignorePackage fi)
+readFileAs :: MonadIO m => FileInfo -> m (FileInfo, Text)
+readFileAs fi = withUTF8FileContentsT (ignorePackage fi) (fi, )

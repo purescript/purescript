@@ -1,10 +1,6 @@
 module Language.PureScript.Sugar.Operators.Common where
 
-import Prelude.Compat
-
-import Control.Monad.State
-
-import Data.Functor.Identity
+import PSPrelude
 
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Pos as P

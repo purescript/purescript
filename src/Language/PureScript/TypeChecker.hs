@@ -9,21 +9,14 @@ module Language.PureScript.TypeChecker
   , checkNewtype
   ) where
 
-import Prelude.Compat
-import Protolude (ordNub)
+import PSPrelude
 
-import Control.Monad (when, unless, void, forM)
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State.Class (MonadState(..), modify)
 import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Writer.Class (MonadWriter(..))
 import Control.Lens ((^..), _1, _2)
 
-import Data.Foldable (for_, traverse_, toList)
+import Data.Foldable (foldl1)
 import Data.List (nub, nubBy, (\\), sort, group)
-import Data.Maybe
-import Data.Monoid ((<>))
-import Data.Text (Text)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -153,7 +146,7 @@ addTypeClass qualifiedClassName args implies dependencies ds = do
 
       unless (any null leftovers) . throwError . errorMessage $
         let
-          solutions = map (map (fst . (args !!)) . S.toList) leftovers
+          solutions = map (map (fst . (args `unsafeIndex`)) . S.toList) leftovers
         in
           UnusableDeclaration ident (nub solutions)
 
@@ -351,7 +344,7 @@ typeCheckAll moduleName _ = traverse go
 
   checkInstanceMembers :: [Declaration] -> m [Declaration]
   checkInstanceMembers instDecls = do
-    let idents = sort . map head . group . map memberName $ instDecls
+    let idents = sort . map unsafeHead . group . map memberName $ instDecls
     for_ (firstDuplicate idents) $ \ident ->
       throwError . errorMessage $ DuplicateValueDeclaration ident
     return instDecls
@@ -503,7 +496,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
 
   checkClassMembersAreExported :: DeclarationRef -> m ()
   checkClassMembersAreExported dr@(TypeClassRef ss' name) = do
-    let members = ValueRef ss' `map` head (mapMaybe findClassMembers decls)
+    let members = ValueRef ss' `map` unsafeHead (mapMaybe findClassMembers decls)
     let missingMembers = members \\ exps
     unless (null missingMembers) . throwError . errorMessage' ss' $ TransitiveExportError dr members
     where

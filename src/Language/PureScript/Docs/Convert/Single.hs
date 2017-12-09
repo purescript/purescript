@@ -3,7 +3,7 @@ module Language.PureScript.Docs.Convert.Single
   , convertComments
   ) where
 
-import Protolude hiding (moduleName)
+import PSPrelude
 
 import Control.Category ((>>>))
 

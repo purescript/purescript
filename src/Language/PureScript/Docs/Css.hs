@@ -1,9 +1,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Language.PureScript.Docs.Css where
 
-import Data.ByteString (ByteString)
-import Data.Text (Text)
-import Data.Text.Encoding (decodeUtf8)
+import PSPrelude
+
 import Data.FileEmbed (embedFile)
 
 -- |

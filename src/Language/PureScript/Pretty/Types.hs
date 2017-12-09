@@ -14,13 +14,12 @@ module Language.PureScript.Pretty.Types
   , prettyPrintObjectKey
   ) where
 
-import Prelude.Compat
+import PSPrelude
 
 import Control.Arrow ((<+>))
 import Control.PatternArrows as PA
 
-import Data.Maybe (fromMaybe)
-import Data.Text (Text)
+import Data.String (String)
 import qualified Data.Text as T
 
 import Language.PureScript.Crash
@@ -33,13 +32,28 @@ import Language.PureScript.Types
 import Language.PureScript.PSString (PSString, prettyPrintString, decodeString)
 import Language.PureScript.Label (Label(..))
 
-import Text.PrettyPrint.Boxes hiding ((<+>))
+import qualified Text.PrettyPrint.Boxes as B
 
--- TODO(Christoph): get rid of T.unpack s
+type Box = B.Box
+
+renderT :: Box -> Text
+renderT = toS . B.render
+
+text :: String -> Box
+text = B.text
+
+textT :: Text -> Box
+textT = text . toS
+
+moveRight :: Int -> Box -> Box
+moveRight = B.moveRight
+
+nullBox :: B.Box
+nullBox = B.nullBox
 
 constraintsAsBox :: TypeRenderOptions -> Constraint -> Box -> Box
 constraintsAsBox tro con ty =
-    constraintAsBox con `before` (" " <> text doubleRightArrow <> " " <> ty)
+    constraintAsBox con `before` (" " B.<> text doubleRightArrow B.<> " " B.<> ty)
   where
     doubleRightArrow = if troUnicode tro then "⇒" else "=>"
 
@@ -50,29 +64,29 @@ constraintAsBox (Constraint pn tys _) = typeAsBox (foldl TypeApp (TypeConstructo
 -- Generate a pretty-printed string representing a Row
 --
 prettyPrintRowWith :: TypeRenderOptions -> Char -> Char -> Type -> Box
-prettyPrintRowWith tro open close = uncurry listToBox . toList []
+prettyPrintRowWith tro open close = uncurry listToBox . toLst []
   where
   nameAndTypeToPs :: Char -> Label -> Type -> Box
-  nameAndTypeToPs start name ty = text (start : ' ' : T.unpack (prettyPrintLabel name) ++ " " ++ doubleColon ++ " ") <> typeAsBox ty
+  nameAndTypeToPs start name ty = textT (T.cons start $ T.cons ' ' $ prettyPrintLabel name <> " " <> doubleColon <> " ") B.<> typeAsBox ty
 
   doubleColon = if troUnicode tro then "∷" else "::"
 
   tailToPs :: Type -> Box
   tailToPs REmpty = nullBox
-  tailToPs other = text "| " <> typeAsBox other
+  tailToPs other = text "| " B.<> typeAsBox other
 
   listToBox :: [(Label, Type)] -> Type -> Box
   listToBox [] REmpty = text [open, close]
-  listToBox [] rest = text [ open, ' ' ] <> tailToPs rest <> text [ ' ', close ]
-  listToBox ts rest = vcat left $
+  listToBox [] rest = text [ open, ' ' ] B.<> tailToPs rest B.<> text [ ' ', close ]
+  listToBox ts rest = B.vcat B.left $
     zipWith (\(nm, ty) i -> nameAndTypeToPs (if i == 0 then open else ',') nm ty) ts [0 :: Int ..] ++
     [ tailToPs rest, text [close] ]
-  toList :: [(Label, Type)] -> Type -> ([(Label, Type)], Type)
-  toList tys (RCons name ty row) = toList ((name, ty):tys) row
-  toList tys r = (reverse tys, r)
+  toLst :: [(Label, Type)] -> Type -> ([(Label, Type)], Type)
+  toLst tys (RCons name ty row) = toLst ((name, ty):tys) row
+  toLst tys r = (reverse tys, r)
 
-prettyPrintRow :: Type -> String
-prettyPrintRow = render . prettyPrintRowWith defaultOptions '(' ')'
+prettyPrintRow :: Type -> Text
+prettyPrintRow = renderT . prettyPrintRowWith defaultOptions '(' ')'
 
 -- Treat `ProxyType t` in a similar way to the application of a type
 -- constructor `@` to `t`, i.e: `@ t`, except that we don't render the unneeded
@@ -127,7 +141,7 @@ explicitParens = mkPattern match
 
 matchTypeAtom :: TypeRenderOptions -> Pattern () Type Box
 matchTypeAtom tro@TypeRenderOptions{troSuggesting = suggesting} =
-    typeLiterals <+> fmap ((`before` (text ")")) . (text "(" <>)) (matchType tro)
+    typeLiterals <+> fmap ((`before` (text ")")) . (text "(" B.<>)) (matchType tro)
   where
     typeLiterals :: Pattern () Type Box
     typeLiterals = mkPattern match where
@@ -145,7 +159,7 @@ matchTypeAtom tro@TypeRenderOptions{troSuggesting = suggesting} =
       match REmpty = Just $ text "()"
       match row@RCons{} = Just $ prettyPrintRowWith tro '(' ')' row
       match (BinaryNoParensType op l r) =
-        Just $ typeAsBox l <> text " " <> typeAsBox op <> text " " <> typeAsBox r
+        Just $ typeAsBox l B.<> text " " B.<> typeAsBox op B.<> text " " B.<> typeAsBox r
       match (TypeOp op) = Just $ text $ T.unpack $ showQualified runOpName op
       match _ = Nothing
 
@@ -153,12 +167,12 @@ matchType :: TypeRenderOptions -> Pattern () Type Box
 matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
   operators :: OperatorTable () Type Box
   operators =
-    OperatorTable [ [ AssocL proxyType $ \p ty -> p <> ty ]
+    OperatorTable [ [ AssocL proxyType $ \p ty -> p B.<> ty ]
                   , [ AssocL typeApp $ \f x -> keepSingleLinesOr (moveRight 2) f x ]
-                  , [ AssocR appliedFunction $ \arg ret -> keepSingleLinesOr id arg (text rightArrow <> " " <> ret) ]
+                  , [ AssocR appliedFunction $ \arg ret -> keepSingleLinesOr id arg (textT rightArrow B.<> " " B.<> ret) ]
                   , [ Wrap constrained $ \deps ty -> constraintsAsBox tro deps ty ]
-                  , [ Wrap forall_ $ \idents ty -> keepSingleLinesOr (moveRight 2) (text (forall' ++ " " ++ unwords idents ++ ".")) ty ]
-                  , [ Wrap kinded $ \k ty -> keepSingleLinesOr (moveRight 2) ty (text (doubleColon ++ " " ++ T.unpack (prettyPrintKind k))) ]
+                  , [ Wrap forall_ $ \idents ty -> keepSingleLinesOr (moveRight 2) (textT (forall' <> " " <> T.unwords idents <> ".")) ty ]
+                  , [ Wrap kinded $ \k ty -> keepSingleLinesOr (moveRight 2) ty (textT (doubleColon <> " " <> prettyPrintKind k)) ]
                   , [ Wrap explicitParens $ \_ ty -> ty ]
                   ]
 
@@ -170,13 +184,13 @@ matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
   -- use the specified function to modify the second box, then combine vertically.
   keepSingleLinesOr :: (Box -> Box) -> Box -> Box -> Box
   keepSingleLinesOr f b1 b2
-    | rows b1 > 1 || rows b2 > 1 = vcat left [ b1, f b2 ]
-    | otherwise = hcat top [ b1, text " ", b2]
+    | B.rows b1 > 1 || B.rows b2 > 1 = b1 B.// f b2
+    | otherwise = B.hcat B.top [ b1, text " ", b2]
 
-forall_ :: Pattern () Type ([String], Type)
+forall_ :: Pattern () Type ([Text], Type)
 forall_ = mkPattern match
   where
-  match (PrettyPrintForAll idents ty) = Just (map T.unpack idents, ty)
+  match (PrettyPrintForAll idents ty) = Just (idents, ty)
   match _ = Nothing
 
 typeAtomAsBox :: Type -> Box
@@ -186,8 +200,8 @@ typeAtomAsBox
   . insertPlaceholders
 
 -- | Generate a pretty-printed string representing a Type, as it should appear inside parentheses
-prettyPrintTypeAtom :: Type -> String
-prettyPrintTypeAtom = render . typeAtomAsBox
+prettyPrintTypeAtom :: Type -> Text
+prettyPrintTypeAtom = renderT . typeAtomAsBox
 
 typeAsBox :: Type -> Box
 typeAsBox = typeAsBoxImpl defaultOptions
@@ -216,20 +230,20 @@ typeAsBoxImpl tro
   . insertPlaceholders
 
 -- | Generate a pretty-printed string representing a 'Type'
-prettyPrintType :: Type -> String
+prettyPrintType :: Type -> Text
 prettyPrintType = prettyPrintType' defaultOptions
 
 -- | Generate a pretty-printed string representing a 'Type' using unicode
 -- symbols where applicable
-prettyPrintTypeWithUnicode :: Type -> String
+prettyPrintTypeWithUnicode :: Type -> Text
 prettyPrintTypeWithUnicode = prettyPrintType' unicodeOptions
 
 -- | Generate a pretty-printed string representing a suggested 'Type'
-prettyPrintSuggestedType :: Type -> String
+prettyPrintSuggestedType :: Type -> Text
 prettyPrintSuggestedType = prettyPrintType' suggestingOptions
 
-prettyPrintType' :: TypeRenderOptions -> Type -> String
-prettyPrintType' tro = render . typeAsBoxImpl tro
+prettyPrintType' :: TypeRenderOptions -> Type -> Text
+prettyPrintType' tro = renderT . typeAsBoxImpl tro
 
 prettyPrintLabel :: Label -> Text
 prettyPrintLabel (Label s) =

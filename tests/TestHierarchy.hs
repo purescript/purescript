@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module TestHierarchy where
 
+import PSPrelude
+
 import Language.PureScript.Hierarchy
 import qualified Language.PureScript as P
 import Test.Hspec (describe, hspec, it, shouldBe)

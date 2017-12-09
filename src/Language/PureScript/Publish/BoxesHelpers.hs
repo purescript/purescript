@@ -4,11 +4,10 @@ module Language.PureScript.Publish.BoxesHelpers
   , module Language.PureScript.Publish.BoxesHelpers
   ) where
 
-import Prelude.Compat
+import PSPrelude
 
-import Data.Text (Text)
 import qualified Data.Text as T
-import System.IO (hPutStr, stderr)
+import Data.String (String)
 
 import qualified Text.PrettyPrint.Boxes as Boxes
 

@@ -22,7 +22,7 @@
 
 module Command.Ide (command) where
 
-import           Protolude
+import           PSPrelude
 
 import qualified Data.Aeson as Aeson
 import           Control.Concurrent.STM
@@ -45,7 +45,7 @@ import qualified Options.Applicative               as Opts
 import           System.Directory
 import           System.Info                       as SysInfo
 import           System.FilePath
-import           System.IO                         hiding (putStrLn, print)
+import           System.IO                         (BufferMode(..), hFlush, hSetEncoding, hSetBuffering, hClose, utf8)
 import           System.IO.Error                   (isEOFError)
 
 listenOnLocalhost :: PortNumber -> IO Socket
@@ -92,12 +92,10 @@ command = Opts.helper <*> subcommands where
   client ClientOptions{..} = do
     hSetEncoding stdin utf8
     hSetEncoding stdout utf8
-    let handler (SomeException e) = do
-          T.putStrLn ("Couldn't connect to purs ide server on port " <> show clientPort <> ":")
-          print e
-          exitFailure
+    let handler (SomeException e) =
+          fatal ("Couldn't connect to purs ide server on port " <> show clientPort <> ":" <> show e)
     h <- connectTo "127.0.0.1" clientPort `catch` handler
-    T.hPutStrLn h =<< T.getLine
+    hPutStrLn h =<< T.getLine
     BS8.putStrLn =<< BS8.hGetLine h
     hFlush stdout
     hClose h
@@ -186,7 +184,7 @@ startServer port env = withSocketsDo $ do
             Nothing -> do
               $(logError) ("Parsing the command failed. Command: " <> cmd)
               liftIO $ do
-                catchGoneHandle (T.hPutStrLn h (encodeT (GeneralError "Error parsing Command.")))
+                catchGoneHandle (hPutStrLn h (encodeT (GeneralError "Error parsing Command.")))
                 hFlush stdout
           liftIO $ catchGoneHandle (hClose h)
 

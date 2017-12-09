@@ -6,25 +6,17 @@ module Language.PureScript.Errors
   , module Language.PureScript.Errors
   ) where
 
-import           Prelude.Compat
-import           Protolude (ordNub)
+import           PSPrelude
 
 import           Control.Arrow ((&&&))
-import           Control.Monad
-import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.Trans.State.Lazy
 import           Control.Monad.Writer
 import           Data.Char (isSpace)
-import           Data.Either (partitionEithers)
-import           Data.Foldable (fold)
-import           Data.Functor.Identity (Identity(..))
-import           Data.List (transpose, nubBy, sort, partition, dropWhileEnd)
+import           Data.List (transpose, nubBy, sort, partition, dropWhileEnd, span)
 import qualified Data.List.NonEmpty as NEL
-import           Data.Maybe (maybeToList, fromMaybe, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
+import           Data.String (String)
 import qualified Data.Text as T
-import           Data.Text (Text)
 import           Language.PureScript.AST
 import qualified Language.PureScript.Bundle as Bundle
 import qualified Language.PureScript.Constants as C
@@ -215,7 +207,7 @@ addHints hints = onErrorMessages $ \(ErrorMessage hints' se) -> ErrorMessage (hi
 
 -- | A map from rigid type variable name/unknown variable pairs to new variables.
 data TypeMap = TypeMap
-  { umSkolemMap   :: M.Map Int (String, Int, Maybe SourceSpan)
+  { umSkolemMap   :: M.Map Int (Text, Int, Maybe SourceSpan)
   -- ^ a map from skolems to their new names, including source and naming info
   , umUnknownMap  :: M.Map Int Int
   -- ^ a map from unification variables to their new names
@@ -250,7 +242,7 @@ replaceUnknowns = everywhereOnTypesM replaceTypes where
     case M.lookup s (umSkolemMap m) of
       Nothing -> do
         let s' = umNextIndex m
-        put $ m { umSkolemMap = M.insert s (T.unpack name, s', ss) (umSkolemMap m), umNextIndex = s' + 1 }
+        put $ m { umSkolemMap = M.insert s (name, s', ss) (umSkolemMap m), umNextIndex = s' + 1 }
         return (Skolem name s' sko ss)
       Just (_, s', _) -> return (Skolem name s' sko ss)
   replaceTypes other = return other
@@ -310,8 +302,8 @@ errorSuggestion err =
       ImplicitImport mn refs -> suggest $ importSuggestion mn refs Nothing
       ImplicitQualifiedImport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
       HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
-      MissingTypeDeclaration ident ty -> suggest $ showIdent ident <> " :: " <> T.pack (prettyPrintSuggestedType ty)
-      WildcardInferredType ty _ -> suggest $ T.pack (prettyPrintSuggestedType ty)
+      MissingTypeDeclaration ident ty -> suggest $ showIdent ident <> " :: " <> prettyPrintSuggestedType ty
+      WildcardInferredType ty _ -> suggest $ prettyPrintSuggestedType ty
       _ -> Nothing
   where
     emptySuggestion = Just $ ErrorSuggestion ""
@@ -349,10 +341,10 @@ ansiColorReset :: String
 ansiColorReset =
    ANSI.setSGRCode [ANSI.Reset]
 
-colorCode :: Maybe (ANSI.ColorIntensity, ANSI.Color) -> Text -> Text
+colorCode :: Maybe (ANSI.ColorIntensity, ANSI.Color) -> String -> String
 colorCode codeColor code = case codeColor of
   Nothing -> code
-  Just cc -> T.pack (ansiColor cc) <> code <> T.pack ansiColorReset
+  Just cc -> ansiColor cc <> code <> ansiColorReset
 
 colorCodeBox :: Maybe (ANSI.ColorIntensity, ANSI.Color) -> Box.Box -> Box.Box
 colorCodeBox codeColor b = case codeColor of
@@ -398,7 +390,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
   um <- get
   return (prettyPrintErrorMessage um em)
   where
-  (markCode, markCodeBox) = (colorCode &&& colorCodeBox) codeColor
+  (markCodeS, markCodeBox) = (colorCode &&& colorCodeBox) codeColor
+  markCode :: Text -> Text
+  markCode = toS . markCodeS . toS
 
   -- Pretty print an ErrorMessage
   prettyPrintErrorMessage :: TypeMap -> ErrorMessage -> Box.Box
@@ -422,14 +416,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       types = map skolemInfo  (M.elems (umSkolemMap typeMap)) ++
               map unknownInfo (M.elems (umUnknownMap typeMap))
 
-      skolemInfo :: (String, Int, Maybe SourceSpan) -> Box.Box
+      skolemInfo :: (Text, Int, Maybe SourceSpan) -> Box.Box
       skolemInfo (name, s, ss) =
         paras $
-          line (markCode (T.pack (name <> show s)) <> " is a rigid type variable")
+          line (markCode (name <> show s) <> " is a rigid type variable")
           : foldMap (return . line . ("  bound at " <>) . displayStartEndPos) ss
 
       unknownInfo :: Int -> Box.Box
-      unknownInfo u = line $ markCode ("t" <> T.pack (show u)) <> " is an unknown type"
+      unknownInfo u = line $ markCode ("t" <> show u) <> " is an unknown type"
 
     renderSimpleErrorMessage :: SimpleErrorMessage -> Box.Box
     renderSimpleErrorMessage (ModuleNotFound mn) =
@@ -438,21 +432,21 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
     renderSimpleErrorMessage (CannotGetFileInfo path) =
       paras [ line "Unable to read file info: "
-            , indent . lineS $ path
+            , indent $ lineS path
             ]
     renderSimpleErrorMessage (CannotReadFile path) =
       paras [ line "Unable to read file: "
-            , indent . lineS $ path
+            , indent $ lineS path
             ]
     renderSimpleErrorMessage (CannotWriteFile path) =
       paras [ line "Unable to write file: "
-            , indent . lineS $ path
+            , indent $ lineS path
             ]
     renderSimpleErrorMessage (ErrorParsingFFIModule path extra) =
       paras $ [ line "Unable to parse foreign module:"
               , indent . lineS $ path
               ] ++
-              map (indent . lineS) (concatMap Bundle.printErrorMessage (maybeToList extra))
+              map (indent . line) (concatMap Bundle.printErrorMessage (maybeToList extra))
     renderSimpleErrorMessage (ErrorParsingModule err) =
       paras [ line "Unable to parse module: "
             , prettyPrintParseError err
@@ -833,7 +827,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             let
               formatTS (names, types) =
                 let
-                  idBoxes = Box.text . T.unpack . showQualified id <$> names
+                  idBoxes = line . showQualified id <$> names
                   tyBoxes = (\t -> BoxHelpers.indented
                               (Box.text ":: " Box.<> typeAsBox t)) <$> types
                   longestId = maximum (map Box.cols idBoxes)
@@ -1262,12 +1256,12 @@ prettyPrintRef ReExportRef{} =
   Nothing
 
 -- | Pretty print multiple errors
-prettyPrintMultipleErrors :: PPEOptions -> MultipleErrors -> String
-prettyPrintMultipleErrors ppeOptions = unlines . map renderBox . prettyPrintMultipleErrorsBox ppeOptions
+prettyPrintMultipleErrors :: PPEOptions -> MultipleErrors -> Text
+prettyPrintMultipleErrors ppeOptions = T.unlines . map renderBox . prettyPrintMultipleErrorsBox ppeOptions
 
 -- | Pretty print multiple warnings
-prettyPrintMultipleWarnings :: PPEOptions -> MultipleErrors -> String
-prettyPrintMultipleWarnings ppeOptions = unlines . map renderBox . prettyPrintMultipleWarningsBox ppeOptions
+prettyPrintMultipleWarnings :: PPEOptions -> MultipleErrors -> Text
+prettyPrintMultipleWarnings ppeOptions = T.unlines . map renderBox . prettyPrintMultipleWarningsBox ppeOptions
 
 -- | Pretty print warnings as a Box
 prettyPrintMultipleWarningsBox :: PPEOptions -> MultipleErrors -> [Box.Box]
@@ -1277,10 +1271,10 @@ prettyPrintMultipleWarningsBox ppeOptions = prettyPrintMultipleErrorsWith (ppeOp
 prettyPrintMultipleErrorsBox :: PPEOptions -> MultipleErrors -> [Box.Box]
 prettyPrintMultipleErrorsBox ppeOptions = prettyPrintMultipleErrorsWith (ppeOptions { ppeLevel = Error }) "Error found:" "Error"
 
-prettyPrintMultipleErrorsWith :: PPEOptions -> String -> String -> MultipleErrors -> [Box.Box]
+prettyPrintMultipleErrorsWith :: PPEOptions -> Text -> Text -> MultipleErrors -> [Box.Box]
 prettyPrintMultipleErrorsWith ppeOptions intro _ (MultipleErrors [e]) =
   let result = prettyPrintSingleError ppeOptions e
-  in [ Box.vcat Box.left [ Box.text intro
+  in [ Box.vcat Box.left [ line intro
                          , result
                          ]
      ]
@@ -1288,7 +1282,7 @@ prettyPrintMultipleErrorsWith ppeOptions _ intro (MultipleErrors es) =
   let result = map (prettyPrintSingleError ppeOptions) es
   in concat $ zipWith withIntro [1 :: Int ..] result
   where
-  withIntro i err = [ Box.text (intro ++ " " ++ show i ++ " of " ++ show (length es) ++ ":")
+  withIntro i err = [ line (intro <> " " <> show i <> " of " <> show (length es) <> ":")
                     , Box.moveRight 2 err
                     ]
 
@@ -1302,7 +1296,7 @@ prettyPrintParseError = prettyPrintParseErrorMessages "or" "unknown parse error"
 -- See <https://github.com/aslatter/parsec/blob/v3.1.9/Text/Parsec/Error.hs#L173>.
 prettyPrintParseErrorMessages :: String -> String -> String -> String -> String -> [Message] -> Box.Box
 prettyPrintParseErrorMessages msgOr msgUnknown msgExpecting msgUnExpected msgEndOfInput msgs
-  | null msgs = Box.text msgUnknown
+  | null msgs = lineS msgUnknown
   | otherwise = Box.vcat Box.left $ map Box.text $ clean [showSysUnExpect,showUnExpect,showExpect,showMessages]
 
   where
@@ -1317,25 +1311,25 @@ prettyPrintParseErrorMessages msgOr msgUnknown msgExpecting msgUnExpected msgEnd
                   | null firstMsg    = msgUnExpected ++ " " ++ msgEndOfInput
                   | otherwise        = msgUnExpected ++ " " ++ firstMsg
     where
-    firstMsg  = PE.messageString (head sysUnExpect)
+    firstMsg  = PE.messageString (fromMaybe (SysUnExpect "???") $ head sysUnExpect)
 
   showMessages      = showMany "" messages
 
   -- helpers
-  showMany pre msgs' = case clean (map PE.messageString msgs') of
+  showMany pre msgs' = case clean (map (toS . PE.messageString) msgs') of
                          [] -> ""
                          ms | null pre  -> commasOr ms
-                            | otherwise -> pre ++ " " ++ commasOr ms
+                            | otherwise -> pre <> " " <> commasOr ms
 
   commasOr []       = ""
   commasOr [m]      = m
-  commasOr ms       = commaSep (init ms) ++ " " ++ msgOr ++ " " ++ last ms
+  commasOr ms       = commaSep (unsafeInit ms) <> " " <> msgOr <> " " <> unsafeLast ms
 
   commaSep          = separate ", " . clean
 
   separate   _ []     = ""
   separate   _ [m]    = m
-  separate sep (m:ms) = m ++ sep ++ separate sep ms
+  separate sep (m:ms) = m <> sep <> separate sep ms
 
   clean             = ordNub . filter (not . null)
 
@@ -1343,21 +1337,22 @@ prettyPrintParseErrorMessages msgOr msgUnknown msgExpecting msgUnExpected msgEnd
 indent :: Box.Box -> Box.Box
 indent = Box.moveUp 1 . Box.moveDown 1 . Box.moveRight 2
 
-line :: Text -> Box.Box
-line = Box.text . T.unpack
-
 lineS :: String -> Box.Box
 lineS = Box.text
 
-renderBox :: Box.Box -> String
-renderBox = unlines
-            . map (dropWhileEnd isSpace)
+line :: Text -> Box.Box
+line = Box.text . toS
+
+renderBox :: Box.Box -> Text
+renderBox =   T.unlines
+            . map T.stripEnd
             . dropWhile whiteSpace
             . dropWhileEnd whiteSpace
-            . lines
+            . T.lines
+            . toS
             . Box.render
   where
-  whiteSpace = all isSpace
+  whiteSpace = T.all isSpace
 
 toTypelevelString :: Type -> Maybe Box.Box
 toTypelevelString (TypeLevelString s) =

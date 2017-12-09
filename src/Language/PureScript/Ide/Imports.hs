@@ -30,7 +30,7 @@ module Language.PureScript.Ide.Imports
        )
        where
 
-import           Protolude hiding (moduleName)
+import           PSPrelude
 
 import           Control.Lens                       ((^.), (%~), ix)
 import           Data.List                          (findIndex, nubBy, partition)

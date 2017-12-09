@@ -11,24 +11,16 @@ module Language.PureScript.TypeChecker.Entailment
   , entails
   ) where
 
-import Prelude.Compat
-import Protolude (ordNub)
+import PSPrelude hiding (sym)
 
-import Control.Arrow (second, (&&&))
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State
+import Control.Arrow ((&&&))
 import Control.Monad.Supply.Class (MonadSupply(..))
 import Control.Monad.Writer
 
-import Data.Foldable (for_, fold, toList)
-import Data.Function (on)
 import Data.Functor (($>))
-import Data.List (minimumBy, groupBy, sortBy)
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.List (minimumBy)
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Data.Traversable (for)
-import Data.Text (Text, stripPrefix, stripSuffix)
 import qualified Data.Text as T
 
 import Language.PureScript.AST
@@ -254,7 +246,7 @@ entails SolverOptions{..} constraint context hints =
                 -- Now enforce any functional dependencies, using unification
                 -- Note: we need to generate fresh types for any unconstrained
                 -- type variables before unifying.
-                let subst = fmap head substs
+                let subst = fmap unsafeHead substs
                 currentSubst <- lift . lift $ gets checkSubstitution
                 subst' <- lift . lift $ withFreshTypes tcd (fmap (substituteType currentSubst) subst)
                 lift . lift $ zipWithM_ (\t1 t2 -> do
@@ -391,12 +383,12 @@ entails SolverOptions{..} constraint context hints =
     appendSymbols arg0@(TypeLevelString lhs) _ arg2@(TypeLevelString out) = do
       lhs' <- decodeString lhs
       out' <- decodeString out
-      rhs <- stripPrefix lhs' out'
+      rhs <- T.stripPrefix lhs' out'
       pure (arg0, TypeLevelString (mkString rhs), arg2)
     appendSymbols _ arg1@(TypeLevelString rhs) arg2@(TypeLevelString out) = do
       rhs' <- decodeString rhs
       out' <- decodeString out
-      lhs <- stripSuffix rhs' out'
+      lhs <- T.stripSuffix rhs' out'
       pure (TypeLevelString (mkString lhs), arg1, arg2)
     appendSymbols _ _ _ = Nothing
     

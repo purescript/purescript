@@ -2,12 +2,10 @@
 
 module Language.PureScript.Errors.JSON where
 
-import Prelude.Compat
+import PSPrelude
 
 import qualified Data.Aeson.TH as A
-import Data.Monoid ((<>))
 import qualified Data.Text as T
-import Data.Text (Text)
 
 import qualified Language.PureScript as P
 
@@ -25,10 +23,10 @@ data ErrorSuggestion = ErrorSuggestion
 
 data JSONError = JSONError
   { position :: Maybe ErrorPosition
-  , message :: String
+  , message :: Text
   , errorCode :: Text
   , errorLink :: Text
-  , filename :: Maybe String
+  , filename :: Maybe FilePath
   , moduleName :: Maybe Text
   , suggestion :: Maybe ErrorSuggestion
   } deriving (Show, Eq)

@@ -9,13 +9,9 @@ module Language.PureScript.TypeChecker.Synonyms
   , replaceAllTypeSynonymsM
   ) where
 
-import           Prelude.Compat
+import           PSPrelude hiding (try)
 
-import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.State
-import           Data.Maybe (fromMaybe)
 import qualified Data.Map as M
-import           Data.Text (Text)
 import           Language.PureScript.Environment
 import           Language.PureScript.Errors
 import           Language.PureScript.Kinds

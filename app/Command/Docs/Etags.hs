@@ -1,13 +1,16 @@
 module Command.Docs.Etags (dumpEtags) where
 
+import           PSPrelude
+
 import           Command.Docs.Tags
 import qualified Language.PureScript as P
+import qualified Data.Text as T
 
-dumpEtags :: [(String, P.Module)] -> [String]
+dumpEtags :: [(FilePath, P.Module)] -> [Text]
 dumpEtags = concatMap renderModEtags
 
-renderModEtags :: (String, P.Module) -> [String]
-renderModEtags (path, mdl) = ["\x0c", path ++ "," ++ show tagsLen] ++ tagLines
-  where tagsLen = sum $ map length tagLines
+renderModEtags :: (FilePath, P.Module) -> [Text]
+renderModEtags (path, mdl) = ["\x0c", toS path <> "," <> show tagsLen] <> tagLines
+  where tagsLen = sum $ map T.length tagLines
         tagLines = map tagLine $ tags mdl
-        tagLine (name, line) = "\x7f" ++ name ++ "\x01" ++ show line ++ ","
+        tagLine (name, line) = "\x7f" <> name <> "\x01" <> show line <> ","

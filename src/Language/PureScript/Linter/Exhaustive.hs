@@ -8,21 +8,13 @@ module Language.PureScript.Linter.Exhaustive
   ( checkExhaustiveExpr
   ) where
 
-import Prelude.Compat
-import Protolude (ordNub)
+import PSPrelude hiding (guard)
 
-import Control.Applicative
-import Control.Arrow (first, second)
-import Control.Monad (unless)
 import Control.Monad.Writer.Class
 import Control.Monad.Supply.Class (MonadSupply, fresh, freshName)
 
-import Data.Function (on)
 import Data.List (foldl', sortBy)
-import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
 import qualified Data.Map as M
-import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.AST.Binders
@@ -81,7 +73,7 @@ getConstructors env defmn n = extractConstructors lnte
   getConsDataName :: Qualified (ProperName 'ConstructorName) -> Qualified (ProperName 'TypeName)
   getConsDataName con =
     case getConsInfo con of
-      Nothing -> internalError $ "Constructor " ++ T.unpack (showQualified runProperName con) ++ " not in the scope of the current environment in getConsDataName."
+      Nothing -> internalError $ "Constructor " <> showQualified runProperName con <> " not in the scope of the current environment in getConsDataName."
       Just (_, pm, _, _) -> qualifyName pm defmn con
 
   getConsInfo :: Qualified (ProperName 'ConstructorName) -> Maybe (DataDeclType, ProperName 'TypeName, Type, [Ident])

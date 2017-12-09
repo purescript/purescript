@@ -19,7 +19,7 @@ module Language.PureScript.Ide.Externs
   , convertExterns
   ) where
 
-import           Protolude hiding (to, from, (&))
+import           PSPrelude
 
 import           Control.Lens
 import           "monad-logger" Control.Monad.Logger

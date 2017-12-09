@@ -2,10 +2,7 @@
 -- and bind for the Eff monad, as well as some of its actions.
 module Language.PureScript.CoreImp.Optimizer.MagicDo (magicDo, inlineST) where
 
-import Prelude.Compat
-import Protolude (ordNub)
-
-import Data.Maybe (fromJust, isJust)
+import PSPrelude
 
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.CoreImp.Optimizer.Common
@@ -94,7 +91,7 @@ inlineST = everywhere convertBlock
   convertBlock (App _ f [arg]) | isSTFunc C.runST f =
     let refs = ordNub . findSTRefsIn $ arg
         usages = findAllSTUsagesIn arg
-        allUsagesAreLocalVars = all (\u -> let v = toVar u in isJust v && fromJust v `elem` refs) usages
+        allUsagesAreLocalVars = all (\u -> let v = toVar u in isJust v && unsafeFromJust v `elem` refs) usages
         localVarsDoNotEscape = all (\r -> length (r `appearingIn` arg) == length (filter (\u -> let v = toVar u in v == Just r) usages)) refs
     in everywhere (convert (allUsagesAreLocalVars && localVarsDoNotEscape)) arg
   convertBlock other = other

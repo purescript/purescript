@@ -4,7 +4,7 @@
 module Language.PureScript.Sugar (desugar, module S) where
 
 import Control.Category ((>>>))
-import Control.Monad
+import Control.Monad ((>=>))
 import Control.Monad.Error.Class (MonadError())
 import Control.Monad.Supply.Class
 import Control.Monad.Writer.Class (MonadWriter())

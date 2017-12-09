@@ -24,7 +24,7 @@ import qualified Data.Text as T
 import qualified Language.PureScript as P
 import           Language.PureScript.Errors.JSON
 import           Language.PureScript.Ide.Types   (ModuleIdent, Completion(..))
-import           Protolude
+import           PSPrelude
 import qualified Text.Parsec.Error               as Parsec
 
 data IdeError
@@ -83,4 +83,4 @@ textError (ParseError parseError msg) = let escape = show
 textError (RebuildError err)          = show err
 
 prettyPrintTypeSingleLine :: P.Type -> Text
-prettyPrintTypeSingleLine = T.unwords . map T.strip . T.lines . T.pack . P.prettyPrintTypeWithUnicode
+prettyPrintTypeSingleLine = T.unwords . map T.strip . T.lines . P.prettyPrintTypeWithUnicode

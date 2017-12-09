@@ -1,13 +1,8 @@
 -- | Useful common functions for building parsers
 module Language.PureScript.Parser.Common where
 
-import           Prelude.Compat
+import           PSPrelude
 
-import           Control.Applicative ((<|>))
-import           Control.Monad (guard)
-import           Data.Maybe (fromMaybe)
-import           Data.Monoid ((<>))
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Language.PureScript.AST.SourcePos
 import           Language.PureScript.Comments

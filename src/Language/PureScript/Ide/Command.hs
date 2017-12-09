@@ -14,7 +14,7 @@
 
 module Language.PureScript.Ide.Command where
 
-import           Protolude
+import           PSPrelude
 
 import           Data.Aeson
 import qualified Language.PureScript               as P

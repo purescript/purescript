@@ -5,15 +5,12 @@
 --
 module Language.PureScript.Pretty.Common where
 
-import Prelude.Compat
+import PSPrelude
 
-import Control.Monad.State (StateT, modify, get)
-
-import Data.List (elemIndices, intersperse)
-import Data.Monoid ((<>))
-import Data.Text (Text)
+import Data.List (elemIndices)
 import qualified Data.Text as T
 import Data.Char (isUpper)
+import Data.Monoid.Extra (mintercalate)
 
 import Language.PureScript.AST (SourcePos(..), SourceSpan(..))
 import Language.PureScript.Parser.Lexer (isUnquotedKey, reservedPsNames)
@@ -21,29 +18,20 @@ import Language.PureScript.Parser.Lexer (isUnquotedKey, reservedPsNames)
 import Text.PrettyPrint.Boxes hiding ((<>))
 import qualified Text.PrettyPrint.Boxes as Box
 
--- |
--- Wrap a string in parentheses
---
-parens :: String -> String
-parens s = "(" <> s <> ")"
-
-parensT :: Text -> Text
-parensT s = "(" <> s <> ")"
-
-parensPos :: (Emit gen) => gen -> gen
-parensPos s = emit "(" <> s <> emit ")"
-
--- |
--- Generalize intercalate slightly for monoids
---
-intercalate :: Monoid m => m -> [m] -> m
-intercalate x xs = mconcat (intersperse x xs)
-
 class (Monoid gen) => Emit gen where
   emit :: Text -> gen
   addMapping :: SourceSpan -> gen
 
-data SMap = SMap Text SourcePos SourcePos
+-- |
+-- Wrap a string in parentheses
+--
+parens :: Text -> Text
+parens s = "(" <> s <> ")"
+
+parensPos :: (Emit gen) => gen -> gen
+parensPos s = emit "(" <> s <> emit ")"
+
+data SMap = SMap FilePath SourcePos SourcePos
 
 -- |
 -- String with length and source-map entries
@@ -76,7 +64,7 @@ instance Emit StrPos where
   emit str =
     -- TODO(Christoph): get rid of T.unpack
     let newlines = elemIndices '\n' (T.unpack str)
-        index = if null newlines then 0 else last newlines + 1
+        index = if null newlines then 0 else unsafeLast newlines + 1
     in
     StrPos (SourcePos { sourcePosLine = length newlines, sourcePosColumn = T.length str - index }, str, [])
 
@@ -85,7 +73,7 @@ instance Emit StrPos where
   --
   addMapping SourceSpan { spanName = file, spanStart = startPos } = StrPos (zeroPos, mempty, [mapping])
     where
-      mapping = SMap (T.pack file) startPos zeroPos
+      mapping = SMap file startPos zeroPos
       zeroPos = SourcePos 0 0
 
 newtype PlainString = PlainString Text deriving Monoid
@@ -145,7 +133,7 @@ prettyPrintMany :: (Emit gen) => (a -> StateT PrinterState Maybe gen) -> [a] -> 
 prettyPrintMany f xs = do
   ss <- mapM f xs
   indentString <- currentIndent
-  return $ intercalate (emit "\n") $ map (mappend indentString) ss
+  return $ mintercalate (emit "\n") $ map (mappend indentString) ss
 
 objectKeyRequiresQuoting :: Text -> Bool
 objectKeyRequiresQuoting s =

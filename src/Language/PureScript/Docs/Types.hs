@@ -6,11 +6,8 @@ module Language.PureScript.Docs.Types
   )
   where
 
-import Protolude hiding (to, from)
-import Prelude (String, unlines, lookup)
+import PSPrelude hiding (from, to)
 
-import GHC.Generics (Generic)
-import Control.DeepSeq (NFData)
 import Control.Arrow ((***))
 
 import Data.Aeson ((.=))
@@ -19,11 +16,13 @@ import Data.Aeson.BetterErrors
    keyMay, withString, eachInArray, asNull, (.!), toAesonParser, toAesonParser',
    fromAesonParser, perhaps, withText, asIntegral, nth, eachInObjectWithKey,
    asString)
+import Data.List (lookup)
 import qualified Data.Map as Map
 import Data.Time.Clock (UTCTime)
 import qualified Data.Time.Format as TimeFormat
 import Data.Version
 import qualified Data.Aeson as A
+import Data.String (String)
 import qualified Data.Text as T
 import qualified Data.Vector as V
 
@@ -193,7 +192,7 @@ convertFundepsToStrings args fundeps =
   argsVec = V.fromList (map fst args)
   getArg i =
     fromMaybe
-      (P.internalError $ unlines
+      (P.internalError $ T.unlines
         [ "convertDeclaration: Functional dependency index"
         , show i
         , "is bigger than arguments list"

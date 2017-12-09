@@ -2,8 +2,7 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Language.PureScript.Ide.ImportsSpec where
 
-import           Protolude hiding (moduleName)
-import           Data.Maybe                      (fromJust)
+import           PSPrelude
 
 import qualified Language.PureScript             as P
 import           Language.PureScript.Ide.Command as Command
@@ -49,14 +48,14 @@ syntaxErrorFile =
 testSliceImportSection :: [Text] -> (P.ModuleName, [Text], [Import], [Text])
 testSliceImportSection = fromRight . sliceImportSection
   where
-    fromRight = fromJust . rightToMaybe
+    fromRight = unsafeFromJust . rightToMaybe
 
 withImports :: [Text] -> [Text]
 withImports is =
   take 2 simpleFile ++ [""] ++ is ++ drop 2 simpleFile
 
 testParseImport :: Text -> Import
-testParseImport = fromJust . parseImport
+testParseImport = unsafeFromJust . parseImport
 
 preludeImport, arrayImport, listImport, consoleImport, maybeImport :: Import
 preludeImport = testParseImport "import Prelude"

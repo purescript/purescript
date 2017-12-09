@@ -9,7 +9,7 @@ module Language.PureScript.Ide.Completion
        , applyCompletionOptions
        ) where
 
-import           Protolude hiding ((<&>), moduleName)
+import           PSPrelude hiding ((<&>))
 
 import           Control.Lens hiding ((&), op)
 import           Data.Aeson

@@ -1,7 +1,6 @@
 module TestPsci where
 
-import Prelude ()
-import Prelude.Compat
+import PSPrelude
 
 import Test.Hspec
 import TestPsci.CommandTest (commandTests)

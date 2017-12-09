@@ -13,27 +13,21 @@ module Language.PureScript.PSString
   , mkString
   ) where
 
-import Prelude.Compat
-import GHC.Generics (Generic)
-import Control.DeepSeq (NFData)
+import PSPrelude
+
+import GHC.Show (Show)
 import Control.Exception (try, evaluate)
-import Control.Applicative ((<|>))
 import Data.Char (chr)
-import Data.Bits (shiftR)
 import Data.List (unfoldr)
-import Data.Monoid ((<>))
 import Data.Scientific (toBoundedInteger)
-import Data.String (IsString(..))
-import Data.ByteString (ByteString)
+import Data.String (IsString(..), String)
 import qualified Data.ByteString as BS
-import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Text.Encoding (decodeUtf16BE)
-import Data.Text.Encoding.Error (UnicodeException)
 import qualified Data.Vector as V
-import Data.Word (Word16, Word8)
 import Numeric (showHex)
 import System.IO.Unsafe (unsafePerformIO)
+import Text.Show (show)
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Types as A
 
@@ -57,7 +51,7 @@ newtype PSString = PSString { toUTF16CodeUnits :: [Word16] }
 instance NFData PSString
 
 instance Show PSString where
-  show = show . codePoints
+  show = PSPrelude.show . codePoints
 
 -- |
 -- Decode a PSString to a String, representing any lone surrogates as the
@@ -100,7 +94,7 @@ decodeStringEither = unfoldr decode . toUTF16CodeUnits
 -- of a String.
 --
 prettyPrintString :: PSString -> Text
-prettyPrintString = T.pack . show
+prettyPrintString = PSPrelude.show
 
 -- |
 -- Attempt to decode a PSString as UTF-16 text. This will fail (returning
@@ -122,8 +116,6 @@ decodeString = hush . decodeEither . BS.pack . concatMap unpair . toUTF16CodeUni
   -- handling any thrown UnicodeExceptions.
   decodeEither :: ByteString -> Either UnicodeException Text
   decodeEither = unsafePerformIO . try . evaluate . decodeUtf16BE
-
-  hush = either (const Nothing) Just
 
 instance IsString PSString where
   fromString a = PSString $ concatMap encodeUTF16 a

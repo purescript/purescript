@@ -1,14 +1,8 @@
 module Language.PureScript.CoreFn.Desugar (moduleToCoreFn) where
 
-import Prelude.Compat
-import Protolude (ordNub)
+import PSPrelude
 
-import Control.Arrow (second)
-
-import Data.Function (on)
 import Data.List (sort, sortBy)
-import Data.Maybe (mapMaybe)
-import Data.Tuple (swap)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as M
 
@@ -56,7 +50,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     [NonRec (ssA ss) (properToIdent ctor) $
       Abs (ss, com, Nothing, Just IsNewtype) (Ident "x") (Var (ssAnn ss) $ Qualified Nothing (Ident "x"))]
   declToCoreFn d@(A.DataDeclaration _ Newtype _ _ _) =
-    error $ "Found newtype with multiple constructors: " ++ show d
+    error $ "Found newtype with multiple constructors: " <> show d
   declToCoreFn (A.DataDeclaration (ss, com) Data tyName _ ctors) =
     flip fmap ctors $ \(ctor, _) ->
       let (_, _, _, fields) = lookupConstructor env (Qualified (Just mn) ctor)
@@ -115,7 +109,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   exprToCoreFn _ com ty (A.PositionedValue ss com1 v) =
     exprToCoreFn ss (com ++ com1) ty v
   exprToCoreFn _ _ _ e =
-    error $ "Unexpected value in exprToCoreFn mn: " ++ show e
+    error $ "Unexpected value in exprToCoreFn mn: " <> show e
 
   -- | Desugars case alternatives from AST to CoreFn representation.
   altToCoreFn :: SourceSpan -> A.CaseAlternative -> CaseAlternative Ann

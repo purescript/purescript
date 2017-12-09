@@ -1,10 +1,11 @@
 module TestPsci.CommandTest where
 
-import Prelude ()
-import Prelude.Compat
+import PSPrelude hiding (get)
 
 import Control.Monad.Trans.RWS.Strict (get)
 import Language.PureScript.Interactive
+import qualified Data.Text as T
+import Data.String (String)
 import Test.Hspec
 import TestPsci.TestEnv
 
@@ -34,7 +35,7 @@ commandTests = context "commandTests" $ do
     length ms' `equalsTo` 3
 
   specPSCi ":complete" $ do
-    ":complete ma" `prints` []
-    ":complete Data.Functor.ma" `prints` (unlines (map ("Data.Functor." ++ ) ["map", "mapFlipped"]))
+    ":complete ma" `prints` ""
+    ":complete Data.Functor.ma" `prints` (T.unlines (map ("Data.Functor." <> ) ["map", "mapFlipped"]))
     run "import Data.Functor"
-    ":complete ma" `prints` (unlines ["map", "mapFlipped"])
+    ":complete ma" `prints` (T.unlines ["map", "mapFlipped"])

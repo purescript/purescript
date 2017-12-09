@@ -7,11 +7,9 @@ module Language.PureScript.Pretty.Values
   , prettyPrintBinderAtom
   ) where
 
-import Prelude.Compat
+import PSPrelude hiding ((<>), list, guard)
 
-import Control.Arrow (second)
-
-import Data.Text (Text)
+import Data.Foldable (foldl1)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Monoid as Monoid ((<>))
 import qualified Data.Text as T
@@ -25,8 +23,6 @@ import Language.PureScript.Types (Constraint(..))
 import Language.PureScript.PSString (PSString, prettyPrintString)
 
 import Text.PrettyPrint.Boxes
-
--- TODO(Christoph): remove T.unpack s
 
 textT :: Text -> Box
 textT = text . T.unpack
@@ -66,9 +62,9 @@ prettyPrintValue d (ObjectUpdateNested o ps) = prettyPrintValueAtom (d - 1) o `b
     printNode (key, Leaf val) = prettyPrintUpdateEntry d key val
     printNode (key, Branch val) = textT (prettyPrintObjectKey key) `beforeWithSpace` prettyPrintUpdate val
 prettyPrintValue d (App val arg) = prettyPrintValueAtom (d - 1) val `beforeWithSpace` prettyPrintValueAtom (d - 1) arg
-prettyPrintValue d (Abs arg val) = text ('\\' : T.unpack (prettyPrintBinder arg) ++ " -> ") // moveRight 2 (prettyPrintValue (d - 1) val)
+prettyPrintValue d (Abs arg val) = textT ("\\" Monoid.<> prettyPrintBinder arg Monoid.<> " -> ") // moveRight 2 (prettyPrintValue (d - 1) val)
 prettyPrintValue d (TypeClassDictionaryConstructorApp className ps) =
-  text (T.unpack (runProperName (disqualify className)) ++ " ") <> prettyPrintValueAtom (d - 1) ps
+  textT (runProperName (disqualify className) Monoid.<> " ") <> prettyPrintValueAtom (d - 1) ps
 prettyPrintValue d (Case values binders) =
   (text "case " <> foldr beforeWithSpace (text "of") (map (prettyPrintValueAtom (d - 1)) values)) //
     moveRight 2 (vcat left (map (prettyPrintCaseAlternative (d - 1)) binders))
@@ -79,14 +75,14 @@ prettyPrintValue d (Let ds val) =
 prettyPrintValue d (Do els) =
   text "do " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els)
 prettyPrintValue _ (Proxy ty) =
-  text "@" <> typeAtomAsBox ty
+  textT "@" <> typeAtomAsBox ty
 prettyPrintValue d (Ado els yield) =
-  text "ado " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els) //
+  textT "ado " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els) //
   (text "in " <> prettyPrintValue (d - 1) yield)
-prettyPrintValue _ (TypeClassDictionary (Constraint name tys _) _ _) = foldl1 beforeWithSpace $ text ("#dict " ++ T.unpack (runProperName (disqualify name))) : map typeAtomAsBox tys
-prettyPrintValue _ (DeferredDictionary name _) = text $ "#dict " ++ T.unpack (runProperName (disqualify name))
+prettyPrintValue _ (TypeClassDictionary (Constraint name tys _) _ _) = foldl1 beforeWithSpace $ textT ("#dict " Monoid.<> runProperName (disqualify name)) : map typeAtomAsBox tys
+prettyPrintValue _ (DeferredDictionary name _) = textT $ "#dict " Monoid.<> runProperName (disqualify name)
 prettyPrintValue _ (TypeClassDictionaryAccessor className ident) =
-    text "#dict-accessor " <> text (T.unpack (runProperName (disqualify className))) <> text "." <> text (T.unpack (showIdent ident)) <> text ">"
+    textT "#dict-accessor " <> textT (runProperName (disqualify className)) <> textT "." <> textT (showIdent ident) <> textT ">"
 prettyPrintValue d (TypedValue _ val _) = prettyPrintValue d val
 prettyPrintValue d (PositionedValue _ _ val) = prettyPrintValue d val
 prettyPrintValue d (Literal l) = prettyPrintLiteralValue d l
@@ -103,12 +99,12 @@ prettyPrintValue d expr@UnaryMinus{} = prettyPrintValueAtom d expr
 prettyPrintValueAtom :: Int -> Expr -> Box
 prettyPrintValueAtom d (Literal l) = prettyPrintLiteralValue d l
 prettyPrintValueAtom _ AnonymousArgument = text "_"
-prettyPrintValueAtom _ (Constructor name) = text $ T.unpack $ runProperName (disqualify name)
-prettyPrintValueAtom _ (Var ident) = text $ T.unpack $ showIdent (disqualify ident)
+prettyPrintValueAtom _ (Constructor name) = textT $ runProperName (disqualify name)
+prettyPrintValueAtom _ (Var ident) = textT $ showIdent (disqualify ident)
 prettyPrintValueAtom d (BinaryNoParens op lhs rhs) =
   prettyPrintValue (d - 1) lhs `beforeWithSpace` printOp op `beforeWithSpace` prettyPrintValue (d - 1) rhs
   where
-  printOp (Op (Qualified _ name)) = text $ T.unpack $ runOpName name
+  printOp (Op (Qualified _ name)) = textT $ runOpName name
   printOp expr = text "`" <> prettyPrintValue (d - 1) expr `before` text "`"
 prettyPrintValueAtom d (TypedValue _ val _) = prettyPrintValueAtom d val
 prettyPrintValueAtom d (PositionedValue _ _ val) = prettyPrintValueAtom d val
@@ -118,7 +114,7 @@ prettyPrintValueAtom d expr = (text "(" <> prettyPrintValue d expr) `before` tex
 
 prettyPrintLiteralValue :: Int -> Literal Expr -> Box
 prettyPrintLiteralValue _ (NumericLiteral n) = text $ either show show n
-prettyPrintLiteralValue _ (StringLiteral s) = text $ T.unpack $ prettyPrintString s
+prettyPrintLiteralValue _ (StringLiteral s) = textT $ prettyPrintString s
 prettyPrintLiteralValue _ (CharLiteral c) = text $ show c
 prettyPrintLiteralValue _ (BooleanLiteral True) = text "true"
 prettyPrintLiteralValue _ (BooleanLiteral False) = text "false"
@@ -128,9 +124,9 @@ prettyPrintLiteralValue d (ObjectLiteral ps) = prettyPrintObject (d - 1) $ secon
 prettyPrintDeclaration :: Int -> Declaration -> Box
 prettyPrintDeclaration d _ | d < 0 = ellipsis
 prettyPrintDeclaration _ (TypeDeclaration td) =
-  text (T.unpack (showIdent (tydeclIdent td)) ++ " :: ") <> typeAsBox (tydeclType td)
+  textT (showIdent (tydeclIdent td)) <> " :: " <> typeAsBox (tydeclType td)
 prettyPrintDeclaration d (ValueDecl _ ident _ [] [GuardedExpr [] val]) =
-  text (T.unpack (showIdent ident) ++ " = ") <> prettyPrintValue (d - 1) val
+  textT (showIdent ident Monoid.<> " = ") <> prettyPrintValue (d - 1) val
 prettyPrintDeclaration d (BindingGroupDeclaration ds) =
   vsep 1 left (NEL.toList (fmap (prettyPrintDeclaration (d - 1) . toDecl) ds))
   where
@@ -140,7 +136,7 @@ prettyPrintDeclaration _ _ = internalError "Invalid argument to prettyPrintDecla
 prettyPrintCaseAlternative :: Int -> CaseAlternative -> Box
 prettyPrintCaseAlternative d _ | d < 0 = ellipsis
 prettyPrintCaseAlternative d (CaseAlternative binders result) =
-  text (T.unpack (T.unwords (map prettyPrintBinderAtom binders))) <> prettyPrintResult result
+  textT (T.unwords (map prettyPrintBinderAtom binders)) <> prettyPrintResult result
   where
   prettyPrintResult :: [GuardedExpr] -> Box
   prettyPrintResult [GuardedExpr [] v] = text " -> " <> prettyPrintValue (d - 1) v
@@ -169,7 +165,7 @@ prettyPrintCaseAlternative d (CaseAlternative binders result) =
     prettyPrintValue (d - 1) cond
   prettyPrintGuard (PatternGuard binder val) =
     foldl1 before
-    [ text (T.unpack (prettyPrintBinder binder))
+    [ textT (prettyPrintBinder binder)
     , text " <- "
     , prettyPrintValue (d - 1) val
     ]
@@ -190,14 +186,14 @@ prettyPrintBinderAtom NullBinder = "_"
 prettyPrintBinderAtom (LiteralBinder l) = prettyPrintLiteralBinder l
 prettyPrintBinderAtom (VarBinder ident) = showIdent ident
 prettyPrintBinderAtom (ConstructorBinder ctor []) = runProperName (disqualify ctor)
-prettyPrintBinderAtom b@ConstructorBinder{} = parensT (prettyPrintBinder b)
+prettyPrintBinderAtom b@ConstructorBinder{} = parens (prettyPrintBinder b)
 prettyPrintBinderAtom (NamedBinder ident binder) = showIdent ident Monoid.<> "@" Monoid.<> prettyPrintBinder binder
 prettyPrintBinderAtom (PositionedBinder _ _ binder) = prettyPrintBinderAtom binder
 prettyPrintBinderAtom (TypedBinder _ binder) = prettyPrintBinderAtom binder
 prettyPrintBinderAtom (OpBinder op) = runOpName (disqualify op)
 prettyPrintBinderAtom (BinaryNoParensBinder op b1 b2) =
   prettyPrintBinderAtom b1 Monoid.<> " " Monoid.<> prettyPrintBinderAtom op Monoid.<> " " Monoid.<> prettyPrintBinderAtom b2
-prettyPrintBinderAtom (ParensInBinder b) = parensT (prettyPrintBinder b)
+prettyPrintBinderAtom (ParensInBinder b) = parens (prettyPrintBinder b)
 
 prettyPrintLiteralBinder :: Literal Binder -> Text
 prettyPrintLiteralBinder (StringLiteral str) = prettyPrintString str

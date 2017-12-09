@@ -6,23 +6,16 @@
 -- | Bundles compiled PureScript modules for the browser.
 module Command.Bundle (command) where
 
-import           Data.Traversable (for)
-import           Data.Monoid ((<>))
+import           PSPrelude hiding ((<.>))
+
 import           Data.Aeson (encode)
-import           Data.Maybe (isNothing)
-import           Control.Applicative
-import           Control.Monad
-import           Control.Monad.Error.Class
-import           Control.Monad.Trans.Except
-import           Control.Monad.IO.Class
+import           Data.List (concat, null)
+
+import           Data.Traversable (for)
 import           System.FilePath (takeDirectory, (</>), (<.>), takeFileName)
 import           System.FilePath.Glob (glob)
-import           System.Exit (exitFailure)
-import           System.IO (stderr, hPutStr, hPutStrLn)
-import           System.IO.UTF8 (readUTF8File, writeUTF8File)
+import           System.IO.UTF8 (withUTF8FileContentsT, writeUTF8FileT, writeUTF8FileBSL, writeUTF8FileT)
 import           System.Directory (createDirectoryIfMissing, getCurrentDirectory)
-import qualified Data.ByteString.Lazy as B
-import qualified Data.ByteString.UTF8 as BU8
 import           Language.PureScript.Bundle
 import           Options.Applicative (Parser)
 import qualified Options.Applicative as Opts
@@ -33,29 +26,27 @@ import           SourceMap.Types
 data Options = Options
   { optionsInputFiles  :: [FilePath]
   , optionsOutputFile  :: Maybe FilePath
-  , optionsEntryPoints :: [String]
-  , optionsMainModule  :: Maybe String
-  , optionsNamespace   :: String
+  , optionsEntryPoints :: [Text]
+  , optionsMainModule  :: Maybe Text
+  , optionsNamespace   :: Text
   , optionsSourceMaps  :: Bool
   } deriving Show
+
 
 -- | The main application function.
 -- This function parses the input files, performs dead code elimination, filters empty modules
 -- and generates and prints the final Javascript bundle.
-app :: (MonadError ErrorMessage m, MonadIO m) => Options -> m (Maybe SourceMapping, String)
+app :: (MonadError ErrorMessage m, MonadIO m) => Options -> m (Maybe SourceMapping, Text)
 app Options{..} = do
   inputFiles <- concat <$> mapM (liftIO . glob) optionsInputFiles
   when (null inputFiles) . liftIO $ do
-    hPutStrLn stderr "purs bundle: No input files."
-    exitFailure
+    fatal "purs bundle: No input files."
   when (isNothing optionsOutputFile && optionsSourceMaps == True) . liftIO $ do
-    hPutStrLn stderr "purs bundle: Source maps only supported when output file specified."
-    exitFailure
+    fatal "purs bundle: Source maps only supported when output file specified."
 
   input <- for inputFiles $ \filename -> do
-    js <- liftIO (readUTF8File filename)
     mid <- guessModuleIdentifier filename
-    length js `seq` return (mid, Just filename, js)                                            -- evaluate readFile till EOF before returning, not to exhaust file handles
+    withUTF8FileContentsT filename (mid, Just filename, )
 
   let entryIds = map (`ModuleIdentifier` Regular) optionsEntryPoints
 
@@ -83,18 +74,18 @@ options = Options <$> some inputFile
     <> Opts.long "output"
     <> Opts.help "The output .js file"
 
-  entryPoint :: Parser String
+  entryPoint :: Parser Text
   entryPoint = Opts.strOption $
        Opts.short 'm'
     <> Opts.long "module"
     <> Opts.help "Entry point module name(s). All code which is not a transitive dependency of an entry point module will be removed."
 
-  mainModule :: Parser String
+  mainModule :: Parser Text
   mainModule = Opts.strOption $
        Opts.long "main"
     <> Opts.help "Generate code to run the main method in the specified module."
 
-  namespace :: Parser String
+  namespace :: Parser Text
   namespace = Opts.strOption $
        Opts.short 'n'
     <> Opts.long "namespace"
@@ -115,7 +106,7 @@ command = run <$> (Opts.helper <*> options) where
     output <- runExceptT (app opts)
     case output of
       Left err -> do
-        hPutStr stderr (unlines (printErrorMessage err))
+        putErrTextLines (printErrorMessage err)
         exitFailure
       Right (sourcemap, js) ->
         case optionsOutputFile opts of
@@ -123,7 +114,7 @@ command = run <$> (Opts.helper <*> options) where
             createDirectoryIfMissing True (takeDirectory outputFile)
             case sourcemap of
               Just sm -> do
-                writeUTF8File outputFile $ js ++ "\n//# sourceMappingURL=" ++ (takeFileName outputFile <.> "map") ++ "\n"
-                writeUTF8File (outputFile <.> "map") $ BU8.toString . B.toStrict . encode $ generate sm
-              Nothing -> writeUTF8File outputFile js
+                writeUTF8FileT outputFile $ js <> "\n//# sourceMappingURL=" <> toS (takeFileName outputFile <.> "map") <> "\n"
+                writeUTF8FileBSL (outputFile <.> "map") $ encode $ generate sm
+              Nothing -> writeUTF8FileT outputFile js
           Nothing -> putStrLn js

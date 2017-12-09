@@ -3,16 +3,12 @@
 --
 module Language.PureScript.Linter (lint, module L) where
 
-import Prelude.Compat
-import Protolude (ordNub)
+import PSPrelude
 
 import Control.Monad.Writer.Class
 
 import Data.List ((\\))
-import Data.Maybe (mapMaybe)
-import Data.Monoid
 import qualified Data.Set as S
-import Data.Text (Text)
 
 import Language.PureScript.AST
 import Language.PureScript.Crash

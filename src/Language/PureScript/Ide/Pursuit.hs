@@ -17,7 +17,7 @@ module Language.PureScript.Ide.Pursuit
   , findPackagesForModuleIdent
   ) where
 
-import           Protolude                     hiding (fromStrict)
+import           PSPrelude hiding (fromStrict)
 
 import qualified Control.Exception             as E
 import           Data.Aeson

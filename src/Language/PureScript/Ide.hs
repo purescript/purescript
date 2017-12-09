@@ -18,7 +18,7 @@ module Language.PureScript.Ide
        ( handleCommand
        ) where
 
-import           Protolude
+import           PSPrelude
 
 import           "monad-logger" Control.Monad.Logger
 import qualified Language.PureScript                as P

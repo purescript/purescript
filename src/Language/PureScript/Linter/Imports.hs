@@ -4,19 +4,12 @@ module Language.PureScript.Linter.Imports
   , UsedImports()
   ) where
 
-import Prelude.Compat
-import Protolude (ordNub)
+import PSPrelude hiding (diff)
 
-import Control.Monad (join, unless, foldM, (<=<))
 import Control.Monad.Writer.Class
 
-import Data.Function (on)
-import Data.Foldable (for_)
-import Data.List (find, intersect, groupBy, sortBy, (\\))
-import Data.Maybe (mapMaybe)
-import Data.Monoid (Sum(..))
+import Data.List (find, intersect, groupBy, sortBy, (\\), tail)
 import Data.Traversable (forM)
-import qualified Data.Text as T
 import qualified Data.Map as M
 
 import Language.PureScript.AST.Declarations
@@ -178,8 +171,8 @@ lintImports (Module _ _ mn mdecls (Just mexports)) env usedImps = do
             Just (Qualified _ name) -> Just (k, Qualified mnq (toName name))
             _ -> Nothing
       | isQualifiedWith k q =
-          case importName (head is) of
-            Qualified (Just mn') name -> Just (mn', Qualified mnq (toName name))
+          case importName <$> head is of
+            Just (Qualified (Just mn') name) -> Just (mn', Qualified mnq (toName name))
             _ -> internalError "unqualified name in extractByQual"
     go _ = Nothing
 
@@ -329,8 +322,8 @@ findUsedRefs ss env mni qn names =
       Just (_, _, exps) ->
         case find (elem dctor . fst . snd) (M.toList (exportedTypes exps)) of
           Just (ty, _) -> ty
-          Nothing -> internalError $ "missing type for data constructor " ++ T.unpack (runProperName dctor) ++ " in findTypeForDctor"
-      Nothing -> internalError $ "missing module " ++ T.unpack (runModuleName mn)  ++ " in findTypeForDctor"
+          Nothing -> internalError $ "missing type for data constructor " <> runProperName dctor <> " in findTypeForDctor"
+      Nothing -> internalError $ "missing module " <> runModuleName mn <> " in findTypeForDctor"
 
 matchName
   :: (ProperName 'ConstructorName -> Maybe (ProperName 'TypeName))

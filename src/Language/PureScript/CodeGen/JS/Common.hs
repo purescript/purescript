@@ -1,11 +1,9 @@
 -- | Common code generation utility functions
 module Language.PureScript.CodeGen.JS.Common where
 
-import Prelude.Compat
+import PSPrelude
 
 import Data.Char
-import Data.Monoid ((<>))
-import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.Crash

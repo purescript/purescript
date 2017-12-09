@@ -3,12 +3,10 @@ module Language.PureScript.AST.Exported
   , isExported
   ) where
 
-import Prelude.Compat
-import Protolude (sortBy, on)
+import PSPrelude
 
 import Control.Category ((>>>))
 
-import Data.Maybe (mapMaybe)
 import qualified Data.Map as M
 
 import Language.PureScript.AST.Declarations

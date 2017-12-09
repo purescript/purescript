@@ -21,7 +21,7 @@ module Language.PureScript.Ide.CaseSplit
        , caseSplit
        ) where
 
-import           Protolude                     hiding (Constructor)
+import           PSPrelude
 
 import qualified Data.Map                      as M
 import qualified Data.Text                     as T
@@ -93,7 +93,7 @@ prettyPrintWildcard (WildcardAnnotations True) = prettyWildcard
 prettyPrintWildcard (WildcardAnnotations False) = const "_"
 
 prettyWildcard :: P.Type -> Text
-prettyWildcard t = "( _ :: " <> T.strip (T.pack (P.prettyPrintTypeAtom t)) <> ")"
+prettyWildcard t = "( _ :: " <> T.strip (P.prettyPrintTypeAtom t) <> ")"
 
 -- | Constructs Patterns to insert into a sourcefile
 makePattern :: Text -- ^ Current line

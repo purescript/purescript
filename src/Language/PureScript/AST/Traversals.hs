@@ -3,13 +3,9 @@
 --
 module Language.PureScript.AST.Traversals where
 
-import Prelude.Compat
+import PSPrelude hiding ((<>))
 
-import Control.Monad
-
-import Data.Foldable (fold)
 import Data.List (mapAccumL)
-import Data.Maybe (mapMaybe)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Set as S
 

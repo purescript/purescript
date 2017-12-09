@@ -24,22 +24,14 @@ module Language.PureScript.TypeChecker.Types
       Check a function of a given type returns a value of another type when applied to its arguments
 -}
 
-import Prelude.Compat
-import Protolude (ordNub)
+import PSPrelude
 
-import Control.Arrow (first, second, (***))
-import Control.Monad
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State.Class (MonadState(..), gets)
+import Control.Arrow ((***))
 import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Writer.Class (MonadWriter(..))
 
-import Data.Bifunctor (bimap)
-import Data.Either (partitionEithers)
 import Data.Functor (($>))
-import Data.List (transpose, (\\), partition, delete)
-import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
+import Data.List (transpose, (\\), partition, delete, lookup)
 import Data.Traversable (for)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as M
@@ -420,7 +412,7 @@ infer' (Hole name) = do
 infer' (PositionedValue pos c val) = warnAndRethrowWithPositionTC pos $ do
   TypedValue t v ty <- infer' val
   return $ TypedValue t (PositionedValue pos c v) ty
-infer' v = internalError $ "Invalid argument to infer: " ++ show v
+infer' v = internalError $ "Invalid argument to infer: " <> show v
 
 inferLetBinding
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)

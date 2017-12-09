@@ -21,34 +21,24 @@ module TestCompiler where
 --   -- @shouldFailWith TypesDoNotUnify
 --   -- @shouldFailWith TransitiveExportError
 
-import Prelude ()
-import Prelude.Compat
+import PSPrelude
 
 import qualified Language.PureScript as P
 
-import Data.Char (isSpace)
-import Data.Function (on)
-import Data.List (sort, stripPrefix, intercalate, groupBy, sortBy, minimumBy)
-import Data.Maybe (mapMaybe)
+import Data.List (sort, stripPrefix, intercalate, groupBy, sortBy, minimumBy, last, null)
+import Data.String (String, lines)
 import Data.Time.Clock (UTCTime())
 import qualified Data.Text as T
 import Data.Tuple (swap)
 
 import qualified Data.Map as M
 
-import Control.Monad
 import Control.Arrow ((***), (>>>))
 
-import Control.Monad.Reader
-import Control.Monad.Writer.Strict
-import Control.Monad.Trans.Except
-
-import System.Exit
 import System.Process hiding (cwd)
 import System.FilePath
 import System.Directory
-import System.IO
-import System.IO.UTF8
+import System.IO.UTF8 (withUTF8FileContentsT, writeUTF8FileT)
 import System.IO.Silently
 import qualified System.FilePath.Glob as Glob
 
@@ -76,7 +66,7 @@ spec = do
       externs <- ExceptT . fmap fst . runTest $ P.make (makeActions modules foreigns) modules
       return (externs, foreigns)
     case supportExterns of
-      Left errs -> fail (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
+      Left errs -> failT (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
       Right (externs, foreigns) -> return (modules, externs, foreigns, passingFiles, warningFiles, failingFiles)
 
   outputFile <- runIO $ do
@@ -145,10 +135,10 @@ spec = do
   getShouldWarnWith :: FilePath -> IO [String]
   getShouldWarnWith = extractPragma "shouldWarnWith"
 
-  extractPragma :: String -> FilePath -> IO [String]
-  extractPragma pragma = fmap go . readUTF8File
+  extractPragma :: Text -> FilePath -> IO [String]
+  extractPragma pragma fp = withUTF8FileContentsT fp go
     where
-    go = lines >>> mapMaybe (stripPrefix ("-- @" ++ pragma ++ " ")) >>> map trim
+    go = T.lines >>> mapMaybe (T.stripPrefix ("-- @" <> pragma <> " ")) >>> map T.strip >>> map toS
 
 inferForeignModules
   :: MonadIO m
@@ -160,7 +150,7 @@ inferForeignModules = P.inferForeignModules . fromList
     fromList = M.fromList . map ((P.getModuleName *** Right) . swap)
 
 trim :: String -> String
-trim = dropWhile isSpace >>> reverse >>> dropWhile isSpace >>> reverse
+trim = toS . T.strip . toS
 
 modulesDir :: FilePath
 modulesDir = ".test_modules" </> "node_modules"
@@ -239,13 +229,13 @@ assertCompiles
 assertCompiles supportModules supportExterns supportForeigns inputFiles outputFile =
   assert supportModules supportExterns supportForeigns inputFiles checkMain $ \e ->
     case e of
-      Left errs -> return . Just . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
+      Left errs -> return . Just . toS . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
       Right _ -> do
         process <- findNodeProcess
         let entryPoint = modulesDir </> "index.js"
-        writeFile entryPoint "require('Main').main()"
+        writeUTF8FileT entryPoint "require('Main').main()"
         result <- traverse (\node -> readProcessWithExitCode node [entryPoint] "") process
-        hPutStrLn outputFile $ "\n" <> takeFileName (last inputFiles) <> ":"
+        hPutStrLn outputFile $ "\n" <> takeFileName (last inputFiles) ++ ":"
         case result of
           Just (ExitSuccess, out, err)
             | not (null err) -> return $ Just $ "Test wrote to stderr:\n\n" <> err
@@ -267,15 +257,15 @@ assertCompilesWithWarnings supportModules supportExterns supportForeigns inputFi
   assert supportModules supportExterns supportForeigns inputFiles checkMain $ \e ->
     case e of
       Left errs ->
-        return . Just . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
+        return . Just . toS . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
       Right warnings ->
         return
-          . fmap (printAllWarnings warnings)
+          . fmap (toS . printAllWarnings warnings)
           $ checkShouldFailWith shouldWarnWith warnings
 
   where
-  printAllWarnings warnings =
-    (<> "\n\n" <> P.prettyPrintMultipleErrors P.defaultPPEOptions warnings)
+  printAllWarnings warnings x =
+    (x ++ "\n\n" ++ toS (P.prettyPrintMultipleErrors P.defaultPPEOptions warnings))
 
 assertDoesNotCompile
   :: [P.Module]

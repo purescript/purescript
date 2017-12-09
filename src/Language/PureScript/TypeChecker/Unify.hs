@@ -16,18 +16,12 @@ module Language.PureScript.TypeChecker.Unify
   , varIfUnknown
   ) where
 
-import Prelude.Compat
-import Protolude (ordNub)
+import PSPrelude
 
-import Control.Arrow (first, second)
-import Control.Monad
-import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State.Class (MonadState(..), gets, modify)
 import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.List (sort)
 import qualified Data.Map as M
-import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.Crash

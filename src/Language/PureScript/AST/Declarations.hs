@@ -9,17 +9,11 @@
 --
 module Language.PureScript.AST.Declarations where
 
-import Prelude.Compat
-
-import Control.DeepSeq (NFData)
-import Control.Monad.Identity
+import PSPrelude
 
 import Data.Aeson.TH
 import qualified Data.Map as M
-import Data.Set (Set)
-import Data.Text (Text)
 import qualified Data.List.NonEmpty as NEL
-import GHC.Generics (Generic)
 
 import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Literals
@@ -190,7 +184,7 @@ data ErrorMessageHint
   | ErrorInApplication Expr Type Expr
   | ErrorInDataConstructor (ProperName 'ConstructorName)
   | ErrorInTypeConstructor (ProperName 'TypeName)
-  | ErrorInBindingGroup (NEL.NonEmpty Ident)
+  | ErrorInBindingGroup (NonEmpty Ident)
   | ErrorInDataBindingGroup [ProperName 'TypeName]
   | ErrorInTypeSynonym (ProperName 'TypeName)
   | ErrorInValueDeclaration Ident
@@ -474,7 +468,7 @@ data Declaration
   -- |
   -- A minimal mutually recursive set of data type declarations
   --
-  | DataBindingGroupDeclaration (NEL.NonEmpty Declaration)
+  | DataBindingGroupDeclaration (NonEmpty Declaration)
   -- |
   -- A type synonym declaration (name, arguments, type)
   --
@@ -493,7 +487,7 @@ data Declaration
   -- |
   -- A minimal mutually recursive set of value declarations
   --
-  | BindingGroupDeclaration (NEL.NonEmpty ((SourceAnn, Ident), NameKind, Expr))
+  | BindingGroupDeclaration (NonEmpty ((SourceAnn, Ident), NameKind, Expr))
   -- |
   -- A foreign import declaration (name, type)
   --

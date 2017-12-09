@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Language.PureScript.Ide.RebuildSpec where
 
-import           Protolude
+import           PSPrelude
 
 import           Language.PureScript.AST.SourcePos (spanName)
 import           Language.PureScript.Ide.Command

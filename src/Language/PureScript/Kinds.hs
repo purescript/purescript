@@ -2,11 +2,8 @@
 
 module Language.PureScript.Kinds where
 
-import Prelude.Compat
+import PSPrelude hiding ((<>))
 
-import GHC.Generics (Generic)
-import Control.DeepSeq (NFData)
-import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Aeson.BetterErrors (Parse, key, asText, asIntegral, nth, fromAesonParser, toAesonParser, throwCustomError)
 import Data.Aeson ((.=))
