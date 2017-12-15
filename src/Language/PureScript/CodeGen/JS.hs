@@ -376,7 +376,6 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
 
   literalToBinderJS :: Text -> [AST] -> Literal (Binder Ann) -> m [AST]
   literalToBinderJS varName done (NumericLiteral num) = do
-    -- TODO: propagate the natural-ness of the unsigned integer to the AST
     return [AST.IfElse Nothing (AST.Binary Nothing AST.EqualTo (AST.Var Nothing varName) (AST.NumericLiteral Nothing num)) (AST.Block Nothing done) Nothing]
   literalToBinderJS varName done (CharLiteral c) =
     return [AST.IfElse Nothing (AST.Binary Nothing AST.EqualTo (AST.Var Nothing varName) (AST.StringLiteral Nothing (fromString [c]))) (AST.Block Nothing done) Nothing]
@@ -419,6 +418,14 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
       -- the value is `Unary Negate (NumericLiteral (LitInt 2147483648))`, and
       -- 2147483648 is larger than the maximum allowed int.
       return $ AST.NumericLiteral ss (LitInt (-i))
+    go (AST.Unary _ AST.Negate (AST.NumericLiteral _ (LitUInt i))) = do
+      let maxInt = 2 * 2147483647
+      throwError . errorMessage $ NegativeUInt (- toInteger i) "JavaScript" maxInt
+    go js@(AST.NumericLiteral _ (LitUInt i)) =
+      let maxInt = 2 * 2147483647
+      in if i > fromInteger maxInt
+         then throwError . errorMessage $ IntOutOfRange (toInteger i) "JavaScript" 0 maxInt
+         else return js
     go js@(AST.NumericLiteral _ (LitInt i)) =
       let minInt = -2147483648
           maxInt = 2147483647
