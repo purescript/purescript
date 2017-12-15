@@ -900,9 +900,19 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (DuplicateExportRef name) =
       line $ "Export list contains multiple references to " <> printName (Qualified Nothing name)
 
-    renderSimpleErrorMessage (IntOutOfRange value backend lo hi) =
-      paras [ line $ "Integer value " <> markCode (T.pack (show value)) <> " is out of range for the " <> backend <> " backend."
-            , line $ "Acceptable values fall within the range " <> markCode (T.pack (show lo)) <> " to " <> markCode (T.pack (show hi)) <> " (inclusive)." ]
+    renderSimpleErrorMessage (IntOutOfRange value backend lo hi)
+        | value > hi && value < hi * 2 =
+          paras [ line $ "Integer value " <> markCode (T.pack (show value)) <> " is out of range for the " <> backend <> " backend."
+                , line $ "Acceptable values fall within the range " <> markCode (T.pack (show lo)) <> " to " <> markCode (T.pack (show hi)) <> " (inclusive)." 
+                , line $ "Consider using the UInt unsigned integer type, which has a range from " 
+                  <> markCode "0"
+                  <> " to "
+                  <> markCode (T.pack (show (hi * 2)))
+                  <> " (inclusive)."
+                ]
+        | otherwise =
+          paras [ line $ "Integer value " <> markCode (T.pack (show value)) <> " is out of range for the " <> backend <> " backend."
+                , line $ "Acceptable values fall within the range " <> markCode (T.pack (show lo)) <> " to " <> markCode (T.pack (show hi)) <> " (inclusive)." ]
     renderSimpleErrorMessage (NegativeUInt value backend hi) =
       paras [ line $ "Unsigned integers may not be negative. The value " <> markCode (T.pack (show value)) <> " was marked as unsigned, but is negative. Did you want to use an Int?"
             , line $ "Acceptable values in the " <> backend <> " backend fall within the range " <> markCode (T.pack (show (0 :: Int))) <> " to " <> markCode (T.pack (show hi)) <> " (inclusive)." ]
