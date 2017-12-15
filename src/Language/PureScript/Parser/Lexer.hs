@@ -68,6 +68,7 @@ module Language.PureScript.Parser.Lexer
 
 import Prelude.Compat hiding (lex)
 
+import Data.Char (digitToInt)
 import Control.Applicative ((<|>))
 import Control.Monad (void, guard)
 import Control.Monad.Identity (Identity)
@@ -301,9 +302,32 @@ parseToken = P.choice
       (P.notFollowedBy P.digit P.<?> "no leading zero in number literal"))
     intOrNat :: Lexer u NumericLiteral
     intOrNat = do
-      i <- read <$> P.try (P.many1 P.digit)
+      i <- read <$> P.try nat
       (P.char 'u' *> pure (LitUInt (fromInteger i))) <|> pure (LitInt i)
 
+    -- these functions are inlined from "Text.Parsec.Token". Why not just
+    -- use 'PT.natural tokenParser'? Well, that does a 'lexeme', which
+    -- consumes spaces between the digits and the @u@ for the unsigned
+    -- integers. This breaks a lot of parses, like:
+    -- > let i = 0
+    -- > untilE do
+    -- >   ...
+    -- which is parsed as `let i = 0u; ntilE do` which is clearly bad.
+    nat = zeroNumber <|> decimal
+
+    zeroNumber = do
+      P.char '0'
+      hexadecimal <|> octal <|> decimal <|> return 0
+
+    decimal = number' 10 P.digit
+    hexadecimal = P.oneOf "xX" *> number' 16 P.hexDigit
+    octal = P.oneOf "oO" *> number' 8 P.octDigit
+
+    number' :: Integer -> Lexer u Char -> Lexer u Integer
+    number' base baseDigit = do
+      digits <- P.many1 baseDigit
+      let n = foldl (\x d -> base*x + toInteger (digitToInt d)) 0 digits
+      seq n (return n)
 
 -- |
 -- We use Text.Parsec.Token to implement the string and number lexemes
