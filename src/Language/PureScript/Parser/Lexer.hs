@@ -302,7 +302,7 @@ parseToken = P.choice
       (P.notFollowedBy P.digit P.<?> "no leading zero in number literal"))
     intOrNat :: Lexer u NumericLiteral
     intOrNat = do
-      i <- read <$> P.try nat
+      i <- P.try nat
       (P.char 'u' *> pure (LitUInt (fromInteger i))) <|> pure (LitInt i)
 
     -- these functions are inlined from "Text.Parsec.Token". Why not just
@@ -316,7 +316,7 @@ parseToken = P.choice
     nat = zeroNumber <|> decimal
 
     zeroNumber = do
-      P.char '0'
+      _ <- P.char '0'
       hexadecimal <|> octal <|> decimal <|> return 0
 
     decimal = number' 10 P.digit
