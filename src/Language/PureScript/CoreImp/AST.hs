@@ -7,7 +7,7 @@ import Control.Monad ((>=>))
 import Control.Monad.Identity (Identity(..), runIdentity)
 import Data.Text (Text)
 
-import Language.PureScript.AST (SourceSpan(..), NumericLiteral(..), foldNumericLiteral)
+import Language.PureScript.AST (SourceSpan(..), NumericLiteral(..))
 import Language.PureScript.Comments
 import Language.PureScript.PSString (PSString)
 import Language.PureScript.Traversals

@@ -19,6 +19,7 @@ primDocsModule = Module
       , record
       , number
       , int
+      , uint
       , string
       , char
       , boolean
