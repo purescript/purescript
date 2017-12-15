@@ -9,5 +9,5 @@ main = do
   let -- uint :: UInt -- TODO: make UInt a type that shows up
       uint = 1u
   -- TODO: actually print the UInt
-  logShow "Done"
+  log "Done"
 
