@@ -77,11 +77,11 @@ import Data.Monoid ((<>))
 import Data.String (fromString)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Numeric.Natural (Natural)
 
 import Language.PureScript.Comments
 import Language.PureScript.Parser.State
 import Language.PureScript.PSString (PSString)
+import Language.PureScript.AST.Literals (NumericLiteral(..), foldNumericLiteral)
 
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Token as PT
@@ -117,18 +117,6 @@ data Token
   | Number NumericLiteral
   | HoleLit Text
   deriving (Show, Eq, Ord)
-
-data NumericLiteral
-  = LitInt Integer
-  | LitNumber Double
-  | LitUInt Natural
-  deriving (Show, Eq, Ord)
-
-foldNumericLiteral :: (Integer -> r) -> (Double -> r) -> (Natural -> r) -> NumericLiteral -> r
-foldNumericLiteral f g k l = case l of
-  LitInt n -> f n
-  LitNumber n -> g n
-  LitUInt n -> k n
 
 prettyPrintToken :: Token -> Text
 prettyPrintToken LParen            = "("
