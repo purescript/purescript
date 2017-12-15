@@ -346,6 +346,7 @@ primTypes =
     , (primName "Char",       (kindType, ExternData))
     , (primName "Number",     (kindType, ExternData))
     , (primName "Int",        (kindType, ExternData))
+    , (primName "UInt",       (kindType, ExternData))
     , (primName "Boolean",    (kindType, ExternData))
     , (primName "Partial",    (kindType, ExternData))
     , (primName "Union",      (FunKind (Row kindType) (FunKind (Row kindType) (FunKind (Row kindType) kindType)), ExternData))

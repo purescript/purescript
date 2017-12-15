@@ -176,6 +176,16 @@ int = primType "Int" $ T.unlines
   , "    x = 23 :: Int"
   ]
 
+uint :: Declaration
+uint = primType "UInt" $ T.unlines
+  [ "A 32-bit unsigned integer. See the purescript-uint package for details"
+  , "of how this is accomplished when compiling to JavaScript."
+  , ""
+  , "Construct values of this type with literals:"
+  , ""
+  , "    x = 23u :: UInt"
+  ]
+
 string :: Declaration
 string = primType "String" $ T.unlines
   [ "A String. As in JavaScript, String values represent sequences of UTF-16"
