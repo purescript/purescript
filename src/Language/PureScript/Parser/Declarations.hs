@@ -19,7 +19,6 @@ import           Prelude hiding (lex)
 import           Protolude (ordNub)
 
 import           Control.Applicative
-import           Control.Arrow ((+++))
 import           Control.Monad (foldM, join, zipWithM)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Parallel.Strategies (withStrategy, parList, rseq)
@@ -555,12 +554,21 @@ parseAnonymousArgument :: TokenParser Expr
 parseAnonymousArgument = underscore *> pure AnonymousArgument
 
 parseNumberLiteral :: TokenParser Binder
-parseNumberLiteral = LiteralBinder . NumericLiteral <$> (sign <*> number)
+parseNumberLiteral = LiteralBinder . NumericLiteral <$> do
+  s <- sign
+  n <- number
+  s n
   where
-  sign :: TokenParser (Either Integer Double -> Either Integer Double)
-  sign = (symbol' "-" >> return (negate +++ negate))
-         <|> (symbol' "+" >> return id)
-         <|> return id
+  sign :: TokenParser (NumericLiteral -> TokenParser NumericLiteral)
+  sign = negativeSign
+         <|> (symbol' "+" >> return return)
+         <|> return return
+  negativeSign = do
+    symbol' "-"
+    pure (foldNumericLiteral 
+      (pure . LitInt . negate) 
+      (pure . LitNumber . negate) 
+      (\_ -> empty P.<?> "UInt may not have a negation sign"))
 
 parseNullaryConstructorBinder :: TokenParser Binder
 parseNullaryConstructorBinder = ConstructorBinder <$> parseQualified dataConstructorName <*> pure []

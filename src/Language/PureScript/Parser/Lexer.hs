@@ -5,6 +5,7 @@ module Language.PureScript.Parser.Lexer
   ( PositionedToken(..)
   , Token()
   , TokenParser()
+  , NumericLiteral(..)
   , lex
   , lexLenient
   , anyToken
@@ -61,6 +62,7 @@ module Language.PureScript.Parser.Lexer
   , reservedTypeNames
   , isSymbolChar
   , isUnquotedKey
+  , foldNumericLiteral
   )
   where
 
@@ -74,6 +76,7 @@ import Data.Monoid ((<>))
 import Data.String (fromString)
 import Data.Text (Text)
 import qualified Data.Text as T
+import Numeric.Natural (Natural)
 
 import Language.PureScript.Comments
 import Language.PureScript.Parser.State
@@ -110,9 +113,21 @@ data Token
   | Symbol Text
   | CharLiteral Char
   | StringLiteral PSString
-  | Number (Either Integer Double)
+  | Number NumericLiteral
   | HoleLit Text
   deriving (Show, Eq, Ord)
+
+data NumericLiteral
+  = LitInt Integer
+  | LitNumber Double
+  | LitUInt Natural
+  deriving (Show, Eq, Ord)
+
+foldNumericLiteral :: (Integer -> r) -> (Double -> r) -> (Natural -> r) -> NumericLiteral -> r
+foldNumericLiteral f g k l = case l of
+  LitInt n -> f n
+  LitNumber n -> g n
+  LitUInt n -> k n
 
 prettyPrintToken :: Token -> Text
 prettyPrintToken LParen            = "("
@@ -142,7 +157,7 @@ prettyPrintToken (Qualifier _)     = "qualifier"
 prettyPrintToken (Symbol s)        = s
 prettyPrintToken (CharLiteral c)   = T.pack (show c)
 prettyPrintToken (StringLiteral s) = T.pack (show s)
-prettyPrintToken (Number n)        = T.pack (either show show n)
+prettyPrintToken (Number n)        = T.pack (foldNumericLiteral show show show n)
 prettyPrintToken (HoleLit name)    = "?" <> name
 
 data PositionedToken = PositionedToken
@@ -274,16 +289,21 @@ parseToken = P.choice
     delimiter   = P.try (P.string "\"\"\"")
     blockString = delimiter *> P.manyTill P.anyChar delimiter
 
-  parseNumber :: Lexer u (Either Integer Double)
+  parseNumber :: Lexer u NumericLiteral
   parseNumber = (consumeLeadingZero *> P.parserZero) <|>
-                  (Right <$> P.try (PT.float tokenParser) <|>
-                  Left <$> P.try (PT.natural tokenParser))
+                  (LitNumber <$> P.try (PT.float tokenParser) <|>
+                  intOrNat)
                 P.<?> "number"
     where
     -- lookAhead doesn't consume any input if its parser succeeds
     -- if notFollowedBy fails though, the consumed '0' will break the choice chain
     consumeLeadingZero = P.lookAhead (P.char '0' *>
       (P.notFollowedBy P.digit P.<?> "no leading zero in number literal"))
+    intOrNat :: Lexer u NumericLiteral
+    intOrNat = do
+      i <- read <$> P.try (P.many1 P.digit)
+      (P.char 'u' *> pure (LitUInt (fromInteger i))) <|> pure (LitInt i)
+
 
 -- |
 -- We use Text.Parsec.Token to implement the string and number lexemes
@@ -521,7 +541,7 @@ stringLiteral = token go P.<?> "string literal"
   go (StringLiteral s) = Just s
   go _ = Nothing
 
-number :: TokenParser (Either Integer Double)
+number :: TokenParser NumericLiteral
 number = token go P.<?> "number"
   where
   go (Number n) = Just n
@@ -530,7 +550,7 @@ number = token go P.<?> "number"
 natural :: TokenParser Integer
 natural = token go P.<?> "natural"
   where
-  go (Number (Left n)) = Just n
+  go (Number (LitInt n)) = Just n
   go _ = Nothing
 
 identifier :: TokenParser Text

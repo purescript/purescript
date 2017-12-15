@@ -293,6 +293,10 @@ tyNumber = primTy "Number"
 tyInt :: Type
 tyInt = primTy "Int"
 
+-- | Type constructor for unsigned integers
+tyUInt :: Type
+tyUInt = primTy "UInt"
+
 -- | Type constructor for booleans
 tyBoolean :: Type
 tyBoolean = primTy "Boolean"

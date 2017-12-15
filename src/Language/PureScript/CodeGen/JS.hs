@@ -252,8 +252,10 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
   iife v exprs = AST.App Nothing (AST.Function Nothing Nothing [] (AST.Block Nothing $ exprs ++ [AST.Return Nothing $ AST.Var Nothing v])) []
 
   literalToValueJS :: Literal (Expr Ann) -> m AST
-  literalToValueJS (NumericLiteral (Left i)) = return $ AST.NumericLiteral Nothing (Left i)
-  literalToValueJS (NumericLiteral (Right n)) = return $ AST.NumericLiteral Nothing (Right n)
+  literalToValueJS (NumericLiteral (LitInt i)) = return $ AST.NumericLiteral Nothing (Left i)
+  literalToValueJS (NumericLiteral (LitNumber n)) = return $ AST.NumericLiteral Nothing (Right n)
+  -- TODO: propagate the natural-ness of the unsigned integer to the AST
+  literalToValueJS (NumericLiteral (LitUInt n)) = return $ AST.NumericLiteral Nothing (Left (toInteger n))
   literalToValueJS (StringLiteral s) = return $ AST.StringLiteral Nothing s
   literalToValueJS (CharLiteral c) = return $ AST.StringLiteral Nothing (fromString [c])
   literalToValueJS (BooleanLiteral b) = return $ AST.BooleanLiteral Nothing b
@@ -376,8 +378,10 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
     return (AST.VariableIntroduction Nothing (identToJs ident) (Just (AST.Var Nothing varName)) : js)
 
   literalToBinderJS :: Text -> [AST] -> Literal (Binder Ann) -> m [AST]
-  literalToBinderJS varName done (NumericLiteral num) =
-    return [AST.IfElse Nothing (AST.Binary Nothing AST.EqualTo (AST.Var Nothing varName) (AST.NumericLiteral Nothing num)) (AST.Block Nothing done) Nothing]
+  literalToBinderJS varName done (NumericLiteral num) = do
+    -- TODO: propagate the natural-ness of the unsigned integer to the AST
+    let num' = foldNumericLiteral Left Right (Left . toInteger) num
+    return [AST.IfElse Nothing (AST.Binary Nothing AST.EqualTo (AST.Var Nothing varName) (AST.NumericLiteral Nothing num')) (AST.Block Nothing done) Nothing]
   literalToBinderJS varName done (CharLiteral c) =
     return [AST.IfElse Nothing (AST.Binary Nothing AST.EqualTo (AST.Var Nothing varName) (AST.StringLiteral Nothing (fromString [c]))) (AST.Block Nothing done) Nothing]
   literalToBinderJS varName done (StringLiteral str) =

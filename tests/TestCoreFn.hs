@@ -84,8 +84,8 @@ spec = context "CoreFnFromJsonTest" $ do
   context "Expr" $ do
     specify "should parse literals" $ do
       let m = Module [] mn mp [] [] []
-                [ NonRec ann (Ident "x1") $ Literal ann (NumericLiteral (Left 1))
-                , NonRec ann (Ident "x2") $ Literal ann (NumericLiteral (Right 1.0))
+                [ NonRec ann (Ident "x1") $ Literal ann (NumericLiteral (LitInt 1))
+                , NonRec ann (Ident "x2") $ Literal ann (NumericLiteral (LitNumber 1.0))
                 , NonRec ann (Ident "x3") $ Literal ann (StringLiteral (mkString "abc"))
                 , NonRec ann (Ident "x4") $ Literal ann (CharLiteral 'c')
                 , NonRec ann (Ident "x5") $ Literal ann (BooleanLiteral True)
@@ -102,7 +102,7 @@ spec = context "CoreFnFromJsonTest" $ do
     specify "should parse Accessor" $ do
       let m = Module [] mn mp [] [] []
                 [ NonRec ann (Ident "x") $
-                    Accessor ann (mkString "field") (Literal ann $ ObjectLiteral [(mkString "field", Literal ann (NumericLiteral (Left 1)))]) ]
+                    Accessor ann (mkString "field") (Literal ann $ ObjectLiteral [(mkString "field", Literal ann (NumericLiteral (LitInt 1)))]) ]
       parseMod m `shouldSatisfy` isSuccess
 
     specify "should parse ObjectUpdate" $ do

@@ -1,10 +1,15 @@
 -- |
 -- The core functional representation for literal values.
 --
-module Language.PureScript.AST.Literals where
+module Language.PureScript.AST.Literals 
+  ( module Language.PureScript.AST.Literals 
+  , NumericLiteral(..)
+  , foldNumericLiteral
+  ) where
 
 import Prelude.Compat
 import Language.PureScript.PSString (PSString)
+import Language.PureScript.Parser.Lexer (NumericLiteral(..), foldNumericLiteral)
 
 -- |
 -- Data type for literal values. Parameterised so it can be used for Exprs and
@@ -14,7 +19,7 @@ data Literal a
   -- |
   -- A numeric literal
   --
-  = NumericLiteral (Either Integer Double)
+  = NumericLiteral NumericLiteral
   -- |
   -- A string literal
   --
