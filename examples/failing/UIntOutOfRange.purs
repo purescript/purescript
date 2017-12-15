@@ -1,4 +1,4 @@
--- @shouldFailWith UIntOutOfRange
+-- @shouldFailWith IntOutOfRange
 
 module Main where
 
