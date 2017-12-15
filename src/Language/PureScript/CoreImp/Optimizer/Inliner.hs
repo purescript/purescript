@@ -24,7 +24,7 @@ import qualified Data.Text as T
 import Language.PureScript.PSString (PSString)
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.CoreImp.Optimizer.Common
-import Language.PureScript.AST (SourceSpan(..))
+import Language.PureScript.AST (SourceSpan(..), NumericLiteral(..))
 import qualified Language.PureScript.Constants as C
 
 -- TODO: Potential bug:
@@ -86,12 +86,12 @@ inlineCommonValues = everywhere convert
   where
   convert :: AST -> AST
   convert (App ss fn [dict])
-    | isDict' [semiringNumber, semiringInt] dict && isDict fnZero fn = NumericLiteral ss (Left 0)
-    | isDict' [semiringNumber, semiringInt] dict && isDict fnOne fn = NumericLiteral ss (Left 1)
+    | isDict' [semiringNumber, semiringInt] dict && isDict fnZero fn = NumericLiteral ss (LitInt 0)
+    | isDict' [semiringNumber, semiringInt] dict && isDict fnOne fn = NumericLiteral ss (LitInt 1)
     | isDict boundedBoolean dict && isDict fnBottom fn = BooleanLiteral ss False
     | isDict boundedBoolean dict && isDict fnTop fn = BooleanLiteral ss True
   convert (App ss (App _ fn [dict]) [x])
-    | isDict ringInt dict && isDict fnNegate fn = Binary ss BitwiseOr (Unary ss Negate x) (NumericLiteral ss (Left 0))
+    | isDict ringInt dict && isDict fnNegate fn = Binary ss BitwiseOr (Unary ss Negate x) (NumericLiteral ss (LitInt 0))
   convert (App ss (App _ (App _ fn [dict]) [x]) [y])
     | isDict semiringInt dict && isDict fnAdd fn = intOp ss Add x y
     | isDict semiringInt dict && isDict fnMultiply fn = intOp ss Multiply x y
@@ -107,7 +107,7 @@ inlineCommonValues = everywhere convert
   fnMultiply = (C.dataSemiring, C.mul)
   fnSubtract = (C.dataRing, C.sub)
   fnNegate = (C.dataRing, C.negate)
-  intOp ss op x y = Binary ss BitwiseOr (Binary ss op x y) (NumericLiteral ss (Left 0))
+  intOp ss op x y = Binary ss BitwiseOr (Binary ss op x y) (NumericLiteral ss (LitInt 0))
 
 inlineCommonOperators :: AST -> AST
 inlineCommonOperators = everywhereTopDown $ applyAll $

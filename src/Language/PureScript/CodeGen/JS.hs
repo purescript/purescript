@@ -252,10 +252,7 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
   iife v exprs = AST.App Nothing (AST.Function Nothing Nothing [] (AST.Block Nothing $ exprs ++ [AST.Return Nothing $ AST.Var Nothing v])) []
 
   literalToValueJS :: Literal (Expr Ann) -> m AST
-  literalToValueJS (NumericLiteral (LitInt i)) = return $ AST.NumericLiteral Nothing (Left i)
-  literalToValueJS (NumericLiteral (LitNumber n)) = return $ AST.NumericLiteral Nothing (Right n)
-  -- TODO: propagate the natural-ness of the unsigned integer to the AST
-  literalToValueJS (NumericLiteral (LitUInt n)) = return $ AST.NumericLiteral Nothing (Left (toInteger n))
+  literalToValueJS (NumericLiteral n) = return $ AST.NumericLiteral Nothing n
   literalToValueJS (StringLiteral s) = return $ AST.StringLiteral Nothing s
   literalToValueJS (CharLiteral c) = return $ AST.StringLiteral Nothing (fromString [c])
   literalToValueJS (BooleanLiteral b) = return $ AST.BooleanLiteral Nothing b
@@ -380,8 +377,7 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
   literalToBinderJS :: Text -> [AST] -> Literal (Binder Ann) -> m [AST]
   literalToBinderJS varName done (NumericLiteral num) = do
     -- TODO: propagate the natural-ness of the unsigned integer to the AST
-    let num' = foldNumericLiteral Left Right (Left . toInteger) num
-    return [AST.IfElse Nothing (AST.Binary Nothing AST.EqualTo (AST.Var Nothing varName) (AST.NumericLiteral Nothing num')) (AST.Block Nothing done) Nothing]
+    return [AST.IfElse Nothing (AST.Binary Nothing AST.EqualTo (AST.Var Nothing varName) (AST.NumericLiteral Nothing num)) (AST.Block Nothing done) Nothing]
   literalToBinderJS varName done (CharLiteral c) =
     return [AST.IfElse Nothing (AST.Binary Nothing AST.EqualTo (AST.Var Nothing varName) (AST.StringLiteral Nothing (fromString [c]))) (AST.Block Nothing done) Nothing]
   literalToBinderJS varName done (StringLiteral str) =
@@ -401,7 +397,7 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
       return (AST.VariableIntroduction Nothing propVar (Just (accessorString prop (AST.Var Nothing varName))) : js)
   literalToBinderJS varName done (ArrayLiteral bs) = do
     js <- go done 0 bs
-    return [AST.IfElse Nothing (AST.Binary Nothing AST.EqualTo (accessorString "length" (AST.Var Nothing varName)) (AST.NumericLiteral Nothing (Left (fromIntegral $ length bs)))) (AST.Block Nothing js) Nothing]
+    return [AST.IfElse Nothing (AST.Binary Nothing AST.EqualTo (accessorString "length" (AST.Var Nothing varName)) (AST.NumericLiteral Nothing (LitInt (fromIntegral $ length bs)))) (AST.Block Nothing js) Nothing]
     where
     go :: [AST] -> Integer -> [Binder Ann] -> m [AST]
     go done' _ [] = return done'
@@ -409,21 +405,21 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
       elVar <- freshName
       done'' <- go done' (index + 1) bs'
       js <- binderToJs elVar done'' binder
-      return (AST.VariableIntroduction Nothing elVar (Just (AST.Indexer Nothing (AST.NumericLiteral Nothing (Left index)) (AST.Var Nothing varName))) : js)
+      return (AST.VariableIntroduction Nothing elVar (Just (AST.Indexer Nothing (AST.NumericLiteral Nothing (LitInt index)) (AST.Var Nothing varName))) : js)
 
   -- Check that all integers fall within the valid int range for JavaScript.
   checkIntegers :: AST -> m ()
   checkIntegers = void . everywhereTopDownM go
     where
     go :: AST -> m AST
-    go (AST.Unary _ AST.Negate (AST.NumericLiteral ss (Left i))) =
+    go (AST.Unary _ AST.Negate (AST.NumericLiteral ss (LitInt i))) =
       -- Move the negation inside the literal; since this is a top-down
       -- traversal doing this replacement will stop the next case from raising
       -- the error when attempting to use -2147483648, as if left unrewritten
-      -- the value is `Unary Negate (NumericLiteral (Left 2147483648))`, and
+      -- the value is `Unary Negate (NumericLiteral (LitInt 2147483648))`, and
       -- 2147483648 is larger than the maximum allowed int.
-      return $ AST.NumericLiteral ss (Left (-i))
-    go js@(AST.NumericLiteral _ (Left i)) =
+      return $ AST.NumericLiteral ss (LitInt (-i))
+    go js@(AST.NumericLiteral _ (LitInt i)) =
       let minInt = -2147483648
           maxInt = 2147483647
       in if i < minInt || i > maxInt

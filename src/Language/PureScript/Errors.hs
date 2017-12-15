@@ -166,6 +166,7 @@ errorCode em = case unwrapErrorMessage em of
   DuplicateImportRef{} -> "DuplicateImportRef"
   DuplicateExportRef{} -> "DuplicateExportRef"
   IntOutOfRange{} -> "IntOutOfRange"
+  NegativeUInt{} -> "NegativeUInt"
   ImplicitQualifiedImport{} -> "ImplicitQualifiedImport"
   ImplicitImport{} -> "ImplicitImport"
   HidingImport{} -> "HidingImport"
@@ -902,6 +903,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (IntOutOfRange value backend lo hi) =
       paras [ line $ "Integer value " <> markCode (T.pack (show value)) <> " is out of range for the " <> backend <> " backend."
             , line $ "Acceptable values fall within the range " <> markCode (T.pack (show lo)) <> " to " <> markCode (T.pack (show hi)) <> " (inclusive)." ]
+    renderSimpleErrorMessage (NegativeUInt value backend hi) =
+      paras [ line $ "Unsigned integers may not be negative. The value " <> markCode (T.pack (show value)) <> " was marked as unsigned, but is negative. Did you want to use an Int?"
+            , line $ "Acceptable values in the " <> backend <> " backend fall within the range " <> markCode (T.pack (show (0 :: Int))) <> " to " <> markCode (T.pack (show hi)) <> " (inclusive)." ]
 
     renderSimpleErrorMessage msg@(ImplicitQualifiedImport importedModule asModule _) =
       paras [ line $ "Module " <> markCode (runModuleName importedModule) <> " was imported as " <> markCode (runModuleName asModule) <> " with unspecified imports."

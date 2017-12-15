@@ -157,7 +157,7 @@ data SimpleErrorMessage
   | DuplicateImportRef Name
   | DuplicateExportRef Name
   | IntOutOfRange Integer Text Integer Integer
-  | NegativeUInt Integer Text Integer Integer
+  | NegativeUInt Integer Text Integer
   | ImplicitQualifiedImport ModuleName ModuleName [DeclarationRef]
   | ImplicitImport ModuleName [DeclarationRef]
   | HidingImport ModuleName [DeclarationRef]

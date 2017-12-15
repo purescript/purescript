@@ -3,9 +3,9 @@
 --
 --  [@Language.PureScript.Parser.Kinds@] Parser for kinds
 --
---  [@Language.PureScript.Parser.Values@] Parser for values
---
 --  [@Language.PureScript.Parser.Types@] Parser for types
+--
+--  [@Language.PureScript.Parser.Lexer@] Parser for lexemes
 --
 --  [@Language.PureScript.Parser.Declaration@] Parsers for declarations and modules
 --

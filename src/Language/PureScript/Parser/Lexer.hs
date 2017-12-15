@@ -288,8 +288,9 @@ parseToken = P.choice
     -- if notFollowedBy fails though, the consumed '0' will break the choice chain
     consumeLeadingZero = P.lookAhead (P.char '0' *>
       (P.notFollowedBy P.digit P.<?> "no leading zero in number literal"))
+
     intOrNat :: Lexer u NumericLiteral
-    intOrNat = do
+    intOrNat = PT.lexeme tokenParser $ do
       i <- P.try nat
       (P.char 'u' *> pure (LitUInt (fromInteger i))) <|> pure (LitInt i)
 

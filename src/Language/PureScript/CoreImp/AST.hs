@@ -7,7 +7,7 @@ import Control.Monad ((>=>))
 import Control.Monad.Identity (Identity(..), runIdentity)
 import Data.Text (Text)
 
-import Language.PureScript.AST (SourceSpan(..))
+import Language.PureScript.AST (SourceSpan(..), NumericLiteral(..), foldNumericLiteral)
 import Language.PureScript.Comments
 import Language.PureScript.PSString (PSString)
 import Language.PureScript.Traversals
@@ -46,7 +46,7 @@ data BinaryOperator
 
 -- | Data type for simplified JavaScript expressions
 data AST
-  = NumericLiteral (Maybe SourceSpan) (Either Integer Double)
+  = NumericLiteral (Maybe SourceSpan) NumericLiteral
   -- ^ A numeric literal
   | StringLiteral (Maybe SourceSpan) PSString
   -- ^ A string literal
