@@ -1,11 +1,12 @@
--- @shouldFailWith NoInstanceFound
+-- @shouldFailWith NegativeUInt
 
 module Main where
 
-import Prelude (negate)
+import Prelude
+import Data.Ring
 
--- Currently this is failing with "Unable to find instance Ring UInt", which is
--- correct, but it'd be nicer if it could fail with "Can't have negative UInt
--- literals"
+-- This is failing with a NoInstanceFound error instead of NegativeUInt. I have
+-- no idea why. I can load `pulp psci` in the directory and it works with UInts
+-- just fine.
 n :: UInt
 n = -1u

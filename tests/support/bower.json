@@ -26,7 +26,7 @@
     "purescript-newtype": "2.0.0",
     "purescript-nonempty": "4.0.0",
     "purescript-partial": "1.2.1",
-    "purescript-prelude": "3.1.0",
+    "purescript-prelude": "https://www.github.com/parsonsmatt/purescript-prelude.git#a793cd7eb7843b271255c986df173e2368644456",
     "purescript-proxy": "2.1.0",
     "purescript-psci-support": "3.0.0",
     "purescript-refs": "3.0.0",

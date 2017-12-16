@@ -257,11 +257,17 @@ semiringNumber = "semiringNumber"
 semiringInt :: forall a. (IsString a) => a
 semiringInt = "semiringInt"
 
+semiringUInt :: forall a. (IsString a) => a
+semiringUInt = "semiringUInt"
+
 ringNumber :: forall a. (IsString a) => a
 ringNumber = "ringNumber"
 
 ringInt :: forall a. (IsString a) => a
 ringInt = "ringInt"
+
+ringUInt :: forall a. (IsString a) => a
+ringUInt = "ringUInt"
 
 moduloSemiringNumber :: forall a. (IsString a) => a
 moduloSemiringNumber = "moduloSemiringNumber"
@@ -284,6 +290,9 @@ ordNumber = "ordNumber"
 ordInt :: forall a. (IsString a) => a
 ordInt = "ordInt"
 
+ordUInt :: forall a. (IsString a) => a
+ordUInt = "ordUInt"
+
 ordString :: forall a. (IsString a) => a
 ordString = "ordString"
 
@@ -295,6 +304,9 @@ eqNumber = "eqNumber"
 
 eqInt :: forall a. (IsString a) => a
 eqInt = "eqInt"
+
+eqUInt :: forall a. (IsString a) => a
+eqUInt = "eqUInt"
 
 eqString :: forall a. (IsString a) => a
 eqString = "eqString"
@@ -487,6 +499,9 @@ dataFunctionUncurried = "Data_Function_Uncurried"
 
 dataIntBits :: forall a. (IsString a) => a
 dataIntBits = "Data_Int_Bits"
+
+dataUIntBits :: forall a. (IsString a) => a
+dataUIntBits = "Data_UInt_Bits"
 
 partialUnsafe :: forall a. (IsString a) => a
 partialUnsafe = "Partial_Unsafe"
