@@ -82,7 +82,7 @@ lintImports (Module _ _ mn mdecls (Just mexports)) env usedImps = do
         let names = ordNub $ M.findWithDefault [] mni usedImps'
             usedRefs = findUsedRefs ss env mni (Just mnq) names
         unless (null usedRefs) .
-          tell . errorMessage' ss $ ImplicitQualifiedImport mni mnq usedRefs
+          tell . errorMessage' ss $ ImplicitQualifiedImport mni mnq $ map (simplifyTypeRef $ const True) usedRefs
 
   for_ imports $ \(mnq, imps) -> do
 
@@ -183,6 +183,17 @@ lintImports (Module _ _ mn mdecls (Just mexports)) env usedImps = do
             _ -> internalError "unqualified name in extractByQual"
     go _ = Nothing
 
+
+-- Replace explicit type refs with data constructor lists from listing the
+-- used constructors explicity `T(X, Y, [...])` to `T(..)` for suggestion
+-- message.
+-- Done everywhere when suggesting a completely new explicit imports list, otherwise
+-- maintain the existing form.
+simplifyTypeRef :: (ProperName 'TypeName -> Bool) -> DeclarationRef -> DeclarationRef
+simplifyTypeRef shouldOpen (TypeRef ss name (Just dctors))
+  | not (null dctors) && shouldOpen name = TypeRef ss name Nothing
+simplifyTypeRef _ other = other
+
 lintImportDecl
   :: forall m
    . MonadWriter MultipleErrors m
@@ -215,16 +226,6 @@ lintImportDecl env mni qualifierName names ss declType allowImplicit =
     if null allRefs
     then unused
     else warn (warning mni (map (simplifyTypeRef $ const True) allRefs))
-
-  -- Replace explicit type refs with data constructor lists from listing the
-  -- used constructors explicity `T(X, Y, [...])` to `T(..)` for suggestion
-  -- message.
-  -- Done everywhere when suggesting a completely new explicit imports list, otherwise
-  -- maintain the existing form.
-  simplifyTypeRef :: (ProperName 'TypeName -> Bool) -> DeclarationRef -> DeclarationRef
-  simplifyTypeRef shouldOpen (TypeRef ss' name (Just dctors))
-    | not (null dctors) && shouldOpen name = TypeRef ss' name Nothing
-  simplifyTypeRef _ other = other
 
   checkExplicit
     :: [DeclarationRef]
