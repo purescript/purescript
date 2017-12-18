@@ -15,7 +15,7 @@ import Control.Monad.Except (MonadError, throwError)
 import Control.Monad.Reader (MonadReader, asks)
 import Control.Monad.Supply.Class
 
-import Data.List ((\\), delete, intersect)
+import Data.List ((\\), delete, partition)
 import qualified Data.Foldable as F
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe, isNothing)
@@ -64,8 +64,7 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
     let header = if comments && not (null coms) then AST.Comment Nothing coms strict else strict
     let foreign' = [AST.VariableIntroduction Nothing "$foreign" foreign_ | not $ null foreigns || isNothing foreign_]
     let moduleBody = header : foreign' ++ jsImports ++ concat optimized
-    let foreignExps = exps `intersect` foreigns
-    let standardExps = exps \\ foreignExps
+    let (foreignExps, standardExps) = partition (`elem` foreigns) exps
     let exps' = AST.ObjectLiteral Nothing $ map (mkString . runIdent &&& AST.Var Nothing . identToJs) standardExps
                                ++ map (mkString . runIdent &&& foreignIdent) foreignExps
     return $ moduleBody ++ [AST.Assignment Nothing (accessorString "exports" (AST.Var Nothing "module")) exps']
