@@ -13,7 +13,7 @@ data B
 
 instance inst2 :: C2 A
 
--- instance inst4 :: (C2 a) => C3 a B
+instance inst3 ::  C3 A B
 
 main :: forall e. Eff (console :: CONSOLE | e) Unit
 main = do
