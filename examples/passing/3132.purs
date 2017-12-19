@@ -16,11 +16,9 @@ instance inst2 :: Two NtTwo where
   dos (NT2 i) =
     i * 2
 
-instance inst3 :: Tri NtTri NtTwo where
-  tres (NT2 0) =
-    NT3 "eq-0"
-  tres _ =
-    NT3 "gt-0"
+instance inst4 :: (Two a) => Quad a (NtFour a) where
+  quattro (NT4 a) =
+    a
 
 main :: forall e. Eff (console :: CONSOLE | e) Unit
 main = do
