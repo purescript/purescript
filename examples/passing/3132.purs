@@ -8,8 +8,6 @@ import ClassDefinitions
 
 newtype NtTwo = NT2 Int
 
-newtype NtTri = NT3 String
-
 newtype NtFour a = NT4 a
 
 instance inst2 :: Two NtTwo where
