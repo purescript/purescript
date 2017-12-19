@@ -22,10 +22,6 @@ instance inst3 :: Tri NtTri NtTwo where
   tres _ =
     NT3 "gt-0"
 
-instance inst4 :: (Two a) => Quad a (NtFour a) where
-  quattro (NT4 a) =
-    a
-
 main :: forall e. Eff (console :: CONSOLE | e) Unit
 main = do
   log "Done"
