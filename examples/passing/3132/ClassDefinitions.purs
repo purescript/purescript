@@ -1,27 +1,34 @@
-module ClassDefinitions (class Two, dos, class Tri, tres, class Quad, quattro) where
+module ClassDefinitions
+  ( class Two
+  , dos
+  , class Tri
+  , tres
+  , class Quad
+  , quattro
+  ) where
 
 import Prelude
 
 class Zero where
-    zilch :: Boolean
+  zilch :: Boolean
 
 class One where
-    uno :: Int -> Number
-    ein :: Number -> Boolean -> Int
+  uno :: Int -> Number
+  ein :: Number -> Boolean -> Int
 
 class One <= Two a where
-    dos :: a -> Int
+  dos :: a -> Int
 
 class (Two a, Zero) <= Tri b a where
-    tres :: a -> b
+  tres :: a -> b
 
 class (Zero, Two a) <= Quad a b where
-    quattro :: b -> a
+  quattro :: b -> a
 
 instance inst0 :: Zero where
-    zilch = true
+  zilch = true
 
 instance inst1 :: One where
-    uno _ = 1.23
-    ein _ true = 321
-    ein _ _ = 123
+  uno _ = 1.23
+  ein _ true = 321
+  ein _ _ = 123
