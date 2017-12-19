@@ -1,4 +1,4 @@
-module ClassDefinitions  where
+module ClassDefinitions (class Two, dos, class Tri, tres, class Quad, quattro) where
 
 import Prelude
 
