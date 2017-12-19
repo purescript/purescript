@@ -6,17 +6,13 @@ import Control.Monad.Eff.Console (CONSOLE, log)
 
 import ClassDefinitions
 
-newtype NtTwo = NT2 Int
+data A
 
-newtype NtFour a = NT4 a
+data B
 
-instance inst2 :: Two NtTwo where
-  dos (NT2 i) =
-    i * 2
+instance inst2 :: C2 A
 
-instance inst4 :: (Two a) => Quad a (NtFour a) where
-  quattro (NT4 a) =
-    a
+instance inst4 :: (C2 a) => C3 a B
 
 main :: forall e. Eff (console :: CONSOLE | e) Unit
 main = do
