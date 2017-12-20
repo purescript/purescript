@@ -24,7 +24,7 @@ import qualified Data.Text as T
 import Language.PureScript.PSString (PSString)
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.CoreImp.Optimizer.Common
-import Language.PureScript.AST (SourceSpan(..))
+import Language.PureScript.AST (SourceSpan(..), NumericLiteral(..))
 import qualified Language.PureScript.Constants as C
 
 -- TODO: Potential bug:
@@ -86,15 +86,17 @@ inlineCommonValues = everywhere convert
   where
   convert :: AST -> AST
   convert (App ss fn [dict])
-    | isDict' [semiringNumber, semiringInt] dict && isDict fnZero fn = NumericLiteral ss (Left 0)
-    | isDict' [semiringNumber, semiringInt] dict && isDict fnOne fn = NumericLiteral ss (Left 1)
+    | isDict' [semiringNumber, semiringInt, semiringUInt] dict && isDict fnZero fn = NumericLiteral ss (LitInt 0)
+    | isDict' [semiringNumber, semiringInt, semiringUInt] dict && isDict fnOne fn = NumericLiteral ss (LitInt 1)
     | isDict boundedBoolean dict && isDict fnBottom fn = BooleanLiteral ss False
     | isDict boundedBoolean dict && isDict fnTop fn = BooleanLiteral ss True
   convert (App ss (App _ fn [dict]) [x])
-    | isDict ringInt dict && isDict fnNegate fn = Binary ss BitwiseOr (Unary ss Negate x) (NumericLiteral ss (Left 0))
+    | isDict ringInt dict && isDict fnNegate fn = Binary ss BitwiseOr (Unary ss Negate x) (NumericLiteral ss (LitInt 0))
   convert (App ss (App _ (App _ fn [dict]) [x]) [y])
     | isDict semiringInt dict && isDict fnAdd fn = intOp ss Add x y
     | isDict semiringInt dict && isDict fnMultiply fn = intOp ss Multiply x y
+    | isDict semiringUInt dict && isDict fnAdd fn = uintOp ss Add x y
+    | isDict semiringUInt dict && isDict fnMultiply fn = uintOp ss Multiply x y
     | isDict euclideanRingInt dict && isDict fnDivide fn = intOp ss Divide x y
     | isDict ringInt dict && isDict fnSubtract fn = intOp ss Subtract x y
   convert other = other
@@ -107,7 +109,8 @@ inlineCommonValues = everywhere convert
   fnMultiply = (C.dataSemiring, C.mul)
   fnSubtract = (C.dataRing, C.sub)
   fnNegate = (C.dataRing, C.negate)
-  intOp ss op x y = Binary ss BitwiseOr (Binary ss op x y) (NumericLiteral ss (Left 0))
+  intOp ss op x y = Binary ss BitwiseOr (Binary ss op x y) (NumericLiteral ss (LitInt 0))
+  uintOp ss op x y = Binary ss ZeroFillShiftRight (Binary ss op x y) (NumericLiteral ss (LitInt 0))
 
 inlineCommonOperators :: AST -> AST
 inlineCommonOperators = everywhereTopDown $ applyAll $
@@ -124,6 +127,8 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
   , binary eqNumber opNotEq NotEqualTo
   , binary eqInt opEq EqualTo
   , binary eqInt opNotEq NotEqualTo
+  , binary eqUInt opEq EqualTo
+  , binary eqUInt opNotEq NotEqualTo
   , binary eqString opEq EqualTo
   , binary eqString opNotEq NotEqualTo
   , binary eqChar opEq EqualTo
@@ -143,6 +148,10 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
   , binary ordInt opLessThanOrEq LessThanOrEqualTo
   , binary ordInt opGreaterThan GreaterThan
   , binary ordInt opGreaterThanOrEq GreaterThanOrEqualTo
+  , binary ordUInt opLessThan LessThan
+  , binary ordUInt opLessThanOrEq LessThanOrEqualTo
+  , binary ordUInt opGreaterThan GreaterThan
+  , binary ordUInt opGreaterThanOrEq GreaterThanOrEqualTo
   , binary ordNumber opLessThan LessThan
   , binary ordNumber opLessThanOrEq LessThanOrEqualTo
   , binary ordNumber opGreaterThan GreaterThan
@@ -165,6 +174,13 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
   , binary' C.dataIntBits C.shr ShiftRight
   , binary' C.dataIntBits C.zshr ZeroFillShiftRight
   , unary'  C.dataIntBits C.complement BitwiseNot
+  , binary' C.dataUIntBits C.or BitwiseOr
+  , binary' C.dataUIntBits C.and BitwiseAnd
+  , binary' C.dataUIntBits C.xor BitwiseXor
+  , binary' C.dataUIntBits C.shl ShiftLeft
+  , binary' C.dataUIntBits C.shr ShiftRight
+  , binary' C.dataUIntBits C.zshr ZeroFillShiftRight
+  , unary'  C.dataUIntBits C.complement BitwiseNot
 
   , inlineNonClassFunction (isModFn (C.dataFunction, C.apply)) $ \f x -> App Nothing f [x]
   , inlineNonClassFunction (isModFn (C.dataFunction, C.applyFlipped)) $ \x f -> App Nothing f [x]
@@ -306,6 +322,9 @@ semiringNumber = (C.dataSemiring, C.semiringNumber)
 semiringInt :: forall a b. (IsString a, IsString b) => (a, b)
 semiringInt = (C.dataSemiring, C.semiringInt)
 
+semiringUInt :: forall a b. (IsString a, IsString b) => (a, b)
+semiringUInt = (C.dataSemiring, C.semiringUInt)
+
 ringNumber :: forall a b. (IsString a, IsString b) => (a, b)
 ringNumber = (C.dataRing, C.ringNumber)
 
@@ -324,6 +343,9 @@ eqNumber = (C.dataEq, C.eqNumber)
 eqInt :: forall a b. (IsString a, IsString b) => (a, b)
 eqInt = (C.dataEq, C.eqInt)
 
+eqUInt :: forall a b. (IsString a, IsString b) => (a, b)
+eqUInt = (C.dataEq, C.eqUInt)
+
 eqString :: forall a b. (IsString a, IsString b) => (a, b)
 eqString = (C.dataEq, C.eqString)
 
@@ -341,6 +363,9 @@ ordNumber = (C.dataOrd, C.ordNumber)
 
 ordInt :: forall a b. (IsString a, IsString b) => (a, b)
 ordInt = (C.dataOrd, C.ordInt)
+
+ordUInt :: forall a b. (IsString a, IsString b) => (a, b)
+ordUInt = (C.dataOrd, C.ordUInt)
 
 ordString :: forall a b. (IsString a, IsString b) => (a, b)
 ordString = (C.dataOrd, C.ordString)

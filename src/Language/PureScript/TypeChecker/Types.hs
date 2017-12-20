@@ -305,8 +305,9 @@ infer'
    . (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => Expr
   -> m Expr
-infer' v@(Literal (NumericLiteral (Left _))) = return $ TypedValue True v tyInt
-infer' v@(Literal (NumericLiteral (Right _))) = return $ TypedValue True v tyNumber
+infer' v@(Literal (NumericLiteral (LitInt _))) = return $ TypedValue True v tyInt
+infer' v@(Literal (NumericLiteral (LitNumber _))) = return $ TypedValue True v tyNumber
+infer' v@(Literal (NumericLiteral (LitUInt _))) = return $ TypedValue True v tyUInt
 infer' v@(Literal (StringLiteral _)) = return $ TypedValue True v tyString
 infer' v@(Literal (CharLiteral _)) = return $ TypedValue True v tyChar
 infer' v@(Literal (BooleanLiteral _)) = return $ TypedValue True v tyBoolean
@@ -469,8 +470,9 @@ inferBinder
 inferBinder _ NullBinder = return M.empty
 inferBinder val (LiteralBinder (StringLiteral _)) = unifyTypes val tyString >> return M.empty
 inferBinder val (LiteralBinder (CharLiteral _)) = unifyTypes val tyChar >> return M.empty
-inferBinder val (LiteralBinder (NumericLiteral (Left _))) = unifyTypes val tyInt >> return M.empty
-inferBinder val (LiteralBinder (NumericLiteral (Right _))) = unifyTypes val tyNumber >> return M.empty
+inferBinder val (LiteralBinder (NumericLiteral (LitInt _))) = unifyTypes val tyInt >> return M.empty
+inferBinder val (LiteralBinder (NumericLiteral (LitNumber _))) = unifyTypes val tyNumber >> return M.empty
+inferBinder val (LiteralBinder (NumericLiteral (LitUInt _))) = unifyTypes val tyUInt >> return M.empty
 inferBinder val (LiteralBinder (BooleanLiteral _)) = unifyTypes val tyBoolean >> return M.empty
 inferBinder val (VarBinder name) = return $ M.singleton name val
 inferBinder val (ConstructorBinder ctor binders) = do
@@ -632,9 +634,11 @@ check' val u@(TUnknown _) = do
   (val'', ty') <- instantiatePolyTypeWithUnknowns val' ty
   unifyTypes ty' u
   return $ TypedValue True val'' ty'
-check' v@(Literal (NumericLiteral (Left _))) t | t == tyInt =
+check' v@(Literal (NumericLiteral (LitInt _))) t | t == tyInt =
   return $ TypedValue True v t
-check' v@(Literal (NumericLiteral (Right _))) t | t == tyNumber =
+check' v@(Literal (NumericLiteral (LitNumber _))) t | t == tyNumber =
+  return $ TypedValue True v t
+check' v@(Literal (NumericLiteral (LitUInt _))) t | t == tyUInt =
   return $ TypedValue True v t
 check' v@(Literal (StringLiteral _)) t | t == tyString =
   return $ TypedValue True v t

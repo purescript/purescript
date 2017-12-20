@@ -117,7 +117,7 @@ prettyPrintValueAtom d (UnaryMinus expr) = text "(-" <> prettyPrintValue d expr 
 prettyPrintValueAtom d expr = (text "(" <> prettyPrintValue d expr) `before` text ")"
 
 prettyPrintLiteralValue :: Int -> Literal Expr -> Box
-prettyPrintLiteralValue _ (NumericLiteral n) = text $ either show show n
+prettyPrintLiteralValue _ (NumericLiteral n) = text $ foldNumericLiteral show show show n
 prettyPrintLiteralValue _ (StringLiteral s) = text $ T.unpack $ prettyPrintString s
 prettyPrintLiteralValue _ (CharLiteral c) = text $ show c
 prettyPrintLiteralValue _ (BooleanLiteral True) = text "true"
@@ -202,7 +202,7 @@ prettyPrintBinderAtom (ParensInBinder b) = parensT (prettyPrintBinder b)
 prettyPrintLiteralBinder :: Literal Binder -> Text
 prettyPrintLiteralBinder (StringLiteral str) = prettyPrintString str
 prettyPrintLiteralBinder (CharLiteral c) = T.pack (show c)
-prettyPrintLiteralBinder (NumericLiteral num) = either (T.pack . show) (T.pack . show) num
+prettyPrintLiteralBinder (NumericLiteral num) = foldNumericLiteral (T.pack . show) (T.pack . show) (T.pack . show) num
 prettyPrintLiteralBinder (BooleanLiteral True) = "true"
 prettyPrintLiteralBinder (BooleanLiteral False) = "false"
 prettyPrintLiteralBinder (ObjectLiteral bs) =

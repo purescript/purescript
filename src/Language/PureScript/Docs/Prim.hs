@@ -19,6 +19,7 @@ primDocsModule = Module
       , record
       , number
       , int
+      , uint
       , string
       , char
       , boolean
@@ -174,6 +175,16 @@ int = primType "Int" $ T.unlines
   , "Construct values of this type with literals:"
   , ""
   , "    x = 23 :: Int"
+  ]
+
+uint :: Declaration
+uint = primType "UInt" $ T.unlines
+  [ "A 32-bit unsigned integer. See the purescript-uint package for details"
+  , "of how this is accomplished when compiling to JavaScript."
+  , ""
+  , "Construct values of this type with literals:"
+  , ""
+  , "    x = 23u :: UInt"
   ]
 
 string :: Declaration

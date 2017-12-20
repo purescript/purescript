@@ -69,8 +69,9 @@ literalFromJSON t = withObject "Literal" literalFromObj
   literalFromObj o = do
     type_ <- o .: "literalType" :: Parser Text
     case type_ of
-      "IntLiteral"      -> NumericLiteral . Left <$> o .: "value"
-      "NumberLiteral"   -> NumericLiteral . Right <$> o .: "value"
+      "IntLiteral"      -> NumericLiteral . LitInt <$> o .: "value"
+      "NumberLiteral"   -> NumericLiteral . LitNumber <$> o .: "value"
+      "UIntLiteral"     -> NumericLiteral . LitUInt <$> o .: "value"
       "StringLiteral"   -> StringLiteral <$> o .: "value"
       "CharLiteral"     -> CharLiteral <$> o .: "value"
       "BooleanLiteral"  -> BooleanLiteral <$> o .: "value"

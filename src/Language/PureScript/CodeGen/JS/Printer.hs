@@ -17,7 +17,7 @@ import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
 
-import Language.PureScript.AST (SourceSpan(..))
+import Language.PureScript.AST (SourceSpan(..), foldNumericLiteral)
 import Language.PureScript.CodeGen.JS.Common
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.Comments
@@ -34,7 +34,7 @@ literals = mkPattern' match'
   match' js = (addMapping' (getSourceSpan js) <>) <$> match js
 
   match :: (Emit gen) => AST -> StateT PrinterState Maybe gen
-  match (NumericLiteral _ n) = return $ emit $ T.pack $ either show show n
+  match (NumericLiteral _ n) = return $ emit $ T.pack $ foldNumericLiteral show show show n
   match (StringLiteral _ s) = return $ emit $ prettyPrintStringJS s
   match (BooleanLiteral _ True) = return $ emit "true"
   match (BooleanLiteral _ False) = return $ emit "false"

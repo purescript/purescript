@@ -50,14 +50,19 @@ annToJSON (ss, _, _, m) = object [ T.pack "sourceSpan"  .= sourceSpanToJSON ss
                                  ]
 
 literalToJSON :: (a -> Value) -> Literal a -> Value
-literalToJSON _ (NumericLiteral (Left n))
+literalToJSON _ (NumericLiteral (LitInt n))
   = object
     [ T.pack "literalType" .= "IntLiteral"
     , T.pack "value"       .= n
     ]
-literalToJSON _ (NumericLiteral (Right n))
+literalToJSON _ (NumericLiteral (LitNumber n))
   = object
       [ T.pack "literalType"  .= "NumberLiteral"
+      , T.pack "value"        .= n
+      ]
+literalToJSON _ (NumericLiteral (LitUInt n))
+  = object
+      [ T.pack "literalType"  .= "UIntLiteral"
       , T.pack "value"        .= n
       ]
 literalToJSON _ (StringLiteral s)

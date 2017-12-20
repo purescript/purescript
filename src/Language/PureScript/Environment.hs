@@ -293,6 +293,10 @@ tyNumber = primTy "Number"
 tyInt :: Type
 tyInt = primTy "Int"
 
+-- | Type constructor for unsigned integers
+tyUInt :: Type
+tyUInt = primTy "UInt"
+
 -- | Type constructor for booleans
 tyBoolean :: Type
 tyBoolean = primTy "Boolean"
@@ -342,6 +346,7 @@ primTypes =
     , (primName "Char",       (kindType, ExternData))
     , (primName "Number",     (kindType, ExternData))
     , (primName "Int",        (kindType, ExternData))
+    , (primName "UInt",       (kindType, ExternData))
     , (primName "Boolean",    (kindType, ExternData))
     , (primName "Partial",    (kindType, ExternData))
     , (primName "Union",      (FunKind (Row kindType) (FunKind (Row kindType) (FunKind (Row kindType) kindType)), ExternData))
