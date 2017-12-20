@@ -13,7 +13,6 @@ import Data.Symbol
 type TestVariants =
   ( foo :: FProxy Maybe
   , bar :: FProxy (Tuple String)
-  , baz :: FProxy (Either String)
   )
 
 _foo :: SProxy "foo"
@@ -21,9 +20,6 @@ _foo = SProxy
 
 _bar :: SProxy "bar"
 _bar = SProxy
-
-_baz :: SProxy "baz"
-_baz = SProxy
 
 main :: Eff _ Unit
 main = do
@@ -33,7 +29,6 @@ main = do
     case1 = case_
        # on _foo (\a → "foo: " <> show (a :: Maybe Int))
        # on _bar (\a → "bar: " <> show (a :: Tuple String Int))
-       # on _baz (\a → "baz: " <> show (a :: Either String Int))
 
     -- without the type signature, this would complain about
     -- Could not match type 
@@ -48,13 +43,11 @@ main = do
     --     t1
     --     ( foo :: FProxy Maybe
     --     , bar :: FProxy (Tuple String)
-    --     , baz :: FProxy (Either String)
     --     )
     -- while inferring the type of `on _baz`
     case2 :: VariantF TestVariants Int → String
     case2 = case_
        # on _foo (\a → "foo: " <> show a)
        # on _bar (\a → "bar: " <> show a)
-       # on _baz (\a → "baz: " <> show a)
 
   log "Done"
