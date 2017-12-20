@@ -62,26 +62,6 @@ primTypeErrorDocsModule = Module
   , modReExports = []
   }
 
-unsafeLookup :: forall v (a :: P.ProperNameType).
-  Map.Map (P.Qualified (P.ProperName a)) v -> String -> Text -> v
-unsafeLookup = unsafeLookupOf P.primName
-
-unsafeRowLookup
-  :: forall v (a :: P.ProperNameType)
-  . Map.Map (P.Qualified (P.ProperName a)) v 
-  -> String 
-  -> Text 
-  -> v
-unsafeRowLookup = unsafeLookupOf (P.primSubName "Row")
-
-unsafeTypeErrorLookup
-  :: forall v (a :: P.ProperNameType)
-  . Map.Map (P.Qualified (P.ProperName a)) v 
-  -> String 
-  -> Text 
-  -> v
-unsafeTypeErrorLookup = unsafeLookupOf (P.primSubName "TypeError")
-
 type NameGen a = Text -> P.Qualified (P.ProperName a)
 
 unsafeLookupOf 
@@ -110,9 +90,8 @@ primKind title comments =
           }
     else P.internalError $ "Docs.Prim: No such Prim kind: " ++ T.unpack title
 
-
 lookupPrimTypeKind :: Text -> P.Kind
-lookupPrimTypeKind = fst . unsafeLookup P.primTypes "Docs.Prim: No such Prim type: "
+lookupPrimTypeKind = lookupPrimTypeKindOf P.primName
 
 lookupPrimTypeKindOf 
   :: NameGen 'P.TypeName
@@ -132,9 +111,6 @@ primType title comments = Declaration
 
 -- | Lookup the TypeClassData of a Prim class. This function is specifically
 -- not exported because it is partial.
-lookupPrimClass :: Text -> P.TypeClassData
-lookupPrimClass = unsafeLookup P.primClasses "Docs.Prim: No such Prim class: "
-
 lookupPrimClassOf :: NameGen 'P.ClassName -> Text -> P.TypeClassData
 lookupPrimClassOf g = unsafeLookupOf g P.primClasses "Docs.Prim: No such Prim class: "
 
