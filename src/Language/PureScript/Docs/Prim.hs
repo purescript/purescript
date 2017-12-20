@@ -23,14 +23,33 @@ primDocsModule = Module
       , char
       , boolean
       , partial
-      , fail
-      , warn
-      , union
-      , rowCons
       , typeConcat
       , typeString
       , kindType
       , kindSymbol
+      ]
+  , modReExports = []
+  }
+
+primRowDocsModule :: Module
+primRowDocsModule = Module
+  { modName = P.moduleNameFromString "Prim.Row"
+  , modComments = Just "The Prim.Row module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains automatically solved classes for workign with row types."
+  , modDeclarations =
+      [ union
+      , rowCons
+      ]
+  , modReExports = []
+  }
+
+
+primTypeErrorDocsModule :: Module
+primTypeErrorDocsModule = Module
+  { modName = P.moduleNameFromString "Prim.TypeError"
+  , modComments = Just "The Prim.TypeError module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains classes that provide custom type error and warning functionality."
+  , modDeclarations =
+      [ warn
+      , fail
       ]
   , modReExports = []
   }

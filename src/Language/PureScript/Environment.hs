@@ -370,7 +370,7 @@ primClasses =
     -- class Warn (message :: Symbol)
     , (primSubName "TypeError" "Warn",    (makeTypeClassData [("message", Just kindSymbol)] [] [] []))
     -- class Union (l :: # Type) (r :: # Type) (u :: # Type) | l r -> u, r u -> l, u l -> r
-    , (primSubName "Row"" Union", (makeTypeClassData
+    , (primSubName "Row" "Union", (makeTypeClassData
                                   [ ("l", Just (Row kindType))
                                   , ("r", Just (Row kindType))
                                   , ("u", Just (Row kindType))

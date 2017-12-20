@@ -21,7 +21,7 @@ foreign import unsafeSet
 get
   :: forall r r' l a
    . IsSymbol l
-  => RowCons l a r' r
+  => Cons l a r' r
   => SProxy l
   -> Record r
   -> a
@@ -30,8 +30,8 @@ get l = unsafeGet (reflectSymbol l)
 set
   :: forall r1 r2 r l a b
    . IsSymbol l
-  => RowCons l a r r1
-  => RowCons l b r r2
+  => Cons l a r r1
+  => Cons l b r r2
   => SProxy l
   -> b
   -> Record r1
@@ -41,8 +41,8 @@ set l = unsafeSet (reflectSymbol l)
 lens 
   :: forall l f r1 r2 r a b
    . IsSymbol l
-  => RowCons l a r r1
-  => RowCons l b r r2
+  => Cons l a r r1
+  => Cons l b r r2
   => Functor f
   => SProxy l
   -> (a -> f b)
