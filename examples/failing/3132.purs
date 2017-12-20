@@ -8,12 +8,10 @@ import Control.Monad.Eff.Console (CONSOLE, log)
 import ClassDefinitions
 
 data A
-
 data B
 
 instance inst2 :: C2 A
-
-instance inst3 ::  C3 A B
+instance inst3 :: (C2 a) => C3 a B
 
 main :: forall e. Eff (console :: CONSOLE | e) Unit
 main = do

@@ -24,7 +24,7 @@ import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
 import Data.Functor (($>))
 import Data.List (minimumBy, groupBy, sortBy)
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Maybe (mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Traversable (for)
@@ -568,14 +568,18 @@ matches deps TypeClassDictionaryInScope{..} tys =
 -- | Add a dictionary for the constraint to the scope, and dictionaries
 -- for all implied superclass instances.
 newDictionaries
-  :: MonadState CheckState m
+  :: (MonadState CheckState m, MonadError MultipleErrors m)
   => [(Qualified (ProperName 'ClassName), Integer)]
   -> Qualified Ident
   -> Constraint
   -> m [NamedDict]
 newDictionaries path name (Constraint className instanceTy _) = do
     tcs <- gets (typeClasses . checkEnv)
-    let TypeClassData{..} = fromMaybe (internalError "newDictionaries: type class lookup failed") $ M.lookup className tcs
+    TypeClassData{..} <-
+      maybe
+        (throwError . errorMessage . UnknownClass $ className)
+        pure
+        $ M.lookup className tcs
     supDicts <- join <$> zipWithM (\(Constraint supName supArgs _) index ->
                                       newDictionaries ((supName, index) : path)
                                                       name
