@@ -227,9 +227,7 @@ checkShouldFailWith expected errs =
   let actual = map P.errorCode $ P.runMultipleErrors errs
   in if sort expected == sort (map T.unpack actual)
     then Nothing
-    else Just $ "Expected these errors: " ++ show expected ++ ", but got these: " 
-      ++ show actual ++ ", full error messages: " 
-      ++ unlines (map (P.renderBox . P.prettyPrintSingleError P.defaultPPEOptions) (P.runMultipleErrors errs))
+    else Just $ "Expected these errors: " ++ show expected ++ ", but got these: " ++ show actual
 
 assertCompiles
   :: [P.Module]
