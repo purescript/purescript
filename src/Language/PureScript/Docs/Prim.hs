@@ -31,8 +31,6 @@ primDocsModule = Module
       , char
       , boolean
       , partial
-      , typeConcat
-      , typeString
       , kindType
       , kindSymbol
       ]
@@ -50,7 +48,6 @@ primRowDocsModule = Module
   , modReExports = []
   }
 
-
 primTypeErrorDocsModule :: Module
 primTypeErrorDocsModule = Module
   { modName = P.moduleNameFromString "Prim.TypeError"
@@ -58,6 +55,8 @@ primTypeErrorDocsModule = Module
   , modDeclarations =
       [ warn
       , fail
+      , typeConcat
+      , typeString
       ]
   , modReExports = []
   }
@@ -99,14 +98,16 @@ lookupPrimTypeKindOf
   -> P.Kind
 lookupPrimTypeKindOf k = fst . unsafeLookupOf k P.primTypes "Docs.Prim: No such Prim type: "
 
-
 primType :: Text -> Text -> Declaration
-primType title comments = Declaration
+primType = primTypeOf P.primName
+
+primTypeOf :: NameGen 'P.TypeName -> Text -> Text -> Declaration
+primTypeOf gen title comments = Declaration
   { declTitle = title
   , declComments = Just comments
   , declSourceSpan = Nothing
   , declChildren = []
-  , declInfo = ExternDataDeclaration (lookupPrimTypeKind title)
+  , declInfo = ExternDataDeclaration (lookupPrimTypeKindOf gen title)
   }
 
 -- | Lookup the TypeClassData of a Prim class. This function is specifically
@@ -132,6 +133,7 @@ primClassOf gen title comments = Declaration
       in
         TypeClassDeclaration args superclasses fundeps
   }
+
 kindType :: Declaration
 kindType = primKind "Type" $ T.unlines
   [ "`Type` (also known as `*`) is the kind of all proper types: those that"
@@ -295,7 +297,7 @@ rowCons = primClassOf (P.primSubName "Row") "Cons" $ T.unlines
   ]
 
 typeConcat :: Declaration
-typeConcat = primType "TypeConcat" $ T.unlines
+typeConcat = primTypeOf (P.primSubName "TypeError") "TypeConcat" $ T.unlines
   [ "The TypeConcat type constructor concatenates two Symbols in a custom type"
   , "error."
   , ""
@@ -304,7 +306,7 @@ typeConcat = primType "TypeConcat" $ T.unlines
   ]
 
 typeString :: Declaration
-typeString = primType "TypeString" $ T.unlines
+typeString = primTypeOf (P.primSubName "TypeError") "TypeString" $ T.unlines
   [ "The TypeString type constructor renders any concrete type into a Symbol"
   , "in a custom type error."
   , ""
