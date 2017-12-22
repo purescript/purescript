@@ -1,17 +1,17 @@
--- @shouldFailWith UnknownClass
-module Main where
+-- @shouldFailWith TransitiveExportError
+module Main (class C3) where
 
 import Prelude
+
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Console (CONSOLE, log)
 
-import ClassDefinitions
+class C1
+instance inst1 :: C1
 
-data A
-data B
+class C1 <= C2 a
 
-instance inst2 :: C2 A
-instance inst3 :: (C2 a) => C3 a B
+class (C2 a) <= C3 a b
 
 main :: forall e. Eff (console :: CONSOLE | e) Unit
 main = do
