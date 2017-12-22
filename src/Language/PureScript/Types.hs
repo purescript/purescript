@@ -15,7 +15,7 @@ import Control.DeepSeq (NFData)
 import Control.Monad ((<=<))
 import qualified Data.Aeson as A
 import qualified Data.Aeson.TH as A
-import Data.List (sortBy, foldl')
+import Data.List (sortBy)
 import Data.Ord (comparing)
 import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))
@@ -291,7 +291,7 @@ everythingOnTypes :: (r -> r -> r) -> (Type -> r) -> Type -> r
 everythingOnTypes (<+>) f = go where
   go t@(TypeApp t1 t2) = f t <+> go t1 <+> go t2
   go t@(ForAll _ ty _) = f t <+> go ty
-  go t@(ConstrainedType c ty) = foldl' (<+>) (f t) (map go (constraintArgs c)) <+> go ty
+  go t@(ConstrainedType c ty) = foldl (<+>) (f t) (map go (constraintArgs c)) <+> go ty
   go t@(RCons _ ty rest) = f t <+> go ty <+> go rest
   go t@(ProxyType ty) = f t <+> go ty
   go t@(KindedType ty _) = f t <+> go ty

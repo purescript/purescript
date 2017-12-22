@@ -435,18 +435,18 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     modify (\s -> s { checkCurrentModule = Just mn })
     decls' <- typeCheckAll mn exps decls
     classesToSuperClasses <- gets
-      ( M.map 
-        ( S.fromList 
-        . fmap constraintClass 
+      ( M.map
+        ( S.fromList
+        . fmap constraintClass
         . typeClassSuperclasses
         )
       . typeClasses
       . checkEnv
       )
-    let 
+    let
       -- A mapping of class names to their declaration refs in this module.
       moduleClassDeclarations :: M.Map (Qualified (ProperName 'ClassName)) DeclarationRef
-      moduleClassDeclarations = 
+      moduleClassDeclarations =
         M.fromList
           . mapMaybe (\x -> case x of
                 td@(TypeClassDeclaration _ name _ _ _ _) ->
@@ -459,7 +459,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
       classDecToRef _ = Nothing
 
       moduleClassDeclarationSet :: S.Set (Qualified (ProperName 'ClassName))
-      moduleClassDeclarationSet = 
+      moduleClassDeclarationSet =
         M.foldrWithKey (\k _ -> S.insert k) S.empty moduleClassDeclarations
 
       -- A function that, given a class name, returns the set of
@@ -470,7 +470,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
           -> S.Set (Qualified (ProperName 'ClassName))
       transitiveSuperClassesFor qname =
         S.intersection moduleClassDeclarationSet
-          $ untilSame 
+          $ untilSame
             (\s -> s <> foldMap (\n -> fromMaybe S.empty (M.lookup n classesToSuperClasses)) s)
             (fromMaybe S.empty (M.lookup qname classesToSuperClasses))
 
@@ -499,17 +499,17 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
       checkExport dr extract ty
     for_ dctors $ \dctors' ->
       for_ dctors' $ \dctor ->
-        for_ (M.lookup (qualify' dctor) (dataConstructors env)) $ \(_, _, ty, _) -> 
+        for_ (M.lookup (qualify' dctor) (dataConstructors env)) $ \(_, _, ty, _) ->
           checkExport dr extract ty
   checkMemberExport extract dr@(ValueRef _ name) = do
     ty <- lookupVariable (qualify' name)
     checkExport dr extract ty
   checkMemberExport _ _ = return ()
 
-  checkSuperClassExport 
+  checkSuperClassExport
     :: (Qualified (ProperName 'ClassName) -> S.Set (Qualified (ProperName 'ClassName)))
     -> M.Map (Qualified (ProperName 'ClassName)) DeclarationRef
-    -> DeclarationRef 
+    -> DeclarationRef
     -> m ()
   checkSuperClassExport superClassesFor classMap dr@(TypeClassRef _ className) = do
     let transitiveSuperClasses = superClassesFor (qualify' className)
@@ -518,7 +518,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
       . throwError . errorMessage' (declRefSourceSpan dr)
       . TransitiveExportError dr
       $ mapMaybe (\n -> M.lookup n classMap) (toList unexportedClasses)
-  checkSuperClassExport _ _ _ = 
+  checkSuperClassExport _ _ _ =
     return ()
 
   checkExport :: DeclarationRef -> (Type -> [DeclarationRef]) -> Type -> m ()
@@ -557,7 +557,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     findClasses :: Type -> [DeclarationRef]
     findClasses = everythingOnTypes (++) go
       where
-      go (ConstrainedType c _) = (fmap (TypeClassRef (declRefSourceSpan ref)) . extractCurrentModuleClass . constraintClass) c 
+      go (ConstrainedType c _) = (fmap (TypeClassRef (declRefSourceSpan ref)) . extractCurrentModuleClass . constraintClass) c
       go _ = []
     extractCurrentModuleClass :: Qualified (ProperName 'ClassName) -> [ProperName 'ClassName]
     extractCurrentModuleClass (Qualified (Just mn') name) | mn == mn' = [name]

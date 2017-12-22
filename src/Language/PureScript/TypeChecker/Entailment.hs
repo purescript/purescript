@@ -568,7 +568,7 @@ matches deps TypeClassDictionaryInScope{..} tys =
 -- | Add a dictionary for the constraint to the scope, and dictionaries
 -- for all implied superclass instances.
 newDictionaries
-  :: (MonadState CheckState m, MonadError MultipleErrors m)
+  :: MonadState CheckState m
   => [(Qualified (ProperName 'ClassName), Integer)]
   -> Qualified Ident
   -> Constraint
