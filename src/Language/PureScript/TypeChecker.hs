@@ -459,8 +459,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
       classDecToRef _ = Nothing
 
       moduleClassDeclarationSet :: S.Set (Qualified (ProperName 'ClassName))
-      moduleClassDeclarationSet =
-        M.foldrWithKey (\k _ -> S.insert k) S.empty moduleClassDeclarations
+      moduleClassDeclarationSet = M.keysSet moduleClassDeclarations
 
       -- A function that, given a class name, returns the set of
       -- transitive class dependencies that are defined in this
