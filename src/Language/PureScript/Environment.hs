@@ -349,12 +349,22 @@ primTypes =
     , (primName "Int",                       (kindType, ExternData))
     , (primName "Boolean",                   (kindType, ExternData))
     , (primName "Partial",                   (kindType, ExternData))
-    , (primSubName "Row" "Union",            (FunKind (Row kindType) (FunKind (Row kindType) (FunKind (Row kindType) kindType)), ExternData))
-    , (primSubName "Row" "Cons",             (FunKind kindSymbol (FunKind kindType (FunKind (Row kindType) (FunKind (Row kindType) kindType))), ExternData))
-    , (primSubName "TypeError" "Fail",       (FunKind kindSymbol kindType, ExternData))
+    ]
+
+primTypeErrorTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
+primTypeErrorTypes =
+  M.fromList
+    [ (primSubName "TypeError" "Fail",       (FunKind kindSymbol kindType, ExternData))
     , (primSubName "TypeError" "Warn",       (FunKind kindSymbol kindType, ExternData))
     , (primSubName "TypeError" "TypeString", (FunKind kindType kindSymbol, ExternData))
     , (primSubName "TypeError" "TypeConcat", (FunKind kindSymbol (FunKind kindSymbol kindSymbol), ExternData))
+    ]
+
+primRowTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
+primRowTypes =
+  M.fromList
+    [ (primSubName "Row" "Union",            (FunKind (Row kindType) (FunKind (Row kindType) (FunKind (Row kindType) kindType)), ExternData))
+    , (primSubName "Row" "Cons",             (FunKind kindSymbol (FunKind kindType (FunKind (Row kindType) (FunKind (Row kindType) kindType))), ExternData))
     ]
 
 -- | The primitive class map. This just contains the `Fail`, `Warn`, and `Partial`
@@ -365,12 +375,24 @@ primClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primClasses =
   M.fromList
     [ (primName "Partial", (makeTypeClassData [] [] [] []))
+    ]
+
+primRowClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
+primRowClasses =
+  M.fromList
+    [
     -- class Fail (message :: Symbol)
-    , (primSubName "TypeError" "Fail",    (makeTypeClassData [("message", Just kindSymbol)] [] [] []))
+      (primSubName "TypeError" "Fail",    (makeTypeClassData [("message", Just kindSymbol)] [] [] []))
     -- class Warn (message :: Symbol)
     , (primSubName "TypeError" "Warn",    (makeTypeClassData [("message", Just kindSymbol)] [] [] []))
+    ]
+
+primTypeErrorClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
+primTypeErrorClasses =
+  M.fromList
+    [
     -- class Union (l :: # Type) (r :: # Type) (u :: # Type) | l r -> u, r u -> l, u l -> r
-    , (primSubName "Row" "Union", (makeTypeClassData
+      (primSubName "Row" "Union", (makeTypeClassData
                                   [ ("l", Just (Row kindType))
                                   , ("r", Just (Row kindType))
                                   , ("u", Just (Row kindType))
