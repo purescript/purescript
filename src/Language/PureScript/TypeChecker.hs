@@ -552,14 +552,12 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
   -- Check that all the classes defined in the current module that appear in member types have also
   -- been exported from the module
   checkClassesAreExported :: DeclarationRef -> m ()
-  checkClassesAreExported ref = do
-      checkMemberExport findClasses  ref
+  checkClassesAreExported ref = checkMemberExport findClasses  ref
     where
     findClasses :: Type -> [DeclarationRef]
     findClasses = everythingOnTypes (++) go
       where
-      go (ConstrainedType c _) = 
-        (fmap (TypeClassRef (declRefSourceSpan ref)) . extractCurrentModuleClass . constraintClass) c 
+      go (ConstrainedType c _) = (fmap (TypeClassRef (declRefSourceSpan ref)) . extractCurrentModuleClass . constraintClass) c 
       go _ = []
     extractCurrentModuleClass :: Qualified (ProperName 'ClassName) -> [ProperName 'ClassName]
     extractCurrentModuleClass (Qualified (Just mn') name) | mn == mn' = [name]

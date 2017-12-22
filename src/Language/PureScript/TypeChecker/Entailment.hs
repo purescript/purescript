@@ -24,7 +24,7 @@ import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
 import Data.Functor (($>))
 import Data.List (minimumBy, groupBy, sortBy)
-import Data.Maybe (mapMaybe)
+import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Data.Traversable (for)
@@ -575,11 +575,7 @@ newDictionaries
   -> m [NamedDict]
 newDictionaries path name (Constraint className instanceTy _) = do
     tcs <- gets (typeClasses . checkEnv)
-    TypeClassData{..} <-
-      maybe
-        (throwError . errorMessage . UnknownClass $ className)
-        pure
-        $ M.lookup className tcs
+    let TypeClassData{..} = fromMaybe (internalError "newDictionaries: type class lookup failed") $ M.lookup className tcs
     supDicts <- join <$> zipWithM (\(Constraint supName supArgs _) index ->
                                       newDictionaries ((supName, index) : path)
                                                       name
