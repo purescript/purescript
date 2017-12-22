@@ -34,6 +34,7 @@ import Data.Maybe (fromJust, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
+import qualified Language.PureScript.Constants as C
 import Language.PureScript.AST
 import Language.PureScript.Environment
 import Language.PureScript.Errors
@@ -218,13 +219,13 @@ mkPrimExports ts cs ks =
 -- | Environment which only contains the Prim modules.
 primEnv :: Env
 primEnv = M.fromList
-  [ ( ModuleName [ProperName "Prim"]
+  [ ( C.Prim
     , (internalModuleSourceSpan "<Prim>", nullImports, primExports)
     )
-  , ( ModuleName [ProperName "Prim", ProperName "Row"]
+  , ( C.PrimRow
     , (internalModuleSourceSpan "<Prim.Row>", nullImports, primRowExports)
     )
-  , ( ModuleName [ProperName "Prim", ProperName "TypeError"]
+  , ( C.PrimTypeError
     , (internalModuleSourceSpan "<Prim.TypeError>", nullImports, primTypeErrorExports)
     )
   ]
