@@ -195,9 +195,17 @@ primExports =
 
 -- | Environment which only contains the Prim module.
 primEnv :: Env
-primEnv = M.singleton
-  (ModuleName [ProperName "Prim"])
-  (internalModuleSourceSpan "<Prim>", nullImports, primExports)
+primEnv = M.fromList
+  [ ( ModuleName [ProperName "Prim"]
+    , (internalModuleSourceSpan "<Prim>", nullImports, primExports)
+    )
+  , ( ModuleName [ProperName "Prim", ProperName "Row"]
+    , (internalModuleSourceSpan "<Prim.Row>", nullImports, primExports)
+    )
+  , ( ModuleName [ProperName "Prim", ProperName "TypeError"]
+    , (internalModuleSourceSpan "<Prim.TypeError>", nullImports, primExports)
+    )
+  ]
 
 -- |
 -- When updating the `Exports` the behaviour is slightly different depending
