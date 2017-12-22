@@ -468,20 +468,44 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
           :: Qualified (ProperName 'ClassName)
           -> S.Set (Qualified (ProperName 'ClassName))
       transitiveSuperClassesFor qname =
-        S.intersection moduleClassDeclarationSet
-          $ untilSame
+        moduleClassDeclarationSet
+          `S.intersection`
+            untilSame
             (\s -> s <> foldMap (\n -> fromMaybe S.empty (M.lookup n classesToSuperClasses)) s)
             (fromMaybe S.empty (M.lookup qname classesToSuperClasses))
+
+      superClassesFor qname =
+        moduleClassDeclarationSet 
+          `S.intersection` 
+            fromMaybe S.empty (M.lookup qname classesToSuperClasses)
 
     for_ exps $ \e -> do
       checkTypesAreExported e
       checkClassMembersAreExported e
       checkClassesAreExported e
-      checkSuperClassExport transitiveSuperClassesFor moduleClassDeclarations e
+      checkSuperClassExport superClassesFor moduleClassDeclarations e
+        `catchError` annotateSuperClasses transitiveSuperClassesFor moduleClassDeclarations
     return $ Module ss coms mn decls' (Just exps)
   where
   qualify' :: a -> Qualified a
   qualify' = Qualified (Just mn)
+
+  annotateSuperClasses 
+    :: (Qualified (ProperName 'ClassName) -> S.Set (Qualified (ProperName 'ClassName)))
+    -> M.Map (Qualified (ProperName 'ClassName)) DeclarationRef
+    -> MultipleErrors
+    -> m ()
+  annotateSuperClasses transitiveSuperClassesFor classMap (MultipleErrors errs) = 
+    throwError (MultipleErrors (map annotateError errs))
+    where
+      annotateError (ErrorMessage hints (TransitiveExportError ref@(TypeClassRef _ className) _)) =
+        let superClasses = transitiveSuperClassesFor (qualify' className)
+            unexportedClasses = S.difference superClasses moduleClassExports
+        in ErrorMessage hints 
+          $ TransitiveExportError ref 
+          $ mapMaybe (`M.lookup` classMap) 
+          $ toList unexportedClasses
+      annotateError err = err
 
   moduleClassExports :: S.Set (Qualified (ProperName 'ClassName))
   moduleClassExports = S.fromList $ mapMaybe (\x -> case x of
@@ -511,8 +535,8 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     -> DeclarationRef
     -> m ()
   checkSuperClassExport superClassesFor classMap dr@(TypeClassRef _ className) = do
-    let transitiveSuperClasses = superClassesFor (qualify' className)
-        unexportedClasses = S.difference transitiveSuperClasses moduleClassExports
+    let superClasses = superClassesFor (qualify' className)
+        unexportedClasses = S.difference superClasses moduleClassExports
     unless (null unexportedClasses)
       . throwError . errorMessage' (declRefSourceSpan dr)
       . TransitiveExportError dr
