@@ -49,7 +49,8 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
 
     f' :: S.Set Text -> Declaration -> MultipleErrors
     f' s dec@(ValueDeclaration vd) = addHint (ErrorInValueDeclaration (valdeclIdent vd)) (warningsInDecl moduleNames dec <> checkTypeVarsInDecl s dec)
-    f' s (TypeDeclaration td) = addHint (ErrorInTypeDeclaration (tydeclIdent td)) (checkTypeVars s (tydeclType td))
+    f' s (TypeDeclaration td@(TypeDeclarationData (ss, _) _ _)) =
+      addHint (PositionedError ss) $ addHint (ErrorInTypeDeclaration (tydeclIdent td)) (checkTypeVars s (tydeclType td))
     f' s dec = warningsInDecl moduleNames dec <> checkTypeVarsInDecl s dec
 
     stepE :: S.Set Ident -> Expr -> MultipleErrors
