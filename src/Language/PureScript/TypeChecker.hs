@@ -515,9 +515,9 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     let transitiveSuperClasses = superClassesFor (qualify' className)
         unexportedClasses = S.difference transitiveSuperClasses moduleClassExports
     unless (null unexportedClasses)
-          . throwError . errorMessage' (declRefSourceSpan dr) 
-          $ TransitiveExportError dr 
-          $ mapMaybe (\n -> M.lookup n classMap) (toList unexportedClasses)
+      . throwError . errorMessage' (declRefSourceSpan dr)
+      . TransitiveExportError dr
+      $ mapMaybe (\n -> M.lookup n classMap) (toList unexportedClasses)
   checkSuperClassExport _ _ _ = 
     return ()
 
