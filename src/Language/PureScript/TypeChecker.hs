@@ -19,8 +19,8 @@ import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Writer.Class (MonadWriter(..))
 import Control.Lens ((^..), _1, _2)
 
-import Data.Foldable (for_, traverse_, toList, fold)
-import Data.List (nub, nubBy, (\\), sort, group, intersect)
+import Data.Foldable (for_, traverse_, toList)
+import Data.List (nub, nubBy, (\\), sort, group)
 import Data.Maybe
 import Data.Monoid ((<>))
 import Data.Text (Text)
@@ -450,10 +450,14 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
         M.fromList
           . mapMaybe (\x -> case x of
                 td@(TypeClassDeclaration _ name _ _ _ _) ->
-                  Just (Qualified (Just mn) name, classDecToRef td)
+                  (,) (Qualified (Just mn) name) <$> classDecToRef td
                 _ ->
                   Nothing)
           $ decls
+      classDecToRef :: Declaration -> Maybe DeclarationRef
+      classDecToRef (TypeClassDeclaration (ss', _) n _ _ _ _) = Just (TypeClassRef ss' n)
+      classDecToRef _ = Nothing
+
       moduleClassDeclarationSet :: S.Set (Qualified (ProperName 'ClassName))
       moduleClassDeclarationSet = 
         M.foldrWithKey (\k _ -> S.insert k) S.empty moduleClassDeclarations
@@ -477,12 +481,12 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
       checkSuperClassExport transitiveSuperClassesFor moduleClassDeclarations e
     return $ Module ss coms mn decls' (Just exps)
   where
-  qualify :: a -> Qualified a
-  qualify = Qualified (Just mn)
+  qualify' :: a -> Qualified a
+  qualify' = Qualified (Just mn)
 
   moduleClassExports :: S.Set (Qualified (ProperName 'ClassName))
   moduleClassExports = S.fromList $ mapMaybe (\x -> case x of
-     TypeClassRef _ name -> Just (qualify name)
+     TypeClassRef _ name -> Just (qualify' name)
      _ -> Nothing) exps
 
   untilSame :: Eq a => (a -> a) -> a -> a
@@ -491,14 +495,14 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
   checkMemberExport :: (Type -> [DeclarationRef]) -> DeclarationRef -> m ()
   checkMemberExport extract dr@(TypeRef _ name dctors) = do
     env <- getEnv
-    for_ (M.lookup (qualify name) (typeSynonyms env)) $ \(_, ty) ->
+    for_ (M.lookup (qualify' name) (typeSynonyms env)) $ \(_, ty) ->
       checkExport dr extract ty
     for_ dctors $ \dctors' ->
       for_ dctors' $ \dctor ->
-        for_ (M.lookup (qualify dctor) (dataConstructors env)) $ \(_, _, ty, _) -> 
+        for_ (M.lookup (qualify' dctor) (dataConstructors env)) $ \(_, _, ty, _) -> 
           checkExport dr extract ty
   checkMemberExport extract dr@(ValueRef _ name) = do
-    ty <- lookupVariable (qualify name)
+    ty <- lookupVariable (qualify' name)
     checkExport dr extract ty
   checkMemberExport _ _ = return ()
 
@@ -507,8 +511,8 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     -> M.Map (Qualified (ProperName 'ClassName)) DeclarationRef
     -> DeclarationRef 
     -> m ()
-  checkSuperClassExport superClassesFor classMap dr@(TypeClassRef ss className) = do
-    let transitiveSuperClasses = superClassesFor (qualify className)
+  checkSuperClassExport superClassesFor classMap dr@(TypeClassRef _ className) = do
+    let transitiveSuperClasses = superClassesFor (qualify' className)
         unexportedClasses = S.difference transitiveSuperClasses moduleClassExports
     unless (null unexportedClasses)
           . throwError . errorMessage' (declRefSourceSpan dr) 
@@ -575,12 +579,3 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     extractMemberName _ = internalError "Unexpected declaration in typeclass member list"
   checkClassMembersAreExported _ = return ()
 
-classDecToRef :: Declaration -> DeclarationRef
-classDecToRef (TypeClassDeclaration (ss, _) n _ _ _ _) = TypeClassRef ss n
-
-onlyClassRefs :: DeclarationRef -> Maybe DeclarationRef
-onlyClassRefs d = case d of
-  TypeClassRef {} -> 
-    Just d
-  _ -> 
-    Nothing
