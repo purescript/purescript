@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Prim.TypeError (class Warn, Warn)
+import Prim.TypeError (class Warn)
 import Control.Monad.Eff.Console (log)
 
 foo :: forall t. Warn "Example" => t -> t
