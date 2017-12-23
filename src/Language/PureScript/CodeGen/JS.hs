@@ -15,7 +15,7 @@ import Control.Monad.Except (MonadError, throwError)
 import Control.Monad.Reader (MonadReader, asks)
 import Control.Monad.Supply.Class
 
-import Data.List ((\\), delete, intersect)
+import Data.List ((\\), delete, partition)
 import qualified Data.Foldable as F
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe, isNothing)
@@ -64,8 +64,7 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
     let header = if comments && not (null coms) then AST.Comment Nothing coms strict else strict
     let foreign' = [AST.VariableIntroduction Nothing "$foreign" foreign_ | not $ null foreigns || isNothing foreign_]
     let moduleBody = header : foreign' ++ jsImports ++ concat optimized
-    let foreignExps = exps `intersect` foreigns
-    let standardExps = exps \\ foreignExps
+    let (foreignExps, standardExps) = partition (`elem` foreigns) exps
     let exps' = AST.ObjectLiteral Nothing $ map (mkString . runIdent &&& AST.Var Nothing . identToJs) standardExps
                                ++ map (mkString . runIdent &&& foreignIdent) foreignExps
     return $ moduleBody ++ [AST.Assignment Nothing (accessorString "exports" (AST.Var Nothing "module")) exps']
@@ -86,17 +85,17 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
     go acc used ((ann, mn') : mns') =
       let mni = Ident $ runModuleName mn'
       in if mn' /= mn && mni `elem` used
-         then let newName = freshModuleName 1 mn' used
+         then let newName = freshModuleName mn' used
               in go (M.insert mn' (ann, newName) acc) (Ident (runModuleName newName) : used) mns'
          else go (M.insert mn' (ann, mn') acc) used mns'
     go acc _ [] = acc
 
-    freshModuleName :: Integer -> ModuleName -> [Ident] -> ModuleName
-    freshModuleName i mn'@(ModuleName pns) used =
-      let newName = ModuleName $ init pns ++ [ProperName $ runProperName (last pns) <> "_" <> T.pack (show i)]
-      in if Ident (runModuleName newName) `elem` used
-         then freshModuleName (i + 1) mn' used
-         else newName
+    freshModuleName :: ModuleName -> [Ident] -> ModuleName
+    freshModuleName (ModuleName pns) used = head $ filter (not . isUsed) $ mkName <$> [1..]
+      where
+      mkName :: Integer -> ModuleName
+      mkName i = ModuleName $ init pns ++ [ProperName $ runProperName (last pns) <> "_" <> T.pack (show i)]
+      isUsed n = Ident (runModuleName n) `elem` used
 
   -- | Generates JavaScript code for a module import, binding the required module
   -- to the alternative
