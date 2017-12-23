@@ -513,6 +513,10 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     -> m ()
   checkSuperClassExport superClassesFor transitiveSuperClassesFor classMap dr@(TypeClassRef _ className) = do
     let superClasses = superClassesFor (qualify' className)
+        -- thanks to laziness, the computation of the transitive
+        -- superclasses defined in-module will only occur if we actually
+        -- throw the error. Constructing the full set of transitive
+        -- superclasses is likely to be costly for every single term.
         transitiveSuperClasses = transitiveSuperClassesFor (qualify' className)
         unexported = S.difference superClasses moduleClassExports
     unless (null unexported)
