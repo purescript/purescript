@@ -445,20 +445,6 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
       . checkEnv
       )
     let
-      -- A mapping of class names to their declaration refs in this module.
-      moduleClassDeclarations :: M.Map (Qualified (ProperName 'ClassName)) DeclarationRef
-      moduleClassDeclarations =
-        M.fromList
-          . mapMaybe (\x -> case x of
-                td@(TypeClassDeclaration _ name _ _ _ _) ->
-                  (,) (Qualified (Just mn) name) <$> classDecToRef td
-                _ ->
-                  Nothing)
-          $ decls
-      classDecToRef :: Declaration -> Maybe DeclarationRef
-      classDecToRef (TypeClassDeclaration (ss', _) n _ _ _ _) = Just (TypeClassRef ss' n)
-      classDecToRef _ = Nothing
-
       -- A function that, given a class name, returns the set of
       -- transitive class dependencies that are defined in this
       -- module.
@@ -477,7 +463,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
       checkTypesAreExported e
       checkClassMembersAreExported e
       checkClassesAreExported e
-      checkSuperClassExport superClassesFor transitiveSuperClassesFor moduleClassDeclarations e
+      checkSuperClassExport superClassesFor transitiveSuperClassesFor e
     return $ Module ss coms mn decls' (Just exps)
   where
   qualify' :: a -> Qualified a
@@ -508,10 +494,9 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
   checkSuperClassExport
     :: (Qualified (ProperName 'ClassName) -> S.Set (Qualified (ProperName 'ClassName)))
     -> (Qualified (ProperName 'ClassName) -> S.Set (Qualified (ProperName 'ClassName)))
-    -> M.Map (Qualified (ProperName 'ClassName)) DeclarationRef
     -> DeclarationRef
     -> m ()
-  checkSuperClassExport superClassesFor transitiveSuperClassesFor classMap dr@(TypeClassRef _ className) = do
+  checkSuperClassExport superClassesFor transitiveSuperClassesFor dr@(TypeClassRef drss className) = do
     let superClasses = superClassesFor (qualify' className)
         -- thanks to laziness, the computation of the transitive
         -- superclasses defined in-module will only occur if we actually
@@ -520,10 +505,11 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
         transitiveSuperClasses = transitiveSuperClassesFor (qualify' className)
         unexported = S.difference superClasses moduleClassExports
     unless (null unexported)
-      . throwError . errorMessage' (declRefSourceSpan dr)
+      . throwError . errorMessage' drss
       . TransitiveExportError dr
-      $ mapMaybe (\n -> M.lookup n classMap) (toList transitiveSuperClasses)
-  checkSuperClassExport _ _ _ _ =
+      . map (TypeClassRef drss . disqualify)
+      $ toList transitiveSuperClasses
+  checkSuperClassExport _ _ _ =
     return ()
 
   checkExport :: DeclarationRef -> (Type -> [DeclarationRef]) -> Type -> m ()
