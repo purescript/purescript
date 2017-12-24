@@ -172,9 +172,6 @@ resolveImport importModule exps imps impQual = resolveByType
     -> [ProperName 'ConstructorName]
     -> ProperName 'ConstructorName
     -> m ()
-    -- this triggers, so we are importing the thing and checking to see
-    -- that it exists, and that never throws an error. but it is not being
-    -- part of the environment.
   checkDctorExists ss tcon exports dctor
     = when (dctor `notElem` exports)
     . throwError . errorMessage' ss
