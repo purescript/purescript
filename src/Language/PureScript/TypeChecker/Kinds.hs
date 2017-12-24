@@ -1,4 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 -- |
 -- This module implements the kind checker
@@ -27,6 +29,8 @@ import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Types
+
+import System.IO.Unsafe (unsafePerformIO)
 
 -- | Generate a fresh kind variable
 freshKind :: (MonadState CheckState m) => m Kind
@@ -239,8 +243,13 @@ infer' other = (, []) <$> go other
     lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
   go (TypeConstructor v) = do
     env <- getEnv
-    case M.lookup v (types env) of
-      Nothing -> throwError . errorMessage . UnknownName $ fmap TyName v
+    let classesKinds = 
+          M.mapKeys (fmap coerceProperName) (fmap typeClassDataToKind (typeClasses env))
+    case M.lookup v (types env `M.union` classesKinds) of
+      Nothing -> do
+        let !()=
+              unsafePerformIO (writeFile "env.txt" (show env))
+        throwError . errorMessage . UnknownName $ fmap TyName v
       Just (kind, _) -> return kind
   go (TypeApp t1 t2) = do
     k0 <- freshKind
@@ -266,3 +275,14 @@ infer' other = (, []) <$> go other
     unifyKinds k2 kindType
     return kindType
   go ty = internalError $ "Invalid argument to infer: " ++ show ty
+
+typeClassDataToKind :: TypeClassData -> (Kind, TypeKind)
+typeClassDataToKind (TypeClassData { typeClassArguments }) = 
+  (convert typeClassArguments, TypeSynonym)
+  where
+    convert [] = kindType
+    convert ((_, mkindAnnotation) : rest) =
+        let k = maybe kindType id mkindAnnotation
+         in FunKind k (convert rest)
+      
+

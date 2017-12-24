@@ -49,6 +49,8 @@ desugarTypeClasses externs = flip evalStateT initialState . traverse desugarModu
   initialState :: MemberMap
   initialState =
     M.mapKeys (qualify (ModuleName [ProperName C.prim])) primClasses
+    `M.union` M.mapKeys (qualify C.PrimRow) primRowClasses
+    `M.union` M.mapKeys (qualify C.PrimTypeError) primTypeErrorClasses
     `M.union` M.fromList (externs >>= \ExternsFile{..} -> mapMaybe (fromExternsDecl efModuleName) efDeclarations)
 
   fromExternsDecl

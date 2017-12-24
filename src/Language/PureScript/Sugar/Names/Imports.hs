@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 module Language.PureScript.Sugar.Names.Imports
   ( ImportDef
   , resolveImports
@@ -20,6 +21,9 @@ import Language.PureScript.Crash
 import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.Sugar.Names.Env
+
+import qualified Language.PureScript.Constants as C
+import System.IO.Unsafe (unsafePerformIO)
 
 type ImportDef = (SourceSpan, ImportDeclarationType, Maybe ModuleName)
 
@@ -68,6 +72,10 @@ resolveModuleImport env ie (mn, imps) = foldM go ie imps
      -> (SourceSpan, Maybe ImportDeclarationType, Maybe ModuleName)
      -> m Imports
   go ie' (ss, typ, impQual) = do
+    -- dumping this out shows that the Fail and Warn type classes are
+      -- available in the exports of the Prim.TypeError module, which is
+      -- present in the env.
+    let !() = unsafePerformIO (when (mn == C.PrimTypeError) (writeFile "imp.txt" (show env)))
     modExports <-
       maybe
         (throwError . errorMessage' ss . UnknownName . Qualified Nothing $ ModName mn)
@@ -120,7 +128,13 @@ resolveImport importModule exps imps impQual = resolveByType
       for_ dctors $ traverse_ (checkDctorExists ss name allDctors)
     check (TypeOpRef ss name) =
       checkImportExists ss TyOpName (exportedTypeOps exps) name
-    check (TypeClassRef ss name) =
+    check (TypeClassRef ss name) = do
+      when (name == ProperName "Warn") $ do
+          -- this triggers, so we are importing the thing and checking to
+          -- see that it exists, and that never throws an error. but it is
+          -- not being part of the environment.
+          let !() = unsafePerformIO (writeFile "warn.txt" (show importModule))
+          pure ()
       checkImportExists ss TyClassName (exportedTypeClasses exps) name
     check (ModuleRef ss name) | isHiding =
       throwError . errorMessage' ss $ ImportHidingModule name
