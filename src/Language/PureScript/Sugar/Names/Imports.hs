@@ -132,7 +132,7 @@ resolveImport importModule exps imps impQual = resolveByType
       when (name == ProperName "Warn") $ do
           -- this triggers, so we are importing the thing and checking to
           -- see that it exists, and that never throws an error. but it is
-          -- not being part of the environment.
+          -- not being made part of the environment.
           let !() = unsafePerformIO (writeFile "warn.txt" (show importModule))
           pure ()
       checkImportExists ss TyClassName (exportedTypeClasses exps) name
@@ -163,6 +163,9 @@ resolveImport importModule exps imps impQual = resolveByType
     -> [ProperName 'ConstructorName]
     -> ProperName 'ConstructorName
     -> m ()
+    -- this triggers, so we are importing the thing and checking to see
+    -- that it exists, and that never throws an error. but it is not being
+    -- part of the environment.
   checkDctorExists ss tcon exports dctor
     = when (dctor `notElem` exports)
     . throwError . errorMessage' ss
@@ -213,6 +216,10 @@ resolveImport importModule exps imps impQual = resolveByType
     return $ imp { importedTypeOps = ops' }
   importRef prov imp (TypeClassRef _ name) = do
     let typeClasses' = updateImports (importedTypeClasses imp) (exportedTypeClasses exps) id name prov
+        -- at this point, the imps are dumped out, and they do *not*
+        -- contain the Warn class anywhere. cool
+        !() = if name == ProperName "Warn" then unsafePerformIO (writeFile "imported.txt" (show imp)) else ()
+        !() = if name == ProperName "Warn" then unsafePerformIO (writeFile "imported-tycs.txt" (show typeClasses')) else ()
     return $ imp { importedTypeClasses = typeClasses' }
   importRef prov imp (KindRef _ name) = do
     let kinds' = updateImports (importedKinds imp) (exportedKinds exps) id name prov
