@@ -21,6 +21,7 @@ import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
+import Language.PureScript.Environment
 import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Errors
@@ -40,7 +41,7 @@ import Language.PureScript.Types
 --
 desugarImports
   :: forall m
-   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (MonadError MultipleErrors m, MonadState Environment m, MonadWriter MultipleErrors m)
   => [ExternsFile]
   -> [Module]
   -> m [Module]
@@ -49,7 +50,7 @@ desugarImports externs modules =
 
 desugarImportsWithEnv
   :: forall m
-  . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  . (MonadError MultipleErrors m, MonadState Environment m, MonadWriter MultipleErrors m)
   => [ExternsFile]
   -> [Module]
   -> m (Env, [Module])

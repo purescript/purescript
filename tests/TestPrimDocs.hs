@@ -1,6 +1,7 @@
 module TestPrimDocs where
 
 import Control.Monad
+import Data.Monoid ((<>))
 import Data.List ((\\))
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -16,7 +17,7 @@ main = do
   putStrLn "Test that Prim is fully documented"
   let actualPrimNames =
         -- note that prim type classes are listed in P.primTypes
-        (map (P.runProperName . P.disqualify . fst) $ Map.toList P.primTypes) ++
+        (map (P.runProperName . P.disqualify . fst) $ Map.toList (P.primTypes <> P.primTypeErrorTypes <> P.primRowTypes)) ++
         (map (P.runProperName . P.disqualify) $ Set.toList P.primKinds)
   let documentedPrimNames = map D.declTitle (concatMap D.modDeclarations D.primModules)
 

@@ -7,6 +7,7 @@ module Language.PureScript.Docs.Prim
   ) where
 
 import Prelude.Compat hiding (fail)
+import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Map as Map
@@ -89,14 +90,11 @@ primKind title comments =
           }
     else P.internalError $ "Docs.Prim: No such Prim kind: " ++ T.unpack title
 
-lookupPrimTypeKind :: Text -> P.Kind
-lookupPrimTypeKind = lookupPrimTypeKindOf P.primName
-
 lookupPrimTypeKindOf 
   :: NameGen 'P.TypeName
   -> Text 
   -> P.Kind
-lookupPrimTypeKindOf k = fst . unsafeLookupOf k P.primTypes "Docs.Prim: No such Prim type: "
+lookupPrimTypeKindOf k = fst . unsafeLookupOf k (P.primTypes <> P.primRowTypes <> P.primTypeErrorTypes) "Docs.Prim: No such Prim type: "
 
 primType :: Text -> Text -> Declaration
 primType = primTypeOf P.primName
@@ -113,7 +111,7 @@ primTypeOf gen title comments = Declaration
 -- | Lookup the TypeClassData of a Prim class. This function is specifically
 -- not exported because it is partial.
 lookupPrimClassOf :: NameGen 'P.ClassName -> Text -> P.TypeClassData
-lookupPrimClassOf g = unsafeLookupOf g P.primClasses "Docs.Prim: No such Prim class: "
+lookupPrimClassOf g = unsafeLookupOf g (P.primClasses <> P.primTypeErrorClasses <> P.primRowClasses) "Docs.Prim: No such Prim class: "
 
 primClass :: Text -> Text -> Declaration
 primClass = primClassOf P.primName

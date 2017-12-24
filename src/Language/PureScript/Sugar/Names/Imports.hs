@@ -1,4 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
 module Language.PureScript.Sugar.Names.Imports
   ( ImportDef
   , resolveImports
@@ -10,12 +9,15 @@ import Prelude.Compat
 
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.State.Class (MonadState(..), modify)
 
 import Data.Foldable (for_, traverse_)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
+import Language.PureScript.Kinds
+import Language.PureScript.Environment
 import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Errors
@@ -23,7 +25,6 @@ import Language.PureScript.Names
 import Language.PureScript.Sugar.Names.Env
 
 import qualified Language.PureScript.Constants as C
-import System.IO.Unsafe (unsafePerformIO)
 
 type ImportDef = (SourceSpan, ImportDeclarationType, Maybe ModuleName)
 
@@ -46,7 +47,7 @@ findImports = foldr go M.empty
 --
 resolveImports
   :: forall m
-   . MonadError MultipleErrors m
+   . (MonadState Environment m, MonadError MultipleErrors m)
   => Env
   -> Module
   -> m (Module, Imports)
@@ -61,7 +62,7 @@ resolveImports env (Module ss coms currentModule decls exps) =
 -- | Constructs a set of imports for a single module import.
 resolveModuleImport
   :: forall m
-   . MonadError MultipleErrors m
+   . (MonadState Environment m, MonadError MultipleErrors m)
   => Env
   -> Imports
   -> (ModuleName, [(SourceSpan, Maybe ImportDeclarationType, Maybe ModuleName)])
@@ -72,10 +73,8 @@ resolveModuleImport env ie (mn, imps) = foldM go ie imps
      -> (SourceSpan, Maybe ImportDeclarationType, Maybe ModuleName)
      -> m Imports
   go ie' (ss, typ, impQual) = do
-    -- dumping this out shows that the Fail and Warn type classes are
-      -- available in the exports of the Prim.TypeError module, which is
-      -- present in the env.
-    let !() = unsafePerformIO (when (mn == C.PrimTypeError) (writeFile "imp.txt" (show env)))
+    when (mn == C.PrimTypeError) (modify addPrimTypeErrorToEnvironment)
+    when (mn == C.PrimRow) (modify addPrimRowToEnvironment)
     modExports <-
       maybe
         (throwError . errorMessage' ss . UnknownName . Qualified Nothing $ ModName mn)
@@ -87,6 +86,22 @@ resolveModuleImport env ie (mn, imps) = foldM go ie imps
                    , importedQualModules = maybe qualModules (`S.insert` qualModules) impQual
                    }
     resolveImport mn modExports ie'' impQual ss typ
+
+addPrimTypeErrorToEnvironment :: Environment -> Environment
+addPrimTypeErrorToEnvironment = augmentEnvironment primTypeErrorTypes primTypeErrorClasses
+
+addPrimRowToEnvironment :: Environment -> Environment
+addPrimRowToEnvironment = augmentEnvironment primRowTypes primRowClasses
+
+augmentEnvironment 
+  :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
+  -> M.Map (Qualified (ProperName 'ClassName)) TypeClassData
+  -> Environment
+  -> Environment
+augmentEnvironment newTypes classes env = env
+  { typeClasses = typeClasses env `M.union` classes
+  , types = types env `M.union` newTypes
+  }
 
 -- |
 -- Extends the local environment for a module by resolving an import of another module.
@@ -128,13 +143,7 @@ resolveImport importModule exps imps impQual = resolveByType
       for_ dctors $ traverse_ (checkDctorExists ss name allDctors)
     check (TypeOpRef ss name) =
       checkImportExists ss TyOpName (exportedTypeOps exps) name
-    check (TypeClassRef ss name) = do
-      when (name == ProperName "Warn") $ do
-          -- this triggers, so we are importing the thing and checking to
-          -- see that it exists, and that never throws an error. but it is
-          -- not being made part of the environment.
-          let !() = unsafePerformIO (writeFile "warn.txt" (show importModule))
-          pure ()
+    check (TypeClassRef ss name) =
       checkImportExists ss TyClassName (exportedTypeClasses exps) name
     check (ModuleRef ss name) | isHiding =
       throwError . errorMessage' ss $ ImportHidingModule name
@@ -216,10 +225,6 @@ resolveImport importModule exps imps impQual = resolveByType
     return $ imp { importedTypeOps = ops' }
   importRef prov imp (TypeClassRef _ name) = do
     let typeClasses' = updateImports (importedTypeClasses imp) (exportedTypeClasses exps) id name prov
-        -- at this point, the imps are dumped out, and they do *not*
-        -- contain the Warn class anywhere. cool
-        !() = if name == ProperName "Warn" then unsafePerformIO (writeFile "imported.txt" (show imp)) else ()
-        !() = if name == ProperName "Warn" then unsafePerformIO (writeFile "imported-tycs.txt" (show typeClasses')) else ()
     return $ imp { importedTypeClasses = typeClasses' }
   importRef prov imp (KindRef _ name) = do
     let kinds' = updateImports (importedKinds imp) (exportedKinds exps) id name prov
