@@ -434,6 +434,18 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
   warnAndRethrow (addHint (ErrorInModule mn)) $ do
     modify (\s -> s { checkCurrentModule = Just mn })
     decls' <- typeCheckAll mn exps decls
+    checkSuperClassesAreExported <- getSuperClassExportCheck
+    for_ exps $ \e -> do
+      checkTypesAreExported e
+      checkClassMembersAreExported e
+      checkClassesAreExported e
+      checkSuperClassesAreExported e
+    return $ Module ss coms mn decls' (Just exps)
+  where
+  qualify' :: a -> Qualified a
+  qualify' = Qualified (Just mn)
+
+  getSuperClassExportCheck = do
     classesToSuperClasses <- gets
       ( M.map
         ( S.fromList
@@ -459,16 +471,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
       superClassesFor qname =
         fromMaybe S.empty (M.lookup qname classesToSuperClasses)
 
-    for_ exps $ \e -> do
-      checkTypesAreExported e
-      checkClassMembersAreExported e
-      checkClassesAreExported e
-      checkSuperClassExport superClassesFor transitiveSuperClassesFor e
-    return $ Module ss coms mn decls' (Just exps)
-  where
-  qualify' :: a -> Qualified a
-  qualify' = Qualified (Just mn)
-
+    pure $ checkSuperClassExport superClassesFor transitiveSuperClassesFor
   moduleClassExports :: S.Set (Qualified (ProperName 'ClassName))
   moduleClassExports = S.fromList $ mapMaybe (\x -> case x of
      TypeClassRef _ name -> Just (qualify' name)
