@@ -48,10 +48,12 @@ desugarTypeClasses externs = flip evalStateT initialState . traverse desugarModu
   where
   initialState :: MemberMap
   initialState =
-    M.mapKeys (qualify (ModuleName [ProperName C.prim])) primClasses
-    `M.union` M.mapKeys (qualify C.PrimRow) primRowClasses
-    `M.union` M.mapKeys (qualify C.PrimTypeError) primTypeErrorClasses
-    `M.union` M.fromList (externs >>= \ExternsFile{..} -> mapMaybe (fromExternsDecl efModuleName) efDeclarations)
+    mconcat
+      [ M.mapKeys (qualify (ModuleName [ProperName C.prim])) primClasses
+      , M.mapKeys (qualify C.PrimRow) primRowClasses
+      , M.mapKeys (qualify C.PrimTypeError) primTypeErrorClasses
+      , M.fromList (externs >>= \ExternsFile{..} -> mapMaybe (fromExternsDecl efModuleName) efDeclarations)
+      ]
 
   fromExternsDecl
     :: ModuleName
