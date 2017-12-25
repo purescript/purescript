@@ -161,7 +161,6 @@ tests:
       - hspec
       - hspec-discover
       - HUnit
-      - silently
 
 flags:
   release:
