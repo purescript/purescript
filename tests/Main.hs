@@ -29,12 +29,6 @@ main = do
 
   heading "Updating support code"
   TestUtils.updateSupportCode
-  heading "CoreFn test suite"
-  TestCoreFn.main
-  heading "Documentation test suite"
-  TestDocs.main
-  heading "Hierarchy test suite"
-  TestHierarchy.main
   heading "Prim documentation test suite"
   TestPrimDocs.main
   heading "psc-publish test suite"
@@ -43,8 +37,20 @@ main = do
   ideTests <- TestIde.main
   compilerTests <- TestCompiler.main
   psciTests <- TestPsci.main
+  coreFnTests <- TestCoreFn.main
+  docsTests <- TestDocs.main
+  hierarchyTests <- TestHierarchy.main
 
-  defaultMain (testGroup "Tests" [compilerTests, psciTests, ideTests])
+  defaultMain $
+    testGroup
+      "Tests"
+      [ compilerTests
+      , psciTests
+      , ideTests
+      , coreFnTests
+      , docsTests
+      , hierarchyTests
+      ]
 
   where
   heading msg = do
