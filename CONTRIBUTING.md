@@ -21,15 +21,11 @@ You can run individual test suites using `stack test --test-arguments="-p
 PATTERN"` where `PATTERN` is one of `compiler`, `repl`, `ide`, `docs`, `corefn`,
 or `hierarchy`.
 
-To build and run a specific test in `examples/passing/` or `examples/failing/`, execute the following commands.
+To build and run a specific test in `examples/passing/` or `examples/failing/`, add test arguments like so:
 
-``` bash
-# Build
-stack exec purs -- compile 'tests/support/bower_components/purescript-*/src/**/*.purs' examples/blah/Blah.purs
+`stack test --fast --test-arguments="-p compiler/**1110.purs*"`
 
-# Run
-node -e "require('./output/Main/').main()"
-```
+This will run whatever test uses the example file `1110.purs`.
 
 ## Code Review
 
