@@ -25,7 +25,7 @@ import Test.Tasty
 import Test.Tasty.Hspec
 
 main :: IO TestTree
-main = testSpec "CoreFn" spec
+main = testSpec "corefn" spec
 
 parseModule :: Value -> Result (Version, Module Ann)
 parseModule = parse moduleFromJSON
