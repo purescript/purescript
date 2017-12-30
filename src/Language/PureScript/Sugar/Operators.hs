@@ -356,9 +356,6 @@ updateTypes goType = (goDecl, goExpr, goBinder)
   goExpr pos (TypedValue check v ty) = do
     ty' <- goType' pos ty
     return (pos, TypedValue check v ty')
-  goExpr pos (Proxy ty) = do
-    ty' <- goType' pos ty
-    return (pos, Proxy ty')
   goExpr pos other = return (pos, other)
 
   goBinder :: Maybe SourceSpan -> Binder -> m (Maybe SourceSpan, Binder)
