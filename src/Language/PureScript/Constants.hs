@@ -421,7 +421,7 @@ symbol = "Symbol"
 -- Code Generation
 
 __unused :: forall a. (IsString a) => a
-__unused = "__unused"
+__unused = "$unused" -- $ avoids name clashing
 
 -- Modules
 
