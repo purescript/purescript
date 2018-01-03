@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Data.Symbol (SProxy(..))
 import Type.Data.Symbol (class AppendSymbol)
 import Control.Monad.Eff.Console (log)
 
@@ -14,20 +15,20 @@ instance balanced2
      , Balanced sym2
      ) => Balanced sym
 
-balanced :: forall sym. Balanced sym => @sym -> String
+balanced :: forall sym. Balanced sym => SProxy sym -> String
 balanced _ = "ok"
 
 b0 :: String
-b0 = balanced @""
+b0 = balanced (SProxy :: SProxy "")
 
 b1 :: String
-b1 = balanced @"()"
+b1 = balanced (SProxy :: SProxy "()")
 
 b2 :: String
-b2 = balanced @"(())"
+b2 = balanced (SProxy :: SProxy "(())")
 
 b3 :: String
-b3 = balanced @"((()))"
+b3 = balanced (SProxy :: SProxy "((()))")
 
 main = do
   log b0

@@ -11,9 +11,11 @@ instance appendNil :: Append Nil b b
 
 instance appendCons :: Append xs b c => Append (Cons x xs) b (Cons x c)
 
-appendProxy :: forall a b c. Append a b c => @a -> @b -> @c
-appendProxy _ _ = @c
+data Proxy a = Proxy
 
-test = appendProxy @(Cons Int Nil) @(Cons String Nil)
+appendProxy :: forall a b c. Append a b c => Proxy a -> Proxy b -> Proxy c
+appendProxy Proxy Proxy = Proxy
+
+test = appendProxy (Proxy :: Proxy (Cons Int Nil)) (Proxy :: Proxy (Cons String Nil))
 
 main = log "Done"

@@ -769,9 +769,6 @@ data Expr
   --
   | Do [DoNotationElement]
   -- |
-  -- A proxy value
-  --
-  | Proxy Type
   -- An ado-notation block
   --
   | Ado [DoNotationElement] Expr

@@ -74,15 +74,6 @@ prettyPrintRowWith tro open close = uncurry listToBox . toList []
 prettyPrintRow :: Type -> String
 prettyPrintRow = render . prettyPrintRowWith defaultOptions '(' ')'
 
--- Treat `ProxyType t` in a similar way to the application of a type
--- constructor `@` to `t`, i.e: `@ t`, except that we don't render the unneeded
--- space. So we end up with `@t`.
-proxyType :: Pattern () Type (Type, Type)
-proxyType = mkPattern match
-  where
-  match (ProxyType t) = Just (TypeConstructor (Qualified Nothing (ProperName "@")), t)
-  match _ = Nothing
-
 typeApp :: Pattern () Type (Type, Type)
 typeApp = mkPattern match
   where
@@ -153,8 +144,7 @@ matchType :: TypeRenderOptions -> Pattern () Type Box
 matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
   operators :: OperatorTable () Type Box
   operators =
-    OperatorTable [ [ AssocL proxyType $ \p ty -> p <> ty ]
-                  , [ AssocL typeApp $ \f x -> keepSingleLinesOr (moveRight 2) f x ]
+    OperatorTable [ [ AssocL typeApp $ \f x -> keepSingleLinesOr (moveRight 2) f x ]
                   , [ AssocR appliedFunction $ \arg ret -> keepSingleLinesOr id arg (text rightArrow <> " " <> ret) ]
                   , [ Wrap constrained $ \deps ty -> constraintsAsBox tro deps ty ]
                   , [ Wrap forall_ $ \idents ty -> keepSingleLinesOr (moveRight 2) (text (forall' ++ " " ++ unwords idents ++ ".")) ty ]
