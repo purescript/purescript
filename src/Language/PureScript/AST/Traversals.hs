@@ -635,7 +635,6 @@ accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (con
   forValues (TypeClassDictionary c _ _) = mconcat (fmap f (constraintArgs c))
   forValues (DeferredDictionary _ tys) = mconcat (fmap f tys)
   forValues (TypedValue _ _ ty) = f ty
-  forValues (Proxy ty) = f ty
   forValues _ = mempty
 
 accumKinds
@@ -669,7 +668,6 @@ accumKinds f = everythingOnValues mappend forDecls forValues (const mempty) (con
   forValues (TypeClassDictionary c _ _) = foldMap forTypes (constraintArgs c)
   forValues (DeferredDictionary _ tys) = foldMap forTypes tys
   forValues (TypedValue _ _ ty) = forTypes ty
-  forValues (Proxy ty) = forTypes ty
   forValues _ = mempty
 
   forTypes (KindedType _ k) = f k
@@ -683,6 +681,5 @@ overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
   where
   g :: Expr -> Expr
   g (TypedValue checkTy val t) = TypedValue checkTy val (f t)
-  g (Proxy t) = Proxy (f t)
   g (TypeClassDictionary c sco hints) = TypeClassDictionary (mapConstraintArgs (fmap f) c) sco hints
   g other = other

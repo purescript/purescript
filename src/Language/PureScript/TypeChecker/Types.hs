@@ -395,9 +395,6 @@ infer' (IfThenElse cond th el) = do
 infer' (Let ds val) = do
   (ds', val'@(TypedValue _ _ valTy)) <- inferLetBinding [] ds val infer
   return $ TypedValue True (Let ds' val') valTy
-infer' (Proxy ty) = do
-  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
-  return $ TypedValue True (Proxy ty') (ProxyType ty')
 infer' (DeferredDictionary className tys) = do
   dicts <- getTypeClassDictionaries
   hints <- getHints

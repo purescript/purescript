@@ -78,8 +78,6 @@ prettyPrintValue d (Let ds val) =
     (text "in " <> prettyPrintValue (d - 1) val)
 prettyPrintValue d (Do els) =
   text "do " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els)
-prettyPrintValue _ (Proxy ty) =
-  text "@" <> typeAtomAsBox ty
 prettyPrintValue d (Ado els yield) =
   text "ado " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els) //
   (text "in " <> prettyPrintValue (d - 1) yield)

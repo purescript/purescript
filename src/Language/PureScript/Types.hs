@@ -66,8 +66,6 @@ data Type
   | REmpty
   -- | A non-empty row
   | RCons Label Type Type
-  -- | A proxy type
-  | ProxyType Type
   -- | A type with a kind annotation
   | KindedType Type Kind
   -- | A placeholder used in pretty printing
@@ -170,7 +168,6 @@ replaceAllTypeVars = go [] where
       usedVars = concatMap (usedTypeVariables . snd) m
   go bs m (ConstrainedType c t) = ConstrainedType (mapConstraintArgs (map (go bs m)) c) (go bs m t)
   go bs m (RCons name' t r) = RCons name' (go bs m t) (go bs m r)
-  go bs m (ProxyType t) = ProxyType (go bs m t)
   go bs m (KindedType t k) = KindedType (go bs m t) k
   go bs m (BinaryNoParensType t1 t2 t3) = BinaryNoParensType (go bs m t1) (go bs m t2) (go bs m t3)
   go bs m (ParensInType t) = ParensInType (go bs m t)
@@ -196,7 +193,6 @@ freeTypeVariables = ordNub . go [] where
   go bound (ForAll v t _) = go (v : bound) t
   go bound (ConstrainedType c t) = concatMap (go bound) (constraintArgs c) ++ go bound t
   go bound (RCons _ t r) = go bound t ++ go bound r
-  go bound (ProxyType t) = go bound t
   go bound (KindedType t _) = go bound t
   go bound (BinaryNoParensType t1 t2 t3) = go bound t1 ++ go bound t2 ++ go bound t3
   go bound (ParensInType t) = go bound t
@@ -233,7 +229,6 @@ everywhereOnTypes f = go where
   go (ForAll arg ty sco) = f (ForAll arg (go ty) sco)
   go (ConstrainedType c ty) = f (ConstrainedType (mapConstraintArgs (map go) c) (go ty))
   go (RCons name ty rest) = f (RCons name (go ty) (go rest))
-  go (ProxyType ty) = f (ProxyType (go ty))
   go (KindedType ty k) = f (KindedType (go ty) k)
   go (PrettyPrintFunction t1 t2) = f (PrettyPrintFunction (go t1) (go t2))
   go (PrettyPrintObject t) = f (PrettyPrintObject (go t))
@@ -248,7 +243,6 @@ everywhereOnTypesTopDown f = go . f where
   go (ForAll arg ty sco) = ForAll arg (go (f ty)) sco
   go (ConstrainedType c ty) = ConstrainedType (mapConstraintArgs (map (go . f)) c) (go (f ty))
   go (RCons name ty rest) = RCons name (go (f ty)) (go (f rest))
-  go (ProxyType ty) = ProxyType (go (f ty))
   go (KindedType ty k) = KindedType (go (f ty)) k
   go (PrettyPrintFunction t1 t2) = PrettyPrintFunction (go (f t1)) (go (f t2))
   go (PrettyPrintObject t) = PrettyPrintObject (go (f t))
@@ -263,7 +257,6 @@ everywhereOnTypesM f = go where
   go (ForAll arg ty sco) = (ForAll arg <$> go ty <*> pure sco) >>= f
   go (ConstrainedType c ty) = (ConstrainedType <$> overConstraintArgs (mapM go) c <*> go ty) >>= f
   go (RCons name ty rest) = (RCons name <$> go ty <*> go rest) >>= f
-  go (ProxyType ty) = (ProxyType <$> go ty) >>= f
   go (KindedType ty k) = (KindedType <$> go ty <*> pure k) >>= f
   go (PrettyPrintFunction t1 t2) = (PrettyPrintFunction <$> go t1 <*> go t2) >>= f
   go (PrettyPrintObject t) = (PrettyPrintObject <$> go t) >>= f
@@ -278,7 +271,6 @@ everywhereOnTypesTopDownM f = go <=< f where
   go (ForAll arg ty sco) = ForAll arg <$> (f ty >>= go) <*> pure sco
   go (ConstrainedType c ty) = ConstrainedType <$> overConstraintArgs (mapM (go <=< f)) c <*> (f ty >>= go)
   go (RCons name ty rest) = RCons name <$> (f ty >>= go) <*> (f rest >>= go)
-  go (ProxyType ty) = ProxyType <$> (f ty >>= go)
   go (KindedType ty k) = KindedType <$> (f ty >>= go) <*> pure k
   go (PrettyPrintFunction t1 t2) = PrettyPrintFunction <$> (f t1 >>= go) <*> (f t2 >>= go)
   go (PrettyPrintObject t) = PrettyPrintObject <$> (f t >>= go)
@@ -293,7 +285,6 @@ everythingOnTypes (<+>) f = go where
   go t@(ForAll _ ty _) = f t <+> go ty
   go t@(ConstrainedType c ty) = foldl (<+>) (f t) (map go (constraintArgs c)) <+> go ty
   go t@(RCons _ ty rest) = f t <+> go ty <+> go rest
-  go t@(ProxyType ty) = f t <+> go ty
   go t@(KindedType ty _) = f t <+> go ty
   go t@(PrettyPrintFunction t1 t2) = f t <+> go t1 <+> go t2
   go t@(PrettyPrintObject t1) = f t <+> go t1
@@ -309,7 +300,6 @@ everythingWithContextOnTypes s0 r0 (<+>) f = go' s0 where
   go s (ForAll _ ty _) = go' s ty
   go s (ConstrainedType c ty) = foldl (<+>) r0 (map (go' s) (constraintArgs c)) <+> go' s ty
   go s (RCons _ ty rest) = go' s ty <+> go' s rest
-  go s (ProxyType ty) = go' s ty
   go s (KindedType ty _) = go' s ty
   go s (PrettyPrintFunction t1 t2) = go' s t1 <+> go' s t2
   go s (PrettyPrintObject t1) = go' s t1

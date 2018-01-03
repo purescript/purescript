@@ -96,12 +96,6 @@ renderTail :: Type -> RenderedCode
 renderTail REmpty = mempty
 renderTail other = sp <> syntax "|" <> sp <> renderType other
 
-proxyType :: Pattern () Type ((), Type)
-proxyType = mkPattern match
-  where
-  match (ProxyType t) = Just ((), t)
-  match _ = Nothing
-
 typeApp :: Pattern () Type (Type, Type)
 typeApp = mkPattern match
   where
@@ -142,8 +136,7 @@ matchType = buildPrettyPrinter operators matchTypeAtom
   where
   operators :: OperatorTable () Type RenderedCode
   operators =
-    OperatorTable [ [ Wrap proxyType $ \_ ty -> syntax "@" <> ty ]
-                  , [ AssocL typeApp $ \f x -> f <> sp <> x ]
+    OperatorTable [ [ AssocL typeApp $ \f x -> f <> sp <> x ]
                   , [ AssocR appliedFunction $ \arg ret -> mintersperse sp [arg, syntax "->", ret] ]
                   , [ Wrap constrained $ \deps ty -> renderConstraints deps ty ]
                   , [ Wrap forall_ $ \tyVars ty -> mconcat [keywordForall, sp, mintersperse sp (map typeVar tyVars), syntax ".", sp, ty] ]
