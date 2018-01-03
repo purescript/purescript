@@ -3,10 +3,12 @@ module TestHierarchy where
 
 import Language.PureScript.Hierarchy
 import qualified Language.PureScript as P
-import Test.Hspec (describe, hspec, it, shouldBe)
 
-main :: IO ()
-main = hspec $ do
+import Test.Tasty
+import Test.Tasty.Hspec (describe, it, shouldBe, testSpec)
+
+main :: IO TestTree
+main = testSpec "hierarchy" $ do
   describe "Language.PureScript.Hierarchy" $ do
     describe "prettyPrint" $ do
       it "creates just the node when there is no relation" $ do

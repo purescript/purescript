@@ -17,15 +17,15 @@ Please follow the following guidelines:
 
 Run all test suites with `stack test`. You will need `npm`, `bower` and `node` on your PATH to run the tests.
 
-To build and run a specific test in `examples/passing/` or `examples/failing/`, execute the following commands.
+You can run individual test suites using `stack test --test-arguments="-p
+PATTERN"` where `PATTERN` is one of `compiler`, `repl`, `ide`, `docs`, `corefn`,
+or `hierarchy`.
 
-``` bash
-# Build
-stack exec purs -- compile 'tests/support/bower_components/purescript-*/src/**/*.purs' examples/blah/Blah.purs
+To build and run a specific test in `examples/passing/` or `examples/failing/`, add test arguments like so:
 
-# Run
-node -e "require('./output/Main/').main()"
-```
+`stack test --fast --test-arguments="-p compiler/**1110.purs*"`
+
+This will run whatever test uses the example file `1110.purs`.
 
 ## Code Review
 

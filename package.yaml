@@ -155,11 +155,12 @@ tests:
     source-dirs: tests
     ghc-options: -Wall
     dependencies:
-    - purescript
-    - hspec
-    - hspec-discover
-    - HUnit
-    - silently
+      - purescript
+      - tasty
+      - tasty-hspec
+      - hspec
+      - hspec-discover
+      - HUnit
 
 flags:
   release:

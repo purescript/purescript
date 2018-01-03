@@ -32,7 +32,9 @@ import qualified Language.PureScript.Publish.ErrorsWarnings as Publish
 import Web.Bower.PackageMeta (parsePackageName, runPackageName)
 
 import TestUtils
-import Test.Hspec (Spec, it, context, expectationFailure, runIO, hspec)
+
+import Test.Tasty
+import Test.Tasty.Hspec (Spec, it, context, expectationFailure, runIO, testSpec)
 
 publishOpts :: Publish.PublishOptions
 publishOpts = Publish.defaultPublishOptions
@@ -47,8 +49,8 @@ getPackage =
   pushd "examples/docs" $
     Publish.preparePackage "bower.json" "resolutions.json" publishOpts
 
-main :: IO ()
-main = hspec spec
+main :: IO TestTree
+main = testSpec "docs" spec
 
 spec :: Spec
 spec = do

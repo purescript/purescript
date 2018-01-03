@@ -21,10 +21,11 @@ import Language.PureScript.CoreFn.ToJSON
 import Language.PureScript.Names
 import Language.PureScript.PSString
 
-import Test.Hspec
+import Test.Tasty
+import Test.Tasty.Hspec
 
-main :: IO ()
-main = hspec spec
+main :: IO TestTree
+main = testSpec "corefn" spec
 
 parseModule :: Value -> Result (Version, Module Ann)
 parseModule = parse moduleFromJSON
