@@ -17,7 +17,6 @@ import qualified Data.Text as T
 import Language.PureScript.CoreFn
 import Language.PureScript.Names
 import Language.PureScript.Traversals
-import qualified Language.PureScript.Constants as C
 
 -- |
 -- The state object used in this module
@@ -62,8 +61,8 @@ newScope x = do
 updateScope :: Ident -> Rename Ident
 updateScope ident =
   case ident of
-    Ident name | name == C.__unused -> return ident
     GenIdent name _ -> go ident $ Ident (fromMaybe "v" name)
+    UnusedIdent -> return UnusedIdent
     _ -> go ident ident
   where
   go :: Ident -> Ident -> Rename Ident
@@ -88,7 +87,7 @@ updateScope ident =
 -- Finds the new name to use for an ident.
 --
 lookupIdent :: Ident -> Rename Ident
-lookupIdent i@(Ident name) | name == C.__unused = return i
+lookupIdent UnusedIdent = return UnusedIdent
 lookupIdent name = do
   name' <- gets $ M.lookup name . rsBoundNames
   case name' of

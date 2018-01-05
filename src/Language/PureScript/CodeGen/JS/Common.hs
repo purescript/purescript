@@ -8,6 +8,7 @@ import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
 
+import qualified Language.PureScript.Constants as C
 import Language.PureScript.Crash
 import Language.PureScript.Names
 
@@ -26,6 +27,13 @@ moduleNameToJs (ModuleName pns) =
 identToJs :: Ident -> Text
 identToJs (Ident name) = properToJs name
 identToJs (GenIdent _ _) = internalError "GenIdent in identToJs"
+identToJs UnusedIdent = C.__unused
+
+-- | Convert an 'Ident' into a valid JavaScript identifier, or Nothing.
+identToJs' :: Ident -> Maybe Text
+identToJs' (Ident name) = Just $ properToJs name
+identToJs' (GenIdent _ _) = internalError "GenIdent in identToJs'"
+identToJs' UnusedIdent = Nothing
 
 properToJs :: Text -> Text
 properToJs name
