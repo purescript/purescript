@@ -292,7 +292,7 @@ typeInstanceDictionaryDeclaration sa name mn deps className tys decls =
       -- The type is a record type, but depending on type instance dependencies, may be constrained.
       -- The dictionary itself is a record literal.
       let superclasses = superClassDictionaryNames typeClassSuperclasses `zip`
-            [ Abs (VarBinder (Ident C.__unused)) (DeferredDictionary superclass tyArgs)
+            [ Abs (VarBinder UnusedIdent) (DeferredDictionary superclass tyArgs)
             | (Constraint superclass suTyArgs _) <- typeClassSuperclasses
             , let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
             ]

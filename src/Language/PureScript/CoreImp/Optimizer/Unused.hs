@@ -1,7 +1,6 @@
 -- | Removes unused variables
 module Language.PureScript.CoreImp.Optimizer.Unused
   ( removeCodeAfterReturnStatements
-  , removeUnusedArg
   , removeUndefinedApp
   ) where
 
@@ -20,12 +19,6 @@ removeCodeAfterReturnStatements = everywhere (removeFromBlock go)
   isReturn (Return _ _) = True
   isReturn (ReturnNoResult _) = True
   isReturn _ = False
-
-removeUnusedArg :: AST -> AST
-removeUnusedArg = everywhere convert
-  where
-  convert (Function ss name [arg] body) | arg == C.__unused = Function ss name [] body
-  convert js = js
 
 removeUndefinedApp :: AST -> AST
 removeUndefinedApp = everywhere convert

@@ -164,6 +164,7 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
   accessor :: Ident -> AST -> AST
   accessor (Ident prop) = accessorString $ mkString prop
   accessor (GenIdent _ _) = internalError "GenIdent in accessor"
+  accessor UnusedIdent = internalError "UnusedIdent in accessor"
 
   accessorString :: PSString -> AST -> AST
   accessorString prop = AST.Indexer Nothing (AST.StringLiteral Nothing prop)
@@ -199,7 +200,10 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
                                (var name)
   valueToJs' (Abs _ arg val) = do
     ret <- valueToJs val
-    return $ AST.Function Nothing Nothing [identToJs arg] (AST.Block Nothing [AST.Return Nothing ret])
+    let jsArg = case arg of
+                  UnusedIdent -> []
+                  _           -> [identToJs arg]
+    return $ AST.Function Nothing Nothing jsArg (AST.Block Nothing [AST.Return Nothing ret])
   valueToJs' e@App{} = do
     let (f, args) = unApp e []
     args' <- mapM valueToJs args

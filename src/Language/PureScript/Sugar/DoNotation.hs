@@ -44,7 +44,7 @@ desugarDo d =
   go [DoNotationValue val] = return val
   go (DoNotationValue val : rest) = do
     rest' <- go rest
-    return $ App (App discard val) (Abs (VarBinder (Ident C.__unused)) rest')
+    return $ App (App discard val) (Abs (VarBinder UnusedIdent) rest')
   go [DoNotationBind _ _] = throwError . errorMessage $ InvalidDoBind
   go (DoNotationBind b _ : _) | First (Just ident) <- foldMap fromIdent (binderNames b) =
       throwError . errorMessage $ CannotUseBindWithDo (Ident ident)
