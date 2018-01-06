@@ -57,6 +57,15 @@ handleCommand c = case c of
     findAvailableExterns >>= loadModulesSync
   LoadSync modules ->
     loadModulesSync modules
+  Usages declarationId _currentModule -> do
+    -- TODO(Christoph): currentModule is unused here, see if we can make
+    -- findUsages work with the rebuild cache
+    decl <- lookupDeclarationId declarationId
+    case decl of
+      Nothing -> throwError (NotFound ("Couldn't find a declaration for " <> show declarationId))
+      Just d -> case d & _idaAnnotation & _annUsages of
+        Nothing -> throwError (GeneralError ("Usages have not been resolved"))
+        Just usages -> pure (UsagesResult usages)
   Type search filters currentModule ->
     findType search filters currentModule
   Complete filters matcher currentModule complOptions ->

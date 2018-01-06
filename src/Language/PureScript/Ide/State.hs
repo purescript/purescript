@@ -20,6 +20,7 @@
 module Language.PureScript.Ide.State
   ( getLoadedModulenames
   , getExternFiles
+  , getFileState
   , resetIdeState
   , cacheRebuild
   , cachedRebuild
@@ -27,6 +28,8 @@ module Language.PureScript.Ide.State
   , insertModule
   , insertExternsSTM
   , getAllModules
+  , lookupDeclarationId
+  -- | Populating the caches
   , populateVolatileState
   , populateVolatileStateSync
   , populateVolatileStateSTM
@@ -50,6 +53,7 @@ import           Language.PureScript.Ide.Externs
 import           Language.PureScript.Ide.Reexports
 import           Language.PureScript.Ide.SourceFile
 import           Language.PureScript.Ide.Types
+import           Language.PureScript.Ide.Usages (resolveUsages)
 import           Language.PureScript.Ide.Util
 
 -- | Resets all State inside psc-ide
@@ -138,6 +142,21 @@ getAllModules mmoduleName = do
               pure (Map.toList resolved)
         _ -> pure (Map.toList declarations)
 
+lookupDeclarationId
+  :: Ide m
+  => IdeDeclarationId
+  -> m (Maybe IdeDeclarationAnn)
+lookupDeclarationId declarationId = do
+  st <- ideStateVar <$> ask
+  liftIO $ atomically $ do
+    vState <- getVolatileStateSTM st
+    pure (find findDecl =<< Map.lookup (declarationId ^. ididModule) (vsDeclarations vState))
+  where
+     findDecl :: IdeDeclarationAnn -> Bool
+     findDecl d =
+        namespaceForDeclaration (discardAnn d) == declarationId ^. ididNamespace
+        && identifierFromIdeDeclaration (discardAnn d) == declarationId ^. ididIdentifier
+
 -- | Adds an ExternsFile into psc-ide's FileState. This does not populate the
 -- VolatileState, which needs to be done after all the necessary Externs and
 -- SourceFiles have been loaded.
@@ -181,7 +200,7 @@ populateVolatileState :: (Ide m, MonadLogger m) => m (Async ())
 populateVolatileState = do
   env <- ask
   let ll = confLogLevel (ideConfiguration env)
-  -- populateVolatileState return Unit for now, so it's fine to discard this
+  -- populateVolatileState returns Unit for now, so it's fine to discard this
   -- result. We might want to block on this in a benchmarking situation.
   liftIO (async (runLogger ll (runReaderT populateVolatileStateSync env)))
 
@@ -196,16 +215,18 @@ populateVolatileStateSTM ref = do
   rebuildCache <- vsCachedRebuild <$> getVolatileStateSTM ref
   let asts = map (extractAstInformation . fst) modules
   let (moduleDeclarations, reexportRefs) = (map fst &&& map snd) (Map.map convertExterns externs)
-      results =
-        moduleDeclarations
-        & map resolveDataConstructorsForModule
-        & resolveLocations asts
-        & resolveDocumentation (map fst modules)
-        & resolveInstances externs
-        & resolveOperators
-        & resolveReexports reexportRefs
-  setVolatileStateSTM ref (IdeVolatileState (AstData asts) (map reResolved results) rebuildCache)
-  pure (force results)
+  let
+    reexportResults =
+      moduleDeclarations
+      & map resolveDataConstructorsForModule
+      & resolveLocations asts
+      & resolveDocumentation (map fst modules)
+      & resolveInstances externs
+      & resolveOperators
+      & resolveReexports reexportRefs
+  let results = map reResolved reexportResults & resolveUsages (Map.map fst modules)
+  setVolatileStateSTM ref (IdeVolatileState (AstData asts) (force results) rebuildCache)
+  pure reexportResults
 
 resolveLocations
   :: ModuleMap (DefinitionSites P.SourceSpan, TypeAnnotations)
@@ -271,23 +292,23 @@ resolveDocumentationForModule
     -> [IdeDeclarationAnn]
     -> [IdeDeclarationAnn]
 resolveDocumentationForModule (P.Module _ _ _ sdecls _) decls = map convertDecl decls
-  where 
+  where
   comments :: Map P.Name [P.Comment]
-  comments = Map.fromListWith (flip (<>)) $ mapMaybe (\d -> 
-    case name d of 
+  comments = Map.fromListWith (flip (<>)) $ mapMaybe (\d ->
+    case name d of
       Just name' -> Just (name', snd $ P.declSourceAnn d)
       _ -> Nothing)
-    sdecls 
+    sdecls
 
   name :: P.Declaration -> Maybe P.Name
   name (P.TypeDeclaration d) = Just $ P.IdentName $ P.tydeclIdent d
   name decl = P.declName decl
 
   convertDecl :: IdeDeclarationAnn -> IdeDeclarationAnn
-  convertDecl (IdeDeclarationAnn ann d) = 
+  convertDecl (IdeDeclarationAnn ann d) =
     convertDeclaration'
       (annotateValue . P.IdentName)
-      (annotateValue . P.IdentName . P.Ident) 
+      (annotateValue . P.IdentName . P.Ident)
       (annotateValue . P.TyName . P.ProperName)
       (annotateValue . P.KiName . P.ProperName)
       d
