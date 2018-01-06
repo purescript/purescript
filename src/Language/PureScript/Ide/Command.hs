@@ -32,9 +32,9 @@ data Command
       , typeFilters       :: [Filter]
       , typeCurrentModule :: Maybe P.ModuleName
       }
-    | Query
-      { queryFilters :: [Filter]
-      , queryCurrentModule :: Maybe P.ModuleName
+    | Usages
+      { usagesDeclarationId :: IdeDeclarationId
+      , usagesCurrentModule :: Maybe P.ModuleName
       }
     | Complete
       { completeFilters       :: [Filter]
@@ -71,7 +71,7 @@ commandName c = case c of
   Load{} -> "Load"
   LoadSync{} -> "LoadSync"
   Type{} -> "Type"
-  Query{} -> "Query"
+  Usages{} -> "Usages"
   Complete{} -> "Complete"
   Pursuit{} -> "Pursuit"
   CaseSplit{} -> "CaseSplit"
@@ -132,11 +132,15 @@ instance FromJSON Command where
           Nothing -> pure (Load [])
           Just params ->
             Load <$> (map P.moduleNameFromString <$> params .:? "modules" .!= [])
-      "query" -> do
+      "usages" -> do
         params <- o .: "params"
-        filters <- params .:? "filters" .!= []
+        declarationId <- params .: "declarationId" >>= \obj -> do
+          IdeDeclarationId
+            <$> map P.moduleNameFromString (obj .: "module")
+            <*> obj .: "namespace"
+            <*> obj .: "identifier"
         currentModule <- params .:?  "currentModule"
-        pure (Query filters currentModule)
+        pure (Usages declarationId currentModule)
       "type" -> do
         params <- o .: "params"
         Type

@@ -9,7 +9,6 @@ import qualified Data.Map as Map
 import           Control.Lens
 import           Language.PureScript.Ide.Usages (Usage(..), collectUsages, insertUsage)
 import qualified Language.PureScript.Ide.Command as Command
-import qualified Language.PureScript.Ide.Filter as Filter
 import           Language.PureScript.Ide.Types
 import qualified Language.PureScript.Ide.Test as Test
 import qualified Language.PureScript as P
@@ -65,11 +64,7 @@ shouldFindUsage us (id, start, end) =
 
 findByIdCommand :: P.ModuleName -> IdeNamespace -> Text -> Command.Command
 findByIdCommand mn ns id =
-  Command.Query
-    [ Filter.moduleFilter [mn]
-    , Filter.namespaceFilter (pure ns)
-    , Filter.equalityFilter id
-    ] Nothing
+  Command.Usages (IdeDeclarationId mn ns id) Nothing
 
 spec :: Spec
 spec = do
@@ -116,8 +111,7 @@ spec = do
       resolved ^. ix (Test.mn "A") . ix 0 . idaAnnotation . annUsages `shouldBe` Just [ (Test.mn "C", Test.ss 1 1) ]
   describe "retrieving usages" $ do
     it "returns a simple value usage" $ do
-      ([_, Right (QueryResult [(_, [da])])], _) <- Test.inProject $
+      ([_, Right (UsagesResult usages)], _) <- Test.inProject $
         Test.runIde [Command.LoadSync [], findByIdCommand (Test.mn "RebuildSpecDep") IdeNSValue "dep"]
-      let Just usages = da ^. idaAnnotation . annUsages
       let cases = zip ["RebuildSpecWithDeps-3:24-3:27", "RebuildSpecWithDeps-5:5-5:5"] usages
       for_ cases (uncurry shouldBeUsage)

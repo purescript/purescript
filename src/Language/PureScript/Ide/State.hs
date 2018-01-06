@@ -28,6 +28,7 @@ module Language.PureScript.Ide.State
   , insertModule
   , insertExternsSTM
   , getAllModules
+  , lookupDeclarationId
   -- | Populating the caches
   , populateVolatileState
   , populateVolatileStateSync
@@ -140,6 +141,21 @@ getAllModules mmoduleName = do
 
               pure (Map.toList resolved)
         _ -> pure (Map.toList declarations)
+
+lookupDeclarationId
+  :: Ide m
+  => IdeDeclarationId
+  -> m (Maybe IdeDeclarationAnn)
+lookupDeclarationId declarationId = do
+  st <- ideStateVar <$> ask
+  liftIO $ atomically $ do
+    vState <- getVolatileStateSTM st
+    pure (find findDecl =<< Map.lookup (declarationId ^. ididModule) (vsDeclarations vState))
+  where
+     findDecl :: IdeDeclarationAnn -> Bool
+     findDecl d =
+        namespaceForDeclaration (discardAnn d) == declarationId ^. ididNamespace
+        && identifierFromIdeDeclaration (discardAnn d) == declarationId ^. ididIdentifier
 
 -- | Adds an ExternsFile into psc-ide's FileState. This does not populate the
 -- VolatileState, which needs to be done after all the necessary Externs and
@@ -276,23 +292,23 @@ resolveDocumentationForModule
     -> [IdeDeclarationAnn]
     -> [IdeDeclarationAnn]
 resolveDocumentationForModule (P.Module _ _ _ sdecls _) decls = map convertDecl decls
-  where 
+  where
   comments :: Map P.Name [P.Comment]
-  comments = Map.fromListWith (flip (<>)) $ mapMaybe (\d -> 
-    case name d of 
+  comments = Map.fromListWith (flip (<>)) $ mapMaybe (\d ->
+    case name d of
       Just name' -> Just (name', snd $ P.declSourceAnn d)
       _ -> Nothing)
-    sdecls 
+    sdecls
 
   name :: P.Declaration -> Maybe P.Name
   name (P.TypeDeclaration d) = Just $ P.IdentName $ P.tydeclIdent d
   name decl = P.declName decl
 
   convertDecl :: IdeDeclarationAnn -> IdeDeclarationAnn
-  convertDecl (IdeDeclarationAnn ann d) = 
+  convertDecl (IdeDeclarationAnn ann d) =
     convertDeclaration'
       (annotateValue . P.IdentName)
-      (annotateValue . P.IdentName . P.Ident) 
+      (annotateValue . P.IdentName . P.Ident)
       (annotateValue . P.TyName . P.ProperName)
       (annotateValue . P.KiName . P.ProperName)
       d

@@ -219,7 +219,7 @@ identifierFromDeclarationRef _ = ""
 data Success =
   CompletionResult [Completion]
   | TextResult Text
-  | QueryResult [(P.ModuleName, [IdeDeclarationAnn])]
+  | UsagesResult [(P.ModuleName, P.SourceSpan)]
   | MultilineTextResult [Text]
   | PursuitResult [PursuitResponse]
   | ImportList (P.ModuleName, [(P.ModuleName, P.ImportDeclarationType, Maybe P.ModuleName)])
@@ -233,10 +233,10 @@ encodeSuccess res =
 
 instance ToJSON Success where
   toJSON (CompletionResult cs) = encodeSuccess cs
-  toJSON (QueryResult r) =
+  toJSON (UsagesResult usages) =
     object
       [ "resultType" .= ("success" :: Text)
-      , "result" .= map (bimap P.runModuleName (map encodeDeclarationAnn)) r
+      , "result" .= usages
       ]
   toJSON (TextResult t) = encodeSuccess t
   toJSON (MultilineTextResult ts) = encodeSuccess ts
@@ -263,97 +263,6 @@ encodeImport (P.runModuleName -> mn, importType, map P.runModuleName -> qualifie
              , "importType" .= ("hiding" :: Text)
              , "identifiers" .= (identifierFromDeclarationRef <$> refs)
              ] ++ map (\x -> "qualifier" .= x) (maybeToList qualifier)
-
-encodeDeclarationAnn :: IdeDeclarationAnn -> Value
-encodeDeclarationAnn IdeDeclarationAnn{_idaAnnotation = annotation, _idaDeclaration = declaration} =
-  object
-    [ "ann" .= object
-      [ "location" .= _annLocation annotation
-      , "exportedFrom".= map P.runModuleName (_annExportedFrom annotation)
-      , "typeAnnotation" .= _annTypeAnnotation annotation
-      , "usages" .= _annUsages annotation
-      ]
-    , "declaration" .= encodeDeclaration declaration
-    ]
-
-encodeDeclaration :: IdeDeclaration -> Value
-encodeDeclaration = \case
-  IdeDeclValue value -> object
-    [ "tag" .= ("value" :: Text)
-    , "params" .= object
-      [ "identifier" .= _ideValueIdent value
-      , "type" .= _ideValueType value
-      ]
-    ]
-  IdeDeclType type' -> object
-    [ "tag" .= ("type" :: Text)
-    , "params" .= object
-      [ "name" .= P.runProperName (_ideTypeName type')
-      , "kind" .= _ideTypeKind type'
-      , "constructors" .= _ideTypeDtors type'
-      ]
-    ]
-  IdeDeclTypeSynonym synonym -> object
-    [ "tag" .= ("typesynonym" :: Text)
-    , "params" .= object
-      [ "name" .= P.runProperName (_ideSynonymName synonym)
-      , "type" .= _ideSynonymType synonym
-      , "kind" .= _ideSynonymKind synonym
-      ]
-    ]
-  IdeDeclDataConstructor constructor -> object
-    [ "tag" .= ("dataconstructor" :: Text)
-    , "params" .= object
-      [ "name" .= P.runProperName (_ideDtorName constructor)
-      -- TODO(Christoph): Maybe there is a better name than typeName here
-      , "typeName" .= _ideDtorTypeName constructor
-      , "type" .= _ideDtorType constructor
-      ]
-    ]
-  IdeDeclTypeClass typeclass -> object
-    [ "tag" .= ("typeclass" :: Text)
-    , "params" .= object
-      [ "name" .= P.runProperName (_ideTCName typeclass)
-      , "kind" .= _ideTCKind typeclass
-      , "instances" .= map encodeIdeInstance (_ideTCInstances typeclass)
-      ]
-    ]
-  IdeDeclValueOperator operator -> object
-    [ "tag" .= ("valueoperator" :: Text)
-    , "params" .= object
-      [ "name" .= P.runOpName (_ideValueOpName operator)
-      , "alias" .= _ideValueOpAlias operator
-      , "precedence" .= _ideValueOpPrecedence operator
-      , "associativity" .= _ideValueOpAssociativity operator
-      , "type" .= _ideValueOpType operator
-      ]
-    ]
-  IdeDeclTypeOperator operator -> object
-    [ "tag" .= ("typeoperator" :: Text)
-    , "params" .= object
-      [ "name" .= P.runOpName (_ideTypeOpName operator)
-      , "alias" .= _ideTypeOpAlias operator
-      , "precedence" .= _ideTypeOpPrecedence operator
-      , "associativity" .= _ideTypeOpAssociativity operator
-      , "kind" .= _ideTypeOpKind operator
-      ]
-    ]
-  IdeDeclKind kind -> object
-    [ "tag" .= ("kind" :: Text)
-    , "params" .= object
-      [ "name" .= P.runProperName kind ]
-    ]
-
-encodeIdeInstance :: IdeInstance -> Value
-encodeIdeInstance IdeInstance{..} = object
-  [ "tag" .= ("instance" :: Text)
-  , "params" .= object
-    [ "module" .= P.runModuleName _ideInstanceModule
-    , "name" .= P.runIdent _ideInstanceName
-    , "types" .= _ideInstanceTypes
-    , "constraints" .= _ideInstanceConstraints
-    ]
-  ]
 
 newtype PursuitQuery = PursuitQuery Text
                      deriving (Show, Eq)
