@@ -236,7 +236,7 @@ instance ToJSON Success where
   toJSON (UsagesResult usages) =
     object
       [ "resultType" .= ("success" :: Text)
-      , "result" .= usages
+      , "result" .= map (first P.runModuleName) usages
       ]
   toJSON (TextResult t) = encodeSuccess t
   toJSON (MultilineTextResult ts) = encodeSuccess ts
