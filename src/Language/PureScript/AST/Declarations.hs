@@ -489,7 +489,7 @@ data Declaration
   | ValueDeclaration {-# UNPACK #-} !(ValueDeclarationData [GuardedExpr])
   -- |
   -- A declaration paired with pattern matching in let-in expression (binder, optional guard, value)
-  | BoundValueDeclaration SourceAnn Binder Expr
+  | BoundValueDeclaration SourceAnn Binder [GuardedExpr]
   -- |
   -- A minimal mutually recursive set of value declarations
   --

@@ -335,6 +335,13 @@ desugarCases = desugarRest <=< fmap join . flip parU toDecls . groupBy inSameGro
       where
       go (Let ds val') = Let <$> desugarCases ds <*> pure val'
       go other = return other
+    desugarRest (BoundValueDeclaration sa b result : rest) =
+      let (_, f, _) = everywhereOnValuesTopDownM return go return
+          f' = mapM (\(GuardedExpr gs e) -> GuardedExpr gs <$> f e)
+      in (:) <$> (BoundValueDeclaration sa b <$> f' result) <*> desugarRest rest
+      where
+      go (Let ds val') = Let <$> desugarCases ds <*> pure val'
+      go other = return other
     desugarRest (d : ds) = (:) d <$> desugarRest ds
     desugarRest [] = pure []
 

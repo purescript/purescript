@@ -104,7 +104,12 @@ parseLocalValueDeclaration = withSourceAnnF .
   go (VarBinder ident) bs = parseValueWithIdentAndBinders ident bs
   go (PositionedBinder _ _ b) bs = go b bs
   go binder [] = do
-    boot <- indented *> equals *> parseValueWithWhereClause
+    boot <- indented *> (
+      (\v -> [MkUnguarded v]) <$> (equals *> withSourceSpan PositionedValue parseValueWithWhereClause) <|>
+        P.many1 (GuardedExpr <$> parseGuard
+                             <*> (indented *> equals
+                                           *> withSourceSpan PositionedValue parseValueWithWhereClause))
+      )
     return $ \sa -> BoundValueDeclaration sa binder boot
   go _ _ = P.unexpected "patterns in local value declaration"
 

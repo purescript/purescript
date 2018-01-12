@@ -55,7 +55,7 @@ everywhereOnValues f g h = (f', g', h')
   f' (DataBindingGroupDeclaration ds) = f (DataBindingGroupDeclaration (fmap f' ds))
   f' (ValueDecl sa name nameKind bs val) =
      f (ValueDecl sa name nameKind (fmap h' bs) (fmap (mapGuardedExpr handleGuard g') val))
-  f' (BoundValueDeclaration sa b expr) = f (BoundValueDeclaration sa (h' b) (g' expr))
+  f' (BoundValueDeclaration sa b expr) = f (BoundValueDeclaration sa (h' b) (fmap (mapGuardedExpr handleGuard g') expr))
   f' (BindingGroupDeclaration ds) = f (BindingGroupDeclaration (fmap (\(name, nameKind, val) -> (name, nameKind, g' val)) ds))
   f' (TypeClassDeclaration sa name args implies deps ds) = f (TypeClassDeclaration sa name args implies deps (fmap f' ds))
   f' (TypeInstanceDeclaration sa ch idx name cs className args ds) = f (TypeInstanceDeclaration sa ch idx name cs className args (mapTypeInstanceBody (fmap f') ds))
@@ -132,7 +132,7 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   f' (BindingGroupDeclaration ds) = BindingGroupDeclaration <$> traverse (\(name, nameKind, val) -> (,,) name nameKind <$> (g val >>= g')) ds
   f' (TypeClassDeclaration sa name args implies deps ds) = TypeClassDeclaration sa name args implies deps <$> traverse (f' <=< f) ds
   f' (TypeInstanceDeclaration sa ch idx name cs className args ds) = TypeInstanceDeclaration sa ch idx name cs className args <$> traverseTypeInstanceBody (traverse (f' <=< f)) ds
-  f' (BoundValueDeclaration sa b expr) = BoundValueDeclaration sa <$> h' b <*> g' expr
+  f' (BoundValueDeclaration sa b expr) = BoundValueDeclaration sa <$> h' b <*> traverse (guardedExprM handleGuard (g' <=< g)) expr
   f' other = f other
 
   g' :: Expr -> m Expr
@@ -199,7 +199,7 @@ everywhereOnValuesM f g h = (f', g', h')
   f' (ValueDecl sa name nameKind bs val) =
     ValueDecl sa name nameKind <$> traverse h' bs <*> traverse (guardedExprM handleGuard g') val >>= f
   f' (BindingGroupDeclaration ds) = (BindingGroupDeclaration <$> traverse (\(name, nameKind, val) -> (,,) name nameKind <$> g' val) ds) >>= f
-  f' (BoundValueDeclaration sa b expr) = (BoundValueDeclaration sa <$> h' b <*> g' expr) >>= f
+  f' (BoundValueDeclaration sa b expr) = (BoundValueDeclaration sa <$> h' b <*> traverse (guardedExprM handleGuard g') expr) >>= f
   f' (TypeClassDeclaration sa name args implies deps ds) = (TypeClassDeclaration sa name args implies deps <$> traverse f' ds) >>= f
   f' (TypeInstanceDeclaration sa ch idx name cs className args ds) = (TypeInstanceDeclaration sa ch idx name cs className args <$> traverseTypeInstanceBody (traverse f') ds) >>= f
   f' other = f other
@@ -273,7 +273,7 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   f' d@(BindingGroupDeclaration ds) = foldl (<>) (f d) (fmap (\(_, _, val) -> g' val) ds)
   f' d@(TypeClassDeclaration _ _ _ _ _ ds) = foldl (<>) (f d) (fmap f' ds)
   f' d@(TypeInstanceDeclaration _ _ _ _ _ _ _ (ExplicitInstance ds)) = foldl (<>) (f d) (fmap f' ds)
-  f' d@(BoundValueDeclaration _ b expr) = f d <> h' b <> g' expr
+  f' d@(BoundValueDeclaration _ b expr) = f d <> foldl (<>) (h' b) (concatMap (\(GuardedExpr grd v) -> fmap k' grd ++ [g' v]) expr)
   f' d = f d
 
   g' :: Expr -> r
