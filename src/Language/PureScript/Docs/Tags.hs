@@ -1,5 +1,6 @@
 module Language.PureScript.Docs.Tags
-  ( dumpCtags
+  ( tags
+  , dumpCtags
   , dumpEtags
   ) where
 
