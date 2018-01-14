@@ -1,12 +1,12 @@
 module Command.Docs.Etags (dumpEtags) where
 
 import           Command.Docs.Tags
-import qualified Language.PureScript as P
+import           Language.PureScript.Docs.Types (Module)
 
-dumpEtags :: [(String, P.Module)] -> [String]
+dumpEtags :: [(String, Module)] -> [String]
 dumpEtags = concatMap renderModEtags
 
-renderModEtags :: (String, P.Module) -> [String]
+renderModEtags :: (String, Module) -> [String]
 renderModEtags (path, mdl) = ["\x0c", path ++ "," ++ show tagsLen] ++ tagLines
   where tagsLen = sum $ map length tagLines
         tagLines = map tagLine $ tags mdl

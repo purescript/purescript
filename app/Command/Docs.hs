@@ -2,8 +2,6 @@
 
 module Command.Docs (command, infoModList) where
 
-import           Protolude (ordNub)
-
 import           Command.Docs.Etags
 import           Command.Docs.Ctags
 import           Command.Docs.Html
@@ -12,12 +10,10 @@ import           Control.Arrow (first, second)
 import           Control.Category ((>>>))
 import           Control.Monad.Writer
 import           Control.Monad.Trans.Except (runExceptT)
-import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Data.Function (on)
 import           Data.List
-import           Data.Maybe (fromMaybe)
 import           Data.Tuple (swap)
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Docs as D
@@ -28,8 +24,8 @@ import           System.Directory (createDirectoryIfMissing)
 import           System.Exit (exitFailure)
 import           System.FilePath (takeDirectory)
 import           System.FilePath.Glob (glob)
-import           System.IO (hPutStrLn, hPrint, stderr)
-import           System.IO.UTF8 (readUTF8FileT, writeUTF8FileT)
+import           System.IO (hPutStrLn, stderr)
+import           System.IO.UTF8 (writeUTF8FileT)
 
 -- | Available output formats
 data Format
@@ -60,19 +56,17 @@ docgen (PSCDocsOptions fmt inputGlob output) = do
     hPutStrLn stderr "purs docs: no input files."
     exitFailure
 
+  ms <- parseAndConvert input
   case fmt of
-    Etags -> dumpTags input dumpEtags
-    Ctags -> dumpTags input dumpCtags
+    Etags -> mapM_ putStrLn $ dumpEtags $ zip input ms
+    Ctags -> mapM_ putStrLn $ dumpCtags $ zip input ms
     Html -> do
       let outputDir = "./generated-docs" -- TODO: make this configurable
-      ms <- parseAndConvert input
       let msHtml = map asHtml (D.primDocsModule : ms)
       createDirectoryIfMissing False outputDir
       writeHtmlModules outputDir msHtml
 
-    Markdown -> do
-      ms <- parseAndConvert input
-
+    Markdown ->
       case output of
         EverythingToStdOut ->
           T.putStrLn (D.runDocs (D.modulesAsMarkdown ms))
@@ -138,26 +132,6 @@ takeModulesByName' getModuleName modules = foldl go ([], [])
     case find ((== name) . getModuleName) modules of
       Just m  -> ((m, x) : ms, missing)
       Nothing -> (ms, name : missing)
-
-dumpTags :: [FilePath] -> ([(String, P.Module)] -> [String]) -> IO ()
-dumpTags input renderTags = do
-  e <- P.parseModulesFromFiles (fromMaybe "") <$> mapM (fmap (first Just) . parseFile) (ordNub input)
-  case e of
-    Left err -> do
-      hPrint stderr err
-      exitFailure
-    Right ms ->
-      ldump (renderTags (pairs ms))
-
-  where
-  pairs :: [(Maybe String, m)] -> [(String, m)]
-  pairs = map (first (fromMaybe ""))
-
-  ldump :: [String] -> IO ()
-  ldump = mapM_ putStrLn
-
-parseFile :: FilePath -> IO (FilePath, Text)
-parseFile input = (,) input <$> readUTF8FileT input
 
 inputFile :: Opts.Parser FilePath
 inputFile = Opts.strArgument $
