@@ -20,6 +20,7 @@
 module Language.PureScript.Ide.State
   ( getLoadedModulenames
   , getExternFiles
+  , getFileState
   , resetIdeState
   , cacheRebuild
   , cachedRebuild
@@ -114,12 +115,12 @@ setVolatileStateSTM ref vs = do
 -- | Checks if the given ModuleName matches the last rebuild cache and if it
 -- does returns all loaded definitions + the definitions inside the rebuild
 -- cache
-getAllModules :: Ide m => Maybe P.ModuleName -> m [(P.ModuleName, [IdeDeclarationAnn])]
+getAllModules :: Ide m => Maybe P.ModuleName -> m (ModuleMap [IdeDeclarationAnn])
 getAllModules mmoduleName = do
   declarations <- vsDeclarations <$> getVolatileState
   rebuild <- cachedRebuild
   case mmoduleName of
-    Nothing -> pure (Map.toList declarations)
+    Nothing -> pure declarations
     Just moduleName ->
       case rebuild of
         Just (cachedModulename, ef)
@@ -135,8 +136,8 @@ getAllModules mmoduleName = do
                 resolved =
                   Map.adjust (resolveOperatorsForModule tmp) moduleName tmp
 
-              pure (Map.toList resolved)
-        _ -> pure (Map.toList declarations)
+              pure resolved
+        _ -> pure declarations
 
 -- | Adds an ExternsFile into psc-ide's FileState. This does not populate the
 -- VolatileState, which needs to be done after all the necessary Externs and
