@@ -1,7 +1,13 @@
-module Language.PureScript.Ide.Usage where
+module Language.PureScript.Ide.Usage
+  ( findReexportingModules
+  , directDependants
+  , eligibleModules
+  , applySearch
+  ) where
 
 import Protolude hiding (moduleName)
 
+import Control.Lens (preview)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Language.PureScript.Ide.Types
@@ -18,8 +24,7 @@ imports build a specification for how the identifier can be found in the
 module.
 -}
 
--- | (Qualifier, Namespace, Identifier)
-type Search = (Maybe P.ModuleName, IdeNamespace, Text)
+type Search = P.Qualified IdeDeclaration
 
 findReexportingModules
   :: (P.ModuleName, IdeDeclaration)
@@ -45,15 +50,13 @@ directDependants declaration modules mn = Map.mapMaybe (nonEmpty . go) modules
     go = foldMap isImporting . P.getModuleDeclarations
 
     isImporting d = case d of
-      P.ImportDeclaration _ mn' it qual | mn == mn' -> case it of
-        P.Implicit -> pure (qual, namespaceForDeclaration declaration, identifierFromIdeDeclaration declaration)
+      P.ImportDeclaration _ mn' it qual | mn == mn' -> P.Qualified qual <$> case it of
+        P.Implicit -> pure declaration
         P.Explicit refs
-          | any (declaration `matchesRef`) refs ->
-              pure (qual, namespaceForDeclaration declaration, identifierFromIdeDeclaration declaration)
+          | any (declaration `matchesRef`) refs -> pure declaration
         P.Explicit _ -> []
         P.Hiding refs
-          | not (any (declaration `matchesRef`) refs) ->
-              pure (qual, namespaceForDeclaration declaration, identifierFromIdeDeclaration declaration)
+          | not (any (declaration `matchesRef`) refs) -> pure declaration
         P.Hiding _ -> []
       _ -> []
 
@@ -98,30 +101,28 @@ eligibleModules
   -> ModuleMap [IdeDeclarationAnn]
   -> ModuleMap P.Module
   -> ModuleMap (NonEmpty Search)
-eligibleModules query decls modules =
-  let searchDefiningModule = (Nothing, namespaceForDeclaration (snd query), identifierFromIdeDeclaration (snd query)) :| []
-  in Map.insert (fst query) searchDefiningModule $
-    foldMap (directDependants (snd query) modules) (fst query :| findReexportingModules query decls)
+eligibleModules query@(moduleName, declaration) decls modules =
+  let
+    searchDefiningModule = P.Qualified Nothing declaration :| []
+  in
+    Map.insert moduleName searchDefiningModule $
+      foldMap (directDependants declaration modules) (moduleName :| findReexportingModules query decls)
 
-applySearch :: P.Module -> Search ->  [P.SourceSpan]
-applySearch module_ (qual, ns, ident) =
+applySearch :: P.Module -> Search -> [P.SourceSpan]
+applySearch module_ search =
   let
     decls = P.getModuleDeclarations module_
-    (extr, _, _, _, _) = P.everythingWithScope
-      mempty
-      go
-      mempty
-      mempty
-      mempty
+    (extr, _, _, _, _) = P.everythingWithScope mempty go mempty mempty mempty
 
     go scope expr = case expr of
       P.PositionedValue sp _ (P.Var i)
-        | ns == IdeNSValue && (isJust qual || not (P.Ident ident `Set.member` scope)) ->
-          [sp | map P.runIdent (P.disqualifyFor qual i) == Just ident]
+        | Just ideValue <- preview _IdeDeclValue (P.disqualify search)
+        , P.isQualified search || not (_ideValueIdent ideValue `Set.member` scope) ->
+          [sp | map P.runIdent i == map identifierFromIdeDeclaration search]
 
       P.PositionedValue sp _ (P.Constructor name)
-        | ns == IdeNSValue ->
-          [sp | map P.runProperName (P.disqualifyFor qual name) == Just ident]
+        | Just ideDtor <- traverse (preview _IdeDeclDataConstructor) search ->
+          [sp | name == map _ideDtorName ideDtor]
       _ -> []
   in
     foldMap (extr mempty) decls
