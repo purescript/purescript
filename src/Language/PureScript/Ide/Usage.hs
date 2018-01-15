@@ -3,6 +3,7 @@ module Language.PureScript.Ide.Usage where
 import Protolude hiding (moduleName)
 
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 import Language.PureScript.Ide.Types
 import Language.PureScript.Ide.Util
 
@@ -98,5 +99,29 @@ eligibleModules
   -> ModuleMap P.Module
   -> ModuleMap (NonEmpty Search)
 eligibleModules query decls modules =
-  -- TODO: insert search for defining module
-  foldMap (directDependants (snd query) modules) (fst query :| findReexportingModules query decls)
+  let searchDefiningModule = (Nothing, namespaceForDeclaration (snd query), identifierFromIdeDeclaration (snd query)) :| []
+  in Map.insert (fst query) searchDefiningModule $
+    foldMap (directDependants (snd query) modules) (fst query :| findReexportingModules query decls)
+
+applySearch :: P.Module -> Search ->  [P.SourceSpan]
+applySearch module_ (qual, ns, ident) =
+  let
+    decls = P.getModuleDeclarations module_
+    (extr, _, _, _, _) = P.everythingWithScope
+      mempty
+      go
+      mempty
+      mempty
+      mempty
+
+    go scope expr = case expr of
+      P.PositionedValue sp _ (P.Var i)
+        | ns == IdeNSValue && (isJust qual || not (P.Ident ident `Set.member` scope)) ->
+          [sp | map P.runIdent (P.disqualifyFor qual i) == Just ident]
+
+      P.PositionedValue sp _ (P.Constructor name)
+        | ns == IdeNSValue ->
+          [sp | map P.runProperName (P.disqualifyFor qual name) == Just ident]
+      _ -> []
+  in
+    foldMap (extr mempty) decls

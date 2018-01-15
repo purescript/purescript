@@ -17,8 +17,6 @@ import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Usage
 import           Protolude
 import           System.Directory
-import           System.FilePath
-import           System.Process
 
 import qualified Language.PureScript             as P
 
@@ -30,6 +28,7 @@ pgConfig =
     , confGlobs = ["src/**/*.purs", ".psc-package/psc-0.11.7/*/*/src/**/*.purs"]
     , confEditorMode = False
     }
+
 runIDE
   :: Maybe IdeState
   -> ExceptT IdeError (ReaderT IdeEnvironment (NoLoggingT IO)) a
@@ -46,4 +45,8 @@ play = map fst $ runIDE Nothing $ do
   _ <- handleCommand (LoadSync [])
   ms <- getAllModules Nothing
   asts <- Map.map fst . fsModules <$> getFileState
-  pure $ eligibleModules (Test.mn "Node.Encoding", _idaDeclaration $ Test.ideDtor "UTF8" "Encoding" Nothing) ms asts
+  -- let elig = eligibleModules (Test.mn "Node.Encoding", _idaDeclaration $ Test.ideDtor "UTF8" "Encoding" Nothing) ms asts
+  let elig = eligibleModules (Test.mn "Data.Function", _idaDeclaration $ Test.ideValue "const" Nothing) ms asts
+  pure $ Map.mapWithKey (\mn searches ->
+                  foldMap (\m ->
+                             foldMap (applySearch m) searches) (Map.lookup mn asts)) elig
