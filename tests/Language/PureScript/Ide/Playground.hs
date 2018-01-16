@@ -45,8 +45,9 @@ play = map fst $ runIDE Nothing $ do
   _ <- handleCommand (LoadSync [])
   ms <- getAllModules Nothing
   asts <- Map.map fst . fsModules <$> getFileState
+  let elig = eligibleModules (Test.mn "Data.Functor", _idaDeclaration $ Test.ideValueOp "<#>" (P.Qualified Nothing (Left "map")) 0 Nothing Nothing) ms asts
   -- let elig = eligibleModules (Test.mn "Node.Encoding", _idaDeclaration $ Test.ideDtor "UTF8" "Encoding" Nothing) ms asts
-  let elig = eligibleModules (Test.mn "Data.Function", _idaDeclaration $ Test.ideValue "const" Nothing) ms asts
-  pure $ Map.mapWithKey (\mn searches ->
+  -- let elig = eligibleModules (Test.mn "Data.Function", _idaDeclaration $ Test.ideValue "const" Nothing) ms asts
+  pure $ Map.filter (not . null) $ Map.mapWithKey (\mn searches ->
                   foldMap (\m ->
                              foldMap (applySearch m) searches) (Map.lookup mn asts)) elig
