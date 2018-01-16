@@ -3,6 +3,7 @@ module Language.PureScript.Ide.Usage
   , directDependants
   , eligibleModules
   , applySearch
+  , findUsages
   ) where
 
 import Protolude hiding (moduleName)
@@ -11,6 +12,7 @@ import Control.Lens (preview)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Language.PureScript.Ide.Types
+import Language.PureScript.Ide.State (getAllModules, getFileState)
 import Language.PureScript.Ide.Util
 
 import qualified Language.PureScript as P
@@ -112,9 +114,9 @@ applySearch :: P.Module -> Search -> [P.SourceSpan]
 applySearch module_ search =
   let
     decls = P.getModuleDeclarations module_
-    (extr, _, _, _, _) = P.everythingWithScope mempty go mempty mempty mempty
+    (extr, _, _, _, _) = P.everythingWithScope mempty goExpr goBinder mempty mempty
 
-    go scope expr = case expr of
+    goExpr scope expr = case expr of
       P.PositionedValue sp _ (P.Var i)
         | Just ideValue <- preview _IdeDeclValue (P.disqualify search)
         , P.isQualified search || not (_ideValueIdent ideValue `Set.member` scope) ->
@@ -123,6 +125,32 @@ applySearch module_ search =
       P.PositionedValue sp _ (P.Constructor name)
         | Just ideDtor <- traverse (preview _IdeDeclDataConstructor) search ->
           [sp | name == map _ideDtorName ideDtor]
+      P.PositionedValue sp _ (P.Op opName)
+        | Just ideOp <- traverse (preview _IdeDeclValueOperator) search ->
+          [sp | opName == map _ideValueOpName ideOp]
+      _ -> []
+
+    goBinder _ binder = case binder of
+      P.PositionedBinder sp _ (P.ConstructorBinder ctorName _)
+        | Just ideDtor <- traverse (preview _IdeDeclDataConstructor) search ->
+          [sp | ctorName == map _ideDtorName ideDtor]
+      P.PositionedBinder sp _ (P.OpBinder opName)
+        | Just op <- traverse (preview _IdeDeclValueOperator) search ->
+          [sp | opName == map _ideValueOpName op]
       _ -> []
   in
     foldMap (extr mempty) decls
+
+findUsages
+  :: (MonadIO m, Ide m)
+  => IdeDeclaration
+  -> P.ModuleName
+  -> m (ModuleMap [P.SourceSpan])
+findUsages declaration moduleName = do
+  ms <- getAllModules Nothing
+  asts <- Map.map fst . fsModules <$> getFileState
+  let elig = eligibleModules (moduleName, declaration) ms asts
+  pure
+    $ Map.filter (not . null)
+    $ Map.mapWithKey (\mn searches ->
+        foldMap (\m -> foldMap (applySearch m) searches) (Map.lookup mn asts)) elig
