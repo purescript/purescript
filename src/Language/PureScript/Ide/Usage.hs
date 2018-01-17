@@ -137,6 +137,9 @@ applySearch module_ search =
       P.PositionedBinder sp _ (P.OpBinder opName)
         | Just op <- traverse (preview _IdeDeclValueOperator) search ->
           [sp | opName == map _ideValueOpName op]
+      P.PositionedBinder sp _ (P.BinaryNoParensBinder (P.OpBinder opName) _ _)
+        | Just op <- traverse (preview _IdeDeclValueOperator) search ->
+          [sp | opName == map _ideValueOpName op]
       _ -> []
   in
     foldMap (extr mempty) decls

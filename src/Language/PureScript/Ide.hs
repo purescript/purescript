@@ -81,9 +81,12 @@ handleCommand c = case c of
     Map.lookup moduleName <$> getAllModules Nothing >>= \case
       Nothing -> throwError (GeneralError "Module not found")
       Just decls -> do
-        case find (\d -> namespaceForDeclaration d == namespace && identifierFromIdeDeclaration d == ident) (map discardAnn decls) of
+        case find (\d -> namespaceForDeclaration (discardAnn d) == namespace
+                    && identifierFromIdeDeclaration (discardAnn d) == ident) decls of
           Nothing -> throwError (GeneralError "Declaration not found")
-          Just declaration -> UsagesResult . fold <$> findUsages declaration moduleName
+          Just declaration -> do
+            let sourceModule = fromMaybe moduleName (declaration & _idaAnnotation & _annExportedFrom)
+            UsagesResult . fold <$> findUsages (discardAnn declaration) sourceModule
   Import fp outfp _ (AddImplicitImport mn) -> do
     rs <- addImplicitImport fp mn
     answerRequest outfp rs
