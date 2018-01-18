@@ -18,13 +18,27 @@ import Language.PureScript.Ide.Util
 import qualified Language.PureScript as P
 
 
-{-
-How we find usages, given an IdeDeclaration:
-1. Find all modules that reexport the given declaration
-2. Find all modules that import from those modules, and while traversing the
-imports build a specification for how the identifier can be found in the
-module.
--}
+-- |
+-- How we find usages, given an IdeDeclaration and the module it was defined in:
+--
+-- 1. Find all modules that reexport the given declaration
+-- 2. Find all modules that import from those modules, and while traversing the
+-- imports build a specification for how the identifier can be found in the
+-- module.
+-- 3. Apply the collected search specifications and collect the results
+findUsages
+  :: (MonadIO m, Ide m)
+  => IdeDeclaration
+  -> P.ModuleName
+  -> m (ModuleMap [P.SourceSpan])
+findUsages declaration moduleName = do
+  ms <- getAllModules Nothing
+  asts <- Map.map fst . fsModules <$> getFileState
+  let elig = eligibleModules (moduleName, declaration) ms asts
+  pure
+    $ Map.filter (not . null)
+    $ Map.mapWithKey (\mn searches ->
+        foldMap (\m -> foldMap (applySearch m) searches) (Map.lookup mn asts)) elig
 
 type Search = P.Qualified IdeDeclaration
 
@@ -144,16 +158,3 @@ applySearch module_ search =
   in
     foldMap (extr mempty) decls
 
-findUsages
-  :: (MonadIO m, Ide m)
-  => IdeDeclaration
-  -> P.ModuleName
-  -> m (ModuleMap [P.SourceSpan])
-findUsages declaration moduleName = do
-  ms <- getAllModules Nothing
-  asts <- Map.map fst . fsModules <$> getFileState
-  let elig = eligibleModules (moduleName, declaration) ms asts
-  pure
-    $ Map.filter (not . null)
-    $ Map.mapWithKey (\mn searches ->
-        foldMap (\m -> foldMap (applySearch m) searches) (Map.lookup mn asts)) elig
