@@ -10,7 +10,15 @@ otherwise behaves the same, accepting a line of JSON on stdin and exiting after
 giving a result on stdout.
 
 The result needs to be unwrapped from the "wrapper" which separates success
-from failure. This wrapper is described at the end of this document.
+from failure:
+
+```json
+{
+  "resultType": "success|error",
+  "result": Result|Error
+}
+```
+
 
 ## Command:
 ### Load
@@ -179,6 +187,40 @@ The following format is returned as the Result:
 ]
 ```
 You should then be able to replace the affected line of code in the editor with the new suggestions.
+
+### Usages
+
+The Usages command accepts a triplet of modulename, namespace, and identifier,
+which uniquely identify a declaration and returns all usages of that identifier
+in all loaded files. Note that we use the parsed source files, so you need to
+pass source globs at startup to use this command.
+
+```json
+{
+ "command": "usages",
+ "params": {
+  "module": "Data.Array",
+  "namespace": "value|type|kind",
+  "identifier": "filter"
+ }
+}
+```
+
+**Result:**
+
+The following format is returned as the Result:
+
+```json
+[ { "name": "/path/to/file"
+  , "start": [1, 3]
+  , "end": [3, 1]
+  }
+, { "name": "/path/to/file"
+  , "start": [5, 6]
+  , "end": [5, 8]
+  }
+]
+```
 
 ### Import
 
@@ -665,17 +707,6 @@ the edit distance in between the search and the loaded identifiers.
     "search": "dilterM",
     "maximumDistance": 3
   }
-}
-```
-
-## Responses
-
-All Responses are wrapped in the following format:
-
-```json
-{
-  "resultType": "success|error",
-  "result": Result|Error
 }
 ```
 

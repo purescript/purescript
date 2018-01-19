@@ -6,17 +6,15 @@ module Language.PureScript.Ide.Usage
   , findUsages
   ) where
 
-import Protolude hiding (moduleName)
+import           Protolude hiding (moduleName)
 
-import Control.Lens (preview)
+import           Control.Lens (preview)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
-import Language.PureScript.Ide.Types
-import Language.PureScript.Ide.State (getAllModules, getFileState)
-import Language.PureScript.Ide.Util
-
 import qualified Language.PureScript as P
-
+import           Language.PureScript.Ide.State (getAllModules, getFileState)
+import           Language.PureScript.Ide.Types
+import           Language.PureScript.Ide.Util
 
 -- |
 -- How we find usages, given an IdeDeclaration and the module it was defined in:
@@ -40,6 +38,9 @@ findUsages declaration moduleName = do
     $ Map.mapWithKey (\mn searches ->
         foldMap (\m -> foldMap (applySearch m) searches) (Map.lookup mn asts)) elig
 
+-- | A declaration can either be imported qualified, or unqualified. All the
+-- information we need to find usages through a Traversal is thus captured in
+-- the `Search` type.
 type Search = P.Qualified IdeDeclaration
 
 findReexportingModules
@@ -124,8 +125,12 @@ eligibleModules query@(moduleName, declaration) decls modules =
     Map.insert moduleName searchDefiningModule $
       foldMap (directDependants declaration modules) (moduleName :| findReexportingModules query decls)
 
+-- | Finds all usages for a given `Search` throughout a module
 applySearch :: P.Module -> Search -> [P.SourceSpan]
 applySearch module_ search =
+  -- TODO(Christoph): Figure out how to find usages inside the defining module.
+  -- The Traversal adds declarations for the current module into `scope` so we
+  -- can't tell shadowed variable from actual usage.
   let
     decls = P.getModuleDeclarations module_
     (extr, _, _, _, _) = P.everythingWithScope mempty goExpr goBinder mempty mempty
