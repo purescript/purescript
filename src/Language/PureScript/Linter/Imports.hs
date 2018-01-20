@@ -13,7 +13,7 @@ import Control.Monad.Writer.Class
 import Data.Function (on)
 import Data.Foldable (for_)
 import Data.List (find, intersect, groupBy, sortBy, (\\))
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, maybeToList)
 import Data.Monoid (Sum(..))
 import Data.Traversable (forM)
 import qualified Data.Text as T
@@ -233,7 +233,7 @@ lintImportDecl env mni qualifierName names ss declType allowImplicit =
   checkExplicit declrefs = do
     let idents = ordNub (mapMaybe runDeclRef declrefs)
         dctors = mapMaybe (getDctorName <=< disqualifyFor qualifierName) names
-        usedNames = mapMaybe (matchName (typeForDCtor mni) <=< disqualifyFor qualifierName) names
+        usedNames = matchName (typeForDCtor mni) =<< mapMaybe (disqualifyFor qualifierName) names
         diff = idents \\ usedNames
 
     didWarn <- case (length diff, length idents) of
@@ -345,10 +345,11 @@ findUsedRefs ss env mni qn names =
 matchName
   :: (ProperName 'ConstructorName -> Maybe (ProperName 'TypeName))
   -> Name
-  -> Maybe Name
-matchName lookupDc (DctorName x) = TyName <$> lookupDc x
-matchName _ ModName{} = Nothing
-matchName _ name = Just name
+  -> [Name]
+matchName lookupDc (DctorName x) = maybeToList $ TyName <$> lookupDc x
+matchName _ (TyClassName pn) = [TyName (coerceProperName pn), TyClassName pn]
+matchName _ ModName{} = []
+matchName _ name = [name]
 
 runDeclRef :: DeclarationRef -> Maybe Name
 runDeclRef (ValueRef _ ident) = Just $ IdentName ident
