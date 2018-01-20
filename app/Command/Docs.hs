@@ -2,8 +2,6 @@
 
 module Command.Docs (command, infoModList) where
 
-import           Command.Docs.Etags
-import           Command.Docs.Ctags
 import           Command.Docs.Html
 import           Control.Applicative
 import           Control.Arrow (first, second)
@@ -18,6 +16,7 @@ import           Data.Tuple (swap)
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Docs as D
 import qualified Language.PureScript.Docs.AsMarkdown as D
+import           Language.PureScript.Docs.Tags (dumpCtags, dumpEtags)
 import qualified Options.Applicative as Opts
 import qualified Text.PrettyPrint.ANSI.Leijen as PP
 import           System.Directory (createDirectoryIfMissing)

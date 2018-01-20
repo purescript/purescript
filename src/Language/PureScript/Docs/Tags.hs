@@ -1,6 +1,12 @@
-module Command.Docs.Tags where
+module Language.PureScript.Docs.Tags
+  ( dumpCtags
+  , dumpEtags
+  ) where
+
+import Prelude
 
 import           Control.Arrow (first)
+import           Data.List (sort)
 import           Data.Maybe (mapMaybe)
 import qualified Data.Text as T
 import Language.PureScript.AST (SourceSpan, sourcePosLine, spanStart)
@@ -21,3 +27,20 @@ tags = map (first T.unpack) . concatMap dtags . modDeclarations
 
     pos :: SourceSpan -> Int
     pos = sourcePosLine . spanStart
+
+dumpEtags :: [(String, Module)] -> [String]
+dumpEtags = concatMap renderModEtags
+
+renderModEtags :: (String, Module) -> [String]
+renderModEtags (path, mdl) = ["\x0c", path ++ "," ++ show tagsLen] ++ tagLines
+  where tagsLen = sum $ map length tagLines
+        tagLines = map tagLine $ tags mdl
+        tagLine (name, line) = "\x7f" ++ name ++ "\x01" ++ show line ++ ","
+
+dumpCtags :: [(String, Module)] -> [String]
+dumpCtags = sort . concatMap renderModCtags
+
+renderModCtags :: (String, Module) -> [String]
+renderModCtags (path, mdl) = sort tagLines
+  where tagLines = map tagLine $ tags mdl
+        tagLine (name, line) = name ++ "\t" ++ path ++ "\t" ++ show line
