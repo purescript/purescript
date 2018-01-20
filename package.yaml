@@ -23,9 +23,9 @@ extra-source-files:
   - tests/support/*.json
   - tests/support/setup-win.cmd
   - tests/support/psci/*.purs
-  - tests/support/pscide/src/*.purs
-  - tests/support/pscide/src/*.js
-  - tests/support/pscide/src/*.fail
+  - tests/support/pscide/src/**/*.purs
+  - tests/support/pscide/src/**/*.js
+  - tests/support/pscide/src/**/*.fail
   - stack.yaml
   - README.md
   - INSTALL.md
