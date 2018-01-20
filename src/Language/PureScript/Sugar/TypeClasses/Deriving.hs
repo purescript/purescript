@@ -135,6 +135,13 @@ deriveInstance mn syns _ ds (TypeInstanceDeclaration sa@(ss, _) ch idx nm deps c
            -> TypeInstanceDeclaration sa ch idx nm deps className tys . ExplicitInstance <$> deriveOrd ss mn syns ds tyCon
            | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty
       _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 1
+  | className == Qualified (Just dataOrd) (ProperName "Ord1")
+  = case tys of
+      [ty] | Just (Qualified mn' _, _) <- unwrapTypeConstructor ty
+           , mn == fromMaybe mn mn'
+           -> TypeInstanceDeclaration sa ch idx nm deps className tys . ExplicitInstance <$> deriveOrd1 ss
+           | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty
+      _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 1
   | className == Qualified (Just dataFunctor) (ProperName "Functor")
   = case tys of
       [ty] | Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
@@ -581,6 +588,17 @@ deriveOrd ss mn syns ds tyConNm = do
           $ fields
       | isAppliedVar ty = ordCompare1 l r
       | otherwise = ordCompare l r
+
+deriveOrd1
+  :: forall m
+   . (MonadError MultipleErrors m, MonadSupply m)
+  => SourceSpan
+  -> m [Declaration]
+deriveOrd1 ss =
+  return [ ValueDecl (ss, []) (Ident C.compare1) Public [] (unguarded dataOrdCompare)]
+  where
+    dataOrdCompare :: Expr
+    dataOrdCompare = Var (Qualified (Just dataOrd) (Ident C.compare))
 
 deriveNewtype
   :: forall m
