@@ -26,6 +26,13 @@ moduleNameToJs (ModuleName pns) =
 identToJs :: Ident -> Text
 identToJs (Ident name) = properToJs name
 identToJs (GenIdent _ _) = internalError "GenIdent in identToJs"
+identToJs UnusedIdent = internalError "UnusedIdent in identToJs"
+
+-- | Convert an 'Ident' into a valid JavaScript identifier, or Nothing.
+identToJs' :: Ident -> Maybe Text
+identToJs' (Ident name) = Just $ properToJs name
+identToJs' (GenIdent _ _) = internalError "GenIdent in identToJs'"
+identToJs' UnusedIdent = Nothing
 
 properToJs :: Text -> Text
 properToJs name

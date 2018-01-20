@@ -99,6 +99,13 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     Case (ss, com, ty, Nothing) (fmap (exprToCoreFn ss [] Nothing) vs) (fmap (altToCoreFn ss) alts)
   exprToCoreFn ss com _ (A.TypedValue _ v ty) =
     exprToCoreFn ss com (Just ty) v
+  -- special case desugaring for the Partial constraint identity function
+  -- see Language.PureScript.Linter.Exhaustive
+  exprToCoreFn ss com ty
+    (A.Let
+      [A.ValueDecl _ UnusedIdent _ _ _]
+      (A.TypedValue _ (A.App (A.App (A.TypedValue _ (A.Var (Qualified Nothing UnusedIdent)) _) _) e) _)
+    ) = exprToCoreFn ss com ty e
   exprToCoreFn ss com ty (A.Let ds v) =
     Let (ss, com, ty, Nothing) (concatMap declToCoreFn ds) (exprToCoreFn ss [] Nothing v)
   exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name (A.TypedValue _ lit@(A.Literal (A.ObjectLiteral _)) _)) =
