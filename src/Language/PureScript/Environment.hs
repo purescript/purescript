@@ -36,7 +36,7 @@ data Environment = Environment
   -- constructor name, argument types and return type.
   , typeSynonyms :: M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe Kind)], Type)
   -- ^ Type synonyms currently in scope
-  , typeClassDictionaries :: M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict))
+  , typeClassDictionaries :: M.Map (Maybe ModuleName) TypeClassDictionaryMap
   -- ^ Available type class dictionaries
   , typeClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
   -- ^ Type classes

@@ -85,9 +85,12 @@ desugarModule _ = internalError "Exports should have been elaborated in name des
 --
 --   class Foo a where
 --     foo :: a -> a
+--     foo x = x
+--
+--   instance fooInt :: Foo Int
 --
 --   instance fooString :: Foo String where
---     foo s = s ++ s
+--     foo s = s <> s
 --
 --   instance fooArray :: (Foo a) => Foo [a] where
 --     foo = map foo
@@ -112,10 +115,16 @@ desugarModule _ = internalError "Exports should have been elaborated in name des
 --   foo :: forall a. (Foo a) => a -> a
 --   foo dict = dict.foo
 --
+--   fooDefault :: Foo a
+--   fooDefault = <TypeClassImplementationDictionary Foo { foo: \x -> x }>
+--
+--   fooInt :: {} -> Foo Int
+--   fooInt _ = <TypeClassDictionaryConstructorApp Foo {}>
+--
 --   fooString :: {} -> Foo String
 --   fooString _ = <TypeClassDictionaryConstructorApp Foo { foo: \s -> s ++ s }>
 --
---   fooArray :: forall a. (Foo a) => Foo [a]
+--   fooArray :: forall a. Foo a -> Foo (Array a)
 --   fooArray = <TypeClassDictionaryConstructorApp Foo { foo: map foo }>
 --
 --   {- Superclasses -}
@@ -138,11 +147,25 @@ desugarModule _ = internalError "Exports should have been elaborated in name des
 -- and finally as the generated javascript:
 --
 --   function Foo(foo) {
---       this.foo = foo;
+--       if (foo !== void 0) {
+--           this.foo = foo;
+--       }
 --   };
 --
 --   var foo = function (dict) {
 --       return dict.foo;
+--   };
+--
+--   var fooDefault = {
+--       foo: function (x) {
+--           return x;
+--       }
+--   };
+--
+--   Foo.prototype = fooDefault;
+--
+--   var fooInt = function (_) {
+--       return new Foo(undefined);
 --   };
 --
 --   var fooString = function (_) {
