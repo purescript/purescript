@@ -121,6 +121,13 @@ deriveInstance mn syns _ ds (TypeInstanceDeclaration sa@(ss, _) ch idx nm deps c
            -> TypeInstanceDeclaration sa ch idx nm deps className tys . ExplicitInstance <$> deriveEq ss mn syns ds tyCon
            | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty
       _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 1
+  | className == Qualified (Just dataEq) (ProperName "Eq1")
+  = case tys of
+      [ty] | Just (Qualified mn' _, _) <- unwrapTypeConstructor ty
+           , mn == fromMaybe mn mn'
+           -> TypeInstanceDeclaration sa ch idx nm deps className tys . ExplicitInstance <$> deriveEq1 ss
+           | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty
+      _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 1
   | className == Qualified (Just dataOrd) (ProperName "Ord")
   = case tys of
       [ty] | Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
@@ -469,6 +476,17 @@ deriveEq ss mn syns ds tyConNm = do
           $ fields
       | isAppliedVar ty = preludeEq1 l r
       | otherwise = preludeEq l r
+
+deriveEq1
+  :: forall m
+   . (MonadError MultipleErrors m, MonadSupply m)
+  => SourceSpan
+  -> m [Declaration]
+deriveEq1 ss =
+  return [ ValueDecl (ss, []) (Ident C.eq1) Public [] (unguarded preludeEq)]
+  where
+    preludeEq :: Expr
+    preludeEq = Var (Qualified (Just dataEq) (Ident C.eq))
 
 deriveOrd
   :: forall m
