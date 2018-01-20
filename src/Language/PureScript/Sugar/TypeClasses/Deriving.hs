@@ -436,6 +436,9 @@ deriveEq ss mn syns ds tyConNm = do
     preludeEq :: Expr -> Expr -> Expr
     preludeEq = App . App (Var (Qualified (Just dataEq) (Ident C.eq)))
 
+    preludeEq1 :: Expr -> Expr -> Expr
+    preludeEq1 = App . App (Var (Qualified (Just dataEq) (Ident C.eq1)))
+
     addCatch :: [CaseAlternative] -> [CaseAlternative]
     addCatch xs
       | length xs /= 1 = xs ++ [catchAll]
@@ -458,12 +461,14 @@ deriveEq ss mn syns ds tyConNm = do
     conjAll xs = foldl1 preludeConj xs
 
     toEqTest :: Expr -> Expr -> Type -> Expr
-    toEqTest l r ty | Just rec <- objectType ty
-                    , Just fields <- decomposeRec rec =
-      conjAll
-      . map (\((Label str), typ) -> toEqTest (Accessor str l) (Accessor str r) typ)
-      $ fields
-    toEqTest l r _ = preludeEq l r
+    toEqTest l r ty
+      | Just rec <- objectType ty
+      , Just fields <- decomposeRec rec =
+          conjAll
+          . map (\((Label str), typ) -> toEqTest (Accessor str l) (Accessor str r) typ)
+          $ fields
+      | isAppliedVar ty = preludeEq1 l r
+      | otherwise = preludeEq l r
 
 deriveOrd
   :: forall m
@@ -616,6 +621,10 @@ mkVarMn mn = Var . Qualified mn
 
 mkVar :: Ident -> Expr
 mkVar = mkVarMn Nothing
+
+isAppliedVar :: Type -> Bool
+isAppliedVar (TypeApp (TypeVar _) _) = True
+isAppliedVar _ = False
 
 objectType :: Type -> Maybe Type
 objectType (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Record"))) rec) = Just rec

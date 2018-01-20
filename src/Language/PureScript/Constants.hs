@@ -100,6 +100,9 @@ greaterThanOrEq = "greaterThanOrEq"
 eq :: forall a. (IsString a) => a
 eq = "eq"
 
+eq1 :: forall a. (IsString a) => a
+eq1 = "eq1"
+
 (/=) :: forall a. (IsString a) => a
 (/=) = "/="
 
