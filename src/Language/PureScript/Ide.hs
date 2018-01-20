@@ -107,14 +107,14 @@ findCompletions
   -> m Success
 findCompletions filters matcher currentModule complOptions = do
   modules <- getAllModules currentModule
-  let insertPrim = (:) (C.Prim, idePrimDeclarations)
+  let insertPrim = (++) idePrimDeclarations
   pure (CompletionResult (getCompletions filters matcher complOptions (insertPrim modules)))
 
 findType :: Ide m =>
             Text -> [Filter] -> Maybe P.ModuleName -> m Success
 findType search filters currentModule = do
   modules <- getAllModules currentModule
-  let insertPrim = (:) (C.Prim, idePrimDeclarations)
+  let insertPrim = (++) idePrimDeclarations
   pure (CompletionResult (getExactCompletions search filters (insertPrim modules)))
 
 findPursuitCompletions :: MonadIO m =>
