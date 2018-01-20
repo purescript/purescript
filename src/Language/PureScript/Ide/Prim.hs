@@ -37,4 +37,3 @@ idePrimDeclarations =
 
     primKinds = foreach (Set.toList PEnv.primKinds) $ \kn ->
       IdeDeclarationAnn emptyAnn (IdeDeclKind (P.disqualify kn))
-
