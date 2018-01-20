@@ -800,7 +800,7 @@ data Expr
   --
   | AnonymousArgument
   -- |
-  -- A typed hole that will be turned into a hint/error duing typechecking
+  -- A typed hole that will be turned into a hint/error during typechecking
   --
   | Hole Text
   -- |
