@@ -418,11 +418,6 @@ typ = "Type"
 symbol :: forall a. (IsString a) => a
 symbol = "Symbol"
 
--- Code Generation
-
-__unused :: forall a. (IsString a) => a
-__unused = "__unused"
-
 -- Modules
 
 prim :: forall a. (IsString a) => a

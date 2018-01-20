@@ -76,6 +76,10 @@ data Ident
   -- A generated name for an identifier
   --
   | GenIdent (Maybe Text) Integer
+  -- |
+  -- A generated name used only for type-checking
+  --
+  | UnusedIdent
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData Ident
@@ -84,6 +88,7 @@ runIdent :: Ident -> Text
 runIdent (Ident i) = i
 runIdent (GenIdent Nothing n) = "$" <> T.pack (show n)
 runIdent (GenIdent (Just name) n) = "$" <> name <> T.pack (show n)
+runIdent UnusedIdent = "$__unused"
 
 showIdent :: Ident -> Text
 showIdent = runIdent

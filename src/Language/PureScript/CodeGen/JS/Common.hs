@@ -26,6 +26,7 @@ moduleNameToJs (ModuleName pns) =
 identToJs :: Ident -> Text
 identToJs (Ident name) = properToJs name
 identToJs (GenIdent _ _) = internalError "GenIdent in identToJs"
+identToJs UnusedIdent = "$__unused"
 
 properToJs :: Text -> Text
 properToJs name

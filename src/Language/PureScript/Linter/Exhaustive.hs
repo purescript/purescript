@@ -291,11 +291,11 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
     return $
       Let
         [ partial var tyVar ]
-        $ App (Var (Qualified Nothing (Ident C.__unused))) e
+        $ App (Var (Qualified Nothing UnusedIdent)) e
     where
       partial :: Text -> Text -> Declaration
       partial var tyVar =
-        ValueDecl (ss, []) (Ident C.__unused) Private [] $
+        ValueDecl (ss, []) UnusedIdent Private [] $
         [MkUnguarded
           (TypedValue
            True

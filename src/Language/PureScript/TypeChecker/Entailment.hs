@@ -360,7 +360,7 @@ entails SolverOptions{..} constraint context hints =
             mkDictionary (NamedInstance n) args = return $ foldl App (Var n) (fold args)
             mkDictionary UnionInstance (Just [e]) =
               -- We need the subgoal dictionary to appear in the term somewhere
-              return $ App (Abs (VarBinder (Ident C.__unused)) valUndefined) e
+              return $ App (Abs (VarBinder UnusedIdent) valUndefined) e
             mkDictionary UnionInstance _ = return valUndefined
             mkDictionary ConsInstance _ = return valUndefined
             mkDictionary RowToListInstance _ = return valUndefined
@@ -371,7 +371,7 @@ entails SolverOptions{..} constraint context hints =
               -- So pass an empty placeholder (undefined) instead.
               return valUndefined
             mkDictionary (IsSymbolInstance sym) _ =
-              let fields = [ ("reflectSymbol", Abs (VarBinder (Ident C.__unused)) (Literal (StringLiteral sym))) ] in
+              let fields = [ ("reflectSymbol", Abs (VarBinder UnusedIdent) (Literal (StringLiteral sym))) ] in
               return $ TypeClassDictionaryConstructorApp C.IsSymbol (Literal (ObjectLiteral fields))
             mkDictionary CompareSymbolInstance _ =
               return $ TypeClassDictionaryConstructorApp C.CompareSymbol (Literal (ObjectLiteral []))
