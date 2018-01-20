@@ -28,8 +28,11 @@ tags = map (first T.unpack) . concatMap dtags . modDeclarations
     pos :: SourceSpan -> Int
     pos = sourcePosLine . spanStart
 
+-- etags files appear to be sorted on module file name:
+-- from emacs source, `emacs/lib-src/etags.c`:
+-- "In etags mode, sort by file name."
 dumpEtags :: [(String, Module)] -> [String]
-dumpEtags = concatMap renderModEtags
+dumpEtags = concatMap renderModEtags . sort
 
 renderModEtags :: (String, Module) -> [String]
 renderModEtags (path, mdl) = ["\x0c", path ++ "," ++ show tagsLen] ++ tagLines
@@ -37,6 +40,9 @@ renderModEtags (path, mdl) = ["\x0c", path ++ "," ++ show tagsLen] ++ tagLines
         tagLines = map tagLine $ tags mdl
         tagLine (name, line) = "\x7f" ++ name ++ "\x01" ++ show line ++ ","
 
+-- ctags files are required to be sorted: http://ctags.sourceforge.net/FORMAT
+-- "The tags file is sorted on {tagname}.  This allows for a binary search in
+--  the file."
 dumpCtags :: [(String, Module)] -> [String]
 dumpCtags = sort . concatMap renderModCtags
 
