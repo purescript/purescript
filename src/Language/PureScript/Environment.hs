@@ -351,6 +351,14 @@ primTypes =
     , (primName "Partial",  (kindType, ExternData))
     ]
 
+-- | This 'Map' contains all of the prim types from all Prim modules.
+allPrimTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
+allPrimTypes = M.unions
+  [ primTypes
+  , primTypeErrorTypes
+  , primRowTypes
+  ]
+
 primTypeErrorTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
 primTypeErrorTypes =
   M.fromList
@@ -367,15 +375,21 @@ primRowTypes =
     , (primSubName "Row" "Cons",  (FunKind kindSymbol (FunKind kindType (FunKind (Row kindType) (FunKind (Row kindType) kindType))), ExternData))
     ]
 
--- | The primitive class map. This just contains the `Fail`, `Warn`, and `Partial`
--- classes. `Partial` is used as a kind of magic constraint for partial
--- functions. `Fail` is used for user-defined type errors. `Warn` for
--- user-defined warnings.
+-- | The primitive class map. This just contains the `Partial` class.
+-- `Partial` is used as a kind of magic constraint for partial functions.
 primClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primClasses =
   M.fromList
     [ (primName "Partial", (makeTypeClassData [] [] [] []))
     ]
+
+-- | This contains all of the type classes from all Prim modules.
+allPrimClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
+allPrimClasses = M.unions
+  [ primClasses
+  , primTypeErrorClasses
+  , primRowClasses
+  ]
 
 primTypeErrorClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primTypeErrorClasses =
