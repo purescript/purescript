@@ -112,6 +112,9 @@ notEq = "notEq"
 compare :: forall a. (IsString a) => a
 compare = "compare"
 
+compare1 :: forall a. (IsString a) => a
+compare1 = "compare1"
+
 (&&) :: forall a. (IsString a) => a
 (&&) = "&&"
 

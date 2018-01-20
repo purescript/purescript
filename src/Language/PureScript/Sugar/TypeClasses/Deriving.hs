@@ -533,6 +533,9 @@ deriveOrd ss mn syns ds tyConNm = do
     ordCompare :: Expr -> Expr -> Expr
     ordCompare = App . App (Var (Qualified (Just dataOrd) (Ident C.compare)))
 
+    ordCompare1 :: Expr -> Expr -> Expr
+    ordCompare1 = App . App (Var (Qualified (Just dataOrd) (Ident C.compare1)))
+
     mkCtorClauses :: ((ProperName 'ConstructorName, [Type]), Bool) -> m [CaseAlternative]
     mkCtorClauses ((ctorName, tys), isLast) = do
       identsL <- replicateM (length tys) (freshIdent "l")
@@ -570,12 +573,14 @@ deriveOrd ss mn syns ds tyConNm = do
                                   ]
 
     toOrdering :: Expr -> Expr -> Type -> Expr
-    toOrdering l r ty | Just rec <- objectType ty
-                      , Just fields <- decomposeRec rec =
-      appendAll
-      . map (\((Label str), typ) -> toOrdering (Accessor str l) (Accessor str r) typ)
-      $ fields
-    toOrdering l r _ = ordCompare l r
+    toOrdering l r ty
+      | Just rec <- objectType ty
+      , Just fields <- decomposeRec rec =
+          appendAll
+          . map (\((Label str), typ) -> toOrdering (Accessor str l) (Accessor str r) typ)
+          $ fields
+      | isAppliedVar ty = ordCompare1 l r
+      | otherwise = ordCompare l r
 
 deriveNewtype
   :: forall m
