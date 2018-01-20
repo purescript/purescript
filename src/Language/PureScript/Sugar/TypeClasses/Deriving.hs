@@ -125,7 +125,7 @@ deriveInstance mn syns _ ds (TypeInstanceDeclaration sa@(ss, _) ch idx nm deps c
   = case tys of
       [ty] | Just (Qualified mn' _, _) <- unwrapTypeConstructor ty
            , mn == fromMaybe mn mn'
-           -> TypeInstanceDeclaration sa ch idx nm deps className tys . ExplicitInstance <$> deriveEq1 ss
+           -> pure . TypeInstanceDeclaration sa ch idx nm deps className tys . ExplicitInstance $ deriveEq1 ss
            | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty
       _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 1
   | className == Qualified (Just dataOrd) (ProperName "Ord")
@@ -139,7 +139,7 @@ deriveInstance mn syns _ ds (TypeInstanceDeclaration sa@(ss, _) ch idx nm deps c
   = case tys of
       [ty] | Just (Qualified mn' _, _) <- unwrapTypeConstructor ty
            , mn == fromMaybe mn mn'
-           -> TypeInstanceDeclaration sa ch idx nm deps className tys . ExplicitInstance <$> deriveOrd1 ss
+           -> pure . TypeInstanceDeclaration sa ch idx nm deps className tys . ExplicitInstance $ deriveOrd1 ss
            | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty
       _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 1
   | className == Qualified (Just dataFunctor) (ProperName "Functor")
@@ -484,13 +484,9 @@ deriveEq ss mn syns ds tyConNm = do
       | isAppliedVar ty = preludeEq1 l r
       | otherwise = preludeEq l r
 
-deriveEq1
-  :: forall m
-   . (MonadError MultipleErrors m, MonadSupply m)
-  => SourceSpan
-  -> m [Declaration]
+deriveEq1 :: SourceSpan -> [Declaration]
 deriveEq1 ss =
-  return [ ValueDecl (ss, []) (Ident C.eq1) Public [] (unguarded preludeEq)]
+  [ ValueDecl (ss, []) (Ident C.eq1) Public [] (unguarded preludeEq)]
   where
     preludeEq :: Expr
     preludeEq = Var (Qualified (Just dataEq) (Ident C.eq))
@@ -589,13 +585,9 @@ deriveOrd ss mn syns ds tyConNm = do
       | isAppliedVar ty = ordCompare1 l r
       | otherwise = ordCompare l r
 
-deriveOrd1
-  :: forall m
-   . (MonadError MultipleErrors m, MonadSupply m)
-  => SourceSpan
-  -> m [Declaration]
+deriveOrd1 :: SourceSpan -> [Declaration]
 deriveOrd1 ss =
-  return [ ValueDecl (ss, []) (Ident C.compare1) Public [] (unguarded dataOrdCompare)]
+  [ ValueDecl (ss, []) (Ident C.compare1) Public [] (unguarded dataOrdCompare)]
   where
     dataOrdCompare :: Expr
     dataOrdCompare = Var (Qualified (Just dataOrd) (Ident C.compare))
