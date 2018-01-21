@@ -79,13 +79,13 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     Accessor (ss, com, ty, Nothing) name (exprToCoreFn ss [] Nothing v)
   exprToCoreFn ss com ty (A.ObjectUpdate obj vs) =
     ObjectUpdate (ss, com, ty, Nothing) (exprToCoreFn ss [] Nothing obj) $ fmap (second (exprToCoreFn ss [] Nothing)) vs
-  exprToCoreFn ss com ty (A.Abs (A.VarBinder name) v) =
+  exprToCoreFn ss com ty (A.Abs (A.VarBinder _ name) v) =
     Abs (ss, com, ty, Nothing) name (exprToCoreFn ss [] Nothing v)
   exprToCoreFn _ _ _ (A.Abs _ _) =
     internalError "Abs with Binder argument was not desugared before exprToCoreFn mn"
   exprToCoreFn ss com ty (A.App v1 v2) =
     App (ss, com, ty, Nothing) (exprToCoreFn ss [] Nothing v1) (exprToCoreFn ss [] Nothing v2)
-  exprToCoreFn ss com ty (A.Var ident) =
+  exprToCoreFn _ com ty (A.Var ss ident) =
     Var (ss, com, ty, getValueMeta ident) ident
   exprToCoreFn ss com ty (A.IfThenElse v1 v2 v3) =
     Case (ss, com, ty, Nothing) [exprToCoreFn ss [] Nothing v1]
@@ -93,7 +93,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
                         (Right $ exprToCoreFn ss [] Nothing v2)
       , CaseAlternative [NullBinder (ssAnn ss)]
                         (Right $ exprToCoreFn ss [] Nothing v3) ]
-  exprToCoreFn ss com ty (A.Constructor name) =
+  exprToCoreFn _ com ty (A.Constructor ss name) =
     Var (ss, com, ty, Just $ getConstructorMeta name) $ fmap properToIdent name
   exprToCoreFn ss com ty (A.Case vs alts) =
     Case (ss, com, ty, Nothing) (fmap (exprToCoreFn ss [] Nothing) vs) (fmap (altToCoreFn ss) alts)
@@ -137,12 +137,12 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     LiteralBinder (ss, com, Nothing, Nothing) (fmap (binderToCoreFn ss com) lit)
   binderToCoreFn ss com A.NullBinder =
     NullBinder (ss, com, Nothing, Nothing)
-  binderToCoreFn ss com (A.VarBinder name) =
+  binderToCoreFn _ com (A.VarBinder ss name) =
     VarBinder (ss, com, Nothing, Nothing) name
-  binderToCoreFn ss com (A.ConstructorBinder dctor@(Qualified mn' _) bs) =
+  binderToCoreFn _ com (A.ConstructorBinder ss dctor@(Qualified mn' _) bs) =
     let (_, tctor, _, _) = lookupConstructor env dctor
     in ConstructorBinder (ss, com, Nothing, Just $ getConstructorMeta dctor) (Qualified mn' tctor) dctor (fmap (binderToCoreFn ss []) bs)
-  binderToCoreFn ss com (A.NamedBinder name b) =
+  binderToCoreFn _ com (A.NamedBinder ss name b) =
     NamedBinder (ss, com, Nothing, Nothing) name (binderToCoreFn ss [] b)
   binderToCoreFn _ com (A.PositionedBinder ss com1 b) =
     binderToCoreFn ss (com ++ com1) b
@@ -198,8 +198,8 @@ findQualModules decls =
   fqDecls _ = []
 
   fqValues :: A.Expr -> [ModuleName]
-  fqValues (A.Var q) = getQual' q
-  fqValues (A.Constructor q) = getQual' q
+  fqValues (A.Var _ q) = getQual' q
+  fqValues (A.Constructor _ q) = getQual' q
   -- Some instances are automatically solved and have their class dictionaries
   -- built inline instead of having a named instance defined and imported.
   -- We therefore need to import these constructors if they aren't already.
@@ -207,7 +207,7 @@ findQualModules decls =
   fqValues _ = []
 
   fqBinders :: A.Binder -> [ModuleName]
-  fqBinders (A.ConstructorBinder q _) = getQual' q
+  fqBinders (A.ConstructorBinder _ q _) = getQual' q
   fqBinders _ = []
 
   getQual' :: Qualified a -> [ModuleName]

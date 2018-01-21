@@ -209,7 +209,7 @@ entails SolverOptions{..} constraint context hints =
     findDicts ctx cn = fmap (fmap NamedInstance) . maybe [] M.elems . (>>= M.lookup cn) . flip M.lookup ctx
 
     valUndefined :: Expr
-    valUndefined = Var (Qualified (Just (ModuleName [ProperName C.prim])) (Ident C.undefined))
+    valUndefined = Var nullSourceSpan (Qualified (Just (ModuleName [ProperName C.prim])) (Ident C.undefined))
 
     solve :: Constraint -> WriterT (Any, [(Ident, InstanceContext, Constraint)]) (StateT InstanceContext m) Expr
     solve con = go 0 con
@@ -280,7 +280,7 @@ entails SolverOptions{..} constraint context hints =
                 modify (combineContexts newContext)
                 -- Mark this constraint for generalization
                 tell (mempty, [(ident, context, unsolved)])
-                return (Var qident)
+                return (Var nullSourceSpan qident)
               Deferred ->
                 -- Constraint was deferred, just return the dictionary unchanged,
                 -- with no unsolved constraints. Hopefully, we can solve this later.
@@ -357,10 +357,10 @@ entails SolverOptions{..} constraint context hints =
 
             -- Make a dictionary from subgoal dictionaries by applying the correct function
             mkDictionary :: Evidence -> Maybe [Expr] -> m Expr
-            mkDictionary (NamedInstance n) args = return $ foldl App (Var n) (fold args)
+            mkDictionary (NamedInstance n) args = return $ foldl App (Var nullSourceSpan n) (fold args)
             mkDictionary UnionInstance (Just [e]) =
               -- We need the subgoal dictionary to appear in the term somewhere
-              return $ App (Abs (VarBinder UnusedIdent) valUndefined) e
+              return $ App (Abs (VarBinder nullSourceSpan UnusedIdent) valUndefined) e
             mkDictionary UnionInstance _ = return valUndefined
             mkDictionary ConsInstance _ = return valUndefined
             mkDictionary RowToListInstance _ = return valUndefined
@@ -371,7 +371,7 @@ entails SolverOptions{..} constraint context hints =
               -- So pass an empty placeholder (undefined) instead.
               return valUndefined
             mkDictionary (IsSymbolInstance sym) _ =
-              let fields = [ ("reflectSymbol", Abs (VarBinder UnusedIdent) (Literal (StringLiteral sym))) ] in
+              let fields = [ ("reflectSymbol", Abs (VarBinder nullSourceSpan UnusedIdent) (Literal (StringLiteral sym))) ] in
               return $ TypeClassDictionaryConstructorApp C.IsSymbol (Literal (ObjectLiteral fields))
             mkDictionary CompareSymbolInstance _ =
               return $ TypeClassDictionaryConstructorApp C.CompareSymbol (Literal (ObjectLiteral []))
@@ -399,7 +399,7 @@ entails SolverOptions{..} constraint context hints =
       lhs <- stripSuffix rhs' out'
       pure (TypeLevelString (mkString lhs), arg1, arg2)
     appendSymbols _ _ _ = Nothing
-    
+
     consSymbol :: Type -> Type -> Type -> Maybe (Type, Type, Type)
     consSymbol _ _ arg@(TypeLevelString s) = do
       (h, t) <- T.uncons =<< decodeString s

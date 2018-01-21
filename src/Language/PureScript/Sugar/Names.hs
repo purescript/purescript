@@ -252,21 +252,21 @@ renameInModule imports (Module modSS coms mn decls exps) =
     -> m ((SourceSpan, [Ident]), Expr)
   updateValue (_, bound) v@(PositionedValue pos' _ _) =
     return ((pos', bound), v)
-  updateValue (pos, bound) (Abs (VarBinder arg) val') =
-    return ((pos, arg : bound), Abs (VarBinder arg) val')
+  updateValue (pos, bound) (Abs (VarBinder ss arg) val') =
+    return ((pos, arg : bound), Abs (VarBinder ss arg) val')
   updateValue (pos, bound) (Let ds val') = do
     let args = mapMaybe letBoundVariable ds
     unless (length (ordNub args) == length args) .
       throwError . errorMessage' pos $ OverlappingNamesInLet
     return ((pos, args ++ bound), Let ds val')
-  updateValue (pos, bound) (Var name'@(Qualified Nothing ident)) | ident `notElem` bound =
-    (,) (pos, bound) <$> (Var <$> updateValueName name' pos)
-  updateValue (pos, bound) (Var name'@(Qualified (Just _) _)) =
-    (,) (pos, bound) <$> (Var <$> updateValueName name' pos)
-  updateValue (pos, bound) (Op op) =
-    (,) (pos, bound) <$> (Op <$> updateValueOpName op pos)
-  updateValue s@(pos, _) (Constructor name) =
-    (,) s <$> (Constructor <$> updateDataConstructorName name pos)
+  updateValue (_, bound) (Var ss name'@(Qualified Nothing ident)) | ident `notElem` bound =
+    (,) (ss, bound) <$> (Var ss <$> updateValueName name' ss)
+  updateValue (_, bound) (Var ss name'@(Qualified (Just _) _)) =
+    (,) (ss, bound) <$> (Var ss <$> updateValueName name' ss)
+  updateValue (_, bound) (Op ss op) =
+    (,) (ss, bound) <$> (Op ss <$> updateValueOpName op ss)
+  updateValue (_, bound) (Constructor ss name) =
+    (,) (ss, bound) <$> (Constructor ss <$> updateDataConstructorName name ss)
   updateValue s@(pos, _) (TypedValue check val ty) =
     (,) s <$> (TypedValue check val <$> updateTypesEverywhere pos ty)
   updateValue s v = return (s, v)
@@ -277,10 +277,10 @@ renameInModule imports (Module modSS coms mn decls exps) =
     -> m ((SourceSpan, [Ident]), Binder)
   updateBinder (_, bound) v@(PositionedBinder pos _ _) =
     return ((pos, bound), v)
-  updateBinder s@(pos, _) (ConstructorBinder name b) =
-    (,) s <$> (ConstructorBinder <$> updateDataConstructorName name pos <*> pure b)
-  updateBinder s@(pos, _) (OpBinder op) =
-    (,) s <$> (OpBinder <$> updateValueOpName op pos)
+  updateBinder (_, bound) (ConstructorBinder ss name b) =
+    (,) (ss, bound) <$> (ConstructorBinder ss <$> updateDataConstructorName name ss <*> pure b)
+  updateBinder (_, bound) (OpBinder ss op) =
+    (,) (ss, bound) <$> (OpBinder ss <$> updateValueOpName op ss)
   updateBinder s@(pos, _) (TypedBinder t b) = do
     t' <- updateTypesEverywhere pos t
     return (s, TypedBinder t' b)

@@ -101,17 +101,17 @@ prettyPrintValue d expr@UnaryMinus{} = prettyPrintValueAtom d expr
 prettyPrintValueAtom :: Int -> Expr -> Box
 prettyPrintValueAtom d (Literal l) = prettyPrintLiteralValue d l
 prettyPrintValueAtom _ AnonymousArgument = text "_"
-prettyPrintValueAtom _ (Constructor name) = text $ T.unpack $ runProperName (disqualify name)
-prettyPrintValueAtom _ (Var ident) = text $ T.unpack $ showIdent (disqualify ident)
+prettyPrintValueAtom _ (Constructor _ name) = text $ T.unpack $ runProperName (disqualify name)
+prettyPrintValueAtom _ (Var _ ident) = text $ T.unpack $ showIdent (disqualify ident)
 prettyPrintValueAtom d (BinaryNoParens op lhs rhs) =
   prettyPrintValue (d - 1) lhs `beforeWithSpace` printOp op `beforeWithSpace` prettyPrintValue (d - 1) rhs
   where
-  printOp (Op (Qualified _ name)) = text $ T.unpack $ runOpName name
+  printOp (Op _ (Qualified _ name)) = text $ T.unpack $ runOpName name
   printOp expr = text "`" <> prettyPrintValue (d - 1) expr `before` text "`"
 prettyPrintValueAtom d (TypedValue _ val _) = prettyPrintValueAtom d val
 prettyPrintValueAtom d (PositionedValue _ _ val) = prettyPrintValueAtom d val
 prettyPrintValueAtom d (Parens expr) = (text "(" <> prettyPrintValue d expr) `before` text ")"
-prettyPrintValueAtom d (UnaryMinus expr) = text "(-" <> prettyPrintValue d expr <> text ")"
+prettyPrintValueAtom d (UnaryMinus _ expr) = text "(-" <> prettyPrintValue d expr <> text ")"
 prettyPrintValueAtom d expr = (text "(" <> prettyPrintValue d expr) `before` text ")"
 
 prettyPrintLiteralValue :: Int -> Literal Expr -> Box
@@ -186,13 +186,13 @@ prettyPrintDoNotationElement d (PositionedDoNotationElement _ _ el) = prettyPrin
 prettyPrintBinderAtom :: Binder -> Text
 prettyPrintBinderAtom NullBinder = "_"
 prettyPrintBinderAtom (LiteralBinder l) = prettyPrintLiteralBinder l
-prettyPrintBinderAtom (VarBinder ident) = showIdent ident
-prettyPrintBinderAtom (ConstructorBinder ctor []) = runProperName (disqualify ctor)
+prettyPrintBinderAtom (VarBinder _ ident) = showIdent ident
+prettyPrintBinderAtom (ConstructorBinder _ ctor []) = runProperName (disqualify ctor)
 prettyPrintBinderAtom b@ConstructorBinder{} = parensT (prettyPrintBinder b)
-prettyPrintBinderAtom (NamedBinder ident binder) = showIdent ident Monoid.<> "@" Monoid.<> prettyPrintBinder binder
+prettyPrintBinderAtom (NamedBinder _ ident binder) = showIdent ident Monoid.<> "@" Monoid.<> prettyPrintBinder binder
 prettyPrintBinderAtom (PositionedBinder _ _ binder) = prettyPrintBinderAtom binder
 prettyPrintBinderAtom (TypedBinder _ binder) = prettyPrintBinderAtom binder
-prettyPrintBinderAtom (OpBinder op) = runOpName (disqualify op)
+prettyPrintBinderAtom (OpBinder _ op) = runOpName (disqualify op)
 prettyPrintBinderAtom (BinaryNoParensBinder op b1 b2) =
   prettyPrintBinderAtom b1 Monoid.<> " " Monoid.<> prettyPrintBinderAtom op Monoid.<> " " Monoid.<> prettyPrintBinderAtom b2
 prettyPrintBinderAtom (ParensInBinder b) = parensT (prettyPrintBinder b)
@@ -219,8 +219,8 @@ prettyPrintLiteralBinder (ArrayLiteral bs) =
 -- Generate a pretty-printed string representing a Binder
 --
 prettyPrintBinder :: Binder -> Text
-prettyPrintBinder (ConstructorBinder ctor []) = runProperName (disqualify ctor)
-prettyPrintBinder (ConstructorBinder ctor args) = (runProperName (disqualify ctor)) Monoid.<> " " Monoid.<> T.unwords (map prettyPrintBinderAtom args)
+prettyPrintBinder (ConstructorBinder _ ctor []) = runProperName (disqualify ctor)
+prettyPrintBinder (ConstructorBinder _ ctor args) = (runProperName (disqualify ctor)) Monoid.<> " " Monoid.<> T.unwords (map prettyPrintBinderAtom args)
 prettyPrintBinder (PositionedBinder _ _ binder) = prettyPrintBinder binder
 prettyPrintBinder (TypedBinder _ binder) = prettyPrintBinder binder
 prettyPrintBinder b = prettyPrintBinderAtom b

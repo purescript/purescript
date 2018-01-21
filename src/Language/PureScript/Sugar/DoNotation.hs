@@ -29,10 +29,10 @@ desugarDo d =
   in rethrowWithPosition (declSourceSpan d) $ f d
   where
   bind :: Expr
-  bind = Var (Qualified Nothing (Ident C.bind))
+  bind = Var nullSourceSpan (Qualified Nothing (Ident C.bind))
 
   discard :: Expr
-  discard = Var (Qualified Nothing (Ident C.discard))
+  discard = Var nullSourceSpan (Qualified Nothing (Ident C.discard))
 
   replace :: Expr -> m Expr
   replace (Do els) = go els
@@ -44,20 +44,20 @@ desugarDo d =
   go [DoNotationValue val] = return val
   go (DoNotationValue val : rest) = do
     rest' <- go rest
-    return $ App (App discard val) (Abs (VarBinder UnusedIdent) rest')
+    return $ App (App discard val) (Abs (VarBinder nullSourceSpan UnusedIdent) rest')
   go [DoNotationBind _ _] = throwError . errorMessage $ InvalidDoBind
   go (DoNotationBind b _ : _) | First (Just ident) <- foldMap fromIdent (binderNames b) =
       throwError . errorMessage $ CannotUseBindWithDo (Ident ident)
     where
       fromIdent (Ident i) | i `elem` [ C.bind, C.discard ] = First (Just i)
       fromIdent _ = mempty
-  go (DoNotationBind (VarBinder ident) val : rest) = do
+  go (DoNotationBind (VarBinder ss ident) val : rest) = do
     rest' <- go rest
-    return $ App (App bind val) (Abs (VarBinder ident) rest')
+    return $ App (App bind val) (Abs (VarBinder ss ident) rest')
   go (DoNotationBind binder val : rest) = do
     rest' <- go rest
     ident <- freshIdent'
-    return $ App (App bind val) (Abs (VarBinder ident) (Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] [MkUnguarded rest']]))
+    return $ App (App bind val) (Abs (VarBinder nullSourceSpan ident) (Case [Var nullSourceSpan (Qualified Nothing ident)] [CaseAlternative [binder] [MkUnguarded rest']]))
   go [DoNotationLet _] = throwError . errorMessage $ InvalidDoLet
   go (DoNotationLet ds : rest) = do
     let checkBind :: Declaration -> m ()

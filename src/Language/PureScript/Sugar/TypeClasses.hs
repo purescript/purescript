@@ -270,7 +270,7 @@ typeInstanceDictionaryDeclaration
   -> [Type]
   -> [Declaration]
   -> Desugar m Declaration
-typeInstanceDictionaryDeclaration sa name mn deps className tys decls =
+typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
   rethrow (addHint (ErrorInInstance className tys)) $ do
   m <- get
 
@@ -292,7 +292,7 @@ typeInstanceDictionaryDeclaration sa name mn deps className tys decls =
       -- The type is a record type, but depending on type instance dependencies, may be constrained.
       -- The dictionary itself is a record literal.
       let superclasses = superClassDictionaryNames typeClassSuperclasses `zip`
-            [ Abs (VarBinder UnusedIdent) (DeferredDictionary superclass tyArgs)
+            [ Abs (VarBinder ss UnusedIdent) (DeferredDictionary superclass tyArgs)
             | (Constraint superclass suTyArgs _) <- typeClassSuperclasses
             , let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
             ]

@@ -54,24 +54,24 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
     f' s dec = warningsInDecl moduleNames dec <> checkTypeVarsInDecl s dec
 
     stepE :: S.Set Ident -> Expr -> MultipleErrors
-    stepE s (Abs (VarBinder name) _) | name `S.member` s = errorMessage (ShadowedName name)
+    stepE s (Abs (VarBinder ss name) _) | name `S.member` s = errorMessage' ss (ShadowedName name)
     stepE s (Let ds' _) = foldMap go ds'
       where
       go d | Just i <- getDeclIdent d
-           , i `S.member` s = errorMessage (ShadowedName i)
+           , i `S.member` s = errorMessage' (declSourceSpan d) (ShadowedName i)
            | otherwise = mempty
     stepE _ _ = mempty
 
     stepB :: S.Set Ident -> Binder -> MultipleErrors
-    stepB s (VarBinder name) | name `S.member` s = errorMessage (ShadowedName name)
-    stepB s (NamedBinder name _) | name `S.member` s = errorMessage (ShadowedName name)
+    stepB s (VarBinder ss name) | name `S.member` s = errorMessage' ss (ShadowedName name)
+    stepB s (NamedBinder ss name _) | name `S.member` s = errorMessage' ss (ShadowedName name)
     stepB _ _ = mempty
 
     stepDo :: S.Set Ident -> DoNotationElement -> MultipleErrors
     stepDo s (DoNotationLet ds') = foldMap go ds'
       where
       go d | Just i <- getDeclIdent d
-           , i `S.member` s = errorMessage (ShadowedName i)
+           , i `S.member` s = errorMessage' (declSourceSpan d) (ShadowedName i)
            | otherwise = mempty
     stepDo _ _ = mempty
 
