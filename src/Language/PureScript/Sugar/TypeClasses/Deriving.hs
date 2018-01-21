@@ -121,11 +121,25 @@ deriveInstance mn syns _ ds (TypeInstanceDeclaration sa@(ss, _) ch idx nm deps c
            -> TypeInstanceDeclaration sa ch idx nm deps className tys . ExplicitInstance <$> deriveEq ss mn syns ds tyCon
            | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty
       _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 1
+  | className == Qualified (Just dataEq) (ProperName "Eq1")
+  = case tys of
+      [ty] | Just (Qualified mn' _, _) <- unwrapTypeConstructor ty
+           , mn == fromMaybe mn mn'
+           -> pure . TypeInstanceDeclaration sa ch idx nm deps className tys . ExplicitInstance $ deriveEq1 ss
+           | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty
+      _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 1
   | className == Qualified (Just dataOrd) (ProperName "Ord")
   = case tys of
       [ty] | Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
            , mn == fromMaybe mn mn'
            -> TypeInstanceDeclaration sa ch idx nm deps className tys . ExplicitInstance <$> deriveOrd ss mn syns ds tyCon
+           | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty
+      _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 1
+  | className == Qualified (Just dataOrd) (ProperName "Ord1")
+  = case tys of
+      [ty] | Just (Qualified mn' _, _) <- unwrapTypeConstructor ty
+           , mn == fromMaybe mn mn'
+           -> pure . TypeInstanceDeclaration sa ch idx nm deps className tys . ExplicitInstance $ deriveOrd1 ss
            | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty
       _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 1
   | className == Qualified (Just dataFunctor) (ProperName "Functor")
@@ -436,6 +450,9 @@ deriveEq ss mn syns ds tyConNm = do
     preludeEq :: Expr -> Expr -> Expr
     preludeEq = App . App (Var (Qualified (Just dataEq) (Ident C.eq)))
 
+    preludeEq1 :: Expr -> Expr -> Expr
+    preludeEq1 = App . App (Var (Qualified (Just dataEq) (Ident C.eq1)))
+
     addCatch :: [CaseAlternative] -> [CaseAlternative]
     addCatch xs
       | length xs /= 1 = xs ++ [catchAll]
@@ -458,12 +475,21 @@ deriveEq ss mn syns ds tyConNm = do
     conjAll xs = foldl1 preludeConj xs
 
     toEqTest :: Expr -> Expr -> Type -> Expr
-    toEqTest l r ty | Just rec <- objectType ty
-                    , Just fields <- decomposeRec rec =
-      conjAll
-      . map (\((Label str), typ) -> toEqTest (Accessor str l) (Accessor str r) typ)
-      $ fields
-    toEqTest l r _ = preludeEq l r
+    toEqTest l r ty
+      | Just rec <- objectType ty
+      , Just fields <- decomposeRec rec =
+          conjAll
+          . map (\((Label str), typ) -> toEqTest (Accessor str l) (Accessor str r) typ)
+          $ fields
+      | isAppliedVar ty = preludeEq1 l r
+      | otherwise = preludeEq l r
+
+deriveEq1 :: SourceSpan -> [Declaration]
+deriveEq1 ss =
+  [ ValueDecl (ss, []) (Ident C.eq1) Public [] (unguarded preludeEq)]
+  where
+    preludeEq :: Expr
+    preludeEq = Var (Qualified (Just dataEq) (Ident C.eq))
 
 deriveOrd
   :: forall m
@@ -510,6 +536,9 @@ deriveOrd ss mn syns ds tyConNm = do
     ordCompare :: Expr -> Expr -> Expr
     ordCompare = App . App (Var (Qualified (Just dataOrd) (Ident C.compare)))
 
+    ordCompare1 :: Expr -> Expr -> Expr
+    ordCompare1 = App . App (Var (Qualified (Just dataOrd) (Ident C.compare1)))
+
     mkCtorClauses :: ((ProperName 'ConstructorName, [Type]), Bool) -> m [CaseAlternative]
     mkCtorClauses ((ctorName, tys), isLast) = do
       identsL <- replicateM (length tys) (freshIdent "l")
@@ -547,12 +576,21 @@ deriveOrd ss mn syns ds tyConNm = do
                                   ]
 
     toOrdering :: Expr -> Expr -> Type -> Expr
-    toOrdering l r ty | Just rec <- objectType ty
-                      , Just fields <- decomposeRec rec =
-      appendAll
-      . map (\((Label str), typ) -> toOrdering (Accessor str l) (Accessor str r) typ)
-      $ fields
-    toOrdering l r _ = ordCompare l r
+    toOrdering l r ty
+      | Just rec <- objectType ty
+      , Just fields <- decomposeRec rec =
+          appendAll
+          . map (\((Label str), typ) -> toOrdering (Accessor str l) (Accessor str r) typ)
+          $ fields
+      | isAppliedVar ty = ordCompare1 l r
+      | otherwise = ordCompare l r
+
+deriveOrd1 :: SourceSpan -> [Declaration]
+deriveOrd1 ss =
+  [ ValueDecl (ss, []) (Ident C.compare1) Public [] (unguarded dataOrdCompare)]
+  where
+    dataOrdCompare :: Expr
+    dataOrdCompare = Var (Qualified (Just dataOrd) (Ident C.compare))
 
 deriveNewtype
   :: forall m
@@ -616,6 +654,10 @@ mkVarMn mn = Var . Qualified mn
 
 mkVar :: Ident -> Expr
 mkVar = mkVarMn Nothing
+
+isAppliedVar :: Type -> Bool
+isAppliedVar (TypeApp (TypeVar _) _) = True
+isAppliedVar _ = False
 
 objectType :: Type -> Maybe Type
 objectType (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Record"))) rec) = Just rec
