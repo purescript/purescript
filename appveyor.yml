@@ -3,7 +3,7 @@ version: '{build}'
 environment:
   # Keep the path as short as possible, just in case.
   STACK_ROOT: c:\s
-  STACK_VER: 1.5.1
+  STACK_VER: 1.6.3
   RELEASE_USER: purescript
   RELEASE_REPO: purescript
 branches:
