@@ -276,11 +276,11 @@ typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
 
   -- Lookup the type arguments and member types for the type class
   TypeClassData{..} <-
-    maybe (throwError . errorMessage . UnknownName $ fmap TyClassName className) return $
+    maybe (throwError . errorMessage' ss . UnknownName $ fmap TyClassName className) return $
       M.lookup (qualify mn className) m
 
   case map fst typeClassMembers \\ mapMaybe declIdent decls of
-    member : _ -> throwError . errorMessage $ MissingClassMember member
+    member : _ -> throwError . errorMessage' ss $ MissingClassMember member
     [] -> do
       -- Replace the type arguments with the appropriate types in the member types
       let memberTypes = map (second (replaceAllTypeVars (zip (map fst typeClassArguments) tys))) typeClassMembers
@@ -307,8 +307,8 @@ typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
   where
 
   memberToValue :: [(Ident, Type)] -> Declaration -> Desugar m Expr
-  memberToValue tys' (ValueDecl _ ident _ [] [MkUnguarded val]) = do
-    _ <- maybe (throwError . errorMessage $ ExtraneousClassMember ident className) return $ lookup ident tys'
+  memberToValue tys' (ValueDecl (ss', _) ident _ [] [MkUnguarded val]) = do
+    _ <- maybe (throwError . errorMessage' ss' $ ExtraneousClassMember ident className) return $ lookup ident tys'
     return val
   memberToValue _ _ = internalError "Invalid declaration in type instance definition"
 
