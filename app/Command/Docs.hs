@@ -8,8 +8,6 @@ import           Control.Arrow (first, second)
 import           Control.Category ((>>>))
 import           Control.Monad.Writer
 import           Control.Monad.Trans.Except (runExceptT)
-import qualified Data.Map.Strict as M
-import           Data.Maybe (fromJust)
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Data.Function (on)
@@ -110,19 +108,9 @@ docgen (PSCDocsOptions fmt inputGlob output) = do
   takeByName' = takeModulesByName' D.modName
 
   parseAndConvert input =
-    runExceptT (do
-      (modules, moduleMap) <- D.parseFilesInPackages input []
-
-      let moduleNameToFileMap =
-            M.fromList $ swap . fmap P.getModuleName <$> modules
-          getModuleFile docModule =
-            fromJust $ M.lookup (D.modName docModule) moduleNameToFileMap
-          pairDocModule docModule =
-            (getModuleFile docModule, docModule)
-
-      convertedModules <- D.convertModulesInPackage (map snd modules) moduleMap
-      pure $ pairDocModule <$> convertedModules
-    ) >>= successOrExit
+    runExceptT (D.parseFilesInPackages input []
+                >>= uncurry D.convertTaggedModulesInPackage)
+    >>= successOrExit
 
 -- |
 -- Given a list of module names and a list of modules, return a list of modules
