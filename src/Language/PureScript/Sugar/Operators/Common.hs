@@ -47,7 +47,6 @@ opTable
   -> [[P.Operator (Chain a) () Identity a]]
 opTable ops fromOp reapply =
   map (map (\(name, a) -> P.Infix (P.try (matchOp fromOp name) >> return (reapply name)) (toAssoc a))) ops
-  ++ [[ P.Infix (P.try (parseOp fromOp >>= \ident -> return (reapply ident))) P.AssocLeft ]]
 
 matchOperators
   :: forall a nameType
