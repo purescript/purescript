@@ -16,6 +16,9 @@ import Language.PureScript.Names
 
 type Chain a = [Either a a]
 
+type FromOp nameType a = a -> Maybe (SourceSpan, Qualified (OpName nameType))
+type Reapply nameType a = SourceSpan -> Qualified (OpName nameType) -> a -> a -> a
+
 toAssoc :: Associativity -> P.Assoc
 toAssoc Infixl = P.AssocLeft
 toAssoc Infixr = P.AssocRight
@@ -28,34 +31,34 @@ parseValue :: P.Parsec (Chain a) () a
 parseValue = token (either Just (const Nothing)) P.<?> "expression"
 
 parseOp
-  :: (a -> Maybe (Qualified (OpName nameType)))
-  -> P.Parsec (Chain a) () (Qualified (OpName nameType))
+  :: FromOp nameType a
+  -> P.Parsec (Chain a) () (SourceSpan, Qualified (OpName nameType))
 parseOp fromOp = token (either (const Nothing) fromOp) P.<?> "operator"
 
 matchOp
-  :: (a -> Maybe (Qualified (OpName nameType)))
+  :: FromOp nameType a
   -> Qualified (OpName nameType)
-  -> P.Parsec (Chain a) () ()
+  -> P.Parsec (Chain a) () SourceSpan
 matchOp fromOp op = do
-  ident <- parseOp fromOp
+  (ss, ident) <- parseOp fromOp
   guard $ ident == op
+  pure ss
 
 opTable
   :: [[(Qualified (OpName nameType), Associativity)]]
-  -> (a -> Maybe (Qualified (OpName nameType)))
-  -> (Qualified (OpName nameType) -> a -> a -> a)
+  -> FromOp nameType a
+  -> Reapply nameType a
   -> [[P.Operator (Chain a) () Identity a]]
 opTable ops fromOp reapply =
-  map (map (\(name, a) -> P.Infix (P.try (matchOp fromOp name) >> return (reapply name)) (toAssoc a))) ops
-  ++ [[ P.Infix (P.try (parseOp fromOp >>= \ident -> return (reapply ident))) P.AssocLeft ]]
+  map (map (\(name, a) -> P.Infix (P.try (matchOp fromOp name) >>= \ss -> return (reapply ss name)) (toAssoc a))) ops
 
 matchOperators
   :: forall a nameType
    . Show a
   => (a -> Bool)
   -> (a -> Maybe (a, a, a))
-  -> (a -> Maybe (Qualified (OpName nameType)))
-  -> (Qualified (OpName nameType) -> a -> a -> a)
+  -> FromOp nameType a
+  -> Reapply nameType a
   -> ([[P.Operator (Chain a) () Identity a]] -> P.OperatorTable (Chain a) () Identity a)
   -> [[(Qualified (OpName nameType), Associativity)]]
   -> a

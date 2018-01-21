@@ -59,7 +59,7 @@ checkSubsume unsolved env st userT envT = checkInEnvironment env st $ do
   userT' <- initializeSkolems userT
   envT' <- initializeSkolems envT
 
-  let dummyExpression = P.Var (P.Qualified Nothing (P.Ident "x"))
+  let dummyExpression = P.Var nullSourceSpan (P.Qualified Nothing (P.Ident "x"))
 
   elab <- subsumes envT' userT'
   subst <- gets TC.checkSubstitution

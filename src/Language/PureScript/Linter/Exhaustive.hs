@@ -115,16 +115,16 @@ genericMerge f bsl@((s, b):bs) bsr@((s', b'):bs')
 --
 missingCasesSingle :: Environment -> ModuleName -> Binder -> Binder -> ([Binder], Either RedundancyError Bool)
 missingCasesSingle _ _ _ NullBinder = ([], return True)
-missingCasesSingle _ _ _ (VarBinder _) = ([], return True)
-missingCasesSingle env mn (VarBinder _) b = missingCasesSingle env mn NullBinder b
-missingCasesSingle env mn br (NamedBinder _ bl) = missingCasesSingle env mn br bl
-missingCasesSingle env mn NullBinder cb@(ConstructorBinder con _) =
+missingCasesSingle _ _ _ (VarBinder _ _) = ([], return True)
+missingCasesSingle env mn (VarBinder _ _) b = missingCasesSingle env mn NullBinder b
+missingCasesSingle env mn br (NamedBinder _ _ bl) = missingCasesSingle env mn br bl
+missingCasesSingle env mn NullBinder cb@(ConstructorBinder ss con _) =
   (concatMap (\cp -> fst $ missingCasesSingle env mn cp cb) allPatterns, return True)
   where
-  allPatterns = map (\(p, t) -> ConstructorBinder (qualifyName p mn con) (initialize $ length t))
+  allPatterns = map (\(p, t) -> ConstructorBinder ss (qualifyName p mn con) (initialize $ length t))
                   $ getConstructors env mn con
-missingCasesSingle env mn cb@(ConstructorBinder con bs) (ConstructorBinder con' bs')
-  | con == con' = let (bs'', pr) = missingCasesMultiple env mn bs bs' in (map (ConstructorBinder con) bs'', pr)
+missingCasesSingle env mn cb@(ConstructorBinder ss con bs) (ConstructorBinder _ con' bs')
+  | con == con' = let (bs'', pr) = missingCasesMultiple env mn bs bs' in (map (ConstructorBinder ss con) bs'', pr)
   | otherwise = ([cb], return False)
 missingCasesSingle env mn NullBinder (LiteralBinder (ObjectLiteral bs)) =
   (map (LiteralBinder . ObjectLiteral . zip (map fst bs)) allMisses, pr)
@@ -291,7 +291,7 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
     return $
       Let
         [ partial var tyVar ]
-        $ App (Var (Qualified Nothing UnusedIdent)) e
+        $ App (Var ss (Qualified Nothing UnusedIdent)) e
     where
       partial :: Text -> Text -> Declaration
       partial var tyVar =
@@ -299,7 +299,7 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
         [MkUnguarded
           (TypedValue
            True
-           (Abs (VarBinder (Ident var)) (Var (Qualified Nothing (Ident var))))
+           (Abs (VarBinder ss (Ident var)) (Var ss (Qualified Nothing (Ident var))))
            (ty tyVar))
         ]
 
@@ -336,7 +336,7 @@ checkExhaustiveExpr initSS env mn = onExpr initSS
   onDecl decl = return decl
 
   onExpr :: SourceSpan -> Expr -> m Expr
-  onExpr ss (UnaryMinus e) = UnaryMinus <$> onExpr ss e
+  onExpr _ (UnaryMinus ss e) = UnaryMinus ss <$> onExpr ss e
   onExpr ss (Literal (ArrayLiteral es)) = Literal . ArrayLiteral <$> mapM (onExpr ss) es
   onExpr ss (Literal (ObjectLiteral es)) = Literal . ObjectLiteral <$> mapM (sndM (onExpr ss)) es
   onExpr ss (TypeClassDictionaryConstructorApp x e) = TypeClassDictionaryConstructorApp x <$> onExpr ss e

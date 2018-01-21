@@ -64,13 +64,13 @@ desugarGuardedExprs ss (Case scrut alternatives)
     -- We bind the scrutinee to Vars here to mitigate this case.
     (scrut', scrut_decls) <- unzip <$> forM scrut (\e -> do
       scrut_id <- freshIdent'
-      pure ( Var (Qualified Nothing scrut_id)
+      pure ( Var ss (Qualified Nothing scrut_id)
            , ValueDecl (ss, []) scrut_id Private [] [MkUnguarded e]
            )
       )
     Let scrut_decls <$> desugarGuardedExprs ss (Case scrut' alternatives)
   where
-    isTrivialExpr (Var _) = True
+    isTrivialExpr (Var _ _) = True
     isTrivialExpr (Literal _) = True
     isTrivialExpr (Accessor _ e) = isTrivialExpr e
     isTrivialExpr (Parens e) = isTrivialExpr e
@@ -226,13 +226,13 @@ desugarGuardedExprs ss (Case scrut alternatives) =
 
         let
           goto_rem_case :: Expr
-          goto_rem_case = Var (Qualified Nothing rem_case_id)
+          goto_rem_case = Var ss (Qualified Nothing rem_case_id)
             `App` Literal (BooleanLiteral True)
           alt_fail = [CaseAlternative [NullBinder] [MkUnguarded goto_rem_case]]
 
         pure $ Let [
           ValueDecl (ss, []) rem_case_id Private []
-            [MkUnguarded (Abs (VarBinder unused_binder) desugared)]
+            [MkUnguarded (Abs (VarBinder ss unused_binder) desugared)]
           ] (mk_body alt_fail)
 
       | otherwise
@@ -308,11 +308,11 @@ desugarAbs = flip parU f
   (f, _, _) = everywhereOnValuesM return replace return
 
   replace :: Expr -> m Expr
-  replace (Abs (stripPositioned -> (VarBinder i)) val) =
-    pure (Abs (VarBinder i) val)
+  replace (Abs (stripPositioned -> (VarBinder ss i)) val) =
+    pure (Abs (VarBinder ss i) val)
   replace (Abs binder val) = do
     ident <- freshIdent'
-    return $ Abs (VarBinder ident) $ Case [Var (Qualified Nothing ident)] [CaseAlternative [binder] [MkUnguarded val]]
+    return $ Abs (VarBinder nullSourceSpan ident) $ Case [Var nullSourceSpan (Qualified Nothing ident)] [CaseAlternative [binder] [MkUnguarded val]]
   replace other = return other
 
 stripPositioned :: Binder -> Binder
@@ -345,13 +345,13 @@ inSameGroup _ _ = False
 toDecls :: forall m. (MonadSupply m, MonadError MultipleErrors m) => [Declaration] -> m [Declaration]
 toDecls [ValueDecl sa@(ss, _) ident nameKind bs [MkUnguarded val]] | all isIrrefutable bs = do
   args <- mapM fromVarBinder bs
-  let body = foldr (Abs . VarBinder) val args
+  let body = foldr (Abs . VarBinder ss) val args
   guardWith (errorMessage' ss (OverlappingArgNames (Just ident))) $ length (ordNub args) == length args
   return [ValueDecl sa ident nameKind [] [MkUnguarded body]]
   where
   fromVarBinder :: Binder -> m Ident
   fromVarBinder NullBinder = freshIdent'
-  fromVarBinder (VarBinder name) = return name
+  fromVarBinder (VarBinder _ name) = return name
   fromVarBinder (PositionedBinder _ _ b) = fromVarBinder b
   fromVarBinder (TypedBinder _ b) = fromVarBinder b
   fromVarBinder _ = internalError "fromVarBinder: Invalid argument"
@@ -380,9 +380,9 @@ makeCaseDeclaration ss ident alternatives = do
   args <- if allUnique (catMaybes argNames)
             then mapM argName argNames
             else replicateM (length argNames) freshIdent'
-  let vars = map (Var . Qualified Nothing) args
+  let vars = map (Var ss . Qualified Nothing) args
       binders = [ CaseAlternative bs result | (bs, result) <- alternatives ]
-  let value = foldr (Abs . VarBinder) (Case vars binders) args
+  let value = foldr (Abs . VarBinder ss) (Case vars binders) args
 
   return $ ValueDecl (ss, []) ident Public [] [MkUnguarded value]
   where
@@ -391,7 +391,7 @@ makeCaseDeclaration ss ident alternatives = do
   -- Everything else becomes Nothing, which indicates that we
   -- have to generate a name.
   findName :: Binder -> Maybe Ident
-  findName (VarBinder name) = Just name
+  findName (VarBinder _ name) = Just name
   findName (PositionedBinder _ _ binder) = findName binder
   findName _ = Nothing
 

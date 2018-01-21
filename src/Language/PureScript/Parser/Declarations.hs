@@ -101,7 +101,7 @@ parseLocalValueDeclaration = withSourceAnnF .
     join $ go <$> parseBinder <*> P.many parseBinderNoParens
   where
   go :: Binder -> [Binder] -> TokenParser (SourceAnn -> Declaration)
-  go (VarBinder ident) bs = parseValueWithIdentAndBinders ident bs
+  go (VarBinder _ ident) bs = parseValueWithIdentAndBinders ident bs
   go (PositionedBinder _ _ b) bs = go b bs
   go binder [] = do
     boot <- indented *> equals *> parseValueWithWhereClause
@@ -381,8 +381,8 @@ parseObjectLiteral p = ObjectLiteral <$> braces (commaSep p)
 parseIdentifierAndValue :: TokenParser (PSString, Expr)
 parseIdentifierAndValue =
   do
-    name <- indented *> lname
-    b <- P.option (Var $ Qualified Nothing (Ident name)) rest
+    (ss, name) <- indented *> withSourceSpan' (,) lname
+    b <- P.option (Var ss $ Qualified Nothing (Ident name)) rest
     return (mkString name, b)
   <|> (,) <$> (indented *> stringLiteral) <*> rest
   where
@@ -400,10 +400,10 @@ parseAbs = do
   toFunction args value = foldr ($) value args
 
 parseVar :: TokenParser Expr
-parseVar = Var <$> parseQualified parseIdent
+parseVar = withSourceSpan' Var $ parseQualified parseIdent
 
 parseConstructor :: TokenParser Expr
-parseConstructor = Constructor <$> parseQualified dataConstructorName
+parseConstructor = withSourceSpan' Constructor $ parseQualified dataConstructorName
 
 parseCase :: TokenParser Expr
 parseCase = Case <$> P.between (reserved "case") (indented *> reserved "of") (commaSep1 parseValue)
@@ -453,7 +453,7 @@ parseValueAtom = withSourceSpan PositionedValue $ P.choice
                  , parseAdo
                  , parseLet
                  , P.try $ Parens <$> parens parseValue
-                 , Op <$> parseQualified (parens parseOperator)
+                 , withSourceSpan' Op $ parseQualified (parens parseOperator)
                  , parseHole
                  ]
 
@@ -461,7 +461,7 @@ parseValueAtom = withSourceSpan PositionedValue $ P.choice
 parseInfixExpr :: TokenParser Expr
 parseInfixExpr
   = P.between tick tick parseValue
-  <|> withSourceSpan PositionedValue (Op <$> parseQualified parseOperator)
+  <|> withSourceSpan' Op (parseQualified parseOperator)
 
 parseHole :: TokenParser Expr
 parseHole = Hole <$> holeLit
@@ -479,7 +479,7 @@ parsePropertyUpdate = do
     parseNestedUpdate = Branch <$> parseUpdaterBodyFields
 
 parseAccessor :: Expr -> TokenParser Expr
-parseAccessor (Constructor _) = P.unexpected "constructor"
+parseAccessor (Constructor _ _) = P.unexpected "constructor"
 parseAccessor obj = P.try $ Accessor <$> (indented *> dot *> indented *> parseLabel) <*> pure obj
 
 parseDo :: TokenParser Expr
@@ -519,15 +519,15 @@ indexersAndAccessors = buildPostfixParser postfixTable parseValueAtom
 
 -- | Parse an expression
 parseValue :: TokenParser Expr
-parseValue = withSourceSpan PositionedValue
-  (P.buildExpressionParser operators
-    . buildPostfixParser postfixTable
-    $ indexersAndAccessors) P.<?> "expression"
+parseValue =
+  P.buildExpressionParser operators
+    (buildPostfixParser postfixTable indexersAndAccessors)
+    P.<?> "expression"
   where
   postfixTable = [ \v -> P.try (flip App <$> (indented *> indexersAndAccessors)) <*> pure v
                  , \v -> flip (TypedValue True) <$> (indented *> doubleColon *> parsePolyType) <*> pure v
                  ]
-  operators = [ [ P.Prefix (indented *> symbol' "-" *> return UnaryMinus)
+  operators = [ [ P.Prefix (indented *> withSourceSpan' (\ss _ -> UnaryMinus ss) (symbol' "-"))
                 ]
               , [ P.Infix (P.try (indented *> parseInfixExpr P.<?> "infix expression") >>= \ident ->
                     return (BinaryNoParens ident)) P.AssocRight
@@ -559,34 +559,40 @@ parseNumberLiteral = LiteralBinder . NumericLiteral <$> (sign <*> number)
          <|> return id
 
 parseNullaryConstructorBinder :: TokenParser Binder
-parseNullaryConstructorBinder = ConstructorBinder <$> parseQualified dataConstructorName <*> pure []
+parseNullaryConstructorBinder = withSourceSpanF $
+  (\name ss -> ConstructorBinder ss name [])
+    <$> parseQualified dataConstructorName
 
 parseConstructorBinder :: TokenParser Binder
-parseConstructorBinder = ConstructorBinder <$> parseQualified dataConstructorName <*> many (indented *> parseBinderNoParens)
+parseConstructorBinder = withSourceSpanF $
+  (\name args ss -> ConstructorBinder ss name args)
+    <$> parseQualified dataConstructorName
+    <*> many (indented *> parseBinderNoParens)
 
 parseObjectBinder:: TokenParser Binder
-parseObjectBinder = LiteralBinder <$> parseObjectLiteral (indented *> parseIdentifierAndBinder)
+parseObjectBinder =
+  LiteralBinder <$> parseObjectLiteral (indented *> parseEntry)
+  where
+    parseEntry :: TokenParser (PSString, Binder)
+    parseEntry = var <|> (,) <$> stringLiteral <*> rest
+      where
+        var = withSourceSpanF $ do
+          name <- lname
+          b <- P.option (\ss -> VarBinder ss (Ident name)) (const <$> rest)
+          return $ \ss -> (mkString name, b ss)
+        rest = indented *> colon *> indented *> parseBinder
 
 parseArrayBinder :: TokenParser Binder
 parseArrayBinder = LiteralBinder <$> parseArrayLiteral (indented *> parseBinder)
 
 parseVarOrNamedBinder :: TokenParser Binder
-parseVarOrNamedBinder = do
+parseVarOrNamedBinder = withSourceSpanF $ do
   name <- parseIdent
-  let parseNamedBinder = NamedBinder name <$> (at *> indented *> parseBinderAtom)
-  parseNamedBinder <|> return (VarBinder name)
+  let parseNamedBinder = (\b ss -> NamedBinder ss name b) <$> (at *> indented *> parseBinderAtom)
+  parseNamedBinder <|> return (`VarBinder` name)
 
 parseNullBinder :: TokenParser Binder
 parseNullBinder = underscore *> return NullBinder
-
-parseIdentifierAndBinder :: TokenParser (PSString, Binder)
-parseIdentifierAndBinder =
-    do name <- lname
-       b <- P.option (VarBinder (Ident name)) rest
-       return (mkString name, b)
-    <|> (,) <$> stringLiteral <*> rest
-  where
-    rest = indented *> colon *> indented *> parseBinder
 
 -- | Parse a binder
 parseBinder :: TokenParser Binder
@@ -607,7 +613,7 @@ parseBinder =
     postfixTable = [ \b -> flip TypedBinder b <$> (indented *> doubleColon *> parsePolyType) ]
 
     parseOpBinder :: TokenParser Binder
-    parseOpBinder = OpBinder <$> parseQualified parseOperator
+    parseOpBinder = withSourceSpan' OpBinder $ parseQualified parseOperator
 
 parseBinderAtom :: TokenParser Binder
 parseBinderAtom = withSourceSpan PositionedBinder

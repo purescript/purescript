@@ -47,7 +47,7 @@ desugarSignedLiterals (Module ss coms mn ds exts) =
   Module ss coms mn (map f' ds) exts
   where
   (f', _, _) = everywhereOnValues id go id
-  go (UnaryMinus val) = App (Var (Qualified Nothing (Ident C.negate))) val
+  go (UnaryMinus ss' val) = App (Var ss' (Qualified Nothing (Ident C.negate))) val
   go other = other
 
 -- |
@@ -142,30 +142,26 @@ rebracketFiltered pred_ externs modules = do
 
     goExpr :: Maybe SourceSpan -> Expr -> m (Maybe SourceSpan, Expr)
     goExpr _ e@(PositionedValue pos _ _) = return (Just pos, e)
-    goExpr pos (Op op) =
-      (pos, ) <$> case op `M.lookup` valueAliased of
+    goExpr _ (Op pos op) =
+      (Just pos, ) <$> case op `M.lookup` valueAliased of
         Just (Qualified mn' (Left alias)) ->
-          return $ Var (Qualified mn' alias)
+          return $ Var pos (Qualified mn' alias)
         Just (Qualified mn' (Right alias)) ->
-          return $ Constructor (Qualified mn' alias)
+          return $ Constructor pos (Qualified mn' alias)
         Nothing ->
-          maybe id rethrowWithPosition pos $
-            throwError . errorMessage . UnknownName $ fmap ValOpName op
+          throwError . errorMessage' pos . UnknownName $ fmap ValOpName op
     goExpr pos other = return (pos, other)
 
     goBinder :: Maybe SourceSpan -> Binder -> m (Maybe SourceSpan, Binder)
     goBinder _ b@(PositionedBinder pos _ _) = return (Just pos, b)
-    goBinder pos (BinaryNoParensBinder (OpBinder op) lhs rhs) =
+    goBinder _ (BinaryNoParensBinder (OpBinder pos op) lhs rhs) =
       case op `M.lookup` valueAliased of
         Just (Qualified mn' (Left alias)) ->
-          maybe id rethrowWithPosition pos $
-            throwError . errorMessage $
-              InvalidOperatorInBinder op (Qualified mn' alias)
+          throwError . errorMessage' pos $ InvalidOperatorInBinder op (Qualified mn' alias)
         Just (Qualified mn' (Right alias)) ->
-          return (pos, ConstructorBinder (Qualified mn' alias) [lhs, rhs])
+          return (Just pos, ConstructorBinder pos (Qualified mn' alias) [lhs, rhs])
         Nothing ->
-          maybe id rethrowWithPosition pos $
-            throwError . errorMessage . UnknownName $ fmap ValOpName op
+          throwError . errorMessage' pos . UnknownName $ fmap ValOpName op
     goBinder _ BinaryNoParensBinder{} =
       internalError "BinaryNoParensBinder has no OpBinder"
     goBinder pos other = return (pos, other)
