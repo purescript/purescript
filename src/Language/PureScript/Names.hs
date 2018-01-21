@@ -1,5 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE DeriveFoldable #-}
 
 -- |
 -- Data types for names
@@ -176,7 +178,7 @@ moduleNameFromString = ModuleName . splitProperNames
 -- A qualified name, i.e. a name with an optional module name
 --
 data Qualified a = Qualified (Maybe ModuleName) a
-  deriving (Show, Eq, Ord, Functor, Generic)
+  deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 instance NFData a => NFData (Qualified a)
 

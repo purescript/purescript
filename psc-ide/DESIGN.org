@@ -225,10 +225,21 @@ it asynchronously and just return the errors/warnings to the editors
 immediately. In a test setting however, we might want to test that the rebuild
 cache was filled properly and serves completions for private members. (Examples:
 Language.PureScript.Ide.RebuildSpec)
+** Find Usages
+   Important Files: Ide.Usages
+
+   Find usages is implemented to execute during query time, rather than load
+   time, to reduce memory usage. We expect the callee to provide us with a
+   module name, namespace, and textual identifier, which uniquely identifies a
+   declaration.
+
+   By starting from a given declaration we can efficiently filter the set of all
+   modules by only looking at reexports and imports first before we perform
+   expensive ASTs traversals searching for usages.
 ** Everything else
 * Tips and Tricks
 ** Running only =ide='s test suite
-   ~stack test --test-arguments "-m Language.PureScript.Ide"~
+   ~stack test --ta "-p ide"~
 * Facts and thoughts without a good place yet
 ** Using externs files as source of truth
 *** Pros
@@ -251,9 +262,11 @@ Language.PureScript.Ide.RebuildSpec)
 - No source positions or docstrings
 ** When source globs are added
 *** New features enabled
-- Enables go-to-definition by allowing us to grab source spans for declarations
+- Enables go-to-definition by allowing us to collect source spans for
+  declarations
 - Enables us to recover type signatures without synonyms expanded
-- Enables us to grab docstrings (We don't do that yet, unfortunately)
+- Enables us to collect docstrings
+- Enables us to collect usages
 *** Cons
 - Slower startup (Actually the load command takes longer, but because the server
   is useless until load has been run I count that as startup). Startup on

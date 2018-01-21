@@ -53,6 +53,11 @@ data Command
       { addClauseLine        :: Text
       , addClauseAnnotations :: WildcardAnnotations
       }
+    | FindUsages
+      { usagesModule :: P.ModuleName
+      , usagesIdentifier :: Text
+      , usagesNamespace :: IdeNamespace
+      }
       -- Import InputFile OutputFile
     | Import FilePath (Maybe FilePath) [Filter] ImportCommand
     | List { listType :: ListType }
@@ -71,6 +76,7 @@ commandName c = case c of
   Pursuit{} -> "Pursuit"
   CaseSplit{} -> "CaseSplit"
   AddClause{} -> "AddClause"
+  FindUsages{} -> "FindUsages"
   Import{} -> "Import"
   List{} -> "List"
   Rebuild{} -> "Rebuild"
@@ -158,6 +164,12 @@ instance FromJSON Command where
         AddClause
           <$> params .: "line"
           <*> (mkAnnotations <$> params .: "annotations")
+      "usages" -> do
+        params <- o .: "params"
+        FindUsages
+          <$> (map P.moduleNameFromString (params .: "module"))
+          <*> params .: "identifier"
+          <*> params .: "namespace"
       "import" -> do
         params <- o .: "params"
         Import
