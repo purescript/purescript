@@ -30,14 +30,13 @@ shouldBeUsage usage' (fp, range) =
     do
       fp `shouldBe` P.spanName usage'
 
-      (startLine, startColumn)
+      (P.sourcePosLine (P.spanStart usage'), P.sourcePosColumn (P.spanStart usage'))
         `shouldBe`
-          ( P.sourcePosLine (P.spanStart usage')
-          , P.sourcePosColumn (P.spanStart usage'))
-      (endLine, endColumn)
+        (startLine, startColumn)
+
+      (P.sourcePosLine (P.spanEnd usage'), P.sourcePosColumn (P.spanEnd usage'))
         `shouldBe`
-          ( P.sourcePosLine (P.spanEnd usage')
-          , P.sourcePosColumn (P.spanEnd usage'))
+        (endLine, endColumn)
 
 spec :: Spec
 spec = describe "Finding Usages" $ do
@@ -58,7 +57,7 @@ spec = describe "Finding Usages" $ do
         Test.runIde [ load ["FindUsage", "FindUsage.Definition", "FindUsage.Reexport"]
                     , usage (Test.mn "FindUsage.Definition") "$%" IdeNSValue
                     ]
-      usage1 `shouldBeUsage` ("src" </> "FindUsage.purs", "9:3-9:9")
+      usage1 `shouldBeUsage` ("src" </> "FindUsage.purs", "9:5-9:7")
     it "finds a reexported usage" $ do
       ([_, Right (UsagesResult [usage1])], _) <- Test.inProject $
         Test.runIde [ load ["FindUsage", "FindUsage.Definition", "FindUsage.Reexport"]
