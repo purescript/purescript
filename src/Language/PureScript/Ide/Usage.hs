@@ -136,27 +136,23 @@ applySearch module_ search =
     (extr, _, _, _, _) = P.everythingWithScope mempty goExpr goBinder mempty mempty
 
     goExpr scope expr = case expr of
-      P.PositionedValue sp _ (P.Var i)
+      P.Var sp i
         | Just ideValue <- preview _IdeDeclValue (P.disqualify search)
         , P.isQualified search || not (_ideValueIdent ideValue `Set.member` scope) ->
           [sp | map P.runIdent i == map identifierFromIdeDeclaration search]
-
-      P.PositionedValue sp _ (P.Constructor name)
+      P.Constructor sp name
         | Just ideDtor <- traverse (preview _IdeDeclDataConstructor) search ->
           [sp | name == map _ideDtorName ideDtor]
-      P.PositionedValue sp _ (P.Op opName)
+      P.Op sp opName
         | Just ideOp <- traverse (preview _IdeDeclValueOperator) search ->
           [sp | opName == map _ideValueOpName ideOp]
       _ -> []
 
     goBinder _ binder = case binder of
-      P.PositionedBinder sp _ (P.ConstructorBinder ctorName _)
+      P.ConstructorBinder sp ctorName _
         | Just ideDtor <- traverse (preview _IdeDeclDataConstructor) search ->
           [sp | ctorName == map _ideDtorName ideDtor]
-      P.PositionedBinder sp _ (P.OpBinder opName)
-        | Just op <- traverse (preview _IdeDeclValueOperator) search ->
-          [sp | opName == map _ideValueOpName op]
-      P.PositionedBinder sp _ (P.BinaryNoParensBinder (P.OpBinder opName) _ _)
+      P.OpBinder sp opName
         | Just op <- traverse (preview _IdeDeclValueOperator) search ->
           [sp | opName == map _ideValueOpName op]
       _ -> []

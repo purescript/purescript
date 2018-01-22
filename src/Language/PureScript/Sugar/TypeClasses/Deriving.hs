@@ -445,13 +445,13 @@ deriveEq ss mn syns ds tyConNm = do
     mkEqFunction _ = internalError "mkEqFunction: expected DataDeclaration"
 
     preludeConj :: Expr -> Expr -> Expr
-    preludeConj = App . App (Var nullSourceSpan (Qualified (Just (ModuleName [ProperName "Data", ProperName "HeytingAlgebra"])) (Ident C.conj)))
+    preludeConj = App . App (Var ss (Qualified (Just (ModuleName [ProperName "Data", ProperName "HeytingAlgebra"])) (Ident C.conj)))
 
     preludeEq :: Expr -> Expr -> Expr
-    preludeEq = App . App (Var nullSourceSpan (Qualified (Just dataEq) (Ident C.eq)))
+    preludeEq = App . App (Var ss (Qualified (Just dataEq) (Ident C.eq)))
 
     preludeEq1 :: Expr -> Expr -> Expr
-    preludeEq1 = App . App (Var (Qualified (Just dataEq) (Ident C.eq1)))
+    preludeEq1 = App . App (Var ss (Qualified (Just dataEq) (Ident C.eq1)))
 
     addCatch :: [CaseAlternative] -> [CaseAlternative]
     addCatch xs
@@ -465,10 +465,10 @@ deriveEq ss mn syns ds tyConNm = do
       identsL <- replicateM (length tys) (freshIdent "l")
       identsR <- replicateM (length tys) (freshIdent "r")
       tys' <- mapM (replaceAllTypeSynonymsM syns) tys
-      let tests = zipWith3 toEqTest (map (Var nullSourceSpan . Qualified Nothing) identsL) (map (Var nullSourceSpan . Qualified Nothing) identsR) tys'
+      let tests = zipWith3 toEqTest (map (Var ss . Qualified Nothing) identsL) (map (Var ss . Qualified Nothing) identsR) tys'
       return $ CaseAlternative [caseBinder identsL, caseBinder identsR] (unguarded (conjAll tests))
       where
-      caseBinder idents = ConstructorBinder nullSourceSpan (Qualified (Just mn) ctorName) (map (VarBinder nullSourceSpan) idents)
+      caseBinder idents = ConstructorBinder ss (Qualified (Just mn) ctorName) (map (VarBinder ss) idents)
 
     conjAll :: [Expr] -> Expr
     conjAll [] = Literal (BooleanLiteral True)
@@ -489,7 +489,7 @@ deriveEq1 ss =
   [ ValueDecl (ss, []) (Ident C.eq1) Public [] (unguarded preludeEq)]
   where
     preludeEq :: Expr
-    preludeEq = Var (Qualified (Just dataEq) (Ident C.eq))
+    preludeEq = Var ss (Qualified (Just dataEq) (Ident C.eq))
 
 deriveOrd
   :: forall m
@@ -528,29 +528,29 @@ deriveOrd ss mn syns ds tyConNm = do
     orderingName = Qualified (Just (ModuleName [ProperName "Data", ProperName "Ordering"])) . ProperName
 
     orderingCtor :: Text -> Expr
-    orderingCtor = Constructor nullSourceSpan . orderingName
+    orderingCtor = Constructor ss . orderingName
 
     orderingBinder :: Text -> Binder
-    orderingBinder name = ConstructorBinder nullSourceSpan (orderingName name) []
+    orderingBinder name = ConstructorBinder ss (orderingName name) []
 
     ordCompare :: Expr -> Expr -> Expr
-    ordCompare = App . App (Var nullSourceSpan (Qualified (Just dataOrd) (Ident C.compare)))
+    ordCompare = App . App (Var ss (Qualified (Just dataOrd) (Ident C.compare)))
 
     ordCompare1 :: Expr -> Expr -> Expr
-    ordCompare1 = App . App (Var (Qualified (Just dataOrd) (Ident C.compare1)))
+    ordCompare1 = App . App (Var ss (Qualified (Just dataOrd) (Ident C.compare1)))
 
     mkCtorClauses :: ((ProperName 'ConstructorName, [Type]), Bool) -> m [CaseAlternative]
     mkCtorClauses ((ctorName, tys), isLast) = do
       identsL <- replicateM (length tys) (freshIdent "l")
       identsR <- replicateM (length tys) (freshIdent "r")
       tys' <- mapM (replaceAllTypeSynonymsM syns) tys
-      let tests = zipWith3 toOrdering (map (Var nullSourceSpan . Qualified Nothing) identsL) (map (Var nullSourceSpan . Qualified Nothing) identsR) tys'
-          extras | not isLast = [ CaseAlternative [ ConstructorBinder nullSourceSpan (Qualified (Just mn) ctorName) (replicate (length tys) NullBinder)
+      let tests = zipWith3 toOrdering (map (Var ss . Qualified Nothing) identsL) (map (Var ss . Qualified Nothing) identsR) tys'
+          extras | not isLast = [ CaseAlternative [ ConstructorBinder ss (Qualified (Just mn) ctorName) (replicate (length tys) NullBinder)
                                                   , NullBinder
                                                   ]
                                                   (unguarded (orderingCtor "LT"))
                                 , CaseAlternative [ NullBinder
-                                                  , ConstructorBinder nullSourceSpan (Qualified (Just mn) ctorName) (replicate (length tys) NullBinder)
+                                                  , ConstructorBinder ss (Qualified (Just mn) ctorName) (replicate (length tys) NullBinder)
                                                   ]
                                                   (unguarded (orderingCtor "GT"))
                                 ]
@@ -562,7 +562,7 @@ deriveOrd ss mn syns ds tyConNm = do
              : extras
 
       where
-      caseBinder idents = ConstructorBinder nullSourceSpan (Qualified (Just mn) ctorName) (map (VarBinder nullSourceSpan) idents)
+      caseBinder idents = ConstructorBinder ss (Qualified (Just mn) ctorName) (map (VarBinder ss) idents)
 
     appendAll :: [Expr] -> Expr
     appendAll [] = orderingCtor "EQ"
@@ -590,7 +590,7 @@ deriveOrd1 ss =
   [ ValueDecl (ss, []) (Ident C.compare1) Public [] (unguarded dataOrdCompare)]
   where
     dataOrdCompare :: Expr
-    dataOrdCompare = Var (Qualified (Just dataOrd) (Ident C.compare))
+    dataOrdCompare = Var ss (Qualified (Just dataOrd) (Ident C.compare))
 
 deriveNewtype
   :: forall m
