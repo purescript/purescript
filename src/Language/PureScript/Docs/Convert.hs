@@ -4,6 +4,7 @@
 module Language.PureScript.Docs.Convert
   ( convertModules
   , convertModulesWithEnv
+  , convertTaggedModulesInPackage
   , convertModulesInPackage
   , convertModulesInPackageWithEnv
   ) where
@@ -24,6 +25,31 @@ import qualified Language.PureScript as P
 import Web.Bower.PackageMeta (PackageName)
 
 import Text.Parsec (eof)
+
+-- |
+-- Like convertModuleInPackage, but with the modules tagged by their
+-- file paths.
+--
+convertTaggedModulesInPackage ::
+  (MonadError P.MultipleErrors m) =>
+  [(FilePath, P.Module)] ->
+  Map P.ModuleName PackageName ->
+  m [(FilePath, Module)]
+convertTaggedModulesInPackage taggedModules modulesDeps =
+  traverse pairDocModule =<< convertModulesInPackage modules modulesDeps
+  where
+  modules = map snd taggedModules
+
+  moduleNameToFileMap =
+    Map.fromList $ swap . fmap P.getModuleName <$> taggedModules
+
+  getModuleFile docModule =
+    case Map.lookup (modName docModule) moduleNameToFileMap of
+      Just filePath -> pure filePath
+      Nothing -> throwError . P.errorMessage $
+        P.ModuleNotFound $ modName docModule
+
+  pairDocModule docModule = (, docModule) <$> getModuleFile docModule
 
 -- |
 -- Like convertModules, except that it takes a list of modules, together with

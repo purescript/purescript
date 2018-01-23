@@ -15,6 +15,7 @@ import Control.Monad.IO.Class (liftIO)
 import Data.List (findIndex)
 import Data.Foldable
 import Safe (headMay)
+import qualified Data.Map as Map
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Monoid
 import Data.Text (Text)
@@ -64,18 +65,31 @@ spec = do
 
   let linksCtx = Docs.getLinksContext pkg
 
-  context "Language.PureScript.Docs" $
-    forM_ testCases $ \(mnString, assertions) -> do
-      let mn = P.moduleNameFromString mnString
-          mdl = find ((==) mn . Docs.modName) pkgModules
+  context "Language.PureScript.Docs" $ do
+    context "Doc generation tests:" $
+      forM_ testCases $ \(mnString, assertions) -> do
+        let mn = P.moduleNameFromString mnString
+            mdl = find ((==) mn . Docs.modName) pkgModules
 
-      context ("in module " ++ T.unpack mnString) $ do
-        case mdl of
-          Nothing ->
-            it "exists in docs output" $
-              expectationFailure ("module not found in docs: " ++ T.unpack mnString)
-          Just mdl' ->
-            toHspec linksCtx mdl' assertions
+        context ("in module " ++ T.unpack mnString) $
+          case mdl of
+            Nothing ->
+              it "exists in docs output" $
+                expectationFailure ("module not found in docs: " ++ T.unpack mnString)
+            Just mdl' ->
+              toHspec linksCtx mdl' assertions
+
+    context "Tag generation tests:" $
+      forM_ testTagsCases $ \(mnString, assertions) -> do
+        let mn = P.moduleNameFromString mnString
+            mdl = find ((==) mn . Docs.modName) pkgModules
+        context ("in module " ++ T.unpack mnString) $
+          case mdl of
+            Nothing ->
+              it "exists in docs output" $
+                expectationFailure ("module not found in docs: " ++ T.unpack mnString)
+            Just mdl' ->
+              tagAssertionsToHspec mdl' assertions
 
   where
   toHspec :: Docs.LinksContext -> Docs.Module -> [DocsAssertion] -> Spec
@@ -87,6 +101,17 @@ spec = do
             pure ()
           Fail reason ->
             expectationFailure (T.unpack (displayAssertionFailure reason))
+
+  tagAssertionsToHspec :: Docs.Module -> [TagsAssertion] -> Spec
+  tagAssertionsToHspec mdl assertions =
+    let tags = Map.fromList $ Docs.tags mdl
+    in forM_ assertions $ \a ->
+      it (T.unpack (displayTagsAssertion a)) $ do
+        case runTagsAssertion a tags of
+          TagsPass ->
+            pure ()
+          TagsFail reason ->
+            expectationFailure (T.unpack (displayTagsAssertionFailure reason))
 
 takeJust :: String -> Maybe a -> a
 takeJust msg = fromMaybe (error msg)
@@ -130,6 +155,12 @@ data DocsAssertion
   -- | Assert that a given declaration comes before another in the output
   | ShouldComeBefore P.ModuleName Text Text
 
+data TagsAssertion
+  -- | Assert that a particular declaration is tagged
+  = ShouldBeTagged Text Int
+  -- | Assert that a particular declaration is not tagged
+  | ShouldNotBeTagged Text
+
 displayAssertion :: DocsAssertion -> Text
 displayAssertion = \case
   ShouldBeDocumented mn decl children ->
@@ -166,6 +197,13 @@ displayAssertion = \case
   ShouldComeBefore mn declA declB ->
     showQual mn declA <> " should come before " <> showQual mn declB <>
     " in the docs"
+
+displayTagsAssertion :: TagsAssertion -> Text
+displayTagsAssertion = \case
+  ShouldBeTagged decl l ->
+    decl <> " should be tagged at line " <> T.pack (show l)
+  ShouldNotBeTagged decl ->
+    decl <> " should not be tagged"
 
 data DocsAssertionFailure
   -- | A declaration was not documented, but should have been
@@ -211,6 +249,14 @@ data DocsAssertionFailure
   -- | Declarations were in the wrong order
   | WrongOrder P.ModuleName Text Text
 
+data TagsAssertionFailure
+  -- | A declaration was not tagged, but should have been
+  = NotTagged Text
+  -- | A declaration was tagged, but should not have been
+  | Tagged Text Int
+  -- | A declaration was tagged on the wrong line
+  | TaggedWrongLine Text Int Int
+
 displayAssertionFailure :: DocsAssertionFailure -> Text
 displayAssertionFailure = \case
   NotDocumented _ decl ->
@@ -251,9 +297,24 @@ displayAssertionFailure = \case
   WrongOrder _ before after ->
     "expected to see " <> before <> " before " <> after
 
+displayTagsAssertionFailure :: TagsAssertionFailure -> Text
+displayTagsAssertionFailure = \case
+  NotTagged decl ->
+    decl <> " was not tagged, but should have been"
+  Tagged decl line ->
+    decl <> " was tagged at line " <> T.pack (show line) <>
+    ", but should not have been"
+  TaggedWrongLine decl taggedLine desiredLine ->
+    decl <> " was tagged at line " <> T.pack (show taggedLine) <>
+    ", but should have been tagged at line " <> T.pack (show desiredLine)
+
 data DocsAssertionResult
   = Pass
   | Fail DocsAssertionFailure
+
+data TagsAssertionResult
+  = TagsPass
+  | TagsFail TagsAssertionFailure
 
 runAssertion :: DocsAssertion -> Docs.LinksContext -> Docs.Module -> DocsAssertionResult
 runAssertion assertion linksCtx Docs.Module{..} =
@@ -423,6 +484,22 @@ runAssertion assertion linksCtx Docs.Module{..} =
         _ ->
           Nothing
 
+runTagsAssertion :: TagsAssertion -> Map.Map String Int -> TagsAssertionResult
+runTagsAssertion assertion tags =
+  case assertion of
+    ShouldBeTagged decl line ->
+      case Map.lookup (T.unpack decl) tags of
+        Just taggedLine ->
+          if taggedLine == line
+            then TagsPass
+            else TagsFail $ TaggedWrongLine decl taggedLine line
+        Nothing -> TagsFail $ NotTagged decl
+
+    ShouldNotBeTagged decl ->
+      case Map.lookup (T.unpack decl) tags of
+        Just taggedLine -> TagsFail $ Tagged decl taggedLine
+        Nothing -> TagsPass
+
 checkConstrained :: P.Type -> Text -> Bool
 checkConstrained ty tyClass =
   case ty of
@@ -583,6 +660,29 @@ testCases =
 
   shouldBeOrdered mn declNames =
     zipWith (ShouldComeBefore mn) declNames (tail declNames)
+
+testTagsCases :: [(Text, [TagsAssertion])]
+testTagsCases =
+  [ ("DeclOrder",
+      [ -- explicit exports
+        ShouldBeTagged "x1" 10
+      , ShouldBeTagged "x3" 11
+      , ShouldBeTagged "X2" 13
+      , ShouldBeTagged "X4" 14
+      , ShouldBeTagged "A" 16
+      , ShouldBeTagged "B" 17
+      ])
+  , ("Example2",
+      [ -- all symbols exported
+        ShouldBeTagged "one" 3
+      , ShouldBeTagged "two" 6
+      ])
+  , ("ExplicitExport",
+      [ -- only one of two symbols exported
+        ShouldBeTagged "one" 3
+      , ShouldNotBeTagged "two"
+      ])
+  ]
 
 showQual :: P.ModuleName -> Text -> Text
 showQual mn decl =
