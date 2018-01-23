@@ -5,7 +5,7 @@ import Control.Monad.Eff.Console (log)
 import Partial.Unsafe (unsafePartial)
 
 main = do
-  let _ = partialTCO true 1000000
+  let _ = unsafePartial partialTCO true 1000000
   log "Done"
 
 partialTCO :: Partial => Boolean -> Int -> Int
