@@ -9,6 +9,7 @@ import Language.PureScript.CoreFn.Ann
 import Language.PureScript.CoreFn.Expr
 import Language.PureScript.CoreFn.Module
 import Language.PureScript.CoreFn.Traversals
+import Language.PureScript.Names (Ident(UnusedIdent), Qualified(Qualified))
 import Language.PureScript.Label
 import Language.PureScript.Types
 import qualified Language.PureScript.Constants as C
@@ -16,7 +17,6 @@ import qualified Language.PureScript.Constants as C
 -- |
 -- CoreFn optimization pass.
 --
-
 optimizeCoreFn :: Module Ann -> Module Ann
 optimizeCoreFn m = m {moduleDecls = optimizeModuleDecls $ moduleDecls m}
 
@@ -47,19 +47,7 @@ closedRecordFields (TypeApp (TypeConstructor C.Record) row) =
     collect _ = Nothing
 closedRecordFields _ = Nothing
 
-optimizeCoreFn :: Module a -> Module a
-optimizeCoreFn m = m {moduleDecls = optimizeModuleDecls $ moduleDecls m}
-
-optimizeModuleDecls :: [Bind a] -> [Bind a]
-optimizeModuleDecls = map transformBinds
-  where
-  (transformBinds, _, _) = everywhereOnValues id transformExprs id
-
-  transformExprs = optimizeUnusedPartialFn
-
--- |
--- Optimize away function generated to typecheck inferred Partial constraints.
---
+-- | See https://github.com/purescript/purescript/issues/3157
 optimizeUnusedPartialFn :: Expr a -> Expr a
 optimizeUnusedPartialFn (Let _
   [NonRec _ UnusedIdent _]
