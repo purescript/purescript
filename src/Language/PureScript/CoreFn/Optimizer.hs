@@ -57,6 +57,9 @@ optimizeModuleDecls = map transformBinds
 
   transformExprs = optimizeUnusedPartialFn
 
+-- |
+-- Optimize away function generated to typecheck inferred Partial constraints.
+--
 optimizeUnusedPartialFn :: Expr a -> Expr a
 optimizeUnusedPartialFn (Let _
   [NonRec _ UnusedIdent _]
