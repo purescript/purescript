@@ -16,6 +16,7 @@ import qualified Language.PureScript.Constants as C
 -- |
 -- CoreFn optimization pass.
 --
+
 optimizeCoreFn :: Module Ann -> Module Ann
 optimizeCoreFn m = m {moduleDecls = optimizeModuleDecls $ moduleDecls m}
 
@@ -23,7 +24,7 @@ optimizeModuleDecls :: [Bind Ann] -> [Bind Ann]
 optimizeModuleDecls = map transformBinds
   where
   (transformBinds, _, _) = everywhereOnValues identity transformExprs identity
-  transformExprs = optimizeClosedRecordUpdate
+  transformExprs = optimizeUnusedPartialFn . optimizeClosedRecordUpdate
 
 optimizeClosedRecordUpdate :: Expr Ann -> Expr Ann
 optimizeClosedRecordUpdate ou@(ObjectUpdate a@(_, _, Just t, _) r updatedFields) =
@@ -45,3 +46,20 @@ closedRecordFields (TypeApp (TypeConstructor C.Record) row) =
     collect (RCons l _ r) = collect r >>= return . (l :)
     collect _ = Nothing
 closedRecordFields _ = Nothing
+
+optimizeCoreFn :: Module a -> Module a
+optimizeCoreFn m = m {moduleDecls = optimizeModuleDecls $ moduleDecls m}
+
+optimizeModuleDecls :: [Bind a] -> [Bind a]
+optimizeModuleDecls = map transformBinds
+  where
+  (transformBinds, _, _) = everywhereOnValues id transformExprs id
+
+  transformExprs = optimizeUnusedPartialFn
+
+optimizeUnusedPartialFn :: Expr a -> Expr a
+optimizeUnusedPartialFn (Let _
+  [NonRec _ UnusedIdent _]
+  (App _ (App _ (Var _ (Qualified _ UnusedIdent)) _) originalCoreFn)) =
+  originalCoreFn
+optimizeUnusedPartialFn e = e
