@@ -214,13 +214,14 @@ data ExportMode = Internal | ReExport
 --
 exportType
   :: MonadError MultipleErrors m
-  => ExportMode
+  => SourceSpan
+  -> ExportMode
   -> Exports
   -> ProperName 'TypeName
   -> [ProperName 'ConstructorName]
   -> ModuleName
   -> m Exports
-exportType exportMode exps name dctors mn = do
+exportType ss exportMode exps name dctors mn = do
   let exTypes = exportedTypes exps
       exClasses = exportedTypeClasses exps
       dctorNameCounts :: [(ProperName 'ConstructorName, Int)]
@@ -242,11 +243,11 @@ exportType exportMode exps name dctors mn = do
     ReExport -> do
       forM_ (name `M.lookup` exTypes) $ \(_, mn') ->
         when (mn /= mn') $
-          throwExportConflict mn mn' (TyName name)
+          throwExportConflict ss mn mn' (TyName name)
       forM_ dctors $ \dctor ->
         forM_ ((elem dctor . fst) `find` exTypes) $ \(_, mn') ->
           when (mn /= mn') $
-            throwExportConflict mn mn' (DctorName dctor)
+            throwExportConflict ss mn mn' (DctorName dctor)
   return $ exps { exportedTypes = M.alter updateOrInsert name exTypes }
   where
   updateOrInsert Nothing = Just (dctors, mn)
@@ -258,12 +259,13 @@ exportType exportMode exps name dctors mn = do
 --
 exportTypeOp
   :: MonadError MultipleErrors m
-  => Exports
+  => SourceSpan
+  -> Exports
   -> OpName 'TypeOpName
   -> ModuleName
   -> m Exports
-exportTypeOp exps op mn = do
-  typeOps <- addExport TyOpName op mn (exportedTypeOps exps)
+exportTypeOp ss exps op mn = do
+  typeOps <- addExport ss TyOpName op mn (exportedTypeOps exps)
   return $ exps { exportedTypeOps = typeOps }
 
 -- |
@@ -271,19 +273,20 @@ exportTypeOp exps op mn = do
 --
 exportTypeClass
   :: MonadError MultipleErrors m
-  => ExportMode
+  => SourceSpan
+  -> ExportMode
   -> Exports
   -> ProperName 'ClassName
   -> ModuleName
   -> m Exports
-exportTypeClass exportMode exps name mn = do
+exportTypeClass ss exportMode exps name mn = do
   let exTypes = exportedTypes exps
   when (exportMode == Internal) $ do
     when (coerceProperName name `M.member` exTypes) $
       throwDeclConflict (TyClassName name) (TyName (coerceProperName name))
     when ((elem (coerceProperName name) . fst) `any` exTypes) $
       throwDeclConflict (TyClassName name) (DctorName (coerceProperName name))
-  classes <- addExport TyClassName name mn (exportedTypeClasses exps)
+  classes <- addExport ss TyClassName name mn (exportedTypeClasses exps)
   return $ exps { exportedTypeClasses = classes }
 
 -- |
@@ -291,12 +294,13 @@ exportTypeClass exportMode exps name mn = do
 --
 exportValue
   :: MonadError MultipleErrors m
-  => Exports
+  => SourceSpan
+  -> Exports
   -> Ident
   -> ModuleName
   -> m Exports
-exportValue exps name mn = do
-  values <- addExport IdentName name mn (exportedValues exps)
+exportValue ss exps name mn = do
+  values <- addExport ss IdentName name mn (exportedValues exps)
   return $ exps { exportedValues = values }
 
 -- |
@@ -305,12 +309,13 @@ exportValue exps name mn = do
 --
 exportValueOp
   :: MonadError MultipleErrors m
-  => Exports
+  => SourceSpan
+  -> Exports
   -> OpName 'ValueOpName
   -> ModuleName
   -> m Exports
-exportValueOp exps op mn = do
-  valueOps <- addExport ValOpName op mn (exportedValueOps exps)
+exportValueOp ss exps op mn = do
+  valueOps <- addExport ss ValOpName op mn (exportedValueOps exps)
   return $ exps { exportedValueOps = valueOps }
 
 -- |
@@ -318,12 +323,13 @@ exportValueOp exps op mn = do
 --
 exportKind
   :: MonadError MultipleErrors m
-  => Exports
+  => SourceSpan
+  -> Exports
   -> ProperName 'KindName
   -> ModuleName
   -> m Exports
-exportKind exps name mn = do
-  kinds <- addExport KiName name mn (exportedKinds exps)
+exportKind ss exps name mn = do
+  kinds <- addExport ss KiName name mn (exportedKinds exps)
   return $ exps { exportedKinds = kinds }
 
 -- |
@@ -332,16 +338,17 @@ exportKind exps name mn = do
 --
 addExport
   :: (MonadError MultipleErrors m, Ord a)
-  => (a -> Name)
+  => SourceSpan
+  -> (a -> Name)
   -> a
   -> ModuleName
   -> M.Map a ModuleName
   -> m (M.Map a ModuleName)
-addExport toName name mn exports =
+addExport ss toName name mn exports =
   case M.lookup name exports of
     Just mn'
       | mn == mn' -> return exports
-      | otherwise -> throwExportConflict mn mn' (toName name)
+      | otherwise -> throwExportConflict ss mn mn' (toName name)
     Nothing ->
       return $ M.insert name mn exports
 
@@ -361,12 +368,13 @@ throwDeclConflict new existing =
 --
 throwExportConflict
   :: MonadError MultipleErrors m
-  => ModuleName
+  => SourceSpan
+  -> ModuleName
   -> ModuleName
   -> Name
   -> m a
-throwExportConflict new existing name =
-  throwError . errorMessage $
+throwExportConflict ss new existing name =
+  throwError . errorMessage' ss $
     ExportConflict (Qualified (Just new) name) (Qualified (Just existing) name)
 
 -- |
