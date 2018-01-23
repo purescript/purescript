@@ -48,6 +48,7 @@ data ImportRecord a =
   ImportRecord
     { importName :: Qualified a
     , importSourceModule :: ModuleName
+    , importSourceSpan :: SourceSpan
     , importProvenance :: ImportProvenance
     }
     deriving (Eq, Ord, Show)
@@ -408,11 +409,11 @@ checkImportConflicts currentModule toName xs =
   in
     if length groups > 1
     then case nonImplicit of
-      [ImportRecord (Qualified (Just mnNew) _) mnOrig _] -> do
+      [ImportRecord (Qualified (Just mnNew) _) mnOrig ss _] -> do
         let warningModule = if mnNew == currentModule then Nothing else Just mnNew
-        tell . errorMessage $ ScopeShadowing name warningModule $ delete mnNew conflictModules
+        tell . errorMessage' ss $ ScopeShadowing name warningModule $ delete mnNew conflictModules
         return (mnNew, mnOrig)
       _ -> throwError . errorMessage $ ScopeConflict name conflictModules
     else
-      let ImportRecord (Qualified (Just mnNew) _) mnOrig _ = head byOrig
+      let ImportRecord (Qualified (Just mnNew) _) mnOrig _ _ = head byOrig
       in return (mnNew, mnOrig)
