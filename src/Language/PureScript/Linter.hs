@@ -48,9 +48,10 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
     f dec = f' S.empty dec
 
     f' :: S.Set Text -> Declaration -> MultipleErrors
-    f' s dec@(ValueDeclaration vd) = addHint (ErrorInValueDeclaration (valdeclIdent vd)) (warningsInDecl moduleNames dec <> checkTypeVarsInDecl s dec)
+    f' s dec@(ValueDeclaration vd) =
+      addHint (ErrorInValueDeclaration (valdeclIdent vd)) (warningsInDecl moduleNames dec <> checkTypeVarsInDecl s dec)
     f' s (TypeDeclaration td@(TypeDeclarationData (ss, _) _ _)) =
-      addHint (PositionedError ss) $ addHint (ErrorInTypeDeclaration (tydeclIdent td)) (checkTypeVars s (tydeclType td))
+      addHint (ErrorInTypeDeclaration (tydeclIdent td)) (checkTypeVars ss s (tydeclType td))
     f' s dec = warningsInDecl moduleNames dec <> checkTypeVarsInDecl s dec
 
     stepE :: S.Set Ident -> Expr -> MultipleErrors
@@ -76,27 +77,28 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
     stepDo _ _ = mempty
 
   checkTypeVarsInDecl :: S.Set Text -> Declaration -> MultipleErrors
-  checkTypeVarsInDecl s d = let (f, _, _, _, _) = accumTypes (checkTypeVars s) in f d
+  checkTypeVarsInDecl s d = let (f, _, _, _, _) = accumTypes (checkTypeVars (declSourceSpan d) s) in f d
 
-  checkTypeVars :: S.Set Text -> Type -> MultipleErrors
-  checkTypeVars set ty = everythingWithContextOnTypes set mempty mappend step ty <> findUnused ty
+  checkTypeVars :: SourceSpan -> S.Set Text -> Type -> MultipleErrors
+  checkTypeVars ss set ty = everythingWithContextOnTypes set mempty mappend step ty <> findUnused ty
     where
     step :: S.Set Text -> Type -> (S.Set Text, MultipleErrors)
     step s (ForAll tv _ _) = bindVar s tv
     step s _ = (s, mempty)
     bindVar :: S.Set Text -> Text -> (S.Set Text, MultipleErrors)
-    bindVar = bind ShadowedTypeVar
+    bindVar = bind ss ShadowedTypeVar
     findUnused :: Type -> MultipleErrors
     findUnused ty' =
       let used = usedTypeVariables ty'
           declared = everythingOnTypes (++) go ty'
           unused = ordNub declared \\ ordNub used
-      in foldl (<>) mempty $ map (errorMessage . UnusedTypeVar) unused
+      in foldl (<>) mempty $ map (errorMessage' ss . UnusedTypeVar) unused
       where
       go :: Type -> [Text]
       go (ForAll tv _ _) = [tv]
       go _ = []
 
-  bind :: (Ord a) => (a -> SimpleErrorMessage) -> S.Set a -> a -> (S.Set a, MultipleErrors)
-  bind mkError s name | name `S.member` s = (s, errorMessage (mkError name))
-                      | otherwise = (S.insert name s, mempty)
+  bind :: (Ord a) => SourceSpan -> (a -> SimpleErrorMessage) -> S.Set a -> a -> (S.Set a, MultipleErrors)
+  bind ss mkError s name
+    | name `S.member` s = (s, errorMessage' ss (mkError name))
+    | otherwise = (S.insert name s, mempty)
