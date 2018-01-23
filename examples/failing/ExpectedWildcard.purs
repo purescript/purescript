@@ -1,5 +1,5 @@
 -- @shouldFailWith ExpectedWildcard
-module NonWildcardNewtypeInstance where
+module ExpectedWildcard where
 
 import Data.Newtype
 
