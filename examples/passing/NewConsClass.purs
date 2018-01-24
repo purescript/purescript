@@ -3,6 +3,7 @@
 module Main where
 
 import Control.Monad.Eff.Console (log)
+import Prim.Row(class Union)
 
 class Cons x xs | xs -> x where
     cons :: x -> xs -> xs
