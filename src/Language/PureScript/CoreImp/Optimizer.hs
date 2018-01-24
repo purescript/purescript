@@ -44,7 +44,6 @@ optimize js = do
       [ collapseNestedBlocks
       , collapseNestedIfs
       , removeCodeAfterReturnStatements
-      , removeUnusedArg
       , removeUndefinedApp
       , unThunk
       , etaConvert

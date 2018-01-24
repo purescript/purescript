@@ -26,16 +26,16 @@ data Binder
   -- |
   -- A binder which binds an identifier
   --
-  | VarBinder Ident
+  | VarBinder SourceSpan Ident
   -- |
   -- A binder which matches a data constructor
   --
-  | ConstructorBinder (Qualified (ProperName 'ConstructorName)) [Binder]
+  | ConstructorBinder SourceSpan (Qualified (ProperName 'ConstructorName)) [Binder]
   -- |
   -- A operator alias binder. During the rebracketing phase of desugaring,
   -- this data constructor will be removed.
   --
-  | OpBinder (Qualified (OpName 'ValueOpName))
+  | OpBinder SourceSpan (Qualified (OpName 'ValueOpName))
   -- |
   -- Binary operator application. During the rebracketing phase of desugaring,
   -- this data constructor will be removed.
@@ -52,7 +52,7 @@ data Binder
   -- |
   -- A binder which binds its input to an identifier
   --
-  | NamedBinder Ident Binder
+  | NamedBinder SourceSpan Ident Binder
   -- |
   -- A binder with source position information
   --
@@ -70,11 +70,11 @@ binderNames :: Binder -> [Ident]
 binderNames = go []
   where
   go ns (LiteralBinder b) = lit ns b
-  go ns (VarBinder name) = name : ns
-  go ns (ConstructorBinder _ bs) = foldl go ns bs
+  go ns (VarBinder _ name) = name : ns
+  go ns (ConstructorBinder _ _ bs) = foldl go ns bs
   go ns (BinaryNoParensBinder b1 b2 b3) = foldl go ns [b1, b2, b3]
   go ns (ParensInBinder b) = go ns b
-  go ns (NamedBinder name b) = go (name : ns) b
+  go ns (NamedBinder _ name b) = go (name : ns) b
   go ns (PositionedBinder _ _ b) = go ns b
   go ns (TypedBinder _ b) = go ns b
   go ns _ = ns
@@ -84,8 +84,7 @@ binderNames = go []
 
 isIrrefutable :: Binder -> Bool
 isIrrefutable NullBinder = True
-isIrrefutable (VarBinder _) = True
+isIrrefutable (VarBinder _ _) = True
 isIrrefutable (PositionedBinder _ _ b) = isIrrefutable b
 isIrrefutable (TypedBinder _ b) = isIrrefutable b
 isIrrefutable _ = False
-

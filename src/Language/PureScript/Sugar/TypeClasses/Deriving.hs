@@ -121,11 +121,25 @@ deriveInstance mn syns _ ds (TypeInstanceDeclaration sa@(ss, _) ch idx nm deps c
            -> TypeInstanceDeclaration sa ch idx nm deps className tys . ExplicitInstance <$> deriveEq ss mn syns ds tyCon
            | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty
       _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 1
+  | className == Qualified (Just dataEq) (ProperName "Eq1")
+  = case tys of
+      [ty] | Just (Qualified mn' _, _) <- unwrapTypeConstructor ty
+           , mn == fromMaybe mn mn'
+           -> pure . TypeInstanceDeclaration sa ch idx nm deps className tys . ExplicitInstance $ deriveEq1 ss
+           | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty
+      _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 1
   | className == Qualified (Just dataOrd) (ProperName "Ord")
   = case tys of
       [ty] | Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
            , mn == fromMaybe mn mn'
            -> TypeInstanceDeclaration sa ch idx nm deps className tys . ExplicitInstance <$> deriveOrd ss mn syns ds tyCon
+           | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty
+      _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 1
+  | className == Qualified (Just dataOrd) (ProperName "Ord1")
+  = case tys of
+      [ty] | Just (Qualified mn' _, _) <- unwrapTypeConstructor ty
+           , mn == fromMaybe mn mn'
+           -> pure . TypeInstanceDeclaration sa ch idx nm deps className tys . ExplicitInstance $ deriveOrd1 ss
            | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty
       _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 1
   | className == Qualified (Just dataFunctor) (ProperName "Functor")
@@ -140,7 +154,7 @@ deriveInstance mn syns _ ds (TypeInstanceDeclaration sa@(ss, _) ch idx nm deps c
       [wrappedTy, unwrappedTy]
         | Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor wrappedTy
         , mn == fromMaybe mn mn'
-        -> do (inst, actualUnwrappedTy) <- deriveNewtype mn syns ds tyCon args unwrappedTy
+        -> do (inst, actualUnwrappedTy) <- deriveNewtype ss mn syns ds tyCon args unwrappedTy
               return $ TypeInstanceDeclaration sa ch idx nm deps className [wrappedTy, actualUnwrappedTy] (ExplicitInstance inst)
         | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys wrappedTy
       _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 2
@@ -149,7 +163,7 @@ deriveInstance mn syns _ ds (TypeInstanceDeclaration sa@(ss, _) ch idx nm deps c
       [actualTy, repTy]
         | Just (Qualified mn' tyCon, args) <- unwrapTypeConstructor actualTy
         , mn == fromMaybe mn mn'
-        -> do (inst, inferredRepTy) <- deriveGenericRep mn syns ds tyCon args repTy
+        -> do (inst, inferredRepTy) <- deriveGenericRep ss mn syns ds tyCon args repTy
               return $ TypeInstanceDeclaration sa ch idx nm deps className [actualTy, inferredRepTy] (ExplicitInstance inst)
         | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys actualTy
       _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 2
@@ -261,38 +275,43 @@ unguarded e = [MkUnguarded e]
 deriveGenericRep
   :: forall m
    . (MonadError MultipleErrors m, MonadSupply m)
-  => ModuleName
+  => SourceSpan
+  -> ModuleName
   -> SynonymMap
   -> [Declaration]
   -> ProperName 'TypeName
   -> [Type]
   -> Type
   -> m ([Declaration], Type)
-deriveGenericRep mn syns ds tyConNm tyConArgs repTy = do
-    checkIsWildcard tyConNm repTy
+deriveGenericRep ss mn syns ds tyConNm tyConArgs repTy = do
+    checkIsWildcard ss tyConNm repTy
     go =<< findTypeDecl tyConNm ds
   where
     go :: Declaration -> m ([Declaration], Type)
-    go (DataDeclaration (ss, _) _ _ args dctors) = do
+    go (DataDeclaration (ss', _) _ _ args dctors) = do
       x <- freshIdent "x"
       (reps, to, from) <- unzip3 <$> traverse makeInst dctors
       let rep = toRepTy reps
           inst | null reps =
                    -- If there are no cases, spin
-                   [ ValueDecl (ss, []) (Ident "to") Public [] $ unguarded $
-                       lamCase x [ CaseAlternative [NullBinder]
-                                                   (unguarded (App toName (Var (Qualified Nothing x))))
-                                 ]
-                   , ValueDecl (ss, []) (Ident "from") Public [] $ unguarded $
-                       lamCase x [ CaseAlternative [NullBinder]
-                                                   (unguarded (App fromName (Var (Qualified Nothing x))))
-                                 ]
+                   [ ValueDecl (ss', []) (Ident "to") Public [] $ unguarded $
+                      lamCase ss' x
+                        [ CaseAlternative
+                            [NullBinder]
+                            (unguarded (App toName (Var ss' (Qualified Nothing x))))
+                        ]
+                   , ValueDecl (ss', []) (Ident "from") Public [] $ unguarded $
+                      lamCase ss' x
+                        [ CaseAlternative
+                            [NullBinder]
+                            (unguarded (App fromName (Var ss' (Qualified Nothing x))))
+                        ]
                    ]
                | otherwise =
-                   [ ValueDecl (ss, []) (Ident "to") Public [] $ unguarded $
-                       lamCase x (zipWith ($) (map underBinder (sumBinders (length dctors))) to)
-                   , ValueDecl (ss, []) (Ident "from") Public [] $ unguarded $
-                       lamCase x (zipWith ($) (map underExpr (sumExprs (length dctors))) from)
+                   [ ValueDecl (ss', []) (Ident "to") Public [] $ unguarded $
+                       lamCase ss' x (zipWith ($) (map underBinder (sumBinders (length dctors))) to)
+                   , ValueDecl (ss', []) (Ident "from") Public [] $ unguarded $
+                       lamCase ss' x (zipWith ($) (map underExpr (sumExprs (length dctors))) from)
                    ]
 
           subst = zipWith ((,) . fst) args tyConArgs
@@ -305,10 +324,10 @@ deriveGenericRep mn syns ds tyConNm tyConArgs repTy = do
     select l r n = take (n - 1) (iterate (r .) l) ++ [compN (n - 1) r]
 
     sumBinders :: Int -> [Binder -> Binder]
-    sumBinders = select (ConstructorBinder inl . pure) (ConstructorBinder inr . pure)
+    sumBinders = select (ConstructorBinder ss inl . pure) (ConstructorBinder ss inr . pure)
 
     sumExprs :: Int -> [Expr -> Expr]
-    sumExprs = select (App (Constructor inl)) (App (Constructor inr))
+    sumExprs = select (App (Constructor ss inl)) (App (Constructor ss inr))
 
     compN :: Int -> (a -> a) -> a -> a
     compN 0 _ = id
@@ -323,9 +342,9 @@ deriveGenericRep mn syns ds tyConNm tyConArgs repTy = do
         return ( TypeApp (TypeApp (TypeConstructor constructor)
                                   (TypeLevelString $ mkString (runProperName ctorName)))
                          ctorTy
-               , CaseAlternative [ ConstructorBinder constructor [matchProduct] ]
-                                 (unguarded (foldl' App (Constructor (Qualified (Just mn) ctorName)) ctorArgs))
-               , CaseAlternative [ ConstructorBinder (Qualified (Just mn) ctorName) matchCtor ]
+               , CaseAlternative [ ConstructorBinder ss constructor [matchProduct] ]
+                                 (unguarded (foldl' App (Constructor ss (Qualified (Just mn) ctorName)) ctorArgs))
+               , CaseAlternative [ ConstructorBinder ss (Qualified (Just mn) ctorName) matchCtor ]
                                  (unguarded (constructor' mkProduct))
                )
 
@@ -337,20 +356,20 @@ deriveGenericRep mn syns ds tyConNm tyConArgs repTy = do
     makeProduct args = do
       (tys, bs1, es1, bs2, es2) <- unzip5 <$> traverse makeArg args
       pure ( foldr1 (\f -> TypeApp (TypeApp (TypeConstructor productName) f)) tys
-           , foldr1 (\b1 b2 -> ConstructorBinder productName [b1, b2]) bs1
+           , foldr1 (\b1 b2 -> ConstructorBinder ss productName [b1, b2]) bs1
            , es1
            , bs2
-           , foldr1 (\e1 -> App (App (Constructor productName) e1)) es2
+           , foldr1 (\e1 -> App (App (Constructor ss productName) e1)) es2
            )
 
     makeArg :: Type -> m (Type, Binder, Expr, Binder, Expr)
     makeArg arg = do
       argName <- freshIdent "arg"
       pure ( TypeApp (TypeConstructor argument) arg
-           , ConstructorBinder argument [ VarBinder argName ]
-           , Var (Qualified Nothing argName)
-           , VarBinder argName
-           , argument' (Var (Qualified Nothing argName))
+           , ConstructorBinder ss argument [ VarBinder ss argName ]
+           , Var ss (Qualified Nothing argName)
+           , VarBinder ss argName
+           , argument' (Var ss (Qualified Nothing argName))
            )
 
     underBinder :: (Binder -> Binder) -> CaseAlternative -> CaseAlternative
@@ -366,10 +385,10 @@ deriveGenericRep mn syns ds tyConNm tyConArgs repTy = do
     toRepTy ctors = foldr1 (\f -> TypeApp (TypeApp sumCtor f)) ctors
 
     toName :: Expr
-    toName = Var (Qualified (Just dataGenericRep) (Ident "to"))
+    toName = Var ss (Qualified (Just dataGenericRep) (Ident "to"))
 
     fromName :: Expr
-    fromName = Var (Qualified (Just dataGenericRep) (Ident "from"))
+    fromName = Var ss (Qualified (Just dataGenericRep) (Ident "from"))
 
     noCtors :: Type
     noCtors = TypeConstructor (Qualified (Just dataGenericRep) (ProperName "NoConstructors"))
@@ -378,7 +397,7 @@ deriveGenericRep mn syns ds tyConNm tyConArgs repTy = do
     noArgs = TypeConstructor (Qualified (Just dataGenericRep) (ProperName "NoArguments"))
 
     noArgs' :: Expr
-    noArgs' = Constructor (Qualified (Just dataGenericRep) (ProperName "NoArguments"))
+    noArgs' = Constructor ss (Qualified (Just dataGenericRep) (ProperName "NoArguments"))
 
     sumCtor :: Type
     sumCtor = TypeConstructor (Qualified (Just dataGenericRep) (ProperName "Sum"))
@@ -396,18 +415,18 @@ deriveGenericRep mn syns ds tyConNm tyConArgs repTy = do
     constructor = Qualified (Just dataGenericRep) (ProperName "Constructor")
 
     constructor' :: Expr -> Expr
-    constructor' = App (Constructor constructor)
+    constructor' = App (Constructor ss constructor)
 
     argument :: Qualified (ProperName ty)
     argument = Qualified (Just dataGenericRep) (ProperName "Argument")
 
     argument' :: Expr -> Expr
-    argument' = App (Constructor argument)
+    argument' = App (Constructor ss argument)
 
-checkIsWildcard :: MonadError MultipleErrors m => ProperName 'TypeName -> Type -> m ()
-checkIsWildcard _ (TypeWildcard _) = return ()
-checkIsWildcard tyConNm _ =
-  throwError . errorMessage $ ExpectedWildcard tyConNm
+checkIsWildcard :: MonadError MultipleErrors m => SourceSpan -> ProperName 'TypeName -> Type -> m ()
+checkIsWildcard _ _ (TypeWildcard _) = return ()
+checkIsWildcard ss tyConNm _ =
+  throwError . errorMessage' ss $ ExpectedWildcard tyConNm
 
 deriveEq
   :: forall m
@@ -424,17 +443,20 @@ deriveEq ss mn syns ds tyConNm = do
   return [ ValueDecl (ss, []) (Ident C.eq) Public [] (unguarded eqFun) ]
   where
     mkEqFunction :: Declaration -> m Expr
-    mkEqFunction (DataDeclaration _ _ _ _ args) = do
+    mkEqFunction (DataDeclaration (ss', _) _ _ _ args) = do
       x <- freshIdent "x"
       y <- freshIdent "y"
-      lamCase2 x y <$> (addCatch <$> mapM mkCtorClause args)
+      lamCase2 ss' x y <$> (addCatch <$> mapM mkCtorClause args)
     mkEqFunction _ = internalError "mkEqFunction: expected DataDeclaration"
 
     preludeConj :: Expr -> Expr -> Expr
-    preludeConj = App . App (Var (Qualified (Just (ModuleName [ProperName "Data", ProperName "HeytingAlgebra"])) (Ident C.conj)))
+    preludeConj = App . App (Var ss (Qualified (Just (ModuleName [ProperName "Data", ProperName "HeytingAlgebra"])) (Ident C.conj)))
 
     preludeEq :: Expr -> Expr -> Expr
-    preludeEq = App . App (Var (Qualified (Just dataEq) (Ident C.eq)))
+    preludeEq = App . App (Var ss (Qualified (Just dataEq) (Ident C.eq)))
+
+    preludeEq1 :: Expr -> Expr -> Expr
+    preludeEq1 = App . App (Var ss (Qualified (Just dataEq) (Ident C.eq1)))
 
     addCatch :: [CaseAlternative] -> [CaseAlternative]
     addCatch xs
@@ -448,22 +470,31 @@ deriveEq ss mn syns ds tyConNm = do
       identsL <- replicateM (length tys) (freshIdent "l")
       identsR <- replicateM (length tys) (freshIdent "r")
       tys' <- mapM (replaceAllTypeSynonymsM syns) tys
-      let tests = zipWith3 toEqTest (map (Var . Qualified Nothing) identsL) (map (Var . Qualified Nothing) identsR) tys'
+      let tests = zipWith3 toEqTest (map (Var ss . Qualified Nothing) identsL) (map (Var ss . Qualified Nothing) identsR) tys'
       return $ CaseAlternative [caseBinder identsL, caseBinder identsR] (unguarded (conjAll tests))
       where
-      caseBinder idents = ConstructorBinder (Qualified (Just mn) ctorName) (map VarBinder idents)
+      caseBinder idents = ConstructorBinder ss (Qualified (Just mn) ctorName) (map (VarBinder ss) idents)
 
     conjAll :: [Expr] -> Expr
     conjAll [] = Literal (BooleanLiteral True)
     conjAll xs = foldl1 preludeConj xs
 
     toEqTest :: Expr -> Expr -> Type -> Expr
-    toEqTest l r ty | Just rec <- objectType ty
-                    , Just fields <- decomposeRec rec =
-      conjAll
-      . map (\((Label str), typ) -> toEqTest (Accessor str l) (Accessor str r) typ)
-      $ fields
-    toEqTest l r _ = preludeEq l r
+    toEqTest l r ty
+      | Just rec <- objectType ty
+      , Just fields <- decomposeRec rec =
+          conjAll
+          . map (\((Label str), typ) -> toEqTest (Accessor str l) (Accessor str r) typ)
+          $ fields
+      | isAppliedVar ty = preludeEq1 l r
+      | otherwise = preludeEq l r
+
+deriveEq1 :: SourceSpan -> [Declaration]
+deriveEq1 ss =
+  [ ValueDecl (ss, []) (Ident C.eq1) Public [] (unguarded preludeEq)]
+  where
+    preludeEq :: Expr
+    preludeEq = Var ss (Qualified (Just dataEq) (Ident C.eq))
 
 deriveOrd
   :: forall m
@@ -480,10 +511,10 @@ deriveOrd ss mn syns ds tyConNm = do
   return [ ValueDecl (ss, []) (Ident C.compare) Public [] (unguarded compareFun) ]
   where
     mkCompareFunction :: Declaration -> m Expr
-    mkCompareFunction (DataDeclaration _ _ _ _ args) = do
+    mkCompareFunction (DataDeclaration (ss', _) _ _ _ args) = do
       x <- freshIdent "x"
       y <- freshIdent "y"
-      lamCase2 x y <$> (addCatch . concat <$> mapM mkCtorClauses (splitLast args))
+      lamCase2 ss' x y <$> (addCatch . concat <$> mapM mkCtorClauses (splitLast args))
     mkCompareFunction _ = internalError "mkCompareFunction: expected DataDeclaration"
 
     splitLast :: [a] -> [(a, Bool)]
@@ -502,26 +533,29 @@ deriveOrd ss mn syns ds tyConNm = do
     orderingName = Qualified (Just (ModuleName [ProperName "Data", ProperName "Ordering"])) . ProperName
 
     orderingCtor :: Text -> Expr
-    orderingCtor = Constructor . orderingName
+    orderingCtor = Constructor ss . orderingName
 
     orderingBinder :: Text -> Binder
-    orderingBinder name = ConstructorBinder (orderingName name) []
+    orderingBinder name = ConstructorBinder ss (orderingName name) []
 
     ordCompare :: Expr -> Expr -> Expr
-    ordCompare = App . App (Var (Qualified (Just dataOrd) (Ident C.compare)))
+    ordCompare = App . App (Var ss (Qualified (Just dataOrd) (Ident C.compare)))
+
+    ordCompare1 :: Expr -> Expr -> Expr
+    ordCompare1 = App . App (Var ss (Qualified (Just dataOrd) (Ident C.compare1)))
 
     mkCtorClauses :: ((ProperName 'ConstructorName, [Type]), Bool) -> m [CaseAlternative]
     mkCtorClauses ((ctorName, tys), isLast) = do
       identsL <- replicateM (length tys) (freshIdent "l")
       identsR <- replicateM (length tys) (freshIdent "r")
       tys' <- mapM (replaceAllTypeSynonymsM syns) tys
-      let tests = zipWith3 toOrdering (map (Var . Qualified Nothing) identsL) (map (Var . Qualified Nothing) identsR) tys'
-          extras | not isLast = [ CaseAlternative [ ConstructorBinder (Qualified (Just mn) ctorName) (replicate (length tys) NullBinder)
+      let tests = zipWith3 toOrdering (map (Var ss . Qualified Nothing) identsL) (map (Var ss . Qualified Nothing) identsR) tys'
+          extras | not isLast = [ CaseAlternative [ ConstructorBinder ss (Qualified (Just mn) ctorName) (replicate (length tys) NullBinder)
                                                   , NullBinder
                                                   ]
                                                   (unguarded (orderingCtor "LT"))
                                 , CaseAlternative [ NullBinder
-                                                  , ConstructorBinder (Qualified (Just mn) ctorName) (replicate (length tys) NullBinder)
+                                                  , ConstructorBinder ss (Qualified (Just mn) ctorName) (replicate (length tys) NullBinder)
                                                   ]
                                                   (unguarded (orderingCtor "GT"))
                                 ]
@@ -533,7 +567,7 @@ deriveOrd ss mn syns ds tyConNm = do
              : extras
 
       where
-      caseBinder idents = ConstructorBinder (Qualified (Just mn) ctorName) (map VarBinder idents)
+      caseBinder idents = ConstructorBinder ss (Qualified (Just mn) ctorName) (map (VarBinder ss) idents)
 
     appendAll :: [Expr] -> Expr
     appendAll [] = orderingCtor "EQ"
@@ -547,44 +581,54 @@ deriveOrd ss mn syns ds tyConNm = do
                                   ]
 
     toOrdering :: Expr -> Expr -> Type -> Expr
-    toOrdering l r ty | Just rec <- objectType ty
-                      , Just fields <- decomposeRec rec =
-      appendAll
-      . map (\((Label str), typ) -> toOrdering (Accessor str l) (Accessor str r) typ)
-      $ fields
-    toOrdering l r _ = ordCompare l r
+    toOrdering l r ty
+      | Just rec <- objectType ty
+      , Just fields <- decomposeRec rec =
+          appendAll
+          . map (\((Label str), typ) -> toOrdering (Accessor str l) (Accessor str r) typ)
+          $ fields
+      | isAppliedVar ty = ordCompare1 l r
+      | otherwise = ordCompare l r
+
+deriveOrd1 :: SourceSpan -> [Declaration]
+deriveOrd1 ss =
+  [ ValueDecl (ss, []) (Ident C.compare1) Public [] (unguarded dataOrdCompare)]
+  where
+    dataOrdCompare :: Expr
+    dataOrdCompare = Var ss (Qualified (Just dataOrd) (Ident C.compare))
 
 deriveNewtype
   :: forall m
    . (MonadError MultipleErrors m, MonadSupply m)
-  => ModuleName
+  => SourceSpan
+  -> ModuleName
   -> SynonymMap
   -> [Declaration]
   -> ProperName 'TypeName
   -> [Type]
   -> Type
   -> m ([Declaration], Type)
-deriveNewtype mn syns ds tyConNm tyConArgs unwrappedTy = do
-    checkIsWildcard tyConNm unwrappedTy
+deriveNewtype ss mn syns ds tyConNm tyConArgs unwrappedTy = do
+    checkIsWildcard ss tyConNm unwrappedTy
     go =<< findTypeDecl tyConNm ds
   where
     go :: Declaration -> m ([Declaration], Type)
-    go (DataDeclaration (ss, _) Data name _ _) =
-      throwError . errorMessage' ss $ CannotDeriveNewtypeForData name
-    go (DataDeclaration (ss, _) Newtype name args dctors) = do
+    go (DataDeclaration (ss', _) Data name _ _) =
+      throwError . errorMessage' ss' $ CannotDeriveNewtypeForData name
+    go (DataDeclaration (ss', _) Newtype name args dctors) = do
       checkNewtype name dctors
       wrappedIdent <- freshIdent "n"
       unwrappedIdent <- freshIdent "a"
       let (ctorName, [ty]) = head dctors
       ty' <- replaceAllTypeSynonymsM syns ty
       let inst =
-            [ ValueDecl (ss, []) (Ident "wrap") Public [] $ unguarded $
-                Constructor (Qualified (Just mn) ctorName)
-            , ValueDecl (ss, []) (Ident "unwrap") Public [] $ unguarded $
-                lamCase wrappedIdent
+            [ ValueDecl (ss', []) (Ident "wrap") Public [] $ unguarded $
+                Constructor ss' (Qualified (Just mn) ctorName)
+            , ValueDecl (ss', []) (Ident "unwrap") Public [] $ unguarded $
+                lamCase ss' wrappedIdent
                   [ CaseAlternative
-                      [ConstructorBinder (Qualified (Just mn) ctorName) [VarBinder unwrappedIdent]]
-                      (unguarded (Var (Qualified Nothing unwrappedIdent)))
+                      [ConstructorBinder ss' (Qualified (Just mn) ctorName) [VarBinder ss' unwrappedIdent]]
+                      (unguarded (Var ss' (Qualified Nothing unwrappedIdent)))
                   ]
             ]
           subst = zipWith ((,) . fst) args tyConArgs
@@ -602,20 +646,24 @@ findTypeDecl tyConNm = maybe (throwError . errorMessage $ CannotFindDerivingType
   isTypeDecl (DataDeclaration _ _ nm _ _) | nm == tyConNm = True
   isTypeDecl _ = False
 
-lam :: Ident -> Expr -> Expr
-lam = Abs . VarBinder
+lam :: SourceSpan -> Ident -> Expr -> Expr
+lam ss = Abs . VarBinder ss
 
-lamCase :: Ident -> [CaseAlternative] -> Expr
-lamCase s = lam s . Case [mkVar s]
+lamCase :: SourceSpan -> Ident -> [CaseAlternative] -> Expr
+lamCase ss s = lam ss s . Case [mkVar ss s]
 
-lamCase2 :: Ident -> Ident -> [CaseAlternative] -> Expr
-lamCase2 s t = lam s . lam t . Case [mkVar s, mkVar t]
+lamCase2 :: SourceSpan -> Ident -> Ident -> [CaseAlternative] -> Expr
+lamCase2 ss s t = lam ss s . lam ss t . Case [mkVar ss s, mkVar ss t]
 
-mkVarMn :: Maybe ModuleName -> Ident -> Expr
-mkVarMn mn = Var . Qualified mn
+mkVarMn :: SourceSpan -> Maybe ModuleName -> Ident -> Expr
+mkVarMn ss mn = Var ss . Qualified mn
 
-mkVar :: Ident -> Expr
-mkVar = mkVarMn Nothing
+mkVar :: SourceSpan -> Ident -> Expr
+mkVar ss = mkVarMn ss Nothing
+
+isAppliedVar :: Type -> Bool
+isAppliedVar (TypeApp (TypeVar _) _) = True
+isAppliedVar _ = False
 
 objectType :: Type -> Maybe Type
 objectType (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Record"))) rec) = Just rec
@@ -652,7 +700,7 @@ deriveFunctor ss mn syns ds tyConNm = do
       ((iTy, _) : _) -> do
         f <- freshIdent "f"
         m <- freshIdent "m"
-        lam f . lamCase m <$> mapM (mkCtorClause iTy f) ctors
+        lam ss' f . lamCase ss' m <$> mapM (mkCtorClause iTy f) ctors
     mkMapFunction _ = internalError "mkMapFunction: expected DataDeclaration"
 
     mkCtorClause :: Text -> Ident -> (ProperName 'ConstructorName, [Type]) -> m CaseAlternative
@@ -660,17 +708,17 @@ deriveFunctor ss mn syns ds tyConNm = do
       idents <- replicateM (length ctorTys) (freshIdent "v")
       ctorTys' <- mapM (replaceAllTypeSynonymsM syns) ctorTys
       args <- zipWithM transformArg idents ctorTys'
-      let ctor = Constructor (Qualified (Just mn) ctorName)
+      let ctor = Constructor ss (Qualified (Just mn) ctorName)
           rebuilt = foldl' App ctor args
-          caseBinder = ConstructorBinder (Qualified (Just mn) ctorName) (VarBinder <$> idents)
+          caseBinder = ConstructorBinder ss (Qualified (Just mn) ctorName) (VarBinder ss <$> idents)
       return $ CaseAlternative [caseBinder] (unguarded rebuilt)
       where
-        fVar = mkVar f
-        mapVar = mkVarMn (Just dataFunctor) (Ident C.map)
+        fVar = mkVar ss f
+        mapVar = mkVarMn ss (Just dataFunctor) (Ident C.map)
 
         -- TODO: deal with type synonyms, ala https://github.com/purescript/purescript/pull/2516
         transformArg :: Ident -> Type -> m Expr
-        transformArg ident = fmap (foldr App (mkVar ident)) . goType where
+        transformArg ident = fmap (foldr App (mkVar ss ident)) . goType where
 
           goType :: Type -> m (Maybe Expr)
           -- argument matches the index type
@@ -688,10 +736,11 @@ deriveFunctor ss mn syns ds tyConNm = do
                                          return ((lbl,) <$> upd)
 
               buildRecord :: [(Label, Expr)] -> m Expr
-              buildRecord updates = do arg <- freshIdent "o"
-                                       let argVar = mkVar arg
-                                           mkAssignment ((Label l), x) = (l, App x (Accessor l argVar))
-                                       return (lam arg (ObjectUpdate argVar (mkAssignment <$> updates)))
+              buildRecord updates = do
+                arg <- freshIdent "o"
+                let argVar = mkVar ss arg
+                    mkAssignment ((Label l), x) = (l, App x (Accessor l argVar))
+                return (lam ss arg (ObjectUpdate argVar (mkAssignment <$> updates)))
 
           -- under a `* -> *`, just assume functor for now
           goType (TypeApp _ t) = fmap (App mapVar) <$> goType t

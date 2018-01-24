@@ -80,3 +80,6 @@ instance A.FromJSON SourceSpan where
 
 internalModuleSourceSpan :: String -> SourceSpan
 internalModuleSourceSpan name = SourceSpan name (SourcePos 0 0) (SourcePos 0 0)
+
+nullSourceSpan :: SourceSpan
+nullSourceSpan = internalModuleSourceSpan ""

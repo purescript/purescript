@@ -14,7 +14,7 @@ import Protolude (ordNub)
 
 import Control.Monad (when, unless, void, forM)
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State.Class (MonadState(..), modify)
+import Control.Monad.State.Class (MonadState(..), modify, gets)
 import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Writer.Class (MonadWriter(..))
 import Control.Lens ((^..), _1, _2)
@@ -198,7 +198,6 @@ checkTypeClassInstance cls i = check where
     TypeApp t1 t2 -> check t1 >> check t2
     REmpty | isFunDepDetermined -> return ()
     RCons _ hd tl | isFunDepDetermined -> check hd >> check tl
-    ProxyType ty -> check ty
     ty -> throwError . errorMessage $ InvalidInstanceHead ty
 
 -- |
@@ -380,7 +379,6 @@ typeCheckAll moduleName _ = traverse go
     typeModule (TypeConstructor (Qualified (Just mn'') _)) = Just mn''
     typeModule (TypeConstructor (Qualified Nothing _)) = internalError "Unqualified type name in checkOrphanInstance"
     typeModule (TypeApp t1 _) = typeModule t1
-    typeModule (ProxyType _) = Nothing
     typeModule _ = internalError "Invalid type in instance in checkOrphanInstance"
 
     modulesByTypeIndex :: M.Map Int (Maybe ModuleName)
@@ -434,30 +432,86 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
   warnAndRethrow (addHint (ErrorInModule mn)) $ do
     modify (\s -> s { checkCurrentModule = Just mn })
     decls' <- typeCheckAll mn exps decls
+    checkSuperClassesAreExported <- getSuperClassExportCheck
     for_ exps $ \e -> do
       checkTypesAreExported e
       checkClassMembersAreExported e
       checkClassesAreExported e
+      checkSuperClassesAreExported e
     return $ Module ss coms mn decls' (Just exps)
   where
+  qualify' :: a -> Qualified a
+  qualify' = Qualified (Just mn)
+
+  getSuperClassExportCheck = do
+    classesToSuperClasses <- gets
+      ( M.map
+        ( S.fromList
+        . filter (\(Qualified mn' _) -> mn' == Just mn)
+        . fmap constraintClass
+        . typeClassSuperclasses
+        )
+      . typeClasses
+      . checkEnv
+      )
+    let
+      -- A function that, given a class name, returns the set of
+      -- transitive class dependencies that are defined in this
+      -- module.
+      transitiveSuperClassesFor
+          :: Qualified (ProperName 'ClassName)
+          -> S.Set (Qualified (ProperName 'ClassName))
+      transitiveSuperClassesFor qname =
+        untilSame
+          (\s -> s <> foldMap (\n -> fromMaybe S.empty (M.lookup n classesToSuperClasses)) s)
+          (fromMaybe S.empty (M.lookup qname classesToSuperClasses))
+
+      superClassesFor qname =
+        fromMaybe S.empty (M.lookup qname classesToSuperClasses)
+
+    pure $ checkSuperClassExport superClassesFor transitiveSuperClassesFor
+  moduleClassExports :: S.Set (Qualified (ProperName 'ClassName))
+  moduleClassExports = S.fromList $ mapMaybe (\x -> case x of
+     TypeClassRef _ name -> Just (qualify' name)
+     _ -> Nothing) exps
+
+  untilSame :: Eq a => (a -> a) -> a -> a
+  untilSame f a = let a' = f a in if a == a' then a else untilSame f a'
 
   checkMemberExport :: (Type -> [DeclarationRef]) -> DeclarationRef -> m ()
   checkMemberExport extract dr@(TypeRef _ name dctors) = do
     env <- getEnv
-    case M.lookup (Qualified (Just mn) name) (typeSynonyms env) of
-      Nothing -> return ()
-      Just (_, ty) -> checkExport dr extract ty
-    case dctors of
-      Nothing -> return ()
-      Just dctors' -> for_ dctors' $ \dctor ->
-        case M.lookup (Qualified (Just mn) dctor) (dataConstructors env) of
-          Nothing -> return ()
-          Just (_, _, ty, _) -> checkExport dr extract ty
-    return ()
+    for_ (M.lookup (qualify' name) (typeSynonyms env)) $ \(_, ty) ->
+      checkExport dr extract ty
+    for_ dctors $ \dctors' ->
+      for_ dctors' $ \dctor ->
+        for_ (M.lookup (qualify' dctor) (dataConstructors env)) $ \(_, _, ty, _) ->
+          checkExport dr extract ty
   checkMemberExport extract dr@(ValueRef _ name) = do
-    ty <- lookupVariable (Qualified (Just mn) name)
+    ty <- lookupVariable (qualify' name)
     checkExport dr extract ty
   checkMemberExport _ _ = return ()
+
+  checkSuperClassExport
+    :: (Qualified (ProperName 'ClassName) -> S.Set (Qualified (ProperName 'ClassName)))
+    -> (Qualified (ProperName 'ClassName) -> S.Set (Qualified (ProperName 'ClassName)))
+    -> DeclarationRef
+    -> m ()
+  checkSuperClassExport superClassesFor transitiveSuperClassesFor dr@(TypeClassRef drss className) = do
+    let superClasses = superClassesFor (qualify' className)
+        -- thanks to laziness, the computation of the transitive
+        -- superclasses defined in-module will only occur if we actually
+        -- throw the error. Constructing the full set of transitive
+        -- superclasses is likely to be costly for every single term.
+        transitiveSuperClasses = transitiveSuperClassesFor (qualify' className)
+        unexported = S.difference superClasses moduleClassExports
+    unless (null unexported)
+      . throwError . errorMessage' drss
+      . TransitiveExportError dr
+      . map (TypeClassRef drss . disqualify)
+      $ toList transitiveSuperClasses
+  checkSuperClassExport _ _ _ =
+    return ()
 
   checkExport :: DeclarationRef -> (Type -> [DeclarationRef]) -> Type -> m ()
   checkExport dr extract ty = case filter (not . exported) (extract ty) of
@@ -514,3 +568,4 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     extractMemberName (TypeDeclaration td) = tydeclIdent td
     extractMemberName _ = internalError "Unexpected declaration in typeclass member list"
   checkClassMembersAreExported _ = return ()
+

@@ -29,13 +29,13 @@ desugarAdo d =
   in f d
   where
   pure' :: Expr
-  pure' = Var (Qualified Nothing (Ident C.pure'))
+  pure' = Var nullSourceSpan (Qualified Nothing (Ident C.pure'))
 
   map' :: Expr
-  map' = Var (Qualified Nothing (Ident C.map))
+  map' = Var nullSourceSpan (Qualified Nothing (Ident C.map))
 
   apply :: Expr
-  apply = Var (Qualified Nothing (Ident C.apply))
+  apply = Var nullSourceSpan (Qualified Nothing (Ident C.apply))
 
   replace :: Expr -> m Expr
   replace (Ado els yield) = do
@@ -49,12 +49,12 @@ desugarAdo d =
   go :: (Expr, [Expr]) -> DoNotationElement -> m (Expr, [Expr])
   go (yield, args) (DoNotationValue val) =
     return (Abs NullBinder yield, val : args)
-  go (yield, args) (DoNotationBind (VarBinder ident) val) =
-    return (Abs (VarBinder ident) yield, val : args)
+  go (yield, args) (DoNotationBind (VarBinder ss ident) val) =
+    return (Abs (VarBinder ss ident) yield, val : args)
   go (yield, args) (DoNotationBind binder val) = do
     ident <- freshIdent'
-    let abs = Abs (VarBinder ident)
-                  (Case [Var (Qualified Nothing ident)]
+    let abs = Abs (VarBinder nullSourceSpan ident)
+                  (Case [Var nullSourceSpan (Qualified Nothing ident)]
                         [CaseAlternative [binder] [MkUnguarded yield]])
     return (abs, val : args)
   go (yield, args) (DoNotationLet ds) = do

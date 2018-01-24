@@ -232,6 +232,10 @@ getModuleName (Module _ _ name _ _) = name
 getModuleSourceSpan :: Module -> SourceSpan
 getModuleSourceSpan (Module ss _ _ _ _) = ss
 
+-- | Return a module's declarations.
+getModuleDeclarations :: Module -> [Declaration]
+getModuleDeclarations (Module _ _ _ declarations _) = declarations
+
 -- |
 -- Add an import declaration for a module if it does not already explicitly import it.
 --
@@ -697,7 +701,7 @@ data Expr
   -- |
   -- A prefix -, will be desugared
   --
-  | UnaryMinus Expr
+  | UnaryMinus SourceSpan Expr
   -- |
   -- Binary operator application. During the rebracketing phase of desugaring, this data constructor
   -- will be removed.
@@ -737,12 +741,12 @@ data Expr
   -- |
   -- Variable
   --
-  | Var (Qualified Ident)
+  | Var SourceSpan (Qualified Ident)
   -- |
   -- An operator. This will be desugared into a function during the "operators"
   -- phase of desugaring.
   --
-  | Op (Qualified (OpName 'ValueOpName))
+  | Op SourceSpan (Qualified (OpName 'ValueOpName))
   -- |
   -- Conditional (if-then-else expression)
   --
@@ -750,7 +754,7 @@ data Expr
   -- |
   -- A data constructor
   --
-  | Constructor (Qualified (ProperName 'ConstructorName))
+  | Constructor SourceSpan (Qualified (ProperName 'ConstructorName))
   -- |
   -- A case expression. During the case expansion phase of desugaring, top-level binders will get
   -- desugared into case expressions, hence the need for guards and multiple binders per branch here.
@@ -769,9 +773,6 @@ data Expr
   --
   | Do [DoNotationElement]
   -- |
-  -- A proxy value
-  --
-  | Proxy Type
   -- An ado-notation block
   --
   | Ado [DoNotationElement] Expr
@@ -803,7 +804,7 @@ data Expr
   --
   | AnonymousArgument
   -- |
-  -- A typed hole that will be turned into a hint/error duing typechecking
+  -- A typed hole that will be turned into a hint/error during typechecking
   --
   | Hole Text
   -- |
@@ -886,8 +887,8 @@ $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ImportDe
 
 isTrueExpr :: Expr -> Bool
 isTrueExpr (Literal (BooleanLiteral True)) = True
-isTrueExpr (Var (Qualified (Just (ModuleName [ProperName "Prelude"])) (Ident "otherwise"))) = True
-isTrueExpr (Var (Qualified (Just (ModuleName [ProperName "Data", ProperName "Boolean"])) (Ident "otherwise"))) = True
+isTrueExpr (Var _ (Qualified (Just (ModuleName [ProperName "Prelude"])) (Ident "otherwise"))) = True
+isTrueExpr (Var _ (Qualified (Just (ModuleName [ProperName "Data", ProperName "Boolean"])) (Ident "otherwise"))) = True
 isTrueExpr (TypedValue _ e _) = isTrueExpr e
 isTrueExpr (PositionedValue _ _ e) = isTrueExpr e
 isTrueExpr _ = False

@@ -100,6 +100,9 @@ greaterThanOrEq = "greaterThanOrEq"
 eq :: forall a. (IsString a) => a
 eq = "eq"
 
+eq1 :: forall a. (IsString a) => a
+eq1 = "eq1"
+
 (/=) :: forall a. (IsString a) => a
 (/=) = "/="
 
@@ -108,6 +111,9 @@ notEq = "notEq"
 
 compare :: forall a. (IsString a) => a
 compare = "compare"
+
+compare1 :: forall a. (IsString a) => a
+compare1 = "compare1"
 
 (&&) :: forall a. (IsString a) => a
 (&&) = "&&"
@@ -423,11 +429,6 @@ typ = "Type"
 
 symbol :: forall a. (IsString a) => a
 symbol = "Symbol"
-
--- Code Generation
-
-__unused :: forall a. (IsString a) => a
-__unused = "__unused"
 
 -- Modules
 

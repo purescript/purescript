@@ -23,14 +23,15 @@ import Web.Bower.PackageMeta (PackageName)
 --    * Parse all of the input and dependency source files
 --    * Associate each dependency module with its package name, thereby
 --      distinguishing these from local modules
---    * Return the parsed modules and a Map mapping module names to package
---      names for modules which come from dependencies. If a module does not
---      exist in the map, it can safely be assumed to be local.
+--    * Return the paths paired with parsed modules, and a Map of module names
+--      to package names for modules which come from dependencies.
+--      If a module does not exist in the map, it can safely be assumed to be
+--      local.
 parseFilesInPackages ::
   (MonadError P.MultipleErrors m, MonadIO m) =>
   [FilePath]
   -> [(PackageName, FilePath)]
-  -> m ([P.Module], Map P.ModuleName PackageName)
+  -> m ([(FilePath, P.Module)], Map P.ModuleName PackageName)
 parseFilesInPackages inputFiles depsFiles = do
   inputFiles' <- traverse (readFileAs . Local) inputFiles
   depsFiles'  <- traverse (readFileAs . uncurry FromDep) depsFiles
@@ -39,7 +40,7 @@ parseFilesInPackages inputFiles depsFiles = do
 
   let mnMap = M.fromList (mapMaybe (\(inpkg, m) -> (P.getModuleName m,) <$> inPkgToMaybe inpkg) modules)
 
-  pure (map snd modules, mnMap)
+  pure (map (first fileInfoToString) modules, mnMap)
 
   where
   parse ::

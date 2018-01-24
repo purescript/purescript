@@ -274,17 +274,17 @@ typeInstanceDictionaryDeclaration
   -> [Type]
   -> [Declaration]
   -> Desugar m Declaration
-typeInstanceDictionaryDeclaration sa name mn deps className tys decls =
+typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
   rethrow (addHint (ErrorInInstance className tys)) $ do
   m <- get
 
   -- Lookup the type arguments and member types for the type class
   TypeClassData{..} <-
-    maybe (throwError . errorMessage . UnknownName $ fmap TyClassName className) return $
+    maybe (throwError . errorMessage' ss . UnknownName $ fmap TyClassName className) return $
       M.lookup (qualify mn className) m
 
   case map fst typeClassMembers \\ mapMaybe declIdent decls of
-    member : _ -> throwError . errorMessage $ MissingClassMember member
+    member : _ -> throwError . errorMessage' ss $ MissingClassMember member
     [] -> do
       -- Replace the type arguments with the appropriate types in the member types
       let memberTypes = map (second (replaceAllTypeVars (zip (map fst typeClassArguments) tys))) typeClassMembers
@@ -296,7 +296,7 @@ typeInstanceDictionaryDeclaration sa name mn deps className tys decls =
       -- The type is a record type, but depending on type instance dependencies, may be constrained.
       -- The dictionary itself is a record literal.
       let superclasses = superClassDictionaryNames typeClassSuperclasses `zip`
-            [ Abs (VarBinder (Ident C.__unused)) (DeferredDictionary superclass tyArgs)
+            [ Abs (VarBinder ss UnusedIdent) (DeferredDictionary superclass tyArgs)
             | (Constraint superclass suTyArgs _) <- typeClassSuperclasses
             , let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
             ]
@@ -311,8 +311,8 @@ typeInstanceDictionaryDeclaration sa name mn deps className tys decls =
   where
 
   memberToValue :: [(Ident, Type)] -> Declaration -> Desugar m Expr
-  memberToValue tys' (ValueDecl _ ident _ [] [MkUnguarded val]) = do
-    _ <- maybe (throwError . errorMessage $ ExtraneousClassMember ident className) return $ lookup ident tys'
+  memberToValue tys' (ValueDecl (ss', _) ident _ [] [MkUnguarded val]) = do
+    _ <- maybe (throwError . errorMessage' ss' $ ExtraneousClassMember ident className) return $ lookup ident tys'
     return val
   memberToValue _ _ = internalError "Invalid declaration in type instance definition"
 

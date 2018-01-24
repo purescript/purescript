@@ -37,7 +37,9 @@ data Environment = Environment
   , typeSynonyms :: M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe Kind)], Type)
   -- ^ Type synonyms currently in scope
   , typeClassDictionaries :: M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict))
-  -- ^ Available type class dictionaries
+  -- ^ Available type class dictionaries. When looking up 'Nothing' in the
+  -- outer map, this returns the map of type class dictionaries in local
+  -- scope (ie dictionaries brought in by a constrained type).
   , typeClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
   -- ^ Type classes
   , kinds :: S.Set (Qualified (ProperName 'KindName))

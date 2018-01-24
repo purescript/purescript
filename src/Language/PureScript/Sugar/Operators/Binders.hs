@@ -18,9 +18,9 @@ matchBinderOperators = matchOperators isBinOp extractOp fromOp reapply id
   extractOp (BinaryNoParensBinder op l r) = Just (op, l, r)
   extractOp _ = Nothing
 
-  fromOp :: Binder -> Maybe (Qualified (OpName 'ValueOpName))
-  fromOp (OpBinder q@(Qualified _ (OpName _))) = Just q
+  fromOp :: Binder -> Maybe (SourceSpan, Qualified (OpName 'ValueOpName))
+  fromOp (OpBinder ss q@(Qualified _ (OpName _))) = Just (ss, q)
   fromOp _ = Nothing
 
-  reapply :: Qualified (OpName 'ValueOpName) -> Binder -> Binder -> Binder
-  reapply = BinaryNoParensBinder . OpBinder
+  reapply :: SourceSpan -> Qualified (OpName 'ValueOpName) -> Binder -> Binder -> Binder
+  reapply ss = BinaryNoParensBinder . OpBinder ss

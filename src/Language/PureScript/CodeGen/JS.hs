@@ -32,8 +32,8 @@ import Language.PureScript.CoreImp.Optimizer
 import Language.PureScript.CoreFn
 import Language.PureScript.Crash
 import Language.PureScript.Errors (ErrorMessageHint(..), SimpleErrorMessage(..),
-                                   MultipleErrors(..), rethrow,
-                                   errorMessage, rethrowWithPosition, addHint)
+                                   MultipleErrors(..), rethrow, errorMessage,
+                                   errorMessage', rethrowWithPosition, addHint)
 import Language.PureScript.Names
 import Language.PureScript.Options
 import Language.PureScript.PSString (PSString, mkString)
@@ -165,6 +165,7 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
   accessor :: Ident -> AST -> AST
   accessor (Ident prop) = accessorString $ mkString prop
   accessor (GenIdent _ _) = internalError "GenIdent in accessor"
+  accessor UnusedIdent = internalError "UnusedIdent in accessor"
 
   accessorString :: PSString -> AST -> AST
   accessorString prop = AST.Indexer Nothing (AST.StringLiteral Nothing prop)
@@ -200,7 +201,10 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
                                (var name)
   valueToJs' (Abs _ arg val) = do
     ret <- valueToJs val
-    return $ AST.Function Nothing Nothing [identToJs arg] (AST.Block Nothing [AST.Return Nothing ret])
+    let jsArg = case arg of
+                  UnusedIdent -> []
+                  _           -> [identToJs arg]
+    return $ AST.Function Nothing Nothing jsArg (AST.Block Nothing [AST.Return Nothing ret])
   valueToJs' e@App{} = do
     let (f, args) = unApp e []
     args' <- mapM valueToJs args
@@ -420,10 +424,10 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
       -- the value is `Unary Negate (NumericLiteral (Left 2147483648))`, and
       -- 2147483648 is larger than the maximum allowed int.
       return $ AST.NumericLiteral ss (Left (-i))
-    go js@(AST.NumericLiteral _ (Left i)) =
+    go js@(AST.NumericLiteral ss (Left i)) =
       let minInt = -2147483648
           maxInt = 2147483647
       in if i < minInt || i > maxInt
-         then throwError . errorMessage $ IntOutOfRange i "JavaScript" minInt maxInt
+         then throwError . maybe errorMessage errorMessage' ss $ IntOutOfRange i "JavaScript" minInt maxInt
          else return js
     go other = return other

@@ -8,13 +8,15 @@ module Main (main) where
 import Prelude ()
 import Prelude.Compat
 
+import Test.Tasty
+
 import qualified TestCompiler
 import qualified TestCoreFn
 import qualified TestDocs
 import qualified TestHierarchy
 import qualified TestPrimDocs
 import qualified TestPsci
-import qualified TestPscIde
+import qualified TestIde
 import qualified TestPscPublish
 import qualified TestUtils
 
@@ -27,22 +29,28 @@ main = do
 
   heading "Updating support code"
   TestUtils.updateSupportCode
-  heading "Main compiler test suite"
-  TestCompiler.main
-  heading "CoreFn test suite"
-  TestCoreFn.main
-  heading "Documentation test suite"
-  TestDocs.main
-  heading "Hierarchy test suite"
-  TestHierarchy.main
   heading "Prim documentation test suite"
   TestPrimDocs.main
   heading "psc-publish test suite"
   TestPscPublish.main
-  heading "psci test suite"
-  TestPsci.main
-  heading "psc-ide test suite"
-  TestPscIde.main
+
+  ideTests <- TestIde.main
+  compilerTests <- TestCompiler.main
+  psciTests <- TestPsci.main
+  coreFnTests <- TestCoreFn.main
+  docsTests <- TestDocs.main
+  hierarchyTests <- TestHierarchy.main
+
+  defaultMain $
+    testGroup
+      "Tests"
+      [ compilerTests
+      , psciTests
+      , ideTests
+      , coreFnTests
+      , docsTests
+      , hierarchyTests
+      ]
 
   where
   heading msg = do
