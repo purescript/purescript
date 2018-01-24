@@ -54,6 +54,11 @@ desugarDo d =
   go (DoNotationBind (VarBinder ss ident) val : rest) = do
     rest' <- go rest
     return $ App (App bind val) (Abs (VarBinder ss ident) rest')
+  go (DoNotationBind
+       (PositionedBinder _ _ (PositionedBinder ss _ NullBinder))
+       val : rest) = do
+    rest' <- go rest
+    return $ App (App bind val) (Abs (VarBinder ss UnusedIdent) rest')
   go (DoNotationBind binder val : rest) = do
     rest' <- go rest
     ident <- freshIdent'
