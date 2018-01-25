@@ -55,11 +55,9 @@ createTemporaryModule exec PSCiState{psciImportedModules = imports, psciLetBindi
     typeDecl      = P.TypeDeclaration
                       (P.TypeDeclarationData (internalSpan, []) (P.Ident "$main")
                         (P.TypeApp
-                          (P.TypeApp
                             (P.TypeConstructor
                               (P.Qualified (Just (P.ModuleName [P.ProperName "$Eff"])) (P.ProperName "Eff")))
-                                (P.TypeWildcard internalSpan))
-                                  (P.TypeWildcard internalSpan)))
+                                (P.TypeWildcard internalSpan)))
     mainDecl      = P.ValueDecl (internalSpan, []) (P.Ident "$main") P.Public [] [P.MkUnguarded mainValue]
     decls         = if exec then [itDecl, typeDecl, mainDecl] else [itDecl]
   in
