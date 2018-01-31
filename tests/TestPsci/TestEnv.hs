@@ -35,7 +35,7 @@ initTestPSCiEnv = do
       case makeResultOrError of
         Left errs -> putStrLn (P.prettyPrintMultipleErrors P.defaultPPEOptions errs) >> exitFailure
         Right (externs, env) ->
-          return (PSCiState [] [] (zip (map snd modules) externs), PSCiConfig pursFiles env)
+          return (updateLoadedExterns (const (zip (map snd modules) externs)) initialPSCiState, PSCiConfig pursFiles env)
 
 -- | Execute a TestPSCi, returning IO
 execTestPSCi :: TestPSCi a -> IO a
