@@ -42,7 +42,7 @@ completion
 completion = liftCompletionM . completion'
 
 completion' :: CompletionFunc CompletionM
-completion' = completeWordWithPrev Nothing " \t\n\r" findCompletions
+completion' = completeWordWithPrev Nothing " \t\n\r([" findCompletions
 
 -- | Callback for Haskeline's `completeWordWithPrev`.
 -- Expects:
