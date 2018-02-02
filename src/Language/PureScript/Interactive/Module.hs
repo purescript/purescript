@@ -43,8 +43,10 @@ loadAllModules files = do
 -- Makes a volatile module to execute the current expression.
 --
 createTemporaryModule :: Bool -> PSCiState -> P.Expr -> P.Module
-createTemporaryModule exec PSCiState{psciImportedModules = imports, psciLetBindings = lets} val =
+createTemporaryModule exec st val =
   let
+    imports       = psciImportedModules st
+    lets          = psciLetBindings st
     moduleName    = P.ModuleName [P.ProperName "$PSCI"]
     effModuleName = P.moduleNameFromString "Control.Monad.Eff"
     effImport     = (effModuleName, P.Implicit, Just (P.ModuleName [P.ProperName "$Eff"]))
@@ -73,10 +75,12 @@ createTemporaryModule exec PSCiState{psciImportedModules = imports, psciLetBindi
 -- Makes a volatile module to hold a non-qualified type synonym for a fully-qualified data type declaration.
 --
 createTemporaryModuleForKind :: PSCiState -> P.Type -> P.Module
-createTemporaryModuleForKind PSCiState{psciImportedModules = imports, psciLetBindings = lets} typ =
+createTemporaryModuleForKind st typ =
   let
+    imports    = psciImportedModules st
+    lets       = psciLetBindings st
     moduleName = P.ModuleName [P.ProperName "$PSCI"]
-    itDecl = P.TypeSynonymDeclaration (internalSpan, []) (P.ProperName "IT") [] typ
+    itDecl     = P.TypeSynonymDeclaration (internalSpan, []) (P.ProperName "IT") [] typ
   in
     P.Module internalSpan [] moduleName ((importDecl `map` imports) ++ lets ++ [itDecl]) Nothing
 
@@ -84,8 +88,9 @@ createTemporaryModuleForKind PSCiState{psciImportedModules = imports, psciLetBin
 -- Makes a volatile module to execute the current imports.
 --
 createTemporaryModuleForImports :: PSCiState -> P.Module
-createTemporaryModuleForImports PSCiState{psciImportedModules = imports} =
+createTemporaryModuleForImports st =
   let
+    imports    = psciImportedModules st
     moduleName = P.ModuleName [P.ProperName "$PSCI"]
   in
     P.Module internalSpan [] moduleName (importDecl `map` imports) Nothing

@@ -50,19 +50,24 @@ completionTestData supportModuleNames =
   , (":show ", [":show import", ":show loaded"])
   , (":show a", [])
 
-  -- :type should complete values and data constructors in scope
-  , (":type Control.Monad.Eff.Console.lo", [":type Control.Monad.Eff.Console.log", ":type Control.Monad.Eff.Console.logShow"])
-  --, (":type uni", [":type unit"])
-  --, (":type E", [":type EQ"])
+  -- :type should complete next word from values and constructors in scope
+  , (":type uni", [":type unit"])
+  , (":type E", [":type EQ"])
+  , (":type P.", map (":type P." ++) ["EQ", "GT", "LT", "unit"]) -- import Prelude (unit, Ordering(..)) as P
+  , (":type Control.Monad.Eff.Console.lo", [])
+  , (":type voi", [])
 
-  -- :kind should complete types in scope
-  --, (":kind C", [":kind Control.Monad.Eff.Pure"])
-  --, (":kind O", [":kind Ordering"])
+  -- :kind should complete next word from types in scope
+  , (":kind Str", [":kind String"])
+  , (":kind ST.", [":kind ST.ST", ":kind ST.STRef"]) -- import Control.Monad.ST as ST
+  , (":kind Control.Monad.Eff.", [])
 
   -- Only one argument for directives should be completed
   , (":show import ", [])
   , (":type EQ ", [])
+  , (":type unit compa", [])
   , (":kind Ordering ", [])
+  , (":kind Array In", [])
 
   -- a few other import tests
   , ("impor", ["import"])
@@ -73,16 +78,13 @@ completionTestData supportModuleNames =
   , ("\"hi", [])
   , ("34", [])
 
-  -- Identifiers and data constructors should be completed
-  --, ("uni", ["unit"])
-  , ("Control.Monad.Eff.Class.", ["Control.Monad.Eff.Class.liftEff"])
-  --, ("G", ["GT"])
-  , ("Data.Ordering.L", ["Data.Ordering.LT"])
-
-  -- if a module is imported qualified, values should complete under the
-  -- qualified name, as well as the original name.
-  , ("ST.new", ["ST.newSTRef"])
-  , ("Control.Monad.ST.new", ["Control.Monad.ST.newSTRef"])
+  -- Identifiers and data constructors in scope should be completed
+  , ("uni", ["unit"])
+  , ("G", ["GT"])
+  , ("P.G", ["P.GT"])
+  , ("P.uni", ["P.unit"])
+  , ("voi", []) -- import Prelude hiding (void)
+  , ("Control.Monad.Eff.Class.", [])
   ]
 
 assertCompletedOk :: (String, [String]) -> Spec
@@ -98,11 +100,22 @@ runCM act = do
 
 getPSCiStateForCompletion :: IO PSCiState
 getPSCiStateForCompletion = do
-  (PSCiState _ bs es, _) <- initTestPSCiEnv
-  let imports = [controlMonadSTasST, (P.ModuleName [P.ProperName "Prelude"], P.Implicit, Nothing)]
-  return $ PSCiState imports bs es
-
-controlMonadSTasST :: ImportedModule
-controlMonadSTasST = (s "Control.Monad.ST", P.Implicit, Just (s "ST"))
+  (st, _) <- initTestPSCiEnv
+  let imports = [-- import Control.Monad.ST as S
+                 (qualName "Control.Monad.ST"
+                    ,P.Implicit
+                    ,Just (qualName "ST"))
+                 -- import Prelude hiding (void)
+                ,(qualName "Prelude"
+                    ,P.Hiding [valName "void"]
+                    ,Nothing)
+                 -- import Prelude (unit, Ordering(..)) as P
+                ,(qualName "Prelude"
+                    ,P.Explicit [valName "unit", typeName "Ordering"]
+                    ,Just (qualName "P"))]
+  return $ updateImportedModules (const imports) st
   where
-  s = P.moduleNameFromString
+    qualName   = P.moduleNameFromString
+    valName    = P.ValueRef srcSpan . P.Ident
+    typeName t = P.TypeRef srcSpan (P.ProperName t) Nothing
+    srcSpan    = P.internalModuleSourceSpan "<internal>"
