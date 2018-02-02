@@ -290,13 +290,12 @@ handleBrowse
   -> m ()
 handleBrowse print' moduleName = do
   st <- get
-  env <- asks psciEnvironment
   if isModInEnv moduleName st
-    then print' $ printModuleSignatures moduleName env
+    then print' (printModuleSignatures moduleName (psciEnvironment st))
     else case lookupUnQualifiedModName moduleName st of
       Just unQualifiedName ->
         if isModInEnv unQualifiedName st
-          then print' $ printModuleSignatures unQualifiedName env
+          then print' (printModuleSignatures unQualifiedName (psciEnvironment st))
           else failNotInEnv moduleName
       Nothing ->
         failNotInEnv moduleName

@@ -1,0 +1,13 @@
+module Data.String.Regex
+  ( split
+  , psoup
+  , Regex(..)
+  ) where
+
+data Regex = Regex Int
+
+psoup :: String
+psoup = "nine days old"
+
+split :: String -> String
+split x = x

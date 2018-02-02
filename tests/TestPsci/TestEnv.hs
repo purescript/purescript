@@ -1,18 +1,23 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module TestPsci.TestEnv where
 
 import Prelude ()
 import Prelude.Compat
 
+import           Control.Monad (void, when)
 import           Control.Monad.IO.Class (liftIO)
-import           Control.Monad.Trans.RWS.Strict (evalRWST, RWST)
+import           Control.Monad.Trans.RWS.Strict (evalRWST, asks, local, RWST)
+import           Data.List (isSuffixOf)
+import qualified Data.Text as T
 import qualified Language.PureScript as P
 import           Language.PureScript.Interactive
-import           System.Directory (getCurrentDirectory)
+import           System.Directory (getCurrentDirectory, doesPathExist, removeFile)
 import           System.Exit
-import           System.FilePath ((</>))
+import           System.FilePath ((</>), pathSeparator)
 import qualified System.FilePath.Glob as Glob
 import           System.Process (readProcessWithExitCode)
-import           Test.Hspec (shouldBe)
+import           Test.Hspec (shouldBe, Expectation)
 
 -- | A monad transformer for handle PSCi actions in tests
 type TestPSCi a = RWST PSCiConfig () PSCiState IO a
@@ -34,8 +39,8 @@ initTestPSCiEnv = do
       makeResultOrError <- runMake . make $ modules
       case makeResultOrError of
         Left errs -> putStrLn (P.prettyPrintMultipleErrors P.defaultPPEOptions errs) >> exitFailure
-        Right (externs, env) ->
-          return (updateLoadedExterns (const (zip (map snd modules) externs)) initialPSCiState, PSCiConfig pursFiles env)
+        Right (externs, _) ->
+          return (updateLoadedExterns (const (zip (map snd modules) externs)) initialPSCiState, PSCiConfig pursFiles)
 
 -- | Execute a TestPSCi, returning IO
 execTestPSCi :: TestPSCi a -> IO a
@@ -70,9 +75,8 @@ runAndEval comm jsOutputEval textOutputEval =
 
 -- | Run a PSCi command, evaluate compiled JS, and ignore evaluation output and printed output
 run :: String -> TestPSCi ()
-run comm = runAndEval comm evalJsAndIgnore ignorePrinted
+run comm = runAndEval comm (void jsEval) ignorePrinted
   where
-    evalJsAndIgnore = jsEval *> return ()
     ignorePrinted _ = return ()
 
 -- | A lifted evaluation of Hspec 'shouldBe' for the TestPSCi
@@ -90,7 +94,44 @@ evaluatesTo command expected = runAndEval command evalJsAndCompare ignorePrinted
 
 -- | An assertion to check command PSCi printed output against a given string
 prints :: String -> String -> TestPSCi ()
-prints command expected = runAndEval command evalJsAndIgnore evalPrinted
+prints command expected = printed command (`shouldBe` expected)
+
+printed :: String -> (String -> Expectation) -> TestPSCi ()
+printed command f = runAndEval command (void jsEval) (liftIO . f)
+
+simulateModuleEdit :: P.ModuleName -> FilePath -> TestPSCi a -> TestPSCi a
+simulateModuleEdit mn newPath action = do
+  ms <- asks psciFileGlobs
+
+  case findReplace ms [] 0 of
+    Nothing  -> fail $ "Did not find " ++ inputPath ++ " in psciFileGlobs"
+    Just xs' -> local (replacePath xs') temporarily <* rebuild
+
   where
-    evalJsAndIgnore = jsEval *> return ()
-    evalPrinted s = s `equalsTo` expected
+  outputPath = modulesDir </> T.unpack (P.runModuleName mn) </> "index.js"
+  inputPath  = T.unpack (T.replace "." "/" (P.runModuleName mn)) ++ ".purs"
+
+  findReplace :: [String] -> [String] -> Int -> Maybe [String]
+  findReplace (x:xs) acc n
+    | inputPath `isSuffixOf` x = findReplace xs acc (n+1)
+    | otherwise                = findReplace xs acc n
+  findReplace [] _   0         = Nothing
+  findReplace [] acc _         = Just (newPath : reverse acc)
+
+  replacePath xs c = c { psciFileGlobs = xs }
+
+  temporarily = do
+    enableRebuild
+    result <- action
+
+    -- Now we need to invalidate the module again, so that it can be reverted. If
+    -- we don't do this, our edited module won't be reverted at the end of the test.
+    enableRebuild
+    return result
+
+  -- Simply adding the file to `PSCiConfig.fileGlobs` isn't sufficient; running
+  -- ":reload" might not rebuild because the compiled JS artificat has a more
+  -- recent timestamp than the "new" source file `newPath`.
+  enableRebuild = liftIO $ do { b <- doesPathExist outputPath; when b (removeFile outputPath) }
+  rebuild       = handleCommand discard (return ()) discard ReloadState
+  discard _     = return ()
