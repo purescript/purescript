@@ -5,6 +5,7 @@ module TestPsci.TestEnv where
 import Prelude ()
 import Prelude.Compat
 
+import           Control.Exception.Lifted (bracket_)
 import           Control.Monad (void, when)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Trans.RWS.Strict (evalRWST, asks, local, RWST)
@@ -109,7 +110,10 @@ simulateModuleEdit mn newPath action = do
 
   where
   outputPath = modulesDir </> T.unpack (P.runModuleName mn) </> "index.js"
-  inputPath  = T.unpack (T.replace "." "/" (P.runModuleName mn)) ++ ".purs"
+  inputPath  = T.unpack (T.replace "." slash (P.runModuleName mn)) ++ ".purs"
+  slash      = T.singleton pathSeparator
+
+  replacePath xs c = c { psciFileGlobs = xs }
 
   findReplace :: [String] -> [String] -> Int -> Maybe [String]
   findReplace (x:xs) acc n
@@ -118,20 +122,10 @@ simulateModuleEdit mn newPath action = do
   findReplace [] _   0         = Nothing
   findReplace [] acc _         = Just (newPath : reverse acc)
 
-  replacePath xs c = c { psciFileGlobs = xs }
-
-  temporarily = do
-    enableRebuild
-    result <- action
-
-    -- Now we need to invalidate the module again, so that it can be reverted. If
-    -- we don't do this, our edited module won't be reverted at the end of the test.
-    enableRebuild
-    return result
-
   -- Simply adding the file to `PSCiConfig.fileGlobs` isn't sufficient; running
-  -- ":reload" might not rebuild because the compiled JS artificat has a more
+  -- ":reload" might not rebuild because the compiled JS artifact has a more
   -- recent timestamp than the "new" source file `newPath`.
+  temporarily   = bracket_ enableRebuild enableRebuild action
   enableRebuild = liftIO $ do { b <- doesPathExist outputPath; when b (removeFile outputPath) }
   rebuild       = handleCommand discard (return ()) discard ReloadState
   discard _     = return ()

@@ -18,6 +18,7 @@ homepage: http://www.purescript.org/
 extra-source-files:
   - examples/**/*.js
   - examples/**/*.purs
+  - examples/**/*.edit
   - examples/**/*.json
   - app/static/*
   - tests/support/*.json
