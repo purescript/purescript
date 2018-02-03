@@ -14,7 +14,6 @@ import qualified Data.Set as Set
 import qualified Language.PureScript as P
 import           Language.PureScript.Ide.State (getAllModules, getFileState)
 import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Util
 
 -- |
 -- How we find usages, given an IdeDeclaration and the module it was defined in:
@@ -56,9 +55,9 @@ findReexportingModules (moduleName, declaration) decls =
   Map.keys (Map.filter (any hasReexport) decls)
   where
     hasReexport d =
-      (d & _idaDeclaration & identifierFromIdeDeclaration) == identifierFromIdeDeclaration declaration
+      getName d == getName declaration
       && (d & _idaAnnotation & _annExportedFrom) == Just moduleName
-      && (d & _idaDeclaration & namespaceForDeclaration) == namespaceForDeclaration declaration
+      && getNameSpace d == getNameSpace declaration
 
 directDependants :: IdeDeclaration -> ModuleMap P.Module -> P.ModuleName -> ModuleMap (NonEmpty Search)
 directDependants declaration modules mn = Map.mapMaybe (nonEmpty . go) modules
@@ -139,7 +138,7 @@ applySearch module_ search =
       P.Var sp i
         | Just ideValue <- preview _IdeDeclValue (P.disqualify search)
         , P.isQualified search || not (_ideValueIdent ideValue `Set.member` scope) ->
-          [sp | map P.runIdent i == map identifierFromIdeDeclaration search]
+          [sp | map P.runIdent i == map getName search]
       P.Constructor sp name
         | Just ideDtor <- traverse (preview _IdeDeclDataConstructor) search ->
           [sp | name == map _ideDtorName ideDtor]

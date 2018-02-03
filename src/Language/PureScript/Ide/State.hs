@@ -240,24 +240,12 @@ convertDeclaration'
   -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
   -> IdeDeclaration
   -> IdeDeclarationAnn
-convertDeclaration' annotateFunction annotateValue annotateType annotateKind d =
-  case d of
-    IdeDeclValue v ->
-      annotateFunction (v ^. ideValueIdent) d
-    IdeDeclType t ->
-      annotateType (t ^. ideTypeName . properNameT) d
-    IdeDeclTypeSynonym s ->
-      annotateType (s ^. ideSynonymName . properNameT) d
-    IdeDeclDataConstructor dtor ->
-      annotateValue (dtor ^. ideDtorName . properNameT) d
-    IdeDeclTypeClass tc ->
-      annotateType (tc ^. ideTCName . properNameT) d
-    IdeDeclValueOperator operator ->
-      annotateValue (operator ^. ideValueOpName . opNameT) d
-    IdeDeclTypeOperator operator ->
-      annotateType (operator ^. ideTypeOpName . opNameT) d
-    IdeDeclKind i ->
-      annotateKind (i ^. properNameT) d
+convertDeclaration' annotateFunction annotateValue annotateType annotateKind decl
+  | IdeDeclValue v <- decl = annotateFunction (v ^. ideValueIdent) decl
+  | otherwise = case getNameSpace decl of
+      IdeNSValue -> annotateValue (getName decl) decl
+      IdeNSType -> annotateType (getName decl) decl
+      IdeNSKind -> annotateKind (getName decl) decl
 
 resolveDocumentation
   :: ModuleMap P.Module
@@ -272,23 +260,23 @@ resolveDocumentationForModule
     -> [IdeDeclarationAnn]
     -> [IdeDeclarationAnn]
 resolveDocumentationForModule (P.Module _ _ _ sdecls _) decls = map convertDecl decls
-  where 
+  where
   comments :: Map P.Name [P.Comment]
-  comments = Map.fromListWith (flip (<>)) $ mapMaybe (\d -> 
-    case name d of 
+  comments = Map.fromListWith (flip (<>)) $ mapMaybe (\d ->
+    case name d of
       Just name' -> Just (name', snd $ P.declSourceAnn d)
       _ -> Nothing)
-    sdecls 
+    sdecls
 
   name :: P.Declaration -> Maybe P.Name
   name (P.TypeDeclaration d) = Just $ P.IdentName $ P.tydeclIdent d
   name decl = P.declName decl
 
   convertDecl :: IdeDeclarationAnn -> IdeDeclarationAnn
-  convertDecl (IdeDeclarationAnn ann d) = 
+  convertDecl (IdeDeclarationAnn ann d) =
     convertDeclaration'
       (annotateValue . P.IdentName)
-      (annotateValue . P.IdentName . P.Ident) 
+      (annotateValue . P.IdentName . P.Ident)
       (annotateValue . P.TyName . P.ProperName)
       (annotateValue . P.KiName . P.ProperName)
       d

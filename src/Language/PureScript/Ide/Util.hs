@@ -13,9 +13,7 @@
 -----------------------------------------------------------------------------
 
 module Language.PureScript.Ide.Util
-  ( identifierFromIdeDeclaration
-  , unwrapMatch
-  , namespaceForDeclaration
+  ( unwrapMatch
   , encodeT
   , decodeT
   , discardAnn
@@ -42,28 +40,6 @@ import           Language.PureScript.Ide.Error       (IdeError(..))
 import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.Types
 import           System.IO.UTF8                      (readUTF8FileT)
-
-identifierFromIdeDeclaration :: IdeDeclaration -> Text
-identifierFromIdeDeclaration d = case d of
-  IdeDeclValue v -> v ^. ideValueIdent . identT
-  IdeDeclType t -> t ^. ideTypeName . properNameT
-  IdeDeclTypeSynonym s -> s ^. ideSynonymName . properNameT
-  IdeDeclDataConstructor dtor -> dtor ^. ideDtorName . properNameT
-  IdeDeclTypeClass tc -> tc ^. ideTCName . properNameT
-  IdeDeclValueOperator op -> op ^. ideValueOpName & P.runOpName
-  IdeDeclTypeOperator op -> op ^. ideTypeOpName & P.runOpName
-  IdeDeclKind name -> P.runProperName name
-
-namespaceForDeclaration :: IdeDeclaration -> IdeNamespace
-namespaceForDeclaration d = case d of
-  IdeDeclValue _ -> IdeNSValue
-  IdeDeclType _ -> IdeNSType
-  IdeDeclTypeSynonym _ -> IdeNSType
-  IdeDeclDataConstructor _ -> IdeNSValue
-  IdeDeclTypeClass _ -> IdeNSType
-  IdeDeclValueOperator _ -> IdeNSValue
-  IdeDeclTypeOperator _ -> IdeNSType
-  IdeDeclKind _ -> IdeNSKind
 
 discardAnn :: IdeDeclarationAnn -> IdeDeclaration
 discardAnn (IdeDeclarationAnn _ d) = d
