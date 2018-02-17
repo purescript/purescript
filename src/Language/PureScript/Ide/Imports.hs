@@ -205,7 +205,7 @@ addExplicitImport' decl moduleName qualifier imports =
     refFromDeclaration (IdeDeclKind kn) =
       P.KindRef ideSpan kn
     refFromDeclaration d =
-      P.ValueRef ideSpan (P.Ident (identifierFromIdeDeclaration d))
+      P.ValueRef ideSpan (P.Ident (getName d))
 
     -- | Adds a declaration to an import:
     -- TypeDeclaration "Maybe" + Data.Maybe (maybe) -> Data.Maybe(Maybe, maybe)

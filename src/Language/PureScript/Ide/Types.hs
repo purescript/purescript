@@ -123,6 +123,62 @@ makeLenses ''IdeDeclarationAnn
 emptyAnn :: Annotation
 emptyAnn = Annotation Nothing Nothing Nothing Nothing
 
+class HasName a where
+  getName :: a -> Text
+  getNameSpace :: a -> IdeNamespace
+
+instance HasName IdeDeclarationAnn where
+  getName = getName . _idaDeclaration
+  getNameSpace = getNameSpace . _idaDeclaration
+
+instance HasName IdeDeclaration where
+  getName = \case
+    IdeDeclValue x -> getName x
+    IdeDeclType x -> getName x
+    IdeDeclTypeSynonym x -> getName x
+    IdeDeclDataConstructor x -> getName x
+    IdeDeclTypeClass x -> getName x
+    IdeDeclValueOperator x -> getName x
+    IdeDeclTypeOperator x -> getName x
+    IdeDeclKind x -> P.runProperName x
+  getNameSpace = \case
+    IdeDeclValue x -> getNameSpace x
+    IdeDeclType x -> getNameSpace x
+    IdeDeclTypeSynonym x -> getNameSpace x
+    IdeDeclDataConstructor x -> getNameSpace x
+    IdeDeclTypeClass x -> getNameSpace x
+    IdeDeclValueOperator x -> getNameSpace x
+    IdeDeclTypeOperator x -> getNameSpace x
+    IdeDeclKind _ -> IdeNSKind
+
+instance HasName IdeValue where
+  getName = P.runIdent . _ideValueIdent
+  getNameSpace = const IdeNSValue
+
+instance HasName IdeType where
+  getName = P.runProperName . _ideTypeName
+  getNameSpace = const IdeNSType
+
+instance HasName IdeTypeSynonym where
+  getName = P.runProperName . _ideSynonymName
+  getNameSpace = const IdeNSType
+
+instance HasName IdeDataConstructor where
+  getName = P.runProperName . _ideDtorName
+  getNameSpace = const IdeNSValue
+
+instance HasName IdeTypeClass where
+  getName = P.runProperName . _ideTCName
+  getNameSpace = const IdeNSType
+
+instance HasName IdeValueOperator where
+  getName = P.runOpName . _ideValueOpName
+  getNameSpace = const IdeNSValue
+
+instance HasName IdeTypeOperator where
+  getName = P.runOpName . _ideTypeOpName
+  getNameSpace = const IdeNSType
+
 type DefinitionSites a = Map IdeNamespaced a
 type TypeAnnotations = Map P.Ident P.Type
 newtype AstData a = AstData (ModuleMap (DefinitionSites a, TypeAnnotations))

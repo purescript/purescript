@@ -89,16 +89,16 @@ groupCompletionReexports :: [Match IdeDeclarationAnn] -> [(Match IdeDeclarationA
 groupCompletionReexports initial =
   Map.elems (foldr go Map.empty initial)
   where
-    go (Match (moduleName, d@(IdeDeclarationAnn ann decl))) =
+    go (Match (moduleName, decl)) =
       let
-        origin = fromMaybe moduleName (ann^.annExportedFrom)
+        origin = fromMaybe moduleName (decl ^. idaAnnotation.annExportedFrom)
       in
         Map.alter
-        (insertDeclaration moduleName origin d)
-        (Namespaced (namespaceForDeclaration decl)
-         (P.runModuleName origin <> "." <> identifierFromIdeDeclaration decl))
-    insertDeclaration moduleName origin d old = case old of
-      Nothing -> Just ( Match (origin, d & idaAnnotation.annExportedFrom .~ Nothing)
+        (insertDeclaration moduleName origin decl)
+        (Namespaced (getNameSpace decl)
+         (P.runModuleName origin <> "." <> getName decl))
+    insertDeclaration moduleName origin decl old = case old of
+      Nothing -> Just ( Match (origin, decl & idaAnnotation.annExportedFrom .~ Nothing)
                       , [moduleName]
                       )
       Just x -> Just (second (moduleName :) x)
@@ -110,17 +110,19 @@ completionFromMatch :: (Match IdeDeclarationAnn, [P.ModuleName]) -> Completion
 completionFromMatch (Match (m, IdeDeclarationAnn ann decl), mns) =
   Completion {..}
   where
-    (complIdentifier, complExpandedType) = case decl of
-      IdeDeclValue v -> (v ^. ideValueIdent . identT, v ^. ideValueType & prettyPrintTypeSingleLine)
-      IdeDeclType t -> (t ^. ideTypeName . properNameT, t ^. ideTypeKind & P.prettyPrintKind)
-      IdeDeclTypeSynonym s -> (s ^. ideSynonymName . properNameT, s ^. ideSynonymType & prettyPrintTypeSingleLine)
-      IdeDeclDataConstructor d -> (d ^. ideDtorName . properNameT, d ^. ideDtorType & prettyPrintTypeSingleLine)
-      IdeDeclTypeClass d -> (d ^. ideTCName . properNameT, d ^. ideTCKind & P.prettyPrintKind)
+    complIdentifier = getName decl
+
+    complExpandedType = case decl of
+      IdeDeclValue v -> v ^. ideValueType & prettyPrintTypeSingleLine
+      IdeDeclType t -> t ^. ideTypeKind & P.prettyPrintKind
+      IdeDeclTypeSynonym s -> s ^. ideSynonymType & prettyPrintTypeSingleLine
+      IdeDeclDataConstructor d -> d ^. ideDtorType & prettyPrintTypeSingleLine
+      IdeDeclTypeClass d -> d ^. ideTCKind & P.prettyPrintKind
       IdeDeclValueOperator (IdeValueOperator op ref precedence associativity typeP) ->
-        (P.runOpName op, maybe (showFixity precedence associativity (valueOperatorAliasT ref) op) prettyPrintTypeSingleLine typeP)
+        maybe (showFixity precedence associativity (valueOperatorAliasT ref) op) prettyPrintTypeSingleLine typeP
       IdeDeclTypeOperator (IdeTypeOperator op ref precedence associativity kind) ->
-        (P.runOpName op, maybe (showFixity precedence associativity (typeOperatorAliasT ref) op) P.prettyPrintKind kind)
-      IdeDeclKind k -> (P.runProperName k, "kind")
+        maybe (showFixity precedence associativity (typeOperatorAliasT ref) op) P.prettyPrintKind kind
+      IdeDeclKind _ -> "kind"
 
     complExportedFrom = mns
 

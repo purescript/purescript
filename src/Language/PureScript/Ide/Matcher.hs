@@ -69,7 +69,7 @@ distanceMatcher' :: Text -> Int -> [Match IdeDeclarationAnn] -> [ScoredMatch Ide
 distanceMatcher' q maxDist = mapMaybe go
   where
     go m = let d = dist (T.unpack y)
-               y = identifierFromIdeDeclaration (discardAnn (unwrapMatch m))
+               y = getName (unwrapMatch m)
           in if d <= maxDist
              then Just (m, 1 / fromIntegral d)
              else Nothing
@@ -89,7 +89,7 @@ flexMatch = mapMaybe . flexRate
 
 flexRate :: Text -> Match IdeDeclarationAnn -> Maybe (ScoredMatch IdeDeclarationAnn)
 flexRate p c = do
-  score <- flexScore p (identifierFromIdeDeclaration (discardAnn (unwrapMatch c)))
+  score <- flexScore p (getName (unwrapMatch c))
   return (c, score)
 
 -- FlexMatching ala Sublime.

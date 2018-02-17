@@ -48,7 +48,7 @@ namespaceFilter namespaces =
   mkFilter (filterModuleDecls filterNamespaces)
   where
     filterNamespaces :: IdeDeclaration -> Bool
-    filterNamespaces decl = elem (namespaceForDeclaration decl) namespaces
+    filterNamespaces decl = elem (getNameSpace decl) namespaces
 
 -- | Only keeps the given Modules
 moduleFilter :: [P.ModuleName] -> Filter
@@ -65,7 +65,7 @@ prefixFilter t =
   mkFilter $ declarationFilter prefix t
   where
     prefix :: IdeDeclaration -> Text -> Bool
-    prefix ed search = search `isPrefixOf` identifierFromIdeDeclaration ed
+    prefix ed search = search `isPrefixOf` getName ed
 
 -- | Only keeps Identifiers that are equal to the search string
 equalityFilter :: Text -> Filter
@@ -73,7 +73,7 @@ equalityFilter =
   mkFilter . declarationFilter equality
   where
     equality :: IdeDeclaration -> Text -> Bool
-    equality ed search = identifierFromIdeDeclaration ed == search
+    equality ed search = getName ed == search
 
 declarationFilter :: (IdeDeclaration -> Text -> Bool) -> Text -> [Module] -> [Module]
 declarationFilter predicate search =

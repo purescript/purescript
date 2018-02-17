@@ -81,8 +81,7 @@ handleCommand c = case c of
     Map.lookup moduleName <$> getAllModules Nothing >>= \case
       Nothing -> throwError (GeneralError "Module not found")
       Just decls -> do
-        case find (\d -> namespaceForDeclaration (discardAnn d) == namespace
-                    && identifierFromIdeDeclaration (discardAnn d) == ident) decls of
+        case find (\d -> getNameSpace d == namespace && getName d == ident) decls of
           Nothing -> throwError (GeneralError "Declaration not found")
           Just declaration -> do
             let sourceModule = fromMaybe moduleName (declaration & _idaAnnotation & _annExportedFrom)
