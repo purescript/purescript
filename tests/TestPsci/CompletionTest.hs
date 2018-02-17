@@ -17,8 +17,9 @@ import           TestUtils (getSupportModuleNames)
 
 completionTests :: Spec
 completionTests = context "completionTests" $ do
-  mns <- runIO $ getSupportModuleNames
-  mapM_ assertCompletedOk (completionTestData mns)
+  mns       <- runIO getSupportModuleNames
+  psciState <- runIO getPSCiStateForCompletion
+  mapM_ (assertCompletedOk psciState) (completionTestData mns)
 
 -- If the cursor is at the right end of the line, with the 1st element of the
 -- pair as the text in the line, then pressing tab should offer all the
@@ -87,16 +88,14 @@ completionTestData supportModuleNames =
   , ("Control.Monad.Eff.Class.", [])
   ]
 
-assertCompletedOk :: (String, [String]) -> Spec
-assertCompletedOk (line, expecteds) = specify line $ do
-  results <- runCM (completion' (reverse line, ""))
+assertCompletedOk :: PSCiState -> (String, [String]) -> Spec
+assertCompletedOk psciState (line, expecteds) = specify line $ do
+  results <- runCM psciState (completion' (reverse line, ""))
   let actuals = formatCompletions results
   sort actuals `shouldBe` sort expecteds
 
-runCM :: CompletionM a -> IO a
-runCM act = do
-  psciState <- getPSCiStateForCompletion
-  evalStateT (liftCompletionM act) psciState
+runCM :: PSCiState -> CompletionM a -> IO a
+runCM psciState act = evalStateT (liftCompletionM act) psciState
 
 getPSCiStateForCompletion :: IO PSCiState
 getPSCiStateForCompletion = do
