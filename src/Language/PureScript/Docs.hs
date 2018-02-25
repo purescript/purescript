@@ -11,5 +11,6 @@ import Language.PureScript.Docs.Prim as Docs
 import Language.PureScript.Docs.ParseInPackage as Docs
 import Language.PureScript.Docs.Render as Docs
 import Language.PureScript.Docs.RenderedCode as Docs
+import Language.PureScript.Docs.Tags as Docs
 import Language.PureScript.Docs.Types as Docs
 import Language.PureScript.Docs.Css as Docs

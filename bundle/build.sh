@@ -35,7 +35,6 @@ fi
 cp "$FULL_BIN" bundle/build/purescript
 
 # Copy extra files to the staging directory
-cp scripts/*             bundle/build/purescript/
 cp bundle/README         bundle/build/purescript/
 cp LICENSE               bundle/build/purescript/
 cp INSTALL.md            bundle/build/purescript/

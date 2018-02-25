@@ -37,14 +37,13 @@ optimize js = do
       [ inlineCommonValues
       , inlineCommonOperators
       ]) js
-    untilFixedPoint (return . tidyUp) . tco . magicDo $ js'
+    untilFixedPoint (return . tidyUp) . tco . inlineST =<< untilFixedPoint (return . magicDo) js'
   where
     tidyUp :: AST -> AST
     tidyUp = applyAll
       [ collapseNestedBlocks
       , collapseNestedIfs
       , removeCodeAfterReturnStatements
-      , removeUnusedArg
       , removeUndefinedApp
       , unThunk
       , etaConvert

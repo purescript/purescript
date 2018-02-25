@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Data.Eq (class Eq1)
 import Control.Monad.Eff.Console (log)
 import Test.Assert
 
@@ -13,7 +14,7 @@ data M f a
   | M3 { foo :: Int, bar :: a, baz :: f a }
   | M4 (MyRecord a)
 
-derive instance eqM :: (Eq (f a), Eq a) => Eq (M f a)
+derive instance eqM :: (Eq1 f, Eq a) => Eq (M f a)
 
 derive instance functorM :: Functor f => Functor (M f)
 
@@ -24,5 +25,5 @@ main = do
   assert $ map show (M1 0 :: MA Int) == M1 0
   assert $ map show (M2 [0, 1] :: MA Int) == M2 ["0", "1"]
   assert $ map show (M3 {foo: 0, bar: 1, baz: [2, 3]} :: MA Int) == M3 {foo: 0, bar: "1", baz: ["2", "3"]}
-  assert $ map show (M4 { myField: 42 }) == M4 { myField: "42" } :: MA String 
+  assert $ map show (M4 { myField: 42 }) == M4 { myField: "42" } :: MA String
   log "Done"

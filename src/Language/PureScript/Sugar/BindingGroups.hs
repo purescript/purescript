@@ -113,9 +113,9 @@ usedIdents moduleName = ordNub . usedIdents' S.empty . valdeclExpression
   (_, usedIdents', _, _, _) = everythingWithScope def usedNamesE def def def
 
   usedNamesE :: S.Set Ident -> Expr -> [Ident]
-  usedNamesE scope (Var (Qualified Nothing name))
+  usedNamesE scope (Var _ (Qualified Nothing name))
     | name `S.notMember` scope = [name]
-  usedNamesE scope (Var (Qualified (Just moduleName') name))
+  usedNamesE scope (Var _ (Qualified (Just moduleName') name))
     | moduleName == moduleName' && name `S.notMember` scope = [name]
   usedNamesE _ _ = []
 
@@ -127,8 +127,8 @@ usedImmediateIdents moduleName =
   def s _ = (s, [])
 
   usedNamesE :: Bool -> Expr -> (Bool, [Ident])
-  usedNamesE True (Var (Qualified Nothing name)) = (True, [name])
-  usedNamesE True (Var (Qualified (Just moduleName') name))
+  usedNamesE True (Var _ (Qualified Nothing name)) = (True, [name])
+  usedNamesE True (Var _ (Qualified (Just moduleName') name))
     | moduleName == moduleName' = (True, [name])
   usedNamesE True (Abs _ _) = (False, [])
   usedNamesE scope _ = (scope, [])
