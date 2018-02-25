@@ -292,7 +292,7 @@ handleBrowse
 handleBrowse print' moduleName = do
   st <- get
   psciConfig <- ask
-  env <- asks psciEnvironment
+  -- env <- asks psciEnvironment
   if isModInEnv moduleName st
     then print' $ printModuleSignatures moduleName psciConfig st
     else case lookupUnQualifiedModName moduleName st of
