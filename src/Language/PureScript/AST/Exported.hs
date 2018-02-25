@@ -101,7 +101,7 @@ filterInstances mn (Just exps) =
 -- Get all type and type class names referenced by a type instance declaration.
 --
 typeInstanceConstituents :: Declaration -> [Either (Qualified (ProperName 'ClassName)) (Qualified (ProperName 'TypeName))]
-typeInstanceConstituents (TypeInstanceDeclaration _ _ constraints className tys _) =
+typeInstanceConstituents (TypeInstanceDeclaration _ _ _ _ constraints className tys _) =
   Left className : (concatMap fromConstraint constraints ++ concatMap fromType tys)
   where
 

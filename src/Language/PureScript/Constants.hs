@@ -100,6 +100,9 @@ greaterThanOrEq = "greaterThanOrEq"
 eq :: forall a. (IsString a) => a
 eq = "eq"
 
+eq1 :: forall a. (IsString a) => a
+eq1 = "eq1"
+
 (/=) :: forall a. (IsString a) => a
 (/=) = "/="
 
@@ -108,6 +111,9 @@ notEq = "notEq"
 
 compare :: forall a. (IsString a) => a
 compare = "compare"
+
+compare1 :: forall a. (IsString a) => a
+compare1 = "compare1"
 
 (&&) :: forall a. (IsString a) => a
 (&&) = "&&"
@@ -191,6 +197,11 @@ pure' = "pure"
 returnEscaped :: forall a. (IsString a) => a
 returnEscaped = "$return"
 
+unit :: forall a. (IsString a) => a
+unit = "unit"
+
+-- Core lib values
+
 untilE :: forall a. (IsString a) => a
 untilE = "untilE"
 
@@ -221,8 +232,11 @@ mkFn = "mkFn"
 runFn :: forall a. (IsString a) => a
 runFn = "runFn"
 
-unit :: forall a. (IsString a) => a
-unit = "unit"
+mkEffFn :: forall a. (IsString a) => a
+mkEffFn = "mkEffFn"
+
+runEffFn :: forall a. (IsString a) => a
+runEffFn = "runEffFn"
 
 -- Prim values
 
@@ -345,6 +359,9 @@ pattern CompareSymbol = Qualified (Just TypeDataSymbol) (ProperName "CompareSymb
 pattern AppendSymbol :: Qualified (ProperName 'ClassName)
 pattern AppendSymbol = Qualified (Just TypeDataSymbol) (ProperName "AppendSymbol")
 
+pattern ConsSymbol :: Qualified (ProperName 'ClassName)
+pattern ConsSymbol = Qualified (Just TypeDataSymbol) (ProperName "ConsSymbol")
+
 -- Type.Data.Ordering
 
 typeDataOrdering :: ModuleName
@@ -407,11 +424,6 @@ typ = "Type"
 symbol :: forall a. (IsString a) => a
 symbol = "Symbol"
 
--- Code Generation
-
-__unused :: forall a. (IsString a) => a
-__unused = "__unused"
-
 -- Modules
 
 prim :: forall a. (IsString a) => a
@@ -440,6 +452,9 @@ pattern ControlBind = ModuleName [ProperName "Control", ProperName "Bind"]
 
 controlBind :: forall a. (IsString a) => a
 controlBind = "Control_Bind"
+
+controlMonadEffUncurried :: forall a. (IsString a) => a
+controlMonadEffUncurried = "Control_Monad_Eff_Uncurried"
 
 dataBounded :: forall a. (IsString a) => a
 dataBounded = "Data_Bounded"

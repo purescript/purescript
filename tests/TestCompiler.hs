@@ -49,14 +49,14 @@ import System.FilePath
 import System.Directory
 import System.IO
 import System.IO.UTF8
-import System.IO.Silently
 import qualified System.FilePath.Glob as Glob
 
 import TestUtils
-import Test.Hspec
+import Test.Tasty
+import Test.Tasty.Hspec
 
-main :: IO ()
-main = hspec spec
+main :: IO TestTree
+main = testSpec "compiler" spec
 
 spec :: Spec
 spec = do
@@ -169,6 +169,7 @@ makeActions :: [P.Module] -> M.Map P.ModuleName FilePath -> P.MakeActions P.Make
 makeActions modules foreigns = (P.buildMakeActions modulesDir (P.internalError "makeActions: input file map was read.") foreigns False)
                                { P.getInputTimestamp = getInputTimestamp
                                , P.getOutputTimestamp = getOutputTimestamp
+                               , P.progress = const (pure ())
                                }
   where
   getInputTimestamp :: P.ModuleName -> P.Make (Either P.RebuildPolicy (Maybe UTCTime))
@@ -194,7 +195,7 @@ compile
   -> [FilePath]
   -> ([P.Module] -> IO ())
   -> IO (Either P.MultipleErrors [P.ExternsFile], P.MultipleErrors)
-compile supportModules supportExterns supportForeigns inputFiles check = silence $ runTest $ do
+compile supportModules supportExterns supportForeigns inputFiles check = runTest $ do
   fs <- liftIO $ readInput inputFiles
   ms <- P.parseModulesFromFiles id fs
   foreigns <- inferForeignModules ms
@@ -227,7 +228,9 @@ checkShouldFailWith expected errs =
   let actual = map P.errorCode $ P.runMultipleErrors errs
   in if sort expected == sort (map T.unpack actual)
     then Nothing
-    else Just $ "Expected these errors: " ++ show expected ++ ", but got these: " ++ show actual
+    else Just $ "Expected these errors: " ++ show expected ++ ", but got these: "
+      ++ show actual ++ ", full error messages: \n"
+      ++ unlines (map (P.renderBox . P.prettyPrintSingleError P.defaultPPEOptions) (P.runMultipleErrors errs))
 
 assertCompiles
   :: [P.Module]

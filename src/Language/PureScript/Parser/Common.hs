@@ -154,3 +154,8 @@ withSourceSpan'
   -> P.Parsec [PositionedToken] u a
   -> P.Parsec [PositionedToken] u b
 withSourceSpan' f = withSourceSpan (\ss _ -> f ss)
+
+withSourceSpanF
+  :: P.Parsec [PositionedToken] u (SourceSpan -> a)
+  -> P.Parsec [PositionedToken] u a
+withSourceSpanF = withSourceSpan (\ss _ f -> f ss)

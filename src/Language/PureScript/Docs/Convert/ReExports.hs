@@ -172,7 +172,7 @@ findImport ::
   m (P.ModuleName, name)
 findImport imps (name, orig) =
   let
-    matches (P.ImportRecord qual mn _) = P.disqualify qual == name && mn == orig
+    matches (P.ImportRecord qual mn _ _) = P.disqualify qual == name && mn == orig
     matching = filter matches imps
     getQualified (P.Qualified mname _) = mname
   in

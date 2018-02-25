@@ -1,5 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE DeriveFoldable #-}
 
 -- |
 -- Data types for names
@@ -76,6 +78,10 @@ data Ident
   -- A generated name for an identifier
   --
   | GenIdent (Maybe Text) Integer
+  -- |
+  -- A generated name used only for type-checking
+  --
+  | UnusedIdent
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData Ident
@@ -84,6 +90,7 @@ runIdent :: Ident -> Text
 runIdent (Ident i) = i
 runIdent (GenIdent Nothing n) = "$" <> T.pack (show n)
 runIdent (GenIdent (Just name) n) = "$" <> name <> T.pack (show n)
+runIdent UnusedIdent = "$__unused"
 
 showIdent :: Ident -> Text
 showIdent = runIdent
@@ -171,7 +178,7 @@ moduleNameFromString = ModuleName . splitProperNames
 -- A qualified name, i.e. a name with an optional module name
 --
 data Qualified a = Qualified (Maybe ModuleName) a
-  deriving (Show, Eq, Ord, Functor, Generic)
+  deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 instance NFData a => NFData (Qualified a)
 

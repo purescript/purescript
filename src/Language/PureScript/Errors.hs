@@ -610,18 +610,16 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , line "with type"
             , markCodeBox $ indent $ typeAsBox t2
             ]
-    renderSimpleErrorMessage (OverlappingInstances nm ts (d : ds)) =
+    renderSimpleErrorMessage (OverlappingInstances _ _ []) = internalError "OverlappingInstances: empty instance list"
+    renderSimpleErrorMessage (OverlappingInstances nm ts ds) =
       paras [ line "Overlapping type class instances found for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
                 , Box.vcat Box.left (map typeAtomAsBox ts)
                 ]
             , line "The following instances were found:"
-            , indent $ paras (line (showQualified showIdent d <> " (chosen)") : map (line . showQualified showIdent) ds)
-            , line "Overlapping type class instances can lead to different behavior based on the order of module imports, and for that reason are not recommended."
-            , line "They may be disallowed completely in a future version of the compiler."
+            , indent $ paras (map (line . showQualified showIdent) ds)
             ]
-    renderSimpleErrorMessage OverlappingInstances{} = internalError "OverlappingInstances: empty instance list"
     renderSimpleErrorMessage (UnknownClass nm) =
       paras [ line "No type class instance was found for class"
             , markCodeBox $ indent $ line (showQualified runProperName nm)

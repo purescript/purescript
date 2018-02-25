@@ -190,9 +190,8 @@ handleShowImportedModules
   => (String -> m ())
   -> m ()
 handleShowImportedModules print' = do
-  PSCiState { psciImportedModules = importedModules } <- get
+  importedModules <- psciImportedModules <$> get
   print' $ showModules importedModules
-  return ()
   where
   showModules = unlines . sort . map (T.unpack . showModule)
   showModule (mn, declType, asQ) =

@@ -67,10 +67,10 @@ renderDeclarationWithOptions opts Declaration{..} =
            [syntax "|" | not (null fundeps)]
         ++ [mintersperse
              (syntax "," <> sp)
-             [idents from <> sp <> syntax "->" <> sp <> idents to | (from, to) <- fundeps ]
+             [typeVars from <> sp <> syntax "->" <> sp <> typeVars to | (from, to) <- fundeps ]
            ]
         where
-          idents = mintersperse sp . map ident'
+          typeVars = mintersperse sp . map typeVar
 
     AliasDeclaration (P.Fixity associativity precedence) for ->
       [ keywordFixity associativity

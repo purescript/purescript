@@ -34,6 +34,7 @@ import           Protolude hiding (moduleName)
 
 import           Control.Lens                       ((^.), (%~), ix)
 import           Data.List                          (findIndex, nubBy, partition)
+import qualified Data.Map                           as Map
 import qualified Data.Text                          as T
 import qualified Language.PureScript                as P
 import           Language.PureScript.Ide.Completion
@@ -261,7 +262,7 @@ addImportForIdentifier :: (Ide m, MonadError IdeError m)
                                       -- the identifier
                           -> m (Either [Match IdeDeclaration] [Text])
 addImportForIdentifier fp ident qual filters = do
-  modules <- getAllModules Nothing
+  modules <- Map.toList <$> getAllModules Nothing
   case map (fmap discardAnn) (getExactMatches ident filters modules) of
     [] ->
       throwError (NotFound "Couldn't find the given identifier. \

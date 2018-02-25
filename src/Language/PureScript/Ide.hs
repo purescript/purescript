@@ -18,9 +18,10 @@ module Language.PureScript.Ide
        ( handleCommand
        ) where
 
-import           Protolude
+import           Protolude hiding (moduleName)
 
 import           "monad-logger" Control.Monad.Logger
+import qualified Data.Map                           as Map
 import qualified Language.PureScript                as P
 import qualified Language.PureScript.Constants      as C
 import qualified Language.PureScript.Ide.CaseSplit  as CS
@@ -38,6 +39,7 @@ import           Language.PureScript.Ide.SourceFile
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
+import           Language.PureScript.Ide.Usage (findUsages)
 import           System.Directory (getCurrentDirectory, getDirectoryContents, doesDirectoryExist, doesFileExist)
 import           System.FilePath ((</>))
 import           System.FilePath.Glob (glob)
@@ -75,6 +77,16 @@ handleCommand c = case c of
     caseSplit l b e wca t
   AddClause l wca ->
     MultilineTextResult <$> CS.addClause l wca
+  FindUsages moduleName ident namespace -> do
+    Map.lookup moduleName <$> getAllModules Nothing >>= \case
+      Nothing -> throwError (GeneralError "Module not found")
+      Just decls -> do
+        case find (\d -> namespaceForDeclaration (discardAnn d) == namespace
+                    && identifierFromIdeDeclaration (discardAnn d) == ident) decls of
+          Nothing -> throwError (GeneralError "Declaration not found")
+          Just declaration -> do
+            let sourceModule = fromMaybe moduleName (declaration & _idaAnnotation & _annExportedFrom)
+            UsagesResult . fold <$> findUsages (discardAnn declaration) sourceModule
   Import fp outfp _ (AddImplicitImport mn) -> do
     rs <- addImplicitImport fp mn
     answerRequest outfp rs
@@ -106,14 +118,14 @@ findCompletions
   -> CompletionOptions
   -> m Success
 findCompletions filters matcher currentModule complOptions = do
-  modules <- getAllModules currentModule
+  modules <- Map.toList <$> getAllModules currentModule
   let insertPrim = (:) (C.Prim, idePrimDeclarations)
   pure (CompletionResult (getCompletions filters matcher complOptions (insertPrim modules)))
 
 findType :: Ide m =>
             Text -> [Filter] -> Maybe P.ModuleName -> m Success
 findType search filters currentModule = do
-  modules <- getAllModules currentModule
+  modules <- Map.toList <$> getAllModules currentModule
   let insertPrim = (:) (C.Prim, idePrimDeclarations)
   pure (CompletionResult (getExactCompletions search filters (insertPrim modules)))
 
