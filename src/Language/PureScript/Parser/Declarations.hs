@@ -351,7 +351,7 @@ parseModuleFromFile toFilePath (k, content) = do
 
 -- | Converts a 'ParseError' into a 'PositionedError'
 toPositionedError :: P.ParseError -> ErrorMessage
-toPositionedError perr = ErrorMessage [ PositionedError (SourceSpan name start end) ] (ErrorParsingModule perr)
+toPositionedError perr = ErrorMessage [ positionedError (SourceSpan name start end) ] (ErrorParsingModule perr)
   where
   name   = (P.sourceName  . P.errorPos) perr
   start  = (toSourcePos . P.errorPos) perr

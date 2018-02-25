@@ -5,6 +5,7 @@ module Language.PureScript.Errors.JSON where
 import Prelude.Compat
 
 import qualified Data.Aeson.TH as A
+import qualified Data.List.NonEmpty as NEL
 import Data.Monoid ((<>))
 import qualified Data.Text as T
 import Data.Text (Text)
@@ -31,6 +32,7 @@ data JSONError = JSONError
   , filename :: Maybe String
   , moduleName :: Maybe Text
   , suggestion :: Maybe ErrorSuggestion
+  , allSpans :: [P.SourceSpan]
   } deriving (Show, Eq)
 
 data JSONResult = JSONResult
@@ -43,22 +45,22 @@ $(A.deriveJSON A.defaultOptions ''JSONError)
 $(A.deriveJSON A.defaultOptions ''JSONResult)
 $(A.deriveJSON A.defaultOptions ''ErrorSuggestion)
 
-
 toJSONErrors :: Bool -> P.Level -> P.MultipleErrors -> [JSONError]
 toJSONErrors verbose level = map (toJSONError verbose level) . P.runMultipleErrors
 
 toJSONError :: Bool -> P.Level -> P.ErrorMessage -> JSONError
 toJSONError verbose level e =
-  JSONError (toErrorPosition <$> sspan)
+  JSONError (toErrorPosition <$> fmap NEL.head spans)
             (P.renderBox (P.prettyPrintSingleError (P.PPEOptions Nothing verbose level False mempty) (P.stripModuleAndSpan e)))
             (P.errorCode e)
             (P.errorDocUri e)
-            (P.spanName <$> sspan)
+            (P.spanName <$> fmap NEL.head spans)
             (P.runModuleName <$> P.errorModule e)
             (toSuggestion e)
+            (maybe [] NEL.toList spans)
   where
-  sspan :: Maybe P.SourceSpan
-  sspan = P.errorSpan e
+  spans :: Maybe (NEL.NonEmpty P.SourceSpan)
+  spans = P.errorSpan e
 
   toErrorPosition :: P.SourceSpan -> ErrorPosition
   toErrorPosition ss =

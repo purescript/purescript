@@ -198,7 +198,7 @@ data ErrorMessageHint
   | ErrorInTypeClassDeclaration (ProperName 'ClassName)
   | ErrorInForeignImport Ident
   | ErrorSolvingConstraint Constraint
-  | PositionedError SourceSpan
+  | PositionedError (NEL.NonEmpty SourceSpan)
   deriving (Show)
 
 -- | Categories of hints
