@@ -232,6 +232,11 @@ getModuleName (Module _ _ name _ _) = name
 getModuleSourceSpan :: Module -> SourceSpan
 getModuleSourceSpan (Module ss _ _ _ _) = ss
 
+-- | Return a module's export list if available
+getModuleDeclarationRefs :: Module -> [DeclarationRef]
+getModuleDeclarationRefs (Module _ _ _ _ Nothing) = []
+getModuleDeclarationRefs (Module _ _ _ _ (Just dr)) = dr
+
 -- |
 -- Add an import declaration for a module if it does not already explicitly import it.
 --
