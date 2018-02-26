@@ -22,7 +22,7 @@ textT = Box.text . T.unpack
 -- Pretty print a module's signatures
 --
 printModuleSignatures :: P.ModuleName -> PSCiConfig -> PSCiState -> String
-printModuleSignatures moduleName cfg@PSCiConfig{..} st@PSCiState{..} = 
+printModuleSignatures moduleName cfg@PSCiConfig{..} st = 
     -- get relevant components of a module from environment
     let env = psciEnvironment
         moduleNamesIdent = byModuleName (names env)
@@ -43,7 +43,7 @@ printModuleSignatures moduleName cfg@PSCiConfig{..} st@PSCiState{..} =
     
   where printModule's showF = Box.vsep 1 Box.left . showF
         getModule modName = 
-          let mMod = find (\(m, _) -> P.getModuleName m == modName) psciLoadedExterns        
+          let mMod = find (\(m, _) -> P.getModuleName m == modName) (psciLoadedExterns st)        
           in case mMod of 
             Just (modu, _) -> Just modu
             Nothing -> Nothing -- This should never happen since `handleBrowse` makes sure to always send us something that is a valid module. TODO: Fix this assumption, don't rely on how external code works.
