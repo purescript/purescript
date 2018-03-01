@@ -1,8 +1,10 @@
 Pull requests are encouraged, but please open issues before starting to work on something that you intend to make into a PR, so that we can decide if it is a good fit or not.
 
-## Finding Issues to Work On
+## Finding Issues to Work On [![Open Source Helpers](https://www.codetriage.com/purescript/purescript/badges/users.svg)](https://www.codetriage.com/purescript/purescript)
 
 If you would like to contribute, please consider the issues in the current milestone first. If you are a new contributor, you may want to have a go at the ["new contributor" issues](https://github.com/purescript/purescript/labels/new%20contributor) to get started.
+
+You can also triage issues which may include reproducing bug reports or asking for vital information, such as version numbers or reproduction instructions. If you would like to start triaging issues, one easy way to get started is to [subscribe to purescript on CodeTriage](https://www.codetriage.com/purescript/purescript).
 
 ## Pull Requests
 
