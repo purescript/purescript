@@ -35,7 +35,7 @@ test-ghci:
 # rerun the profiled test run.
 test-profiling:
 	$(stack) test --executable-profiling --ta '+RTS -pj -RTS' $(package)
-	cat tests.prof | ghc-prof-aeson-flamegraph | flamegraph.pl > tests.svg
+	cat tests.prof | stack exec ghc-prof-aeson-flamegraph | flamegraph.pl > tests.svg
 
 bench:
 	$(stack) bench $(package)
