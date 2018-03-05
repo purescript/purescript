@@ -7,6 +7,7 @@ module Language.PureScript.Sugar.Names.Env
   , nullExports
   , Env
   , primEnv
+  , primExports
   , envModuleSourceSpan
   , envModuleImports
   , envModuleExports
