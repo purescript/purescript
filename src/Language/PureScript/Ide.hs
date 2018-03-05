@@ -23,7 +23,6 @@ import           Protolude hiding (moduleName)
 import           "monad-logger" Control.Monad.Logger
 import qualified Data.Map                           as Map
 import qualified Language.PureScript                as P
-import qualified Language.PureScript.Constants      as C
 import qualified Language.PureScript.Ide.CaseSplit  as CS
 import           Language.PureScript.Ide.Command
 import           Language.PureScript.Ide.Completion
