@@ -27,6 +27,7 @@ module Language.PureScript.Interactive.Types
 
 import Prelude.Compat
 
+import           Control.Monad.State (evalStateT)
 import qualified Language.PureScript as P
 import qualified Data.Map as M
 import           Language.PureScript.Sugar.Names.Env (nullImports, primExports)
@@ -110,7 +111,7 @@ updateImportExports st@(PSCiState modules lets externs _ _) =
 
   desugarModule :: [P.Module] -> Either P.MultipleErrors (P.Env, [P.Module])
   desugarModule = runExceptT =<< hushWarnings . P.desugarImportsWithEnv (map snd externs)
-  hushWarnings  = fmap fst . runWriterT
+  hushWarnings  = flip evalStateT P.initEnvironment . fmap fst . runWriterT
 
   temporaryName :: P.ModuleName
   temporaryName = P.ModuleName [P.ProperName "$PSCI"]

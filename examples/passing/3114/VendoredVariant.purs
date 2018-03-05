@@ -2,6 +2,8 @@ module VendoredVariant where
 
 import Prelude
 
+import Prim.Row as Row
+
 import Unsafe.Coerce (unsafeCoerce)
 import Partial.Unsafe (unsafeCrashWith)
 import Data.Symbol
@@ -21,7 +23,7 @@ case_ r = unsafeCrashWith case unsafeCoerce r of
 
 on
   :: forall sym f a b r1 r2
-  . RowCons sym (FProxy f) r1 r2
+  . Row.Cons sym (FProxy f) r1 r2
   => IsSymbol sym
   => SProxy sym
   -> (f a -> b)
