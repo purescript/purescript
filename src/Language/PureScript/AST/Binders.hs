@@ -5,6 +5,8 @@ module Language.PureScript.AST.Binders where
 
 import Prelude.Compat
 
+import Data.Semigroup
+
 import Language.PureScript.AST.SourcePos
 import Language.PureScript.AST.Literals
 import Language.PureScript.Names
@@ -101,10 +103,6 @@ instance Eq Binder where
     (==) ty ty' && (==) b b'
   (==) TypedBinder{} _ = False
 
-nextIfEq :: Ordering -> Ordering -> Ordering
-nextIfEq EQ o = o
-nextIfEq o _ = o
-
 instance Ord Binder where
   compare NullBinder NullBinder = EQ
   compare NullBinder _ = LT
@@ -119,7 +117,7 @@ instance Ord Binder where
   compare VarBinder{} _ = LT
 
   compare (ConstructorBinder _ qpc bs) (ConstructorBinder _ qpc' bs') =
-    compare qpc qpc' `nextIfEq` compare bs bs'
+    compare qpc qpc' <> compare bs bs'
   compare ConstructorBinder{} NullBinder = GT
   compare ConstructorBinder{} LiteralBinder{} = GT
   compare ConstructorBinder{} VarBinder{} = GT
@@ -134,7 +132,7 @@ instance Ord Binder where
   compare OpBinder{} _ = LT
 
   compare (BinaryNoParensBinder b1 b2 b3) (BinaryNoParensBinder b1' b2' b3') =
-    compare b1 b1' `nextIfEq` compare b2 b2' `nextIfEq` compare b3 b3'
+    compare b1 b1' <> compare b2 b2' <> compare b3 b3'
   compare BinaryNoParensBinder{} ParensInBinder{} = LT
   compare BinaryNoParensBinder{} NamedBinder{} = LT
   compare BinaryNoParensBinder{} PositionedBinder{} = LT
@@ -149,18 +147,18 @@ instance Ord Binder where
   compare ParensInBinder{} _ = GT
 
   compare (NamedBinder _ ident b) (NamedBinder _ ident' b') =
-    compare ident ident' `nextIfEq` compare b b'
+    compare ident ident' <> compare b b'
   compare NamedBinder{} PositionedBinder{} = LT
   compare NamedBinder{} TypedBinder{} = LT
   compare NamedBinder{} _ = GT
 
   compare (PositionedBinder _ comments b) (PositionedBinder _ comments' b') =
-    compare comments comments' `nextIfEq` compare b b'
+    compare comments comments' <> compare b b'
   compare PositionedBinder{} TypedBinder{} = LT
   compare PositionedBinder{} _ = GT
 
   compare (TypedBinder ty b) (TypedBinder ty' b') =
-    compare ty ty' `nextIfEq` compare b b'
+    compare ty ty' <> compare b b'
   compare TypedBinder{} _ = GT
 
 -- |
