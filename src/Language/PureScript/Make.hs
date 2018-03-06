@@ -157,6 +157,13 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
   evalSupplyT nextVar' . codegen renamed env' . encode $ exts
   return exts
 
+type ExternsMap = M.Map ModuleName ExternsStruct
+
+data ExternsStruct = ExternsStruct
+  { esModificationTime :: UTCTime
+  , esExternsFile :: ExternsFile
+  }
+
 -- | Compiles in "make" mode, compiling each module separately to a @.js@ file and an @externs.json@ file.
 --
 -- If timestamps have not changed, the externs file can be used to provide the module's types without
@@ -170,11 +177,47 @@ make ma@MakeActions{..} ms = do
 
   (sorted, graph) <- sortModules ms
 
-  barriers <- zip (map getModuleName sorted) <$> replicateM (length ms) ((,) <$> C.newEmptyMVar <*> C.newEmptyMVar)
+  let
+    findExistingExtern :: ExternsMap -> Module -> m ExternsMap
+    findExistingExtern prev (getModuleName -> moduleName) = do
+      outputTimestamp <- getOutputTimestamp moduleName
+      let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
+      case traverse (fmap esModificationTime . flip M.lookup prev) deps of
+        Nothing ->
+          -- If we end up here, one of the dependencies didn't exist in the
+          -- ExternsMap and so we know a dependency needs to be rebuilt, which
+          -- means we need to be rebuilt in turn.
+          pure prev
+        Just modTimes -> do
+          let dependencyTimestamp = maximumMaybe modTimes
+          inputTimestamp <- getInputTimestamp moduleName
+          let
+            shouldRebuild = case (inputTimestamp, dependencyTimestamp, outputTimestamp) of
+              (Right (Just t1), Just t3, Just t2) -> t1 > t2 || t3 > t2
+              (Right (Just t1), Nothing, Just t2) -> t1 > t2
+              (Left RebuildNever, _, Just _) -> False
+              _ -> True
+          if shouldRebuild
+            then pure prev
+            else do
+              mexts <- decodeExterns . snd <$> readExterns moduleName
+              case mexts of
+                Just exts ->
+                  pure $ M.insert
+                    moduleName
+                    (ExternsStruct (fromMaybe (internalError "make: outputTimestamp was Nothing") outputTimestamp) exts)
+                    prev
+                Nothing -> pure prev
 
-  for_ sorted $ \m -> fork $ do
+  externsMap <- foldM findExistingExtern M.empty sorted
+
+  -- We only rebuild modules that don't appear in the ExternsMap
+  let toBeRebuilt = filter (not . flip M.member externsMap . getModuleName) sorted
+  barriers <- zip (map getModuleName toBeRebuilt) <$> replicateM (length toBeRebuilt) ((,) <$> C.newEmptyMVar <*> C.newEmptyMVar)
+
+  for_ toBeRebuilt $ \m -> fork $ do
     let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup (getModuleName m) graph)
-    buildModule barriers (importPrim m) (deps `inOrderOf` map getModuleName sorted)
+    buildModule externsMap barriers (importPrim m) (deps `inOrderOf` map getModuleName sorted)
 
   -- Wait for all threads to complete, and collect errors.
   errors <- catMaybes <$> for barriers (takeMVar . snd . snd)
@@ -205,51 +248,31 @@ make ma@MakeActions{..} ms = do
   inOrderOf :: (Ord a) => [a] -> [a] -> [a]
   inOrderOf xs ys = let s = S.fromList xs in filter (`S.member` s) ys
 
-  buildModule :: [(ModuleName, (C.MVar (Maybe (MultipleErrors, ExternsFile)), C.MVar (Maybe MultipleErrors)))] -> Module -> [ModuleName] -> m ()
-  buildModule barriers m@(Module _ _ moduleName _ _) deps = flip catchError (markComplete Nothing . Just) $ do
+  buildModule :: ExternsMap -> [(ModuleName, (C.MVar (Maybe (MultipleErrors, ExternsFile)), C.MVar (Maybe MultipleErrors)))] -> Module -> [ModuleName] -> m ()
+  buildModule externsMap barriers m@(Module _ _ moduleName _ _) deps = flip catchError (markComplete Nothing . Just) $ do
     -- We need to wait for dependencies to be built, before checking if the current
     -- module should be rebuilt, so the first thing to do is to wait on the
     -- MVars for the module's dependencies.
-    mexterns <- fmap unzip . sequence <$> traverse (readMVar . fst . fromMaybe (internalError "make: no barrier") . flip lookup barriers) deps
+    let lookupExtern mn = fmap (\e -> (MultipleErrors [], esExternsFile e)) (M.lookup mn externsMap)
+    let lookupBarriers mn = readMVar $ fst $ fromMaybe (internalError "make: no barrier") $ lookup mn barriers
+    mexterns <- fmap unzip . sequence <$> traverse (\d -> case lookupExtern d of
+                                                       Nothing -> lookupBarriers d
+                                                       Just e -> pure (Just e)) deps
 
     case mexterns of
       Just (_, externs) -> do
-        outputTimestamp <- getOutputTimestamp moduleName
-        dependencyTimestamp <- maximumMaybe <$> traverse (fmap shouldExist . getOutputTimestamp) deps
-        inputTimestamp <- getInputTimestamp moduleName
-
-        let shouldRebuild = case (inputTimestamp, dependencyTimestamp, outputTimestamp) of
-                              (Right (Just t1), Just t3, Just t2) -> t1 > t2 || t3 > t2
-                              (Right (Just t1), Nothing, Just t2) -> t1 > t2
-                              (Left RebuildNever, _, Just _) -> False
-                              _ -> True
-
-        let rebuild = do
-              (exts, warnings) <- listen $ rebuildModule ma externs m
-              markComplete (Just (warnings, exts)) Nothing
-
-        if shouldRebuild
-          then rebuild
-          else do
-            mexts <- decodeExterns . snd <$> readExterns moduleName
-            case mexts of
-              Just exts -> markComplete (Just (mempty, exts)) Nothing
-              Nothing -> rebuild
+        (exts, warnings) <- listen $ rebuildModule ma externs m
+        markComplete (Just (warnings, exts)) Nothing
       Nothing -> markComplete Nothing Nothing
     where
     markComplete :: Maybe (MultipleErrors, ExternsFile) -> Maybe MultipleErrors -> m ()
     markComplete externs errors = do
-      putMVar (fst $ fromMaybe (internalError "make: no barrier") $ lookup moduleName barriers) externs
-      putMVar (snd $ fromMaybe (internalError "make: no barrier") $ lookup moduleName barriers) errors
+      putMVar (fst $ fromMaybe (internalError "make: markComplete no barrier") $ lookup moduleName barriers) externs
+      putMVar (snd $ fromMaybe (internalError "make: markComplete no barrier") $ lookup moduleName barriers) errors
 
   maximumMaybe :: Ord a => [a] -> Maybe a
   maximumMaybe [] = Nothing
   maximumMaybe xs = Just $ maximum xs
-
-  -- Make sure a dependency exists
-  shouldExist :: Maybe UTCTime -> UTCTime
-  shouldExist (Just t) = t
-  shouldExist _ = internalError "make: dependency should already have been built."
 
   decodeExterns :: Externs -> Maybe ExternsFile
   decodeExterns bs = do
@@ -410,7 +433,9 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   getTimestamp :: FilePath -> Make (Maybe UTCTime)
   getTimestamp path = makeIO (const (ErrorMessage [] $ CannotGetFileInfo path)) $ do
     exists <- doesFileExist path
-    traverse (const $ getModificationTime path) $ guard exists
+    if exists
+      then Just <$> getModificationTime path
+      else pure Nothing
 
   writeTextFile :: FilePath -> B.ByteString -> Make ()
   writeTextFile path text = makeIO (const (ErrorMessage [] $ CannotWriteFile path)) $ do
