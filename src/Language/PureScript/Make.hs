@@ -193,21 +193,22 @@ make ma@MakeActions{..} ms = do
           let dependencyTimestamp = maximumMaybe modTimes
           inputTimestamp <- getInputTimestamp moduleName
           let
-            shouldRebuild = case (inputTimestamp, dependencyTimestamp, outputTimestamp) of
-              (Right (Just t1), Just t3, Just t2) -> t1 > t2 || t3 > t2
-              (Right (Just t1), Nothing, Just t2) -> t1 > t2
-              (Left RebuildNever, _, Just _) -> False
-              _ -> True
-          if shouldRebuild
-            then pure prev
-            else do
+            existingExtern = case (inputTimestamp, dependencyTimestamp, outputTimestamp) of
+              (Right (Just t1), Just t3, Just t2) ->
+                if t1 > t2 || t3 > t2 then Nothing else Just t2
+              (Right (Just t1), Nothing, Just t2) ->
+                if t1 > t2 then Nothing else Just t2
+              (Left RebuildNever, _, Just t2) ->
+                Just t2
+              _ ->
+                Nothing
+          case existingExtern of
+            Nothing -> pure prev
+            Just outputTime -> do
               mexts <- decodeExterns . snd <$> readExterns moduleName
               case mexts of
                 Just exts ->
-                  pure $ M.insert
-                    moduleName
-                    (ExternsStruct (fromMaybe (internalError "make: outputTimestamp was Nothing") outputTimestamp) exts)
-                    prev
+                  pure (M.insert moduleName (ExternsStruct outputTime exts) prev)
                 Nothing -> pure prev
 
   externsMap <- foldM findExistingExtern M.empty sorted
