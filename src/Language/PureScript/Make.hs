@@ -23,6 +23,7 @@ module Language.PureScript.Make
 import           Prelude.Compat
 
 import           Control.Concurrent.Lifted as C
+import           Control.Applicative ((<|>))
 import           Control.Monad hiding (sequence)
 import           Control.Monad.Base (MonadBase(..))
 import           Control.Monad.Error.Class (MonadError(..))
@@ -38,7 +39,7 @@ import           Data.Aeson (encode, decode)
 import           Data.Either (partitionEithers)
 import           Data.Function (on)
 import           Data.Foldable (for_)
-import           Data.List (foldl', sortBy, groupBy)
+import           Data.List (foldl', sortBy, groupBy, find)
 import           Data.Maybe (fromMaybe, catMaybes)
 import           Data.Monoid ((<>))
 import           Data.Time.Clock
@@ -227,7 +228,13 @@ make ma@MakeActions{..} ms = do
 
   -- Bundle up all the externs and return them as an Environment
   (_, externs) <- unzip . fromMaybe (internalError "make: externs were missing but no errors reported.") . sequence <$> for barriers (takeMVar . fst . snd)
-  return externs
+
+  let
+    lookupResult mn = fromMaybe (internalError "Do this nicer") $
+      fmap esExternsFile (M.lookup mn externsMap)
+      <|> find (\e -> efModuleName e == mn) externs
+
+  return (map lookupResult (map getModuleName sorted))
 
   where
   checkModuleNamesAreUnique :: m ()
