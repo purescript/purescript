@@ -65,6 +65,13 @@ data Binder
   | TypedBinder Type Binder
   deriving (Show)
 
+-- Manual Eq and Ord instances for `Binder` were added on 2018-03-05. Comparing
+-- the `SourceSpan` values embedded in some of the data constructors of `Binder`
+-- was expensive. This made exhaustiveness checking observably slow for code
+-- such as the `explode` function in `examples/passing/LargeSumTypes.purs`.
+-- Custom instances were written to skip comparing the `SourceSpan` values. Only
+-- the `Ord` instance was needed for the speed-up, but I did not want the `Eq`
+-- to have mismatched behavior.
 instance Eq Binder where
   (==) NullBinder NullBinder = True
   (==) NullBinder _ = False
