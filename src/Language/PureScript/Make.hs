@@ -38,7 +38,8 @@ import           Data.Aeson (encode, decode)
 import           Data.Either (partitionEithers)
 import           Data.Function (on)
 import           Data.Foldable (for_)
-import           Data.List (foldl', sortBy, groupBy)
+import           Data.List (foldl', sortBy)
+import qualified Data.List.NonEmpty as NEL
 import           Data.Maybe (fromMaybe, catMaybes)
 import           Data.Monoid ((<>))
 import           Data.Time.Clock
@@ -191,13 +192,13 @@ make ma@MakeActions{..} ms = do
   checkModuleNamesAreUnique =
     for_ (findDuplicates getModuleName ms) $ \mss ->
       throwError . flip foldMap mss $ \ms' ->
-        let mn = getModuleName (head ms')
-        in errorMessage $ DuplicateModule mn (map getModuleSourceSpan ms')
+        let mn = getModuleName (NEL.head ms')
+        in errorMessage'' (fmap getModuleSourceSpan ms') $ DuplicateModule mn
 
   -- Find all groups of duplicate values in a list based on a projection.
-  findDuplicates :: Ord b => (a -> b) -> [a] -> Maybe [[a]]
+  findDuplicates :: Ord b => (a -> b) -> [a] -> Maybe [NEL.NonEmpty a]
   findDuplicates f xs =
-    case filter ((> 1) . length) . groupBy ((==) `on` f) . sortBy (compare `on` f) $ xs of
+    case filter ((> 1) . length) . NEL.groupBy ((==) `on` f) . sortBy (compare `on` f) $ xs of
       [] -> Nothing
       xss -> Just xss
 

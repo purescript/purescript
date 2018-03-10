@@ -197,6 +197,10 @@ errorMessage err = MultipleErrors [ErrorMessage [] err]
 errorMessage' :: SourceSpan -> SimpleErrorMessage -> MultipleErrors
 errorMessage' ss err = MultipleErrors [ErrorMessage [positionedError ss] err]
 
+-- | Create an error set from a single simple error message and source annotations
+errorMessage'' :: NEL.NonEmpty SourceSpan -> SimpleErrorMessage -> MultipleErrors
+errorMessage'' sss err = MultipleErrors [ErrorMessage [PositionedError sss] err]
+
 -- | Create an error set from a single error message
 singleError :: ErrorMessage -> MultipleErrors
 singleError = MultipleErrors . pure
@@ -537,10 +541,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line $ "Declaration for " <> printName (Qualified Nothing new) <> " conflicts with an existing " <> nameType existing <> " of the same name."
     renderSimpleErrorMessage (ExportConflict new existing) =
       line $ "Export for " <> printName new <> " conflicts with " <> runName existing
-    renderSimpleErrorMessage (DuplicateModule mn ss) =
-      paras [ line ("Module " <> markCode (runModuleName mn) <> " has been defined multiple times:")
-            , indent . paras $ map (line . displaySourceSpan relPath) ss
-            ]
+    renderSimpleErrorMessage (DuplicateModule mn) =
+      line $ "Module " <> markCode (runModuleName mn) <> " has been defined multiple times"
     renderSimpleErrorMessage (DuplicateTypeClass pn ss) =
       paras [ line ("Type class " <> markCode (runProperName pn) <> " has been defined multiple times:")
             , indent $ line $ displaySourceSpan relPath ss

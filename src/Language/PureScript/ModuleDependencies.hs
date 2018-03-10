@@ -7,7 +7,7 @@ module Language.PureScript.ModuleDependencies
 import           Protolude hiding (head)
 
 import           Data.Graph
-import           Data.List (head)
+import qualified Data.List.NonEmpty as NEL
 import qualified Data.Set as S
 import           Language.PureScript.AST
 import qualified Language.PureScript.Constants as C
@@ -62,5 +62,5 @@ toModule (AcyclicSCC m) = return m
 toModule (CyclicSCC [m]) = return m
 toModule (CyclicSCC ms) =
   throwError
-    . errorMessage' (getModuleSourceSpan (head ms))
+    . errorMessage'' (NEL.fromList (fmap getModuleSourceSpan ms))
     $ CycleInModules (map getModuleName ms)
