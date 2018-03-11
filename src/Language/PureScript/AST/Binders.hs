@@ -24,7 +24,7 @@ data Binder
   -- |
   -- A binder which matches a literal
   --
-  | LiteralBinder (Literal Binder)
+  | LiteralBinder SourceSpan (Literal Binder)
   -- |
   -- A binder which binds an identifier
   --
@@ -76,7 +76,7 @@ instance Eq Binder where
   (==) NullBinder NullBinder = True
   (==) NullBinder _ = False
 
-  (==) (LiteralBinder lb) (LiteralBinder lb') = (==) lb lb'
+  (==) (LiteralBinder _ lb) (LiteralBinder _ lb') = (==) lb lb'
   (==) LiteralBinder{} _ = False
 
   (==) (VarBinder _ ident) (VarBinder _ ident') = (==) ident ident'
@@ -114,7 +114,7 @@ instance Ord Binder where
   compare NullBinder NullBinder = EQ
   compare NullBinder _ = LT
 
-  compare (LiteralBinder lb) (LiteralBinder lb') = compare lb lb'
+  compare (LiteralBinder _ lb) (LiteralBinder _ lb') = compare lb lb'
   compare LiteralBinder{} NullBinder = GT
   compare LiteralBinder{} _ = LT
 
@@ -174,7 +174,7 @@ instance Ord Binder where
 binderNames :: Binder -> [Ident]
 binderNames = go []
   where
-  go ns (LiteralBinder b) = lit ns b
+  go ns (LiteralBinder _ b) = lit ns b
   go ns (VarBinder _ name) = name : ns
   go ns (ConstructorBinder _ _ bs) = foldl go ns bs
   go ns (BinaryNoParensBinder b1 b2 b3) = foldl go ns [b1, b2, b3]

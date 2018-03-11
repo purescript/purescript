@@ -463,7 +463,7 @@ deriveEq ss mn syns ds tyConNm = do
       | length xs /= 1 = xs ++ [catchAll]
       | otherwise = xs -- Avoid redundant case
       where
-      catchAll = CaseAlternative [NullBinder, NullBinder] (unguarded (Literal (BooleanLiteral False)))
+      catchAll = CaseAlternative [NullBinder, NullBinder] (unguarded (Literal ss (BooleanLiteral False)))
 
     mkCtorClause :: (ProperName 'ConstructorName, [Type]) -> m CaseAlternative
     mkCtorClause (ctorName, tys) = do
@@ -476,7 +476,7 @@ deriveEq ss mn syns ds tyConNm = do
       caseBinder idents = ConstructorBinder ss (Qualified (Just mn) ctorName) (map (VarBinder ss) idents)
 
     conjAll :: [Expr] -> Expr
-    conjAll [] = Literal (BooleanLiteral True)
+    conjAll [] = Literal ss (BooleanLiteral True)
     conjAll xs = foldl1 preludeConj xs
 
     toEqTest :: Expr -> Expr -> Type -> Expr
