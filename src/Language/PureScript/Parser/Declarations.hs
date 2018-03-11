@@ -572,7 +572,7 @@ parseConstructorBinder = withSourceSpanF $
 
 parseObjectBinder:: TokenParser Binder
 parseObjectBinder = withSourceSpanF $
-  (flip LiteralBinder) <$> parseObjectLiteral (indented *> parseEntry)
+  flip LiteralBinder <$> parseObjectLiteral (indented *> parseEntry)
   where
     parseEntry :: TokenParser (PSString, Binder)
     parseEntry = var <|> (,) <$> stringLiteral <*> rest
@@ -585,7 +585,7 @@ parseObjectBinder = withSourceSpanF $
 
 parseArrayBinder :: TokenParser Binder
 parseArrayBinder = withSourceSpanF $
-  (flip LiteralBinder) <$> parseArrayLiteral (indented *> parseBinder)
+  flip LiteralBinder <$> parseArrayLiteral (indented *> parseBinder)
 
 parseVarOrNamedBinder :: TokenParser Binder
 parseVarOrNamedBinder = withSourceSpanF $ do
@@ -621,9 +621,9 @@ parseBinderAtom :: TokenParser Binder
 parseBinderAtom = withSourceSpan PositionedBinder
   (P.choice
    [ parseNullBinder
-   , withSourceSpanF $ (flip LiteralBinder) <$> parseCharLiteral
-   , withSourceSpanF $ (flip LiteralBinder) <$> parseStringLiteral
-   , withSourceSpanF $ (flip LiteralBinder) <$> parseBooleanLiteral
+   , withSourceSpanF $ flip LiteralBinder <$> parseCharLiteral
+   , withSourceSpanF $ flip LiteralBinder <$> parseStringLiteral
+   , withSourceSpanF $ flip LiteralBinder <$> parseBooleanLiteral
    , parseNumberLiteral
    , parseVarOrNamedBinder
    , parseConstructorBinder
@@ -637,9 +637,9 @@ parseBinderNoParens :: TokenParser Binder
 parseBinderNoParens = withSourceSpan PositionedBinder
   (P.choice
     [ parseNullBinder
-    , withSourceSpanF $ (flip LiteralBinder) <$> parseCharLiteral
-    , withSourceSpanF $ (flip LiteralBinder) <$> parseStringLiteral
-    , withSourceSpanF $ (flip LiteralBinder) <$> parseBooleanLiteral
+    , withSourceSpanF $ flip LiteralBinder <$> parseCharLiteral
+    , withSourceSpanF $ flip LiteralBinder <$> parseStringLiteral
+    , withSourceSpanF $ flip LiteralBinder <$> parseBooleanLiteral
     , parseNumberLiteral
     , parseVarOrNamedBinder
     , parseNullaryConstructorBinder
