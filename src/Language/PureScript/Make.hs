@@ -353,7 +353,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
             tell $ errorMessage' modSS $ UnnecessaryFFIModule mn path
             return Nothing
         | otherwise -> do
-            checkForeignDecls m path
+            checkForeignDecls modSS m path
             return $ Just $ Imp.App Nothing (Imp.Var Nothing "require") [Imp.StringLiteral Nothing "./foreign"]
       Nothing | requiresForeign m -> throwError . errorMessage $ MissingFFIModule mn
               | otherwise -> return Nothing
@@ -425,8 +425,8 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 
 -- | Check that the declarations in a given PureScript module match with those
 -- in its corresponding foreign module.
-checkForeignDecls :: CF.Module ann -> FilePath -> SupplyT Make ()
-checkForeignDecls m path = do
+checkForeignDecls :: SourceSpan -> CF.Module ann -> FilePath -> SupplyT Make ()
+checkForeignDecls modSS m path = do
   jsStr <- lift $ readTextFile path
   js <- either (errorParsingModule . Bundle.UnableToParseModule) pure $ JS.parse (BU8.toString (B.toStrict jsStr)) path
 
@@ -439,12 +439,12 @@ checkForeignDecls m path = do
 
   let unusedFFI = foreignIdents S.\\ importedIdents
   unless (null unusedFFI) $
-    tell . errorMessage . UnusedFFIImplementations mname $
+    tell . errorMessage' modSS . UnusedFFIImplementations mname $
       S.toList unusedFFI
 
   let missingFFI = importedIdents S.\\ foreignIdents
   unless (null missingFFI) $
-    throwError . errorMessage . MissingFFIImplementations mname $
+    throwError . errorMessage' modSS . MissingFFIImplementations mname $
       S.toList missingFFI
 
   where
