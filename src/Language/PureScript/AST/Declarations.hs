@@ -93,7 +93,7 @@ data SimpleErrorMessage
   | ScopeShadowing Name (Maybe ModuleName) [ModuleName]
   | DeclConflict Name Name
   | ExportConflict (Qualified Name) (Qualified Name)
-  | DuplicateModule ModuleName [SourceSpan]
+  | DuplicateModule ModuleName
   | DuplicateTypeClass (ProperName 'ClassName) SourceSpan
   | DuplicateInstance Ident SourceSpan
   | DuplicateTypeArgument Text
