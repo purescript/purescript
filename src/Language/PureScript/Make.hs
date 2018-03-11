@@ -108,7 +108,7 @@ data MakeActions m = MakeActions
   , readExterns :: ModuleName -> m (FilePath, Externs)
   -- ^ Read the externs file for a module as a string and also return the actual
   -- path for the file.
-  , codegen :: CF.Module CF.Ann -> Environment -> Externs -> SupplyT m ()
+  , codegen :: SourceSpan -> CF.Module CF.Ann -> Environment -> Externs -> SupplyT m ()
   -- ^ Run the code generator for the module and write any required output files.
   , progress :: ProgressMessage -> m ()
   -- ^ Respond to a progress update.
@@ -154,7 +154,7 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
       corefn = CF.moduleToCoreFn env' mod'
       [renamed] = renameInModules [corefn]
       exts = moduleToExternsFile mod' env'
-  evalSupplyT nextVar' . codegen renamed env' . encode $ exts
+  evalSupplyT nextVar' . codegen ss renamed env' . encode $ exts
   return exts
 
 -- | Compiles in "make" mode, compiling each module separately to a @.js@ file and an @externs.json@ file.
@@ -344,13 +344,13 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     let path = outputDir </> T.unpack (runModuleName mn) </> "externs.json"
     (path, ) <$> readTextFile path
 
-  codegen :: CF.Module CF.Ann -> Environment -> Externs -> SupplyT Make ()
-  codegen m _ exts = do
+  codegen :: SourceSpan -> CF.Module CF.Ann -> Environment -> Externs -> SupplyT Make ()
+  codegen modSS m _ exts = do
     let mn = CF.moduleName m
     foreignInclude <- case mn `M.lookup` foreigns of
       Just path
         | not $ requiresForeign m -> do
-            tell $ errorMessage $ UnnecessaryFFIModule mn path
+            tell $ errorMessage' modSS $ UnnecessaryFFIModule mn path
             return Nothing
         | otherwise -> do
             checkForeignDecls m path
