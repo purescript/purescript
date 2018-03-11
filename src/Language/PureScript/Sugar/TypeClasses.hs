@@ -297,7 +297,7 @@ typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
             , let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
             ]
 
-      let props = Literal $ ObjectLiteral $ map (first mkString) (members ++ superclasses)
+      let props = Literal ss $ ObjectLiteral $ map (first mkString) (members ++ superclasses)
           dictTy = foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
           constrainedTy = quantify (foldr ConstrainedType dictTy deps)
           dict = TypeClassDictionaryConstructorApp className props

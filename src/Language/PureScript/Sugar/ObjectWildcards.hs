@@ -41,7 +41,7 @@ desugarDecl d = rethrowWithPosition (declSourceSpan d) $ fn d
     , BinaryNoParens op u val <- b'
     , isAnonymousArgument u = do arg <- freshIdent'
                                  return $ Abs (VarBinder nullSourceSpan arg) $ App (App op (Var nullSourceSpan (Qualified Nothing arg))) val
-  desugarExpr (Literal (ObjectLiteral ps)) = wrapLambdaAssoc (Literal . ObjectLiteral) ps
+  desugarExpr (Literal ss (ObjectLiteral ps)) = wrapLambdaAssoc (Literal ss . ObjectLiteral) ps
   desugarExpr (ObjectUpdateNested obj ps) = transformNestedUpdate obj ps
   desugarExpr (Accessor prop u)
     | Just props <- peelAnonAccessorChain u = do

@@ -71,7 +71,7 @@ desugarGuardedExprs ss (Case scrut alternatives)
     Let scrut_decls <$> desugarGuardedExprs ss (Case scrut' alternatives)
   where
     isTrivialExpr (Var _ _) = True
-    isTrivialExpr (Literal _) = True
+    isTrivialExpr (Literal _ _) = True
     isTrivialExpr (Accessor _ e) = isTrivialExpr e
     isTrivialExpr (Parens e) = isTrivialExpr e
     isTrivialExpr (PositionedValue _ _ e) = isTrivialExpr e
@@ -196,7 +196,7 @@ desugarGuardedExprs ss (Case scrut alternatives) =
       | isTrueExpr c = desugarGuard gs e match_failed
       | otherwise =
         Case [c]
-          (CaseAlternative [LiteralBinder (BooleanLiteral True)]
+          (CaseAlternative [LiteralBinder ss (BooleanLiteral True)]
             [MkUnguarded (desugarGuard gs e match_failed)] : match_failed)
 
     desugarGuard (PatternGuard vb g : gs) e match_failed =
@@ -227,7 +227,7 @@ desugarGuardedExprs ss (Case scrut alternatives) =
         let
           goto_rem_case :: Expr
           goto_rem_case = Var ss (Qualified Nothing rem_case_id)
-            `App` Literal (BooleanLiteral True)
+            `App` Literal ss (BooleanLiteral True)
           alt_fail = [CaseAlternative [NullBinder] [MkUnguarded goto_rem_case]]
 
         pure $ Let [
