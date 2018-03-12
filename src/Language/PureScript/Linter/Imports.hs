@@ -13,6 +13,7 @@ import Control.Monad.Writer.Class
 import Data.Function (on)
 import Data.Foldable (for_)
 import Data.List (find, intersect, groupBy, sortBy, (\\))
+import qualified Data.List.NonEmpty as NEL
 import Data.Maybe (mapMaybe)
 import Data.Monoid (Sum(..))
 import Data.Traversable (forM)
@@ -167,18 +168,18 @@ lintImports (Module _ _ mn mdecls (Just mexports)) env usedImps = do
 
   extractByQual
     :: ModuleName
-    -> M.Map (Qualified a) [ImportRecord a]
+    -> M.Map (Qualified a) (NEL.NonEmpty (ImportRecord a))
     -> (a -> Name)
     -> [(ModuleName, Qualified Name)]
   extractByQual k m toName = mapMaybe go (M.toList m)
     where
     go (q@(Qualified mnq _), is)
       | isUnqualified q =
-          case find (isQualifiedWith k) (map importName is) of
+          case find (isQualifiedWith k) (fmap importName is) of
             Just (Qualified _ name) -> Just (k, Qualified mnq (toName name))
             _ -> Nothing
       | isQualifiedWith k q =
-          case importName (head is) of
+          case importName (NEL.head is) of
             Qualified (Just mn') name -> Just (mn', Qualified mnq (toName name))
             _ -> internalError "unqualified name in extractByQual"
     go _ = Nothing

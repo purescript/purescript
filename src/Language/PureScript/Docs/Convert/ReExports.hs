@@ -12,6 +12,7 @@ import Control.Monad.Trans.Reader (runReaderT)
 import Control.Monad.Trans.State.Strict (execState)
 
 import Data.Either
+import qualified Data.List.NonEmpty as NEL
 import Data.Map (Map)
 import Data.Maybe (mapMaybe)
 import Data.Monoid ((<>))
@@ -132,24 +133,24 @@ collectDeclarations imports exports = do
     Map.fromListWith (<>) <$> traverse (uncurry lookup') imps'
 
   expVals = P.exportedValues exports
-  impVals = concat (Map.elems (P.importedValues imports))
+  impVals = concat (fmap NEL.toList (Map.elems (P.importedValues imports)))
 
   expValOps = P.exportedValueOps exports
-  impValOps = concat (Map.elems (P.importedValueOps imports))
+  impValOps = concat (fmap NEL.toList (Map.elems (P.importedValueOps imports)))
 
   expTypes = Map.map snd (P.exportedTypes exports)
-  impTypes = concat (Map.elems (P.importedTypes imports))
+  impTypes = concat (fmap NEL.toList (Map.elems (P.importedTypes imports)))
 
   expTypeOps = P.exportedTypeOps exports
-  impTypeOps = concat (Map.elems (P.importedTypeOps imports))
+  impTypeOps = concat (fmap NEL.toList (Map.elems (P.importedTypeOps imports)))
 
   expCtors = concatMap fst (Map.elems (P.exportedTypes exports))
 
   expTCs = P.exportedTypeClasses exports
-  impTCs = concat (Map.elems (P.importedTypeClasses imports))
+  impTCs = concat (fmap NEL.toList (Map.elems (P.importedTypeClasses imports)))
 
   expKinds = P.exportedKinds exports
-  impKinds = concat (Map.elems (P.importedKinds imports))
+  impKinds = concat (fmap NEL.toList (Map.elems (P.importedKinds imports)))
 
 -- |
 -- Given a list of imported declarations (of a particular kind, ie. type, data,
