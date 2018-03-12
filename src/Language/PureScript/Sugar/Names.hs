@@ -17,6 +17,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Lazy
 import Control.Monad.Writer (MonadWriter(..), censor)
 
+import qualified Data.List.NonEmpty as NEL
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -382,7 +383,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
   -- (e.g. M.Map -> Data.Map.Map).
   update
     :: (Ord a)
-    => M.Map (Qualified a) [ImportRecord a]
+    => M.Map (Qualified a) (NEL.NonEmpty (ImportRecord a))
     -> (a -> Name)
     -> Qualified a
     -> SourceSpan

@@ -12,6 +12,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Data.Function (on)
 import Data.Foldable (traverse_)
 import Data.List (intersect, groupBy, sortBy)
+import qualified Data.List.NonEmpty as NEL
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
 
@@ -124,9 +125,9 @@ resolveExports env ss mn imps exps refs =
     :: Bool
     -> ModuleName
     -> (a -> Name)
-    -> M.Map (Qualified a) [ImportRecord a]
+    -> M.Map (Qualified a) (NEL.NonEmpty (ImportRecord a))
     -> m [Qualified a]
-  extract useQual name toName = fmap (map (importName . head . snd)) . go . M.toList
+  extract useQual name toName = fmap (map (importName . NEL.head . snd)) . go . M.toList
     where
     go = filterM $ \(name', options) -> do
       let isMatch = if useQual then isQualifiedWith name name' else any (checkUnqual name') options

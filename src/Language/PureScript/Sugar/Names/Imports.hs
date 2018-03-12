@@ -11,6 +11,7 @@ import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Foldable (for_, traverse_)
+import Data.List.NonEmpty as NEL
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -49,7 +50,7 @@ resolveImports
 resolveImports env (Module ss coms currentModule decls exps) =
   rethrow (addHint (ErrorInModule currentModule)) $ do
     let imports = findImports decls
-        imports' = M.map (map (\(ss', dt, mmn) -> (ss', Just dt, mmn))) imports
+        imports' = M.map (fmap (\(ss', dt, mmn) -> (ss', Just dt, mmn))) imports
         scope = M.insert currentModule [(internalModuleSourceSpan "<module>", Nothing, Nothing)] imports'
     (Module ss coms currentModule decls exps,) <$>
       foldM (resolveModuleImport env) nullImports (M.toList scope)
@@ -190,7 +191,7 @@ resolveImport importModule exps imps impQual = resolveByType
     let types' = updateImports (importedTypes imp) (exportedTypes exps) snd name ss prov
     let (dctorNames, mn) = allExportedDataConstructors name
         dctorLookup :: M.Map (ProperName 'ConstructorName) ModuleName
-        dctorLookup = M.fromList $ map (, mn) dctorNames
+        dctorLookup = M.fromList $ fmap (, mn) dctorNames
     traverse_ (traverse_ $ checkDctorExists ss name dctorNames) dctors
     let dctors' = foldl (\m d -> updateImports m dctorLookup id d ss prov) (importedDataConstructors imp) (fromMaybe dctorNames dctors)
     return $ imp { importedTypes = types', importedDataConstructors = dctors' }
@@ -218,19 +219,19 @@ resolveImport importModule exps imps impQual = resolveByType
   -- Add something to an import resolution list
   updateImports
     :: Ord a
-    => M.Map (Qualified a) [ImportRecord a]
+    => M.Map (Qualified a) (NEL.NonEmpty (ImportRecord a))
     -> M.Map a b
     -> (b -> ModuleName)
     -> a
     -> SourceSpan
     -> ImportProvenance
-    -> M.Map (Qualified a) [ImportRecord a]
+    -> M.Map (Qualified a) (NEL.NonEmpty (ImportRecord a))
   updateImports imps' exps' expName name ss prov =
     let
       mnOrig = maybe (internalError "Invalid state in updateImports") expName (name `M.lookup` exps')
       rec = ImportRecord (Qualified (Just importModule) name) mnOrig ss prov
     in
       M.alter
-        (\currNames -> Just $ rec : fromMaybe [] currNames)
+        (Just . maybe (pure rec) (NEL.cons rec))
         (Qualified impQual name)
         imps'

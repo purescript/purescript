@@ -30,7 +30,8 @@ import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Function (on)
 import Data.Foldable (find)
-import Data.List (groupBy, sortBy, delete)
+import Data.List (delete)
+import qualified Data.List.NonEmpty as NEL
 import Data.Maybe (fromJust, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -66,7 +67,7 @@ data ImportProvenance
   | Prim
   deriving (Eq, Ord, Show)
 
-type ImportMap a = M.Map (Qualified a) [ImportRecord a]
+type ImportMap a = M.Map (Qualified a) (NEL.NonEmpty (ImportRecord a))
 
 -- |
 -- The imported declarations for a module, including the module's own members.
@@ -398,23 +399,29 @@ checkImportConflicts
    . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
   -> (a -> Name)
-  -> [ImportRecord a]
+  -> NEL.NonEmpty (ImportRecord a)
   -> m (ModuleName, ModuleName)
 checkImportConflicts currentModule toName xs =
   let
-    byOrig = sortBy (compare `on` importSourceModule) xs
-    groups = groupBy ((==) `on` importSourceModule) byOrig
-    nonImplicit = filter ((/= FromImplicit) . importProvenance) xs
-    name = toName . disqualify . importName $ head xs
-    conflictModules = mapMaybe (getQual . importName . head) groups
+    byOrig = NEL.sortBy (compare `on` importSourceModule) xs
+    groups = NEL.groupBy ((==) `on` importSourceModule) byOrig
+    nonImplicit = NEL.filter ((/= FromImplicit) . importProvenance) xs
+    name = toName . disqualify . importName $ NEL.head xs
+    conflictModules = mapMaybe (getQual . importName . NEL.head) groups
+    defaultResult =
+      let ImportRecord (Qualified (Just mnNew) _) mnOrig _ _ = NEL.head byOrig
+      in (mnNew, mnOrig)
   in
     if length groups > 1
     then case nonImplicit of
+      [] ->
+        return defaultResult
       [ImportRecord (Qualified (Just mnNew) _) mnOrig ss _] -> do
         let warningModule = if mnNew == currentModule then Nothing else Just mnNew
         tell . errorMessage' ss $ ScopeShadowing name warningModule $ delete mnNew conflictModules
         return (mnNew, mnOrig)
-      _ -> throwError . errorMessage $ ScopeConflict name conflictModules
+      recs -> do
+        let sss = fmap importSourceSpan (NEL.fromList recs)
+        throwError . errorMessage'' sss $ ScopeConflict name conflictModules
     else
-      let ImportRecord (Qualified (Just mnNew) _) mnOrig _ _ = head byOrig
-      in return (mnNew, mnOrig)
+      return defaultResult
