@@ -126,12 +126,12 @@ missingCasesSingle env mn NullBinder cb@(ConstructorBinder ss con _) =
 missingCasesSingle env mn cb@(ConstructorBinder ss con bs) (ConstructorBinder _ con' bs')
   | con == con' = let (bs'', pr) = missingCasesMultiple env mn bs bs' in (map (ConstructorBinder ss con) bs'', pr)
   | otherwise = ([cb], return False)
-missingCasesSingle env mn NullBinder (LiteralBinder (ObjectLiteral bs)) =
-  (map (LiteralBinder . ObjectLiteral . zip (map fst bs)) allMisses, pr)
+missingCasesSingle env mn NullBinder (LiteralBinder ss (ObjectLiteral bs)) =
+  (map (LiteralBinder ss . ObjectLiteral . zip (map fst bs)) allMisses, pr)
   where
   (allMisses, pr) = missingCasesMultiple env mn (initialize $ length bs) (map snd bs)
-missingCasesSingle env mn (LiteralBinder (ObjectLiteral bs)) (LiteralBinder (ObjectLiteral bs')) =
-  (map (LiteralBinder . ObjectLiteral . zip sortedNames) allMisses, pr)
+missingCasesSingle env mn (LiteralBinder _ (ObjectLiteral bs)) (LiteralBinder ss (ObjectLiteral bs')) =
+  (map (LiteralBinder ss . ObjectLiteral . zip sortedNames) allMisses, pr)
   where
   (allMisses, pr) = uncurry (missingCasesMultiple env mn) (unzip binders)
 
@@ -148,10 +148,10 @@ missingCasesSingle env mn (LiteralBinder (ObjectLiteral bs)) (LiteralBinder (Obj
   compBS e s b b' = (s, compB e b b')
 
   (sortedNames, binders) = unzip $ genericMerge (compBS NullBinder) sbs sbs'
-missingCasesSingle _ _ NullBinder (LiteralBinder (BooleanLiteral b)) = ([LiteralBinder . BooleanLiteral $ not b], return True)
-missingCasesSingle _ _ (LiteralBinder (BooleanLiteral bl)) (LiteralBinder (BooleanLiteral br))
+missingCasesSingle _ _ NullBinder (LiteralBinder ss (BooleanLiteral b)) = ([LiteralBinder ss . BooleanLiteral $ not b], return True)
+missingCasesSingle _ _ (LiteralBinder ss (BooleanLiteral bl)) (LiteralBinder _ (BooleanLiteral br))
   | bl == br = ([], return True)
-  | otherwise = ([LiteralBinder $ BooleanLiteral bl], return False)
+  | otherwise = ([LiteralBinder ss $ BooleanLiteral bl], return False)
 missingCasesSingle env mn b (PositionedBinder _ _ cb) = missingCasesSingle env mn b cb
 missingCasesSingle env mn b (TypedBinder _ cb) = missingCasesSingle env mn b cb
 missingCasesSingle _ _ b _ = ([b], Left Unknown)
@@ -337,8 +337,8 @@ checkExhaustiveExpr initSS env mn = onExpr initSS
 
   onExpr :: SourceSpan -> Expr -> m Expr
   onExpr _ (UnaryMinus ss e) = UnaryMinus ss <$> onExpr ss e
-  onExpr ss (Literal (ArrayLiteral es)) = Literal . ArrayLiteral <$> mapM (onExpr ss) es
-  onExpr ss (Literal (ObjectLiteral es)) = Literal . ObjectLiteral <$> mapM (sndM (onExpr ss)) es
+  onExpr _ (Literal ss (ArrayLiteral es)) = Literal ss . ArrayLiteral <$> mapM (onExpr ss) es
+  onExpr _ (Literal ss (ObjectLiteral es)) = Literal ss . ObjectLiteral <$> mapM (sndM (onExpr ss)) es
   onExpr ss (TypeClassDictionaryConstructorApp x e) = TypeClassDictionaryConstructorApp x <$> onExpr ss e
   onExpr ss (Accessor x e) = Accessor x <$> onExpr ss e
   onExpr ss (ObjectUpdate o es) = ObjectUpdate <$> onExpr ss o <*> mapM (sndM (onExpr ss)) es

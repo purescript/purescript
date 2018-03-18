@@ -100,7 +100,7 @@ skolemEscapeCheck expr@TypedValue{} =
     go (scopes, _) (PositionedValue ss _ _) = ((scopes, Just ss), [])
     go (scopes, ssUsed) val@(TypedValue _ _ ty) =
         ( (allScopes, ssUsed)
-        , [ ErrorMessage (maybe id ((:) . PositionedError) ssUsed [ ErrorInExpression val ]) $
+        , [ ErrorMessage (maybe id ((:) . positionedError) ssUsed [ ErrorInExpression val ]) $
               EscapedSkolem name ssBound ty
           | (name, scope, ssBound) <- collectSkolems ty
           , notMember scope allScopes

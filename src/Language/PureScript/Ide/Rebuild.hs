@@ -158,7 +158,7 @@ shushProgress ma _ =
 -- files though)
 shushCodegen :: P.MakeActions P.Make -> MakeActionsEnv -> P.MakeActions P.Make
 shushCodegen ma MakeActionsEnv{..} =
-  ma { P.codegen = \_ _ _ -> pure () }
+  ma { P.codegen = \_ _ _ _ -> pure () }
 
 -- | Returns a topologically sorted list of dependent ExternsFiles for the given
 -- module. Throws an error if there is a cyclic dependency within the
