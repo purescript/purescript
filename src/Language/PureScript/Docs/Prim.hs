@@ -1,4 +1,4 @@
--- | This module provides documentation for the builtin Prim module.
+-- | This module provides documentation for the builtin Prim modules.
 module Language.PureScript.Docs.Prim
   ( primDocsModule
   , primRowDocsModule
@@ -64,12 +64,12 @@ primTypeErrorDocsModule = Module
 
 type NameGen a = Text -> P.Qualified (P.ProperName a)
 
-unsafeLookupOf 
+unsafeLookupOf
   :: forall v (a :: P.ProperNameType)
   . NameGen a
-  -> Map.Map (P.Qualified (P.ProperName a)) v 
-  -> String 
-  -> Text 
+  -> Map.Map (P.Qualified (P.ProperName a)) v
+  -> String
+  -> Text
   -> v
 unsafeLookupOf k m errorMsg name = go name
   where
@@ -90,9 +90,9 @@ primKind title comments =
           }
     else P.internalError $ "Docs.Prim: No such Prim kind: " ++ T.unpack title
 
-lookupPrimTypeKindOf 
+lookupPrimTypeKindOf
   :: NameGen 'P.TypeName
-  -> Text 
+  -> Text
   -> P.Kind
 lookupPrimTypeKindOf k = fst . unsafeLookupOf k (P.primTypes <> P.primRowTypes <> P.primTypeErrorTypes) "Docs.Prim: No such Prim type: "
 
