@@ -46,7 +46,7 @@ spec = describe "Finding Usages" $ do
                     , usage (Test.mn "FindUsage.Definition") "usageId" IdeNSValue
                     ]
       usage1 `shouldBeUsage` ("src" </> "FindUsage.purs", "12:11-12:18")
-      usage2 `shouldBeUsage` ("src" </> "FindUsage/Definition.purs", "13:18-13:18")
+      usage2 `shouldBeUsage` ("src" </> "FindUsage" </> "Definition.purs", "13:18-13:18")
     it "finds a simple recursive usage" $ do
       ([_, Right (UsagesResult [usage1])], _) <- Test.inProject $
         Test.runIde [ load ["FindUsage.Recursive"]
