@@ -93,7 +93,7 @@ data MakeActions m = MakeActions
   , readExterns :: ModuleName -> m (FilePath, Externs)
   -- ^ Read the externs file for a module as a string and also return the actual
   -- path for the file.
-  , codegen :: CF.Module CF.Ann -> Environment -> Externs -> SupplyT m ()
+  , codegen :: SourceSpan -> CF.Module CF.Ann -> Environment -> Externs -> SupplyT m ()
   -- ^ Run the code generator for the module and write any required output files.
   , progress :: ProgressMessage -> m ()
   -- ^ Respond to a progress update.
@@ -138,18 +138,18 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     let path = outputDir </> T.unpack (runModuleName mn) </> "externs.json"
     (path, ) <$> readTextFile path
 
-  codegen :: CF.Module CF.Ann -> Environment -> Externs -> SupplyT Make ()
-  codegen m _ exts = do
+  codegen :: SourceSpan -> CF.Module CF.Ann -> Environment -> Externs -> SupplyT Make ()
+  codegen modSS m _ exts = do
     let mn = CF.moduleName m
     foreignInclude <- case mn `M.lookup` foreigns of
       Just path
         | not $ requiresForeign m -> do
-            tell $ errorMessage $ UnnecessaryFFIModule mn path
+            tell $ errorMessage' modSS $ UnnecessaryFFIModule mn path
             return Nothing
         | otherwise -> do
-            checkForeignDecls m path
+            checkForeignDecls modSS m path
             return $ Just $ Imp.App Nothing (Imp.Var Nothing "require") [Imp.StringLiteral Nothing "./foreign"]
-      Nothing | requiresForeign m -> throwError . errorMessage $ MissingFFIModule mn
+      Nothing | requiresForeign m -> throwError . errorMessage' modSS $ MissingFFIModule mn
               | otherwise -> return Nothing
     rawJs <- J.moduleToJs m foreignInclude
     dir <- lift $ makeIO (const (ErrorMessage [] $ CannotGetFileInfo ".")) getCurrentDirectory
@@ -221,8 +221,8 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 
 -- | Check that the declarations in a given PureScript module match with those
 -- in its corresponding foreign module.
-checkForeignDecls :: CF.Module ann -> FilePath -> SupplyT Make ()
-checkForeignDecls m path = do
+checkForeignDecls :: SourceSpan -> CF.Module ann -> FilePath -> SupplyT Make ()
+checkForeignDecls modSS m path = do
   jsStr <- lift $ readTextFile path
   js <- either (errorParsingModule . Bundle.UnableToParseModule) pure $ JS.parse (BU8.toString (B.toStrict jsStr)) path
 
@@ -235,12 +235,12 @@ checkForeignDecls m path = do
 
   let unusedFFI = foreignIdents S.\\ importedIdents
   unless (null unusedFFI) $
-    tell . errorMessage . UnusedFFIImplementations mname $
+    tell . errorMessage' modSS . UnusedFFIImplementations mname $
       S.toList unusedFFI
 
   let missingFFI = importedIdents S.\\ foreignIdents
   unless (null missingFFI) $
-    throwError . errorMessage . MissingFFIImplementations mname $
+    throwError . errorMessage' modSS . MissingFFIImplementations mname $
       S.toList missingFFI
 
   where

@@ -167,7 +167,7 @@ handleDecls
   -> m ()
 handleDecls ds = do
   st <- gets (updateLets (++ ds))
-  let m = createTemporaryModule False st (P.Literal (P.ObjectLiteral []))
+  let m = createTemporaryModule False st (P.Literal P.nullSourceSpan (P.ObjectLiteral []))
   e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
   case e of
     Left err -> printErrors err

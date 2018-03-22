@@ -371,14 +371,14 @@ entails SolverOptions{..} constraint context hints =
               -- So pass an empty placeholder (undefined) instead.
               return valUndefined
             mkDictionary (IsSymbolInstance sym) _ =
-              let fields = [ ("reflectSymbol", Abs (VarBinder nullSourceSpan UnusedIdent) (Literal (StringLiteral sym))) ] in
-              return $ TypeClassDictionaryConstructorApp C.IsSymbol (Literal (ObjectLiteral fields))
+              let fields = [ ("reflectSymbol", Abs (VarBinder nullSourceSpan UnusedIdent) (Literal nullSourceSpan (StringLiteral sym))) ] in
+              return $ TypeClassDictionaryConstructorApp C.IsSymbol (Literal nullSourceSpan (ObjectLiteral fields))
             mkDictionary CompareSymbolInstance _ =
-              return $ TypeClassDictionaryConstructorApp C.CompareSymbol (Literal (ObjectLiteral []))
+              return $ TypeClassDictionaryConstructorApp C.CompareSymbol (Literal nullSourceSpan (ObjectLiteral []))
             mkDictionary ConsSymbolInstance _ =
-              return $ TypeClassDictionaryConstructorApp C.ConsSymbol (Literal (ObjectLiteral []))
+              return $ TypeClassDictionaryConstructorApp C.ConsSymbol (Literal nullSourceSpan (ObjectLiteral []))
             mkDictionary AppendSymbolInstance _ =
-              return $ TypeClassDictionaryConstructorApp C.AppendSymbol (Literal (ObjectLiteral []))
+              return $ TypeClassDictionaryConstructorApp C.AppendSymbol (Literal nullSourceSpan (ObjectLiteral []))
 
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr

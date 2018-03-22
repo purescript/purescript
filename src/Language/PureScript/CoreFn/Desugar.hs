@@ -73,7 +73,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
 
   -- | Desugars expressions from AST to CoreFn representation.
   exprToCoreFn :: SourceSpan -> [Comment] -> Maybe Type -> A.Expr -> Expr Ann
-  exprToCoreFn ss com ty (A.Literal lit) =
+  exprToCoreFn _ com ty (A.Literal ss lit) =
     Literal (ss, com, ty, Nothing) (fmap (exprToCoreFn ss com Nothing) lit)
   exprToCoreFn ss com ty (A.Accessor name v) =
     Accessor (ss, com, ty, Nothing) name (exprToCoreFn ss [] Nothing v)
@@ -101,9 +101,9 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     exprToCoreFn ss com (Just ty) v
   exprToCoreFn ss com ty (A.Let ds v) =
     Let (ss, com, ty, Nothing) (concatMap declToCoreFn ds) (exprToCoreFn ss [] Nothing v)
-  exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name (A.TypedValue _ lit@(A.Literal (A.ObjectLiteral _)) _)) =
+  exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name (A.TypedValue _ lit@(A.Literal _ (A.ObjectLiteral _)) _)) =
     exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name lit)
-  exprToCoreFn ss com _ (A.TypeClassDictionaryConstructorApp name (A.Literal (A.ObjectLiteral vs))) =
+  exprToCoreFn ss com _ (A.TypeClassDictionaryConstructorApp name (A.Literal _ (A.ObjectLiteral vs))) =
     let args = fmap (exprToCoreFn ss [] Nothing . snd) $ sortBy (compare `on` fst) vs
         ctor = Var (ss, [], Nothing, Just IsTypeClassConstructor) (fmap properToIdent name)
     in foldl (App (ss, com, Nothing, Nothing)) ctor args
@@ -133,7 +133,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
 
   -- | Desugars case binders from AST to CoreFn representation.
   binderToCoreFn :: SourceSpan -> [Comment] -> A.Binder -> Binder Ann
-  binderToCoreFn ss com (A.LiteralBinder lit) =
+  binderToCoreFn _ com (A.LiteralBinder ss lit) =
     LiteralBinder (ss, com, Nothing, Nothing) (fmap (binderToCoreFn ss com) lit)
   binderToCoreFn ss com A.NullBinder =
     NullBinder (ss, com, Nothing, Nothing)
