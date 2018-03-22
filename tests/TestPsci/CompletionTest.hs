@@ -86,6 +86,10 @@ completionTestData supportModuleNames =
   , ("P.uni", ["P.unit"])
   , ("voi", []) -- import Prelude hiding (void)
   , ("Control.Monad.Eff.Class.", [])
+
+  -- Parens and brackets aren't considered part of the current identifier
+  , ("map id [uni", ["map id [unit"])
+  , ("map (cons", ["map (const"])
   ]
 
 assertCompletedOk :: PSCiState -> (String, [String]) -> Spec
