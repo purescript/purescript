@@ -168,7 +168,7 @@ handleDecls
   -> m ()
 handleDecls ds = do
   st <- gets (updateLets (++ ds))
-  let m = createTemporaryModule False st (P.Literal (P.ObjectLiteral []))
+  let m = createTemporaryModule False st (P.Literal P.nullSourceSpan (P.ObjectLiteral []))
   e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
   case e of
     Left err -> printErrors err
@@ -297,13 +297,12 @@ handleBrowse print' moduleName = do
     Nothing       -> failNotInEnv moduleName
   where
     findMod needle externs imports =
-      let
-        qualMod = fromMaybe needle (lookupUnQualifiedModName needle imports)
-        primMod = P.ModuleName [P.ProperName "Prim"]
-        modules = S.fromList (primMod : (P.getModuleName . fst <$> externs))
-       in if qualMod `S.member` modules
-            then Just qualMod
-            else Nothing
+      let qualMod = fromMaybe needle (lookupUnQualifiedModName needle imports)
+          primMod = P.ModuleName [P.ProperName "Prim"]
+          modules = S.fromList (primMod : (P.getModuleName . fst <$> externs))
+      in if qualMod `S.member` modules
+           then Just qualMod
+           else Nothing
 
     failNotInEnv modName = print' $ T.unpack $ "Module '" <> N.runModuleName modName <> "' is not valid."
     lookupUnQualifiedModName needle imports =

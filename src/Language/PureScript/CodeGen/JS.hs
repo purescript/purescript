@@ -177,7 +177,7 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
 
   valueToJs' :: Expr Ann -> m AST
   valueToJs' (Literal (pos, _, _, _) l) =
-    rethrowWithPosition pos $ literalToValueJS l
+    rethrowWithPosition pos $ literalToValueJS pos l
   valueToJs' (Var (_, _, _, Just (IsConstructor _ [])) name) =
     return $ accessorString "value" $ qualifiedToJS id name
   valueToJs' (Var (_, _, _, Just (IsConstructor _ _)) name) =
@@ -255,14 +255,14 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
   iife :: Text -> [AST] -> AST
   iife v exprs = AST.App Nothing (AST.Function Nothing Nothing [] (AST.Block Nothing $ exprs ++ [AST.Return Nothing $ AST.Var Nothing v])) []
 
-  literalToValueJS :: Literal (Expr Ann) -> m AST
-  literalToValueJS (NumericLiteral (Left i)) = return $ AST.NumericLiteral Nothing (Left i)
-  literalToValueJS (NumericLiteral (Right n)) = return $ AST.NumericLiteral Nothing (Right n)
-  literalToValueJS (StringLiteral s) = return $ AST.StringLiteral Nothing s
-  literalToValueJS (CharLiteral c) = return $ AST.StringLiteral Nothing (fromString [c])
-  literalToValueJS (BooleanLiteral b) = return $ AST.BooleanLiteral Nothing b
-  literalToValueJS (ArrayLiteral xs) = AST.ArrayLiteral Nothing <$> mapM valueToJs xs
-  literalToValueJS (ObjectLiteral ps) = AST.ObjectLiteral Nothing <$> mapM (sndM valueToJs) ps
+  literalToValueJS :: SourceSpan -> Literal (Expr Ann) -> m AST
+  literalToValueJS ss (NumericLiteral (Left i)) = return $ AST.NumericLiteral (Just ss) (Left i)
+  literalToValueJS ss (NumericLiteral (Right n)) = return $ AST.NumericLiteral (Just ss) (Right n)
+  literalToValueJS ss (StringLiteral s) = return $ AST.StringLiteral (Just ss) s
+  literalToValueJS ss (CharLiteral c) = return $ AST.StringLiteral (Just ss) (fromString [c])
+  literalToValueJS ss (BooleanLiteral b) = return $ AST.BooleanLiteral (Just ss) b
+  literalToValueJS ss (ArrayLiteral xs) = AST.ArrayLiteral (Just ss) <$> mapM valueToJs xs
+  literalToValueJS ss (ObjectLiteral ps) = AST.ObjectLiteral (Just ss) <$> mapM (sndM valueToJs) ps
 
   -- | Shallow copy an object.
   extendObj :: AST -> [(PSString, AST)] -> m AST

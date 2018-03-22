@@ -233,7 +233,7 @@ typeCheckAll moduleName _ = traverse go
   where
   go :: Declaration -> m Declaration
   go (DataDeclaration sa@(ss, _) dtype name args dctors) = do
-    warnAndRethrow (addHint (ErrorInTypeConstructor name) . addHint (PositionedError ss)) $ do
+    warnAndRethrow (addHint (ErrorInTypeConstructor name) . addHint (positionedError ss)) $ do
       when (dtype == Newtype) $ checkNewtype name dctors
       checkDuplicateTypeArguments $ map fst args
       ctorKind <- kindsOf True moduleName name args (concatMap snd dctors)
@@ -263,7 +263,7 @@ typeCheckAll moduleName _ = traverse go
     toDataDecl (DataDeclaration _ dtype nm args dctors) = Just (dtype, nm, args, dctors)
     toDataDecl _ = Nothing
   go (TypeSynonymDeclaration sa@(ss, _) name args ty) = do
-    warnAndRethrow (addHint (ErrorInTypeSynonym name) . addHint (PositionedError ss) ) $ do
+    warnAndRethrow (addHint (ErrorInTypeSynonym name) . addHint (positionedError ss) ) $ do
       checkDuplicateTypeArguments $ map fst args
       kind <- kindsOf False moduleName name args [ty]
       let args' = args `withKinds` kind
@@ -273,7 +273,7 @@ typeCheckAll moduleName _ = traverse go
     internalError "Type declarations should have been removed before typeCheckAlld"
   go (ValueDecl sa@(ss, _) name nameKind [] [MkUnguarded val]) = do
     env <- getEnv
-    warnAndRethrow (addHint (ErrorInValueDeclaration name) . addHint (PositionedError ss)) $ do
+    warnAndRethrow (addHint (ErrorInValueDeclaration name) . addHint (positionedError ss)) $ do
       val' <- checkExhaustiveExpr ss env moduleName val
       valueIsNotDefined moduleName name
       [(_, (val'', ty))] <- typesOf NonRecursiveBindingGroup moduleName [((sa, name), val')]
@@ -304,7 +304,7 @@ typeCheckAll moduleName _ = traverse go
     putEnv $ env { kinds = S.insert (Qualified (Just moduleName) name) (kinds env) }
     return d
   go (d@(ExternDeclaration (ss, _) name ty)) = do
-    warnAndRethrow (addHint (ErrorInForeignImport name) . addHint (PositionedError ss)) $ do
+    warnAndRethrow (addHint (ErrorInForeignImport name) . addHint (positionedError ss)) $ do
       env <- getEnv
       kind <- kindOf ty
       guardWith (errorMessage (ExpectedType ty kind)) $ kind == kindType
@@ -315,7 +315,7 @@ typeCheckAll moduleName _ = traverse go
   go d@FixityDeclaration{} = return d
   go d@ImportDeclaration{} = return d
   go d@(TypeClassDeclaration (ss, _) pn args implies deps tys) = do
-    warnAndRethrow (addHint (ErrorInTypeClassDeclaration pn) . addHint (PositionedError ss)) $ do
+    warnAndRethrow (addHint (ErrorInTypeClassDeclaration pn) . addHint (positionedError ss)) $ do
       env <- getEnv
       let qualifiedClassName = Qualified (Just moduleName) pn
       guardWith (errorMessage (DuplicateTypeClass pn ss)) $
@@ -323,7 +323,7 @@ typeCheckAll moduleName _ = traverse go
       addTypeClass qualifiedClassName args implies deps tys
       return d
   go (d@(TypeInstanceDeclaration (ss, _) ch idx dictName deps className tys body)) =
-    rethrow (addHint (ErrorInInstance className tys) . addHint (PositionedError ss)) $ do
+    rethrow (addHint (ErrorInInstance className tys) . addHint (positionedError ss)) $ do
       env <- getEnv
       let qualifiedDictName = Qualified (Just moduleName) dictName
       flip (traverse_ . traverse_) (typeClassDictionaries env) $ \dictionaries ->
@@ -568,4 +568,3 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     extractMemberName (TypeDeclaration td) = tydeclIdent td
     extractMemberName _ = internalError "Unexpected declaration in typeclass member list"
   checkClassMembersAreExported _ = return ()
-

@@ -127,7 +127,7 @@ rethrowWithPositionTC
   => SourceSpan
   -> m a
   -> m a
-rethrowWithPositionTC pos = withErrorMessageHint (PositionedError pos)
+rethrowWithPositionTC pos = withErrorMessageHint (positionedError pos)
 
 warnAndRethrowWithPositionTC
   :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)

@@ -93,7 +93,7 @@ data SimpleErrorMessage
   | ScopeShadowing Name (Maybe ModuleName) [ModuleName]
   | DeclConflict Name Name
   | ExportConflict (Qualified Name) (Qualified Name)
-  | DuplicateModule ModuleName [SourceSpan]
+  | DuplicateModule ModuleName
   | DuplicateTypeClass (ProperName 'ClassName) SourceSpan
   | DuplicateInstance Ident SourceSpan
   | DuplicateTypeArgument Text
@@ -198,7 +198,7 @@ data ErrorMessageHint
   | ErrorInTypeClassDeclaration (ProperName 'ClassName)
   | ErrorInForeignImport Ident
   | ErrorSolvingConstraint Constraint
-  | PositionedError SourceSpan
+  | PositionedError (NEL.NonEmpty SourceSpan)
   deriving (Show)
 
 -- | Categories of hints
@@ -697,7 +697,7 @@ data Expr
   -- |
   -- A literal value
   --
-  = Literal (Literal Expr)
+  = Literal SourceSpan (Literal Expr)
   -- |
   -- A prefix -, will be desugared
   --
@@ -886,7 +886,7 @@ $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Declarat
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ImportDeclarationType)
 
 isTrueExpr :: Expr -> Bool
-isTrueExpr (Literal (BooleanLiteral True)) = True
+isTrueExpr (Literal _ (BooleanLiteral True)) = True
 isTrueExpr (Var _ (Qualified (Just (ModuleName [ProperName "Prelude"])) (Ident "otherwise"))) = True
 isTrueExpr (Var _ (Qualified (Just (ModuleName [ProperName "Data", ProperName "Boolean"])) (Ident "otherwise"))) = True
 isTrueExpr (TypedValue _ e _) = isTrueExpr e

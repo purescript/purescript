@@ -62,7 +62,7 @@ everywhereOnValues f g h = (f', g', h')
   f' other = f other
 
   g' :: Expr -> Expr
-  g' (Literal l) = g (Literal (lit g' l))
+  g' (Literal ss l) = g (Literal ss (lit g' l))
   g' (UnaryMinus ss v) = g (UnaryMinus ss (g' v))
   g' (BinaryNoParens op v1 v2) = g (BinaryNoParens (g' op) (g' v1) (g' v2))
   g' (Parens v) = g (Parens (g' v))
@@ -85,7 +85,7 @@ everywhereOnValues f g h = (f', g', h')
   h' (ConstructorBinder ss ctor bs) = h (ConstructorBinder ss ctor (fmap h' bs))
   h' (BinaryNoParensBinder b1 b2 b3) = h (BinaryNoParensBinder (h' b1) (h' b2) (h' b3))
   h' (ParensInBinder b) = h (ParensInBinder (h' b))
-  h' (LiteralBinder l) = h (LiteralBinder (lit h' l))
+  h' (LiteralBinder ss l) = h (LiteralBinder ss (lit h' l))
   h' (NamedBinder ss name b) = h (NamedBinder ss name (h' b))
   h' (PositionedBinder pos com b) = h (PositionedBinder pos com (h' b))
   h' (TypedBinder t b) = h (TypedBinder t (h' b))
@@ -136,7 +136,7 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   f' other = f other
 
   g' :: Expr -> m Expr
-  g' (Literal l) = Literal <$> litM (g >=> g') l
+  g' (Literal ss l) = Literal ss <$> litM (g >=> g') l
   g' (UnaryMinus ss v) = UnaryMinus ss <$> (g v >>= g')
   g' (BinaryNoParens op v1 v2) = BinaryNoParens <$> (g op >>= g') <*> (g v1 >>= g') <*> (g v2 >>= g')
   g' (Parens v) = Parens <$> (g v >>= g')
@@ -156,7 +156,7 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   g' other = g other
 
   h' :: Binder -> m Binder
-  h' (LiteralBinder l) = LiteralBinder <$> litM (h >=> h') l
+  h' (LiteralBinder ss l) = LiteralBinder ss <$> litM (h >=> h') l
   h' (ConstructorBinder ss ctor bs) = ConstructorBinder ss ctor <$> traverse (h' <=< h) bs
   h' (BinaryNoParensBinder b1 b2 b3) = BinaryNoParensBinder <$> (h b1 >>= h') <*> (h b2 >>= h') <*> (h b3 >>= h')
   h' (ParensInBinder b) = ParensInBinder <$> (h b >>= h')
@@ -205,7 +205,7 @@ everywhereOnValuesM f g h = (f', g', h')
   f' other = f other
 
   g' :: Expr -> m Expr
-  g' (Literal l) = (Literal <$> litM g' l) >>= g
+  g' (Literal ss l) = (Literal ss <$> litM g' l) >>= g
   g' (UnaryMinus ss v) = (UnaryMinus ss <$> g' v) >>= g
   g' (BinaryNoParens op v1 v2) = (BinaryNoParens <$> g' op <*> g' v1 <*> g' v2) >>= g
   g' (Parens v) = (Parens <$> g' v) >>= g
@@ -225,7 +225,7 @@ everywhereOnValuesM f g h = (f', g', h')
   g' other = g other
 
   h' :: Binder -> m Binder
-  h' (LiteralBinder l) = (LiteralBinder <$> litM h' l) >>= h
+  h' (LiteralBinder ss l) = (LiteralBinder ss <$> litM h' l) >>= h
   h' (ConstructorBinder ss ctor bs) = (ConstructorBinder ss ctor <$> traverse h' bs) >>= h
   h' (BinaryNoParensBinder b1 b2 b3) = (BinaryNoParensBinder <$> h' b1 <*> h' b2 <*> h' b3) >>= h
   h' (ParensInBinder b) = (ParensInBinder <$> h' b) >>= h
@@ -277,7 +277,7 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   f' d = f d
 
   g' :: Expr -> r
-  g' v@(Literal l) = lit (g v) g' l
+  g' v@(Literal _ l) = lit (g v) g' l
   g' v@(UnaryMinus _ v1) = g v <> g' v1
   g' v@(BinaryNoParens op v1 v2) = g v <> g' op <> g' v1 <> g' v2
   g' v@(Parens v1) = g v <> g' v1
@@ -297,7 +297,7 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   g' v = g v
 
   h' :: Binder -> r
-  h' b@(LiteralBinder l) = lit (h b) h' l
+  h' b@(LiteralBinder _ l) = lit (h b) h' l
   h' b@(ConstructorBinder _ _ bs) = foldl (<>) (h b) (fmap h' bs)
   h' b@(BinaryNoParensBinder b1 b2 b3) = h b <> h' b1 <> h' b2 <> h' b3
   h' b@(ParensInBinder b1) = h b <> h' b1
@@ -358,7 +358,7 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   g'' s v = let (s', r) = g s v in r <> g' s' v
 
   g' :: s -> Expr -> r
-  g' s (Literal l) = lit g'' s l
+  g' s (Literal _ l) = lit g'' s l
   g' s (UnaryMinus _ v1) = g'' s v1
   g' s (BinaryNoParens op v1 v2) = g'' s op <> g'' s v1 <> g'' s v2
   g' s (Parens v1) = g'' s v1
@@ -381,7 +381,7 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   h'' s b = let (s', r) = h s b in r <> h' s' b
 
   h' :: s -> Binder -> r
-  h' s (LiteralBinder l) = lit h'' s l
+  h' s (LiteralBinder _ l) = lit h'' s l
   h' s (ConstructorBinder _ _ bs) = foldl (<>) r0 (fmap (h'' s) bs)
   h' s (BinaryNoParensBinder b1 b2 b3) = h'' s b1 <> h'' s b2 <> h'' s b3
   h' s (ParensInBinder b) = h'' s b
@@ -443,7 +443,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
 
   g'' s = uncurry g' <=< g s
 
-  g' s (Literal l) = Literal <$> lit g'' s l
+  g' s (Literal ss l) = Literal ss <$> lit g'' s l
   g' s (UnaryMinus ss v) = UnaryMinus ss <$> g'' s v
   g' s (BinaryNoParens op v1 v2) = BinaryNoParens <$> g'' s op <*> g'' s v1 <*> g'' s v2
   g' s (Parens v) = Parens <$> g'' s v
@@ -464,7 +464,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
 
   h'' s = uncurry h' <=< h s
 
-  h' s (LiteralBinder l) = LiteralBinder <$> lit h'' s l
+  h' s (LiteralBinder ss l) = LiteralBinder ss <$> lit h'' s l
   h' s (ConstructorBinder ss ctor bs) = ConstructorBinder ss ctor <$> traverse (h'' s) bs
   h' s (BinaryNoParensBinder b1 b2 b3) = BinaryNoParensBinder <$> h'' s b1 <*> h'' s b2 <*> h'' s b3
   h' s (ParensInBinder b) = ParensInBinder <$> h'' s b
@@ -533,7 +533,7 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   g'' s a = g s a <> g' s a
 
   g' :: S.Set Ident -> Expr -> r
-  g' s (Literal l) = lit g'' s l
+  g' s (Literal _ l) = lit g'' s l
   g' s (UnaryMinus _ v1) = g'' s v1
   g' s (BinaryNoParens op v1 v2) = g'' s op <> g'' s v1 <> g'' s v2
   g' s (Parens v1) = g'' s v1
@@ -562,7 +562,7 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   h'' s a = h s a <> h' s a
 
   h' :: S.Set Ident -> Binder -> r
-  h' s (LiteralBinder l) = lit h'' s l
+  h' s (LiteralBinder _ l) = lit h'' s l
   h' s (ConstructorBinder _ _ bs) = foldMap (h'' s) bs
   h' s (BinaryNoParensBinder b1 b2 b3) = foldMap (h'' s) [b1, b2, b3]
   h' s (ParensInBinder b) = h'' s b
