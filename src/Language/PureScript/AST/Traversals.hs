@@ -1,9 +1,15 @@
+{-# LANGUAGE CPP #-}
+
 -- |
 -- AST traversal helpers
 --
 module Language.PureScript.AST.Traversals where
 
+#if MIN_VERSION_base(4,11,0)
+import Prelude.Compat hiding ((<>))
+#else
 import Prelude.Compat
+#endif
 
 import Control.Monad
 

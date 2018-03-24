@@ -16,6 +16,7 @@ import Data.Map (Map)
 import Data.Maybe (mapMaybe)
 import Data.Monoid ((<>))
 import qualified Data.Map as Map
+import qualified Data.Semigroup as Sem
 import Data.Text (Text)
 import qualified Data.Text as T
 
@@ -402,12 +403,14 @@ data TypeClassEnv = TypeClassEnv
   }
   deriving (Show)
 
+instance Sem.Semigroup TypeClassEnv where
+  (TypeClassEnv a1 b1 c1) <> (TypeClassEnv a2 b2 c2) =
+    TypeClassEnv (a1 Sem.<> a2) (b1 Sem.<> b2) (c1 Sem.<> c2)
+
 instance Monoid TypeClassEnv where
   mempty =
     TypeClassEnv mempty mempty mempty
-  mappend (TypeClassEnv a1 b1 c1)
-          (TypeClassEnv a2 b2 c2) =
-    TypeClassEnv (a1 <> a2) (b1 <> b2) (c1 <> c2)
+  mappend = (Sem.<>)
 
 -- |
 -- Take a TypeClassEnv and handle all of the type class members in it, either

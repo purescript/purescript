@@ -1,7 +1,13 @@
+{-# LANGUAGE CPP #-}
+
 -- | Data types for the imperative core AST
 module Language.PureScript.CoreImp.AST where
 
+#if MIN_VERSION_base(4,11,0)
+import Prelude.Compat hiding ((<>))
+#else
 import Prelude.Compat
+#endif
 
 import Control.Monad ((>=>))
 import Control.Monad.Identity (Identity(..), runIdentity)

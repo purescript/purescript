@@ -28,6 +28,7 @@ import           Protolude                     hiding (isPrefixOf)
 
 import           Data.Aeson
 import           Data.List.NonEmpty            (NonEmpty)
+import qualified Data.Semigroup as Sem
 import           Data.Text                     (isPrefixOf)
 import qualified Language.PureScript.Ide.Filter.Declaration as D
 import           Language.PureScript.Ide.Types
@@ -35,7 +36,7 @@ import           Language.PureScript.Ide.Util
 import qualified Language.PureScript           as P
 
 newtype Filter = Filter (Endo [Module])
-  deriving (Monoid)
+  deriving (Sem.Semigroup, Monoid)
 
 type Module = (P.ModuleName, [IdeDeclarationAnn])
 

@@ -18,7 +18,7 @@ import Control.Arrow (second, (&&&))
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 import Control.Monad.Supply.Class (MonadSupply(..))
-import Control.Monad.Writer
+import Control.Monad.Writer hiding ((<>))
 
 import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
@@ -26,6 +26,8 @@ import Data.Functor (($>))
 import Data.List (minimumBy, groupBy, sortBy)
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
+import qualified Data.Semigroup as Sem
+import Data.Monoid ((<>))
 import qualified Data.Set as S
 import Data.Traversable (for)
 import Data.Text (Text, stripPrefix, stripSuffix)
@@ -140,13 +142,16 @@ data Matched t
   | Unknown
   deriving (Eq, Show, Functor)
 
-instance Monoid t => Monoid (Matched t) where
+instance (Sem.Semigroup t) => Sem.Semigroup (Matched t) where
+  (Match l) <> (Match r) = Match (l Sem.<> r)
+  Apart     <> _         = Apart
+  _         <> Apart     = Apart
+  _         <> _         = Unknown
+
+instance (Sem.Semigroup t, Monoid t) => Monoid (Matched t) where
   mempty = Match mempty
 
-  mappend (Match l) (Match r) = Match (l <> r)
-  mappend Apart     _         = Apart
-  mappend _         Apart     = Apart
-  mappend _         _         = Unknown
+  mappend = (Sem.<>)
 
 -- | Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.

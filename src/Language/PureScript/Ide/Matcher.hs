@@ -25,6 +25,7 @@ module Language.PureScript.Ide.Matcher
 import           Protolude
 
 import           Data.Aeson
+import qualified Data.Semigroup                as Sem
 import qualified Data.Text                     as T
 import qualified Data.Text.Encoding            as TE
 import           Language.PureScript.Ide.Types
@@ -35,7 +36,7 @@ import           Text.Regex.TDFA               ((=~))
 
 type ScoredMatch a = (Match a, Double)
 
-newtype Matcher a = Matcher (Endo [Match a]) deriving (Monoid)
+newtype Matcher a = Matcher (Endo [Match a]) deriving (Sem.Semigroup, Monoid)
 
 instance FromJSON (Matcher IdeDeclarationAnn) where
   parseJSON = withObject "matcher" $ \o -> do

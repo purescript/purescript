@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 -- |
 -- Pretty printer for Types
 --
@@ -14,7 +16,11 @@ module Language.PureScript.Pretty.Types
   , prettyPrintObjectKey
   ) where
 
+#if MIN_VERSION_base(4,11,0)
+import Prelude.Compat hiding ((<>))
+#else
 import Prelude.Compat
+#endif
 
 import Control.Arrow ((<+>))
 import Control.PatternArrows as PA

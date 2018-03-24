@@ -52,6 +52,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Data.Monoid ((<>))
 import Data.Aeson.BetterErrors (Parse, nth, withText, withValue, toAesonParser, perhaps, asText, eachInArray)
 import qualified Data.Aeson as A
+import qualified Data.Semigroup as Sem
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.ByteString.Lazy as BS
@@ -248,7 +249,7 @@ asRenderedCodeElement =
 --
 newtype RenderedCode
   = RC { unRC :: [RenderedCodeElement] }
-  deriving (Show, Eq, Ord, Monoid)
+  deriving (Show, Eq, Ord, Sem.Semigroup, Monoid)
 
 instance A.ToJSON RenderedCode where
   toJSON (RC elems) = A.toJSON elems
