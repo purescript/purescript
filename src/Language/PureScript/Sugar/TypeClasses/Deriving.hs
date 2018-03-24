@@ -45,13 +45,13 @@ data NewtypeDerivedInstances = NewtypeDerivedInstances
 
 instance Sem.Semigroup NewtypeDerivedInstances where
   x <> y =
-    NewtypeDerivedInstances { ndiClasses          = ndiClasses          x <> ndiClasses          y
-                            , ndiDerivedInstances = ndiDerivedInstances x <> ndiDerivedInstances y
+    NewtypeDerivedInstances { ndiClasses          = ndiClasses          x Sem.<> ndiClasses          y
+                            , ndiDerivedInstances = ndiDerivedInstances x Sem.<> ndiDerivedInstances y
                             }
 
 instance Monoid NewtypeDerivedInstances where
   mempty = NewtypeDerivedInstances mempty mempty
-  mappend = (<>)
+  mappend = (Sem.<>)
 
 -- | Extract the name of the newtype appearing in the last type argument of
 -- a derived newtype instance.

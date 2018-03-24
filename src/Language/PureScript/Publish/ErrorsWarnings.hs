@@ -315,11 +315,11 @@ data CollectedWarnings = CollectedWarnings
 instance Sem.Semigroup CollectedWarnings where
   (CollectedWarnings as bs cs d es) <>
           (CollectedWarnings as' bs' cs' d' es') =
-    CollectedWarnings (as <> as') (bs <> bs') (cs <> cs') (d <> d') (es <> es')
+    CollectedWarnings (as Sem.<> as') (bs Sem.<> bs') (cs Sem.<> cs') (d Sem.<> d') (es Sem.<> es')
 
 instance Monoid CollectedWarnings where
   mempty = CollectedWarnings mempty mempty mempty mempty mempty
-  mappend = (<>)
+  mappend = (Sem.<>)
 
 collectWarnings :: [PackageWarning] -> CollectedWarnings
 collectWarnings = foldMap singular

@@ -148,10 +148,10 @@ instance (Sem.Semigroup t) => Sem.Semigroup (Matched t) where
   _         <> Apart     = Apart
   _         <> _         = Unknown
 
-instance Monoid t => Monoid (Matched t) where
+instance (Sem.Semigroup t, Monoid t) => Monoid (Matched t) where
   mempty = Match mempty
 
-  mappend = (<>)
+  mappend = (Sem.<>)
 
 -- | Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.

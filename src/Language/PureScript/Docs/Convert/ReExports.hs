@@ -405,12 +405,12 @@ data TypeClassEnv = TypeClassEnv
 
 instance Sem.Semigroup TypeClassEnv where
   (TypeClassEnv a1 b1 c1) <> (TypeClassEnv a2 b2 c2) =
-    TypeClassEnv (a1 <> a2) (b1 <> b2) (c1 <> c2)
+    TypeClassEnv (a1 Sem.<> a2) (b1 Sem.<> b2) (c1 Sem.<> c2)
 
 instance Monoid TypeClassEnv where
   mempty =
     TypeClassEnv mempty mempty mempty
-  mappend = (<>)
+  mappend = (Sem.<>)
 
 -- |
 -- Take a TypeClassEnv and handle all of the type class members in it, either

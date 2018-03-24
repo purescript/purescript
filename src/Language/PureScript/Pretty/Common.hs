@@ -57,12 +57,12 @@ newtype StrPos = StrPos (SourcePos, Text, [SMap])
 -- the length of the left.
 --
 instance Sem.Semigroup StrPos where
-  StrPos (a,b,c) <> StrPos (a',b',c') = StrPos (a `addPos` a', b <> b', c ++ (bumpPos a <$> c'))
+  StrPos (a,b,c) <> StrPos (a',b',c') = StrPos (a `addPos` a', b Sem.<> b', c ++ (bumpPos a <$> c'))
 
 instance Monoid StrPos where
   mempty = StrPos (SourcePos 0 0, "", [])
 
-  mappend = (<>)
+  mappend = (Sem.<>)
 
   mconcat ms =
     let s' = foldMap (\(StrPos(_, s, _)) -> s) ms
