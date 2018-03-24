@@ -1,9 +1,14 @@
+{-# LANGUAGE CPP #-}
 -- |
 -- CoreFn traversal helpers
 --
 module Language.PureScript.CoreFn.Traversals where
 
+#if MIN_VERSION_base(4,11,0)
+import Prelude.Compat hiding ((<>))
+#else
 import Prelude.Compat
+#endif
 
 import Control.Arrow (second, (***), (+++))
 

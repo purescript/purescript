@@ -23,6 +23,7 @@ import qualified Data.List.NonEmpty as NEL
 import           Data.Maybe (maybeToList, fromMaybe, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.Semigroup as Sem
 import qualified Data.Text as T
 import           Data.Text (Text)
 import           Language.PureScript.AST
@@ -183,7 +184,7 @@ errorCode em = case unwrapErrorMessage em of
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
   { runMultipleErrors :: [ErrorMessage]
-  } deriving (Show, Monoid)
+  } deriving (Show, Sem.Semigroup, Monoid)
 
 -- | Check whether a collection of errors is empty or not.
 nonEmpty :: MultipleErrors -> Bool

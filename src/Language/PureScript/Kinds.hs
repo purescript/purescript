@@ -1,8 +1,13 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE CPP #-}
 
 module Language.PureScript.Kinds where
 
+#if MIN_VERSION_base(4,11,0)
+import Prelude.Compat hiding ((<>))
+#else
 import Prelude.Compat
+#endif
 
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)

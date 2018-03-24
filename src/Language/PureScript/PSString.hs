@@ -21,6 +21,7 @@ import Control.Applicative ((<|>))
 import Data.Char (chr)
 import Data.Bits (shiftR)
 import Data.List (unfoldr)
+import qualified Data.Semigroup as Sem
 import Data.Monoid ((<>))
 import Data.Scientific (toBoundedInteger)
 import Data.String (IsString(..))
@@ -52,7 +53,7 @@ import qualified Data.Aeson.Types as A
 -- and arrays of UTF-16 code units (integers) otherwise.
 --
 newtype PSString = PSString { toUTF16CodeUnits :: [Word16] }
-  deriving (Eq, Ord, Monoid, Generic)
+  deriving (Eq, Ord, Sem.Semigroup, Monoid, Generic)
 
 instance NFData PSString
 

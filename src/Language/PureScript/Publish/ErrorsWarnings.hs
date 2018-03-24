@@ -22,6 +22,7 @@ import Data.List (intersperse)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe
 import Data.Monoid
+import qualified Data.Semigroup as Sem
 import Data.Version
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Text (Text)
@@ -311,11 +312,14 @@ data CollectedWarnings = CollectedWarnings
   }
   deriving (Show, Eq, Ord)
 
-instance Monoid CollectedWarnings where
-  mempty = CollectedWarnings mempty mempty mempty mempty mempty
-  mappend (CollectedWarnings as bs cs d es)
+instance Sem.Semigroup CollectedWarnings where
+  (CollectedWarnings as bs cs d es) <>
           (CollectedWarnings as' bs' cs' d' es') =
     CollectedWarnings (as <> as') (bs <> bs') (cs <> cs') (d <> d') (es <> es')
+
+instance Monoid CollectedWarnings where
+  mempty = CollectedWarnings mempty mempty mempty mempty mempty
+  mappend = (<>)
 
 collectWarnings :: [PackageWarning] -> CollectedWarnings
 collectWarnings = foldMap singular

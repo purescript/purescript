@@ -15,6 +15,7 @@ import qualified Data.Map as M
 import           Data.Monoid ((<>))
 import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Ord (comparing)
+import qualified Data.Semigroup as Sem
 import qualified Data.Set as S
 import           Data.Text (Text)
 import           Language.PureScript.AST
@@ -42,12 +43,15 @@ data NewtypeDerivedInstances = NewtypeDerivedInstances
   -- ^ A list of newtype instances which were derived in this module.
   } deriving Show
 
-instance Monoid NewtypeDerivedInstances where
-  mempty = NewtypeDerivedInstances mempty mempty
-  mappend x y =
+instance Sem.Semigroup NewtypeDerivedInstances where
+  x <> y =
     NewtypeDerivedInstances { ndiClasses          = ndiClasses          x <> ndiClasses          y
                             , ndiDerivedInstances = ndiDerivedInstances x <> ndiDerivedInstances y
                             }
+
+instance Monoid NewtypeDerivedInstances where
+  mempty = NewtypeDerivedInstances mempty mempty
+  mappend = (<>)
 
 -- | Extract the name of the newtype appearing in the last type argument of
 -- a derived newtype instance.
