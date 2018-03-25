@@ -8,7 +8,6 @@ import Control.Monad
 import Control.Monad.Error.Class (MonadError())
 import Control.Monad.Supply.Class
 import Control.Monad.Writer.Class (MonadWriter())
-import Control.Monad.State (MonadState)
 
 import Data.List (map)
 import Data.Traversable (traverse)
@@ -16,7 +15,6 @@ import Data.Traversable (traverse)
 import Language.PureScript.AST
 import Language.PureScript.Errors
 import Language.PureScript.Externs
-import Language.PureScript.Environment (Environment)
 import Language.PureScript.Sugar.BindingGroups as S
 import Language.PureScript.Sugar.CaseDeclarations as S
 import Language.PureScript.Sugar.DoNotation as S
@@ -55,7 +53,7 @@ import Language.PureScript.Sugar.TypeDeclarations as S
 --  * Group mutually recursive value and data declarations into binding groups.
 --
 desugar
-  :: (MonadSupply m, MonadState Environment m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  :: (MonadSupply m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => [ExternsFile]
   -> [Module]
   -> m [Module]
@@ -73,4 +71,3 @@ desugar externs =
     >=> traverse (deriveInstances externs)
     >=> desugarTypeClasses externs
     >=> traverse createBindingGroupsModule
-

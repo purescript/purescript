@@ -96,7 +96,7 @@ instance A.ToJSON FunctionalDependency where
 
 -- | The initial environment with no values and only the default javascript types defined
 initEnvironment :: Environment
-initEnvironment = Environment M.empty primTypes M.empty M.empty M.empty primClasses primKinds
+initEnvironment = Environment M.empty allPrimTypes M.empty M.empty M.empty allPrimClasses primKinds
 
 -- | A constructor for TypeClassData that computes which type class arguments are fully determined
 -- and argument covering sets.
@@ -263,7 +263,7 @@ primName = Qualified (Just $ ModuleName [ProperName C.prim]) . ProperName
 
 -- | Construct a 'ProperName' in the @Prim.NAME@ module.
 primSubName :: Text -> Text -> Qualified (ProperName a)
-primSubName sub = 
+primSubName sub =
   Qualified (Just $ ModuleName [ProperName C.prim, ProperName sub]) . ProperName
 
 primKind :: Text -> Kind

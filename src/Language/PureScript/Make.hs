@@ -33,7 +33,6 @@ import           Control.Monad.Supply
 import           Control.Monad.Trans.Class (MonadTrans(..))
 import           Control.Monad.Trans.Control (MonadBaseControl(..))
 import           Control.Monad.Trans.Except
-import           Control.Monad.Trans.State (runStateT)
 import           Control.Monad.Writer.Class (MonadWriter(..))
 import           Data.Aeson (encode, decode)
 import           Data.Either (partitionEithers)
@@ -142,8 +141,8 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
       withPrim = importPrim m
   lint withPrim
   ((Module ss coms _ elaborated exps, env'), nextVar) <- runSupplyT 0 $ do
-    ([desugared], env') <- runStateT (desugar externs [withPrim]) env
-    runCheck' (emptyCheckState env') $ typeCheckModule desugared
+    [desugared] <- desugar externs [withPrim]
+    runCheck' (emptyCheckState env) $ typeCheckModule desugared
 
   -- desugar case declarations *after* type- and exhaustiveness checking
   -- since pattern guards introduces cases which the exhaustiveness checker

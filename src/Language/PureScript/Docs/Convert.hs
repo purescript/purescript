@@ -14,7 +14,6 @@ import Protolude hiding (check)
 import Control.Arrow ((&&&))
 import Control.Category ((>>>))
 import Control.Monad.Writer.Strict (runWriterT)
-import Control.Monad.State (evalStateT)
 import qualified Data.Map as Map
 import Data.String (String)
 
@@ -128,7 +127,7 @@ convertSorted ::
 convertSorted withPackage modules = do
   (env, convertedModules) <- second (map convertSingleModule) <$> partiallyDesugar modules
 
-  modulesWithTypes <- evalStateT (typeCheckIfNecessary modules convertedModules) P.initEnvironment
+  modulesWithTypes <- typeCheckIfNecessary modules convertedModules
   let moduleMap = Map.fromList (map (modName &&& identity) modulesWithTypes)
 
   let traversalOrder = map P.getModuleName modules
@@ -140,7 +139,7 @@ convertSorted withPackage modules = do
 -- types.
 --
 typeCheckIfNecessary ::
-  (MonadError P.MultipleErrors m, MonadState P.Environment m) =>
+  (MonadError P.MultipleErrors m) =>
   [P.Module] ->
   [Module] ->
   m [Module]
@@ -164,16 +163,20 @@ typeCheckIfNecessary modules convertedModules =
 -- were not provided.
 --
 typeCheck ::
-  (MonadError P.MultipleErrors m, MonadState P.Environment m) =>
+  (MonadError P.MultipleErrors m) =>
   [P.Module] ->
   m ([P.Module], P.Environment)
-typeCheck ms = ignoreWarnings . P.evalSupplyT 0 $ do
-  ms' <- P.desugar [] ms
-  e <- get
-  (ms'', e') <- P.runCheck' (P.emptyCheckState e) (traverse P.typeCheckModule ms')
-  put e'
-  pure (ms'', e')
+typeCheck =
+  (P.desugar [] >=> check)
+  >>> fmap (second P.checkEnv)
+  >>> P.evalSupplyT 0
+  >>> ignoreWarnings
+
   where
+  check ms =
+    runStateT
+      (traverse P.typeCheckModule ms)
+      (P.emptyCheckState P.initEnvironment)
 
   ignoreWarnings =
     fmap fst . runWriterT
@@ -223,7 +226,7 @@ partiallyDesugar ::
   (MonadError P.MultipleErrors m) =>
   [P.Module]
   -> m (P.Env, [P.Module])
-partiallyDesugar = P.evalSupplyT 0 . flip evalStateT P.initEnvironment . desugar'
+partiallyDesugar = P.evalSupplyT 0 . desugar'
   where
   desugar' =
     traverse P.desugarDoModule
