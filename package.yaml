@@ -158,6 +158,8 @@ tests:
       - hspec
       - hspec-discover
       - HUnit
+    default-extensions:
+      - NoImplicitPrelude
 
 flags:
   release:

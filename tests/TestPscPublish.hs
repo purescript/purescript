@@ -4,6 +4,8 @@
 
 module TestPscPublish where
 
+import Prelude
+
 import Control.Monad.IO.Class (liftIO)
 import System.Exit (exitFailure)
 import Data.ByteString.Lazy (ByteString)
