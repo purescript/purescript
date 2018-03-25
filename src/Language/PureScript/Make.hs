@@ -197,7 +197,7 @@ make ma@MakeActions{..} ms = do
       case getModuleName m of
         mn@(ModuleName (ProperName "Prim" : _)) ->
           throwError
-            . errorMessage'' (pure (getModuleSourceSpan m))
+            . errorMessage' (getModuleSourceSpan m)
             $ CannotDefinePrimModules mn
         _ ->
           pure ()
