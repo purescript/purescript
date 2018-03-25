@@ -35,6 +35,7 @@ import Data.Maybe (fromJust, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
+import qualified Language.PureScript.Constants as C
 import Language.PureScript.AST
 import Language.PureScript.Environment
 import Language.PureScript.Errors
@@ -184,22 +185,52 @@ envModuleExports (_, _, exps) = exps
 -- The exported types from the @Prim@ module
 --
 primExports :: Exports
-primExports =
+primExports = mkPrimExports primTypes primClasses primKinds
+
+-- |
+-- The exported types from the @Prim.Row@ module
+--
+primRowExports :: Exports
+primRowExports = mkPrimExports primRowTypes primRowClasses mempty
+
+-- |
+-- The exported types from the @Prim.TypeError@ module
+--
+primTypeErrorExports :: Exports
+primTypeErrorExports = mkPrimExports primTypeErrorTypes primTypeErrorClasses mempty
+
+-- |
+-- Create a set of exports for a Prim module.
+--
+mkPrimExports 
+  :: M.Map (Qualified (ProperName 'TypeName)) a
+  -> M.Map (Qualified (ProperName 'ClassName)) b
+  -> S.Set (Qualified (ProperName 'KindName))
+  -> Exports
+mkPrimExports ts cs ks =
   nullExports
-    { exportedTypes = M.fromList $ mkTypeEntry `map` M.keys primTypes
-    , exportedTypeClasses = M.fromList $ mkClassEntry `map` M.keys primClasses
-    , exportedKinds = M.fromList $ mkKindEntry `map` S.toList primKinds
+    { exportedTypes = M.fromList $ mkTypeEntry `map` M.keys ts
+    , exportedTypeClasses = M.fromList $ mkClassEntry `map` M.keys cs
+    , exportedKinds = M.fromList $ mkKindEntry `map` S.toList ks
     }
   where
   mkTypeEntry (Qualified mn name) = (name, ([], fromJust mn))
   mkClassEntry (Qualified mn name) = (name, fromJust mn)
   mkKindEntry (Qualified mn name) = (name, fromJust mn)
 
--- | Environment which only contains the Prim module.
+-- | Environment which only contains the Prim modules.
 primEnv :: Env
-primEnv = M.singleton
-  (ModuleName [ProperName "Prim"])
-  (internalModuleSourceSpan "<Prim>", nullImports, primExports)
+primEnv = M.fromList
+  [ ( C.Prim
+    , (internalModuleSourceSpan "<Prim>", nullImports, primExports)
+    )
+  , ( C.PrimRow
+    , (internalModuleSourceSpan "<Prim.Row>", nullImports, primRowExports)
+    )
+  , ( C.PrimTypeError
+    , (internalModuleSourceSpan "<Prim.TypeError>", nullImports, primTypeErrorExports)
+    )
+  ]
 
 -- |
 -- When updating the `Exports` the behaviour is slightly different depending

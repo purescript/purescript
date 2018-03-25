@@ -1,13 +1,22 @@
--- | This module provides documentation for the builtin Prim module.
-module Language.PureScript.Docs.Prim (primDocsModule) where
+-- | This module provides documentation for the builtin Prim modules.
+module Language.PureScript.Docs.Prim
+  ( primDocsModule
+  , primRowDocsModule
+  , primTypeErrorDocsModule
+  , primModules
+  ) where
 
 import Prelude.Compat hiding (fail)
+import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Language.PureScript.Docs.Types
 import qualified Language.PureScript as P
+
+primModules :: [Module]
+primModules = [primDocsModule, primRowDocsModule, primTypeErrorDocsModule]
 
 primDocsModule :: Module
 primDocsModule = Module
@@ -23,23 +32,48 @@ primDocsModule = Module
       , char
       , boolean
       , partial
-      , fail
-      , warn
-      , union
-      , rowCons
-      , typeConcat
-      , typeString
       , kindType
       , kindSymbol
       ]
   , modReExports = []
   }
 
-unsafeLookup :: forall v (a :: P.ProperNameType).
-  Map.Map (P.Qualified (P.ProperName a)) v -> String -> Text -> v
-unsafeLookup m errorMsg name = go name
+primRowDocsModule :: Module
+primRowDocsModule = Module
+  { modName = P.moduleNameFromString "Prim.Row"
+  , modComments = Just "The Prim.Row module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains automatically solved classes for working with row types."
+  , modDeclarations =
+      [ union
+      , rowCons
+      ]
+  , modReExports = []
+  }
+
+primTypeErrorDocsModule :: Module
+primTypeErrorDocsModule = Module
+  { modName = P.moduleNameFromString "Prim.TypeError"
+  , modComments = Just "The Prim.TypeError module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains classes that provide custom type error and warning functionality."
+  , modDeclarations =
+      [ warn
+      , fail
+      , typeConcat
+      , typeString
+      ]
+  , modReExports = []
+  }
+
+type NameGen a = Text -> P.Qualified (P.ProperName a)
+
+unsafeLookupOf
+  :: forall v (a :: P.ProperNameType)
+  . NameGen a
+  -> Map.Map (P.Qualified (P.ProperName a)) v
+  -> String
+  -> Text
+  -> v
+unsafeLookupOf k m errorMsg name = go name
   where
-  go = fromJust' . flip Map.lookup m . P.primName
+  go = fromJust' . flip Map.lookup m . k
 
   fromJust' (Just x) = x
   fromJust' _ = P.internalError $ errorMsg ++ show name
@@ -56,32 +90,41 @@ primKind title comments =
           }
     else P.internalError $ "Docs.Prim: No such Prim kind: " ++ T.unpack title
 
-lookupPrimTypeKind :: Text -> P.Kind
-lookupPrimTypeKind = fst . unsafeLookup P.primTypes "Docs.Prim: No such Prim type: "
+lookupPrimTypeKindOf
+  :: NameGen 'P.TypeName
+  -> Text
+  -> P.Kind
+lookupPrimTypeKindOf k = fst . unsafeLookupOf k (P.primTypes <> P.primRowTypes <> P.primTypeErrorTypes) "Docs.Prim: No such Prim type: "
 
 primType :: Text -> Text -> Declaration
-primType title comments = Declaration
+primType = primTypeOf P.primName
+
+primTypeOf :: NameGen 'P.TypeName -> Text -> Text -> Declaration
+primTypeOf gen title comments = Declaration
   { declTitle = title
   , declComments = Just comments
   , declSourceSpan = Nothing
   , declChildren = []
-  , declInfo = ExternDataDeclaration (lookupPrimTypeKind title)
+  , declInfo = ExternDataDeclaration (lookupPrimTypeKindOf gen title)
   }
 
 -- | Lookup the TypeClassData of a Prim class. This function is specifically
 -- not exported because it is partial.
-lookupPrimClass :: Text -> P.TypeClassData
-lookupPrimClass = unsafeLookup P.primClasses "Docs.Prim: No such Prim class: "
+lookupPrimClassOf :: NameGen 'P.ClassName -> Text -> P.TypeClassData
+lookupPrimClassOf g = unsafeLookupOf g (P.primClasses <> P.primTypeErrorClasses <> P.primRowClasses) "Docs.Prim: No such Prim class: "
 
 primClass :: Text -> Text -> Declaration
-primClass title comments = Declaration
+primClass = primClassOf P.primName
+
+primClassOf :: NameGen 'P.ClassName -> Text -> Text -> Declaration
+primClassOf gen title comments = Declaration
   { declTitle = title
   , declComments = Just comments
   , declSourceSpan = Nothing
   , declChildren = []
   , declInfo =
       let
-        tcd = lookupPrimClass title
+        tcd = lookupPrimClassOf gen title
         args = P.typeClassArguments tcd
         superclasses = P.typeClassSuperclasses tcd
         fundeps = convertFundepsToStrings args (P.typeClassDependencies tcd)
@@ -219,7 +262,7 @@ partial = primClass "Partial" $ T.unlines
   ]
 
 fail :: Declaration
-fail = primClass "Fail" $ T.unlines
+fail = primClassOf (P.primSubName "TypeError") "Fail" $ T.unlines
   [ "The Fail type class is part of the custom type errors feature. To provide"
   , "a custom type error when someone tries to use a particular instance,"
   , "write that instance out with a Fail constraint."
@@ -229,7 +272,7 @@ fail = primClass "Fail" $ T.unlines
   ]
 
 warn :: Declaration
-warn = primClass "Warn" $ T.unlines
+warn = primClassOf (P.primSubName "TypeError") "Warn" $ T.unlines
   [ "The Warn type class allows a custom compiler warning to be displayed."
   , ""
   , "For more information, see"
@@ -237,7 +280,7 @@ warn = primClass "Warn" $ T.unlines
   ]
 
 union :: Declaration
-union = primClass "Union" $ T.unlines
+union = primClassOf (P.primSubName "Row") "Union" $ T.unlines
   [ "The Union type class is used to compute the union of two rows of types"
   , "(left-biased, including duplicates)."
   , ""
@@ -245,14 +288,14 @@ union = primClass "Union" $ T.unlines
   ]
 
 rowCons :: Declaration
-rowCons = primClass "RowCons" $ T.unlines
-  [ "The RowCons type class is a 4-way relation which asserts that one row of"
+rowCons = primClassOf (P.primSubName "Row") "Cons" $ T.unlines
+  [ "The Cons type class is a 4-way relation which asserts that one row of"
   , "types can be obtained from another by inserting a new label/type pair on"
   , "the left."
   ]
 
 typeConcat :: Declaration
-typeConcat = primType "TypeConcat" $ T.unlines
+typeConcat = primTypeOf (P.primSubName "TypeError") "TypeConcat" $ T.unlines
   [ "The TypeConcat type constructor concatenates two Symbols in a custom type"
   , "error."
   , ""
@@ -261,7 +304,7 @@ typeConcat = primType "TypeConcat" $ T.unlines
   ]
 
 typeString :: Declaration
-typeString = primType "TypeString" $ T.unlines
+typeString = primTypeOf (P.primSubName "TypeError") "TypeString" $ T.unlines
   [ "The TypeString type constructor renders any concrete type into a Symbol"
   , "in a custom type error."
   , ""

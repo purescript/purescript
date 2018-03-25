@@ -259,7 +259,7 @@ addDefaultImport (Qualified toImportAs toImport) m@(Module ss coms mn decls exps
 importPrim :: Module -> Module
 importPrim =
   let
-    primModName = ModuleName [ProperName C.prim]
+    primModName = C.Prim
   in
     addDefaultImport (Qualified (Just primModName) primModName)
       . addDefaultImport (Qualified Nothing primModName)

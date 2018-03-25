@@ -23,7 +23,6 @@ import           Protolude hiding (moduleName)
 import           "monad-logger" Control.Monad.Logger
 import qualified Data.Map                           as Map
 import qualified Language.PureScript                as P
-import qualified Language.PureScript.Constants      as C
 import qualified Language.PureScript.Ide.CaseSplit  as CS
 import           Language.PureScript.Ide.Command
 import           Language.PureScript.Ide.Completion
@@ -119,14 +118,14 @@ findCompletions
   -> m Success
 findCompletions filters matcher currentModule complOptions = do
   modules <- Map.toList <$> getAllModules currentModule
-  let insertPrim = (:) (C.Prim, idePrimDeclarations)
+  let insertPrim = (++) idePrimDeclarations
   pure (CompletionResult (getCompletions filters matcher complOptions (insertPrim modules)))
 
 findType :: Ide m =>
             Text -> [Filter] -> Maybe P.ModuleName -> m Success
 findType search filters currentModule = do
   modules <- Map.toList <$> getAllModules currentModule
-  let insertPrim = (:) (C.Prim, idePrimDeclarations)
+  let insertPrim = (++) idePrimDeclarations
   pure (CompletionResult (getExactCompletions search filters (insertPrim modules)))
 
 findPursuitCompletions :: MonadIO m =>
