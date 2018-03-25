@@ -173,6 +173,7 @@ data SimpleErrorMessage
   | UserDefinedWarning Type
   -- | a declaration couldn't be used because it contained free variables
   | UnusableDeclaration Ident [[Text]]
+  | CannotDefinePrimModules ModuleName
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
