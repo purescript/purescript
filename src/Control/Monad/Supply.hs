@@ -1,5 +1,3 @@
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 -- |
@@ -19,10 +17,6 @@ import Data.Functor.Identity
 
 newtype SupplyT m a = SupplyT { unSupplyT :: StateT Integer m a }
   deriving (Functor, Applicative, Monad, MonadTrans, MonadError e, MonadWriter w, MonadReader r, Alternative, MonadPlus)
-
-instance (MonadState s m) => MonadState s (SupplyT m) where
-  get = SupplyT (lift get)
-  put x = SupplyT (lift (put x))
 
 runSupplyT :: Integer -> SupplyT m a -> m (a, Integer)
 runSupplyT n = flip runStateT n . unSupplyT

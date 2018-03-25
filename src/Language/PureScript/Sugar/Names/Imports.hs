@@ -9,22 +9,17 @@ import Prelude.Compat
 
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State.Class (MonadState(..), modify)
 
 import Data.Foldable (for_, traverse_)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
-import Language.PureScript.Kinds
-import Language.PureScript.Environment
 import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.Sugar.Names.Env
-
-import qualified Language.PureScript.Constants as C
 
 type ImportDef = (SourceSpan, ImportDeclarationType, Maybe ModuleName)
 
@@ -47,7 +42,7 @@ findImports = foldr go M.empty
 --
 resolveImports
   :: forall m
-   . (MonadState Environment m, MonadError MultipleErrors m)
+   . MonadError MultipleErrors m
   => Env
   -> Module
   -> m (Module, Imports)
@@ -62,7 +57,7 @@ resolveImports env (Module ss coms currentModule decls exps) =
 -- | Constructs a set of imports for a single module import.
 resolveModuleImport
   :: forall m
-   . (MonadState Environment m, MonadError MultipleErrors m)
+   . MonadError MultipleErrors m
   => Env
   -> Imports
   -> (ModuleName, [(SourceSpan, Maybe ImportDeclarationType, Maybe ModuleName)])
@@ -73,8 +68,6 @@ resolveModuleImport env ie (mn, imps) = foldM go ie imps
      -> (SourceSpan, Maybe ImportDeclarationType, Maybe ModuleName)
      -> m Imports
   go ie' (ss, typ, impQual) = do
-    when (mn == C.PrimTypeError) (modify addPrimTypeErrorToEnvironment)
-    when (mn == C.PrimRow) (modify addPrimRowToEnvironment)
     modExports <-
       maybe
         (throwError . errorMessage' ss . UnknownName . Qualified Nothing $ ModName mn)
@@ -86,22 +79,6 @@ resolveModuleImport env ie (mn, imps) = foldM go ie imps
                    , importedQualModules = maybe qualModules (`S.insert` qualModules) impQual
                    }
     resolveImport mn modExports ie'' impQual ss typ
-
-addPrimTypeErrorToEnvironment :: Environment -> Environment
-addPrimTypeErrorToEnvironment = augmentEnvironment primTypeErrorTypes primTypeErrorClasses
-
-addPrimRowToEnvironment :: Environment -> Environment
-addPrimRowToEnvironment = augmentEnvironment primRowTypes primRowClasses
-
-augmentEnvironment 
-  :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
-  -> M.Map (Qualified (ProperName 'ClassName)) TypeClassData
-  -> Environment
-  -> Environment
-augmentEnvironment newTypes classes env = env
-  { typeClasses = typeClasses env `M.union` classes
-  , types = types env `M.union` newTypes
-  }
 
 -- |
 -- Extends the local environment for a module by resolving an import of another module.
