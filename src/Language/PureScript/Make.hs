@@ -110,7 +110,7 @@ make ma@MakeActions{..} ms = do
   -- so they can be folded into an Environment. This result is used in the tests
   -- and in PSCI.
   let lookupResult mn = fromMaybe (internalError "make: module not found in results") (M.lookup mn results)
-  return (map lookupResult (map getModuleName sorted))
+  return (map (lookupResult . getModuleName) sorted)
 
   where
   checkModuleNames :: m ()
