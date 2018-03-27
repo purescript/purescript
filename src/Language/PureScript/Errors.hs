@@ -179,6 +179,7 @@ errorCode em = case unwrapErrorMessage em of
   ClassInstanceArityMismatch{} -> "ClassInstanceArityMismatch"
   UserDefinedWarning{} -> "UserDefinedWarning"
   UnusableDeclaration{} -> "UnusableDeclaration"
+  CannotDefinePrimModules{} -> "CannotDefinePrimModules"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -987,6 +988,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , Box.moveRight 2 . Box.vsep 0 Box.top $
                 map (\set -> line $ "{ " <> T.intercalate ", " set <> " }") options
             ]
+
+    renderSimpleErrorMessage (CannotDefinePrimModules mn) =
+      paras $
+        [ line $ "The module name " <> markCode (runModuleName mn) <> " is in the Prim namespace."
+        , line $ "The Prim namespace is reserved for compiler-defined terms."
+        ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1 t2) detail =

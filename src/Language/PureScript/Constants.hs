@@ -403,20 +403,26 @@ partial = "Partial"
 pattern Prim :: ModuleName
 pattern Prim = ModuleName [ProperName "Prim"]
 
+pattern PrimRow :: ModuleName
+pattern PrimRow = ModuleName [ProperName "Prim", ProperName "Row"]
+
+pattern PrimTypeError :: ModuleName
+pattern PrimTypeError = ModuleName [ProperName "Prim", ProperName "TypeError"]
+
 pattern Partial :: Qualified (ProperName 'ClassName)
 pattern Partial = Qualified (Just Prim) (ProperName "Partial")
 
 pattern Fail :: Qualified (ProperName 'ClassName)
-pattern Fail = Qualified (Just Prim) (ProperName "Fail")
+pattern Fail = Qualified (Just PrimTypeError) (ProperName "Fail")
 
 pattern Warn :: Qualified (ProperName 'ClassName)
-pattern Warn = Qualified (Just Prim) (ProperName "Warn")
+pattern Warn = Qualified (Just PrimTypeError) (ProperName "Warn")
 
 pattern Union :: Qualified (ProperName 'ClassName)
-pattern Union = Qualified (Just Prim) (ProperName "Union")
+pattern Union = Qualified (Just PrimRow) (ProperName "Union")
 
 pattern RowCons :: Qualified (ProperName 'ClassName)
-pattern RowCons = Qualified (Just Prim) (ProperName "RowCons")
+pattern RowCons = Qualified (Just PrimRow) (ProperName "Cons")
 
 typ :: forall a. (IsString a) => a
 typ = "Type"
