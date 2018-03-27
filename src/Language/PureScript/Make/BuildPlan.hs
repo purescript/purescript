@@ -37,8 +37,8 @@ data BuildPlan = BuildPlan
   }
 
 data Prebuilt = Prebuilt
-  { esModificationTime :: UTCTime
-  , esExternsFile :: ExternsFile
+  { pbModificationTime :: UTCTime
+  , pbExternsFile :: ExternsFile
   }
 
 data BuildJob = BuildJob
@@ -81,7 +81,7 @@ collectResults
   => BuildPlan
   -> m (M.Map ModuleName ExternsFile)
 collectResults buildPlan = do
-  let externs = M.map esExternsFile (bpPrebuilt buildPlan)
+  let externs = M.map pbExternsFile (bpPrebuilt buildPlan)
   barrierResults <- traverse (takeMVar . bjResult) $ bpBuildJobs buildPlan
   let barrierExterns = M.map (snd . fromMaybe (internalError "make: externs were missing but no errors reported.")) barrierResults
   pure (M.union externs barrierExterns)
@@ -96,7 +96,7 @@ getResult
 getResult buildPlan moduleName =
   case M.lookup moduleName (bpPrebuilt buildPlan) of
     Just es ->
-      pure (Just (MultipleErrors [], esExternsFile es))
+      pure (Just (MultipleErrors [], pbExternsFile es))
     Nothing ->
       readMVar $ bjResult $ fromMaybe (internalError "make: no barrier") $ M.lookup moduleName (bpBuildJobs buildPlan)
 
@@ -123,7 +123,7 @@ construct MakeActions{..} (sorted, graph) = do
     findExistingExtern prev (getModuleName -> moduleName) = do
       outputTimestamp <- getOutputTimestamp moduleName
       let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
-      case traverse (fmap esModificationTime . flip M.lookup prev) deps of
+      case traverse (fmap pbModificationTime . flip M.lookup prev) deps of
         Nothing ->
           -- If we end up here, one of the dependencies didn't exist in the
           -- prebuilt map and so we know a dependency needs to be rebuilt, which
