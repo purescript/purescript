@@ -2,7 +2,9 @@
 module Language.PureScript.Constants where
 
 import Prelude.Compat
+
 import Data.String (IsString)
+import Language.PureScript.PSString (PSString)
 import Language.PureScript.Names
 
 -- Operators
@@ -245,14 +247,25 @@ undefined = "undefined"
 
 -- Type Class Dictionary Names
 
-monadEffDictionary :: forall a. (IsString a) => a
-monadEffDictionary = "monadEff"
+data EffectDictionaries = EffectDictionaries
+  { edApplicativeDict :: PSString
+  , edBindDict :: PSString
+  , edMonadDict :: PSString
+  }
 
-applicativeEffDictionary :: forall a. (IsString a) => a
-applicativeEffDictionary = "applicativeEff"
+effDictionaries :: EffectDictionaries
+effDictionaries = EffectDictionaries
+  { edApplicativeDict = "applicativeEff"
+  , edBindDict = "bindEff"
+  , edMonadDict = "monadEff"
+  }
 
-bindEffDictionary :: forall a. (IsString a) => a
-bindEffDictionary = "bindEff"
+effectDictionaries :: EffectDictionaries
+effectDictionaries = EffectDictionaries
+  { edApplicativeDict = "applicativeEffect"
+  , edBindDict = "bindEffect"
+  , edMonadDict = "monadEffect"
+  }
 
 discardUnitDictionary :: forall a. (IsString a) => a
 discardUnitDictionary = "discardUnit"
@@ -443,6 +456,9 @@ dataArray = "Data_Array"
 
 eff :: forall a. (IsString a) => a
 eff = "Control_Monad_Eff"
+
+effect :: forall a. (IsString a) => a
+effect = "Control_Monad_Effect"
 
 st :: forall a. (IsString a) => a
 st = "Control_Monad_ST"
