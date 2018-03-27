@@ -12,9 +12,7 @@ import           Prelude
 
 import           Control.Concurrent.Lifted as C
 import           Control.Monad hiding (sequence)
-import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Trans.Control (MonadBaseControl(..))
-import           Control.Monad.Writer.Class (MonadWriter(..))
 import           Data.Aeson (decode)
 import qualified Data.Map as M
 import           Data.Maybe (catMaybes, fromMaybe)
@@ -105,7 +103,7 @@ getResult buildPlan moduleName =
 -- The given MakeActions are used to collect various timestamps in order to
 -- determine whether a module needs rebuilding.
 construct
-  :: forall m. (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  :: forall m. (Monad m, MonadBaseControl IO m)
   => MakeActions m
   -> ([Module], [(ModuleName, [ModuleName])])
   -> m BuildPlan
