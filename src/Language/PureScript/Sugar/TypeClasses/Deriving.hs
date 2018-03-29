@@ -742,8 +742,11 @@ deriveFunctor ss mn syns ds tyConNm = do
                     mkAssignment ((Label l), x) = (l, App x (Accessor l argVar))
                 return (lam ss arg (ObjectUpdate argVar (mkAssignment <$> updates)))
 
-          -- quantification
-          goType (ForAll _ t _) = goType t
+          -- quantifiers
+          goType (ForAll scopedVar t _) | scopedVar /= iTyName = goType t
+
+          -- constraints
+          goType (ConstrainedType _ t) = goType t
 
           -- under a `* -> *`, just assume functor for now
           goType (TypeApp _ t) = fmap (App mapVar) <$> goType t
