@@ -13,6 +13,7 @@ data M f a
   | M2 (f a)
   | M3 { foo :: Int, bar :: a, baz :: f a }
   | M4 (MyRecord a)
+  | M5 (forall x. a)
 
 derive instance eqM :: (Eq1 f, Eq a) => Eq (M f a)
 
@@ -26,4 +27,5 @@ main = do
   assert $ map show (M2 [0, 1] :: MA Int) == M2 ["0", "1"]
   assert $ map show (M3 {foo: 0, bar: 1, baz: [2, 3]} :: MA Int) == M3 {foo: 0, bar: "1", baz: ["2", "3"]}
   assert $ map show (M4 { myField: 42 }) == M4 { myField: "42" } :: MA String
+  assert $ map show (M5 42) == M5 "42" :: MA String
   log "Done"
