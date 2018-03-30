@@ -17,6 +17,14 @@ tmp/
 output
 examples/docs/docs/
 core-tests/full-core-docs.md
+tests/support/package-lock.json
 .psc-ide-port
 .psc-package/
 purescript.cabal
+
+# Profiling related
+*.aux
+*.hp
+*.prof
+*.ps
+*.svg
