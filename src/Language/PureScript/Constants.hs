@@ -2,7 +2,9 @@
 module Language.PureScript.Constants where
 
 import Prelude.Compat
+
 import Data.String (IsString)
+import Language.PureScript.PSString (PSString)
 import Language.PureScript.Names
 
 -- Operators
@@ -245,14 +247,25 @@ undefined = "undefined"
 
 -- Type Class Dictionary Names
 
-monadEffDictionary :: forall a. (IsString a) => a
-monadEffDictionary = "monadEff"
+data EffectDictionaries = EffectDictionaries
+  { edApplicativeDict :: PSString
+  , edBindDict :: PSString
+  , edMonadDict :: PSString
+  }
 
-applicativeEffDictionary :: forall a. (IsString a) => a
-applicativeEffDictionary = "applicativeEff"
+effDictionaries :: EffectDictionaries
+effDictionaries = EffectDictionaries
+  { edApplicativeDict = "applicativeEff"
+  , edBindDict = "bindEff"
+  , edMonadDict = "monadEff"
+  }
 
-bindEffDictionary :: forall a. (IsString a) => a
-bindEffDictionary = "bindEff"
+effectDictionaries :: EffectDictionaries
+effectDictionaries = EffectDictionaries
+  { edApplicativeDict = "applicativeEffect"
+  , edBindDict = "bindEffect"
+  , edMonadDict = "monadEffect"
+  }
 
 discardUnitDictionary :: forall a. (IsString a) => a
 discardUnitDictionary = "discardUnit"
@@ -403,20 +416,26 @@ partial = "Partial"
 pattern Prim :: ModuleName
 pattern Prim = ModuleName [ProperName "Prim"]
 
+pattern PrimRow :: ModuleName
+pattern PrimRow = ModuleName [ProperName "Prim", ProperName "Row"]
+
+pattern PrimTypeError :: ModuleName
+pattern PrimTypeError = ModuleName [ProperName "Prim", ProperName "TypeError"]
+
 pattern Partial :: Qualified (ProperName 'ClassName)
 pattern Partial = Qualified (Just Prim) (ProperName "Partial")
 
 pattern Fail :: Qualified (ProperName 'ClassName)
-pattern Fail = Qualified (Just Prim) (ProperName "Fail")
+pattern Fail = Qualified (Just PrimTypeError) (ProperName "Fail")
 
 pattern Warn :: Qualified (ProperName 'ClassName)
-pattern Warn = Qualified (Just Prim) (ProperName "Warn")
+pattern Warn = Qualified (Just PrimTypeError) (ProperName "Warn")
 
 pattern Union :: Qualified (ProperName 'ClassName)
-pattern Union = Qualified (Just Prim) (ProperName "Union")
+pattern Union = Qualified (Just PrimRow) (ProperName "Union")
 
 pattern RowCons :: Qualified (ProperName 'ClassName)
-pattern RowCons = Qualified (Just Prim) (ProperName "RowCons")
+pattern RowCons = Qualified (Just PrimRow) (ProperName "Cons")
 
 typ :: forall a. (IsString a) => a
 typ = "Type"
@@ -437,6 +456,9 @@ dataArray = "Data_Array"
 
 eff :: forall a. (IsString a) => a
 eff = "Control_Monad_Eff"
+
+effect :: forall a. (IsString a) => a
+effect = "Control_Monad_Effect"
 
 st :: forall a. (IsString a) => a
 st = "Control_Monad_ST"

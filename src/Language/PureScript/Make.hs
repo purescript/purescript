@@ -167,7 +167,7 @@ make :: forall m. (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, 
      -> [Module]
      -> m [ExternsFile]
 make ma@MakeActions{..} ms = do
-  checkModuleNamesAreUnique
+  checkModuleNames
 
   (sorted, graph) <- sortModules ms
 
@@ -188,6 +188,20 @@ make ma@MakeActions{..} ms = do
   return externs
 
   where
+  checkModuleNames :: m ()
+  checkModuleNames = checkNoPrim *> checkModuleNamesAreUnique
+
+  checkNoPrim :: m ()
+  checkNoPrim =
+    for_ ms $ \m -> do
+      case getModuleName m of
+        mn@(ModuleName (ProperName "Prim" : _)) ->
+          throwError
+            . errorMessage' (getModuleSourceSpan m)
+            $ CannotDefinePrimModules mn
+        _ ->
+          pure ()
+
   checkModuleNamesAreUnique :: m ()
   checkModuleNamesAreUnique =
     for_ (findDuplicates getModuleName ms) $ \mss ->

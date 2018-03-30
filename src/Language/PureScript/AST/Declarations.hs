@@ -173,6 +173,7 @@ data SimpleErrorMessage
   | UserDefinedWarning Type
   -- | a declaration couldn't be used because it contained free variables
   | UnusableDeclaration Ident [[Text]]
+  | CannotDefinePrimModules ModuleName
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
@@ -259,7 +260,7 @@ addDefaultImport (Qualified toImportAs toImport) m@(Module ss coms mn decls exps
 importPrim :: Module -> Module
 importPrim =
   let
-    primModName = ModuleName [ProperName C.prim]
+    primModName = C.Prim
   in
     addDefaultImport (Qualified (Just primModName) primModName)
       . addDefaultImport (Qualified Nothing primModName)
