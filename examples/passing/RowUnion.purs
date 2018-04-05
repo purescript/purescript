@@ -1,6 +1,7 @@
 module Main where
 
 import Prelude
+import Prim.Row
 import Control.Monad.Eff
 import Control.Monad.Eff.Console
 

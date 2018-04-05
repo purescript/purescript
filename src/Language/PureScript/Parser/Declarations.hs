@@ -351,7 +351,7 @@ parseModuleFromFile toFilePath (k, content) = do
 
 -- | Converts a 'ParseError' into a 'PositionedError'
 toPositionedError :: P.ParseError -> ErrorMessage
-toPositionedError perr = ErrorMessage [ PositionedError (SourceSpan name start end) ] (ErrorParsingModule perr)
+toPositionedError perr = ErrorMessage [ positionedError (SourceSpan name start end) ] (ErrorParsingModule perr)
   where
   name   = (P.sourceName  . P.errorPos) perr
   start  = (toSourcePos . P.errorPos) perr
@@ -438,12 +438,12 @@ parseLet = do
 parseValueAtom :: TokenParser Expr
 parseValueAtom = withSourceSpan PositionedValue $ P.choice
                  [ parseAnonymousArgument
-                 , Literal <$> parseNumericLiteral
-                 , Literal <$> parseCharLiteral
-                 , Literal <$> parseStringLiteral
-                 , Literal <$> parseBooleanLiteral
-                 , Literal <$> parseArrayLiteral parseValue
-                 , Literal <$> parseObjectLiteral parseIdentifierAndValue
+                 , withSourceSpan' Literal $ parseNumericLiteral
+                 , withSourceSpan' Literal $ parseCharLiteral
+                 , withSourceSpan' Literal $ parseStringLiteral
+                 , withSourceSpan' Literal $ parseBooleanLiteral
+                 , withSourceSpan' Literal $ parseArrayLiteral parseValue
+                 , withSourceSpan' Literal $ parseObjectLiteral parseIdentifierAndValue
                  , parseAbs
                  , P.try parseConstructor
                  , P.try parseVar
@@ -551,7 +551,8 @@ parseAnonymousArgument :: TokenParser Expr
 parseAnonymousArgument = underscore *> pure AnonymousArgument
 
 parseNumberLiteral :: TokenParser Binder
-parseNumberLiteral = LiteralBinder . NumericLiteral <$> (sign <*> number)
+parseNumberLiteral = withSourceSpanF $
+  (\n ss -> LiteralBinder ss (NumericLiteral n)) <$> (sign <*> number)
   where
   sign :: TokenParser (Either Integer Double -> Either Integer Double)
   sign = (symbol' "-" >> return (negate +++ negate))
@@ -570,8 +571,8 @@ parseConstructorBinder = withSourceSpanF $
     <*> many (indented *> parseBinderNoParens)
 
 parseObjectBinder:: TokenParser Binder
-parseObjectBinder =
-  LiteralBinder <$> parseObjectLiteral (indented *> parseEntry)
+parseObjectBinder = withSourceSpanF $
+  flip LiteralBinder <$> parseObjectLiteral (indented *> parseEntry)
   where
     parseEntry :: TokenParser (PSString, Binder)
     parseEntry = var <|> (,) <$> stringLiteral <*> rest
@@ -583,7 +584,8 @@ parseObjectBinder =
         rest = indented *> colon *> indented *> parseBinder
 
 parseArrayBinder :: TokenParser Binder
-parseArrayBinder = LiteralBinder <$> parseArrayLiteral (indented *> parseBinder)
+parseArrayBinder = withSourceSpanF $
+  flip LiteralBinder <$> parseArrayLiteral (indented *> parseBinder)
 
 parseVarOrNamedBinder :: TokenParser Binder
 parseVarOrNamedBinder = withSourceSpanF $ do
@@ -619,9 +621,9 @@ parseBinderAtom :: TokenParser Binder
 parseBinderAtom = withSourceSpan PositionedBinder
   (P.choice
    [ parseNullBinder
-   , LiteralBinder <$> parseCharLiteral
-   , LiteralBinder <$> parseStringLiteral
-   , LiteralBinder <$> parseBooleanLiteral
+   , withSourceSpanF $ flip LiteralBinder <$> parseCharLiteral
+   , withSourceSpanF $ flip LiteralBinder <$> parseStringLiteral
+   , withSourceSpanF $ flip LiteralBinder <$> parseBooleanLiteral
    , parseNumberLiteral
    , parseVarOrNamedBinder
    , parseConstructorBinder
@@ -635,9 +637,9 @@ parseBinderNoParens :: TokenParser Binder
 parseBinderNoParens = withSourceSpan PositionedBinder
   (P.choice
     [ parseNullBinder
-    , LiteralBinder <$> parseCharLiteral
-    , LiteralBinder <$> parseStringLiteral
-    , LiteralBinder <$> parseBooleanLiteral
+    , withSourceSpanF $ flip LiteralBinder <$> parseCharLiteral
+    , withSourceSpanF $ flip LiteralBinder <$> parseStringLiteral
+    , withSourceSpanF $ flip LiteralBinder <$> parseBooleanLiteral
     , parseNumberLiteral
     , parseVarOrNamedBinder
     , parseNullaryConstructorBinder

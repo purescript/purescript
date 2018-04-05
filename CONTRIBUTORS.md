@@ -26,6 +26,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@balajirrao](https://github.com/balajirrao) | Balaji Rao | MIT license |
 | [@bbqbaron](https://github.com/bbqbaron) | Eric Loren | [MIT license](http://opensource.org/licenses/MIT) |
 | [@bergmark](https://github.com/bergmark) | Adam Bergmark | MIT license |
+| [@bitemyapp](https://github.com/bitemyapp) | Chris Allen | [MIT license](http://opensource.org/licenses/MIT) |
 | [@bmjames](https://github.com/bmjames) | Ben James | [MIT license](http://opensource.org/licenses/MIT) |
 | [@Bogdanp](https://github.com/Bogdanp) | Bogdan Paul Popa | [MIT license](http://opensource.org/licenses/MIT) |
 | [@brandonhamilton](https://github.com/brandonhamilton) | Brandon Hamilton | [MIT license](http://opensource.org/licenses/MIT) |

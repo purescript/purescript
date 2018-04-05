@@ -42,7 +42,7 @@ completion
 completion = liftCompletionM . completion'
 
 completion' :: CompletionFunc CompletionM
-completion' = completeWordWithPrev Nothing " \t\n\r" findCompletions
+completion' = completeWordWithPrev Nothing " \t\n\r([" findCompletions
 
 -- | Callback for Haskeline's `completeWordWithPrev`.
 -- Expects:
@@ -113,28 +113,18 @@ completionContext _ _ = [CtxIdentifier]
 completeDirective :: [String] -> String -> [CompletionContext]
 completeDirective ws w =
   case ws of
-    []    -> [CtxDirective w]
-    [dir] -> case D.directivesFor <$> stripPrefix ":" dir of
-                -- only offer completions if the directive is unambiguous
-                Just [dir'] -> directiveArg w dir'
-                _           -> []
+    []     -> [CtxDirective w]
+    (x:xs) -> case D.directivesFor <$> stripPrefix ":" x of
+                 -- only offer completions if the directive is unambiguous
+                 Just [dir] -> directiveArg xs dir
+                 _          -> []
 
-    -- All directives take exactly one argument. If we haven't yet matched,
-    -- that means one argument has already been supplied. So don't complete
-    -- any others.
-    _     -> []
-
-directiveArg :: String -> Directive -> [CompletionContext]
-directiveArg _ Browse      = [CtxModule]
-directiveArg _ Quit        = []
-directiveArg _ Reload      = []
-directiveArg _ Clear       = []
-directiveArg _ Help        = []
-directiveArg _ Paste       = []
-directiveArg _ Show        = map CtxFixed replQueryStrings
-directiveArg _ Type        = [CtxIdentifier]
-directiveArg _ Kind        = [CtxType]
-directiveArg _ Complete    = []
+directiveArg :: [String] -> Directive -> [CompletionContext]
+directiveArg [] Browse = [CtxModule]                    -- only complete very next term
+directiveArg [] Show   = map CtxFixed replQueryStrings  -- only complete very next term
+directiveArg _ Type    = [CtxIdentifier]
+directiveArg _ Kind    = [CtxType]
+directiveArg _ _       = []
 
 completeImport :: [String] -> String -> [CompletionContext]
 completeImport ws w' =

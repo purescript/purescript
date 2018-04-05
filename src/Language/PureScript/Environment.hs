@@ -96,7 +96,7 @@ instance A.ToJSON FunctionalDependency where
 
 -- | The initial environment with no values and only the default javascript types defined
 initEnvironment :: Environment
-initEnvironment = Environment M.empty primTypes M.empty M.empty M.empty primClasses primKinds
+initEnvironment = Environment M.empty allPrimTypes M.empty M.empty M.empty allPrimClasses primKinds
 
 -- | A constructor for TypeClassData that computes which type class arguments are fully determined
 -- and argument covering sets.
@@ -261,6 +261,11 @@ instance A.FromJSON DataDeclType where
 primName :: Text -> Qualified (ProperName a)
 primName = Qualified (Just $ ModuleName [ProperName C.prim]) . ProperName
 
+-- | Construct a 'ProperName' in the @Prim.NAME@ module.
+primSubName :: Text -> Text -> Qualified (ProperName a)
+primSubName sub =
+  Qualified (Just $ ModuleName [ProperName C.prim, ProperName sub]) . ProperName
+
 primKind :: Text -> Kind
 primKind = NamedKind . primName
 
@@ -337,55 +342,91 @@ primKinds =
 primTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
 primTypes =
   M.fromList
-    [ (primName "Function",   (FunKind kindType (FunKind kindType kindType), ExternData))
-    , (primName "Array",      (FunKind kindType kindType, ExternData))
-    , (primName "Record",     (FunKind (Row kindType) kindType, ExternData))
-    , (primName "String",     (kindType, ExternData))
-    , (primName "Char",       (kindType, ExternData))
-    , (primName "Number",     (kindType, ExternData))
-    , (primName "Int",        (kindType, ExternData))
-    , (primName "Boolean",    (kindType, ExternData))
-    , (primName "Partial",    (kindType, ExternData))
-    , (primName "Union",      (FunKind (Row kindType) (FunKind (Row kindType) (FunKind (Row kindType) kindType)), ExternData))
-    , (primName "RowCons",    (FunKind kindSymbol (FunKind kindType (FunKind (Row kindType) (FunKind (Row kindType) kindType))), ExternData))
-    , (primName "Fail",       (FunKind kindSymbol kindType, ExternData))
-    , (primName "Warn",       (FunKind kindSymbol kindType, ExternData))
-    , (primName "TypeString", (FunKind kindType kindSymbol, ExternData))
-    , (primName "TypeConcat", (FunKind kindSymbol (FunKind kindSymbol kindSymbol), ExternData))
+    [ (primName "Function", (FunKind kindType (FunKind kindType kindType), ExternData))
+    , (primName "Array",    (FunKind kindType kindType, ExternData))
+    , (primName "Record",   (FunKind (Row kindType) kindType, ExternData))
+    , (primName "String",   (kindType, ExternData))
+    , (primName "Char",     (kindType, ExternData))
+    , (primName "Number",   (kindType, ExternData))
+    , (primName "Int",      (kindType, ExternData))
+    , (primName "Boolean",  (kindType, ExternData))
+    , (primName "Partial",  (kindType, ExternData))
     ]
 
--- | The primitive class map. This just contains the `Fail`, `Warn`, and `Partial`
--- classes. `Partial` is used as a kind of magic constraint for partial
--- functions. `Fail` is used for user-defined type errors. `Warn` for
--- user-defined warnings.
+-- | This 'Map' contains all of the prim types from all Prim modules.
+allPrimTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
+allPrimTypes = M.unions
+  [ primTypes
+  , primTypeErrorTypes
+  , primRowTypes
+  ]
+
+primTypeErrorTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
+primTypeErrorTypes =
+  M.fromList
+    [ (primSubName "TypeError" "Fail",       (FunKind kindSymbol kindType, ExternData))
+    , (primSubName "TypeError" "Warn",       (FunKind kindSymbol kindType, ExternData))
+    , (primSubName "TypeError" "TypeString", (FunKind kindType kindSymbol, ExternData))
+    , (primSubName "TypeError" "TypeConcat", (FunKind kindSymbol (FunKind kindSymbol kindSymbol), ExternData))
+    ]
+
+primRowTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
+primRowTypes =
+  M.fromList
+    [ (primSubName "Row" "Union", (FunKind (Row kindType) (FunKind (Row kindType) (FunKind (Row kindType) kindType)), ExternData))
+    , (primSubName "Row" "Cons",  (FunKind kindSymbol (FunKind kindType (FunKind (Row kindType) (FunKind (Row kindType) kindType))), ExternData))
+    ]
+
+-- | The primitive class map. This just contains the `Partial` class.
+-- `Partial` is used as a kind of magic constraint for partial functions.
 primClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primClasses =
   M.fromList
     [ (primName "Partial", (makeTypeClassData [] [] [] []))
+    ]
+
+-- | This contains all of the type classes from all Prim modules.
+allPrimClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
+allPrimClasses = M.unions
+  [ primClasses
+  , primTypeErrorClasses
+  , primRowClasses
+  ]
+
+primTypeErrorClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
+primTypeErrorClasses =
+  M.fromList
+    [
     -- class Fail (message :: Symbol)
-    , (primName "Fail",    (makeTypeClassData [("message", Just kindSymbol)] [] [] []))
+      (primSubName "TypeError" "Fail", (makeTypeClassData [("message", Just kindSymbol)] [] [] []))
     -- class Warn (message :: Symbol)
-    , (primName "Warn",    (makeTypeClassData [("message", Just kindSymbol)] [] [] []))
+    , (primSubName "TypeError" "Warn", (makeTypeClassData [("message", Just kindSymbol)] [] [] []))
+    ]
+
+primRowClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
+primRowClasses =
+  M.fromList
+    [
     -- class Union (l :: # Type) (r :: # Type) (u :: # Type) | l r -> u, r u -> l, u l -> r
-    , (primName "Union",   (makeTypeClassData
-                             [ ("l", Just (Row kindType))
-                             , ("r", Just (Row kindType))
-                             , ("u", Just (Row kindType))
-                             ] [] []
-                             [ FunctionalDependency [0, 1] [2]
-                             , FunctionalDependency [1, 2] [0]
-                             , FunctionalDependency [2, 0] [1]
-                             ]))
+      (primSubName "Row" "Union", (makeTypeClassData
+                                  [ ("l", Just (Row kindType))
+                                  , ("r", Just (Row kindType))
+                                  , ("u", Just (Row kindType))
+                                  ] [] []
+                                  [ FunctionalDependency [0, 1] [2]
+                                  , FunctionalDependency [1, 2] [0]
+                                  , FunctionalDependency [2, 0] [1]
+                                  ]))
     -- class RowCons (l :: Symbol) (a :: Type) (i :: # Type) (o :: # Type) | l i a -> o, l o -> a i
-    , (primName "RowCons", (makeTypeClassData
-                             [ ("l", Just kindSymbol)
-                             , ("a", Just kindType)
-                             , ("i", Just (Row kindType))
-                             , ("o", Just (Row kindType))
-                             ] [] []
-                             [ FunctionalDependency [0, 1, 2] [3]
-                             , FunctionalDependency [0, 3] [1, 2]
-                             ]))
+    , (primSubName "Row" "Cons", (makeTypeClassData
+                                 [ ("l", Just kindSymbol)
+                                 , ("a", Just kindType)
+                                 , ("i", Just (Row kindType))
+                                 , ("o", Just (Row kindType))
+                                 ] [] []
+                                 [ FunctionalDependency [0, 1, 2] [3]
+                                 , FunctionalDependency [0, 3] [1, 2]
+                                 ]))
     ]
 
 -- | Finds information about data constructors from the current environment.

@@ -38,7 +38,8 @@ import           Data.Aeson (encode, decode)
 import           Data.Either (partitionEithers)
 import           Data.Function (on)
 import           Data.Foldable (for_)
-import           Data.List (foldl', sortBy, groupBy)
+import           Data.List (foldl', sortBy)
+import qualified Data.List.NonEmpty as NEL
 import           Data.Maybe (fromMaybe, catMaybes)
 import           Data.Monoid ((<>))
 import           Data.Time.Clock
@@ -108,7 +109,7 @@ data MakeActions m = MakeActions
   , readExterns :: ModuleName -> m (FilePath, Externs)
   -- ^ Read the externs file for a module as a string and also return the actual
   -- path for the file.
-  , codegen :: CF.Module CF.Ann -> Environment -> Externs -> SupplyT m ()
+  , codegen :: SourceSpan -> CF.Module CF.Ann -> Environment -> Externs -> SupplyT m ()
   -- ^ Run the code generator for the module and write any required output files.
   , progress :: ProgressMessage -> m ()
   -- ^ Respond to a progress update.
@@ -154,7 +155,7 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
       corefn = CF.moduleToCoreFn env' mod'
       [renamed] = renameInModules [corefn]
       exts = moduleToExternsFile mod' env'
-  evalSupplyT nextVar' . codegen renamed env' . encode $ exts
+  evalSupplyT nextVar' . codegen ss renamed env' . encode $ exts
   return exts
 
 -- | Compiles in "make" mode, compiling each module separately to a @.js@ file and an @externs.json@ file.
@@ -166,7 +167,7 @@ make :: forall m. (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, 
      -> [Module]
      -> m [ExternsFile]
 make ma@MakeActions{..} ms = do
-  checkModuleNamesAreUnique
+  checkModuleNames
 
   (sorted, graph) <- sortModules ms
 
@@ -187,17 +188,31 @@ make ma@MakeActions{..} ms = do
   return externs
 
   where
+  checkModuleNames :: m ()
+  checkModuleNames = checkNoPrim *> checkModuleNamesAreUnique
+
+  checkNoPrim :: m ()
+  checkNoPrim =
+    for_ ms $ \m -> do
+      case getModuleName m of
+        mn@(ModuleName (ProperName "Prim" : _)) ->
+          throwError
+            . errorMessage' (getModuleSourceSpan m)
+            $ CannotDefinePrimModules mn
+        _ ->
+          pure ()
+
   checkModuleNamesAreUnique :: m ()
   checkModuleNamesAreUnique =
     for_ (findDuplicates getModuleName ms) $ \mss ->
       throwError . flip foldMap mss $ \ms' ->
-        let mn = getModuleName (head ms')
-        in errorMessage $ DuplicateModule mn (map getModuleSourceSpan ms')
+        let mn = getModuleName (NEL.head ms')
+        in errorMessage'' (fmap getModuleSourceSpan ms') $ DuplicateModule mn
 
   -- Find all groups of duplicate values in a list based on a projection.
-  findDuplicates :: Ord b => (a -> b) -> [a] -> Maybe [[a]]
+  findDuplicates :: Ord b => (a -> b) -> [a] -> Maybe [NEL.NonEmpty a]
   findDuplicates f xs =
-    case filter ((> 1) . length) . groupBy ((==) `on` f) . sortBy (compare `on` f) $ xs of
+    case filter ((> 1) . length) . NEL.groupBy ((==) `on` f) . sortBy (compare `on` f) $ xs of
       [] -> Nothing
       xss -> Just xss
 
@@ -344,8 +359,8 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     let path = outputDir </> T.unpack (runModuleName mn) </> "externs.json"
     (path, ) <$> readTextFile path
 
-  codegen :: CF.Module CF.Ann -> Environment -> Externs -> SupplyT Make ()
-  codegen m _ exts = do
+  codegen :: SourceSpan -> CF.Module CF.Ann -> Environment -> Externs -> SupplyT Make ()
+  codegen modSS m _ exts = do
     let mn = CF.moduleName m
     let filePath = T.unpack (runModuleName mn)
         externsFile = outputDir </> filePath </> "externs.json"
@@ -360,10 +375,10 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
         foreignInclude <- case mn `M.lookup` foreigns of
           Just path
             | not $ requiresForeign m -> do
-                tell $ errorMessage $ UnnecessaryFFIModule mn path
+                tell $ errorMessage' modSS $ UnnecessaryFFIModule mn path
                 return Nothing
             | otherwise -> do
-                checkForeignDecls m path
+                checkForeignDecls modSS m path
                 return $ Just $ Imp.App Nothing (Imp.Var Nothing "require") [Imp.StringLiteral Nothing "./foreign"]
           Nothing | requiresForeign m -> throwError . errorMessage $ MissingFFIModule mn
                   | otherwise -> return Nothing
@@ -428,8 +443,8 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 
 -- | Check that the declarations in a given PureScript module match with those
 -- in its corresponding foreign module.
-checkForeignDecls :: CF.Module ann -> FilePath -> SupplyT Make ()
-checkForeignDecls m path = do
+checkForeignDecls :: SourceSpan -> CF.Module ann -> FilePath -> SupplyT Make ()
+checkForeignDecls modSS m path = do
   jsStr <- lift $ readTextFile path
   js <- either (errorParsingModule . Bundle.UnableToParseModule) pure $ JS.parse (BU8.toString (B.toStrict jsStr)) path
 
@@ -442,12 +457,12 @@ checkForeignDecls m path = do
 
   let unusedFFI = foreignIdents S.\\ importedIdents
   unless (null unusedFFI) $
-    tell . errorMessage . UnusedFFIImplementations mname $
+    tell . errorMessage' modSS . UnusedFFIImplementations mname $
       S.toList unusedFFI
 
   let missingFFI = importedIdents S.\\ foreignIdents
   unless (null missingFFI) $
-    throwError . errorMessage . MissingFFIImplementations mname $
+    throwError . errorMessage' modSS . MissingFFIImplementations mname $
       S.toList missingFFI
 
   where

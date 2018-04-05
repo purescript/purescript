@@ -48,8 +48,12 @@ desugarTypeClasses externs = flip evalStateT initialState . traverse desugarModu
   where
   initialState :: MemberMap
   initialState =
-    M.mapKeys (qualify (ModuleName [ProperName C.prim])) primClasses
-    `M.union` M.fromList (externs >>= \ExternsFile{..} -> mapMaybe (fromExternsDecl efModuleName) efDeclarations)
+    mconcat
+      [ M.mapKeys (qualify (ModuleName [ProperName C.prim])) primClasses
+      , M.mapKeys (qualify C.PrimRow) primRowClasses
+      , M.mapKeys (qualify C.PrimTypeError) primTypeErrorClasses
+      , M.fromList (externs >>= \ExternsFile{..} -> mapMaybe (fromExternsDecl efModuleName) efDeclarations)
+      ]
 
   fromExternsDecl
     :: ModuleName
@@ -297,7 +301,7 @@ typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
             , let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
             ]
 
-      let props = Literal $ ObjectLiteral $ map (first mkString) (members ++ superclasses)
+      let props = Literal ss $ ObjectLiteral $ map (first mkString) (members ++ superclasses)
           dictTy = foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
           constrainedTy = quantify (foldr ConstrainedType dictTy deps)
           dict = TypeClassDictionaryConstructorApp className props

@@ -63,12 +63,13 @@ completionTestData supportModuleNames =
   , (":kind ST.", [":kind ST.ST", ":kind ST.STRef"]) -- import Control.Monad.ST as ST
   , (":kind Control.Monad.Eff.", [])
 
-  -- Only one argument for directives should be completed
+  -- Only one argument for these directives should be completed
   , (":show import ", [])
-  , (":type EQ ", [])
-  , (":type unit compa", [])
-  , (":kind Ordering ", [])
-  , (":kind Array In", [])
+  , (":browse Data.List ", [])
+
+  -- These directives take any number of completable terms
+  , (":type const compa", [":type const compare", ":type const comparing"])
+  , (":kind Array In", [":kind Array Int"])
 
   -- a few other import tests
   , ("impor", ["import"])
@@ -86,6 +87,10 @@ completionTestData supportModuleNames =
   , ("P.uni", ["P.unit"])
   , ("voi", []) -- import Prelude hiding (void)
   , ("Control.Monad.Eff.Class.", [])
+
+  -- Parens and brackets aren't considered part of the current identifier
+  , ("map id [uni", ["map id [unit"])
+  , ("map (cons", ["map (const"])
   ]
 
 assertCompletedOk :: PSCiState -> (String, [String]) -> Spec

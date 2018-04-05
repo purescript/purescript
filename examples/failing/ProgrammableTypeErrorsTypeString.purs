@@ -3,6 +3,7 @@
 module Main where
 
 import Prelude
+import Prim.TypeError
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Console (log)
 

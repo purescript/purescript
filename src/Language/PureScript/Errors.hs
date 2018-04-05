@@ -47,7 +47,7 @@ import qualified Text.PrettyPrint.Boxes as Box
 newtype ErrorSuggestion = ErrorSuggestion Text
 
 -- | Get the source span for an error
-errorSpan :: ErrorMessage -> Maybe SourceSpan
+errorSpan :: ErrorMessage -> Maybe (NEL.NonEmpty SourceSpan)
 errorSpan = findHint matchSpan
   where
   matchSpan (PositionedError ss) = Just ss
@@ -179,6 +179,7 @@ errorCode em = case unwrapErrorMessage em of
   ClassInstanceArityMismatch{} -> "ClassInstanceArityMismatch"
   UserDefinedWarning{} -> "UserDefinedWarning"
   UnusableDeclaration{} -> "UnusableDeclaration"
+  CannotDefinePrimModules{} -> "CannotDefinePrimModules"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -195,7 +196,11 @@ errorMessage err = MultipleErrors [ErrorMessage [] err]
 
 -- | Create an error set from a single simple error message and source annotation
 errorMessage' :: SourceSpan -> SimpleErrorMessage -> MultipleErrors
-errorMessage' ss err = MultipleErrors [ErrorMessage [PositionedError ss] err]
+errorMessage' ss err = MultipleErrors [ErrorMessage [positionedError ss] err]
+
+-- | Create an error set from a single simple error message and source annotations
+errorMessage'' :: NEL.NonEmpty SourceSpan -> SimpleErrorMessage -> MultipleErrors
+errorMessage'' sss err = MultipleErrors [ErrorMessage [PositionedError sss] err]
 
 -- | Create an error set from a single error message
 singleError :: ErrorMessage -> MultipleErrors
@@ -327,7 +332,10 @@ errorSuggestion err =
 
 suggestionSpan :: ErrorMessage -> Maybe SourceSpan
 suggestionSpan e =
-  getSpan (unwrapErrorMessage e) <$> errorSpan e
+  -- The `NEL.head` is a bit arbitrary here, but I don't think we'll
+  -- have errors-with-suggestions that also have multiple source
+  -- spans. -garyb
+  getSpan (unwrapErrorMessage e) . NEL.head <$> errorSpan e
   where
     startOnly SourceSpan{spanName, spanStart} = SourceSpan {spanName, spanStart, spanEnd = spanStart}
 
@@ -534,10 +542,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line $ "Declaration for " <> printName (Qualified Nothing new) <> " conflicts with an existing " <> nameType existing <> " of the same name."
     renderSimpleErrorMessage (ExportConflict new existing) =
       line $ "Export for " <> printName new <> " conflicts with " <> runName existing
-    renderSimpleErrorMessage (DuplicateModule mn ss) =
-      paras [ line ("Module " <> markCode (runModuleName mn) <> " has been defined multiple times:")
-            , indent . paras $ map (line . displaySourceSpan relPath) ss
-            ]
+    renderSimpleErrorMessage (DuplicateModule mn) =
+      line $ "Module " <> markCode (runModuleName mn) <> " has been defined multiple times"
     renderSimpleErrorMessage (DuplicateTypeClass pn ss) =
       paras [ line ("Type class " <> markCode (runProperName pn) <> " has been defined multiple times:")
             , indent $ line $ displaySourceSpan relPath ss
@@ -983,6 +989,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 map (\set -> line $ "{ " <> T.intercalate ", " set <> " }") options
             ]
 
+    renderSimpleErrorMessage (CannotDefinePrimModules mn) =
+      paras $
+        [ line $ "The module name " <> markCode (runModuleName mn) <> " is in the Prim namespace."
+        , line $ "The Prim namespace is reserved for compiler-defined terms."
+        ]
+
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1 t2) detail =
       paras [ detail
@@ -1108,7 +1120,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 ]
             ]
     renderHint (PositionedError srcSpan) detail =
-      paras [ line $ "at " <> displaySourceSpan relPath srcSpan
+      paras [ line $ "at " <> displaySourceSpan relPath (NEL.head srcSpan)
             , detail
             ]
 
@@ -1393,7 +1405,10 @@ warnAndRethrowWithPosition :: (MonadError MultipleErrors m, MonadWriter Multiple
 warnAndRethrowWithPosition pos = rethrowWithPosition pos . warnWithPosition pos
 
 withPosition :: SourceSpan -> ErrorMessage -> ErrorMessage
-withPosition pos (ErrorMessage hints se) = ErrorMessage (PositionedError pos : hints) se
+withPosition pos (ErrorMessage hints se) = ErrorMessage (positionedError pos : hints) se
+
+positionedError :: SourceSpan -> ErrorMessageHint
+positionedError = PositionedError . pure
 
 -- | Runs a computation listening for warnings and then escalating any warnings
 -- that match the predicate to error status.

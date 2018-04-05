@@ -93,7 +93,7 @@ data SimpleErrorMessage
   | ScopeShadowing Name (Maybe ModuleName) [ModuleName]
   | DeclConflict Name Name
   | ExportConflict (Qualified Name) (Qualified Name)
-  | DuplicateModule ModuleName [SourceSpan]
+  | DuplicateModule ModuleName
   | DuplicateTypeClass (ProperName 'ClassName) SourceSpan
   | DuplicateInstance Ident SourceSpan
   | DuplicateTypeArgument Text
@@ -173,6 +173,7 @@ data SimpleErrorMessage
   | UserDefinedWarning Type
   -- | a declaration couldn't be used because it contained free variables
   | UnusableDeclaration Ident [[Text]]
+  | CannotDefinePrimModules ModuleName
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
@@ -198,7 +199,7 @@ data ErrorMessageHint
   | ErrorInTypeClassDeclaration (ProperName 'ClassName)
   | ErrorInForeignImport Ident
   | ErrorSolvingConstraint Constraint
-  | PositionedError SourceSpan
+  | PositionedError (NEL.NonEmpty SourceSpan)
   deriving (Show)
 
 -- | Categories of hints
@@ -259,7 +260,7 @@ addDefaultImport (Qualified toImportAs toImport) m@(Module ss coms mn decls exps
 importPrim :: Module -> Module
 importPrim =
   let
-    primModName = ModuleName [ProperName C.prim]
+    primModName = C.Prim
   in
     addDefaultImport (Qualified (Just primModName) primModName)
       . addDefaultImport (Qualified Nothing primModName)
@@ -697,7 +698,7 @@ data Expr
   -- |
   -- A literal value
   --
-  = Literal (Literal Expr)
+  = Literal SourceSpan (Literal Expr)
   -- |
   -- A prefix -, will be desugared
   --
@@ -886,7 +887,7 @@ $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Declarat
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ImportDeclarationType)
 
 isTrueExpr :: Expr -> Bool
-isTrueExpr (Literal (BooleanLiteral True)) = True
+isTrueExpr (Literal _ (BooleanLiteral True)) = True
 isTrueExpr (Var _ (Qualified (Just (ModuleName [ProperName "Prelude"])) (Ident "otherwise"))) = True
 isTrueExpr (Var _ (Qualified (Just (ModuleName [ProperName "Data", ProperName "Boolean"])) (Ident "otherwise"))) = True
 isTrueExpr (TypedValue _ e _) = isTrueExpr e

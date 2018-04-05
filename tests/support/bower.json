@@ -19,7 +19,7 @@
     "purescript-integers": "3.1.0",
     "purescript-invariant": "3.0.0",
     "purescript-lazy": "3.0.0",
-    "purescript-lists": "4.9.0",
+    "purescript-lists": "purescript/purescript-lists#compiler/0.12",
     "purescript-math": "2.1.0",
     "purescript-maybe": "3.0.0",
     "purescript-monoid": "3.1.0",
@@ -32,12 +32,16 @@
     "purescript-refs": "3.0.0",
     "purescript-st": "3.0.0",
     "purescript-strings": "3.3.0",
-    "purescript-symbols": "3.0.0",
+    "purescript-symbols": "purescript/purescript-symbols#compiler/0.12",
     "purescript-tailrec": "3.3.0",
     "purescript-tuples": "4.1.0",
     "purescript-type-equality": "2.1.0",
-    "purescript-typelevel-prelude": "#phil/append-symbol",
+    "purescript-typelevel-prelude": "purescript/purescript-typelevel-prelude#compiler/0.12",
     "purescript-unfoldable": "3.0.0",
     "purescript-unsafe-coerce": "3.0.0"
+  },
+  "resolutions": {
+    "purescript-symbols": "compiler/0.12",
+    "purescript-lists": "compiler/0.12"
   }
 }
