@@ -347,17 +347,6 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   codegen :: CF.Module CF.Ann -> Environment -> Externs -> SupplyT Make ()
   codegen m _ exts = do
     let mn = CF.moduleName m
-    foreignInclude <- case mn `M.lookup` foreigns of
-      Just path
-        | not $ requiresForeign m -> do
-            tell $ errorMessage $ UnnecessaryFFIModule mn path
-            return Nothing
-        | otherwise -> do
-            checkForeignDecls m path
-            return $ Just $ Imp.App Nothing (Imp.Var Nothing "require") [Imp.StringLiteral Nothing "./foreign"]
-      Nothing | requiresForeign m -> throwError . errorMessage $ MissingFFIModule mn
-              | otherwise -> return Nothing
-
     let filePath = T.unpack (runModuleName mn)
         externsFile = outputDir </> filePath </> "externs.json"
     lift $ writeTextFile externsFile exts
@@ -368,6 +357,17 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
             json = CFJ.moduleToJSON Paths.version m
         lift $ writeTextFile coreFnFile (encode json)
       else do
+        foreignInclude <- case mn `M.lookup` foreigns of
+          Just path
+            | not $ requiresForeign m -> do
+                tell $ errorMessage $ UnnecessaryFFIModule mn path
+                return Nothing
+            | otherwise -> do
+                checkForeignDecls m path
+                return $ Just $ Imp.App Nothing (Imp.Var Nothing "require") [Imp.StringLiteral Nothing "./foreign"]
+          Nothing | requiresForeign m -> throwError . errorMessage $ MissingFFIModule mn
+                  | otherwise -> return Nothing
+
         rawJs <- J.moduleToJs m foreignInclude
         dir <- lift $ makeIO (const (ErrorMessage [] $ CannotGetFileInfo ".")) getCurrentDirectory
         sourceMaps <- lift $ asks optionsSourceMaps
