@@ -41,11 +41,18 @@ shouldBeUsage usage' (fp, range) =
 spec :: Spec
 spec = describe "Finding Usages" $ do
     it "finds a simple usage" $ do
-      ([_, Right (UsagesResult [usage1])], _) <- Test.inProject $
+      ([_, Right (UsagesResult [usage1, usage2])], _) <- Test.inProject $
         Test.runIde [ load ["FindUsage", "FindUsage.Definition", "FindUsage.Reexport"]
                     , usage (Test.mn "FindUsage.Definition") "usageId" IdeNSValue
                     ]
       usage1 `shouldBeUsage` ("src" </> "FindUsage.purs", "12:11-12:18")
+      usage2 `shouldBeUsage` ("src" </> "FindUsage" </> "Definition.purs", "13:18-13:18")
+    it "finds a simple recursive usage" $ do
+      ([_, Right (UsagesResult [usage1])], _) <- Test.inProject $
+        Test.runIde [ load ["FindUsage.Recursive"]
+                    , usage (Test.mn "FindUsage.Recursive") "recursiveUsage" IdeNSValue
+                    ]
+      usage1 `shouldBeUsage` ("src" </> "FindUsage" </> "Recursive.purs", "7:12-7:26")
     it "finds a constructor usage" $ do
       ([_, Right (UsagesResult [usage1])], _) <- Test.inProject $
         Test.runIde [ load ["FindUsage", "FindUsage.Definition", "FindUsage.Reexport"]

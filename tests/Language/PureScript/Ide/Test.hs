@@ -23,7 +23,7 @@ defConfig =
   IdeConfiguration
     { confLogLevel = LogNone
     , confOutputPath = "output/"
-    , confGlobs = ["src/*.purs"]
+    , confGlobs = ["src/**/*.purs"]
     , confEditorMode = False
     }
 

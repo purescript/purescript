@@ -128,17 +128,23 @@ eligibleModules query@(moduleName, declaration) decls modules =
 -- | Finds all usages for a given `Search` throughout a module
 applySearch :: P.Module -> Search -> [P.SourceSpan]
 applySearch module_ search =
-  -- TODO(Christoph): Figure out how to find usages inside the defining module.
-  -- The Traversal adds declarations for the current module into `scope` so we
-  -- can't tell shadowed variable from actual usage.
-  let
+  foldMap findUsageInDeclaration decls
+  where
     decls = P.getModuleDeclarations module_
-    (extr, _, _, _, _) = P.everythingWithScope mempty goExpr goBinder mempty mempty
+    findUsageInDeclaration decl =
+      let
+        (extr, _, _, _, _) = P.everythingWithScope mempty (goExpr decl) goBinder mempty mempty
+      in
+        extr mempty decl
 
-    goExpr scope expr = case expr of
+    goExpr decl scope expr = case expr of
       P.Var sp i
         | Just ideValue <- preview _IdeDeclValue (P.disqualify search)
-        , P.isQualified search || not (_ideValueIdent ideValue `Set.member` scope) ->
+        , P.isQualified search
+          || not (_ideValueIdent ideValue `Set.member` scope)
+          -- This case means we're looking at a recursive definition for a
+          -- value, which we count as a usage.
+          || P.declName decl == Just (P.IdentName (_ideValueIdent ideValue)) ->
           [sp | map P.runIdent i == map identifierFromIdeDeclaration search]
       P.Constructor sp name
         | Just ideDtor <- traverse (preview _IdeDeclDataConstructor) search ->
@@ -156,6 +162,3 @@ applySearch module_ search =
         | Just op <- traverse (preview _IdeDeclValueOperator) search ->
           [sp | opName == map _ideValueOpName op]
       _ -> []
-  in
-    foldMap (extr mempty) decls
-

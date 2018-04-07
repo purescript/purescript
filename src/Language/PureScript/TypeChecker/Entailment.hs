@@ -23,7 +23,7 @@ import Control.Monad.Writer
 import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
 import Data.Functor (($>))
-import Data.List (minimumBy, groupBy, sortBy)
+import Data.List (minimumBy, groupBy, nubBy, sortBy)
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -57,6 +57,7 @@ data Evidence
   | AppendSymbolInstance
   | UnionInstance
   | ConsInstance
+  | NubInstance
   | RowToListInstance
   deriving (Show, Eq)
 
@@ -190,6 +191,9 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ C.Union [l, r, u]
       | Just (lOut, rOut, uOut, cst) <- unionRows l r u
       = [ TypeClassDictionaryInScope [] 0 UnionInstance [] C.Union [lOut, rOut, uOut] cst ]
+    forClassName _ C.Nub [r, _]
+      | Just r' <- nubRows r
+      = [ TypeClassDictionaryInScope [] 0 NubInstance [] C.Nub [r, r'] Nothing ]
     forClassName _ C.RowCons [TypeLevelString sym, ty, r, _]
       = [ TypeClassDictionaryInScope [] 0 ConsInstance [] C.RowCons [TypeLevelString sym, ty, r, RCons (Label sym) ty r] Nothing ]
     forClassName _ C.RowToList [r, _]
@@ -363,6 +367,7 @@ entails SolverOptions{..} constraint context hints =
               return $ App (Abs (VarBinder nullSourceSpan UnusedIdent) valUndefined) e
             mkDictionary UnionInstance _ = return valUndefined
             mkDictionary ConsInstance _ = return valUndefined
+            mkDictionary NubInstance _ = return valUndefined
             mkDictionary RowToListInstance _ = return valUndefined
             mkDictionary (WarnInstance msg) _ = do
               tell . errorMessage $ UserDefinedWarning msg
@@ -445,6 +450,13 @@ entails SolverOptions{..} constraint context hints =
                                      [ TypeLevelString (runLabel lbl)
                                      , ty
                                      , tl ]
+
+    nubRows :: Type -> Maybe Type
+    nubRows r =
+        guard (REmpty == rest) $>
+        rowFromList (nubBy ((==) `on` fst) fixed, rest)
+      where
+        (fixed, rest) = rowToSortedList r
 
 -- Check if an instance matches our list of types, allowing for types
 -- to be solved via functional dependencies. If the types match, we return a
