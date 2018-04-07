@@ -44,6 +44,7 @@ primRowDocsModule = Module
   , modComments = Just "The Prim.Row module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains automatically solved classes for working with row types."
   , modDeclarations =
       [ union
+      , nub
       , rowCons
       ]
   , modReExports = []
@@ -285,6 +286,11 @@ union = primClassOf (P.primSubName "Row") "Union" $ T.unlines
   , "(left-biased, including duplicates)."
   , ""
   , "The third type argument represents the union of the first two."
+  ]
+
+nub :: Declaration
+nub = primClassOf (P.primSubName "Row") "Nub" $ T.unlines
+  [ "The Nub type class is used to remove duplicate labels from rows."
   ]
 
 rowCons :: Declaration

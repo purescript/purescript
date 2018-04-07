@@ -434,6 +434,9 @@ pattern Warn = Qualified (Just PrimTypeError) (ProperName "Warn")
 pattern Union :: Qualified (ProperName 'ClassName)
 pattern Union = Qualified (Just PrimRow) (ProperName "Union")
 
+pattern Nub :: Qualified (ProperName 'ClassName)
+pattern Nub = Qualified (Just PrimRow) (ProperName "Nub")
+
 pattern RowCons :: Qualified (ProperName 'ClassName)
 pattern RowCons = Qualified (Just PrimRow) (ProperName "Cons")
 
