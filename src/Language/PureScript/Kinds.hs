@@ -81,8 +81,8 @@ kindFromJSON = do
   primKind :: Text -> Kind
   primKind = NamedKind . primName
 
-  kindType = primKind "Type"
-  kindSymbol = primKind "Symbol"
+  kindType = primKind C.typ
+  kindSymbol = primKind C.symbol
 
 instance A.FromJSON Kind where
   parseJSON = toAesonParser id kindFromJSON

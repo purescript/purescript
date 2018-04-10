@@ -1,9 +1,9 @@
 module TypeLevelString where
 
-import Prim.TypeError (class Fail)
+import Prim.TypeError (class Fail, Text)
 
 data Foo
 
 class Bar a
 
-instance fooBar :: Fail "oops" => Bar Foo
+instance fooBar :: Fail (Text "oops") => Bar Foo

@@ -269,12 +269,18 @@ primSubName sub =
 primKind :: Text -> Kind
 primKind = NamedKind . primName
 
+primSubKind :: Text -> Text -> Kind
+primSubKind sub = NamedKind . primSubName sub
+
 -- | Kind of ground types
 kindType :: Kind
 kindType = primKind C.typ
 
 kindSymbol :: Kind
 kindSymbol = primKind C.symbol
+
+kindDoc :: Kind
+kindDoc = primSubKind C.typeError C.doc
 
 -- | Construct a type in the Prim module
 primTy :: Text -> Type
@@ -334,6 +340,7 @@ primKinds =
   S.fromList
     [ primName C.typ
     , primName C.symbol
+    , primSubName C.typeError C.doc
     ]
 
 -- | The primitive types in the external javascript environment with their
@@ -364,18 +371,20 @@ allPrimTypes = M.unions
 primTypeErrorTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
 primTypeErrorTypes =
   M.fromList
-    [ (primSubName "TypeError" "Fail",       (FunKind kindSymbol kindType, ExternData))
-    , (primSubName "TypeError" "Warn",       (FunKind kindSymbol kindType, ExternData))
-    , (primSubName "TypeError" "TypeString", (FunKind kindType kindSymbol, ExternData))
-    , (primSubName "TypeError" "TypeConcat", (FunKind kindSymbol (FunKind kindSymbol kindSymbol), ExternData))
+    [ (primSubName C.typeError "Fail", (FunKind kindDoc kindType, ExternData))
+    , (primSubName C.typeError "Warn", (FunKind kindDoc kindType, ExternData))
+    , (primSubName C.typeError "Text", (FunKind kindSymbol kindDoc, ExternData))
+    , (primSubName C.typeError "Quote", (FunKind kindType kindDoc, ExternData))
+    , (primSubName C.typeError "Beside", (FunKind kindDoc (FunKind kindDoc kindDoc), ExternData))
+    , (primSubName C.typeError "Above", (FunKind kindDoc (FunKind kindDoc kindDoc), ExternData))
     ]
 
 primRowTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
 primRowTypes =
   M.fromList
-    [ (primSubName "Row" "Union", (FunKind (Row kindType) (FunKind (Row kindType) (FunKind (Row kindType) kindType)), ExternData))
-    , (primSubName "Row" "Nub", (FunKind (Row kindType) (FunKind (Row kindType) kindType), ExternData))
-    , (primSubName "Row" "Cons",  (FunKind kindSymbol (FunKind kindType (FunKind (Row kindType) (FunKind (Row kindType) kindType))), ExternData))
+    [ (primSubName C.row "Union", (FunKind (Row kindType) (FunKind (Row kindType) (FunKind (Row kindType) kindType)), ExternData))
+    , (primSubName C.row "Nub", (FunKind (Row kindType) (FunKind (Row kindType) kindType), ExternData))
+    , (primSubName C.row "Cons",  (FunKind kindSymbol (FunKind kindType (FunKind (Row kindType) (FunKind (Row kindType) kindType))), ExternData))
     ]
 
 -- | The primitive class map. This just contains the `Partial` class.
@@ -399,9 +408,9 @@ primTypeErrorClasses =
   M.fromList
     [
     -- class Fail (message :: Symbol)
-      (primSubName "TypeError" "Fail", (makeTypeClassData [("message", Just kindSymbol)] [] [] []))
+      (primSubName C.typeError "Fail", (makeTypeClassData [("message", Just kindDoc)] [] [] []))
     -- class Warn (message :: Symbol)
-    , (primSubName "TypeError" "Warn", (makeTypeClassData [("message", Just kindSymbol)] [] [] []))
+    , (primSubName C.typeError "Warn", (makeTypeClassData [("message", Just kindDoc)] [] [] []))
     ]
 
 primRowClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
@@ -409,7 +418,7 @@ primRowClasses =
   M.fromList
     [
     -- class Union (left :: # Type) (right :: # Type) (union :: # Type) | left right -> union, right union -> left, union left -> right
-      (primSubName "Row" "Union", (makeTypeClassData
+      (primSubName C.row "Union", (makeTypeClassData
                                   [ ("left", Just (Row kindType))
                                   , ("right", Just (Row kindType))
                                   , ("union", Just (Row kindType))
@@ -419,14 +428,14 @@ primRowClasses =
                                   , FunctionalDependency [2, 0] [1]
                                   ]))
     -- class Nub (original :: # Type) (nubbed :: # Type) | i -> o
-    , (primSubName "Row" "Nub", (makeTypeClassData
+    , (primSubName C.row "Nub", (makeTypeClassData
                                   [ ("original", Just (Row kindType))
                                   , ("nubbed", Just (Row kindType))
                                   ] [] []
                                   [ FunctionalDependency [0] [1]
                                   ]))
     -- class RowCons (label :: Symbol) (a :: Type) (tail :: # Type) (row :: # Type) | label tail a -> row, label row -> tail a
-    , (primSubName "Row" "Cons", (makeTypeClassData
+    , (primSubName C.row "Cons", (makeTypeClassData
                                  [ ("label", Just kindSymbol)
                                  , ("a", Just kindType)
                                  , ("tail", Just (Row kindType))

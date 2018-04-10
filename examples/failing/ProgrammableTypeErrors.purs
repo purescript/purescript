@@ -10,7 +10,7 @@ import Control.Monad.Eff.Console (log)
 class MyShow a where
   myShow :: a -> String
 
-instance cannotShowFunctions :: Fail "Cannot show functions" => MyShow (a -> b) where
+instance cannotShowFunctions :: Fail (Text "Cannot show functions") => MyShow (a -> b) where
   myShow _ = "unreachable"
 
 main :: Eff _ _
