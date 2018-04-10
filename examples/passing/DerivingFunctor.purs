@@ -15,8 +15,10 @@ data M f a
   | M4 (MyRecord a)
 
 derive instance eqM :: (Eq1 f, Eq a) => Eq (M f a)
-
 derive instance functorM :: Functor f => Functor (M f)
+
+data T a = T (forall t. Show t => t -> a)
+derive instance functorT :: Functor T
 
 type MA = M Array
 
@@ -26,4 +28,9 @@ main = do
   assert $ map show (M2 [0, 1] :: MA Int) == M2 ["0", "1"]
   assert $ map show (M3 {foo: 0, bar: 1, baz: [2, 3]} :: MA Int) == M3 {foo: 0, bar: "1", baz: ["2", "3"]}
   assert $ map show (M4 { myField: 42 }) == M4 { myField: "42" } :: MA String
+
+  case map show (T \_ -> 42) of
+    T f -> assert $ f "hello" == "42"
+    _   -> assert false
+
   log "Done"
