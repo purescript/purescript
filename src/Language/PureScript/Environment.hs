@@ -408,29 +408,29 @@ primRowClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primRowClasses =
   M.fromList
     [
-    -- class Union (l :: # Type) (r :: # Type) (u :: # Type) | l r -> u, r u -> l, u l -> r
+    -- class Union (left :: # Type) (right :: # Type) (union :: # Type) | left right -> union, right union -> left, union left -> right
       (primSubName "Row" "Union", (makeTypeClassData
-                                  [ ("l", Just (Row kindType))
-                                  , ("r", Just (Row kindType))
-                                  , ("u", Just (Row kindType))
+                                  [ ("left", Just (Row kindType))
+                                  , ("right", Just (Row kindType))
+                                  , ("union", Just (Row kindType))
                                   ] [] []
                                   [ FunctionalDependency [0, 1] [2]
                                   , FunctionalDependency [1, 2] [0]
                                   , FunctionalDependency [2, 0] [1]
                                   ]))
-    -- class Nub (i :: # Type) (o :: # Type) | i -> o
+    -- class Nub (original :: # Type) (nubbed :: # Type) | i -> o
     , (primSubName "Row" "Nub", (makeTypeClassData
-                                  [ ("i", Just (Row kindType))
-                                  , ("o", Just (Row kindType))
+                                  [ ("original", Just (Row kindType))
+                                  , ("nubbed", Just (Row kindType))
                                   ] [] []
                                   [ FunctionalDependency [0] [1]
                                   ]))
-    -- class RowCons (l :: Symbol) (a :: Type) (i :: # Type) (o :: # Type) | l i a -> o, l o -> a i
+    -- class RowCons (label :: Symbol) (a :: Type) (tail :: # Type) (row :: # Type) | label tail a -> row, label row -> tail a
     , (primSubName "Row" "Cons", (makeTypeClassData
-                                 [ ("l", Just kindSymbol)
+                                 [ ("label", Just kindSymbol)
                                  , ("a", Just kindType)
-                                 , ("i", Just (Row kindType))
-                                 , ("o", Just (Row kindType))
+                                 , ("tail", Just (Row kindType))
+                                 , ("row", Just (Row kindType))
                                  ] [] []
                                  [ FunctionalDependency [0, 1, 2] [3]
                                  , FunctionalDependency [0, 3] [1, 2]

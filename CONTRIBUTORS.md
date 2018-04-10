@@ -114,6 +114,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@trofi](https://github.com/trofi) | Sergei Trofimovich | [MIT license](http://opensource.org/licenses/MIT) |
 | [@utkarshkukreti](https://github.com/utkarshkukreti) | Utkarsh Kukreti | [MIT license](http://opensource.org/licenses/MIT) |
 | [@vkorablin](https://github.com/vkorablin) | Vladimir Korablin | MIT license |
+| [@vladciobanu](https://github.com/vladciobanu) | Vladimir Ciobanu | [MIT license](http://opensource.org/licenses/MIT) |
 | [@zudov](https://github.com/zudov) | Konstantin Zudov | [MIT license](http://opensource.org/licenses/MIT) |
 | [@b123400](https://github.com/b123400) | b123400 | [MIT license](https://opensource.org/licenses/MIT) |
 | [@kcsongor](https://github.com/kcsongor) | Csongor Kiss | [MIT license](http://opensource.org/licenses/MIT) |
