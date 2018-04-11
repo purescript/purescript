@@ -1,5 +1,7 @@
 module TestPrimDocs where
 
+import Prelude
+
 import Control.Monad
 import Data.Monoid ((<>))
 import Data.List ((\\))
