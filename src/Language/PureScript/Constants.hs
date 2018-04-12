@@ -240,6 +240,12 @@ mkEffFn = "mkEffFn"
 runEffFn :: forall a. (IsString a) => a
 runEffFn = "runEffFn"
 
+mkEffectFn :: forall a. (IsString a) => a
+mkEffectFn = "mkEffectFn"
+
+runEffectFn :: forall a. (IsString a) => a
+runEffectFn = "runEffectFn"
+
 -- Prim values
 
 undefined :: forall a. (IsString a) => a
@@ -461,7 +467,7 @@ eff :: forall a. (IsString a) => a
 eff = "Control_Monad_Eff"
 
 effect :: forall a. (IsString a) => a
-effect = "Control_Monad_Effect"
+effect = "Effect"
 
 st :: forall a. (IsString a) => a
 st = "Control_Monad_ST"
@@ -480,6 +486,9 @@ controlBind = "Control_Bind"
 
 controlMonadEffUncurried :: forall a. (IsString a) => a
 controlMonadEffUncurried = "Control_Monad_Eff_Uncurried"
+
+effectUncurried :: forall a. (IsString a) => a
+effectUncurried = "Effect_Uncurried"
 
 dataBounded :: forall a. (IsString a) => a
 dataBounded = "Data_Bounded"
