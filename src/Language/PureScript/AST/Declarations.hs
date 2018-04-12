@@ -158,6 +158,7 @@ data SimpleErrorMessage
   | DuplicateExportRef Name
   | IntOutOfRange Integer Text Integer Integer
   | ImplicitQualifiedImport ModuleName ModuleName [DeclarationRef]
+  | ImplicitQualifiedImportReExport ModuleName ModuleName [DeclarationRef]
   | ImplicitImport ModuleName [DeclarationRef]
   | HidingImport ModuleName [DeclarationRef]
   | CaseBinderLengthDiffers Int [Binder]

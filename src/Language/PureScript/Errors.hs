@@ -167,6 +167,7 @@ errorCode em = case unwrapErrorMessage em of
   DuplicateExportRef{} -> "DuplicateExportRef"
   IntOutOfRange{} -> "IntOutOfRange"
   ImplicitQualifiedImport{} -> "ImplicitQualifiedImport"
+  ImplicitQualifiedImportReExport{} -> "ImplicitQualifiedImportReExport"
   ImplicitImport{} -> "ImplicitImport"
   HidingImport{} -> "HidingImport"
   CaseBinderLengthDiffers{} -> "CaseBinderLengthDiffers"
@@ -314,6 +315,7 @@ errorSuggestion err =
       UnusedDctorExplicitImport mn _ _ qual refs -> suggest $ importSuggestion mn refs qual
       ImplicitImport mn refs -> suggest $ importSuggestion mn refs Nothing
       ImplicitQualifiedImport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
+      ImplicitQualifiedImportReExport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
       HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
       MissingTypeDeclaration ident ty -> suggest $ showIdent ident <> " :: " <> T.pack (prettyPrintSuggestedType ty)
       WildcardInferredType ty _ -> suggest $ T.pack (prettyPrintSuggestedType ty)
@@ -912,6 +914,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage msg@(ImplicitQualifiedImport importedModule asModule _) =
       paras [ line $ "Module " <> markCode (runModuleName importedModule) <> " was imported as " <> markCode (runModuleName asModule) <> " with unspecified imports."
             , line $ "As there are multiple modules being imported as " <> markCode (runModuleName asModule) <> ", consider using the explicit form:"
+            , indent $ line $ markCode $ showSuggestion msg
+            ]
+    renderSimpleErrorMessage msg@(ImplicitQualifiedImportReExport importedModule asModule _) =
+      paras [ line $ "Module " <> markCode (runModuleName importedModule) <> " was imported as " <> markCode (runModuleName asModule) <> " with unspecified imports."
+            , line $ "As this module is being re-exported, consider using the explicit form:"
             , indent $ line $ markCode $ showSuggestion msg
             ]
 
