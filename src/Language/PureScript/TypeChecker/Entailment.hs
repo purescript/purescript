@@ -168,43 +168,59 @@ entails SolverOptions{..} constraint context hints =
     solve constraint
   where
     forClassName :: InstanceContext -> Qualified (ProperName 'ClassName) -> [Type] -> [TypeClassDict]
-    forClassName ctx cn@C.Warn [msg] =
-      -- Prefer a warning dictionary in scope if there is one available.
-      -- This allows us to defer a warning by propagating the constraint.
-      findDicts ctx cn Nothing ++ [TypeClassDictionaryInScope [] 0 (WarnInstance msg) [] C.Warn [msg] Nothing]
-    forClassName _ C.IsSymbol [TypeLevelString sym] =
-      [TypeClassDictionaryInScope [] 0 (IsSymbolInstance sym) [] C.IsSymbol [TypeLevelString sym] Nothing]
-    forClassName _ C.CompareSymbol [arg0@(TypeLevelString lhs), arg1@(TypeLevelString rhs), _] =
-      let ordering = case compare lhs rhs of
-                  LT -> C.orderingLT
-                  EQ -> C.orderingEQ
-                  GT -> C.orderingGT
-          args = [arg0, arg1, TypeConstructor ordering]
-      in [TypeClassDictionaryInScope [] 0 CompareSymbolInstance [] C.CompareSymbol args Nothing]
-    forClassName _ C.AppendSymbol [arg0, arg1, arg2]
-      | Just (arg0', arg1', arg2') <- appendSymbols arg0 arg1 arg2 =
-      let args = [arg0', arg1', arg2']
-      in [TypeClassDictionaryInScope [] 0 AppendSymbolInstance [] C.AppendSymbol args Nothing]
-    forClassName _ C.ConsSymbol [arg0, arg1, arg2]
-      | Just (arg0', arg1', arg2') <- consSymbol arg0 arg1 arg2 =
-      let args = [arg0', arg1', arg2']
-      in [TypeClassDictionaryInScope [] 0 ConsSymbolInstance [] C.ConsSymbol args Nothing]
-    forClassName _ C.Union [l, r, u]
-      | Just (lOut, rOut, uOut, cst) <- unionRows l r u
-      = [ TypeClassDictionaryInScope [] 0 UnionInstance [] C.Union [lOut, rOut, uOut] cst ]
-    forClassName _ C.Nub [r, _]
-      | Just r' <- nubRows r
-      = [ TypeClassDictionaryInScope [] 0 NubInstance [] C.Nub [r, r'] Nothing ]
-    forClassName _ C.Lacks [TypeLevelString sym, r]
-      | Just (r', cst) <- rowLacks sym r
-      = [ TypeClassDictionaryInScope [] 0 LacksInstance [] C.Lacks [TypeLevelString sym, r'] cst ]
-    forClassName _ C.RowCons [TypeLevelString sym, ty, r, _]
-      = [ TypeClassDictionaryInScope [] 0 ConsInstance [] C.RowCons [TypeLevelString sym, ty, r, RCons (Label sym) ty r] Nothing ]
-    forClassName _ C.RowToList [r, _]
-      | Just entries <- solveRowToList r
-      = [ TypeClassDictionaryInScope [] 0 RowToListInstance [] C.RowToList [r, entries] Nothing ]
+    forClassName ctx cn@C.Warn args = case args of
+      [msg] ->
+        -- Prefer a warning dictionary in scope if there is one available.
+        -- This allows us to defer a warning by propagating the constraint.
+        findDicts ctx cn Nothing ++ [TypeClassDictionaryInScope [] 0 (WarnInstance msg) [] C.Warn [msg] Nothing]
+      _ -> forClassNameError
+    forClassName _ C.IsSymbol args = case args of
+      [TypeLevelString sym] ->
+        [TypeClassDictionaryInScope [] 0 (IsSymbolInstance sym) [] C.IsSymbol [TypeLevelString sym] Nothing]
+      _ -> forClassNameError
+    forClassName _ C.CompareSymbol args = case args of
+      [arg0@(TypeLevelString lhs), arg1@(TypeLevelString rhs), _] ->
+        let ordering = case compare lhs rhs of
+                    LT -> C.orderingLT
+                    EQ -> C.orderingEQ
+                    GT -> C.orderingGT
+            args' = [arg0, arg1, TypeConstructor ordering]
+        in [TypeClassDictionaryInScope [] 0 CompareSymbolInstance [] C.CompareSymbol args' Nothing]
+      _ -> forClassNameError
+    forClassName _ C.AppendSymbol args = case args of
+      [arg0, arg1, arg2] | Just (arg0', arg1', arg2') <- appendSymbols arg0 arg1 arg2 ->
+        let args' = [arg0', arg1', arg2']
+        in [TypeClassDictionaryInScope [] 0 AppendSymbolInstance [] C.AppendSymbol args' Nothing]
+      _ -> forClassNameError
+    forClassName _ C.ConsSymbol args = case args of
+      [arg0, arg1, arg2] | Just (arg0', arg1', arg2') <- consSymbol arg0 arg1 arg2 ->
+        let args' = [arg0', arg1', arg2']
+        in [TypeClassDictionaryInScope [] 0 ConsSymbolInstance [] C.ConsSymbol args' Nothing]
+      _ -> forClassNameError
+    forClassName _ C.Union args = case args of
+      [l, r, u] | Just (lOut, rOut, uOut, cst) <- unionRows l r u ->
+        [ TypeClassDictionaryInScope [] 0 UnionInstance [] C.Union [lOut, rOut, uOut] cst ]
+      _ -> forClassNameError
+    forClassName _ C.Nub args = case args of
+      [r, _] | Just r' <- nubRows r ->
+        [ TypeClassDictionaryInScope [] 0 NubInstance [] C.Nub [r, r'] Nothing ]
+      _ -> forClassNameError
+    forClassName _ C.Lacks args = case args of
+      [TypeLevelString sym, r] | Just (r', cst) <- rowLacks sym r ->
+        [ TypeClassDictionaryInScope [] 0 LacksInstance [] C.Lacks [TypeLevelString sym, r'] cst ]
+      _ -> forClassNameError
+    forClassName _ C.RowCons args = case args of
+      [TypeLevelString sym, ty, r, _] ->
+        [ TypeClassDictionaryInScope [] 0 ConsInstance [] C.RowCons [TypeLevelString sym, ty, r, RCons (Label sym) ty r] Nothing ]
+      _ -> forClassNameError
+    forClassName _ C.RowToList args = case args of
+      [r, _] | Just entries <- solveRowToList r ->
+        [ TypeClassDictionaryInScope [] 0 RowToListInstance [] C.RowToList [r, entries] Nothing ]
+      _ -> forClassNameError
     forClassName ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (ordNub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
-    forClassName _ _ _ = internalError "forClassName: expected qualified class name"
+    forClassName _ _ _ = forClassNameError
+
+    forClassNameError = internalError "forClassName: expected qualified class name"
 
     ctorModules :: Type -> Maybe ModuleName
     ctorModules (TypeConstructor (Qualified (Just mn) _)) = Just mn
