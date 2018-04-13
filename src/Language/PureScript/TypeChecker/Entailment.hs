@@ -197,7 +197,7 @@ entails SolverOptions{..} constraint context hints =
       = [ TypeClassDictionaryInScope [] 0 NubInstance [] C.Nub [r, r'] Nothing ]
     forClassName _ C.Lacks [TypeLevelString sym, r]
       | Just (r', cst) <- rowLacks sym r
-      = [ TypeClassDictionaryInScope [] 0 LacksInstance [] C.Lacks [(TypeLevelString sym), r'] cst ]
+      = [ TypeClassDictionaryInScope [] 0 LacksInstance [] C.Lacks [TypeLevelString sym, r'] cst ]
     forClassName _ C.RowCons [TypeLevelString sym, ty, r, _]
       = [ TypeClassDictionaryInScope [] 0 ConsInstance [] C.RowCons [TypeLevelString sym, ty, r, RCons (Label sym) ty r] Nothing ]
     forClassName _ C.RowToList [r, _]
