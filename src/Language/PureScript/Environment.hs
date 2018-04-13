@@ -426,10 +426,10 @@ primRowClasses =
                                   ] [] []
                                   [ FunctionalDependency [0] [1]
                                   ]))
-    -- class Lacks (label :: Symbol) (rows :: # Type)
+    -- class Lacks (label :: Symbol) (row :: # Type)
     , (primSubName "Row" "Lacks", (makeTypeClassData
                                   [ ("label", Just kindSymbol)
-                                  , ("rows", Just (Row kindType))
+                                  , ("row", Just (Row kindType))
                                   ] [] [] []))
     -- class RowCons (label :: Symbol) (a :: Type) (tail :: # Type) (row :: # Type) | label tail a -> row, label row -> tail a
     , (primSubName "Row" "Cons", (makeTypeClassData
