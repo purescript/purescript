@@ -12,10 +12,10 @@ instance nullaryTypeClass :: NullaryTypeClass where
 class Coerce a b where
   coerce :: a -> b
 
-instance coerceRefl :: Coerce a a where
-  coerce a = a
-
 instance coerceShow :: Show a => Coerce a String where
   coerce = show
+else
+instance coerceRefl :: Coerce a a where
+  coerce a = a
 
 main = log "Done"

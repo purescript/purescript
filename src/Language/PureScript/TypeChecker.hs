@@ -334,10 +334,13 @@ typeCheckAll moduleName _ = traverse go
         Just typeClass -> do
           checkInstanceArity dictName className typeClass tys
           sequence_ (zipWith (checkTypeClassInstance typeClass) [0..] tys)
-          checkOrphanInstance dictName className typeClass tys
+          let nonOrphanModules = findNonOrphanModules className typeClass tys
+          checkOrphanInstance dictName className tys nonOrphanModules
+          let qualifiedChain = Qualified (Just moduleName) <$> ch
+          checkOverlappingInstance qualifiedChain dictName className typeClass tys nonOrphanModules
           _ <- traverseTypeInstanceBody checkInstanceMembers body
           deps' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms deps
-          let dict = TypeClassDictionaryInScope (Qualified (Just moduleName) <$> ch) idx qualifiedDictName [] className tys (Just deps')
+          let dict = TypeClassDictionaryInScope qualifiedChain idx qualifiedDictName [] className tys (Just deps')
           addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) dict
           return d
 
@@ -365,21 +368,23 @@ typeCheckAll moduleName _ = traverse go
       | otherwise = firstDuplicate xs
     firstDuplicate _ = Nothing
 
-  checkOrphanInstance :: Ident -> Qualified (ProperName 'ClassName) -> TypeClassData -> [Type] -> m ()
-  checkOrphanInstance dictName className@(Qualified (Just mn') _) typeClass tys'
-    | moduleName `S.member` nonOrphanModules' = return ()
-    | otherwise = throwError . errorMessage $ OrphanInstance dictName className nonOrphanModules' tys'
+  findNonOrphanModules
+    :: Qualified (ProperName 'ClassName)
+    -> TypeClassData
+    -> [Type]
+    -> S.Set ModuleName
+  findNonOrphanModules (Qualified (Just mn') _) typeClass tys' = nonOrphanModules
     where
-    nonOrphanModules' :: S.Set ModuleName
-    nonOrphanModules' = S.insert mn' nonOrphanModules
+    nonOrphanModules :: S.Set ModuleName
+    nonOrphanModules = S.insert mn' nonOrphanModules'
 
     typeModule :: Type -> Maybe ModuleName
     typeModule (TypeVar _) = Nothing
     typeModule (TypeLevelString _) = Nothing
     typeModule (TypeConstructor (Qualified (Just mn'') _)) = Just mn''
-    typeModule (TypeConstructor (Qualified Nothing _)) = internalError "Unqualified type name in checkOrphanInstance"
+    typeModule (TypeConstructor (Qualified Nothing _)) = internalError "Unqualified type name in findNonOrphanModules"
     typeModule (TypeApp t1 _) = typeModule t1
-    typeModule _ = internalError "Invalid type in instance in checkOrphanInstance"
+    typeModule _ = internalError "Invalid type in instance in findNonOrphanModules"
 
     modulesByTypeIndex :: M.Map Int (Maybe ModuleName)
     modulesByTypeIndex = M.fromList (zip [0 ..] (typeModule <$> tys'))
@@ -387,16 +392,74 @@ typeCheckAll moduleName _ = traverse go
     lookupModule :: Int -> S.Set ModuleName
     lookupModule idx = case M.lookup idx modulesByTypeIndex of
       Just ms -> S.fromList (toList ms)
-      Nothing -> internalError "Unknown type index in checkOrphanInstance"
+      Nothing -> internalError "Unknown type index in findNonOrphanModules"
 
     -- If the instance is declared in a module that wouldn't be found based on a covering set
     -- then it is considered an orphan - because we'd have a situation in which we expect an
     -- instance but can't find it. So a valid module must be applicable across *all* covering
     -- sets - therefore we take the intersection of covering set modules.
-    nonOrphanModules :: S.Set ModuleName
-    nonOrphanModules = foldl1 S.intersection (foldMap lookupModule `S.map` typeClassCoveringSets typeClass)
+    nonOrphanModules' :: S.Set ModuleName
+    nonOrphanModules' = foldl1 S.intersection (foldMap lookupModule `S.map` typeClassCoveringSets typeClass)
+  findNonOrphanModules _ _ _ = internalError "Unqualified class name in findNonOrphanModules"
 
-  checkOrphanInstance _ _ _ _ = internalError "Unqualified class name in checkOrphanInstance"
+  -- Check that the instance currently being declared doesn't overlap with any
+  -- other instance in any module that this instance wouldn't be considered an
+  -- orphan in.  There are overlapping instance situations that won't be caught
+  -- by this, for example when combining multiparametr type classes with
+  -- flexible instances: the instances `Cls X y` and `Cls x Y` overlap and
+  -- could live in different modules but won't be caught here.
+  checkOverlappingInstance
+    :: [Qualified Ident]
+    -> Ident
+    -> Qualified (ProperName 'ClassName)
+    -> TypeClassData
+    -> [Type]
+    -> S.Set ModuleName
+    -> m ()
+  checkOverlappingInstance ch dictName className typeClass tys' nonOrphanModules = do
+    for_ nonOrphanModules $ \m -> do
+      dicts <- M.toList <$> lookupTypeClassDictionariesForClass (Just m) className
+
+      for_ dicts $ \(ident, dict) -> do
+        -- ignore instances in the same instance chain
+        if ch == tcdChain dict ||
+           instancesAreApart (typeClassCoveringSets typeClass) tys' (tcdInstanceTypes dict)
+        then return ()
+        else throwError . errorMessage $
+               OverlappingInstances className
+                                    tys'
+                                    [ident, Qualified (Just moduleName) dictName]
+
+  instancesAreApart
+    :: S.Set (S.Set Int)
+    -> [Type]
+    -> [Type]
+    -> Bool
+  instancesAreApart sets lhs rhs = all (any typesApart . S.toList) (S.toList sets)
+    where
+      typesApart :: Int -> Bool
+      typesApart i = typeHeadsApart (lhs !! i) (rhs !! i)
+
+      -- Note: implementation doesn't need to care about all possible cases:
+      -- TUnknown, Skolem, etc.
+      typeHeadsApart :: Type -> Type -> Bool
+      typeHeadsApart l                 r                 | l == r = False
+      typeHeadsApart (TypeVar _)       _                          = False
+      typeHeadsApart _                 (TypeVar _)                = False
+      typeHeadsApart (KindedType t1 _) t2                         = typeHeadsApart t1 t2
+      typeHeadsApart t1                (KindedType t2 _)          = typeHeadsApart t1 t2
+      typeHeadsApart (TypeApp h1 t1)   (TypeApp h2 t2)            = typeHeadsApart h1 h2 || typeHeadsApart t1 t2
+      typeHeadsApart _                 _                          = True
+
+  checkOrphanInstance
+    :: Ident
+    -> Qualified (ProperName 'ClassName)
+    -> [Type]
+    -> S.Set ModuleName
+    -> m ()
+  checkOrphanInstance dictName className tys' nonOrphanModules
+    | moduleName `S.member` nonOrphanModules = return ()
+    | otherwise = throwError . errorMessage $ OrphanInstance dictName className nonOrphanModules tys'
 
   -- |
   -- This function adds the argument kinds for a type constructor so that they may appear in the externs file,
