@@ -171,7 +171,8 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
   , inlineNonClassFunction (isModFnWithDict (C.dataArray, C.unsafeIndex)) $ flip (Indexer Nothing)
   ] ++
   [ fn | i <- [0..10], fn <- [ mkFn i, runFn i ] ] ++
-  [ fn | i <- [0..10], fn <- [ mkEffFn i, runEffFn i ] ]
+  [ fn | i <- [0..10], fn <- [ mkEffFn C.controlMonadEffUncurried C.mkEffFn i, runEffFn C.controlMonadEffUncurried C.runEffFn i ] ] ++
+  [ fn | i <- [0..10], fn <- [ mkEffFn C.effectUncurried C.mkEffectFn i, runEffFn C.effectUncurried C.runEffectFn i ] ]
   where
   binary :: (Text, PSString) -> (Text, PSString) -> BinaryOperator -> AST -> AST
   binary dict fns op = convert where
@@ -198,8 +199,8 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
   mkFn = mkFn' C.dataFunctionUncurried C.mkFn $ \ss1 ss2 ss3 args js ->
     Function ss1 Nothing args (Block ss2 [Return ss3 js])
 
-  mkEffFn :: Int -> AST -> AST
-  mkEffFn = mkFn' C.controlMonadEffUncurried C.mkEffFn $ \ss1 ss2 ss3 args js ->
+  mkEffFn :: Text -> Text -> Int -> AST -> AST
+  mkEffFn modName fnName = mkFn' modName fnName $ \ss1 ss2 ss3 args js ->
     Function ss1 Nothing args (Block ss2 [Return ss3 (App ss3 js [])])
 
   mkFn' :: Text -> Text -> (Maybe SourceSpan -> Maybe SourceSpan -> Maybe SourceSpan -> [Text] -> AST -> AST) -> Int -> AST -> AST
@@ -228,8 +229,8 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
   runFn :: Int -> AST -> AST
   runFn = runFn' C.dataFunctionUncurried C.runFn App
 
-  runEffFn :: Int -> AST -> AST
-  runEffFn = runFn' C.controlMonadEffUncurried C.runEffFn $ \ss fn acc ->
+  runEffFn :: Text -> Text -> Int -> AST -> AST
+  runEffFn modName fnName = runFn' modName fnName $ \ss fn acc ->
     Function ss Nothing [] (Block ss [Return ss (App ss fn acc)])
 
   runFn' :: Text -> Text -> (Maybe SourceSpan -> AST -> [AST] -> AST) -> Int -> AST -> AST
