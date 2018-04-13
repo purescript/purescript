@@ -163,6 +163,14 @@ lookupTypeClassDictionaries
   -> m (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict))
 lookupTypeClassDictionaries mn = fromMaybe M.empty . M.lookup mn . typeClassDictionaries . checkEnv <$> get
 
+-- | Lookup type class dictionaries in a module.
+lookupTypeClassDictionariesForClass
+  :: (MonadState CheckState m)
+  => Maybe ModuleName
+  -> Qualified (ProperName 'ClassName)
+  -> m (M.Map (Qualified Ident) NamedDict)
+lookupTypeClassDictionariesForClass mn cn = fromMaybe M.empty . M.lookup cn <$> lookupTypeClassDictionaries mn
+
 -- | Temporarily bind a collection of names to local variables
 bindLocalVariables
   :: (MonadState CheckState m)

@@ -28,7 +28,7 @@
     "purescript-partial": "1.2.1",
     "purescript-prelude": "3.1.0",
     "purescript-proxy": "2.1.0",
-    "purescript-psci-support": "3.0.0",
+    "purescript-psci-support": "purescript/purescript-psci-support#compiler/0.12",
     "purescript-refs": "3.0.0",
     "purescript-st": "3.0.0",
     "purescript-strings": "3.3.0",

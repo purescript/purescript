@@ -22,24 +22,24 @@ class NonexportedClass a where
 
 -- There are three places that a nonexported type or type class can occur,
 -- leading an instance to count as non-exported:
+--  * The instance types
 --  * Constraints
 --  * The type class itself
---  * The instance types
 
--- Case 1: constraints
-instance nonExportedFoo :: (NonexportedClass a) => Foo a where
-  foo = notExported
-
--- Another instance of case 1:
-instance nonExportedFoo2 :: (Foo NonexportedType) => Foo (a -> a) where
-  foo = id
-
--- Case 2: type class
-instance nonExportedNonexportedType :: NonexportedClass (Const Int a) where
-  notExported = Const 0
-
--- Case 3: instance types
+-- Case 1: instance types
 instance constFoo :: Foo (Const NonexportedType b) where
   foo = Const NonexportedType
+else
+-- Case 2: constraints
+instance nonExportedFoo :: (Foo NonexportedType) => Foo (a -> a) where
+  foo = id
+else
+-- Another instance of case 2:
+instance nonExportedFoo2 :: (NonexportedClass a) => Foo a where
+  foo = notExported
+
+-- Case 3: type class
+instance nonExportedNonexportedType :: NonexportedClass (Const Int a) where
+  notExported = Const 0
 
 main = log "Done"
