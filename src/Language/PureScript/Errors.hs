@@ -987,7 +987,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
 
         case unexplained of
           [required] ->
-            [ line $ "These arguments are: { " <> T.intercalate "," required <> "}"
+            [ line $ "These arguments are: { " <> T.intercalate ", " required <> " }"
             ]
 
           options  ->
