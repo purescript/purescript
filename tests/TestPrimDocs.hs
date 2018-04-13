@@ -30,4 +30,4 @@ main = do
     error $ "Undocumented Prim names: " ++ show undocumentedNames
 
   when (not (null extraNames)) $
-    error $ "Extra Prim names: " ++ show undocumentedNames
+    error $ "Extra Prim names: " ++ show extraNames

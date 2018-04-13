@@ -58,6 +58,7 @@ data Evidence
   | UnionInstance
   | ConsInstance
   | NubInstance
+  | LacksInstance
   | RowToListInstance
   deriving (Show, Eq)
 
@@ -194,6 +195,9 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ C.Nub [r, _]
       | Just r' <- nubRows r
       = [ TypeClassDictionaryInScope [] 0 NubInstance [] C.Nub [r, r'] Nothing ]
+    forClassName _ C.Lacks [TypeLevelString sym, r]
+      | Just (r', cst) <- rowLacks sym r
+      = [ TypeClassDictionaryInScope [] 0 LacksInstance [] C.Lacks [(TypeLevelString sym), r'] cst ]
     forClassName _ C.RowCons [TypeLevelString sym, ty, r, _]
       = [ TypeClassDictionaryInScope [] 0 ConsInstance [] C.RowCons [TypeLevelString sym, ty, r, RCons (Label sym) ty r] Nothing ]
     forClassName _ C.RowToList [r, _]
@@ -368,6 +372,7 @@ entails SolverOptions{..} constraint context hints =
             mkDictionary UnionInstance _ = return valUndefined
             mkDictionary ConsInstance _ = return valUndefined
             mkDictionary NubInstance _ = return valUndefined
+            mkDictionary LacksInstance _ = return valUndefined
             mkDictionary RowToListInstance _ = return valUndefined
             mkDictionary (WarnInstance msg) _ = do
               tell . errorMessage $ UserDefinedWarning msg
@@ -457,6 +462,19 @@ entails SolverOptions{..} constraint context hints =
         rowFromList (nubBy ((==) `on` fst) fixed, rest)
       where
         (fixed, rest) = rowToSortedList r
+
+    rowLacks :: PSString -> Type -> Maybe (Type, Maybe [Constraint])
+    rowLacks sym r =
+        guard (lacksSym && canMakeProgress) $> (r, cst)
+      where
+        (fixed, rest) = rowToList r
+
+        lacksSym =
+          not $ sym `elem` (runLabel . fst <$> fixed)
+
+        (canMakeProgress, cst) = case rest of
+            REmpty -> (True, Nothing)
+            _ -> (not (null fixed), Just [ Constraint C.Lacks [TypeLevelString sym, rest] Nothing ])
 
 -- Check if an instance matches our list of types, allowing for types
 -- to be solved via functional dependencies. If the types match, we return a
