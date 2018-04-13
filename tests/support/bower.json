@@ -19,7 +19,7 @@
     "purescript-integers": "3.1.0",
     "purescript-invariant": "3.0.0",
     "purescript-lazy": "3.0.0",
-    "purescript-lists": "LiamGoodacre/purescript-lists#feature/error-doc",
+    "purescript-lists": "purescript/purescript-lists#compiler/0.12",
     "purescript-math": "2.1.0",
     "purescript-maybe": "3.0.0",
     "purescript-monoid": "3.1.0",
@@ -42,6 +42,6 @@
   },
   "resolutions": {
     "purescript-symbols": "compiler/0.12",
-    "purescript-lists": "feature/error-doc"
+    "purescript-lists": "compiler/0.12"
   }
 }
