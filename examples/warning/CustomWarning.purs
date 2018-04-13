@@ -3,7 +3,7 @@ module Main where
 
 import Prim.TypeError
 
-foo :: forall t. Warn (TypeConcat "Custom warning " (TypeString t)) => t -> t
+foo :: forall t. Warn (Beside (Text "Custom warning ") (Quote t)) => t -> t
 foo x = x
 
 bar :: Int

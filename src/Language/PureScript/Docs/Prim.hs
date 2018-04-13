@@ -57,8 +57,11 @@ primTypeErrorDocsModule = Module
   , modDeclarations =
       [ warn
       , fail
-      , typeConcat
-      , typeString
+      , kindDoc
+      , textDoc
+      , quoteDoc
+      , besideDoc
+      , aboveDoc
       ]
   , modReExports = []
   }
@@ -79,9 +82,13 @@ unsafeLookupOf k m errorMsg name = go name
   fromJust' (Just x) = x
   fromJust' _ = P.internalError $ errorMsg ++ show name
 
-primKind :: Text -> Text -> Declaration
-primKind title comments =
-  if Set.member (P.primName title) P.primKinds
+primKindOf
+  :: NameGen 'P.KindName
+  -> Text
+  -> Text
+  -> Declaration
+primKindOf g title comments =
+  if Set.member (g title) P.primKinds
      then Declaration
           { declTitle = title
           , declComments = Just comments
@@ -90,6 +97,9 @@ primKind title comments =
           , declInfo = ExternKindDeclaration
           }
     else P.internalError $ "Docs.Prim: No such Prim kind: " ++ T.unpack title
+
+primKind :: Text -> Text -> Declaration
+primKind = primKindOf P.primName
 
 lookupPrimTypeKindOf
   :: NameGen 'P.TypeName
@@ -300,18 +310,44 @@ rowCons = primClassOf (P.primSubName "Row") "Cons" $ T.unlines
   , "the left."
   ]
 
-typeConcat :: Declaration
-typeConcat = primTypeOf (P.primSubName "TypeError") "TypeConcat" $ T.unlines
-  [ "The TypeConcat type constructor concatenates two Symbols in a custom type"
-  , "error."
+kindDoc :: Declaration
+kindDoc = primKindOf (P.primSubName "TypeError") "Doc" $ T.unlines
+  [ "`Doc` is the kind of type-level documents."
+  , ""
+  , "This kind is used with the `Fail` and `Warn` type clases."
+  , "Build up a `Doc` with `Text`, `Quote`, `Beside`, and `Above`."
+  ]
+
+textDoc :: Declaration
+textDoc = primTypeOf (P.primSubName "TypeError") "Text" $ T.unlines
+  [ "The Text type constructor makes a Doc from a Symbol"
+  , "to be used in a custom type error."
   , ""
   , "For more information, see"
   , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
   ]
 
-typeString :: Declaration
-typeString = primTypeOf (P.primSubName "TypeError") "TypeString" $ T.unlines
-  [ "The TypeString type constructor renders any concrete type into a Symbol"
+quoteDoc :: Declaration
+quoteDoc = primTypeOf (P.primSubName "TypeError") "Quote" $ T.unlines
+  [ "The Quote type constructor renders any concrete type as a Doc"
+  , "to be used in a custom type error."
+  , ""
+  , "For more information, see"
+  , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
+  ]
+
+besideDoc :: Declaration
+besideDoc = primTypeOf (P.primSubName "TypeError") "Beside" $ T.unlines
+  [ "The Beside type constructor combines two Docs horizontally"
+  , "to be used in a custom type error."
+  , ""
+  , "For more information, see"
+  , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
+  ]
+
+aboveDoc :: Declaration
+aboveDoc = primTypeOf (P.primSubName "TypeError") "Above" $ T.unlines
+  [ "The Above type constructor combines two Docs vertically"
   , "in a custom type error."
   , ""
   , "For more information, see"

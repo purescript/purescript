@@ -1382,10 +1382,15 @@ toTypelevelString :: Type -> Maybe Box.Box
 toTypelevelString (TypeLevelString s) =
   Just . Box.text $ decodeStringWithReplacement s
 toTypelevelString (TypeApp (TypeConstructor f) x)
-  | f == primName "TypeString" = Just (typeAsBox x)
+  | f == primSubName C.typeError "Text" = toTypelevelString x
+toTypelevelString (TypeApp (TypeConstructor f) x)
+  | f == primSubName C.typeError "Quote" = Just (typeAsBox x)
 toTypelevelString (TypeApp (TypeApp (TypeConstructor f) x) ret)
-  | f == primName "TypeConcat" =
+  | f == primSubName C.typeError "Beside" =
     (Box.<>) <$> toTypelevelString x <*> toTypelevelString ret
+toTypelevelString (TypeApp (TypeApp (TypeConstructor f) x) ret)
+  | f == primSubName C.typeError "Above" =
+    (Box.//) <$> toTypelevelString x <*> toTypelevelString ret
 toTypelevelString _ = Nothing
 
 -- | Rethrow an error with a more detailed error message in the case of failure

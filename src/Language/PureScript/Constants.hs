@@ -452,10 +452,19 @@ typ = "Type"
 symbol :: forall a. (IsString a) => a
 symbol = "Symbol"
 
+doc :: forall a. (IsString a) => a
+doc = "Doc"
+
 -- Modules
 
 prim :: forall a. (IsString a) => a
 prim = "Prim"
+
+typeError :: forall a. (IsString a) => a
+typeError = "TypeError"
+
+row :: forall a. (IsString a) => a
+row = "Row"
 
 prelude :: forall a. (IsString a) => a
 prelude = "Prelude"
