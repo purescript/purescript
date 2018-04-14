@@ -14,9 +14,10 @@ import           Prelude.Compat
 import           Protolude (ordNub)
 
 import           Data.List (sort, find, foldl')
-import           Data.Maybe (mapMaybe)
+import           Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
 import           Data.Monoid ((<>))
+import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
 
@@ -291,22 +292,21 @@ handleBrowse
 handleBrowse print' moduleName = do
   st <- get
   env <- asks psciEnvironment
-  if isModInEnv moduleName st
-    then print' $ printModuleSignatures moduleName env
-    else case lookupUnQualifiedModName moduleName st of
-      Just unQualifiedName ->
-        if isModInEnv unQualifiedName st
-          then print' $ printModuleSignatures unQualifiedName env
-          else failNotInEnv moduleName
-      Nothing ->
-        failNotInEnv moduleName
+  case findMod moduleName (psciLoadedExterns st) (psciImportedModules st) of
+    Just qualName -> print' $ printModuleSignatures qualName env
+    Nothing       -> failNotInEnv moduleName
   where
-    isModInEnv modName =
-        any ((== modName) . P.getModuleName . fst) . psciLoadedExterns
-    failNotInEnv modName =
-        print' $ T.unpack $ "Module '" <> N.runModuleName modName <> "' is not valid."
-    lookupUnQualifiedModName quaModName st =
-        (\(modName,_,_) -> modName) <$> find ( \(_, _, mayQuaName) -> mayQuaName == Just quaModName) (psciImportedModules st)
+    findMod needle externs imports =
+      let qualMod = fromMaybe needle (lookupUnQualifiedModName needle imports)
+          primMod = P.ModuleName [P.ProperName "Prim"]
+          modules = S.fromList (primMod : (P.getModuleName . fst <$> externs))
+      in if qualMod `S.member` modules
+           then Just qualMod
+           else Nothing
+
+    failNotInEnv modName = print' $ T.unpack $ "Module '" <> N.runModuleName modName <> "' is not valid."
+    lookupUnQualifiedModName needle imports =
+        (\(modName,_,_) -> modName) <$> find (\(_,_,mayQuaName) -> mayQuaName == Just needle) imports
 
 -- | Return output as would be returned by tab completion, for tools integration etc.
 handleComplete
