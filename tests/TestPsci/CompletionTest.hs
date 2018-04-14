@@ -88,6 +88,13 @@ completionTestData supportModuleNames =
   , ("voi", []) -- import Prelude hiding (void)
   , ("Control.Monad.Eff.Class.", [])
 
+  -- complete first name after type annotation symbol
+  , ("1 :: I", ["1 :: Int"])
+  , ("1 ::I",  ["1 ::Int"])
+  , ("1:: I",  ["1:: Int"])
+  , ("1::I",   ["1::Int"])
+  , ("(1::Int) uni", ["(1::Int) unit"]) -- back to completing values
+
   -- Parens and brackets aren't considered part of the current identifier
   , ("map id [uni", ["map id [unit"])
   , ("map (cons", ["map (const"])

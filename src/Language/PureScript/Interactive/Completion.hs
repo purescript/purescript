@@ -12,7 +12,7 @@ import Protolude (ordNub)
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.State.Class (MonadState(..))
 import           Control.Monad.Trans.Reader (asks, runReaderT, ReaderT)
-import           Data.List (nub, isPrefixOf, sortBy, stripPrefix)
+import           Data.List (nub, isPrefixOf, isInfixOf, isSuffixOf, sortBy, stripPrefix)
 import           Data.Map (keys)
 import           Data.Maybe (mapMaybe)
 import qualified Data.Text as T
@@ -63,7 +63,7 @@ findCompletions prev word = do
         CtxFilePath f        -> map Right <$> listFiles f
         CtxModule            -> map Left <$> getModuleNames
         CtxIdentifier        -> map Left <$> ((++) <$> getIdentNames <*> getDctorNames)
-        CtxType              -> map Left <$> getTypeNames
+        CtxType pre          -> map (Left . (pre ++)) <$> getTypeNames
         CtxFixed str         -> return [Left str]
         CtxDirective d       -> return (map Left (completeDirectives d))
 
@@ -96,7 +96,7 @@ data CompletionContext
   | CtxFilePath String
   | CtxModule
   | CtxIdentifier
-  | CtxType
+  | CtxType String
   | CtxFixed String
   deriving (Show)
 
@@ -105,10 +105,20 @@ data CompletionContext
 -- a list of complete words (to the left of the cursor) as the first argument,
 -- and the current word as the second argument.
 completionContext :: [String] -> String -> [CompletionContext]
+completionContext _ w  | "::" `isInfixOf` w = [CtxType (w `endingWith` "::")]
+completionContext ws _ | lastSatisfies ("::" `isSuffixOf`) ws = [CtxType ""]
 completionContext [] _ = [CtxDirective "", CtxIdentifier, CtxFixed "import"]
 completionContext ws w | headSatisfies (":" `isPrefixOf`) ws = completeDirective ws w
 completionContext ws w | headSatisfies (== "import") ws = completeImport ws w
 completionContext _ _ = [CtxIdentifier]
+
+endingWith :: String -> String -> String
+endingWith str stop = aux "" str
+  where
+  aux acc s@(x:xs)
+    | stop `isPrefixOf` s = reverse (stop ++ acc)
+    | otherwise           = aux (x:acc) xs
+  aux acc []              = reverse (stop ++ acc)
 
 completeDirective :: [String] -> String -> [CompletionContext]
 completeDirective ws w =
@@ -123,7 +133,7 @@ directiveArg :: [String] -> Directive -> [CompletionContext]
 directiveArg [] Browse = [CtxModule]                    -- only complete very next term
 directiveArg [] Show   = map CtxFixed replQueryStrings  -- only complete very next term
 directiveArg _ Type    = [CtxIdentifier]
-directiveArg _ Kind    = [CtxType]
+directiveArg _ Kind    = [CtxType ""]
 directiveArg _ _       = []
 
 completeImport :: [String] -> String -> [CompletionContext]
@@ -137,6 +147,10 @@ headSatisfies p str =
   case str of
     (c:_)  -> p c
     _     -> False
+
+lastSatisfies :: (a -> Bool) -> [a] -> Bool
+lastSatisfies _ [] = False
+lastSatisfies p xs = p (last xs)
 
 getLoadedModules :: CompletionM [P.Module]
 getLoadedModules = asks (map fst . psciLoadedExterns)
