@@ -118,7 +118,6 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
   , unary  ringNumber opNegate Negate
 
   , binary euclideanRingNumber opDiv Divide
-  , binary euclideanRingInt opMod Modulus
 
   , binary eqNumber opEq EqualTo
   , binary eqNumber opNotEq NotEqualTo
@@ -396,9 +395,6 @@ opNegate = (C.dataRing, C.negate)
 
 opDiv :: forall a b. (IsString a, IsString b) => (a, b)
 opDiv = (C.dataEuclideanRing, C.div)
-
-opMod :: forall a b. (IsString a, IsString b) => (a, b)
-opMod = (C.dataEuclideanRing, C.mod)
 
 opConj :: forall a b. (IsString a, IsString b) => (a, b)
 opConj = (C.dataHeytingAlgebra, C.conj)
