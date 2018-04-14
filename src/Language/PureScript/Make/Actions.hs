@@ -247,7 +247,7 @@ checkForeignDecls modSS m path = do
   mname = CF.moduleName m
 
   errorParsingModule :: Bundle.ErrorMessage -> SupplyT Make a
-  errorParsingModule = throwError . errorMessage . ErrorParsingFFIModule path . Just
+  errorParsingModule = throwError . errorMessage' modSS . ErrorParsingFFIModule path . Just
 
   getExps :: JS.JSAST -> Either Bundle.ErrorMessage [String]
   getExps = Bundle.getExportedIdentifiers (T.unpack (runModuleName mname))
