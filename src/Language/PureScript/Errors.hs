@@ -78,7 +78,6 @@ errorCode em = case unwrapErrorMessage em of
   ErrorParsingFFIModule{} -> "ErrorParsingFFIModule"
   ErrorParsingModule{} -> "ErrorParsingModule"
   MissingFFIModule{} -> "MissingFFIModule"
-  MultipleFFIModules{} -> "MultipleFFIModules"
   UnnecessaryFFIModule{} -> "UnnecessaryFFIModule"
   MissingFFIImplementations{} -> "MissingFFIImplementations"
   UnusedFFIImplementations{} -> "UnusedFFIImplementations"
@@ -488,10 +487,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 [ line $ "The identifier " <> markCode ident <> " is not valid in PureScript."
                 , line "Note that exported identifiers in FFI modules must be valid PureScript identifiers."
                 ]
-            ]
-    renderSimpleErrorMessage (MultipleFFIModules mn paths) =
-      paras [ line $ "Multiple foreign module implementations have been provided for module " <> markCode (runModuleName mn) <> ": "
-            , indent . paras $ map lineS paths
             ]
     renderSimpleErrorMessage InvalidDoBind =
       line "The last statement in a 'do' block must be an expression, but this block ends with a binder."
