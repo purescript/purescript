@@ -95,7 +95,6 @@ inlineCommonValues = everywhere convert
   convert (App ss (App _ (App _ fn [dict]) [x]) [y])
     | isDict semiringInt dict && isDict fnAdd fn = intOp ss Add x y
     | isDict semiringInt dict && isDict fnMultiply fn = intOp ss Multiply x y
-    | isDict euclideanRingInt dict && isDict fnDivide fn = intOp ss Divide x y
     | isDict ringInt dict && isDict fnSubtract fn = intOp ss Subtract x y
   convert other = other
   fnZero = (C.dataSemiring, C.zero)
@@ -103,7 +102,6 @@ inlineCommonValues = everywhere convert
   fnBottom = (C.dataBounded, C.bottom)
   fnTop = (C.dataBounded, C.top)
   fnAdd = (C.dataSemiring, C.add)
-  fnDivide = (C.dataEuclideanRing, C.div)
   fnMultiply = (C.dataSemiring, C.mul)
   fnSubtract = (C.dataRing, C.sub)
   fnNegate = (C.dataRing, C.negate)
@@ -314,9 +312,6 @@ ringInt = (C.dataRing, C.ringInt)
 
 euclideanRingNumber :: forall a b. (IsString a, IsString b) => (a, b)
 euclideanRingNumber = (C.dataEuclideanRing, C.euclideanRingNumber)
-
-euclideanRingInt :: forall a b. (IsString a, IsString b) => (a, b)
-euclideanRingInt = (C.dataEuclideanRing, C.euclideanRingInt)
 
 eqNumber :: forall a b. (IsString a, IsString b) => (a, b)
 eqNumber = (C.dataEq, C.eqNumber)
