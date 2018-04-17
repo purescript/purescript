@@ -58,6 +58,7 @@ data Evidence
   | UnionInstance
   | ConsInstance
   | NubInstance
+  | LacksInstance
   | RowToListInstance
   deriving (Show, Eq)
 
@@ -171,34 +172,15 @@ entails SolverOptions{..} constraint context hints =
       -- Prefer a warning dictionary in scope if there is one available.
       -- This allows us to defer a warning by propagating the constraint.
       findDicts ctx cn Nothing ++ [TypeClassDictionaryInScope [] 0 (WarnInstance msg) [] C.Warn [msg] Nothing]
-    forClassName _ C.IsSymbol [TypeLevelString sym] =
-      [TypeClassDictionaryInScope [] 0 (IsSymbolInstance sym) [] C.IsSymbol [TypeLevelString sym] Nothing]
-    forClassName _ C.CompareSymbol [arg0@(TypeLevelString lhs), arg1@(TypeLevelString rhs), _] =
-      let ordering = case compare lhs rhs of
-                  LT -> C.orderingLT
-                  EQ -> C.orderingEQ
-                  GT -> C.orderingGT
-          args = [arg0, arg1, TypeConstructor ordering]
-      in [TypeClassDictionaryInScope [] 0 CompareSymbolInstance [] C.CompareSymbol args Nothing]
-    forClassName _ C.AppendSymbol [arg0, arg1, arg2]
-      | Just (arg0', arg1', arg2') <- appendSymbols arg0 arg1 arg2 =
-      let args = [arg0', arg1', arg2']
-      in [TypeClassDictionaryInScope [] 0 AppendSymbolInstance [] C.AppendSymbol args Nothing]
-    forClassName _ C.ConsSymbol [arg0, arg1, arg2]
-      | Just (arg0', arg1', arg2') <- consSymbol arg0 arg1 arg2 =
-      let args = [arg0', arg1', arg2']
-      in [TypeClassDictionaryInScope [] 0 ConsSymbolInstance [] C.ConsSymbol args Nothing]
-    forClassName _ C.Union [l, r, u]
-      | Just (lOut, rOut, uOut, cst) <- unionRows l r u
-      = [ TypeClassDictionaryInScope [] 0 UnionInstance [] C.Union [lOut, rOut, uOut] cst ]
-    forClassName _ C.Nub [r, _]
-      | Just r' <- nubRows r
-      = [ TypeClassDictionaryInScope [] 0 NubInstance [] C.Nub [r, r'] Nothing ]
-    forClassName _ C.RowCons [TypeLevelString sym, ty, r, _]
-      = [ TypeClassDictionaryInScope [] 0 ConsInstance [] C.RowCons [TypeLevelString sym, ty, r, RCons (Label sym) ty r] Nothing ]
-    forClassName _ C.RowToList [r, _]
-      | Just entries <- solveRowToList r
-      = [ TypeClassDictionaryInScope [] 0 RowToListInstance [] C.RowToList [r, entries] Nothing ]
+    forClassName _ C.IsSymbol args | Just dicts <- solveIsSymbol args = dicts
+    forClassName _ C.CompareSymbol args | Just dicts <- solveCompareSymbol args = dicts
+    forClassName _ C.AppendSymbol args | Just dicts <- solveAppendSymbol args = dicts
+    forClassName _ C.ConsSymbol args | Just dicts <- solveConsSymbol args = dicts
+    forClassName _ C.Union args | Just dicts <- solveUnion args = dicts
+    forClassName _ C.Nub args | Just dicts <- solveNub args = dicts
+    forClassName _ C.Lacks args | Just dicts <- solveLacks args = dicts
+    forClassName _ C.RowCons args | Just dicts <- solveRowCons args = dicts
+    forClassName _ C.RowToList args | Just dicts <- solveRowToList args = dicts
     forClassName ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (ordNub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
     forClassName _ _ _ = internalError "forClassName: expected qualified class name"
 
@@ -368,6 +350,7 @@ entails SolverOptions{..} constraint context hints =
             mkDictionary UnionInstance _ = return valUndefined
             mkDictionary ConsInstance _ = return valUndefined
             mkDictionary NubInstance _ = return valUndefined
+            mkDictionary LacksInstance _ = return valUndefined
             mkDictionary RowToListInstance _ = return valUndefined
             mkDictionary (WarnInstance msg) _ = do
               tell . errorMessage $ UserDefinedWarning msg
@@ -390,6 +373,27 @@ entails SolverOptions{..} constraint context hints =
         subclassDictionaryValue dict className index =
           App (Accessor (mkString (superclassName className index)) dict) valUndefined
 
+    solveIsSymbol :: [Type] -> Maybe [TypeClassDict]
+    solveIsSymbol [TypeLevelString sym] = Just [TypeClassDictionaryInScope [] 0 (IsSymbolInstance sym) [] C.IsSymbol [TypeLevelString sym] Nothing]
+    solveIsSymbol _ = Nothing
+
+    solveCompareSymbol :: [Type] -> Maybe [TypeClassDict]
+    solveCompareSymbol [arg0@(TypeLevelString lhs), arg1@(TypeLevelString rhs), _] =
+      let ordering = case compare lhs rhs of
+                  LT -> C.orderingLT
+                  EQ -> C.orderingEQ
+                  GT -> C.orderingGT
+          args' = [arg0, arg1, TypeConstructor ordering]
+      in Just [TypeClassDictionaryInScope [] 0 CompareSymbolInstance [] C.CompareSymbol args' Nothing]
+    solveCompareSymbol _ = Nothing
+
+    solveAppendSymbol :: [Type] -> Maybe [TypeClassDict]
+    solveAppendSymbol [arg0, arg1, arg2] = do
+      (arg0', arg1', arg2') <- appendSymbols arg0 arg1 arg2
+      let args' = [arg0', arg1', arg2']
+      pure [TypeClassDictionaryInScope [] 0 AppendSymbolInstance [] C.AppendSymbol args' Nothing]
+    solveAppendSymbol _ = Nothing
+
     -- | Append type level symbols, or, run backwards, strip a prefix or suffix
     appendSymbols :: Type -> Type -> Type -> Maybe (Type, Type, Type)
     appendSymbols arg0@(TypeLevelString lhs) arg1@(TypeLevelString rhs) _ = Just (arg0, arg1, TypeLevelString (lhs <> rhs))
@@ -405,6 +409,13 @@ entails SolverOptions{..} constraint context hints =
       pure (TypeLevelString (mkString lhs), arg1, arg2)
     appendSymbols _ _ _ = Nothing
 
+    solveConsSymbol :: [Type] -> Maybe [TypeClassDict]
+    solveConsSymbol [arg0, arg1, arg2] = do
+      (arg0', arg1', arg2') <- consSymbol arg0 arg1 arg2
+      let args' = [arg0', arg1', arg2']
+      pure [TypeClassDictionaryInScope [] 0 ConsSymbolInstance [] C.ConsSymbol args' Nothing]
+    solveConsSymbol _ = Nothing
+
     consSymbol :: Type -> Type -> Type -> Maybe (Type, Type, Type)
     consSymbol _ _ arg@(TypeLevelString s) = do
       (h, t) <- T.uncons =<< decodeString s
@@ -416,6 +427,12 @@ entails SolverOptions{..} constraint context hints =
       guard (T.length h' == 1)
       pure (arg1, arg2, TypeLevelString (mkString $ h' <> t'))
     consSymbol _ _ _ = Nothing
+
+    solveUnion :: [Type] -> Maybe [TypeClassDict]
+    solveUnion [l, r, u] = do
+      (lOut, rOut, uOut, cst) <- unionRows l r u
+      pure [ TypeClassDictionaryInScope [] 0 UnionInstance [] C.Union [lOut, rOut, uOut] cst ]
+    solveUnion _ = Nothing
 
     -- | Left biased union of two row types
     unionRows :: Type -> Type -> Type -> Maybe (Type, Type, Type, Maybe [Constraint])
@@ -439,9 +456,20 @@ entails SolverOptions{..} constraint context hints =
             -- types for such labels.
             _ -> (not (null fixed), (fixed, rowVar), Just [ Constraint C.Union [rest, r, rowVar] Nothing ])
 
+    solveRowCons :: [Type] -> Maybe [TypeClassDict]
+    solveRowCons [TypeLevelString sym, ty, r, _] =
+      Just [ TypeClassDictionaryInScope [] 0 ConsInstance [] C.RowCons [TypeLevelString sym, ty, r, RCons (Label sym) ty r] Nothing ]
+    solveRowCons _ = Nothing
+
+    solveRowToList :: [Type] -> Maybe [TypeClassDict]
+    solveRowToList [r, _] = do
+      entries <- rowToRowList r
+      pure [ TypeClassDictionaryInScope [] 0 RowToListInstance [] C.RowToList [r, entries] Nothing ]
+    solveRowToList _ = Nothing
+
     -- | Convert a closed row to a sorted list of entries
-    solveRowToList :: Type -> Maybe Type
-    solveRowToList r =
+    rowToRowList :: Type -> Maybe Type
+    rowToRowList r =
         guard (REmpty == rest) $>
         foldr rowListCons (TypeConstructor C.RowListNil) fixed
       where
@@ -451,12 +479,37 @@ entails SolverOptions{..} constraint context hints =
                                      , ty
                                      , tl ]
 
+    solveNub :: [Type] -> Maybe [TypeClassDict]
+    solveNub [r, _] = do
+      r' <- nubRows r
+      pure [ TypeClassDictionaryInScope [] 0 NubInstance [] C.Nub [r, r'] Nothing ]
+    solveNub _ = Nothing
+
     nubRows :: Type -> Maybe Type
     nubRows r =
         guard (REmpty == rest) $>
         rowFromList (nubBy ((==) `on` fst) fixed, rest)
       where
         (fixed, rest) = rowToSortedList r
+
+    solveLacks :: [Type] -> Maybe [TypeClassDict]
+    solveLacks [TypeLevelString sym, r] = do
+      (r', cst) <- rowLacks sym r
+      pure [ TypeClassDictionaryInScope [] 0 LacksInstance [] C.Lacks [TypeLevelString sym, r'] cst ]
+    solveLacks _ = Nothing
+
+    rowLacks :: PSString -> Type -> Maybe (Type, Maybe [Constraint])
+    rowLacks sym r =
+        guard (lacksSym && canMakeProgress) $> (r, cst)
+      where
+        (fixed, rest) = rowToList r
+
+        lacksSym =
+          not $ sym `elem` (runLabel . fst <$> fixed)
+
+        (canMakeProgress, cst) = case rest of
+            REmpty -> (True, Nothing)
+            _ -> (not (null fixed), Just [ Constraint C.Lacks [TypeLevelString sym, rest] Nothing ])
 
 -- Check if an instance matches our list of types, allowing for types
 -- to be solved via functional dependencies. If the types match, we return a

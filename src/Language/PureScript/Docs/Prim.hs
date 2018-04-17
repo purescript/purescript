@@ -45,6 +45,7 @@ primRowDocsModule = Module
   , modDeclarations =
       [ union
       , nub
+      , lacks
       , rowCons
       ]
   , modReExports = []
@@ -301,6 +302,11 @@ union = primClassOf (P.primSubName "Row") "Union" $ T.unlines
 nub :: Declaration
 nub = primClassOf (P.primSubName "Row") "Nub" $ T.unlines
   [ "The Nub type class is used to remove duplicate labels from rows."
+  ]
+
+lacks :: Declaration
+lacks = primClassOf (P.primSubName "Row") "Lacks" $ T.unlines
+  [ "The Lacks type class asserts that a label does not occur in a given row."
   ]
 
 rowCons :: Declaration

@@ -384,6 +384,7 @@ primRowTypes =
   M.fromList
     [ (primSubName C.row "Union", (FunKind (Row kindType) (FunKind (Row kindType) (FunKind (Row kindType) kindType)), ExternData))
     , (primSubName C.row "Nub", (FunKind (Row kindType) (FunKind (Row kindType) kindType), ExternData))
+    , (primSubName C.row "Lacks", (FunKind kindSymbol (FunKind (Row kindType) kindType), ExternData))
     , (primSubName C.row "Cons",  (FunKind kindSymbol (FunKind kindType (FunKind (Row kindType) (FunKind (Row kindType) kindType))), ExternData))
     ]
 
@@ -434,6 +435,11 @@ primRowClasses =
                                   ] [] []
                                   [ FunctionalDependency [0] [1]
                                   ]))
+    -- class Lacks (label :: Symbol) (row :: # Type)
+    , (primSubName C.row "Lacks", (makeTypeClassData
+                                  [ ("label", Just kindSymbol)
+                                  , ("row", Just (Row kindType))
+                                  ] [] [] []))
     -- class RowCons (label :: Symbol) (a :: Type) (tail :: # Type) (row :: # Type) | label tail a -> row, label row -> tail a
     , (primSubName C.row "Cons", (makeTypeClassData
                                  [ ("label", Just kindSymbol)
