@@ -167,7 +167,7 @@ findAvailableExterns :: (Ide m, MonadError IdeError m) => m [P.ModuleName]
 findAvailableExterns = do
   oDir <- outputDirectory
   unlessM (liftIO (doesDirectoryExist oDir))
-    (throwError (GeneralError "Couldn't locate your output directory."))
+    (throwError (GeneralError $ "Couldn't locate your output directory: " <> (toS oDir) <> "."))
   liftIO $ do
     directories <- getDirectoryContents oDir
     moduleNames <- filterM (containsExterns oDir) directories
