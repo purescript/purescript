@@ -22,6 +22,7 @@ import           Protolude hiding (moduleName)
 
 import           "monad-logger" Control.Monad.Logger
 import qualified Data.Map                           as Map
+import qualified Data.Text                          as T
 import qualified Language.PureScript                as P
 import qualified Language.PureScript.Ide.CaseSplit  as CS
 import           Language.PureScript.Ide.Command
@@ -40,7 +41,7 @@ import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 import           Language.PureScript.Ide.Usage (findUsages)
 import           System.Directory (getCurrentDirectory, getDirectoryContents, doesDirectoryExist, doesFileExist)
-import           System.FilePath ((</>))
+import           System.FilePath ((</>), normalise)
 import           System.FilePath.Glob (glob)
 
 -- | Accepts a Commmand and runs it against psc-ide's State. This is the main
@@ -167,7 +168,7 @@ findAvailableExterns :: (Ide m, MonadError IdeError m) => m [P.ModuleName]
 findAvailableExterns = do
   oDir <- outputDirectory
   unlessM (liftIO (doesDirectoryExist oDir))
-    (throwError (GeneralError "Couldn't locate your output directory."))
+    (throwError (GeneralError $ "Couldn't locate your output directory at: " <> (T.pack (normalise oDir))))
   liftIO $ do
     directories <- getDirectoryContents oDir
     moduleNames <- filterM (containsExterns oDir) directories
