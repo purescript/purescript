@@ -122,6 +122,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@bjornmelgaaard](https://github.com/BjornMelgaard) | Sergey Homa | [MIT license](http://opensource.org/licenses/MIT) |
 | [@thimoteus](https://github.com/Thimoteus) | thimoteus | [MIT license](http://opensource.org/licenses/MIT) |
 | [@sloosch](https://github.com/sloosch) | Simon Looschen | [MIT license](http://opensource.org/licenses/MIT) |
+| [@rgrinberg](https://github.com/rgrinberg) | Rudi Grinberg | [MIT license](http://opensource.org/licenses/MIT) |
 
 ### Contributors using Modified Terms
 
