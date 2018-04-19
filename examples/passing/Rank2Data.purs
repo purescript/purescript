@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude hiding (add)
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 data Id = Id forall a. a -> a
 

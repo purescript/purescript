@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude hiding (append)
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 test = \x -> x.foo + x.bar + 1.0
 

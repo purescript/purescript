@@ -2,7 +2,7 @@
 module Main where
 
 import M1
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 testX = X
 

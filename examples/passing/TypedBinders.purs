@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 data Tuple a b = Tuple a b
 
@@ -62,7 +62,7 @@ test5 = \(x :: Int1) -> x
 
 main = do
   let t1 = test
-      t2 = test2 id
+      t2 = test2 identity
       t3 = test3 1
       t4 = test4 (Tuple 1 0)
   log "Done"

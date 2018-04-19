@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 type Foo = (x :: Number | (y :: Number | (z :: Number)))
 type Bar = (x :: Number, y :: Number, z :: Number)

@@ -2,7 +2,7 @@ module Main where
 
 import Prelude
 import Data.Eq (class Eq1)
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 import Test.Assert
 
 type MyRecord a = { myField :: a }

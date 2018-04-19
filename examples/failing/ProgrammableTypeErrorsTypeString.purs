@@ -4,8 +4,8 @@ module Main where
 
 import Prelude
 import Prim.TypeError
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Console (log)
+import Effect (Effect)
+import Effect.Console (log)
 
 newtype MyType a = MyType a
 
@@ -19,6 +19,6 @@ instance cannotShowFunctions ::
 
 infixl 6 type Beside as <>
 
-main :: Eff _ _
+main :: Effect Unit
 main = do
   log $ show (MyType 2)

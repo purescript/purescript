@@ -10,7 +10,7 @@ class Monad m <= MonadEff eff m | m -> eff where
   liftEff :: forall a. Eff eff a -> m a
 
 instance monadEffEff :: MonadEff eff (Eff eff) where
-  liftEff = id
+  liftEff = identity
 
 -- This should generate a warning with the correct inferred type.
 test :: forall m. MonadEff _ m => m Unit

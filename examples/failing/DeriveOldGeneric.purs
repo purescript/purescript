@@ -3,7 +3,7 @@ module DeriveOldGeneric where
 
 import Prelude
 import Data.Generic
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 newtype Foo = Foo Int
 

@@ -1,7 +1,7 @@
 module Records where
 
 import Prelude
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 import Test.Assert (assert')
 
 newtype AstralKeys = AstralKeys { "💡" :: Int, "💢" :: Int }

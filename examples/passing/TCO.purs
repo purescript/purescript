@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console (log, logShow)
+import Effect.Console (log, logShow)
 import Control.Monad.Rec.Class
 import Data.Array ((..), span, length)
 
@@ -22,7 +22,7 @@ main = do
   log "Done"
 
 applyN :: forall a. Int -> (a -> a) -> a -> a
-applyN = go id
+applyN = go identity
   where
   go f n _ | n <= 0 = f
   go f n g = go (f >>> g) (n - 1) g

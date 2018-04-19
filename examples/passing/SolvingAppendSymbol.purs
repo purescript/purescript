@@ -1,8 +1,9 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console (log)
-import Type.Data.Symbol (SProxy(..), class AppendSymbol, appendSymbol, reflectSymbol)
+import Effect.Console (log)
+import Prim.Symbol (class Append)
+import Type.Data.Symbol (SProxy(..), appendSymbol, reflectSymbol)
 
 sym :: SProxy ""
 sym = SProxy

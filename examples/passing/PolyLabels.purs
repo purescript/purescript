@@ -2,8 +2,8 @@ module Main where
 
 import Prelude
 import Prim.Row
-import Control.Monad.Eff
-import Control.Monad.Eff.Console
+import Effect
+import Effect.Console
 import Data.Symbol (class IsSymbol, SProxy(..), reflectSymbol)
 
 foreign import unsafeGet
@@ -60,7 +60,7 @@ setFoo = set (SProxy :: SProxy "foo")
 fooLens :: forall f a b r. Functor f => (a -> f b) -> { foo :: a | r } -> f { foo :: b | r } 
 fooLens = lens (SProxy :: SProxy "foo")
 
-main :: Eff (console :: CONSOLE) Unit
+main :: Effect Unit
 main = do
   _ <- fooLens logShow { foo: 1 }
   log (getFoo (setFoo "Done" { foo: 1 }))

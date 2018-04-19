@@ -2,8 +2,8 @@ module Main where
 
 import Prelude
 import Partial.Unsafe (unsafePartial)
-import Control.Monad.Eff
-import Control.Monad.Eff.Console (logShow, log)
+import Effect
+import Effect.Console (logShow, log)
 
 test1 x = y
   where
@@ -37,7 +37,7 @@ test7 x = go x
   go y | (x - 0.1 < y * y) && (y * y < x + 0.1) = y
   go y = go $ (y + x / y) / 2.0
 
-main :: Eff _ _
+main :: Effect _
 main = do
   logShow (test1 1.0)
   logShow (test2 1.0 2.0)

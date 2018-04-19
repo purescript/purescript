@@ -1,6 +1,6 @@
 module Main where
 
-  import Control.Monad.Eff.Console
+  import Effect.Console
   import A
   import B
   import C

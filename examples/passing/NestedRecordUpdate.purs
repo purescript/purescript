@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console
+import Effect.Console
 
 type T = { foo :: Int, bar :: { baz :: Int, qux :: { lhs :: Int, rhs :: Int } } }
 

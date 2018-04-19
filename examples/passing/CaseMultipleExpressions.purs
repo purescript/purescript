@@ -2,10 +2,10 @@ module Main where
 
 import Prelude
 import Partial.Unsafe (unsafeCrashWith)
-import Control.Monad.Eff.Console
-import Control.Monad.Eff
+import Effect.Console
+import Effect
 
-doIt :: forall eff. Eff eff Boolean
+doIt :: Effect Boolean
 doIt = pure true
 
 set = do

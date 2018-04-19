@@ -1,8 +1,8 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff
-import Control.Monad.Eff.Console
+import Effect
+import Effect.Console
 
 -- Here we import as alias of reflectSymbol without importing Data.Symbol. However,
 -- Data.Symbol should be implicitly imported as we have an instance of IsSymbol solved.

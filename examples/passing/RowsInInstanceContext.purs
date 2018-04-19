@@ -1,8 +1,8 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Console (CONSOLE, log)
+import Effect (Effect)
+import Effect.Console (log)
 import Data.Newtype (class Newtype, unwrap)
 
 class TypeEquals a b | a -> b, b -> a where
@@ -10,8 +10,8 @@ class TypeEquals a b | a -> b, b -> a where
   coerceBack :: b -> a
 
 instance refl :: TypeEquals a a where
-  coerce = id
-  coerceBack = id
+  coerce = identity
+  coerceBack = identity
 
 newtype RecordNewtype = RecordNewtype { x :: String }
 
@@ -21,5 +21,5 @@ instance newtypeRecordNewtype ::
   wrap = RecordNewtype <<< coerce
   unwrap (RecordNewtype rec) = coerceBack rec
 
-main :: Eff (console :: CONSOLE) Unit
+main :: Effect Unit
 main = log (unwrap (RecordNewtype { x: "Done" })).x

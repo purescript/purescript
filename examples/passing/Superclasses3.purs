@@ -1,8 +1,8 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console
-import Control.Monad.Eff
+import Effect.Console
+import Effect
 
 class Monad m <= MonadWriter w m where
   tell :: w -> m Unit
@@ -16,9 +16,9 @@ test w = do
   tell w
   tell w
 
-data MTrace a = MTrace (Eff (console :: CONSOLE) a)
+data MTrace a = MTrace (Effect a)
 
-runMTrace :: forall a. MTrace a -> Eff (console :: CONSOLE) a
+runMTrace :: forall a. MTrace a -> Effect a
 runMTrace (MTrace a) = a
 
 instance functorMTrace :: Functor MTrace where

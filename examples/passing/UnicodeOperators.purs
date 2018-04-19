@@ -1,6 +1,6 @@
 module Main where
 
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 compose :: forall a b c. (b -> c) -> (a -> b) -> a -> c
 compose f g a = f (g a)

@@ -2,7 +2,7 @@ module Main where
 
 import Prelude
 import Data.Monoid (class Monoid, mempty)
-import Control.Monad.Eff.Console (log, logShow)
+import Effect.Console (log, logShow)
 
 data B a = B a a
 

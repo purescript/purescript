@@ -1,9 +1,11 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console (log)
-import Type.Data.Symbol (SProxy(..), class CompareSymbol, compareSymbol)
-import Type.Data.Ordering (OProxy(..), kind Ordering, LT, EQ, GT, reflectOrdering)
+import Effect.Console (log)
+import Prim.Symbol (class Compare)
+import Prim.Ordering (kind Ordering, LT, EQ, GT)
+import Type.Data.Symbol (SProxy(..), compareSymbol)
+import Type.Data.Ordering (OProxy(..), reflectOrdering)
 
 symA :: SProxy "A"
 symA = SProxy

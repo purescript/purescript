@@ -2,7 +2,6 @@
 module Main where
 
 import Prelude
-import Data.Monoid (class Monoid)
 import Data.Tuple (Tuple(..))
 
 class (Monad m, Monoid w) <= MonadTell w m | m -> w where
