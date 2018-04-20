@@ -16,7 +16,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Tree (Tree, rootLabel)
 import qualified Data.Graph as G
-import           Data.Foldable (toList)
+import           Data.Foldable (toList, fold)
 
 import           Language.PureScript.Crash
 import           Language.PureScript.Kinds
@@ -96,7 +96,7 @@ instance A.ToJSON FunctionalDependency where
 
 -- | The initial environment with no values and only the default javascript types defined
 initEnvironment :: Environment
-initEnvironment = Environment M.empty allPrimTypes M.empty M.empty M.empty allPrimClasses primKinds
+initEnvironment = Environment M.empty allPrimTypes M.empty M.empty M.empty allPrimClasses allPrimKinds
 
 -- | A constructor for TypeClassData that computes which type class arguments are fully determined
 -- and argument covering sets.
@@ -348,33 +348,55 @@ isTypeOrApplied t1 t2 = t1 == t2
 function :: Type -> Type -> Type
 function t1 = TypeApp (TypeApp tyFunction t1)
 
--- | The primitive kinds
+-- | Kinds in @Prim@
 primKinds :: S.Set (Qualified (ProperName 'KindName))
-primKinds =
-  S.fromList
-    [ primName C.typ
-    , primName C.symbol
-    , primSubName C.moduleOrdering C.kindOrdering
-    , primSubName C.moduleRowList C.kindRowList
-    , primSubName C.typeError C.doc
-    ]
+primKinds = S.fromList
+  [ primName C.typ
+  , primName C.symbol
+  ]
+
+-- | Kinds in @Prim.Ordering@
+primOrderingKinds :: S.Set (Qualified (ProperName 'KindName))
+primOrderingKinds = S.fromList
+  [ primSubName C.moduleOrdering C.kindOrdering
+  ]
+
+-- | Kinds in @Prim.RowList@
+primRowListKinds :: S.Set (Qualified (ProperName 'KindName))
+primRowListKinds = S.fromList
+  [ primSubName C.moduleRowList C.kindRowList
+  ]
+
+-- | Kinds in @Prim.TypeError@
+primTypeErrorKinds :: S.Set (Qualified (ProperName 'KindName))
+primTypeErrorKinds = S.fromList
+  [ primSubName C.typeError C.doc
+  ]
+
+-- | All primitive kinds
+allPrimKinds :: S.Set (Qualified (ProperName 'KindName))
+allPrimKinds = fold
+  [ primKinds
+  , primOrderingKinds
+  , primRowListKinds
+  , primTypeErrorKinds
+  ]
 
 -- | The primitive types in the external javascript environment with their
 -- associated kinds. There are also pseudo `Fail`, `Warn`, and `Partial` types
 -- that correspond to the classes with the same names.
 primTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
-primTypes =
-  M.fromList
-    [ (primName "Function", (kindType -:> kindType -:> kindType, ExternData))
-    , (primName "Array",    (kindType -:> kindType, ExternData))
-    , (primName "Record",   (Row kindType -:> kindType, ExternData))
-    , (primName "String",   (kindType, ExternData))
-    , (primName "Char",     (kindType, ExternData))
-    , (primName "Number",   (kindType, ExternData))
-    , (primName "Int",      (kindType, ExternData))
-    , (primName "Boolean",  (kindType, ExternData))
-    , (primName "Partial",  (kindType, ExternData))
-    ]
+primTypes = M.fromList
+  [ (primName "Function", (kindType -:> kindType -:> kindType, ExternData))
+  , (primName "Array",    (kindType -:> kindType, ExternData))
+  , (primName "Record",   (Row kindType -:> kindType, ExternData))
+  , (primName "String",   (kindType, ExternData))
+  , (primName "Char",     (kindType, ExternData))
+  , (primName "Number",   (kindType, ExternData))
+  , (primName "Int",      (kindType, ExternData))
+  , (primName "Boolean",  (kindType, ExternData))
+  , (primName "Partial",  (kindType, ExternData))
+  ]
 
 -- | This 'Map' contains all of the prim types from all Prim modules.
 allPrimTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)

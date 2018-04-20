@@ -51,6 +51,8 @@ desugarTypeClasses externs = flip evalStateT initialState . traverse desugarModu
     mconcat
       [ M.mapKeys (qualify (ModuleName [ProperName C.prim])) primClasses
       , M.mapKeys (qualify C.PrimRow) primRowClasses
+      , M.mapKeys (qualify C.PrimRowList) primRowListClasses
+      , M.mapKeys (qualify C.PrimSymbol) primSymbolClasses
       , M.mapKeys (qualify C.PrimTypeError) primTypeErrorClasses
       , M.fromList (externs >>= \ExternsFile{..} -> mapMaybe (fromExternsDecl efModuleName) efDeclarations)
       ]

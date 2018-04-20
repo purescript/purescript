@@ -6,7 +6,8 @@ module Symbols where
 import Prelude
 import Effect.Console (log)
 import Prim.Symbol (class Append)
-import Type.Data.Symbol (SProxy(..), appendSymbol, reflectSymbol)
+import Type.Data.Symbol (SProxy(..), reflectSymbol)
+import Type.Data.Symbol (append) as Symbol
 import Test.Assert (assert')
 
 highS :: SProxy "\xd834"
@@ -16,10 +17,10 @@ lowS :: SProxy "\xdf06"
 lowS = SProxy
 
 loneSurrogates :: Boolean
-loneSurrogates = reflectSymbol (appendSymbol highS lowS) == "\x1d306"
+loneSurrogates = reflectSymbol (Symbol.append highS lowS) == "\x1d306"
 
 outOfOrderSurrogates :: Boolean
-outOfOrderSurrogates = reflectSymbol (appendSymbol lowS highS) == "\xdf06\xd834"
+outOfOrderSurrogates = reflectSymbol (Symbol.append lowS highS) == "\xdf06\xd834"
 
 notReplacing :: Boolean
 notReplacing = reflectSymbol lowS /= "\xfffd"

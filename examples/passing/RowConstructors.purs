@@ -14,7 +14,7 @@ bar :: { | Bar }
 bar = { x: 0.0, y: 0.0, z: 0.0 }
 
 id' :: Record Foo -> Record Bar
-id' = id
+id' = identity
 
 foo' :: { | Foo }
 foo' = id' foo

@@ -3,7 +3,8 @@ module Main where
 import Prelude
 import Effect.Console (log)
 import Prim.Symbol (class Append)
-import Type.Data.Symbol (SProxy(..), appendSymbol, reflectSymbol)
+import Type.Data.Symbol (SProxy(..), reflectSymbol)
+import Type.Data.Symbol (append) as Symbol
 
 sym :: SProxy ""
 sym = SProxy
@@ -15,13 +16,13 @@ symB :: SProxy "B"
 symB = SProxy
 
 egAB :: SProxy "AB"
-egAB = appendSymbol symA symB
+egAB = Symbol.append symA symB
 
 egBA :: SProxy "BA"
-egBA = appendSymbol symB symA
+egBA = Symbol.append symB symA
 
 egA' :: SProxy "A"
-egA' = appendSymbol sym (appendSymbol symA sym)
+egA' = Symbol.append sym (append symA sym)
 
 main = do
   let gotAB = reflectSymbol egAB == "AB"

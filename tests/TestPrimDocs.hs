@@ -26,7 +26,7 @@ main = do
             P.primRowListTypes <>
             P.primTypeErrorTypes <>
             P.primSymbolTypes )) ++
-        (map (P.runProperName . P.disqualify) $ Set.toList P.primKinds)
+        (map (P.runProperName . P.disqualify) $ Set.toList P.allPrimKinds)
   let documentedPrimNames = map D.declTitle (concatMap D.modDeclarations D.primModules)
 
   let undocumentedNames = actualPrimNames \\ documentedPrimNames

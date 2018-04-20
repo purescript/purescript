@@ -55,7 +55,7 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
     let usedNames = concatMap getNames decls
     let mnLookup = renameImports usedNames imps
     jsImports <- traverse (importToJs mnLookup) 
-      . (\\ [mn, C.Prim, C.PrimRow, C.PrimTypeError]) $ ordNub $ map snd imps
+      . (\\ [mn, C.Prim, C.PrimOrdering, C.PrimRow, C.PrimRowList, C.PrimSymbol, C.PrimTypeError]) $ ordNub $ map snd imps
     let decls' = renameModules mnLookup decls
     jsDecls <- mapM bindToJs decls'
     optimized <- traverse (traverse optimize) jsDecls

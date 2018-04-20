@@ -134,7 +134,7 @@ primKindOf
   -> Text
   -> Declaration
 primKindOf g title comments =
-  if Set.member (g title) P.primKinds
+  if Set.member (g title) P.allPrimKinds
      then Declaration
           { declTitle = title
           , declComments = Just comments

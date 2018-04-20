@@ -188,16 +188,34 @@ primExports :: Exports
 primExports = mkPrimExports primTypes primClasses primKinds
 
 -- |
+-- The exported types from the @Prim.Ordering@ module
+--
+primOrderingExports :: Exports
+primOrderingExports = mkPrimExports primOrderingTypes mempty primOrderingKinds
+
+-- |
 -- The exported types from the @Prim.Row@ module
 --
 primRowExports :: Exports
 primRowExports = mkPrimExports primRowTypes primRowClasses mempty
 
 -- |
+-- The exported types from the @Prim.RowList@ module
+--
+primRowListExports :: Exports
+primRowListExports = mkPrimExports primRowListTypes primRowListClasses primRowListKinds
+
+-- |
+-- The exported types from the @Prim.Symbol@ module
+--
+primSymbolExports :: Exports
+primSymbolExports = mkPrimExports primSymbolTypes primSymbolClasses mempty
+
+-- |
 -- The exported types from the @Prim.TypeError@ module
 --
 primTypeErrorExports :: Exports
-primTypeErrorExports = mkPrimExports primTypeErrorTypes primTypeErrorClasses mempty
+primTypeErrorExports = mkPrimExports primTypeErrorTypes primTypeErrorClasses primTypeErrorKinds
 
 -- |
 -- Create a set of exports for a Prim module.
@@ -224,8 +242,17 @@ primEnv = M.fromList
   [ ( C.Prim
     , (internalModuleSourceSpan "<Prim>", nullImports, primExports)
     )
+  , ( C.PrimOrdering
+    , (internalModuleSourceSpan "<Prim.Ordering>", nullImports, primOrderingExports)
+    )
   , ( C.PrimRow
     , (internalModuleSourceSpan "<Prim.Row>", nullImports, primRowExports)
+    )
+  , ( C.PrimRowList
+    , (internalModuleSourceSpan "<Prim.RowList>", nullImports, primRowListExports)
+    )
+  , ( C.PrimSymbol
+    , (internalModuleSourceSpan "<Prim.Symbol>", nullImports, primSymbolExports)
     )
   , ( C.PrimTypeError
     , (internalModuleSourceSpan "<Prim.TypeError>", nullImports, primTypeErrorExports)
