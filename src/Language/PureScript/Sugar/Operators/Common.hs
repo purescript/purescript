@@ -125,13 +125,20 @@ matchOperators isBinOp extractOp fromOp reapply modOpTable ops = parseChains
         else
           map
             (\grp ->
-              ErrorMessage
-                [PositionedError (join . fmap (fromJust . flip M.lookup chainOpSpans) $ grp)]
+              mkPositionedError chainOpSpans grp
                 (MixedAssociativityError (fmap (\name -> (eraseOpName <$> name, opAssoc name)) grp)))
             mixedAssoc
           ++ map
             (\grp ->
-              ErrorMessage
-                [PositionedError (join . fmap (fromJust . flip M.lookup chainOpSpans) $ grp)]
+              mkPositionedError chainOpSpans grp
                 (NonAssociativeError (fmap (fmap eraseOpName) grp)))
             nonAssoc
+
+  mkPositionedError
+    :: M.Map (Qualified (OpName nameType)) (NEL.NonEmpty SourceSpan)
+    -> NEL.NonEmpty (Qualified (OpName nameType))
+    -> SimpleErrorMessage
+    -> ErrorMessage
+  mkPositionedError chainOpSpans grp =
+    ErrorMessage
+      [PositionedError (join . fmap (fromJust . flip M.lookup chainOpSpans) $ grp)]
