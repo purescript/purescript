@@ -174,6 +174,8 @@ data SimpleErrorMessage
   -- | a declaration couldn't be used because it contained free variables
   | UnusableDeclaration Ident [[Text]]
   | CannotDefinePrimModules ModuleName
+  | MixedAssociativityError (NEL.NonEmpty (Qualified (OpName 'AnyOpName), Associativity))
+  | NonAssociativeError (NEL.NonEmpty (Qualified (OpName 'AnyOpName)))
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
