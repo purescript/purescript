@@ -48,8 +48,8 @@ createTemporaryModule exec st val =
     imports       = psciImportedModules st
     lets          = psciLetBindings st
     moduleName    = P.ModuleName [P.ProperName "$PSCI"]
-    effModuleName = P.moduleNameFromString "Control.Monad.Eff"
-    effImport     = (effModuleName, P.Implicit, Just (P.ModuleName [P.ProperName "$Eff"]))
+    effModuleName = P.moduleNameFromString "Effect"
+    effImport     = (effModuleName, P.Implicit, Just (P.ModuleName [P.ProperName "$Effect"]))
     supportImport = (supportModuleName, P.Implicit, Just (P.ModuleName [P.ProperName "$Support"]))
     eval          = P.Var internalSpan (P.Qualified (Just (P.ModuleName [P.ProperName "$Support"])) (P.Ident "eval"))
     mainValue     = P.App eval (P.Var internalSpan (P.Qualified Nothing (P.Ident "it")))
@@ -57,10 +57,9 @@ createTemporaryModule exec st val =
     typeDecl      = P.TypeDeclaration
                       (P.TypeDeclarationData (internalSpan, []) (P.Ident "$main")
                         (P.TypeApp
-                          (P.TypeApp
-                            (P.TypeConstructor
-                              (P.Qualified (Just (P.ModuleName [P.ProperName "$Eff"])) (P.ProperName "Eff")))
-                                (P.TypeWildcard internalSpan))
+                          (P.TypeConstructor
+                            (P.Qualified (Just (P.ModuleName [P.ProperName "$Effect"])) (P.ProperName "Effect"))
+                                )
                                   (P.TypeWildcard internalSpan)))
     mainDecl      = P.ValueDecl (internalSpan, []) (P.Ident "$main") P.Public [] [P.MkUnguarded mainValue]
     decls         = if exec then [itDecl, typeDecl, mainDecl] else [itDecl]
