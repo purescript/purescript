@@ -2,7 +2,7 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff
+import Effect
 import Control.Monad.ST
 
 test _ = do

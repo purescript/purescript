@@ -1,23 +1,21 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff
-import Control.Monad.Eff.Console
+import Effect
+import Effect.Console
 
--- Until the functional dependency gets added to purescript-eff, 
--- we need this here.
-class Monad m <= MonadEff eff m | m -> eff where
-  liftEff :: forall a. Eff eff a -> m a
+class Monad m <= MonadEffect m where
+  liftEffect :: forall a. Effect a -> m a
 
-instance monadEffEff :: MonadEff eff (Eff eff) where
-  liftEff = identity
+instance monadEffectEffect :: MonadEffect Effect where
+  liftEffect = identity
 
 -- This should generate a warning with the correct inferred type.
-test :: forall m. MonadEff _ m => m Unit
-test = liftEff $ log "Done"
+test :: forall m. MonadEffect m => m Unit
+test = liftEffect $ log "Done"
 
-test1 :: Eff _ Unit
-test1 = liftEff $ log "Done"
+test1 :: Effect Unit
+test1 = liftEffect $ log "Done"
 
-main :: forall eff. Eff (console :: CONSOLE | eff) Unit
+main :: Effect Unit
 main = test

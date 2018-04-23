@@ -1,18 +1,18 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff (whileE)
-import Control.Monad.Eff.Console (log, logShow)
-import Control.Monad.ST (runST, newSTRef, readSTRef, writeSTRef)
+import Effect (whileE)
+import Effect.Console (log, logShow)
+import Control.Monad.ST as ST
+import Control.Monad.ST.Ref as STRef
 
 main = do
-  runST do
-    n1 <- newSTRef 1.0
-    n2 <- newSTRef 1.0
-    whileE ((>) 1000.0 <$> readSTRef n1) $ do
-      n1' <- readSTRef n1
-      n2' <- readSTRef n2
-      _ <- writeSTRef n2 $ n1' + n2'
-      _ <- writeSTRef n1 n2'
-      logShow n2'
+  ST.run do
+    n1 <- STRef.new 1.0
+    n2 <- STRef.new 1.0
+    ST.while ((>) 1000.0 <$> STRef.read n1) do
+      n1' <- STRef.read n1
+      n2' <- STRef.read n2
+      _ <- STRef.write (n1' + n2') n2
+      void $ STRef.write n2' n1
   log "Done"

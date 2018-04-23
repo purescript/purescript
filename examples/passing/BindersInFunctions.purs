@@ -4,7 +4,7 @@ import Prelude
 import Partial.Unsafe (unsafePartial)
 import Test.Assert (assert')
 import Effect (Effect)
-import Effeect.Console (log)
+import Effect.Console (log)
 
 snd :: forall a. Partial => Array a -> a
 snd = \[_, y] -> y
