@@ -290,7 +290,7 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
     var <- freshName
     return $
       Let
-        NotFromWhere
+        FromLet
         [ partial var tyVar ]
         $ App (Var ss (Qualified Nothing UnusedIdent)) e
     where

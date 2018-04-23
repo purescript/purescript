@@ -825,7 +825,7 @@ data WhereProvenance
   -- |
   -- The let binding was always a let binding
   --
-  | NotFromWhere
+  | FromLet
   deriving (Show)
 
 -- |

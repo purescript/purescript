@@ -76,7 +76,7 @@ prettyPrintValue d (Let FromWhere ds val) =
   prettyPrintValue (d - 1) val //
     moveRight 2 (text "where" //
                  vcat left (map (prettyPrintDeclaration (d - 1)) ds))
-prettyPrintValue d (Let NotFromWhere ds val) =
+prettyPrintValue d (Let FromLet ds val) =
   text "let" //
     moveRight 2 (vcat left (map (prettyPrintDeclaration (d - 1)) ds)) //
     (text "in " <> prettyPrintValue (d - 1) val)

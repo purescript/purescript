@@ -433,7 +433,7 @@ parseLet = do
   indented
   reserved "in"
   result <- parseValue
-  return $ Let NotFromWhere ds result
+  return $ Let FromLet ds result
 
 parseValueAtom :: TokenParser Expr
 parseValueAtom = withSourceSpan PositionedValue $ P.choice

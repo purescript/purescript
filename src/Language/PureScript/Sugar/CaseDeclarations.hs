@@ -68,7 +68,7 @@ desugarGuardedExprs ss (Case scrut alternatives)
            , ValueDecl (ss, []) scrut_id Private [] [MkUnguarded e]
            )
       )
-    Let NotFromWhere scrut_decls <$> desugarGuardedExprs ss (Case scrut' alternatives)
+    Let FromLet scrut_decls <$> desugarGuardedExprs ss (Case scrut' alternatives)
   where
     isTrivialExpr (Var _ _) = True
     isTrivialExpr (Literal _ _) = True
@@ -230,7 +230,7 @@ desugarGuardedExprs ss (Case scrut alternatives) =
             `App` Literal ss (BooleanLiteral True)
           alt_fail = [CaseAlternative [NullBinder] [MkUnguarded goto_rem_case]]
 
-        pure $ Let NotFromWhere [
+        pure $ Let FromLet [
           ValueDecl (ss, []) rem_case_id Private []
             [MkUnguarded (Abs (VarBinder ss unused_binder) desugared)]
           ] (mk_body alt_fail)
