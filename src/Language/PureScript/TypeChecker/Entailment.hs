@@ -361,12 +361,9 @@ entails SolverOptions{..} constraint context hints =
             mkDictionary (IsSymbolInstance sym) _ =
               let fields = [ ("reflectSymbol", Abs (VarBinder nullSourceSpan UnusedIdent) (Literal nullSourceSpan (StringLiteral sym))) ] in
               return $ TypeClassDictionaryConstructorApp C.IsSymbol (Literal nullSourceSpan (ObjectLiteral fields))
-            mkDictionary SymbolCompareInstance _ =
-              return $ TypeClassDictionaryConstructorApp C.SymbolCompare (Literal nullSourceSpan (ObjectLiteral []))
-            mkDictionary SymbolConsInstance _ =
-              return $ TypeClassDictionaryConstructorApp C.SymbolCons (Literal nullSourceSpan (ObjectLiteral []))
-            mkDictionary SymbolAppendInstance _ =
-              return $ TypeClassDictionaryConstructorApp C.SymbolAppend (Literal nullSourceSpan (ObjectLiteral []))
+            mkDictionary SymbolCompareInstance _ = return valUndefined
+            mkDictionary SymbolConsInstance _ = return valUndefined
+            mkDictionary SymbolAppendInstance _ = return valUndefined
 
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr
