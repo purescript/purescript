@@ -22,7 +22,7 @@ egBA :: SProxy "BA"
 egBA = Symbol.append symB symA
 
 egA' :: SProxy "A"
-egA' = Symbol.append sym (append symA sym)
+egA' = Symbol.append sym (Symbol.append symA sym)
 
 main = do
   let gotAB = reflectSymbol egAB == "AB"
