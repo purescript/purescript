@@ -3,8 +3,9 @@ module Main where
 
 import Prelude
 import Effect
-import Control.Monad.ST
+import Control.Monad.ST as ST
+import Control.Monad.ST.Ref as STRef
 
 test _ = do
-  r <- runST (newSTRef 0)
+  let r = ST.run (STRef.new 0)
   pure 0

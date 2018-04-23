@@ -3,7 +3,7 @@
 module Main where
 
 import Prelude hiding (one)
-import Effect hiding (Effect)
+import Effect hiding (untilE)
 
 main :: Effect Unit
 main = pure unit

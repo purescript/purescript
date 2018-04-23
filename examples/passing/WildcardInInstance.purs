@@ -4,18 +4,18 @@ import Prelude
 import Effect
 import Effect.Console
 
-class Monad m <= MonadEffect m where
-  liftEffect :: forall a. Effect a -> m a
+class Monad m <= MonadAsk r m | m -> r where
+  ask :: m r
 
-instance monadEffectEffect :: MonadEffect Effect where
-  liftEffect = identity
+instance monadAskFun :: MonadAsk r ((->) r) where
+  ask = identity
 
 -- This should generate a warning with the correct inferred type.
-test :: forall m. MonadEffect m => m Unit
-test = liftEffect $ log "Done"
-
-test1 :: Effect Unit
-test1 = liftEffect $ log "Done"
+test :: forall m. MonadAsk _ m  => m Int
+test = do
+  x <- ask
+  pure (x + 1)
 
 main :: Effect Unit
-main = test
+main = do
+  log "Done"
