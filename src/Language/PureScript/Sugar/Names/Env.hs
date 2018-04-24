@@ -220,7 +220,7 @@ primTypeErrorExports = mkPrimExports primTypeErrorTypes primTypeErrorClasses pri
 -- |
 -- Create a set of exports for a Prim module.
 --
-mkPrimExports 
+mkPrimExports
   :: M.Map (Qualified (ProperName 'TypeName)) a
   -> M.Map (Qualified (ProperName 'ClassName)) b
   -> S.Set (Qualified (ProperName 'KindName))
@@ -454,11 +454,12 @@ getExports env mn =
 checkImportConflicts
   :: forall m a
    . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
-  => ModuleName
+  => SourceSpan
+  -> ModuleName
   -> (a -> Name)
   -> [ImportRecord a]
   -> m (ModuleName, ModuleName)
-checkImportConflicts currentModule toName xs =
+checkImportConflicts ss currentModule toName xs =
   let
     byOrig = sortBy (compare `on` importSourceModule) xs
     groups = groupBy ((==) `on` importSourceModule) byOrig
@@ -468,11 +469,11 @@ checkImportConflicts currentModule toName xs =
   in
     if length groups > 1
     then case nonImplicit of
-      [ImportRecord (Qualified (Just mnNew) _) mnOrig ss _] -> do
+      [ImportRecord (Qualified (Just mnNew) _) mnOrig ss' _] -> do
         let warningModule = if mnNew == currentModule then Nothing else Just mnNew
-        tell . errorMessage' ss $ ScopeShadowing name warningModule $ delete mnNew conflictModules
+        tell . errorMessage' ss' $ ScopeShadowing name warningModule $ delete mnNew conflictModules
         return (mnNew, mnOrig)
-      _ -> throwError . errorMessage $ ScopeConflict name conflictModules
+      _ -> throwError . errorMessage' ss $ ScopeConflict name conflictModules
     else
       let ImportRecord (Qualified (Just mnNew) _) mnOrig _ _ = head byOrig
       in return (mnNew, mnOrig)

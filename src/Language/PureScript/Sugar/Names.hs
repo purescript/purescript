@@ -396,7 +396,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
       -- re-exports. If there are multiple options for the name to resolve to
       -- in scope, we throw an error.
       (Just options, _) -> do
-        (mnNew, mnOrig) <- checkImportConflicts mn toName options
+        (mnNew, mnOrig) <- checkImportConflicts pos mn toName options
         modify $ \usedImports ->
           M.insertWith (++) mnNew [fmap toName qname] usedImports
         return $ Qualified (Just mnOrig) name
