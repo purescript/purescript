@@ -1,6 +1,6 @@
 -- @shouldFailWith ErrorParsingModule
 module Bad_Module where
 
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 main = log "Done"

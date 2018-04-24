@@ -2,11 +2,11 @@ module Main where
 
 import Prelude
 import Eg (Foo'(Bar'), (:->))
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Console (CONSOLE, log)
+import Effect (Effect)
+import Effect.Console (log)
 
 bar' :: Foo'
 bar' = 4 :-> 5
 
-main :: forall e. Eff (console :: CONSOLE | e) Unit
+main :: Effect Unit
 main = case bar' of Bar' l r -> log "Done"

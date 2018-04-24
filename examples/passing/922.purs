@@ -2,7 +2,7 @@ module Main where
 
 import Prelude
 
-import Control.Monad.Eff.Console
+import Effect.Console
 
 class Default a where
   def :: a

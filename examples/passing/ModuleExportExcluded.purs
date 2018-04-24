@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console (log, logShow)
+import Effect.Console (log, logShow)
 import A (foo)
 
 otherwise = false

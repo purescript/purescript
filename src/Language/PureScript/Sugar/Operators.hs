@@ -197,19 +197,13 @@ rebracketModule pred_ valueOpTable typeOpTable (Module ss coms mn ds exts) =
   (f, _, _) =
       everywhereOnValuesTopDownM
         goDecl
-        (goExpr <=< decontextify goExpr')
-        (goBinder <=< decontextify goBinder')
+        (matchExprOperators valueOpTable <=< decontextify goExpr')
+        (matchBinderOperators valueOpTable <=< decontextify goBinder')
 
   (goDecl, goExpr', goBinder') = updateTypes (const goType)
 
-  goExpr :: Expr -> m Expr
-  goExpr = return . matchExprOperators valueOpTable
-
-  goBinder :: Binder -> m Binder
-  goBinder = return . matchBinderOperators valueOpTable
-
   goType :: Type -> m Type
-  goType = return . matchTypeOperators typeOpTable
+  goType = matchTypeOperators typeOpTable
 
   decontextify :: (Maybe SourceSpan -> a -> m (Maybe SourceSpan, a)) -> a -> m a
   decontextify ctxf = fmap snd . ctxf Nothing

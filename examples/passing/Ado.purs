@@ -1,8 +1,8 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console (log)
-import Control.Monad.Eff.Ref (newRef, writeRef, readRef)
+import Effect.Console (log)
+import Effect.Ref as Ref
 
 data Maybe a = Nothing | Just a
 
@@ -67,10 +67,10 @@ test11 = \_ -> ado
   in show (x :: Int) <> y <> show (z :: Array Int)
 
 main = do
-  r <- newRef "X"
+  r <- Ref.new "X"
   log =<< ado
-    _ <- writeRef r "D"
-    a <- readRef r
+    _ <- Ref.write "D" r
+    a <- Ref.read r
     b <- pure "o"
     let c = "n"
     d <- pure "e"

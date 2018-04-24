@@ -1,8 +1,8 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Console (log, CONSOLE)
+import Effect (Effect)
+import Effect.Console (log)
 
 data Foo = X | Y
 
@@ -12,7 +12,7 @@ what x = case _, x, _ of
   0, Y, true → X
   _, _, _ → Y
 
-main :: forall e. Eff (console :: CONSOLE | e) Unit
+main :: Effect Unit
 main = do
   let tmp = what Y 0 true
   log "Done"

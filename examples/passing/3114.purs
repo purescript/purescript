@@ -5,8 +5,8 @@ import Prelude
 import Data.Either
 import Data.Maybe
 import Data.Tuple
-import Control.Monad.Eff
-import Control.Monad.Eff.Console (log)
+import Effect
+import Effect.Console (log)
 import VendoredVariant
 import Data.Symbol
 
@@ -21,7 +21,7 @@ _foo = SProxy
 _bar :: SProxy "bar"
 _bar = SProxy
 
-main :: Eff _ Unit
+main :: Effect Unit
 main = do
   let
     -- with the type signatures on `a`, this compiles fine.

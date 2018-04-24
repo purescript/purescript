@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 test1 :: (forall a. (a -> a)) -> Number
 test1 = \f -> f 0.0

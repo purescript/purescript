@@ -16,7 +16,14 @@ import Language.PureScript.Docs.Types
 import qualified Language.PureScript as P
 
 primModules :: [Module]
-primModules = [primDocsModule, primRowDocsModule, primTypeErrorDocsModule]
+primModules =
+  [ primDocsModule
+  , primOrderingDocsModule
+  , primRowDocsModule
+  , primRowListDocsModule
+  , primSymbolDocsModule
+  , primTypeErrorDocsModule
+  ]
 
 primDocsModule :: Module
 primDocsModule = Module
@@ -38,10 +45,23 @@ primDocsModule = Module
   , modReExports = []
   }
 
+primOrderingDocsModule :: Module
+primOrderingDocsModule = Module
+  { modName = P.moduleNameFromString "Prim.Ordering"
+  , modComments = Just "The Prim.Row module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains a type level `Ordering` data structure."
+  , modDeclarations =
+      [ kindOrdering
+      , orderingLT
+      , orderingEQ
+      , orderingGT
+      ]
+  , modReExports = []
+  }
+
 primRowDocsModule :: Module
 primRowDocsModule = Module
   { modName = P.moduleNameFromString "Prim.Row"
-  , modComments = Just "The Prim.Row module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains automatically solved classes for working with row types."
+  , modComments = Just "The Prim.Row module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains automatically solved type classes for working with row types."
   , modDeclarations =
       [ union
       , nub
@@ -51,10 +71,35 @@ primRowDocsModule = Module
   , modReExports = []
   }
 
+primRowListDocsModule :: Module
+primRowListDocsModule = Module
+  { modName = P.moduleNameFromString "Prim.RowList"
+  , modComments = Just "The Prim.RowList module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains a type level list (`RowList`) that represents an ordered view of a row of types."
+  , modDeclarations =
+      [ kindRowList
+      , rowListCons
+      , rowListNil
+      , rowToList
+      ]
+  , modReExports = []
+  }
+
+primSymbolDocsModule :: Module
+primSymbolDocsModule = Module
+  { modName = P.moduleNameFromString "Prim.Symbol"
+  , modComments = Just "The Prim.Symbol module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains automatically solved type classes for working with `Symbols`."
+  , modDeclarations =
+      [ symbolAppend
+      , symbolCompare
+      , symbolCons
+      ]
+  , modReExports = []
+  }
+
 primTypeErrorDocsModule :: Module
 primTypeErrorDocsModule = Module
   { modName = P.moduleNameFromString "Prim.TypeError"
-  , modComments = Just "The Prim.TypeError module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains classes that provide custom type error and warning functionality."
+  , modComments = Just "The Prim.TypeError module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains type classes that provide custom type error and warning functionality."
   , modDeclarations =
       [ warn
       , fail
@@ -89,7 +134,7 @@ primKindOf
   -> Text
   -> Declaration
 primKindOf g title comments =
-  if Set.member (g title) P.primKinds
+  if Set.member (g title) P.allPrimKinds
      then Declaration
           { declTitle = title
           , declComments = Just comments
@@ -106,7 +151,13 @@ lookupPrimTypeKindOf
   :: NameGen 'P.TypeName
   -> Text
   -> P.Kind
-lookupPrimTypeKindOf k = fst . unsafeLookupOf k (P.primTypes <> P.primRowTypes <> P.primTypeErrorTypes) "Docs.Prim: No such Prim type: "
+lookupPrimTypeKindOf k = fst . unsafeLookupOf k
+  ( P.primTypes <>
+    P.primOrderingTypes <>
+    P.primRowTypes <>
+    P.primRowListTypes <>
+    P.primTypeErrorTypes
+  ) "Docs.Prim: No such Prim type: "
 
 primType :: Text -> Text -> Declaration
 primType = primTypeOf P.primName
@@ -123,7 +174,13 @@ primTypeOf gen title comments = Declaration
 -- | Lookup the TypeClassData of a Prim class. This function is specifically
 -- not exported because it is partial.
 lookupPrimClassOf :: NameGen 'P.ClassName -> Text -> P.TypeClassData
-lookupPrimClassOf g = unsafeLookupOf g (P.primClasses <> P.primTypeErrorClasses <> P.primRowClasses) "Docs.Prim: No such Prim class: "
+lookupPrimClassOf g = unsafeLookupOf g
+  ( P.primClasses <>
+    P.primRowClasses <>
+    P.primRowListClasses <>
+    P.primSymbolClasses <>
+    P.primTypeErrorClasses
+  ) "Docs.Prim: No such Prim class: "
 
 primClass :: Text -> Text -> Declaration
 primClass = primClassOf P.primName
@@ -273,22 +330,26 @@ partial = primClass "Partial" $ T.unlines
   , "[the Partial type class guide](https://github.com/purescript/documentation/blob/master/guides/The-Partial-type-class.md)."
   ]
 
-fail :: Declaration
-fail = primClassOf (P.primSubName "TypeError") "Fail" $ T.unlines
-  [ "The Fail type class is part of the custom type errors feature. To provide"
-  , "a custom type error when someone tries to use a particular instance,"
-  , "write that instance out with a Fail constraint."
-  , ""
-  , "For more information, see"
-  , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
+kindOrdering :: Declaration
+kindOrdering = primKindOf (P.primSubName "Ordering") "Ordering" $ T.unlines
+  [ "The `Ordering` kind represents the three possibilites of comparing two"
+  , "types of the same kind: `LT` (less than), `EQ` (equal to), and"
+  , "`GT` (greater than)."
   ]
 
-warn :: Declaration
-warn = primClassOf (P.primSubName "TypeError") "Warn" $ T.unlines
-  [ "The Warn type class allows a custom compiler warning to be displayed."
-  , ""
-  , "For more information, see"
-  , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
+orderingLT :: Declaration
+orderingLT = primTypeOf (P.primSubName "Ordering") "LT" $ T.unlines
+  [ "The 'less than' ordering type."
+  ]
+
+orderingEQ :: Declaration
+orderingEQ = primTypeOf (P.primSubName "Ordering") "EQ" $ T.unlines
+  [ "The 'equal to' ordering type."
+  ]
+
+orderingGT :: Declaration
+orderingGT = primTypeOf (P.primSubName "Ordering") "GT" $ T.unlines
+  [ "The 'greater than' ordering type."
   ]
 
 union :: Declaration
@@ -314,6 +375,66 @@ rowCons = primClassOf (P.primSubName "Row") "Cons" $ T.unlines
   [ "The Cons type class is a 4-way relation which asserts that one row of"
   , "types can be obtained from another by inserting a new label/type pair on"
   , "the left."
+  ]
+
+kindRowList :: Declaration
+kindRowList = primKindOf (P.primSubName "RowList") "RowList" $ T.unlines
+  [ "A type level list representation of a row of types."
+  ]
+
+rowListCons :: Declaration
+rowListCons = primTypeOf (P.primSubName "RowList") "Cons" $ T.unlines
+  [ "Constructs a new `RowList` from a label, a type, and an existing tail"
+  , "`RowList`.  E.g: `Cons \"x\" Int (Cons \"y\" Int Nil)`."
+  ]
+
+rowListNil :: Declaration
+rowListNil = primTypeOf (P.primSubName "RowList") "Nil" $ T.unlines
+  [ "The empty `RowList`."
+  ]
+
+rowToList :: Declaration
+rowToList = primTypeOf (P.primSubName "RowList") "RowToList" $ T.unlines
+  [ "Compiler solved type class for generating a `RowList` from a closed row"
+  , "of types.  Entries are sorted by label and duplicates are preserved in"
+  , "the order they appeared in the row."
+  ]
+
+symbolAppend :: Declaration
+symbolAppend = primClassOf (P.primSubName "Symbol") "Append" $ T.unlines
+  [ "Compiler solved type class for appending `Symbol`s together."
+  ]
+
+symbolCompare :: Declaration
+symbolCompare = primClassOf (P.primSubName "Symbol") "Compare" $ T.unlines
+  [ "Compiler solved type class for comparing two `Symbol`s."
+  , "Produces an `Ordering`."
+  ]
+
+symbolCons :: Declaration
+symbolCons = primClassOf (P.primSubName "Symbol") "Cons" $ T.unlines
+  [ "Compiler solved type class for either splitting up a symbol into its"
+  , "head and tail or for combining a head and tail into a new symbol."
+  , "Requires the head to be a single character and the combined string"
+  , "cannot be empty."
+  ]
+
+fail :: Declaration
+fail = primClassOf (P.primSubName "TypeError") "Fail" $ T.unlines
+  [ "The Fail type class is part of the custom type errors feature. To provide"
+  , "a custom type error when someone tries to use a particular instance,"
+  , "write that instance out with a Fail constraint."
+  , ""
+  , "For more information, see"
+  , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
+  ]
+
+warn :: Declaration
+warn = primClassOf (P.primSubName "TypeError") "Warn" $ T.unlines
+  [ "The Warn type class allows a custom compiler warning to be displayed."
+  , ""
+  , "For more information, see"
+  , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
   ]
 
 kindDoc :: Declaration
@@ -359,3 +480,4 @@ aboveDoc = primTypeOf (P.primSubName "TypeError") "Above" $ T.unlines
   , "For more information, see"
   , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
   ]
+

@@ -1,8 +1,8 @@
 module Main where
 
 import Prelude hiding (apply)
-import Control.Monad.Eff
-import Control.Monad.Eff.Console
+import Effect
+import Effect.Console
 
 newtype Thing = Thing String
 

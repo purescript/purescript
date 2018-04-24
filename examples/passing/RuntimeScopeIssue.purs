@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console (log, logShow)
+import Effect.Console (log, logShow)
 
 class A a where
   a :: a -> Boolean

@@ -2,7 +2,7 @@ module Main where
 
 import Prelude ((==), (/=), (<>), discard)
 import Test.Assert (assert, assert')
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 singleCharacter = "\0\b\t\n\v\f\r\"\\" == "\x0\x8\x9\xA\xB\xC\xD\x22\x5C"
 hex = "\x1D306\x2603\x3C6\xE0\x0" == "𝌆☃φà\0"

@@ -1,9 +1,9 @@
 module Main where
 
   import Prelude (Unit, bind, discard, (==))
-  import Control.Monad.Eff (Eff)
-  import Control.Monad.Eff.Console (CONSOLE, log)
-  import Test.Assert (ASSERT, assert')
+  import Effect (Effect)
+  import Effect.Console (log)
+  import Test.Assert (assert')
   import List (List(..), (:))
   import List as L
 
@@ -26,7 +26,7 @@ module Main where
   get3 _ (_ ! (x ! _)) = x
   get3 y _ = y
 
-  main ∷ Eff (assert ∷ ASSERT, console ∷ CONSOLE) Unit
+  main ∷ Effect Unit
   main = do
     assert' "Incorrect result!" (get1 0 (1 : 2 : 3 : Nil) == 2)
     assert' "Incorrect result!" (get2 0 (1 ! (2 ! (3 ! Nil))) == 2)

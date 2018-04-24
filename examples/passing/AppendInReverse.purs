@@ -2,16 +2,16 @@ module Main where
 
 import Prelude
 import Data.Symbol (SProxy(..))
-import Type.Data.Symbol (class AppendSymbol)
-import Control.Monad.Eff.Console (log)
+import Prim.Symbol (class Append)
+import Effect.Console (log)
 
 class Balanced (sym :: Symbol)
 
 instance balanced1 :: Balanced ""
 else
 instance balanced2
-  :: ( AppendSymbol "(" sym1 sym
-     , AppendSymbol sym2 ")" sym1
+  :: ( Append "(" sym1 sym
+     , Append sym2 ")" sym1
      , Balanced sym2
      ) => Balanced sym
 

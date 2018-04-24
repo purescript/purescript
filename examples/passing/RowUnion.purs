@@ -2,8 +2,8 @@ module Main where
 
 import Prelude
 import Prim.Row
-import Control.Monad.Eff
-import Control.Monad.Eff.Console
+import Effect
+import Effect.Console
 
 foreign import merge
   :: forall r1 r2 r3
@@ -51,7 +51,7 @@ test4 = withDefaults { x: 1, y: 2 }
 class Subrow (r :: # Type) (s :: # Type)
 instance subrow :: Union r t s => Subrow r s
 
-main :: Eff (console :: CONSOLE) Unit
+main :: Effect Unit
 main = do
   logShow test1.x
   logShow test1.y

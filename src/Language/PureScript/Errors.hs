@@ -180,6 +180,8 @@ errorCode em = case unwrapErrorMessage em of
   UserDefinedWarning{} -> "UserDefinedWarning"
   UnusableDeclaration{} -> "UnusableDeclaration"
   CannotDefinePrimModules{} -> "CannotDefinePrimModules"
+  MixedAssociativityError{} -> "MixedAssociativityError"
+  NonAssociativeError{} -> "NonAssociativeError"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -996,6 +998,27 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
         [ line $ "The module name " <> markCode (runModuleName mn) <> " is in the Prim namespace."
         , line $ "The Prim namespace is reserved for compiler-defined terms."
         ]
+
+    renderSimpleErrorMessage (MixedAssociativityError opsWithAssoc) =
+      paras
+        [ line "Cannot parse an expression that uses operators of the same precedence but mixed associativity:"
+        , indent $ paras $ map (\(name, assoc) -> line $ markCode (showQualified showOp name) <> " is " <> markCode (T.pack (showAssoc assoc))) (NEL.toList opsWithAssoc)
+        , line "Use parentheses to resolve this ambiguity."
+        ]
+
+    renderSimpleErrorMessage (NonAssociativeError ops) =
+      if NEL.length ops == 1
+        then
+          paras
+            [ line $ "Cannot parse an expression that uses multiple instances of the non-associative operator " <> markCode (showQualified showOp (NEL.head ops)) <> "."
+            , line "Use parentheses to resolve this ambiguity."
+            ]
+        else
+          paras
+            [ line "Cannot parse an expression that uses multiple non-associative operators of the same precedence:"
+            , indent $ paras $ map (line . markCode . showQualified showOp) (NEL.toList ops)
+            , line "Use parentheses to resolve this ambiguity."
+            ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1 t2) detail =

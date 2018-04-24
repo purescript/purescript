@@ -1,7 +1,7 @@
 module Main where
 
 import Lib (X, Y)
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 idX :: X -> X
 idX x = x
