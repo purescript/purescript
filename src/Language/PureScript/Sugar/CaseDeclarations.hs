@@ -68,7 +68,7 @@ desugarGuardedExprs ss (Case scrut alternatives)
            , ValueDecl (ss, []) scrut_id Private [] [MkUnguarded e]
            )
       )
-    Let scrut_decls <$> desugarGuardedExprs ss (Case scrut' alternatives)
+    Let FromLet scrut_decls <$> desugarGuardedExprs ss (Case scrut' alternatives)
   where
     isTrivialExpr (Var _ _) = True
     isTrivialExpr (Literal _ _) = True
@@ -230,7 +230,7 @@ desugarGuardedExprs ss (Case scrut alternatives) =
             `App` Literal ss (BooleanLiteral True)
           alt_fail = [CaseAlternative [NullBinder] [MkUnguarded goto_rem_case]]
 
-        pure $ Let [
+        pure $ Let FromLet [
           ValueDecl (ss, []) rem_case_id Private []
             [MkUnguarded (Abs (VarBinder ss unused_binder) desugared)]
           ] (mk_body alt_fail)
@@ -333,7 +333,7 @@ desugarCases = desugarRest <=< fmap join . flip parU toDecls . groupBy inSameGro
           f' = mapM (\(GuardedExpr gs e) -> GuardedExpr gs <$> f e)
       in (:) <$> (ValueDecl sa name nameKind bs <$> f' result) <*> desugarRest rest
       where
-      go (Let ds val') = Let <$> desugarCases ds <*> pure val'
+      go (Let w ds val') = Let w <$> desugarCases ds <*> pure val'
       go other = return other
     desugarRest (d : ds) = (:) d <$> desugarRest ds
     desugarRest [] = pure []

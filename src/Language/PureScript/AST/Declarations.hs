@@ -770,7 +770,7 @@ data Expr
   -- |
   -- A let binding
   --
-  | Let [Declaration] Expr
+  | Let WhereProvenance [Declaration] Expr
   -- |
   -- A do-notation block
   --
@@ -814,6 +814,20 @@ data Expr
   -- A value with source position information
   --
   | PositionedValue SourceSpan [Comment] Expr
+  deriving (Show)
+
+-- |
+-- Metadata that tells where a let binding originated
+--
+data WhereProvenance
+  -- |
+  -- The let binding was originally a where clause
+  --
+  = FromWhere
+  -- |
+  -- The let binding was always a let binding
+  --
+  | FromLet
   deriving (Show)
 
 -- |

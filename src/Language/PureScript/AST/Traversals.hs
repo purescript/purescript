@@ -75,7 +75,7 @@ everywhereOnValues f g h = (f', g', h')
   g' (IfThenElse v1 v2 v3) = g (IfThenElse (g' v1) (g' v2) (g' v3))
   g' (Case vs alts) = g (Case (fmap g' vs) (fmap handleCaseAlternative alts))
   g' (TypedValue check v ty) = g (TypedValue check (g' v) ty)
-  g' (Let ds v) = g (Let (fmap f' ds) (g' v))
+  g' (Let w ds v) = g (Let w (fmap f' ds) (g' v))
   g' (Do es) = g (Do (fmap handleDoNotationElement es))
   g' (Ado es v) = g (Ado (fmap handleDoNotationElement es) (g' v))
   g' (PositionedValue pos com v) = g (PositionedValue pos com (g' v))
@@ -149,7 +149,7 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   g' (IfThenElse v1 v2 v3) = IfThenElse <$> (g v1 >>= g') <*> (g v2 >>= g') <*> (g v3 >>= g')
   g' (Case vs alts) = Case <$> traverse (g' <=< g) vs <*> traverse handleCaseAlternative alts
   g' (TypedValue check v ty) = TypedValue check <$> (g v >>= g') <*> pure ty
-  g' (Let ds v) = Let <$> traverse (f' <=< f) ds <*> (g v >>= g')
+  g' (Let w ds v) = Let w <$> traverse (f' <=< f) ds <*> (g v >>= g')
   g' (Do es) = Do <$> traverse handleDoNotationElement es
   g' (Ado es v) = Ado <$> traverse handleDoNotationElement es <*> (g v >>= g')
   g' (PositionedValue pos com v) = PositionedValue pos com <$> (g v >>= g')
@@ -218,7 +218,7 @@ everywhereOnValuesM f g h = (f', g', h')
   g' (IfThenElse v1 v2 v3) = (IfThenElse <$> g' v1 <*> g' v2 <*> g' v3) >>= g
   g' (Case vs alts) = (Case <$> traverse g' vs <*> traverse handleCaseAlternative alts) >>= g
   g' (TypedValue check v ty) = (TypedValue check <$> g' v <*> pure ty) >>= g
-  g' (Let ds v) = (Let <$> traverse f' ds <*> g' v) >>= g
+  g' (Let w ds v) = (Let w <$> traverse f' ds <*> g' v) >>= g
   g' (Do es) = (Do <$> traverse handleDoNotationElement es) >>= g
   g' (Ado es v) = (Ado <$> traverse handleDoNotationElement es <*> g' v) >>= g
   g' (PositionedValue pos com v) = (PositionedValue pos com <$> g' v) >>= g
@@ -290,7 +290,7 @@ everythingOnValues (<>) f g h i j = (f', g', h', i', j')
   g' v@(IfThenElse v1 v2 v3) = g v <> g' v1 <> g' v2 <> g' v3
   g' v@(Case vs alts) = foldl (<>) (foldl (<>) (g v) (fmap g' vs)) (fmap i' alts)
   g' v@(TypedValue _ v1 _) = g v <> g' v1
-  g' v@(Let ds v1) = foldl (<>) (g v) (fmap f' ds) <> g' v1
+  g' v@(Let _ ds v1) = foldl (<>) (g v) (fmap f' ds) <> g' v1
   g' v@(Do es) = foldl (<>) (g v) (fmap j' es)
   g' v@(Ado es v1) = foldl (<>) (g v) (fmap j' es) <> g' v1
   g' v@(PositionedValue _ _ v1) = g v <> g' v1
@@ -371,7 +371,7 @@ everythingWithContextOnValues s0 r0 (<>) f g h i j = (f'' s0, g'' s0, h'' s0, i'
   g' s (IfThenElse v1 v2 v3) = g'' s v1 <> g'' s v2 <> g'' s v3
   g' s (Case vs alts) = foldl (<>) (foldl (<>) r0 (fmap (g'' s) vs)) (fmap (i'' s) alts)
   g' s (TypedValue _ v1 _) = g'' s v1
-  g' s (Let ds v1) = foldl (<>) r0 (fmap (f'' s) ds) <> g'' s v1
+  g' s (Let _ ds v1) = foldl (<>) r0 (fmap (f'' s) ds) <> g'' s v1
   g' s (Do es) = foldl (<>) r0 (fmap (j'' s) es)
   g' s (Ado es v1) = foldl (<>) r0 (fmap (j'' s) es) <> g'' s v1
   g' s (PositionedValue _ _ v1) = g'' s v1
@@ -456,7 +456,7 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   g' s (IfThenElse v1 v2 v3) = IfThenElse <$> g'' s v1 <*> g'' s v2 <*> g'' s v3
   g' s (Case vs alts) = Case <$> traverse (g'' s) vs <*> traverse (i'' s) alts
   g' s (TypedValue check v ty) = TypedValue check <$> g'' s v <*> pure ty
-  g' s (Let ds v) = Let <$> traverse (f'' s) ds <*> g'' s v
+  g' s (Let w ds v) = Let w <$> traverse (f'' s) ds <*> g'' s v
   g' s (Do es) = Do <$> traverse (j'' s) es
   g' s (Ado es v) = Ado <$> traverse (j'' s) es <*> g'' s v
   g' s (PositionedValue pos com v) = PositionedValue pos com <$> g'' s v
@@ -548,7 +548,7 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   g' s (IfThenElse v1 v2 v3) = g'' s v1 <> g'' s v2 <> g'' s v3
   g' s (Case vs alts) = foldMap (g'' s) vs <> foldMap (i'' s) alts
   g' s (TypedValue _ v1 _) = g'' s v1
-  g' s (Let ds v1) =
+  g' s (Let _ ds v1) =
     let s' = S.union s (S.fromList (mapMaybe getDeclIdent ds))
     in foldMap (f'' s') ds <> g'' s' v1
   g' s (Do es) = fold . snd . mapAccumL j'' s $ es

@@ -78,7 +78,7 @@ parseValueWithWhereClause = do
     reserved "where"
     indented
     mark $ P.many1 (same *> parseLocalDeclaration)
-  return $ maybe value (`Let` value) whereClause
+  return $ maybe value (\ds -> Let FromWhere ds value) whereClause
 
 parseValueWithIdentAndBinders :: Ident -> [Binder] -> TokenParser (SourceAnn -> Declaration)
 parseValueWithIdentAndBinders ident bs = do
@@ -433,7 +433,7 @@ parseLet = do
   indented
   reserved "in"
   result <- parseValue
-  return $ Let ds result
+  return $ Let FromLet ds result
 
 parseValueAtom :: TokenParser Expr
 parseValueAtom = withSourceSpan PositionedValue $ P.choice

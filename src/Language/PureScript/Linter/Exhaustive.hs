@@ -290,6 +290,7 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
     var <- freshName
     return $
       Let
+        FromLet
         [ partial var tyVar ]
         $ App (Var ss (Qualified Nothing UnusedIdent)) e
     where
@@ -349,7 +350,7 @@ checkExhaustiveExpr initSS env mn = onExpr initSS
     case' <- Case <$> mapM (onExpr ss) es <*> mapM (onCaseAlternative ss) cas
     checkExhaustive ss env mn (length es) cas case'
   onExpr ss (TypedValue x e y) = TypedValue x <$> onExpr ss e <*> pure y
-  onExpr ss (Let ds e) = Let <$> mapM onDecl ds <*> onExpr ss e
+  onExpr ss (Let w ds e) = Let w <$> mapM onDecl ds <*> onExpr ss e
   onExpr _ (PositionedValue ss x e) = PositionedValue ss x <$> onExpr ss e
   onExpr _ expr = return expr
 

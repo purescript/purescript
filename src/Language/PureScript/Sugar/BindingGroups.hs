@@ -58,7 +58,7 @@ createBindingGroups moduleName = mapM f <=< handleDecls
   (f, _, _) = everywhereOnValuesTopDownM return handleExprs return
 
   handleExprs :: Expr -> m Expr
-  handleExprs (Let ds val) = flip Let val <$> handleDecls ds
+  handleExprs (Let w ds val) = (\ds' -> Let w ds' val) <$> handleDecls ds
   handleExprs other = return other
 
   -- |
@@ -102,7 +102,7 @@ collapseBindingGroups =
   go other = [other]
 
 collapseBindingGroupsForValue :: Expr -> Expr
-collapseBindingGroupsForValue (Let ds val) = Let (collapseBindingGroups ds) val
+collapseBindingGroupsForValue (Let w ds val) = Let w (collapseBindingGroups ds) val
 collapseBindingGroupsForValue other = other
 
 usedIdents :: ModuleName -> ValueDeclarationData Expr -> [Ident]
