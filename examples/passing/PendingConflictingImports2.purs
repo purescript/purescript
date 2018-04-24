@@ -1,7 +1,7 @@
 module Main where
 
 import A
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 -- No error as we never force `thing` to be resolved in `Main`
 thing :: Int

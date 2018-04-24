@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 instance fooNumber :: Foo Number where
   foo = 0.0

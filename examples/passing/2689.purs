@@ -1,11 +1,11 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console
+import Effect.Console
 import Data.Array.Partial
 import Partial.Unsafe
 
-sumTCObug = go id where 
+sumTCObug = go identity where 
   go f 0 = f 
   go f n =
     let
@@ -13,7 +13,7 @@ sumTCObug = go id where
     in
       go f' 0
 
-sumTCObug' = go id where 
+sumTCObug' = go identity where 
   go f 0 = f
   go f n = go (\a -> n + a) 0
 

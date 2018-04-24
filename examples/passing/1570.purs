@@ -1,6 +1,6 @@
 module Main where
 
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 test :: forall a. a -> a
 test = \(x :: a) -> x

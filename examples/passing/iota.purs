@@ -1,6 +1,6 @@
 module Main where
 
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 s = \x -> \y -> \z -> x z (y z)
 

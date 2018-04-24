@@ -2,8 +2,8 @@
 module Main where
 
 import Prelude (Unit, unit, pure)
-import Control.Monad.Eff (Eff)
+import Effect (Effect)
 import Lib (type (~>), natId)
 
-main :: Eff () Unit
+main :: Effect Unit
 main = natId (pure unit)

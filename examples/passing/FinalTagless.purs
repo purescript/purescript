@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude hiding (add)
-import Control.Monad.Eff.Console (log, logShow)
+import Effect.Console (log, logShow)
 
 class E e where
   num :: Number -> e Number

@@ -3,13 +3,13 @@ module Main where
 
 import Prelude
 
-import Control.Monad.Eff (Eff)
+import Effect (Effect)
 
 test :: forall m. Monad m => Int -> m Unit
 test x =
   let x = unit
   in pure x
 
-main :: Eff () Unit
+main :: Effect Unit
 main = test 42
 

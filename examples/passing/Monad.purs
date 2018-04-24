@@ -1,6 +1,6 @@
 module Main where
 
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 type Monad m = { return :: forall a. a -> m a
 	 , bind :: forall a b. m a -> (a -> m b) -> m b }

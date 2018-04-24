@@ -3,7 +3,7 @@
 module Main where
 
 import Prelude hiding (one)
-import Control.Monad.Eff hiding (runPure)
+import Effect hiding (untilE)
 
-main :: Eff () Unit
+main :: Effect Unit
 main = pure unit

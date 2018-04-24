@@ -359,56 +359,6 @@ fromSpine = "fromSpine"
 toSignature :: forall a. (IsString a) => a
 toSignature = "toSignature"
 
--- Data.Symbol
-
-pattern DataSymbol :: ModuleName
-pattern DataSymbol = ModuleName [ProperName "Data", ProperName "Symbol"]
-
-pattern IsSymbol :: Qualified (ProperName 'ClassName)
-pattern IsSymbol = Qualified (Just DataSymbol) (ProperName "IsSymbol")
-
--- Type.Data.Symbol
-
-pattern TypeDataSymbol :: ModuleName
-pattern TypeDataSymbol = ModuleName [ProperName "Type", ProperName "Data", ProperName "Symbol"]
-
-pattern CompareSymbol :: Qualified (ProperName 'ClassName)
-pattern CompareSymbol = Qualified (Just TypeDataSymbol) (ProperName "CompareSymbol")
-
-pattern AppendSymbol :: Qualified (ProperName 'ClassName)
-pattern AppendSymbol = Qualified (Just TypeDataSymbol) (ProperName "AppendSymbol")
-
-pattern ConsSymbol :: Qualified (ProperName 'ClassName)
-pattern ConsSymbol = Qualified (Just TypeDataSymbol) (ProperName "ConsSymbol")
-
--- Type.Data.Ordering
-
-typeDataOrdering :: ModuleName
-typeDataOrdering = ModuleName [ProperName "Type", ProperName "Data", ProperName "Ordering"]
-
-orderingLT :: Qualified (ProperName 'TypeName)
-orderingLT = Qualified (Just typeDataOrdering) (ProperName "LT")
-
-orderingEQ :: Qualified (ProperName 'TypeName)
-orderingEQ = Qualified (Just typeDataOrdering) (ProperName "EQ")
-
-orderingGT :: Qualified (ProperName 'TypeName)
-orderingGT = Qualified (Just typeDataOrdering) (ProperName "GT")
-
--- Type.Row
-
-pattern TypeRow :: ModuleName
-pattern TypeRow = ModuleName [ProperName "Type", ProperName "Row"]
-
-pattern RowToList :: Qualified (ProperName 'ClassName)
-pattern RowToList = Qualified (Just TypeRow) (ProperName "RowToList")
-
-pattern RowListNil :: Qualified (ProperName 'TypeName)
-pattern RowListNil = Qualified (Just TypeRow) (ProperName "Nil")
-
-pattern RowListCons :: Qualified (ProperName 'TypeName)
-pattern RowListCons = Qualified (Just TypeRow) (ProperName "Cons")
-
 -- Main module
 
 main :: forall a. (IsString a) => a
@@ -422,14 +372,72 @@ partial = "Partial"
 pattern Prim :: ModuleName
 pattern Prim = ModuleName [ProperName "Prim"]
 
+pattern Partial :: Qualified (ProperName 'ClassName)
+pattern Partial = Qualified (Just Prim) (ProperName "Partial")
+
+-- Prim.Ordering
+
+pattern PrimOrdering :: ModuleName
+pattern PrimOrdering = ModuleName [ProperName "Prim", ProperName "Ordering"]
+
+orderingLT :: Qualified (ProperName 'TypeName)
+orderingLT = Qualified (Just PrimOrdering) (ProperName "LT")
+
+orderingEQ :: Qualified (ProperName 'TypeName)
+orderingEQ = Qualified (Just PrimOrdering) (ProperName "EQ")
+
+orderingGT :: Qualified (ProperName 'TypeName)
+orderingGT = Qualified (Just PrimOrdering) (ProperName "GT")
+
+-- Prim.Row
+
 pattern PrimRow :: ModuleName
 pattern PrimRow = ModuleName [ProperName "Prim", ProperName "Row"]
 
+pattern RowUnion :: Qualified (ProperName 'ClassName)
+pattern RowUnion = Qualified (Just PrimRow) (ProperName "Union")
+
+pattern RowNub :: Qualified (ProperName 'ClassName)
+pattern RowNub = Qualified (Just PrimRow) (ProperName "Nub")
+
+pattern RowCons :: Qualified (ProperName 'ClassName)
+pattern RowCons = Qualified (Just PrimRow) (ProperName "Cons")
+
+pattern RowLacks :: Qualified (ProperName 'ClassName)
+pattern RowLacks = Qualified (Just PrimRow) (ProperName "Lacks")
+
+-- Prim.RowList
+
+pattern PrimRowList :: ModuleName
+pattern PrimRowList = ModuleName [ProperName "Prim", ProperName "RowList"]
+
+pattern RowToList :: Qualified (ProperName 'ClassName)
+pattern RowToList = Qualified (Just PrimRowList) (ProperName "RowToList")
+
+pattern RowListNil :: Qualified (ProperName 'TypeName)
+pattern RowListNil = Qualified (Just PrimRowList) (ProperName "Nil")
+
+pattern RowListCons :: Qualified (ProperName 'TypeName)
+pattern RowListCons = Qualified (Just PrimRowList) (ProperName "Cons")
+
+-- Prim.Symbol
+
+pattern PrimSymbol :: ModuleName
+pattern PrimSymbol = ModuleName [ProperName "Prim", ProperName "Symbol"]
+
+pattern SymbolCompare :: Qualified (ProperName 'ClassName)
+pattern SymbolCompare = Qualified (Just PrimSymbol) (ProperName "Compare")
+
+pattern SymbolAppend :: Qualified (ProperName 'ClassName)
+pattern SymbolAppend = Qualified (Just PrimSymbol) (ProperName "Append")
+
+pattern SymbolCons :: Qualified (ProperName 'ClassName)
+pattern SymbolCons = Qualified (Just PrimSymbol) (ProperName "Cons")
+
+-- Prim.TypeError
+
 pattern PrimTypeError :: ModuleName
 pattern PrimTypeError = ModuleName [ProperName "Prim", ProperName "TypeError"]
-
-pattern Partial :: Qualified (ProperName 'ClassName)
-pattern Partial = Qualified (Just Prim) (ProperName "Partial")
 
 pattern Fail :: Qualified (ProperName 'ClassName)
 pattern Fail = Qualified (Just PrimTypeError) (ProperName "Fail")
@@ -437,20 +445,22 @@ pattern Fail = Qualified (Just PrimTypeError) (ProperName "Fail")
 pattern Warn :: Qualified (ProperName 'ClassName)
 pattern Warn = Qualified (Just PrimTypeError) (ProperName "Warn")
 
-pattern Union :: Qualified (ProperName 'ClassName)
-pattern Union = Qualified (Just PrimRow) (ProperName "Union")
+-- Data.Symbol
 
-pattern Nub :: Qualified (ProperName 'ClassName)
-pattern Nub = Qualified (Just PrimRow) (ProperName "Nub")
+pattern DataSymbol :: ModuleName
+pattern DataSymbol = ModuleName [ProperName "Data", ProperName "Symbol"]
 
-pattern Lacks :: Qualified (ProperName 'ClassName)
-pattern Lacks = Qualified (Just PrimRow) (ProperName "Lacks")
-
-pattern RowCons :: Qualified (ProperName 'ClassName)
-pattern RowCons = Qualified (Just PrimRow) (ProperName "Cons")
+pattern IsSymbol :: Qualified (ProperName 'ClassName)
+pattern IsSymbol = Qualified (Just DataSymbol) (ProperName "IsSymbol")
 
 typ :: forall a. (IsString a) => a
 typ = "Type"
+
+kindOrdering :: forall a. (IsString a) => a
+kindOrdering = "Ordering"
+
+kindRowList :: forall a. (IsString a) => a
+kindRowList = "RowList"
 
 symbol :: forall a. (IsString a) => a
 symbol = "Symbol"
@@ -463,11 +473,20 @@ doc = "Doc"
 prim :: forall a. (IsString a) => a
 prim = "Prim"
 
+moduleOrdering :: forall a. (IsString a) => a
+moduleOrdering = "Ordering"
+
+moduleRow :: forall a. (IsString a) => a
+moduleRow = "Row"
+
+moduleRowList :: forall a. (IsString a) => a
+moduleRowList = "RowList"
+
+moduleSymbol :: forall a. (IsString a) => a
+moduleSymbol = "Symbol"
+
 typeError :: forall a. (IsString a) => a
 typeError = "TypeError"
-
-row :: forall a. (IsString a) => a
-row = "Row"
 
 prelude :: forall a. (IsString a) => a
 prelude = "Prelude"

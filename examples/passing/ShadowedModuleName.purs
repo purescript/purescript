@@ -1,7 +1,7 @@
 module Main where
 
 import Test
-import Control.Monad.Eff.Console
+import Effect.Console
 
 data Test = Test
 

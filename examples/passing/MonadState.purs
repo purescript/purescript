@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console
+import Effect.Console
 
 data Tuple a b = Tuple a b
 
@@ -56,7 +56,7 @@ modify f =
     put (same f s)
   where
     same :: forall a. (a -> a) -> (a -> a)
-    same = id
+    same = identity
 
 main = do
   logShow $ runState 0 (modify (_ + 1))

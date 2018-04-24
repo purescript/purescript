@@ -1,6 +1,6 @@
 module Main where
 
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 import Prim.Row (class Lacks)
 import Type.Row (RProxy(..))
 

@@ -1,7 +1,7 @@
 module Main (main) where
 
 import Prelude ((+))
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 -- the __unused parameter used to get optimized away
 abuseUnused :: forall a. a -> a

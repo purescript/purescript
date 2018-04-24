@@ -2,7 +2,7 @@
 -- class methods that should be valid based on various configurations of fundeps
 module Main where
 
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 -- no fundeps
 class C0 a b where

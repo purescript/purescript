@@ -1,8 +1,8 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Console (CONSOLE, log)
+import Effect (Effect)
+import Effect.Console (log)
 
 foo :: Array Int
 foo = do
@@ -10,11 +10,5 @@ foo = do
   xs :: Array Int <- xss
   xs
 
-main :: 
-    forall eff.
-      Eff
-        ( console :: CONSOLE
-        | eff
-        )
-        Unit
+main :: Effect Unit
 main = log "Done"

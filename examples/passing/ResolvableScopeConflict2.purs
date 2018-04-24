@@ -1,7 +1,7 @@
 module Main where
 
 import A
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 thing :: Int
 thing = 1

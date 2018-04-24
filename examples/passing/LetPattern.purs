@@ -2,9 +2,9 @@ module Main where
 
 import Prelude
 import Partial.Unsafe (unsafePartial)
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Console (CONSOLE, log)
-import Test.Assert (ASSERT, assert')
+import Effect (Effect)
+import Effect.Console (log)
+import Test.Assert (assert')
 
 patternSimple :: Boolean
 patternSimple =
@@ -12,7 +12,7 @@ patternSimple =
   in
    x == 25252
 
-patternDoSimple :: forall e. Eff e Boolean
+patternDoSimple :: Effect Boolean
 patternDoSimple = do
   let x = 25252
   pure $ x == 25252
@@ -25,7 +25,7 @@ patternNewtype =
   in
    a == 123
 
-patternDoNewtype :: forall e. Eff e Boolean
+patternDoNewtype :: Effect Boolean
 patternDoNewtype = do
   let X a = X 123
   pure $ a == 123
@@ -44,12 +44,12 @@ patternDataIgnored =
   in
    x == "world, hello"
 
-patternDoData :: forall e. Eff e Boolean
+patternDoData :: Effect Boolean
 patternDoData = do
   let Y a b c = Y 456 "hello, world" false
   pure $ a == 456 && b == "hello, world" && not c
 
-patternDoDataIgnored :: forall e. Eff e Boolean
+patternDoDataIgnored :: Effect Boolean
 patternDoDataIgnored = do
   let Y _ x _ = Y 789 "world, hello" true
   pure $ x == "world, hello"
@@ -60,7 +60,7 @@ patternArray = unsafePartial $
   in
    a == 1 && b == 2
 
-patternDoArray :: forall e. Eff e Boolean
+patternDoArray :: Effect Boolean
 patternDoArray = unsafePartial do
   let [a, b] = [1, 2]
   pure $ a == 1 && b == 2
@@ -77,7 +77,7 @@ patternMultiple = unsafePartial $
    x == 25252 && a == 25252 && b == 25252 && c == "hello, world" &&
      not d && e == "world, hello" && f == 1 && g == 2
 
-patternDoMultiple :: forall e. Eff e Boolean
+patternDoMultiple :: Effect Boolean
 patternDoMultiple = unsafePartial do
   let
     x = 25252
@@ -99,7 +99,7 @@ patternMultipleWithNormal = unsafePartial $
    x == 25252 && y == 2525 &&
      a == 25252 && b == 2525 && c == "hello, world" && not d
 
-patternDoMultipleWithNormal :: forall e. Eff e Boolean
+patternDoMultipleWithNormal :: Effect Boolean
 patternDoMultipleWithNormal = unsafePartial do
   let
     x = 25252
@@ -121,7 +121,7 @@ patternWithParens = unsafePartial $
    x == 25252 && a == 25252 && b == 25252 && c == "hello, world" &&
      not d && e == "world, hello" && f == 1 && g == 2
 
-patternDoWithParens :: forall e. Eff e Boolean
+patternDoWithParens :: Effect Boolean
 patternDoWithParens = unsafePartial do
   let
     (x) = 25252
@@ -139,7 +139,7 @@ patternWithNamedBinder = unsafePartial $
   in
    a.x == 10 && x == 10 && a.y == 20 && y == 20
 
-patternDoWithNamedBinder :: forall e. Eff e Boolean
+patternDoWithNamedBinder :: Effect Boolean
 patternDoWithNamedBinder = unsafePartial do
   let
     a@{x, y} = {x: 10, y: 20}
@@ -164,14 +164,14 @@ patternWithInfixOp = unsafePartial $
   in
    x == 1 && xs == 2 : 3 : 4 : Nil
 
-patternDoWithInfixOp :: forall e. Eff e Boolean
+patternDoWithInfixOp :: Effect Boolean
 patternDoWithInfixOp = unsafePartial do
   let
     x : xs = 1 : 2 : 3 : 4 : Nil
   pure $
     x == 1 && xs == 2 : 3 : 4 : Nil
 
-main :: Eff (assert :: ASSERT, console :: CONSOLE) Unit
+main :: Effect Unit
 main = do
   assert' "simple variable pattern" patternSimple
   assert' "simple variable pattern with do" =<< patternDoSimple

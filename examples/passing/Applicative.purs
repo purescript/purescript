@@ -1,6 +1,6 @@
 module Main where
 
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 class Applicative f where
   pure :: forall a. a -> f a

@@ -3,7 +3,7 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console (logShow)
+import Effect.Console (logShow)
 
 class Su a where
   su :: a -> a

@@ -2,7 +2,7 @@
 -- in the presence of the `Cons` class from `Prim.Row`.
 module Main where
 
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 import Prim.Row(class Union)
 
 class Cons x xs | xs -> x where

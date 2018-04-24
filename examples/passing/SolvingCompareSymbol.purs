@@ -1,9 +1,12 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console (log)
-import Type.Data.Symbol (SProxy(..), class CompareSymbol, compareSymbol)
-import Type.Data.Ordering (OProxy(..), kind Ordering, LT, EQ, GT, reflectOrdering)
+import Effect.Console (log)
+import Prim.Symbol (class Compare)
+import Prim.Ordering (kind Ordering, LT, EQ, GT)
+import Type.Data.Symbol (SProxy(..))
+import Type.Data.Symbol (compare) as Symbol
+import Type.Data.Ordering (OProxy(..), reflectOrdering)
 
 symA :: SProxy "A"
 symA = SProxy
@@ -12,13 +15,13 @@ symB :: SProxy "B"
 symB = SProxy
 
 egLT :: OProxy LT
-egLT = compareSymbol symA symB
+egLT = Symbol.compare symA symB
 
 egEQ :: OProxy EQ
-egEQ = compareSymbol symA symA
+egEQ = Symbol.compare symA symA
 
 egGT :: OProxy GT
-egGT = compareSymbol symB symA
+egGT = Symbol.compare symB symA
 
 main = do
   let gotLT = reflectOrdering egLT == LT

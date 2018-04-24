@@ -4,9 +4,9 @@ module Main where
 
 import Prelude
 
-import Control.Monad.Eff (Eff)
+import Effect (Effect)
 
-main :: Eff () Unit
+main :: Effect Unit
 main = do
   x <- let x = pure unit in x
   pure unit

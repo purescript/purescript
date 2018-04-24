@@ -1,8 +1,8 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff
-import Control.Monad.Eff.Console
+import Effect
+import Effect.Console
 import Test.Assert
 
 foo foo = let foo_1 = \_ -> foo

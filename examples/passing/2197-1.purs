@@ -1,6 +1,6 @@
 module Main where
 
-import Control.Monad.Eff.Console
+import Effect.Console
 import Prim as P
 
 type Number = P.Number

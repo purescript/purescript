@@ -2,9 +2,9 @@ module Main where
 
 import Prelude
 import Prelude as P
-import Control.Monad.Eff.Console
+import Effect.Console
 
 f :: forall a. a -> a
-f = P.id
+f = P.identity
 
 main = P.($) log ((f P.<<< f) "Done")

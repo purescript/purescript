@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console (logShow, log)
+import Effect.Console (logShow, log)
 
 main = do
 

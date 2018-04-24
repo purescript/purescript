@@ -1,7 +1,7 @@
 module Main (T, T', T'', T''', main) where
 
 import Prelude
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 data T a = T
 type T' = T Unit

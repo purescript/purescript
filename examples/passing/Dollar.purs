@@ -1,6 +1,6 @@
 module Main where
 
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 applyFn :: forall a b. (a -> b) -> a -> b
 applyFn f x = f x

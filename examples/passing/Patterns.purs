@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 test = \x -> case x of
   { str: "Foo", bool: true } -> true

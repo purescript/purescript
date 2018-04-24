@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 example1 :: String
 example1 = do
@@ -13,7 +13,7 @@ example1 = do
   discard x f = x <> f unit
 
 applySecond :: forall f a b. Apply f => f a -> f b -> f b
-applySecond fa fb = const id <$> fa <*> fb
+applySecond fa fb = const identity <$> fa <*> fb
 
 infixl 4 applySecond as *>
 
