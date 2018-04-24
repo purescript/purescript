@@ -2,8 +2,8 @@ module Main where
 
 import Prelude
 import Data.Function.Uncurried
-import Control.Monad.Eff
-import Control.Monad.Eff.Console
+import Effect
+import Effect.Console
 
 f = mkFn2 $ \a b -> runFn2 g a b + runFn2 g b a
 

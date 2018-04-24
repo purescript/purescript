@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude hiding (add)
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 runNat f = f 0.0 (\n -> n + 1.0)
 

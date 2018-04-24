@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 fib = \n -> case n of
   0.0 -> 1.0

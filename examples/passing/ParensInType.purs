@@ -1,20 +1,14 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Console (CONSOLE, log)
+import Effect (Effect)
+import Effect.Console (log)
 
 class Foo a where
-  foo :: forall eff. (String -> a (( console :: CONSOLE | eff)) ((Unit)))
+  foo :: (String -> a ((Unit)))
 
-instance fooLogEff :: Foo Eff where
+instance fooLogEff :: Foo Effect where
   foo = log
 
-main :: 
-    forall eff.
-      Eff
-        ( console :: CONSOLE
-        | eff
-        )
-        Unit
+main :: Effect Unit
 main = foo "Done"

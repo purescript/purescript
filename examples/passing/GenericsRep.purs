@@ -1,8 +1,8 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Console (CONSOLE, log, logShow)
+import Effect (Effect)
+import Effect.Console (log, logShow)
 import Data.Generic.Rep (class Generic)
 import Data.Generic.Rep.Eq (genericEq)
 
@@ -33,7 +33,7 @@ newtype W = W { x :: Int, y :: MyString }
 
 derive instance genericW :: Generic W _
 
-main :: Eff (console :: CONSOLE) Unit
+main :: Effect Unit
 main = do
   logShow (X 0 == X 1)
   logShow (X 1 == X 1)

@@ -2,7 +2,7 @@ module Main where
 
 import Prelude
 import Test.Assert
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 test :: forall a b. a -> b -> a
 test = \const _ -> const

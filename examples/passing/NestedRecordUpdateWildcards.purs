@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console
+import Effect.Console
 
 update = _ { foo = _, bar { baz = _, qux = _ } }
 

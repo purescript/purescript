@@ -1,7 +1,7 @@
 module Main where
 
 import Lib (class X, go)
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 go' :: forall a. X a => a -> a
 go' = go

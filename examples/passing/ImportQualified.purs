@@ -1,8 +1,8 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff
+import Effect
 import M1
-import Control.Monad.Eff.Console as C
+import Effect.Console as C
 
 main = C.log (log "Done")

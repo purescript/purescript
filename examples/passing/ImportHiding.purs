@@ -1,6 +1,6 @@
 module Main where
 
-import Control.Monad.Eff.Console
+import Effect.Console
 import Prelude hiding (
   show, -- a value
   class Show, -- a type class

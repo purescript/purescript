@@ -8,7 +8,7 @@ module Main
   ) where
 
 import Prelude
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 data Const a b = Const a
 
@@ -32,7 +32,7 @@ instance constFoo :: Foo (Const NonexportedType b) where
 else
 -- Case 2: constraints
 instance nonExportedFoo :: (Foo NonexportedType) => Foo (a -> a) where
-  foo = id
+  foo = identity
 else
 -- Another instance of case 2:
 instance nonExportedFoo2 :: (NonexportedClass a) => Foo a where

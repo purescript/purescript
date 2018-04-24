@@ -2,7 +2,7 @@ module Main where
 
   import Prelude
   import Middle
-  import Control.Monad.Eff.Console
+  import Effect.Console
 
   main = do
     logShow (middle unit)

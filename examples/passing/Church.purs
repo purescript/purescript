@@ -1,6 +1,6 @@
 module Main where
 
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 type List a = forall r. r -> (a -> r -> r) -> r
 

@@ -6,8 +6,8 @@ module Main where
 import Data.Unit (Unit, unit)
 
 -- All of the below are unused
-import Control.Monad.Eff
-import Control.Monad.Eff.Console as Console
+import Effect
+import Effect.Console as Console
 import Test.Assert ()
 
 main :: Unit

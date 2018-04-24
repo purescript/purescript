@@ -1,8 +1,8 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff
-import Control.Monad.Eff.Console (log)
+import Effect
+import Effect.Console (log)
 import Test.Assert
 
 f 1 = 1

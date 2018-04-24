@@ -2,7 +2,7 @@
 
 module Main where
 
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 -- Nat : Type
 data Z

@@ -2,8 +2,8 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff
-import Control.Monad.Eff.Console (log)
+import Effect
+import Effect.Console (log)
 
 o :: { type :: String }
 o = { type: "o" }
@@ -15,5 +15,5 @@ f :: forall r. { type :: String | r } -> String
 f { type: "p" } = "Done"
 f _ = "Fail"
 
-main :: Eff _ _
+main :: Effect _
 main = log $ f { type: p.type, foo: "bar" }

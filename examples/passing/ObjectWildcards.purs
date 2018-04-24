@@ -1,13 +1,13 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff
-import Control.Monad.Eff.Console
+import Effect
+import Effect.Console
 import Test.Assert
 
 mkRecord = { foo: _, bar: _, baz: "baz" }
 
-getValue :: forall e. Eff (| e) Boolean
+getValue :: Effect Boolean
 getValue = pure true
 
 main = do

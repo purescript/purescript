@@ -2,7 +2,7 @@ module Main where
 
 import Prelude
 import Prim.TypeError (class Warn, Text)
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 foo :: forall t. Warn (Text "Example") => t -> t
 foo x = x

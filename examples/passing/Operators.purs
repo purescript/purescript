@@ -3,8 +3,8 @@ module Main where
 import Prelude
 import Other (foo)
 import Other as Other
-import Control.Monad.Eff
-import Control.Monad.Eff.Console
+import Effect
+import Effect.Console
 
 op1 :: forall a. a -> a -> a
 op1 x _ = x

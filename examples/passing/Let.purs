@@ -2,8 +2,8 @@ module Main where
 
 import Prelude
 import Partial.Unsafe (unsafePartial)
-import Control.Monad.Eff
-import Control.Monad.Eff.Console (log, logShow)
+import Effect
+import Effect.Console (log, logShow)
 import Control.Monad.ST
 
 test1 x = let
@@ -46,7 +46,7 @@ test10 _ =
     g x = f x / 2.0
   in f 10.0
 
-main :: Eff _ _
+main :: Effect _
 main = do
   logShow (test1 1.0)
   logShow (test2 1.0 2.0)

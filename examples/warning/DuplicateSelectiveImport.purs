@@ -4,7 +4,7 @@ module Main where
 import Prelude (Unit, unit)
 import Prelude (pure)
 
-import Control.Monad.Eff (Eff)
+import Effect (Effect)
 
-main :: Eff () Unit
+main :: Effect Unit
 main = pure unit

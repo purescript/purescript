@@ -1,7 +1,7 @@
 -- @shouldFailWith KindsDoNotUnify
 module Main where
 
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 type Foo = { x :: Number }
 type Bar = { | Foo }

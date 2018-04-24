@@ -16,7 +16,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Tree (Tree, rootLabel)
 import qualified Data.Graph as G
-import           Data.Foldable (toList)
+import           Data.Foldable (toList, fold)
 
 import           Language.PureScript.Crash
 import           Language.PureScript.Kinds
@@ -96,7 +96,7 @@ instance A.ToJSON FunctionalDependency where
 
 -- | The initial environment with no values and only the default javascript types defined
 initEnvironment :: Environment
-initEnvironment = Environment M.empty allPrimTypes M.empty M.empty M.empty allPrimClasses primKinds
+initEnvironment = Environment M.empty allPrimTypes M.empty M.empty M.empty allPrimClasses allPrimKinds
 
 -- | A constructor for TypeClassData that computes which type class arguments are fully determined
 -- and argument covering sets.
@@ -276,11 +276,25 @@ primSubKind sub = NamedKind . primSubName sub
 kindType :: Kind
 kindType = primKind C.typ
 
+-- To make reading the kind signatures below easier
+kindConstraint :: Kind
+kindConstraint = kindType
+
+(-:>) :: Kind -> Kind -> Kind
+(-:>) = FunKind
+infixr 4 -:>
+
 kindSymbol :: Kind
 kindSymbol = primKind C.symbol
 
 kindDoc :: Kind
 kindDoc = primSubKind C.typeError C.doc
+
+kindOrdering :: Kind
+kindOrdering = primSubKind C.moduleOrdering C.kindOrdering
+
+kindRowList :: Kind
+kindRowList = primSubKind C.moduleRowList C.kindRowList
 
 -- | Construct a type in the Prim module
 primTy :: Text -> Type
@@ -334,58 +348,109 @@ isTypeOrApplied t1 t2 = t1 == t2
 function :: Type -> Type -> Type
 function t1 = TypeApp (TypeApp tyFunction t1)
 
--- | The primitive kinds
+-- | Kinds in @Prim@
 primKinds :: S.Set (Qualified (ProperName 'KindName))
-primKinds =
-  S.fromList
-    [ primName C.typ
-    , primName C.symbol
-    , primSubName C.typeError C.doc
-    ]
+primKinds = S.fromList
+  [ primName C.typ
+  , primName C.symbol
+  ]
+
+-- | Kinds in @Prim.Ordering@
+primOrderingKinds :: S.Set (Qualified (ProperName 'KindName))
+primOrderingKinds = S.fromList
+  [ primSubName C.moduleOrdering C.kindOrdering
+  ]
+
+-- | Kinds in @Prim.RowList@
+primRowListKinds :: S.Set (Qualified (ProperName 'KindName))
+primRowListKinds = S.fromList
+  [ primSubName C.moduleRowList C.kindRowList
+  ]
+
+-- | Kinds in @Prim.TypeError@
+primTypeErrorKinds :: S.Set (Qualified (ProperName 'KindName))
+primTypeErrorKinds = S.fromList
+  [ primSubName C.typeError C.doc
+  ]
+
+-- | All primitive kinds
+allPrimKinds :: S.Set (Qualified (ProperName 'KindName))
+allPrimKinds = fold
+  [ primKinds
+  , primOrderingKinds
+  , primRowListKinds
+  , primTypeErrorKinds
+  ]
 
 -- | The primitive types in the external javascript environment with their
 -- associated kinds. There are also pseudo `Fail`, `Warn`, and `Partial` types
 -- that correspond to the classes with the same names.
 primTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
-primTypes =
-  M.fromList
-    [ (primName "Function", (FunKind kindType (FunKind kindType kindType), ExternData))
-    , (primName "Array",    (FunKind kindType kindType, ExternData))
-    , (primName "Record",   (FunKind (Row kindType) kindType, ExternData))
-    , (primName "String",   (kindType, ExternData))
-    , (primName "Char",     (kindType, ExternData))
-    , (primName "Number",   (kindType, ExternData))
-    , (primName "Int",      (kindType, ExternData))
-    , (primName "Boolean",  (kindType, ExternData))
-    , (primName "Partial",  (kindType, ExternData))
-    ]
+primTypes = M.fromList
+  [ (primName "Function", (kindType -:> kindType -:> kindType, ExternData))
+  , (primName "Array",    (kindType -:> kindType, ExternData))
+  , (primName "Record",   (Row kindType -:> kindType, ExternData))
+  , (primName "String",   (kindType, ExternData))
+  , (primName "Char",     (kindType, ExternData))
+  , (primName "Number",   (kindType, ExternData))
+  , (primName "Int",      (kindType, ExternData))
+  , (primName "Boolean",  (kindType, ExternData))
+  , (primName "Partial",  (kindConstraint, ExternData))
+  ]
 
 -- | This 'Map' contains all of the prim types from all Prim modules.
 allPrimTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
 allPrimTypes = M.unions
   [ primTypes
-  , primTypeErrorTypes
+  , primOrderingTypes
   , primRowTypes
+  , primRowListTypes
+  , primSymbolTypes
+  , primTypeErrorTypes
   ]
 
-primTypeErrorTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
-primTypeErrorTypes =
+primOrderingTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
+primOrderingTypes =
   M.fromList
-    [ (primSubName C.typeError "Fail", (FunKind kindDoc kindType, ExternData))
-    , (primSubName C.typeError "Warn", (FunKind kindDoc kindType, ExternData))
-    , (primSubName C.typeError "Text", (FunKind kindSymbol kindDoc, ExternData))
-    , (primSubName C.typeError "Quote", (FunKind kindType kindDoc, ExternData))
-    , (primSubName C.typeError "Beside", (FunKind kindDoc (FunKind kindDoc kindDoc), ExternData))
-    , (primSubName C.typeError "Above", (FunKind kindDoc (FunKind kindDoc kindDoc), ExternData))
+    [ (primSubName C.moduleOrdering "LT", (kindOrdering, ExternData))
+    , (primSubName C.moduleOrdering "EQ", (kindOrdering, ExternData))
+    , (primSubName C.moduleOrdering "GT", (kindOrdering, ExternData))
     ]
 
 primRowTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
 primRowTypes =
   M.fromList
-    [ (primSubName C.row "Union", (FunKind (Row kindType) (FunKind (Row kindType) (FunKind (Row kindType) kindType)), ExternData))
-    , (primSubName C.row "Nub", (FunKind (Row kindType) (FunKind (Row kindType) kindType), ExternData))
-    , (primSubName C.row "Lacks", (FunKind kindSymbol (FunKind (Row kindType) kindType), ExternData))
-    , (primSubName C.row "Cons",  (FunKind kindSymbol (FunKind kindType (FunKind (Row kindType) (FunKind (Row kindType) kindType))), ExternData))
+    [ (primSubName C.moduleRow "Union", (Row kindType -:> Row kindType -:> Row kindType -:> kindConstraint, ExternData))
+    , (primSubName C.moduleRow "Nub", (Row kindType -:> Row kindType -:> kindConstraint, ExternData))
+    , (primSubName C.moduleRow "Lacks", (kindSymbol -:> Row kindType -:> kindConstraint, ExternData))
+    , (primSubName C.moduleRow "Cons",  (kindSymbol -:> kindType -:> Row kindType -:> Row kindType -:> kindConstraint, ExternData))
+    ]
+
+primRowListTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
+primRowListTypes =
+  M.fromList
+    [ (primSubName C.moduleRowList "Cons", (kindSymbol -:> kindType -:> kindRowList -:> kindRowList, ExternData))
+    , (primSubName C.moduleRowList "Nil", (kindRowList, ExternData))
+    , (primSubName C.moduleRowList "RowToList",  (Row kindType -:> kindRowList -:> kindConstraint, ExternData))
+    ]
+
+primSymbolTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
+primSymbolTypes =
+  M.fromList
+    [ (primSubName C.moduleSymbol "Append",  (kindSymbol -:> kindSymbol -:> kindSymbol -:> kindConstraint, ExternData))
+    , (primSubName C.moduleSymbol "Compare", (kindSymbol -:> kindSymbol -:> kindOrdering -:> kindConstraint, ExternData))
+    , (primSubName C.moduleSymbol "Cons",  (kindSymbol -:> kindSymbol -:> kindSymbol -:> kindConstraint, ExternData))
+    ]
+
+primTypeErrorTypes :: M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
+primTypeErrorTypes =
+  M.fromList
+    [ (primSubName C.typeError "Fail", (kindDoc -:> kindConstraint, ExternData))
+    , (primSubName C.typeError "Warn", (kindDoc -:> kindConstraint, ExternData))
+    , (primSubName C.typeError "Text", (kindSymbol -:> kindDoc, ExternData))
+    , (primSubName C.typeError "Quote", (kindType -:> kindDoc, ExternData))
+    , (primSubName C.typeError "Beside", (kindDoc -:> kindDoc -:> kindDoc, ExternData))
+    , (primSubName C.typeError "Above", (kindDoc -:> kindDoc -:> kindDoc, ExternData))
     ]
 
 -- | The primitive class map. This just contains the `Partial` class.
@@ -400,56 +465,108 @@ primClasses =
 allPrimClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 allPrimClasses = M.unions
   [ primClasses
-  , primTypeErrorClasses
   , primRowClasses
+  , primRowListClasses
+  , primSymbolClasses
+  , primTypeErrorClasses
   ]
-
-primTypeErrorClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
-primTypeErrorClasses =
-  M.fromList
-    [
-    -- class Fail (message :: Symbol)
-      (primSubName C.typeError "Fail", (makeTypeClassData [("message", Just kindDoc)] [] [] []))
-    -- class Warn (message :: Symbol)
-    , (primSubName C.typeError "Warn", (makeTypeClassData [("message", Just kindDoc)] [] [] []))
-    ]
 
 primRowClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primRowClasses =
   M.fromList
-    [
     -- class Union (left :: # Type) (right :: # Type) (union :: # Type) | left right -> union, right union -> left, union left -> right
-      (primSubName C.row "Union", (makeTypeClassData
-                                  [ ("left", Just (Row kindType))
-                                  , ("right", Just (Row kindType))
-                                  , ("union", Just (Row kindType))
-                                  ] [] []
-                                  [ FunctionalDependency [0, 1] [2]
-                                  , FunctionalDependency [1, 2] [0]
-                                  , FunctionalDependency [2, 0] [1]
-                                  ]))
+    [ (primSubName C.moduleRow "Union", makeTypeClassData
+        [ ("left", Just (Row kindType))
+        , ("right", Just (Row kindType))
+        , ("union", Just (Row kindType))
+        ] [] []
+        [ FunctionalDependency [0, 1] [2]
+        , FunctionalDependency [1, 2] [0]
+        , FunctionalDependency [2, 0] [1]
+        ])
+
     -- class Nub (original :: # Type) (nubbed :: # Type) | i -> o
-    , (primSubName C.row "Nub", (makeTypeClassData
-                                  [ ("original", Just (Row kindType))
-                                  , ("nubbed", Just (Row kindType))
-                                  ] [] []
-                                  [ FunctionalDependency [0] [1]
-                                  ]))
+    , (primSubName C.moduleRow "Nub", makeTypeClassData
+        [ ("original", Just (Row kindType))
+        , ("nubbed", Just (Row kindType))
+        ] [] []
+        [ FunctionalDependency [0] [1]
+        ])
+
     -- class Lacks (label :: Symbol) (row :: # Type)
-    , (primSubName C.row "Lacks", (makeTypeClassData
-                                  [ ("label", Just kindSymbol)
-                                  , ("row", Just (Row kindType))
-                                  ] [] [] []))
+    , (primSubName C.moduleRow "Lacks", makeTypeClassData
+        [ ("label", Just kindSymbol)
+        , ("row", Just (Row kindType))
+        ] [] [] [])
+
     -- class RowCons (label :: Symbol) (a :: Type) (tail :: # Type) (row :: # Type) | label tail a -> row, label row -> tail a
-    , (primSubName C.row "Cons", (makeTypeClassData
-                                 [ ("label", Just kindSymbol)
-                                 , ("a", Just kindType)
-                                 , ("tail", Just (Row kindType))
-                                 , ("row", Just (Row kindType))
-                                 ] [] []
-                                 [ FunctionalDependency [0, 1, 2] [3]
-                                 , FunctionalDependency [0, 3] [1, 2]
-                                 ]))
+    , (primSubName C.moduleRow "Cons", makeTypeClassData
+        [ ("label", Just kindSymbol)
+        , ("a", Just kindType)
+        , ("tail", Just (Row kindType))
+        , ("row", Just (Row kindType))
+        ] [] []
+        [ FunctionalDependency [0, 1, 2] [3]
+        , FunctionalDependency [0, 3] [1, 2]
+        ])
+    ]
+
+primRowListClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
+primRowListClasses =
+  M.fromList
+    -- class RowToList (row :: # Type) (list :: RowList) | row -> list
+    [ (primSubName C.moduleRowList "RowToList", makeTypeClassData
+        [ ("row", Just (Row kindType))
+        , ("list", Just kindRowList)
+        ] [] []
+        [ FunctionalDependency [0] [1]
+        ])
+    ]
+
+primSymbolClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
+primSymbolClasses =
+  M.fromList
+    -- class Append (left :: Symbol) (right :: Symbol) (appended :: Symbol) | left right -> appended, right appended -> left, appended left -> right
+    [ (primSubName C.moduleSymbol "Append", makeTypeClassData
+        [ ("left", Just kindSymbol)
+        , ("right", Just kindSymbol)
+        , ("appended", Just kindSymbol)
+        ] [] []
+        [ FunctionalDependency [0, 1] [2]
+        , FunctionalDependency [1, 2] [0]
+        , FunctionalDependency [2, 0] [1]
+        ])
+
+    -- class Compare (left :: Symbol) (right :: Symbol) (ordering :: Ordering) | left right -> ordering
+    , (primSubName C.moduleSymbol "Compare", makeTypeClassData
+        [ ("left", Just kindSymbol)
+        , ("right", Just kindSymbol)
+        , ("ordering", Just kindOrdering)
+        ] [] []
+        [ FunctionalDependency [0, 1] [2]
+        ])
+
+    -- class Cons (head :: Symbol) (tail :: Symbol) (symbol :: Symbol) | head tail -> symbol, symbol -> head tail
+    , (primSubName C.moduleSymbol "Cons", makeTypeClassData
+        [ ("head", Just kindSymbol)
+        , ("tail", Just kindSymbol)
+        , ("symbol", Just kindSymbol)
+        ] [] []
+        [ FunctionalDependency [0, 1] [2]
+        , FunctionalDependency [2] [0, 1]
+        ])
+    ]
+
+primTypeErrorClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
+primTypeErrorClasses =
+  M.fromList
+    -- class Fail (message :: Symbol)
+    [ (primSubName C.typeError "Fail", makeTypeClassData
+        [("message", Just kindDoc)] [] [] [])
+
+    -- class Warn (message :: Symbol)
+    , (primSubName C.typeError "Warn", makeTypeClassData
+        [("message", Just kindDoc)] [] [] [])
     ]
 
 -- | Finds information about data constructors from the current environment.

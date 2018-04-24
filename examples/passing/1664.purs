@@ -1,14 +1,14 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff
-import Control.Monad.Eff.Console
+import Effect
+import Effect.Console
 
 data Identity a = Identity a
 
-newtype IdentityEff e a = IdentityEff (Eff e (Identity a))
+newtype IdentityEff a = IdentityEff (Effect (Identity a))
 
-test :: forall e a. IdentityEff e a -> IdentityEff e Unit
+test :: forall a. IdentityEff a -> IdentityEff Unit
 test (IdentityEff action) = IdentityEff $ do
   (Identity x :: Identity _) <- action
   pure $ Identity unit

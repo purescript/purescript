@@ -2,8 +2,8 @@ module Main where
 
 import Prelude
 
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Console (CONSOLE, log)
+import Effect (Effect)
+import Effect.Console (log)
 
 class IsStream el s | s -> el where
   cons :: el -> (Unit -> s) -> s
@@ -19,7 +19,7 @@ test :: forall el s. IsStream el s => s -> s
 test s = case uncons s of
            { head, tail } -> cons head \_ -> tail
 
-main :: Eff (console :: CONSOLE) Unit
+main :: Effect Unit
 main = do
   let dones :: Stream String
       dones = cons "Done" \_ -> dones

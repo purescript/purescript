@@ -3,7 +3,7 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff
+import Effect
 
-main :: Eff () Unit
+main :: Effect Unit
 main = pure unit

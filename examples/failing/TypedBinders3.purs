@@ -2,7 +2,7 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 test = case 1 of
   (0 :: String) -> true
