@@ -130,7 +130,7 @@ resolveExports env ss mn imps exps refs =
     where
     go = filterM $ \(name', options) -> do
       let isMatch = if useQual then isQualifiedWith name name' else any (checkUnqual name') options
-      when (isMatch && length options > 1) $ void $ checkImportConflicts mn toName options
+      when (isMatch && length options > 1) $ void $ checkImportConflicts ss mn toName options
       return isMatch
     checkUnqual name' ir = isUnqualified name' && isQualifiedWith name (importName ir)
 
