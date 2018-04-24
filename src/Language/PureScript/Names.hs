@@ -121,7 +121,10 @@ showOp op = "(" <> runOpName op <> ")"
 -- |
 -- The closed set of operator alias types.
 --
-data OpNameType = ValueOpName | TypeOpName
+data OpNameType = ValueOpName | TypeOpName | AnyOpName
+
+eraseOpName :: OpName a -> OpName 'AnyOpName
+eraseOpName = OpName . runOpName
 
 -- |
 -- Proper names, i.e. capitalized names for e.g. module names, type//data constructors.
