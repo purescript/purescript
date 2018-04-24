@@ -332,7 +332,7 @@ partial = primClass "Partial" $ T.unlines
 
 kindOrdering :: Declaration
 kindOrdering = primKindOf (P.primSubName "Ordering") "Ordering" $ T.unlines
-  [ "The `Ordering` kind represents the three possibilites of comparing twos"
+  [ "The `Ordering` kind represents the three possibilites of comparing two"
   , "types of the same kind: `LT` (less than), `EQ` (equal to), and"
   , "`GT` (greater than)."
   ]

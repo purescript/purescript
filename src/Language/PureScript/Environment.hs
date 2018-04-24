@@ -395,7 +395,7 @@ primTypes = M.fromList
   , (primName "Number",   (kindType, ExternData))
   , (primName "Int",      (kindType, ExternData))
   , (primName "Boolean",  (kindType, ExternData))
-  , (primName "Partial",  (kindType, ExternData))
+  , (primName "Partial",  (kindConstraint, ExternData))
   ]
 
 -- | This 'Map' contains all of the prim types from all Prim modules.
