@@ -495,18 +495,6 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
 data ScopedIdent = LocalIdent Ident | ToplevelIdent Ident
   deriving (Show, Eq, Ord)
 
-unwrapScopedIdent :: ScopedIdent -> Ident
-unwrapScopedIdent = foldScopedIdent id id
-
-foldScopedIdent
-  :: (Ident -> a)
-  -> (Ident -> a)
-  -> ScopedIdent
-  -> a
-foldScopedIdent f g = \case
-  LocalIdent i -> f i
-  ToplevelIdent i -> g i
-
 inScope :: Ident -> S.Set ScopedIdent -> Bool
 inScope i s = (LocalIdent i `S.member` s) || (ToplevelIdent i `S.member` s)
 

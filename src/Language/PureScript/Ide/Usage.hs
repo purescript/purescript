@@ -131,13 +131,13 @@ applySearch module_ search =
   foldMap findUsageInDeclaration decls
   where
     decls = P.getModuleDeclarations module_
-    findUsageInDeclaration decl =
+    findUsageInDeclaration =
       let
-        (extr, _, _, _, _) = P.everythingWithScope mempty (goExpr decl) goBinder mempty mempty
+        (extr, _, _, _, _) = P.everythingWithScope mempty goExpr goBinder mempty mempty
       in
-        extr mempty decl
+        extr mempty
 
-    goExpr decl scope expr = case expr of
+    goExpr scope expr = case expr of
       P.Var sp i
         | Just ideValue <- preview _IdeDeclValue (P.disqualify search)
         , P.isQualified search
