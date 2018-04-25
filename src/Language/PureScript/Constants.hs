@@ -375,6 +375,9 @@ pattern Prim = ModuleName [ProperName "Prim"]
 pattern Partial :: Qualified (ProperName 'ClassName)
 pattern Partial = Qualified (Just Prim) (ProperName "Partial")
 
+pattern Record :: Qualified (ProperName 'TypeName)
+pattern Record = Qualified (Just Prim) (ProperName "Record")
+
 -- Prim.Ordering
 
 pattern PrimOrdering :: ModuleName
