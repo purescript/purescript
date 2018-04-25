@@ -10,8 +10,8 @@ import Language.PureScript.CoreFn.Expr
 import Language.PureScript.CoreFn.Module
 import Language.PureScript.CoreFn.Traversals
 import Language.PureScript.Label
-import Language.PureScript.Names
 import Language.PureScript.Types
+import qualified Language.PureScript.Constants as C
 
 -- |
 -- CoreFn optimization pass.
@@ -37,7 +37,7 @@ optimizeClosedRecordUpdate e = e
 
 -- | Return the labels of a closed record, or Nothing for other types or open records.
 closedRecordFields :: Type -> Maybe [Label]
-closedRecordFields (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Record"))) row) =
+closedRecordFields (TypeApp (TypeConstructor C.Record) row) =
   collect row
   where
     collect :: Type -> Maybe [Label]
