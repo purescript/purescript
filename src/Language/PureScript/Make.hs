@@ -72,7 +72,8 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
   regrouped <- createBindingGroups moduleName . collapseBindingGroups $ deguarded
   let mod' = Module ss coms moduleName regrouped exps
       corefn = CF.moduleToCoreFn env' mod'
-      [renamed] = renameInModules [corefn]
+      optimized = CF.optimizeCoreFn corefn
+      [renamed] = renameInModules [optimized]
       exts = moduleToExternsFile mod' env'
   evalSupplyT nextVar' . codegen ss renamed env' . encode $ exts
   return exts
