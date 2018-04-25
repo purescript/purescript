@@ -141,10 +141,7 @@ applySearch module_ search =
       P.Var sp i
         | Just ideValue <- preview _IdeDeclValue (P.disqualify search)
         , P.isQualified search
-          || not (_ideValueIdent ideValue `Set.member` scope)
-          -- This case means we're looking at a recursive definition for a
-          -- value, which we count as a usage.
-          || P.declName decl == Just (P.IdentName (_ideValueIdent ideValue)) ->
+          || not (P.LocalIdent (_ideValueIdent ideValue) `Set.member` scope) ->
           [sp | map P.runIdent i == map identifierFromIdeDeclaration search]
       P.Constructor sp name
         | Just ideDtor <- traverse (preview _IdeDeclDataConstructor) search ->
