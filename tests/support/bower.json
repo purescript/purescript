@@ -30,7 +30,6 @@
     "purescript-refs": "purescript/purescript-refs#compiler/0.12",
     "purescript-st": "purescript/purescript-st#compiler/0.12",
     "purescript-strings": "purescript/purescript-strings#compiler/0.12",
-    "purescript-symbols": "purescript/purescript-symbols#compiler/0.12",
     "purescript-tailrec": "purescript/purescript-tailrec#compiler/0.12",
     "purescript-tuples": "purescript/purescript-tuples#compiler/0.12",
     "purescript-type-equality": "purescript/purescript-type-equality#compiler/0.12",
