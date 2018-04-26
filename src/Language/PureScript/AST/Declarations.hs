@@ -30,6 +30,7 @@ import Language.PureScript.PSString (PSString)
 import Language.PureScript.Label (Label)
 import Language.PureScript.Names
 import Language.PureScript.Kinds
+import Language.PureScript.Roles
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Comments
 import Language.PureScript.Environment
@@ -434,6 +435,19 @@ isExplicit :: ImportDeclarationType -> Bool
 isExplicit (Explicit _) = True
 isExplicit _ = False
 
+-- | A role declaration assigns a list of roles to a type constructor's
+-- parameters, e.g.:
+--
+-- @role T representational phantom@
+--
+-- In this example, @T@ is the identifier and @[representational, phantom]@ is
+-- the list of roles (@T@ presumably having two parameters).
+data RoleDeclarationData = RoleDeclarationData
+  { rdeclSourceAnn :: !SourceAnn
+  , rdeclIdent :: !(ProperName 'TypeName)
+  , rdeclRoles :: ![Role]
+  } deriving (Show, Eq)
+
 -- | A type declaration assigns a type to an identifier, eg:
 --
 -- @identity :: forall a. a -> a@
@@ -497,6 +511,10 @@ data Declaration
   -- A type synonym declaration (name, arguments, type)
   --
   | TypeSynonymDeclaration SourceAnn (ProperName 'TypeName) [(Text, Maybe SourceKind)] SourceType
+  -- |
+  -- A role declaration (name, roles)
+  --
+  | RoleDeclaration {-# UNPACK #-} !RoleDeclarationData
   -- |
   -- A type declaration for a value (name, ty)
   --
@@ -580,6 +598,7 @@ declSourceAnn :: Declaration -> SourceAnn
 declSourceAnn (DataDeclaration sa _ _ _ _) = sa
 declSourceAnn (DataBindingGroupDeclaration ds) = declSourceAnn (NEL.head ds)
 declSourceAnn (TypeSynonymDeclaration sa _ _ _) = sa
+declSourceAnn (RoleDeclaration rd) = rdeclSourceAnn rd
 declSourceAnn (TypeDeclaration td) = tydeclSourceAnn td
 declSourceAnn (ValueDeclaration vd) = valdeclSourceAnn vd
 declSourceAnn (BoundValueDeclaration sa _ _) = sa
@@ -611,6 +630,7 @@ declName BindingGroupDeclaration{} = Nothing
 declName DataBindingGroupDeclaration{} = Nothing
 declName BoundValueDeclaration{} = Nothing
 declName TypeDeclaration{} = Nothing
+declName RoleDeclaration{} = Nothing
 
 -- |
 -- Test if a declaration is a value declaration
@@ -633,6 +653,13 @@ isDataDecl _ = False
 isImportDecl :: Declaration -> Bool
 isImportDecl ImportDeclaration{} = True
 isImportDecl _ = False
+
+-- |
+-- Test if a declaration is a role declaration
+--
+isRoleDecl :: Declaration -> Bool
+isRoleDecl RoleDeclaration{} = True
+isRoleDecl _ = False
 
 -- |
 -- Test if a declaration is a data type foreign import

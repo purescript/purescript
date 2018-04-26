@@ -23,6 +23,7 @@ import           Language.PureScript.AST.SourcePos
 import           Language.PureScript.Crash
 import           Language.PureScript.Kinds
 import           Language.PureScript.Names
+import           Language.PureScript.Roles
 import           Language.PureScript.TypeClassDictionaries
 import           Language.PureScript.Types
 import qualified Language.PureScript.Constants as C
@@ -36,6 +37,8 @@ data Environment = Environment
   , dataConstructors :: M.Map (Qualified (ProperName 'ConstructorName)) (DataDeclType, ProperName 'TypeName, SourceType, [Ident])
   -- ^ Data constructors currently in scope, along with their associated type
   -- constructor name, argument types and return type.
+  , roleDeclarations :: M.Map (Qualified (ProperName 'TypeName)) [Role]
+  -- ^ Explicit role declarations currently in scope.
   , typeSynonyms :: M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe SourceKind)], SourceType)
   -- ^ Type synonyms currently in scope
   , typeClassDictionaries :: M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict)))
@@ -98,7 +101,7 @@ instance A.ToJSON FunctionalDependency where
 
 -- | The initial environment with no values and only the default javascript types defined
 initEnvironment :: Environment
-initEnvironment = Environment M.empty allPrimTypes M.empty M.empty M.empty allPrimClasses allPrimKinds
+initEnvironment = Environment M.empty allPrimTypes M.empty M.empty M.empty M.empty allPrimClasses allPrimKinds
 
 -- | A constructor for TypeClassData that computes which type class arguments are fully determined
 -- and argument covering sets.
@@ -422,6 +425,7 @@ allPrimTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceKind, TypeKind)
 allPrimTypes = M.unions
   [ primTypes
   , primBooleanTypes
+  , primCoerceTypes
   , primOrderingTypes
   , primRowTypes
   , primRowListTypes
@@ -434,6 +438,12 @@ primBooleanTypes =
   M.fromList
     [ (primSubName C.moduleBoolean "True", (kindBoolean, ExternData))
     , (primSubName C.moduleBoolean "False", (kindBoolean, ExternData))
+    ]
+
+primCoerceTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceKind, TypeKind)
+primCoerceTypes =
+  M.fromList
+    [ (primSubName C.moduleCoerce "Coercible", (kindType -:> kindType -:> kindConstraint, ExternData))
     ]
 
 primOrderingTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceKind, TypeKind)
@@ -493,11 +503,21 @@ primClasses =
 allPrimClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 allPrimClasses = M.unions
   [ primClasses
+  , primCoerceClasses
   , primRowClasses
   , primRowListClasses
   , primSymbolClasses
   , primTypeErrorClasses
   ]
+
+primCoerceClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
+primCoerceClasses =
+  M.fromList
+    [ (primSubName C.moduleCoerce "Coercible", makeTypeClassData
+        [ ("a", Just kindType)
+        , ("b", Just kindType)
+        ] [] [] [])
+    ]
 
 primRowClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primRowClasses =
@@ -596,6 +616,21 @@ primTypeErrorClasses =
     , (primSubName C.typeError "Warn", makeTypeClassData
         [("message", Just kindDoc)] [] [] [])
     ]
+
+-- | Looks up a given name and, if it names a newtype, returns the names of the
+-- type's parameters, the type the newtype wraps and the names of the type's
+-- fields.
+lookupNewtypeConstructor :: Environment -> Qualified (ProperName 'TypeName) -> Maybe ([Text], SourceType, [Ident])
+lookupNewtypeConstructor env ty@(Qualified mn _) =
+  M.lookup ty (types env) >>= \case
+    (_, DataType tvs [(ctor, [wrappedTy])]) ->
+      M.lookup (Qualified mn ctor) (dataConstructors env) >>= \case
+        (Newtype, _, _, ids) ->
+          pure (map fst tvs, wrappedTy, ids)
+        _ ->
+          Nothing
+    _ ->
+      Nothing
 
 -- | Finds information about data constructors from the current environment.
 lookupConstructor :: Environment -> Qualified (ProperName 'ConstructorName) -> (DataDeclType, ProperName 'TypeName, SourceType, [Ident])

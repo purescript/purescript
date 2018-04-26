@@ -195,6 +195,12 @@ primBooleanExports :: Exports
 primBooleanExports = mkPrimExports primBooleanTypes mempty primBooleanKinds
 
 -- |
+-- The exported types from the @Prim.Coerce@ module
+--
+primCoerceExports :: Exports
+primCoerceExports = mkPrimExports primCoerceTypes primCoerceClasses mempty
+
+-- |
 -- The exported types from the @Prim.Ordering@ module
 --
 primOrderingExports :: Exports
@@ -257,6 +263,9 @@ primEnv = M.fromList
     )
   , ( C.PrimBoolean
     , (internalModuleSourceSpan "<Prim.Boolean>", nullImports, primBooleanExports)
+    )
+  , ( C.PrimCoerce
+    , (internalModuleSourceSpan "<Prim.Coerce>", nullImports, primCoerceExports)
     )
   , ( C.PrimOrdering
     , (internalModuleSourceSpan "<Prim.Ordering>", nullImports, primOrderingExports)
