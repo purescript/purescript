@@ -254,11 +254,11 @@ renameInModule imports (Module modSS coms mn decls exps) =
     return ((pos', bound), v)
   updateValue (pos, bound) (Abs (VarBinder ss arg) val') =
     return ((pos, arg : bound), Abs (VarBinder ss arg) val')
-  updateValue (pos, bound) (Let ds val') = do
+  updateValue (pos, bound) (Let w ds val') = do
     let args = mapMaybe letBoundVariable ds
     unless (length (ordNub args) == length args) .
       throwError . errorMessage' pos $ OverlappingNamesInLet
-    return ((pos, args ++ bound), Let ds val')
+    return ((pos, args ++ bound), Let w ds val')
   updateValue (_, bound) (Var ss name'@(Qualified Nothing ident)) | ident `notElem` bound =
     (,) (ss, bound) <$> (Var ss <$> updateValueName name' ss)
   updateValue (_, bound) (Var ss name'@(Qualified (Just _) _)) =
@@ -396,7 +396,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
       -- re-exports. If there are multiple options for the name to resolve to
       -- in scope, we throw an error.
       (Just options, _) -> do
-        (mnNew, mnOrig) <- checkImportConflicts mn toName options
+        (mnNew, mnOrig) <- checkImportConflicts pos mn toName options
         modify $ \usedImports ->
           M.insertWith (++) mnNew [fmap toName qname] usedImports
         return $ Qualified (Just mnOrig) name

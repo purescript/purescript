@@ -24,18 +24,20 @@ desugarLetPattern decl =
   in f decl
   where
   replace :: Expr -> Expr
-  replace (Let ds e) = go (partitionDecls ds) e
+  replace (Let w ds e) = go w (partitionDecls ds) e
   replace other = other
 
-  go :: [Either [Declaration] (SourceAnn, Binder, Expr)]
+  go :: WhereProvenance
+     -- ^ Metadata about whether the let-in was a where clause
+     -> [Either [Declaration] (SourceAnn, Binder, Expr)]
      -- ^ Declarations to desugar
      -> Expr
      -- ^ The original let-in result expression
      -> Expr
-  go [] e = e
-  go (Right ((pos, com), binder, boundE) : ds) e =
-    PositionedValue pos com $ Case [boundE] [CaseAlternative [binder] [MkUnguarded $ go ds e]]
-  go (Left ds:dss) e = Let ds (go dss e)
+  go _ [] e = e
+  go w (Right ((pos, com), binder, boundE) : ds) e =
+    PositionedValue pos com $ Case [boundE] [CaseAlternative [binder] [MkUnguarded $ go w ds e]]
+  go w (Left ds:dss) e = Let w ds (go w dss e)
 
 partitionDecls :: [Declaration] -> [Either [Declaration] (SourceAnn, Binder, Expr)]
 partitionDecls = concatMap f . groupBy ((==) `on` isBoundValueDeclaration)

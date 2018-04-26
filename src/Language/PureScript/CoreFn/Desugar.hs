@@ -99,8 +99,8 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     Case (ss, com, ty, Nothing) (fmap (exprToCoreFn ss [] Nothing) vs) (fmap (altToCoreFn ss) alts)
   exprToCoreFn ss com _ (A.TypedValue _ v ty) =
     exprToCoreFn ss com (Just ty) v
-  exprToCoreFn ss com ty (A.Let ds v) =
-    Let (ss, com, ty, Nothing) (concatMap declToCoreFn ds) (exprToCoreFn ss [] Nothing v)
+  exprToCoreFn ss com ty (A.Let w ds v) =
+    Let (ss, com, ty, getLetMeta w) (concatMap declToCoreFn ds) (exprToCoreFn ss [] Nothing v)
   exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name (A.TypedValue _ lit@(A.Literal _ (A.ObjectLiteral _)) _)) =
     exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name lit)
   exprToCoreFn ss com _ (A.TypeClassDictionaryConstructorApp name (A.Literal _ (A.ObjectLiteral vs))) =
@@ -154,6 +154,11 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     internalError "BinaryNoParensBinder should have been desugared before binderToCoreFn"
   binderToCoreFn _ _ A.ParensInBinder{} =
     internalError "ParensInBinder should have been desugared before binderToCoreFn"
+
+  -- | Gets metadata for let bindings.
+  getLetMeta :: A.WhereProvenance -> Maybe Meta
+  getLetMeta A.FromWhere = Just IsWhere
+  getLetMeta A.FromLet = Nothing
 
   -- | Gets metadata for values.
   getValueMeta :: Qualified Ident -> Maybe Meta

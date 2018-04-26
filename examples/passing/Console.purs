@@ -1,8 +1,8 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff
-import Control.Monad.Eff.Console
+import Effect
+import Effect.Console
 
 replicateM_ :: forall m a. Monad m => Number -> m a -> m Unit
 replicateM_ 0.0 _ = pure unit

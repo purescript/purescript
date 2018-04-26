@@ -95,7 +95,6 @@ inlineCommonValues = everywhere convert
   convert (App ss (App _ (App _ fn [dict]) [x]) [y])
     | isDict semiringInt dict && isDict fnAdd fn = intOp ss Add x y
     | isDict semiringInt dict && isDict fnMultiply fn = intOp ss Multiply x y
-    | isDict euclideanRingInt dict && isDict fnDivide fn = intOp ss Divide x y
     | isDict ringInt dict && isDict fnSubtract fn = intOp ss Subtract x y
   convert other = other
   fnZero = (C.dataSemiring, C.zero)
@@ -103,7 +102,6 @@ inlineCommonValues = everywhere convert
   fnBottom = (C.dataBounded, C.bottom)
   fnTop = (C.dataBounded, C.top)
   fnAdd = (C.dataSemiring, C.add)
-  fnDivide = (C.dataEuclideanRing, C.div)
   fnMultiply = (C.dataSemiring, C.mul)
   fnSubtract = (C.dataRing, C.sub)
   fnNegate = (C.dataRing, C.negate)
@@ -118,7 +116,6 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
   , unary  ringNumber opNegate Negate
 
   , binary euclideanRingNumber opDiv Divide
-  , binary euclideanRingInt opMod Modulus
 
   , binary eqNumber opEq EqualTo
   , binary eqNumber opNotEq NotEqualTo
@@ -171,7 +168,8 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
   , inlineNonClassFunction (isModFnWithDict (C.dataArray, C.unsafeIndex)) $ flip (Indexer Nothing)
   ] ++
   [ fn | i <- [0..10], fn <- [ mkFn i, runFn i ] ] ++
-  [ fn | i <- [0..10], fn <- [ mkEffFn i, runEffFn i ] ]
+  [ fn | i <- [0..10], fn <- [ mkEffFn C.controlMonadEffUncurried C.mkEffFn i, runEffFn C.controlMonadEffUncurried C.runEffFn i ] ] ++
+  [ fn | i <- [0..10], fn <- [ mkEffFn C.effectUncurried C.mkEffectFn i, runEffFn C.effectUncurried C.runEffectFn i ] ]
   where
   binary :: (Text, PSString) -> (Text, PSString) -> BinaryOperator -> AST -> AST
   binary dict fns op = convert where
@@ -198,8 +196,8 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
   mkFn = mkFn' C.dataFunctionUncurried C.mkFn $ \ss1 ss2 ss3 args js ->
     Function ss1 Nothing args (Block ss2 [Return ss3 js])
 
-  mkEffFn :: Int -> AST -> AST
-  mkEffFn = mkFn' C.controlMonadEffUncurried C.mkEffFn $ \ss1 ss2 ss3 args js ->
+  mkEffFn :: Text -> Text -> Int -> AST -> AST
+  mkEffFn modName fnName = mkFn' modName fnName $ \ss1 ss2 ss3 args js ->
     Function ss1 Nothing args (Block ss2 [Return ss3 (App ss3 js [])])
 
   mkFn' :: Text -> Text -> (Maybe SourceSpan -> Maybe SourceSpan -> Maybe SourceSpan -> [Text] -> AST -> AST) -> Int -> AST -> AST
@@ -228,8 +226,8 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
   runFn :: Int -> AST -> AST
   runFn = runFn' C.dataFunctionUncurried C.runFn App
 
-  runEffFn :: Int -> AST -> AST
-  runEffFn = runFn' C.controlMonadEffUncurried C.runEffFn $ \ss fn acc ->
+  runEffFn :: Text -> Text -> Int -> AST -> AST
+  runEffFn modName fnName = runFn' modName fnName $ \ss fn acc ->
     Function ss Nothing [] (Block ss [Return ss (App ss fn acc)])
 
   runFn' :: Text -> Text -> (Maybe SourceSpan -> AST -> [AST] -> AST) -> Int -> AST -> AST
@@ -315,9 +313,6 @@ ringInt = (C.dataRing, C.ringInt)
 euclideanRingNumber :: forall a b. (IsString a, IsString b) => (a, b)
 euclideanRingNumber = (C.dataEuclideanRing, C.euclideanRingNumber)
 
-euclideanRingInt :: forall a b. (IsString a, IsString b) => (a, b)
-euclideanRingInt = (C.dataEuclideanRing, C.euclideanRingInt)
-
 eqNumber :: forall a b. (IsString a, IsString b) => (a, b)
 eqNumber = (C.dataEq, C.eqNumber)
 
@@ -395,9 +390,6 @@ opNegate = (C.dataRing, C.negate)
 
 opDiv :: forall a b. (IsString a, IsString b) => (a, b)
 opDiv = (C.dataEuclideanRing, C.div)
-
-opMod :: forall a b. (IsString a, IsString b) => (a, b)
-opMod = (C.dataEuclideanRing, C.mod)
 
 opConj :: forall a b. (IsString a, IsString b) => (a, b)
 opConj = (C.dataHeytingAlgebra, C.conj)

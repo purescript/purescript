@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 type Foo = (x :: Number | (y :: Number | (z :: Number)))
 type Bar = (x :: Number, y :: Number, z :: Number)
@@ -14,7 +14,7 @@ bar :: { | Bar }
 bar = { x: 0.0, y: 0.0, z: 0.0 }
 
 id' :: Record Foo -> Record Bar
-id' = id
+id' = identity
 
 foo' :: { | Foo }
 foo' = id' foo

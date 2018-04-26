@@ -43,6 +43,7 @@ metaFromJSON v = withObject "Meta" metaFromObj v
         "IsTypeClassConstructor"
                         -> return $ Just IsTypeClassConstructor
         "IsForeign"     -> return $ Just IsForeign
+        "IsWhere"       -> return $ Just IsWhere
         _               -> fail ("not recognized Meta: " ++ T.unpack type_)
 
     isConstructorFromJSON o = do

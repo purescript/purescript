@@ -62,7 +62,7 @@ preludeImport, arrayImport, listImport, consoleImport, maybeImport :: Import
 preludeImport = testParseImport "import Prelude"
 arrayImport = testParseImport "import Data.Array (head, cons)"
 listImport = testParseImport "import Data.List as List"
-consoleImport = testParseImport "import Control.Monad.Eff.Console (log) as Console"
+consoleImport = testParseImport "import Effect.Console (log) as Console"
 maybeImport = testParseImport "import Data.Maybe (Maybe(Just))"
 
 spec :: Spec
@@ -103,7 +103,7 @@ spec = do
     it "pretty prints a qualified import" $
       shouldBe (prettyPrintImport' listImport) "import Data.List as List"
     it "pretty prints a qualified explicit import" $
-      shouldBe (prettyPrintImport' consoleImport) "import Control.Monad.Eff.Console (log) as Console"
+      shouldBe (prettyPrintImport' consoleImport) "import Effect.Console (log) as Console"
     it "pretty prints an import with a datatype (and PositionedRef's for the dtors)" $
       shouldBe (prettyPrintImport' maybeImport) "import Data.Maybe (Maybe(Just))"
 

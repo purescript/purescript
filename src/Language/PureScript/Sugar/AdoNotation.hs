@@ -58,7 +58,7 @@ desugarAdo d =
                         [CaseAlternative [binder] [MkUnguarded yield]])
     return (abs, val : args)
   go (yield, args) (DoNotationLet ds) = do
-    return (Let ds yield, args)
+    return (Let FromLet ds yield, args)
   go acc (PositionedDoNotationElement pos com el) =
     rethrowWithPosition pos $ do
       (yield, args) <- go acc el

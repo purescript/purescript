@@ -2,13 +2,19 @@ module Language.PureScript.Sugar.Operators.Types where
 
 import Prelude.Compat
 
+import Control.Monad.Except
 import Language.PureScript.AST
 import Language.PureScript.Crash
+import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.Sugar.Operators.Common
 import Language.PureScript.Types
 
-matchTypeOperators :: [[(Qualified (OpName 'TypeOpName), Associativity)]] -> Type -> Type
+matchTypeOperators
+  :: MonadError MultipleErrors m
+  => [[(Qualified (OpName 'TypeOpName), Associativity)]]
+  -> Type
+  -> m Type
 matchTypeOperators = matchOperators isBinOp extractOp fromOp reapply id
   where
 

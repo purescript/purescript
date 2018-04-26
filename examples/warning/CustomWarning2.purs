@@ -3,10 +3,10 @@ module Main where
 
 import Prim.TypeError
 
-foo :: Warn "foo" => Int -> Int
+foo :: Warn (Text "foo") => Int -> Int
 foo x = x
 
-bar :: Warn "foo" => Int
+bar :: Warn (Text "foo") => Int
 bar = foo 42
 
 baz :: Int

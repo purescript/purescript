@@ -1,20 +1,20 @@
 module Main where
 
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Console (log)
+import Effect (Effect)
+import Effect.Console (log)
 import Prelude
 
-pu :: forall eff. Eff eff Unit
-pu = pure unit
+pu :: forall i. i -> Effect Unit
+pu _ = pure unit
 
-type C eff = { pu :: Eff eff Unit }
+type C i = { pu :: i -> Effect Unit }
 
-sampleC :: C ()
+sampleC :: C Unit
 sampleC = { pu: pu }
 
 newtype Identity a = Id a
 
-sampleIdC :: Identity (C ())
+sampleIdC :: Identity (C Unit)
 sampleIdC = Id { pu : pu }
 
 main = log "Done"

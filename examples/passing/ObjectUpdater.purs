@@ -1,11 +1,11 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff
-import Control.Monad.Eff.Console
+import Effect
+import Effect.Console
 import Test.Assert
 
-getValue :: forall e. Eff (| e) Boolean
+getValue :: Effect Boolean
 getValue = pure true
 
 main = do

@@ -3,6 +3,7 @@ module TestPsci.TestEnv where
 import Prelude ()
 import Prelude.Compat
 
+import           Control.Monad (void)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Trans.RWS.Strict (evalRWST, RWST)
 import qualified Language.PureScript as P
@@ -12,7 +13,7 @@ import           System.Exit
 import           System.FilePath ((</>))
 import qualified System.FilePath.Glob as Glob
 import           System.Process (readProcessWithExitCode)
-import           Test.Hspec (shouldBe)
+import           Test.Hspec (shouldBe, Expectation)
 
 -- | A monad transformer for handle PSCi actions in tests
 type TestPSCi a = RWST PSCiConfig () PSCiState IO a
@@ -90,7 +91,7 @@ evaluatesTo command expected = runAndEval command evalJsAndCompare ignorePrinted
 
 -- | An assertion to check command PSCi printed output against a given string
 prints :: String -> String -> TestPSCi ()
-prints command expected = runAndEval command evalJsAndIgnore evalPrinted
-  where
-    evalJsAndIgnore = jsEval *> return ()
-    evalPrinted s = s `equalsTo` expected
+prints command expected = printed command (`shouldBe` expected)
+
+printed :: String -> (String -> Expectation) -> TestPSCi ()
+printed command f = runAndEval command (void jsEval) (liftIO . f)

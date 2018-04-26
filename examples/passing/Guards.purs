@@ -1,7 +1,7 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 collatz = \x -> case x of
   y | y `mod` 2.0 == 0.0 -> y / 2.0

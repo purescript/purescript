@@ -42,7 +42,7 @@ sortModules ms = do
     toGraphNode mns m@(Module _ _ mn ds _) = do
       let deps = ordNub (mapMaybe usedModules ds)
       void . parU deps $ \(dep, pos) ->
-        when (dep `notElem` [C.Prim, C.PrimRow, C.PrimTypeError] && S.notMember dep mns) .
+        when (dep `notElem` [C.Prim, C.PrimOrdering, C.PrimRow, C.PrimRowList, C.PrimSymbol, C.PrimTypeError] && S.notMember dep mns) .
           throwError
             . addHint (ErrorInModule mn)
             . errorMessage' pos

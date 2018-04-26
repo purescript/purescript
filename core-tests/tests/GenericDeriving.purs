@@ -2,8 +2,8 @@ module Test.GenericDeriving where
 
 import Prelude
 
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Console (CONSOLE, log, logShow)
+import Effect (Effect)
+import Effect.Console (log, logShow)
 import Data.Generic (class Generic, gShow, gEq)
 import Partial.Unsafe (unsafePartial)
 
@@ -24,7 +24,7 @@ newtype X b = X b
 
 derive instance genericX :: Generic (X String)
 
-main :: forall eff. Eff (console :: CONSOLE | eff) Unit
+main :: Effect Unit
 main = unsafePartial do
   log $ gShow (D { "asgård": C [ A 1.0 "test", B 42, D { "asgård": true } ] })
   logShow $ gEq (C [B 0]) (C [B 0] :: A Empty)

@@ -66,5 +66,5 @@ desugarDo d =
         checkBind _ = pure ()
     mapM_ checkBind ds
     rest' <- go rest
-    return $ Let ds rest'
+    return $ Let FromLet ds rest'
   go (PositionedDoNotationElement pos com el : rest) = rethrowWithPosition pos $ PositionedValue pos com <$> go (el : rest)

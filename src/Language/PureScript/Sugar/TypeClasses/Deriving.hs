@@ -666,7 +666,7 @@ isAppliedVar (TypeApp (TypeVar _) _) = True
 isAppliedVar _ = False
 
 objectType :: Type -> Maybe Type
-objectType (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Record"))) rec) = Just rec
+objectType (TypeApp (TypeConstructor C.Record) rec) = Just rec
 objectType _ = Nothing
 
 decomposeRec :: Type -> Maybe [(Label, Type)]
@@ -741,6 +741,12 @@ deriveFunctor ss mn syns ds tyConNm = do
                 let argVar = mkVar ss arg
                     mkAssignment ((Label l), x) = (l, App x (Accessor l argVar))
                 return (lam ss arg (ObjectUpdate argVar (mkAssignment <$> updates)))
+
+          -- quantifiers
+          goType (ForAll scopedVar t _) | scopedVar /= iTyName = goType t
+
+          -- constraints
+          goType (ConstrainedType _ t) = goType t
 
           -- under a `* -> *`, just assume functor for now
           goType (TypeApp _ t) = fmap (App mapVar) <$> goType t

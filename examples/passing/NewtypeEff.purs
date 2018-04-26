@@ -1,12 +1,12 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff.Console
-import Control.Monad.Eff
+import Effect.Console
+import Effect
 
-newtype T a = T (Eff (console :: CONSOLE) a)
+newtype T a = T (Effect a)
 
-runT :: forall a. T a -> Eff (console :: CONSOLE) a
+runT :: forall a. T a -> Effect a
 runT (T t) = t
 
 instance functorT :: Functor T where

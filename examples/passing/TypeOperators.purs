@@ -1,7 +1,7 @@
 module Main where
 
 import A (type (~>), type (/\), (/\))
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 natty ∷ ∀ f. f ~> f
 natty x = x

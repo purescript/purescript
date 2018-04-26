@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module TestHierarchy where
 
+import Prelude
+
 import Language.PureScript.Hierarchy
 import qualified Language.PureScript as P
 

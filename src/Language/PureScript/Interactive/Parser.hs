@@ -2,11 +2,13 @@
 -- Parser for PSCI.
 --
 module Language.PureScript.Interactive.Parser
-  ( parseCommand
+  ( parseDotFile
+  , parseCommand
   ) where
 
 import           Prelude.Compat hiding (lex)
 
+import           Control.Applicative ((<|>))
 import           Control.Monad (join)
 import           Data.Bifunctor (first)
 import           Data.Char (isSpace)
@@ -17,6 +19,16 @@ import qualified Language.PureScript as P
 import qualified Language.PureScript.Interactive.Directive as D
 import           Language.PureScript.Interactive.Types
 import           Language.PureScript.Parser.Common (mark, same)
+
+-- |
+-- Parses a limited set of commands from from .purs-repl
+--
+parseDotFile :: FilePath -> String -> Either String [Command]
+parseDotFile filePath s = first show $ do
+  ts <- P.lex filePath (T.pack s)
+  P.runTokenParser filePath (many parser <* eof) ts
+  where
+  parser  = psciImport <|> fail "The .purs-repl file only supports import declarations"
 
 -- |
 -- Parses PSCI metacommands or expressions input from the user.
@@ -72,6 +84,7 @@ parseDirective cmd =
     Type     -> TypeOf <$> parseRest P.parseValue arg
     Kind     -> KindOf <$> parseRest P.parseType arg
     Complete -> return (CompleteStr arg)
+
 -- |
 -- Parses expressions entered at the PSCI repl.
 --

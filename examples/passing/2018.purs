@@ -3,10 +3,10 @@ module Main where
 import Prelude
 import A (foo)
 import B (Foo(..))
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Console (CONSOLE, log)
+import Effect (Effect)
+import Effect.Console (log)
 
-main :: forall e. Eff (console :: CONSOLE | e) Unit
+main :: Effect Unit
 main = do
   let tmp = foo X
   log "Done"

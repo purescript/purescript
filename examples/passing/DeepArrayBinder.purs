@@ -1,8 +1,8 @@
 module Main where
 
 import Prelude
-import Control.Monad.Eff
-import Control.Monad.Eff.Console (log)
+import Effect
+import Effect.Console (log)
 import Test.Assert
 
 data List a = Cons a (List a) | Nil

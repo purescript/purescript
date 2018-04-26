@@ -40,3 +40,7 @@ commandTests = context "commandTests" $ do
     ":complete ma" `prints` unlines ["map", "mapFlipped"]
     run "import Control.Monad as M"
     ":complete M.a" `prints` unlines ["M.ap", "M.apply"]
+
+  specPSCi ":browse" $ do
+    ":browse Mirp" `printed` flip shouldContain "is not valid"
+    ":browse Prim" `printed` flip shouldContain "class Partial"

@@ -78,7 +78,6 @@ errorCode em = case unwrapErrorMessage em of
   ErrorParsingFFIModule{} -> "ErrorParsingFFIModule"
   ErrorParsingModule{} -> "ErrorParsingModule"
   MissingFFIModule{} -> "MissingFFIModule"
-  MultipleFFIModules{} -> "MultipleFFIModules"
   UnnecessaryFFIModule{} -> "UnnecessaryFFIModule"
   MissingFFIImplementations{} -> "MissingFFIImplementations"
   UnusedFFIImplementations{} -> "UnusedFFIImplementations"
@@ -167,6 +166,7 @@ errorCode em = case unwrapErrorMessage em of
   DuplicateExportRef{} -> "DuplicateExportRef"
   IntOutOfRange{} -> "IntOutOfRange"
   ImplicitQualifiedImport{} -> "ImplicitQualifiedImport"
+  ImplicitQualifiedImportReExport{} -> "ImplicitQualifiedImportReExport"
   ImplicitImport{} -> "ImplicitImport"
   HidingImport{} -> "HidingImport"
   CaseBinderLengthDiffers{} -> "CaseBinderLengthDiffers"
@@ -180,6 +180,8 @@ errorCode em = case unwrapErrorMessage em of
   UserDefinedWarning{} -> "UserDefinedWarning"
   UnusableDeclaration{} -> "UnusableDeclaration"
   CannotDefinePrimModules{} -> "CannotDefinePrimModules"
+  MixedAssociativityError{} -> "MixedAssociativityError"
+  NonAssociativeError{} -> "NonAssociativeError"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -314,6 +316,7 @@ errorSuggestion err =
       UnusedDctorExplicitImport mn _ _ qual refs -> suggest $ importSuggestion mn refs qual
       ImplicitImport mn refs -> suggest $ importSuggestion mn refs Nothing
       ImplicitQualifiedImport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
+      ImplicitQualifiedImportReExport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
       HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
       MissingTypeDeclaration ident ty -> suggest $ showIdent ident <> " :: " <> T.pack (prettyPrintSuggestedType ty)
       WildcardInferredType ty _ -> suggest $ T.pack (prettyPrintSuggestedType ty)
@@ -486,10 +489,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 [ line $ "The identifier " <> markCode ident <> " is not valid in PureScript."
                 , line "Note that exported identifiers in FFI modules must be valid PureScript identifiers."
                 ]
-            ]
-    renderSimpleErrorMessage (MultipleFFIModules mn paths) =
-      paras [ line $ "Multiple foreign module implementations have been provided for module " <> markCode (runModuleName mn) <> ": "
-            , indent . paras $ map lineS paths
             ]
     renderSimpleErrorMessage InvalidDoBind =
       line "The last statement in a 'do' block must be an expression, but this block ends with a binder."
@@ -914,6 +913,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , line $ "As there are multiple modules being imported as " <> markCode (runModuleName asModule) <> ", consider using the explicit form:"
             , indent $ line $ markCode $ showSuggestion msg
             ]
+    renderSimpleErrorMessage msg@(ImplicitQualifiedImportReExport importedModule asModule _) =
+      paras [ line $ "Module " <> markCode (runModuleName importedModule) <> " was imported as " <> markCode (runModuleName asModule) <> " with unspecified imports."
+            , line $ "As this module is being re-exported, consider using the explicit form:"
+            , indent $ line $ markCode $ showSuggestion msg
+            ]
 
     renderSimpleErrorMessage msg@(ImplicitImport mn _) =
       paras [ line $ "Module " <> markCode (runModuleName mn) <> " has unspecified imports, consider using the explicit form: "
@@ -980,7 +984,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
 
         case unexplained of
           [required] ->
-            [ line $ "These arguments are: { " <> T.intercalate "," required <> "}"
+            [ line $ "These arguments are: { " <> T.intercalate ", " required <> " }"
             ]
 
           options  ->
@@ -994,6 +998,27 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
         [ line $ "The module name " <> markCode (runModuleName mn) <> " is in the Prim namespace."
         , line $ "The Prim namespace is reserved for compiler-defined terms."
         ]
+
+    renderSimpleErrorMessage (MixedAssociativityError opsWithAssoc) =
+      paras
+        [ line "Cannot parse an expression that uses operators of the same precedence but mixed associativity:"
+        , indent $ paras $ map (\(name, assoc) -> line $ markCode (showQualified showOp name) <> " is " <> markCode (T.pack (showAssoc assoc))) (NEL.toList opsWithAssoc)
+        , line "Use parentheses to resolve this ambiguity."
+        ]
+
+    renderSimpleErrorMessage (NonAssociativeError ops) =
+      if NEL.length ops == 1
+        then
+          paras
+            [ line $ "Cannot parse an expression that uses multiple instances of the non-associative operator " <> markCode (showQualified showOp (NEL.head ops)) <> "."
+            , line "Use parentheses to resolve this ambiguity."
+            ]
+        else
+          paras
+            [ line "Cannot parse an expression that uses multiple non-associative operators of the same precedence:"
+            , indent $ paras $ map (line . markCode . showQualified showOp) (NEL.toList ops)
+            , line "Use parentheses to resolve this ambiguity."
+            ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1 t2) detail =
@@ -1375,10 +1400,15 @@ toTypelevelString :: Type -> Maybe Box.Box
 toTypelevelString (TypeLevelString s) =
   Just . Box.text $ decodeStringWithReplacement s
 toTypelevelString (TypeApp (TypeConstructor f) x)
-  | f == primName "TypeString" = Just (typeAsBox x)
+  | f == primSubName C.typeError "Text" = toTypelevelString x
+toTypelevelString (TypeApp (TypeConstructor f) x)
+  | f == primSubName C.typeError "Quote" = Just (typeAsBox x)
 toTypelevelString (TypeApp (TypeApp (TypeConstructor f) x) ret)
-  | f == primName "TypeConcat" =
+  | f == primSubName C.typeError "Beside" =
     (Box.<>) <$> toTypelevelString x <*> toTypelevelString ret
+toTypelevelString (TypeApp (TypeApp (TypeConstructor f) x) ret)
+  | f == primSubName C.typeError "Above" =
+    (Box.//) <$> toTypelevelString x <*> toTypelevelString ret
 toTypelevelString _ = Nothing
 
 -- | Rethrow an error with a more detailed error message in the case of failure

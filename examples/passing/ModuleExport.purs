@@ -1,6 +1,6 @@
 module Main where
 
-import Control.Monad.Eff.Console (log, logShow)
+import Effect.Console (log, logShow)
 import A
 
 main = do

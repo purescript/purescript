@@ -4,7 +4,7 @@ module Main where
 
 import Prelude
 import Test.Assert (assert')
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
 main = do
   test "0.17" 0.17

@@ -69,7 +69,6 @@ data SimpleErrorMessage
   | ErrorParsingFFIModule FilePath (Maybe Bundle.ErrorMessage)
   | ErrorParsingModule P.ParseError
   | MissingFFIModule ModuleName
-  | MultipleFFIModules ModuleName [FilePath]
   | UnnecessaryFFIModule ModuleName FilePath
   | MissingFFIImplementations ModuleName [Ident]
   | UnusedFFIImplementations ModuleName [Ident]
@@ -158,6 +157,7 @@ data SimpleErrorMessage
   | DuplicateExportRef Name
   | IntOutOfRange Integer Text Integer Integer
   | ImplicitQualifiedImport ModuleName ModuleName [DeclarationRef]
+  | ImplicitQualifiedImportReExport ModuleName ModuleName [DeclarationRef]
   | ImplicitImport ModuleName [DeclarationRef]
   | HidingImport ModuleName [DeclarationRef]
   | CaseBinderLengthDiffers Int [Binder]
@@ -174,6 +174,8 @@ data SimpleErrorMessage
   -- | a declaration couldn't be used because it contained free variables
   | UnusableDeclaration Ident [[Text]]
   | CannotDefinePrimModules ModuleName
+  | MixedAssociativityError (NEL.NonEmpty (Qualified (OpName 'AnyOpName), Associativity))
+  | NonAssociativeError (NEL.NonEmpty (Qualified (OpName 'AnyOpName)))
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
@@ -768,7 +770,7 @@ data Expr
   -- |
   -- A let binding
   --
-  | Let [Declaration] Expr
+  | Let WhereProvenance [Declaration] Expr
   -- |
   -- A do-notation block
   --
@@ -812,6 +814,20 @@ data Expr
   -- A value with source position information
   --
   | PositionedValue SourceSpan [Comment] Expr
+  deriving (Show)
+
+-- |
+-- Metadata that tells where a let binding originated
+--
+data WhereProvenance
+  -- |
+  -- The let binding was originally a where clause
+  --
+  = FromWhere
+  -- |
+  -- The let binding was always a let binding
+  --
+  | FromLet
   deriving (Show)
 
 -- |

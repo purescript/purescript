@@ -4,14 +4,14 @@ module Main where
 
 import Prelude
 import Prim.TypeError
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Console (log)
+import Effect (Effect)
+import Effect.Console (log)
 
 class MyShow a where
   myShow :: a -> String
 
-instance cannotShowFunctions :: Fail "Cannot show functions" => MyShow (a -> b) where
+instance cannotShowFunctions :: Fail (Text "Cannot show functions") => MyShow (a -> b) where
   myShow _ = "unreachable"
 
-main :: Eff _ _
+main :: Effect Unit
 main = log (myShow (_ + 1))

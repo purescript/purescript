@@ -1,9 +1,9 @@
 -- @shouldFailWith ErrorParsingModule
 module Main where
 
-import Control.Monad.Eff.Console (log)
+import Effect.Console (log)
 
-test = (\f :: Int -> Int -> f 10) id
+test = (\f :: Int -> Int -> f 10) identity
 
 main = do
   let t1 = test
