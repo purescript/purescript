@@ -2,6 +2,7 @@
 module Language.PureScript.Options where
 
 import Prelude.Compat
+import qualified Data.Set as S
 
 -- | The data type of compiler options
 data Options = Options
@@ -9,12 +10,13 @@ data Options = Options
   -- ^ Verbose error message
   , optionsNoComments :: Bool
   -- ^ Remove the comments from the generated js
-  , optionsSourceMaps :: Bool
-  -- ^ Generate source maps
-  , optionsDumpCoreFn :: Bool
-  -- ^ Dump CoreFn
+  , optionsCodegenTargets :: S.Set CodegenTarget
+  -- ^ Codegen targets (JS, CoreFn, etc.)
   } deriving Show
 
 -- Default make options
 defaultOptions :: Options
-defaultOptions = Options False False False False
+defaultOptions = Options False False (S.singleton JS)
+
+data CodegenTarget = JS | JSSourceMap | CoreFn
+  deriving (Eq, Ord, Show)
