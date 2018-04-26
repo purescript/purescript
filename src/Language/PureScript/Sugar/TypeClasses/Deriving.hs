@@ -204,7 +204,7 @@ deriveNewtypeInstance ss mn syns ndis className ds tys tyConNm dargs = do
     tyCon <- findTypeDecl tyConNm ds
     go tyCon
   where
-    go (DataDeclaration _ Newtype _ tyArgNames [(_, [wrapped])])
+    go (DataDeclaration _ Newtype _ tyArgNames [(_, [wrapped])]) = do
       -- The newtype might not be applied to all type arguments.
       -- This is okay as long as the newtype wraps something which ends with
       -- sufficiently many type applications to variables.
@@ -214,10 +214,12 @@ deriveNewtypeInstance ss mn syns ndis className ds tys tyConNm dargs = do
       --
       -- since Array a is a type application which uses the last
       -- type argument
-      | Just wrapped' <- stripRight (takeReverse (length tyArgNames - length dargs) tyArgNames) wrapped =
-          do let subst = zipWith (\(name, _) t -> (name, t)) tyArgNames dargs
-             wrapped'' <- replaceAllTypeSynonymsM syns wrapped'
-             return (DeferredDictionary className (init tys ++ [replaceAllTypeVars subst wrapped'']))
+      wrapped' <- replaceAllTypeSynonymsM syns wrapped
+      case stripRight (takeReverse (length tyArgNames - length dargs) tyArgNames) wrapped' of
+        Just wrapped'' -> do
+          let subst = zipWith (\(name, _) t -> (name, t)) tyArgNames dargs
+          return (DeferredDictionary className (init tys ++ [replaceAllTypeVars subst wrapped'']))
+        Nothing -> throwError . errorMessage' ss $ InvalidNewtypeInstance className tys
     go _ = throwError . errorMessage' ss $ InvalidNewtypeInstance className tys
 
     takeReverse :: Int -> [a] -> [a]
