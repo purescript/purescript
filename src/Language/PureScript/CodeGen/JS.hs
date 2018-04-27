@@ -54,7 +54,7 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
     let mnLookup = renameImports usedNames imps
-    jsImports <- traverse (importToJs mnLookup) 
+    jsImports <- traverse (importToJs mnLookup)
       . (\\ [mn, C.Prim, C.PrimOrdering, C.PrimRow, C.PrimRowList, C.PrimSymbol, C.PrimTypeError]) $ ordNub $ map snd imps
     let decls' = renameModules mnLookup decls
     jsDecls <- mapM bindToJs decls'
@@ -150,7 +150,7 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
 
   withPos :: SourceSpan -> AST -> m AST
   withPos ss js = do
-    withSM <- asks optionsSourceMaps
+    withSM <- asks (elem JSSourceMap . optionsCodegenTargets)
     return $ if withSM
       then withSourceSpan ss js
       else js
