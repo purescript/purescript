@@ -52,14 +52,7 @@ data Evidence
   -- | Computed instances
   | WarnInstance Type         -- ^ Warn type class with a user-defined warning message
   | IsSymbolInstance PSString -- ^ The IsSymbol type class for a given Symbol literal
-  | SymbolCompareInstance
-  | SymbolConsInstance
-  | SymbolAppendInstance
-  | UnionInstance
-  | ConsInstance
-  | NubInstance
-  | LacksInstance
-  | RowToListInstance
+  | EmptyClassInstance        -- ^ For any solved type class with no members
   deriving (Show, Eq)
 
 -- | Extract the identifier of a named instance
@@ -341,29 +334,24 @@ entails SolverOptions{..} constraint context hints =
             solveSubgoals subst (Just subgoals) =
               Just <$> traverse (go (work + 1) . mapConstraintArgs (map (replaceAllTypeVars (M.toList subst)))) subgoals
 
+            -- We need subgoal dictionaries to appear in the term somewhere
+            -- If there aren't any then the dictionary is just undefined
+            useEmptyDict :: Maybe [Expr] -> Expr
+            useEmptyDict args = foldl (App . Abs (VarBinder nullSourceSpan UnusedIdent)) valUndefined (fold args)
+
             -- Make a dictionary from subgoal dictionaries by applying the correct function
             mkDictionary :: Evidence -> Maybe [Expr] -> m Expr
             mkDictionary (NamedInstance n) args = return $ foldl App (Var nullSourceSpan n) (fold args)
-            mkDictionary UnionInstance (Just [e]) =
-              -- We need the subgoal dictionary to appear in the term somewhere
-              return $ App (Abs (VarBinder nullSourceSpan UnusedIdent) valUndefined) e
-            mkDictionary UnionInstance _ = return valUndefined
-            mkDictionary ConsInstance _ = return valUndefined
-            mkDictionary NubInstance _ = return valUndefined
-            mkDictionary LacksInstance _ = return valUndefined
-            mkDictionary RowToListInstance _ = return valUndefined
-            mkDictionary (WarnInstance msg) _ = do
+            mkDictionary EmptyClassInstance args = return (useEmptyDict args)
+            mkDictionary (WarnInstance msg) args = do
               tell . errorMessage $ UserDefinedWarning msg
               -- We cannot call the type class constructor here because Warn is declared in Prim.
               -- This means that it doesn't have a definition that we can import.
               -- So pass an empty placeholder (undefined) instead.
-              return valUndefined
+              return (useEmptyDict args)
             mkDictionary (IsSymbolInstance sym) _ =
               let fields = [ ("reflectSymbol", Abs (VarBinder nullSourceSpan UnusedIdent) (Literal nullSourceSpan (StringLiteral sym))) ] in
               return $ TypeClassDictionaryConstructorApp C.IsSymbol (Literal nullSourceSpan (ObjectLiteral fields))
-            mkDictionary SymbolCompareInstance _ = return valUndefined
-            mkDictionary SymbolConsInstance _ = return valUndefined
-            mkDictionary SymbolAppendInstance _ = return valUndefined
 
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr
@@ -381,14 +369,14 @@ entails SolverOptions{..} constraint context hints =
                   EQ -> C.orderingEQ
                   GT -> C.orderingGT
           args' = [arg0, arg1, TypeConstructor ordering]
-      in Just [TypeClassDictionaryInScope [] 0 SymbolCompareInstance [] C.SymbolCompare args' Nothing]
+      in Just [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.SymbolCompare args' Nothing]
     solveSymbolCompare _ = Nothing
 
     solveSymbolAppend :: [Type] -> Maybe [TypeClassDict]
     solveSymbolAppend [arg0, arg1, arg2] = do
       (arg0', arg1', arg2') <- appendSymbols arg0 arg1 arg2
       let args' = [arg0', arg1', arg2']
-      pure [TypeClassDictionaryInScope [] 0 SymbolAppendInstance [] C.SymbolAppend args' Nothing]
+      pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.SymbolAppend args' Nothing]
     solveSymbolAppend _ = Nothing
 
     -- | Append type level symbols, or, run backwards, strip a prefix or suffix
@@ -410,7 +398,7 @@ entails SolverOptions{..} constraint context hints =
     solveSymbolCons [arg0, arg1, arg2] = do
       (arg0', arg1', arg2') <- consSymbol arg0 arg1 arg2
       let args' = [arg0', arg1', arg2']
-      pure [TypeClassDictionaryInScope [] 0 SymbolConsInstance [] C.SymbolCons args' Nothing]
+      pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.SymbolCons args' Nothing]
     solveSymbolCons _ = Nothing
 
     consSymbol :: Type -> Type -> Type -> Maybe (Type, Type, Type)
@@ -428,7 +416,7 @@ entails SolverOptions{..} constraint context hints =
     solveUnion :: [Type] -> Maybe [TypeClassDict]
     solveUnion [l, r, u] = do
       (lOut, rOut, uOut, cst) <- unionRows l r u
-      pure [ TypeClassDictionaryInScope [] 0 UnionInstance [] C.RowUnion [lOut, rOut, uOut] cst ]
+      pure [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowUnion [lOut, rOut, uOut] cst ]
     solveUnion _ = Nothing
 
     -- | Left biased union of two row types
@@ -455,13 +443,13 @@ entails SolverOptions{..} constraint context hints =
 
     solveRowCons :: [Type] -> Maybe [TypeClassDict]
     solveRowCons [TypeLevelString sym, ty, r, _] =
-      Just [ TypeClassDictionaryInScope [] 0 ConsInstance [] C.RowCons [TypeLevelString sym, ty, r, RCons (Label sym) ty r] Nothing ]
+      Just [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowCons [TypeLevelString sym, ty, r, RCons (Label sym) ty r] Nothing ]
     solveRowCons _ = Nothing
 
     solveRowToList :: [Type] -> Maybe [TypeClassDict]
     solveRowToList [r, _] = do
       entries <- rowToRowList r
-      pure [ TypeClassDictionaryInScope [] 0 RowToListInstance [] C.RowToList [r, entries] Nothing ]
+      pure [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowToList [r, entries] Nothing ]
     solveRowToList _ = Nothing
 
     -- | Convert a closed row to a sorted list of entries
@@ -479,7 +467,7 @@ entails SolverOptions{..} constraint context hints =
     solveNub :: [Type] -> Maybe [TypeClassDict]
     solveNub [r, _] = do
       r' <- nubRows r
-      pure [ TypeClassDictionaryInScope [] 0 NubInstance [] C.RowNub [r, r'] Nothing ]
+      pure [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowNub [r, r'] Nothing ]
     solveNub _ = Nothing
 
     nubRows :: Type -> Maybe Type
@@ -492,7 +480,7 @@ entails SolverOptions{..} constraint context hints =
     solveLacks :: [Type] -> Maybe [TypeClassDict]
     solveLacks [TypeLevelString sym, r] = do
       (r', cst) <- rowLacks sym r
-      pure [ TypeClassDictionaryInScope [] 0 LacksInstance [] C.RowLacks [TypeLevelString sym, r'] cst ]
+      pure [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowLacks [TypeLevelString sym, r'] cst ]
     solveLacks _ = Nothing
 
     rowLacks :: PSString -> Type -> Maybe (Type, Maybe [Constraint])
