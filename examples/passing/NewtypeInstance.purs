@@ -50,6 +50,10 @@ derive newtype instance bindMyWriter :: Semigroup w => Bind (MyWriter w)
 derive newtype instance monadMyWriter :: Monoid w => Monad (MyWriter w)
 derive newtype instance monadWriterMyWriter :: Monoid w => MonadWriter w (MyWriter w)
 
+type Syn' w a = MyWriter w a
+newtype Syn a = Syn (Syn' (MyArray Int) a)
+derive newtype instance functorSyn :: Functor Syn
+
 main = do
   logShow (X "test")
   logShow (singleton "test" :: Y String)
