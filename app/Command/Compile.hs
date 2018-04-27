@@ -154,6 +154,7 @@ targetParser =
       $ maybe (Opts.readerError targetsMessage) pure
       . flip M.lookup targets
       . T.unpack
+      . T.strip
 
 options :: Opts.Parser P.Options
 options =
