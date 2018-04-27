@@ -28,8 +28,8 @@ import Language.PureScript.Types
 lint :: forall m. (MonadWriter MultipleErrors m) => Module -> m ()
 lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDeclaration ds
   where
-  moduleNames :: S.Set Ident
-  moduleNames = S.fromList (ordNub (mapMaybe getDeclIdent ds))
+  moduleNames :: S.Set ScopedIdent
+  moduleNames = S.fromList (map ToplevelIdent (mapMaybe getDeclIdent ds))
 
   getDeclIdent :: Declaration -> Maybe Ident
   getDeclIdent (ValueDeclaration vd) = Just (valdeclIdent vd)
@@ -54,26 +54,30 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
       addHint (ErrorInTypeDeclaration (tydeclIdent td)) (checkTypeVars ss s (tydeclType td))
     f' s dec = warningsInDecl moduleNames dec <> checkTypeVarsInDecl s dec
 
-    stepE :: S.Set Ident -> Expr -> MultipleErrors
-    stepE s (Abs (VarBinder ss name) _) | name `S.member` s = errorMessage' ss (ShadowedName name)
+    stepE :: S.Set ScopedIdent -> Expr -> MultipleErrors
+    stepE s (Abs (VarBinder ss name) _) | name `inScope` s = errorMessage' ss (ShadowedName name)
     stepE s (Let _ ds' _) = foldMap go ds'
       where
       go d | Just i <- getDeclIdent d
-           , i `S.member` s = errorMessage' (declSourceSpan d) (ShadowedName i)
+           , inScope i s = errorMessage' (declSourceSpan d) (ShadowedName i)
            | otherwise = mempty
     stepE _ _ = mempty
 
-    stepB :: S.Set Ident -> Binder -> MultipleErrors
-    stepB s (VarBinder ss name) | name `S.member` s = errorMessage' ss (ShadowedName name)
-    stepB s (NamedBinder ss name _) | name `S.member` s = errorMessage' ss (ShadowedName name)
+    stepB :: S.Set ScopedIdent -> Binder -> MultipleErrors
+    stepB s (VarBinder ss name)
+      | name `inScope` s
+      = errorMessage' ss (ShadowedName name)
+    stepB s (NamedBinder ss name _)
+      | inScope name s
+      = errorMessage' ss (ShadowedName name)
     stepB _ _ = mempty
 
-    stepDo :: S.Set Ident -> DoNotationElement -> MultipleErrors
+    stepDo :: S.Set ScopedIdent -> DoNotationElement -> MultipleErrors
     stepDo s (DoNotationLet ds') = foldMap go ds'
       where
-      go d | Just i <- getDeclIdent d
-           , i `S.member` s = errorMessage' (declSourceSpan d) (ShadowedName i)
-           | otherwise = mempty
+      go d
+        | Just i <- getDeclIdent d, i `inScope` s = errorMessage' (declSourceSpan d) (ShadowedName i)
+        | otherwise = mempty
     stepDo _ _ = mempty
 
   checkTypeVarsInDecl :: S.Set Text -> Declaration -> MultipleErrors

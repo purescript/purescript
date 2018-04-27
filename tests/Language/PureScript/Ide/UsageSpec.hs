@@ -53,6 +53,12 @@ spec = describe "Finding Usages" $ do
                     , usage (Test.mn "FindUsage.Recursive") "recursiveUsage" IdeNSValue
                     ]
       usage1 `shouldBeUsage` ("src" </> "FindUsage" </> "Recursive.purs", "7:12-7:26")
+    it "ignores a locally shadowed recursive usage" $ do
+      ([_, Right (UsagesResult usageResult)], _) <- Test.inProject $
+        Test.runIde [ load ["FindUsage.RecursiveShadowed"]
+                    , usage (Test.mn "FindUsage.RecursiveShadowed") "recursiveUsage" IdeNSValue
+                    ]
+      usageResult `shouldBe` []
     it "finds a constructor usage" $ do
       ([_, Right (UsagesResult [usage1])], _) <- Test.inProject $
         Test.runIde [ load ["FindUsage", "FindUsage.Definition", "FindUsage.Reexport"]
