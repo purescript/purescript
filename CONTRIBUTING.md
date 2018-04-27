@@ -8,7 +8,7 @@ If you would like to contribute, please consider the issues in the current miles
 
 Please follow the following guidelines:
 
-- Add at least a test to `examples/passing/` and possibly to `examples/failing/`.
+- Add at least a test to `tests/purs/passing/` and possibly to `tests/purs/failing/`.
 - Build the binaries and libs with `stack build`
 - Make sure that all test suites are passing. Run the test suites with `stack test`.
 - Build the core libraries by running the script in `core-tests`.
@@ -21,7 +21,7 @@ You can run individual test suites using `stack test --test-arguments="-p
 PATTERN"` where `PATTERN` is one of `compiler`, `repl`, `ide`, `docs`, `corefn`,
 or `hierarchy`.
 
-To build and run a specific test in `examples/passing/` or `examples/failing/`, add test arguments like so:
+To build and run a specific test in `tests/purs/passing/` or `tests/purs/failing/`, add test arguments like so:
 
 `stack test --fast --test-arguments="-p compiler/**1110.purs*"`
 

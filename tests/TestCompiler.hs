@@ -63,9 +63,9 @@ spec = do
 
   (supportModules, supportExterns, supportForeigns, passingTestCases, warningTestCases, failingTestCases) <- runIO $ do
     cwd <- getCurrentDirectory
-    let passing = cwd </> "examples" </> "passing"
-    let warning = cwd </> "examples" </> "warning"
-    let failing = cwd </> "examples" </> "failing"
+    let passing = cwd </> "tests" </> "purs" </> "passing"
+    let warning = cwd </> "tests" </> "purs" </> "warning"
+    let failing = cwd </> "tests" </> "purs" </> "failing"
     passingFiles <- getTestFiles passing <$> testGlob passing
     warningFiles <- getTestFiles warning <$> testGlob warning
     failingFiles <- getTestFiles failing <$> testGlob failing

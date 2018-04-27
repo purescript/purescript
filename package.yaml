@@ -16,10 +16,10 @@ license: BSD3
 github: purescript/purescript
 homepage: http://www.purescript.org/
 extra-source-files:
-  - examples/**/*.js
-  - examples/**/*.purs
-  - examples/**/*.json
   - app/static/*
+  - tests/purs/**/*.js
+  - tests/purs/**/*.purs
+  - tests/purs/**/*.json
   - tests/support/*.json
   - tests/support/setup-win.cmd
   - tests/support/psci/*.purs
