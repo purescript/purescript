@@ -47,7 +47,7 @@ publishOpts = Publish.defaultPublishOptions
 
 getPackage :: IO (Either Publish.PackageError (Docs.Package Docs.NotYetKnown))
 getPackage =
-  pushd "examples/docs" $
+  pushd "tests/purs/docs" $
     Publish.preparePackage "bower.json" "resolutions.json" publishOpts
 
 main :: IO TestTree
