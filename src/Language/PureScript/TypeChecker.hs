@@ -546,15 +546,20 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
   checkMemberExport :: (Type -> [DeclarationRef]) -> DeclarationRef -> m ()
   checkMemberExport extract dr@(TypeRef _ name dctors) = do
     env <- getEnv
+    for_ (M.lookup (qualify' name) (types env)) $ \(k, _) -> do
+      let findModuleKinds = everythingOnKinds (++) $ \case
+            NamedKind (Qualified (Just mn') kindName) | mn' == mn -> [kindName]
+            _ -> []
+      checkExport dr $ KindRef (declRefSourceSpan dr) <$> findModuleKinds k
     for_ (M.lookup (qualify' name) (typeSynonyms env)) $ \(_, ty) ->
-      checkExport dr extract ty
+      checkExport dr (extract ty)
     for_ dctors $ \dctors' ->
       for_ dctors' $ \dctor ->
         for_ (M.lookup (qualify' dctor) (dataConstructors env)) $ \(_, _, ty, _) ->
-          checkExport dr extract ty
+          checkExport dr (extract ty)
   checkMemberExport extract dr@(ValueRef _ name) = do
     ty <- lookupVariable (qualify' name)
-    checkExport dr extract ty
+    checkExport dr (extract ty)
   checkMemberExport _ _ = return ()
 
   checkSuperClassExport
@@ -578,13 +583,14 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
   checkSuperClassExport _ _ _ =
     return ()
 
-  checkExport :: DeclarationRef -> (Type -> [DeclarationRef]) -> Type -> m ()
-  checkExport dr extract ty = case filter (not . exported) (extract ty) of
+  checkExport :: DeclarationRef -> [DeclarationRef] -> m ()
+  checkExport dr drs = case filter (not . exported) drs of
     [] -> return ()
     hidden -> throwError . errorMessage' (declRefSourceSpan dr) $ TransitiveExportError dr (nubBy nubEq hidden)
     where
     exported e = any (exports e) exps
     exports (TypeRef _ pn1 _) (TypeRef _ pn2 _) = pn1 == pn2
+    exports (KindRef _ pn1) (KindRef _ pn2) = pn1 == pn2
     exports (ValueRef _ id1) (ValueRef _ id2) = id1 == id2
     exports (TypeClassRef _ pn1) (TypeClassRef _ pn2) = pn1 == pn2
     exports _ _ = False
