@@ -133,17 +133,17 @@ rebracketFiltered pred_ externs modules = do
     (goDecl', goExpr', goBinder') = updateTypes goType
     (f', _, _, _, _) =
       everywhereWithContextOnValuesM
-        Nothing
-        (\_ d -> (Just (declSourceSpan d),) <$> goDecl' d)
+        ss
+        (\_ d -> (declSourceSpan d,) <$> goDecl' d)
         (\pos -> uncurry goExpr <=< goExpr' pos)
         (\pos -> uncurry goBinder <=< goBinder' pos)
         defS
         defS
 
-    goExpr :: Maybe SourceSpan -> Expr -> m (Maybe SourceSpan, Expr)
-    goExpr _ e@(PositionedValue pos _ _) = return (Just pos, e)
+    goExpr :: SourceSpan -> Expr -> m (SourceSpan, Expr)
+    goExpr _ e@(PositionedValue pos _ _) = return (pos, e)
     goExpr _ (Op pos op) =
-      (Just pos, ) <$> case op `M.lookup` valueAliased of
+      (pos,) <$> case op `M.lookup` valueAliased of
         Just (Qualified mn' (Left alias)) ->
           return $ Var pos (Qualified mn' alias)
         Just (Qualified mn' (Right alias)) ->
@@ -152,31 +152,28 @@ rebracketFiltered pred_ externs modules = do
           throwError . errorMessage' pos . UnknownName $ fmap ValOpName op
     goExpr pos other = return (pos, other)
 
-    goBinder :: Maybe SourceSpan -> Binder -> m (Maybe SourceSpan, Binder)
-    goBinder _ b@(PositionedBinder pos _ _) = return (Just pos, b)
+    goBinder :: SourceSpan -> Binder -> m (SourceSpan, Binder)
+    goBinder _ b@(PositionedBinder pos _ _) = return (pos, b)
     goBinder _ (BinaryNoParensBinder (OpBinder pos op) lhs rhs) =
       case op `M.lookup` valueAliased of
         Just (Qualified mn' (Left alias)) ->
           throwError . errorMessage' pos $ InvalidOperatorInBinder op (Qualified mn' alias)
         Just (Qualified mn' (Right alias)) ->
-          return (Just pos, ConstructorBinder pos (Qualified mn' alias) [lhs, rhs])
+          return (pos, ConstructorBinder pos (Qualified mn' alias) [lhs, rhs])
         Nothing ->
           throwError . errorMessage' pos . UnknownName $ fmap ValOpName op
     goBinder _ BinaryNoParensBinder{} =
       internalError "BinaryNoParensBinder has no OpBinder"
     goBinder pos other = return (pos, other)
 
-    goType :: Maybe SourceSpan -> Type -> m Type
-    goType pos = maybe id rethrowWithPosition pos . go
-      where
-      go :: Type -> m Type
-      go (BinaryNoParensType (TypeOp op) lhs rhs) =
-        case op `M.lookup` typeAliased of
-          Just alias ->
-            return $ TypeApp (TypeApp (TypeConstructor alias) lhs) rhs
-          Nothing ->
-            throwError . errorMessage $ UnknownName $ fmap TyOpName op
-      go other = return other
+    goType :: SourceSpan -> Type -> m Type
+    goType pos (BinaryNoParensType (TypeOp op) lhs rhs) =
+      case op `M.lookup` typeAliased of
+        Just alias ->
+          return $ TypeApp (TypeApp (TypeConstructor alias) lhs) rhs
+        Nothing ->
+          throwError . errorMessage' pos $ UnknownName $ fmap TyOpName op
+    goType _ other = return other
 
 rebracketModule
   :: forall m
@@ -194,19 +191,22 @@ rebracketModule pred_ valueOpTable typeOpTable (Module ss coms mn ds exts) =
     fmap (map (\d -> if pred_ d then removeParens d else d)) .
     flip parU (usingPredicate pred_ f)
 
-  (f, _, _) =
-      everywhereOnValuesTopDownM
-        goDecl
-        (matchExprOperators valueOpTable <=< decontextify goExpr')
-        (matchBinderOperators valueOpTable <=< decontextify goBinder')
+  (f, _, _, _, _) =
+      everywhereWithContextOnValuesM
+        ss
+        (\_ d -> (declSourceSpan d,) <$> goDecl d)
+        (\pos -> wrap (matchExprOperators valueOpTable) <=< goExpr' pos)
+        (\pos -> wrap (matchBinderOperators valueOpTable) <=< goBinder' pos)
+        defS
+        defS
 
-  (goDecl, goExpr', goBinder') = updateTypes (const goType)
+  (goDecl, goExpr', goBinder') = updateTypes goType
 
-  goType :: Type -> m Type
-  goType = matchTypeOperators typeOpTable
+  goType :: SourceSpan -> Type -> m Type
+  goType = flip matchTypeOperators typeOpTable
 
-  decontextify :: (Maybe SourceSpan -> a -> m (Maybe SourceSpan, a)) -> a -> m a
-  decontextify ctxf = fmap snd . ctxf Nothing
+  wrap :: (a -> m a) -> (SourceSpan, a) -> m (SourceSpan, a)
+  wrap go (ss', a) = (ss',) <$> go a
 
 removeParens :: Declaration -> Declaration
 removeParens = f
@@ -232,10 +232,10 @@ removeParens = f
   goType t = t
 
   decontextify
-    :: (Maybe SourceSpan -> a -> Identity (Maybe SourceSpan, a))
+    :: (SourceSpan -> a -> Identity (SourceSpan, a))
     -> a
     -> a
-  decontextify ctxf = snd . runIdentity . ctxf Nothing
+  decontextify ctxf = snd . runIdentity . ctxf (internalError "attempted to use SourceSpan in removeParens")
 
 externsFixities :: ExternsFile -> [Either ValueFixityRecord TypeFixityRecord]
 externsFixities ExternsFile{..} =
@@ -302,41 +302,38 @@ customOperatorTable fixities =
 updateTypes
   :: forall m
    . Monad m
-  => (Maybe SourceSpan -> Type -> m Type)
+  => (SourceSpan -> Type -> m Type)
   -> ( Declaration -> m Declaration
-     , Maybe SourceSpan -> Expr -> m (Maybe SourceSpan, Expr)
-     , Maybe SourceSpan -> Binder -> m (Maybe SourceSpan, Binder)
+     , SourceSpan -> Expr -> m (SourceSpan, Expr)
+     , SourceSpan -> Binder -> m (SourceSpan, Binder)
      )
 updateTypes goType = (goDecl, goExpr, goBinder)
   where
 
-  goType' :: Maybe SourceSpan -> Type -> m Type
+  goType' :: SourceSpan -> Type -> m Type
   goType' = everywhereOnTypesTopDownM . goType
-
-  goType'' :: SourceSpan -> Type -> m Type
-  goType'' = goType' . Just
 
   goDecl :: Declaration -> m Declaration
   goDecl (DataDeclaration sa@(ss, _) ddt name args dctors) =
-    DataDeclaration sa ddt name args <$> traverse (sndM (traverse (goType'' ss))) dctors
+    DataDeclaration sa ddt name args <$> traverse (sndM (traverse (goType' ss))) dctors
   goDecl (ExternDeclaration sa@(ss, _) name ty) =
-    ExternDeclaration sa name <$> goType'' ss ty
+    ExternDeclaration sa name <$> goType' ss ty
   goDecl (TypeClassDeclaration sa@(ss, _) name args implies deps decls) = do
-    implies' <- traverse (overConstraintArgs (traverse (goType'' ss))) implies
+    implies' <- traverse (overConstraintArgs (traverse (goType' ss))) implies
     return $ TypeClassDeclaration sa name args implies' deps decls
   goDecl (TypeInstanceDeclaration sa@(ss, _) ch idx name cs className tys impls) = do
-    cs' <- traverse (overConstraintArgs (traverse (goType'' ss))) cs
-    tys' <- traverse (goType'' ss) tys
+    cs' <- traverse (overConstraintArgs (traverse (goType' ss))) cs
+    tys' <- traverse (goType' ss) tys
     return $ TypeInstanceDeclaration sa ch idx name cs' className tys' impls
   goDecl (TypeSynonymDeclaration sa@(ss, _) name args ty) =
-    TypeSynonymDeclaration sa name args <$> goType'' ss ty
+    TypeSynonymDeclaration sa name args <$> goType' ss ty
   goDecl (TypeDeclaration (TypeDeclarationData sa@(ss, _) expr ty)) =
-    TypeDeclaration . TypeDeclarationData sa expr <$> goType'' ss ty
+    TypeDeclaration . TypeDeclarationData sa expr <$> goType' ss ty
   goDecl other =
     return other
 
-  goExpr :: Maybe SourceSpan -> Expr -> m (Maybe SourceSpan, Expr)
-  goExpr _ e@(PositionedValue pos _ _) = return (Just pos, e)
+  goExpr :: SourceSpan -> Expr -> m (SourceSpan, Expr)
+  goExpr _ e@(PositionedValue pos _ _) = return (pos, e)
   goExpr pos (TypeClassDictionary (Constraint name tys info) dicts hints) = do
     tys' <- traverse (goType' pos) tys
     return (pos, TypeClassDictionary (Constraint name tys' info) dicts hints)
@@ -348,8 +345,8 @@ updateTypes goType = (goDecl, goExpr, goBinder)
     return (pos, TypedValue check v ty')
   goExpr pos other = return (pos, other)
 
-  goBinder :: Maybe SourceSpan -> Binder -> m (Maybe SourceSpan, Binder)
-  goBinder _ e@(PositionedBinder pos _ _) = return (Just pos, e)
+  goBinder :: SourceSpan -> Binder -> m (SourceSpan, Binder)
+  goBinder _ e@(PositionedBinder pos _ _) = return (pos, e)
   goBinder pos (TypedBinder ty b) = do
     ty' <- goType' pos ty
     return (pos, TypedBinder ty' b)
