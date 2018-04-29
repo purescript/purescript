@@ -45,6 +45,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@erdeszt](https://github.com/erdeszt) | Tibor Erdesz | [MIT license](http://opensource.org/licenses/MIT) |
 | [@etrepum](https://github.com/etrepum) | Bob Ippolito | [MIT license](http://opensource.org/licenses/MIT) |
 | [@faineance](https://github.com/faineance) | faineance | [MIT license](http://opensource.org/licenses/MIT) |
+| [@fehrenbach](https://github.com/fehrenbach) | Stefan Fehrenbach | [MIT license](http://opensource.org/licenses/MIT) |
 | [@felixSchl](https://github.com/felixSchl) | Felix Schlitter | [MIT license](http://opensource.org/licenses/MIT) |
 | [@FrigoEU](https://github.com/FrigoEU) | Simon Van Casteren | [MIT license](http://opensource.org/licenses/MIT) |
 | [@garyb](https://github.com/garyb) | Gary Burgess | [MIT license](http://opensource.org/licenses/MIT) |
