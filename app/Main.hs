@@ -55,7 +55,7 @@ main = do
               (Opts.progDesc "Compile PureScript source files"))
         , Opts.command "docs"
             (Opts.info Docs.command
-              (Opts.progDesc "Generate Markdown documentation from PureScript source files" <> Docs.infoModList))
+              (Opts.progDesc "Generate documentation from PureScript source files in a variety of formats, including Markdown and HTML" <> Docs.infoModList))
         , Opts.command "hierarchy"
             (Opts.info Hierarchy.command
               (Opts.progDesc "Generate a GraphViz directed graph of PureScript type classes"))
