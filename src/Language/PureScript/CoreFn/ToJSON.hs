@@ -104,7 +104,8 @@ moduleNameToJSON (ModuleName pns) = toJSON $ properNameToJSON `map` pns
 
 moduleToJSON :: Version -> Module Ann -> Value
 moduleToJSON v m = object
-  [ T.pack "moduleName" .= moduleNameToJSON (moduleName m)
+  [ T.pack "sourceSpan" .= sourceSpanToJSON (moduleSourceSpan m)
+  , T.pack "moduleName" .= moduleNameToJSON (moduleName m)
   , T.pack "modulePath" .= toJSON (modulePath m)
   , T.pack "imports"    .= map importToJSON (moduleImports m)
   , T.pack "exports"    .= map identToJSON (moduleExports m)

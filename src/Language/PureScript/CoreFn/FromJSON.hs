@@ -55,14 +55,15 @@ annFromJSON :: FilePath -> Value -> Parser Ann
 annFromJSON modulePath = withObject "Ann" annFromObj
   where
   annFromObj o = do
-    ss <- o .: "sourceSpan" >>= sourceSpanFromJSON
+    ss <- o .: "sourceSpan" >>= sourceSpanFromJSON modulePath
     mm <- o .: "meta" >>= metaFromJSON
     return (ss, [], Nothing, mm)
 
-  sourceSpanFromJSON = withObject "SourceSpan" $ \o ->
-    SourceSpan modulePath <$>
-      o .: "start" <*>
-      o .: "end"
+sourceSpanFromJSON :: FilePath -> Value -> Parser SourceSpan
+sourceSpanFromJSON modulePath = withObject "SourceSpan" $ \o ->
+  SourceSpan modulePath <$>
+    o .: "start" <*>
+    o .: "end"
 
 literalFromJSON :: (Value -> Parser a) -> Value -> Parser (Literal a)
 literalFromJSON t = withObject "Literal" literalFromObj
@@ -112,6 +113,7 @@ moduleFromJSON = withObject "Module" moduleFromObj
     version <- o .: "builtWith" >>= versionFromJSON
     moduleName <- o .: "moduleName" >>= moduleNameFromJSON
     modulePath <- o .: "modulePath"
+    moduleSourceSpan <- o .: "sourceSpan" >>= sourceSpanFromJSON modulePath
     moduleImports <- o .: "imports" >>= listParser (importFromJSON modulePath)
     moduleExports <- o .: "exports" >>= listParser identFromJSON
     moduleDecls <- o .: "decls" >>= listParser (bindFromJSON modulePath)
