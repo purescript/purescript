@@ -50,7 +50,7 @@ moduleToJs
   => Module Ann
   -> Maybe AST
   -> m [AST]
-moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
+moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreign_ =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
     let mnLookup = renameImports usedNames imps

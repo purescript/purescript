@@ -110,7 +110,7 @@ renameInModules :: [Module Ann] -> [Module Ann]
 renameInModules = map go
   where
   go :: Module Ann -> Module Ann
-  go m@(Module _ _ _ _ _ _ decls) = m { moduleDecls = map (renameInDecl' (findDeclIdents decls)) decls }
+  go m@(Module _ _ _ _ _ _ _ decls) = m { moduleDecls = map (renameInDecl' (findDeclIdents decls)) decls }
 
   renameInDecl' :: [Ident] -> Bind Ann -> Bind Ann
   renameInDecl' scope = runRename scope . renameInDecl True
