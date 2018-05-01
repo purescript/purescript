@@ -75,7 +75,7 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
       optimized = CF.optimizeCoreFn corefn
       [renamed] = renameInModules [optimized]
       exts = moduleToExternsFile mod' env'
-  evalSupplyT nextVar' . codegen ss renamed env' . encode $ exts
+  evalSupplyT nextVar' . codegen renamed env' . encode $ exts
   return exts
 
 -- | Compiles in "make" mode, compiling each module separately to a @.js@ file and an @externs.json@ file.
