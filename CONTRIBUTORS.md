@@ -32,6 +32,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@brandonhamilton](https://github.com/brandonhamilton) | Brandon Hamilton | [MIT license](http://opensource.org/licenses/MIT) |
 | [@bsermons](https://github.com/bsermons) | Brian Sermons | [MIT license](http://opensource.org/licenses/MIT) |
 | [@cdepillabout](https://github.com/cdepillabout) | Dennis Gosnell | [MIT license](http://opensource.org/licenses/MIT) |
+| [@chexxor](https://github.com/chexxor) | Alex Berg | [MIT license](http://opensource.org/licenses/MIT) |
 | [@chrisdone](https://github.com/chrisdone) | Chris Done | MIT license |
 | [@cmdv](https://github.com/cmdv) | Vincent Orr | MIT license |
 | [@codedmart](https://github.com/codedmart) | Brandon Martin | [MIT license](http://opensource.org/licenses/MIT) |
