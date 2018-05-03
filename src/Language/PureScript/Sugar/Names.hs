@@ -2,6 +2,7 @@ module Language.PureScript.Sugar.Names
   ( desugarImports
   , desugarImportsWithEnv
   , Env
+  , primEnv
   , ImportRecord(..)
   , ImportProvenance(..)
   , Imports(..)

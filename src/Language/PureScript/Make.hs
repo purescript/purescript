@@ -119,14 +119,12 @@ make ma@MakeActions{..} ms = do
 
   checkNoPrim :: m ()
   checkNoPrim =
-    for_ ms $ \m -> do
-      case getModuleName m of
-        mn@(ModuleName (ProperName "Prim" : _)) ->
-          throwError
-            . errorMessage' (getModuleSourceSpan m)
-            $ CannotDefinePrimModules mn
-        _ ->
-          pure ()
+    for_ ms $ \m ->
+      let mn = getModuleName m
+      in when (isBuiltinModuleName mn) $
+           throwError
+             . errorMessage' (getModuleSourceSpan m)
+             $ CannotDefinePrimModules mn
 
   checkModuleNamesAreUnique :: m ()
   checkModuleNamesAreUnique =
