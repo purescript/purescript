@@ -177,6 +177,10 @@ moduleNameFromString = ModuleName . splitProperNames
     s' -> ProperName w : splitProperNames s''
       where (w, s'') = T.break (== '.') s'
 
+isBuiltinModuleName :: ModuleName -> Bool
+isBuiltinModuleName (ModuleName (ProperName "Prim" : _)) = True
+isBuiltinModuleName _ = False
+
 -- |
 -- A qualified name, i.e. a name with an optional module name
 --

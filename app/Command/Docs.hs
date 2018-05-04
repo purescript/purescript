@@ -62,7 +62,7 @@ docgen (PSCDocsOptions fmt inputGlob output) = do
     Ctags -> mapM_ putStrLn $ dumpCtags fileMs
     Html -> do
       let outputDir = "./generated-docs" -- TODO: make this configurable
-      let msHtml = map asHtml (D.primDocsModule : ms)
+      let msHtml = map asHtml (D.primModules ++ ms)
       createDirectoryIfMissing False outputDir
       writeHtmlModules outputDir msHtml
 

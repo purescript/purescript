@@ -394,7 +394,7 @@ rowListNil = primTypeOf (P.primSubName "RowList") "Nil" $ T.unlines
   ]
 
 rowToList :: Declaration
-rowToList = primTypeOf (P.primSubName "RowList") "RowToList" $ T.unlines
+rowToList = primClassOf (P.primSubName "RowList") "RowToList" $ T.unlines
   [ "Compiler solved type class for generating a `RowList` from a closed row"
   , "of types.  Entries are sorted by label and duplicates are preserved in"
   , "the order they appeared in the row."
