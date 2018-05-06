@@ -127,7 +127,8 @@ data SimpleErrorMessage
   | MissingClassMember Ident
   | ExtraneousClassMember Ident (Qualified (ProperName 'ClassName))
   | ExpectedType Type Kind
-  | IncorrectConstructorArity (Qualified (ProperName 'ConstructorName))
+  -- | constructor name, expected argument count, actual argument count
+  | IncorrectConstructorArity (Qualified (ProperName 'ConstructorName)) Int Int
   | ExprDoesNotHaveType Expr Type
   | PropertyIsMissing Label
   | AdditionalProperty Label
