@@ -479,7 +479,7 @@ inferBinder val (ConstructorBinder ss ctor binders) = do
       let (args, ret) = peelArgs fn'
           expected = length args
           actual = length binders
-      unless (expected == actual) . throwError . errorMessage $ IncorrectConstructorArity ctor expected actual
+      unless (expected == actual) . throwError . errorMessage' ss $ IncorrectConstructorArity ctor expected actual
       unifyTypes ret val
       M.unions <$> zipWithM inferBinder (reverse args) binders
     _ -> throwError . errorMessage' ss . UnknownName . fmap DctorName $ ctor
