@@ -765,8 +765,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , indent $ line $ markCode $ prettyPrintKind kind
             , line "instead."
             ]
-    renderSimpleErrorMessage (IncorrectConstructorArity nm) =
-      line $ "Data constructor " <> markCode (showQualified runProperName nm) <> " was given the wrong number of arguments in a case expression."
+    renderSimpleErrorMessage (IncorrectConstructorArity nm expected actual) =
+      paras [ line $ "Data constructor " <> markCode (showQualified runProperName nm) <> " was given " <> T.pack (show actual) <> " arguments in a case expression, but expected " <> T.pack (show expected) <> " arguments."
+            , line $ "This problem can be fixed by giving " <> markCode (showQualified runProperName nm) <> " " <> T.pack (show expected) <> " arguments."
+            ]
     renderSimpleErrorMessage (ExprDoesNotHaveType expr ty) =
       paras [ line "Expression"
             , markCodeBox $ indent $ prettyPrintValue valueDepth expr

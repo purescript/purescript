@@ -477,7 +477,9 @@ inferBinder val (ConstructorBinder ss ctor binders) = do
       (_, fn) <- instantiatePolyTypeWithUnknowns (internalError "Data constructor types cannot contain constraints") ty
       fn' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ fn
       let (args, ret) = peelArgs fn'
-      unless (length args == length binders) . throwError . errorMessage $ IncorrectConstructorArity ctor
+          expected = length args
+          actual = length binders
+      unless (expected == actual) . throwError . errorMessage' ss $ IncorrectConstructorArity ctor expected actual
       unifyTypes ret val
       M.unions <$> zipWithM inferBinder (reverse args) binders
     _ -> throwError . errorMessage' ss . UnknownName . fmap DctorName $ ctor
