@@ -33,7 +33,6 @@ import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.Imports    hiding (Import)
 import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Prim
-import           Language.PureScript.Ide.Pursuit
 import           Language.PureScript.Ide.Rebuild
 import           Language.PureScript.Ide.SourceFile
 import           Language.PureScript.Ide.State
@@ -63,10 +62,6 @@ handleCommand c = case c of
     findType search filters currentModule
   Complete filters matcher currentModule complOptions ->
     findCompletions filters matcher currentModule complOptions
-  Pursuit query Package ->
-    findPursuitPackages query
-  Pursuit query Identifier ->
-    findPursuitCompletions query
   List LoadedModules ->
     printModules
   List AvailableModules ->
@@ -128,16 +123,6 @@ findType search filters currentModule = do
   modules <- Map.toList <$> getAllModules currentModule
   let insertPrim = (++) idePrimDeclarations
   pure (CompletionResult (getExactCompletions search filters (insertPrim modules)))
-
-findPursuitCompletions :: MonadIO m =>
-                          PursuitQuery -> m Success
-findPursuitCompletions (PursuitQuery q) =
-  PursuitResult <$> liftIO (searchPursuitForDeclarations q)
-
-findPursuitPackages :: MonadIO m =>
-                       PursuitQuery -> m Success
-findPursuitPackages (PursuitQuery q) =
-  PursuitResult <$> liftIO (findPackagesForModuleIdent q)
 
 printModules :: Ide m => m Success
 printModules = ModuleList . map P.runModuleName <$> getLoadedModulenames
