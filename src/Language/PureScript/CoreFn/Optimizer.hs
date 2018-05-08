@@ -1,6 +1,6 @@
 module Language.PureScript.CoreFn.Optimizer (optimizeCoreFn) where
 
-import Protolude
+import Protolude hiding (Type)
 
 import Data.List (lookup)
 import Language.PureScript.AST.Literals
