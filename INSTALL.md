@@ -6,16 +6,14 @@ alternatively Stack Overflow.
 
 ## Using prebuilt binaries
 
-The prebuilt binaries are compiled with GHC 8.0.2 and therefore they should
-run on any operating system supported by GHC 8.0.2, such as:
+The prebuilt binaries are compiled with GHC 8.2.2 and therefore they should
+run on any operating system supported by GHC 8.2.2, such as:
 
 * Windows Vista or later,
 * OS X 10.7 or later,
-* Linux ??? (we're not sure what the minimum version is).
+* Linux ??? (we're not sure what the minimum version is)
 
-This list is not exhaustive. If your OS is too old or not listed, or if the
-binaries fail to run, you may be able to install the compiler by building it
-from source; see below.
+This list is not exhaustive. If your OS is too old or not listed, or if the binaries fail to run, you may be able to install the compiler by building it from source; see below. See also <https://www.haskell.org/ghc/download_ghc_8_2_2.html> for more details about the operating systems which GHC 8.2.2 supports.
 
 Other prebuilt distributions (eg, Homebrew, AUR, npm) will probably have the
 same requirements.
