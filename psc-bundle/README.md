@@ -1,10 +1,10 @@
-# psc-bundle
+# purs bundle
 
 A dead code elimination tool for PureScript-style CommonJS modules. This can be used as an alternative to Browserify.
 
 ## Usage
 
-    psc-bundle FILE (-m|--module ARG) [--main ARG] [--namespace ARG]
+    purs bundle FILE (-m|--module ARG) [--main ARG] [--namespace ARG]
     
 Options:
 
@@ -15,4 +15,4 @@ Options:
 
 For example, to bundle the modules in the `output` directory, with main module `Main`:
 
-    psc-bundle output/**/*.js -m Main --main Main
+    purs bundle output/**/*.js -m Main --main Main
