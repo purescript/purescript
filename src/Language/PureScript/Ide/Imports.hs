@@ -189,7 +189,7 @@ addExplicitImport' decl moduleName qualifier imports =
         any (\case
           Import mn P.Implicit qualifier' -> mn == moduleName && qualifier == qualifier'
           _ -> False) imports
-    isImplicitlyImportedByPrim =
+    isNotExplicitlyImportedFromPrim =
       moduleName == C.Prim &&
         not (any (\case
           Import C.Prim (P.Explicit _) Nothing -> True
@@ -199,7 +199,7 @@ addExplicitImport' decl moduleName qualifier imports =
     matches _ = False
     freshImport = Import moduleName (P.Explicit [refFromDeclaration decl]) qualifier
   in
-    if isImplicitlyImported || isImplicitlyImportedByPrim
+    if isImplicitlyImported || isNotExplicitlyImportedFromPrim
     then imports
     else updateAtFirstOrPrepend matches (insertDeclIntoImport decl) freshImport imports
   where
