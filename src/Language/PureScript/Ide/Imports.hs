@@ -51,7 +51,7 @@ import qualified Text.Parsec as Parsec
 data Import = Import P.ModuleName P.ImportDeclarationType (Maybe P.ModuleName)
               deriving (Eq, Show)
 
--- | Reads a file and returns the parsed modulename as well as the parsed
+-- | Reads a file and returns the parsed module name as well as the parsed
 -- imports, while ignoring eventual parse errors that aren't relevant to the
 -- import section
 parseImportsFromFile
