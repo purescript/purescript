@@ -9,6 +9,7 @@ import qualified Language.PureScript             as P
 import           Language.PureScript.Ide.Command as Command
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Imports
+import           Language.PureScript.Ide.Filter (moduleFilter)
 import qualified Language.PureScript.Ide.Test as Test
 import           Language.PureScript.Ide.Types
 import           System.FilePath
@@ -343,6 +344,10 @@ addExplicitImport :: Text -> Command
 addExplicitImport i =
   Command.Import ("src" </> "ImportsSpec.purs") Nothing [] (Command.AddImportForIdentifier i Nothing)
 
+addExplicitImportFiltered :: Text -> [P.ModuleName] -> Command
+addExplicitImportFiltered i ms =
+  Command.Import ("src" </> "ImportsSpec.purs") Nothing [moduleFilter ms] (Command.AddImportForIdentifier i Nothing)
+
 importShouldBe :: [Text] -> [Text] -> Expectation
 importShouldBe res importSection =
   res `shouldBe` [ "module ImportsSpec where" , ""] ++ importSection ++ [ "" , "myId x = x"]
@@ -393,3 +398,12 @@ importFromIdeState = do
      \write to the output file" $ do
     result <- runIdeLoaded (addExplicitImport "doesnExist")
     result `shouldSatisfy` isLeft
+  it "doesn't import things from the Prim modules" $ do
+    Right (MultilineTextResult result) <- runIdeLoaded (addExplicitImport "String")
+    result `importShouldBe` []
+  it "imports classes from Prim.* modules" $ do
+    Right (MultilineTextResult result) <- runIdeLoaded (addExplicitImportFiltered "Cons" [Test.mn "Prim.Row"])
+    result `importShouldBe` ["import Prim.Row (class Cons)"]
+  it "imports types from Prim.* modules" $ do
+    Right (MultilineTextResult result) <- runIdeLoaded (addExplicitImportFiltered "Cons" [Test.mn "Prim.RowList"])
+    result `importShouldBe` ["import Prim.RowList (Cons)"]

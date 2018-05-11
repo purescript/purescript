@@ -35,13 +35,18 @@ idePrimDeclarations =
     annClass cls = foreach (Map.toList cls) $ \(cn, _) ->
       -- Dummy kind and instances here, but we primarily care about the name completion
       IdeDeclarationAnn emptyAnn (IdeDeclTypeClass (IdeTypeClass (P.disqualify cn) P.kindType []) )
+    -- The Environment for typechecking holds both a type class as well as a
+    -- type declaration for every class, but we filter the types out when we
+    -- load the Externs, so we do the same here
+    removeClasses types classes =
+      Map.difference types (Map.mapKeys (map P.coerceProperName) classes)
 
-    primTypes = annType PEnv.primTypes
+    primTypes = annType (removeClasses PEnv.primTypes PEnv.primClasses)
     primOrderingTypes = annType PEnv.primOrderingTypes
-    primRowTypes = annType PEnv.primRowTypes
-    primRowListTypes = annType PEnv.primRowListTypes
-    primSymbolTypes = annType PEnv.primSymbolTypes
-    primTypeErrorTypes = annType PEnv.primTypeErrorTypes
+    primRowTypes = annType (removeClasses PEnv.primRowTypes PEnv.primRowClasses)
+    primRowListTypes = annType (removeClasses PEnv.primRowListTypes PEnv.primRowListClasses)
+    primSymbolTypes = annType (removeClasses PEnv.primSymbolTypes PEnv.primSymbolClasses)
+    primTypeErrorTypes = annType (removeClasses PEnv.primTypeErrorTypes PEnv.primTypeErrorClasses)
 
     primClasses = annClass PEnv.primClasses
     primRowClasses = annClass PEnv.primRowClasses

@@ -37,10 +37,12 @@ import           Data.List                          (findIndex, nubBy, partition
 import qualified Data.Map                           as Map
 import qualified Data.Text                          as T
 import qualified Language.PureScript                as P
+import qualified Language.PureScript.Constants      as C
 import           Language.PureScript.Ide.Completion
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.State
+import           Language.PureScript.Ide.Prim
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 import           System.IO.UTF8                     (writeUTF8FileT)
@@ -49,7 +51,7 @@ import qualified Text.Parsec as Parsec
 data Import = Import P.ModuleName P.ImportDeclarationType (Maybe P.ModuleName)
               deriving (Eq, Show)
 
--- | Reads a file and returns the parsed modulename as well as the parsed
+-- | Reads a file and returns the parsed module name as well as the parsed
 -- imports, while ignoring eventual parse errors that aren't relevant to the
 -- import section
 parseImportsFromFile
@@ -64,8 +66,10 @@ parseImportsFromFile file = do
 
 -- | Reads a file and returns the (lines before the imports, the imports, the
 -- lines after the imports)
-parseImportsFromFile' :: (MonadIO m, MonadError IdeError m) =>
-                        FilePath -> m (P.ModuleName, [Text], [Import], [Text])
+parseImportsFromFile'
+  :: (MonadIO m, MonadError IdeError m)
+  => FilePath
+  -> m (P.ModuleName, [Text], [Import], [Text])
 parseImportsFromFile' fp = do
   file <- ideReadFile fp
   case sliceImportSection (T.lines file) of
@@ -101,12 +105,13 @@ sliceImportSection :: [Text] -> Either Text (P.ModuleName, [Text], [Import], [Te
 sliceImportSection fileLines = first show $ do
   tokens <- P.lexLenient "<psc-ide>" file
   ImportParse{..} <- P.runTokenParser "<psc-ide>" parseModuleHeader tokens
-  pure ( ipModuleName
-       , sliceFile (P.SourcePos 1 1) (prevPos ipStart)
-       , ipImports
-       -- Not sure why I need to drop 1 here, but it makes the tests pass
-       , drop 1 (sliceFile (nextPos ipEnd) (P.SourcePos (length fileLines) (lineLength (length fileLines))))
-       )
+  pure
+    ( ipModuleName
+    , sliceFile (P.SourcePos 1 1) (prevPos ipStart)
+    , ipImports
+    -- Not sure why I need to drop 1 here, but it makes the tests pass
+    , drop 1 (sliceFile (nextPos ipEnd) (P.SourcePos (length fileLines) (lineLength (length fileLines))))
+    )
   where
     prevPos (P.SourcePos l c)
       | l == 1 && c == 1 = P.SourcePos l c
@@ -181,14 +186,20 @@ addExplicitImport' :: IdeDeclaration -> P.ModuleName -> Maybe P.ModuleName -> [I
 addExplicitImport' decl moduleName qualifier imports =
   let
     isImplicitlyImported =
-      not . null $ filter (\case
-                              (Import mn P.Implicit qualifier') -> mn == moduleName && qualifier == qualifier'
-                              _ -> False) imports
+        any (\case
+          Import mn P.Implicit qualifier' -> mn == moduleName && qualifier == qualifier'
+          _ -> False) imports
+    isNotExplicitlyImportedFromPrim =
+      moduleName == C.Prim &&
+        not (any (\case
+          Import C.Prim (P.Explicit _) Nothing -> True
+          _ -> False) imports)
+
     matches (Import mn (P.Explicit _) qualifier') = mn == moduleName && qualifier == qualifier'
     matches _ = False
     freshImport = Import moduleName (P.Explicit [refFromDeclaration decl]) qualifier
   in
-    if isImplicitlyImported
+    if isImplicitlyImported || isNotExplicitlyImportedFromPrim
     then imports
     else updateAtFirstOrPrepend matches (insertDeclIntoImport decl) freshImport imports
   where
@@ -254,16 +265,17 @@ updateAtFirstOrPrepend p t d l =
 --
 -- * If more than one possible imports are found, reports the possibilities as a
 -- list of completions.
-addImportForIdentifier :: (Ide m, MonadError IdeError m)
-                          => FilePath -- ^ The Sourcefile to read from
-                          -> Text     -- ^ The identifier to import
-                          -> Maybe P.ModuleName  -- ^ The optional qualifier under which to import
-                          -> [Filter] -- ^ Filters to apply before searching for
-                                      -- the identifier
-                          -> m (Either [Match IdeDeclaration] [Text])
+addImportForIdentifier
+  :: (Ide m, MonadError IdeError m)
+  => FilePath -- ^ The Sourcefile to read from
+  -> Text     -- ^ The identifier to import
+  -> Maybe P.ModuleName  -- ^ The optional qualifier under which to import
+  -> [Filter] -- ^ Filters to apply before searching for the identifier
+  -> m (Either [Match IdeDeclaration] [Text])
 addImportForIdentifier fp ident qual filters = do
+  let addPrim = (++) idePrimDeclarations
   modules <- Map.toList <$> getAllModules Nothing
-  case map (fmap discardAnn) (getExactMatches ident filters modules) of
+  case map (fmap discardAnn) (getExactMatches ident filters (addPrim modules)) of
     [] ->
       throwError (NotFound "Couldn't find the given identifier. \
                            \Have you loaded the corresponding module?")
