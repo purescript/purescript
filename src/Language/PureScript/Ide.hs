@@ -99,7 +99,7 @@ handleCommand c = case c of
   RebuildSync file actualFile ->
     rebuildFileSync file actualFile
   Cwd ->
-    TextResult . toS <$> liftIO getCurrentDirectory
+    TextResult . T.pack <$> liftIO getCurrentDirectory
   Reset ->
     resetIdeState $> TextResult "State has been reset."
   Quit ->
@@ -117,8 +117,12 @@ findCompletions filters matcher currentModule complOptions = do
   let insertPrim = (++) idePrimDeclarations
   pure (CompletionResult (getCompletions filters matcher complOptions (insertPrim modules)))
 
-findType :: Ide m =>
-            Text -> [Filter] -> Maybe P.ModuleName -> m Success
+findType
+  :: Ide m
+  => Text
+  -> [Filter]
+  -> Maybe P.ModuleName
+  -> m Success
 findType search filters currentModule = do
   modules <- Map.toList <$> getAllModules currentModule
   let insertPrim = (++) idePrimDeclarations
