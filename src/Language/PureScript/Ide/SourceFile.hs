@@ -29,7 +29,6 @@ import qualified Language.PureScript           as P
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
-import           System.Directory (makeAbsolute)
 
 parseModule
   :: (MonadIO m, MonadError IdeError m)
