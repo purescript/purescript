@@ -29,14 +29,15 @@ import qualified Language.PureScript           as P
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
+import           System.Directory (makeAbsolute)
 
 parseModule
   :: (MonadIO m, MonadError IdeError m)
   => FilePath
   -> m (Either FilePath (FilePath, P.Module))
 parseModule path = do
-  contents <- ideReadFile path
-  pure (parseModule' path contents)
+  (absPath, contents) <- ideReadFile path
+  pure (parseModule' absPath contents)
 
 parseModule' :: FilePath -> Text -> Either FilePath (FilePath, P.Module)
 parseModule' path file =
@@ -49,7 +50,7 @@ parseModulesFromFiles
   => [FilePath]
   -> m [Either FilePath (FilePath, P.Module)]
 parseModulesFromFiles paths = do
-  files <- traverse (\p -> (p,) <$> ideReadFile p) paths
+  files <- traverse ideReadFile paths
   pure (inParallel (map (uncurry parseModule') files))
   where
     inParallel :: [Either e (k, a)] -> [Either e (k, a)]
