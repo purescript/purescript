@@ -28,13 +28,13 @@ findUsages
   :: (MonadIO m, Ide m)
   => IdeDeclaration
   -> P.ModuleName
-  -> m (ModuleMap [P.SourceSpan])
+  -> m (ModuleMap (NonEmpty P.SourceSpan))
 findUsages declaration moduleName = do
   ms <- getAllModules Nothing
   asts <- Map.map fst . fsModules <$> getFileState
   let elig = eligibleModules (moduleName, declaration) ms asts
   pure
-    $ Map.filter (not . null)
+    $ Map.mapMaybe nonEmpty
     $ Map.mapWithKey (\mn searches ->
         foldMap (\m -> foldMap (applySearch m) searches) (Map.lookup mn asts)) elig
 

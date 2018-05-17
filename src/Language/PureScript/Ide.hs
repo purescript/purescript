@@ -81,7 +81,7 @@ handleCommand c = case c of
           Nothing -> throwError (GeneralError "Declaration not found")
           Just declaration -> do
             let sourceModule = fromMaybe moduleName (declaration & _idaAnnotation & _annExportedFrom)
-            UsagesResult . fold <$> findUsages (discardAnn declaration) sourceModule
+            UsagesResult . foldMap toList <$> findUsages (discardAnn declaration) sourceModule
   Import fp outfp _ (AddImplicitImport mn) -> do
     rs <- addImplicitImport fp mn
     answerRequest outfp rs
