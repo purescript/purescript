@@ -11,7 +11,7 @@ import qualified Language.PureScript.Ide.Test as Test
 import qualified Language.PureScript as P
 import           Test.Hspec
 import           Data.Text.Read (decimal)
-import System.FilePath
+import           System.FilePath
 
 load :: [Text] -> Command
 load = LoadSync . map Test.mn
@@ -28,7 +28,8 @@ shouldBeUsage usage' (fp, range) =
     [ endLine, endColumn ] = map unsafeReadInt (Text.splitOn ":" end)
   in
     do
-      fp `shouldBe` P.spanName usage'
+      projectDir <- Test.getProjectDirectory
+      projectDir </> fp `shouldBe` P.spanName usage'
 
       (P.sourcePosLine (P.spanStart usage'), P.sourcePosColumn (P.spanStart usage'))
         `shouldBe`

@@ -34,7 +34,6 @@ import           Protolude                           hiding (decodeUtf8,
 
 import           Control.Lens                        hiding ((&), op)
 import           Data.Aeson
-import qualified Data.Text                           as T
 import qualified Data.Text.Lazy                      as TL
 import           Data.Text.Lazy.Encoding             as TLE
 import qualified Language.PureScript                 as P
@@ -42,6 +41,7 @@ import           Language.PureScript.Ide.Error       (IdeError(..))
 import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.Types
 import           System.IO.UTF8                      (readUTF8FileT)
+import           System.Directory                    (makeAbsolute)
 
 identifierFromIdeDeclaration :: IdeDeclaration -> Text
 identifierFromIdeDeclaration d = case d of
@@ -103,13 +103,22 @@ ideReadFile'
   :: (MonadIO m, MonadError IdeError m)
   => (FilePath -> IO Text)
   -> FilePath
-  -> m Text
+  -> m (FilePath, Text)
 ideReadFile' fileReader fp = do
-  contents :: Either IOException Text <- liftIO (try (fileReader fp))
-  either
-    (\_ -> throwError (GeneralError ("Couldn't find file at: " <> T.pack fp)))
-    pure
-    contents
+  absPath <- liftIO (try (makeAbsolute fp)) >>= \case
+    Left (err :: IOException) ->
+      throwError
+        (GeneralError
+          ("Couldn't resolve path for: " <> show fp <> ", Error: " <> show err))
+    Right absPath -> pure absPath
+  contents <- liftIO (try (fileReader absPath)) >>= \case
+    Left (err :: IOException) ->
+      throwError
+        (GeneralError
+          ("Couldn't find file at: " <> show absPath <> ", Error: " <> show err))
+    Right contents ->
+      pure contents
+  pure (absPath, contents)
 
-ideReadFile :: (MonadIO m, MonadError IdeError m) => FilePath -> m Text
+ideReadFile :: (MonadIO m, MonadError IdeError m) => FilePath -> m (FilePath, Text)
 ideReadFile = ideReadFile' readUTF8FileT

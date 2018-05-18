@@ -81,7 +81,7 @@ handleCommand c = case c of
           Nothing -> throwError (GeneralError "Declaration not found")
           Just declaration -> do
             let sourceModule = fromMaybe moduleName (declaration & _idaAnnotation & _annExportedFrom)
-            UsagesResult . fold <$> findUsages (discardAnn declaration) sourceModule
+            UsagesResult . foldMap toList <$> findUsages (discardAnn declaration) sourceModule
   Import fp outfp _ (AddImplicitImport mn) -> do
     rs <- addImplicitImport fp mn
     answerRequest outfp rs
@@ -99,7 +99,7 @@ handleCommand c = case c of
   RebuildSync file actualFile ->
     rebuildFileSync file actualFile
   Cwd ->
-    TextResult . toS <$> liftIO getCurrentDirectory
+    TextResult . T.pack <$> liftIO getCurrentDirectory
   Reset ->
     resetIdeState $> TextResult "State has been reset."
   Quit ->
@@ -117,8 +117,12 @@ findCompletions filters matcher currentModule complOptions = do
   let insertPrim = (++) idePrimDeclarations
   pure (CompletionResult (getCompletions filters matcher complOptions (insertPrim modules)))
 
-findType :: Ide m =>
-            Text -> [Filter] -> Maybe P.ModuleName -> m Success
+findType
+  :: Ide m
+  => Text
+  -> [Filter]
+  -> Maybe P.ModuleName
+  -> m Success
 findType search filters currentModule = do
   modules <- Map.toList <$> getAllModules currentModule
   let insertPrim = (++) idePrimDeclarations

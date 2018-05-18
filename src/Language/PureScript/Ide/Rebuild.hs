@@ -49,7 +49,7 @@ rebuildFile file actualFile runOpenBuild = do
 
   input <- ideReadFile file
 
-  m <- case snd <$> P.parseModuleFromFile (maybe identity const actualFile) (file, input) of
+  m <- case snd <$> P.parseModuleFromFile (maybe identity const actualFile) input of
     Left parseError ->
       throwError (RebuildError (P.MultipleErrors [P.toPositionedError parseError]))
     Right m -> pure m

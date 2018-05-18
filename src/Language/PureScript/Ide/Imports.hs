@@ -71,7 +71,7 @@ parseImportsFromFile'
   => FilePath
   -> m (P.ModuleName, [Text], [Import], [Text])
 parseImportsFromFile' fp = do
-  file <- ideReadFile fp
+  (_, file) <- ideReadFile fp
   case sliceImportSection (T.lines file) of
     Right res -> pure res
     Left err -> throwError (GeneralError err)
