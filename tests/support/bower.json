@@ -67,7 +67,6 @@
     "purescript-refs": "compiler/0.12",
     "purescript-st": "compiler/0.12",
     "purescript-strings": "compiler/0.12",
-    "purescript-symbols": "compiler/0.12",
     "purescript-tailrec": "compiler/0.12",
     "purescript-tuples": "compiler/0.12",
     "purescript-type-equality": "compiler/0.12",
