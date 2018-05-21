@@ -448,6 +448,9 @@ pattern Fail = Qualified (Just PrimTypeError) (ProperName "Fail")
 pattern Warn :: Qualified (ProperName 'ClassName)
 pattern Warn = Qualified (Just PrimTypeError) (ProperName "Warn")
 
+primModules :: [ModuleName]
+primModules = [Prim, PrimOrdering, PrimRow, PrimRowList, PrimSymbol, PrimTypeError]
+
 -- Data.Symbol
 
 pattern DataSymbol :: ModuleName
