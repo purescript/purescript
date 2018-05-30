@@ -4,7 +4,7 @@ module Language.PureScript.CodeGen.JS.Printer
   , prettyPrintJSWithSourceMaps
   ) where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 
 import Control.Arrow ((<+>))
 import Control.Monad (forM, mzero)

@@ -64,7 +64,7 @@ module Language.PureScript.Parser.Lexer
   )
   where
 
-import Prelude.Compat hiding (lex)
+import Prelude.Compat hiding (lex, (<>))
 
 import Control.Applicative ((<|>))
 import Control.Monad (void, guard)

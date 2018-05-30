@@ -6,7 +6,7 @@ module Language.PureScript.Docs.Prim
   , primModules
   ) where
 
-import Prelude.Compat hiding (fail)
+import Prelude.Compat hiding (fail, (<>))
 import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -480,4 +480,3 @@ aboveDoc = primTypeOf (P.primSubName "TypeError") "Above" $ T.unlines
   , "For more information, see"
   , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
   ]
-

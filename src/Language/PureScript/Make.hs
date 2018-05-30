@@ -8,7 +8,7 @@ module Language.PureScript.Make
   , module Actions
   ) where
 
-import           Prelude.Compat
+import           Prelude.Compat hiding ((<>))
 
 import           Control.Concurrent.Lifted as C
 import           Control.Monad hiding (sequence)

@@ -8,7 +8,7 @@ module Language.PureScript.Linter.Exhaustive
   ( checkExhaustiveExpr
   ) where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 import Protolude (ordNub)
 
 import Control.Applicative

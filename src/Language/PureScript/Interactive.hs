@@ -10,7 +10,7 @@ module Language.PureScript.Interactive
   ) where
 
 import           Prelude ()
-import           Prelude.Compat
+import           Prelude.Compat hiding ((<>))
 import           Protolude (ordNub)
 
 import           Data.List (sort, find, foldl')

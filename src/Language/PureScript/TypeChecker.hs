@@ -9,7 +9,7 @@ module Language.PureScript.TypeChecker
   , checkNewtype
   ) where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 import Protolude (ordNub)
 
 import Control.Monad (when, unless, void, forM)

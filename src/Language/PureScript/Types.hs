@@ -7,7 +7,7 @@
 --
 module Language.PureScript.Types where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 import Protolude (ordNub)
 
 import Control.Arrow (first)

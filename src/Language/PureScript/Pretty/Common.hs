@@ -5,7 +5,7 @@
 --
 module Language.PureScript.Pretty.Common where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 
 import Control.Monad.State (StateT, modify, get)
 

@@ -5,7 +5,7 @@ module Language.PureScript.Pretty.Kinds
   ( prettyPrintKind
   ) where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 
 import Control.Arrow (ArrowPlus(..))
 import Control.PatternArrows as PA

@@ -3,7 +3,7 @@
 --
 module Language.PureScript.Renamer (renameInModules) where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 
 import Control.Monad.State
 

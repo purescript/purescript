@@ -10,7 +10,7 @@ module Language.PureScript.Docs.RenderedCode.RenderType
   , renderTypeAtomWithOptions
   ) where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 
 import Data.Maybe (fromMaybe)
 import Data.Monoid ((<>))

@@ -13,7 +13,7 @@ module Language.PureScript.Publish.ErrorsWarnings
   , renderWarnings
   ) where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 
 import Control.Exception (IOException)
 

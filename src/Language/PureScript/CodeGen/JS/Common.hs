@@ -1,7 +1,7 @@
 -- | Common code generation utility functions
 module Language.PureScript.CodeGen.JS.Common where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 
 import Data.Char
 import Data.Monoid ((<>))

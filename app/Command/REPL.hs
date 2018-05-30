@@ -13,7 +13,7 @@
 module Command.REPL (command) where
 
 import           Prelude ()
-import           Prelude.Compat
+import           Prelude.Compat hiding ((<>))
 import           Control.Applicative (many, (<|>))
 import           Control.Concurrent (forkIO)
 import           Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar,
