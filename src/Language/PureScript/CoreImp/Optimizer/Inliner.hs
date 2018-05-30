@@ -11,7 +11,7 @@ module Language.PureScript.CoreImp.Optimizer.Inliner
   , evaluateIifes
   ) where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 
 import Control.Monad.Supply.Class (MonadSupply, freshName)
 

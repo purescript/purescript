@@ -7,7 +7,7 @@
 
 module Control.Monad.Supply.Class where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 
 import Control.Monad.Supply
 import Control.Monad.State

@@ -3,7 +3,7 @@
 --
 module Language.PureScript.Linter (lint, module L) where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 import Protolude (ordNub)
 
 import Control.Monad.Writer.Class

@@ -11,7 +11,7 @@ module Language.PureScript.TypeChecker.Entailment
   , entails
   ) where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 import Protolude (ordNub)
 
 import Control.Arrow (second, (&&&))

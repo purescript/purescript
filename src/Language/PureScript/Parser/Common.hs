@@ -1,7 +1,7 @@
 -- | Useful common functions for building parsers
 module Language.PureScript.Parser.Common where
 
-import           Prelude.Compat
+import           Prelude.Compat hiding ((<>))
 
 import           Control.Applicative ((<|>))
 import           Control.Monad (guard)

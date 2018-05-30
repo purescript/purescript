@@ -8,7 +8,7 @@
 --
 module Language.PureScript.Names where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 
 import Control.Monad.Supply.Class
 import Control.DeepSeq (NFData)

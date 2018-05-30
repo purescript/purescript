@@ -6,7 +6,7 @@ module Language.PureScript.Docs.AsMarkdown
   , codeToString
   ) where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 
 import Control.Monad (unless, zipWithM_)
 import Control.Monad.Error.Class (MonadError)

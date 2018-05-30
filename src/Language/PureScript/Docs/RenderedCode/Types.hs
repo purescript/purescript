@@ -43,7 +43,7 @@ module Language.PureScript.Docs.RenderedCode.Types
  , aliasName
  ) where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 import GHC.Generics (Generic)
 
 import Control.DeepSeq (NFData)

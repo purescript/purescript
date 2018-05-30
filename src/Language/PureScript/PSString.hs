@@ -13,7 +13,7 @@ module Language.PureScript.PSString
   , mkString
   ) where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
 import Control.Exception (try, evaluate)

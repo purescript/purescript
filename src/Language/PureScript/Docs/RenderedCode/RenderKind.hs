@@ -7,7 +7,7 @@ module Language.PureScript.Docs.RenderedCode.RenderKind
 -- TODO: This is pretty much copied from Language.PureScript.Pretty.Kinds.
 -- Ideally we would unify the two.
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 
 import Control.Arrow (ArrowPlus(..))
 import Control.PatternArrows as PA

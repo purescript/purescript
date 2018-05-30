@@ -1,7 +1,7 @@
 -- | This module implements tail call elimination.
 module Language.PureScript.CoreImp.Optimizer.TCO (tco) where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 
 import Data.Text (Text)
 import Data.Monoid ((<>))

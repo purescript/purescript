@@ -7,7 +7,7 @@ module Language.PureScript.Pretty.Values
   , prettyPrintBinderAtom
   ) where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 
 import Control.Arrow (second)
 

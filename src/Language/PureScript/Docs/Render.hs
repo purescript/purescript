@@ -9,7 +9,7 @@
 
 module Language.PureScript.Docs.Render where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 
 import Data.Maybe (maybeToList)
 import Data.Monoid ((<>))

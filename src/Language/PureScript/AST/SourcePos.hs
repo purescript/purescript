@@ -4,7 +4,7 @@
 --
 module Language.PureScript.AST.SourcePos where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 
 import Control.DeepSeq (NFData)
 import Data.Aeson ((.=), (.:))
