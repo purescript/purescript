@@ -14,7 +14,6 @@ import Control.Monad.Trans.State.Strict (execState)
 import Data.Either
 import Data.Map (Map)
 import Data.Maybe (mapMaybe)
-import Data.Monoid ((<>))
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as T

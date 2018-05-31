@@ -7,7 +7,6 @@
 module Command.Bundle (command) where
 
 import           Data.Traversable (for)
-import           Data.Monoid ((<>))
 import           Data.Aeson (encode)
 import           Data.Maybe (isNothing)
 import           Control.Applicative

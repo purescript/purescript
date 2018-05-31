@@ -12,7 +12,6 @@ import           Control.Monad.Supply.Class (MonadSupply)
 import           Data.Foldable (for_)
 import           Data.List (foldl', find, sortBy, unzip5)
 import qualified Data.Map as M
-import           Data.Monoid ((<>))
 import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Ord (comparing)
 import qualified Data.Set as S

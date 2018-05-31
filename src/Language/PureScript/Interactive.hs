@@ -16,7 +16,6 @@ import           Protolude (ordNub)
 import           Data.List (sort, find, foldl')
 import           Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
-import           Data.Monoid ((<>))
 import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T

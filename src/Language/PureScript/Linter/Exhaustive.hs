@@ -20,7 +20,6 @@ import Control.Monad.Supply.Class (MonadSupply, fresh, freshName)
 import Data.Function (on)
 import Data.List (foldl', sortBy)
 import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
 import qualified Data.Map as M
 import Data.Text (Text)
 import qualified Data.Text as T

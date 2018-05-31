@@ -10,7 +10,6 @@ import Prelude.Compat
 import Control.Monad.State (StateT, modify, get)
 
 import Data.List (elemIndices, intersperse)
-import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Char (isUpper)

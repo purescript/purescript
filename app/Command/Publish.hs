@@ -5,7 +5,6 @@ module Command.Publish (command) where
 import           Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as A
 import qualified Data.ByteString.Lazy.Char8 as BL
-import           Data.Monoid ((<>))
 import           Data.Time.Clock (getCurrentTime)
 import           Data.Version (Version(..))
 import           Language.PureScript.Publish

@@ -22,7 +22,6 @@ import Control.Lens ((^..), _1, _2)
 import Data.Foldable (for_, traverse_, toList)
 import Data.List (nub, nubBy, (\\), sort, group)
 import Data.Maybe
-import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as M

@@ -3,7 +3,6 @@ module TestPrimDocs where
 import Prelude
 
 import Control.Monad
-import Data.Monoid ((<>))
 import Data.List ((\\))
 import qualified Data.Map as Map
 import qualified Data.Set as Set

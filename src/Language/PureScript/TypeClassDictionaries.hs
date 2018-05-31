@@ -7,7 +7,6 @@ import Prelude.Compat
 
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
-import Data.Monoid ((<>))
 import Data.Text (Text, pack)
 
 import Language.PureScript.Names

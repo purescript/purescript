@@ -10,7 +10,6 @@ import Control.Monad.State
 import Data.List (find)
 import Data.Maybe (fromJust, fromMaybe)
 import qualified Data.Map as M
-import Data.Monoid ((<>))
 import qualified Data.Set as S
 import qualified Data.Text as T
 

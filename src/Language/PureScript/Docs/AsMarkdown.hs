@@ -13,7 +13,6 @@ import Control.Monad.Error.Class (MonadError)
 import Control.Monad.Writer (Writer, tell, execWriter)
 
 import Data.Foldable (for_)
-import Data.Monoid ((<>))
 import Data.List (partition)
 import Data.Text (Text)
 import qualified Data.Text as T
