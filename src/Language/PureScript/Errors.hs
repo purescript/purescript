@@ -186,7 +186,7 @@ errorCode em = case unwrapErrorMessage em of
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
   { runMultipleErrors :: [ErrorMessage]
-  } deriving (Show, Monoid)
+  } deriving (Show, Semigroup, Monoid)
 
 -- | Check whether a collection of errors is empty or not.
 nonEmpty :: MultipleErrors -> Bool

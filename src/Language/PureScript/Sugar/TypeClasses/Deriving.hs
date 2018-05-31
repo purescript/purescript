@@ -42,12 +42,14 @@ data NewtypeDerivedInstances = NewtypeDerivedInstances
   -- ^ A list of newtype instances which were derived in this module.
   } deriving Show
 
-instance Monoid NewtypeDerivedInstances where
-  mempty = NewtypeDerivedInstances mempty mempty
-  mappend x y =
+instance Semigroup NewtypeDerivedInstances where
+  x <> y =
     NewtypeDerivedInstances { ndiClasses          = ndiClasses          x <> ndiClasses          y
                             , ndiDerivedInstances = ndiDerivedInstances x <> ndiDerivedInstances y
                             }
+
+instance Monoid NewtypeDerivedInstances where
+  mempty = NewtypeDerivedInstances mempty mempty
 
 -- | Extract the name of the newtype appearing in the last type argument of
 -- a derived newtype instance.

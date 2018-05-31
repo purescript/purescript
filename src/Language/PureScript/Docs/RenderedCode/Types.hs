@@ -248,7 +248,7 @@ asRenderedCodeElement =
 --
 newtype RenderedCode
   = RC { unRC :: [RenderedCodeElement] }
-  deriving (Show, Eq, Ord, Monoid)
+  deriving (Show, Eq, Ord, Semigroup, Monoid)
 
 instance A.ToJSON RenderedCode where
   toJSON (RC elems) = A.toJSON elems

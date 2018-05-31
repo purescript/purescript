@@ -52,7 +52,7 @@ import qualified Data.Aeson.Types as A
 -- and arrays of UTF-16 code units (integers) otherwise.
 --
 newtype PSString = PSString { toUTF16CodeUnits :: [Word16] }
-  deriving (Eq, Ord, Monoid, Generic)
+  deriving (Eq, Ord, Semigroup, Monoid, Generic)
 
 instance NFData PSString
 

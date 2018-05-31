@@ -8,7 +8,6 @@ module Command.Compile (command) where
 
 import           Control.Applicative
 import           Control.Monad
-import           Control.Monad.Writer.Strict
 import qualified Data.Aeson as A
 import           Data.Bool (bool)
 import qualified Data.ByteString.Lazy as B

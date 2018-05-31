@@ -15,7 +15,6 @@ import qualified Command.Ide as Ide
 import qualified Command.Publish as Publish
 import qualified Command.REPL as REPL
 import           Data.Foldable (fold)
-import           Data.Monoid ((<>))
 import qualified Options.Applicative as Opts
 import           System.Environment (getArgs)
 import qualified System.IO as IO
