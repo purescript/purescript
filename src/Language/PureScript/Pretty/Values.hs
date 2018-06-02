@@ -11,6 +11,7 @@ import Prelude.Compat hiding ((<>))
 
 import Control.Arrow (second)
 
+import Data.Maybe (maybe)
 import Data.Text (Text)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Monoid as Monoid ((<>))
@@ -80,8 +81,8 @@ prettyPrintValue d (Let FromLet ds val) =
   text "let" //
     moveRight 2 (vcat left (map (prettyPrintDeclaration (d - 1)) ds)) //
     (text "in " <> prettyPrintValue (d - 1) val)
-prettyPrintValue d (Do els) =
-  text "do " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els)
+prettyPrintValue d (Do m els) =
+  textT (maybe "" ((Monoid.<> ".") . runModuleName) m) <> text "do " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els)
 prettyPrintValue d (Ado els yield) =
   text "ado " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els) //
   (text "in " <> prettyPrintValue (d - 1) yield)

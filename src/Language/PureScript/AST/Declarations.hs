@@ -775,7 +775,7 @@ data Expr
   -- |
   -- A do-notation block
   --
-  | Do [DoNotationElement]
+  | Do (Maybe ModuleName) [DoNotationElement]
   -- |
   -- An ado-notation block
   --
