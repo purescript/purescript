@@ -85,6 +85,15 @@ literals = mkPattern' match'
     , return $ emit ") "
     , prettyPrintJS' sts
     ]
+  match (Import _ modname file) = mconcat <$> sequence
+    [ return $ emit $ "import " <> modname
+    , return $ emit " from "
+    , maybe (return mempty) (fmap (emit "" <>) . prettyPrintJS') file
+    ]
+  match (Export _ sts) = mconcat <$> sequence
+    [ return $ emit "export default "
+    , prettyPrintJS' sts
+    ]
   match (For _ ident start end sts) = mconcat <$> sequence
     [ return $ emit $ "for (var " <> ident <> " = "
     , prettyPrintJS' start
@@ -123,7 +132,7 @@ literals = mkPattern' match'
   match _ = mzero
 
   comment :: (Emit gen) => Comment -> StateT PrinterState Maybe gen
-  comment (LineComment com) = fmap mconcat $ sequence $
+  comment (LineComment com) = mconcat <$> sequence
     [ currentIndent
     , return $ emit "//" <> emit com <> emit "\n"
     ]
