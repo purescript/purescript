@@ -70,6 +70,10 @@ data AST
   -- ^ Import variable assignment
   | Export (Maybe SourceSpan) AST
   -- ^ Export object assignment
+  | ExportStandard (Maybe SourceSpan) [(PSString, AST)]
+  -- ^ Standard export body
+  | ExportForeign (Maybe SourceSpan) [(PSString, AST)]
+  -- ^ Standard export body
   | Var (Maybe SourceSpan) Text
   -- ^ Variable
   | Block (Maybe SourceSpan) [AST]
@@ -116,6 +120,8 @@ withSourceSpan withSpan = go where
   go (App _ j js) = App ss j js
   go (Import _ j1 j2) = Import ss j1 j2
   go (Export _ js) = Export ss js
+  go (ExportStandard _ js) = ObjectLiteral ss js
+  go (ExportForeign _ js) = ObjectLiteral ss js
   go (Var _ s) = Var ss s
   go (Block _ js) = Block ss js
   go (VariableIntroduction _ name j) = VariableIntroduction ss name j
@@ -145,6 +151,8 @@ getSourceSpan = go where
   go (App ss _ _) = ss
   go (Import ss _ _) = ss
   go (Export ss _) = ss
+  go (ExportStandard ss _) = ss
+  go (ExportForeign ss _) = ss
   go (Var ss _) = ss
   go (Block ss _) = ss
   go (VariableIntroduction ss _ _) = ss
@@ -171,6 +179,8 @@ everywhere f = go where
   go (App ss j js) = f (App ss (go j) (map go js))
   go (Import ss j1 j2) = f (Import ss j1 (fmap go j2))
   go (Export ss js) = f (Export  ss (go js))
+  go (ExportStandard ss js) = f (ObjectLiteral ss (map (fmap go) js))
+  go (ExportForeign ss js) = f (ObjectLiteral ss (map (fmap go) js))
   go (Block ss js) = f (Block ss (map go js))
   go (VariableIntroduction ss name j) = f (VariableIntroduction ss name (fmap go j))
   go (Assignment ss j1 j2) = f (Assignment ss (go j1) (go j2))
@@ -199,6 +209,8 @@ everywhereTopDownM f = f >=> go where
   go (App ss j js) = App ss <$> f' j <*> traverse f' js
   go (Import ss j js) = Import ss j <$> traverse f' js
   go (Export ss j) = Export ss <$> f' j
+  go (ExportStandard ss js) = ObjectLiteral ss <$> traverse (sndM f') js
+  go (ExportForeign ss js) = ObjectLiteral ss <$> traverse (sndM f') js
   go (Block ss js) = Block ss <$> traverse f' js
   go (VariableIntroduction ss name j) = VariableIntroduction ss name <$> traverse f' j
   go (Assignment ss j1 j2) = Assignment ss <$> f' j1 <*> f' j2
@@ -223,6 +235,8 @@ everything (<>) f = go where
   go j@(App _ j1 js) = foldl (<>) (f j <> go j1) (map go js)
   go j@(Import _ _ (Just js)) = f j <> go js
   go j@(Export _ js) = f j <> go js
+  go j@(ExportStandard _ js) = foldl (<>) (f j) (map (go . snd) js)
+  go j@(ExportForeign _ js) = foldl (<>) (f j) (map (go . snd) js)
   go j@(Block _ js) = foldl (<>) (f j) (map go js)
   go j@(VariableIntroduction _ _ (Just j1)) = f j <> go j1
   go j@(Assignment _ j1 j2) = f j <> go j1 <> go j2

@@ -54,20 +54,32 @@ literals = mkPattern' match'
     , currentIndent
     , return $ emit "}"
     ]
-    where
-    objectPropertyToString :: (Emit gen) => PSString -> gen
-    objectPropertyToString s =
-      emit $ case decodeString s of
-        Just s' | not (identNeedsEscaping s') ->
-          s'
-        _ ->
-          prettyPrintStringJS s
   match (Block _ sts) = mconcat <$> sequence
     [ return $ emit "{\n"
     , withIndent $ prettyStatements sts
     , return $ emit "\n"
     , currentIndent
     , return $ emit "}"
+    ]
+  match (ExportStandard _ []) = return $ emit ""
+  match (ExportStandard _ ps) = mconcat <$> sequence
+    [ return $ emit "export "
+    , return $ emit "{\n"
+    , withIndent $ do
+        jss <- forM ps $ \(key, value) -> fmap (objectPropertyToString key <>) . prettyPrintJS' $ value
+        indentString <- currentIndent
+        return $ intercalate (emit ",\n") $ map (indentString <>) jss
+    , return $ emit "\n"
+    , currentIndent
+    , return $ emit "}"
+    ]
+  match (ExportForeign _ []) = return $ emit ""
+  match (ExportForeign _ ps) = mconcat <$> sequence
+    [ withIndent $ do
+        jss <- forM ps
+          $ \(key, value) ->
+          fmap ((emit "export const " <> objectPropertyToString key <> emit " = ") <>) . prettyPrintJS' $ value
+        return $ intercalate (emit ";\n") jss
     ]
   match (Var _ ident) = return $ emit ident
   match (VariableIntroduction _ ident value) = mconcat <$> sequence
@@ -86,12 +98,12 @@ literals = mkPattern' match'
     , prettyPrintJS' sts
     ]
   match (Import _ modname file) = mconcat <$> sequence
-    [ return $ emit $ "import " <> modname
+    [ return $ emit $ "import * as " <> modname
     , return $ emit " from "
     , maybe (return mempty) (fmap (emit "" <>) . prettyPrintJS') file
     ]
   match (Export _ sts) = mconcat <$> sequence
-    [ return $ emit "export default "
+    [ return $ emit "export "
     , prettyPrintJS' sts
     ]
   match (For _ ident start end sts) = mconcat <$> sequence
@@ -158,6 +170,12 @@ literals = mkPattern' match'
         Nothing -> case T.uncons t of
           Just (x, xs) -> x `T.cons` removeComments xs
           Nothing -> ""
+
+objectPropertyToString :: (Emit gen) => PSString -> gen
+objectPropertyToString s =
+  emit $ case decodeString s of
+    Just s' | not (identNeedsEscaping s') -> s'
+    _ -> prettyPrintStringJS s
 
 accessor :: Pattern PrinterState AST (Text, AST)
 accessor = mkPattern match
