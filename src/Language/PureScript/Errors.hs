@@ -78,7 +78,6 @@ errorCode em = case unwrapErrorMessage em of
   ErrorParsingFFIModule{} -> "ErrorParsingFFIModule"
   ErrorParsingModule{} -> "ErrorParsingModule"
   MissingFFIModule{} -> "MissingFFIModule"
-  MultipleFFIModules{} -> "MultipleFFIModules"
   UnnecessaryFFIModule{} -> "UnnecessaryFFIModule"
   MissingFFIImplementations{} -> "MissingFFIImplementations"
   UnusedFFIImplementations{} -> "UnusedFFIImplementations"
@@ -182,6 +181,8 @@ errorCode em = case unwrapErrorMessage em of
   UserDefinedWarning{} -> "UserDefinedWarning"
   UnusableDeclaration{} -> "UnusableDeclaration"
   CannotDefinePrimModules{} -> "CannotDefinePrimModules"
+  MixedAssociativityError{} -> "MixedAssociativityError"
+  NonAssociativeError{} -> "NonAssociativeError"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -490,10 +491,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 , line "Note that exported identifiers in FFI modules must be valid PureScript identifiers."
                 ]
             ]
-    renderSimpleErrorMessage (MultipleFFIModules mn paths) =
-      paras [ line $ "Multiple foreign module implementations have been provided for module " <> markCode (runModuleName mn) <> ": "
-            , indent . paras $ map lineS paths
-            ]
     renderSimpleErrorMessage InvalidDoBind =
       line "The last statement in a 'do' block must be an expression, but this block ends with a binder."
     renderSimpleErrorMessage InvalidDoLet =
@@ -775,8 +772,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , indent $ line $ markCode $ prettyPrintKind kind
             , line "instead."
             ]
-    renderSimpleErrorMessage (IncorrectConstructorArity nm) =
-      line $ "Data constructor " <> markCode (showQualified runProperName nm) <> " was given the wrong number of arguments in a case expression."
+    renderSimpleErrorMessage (IncorrectConstructorArity nm expected actual) =
+      paras [ line $ "Data constructor " <> markCode (showQualified runProperName nm) <> " was given " <> T.pack (show actual) <> " arguments in a case expression, but expected " <> T.pack (show expected) <> " arguments."
+            , line $ "This problem can be fixed by giving " <> markCode (showQualified runProperName nm) <> " " <> T.pack (show expected) <> " arguments."
+            ]
     renderSimpleErrorMessage (ExprDoesNotHaveType expr ty) =
       paras [ line "Expression"
             , markCodeBox $ indent $ prettyPrintValue valueDepth expr
@@ -1008,6 +1007,27 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
         [ line $ "The module name " <> markCode (runModuleName mn) <> " is in the Prim namespace."
         , line $ "The Prim namespace is reserved for compiler-defined terms."
         ]
+
+    renderSimpleErrorMessage (MixedAssociativityError opsWithAssoc) =
+      paras
+        [ line "Cannot parse an expression that uses operators of the same precedence but mixed associativity:"
+        , indent $ paras $ map (\(name, assoc) -> line $ markCode (showQualified showOp name) <> " is " <> markCode (T.pack (showAssoc assoc))) (NEL.toList opsWithAssoc)
+        , line "Use parentheses to resolve this ambiguity."
+        ]
+
+    renderSimpleErrorMessage (NonAssociativeError ops) =
+      if NEL.length ops == 1
+        then
+          paras
+            [ line $ "Cannot parse an expression that uses multiple instances of the non-associative operator " <> markCode (showQualified showOp (NEL.head ops)) <> "."
+            , line "Use parentheses to resolve this ambiguity."
+            ]
+        else
+          paras
+            [ line "Cannot parse an expression that uses multiple non-associative operators of the same precedence:"
+            , indent $ paras $ map (line . markCode . showQualified showOp) (NEL.toList ops)
+            , line "Use parentheses to resolve this ambiguity."
+            ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1 t2) detail =

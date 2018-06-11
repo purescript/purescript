@@ -145,12 +145,19 @@ printErrorMessage (MissingMainModule mName) =
 
 -- | Calculate the ModuleIdentifier which a require(...) statement imports.
 checkImportPath :: String -> ModuleIdentifier -> S.Set String -> Either String ModuleIdentifier
-checkImportPath "./foreign" m _ =
+checkImportPath "./foreign.js" m _ =
   Right (ModuleIdentifier (moduleName m) Foreign)
 checkImportPath name _ names
-  | Just name' <- stripPrefix "../" name
+  | Just name' <- stripSuffix "/index.js" =<< stripPrefix "../" name
   , name' `S.member` names = Right (ModuleIdentifier name' Regular)
 checkImportPath name _ _ = Left name
+
+stripSuffix :: Eq a => [a] -> [a] -> Maybe [a]
+stripSuffix suffix xs =
+  case splitAt (length xs - length suffix) xs of
+    (before, after)
+      | after == suffix -> Just before
+      | otherwise -> Nothing
 
 -- | Compute the dependencies of all elements in a module, and add them to the tree.
 --

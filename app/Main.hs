@@ -19,6 +19,7 @@ import           Data.Monoid ((<>))
 import qualified Options.Applicative as Opts
 import           System.Environment (getArgs)
 import qualified System.IO as IO
+import qualified Text.PrettyPrint.ANSI.Leijen as Doc
 import           Version (versionString)
 
 
@@ -32,7 +33,20 @@ main = do
     opts        = Opts.info (versionInfo <*> Opts.helper <*> commands) infoModList
     infoModList = Opts.fullDesc <> headerInfo <> footerInfo
     headerInfo  = Opts.progDesc "The PureScript compiler and tools"
-    footerInfo  = Opts.footer $ "purs " ++ versionString
+    footerInfo  = Opts.footerDoc (Just footer)
+
+    footer =
+      mconcat
+        [ para $
+            "For help using each individual command, run `purs COMMAND --help`. " ++
+            "For example, `purs compile --help` displays options specific to the `compile` command."
+        , Doc.hardline
+        , Doc.hardline
+        , Doc.text $ "purs " ++ versionString
+        ]
+
+    para :: String -> Doc.Doc
+    para = foldr (Doc.</>) Doc.empty . map Doc.text . words
 
     -- | Displays full command help when invoked with no arguments.
     execParserPure :: Opts.ParserInfo a -> [String] -> Opts.ParserResult a
@@ -55,7 +69,7 @@ main = do
               (Opts.progDesc "Compile PureScript source files"))
         , Opts.command "docs"
             (Opts.info Docs.command
-              (Opts.progDesc "Generate Markdown documentation from PureScript source files" <> Docs.infoModList))
+              (Opts.progDesc "Generate documentation from PureScript source files in a variety of formats, including Markdown and HTML" <> Docs.infoModList))
         , Opts.command "hierarchy"
             (Opts.info Hierarchy.command
               (Opts.progDesc "Generate a GraphViz directed graph of PureScript type classes"))

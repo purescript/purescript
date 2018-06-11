@@ -389,52 +389,6 @@ In the Success case you get a list of warnings in the compilers json format.
 
 In the Error case you get the errors in the compilers json format
 
-### Pursuit
-The `pursuit` command looks up the packages/completions for a given identifier from Pursuit.
-
-**Params:**
- - `query :: String`: With `type: "package"` this should be a module name. With
-   `type: "completion"` this can be any string to look up.
- - `type :: String`: Takes the following values:
-   - `package`: Looks for packages that contain the given module name.
-   - `completion` Looks for declarations for the query from Pursuit.
-
-```json
-{
-  "command": "pursuit",
-  "params": {
-    "query": "Data.Array",
-    "type": "package"
-  }
-}
-```
-
-**Result:**
-
-`package` returns:
-
-```json
-[
-  {
-  "module": "Module1.Name",
-  "package": "purescript-packagename"
-  }
-]
-```
-
-`completion` returns:
-
-```json
-[
-  {
-  "module": "Data.Array",
-  "identifier": "filter",
-  "type": "forall a. (a -> Boolean) -> Array a -> Array a",
-  "package": "purescript-arrays"
-  }
-]
-```
-
 ### List
 
 #### Loaded Modules

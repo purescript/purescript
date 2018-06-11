@@ -69,7 +69,7 @@ desugarDecl d = rethrowWithPosition (declSourceSpan d) $ fn d
       then Abs (VarBinder nullSourceSpan val) <$> wrapLambda (buildUpdates valExpr) ps
       else wrapLambda (buildLet val . buildUpdates valExpr) ps
     where
-      buildLet val = Let [ValueDecl (declSourceSpan d, []) val Public [] [MkUnguarded obj]]
+      buildLet val = Let FromLet [ValueDecl (declSourceSpan d, []) val Public [] [MkUnguarded obj]]
 
       -- recursively build up the nested `ObjectUpdate` expressions
       buildUpdates :: Expr -> PathTree Expr -> Expr

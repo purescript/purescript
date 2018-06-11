@@ -28,13 +28,13 @@ findUsages
   :: (MonadIO m, Ide m)
   => IdeDeclaration
   -> P.ModuleName
-  -> m (ModuleMap [P.SourceSpan])
+  -> m (ModuleMap (NonEmpty P.SourceSpan))
 findUsages declaration moduleName = do
   ms <- getAllModules Nothing
   asts <- Map.map fst . fsModules <$> getFileState
   let elig = eligibleModules (moduleName, declaration) ms asts
   pure
-    $ Map.filter (not . null)
+    $ Map.mapMaybe nonEmpty
     $ Map.mapWithKey (\mn searches ->
         foldMap (\m -> foldMap (applySearch m) searches) (Map.lookup mn asts)) elig
 
@@ -131,20 +131,17 @@ applySearch module_ search =
   foldMap findUsageInDeclaration decls
   where
     decls = P.getModuleDeclarations module_
-    findUsageInDeclaration decl =
+    findUsageInDeclaration =
       let
-        (extr, _, _, _, _) = P.everythingWithScope mempty (goExpr decl) goBinder mempty mempty
+        (extr, _, _, _, _) = P.everythingWithScope mempty goExpr goBinder mempty mempty
       in
-        extr mempty decl
+        extr mempty
 
-    goExpr decl scope expr = case expr of
+    goExpr scope expr = case expr of
       P.Var sp i
         | Just ideValue <- preview _IdeDeclValue (P.disqualify search)
         , P.isQualified search
-          || not (_ideValueIdent ideValue `Set.member` scope)
-          -- This case means we're looking at a recursive definition for a
-          -- value, which we count as a usage.
-          || P.declName decl == Just (P.IdentName (_ideValueIdent ideValue)) ->
+          || not (P.LocalIdent (_ideValueIdent ideValue) `Set.member` scope) ->
           [sp | map P.runIdent i == map identifierFromIdeDeclaration search]
       P.Constructor sp name
         | Just ideDtor <- traverse (preview _IdeDeclDataConstructor) search ->

@@ -72,9 +72,10 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
   regrouped <- createBindingGroups moduleName . collapseBindingGroups $ deguarded
   let mod' = Module ss coms moduleName regrouped exps
       corefn = CF.moduleToCoreFn env' mod'
-      [renamed] = renameInModules [corefn]
+      optimized = CF.optimizeCoreFn corefn
+      [renamed] = renameInModules [optimized]
       exts = moduleToExternsFile mod' env'
-  evalSupplyT nextVar' . codegen ss renamed env' . encode $ exts
+  evalSupplyT nextVar' . codegen renamed env' . encode $ exts
   return exts
 
 -- | Compiles in "make" mode, compiling each module separately to a @.js@ file and an @externs.json@ file.
@@ -118,14 +119,12 @@ make ma@MakeActions{..} ms = do
 
   checkNoPrim :: m ()
   checkNoPrim =
-    for_ ms $ \m -> do
-      case getModuleName m of
-        mn@(ModuleName (ProperName "Prim" : _)) ->
-          throwError
-            . errorMessage' (getModuleSourceSpan m)
-            $ CannotDefinePrimModules mn
-        _ ->
-          pure ()
+    for_ ms $ \m ->
+      let mn = getModuleName m
+      in when (isBuiltinModuleName mn) $
+           throwError
+             . errorMessage' (getModuleSourceSpan m)
+             $ CannotDefinePrimModules mn
 
   checkModuleNamesAreUnique :: m ()
   checkModuleNamesAreUnique =

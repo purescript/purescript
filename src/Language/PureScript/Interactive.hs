@@ -30,6 +30,7 @@ import           Control.Monad.Writer.Strict (Writer(), runWriter)
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Names as N
+import qualified Language.PureScript.Constants as C
 
 import           Language.PureScript.Interactive.Completion   as Interactive
 import           Language.PureScript.Interactive.IO           as Interactive
@@ -298,8 +299,7 @@ handleBrowse print' moduleName = do
   where
     findMod needle externs imports =
       let qualMod = fromMaybe needle (lookupUnQualifiedModName needle imports)
-          primMod = P.ModuleName [P.ProperName "Prim"]
-          modules = S.fromList (primMod : (P.getModuleName . fst <$> externs))
+          modules = S.fromList (C.primModules <> (P.getModuleName . fst <$> externs))
       in if qualMod `S.member` modules
            then Just qualMod
            else Nothing

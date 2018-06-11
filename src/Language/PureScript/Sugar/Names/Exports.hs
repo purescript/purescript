@@ -103,13 +103,13 @@ resolveExports env ss mn imps exps refs =
     let isPseudo = isPseudoModule name
     when (not isPseudo && not (isImportedModule name))
       . throwError . errorMessage' ss' . UnknownExport $ ModName name
-    reTypes <- extract isPseudo name TyName (importedTypes imps)
-    reTypeOps <- extract isPseudo name TyOpName (importedTypeOps imps)
-    reDctors <- extract isPseudo name DctorName (importedDataConstructors imps)
-    reClasses <- extract isPseudo name TyClassName (importedTypeClasses imps)
-    reValues <- extract isPseudo name IdentName (importedValues imps)
-    reValueOps <- extract isPseudo name ValOpName (importedValueOps imps)
-    reKinds <- extract isPseudo name KiName (importedKinds imps)
+    reTypes <- extract ss' isPseudo name TyName (importedTypes imps)
+    reTypeOps <- extract ss' isPseudo name TyOpName (importedTypeOps imps)
+    reDctors <- extract ss' isPseudo name DctorName (importedDataConstructors imps)
+    reClasses <- extract ss' isPseudo name TyClassName (importedTypeClasses imps)
+    reValues <- extract ss' isPseudo name IdentName (importedValues imps)
+    reValueOps <- extract ss' isPseudo name ValOpName (importedValueOps imps)
+    reKinds <- extract ss' isPseudo name KiName (importedKinds imps)
     foldM (\exps' ((tctor, dctors), mn') -> exportType ss' ReExport exps' tctor dctors mn') result (resolveTypeExports reTypes reDctors)
       >>= flip (foldM (uncurry . exportTypeOp ss')) (map resolveTypeOp reTypeOps)
       >>= flip (foldM (uncurry . exportTypeClass ss' ReExport)) (map resolveClass reClasses)
@@ -121,16 +121,17 @@ resolveExports env ss mn imps exps refs =
   -- Extracts a list of values for a module based on a lookup table. If the
   -- boolean is true the values are filtered by the qualification
   extract
-    :: Bool
+    :: SourceSpan
+    -> Bool
     -> ModuleName
     -> (a -> Name)
     -> M.Map (Qualified a) [ImportRecord a]
     -> m [Qualified a]
-  extract useQual name toName = fmap (map (importName . head . snd)) . go . M.toList
+  extract ss' useQual name toName = fmap (map (importName . head . snd)) . go . M.toList
     where
     go = filterM $ \(name', options) -> do
       let isMatch = if useQual then isQualifiedWith name name' else any (checkUnqual name') options
-      when (isMatch && length options > 1) $ void $ checkImportConflicts mn toName options
+      when (isMatch && length options > 1) $ void $ checkImportConflicts ss' mn toName options
       return isMatch
     checkUnqual name' ir = isUnqualified name' && isQualifiedWith name (importName ir)
 

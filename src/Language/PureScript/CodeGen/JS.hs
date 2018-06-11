@@ -50,12 +50,12 @@ moduleToJs
   => Module Ann
   -> Maybe AST
   -> m [AST]
-moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
+moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreign_ =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
     let mnLookup = renameImports usedNames imps
-    jsImports <- traverse (importToJs mnLookup) 
-      . (\\ [mn, C.Prim, C.PrimRow, C.PrimTypeError]) $ ordNub $ map snd imps
+    jsImports <- traverse (importToJs mnLookup)
+      . (\\ (mn : C.primModules)) $ ordNub $ map snd imps
     let decls' = renameModules mnLookup decls
     jsDecls <- mapM bindToJs decls'
     optimized <- traverse (traverse optimize) jsDecls
@@ -104,7 +104,8 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
   importToJs :: M.Map ModuleName (Ann, ModuleName) -> ModuleName -> m AST
   importToJs mnLookup mn' = do
     let ((ss, _, _, _), mnSafe) = fromMaybe (internalError "Missing value in mnLookup") $ M.lookup mn' mnLookup
-    let moduleBody = AST.App Nothing (AST.Var Nothing "require") [AST.StringLiteral Nothing (fromString (".." </> T.unpack (runModuleName mn')))]
+    let moduleBody = AST.App Nothing (AST.Var Nothing "require")
+          [AST.StringLiteral Nothing (fromString (".." </> T.unpack (runModuleName mn') </> "index.js"))]
     withPos ss $ AST.VariableIntroduction Nothing (moduleNameToJs mnSafe) (Just moduleBody)
 
   -- | Replaces the `ModuleName`s in the AST so that the generated code refers to
@@ -149,7 +150,7 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
 
   withPos :: SourceSpan -> AST -> m AST
   withPos ss js = do
-    withSM <- asks optionsSourceMaps
+    withSM <- asks (elem JSSourceMap . optionsCodegenTargets)
     return $ if withSM
       then withSourceSpan ss js
       else js

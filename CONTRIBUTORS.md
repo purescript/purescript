@@ -32,6 +32,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@brandonhamilton](https://github.com/brandonhamilton) | Brandon Hamilton | [MIT license](http://opensource.org/licenses/MIT) |
 | [@bsermons](https://github.com/bsermons) | Brian Sermons | [MIT license](http://opensource.org/licenses/MIT) |
 | [@cdepillabout](https://github.com/cdepillabout) | Dennis Gosnell | [MIT license](http://opensource.org/licenses/MIT) |
+| [@chexxor](https://github.com/chexxor) | Alex Berg | [MIT license](http://opensource.org/licenses/MIT) |
 | [@chrisdone](https://github.com/chrisdone) | Chris Done | MIT license |
 | [@cmdv](https://github.com/cmdv) | Vincent Orr | MIT license |
 | [@codedmart](https://github.com/codedmart) | Brandon Martin | [MIT license](http://opensource.org/licenses/MIT) |
@@ -45,6 +46,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@erdeszt](https://github.com/erdeszt) | Tibor Erdesz | [MIT license](http://opensource.org/licenses/MIT) |
 | [@etrepum](https://github.com/etrepum) | Bob Ippolito | [MIT license](http://opensource.org/licenses/MIT) |
 | [@faineance](https://github.com/faineance) | faineance | [MIT license](http://opensource.org/licenses/MIT) |
+| [@fehrenbach](https://github.com/fehrenbach) | Stefan Fehrenbach | [MIT license](http://opensource.org/licenses/MIT) |
 | [@felixSchl](https://github.com/felixSchl) | Felix Schlitter | [MIT license](http://opensource.org/licenses/MIT) |
 | [@FrigoEU](https://github.com/FrigoEU) | Simon Van Casteren | [MIT license](http://opensource.org/licenses/MIT) |
 | [@garyb](https://github.com/garyb) | Gary Burgess | [MIT license](http://opensource.org/licenses/MIT) |
@@ -122,6 +124,8 @@ If you would prefer to use different terms, please use the section below instead
 | [@bjornmelgaaard](https://github.com/BjornMelgaard) | Sergey Homa | [MIT license](http://opensource.org/licenses/MIT) |
 | [@thimoteus](https://github.com/Thimoteus) | thimoteus | [MIT license](http://opensource.org/licenses/MIT) |
 | [@sloosch](https://github.com/sloosch) | Simon Looschen | [MIT license](http://opensource.org/licenses/MIT) |
+| [@rgrinberg](https://github.com/rgrinberg) | Rudi Grinberg | [MIT license](http://opensource.org/licenses/MIT) |
+| [@gabejohnson](https://github.com/gabejohnson) | Gabe Johnson | [MIT license](http://opensource.org/licenses/MIT) |
 
 ### Contributors using Modified Terms
 

@@ -38,10 +38,6 @@ data Command
       , completeCurrentModule :: Maybe P.ModuleName
       , completeOptions       :: CompletionOptions
       }
-    | Pursuit
-      { pursuitQuery      :: PursuitQuery
-      , pursuitSearchType :: PursuitSearchType
-      }
     | CaseSplit
       { caseSplitLine        :: Text
       , caseSplitBegin       :: Int
@@ -73,7 +69,6 @@ commandName c = case c of
   LoadSync{} -> "LoadSync"
   Type{} -> "Type"
   Complete{} -> "Complete"
-  Pursuit{} -> "Pursuit"
   CaseSplit{} -> "CaseSplit"
   AddClause{} -> "AddClause"
   FindUsages{} -> "FindUsages"
@@ -146,11 +141,6 @@ instance FromJSON Command where
           <*> params .:? "matcher" .!= mempty
           <*> (fmap P.moduleNameFromString <$> params .:? "currentModule")
           <*> params .:? "options" .!= defaultCompletionOptions
-      "pursuit" -> do
-        params <- o .: "params"
-        Pursuit
-          <$> params .: "query"
-          <*> params .: "type"
       "caseSplit" -> do
         params <- o .: "params"
         CaseSplit

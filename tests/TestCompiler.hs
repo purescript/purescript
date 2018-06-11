@@ -63,9 +63,9 @@ spec = do
 
   (supportModules, supportExterns, supportForeigns, passingTestCases, warningTestCases, failingTestCases) <- runIO $ do
     cwd <- getCurrentDirectory
-    let passing = cwd </> "examples" </> "passing"
-    let warning = cwd </> "examples" </> "warning"
-    let failing = cwd </> "examples" </> "failing"
+    let passing = cwd </> "tests" </> "purs" </> "passing"
+    let warning = cwd </> "tests" </> "purs" </> "warning"
+    let failing = cwd </> "tests" </> "purs" </> "failing"
     passingFiles <- getTestFiles passing <$> testGlob passing
     warningFiles <- getTestFiles warning <$> testGlob warning
     failingFiles <- getTestFiles failing <$> testGlob failing
@@ -227,10 +227,20 @@ checkShouldFailWith :: [String] -> P.MultipleErrors -> Maybe String
 checkShouldFailWith expected errs =
   let actual = map P.errorCode $ P.runMultipleErrors errs
   in if sort expected == sort (map T.unpack actual)
-    then Nothing
+    then checkPositioned errs
     else Just $ "Expected these errors: " ++ show expected ++ ", but got these: "
       ++ show actual ++ ", full error messages: \n"
       ++ unlines (map (P.renderBox . P.prettyPrintSingleError P.defaultPPEOptions) (P.runMultipleErrors errs))
+
+checkPositioned :: P.MultipleErrors -> Maybe String
+checkPositioned errs =
+  case mapMaybe (\err -> maybe (Just err) (const Nothing) (P.errorSpan err)) (P.runMultipleErrors errs) of
+    [] ->
+      Nothing
+    errs' ->
+      Just
+        $ "Found errors with missing source spans:\n"
+        ++ unlines (map (P.renderBox . P.prettyPrintSingleError P.defaultPPEOptions) errs')
 
 assertCompiles
   :: [P.Module]

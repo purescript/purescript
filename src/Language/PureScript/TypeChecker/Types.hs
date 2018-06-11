@@ -392,9 +392,9 @@ infer' (IfThenElse cond th el) = do
   (el'', elTy') <- instantiatePolyTypeWithUnknowns el' elTy
   unifyTypes thTy' elTy'
   return $ TypedValue True (IfThenElse cond' th'' el'') thTy'
-infer' (Let ds val) = do
+infer' (Let w ds val) = do
   (ds', val'@(TypedValue _ _ valTy)) <- inferLetBinding [] ds val infer
-  return $ TypedValue True (Let ds' val') valTy
+  return $ TypedValue True (Let w ds' val') valTy
 infer' (DeferredDictionary className tys) = do
   dicts <- getTypeClassDictionaries
   hints <- getHints
@@ -477,7 +477,9 @@ inferBinder val (ConstructorBinder ss ctor binders) = do
       (_, fn) <- instantiatePolyTypeWithUnknowns (internalError "Data constructor types cannot contain constraints") ty
       fn' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ fn
       let (args, ret) = peelArgs fn'
-      unless (length args == length binders) . throwError . errorMessage $ IncorrectConstructorArity ctor
+          expected = length args
+          actual = length binders
+      unless (expected == actual) . throwError . errorMessage' ss $ IncorrectConstructorArity ctor expected actual
       unifyTypes ret val
       M.unions <$> zipWithM inferBinder (reverse args) binders
     _ -> throwError . errorMessage' ss . UnknownName . fmap DctorName $ ctor
@@ -722,9 +724,9 @@ check' v@(Constructor _ c) ty = do
       ty' <- introduceSkolemScope ty
       elaborate <- subsumes repl ty'
       return $ TypedValue True (elaborate v) ty'
-check' (Let ds val) ty = do
+check' (Let w ds val) ty = do
   (ds', val') <- inferLetBinding [] ds val (`check` ty)
-  return $ TypedValue True (Let ds' val') ty
+  return $ TypedValue True (Let w ds' val') ty
 check' val kt@(KindedType ty kind) = do
   checkTypeKind ty kind
   val' <- check' val ty
