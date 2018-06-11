@@ -110,6 +110,7 @@ errorCode em = case unwrapErrorMessage em of
   InvalidDoLet -> "InvalidDoLet"
   CycleInDeclaration{} -> "CycleInDeclaration"
   CycleInTypeSynonym{} -> "CycleInTypeSynonym"
+  CycleInTypeClassDeclaration{} -> "CycleInTypeClassDeclaration"
   CycleInModules{} -> "CycleInModules"
   NameIsUndefined{} -> "NameIsUndefined"
   UndefinedTypeVariable{} -> "UndefinedTypeVariable"
@@ -566,6 +567,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                        Nothing -> "A cycle appears in a set of type synonym definitions."
             , line "Cycles are disallowed because they can lead to loops in the type checker."
             , line "Consider using a 'newtype' instead."
+            ]
+    renderSimpleErrorMessage (CycleInTypeClassDeclaration name) =
+      paras [ line $ case name of
+                       Just pn -> "A cycle appears in the definition of type class " <> markCode (runProperName pn)
+                       Nothing -> "A cycle appears in a set of type class definitions."
+            , line "Cycles are disallowed because they can lead to loops in the type checker."
             ]
     renderSimpleErrorMessage (NameIsUndefined ident) =
       line $ "Value " <> markCode (showIdent ident) <> " is undefined."
