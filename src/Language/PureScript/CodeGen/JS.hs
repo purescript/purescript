@@ -67,8 +67,8 @@ moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreign_ =
     let moduleBody = header : foreign' ++ jsImports ++ concat optimized
     let foreignExps = exps `intersect` foreigns
     let standardExps = exps \\ foreignExps
-    let exportStandard' = AST.ExportForeign Nothing
-                        $ map (mkString . runIdent &&& AST.Var Nothing . identToJs) standardExps
+    let exportStandard' = AST.ExportStandard Nothing
+                        $ map (AST.Var Nothing . identToJs) standardExps
     let exportForeign' = AST.ExportForeign Nothing $ map (mkString . runIdent &&& foreignIdent) foreignExps
     return $ moduleBody ++ [exportStandard', exportForeign']
 

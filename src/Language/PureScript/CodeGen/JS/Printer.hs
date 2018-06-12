@@ -66,7 +66,7 @@ literals = mkPattern' match'
     [ return $ emit "export "
     , return $ emit "{\n"
     , withIndent $ do
-        jss <- forM ps $ \(key, value) -> fmap (objectPropertyToString key <>) . prettyPrintJS' $ value
+        jss <- forM ps prettyPrintJS'
         indentString <- currentIndent
         return $ intercalate (emit ",\n") $ map (indentString <>) jss
     , return $ emit "\n"
@@ -78,7 +78,7 @@ literals = mkPattern' match'
     [ withIndent $ do
         jss <- forM ps
           $ \(key, value) ->
-          fmap ((emit "export const " <> objectPropertyToString key <> emit " = ") <>) . prettyPrintJS' $ value
+          fmap ((emit "export const " <> objectPropertyToString' key <> emit " = ") <>) . prettyPrintJS' $ value
         return $ intercalate (emit ";\n") jss
     ]
   match (Var _ ident) = return $ emit ident
@@ -170,6 +170,13 @@ literals = mkPattern' match'
         Nothing -> case T.uncons t of
           Just (x, xs) -> x `T.cons` removeComments xs
           Nothing -> ""
+
+objectPropertyToString' :: (Emit gen) => PSString -> gen
+objectPropertyToString' s =
+  emit $ case decodeString s of
+    Just s' | not (identNeedsEscaping s') -> s'
+    _ ->  T.replace "'" "$prime" (T.filter (/= '"') $ prettyPrintStringJS s)
+    -- this should really be using IndentToJs
 
 objectPropertyToString :: (Emit gen) => PSString -> gen
 objectPropertyToString s =
