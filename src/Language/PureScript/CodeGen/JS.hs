@@ -69,7 +69,7 @@ moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreign_ =
     let standardExps = exps \\ foreignExps
     let exportStandard' = AST.ExportStandard Nothing
                         $ map (AST.Var Nothing . identToJs) standardExps
-    let exportForeign' = AST.ExportForeign Nothing $ map (mkString . runIdent &&& foreignIdent) foreignExps
+    let exportForeign' = AST.ExportForeign Nothing $ map (mkString . identToJs &&& foreignIdent) foreignExps
     return $ moduleBody ++ [exportStandard', exportForeign']
 
   where
