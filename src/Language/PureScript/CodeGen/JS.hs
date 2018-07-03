@@ -63,13 +63,14 @@ moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreign_ =
     comments <- not <$> asks optionsNoComments
     let strict = AST.StringLiteral Nothing "use strict"
     let header = if comments && not (null coms) then AST.Comment Nothing coms strict else strict
-    let foreign' = [AST.VariableIntroduction Nothing "$foreign" foreign_ | not $ null foreigns || isNothing foreign_]
+    let foreign' = [AST.Import Nothing "$foreign" foreign_ | not $ null foreigns || isNothing foreign_]
     let moduleBody = header : foreign' ++ jsImports ++ concat optimized
     let foreignExps = exps `intersect` foreigns
     let standardExps = exps \\ foreignExps
-    let exps' = AST.ObjectLiteral Nothing $ map (mkString . runIdent &&& AST.Var Nothing . identToJs) standardExps
-                               ++ map (mkString . runIdent &&& foreignIdent) foreignExps
-    return $ moduleBody ++ [AST.Assignment Nothing (accessorString "exports" (AST.Var Nothing "module")) exps']
+    let exportStandard' = AST.ExportStandard Nothing
+                        $ map (AST.Var Nothing . identToJs) standardExps
+    let exportForeign' = AST.ExportForeign Nothing $ map (mkString . identToJs &&& foreignIdent) foreignExps
+    return $ moduleBody ++ [exportStandard', exportForeign']
 
   where
 
@@ -104,9 +105,11 @@ moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreign_ =
   importToJs :: M.Map ModuleName (Ann, ModuleName) -> ModuleName -> m AST
   importToJs mnLookup mn' = do
     let ((ss, _, _, _), mnSafe) = fromMaybe (internalError "Missing value in mnLookup") $ M.lookup mn' mnLookup
-    let moduleBody = AST.App Nothing (AST.Var Nothing "require")
-          [AST.StringLiteral Nothing (fromString (".." </> T.unpack (runModuleName mn') </> "index.js"))]
-    withPos ss $ AST.VariableIntroduction Nothing (moduleNameToJs mnSafe) (Just moduleBody)
+    withPos ss $
+      AST.Import Nothing
+      (moduleNameToJs mnSafe)
+      (Just $ AST.StringLiteral Nothing
+        (fromString (".." </> T.unpack (runModuleName mn') </> "index.js")))
 
   -- | Replaces the `ModuleName`s in the AST so that the generated code refers to
   -- the collision-avoiding renamed module imports.
