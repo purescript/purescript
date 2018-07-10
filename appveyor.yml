@@ -6,6 +6,9 @@ environment:
   STACK_VER: 1.6.3
   RELEASE_USER: purescript
   RELEASE_REPO: purescript
+  # See https://github.com/commercialhaskell/stack/issues/3944, might no 
+  # longer be necessary after we've moved to a snapshot with network >= 0.2.7.1
+  TMP: "c:\\tmp"
 branches:
   # Only build master and tagged versions, i.e. not feature branches; feature
   # branches already get built after opening a pull request.
