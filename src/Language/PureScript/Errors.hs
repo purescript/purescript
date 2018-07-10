@@ -753,10 +753,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line $ "Argument list lengths differ in declaration " <> markCode (showIdent ident)
     renderSimpleErrorMessage (OverlappingArgNames ident) =
       line $ "Overlapping names in function/binder" <> foldMap ((" in declaration " <>) . showIdent) ident
-    renderSimpleErrorMessage (MissingClassMember ident ty) =
-      paras [ line $ "Type class member " <> markCode (showIdent ident) <> " has not been implemented. It is expected to have the following type:"
-            , markCodeBox $ indent $ Box.text (T.unpack (showIdent ident)) Box.<> Box.text " :: " Box.<> typeAsBox ty
-            ]
+    renderSimpleErrorMessage (MissingClassMember identsAndTypes) =
+      paras $ [ line "The following type class members have not been implemented:"
+              , Box.vcat Box.left
+                [ markCodeBox $ Box.text (T.unpack (showIdent ident)) Box.<> " :: " Box.<> typeAsBox ty
+                | (ident, ty) <- NEL.toList identsAndTypes ]
+              ]
     renderSimpleErrorMessage (ExtraneousClassMember ident className) =
       line $ "" <> markCode (showIdent ident) <> " is not a member of type class " <> markCode (showQualified runProperName className)
     renderSimpleErrorMessage (ExpectedType ty kind) =
