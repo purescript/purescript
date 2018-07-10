@@ -9,7 +9,7 @@ import Prelude ()
 import Prelude.Compat
 
 import Data.Aeson
-import Data.Aeson.Types
+import Data.Aeson.Types as Aeson
 import Data.Version
 
 import Language.PureScript.AST.Literals
@@ -37,7 +37,7 @@ parseMod m =
   in snd <$> parseModule (moduleToJSON v m)
 
 isSuccess :: Result a -> Bool
-isSuccess (Success _) = True
+isSuccess (Aeson.Success _) = True
 isSuccess _           = False
 
 spec :: Spec
@@ -52,42 +52,42 @@ spec = context "CoreFnFromJsonTest" $ do
     r `shouldSatisfy` isSuccess
     case r of
       Error _   -> return ()
-      Success m -> moduleName m `shouldBe` mn
+      Aeson.Success m -> moduleName m `shouldBe` mn
 
   specify "should parse source span" $ do
     let r = parseMod $ Module ss [] mn mp [] [] [] []
     r `shouldSatisfy` isSuccess
     case r of
       Error _   -> return ()
-      Success m -> moduleSourceSpan m `shouldBe` ss
+      Aeson.Success m -> moduleSourceSpan m `shouldBe` ss
 
   specify "should parse module path" $ do
     let r = parseMod $ Module ss [] mn mp [] [] [] []
     r `shouldSatisfy` isSuccess
     case r of
       Error _   -> return ()
-      Success m -> modulePath m `shouldBe` mp
+      Aeson.Success m -> modulePath m `shouldBe` mp
 
   specify "should parse imports" $ do
     let r = parseMod $ Module ss [] mn mp [(ann, mn)] [] [] []
     r `shouldSatisfy` isSuccess
     case r of
       Error _   -> return ()
-      Success m -> moduleImports m `shouldBe` [(ann, mn)]
+      Aeson.Success m -> moduleImports m `shouldBe` [(ann, mn)]
 
   specify "should parse exports" $ do
     let r = parseMod $ Module ss [] mn mp [] [Ident "exp"] [] []
     r `shouldSatisfy` isSuccess
     case r of
       Error _   -> return ()
-      Success m -> moduleExports m `shouldBe` [Ident "exp"]
+      Aeson.Success m -> moduleExports m `shouldBe` [Ident "exp"]
 
   specify "should parse foreign" $ do
     let r = parseMod $ Module ss [] mn mp [] [] [Ident "exp"] []
     r `shouldSatisfy` isSuccess
     case r of
       Error _   -> return ()
-      Success m -> moduleForeign m `shouldBe` [Ident "exp"]
+      Aeson.Success m -> moduleForeign m `shouldBe` [Ident "exp"]
 
   context "Expr" $ do
     specify "should parse literals" $ do
