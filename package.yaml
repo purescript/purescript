@@ -55,8 +55,8 @@ dependencies:
   - Glob >=0.9 && <0.10
   - haskeline >=0.7.0.0
   - language-javascript >=0.6.0.9 && <0.7
-  - lens ==4.*
   - lifted-base >=0.2.3 && <0.2.4
+  - microlens-platform >=0.3.9.0 && <0.4
   - monad-control >=1.0.0.0 && <1.1
   - monad-logger >=0.3 && <0.4
   - mtl >=2.1.0 && <2.3.0

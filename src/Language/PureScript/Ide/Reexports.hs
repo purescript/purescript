@@ -25,11 +25,11 @@ module Language.PureScript.Ide.Reexports
 
 import           Protolude hiding (moduleName)
 
-import           Control.Lens                  hiding ((&))
 import qualified Data.Map                      as Map
 import qualified Language.PureScript           as P
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
+import           Lens.Micro.Platform           hiding ((&))
 
 -- | Contains the module with resolved reexports, and possible failures
 data ReexportResult a
