@@ -70,7 +70,6 @@ dependencies:
   - scientific >=0.3.4.9 && <0.4
   - semigroups >=0.16.2 && <0.19
   - sourcemap >=0.1.6
-  - spdx ==0.2.*
   - split
   - stm >=0.2.4.0
   - stringsearch

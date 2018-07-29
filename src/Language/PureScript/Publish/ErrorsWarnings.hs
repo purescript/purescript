@@ -59,7 +59,6 @@ data UserError
   | AmbiguousVersions [Version] -- Invariant: should contain at least two elements
   | BadRepositoryField RepositoryFieldError
   | NoLicenseSpecified
-  | InvalidLicense
   | MissingDependencies (NonEmpty PackageName)
   | CompileError P.MultipleErrors
   | DirtyWorkingTree
@@ -189,16 +188,6 @@ displayUserError e = case e of
           , "necessary."
           ])
       ]
-  InvalidLicense ->
-    vcat $
-      [ para (concat
-          [ "The license specified in package manifest is not a valid SPDX license "
-          , "expression. Please use the SPDX license expression format. For "
-          , "example, any of the following would be acceptable:"
-          ])
-      , spacer
-      ] ++
-      spdxExamples
   MissingDependencies pkgs ->
     let singular = NonEmpty.length pkgs == 1
         pl a b = if singular then b else a
