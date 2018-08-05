@@ -36,7 +36,7 @@ import qualified Data.Text as T
 import Data.Time.Clock (UTCTime)
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Data.Version
-import qualified Data.SPDX as SPDX
+import qualified Distribution.SPDX as SPDX
 
 import System.Directory (doesFileExist)
 import System.FilePath.Glob (globDir1)
@@ -230,7 +230,7 @@ checkLicense pkgMeta =
 -- Check if a string is a valid SPDX license expression.
 --
 isValidSPDX :: String -> Bool
-isValidSPDX = (== 1) . length . SPDX.parseExpression
+isValidSPDX = isJust . SPDX.mkLicenseId
 
 extractGithub :: Text -> Maybe (D.GithubUser, D.GithubRepo)
 extractGithub = stripGitHubPrefixes
