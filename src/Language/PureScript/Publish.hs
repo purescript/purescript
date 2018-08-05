@@ -37,6 +37,7 @@ import Data.Time.Clock (UTCTime)
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Data.Version
 import qualified Distribution.SPDX as SPDX
+import qualified Distribution.Parsec.Class as CabalParsec
 
 import System.Directory (doesFileExist)
 import System.FilePath.Glob (globDir1)
@@ -230,7 +231,11 @@ checkLicense pkgMeta =
 -- Check if a string is a valid SPDX license expression.
 --
 isValidSPDX :: String -> Bool
-isValidSPDX = isJust . SPDX.mkLicenseId
+isValidSPDX input = case CabalParsec.simpleParsec input of
+  Nothing -> False
+  Just SPDX.NONE -> False
+  Just _ -> True
+
 
 extractGithub :: Text -> Maybe (D.GithubUser, D.GithubRepo)
 extractGithub = stripGitHubPrefixes
