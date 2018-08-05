@@ -36,6 +36,7 @@ import qualified Data.Text as T
 import Data.Time.Clock (UTCTime)
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Data.Version
+import qualified Data.SPDX as SPDX
 
 import System.Directory (doesFileExist)
 import System.FilePath.Glob (globDir1)
@@ -218,8 +219,18 @@ getManifestRepositoryInfo pkgMeta =
 
 checkLicense :: PackageMeta -> PrepareM ()
 checkLicense pkgMeta =
-  when (null (bowerLicense pkgMeta))
-    (userError NoLicenseSpecified)
+  case bowerLicense pkgMeta of
+    [] ->
+      userError NoLicenseSpecified
+    ls ->
+      unless (any (isValidSPDX . T.unpack) ls)
+        (userError InvalidLicense)
+
+-- |
+-- Check if a string is a valid SPDX license expression.
+--
+isValidSPDX :: String -> Bool
+isValidSPDX = (== 1) . length . SPDX.parseExpression
 
 extractGithub :: Text -> Maybe (D.GithubUser, D.GithubRepo)
 extractGithub = stripGitHubPrefixes

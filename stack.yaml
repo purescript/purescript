@@ -1,4 +1,8 @@
 resolver: lts-12.0
 packages:
 - '.'
+- location:
+    git: https://github.com/phadej/spdx.git
+    commit: 4288df6e4b7840eb94d825dcd446b42fef25ef56
+  extra-dep: true
 extra-deps:
