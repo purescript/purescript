@@ -2,11 +2,12 @@
 set -e
 
 STACK="stack --no-terminal --jobs=1"
+[[ "$BUILD_TYPE" == "haddock" ]] && DEPS_HADDOCK="--haddock"
 
 # Setup & install dependencies or abort
 ret=0
 $TIMEOUT 45m $STACK --install-ghc build \
-  --only-dependencies --test --haddock \
+  --only-dependencies --test $DEPS_HADDOCK \
   || ret=$?
 case "$ret" in
   0) # continue
