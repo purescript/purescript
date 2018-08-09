@@ -6,7 +6,7 @@ STACK="stack --no-terminal --jobs=1"
 
 # Setup & install dependencies or abort
 ret=0
-$TIMEOUT 45m $STACK --install-ghc build \
+$TIMEOUT 40m $STACK --install-ghc build \
   --only-dependencies --test $DEPS_HADDOCK \
   || ret=$?
 case "$ret" in
