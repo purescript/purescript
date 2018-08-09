@@ -22,7 +22,6 @@ import           Protolude (catMaybes)
 
 import           Control.Applicative (optional)
 import           Data.Foldable (for_)
-import           Data.Monoid ((<>))
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import           Options.Applicative (Parser)

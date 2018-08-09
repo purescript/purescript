@@ -32,15 +32,16 @@ extra-source-files:
   - CONTRIBUTORS.md
   - CONTRIBUTING.md
 dependencies:
-  - aeson >=1.0 && <1.3
+  - aeson >=1.0 && <1.4
   - aeson-better-errors >=0.8
   - ansi-terminal >=0.7.1 && <0.9
-  - base >=4.8 && <4.11
+  - base >=4.8 && <4.12
   - base-compat >=0.6.0
   - blaze-html >=0.8.1 && <0.10
   - bower-json >=1.0.0.1 && <1.1
   - boxes >=0.1.4 && <0.2.0
   - bytestring
+  - Cabal >= 2.2
   - cheapskate >=0.1 && <0.2
   - clock
   - containers
@@ -70,7 +71,6 @@ dependencies:
   - scientific >=0.3.4.9 && <0.4
   - semigroups >=0.16.2 && <0.19
   - sourcemap >=0.1.6
-  - spdx ==0.2.*
   - split
   - stm >=0.2.4.0
   - stringsearch

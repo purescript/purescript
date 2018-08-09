@@ -12,7 +12,6 @@ import           Control.Monad.Supply.Class (MonadSupply)
 import           Data.Foldable (for_)
 import           Data.List (foldl', find, sortBy, unzip5)
 import qualified Data.Map as M
-import           Data.Monoid ((<>))
 import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Ord (comparing)
 import qualified Data.Set as S
@@ -42,12 +41,14 @@ data NewtypeDerivedInstances = NewtypeDerivedInstances
   -- ^ A list of newtype instances which were derived in this module.
   } deriving Show
 
-instance Monoid NewtypeDerivedInstances where
-  mempty = NewtypeDerivedInstances mempty mempty
-  mappend x y =
+instance Semigroup NewtypeDerivedInstances where
+  x <> y =
     NewtypeDerivedInstances { ndiClasses          = ndiClasses          x <> ndiClasses          y
                             , ndiDerivedInstances = ndiDerivedInstances x <> ndiDerivedInstances y
                             }
+
+instance Monoid NewtypeDerivedInstances where
+  mempty = NewtypeDerivedInstances mempty mempty
 
 -- | Extract the name of the newtype appearing in the last type argument of
 -- a derived newtype instance.

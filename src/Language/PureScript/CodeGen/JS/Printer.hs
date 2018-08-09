@@ -13,7 +13,6 @@ import Control.PatternArrows
 import qualified Control.Arrow as A
 
 import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
 

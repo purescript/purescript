@@ -13,7 +13,6 @@ module Language.PureScript.Docs.RenderedCode.RenderType
 import Prelude.Compat
 
 import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
 import Data.Text (Text)
 
 import Control.Arrow ((<+>))

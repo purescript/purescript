@@ -12,7 +12,6 @@ import Prelude.Compat
 import Control.Arrow (ArrowPlus(..))
 import Control.PatternArrows as PA
 
-import Data.Monoid ((<>))
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 

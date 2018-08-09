@@ -39,7 +39,6 @@ import Data.Either (partitionEithers)
 import Data.Functor (($>))
 import Data.List (transpose, (\\), partition, delete)
 import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
 import Data.Traversable (for)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as M

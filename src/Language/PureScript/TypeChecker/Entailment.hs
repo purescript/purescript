@@ -135,13 +135,14 @@ data Matched t
   | Unknown
   deriving (Eq, Show, Functor)
 
+instance Semigroup t => Semigroup (Matched t) where
+  (Match l) <> (Match r) = Match (l <> r)
+  Apart     <> _         = Apart
+  _         <> Apart     = Apart
+  _         <> _         = Unknown
+
 instance Monoid t => Monoid (Matched t) where
   mempty = Match mempty
-
-  mappend (Match l) (Match r) = Match (l <> r)
-  mappend Apart     _         = Apart
-  mappend _         Apart     = Apart
-  mappend _         _         = Unknown
 
 -- | Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.

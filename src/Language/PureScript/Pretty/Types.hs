@@ -14,7 +14,7 @@ module Language.PureScript.Pretty.Types
   , prettyPrintObjectKey
   ) where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 
 import Control.Arrow ((<+>))
 import Control.PatternArrows as PA

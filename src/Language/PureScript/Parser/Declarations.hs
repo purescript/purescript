@@ -25,7 +25,6 @@ import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Parallel.Strategies (withStrategy, parList, rseq)
 import           Data.Functor (($>))
 import           Data.Maybe (fromMaybe)
-import           Data.Monoid ((<>))
 import qualified Data.Set as S
 import           Data.Text (Text)
 import           Language.PureScript.AST

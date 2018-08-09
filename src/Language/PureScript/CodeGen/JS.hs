@@ -19,7 +19,6 @@ import Data.List ((\\), intersect)
 import qualified Data.Foldable as F
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe, isNothing)
-import Data.Monoid ((<>))
 import Data.String (fromString)
 import Data.Text (Text)
 import qualified Data.Text as T

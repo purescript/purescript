@@ -12,7 +12,6 @@ module Language.PureScript.Docs.Render where
 import Prelude.Compat
 
 import Data.Maybe (maybeToList)
-import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
 

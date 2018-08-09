@@ -35,7 +35,7 @@ import           Language.PureScript.Ide.Util
 import qualified Language.PureScript           as P
 
 newtype Filter = Filter (Endo [Module])
-  deriving (Monoid)
+  deriving (Semigroup, Monoid)
 
 type Module = (P.ModuleName, [IdeDeclarationAnn])
 
