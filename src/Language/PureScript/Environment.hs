@@ -451,6 +451,7 @@ primRowTypes =
     , (primSubName C.moduleRow "Nub", (kindRow kindType -:> kindRow kindType -:> kindConstraint, ExternData))
     , (primSubName C.moduleRow "Lacks", (kindSymbol -:> kindRow kindType -:> kindConstraint, ExternData))
     , (primSubName C.moduleRow "Cons",  (kindSymbol -:> kindType -:> kindRow kindType -:> kindRow kindType -:> kindConstraint, ExternData))
+    , (primSubName C.moduleRow "Contains", (kindSymbol -:> kindRow kindType -:> kindBoolean -:> kindConstraint, ExternData))
     ]
 
 primRowListTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceKind, TypeKind)
@@ -526,6 +527,15 @@ primRowClasses =
         [ ("label", Just kindSymbol)
         , ("row", Just (kindRow kindType))
         ] [] [] [])
+
+    -- class Contains (label :: Symbol) (row :: # Type) (result :: Boolean)
+    , (primSubName C.moduleRow "Contains", makeTypeClassData
+        [ ("label", Just kindSymbol)
+        , ("row", Just (kindRow kindType))
+        , ("result", Just kindBoolean)
+        ] [] []
+        [ FunctionalDependency [0, 1] [2]
+        ])
 
     -- class RowCons (label :: Symbol) (a :: Type) (tail :: # Type) (row :: # Type) | label tail a -> row, label row -> tail a
     , (primSubName C.moduleRow "Cons", makeTypeClassData

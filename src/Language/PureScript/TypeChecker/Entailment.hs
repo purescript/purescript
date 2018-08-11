@@ -174,6 +174,7 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ C.RowUnion args | Just dicts <- solveUnion args = dicts
     forClassName _ C.RowNub args | Just dicts <- solveNub args = dicts
     forClassName _ C.RowLacks args | Just dicts <- solveLacks args = dicts
+    forClassName _ C.RowContains args | Just dicts <- solveRowContains args = dicts
     forClassName _ C.RowCons args | Just dicts <- solveRowCons args = dicts
     forClassName _ C.RowToList args | Just dicts <- solveRowToList args = dicts
     forClassName ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (ordNub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
@@ -498,6 +499,22 @@ entails SolverOptions{..} constraint context hints =
         (canMakeProgress, cst) = case rest of
             REmpty _ -> (True, Nothing)
             _ -> (not (null fixed), Just [ srcConstraint C.RowLacks [srcTypeLevelString sym, rest] Nothing ])
+
+    solveRowContains :: [SourceType] -> Maybe [TypeClassDict]
+    solveRowContains [TypeLevelString _ sym, r, _] =
+        pure [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowContains [srcTypeLevelString sym, r, result] Nothing ]
+      where
+        result = rowContains sym r
+    solveRowContains _ = Nothing
+
+    rowContains :: PSString -> SourceType -> SourceType
+    rowContains sym r =
+      TypeConstructor NullSourceAnn $ if hasSym
+        then C.booleanTrue
+        else C.booleanFalse
+      where
+        (rl, _) = rowToList r
+        hasSym = sym `elem` (runLabel . rowListLabel <$> rl)
 
 -- Check if an instance matches our list of types, allowing for types
 -- to be solved via functional dependencies. If the types match, we return a

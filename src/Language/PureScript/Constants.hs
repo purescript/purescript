@@ -429,6 +429,9 @@ pattern RowCons = Qualified (Just PrimRow) (ProperName "Cons")
 pattern RowLacks :: Qualified (ProperName 'ClassName)
 pattern RowLacks = Qualified (Just PrimRow) (ProperName "Lacks")
 
+pattern RowContains :: Qualified (ProperName 'ClassName)
+pattern RowContains = Qualified (Just PrimRow) (ProperName "Contains")
+
 -- Prim.RowList
 
 pattern PrimRowList :: ModuleName

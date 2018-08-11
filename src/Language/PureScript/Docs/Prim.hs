@@ -83,6 +83,7 @@ primRowDocsModule = Module
       [ union
       , nub
       , lacks
+      , rowContains
       , rowCons
       ]
   , modReExports = []
@@ -401,6 +402,12 @@ nub = primClassOf (P.primSubName "Row") "Nub" $ T.unlines
 lacks :: Declaration
 lacks = primClassOf (P.primSubName "Row") "Lacks" $ T.unlines
   [ "The Lacks type class asserts that a label does not occur in a given row."
+  ]
+
+rowContains :: Declaration
+rowContains = primClassOf (P.primSubName "Row") "Contains" $ T.unlines
+  [ "The Contains type class checks if a label occurs in a given row and returns"
+  , "the result as a type of kind Prim.Boolean"
   ]
 
 rowCons :: Declaration
