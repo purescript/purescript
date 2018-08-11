@@ -14,9 +14,11 @@ import           Control.Arrow (first, second)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.State
 import           Control.Monad.Supply.Class
-import           Data.List ((\\), find, sortBy)
+import           Data.List (find, sortBy)
 import qualified Data.Map as M
 import           Data.Maybe (catMaybes, mapMaybe, isJust, fromMaybe)
+import qualified Data.List.NonEmpty as NEL
+import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Language.PureScript.Constants as C
 import           Language.PureScript.Crash
@@ -285,12 +287,14 @@ typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
     maybe (throwError . errorMessage' ss . UnknownName $ fmap TyClassName className) return $
       M.lookup (qualify mn className) m
 
-  case map fst typeClassMembers \\ mapMaybe declIdent decls of
-    member : _ -> throwError . errorMessage' ss $ MissingClassMember member
-    [] -> do
-      -- Replace the type arguments with the appropriate types in the member types
-      let memberTypes = map (second (replaceAllTypeVars (zip (map fst typeClassArguments) tys))) typeClassMembers
+  -- Replace the type arguments with the appropriate types in the member types
+  let memberTypes = map (second (replaceAllTypeVars (zip (map fst typeClassArguments) tys))) typeClassMembers
 
+  let declaredMembers = S.fromList $ mapMaybe declIdent decls
+
+  case filter (\(ident, _) -> not $ S.member ident declaredMembers) memberTypes of
+    hd : tl -> throwError . errorMessage' ss $ MissingClassMember (hd NEL.:| tl)
+    [] -> do
       -- Create values for the type instance members
       members <- zip (map typeClassMemberName decls) <$> traverse (memberToValue memberTypes) decls
 
