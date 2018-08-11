@@ -8,13 +8,13 @@ module Language.PureScript.Ide.Usage
 
 import           Protolude hiding (moduleName)
 
-import           Control.Lens (preview)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Language.PureScript as P
 import           Language.PureScript.Ide.State (getAllModules, getFileState)
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
+import           Lens.Micro.Platform (preview)
 
 -- |
 -- How we find usages, given an IdeDeclaration and the module it was defined in:

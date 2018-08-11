@@ -30,9 +30,8 @@ module Language.PureScript.Ide.Util
   ) where
 
 import           Protolude                           hiding (decodeUtf8,
-                                                      encodeUtf8)
+                                                      encodeUtf8, to)
 
-import           Control.Lens                        hiding ((&), op)
 import           Data.Aeson
 import qualified Data.Text.Lazy                      as TL
 import           Data.Text.Lazy.Encoding             as TLE
@@ -40,6 +39,7 @@ import qualified Language.PureScript                 as P
 import           Language.PureScript.Ide.Error       (IdeError(..))
 import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.Types
+import           Lens.Micro.Platform                 hiding ((&))
 import           System.IO.UTF8                      (readUTF8FileT)
 import           System.Directory                    (makeAbsolute)
 
@@ -90,14 +90,14 @@ encodeT = TL.toStrict . TLE.decodeUtf8 . encode
 decodeT :: (FromJSON a) => Text -> Maybe a
 decodeT = decode . TLE.encodeUtf8 . TL.fromStrict
 
-properNameT :: Iso' (P.ProperName a) Text
-properNameT = iso P.runProperName P.ProperName
+properNameT :: Getting r (P.ProperName a) Text
+properNameT = to P.runProperName
 
-identT :: Iso' P.Ident Text
-identT = iso P.runIdent P.Ident
+identT :: Getting r P.Ident Text
+identT = to P.runIdent
 
-opNameT :: Iso' (P.OpName a) Text
-opNameT = iso P.runOpName P.OpName
+opNameT :: Getting r (P.OpName a) Text
+opNameT = to P.runOpName
 
 ideReadFile'
   :: (MonadIO m, MonadError IdeError m)

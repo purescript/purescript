@@ -22,11 +22,11 @@ module Language.PureScript.Ide.Types where
 import           Protolude hiding (moduleName)
 
 import           Control.Concurrent.STM
-import           Control.Lens.TH
 import           Data.Aeson
 import qualified Data.Map.Lazy as M
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Errors.JSON as P
+import           Lens.Micro.Platform hiding ((.=))
 
 type ModuleIdent = Text
 type ModuleMap a = Map P.ModuleName a
@@ -94,7 +94,41 @@ data IdeTypeOperator = IdeTypeOperator
   , _ideTypeOpKind          :: Maybe P.Kind
   } deriving (Show, Eq, Ord, Generic, NFData)
 
-makePrisms ''IdeDeclaration
+_IdeDeclValue :: Traversal' IdeDeclaration IdeValue
+_IdeDeclValue f (IdeDeclValue x) = map IdeDeclValue (f x)
+_IdeDeclValue _ x = pure x
+
+_IdeDeclType :: Traversal' IdeDeclaration IdeType
+_IdeDeclType f (IdeDeclType x) = map IdeDeclType (f x)
+_IdeDeclType _ x = pure x
+
+_IdeDeclTypeSynonym :: Traversal' IdeDeclaration IdeTypeSynonym
+_IdeDeclTypeSynonym f (IdeDeclTypeSynonym x) = map IdeDeclTypeSynonym (f x)
+_IdeDeclTypeSynonym _ x = pure x
+
+_IdeDeclDataConstructor :: Traversal' IdeDeclaration IdeDataConstructor
+_IdeDeclDataConstructor f (IdeDeclDataConstructor x) = map IdeDeclDataConstructor (f x)
+_IdeDeclDataConstructor _ x = pure x
+
+_IdeDeclTypeClass :: Traversal' IdeDeclaration IdeTypeClass
+_IdeDeclTypeClass f (IdeDeclTypeClass x) = map IdeDeclTypeClass (f x)
+_IdeDeclTypeClass _ x = pure x
+
+_IdeDeclValueOperator :: Traversal' IdeDeclaration IdeValueOperator
+_IdeDeclValueOperator f (IdeDeclValueOperator x) = map IdeDeclValueOperator (f x)
+_IdeDeclValueOperator _ x = pure x
+
+_IdeDeclTypeOperator :: Traversal' IdeDeclaration IdeTypeOperator
+_IdeDeclTypeOperator f (IdeDeclTypeOperator x) = map IdeDeclTypeOperator (f x)
+_IdeDeclTypeOperator _ x = pure x
+
+_IdeDeclKind :: Traversal' IdeDeclaration (P.ProperName 'P.KindName)
+_IdeDeclKind f (IdeDeclKind x) = map IdeDeclKind (f x)
+_IdeDeclKind _ x = pure x
+
+anyOf :: Getting Any s a -> (a -> Bool) -> s -> Bool
+anyOf g p = getAny . getConst . g (Const . Any . p)
+
 makeLenses ''IdeValue
 makeLenses ''IdeType
 makeLenses ''IdeTypeSynonym

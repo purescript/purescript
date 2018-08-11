@@ -41,7 +41,6 @@ import           Protolude hiding (moduleName)
 
 import           Control.Arrow
 import           Control.Concurrent.STM
-import           Control.Lens                       hiding (op, (&))
 import           "monad-logger" Control.Monad.Logger
 import qualified Data.Map.Lazy                      as Map
 import qualified Language.PureScript                as P
@@ -52,6 +51,7 @@ import           Language.PureScript.Ide.Reexports
 import           Language.PureScript.Ide.SourceFile
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
+import           Lens.Micro.Platform                hiding ((&))
 
 -- | Resets all State inside psc-ide
 resetIdeState :: Ide m => m ()
@@ -329,7 +329,7 @@ resolveInstances externs declarations =
           mapIf matchTC (idaDeclaration
                          . _IdeDeclTypeClass
                          . ideTCInstances
-                         %~ cons ideInstance)
+                         %~ (ideInstance :))
       in
         acc' & ix classModule %~ updateDeclaration
 

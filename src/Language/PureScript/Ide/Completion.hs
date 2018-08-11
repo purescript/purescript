@@ -11,7 +11,6 @@ module Language.PureScript.Ide.Completion
 
 import           Protolude hiding ((<&>), moduleName)
 
-import           Control.Lens hiding ((&), op)
 import           Data.Aeson
 import qualified Data.Map as Map
 import qualified Data.Text as T
@@ -21,6 +20,7 @@ import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
+import           Lens.Micro.Platform hiding ((&))
 
 type Module = (P.ModuleName, [IdeDeclarationAnn])
 
