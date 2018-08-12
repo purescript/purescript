@@ -13,6 +13,9 @@ idePrimDeclarations =
   [ ( C.Prim
     , mconcat [primTypes, primKinds, primClasses]
     )
+  , ( C.PrimBoolean
+    , mconcat [primBooleanTypes, primBooleanKinds]
+    )
   , ( C.PrimOrdering
     , mconcat [primOrderingTypes, primOrderingKinds]
     )
@@ -42,6 +45,7 @@ idePrimDeclarations =
       Map.difference types (Map.mapKeys (map P.coerceProperName) classes)
 
     primTypes = annType (removeClasses PEnv.primTypes PEnv.primClasses)
+    primBooleanTypes = annType PEnv.primBooleanTypes
     primOrderingTypes = annType PEnv.primOrderingTypes
     primRowTypes = annType (removeClasses PEnv.primRowTypes PEnv.primRowClasses)
     primRowListTypes = annType (removeClasses PEnv.primRowListTypes PEnv.primRowListClasses)
@@ -55,6 +59,9 @@ idePrimDeclarations =
     primTypeErrorClasses = annClass PEnv.primTypeErrorClasses
 
     primKinds = foreach (Set.toList PEnv.primKinds) $ \kn ->
+      IdeDeclarationAnn emptyAnn (IdeDeclKind (P.disqualify kn))
+
+    primBooleanKinds = foreach (Set.toList PEnv.primBooleanKinds) $ \kn ->
       IdeDeclarationAnn emptyAnn (IdeDeclKind (P.disqualify kn))
 
     primOrderingKinds = foreach (Set.toList PEnv.primOrderingKinds) $ \kn ->
