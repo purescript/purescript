@@ -753,6 +753,12 @@ data Expr
   --
   | App Expr Expr
   -- |
+  -- Hint that an expression is unused.
+  -- This is used to ignore type class dictionaries that are necessarily empty.
+  -- The inner expression lets us solve subgoals before eliminating the whole expression.
+  -- The code gen will render this as `undefined`, regardless of what the inner expression is.
+  | Unused Expr
+  -- |
   -- Variable
   --
   | Var SourceSpan (Qualified Ident)
