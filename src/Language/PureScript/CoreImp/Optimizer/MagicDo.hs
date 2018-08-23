@@ -57,6 +57,9 @@ magicDo effectModule C.EffectDictionaries{..} = everywhereTopDown convert
   -- Desugar whileE
   convert (App _ (App _ (App s1 f [arg1]) [arg2]) []) | isEffFunc edWhile f =
     App s1 (Function s1 Nothing [] (Block s1 [ While s1 (App s1 arg1 []) (Block s1 [ App s1 arg2 [] ]), Return s1 $ ObjectLiteral s1 []])) []
+  -- Desugar forE
+  convert (App _ (App _ (App _ (App s1 f [lo]) [hi]) [intToEff]) []) | isEffFunc C.forE f =
+    App s1 (Function s1 Nothing [] (Block s1 [ For s1 "i" lo hi (Block s1 [(App s1 (App s1 intToEff [Var s1 "i"]) []), Return s1 $ ObjectLiteral s1 []])])) []
   -- Inline __do returns
   convert (Return _ (App _ (Function _ (Just ident) [] body) [])) | ident == fnName = body
   -- Inline double applications

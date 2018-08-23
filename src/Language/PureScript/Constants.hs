@@ -204,6 +204,15 @@ unit = "unit"
 
 -- Core lib values
 
+untilE :: forall a. (IsString a) => a
+untilE = "untilE"
+
+whileE :: forall a. (IsString a) => a
+whileE = "whileE"
+
+forE :: forall a. (IsString a) => a
+forE = "forE"
+
 runST :: forall a. (IsString a) => a
 runST = "run"
 
