@@ -59,7 +59,8 @@ magicDo effectModule C.EffectDictionaries{..} = everywhereTopDown convert
     App s1 (Function s1 Nothing [] (Block s1 [ While s1 (App s1 arg1 []) (Block s1 [ App s1 arg2 [] ]), Return s1 $ ObjectLiteral s1 []])) []
   -- Desugar forE
   convert (App _ (App _ (App _ (App s1 f [lo]) [hi]) [intToEff]) []) | isEffFunc C.forE f =
-    App s1 (Function s1 Nothing [] (Block s1 [ For s1 "i" lo hi (Block s1 [(App s1 (App s1 intToEff [Var s1 "i"]) [])]), Return s1 $ ObjectLiteral s1 []])) []
+    App s1 (Function s1 Nothing [] (Block s1 [ For s1 counter lo hi (Block s1 [(App s1 (App s1 intToEff [Var s1 counter]) [])]), Return s1 $ ObjectLiteral s1 []])) []
+    where counter = "$__i"
   -- Note: Desugaring forEachE requires a modification to the AST of "For" to allow
   -- hoisting of the array length.
   -- Inline __do returns
