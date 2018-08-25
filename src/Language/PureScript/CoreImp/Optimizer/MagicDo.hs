@@ -61,8 +61,6 @@ magicDo effectModule C.EffectDictionaries{..} = everywhereTopDown convert
   convert (App _ (App _ (App _ (App s1 f [lo]) [hi]) [intToEff]) []) | isEffFunc C.forE f =
     App s1 (Function s1 Nothing [] (Block s1 [ For s1 counter lo hi (Block s1 [(App s1 (App s1 intToEff [Var s1 counter]) [])]), Return s1 $ ObjectLiteral s1 []])) []
     where counter = "$__i"
-  -- Note: Desugaring forEachE requires a modification to the AST of "For" to allow
-  -- hoisting of the array length.
   -- Inline __do returns
   convert (Return _ (App _ (Function _ (Just ident) [] body) [])) | ident == fnName = body
   -- Inline double applications
