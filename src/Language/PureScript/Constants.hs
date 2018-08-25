@@ -204,6 +204,9 @@ unit = "unit"
 
 -- Core lib values
 
+foreachE :: forall a. (IsString a) => a
+foreachE = "foreachE"
+
 runST :: forall a. (IsString a) => a
 runST = "run"
 
