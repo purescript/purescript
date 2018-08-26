@@ -58,10 +58,12 @@ magicDo effectModule C.EffectDictionaries{..} = everywhereTopDown convert
   convert (App _ (App _ (App s1 f [arg1]) [arg2]) []) | isEffFunc edWhile f =
     App s1 (Function s1 Nothing [] (Block s1 [ While s1 (App s1 arg1 []) (Block s1 [ App s1 arg2 [] ]), Return s1 $ ObjectLiteral s1 []])) []
   -- Desugar forE
-  convert (App _ (App _ (App _ (App s1 f [lo]) [hi]) [intToEff]) []) | isEffFunc C.forE f =
-    App s1 (Function s1 Nothing [] (Block s1 [ VariableIntroduction s1 fn (Just intToEff), For s1 counter lo hi (Block s1 [App s1 (App s1 (Var s1 fn) [Var s1 counter]) []]), Return s1 $ ObjectLiteral s1 []])) []
+  convert (App _ (App _ (App _ (App s1 f [loArg]) [hiArg]) [intToEff]) []) | isEffFunc C.forE f =
+    App s1 (Function s1 Nothing [] (Block s1 [ VariableIntroduction s1 lo (Just loArg), VariableIntroduction s1 hi (Just hiArg), VariableIntroduction s1 fn (Just intToEff), For s1 counter (Var s1 lo) (Var s1 hi) (Block s1 [App s1 (App s1 (Var s1 fn) [Var s1 counter]) []]), Return s1 $ ObjectLiteral s1 []])) []
     where
     counter = "$__i"
+    lo = "$__lo"
+    hi = "$__hi"
     fn = "$__f"
   -- Inline __do returns
   convert (Return _ (App _ (Function _ (Just ident) [] body) [])) | ident == fnName = body
