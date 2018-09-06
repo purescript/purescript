@@ -23,7 +23,7 @@ or `hierarchy`.
 
 To build and run a specific test in `tests/purs/passing/` or `tests/purs/failing/`, add test arguments like so:
 
-`stack test --fast --test-arguments="-p compiler/**1110.purs*"`
+`stack test --fast --test-arguments="-p 1110.purs"`
 
 This will run whatever test uses the example file `1110.purs`.
 
