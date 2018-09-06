@@ -202,7 +202,7 @@ deriveNewtypeInstance
   -> m Expr
 deriveNewtypeInstance ss mn syns ndis className ds tys tyConNm dargs = do
     verifySuperclasses
-    tyCon <- findTypeDecl tyConNm ds
+    tyCon <- findTypeDecl ss tyConNm ds
     go tyCon
   where
     go (DataDeclaration _ Newtype _ tyArgNames [(_, [wrapped])]) = do
@@ -288,7 +288,7 @@ deriveGenericRep
   -> m ([Declaration], Type)
 deriveGenericRep ss mn syns ds tyConNm tyConArgs repTy = do
     checkIsWildcard ss tyConNm repTy
-    go =<< findTypeDecl tyConNm ds
+    go =<< findTypeDecl ss tyConNm ds
   where
     go :: Declaration -> m ([Declaration], Type)
     go (DataDeclaration (ss', _) _ _ args dctors) = do
@@ -441,7 +441,7 @@ deriveEq
   -> ProperName 'TypeName
   -> m [Declaration]
 deriveEq ss mn syns ds tyConNm = do
-  tyCon <- findTypeDecl tyConNm ds
+  tyCon <- findTypeDecl ss tyConNm ds
   eqFun <- mkEqFunction tyCon
   return [ ValueDecl (ss, []) (Ident C.eq) Public [] (unguarded eqFun) ]
   where
@@ -509,7 +509,7 @@ deriveOrd
   -> ProperName 'TypeName
   -> m [Declaration]
 deriveOrd ss mn syns ds tyConNm = do
-  tyCon <- findTypeDecl tyConNm ds
+  tyCon <- findTypeDecl ss tyConNm ds
   compareFun <- mkCompareFunction tyCon
   return [ ValueDecl (ss, []) (Ident C.compare) Public [] (unguarded compareFun) ]
   where
@@ -613,7 +613,7 @@ deriveNewtype
   -> m ([Declaration], Type)
 deriveNewtype ss mn syns ds tyConNm tyConArgs unwrappedTy = do
     checkIsWildcard ss tyConNm unwrappedTy
-    go =<< findTypeDecl tyConNm ds
+    go =<< findTypeDecl ss tyConNm ds
   where
     go :: Declaration -> m ([Declaration], Type)
     go (DataDeclaration (ss', _) Data name _ _) =
@@ -640,10 +640,11 @@ deriveNewtype ss mn syns ds tyConNm tyConArgs unwrappedTy = do
 
 findTypeDecl
   :: (MonadError MultipleErrors m)
-  => ProperName 'TypeName
+  => SourceSpan
+  -> ProperName 'TypeName
   -> [Declaration]
   -> m Declaration
-findTypeDecl tyConNm = maybe (throwError . errorMessage $ CannotFindDerivingType tyConNm) return . find isTypeDecl
+findTypeDecl ss tyConNm = maybe (throwError . errorMessage' ss $ CannotFindDerivingType tyConNm) return . find isTypeDecl
   where
   isTypeDecl :: Declaration -> Bool
   isTypeDecl (DataDeclaration _ _ nm _ _) | nm == tyConNm = True
@@ -693,7 +694,7 @@ deriveFunctor
   -> ProperName 'TypeName
   -> m [Declaration]
 deriveFunctor ss mn syns ds tyConNm = do
-  tyCon <- findTypeDecl tyConNm ds
+  tyCon <- findTypeDecl ss tyConNm ds
   mapFun <- mkMapFunction tyCon
   return [ ValueDecl (ss, []) (Ident C.map) Public [] (unguarded mapFun) ]
   where
