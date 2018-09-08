@@ -167,7 +167,7 @@ moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreign_ =
   -- a PureScript identifier. If the name is not valid in JavaScript (symbol based, reserved name) an
   -- indexer is returned.
   accessor :: Ident -> AST -> AST
-  accessor (Ident prop) = accessorString $ mkString prop
+  accessor (Ident prop) = accessorString $ mkString $ properToJs prop
   accessor (GenIdent _ _) = internalError "GenIdent in accessor"
   accessor UnusedIdent = internalError "UnusedIdent in accessor"
 
