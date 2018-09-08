@@ -19,7 +19,6 @@ import Data.List ((\\), intersect)
 import qualified Data.Foldable as F
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe, isNothing)
-import Data.Monoid ((<>))
 import Data.String (fromString)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -55,7 +54,7 @@ moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreign_ =
     let usedNames = concatMap getNames decls
     let mnLookup = renameImports usedNames imps
     jsImports <- traverse (importToJs mnLookup)
-      . (\\ [mn, C.Prim, C.PrimOrdering, C.PrimRow, C.PrimRowList, C.PrimSymbol, C.PrimTypeError]) $ ordNub $ map snd imps
+      . (\\ (mn : C.primModules)) $ ordNub $ map snd imps
     let decls' = renameModules mnLookup decls
     jsDecls <- mapM bindToJs decls'
     optimized <- traverse (traverse optimize) jsDecls

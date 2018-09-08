@@ -124,7 +124,7 @@ data SimpleErrorMessage
   | DuplicateValueDeclaration Ident
   | ArgListLengthsDiffer Ident
   | OverlappingArgNames (Maybe Ident)
-  | MissingClassMember Ident
+  | MissingClassMember (NEL.NonEmpty (Ident, Type))
   | ExtraneousClassMember Ident (Qualified (ProperName 'ClassName))
   | ExpectedType Type Kind
   -- | constructor name, expected argument count, actual argument count

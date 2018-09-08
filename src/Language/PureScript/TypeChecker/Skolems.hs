@@ -14,7 +14,6 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets, modify)
 import Data.Foldable (traverse_)
 import Data.Functor.Identity (Identity(), runIdentity)
-import Data.Monoid
 import Data.Set (Set, fromList, notMember)
 import Data.Text (Text)
 import Language.PureScript.AST

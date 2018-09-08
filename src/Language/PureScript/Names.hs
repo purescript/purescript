@@ -16,7 +16,6 @@ import Control.DeepSeq (NFData)
 import GHC.Generics (Generic)
 import Data.Aeson
 import Data.Aeson.TH
-import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
 

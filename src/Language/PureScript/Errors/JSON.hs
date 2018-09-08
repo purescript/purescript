@@ -6,7 +6,6 @@ import Prelude.Compat
 
 import qualified Data.Aeson.TH as A
 import qualified Data.List.NonEmpty as NEL
-import Data.Monoid ((<>))
 import qualified Data.Text as T
 import Data.Text (Text)
 

@@ -40,7 +40,6 @@ import Control.Monad
 import Control.Arrow ((***), (>>>))
 
 import Control.Monad.Reader
-import Control.Monad.Writer.Strict
 import Control.Monad.Trans.Except
 
 import System.Exit

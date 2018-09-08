@@ -34,12 +34,12 @@ completionTestData supportModuleNames =
   , (":b",  [":browse"])
 
   -- :browse should complete module names
-  , (":b Eff",    map (":b Effect" ++) ["", ".Unsafe", ".Class", ".Console", ".Uncurried", ".Ref"])
-  , (":b Effect.", map (":b Effect" ++) [".Unsafe", ".Class", ".Console", ".Uncurried", ".Ref"])
+  , (":b Eff",    map (":b Effect" ++) ["", ".Unsafe", ".Class", ".Class.Console", ".Console", ".Uncurried", ".Ref"])
+  , (":b Effect.", map (":b Effect" ++) [".Unsafe", ".Class", ".Class.Console", ".Console", ".Uncurried", ".Ref"])
 
   -- import should complete module names
-  , ("import Eff",    map ("import Effect" ++) ["", ".Unsafe", ".Class", ".Console", ".Uncurried", ".Ref"])
-  , ("import Effect.", map ("import Effect" ++) [".Unsafe", ".Class", ".Console", ".Uncurried", ".Ref"])
+  , ("import Eff",    map ("import Effect" ++) ["", ".Unsafe", ".Class", ".Class.Console", ".Console", ".Uncurried", ".Ref"])
+  , ("import Effect.", map ("import Effect" ++) [".Unsafe", ".Class", ".Class.Console", ".Console", ".Uncurried", ".Ref"])
 
   -- :quit, :help, :reload, :clear should not complete
   , (":help ", [])

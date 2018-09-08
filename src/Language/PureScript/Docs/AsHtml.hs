@@ -20,7 +20,6 @@ import Control.Monad (unless)
 import Data.Char (isUpper)
 import Data.Either (isRight)
 import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
 import Data.Foldable (for_)
 import Data.String (fromString)
 

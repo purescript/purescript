@@ -7,7 +7,6 @@ module Language.PureScript.Docs.Prim
   ) where
 
 import Prelude.Compat hiding (fail)
-import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Map as Map

@@ -102,8 +102,8 @@ everywhereOnKindsM f = go
   go other = f other
 
 everythingOnKinds :: (r -> r -> r) -> (Kind -> r) -> Kind -> r
-everythingOnKinds (<>) f = go
+everythingOnKinds (<>.) f = go
   where
-  go k@(Row k1) = f k <> go k1
-  go k@(FunKind k1 k2) = f k <> go k1 <> go k2
+  go k@(Row k1) = f k <>. go k1
+  go k@(FunKind k1 k2) = f k <>. go k1 <>. go k2
   go other = f other

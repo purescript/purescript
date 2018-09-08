@@ -16,7 +16,6 @@ import Prelude.Compat
 import Control.Monad.Supply.Class (MonadSupply, freshName)
 
 import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
 import Data.String (IsString, fromString)
 import Data.Text (Text)
 import qualified Data.Text as T

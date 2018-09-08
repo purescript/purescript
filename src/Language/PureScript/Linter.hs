@@ -10,7 +10,6 @@ import Control.Monad.Writer.Class
 
 import Data.List ((\\))
 import Data.Maybe (mapMaybe)
-import Data.Monoid
 import qualified Data.Set as S
 import Data.Text (Text)
 

@@ -8,13 +8,13 @@ module Language.PureScript.Ide.Usage
 
 import           Protolude hiding (moduleName)
 
-import           Control.Lens (preview)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Language.PureScript as P
 import           Language.PureScript.Ide.State (getAllModules, getFileState)
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
+import           Lens.Micro.Platform (preview)
 
 -- |
 -- How we find usages, given an IdeDeclaration and the module it was defined in:
@@ -28,13 +28,13 @@ findUsages
   :: (MonadIO m, Ide m)
   => IdeDeclaration
   -> P.ModuleName
-  -> m (ModuleMap [P.SourceSpan])
+  -> m (ModuleMap (NonEmpty P.SourceSpan))
 findUsages declaration moduleName = do
   ms <- getAllModules Nothing
   asts <- Map.map fst . fsModules <$> getFileState
   let elig = eligibleModules (moduleName, declaration) ms asts
   pure
-    $ Map.filter (not . null)
+    $ Map.mapMaybe nonEmpty
     $ Map.mapWithKey (\mn searches ->
         foldMap (\m -> foldMap (applySearch m) searches) (Map.lookup mn asts)) elig
 

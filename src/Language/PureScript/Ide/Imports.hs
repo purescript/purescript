@@ -32,7 +32,6 @@ module Language.PureScript.Ide.Imports
 
 import           Protolude hiding (moduleName)
 
-import           Control.Lens                       ((^.), (%~), ix)
 import           Data.List                          (findIndex, nubBy, partition)
 import qualified Data.Map                           as Map
 import qualified Data.Text                          as T
@@ -45,6 +44,7 @@ import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Prim
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
+import           Lens.Micro.Platform                ((^.), (%~), ix)
 import           System.IO.UTF8                     (writeUTF8FileT)
 import qualified Text.Parsec as Parsec
 
@@ -71,7 +71,7 @@ parseImportsFromFile'
   => FilePath
   -> m (P.ModuleName, [Text], [Import], [Text])
 parseImportsFromFile' fp = do
-  file <- ideReadFile fp
+  (_, file) <- ideReadFile fp
   case sliceImportSection (T.lines file) of
     Right res -> pure res
     Left err -> throwError (GeneralError err)
