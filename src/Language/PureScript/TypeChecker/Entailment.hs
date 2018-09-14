@@ -195,7 +195,7 @@ entails SolverOptions{..} constraint context hints =
     solve con = go 0 con
       where
         go :: Int -> Constraint -> WriterT (Any, [(Ident, InstanceContext, Constraint)]) (StateT InstanceContext m) Expr
-        go work (Constraint className' tys' _) | work > 1000 = throwError . errorMessage $ PossiblyInfiniteInstance className' tys'
+        go work (Constraint className' tys' _) | work > 10000 = throwError . errorMessage $ PossiblyInfiniteInstance className' tys'
         go work con'@(Constraint className' tys' conInfo) = WriterT . StateT . (withErrorMessageHint (ErrorSolvingConstraint con') .) . runStateT . runWriterT $ do
             -- We might have unified types by solving other constraints, so we need to
             -- apply the latest substitution.
