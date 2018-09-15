@@ -18,7 +18,7 @@ import           Control.Monad.Writer.Class (MonadWriter(..))
 import           Data.Aeson (encode)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.Lazy as LB
-import qualified Data.ByteString.UTF8 as BU8
+import qualified Data.ByteString.Lazy.UTF8 as LBU8
 import           Data.Either (partitionEithers)
 import           Data.Foldable (for_, minimum)
 import qualified Data.List.NonEmpty as NEL
@@ -229,7 +229,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 checkForeignDecls :: CF.Module ann -> FilePath -> SupplyT Make ()
 checkForeignDecls m path = do
   jsStr <- lift $ readTextFile path
-  js <- either (errorParsingModule . Bundle.UnableToParseModule) pure $ JS.parse (BU8.toString (B.toStrict jsStr)) path
+  js <- either (errorParsingModule . Bundle.UnableToParseModule) pure $ JS.parse (LBU8.toString jsStr) path
 
   foreignIdentsStrs <- either errorParsingModule pure $ getExps js
   foreignIdents <- either
