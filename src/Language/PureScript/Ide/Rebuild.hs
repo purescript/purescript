@@ -10,11 +10,13 @@ module Language.PureScript.Ide.Rebuild
 import           Protolude
 
 import           "monad-logger" Control.Monad.Logger
+import           Control.Monad.Writer.Class (MonadWriter(..))
 import qualified Data.List                       as List
 import qualified Data.Map.Lazy                   as M
 import           Data.Maybe                      (fromJust)
 import qualified Data.Set                        as S
 import qualified Language.PureScript             as P
+import qualified Language.PureScript.CoreFn      as CF
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.State
@@ -154,11 +156,25 @@ shushProgress :: P.MakeActions P.Make -> MakeActionsEnv -> P.MakeActions P.Make
 shushProgress ma _ =
   ma { P.progress = \_ -> pure () }
 
--- | Stops any kind of codegen (also silences errors about missing or unused FFI
--- files though)
+-- | Stops any kind of codegen (only keeps errors about missing or unused FFI
+-- files)
 shushCodegen :: P.MakeActions P.Make -> MakeActionsEnv -> P.MakeActions P.Make
 shushCodegen ma MakeActionsEnv{..} =
-  ma { P.codegen = \_ _ _ -> pure () }
+  ma { P.codegen = \_ _ _ -> pure ()
+     , P.ffiCodegen = \m -> do
+        let mn = CF.moduleName m
+        case mn `M.lookup` maeForeignPathMap of
+            Just path
+                | not $ requiresForeign m ->
+                    tell $ P.errorMessage' (CF.moduleSourceSpan m) $ P.UnnecessaryFFIModule mn path
+                | otherwise ->
+                    P.checkForeignDecls m path
+            Nothing | requiresForeign m -> throwError . P.errorMessage' (CF.moduleSourceSpan m) $ P.MissingFFIModule mn
+                    | otherwise -> return ()
+     }
+  where
+  requiresForeign :: CF.Module a -> Bool
+  requiresForeign = not . null . CF.moduleForeign
 
 -- | Returns a topologically sorted list of dependent ExternsFiles for the given
 -- module. Throws an error if there is a cyclic dependency within the
