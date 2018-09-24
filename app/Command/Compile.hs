@@ -10,8 +10,7 @@ import           Control.Applicative
 import           Control.Monad
 import qualified Data.Aeson as A
 import           Data.Bool (bool)
-import qualified Data.ByteString.Lazy as B
-import qualified Data.ByteString.UTF8 as BU8
+import qualified Data.ByteString.Lazy.UTF8 as LBU8
 import           Data.List (intercalate)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -51,7 +50,7 @@ printWarningsAndErrors verbose False warnings errors = do
       exitFailure
     Right _ -> return ()
 printWarningsAndErrors verbose True warnings errors = do
-  hPutStrLn stderr . BU8.toString . B.toStrict . A.encode $
+  hPutStrLn stderr . LBU8.toString . A.encode $
     JSONResult (toJSONErrors verbose P.Warning warnings)
                (either (toJSONErrors verbose P.Error) (const []) errors)
   either (const exitFailure) (const (return ())) errors
