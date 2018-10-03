@@ -33,14 +33,10 @@ desugarDecl d = rethrowWithPosition (declSourceSpan d) $ fn d
   desugarExpr :: Expr -> m Expr
   desugarExpr AnonymousArgument = throwError . errorMessage $ IncorrectAnonymousArgument
   desugarExpr (Parens b)
-    | b' <- stripPositionInfo b
-    , BinaryNoParens op val u <- b'
-    , isAnonymousArgument u = do arg <- freshIdent'
-                                 return $ Abs (VarBinder nullSourceSpan arg) $ App (App op val) (Var nullSourceSpan (Qualified Nothing arg))
-    | b' <- stripPositionInfo b
-    , BinaryNoParens op u val <- b'
-    , isAnonymousArgument u = do arg <- freshIdent'
-                                 return $ Abs (VarBinder nullSourceSpan arg) $ App (App op (Var nullSourceSpan (Qualified Nothing arg))) val
+    | BinaryNoParens op val u <- stripPositionInfo b
+    , isAnonymousArgument u = do
+        arg <- freshIdent'
+        return $ Abs (VarBinder nullSourceSpan arg) $ App (App op val) (Var nullSourceSpan (Qualified Nothing arg))
   desugarExpr (Literal ss (ObjectLiteral ps)) = wrapLambdaAssoc (Literal ss . ObjectLiteral) ps
   desugarExpr (ObjectUpdateNested obj ps) = transformNestedUpdate obj ps
   desugarExpr (Accessor prop u)
