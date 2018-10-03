@@ -124,7 +124,7 @@ matchTypeAtom tro@TypeRenderOptions{troSuggesting = suggesting} =
     typeLiterals = mkPattern match where
       match TypeWildcard{} = Just $ text "_"
       match (TypeVar var) = Just $ text $ T.unpack var
-      match (TypeLevelString s) = Just $ text $ T.unpack $ prettyPrintString s
+      match (TypeLevelString s) = Just $ text $ T.unpack $ prettyPrintLabel $ Label s
       match (PrettyPrintObject row) = Just $ prettyPrintRowWith tro '{' '}' row
       match (TypeConstructor ctor) = Just $ text $ T.unpack $ runProperName $ disqualify ctor
       match (TUnknown u)

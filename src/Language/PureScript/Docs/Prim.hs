@@ -102,6 +102,7 @@ primTypeErrorDocsModule = Module
   , modDeclarations =
       [ warn
       , fail
+      , quoteLabel
       , kindDoc
       , textDoc
       , quoteDoc
@@ -435,6 +436,10 @@ warn = primClassOf (P.primSubName "TypeError") "Warn" $ T.unlines
   , "For more information, see"
   , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
   ]
+
+quoteLabel :: Declaration
+quoteLabel = primTypeOf (P.primSubName "TypeError") "QuoteLabel" $ T.unlines
+  [ "The QuoteLabel type class allows bla bla" ]
 
 kindDoc :: Declaration
 kindDoc = primKindOf (P.primSubName "TypeError") "Doc" $ T.unlines
