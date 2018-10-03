@@ -75,6 +75,7 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
       optimized = CF.optimizeCoreFn corefn
       [renamed] = renameInModules [optimized]
       exts = moduleToExternsFile mod' env'
+  ffiCodegen renamed
   evalSupplyT nextVar' . codegen renamed env' . encode $ exts
   return exts
 
