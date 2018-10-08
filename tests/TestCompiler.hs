@@ -233,13 +233,25 @@ checkShouldFailWith expected errs =
 
 checkPositioned :: P.MultipleErrors -> Maybe String
 checkPositioned errs =
-  case mapMaybe (\err -> maybe (Just err) (const Nothing) (P.errorSpan err)) (P.runMultipleErrors errs) of
+  case mapMaybe guardSpans (P.runMultipleErrors errs) of
     [] ->
       Nothing
     errs' ->
       Just
         $ "Found errors with missing source spans:\n"
         ++ unlines (map (P.renderBox . P.prettyPrintSingleError P.defaultPPEOptions) errs')
+  where
+  guardSpans :: P.ErrorMessage -> Maybe P.ErrorMessage
+  guardSpans err = case P.errorSpan err of
+    Just ss | any (not . isNonsenseSpan) ss -> Nothing
+    _ -> Just err
+
+  isNonsenseSpan :: P.SourceSpan -> Bool
+  isNonsenseSpan (P.SourceSpan spanName spanStart spanEnd) =
+    spanName == "" || spanName == "<module>" || (spanStart == emptyPos && spanEnd == emptyPos)
+
+  emptyPos :: P.SourcePos
+  emptyPos = P.SourcePos 0 0
 
 assertCompiles
   :: [P.Module]
