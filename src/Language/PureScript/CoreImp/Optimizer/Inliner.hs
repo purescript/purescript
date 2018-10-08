@@ -15,6 +15,7 @@ import Prelude.Compat
 
 import Control.Monad.Supply.Class (MonadSupply, freshName)
 
+import Data.Either (rights)
 import Data.Maybe (fromMaybe)
 import Data.String (IsString, fromString)
 import Data.Text (Text)
@@ -269,12 +270,11 @@ inlineFnComposition = everywhereTopDownM convert where
   convert other = return other
 
   mkApps :: Maybe SourceSpan -> [Either AST (Text, AST)] -> Text -> AST
-  mkApps ss fns a = App ss (Function ss Nothing vars (Block ss [Return Nothing comp])) args
+  mkApps ss fns a = App ss (Function ss Nothing [] (Block ss $ vars <> [Return Nothing comp])) []
     where
+    vars = uncurry (VariableIntroduction ss) . fmap Just <$> rights fns
     comp = Function ss Nothing [a] (Block ss [Return Nothing apps])
     apps = foldr (\fn acc -> App ss (mkApp fn) [acc]) (Var ss a) fns
-    vars = foldMap (pure . fst) =<< fns
-    args = foldMap (pure . snd) =<< fns
 
   mkApp :: Either AST (Text, AST) -> AST
   mkApp = either id $ \(name, arg) -> Var (getSourceSpan arg) name
