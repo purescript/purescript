@@ -32,6 +32,7 @@ import Data.Function (on)
 import Data.Foldable (find)
 import Data.List (groupBy, sortBy, delete)
 import Data.Maybe (fromJust, mapMaybe)
+import Safe (headMay)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
@@ -469,8 +470,9 @@ checkImportConflicts ss currentModule toName xs =
   in
     if length groups > 1
     then case nonImplicit of
-      [ImportRecord (Qualified (Just mnNew) _) mnOrig ss' _] -> do
+      [ImportRecord (Qualified (Just mnNew) _) mnOrig _ _] -> do
         let warningModule = if mnNew == currentModule then Nothing else Just mnNew
+            ss' = maybe nullSourceSpan importSourceSpan . headMay . filter ((== FromImplicit) . importProvenance) $ xs
         tell . errorMessage' ss' $ ScopeShadowing name warningModule $ delete mnNew conflictModules
         return (mnNew, mnOrig)
       _ -> throwError . errorMessage' ss $ ScopeConflict name conflictModules
