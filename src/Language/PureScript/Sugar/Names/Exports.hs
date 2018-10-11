@@ -147,6 +147,7 @@ resolveExports env ss mn imps exps refs =
     -- values if that fails to see whether the value has been imported at all.
     testQuals :: (forall a b. M.Map (Qualified a) b -> [Qualified a]) -> ModuleName -> Bool
     testQuals f mn' = any (isQualifiedWith mn') (f (importedTypes imps))
+                   || any (isQualifiedWith mn') (f (importedTypeOps imps))
                    || any (isQualifiedWith mn') (f (importedDataConstructors imps))
                    || any (isQualifiedWith mn') (f (importedTypeClasses imps))
                    || any (isQualifiedWith mn') (f (importedValues imps))
