@@ -118,7 +118,14 @@ deriveInstance
   -> [Declaration]
   -> Declaration
   -> m Declaration
-deriveInstance mn syns kinds _ ds (TypeInstanceDeclaration sa@(ss, _) ch idx nm deps className tys DerivedInstance)
+deriveInstance mn syns _ ds (TypeInstanceDeclaration sa@(ss, _) ch idx nm deps className tys DerivedInstance)
+  | className == Qualified (Just dataHashable) (ProperName "Hashable")
+  = case tys of
+      [ty] | Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
+           , mn == fromMaybe mn mn'
+           -> TypeInstanceDeclaration sa ch idx nm deps className tys . ExplicitInstance <$> deriveHashable ss mn syns ds tyCon
+           | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty
+      _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 1
   | className == Qualified (Just dataEq) (ProperName "Eq")
   = case tys of
       [ty] | Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
@@ -276,6 +283,12 @@ dataNewtype = ModuleName [ ProperName "Data", ProperName "Newtype" ]
 
 dataFunctor :: ModuleName
 dataFunctor = ModuleName [ ProperName "Data", ProperName "Functor" ]
+
+dataHashable :: ModuleName
+dataHashable = ModuleName [ ProperName "Data", ProperName "Hashable" ]
+
+dataSemiring :: ModuleName
+dataSemiring = ModuleName [ ProperName "Data", ProperName "Semiring" ]
 
 unguarded :: Expr -> [GuardedExpr]
 unguarded e = [MkUnguarded e]
@@ -607,6 +620,57 @@ deriveOrd1 ss =
   where
     dataOrdCompare :: Expr
     dataOrdCompare = Var ss (Qualified (Just dataOrd) (Ident C.compare))
+
+deriveHashable :: forall m
+   . (MonadError MultipleErrors m, MonadSupply m)
+  => SourceSpan
+  -> ModuleName
+  -> SynonymMap
+  -> [Declaration]
+  -> ProperName 'TypeName
+  -> m [Declaration]
+deriveHashable ss mn syns ds tyConNm = do
+  tyCon <- findTypeDecl ss tyConNm ds
+  hashFun <- mkHashFunction tyCon
+  return [ ValueDecl (ss, []) (Ident C.hash) Public [] (unguarded hashFun) ]
+  where
+    mkHashFunction :: Declaration -> m Expr
+    mkHashFunction (DataDeclaration (ss', _) _ _ _ args) = do
+      x <- freshIdent "x"
+      lamCase ss' x <$> (concat <$> mapM mkCases (zip args [0..]))
+    mkHashFunction _ = internalError "mkHashFunction: expected DataDeclaration"
+
+    mkCases :: ((ProperName 'ConstructorName, [Type]), Int) -> m [CaseAlternative]
+    mkCases ((ctorName, tys), nth) = do
+      idents <- replicateM (length tys) (freshIdent "x")
+      tys' <- mapM (replaceAllTypeSynonymsM syns) tys
+      let binder = ConstructorBinder ss (Qualified (Just mn) ctorName) (map (VarBinder ss) idents)
+      let result = foldl combineHashes (initialHash nth)
+                   $ zipWith mkCallToHash (map (Var ss . Qualified Nothing) idents) tys'
+      return [CaseAlternative [binder] (unguarded result)]
+
+    mkCallToHash :: Expr -> Type -> Expr
+    mkCallToHash var ty
+      | Just rec <- objectType ty
+      , Just fields <- decomposeRec rec =
+          foldl combineHashes (initialHash 0)
+          $ map (\((Label str), typ) -> mkCallToHash (Accessor str var) typ) fields
+      {- If we ever want a Hashable1
+      | isAppliedVar ty = hashableHash1 var -}
+      | otherwise = hashableHash var
+
+    hashableHash :: Expr -> Expr
+    hashableHash = App (Var ss (Qualified (Just dataHashable) (Ident C.hash)))
+
+    combineHashes :: Expr -> Expr -> Expr
+    combineHashes acc h = App (App add (App (App mul acc) thirtyone)) h -- acc * 31 + h -- for want of a better combining function
+      where
+        add = Var ss (Qualified (Just dataSemiring) (Ident C.add))
+        mul = Var ss (Qualified (Just dataSemiring) (Ident C.mul))
+        thirtyone = Literal ss (NumericLiteral (Left 31))
+
+    -- initial hash is just the running number of constructor, for now
+    initialHash nth = Literal ss (NumericLiteral (Left (toEnum nth)))
 
 deriveNewtype
   :: forall m
