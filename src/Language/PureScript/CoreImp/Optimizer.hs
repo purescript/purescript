@@ -38,8 +38,9 @@ optimize js = do
       , inlineCommonOperators
       ]) js
     untilFixedPoint (return . tidyUp) . tco . inlineST
-      =<< untilFixedPoint (return . magicDo')
-      =<< untilFixedPoint (return . magicDo) js'
+      =<< untilFixedPoint (return . magicDoST)
+      =<< untilFixedPoint (return . magicDoEff)
+      =<< untilFixedPoint (return . magicDoEffect) js'
   where
     tidyUp :: AST -> AST
     tidyUp = applyAll
