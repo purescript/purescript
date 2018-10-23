@@ -437,10 +437,6 @@ warn = primClassOf (P.primSubName "TypeError") "Warn" $ T.unlines
   , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
   ]
 
-quoteLabel :: Declaration
-quoteLabel = primTypeOf (P.primSubName "TypeError") "QuoteLabel" $ T.unlines
-  [ "The QuoteLabel type class allows bla bla" ]
-
 kindDoc :: Declaration
 kindDoc = primKindOf (P.primSubName "TypeError") "Doc" $ T.unlines
   [ "`Doc` is the kind of type-level documents."
@@ -461,6 +457,15 @@ textDoc = primTypeOf (P.primSubName "TypeError") "Text" $ T.unlines
 quoteDoc :: Declaration
 quoteDoc = primTypeOf (P.primSubName "TypeError") "Quote" $ T.unlines
   [ "The Quote type constructor renders any concrete type as a Doc"
+  , "to be used in a custom type error."
+  , ""
+  , "For more information, see"
+  , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
+  ]
+
+quoteLabel :: Declaration
+quoteLabel = primTypeOf (P.primSubName "TypeError") "QuoteLabel" $ T.unlines
+  [ "The QuoteLabel type constructor renders any label as a Doc"
   , "to be used in a custom type error."
   , ""
   , "For more information, see"
