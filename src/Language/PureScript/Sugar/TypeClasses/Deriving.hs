@@ -640,34 +640,43 @@ deriveHashable ss mn syns ds tyConNm = do
       lamCase ss' x <$> (concat <$> mapM mkCases (zip args [0..]))
     mkHashFunction _ = internalError "mkHashFunction: expected DataDeclaration"
 
+    dataHashableHashNewtypeConstructor = (Qualified (Just dataHashable) (ProperName "Hash"))
+
     mkCases :: ((ProperName 'ConstructorName, [Type]), Int) -> m [CaseAlternative]
     mkCases ((ctorName, tys), nth) = do
       idents <- replicateM (length tys) (freshIdent "x")
       tys' <- mapM (replaceAllTypeSynonymsM syns) tys
       let binder = ConstructorBinder ss (Qualified (Just mn) ctorName) (map (VarBinder ss) idents)
-      let result = foldl combineHashes (initialHash nth)
-                   $ zipWith mkCallToHash (map (Var ss . Qualified Nothing) idents) tys'
+      individualHashes <- mapM (uncurry computeHash) (zip (map (Var ss . Qualified Nothing) idents) tys')
+      let hash = combineHashes (initialHash nth) individualHashes
+      let result = App (Constructor ss dataHashableHashNewtypeConstructor) $ hash
       return [CaseAlternative [binder] (unguarded result)]
 
-    mkCallToHash :: Expr -> Type -> Expr
-    mkCallToHash var ty
+    computeHash :: Expr -> Type -> m Expr
+    computeHash e ty
       | Just rec <- objectType ty
-      , Just fields <- decomposeRec rec =
-          foldl combineHashes (initialHash 0)
-          $ map (\((Label str), typ) -> mkCallToHash (Accessor str var) typ) fields
-      {- If we ever want a Hashable1
-      | isAppliedVar ty = hashableHash1 var -}
-      | otherwise = hashableHash var
+      , Just fields <- decomposeRec rec
+          = do fieldHashes <- mapM (\((Label str), fieldTy) -> computeHash (Accessor str e) fieldTy) fields
+               pure (combineHashes (initialHash 0) fieldHashes)
+      | otherwise = do
+          hx <- freshIdent "hx"
+          pure $ Case [ hashableHash e ]
+                      [ CaseAlternative [ ConstructorBinder ss dataHashableHashNewtypeConstructor [ VarBinder ss hx ] ]
+                        (unguarded (Var ss (Qualified Nothing hx))) ]
 
     hashableHash :: Expr -> Expr
     hashableHash = App (Var ss (Qualified (Just dataHashable) (Ident C.hash)))
 
-    combineHashes :: Expr -> Expr -> Expr
-    combineHashes acc h = App (App add (App (App mul acc) thirtyone)) h -- acc * 31 + h -- for want of a better combining function
+    -- acc * 31 + h -- for want of a better combining function
+    combiningFunction :: Expr -> Expr -> Expr
+    combiningFunction acc h = App (App add (App (App mul acc) thirtyone)) h
       where
         add = Var ss (Qualified (Just dataSemiring) (Ident C.add))
         mul = Var ss (Qualified (Just dataSemiring) (Ident C.mul))
         thirtyone = Literal ss (NumericLiteral (Left 31))
+
+    combineHashes :: Expr -> [Expr] -> Expr
+    combineHashes = foldl' combiningFunction
 
     -- initial hash is just the running number of constructor, for now
     initialHash nth = Literal ss (NumericLiteral (Left (toEnum nth)))
