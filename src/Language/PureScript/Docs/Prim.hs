@@ -102,10 +102,10 @@ primTypeErrorDocsModule = Module
   , modDeclarations =
       [ warn
       , fail
-      , quoteLabel
       , kindDoc
       , textDoc
       , quoteDoc
+      , quoteLabelDoc
       , besideDoc
       , aboveDoc
       ]
@@ -463,10 +463,10 @@ quoteDoc = primTypeOf (P.primSubName "TypeError") "Quote" $ T.unlines
   , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
   ]
 
-quoteLabel :: Declaration
-quoteLabel = primTypeOf (P.primSubName "TypeError") "QuoteLabel" $ T.unlines
-  [ "The QuoteLabel type constructor renders any label as a Doc"
-  , "to be used in a custom type error."
+quoteLabelDoc :: Declaration
+quoteLabelDoc = primTypeOf (P.primSubName "TypeError") "QuoteLabel" $ T.unlines
+  [ "The QuoteLabel type constructor renders any Symbol as a syntactically valid label,"
+  , "escaping with quotes as needed."
   , ""
   , "For more information, see"
   , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
