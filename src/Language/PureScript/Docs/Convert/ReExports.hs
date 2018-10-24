@@ -14,7 +14,6 @@ import Control.Monad.Trans.State.Strict (execState)
 import Data.Either
 import Data.Map (Map)
 import Data.Maybe (mapMaybe)
-import Data.Monoid ((<>))
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -182,6 +181,12 @@ findImport imps (name, orig) =
       -- and B). In this case, we just take its first appearance.
       (importedFrom:_) ->
         pure (importedFrom, name)
+
+      -- Builtin modules do not have any Imports in the Env, and therefore must
+      -- be handled specially here.
+      [] | P.isBuiltinModuleName orig ->
+        pure (orig, name)
+
       [] ->
         internalErrorInModule ("findImport: not found: " ++ show (name, orig))
 
@@ -269,9 +274,15 @@ lookupTypeDeclaration importedFrom ty = do
   case ds of
     [d] ->
       pure (importedFrom, [d])
+    [] | P.isBuiltinModuleName importedFrom ->
+      -- Type classes in builtin modules (i.e. submodules of Prim) also have
+      -- corresponding pseudo-types in the primEnv, but since these are an
+      -- implementation detail they do not exist in the Modules, and hence in
+      -- this case, `ds` will be empty.
+      pure (importedFrom, [])
     other ->
       internalErrorInModule
-        ("lookupTypeDeclaration: unexpected result: " ++ show other)
+        ("lookupTypeDeclaration: unexpected result for " ++ show ty ++ ": " ++ show other)
 
 lookupTypeOpDeclaration
   :: (MonadState (Map P.ModuleName Module) m,MonadReader P.ModuleName m)
@@ -305,7 +316,8 @@ lookupTypeClassDeclaration importedFrom tyClass = do
       pure (importedFrom, [d])
     other ->
       internalErrorInModule
-        ("lookupTypeClassDeclaration: unexpected result: "
+        ("lookupTypeClassDeclaration: unexpected result for "
+         ++ show tyClass ++ ": "
          ++ (unlines . map show) other)
 
 lookupKindDeclaration
@@ -402,12 +414,13 @@ data TypeClassEnv = TypeClassEnv
   }
   deriving (Show)
 
+instance Semigroup TypeClassEnv where
+  (TypeClassEnv a1 b1 c1) <> (TypeClassEnv a2 b2 c2) =
+    TypeClassEnv (a1 <> a2) (b1 <> b2) (c1 <> c2)
+
 instance Monoid TypeClassEnv where
   mempty =
     TypeClassEnv mempty mempty mempty
-  mappend (TypeClassEnv a1 b1 c1)
-          (TypeClassEnv a2 b2 c2) =
-    TypeClassEnv (a1 <> a2) (b1 <> b2) (c1 <> c2)
 
 -- |
 -- Take a TypeClassEnv and handle all of the type class members in it, either

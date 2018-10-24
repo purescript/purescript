@@ -27,7 +27,8 @@ It supports the following options:
   files. This flag is reversed on Windows and polling is the default.
 - `--log-level`: Can be set to one of "all", "none", "debug" and "perf"
 - `--no-watch`: Disables the filewatcher
-- `--editor-mode`: Only reload on source file changes reported by the editor
+- `--editor-mode`: Rather than watch externs files, expect an editor to report
+  changed source files.
 - `--version`: Output psc-ide version
 
 ## Issuing queries

@@ -21,7 +21,6 @@ module Language.PureScript.Ide.Externs
 
 import           Protolude hiding (to, from, (&))
 
-import           Control.Lens
 import           "monad-logger" Control.Monad.Logger
 import           Data.Aeson (decodeStrict)
 import           Data.Aeson.Types (withObject, parseMaybe, (.:))
@@ -29,6 +28,7 @@ import qualified Data.ByteString as BS
 import           Data.Version (showVersion)
 import           Language.PureScript.Ide.Error (IdeError (..))
 import           Language.PureScript.Ide.Types
+import           Lens.Micro.Platform
 
 import qualified Language.PureScript as P
 

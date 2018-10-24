@@ -22,8 +22,8 @@ import           Protolude hiding (moduleName)
 
 import           "monad-logger" Control.Monad.Logger
 import qualified Data.Map                           as Map
+import qualified Data.Text                          as T
 import qualified Language.PureScript                as P
-import qualified Language.PureScript.Constants      as C
 import qualified Language.PureScript.Ide.CaseSplit  as CS
 import           Language.PureScript.Ide.Command
 import           Language.PureScript.Ide.Completion
@@ -33,7 +33,6 @@ import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.Imports    hiding (Import)
 import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Prim
-import           Language.PureScript.Ide.Pursuit
 import           Language.PureScript.Ide.Rebuild
 import           Language.PureScript.Ide.SourceFile
 import           Language.PureScript.Ide.State
@@ -41,7 +40,7 @@ import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 import           Language.PureScript.Ide.Usage (findUsages)
 import           System.Directory (getCurrentDirectory, getDirectoryContents, doesDirectoryExist, doesFileExist)
-import           System.FilePath ((</>))
+import           System.FilePath ((</>), normalise)
 import           System.FilePath.Glob (glob)
 
 -- | Accepts a Commmand and runs it against psc-ide's State. This is the main
@@ -63,10 +62,6 @@ handleCommand c = case c of
     findType search filters currentModule
   Complete filters matcher currentModule complOptions ->
     findCompletions filters matcher currentModule complOptions
-  Pursuit query Package ->
-    findPursuitPackages query
-  Pursuit query Identifier ->
-    findPursuitCompletions query
   List LoadedModules ->
     printModules
   List AvailableModules ->
@@ -86,7 +81,7 @@ handleCommand c = case c of
           Nothing -> throwError (GeneralError "Declaration not found")
           Just declaration -> do
             let sourceModule = fromMaybe moduleName (declaration & _idaAnnotation & _annExportedFrom)
-            UsagesResult . fold <$> findUsages (discardAnn declaration) sourceModule
+            UsagesResult . foldMap toList <$> findUsages (discardAnn declaration) sourceModule
   Import fp outfp _ (AddImplicitImport mn) -> do
     rs <- addImplicitImport fp mn
     answerRequest outfp rs
@@ -104,7 +99,7 @@ handleCommand c = case c of
   RebuildSync file actualFile ->
     rebuildFileSync file actualFile
   Cwd ->
-    TextResult . toS <$> liftIO getCurrentDirectory
+    TextResult . T.pack <$> liftIO getCurrentDirectory
   Reset ->
     resetIdeState $> TextResult "State has been reset."
   Quit ->
@@ -119,25 +114,19 @@ findCompletions
   -> m Success
 findCompletions filters matcher currentModule complOptions = do
   modules <- Map.toList <$> getAllModules currentModule
-  let insertPrim = (:) (C.Prim, idePrimDeclarations)
+  let insertPrim = (++) idePrimDeclarations
   pure (CompletionResult (getCompletions filters matcher complOptions (insertPrim modules)))
 
-findType :: Ide m =>
-            Text -> [Filter] -> Maybe P.ModuleName -> m Success
+findType
+  :: Ide m
+  => Text
+  -> [Filter]
+  -> Maybe P.ModuleName
+  -> m Success
 findType search filters currentModule = do
   modules <- Map.toList <$> getAllModules currentModule
-  let insertPrim = (:) (C.Prim, idePrimDeclarations)
+  let insertPrim = (++) idePrimDeclarations
   pure (CompletionResult (getExactCompletions search filters (insertPrim modules)))
-
-findPursuitCompletions :: MonadIO m =>
-                          PursuitQuery -> m Success
-findPursuitCompletions (PursuitQuery q) =
-  PursuitResult <$> liftIO (searchPursuitForDeclarations q)
-
-findPursuitPackages :: MonadIO m =>
-                       PursuitQuery -> m Success
-findPursuitPackages (PursuitQuery q) =
-  PursuitResult <$> liftIO (findPackagesForModuleIdent q)
 
 printModules :: Ide m => m Success
 printModules = ModuleList . map P.runModuleName <$> getLoadedModulenames
@@ -168,7 +157,7 @@ findAvailableExterns :: (Ide m, MonadError IdeError m) => m [P.ModuleName]
 findAvailableExterns = do
   oDir <- outputDirectory
   unlessM (liftIO (doesDirectoryExist oDir))
-    (throwError (GeneralError "Couldn't locate your output directory."))
+    (throwError (GeneralError $ "Couldn't locate your output directory at: " <> (T.pack (normalise oDir))))
   liftIO $ do
     directories <- getDirectoryContents oDir
     moduleNames <- filterM (containsExterns oDir) directories

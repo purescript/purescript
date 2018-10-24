@@ -69,7 +69,6 @@ data SimpleErrorMessage
   | ErrorParsingFFIModule FilePath (Maybe Bundle.ErrorMessage)
   | ErrorParsingModule P.ParseError
   | MissingFFIModule ModuleName
-  | MultipleFFIModules ModuleName [FilePath]
   | UnnecessaryFFIModule ModuleName FilePath
   | MissingFFIImplementations ModuleName [Ident]
   | UnusedFFIImplementations ModuleName [Ident]
@@ -93,7 +92,7 @@ data SimpleErrorMessage
   | ScopeShadowing Name (Maybe ModuleName) [ModuleName]
   | DeclConflict Name Name
   | ExportConflict (Qualified Name) (Qualified Name)
-  | DuplicateModule ModuleName [SourceSpan]
+  | DuplicateModule ModuleName
   | DuplicateTypeClass (ProperName 'ClassName) SourceSpan
   | DuplicateInstance Ident SourceSpan
   | DuplicateTypeArgument Text
@@ -125,10 +124,11 @@ data SimpleErrorMessage
   | DuplicateValueDeclaration Ident
   | ArgListLengthsDiffer Ident
   | OverlappingArgNames (Maybe Ident)
-  | MissingClassMember Ident
+  | MissingClassMember (NEL.NonEmpty (Ident, Type))
   | ExtraneousClassMember Ident (Qualified (ProperName 'ClassName))
   | ExpectedType Type Kind
-  | IncorrectConstructorArity (Qualified (ProperName 'ConstructorName))
+  -- | constructor name, expected argument count, actual argument count
+  | IncorrectConstructorArity (Qualified (ProperName 'ConstructorName)) Int Int
   | ExprDoesNotHaveType Expr Type
   | PropertyIsMissing Label
   | AdditionalProperty Label
@@ -158,6 +158,7 @@ data SimpleErrorMessage
   | DuplicateExportRef Name
   | IntOutOfRange Integer Text Integer Integer
   | ImplicitQualifiedImport ModuleName ModuleName [DeclarationRef]
+  | ImplicitQualifiedImportReExport ModuleName ModuleName [DeclarationRef]
   | ImplicitImport ModuleName [DeclarationRef]
   | HidingImport ModuleName [DeclarationRef]
   | CaseBinderLengthDiffers Int [Binder]
@@ -173,6 +174,9 @@ data SimpleErrorMessage
   | UserDefinedWarning Type
   -- | a declaration couldn't be used because it contained free variables
   | UnusableDeclaration Ident [[Text]]
+  | CannotDefinePrimModules ModuleName
+  | MixedAssociativityError (NEL.NonEmpty (Qualified (OpName 'AnyOpName), Associativity))
+  | NonAssociativeError (NEL.NonEmpty (Qualified (OpName 'AnyOpName)))
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
@@ -198,7 +202,7 @@ data ErrorMessageHint
   | ErrorInTypeClassDeclaration (ProperName 'ClassName)
   | ErrorInForeignImport Ident
   | ErrorSolvingConstraint Constraint
-  | PositionedError SourceSpan
+  | PositionedError (NEL.NonEmpty SourceSpan)
   deriving (Show)
 
 -- | Categories of hints
@@ -259,7 +263,7 @@ addDefaultImport (Qualified toImportAs toImport) m@(Module ss coms mn decls exps
 importPrim :: Module -> Module
 importPrim =
   let
-    primModName = ModuleName [ProperName C.prim]
+    primModName = C.Prim
   in
     addDefaultImport (Qualified (Just primModName) primModName)
       . addDefaultImport (Qualified Nothing primModName)
@@ -697,7 +701,7 @@ data Expr
   -- |
   -- A literal value
   --
-  = Literal (Literal Expr)
+  = Literal SourceSpan (Literal Expr)
   -- |
   -- A prefix -, will be desugared
   --
@@ -767,7 +771,7 @@ data Expr
   -- |
   -- A let binding
   --
-  | Let [Declaration] Expr
+  | Let WhereProvenance [Declaration] Expr
   -- |
   -- A do-notation block
   --
@@ -811,6 +815,20 @@ data Expr
   -- A value with source position information
   --
   | PositionedValue SourceSpan [Comment] Expr
+  deriving (Show)
+
+-- |
+-- Metadata that tells where a let binding originated
+--
+data WhereProvenance
+  -- |
+  -- The let binding was originally a where clause
+  --
+  = FromWhere
+  -- |
+  -- The let binding was always a let binding
+  --
+  | FromLet
   deriving (Show)
 
 -- |
@@ -886,7 +904,7 @@ $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Declarat
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ImportDeclarationType)
 
 isTrueExpr :: Expr -> Bool
-isTrueExpr (Literal (BooleanLiteral True)) = True
+isTrueExpr (Literal _ (BooleanLiteral True)) = True
 isTrueExpr (Var _ (Qualified (Just (ModuleName [ProperName "Prelude"])) (Ident "otherwise"))) = True
 isTrueExpr (Var _ (Qualified (Just (ModuleName [ProperName "Data", ProperName "Boolean"])) (Ident "otherwise"))) = True
 isTrueExpr (TypedValue _ e _) = isTrueExpr e

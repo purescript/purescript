@@ -40,7 +40,6 @@ import Control.Monad
 import Control.Arrow ((***), (>>>))
 
 import Control.Monad.Reader
-import Control.Monad.Writer.Strict
 import Control.Monad.Trans.Except
 
 import System.Exit
@@ -63,9 +62,9 @@ spec = do
 
   (supportModules, supportExterns, supportForeigns, passingTestCases, warningTestCases, failingTestCases) <- runIO $ do
     cwd <- getCurrentDirectory
-    let passing = cwd </> "examples" </> "passing"
-    let warning = cwd </> "examples" </> "warning"
-    let failing = cwd </> "examples" </> "failing"
+    let passing = cwd </> "tests" </> "purs" </> "passing"
+    let warning = cwd </> "tests" </> "purs" </> "warning"
+    let failing = cwd </> "tests" </> "purs" </> "failing"
     passingFiles <- getTestFiles passing <$> testGlob passing
     warningFiles <- getTestFiles warning <$> testGlob warning
     failingFiles <- getTestFiles failing <$> testGlob failing
@@ -227,10 +226,32 @@ checkShouldFailWith :: [String] -> P.MultipleErrors -> Maybe String
 checkShouldFailWith expected errs =
   let actual = map P.errorCode $ P.runMultipleErrors errs
   in if sort expected == sort (map T.unpack actual)
-    then Nothing
+    then checkPositioned errs
     else Just $ "Expected these errors: " ++ show expected ++ ", but got these: "
       ++ show actual ++ ", full error messages: \n"
       ++ unlines (map (P.renderBox . P.prettyPrintSingleError P.defaultPPEOptions) (P.runMultipleErrors errs))
+
+checkPositioned :: P.MultipleErrors -> Maybe String
+checkPositioned errs =
+  case mapMaybe guardSpans (P.runMultipleErrors errs) of
+    [] ->
+      Nothing
+    errs' ->
+      Just
+        $ "Found errors with missing source spans:\n"
+        ++ unlines (map (P.renderBox . P.prettyPrintSingleError P.defaultPPEOptions) errs')
+  where
+  guardSpans :: P.ErrorMessage -> Maybe P.ErrorMessage
+  guardSpans err = case P.errorSpan err of
+    Just ss | any (not . isNonsenseSpan) ss -> Nothing
+    _ -> Just err
+
+  isNonsenseSpan :: P.SourceSpan -> Bool
+  isNonsenseSpan (P.SourceSpan spanName spanStart spanEnd) =
+    spanName == "" || spanName == "<module>" || (spanStart == emptyPos && spanEnd == emptyPos)
+
+  emptyPos :: P.SourcePos
+  emptyPos = P.SourcePos 0 0
 
 assertCompiles
   :: [P.Module]

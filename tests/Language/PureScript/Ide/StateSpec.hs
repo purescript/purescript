@@ -3,11 +3,11 @@
 module Language.PureScript.Ide.StateSpec where
 
 import           Protolude
-import           Control.Lens hiding ((&))
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Test
 import qualified Language.PureScript as P
+import           Lens.Micro.Platform hiding ((&))
 import           Test.Hspec
 import qualified Data.Map as Map
 
@@ -91,7 +91,7 @@ spec = do
     it "resolves an instance for an existing type class" $ do
       resolveInstances (Map.singleton (mn "InstanceModule") ef) moduleMap
         `shouldSatisfy`
-        elemOf (ix (mn "ClassModule") . ix 0 . idaDeclaration . _IdeDeclTypeClass . ideTCInstances . folded) ideInstance
+        anyOf (ix (mn "ClassModule") . ix 0 . idaDeclaration . _IdeDeclTypeClass . ideTCInstances . folded) (ideInstance ==)
   describe "resolving data constructors" $ do
     it "resolves a constructor" $ do
       resolveDataConstructorsForModule (snd testModule)

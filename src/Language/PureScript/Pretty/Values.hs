@@ -7,7 +7,7 @@ module Language.PureScript.Pretty.Values
   , prettyPrintBinderAtom
   ) where
 
-import Prelude.Compat
+import Prelude.Compat hiding ((<>))
 
 import Control.Arrow (second)
 
@@ -72,7 +72,11 @@ prettyPrintValue d (TypeClassDictionaryConstructorApp className ps) =
 prettyPrintValue d (Case values binders) =
   (text "case " <> foldr beforeWithSpace (text "of") (map (prettyPrintValueAtom (d - 1)) values)) //
     moveRight 2 (vcat left (map (prettyPrintCaseAlternative (d - 1)) binders))
-prettyPrintValue d (Let ds val) =
+prettyPrintValue d (Let FromWhere ds val) =
+  prettyPrintValue (d - 1) val //
+    moveRight 2 (text "where" //
+                 vcat left (map (prettyPrintDeclaration (d - 1)) ds))
+prettyPrintValue d (Let FromLet ds val) =
   text "let" //
     moveRight 2 (vcat left (map (prettyPrintDeclaration (d - 1)) ds)) //
     (text "in " <> prettyPrintValue (d - 1) val)
@@ -87,7 +91,7 @@ prettyPrintValue _ (TypeClassDictionaryAccessor className ident) =
     text "#dict-accessor " <> text (T.unpack (runProperName (disqualify className))) <> text "." <> text (T.unpack (showIdent ident)) <> text ">"
 prettyPrintValue d (TypedValue _ val _) = prettyPrintValue d val
 prettyPrintValue d (PositionedValue _ _ val) = prettyPrintValue d val
-prettyPrintValue d (Literal l) = prettyPrintLiteralValue d l
+prettyPrintValue d (Literal _ l) = prettyPrintLiteralValue d l
 prettyPrintValue _ (Hole name) = text "?" <> textT name
 prettyPrintValue d expr@AnonymousArgument{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@Constructor{} = prettyPrintValueAtom d expr
@@ -99,7 +103,7 @@ prettyPrintValue d expr@UnaryMinus{} = prettyPrintValueAtom d expr
 
 -- | Pretty-print an atomic expression, adding parentheses if necessary.
 prettyPrintValueAtom :: Int -> Expr -> Box
-prettyPrintValueAtom d (Literal l) = prettyPrintLiteralValue d l
+prettyPrintValueAtom d (Literal _ l) = prettyPrintLiteralValue d l
 prettyPrintValueAtom _ AnonymousArgument = text "_"
 prettyPrintValueAtom _ (Constructor _ name) = text $ T.unpack $ runProperName (disqualify name)
 prettyPrintValueAtom _ (Var _ ident) = text $ T.unpack $ showIdent (disqualify ident)
@@ -185,7 +189,7 @@ prettyPrintDoNotationElement d (PositionedDoNotationElement _ _ el) = prettyPrin
 
 prettyPrintBinderAtom :: Binder -> Text
 prettyPrintBinderAtom NullBinder = "_"
-prettyPrintBinderAtom (LiteralBinder l) = prettyPrintLiteralBinder l
+prettyPrintBinderAtom (LiteralBinder _ l) = prettyPrintLiteralBinder l
 prettyPrintBinderAtom (VarBinder _ ident) = showIdent ident
 prettyPrintBinderAtom (ConstructorBinder _ ctor []) = runProperName (disqualify ctor)
 prettyPrintBinderAtom b@ConstructorBinder{} = parensT (prettyPrintBinder b)

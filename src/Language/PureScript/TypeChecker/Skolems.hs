@@ -14,7 +14,6 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets, modify)
 import Data.Foldable (traverse_)
 import Data.Functor.Identity (Identity(), runIdentity)
-import Data.Monoid
 import Data.Set (Set, fromList, notMember)
 import Data.Text (Text)
 import Language.PureScript.AST
@@ -100,7 +99,7 @@ skolemEscapeCheck expr@TypedValue{} =
     go (scopes, _) (PositionedValue ss _ _) = ((scopes, Just ss), [])
     go (scopes, ssUsed) val@(TypedValue _ _ ty) =
         ( (allScopes, ssUsed)
-        , [ ErrorMessage (maybe id ((:) . PositionedError) ssUsed [ ErrorInExpression val ]) $
+        , [ ErrorMessage (maybe id ((:) . positionedError) ssUsed [ ErrorInExpression val ]) $
               EscapedSkolem name ssBound ty
           | (name, scope, ssBound) <- collectSkolems ty
           , notMember scope allScopes

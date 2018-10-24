@@ -32,9 +32,11 @@ import Data.Function (on)
 import Data.Foldable (find)
 import Data.List (groupBy, sortBy, delete)
 import Data.Maybe (fromJust, mapMaybe)
+import Safe (headMay)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
+import qualified Language.PureScript.Constants as C
 import Language.PureScript.AST
 import Language.PureScript.Environment
 import Language.PureScript.Errors
@@ -184,22 +186,79 @@ envModuleExports (_, _, exps) = exps
 -- The exported types from the @Prim@ module
 --
 primExports :: Exports
-primExports =
+primExports = mkPrimExports primTypes primClasses primKinds
+
+-- |
+-- The exported types from the @Prim.Ordering@ module
+--
+primOrderingExports :: Exports
+primOrderingExports = mkPrimExports primOrderingTypes mempty primOrderingKinds
+
+-- |
+-- The exported types from the @Prim.Row@ module
+--
+primRowExports :: Exports
+primRowExports = mkPrimExports primRowTypes primRowClasses mempty
+
+-- |
+-- The exported types from the @Prim.RowList@ module
+--
+primRowListExports :: Exports
+primRowListExports = mkPrimExports primRowListTypes primRowListClasses primRowListKinds
+
+-- |
+-- The exported types from the @Prim.Symbol@ module
+--
+primSymbolExports :: Exports
+primSymbolExports = mkPrimExports primSymbolTypes primSymbolClasses mempty
+
+-- |
+-- The exported types from the @Prim.TypeError@ module
+--
+primTypeErrorExports :: Exports
+primTypeErrorExports = mkPrimExports primTypeErrorTypes primTypeErrorClasses primTypeErrorKinds
+
+-- |
+-- Create a set of exports for a Prim module.
+--
+mkPrimExports
+  :: M.Map (Qualified (ProperName 'TypeName)) a
+  -> M.Map (Qualified (ProperName 'ClassName)) b
+  -> S.Set (Qualified (ProperName 'KindName))
+  -> Exports
+mkPrimExports ts cs ks =
   nullExports
-    { exportedTypes = M.fromList $ mkTypeEntry `map` M.keys primTypes
-    , exportedTypeClasses = M.fromList $ mkClassEntry `map` M.keys primClasses
-    , exportedKinds = M.fromList $ mkKindEntry `map` S.toList primKinds
+    { exportedTypes = M.fromList $ mkTypeEntry `map` M.keys ts
+    , exportedTypeClasses = M.fromList $ mkClassEntry `map` M.keys cs
+    , exportedKinds = M.fromList $ mkKindEntry `map` S.toList ks
     }
   where
   mkTypeEntry (Qualified mn name) = (name, ([], fromJust mn))
   mkClassEntry (Qualified mn name) = (name, fromJust mn)
   mkKindEntry (Qualified mn name) = (name, fromJust mn)
 
--- | Environment which only contains the Prim module.
+-- | Environment which only contains the Prim modules.
 primEnv :: Env
-primEnv = M.singleton
-  (ModuleName [ProperName "Prim"])
-  (internalModuleSourceSpan "<Prim>", nullImports, primExports)
+primEnv = M.fromList
+  [ ( C.Prim
+    , (internalModuleSourceSpan "<Prim>", nullImports, primExports)
+    )
+  , ( C.PrimOrdering
+    , (internalModuleSourceSpan "<Prim.Ordering>", nullImports, primOrderingExports)
+    )
+  , ( C.PrimRow
+    , (internalModuleSourceSpan "<Prim.Row>", nullImports, primRowExports)
+    )
+  , ( C.PrimRowList
+    , (internalModuleSourceSpan "<Prim.RowList>", nullImports, primRowListExports)
+    )
+  , ( C.PrimSymbol
+    , (internalModuleSourceSpan "<Prim.Symbol>", nullImports, primSymbolExports)
+    )
+  , ( C.PrimTypeError
+    , (internalModuleSourceSpan "<Prim.TypeError>", nullImports, primTypeErrorExports)
+    )
+  ]
 
 -- |
 -- When updating the `Exports` the behaviour is slightly different depending
@@ -396,11 +455,12 @@ getExports env mn =
 checkImportConflicts
   :: forall m a
    . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
-  => ModuleName
+  => SourceSpan
+  -> ModuleName
   -> (a -> Name)
   -> [ImportRecord a]
   -> m (ModuleName, ModuleName)
-checkImportConflicts currentModule toName xs =
+checkImportConflicts ss currentModule toName xs =
   let
     byOrig = sortBy (compare `on` importSourceModule) xs
     groups = groupBy ((==) `on` importSourceModule) byOrig
@@ -410,11 +470,12 @@ checkImportConflicts currentModule toName xs =
   in
     if length groups > 1
     then case nonImplicit of
-      [ImportRecord (Qualified (Just mnNew) _) mnOrig ss _] -> do
+      [ImportRecord (Qualified (Just mnNew) _) mnOrig _ _] -> do
         let warningModule = if mnNew == currentModule then Nothing else Just mnNew
-        tell . errorMessage' ss $ ScopeShadowing name warningModule $ delete mnNew conflictModules
+            ss' = maybe nullSourceSpan importSourceSpan . headMay . filter ((== FromImplicit) . importProvenance) $ xs
+        tell . errorMessage' ss' $ ScopeShadowing name warningModule $ delete mnNew conflictModules
         return (mnNew, mnOrig)
-      _ -> throwError . errorMessage $ ScopeConflict name conflictModules
+      _ -> throwError . errorMessage' ss $ ScopeConflict name conflictModules
     else
       let ImportRecord (Qualified (Just mnNew) _) mnOrig _ _ = head byOrig
       in return (mnNew, mnOrig)

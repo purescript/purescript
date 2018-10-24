@@ -4,7 +4,6 @@ module Language.PureScript.CoreImp.Optimizer.TCO (tco) where
 import Prelude.Compat
 
 import Data.Text (Text)
-import Data.Monoid ((<>))
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.AST.SourcePos (SourceSpan)
 import Safe (headDef, tailSafe)

@@ -1,9 +1,8 @@
 module Test.Main where
 
 import Prelude
-import Control.Monad.Eff (Eff)
-import Control.Monad.Eff.Console (CONSOLE)
+import Effect (Effect)
 import Test.GenericDeriving as GenericDeriving
 
-main :: forall eff. Eff (console :: CONSOLE | eff) Unit
+main :: Effect Unit
 main = GenericDeriving.main

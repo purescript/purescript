@@ -8,13 +8,13 @@ module Language.PureScript.Ide.Usage
 
 import           Protolude hiding (moduleName)
 
-import           Control.Lens (preview)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Language.PureScript as P
 import           Language.PureScript.Ide.State (getAllModules, getFileState)
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
+import           Lens.Micro.Platform (preview)
 
 -- |
 -- How we find usages, given an IdeDeclaration and the module it was defined in:
@@ -28,13 +28,13 @@ findUsages
   :: (MonadIO m, Ide m)
   => IdeDeclaration
   -> P.ModuleName
-  -> m (ModuleMap [P.SourceSpan])
+  -> m (ModuleMap (NonEmpty P.SourceSpan))
 findUsages declaration moduleName = do
   ms <- getAllModules Nothing
   asts <- Map.map fst . fsModules <$> getFileState
   let elig = eligibleModules (moduleName, declaration) ms asts
   pure
-    $ Map.filter (not . null)
+    $ Map.mapMaybe nonEmpty
     $ Map.mapWithKey (\mn searches ->
         foldMap (\m -> foldMap (applySearch m) searches) (Map.lookup mn asts)) elig
 
@@ -128,17 +128,20 @@ eligibleModules query@(moduleName, declaration) decls modules =
 -- | Finds all usages for a given `Search` throughout a module
 applySearch :: P.Module -> Search -> [P.SourceSpan]
 applySearch module_ search =
-  -- TODO(Christoph): Figure out how to find usages inside the defining module.
-  -- The Traversal adds declarations for the current module into `scope` so we
-  -- can't tell shadowed variable from actual usage.
-  let
+  foldMap findUsageInDeclaration decls
+  where
     decls = P.getModuleDeclarations module_
-    (extr, _, _, _, _) = P.everythingWithScope mempty goExpr goBinder mempty mempty
+    findUsageInDeclaration =
+      let
+        (extr, _, _, _, _) = P.everythingWithScope mempty goExpr goBinder mempty mempty
+      in
+        extr mempty
 
     goExpr scope expr = case expr of
       P.Var sp i
         | Just ideValue <- preview _IdeDeclValue (P.disqualify search)
-        , P.isQualified search || not (_ideValueIdent ideValue `Set.member` scope) ->
+        , P.isQualified search
+          || not (P.LocalIdent (_ideValueIdent ideValue) `Set.member` scope) ->
           [sp | map P.runIdent i == map identifierFromIdeDeclaration search]
       P.Constructor sp name
         | Just ideDtor <- traverse (preview _IdeDeclDataConstructor) search ->
@@ -156,6 +159,3 @@ applySearch module_ search =
         | Just op <- traverse (preview _IdeDeclValueOperator) search ->
           [sp | opName == map _ideValueOpName op]
       _ -> []
-  in
-    foldMap (extr mempty) decls
-

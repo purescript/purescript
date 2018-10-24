@@ -19,7 +19,6 @@ import           Prelude.Compat
 import           Protolude (ordNub)
 
 import           Data.List (sort)
-import           Data.Monoid ((<>))
 import qualified Data.Text as T
 import qualified Language.PureScript as P
 

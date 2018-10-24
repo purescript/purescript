@@ -34,12 +34,12 @@ completionTestData supportModuleNames =
   , (":b",  [":browse"])
 
   -- :browse should complete module names
-  , (":b Control.Monad.E",    map (":b Control.Monad.Eff" ++) ["", ".Unsafe", ".Class", ".Console", ".Uncurried", ".Ref", ".Ref.Unsafe"])
-  , (":b Control.Monad.Eff.", map (":b Control.Monad.Eff" ++) [".Unsafe", ".Class", ".Console", ".Uncurried", ".Ref", ".Ref.Unsafe"])
+  , (":b Eff",    map (":b Effect" ++) ["", ".Unsafe", ".Class", ".Class.Console", ".Console", ".Uncurried", ".Ref"])
+  , (":b Effect.", map (":b Effect" ++) [".Unsafe", ".Class", ".Class.Console", ".Console", ".Uncurried", ".Ref"])
 
   -- import should complete module names
-  , ("import Control.Monad.E",    map ("import Control.Monad.Eff" ++) ["", ".Unsafe", ".Class", ".Console", ".Uncurried", ".Ref", ".Ref.Unsafe"])
-  , ("import Control.Monad.Eff.", map ("import Control.Monad.Eff" ++) [".Unsafe", ".Class", ".Console", ".Uncurried", ".Ref", ".Ref.Unsafe"])
+  , ("import Eff",    map ("import Effect" ++) ["", ".Unsafe", ".Class", ".Class.Console", ".Console", ".Uncurried", ".Ref"])
+  , ("import Effect.", map ("import Effect" ++) [".Unsafe", ".Class", ".Class.Console", ".Console", ".Uncurried", ".Ref"])
 
   -- :quit, :help, :reload, :clear should not complete
   , (":help ", [])
@@ -55,20 +55,22 @@ completionTestData supportModuleNames =
   , (":type uni", [":type unit"])
   , (":type E", [":type EQ"])
   , (":type P.", map (":type P." ++) ["EQ", "GT", "LT", "unit"]) -- import Prelude (unit, Ordering(..)) as P
-  , (":type Control.Monad.Eff.Console.lo", [])
+  , (":type Effect.Console.lo", [])
   , (":type voi", [])
 
   -- :kind should complete next word from types in scope
   , (":kind Str", [":kind String"])
-  , (":kind ST.", [":kind ST.ST", ":kind ST.STRef"]) -- import Control.Monad.ST as ST
-  , (":kind Control.Monad.Eff.", [])
+  , (":kind ST.", [":kind ST.ST"]) -- import Control.Monad.ST as ST
+  , (":kind STRef.", [":kind STRef.STRef"]) -- import Control.Monad.ST.Ref as STRef
+  , (":kind Effect.", [])
 
-  -- Only one argument for directives should be completed
+  -- Only one argument for these directives should be completed
   , (":show import ", [])
-  , (":type EQ ", [])
-  , (":type unit compa", [])
-  , (":kind Ordering ", [])
-  , (":kind Array In", [])
+  , (":browse Data.List ", [])
+
+  -- These directives take any number of completable terms
+  , (":type const compa", [":type const compare", ":type const comparing"])
+  , (":kind Array In", [":kind Array Int"])
 
   -- a few other import tests
   , ("impor", ["import"])
@@ -85,7 +87,18 @@ completionTestData supportModuleNames =
   , ("P.G", ["P.GT"])
   , ("P.uni", ["P.unit"])
   , ("voi", []) -- import Prelude hiding (void)
-  , ("Control.Monad.Eff.Class.", [])
+  , ("Effect.Class.", [])
+
+  -- complete first name after type annotation symbol
+  , ("1 :: I", ["1 :: Int"])
+  , ("1 ::I",  ["1 ::Int"])
+  , ("1:: I",  ["1:: Int"])
+  , ("1::I",   ["1::Int"])
+  , ("(1::Int) uni", ["(1::Int) unit"]) -- back to completing values
+
+  -- Parens and brackets aren't considered part of the current identifier
+  , ("map id [uni", ["map id [unit"])
+  , ("map (cons", ["map (const"])
   ]
 
 assertCompletedOk :: PSCiState -> (String, [String]) -> Spec
@@ -104,6 +117,10 @@ getPSCiStateForCompletion = do
                  (qualName "Control.Monad.ST"
                     ,P.Implicit
                     ,Just (qualName "ST"))
+                , -- import Control.Monad.ST.Ref as STRef
+                 (qualName "Control.Monad.ST.Ref"
+                    ,P.Implicit
+                    ,Just (qualName "STRef"))
                  -- import Prelude hiding (void)
                 ,(qualName "Prelude"
                     ,P.Hiding [valName "void"]

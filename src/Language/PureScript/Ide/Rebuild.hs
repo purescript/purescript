@@ -49,7 +49,7 @@ rebuildFile file actualFile runOpenBuild = do
 
   input <- ideReadFile file
 
-  m <- case snd <$> P.parseModuleFromFile (maybe identity const actualFile) (file, input) of
+  m <- case snd <$> P.parseModuleFromFile (maybe identity const actualFile) input of
     Left parseError ->
       throwError (RebuildError (P.MultipleErrors [P.toPositionedError parseError]))
     Right m -> pure m
@@ -154,11 +154,12 @@ shushProgress :: P.MakeActions P.Make -> MakeActionsEnv -> P.MakeActions P.Make
 shushProgress ma _ =
   ma { P.progress = \_ -> pure () }
 
--- | Stops any kind of codegen (also silences errors about missing or unused FFI
--- files though)
+-- | Stops any kind of codegen
 shushCodegen :: P.MakeActions P.Make -> MakeActionsEnv -> P.MakeActions P.Make
 shushCodegen ma MakeActionsEnv{..} =
-  ma { P.codegen = \_ _ _ -> pure () }
+  ma { P.codegen = \_ _ _ -> pure ()
+     , P.ffiCodegen = \_ -> pure ()
+     }
 
 -- | Returns a topologically sorted list of dependent ExternsFiles for the given
 -- module. Throws an error if there is a cyclic dependency within the

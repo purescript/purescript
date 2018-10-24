@@ -127,7 +127,7 @@ rethrowWithPositionTC
   => SourceSpan
   -> m a
   -> m a
-rethrowWithPositionTC pos = withErrorMessageHint (PositionedError pos)
+rethrowWithPositionTC pos = withErrorMessageHint (positionedError pos)
 
 warnAndRethrowWithPositionTC
   :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
@@ -162,6 +162,14 @@ lookupTypeClassDictionaries
   => Maybe ModuleName
   -> m (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict))
 lookupTypeClassDictionaries mn = fromMaybe M.empty . M.lookup mn . typeClassDictionaries . checkEnv <$> get
+
+-- | Lookup type class dictionaries in a module.
+lookupTypeClassDictionariesForClass
+  :: (MonadState CheckState m)
+  => Maybe ModuleName
+  -> Qualified (ProperName 'ClassName)
+  -> m (M.Map (Qualified Ident) NamedDict)
+lookupTypeClassDictionariesForClass mn cn = fromMaybe M.empty . M.lookup cn <$> lookupTypeClassDictionaries mn
 
 -- | Temporarily bind a collection of names to local variables
 bindLocalVariables

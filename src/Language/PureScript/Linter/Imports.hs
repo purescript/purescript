@@ -106,6 +106,23 @@ lintImports (Module _ _ mn mdecls (Just mexports)) env usedImps = do
         Hiding refs -> refs
         _ -> []
 
+  -- Check re-exported modules to see if we are re-exporting a qualified module
+  -- that has unspecified imports.
+  for_ mexports $ \case
+    ModuleRef _ mnq ->
+      case M.lookup mnq (byQual imports) of
+        -- We only match the single-entry case here as otherwise there will be
+        -- a different warning about implicit imports potentially colliding
+        -- anyway
+        Just [(ss, Implicit, mni)] -> do
+          let names = ordNub $ M.findWithDefault [] mni usedImps'
+              usedRefs = findUsedRefs ss env mni (Just mnq) names
+          tell . errorMessage' ss $
+            ImplicitQualifiedImportReExport mni mnq
+              $ map (simplifyTypeRef $ const True) usedRefs
+        _ -> pure ()
+    _ -> pure ()
+
   where
 
   defQual :: ImportDef -> Maybe ModuleName

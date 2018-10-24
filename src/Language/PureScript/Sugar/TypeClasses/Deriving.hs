@@ -12,7 +12,6 @@ import           Control.Monad.Supply.Class (MonadSupply)
 import           Data.Foldable (for_)
 import           Data.List (foldl', find, sortBy, unzip5)
 import qualified Data.Map as M
-import           Data.Monoid ((<>))
 import           Data.Maybe (fromMaybe, mapMaybe)
 import           Data.Ord (comparing)
 import qualified Data.Set as S
@@ -42,12 +41,14 @@ data NewtypeDerivedInstances = NewtypeDerivedInstances
   -- ^ A list of newtype instances which were derived in this module.
   } deriving Show
 
-instance Monoid NewtypeDerivedInstances where
-  mempty = NewtypeDerivedInstances mempty mempty
-  mappend x y =
+instance Semigroup NewtypeDerivedInstances where
+  x <> y =
     NewtypeDerivedInstances { ndiClasses          = ndiClasses          x <> ndiClasses          y
                             , ndiDerivedInstances = ndiDerivedInstances x <> ndiDerivedInstances y
                             }
+
+instance Monoid NewtypeDerivedInstances where
+  mempty = NewtypeDerivedInstances mempty mempty
 
 -- | Extract the name of the newtype appearing in the last type argument of
 -- a derived newtype instance.
@@ -201,10 +202,10 @@ deriveNewtypeInstance
   -> m Expr
 deriveNewtypeInstance ss mn syns ndis className ds tys tyConNm dargs = do
     verifySuperclasses
-    tyCon <- findTypeDecl tyConNm ds
+    tyCon <- findTypeDecl ss tyConNm ds
     go tyCon
   where
-    go (DataDeclaration _ Newtype _ tyArgNames [(_, [wrapped])])
+    go (DataDeclaration _ Newtype _ tyArgNames [(_, [wrapped])]) = do
       -- The newtype might not be applied to all type arguments.
       -- This is okay as long as the newtype wraps something which ends with
       -- sufficiently many type applications to variables.
@@ -214,10 +215,12 @@ deriveNewtypeInstance ss mn syns ndis className ds tys tyConNm dargs = do
       --
       -- since Array a is a type application which uses the last
       -- type argument
-      | Just wrapped' <- stripRight (takeReverse (length tyArgNames - length dargs) tyArgNames) wrapped =
-          do let subst = zipWith (\(name, _) t -> (name, t)) tyArgNames dargs
-             wrapped'' <- replaceAllTypeSynonymsM syns wrapped'
-             return (DeferredDictionary className (init tys ++ [replaceAllTypeVars subst wrapped'']))
+      wrapped' <- replaceAllTypeSynonymsM syns wrapped
+      case stripRight (takeReverse (length tyArgNames - length dargs) tyArgNames) wrapped' of
+        Just wrapped'' -> do
+          let subst = zipWith (\(name, _) t -> (name, t)) tyArgNames dargs
+          return (DeferredDictionary className (init tys ++ [replaceAllTypeVars subst wrapped'']))
+        Nothing -> throwError . errorMessage' ss $ InvalidNewtypeInstance className tys
     go _ = throwError . errorMessage' ss $ InvalidNewtypeInstance className tys
 
     takeReverse :: Int -> [a] -> [a]
@@ -285,7 +288,7 @@ deriveGenericRep
   -> m ([Declaration], Type)
 deriveGenericRep ss mn syns ds tyConNm tyConArgs repTy = do
     checkIsWildcard ss tyConNm repTy
-    go =<< findTypeDecl tyConNm ds
+    go =<< findTypeDecl ss tyConNm ds
   where
     go :: Declaration -> m ([Declaration], Type)
     go (DataDeclaration (ss', _) _ _ args dctors) = do
@@ -438,7 +441,7 @@ deriveEq
   -> ProperName 'TypeName
   -> m [Declaration]
 deriveEq ss mn syns ds tyConNm = do
-  tyCon <- findTypeDecl tyConNm ds
+  tyCon <- findTypeDecl ss tyConNm ds
   eqFun <- mkEqFunction tyCon
   return [ ValueDecl (ss, []) (Ident C.eq) Public [] (unguarded eqFun) ]
   where
@@ -463,7 +466,7 @@ deriveEq ss mn syns ds tyConNm = do
       | length xs /= 1 = xs ++ [catchAll]
       | otherwise = xs -- Avoid redundant case
       where
-      catchAll = CaseAlternative [NullBinder, NullBinder] (unguarded (Literal (BooleanLiteral False)))
+      catchAll = CaseAlternative [NullBinder, NullBinder] (unguarded (Literal ss (BooleanLiteral False)))
 
     mkCtorClause :: (ProperName 'ConstructorName, [Type]) -> m CaseAlternative
     mkCtorClause (ctorName, tys) = do
@@ -476,7 +479,7 @@ deriveEq ss mn syns ds tyConNm = do
       caseBinder idents = ConstructorBinder ss (Qualified (Just mn) ctorName) (map (VarBinder ss) idents)
 
     conjAll :: [Expr] -> Expr
-    conjAll [] = Literal (BooleanLiteral True)
+    conjAll [] = Literal ss (BooleanLiteral True)
     conjAll xs = foldl1 preludeConj xs
 
     toEqTest :: Expr -> Expr -> Type -> Expr
@@ -506,7 +509,7 @@ deriveOrd
   -> ProperName 'TypeName
   -> m [Declaration]
 deriveOrd ss mn syns ds tyConNm = do
-  tyCon <- findTypeDecl tyConNm ds
+  tyCon <- findTypeDecl ss tyConNm ds
   compareFun <- mkCompareFunction tyCon
   return [ ValueDecl (ss, []) (Ident C.compare) Public [] (unguarded compareFun) ]
   where
@@ -610,7 +613,7 @@ deriveNewtype
   -> m ([Declaration], Type)
 deriveNewtype ss mn syns ds tyConNm tyConArgs unwrappedTy = do
     checkIsWildcard ss tyConNm unwrappedTy
-    go =<< findTypeDecl tyConNm ds
+    go =<< findTypeDecl ss tyConNm ds
   where
     go :: Declaration -> m ([Declaration], Type)
     go (DataDeclaration (ss', _) Data name _ _) =
@@ -637,10 +640,11 @@ deriveNewtype ss mn syns ds tyConNm tyConArgs unwrappedTy = do
 
 findTypeDecl
   :: (MonadError MultipleErrors m)
-  => ProperName 'TypeName
+  => SourceSpan
+  -> ProperName 'TypeName
   -> [Declaration]
   -> m Declaration
-findTypeDecl tyConNm = maybe (throwError . errorMessage $ CannotFindDerivingType tyConNm) return . find isTypeDecl
+findTypeDecl ss tyConNm = maybe (throwError . errorMessage' ss $ CannotFindDerivingType tyConNm) return . find isTypeDecl
   where
   isTypeDecl :: Declaration -> Bool
   isTypeDecl (DataDeclaration _ _ nm _ _) | nm == tyConNm = True
@@ -666,7 +670,7 @@ isAppliedVar (TypeApp (TypeVar _) _) = True
 isAppliedVar _ = False
 
 objectType :: Type -> Maybe Type
-objectType (TypeApp (TypeConstructor (Qualified (Just (ModuleName [ProperName "Prim"])) (ProperName "Record"))) rec) = Just rec
+objectType (TypeApp (TypeConstructor C.Record) rec) = Just rec
 objectType _ = Nothing
 
 decomposeRec :: Type -> Maybe [(Label, Type)]
@@ -690,7 +694,7 @@ deriveFunctor
   -> ProperName 'TypeName
   -> m [Declaration]
 deriveFunctor ss mn syns ds tyConNm = do
-  tyCon <- findTypeDecl tyConNm ds
+  tyCon <- findTypeDecl ss tyConNm ds
   mapFun <- mkMapFunction tyCon
   return [ ValueDecl (ss, []) (Ident C.map) Public [] (unguarded mapFun) ]
   where
@@ -741,6 +745,12 @@ deriveFunctor ss mn syns ds tyConNm = do
                 let argVar = mkVar ss arg
                     mkAssignment ((Label l), x) = (l, App x (Accessor l argVar))
                 return (lam ss arg (ObjectUpdate argVar (mkAssignment <$> updates)))
+
+          -- quantifiers
+          goType (ForAll scopedVar t _) | scopedVar /= iTyName = goType t
+
+          -- constraints
+          goType (ConstrainedType _ t) = goType t
 
           -- under a `* -> *`, just assume functor for now
           goType (TypeApp _ t) = fmap (App mapVar) <$> goType t

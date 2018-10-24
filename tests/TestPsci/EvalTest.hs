@@ -23,7 +23,7 @@ evalTests = context "evalTests" $ do
 evalTestFiles :: IO [FilePath]
 evalTestFiles = do
   cwd <- getCurrentDirectory
-  let psciExamples = cwd </> "examples" </> "psci"
+  let psciExamples = cwd </> "tests" </> "purs" </> "psci"
   Glob.globDir1 (Glob.compile "**/*.purs") psciExamples
 
 data EvalLine = Line String

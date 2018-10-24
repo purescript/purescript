@@ -31,7 +31,6 @@ import           Control.Monad.Trans.State.Strict (StateT, evalStateT)
 import           Control.Monad.Trans.Reader (ReaderT, runReaderT)
 import           Data.FileEmbed (embedStringFile)
 import           Data.Foldable (for_)
-import           Data.Monoid ((<>))
 import           Data.String (IsString(..))
 import           Data.Text (Text, unpack)
 import           Data.Traversable (for)
@@ -360,13 +359,10 @@ command = loop <$> options
                       configFile <- (</> ".purs-repl") <$> liftIO getCurrentDirectory
                       exists <- liftIO $ doesFileExist configFile
                       when exists $ do
-                        ls <- lines <$> liftIO (readUTF8File configFile)
-                        for_ ls $ \l -> do
-                          liftIO (putStrLn l)
-                          case parseCommand l of
-                            Left err -> liftIO (putStrLn err >> exitFailure)
-                            Right cmd@Import{} -> handleCommand' state cmd
-                            Right _ -> liftIO (putStrLn "The .purs-repl file only supports import declarations")
+                        cf <- liftIO (readUTF8File configFile)
+                        case parseDotFile configFile cf of
+                          Left err -> liftIO (putStrLn err >> exitFailure)
+                          Right cmds -> liftIO (putStrLn cf) >> for_ cmds (handleCommand' state)
 
                     handleCommandWithInterrupts
                       :: state

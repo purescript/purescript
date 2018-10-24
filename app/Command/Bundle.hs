@@ -7,7 +7,6 @@
 module Command.Bundle (command) where
 
 import           Data.Traversable (for)
-import           Data.Monoid ((<>))
 import           Data.Aeson (encode)
 import           Data.Maybe (isNothing)
 import           Control.Applicative
@@ -21,8 +20,7 @@ import           System.Exit (exitFailure)
 import           System.IO (stderr, hPutStr, hPutStrLn)
 import           System.IO.UTF8 (readUTF8File, writeUTF8File)
 import           System.Directory (createDirectoryIfMissing, getCurrentDirectory)
-import qualified Data.ByteString.Lazy as B
-import qualified Data.ByteString.UTF8 as BU8
+import qualified Data.ByteString.Lazy.UTF8 as LBU8
 import           Language.PureScript.Bundle
 import           Options.Applicative (Parser)
 import qualified Options.Applicative as Opts
@@ -124,6 +122,6 @@ command = run <$> (Opts.helper <*> options) where
             case sourcemap of
               Just sm -> do
                 writeUTF8File outputFile $ js ++ "\n//# sourceMappingURL=" ++ (takeFileName outputFile <.> "map") ++ "\n"
-                writeUTF8File (outputFile <.> "map") $ BU8.toString . B.toStrict . encode $ generate sm
+                writeUTF8File (outputFile <.> "map") $ LBU8.toString . encode $ generate sm
               Nothing -> writeUTF8File outputFile js
           Nothing -> putStrLn js

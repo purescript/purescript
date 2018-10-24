@@ -1,6 +1,8 @@
-resolver: lts-10.3
+resolver: lts-12.0
 packages:
 - '.'
 extra-deps:
-- pipes-http-1.0.5
-- Win32-notify-0.3.0.3
+nix:
+  enable: false
+  packages:
+  - zlib

@@ -3,9 +3,12 @@ version: '{build}'
 environment:
   # Keep the path as short as possible, just in case.
   STACK_ROOT: c:\s
-  STACK_VER: 1.6.3
+  STACK_VER: 1.7.1
   RELEASE_USER: purescript
   RELEASE_REPO: purescript
+  # See https://github.com/commercialhaskell/stack/issues/3944, might no 
+  # longer be necessary after we've moved to a snapshot with network >= 0.2.7.1
+  TMP: "c:\\tmp"
 branches:
   # Only build master and tagged versions, i.e. not feature branches; feature
   # branches already get built after opening a pull request.
@@ -19,7 +22,7 @@ cache:
 - c:\s -> appveyor/cache-buster.txt
 install:
 - git submodule update --init
-- ps: Install-Product node 6
+- ps: Install-Product node 8
 - npm install -g bower
 
 - ps: |

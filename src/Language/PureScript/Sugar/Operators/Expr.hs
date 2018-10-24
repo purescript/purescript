@@ -2,6 +2,7 @@ module Language.PureScript.Sugar.Operators.Expr where
 
 import Prelude.Compat
 
+import Control.Monad.Except
 import Data.Functor.Identity
 
 import qualified Text.Parsec as P
@@ -10,8 +11,13 @@ import qualified Text.Parsec.Expr as P
 import Language.PureScript.AST
 import Language.PureScript.Names
 import Language.PureScript.Sugar.Operators.Common
+import Language.PureScript.Errors
 
-matchExprOperators :: [[(Qualified (OpName 'ValueOpName), Associativity)]] -> Expr -> Expr
+matchExprOperators
+  :: MonadError MultipleErrors m
+  => [[(Qualified (OpName 'ValueOpName), Associativity)]]
+  -> Expr
+  -> m Expr
 matchExprOperators = matchOperators isBinOp extractOp fromOp reapply modOpTable
   where
 

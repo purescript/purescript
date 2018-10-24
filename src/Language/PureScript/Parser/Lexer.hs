@@ -70,7 +70,6 @@ import Control.Applicative ((<|>))
 import Control.Monad (void, guard)
 import Control.Monad.Identity (Identity)
 import Data.Char (isSpace, isAscii, isSymbol, isAlphaNum)
-import Data.Monoid ((<>))
 import Data.String (fromString)
 import Data.Text (Text)
 import qualified Data.Text as T

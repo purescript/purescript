@@ -8,7 +8,6 @@ import Prelude.Compat
 
 import Control.DeepSeq (NFData)
 import Data.Aeson ((.=), (.:))
-import Data.Monoid
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import Language.PureScript.Comments

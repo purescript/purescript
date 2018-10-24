@@ -35,7 +35,7 @@ import           Text.Regex.TDFA               ((=~))
 
 type ScoredMatch a = (Match a, Double)
 
-newtype Matcher a = Matcher (Endo [Match a]) deriving (Monoid)
+newtype Matcher a = Matcher (Endo [Match a]) deriving (Semigroup, Monoid)
 
 instance FromJSON (Matcher IdeDeclarationAnn) where
   parseJSON = withObject "matcher" $ \o -> do

@@ -7,7 +7,7 @@ module Language.PureScript.ModuleDependencies
 import           Protolude hiding (head)
 
 import           Data.Graph
-import           Data.List (head)
+import           Data.List.NonEmpty (NonEmpty((:|)))
 import qualified Data.Set as S
 import           Language.PureScript.AST
 import qualified Language.PureScript.Constants as C
@@ -42,7 +42,7 @@ sortModules ms = do
     toGraphNode mns m@(Module _ _ mn ds _) = do
       let deps = ordNub (mapMaybe usedModules ds)
       void . parU deps $ \(dep, pos) ->
-        when (dep /= C.Prim && S.notMember dep mns) .
+        when (dep `notElem` C.primModules && S.notMember dep mns) .
           throwError
             . addHint (ErrorInModule mn)
             . errorMessage' pos
@@ -59,8 +59,9 @@ usedModules _ = Nothing
 -- | Convert a strongly connected component of the module graph to a module
 toModule :: MonadError MultipleErrors m => SCC Module -> m Module
 toModule (AcyclicSCC m) = return m
+toModule (CyclicSCC []) = internalError "toModule: empty CyclicSCC"
 toModule (CyclicSCC [m]) = return m
-toModule (CyclicSCC ms) =
+toModule (CyclicSCC (m : ms)) =
   throwError
-    . errorMessage' (getModuleSourceSpan (head ms))
+    . errorMessage'' (fmap getModuleSourceSpan (m :| ms))
     $ CycleInModules (map getModuleName ms)

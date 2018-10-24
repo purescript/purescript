@@ -14,9 +14,9 @@ import           Prelude.Compat
 import           Protolude (ordNub)
 
 import           Data.List (sort, find, foldl')
-import           Data.Maybe (mapMaybe)
+import           Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
-import           Data.Monoid ((<>))
+import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
 
@@ -29,6 +29,7 @@ import           Control.Monad.Writer.Strict (Writer(), runWriter)
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Names as N
+import qualified Language.PureScript.Constants as C
 
 import           Language.PureScript.Interactive.Completion   as Interactive
 import           Language.PureScript.Interactive.IO           as Interactive
@@ -167,7 +168,7 @@ handleDecls
   -> m ()
 handleDecls ds = do
   st <- gets (updateLets (++ ds))
-  let m = createTemporaryModule False st (P.Literal (P.ObjectLiteral []))
+  let m = createTemporaryModule False st (P.Literal P.nullSourceSpan (P.ObjectLiteral []))
   e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
   case e of
     Left err -> printErrors err
@@ -290,22 +291,21 @@ handleBrowse
   -> m ()
 handleBrowse print' moduleName = do
   st <- get
-  if isModInEnv moduleName st
-    then print' (printModuleSignatures moduleName (psciEnvironment st))
-    else case lookupUnQualifiedModName moduleName st of
-      Just unQualifiedName ->
-        if isModInEnv unQualifiedName st
-          then print' (printModuleSignatures unQualifiedName (psciEnvironment st))
-          else failNotInEnv moduleName
-      Nothing ->
-        failNotInEnv moduleName
+  let env = psciEnvironment st
+  case findMod moduleName (psciLoadedExterns st) (psciImportedModules st) of
+    Just qualName -> print' $ printModuleSignatures qualName env
+    Nothing       -> failNotInEnv moduleName
   where
-    isModInEnv modName =
-        any ((== modName) . P.getModuleName . fst) . psciLoadedExterns
-    failNotInEnv modName =
-        print' $ T.unpack $ "Module '" <> N.runModuleName modName <> "' is not valid."
-    lookupUnQualifiedModName quaModName st =
-        (\(modName,_,_) -> modName) <$> find ( \(_, _, mayQuaName) -> mayQuaName == Just quaModName) (psciImportedModules st)
+    findMod needle externs imports =
+      let qualMod = fromMaybe needle (lookupUnQualifiedModName needle imports)
+          modules = S.fromList (C.primModules <> (P.getModuleName . fst <$> externs))
+      in if qualMod `S.member` modules
+           then Just qualMod
+           else Nothing
+
+    failNotInEnv modName = print' $ T.unpack $ "Module '" <> N.runModuleName modName <> "' is not valid."
+    lookupUnQualifiedModName needle imports =
+        (\(modName,_,_) -> modName) <$> find (\(_,_,mayQuaName) -> mayQuaName == Just needle) imports
 
 -- | Return output as would be returned by tab completion, for tools integration etc.
 handleComplete

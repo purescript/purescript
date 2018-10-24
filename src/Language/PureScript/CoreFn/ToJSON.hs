@@ -37,6 +37,7 @@ metaToJSON (IsConstructor t is)
 metaToJSON IsNewtype              = object [ T.pack "metaType"  .= "IsNewtype" ]
 metaToJSON IsTypeClassConstructor = object [ T.pack "metaType"  .= "IsTypeClassConstructor" ]
 metaToJSON IsForeign              = object [ T.pack "metaType"  .= "IsForeign" ]
+metaToJSON IsWhere                = object [ T.pack "metaType"  .= "IsWhere" ]
 
 sourceSpanToJSON :: SourceSpan -> Value
 sourceSpanToJSON (SourceSpan _ spanStart spanEnd) =
@@ -103,7 +104,8 @@ moduleNameToJSON (ModuleName pns) = toJSON $ properNameToJSON `map` pns
 
 moduleToJSON :: Version -> Module Ann -> Value
 moduleToJSON v m = object
-  [ T.pack "moduleName" .= moduleNameToJSON (moduleName m)
+  [ T.pack "sourceSpan" .= sourceSpanToJSON (moduleSourceSpan m)
+  , T.pack "moduleName" .= moduleNameToJSON (moduleName m)
   , T.pack "modulePath" .= toJSON (modulePath m)
   , T.pack "imports"    .= map importToJSON (moduleImports m)
   , T.pack "exports"    .= map identToJSON (moduleExports m)

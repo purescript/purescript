@@ -26,7 +26,12 @@ data Meta
   -- |
   -- The contained reference is for a foreign member
   --
-  | IsForeign deriving (Show, Eq, Ord)
+  | IsForeign
+  -- |
+  -- The contained value is a where clause
+  --
+  | IsWhere
+  deriving (Show, Eq, Ord)
 
 -- |
 -- Data constructor metadata

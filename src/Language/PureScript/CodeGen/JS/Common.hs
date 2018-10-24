@@ -4,7 +4,6 @@ module Language.PureScript.CodeGen.JS.Common where
 import Prelude.Compat
 
 import Data.Char
-import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
 

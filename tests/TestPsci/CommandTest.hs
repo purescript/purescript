@@ -62,3 +62,6 @@ commandTests = context "commandTests" $ do
       run ":reload"
       ":browse Reload" `printed` flip shouldNotContain "reload ::"
       ":browse Reload" `printed` flip shouldContain    "edited ::"
+
+    ":browse Mirp" `printed` flip shouldContain "is not valid"
+    ":browse Prim" `printed` flip shouldContain "class Partial"
