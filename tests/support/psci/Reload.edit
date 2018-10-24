@@ -1,0 +1,4 @@
+module Reload where
+
+edited :: String
+edited = "reload"

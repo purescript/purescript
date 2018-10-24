@@ -18,12 +18,12 @@ homepage: http://www.purescript.org/
 extra-source-files:
   - examples/**/*.js
   - examples/**/*.purs
-  - examples/**/*.edit
   - examples/**/*.json
   - app/static/*
   - tests/support/*.json
   - tests/support/setup-win.cmd
-  - tests/support/psci/*.purs
+  - tests/support/psci/**.purs
+  - tests/support/psci/**.edit
   - tests/support/pscide/src/**/*.purs
   - tests/support/pscide/src/**/*.js
   - tests/support/pscide/src/**/*.fail

@@ -53,12 +53,12 @@ commandTests = context "commandTests" $ do
 
   specPSCi ":reload, :browse" $ do
     cwd <- liftIO getCurrentDirectory
-    let new = cwd </> "examples" </> "psci" </> "Regex.edit"
+    let new = cwd </> "tests" </> "support" </> "psci" </> "Reload.edit"
 
-    ":browse Data.String.Regex" `printed` flip shouldContain    "flags ::"
-    ":browse Data.String.Regex" `printed` flip shouldNotContain "psoup ::"
+    ":browse Reload" `printed` flip shouldContain    "reload ::"
+    ":browse Reload" `printed` flip shouldNotContain "edited ::"
 
-    simulateModuleEdit (moduleNameFromString "Data.String.Regex") new $ do
+    simulateModuleEdit (moduleNameFromString "Reload") new $ do
       run ":reload"
-      ":browse Data.String.Regex" `printed` flip shouldNotContain "flags ::"
-      ":browse Data.String.Regex" `printed` flip shouldContain    "psoup ::"
+      ":browse Reload" `printed` flip shouldNotContain "reload ::"
+      ":browse Reload" `printed` flip shouldContain    "edited ::"

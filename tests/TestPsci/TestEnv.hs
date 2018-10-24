@@ -28,9 +28,10 @@ initTestPSCiEnv :: IO (PSCiState, PSCiConfig)
 initTestPSCiEnv = do
   -- Load test support packages
   cwd <- getCurrentDirectory
-  let supportDir = cwd </> "tests" </> "support" </> "bower_components"
-  let supportFiles ext = Glob.globDir1 (Glob.compile ("purescript-*/src/**/*." ++ ext)) supportDir
-  pursFiles <- supportFiles "purs"
+  let supportDir = cwd </> "tests" </> "support"
+  psciFiles <- Glob.globDir1 (Glob.compile "**/*.purs") (supportDir </> "psci")
+  libraries <- Glob.globDir1 (Glob.compile "purescript-*/src/**/*.purs") (supportDir </> "bower_components")
+  let pursFiles = psciFiles ++ libraries
   modulesOrError <- loadAllModules pursFiles
   case modulesOrError of
     Left err ->
@@ -117,8 +118,8 @@ simulateModuleEdit mn newPath action = do
 
   findReplace :: [String] -> [String] -> Int -> Maybe [String]
   findReplace (x:xs) acc n
-    | inputPath `isSuffixOf` x = findReplace xs acc (n+1)
-    | otherwise                = findReplace xs acc n
+    | inputPath `isSuffixOf` x = findReplace xs acc (n+1) -- remove matching path
+    | otherwise                = findReplace xs (x:acc) n
   findReplace [] _   0         = Nothing
   findReplace [] acc _         = Just (newPath : reverse acc)
 
