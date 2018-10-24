@@ -643,31 +643,30 @@ deriveHashable ss mn syns ds tyConNm = do
     mkCases :: ((ProperName 'ConstructorName, [Type]), Int) -> m [CaseAlternative]
     mkCases ((ctorName, tys), nth) = do
       xs <- replicateM (length tys) (freshIdent "x")
-      tys' <- mapM (replaceAllTypeSynonymsM syns) tys
       let binder = ConstructorBinder ss (Qualified (Just mn) ctorName) (map (VarBinder ss) xs)
-      theHash <- computeAndCombineHashes (initialHash nth) (zip (map (Var ss . Qualified Nothing) xs) tys')
-      return [CaseAlternative [binder] (unguarded theHash)]
+      tys' <- mapM (replaceAllTypeSynonymsM syns) tys
 
-    computeAndCombineHashes :: Expr -> [(Expr, Type)] -> m Expr
-    computeAndCombineHashes unique ets = do
-      hashes <- mapM hash ets
-      unhash hashes (wrapHash . combineHashes unique . map (Var ss . Qualified Nothing))
+      -- collect all record and constructor fields
+      let es = collectFields (zip (map var xs) tys')
+      -- make recursive calls to `hash`
+      let hashEs = map (App (Var ss (Qualified (Just dataHashable) (Ident C.hash)))) es
+      hs <- replicateM (length es) (freshIdent "h")
+      -- unwrap all of the `Hash` newtypes
+      let theCase = Case hashEs
+                    [ CaseAlternative (map hashBinder hs)
+                      -- combine hashes, then wrap in newtype
+                      (unguarded (wrapHash (foldl' combiningFunction (initialHash nth) (map var hs)))) ]
 
-    -- The resulting expression has type `Hash a`
-    hash :: (Expr, Type) -> m Expr
-    hash (e, ty)
+      return [CaseAlternative [binder] (unguarded theCase)]
+
+    collectFields [] = []
+    collectFields ((e,ty):rest)
       | Just rec <- objectType ty
       , Just fields <- decomposeRec rec
-          = computeAndCombineHashes (initialHash 0) (map (\((Label str), fieldTy) -> (Accessor str e, fieldTy)) fields)
-      | otherwise = pure (App (Var ss (Qualified (Just dataHashable) (Ident C.hash))) e)
+          = collectFields (map (\((Label str), fieldTy) -> (Accessor str e, fieldTy)) fields) ++ collectFields rest
+      | otherwise = e:collectFields rest
 
-    -- Turns a list of expresions of type `Hash a` into an expression
-    -- of type `Int` via the second argument, a function to `Int` from
-    -- identifiers bound to expressions of type `Int`.
-    unhash :: [Expr] -> ([Ident] -> Expr) -> m Expr
-    unhash es e = do
-      hs <- replicateM (length es) (freshIdent "h")
-      pure $ Case es [ CaseAlternative (map hashBinder hs) (unguarded (e hs)) ]
+    var = Var ss . Qualified Nothing
 
     dataHashableHashNewtypeConstructor = (Qualified (Just dataHashable) (ProperName "Hash"))
 
@@ -683,9 +682,6 @@ deriveHashable ss mn syns ds tyConNm = do
         add = Var ss (Qualified (Just dataSemiring) (Ident C.add))
         mul = Var ss (Qualified (Just dataSemiring) (Ident C.mul))
         thirtyone = Literal ss (NumericLiteral (Left 31))
-
-    combineHashes :: Expr -> [Expr] -> Expr
-    combineHashes = foldl' combiningFunction
 
     -- initial hash is just the running number of constructor, for now
     initialHash nth = Literal ss (NumericLiteral (Left (toEnum nth)))
