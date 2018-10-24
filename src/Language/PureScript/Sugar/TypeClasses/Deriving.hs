@@ -640,32 +640,41 @@ deriveHashable ss mn syns ds tyConNm = do
       lamCase ss' x <$> (concat <$> mapM mkCases (zip args [0..]))
     mkHashFunction _ = internalError "mkHashFunction: expected DataDeclaration"
 
-    dataHashableHashNewtypeConstructor = (Qualified (Just dataHashable) (ProperName "Hash"))
-
     mkCases :: ((ProperName 'ConstructorName, [Type]), Int) -> m [CaseAlternative]
     mkCases ((ctorName, tys), nth) = do
-      idents <- replicateM (length tys) (freshIdent "x")
+      xs <- replicateM (length tys) (freshIdent "x")
       tys' <- mapM (replaceAllTypeSynonymsM syns) tys
-      let binder = ConstructorBinder ss (Qualified (Just mn) ctorName) (map (VarBinder ss) idents)
-      individualHashes <- mapM (uncurry computeHash) (zip (map (Var ss . Qualified Nothing) idents) tys')
-      let hash = combineHashes (initialHash nth) individualHashes
-      let result = App (Constructor ss dataHashableHashNewtypeConstructor) $ hash
-      return [CaseAlternative [binder] (unguarded result)]
+      let binder = ConstructorBinder ss (Qualified (Just mn) ctorName) (map (VarBinder ss) xs)
+      theHash <- computeAndCombineHashes (initialHash nth) (zip (map (Var ss . Qualified Nothing) xs) tys')
+      return [CaseAlternative [binder] (unguarded theHash)]
 
-    computeHash :: Expr -> Type -> m Expr
-    computeHash e ty
+    computeAndCombineHashes :: Expr -> [(Expr, Type)] -> m Expr
+    computeAndCombineHashes unique ets = do
+      hashes <- mapM hash ets
+      unhash hashes (wrapHash . combineHashes unique . map (Var ss . Qualified Nothing))
+
+    -- The resulting expression has type `Hash a`
+    hash :: (Expr, Type) -> m Expr
+    hash (e, ty)
       | Just rec <- objectType ty
       , Just fields <- decomposeRec rec
-          = do fieldHashes <- mapM (\((Label str), fieldTy) -> computeHash (Accessor str e) fieldTy) fields
-               pure (combineHashes (initialHash 0) fieldHashes)
-      | otherwise = do
-          hx <- freshIdent "hx"
-          pure $ Case [ hashableHash e ]
-                      [ CaseAlternative [ ConstructorBinder ss dataHashableHashNewtypeConstructor [ VarBinder ss hx ] ]
-                        (unguarded (Var ss (Qualified Nothing hx))) ]
+          = computeAndCombineHashes (initialHash 0) (map (\((Label str), fieldTy) -> (Accessor str e, fieldTy)) fields)
+      | otherwise = pure (App (Var ss (Qualified (Just dataHashable) (Ident C.hash))) e)
 
-    hashableHash :: Expr -> Expr
-    hashableHash = App (Var ss (Qualified (Just dataHashable) (Ident C.hash)))
+    -- Turns a list of expresions of type `Hash a` into an expression
+    -- of type `Int` via the second argument, a function to `Int` from
+    -- identifiers bound to expressions of type `Int`.
+    unhash :: [Expr] -> ([Ident] -> Expr) -> m Expr
+    unhash es e = do
+      hs <- replicateM (length es) (freshIdent "h")
+      pure $ Case es [ CaseAlternative (map hashBinder hs) (unguarded (e hs)) ]
+
+    dataHashableHashNewtypeConstructor = (Qualified (Just dataHashable) (ProperName "Hash"))
+
+    wrapHash = App (Constructor ss dataHashableHashNewtypeConstructor)
+
+    hashBinder :: Ident -> Binder
+    hashBinder hx = ConstructorBinder ss dataHashableHashNewtypeConstructor [ VarBinder ss hx ]
 
     -- acc * 31 + h -- for want of a better combining function
     combiningFunction :: Expr -> Expr -> Expr
