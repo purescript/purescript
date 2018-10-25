@@ -63,7 +63,7 @@ magicDo effectModule C.EffectDictionaries{..} = everywhereTopDown convert
                     Return s1 $ ObjectLiteral s1 []])) []
   -- Desugar forE
   convert (App _ (App _ (App _ (App s1 f [loArg]) [hiArg]) [intToEff]) [])
-    | isEffFunc C.forE f =
+    | isEffFunc edFor f =
         App s1 (Function s1 Nothing []
                  (Block s1 [
                    VariableIntroduction s1 lo (Just loArg),

@@ -204,15 +204,6 @@ unit = "unit"
 
 -- Core lib values
 
-untilE :: forall a. (IsString a) => a
-untilE = "untilE"
-
-whileE :: forall a. (IsString a) => a
-whileE = "whileE"
-
-forE :: forall a. (IsString a) => a
-forE = "forE"
-
 runST :: forall a. (IsString a) => a
 runST = "run"
 
@@ -262,6 +253,7 @@ data EffectDictionaries = EffectDictionaries
   , edMonadDict :: PSString
   , edWhile :: PSString
   , edUntil :: PSString
+  , edFor :: PSString
   }
 
 effDictionaries :: EffectDictionaries
@@ -271,6 +263,7 @@ effDictionaries = EffectDictionaries
   , edMonadDict = "monadEff"
   , edWhile = "whileE"
   , edUntil = "untilE"
+  , edFor = "forE"
   }
 
 effectDictionaries :: EffectDictionaries
@@ -280,6 +273,7 @@ effectDictionaries = EffectDictionaries
   , edMonadDict = "monadEffect"
   , edWhile = "whileE"
   , edUntil = "untilE"
+  , edFor = "forE"
   }
 
 stDictionaries :: EffectDictionaries
@@ -289,6 +283,7 @@ stDictionaries = EffectDictionaries
   , edMonadDict = "monadST"
   , edWhile = "while"
   , edUntil = "until"
+  , edFor = "for"
   }
 
 discardUnitDictionary :: forall a. (IsString a) => a
