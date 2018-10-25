@@ -104,24 +104,20 @@ printed command f = runAndEval command (void jsEval) (liftIO . f)
 simulateModuleEdit :: P.ModuleName -> FilePath -> TestPSCi a -> TestPSCi a
 simulateModuleEdit mn newPath action = do
   ms <- asks psciFileGlobs
-
-  case findReplace ms [] 0 of
+  case replacePath ms of
     Nothing  -> fail $ "Did not find " ++ inputPath ++ " in psciFileGlobs"
-    Just xs' -> local (replacePath xs') temporarily <* rebuild
+    Just xs' -> local (\c -> c { psciFileGlobs = xs' }) temporarily <* rebuild
 
   where
   outputPath = modulesDir </> T.unpack (P.runModuleName mn) </> "index.js"
   inputPath  = T.unpack (T.replace "." slash (P.runModuleName mn)) ++ ".purs"
   slash      = T.singleton pathSeparator
 
-  replacePath xs c = c { psciFileGlobs = xs }
-
-  findReplace :: [String] -> [String] -> Int -> Maybe [String]
-  findReplace (x:xs) acc n
-    | inputPath `isSuffixOf` x = findReplace xs acc (n+1) -- remove matching path
-    | otherwise                = findReplace xs (x:acc) n
-  findReplace [] _   0         = Nothing
-  findReplace [] acc _         = Just (newPath : reverse acc)
+  replacePath :: [String] -> Maybe [String]
+  replacePath (x:xs)
+    | inputPath `isSuffixOf` x = Just (newPath : xs)
+    | otherwise                = fmap (x:) (replacePath xs)
+  replacePath []               = Nothing
 
   -- Simply adding the file to `PSCiConfig.fileGlobs` isn't sufficient; running
   -- ":reload" might not rebuild because the compiled JS artifact has a more
