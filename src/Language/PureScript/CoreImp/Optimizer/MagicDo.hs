@@ -79,7 +79,7 @@ magicDo effectModule C.EffectDictionaries{..} = everywhereTopDown convert
     fn = "$__f"
   -- Desugar foreachE
   convert (App _ (App _ (App s1 f [asArg]) [aToEff]) [])
-    | isEffFunc C.foreachE f =
+    | isEffFunc edForeach f =
     App s1 (Function s1 Nothing []
              (Block s1 [
                VariableIntroduction s1 as (Just asArg),
