@@ -78,8 +78,17 @@ magicDo effectModule C.EffectDictionaries{..} = everywhereTopDown convert
     hi = "$__hi"
     fn = "$__f"
   -- Desugar foreachE
-  convert (App _ (App _ (App s1 f [asArg]) [aToEff]) []) | isEffFunc C.foreachE f =
-    App s1 (Function s1 Nothing [] (Block s1 [VariableIntroduction s1 as (Just asArg), VariableIntroduction s1 fn (Just aToEff), VariableIntroduction s1 len Nothing, Assignment s1 (Var s1 len) (Indexer s1 (StringLiteral s1 "length") asVar), For s1 counter (NumericLiteral s1 $ Left 0) (Var s1 len) (Block s1 [App s1 (App s1 (Var s1 fn) [Indexer s1 (Var s1 counter) asVar]) []]), Return s1 $ ObjectLiteral s1 []])) []
+  convert (App _ (App _ (App s1 f [asArg]) [aToEff]) [])
+    | isEffFunc C.foreachE f =
+    App s1 (Function s1 Nothing []
+             (Block s1 [
+               VariableIntroduction s1 as (Just asArg),
+               VariableIntroduction s1 fn (Just aToEff),
+               VariableIntroduction s1 len Nothing,
+               Assignment s1 (Var s1 len) (Indexer s1 (StringLiteral s1 "length") asVar),
+               For s1 counter (NumericLiteral s1 $ Left 0) (Var s1 len)
+                   (Block s1 [App s1 (App s1 (Var s1 fn) [Indexer s1 (Var s1 counter) asVar]) []]),
+               Return s1 $ ObjectLiteral s1 []])) []
     where
     counter = "$__i"
     fn = "$__f"
