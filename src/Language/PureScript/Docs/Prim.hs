@@ -465,8 +465,8 @@ quoteDoc = primTypeOf (P.primSubName "TypeError") "Quote" $ T.unlines
 
 quoteLabelDoc :: Declaration
 quoteLabelDoc = primTypeOf (P.primSubName "TypeError") "QuoteLabel" $ T.unlines
-  [ "The QuoteLabel type constructor renders any Symbol as a syntactically valid label,"
-  , "escaping with quotes as needed."
+  [ "The `QuoteLabel` type constructor will produce a `Doc` when given a `Symbol`. When the resulting `Doc` is rendered "
+  , "for a `Warn` or `Fail` constraint, a syntactically valid label will be produces, escaping with quotes as needed."
   , ""
   , "For more information, see"
   , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
