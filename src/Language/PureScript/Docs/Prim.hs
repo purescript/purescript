@@ -442,7 +442,7 @@ kindDoc = primKindOf (P.primSubName "TypeError") "Doc" $ T.unlines
   [ "`Doc` is the kind of type-level documents."
   , ""
   , "This kind is used with the `Fail` and `Warn` type clases."
-  , "Build up a `Doc` with `Text`, `Quote`, `Beside`, and `Above`."
+  , "Build up a `Doc` with `Text`, `Quote`, `QuoteLabel`, `Beside`, and `Above`."
   ]
 
 textDoc :: Declaration
