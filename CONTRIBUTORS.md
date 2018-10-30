@@ -126,6 +126,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@sloosch](https://github.com/sloosch) | Simon Looschen | [MIT license](http://opensource.org/licenses/MIT) |
 | [@rgrinberg](https://github.com/rgrinberg) | Rudi Grinberg | [MIT license](http://opensource.org/licenses/MIT) |
 | [@gabejohnson](https://github.com/gabejohnson) | Gabe Johnson | [MIT license](http://opensource.org/licenses/MIT) |
+| [@dariooddenino](https://github.com/dariooddenino) | Dario Oddenino | [MIT license](http://opensource.org/licenses/MIT) |
 
 ### Contributors using Modified Terms
 

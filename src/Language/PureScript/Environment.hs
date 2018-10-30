@@ -449,6 +449,7 @@ primTypeErrorTypes =
     , (primSubName C.typeError "Warn", (kindDoc -:> kindConstraint, ExternData))
     , (primSubName C.typeError "Text", (kindSymbol -:> kindDoc, ExternData))
     , (primSubName C.typeError "Quote", (kindType -:> kindDoc, ExternData))
+    , (primSubName C.typeError "QuoteLabel", (kindSymbol -:> kindDoc, ExternData))
     , (primSubName C.typeError "Beside", (kindDoc -:> kindDoc -:> kindDoc, ExternData))
     , (primSubName C.typeError "Above", (kindDoc -:> kindDoc -:> kindDoc, ExternData))
     ]

@@ -1409,6 +1409,8 @@ toTypelevelString (TypeApp (TypeConstructor f) x)
   | f == primSubName C.typeError "Text" = toTypelevelString x
 toTypelevelString (TypeApp (TypeConstructor f) x)
   | f == primSubName C.typeError "Quote" = Just (typeAsBox x)
+toTypelevelString (TypeApp (TypeConstructor f) (TypeLevelString x))
+  | f == primSubName C.typeError "QuoteLabel" = Just . line . prettyPrintLabel . Label $ x
 toTypelevelString (TypeApp (TypeApp (TypeConstructor f) x) ret)
   | f == primSubName C.typeError "Beside" =
     (Box.<>) <$> toTypelevelString x <*> toTypelevelString ret

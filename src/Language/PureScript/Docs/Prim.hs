@@ -105,6 +105,7 @@ primTypeErrorDocsModule = Module
       , kindDoc
       , textDoc
       , quoteDoc
+      , quoteLabelDoc
       , besideDoc
       , aboveDoc
       ]
@@ -441,7 +442,7 @@ kindDoc = primKindOf (P.primSubName "TypeError") "Doc" $ T.unlines
   [ "`Doc` is the kind of type-level documents."
   , ""
   , "This kind is used with the `Fail` and `Warn` type clases."
-  , "Build up a `Doc` with `Text`, `Quote`, `Beside`, and `Above`."
+  , "Build up a `Doc` with `Text`, `Quote`, `QuoteLabel`, `Beside`, and `Above`."
   ]
 
 textDoc :: Declaration
@@ -457,6 +458,15 @@ quoteDoc :: Declaration
 quoteDoc = primTypeOf (P.primSubName "TypeError") "Quote" $ T.unlines
   [ "The Quote type constructor renders any concrete type as a Doc"
   , "to be used in a custom type error."
+  , ""
+  , "For more information, see"
+  , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
+  ]
+
+quoteLabelDoc :: Declaration
+quoteLabelDoc = primTypeOf (P.primSubName "TypeError") "QuoteLabel" $ T.unlines
+  [ "The `QuoteLabel` type constructor will produce a `Doc` when given a `Symbol`. When the resulting `Doc` is rendered"
+  , "for a `Warn` or `Fail` constraint, a syntactically valid label will be produced, escaping with quotes as needed."
   , ""
   , "For more information, see"
   , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
