@@ -3,6 +3,8 @@ module Language.PureScript.Options where
 
 import Prelude.Compat
 import qualified Data.Set as S
+import Data.Map (Map)
+import qualified Data.Map as Map
 
 -- | The data type of compiler options
 data Options = Options
@@ -20,3 +22,10 @@ defaultOptions = Options False False (S.singleton JS)
 
 data CodegenTarget = JS | JSSourceMap | CoreFn
   deriving (Eq, Ord, Show)
+
+codegenTargets :: Map String CodegenTarget
+codegenTargets = Map.fromList
+  [ ("js", JS)
+  , ("sourcemaps", JSSourceMap)
+  , ("corefn", CoreFn)
+  ]

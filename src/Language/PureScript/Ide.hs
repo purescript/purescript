@@ -94,10 +94,10 @@ handleCommand c = case c of
       Right rs' -> answerRequest outfp rs'
       Left question ->
         pure (CompletionResult (map (completionFromMatch . simpleExport . map withEmptyAnn) question))
-  Rebuild file actualFile ->
-    rebuildFileAsync file actualFile
-  RebuildSync file actualFile ->
-    rebuildFileSync file actualFile
+  Rebuild file actualFile targets ->
+    rebuildFileAsync file actualFile targets
+  RebuildSync file actualFile targets ->
+    rebuildFileSync file actualFile targets
   Cwd ->
     TextResult . T.pack <$> liftIO getCurrentDirectory
   Reset ->

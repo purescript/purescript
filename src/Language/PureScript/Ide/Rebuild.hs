@@ -42,10 +42,12 @@ rebuildFile
   -- ^ The file to rebuild
   -> Maybe FilePath
   -- ^ The file to use as the location for parsing and errors
+  -> Set P.CodegenTarget
+  -- ^ The targets to codegen
   -> (ReaderT IdeEnvironment (LoggingT IO) () -> m ())
   -- ^ A runner for the second build with open exports
   -> m Success
-rebuildFile file actualFile runOpenBuild = do
+rebuildFile file actualFile codegenTargets runOpenBuild = do
 
   input <- ideReadFile file
 
@@ -69,7 +71,7 @@ rebuildFile file actualFile runOpenBuild = do
   -- Rebuild the single module using the cached externs
   (result, warnings) <- logPerf (labelTimespec "Rebuilding Module") $
     liftIO
-    . P.runMake P.defaultOptions
+    . P.runMake (P.defaultOptions { P.optionsCodegenTargets = codegenTargets })
     . P.rebuildModule (buildMakeActions
                         >>= shushProgress $ makeEnv) externs $ m
   case result of
@@ -87,8 +89,8 @@ isEditorMode = asks (confEditorMode . ideConfiguration)
 
 rebuildFileAsync
   :: forall m. (Ide m, MonadLogger m, MonadError IdeError m)
-  => FilePath -> Maybe FilePath -> m Success
-rebuildFileAsync fp fp' = rebuildFile fp fp' asyncRun
+  => FilePath -> Maybe FilePath -> Set P.CodegenTarget -> m Success
+rebuildFileAsync fp fp' ts = rebuildFile fp fp' ts asyncRun
   where
     asyncRun :: ReaderT IdeEnvironment (LoggingT IO) () -> m ()
     asyncRun action = do
@@ -98,8 +100,8 @@ rebuildFileAsync fp fp' = rebuildFile fp fp' asyncRun
 
 rebuildFileSync
   :: forall m. (Ide m, MonadLogger m, MonadError IdeError m)
-  => FilePath -> Maybe FilePath -> m Success
-rebuildFileSync fp fp' = rebuildFile fp fp' syncRun
+  => FilePath -> Maybe FilePath -> Set P.CodegenTarget -> m Success
+rebuildFileSync fp fp' ts = rebuildFile fp fp' ts syncRun
   where
     syncRun :: ReaderT IdeEnvironment (LoggingT IO) () -> m ()
     syncRun action = do

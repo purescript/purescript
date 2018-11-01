@@ -17,6 +17,8 @@ module Language.PureScript.Ide.Command where
 import           Protolude
 
 import           Data.Aeson
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 import qualified Language.PureScript               as P
 import           Language.PureScript.Ide.CaseSplit
 import           Language.PureScript.Ide.Completion
@@ -57,8 +59,8 @@ data Command
       -- Import InputFile OutputFile
     | Import FilePath (Maybe FilePath) [Filter] ImportCommand
     | List { listType :: ListType }
-    | Rebuild FilePath (Maybe FilePath)
-    | RebuildSync FilePath (Maybe FilePath)
+    | Rebuild FilePath (Maybe FilePath) (Set P.CodegenTarget)
+    | RebuildSync FilePath (Maybe FilePath) (Set P.CodegenTarget)
     | Cwd
     | Reset
     | Quit
@@ -172,7 +174,11 @@ instance FromJSON Command where
         Rebuild
           <$> params .: "file"
           <*> params .:? "actualFile"
+          <*> (parseCodegenTargets =<< params .:? "codegen" .!= [ "js" ])
       _ -> mzero
     where
+      parseCodegenTargets =
+        maybe mzero (pure . Set.fromList) . traverse (flip Map.lookup P.codegenTargets)
+
       mkAnnotations True = explicitAnnotations
       mkAnnotations False = noAnnotations
