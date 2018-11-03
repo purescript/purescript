@@ -135,22 +135,15 @@ codegenTargets = Opts.option targetParser $
       <> " The default target is 'js', but if this option is used only the targets specified will be used."
       )
 
-targets :: M.Map String P.CodegenTarget
-targets = M.fromList
-  [ ("js", P.JS)
-  , ("sourcemaps", P.JSSourceMap)
-  , ("corefn", P.CoreFn)
-  ]
-
 targetsMessage :: String
-targetsMessage = "Accepted codegen targets are '" <> intercalate "', '" (M.keys targets) <> "'."
+targetsMessage = "Accepted codegen targets are '" <> intercalate "', '" (M.keys P.codegenTargets) <> "'."
 
 targetParser :: Opts.ReadM [P.CodegenTarget]
 targetParser =
   Opts.str >>= \s ->
     for (T.split (== ',') s)
       $ maybe (Opts.readerError targetsMessage) pure
-      . flip M.lookup targets
+      . flip M.lookup P.codegenTargets
       . T.unpack
       . T.strip
 

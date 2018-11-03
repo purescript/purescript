@@ -44,7 +44,7 @@ import           Language.PureScript.Errors
 import           Language.PureScript.Make.Monad
 import           Language.PureScript.Names
 import           Language.PureScript.Names (runModuleName, ModuleName)
-import           Language.PureScript.Options
+import           Language.PureScript.Options hiding (codegenTargets)
 import qualified Language.PureScript.Parser as PSParser
 import           Language.PureScript.Pretty.Common (SMap(..))
 import qualified Paths_purescript as Paths

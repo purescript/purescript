@@ -4,7 +4,8 @@ module Language.PureScript.Ide.CompletionSpec where
 
 import Protolude
 
-import Language.PureScript as P
+import qualified Data.Set as Set
+import qualified Language.PureScript as P
 import Language.PureScript.Ide.Test as Test
 import Language.PureScript.Ide.Command as Command
 import Language.PureScript.Ide.Completion
@@ -30,7 +31,7 @@ load :: [Text] -> Command
 load = LoadSync . map Test.mn
 
 rebuildSync :: FilePath -> Command
-rebuildSync fp = RebuildSync ("src" </> fp) Nothing
+rebuildSync fp = RebuildSync ("src" </> fp) Nothing (Set.singleton P.JS)
 
 spec :: Spec
 spec = describe "Applying completion options" $ do

@@ -372,13 +372,17 @@ Arguments:
   - `actualFile :: Maybe String` Specifies the path to be used for location
     information and parse errors. This is useful in case a temp file is used as
     the source for a rebuild.
+  - `codegen :: Maybe [String]` Specified the codegen targets the
+    rebuild should produce. Uses the same target names as the command
+    line compiler. Defaults to just JS output
 
 ```json
 {
   "command": "rebuild",
   "params": {
-    "file": "/path/to/file.purs"
-    "actualFile": "/path/to/actualFile.purs"
+    "file": "/path/to/file.purs",
+    "actualFile": "/path/to/actualFile.purs",
+    "codegen": ["js", "corefn"]
   }
 }
 ```
