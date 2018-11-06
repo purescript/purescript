@@ -318,19 +318,19 @@ command = loop <$> options
           unless (supportModuleIsDefined (map snd modules)) . liftIO $ do
             putStr supportModuleMessage
             exitFailure
-          (externs, env) <- ExceptT . runMake . make $ modules
-          return (modules, externs, env)
+          (externs, _) <- ExceptT . runMake . make $ modules
+          return (modules, externs)
         case psciBackend of
           Backend setup eval reload (shutdown :: state -> IO ()) ->
             case e of
               Left errs -> do
                 pwd <- getCurrentDirectory
                 putStrLn (P.prettyPrintMultipleErrors P.defaultPPEOptions {P.ppeRelativeDirectory = pwd} errs) >> exitFailure
-              Right (modules, externs, env) -> do
+              Right (modules, externs) -> do
                 historyFilename <- getHistoryFilename
                 let settings = defaultSettings { historyFile = Just historyFilename }
                     initialState = updateLoadedExterns (const (zip (map snd modules) externs)) initialPSCiState
-                    config = PSCiConfig psciInputGlob env
+                    config = PSCiConfig psciInputGlob
                     runner = flip runReaderT config
                              . flip evalStateT initialState
                              . runInputT (setComplete completion settings)

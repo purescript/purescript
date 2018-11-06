@@ -22,7 +22,8 @@ extra-source-files:
   - tests/purs/**/*.json
   - tests/support/*.json
   - tests/support/setup-win.cmd
-  - tests/support/psci/*.purs
+  - tests/support/psci/**.purs
+  - tests/support/psci/**.edit
   - tests/support/pscide/src/**/*.purs
   - tests/support/pscide/src/**/*.js
   - tests/support/pscide/src/**/*.fail

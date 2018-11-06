@@ -291,7 +291,7 @@ handleBrowse
   -> m ()
 handleBrowse print' moduleName = do
   st <- get
-  env <- asks psciEnvironment
+  let env = psciEnvironment st
   case findMod moduleName (psciLoadedExterns st) (psciImportedModules st) of
     Just qualName -> print' $ printModuleSignatures qualName env
     Nothing       -> failNotInEnv moduleName

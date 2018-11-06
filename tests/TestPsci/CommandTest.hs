@@ -1,10 +1,16 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module TestPsci.CommandTest where
 
 import Prelude ()
 import Prelude.Compat
 
+import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.RWS.Strict (get)
+import Language.PureScript (moduleNameFromString)
 import Language.PureScript.Interactive
+import System.FilePath ((</>))
+import System.Directory (getCurrentDirectory)
 import Test.Hspec
 import TestPsci.TestEnv
 
@@ -42,5 +48,20 @@ commandTests = context "commandTests" $ do
     ":complete M.a" `prints` unlines ["M.ap", "M.apply"]
 
   specPSCi ":browse" $ do
+    ":browse Data.Void" `printed` flip shouldContain "data Void"
+    ":browse Data.Void" `printed` flip shouldContain "absurd ::"
+
+  specPSCi ":reload, :browse" $ do
+    cwd <- liftIO getCurrentDirectory
+    let new = cwd </> "tests" </> "support" </> "psci" </> "Reload.edit"
+
+    ":browse Reload" `printed` flip shouldContain    "reload ::"
+    ":browse Reload" `printed` flip shouldNotContain "edited ::"
+
+    simulateModuleEdit (moduleNameFromString "Reload") new $ do
+      run ":reload"
+      ":browse Reload" `printed` flip shouldNotContain "reload ::"
+      ":browse Reload" `printed` flip shouldContain    "edited ::"
+
     ":browse Mirp" `printed` flip shouldContain "is not valid"
     ":browse Prim" `printed` flip shouldContain "class Partial"

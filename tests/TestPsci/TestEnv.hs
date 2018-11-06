@@ -1,16 +1,21 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module TestPsci.TestEnv where
 
 import Prelude ()
 import Prelude.Compat
 
-import           Control.Monad (void)
+import           Control.Exception.Lifted (bracket_)
+import           Control.Monad (void, when)
 import           Control.Monad.IO.Class (liftIO)
-import           Control.Monad.Trans.RWS.Strict (evalRWST, RWST)
+import           Control.Monad.Trans.RWS.Strict (evalRWST, asks, local, RWST)
+import           Data.List (isSuffixOf)
+import qualified Data.Text as T
 import qualified Language.PureScript as P
 import           Language.PureScript.Interactive
-import           System.Directory (getCurrentDirectory)
+import           System.Directory (getCurrentDirectory, doesPathExist, removeFile)
 import           System.Exit
-import           System.FilePath ((</>))
+import           System.FilePath ((</>), pathSeparator)
 import qualified System.FilePath.Glob as Glob
 import           System.Process (readProcessWithExitCode)
 import           Test.Hspec (shouldBe, Expectation)
@@ -23,9 +28,10 @@ initTestPSCiEnv :: IO (PSCiState, PSCiConfig)
 initTestPSCiEnv = do
   -- Load test support packages
   cwd <- getCurrentDirectory
-  let supportDir = cwd </> "tests" </> "support" </> "bower_components"
-  let supportFiles ext = Glob.globDir1 (Glob.compile ("purescript-*/src/**/*." ++ ext)) supportDir
-  pursFiles <- supportFiles "purs"
+  let supportDir = cwd </> "tests" </> "support"
+  psciFiles <- Glob.globDir1 (Glob.compile "**/*.purs") (supportDir </> "psci")
+  libraries <- Glob.globDir1 (Glob.compile "purescript-*/src/**/*.purs") (supportDir </> "bower_components")
+  let pursFiles = psciFiles ++ libraries
   modulesOrError <- loadAllModules pursFiles
   case modulesOrError of
     Left err ->
@@ -35,8 +41,8 @@ initTestPSCiEnv = do
       makeResultOrError <- runMake . make $ modules
       case makeResultOrError of
         Left errs -> putStrLn (P.prettyPrintMultipleErrors P.defaultPPEOptions errs) >> exitFailure
-        Right (externs, env) ->
-          return (updateLoadedExterns (const (zip (map snd modules) externs)) initialPSCiState, PSCiConfig pursFiles env)
+        Right (externs, _) ->
+          return (updateLoadedExterns (const (zip (map snd modules) externs)) initialPSCiState, PSCiConfig pursFiles)
 
 -- | Execute a TestPSCi, returning IO
 execTestPSCi :: TestPSCi a -> IO a
@@ -71,9 +77,8 @@ runAndEval comm jsOutputEval textOutputEval =
 
 -- | Run a PSCi command, evaluate compiled JS, and ignore evaluation output and printed output
 run :: String -> TestPSCi ()
-run comm = runAndEval comm evalJsAndIgnore ignorePrinted
+run comm = runAndEval comm (void jsEval) ignorePrinted
   where
-    evalJsAndIgnore = jsEval *> return ()
     ignorePrinted _ = return ()
 
 -- | A lifted evaluation of Hspec 'shouldBe' for the TestPSCi
@@ -95,3 +100,29 @@ prints command expected = printed command (`shouldBe` expected)
 
 printed :: String -> (String -> Expectation) -> TestPSCi ()
 printed command f = runAndEval command (void jsEval) (liftIO . f)
+
+simulateModuleEdit :: P.ModuleName -> FilePath -> TestPSCi a -> TestPSCi a
+simulateModuleEdit mn newPath action = do
+  ms <- asks psciFileGlobs
+  case replacePath ms of
+    Nothing  -> fail $ "Did not find " ++ inputPath ++ " in psciFileGlobs"
+    Just xs' -> local (\c -> c { psciFileGlobs = xs' }) temporarily <* rebuild
+
+  where
+  outputPath = modulesDir </> T.unpack (P.runModuleName mn) </> "index.js"
+  inputPath  = T.unpack (T.replace "." slash (P.runModuleName mn)) ++ ".purs"
+  slash      = T.singleton pathSeparator
+
+  replacePath :: [String] -> Maybe [String]
+  replacePath (x:xs)
+    | inputPath `isSuffixOf` x = Just (newPath : xs)
+    | otherwise                = fmap (x:) (replacePath xs)
+  replacePath []               = Nothing
+
+  -- Simply adding the file to `PSCiConfig.fileGlobs` isn't sufficient; running
+  -- ":reload" might not rebuild because the compiled JS artifact has a more
+  -- recent timestamp than the "new" source file `newPath`.
+  temporarily   = bracket_ enableRebuild enableRebuild action
+  enableRebuild = liftIO $ do { b <- doesPathExist outputPath; when b (removeFile outputPath) }
+  rebuild       = handleCommand discard (return ()) discard ReloadState
+  discard _     = return ()
