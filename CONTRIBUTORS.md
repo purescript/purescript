@@ -93,7 +93,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@pseudonom](https://github.com/pseudonom) | Eric Easley | [MIT license](http://opensource.org/licenses/MIT) |
 | [@quesebifurcan](https://github.com/quesebifurcan) | Fredrik Wallberg | [MIT license](http://opensource.org/licenses/MIT) |
 | [@rightfold](https://github.com/rightfold) | rightfold | [MIT license](https://opensource.org/licenses/MIT) |
-| [@rndnoise](https://github.com/rndnoise) | rndnoise | [MIT license](http://opensource.org/licenses/MIT) |
+| [@rndnoise](https://www.github.com/rndnoise) | rndnoise | [MIT license](http://opensource.org/licenses/MIT) |
 | [@robdaemon](https://github.com/robdaemon) | Robert Roland | [MIT license](http://opensource.org/licenses/MIT) |
 | [@RossMeikleham](https://github.com/RossMeikleham) | Ross Meikleham | [MIT license](http://opensource.org/licenses/MIT) |
 | [@Rufflewind](https://github.com/Rufflewind) | Phil Ruffwind | [MIT license](https://opensource.org/licenses/MIT) |
