@@ -292,7 +292,7 @@ nodeBackend nodePath nodeArgs = Backend setup eval reload shutdown
       case result of
         Just (ExitSuccess, out, _)   -> putStrLn out
         Just (ExitFailure _, _, err) -> putStrLn err
-        Nothing                      -> putStrLn "Couldn't find node.js"
+        Nothing                      -> putStrLn "Could not find node.js. Do you have node.js installed and available in your PATH?"
 
     reload :: () -> IO ()
     reload _ = return ()
