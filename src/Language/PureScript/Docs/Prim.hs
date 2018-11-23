@@ -203,8 +203,7 @@ primClassOf gen title comments = Declaration
 
 kindType :: Declaration
 kindType = primKind "Type" $ T.unlines
-  [ "`Type` (also known as `*`) is the kind of all proper types: those that"
-  , "classify value-level terms."
+  [ "`Type` is the kind of all proper types: those that classify value-level terms."
   , "For example the type `Boolean` has kind `Type`; denoted by `Boolean :: Type`."
   ]
 
