@@ -528,7 +528,7 @@ primRowClasses =
         , ("row", Just (kindRow kindType))
         ] [] [] [])
 
-    -- class Contains (label :: Symbol) (row :: # Type) (result :: Boolean)
+    -- class Contains (label :: Symbol) (row :: # Type) (result :: Boolean) | label row -> result
     , (primSubName C.moduleRow "Contains", makeTypeClassData
         [ ("label", Just kindSymbol)
         , ("row", Just (kindRow kindType))
