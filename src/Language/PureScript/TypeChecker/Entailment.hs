@@ -501,20 +501,25 @@ entails SolverOptions{..} constraint context hints =
             _ -> (not (null fixed), Just [ srcConstraint C.RowLacks [srcTypeLevelString sym, rest] Nothing ])
 
     solveRowContains :: [SourceType] -> Maybe [TypeClassDict]
-    solveRowContains [TypeLevelString _ sym, r, _] =
+    solveRowContains [TypeLevelString _ sym, r, _] = do
+        result <- rowContains sym r
         pure [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowContains [srcTypeLevelString sym, r, result] Nothing ]
-      where
-        result = rowContains sym r
     solveRowContains _ = Nothing
 
-    rowContains :: PSString -> SourceType -> SourceType
+    rowContains :: PSString -> SourceType -> Maybe SourceType
     rowContains sym r =
-      TypeConstructor NullSourceAnn $ if hasSym
-        then C.booleanTrue
-        else C.booleanFalse
+      result
       where
-        (rl, _) = rowToList r
+        (rl, rest) = rowToList r
         hasSym = sym `elem` (runLabel . rowListLabel <$> rl)
+        currentResult =
+          TypeConstructor NullSourceAnn $ if hasSym
+            then C.booleanTrue
+            else C.booleanFalse
+
+        result = case rest of
+            REmpty _ -> Just currentResult
+            _ -> Nothing
 
 -- Check if an instance matches our list of types, allowing for types
 -- to be solved via functional dependencies. If the types match, we return a
