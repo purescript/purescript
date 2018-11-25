@@ -501,14 +501,14 @@ entails SolverOptions{..} constraint context hints =
             _ -> (not (null fixed), Just [ srcConstraint C.RowLacks [srcTypeLevelString sym, rest] Nothing ])
 
     solveRowContains :: [SourceType] -> Maybe [TypeClassDict]
-    solveRowContains [TypeLevelString _ sym, r, _] = do
-        result <- rowContains sym r
-        pure [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowContains [srcTypeLevelString sym, r, result] Nothing ]
+    solveRowContains [TypeLevelString _ sym, r, inferred] = do
+        (result, cst) <- rowContains sym r inferred
+        pure [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowContains [srcTypeLevelString sym, r, result] cst ]
     solveRowContains _ = Nothing
 
-    rowContains :: PSString -> SourceType -> Maybe SourceType
-    rowContains sym r =
-      result
+    rowContains :: PSString -> SourceType -> SourceType -> Maybe (SourceType, Maybe [SourceConstraint])
+    rowContains sym r inferred =
+      guard canMakeProgress $> (result, cst)
       where
         (rl, rest) = rowToList r
         hasSym = sym `elem` (runLabel . rowListLabel <$> rl)
@@ -517,9 +517,9 @@ entails SolverOptions{..} constraint context hints =
             then C.booleanTrue
             else C.booleanFalse
 
-        result = case rest of
-            REmpty _ -> Just currentResult
-            _ -> Nothing
+        (canMakeProgress, result, cst) = case rest of
+            REmpty _ -> (True, currentResult, Nothing)
+            _ -> (not (null rl), inferred, Just [ srcConstraint C.RowContains [srcTypeLevelString sym, rest, inferred] Nothing ])
 
 -- Check if an instance matches our list of types, allowing for types
 -- to be solved via functional dependencies. If the types match, we return a
