@@ -17,6 +17,7 @@ import qualified Language.PureScript as P
 primModules :: [Module]
 primModules =
   [ primDocsModule
+  , primBooleanDocsModule
   , primOrderingDocsModule
   , primRowDocsModule
   , primRowListDocsModule
@@ -44,10 +45,22 @@ primDocsModule = Module
   , modReExports = []
   }
 
+primBooleanDocsModule :: Module
+primBooleanDocsModule = Module
+  { modName = P.moduleNameFromString "Prim.Boolean"
+  , modComments = Just "The Prim.Boolean module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains a type level `Boolean` data structure."
+  , modDeclarations =
+      [ kindBoolean
+      , booleanTrue
+      , booleanFalse
+      ]
+  , modReExports = []
+  }
+
 primOrderingDocsModule :: Module
 primOrderingDocsModule = Module
   { modName = P.moduleNameFromString "Prim.Ordering"
-  , modComments = Just "The Prim.Row module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains a type level `Ordering` data structure."
+  , modComments = Just "The Prim.Ordering module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains a type level `Ordering` data structure."
   , modDeclarations =
       [ kindOrdering
       , orderingLT
@@ -153,6 +166,7 @@ lookupPrimTypeKindOf
   -> P.Kind
 lookupPrimTypeKindOf k = fst . unsafeLookupOf k
   ( P.primTypes <>
+    P.primBooleanTypes <>
     P.primOrderingTypes <>
     P.primRowTypes <>
     P.primRowListTypes <>
@@ -327,6 +341,21 @@ partial = primClass "Partial" $ T.unlines
   , "thrown, although it is not safe to assume that this will happen in all"
   , "cases. For more information, see"
   , "[the Partial type class guide](https://github.com/purescript/documentation/blob/master/guides/The-Partial-type-class.md)."
+  ]
+
+kindBoolean :: Declaration
+kindBoolean = primKindOf (P.primSubName "Boolean") "Boolean" $ T.unlines
+  [ "The `Boolean` kind provides True/False types at the type level"
+  ]
+
+booleanTrue :: Declaration
+booleanTrue = primTypeOf (P.primSubName "Boolean") "True" $ T.unlines
+  [ "The 'True' boolean type."
+  ]
+
+booleanFalse :: Declaration
+booleanFalse = primTypeOf (P.primSubName "Boolean") "False" $ T.unlines
+  [ "The 'False' boolean type."
   ]
 
 kindOrdering :: Declaration

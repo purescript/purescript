@@ -20,6 +20,7 @@ main = do
         -- note that prim type classes are listed in P.primTypes
         (map (P.runProperName . P.disqualify . fst) $ Map.toList
           ( P.primTypes <>
+            P.primBooleanTypes <>
             P.primOrderingTypes <>
             P.primRowTypes <>
             P.primRowListTypes <>

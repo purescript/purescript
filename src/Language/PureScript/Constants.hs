@@ -387,6 +387,17 @@ pattern Partial = Qualified (Just Prim) (ProperName "Partial")
 pattern Record :: Qualified (ProperName 'TypeName)
 pattern Record = Qualified (Just Prim) (ProperName "Record")
 
+-- Prim.Boolean
+
+pattern PrimBoolean :: ModuleName
+pattern PrimBoolean = ModuleName [ProperName "Prim", ProperName "Boolean"]
+
+booleanTrue :: Qualified (ProperName 'TypeName)
+booleanTrue = Qualified (Just PrimBoolean) (ProperName "True")
+
+booleanFalse :: Qualified (ProperName 'TypeName)
+booleanFalse = Qualified (Just PrimBoolean) (ProperName "False")
+
 -- Prim.Ordering
 
 pattern PrimOrdering :: ModuleName
@@ -458,7 +469,7 @@ pattern Warn :: Qualified (ProperName 'ClassName)
 pattern Warn = Qualified (Just PrimTypeError) (ProperName "Warn")
 
 primModules :: [ModuleName]
-primModules = [Prim, PrimOrdering, PrimRow, PrimRowList, PrimSymbol, PrimTypeError]
+primModules = [Prim, PrimBoolean, PrimOrdering, PrimRow, PrimRowList, PrimSymbol, PrimTypeError]
 
 -- Data.Symbol
 
@@ -470,6 +481,9 @@ pattern IsSymbol = Qualified (Just DataSymbol) (ProperName "IsSymbol")
 
 typ :: forall a. (IsString a) => a
 typ = "Type"
+
+kindBoolean :: forall a. (IsString a) => a
+kindBoolean = "Boolean"
 
 kindOrdering :: forall a. (IsString a) => a
 kindOrdering = "Ordering"
@@ -487,6 +501,9 @@ doc = "Doc"
 
 prim :: forall a. (IsString a) => a
 prim = "Prim"
+
+moduleBoolean :: forall a. (IsString a) => a
+moduleBoolean = "Boolean"
 
 moduleOrdering :: forall a. (IsString a) => a
 moduleOrdering = "Ordering"
