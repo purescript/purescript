@@ -28,7 +28,11 @@ primModules =
 primDocsModule :: Module
 primDocsModule = Module
   { modName = P.moduleNameFromString "Prim"
-  , modComments = Just "The Prim module is embedded in the PureScript compiler in order to provide compiler support for certain types &mdash; for example, value literals, or syntax sugar. It is implicitly imported unqualified in every module except those that list it as a qualified import."
+  , modComments = Just $ T.unlines
+      [ "The `Prim` module is embedded in the PureScript compiler in order to provide compiler support for certain types &mdash; for example, value literals, or syntax sugar. It is implicitly imported unqualified in every module except those that list it as a qualified import."
+      , ""
+      , "`Prim` does not include additional built-in types and kinds that are defined deeper in the compiler. For example, the Row kind (i.e. `(name :: String, age :: Int)`, which has kind `# Type`), Type wildcards (e.g. `functionTypeSignature :: _ -> Int`), and Quantified Types. Rather, these are documented in the language reference [here](https://github.com/purescript/documentation/blob/master/language/Types.md)."
+      ]
   , modDeclarations =
       [ function
       , array
