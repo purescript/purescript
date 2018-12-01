@@ -58,6 +58,8 @@ data PublishOptions = PublishOptions
   , publishGetTagTime :: Text -> PrepareM UTCTime
   , -- | What to do when the working tree is dirty
     publishWorkingTreeDirty :: PrepareM ()
+  , publishCheckLicense :: PackageMeta -> PrepareM ()
+  , publishGetRepoInfo :: PackageMeta -> PrepareM (D.GithubUser, D.GithubRepo)
   }
 
 defaultPublishOptions :: PublishOptions
@@ -65,6 +67,8 @@ defaultPublishOptions = PublishOptions
   { publishGetVersion = getVersionFromGitTag
   , publishGetTagTime = getTagTime
   , publishWorkingTreeDirty = userError DirtyWorkingTree
+  , publishCheckLicense = checkLicense
+  , publishGetRepoInfo = getManifestRepositoryInfo
   }
 
 -- | Attempt to retrieve package metadata from the current directory.
@@ -125,14 +129,15 @@ preparePackage' manifestFile resolutionsFile opts = do
 
   pkgMeta <- liftIO (Bower.decodeFile manifestFile)
                     >>= flip catchLeft (userError . CouldntDecodePackageManifest)
-  checkLicense pkgMeta
+  publishCheckLicense opts pkgMeta
 
   (pkgVersionTag, pkgVersion) <- publishGetVersion opts
   pkgTagTime                  <- Just <$> publishGetTagTime opts pkgVersionTag
-  pkgGithub                   <- getManifestRepositoryInfo pkgMeta
+  pkgGithub                   <- publishGetRepoInfo opts pkgMeta
 
   let declaredDeps = map fst (bowerDependencies pkgMeta ++
                               bowerDevDependencies pkgMeta)
+
   resolvedDeps                <- getResolvedDependencies resolutionsFile declaredDeps
 
   (pkgModules, pkgModuleMap)  <- getModules (map (second fst) resolvedDeps)
