@@ -53,14 +53,14 @@ createTemporaryModule exec st val =
     supportImport = (supportModuleName, P.Implicit, Just (P.ModuleName [P.ProperName "$Support"]))
     eval          = P.Var internalSpan (P.Qualified (Just (P.ModuleName [P.ProperName "$Support"])) (P.Ident "eval"))
     mainValue     = P.App eval (P.Var internalSpan (P.Qualified Nothing (P.Ident "it")))
-    itDecl        = P.ValueDecl (internalSpan, []) (P.Ident "it") P.Public [] [P.MkUnguarded val]
+    itDecl        = P.ValueDecl (internalSpan, []) Nothing (P.Ident "it") P.Public [] [P.MkUnguarded val]
     typeDecl      = P.TypeDeclaration
                       (P.TypeDeclarationData (internalSpan, []) (P.Ident "$main")
                         (P.TypeApp
                           (P.TypeConstructor
                             (P.Qualified (Just (P.ModuleName [P.ProperName "$Effect"])) (P.ProperName "Effect")))
                                   (P.TypeWildcard internalSpan)))
-    mainDecl      = P.ValueDecl (internalSpan, []) (P.Ident "$main") P.Public [] [P.MkUnguarded mainValue]
+    mainDecl      = P.ValueDecl (internalSpan, []) Nothing (P.Ident "$main") P.Public [] [P.MkUnguarded mainValue]
     decls         = if exec then [itDecl, typeDecl, mainDecl] else [itDecl]
   in
     P.Module internalSpan

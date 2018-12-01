@@ -10,6 +10,7 @@ module Language.PureScript.Sugar.TypeClasses
 
 import Prelude.Compat
 
+import           Control.Applicative ((<|>))
 import           Control.Arrow (first, second)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.State
@@ -195,7 +196,7 @@ desugarDecl mn exps = go
   go d@(TypeInstanceDeclaration sa _ _ name deps className tys (NewtypeInstanceWithDictionary dict)) = do
     let dictTy = foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
         constrainedTy = quantify (foldr ConstrainedType dictTy deps)
-    return (expRef name className tys, [d, ValueDecl sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]])
+    return (expRef name className tys, [d, ValueDecl sa Nothing name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]])
   go other = return (Nothing, [other])
 
   expRef :: Ident -> Qualified (ProperName 'ClassName) -> [Type] -> Maybe DeclarationRef
@@ -257,7 +258,7 @@ typeClassMemberToDictionaryAccessor
   -> Declaration
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarationData sa ident ty)) =
   let className = Qualified (Just mn) name
-  in ValueDecl sa ident Private [] $
+  in ValueDecl sa Nothing ident Private [] $
     [MkUnguarded (
      TypedValue False (TypeClassDictionaryAccessor className ident) $
        moveQuantifiersToFront (quantify (ConstrainedType (Constraint className (map (TypeVar . fst) args) Nothing) ty))
@@ -296,7 +297,9 @@ typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
     hd : tl -> throwError . errorMessage' ss $ MissingClassMember (hd NEL.:| tl)
     [] -> do
       -- Create values for the type instance members
-      members <- zip (map typeClassMemberName decls) <$> traverse (memberToValue memberTypes) decls
+      members <- traverse (desugarMember memberTypes) decls
+      let memberDeclarations = fst <$> members
+      let memberAssignments = snd <$> members
 
       -- Create the type of the dictionary
       -- The type is a record type, but depending on type instance dependencies, may be constrained.
@@ -306,21 +309,36 @@ typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
             | (Constraint superclass suTyArgs _) <- typeClassSuperclasses
             , let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
             ]
+      supers <- traverse desugarSuper superclasses
+      let superDeclarations = fst <$> supers
+      let superAssignments = snd <$> supers
 
-      let props = Literal ss $ ObjectLiteral $ map (first mkString) (members ++ superclasses)
+      let props = Literal ss $ ObjectLiteral $ map (first mkString) (memberAssignments ++ superAssignments)
           dictTy = foldl TypeApp (TypeConstructor (fmap coerceProperName className)) tys
           constrainedTy = quantify (foldr ConstrainedType dictTy deps)
-          dict = TypeClassDictionaryConstructorApp className props
-          result = ValueDecl sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]
+          buildObject = Let FromWhere (memberDeclarations ++ superDeclarations) props
+          dict = TypeClassDictionaryConstructorApp className buildObject
+          result = ValueDecl sa Nothing name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]
+
       return result
 
   where
 
-  memberToValue :: [(Ident, Type)] -> Declaration -> Desugar m Expr
-  memberToValue tys' (ValueDecl (ss', _) ident _ [] [MkUnguarded val]) = do
-    _ <- maybe (throwError . errorMessage' ss' $ ExtraneousClassMember ident className) return $ lookup ident tys'
-    return val
-  memberToValue _ _ = internalError "Invalid declaration in type instance definition"
+  desugarMember :: [(Ident, Type)] -> Declaration -> Desugar m (Declaration, (Text, Expr))
+  desugarMember tys' (ValueDecl (ss', sc') publicName ident nameKind [] [MkUnguarded val]) = do
+    memberTy <- maybe (throwError . errorMessage' ss' $ ExtraneousClassMember ident className) return $ lookup ident tys'
+    freshId <- freshIdent (runIdent ident)
+    let letEntry = ValueDecl (ss', sc') (publicName <|> Just ident) freshId nameKind [] [MkUnguarded (TypedValue True val memberTy)]
+    let dictEntry = (runIdent ident, Var nullSourceSpan (Qualified Nothing freshId))
+    return (letEntry, dictEntry)
+  desugarMember _ _ = internalError "Invalid declaration in type instance definition"
+
+  desugarSuper :: (Text, Expr) -> Desugar m (Declaration, (Text, Expr))
+  desugarSuper (superName, val) = do
+    freshId <- freshIdent superName
+    let letEntry = ValueDecl (nullSourceSpan, mempty) (Just (Ident superName)) freshId Public [] [MkUnguarded val]
+    let dictEntry = (superName, Var nullSourceSpan (Qualified Nothing freshId))
+    return (letEntry, dictEntry)
 
 declIdent :: Declaration -> Maybe Ident
 declIdent (ValueDeclaration vd) = Just (valdeclIdent vd)

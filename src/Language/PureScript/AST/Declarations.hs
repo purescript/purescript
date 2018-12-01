@@ -452,6 +452,8 @@ unwrapTypeDeclaration td = (tydeclIdent td, tydeclType td)
 -- In this example @double@ is the identifier, @x@ is a binder and @x + x@ is the expression.
 data ValueDeclarationData a = ValueDeclarationData
   { valdeclSourceAnn :: !SourceAnn
+  , valdeclPublicName :: !(Maybe Ident)
+  -- ^ The declared value's name - renders instead of valdeclIdent
   , valdeclIdent :: !Ident
   -- ^ The declared value's name
   , valdeclName :: !NameKind
@@ -467,9 +469,9 @@ getValueDeclaration :: Declaration -> Maybe (ValueDeclarationData [GuardedExpr])
 getValueDeclaration (ValueDeclaration d) = Just d
 getValueDeclaration _ = Nothing
 
-pattern ValueDecl :: SourceAnn -> Ident -> NameKind -> [Binder] -> [GuardedExpr] -> Declaration
-pattern ValueDecl sann ident name binders expr
-  = ValueDeclaration (ValueDeclarationData sann ident name binders expr)
+pattern ValueDecl :: SourceAnn -> Maybe Ident -> Ident -> NameKind -> [Binder] -> [GuardedExpr] -> Declaration
+pattern ValueDecl sann publicName ident name binders expr
+  = ValueDeclaration (ValueDeclarationData sann publicName ident name binders expr)
 
 -- |
 -- The data type of declarations

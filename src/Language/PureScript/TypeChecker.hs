@@ -272,14 +272,14 @@ typeCheckAll moduleName _ = traverse go
     return $ TypeSynonymDeclaration sa name args ty
   go TypeDeclaration{} =
     internalError "Type declarations should have been removed before typeCheckAlld"
-  go (ValueDecl sa@(ss, _) name nameKind [] [MkUnguarded val]) = do
+  go (ValueDecl sa@(ss, _) publicName name nameKind [] [MkUnguarded val]) = do
     env <- getEnv
     warnAndRethrow (addHint (ErrorInValueDeclaration name) . addHint (positionedError ss)) $ do
       val' <- checkExhaustiveExpr ss env moduleName val
       valueIsNotDefined moduleName name
       [(_, (val'', ty))] <- typesOf NonRecursiveBindingGroup moduleName [((sa, name), val')]
       addValue moduleName name ty nameKind
-      return $ ValueDecl sa name nameKind [] [MkUnguarded val'']
+      return $ ValueDecl sa publicName name nameKind [] [MkUnguarded val'']
   go ValueDeclaration{} = internalError "Binders were not desugared"
   go BoundValueDeclaration{} = internalError "BoundValueDeclaration should be desugared"
   go (BindingGroupDeclaration vals) = do

@@ -63,7 +63,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
       in NonRec (ssA ss) (properToIdent ctor) $ Constructor (ss, com, Nothing, Nothing) tyName ctor fields
   declToCoreFn (A.DataBindingGroupDeclaration ds) =
     concatMap declToCoreFn ds
-  declToCoreFn (A.ValueDecl (ss, com) name _ _ [A.MkUnguarded e]) =
+  declToCoreFn (A.ValueDecl (ss, com) _ name _ _ [A.MkUnguarded e]) =
     [NonRec (ssA ss) name (exprToCoreFn ss com Nothing e)]
   declToCoreFn (A.BindingGroupDeclaration ds) =
     [Rec . NEL.toList $ fmap (\(((ss, com), name), _, e) -> ((ssA ss, name), exprToCoreFn ss com Nothing e)) ds]
@@ -101,10 +101,16 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     exprToCoreFn ss com (Just ty) v
   exprToCoreFn ss com ty (A.Let w ds v) =
     Let (ss, com, ty, getLetMeta w) (concatMap declToCoreFn ds) (exprToCoreFn ss [] Nothing v)
-  exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name (A.TypedValue _ lit@(A.Literal _ (A.ObjectLiteral _)) _)) =
+  exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name (A.TypedValue _ lit _)) =
     exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name lit)
   exprToCoreFn ss com _ (A.TypeClassDictionaryConstructorApp name (A.Literal _ (A.ObjectLiteral vs))) =
     let args = fmap (exprToCoreFn ss [] Nothing . snd) $ sortBy (compare `on` fst) vs
+        ctor = Var (ss, [], Nothing, Just IsTypeClassConstructor) (fmap properToIdent name)
+    in foldl (App (ss, com, Nothing, Nothing)) ctor args
+  exprToCoreFn ss com _ (A.TypeClassDictionaryConstructorApp name (A.Let _ ds _)) =
+    let memberCoreFn (A.ValueDecl (ss', _) (Just ident) _ _ _ [A.MkUnguarded e]) = (runIdent ident, exprToCoreFn ss' [] Nothing e)
+        memberCoreFn _ = error $ "Unexpected value in type class dictionary constructor application"
+        args = snd <$> sortBy (compare `on` fst) (memberCoreFn <$> ds)
         ctor = Var (ss, [], Nothing, Just IsTypeClassConstructor) (fmap properToIdent name)
     in foldl (App (ss, com, Nothing, Nothing)) ctor args
   exprToCoreFn ss com ty  (A.TypeClassDictionaryAccessor _ ident) =

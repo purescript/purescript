@@ -98,7 +98,7 @@ collapseBindingGroups =
   go (DataBindingGroupDeclaration ds) = NEL.toList ds
   go (BindingGroupDeclaration ds) =
     NEL.toList $ fmap (\((sa, ident), nameKind, val) ->
-      ValueDecl sa ident nameKind [] [MkUnguarded val]) ds
+      ValueDecl sa Nothing ident nameKind [] [MkUnguarded val]) ds
   go other = [other]
 
 collapseBindingGroupsForValue :: Expr -> Expr
@@ -187,7 +187,7 @@ toBindingGroup moduleName (CyclicSCC ds') = do
   toBinding (CyclicSCC ds) = throwError $ foldMap cycleError ds
 
   cycleError :: ValueDeclarationData Expr -> MultipleErrors
-  cycleError (ValueDeclarationData (ss, _) n _ _ _) = errorMessage' ss $ CycleInDeclaration n
+  cycleError (ValueDeclarationData (ss, _) _ n _ _ _) = errorMessage' ss $ CycleInDeclaration n
 
 toDataBindingGroup
   :: MonadError MultipleErrors m
@@ -209,5 +209,5 @@ mkDeclaration :: ValueDeclarationData Expr -> Declaration
 mkDeclaration = ValueDeclaration . fmap (pure . MkUnguarded)
 
 fromValueDecl :: ValueDeclarationData Expr -> ((SourceAnn, Ident), NameKind, Expr)
-fromValueDecl (ValueDeclarationData sa ident nameKind [] val) = ((sa, ident), nameKind, val)
+fromValueDecl (ValueDeclarationData sa _ ident nameKind [] val) = ((sa, ident), nameKind, val)
 fromValueDecl ValueDeclarationData{} = internalError "Binders should have been desugared"

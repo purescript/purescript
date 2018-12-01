@@ -87,7 +87,7 @@ parseValueWithIdentAndBinders ident bs = do
                            <*> (indented *> equals
                                          *> withSourceSpan PositionedValue parseValueWithWhereClause))
     )
-  return $ \sa -> ValueDecl sa ident Public bs value
+  return $ \sa -> ValueDecl sa Nothing ident Public bs value
 
 parseValueDeclaration :: TokenParser Declaration
 parseValueDeclaration = withSourceAnnF $ do

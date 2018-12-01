@@ -187,7 +187,7 @@ data NameKind
   -- ^ A private value introduced as an artifact of code generation (class instances, class member
   -- accessors, etc.)
   | Public
-  -- ^ A public value for a module member or foreing import declaration
+  -- ^ A public value for a module member or foreign import declaration
   | External
   -- ^ A name for member introduced by foreign import
   deriving (Show, Eq, Generic)
