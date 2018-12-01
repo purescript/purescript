@@ -160,11 +160,11 @@ addTypeClass qualifiedClassName args implies dependencies ds = do
 addTypeClassDictionaries
   :: (MonadState CheckState m)
   => Maybe ModuleName
-  -> M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict)
+  -> M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))
   -> m ()
 addTypeClassDictionaries mn entries =
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = insertState st } }
-  where insertState st = M.insertWith (M.unionWith M.union) mn entries (typeClassDictionaries . checkEnv $ st)
+  where insertState st = M.insertWith (M.unionWith (M.unionWith (<>))) mn entries (typeClassDictionaries . checkEnv $ st)
 
 checkDuplicateTypeArguments
   :: (MonadState CheckState m, MonadError MultipleErrors m)
@@ -343,7 +343,7 @@ typeCheckAll moduleName _ = traverse go
           _ <- traverseTypeInstanceBody checkInstanceMembers body
           deps' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms deps
           let dict = TypeClassDictionaryInScope qualifiedChain idx qualifiedDictName [] className tys (Just deps')
-          addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) dict
+          addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) (pure dict)
           return d
 
   checkInstanceArity :: Ident -> Qualified (ProperName 'ClassName) -> TypeClassData -> [Type] -> m ()
@@ -422,15 +422,16 @@ typeCheckAll moduleName _ = traverse go
     for_ nonOrphanModules $ \m -> do
       dicts <- M.toList <$> lookupTypeClassDictionariesForClass (Just m) className
 
-      for_ dicts $ \(ident, dict) -> do
-        -- ignore instances in the same instance chain
-        if ch == tcdChain dict ||
-           instancesAreApart (typeClassCoveringSets typeClass) tys' (tcdInstanceTypes dict)
-        then return ()
-        else throwError . errorMessage $
-               OverlappingInstances className
-                                    tys'
-                                    [ident, Qualified (Just moduleName) dictName]
+      for_ dicts $ \(ident, dictNel) -> do
+        for_ dictNel $ \dict -> do
+          -- ignore instances in the same instance chain
+          if ch == tcdChain dict ||
+            instancesAreApart (typeClassCoveringSets typeClass) tys' (tcdInstanceTypes dict)
+          then return ()
+          else throwError . errorMessage $
+                OverlappingInstances className
+                                      tys'
+                                      [ident, Qualified (Just moduleName) dictName]
 
   instancesAreApart
     :: S.Set (S.Set Int)

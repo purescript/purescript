@@ -793,7 +793,7 @@ data Expr
   -- instance type, and the type class dictionaries in scope.
   --
   | TypeClassDictionary Constraint
-                        (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict)))
+                        (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))))
                         [ErrorMessageHint]
   -- |
   -- A typeclass dictionary accessor, the implementation is left unspecified until CoreFn desugaring.

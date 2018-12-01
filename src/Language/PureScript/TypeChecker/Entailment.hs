@@ -30,6 +30,7 @@ import qualified Data.Set as S
 import Data.Traversable (for)
 import Data.Text (Text, stripPrefix, stripSuffix)
 import qualified Data.Text as T
+import qualified Data.List.NonEmpty as NEL
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -66,7 +67,7 @@ type TypeClassDict = TypeClassDictionaryInScope Evidence
 -- | The 'InstanceContext' tracks those constraints which can be satisfied.
 type InstanceContext = M.Map (Maybe ModuleName)
                          (M.Map (Qualified (ProperName 'ClassName))
-                           (M.Map (Qualified Ident) NamedDict))
+                           (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict)))
 
 -- | A type substitution which makes an instance head match a list of types.
 --
@@ -75,7 +76,7 @@ type InstanceContext = M.Map (Maybe ModuleName)
 type Matching a = M.Map Text a
 
 combineContexts :: InstanceContext -> InstanceContext -> InstanceContext
-combineContexts = M.unionWith (M.unionWith M.union)
+combineContexts = M.unionWith (M.unionWith (M.unionWith (<>)))
 
 -- | Replace type class dictionary placeholders with inferred type class dictionaries
 replaceTypeClassDictionaries
@@ -186,7 +187,7 @@ entails SolverOptions{..} constraint context hints =
     ctorModules _ = Nothing
 
     findDicts :: InstanceContext -> Qualified (ProperName 'ClassName) -> Maybe ModuleName -> [TypeClassDict]
-    findDicts ctx cn = fmap (fmap NamedInstance) . maybe [] M.elems . (>>= M.lookup cn) . flip M.lookup ctx
+    findDicts ctx cn = fmap (fmap NamedInstance) . foldMap NEL.toList . foldMap M.elems . (>>= M.lookup cn) . flip M.lookup ctx
 
     valUndefined :: Expr
     valUndefined = Var nullSourceSpan (Qualified (Just (ModuleName [ProperName C.prim])) (Ident C.undefined))
@@ -637,7 +638,7 @@ newDictionaries path name (Constraint className instanceTy _) = do
 
 mkContext :: [NamedDict] -> InstanceContext
 mkContext = foldr combineContexts M.empty . map fromDict where
-  fromDict d = M.singleton Nothing (M.singleton (tcdClassName d) (M.singleton (tcdValue d) d))
+  fromDict d = M.singleton Nothing (M.singleton (tcdClassName d) (M.singleton (tcdValue d) (pure d)))
 
 -- | Check all pairs of values in a list match a predicate
 pairwiseAll :: Monoid m => (a -> a -> m) -> [a] -> m
