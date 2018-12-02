@@ -4,11 +4,9 @@
 module Language.PureScript.Linter (lint, module L) where
 
 import Prelude.Compat
-import Protolude (ordNub)
 
 import Control.Monad.Writer.Class
 
-import Data.List ((\\))
 import Data.Maybe (mapMaybe)
 import qualified Data.Set as S
 import Data.Text (Text)
@@ -83,25 +81,51 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
   checkTypeVarsInDecl s d = let (f, _, _, _, _) = accumTypes (checkTypeVars (declSourceSpan d) s) in f d
 
   checkTypeVars :: SourceSpan -> S.Set Text -> Type -> MultipleErrors
-  checkTypeVars ss set ty = everythingWithContextOnTypes set mempty mappend step ty <> findUnused ty
+  checkTypeVars ss set ty = everythingWithContextOnTypes set mempty mappend step ty <> snd (findUnused ty)
     where
+
     step :: S.Set Text -> Type -> (S.Set Text, MultipleErrors)
     step s (ForAll tv _ _) = bindVar s tv
     step s _ = (s, mempty)
+
     bindVar :: S.Set Text -> Text -> (S.Set Text, MultipleErrors)
     bindVar = bind ss ShadowedTypeVar
-    findUnused :: Type -> MultipleErrors
-    findUnused ty' =
-      let used = usedTypeVariables ty'
-          declared = everythingOnTypes (++) go ty'
-          unused = ordNub declared \\ ordNub used
-      in foldl (<>) mempty $ map (errorMessage' ss . UnusedTypeVar) unused
-      where
-      go :: Type -> [Text]
-      go (ForAll tv _ _) = [tv]
-      go _ = []
+
+    findUnused :: Type -> (S.Set Text, MultipleErrors)
+    findUnused = go set where
+      -- Recursively walk the type and prune used variables from `unused`
+      go :: S.Set Text -> Type -> (S.Set Text, MultipleErrors)
+      go unused (TypeVar v) = (S.delete v unused, mempty)
+      go unused (ForAll tv t1 _) =
+        let (nowUnused, errors) = go (S.insert tv unused) t1
+            restoredUnused = if S.member tv unused then S.insert tv nowUnused else nowUnused
+            combinedErrors = if S.member tv nowUnused then errors <> errorMessage' ss (UnusedTypeVar tv) else errors
+        in (restoredUnused, combinedErrors)
+      go unused (TypeApp f x) = go unused f `combine` go unused x
+      go unused (ConstrainedType c t1) = foldl combine (unused, mempty) $ map (go unused) (constraintArgs c <> [t1])
+      go unused (RCons _ t1 rest) = go unused t1 `combine` go unused rest
+      go unused (KindedType t1 _) = go unused t1
+      go unused (ParensInType t1) = go unused t1
+      go unused (BinaryNoParensType t1 t2 t3) = go unused t1 `combine` go unused t2 `combine` go unused t3
+      go unused TUnknown{} = (unused, mempty)
+      go unused TypeLevelString{} = (unused, mempty)
+      go unused TypeWildcard{} = (unused, mempty)
+      go unused TypeConstructor{} = (unused, mempty)
+      go unused TypeOp{} = (unused, mempty)
+      go unused Skolem{} = (unused, mempty)
+      go unused REmpty = (unused, mempty)
+      go unused PrettyPrintFunction{} = (unused, mempty)
+      go unused PrettyPrintObject{} = (unused, mempty)
+      go unused PrettyPrintForAll{} = (unused, mempty)
+
+      combine ::
+        (S.Set Text, MultipleErrors) ->
+        (S.Set Text, MultipleErrors) ->
+        (S.Set Text, MultipleErrors)
+      combine (a, b) (c, d) = (S.intersection a c, b <> d)
 
   bind :: (Ord a) => SourceSpan -> (a -> SimpleErrorMessage) -> S.Set a -> a -> (S.Set a, MultipleErrors)
   bind ss mkError s name
     | name `S.member` s = (s, errorMessage' ss (mkError name))
     | otherwise = (S.insert name s, mempty)
+
