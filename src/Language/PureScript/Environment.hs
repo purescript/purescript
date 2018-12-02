@@ -17,6 +17,7 @@ import qualified Data.Text as T
 import           Data.Tree (Tree, rootLabel)
 import qualified Data.Graph as G
 import           Data.Foldable (toList, fold)
+import qualified Data.List.NonEmpty as NEL
 
 import           Language.PureScript.Crash
 import           Language.PureScript.Kinds
@@ -36,7 +37,7 @@ data Environment = Environment
   -- constructor name, argument types and return type.
   , typeSynonyms :: M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe Kind)], Type)
   -- ^ Type synonyms currently in scope
-  , typeClassDictionaries :: M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict))
+  , typeClassDictionaries :: M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict)))
   -- ^ Available type class dictionaries. When looking up 'Nothing' in the
   -- outer map, this returns the map of type class dictionaries in local
   -- scope (ie dictionaries brought in by a constrained type).

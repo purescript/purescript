@@ -25,6 +25,7 @@ import qualified Data.Text as T
 import Data.Version (showVersion)
 import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.List.NonEmpty as NEL
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -154,7 +155,11 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   applyDecl env (EDValue ident ty) = env { names = M.insert (Qualified (Just efModuleName) ident) (ty, External, Defined) (names env) }
   applyDecl env (EDClass pn args members cs deps) = env { typeClasses = M.insert (qual pn) (makeTypeClassData args members cs deps) (typeClasses env) }
   applyDecl env (EDKind pn) = env { kinds = S.insert (qual pn) (kinds env) }
-  applyDecl env (EDInstance className ident tys cs ch idx) = env { typeClassDictionaries = updateMap (updateMap (M.insert (qual ident) dict) className) (Just efModuleName) (typeClassDictionaries env) }
+  applyDecl env (EDInstance className ident tys cs ch idx) =
+    env { typeClassDictionaries =
+            updateMap
+              (updateMap (M.insertWith (<>) (qual ident) (pure dict)) className)
+              (Just efModuleName) (typeClassDictionaries env) }
     where
     dict :: NamedDict
     dict = TypeClassDictionaryInScope ch idx (qual ident) [] className tys cs
@@ -224,7 +229,8 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
     = [ EDInstance tcdClassName ident tcdInstanceTypes tcdDependencies tcdChain tcdIndex
       | m1 <- maybeToList (M.lookup (Just mn) (typeClassDictionaries env))
       , m2 <- M.elems m1
-      , TypeClassDictionaryInScope{..} <- maybeToList (M.lookup (Qualified (Just mn) ident) m2)
+      , nel <- maybeToList (M.lookup (Qualified (Just mn) ident) m2)
+      , TypeClassDictionaryInScope{..} <- NEL.toList nel
       ]
   toExternsDeclaration (KindRef _ pn)
     | Qualified (Just mn) pn `S.member` kinds env
