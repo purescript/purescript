@@ -28,7 +28,11 @@ primModules =
 primDocsModule :: Module
 primDocsModule = Module
   { modName = P.moduleNameFromString "Prim"
-  , modComments = Just "The Prim module is embedded in the PureScript compiler in order to provide compiler support for certain types &mdash; for example, value literals, or syntax sugar. It is implicitly imported unqualified in every module except those that list it as a qualified import."
+  , modComments = Just $ T.unlines
+      [ "The `Prim` module is embedded in the PureScript compiler in order to provide compiler support for certain types &mdash; for example, value literals, or syntax sugar. It is implicitly imported unqualified in every module except those that list it as a qualified import."
+      , ""
+      , "`Prim` does not include additional built-in types and kinds that are defined deeper in the compiler. For example, row kinds (e.g. `# Type`, which is the kind of types such as `(name :: String, age :: Int)`), Type wildcards (e.g. `f :: _ -> Int`), and Quantified Types. Rather, these are documented in [the PureScript language reference](https://github.com/purescript/documentation/blob/master/language/Types.md)."
+      ]
   , modDeclarations =
       [ function
       , array
@@ -517,4 +521,3 @@ aboveDoc = primTypeOf (P.primSubName "TypeError") "Above" $ T.unlines
   , "For more information, see"
   , "[the Custom Type Errors guide](https://github.com/purescript/documentation/blob/master/guides/Custom-Type-Errors.md)."
   ]
-
