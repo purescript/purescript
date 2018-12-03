@@ -9,6 +9,7 @@ import           Control.Exception.Lifted (bracket_)
 import           Control.Monad (void, when)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Trans.RWS.Strict (evalRWST, asks, local, RWST)
+import           Data.Foldable (traverse_)
 import           Data.List (isSuffixOf)
 import qualified Data.Text as T
 import qualified Language.PureScript as P
@@ -70,10 +71,10 @@ runAndEval :: String -> TestPSCi () -> (String -> TestPSCi ()) -> TestPSCi ()
 runAndEval comm jsOutputEval textOutputEval =
   case parseCommand comm of
     Left errStr -> liftIO $ putStrLn errStr >> exitFailure
-    Right command ->
+    Right commands ->
       -- The JS result is ignored, as it's already written in a JS source file.
       -- For the detail, please refer to Interactive.hs
-      handleCommand (\_ -> jsOutputEval) (return ()) textOutputEval command
+      traverse_ (handleCommand (\_ -> jsOutputEval) (return ()) textOutputEval) commands
 
 -- | Run a PSCi command, evaluate compiled JS, and ignore evaluation output and printed output
 run :: String -> TestPSCi ()
