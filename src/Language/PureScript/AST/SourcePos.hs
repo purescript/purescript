@@ -33,6 +33,11 @@ displaySourcePos sp =
   "line " <> T.pack (show (sourcePosLine sp)) <>
     ", column " <> T.pack (show (sourcePosColumn sp))
 
+displaySourcePosShort :: SourcePos -> Text
+displaySourcePosShort sp =
+  T.pack (show (sourcePosLine sp)) <>
+    ":" <> T.pack (show (sourcePosColumn sp))
+
 instance A.ToJSON SourcePos where
   toJSON SourcePos{..} =
     A.toJSON [sourcePosLine, sourcePosColumn]
@@ -55,12 +60,19 @@ instance NFData SourceSpan
 
 displayStartEndPos :: SourceSpan -> Text
 displayStartEndPos sp =
+  "(" <>
   displaySourcePos (spanStart sp) <> " - " <>
-  displaySourcePos (spanEnd sp)
+  displaySourcePos (spanEnd sp) <> ")"
+
+displayStartEndPosShort :: SourceSpan -> Text
+displayStartEndPosShort sp =
+  displaySourcePosShort (spanStart sp) <> " - " <>
+  displaySourcePosShort (spanEnd sp)
 
 displaySourceSpan :: FilePath -> SourceSpan -> Text
 displaySourceSpan relPath sp =
-  T.pack (makeRelative relPath (spanName sp)) <> " " <>
+  T.pack (makeRelative relPath (spanName sp)) <> ":" <>
+    displayStartEndPosShort sp <> " " <>
     displayStartEndPos sp
 
 instance A.ToJSON SourceSpan where
