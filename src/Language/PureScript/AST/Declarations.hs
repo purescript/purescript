@@ -779,7 +779,7 @@ data Expr
   -- |
   -- An ado-notation block
   --
-  | Ado [DoNotationElement] Expr
+  | Ado (Maybe ModuleName) [DoNotationElement] Expr
   -- |
   -- An application of a typeclass dictionary constructor. The value should be
   -- an ObjectLiteral.

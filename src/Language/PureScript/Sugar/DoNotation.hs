@@ -32,8 +32,8 @@ desugarDo d =
   bind :: SourceSpan -> Maybe ModuleName -> Expr
   bind ss m = Var ss (Qualified m (Ident C.bind))
 
-  discard :: SourceSpan -> Expr
-  discard = flip Var (Qualified Nothing (Ident C.discard))
+  discard :: SourceSpan -> Maybe ModuleName -> Expr
+  discard ss m = Var ss (Qualified m (Ident C.discard))
 
   replace :: SourceSpan -> Expr -> m Expr
   replace pos (Do m els) = go pos m els
@@ -45,7 +45,7 @@ desugarDo d =
   go _ _ [DoNotationValue val] = return val
   go pos m (DoNotationValue val : rest) = do
     rest' <- go pos m rest
-    return $ App (App (discard pos) val) (Abs (VarBinder pos UnusedIdent) rest')
+    return $ App (App (discard pos m) val) (Abs (VarBinder pos UnusedIdent) rest')
   go _ _ [DoNotationBind _ _] = throwError . errorMessage $ InvalidDoBind
   go _ _ (DoNotationBind b _ : _) | First (Just ident) <- foldMap fromIdent (binderNames b) =
       throwError . errorMessage $ CannotUseBindWithDo (Ident ident)

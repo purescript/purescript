@@ -83,8 +83,8 @@ prettyPrintValue d (Let FromLet ds val) =
     (text "in " <> prettyPrintValue (d - 1) val)
 prettyPrintValue d (Do m els) =
   textT (maybe "" ((Monoid.<> ".") . runModuleName) m) <> text "do " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els)
-prettyPrintValue d (Ado els yield) =
-  text "ado " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els) //
+prettyPrintValue d (Ado m els yield) =
+  textT (maybe "" ((Monoid.<> ".") . runModuleName) m) <> text "ado " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els) //
   (text "in " <> prettyPrintValue (d - 1) yield)
 prettyPrintValue _ (TypeClassDictionary (Constraint name tys _) _ _) = foldl1 beforeWithSpace $ text ("#dict " ++ T.unpack (runProperName (disqualify name))) : map typeAtomAsBox tys
 prettyPrintValue _ (DeferredDictionary name _) = text $ "#dict " ++ T.unpack (runProperName (disqualify name))

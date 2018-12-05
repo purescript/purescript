@@ -28,21 +28,21 @@ desugarAdo d =
   let (f, _, _) = everywhereOnValuesM return replace return
   in f d
   where
-  pure' :: Expr
-  pure' = Var nullSourceSpan (Qualified Nothing (Ident C.pure'))
+  pure' :: Maybe ModuleName -> Expr
+  pure' m = Var nullSourceSpan (Qualified m (Ident C.pure'))
 
-  map' :: Expr
-  map' = Var nullSourceSpan (Qualified Nothing (Ident C.map))
+  map' :: Maybe ModuleName -> Expr
+  map' m = Var nullSourceSpan (Qualified m (Ident C.map))
 
-  apply :: Expr
-  apply = Var nullSourceSpan (Qualified Nothing (Ident C.apply))
+  apply :: Maybe ModuleName -> Expr
+  apply m = Var nullSourceSpan (Qualified m (Ident C.apply))
 
   replace :: Expr -> m Expr
-  replace (Ado els yield) = do
+  replace (Ado m els yield) = do
     (func, args) <- foldM go (yield, []) (reverse els)
     return $ case args of
-      [] -> App pure' func
-      hd : tl -> foldl' (\a b -> App (App apply a) b) (App (App map' func) hd) tl
+      [] -> App (pure' m) func
+      hd : tl -> foldl' (\a b -> App (App (apply m) a) b) (App (App (map' m) func) hd) tl
   replace (PositionedValue pos com v) = PositionedValue pos com <$> rethrowWithPosition pos (replace v)
   replace other = return other
 
