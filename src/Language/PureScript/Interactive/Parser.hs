@@ -84,6 +84,7 @@ parseDirective cmd =
     Type     -> TypeOf <$> parseRest P.parseValue arg
     Kind     -> KindOf <$> parseRest P.parseType arg
     Complete -> return (CompleteStr arg)
+    Print    -> SetInteractivePrint <$> parseRest parseFullyQualifiedIdent arg
 
 -- |
 -- Parses expressions entered at the PSCI repl.
@@ -136,3 +137,12 @@ psciDeprecatedLet = do
   _ <- mark (many1 (same *> P.parseLocalDeclaration))
   notFollowedBy $ P.reserved "in"
   fail "Declarations in PSCi no longer require \"let\", as of version 0.11.0"
+
+parseFullyQualifiedIdent :: P.TokenParser (P.ModuleName, P.Ident)
+parseFullyQualifiedIdent = do
+  qname <- P.parseQualified P.parseIdent
+  case qname of
+    P.Qualified (Just mn) ident ->
+      pure (mn, ident)
+    P.Qualified Nothing _ ->
+      fail "Expected a fully-qualified name (eg: PSCI.Support.eval)"

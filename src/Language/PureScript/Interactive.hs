@@ -112,6 +112,7 @@ handleCommand _ _ p (BrowseModule moduleName) = handleBrowse p moduleName
 handleCommand _ _ p (ShowInfo QueryLoaded)    = handleShowLoadedModules p
 handleCommand _ _ p (ShowInfo QueryImport)    = handleShowImportedModules p
 handleCommand _ _ p (CompleteStr prefix)      = handleComplete p prefix
+handleCommand _ _ p (SetInteractivePrint ip)  = handleSetInteractivePrint p ip
 handleCommand _ _ _ _                         = P.internalError "handleCommand: unexpected command"
 
 -- | Reload the application state
@@ -318,3 +319,26 @@ handleComplete print' prefix = do
   let act = liftCompletionM (completion' (reverse prefix, ""))
   results <- evalStateT act st
   print' $ unlines (formatCompletions results)
+
+-- | Attempt to set the interactive print function. Note that the state will
+-- only be updated if the interactive print function exists and appears to
+-- work; we test it by attempting to evaluate '0'.
+handleSetInteractivePrint
+  :: (MonadState PSCiState m, MonadIO m)
+  => (String -> m ())
+  -> (P.ModuleName, P.Ident)
+  -> m ()
+handleSetInteractivePrint print' new = do
+  current <- gets psciInteractivePrint
+  modify (setInteractivePrint new)
+  st <- get
+  let expr = P.Literal internalSpan (P.NumericLiteral (Left 0))
+  let m = createTemporaryModule True st expr
+  e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
+  case e of
+    Left errs -> do
+      modify (setInteractivePrint current)
+      print' "Unable to set the repl's printing function:"
+      printErrors errs
+    Right _ ->
+      pure ()
