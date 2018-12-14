@@ -69,7 +69,7 @@ import Prelude.Compat hiding (lex)
 import Control.Applicative ((<|>))
 import Control.Monad (void, guard)
 import Control.Monad.Identity (Identity)
-import Data.Char (isSpace, isAscii, isSymbol, isAlphaNum)
+import Data.Char (isSpace, isAscii, isSymbol, isAlphaNum, isAlpha, isLower)
 import Data.String (fromString)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -591,7 +591,7 @@ isSymbolChar c = (c `elem` (":!#$%&*+./<=>?@\\^|-~" :: [Char])) || (not (isAscii
 -- The characters allowed in the head of an unquoted record key
 --
 isUnquotedKeyHeadChar :: Char -> Bool
-isUnquotedKeyHeadChar c = (c == '_') || isAlphaNum c
+isUnquotedKeyHeadChar c = (c == '_') || (isAlpha c && isLower c)
 
 -- |
 -- The characters allowed in the tail of an unquoted record key
@@ -603,7 +603,9 @@ isUnquotedKeyTailChar c = (c `elem` ("_'" :: [Char])) || isAlphaNum c
 -- Strings allowed to be left unquoted in a record key
 --
 isUnquotedKey :: Text -> Bool
-isUnquotedKey t = case T.uncons t of
-  Nothing -> False
-  Just (hd, tl) -> isUnquotedKeyHeadChar hd &&
-                   T.all isUnquotedKeyTailChar tl
+isUnquotedKey t =
+  t `notElem` reservedPsNames
+  && case T.uncons t of
+      Nothing -> False
+      Just (hd, tl) -> isUnquotedKeyHeadChar hd &&
+                       T.all isUnquotedKeyTailChar tl
