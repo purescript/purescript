@@ -23,6 +23,7 @@ import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 
+import Language.PureScript.AST.SourcePos
 import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Kinds
@@ -86,7 +87,7 @@ appliedFunction = mkPattern match
   match (PrettyPrintFunction arg ret) = Just (arg, ret)
   match _ = Nothing
 
-kinded :: Pattern () Type (Kind, Type)
+kinded :: Pattern () Type (Kind SourceAnn, Type)
 kinded = mkPattern match
   where
   match (KindedType t k) = Just (k, t)

@@ -700,7 +700,7 @@ deriveFunctor ss mn syns ds tyConNm = do
   where
     mkMapFunction :: Declaration -> m Expr
     mkMapFunction (DataDeclaration (ss', _) _ _ tys ctors) = case reverse tys of
-      [] -> throwError . errorMessage' ss' $ KindsDoNotUnify (FunKind kindType kindType) kindType
+      [] -> throwError . errorMessage' ss' $ KindsDoNotUnify (FunKind nullSourceAnn kindType kindType) kindType
       ((iTy, _) : _) -> do
         f <- freshIdent "f"
         m <- freshIdent "m"

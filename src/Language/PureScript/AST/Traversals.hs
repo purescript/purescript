@@ -16,6 +16,7 @@ import qualified Data.Set as S
 import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Declarations
 import Language.PureScript.AST.Literals
+import Language.PureScript.AST.SourcePos
 import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.Traversals
@@ -644,7 +645,7 @@ accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (con
 
 accumKinds
   :: (Monoid r)
-  => (Kind -> r)
+  => (Kind SourceAnn -> r)
   -> ( Declaration -> r
      , Expr -> r
      , Binder -> r

@@ -167,7 +167,7 @@ primKind = primKindOf P.primName
 lookupPrimTypeKindOf
   :: NameGen 'P.TypeName
   -> Text
-  -> P.Kind
+  -> P.Kind P.SourceAnn
 lookupPrimTypeKindOf k = fst . unsafeLookupOf k
   ( P.primTypes <>
     P.primBooleanTypes <>

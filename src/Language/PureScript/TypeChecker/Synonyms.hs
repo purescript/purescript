@@ -24,7 +24,7 @@ import           Language.PureScript.TypeChecker.Monad
 import           Language.PureScript.Types
 
 -- | Type synonym information (arguments with kinds, aliased type), indexed by name
-type SynonymMap = M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe Kind)], Type)
+type SynonymMap = M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe (Kind SourceAnn))], Type)
 
 replaceAllTypeSynonyms'
   :: SynonymMap

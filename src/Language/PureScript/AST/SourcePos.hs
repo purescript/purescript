@@ -82,3 +82,32 @@ internalModuleSourceSpan name = SourceSpan name (SourcePos 0 0) (SourcePos 0 0)
 
 nullSourceSpan :: SourceSpan
 nullSourceSpan = internalModuleSourceSpan ""
+
+nullSourceAnn :: SourceAnn
+nullSourceAnn = (nullSourceSpan, [])
+
+minSourcePos :: SourcePos -> SourcePos -> SourcePos
+minSourcePos a@(SourcePos l1 c1) b@(SourcePos l2 c2)
+  | l1 < l2   = a
+  | l1 > l2   = b
+  | c1 < c2   = a
+  | c1 > c2   = b
+  | otherwise = a
+
+maxSourcePos :: SourcePos -> SourcePos -> SourcePos
+maxSourcePos a@(SourcePos l1 c1) b@(SourcePos l2 c2)
+  | l1 > l2   = a
+  | l1 < l2   = b
+  | c1 > c2   = a
+  | c1 < c2   = b
+  | otherwise = a
+
+widenSourceSpan :: SourceSpan -> SourceSpan -> SourceSpan
+widenSourceSpan (SourceSpan n1 s1 e1) (SourceSpan n2 s2 e2) =
+  SourceSpan n (minSourcePos s1 s2) (maxSourcePos e1 e2)
+  where
+  n | n1 == ""  = n2
+    | otherwise = n1
+
+widenSourceAnn :: SourceAnn -> SourceAnn -> SourceAnn
+widenSourceAnn (s1, _) (s2, _) = (widenSourceSpan s1 s2, [])

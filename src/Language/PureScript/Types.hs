@@ -66,7 +66,7 @@ data Type
   -- | A non-empty row
   | RCons Label Type Type
   -- | A type with a kind annotation
-  | KindedType Type Kind
+  | KindedType Type (Kind SourceAnn)
   -- | A placeholder used in pretty printing
   | PrettyPrintFunction Type Type
   -- | A placeholder used in pretty printing

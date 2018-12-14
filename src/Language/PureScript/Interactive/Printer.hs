@@ -79,16 +79,16 @@ printModuleSignatures moduleName P.Environment{..} =
 
 
         findType
-          :: M.Map (P.Qualified (P.ProperName 'P.TypeName)) (P.Kind, P.TypeKind)
+          :: M.Map (P.Qualified (P.ProperName 'P.TypeName)) (P.Kind P.SourceAnn, P.TypeKind)
           -> P.Qualified (P.ProperName 'P.TypeName)
-          -> (P.Qualified (P.ProperName 'P.TypeName), Maybe (P.Kind, P.TypeKind))
+          -> (P.Qualified (P.ProperName 'P.TypeName), Maybe (P.Kind P.SourceAnn, P.TypeKind))
         findType envTypes name = (name, M.lookup name envTypes)
 
         showType
           :: M.Map (P.Qualified (P.ProperName 'P.ClassName)) P.TypeClassData
           -> M.Map (P.Qualified (P.ProperName 'P.ConstructorName)) (P.DataDeclType, P.ProperName 'P.TypeName, P.Type, [P.Ident])
-          -> M.Map (P.Qualified (P.ProperName 'P.TypeName)) ([(Text, Maybe P.Kind)], P.Type)
-          -> (P.Qualified (P.ProperName 'P.TypeName), Maybe (P.Kind, P.TypeKind))
+          -> M.Map (P.Qualified (P.ProperName 'P.TypeName)) ([(Text, Maybe (P.Kind P.SourceAnn))], P.Type)
+          -> (P.Qualified (P.ProperName 'P.TypeName), Maybe (P.Kind P.SourceAnn, P.TypeKind))
           -> Maybe Box.Box
         showType typeClassesEnv dataConstructorsEnv typeSynonymsEnv (n@(P.Qualified modul name), typ) =
           case (typ, M.lookup n typeSynonymsEnv) of

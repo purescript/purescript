@@ -268,9 +268,9 @@ typeForBindingGroupElement (ident, (val, ty)) dict = do
 checkTypeKind
   :: MonadError MultipleErrors m
   => Type
-  -> Kind
+  -> Kind SourceAnn
   -> m ()
-checkTypeKind ty kind = guardWith (errorMessage (ExpectedType ty kind)) $ kind == kindType
+checkTypeKind ty kind = guardWith (errorMessage (ExpectedType ty kind)) $ isKindType kind
 
 -- | Remove any ForAlls and ConstrainedType constructors in a type by introducing new unknowns
 -- or TypeClassDictionary values.

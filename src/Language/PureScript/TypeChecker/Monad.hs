@@ -28,7 +28,7 @@ import Language.PureScript.Types
 -- | A substitution of unification variables for types or kinds
 data Substitution = Substitution
   { substType :: M.Map Int Type -- ^ Type substitution
-  , substKind :: M.Map Int Kind -- ^ Kind substitution
+  , substKind :: M.Map Int (Kind SourceAnn) -- ^ Kind substitution
   }
 
 -- | An empty substitution
@@ -81,7 +81,7 @@ bindNames newNames action = do
 -- | Temporarily bind a collection of names to types
 bindTypes
   :: MonadState CheckState m
-  => M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
+  => M.Map (Qualified (ProperName 'TypeName)) (Kind SourceAnn, TypeKind)
   -> m a
   -> m a
 bindTypes newNames action = do
@@ -95,7 +95,7 @@ bindTypes newNames action = do
 withScopedTypeVars
   :: (MonadState CheckState m, MonadWriter MultipleErrors m)
   => ModuleName
-  -> [(Text, Kind)]
+  -> [(Text, Kind SourceAnn)]
   -> m a
   -> m a
 withScopedTypeVars mn ks ma = do
@@ -192,7 +192,7 @@ bindLocalVariables bindings =
 bindLocalTypeVariables
   :: (MonadState CheckState m)
   => ModuleName
-  -> [(ProperName 'TypeName, Kind)]
+  -> [(ProperName 'TypeName, Kind SourceAnn)]
   -> m a
   -> m a
 bindLocalTypeVariables moduleName bindings =
@@ -252,7 +252,7 @@ lookupTypeVariable
   :: (e ~ MultipleErrors, MonadState CheckState m, MonadError e m)
   => ModuleName
   -> Qualified (ProperName 'TypeName)
-  -> m Kind
+  -> m (Kind SourceAnn)
 lookupTypeVariable currentModule (Qualified moduleName name) = do
   env <- getEnv
   case M.lookup (Qualified (Just $ fromMaybe currentModule moduleName) name) (types env) of

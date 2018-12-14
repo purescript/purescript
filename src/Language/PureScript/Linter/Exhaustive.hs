@@ -67,11 +67,11 @@ getConstructors :: Environment -> ModuleName -> Qualified (ProperName 'Construct
 getConstructors env defmn n = extractConstructors lnte
   where
 
-  extractConstructors :: Maybe (Kind, TypeKind) -> [(ProperName 'ConstructorName, [Type])]
+  extractConstructors :: Maybe (Kind SourceAnn, TypeKind) -> [(ProperName 'ConstructorName, [Type])]
   extractConstructors (Just (_, DataType _ pt)) = pt
   extractConstructors _ = internalError "Data name not in the scope of the current environment in extractConstructors"
 
-  lnte :: Maybe (Kind, TypeKind)
+  lnte :: Maybe (Kind SourceAnn, TypeKind)
   lnte = M.lookup qpn (types env)
 
   qpn :: Qualified (ProperName 'TypeName)

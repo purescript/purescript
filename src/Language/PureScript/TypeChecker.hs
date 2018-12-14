@@ -48,9 +48,9 @@ addDataType
   => ModuleName
   -> DataDeclType
   -> ProperName 'TypeName
-  -> [(Text, Maybe Kind)]
+  -> [(Text, Maybe (Kind SourceAnn))]
   -> [(ProperName 'ConstructorName, [Type])]
-  -> Kind
+  -> Kind SourceAnn
   -> m ()
 addDataType moduleName dtype name args dctors ctorKind = do
   env <- getEnv
@@ -81,9 +81,9 @@ addTypeSynonym
   :: (MonadState CheckState m, MonadError MultipleErrors m)
   => ModuleName
   -> ProperName 'TypeName
-  -> [(Text, Maybe Kind)]
+  -> [(Text, Maybe (Kind SourceAnn))]
   -> Type
-  -> Kind
+  -> Kind SourceAnn
   -> m ()
 addTypeSynonym moduleName name args ty kind = do
   env <- getEnv
@@ -117,7 +117,7 @@ addTypeClass
   :: forall m
    . (MonadState CheckState m, MonadError MultipleErrors m)
   => Qualified (ProperName 'ClassName)
-  -> [(Text, Maybe Kind)]
+  -> [(Text, Maybe (Kind SourceAnn))]
   -> [Constraint]
   -> [FunctionalDependency]
   -> [Declaration]
@@ -468,11 +468,11 @@ typeCheckAll moduleName _ = traverse go
   -- This function adds the argument kinds for a type constructor so that they may appear in the externs file,
   -- extracted from the kind of the type constructor itself.
   --
-  withKinds :: [(Text, Maybe Kind)] -> Kind -> [(Text, Maybe Kind)]
+  withKinds :: [(Text, Maybe (Kind SourceAnn))] -> Kind SourceAnn -> [(Text, Maybe (Kind SourceAnn))]
   withKinds []                  _               = []
-  withKinds (s@(_, Just _ ):ss) (FunKind _   k) = s : withKinds ss k
-  withKinds (  (s, Nothing):ss) (FunKind k1 k2) = (s, Just k1) : withKinds ss k2
-  withKinds _                   _               = internalError "Invalid arguments to peelKinds"
+  withKinds (s@(_, Just _ ):ss) (FunKind _ _   k) = s : withKinds ss k
+  withKinds (  (s, Nothing):ss) (FunKind _ k1 k2) = (s, Just k1) : withKinds ss k2
+  withKinds _                   _                 = internalError "Invalid arguments to peelKinds"
 
 checkNewtype
   :: forall m
@@ -549,7 +549,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     env <- getEnv
     for_ (M.lookup (qualify' name) (types env)) $ \(k, _) -> do
       let findModuleKinds = everythingOnKinds (++) $ \case
-            NamedKind (Qualified (Just mn') kindName) | mn' == mn -> [kindName]
+            NamedKind _ (Qualified (Just mn') kindName) | mn' == mn -> [kindName]
             _ -> []
       checkExport dr $ KindRef (declRefSourceSpan dr) <$> findModuleKinds k
     for_ (M.lookup (qualify' name) (typeSynonyms env)) $ \(_, ty) ->

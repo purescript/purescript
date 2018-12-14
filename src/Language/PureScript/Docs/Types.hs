@@ -154,23 +154,23 @@ data DeclarationInfo
   -- newtype) and its type arguments. Constructors are represented as child
   -- declarations.
   --
-  | DataDeclaration P.DataDeclType [(Text, Maybe P.Kind)]
+  | DataDeclaration P.DataDeclType [(Text, Maybe (P.Kind P.SourceAnn))]
 
   -- |
   -- A data type foreign import, with its kind.
   --
-  | ExternDataDeclaration P.Kind
+  | ExternDataDeclaration (P.Kind P.SourceAnn)
 
   -- |
   -- A type synonym, with its type arguments and its type.
   --
-  | TypeSynonymDeclaration [(Text, Maybe P.Kind)] P.Type
+  | TypeSynonymDeclaration [(Text, Maybe (P.Kind P.SourceAnn))] P.Type
 
   -- |
   -- A type class, with its type arguments, its superclasses and functional
   -- dependencies. Instances and members are represented as child declarations.
   --
-  | TypeClassDeclaration [(Text, Maybe P.Kind)] [P.Constraint] [([Text], [Text])]
+  | TypeClassDeclaration [(Text, Maybe (P.Kind P.SourceAnn))] [P.Constraint] [([Text], [Text])]
 
   -- |
   -- An operator alias declaration, with the member the alias is for and the
@@ -186,7 +186,7 @@ data DeclarationInfo
 
 instance NFData DeclarationInfo
 
-convertFundepsToStrings :: [(Text, Maybe P.Kind)] -> [P.FunctionalDependency] -> [([Text], [Text])]
+convertFundepsToStrings :: [(Text, Maybe (P.Kind P.SourceAnn))] -> [P.FunctionalDependency] -> [([Text], [Text])]
 convertFundepsToStrings args fundeps =
   map (\(P.FunctionalDependency from to) -> toArgs from to) fundeps
   where
@@ -652,13 +652,13 @@ asDeclarationInfo = do
     other ->
       throwCustomError (InvalidDeclarationType other)
 
-asTypeArguments :: Parse PackageError [(Text, Maybe P.Kind)]
+asTypeArguments :: Parse PackageError [(Text, Maybe (P.Kind P.SourceAnn))]
 asTypeArguments = eachInArray asTypeArgument
   where
   asTypeArgument = (,) <$> nth 0 asText <*> nth 1 (perhaps asKind)
 
-asKind :: Parse PackageError P.Kind
-asKind = P.kindFromJSON .! InvalidKind
+asKind :: Parse PackageError (P.Kind P.SourceAnn)
+asKind = P.kindFromJSON P.nullSourceAnn fromAesonParser .! InvalidKind
 
 asType :: Parse e P.Type
 asType = fromAesonParser

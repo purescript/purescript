@@ -99,13 +99,13 @@ data ExternsDeclaration =
   -- | A type declaration
     EDType
       { edTypeName                :: ProperName 'TypeName
-      , edTypeKind                :: Kind
+      , edTypeKind                :: Kind SourceAnn
       , edTypeDeclarationKind     :: TypeKind
       }
   -- | A type synonym
   | EDTypeSynonym
       { edTypeSynonymName         :: ProperName 'TypeName
-      , edTypeSynonymArguments    :: [(Text, Maybe Kind)]
+      , edTypeSynonymArguments    :: [(Text, Maybe (Kind SourceAnn))]
       , edTypeSynonymType         :: Type
       }
   -- | A data construtor
@@ -124,7 +124,7 @@ data ExternsDeclaration =
   -- | A type class declaration
   | EDClass
       { edClassName               :: ProperName 'ClassName
-      , edClassTypeArguments      :: [(Text, Maybe Kind)]
+      , edClassTypeArguments      :: [(Text, Maybe (Kind SourceAnn))]
       , edClassMembers            :: [(Ident, Type)]
       , edClassConstraints        :: [Constraint]
       , edFunctionalDependencies  :: [FunctionalDependency]

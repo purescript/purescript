@@ -41,7 +41,7 @@ import           Language.PureScript.Types
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
-kindedIdent :: TokenParser (Text, Maybe Kind)
+kindedIdent :: TokenParser (Text, Maybe (Kind SourceAnn))
 kindedIdent = (, Nothing) <$> identifier
           <|> parens ((,) <$> identifier <*> (Just <$> (indented *> doubleColon *> indented *> parseKind)))
 

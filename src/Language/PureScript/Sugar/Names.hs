@@ -306,17 +306,17 @@ renameInModule imports (Module modSS coms mn decls exps) =
   letBoundVariable :: Declaration -> Maybe Ident
   letBoundVariable = fmap valdeclIdent . getValueDeclaration
 
-  updateKindsEverywhere :: SourceSpan -> Kind -> m Kind
+  updateKindsEverywhere :: SourceSpan -> Kind SourceAnn -> m (Kind SourceAnn)
   updateKindsEverywhere pos = everywhereOnKindsM updateKind
     where
-    updateKind :: Kind -> m Kind
-    updateKind (NamedKind name) = NamedKind <$> updateKindName name pos
+    updateKind :: Kind SourceAnn -> m (Kind SourceAnn)
+    updateKind (NamedKind ann name) = NamedKind ann <$> updateKindName name pos
     updateKind k = return k
 
   updateTypeArguments
     :: (Traversable f, Traversable g)
     => SourceSpan
-    -> f (a, g Kind) -> m (f (a, g Kind))
+    -> f (a, g (Kind SourceAnn)) -> m (f (a, g (Kind SourceAnn)))
   updateTypeArguments pos = traverse (sndM (traverse (updateKindsEverywhere pos)))
 
   updateTypesEverywhere :: SourceSpan -> Type -> m Type

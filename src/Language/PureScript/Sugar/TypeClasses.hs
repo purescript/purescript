@@ -236,7 +236,7 @@ memberToNameAndType _ = internalError "Invalid declaration in type class definit
 typeClassDictionaryDeclaration
   :: SourceAnn
   -> ProperName 'ClassName
-  -> [(Text, Maybe Kind)]
+  -> [(Text, Maybe (Kind SourceAnn))]
   -> [Constraint]
   -> [Declaration]
   -> Declaration
@@ -252,7 +252,7 @@ typeClassDictionaryDeclaration sa name args implies members =
 typeClassMemberToDictionaryAccessor
   :: ModuleName
   -> ProperName 'ClassName
-  -> [(Text, Maybe Kind)]
+  -> [(Text, Maybe (Kind SourceAnn))]
   -> Declaration
   -> Declaration
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarationData sa ident ty)) =

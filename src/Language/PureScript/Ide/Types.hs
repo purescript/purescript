@@ -49,14 +49,14 @@ data IdeValue = IdeValue
 
 data IdeType = IdeType
  { _ideTypeName :: P.ProperName 'P.TypeName
- , _ideTypeKind :: P.Kind
+ , _ideTypeKind :: P.Kind P.SourceAnn
  , _ideTypeDtors :: [(P.ProperName 'P.ConstructorName, P.Type)]
  } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeTypeSynonym = IdeTypeSynonym
   { _ideSynonymName :: P.ProperName 'P.TypeName
   , _ideSynonymType :: P.Type
-  , _ideSynonymKind :: P.Kind
+  , _ideSynonymKind :: P.Kind P.SourceAnn
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeDataConstructor = IdeDataConstructor
@@ -67,7 +67,7 @@ data IdeDataConstructor = IdeDataConstructor
 
 data IdeTypeClass = IdeTypeClass
   { _ideTCName :: P.ProperName 'P.ClassName
-  , _ideTCKind :: P.Kind
+  , _ideTCKind :: P.Kind P.SourceAnn
   , _ideTCInstances :: [IdeInstance]
   } deriving (Show, Eq, Ord, Generic, NFData)
 
@@ -91,7 +91,7 @@ data IdeTypeOperator = IdeTypeOperator
   , _ideTypeOpAlias         :: P.Qualified (P.ProperName 'P.TypeName)
   , _ideTypeOpPrecedence    :: P.Precedence
   , _ideTypeOpAssociativity :: P.Associativity
-  , _ideTypeOpKind          :: Maybe P.Kind
+  , _ideTypeOpKind          :: Maybe (P.Kind P.SourceAnn)
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 _IdeDeclValue :: Traversal' IdeDeclaration IdeValue

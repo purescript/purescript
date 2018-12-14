@@ -77,7 +77,7 @@ data SimpleErrorMessage
   | CannotReadFile FilePath
   | CannotWriteFile FilePath
   | InfiniteType Type
-  | InfiniteKind Kind
+  | InfiniteKind (Kind SourceAnn)
   | MultipleValueOpFixities (OpName 'ValueOpName)
   | MultipleTypeOpFixities (OpName 'TypeOpName)
   | OrphanTypeDeclaration Ident
@@ -106,7 +106,7 @@ data SimpleErrorMessage
   | PartiallyAppliedSynonym (Qualified (ProperName 'TypeName))
   | EscapedSkolem Text (Maybe SourceSpan) Type
   | TypesDoNotUnify Type Type
-  | KindsDoNotUnify Kind Kind
+  | KindsDoNotUnify (Kind SourceAnn) (Kind SourceAnn)
   | ConstrainedTypeUnified Type Type
   | OverlappingInstances (Qualified (ProperName 'ClassName)) [Type] [Qualified Ident]
   | NoInstanceFound Constraint
@@ -126,7 +126,7 @@ data SimpleErrorMessage
   | OverlappingArgNames (Maybe Ident)
   | MissingClassMember (NEL.NonEmpty (Ident, Type))
   | ExtraneousClassMember Ident (Qualified (ProperName 'ClassName))
-  | ExpectedType Type Kind
+  | ExpectedType Type (Kind SourceAnn)
   -- | constructor name, expected argument count, actual argument count
   | IncorrectConstructorArity (Qualified (ProperName 'ConstructorName)) Int Int
   | ExprDoesNotHaveType Expr Type
@@ -478,7 +478,7 @@ data Declaration
   -- |
   -- A data type declaration (data or newtype, name, arguments, data constructors)
   --
-  = DataDeclaration SourceAnn DataDeclType (ProperName 'TypeName) [(Text, Maybe Kind)] [(ProperName 'ConstructorName, [Type])]
+  = DataDeclaration SourceAnn DataDeclType (ProperName 'TypeName) [(Text, Maybe (Kind SourceAnn))] [(ProperName 'ConstructorName, [Type])]
   -- |
   -- A minimal mutually recursive set of data type declarations
   --
@@ -486,7 +486,7 @@ data Declaration
   -- |
   -- A type synonym declaration (name, arguments, type)
   --
-  | TypeSynonymDeclaration SourceAnn (ProperName 'TypeName) [(Text, Maybe Kind)] Type
+  | TypeSynonymDeclaration SourceAnn (ProperName 'TypeName) [(Text, Maybe (Kind SourceAnn))] Type
   -- |
   -- A type declaration for a value (name, ty)
   --
@@ -509,7 +509,7 @@ data Declaration
   -- |
   -- A data type foreign import (name, kind)
   --
-  | ExternDataDeclaration SourceAnn (ProperName 'TypeName) Kind
+  | ExternDataDeclaration SourceAnn (ProperName 'TypeName) (Kind SourceAnn)
   -- |
   -- A foreign kind import (name)
   --
@@ -525,7 +525,7 @@ data Declaration
   -- |
   -- A type class declaration (name, argument, implies, member declarations)
   --
-  | TypeClassDeclaration SourceAnn (ProperName 'ClassName) [(Text, Maybe Kind)] [Constraint] [FunctionalDependency] [Declaration]
+  | TypeClassDeclaration SourceAnn (ProperName 'ClassName) [(Text, Maybe (Kind SourceAnn))] [Constraint] [FunctionalDependency] [Declaration]
   -- |
   -- A type instance declaration (instance chain, chain index, name,
   -- dependencies, class name, instance types, member declarations)
