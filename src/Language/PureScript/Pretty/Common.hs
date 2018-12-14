@@ -12,10 +12,9 @@ import Control.Monad.State (StateT, modify, get)
 import Data.List (elemIndices, intersperse)
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Char (isUpper)
 
 import Language.PureScript.AST (SourcePos(..), SourceSpan(..))
-import Language.PureScript.Parser.Lexer (isUnquotedKey, reservedPsNames)
+import Language.PureScript.Parser.Lexer (isUnquotedKey)
 
 import Text.PrettyPrint.Boxes hiding ((<>))
 import qualified Text.PrettyPrint.Boxes as Box
@@ -148,11 +147,7 @@ prettyPrintMany f xs = do
   return $ intercalate (emit "\n") $ map (mappend indentString) ss
 
 objectKeyRequiresQuoting :: Text -> Bool
-objectKeyRequiresQuoting s =
-  s `elem` reservedPsNames || not (isUnquotedKey s) || startsUppercase s where
-    startsUppercase label = case T.uncons label of
-      Just (c, _) -> isUpper c
-      _ -> False
+objectKeyRequiresQuoting = not . isUnquotedKey
 
 -- | Place a box before another, vertically when the first box takes up multiple lines.
 before :: Box -> Box -> Box
