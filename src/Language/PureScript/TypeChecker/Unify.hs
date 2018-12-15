@@ -42,7 +42,7 @@ freshType :: (MonadState CheckState m) => m SourceType
 freshType = do
   t <- gets checkNextType
   modify $ \st -> st { checkNextType = t + 1 }
-  return $ TUnknown NullSourceAnn t
+  return $ srcTUnknown t
 
 -- | Update the substitution to solve a type constraint
 solveType :: (MonadError MultipleErrors m, MonadState CheckState m) => Int -> SourceType -> m ()

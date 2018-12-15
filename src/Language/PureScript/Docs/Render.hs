@@ -37,7 +37,7 @@ renderDeclarationWithOptions opts Declaration{..} =
       ]
     ExternDataDeclaration kind' ->
       [ keywordData
-      , renderType' (P.TypeConstructor P.NullSourceAnn (notQualified declTitle))
+      , renderType' (P.srcTypeConstructor (notQualified declTitle))
       , syntax "::"
       , renderKind kind'
       ]
@@ -142,10 +142,10 @@ dataCtor' = dataCtor . notQualified
 
 typeApp :: Text -> [(Text, Maybe P.SourceKind)] -> P.SourceType
 typeApp title typeArgs =
-  foldl (P.TypeApp P.NullSourceAnn)
-        (P.TypeConstructor P.NullSourceAnn (notQualified title))
+  foldl P.srcTypeApp
+        (P.srcTypeConstructor (notQualified title))
         (map toTypeVar typeArgs)
 
 toTypeVar :: (Text, Maybe P.SourceKind) -> P.SourceType
-toTypeVar (s, Nothing) = P.TypeVar P.NullSourceAnn s
-toTypeVar (s, Just k) = P.KindedType P.NullSourceAnn (P.TypeVar P.NullSourceAnn s) k
+toTypeVar (s, Nothing) = P.srcTypeVar s
+toTypeVar (s, Just k) = P.srcKindedType (P.srcTypeVar s) k

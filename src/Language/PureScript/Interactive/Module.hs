@@ -56,10 +56,10 @@ createTemporaryModule exec st val =
     itDecl        = P.ValueDecl (internalSpan, []) (P.Ident "it") P.Public [] [P.MkUnguarded val]
     typeDecl      = P.TypeDeclaration
                       (P.TypeDeclarationData (internalSpan, []) (P.Ident "$main")
-                        (P.TypeApp P.NullSourceAnn
-                          (P.TypeConstructor P.NullSourceAnn
+                        (P.srcTypeApp
+                          (P.srcTypeConstructor
                             (P.Qualified (Just (P.ModuleName [P.ProperName "$Effect"])) (P.ProperName "Effect")))
-                                  (P.TypeWildcard P.NullSourceAnn)))
+                                  P.srcTypeWildcard))
     mainDecl      = P.ValueDecl (internalSpan, []) (P.Ident "$main") P.Public [] [P.MkUnguarded mainValue]
     decls         = if exec then [itDecl, typeDecl, mainDecl] else [itDecl]
   in

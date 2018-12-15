@@ -163,7 +163,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
     generalize unsolved = varIfUnknown . constrain unsolved
 
     -- | Add any unsolved constraints
-    constrain cs ty = foldr (ConstrainedType NullSourceAnn) ty (map (\(_, _, x) -> x) cs)
+    constrain cs ty = foldr srcConstrainedType ty (map (\(_, _, x) -> x) cs)
 
     -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
     tidyUp ts sub = first (map (second (first (second (overTypes (substituteType sub) *** substituteType sub))))) ts
@@ -316,7 +316,7 @@ infer' (Literal ss (ArrayLiteral vals)) = do
     (val', t') <- instantiatePolyTypeWithUnknowns val t
     unifyTypes els t'
     return (TypedValue ch val' t')
-  return $ TypedValue True (Literal ss (ArrayLiteral ts')) (TypeApp NullSourceAnn tyArray els)
+  return $ TypedValue True (Literal ss (ArrayLiteral ts')) (srcTypeApp tyArray els)
 infer' (Literal ss (ObjectLiteral ps)) = do
   ensureNoDuplicateProperties ps
   -- We make a special case for Vars in record labels, since these are the
@@ -335,25 +335,25 @@ infer' (Literal ss (ObjectLiteral ps)) = do
                         else pure (val', ty)
         pure (name, valAndType)
 
-      toRowListItem (lbl, (_, ty)) = RowListItem NullSourceAnn (Label lbl) ty
+      toRowListItem (lbl, (_, ty)) = srcRowListItem (Label lbl) ty
 
   fields <- forM ps inferProperty
-  let ty = TypeApp NullSourceAnn tyRecord $ rowFromList (map toRowListItem fields, REmpty NullSourceAnn)
+  let ty = srcTypeApp tyRecord $ rowFromList (map toRowListItem fields, srcREmpty)
   return $ TypedValue True (Literal ss (ObjectLiteral (map (fmap (uncurry (TypedValue True))) fields))) ty
 infer' (ObjectUpdate o ps) = do
   ensureNoDuplicateProperties ps
   row <- freshType
   newVals <- zipWith (\(name, _) t -> (name, t)) ps <$> traverse (infer . snd) ps
-  let toRowListItem = uncurry (RowListItem NullSourceAnn)
+  let toRowListItem = uncurry srcRowListItem
   let newTys = map (\(name, TypedValue _ _ ty) -> (Label name, ty)) newVals
   oldTys <- zip (map (Label . fst) ps) <$> replicateM (length ps) freshType
-  let oldTy = TypeApp NullSourceAnn tyRecord $ rowFromList (toRowListItem <$> oldTys, row)
+  let oldTy = srcTypeApp tyRecord $ rowFromList (toRowListItem <$> oldTys, row)
   o' <- TypedValue True <$> check o oldTy <*> pure oldTy
-  return $ TypedValue True (ObjectUpdate o' newVals) $ TypeApp NullSourceAnn tyRecord $ rowFromList (toRowListItem <$> newTys, row)
+  return $ TypedValue True (ObjectUpdate o' newVals) $ srcTypeApp tyRecord $ rowFromList (toRowListItem <$> newTys, row)
 infer' (Accessor prop val) = withErrorMessageHint (ErrorCheckingAccessor val prop) $ do
   field <- freshType
   rest <- freshType
-  typed <- check val (TypeApp NullSourceAnn tyRecord (RCons NullSourceAnn (Label prop) field rest))
+  typed <- check val (srcTypeApp tyRecord (srcRCons (Label prop) field rest))
   return $ TypedValue True (Accessor prop typed) field
 infer' (Abs binder ret)
   | VarBinder ss arg <- binder = do
@@ -402,8 +402,8 @@ infer' (DeferredDictionary className tys) = do
   dicts <- getTypeClassDictionaries
   hints <- getHints
   return $ TypedValue False
-             (TypeClassDictionary (Constraint NullSourceAnn className tys Nothing) dicts hints)
-             (foldl (TypeApp NullSourceAnn) (TypeConstructor NullSourceAnn (fmap coerceProperName className)) tys)
+             (TypeClassDictionary (srcConstraint className tys Nothing) dicts hints)
+             (foldl srcTypeApp (srcTypeConstructor (fmap coerceProperName className)) tys)
 infer' (TypedValue checkType val ty) = do
   Just moduleName <- checkCurrentModule <$> get
   (kind, args) <- kindOfWithScopedVars ty
@@ -496,7 +496,7 @@ inferBinder val (LiteralBinder _ (ObjectLiteral props)) = do
   row <- freshType
   rest <- freshType
   m1 <- inferRowProperties row rest props
-  unifyTypes val (TypeApp NullSourceAnn tyRecord row)
+  unifyTypes val (srcTypeApp tyRecord row)
   return m1
   where
   inferRowProperties :: SourceType -> SourceType -> [(PSString, Binder)] -> m (M.Map Ident SourceType)
@@ -504,12 +504,12 @@ inferBinder val (LiteralBinder _ (ObjectLiteral props)) = do
   inferRowProperties nrow row ((name, binder):binders) = do
     propTy <- freshType
     m1 <- inferBinder propTy binder
-    m2 <- inferRowProperties nrow (RCons NullSourceAnn (Label name) propTy row) binders
+    m2 <- inferRowProperties nrow (srcRCons (Label name) propTy row) binders
     return $ m1 `M.union` m2
 inferBinder val (LiteralBinder _ (ArrayLiteral binders)) = do
   el <- freshType
   m1 <- M.unions <$> traverse (inferBinder el) binders
-  unifyTypes val (TypeApp NullSourceAnn tyArray el)
+  unifyTypes val (srcTypeApp tyArray el)
   return m1
 inferBinder val (NamedBinder ss name binder) =
   warnAndRethrowWithPositionTC ss $ do
@@ -676,7 +676,7 @@ check' (DeferredDictionary className tys) ty = do
   dicts <- getTypeClassDictionaries
   hints <- getHints
   return $ TypedValue False
-             (TypeClassDictionary (Constraint NullSourceAnn className tys Nothing) dicts hints)
+             (TypeClassDictionary (srcConstraint className tys Nothing) dicts hints)
              ty
 check' (TypedValue checkType val ty1) ty2 = do
   kind <- kindOf ty1
@@ -710,13 +710,13 @@ check' e@(ObjectUpdate obj ps) t@(TypeApp _ o row) | o == tyRecord = do
   -- We check _obj_ against the type _t_ with the types in _ps_ replaced with unknowns.
   let (propsToCheck, rest) = rowToList row
       (removedProps, remainingProps) = partition (\(RowListItem _ p _) -> p `elem` map (Label . fst) ps) propsToCheck
-  us <- zipWith (RowListItem NullSourceAnn) (map rowListLabel removedProps) <$> replicateM (length ps) freshType
-  obj' <- check obj (TypeApp NullSourceAnn tyRecord (rowFromList (us ++ remainingProps, rest)))
+  us <- zipWith srcRowListItem (map rowListLabel removedProps) <$> replicateM (length ps) freshType
+  obj' <- check obj (srcTypeApp tyRecord (rowFromList (us ++ remainingProps, rest)))
   ps' <- checkProperties e ps row True
   return $ TypedValue True (ObjectUpdate obj' ps') t
 check' (Accessor prop val) ty = withErrorMessageHint (ErrorCheckingAccessor val prop) $ do
   rest <- freshType
-  val' <- check val (TypeApp NullSourceAnn tyRecord (RCons NullSourceAnn (Label prop) ty rest))
+  val' <- check val (srcTypeApp tyRecord (srcRCons (Label prop) ty rest))
   return $ TypedValue True (Accessor prop val') ty
 check' v@(Constructor _ c) ty = do
   env <- getEnv
@@ -759,7 +759,7 @@ checkProperties expr ps row lax = let (ts, r') = rowToList row in go ps (toRowPa
   go [] [] (REmpty _) = return []
   go [] [] u@(TUnknown _ _)
     | lax = return []
-    | otherwise = do unifyTypes u (REmpty NullSourceAnn)
+    | otherwise = do unifyTypes u srcREmpty
                      return []
   go [] [] Skolem{} | lax = return []
   go [] ((p, _): _) _ | lax = return []
@@ -770,14 +770,14 @@ checkProperties expr ps row lax = let (ts, r') = rowToList row in go ps (toRowPa
       Nothing -> do
         v'@(TypedValue _ _ ty) <- infer v
         rest <- freshType
-        unifyTypes r (RCons NullSourceAnn (Label p) ty rest)
+        unifyTypes r (srcRCons (Label p) ty rest)
         ps'' <- go ps' ts rest
         return $ (p, v') : ps''
       Just ty -> do
         v' <- check v ty
         ps'' <- go ps' (delete (Label p, ty) ts) r
         return $ (p, v') : ps''
-  go _ _ _ = throwError . errorMessage $ ExprDoesNotHaveType expr (TypeApp NullSourceAnn tyRecord row)
+  go _ _ _ = throwError . errorMessage $ ExprDoesNotHaveType expr (srcTypeApp tyRecord row)
 
 -- | Check the type of a function application, rethrowing errors to provide a better error message.
 --

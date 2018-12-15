@@ -33,6 +33,18 @@ data Kind a
 
 instance NFData a => NFData (Kind a)
 
+srcKUnknown :: Int -> SourceKind
+srcKUnknown = KUnknown NullSourceAnn
+
+srcRow :: SourceKind -> SourceKind
+srcRow = Row NullSourceAnn
+
+srcFunKind :: SourceKind -> SourceKind -> SourceKind
+srcFunKind = FunKind NullSourceAnn
+
+srcNamedKind :: Qualified (ProperName 'KindName) -> SourceKind
+srcNamedKind = NamedKind NullSourceAnn
+
 -- This is equivalent to the derived Aeson ToJSON instance, except that we
 -- write it out manually so that we can define a parser which is
 -- backwards-compatible.

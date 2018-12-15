@@ -701,10 +701,9 @@ asSourcePos = P.SourcePos <$> nth 0 asIntegral
                           <*> nth 1 asIntegral
 
 asConstraint :: Parse PackageError P.SourceConstraint
-asConstraint = P.Constraint P.NullSourceAnn
-                            <$> key "constraintClass" asQualifiedProperName
-                            <*> key "constraintArgs" (eachInArray asType)
-                            <*> pure Nothing
+asConstraint = P.srcConstraint <$> key "constraintClass" asQualifiedProperName
+                               <*> key "constraintArgs" (eachInArray asType)
+                               <*> pure Nothing
 
 asQualifiedProperName :: Parse e (P.Qualified (P.ProperName a))
 asQualifiedProperName = fromAesonParser

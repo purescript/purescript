@@ -193,8 +193,8 @@ desugarDecl mn exps = go
     dictDecl <- typeInstanceDictionaryDeclaration sa name mn deps className tys desugared
     return (expRef name className tys, [d, dictDecl])
   go d@(TypeInstanceDeclaration sa _ _ name deps className tys (NewtypeInstanceWithDictionary dict)) = do
-    let dictTy = foldl (TypeApp NullSourceAnn) (TypeConstructor NullSourceAnn (fmap coerceProperName className)) tys
-        constrainedTy = quantify (foldr (ConstrainedType NullSourceAnn) dictTy deps)
+    let dictTy = foldl srcTypeApp (srcTypeConstructor (fmap coerceProperName className)) tys
+        constrainedTy = quantify (foldr (srcConstrainedType) dictTy deps)
     return (expRef name className tys, [d, ValueDecl sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]])
   go other = return (Nothing, [other])
 
@@ -242,13 +242,13 @@ typeClassDictionaryDeclaration
   -> Declaration
 typeClassDictionaryDeclaration sa name args implies members =
   let superclassTypes = superClassDictionaryNames implies `zip`
-        [ function unit (foldl (TypeApp NullSourceAnn) (TypeConstructor NullSourceAnn (fmap coerceProperName superclass)) tyArgs)
-        | (Constraint NullSourceAnn superclass tyArgs _) <- implies
+        [ function unit (foldl srcTypeApp (srcTypeConstructor (fmap coerceProperName superclass)) tyArgs)
+        | (Constraint _ superclass tyArgs _) <- implies
         ]
       members' = map (first runIdent . memberToNameAndType) members
       mtys = members' ++ superclassTypes
-      toRowListItem (l, t) = RowListItem NullSourceAnn (Label $ mkString l) t
-  in TypeSynonymDeclaration sa (coerceProperName name) args (TypeApp NullSourceAnn tyRecord $ rowFromList (map toRowListItem mtys, REmpty NullSourceAnn))
+      toRowListItem (l, t) = srcRowListItem (Label $ mkString l) t
+  in TypeSynonymDeclaration sa (coerceProperName name) args (srcTypeApp tyRecord $ rowFromList (map toRowListItem mtys, srcREmpty))
 
 typeClassMemberToDictionaryAccessor
   :: ModuleName
@@ -261,12 +261,12 @@ typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarati
   in ValueDecl sa ident Private [] $
     [MkUnguarded (
      TypedValue False (TypeClassDictionaryAccessor className ident) $
-       moveQuantifiersToFront (quantify (ConstrainedType NullSourceAnn (Constraint NullSourceAnn className (map (TypeVar NullSourceAnn . fst) args) Nothing) ty))
+       moveQuantifiersToFront (quantify (srcConstrainedType (srcConstraint className (map (srcTypeVar . fst) args) Nothing) ty))
     )]
 typeClassMemberToDictionaryAccessor _ _ _ _ = internalError "Invalid declaration in type class definition"
 
 unit :: SourceType
-unit = TypeApp NullSourceAnn tyRecord (REmpty NullSourceAnn)
+unit = srcTypeApp tyRecord srcREmpty
 
 typeInstanceDictionaryDeclaration
   :: forall m
@@ -304,13 +304,13 @@ typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
       -- The dictionary itself is a record literal.
       let superclasses = superClassDictionaryNames typeClassSuperclasses `zip`
             [ Abs (VarBinder ss UnusedIdent) (DeferredDictionary superclass tyArgs)
-            | (Constraint NullSourceAnn superclass suTyArgs _) <- typeClassSuperclasses
+            | (Constraint _ superclass suTyArgs _) <- typeClassSuperclasses
             , let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
             ]
 
       let props = Literal ss $ ObjectLiteral $ map (first mkString) (members ++ superclasses)
-          dictTy = foldl (TypeApp NullSourceAnn) (TypeConstructor NullSourceAnn (fmap coerceProperName className)) tys
-          constrainedTy = quantify (foldr (ConstrainedType NullSourceAnn) dictTy deps)
+          dictTy = foldl srcTypeApp (srcTypeConstructor (fmap coerceProperName className)) tys
+          constrainedTy = quantify (foldr srcConstrainedType dictTy deps)
           dict = TypeClassDictionaryConstructorApp className props
           result = ValueDecl sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]
       return result

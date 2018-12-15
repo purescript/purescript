@@ -468,7 +468,7 @@ handleEnv TypeClassEnv{..} =
           ++ T.unpack cdeclTitle)
 
   addConstraint constraint =
-    P.quantify . P.moveQuantifiersToFront . P.ConstrainedType P.NullSourceAnn constraint
+    P.quantify . P.moveQuantifiersToFront . P.srcConstrainedType constraint
 
 splitMap :: Map k (v1, v2) -> (Map k v1, Map k v2)
 splitMap = fmap fst &&& fmap snd
@@ -538,8 +538,8 @@ typeClassConstraintFor :: Declaration -> Maybe P.SourceConstraint
 typeClassConstraintFor Declaration{..} =
   case declInfo of
     TypeClassDeclaration tyArgs _ _ ->
-      Just (P.Constraint P.NullSourceAnn (P.Qualified Nothing (P.ProperName declTitle)) (mkConstraint tyArgs) Nothing)
+      Just (P.srcConstraint (P.Qualified Nothing (P.ProperName declTitle)) (mkConstraint tyArgs) Nothing)
     _ ->
       Nothing
   where
-  mkConstraint = map (P.TypeVar P.NullSourceAnn . fst)
+  mkConstraint = map (P.srcTypeVar . fst)

@@ -90,6 +90,51 @@ data Type a
 
 instance NFData a => NFData (Type a)
 
+srcTUnknown :: Int -> SourceType
+srcTUnknown = TUnknown NullSourceAnn
+
+srcTypeVar :: Text -> SourceType
+srcTypeVar = TypeVar NullSourceAnn
+
+srcTypeLevelString :: PSString -> SourceType
+srcTypeLevelString = TypeLevelString NullSourceAnn
+
+srcTypeWildcard :: SourceType
+srcTypeWildcard = TypeWildcard NullSourceAnn
+
+srcTypeConstructor :: Qualified (ProperName 'TypeName) -> SourceType
+srcTypeConstructor = TypeConstructor NullSourceAnn
+
+srcTypeOp :: Qualified (OpName 'TypeOpName) -> SourceType
+srcTypeOp = TypeOp NullSourceAnn
+
+srcTypeApp :: SourceType -> SourceType -> SourceType
+srcTypeApp = TypeApp NullSourceAnn
+
+srcForAll :: Text -> SourceType -> Maybe SkolemScope -> SourceType
+srcForAll = ForAll NullSourceAnn
+
+srcConstrainedType :: SourceConstraint -> SourceType -> SourceType
+srcConstrainedType = ConstrainedType NullSourceAnn
+
+srcSkolem :: Text -> Int -> SkolemScope -> SourceType
+srcSkolem = Skolem NullSourceAnn
+
+srcREmpty :: SourceType
+srcREmpty = REmpty NullSourceAnn
+
+srcRCons :: Label -> SourceType -> SourceType -> SourceType
+srcRCons = RCons NullSourceAnn
+
+srcKindedType :: SourceType -> SourceKind -> SourceType
+srcKindedType = KindedType NullSourceAnn
+
+srcBinaryNoParensType :: SourceType -> SourceType -> SourceType -> SourceType
+srcBinaryNoParensType = BinaryNoParensType NullSourceAnn
+
+srcParensInType :: SourceType -> SourceType
+srcParensInType = ParensInType NullSourceAnn
+
 -- | Additional data relevant to type class constraints
 data ConstraintData
   = PartialConstraintData [[Text]] Bool
@@ -116,6 +161,9 @@ data Constraint a = Constraint
 
 instance NFData a => NFData (Constraint a)
 
+srcConstraint :: Qualified (ProperName 'ClassName) -> [SourceType] -> Maybe ConstraintData -> SourceConstraint
+srcConstraint = Constraint NullSourceAnn
+
 mapConstraintArgs :: ([Type a] -> [Type a]) -> Constraint a -> Constraint a
 mapConstraintArgs f c = c { constraintArgs = f (constraintArgs c) }
 
@@ -131,6 +179,9 @@ data RowListItem a = RowListItem
   , rowListLabel :: Label
   , rowListType :: Type a
   } deriving (Show, Eq, Ord, Generic, Functor)
+
+srcRowListItem :: Label -> SourceType -> RowListItem SourceAnn
+srcRowListItem = RowListItem NullSourceAnn
 
 -- | Convert a row to a list of pairs of labels and types
 rowToList :: Type a -> ([RowListItem a], Type a)

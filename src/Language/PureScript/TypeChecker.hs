@@ -71,7 +71,7 @@ addDataConstructor
 addDataConstructor moduleName dtype name args dctor tys = do
   env <- getEnv
   traverse_ checkTypeSynonyms tys
-  let retTy = foldl (TypeApp NullSourceAnn) (TypeConstructor NullSourceAnn (Qualified (Just moduleName) name)) (map (TypeVar NullSourceAnn) args)
+  let retTy = foldl srcTypeApp (srcTypeConstructor (Qualified (Just moduleName) name)) (map srcTypeVar args)
   let dctorTy = foldr function retTy tys
   let polyType = mkForAll (map (NullSourceAnn,) args) dctorTy
   let fields = [Ident ("value" <> T.pack (show n)) | n <- [0..(length tys - 1)]]

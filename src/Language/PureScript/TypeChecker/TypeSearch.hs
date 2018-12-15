@@ -95,7 +95,7 @@ accessorSearch unsolved env st userT = maybe ([], []) fst $ checkInEnvironment e
 
   rowType <- freshType
   resultType <- freshType
-  let recordFunction = TypeApp NullSourceAnn (TypeApp NullSourceAnn tyFunction (TypeApp NullSourceAnn tyRecord rowType)) resultType
+  let recordFunction = srcTypeApp (srcTypeApp tyFunction (srcTypeApp tyRecord rowType)) resultType
   _ <- subsumes recordFunction userT'
   subst <- gets TC.checkSubstitution
   let solvedRow = toRowPair <$> fst (rowToList (substituteType subst rowType))

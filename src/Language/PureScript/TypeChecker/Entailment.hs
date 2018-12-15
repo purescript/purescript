@@ -265,7 +265,7 @@ entails SolverOptions{..} constraint context hints =
               Deferred ->
                 -- Constraint was deferred, just return the dictionary unchanged,
                 -- with no unsolved constraints. Hopefully, we can solve this later.
-                return (TypeClassDictionary (Constraint NullSourceAnn className' tys'' conInfo) context hints)
+                return (TypeClassDictionary (srcConstraint className' tys'' conInfo) context hints)
           where
             -- | When checking functional dependencies, we need to use unification to make
             -- sure it is safe to use the selected instance. We will unify the solved type with
@@ -303,8 +303,8 @@ entails SolverOptions{..} constraint context hints =
               | solverDeferErrors = return Deferred
               -- We need a special case for nullary type classes, since we want
               -- to generalize over Partial constraints.
-              | solverShouldGeneralize && (null tyArgs || any canBeGeneralized tyArgs) = return (Unsolved (Constraint NullSourceAnn className' tyArgs conInfo))
-              | otherwise = throwError . errorMessage $ NoInstanceFound (Constraint NullSourceAnn className' tyArgs conInfo)
+              | solverShouldGeneralize && (null tyArgs || any canBeGeneralized tyArgs) = return (Unsolved (srcConstraint className' tyArgs conInfo))
+              | otherwise = throwError . errorMessage $ NoInstanceFound (srcConstraint className' tyArgs conInfo)
             unique _      [(a, dict)] = return $ Solved a dict
             unique tyArgs tcds
               | pairwiseAny overlapping (map snd tcds) =
@@ -370,7 +370,7 @@ entails SolverOptions{..} constraint context hints =
                   LT -> C.orderingLT
                   EQ -> C.orderingEQ
                   GT -> C.orderingGT
-          args' = [arg0, arg1, TypeConstructor NullSourceAnn ordering]
+          args' = [arg0, arg1, srcTypeConstructor ordering]
       in Just [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.SymbolCompare args' Nothing]
     solveSymbolCompare _ = Nothing
 
@@ -383,17 +383,17 @@ entails SolverOptions{..} constraint context hints =
 
     -- | Append type level symbols, or, run backwards, strip a prefix or suffix
     appendSymbols :: SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType)
-    appendSymbols arg0@(TypeLevelString _ lhs) arg1@(TypeLevelString _ rhs) _ = Just (arg0, arg1, TypeLevelString NullSourceAnn (lhs <> rhs))
+    appendSymbols arg0@(TypeLevelString _ lhs) arg1@(TypeLevelString _ rhs) _ = Just (arg0, arg1, srcTypeLevelString (lhs <> rhs))
     appendSymbols arg0@(TypeLevelString _ lhs) _ arg2@(TypeLevelString _ out) = do
       lhs' <- decodeString lhs
       out' <- decodeString out
       rhs <- stripPrefix lhs' out'
-      pure (arg0, TypeLevelString NullSourceAnn (mkString rhs), arg2)
+      pure (arg0, srcTypeLevelString (mkString rhs), arg2)
     appendSymbols _ arg1@(TypeLevelString _ rhs) arg2@(TypeLevelString _ out) = do
       rhs' <- decodeString rhs
       out' <- decodeString out
       lhs <- stripSuffix rhs' out'
-      pure (TypeLevelString NullSourceAnn (mkString lhs), arg1, arg2)
+      pure (srcTypeLevelString (mkString lhs), arg1, arg2)
     appendSymbols _ _ _ = Nothing
 
     solveSymbolCons :: [SourceType] -> Maybe [TypeClassDict]
@@ -407,12 +407,12 @@ entails SolverOptions{..} constraint context hints =
     consSymbol _ _ arg@(TypeLevelString _ s) = do
       (h, t) <- T.uncons =<< decodeString s
       pure (mkTLString (T.singleton h), mkTLString t, arg)
-      where mkTLString = TypeLevelString NullSourceAnn . mkString
+      where mkTLString = srcTypeLevelString . mkString
     consSymbol arg1@(TypeLevelString _ h) arg2@(TypeLevelString _ t) _ = do
       h' <- decodeString h
       t' <- decodeString t
       guard (T.length h' == 1)
-      pure (arg1, arg2, TypeLevelString NullSourceAnn (mkString $ h' <> t'))
+      pure (arg1, arg2, srcTypeLevelString (mkString $ h' <> t'))
     consSymbol _ _ _ = Nothing
 
     solveUnion :: [SourceType] -> Maybe [TypeClassDict]
@@ -428,7 +428,7 @@ entails SolverOptions{..} constraint context hints =
       where
         (fixed, rest) = rowToList l
 
-        rowVar = TypeVar NullSourceAnn "r"
+        rowVar = srcTypeVar "r"
 
         (canMakeProgress, out, cons) =
           case rest of
@@ -441,11 +441,11 @@ entails SolverOptions{..} constraint context hints =
             -- Otherwise, the left hand tail might contain the same labels as on
             -- the right hand side, and we can't be certain we won't reorder the
             -- types for such labels.
-            _ -> (not (null fixed), (fixed, rowVar), Just [ Constraint NullSourceAnn C.RowUnion [rest, r, rowVar] Nothing ])
+            _ -> (not (null fixed), (fixed, rowVar), Just [ srcConstraint C.RowUnion [rest, r, rowVar] Nothing ])
 
     solveRowCons :: [SourceType] -> Maybe [TypeClassDict]
     solveRowCons [TypeLevelString ann sym, ty, r, _] =
-      Just [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowCons [TypeLevelString ann sym, ty, r, RCons NullSourceAnn (Label sym) ty r] Nothing ]
+      Just [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowCons [TypeLevelString ann sym, ty, r, srcRCons (Label sym) ty r] Nothing ]
     solveRowCons _ = Nothing
 
     solveRowToList :: [SourceType] -> Maybe [TypeClassDict]
@@ -458,12 +458,12 @@ entails SolverOptions{..} constraint context hints =
     rowToRowList :: SourceType -> Maybe SourceType
     rowToRowList r =
         guard (eqType rest $ REmpty ()) $>
-        foldr rowListCons (TypeConstructor NullSourceAnn C.RowListNil) fixed
+        foldr rowListCons (srcTypeConstructor C.RowListNil) fixed
       where
         (fixed, rest) = rowToSortedList r
         rowListCons (RowListItem _ lbl ty) tl =
-          foldl (TypeApp NullSourceAnn) (TypeConstructor NullSourceAnn C.RowListCons)
-            [ TypeLevelString NullSourceAnn (runLabel lbl)
+          foldl srcTypeApp (srcTypeConstructor C.RowListCons)
+            [ srcTypeLevelString (runLabel lbl)
             , ty
             , tl ]
 
@@ -497,7 +497,7 @@ entails SolverOptions{..} constraint context hints =
 
         (canMakeProgress, cst) = case rest of
             REmpty _ -> (True, Nothing)
-            _ -> (not (null fixed), Just [ Constraint NullSourceAnn C.RowLacks [TypeLevelString NullSourceAnn sym, rest] Nothing ])
+            _ -> (not (null fixed), Just [ srcConstraint C.RowLacks [srcTypeLevelString sym, rest] Nothing ])
 
 -- Check if an instance matches our list of types, allowing for types
 -- to be solved via functional dependencies. If the types match, we return a
