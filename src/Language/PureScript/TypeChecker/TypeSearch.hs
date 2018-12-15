@@ -39,17 +39,17 @@ evalWriterT :: Monad m => WriterT b m r -> m r
 evalWriterT m = liftM fst (runWriterT m)
 
 checkSubsume
-  :: Maybe [(P.Ident, Entailment.InstanceContext, P.Constraint)]
+  :: Maybe [(P.Ident, Entailment.InstanceContext, (P.Constraint P.SourceAnn))]
   -- ^ Additional constraints we need to satisfy
   -> P.Environment
   -- ^ The Environment which contains the relevant definitions and typeclasses
   -> TC.CheckState
   -- ^ The typechecker state
-  -> P.Type
+  -> P.Type P.SourceAnn
   -- ^ The user supplied type
-  -> P.Type
+  -> P.Type P.SourceAnn
   -- ^ The type supplied by the environment
-  -> Maybe ((P.Expr, [(P.Ident, Entailment.InstanceContext, P.Constraint)]), P.Environment)
+  -> Maybe ((P.Expr, [(P.Ident, Entailment.InstanceContext, P.Constraint P.SourceAnn)]), P.Environment)
 checkSubsume unsolved env st userT envT = checkInEnvironment env st $ do
   let initializeSkolems =
         Skolem.introduceSkolemScope
@@ -79,11 +79,11 @@ checkSubsume unsolved env st userT envT = checkInEnvironment env st $ do
   Entailment.replaceTypeClassDictionaries (isJust unsolved) expP
 
 accessorSearch
-  :: Maybe [(P.Ident, Entailment.InstanceContext, P.Constraint)]
+  :: Maybe [(P.Ident, Entailment.InstanceContext, P.Constraint P.SourceAnn)]
   -> P.Environment
   -> TC.CheckState
-  -> P.Type
-  -> ([(Label, P.Type)], [(Label, P.Type)])
+  -> P.Type P.SourceAnn
+  -> ([(Label, P.Type P.SourceAnn)], [(Label, P.Type P.SourceAnn)])
   -- ^ (all accessors we found, all accessors we found that match the result type)
 accessorSearch unsolved env st userT = maybe ([], []) fst $ checkInEnvironment env st $ do
   let initializeSkolems =
@@ -95,28 +95,29 @@ accessorSearch unsolved env st userT = maybe ([], []) fst $ checkInEnvironment e
 
   rowType <- freshType
   resultType <- freshType
-  let recordFunction = TypeApp (TypeApp tyFunction (TypeApp tyRecord rowType)) resultType
+  let recordFunction = TypeApp NullSourceAnn (TypeApp NullSourceAnn tyFunction (TypeApp NullSourceAnn tyRecord rowType)) resultType
   _ <- subsumes recordFunction userT'
   subst <- gets TC.checkSubstitution
-  let solvedRow = fst (rowToList (substituteType subst rowType))
+  let solvedRow = toRowPair <$> fst (rowToList (substituteType subst rowType))
   tcS <- get
   pure (solvedRow, filter (\x -> checkAccessor tcS (substituteType subst resultType) x) solvedRow)
   where
     checkAccessor tcs x (_, type') = isJust (checkSubsume unsolved env tcs x type')
+    toRowPair (RowListItem _ lbl ty) = (lbl, ty)
 
 typeSearch
-  :: Maybe [(P.Ident, Entailment.InstanceContext, P.Constraint)]
+  :: Maybe [(P.Ident, Entailment.InstanceContext, P.Constraint P.SourceAnn)]
   -- ^ Additional constraints we need to satisfy
   -> P.Environment
   -- ^ The Environment which contains the relevant definitions and typeclasses
   -> TC.CheckState
   -- ^ The typechecker state
-  -> P.Type
+  -> P.Type P.SourceAnn
   -- ^ The type we are looking for
-  -> ([(P.Qualified Text, P.Type)], Maybe [(Label, P.Type)])
+  -> ([(P.Qualified Text, P.Type P.SourceAnn)], Maybe [(Label, P.Type P.SourceAnn)])
 typeSearch unsolved env st type' =
   let
-    runTypeSearch :: Map k P.Type -> Map k P.Type
+    runTypeSearch :: Map k (P.Type P.SourceAnn) -> Map k (P.Type P.SourceAnn)
     runTypeSearch = Map.mapMaybe (\ty -> checkSubsume unsolved env st type' ty $> ty)
 
     matchingNames = runTypeSearch (Map.map (\(ty, _, _) -> ty) (P.names env))

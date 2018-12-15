@@ -1,7 +1,4 @@
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE DeriveFoldable #-}
-{-# LANGUAGE DeriveTraversable #-}
 
 module Language.PureScript.Kinds where
 
@@ -16,7 +13,6 @@ import Data.Aeson.BetterErrors (Parse, key, asText, asIntegral, nth, fromAesonPa
 import Data.Aeson ((.=))
 import qualified Data.Aeson as A
 
-import Language.PureScript.AST.SourcePos
 import Language.PureScript.Names
 import qualified Language.PureScript.Constants as C
 
@@ -30,7 +26,7 @@ data Kind a
   | FunKind a (Kind a) (Kind a)
   -- | A named kind
   | NamedKind a (Qualified (ProperName 'KindName))
-  deriving (Show, Eq, Ord, Generic, Functor, Foldable, Traversable)
+  deriving (Show, Eq, Ord, Generic, Functor)
 
 instance NFData a => NFData (Kind a)
 
@@ -89,8 +85,9 @@ kindFromJSON defaultAnn annFromJSON = fix $ \go -> do
   kindType = primKind C.typ
   kindSymbol = primKind C.symbol
 
-instance A.FromJSON (Kind SourceAnn) where
-  parseJSON = toAesonParser id (kindFromJSON nullSourceAnn fromAesonParser)
+instance A.FromJSON a => A.FromJSON (Kind a) where
+  -- TODO
+  parseJSON = toAesonParser id (kindFromJSON undefined fromAesonParser)
 
 everywhereOnKinds :: (Kind a -> Kind a) -> Kind a -> Kind a
 everywhereOnKinds f = go
@@ -118,3 +115,10 @@ annotationForKind (KUnknown a _) = a
 annotationForKind (Row a _) = a
 annotationForKind (FunKind a _ _) = a
 annotationForKind (NamedKind a _) = a
+
+eqKind :: Kind a -> Kind b -> Bool
+eqKind (KUnknown _ a) (KUnknown _ a') = a == a'
+eqKind (Row _ a) (Row _ a') = eqKind a a'
+eqKind (FunKind _ a b) (FunKind _ a' b') = eqKind a a' && eqKind b b'
+eqKind (NamedKind _ a) (NamedKind _ a') = a == a'
+eqKind _ _ = False

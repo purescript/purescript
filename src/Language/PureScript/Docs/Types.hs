@@ -147,7 +147,7 @@ data DeclarationInfo
   -- |
   -- A value declaration, with its type.
   --
-  = ValueDeclaration P.Type
+  = ValueDeclaration (P.Type P.SourceAnn)
 
   -- |
   -- A data/newtype declaration, with the kind of declaration (data or
@@ -164,13 +164,13 @@ data DeclarationInfo
   -- |
   -- A type synonym, with its type arguments and its type.
   --
-  | TypeSynonymDeclaration [(Text, Maybe (P.Kind P.SourceAnn))] P.Type
+  | TypeSynonymDeclaration [(Text, Maybe (P.Kind P.SourceAnn))] (P.Type P.SourceAnn)
 
   -- |
   -- A type class, with its type arguments, its superclasses and functional
   -- dependencies. Instances and members are represented as child declarations.
   --
-  | TypeClassDeclaration [(Text, Maybe (P.Kind P.SourceAnn))] [P.Constraint] [([Text], [Text])]
+  | TypeClassDeclaration [(Text, Maybe (P.Kind P.SourceAnn))] [P.Constraint P.SourceAnn] [([Text], [Text])]
 
   -- |
   -- An operator alias declaration, with the member the alias is for and the
@@ -287,19 +287,19 @@ data ChildDeclarationInfo
   -- |
   -- A type instance declaration, with its dependencies and its type.
   --
-  = ChildInstance [P.Constraint] P.Type
+  = ChildInstance [P.Constraint P.SourceAnn] (P.Type P.SourceAnn)
 
   -- |
   -- A data constructor, with its type arguments.
   --
-  | ChildDataConstructor [P.Type]
+  | ChildDataConstructor [P.Type P.SourceAnn]
 
   -- |
   -- A type class member, with its type. Note that the type does not include
   -- the type class constraint; this may be added manually if desired. For
   -- example, `pure` from `Applicative` would be `forall a. a -> f a`.
   --
-  | ChildTypeClassMember P.Type
+  | ChildTypeClassMember (P.Type P.SourceAnn)
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData ChildDeclarationInfo
@@ -660,7 +660,7 @@ asTypeArguments = eachInArray asTypeArgument
 asKind :: Parse PackageError (P.Kind P.SourceAnn)
 asKind = P.kindFromJSON P.nullSourceAnn fromAesonParser .! InvalidKind
 
-asType :: Parse e P.Type
+asType :: Parse e (P.Type P.SourceAnn)
 asType = fromAesonParser
 
 asFunDeps :: Parse PackageError [([Text], [Text])]
@@ -700,8 +700,9 @@ asSourcePos :: Parse e P.SourcePos
 asSourcePos = P.SourcePos <$> nth 0 asIntegral
                           <*> nth 1 asIntegral
 
-asConstraint :: Parse PackageError P.Constraint
-asConstraint = P.Constraint <$> key "constraintClass" asQualifiedProperName
+asConstraint :: Parse PackageError (P.Constraint P.SourceAnn)
+asConstraint = P.Constraint P.NullSourceAnn
+                            <$> key "constraintClass" asQualifiedProperName
                             <*> key "constraintArgs" (eachInArray asType)
                             <*> pure Nothing
 

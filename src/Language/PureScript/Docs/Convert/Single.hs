@@ -114,7 +114,7 @@ convertDeclaration (P.ValueDecl sa _ _ _ [P.MkUnguarded (P.TypedValue _ _ ty)]) 
 convertDeclaration (P.ValueDecl sa _ _ _ _) title =
   -- If no explicit type declaration was provided, insert a wildcard, so that
   -- the actual type will be added during type checking.
-  basicDeclaration sa title (ValueDeclaration (P.TypeWildcard (fst sa)))
+  basicDeclaration sa title (ValueDeclaration (P.TypeWildcard (fst sa, [])))
 convertDeclaration (P.ExternDeclaration sa _ ty) title =
   basicDeclaration sa title (ValueDeclaration ty)
 convertDeclaration (P.DataDeclaration sa dtype _ args ctors) title =
@@ -146,11 +146,11 @@ convertDeclaration (P.TypeInstanceDeclaration (ss, com) _ _ _ constraints classN
   typeNameStrings = ordNub (concatMap (P.everythingOnTypes (++) extractProperNames) tys)
   unQual x = let (P.Qualified _ y) = x in P.runProperName y
 
-  extractProperNames (P.TypeConstructor n) = [unQual n]
+  extractProperNames (P.TypeConstructor _ n) = [unQual n]
   extractProperNames _ = []
 
   childDecl = ChildDeclaration title (convertComments com) (Just ss) (ChildInstance constraints classApp)
-  classApp = foldl' P.TypeApp (P.TypeConstructor (fmap P.coerceProperName className)) tys
+  classApp = foldl' (P.TypeApp P.NullSourceAnn) (P.TypeConstructor P.NullSourceAnn (fmap P.coerceProperName className)) tys
 convertDeclaration (P.ValueFixityDeclaration sa fixity (P.Qualified mn alias) _) title =
   Just . Right $ mkDeclaration sa title (AliasDeclaration fixity (P.Qualified mn (Right alias)))
 convertDeclaration (P.TypeFixityDeclaration sa fixity (P.Qualified mn alias) _) title =

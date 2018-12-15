@@ -204,10 +204,11 @@ parseTypeClassDeclaration = withSourceAnnF $ do
     indented *> mark (P.many (same *> parseTypeDeclaration))
   return $ \sa -> TypeClassDeclaration sa className idents implies dependencies members
 
-parseConstraint :: TokenParser Constraint
-parseConstraint = Constraint <$> parseQualified properName
-                             <*> P.many (noWildcards $ noForAll parseTypeAtom)
-                             <*> pure Nothing
+parseConstraint :: TokenParser (Constraint SourceAnn)
+parseConstraint = withSourceAnnF $ do
+  name <- parseQualified properName
+  args <- P.many (noWildcards $ noForAll parseTypeAtom)
+  return $ \ann -> Constraint ann name args Nothing
 
 parseInstanceDeclaration :: TokenParser (TypeInstanceBody -> Declaration)
 parseInstanceDeclaration = withSourceAnnF $ do

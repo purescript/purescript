@@ -82,5 +82,5 @@ textError (ParseError parseError msg) = let escape = show
                                         in msg <> ": " <> escape parseError
 textError (RebuildError err)          = show err
 
-prettyPrintTypeSingleLine :: P.Type -> Text
+prettyPrintTypeSingleLine :: P.Type a -> Text
 prettyPrintTypeSingleLine = T.unwords . map T.strip . T.lines . T.pack . P.prettyPrintTypeWithUnicode

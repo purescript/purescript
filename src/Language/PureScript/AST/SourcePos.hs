@@ -86,6 +86,16 @@ nullSourceSpan = internalModuleSourceSpan ""
 nullSourceAnn :: SourceAnn
 nullSourceAnn = (nullSourceSpan, [])
 
+pattern NullSourceSpan :: SourceSpan
+pattern NullSourceSpan = SourceSpan "" (SourcePos 0 0) (SourcePos 0 0)
+
+pattern NullSourceAnn :: SourceAnn
+pattern NullSourceAnn = (NullSourceSpan, [])
+
+nonEmptySpan :: SourceAnn -> Maybe SourceSpan
+nonEmptySpan (NullSourceSpan, _) = Nothing
+nonEmptySpan (ss, _) = Just ss
+
 minSourcePos :: SourcePos -> SourcePos -> SourcePos
 minSourcePos a@(SourcePos l1 c1) b@(SourcePos l2 c2)
   | l1 < l2   = a

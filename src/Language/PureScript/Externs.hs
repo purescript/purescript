@@ -106,35 +106,35 @@ data ExternsDeclaration =
   | EDTypeSynonym
       { edTypeSynonymName         :: ProperName 'TypeName
       , edTypeSynonymArguments    :: [(Text, Maybe (Kind SourceAnn))]
-      , edTypeSynonymType         :: Type
+      , edTypeSynonymType         :: Type SourceAnn
       }
   -- | A data construtor
   | EDDataConstructor
       { edDataCtorName            :: ProperName 'ConstructorName
       , edDataCtorOrigin          :: DataDeclType
       , edDataCtorTypeCtor        :: ProperName 'TypeName
-      , edDataCtorType            :: Type
+      , edDataCtorType            :: Type SourceAnn
       , edDataCtorFields          :: [Ident]
       }
   -- | A value declaration
   | EDValue
       { edValueName               :: Ident
-      , edValueType               :: Type
+      , edValueType               :: Type SourceAnn
       }
   -- | A type class declaration
   | EDClass
       { edClassName               :: ProperName 'ClassName
       , edClassTypeArguments      :: [(Text, Maybe (Kind SourceAnn))]
-      , edClassMembers            :: [(Ident, Type)]
-      , edClassConstraints        :: [Constraint]
+      , edClassMembers            :: [(Ident, Type SourceAnn)]
+      , edClassConstraints        :: [Constraint SourceAnn]
       , edFunctionalDependencies  :: [FunctionalDependency]
       }
   -- | An instance declaration
   | EDInstance
       { edInstanceClassName       :: Qualified (ProperName 'ClassName)
       , edInstanceName            :: Ident
-      , edInstanceTypes           :: [Type]
-      , edInstanceConstraints     :: Maybe [Constraint]
+      , edInstanceTypes           :: [Type SourceAnn]
+      , edInstanceConstraints     :: Maybe [Constraint SourceAnn]
       , edInstanceChain           :: [Qualified Ident]
       , edInstanceChainIndex      :: Integer
       }
