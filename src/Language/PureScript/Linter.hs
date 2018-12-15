@@ -80,21 +80,21 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
   checkTypeVarsInDecl :: S.Set Text -> Declaration -> MultipleErrors
   checkTypeVarsInDecl s d = let (f, _, _, _, _) = accumTypes (checkTypeVars (declSourceSpan d) s) in f d
 
-  checkTypeVars :: SourceSpan -> S.Set Text -> Type SourceAnn -> MultipleErrors
+  checkTypeVars :: SourceSpan -> S.Set Text -> SourceType -> MultipleErrors
   checkTypeVars ss set ty = everythingWithContextOnTypes set mempty mappend step ty <> snd (findUnused ty)
     where
 
-    step :: S.Set Text -> Type SourceAnn -> (S.Set Text, MultipleErrors)
+    step :: S.Set Text -> SourceType -> (S.Set Text, MultipleErrors)
     step s (ForAll _ tv _ _) = bindVar s tv
     step s _ = (s, mempty)
 
     bindVar :: S.Set Text -> Text -> (S.Set Text, MultipleErrors)
     bindVar = bind ss ShadowedTypeVar
 
-    findUnused :: Type SourceAnn -> (S.Set Text, MultipleErrors)
+    findUnused :: SourceType -> (S.Set Text, MultipleErrors)
     findUnused = go set where
       -- Recursively walk the type and prune used variables from `unused`
-      go :: S.Set Text -> Type SourceAnn -> (S.Set Text, MultipleErrors)
+      go :: S.Set Text -> SourceType -> (S.Set Text, MultipleErrors)
       go unused (TypeVar _ v) = (S.delete v unused, mempty)
       go unused (ForAll _ tv t1 _) =
         let (nowUnused, errors) = go (S.insert tv unused) t1

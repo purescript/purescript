@@ -70,7 +70,7 @@ skolemizeTypesInValue ann ident sko scope =
       | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedBinder (skolemize ann ident sko scope ty) b)
     onBinder sco other = return (sco, other)
 
-    peelTypeVars :: Type SourceAnn -> [Text]
+    peelTypeVars :: SourceType -> [Text]
     peelTypeVars (ForAll _ i ty _) = i : peelTypeVars ty
     peelTypeVars _ = []
 
@@ -115,13 +115,13 @@ skolemEscapeCheck expr@TypedValue{} =
         allScopes = fromList newScopes <> scopes
 
         -- Collect any scopes appearing in quantifiers at the top level
-        collectScopes :: Type SourceAnn -> [SkolemScope]
+        collectScopes :: SourceType -> [SkolemScope]
         collectScopes (ForAll _ _ t (Just sco)) = sco : collectScopes t
         collectScopes ForAll{} = internalError "skolemEscapeCheck: No skolem scope"
         collectScopes _ = []
 
         -- Collect any skolem variables appearing in a type
-        collectSkolems :: Type SourceAnn -> [(SourceAnn, Text, SkolemScope)]
+        collectSkolems :: SourceType -> [(SourceAnn, Text, SkolemScope)]
         collectSkolems = everythingOnTypes (++) collect where
           collect (Skolem ss name _ scope) = [(ss, name, scope)]
           collect _ = []

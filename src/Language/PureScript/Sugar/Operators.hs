@@ -166,7 +166,7 @@ rebracketFiltered pred_ externs modules = do
       internalError "BinaryNoParensBinder has no OpBinder"
     goBinder pos other = return (pos, other)
 
-    goType :: SourceSpan -> Type SourceAnn -> m (Type SourceAnn)
+    goType :: SourceSpan -> SourceType -> m SourceType
     goType pos (BinaryNoParensType ann (TypeOp ann2 op) lhs rhs) =
       case op `M.lookup` typeAliased of
         Just alias ->
@@ -202,7 +202,7 @@ rebracketModule pred_ valueOpTable typeOpTable (Module ss coms mn ds exts) =
 
   (goDecl, goExpr', goBinder') = updateTypes goType
 
-  goType :: SourceSpan -> Type SourceAnn -> m (Type SourceAnn)
+  goType :: SourceSpan -> SourceType -> m SourceType
   goType = flip matchTypeOperators typeOpTable
 
   wrap :: (a -> m a) -> (SourceSpan, a) -> m (SourceSpan, a)
@@ -302,7 +302,7 @@ customOperatorTable fixities =
 updateTypes
   :: forall m
    . Monad m
-  => (SourceSpan -> Type SourceAnn -> m (Type SourceAnn))
+  => (SourceSpan -> SourceType -> m SourceType)
   -> ( Declaration -> m Declaration
      , SourceSpan -> Expr -> m (SourceSpan, Expr)
      , SourceSpan -> Binder -> m (SourceSpan, Binder)
@@ -310,7 +310,7 @@ updateTypes
 updateTypes goType = (goDecl, goExpr, goBinder)
   where
 
-  goType' :: SourceSpan -> Type SourceAnn -> m (Type SourceAnn)
+  goType' :: SourceSpan -> SourceType -> m SourceType
   goType' = everywhereOnTypesTopDownM . goType
 
   goDecl :: Declaration -> m Declaration

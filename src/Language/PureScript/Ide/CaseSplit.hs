@@ -35,7 +35,7 @@ import           Language.PureScript.Ide.Types
 import           Text.Parsec                   as Parsec
 import qualified Text.PrettyPrint.Boxes        as Box
 
-type Constructor = (P.ProperName 'P.ConstructorName, [P.Type P.SourceAnn])
+type Constructor = (P.ProperName 'P.ConstructorName, [P.SourceType])
 
 newtype WildcardAnnotations = WildcardAnnotations Bool
 
@@ -116,7 +116,7 @@ addClause s wca = do
   pure [s, template]
 
 parseType' :: (MonadError IdeError m) =>
-              Text -> m (P.Type P.SourceAnn)
+              Text -> m P.SourceType
 parseType' s =
   case P.lex "<psc-ide>" (toS s) >>= P.runTokenParser "<psc-ide>" (P.parseType <* Parsec.eof) of
     Right type' -> pure type'
@@ -124,7 +124,7 @@ parseType' s =
       throwError (GeneralError ("Parsing the splittype failed with:"
                                 <> show err))
 
-parseTypeDeclaration' :: (MonadError IdeError m) => Text -> m (P.Ident, P.Type P.SourceAnn)
+parseTypeDeclaration' :: (MonadError IdeError m) => Text -> m (P.Ident, P.SourceType)
 parseTypeDeclaration' s =
   let x = do
         ts <- P.lex "" (toS s)

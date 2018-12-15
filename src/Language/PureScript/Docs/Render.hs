@@ -85,7 +85,7 @@ renderDeclarationWithOptions opts Declaration{..} =
       ]
 
   where
-  renderType' :: P.Type P.SourceAnn -> RenderedCode
+  renderType' :: P.SourceType -> RenderedCode
   renderType' = renderTypeWithOptions opts
 
 renderChildDeclaration :: ChildDeclaration -> RenderedCode
@@ -109,17 +109,17 @@ renderChildDeclarationWithOptions opts ChildDeclaration{..} =
   renderType' = renderTypeWithOptions opts
   renderTypeAtom' = renderTypeAtomWithOptions opts
 
-renderConstraint :: P.Constraint P.SourceAnn -> RenderedCode
+renderConstraint :: P.SourceConstraint -> RenderedCode
 renderConstraint = renderConstraintWithOptions defaultRenderTypeOptions
 
-renderConstraintWithOptions :: RenderTypeOptions -> P.Constraint P.SourceAnn -> RenderedCode
+renderConstraintWithOptions :: RenderTypeOptions -> P.SourceConstraint -> RenderedCode
 renderConstraintWithOptions opts (P.Constraint ann pn tys _) =
   renderTypeWithOptions opts $ foldl (P.TypeApp ann) (P.TypeConstructor ann (fmap P.coerceProperName pn)) tys
 
-renderConstraints :: [P.Constraint P.SourceAnn] -> Maybe RenderedCode
+renderConstraints :: [P.SourceConstraint] -> Maybe RenderedCode
 renderConstraints = renderConstraintsWithOptions defaultRenderTypeOptions
 
-renderConstraintsWithOptions :: RenderTypeOptions -> [P.Constraint P.SourceAnn] -> Maybe RenderedCode
+renderConstraintsWithOptions :: RenderTypeOptions -> [P.SourceConstraint] -> Maybe RenderedCode
 renderConstraintsWithOptions opts constraints
   | null constraints = Nothing
   | otherwise = Just $
@@ -140,12 +140,12 @@ ident' = ident . P.Qualified Nothing . P.Ident
 dataCtor' :: Text -> RenderedCode
 dataCtor' = dataCtor . notQualified
 
-typeApp :: Text -> [(Text, Maybe (P.Kind P.SourceAnn))] -> P.Type P.SourceAnn
+typeApp :: Text -> [(Text, Maybe P.SourceKind)] -> P.SourceType
 typeApp title typeArgs =
   foldl (P.TypeApp P.NullSourceAnn)
         (P.TypeConstructor P.NullSourceAnn (notQualified title))
         (map toTypeVar typeArgs)
 
-toTypeVar :: (Text, Maybe (P.Kind P.SourceAnn)) -> P.Type P.SourceAnn
+toTypeVar :: (Text, Maybe P.SourceKind) -> P.SourceType
 toTypeVar (s, Nothing) = P.TypeVar P.NullSourceAnn s
 toTypeVar (s, Just k) = P.KindedType P.NullSourceAnn (P.TypeVar P.NullSourceAnn s) k

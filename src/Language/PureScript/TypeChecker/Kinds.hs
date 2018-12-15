@@ -30,7 +30,7 @@ import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Types
 
 -- | Generate a fresh kind variable
-freshKind :: (MonadState CheckState m) => m (Kind SourceAnn)
+freshKind :: (MonadState CheckState m) => m SourceKind
 freshKind = do
   k <- gets checkNextKind
   modify $ \st -> st { checkNextKind = k + 1 }
@@ -40,7 +40,7 @@ freshKind = do
 solveKind
   :: (MonadError MultipleErrors m, MonadState CheckState m)
   => Int
-  -> Kind SourceAnn
+  -> SourceKind
   -> m ()
 solveKind u k = do
   occursCheck u k
@@ -51,7 +51,7 @@ solveKind u k = do
                      }
 
 -- | Apply a substitution to a kind
-substituteKind :: Substitution -> Kind SourceAnn -> Kind SourceAnn
+substituteKind :: Substitution -> SourceKind -> SourceKind
 substituteKind sub = everywhereOnKinds go
   where
   go (KUnknown ann u) =
@@ -65,7 +65,7 @@ substituteKind sub = everywhereOnKinds go
 occursCheck
   :: (MonadError MultipleErrors m)
   => Int
-  -> Kind SourceAnn
+  -> SourceKind
   -> m ()
 occursCheck _ KUnknown{} = return ()
 occursCheck u k = void $ everywhereOnKindsM go k
@@ -76,8 +76,8 @@ occursCheck u k = void $ everywhereOnKindsM go k
 -- | Unify two kinds
 unifyKinds
   :: (MonadError MultipleErrors m, MonadState CheckState m)
-  => Kind SourceAnn
-  -> Kind SourceAnn
+  => SourceKind
+  -> SourceKind
   -> m ()
 unifyKinds k1 k2 = do
   sub <- gets checkSubstitution
@@ -96,15 +96,15 @@ unifyKinds k1 k2 = do
 -- | Infer the kind of a single type
 kindOf
   :: (MonadError MultipleErrors m, MonadState CheckState m)
-  => Type SourceAnn
-  -> m (Kind SourceAnn)
+  => SourceType
+  -> m SourceKind
 kindOf ty = fst <$> kindOfWithScopedVars ty
 
 -- | Infer the kind of a single type, returning the kinds of any scoped type variables
 kindOfWithScopedVars ::
   (MonadError MultipleErrors m, MonadState CheckState m) =>
-  Type SourceAnn ->
-  m (Kind SourceAnn, [(Text, Kind SourceAnn)])
+  SourceType ->
+  m (SourceKind, [(Text, SourceKind)])
 kindOfWithScopedVars ty =
   withErrorMessageHint (ErrorCheckingKind ty) $
     fmap tidyUp . withFreshSubstitution . captureSubstitution $ infer ty
@@ -119,9 +119,9 @@ kindsOf
   => Bool
   -> ModuleName
   -> ProperName 'TypeName
-  -> [(Text, Maybe (Kind SourceAnn))]
-  -> [Type SourceAnn]
-  -> m (Kind SourceAnn)
+  -> [(Text, Maybe SourceKind)]
+  -> [SourceType]
+  -> m SourceKind
 kindsOf isData moduleName name args ts = fmap tidyUp . withFreshSubstitution . captureSubstitution $ do
   tyCon <- freshKind
   kargs <- replicateM (length args) freshKind
@@ -134,9 +134,9 @@ kindsOf isData moduleName name args ts = fmap tidyUp . withFreshSubstitution . c
 
 freshKindVar
   :: (MonadError MultipleErrors m, MonadState CheckState m)
-  => (Text, Maybe (Kind SourceAnn))
-  -> Kind SourceAnn
-  -> m (ProperName 'TypeName, Kind SourceAnn)
+  => (Text, Maybe SourceKind)
+  -> SourceKind
+  -> m (ProperName 'TypeName, SourceKind)
 freshKindVar (arg, Nothing) kind = return (ProperName arg, kind)
 freshKindVar (arg, Just kind') kind = do
   unifyKinds kind kind'
@@ -146,9 +146,9 @@ freshKindVar (arg, Just kind') kind = do
 kindsOfAll
   :: (MonadError MultipleErrors m, MonadState CheckState m)
   => ModuleName
-  -> [(ProperName 'TypeName, [(Text, Maybe (Kind SourceAnn))], Type SourceAnn)]
-  -> [(ProperName 'TypeName, [(Text, Maybe (Kind SourceAnn))], [Type SourceAnn])]
-  -> m ([Kind SourceAnn], [Kind SourceAnn])
+  -> [(ProperName 'TypeName, [(Text, Maybe SourceKind)], SourceType)]
+  -> [(ProperName 'TypeName, [(Text, Maybe SourceKind)], [SourceType])]
+  -> m ([SourceKind], [SourceKind])
 kindsOfAll moduleName syns tys = fmap tidyUp . withFreshSubstitution . captureSubstitution $ do
   synVars <- replicateM (length syns) freshKind
   let dict = zipWith (\(name, _, _) var -> (name, var)) syns synVars
@@ -174,10 +174,10 @@ kindsOfAll moduleName syns tys = fmap tidyUp . withFreshSubstitution . captureSu
 solveTypes
   :: (MonadError MultipleErrors m, MonadState CheckState m)
   => Bool
-  -> [Type SourceAnn]
-  -> [Kind SourceAnn]
-  -> Kind SourceAnn
-  -> m (Kind SourceAnn)
+  -> [SourceType]
+  -> [SourceKind]
+  -> SourceKind
+  -> m SourceKind
 solveTypes isData ts kargs tyCon = do
   ks <- traverse (fmap fst . infer) ts
   when isData $ do
@@ -197,15 +197,15 @@ starIfUnknown k = k
 -- | Infer a kind for a type
 infer
   :: (MonadError MultipleErrors m, MonadState CheckState m)
-  => Type SourceAnn
-  -> m (Kind SourceAnn, [(Text, Kind SourceAnn)])
+  => SourceType
+  -> m (SourceKind, [(Text, SourceKind)])
 infer ty = withErrorMessageHint (ErrorCheckingKind ty) $ infer' ty
 
 infer'
   :: forall m
    . (MonadError MultipleErrors m, MonadState CheckState m)
-  => Type SourceAnn
-  -> m (Kind SourceAnn, [(Text, Kind SourceAnn)])
+  => SourceType
+  -> m (SourceKind, [(Text, SourceKind)])
 infer' (ForAll _ ident ty _) = do
   k1 <- freshKind
   Just moduleName <- checkCurrentModule <$> get
@@ -218,7 +218,7 @@ infer' (KindedType _ ty k) = do
   return (k', args)
 infer' other = (, []) <$> go other
   where
-  go :: Type SourceAnn -> m (Kind SourceAnn)
+  go :: SourceType -> m SourceKind
   go (ForAll _ ident ty _) = do
     k1 <- freshKind
     Just moduleName <- checkCurrentModule <$> get

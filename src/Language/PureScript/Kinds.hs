@@ -13,8 +13,11 @@ import Data.Aeson.BetterErrors (Parse, key, asText, asIntegral, nth, fromAesonPa
 import Data.Aeson ((.=))
 import qualified Data.Aeson as A
 
+import Language.PureScript.AST.SourcePos
 import Language.PureScript.Names
 import qualified Language.PureScript.Constants as C
+
+type SourceKind = Kind SourceAnn
 
 -- | The data type of kinds
 data Kind a

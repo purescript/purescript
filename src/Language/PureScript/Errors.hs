@@ -242,9 +242,9 @@ data Level = Error | Warning deriving Show
 unwrapErrorMessage :: ErrorMessage -> SimpleErrorMessage
 unwrapErrorMessage (ErrorMessage _ se) = se
 
-replaceUnknowns :: Type SourceAnn -> State TypeMap (Type SourceAnn)
+replaceUnknowns :: SourceType -> State TypeMap SourceType
 replaceUnknowns = everywhereOnTypesM replaceTypes where
-  replaceTypes :: Type SourceAnn -> State TypeMap (Type SourceAnn)
+  replaceTypes :: SourceType -> State TypeMap SourceType
   replaceTypes (TUnknown ann u) = do
     m <- get
     case M.lookup u (umUnknownMap m) of
@@ -263,10 +263,10 @@ replaceUnknowns = everywhereOnTypesM replaceTypes where
       Just (_, s', _) -> return (Skolem ann name s' sko)
   replaceTypes other = return other
 
-onTypesInErrorMessage :: (Type SourceAnn -> Type SourceAnn) -> ErrorMessage -> ErrorMessage
+onTypesInErrorMessage :: (SourceType -> SourceType) -> ErrorMessage -> ErrorMessage
 onTypesInErrorMessage f = runIdentity . onTypesInErrorMessageM (Identity . f)
 
-onTypesInErrorMessageM :: Applicative m => (Type SourceAnn -> m (Type SourceAnn)) -> ErrorMessage -> m ErrorMessage
+onTypesInErrorMessageM :: Applicative m => (SourceType -> m SourceType) -> ErrorMessage -> m ErrorMessage
 onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse gHint hints <*> gSimple simple
   where
   gSimple (InfiniteType t) = InfiniteType <$> f t

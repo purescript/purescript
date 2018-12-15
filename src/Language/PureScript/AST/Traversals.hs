@@ -16,7 +16,6 @@ import qualified Data.Set as S
 import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Declarations
 import Language.PureScript.AST.Literals
-import Language.PureScript.AST.SourcePos
 import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.Traversals
@@ -621,7 +620,7 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
 
 accumTypes
   :: (Monoid r)
-  => (Type SourceAnn -> r)
+  => (SourceType -> r)
   -> ( Declaration -> r
      , Expr -> r
      , Binder -> r
@@ -645,7 +644,7 @@ accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (con
 
 accumKinds
   :: (Monoid r)
-  => (Kind SourceAnn -> r)
+  => (SourceKind -> r)
   -> ( Declaration -> r
      , Expr -> r
      , Binder -> r
@@ -682,7 +681,7 @@ accumKinds f = everythingOnValues mappend forDecls forValues (const mempty) (con
 -- |
 -- Map a function over type annotations appearing inside a value
 --
-overTypes :: (Type SourceAnn -> Type SourceAnn) -> Expr -> Expr
+overTypes :: (SourceType -> SourceType) -> Expr -> Expr
 overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
   where
   g :: Expr -> Expr

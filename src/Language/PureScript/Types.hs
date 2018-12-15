@@ -23,10 +23,14 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import GHC.Generics (Generic)
 
+import Language.PureScript.AST.SourcePos
 import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.Label (Label)
 import Language.PureScript.PSString (PSString)
+
+type SourceType = Type SourceAnn
+type SourceConstraint = Constraint SourceAnn
 
 -- |
 -- An identifier for the scope of a skolem variable

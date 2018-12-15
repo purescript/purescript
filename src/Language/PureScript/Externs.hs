@@ -99,42 +99,42 @@ data ExternsDeclaration =
   -- | A type declaration
     EDType
       { edTypeName                :: ProperName 'TypeName
-      , edTypeKind                :: Kind SourceAnn
+      , edTypeKind                :: SourceKind
       , edTypeDeclarationKind     :: TypeKind
       }
   -- | A type synonym
   | EDTypeSynonym
       { edTypeSynonymName         :: ProperName 'TypeName
-      , edTypeSynonymArguments    :: [(Text, Maybe (Kind SourceAnn))]
-      , edTypeSynonymType         :: Type SourceAnn
+      , edTypeSynonymArguments    :: [(Text, Maybe SourceKind)]
+      , edTypeSynonymType         :: SourceType
       }
   -- | A data construtor
   | EDDataConstructor
       { edDataCtorName            :: ProperName 'ConstructorName
       , edDataCtorOrigin          :: DataDeclType
       , edDataCtorTypeCtor        :: ProperName 'TypeName
-      , edDataCtorType            :: Type SourceAnn
+      , edDataCtorType            :: SourceType
       , edDataCtorFields          :: [Ident]
       }
   -- | A value declaration
   | EDValue
       { edValueName               :: Ident
-      , edValueType               :: Type SourceAnn
+      , edValueType               :: SourceType
       }
   -- | A type class declaration
   | EDClass
       { edClassName               :: ProperName 'ClassName
-      , edClassTypeArguments      :: [(Text, Maybe (Kind SourceAnn))]
-      , edClassMembers            :: [(Ident, Type SourceAnn)]
-      , edClassConstraints        :: [Constraint SourceAnn]
+      , edClassTypeArguments      :: [(Text, Maybe SourceKind)]
+      , edClassMembers            :: [(Ident, SourceType)]
+      , edClassConstraints        :: [SourceConstraint]
       , edFunctionalDependencies  :: [FunctionalDependency]
       }
   -- | An instance declaration
   | EDInstance
       { edInstanceClassName       :: Qualified (ProperName 'ClassName)
       , edInstanceName            :: Ident
-      , edInstanceTypes           :: [Type SourceAnn]
-      , edInstanceConstraints     :: Maybe [Constraint SourceAnn]
+      , edInstanceTypes           :: [SourceType]
+      , edInstanceConstraints     :: Maybe [SourceConstraint]
       , edInstanceChain           :: [Qualified Ident]
       , edInstanceChainIndex      :: Integer
       }

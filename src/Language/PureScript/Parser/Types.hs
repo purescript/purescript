@@ -25,30 +25,30 @@ import Language.PureScript.Label (Label(..))
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
-parseFunction :: TokenParser (Type SourceAnn)
+parseFunction :: TokenParser SourceType
 parseFunction = parens rarrow *> return tyFunction
 
-parseObject :: TokenParser (Type SourceAnn)
+parseObject :: TokenParser SourceType
 parseObject = withSourceAnnF $ braces $ do
   rows <- parseRow
   return $ \ann -> TypeApp ann tyRecord rows
 
-parseTypeLevelString :: TokenParser (Type SourceAnn)
+parseTypeLevelString :: TokenParser SourceType
 parseTypeLevelString = withSourceAnnF $ flip TypeLevelString <$> stringLiteral
 
-parseTypeWildcard :: TokenParser (Type SourceAnn)
+parseTypeWildcard :: TokenParser SourceType
 parseTypeWildcard = withSourceAnnF $ underscore $> TypeWildcard
 
-parseTypeVariable :: TokenParser (Type SourceAnn)
+parseTypeVariable :: TokenParser SourceType
 parseTypeVariable = withSourceAnnF $ do
   ident <- identifier
   when (ident `elem` reservedTypeNames) $ P.unexpected (T.unpack ident)
   return $ \ann -> TypeVar ann ident
 
-parseTypeConstructor :: TokenParser (Type SourceAnn)
+parseTypeConstructor :: TokenParser SourceType
 parseTypeConstructor = withSourceAnnF $ flip TypeConstructor <$> parseQualified typeName
 
-parseForAll :: TokenParser (Type SourceAnn)
+parseForAll :: TokenParser SourceType
 parseForAll =
   mkForAll
     <$> ((reserved "forall" <|> reserved "∀")
@@ -59,7 +59,7 @@ parseForAll =
 -- |
 -- Parse an atomic type with no `forall`
 --
-noForAll :: TokenParser (Type SourceAnn) -> TokenParser (Type SourceAnn)
+noForAll :: TokenParser SourceType -> TokenParser SourceType
 noForAll p = do
  ty <- p
  when (containsForAll ty) $ P.unexpected "forall"
@@ -68,7 +68,7 @@ noForAll p = do
 -- |
 -- Parse a type as it appears in e.g. a data constructor
 --
-parseTypeAtom :: TokenParser (Type SourceAnn)
+parseTypeAtom :: TokenParser SourceType
 parseTypeAtom = indented *> P.choice
             [ P.try parseFunction
             , parseTypeLevelString
@@ -82,10 +82,10 @@ parseTypeAtom = indented *> P.choice
             , parseParensInType
             ]
 
-parseParensInType :: TokenParser (Type SourceAnn)
+parseParensInType :: TokenParser SourceType
 parseParensInType = withSourceAnnF $ flip ParensInType <$> parens parsePolyType
 
-parseConstrainedType :: TokenParser (SourceAnn, [Constraint SourceAnn], Type SourceAnn)
+parseConstrainedType :: TokenParser (SourceAnn, [SourceConstraint], SourceType)
 parseConstrainedType = withSourceAnnF $ do
   constraints <- parens (commaSep1 parseConstraint) <|> pure <$> parseConstraint
   _ <- rfatArrow
@@ -102,7 +102,7 @@ parseConstrainedType = withSourceAnnF $ do
 -- This is here to improve the error message when the user
 -- tries to use the old style constraint contexts.
 -- TODO: Remove this before 1.0
-typeOrConstrainedType :: TokenParser (Type SourceAnn)
+typeOrConstrainedType :: TokenParser SourceType
 typeOrConstrainedType = do
   e <- P.try (Left <$> parseConstrainedType) <|> Right <$> parseTypeAtom
   case e of
@@ -119,7 +119,7 @@ typeOrConstrainedType = do
                 ]
     Right ty -> pure ty
 
-parseAnyType :: TokenParser (Type SourceAnn)
+parseAnyType :: TokenParser SourceType
 parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTable typeOrConstrainedType) P.<?> "type"
   where
   operators = [ [ P.Infix (return mkTypeApp) P.AssocLeft ]
@@ -146,7 +146,7 @@ parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTabl
 -- |
 -- Parse a monotype
 --
-parseType :: TokenParser (Type SourceAnn)
+parseType :: TokenParser SourceType
 parseType = do
   ty <- parseAnyType
   unless (isMonoType ty) $ P.unexpected "polymorphic type"
@@ -155,27 +155,27 @@ parseType = do
 -- |
 -- Parse a polytype
 --
-parsePolyType :: TokenParser (Type SourceAnn)
+parsePolyType :: TokenParser SourceType
 parsePolyType = parseAnyType
 
 -- |
 -- Parse an atomic type with no wildcards
 --
-noWildcards :: TokenParser (Type SourceAnn) -> TokenParser (Type SourceAnn)
+noWildcards :: TokenParser SourceType -> TokenParser SourceType
 noWildcards p = do
   ty <- p
   when (containsWildcards ty) $ P.unexpected "type wildcard"
   return ty
 
-parseRowListItem :: TokenParser (Type SourceAnn) -> TokenParser (RowListItem SourceAnn)
+parseRowListItem :: TokenParser SourceType -> TokenParser (RowListItem SourceAnn)
 parseRowListItem p = withSourceAnnF $
   (\name ty ann -> RowListItem ann name ty)
     <$> (indented *> (Label <$> parseLabel) <* indented <* doubleColon) <*> p
 
-parseRowEnding :: TokenParser (Type SourceAnn)
+parseRowEnding :: TokenParser SourceType
 parseRowEnding =
   (indented *> pipe *> indented *> parseType)
     <|> withSourceAnnF (return REmpty)
 
-parseRow :: TokenParser (Type SourceAnn)
+parseRow :: TokenParser SourceType
 parseRow = (curry rowFromList <$> commaSep (parseRowListItem parsePolyType) <*> parseRowEnding) P.<?> "row"

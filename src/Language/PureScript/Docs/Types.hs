@@ -147,30 +147,30 @@ data DeclarationInfo
   -- |
   -- A value declaration, with its type.
   --
-  = ValueDeclaration (P.Type P.SourceAnn)
+  = ValueDeclaration P.SourceType
 
   -- |
   -- A data/newtype declaration, with the kind of declaration (data or
   -- newtype) and its type arguments. Constructors are represented as child
   -- declarations.
   --
-  | DataDeclaration P.DataDeclType [(Text, Maybe (P.Kind P.SourceAnn))]
+  | DataDeclaration P.DataDeclType [(Text, Maybe P.SourceKind)]
 
   -- |
   -- A data type foreign import, with its kind.
   --
-  | ExternDataDeclaration (P.Kind P.SourceAnn)
+  | ExternDataDeclaration P.SourceKind
 
   -- |
   -- A type synonym, with its type arguments and its type.
   --
-  | TypeSynonymDeclaration [(Text, Maybe (P.Kind P.SourceAnn))] (P.Type P.SourceAnn)
+  | TypeSynonymDeclaration [(Text, Maybe P.SourceKind)] P.SourceType
 
   -- |
   -- A type class, with its type arguments, its superclasses and functional
   -- dependencies. Instances and members are represented as child declarations.
   --
-  | TypeClassDeclaration [(Text, Maybe (P.Kind P.SourceAnn))] [P.Constraint P.SourceAnn] [([Text], [Text])]
+  | TypeClassDeclaration [(Text, Maybe P.SourceKind)] [P.SourceConstraint] [([Text], [Text])]
 
   -- |
   -- An operator alias declaration, with the member the alias is for and the
@@ -186,7 +186,7 @@ data DeclarationInfo
 
 instance NFData DeclarationInfo
 
-convertFundepsToStrings :: [(Text, Maybe (P.Kind P.SourceAnn))] -> [P.FunctionalDependency] -> [([Text], [Text])]
+convertFundepsToStrings :: [(Text, Maybe P.SourceKind)] -> [P.FunctionalDependency] -> [([Text], [Text])]
 convertFundepsToStrings args fundeps =
   map (\(P.FunctionalDependency from to) -> toArgs from to) fundeps
   where
@@ -287,19 +287,19 @@ data ChildDeclarationInfo
   -- |
   -- A type instance declaration, with its dependencies and its type.
   --
-  = ChildInstance [P.Constraint P.SourceAnn] (P.Type P.SourceAnn)
+  = ChildInstance [P.SourceConstraint] P.SourceType
 
   -- |
   -- A data constructor, with its type arguments.
   --
-  | ChildDataConstructor [P.Type P.SourceAnn]
+  | ChildDataConstructor [P.SourceType]
 
   -- |
   -- A type class member, with its type. Note that the type does not include
   -- the type class constraint; this may be added manually if desired. For
   -- example, `pure` from `Applicative` would be `forall a. a -> f a`.
   --
-  | ChildTypeClassMember (P.Type P.SourceAnn)
+  | ChildTypeClassMember P.SourceType
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData ChildDeclarationInfo
@@ -652,15 +652,15 @@ asDeclarationInfo = do
     other ->
       throwCustomError (InvalidDeclarationType other)
 
-asTypeArguments :: Parse PackageError [(Text, Maybe (P.Kind P.SourceAnn))]
+asTypeArguments :: Parse PackageError [(Text, Maybe P.SourceKind)]
 asTypeArguments = eachInArray asTypeArgument
   where
   asTypeArgument = (,) <$> nth 0 asText <*> nth 1 (perhaps asKind)
 
-asKind :: Parse PackageError (P.Kind P.SourceAnn)
+asKind :: Parse PackageError P.SourceKind
 asKind = P.kindFromJSON P.nullSourceAnn fromAesonParser .! InvalidKind
 
-asType :: Parse e (P.Type P.SourceAnn)
+asType :: Parse e P.SourceType
 asType = fromAesonParser
 
 asFunDeps :: Parse PackageError [([Text], [Text])]
@@ -700,7 +700,7 @@ asSourcePos :: Parse e P.SourcePos
 asSourcePos = P.SourcePos <$> nth 0 asIntegral
                           <*> nth 1 asIntegral
 
-asConstraint :: Parse PackageError (P.Constraint P.SourceAnn)
+asConstraint :: Parse PackageError P.SourceConstraint
 asConstraint = P.Constraint P.NullSourceAnn
                             <$> key "constraintClass" asQualifiedProperName
                             <*> key "constraintArgs" (eachInArray asType)

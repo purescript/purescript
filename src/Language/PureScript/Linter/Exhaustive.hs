@@ -63,15 +63,15 @@ qualifyName n defmn qn = Qualified (Just mn) n
 -- where: - ProperName is the name of the constructor (for example, "Nothing" in Maybe)
 --        - [Type] is the list of arguments, if it has (for example, "Just" has [TypeVar "a"])
 --
-getConstructors :: Environment -> ModuleName -> Qualified (ProperName 'ConstructorName) -> [(ProperName 'ConstructorName, [Type SourceAnn])]
+getConstructors :: Environment -> ModuleName -> Qualified (ProperName 'ConstructorName) -> [(ProperName 'ConstructorName, [SourceType])]
 getConstructors env defmn n = extractConstructors lnte
   where
 
-  extractConstructors :: Maybe (Kind SourceAnn, TypeKind) -> [(ProperName 'ConstructorName, [Type SourceAnn])]
+  extractConstructors :: Maybe (SourceKind, TypeKind) -> [(ProperName 'ConstructorName, [SourceType])]
   extractConstructors (Just (_, DataType _ pt)) = pt
   extractConstructors _ = internalError "Data name not in the scope of the current environment in extractConstructors"
 
-  lnte :: Maybe (Kind SourceAnn, TypeKind)
+  lnte :: Maybe (SourceKind, TypeKind)
   lnte = M.lookup qpn (types env)
 
   qpn :: Qualified (ProperName 'TypeName)
@@ -83,7 +83,7 @@ getConstructors env defmn n = extractConstructors lnte
       Nothing -> internalError $ "Constructor " ++ T.unpack (showQualified runProperName con) ++ " not in the scope of the current environment in getConsDataName."
       Just (_, pm, _, _) -> qualifyName pm defmn con
 
-  getConsInfo :: Qualified (ProperName 'ConstructorName) -> Maybe (DataDeclType, ProperName 'TypeName, Type SourceAnn, [Ident])
+  getConsInfo :: Qualified (ProperName 'ConstructorName) -> Maybe (DataDeclType, ProperName 'TypeName, SourceType, [Ident])
   getConsInfo con = M.lookup con (dataConstructors env)
 
 -- |
@@ -303,7 +303,7 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
            (ty tyVar))
         ]
 
-      ty :: Text -> Type SourceAnn
+      ty :: Text -> SourceType
       ty tyVar =
         ForAll NullSourceAnn tyVar
           ( ConstrainedType NullSourceAnn

@@ -34,7 +34,7 @@ import           Language.PureScript.TypeChecker.Synonyms (SynonymMap, replaceAl
 -- instances were derived in the same way. This data structure is used to ensure
 -- this property.
 data NewtypeDerivedInstances = NewtypeDerivedInstances
-  { ndiClasses :: M.Map (ModuleName, ProperName 'ClassName) ([Text], [Constraint SourceAnn], [FunctionalDependency])
+  { ndiClasses :: M.Map (ModuleName, ProperName 'ClassName) ([Text], [SourceConstraint], [FunctionalDependency])
   -- ^ A list of superclass constraints for each type class. Since type classes
   -- have not been desugared here, we need to track this.
   , ndiDerivedInstances :: S.Set ((ModuleName, ProperName 'ClassName), (ModuleName, ProperName 'TypeName))
@@ -57,7 +57,7 @@ instance Monoid NewtypeDerivedInstances where
 -- (no flexible instances allowed), we don't need to bother with unification when
 -- looking for matching superclass instances, which saves us a lot of work. Instead,
 -- we just match the newtype name.
-extractNewtypeName :: ModuleName -> [Type SourceAnn] -> Maybe (ModuleName, ProperName 'TypeName)
+extractNewtypeName :: ModuleName -> [SourceType] -> Maybe (ModuleName, ProperName 'TypeName)
 extractNewtypeName _ [] = Nothing
 extractNewtypeName mn xs = go (last xs) where
   go (TypeApp _ ty (TypeVar _ _)) = go ty
@@ -178,7 +178,7 @@ deriveInstance mn syns ndis ds (TypeInstanceDeclaration sa@(ss, _) ch idx nm dep
     _ -> throwError . errorMessage' ss $ InvalidNewtypeInstance className tys
 deriveInstance _ _ _ _ e = return e
 
-unwrapTypeConstructor :: Type SourceAnn -> Maybe (Qualified (ProperName 'TypeName), [Type SourceAnn])
+unwrapTypeConstructor :: SourceType -> Maybe (Qualified (ProperName 'TypeName), [SourceType])
 unwrapTypeConstructor = fmap (second reverse) . go
   where
   go (TypeConstructor _ tyCon) = Just (tyCon, [])
@@ -196,9 +196,9 @@ deriveNewtypeInstance
   -> NewtypeDerivedInstances
   -> Qualified (ProperName 'ClassName)
   -> [Declaration]
-  -> [Type SourceAnn]
+  -> [SourceType]
   -> ProperName 'TypeName
-  -> [Type SourceAnn]
+  -> [SourceType]
   -> m Expr
 deriveNewtypeInstance ss mn syns ndis className ds tys tyConNm dargs = do
     verifySuperclasses
@@ -226,7 +226,7 @@ deriveNewtypeInstance ss mn syns ndis className ds tys tyConNm dargs = do
     takeReverse :: Int -> [a] -> [a]
     takeReverse n = take n . reverse
 
-    stripRight :: [(Text, Maybe kind)] -> Type SourceAnn -> Maybe (Type SourceAnn)
+    stripRight :: [(Text, Maybe kind)] -> SourceType -> Maybe SourceType
     stripRight [] ty = Just ty
     stripRight ((arg, _) : args) (TypeApp NullSourceAnn t (TypeVar NullSourceAnn arg'))
       | arg == arg' = stripRight args t
@@ -283,14 +283,14 @@ deriveGenericRep
   -> SynonymMap
   -> [Declaration]
   -> ProperName 'TypeName
-  -> [Type SourceAnn]
-  -> Type SourceAnn
-  -> m ([Declaration], Type SourceAnn)
+  -> [SourceType]
+  -> SourceType
+  -> m ([Declaration], SourceType)
 deriveGenericRep ss mn syns ds tyConNm tyConArgs repTy = do
     checkIsWildcard ss tyConNm repTy
     go =<< findTypeDecl ss tyConNm ds
   where
-    go :: Declaration -> m ([Declaration], Type SourceAnn)
+    go :: Declaration -> m ([Declaration], SourceType)
     go (DataDeclaration (ss', _) _ _ args dctors) = do
       x <- freshIdent "x"
       (reps, to, from) <- unzip3 <$> traverse makeInst dctors
@@ -337,8 +337,8 @@ deriveGenericRep ss mn syns ds tyConNm tyConArgs repTy = do
     compN n f = f . compN (n - 1) f
 
     makeInst
-      :: (ProperName 'ConstructorName, [Type SourceAnn])
-      -> m (Type SourceAnn, CaseAlternative, CaseAlternative)
+      :: (ProperName 'ConstructorName, [SourceType])
+      -> m (SourceType, CaseAlternative, CaseAlternative)
     makeInst (ctorName, args) = do
         args' <- mapM (replaceAllTypeSynonymsM syns) args
         (ctorTy, matchProduct, ctorArgs, matchCtor, mkProduct) <- makeProduct args'
@@ -352,8 +352,8 @@ deriveGenericRep ss mn syns ds tyConNm tyConArgs repTy = do
                )
 
     makeProduct
-      :: [Type SourceAnn]
-      -> m (Type SourceAnn, Binder, [Expr], [Binder], Expr)
+      :: [SourceType]
+      -> m (SourceType, Binder, [Expr], [Binder], Expr)
     makeProduct [] =
       pure (noArgs, NullBinder, [], [], noArgs')
     makeProduct args = do
@@ -365,7 +365,7 @@ deriveGenericRep ss mn syns ds tyConNm tyConArgs repTy = do
            , foldr1 (\e1 -> App (App (Constructor ss productName) e1)) es2
            )
 
-    makeArg :: Type SourceAnn -> m (Type SourceAnn, Binder, Expr, Binder, Expr)
+    makeArg :: SourceType -> m (SourceType, Binder, Expr, Binder, Expr)
     makeArg arg = do
       argName <- freshIdent "arg"
       pure ( TypeApp NullSourceAnn (TypeConstructor NullSourceAnn argument) arg
@@ -382,7 +382,7 @@ deriveGenericRep ss mn syns ds tyConNm tyConArgs repTy = do
     underExpr f (CaseAlternative b [MkUnguarded e]) = CaseAlternative b (unguarded (f e))
     underExpr _ _ = internalError "underExpr: expected unguarded alternative"
 
-    toRepTy :: [Type SourceAnn] -> Type SourceAnn
+    toRepTy :: [SourceType] -> SourceType
     toRepTy [] = noCtors
     toRepTy [only] = only
     toRepTy ctors = foldr1 (\f -> TypeApp NullSourceAnn (TypeApp NullSourceAnn sumCtor f)) ctors
@@ -393,16 +393,16 @@ deriveGenericRep ss mn syns ds tyConNm tyConArgs repTy = do
     fromName :: Expr
     fromName = Var ss (Qualified (Just dataGenericRep) (Ident "from"))
 
-    noCtors :: Type SourceAnn
+    noCtors :: SourceType
     noCtors = TypeConstructor NullSourceAnn (Qualified (Just dataGenericRep) (ProperName "NoConstructors"))
 
-    noArgs :: Type SourceAnn
+    noArgs :: SourceType
     noArgs = TypeConstructor NullSourceAnn (Qualified (Just dataGenericRep) (ProperName "NoArguments"))
 
     noArgs' :: Expr
     noArgs' = Constructor ss (Qualified (Just dataGenericRep) (ProperName "NoArguments"))
 
-    sumCtor :: Type SourceAnn
+    sumCtor :: SourceType
     sumCtor = TypeConstructor NullSourceAnn (Qualified (Just dataGenericRep) (ProperName "Sum"))
 
     inl :: Qualified (ProperName 'ConstructorName)
@@ -426,7 +426,7 @@ deriveGenericRep ss mn syns ds tyConNm tyConArgs repTy = do
     argument' :: Expr -> Expr
     argument' = App (Constructor ss argument)
 
-checkIsWildcard :: MonadError MultipleErrors m => SourceSpan -> ProperName 'TypeName -> Type SourceAnn -> m ()
+checkIsWildcard :: MonadError MultipleErrors m => SourceSpan -> ProperName 'TypeName -> SourceType -> m ()
 checkIsWildcard _ _ (TypeWildcard _) = return ()
 checkIsWildcard ss tyConNm _ =
   throwError . errorMessage' ss $ ExpectedWildcard tyConNm
@@ -468,7 +468,7 @@ deriveEq ss mn syns ds tyConNm = do
       where
       catchAll = CaseAlternative [NullBinder, NullBinder] (unguarded (Literal ss (BooleanLiteral False)))
 
-    mkCtorClause :: (ProperName 'ConstructorName, [Type SourceAnn]) -> m CaseAlternative
+    mkCtorClause :: (ProperName 'ConstructorName, [SourceType]) -> m CaseAlternative
     mkCtorClause (ctorName, tys) = do
       identsL <- replicateM (length tys) (freshIdent "l")
       identsR <- replicateM (length tys) (freshIdent "r")
@@ -482,7 +482,7 @@ deriveEq ss mn syns ds tyConNm = do
     conjAll [] = Literal ss (BooleanLiteral True)
     conjAll xs = foldl1 preludeConj xs
 
-    toEqTest :: Expr -> Expr -> Type SourceAnn -> Expr
+    toEqTest :: Expr -> Expr -> SourceType -> Expr
     toEqTest l r ty
       | Just rec <- objectType ty
       , Just fields <- decomposeRec rec =
@@ -547,7 +547,7 @@ deriveOrd ss mn syns ds tyConNm = do
     ordCompare1 :: Expr -> Expr -> Expr
     ordCompare1 = App . App (Var ss (Qualified (Just dataOrd) (Ident C.compare1)))
 
-    mkCtorClauses :: ((ProperName 'ConstructorName, [Type SourceAnn]), Bool) -> m [CaseAlternative]
+    mkCtorClauses :: ((ProperName 'ConstructorName, [SourceType]), Bool) -> m [CaseAlternative]
     mkCtorClauses ((ctorName, tys), isLast) = do
       identsL <- replicateM (length tys) (freshIdent "l")
       identsR <- replicateM (length tys) (freshIdent "r")
@@ -583,7 +583,7 @@ deriveOrd ss mn syns ds tyConNm = do
                                                     (unguarded (appendAll xs))
                                   ]
 
-    toOrdering :: Expr -> Expr -> Type SourceAnn -> Expr
+    toOrdering :: Expr -> Expr -> SourceType -> Expr
     toOrdering l r ty
       | Just rec <- objectType ty
       , Just fields <- decomposeRec rec =
@@ -608,14 +608,14 @@ deriveNewtype
   -> SynonymMap
   -> [Declaration]
   -> ProperName 'TypeName
-  -> [Type SourceAnn]
-  -> Type SourceAnn
-  -> m ([Declaration], Type SourceAnn)
+  -> [SourceType]
+  -> SourceType
+  -> m ([Declaration], SourceType)
 deriveNewtype ss mn syns ds tyConNm tyConArgs unwrappedTy = do
     checkIsWildcard ss tyConNm unwrappedTy
     go =<< findTypeDecl ss tyConNm ds
   where
-    go :: Declaration -> m ([Declaration], Type SourceAnn)
+    go :: Declaration -> m ([Declaration], SourceType)
     go (DataDeclaration (ss', _) Data name _ _) =
       throwError . errorMessage' ss' $ CannotDeriveNewtypeForData name
     go (DataDeclaration (ss', _) Newtype name args dctors) = do
@@ -673,13 +673,13 @@ objectType :: Type a -> Maybe (Type a)
 objectType (TypeApp _ (TypeConstructor _ C.Record) rec) = Just rec
 objectType _ = Nothing
 
-decomposeRec :: Type SourceAnn -> Maybe [(Label, Type SourceAnn)]
+decomposeRec :: SourceType -> Maybe [(Label, SourceType)]
 decomposeRec = fmap (sortBy (comparing fst)) . go
   where go (RCons _ str typ typs) = fmap ((str, typ) :) (go typs)
         go (REmpty _) = Just []
         go _ = Nothing
 
-decomposeRec' :: Type SourceAnn -> [(Label, Type SourceAnn)]
+decomposeRec' :: SourceType -> [(Label, SourceType)]
 decomposeRec' = sortBy (comparing fst) . go
   where go (RCons _ str typ typs) = (str, typ) : go typs
         go _ = []
@@ -707,7 +707,7 @@ deriveFunctor ss mn syns ds tyConNm = do
         lam ss' f . lamCase ss' m <$> mapM (mkCtorClause iTy f) ctors
     mkMapFunction _ = internalError "mkMapFunction: expected DataDeclaration"
 
-    mkCtorClause :: Text -> Ident -> (ProperName 'ConstructorName, [Type SourceAnn]) -> m CaseAlternative
+    mkCtorClause :: Text -> Ident -> (ProperName 'ConstructorName, [SourceType]) -> m CaseAlternative
     mkCtorClause iTyName f (ctorName, ctorTys) = do
       idents <- replicateM (length ctorTys) (freshIdent "v")
       ctorTys' <- mapM (replaceAllTypeSynonymsM syns) ctorTys
@@ -721,10 +721,10 @@ deriveFunctor ss mn syns ds tyConNm = do
         mapVar = mkVarMn ss (Just dataFunctor) (Ident C.map)
 
         -- TODO: deal with type synonyms, ala https://github.com/purescript/purescript/pull/2516
-        transformArg :: Ident -> Type SourceAnn -> m Expr
+        transformArg :: Ident -> SourceType -> m Expr
         transformArg ident = fmap (foldr App (mkVar ss ident)) . goType where
 
-          goType :: Type SourceAnn -> m (Maybe Expr)
+          goType :: SourceType -> m (Maybe Expr)
           -- argument matches the index type
           goType (TypeVar _ t) | t == iTyName = return (Just fVar)
 
@@ -735,7 +735,7 @@ deriveFunctor ss mn syns ds tyConNm = do
               justUpdates :: [Maybe (Label, Expr)] -> Maybe [(Label, Expr)]
               justUpdates = foldMap (fmap return)
 
-              buildUpdate :: (Label, Type SourceAnn) -> m (Maybe (Label, Expr))
+              buildUpdate :: (Label, SourceType) -> m (Maybe (Label, Expr))
               buildUpdate (lbl, ty) = do upd <- goType ty
                                          return ((lbl,) <$> upd)
 

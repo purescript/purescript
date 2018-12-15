@@ -38,14 +38,14 @@ import Language.PureScript.TypeChecker.Skolems
 import Language.PureScript.Types
 
 -- | Generate a fresh type variable
-freshType :: (MonadState CheckState m) => m (Type SourceAnn)
+freshType :: (MonadState CheckState m) => m SourceType
 freshType = do
   t <- gets checkNextType
   modify $ \st -> st { checkNextType = t + 1 }
   return $ TUnknown NullSourceAnn t
 
 -- | Update the substitution to solve a type constraint
-solveType :: (MonadError MultipleErrors m, MonadState CheckState m) => Int -> Type SourceAnn -> m ()
+solveType :: (MonadError MultipleErrors m, MonadState CheckState m) => Int -> SourceType -> m ()
 solveType u t = do
   occursCheck u t
   modify $ \cs -> cs { checkSubstitution =
@@ -55,7 +55,7 @@ solveType u t = do
                      }
 
 -- | Apply a substitution to a type
-substituteType :: Substitution -> Type SourceAnn -> Type SourceAnn
+substituteType :: Substitution -> SourceType -> SourceType
 substituteType sub = everywhereOnTypes go
   where
   go (TUnknown ann u) =
@@ -66,7 +66,7 @@ substituteType sub = everywhereOnTypes go
   go other = other
 
 -- | Make sure that an unknown does not occur in a type
-occursCheck :: (MonadError MultipleErrors m) => Int -> Type SourceAnn -> m ()
+occursCheck :: (MonadError MultipleErrors m) => Int -> SourceType -> m ()
 occursCheck _ TUnknown{} = return ()
 occursCheck u t = void $ everywhereOnTypesM go t
   where
@@ -82,7 +82,7 @@ unknownsInType t = everythingOnTypes (.) go t []
   go _ = id
 
 -- | Unify two types, updating the current substitution
-unifyTypes :: (MonadError MultipleErrors m, MonadState CheckState m) => Type SourceAnn -> Type SourceAnn -> m ()
+unifyTypes :: (MonadError MultipleErrors m, MonadState CheckState m) => SourceType -> SourceType -> m ()
 unifyTypes t1 t2 = do
   sub <- gets checkSubstitution
   withErrorMessageHint (ErrorUnifyingTypes t1 t2) $ unifyTypes' (substituteType sub t1) (substituteType sub t2)
@@ -151,11 +151,11 @@ alignRowsWith f ty1 ty2 = go s1 s2 where
 --
 -- Common labels are identified and unified. Remaining labels and types are unified with a
 -- trailing row unification variable, if appropriate.
-unifyRows :: forall m. (MonadError MultipleErrors m, MonadState CheckState m) => Type SourceAnn -> Type SourceAnn -> m ()
+unifyRows :: forall m. (MonadError MultipleErrors m, MonadState CheckState m) => SourceType -> SourceType -> m ()
 unifyRows r1 r2 = sequence_ matches *> uncurry unifyTails rest where
   (matches, rest) = alignRowsWith unifyTypes r1 r2
 
-  unifyTails :: ([RowListItem SourceAnn], Type SourceAnn) -> ([RowListItem SourceAnn], Type SourceAnn) -> m ()
+  unifyTails :: ([RowListItem SourceAnn], SourceType) -> ([RowListItem SourceAnn], SourceType) -> m ()
   unifyTails ([], TUnknown _ u)    (sd, r)               = solveType u (rowFromList (sd, r))
   unifyTails (sd, r)               ([], TUnknown _ u)    = solveType u (rowFromList (sd, r))
   unifyTails ([], REmpty _)        ([], REmpty _)        = return ()
@@ -173,7 +173,7 @@ unifyRows r1 r2 = sequence_ matches *> uncurry unifyTails rest where
 -- |
 -- Replace a single type variable with a new unification variable
 --
-replaceVarWithUnknown :: (MonadState CheckState m) => Text -> Type SourceAnn -> m (Type SourceAnn)
+replaceVarWithUnknown :: (MonadState CheckState m) => Text -> SourceType -> m SourceType
 replaceVarWithUnknown ident ty = do
   tu <- freshType
   return $ replaceTypeVars ident tu ty
@@ -181,7 +181,7 @@ replaceVarWithUnknown ident ty = do
 -- |
 -- Replace type wildcards with unknowns
 --
-replaceTypeWildcards :: (MonadWriter MultipleErrors m, MonadState CheckState m) => Type SourceAnn -> m (Type SourceAnn)
+replaceTypeWildcards :: (MonadWriter MultipleErrors m, MonadState CheckState m) => SourceType -> m SourceType
 replaceTypeWildcards = everywhereOnTypesM replace
   where
   replace (TypeWildcard ann) = do
@@ -194,12 +194,12 @@ replaceTypeWildcards = everywhereOnTypesM replace
 -- |
 -- Replace outermost unsolved unification variables with named type variables
 --
-varIfUnknown :: Type SourceAnn -> Type SourceAnn
+varIfUnknown :: SourceType -> SourceType
 varIfUnknown ty =
   let unks = nubBy ((==) `on` snd) $ unknownsInType ty
       toName = T.cons 't' . T.pack .  show
       ty' = everywhereOnTypes typeToVar ty
-      typeToVar :: Type SourceAnn -> Type SourceAnn
+      typeToVar :: SourceType -> SourceType
       typeToVar (TUnknown ann u) = TypeVar ann (toName u)
       typeToVar t = t
   in mkForAll (sortBy (comparing snd) . fmap (fmap toName) $ unks) ty'

@@ -61,8 +61,8 @@ defaultCoercion SNoElaborate = ()
 -- | Check that one type subsumes another, rethrowing errors to provide a better error message
 subsumes
   :: (MonadError MultipleErrors m, MonadState CheckState m)
-  => Type SourceAnn
-  -> Type SourceAnn
+  => SourceType
+  -> SourceType
   -> m (Expr -> Expr)
 subsumes ty1 ty2 =
   withErrorMessageHint (ErrorInSubsumption ty1 ty2) $
@@ -72,8 +72,8 @@ subsumes ty1 ty2 =
 subsumes'
   :: (MonadError MultipleErrors m, MonadState CheckState m)
   => ModeSing mode
-  -> Type SourceAnn
-  -> Type SourceAnn
+  -> SourceType
+  -> SourceType
   -> m (Coercion mode)
 subsumes' mode (ForAll _ ident ty1 _) ty2 = do
   replaced <- replaceVarWithUnknown ident ty1

@@ -195,7 +195,7 @@ lookupValueDeclaration ::
    MonadReader P.ModuleName m) =>
   P.ModuleName ->
   P.Ident ->
-  m (P.ModuleName, [Either (Text, P.Constraint P.SourceAnn, ChildDeclaration) Declaration])
+  m (P.ModuleName, [Either (Text, P.SourceConstraint, ChildDeclaration) Declaration])
 lookupValueDeclaration importedFrom ident = do
   decls <- lookupModuleDeclarations "lookupValueDeclaration" importedFrom
   let
@@ -360,7 +360,7 @@ lookupModuleDeclarations definedIn moduleName = do
 
 handleTypeClassMembers ::
   (MonadReader P.ModuleName m) =>
-  Map P.ModuleName [Either (Text, P.Constraint P.SourceAnn, ChildDeclaration) Declaration] ->
+  Map P.ModuleName [Either (Text, P.SourceConstraint, ChildDeclaration) Declaration] ->
   Map P.ModuleName [Declaration] ->
   m (Map P.ModuleName [Declaration], Map P.ModuleName [Declaration])
 handleTypeClassMembers valsAndMembers typeClasses =
@@ -375,7 +375,7 @@ handleTypeClassMembers valsAndMembers typeClasses =
       |> fmap splitMap
 
 valsAndMembersToEnv ::
-  [Either (Text, P.Constraint P.SourceAnn, ChildDeclaration) Declaration] -> TypeClassEnv
+  [Either (Text, P.SourceConstraint, ChildDeclaration) Declaration] -> TypeClassEnv
 valsAndMembersToEnv xs =
   let (envUnhandledMembers, envValues) = partitionEithers xs
       envTypeClasses = []
@@ -400,7 +400,7 @@ data TypeClassEnv = TypeClassEnv
     -- name of the type class they belong to, and the constraint is used to
     -- make sure that they have the correct type if they get promoted.
     --
-    envUnhandledMembers :: [(Text, P.Constraint P.SourceAnn, ChildDeclaration)]
+    envUnhandledMembers :: [(Text, P.SourceConstraint, ChildDeclaration)]
     -- |
     -- A list of normal value declarations. Type class members will be added to
     -- this list if their parent type class is not available.
@@ -534,7 +534,7 @@ internalErrorInModule msg = do
 -- If the provided Declaration is a TypeClassDeclaration, construct an
 -- appropriate Constraint for use with the types of its members.
 --
-typeClassConstraintFor :: Declaration -> Maybe (P.Constraint P.SourceAnn)
+typeClassConstraintFor :: Declaration -> Maybe P.SourceConstraint
 typeClassConstraintFor Declaration{..} =
   case declInfo of
     TypeClassDeclaration tyArgs _ _ ->

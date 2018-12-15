@@ -75,7 +75,7 @@ typesOf
   => BindingGroupType
   -> ModuleName
   -> [((SourceAnn, Ident), Expr)]
-  -> m [((SourceAnn, Ident), (Expr, Type SourceAnn))]
+  -> m [((SourceAnn, Ident), (Expr, SourceType))]
 typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
     (tys, wInfer) <- capturingSubstitution tidyUp $ do
       (SplitBindingGroup untyped typed dict, w) <- withoutWarnings $ typeDictionaryForBindingGroup (Just moduleName) vals
@@ -144,7 +144,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
 
     -- | Run type search to complete any typed hole error messages
     runTypeSearch
-      :: Maybe [(Ident, InstanceContext, Constraint SourceAnn)]
+      :: Maybe [(Ident, InstanceContext, SourceConstraint)]
       -- ^ Any unsolved constraints which we need to continue to satisfy
       -> CheckState
       -- ^ The final type checker state
@@ -177,11 +177,11 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
 --
 -- This structure breaks down a binding group into typed and untyped parts.
 data SplitBindingGroup = SplitBindingGroup
-  { _splitBindingGroupUntyped :: [((SourceAnn, Ident), (Expr, Type SourceAnn))]
+  { _splitBindingGroupUntyped :: [((SourceAnn, Ident), (Expr, SourceType))]
   -- ^ The untyped expressions
-  , _splitBindingGroupTyped :: [((SourceAnn, Ident), (Expr, Type SourceAnn, Bool))]
+  , _splitBindingGroupTyped :: [((SourceAnn, Ident), (Expr, SourceType, Bool))]
   -- ^ The typed expressions, along with their type annotations
-  , _splitBindingGroupNames :: M.Map (Qualified Ident) (Type SourceAnn, NameKind, NameVisibility)
+  , _splitBindingGroupNames :: M.Map (Qualified Ident) (SourceType, NameKind, NameVisibility)
   -- ^ A map containing all expressions and their assigned types (which might be
   -- fresh unification variables). These will be added to the 'Environment' after
   -- the binding group is checked, so the value type of the 'Map' is chosen to be
@@ -218,7 +218,7 @@ typeDictionaryForBindingGroup moduleName vals = do
   where
     -- | Check if a value contains a type annotation, and if so, separate it
     -- from the value itself.
-    splitTypeAnnotation :: (a, Expr) -> Either (a, Expr) (a, (Expr, Type SourceAnn, Bool))
+    splitTypeAnnotation :: (a, Expr) -> Either (a, Expr) (a, (Expr, SourceType, Bool))
     splitTypeAnnotation (a, TypedValue checkType value ty) = Right (a, (value, ty, checkType))
     splitTypeAnnotation (a, PositionedValue pos c value) =
       bimap (second (PositionedValue pos c))
@@ -230,11 +230,11 @@ typeDictionaryForBindingGroup moduleName vals = do
 checkTypedBindingGroupElement
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
-  -> ((SourceAnn, Ident), (Expr, Type SourceAnn, Bool))
+  -> ((SourceAnn, Ident), (Expr, SourceType, Bool))
   -- ^ The identifier we are trying to define, along with the expression and its type annotation
-  -> M.Map (Qualified Ident) (Type SourceAnn, NameKind, NameVisibility)
+  -> M.Map (Qualified Ident) (SourceType, NameKind, NameVisibility)
   -- ^ Names brought into scope in this binding group
-  -> m ((SourceAnn, Ident), (Expr, Type SourceAnn))
+  -> m ((SourceAnn, Ident), (Expr, SourceType))
 checkTypedBindingGroupElement mn (ident, (val, ty, checkType)) dict = do
   -- Kind check
   (kind, args) <- kindOfWithScopedVars ty
@@ -251,12 +251,12 @@ checkTypedBindingGroupElement mn (ident, (val, ty, checkType)) dict = do
 -- | Infer a type for a value in a binding group which lacks an annotation.
 typeForBindingGroupElement
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
-  => ((SourceAnn, Ident), (Expr, Type SourceAnn))
+  => ((SourceAnn, Ident), (Expr, SourceType))
   -- ^ The identifier we are trying to define, along with the expression and its assigned type
   -- (at this point, this should be a unification variable)
-  -> M.Map (Qualified Ident) (Type SourceAnn, NameKind, NameVisibility)
+  -> M.Map (Qualified Ident) (SourceType, NameKind, NameVisibility)
   -- ^ Names brought into scope in this binding group
-  -> m ((SourceAnn, Ident), (Expr, Type SourceAnn))
+  -> m ((SourceAnn, Ident), (Expr, SourceType))
 typeForBindingGroupElement (ident, (val, ty)) dict = do
   -- Infer the type with the new names in scope
   TypedValue _ val' ty' <- bindNames dict $ infer val
@@ -267,8 +267,8 @@ typeForBindingGroupElement (ident, (val, ty)) dict = do
 -- | Check the kind of a type, failing if it is not of kind *.
 checkTypeKind
   :: MonadError MultipleErrors m
-  => Type SourceAnn
-  -> Kind SourceAnn
+  => SourceType
+  -> SourceKind
   -> m ()
 checkTypeKind ty kind = guardWith (errorMessage (ExpectedType ty kind)) $ isKindType kind
 
@@ -280,8 +280,8 @@ checkTypeKind ty kind = guardWith (errorMessage (ExpectedType ty kind)) $ isKind
 instantiatePolyTypeWithUnknowns
   :: (MonadState CheckState m, MonadError MultipleErrors m)
   => Expr
-  -> Type SourceAnn
-  -> m (Expr, Type SourceAnn)
+  -> SourceType
+  -> m (Expr, SourceType)
 instantiatePolyTypeWithUnknowns val (ForAll _ ident ty _) = do
   ty' <- replaceVarWithUnknown ident ty
   instantiatePolyTypeWithUnknowns val ty'
@@ -327,7 +327,7 @@ infer' (Literal ss (ObjectLiteral ps)) = do
       shouldInstantiate (PositionedValue _ _ e) = shouldInstantiate e
       shouldInstantiate _ = False
 
-      inferProperty :: (PSString, Expr) -> m (PSString, (Expr, Type SourceAnn))
+      inferProperty :: (PSString, Expr) -> m (PSString, (Expr, SourceType))
       inferProperty (name, val) = do
         TypedValue _ val' ty <- infer val
         valAndType <- if shouldInstantiate val
@@ -463,9 +463,9 @@ inferLetBinding _ _ _ _ = internalError "Invalid argument to inferLetBinding"
 inferBinder
   :: forall m
    . (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
-  => Type SourceAnn
+  => SourceType
   -> Binder
-  -> m (M.Map Ident (Type SourceAnn))
+  -> m (M.Map Ident SourceType)
 inferBinder _ NullBinder = return M.empty
 inferBinder val (LiteralBinder _ (StringLiteral _)) = unifyTypes val tyString >> return M.empty
 inferBinder val (LiteralBinder _ (CharLiteral _)) = unifyTypes val tyChar >> return M.empty
@@ -499,7 +499,7 @@ inferBinder val (LiteralBinder _ (ObjectLiteral props)) = do
   unifyTypes val (TypeApp NullSourceAnn tyRecord row)
   return m1
   where
-  inferRowProperties :: Type SourceAnn -> Type SourceAnn -> [(PSString, Binder)] -> m (M.Map Ident (Type SourceAnn))
+  inferRowProperties :: SourceType -> SourceType -> [(PSString, Binder)] -> m (M.Map Ident SourceType)
   inferRowProperties nrow row [] = unifyTypes nrow row >> return M.empty
   inferRowProperties nrow row ((name, binder):binders) = do
     propTy <- freshType
@@ -545,7 +545,7 @@ instantiateForBinders
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => [Expr]
   -> [CaseAlternative]
-  -> m ([Expr], [Type SourceAnn])
+  -> m ([Expr], [SourceType])
 instantiateForBinders vals cas = unzip <$> zipWithM (\val inst -> do
   TypedValue _ val' ty <- infer val
   if inst
@@ -560,8 +560,8 @@ instantiateForBinders vals cas = unzip <$> zipWithM (\val inst -> do
 --
 checkBinders
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
-  => [Type SourceAnn]
-  -> Type SourceAnn
+  => [SourceType]
+  -> SourceType
   -> [CaseAlternative]
   -> m [CaseAlternative]
 checkBinders _ _ [] = return []
@@ -577,7 +577,7 @@ checkBinders nvals ret (CaseAlternative binders result : bs) = do
 checkGuardedRhs
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => GuardedExpr
-  -> Type SourceAnn
+  -> SourceType
   -> m GuardedExpr
 checkGuardedRhs (GuardedExpr [] rhs) ret = do
   rhs' <- TypedValue True <$> check rhs ret <*> pure ret
@@ -601,7 +601,7 @@ checkGuardedRhs (GuardedExpr (PatternGuard binder expr : guards) rhs) ret = do
 check
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => Expr
-  -> Type SourceAnn
+  -> SourceType
   -> m Expr
 check val ty = withErrorMessageHint (ErrorCheckingType val ty) $ check' val ty
 
@@ -612,7 +612,7 @@ check'
   :: forall m
    . (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => Expr
-  -> Type SourceAnn
+  -> SourceType
   -> m Expr
 check' val (ForAll ann ident ty _) = do
   scope <- newSkolemScope
@@ -751,7 +751,7 @@ checkProperties
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => Expr
   -> [(PSString, Expr)]
-  -> Type SourceAnn
+  -> SourceType
   -> Bool
   -> m [(PSString, Expr)]
 checkProperties expr ps row lax = let (ts, r') = rowToList row in go ps (toRowPair <$> ts) r' where
@@ -796,11 +796,11 @@ checkFunctionApplication
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => Expr
   -- ^ The function expression
-  -> Type SourceAnn
+  -> SourceType
   -- ^ The type of the function
   -> Expr
   -- ^ The argument expression
-  -> m (Type SourceAnn, Expr)
+  -> m (SourceType, Expr)
   -- ^ The result type, and the elaborated term
 checkFunctionApplication fn fnTy arg = withErrorMessageHint (ErrorInApplication fn fnTy arg) $ do
   subst <- gets checkSubstitution
@@ -810,9 +810,9 @@ checkFunctionApplication fn fnTy arg = withErrorMessageHint (ErrorInApplication 
 checkFunctionApplication'
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => Expr
-  -> Type SourceAnn
+  -> SourceType
   -> Expr
-  -> m (Type SourceAnn, Expr)
+  -> m (SourceType, Expr)
 checkFunctionApplication' fn (TypeApp _ (TypeApp _ tyFunction' argTy) retTy) arg = do
   unifyTypes tyFunction' tyFunction
   arg' <- check arg argTy

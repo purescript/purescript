@@ -5,7 +5,6 @@ module Language.PureScript.Parser.Kinds (parseKind) where
 
 import Prelude.Compat
 
-import Language.PureScript.AST.SourcePos
 import Language.PureScript.Kinds
 import Language.PureScript.Parser.Common
 import Language.PureScript.Parser.Lexer
@@ -13,12 +12,12 @@ import Language.PureScript.Parser.Lexer
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
-parseNamedKind :: TokenParser (Kind SourceAnn)
+parseNamedKind :: TokenParser SourceKind
 parseNamedKind = withSourceAnnF $ do
   name <- parseQualified kindName
   return $ \ann -> NamedKind ann name
 
-parseKindAtom :: TokenParser (Kind SourceAnn)
+parseKindAtom :: TokenParser SourceKind
 parseKindAtom =
   indented *> P.choice
     [ parseNamedKind
@@ -28,7 +27,7 @@ parseKindAtom =
 -- |
 -- Parse a kind
 --
-parseKind :: TokenParser (Kind SourceAnn)
+parseKind :: TokenParser SourceKind
 parseKind = P.buildExpressionParser operators parseKindAtom P.<?> "kind"
   where
   operators = [ [ P.Prefix (withSourceAnnF $ symbol' "#" >> return Row) ]

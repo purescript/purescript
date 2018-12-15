@@ -72,7 +72,7 @@ createTemporaryModule exec st val =
 -- |
 -- Makes a volatile module to hold a non-qualified type synonym for a fully-qualified data type declaration.
 --
-createTemporaryModuleForKind :: PSCiState -> P.Type P.SourceAnn -> P.Module
+createTemporaryModuleForKind :: PSCiState -> P.SourceType -> P.Module
 createTemporaryModuleForKind st typ =
   let
     imports    = psciImportedModules st

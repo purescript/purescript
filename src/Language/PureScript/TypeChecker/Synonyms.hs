@@ -24,18 +24,18 @@ import           Language.PureScript.TypeChecker.Monad
 import           Language.PureScript.Types
 
 -- | Type synonym information (arguments with kinds, aliased type), indexed by name
-type SynonymMap = M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe (Kind SourceAnn))], Type SourceAnn)
+type SynonymMap = M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe SourceKind)], SourceType)
 
 replaceAllTypeSynonyms'
   :: SynonymMap
-  -> Type SourceAnn
-  -> Either MultipleErrors (Type SourceAnn)
+  -> SourceType
+  -> Either MultipleErrors SourceType
 replaceAllTypeSynonyms' syns = everywhereOnTypesTopDownM try
   where
-  try :: Type SourceAnn -> Either MultipleErrors (Type SourceAnn)
+  try :: SourceType -> Either MultipleErrors SourceType
   try t = fromMaybe t <$> go 0 [] t
 
-  go :: Int -> [Type SourceAnn] -> Type SourceAnn -> Either MultipleErrors (Maybe (Type SourceAnn))
+  go :: Int -> [SourceType] -> SourceType -> Either MultipleErrors (Maybe SourceType)
   go c args (TypeConstructor _ ctor)
     | Just (synArgs, body) <- M.lookup ctor syns
     , c == length synArgs
@@ -48,7 +48,7 @@ replaceAllTypeSynonyms' syns = everywhereOnTypesTopDownM try
   go _ _ _ = return Nothing
 
 -- | Replace fully applied type synonyms
-replaceAllTypeSynonyms :: (e ~ MultipleErrors, MonadState CheckState m, MonadError e m) => Type SourceAnn -> m (Type SourceAnn)
+replaceAllTypeSynonyms :: (e ~ MultipleErrors, MonadState CheckState m, MonadError e m) => SourceType -> m SourceType
 replaceAllTypeSynonyms d = do
   env <- getEnv
   either throwError return $ replaceAllTypeSynonyms' (typeSynonyms env) d
@@ -57,6 +57,6 @@ replaceAllTypeSynonyms d = do
 replaceAllTypeSynonymsM
   :: MonadError MultipleErrors m
   => SynonymMap
-  -> Type SourceAnn
-  -> m (Type SourceAnn)
+  -> SourceType
+  -> m SourceType
 replaceAllTypeSynonymsM syns = either throwError pure . replaceAllTypeSynonyms' syns

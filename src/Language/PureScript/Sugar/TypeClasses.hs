@@ -198,7 +198,7 @@ desugarDecl mn exps = go
     return (expRef name className tys, [d, ValueDecl sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]])
   go other = return (Nothing, [other])
 
-  expRef :: Ident -> Qualified (ProperName 'ClassName) -> [Type SourceAnn] -> Maybe DeclarationRef
+  expRef :: Ident -> Qualified (ProperName 'ClassName) -> [SourceType] -> Maybe DeclarationRef
   expRef name className tys
     | isExportedClass className && all isExportedType (getConstructors `concatMap` tys) = Just $ TypeInstanceRef genSpan name
     | otherwise = Nothing
@@ -220,7 +220,7 @@ desugarDecl mn exps = go
   matchesTypeRef pn (TypeRef _ pn' _) = pn == pn'
   matchesTypeRef _ _ = False
 
-  getConstructors :: Type SourceAnn -> [Qualified (ProperName 'TypeName)]
+  getConstructors :: SourceType -> [Qualified (ProperName 'TypeName)]
   getConstructors = everythingOnTypes (++) getConstructor
     where
     getConstructor (TypeConstructor _ tcname) = [tcname]
@@ -229,15 +229,15 @@ desugarDecl mn exps = go
   genSpan :: SourceSpan
   genSpan = internalModuleSourceSpan "<generated>"
 
-memberToNameAndType :: Declaration -> (Ident, Type SourceAnn)
+memberToNameAndType :: Declaration -> (Ident, SourceType)
 memberToNameAndType (TypeDeclaration td) = unwrapTypeDeclaration td
 memberToNameAndType _ = internalError "Invalid declaration in type class definition"
 
 typeClassDictionaryDeclaration
   :: SourceAnn
   -> ProperName 'ClassName
-  -> [(Text, Maybe (Kind SourceAnn))]
-  -> [Constraint SourceAnn]
+  -> [(Text, Maybe SourceKind)]
+  -> [SourceConstraint]
   -> [Declaration]
   -> Declaration
 typeClassDictionaryDeclaration sa name args implies members =
@@ -253,7 +253,7 @@ typeClassDictionaryDeclaration sa name args implies members =
 typeClassMemberToDictionaryAccessor
   :: ModuleName
   -> ProperName 'ClassName
-  -> [(Text, Maybe (Kind SourceAnn))]
+  -> [(Text, Maybe SourceKind)]
   -> Declaration
   -> Declaration
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarationData sa ident ty)) =
@@ -265,7 +265,7 @@ typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarati
     )]
 typeClassMemberToDictionaryAccessor _ _ _ _ = internalError "Invalid declaration in type class definition"
 
-unit :: Type SourceAnn
+unit :: SourceType
 unit = TypeApp NullSourceAnn tyRecord (REmpty NullSourceAnn)
 
 typeInstanceDictionaryDeclaration
@@ -274,9 +274,9 @@ typeInstanceDictionaryDeclaration
   => SourceAnn
   -> Ident
   -> ModuleName
-  -> [Constraint SourceAnn]
+  -> [SourceConstraint]
   -> Qualified (ProperName 'ClassName)
-  -> [Type SourceAnn]
+  -> [SourceType]
   -> [Declaration]
   -> Desugar m Declaration
 typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
@@ -317,7 +317,7 @@ typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
 
   where
 
-  memberToValue :: [(Ident, Type SourceAnn)] -> Declaration -> Desugar m Expr
+  memberToValue :: [(Ident, SourceType)] -> Declaration -> Desugar m Expr
   memberToValue tys' (ValueDecl (ss', _) ident _ [] [MkUnguarded val]) = do
     _ <- maybe (throwError . errorMessage' ss' $ ExtraneousClassMember ident className) return $ lookup ident tys'
     return val
