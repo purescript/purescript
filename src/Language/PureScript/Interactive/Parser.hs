@@ -33,11 +33,11 @@ parseDotFile filePath s = first show $ do
 -- |
 -- Parses PSCI metacommands or expressions input from the user.
 --
-parseCommand :: String -> Either String Command
+parseCommand :: String -> Either String [Command]
 parseCommand cmdString =
   case cmdString of
-    (':' : cmd) -> parseDirective cmd
-    _ -> parseRest psciCommand cmdString
+    (':' : cmd) -> pure <$> parseDirective cmd
+    _ -> parseRest (many1 psciCommand) cmdString
 
 parseRest :: P.TokenParser a -> String -> Either String a
 parseRest p s = first show $ do

@@ -96,15 +96,15 @@ psciOptions = PSCiOptions <$> many inputFile
                           <*> backend
 
 -- | Parses the input and returns either a command, or an error as a 'String'.
-getCommand :: forall m. MonadException m => InputT m (Either String (Maybe Command))
-getCommand = handleInterrupt (return (Right Nothing)) $ do
+getCommand :: forall m. MonadException m => InputT m (Either String [Command])
+getCommand = handleInterrupt (return (Right [])) $ do
   line <- withInterrupt $ getInputLine "> "
   case line of
-    Nothing -> return (Right (Just QuitPSCi)) -- Ctrl-D when input is empty
-    Just "" -> return (Right Nothing)
-    Just s  -> return . fmap Just $ parseCommand s
+    Nothing -> return (Right [QuitPSCi]) -- Ctrl-D when input is empty
+    Just "" -> return (Right [])
+    Just s  -> return (parseCommand s)
 
-pasteMode :: forall m. MonadException m => InputT m (Either String Command)
+pasteMode :: forall m. MonadException m => InputT m (Either String [Command])
 pasteMode =
     parseCommand <$> go []
   where
@@ -343,16 +343,20 @@ command = loop <$> options
                       c <- getCommand
                       case c of
                         Left err -> outputStrLn err >> go state
-                        Right Nothing -> go state
-                        Right (Just PasteLines) -> do
+                        Right xs -> goExec xs
+                      where
+                      goExec :: [Command] -> InputT (StateT PSCiState (ReaderT PSCiConfig IO)) ()
+                      goExec xs = case xs of
+                        [] -> go state
+                        (PasteLines : rest) -> do
                           c' <- pasteMode
                           case c' of
-                            Left err -> outputStrLn err >> go state
-                            Right c'' -> handleCommandWithInterrupts state c''
-                        Right (Just QuitPSCi) -> do
+                            Left err -> outputStrLn err >> goExec rest
+                            Right c'' -> handleCommandWithInterrupts state c'' >> goExec rest
+                        (QuitPSCi : _) -> do
                           outputStrLn quitMessage
                           liftIO $ shutdown state
-                        Right (Just c') -> handleCommandWithInterrupts state c'
+                        (c' : rest) -> handleCommandWithInterrupts state [c'] >> goExec rest
 
                     loadUserConfig :: state -> StateT PSCiState (ReaderT PSCiConfig IO) ()
                     loadUserConfig state = do
@@ -366,12 +370,11 @@ command = loop <$> options
 
                     handleCommandWithInterrupts
                       :: state
-                      -> Command
+                      -> [Command]
                       -> InputT (StateT PSCiState (ReaderT PSCiConfig IO)) ()
-                    handleCommandWithInterrupts state cmd = do
+                    handleCommandWithInterrupts state cmds = do
                       handleInterrupt (outputStrLn "Interrupted.")
-                                      (withInterrupt (lift (handleCommand' state cmd)))
-                      go state
+                                      (withInterrupt (lift (for_ cmds (handleCommand' state))))
 
                 putStrLn prologueMessage
                 backendState <- setup
