@@ -233,16 +233,16 @@ moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreign_ =
     ds' <- concat <$> mapM bindToJs ds
     ret <- valueToJs val
     return $ AST.App Nothing (AST.Function Nothing Nothing [] (AST.Block Nothing (ds' ++ [AST.Return Nothing ret]))) []
-  valueToJs' (Constructor (_, _, _, Just IsNewtype) _ (ProperName ctor) _) =
+  valueToJs' (Constructor (_, _, _, Just IsNewtype) _ ctor _) =
     return $ AST.VariableIntroduction Nothing (properToJs ctor) (Just $
                 AST.ObjectLiteral Nothing [("create",
                   AST.Function Nothing Nothing ["value"]
                     (AST.Block Nothing [AST.Return Nothing $ AST.Var Nothing "value"]))])
-  valueToJs' (Constructor _ _ (ProperName ctor) []) =
+  valueToJs' (Constructor _ _ ctor []) =
     return $ iife (properToJs ctor) [ AST.Function Nothing (Just (properToJs ctor)) [] (AST.Block Nothing [])
            , AST.Assignment Nothing (accessorString "value" (AST.Var Nothing (properToJs ctor)))
                 (AST.Unary Nothing AST.New $ AST.App Nothing (AST.Var Nothing (properToJs ctor)) []) ]
-  valueToJs' (Constructor _ _ (ProperName ctor) fields) =
+  valueToJs' (Constructor _ _ ctor fields) =
     let constructor =
           let body = [ AST.Assignment Nothing ((accessorString $ mkString $ identToJs f) (AST.Var Nothing "this")) (var f) | f <- fields ]
           in AST.Function Nothing (Just (properToJs ctor)) (identToJs `map` fields) (AST.Block Nothing body)

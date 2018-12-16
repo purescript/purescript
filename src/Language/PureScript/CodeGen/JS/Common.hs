@@ -20,15 +20,21 @@ moduleNameToJs (ModuleName pns) =
 --  * Alphanumeric characters are kept unmodified.
 --
 --  * Reserved javascript identifiers are prefixed with '$$'.
---
---  * Symbols are prefixed with '$' followed by a symbol name or their ordinal value.
 identToJs :: Ident -> Text
-identToJs (Ident name) = properToJs name
+identToJs (Ident name) = anyNameToJs name
 identToJs (GenIdent _ _) = internalError "GenIdent in identToJs"
 identToJs UnusedIdent = "$__unused"
 
-properToJs :: Text -> Text
-properToJs name
+-- | Convert a 'ProperName' into a valid JavaScript identifier:
+--
+--  * Alphanumeric characters are kept unmodified.
+--
+--  * Reserved javascript identifiers are prefixed with '$$'.
+properToJs :: ProperName a -> Text
+properToJs = anyNameToJs . runProperName
+
+anyNameToJs :: Text -> Text
+anyNameToJs name =
   | nameIsJsReserved name || nameIsJsBuiltIn name = "$$" <> name
   | otherwise = T.concatMap identCharToText name
 
