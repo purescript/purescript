@@ -33,14 +33,29 @@ identToJs UnusedIdent = "$__unused"
 properToJs :: ProperName a -> Text
 properToJs = anyNameToJs . runProperName
 
+-- | Convert any name into a valid JavaScript identifier.
+--
+-- Note that this function assumes that the argument is a valid PureScript
+-- identifier (either an 'Ident' or a 'ProperName') to begin with; as such it
+-- will not produce valid JavaScript identifiers if the argument e.g. begins
+-- with a digit. Prefer 'identToJs' or 'properToJs' where possible.
 anyNameToJs :: Text -> Text
-anyNameToJs name =
+anyNameToJs name
   | nameIsJsReserved name || nameIsJsBuiltIn name = "$$" <> name
   | otherwise = T.concatMap identCharToText name
 
--- | Test if a string is a valid AST identifier without escaping.
-identNeedsEscaping :: Text -> Bool
-identNeedsEscaping s = s /= properToJs s || T.null s
+-- | Test if a string is a valid JavaScript identifier as-is. Note that, while
+-- a return value of 'True' guarantees that the string is a valid JS
+-- identifier, a return value of 'False' does not guarantee that the string is
+-- not a valid JS identifier. That is, this check is more conservative than
+-- absolutely necessary.
+isValidJsIdentifier :: Text -> Bool
+isValidJsIdentifier s =
+  and
+    [ not (T.null s)
+    , isAlpha (T.head s)
+    , s == anyNameToJs s
+    ]
 
 -- | Attempts to find a human-readable name for a symbol, if none has been specified returns the
 -- ordinal value.
