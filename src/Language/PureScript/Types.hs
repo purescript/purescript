@@ -1,7 +1,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 -- |
 -- Data types for types
@@ -16,6 +17,7 @@ import Control.DeepSeq (NFData)
 import Control.Monad ((<=<))
 import qualified Data.Aeson as A
 import qualified Data.Aeson.TH as A
+import Data.Foldable (fold)
 import Data.List (sortBy)
 import Data.Ord (comparing)
 import Data.Maybe (fromMaybe)
@@ -86,7 +88,7 @@ data Type a
   -- Note: although it seems this constructor is not used, it _is_ useful,
   -- since it prevents certain traversals from matching.
   | ParensInType a (Type a)
-  deriving (Show, Eq, Ord, Generic, Functor)
+  deriving (Show, Generic, Functor, Foldable, Traversable)
 
 instance NFData a => NFData (Type a)
 
@@ -157,7 +159,7 @@ data Constraint a = Constraint
   -- ^ type arguments
   , constraintData  :: Maybe ConstraintData
   -- ^ additional data relevant to this constraint
-  } deriving (Show, Eq, Ord, Generic, Functor)
+  } deriving (Show, Generic, Functor, Foldable, Traversable)
 
 instance NFData a => NFData (Constraint a)
 
@@ -178,7 +180,7 @@ data RowListItem a = RowListItem
   { rowListAnn :: a
   , rowListLabel :: Label
   , rowListType :: Type a
-  } deriving (Show, Eq, Ord, Generic, Functor)
+  } deriving (Show, Generic, Functor, Foldable, Traversable)
 
 srcRowListItem :: Label -> SourceType -> RowListItem SourceAnn
 srcRowListItem = RowListItem NullSourceAnn
@@ -393,6 +395,12 @@ annotationForType (PrettyPrintForAll a _ _) = a
 annotationForType (BinaryNoParensType a _ _ _) = a
 annotationForType (ParensInType a _) = a
 
+instance Eq (Type a) where
+  (==) = eqType
+
+instance Ord (Type a) where
+  compare = compareType
+
 eqType :: Type a -> Type b -> Bool
 eqType (TUnknown _ a) (TUnknown _ a') = a == a'
 eqType (TypeVar _ a) (TypeVar _ a') = a == a'
@@ -414,5 +422,85 @@ eqType (BinaryNoParensType _ a b c) (BinaryNoParensType _ a' b' c') = eqType a a
 eqType (ParensInType _ a) (ParensInType _ a') = eqType a a'
 eqType _ _ = False
 
+compareType :: Type a -> Type b -> Ordering
+compareType (TUnknown _ a) (TUnknown _ a') = compare a a'
+compareType (TUnknown {}) _ = LT
+
+compareType (TypeVar _ a) (TypeVar _ a') = compare a a'
+compareType (TypeVar {}) _ = LT
+compareType _ (TypeVar {}) = GT
+
+compareType (TypeLevelString _ a) (TypeLevelString _ a') = compare a a'
+compareType (TypeLevelString {}) _ = LT
+compareType _ (TypeLevelString {}) = GT
+
+compareType (TypeWildcard _) (TypeWildcard _) = EQ
+compareType (TypeWildcard _) _ = LT
+compareType _ (TypeWildcard _) = GT
+
+compareType (TypeConstructor _ a) (TypeConstructor _ a') = compare a a'
+compareType (TypeConstructor {}) _ = LT
+compareType _ (TypeConstructor {}) = GT
+
+compareType (TypeOp _ a) (TypeOp _ a') = compare a a'
+compareType (TypeOp {}) _ = LT
+compareType _ (TypeOp {}) = GT
+
+compareType (TypeApp _ a b) (TypeApp _ a' b') = compareType a a' <> compareType b b'
+compareType (TypeApp {}) _ = LT
+compareType _ (TypeApp {}) = GT
+
+compareType (ForAll _ a b c) (ForAll _ a' b' c') = compare a a' <> compareType b b' <> compare c c'
+compareType (ForAll {}) _ = LT
+compareType _ (ForAll {}) = GT
+
+compareType (ConstrainedType _ a b) (ConstrainedType _ a' b') = compareConstraint a a' <> compareType b b'
+compareType (ConstrainedType {}) _ = LT
+compareType _ (ConstrainedType {}) = GT
+
+compareType (Skolem _ a b c) (Skolem _ a' b' c') = compare a a' <> compare b b' <> compare c c'
+compareType (Skolem {}) _ = LT
+compareType _ (Skolem {}) = GT
+
+compareType (REmpty _) (REmpty _) = EQ
+compareType (REmpty _) _ = LT
+compareType _ (REmpty _) = GT
+
+compareType (RCons _ a b c) (RCons _ a' b' c') = compare a a' <> compareType b b' <> compareType c c'
+compareType (RCons {}) _ = LT
+compareType _ (RCons {}) = GT
+
+compareType (KindedType _ a b) (KindedType _ a' b') = compareType a a' <> compareKind b b'
+compareType (KindedType {}) _ = LT
+compareType _ (KindedType {}) = GT
+
+compareType (PrettyPrintFunction _ a b) (PrettyPrintFunction _ a' b') = compareType a a' <> compareType b b'
+compareType (PrettyPrintFunction {}) _ = LT
+compareType _ (PrettyPrintFunction {}) = GT
+
+compareType (PrettyPrintObject _ a) (PrettyPrintObject _ a') = compareType a a'
+compareType (PrettyPrintObject {}) _ = LT
+compareType _ (PrettyPrintObject {}) = GT
+
+compareType (PrettyPrintForAll _ a b) (PrettyPrintForAll _ a' b') = compare a a' <> compareType b b'
+compareType (PrettyPrintForAll {}) _ = LT
+compareType _ (PrettyPrintForAll {}) = GT
+
+compareType (BinaryNoParensType _ a b c) (BinaryNoParensType _ a' b' c') = compareType a a' <> compareType b b' <> compareType c c'
+compareType (BinaryNoParensType {}) _ = LT
+compareType _ (BinaryNoParensType {}) = GT
+
+compareType (ParensInType _ a) (ParensInType _ a') = compareType a a'
+compareType (ParensInType {}) _ = GT
+
+instance Eq (Constraint a) where
+  (==) = eqConstraint
+
+instance Ord (Constraint a) where
+  compare = compareConstraint
+
 eqConstraint :: Constraint a -> Constraint b -> Bool
 eqConstraint (Constraint _ a b c) (Constraint _ a' b' c') = a == a' && and (zipWith eqType b b') && c == c'
+
+compareConstraint :: Constraint a -> Constraint b -> Ordering
+compareConstraint (Constraint _ a b c) (Constraint _ a' b' c') = compare a a' <> fold (zipWith compareType b b') <> compare c c'
