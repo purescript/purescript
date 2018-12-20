@@ -55,7 +55,7 @@ annLoc (IdeDeclarationAnn a d) loc = IdeDeclarationAnn a {_annLocation = Just lo
 annExp :: IdeDeclarationAnn -> Text -> IdeDeclarationAnn
 annExp (IdeDeclarationAnn a d) e = IdeDeclarationAnn a {_annExportedFrom = Just (mn e)} d
 
-annTyp :: IdeDeclarationAnn -> P.Type -> IdeDeclarationAnn
+annTyp :: IdeDeclarationAnn -> P.SourceType -> IdeDeclarationAnn
 annTyp (IdeDeclarationAnn a d) ta = IdeDeclarationAnn a {_annTypeAnnotation = Just ta} d
 
 
@@ -63,22 +63,22 @@ ida :: IdeDeclaration -> IdeDeclarationAnn
 ida = IdeDeclarationAnn emptyAnn
 
 -- | Builders for Ide declarations
-ideValue :: Text -> Maybe P.Type -> IdeDeclarationAnn
+ideValue :: Text -> Maybe P.SourceType -> IdeDeclarationAnn
 ideValue i ty = ida (IdeDeclValue (IdeValue (P.Ident i) (fromMaybe P.tyString ty)))
 
-ideType :: Text -> Maybe P.Kind -> [(P.ProperName 'P.ConstructorName, P.Type)] -> IdeDeclarationAnn
+ideType :: Text -> Maybe P.SourceKind -> [(P.ProperName 'P.ConstructorName, P.SourceType)] -> IdeDeclarationAnn
 ideType pn ki dtors = ida (IdeDeclType (IdeType (P.ProperName pn) (fromMaybe P.kindType ki) dtors))
 
-ideSynonym :: Text -> Maybe P.Type -> Maybe P.Kind -> IdeDeclarationAnn
+ideSynonym :: Text -> Maybe P.SourceType -> Maybe P.SourceKind -> IdeDeclarationAnn
 ideSynonym pn ty kind = ida (IdeDeclTypeSynonym (IdeTypeSynonym (P.ProperName pn) (fromMaybe P.tyString ty) (fromMaybe P.kindType kind)))
 
-ideTypeClass :: Text -> P.Kind -> [IdeInstance] -> IdeDeclarationAnn
+ideTypeClass :: Text -> P.SourceKind -> [IdeInstance] -> IdeDeclarationAnn
 ideTypeClass pn kind instances = ida (IdeDeclTypeClass (IdeTypeClass (P.ProperName pn) kind instances))
 
-ideDtor :: Text -> Text -> Maybe P.Type -> IdeDeclarationAnn
+ideDtor :: Text -> Text -> Maybe P.SourceType -> IdeDeclarationAnn
 ideDtor pn tn ty = ida (IdeDeclDataConstructor (IdeDataConstructor (P.ProperName pn) (P.ProperName tn) (fromMaybe P.tyString ty)))
 
-ideValueOp :: Text -> P.Qualified (Either Text Text) -> Integer -> Maybe P.Associativity -> Maybe P.Type -> IdeDeclarationAnn
+ideValueOp :: Text -> P.Qualified (Either Text Text) -> Integer -> Maybe P.Associativity -> Maybe P.SourceType -> IdeDeclarationAnn
 ideValueOp opName ident precedence assoc t =
   ida (IdeDeclValueOperator
        (IdeValueOperator
@@ -88,7 +88,7 @@ ideValueOp opName ident precedence assoc t =
         (fromMaybe P.Infix assoc)
         t))
 
-ideTypeOp :: Text -> P.Qualified Text -> Integer -> Maybe P.Associativity -> Maybe P.Kind -> IdeDeclarationAnn
+ideTypeOp :: Text -> P.Qualified Text -> Integer -> Maybe P.Associativity -> Maybe P.SourceKind -> IdeDeclarationAnn
 ideTypeOp opName ident precedence assoc k =
   ida (IdeDeclTypeOperator
        (IdeTypeOperator

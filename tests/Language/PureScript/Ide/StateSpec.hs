@@ -11,22 +11,22 @@ import           Lens.Micro.Platform hiding ((&))
 import           Test.Hspec
 import qualified Data.Map as Map
 
-valueOperator :: Maybe P.Type -> IdeDeclarationAnn
+valueOperator :: Maybe P.SourceType -> IdeDeclarationAnn
 valueOperator =
   ideValueOp "<$>" (P.Qualified (Just (mn "Test")) (Left "function")) 2 Nothing
 
-ctorOperator :: Maybe P.Type -> IdeDeclarationAnn
+ctorOperator :: Maybe P.SourceType -> IdeDeclarationAnn
 ctorOperator =
   ideValueOp ":" (P.Qualified (Just (mn "Test")) (Right "Cons")) 2 Nothing
 
-typeOperator :: Maybe P.Kind -> IdeDeclarationAnn
+typeOperator :: Maybe P.SourceKind -> IdeDeclarationAnn
 typeOperator =
   ideTypeOp ":" (P.Qualified (Just (mn "Test")) "List") 2 Nothing
 
 testModule :: (P.ModuleName, [IdeDeclarationAnn])
 testModule =
   (mn "Test",
-    [ ideValue "function" (Just P.REmpty)
+    [ ideValue "function" (Just P.srcREmpty)
     , ideDtor "Cons" "List" (Just P.tyString)
     , ideType "List" Nothing []
     , valueOperator Nothing
@@ -82,7 +82,7 @@ spec :: Spec
 spec = do
   describe "resolving operators" $ do
     it "resolves the type for a value operator" $
-      resolveOperatorsForModule testState (snd testModule) `shouldSatisfy` elem (valueOperator (Just P.REmpty))
+      resolveOperatorsForModule testState (snd testModule) `shouldSatisfy` elem (valueOperator (Just P.srcREmpty))
     it "resolves the type for a constructor operator" $
       resolveOperatorsForModule testState (snd testModule) `shouldSatisfy` elem (ctorOperator (Just P.tyString))
     it "resolves the kind for a type operator" $

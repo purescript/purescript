@@ -228,7 +228,7 @@ deriveNewtypeInstance ss mn syns ndis className ds tys tyConNm dargs = do
 
     stripRight :: [(Text, Maybe kind)] -> SourceType -> Maybe SourceType
     stripRight [] ty = Just ty
-    stripRight ((arg, _) : args) (TypeApp NullSourceAnn t (TypeVar NullSourceAnn arg'))
+    stripRight ((arg, _) : args) (TypeApp _ t (TypeVar _ arg'))
       | arg == arg' = stripRight args t
     stripRight _ _ = Nothing
 

@@ -658,7 +658,7 @@ asTypeArguments = eachInArray asTypeArgument
   asTypeArgument = (,) <$> nth 0 asText <*> nth 1 (perhaps asKind)
 
 asKind :: Parse PackageError P.SourceKind
-asKind = P.kindFromJSON P.nullSourceAnn fromAesonParser .! InvalidKind
+asKind = P.kindFromJSON (pure P.NullSourceAnn) fromAesonParser .! InvalidKind
 
 asType :: Parse e P.SourceType
 asType = fromAesonParser
@@ -701,15 +701,19 @@ asSourcePos = P.SourcePos <$> nth 0 asIntegral
                           <*> nth 1 asIntegral
 
 asConstraint :: Parse PackageError P.SourceConstraint
-asConstraint = P.srcConstraint <$> key "constraintClass" asQualifiedProperName
-                               <*> key "constraintArgs" (eachInArray asType)
-                               <*> pure Nothing
+asConstraint = P.Constraint <$> key "constraintAnn" asSourceAnn
+                            <*> key "constraintClass" asQualifiedProperName
+                            <*> key "constraintArgs" (eachInArray asType)
+                            <*> pure Nothing
 
 asQualifiedProperName :: Parse e (P.Qualified (P.ProperName a))
 asQualifiedProperName = fromAesonParser
 
 asQualifiedIdent :: Parse e (P.Qualified P.Ident)
 asQualifiedIdent = fromAesonParser
+
+asSourceAnn :: Parse e (P.SourceAnn)
+asSourceAnn = fromAesonParser
 
 asModuleMap :: Parse PackageError (Map P.ModuleName PackageName)
 asModuleMap =
