@@ -13,7 +13,7 @@ import           System.IO.UTF8 (readUTF8FileT)
 
 -- | The name of the PSCI support module
 supportModuleName :: P.ModuleName
-supportModuleName = P.moduleNameFromString "PSCI.Support"
+supportModuleName = fst initialInteractivePrint
 
 -- | Checks if the Console module is defined
 supportModuleIsDefined :: [P.Module] -> Bool

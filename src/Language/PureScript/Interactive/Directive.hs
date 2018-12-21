@@ -106,6 +106,6 @@ help =
   , (Show,     "loaded",    "Show all loaded modules")
   , (Paste,    "paste",     "Enter multiple lines, terminated by ^D")
   , (Complete, "<prefix>",  "Show completions for <prefix> as if pressing tab")
-  , (Print,    "<fn>",      "Set the repl's printing function to <fn>")
+  , (Print,    "<fn>",      "Set the repl's printing function to <fn> (which must be fully qualified)")
   ]
 
