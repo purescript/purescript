@@ -7,6 +7,7 @@ module Language.PureScript.Docs.Prim
   ) where
 
 import Prelude.Compat hiding (fail)
+import Data.Functor (($>))
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Map as Map
@@ -167,8 +168,8 @@ primKind = primKindOf P.primName
 lookupPrimTypeKindOf
   :: NameGen 'P.TypeName
   -> Text
-  -> P.Kind
-lookupPrimTypeKindOf k = fst . unsafeLookupOf k
+  -> Kind'
+lookupPrimTypeKindOf k = ($> ()) . fst . unsafeLookupOf k
   ( P.primTypes <>
     P.primBooleanTypes <>
     P.primOrderingTypes <>
@@ -212,8 +213,8 @@ primClassOf gen title comments = Declaration
   , declInfo =
       let
         tcd = lookupPrimClassOf gen title
-        args = P.typeClassArguments tcd
-        superclasses = P.typeClassSuperclasses tcd
+        args = fmap (fmap (fmap ($> ()))) $ P.typeClassArguments tcd
+        superclasses = fmap ($> ()) $ P.typeClassSuperclasses tcd
         fundeps = convertFundepsToStrings args (P.typeClassDependencies tcd)
       in
         TypeClassDeclaration args superclasses fundeps

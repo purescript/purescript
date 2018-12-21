@@ -166,11 +166,11 @@ rebracketFiltered pred_ externs modules = do
       internalError "BinaryNoParensBinder has no OpBinder"
     goBinder pos other = return (pos, other)
 
-    goType :: SourceSpan -> Type -> m Type
-    goType pos (BinaryNoParensType (TypeOp op) lhs rhs) =
+    goType :: SourceSpan -> SourceType -> m SourceType
+    goType pos (BinaryNoParensType ann (TypeOp ann2 op) lhs rhs) =
       case op `M.lookup` typeAliased of
         Just alias ->
-          return $ TypeApp (TypeApp (TypeConstructor alias) lhs) rhs
+          return $ TypeApp ann (TypeApp ann (TypeConstructor ann2 alias) lhs) rhs
         Nothing ->
           throwError . errorMessage' pos $ UnknownName $ fmap TyOpName op
     goType _ other = return other
@@ -202,7 +202,7 @@ rebracketModule pred_ valueOpTable typeOpTable (Module ss coms mn ds exts) =
 
   (goDecl, goExpr', goBinder') = updateTypes goType
 
-  goType :: SourceSpan -> Type -> m Type
+  goType :: SourceSpan -> SourceType -> m SourceType
   goType = flip matchTypeOperators typeOpTable
 
   wrap :: (a -> m a) -> (SourceSpan, a) -> m (SourceSpan, a)
@@ -227,8 +227,8 @@ removeParens = f
   goBinder (ParensInBinder b) = goBinder b
   goBinder b = b
 
-  goType :: Type -> Type
-  goType (ParensInType t) = goType t
+  goType :: Type a -> Type a
+  goType (ParensInType _ t) = goType t
   goType t = t
 
   decontextify
@@ -302,7 +302,7 @@ customOperatorTable fixities =
 updateTypes
   :: forall m
    . Monad m
-  => (SourceSpan -> Type -> m Type)
+  => (SourceSpan -> SourceType -> m SourceType)
   -> ( Declaration -> m Declaration
      , SourceSpan -> Expr -> m (SourceSpan, Expr)
      , SourceSpan -> Binder -> m (SourceSpan, Binder)
@@ -310,7 +310,7 @@ updateTypes
 updateTypes goType = (goDecl, goExpr, goBinder)
   where
 
-  goType' :: SourceSpan -> Type -> m Type
+  goType' :: SourceSpan -> SourceType -> m SourceType
   goType' = everywhereOnTypesTopDownM . goType
 
   goDecl :: Declaration -> m Declaration
@@ -334,9 +334,9 @@ updateTypes goType = (goDecl, goExpr, goBinder)
 
   goExpr :: SourceSpan -> Expr -> m (SourceSpan, Expr)
   goExpr _ e@(PositionedValue pos _ _) = return (pos, e)
-  goExpr pos (TypeClassDictionary (Constraint name tys info) dicts hints) = do
+  goExpr pos (TypeClassDictionary (Constraint ann name tys info) dicts hints) = do
     tys' <- traverse (goType' pos) tys
-    return (pos, TypeClassDictionary (Constraint name tys' info) dicts hints)
+    return (pos, TypeClassDictionary (Constraint ann name tys' info) dicts hints)
   goExpr pos (DeferredDictionary cls tys) = do
     tys' <- traverse (goType' pos) tys
     return (pos, DeferredDictionary cls tys')

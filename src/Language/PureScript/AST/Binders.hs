@@ -60,7 +60,7 @@ data Binder
   -- |
   -- A binder with a type annotation
   --
-  | TypedBinder Type Binder
+  | TypedBinder SourceType Binder
   deriving (Show)
 
 -- Manual Eq and Ord instances for `Binder` were added on 2018-03-05. Comparing

@@ -195,7 +195,7 @@ lookupValueDeclaration ::
    MonadReader P.ModuleName m) =>
   P.ModuleName ->
   P.Ident ->
-  m (P.ModuleName, [Either (Text, P.Constraint, ChildDeclaration) Declaration])
+  m (P.ModuleName, [Either (Text, Constraint', ChildDeclaration) Declaration])
 lookupValueDeclaration importedFrom ident = do
   decls <- lookupModuleDeclarations "lookupValueDeclaration" importedFrom
   let
@@ -360,7 +360,7 @@ lookupModuleDeclarations definedIn moduleName = do
 
 handleTypeClassMembers ::
   (MonadReader P.ModuleName m) =>
-  Map P.ModuleName [Either (Text, P.Constraint, ChildDeclaration) Declaration] ->
+  Map P.ModuleName [Either (Text, Constraint', ChildDeclaration) Declaration] ->
   Map P.ModuleName [Declaration] ->
   m (Map P.ModuleName [Declaration], Map P.ModuleName [Declaration])
 handleTypeClassMembers valsAndMembers typeClasses =
@@ -375,7 +375,7 @@ handleTypeClassMembers valsAndMembers typeClasses =
       |> fmap splitMap
 
 valsAndMembersToEnv ::
-  [Either (Text, P.Constraint, ChildDeclaration) Declaration] -> TypeClassEnv
+  [Either (Text, Constraint', ChildDeclaration) Declaration] -> TypeClassEnv
 valsAndMembersToEnv xs =
   let (envUnhandledMembers, envValues) = partitionEithers xs
       envTypeClasses = []
@@ -400,7 +400,7 @@ data TypeClassEnv = TypeClassEnv
     -- name of the type class they belong to, and the constraint is used to
     -- make sure that they have the correct type if they get promoted.
     --
-    envUnhandledMembers :: [(Text, P.Constraint, ChildDeclaration)]
+    envUnhandledMembers :: [(Text, Constraint', ChildDeclaration)]
     -- |
     -- A list of normal value declarations. Type class members will be added to
     -- this list if their parent type class is not available.
@@ -468,7 +468,7 @@ handleEnv TypeClassEnv{..} =
           ++ T.unpack cdeclTitle)
 
   addConstraint constraint =
-    P.quantify . P.moveQuantifiersToFront . P.ConstrainedType constraint
+    P.quantify . P.moveQuantifiersToFront . P.ConstrainedType () constraint
 
 splitMap :: Map k (v1, v2) -> (Map k v1, Map k v2)
 splitMap = fmap fst &&& fmap snd
@@ -534,12 +534,12 @@ internalErrorInModule msg = do
 -- If the provided Declaration is a TypeClassDeclaration, construct an
 -- appropriate Constraint for use with the types of its members.
 --
-typeClassConstraintFor :: Declaration -> Maybe P.Constraint
+typeClassConstraintFor :: Declaration -> Maybe Constraint'
 typeClassConstraintFor Declaration{..} =
   case declInfo of
     TypeClassDeclaration tyArgs _ _ ->
-      Just (P.Constraint (P.Qualified Nothing (P.ProperName declTitle)) (mkConstraint tyArgs) Nothing)
+      Just (P.Constraint () (P.Qualified Nothing (P.ProperName declTitle)) (mkConstraint tyArgs) Nothing)
     _ ->
       Nothing
   where
-  mkConstraint = map (P.TypeVar . fst)
+  mkConstraint = map (P.TypeVar () . fst)

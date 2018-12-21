@@ -44,38 +44,38 @@ data IdeDeclaration
 
 data IdeValue = IdeValue
   { _ideValueIdent :: P.Ident
-  , _ideValueType  :: P.Type
+  , _ideValueType  :: P.SourceType
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeType = IdeType
  { _ideTypeName :: P.ProperName 'P.TypeName
- , _ideTypeKind :: P.Kind
- , _ideTypeDtors :: [(P.ProperName 'P.ConstructorName, P.Type)]
+ , _ideTypeKind :: P.SourceKind
+ , _ideTypeDtors :: [(P.ProperName 'P.ConstructorName, P.SourceType)]
  } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeTypeSynonym = IdeTypeSynonym
   { _ideSynonymName :: P.ProperName 'P.TypeName
-  , _ideSynonymType :: P.Type
-  , _ideSynonymKind :: P.Kind
+  , _ideSynonymType :: P.SourceType
+  , _ideSynonymKind :: P.SourceKind
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeDataConstructor = IdeDataConstructor
   { _ideDtorName     :: P.ProperName 'P.ConstructorName
   , _ideDtorTypeName :: P.ProperName 'P.TypeName
-  , _ideDtorType     :: P.Type
+  , _ideDtorType     :: P.SourceType
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeTypeClass = IdeTypeClass
   { _ideTCName :: P.ProperName 'P.ClassName
-  , _ideTCKind :: P.Kind
+  , _ideTCKind :: P.SourceKind
   , _ideTCInstances :: [IdeInstance]
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeInstance = IdeInstance
   { _ideInstanceModule      :: P.ModuleName
   , _ideInstanceName        :: P.Ident
-  , _ideInstanceTypes       :: [P.Type]
-  , _ideInstanceConstraints :: Maybe [P.Constraint]
+  , _ideInstanceTypes       :: [P.SourceType]
+  , _ideInstanceConstraints :: Maybe [P.SourceConstraint]
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeValueOperator = IdeValueOperator
@@ -83,7 +83,7 @@ data IdeValueOperator = IdeValueOperator
   , _ideValueOpAlias         :: P.Qualified (Either P.Ident (P.ProperName 'P.ConstructorName))
   , _ideValueOpPrecedence    :: P.Precedence
   , _ideValueOpAssociativity :: P.Associativity
-  , _ideValueOpType          :: Maybe P.Type
+  , _ideValueOpType          :: Maybe P.SourceType
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeTypeOperator = IdeTypeOperator
@@ -91,7 +91,7 @@ data IdeTypeOperator = IdeTypeOperator
   , _ideTypeOpAlias         :: P.Qualified (P.ProperName 'P.TypeName)
   , _ideTypeOpPrecedence    :: P.Precedence
   , _ideTypeOpAssociativity :: P.Associativity
-  , _ideTypeOpKind          :: Maybe P.Kind
+  , _ideTypeOpKind          :: Maybe P.SourceKind
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 _IdeDeclValue :: Traversal' IdeDeclaration IdeValue
@@ -147,7 +147,7 @@ data Annotation
   = Annotation
   { _annLocation       :: Maybe P.SourceSpan
   , _annExportedFrom   :: Maybe P.ModuleName
-  , _annTypeAnnotation :: Maybe P.Type
+  , _annTypeAnnotation :: Maybe P.SourceType
   , _annDocumentation  :: Maybe Text
   } deriving (Show, Eq, Ord, Generic, NFData)
 
@@ -158,7 +158,7 @@ emptyAnn :: Annotation
 emptyAnn = Annotation Nothing Nothing Nothing Nothing
 
 type DefinitionSites a = Map IdeNamespaced a
-type TypeAnnotations = Map P.Ident P.Type
+type TypeAnnotations = Map P.Ident P.SourceType
 newtype AstData a = AstData (ModuleMap (DefinitionSites a, TypeAnnotations))
   -- ^ SourceSpans for the definition sites of values and types as well as type
   -- annotations found in a module

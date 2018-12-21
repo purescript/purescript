@@ -12,10 +12,12 @@ import Language.PureScript.Parser.Lexer
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
-parseNamedKind :: TokenParser Kind
-parseNamedKind = NamedKind <$> parseQualified kindName
+parseNamedKind :: TokenParser SourceKind
+parseNamedKind = withSourceAnnF $ do
+  name <- parseQualified kindName
+  return $ \ann -> NamedKind ann name
 
-parseKindAtom :: TokenParser Kind
+parseKindAtom :: TokenParser SourceKind
 parseKindAtom =
   indented *> P.choice
     [ parseNamedKind
@@ -25,8 +27,8 @@ parseKindAtom =
 -- |
 -- Parse a kind
 --
-parseKind :: TokenParser Kind
+parseKind :: TokenParser SourceKind
 parseKind = P.buildExpressionParser operators parseKindAtom P.<?> "kind"
   where
-  operators = [ [ P.Prefix (symbol' "#" >> return Row) ]
-              , [ P.Infix (rarrow >> return FunKind) P.AssocRight ] ]
+  operators = [ [ P.Prefix (withSourceAnnF $ symbol' "#" >> return Row) ]
+              , [ P.Infix (withSourceAnnF $ rarrow >> return FunKind) P.AssocRight ] ]

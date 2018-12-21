@@ -53,7 +53,7 @@ main = testSpec "hierarchy" $ do
                  (P.internalModuleSourceSpan "<B>", [])
                  (P.ProperName "B")
                  []
-                 [P.Constraint (P.Qualified Nothing $ P.ProperName "A") [] Nothing]
+                 [P.srcConstraint (P.Qualified Nothing $ P.ProperName "A") [] Nothing]
                  []
                  []
               ]

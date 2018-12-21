@@ -7,6 +7,7 @@ import Protolude hiding (moduleName)
 
 import Control.Category ((>>>))
 
+import Data.Functor (($>))
 import qualified Data.Text as T
 
 import Language.PureScript.Docs.Types
@@ -110,33 +111,34 @@ basicDeclaration sa title = Just . Right . mkDeclaration sa title
 
 convertDeclaration :: P.Declaration -> Text -> Maybe IntermediateDeclaration
 convertDeclaration (P.ValueDecl sa _ _ _ [P.MkUnguarded (P.TypedValue _ _ ty)]) title =
-  basicDeclaration sa title (ValueDeclaration ty)
+  basicDeclaration sa title (ValueDeclaration (ty $> ()))
 convertDeclaration (P.ValueDecl sa _ _ _ _) title =
   -- If no explicit type declaration was provided, insert a wildcard, so that
   -- the actual type will be added during type checking.
-  basicDeclaration sa title (ValueDeclaration (P.TypeWildcard (fst sa)))
+  basicDeclaration sa title (ValueDeclaration (P.TypeWildcard ()))
 convertDeclaration (P.ExternDeclaration sa _ ty) title =
-  basicDeclaration sa title (ValueDeclaration ty)
+  basicDeclaration sa title (ValueDeclaration (ty $> ()))
 convertDeclaration (P.DataDeclaration sa dtype _ args ctors) title =
   Just (Right (mkDeclaration sa title info) { declChildren = children })
   where
-  info = DataDeclaration dtype args
-  children = map convertCtor ctors
+  info = DataDeclaration dtype (fmap (fmap (fmap ($> ()))) args)
+  children = map convertCtor (fmap (fmap (fmap ($> ()))) ctors)
   convertCtor (ctor', tys) =
     ChildDeclaration (P.runProperName ctor') Nothing Nothing (ChildDataConstructor tys)
 convertDeclaration (P.ExternDataDeclaration sa _ kind') title =
-  basicDeclaration sa title (ExternDataDeclaration kind')
+  basicDeclaration sa title (ExternDataDeclaration (kind' $> ()))
 convertDeclaration (P.ExternKindDeclaration sa _) title =
   basicDeclaration sa title ExternKindDeclaration
 convertDeclaration (P.TypeSynonymDeclaration sa _ args ty) title =
-  basicDeclaration sa title (TypeSynonymDeclaration args ty)
+  basicDeclaration sa title (TypeSynonymDeclaration (fmap (fmap (fmap ($> ()))) args) (ty $> ()))
 convertDeclaration (P.TypeClassDeclaration sa _ args implies fundeps ds) title =
   Just (Right (mkDeclaration sa title info) { declChildren = children })
   where
-  info = TypeClassDeclaration args implies (convertFundepsToStrings args fundeps)
+  args' = fmap (fmap (fmap ($> ()))) args
+  info = TypeClassDeclaration args' (fmap ($> ()) implies) (convertFundepsToStrings args' fundeps)
   children = map convertClassMember ds
   convertClassMember (P.TypeDeclaration (P.TypeDeclarationData (ss, com) ident' ty)) =
-    ChildDeclaration (P.showIdent ident') (convertComments com) (Just ss) (ChildTypeClassMember ty)
+    ChildDeclaration (P.showIdent ident') (convertComments com) (Just ss) (ChildTypeClassMember (ty $> ()))
   convertClassMember _ =
     P.internalError "convertDeclaration: Invalid argument to convertClassMember."
 convertDeclaration (P.TypeInstanceDeclaration (ss, com) _ _ _ constraints className tys _) title =
@@ -146,11 +148,11 @@ convertDeclaration (P.TypeInstanceDeclaration (ss, com) _ _ _ constraints classN
   typeNameStrings = ordNub (concatMap (P.everythingOnTypes (++) extractProperNames) tys)
   unQual x = let (P.Qualified _ y) = x in P.runProperName y
 
-  extractProperNames (P.TypeConstructor n) = [unQual n]
+  extractProperNames (P.TypeConstructor _ n) = [unQual n]
   extractProperNames _ = []
 
-  childDecl = ChildDeclaration title (convertComments com) (Just ss) (ChildInstance constraints classApp)
-  classApp = foldl' P.TypeApp (P.TypeConstructor (fmap P.coerceProperName className)) tys
+  childDecl = ChildDeclaration title (convertComments com) (Just ss) (ChildInstance (fmap ($> ()) constraints) (classApp $> ()))
+  classApp = foldl' P.srcTypeApp (P.srcTypeConstructor (fmap P.coerceProperName className)) tys
 convertDeclaration (P.ValueFixityDeclaration sa fixity (P.Qualified mn alias) _) title =
   Just . Right $ mkDeclaration sa title (AliasDeclaration fixity (P.Qualified mn (Right alias)))
 convertDeclaration (P.TypeFixityDeclaration sa fixity (P.Qualified mn alias) _) title =

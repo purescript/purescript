@@ -41,7 +41,7 @@ import           Language.PureScript.Types
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
-kindedIdent :: TokenParser (Text, Maybe Kind)
+kindedIdent :: TokenParser (Text, Maybe SourceKind)
 kindedIdent = (, Nothing) <$> identifier
           <|> parens ((,) <$> identifier <*> (Just <$> (indented *> doubleColon *> indented *> parseKind)))
 
@@ -204,10 +204,11 @@ parseTypeClassDeclaration = withSourceAnnF $ do
     indented *> mark (P.many (same *> parseTypeDeclaration))
   return $ \sa -> TypeClassDeclaration sa className idents implies dependencies members
 
-parseConstraint :: TokenParser Constraint
-parseConstraint = Constraint <$> parseQualified properName
-                             <*> P.many (noWildcards $ noForAll parseTypeAtom)
-                             <*> pure Nothing
+parseConstraint :: TokenParser SourceConstraint
+parseConstraint = withSourceAnnF $ do
+  name <- parseQualified properName
+  args <- P.many (noWildcards $ noForAll parseTypeAtom)
+  return $ \ann -> Constraint ann name args Nothing
 
 parseInstanceDeclaration :: TokenParser (TypeInstanceBody -> Declaration)
 parseInstanceDeclaration = withSourceAnnF $ do

@@ -51,7 +51,7 @@ data Evidence
   = NamedInstance (Qualified Ident)
 
   -- | Computed instances
-  | WarnInstance Type         -- ^ Warn type class with a user-defined warning message
+  | WarnInstance SourceType -- ^ Warn type class with a user-defined warning message
   | IsSymbolInstance PSString -- ^ The IsSymbol type class for a given Symbol literal
   | EmptyClassInstance        -- ^ For any solved type class with no members
   deriving (Show, Eq)
@@ -84,7 +84,7 @@ replaceTypeClassDictionaries
    . (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
   => Bool
   -> Expr
-  -> m (Expr, [(Ident, InstanceContext, Constraint)])
+  -> m (Expr, [(Ident, InstanceContext, SourceConstraint)])
 replaceTypeClassDictionaries shouldGeneralize expr = flip evalStateT M.empty $ do
     -- Loop, deferring any unsolved constraints, until there are no more
     -- constraints which can be solved, then make a generalization pass.
@@ -98,16 +98,16 @@ replaceTypeClassDictionaries shouldGeneralize expr = flip evalStateT M.empty $ d
     -- This pass solves constraints where possible, deferring constraints if not.
     deferPass :: Expr -> StateT InstanceContext m (Expr, Any)
     deferPass = fmap (second fst) . runWriterT . f where
-      f :: Expr -> WriterT (Any, [(Ident, InstanceContext, Constraint)]) (StateT InstanceContext m) Expr
+      f :: Expr -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
       (_, f, _) = everywhereOnValuesTopDownM return (go True) return
 
     -- This pass generalizes any remaining constraints
-    generalizePass :: Expr -> StateT InstanceContext m (Expr, [(Ident, InstanceContext, Constraint)])
+    generalizePass :: Expr -> StateT InstanceContext m (Expr, [(Ident, InstanceContext, SourceConstraint)])
     generalizePass = fmap (second snd) . runWriterT . f where
-      f :: Expr -> WriterT (Any, [(Ident, InstanceContext, Constraint)]) (StateT InstanceContext m) Expr
+      f :: Expr -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
       (_, f, _) = everywhereOnValuesTopDownM return (go False) return
 
-    go :: Bool -> Expr -> WriterT (Any, [(Ident, InstanceContext, Constraint)]) (StateT InstanceContext m) Expr
+    go :: Bool -> Expr -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
     go deferErrors (TypeClassDictionary constraint context hints) =
       rethrow (addHints hints) $ entails (SolverOptions shouldGeneralize deferErrors) constraint context hints
     go _ other = return other
@@ -116,7 +116,7 @@ replaceTypeClassDictionaries shouldGeneralize expr = flip evalStateT M.empty $ d
 data EntailsResult a
   = Solved a TypeClassDict
   -- ^ We solved this constraint
-  | Unsolved Constraint
+  | Unsolved SourceConstraint
   -- ^ We couldn't solve this constraint right now, it will be generalized
   | Deferred
   -- ^ We couldn't solve this constraint right now, so it has been deferred
@@ -152,17 +152,17 @@ entails
    . (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadSupply m)
   => SolverOptions
   -- ^ Solver options
-  -> Constraint
+  -> SourceConstraint
   -- ^ The constraint to solve
   -> InstanceContext
   -- ^ The contexts in which to solve the constraint
   -> [ErrorMessageHint]
   -- ^ Error message hints to apply to any instance errors
-  -> WriterT (Any, [(Ident, InstanceContext, Constraint)]) (StateT InstanceContext m) Expr
+  -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
 entails SolverOptions{..} constraint context hints =
     solve constraint
   where
-    forClassName :: InstanceContext -> Qualified (ProperName 'ClassName) -> [Type] -> [TypeClassDict]
+    forClassName :: InstanceContext -> Qualified (ProperName 'ClassName) -> [SourceType] -> [TypeClassDict]
     forClassName ctx cn@C.Warn [msg] =
       -- Prefer a warning dictionary in scope if there is one available.
       -- This allows us to defer a warning by propagating the constraint.
@@ -179,11 +179,11 @@ entails SolverOptions{..} constraint context hints =
     forClassName ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (ordNub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
     forClassName _ _ _ = internalError "forClassName: expected qualified class name"
 
-    ctorModules :: Type -> Maybe ModuleName
-    ctorModules (TypeConstructor (Qualified (Just mn) _)) = Just mn
-    ctorModules (TypeConstructor (Qualified Nothing _)) = internalError "ctorModules: unqualified type name"
-    ctorModules (TypeApp ty _) = ctorModules ty
-    ctorModules (KindedType ty _) = ctorModules ty
+    ctorModules :: SourceType -> Maybe ModuleName
+    ctorModules (TypeConstructor _ (Qualified (Just mn) _)) = Just mn
+    ctorModules (TypeConstructor _ (Qualified Nothing _)) = internalError "ctorModules: unqualified type name"
+    ctorModules (TypeApp _ ty _) = ctorModules ty
+    ctorModules (KindedType _ ty _) = ctorModules ty
     ctorModules _ = Nothing
 
     findDicts :: InstanceContext -> Qualified (ProperName 'ClassName) -> Maybe ModuleName -> [TypeClassDict]
@@ -192,12 +192,12 @@ entails SolverOptions{..} constraint context hints =
     valUndefined :: Expr
     valUndefined = Var nullSourceSpan (Qualified (Just (ModuleName [ProperName C.prim])) (Ident C.undefined))
 
-    solve :: Constraint -> WriterT (Any, [(Ident, InstanceContext, Constraint)]) (StateT InstanceContext m) Expr
+    solve :: SourceConstraint -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
     solve con = go 0 con
       where
-        go :: Int -> Constraint -> WriterT (Any, [(Ident, InstanceContext, Constraint)]) (StateT InstanceContext m) Expr
-        go work (Constraint className' tys' _) | work > 1000 = throwError . errorMessage $ PossiblyInfiniteInstance className' tys'
-        go work con'@(Constraint className' tys' conInfo) = WriterT . StateT . (withErrorMessageHint (ErrorSolvingConstraint con') .) . runStateT . runWriterT $ do
+        go :: Int -> SourceConstraint -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
+        go work (Constraint _ className' tys' _) | work > 1000 = throwError . errorMessage $ PossiblyInfiniteInstance className' tys'
+        go work con'@(Constraint _ className' tys' conInfo) = WriterT . StateT . (withErrorMessageHint (ErrorSolvingConstraint con') .) . runStateT . runWriterT $ do
             -- We might have unified types by solving other constraints, so we need to
             -- apply the latest substitution.
             latestSubst <- lift . lift $ gets checkSubstitution
@@ -265,7 +265,7 @@ entails SolverOptions{..} constraint context hints =
               Deferred ->
                 -- Constraint was deferred, just return the dictionary unchanged,
                 -- with no unsolved constraints. Hopefully, we can solve this later.
-                return (TypeClassDictionary (Constraint className' tys'' conInfo) context hints)
+                return (TypeClassDictionary (srcConstraint className' tys'' conInfo) context hints)
           where
             -- | When checking functional dependencies, we need to use unification to make
             -- sure it is safe to use the selected instance. We will unify the solved type with
@@ -280,8 +280,8 @@ entails SolverOptions{..} constraint context hints =
             -- as necessary, based on the types in the instance head.
             withFreshTypes
               :: TypeClassDict
-              -> Matching Type
-              -> m (Matching Type)
+              -> Matching SourceType
+              -> m (Matching SourceType)
             withFreshTypes TypeClassDictionaryInScope{..} subst = do
                 let onType = everythingOnTypes S.union fromTypeVar
                     typeVarsInHead = foldMap onType tcdInstanceTypes
@@ -291,29 +291,29 @@ entails SolverOptions{..} constraint context hints =
                 newSubst <- traverse withFreshType (S.toList uninstantiatedTypeVars)
                 return (subst <> M.fromList newSubst)
               where
-                fromTypeVar (TypeVar v) = S.singleton v
+                fromTypeVar (TypeVar _ v) = S.singleton v
                 fromTypeVar _ = S.empty
 
                 withFreshType s = do
                   t <- freshType
                   return (s, t)
 
-            unique :: [Type] -> [(a, TypeClassDict)] -> m (EntailsResult a)
+            unique :: [SourceType] -> [(a, TypeClassDict)] -> m (EntailsResult a)
             unique tyArgs []
               | solverDeferErrors = return Deferred
               -- We need a special case for nullary type classes, since we want
               -- to generalize over Partial constraints.
-              | solverShouldGeneralize && (null tyArgs || any canBeGeneralized tyArgs) = return (Unsolved (Constraint className' tyArgs conInfo))
-              | otherwise = throwError . errorMessage $ NoInstanceFound (Constraint className' tyArgs conInfo)
+              | solverShouldGeneralize && (null tyArgs || any canBeGeneralized tyArgs) = return (Unsolved (srcConstraint className' tyArgs conInfo))
+              | otherwise = throwError . errorMessage $ NoInstanceFound (srcConstraint className' tyArgs conInfo)
             unique _      [(a, dict)] = return $ Solved a dict
             unique tyArgs tcds
               | pairwiseAny overlapping (map snd tcds) =
                   throwError . errorMessage $ OverlappingInstances className' tyArgs (tcds >>= (toList . namedInstanceIdentifier . tcdValue . snd))
               | otherwise = return $ uncurry Solved (minimumBy (compare `on` length . tcdPath . snd) tcds)
 
-            canBeGeneralized :: Type -> Bool
+            canBeGeneralized :: Type a -> Bool
             canBeGeneralized TUnknown{} = True
-            canBeGeneralized (KindedType t _) = canBeGeneralized t
+            canBeGeneralized (KindedType _ t _) = canBeGeneralized t
             canBeGeneralized _ = False
 
             -- |
@@ -331,7 +331,7 @@ entails SolverOptions{..} constraint context hints =
             -- Create dictionaries for subgoals which still need to be solved by calling go recursively
             -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
             -- unifies with Either a b, and we can satisfy the subgoals Show a and Show b recursively.
-            solveSubgoals :: Matching Type -> Maybe [Constraint] -> WriterT (Any, [(Ident, InstanceContext, Constraint)]) (StateT InstanceContext m) (Maybe [Expr])
+            solveSubgoals :: Matching SourceType -> Maybe [SourceConstraint] -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) (Maybe [Expr])
             solveSubgoals _ Nothing = return Nothing
             solveSubgoals subst (Just subgoals) =
               Just <$> traverse (go (work + 1) . mapConstraintArgs (map (replaceAllTypeVars (M.toList subst)))) subgoals
@@ -360,21 +360,21 @@ entails SolverOptions{..} constraint context hints =
         subclassDictionaryValue dict className index =
           App (Accessor (mkString (superclassName className index)) dict) valUndefined
 
-    solveIsSymbol :: [Type] -> Maybe [TypeClassDict]
-    solveIsSymbol [TypeLevelString sym] = Just [TypeClassDictionaryInScope [] 0 (IsSymbolInstance sym) [] C.IsSymbol [TypeLevelString sym] Nothing]
+    solveIsSymbol :: [SourceType] -> Maybe [TypeClassDict]
+    solveIsSymbol [TypeLevelString ann sym] = Just [TypeClassDictionaryInScope [] 0 (IsSymbolInstance sym) [] C.IsSymbol [TypeLevelString ann sym] Nothing]
     solveIsSymbol _ = Nothing
 
-    solveSymbolCompare :: [Type] -> Maybe [TypeClassDict]
-    solveSymbolCompare [arg0@(TypeLevelString lhs), arg1@(TypeLevelString rhs), _] =
+    solveSymbolCompare :: [SourceType] -> Maybe [TypeClassDict]
+    solveSymbolCompare [arg0@(TypeLevelString _ lhs), arg1@(TypeLevelString _ rhs), _] =
       let ordering = case compare lhs rhs of
                   LT -> C.orderingLT
                   EQ -> C.orderingEQ
                   GT -> C.orderingGT
-          args' = [arg0, arg1, TypeConstructor ordering]
+          args' = [arg0, arg1, srcTypeConstructor ordering]
       in Just [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.SymbolCompare args' Nothing]
     solveSymbolCompare _ = Nothing
 
-    solveSymbolAppend :: [Type] -> Maybe [TypeClassDict]
+    solveSymbolAppend :: [SourceType] -> Maybe [TypeClassDict]
     solveSymbolAppend [arg0, arg1, arg2] = do
       (arg0', arg1', arg2') <- appendSymbols arg0 arg1 arg2
       let args' = [arg0', arg1', arg2']
@@ -382,126 +382,127 @@ entails SolverOptions{..} constraint context hints =
     solveSymbolAppend _ = Nothing
 
     -- | Append type level symbols, or, run backwards, strip a prefix or suffix
-    appendSymbols :: Type -> Type -> Type -> Maybe (Type, Type, Type)
-    appendSymbols arg0@(TypeLevelString lhs) arg1@(TypeLevelString rhs) _ = Just (arg0, arg1, TypeLevelString (lhs <> rhs))
-    appendSymbols arg0@(TypeLevelString lhs) _ arg2@(TypeLevelString out) = do
+    appendSymbols :: SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType)
+    appendSymbols arg0@(TypeLevelString _ lhs) arg1@(TypeLevelString _ rhs) _ = Just (arg0, arg1, srcTypeLevelString (lhs <> rhs))
+    appendSymbols arg0@(TypeLevelString _ lhs) _ arg2@(TypeLevelString _ out) = do
       lhs' <- decodeString lhs
       out' <- decodeString out
       rhs <- stripPrefix lhs' out'
-      pure (arg0, TypeLevelString (mkString rhs), arg2)
-    appendSymbols _ arg1@(TypeLevelString rhs) arg2@(TypeLevelString out) = do
+      pure (arg0, srcTypeLevelString (mkString rhs), arg2)
+    appendSymbols _ arg1@(TypeLevelString _ rhs) arg2@(TypeLevelString _ out) = do
       rhs' <- decodeString rhs
       out' <- decodeString out
       lhs <- stripSuffix rhs' out'
-      pure (TypeLevelString (mkString lhs), arg1, arg2)
+      pure (srcTypeLevelString (mkString lhs), arg1, arg2)
     appendSymbols _ _ _ = Nothing
 
-    solveSymbolCons :: [Type] -> Maybe [TypeClassDict]
+    solveSymbolCons :: [SourceType] -> Maybe [TypeClassDict]
     solveSymbolCons [arg0, arg1, arg2] = do
       (arg0', arg1', arg2') <- consSymbol arg0 arg1 arg2
       let args' = [arg0', arg1', arg2']
       pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.SymbolCons args' Nothing]
     solveSymbolCons _ = Nothing
 
-    consSymbol :: Type -> Type -> Type -> Maybe (Type, Type, Type)
-    consSymbol _ _ arg@(TypeLevelString s) = do
+    consSymbol :: SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType)
+    consSymbol _ _ arg@(TypeLevelString _ s) = do
       (h, t) <- T.uncons =<< decodeString s
       pure (mkTLString (T.singleton h), mkTLString t, arg)
-      where mkTLString = TypeLevelString . mkString
-    consSymbol arg1@(TypeLevelString h) arg2@(TypeLevelString t) _ = do
+      where mkTLString = srcTypeLevelString . mkString
+    consSymbol arg1@(TypeLevelString _ h) arg2@(TypeLevelString _ t) _ = do
       h' <- decodeString h
       t' <- decodeString t
       guard (T.length h' == 1)
-      pure (arg1, arg2, TypeLevelString (mkString $ h' <> t'))
+      pure (arg1, arg2, srcTypeLevelString (mkString $ h' <> t'))
     consSymbol _ _ _ = Nothing
 
-    solveUnion :: [Type] -> Maybe [TypeClassDict]
+    solveUnion :: [SourceType] -> Maybe [TypeClassDict]
     solveUnion [l, r, u] = do
       (lOut, rOut, uOut, cst) <- unionRows l r u
       pure [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowUnion [lOut, rOut, uOut] cst ]
     solveUnion _ = Nothing
 
     -- | Left biased union of two row types
-    unionRows :: Type -> Type -> Type -> Maybe (Type, Type, Type, Maybe [Constraint])
+    unionRows :: SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType, Maybe [SourceConstraint])
     unionRows l r _ =
         guard canMakeProgress $> (l, r, rowFromList out, cons)
       where
         (fixed, rest) = rowToList l
 
-        rowVar = TypeVar "r"
+        rowVar = srcTypeVar "r"
 
         (canMakeProgress, out, cons) =
           case rest of
             -- If the left hand side is a closed row, then we can merge
             -- its labels into the right hand side.
-            REmpty -> (True, (fixed, r), Nothing)
+            REmpty _ -> (True, (fixed, r), Nothing)
             -- If the left hand side is not definitely closed, then the only way we
             -- can safely make progress is to move any known labels from the left
             -- input into the output, and add a constraint for any remaining labels.
             -- Otherwise, the left hand tail might contain the same labels as on
             -- the right hand side, and we can't be certain we won't reorder the
             -- types for such labels.
-            _ -> (not (null fixed), (fixed, rowVar), Just [ Constraint C.RowUnion [rest, r, rowVar] Nothing ])
+            _ -> (not (null fixed), (fixed, rowVar), Just [ srcConstraint C.RowUnion [rest, r, rowVar] Nothing ])
 
-    solveRowCons :: [Type] -> Maybe [TypeClassDict]
-    solveRowCons [TypeLevelString sym, ty, r, _] =
-      Just [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowCons [TypeLevelString sym, ty, r, RCons (Label sym) ty r] Nothing ]
+    solveRowCons :: [SourceType] -> Maybe [TypeClassDict]
+    solveRowCons [TypeLevelString ann sym, ty, r, _] =
+      Just [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowCons [TypeLevelString ann sym, ty, r, srcRCons (Label sym) ty r] Nothing ]
     solveRowCons _ = Nothing
 
-    solveRowToList :: [Type] -> Maybe [TypeClassDict]
+    solveRowToList :: [SourceType] -> Maybe [TypeClassDict]
     solveRowToList [r, _] = do
       entries <- rowToRowList r
       pure [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowToList [r, entries] Nothing ]
     solveRowToList _ = Nothing
 
     -- | Convert a closed row to a sorted list of entries
-    rowToRowList :: Type -> Maybe Type
+    rowToRowList :: SourceType -> Maybe SourceType
     rowToRowList r =
-        guard (REmpty == rest) $>
-        foldr rowListCons (TypeConstructor C.RowListNil) fixed
+        guard (eqType rest $ REmpty ()) $>
+        foldr rowListCons (srcTypeConstructor C.RowListNil) fixed
       where
         (fixed, rest) = rowToSortedList r
-        rowListCons (lbl, ty) tl = foldl TypeApp (TypeConstructor C.RowListCons)
-                                     [ TypeLevelString (runLabel lbl)
-                                     , ty
-                                     , tl ]
+        rowListCons (RowListItem _ lbl ty) tl =
+          foldl srcTypeApp (srcTypeConstructor C.RowListCons)
+            [ srcTypeLevelString (runLabel lbl)
+            , ty
+            , tl ]
 
-    solveNub :: [Type] -> Maybe [TypeClassDict]
+    solveNub :: [SourceType] -> Maybe [TypeClassDict]
     solveNub [r, _] = do
       r' <- nubRows r
       pure [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowNub [r, r'] Nothing ]
     solveNub _ = Nothing
 
-    nubRows :: Type -> Maybe Type
+    nubRows :: SourceType -> Maybe SourceType
     nubRows r =
-        guard (REmpty == rest) $>
-        rowFromList (nubBy ((==) `on` fst) fixed, rest)
+        guard (eqType rest $ REmpty ()) $>
+        rowFromList (nubBy ((==) `on` rowListLabel) fixed, rest)
       where
         (fixed, rest) = rowToSortedList r
 
-    solveLacks :: [Type] -> Maybe [TypeClassDict]
-    solveLacks [TypeLevelString sym, r] = do
+    solveLacks :: [SourceType] -> Maybe [TypeClassDict]
+    solveLacks [TypeLevelString ann sym, r] = do
       (r', cst) <- rowLacks sym r
-      pure [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowLacks [TypeLevelString sym, r'] cst ]
+      pure [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowLacks [TypeLevelString ann sym, r'] cst ]
     solveLacks _ = Nothing
 
-    rowLacks :: PSString -> Type -> Maybe (Type, Maybe [Constraint])
+    rowLacks :: PSString -> SourceType -> Maybe (SourceType, Maybe [SourceConstraint])
     rowLacks sym r =
         guard (lacksSym && canMakeProgress) $> (r, cst)
       where
         (fixed, rest) = rowToList r
 
         lacksSym =
-          not $ sym `elem` (runLabel . fst <$> fixed)
+          not $ sym `elem` (runLabel . rowListLabel <$> fixed)
 
         (canMakeProgress, cst) = case rest of
-            REmpty -> (True, Nothing)
-            _ -> (not (null fixed), Just [ Constraint C.RowLacks [TypeLevelString sym, rest] Nothing ])
+            REmpty _ -> (True, Nothing)
+            _ -> (not (null fixed), Just [ srcConstraint C.RowLacks [srcTypeLevelString sym, rest] Nothing ])
 
 -- Check if an instance matches our list of types, allowing for types
 -- to be solved via functional dependencies. If the types match, we return a
 -- substitution which makes them match. If not, we return 'Nothing'.
-matches :: [FunctionalDependency] -> TypeClassDict -> [Type] -> Matched (Matching [Type])
+matches :: [FunctionalDependency] -> TypeClassDict -> [SourceType] -> Matched (Matching [SourceType])
 matches deps TypeClassDictionaryInScope{..} tys =
     -- First, find those types which match exactly
     let matched = zipWith typeHeadsAreEqual tys tcdInstanceTypes in
@@ -542,76 +543,76 @@ matches deps TypeClassDictionaryInScope{..} tys =
     -- Check whether the type heads of two types are equal (for the purposes of type class dictionary lookup),
     -- and return a substitution from type variables to types which makes the type heads unify.
     --
-    typeHeadsAreEqual :: Type -> Type -> (Matched (), Matching [Type])
-    typeHeadsAreEqual (KindedType t1 _)    t2                              = typeHeadsAreEqual t1 t2
-    typeHeadsAreEqual t1                   (KindedType t2 _)               = typeHeadsAreEqual t1 t2
-    typeHeadsAreEqual (TUnknown u1)        (TUnknown u2)        | u1 == u2 = (Match (), M.empty)
-    typeHeadsAreEqual (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    | s1 == s2 = (Match (), M.empty)
-    typeHeadsAreEqual t                    (TypeVar v)                     = (Match (), M.singleton v [t])
-    typeHeadsAreEqual (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = (Match (), M.empty)
-    typeHeadsAreEqual (TypeLevelString s1) (TypeLevelString s2) | s1 == s2 = (Match (), M.empty)
-    typeHeadsAreEqual (TypeApp h1 t1)      (TypeApp h2 t2)                 =
+    typeHeadsAreEqual :: Type a -> Type a -> (Matched (), Matching [Type a])
+    typeHeadsAreEqual (KindedType _  t1 _) t2                                  = typeHeadsAreEqual t1 t2
+    typeHeadsAreEqual t1                     (KindedType _ t2 _)               = typeHeadsAreEqual t1 t2
+    typeHeadsAreEqual (TUnknown _ u1)        (TUnknown _ u2)      | u1 == u2   = (Match (), M.empty)
+    typeHeadsAreEqual (Skolem _ _ s1 _)      (Skolem _ _ s2 _)    | s1 == s2   = (Match (), M.empty)
+    typeHeadsAreEqual t                      (TypeVar _ v)                     = (Match (), M.singleton v [t])
+    typeHeadsAreEqual (TypeConstructor _ c1) (TypeConstructor _ c2) | c1 == c2 = (Match (), M.empty)
+    typeHeadsAreEqual (TypeLevelString _ s1) (TypeLevelString _ s2) | s1 == s2 = (Match (), M.empty)
+    typeHeadsAreEqual (TypeApp _ h1 t1)      (TypeApp _ h2 t2)                 =
       both (typeHeadsAreEqual h1 h2) (typeHeadsAreEqual t1 t2)
-    typeHeadsAreEqual REmpty REmpty = (Match (), M.empty)
+    typeHeadsAreEqual (REmpty _) (REmpty _) = (Match (), M.empty)
     typeHeadsAreEqual r1@RCons{} r2@RCons{} =
         foldr both (uncurry go rest) common
       where
         (common, rest) = alignRowsWith typeHeadsAreEqual r1 r2
 
-        go :: ([(Label, Type)], Type) -> ([(Label, Type)], Type) -> (Matched (), Matching [Type])
-        go (l,  KindedType t1 _)  (r,  t2)                            = go (l, t1) (r, t2)
-        go (l,  t1)               (r,  KindedType t2 _)               = go (l, t1) (r, t2)
-        go ([], REmpty)           ([], REmpty)                        = (Match (), M.empty)
-        go ([], TUnknown u1)      ([], TUnknown u2)      | u1 == u2   = (Match (), M.empty)
-        go ([], TypeVar v1)       ([], TypeVar v2)       | v1 == v2   = (Match (), M.empty)
-        go ([], Skolem _ sk1 _ _) ([], Skolem _ sk2 _ _) | sk1 == sk2 = (Match (), M.empty)
-        go ([], TUnknown _)       _                                   = (Unknown, M.empty)
-        go (sd, r)                ([], TypeVar v)                     = (Match (), M.singleton v [rowFromList (sd, r)])
-        go _ _                                                        = (Apart, M.empty)
-    typeHeadsAreEqual (TUnknown _) _ = (Unknown, M.empty)
+        go :: ([RowListItem a], Type a) -> ([RowListItem a], Type a) -> (Matched (), Matching [Type a])
+        go (l,  KindedType _ t1 _) (r,  t2)                            = go (l, t1) (r, t2)
+        go (l,  t1)                (r,  KindedType _ t2 _)             = go (l, t1) (r, t2)
+        go ([], REmpty _)          ([], REmpty _)                      = (Match (), M.empty)
+        go ([], TUnknown _ u1)     ([], TUnknown _ u2)      | u1 == u2 = (Match (), M.empty)
+        go ([], TypeVar _ v1)      ([], TypeVar _ v2)       | v1 == v2 = (Match (), M.empty)
+        go ([], Skolem _ _ sk1 _)  ([], Skolem _ _ sk2 _) | sk1 == sk2 = (Match (), M.empty)
+        go ([], TUnknown _ _)      _                                   = (Unknown, M.empty)
+        go (sd, r)                 ([], TypeVar _ v)                   = (Match (), M.singleton v [rowFromList (sd, r)])
+        go _ _                                                         = (Apart, M.empty)
+    typeHeadsAreEqual (TUnknown _ _) _ = (Unknown, M.empty)
     typeHeadsAreEqual _ _ = (Apart, M.empty)
 
 
-    both :: (Matched (), Matching [Type]) -> (Matched (), Matching [Type]) -> (Matched (), Matching [Type])
+    both :: (Matched (), Matching [Type a]) -> (Matched (), Matching [Type a]) -> (Matched (), Matching [Type a])
     both (b1, m1) (b2, m2) = (b1 <> b2, M.unionWith (++) m1 m2)
 
     -- Ensure that a substitution is valid
-    verifySubstitution :: Matching [Type] -> Matched (Matching [Type])
+    verifySubstitution :: Matching [Type a] -> Matched (Matching [Type a])
     verifySubstitution mts = foldMap meet mts $> mts where
       meet = pairwiseAll typesAreEqual
 
       -- Note that unknowns are only allowed to unify if they came from a type
       -- which was _not_ solved, i.e. one which was inferred by a functional
       -- dependency.
-      typesAreEqual :: Type -> Type -> Matched ()
-      typesAreEqual (KindedType t1 _)    t2                   = typesAreEqual t1 t2
-      typesAreEqual t1                   (KindedType t2 _)    = typesAreEqual t1 t2
-      typesAreEqual (TUnknown u1)        (TUnknown u2)        | u1 == u2 = Match ()
-      typesAreEqual (Skolem _ s1 _ _)    (Skolem _ s2 _ _)    | s1 == s2 = Match ()
-      typesAreEqual (Skolem _ _ _ _)     _                    = Unknown
-      typesAreEqual _                    (Skolem _ _ _ _)     = Unknown
-      typesAreEqual (TypeVar v1)         (TypeVar v2)         | v1 == v2 = Match ()
-      typesAreEqual (TypeLevelString s1) (TypeLevelString s2) | s1 == s2 = Match ()
-      typesAreEqual (TypeConstructor c1) (TypeConstructor c2) | c1 == c2 = Match ()
-      typesAreEqual (TypeApp h1 t1)      (TypeApp h2 t2)      = typesAreEqual h1 h2 <> typesAreEqual t1 t2
-      typesAreEqual REmpty               REmpty               = Match ()
-      typesAreEqual r1                   r2                   | isRCons r1 || isRCons r2 =
+      typesAreEqual :: Type a -> Type a -> Matched ()
+      typesAreEqual (KindedType _ t1 _)    t2                     = typesAreEqual t1 t2
+      typesAreEqual t1                     (KindedType _ t2 _)    = typesAreEqual t1 t2
+      typesAreEqual (TUnknown _ u1)        (TUnknown _ u2)        | u1 == u2 = Match ()
+      typesAreEqual (Skolem _ _ s1 _)      (Skolem _ _ s2 _)      | s1 == s2 = Match ()
+      typesAreEqual (Skolem _ _ _ _)       _                      = Unknown
+      typesAreEqual _                      (Skolem _ _ _ _)       = Unknown
+      typesAreEqual (TypeVar _ v1)         (TypeVar _ v2)         | v1 == v2 = Match ()
+      typesAreEqual (TypeLevelString _ s1) (TypeLevelString _ s2) | s1 == s2 = Match ()
+      typesAreEqual (TypeConstructor _ c1) (TypeConstructor _ c2) | c1 == c2 = Match ()
+      typesAreEqual (TypeApp _ h1 t1)      (TypeApp _ h2 t2)      = typesAreEqual h1 h2 <> typesAreEqual t1 t2
+      typesAreEqual (REmpty _)             (REmpty _)             = Match ()
+      typesAreEqual r1                     r2                     | isRCons r1 || isRCons r2 =
           let (common, rest) = alignRowsWith typesAreEqual r1 r2
           in fold common <> uncurry go rest
         where
-          go :: ([(Label, Type)], Type) -> ([(Label, Type)], Type) -> Matched ()
-          go (l, KindedType t1 _)  (r, t2)                          = go (l, t1) (r, t2)
-          go (l, t1)               (r, KindedType t2 _)             = go (l, t1) (r, t2)
-          go ([], TUnknown u1)     ([], TUnknown u2)     | u1 == u2 = Match ()
-          go ([], Skolem _ s1 _ _) ([], Skolem _ s2 _ _) | s1 == s2 = Match ()
-          go ([], Skolem _ _ _ _)  _                                = Unknown
-          go _                     ([], Skolem _ _ _ _)             = Unknown
-          go ([], REmpty)          ([], REmpty)                     = Match ()
-          go ([], TypeVar v1)      ([], TypeVar v2)      | v1 == v2 = Match ()
-          go _  _                                                   = Apart
-      typesAreEqual _                    _                    = Apart
+          go :: ([RowListItem a], Type a) -> ([RowListItem a], Type a) -> Matched ()
+          go (l, KindedType _ t1 _) (r, t2)                           = go (l, t1) (r, t2)
+          go (l, t1)                (r, KindedType _ t2 _)            = go (l, t1) (r, t2)
+          go ([], TUnknown _ u1)    ([], TUnknown _ u2)    | u1 == u2 = Match ()
+          go ([], Skolem _ _ s1 _)  ([], Skolem _ _ s2 _)  | s1 == s2 = Match ()
+          go ([], Skolem _ _ _ _)   _                                 = Unknown
+          go _                      ([], Skolem _ _ _ _)              = Unknown
+          go ([], REmpty _)         ([], REmpty _)                    = Match ()
+          go ([], TypeVar _ v1)     ([], TypeVar _ v2)     | v1 == v2 = Match ()
+          go _  _                                                     = Apart
+      typesAreEqual _               _                                 = Apart
 
-      isRCons :: Type -> Bool
+      isRCons :: Type a -> Bool
       isRCons RCons{}    = True
       isRCons _          = False
 
@@ -621,19 +622,19 @@ newDictionaries
   :: MonadState CheckState m
   => [(Qualified (ProperName 'ClassName), Integer)]
   -> Qualified Ident
-  -> Constraint
+  -> SourceConstraint
   -> m [NamedDict]
-newDictionaries path name (Constraint className instanceTy _) = do
+newDictionaries path name (Constraint _ className instanceTy _) = do
     tcs <- gets (typeClasses . checkEnv)
     let TypeClassData{..} = fromMaybe (internalError "newDictionaries: type class lookup failed") $ M.lookup className tcs
-    supDicts <- join <$> zipWithM (\(Constraint supName supArgs _) index ->
+    supDicts <- join <$> zipWithM (\(Constraint ann supName supArgs _) index ->
                                       newDictionaries ((supName, index) : path)
                                                       name
-                                                      (Constraint supName (instantiateSuperclass (map fst typeClassArguments) supArgs instanceTy) Nothing)
+                                                      (Constraint ann supName (instantiateSuperclass (map fst typeClassArguments) supArgs instanceTy) Nothing)
                                   ) typeClassSuperclasses [0..]
     return (TypeClassDictionaryInScope [] 0 name path className instanceTy Nothing : supDicts)
   where
-    instantiateSuperclass :: [Text] -> [Type] -> [Type] -> [Type]
+    instantiateSuperclass :: [Text] -> [SourceType] -> [SourceType] -> [SourceType]
     instantiateSuperclass args supArgs tys = map (replaceAllTypeVars (zip args tys)) supArgs
 
 mkContext :: [NamedDict] -> InstanceContext

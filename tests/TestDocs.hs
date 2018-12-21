@@ -133,10 +133,10 @@ data DocsAssertion
   | ShouldHaveFunDeps P.ModuleName Text [([Text],[Text])]
   -- | Assert that a particular value declaration exists, and its type
   -- satisfies the given predicate.
-  | ValueShouldHaveTypeSignature P.ModuleName Text (P.Type -> Bool)
+  | ValueShouldHaveTypeSignature P.ModuleName Text (Docs.Type' -> Bool)
   -- | Assert that a particular instance declaration exists under some class or
   -- type declaration, and that its type satisfies the given predicate.
-  | InstanceShouldHaveTypeSignature P.ModuleName Text Text (P.Type -> Bool)
+  | InstanceShouldHaveTypeSignature P.ModuleName Text Text (Docs.Type' -> Bool)
   -- | Assert that a particular type alias exists, and its corresponding
   -- type, when rendered, matches a given string exactly
   -- fields: module, type synonym name, expected type
@@ -225,7 +225,7 @@ data DocsAssertionFailure
   -- because the inferred type was used when the explicit type should have
   -- been.
   -- Fields: module name, declaration name, actual type.
-  | DeclarationWrongType P.ModuleName Text P.Type
+  | DeclarationWrongType P.ModuleName Text Docs.Type'
   -- | A Type synonym has been rendered in an unexpected format
   -- Fields: module name, declaration name, expected rendering, actual rendering
   | TypeSynonymMismatch P.ModuleName Text Text Text
@@ -500,13 +500,13 @@ runTagsAssertion assertion tags =
         Just taggedLine -> TagsFail $ Tagged decl taggedLine
         Nothing -> TagsPass
 
-checkConstrained :: P.Type -> Text -> Bool
+checkConstrained :: P.Type a -> Text -> Bool
 checkConstrained ty tyClass =
   case ty of
-    P.ConstrainedType c ty'
+    P.ConstrainedType _ c ty'
       | matches tyClass c -> True
       | otherwise -> checkConstrained ty' tyClass
-    P.ForAll _ ty' _ ->
+    P.ForAll _ _ ty' _ ->
       checkConstrained ty' tyClass
     _ ->
       False
@@ -593,8 +593,8 @@ testCases =
 
   , ("ExplicitTypeSignatures",
       [ ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "explicit" (hasTypeVar "something")
-      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "anInt"    (P.tyInt ==)
-      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "aNumber"  (P.tyNumber ==)
+      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "anInt"    (P.tyInt `P.eqType`)
+      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "aNumber"  (P.tyNumber `P.eqType`)
       ])
 
   , ("ConstrainedArgument",
@@ -652,7 +652,7 @@ testCases =
   hasTypeVar varName =
     getAny . P.everythingOnTypes (<>) (Any . isVar varName)
 
-  isVar varName (P.TypeVar name) | varName == T.unpack name = True
+  isVar varName (P.TypeVar _ name) | varName == T.unpack name = True
   isVar _ _ = False
 
   renderedType expected ty =

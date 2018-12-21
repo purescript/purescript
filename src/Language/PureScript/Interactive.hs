@@ -261,7 +261,7 @@ handleTypeOf print' val = do
 handleKindOf
   :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
   => (String -> m ())
-  -> P.Type
+  -> P.SourceType
   -> m ()
 handleKindOf print' typ = do
   st <- get

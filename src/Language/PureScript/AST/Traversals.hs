@@ -620,7 +620,7 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
 
 accumTypes
   :: (Monoid r)
-  => (Type -> r)
+  => (SourceType -> r)
   -> ( Declaration -> r
      , Expr -> r
      , Binder -> r
@@ -644,7 +644,7 @@ accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (con
 
 accumKinds
   :: (Monoid r)
-  => (Kind -> r)
+  => (SourceKind -> r)
   -> ( Declaration -> r
      , Expr -> r
      , Binder -> r
@@ -675,13 +675,13 @@ accumKinds f = everythingOnValues mappend forDecls forValues (const mempty) (con
   forValues (TypedValue _ _ ty) = forTypes ty
   forValues _ = mempty
 
-  forTypes (KindedType _ k) = f k
+  forTypes (KindedType _ _ k) = f k
   forTypes _ = mempty
 
 -- |
 -- Map a function over type annotations appearing inside a value
 --
-overTypes :: (Type -> Type) -> Expr -> Expr
+overTypes :: (SourceType -> SourceType) -> Expr -> Expr
 overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
   where
   g :: Expr -> Expr

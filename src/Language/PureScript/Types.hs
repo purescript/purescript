@@ -1,6 +1,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 -- |
 -- Data types for types
@@ -15,6 +17,7 @@ import Control.DeepSeq (NFData)
 import Control.Monad ((<=<))
 import qualified Data.Aeson as A
 import qualified Data.Aeson.TH as A
+import Data.Foldable (fold)
 import Data.List (sortBy)
 import Data.Ord (comparing)
 import Data.Maybe (fromMaybe)
@@ -28,6 +31,9 @@ import Language.PureScript.Names
 import Language.PureScript.Label (Label)
 import Language.PureScript.PSString (PSString)
 
+type SourceType = Type SourceAnn
+type SourceConstraint = Constraint SourceAnn
+
 -- |
 -- An identifier for the scope of a skolem variable
 --
@@ -39,52 +45,97 @@ instance NFData SkolemScope
 -- |
 -- The type of types
 --
-data Type
+data Type a
   -- | A unification variable of type Type
-  = TUnknown Int
+  = TUnknown a Int
   -- | A named type variable
-  | TypeVar Text
+  | TypeVar a Text
   -- | A type-level string
-  | TypeLevelString PSString
+  | TypeLevelString a PSString
   -- | A type wildcard, as would appear in a partial type synonym
-  | TypeWildcard SourceSpan
+  | TypeWildcard a
   -- | A type constructor
-  | TypeConstructor (Qualified (ProperName 'TypeName))
+  | TypeConstructor a (Qualified (ProperName 'TypeName))
   -- | A type operator. This will be desugared into a type constructor during the
   -- "operators" phase of desugaring.
-  | TypeOp (Qualified (OpName 'TypeOpName))
+  | TypeOp a (Qualified (OpName 'TypeOpName))
   -- | A type application
-  | TypeApp Type Type
+  | TypeApp a (Type a) (Type a)
   -- | Forall quantifier
-  | ForAll Text Type (Maybe SkolemScope)
+  | ForAll a Text (Type a) (Maybe SkolemScope)
   -- | A type with a set of type class constraints
-  | ConstrainedType Constraint Type
+  | ConstrainedType a (Constraint a) (Type a)
   -- | A skolem constant
-  | Skolem Text Int SkolemScope (Maybe SourceSpan)
+  | Skolem a Text Int SkolemScope
   -- | An empty row
-  | REmpty
+  | REmpty a
   -- | A non-empty row
-  | RCons Label Type Type
+  | RCons a Label (Type a) (Type a)
   -- | A type with a kind annotation
-  | KindedType Type Kind
+  | KindedType a (Type a) (Kind a)
   -- | A placeholder used in pretty printing
-  | PrettyPrintFunction Type Type
+  | PrettyPrintFunction a (Type a) (Type a)
   -- | A placeholder used in pretty printing
-  | PrettyPrintObject Type
+  | PrettyPrintObject a (Type a)
   -- | A placeholder used in pretty printing
-  | PrettyPrintForAll [Text] Type
+  | PrettyPrintForAll a [Text] (Type a)
   -- | Binary operator application. During the rebracketing phase of desugaring,
   -- this data constructor will be removed.
-  | BinaryNoParensType Type Type Type
+  | BinaryNoParensType a (Type a) (Type a) (Type a)
   -- | Explicit parentheses. During the rebracketing phase of desugaring, this
   -- data constructor will be removed.
   --
   -- Note: although it seems this constructor is not used, it _is_ useful,
   -- since it prevents certain traversals from matching.
-  | ParensInType Type
-  deriving (Show, Eq, Ord, Generic)
+  | ParensInType a (Type a)
+  deriving (Show, Generic, Functor, Foldable, Traversable)
 
-instance NFData Type
+instance NFData a => NFData (Type a)
+
+srcTUnknown :: Int -> SourceType
+srcTUnknown = TUnknown NullSourceAnn
+
+srcTypeVar :: Text -> SourceType
+srcTypeVar = TypeVar NullSourceAnn
+
+srcTypeLevelString :: PSString -> SourceType
+srcTypeLevelString = TypeLevelString NullSourceAnn
+
+srcTypeWildcard :: SourceType
+srcTypeWildcard = TypeWildcard NullSourceAnn
+
+srcTypeConstructor :: Qualified (ProperName 'TypeName) -> SourceType
+srcTypeConstructor = TypeConstructor NullSourceAnn
+
+srcTypeOp :: Qualified (OpName 'TypeOpName) -> SourceType
+srcTypeOp = TypeOp NullSourceAnn
+
+srcTypeApp :: SourceType -> SourceType -> SourceType
+srcTypeApp = TypeApp NullSourceAnn
+
+srcForAll :: Text -> SourceType -> Maybe SkolemScope -> SourceType
+srcForAll = ForAll NullSourceAnn
+
+srcConstrainedType :: SourceConstraint -> SourceType -> SourceType
+srcConstrainedType = ConstrainedType NullSourceAnn
+
+srcSkolem :: Text -> Int -> SkolemScope -> SourceType
+srcSkolem = Skolem NullSourceAnn
+
+srcREmpty :: SourceType
+srcREmpty = REmpty NullSourceAnn
+
+srcRCons :: Label -> SourceType -> SourceType -> SourceType
+srcRCons = RCons NullSourceAnn
+
+srcKindedType :: SourceType -> SourceKind -> SourceType
+srcKindedType = KindedType NullSourceAnn
+
+srcBinaryNoParensType :: SourceType -> SourceType -> SourceType -> SourceType
+srcBinaryNoParensType = BinaryNoParensType NullSourceAnn
+
+srcParensInType :: SourceType -> SourceType
+srcParensInType = ParensInType NullSourceAnn
 
 -- | Additional data relevant to type class constraints
 data ConstraintData
@@ -99,77 +150,92 @@ data ConstraintData
 instance NFData ConstraintData
 
 -- | A typeclass constraint
-data Constraint = Constraint
-  { constraintClass :: Qualified (ProperName 'ClassName)
+data Constraint a = Constraint
+  { constraintAnn :: a
+  -- ^ constraint annotation
+  , constraintClass :: Qualified (ProperName 'ClassName)
   -- ^ constraint class name
-  , constraintArgs  :: [Type]
+  , constraintArgs  :: [Type a]
   -- ^ type arguments
   , constraintData  :: Maybe ConstraintData
   -- ^ additional data relevant to this constraint
-  } deriving (Show, Eq, Ord, Generic)
+  } deriving (Show, Generic, Functor, Foldable, Traversable)
 
-instance NFData Constraint
+instance NFData a => NFData (Constraint a)
 
-mapConstraintArgs :: ([Type] -> [Type]) -> Constraint -> Constraint
+srcConstraint :: Qualified (ProperName 'ClassName) -> [SourceType] -> Maybe ConstraintData -> SourceConstraint
+srcConstraint = Constraint NullSourceAnn
+
+mapConstraintArgs :: ([Type a] -> [Type a]) -> Constraint a -> Constraint a
 mapConstraintArgs f c = c { constraintArgs = f (constraintArgs c) }
 
-overConstraintArgs :: Functor f => ([Type] -> f [Type]) -> Constraint -> f Constraint
+overConstraintArgs :: Functor f => ([Type a] -> f [Type a]) -> Constraint a -> f (Constraint a)
 overConstraintArgs f c = (\args -> c { constraintArgs = args }) <$> f (constraintArgs c)
 
 $(A.deriveJSON A.defaultOptions ''Type)
 $(A.deriveJSON A.defaultOptions ''Constraint)
 $(A.deriveJSON A.defaultOptions ''ConstraintData)
 
+data RowListItem a = RowListItem
+  { rowListAnn :: a
+  , rowListLabel :: Label
+  , rowListType :: Type a
+  } deriving (Show, Generic, Functor, Foldable, Traversable)
+
+srcRowListItem :: Label -> SourceType -> RowListItem SourceAnn
+srcRowListItem = RowListItem NullSourceAnn
+
 -- | Convert a row to a list of pairs of labels and types
-rowToList :: Type -> ([(Label, Type)], Type)
+rowToList :: Type a -> ([RowListItem a], Type a)
 rowToList = go where
-  go (RCons name ty row) =
-    first ((name, ty) :) (rowToList row)
+  go (RCons ann name ty row) =
+    first (RowListItem ann name ty :) (rowToList row)
   go r = ([], r)
 
 -- | Convert a row to a list of pairs of labels and types, sorted by the labels.
-rowToSortedList :: Type -> ([(Label, Type)], Type)
-rowToSortedList = first (sortBy (comparing fst)) . rowToList
+rowToSortedList :: Type a -> ([RowListItem a], Type a)
+rowToSortedList = first (sortBy (comparing rowListLabel)) . rowToList
 
 -- | Convert a list of labels and types to a row
-rowFromList :: ([(Label, Type)], Type) -> Type
-rowFromList (xs, r) = foldr (uncurry RCons) r xs
+rowFromList :: ([RowListItem a], Type a) -> Type a
+rowFromList (xs, r) = foldr (\(RowListItem ann name ty) -> RCons ann name ty) r xs
 
 -- | Check whether a type is a monotype
-isMonoType :: Type -> Bool
+isMonoType :: Type a -> Bool
 isMonoType ForAll{} = False
-isMonoType (ParensInType t) = isMonoType t
-isMonoType (KindedType t _) = isMonoType t
+isMonoType (ParensInType _ t) = isMonoType t
+isMonoType (KindedType _ t _) = isMonoType t
 isMonoType _        = True
 
 -- | Universally quantify a type
-mkForAll :: [Text] -> Type -> Type
-mkForAll args ty = foldl (\t arg -> ForAll arg t Nothing) ty args
+mkForAll :: [(a, Text)] -> Type a -> Type a
+mkForAll args ty = foldl (\t (ann, arg) -> ForAll ann arg t Nothing) ty args
 
 -- | Replace a type variable, taking into account variable shadowing
-replaceTypeVars :: Text -> Type -> Type -> Type
+replaceTypeVars :: Text -> Type a -> Type a -> Type a
 replaceTypeVars v r = replaceAllTypeVars [(v, r)]
 
 -- | Replace named type variables with types
-replaceAllTypeVars :: [(Text, Type)] -> Type -> Type
+replaceAllTypeVars :: [(Text, Type a)] -> Type a -> Type a
 replaceAllTypeVars = go [] where
-  go :: [Text] -> [(Text, Type)] -> Type -> Type
-  go _  m (TypeVar v) = fromMaybe (TypeVar v) (v `lookup` m)
-  go bs m (TypeApp t1 t2) = TypeApp (go bs m t1) (go bs m t2)
-  go bs m f@(ForAll v t sco) | v `elem` keys = go bs (filter ((/= v) . fst) m) f
-                             | v `elem` usedVars =
-                               let v' = genName v (keys ++ bs ++ usedVars)
-                                   t' = go bs [(v, TypeVar v')] t
-                               in ForAll v' (go (v' : bs) m t') sco
-                             | otherwise = ForAll v (go (v : bs) m t) sco
+  go :: [Text] -> [(Text, Type a)] -> Type a -> Type a
+  go _  m (TypeVar ann v) = fromMaybe (TypeVar ann v) (v `lookup` m)
+  go bs m (TypeApp ann t1 t2) = TypeApp ann (go bs m t1) (go bs m t2)
+  go bs m f@(ForAll ann v t sco)
+    | v `elem` keys = go bs (filter ((/= v) . fst) m) f
+    | v `elem` usedVars =
+      let v' = genName v (keys ++ bs ++ usedVars)
+          t' = go bs [(v, TypeVar ann v')] t
+      in ForAll ann v' (go (v' : bs) m t') sco
+    | otherwise = ForAll ann v (go (v : bs) m t) sco
     where
       keys = map fst m
       usedVars = concatMap (usedTypeVariables . snd) m
-  go bs m (ConstrainedType c t) = ConstrainedType (mapConstraintArgs (map (go bs m)) c) (go bs m t)
-  go bs m (RCons name' t r) = RCons name' (go bs m t) (go bs m r)
-  go bs m (KindedType t k) = KindedType (go bs m t) k
-  go bs m (BinaryNoParensType t1 t2 t3) = BinaryNoParensType (go bs m t1) (go bs m t2) (go bs m t3)
-  go bs m (ParensInType t) = ParensInType (go bs m t)
+  go bs m (ConstrainedType ann c t) = ConstrainedType ann (mapConstraintArgs (map (go bs m)) c) (go bs m t)
+  go bs m (RCons ann name' t r) = RCons ann name' (go bs m t) (go bs m r)
+  go bs m (KindedType ann t k) = KindedType ann (go bs m t) k
+  go bs m (BinaryNoParensType ann t1 t2 t3) = BinaryNoParensType ann (go bs m t1) (go bs m t2) (go bs m t3)
+  go bs m (ParensInType ann t) = ParensInType ann (go bs m t)
   go _  _ ty = ty
 
   genName orig inUse = try' 0 where
@@ -178,131 +244,263 @@ replaceAllTypeVars = go [] where
            | otherwise = orig <> T.pack (show n)
 
 -- | Collect all type variables appearing in a type
-usedTypeVariables :: Type -> [Text]
+usedTypeVariables :: Type a -> [Text]
 usedTypeVariables = ordNub . everythingOnTypes (++) go where
-  go (TypeVar v) = [v]
+  go (TypeVar _ v) = [v]
   go _ = []
 
 -- | Collect all free type variables appearing in a type
-freeTypeVariables :: Type -> [Text]
+freeTypeVariables :: Type a -> [Text]
 freeTypeVariables = ordNub . go [] where
-  go :: [Text] -> Type -> [Text]
-  go bound (TypeVar v) | v `notElem` bound = [v]
-  go bound (TypeApp t1 t2) = go bound t1 ++ go bound t2
-  go bound (ForAll v t _) = go (v : bound) t
-  go bound (ConstrainedType c t) = concatMap (go bound) (constraintArgs c) ++ go bound t
-  go bound (RCons _ t r) = go bound t ++ go bound r
-  go bound (KindedType t _) = go bound t
-  go bound (BinaryNoParensType t1 t2 t3) = go bound t1 ++ go bound t2 ++ go bound t3
-  go bound (ParensInType t) = go bound t
+  go :: [Text] -> Type a -> [Text]
+  go bound (TypeVar _ v) | v `notElem` bound = [v]
+  go bound (TypeApp _ t1 t2) = go bound t1 ++ go bound t2
+  go bound (ForAll _ v t _) = go (v : bound) t
+  go bound (ConstrainedType _ c t) = concatMap (go bound) (constraintArgs c) ++ go bound t
+  go bound (RCons _ _ t r) = go bound t ++ go bound r
+  go bound (KindedType _ t _) = go bound t
+  go bound (BinaryNoParensType _ t1 t2 t3) = go bound t1 ++ go bound t2 ++ go bound t3
+  go bound (ParensInType _ t) = go bound t
   go _ _ = []
 
 -- | Universally quantify over all type variables appearing free in a type
-quantify :: Type -> Type
-quantify ty = foldr (\arg t -> ForAll arg t Nothing) ty $ freeTypeVariables ty
+quantify :: Type a -> Type a
+quantify ty = foldr (\arg t -> ForAll ann arg t Nothing) ty $ freeTypeVariables ty
+  where
+  ann = annotationForType ty
 
 -- | Move all universal quantifiers to the front of a type
-moveQuantifiersToFront :: Type -> Type
+moveQuantifiersToFront :: Type a -> Type a
 moveQuantifiersToFront = go [] [] where
-  go qs cs (ForAll q ty sco) = go ((q, sco) : qs) cs ty
-  go qs cs (ConstrainedType c ty) = go qs (c : cs) ty
-  go qs cs ty = foldl (\ty' (q, sco) -> ForAll q ty' sco) (foldl (flip ConstrainedType) ty cs) qs
+  go qs cs (ForAll ann q ty sco) = go ((ann, q, sco) : qs) cs ty
+  go qs cs (ConstrainedType ann c ty) = go qs ((ann, c) : cs) ty
+  go qs cs ty = foldl (\ty' (ann, q, sco) -> ForAll ann q ty' sco) (foldl (\ty' (ann, c) -> ConstrainedType ann c ty') ty cs) qs
 
 -- | Check if a type contains wildcards
-containsWildcards :: Type -> Bool
+containsWildcards :: Type a -> Bool
 containsWildcards = everythingOnTypes (||) go where
-  go :: Type -> Bool
+  go :: Type a -> Bool
   go TypeWildcard{} = True
   go _ = False
 
 -- | Check if a type contains `forall`
-containsForAll :: Type -> Bool
+containsForAll :: Type a -> Bool
 containsForAll = everythingOnTypes (||) go where
-  go :: Type -> Bool
+  go :: Type a -> Bool
   go ForAll{} = True
   go _ = False
 
-everywhereOnTypes :: (Type -> Type) -> Type -> Type
+everywhereOnTypes :: (Type a -> Type a) -> Type a -> Type a
 everywhereOnTypes f = go where
-  go (TypeApp t1 t2) = f (TypeApp (go t1) (go t2))
-  go (ForAll arg ty sco) = f (ForAll arg (go ty) sco)
-  go (ConstrainedType c ty) = f (ConstrainedType (mapConstraintArgs (map go) c) (go ty))
-  go (RCons name ty rest) = f (RCons name (go ty) (go rest))
-  go (KindedType ty k) = f (KindedType (go ty) k)
-  go (PrettyPrintFunction t1 t2) = f (PrettyPrintFunction (go t1) (go t2))
-  go (PrettyPrintObject t) = f (PrettyPrintObject (go t))
-  go (PrettyPrintForAll args t) = f (PrettyPrintForAll args (go t))
-  go (BinaryNoParensType t1 t2 t3) = f (BinaryNoParensType (go t1) (go t2) (go t3))
-  go (ParensInType t) = f (ParensInType (go t))
+  go (TypeApp ann t1 t2) = f (TypeApp ann (go t1) (go t2))
+  go (ForAll ann arg ty sco) = f (ForAll ann arg (go ty) sco)
+  go (ConstrainedType ann c ty) = f (ConstrainedType ann (mapConstraintArgs (map go) c) (go ty))
+  go (RCons ann name ty rest) = f (RCons ann name (go ty) (go rest))
+  go (KindedType ann ty k) = f (KindedType ann (go ty) k)
+  go (PrettyPrintFunction ann t1 t2) = f (PrettyPrintFunction ann (go t1) (go t2))
+  go (PrettyPrintObject ann t) = f (PrettyPrintObject ann (go t))
+  go (PrettyPrintForAll ann args t) = f (PrettyPrintForAll ann args (go t))
+  go (BinaryNoParensType ann t1 t2 t3) = f (BinaryNoParensType ann (go t1) (go t2) (go t3))
+  go (ParensInType ann t) = f (ParensInType ann (go t))
   go other = f other
 
-everywhereOnTypesTopDown :: (Type -> Type) -> Type -> Type
+everywhereOnTypesTopDown :: (Type a -> Type a) -> Type a -> Type a
 everywhereOnTypesTopDown f = go . f where
-  go (TypeApp t1 t2) = TypeApp (go (f t1)) (go (f t2))
-  go (ForAll arg ty sco) = ForAll arg (go (f ty)) sco
-  go (ConstrainedType c ty) = ConstrainedType (mapConstraintArgs (map (go . f)) c) (go (f ty))
-  go (RCons name ty rest) = RCons name (go (f ty)) (go (f rest))
-  go (KindedType ty k) = KindedType (go (f ty)) k
-  go (PrettyPrintFunction t1 t2) = PrettyPrintFunction (go (f t1)) (go (f t2))
-  go (PrettyPrintObject t) = PrettyPrintObject (go (f t))
-  go (PrettyPrintForAll args t) = PrettyPrintForAll args (go (f t))
-  go (BinaryNoParensType t1 t2 t3) = BinaryNoParensType (go (f t1)) (go (f t2)) (go (f t3))
-  go (ParensInType t) = ParensInType (go (f t))
+  go (TypeApp ann t1 t2) = TypeApp ann (go (f t1)) (go (f t2))
+  go (ForAll ann arg ty sco) = ForAll ann arg (go (f ty)) sco
+  go (ConstrainedType ann c ty) = ConstrainedType ann (mapConstraintArgs (map (go . f)) c) (go (f ty))
+  go (RCons ann name ty rest) = RCons ann name (go (f ty)) (go (f rest))
+  go (KindedType ann ty k) = KindedType ann (go (f ty)) k
+  go (PrettyPrintFunction ann t1 t2) = PrettyPrintFunction ann (go (f t1)) (go (f t2))
+  go (PrettyPrintObject ann t) = PrettyPrintObject ann (go (f t))
+  go (PrettyPrintForAll ann args t) = PrettyPrintForAll ann args (go (f t))
+  go (BinaryNoParensType ann t1 t2 t3) = BinaryNoParensType ann (go (f t1)) (go (f t2)) (go (f t3))
+  go (ParensInType ann t) = ParensInType ann (go (f t))
   go other = f other
 
-everywhereOnTypesM :: Monad m => (Type -> m Type) -> Type -> m Type
+everywhereOnTypesM :: Monad m => (Type a -> m (Type a)) -> Type a -> m (Type a)
 everywhereOnTypesM f = go where
-  go (TypeApp t1 t2) = (TypeApp <$> go t1 <*> go t2) >>= f
-  go (ForAll arg ty sco) = (ForAll arg <$> go ty <*> pure sco) >>= f
-  go (ConstrainedType c ty) = (ConstrainedType <$> overConstraintArgs (mapM go) c <*> go ty) >>= f
-  go (RCons name ty rest) = (RCons name <$> go ty <*> go rest) >>= f
-  go (KindedType ty k) = (KindedType <$> go ty <*> pure k) >>= f
-  go (PrettyPrintFunction t1 t2) = (PrettyPrintFunction <$> go t1 <*> go t2) >>= f
-  go (PrettyPrintObject t) = (PrettyPrintObject <$> go t) >>= f
-  go (PrettyPrintForAll args t) = (PrettyPrintForAll args <$> go t) >>= f
-  go (BinaryNoParensType t1 t2 t3) = (BinaryNoParensType <$> go t1 <*> go t2 <*> go t3) >>= f
-  go (ParensInType t) = (ParensInType <$> go t) >>= f
+  go (TypeApp ann t1 t2) = (TypeApp ann <$> go t1 <*> go t2) >>= f
+  go (ForAll ann arg ty sco) = (ForAll ann arg <$> go ty <*> pure sco) >>= f
+  go (ConstrainedType ann c ty) = (ConstrainedType ann <$> overConstraintArgs (mapM go) c <*> go ty) >>= f
+  go (RCons ann name ty rest) = (RCons ann name <$> go ty <*> go rest) >>= f
+  go (KindedType ann ty k) = (KindedType ann <$> go ty <*> pure k) >>= f
+  go (PrettyPrintFunction ann t1 t2) = (PrettyPrintFunction ann <$> go t1 <*> go t2) >>= f
+  go (PrettyPrintObject ann t) = (PrettyPrintObject ann <$> go t) >>= f
+  go (PrettyPrintForAll ann args t) = (PrettyPrintForAll ann args <$> go t) >>= f
+  go (BinaryNoParensType ann t1 t2 t3) = (BinaryNoParensType ann <$> go t1 <*> go t2 <*> go t3) >>= f
+  go (ParensInType ann t) = (ParensInType ann <$> go t) >>= f
   go other = f other
 
-everywhereOnTypesTopDownM :: Monad m => (Type -> m Type) -> Type -> m Type
+everywhereOnTypesTopDownM :: Monad m => (Type a -> m (Type a)) -> Type a -> m (Type a)
 everywhereOnTypesTopDownM f = go <=< f where
-  go (TypeApp t1 t2) = TypeApp <$> (f t1 >>= go) <*> (f t2 >>= go)
-  go (ForAll arg ty sco) = ForAll arg <$> (f ty >>= go) <*> pure sco
-  go (ConstrainedType c ty) = ConstrainedType <$> overConstraintArgs (mapM (go <=< f)) c <*> (f ty >>= go)
-  go (RCons name ty rest) = RCons name <$> (f ty >>= go) <*> (f rest >>= go)
-  go (KindedType ty k) = KindedType <$> (f ty >>= go) <*> pure k
-  go (PrettyPrintFunction t1 t2) = PrettyPrintFunction <$> (f t1 >>= go) <*> (f t2 >>= go)
-  go (PrettyPrintObject t) = PrettyPrintObject <$> (f t >>= go)
-  go (PrettyPrintForAll args t) = PrettyPrintForAll args <$> (f t >>= go)
-  go (BinaryNoParensType t1 t2 t3) = BinaryNoParensType <$> (f t1 >>= go) <*> (f t2 >>= go) <*> (f t3 >>= go)
-  go (ParensInType t) = ParensInType <$> (f t >>= go)
+  go (TypeApp ann t1 t2) = TypeApp ann <$> (f t1 >>= go) <*> (f t2 >>= go)
+  go (ForAll ann arg ty sco) = ForAll ann arg <$> (f ty >>= go) <*> pure sco
+  go (ConstrainedType ann c ty) = ConstrainedType ann <$> overConstraintArgs (mapM (go <=< f)) c <*> (f ty >>= go)
+  go (RCons ann name ty rest) = RCons ann name <$> (f ty >>= go) <*> (f rest >>= go)
+  go (KindedType ann ty k) = KindedType ann <$> (f ty >>= go) <*> pure k
+  go (PrettyPrintFunction ann t1 t2) = PrettyPrintFunction ann <$> (f t1 >>= go) <*> (f t2 >>= go)
+  go (PrettyPrintObject ann t) = PrettyPrintObject ann <$> (f t >>= go)
+  go (PrettyPrintForAll ann args t) = PrettyPrintForAll ann args <$> (f t >>= go)
+  go (BinaryNoParensType ann t1 t2 t3) = BinaryNoParensType ann <$> (f t1 >>= go) <*> (f t2 >>= go) <*> (f t3 >>= go)
+  go (ParensInType ann t) = ParensInType ann <$> (f t >>= go)
   go other = f other
 
-everythingOnTypes :: (r -> r -> r) -> (Type -> r) -> Type -> r
+everythingOnTypes :: (r -> r -> r) -> (Type a -> r) -> Type a -> r
 everythingOnTypes (<+>) f = go where
-  go t@(TypeApp t1 t2) = f t <+> go t1 <+> go t2
-  go t@(ForAll _ ty _) = f t <+> go ty
-  go t@(ConstrainedType c ty) = foldl (<+>) (f t) (map go (constraintArgs c)) <+> go ty
-  go t@(RCons _ ty rest) = f t <+> go ty <+> go rest
-  go t@(KindedType ty _) = f t <+> go ty
-  go t@(PrettyPrintFunction t1 t2) = f t <+> go t1 <+> go t2
-  go t@(PrettyPrintObject t1) = f t <+> go t1
-  go t@(PrettyPrintForAll _ t1) = f t <+> go t1
-  go t@(BinaryNoParensType t1 t2 t3) = f t <+> go t1 <+> go t2 <+> go t3
-  go t@(ParensInType t1) = f t <+> go t1
+  go t@(TypeApp _ t1 t2) = f t <+> go t1 <+> go t2
+  go t@(ForAll _ _ ty _) = f t <+> go ty
+  go t@(ConstrainedType _ c ty) = foldl (<+>) (f t) (map go (constraintArgs c)) <+> go ty
+  go t@(RCons _ _ ty rest) = f t <+> go ty <+> go rest
+  go t@(KindedType _ ty _) = f t <+> go ty
+  go t@(PrettyPrintFunction _ t1 t2) = f t <+> go t1 <+> go t2
+  go t@(PrettyPrintObject _ t1) = f t <+> go t1
+  go t@(PrettyPrintForAll _ _ t1) = f t <+> go t1
+  go t@(BinaryNoParensType _ t1 t2 t3) = f t <+> go t1 <+> go t2 <+> go t3
+  go t@(ParensInType _ t1) = f t <+> go t1
   go other = f other
 
-everythingWithContextOnTypes :: s -> r -> (r -> r -> r) -> (s -> Type -> (s, r)) -> Type -> r
+everythingWithContextOnTypes :: s -> r -> (r -> r -> r) -> (s -> Type a -> (s, r)) -> Type a -> r
 everythingWithContextOnTypes s0 r0 (<+>) f = go' s0 where
   go' s t = let (s', r) = f s t in r <+> go s' t
-  go s (TypeApp t1 t2) = go' s t1 <+> go' s t2
-  go s (ForAll _ ty _) = go' s ty
-  go s (ConstrainedType c ty) = foldl (<+>) r0 (map (go' s) (constraintArgs c)) <+> go' s ty
-  go s (RCons _ ty rest) = go' s ty <+> go' s rest
-  go s (KindedType ty _) = go' s ty
-  go s (PrettyPrintFunction t1 t2) = go' s t1 <+> go' s t2
-  go s (PrettyPrintObject t1) = go' s t1
-  go s (PrettyPrintForAll _ t1) = go' s t1
-  go s (BinaryNoParensType t1 t2 t3) = go' s t1 <+> go' s t2 <+> go' s t3
-  go s (ParensInType t1) = go' s t1
+  go s (TypeApp _ t1 t2) = go' s t1 <+> go' s t2
+  go s (ForAll _ _ ty _) = go' s ty
+  go s (ConstrainedType _ c ty) = foldl (<+>) r0 (map (go' s) (constraintArgs c)) <+> go' s ty
+  go s (RCons _ _ ty rest) = go' s ty <+> go' s rest
+  go s (KindedType _ ty _) = go' s ty
+  go s (PrettyPrintFunction _ t1 t2) = go' s t1 <+> go' s t2
+  go s (PrettyPrintObject _ t1) = go' s t1
+  go s (PrettyPrintForAll _ _ t1) = go' s t1
+  go s (BinaryNoParensType _ t1 t2 t3) = go' s t1 <+> go' s t2 <+> go' s t3
+  go s (ParensInType _ t1) = go' s t1
   go _ _ = r0
+
+annotationForType :: Type a -> a
+annotationForType (TUnknown a _) = a
+annotationForType (TypeVar a _) = a
+annotationForType (TypeLevelString a _) = a
+annotationForType (TypeWildcard a) = a
+annotationForType (TypeConstructor a _) = a
+annotationForType (TypeOp a _) = a
+annotationForType (TypeApp a _ _) = a
+annotationForType (ForAll a _ _ _) = a
+annotationForType (ConstrainedType a _ _) = a
+annotationForType (Skolem a _ _ _) = a
+annotationForType (REmpty a) = a
+annotationForType (RCons a _ _ _) = a
+annotationForType (KindedType a _ _) = a
+annotationForType (PrettyPrintFunction a _ _) = a
+annotationForType (PrettyPrintObject a _) = a
+annotationForType (PrettyPrintForAll a _ _) = a
+annotationForType (BinaryNoParensType a _ _ _) = a
+annotationForType (ParensInType a _) = a
+
+instance Eq (Type a) where
+  (==) = eqType
+
+instance Ord (Type a) where
+  compare = compareType
+
+eqType :: Type a -> Type b -> Bool
+eqType (TUnknown _ a) (TUnknown _ a') = a == a'
+eqType (TypeVar _ a) (TypeVar _ a') = a == a'
+eqType (TypeLevelString _ a) (TypeLevelString _ a') = a == a'
+eqType (TypeWildcard _) (TypeWildcard _) = True
+eqType (TypeConstructor _ a) (TypeConstructor _ a') = a == a'
+eqType (TypeOp _ a) (TypeOp _ a') = a == a'
+eqType (TypeApp _ a b) (TypeApp _ a' b') = eqType a a' && eqType b b'
+eqType (ForAll _ a b c) (ForAll _ a' b' c') = a == a' && eqType b b' && c == c'
+eqType (ConstrainedType _ a b) (ConstrainedType _ a' b') = eqConstraint a a' && eqType b b'
+eqType (Skolem _ a b c) (Skolem _ a' b' c') = a == a' && b == b' && c == c'
+eqType (REmpty _) (REmpty _) = True
+eqType (RCons _ a b c) (RCons _ a' b' c') = a == a' && eqType b b' && eqType c c'
+eqType (KindedType _ a b) (KindedType _ a' b') = eqType a a' && eqKind b b'
+eqType (PrettyPrintFunction _ a b) (PrettyPrintFunction _ a' b') = eqType a a' && eqType b b'
+eqType (PrettyPrintObject _ a) (PrettyPrintObject _ a') = eqType a a'
+eqType (PrettyPrintForAll _ a b) (PrettyPrintForAll _ a' b') = a == a' && eqType b b'
+eqType (BinaryNoParensType _ a b c) (BinaryNoParensType _ a' b' c') = eqType a a' && eqType b b' && eqType c c'
+eqType (ParensInType _ a) (ParensInType _ a') = eqType a a'
+eqType _ _ = False
+
+compareType :: Type a -> Type b -> Ordering
+compareType (TUnknown _ a) (TUnknown _ a') = compare a a'
+compareType (TUnknown {}) _ = LT
+
+compareType (TypeVar _ a) (TypeVar _ a') = compare a a'
+compareType (TypeVar {}) _ = LT
+compareType _ (TypeVar {}) = GT
+
+compareType (TypeLevelString _ a) (TypeLevelString _ a') = compare a a'
+compareType (TypeLevelString {}) _ = LT
+compareType _ (TypeLevelString {}) = GT
+
+compareType (TypeWildcard _) (TypeWildcard _) = EQ
+compareType (TypeWildcard _) _ = LT
+compareType _ (TypeWildcard _) = GT
+
+compareType (TypeConstructor _ a) (TypeConstructor _ a') = compare a a'
+compareType (TypeConstructor {}) _ = LT
+compareType _ (TypeConstructor {}) = GT
+
+compareType (TypeOp _ a) (TypeOp _ a') = compare a a'
+compareType (TypeOp {}) _ = LT
+compareType _ (TypeOp {}) = GT
+
+compareType (TypeApp _ a b) (TypeApp _ a' b') = compareType a a' <> compareType b b'
+compareType (TypeApp {}) _ = LT
+compareType _ (TypeApp {}) = GT
+
+compareType (ForAll _ a b c) (ForAll _ a' b' c') = compare a a' <> compareType b b' <> compare c c'
+compareType (ForAll {}) _ = LT
+compareType _ (ForAll {}) = GT
+
+compareType (ConstrainedType _ a b) (ConstrainedType _ a' b') = compareConstraint a a' <> compareType b b'
+compareType (ConstrainedType {}) _ = LT
+compareType _ (ConstrainedType {}) = GT
+
+compareType (Skolem _ a b c) (Skolem _ a' b' c') = compare a a' <> compare b b' <> compare c c'
+compareType (Skolem {}) _ = LT
+compareType _ (Skolem {}) = GT
+
+compareType (REmpty _) (REmpty _) = EQ
+compareType (REmpty _) _ = LT
+compareType _ (REmpty _) = GT
+
+compareType (RCons _ a b c) (RCons _ a' b' c') = compare a a' <> compareType b b' <> compareType c c'
+compareType (RCons {}) _ = LT
+compareType _ (RCons {}) = GT
+
+compareType (KindedType _ a b) (KindedType _ a' b') = compareType a a' <> compareKind b b'
+compareType (KindedType {}) _ = LT
+compareType _ (KindedType {}) = GT
+
+compareType (PrettyPrintFunction _ a b) (PrettyPrintFunction _ a' b') = compareType a a' <> compareType b b'
+compareType (PrettyPrintFunction {}) _ = LT
+compareType _ (PrettyPrintFunction {}) = GT
+
+compareType (PrettyPrintObject _ a) (PrettyPrintObject _ a') = compareType a a'
+compareType (PrettyPrintObject {}) _ = LT
+compareType _ (PrettyPrintObject {}) = GT
+
+compareType (PrettyPrintForAll _ a b) (PrettyPrintForAll _ a' b') = compare a a' <> compareType b b'
+compareType (PrettyPrintForAll {}) _ = LT
+compareType _ (PrettyPrintForAll {}) = GT
+
+compareType (BinaryNoParensType _ a b c) (BinaryNoParensType _ a' b' c') = compareType a a' <> compareType b b' <> compareType c c'
+compareType (BinaryNoParensType {}) _ = LT
+compareType _ (BinaryNoParensType {}) = GT
+
+compareType (ParensInType _ a) (ParensInType _ a') = compareType a a'
+compareType (ParensInType {}) _ = GT
+
+instance Eq (Constraint a) where
+  (==) = eqConstraint
+
+instance Ord (Constraint a) where
+  compare = compareConstraint
+
+eqConstraint :: Constraint a -> Constraint b -> Bool
+eqConstraint (Constraint _ a b c) (Constraint _ a' b' c') = a == a' && and (zipWith eqType b b') && c == c'
+
+compareConstraint :: Constraint a -> Constraint b -> Ordering
+compareConstraint (Constraint _ a b c) (Constraint _ a' b' c') = compare a a' <> fold (zipWith compareType b b') <> compare c c'

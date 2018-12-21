@@ -174,7 +174,7 @@ data Command
   -- | Find the type of an expression
   | TypeOf P.Expr
   -- | Find the kind of an expression
-  | KindOf P.Type
+  | KindOf P.SourceType
   -- | Shows information about the current state of the REPL
   | ShowInfo ReplQuery
   -- | Paste multiple lines

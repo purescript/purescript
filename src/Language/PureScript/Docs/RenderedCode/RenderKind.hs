@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 -- | Functions for producing RenderedCode values from PureScript Kind values.
 --
 module Language.PureScript.Docs.RenderedCode.RenderKind
@@ -20,37 +21,37 @@ import Language.PureScript.Kinds
 
 import Language.PureScript.Docs.RenderedCode.Types
 
-typeLiterals :: Pattern () Kind RenderedCode
+typeLiterals :: Pattern () (Kind a) RenderedCode
 typeLiterals = mkPattern match
   where
-  match (KUnknown u) =
+  match (KUnknown _ u) =
     Just $ typeVar $ T.cons 'k' (T.pack (show u))
-  match (NamedKind n) =
+  match (NamedKind _ n) =
     Just $ kind n
   match _ = Nothing
 
-matchRow :: Pattern () Kind ((), Kind)
+matchRow :: Pattern () (Kind a) ((), Kind a)
 matchRow = mkPattern match
   where
-  match (Row k) = Just ((), k)
+  match (Row _ k) = Just ((), k)
   match _ = Nothing
 
-funKind :: Pattern () Kind (Kind, Kind)
+funKind :: Pattern () (Kind a) (Kind a, Kind a)
 funKind = mkPattern match
   where
-  match (FunKind arg ret) = Just (arg, ret)
+  match (FunKind _ arg ret) = Just (arg, ret)
   match _ = Nothing
 
 -- | Generate RenderedCode value representing a Kind
-renderKind :: Kind -> RenderedCode
+renderKind :: forall a. Kind a -> RenderedCode
 renderKind
   = fromMaybe (internalError "Incomplete pattern")
   . PA.pattern matchKind ()
   where
-  matchKind :: Pattern () Kind RenderedCode
+  matchKind :: Pattern () (Kind a) RenderedCode
   matchKind = buildPrettyPrinter operators (typeLiterals <+> fmap parens matchKind)
 
-  operators :: OperatorTable () Kind RenderedCode
+  operators :: OperatorTable () (Kind a) RenderedCode
   operators =
     OperatorTable [ [ Wrap matchRow $ \_ k -> syntax "#" <> sp <> k]
                   , [ AssocR funKind $ \arg ret -> arg <> sp <> syntax "->" <> sp <> ret ] ]

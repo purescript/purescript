@@ -306,35 +306,35 @@ renameInModule imports (Module modSS coms mn decls exps) =
   letBoundVariable :: Declaration -> Maybe Ident
   letBoundVariable = fmap valdeclIdent . getValueDeclaration
 
-  updateKindsEverywhere :: SourceSpan -> Kind -> m Kind
+  updateKindsEverywhere :: SourceSpan -> Kind a -> m (Kind a)
   updateKindsEverywhere pos = everywhereOnKindsM updateKind
     where
-    updateKind :: Kind -> m Kind
-    updateKind (NamedKind name) = NamedKind <$> updateKindName name pos
+    updateKind :: Kind a -> m (Kind a)
+    updateKind (NamedKind ann name) = NamedKind ann <$> updateKindName name pos
     updateKind k = return k
 
   updateTypeArguments
     :: (Traversable f, Traversable g)
     => SourceSpan
-    -> f (a, g Kind) -> m (f (a, g Kind))
+    -> f (a, g (Kind ann)) -> m (f (a, g (Kind ann)))
   updateTypeArguments pos = traverse (sndM (traverse (updateKindsEverywhere pos)))
 
-  updateTypesEverywhere :: SourceSpan -> Type -> m Type
+  updateTypesEverywhere :: SourceSpan -> Type a -> m (Type a)
   updateTypesEverywhere pos = everywhereOnTypesM updateType
     where
-    updateType :: Type -> m Type
-    updateType (TypeOp name) = TypeOp <$> updateTypeOpName name pos
-    updateType (TypeConstructor name) = TypeConstructor <$> updateTypeName name pos
-    updateType (ConstrainedType c t) = ConstrainedType <$> updateInConstraint c <*> pure t
-    updateType (KindedType t k) = KindedType t <$> updateKindsEverywhere pos k
+    updateType :: Type a -> m (Type a)
+    updateType (TypeOp ann name) = TypeOp ann <$> updateTypeOpName name pos
+    updateType (TypeConstructor ann name) = TypeConstructor ann <$> updateTypeName name pos
+    updateType (ConstrainedType ann c t) = ConstrainedType ann <$> updateInConstraint c <*> pure t
+    updateType (KindedType ann t k) = KindedType ann t <$> updateKindsEverywhere pos k
     updateType t = return t
-    updateInConstraint :: Constraint -> m Constraint
-    updateInConstraint (Constraint name ts info) =
-      Constraint <$> updateClassName name pos <*> pure ts <*> pure info
+    updateInConstraint :: Constraint a -> m (Constraint a)
+    updateInConstraint (Constraint ann name ts info) =
+      Constraint ann <$> updateClassName name pos <*> pure ts <*> pure info
 
-  updateConstraints :: SourceSpan -> [Constraint] -> m [Constraint]
-  updateConstraints pos = traverse $ \(Constraint name ts info) ->
-    Constraint
+  updateConstraints :: SourceSpan -> [Constraint a] -> m [Constraint a]
+  updateConstraints pos = traverse $ \(Constraint ann name ts info) ->
+    Constraint ann
       <$> updateClassName name pos
       <*> traverse (updateTypesEverywhere pos) ts
       <*> pure info

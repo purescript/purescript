@@ -48,9 +48,9 @@ addDataType
   => ModuleName
   -> DataDeclType
   -> ProperName 'TypeName
-  -> [(Text, Maybe Kind)]
-  -> [(ProperName 'ConstructorName, [Type])]
-  -> Kind
+  -> [(Text, Maybe SourceKind)]
+  -> [(ProperName 'ConstructorName, [SourceType])]
+  -> SourceKind
   -> m ()
 addDataType moduleName dtype name args dctors ctorKind = do
   env <- getEnv
@@ -66,14 +66,14 @@ addDataConstructor
   -> ProperName 'TypeName
   -> [Text]
   -> ProperName 'ConstructorName
-  -> [Type]
+  -> [SourceType]
   -> m ()
 addDataConstructor moduleName dtype name args dctor tys = do
   env <- getEnv
   traverse_ checkTypeSynonyms tys
-  let retTy = foldl TypeApp (TypeConstructor (Qualified (Just moduleName) name)) (map TypeVar args)
+  let retTy = foldl srcTypeApp (srcTypeConstructor (Qualified (Just moduleName) name)) (map srcTypeVar args)
   let dctorTy = foldr function retTy tys
-  let polyType = mkForAll args dctorTy
+  let polyType = mkForAll (map (NullSourceAnn,) args) dctorTy
   let fields = [Ident ("value" <> T.pack (show n)) | n <- [0..(length tys - 1)]]
   putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (dtype, name, polyType, fields) (dataConstructors env) }
 
@@ -81,9 +81,9 @@ addTypeSynonym
   :: (MonadState CheckState m, MonadError MultipleErrors m)
   => ModuleName
   -> ProperName 'TypeName
-  -> [(Text, Maybe Kind)]
-  -> Type
-  -> Kind
+  -> [(Text, Maybe SourceKind)]
+  -> SourceType
+  -> SourceKind
   -> m ()
 addTypeSynonym moduleName name args ty kind = do
   env <- getEnv
@@ -106,7 +106,7 @@ addValue
   :: (MonadState CheckState m)
   => ModuleName
   -> Ident
-  -> Type
+  -> SourceType
   -> NameKind
   -> m ()
 addValue moduleName name ty nameKind = do
@@ -117,8 +117,8 @@ addTypeClass
   :: forall m
    . (MonadState CheckState m, MonadError MultipleErrors m)
   => Qualified (ProperName 'ClassName)
-  -> [(Text, Maybe Kind)]
-  -> [Constraint]
+  -> [(Text, Maybe SourceKind)]
+  -> [SourceConstraint]
   -> [FunctionalDependency]
   -> [Declaration]
   -> m ()
@@ -127,7 +127,7 @@ addTypeClass qualifiedClassName args implies dependencies ds = do
   traverse_ (checkMemberIsUsable (typeSynonyms env)) classMembers
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert qualifiedClassName newClass (typeClasses . checkEnv $ st) } }
   where
-    classMembers :: [(Ident, Type)]
+    classMembers :: [(Ident, SourceType)]
     classMembers = map toPair ds
 
     newClass :: TypeClassData
@@ -145,7 +145,7 @@ addTypeClass qualifiedClassName args implies dependencies ds = do
     -- Currently we are only checking usability based on the type class currently
     -- being defined.  If the mentioned arguments don't include a covering set,
     -- then we won't be able to find a instance.
-    checkMemberIsUsable :: T.SynonymMap -> (Ident, Type) -> m ()
+    checkMemberIsUsable :: T.SynonymMap -> (Ident, SourceType) -> m ()
     checkMemberIsUsable syns (ident, memberTy) = do
       memberTy' <- T.replaceAllTypeSynonymsM syns memberTy
       let mentionedArgIndexes = S.fromList (mapMaybe argToIndex (freeTypeVariables memberTy'))
@@ -180,7 +180,7 @@ checkTypeClassInstance
   :: (MonadState CheckState m, MonadError MultipleErrors m)
   => TypeClassData
   -> Int -- ^ index of type class argument
-  -> Type
+  -> SourceType
   -> m ()
 checkTypeClassInstance cls i = check where
   -- If the argument is determined via fundeps then we are less restrictive in
@@ -189,15 +189,15 @@ checkTypeClassInstance cls i = check where
   -- row types are allowed in determined type class arguments.
   isFunDepDetermined = S.member i (typeClassDeterminedArguments cls)
   check = \case
-    TypeVar _ -> return ()
-    TypeLevelString _ -> return ()
-    TypeConstructor ctor -> do
+    TypeVar _ _ -> return ()
+    TypeLevelString _ _ -> return ()
+    TypeConstructor _ ctor -> do
       env <- getEnv
       when (ctor `M.member` typeSynonyms env) . throwError . errorMessage $ TypeSynonymInstance
       return ()
-    TypeApp t1 t2 -> check t1 >> check t2
-    REmpty | isFunDepDetermined -> return ()
-    RCons _ hd tl | isFunDepDetermined -> check hd >> check tl
+    TypeApp _ t1 t2 -> check t1 >> check t2
+    REmpty _ | isFunDepDetermined -> return ()
+    RCons _ _ hd tl | isFunDepDetermined -> check hd >> check tl
     ty -> throwError . errorMessage $ InvalidInstanceHead ty
 
 -- |
@@ -205,7 +205,7 @@ checkTypeClassInstance cls i = check where
 --
 checkTypeSynonyms
   :: (MonadState CheckState m, MonadError MultipleErrors m)
-  => Type
+  => SourceType
   -> m ()
 checkTypeSynonyms = void . replaceAllTypeSynonyms
 
@@ -346,7 +346,7 @@ typeCheckAll moduleName _ = traverse go
           addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) (pure dict)
           return d
 
-  checkInstanceArity :: Ident -> Qualified (ProperName 'ClassName) -> TypeClassData -> [Type] -> m ()
+  checkInstanceArity :: Ident -> Qualified (ProperName 'ClassName) -> TypeClassData -> [SourceType] -> m ()
   checkInstanceArity dictName className typeClass tys = do
     let typeClassArity = length (typeClassArguments typeClass)
         instanceArity = length tys
@@ -373,19 +373,19 @@ typeCheckAll moduleName _ = traverse go
   findNonOrphanModules
     :: Qualified (ProperName 'ClassName)
     -> TypeClassData
-    -> [Type]
+    -> [SourceType]
     -> S.Set ModuleName
   findNonOrphanModules (Qualified (Just mn') _) typeClass tys' = nonOrphanModules
     where
     nonOrphanModules :: S.Set ModuleName
     nonOrphanModules = S.insert mn' nonOrphanModules'
 
-    typeModule :: Type -> Maybe ModuleName
-    typeModule (TypeVar _) = Nothing
-    typeModule (TypeLevelString _) = Nothing
-    typeModule (TypeConstructor (Qualified (Just mn'') _)) = Just mn''
-    typeModule (TypeConstructor (Qualified Nothing _)) = internalError "Unqualified type name in findNonOrphanModules"
-    typeModule (TypeApp t1 _) = typeModule t1
+    typeModule :: SourceType -> Maybe ModuleName
+    typeModule (TypeVar _ _) = Nothing
+    typeModule (TypeLevelString _ _) = Nothing
+    typeModule (TypeConstructor _ (Qualified (Just mn'') _)) = Just mn''
+    typeModule (TypeConstructor _ (Qualified Nothing _)) = internalError "Unqualified type name in findNonOrphanModules"
+    typeModule (TypeApp _ t1 _) = typeModule t1
     typeModule _ = internalError "Invalid type in instance in findNonOrphanModules"
 
     modulesByTypeIndex :: M.Map Int (Maybe ModuleName)
@@ -415,7 +415,7 @@ typeCheckAll moduleName _ = traverse go
     -> Ident
     -> Qualified (ProperName 'ClassName)
     -> TypeClassData
-    -> [Type]
+    -> [SourceType]
     -> S.Set ModuleName
     -> m ()
   checkOverlappingInstance ch dictName className typeClass tys' nonOrphanModules = do
@@ -435,8 +435,8 @@ typeCheckAll moduleName _ = traverse go
 
   instancesAreApart
     :: S.Set (S.Set Int)
-    -> [Type]
-    -> [Type]
+    -> [SourceType]
+    -> [SourceType]
     -> Bool
   instancesAreApart sets lhs rhs = all (any typesApart . S.toList) (S.toList sets)
     where
@@ -445,19 +445,19 @@ typeCheckAll moduleName _ = traverse go
 
       -- Note: implementation doesn't need to care about all possible cases:
       -- TUnknown, Skolem, etc.
-      typeHeadsApart :: Type -> Type -> Bool
-      typeHeadsApart l                 r                 | l == r = False
-      typeHeadsApart (TypeVar _)       _                          = False
-      typeHeadsApart _                 (TypeVar _)                = False
-      typeHeadsApart (KindedType t1 _) t2                         = typeHeadsApart t1 t2
-      typeHeadsApart t1                (KindedType t2 _)          = typeHeadsApart t1 t2
-      typeHeadsApart (TypeApp h1 t1)   (TypeApp h2 t2)            = typeHeadsApart h1 h2 || typeHeadsApart t1 t2
-      typeHeadsApart _                 _                          = True
+      typeHeadsApart :: SourceType -> SourceType -> Bool
+      typeHeadsApart l                   r             | eqType l r = False
+      typeHeadsApart (TypeVar _ _)       _                          = False
+      typeHeadsApart _                   (TypeVar _ _)              = False
+      typeHeadsApart (KindedType _ t1 _) t2                         = typeHeadsApart t1 t2
+      typeHeadsApart t1                  (KindedType _ t2 _)        = typeHeadsApart t1 t2
+      typeHeadsApart (TypeApp _ h1 t1)   (TypeApp _ h2 t2)          = typeHeadsApart h1 h2 || typeHeadsApart t1 t2
+      typeHeadsApart _                   _                          = True
 
   checkOrphanInstance
     :: Ident
     -> Qualified (ProperName 'ClassName)
-    -> [Type]
+    -> [SourceType]
     -> S.Set ModuleName
     -> m ()
   checkOrphanInstance dictName className tys' nonOrphanModules
@@ -468,17 +468,17 @@ typeCheckAll moduleName _ = traverse go
   -- This function adds the argument kinds for a type constructor so that they may appear in the externs file,
   -- extracted from the kind of the type constructor itself.
   --
-  withKinds :: [(Text, Maybe Kind)] -> Kind -> [(Text, Maybe Kind)]
+  withKinds :: [(Text, Maybe SourceKind)] -> SourceKind -> [(Text, Maybe SourceKind)]
   withKinds []                  _               = []
-  withKinds (s@(_, Just _ ):ss) (FunKind _   k) = s : withKinds ss k
-  withKinds (  (s, Nothing):ss) (FunKind k1 k2) = (s, Just k1) : withKinds ss k2
-  withKinds _                   _               = internalError "Invalid arguments to peelKinds"
+  withKinds (s@(_, Just _ ):ss) (FunKind _ _   k) = s : withKinds ss k
+  withKinds (  (s, Nothing):ss) (FunKind _ k1 k2) = (s, Just k1) : withKinds ss k2
+  withKinds _                   _                 = internalError "Invalid arguments to peelKinds"
 
 checkNewtype
   :: forall m
    . MonadError MultipleErrors m
   => ProperName 'TypeName
-  -> [(ProperName 'ConstructorName, [Type])]
+  -> [(ProperName 'ConstructorName, [SourceType])]
   -> m ()
 checkNewtype _ [(_, [_])] = return ()
 checkNewtype name _ = throwError . errorMessage $ InvalidNewtype name
@@ -544,12 +544,12 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
   untilSame :: Eq a => (a -> a) -> a -> a
   untilSame f a = let a' = f a in if a == a' then a else untilSame f a'
 
-  checkMemberExport :: (Type -> [DeclarationRef]) -> DeclarationRef -> m ()
+  checkMemberExport :: (SourceType -> [DeclarationRef]) -> DeclarationRef -> m ()
   checkMemberExport extract dr@(TypeRef _ name dctors) = do
     env <- getEnv
     for_ (M.lookup (qualify' name) (types env)) $ \(k, _) -> do
       let findModuleKinds = everythingOnKinds (++) $ \case
-            NamedKind (Qualified (Just mn') kindName) | mn' == mn -> [kindName]
+            NamedKind _ (Qualified (Just mn') kindName) | mn' == mn -> [kindName]
             _ -> []
       checkExport dr $ KindRef (declRefSourceSpan dr) <$> findModuleKinds k
     for_ (M.lookup (qualify' name) (typeSynonyms env)) $ \(_, ty) ->
@@ -606,10 +606,10 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
   checkTypesAreExported :: DeclarationRef -> m ()
   checkTypesAreExported ref = checkMemberExport findTcons ref
     where
-    findTcons :: Type -> [DeclarationRef]
+    findTcons :: SourceType -> [DeclarationRef]
     findTcons = everythingOnTypes (++) go
       where
-      go (TypeConstructor (Qualified (Just mn') name)) | mn' == mn =
+      go (TypeConstructor _ (Qualified (Just mn') name)) | mn' == mn =
         [TypeRef (declRefSourceSpan ref) name (internalError "Data constructors unused in checkTypesAreExported")]
       go _ = []
 
@@ -618,10 +618,10 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
   checkClassesAreExported :: DeclarationRef -> m ()
   checkClassesAreExported ref = checkMemberExport findClasses ref
     where
-    findClasses :: Type -> [DeclarationRef]
+    findClasses :: SourceType -> [DeclarationRef]
     findClasses = everythingOnTypes (++) go
       where
-      go (ConstrainedType c _) = (fmap (TypeClassRef (declRefSourceSpan ref)) . extractCurrentModuleClass . constraintClass) c
+      go (ConstrainedType _ c _) = (fmap (TypeClassRef (declRefSourceSpan ref)) . extractCurrentModuleClass . constraintClass) c
       go _ = []
     extractCurrentModuleClass :: Qualified (ProperName 'ClassName) -> [ProperName 'ClassName]
     extractCurrentModuleClass (Qualified (Just mn') name) | mn == mn' = [name]

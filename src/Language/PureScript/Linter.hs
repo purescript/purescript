@@ -80,40 +80,40 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
   checkTypeVarsInDecl :: S.Set Text -> Declaration -> MultipleErrors
   checkTypeVarsInDecl s d = let (f, _, _, _, _) = accumTypes (checkTypeVars (declSourceSpan d) s) in f d
 
-  checkTypeVars :: SourceSpan -> S.Set Text -> Type -> MultipleErrors
+  checkTypeVars :: SourceSpan -> S.Set Text -> SourceType -> MultipleErrors
   checkTypeVars ss set ty = everythingWithContextOnTypes set mempty mappend step ty <> snd (findUnused ty)
     where
 
-    step :: S.Set Text -> Type -> (S.Set Text, MultipleErrors)
-    step s (ForAll tv _ _) = bindVar s tv
+    step :: S.Set Text -> SourceType -> (S.Set Text, MultipleErrors)
+    step s (ForAll _ tv _ _) = bindVar s tv
     step s _ = (s, mempty)
 
     bindVar :: S.Set Text -> Text -> (S.Set Text, MultipleErrors)
     bindVar = bind ss ShadowedTypeVar
 
-    findUnused :: Type -> (S.Set Text, MultipleErrors)
+    findUnused :: SourceType -> (S.Set Text, MultipleErrors)
     findUnused = go set where
       -- Recursively walk the type and prune used variables from `unused`
-      go :: S.Set Text -> Type -> (S.Set Text, MultipleErrors)
-      go unused (TypeVar v) = (S.delete v unused, mempty)
-      go unused (ForAll tv t1 _) =
+      go :: S.Set Text -> SourceType -> (S.Set Text, MultipleErrors)
+      go unused (TypeVar _ v) = (S.delete v unused, mempty)
+      go unused (ForAll _ tv t1 _) =
         let (nowUnused, errors) = go (S.insert tv unused) t1
             restoredUnused = if S.member tv unused then S.insert tv nowUnused else nowUnused
             combinedErrors = if S.member tv nowUnused then errors <> errorMessage' ss (UnusedTypeVar tv) else errors
         in (restoredUnused, combinedErrors)
-      go unused (TypeApp f x) = go unused f `combine` go unused x
-      go unused (ConstrainedType c t1) = foldl combine (unused, mempty) $ map (go unused) (constraintArgs c <> [t1])
-      go unused (RCons _ t1 rest) = go unused t1 `combine` go unused rest
-      go unused (KindedType t1 _) = go unused t1
-      go unused (ParensInType t1) = go unused t1
-      go unused (BinaryNoParensType t1 t2 t3) = go unused t1 `combine` go unused t2 `combine` go unused t3
+      go unused (TypeApp _ f x) = go unused f `combine` go unused x
+      go unused (ConstrainedType _ c t1) = foldl combine (unused, mempty) $ map (go unused) (constraintArgs c <> [t1])
+      go unused (RCons _ _ t1 rest) = go unused t1 `combine` go unused rest
+      go unused (KindedType _ t1 _) = go unused t1
+      go unused (ParensInType _ t1) = go unused t1
+      go unused (BinaryNoParensType _ t1 t2 t3) = go unused t1 `combine` go unused t2 `combine` go unused t3
       go unused TUnknown{} = (unused, mempty)
       go unused TypeLevelString{} = (unused, mempty)
       go unused TypeWildcard{} = (unused, mempty)
       go unused TypeConstructor{} = (unused, mempty)
       go unused TypeOp{} = (unused, mempty)
       go unused Skolem{} = (unused, mempty)
-      go unused REmpty = (unused, mempty)
+      go unused REmpty{} = (unused, mempty)
       go unused PrettyPrintFunction{} = (unused, mempty)
       go unused PrettyPrintObject{} = (unused, mempty)
       go unused PrettyPrintForAll{} = (unused, mempty)

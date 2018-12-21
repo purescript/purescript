@@ -65,7 +65,7 @@ extractAstInformation (P.Module _ _ _ decls _) =
   in (definitions, typeAnnotations)
 
 -- | Extracts type annotations for functions from a given Module
-extractTypeAnnotations :: [P.Declaration] -> [(P.Ident, P.Type)]
+extractTypeAnnotations :: [P.Declaration] -> [(P.Ident, P.SourceType)]
 extractTypeAnnotations = mapMaybe (map P.unwrapTypeDeclaration . P.getTypeDeclaration)
 
 -- | Given a surrounding Sourcespan and a Declaration from the PS AST, extracts

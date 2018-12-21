@@ -37,7 +37,7 @@ renderDeclarationWithOptions opts Declaration{..} =
       ]
     ExternDataDeclaration kind' ->
       [ keywordData
-      , renderType' (P.TypeConstructor (notQualified declTitle))
+      , renderType' (P.TypeConstructor () (notQualified declTitle))
       , syntax "::"
       , renderKind kind'
       ]
@@ -85,7 +85,7 @@ renderDeclarationWithOptions opts Declaration{..} =
       ]
 
   where
-  renderType' :: P.Type -> RenderedCode
+  renderType' :: Type' -> RenderedCode
   renderType' = renderTypeWithOptions opts
 
 renderChildDeclaration :: ChildDeclaration -> RenderedCode
@@ -109,17 +109,17 @@ renderChildDeclarationWithOptions opts ChildDeclaration{..} =
   renderType' = renderTypeWithOptions opts
   renderTypeAtom' = renderTypeAtomWithOptions opts
 
-renderConstraint :: P.Constraint -> RenderedCode
+renderConstraint :: Constraint' -> RenderedCode
 renderConstraint = renderConstraintWithOptions defaultRenderTypeOptions
 
-renderConstraintWithOptions :: RenderTypeOptions -> P.Constraint -> RenderedCode
-renderConstraintWithOptions opts (P.Constraint pn tys _) =
-  renderTypeWithOptions opts $ foldl P.TypeApp (P.TypeConstructor (fmap P.coerceProperName pn)) tys
+renderConstraintWithOptions :: RenderTypeOptions -> Constraint' -> RenderedCode
+renderConstraintWithOptions opts (P.Constraint ann pn tys _) =
+  renderTypeWithOptions opts $ foldl (P.TypeApp ann) (P.TypeConstructor ann (fmap P.coerceProperName pn)) tys
 
-renderConstraints :: [P.Constraint] -> Maybe RenderedCode
+renderConstraints :: [Constraint'] -> Maybe RenderedCode
 renderConstraints = renderConstraintsWithOptions defaultRenderTypeOptions
 
-renderConstraintsWithOptions :: RenderTypeOptions -> [P.Constraint] -> Maybe RenderedCode
+renderConstraintsWithOptions :: RenderTypeOptions -> [Constraint'] -> Maybe RenderedCode
 renderConstraintsWithOptions opts constraints
   | null constraints = Nothing
   | otherwise = Just $
@@ -140,12 +140,12 @@ ident' = ident . P.Qualified Nothing . P.Ident
 dataCtor' :: Text -> RenderedCode
 dataCtor' = dataCtor . notQualified
 
-typeApp :: Text -> [(Text, Maybe P.Kind)] -> P.Type
+typeApp :: Text -> [(Text, Maybe Kind')] -> Type'
 typeApp title typeArgs =
-  foldl P.TypeApp
-        (P.TypeConstructor (notQualified title))
+  foldl (P.TypeApp ())
+        (P.TypeConstructor () (notQualified title))
         (map toTypeVar typeArgs)
 
-toTypeVar :: (Text, Maybe P.Kind) -> P.Type
-toTypeVar (s, Nothing) = P.TypeVar s
-toTypeVar (s, Just k) = P.KindedType (P.TypeVar s) k
+toTypeVar :: (Text, Maybe Kind') -> Type'
+toTypeVar (s, Nothing) = P.TypeVar () s
+toTypeVar (s, Just k) = P.KindedType () (P.TypeVar () s) k

@@ -116,7 +116,7 @@ findSynonym :: P.ProperName 'P.TypeName -> [IdeDeclaration] -> Maybe IdeTypeSyno
 -- involved. We collect these and resolve them at the end of the conversion process.
 data ToResolve
   = TypeClassToResolve (P.ProperName 'P.ClassName)
-  | SynonymToResolve (P.ProperName 'P.TypeName) P.Type
+  | SynonymToResolve (P.ProperName 'P.TypeName) P.SourceType
 
 convertExport :: P.DeclarationRef -> Maybe (P.ModuleName, P.DeclarationRef)
 convertExport (P.ReExportRef _ m r) = Just (m, r)

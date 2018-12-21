@@ -13,22 +13,22 @@ matchTypeOperators
   :: MonadError MultipleErrors m
   => SourceSpan
   -> [[(Qualified (OpName 'TypeOpName), Associativity)]]
-  -> Type
-  -> m Type
+  -> SourceType
+  -> m SourceType
 matchTypeOperators ss = matchOperators isBinOp extractOp fromOp reapply id
   where
 
-  isBinOp :: Type -> Bool
+  isBinOp :: SourceType -> Bool
   isBinOp BinaryNoParensType{} = True
   isBinOp _ = False
 
-  extractOp :: Type -> Maybe (Type, Type, Type)
-  extractOp (BinaryNoParensType op l r) = Just (op, l, r)
+  extractOp :: SourceType -> Maybe (SourceType, SourceType, SourceType)
+  extractOp (BinaryNoParensType _ op l r) = Just (op, l, r)
   extractOp _ = Nothing
 
-  fromOp :: Type -> Maybe (SourceSpan, Qualified (OpName 'TypeOpName))
-  fromOp (TypeOp q@(Qualified _ (OpName _))) = Just (ss, q)
+  fromOp :: SourceType -> Maybe (SourceSpan, Qualified (OpName 'TypeOpName))
+  fromOp (TypeOp _ q@(Qualified _ (OpName _))) = Just (ss, q)
   fromOp _ = Nothing
 
-  reapply :: a -> Qualified (OpName 'TypeOpName) -> Type -> Type -> Type
-  reapply _ = BinaryNoParensType . TypeOp
+  reapply :: a -> Qualified (OpName 'TypeOpName) -> SourceType -> SourceType -> SourceType
+  reapply _ = srcBinaryNoParensType . srcTypeOp

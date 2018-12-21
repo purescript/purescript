@@ -31,10 +31,10 @@ newSkolemConstant = do
   return s
 
 -- | Introduce skolem scope at every occurence of a ForAll
-introduceSkolemScope :: MonadState CheckState m => Type -> m Type
+introduceSkolemScope :: MonadState CheckState m => Type a -> m (Type a)
 introduceSkolemScope = everywhereOnTypesM go
   where
-  go (ForAll ident ty Nothing) = ForAll ident ty <$> (Just <$> newSkolemScope)
+  go (ForAll ann ident ty Nothing) = ForAll ann ident ty <$> (Just <$> newSkolemScope)
   go other = return other
 
 -- | Generate a new skolem scope
@@ -45,14 +45,14 @@ newSkolemScope = do
   return $ SkolemScope s
 
 -- | Skolemize a type variable by replacing its instances with fresh skolem constants
-skolemize :: Text -> Int -> SkolemScope -> Maybe SourceSpan -> Type -> Type
-skolemize ident sko scope ss = replaceTypeVars ident (Skolem ident sko scope ss)
+skolemize :: a -> Text -> Int -> SkolemScope -> Type a -> Type a
+skolemize ann ident sko scope = replaceTypeVars ident (Skolem ann ident sko scope)
 
 -- | This function skolemizes type variables appearing in any type signatures or
 -- 'DeferredDictionary' placeholders. These type variables are the only places
 -- where scoped type variables can appear in expressions.
-skolemizeTypesInValue :: Text -> Int -> SkolemScope -> Maybe SourceSpan -> Expr -> Expr
-skolemizeTypesInValue ident sko scope ss =
+skolemizeTypesInValue :: SourceAnn -> Text -> Int -> SkolemScope -> Expr -> Expr
+skolemizeTypesInValue ann ident sko scope =
     runIdentity . onExpr'
   where
     onExpr' :: Expr -> Identity Expr
@@ -60,18 +60,18 @@ skolemizeTypesInValue ident sko scope ss =
 
     onExpr :: [Text] -> Expr -> Identity ([Text], Expr)
     onExpr sco (DeferredDictionary c ts)
-      | ident `notElem` sco = return (sco, DeferredDictionary c (map (skolemize ident sko scope ss) ts))
+      | ident `notElem` sco = return (sco, DeferredDictionary c (map (skolemize ann ident sko scope) ts))
     onExpr sco (TypedValue check val ty)
-      | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedValue check val (skolemize ident sko scope ss ty))
+      | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedValue check val (skolemize ann ident sko scope ty))
     onExpr sco other = return (sco, other)
 
     onBinder :: [Text] -> Binder -> Identity ([Text], Binder)
     onBinder sco (TypedBinder ty b)
-      | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedBinder (skolemize ident sko scope ss ty) b)
+      | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedBinder (skolemize ann ident sko scope ty) b)
     onBinder sco other = return (sco, other)
 
-    peelTypeVars :: Type -> [Text]
-    peelTypeVars (ForAll i ty _) = i : peelTypeVars ty
+    peelTypeVars :: SourceType -> [Text]
+    peelTypeVars (ForAll _ i ty _) = i : peelTypeVars ty
     peelTypeVars _ = []
 
 -- | Ensure skolem variables do not escape their scope
@@ -100,8 +100,8 @@ skolemEscapeCheck expr@TypedValue{} =
     go (scopes, ssUsed) val@(TypedValue _ _ ty) =
         ( (allScopes, ssUsed)
         , [ ErrorMessage (maybe id ((:) . positionedError) ssUsed [ ErrorInExpression val ]) $
-              EscapedSkolem name ssBound ty
-          | (name, scope, ssBound) <- collectSkolems ty
+              EscapedSkolem name (nonEmptySpan ssBound) ty
+          | (ssBound, name, scope) <- collectSkolems ty
           , notMember scope allScopes
           ]
         )
@@ -115,15 +115,15 @@ skolemEscapeCheck expr@TypedValue{} =
         allScopes = fromList newScopes <> scopes
 
         -- Collect any scopes appearing in quantifiers at the top level
-        collectScopes :: Type -> [SkolemScope]
-        collectScopes (ForAll _ t (Just sco)) = sco : collectScopes t
+        collectScopes :: SourceType -> [SkolemScope]
+        collectScopes (ForAll _ _ t (Just sco)) = sco : collectScopes t
         collectScopes ForAll{} = internalError "skolemEscapeCheck: No skolem scope"
         collectScopes _ = []
 
         -- Collect any skolem variables appearing in a type
-        collectSkolems :: Type -> [(Text, SkolemScope, Maybe SourceSpan)]
+        collectSkolems :: SourceType -> [(SourceAnn, Text, SkolemScope)]
         collectSkolems = everythingOnTypes (++) collect where
-          collect (Skolem name _ scope srcSpan) = [(name, scope, srcSpan)]
+          collect (Skolem ss name _ scope) = [(ss, name, scope)]
           collect _ = []
     go scos _ = (scos, [])
 skolemEscapeCheck _ = internalError "skolemEscapeCheck: untyped value"

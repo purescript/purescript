@@ -37,13 +37,13 @@ optimizeClosedRecordUpdate ou@(ObjectUpdate a@(_, _, Just t, _) r updatedFields)
 optimizeClosedRecordUpdate e = e
 
 -- | Return the labels of a closed record, or Nothing for other types or open records.
-closedRecordFields :: Type -> Maybe [Label]
-closedRecordFields (TypeApp (TypeConstructor C.Record) row) =
+closedRecordFields :: Type a -> Maybe [Label]
+closedRecordFields (TypeApp _ (TypeConstructor _ C.Record) row) =
   collect row
   where
-    collect :: Type -> Maybe [Label]
-    collect REmpty = Just []
-    collect (RCons l _ r) = collect r >>= return . (l :)
+    collect :: Type a -> Maybe [Label]
+    collect (REmpty _) = Just []
+    collect (RCons _ l _ r) = collect r >>= return . (l :)
     collect _ = Nothing
 closedRecordFields _ = Nothing
 
