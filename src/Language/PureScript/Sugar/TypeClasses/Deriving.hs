@@ -246,8 +246,8 @@ deriveNewtypeInstance ss mn syns ndis className ds tys tyConNm dargs = do
               -- Everything else raises a UnverifiableSuperclassInstance warning.
               -- This covers pretty much all cases we're interested in, but later we might want to do
               -- more work to extend this to other superclass relationships.
-              let determined = map (TypeVar NullSourceAnn . (args !!)) . ordNub . concatMap fdDetermined . filter ((== [length args - 1]) . fdDeterminers) $ deps
-              if eqType (last constraintArgs) (TypeVar NullSourceAnn (last args)) && all (`elem` determined) (init constraintArgs)
+              let determined = map (srcTypeVar . (args !!)) . ordNub . concatMap fdDetermined . filter ((== [length args - 1]) . fdDeterminers) $ deps
+              if eqType (last constraintArgs) (srcTypeVar (last args)) && all (`elem` determined) (init constraintArgs)
                 then do
                   -- Now make sure that a superclass instance was derived. Again, this is not a complete
                   -- check, since the superclass might have multiple type arguments, so overlaps might still
@@ -342,8 +342,8 @@ deriveGenericRep ss mn syns ds tyConNm tyConArgs repTy = do
     makeInst (ctorName, args) = do
         args' <- mapM (replaceAllTypeSynonymsM syns) args
         (ctorTy, matchProduct, ctorArgs, matchCtor, mkProduct) <- makeProduct args'
-        return ( TypeApp NullSourceAnn (TypeApp NullSourceAnn (TypeConstructor NullSourceAnn constructor)
-                                  (TypeLevelString NullSourceAnn $ mkString (runProperName ctorName)))
+        return ( srcTypeApp (srcTypeApp (srcTypeConstructor constructor)
+                                  (srcTypeLevelString $ mkString (runProperName ctorName)))
                          ctorTy
                , CaseAlternative [ ConstructorBinder ss constructor [matchProduct] ]
                                  (unguarded (foldl' App (Constructor ss (Qualified (Just mn) ctorName)) ctorArgs))
@@ -358,7 +358,7 @@ deriveGenericRep ss mn syns ds tyConNm tyConArgs repTy = do
       pure (noArgs, NullBinder, [], [], noArgs')
     makeProduct args = do
       (tys, bs1, es1, bs2, es2) <- unzip5 <$> traverse makeArg args
-      pure ( foldr1 (\f -> TypeApp NullSourceAnn (TypeApp NullSourceAnn (TypeConstructor NullSourceAnn productName) f)) tys
+      pure ( foldr1 (\f -> srcTypeApp (srcTypeApp (srcTypeConstructor productName) f)) tys
            , foldr1 (\b1 b2 -> ConstructorBinder ss productName [b1, b2]) bs1
            , es1
            , bs2
@@ -368,7 +368,7 @@ deriveGenericRep ss mn syns ds tyConNm tyConArgs repTy = do
     makeArg :: SourceType -> m (SourceType, Binder, Expr, Binder, Expr)
     makeArg arg = do
       argName <- freshIdent "arg"
-      pure ( TypeApp NullSourceAnn (TypeConstructor NullSourceAnn argument) arg
+      pure ( srcTypeApp (srcTypeConstructor argument) arg
            , ConstructorBinder ss argument [ VarBinder ss argName ]
            , Var ss (Qualified Nothing argName)
            , VarBinder ss argName
@@ -385,7 +385,7 @@ deriveGenericRep ss mn syns ds tyConNm tyConArgs repTy = do
     toRepTy :: [SourceType] -> SourceType
     toRepTy [] = noCtors
     toRepTy [only] = only
-    toRepTy ctors = foldr1 (\f -> TypeApp NullSourceAnn (TypeApp NullSourceAnn sumCtor f)) ctors
+    toRepTy ctors = foldr1 (\f -> srcTypeApp (srcTypeApp sumCtor f)) ctors
 
     toName :: Expr
     toName = Var ss (Qualified (Just dataGenericRep) (Ident "to"))
@@ -394,16 +394,16 @@ deriveGenericRep ss mn syns ds tyConNm tyConArgs repTy = do
     fromName = Var ss (Qualified (Just dataGenericRep) (Ident "from"))
 
     noCtors :: SourceType
-    noCtors = TypeConstructor NullSourceAnn (Qualified (Just dataGenericRep) (ProperName "NoConstructors"))
+    noCtors = srcTypeConstructor (Qualified (Just dataGenericRep) (ProperName "NoConstructors"))
 
     noArgs :: SourceType
-    noArgs = TypeConstructor NullSourceAnn (Qualified (Just dataGenericRep) (ProperName "NoArguments"))
+    noArgs = srcTypeConstructor (Qualified (Just dataGenericRep) (ProperName "NoArguments"))
 
     noArgs' :: Expr
     noArgs' = Constructor ss (Qualified (Just dataGenericRep) (ProperName "NoArguments"))
 
     sumCtor :: SourceType
-    sumCtor = TypeConstructor NullSourceAnn (Qualified (Just dataGenericRep) (ProperName "Sum"))
+    sumCtor = srcTypeConstructor (Qualified (Just dataGenericRep) (ProperName "Sum"))
 
     inl :: Qualified (ProperName 'ConstructorName)
     inl = Qualified (Just dataGenericRep) (ProperName "Inl")
