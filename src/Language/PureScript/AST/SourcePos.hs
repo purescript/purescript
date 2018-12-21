@@ -96,25 +96,9 @@ nonEmptySpan :: SourceAnn -> Maybe SourceSpan
 nonEmptySpan (NullSourceSpan, _) = Nothing
 nonEmptySpan (ss, _) = Just ss
 
-minSourcePos :: SourcePos -> SourcePos -> SourcePos
-minSourcePos a@(SourcePos l1 c1) b@(SourcePos l2 c2)
-  | l1 < l2   = a
-  | l1 > l2   = b
-  | c1 < c2   = a
-  | c1 > c2   = b
-  | otherwise = a
-
-maxSourcePos :: SourcePos -> SourcePos -> SourcePos
-maxSourcePos a@(SourcePos l1 c1) b@(SourcePos l2 c2)
-  | l1 > l2   = a
-  | l1 < l2   = b
-  | c1 > c2   = a
-  | c1 < c2   = b
-  | otherwise = a
-
 widenSourceSpan :: SourceSpan -> SourceSpan -> SourceSpan
 widenSourceSpan (SourceSpan n1 s1 e1) (SourceSpan n2 s2 e2) =
-  SourceSpan n (minSourcePos s1 s2) (maxSourcePos e1 e2)
+  SourceSpan n (min s1 s2) (max e1 e2)
   where
   n | n1 == ""  = n2
     | otherwise = n1
