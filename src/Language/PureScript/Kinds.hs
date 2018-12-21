@@ -156,6 +156,7 @@ compareKind (KUnknown {}) _ = LT
 
 compareKind (Row _ a) (Row _ a') = compareKind a a'
 compareKind (Row {}) _ = LT
+compareKind _ (Row {}) = GT
 
 compareKind (FunKind _ a b) (FunKind _ a' b') = compareKind a b <> compareKind a' b'
 compareKind (FunKind {}) _ = LT
