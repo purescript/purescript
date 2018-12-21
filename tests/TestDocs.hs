@@ -133,10 +133,10 @@ data DocsAssertion
   | ShouldHaveFunDeps P.ModuleName Text [([Text],[Text])]
   -- | Assert that a particular value declaration exists, and its type
   -- satisfies the given predicate.
-  | ValueShouldHaveTypeSignature P.ModuleName Text (P.SourceType -> Bool)
+  | ValueShouldHaveTypeSignature P.ModuleName Text (Docs.Type' -> Bool)
   -- | Assert that a particular instance declaration exists under some class or
   -- type declaration, and that its type satisfies the given predicate.
-  | InstanceShouldHaveTypeSignature P.ModuleName Text Text (P.SourceType -> Bool)
+  | InstanceShouldHaveTypeSignature P.ModuleName Text Text (Docs.Type' -> Bool)
   -- | Assert that a particular type alias exists, and its corresponding
   -- type, when rendered, matches a given string exactly
   -- fields: module, type synonym name, expected type
@@ -225,7 +225,7 @@ data DocsAssertionFailure
   -- because the inferred type was used when the explicit type should have
   -- been.
   -- Fields: module name, declaration name, actual type.
-  | DeclarationWrongType P.ModuleName Text P.SourceType
+  | DeclarationWrongType P.ModuleName Text Docs.Type'
   -- | A Type synonym has been rendered in an unexpected format
   -- Fields: module name, declaration name, expected rendering, actual rendering
   | TypeSynonymMismatch P.ModuleName Text Text Text
@@ -593,8 +593,8 @@ testCases =
 
   , ("ExplicitTypeSignatures",
       [ ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "explicit" (hasTypeVar "something")
-      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "anInt"    (P.tyInt ==)
-      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "aNumber"  (P.tyNumber ==)
+      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "anInt"    (P.tyInt `P.eqType`)
+      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "aNumber"  (P.tyNumber `P.eqType`)
       ])
 
   , ("ConstrainedArgument",

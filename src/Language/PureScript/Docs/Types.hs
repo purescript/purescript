@@ -39,6 +39,10 @@ import Language.PureScript.Docs.RenderedCode as ReExports
    RenderedCodeElement(..), asRenderedCodeElement,
    Namespace(..), FixityAlias)
 
+type Type' = P.Type ()
+type Kind' = P.Kind ()
+type Constraint' = P.Constraint ()
+
 --------------------
 -- Types
 
@@ -147,30 +151,30 @@ data DeclarationInfo
   -- |
   -- A value declaration, with its type.
   --
-  = ValueDeclaration P.SourceType
+  = ValueDeclaration Type'
 
   -- |
   -- A data/newtype declaration, with the kind of declaration (data or
   -- newtype) and its type arguments. Constructors are represented as child
   -- declarations.
   --
-  | DataDeclaration P.DataDeclType [(Text, Maybe P.SourceKind)]
+  | DataDeclaration P.DataDeclType [(Text, Maybe Kind')]
 
   -- |
   -- A data type foreign import, with its kind.
   --
-  | ExternDataDeclaration P.SourceKind
+  | ExternDataDeclaration Kind'
 
   -- |
   -- A type synonym, with its type arguments and its type.
   --
-  | TypeSynonymDeclaration [(Text, Maybe P.SourceKind)] P.SourceType
+  | TypeSynonymDeclaration [(Text, Maybe Kind')] Type'
 
   -- |
   -- A type class, with its type arguments, its superclasses and functional
   -- dependencies. Instances and members are represented as child declarations.
   --
-  | TypeClassDeclaration [(Text, Maybe P.SourceKind)] [P.SourceConstraint] [([Text], [Text])]
+  | TypeClassDeclaration [(Text, Maybe Kind')] [Constraint'] [([Text], [Text])]
 
   -- |
   -- An operator alias declaration, with the member the alias is for and the
@@ -186,7 +190,7 @@ data DeclarationInfo
 
 instance NFData DeclarationInfo
 
-convertFundepsToStrings :: [(Text, Maybe P.SourceKind)] -> [P.FunctionalDependency] -> [([Text], [Text])]
+convertFundepsToStrings :: [(Text, Maybe Kind')] -> [P.FunctionalDependency] -> [([Text], [Text])]
 convertFundepsToStrings args fundeps =
   map (\(P.FunctionalDependency from to) -> toArgs from to) fundeps
   where
@@ -287,19 +291,19 @@ data ChildDeclarationInfo
   -- |
   -- A type instance declaration, with its dependencies and its type.
   --
-  = ChildInstance [P.SourceConstraint] P.SourceType
+  = ChildInstance [Constraint'] Type'
 
   -- |
   -- A data constructor, with its type arguments.
   --
-  | ChildDataConstructor [P.SourceType]
+  | ChildDataConstructor [Type']
 
   -- |
   -- A type class member, with its type. Note that the type does not include
   -- the type class constraint; this may be added manually if desired. For
   -- example, `pure` from `Applicative` would be `forall a. a -> f a`.
   --
-  | ChildTypeClassMember P.SourceType
+  | ChildTypeClassMember Type'
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData ChildDeclarationInfo
@@ -652,15 +656,15 @@ asDeclarationInfo = do
     other ->
       throwCustomError (InvalidDeclarationType other)
 
-asTypeArguments :: Parse PackageError [(Text, Maybe P.SourceKind)]
+asTypeArguments :: Parse PackageError [(Text, Maybe Kind')]
 asTypeArguments = eachInArray asTypeArgument
   where
   asTypeArgument = (,) <$> nth 0 asText <*> nth 1 (perhaps asKind)
 
-asKind :: Parse PackageError P.SourceKind
-asKind = P.kindFromJSON (pure P.NullSourceAnn) fromAesonParser .! InvalidKind
+asKind :: Parse PackageError Kind'
+asKind = P.kindFromJSON (pure ()) fromAesonParser .! InvalidKind
 
-asType :: Parse e P.SourceType
+asType :: Parse e Type'
 asType = fromAesonParser
 
 asFunDeps :: Parse PackageError [([Text], [Text])]
@@ -700,11 +704,10 @@ asSourcePos :: Parse e P.SourcePos
 asSourcePos = P.SourcePos <$> nth 0 asIntegral
                           <*> nth 1 asIntegral
 
-asConstraint :: Parse PackageError P.SourceConstraint
-asConstraint = P.Constraint <$> key "constraintAnn" asSourceAnn
-                            <*> key "constraintClass" asQualifiedProperName
-                            <*> key "constraintArgs" (eachInArray asType)
-                            <*> pure Nothing
+asConstraint :: Parse PackageError Constraint'
+asConstraint = P.Constraint () <$> key "constraintClass" asQualifiedProperName
+                               <*> key "constraintArgs" (eachInArray asType)
+                               <*> pure Nothing
 
 asQualifiedProperName :: Parse e (P.Qualified (P.ProperName a))
 asQualifiedProperName = fromAesonParser
