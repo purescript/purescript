@@ -604,8 +604,7 @@ isUnquotedKeyTailChar c = (c `elem` ("_'" :: [Char])) || isAlphaNum c
 --
 isUnquotedKey :: Text -> Bool
 isUnquotedKey t =
-  t `notElem` reservedPsNames
-  && case T.uncons t of
-      Nothing -> False
-      Just (hd, tl) -> isUnquotedKeyHeadChar hd &&
-                       T.all isUnquotedKeyTailChar tl
+  case T.uncons t of
+    Nothing -> False
+    Just (hd, tl) -> isUnquotedKeyHeadChar hd &&
+                     T.all isUnquotedKeyTailChar tl
