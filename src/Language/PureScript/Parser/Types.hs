@@ -131,16 +131,16 @@ parseAnyType = P.buildExpressionParser operators (buildPostfixParser postfixTabl
                  ]
 
   mkTypeApp lhs rhs =
-    TypeApp (widenSourceAnn (annotationForType lhs) (annotationForType rhs)) lhs rhs
+    TypeApp (widenSourceAnn (getAnnForType lhs) (getAnnForType rhs)) lhs rhs
 
   parseTypeOp = withSourceAnnF $ do
     ident <- P.try (parseQualified parseOperator)
     return $ \ann lhs rhs ->
-      BinaryNoParensType (widenSourceAnn (annotationForType lhs) (annotationForType rhs)) (TypeOp ann ident) lhs rhs
+      BinaryNoParensType (widenSourceAnn (getAnnForType lhs) (getAnnForType rhs)) (TypeOp ann ident) lhs rhs
 
   parseKindedType ty = do
     kind <- indented *> doubleColon *> parseKind
-    return $ KindedType (widenSourceAnn (annotationForType ty) (annotationForKind kind)) ty kind
+    return $ KindedType (widenSourceAnn (getAnnForType ty) (getAnnForKind kind)) ty kind
 
 
 -- |

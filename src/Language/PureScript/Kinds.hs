@@ -20,6 +20,8 @@ import Language.PureScript.AST.SourcePos
 import Language.PureScript.Names
 import qualified Language.PureScript.Constants as C
 
+import Lens.Micro.Platform (Lens', (^.), set)
+
 type SourceKind = Kind SourceAnn
 
 -- | The data type of kinds
@@ -131,11 +133,17 @@ everythingOnKinds (<>.) f = go
   go k@(FunKind _ k1 k2) = f k <>. go k1 <>. go k2
   go other = f other
 
-annotationForKind :: Kind a -> a
-annotationForKind (KUnknown a _) = a
-annotationForKind (Row a _) = a
-annotationForKind (FunKind a _ _) = a
-annotationForKind (NamedKind a _) = a
+annForKind :: Lens' (Kind a) a
+annForKind k (KUnknown a b) = (\z -> KUnknown z b) <$> k a
+annForKind k (Row a b) = (\z -> Row z b) <$> k a
+annForKind k (FunKind a b c) = (\z -> FunKind z b c) <$> k a
+annForKind k (NamedKind a b) = (\z -> NamedKind z b) <$> k a
+
+getAnnForKind :: Kind a -> a
+getAnnForKind = (^. annForKind)
+
+setAnnForKind :: a -> Kind a -> Kind a
+setAnnForKind = set annForKind
 
 instance Eq (Kind a) where
   (==) = eqKind
