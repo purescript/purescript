@@ -18,6 +18,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 
 import Data.Functor (($>))
+import Data.List (sort)
 import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Map as M
 import Data.Text (Text)
@@ -95,13 +96,10 @@ unifyKinds k1 k2 = do
   go (FunKind _ k1' k2') (FunKind _ k3 k4) = do
     unifyKinds k1' k3
     unifyKinds k2' k4
-  go k1' k2' = do
-    let
-      err = KindsDoNotUnify k1' k2'
-      sss = filter (/= NullSourceSpan) $ map (fst . getAnnForKind) [k2', k1']
-    case sss of
-      [] -> throwError $ errorMessage err
-      a : bs -> throwError $ errorMessage'' (a :| bs) err
+  go k1' k2' =
+    throwError
+      . errorMessage''' (fst . getAnnForKind <$> [k1', k2'])
+      $ KindsDoNotUnify k1' k2'
 
 -- | Infer the kind of a single type
 kindOf
