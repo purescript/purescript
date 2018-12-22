@@ -1446,6 +1446,7 @@ warnAndRethrowWithPosition :: (MonadError MultipleErrors m, MonadWriter Multiple
 warnAndRethrowWithPosition pos = rethrowWithPosition pos . warnWithPosition pos
 
 withPosition :: SourceSpan -> ErrorMessage -> ErrorMessage
+withPosition NullSourceSpan err = err
 withPosition pos (ErrorMessage hints se) = ErrorMessage (positionedError pos : hints) se
 
 positionedError :: SourceSpan -> ErrorMessageHint
