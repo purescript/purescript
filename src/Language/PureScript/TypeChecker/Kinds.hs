@@ -18,8 +18,6 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 
 import Data.Functor (($>))
-import Data.List (sort)
-import Data.List.NonEmpty (NonEmpty(..))
 import qualified Data.Map as M
 import Data.Text (Text)
 
