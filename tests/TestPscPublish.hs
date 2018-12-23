@@ -11,14 +11,17 @@ import Data.ByteString.Lazy (ByteString)
 import Data.Time.Clock (getCurrentTime)
 import qualified Data.Aeson as A
 import Data.Version
+import Data.Foldable (forM_)
 import qualified Text.PrettyPrint.Boxes as Boxes
+import System.Directory (listDirectory)
+import System.FilePath ((</>))
 
 import Language.PureScript.Docs
 import Language.PureScript.Publish
 import Language.PureScript.Publish.ErrorsWarnings as Publish
 
 import Test.Tasty
-import Test.Tasty.Hspec (Spec, Expectation, it, expectationFailure, testSpec)
+import Test.Tasty.Hspec (Spec, Expectation, runIO, context, it, expectationFailure, testSpec)
 import TestUtils
 
 main :: IO TestTree
@@ -26,10 +29,25 @@ main = testSpec "publish" spec
 
 spec :: Spec
 spec = do
-  it "roundtrips purescript-prelude" $ do
+  it "roundtrips the json for purescript-prelude" $ do
     testPackage
       "tests/support/bower_components/purescript-prelude"
       "../../prelude-resolutions.json"
+
+  context "json compatibility" $ do
+    let compatDir = "tests" </> "json-compat"
+    versions <- runIO $ listDirectory compatDir
+    forM_ versions $ \version -> do
+      context ("json produced by " ++ version) $ do
+        files <- runIO $ listDirectory (compatDir </> version)
+        forM_ files $ \file -> do
+          it file $ do
+            result <- A.eitherDecodeFileStrict' (compatDir </> version </> file)
+            case result of
+              Right (_ :: VerifiedPackage) ->
+                pure ()
+              Left err ->
+                expectationFailure ("JSON parsing failed: " ++ err)
 
 data TestResult
   = ParseFailed String

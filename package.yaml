@@ -20,6 +20,7 @@ extra-source-files:
   - tests/purs/**/*.js
   - tests/purs/**/*.purs
   - tests/purs/**/*.json
+  - tests/json-compat/**/*.json
   - tests/support/*.json
   - tests/support/setup-win.cmd
   - tests/support/psci/**.purs
