@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 -- |
 -- Data types for types
@@ -12,11 +13,13 @@ module Language.PureScript.Types where
 import Prelude.Compat
 import Protolude (ordNub)
 
+import Control.Applicative ((<|>))
 import Control.Arrow (first)
 import Control.DeepSeq (NFData)
 import Control.Monad ((<=<))
+import Data.Aeson ((.:), (.=))
 import qualified Data.Aeson as A
-import qualified Data.Aeson.TH as A
+import qualified Data.Aeson.Types as A
 import Data.Foldable (fold)
 import Data.List (sortBy)
 import Data.Ord (comparing)
@@ -172,9 +175,184 @@ mapConstraintArgs f c = c { constraintArgs = f (constraintArgs c) }
 overConstraintArgs :: Functor f => ([Type a] -> f [Type a]) -> Constraint a -> f (Constraint a)
 overConstraintArgs f c = (\args -> c { constraintArgs = args }) <$> f (constraintArgs c)
 
-$(A.deriveJSON A.defaultOptions ''Type)
-$(A.deriveJSON A.defaultOptions ''Constraint)
-$(A.deriveJSON A.defaultOptions ''ConstraintData)
+constraintDataToJSON :: ConstraintData -> A.Value
+constraintDataToJSON (PartialConstraintData bs trunc) =
+  A.object
+    [ "contents" .= (bs, trunc)
+    ]
+
+constraintToJSON :: (a -> A.Value) -> Constraint a -> A.Value
+constraintToJSON annToJSON (Constraint {..}) =
+  A.object
+    [ "constraintAnn"   .= annToJSON constraintAnn
+    , "constraintClass" .= constraintClass
+    , "constraintArgs"  .= fmap (typeToJSON annToJSON) constraintArgs
+    , "constraintData"  .= fmap constraintDataToJSON constraintData
+    ]
+
+typeToJSON :: forall a. (a -> A.Value) -> Type a -> A.Value
+typeToJSON annToJSON ty =
+  case ty of
+    TUnknown a b ->
+      variant "TUnknown" a b
+    TypeVar a b ->
+      variant "TypeVar" a b
+    TypeLevelString a b ->
+      variant "TypeLevelString" a b
+    TypeWildcard a ->
+      nullary "TypeWildcard" a
+    TypeConstructor a b ->
+      variant "TypeConstructor" a b
+    TypeOp a b ->
+      variant "TypeOp" a b
+    TypeApp a b c ->
+      variant "TypeApp" a (go b, go c)
+    ForAll a b c d ->
+      variant "ForAll" a (b, go c, d)
+    ConstrainedType a b c ->
+      variant "ConstrainedType" a (constraintToJSON annToJSON b, go c)
+    Skolem a b c d ->
+      variant "Skolem" a (b, c, d)
+    REmpty a ->
+      nullary "REmpty" a
+    RCons a b c d ->
+      variant "RCons" a (b, go c, go d)
+    KindedType a b c ->
+      variant "KindedType" a (go b, kindToJSON annToJSON c)
+    PrettyPrintFunction a b c ->
+      variant "PrettyPrintFunction" a (go b, go c)
+    PrettyPrintObject a b ->
+      variant "PrettyPrintObject" a (go b)
+    PrettyPrintForAll a b c ->
+      variant "PrettyPrintForAll" a (b, go c)
+    BinaryNoParensType a b c d ->
+      variant "BinaryNoParensType" a (go b, go c, go d)
+    ParensInType a b ->
+      variant "ParensInType" a (go b)
+  where
+  go :: Type a -> A.Value
+  go = typeToJSON annToJSON
+
+  variant :: A.ToJSON b => String -> a -> b -> A.Value
+  variant tag ann contents =
+    A.object
+      [ "tag"        .= tag
+      , "annotation" .= annToJSON ann
+      , "contents"   .= contents
+      ]
+
+  nullary :: String -> a -> A.Value
+  nullary tag ann =
+    A.object
+      [ "tag"        .= tag
+      , "annotation" .= annToJSON ann
+      ]
+
+instance A.ToJSON a => A.ToJSON (Type a) where
+  toJSON = typeToJSON A.toJSON
+
+instance A.ToJSON a => A.ToJSON (Constraint a) where
+  toJSON = constraintToJSON A.toJSON
+
+instance A.ToJSON ConstraintData where
+  toJSON = constraintDataToJSON
+
+constraintDataFromJSON :: A.Value -> A.Parser ConstraintData
+constraintDataFromJSON = A.withObject "PartialConstraintData" $ \o -> do
+  (bs, trunc) <- o .: "contents"
+  pure $ PartialConstraintData bs trunc
+
+constraintFromJSON :: forall a. A.Parser a -> (A.Value -> A.Parser a) -> A.Value -> A.Parser (Constraint a)
+constraintFromJSON defaultAnn annFromJSON = A.withObject "Constraint" $ \o -> do
+  constraintAnn   <- (o .: "constraintAnn" >>= annFromJSON) <|> defaultAnn
+  constraintClass <- o .: "constraintClass"
+  constraintArgs  <- o .: "constraintArgs" >>= traverse (typeFromJSON defaultAnn annFromJSON)
+  constraintData  <- o .: "constraintData" >>= traverse constraintDataFromJSON
+  pure $ Constraint {..}
+
+typeFromJSON :: forall a. A.Parser a -> (A.Value -> A.Parser a) -> A.Value -> A.Parser (Type a)
+typeFromJSON defaultAnn annFromJSON = A.withObject "Type" $ \o -> do
+  tag <- o .: "tag"
+  a   <- (o .: "annotation" >>= annFromJSON) <|> defaultAnn
+  let
+    contents :: A.FromJSON b => A.Parser b
+    contents = o .: "contents"
+  case tag of
+    "TUnknown" ->
+      TUnknown a <$> contents
+    "TypeVar" ->
+      TypeVar a <$> contents
+    "TypeLevelString" ->
+      TypeLevelString a <$> contents
+    "TypeWildcard" ->
+      pure $ TypeWildcard a
+    "TypeConstructor" ->
+      TypeConstructor a <$> contents
+    "TypeOp" ->
+      TypeOp a <$> contents
+    "TypeApp" -> do
+      (b, c) <- contents
+      TypeApp a <$> go b <*> go c
+    "ForAll" -> do
+      (b, c, d) <- contents
+      ForAll a b <$> go c <*> pure d
+    "ConstrainedType" -> do
+      (b, c) <- contents
+      ConstrainedType a <$> constraintFromJSON defaultAnn annFromJSON b <*> go c
+    "Skolem" -> do
+      (b, c, d) <- contents
+      pure $ Skolem a b c d
+    "REmpty" ->
+      pure $ REmpty a
+    "RCons" -> do
+      (b, c, d) <- contents
+      RCons a b <$> go c <*> go d
+    "KindedType" -> do
+      (b, c) <- contents
+      KindedType a <$> go b <*> kindFromJSON defaultAnn annFromJSON c
+    "PrettyPrintFunction" -> do
+      (b, c) <- contents
+      PrettyPrintFunction a <$> go b <*> go c
+    "PrettyPrintObject" -> do
+      b <- contents
+      PrettyPrintObject a <$> go b
+    "PrettyPrintForAll" -> do
+      (b, c) <- contents
+      PrettyPrintForAll a b <$> go c
+    "BinaryNoParensType" -> do
+      (b, c, d) <- contents
+      BinaryNoParensType a <$> go b <*> go c <*> go d
+    "ParensInType" -> do
+      b <- contents
+      ParensInType a <$> go b
+    other ->
+      fail $ "Unrecognised tag: " ++ other
+  where
+  go :: A.Value -> A.Parser (Type a)
+  go = typeFromJSON defaultAnn annFromJSON
+
+-- These overlapping instances exist to preserve compatability for common
+-- instances which have a sensible default for missing annotations.
+instance {-# OVERLAPPING #-} A.FromJSON (Type SourceAnn) where
+  parseJSON = typeFromJSON (pure NullSourceAnn) A.parseJSON
+
+instance {-# OVERLAPPING #-} A.FromJSON (Type ()) where
+  parseJSON = typeFromJSON (pure ()) A.parseJSON
+
+instance {-# OVERLAPPING #-} A.FromJSON a => A.FromJSON (Type a) where
+  parseJSON = typeFromJSON (fail "Invalid annotation") A.parseJSON
+
+instance {-# OVERLAPPING #-} A.FromJSON (Constraint SourceAnn) where
+  parseJSON = constraintFromJSON (pure NullSourceAnn) A.parseJSON
+
+instance {-# OVERLAPPING #-} A.FromJSON (Constraint ()) where
+  parseJSON = constraintFromJSON (pure ()) A.parseJSON
+
+instance {-# OVERLAPPING #-} A.FromJSON a => A.FromJSON (Constraint a) where
+  parseJSON = constraintFromJSON (fail "Invalid annotation") A.parseJSON
+
+instance A.FromJSON ConstraintData where
+  parseJSON = constraintDataFromJSON
 
 data RowListItem a = RowListItem
   { rowListAnn :: a

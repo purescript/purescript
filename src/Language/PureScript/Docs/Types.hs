@@ -662,7 +662,7 @@ asTypeArguments = eachInArray asTypeArgument
   asTypeArgument = (,) <$> nth 0 asText <*> nth 1 (perhaps asKind)
 
 asKind :: Parse PackageError Kind'
-asKind = P.kindFromJSON (pure ()) fromAesonParser .! InvalidKind
+asKind = fromAesonParser .! InvalidKind
 
 asType :: Parse e Type'
 asType = fromAesonParser
