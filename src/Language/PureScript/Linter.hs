@@ -114,9 +114,6 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
       go unused TypeOp{} = (unused, mempty)
       go unused Skolem{} = (unused, mempty)
       go unused REmpty{} = (unused, mempty)
-      go unused PrettyPrintFunction{} = (unused, mempty)
-      go unused PrettyPrintObject{} = (unused, mempty)
-      go unused PrettyPrintForAll{} = (unused, mempty)
 
       combine ::
         (S.Set Text, MultipleErrors) ->

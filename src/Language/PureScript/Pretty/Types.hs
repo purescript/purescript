@@ -2,12 +2,17 @@
 -- Pretty printer for Types
 --
 module Language.PureScript.Pretty.Types
-  ( typeAsBox
+  ( PrettyPrintType(..)
+  , PrettyPrintConstraint
+  , convertPrettyPrintType
+  , typeAsBox
+  , typeAsBox'
   , suggestedTypeAsBox
   , prettyPrintType
   , prettyPrintTypeWithUnicode
   , prettyPrintSuggestedType
   , typeAtomAsBox
+  , typeAtomAsBox'
   , prettyPrintTypeAtom
   , prettyPrintRow
   , prettyPrintLabel
@@ -19,6 +24,7 @@ import Prelude.Compat hiding ((<>))
 import Control.Arrow ((<+>))
 import Control.PatternArrows as PA
 
+import Data.Functor (($>))
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -35,114 +41,147 @@ import Language.PureScript.Label (Label(..))
 
 import Text.PrettyPrint.Boxes hiding ((<+>))
 
+data PrettyPrintType
+  = PPTUnknown Int
+  | PPTypeVar Text
+  | PPTypeLevelString PSString
+  | PPTypeWildcard
+  | PPTypeConstructor (Qualified (ProperName 'TypeName))
+  | PPTypeOp (Qualified (OpName 'TypeOpName))
+  | PPSkolem Text Int
+  | PPTypeApp PrettyPrintType PrettyPrintType
+  | PPConstrainedType PrettyPrintConstraint PrettyPrintType
+  | PPKindedType PrettyPrintType (Kind ())
+  | PPBinaryNoParensType PrettyPrintType PrettyPrintType PrettyPrintType
+  | PPParensInType PrettyPrintType
+  | PPForAll [Text] PrettyPrintType
+  | PPFunction PrettyPrintType PrettyPrintType
+  | PPRecord PrettyPrintType
+  | PPRCons Label PrettyPrintType PrettyPrintType
+  | PPREmpty
+
+type PrettyPrintConstraint = (Qualified (ProperName 'ClassName), [PrettyPrintType])
+
+convertPrettyPrintType :: Type a -> PrettyPrintType
+convertPrettyPrintType = go
+  where
+  go (TUnknown _ n) = PPTUnknown n
+  go (TypeVar _ t) = PPTypeVar t
+  go (TypeLevelString _ s) = PPTypeLevelString s
+  go (TypeWildcard _) = PPTypeWildcard
+  go (TypeConstructor _ c) = PPTypeConstructor c
+  go (TypeOp _ o) = PPTypeOp o
+  go (Skolem _ t n _) = PPSkolem t n
+  go (ConstrainedType _ (Constraint _ cls args _) ty) = PPConstrainedType (cls, go <$> args) (go ty)
+  go (KindedType _ ty k) = PPKindedType (go ty) (k $> ())
+  go (BinaryNoParensType _ ty1 ty2 ty3) = PPBinaryNoParensType (go ty1) (go ty2) (go ty3)
+  go (ParensInType _ ty) = PPParensInType (go ty)
+  go (REmpty _) = PPREmpty
+  go (RCons _ l ty1 ty2) = PPRCons l (go ty1) (go ty2)
+  go (ForAll _ v ty _) = goForAll [v] ty
+  go (TypeApp _ (TypeApp _ f arg) ret) | eqType f tyFunction = PPFunction (go arg) (go ret)
+  go (TypeApp _ o r) | eqType o tyRecord = PPRecord (go r)
+  go (TypeApp _ a b) = PPTypeApp (go a) (go b)
+
+  goForAll vs (ForAll _ v ty _) = goForAll (v : vs) ty
+  goForAll vs ty = PPForAll vs (go ty)
+
 -- TODO(Christoph): get rid of T.unpack s
 
-constraintsAsBox :: TypeRenderOptions -> Constraint a -> Box -> Box
+constraintsAsBox :: TypeRenderOptions -> PrettyPrintConstraint -> Box -> Box
 constraintsAsBox tro con ty =
     constraintAsBox con `before` (" " <> text doubleRightArrow <> " " <> ty)
   where
     doubleRightArrow = if troUnicode tro then "⇒" else "=>"
 
-constraintAsBox :: Constraint a -> Box
-constraintAsBox (Constraint ann pn tys _) = typeAsBox (foldl (TypeApp ann) (TypeConstructor ann (fmap coerceProperName pn)) tys)
+constraintAsBox :: PrettyPrintConstraint -> Box
+constraintAsBox (pn, tys) = typeAsBox' (foldl PPTypeApp (PPTypeConstructor (fmap coerceProperName pn)) tys)
 
 -- |
 -- Generate a pretty-printed string representing a Row
 --
-prettyPrintRowWith :: TypeRenderOptions -> Char -> Char -> Type a -> Box
+prettyPrintRowWith :: TypeRenderOptions -> Char -> Char -> PrettyPrintType -> Box
 prettyPrintRowWith tro open close = uncurry listToBox . toList []
   where
-  nameAndTypeToPs :: Char -> Label -> Type a -> Box
-  nameAndTypeToPs start name ty = text (start : ' ' : T.unpack (prettyPrintLabel name) ++ " " ++ doubleColon ++ " ") <> typeAsBox ty
+  nameAndTypeToPs :: Char -> Label -> PrettyPrintType -> Box
+  nameAndTypeToPs start name ty = text (start : ' ' : T.unpack (prettyPrintLabel name) ++ " " ++ doubleColon ++ " ") <> typeAsBox' ty
 
   doubleColon = if troUnicode tro then "∷" else "::"
 
-  tailToPs :: Type a -> Box
-  tailToPs (REmpty _) = nullBox
-  tailToPs other = text "| " <> typeAsBox other
+  tailToPs :: PrettyPrintType -> Box
+  tailToPs PPREmpty = nullBox
+  tailToPs other = text "| " <> typeAsBox' other
 
-  listToBox :: [(Label, Type a)] -> Type a -> Box
-  listToBox [] (REmpty _) = text [open, close]
+  listToBox :: [(Label, PrettyPrintType)] -> PrettyPrintType -> Box
+  listToBox [] PPREmpty = text [open, close]
   listToBox [] rest = text [ open, ' ' ] <> tailToPs rest <> text [ ' ', close ]
   listToBox ts rest = vcat left $
     zipWith (\(nm, ty) i -> nameAndTypeToPs (if i == 0 then open else ',') nm ty) ts [0 :: Int ..] ++
     [ tailToPs rest, text [close] ]
-  toList :: [(Label, Type a)] -> Type a -> ([(Label, Type a)], Type a)
-  toList tys (RCons _ name ty row) = toList ((name, ty):tys) row
+  toList :: [(Label, PrettyPrintType)] -> PrettyPrintType -> ([(Label, PrettyPrintType)], PrettyPrintType)
+  toList tys (PPRCons name ty row) = toList ((name, ty):tys) row
   toList tys r = (reverse tys, r)
 
-prettyPrintRow :: Type a -> String
+prettyPrintRow :: PrettyPrintType -> String
 prettyPrintRow = render . prettyPrintRowWith defaultOptions '(' ')'
 
-typeApp :: Pattern () (Type a) (Type a, Type a)
+typeApp :: Pattern () PrettyPrintType (PrettyPrintType, PrettyPrintType)
 typeApp = mkPattern match
   where
-  match (TypeApp _ f x) = Just (f, x)
+  match (PPTypeApp f x) = Just (f, x)
   match _ = Nothing
 
-appliedFunction :: Pattern () (Type a) (Type a, Type a)
+appliedFunction :: Pattern () PrettyPrintType (PrettyPrintType, PrettyPrintType)
 appliedFunction = mkPattern match
   where
-  match (PrettyPrintFunction _ arg ret) = Just (arg, ret)
+  match (PPFunction arg ret) = Just (arg, ret)
   match _ = Nothing
 
-kinded :: Pattern () (Type a) (Kind a, Type a)
+kinded :: Pattern () PrettyPrintType (Kind (), PrettyPrintType)
 kinded = mkPattern match
   where
-  match (KindedType _ t k) = Just (k, t)
+  match (PPKindedType t k) = Just (k, t)
   match _ = Nothing
 
-insertPlaceholders :: Type a -> Type a
-insertPlaceholders = everywhereOnTypesTopDown convertForAlls . everywhereOnTypes convert
-  where
-  convert (TypeApp _ (TypeApp ann f arg) ret) | eqType f tyFunction = PrettyPrintFunction ann arg ret
-  convert (TypeApp ann o r) | eqType o tyRecord = PrettyPrintObject ann r
-  convert other = other
-  convertForAlls (ForAll ann ident ty _) = go [ident] ty
-    where
-    go idents (ForAll _ ident' ty' _) = go (ident' : idents) ty'
-    go idents other = PrettyPrintForAll ann idents other
-  convertForAlls other = other
-
-constrained :: Pattern () (Type a) (Constraint a, Type a)
+constrained :: Pattern () PrettyPrintType (PrettyPrintConstraint, PrettyPrintType)
 constrained = mkPattern match
   where
-  match (ConstrainedType _ deps ty) = Just (deps, ty)
+  match (PPConstrainedType deps ty) = Just (deps, ty)
   match _ = Nothing
 
-explicitParens :: Pattern () (Type a) ((), Type a)
+explicitParens :: Pattern () PrettyPrintType ((), PrettyPrintType)
 explicitParens = mkPattern match
   where
-  match (ParensInType _ ty) = Just ((), ty)
+  match (PPParensInType ty) = Just ((), ty)
   match _ = Nothing
 
-matchTypeAtom :: TypeRenderOptions -> Pattern () (Type a) Box
+matchTypeAtom :: TypeRenderOptions -> Pattern () PrettyPrintType Box
 matchTypeAtom tro@TypeRenderOptions{troSuggesting = suggesting} =
     typeLiterals <+> fmap ((`before` (text ")")) . (text "(" <>)) (matchType tro)
   where
-    typeLiterals :: Pattern () (Type a) Box
+    typeLiterals :: Pattern () PrettyPrintType Box
     typeLiterals = mkPattern match where
-      match TypeWildcard{} = Just $ text "_"
-      match (TypeVar _ var) = Just $ text $ T.unpack var
-      match (TypeLevelString _ s) = Just $ text $ T.unpack $ prettyPrintString s
-      match (PrettyPrintObject _ row) = Just $ prettyPrintRowWith tro '{' '}' row
-      match (TypeConstructor _ ctor) = Just $ text $ T.unpack $ runProperName $ disqualify ctor
-      match (TUnknown _ u)
+      match PPTypeWildcard = Just $ text "_"
+      match (PPTypeVar var) = Just $ text $ T.unpack var
+      match (PPTypeLevelString s) = Just $ text $ T.unpack $ prettyPrintString s
+      match (PPRecord row) = Just $ prettyPrintRowWith tro '{' '}' row
+      match (PPTypeConstructor ctor) = Just $ text $ T.unpack $ runProperName $ disqualify ctor
+      match (PPTUnknown u)
         | suggesting = Just $ text "_"
         | otherwise = Just $ text $ 't' : show u
-      match (Skolem _ name s _)
+      match (PPSkolem name s)
         | suggesting =  Just $ text $ T.unpack name
         | otherwise = Just $ text $ T.unpack name ++ show s
-      match (REmpty _) = Just $ text "()"
-      match row@RCons{} = Just $ prettyPrintRowWith tro '(' ')' row
-      match (BinaryNoParensType _ op l r) =
-        Just $ typeAsBox l <> text " " <> typeAsBox op <> text " " <> typeAsBox r
-      match (TypeOp _ op) = Just $ text $ T.unpack $ showQualified runOpName op
+      match PPREmpty = Just $ text "()"
+      match row@PPRCons{} = Just $ prettyPrintRowWith tro '(' ')' row
+      match (PPBinaryNoParensType op l r) =
+        Just $ typeAsBox' l <> text " " <> typeAsBox' op <> text " " <> typeAsBox' r
+      match (PPTypeOp op) = Just $ text $ T.unpack $ showQualified runOpName op
       match _ = Nothing
 
-matchType :: TypeRenderOptions -> Pattern () (Type a) Box
+matchType :: TypeRenderOptions -> Pattern () PrettyPrintType Box
 matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
-  operators :: OperatorTable () (Type a) Box
+  operators :: OperatorTable () PrettyPrintType Box
   operators =
     OperatorTable [ [ AssocL typeApp $ \f x -> keepSingleLinesOr (moveRight 2) f x ]
                   , [ AssocR appliedFunction $ \arg ret -> keepSingleLinesOr id arg (text rightArrow <> " " <> ret) ]
@@ -163,26 +202,31 @@ matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
     | rows b1 > 1 || rows b2 > 1 = vcat left [ b1, f b2 ]
     | otherwise = hcat top [ b1, text " ", b2]
 
-forall_ :: Pattern () (Type a) ([String], Type a)
+forall_ :: Pattern () PrettyPrintType ([String], PrettyPrintType)
 forall_ = mkPattern match
   where
-  match (PrettyPrintForAll _ idents ty) = Just (map T.unpack idents, ty)
+  match (PPForAll idents ty) = Just (map T.unpack idents, ty)
   match _ = Nothing
 
-typeAtomAsBox :: Type a -> Box
-typeAtomAsBox
+typeAtomAsBox' :: PrettyPrintType -> Box
+typeAtomAsBox'
   = fromMaybe (internalError "Incomplete pattern")
   . PA.pattern (matchTypeAtom defaultOptions) ()
-  . insertPlaceholders
+
+typeAtomAsBox :: Type a -> Box
+typeAtomAsBox = typeAtomAsBox' . convertPrettyPrintType
 
 -- | Generate a pretty-printed string representing a Type, as it should appear inside parentheses
 prettyPrintTypeAtom :: Type a -> String
 prettyPrintTypeAtom = render . typeAtomAsBox
 
-typeAsBox :: Type a -> Box
-typeAsBox = typeAsBoxImpl defaultOptions
+typeAsBox' :: PrettyPrintType -> Box
+typeAsBox' = typeAsBoxImpl defaultOptions
 
-suggestedTypeAsBox :: Type a -> Box
+typeAsBox :: Type a -> Box
+typeAsBox = typeAsBox' . convertPrettyPrintType
+
+suggestedTypeAsBox :: PrettyPrintType -> Box
 suggestedTypeAsBox = typeAsBoxImpl suggestingOptions
 
 data TypeRenderOptions = TypeRenderOptions
@@ -199,11 +243,10 @@ defaultOptions = TypeRenderOptions False False
 unicodeOptions :: TypeRenderOptions
 unicodeOptions = TypeRenderOptions False True
 
-typeAsBoxImpl :: TypeRenderOptions -> Type a -> Box
+typeAsBoxImpl :: TypeRenderOptions -> PrettyPrintType -> Box
 typeAsBoxImpl tro
   = fromMaybe (internalError "Incomplete pattern")
   . PA.pattern (matchType tro) ()
-  . insertPlaceholders
 
 -- | Generate a pretty-printed string representing a 'Type'
 prettyPrintType :: Type a -> String
@@ -219,7 +262,7 @@ prettyPrintSuggestedType :: Type a -> String
 prettyPrintSuggestedType = prettyPrintType' suggestingOptions
 
 prettyPrintType' :: TypeRenderOptions -> Type a -> String
-prettyPrintType' tro = render . typeAsBoxImpl tro
+prettyPrintType' tro = render . typeAsBoxImpl tro . convertPrettyPrintType
 
 prettyPrintLabel :: Label -> Text
 prettyPrintLabel (Label s) =

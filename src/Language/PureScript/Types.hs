@@ -76,12 +76,6 @@ data Type a
   | RCons a Label (Type a) (Type a)
   -- | A type with a kind annotation
   | KindedType a (Type a) (Kind a)
-  -- | A placeholder used in pretty printing
-  | PrettyPrintFunction a (Type a) (Type a)
-  -- | A placeholder used in pretty printing
-  | PrettyPrintObject a (Type a)
-  -- | A placeholder used in pretty printing
-  | PrettyPrintForAll a [Text] (Type a)
   -- | Binary operator application. During the rebracketing phase of desugaring,
   -- this data constructor will be removed.
   | BinaryNoParensType a (Type a) (Type a) (Type a)
@@ -219,12 +213,6 @@ typeToJSON annToJSON ty =
       variant "RCons" a (b, go c, go d)
     KindedType a b c ->
       variant "KindedType" a (go b, kindToJSON annToJSON c)
-    PrettyPrintFunction a b c ->
-      variant "PrettyPrintFunction" a (go b, go c)
-    PrettyPrintObject a b ->
-      variant "PrettyPrintObject" a (go b)
-    PrettyPrintForAll a b c ->
-      variant "PrettyPrintForAll" a (b, go c)
     BinaryNoParensType a b c d ->
       variant "BinaryNoParensType" a (go b, go c, go d)
     ParensInType a b ->
@@ -310,15 +298,6 @@ typeFromJSON defaultAnn annFromJSON = A.withObject "Type" $ \o -> do
     "KindedType" -> do
       (b, c) <- contents
       KindedType a <$> go b <*> kindFromJSON defaultAnn annFromJSON c
-    "PrettyPrintFunction" -> do
-      (b, c) <- contents
-      PrettyPrintFunction a <$> go b <*> go c
-    "PrettyPrintObject" -> do
-      b <- contents
-      PrettyPrintObject a <$> go b
-    "PrettyPrintForAll" -> do
-      (b, c) <- contents
-      PrettyPrintForAll a b <$> go c
     "BinaryNoParensType" -> do
       (b, c, d) <- contents
       BinaryNoParensType a <$> go b <*> go c <*> go d
@@ -475,9 +454,6 @@ everywhereOnTypes f = go where
   go (ConstrainedType ann c ty) = f (ConstrainedType ann (mapConstraintArgs (map go) c) (go ty))
   go (RCons ann name ty rest) = f (RCons ann name (go ty) (go rest))
   go (KindedType ann ty k) = f (KindedType ann (go ty) k)
-  go (PrettyPrintFunction ann t1 t2) = f (PrettyPrintFunction ann (go t1) (go t2))
-  go (PrettyPrintObject ann t) = f (PrettyPrintObject ann (go t))
-  go (PrettyPrintForAll ann args t) = f (PrettyPrintForAll ann args (go t))
   go (BinaryNoParensType ann t1 t2 t3) = f (BinaryNoParensType ann (go t1) (go t2) (go t3))
   go (ParensInType ann t) = f (ParensInType ann (go t))
   go other = f other
@@ -489,9 +465,6 @@ everywhereOnTypesTopDown f = go . f where
   go (ConstrainedType ann c ty) = ConstrainedType ann (mapConstraintArgs (map (go . f)) c) (go (f ty))
   go (RCons ann name ty rest) = RCons ann name (go (f ty)) (go (f rest))
   go (KindedType ann ty k) = KindedType ann (go (f ty)) k
-  go (PrettyPrintFunction ann t1 t2) = PrettyPrintFunction ann (go (f t1)) (go (f t2))
-  go (PrettyPrintObject ann t) = PrettyPrintObject ann (go (f t))
-  go (PrettyPrintForAll ann args t) = PrettyPrintForAll ann args (go (f t))
   go (BinaryNoParensType ann t1 t2 t3) = BinaryNoParensType ann (go (f t1)) (go (f t2)) (go (f t3))
   go (ParensInType ann t) = ParensInType ann (go (f t))
   go other = f other
@@ -503,9 +476,6 @@ everywhereOnTypesM f = go where
   go (ConstrainedType ann c ty) = (ConstrainedType ann <$> overConstraintArgs (mapM go) c <*> go ty) >>= f
   go (RCons ann name ty rest) = (RCons ann name <$> go ty <*> go rest) >>= f
   go (KindedType ann ty k) = (KindedType ann <$> go ty <*> pure k) >>= f
-  go (PrettyPrintFunction ann t1 t2) = (PrettyPrintFunction ann <$> go t1 <*> go t2) >>= f
-  go (PrettyPrintObject ann t) = (PrettyPrintObject ann <$> go t) >>= f
-  go (PrettyPrintForAll ann args t) = (PrettyPrintForAll ann args <$> go t) >>= f
   go (BinaryNoParensType ann t1 t2 t3) = (BinaryNoParensType ann <$> go t1 <*> go t2 <*> go t3) >>= f
   go (ParensInType ann t) = (ParensInType ann <$> go t) >>= f
   go other = f other
@@ -517,9 +487,6 @@ everywhereOnTypesTopDownM f = go <=< f where
   go (ConstrainedType ann c ty) = ConstrainedType ann <$> overConstraintArgs (mapM (go <=< f)) c <*> (f ty >>= go)
   go (RCons ann name ty rest) = RCons ann name <$> (f ty >>= go) <*> (f rest >>= go)
   go (KindedType ann ty k) = KindedType ann <$> (f ty >>= go) <*> pure k
-  go (PrettyPrintFunction ann t1 t2) = PrettyPrintFunction ann <$> (f t1 >>= go) <*> (f t2 >>= go)
-  go (PrettyPrintObject ann t) = PrettyPrintObject ann <$> (f t >>= go)
-  go (PrettyPrintForAll ann args t) = PrettyPrintForAll ann args <$> (f t >>= go)
   go (BinaryNoParensType ann t1 t2 t3) = BinaryNoParensType ann <$> (f t1 >>= go) <*> (f t2 >>= go) <*> (f t3 >>= go)
   go (ParensInType ann t) = ParensInType ann <$> (f t >>= go)
   go other = f other
@@ -531,9 +498,6 @@ everythingOnTypes (<+>) f = go where
   go t@(ConstrainedType _ c ty) = foldl (<+>) (f t) (map go (constraintArgs c)) <+> go ty
   go t@(RCons _ _ ty rest) = f t <+> go ty <+> go rest
   go t@(KindedType _ ty _) = f t <+> go ty
-  go t@(PrettyPrintFunction _ t1 t2) = f t <+> go t1 <+> go t2
-  go t@(PrettyPrintObject _ t1) = f t <+> go t1
-  go t@(PrettyPrintForAll _ _ t1) = f t <+> go t1
   go t@(BinaryNoParensType _ t1 t2 t3) = f t <+> go t1 <+> go t2 <+> go t3
   go t@(ParensInType _ t1) = f t <+> go t1
   go other = f other
@@ -546,9 +510,6 @@ everythingWithContextOnTypes s0 r0 (<+>) f = go' s0 where
   go s (ConstrainedType _ c ty) = foldl (<+>) r0 (map (go' s) (constraintArgs c)) <+> go' s ty
   go s (RCons _ _ ty rest) = go' s ty <+> go' s rest
   go s (KindedType _ ty _) = go' s ty
-  go s (PrettyPrintFunction _ t1 t2) = go' s t1 <+> go' s t2
-  go s (PrettyPrintObject _ t1) = go' s t1
-  go s (PrettyPrintForAll _ _ t1) = go' s t1
   go s (BinaryNoParensType _ t1 t2 t3) = go' s t1 <+> go' s t2 <+> go' s t3
   go s (ParensInType _ t1) = go' s t1
   go _ _ = r0
@@ -567,9 +528,6 @@ annotationForType (Skolem a _ _ _) = a
 annotationForType (REmpty a) = a
 annotationForType (RCons a _ _ _) = a
 annotationForType (KindedType a _ _) = a
-annotationForType (PrettyPrintFunction a _ _) = a
-annotationForType (PrettyPrintObject a _) = a
-annotationForType (PrettyPrintForAll a _ _) = a
 annotationForType (BinaryNoParensType a _ _ _) = a
 annotationForType (ParensInType a _) = a
 
@@ -593,9 +551,6 @@ eqType (Skolem _ a b c) (Skolem _ a' b' c') = a == a' && b == b' && c == c'
 eqType (REmpty _) (REmpty _) = True
 eqType (RCons _ a b c) (RCons _ a' b' c') = a == a' && eqType b b' && eqType c c'
 eqType (KindedType _ a b) (KindedType _ a' b') = eqType a a' && eqKind b b'
-eqType (PrettyPrintFunction _ a b) (PrettyPrintFunction _ a' b') = eqType a a' && eqType b b'
-eqType (PrettyPrintObject _ a) (PrettyPrintObject _ a') = eqType a a'
-eqType (PrettyPrintForAll _ a b) (PrettyPrintForAll _ a' b') = a == a' && eqType b b'
 eqType (BinaryNoParensType _ a b c) (BinaryNoParensType _ a' b' c') = eqType a a' && eqType b b' && eqType c c'
 eqType (ParensInType _ a) (ParensInType _ a') = eqType a a'
 eqType _ _ = False
@@ -651,18 +606,6 @@ compareType _ (RCons {}) = GT
 compareType (KindedType _ a b) (KindedType _ a' b') = compareType a a' <> compareKind b b'
 compareType (KindedType {}) _ = LT
 compareType _ (KindedType {}) = GT
-
-compareType (PrettyPrintFunction _ a b) (PrettyPrintFunction _ a' b') = compareType a a' <> compareType b b'
-compareType (PrettyPrintFunction {}) _ = LT
-compareType _ (PrettyPrintFunction {}) = GT
-
-compareType (PrettyPrintObject _ a) (PrettyPrintObject _ a') = compareType a a'
-compareType (PrettyPrintObject {}) _ = LT
-compareType _ (PrettyPrintObject {}) = GT
-
-compareType (PrettyPrintForAll _ a b) (PrettyPrintForAll _ a' b') = compare a a' <> compareType b b'
-compareType (PrettyPrintForAll {}) _ = LT
-compareType _ (PrettyPrintForAll {}) = GT
 
 compareType (BinaryNoParensType _ a b c) (BinaryNoParensType _ a' b' c') = compareType a a' <> compareType b b' <> compareType c c'
 compareType (BinaryNoParensType {}) _ = LT
