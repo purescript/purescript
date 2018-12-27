@@ -7,22 +7,47 @@ module TestPscPublish where
 import Prelude
 
 import Control.Monad.IO.Class (liftIO)
-import System.Exit (exitFailure)
 import Data.ByteString.Lazy (ByteString)
 import Data.Time.Clock (getCurrentTime)
 import qualified Data.Aeson as A
 import Data.Version
+import Data.Foldable (forM_)
+import qualified Text.PrettyPrint.Boxes as Boxes
+import System.Directory (listDirectory)
+import System.FilePath ((</>))
 
 import Language.PureScript.Docs
 import Language.PureScript.Publish
 import Language.PureScript.Publish.ErrorsWarnings as Publish
 
+import Test.Tasty
+import Test.Tasty.Hspec (Spec, Expectation, runIO, context, it, expectationFailure, testSpec)
 import TestUtils
 
-main :: IO ()
-main = testPackage
-         "tests/support/bower_components/purescript-prelude"
-         "../../prelude-resolutions.json"
+main :: IO TestTree
+main = testSpec "publish" spec
+
+spec :: Spec
+spec = do
+  it "roundtrips the json for purescript-prelude" $ do
+    testPackage
+      "tests/support/bower_components/purescript-prelude"
+      "../../prelude-resolutions.json"
+
+  context "json compatibility" $ do
+    let compatDir = "tests" </> "json-compat"
+    versions <- runIO $ listDirectory compatDir
+    forM_ versions $ \version -> do
+      context ("json produced by " ++ version) $ do
+        files <- runIO $ listDirectory (compatDir </> version)
+        forM_ files $ \file -> do
+          it file $ do
+            result <- A.eitherDecodeFileStrict' (compatDir </> version </> file)
+            case result of
+              Right (_ :: VerifiedPackage) ->
+                pure ()
+              Left err ->
+                expectationFailure ("JSON parsing failed: " ++ err)
 
 data TestResult
   = ParseFailed String
@@ -51,18 +76,19 @@ testRunOptions = defaultPublishOptions
 
 -- | Given a directory which contains a package, produce JSON from it, and then
 -- | attempt to parse it again, and ensure that it doesn't change.
-testPackage :: FilePath -> FilePath -> IO ()
-testPackage dir resolutionsFile = pushd dir $ do
-  res <- preparePackage "bower.json" resolutionsFile testRunOptions
+testPackage :: FilePath -> FilePath -> Expectation
+testPackage dir resolutionsFile = do
+  res <- pushd dir (preparePackage "bower.json" resolutionsFile testRunOptions)
   case res of
-    Left e -> preparePackageError e
-    Right package -> case roundTrip package of
-      Pass _ -> do
-        putStrLn ("psc-publish test passed for: " ++ dir)
-        pure ()
-      other -> do
-        putStrLn ("psc-publish tests failed on " ++ dir ++ ":")
-        print other
-        exitFailure
-  where
-    preparePackageError e = Publish.printErrorToStdout e >> exitFailure
+    Left err ->
+      expectationFailure $
+        "Failed to produce JSON from " ++ dir ++ ":\n" ++
+        Boxes.render (Publish.renderError err)
+    Right package ->
+      case roundTrip package of
+        Pass _ ->
+          pure ()
+        ParseFailed msg ->
+          expectationFailure ("Failed to re-parse: " ++ msg)
+        Mismatch _ _ ->
+          expectationFailure "JSON did not match"
