@@ -4,8 +4,8 @@ import Prelude
 import Effect.Console (log)
 import IxMonad as Ix
 
-testIndexed :: forall m a. Ix.IxMonad m => m a a String
-testIndexed = Ix.do
+testIMonad :: forall m a. Ix.IxMonad m => m a a String
+testIMonad = Ix.do
   a <- Ix.pure "test"
   b <- Ix.pure "test"
   Ix.pure (a <> b)
