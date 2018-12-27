@@ -448,8 +448,8 @@ parseValueAtom = withSourceSpan PositionedValue $ P.choice
                  , P.try parseVar
                  , parseCase
                  , parseIfThenElse
-                 , P.try parseDo
-                 , P.try parseAdo
+                 , parseDo
+                 , parseAdo
                  , parseLet
                  , P.try $ Parens <$> parens parseValue
                  , withSourceSpan' Op $ parseQualified (parens parseOperator)
@@ -483,13 +483,13 @@ parseAccessor obj = P.try $ Accessor <$> (indented *> dot *> indented *> parseLa
 
 parseDo :: TokenParser Expr
 parseDo = do
-  m <- parseQualified (reserved "do") >>= \(Qualified m _) -> pure m
+  m <- P.try (parseQualified (reserved "do") >>= pure . getQual) <|> (reserved "do" *> pure Nothing)
   indented
   Do m <$> mark (P.many1 (same *> mark parseDoNotationElement))
 
 parseAdo :: TokenParser Expr
 parseAdo = do
-  m <- parseQualified (reserved "ado") >>= \(Qualified m _) -> pure m
+  m <- P.try (parseQualified (reserved "ado") >>= pure . getQual) <|> (reserved "ado" *> pure Nothing)
   indented
   elements <- mark (P.many (same *> mark parseDoNotationElement))
   yield <- mark (reserved "in" *> parseValue)
