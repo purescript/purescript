@@ -79,3 +79,4 @@ commandTests = context "commandTests" $ do
     ":print InteractivePrint.unsafeEval" `printed` flip shouldNotContain failMsg
     "(identity :: _ -> _)" `printed` flip shouldContain "[Function]"
     interactivePrintModuleShouldBe (moduleNameFromString "InteractivePrint")
+    ":print" `printed` flip shouldContain "InteractivePrint"

@@ -207,11 +207,12 @@ data Command
 data ReplQuery
   = QueryLoaded
   | QueryImport
+  | QueryPrint
   deriving (Eq, Show)
 
 -- | A list of all ReplQuery values.
 replQueries :: [ReplQuery]
-replQueries = [QueryLoaded, QueryImport]
+replQueries = [QueryLoaded, QueryImport, QueryPrint]
 
 replQueryStrings :: [String]
 replQueryStrings = map showReplQuery replQueries
@@ -219,10 +220,12 @@ replQueryStrings = map showReplQuery replQueries
 showReplQuery :: ReplQuery -> String
 showReplQuery QueryLoaded = "loaded"
 showReplQuery QueryImport = "import"
+showReplQuery QueryPrint = "print"
 
 parseReplQuery :: String -> Maybe ReplQuery
 parseReplQuery "loaded" = Just QueryLoaded
 parseReplQuery "import" = Just QueryImport
+parseReplQuery "print" = Just QueryPrint
 parseReplQuery _ = Nothing
 
 data Directive

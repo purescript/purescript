@@ -84,7 +84,10 @@ parseDirective cmd =
     Type     -> TypeOf <$> parseRest P.parseValue arg
     Kind     -> KindOf <$> parseRest P.parseType arg
     Complete -> return (CompleteStr arg)
-    Print    -> SetInteractivePrint <$> parseRest parseFullyQualifiedIdent arg
+    Print    -> parseRest
+                  ((eof *> return (ShowInfo QueryPrint))
+                  <|> (SetInteractivePrint <$> parseFullyQualifiedIdent))
+                  arg
 
 -- |
 -- Parses expressions entered at the PSCI repl.
