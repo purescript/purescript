@@ -2,12 +2,10 @@
 
 module Language.PureScript.Docs.RenderedCode.RenderType
   ( renderType
+  , renderType'
   , renderTypeAtom
+  , renderTypeAtom'
   , renderRow
-  , RenderTypeOptions(..)
-  , defaultRenderTypeOptions
-  , renderTypeWithOptions
-  , renderTypeAtomWithOptions
   ) where
 
 import Prelude.Compat
@@ -19,8 +17,8 @@ import Control.Arrow ((<+>))
 import Control.PatternArrows as PA
 
 import Language.PureScript.Crash
-import Language.PureScript.Environment
 import Language.PureScript.Kinds
+import Language.PureScript.Label
 import Language.PureScript.Names
 import Language.PureScript.Pretty.Types
 import Language.PureScript.Types
@@ -30,40 +28,40 @@ import Language.PureScript.Docs.RenderedCode.Types
 import Language.PureScript.Docs.Utils.MonoidExtras
 import Language.PureScript.Docs.RenderedCode.RenderKind (renderKind)
 
-typeLiterals :: Pattern () (Type a) RenderedCode
+typeLiterals :: Pattern () PrettyPrintType RenderedCode
 typeLiterals = mkPattern match
   where
-  match TypeWildcard{} =
+  match PPTypeWildcard =
     Just (syntax "_")
-  match (TypeVar _ var) =
+  match (PPTypeVar var) =
     Just (typeVar var)
-  match (PrettyPrintObject _ row) =
+  match (PPRecord row) =
     Just $ mintersperse sp
               [ syntax "{"
               , renderRow row
               , syntax "}"
               ]
-  match (TypeConstructor _ n) =
+  match (PPTypeConstructor n) =
     Just (typeCtor n)
-  match REmpty{} =
+  match PPREmpty =
     Just (syntax "()")
-  match row@RCons{} =
+  match row@PPRCons{} =
     Just (syntax "(" <> renderRow row <> syntax ")")
-  match (BinaryNoParensType _ op l r) =
-    Just $ renderTypeAtom l <> sp <> renderTypeAtom op <> sp <> renderTypeAtom r
-  match (TypeOp _ n) =
+  match (PPBinaryNoParensType op l r) =
+    Just $ renderTypeAtom' l <> sp <> renderTypeAtom' op <> sp <> renderTypeAtom' r
+  match (PPTypeOp n) =
     Just (typeOp n)
-  match (TypeLevelString _ str) =
+  match (PPTypeLevelString str) =
     Just (syntax (prettyPrintString str))
   match _ =
     Nothing
 
-renderConstraint :: Constraint a -> RenderedCode
-renderConstraint (Constraint ann pn tys _) =
-  let instApp = foldl (TypeApp ann) (TypeConstructor ann (fmap coerceProperName pn)) tys
-  in  renderType instApp
+renderConstraint :: PrettyPrintConstraint -> RenderedCode
+renderConstraint (pn, tys) =
+  let instApp = foldl PPTypeApp (PPTypeConstructor (fmap coerceProperName pn)) tys
+  in  renderType' instApp
 
-renderConstraints :: Constraint a -> RenderedCode -> RenderedCode
+renderConstraints :: PrettyPrintConstraint -> RenderedCode -> RenderedCode
 renderConstraints con ty =
   mintersperse sp
     [ renderConstraint con
@@ -74,65 +72,68 @@ renderConstraints con ty =
 -- |
 -- Render code representing a Row
 --
-renderRow :: Type a -> RenderedCode
-renderRow = uncurry renderRow' . rowToList
+renderRow :: PrettyPrintType -> RenderedCode
+renderRow = uncurry renderRow' . go []
   where
   renderRow' h t = renderHead h <> renderTail t
 
-renderHead :: [RowListItem a] -> RenderedCode
+  go ts (PPRCons l t r) = go ((l, t) : ts) r
+  go ts t = (reverse ts, t)
+
+renderHead :: [(Label, PrettyPrintType)] -> RenderedCode
 renderHead = mintersperse (syntax "," <> sp) . map renderLabel
 
-renderLabel :: RowListItem a -> RenderedCode
-renderLabel (RowListItem _ label ty) =
+renderLabel :: (Label, PrettyPrintType) -> RenderedCode
+renderLabel (label, ty) =
   mintersperse sp
     [ typeVar $ prettyPrintLabel label
     , syntax "::"
-    , renderType ty
+    , renderType' ty
     ]
 
-renderTail :: Type a -> RenderedCode
-renderTail REmpty{} = mempty
-renderTail other = sp <> syntax "|" <> sp <> renderType other
+renderTail :: PrettyPrintType -> RenderedCode
+renderTail PPREmpty = mempty
+renderTail other = sp <> syntax "|" <> sp <> renderType' other
 
-typeApp :: Pattern () (Type a) (Type a, Type a)
+typeApp :: Pattern () PrettyPrintType (PrettyPrintType, PrettyPrintType)
 typeApp = mkPattern match
   where
-  match (TypeApp _ f x) = Just (f, x)
+  match (PPTypeApp f x) = Just (f, x)
   match _ = Nothing
 
-appliedFunction :: Pattern () (Type a) (Type a, Type a)
+appliedFunction :: Pattern () PrettyPrintType (PrettyPrintType, PrettyPrintType)
 appliedFunction = mkPattern match
   where
-  match (PrettyPrintFunction _ arg ret) = Just (arg, ret)
+  match (PPFunction arg ret) = Just (arg, ret)
   match _ = Nothing
 
-kinded :: Pattern () (Type a) (Kind a, Type a)
+kinded :: Pattern () PrettyPrintType (Kind (), PrettyPrintType)
 kinded = mkPattern match
   where
-  match (KindedType _ t k) = Just (k, t)
+  match (PPKindedType t k) = Just (k, t)
   match _ = Nothing
 
-constrained :: Pattern () (Type a) (Constraint a, Type a)
+constrained :: Pattern () PrettyPrintType (PrettyPrintConstraint, PrettyPrintType)
 constrained = mkPattern match
   where
-  match (ConstrainedType _ con ty) = Just (con, ty)
+  match (PPConstrainedType con ty) = Just (con, ty)
   match _ = Nothing
 
-explicitParens :: Pattern () (Type a) ((), Type a)
+explicitParens :: Pattern () PrettyPrintType ((), PrettyPrintType)
 explicitParens = mkPattern match
   where
-  match (ParensInType _ ty) = Just ((), ty)
+  match (PPParensInType ty) = Just ((), ty)
   match _ = Nothing
 
-matchTypeAtom :: Pattern () (Type a) RenderedCode
+matchTypeAtom :: Pattern () PrettyPrintType RenderedCode
 matchTypeAtom = typeLiterals <+> fmap parens_ matchType
   where
   parens_ x = syntax "(" <> x <> syntax ")"
 
-matchType :: Pattern () (Type a) RenderedCode
+matchType :: Pattern () PrettyPrintType RenderedCode
 matchType = buildPrettyPrinter operators matchTypeAtom
   where
-  operators :: OperatorTable () (Type a) RenderedCode
+  operators :: OperatorTable () PrettyPrintType RenderedCode
   operators =
     OperatorTable [ [ AssocL typeApp $ \f x -> f <> sp <> x ]
                   , [ AssocR appliedFunction $ \arg ret -> mintersperse sp [arg, syntax "->", ret] ]
@@ -142,64 +143,30 @@ matchType = buildPrettyPrinter operators matchTypeAtom
                   , [ Wrap explicitParens $ \_ ty -> ty ]
                   ]
 
-forall_ :: Pattern () (Type a) ([Text], Type a)
+forall_ :: Pattern () PrettyPrintType ([Text], PrettyPrintType)
 forall_ = mkPattern match
   where
-  match (PrettyPrintForAll _ idents ty) = Just (idents, ty)
+  match (PPForAll idents ty) = Just (idents, ty)
   match _ = Nothing
-
-insertPlaceholders :: RenderTypeOptions -> Type a -> Type a
-insertPlaceholders opts =
-  everywhereOnTypesTopDown convertForAlls . everywhereOnTypes (convert opts)
-
-convert :: RenderTypeOptions -> Type a -> Type a
-convert _ (TypeApp a (TypeApp _ f arg) ret) | eqType f tyFunction = PrettyPrintFunction a arg ret
-convert opts (TypeApp a o r) | eqType o tyRecord && prettyPrintObjects opts = PrettyPrintObject a r
-convert _ other = other
-
-convertForAlls :: Type a -> Type a
-convertForAlls (ForAll ann i ty _) = go [i] ty
-  where
-  go idents (ForAll _ i' ty' _) = go (i' : idents) ty'
-  go idents other = PrettyPrintForAll ann idents other
-convertForAlls other = other
-
-preprocessType :: RenderTypeOptions -> Type a -> Type a
-preprocessType opts = insertPlaceholders opts
-
 
 -- |
 -- Render code representing a Type
 --
 renderType :: Type a -> RenderedCode
-renderType = renderTypeWithOptions defaultRenderTypeOptions
+renderType = renderType' . convertPrettyPrintType
+
+renderType' :: PrettyPrintType -> RenderedCode
+renderType'
+  = fromMaybe (internalError "Incomplete pattern")
+  . PA.pattern matchType ()
 
 -- |
 -- Render code representing a Type, as it should appear inside parentheses
 --
 renderTypeAtom :: Type a -> RenderedCode
-renderTypeAtom = renderTypeAtomWithOptions defaultRenderTypeOptions
+renderTypeAtom = renderTypeAtom' . convertPrettyPrintType
 
-data RenderTypeOptions = RenderTypeOptions
-  { prettyPrintObjects :: Bool
-  , currentModule :: Maybe ModuleName
-  }
-
-defaultRenderTypeOptions :: RenderTypeOptions
-defaultRenderTypeOptions =
-  RenderTypeOptions
-    { prettyPrintObjects = True
-    , currentModule = Nothing
-    }
-
-renderTypeWithOptions :: RenderTypeOptions -> Type a -> RenderedCode
-renderTypeWithOptions opts
-  = fromMaybe (internalError "Incomplete pattern")
-  . PA.pattern matchType ()
-  . preprocessType opts
-
-renderTypeAtomWithOptions :: RenderTypeOptions -> Type a -> RenderedCode
-renderTypeAtomWithOptions opts
+renderTypeAtom' :: PrettyPrintType -> RenderedCode
+renderTypeAtom'
   = fromMaybe (internalError "Incomplete pattern")
   . PA.pattern matchTypeAtom ()
-  . preprocessType opts
