@@ -228,51 +228,48 @@ infer' (KindedType _ ty k) = do
 infer' other = (, []) <$> go other
   where
   go :: SourceType -> m SourceKind
-  go ty = rethrowWithPosition (fst $ getAnnForType ty) $ go' ty
-
-  go' :: SourceType -> m SourceKind
-  go' (ForAll ann ident ty _) = do
+  go (ForAll ann ident ty _) = do
     k1 <- freshKind ann
     Just moduleName <- checkCurrentModule <$> get
     k2 <- bindLocalTypeVariables moduleName [(ProperName ident, k1)] $ go ty
     unifyKinds k2 kindType
     return $ kindType $> ann
-  go' (KindedType _ ty k) = do
+  go (KindedType _ ty k) = do
     k' <- go ty
     unifyKinds k k'
     return k'
-  go' (TypeWildcard ann) = freshKind ann
-  go' (TUnknown ann _) = freshKind ann
-  go' (TypeLevelString ann _) = return $ kindSymbol $> ann
-  go' (TypeVar ann v) = do
+  go (TypeWildcard ann) = freshKind ann
+  go (TUnknown ann _) = freshKind ann
+  go (TypeLevelString ann _) = return $ kindSymbol $> ann
+  go (TypeVar ann v) = do
     Just moduleName <- checkCurrentModule <$> get
     ($> ann) <$> lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
-  go' (Skolem ann v _ _) = do
+  go (Skolem ann v _ _) = do
     Just moduleName <- checkCurrentModule <$> get
     ($> ann) <$> lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
-  go' (TypeConstructor ann v) = do
+  go (TypeConstructor ann v) = do
     env <- getEnv
     case M.lookup v (types env) of
-      Nothing -> throwError . errorMessage . UnknownName $ fmap TyName v
+      Nothing -> throwError . errorMessage' (fst ann) . UnknownName $ fmap TyName v
       Just (kind, _) -> return $ kind $> ann
-  go' (TypeApp ann t1 t2) = do
+  go (TypeApp ann t1 t2) = do
     k0 <- freshKind ann
     k1 <- go t1
     k2 <- go t2
     unifyKinds k1 (FunKind ann k2 k0)
     return k0
-  go' (REmpty ann) = do
+  go (REmpty ann) = do
     k <- freshKind ann
     return $ Row ann k
-  go' (RCons ann _ ty row) = do
+  go (RCons ann _ ty row) = do
     k1 <- go ty
     k2 <- go row
     unifyKinds k2 (Row ann k1)
     return $ Row ann k1
-  go' (ConstrainedType ann2 (Constraint ann1 className tys _) ty) = do
+  go (ConstrainedType ann2 (Constraint ann1 className tys _) ty) = do
     k1 <- go $ foldl (TypeApp ann2) (TypeConstructor ann1 (fmap coerceProperName className)) tys
     unifyKinds k1 kindType
     k2 <- go ty
     unifyKinds k2 kindType
     return $ kindType $> ann2
-  go' ty = internalError $ "Invalid argument to infer: " ++ show ty
+  go ty = internalError $ "Invalid argument to infer: " ++ show ty
