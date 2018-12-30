@@ -56,7 +56,7 @@ data Type a
   -- | A type-level string
   | TypeLevelString a PSString
   -- | A type wildcard, as would appear in a partial type synonym
-  | TypeWildcard a
+  | TypeWildcard a (Maybe Text)
   -- | A type constructor
   | TypeConstructor a (Qualified (ProperName 'TypeName))
   -- | A type operator. This will be desugared into a type constructor during the
@@ -99,7 +99,7 @@ srcTypeLevelString :: PSString -> SourceType
 srcTypeLevelString = TypeLevelString NullSourceAnn
 
 srcTypeWildcard :: SourceType
-srcTypeWildcard = TypeWildcard NullSourceAnn
+srcTypeWildcard = TypeWildcard NullSourceAnn Nothing
 
 srcTypeConstructor :: Qualified (ProperName 'TypeName) -> SourceType
 srcTypeConstructor = TypeConstructor NullSourceAnn
@@ -193,8 +193,8 @@ typeToJSON annToJSON ty =
       variant "TypeVar" a b
     TypeLevelString a b ->
       variant "TypeLevelString" a b
-    TypeWildcard a ->
-      nullary "TypeWildcard" a
+    TypeWildcard a b ->
+      variant "TypeWildcard" a b
     TypeConstructor a b ->
       variant "TypeConstructor" a b
     TypeOp a b ->
@@ -272,8 +272,9 @@ typeFromJSON defaultAnn annFromJSON = A.withObject "Type" $ \o -> do
       TypeVar a <$> contents
     "TypeLevelString" ->
       TypeLevelString a <$> contents
-    "TypeWildcard" ->
-      pure $ TypeWildcard a
+    "TypeWildcard" -> do
+      b <- contents <|> pure Nothing
+      pure $ TypeWildcard a b
     "TypeConstructor" ->
       TypeConstructor a <$> contents
     "TypeOp" ->
@@ -518,7 +519,7 @@ annotationForType :: Type a -> a
 annotationForType (TUnknown a _) = a
 annotationForType (TypeVar a _) = a
 annotationForType (TypeLevelString a _) = a
-annotationForType (TypeWildcard a) = a
+annotationForType (TypeWildcard a _) = a
 annotationForType (TypeConstructor a _) = a
 annotationForType (TypeOp a _) = a
 annotationForType (TypeApp a _ _) = a
@@ -541,7 +542,7 @@ eqType :: Type a -> Type b -> Bool
 eqType (TUnknown _ a) (TUnknown _ a') = a == a'
 eqType (TypeVar _ a) (TypeVar _ a') = a == a'
 eqType (TypeLevelString _ a) (TypeLevelString _ a') = a == a'
-eqType (TypeWildcard _) (TypeWildcard _) = True
+eqType (TypeWildcard _ a) (TypeWildcard _ a') = a == a'
 eqType (TypeConstructor _ a) (TypeConstructor _ a') = a == a'
 eqType (TypeOp _ a) (TypeOp _ a') = a == a'
 eqType (TypeApp _ a b) (TypeApp _ a' b') = eqType a a' && eqType b b'
@@ -567,9 +568,9 @@ compareType (TypeLevelString _ a) (TypeLevelString _ a') = compare a a'
 compareType (TypeLevelString {}) _ = LT
 compareType _ (TypeLevelString {}) = GT
 
-compareType (TypeWildcard _) (TypeWildcard _) = EQ
-compareType (TypeWildcard _) _ = LT
-compareType _ (TypeWildcard _) = GT
+compareType (TypeWildcard _ a) (TypeWildcard _ a') = compare a a'
+compareType (TypeWildcard {}) _ = LT
+compareType _ (TypeWildcard {}) = GT
 
 compareType (TypeConstructor _ a) (TypeConstructor _ a') = compare a a'
 compareType (TypeConstructor {}) _ = LT

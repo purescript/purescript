@@ -141,7 +141,7 @@ data SimpleErrorMessage
   | ShadowedName Ident
   | ShadowedTypeVar Text
   | UnusedTypeVar Text
-  | WildcardInferredType SourceType Context
+  | WildcardInferredType SourceType Context (Maybe Text)
   | HoleInferredType Text SourceType Context TypeSearch
   | MissingTypeDeclaration Ident SourceType
   | OverlappingPattern [[Binder]] Bool

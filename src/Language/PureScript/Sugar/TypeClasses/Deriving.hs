@@ -427,7 +427,7 @@ deriveGenericRep ss mn syns ds tyConNm tyConArgs repTy = do
     argument' = App (Constructor ss argument)
 
 checkIsWildcard :: MonadError MultipleErrors m => SourceSpan -> ProperName 'TypeName -> SourceType -> m ()
-checkIsWildcard _ _ (TypeWildcard _) = return ()
+checkIsWildcard _ _ (TypeWildcard _ Nothing) = return ()
 checkIsWildcard ss tyConNm _ =
   throwError . errorMessage' ss $ ExpectedWildcard tyConNm
 

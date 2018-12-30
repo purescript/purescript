@@ -286,7 +286,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ExpectedTypeConstructor cl ts ty) = ExpectedTypeConstructor cl <$> traverse f ts <*> f ty
   gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
   gSimple (OrphanInstance nm cl noms ts) = OrphanInstance nm cl noms <$> traverse f ts
-  gSimple (WildcardInferredType ty ctx) = WildcardInferredType <$> f ty <*> traverse (sndM f) ctx
+  gSimple (WildcardInferredType ty ctx n) = WildcardInferredType <$> f ty <*> traverse (sndM f) ctx <*> pure n
   gSimple (HoleInferredType name ty ctx env) = HoleInferredType name <$> f ty <*> traverse (sndM f) ctx  <*> onTypeSearchTypesM f env
   gSimple (MissingTypeDeclaration nm ty) = MissingTypeDeclaration nm <$> f ty
   gSimple (CannotGeneralizeRecursiveFunction nm ty) = CannotGeneralizeRecursiveFunction nm <$> f ty
@@ -320,7 +320,7 @@ errorSuggestion err =
       ImplicitQualifiedImportReExport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
       HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
       MissingTypeDeclaration ident ty -> suggest $ showIdent ident <> " :: " <> T.pack (prettyPrintSuggestedType ty)
-      WildcardInferredType ty _ -> suggest $ T.pack (prettyPrintSuggestedType ty)
+      WildcardInferredType ty _ _ -> suggest $ T.pack (prettyPrintSuggestedType ty)
       _ -> Nothing
   where
     emptySuggestion = Just $ ErrorSuggestion ""
@@ -835,7 +835,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line "hiding imports cannot be used to hide modules."
             , line $ "An attempt was made to hide the import of " <> markCode (runModuleName name)
             ]
-    renderSimpleErrorMessage (WildcardInferredType ty ctx) =
+    renderSimpleErrorMessage (WildcardInferredType ty ctx (Just name)) =
+      paras $ [ line $ "Wildcard type definition '" <> markCode name <> "' has the inferred type "
+              , markCodeBox $ indent $ typeAsBox ty
+              ] <> renderContext ctx
+    renderSimpleErrorMessage (WildcardInferredType ty ctx Nothing) =
       paras $ [ line "Wildcard type definition has the inferred type "
               , markCodeBox $ indent $ typeAsBox ty
               ] <> renderContext ctx
@@ -1450,6 +1454,9 @@ withPosition pos (ErrorMessage hints se) = ErrorMessage (positionedError pos : h
 
 positionedError :: SourceSpan -> ErrorMessageHint
 positionedError = PositionedError . pure
+
+filterErrors :: (ErrorMessage -> Bool) -> MultipleErrors -> MultipleErrors
+filterErrors f = MultipleErrors . filter f . runMultipleErrors
 
 -- | Runs a computation listening for warnings and then escalating any warnings
 -- that match the predicate to error status.

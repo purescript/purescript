@@ -184,10 +184,10 @@ replaceVarWithUnknown ident ty = do
 replaceTypeWildcards :: (MonadWriter MultipleErrors m, MonadState CheckState m) => SourceType -> m SourceType
 replaceTypeWildcards = everywhereOnTypesM replace
   where
-  replace (TypeWildcard ann) = do
+  replace (TypeWildcard ann name) = do
     t <- freshType
     ctx <- getLocalContext
-    warnWithPosition (fst ann) $ tell . errorMessage $ WildcardInferredType t ctx
+    warnWithPosition (fst ann) $ tell . errorMessage $ WildcardInferredType t ctx name
     return t
   replace other = return other
 
