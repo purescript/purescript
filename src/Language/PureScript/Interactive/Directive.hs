@@ -33,6 +33,7 @@ directiveStrings =
     , (Show      , ["show"])
     , (Paste     , ["paste"])
     , (Complete  , ["complete"])
+    , (Print     , ["print"])
     ]
 
 -- |
@@ -80,16 +81,6 @@ parseDirective :: String -> Maybe Directive
 parseDirective = listToMaybe . directivesFor
 
 -- |
--- True if the given directive takes an argument, false otherwise.
-hasArgument :: Directive -> Bool
-hasArgument Help = False
-hasArgument Quit = False
-hasArgument Reload = False
-hasArgument Clear = False
-hasArgument Paste = False
-hasArgument _ = True
-
--- |
 -- The help menu.
 --
 help :: [(Directive, String, String)]
@@ -103,7 +94,9 @@ help =
   , (Kind,     "<type>",    "Show the kind of <type>")
   , (Show,     "import",    "Show all imported modules")
   , (Show,     "loaded",    "Show all loaded modules")
+  , (Show,     "print",     "Show the repl's current printing function")
   , (Paste,    "paste",     "Enter multiple lines, terminated by ^D")
   , (Complete, "<prefix>",  "Show completions for <prefix> as if pressing tab")
+  , (Print,    "<fn>",      "Set the repl's printing function to <fn> (which must be fully qualified)")
   ]
 

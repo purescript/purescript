@@ -65,3 +65,18 @@ commandTests = context "commandTests" $ do
 
     ":browse Mirp" `printed` flip shouldContain "is not valid"
     ":browse Prim" `printed` flip shouldContain "class Partial"
+
+  specPSCi ":print" $ do
+    let failMsg = "Unable to set the repl's printing function"
+    let interactivePrintModuleShouldBe modName = do
+          modName' <- (fst . psciInteractivePrint) <$> get
+          modName' `equalsTo` modName
+
+    run "import Prelude"
+    ":print Prelude.show" `printed` flip shouldContain failMsg
+    interactivePrintModuleShouldBe (moduleNameFromString "PSCI.Support")
+
+    ":print InteractivePrint.unsafeEval" `printed` flip shouldNotContain failMsg
+    "(identity :: _ -> _)" `printed` flip shouldContain "[Function]"
+    interactivePrintModuleShouldBe (moduleNameFromString "InteractivePrint")
+    ":print" `printed` flip shouldContain "InteractivePrint"
