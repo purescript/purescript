@@ -775,11 +775,11 @@ data Expr
   -- |
   -- A do-notation block
   --
-  | Do [DoNotationElement]
+  | Do (Maybe ModuleName) [DoNotationElement]
   -- |
   -- An ado-notation block
   --
-  | Ado [DoNotationElement] Expr
+  | Ado (Maybe ModuleName) [DoNotationElement] Expr
   -- |
   -- An application of a typeclass dictionary constructor. The value should be
   -- an ObjectLiteral.

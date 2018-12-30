@@ -484,17 +484,17 @@ parseAccessor obj = P.try $ Accessor <$> (indented *> dot *> indented *> parseLa
 
 parseDo :: TokenParser Expr
 parseDo = do
-  reserved "do"
+  m <- P.try (getQual <$> parseQualified (reserved "do")) <|> (reserved "do" *> pure Nothing)
   indented
-  Do <$> mark (P.many1 (same *> mark parseDoNotationElement))
+  Do m <$> mark (P.many1 (same *> mark parseDoNotationElement))
 
 parseAdo :: TokenParser Expr
 parseAdo = do
-  reserved "ado"
+  m <- P.try (getQual <$> parseQualified (reserved "ado")) <|> (reserved "ado" *> pure Nothing)
   indented
   elements <- mark (P.many (same *> mark parseDoNotationElement))
   yield <- mark (reserved "in" *> parseValue)
-  pure $ Ado elements yield
+  pure $ Ado m elements yield
 
 parseDoNotationLet :: TokenParser DoNotationElement
 parseDoNotationLet = DoNotationLet <$> (reserved "let" *> indented *> mark (P.many1 (same *> parseLocalDeclaration)))

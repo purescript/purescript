@@ -76,8 +76,8 @@ everywhereOnValues f g h = (f', g', h')
   g' (Case vs alts) = g (Case (fmap g' vs) (fmap handleCaseAlternative alts))
   g' (TypedValue check v ty) = g (TypedValue check (g' v) ty)
   g' (Let w ds v) = g (Let w (fmap f' ds) (g' v))
-  g' (Do es) = g (Do (fmap handleDoNotationElement es))
-  g' (Ado es v) = g (Ado (fmap handleDoNotationElement es) (g' v))
+  g' (Do m es) = g (Do m (fmap handleDoNotationElement es))
+  g' (Ado m es v) = g (Ado m (fmap handleDoNotationElement es) (g' v))
   g' (PositionedValue pos com v) = g (PositionedValue pos com (g' v))
   g' other = g other
 
@@ -150,8 +150,8 @@ everywhereOnValuesTopDownM f g h = (f' <=< f, g' <=< g, h' <=< h)
   g' (Case vs alts) = Case <$> traverse (g' <=< g) vs <*> traverse handleCaseAlternative alts
   g' (TypedValue check v ty) = TypedValue check <$> (g v >>= g') <*> pure ty
   g' (Let w ds v) = Let w <$> traverse (f' <=< f) ds <*> (g v >>= g')
-  g' (Do es) = Do <$> traverse handleDoNotationElement es
-  g' (Ado es v) = Ado <$> traverse handleDoNotationElement es <*> (g v >>= g')
+  g' (Do m es) = Do m <$> traverse handleDoNotationElement es
+  g' (Ado m es v) = Ado m <$> traverse handleDoNotationElement es <*> (g v >>= g')
   g' (PositionedValue pos com v) = PositionedValue pos com <$> (g v >>= g')
   g' other = g other
 
@@ -219,8 +219,8 @@ everywhereOnValuesM f g h = (f', g', h')
   g' (Case vs alts) = (Case <$> traverse g' vs <*> traverse handleCaseAlternative alts) >>= g
   g' (TypedValue check v ty) = (TypedValue check <$> g' v <*> pure ty) >>= g
   g' (Let w ds v) = (Let w <$> traverse f' ds <*> g' v) >>= g
-  g' (Do es) = (Do <$> traverse handleDoNotationElement es) >>= g
-  g' (Ado es v) = (Ado <$> traverse handleDoNotationElement es <*> g' v) >>= g
+  g' (Do m es) = (Do m <$> traverse handleDoNotationElement es) >>= g
+  g' (Ado m es v) = (Ado m <$> traverse handleDoNotationElement es <*> g' v) >>= g
   g' (PositionedValue pos com v) = (PositionedValue pos com <$> g' v) >>= g
   g' other = g other
 
@@ -291,8 +291,8 @@ everythingOnValues (<>.) f g h i j = (f', g', h', i', j')
   g' v@(Case vs alts) = foldl (<>.) (foldl (<>.) (g v) (fmap g' vs)) (fmap i' alts)
   g' v@(TypedValue _ v1 _) = g v <>. g' v1
   g' v@(Let _ ds v1) = foldl (<>.) (g v) (fmap f' ds) <>. g' v1
-  g' v@(Do es) = foldl (<>.) (g v) (fmap j' es)
-  g' v@(Ado es v1) = foldl (<>.) (g v) (fmap j' es) <>. g' v1
+  g' v@(Do _ es) = foldl (<>.) (g v) (fmap j' es)
+  g' v@(Ado _ es v1) = foldl (<>.) (g v) (fmap j' es) <>. g' v1
   g' v@(PositionedValue _ _ v1) = g v <>. g' v1
   g' v = g v
 
@@ -372,8 +372,8 @@ everythingWithContextOnValues s0 r0 (<>.) f g h i j = (f'' s0, g'' s0, h'' s0, i
   g' s (Case vs alts) = foldl (<>.) (foldl (<>.) r0 (fmap (g'' s) vs)) (fmap (i'' s) alts)
   g' s (TypedValue _ v1 _) = g'' s v1
   g' s (Let _ ds v1) = foldl (<>.) r0 (fmap (f'' s) ds) <>. g'' s v1
-  g' s (Do es) = foldl (<>.) r0 (fmap (j'' s) es)
-  g' s (Ado es v1) = foldl (<>.) r0 (fmap (j'' s) es) <>. g'' s v1
+  g' s (Do _ es) = foldl (<>.) r0 (fmap (j'' s) es)
+  g' s (Ado _ es v1) = foldl (<>.) r0 (fmap (j'' s) es) <>. g'' s v1
   g' s (PositionedValue _ _ v1) = g'' s v1
   g' _ _ = r0
 
@@ -457,8 +457,8 @@ everywhereWithContextOnValuesM s0 f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j
   g' s (Case vs alts) = Case <$> traverse (g'' s) vs <*> traverse (i'' s) alts
   g' s (TypedValue check v ty) = TypedValue check <$> g'' s v <*> pure ty
   g' s (Let w ds v) = Let w <$> traverse (f'' s) ds <*> g'' s v
-  g' s (Do es) = Do <$> traverse (j'' s) es
-  g' s (Ado es v) = Ado <$> traverse (j'' s) es <*> g'' s v
+  g' s (Do m es) = Do m <$> traverse (j'' s) es
+  g' s (Ado m es v) = Ado m <$> traverse (j'' s) es <*> g'' s v
   g' s (PositionedValue pos com v) = PositionedValue pos com <$> g'' s v
   g' _ other = return other
 
@@ -554,8 +554,8 @@ everythingWithScope f g h i j = (f'', g'', h'', i'', \s -> snd . j'' s)
   g' s (Let _ ds v1) =
     let s' = S.union s (S.fromList (map LocalIdent (mapMaybe getDeclIdent ds)))
     in foldMap (f'' s') ds <> g'' s' v1
-  g' s (Do es) = fold . snd . mapAccumL j'' s $ es
-  g' s (Ado es v1) =
+  g' s (Do _ es) = fold . snd . mapAccumL j'' s $ es
+  g' s (Ado _ es v1) =
     let s' = S.union s (foldMap (fst . j'' s) es)
     in g'' s' v1
   g' s (PositionedValue _ _ v1) = g'' s v1
