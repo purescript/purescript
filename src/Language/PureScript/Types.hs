@@ -424,9 +424,7 @@ freeTypeVariables = ordNub . go [] where
 
 -- | Universally quantify over all type variables appearing free in a type
 quantify :: Type a -> Type a
-quantify ty = foldr (\arg t -> ForAll ann arg t Nothing) ty $ freeTypeVariables ty
-  where
-  ann = getAnnForType ty
+quantify ty = foldr (\arg t -> ForAll (getAnnForType ty) arg t Nothing) ty $ freeTypeVariables ty
 
 -- | Move all universal quantifiers to the front of a type
 moveQuantifiersToFront :: Type a -> Type a

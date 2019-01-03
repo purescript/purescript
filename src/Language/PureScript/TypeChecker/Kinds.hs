@@ -20,6 +20,7 @@ import Control.Monad.State
 import Data.Functor (($>))
 import qualified Data.Map as M
 import Data.Text (Text)
+import Data.Traversable (for)
 
 import Language.PureScript.Crash
 import Language.PureScript.Environment
@@ -152,23 +153,23 @@ freshKindVar (arg, Just kind') kind = do
 kindsOfAll
   :: (MonadError MultipleErrors m, MonadState CheckState m)
   => ModuleName
-  -> [(ProperName 'TypeName, [(Text, Maybe SourceKind)], SourceType)]
-  -> [(ProperName 'TypeName, [(Text, Maybe SourceKind)], [SourceType])]
+  -> [(SourceAnn, ProperName 'TypeName, [(Text, Maybe SourceKind)], SourceType)]
+  -> [(SourceAnn, ProperName 'TypeName, [(Text, Maybe SourceKind)], [SourceType])]
   -> m ([SourceKind], [SourceKind])
 kindsOfAll moduleName syns tys = fmap tidyUp . withFreshSubstitution . captureSubstitution $ do
-  synVars <- replicateM (length syns) freshKind'
-  let dict = zipWith (\(name, _, _) var -> (name, var)) syns synVars
+  synVars <- for syns $ \(sa, _, _, _) -> freshKind sa
+  let dict = zipWith (\(_, name, _, _) var -> (name, var)) syns synVars
   bindLocalTypeVariables moduleName dict $ do
-    tyCons <- replicateM (length tys) freshKind'
-    let dict' = zipWith (\(name, _, _) tyCon -> (name, tyCon)) tys tyCons
+    tyCons <- for tys $ \(sa, _, _, _) -> freshKind sa
+    let dict' = zipWith (\(_, name, _, _) tyCon -> (name, tyCon)) tys tyCons
     bindLocalTypeVariables moduleName dict' $ do
-      data_ks <- zipWithM (\tyCon (_, args, ts) -> do
-        kargs <- replicateM (length args) freshKind'
+      data_ks <- zipWithM (\tyCon (_, _, args, ts) -> do
+        kargs <- for args $ \(_, kind) -> maybe freshKind' (freshKind . getAnnForKind) kind
         argDict <- zipWithM freshKindVar args kargs
         bindLocalTypeVariables moduleName argDict $
           solveTypes True ts kargs tyCon) tyCons tys
-      syn_ks <- zipWithM (\synVar (_, args, ty) -> do
-        kargs <- replicateM (length args) freshKind'
+      syn_ks <- zipWithM (\synVar (_, _, args, ty) -> do
+        kargs <- for args $ \(_, kind) -> maybe freshKind' (freshKind . getAnnForKind) kind
         argDict <- zipWithM freshKindVar args kargs
         bindLocalTypeVariables moduleName argDict $
           solveTypes False [ty] kargs synVar) synVars syns
@@ -189,7 +190,7 @@ solveTypes isData ts kargs tyCon = do
   when isData $ do
     unifyKinds tyCon (foldr srcFunKind kindType kargs)
     forM_ ks $ \k -> unifyKinds k kindType
-  unless isData $ do
+  unless isData $
     unifyKinds tyCon (foldr srcFunKind (head ks) kargs)
   return tyCon
 
