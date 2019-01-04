@@ -41,7 +41,7 @@ import Language.PureScript.TypeChecker.Types as T
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 
-import Lens.Micro.Platform ((^..), _1, _2)
+import Lens.Micro.Platform ((^..), _2, _3)
 
 addDataType
   :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
@@ -244,24 +244,24 @@ typeCheckAll moduleName _ = traverse go
     let tysList = NEL.toList tys
         syns = mapMaybe toTypeSynonym tysList
         dataDecls = mapMaybe toDataDecl tysList
-        bindingGroupNames = ordNub ((syns^..traverse._1) ++ (dataDecls^..traverse._2))
+        bindingGroupNames = ordNub ((syns^..traverse._2) ++ (dataDecls^..traverse._3))
         sss = fmap declSourceSpan tys
     warnAndRethrow (addHint (ErrorInDataBindingGroup bindingGroupNames) . addHint (PositionedError sss)) $ do
-      (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(_, name, args, dctors) -> (name, args, concatMap snd dctors)) dataDecls)
-      for_ (zip dataDecls data_ks) $ \((dtype, name, args, dctors), ctorKind) -> do
+      (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(sa, _, name, args, dctors) -> (sa, name, args, concatMap snd dctors)) dataDecls)
+      for_ (zip dataDecls data_ks) $ \((_, dtype, name, args, dctors), ctorKind) -> do
         when (dtype == Newtype) $ checkNewtype name dctors
         checkDuplicateTypeArguments $ map fst args
         let args' = args `withKinds` ctorKind
         addDataType moduleName dtype name args' dctors ctorKind
-      for_ (zip syns syn_ks) $ \((name, args, ty), kind) -> do
+      for_ (zip syns syn_ks) $ \((_, name, args, ty), kind) -> do
         checkDuplicateTypeArguments $ map fst args
         let args' = args `withKinds` kind
         addTypeSynonym moduleName name args' ty kind
     return d
     where
-    toTypeSynonym (TypeSynonymDeclaration _ nm args ty) = Just (nm, args, ty)
+    toTypeSynonym (TypeSynonymDeclaration sa nm args ty) = Just (sa, nm, args, ty)
     toTypeSynonym _ = Nothing
-    toDataDecl (DataDeclaration _ dtype nm args dctors) = Just (dtype, nm, args, dctors)
+    toDataDecl (DataDeclaration sa dtype nm args dctors) = Just (sa, dtype, nm, args, dctors)
     toDataDecl _ = Nothing
   go (TypeSynonymDeclaration sa@(ss, _) name args ty) = do
     warnAndRethrow (addHint (ErrorInTypeSynonym name) . addHint (positionedError ss) ) $ do

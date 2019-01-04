@@ -20,6 +20,7 @@ import Control.Monad.State
 import Data.Functor (($>))
 import qualified Data.Map as M
 import Data.Text (Text)
+import Data.Traversable (for)
 
 import Language.PureScript.Crash
 import Language.PureScript.Environment
@@ -30,11 +31,14 @@ import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Types
 
 -- | Generate a fresh kind variable
-freshKind :: (MonadState CheckState m) => m SourceKind
-freshKind = do
+freshKind :: (MonadState CheckState m) => SourceAnn -> m SourceKind
+freshKind ann = do
   k <- gets checkNextKind
   modify $ \st -> st { checkNextKind = k + 1 }
-  return $ KUnknown nullSourceAnn k
+  return $ KUnknown ann k
+
+freshKind' :: (MonadState CheckState m) => m SourceKind
+freshKind' = freshKind NullSourceAnn
 
 -- | Update the substitution to solve a kind constraint
 solveKind
@@ -91,7 +95,10 @@ unifyKinds k1 k2 = do
   go (FunKind _ k1' k2') (FunKind _ k3 k4) = do
     unifyKinds k1' k3
     unifyKinds k2' k4
-  go k1' k2' = throwError . errorMessage $ KindsDoNotUnify k1' k2'
+  go k1' k2' =
+    throwError
+      . errorMessage''' (fst . getAnnForKind <$> [k1', k2'])
+      $ KindsDoNotUnify k1' k2'
 
 -- | Infer the kind of a single type
 kindOf
@@ -123,8 +130,8 @@ kindsOf
   -> [SourceType]
   -> m SourceKind
 kindsOf isData moduleName name args ts = fmap tidyUp . withFreshSubstitution . captureSubstitution $ do
-  tyCon <- freshKind
-  kargs <- replicateM (length args) freshKind
+  tyCon <- freshKind'
+  kargs <- replicateM (length args) $ freshKind'
   rest <- zipWithM freshKindVar args kargs
   let dict = (name, tyCon) : rest
   bindLocalTypeVariables moduleName dict $
@@ -146,23 +153,23 @@ freshKindVar (arg, Just kind') kind = do
 kindsOfAll
   :: (MonadError MultipleErrors m, MonadState CheckState m)
   => ModuleName
-  -> [(ProperName 'TypeName, [(Text, Maybe SourceKind)], SourceType)]
-  -> [(ProperName 'TypeName, [(Text, Maybe SourceKind)], [SourceType])]
+  -> [(SourceAnn, ProperName 'TypeName, [(Text, Maybe SourceKind)], SourceType)]
+  -> [(SourceAnn, ProperName 'TypeName, [(Text, Maybe SourceKind)], [SourceType])]
   -> m ([SourceKind], [SourceKind])
 kindsOfAll moduleName syns tys = fmap tidyUp . withFreshSubstitution . captureSubstitution $ do
-  synVars <- replicateM (length syns) freshKind
-  let dict = zipWith (\(name, _, _) var -> (name, var)) syns synVars
+  synVars <- for syns $ \(sa, _, _, _) -> freshKind sa
+  let dict = zipWith (\(_, name, _, _) var -> (name, var)) syns synVars
   bindLocalTypeVariables moduleName dict $ do
-    tyCons <- replicateM (length tys) freshKind
-    let dict' = zipWith (\(name, _, _) tyCon -> (name, tyCon)) tys tyCons
+    tyCons <- for tys $ \(sa, _, _, _) -> freshKind sa
+    let dict' = zipWith (\(_, name, _, _) tyCon -> (name, tyCon)) tys tyCons
     bindLocalTypeVariables moduleName dict' $ do
-      data_ks <- zipWithM (\tyCon (_, args, ts) -> do
-        kargs <- replicateM (length args) freshKind
+      data_ks <- zipWithM (\tyCon (_, _, args, ts) -> do
+        kargs <- for args $ \(_, kind) -> maybe freshKind' (freshKind . getAnnForKind) kind
         argDict <- zipWithM freshKindVar args kargs
         bindLocalTypeVariables moduleName argDict $
           solveTypes True ts kargs tyCon) tyCons tys
-      syn_ks <- zipWithM (\synVar (_, args, ty) -> do
-        kargs <- replicateM (length args) freshKind
+      syn_ks <- zipWithM (\synVar (_, _, args, ty) -> do
+        kargs <- for args $ \(_, kind) -> maybe freshKind' (freshKind . getAnnForKind) kind
         argDict <- zipWithM freshKindVar args kargs
         bindLocalTypeVariables moduleName argDict $
           solveTypes False [ty] kargs synVar) synVars syns
@@ -181,10 +188,10 @@ solveTypes
 solveTypes isData ts kargs tyCon = do
   ks <- traverse (fmap fst . infer) ts
   when isData $ do
-    unifyKinds tyCon (foldr (FunKind nullSourceAnn) kindType kargs)
+    unifyKinds tyCon (foldr srcFunKind kindType kargs)
     forM_ ks $ \k -> unifyKinds k kindType
   unless isData $
-    unifyKinds tyCon (foldr (FunKind nullSourceAnn) (head ks) kargs)
+    unifyKinds tyCon (foldr srcFunKind (head ks) kargs)
   return tyCon
 
 -- | Default all unknown kinds to the kindType kind of types
@@ -199,15 +206,18 @@ infer
   :: (MonadError MultipleErrors m, MonadState CheckState m)
   => SourceType
   -> m (SourceKind, [(Text, SourceKind)])
-infer ty = withErrorMessageHint (ErrorCheckingKind ty) $ infer' ty
+infer ty =
+  withErrorMessageHint (ErrorCheckingKind ty)
+    . rethrowWithPosition (fst $ getAnnForType ty)
+    $ infer' ty
 
 infer'
   :: forall m
    . (MonadError MultipleErrors m, MonadState CheckState m)
   => SourceType
   -> m (SourceKind, [(Text, SourceKind)])
-infer' (ForAll _ ident ty _) = do
-  k1 <- freshKind
+infer' (ForAll ann ident ty _) = do
+  k1 <- freshKind ann
   Just moduleName <- checkCurrentModule <$> get
   (k2, args) <- bindLocalTypeVariables moduleName [(ProperName ident, k1)] $ infer ty
   unifyKinds k2 kindType
@@ -219,48 +229,48 @@ infer' (KindedType _ ty k) = do
 infer' other = (, []) <$> go other
   where
   go :: SourceType -> m SourceKind
-  go (ForAll _ ident ty _) = do
-    k1 <- freshKind
+  go (ForAll ann ident ty _) = do
+    k1 <- freshKind ann
     Just moduleName <- checkCurrentModule <$> get
     k2 <- bindLocalTypeVariables moduleName [(ProperName ident, k1)] $ go ty
     unifyKinds k2 kindType
-    return kindType
+    return $ kindType $> ann
   go (KindedType _ ty k) = do
     k' <- go ty
     unifyKinds k k'
     return k'
-  go TypeWildcard{} = freshKind
-  go TUnknown{} = freshKind
-  go (TypeLevelString {}) = return kindSymbol
-  go (TypeVar _ v) = do
+  go (TypeWildcard ann) = freshKind ann
+  go (TUnknown ann _) = freshKind ann
+  go (TypeLevelString ann _) = return $ kindSymbol $> ann
+  go (TypeVar ann v) = do
     Just moduleName <- checkCurrentModule <$> get
-    lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
-  go (Skolem _ v _ _) = do
+    ($> ann) <$> lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
+  go (Skolem ann v _ _) = do
     Just moduleName <- checkCurrentModule <$> get
-    lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
-  go (TypeConstructor _ v) = do
+    ($> ann) <$> lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
+  go (TypeConstructor ann v) = do
     env <- getEnv
     case M.lookup v (types env) of
-      Nothing -> throwError . errorMessage . UnknownName $ fmap TyName v
-      Just (kind, _) -> return kind
-  go (TypeApp _ t1 t2) = do
-    k0 <- freshKind
+      Nothing -> throwError . errorMessage' (fst ann) . UnknownName $ fmap TyName v
+      Just (kind, _) -> return $ kind $> ann
+  go (TypeApp ann t1 t2) = do
+    k0 <- freshKind ann
     k1 <- go t1
     k2 <- go t2
-    unifyKinds k1 (FunKind nullSourceAnn k2 k0)
+    unifyKinds k1 (FunKind ann k2 k0)
     return k0
-  go (REmpty _) = do
-    k <- freshKind
-    return $ Row nullSourceAnn k
-  go (RCons _ _ ty row) = do
+  go (REmpty ann) = do
+    k <- freshKind ann
+    return $ Row ann k
+  go (RCons ann _ ty row) = do
     k1 <- go ty
     k2 <- go row
-    unifyKinds k2 (Row nullSourceAnn k1)
-    return $ Row nullSourceAnn k1
+    unifyKinds k2 (Row ann k1)
+    return $ Row ann k1
   go (ConstrainedType ann2 (Constraint ann1 className tys _) ty) = do
     k1 <- go $ foldl (TypeApp ann2) (TypeConstructor ann1 (fmap coerceProperName className)) tys
     unifyKinds k1 kindType
     k2 <- go ty
     unifyKinds k2 kindType
-    return kindType
+    return $ kindType $> ann2
   go ty = internalError $ "Invalid argument to infer: " ++ show ty

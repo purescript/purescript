@@ -34,6 +34,8 @@ import Language.PureScript.Names
 import Language.PureScript.Label (Label)
 import Language.PureScript.PSString (PSString)
 
+import Lens.Micro.Platform (Lens', (^.), set)
+
 type SourceType = Type SourceAnn
 type SourceConstraint = Constraint SourceAnn
 
@@ -422,9 +424,7 @@ freeTypeVariables = ordNub . go [] where
 
 -- | Universally quantify over all type variables appearing free in a type
 quantify :: Type a -> Type a
-quantify ty = foldr (\arg t -> ForAll ann arg t Nothing) ty $ freeTypeVariables ty
-  where
-  ann = annotationForType ty
+quantify ty = foldr (\arg t -> ForAll (getAnnForType ty) arg t Nothing) ty $ freeTypeVariables ty
 
 -- | Move all universal quantifiers to the front of a type
 moveQuantifiersToFront :: Type a -> Type a
@@ -514,22 +514,28 @@ everythingWithContextOnTypes s0 r0 (<+>) f = go' s0 where
   go s (ParensInType _ t1) = go' s t1
   go _ _ = r0
 
-annotationForType :: Type a -> a
-annotationForType (TUnknown a _) = a
-annotationForType (TypeVar a _) = a
-annotationForType (TypeLevelString a _) = a
-annotationForType (TypeWildcard a) = a
-annotationForType (TypeConstructor a _) = a
-annotationForType (TypeOp a _) = a
-annotationForType (TypeApp a _ _) = a
-annotationForType (ForAll a _ _ _) = a
-annotationForType (ConstrainedType a _ _) = a
-annotationForType (Skolem a _ _ _) = a
-annotationForType (REmpty a) = a
-annotationForType (RCons a _ _ _) = a
-annotationForType (KindedType a _ _) = a
-annotationForType (BinaryNoParensType a _ _ _) = a
-annotationForType (ParensInType a _) = a
+annForType :: Lens' (Type a) a
+annForType k (TUnknown a b) = (\z -> TUnknown z b) <$> k a
+annForType k (TypeVar a b) = (\z -> TypeVar z b) <$> k a
+annForType k (TypeLevelString a b) = (\z -> TypeLevelString z b) <$> k a
+annForType k (TypeWildcard a) = TypeWildcard <$> k a
+annForType k (TypeConstructor a b) = (\z -> TypeConstructor z b) <$> k a
+annForType k (TypeOp a b) = (\z -> TypeOp z b) <$> k a
+annForType k (TypeApp a b c) = (\z -> TypeApp z b c) <$> k a
+annForType k (ForAll a b c d) = (\z -> ForAll z b c d) <$> k a
+annForType k (ConstrainedType a b c) = (\z -> ConstrainedType z b c) <$> k a
+annForType k (Skolem a b c d) = (\z -> Skolem z b c d) <$> k a
+annForType k (REmpty a) = REmpty <$> k a
+annForType k (RCons a b c d) = (\z -> RCons z b c d) <$> k a
+annForType k (KindedType a b c) = (\z -> KindedType z b c) <$> k a
+annForType k (BinaryNoParensType a b c d) = (\z -> BinaryNoParensType z b c d) <$> k a
+annForType k (ParensInType a b) = (\z -> ParensInType z b) <$> k a
+
+getAnnForType :: Type a -> a
+getAnnForType = (^. annForType)
+
+setAnnForType :: a -> Type a -> Type a
+setAnnForType = set annForType
 
 instance Eq (Type a) where
   (==) = eqType

@@ -18,7 +18,7 @@ import           Data.Char (isSpace)
 import           Data.Either (partitionEithers)
 import           Data.Foldable (fold)
 import           Data.Functor.Identity (Identity(..))
-import           Data.List (transpose, nubBy, partition, dropWhileEnd, sortBy)
+import           Data.List (transpose, nubBy, partition, dropWhileEnd, sort, sortBy)
 import qualified Data.List.NonEmpty as NEL
 import           Data.Maybe (maybeToList, fromMaybe, mapMaybe)
 import qualified Data.Map as M
@@ -204,6 +204,15 @@ errorMessage' ss err = MultipleErrors [ErrorMessage [positionedError ss] err]
 -- | Create an error set from a single simple error message and source annotations
 errorMessage'' :: NEL.NonEmpty SourceSpan -> SimpleErrorMessage -> MultipleErrors
 errorMessage'' sss err = MultipleErrors [ErrorMessage [PositionedError sss] err]
+
+-- | Create an error from multiple (possibly empty) source spans, reversed sorted.
+errorMessage''' :: [SourceSpan] -> SimpleErrorMessage -> MultipleErrors
+errorMessage''' sss err =
+  maybe (errorMessage err) (flip errorMessage'' err)
+    . NEL.nonEmpty
+    . reverse
+    . sort
+    $ filter (/= NullSourceSpan) sss
 
 -- | Create an error set from a single error message
 singleError :: ErrorMessage -> MultipleErrors
@@ -1446,6 +1455,7 @@ warnAndRethrowWithPosition :: (MonadError MultipleErrors m, MonadWriter Multiple
 warnAndRethrowWithPosition pos = rethrowWithPosition pos . warnWithPosition pos
 
 withPosition :: SourceSpan -> ErrorMessage -> ErrorMessage
+withPosition NullSourceSpan err = err
 withPosition pos (ErrorMessage hints se) = ErrorMessage (positionedError pos : hints) se
 
 positionedError :: SourceSpan -> ErrorMessageHint

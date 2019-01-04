@@ -109,6 +109,8 @@ nonEmptySpan (NullSourceSpan, _) = Nothing
 nonEmptySpan (ss, _) = Just ss
 
 widenSourceSpan :: SourceSpan -> SourceSpan -> SourceSpan
+widenSourceSpan NullSourceSpan b = b
+widenSourceSpan a NullSourceSpan = a
 widenSourceSpan (SourceSpan n1 s1 e1) (SourceSpan n2 s2 e2) =
   SourceSpan n (min s1 s2) (max e1 e2)
   where
