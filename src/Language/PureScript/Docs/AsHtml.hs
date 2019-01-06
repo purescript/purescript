@@ -53,18 +53,16 @@ data HtmlOutputModule a = HtmlOutputModule
   deriving (Show, Functor)
 
 data HtmlRenderContext = HtmlRenderContext
-  { currentModuleName :: P.ModuleName
-  , buildDocLink :: Namespace -> Text -> ContainingModule -> Maybe DocLink
+  { buildDocLink :: Namespace -> Text -> ContainingModule -> Maybe DocLink
   , renderDocLink :: DocLink -> Text
   , renderSourceLink :: P.SourceSpan -> Maybe Text
   }
 
 -- |
 -- An HtmlRenderContext for when you don't want to render any links.
-nullRenderContext :: P.ModuleName -> HtmlRenderContext
-nullRenderContext mn = HtmlRenderContext
-  { currentModuleName = mn
-  , buildDocLink = const (const (const Nothing))
+nullRenderContext :: HtmlRenderContext
+nullRenderContext = HtmlRenderContext
+  { buildDocLink = const (const (const Nothing))
   , renderDocLink = const ""
   , renderSourceLink = const Nothing
   }
@@ -83,16 +81,16 @@ moduleAsHtml
     :: (InPackage P.ModuleName -> Maybe HtmlRenderContext)
     -> Module
     -> (P.ModuleName, HtmlOutputModule Html)
-moduleAsHtml getR Module{..} = (modName, HtmlOutputModule modHtml reexports)
+moduleAsHtml getHtmlCtx Module{..} = (modName, HtmlOutputModule modHtml reexports)
   where
   modHtml = do
-    let r = fromMaybe (nullRenderContext modName) $ getR (Local modName)
+    let r = fromMaybe nullRenderContext $ getHtmlCtx (Local modName)
      in do
         for_ modComments renderMarkdown
         for_ modDeclarations (declAsHtml r)
   reexports =
     flip map modReExports $ \(pkg, decls) ->
-        let r = fromMaybe (nullRenderContext modName) $ getR pkg
+        let r = fromMaybe nullRenderContext $ getHtmlCtx pkg
          in (pkg, foldMap (declAsHtml r) decls)
 
 -- renderIndex :: LinksContext -> [(Maybe Char, Html)]
@@ -101,17 +99,17 @@ moduleAsHtml getR Module{..} = (modName, HtmlOutputModule modHtml reexports)
 --   go = takeLocals
 --      >>> groupIndex getIndex renderEntry
 --      >>> map (second (ul . mconcat))
--- 
+--
 --   getIndex (_, title_) = do
 --     c <- textHeadMay title_
 --     guard (toUpper c `elem` ['A'..'Z'])
 --     pure c
--- 
+--
 --   textHeadMay t =
 --     case T.length t of
 --       0 -> Nothing
 --       _ -> Just (T.index t 0)
--- 
+--
 --   renderEntry (mn, title_) =
 --     li $ do
 --       let url = T.pack (filePathFor mn `relativeTo` "index") <> "#" <> title_
@@ -119,7 +117,7 @@ moduleAsHtml getR Module{..} = (modName, HtmlOutputModule modHtml reexports)
 --         a ! A.href (v url) $ text title_
 --       sp
 --       text ("(" <> P.runModuleName mn <> ")")
--- 
+--
 --   groupIndex :: Ord i => (a -> Maybe i) -> (a -> b) -> [a] -> [(Maybe i, [b])]
 --   groupIndex f g =
 --     map (second DList.toList) . M.toList . foldr go' M.empty . sortBy (comparing f)
@@ -233,13 +231,13 @@ renderLink r link_@DocLink{..} =
   a ! A.href (v (renderDocLink r link_ <> fragmentFor link_))
     ! A.title (v fullyQualifiedName)
   where
-  fullyQualifiedName = case linkLocation of
-    SameModule                -> fq (currentModuleName r) linkTitle
-    LocalModule _ modName     -> fq modName linkTitle
-    DepsModule _ _ _ modName  -> fq modName linkTitle
-    BuiltinModule modName     -> fq modName linkTitle
+  fullyQualifiedName =
+    P.runModuleName modName <> "." <> linkTitle
 
-  fq mn str = P.runModuleName mn <> "." <> str
+  modName = case linkLocation of
+    LocalModule m    -> m
+    DepsModule _ _ m -> m
+    BuiltinModule m  -> m
 
 makeFragment :: Namespace -> Text -> Text
 makeFragment ns = (prefix <>) . escape

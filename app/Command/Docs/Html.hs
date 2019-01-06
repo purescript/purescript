@@ -48,8 +48,7 @@ writeHtmlFile filepath =
 
 getHtmlRenderContext :: P.ModuleName -> D.HtmlRenderContext
 getHtmlRenderContext mn = D.HtmlRenderContext
-  { D.currentModuleName = mn
-  , D.buildDocLink = getLink mn
+  { D.buildDocLink = getLink mn
   , D.renderDocLink = renderLink
   , D.renderSourceLink = const Nothing
   }
@@ -70,11 +69,11 @@ getLink curMn namespace target containingMod = do
   normalLinkLocation = do
     case containingMod of
       D.ThisModule ->
-        return D.SameModule
+        return $ D.LocalModule curMn
       D.OtherModule destMn ->
         -- This is OK because all modules count as 'local' for purs docs in
         -- html mode
-        return $ D.LocalModule curMn destMn
+        return $ D.LocalModule destMn
 
   builtinLinkLocation = do
     let primMn = P.moduleNameFromString "Prim"
@@ -84,9 +83,7 @@ getLink curMn namespace target containingMod = do
 renderLink :: D.DocLink -> Text
 renderLink l =
   case D.linkLocation l of
-    D.SameModule ->
-      ""
-    D.LocalModule _ dest ->
+    D.LocalModule dest ->
       P.runModuleName dest <> ".html"
     D.DepsModule{} ->
       P.internalError "DepsModule: not implemented"
