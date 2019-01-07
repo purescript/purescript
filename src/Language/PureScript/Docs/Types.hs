@@ -414,18 +414,13 @@ data DocLink = DocLink
 instance NFData DocLink
 
 data LinkLocation
-  -- | A link to a declaration in the same module.
-  = SameModule
+  -- | A link to a declaration in the current package.
+  = LocalModule P.ModuleName
 
-  -- | A link to a declaration in a different module, but still in the current
-  -- package; we need to store the current module and the other declaration's
-  -- module.
-  | LocalModule P.ModuleName P.ModuleName
-
-  -- | A link to a declaration in a different package. We store: current module
-  -- name, name of the other package, version of the other package, and name of
-  -- the module in the other package that the declaration is in.
-  | DepsModule P.ModuleName PackageName Version P.ModuleName
+  -- | A link to a declaration in a different package. The arguments represent
+  -- the name of the other package, the version of the other package, and the
+  -- name of the module in the other package that the declaration is in.
+  | DepsModule PackageName Version P.ModuleName
 
   -- | A link to a declaration that is built in to the compiler, e.g. the Prim
   -- module. In this case we only need to store the module that the builtin
@@ -454,14 +449,14 @@ getLink LinksContext{..} curMn namespace target containingMod = do
   normalLinkLocation = do
     case containingMod of
       ThisModule ->
-        return SameModule
+        return $ LocalModule curMn
       OtherModule destMn ->
         case Map.lookup destMn ctxModuleMap of
           Nothing ->
-            return $ LocalModule curMn destMn
+            return $ LocalModule destMn
           Just pkgName -> do
             pkgVersion <- lookup pkgName ctxResolvedDependencies
-            return $ DepsModule curMn pkgName pkgVersion destMn
+            return $ DepsModule pkgName pkgVersion destMn
 
   builtinLinkLocation =
     case containingMod of
