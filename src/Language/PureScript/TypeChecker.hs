@@ -470,7 +470,7 @@ typeCheckAll moduleName _ = traverse go
   censorLocalUnnamedWildcards _ = id
 
   isLocalUnnamedWildcardError :: SourceType -> ErrorMessage -> Bool
-  isLocalUnnamedWildcardError ty err@(ErrorMessage _ (WildcardInferredType _ _ Nothing)) =
+  isLocalUnnamedWildcardError ty err@(ErrorMessage _ (WildcardInferredType _ _)) =
     let
       ssWildcard (TypeWildcard (ss', _) Nothing) = [ss']
       ssWildcard _ = []

@@ -151,12 +151,12 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
       -> ErrorMessage
       -> ErrorMessage
     runTypeSearch cons st = \case
-      ErrorMessage hints (HoleInferredType x ty y (TSBefore env)) ->
+      ErrorMessage hints (HoleInferredType x ty y (Just (TSBefore env))) ->
         let subst = checkSubstitution st
             searchResult = onTypeSearchTypes
               (substituteType subst)
               (uncurry TSAfter (typeSearch cons env st (substituteType subst ty)))
-        in ErrorMessage hints (HoleInferredType x ty y searchResult)
+        in ErrorMessage hints (HoleInferredType x ty y (Just searchResult))
       other -> other
 
     -- | Generalize type vars using forall and add inferred constraints
@@ -415,7 +415,7 @@ infer' (Hole name) = do
   ty <- freshType
   ctx <- getLocalContext
   env <- getEnv
-  tell . errorMessage $ HoleInferredType name ty ctx (TSBefore env)
+  tell . errorMessage $ HoleInferredType name ty ctx . Just $ TSBefore env
   return $ TypedValue True (Hole name) ty
 infer' (PositionedValue pos c val) = warnAndRethrowWithPositionTC pos $ do
   TypedValue t v ty <- infer' val

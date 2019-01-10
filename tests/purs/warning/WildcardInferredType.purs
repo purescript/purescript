@@ -1,27 +1,14 @@
 -- @shouldWarnWith WildcardInferredType
 -- @shouldWarnWith WildcardInferredType
--- @shouldWarnWith WildcardInferredType
--- @shouldWarnWith WildcardInferredType
--- @shouldWarnWith WildcardInferredType
 module Main where
 
-x :: Int
-x = 0 :: ?x
+x = 0 :: _
 
-y :: ?y
+y :: _
 y = 0
 
 z :: Int
 z =
-  let n :: ?n
+  let n :: _
       n = 0
   in n
-
-w :: Int
-w = n
-  where
-  n :: ?n
-  n = 0
-
-v :: ?v
-v = 0
