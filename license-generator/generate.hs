@@ -56,7 +56,7 @@ depsNamesAndVersions :: IO [(String, String)]
 depsNamesAndVersions = do
   contents <- lines <$> getContents
   deps <- traverse parse contents
-  pure (filter ((/= "purescript") . fst) deps)
+  pure (filter (\(name, _) -> name /= "purescript" && name /= "rts") deps)
 
   where
   parse line =
