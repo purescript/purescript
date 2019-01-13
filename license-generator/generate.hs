@@ -1,3 +1,6 @@
+#!/usr/bin/env stack
+-- stack --resolver lts-12.0 script
+
 {-# LANGUAGE TupleSections #-}
 -- |
 -- A small script which regenerates the LICENSE file with all
@@ -6,7 +9,7 @@
 --
 -- It is recommended to run this as follows:
 --
--- stack list-dependencies --flag purescript:RELEASE | stack exec runhaskell license-generator/generate.hs > LICENSE
+-- stack list-dependencies --flag purescript:RELEASE | stack license-generator/generate.hs > LICENSE
 --
 
 module Main (main) where
