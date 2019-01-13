@@ -189,7 +189,7 @@ solveTypes isData ts kargs tyCon = do
   ks <- traverse (fmap fst . infer) ts
   when isData $ do
     unifyKinds tyCon (foldr srcFunKind kindType kargs)
-    forM_ ks $ \k -> unifyKinds k kindType
+    forM_ ks $ \k -> unifyKinds k (kindType $> getAnnForKind k)
   unless isData $
     unifyKinds tyCon (foldr srcFunKind (head ks) kargs)
   return tyCon
