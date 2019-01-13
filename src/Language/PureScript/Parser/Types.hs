@@ -37,7 +37,10 @@ parseTypeLevelString :: TokenParser SourceType
 parseTypeLevelString = withSourceAnnF $ flip TypeLevelString <$> stringLiteral
 
 parseTypeWildcard :: TokenParser SourceType
-parseTypeWildcard = withSourceAnnF $ underscore $> TypeWildcard
+parseTypeWildcard = withSourceAnnF $ do
+  name <- Just <$> holeLit
+      <|> Nothing <$ underscore
+  return $ flip TypeWildcard name
 
 parseTypeVariable :: TokenParser SourceType
 parseTypeVariable = withSourceAnnF $ do

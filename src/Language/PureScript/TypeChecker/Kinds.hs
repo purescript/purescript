@@ -239,7 +239,7 @@ infer' other = (, []) <$> go other
     k' <- go ty
     unifyKinds k k'
     return k'
-  go (TypeWildcard ann) = freshKind ann
+  go (TypeWildcard ann _) = freshKind ann
   go (TUnknown ann _) = freshKind ann
   go (TypeLevelString ann _) = return $ kindSymbol $> ann
   go (TypeVar ann v) = do

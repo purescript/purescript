@@ -16,10 +16,10 @@ import Control.Monad (when, unless, void, forM)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), modify, gets)
 import Control.Monad.Supply.Class (MonadSupply)
-import Control.Monad.Writer.Class (MonadWriter(..))
+import Control.Monad.Writer.Class (MonadWriter(..), censor)
 
 import Data.Foldable (for_, traverse_, toList)
-import Data.List (nub, nubBy, (\\), sort, group)
+import Data.List (nub, nubBy, (\\), sort, group, intersect)
 import Data.Maybe
 import Data.Text (Text)
 import qualified Data.List.NonEmpty as NEL
@@ -274,12 +274,13 @@ typeCheckAll moduleName _ = traverse go
     internalError "Type declarations should have been removed before typeCheckAlld"
   go (ValueDecl sa@(ss, _) name nameKind [] [MkUnguarded val]) = do
     env <- getEnv
-    warnAndRethrow (addHint (ErrorInValueDeclaration name) . addHint (positionedError ss)) $ do
+    warnAndRethrow (addHint (ErrorInValueDeclaration name) . addHint (positionedError ss)) . censorLocalUnnamedWildcards val $ do
       val' <- checkExhaustiveExpr ss env moduleName val
       valueIsNotDefined moduleName name
       [(_, (val'', ty))] <- typesOf NonRecursiveBindingGroup moduleName [((sa, name), val')]
       addValue moduleName name ty nameKind
       return $ ValueDecl sa name nameKind [] [MkUnguarded val'']
+    where
   go ValueDeclaration{} = internalError "Binders were not desugared"
   go BoundValueDeclaration{} = internalError "BoundValueDeclaration should be desugared"
   go (BindingGroupDeclaration vals) = do
@@ -463,6 +464,21 @@ typeCheckAll moduleName _ = traverse go
   checkOrphanInstance dictName className tys' nonOrphanModules
     | moduleName `S.member` nonOrphanModules = return ()
     | otherwise = throwError . errorMessage $ OrphanInstance dictName className nonOrphanModules tys'
+
+  censorLocalUnnamedWildcards :: Expr -> m a -> m a
+  censorLocalUnnamedWildcards (TypedValue _ _ ty) = censor (filterErrors (not . isLocalUnnamedWildcardError ty))
+  censorLocalUnnamedWildcards _ = id
+
+  isLocalUnnamedWildcardError :: SourceType -> ErrorMessage -> Bool
+  isLocalUnnamedWildcardError ty err@(ErrorMessage _ (WildcardInferredType _ _)) =
+    let
+      ssWildcard (TypeWildcard (ss', _) Nothing) = [ss']
+      ssWildcard _ = []
+      sssWildcards = everythingOnTypes (<>) ssWildcard ty
+      sss = maybe [] NEL.toList $ errorSpan err
+    in
+      null $ intersect sss sssWildcards
+  isLocalUnnamedWildcardError _ _ = False
 
   -- |
   -- This function adds the argument kinds for a type constructor so that they may appear in the externs file,

@@ -31,8 +31,8 @@ import Language.PureScript.Docs.RenderedCode.RenderKind (renderKind)
 typeLiterals :: Pattern () PrettyPrintType RenderedCode
 typeLiterals = mkPattern match
   where
-  match PPTypeWildcard =
-    Just (syntax "_")
+  match (PPTypeWildcard name) =
+    Just $ maybe (syntax "_") (syntax . ("?" <>)) name
   match (PPTypeVar var) =
     Just (typeVar var)
   match (PPRecord row) =

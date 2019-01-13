@@ -45,7 +45,7 @@ data PrettyPrintType
   = PPTUnknown Int
   | PPTypeVar Text
   | PPTypeLevelString PSString
-  | PPTypeWildcard
+  | PPTypeWildcard (Maybe Text)
   | PPTypeConstructor (Qualified (ProperName 'TypeName))
   | PPTypeOp (Qualified (OpName 'TypeOpName))
   | PPSkolem Text Int
@@ -68,7 +68,7 @@ convertPrettyPrintType = go
   go (TUnknown _ n) = PPTUnknown n
   go (TypeVar _ t) = PPTypeVar t
   go (TypeLevelString _ s) = PPTypeLevelString s
-  go (TypeWildcard _) = PPTypeWildcard
+  go (TypeWildcard _ n) = PPTypeWildcard n
   go (TypeConstructor _ c) = PPTypeConstructor c
   go (TypeOp _ o) = PPTypeOp o
   go (Skolem _ t n _) = PPSkolem t n
@@ -161,7 +161,7 @@ matchTypeAtom tro@TypeRenderOptions{troSuggesting = suggesting} =
   where
     typeLiterals :: Pattern () PrettyPrintType Box
     typeLiterals = mkPattern match where
-      match PPTypeWildcard = Just $ text "_"
+      match (PPTypeWildcard name) = Just $ maybe (text "_") (text . ('?' :) . T.unpack) name
       match (PPTypeVar var) = Just $ text $ T.unpack var
       match (PPTypeLevelString s) = Just $ text $ T.unpack $ prettyPrintString s
       match (PPRecord row) = Just $ prettyPrintRowWith tro '{' '}' row

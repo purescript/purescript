@@ -296,7 +296,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
   gSimple (OrphanInstance nm cl noms ts) = OrphanInstance nm cl noms <$> traverse f ts
   gSimple (WildcardInferredType ty ctx) = WildcardInferredType <$> f ty <*> traverse (sndM f) ctx
-  gSimple (HoleInferredType name ty ctx env) = HoleInferredType name <$> f ty <*> traverse (sndM f) ctx  <*> onTypeSearchTypesM f env
+  gSimple (HoleInferredType name ty ctx env) = HoleInferredType name <$> f ty <*> traverse (sndM f) ctx  <*> traverse (onTypeSearchTypesM f) env
   gSimple (MissingTypeDeclaration nm ty) = MissingTypeDeclaration nm <$> f ty
   gSimple (CannotGeneralizeRecursiveFunction nm ty) = CannotGeneralizeRecursiveFunction nm <$> f ty
   gSimple other = pure other
@@ -852,7 +852,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       let
         maxTSResults = 15
         tsResult = case ts of
-          (TSAfter{tsAfterIdentifiers=idents}) | not (null idents) ->
+          Just (TSAfter{tsAfterIdentifiers=idents}) | not (null idents) ->
             let
               formatTS (names, types) =
                 let
@@ -1460,6 +1460,9 @@ withPosition pos (ErrorMessage hints se) = ErrorMessage (positionedError pos : h
 
 positionedError :: SourceSpan -> ErrorMessageHint
 positionedError = PositionedError . pure
+
+filterErrors :: (ErrorMessage -> Bool) -> MultipleErrors -> MultipleErrors
+filterErrors f = MultipleErrors . filter f . runMultipleErrors
 
 -- | Runs a computation listening for warnings and then escalating any warnings
 -- that match the predicate to error status.

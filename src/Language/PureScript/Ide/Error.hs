@@ -52,7 +52,7 @@ encodeRebuildErrors = toJSON . map encodeRebuildError . P.runMultipleErrors
     encodeRebuildError err = case err of
       (P.ErrorMessage _
        ((P.HoleInferredType name _ _
-         (P.TSAfter{tsAfterIdentifiers=idents, tsAfterRecordFields=fields})))) ->
+         (Just (P.TSAfter{tsAfterIdentifiers=idents, tsAfterRecordFields=fields}))))) ->
         insertTSCompletions name idents (fromMaybe [] fields) (toJSON (toJSONError False P.Error err))
       _ ->
         (toJSON . toJSONError False P.Error) err
