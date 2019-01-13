@@ -35,6 +35,7 @@ Have any of the following JSON formats changed? If so, it may be worth
 considering what effects this may have:
 
 - [ ] Corefn
+- [ ] Ide protocol
 - [ ] JSON produced by `purs publish`
   - [ ] check whether this affects Pursuit
 
