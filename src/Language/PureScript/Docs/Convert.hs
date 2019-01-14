@@ -249,6 +249,7 @@ partiallyDesugar = P.evalSupplyT 0 . desugar'
   where
   desugar' =
     traverse P.desugarDoModule
+      >=> traverse P.desugarAdoModule
       >=> map P.desugarLetPatternModule
       >>> traverse P.desugarCasesModule
       >=> traverse P.desugarTypeDeclarationsModule

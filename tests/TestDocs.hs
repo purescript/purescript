@@ -643,6 +643,11 @@ testCases =
   , ("DeclOrderNoExportList",
       shouldBeOrdered (n "DeclOrderNoExportList")
         [ "x1", "x3", "X2", "X4", "A", "B" ])
+
+  , ("Ado",
+      [ ValueShouldHaveTypeSignature (n "Ado") "test" (renderedType "Int")
+      ]
+    )
   ]
 
   where
