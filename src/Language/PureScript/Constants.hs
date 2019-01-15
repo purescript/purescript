@@ -457,6 +457,12 @@ pattern SymbolAppend = Qualified (Just PrimSymbol) (ProperName "Append")
 pattern SymbolCons :: Qualified (ProperName 'ClassName)
 pattern SymbolCons = Qualified (Just PrimSymbol) (ProperName "Cons")
 
+pattern SymbolContains :: Qualified (ProperName 'ClassName)
+pattern SymbolContains = Qualified (Just PrimSymbol) (ProperName "Contains")
+
+pattern SymbolBreakOn :: Qualified (ProperName 'ClassName)
+pattern SymbolBreakOn = Qualified (Just PrimSymbol) (ProperName "BreakOn")
+
 -- Prim.TypeError
 
 pattern PrimTypeError :: ModuleName

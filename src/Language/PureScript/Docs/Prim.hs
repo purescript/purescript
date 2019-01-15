@@ -109,6 +109,8 @@ primSymbolDocsModule = Module
       [ symbolAppend
       , symbolCompare
       , symbolCons
+      , symbolContains
+      , symbolBreakOn
       ]
   , modReExports = []
   }
@@ -450,6 +452,20 @@ symbolCons = primClassOf (P.primSubName "Symbol") "Cons" $ T.unlines
   , "head and tail or for combining a head and tail into a new symbol."
   , "Requires the head to be a single character and the combined string"
   , "cannot be empty."
+  ]
+
+symbolContains :: Declaration
+symbolContains = primClassOf (P.primSubName "Symbol") "Contains" $ T.unlines
+  [ "Compiler solved type class for checking if a Symbol contains a Symbol."
+  ]
+
+symbolBreakOn :: Declaration
+symbolBreakOn = primClassOf (P.primSubName "Symbol") "BreakOn" $ T.unlines
+  [ "Compiler solved type class for breaking a symbol into its head and tail"
+  , "using the whole symbol and a breaking symbol, or for joining together the"
+  , "head and tail with the breaking symbol."
+  , "Does not resolve when the tail is empty, i.e. the breaker is not in the Symbol."
+  , "Use SymbolContains for conditional logic."
   ]
 
 fail :: Declaration

@@ -171,6 +171,8 @@ entails SolverOptions{..} constraint context hints =
     forClassName _ C.SymbolCompare args | Just dicts <- solveSymbolCompare args = dicts
     forClassName _ C.SymbolAppend args | Just dicts <- solveSymbolAppend args = dicts
     forClassName _ C.SymbolCons args | Just dicts <- solveSymbolCons args = dicts
+    forClassName _ C.SymbolContains args | Just dicts <- solveSymbolContains args = dicts
+    forClassName _ C.SymbolBreakOn args | Just dicts <- solveSymbolBreakOn args = dicts
     forClassName _ C.RowUnion args | Just dicts <- solveUnion args = dicts
     forClassName _ C.RowNub args | Just dicts <- solveNub args = dicts
     forClassName _ C.RowLacks args | Just dicts <- solveLacks args = dicts
@@ -414,6 +416,46 @@ entails SolverOptions{..} constraint context hints =
       guard (T.length h' == 1)
       pure (arg1, arg2, srcTypeLevelString (mkString $ h' <> t'))
     consSymbol _ _ _ = Nothing
+
+    solveSymbolContains :: [SourceType] -> Maybe [TypeClassDict]
+    solveSymbolContains [arg0, arg1, arg2] = do
+      (arg0', arg1', arg2') <- containsSymbol arg0 arg1 arg2
+      let args' = [arg0', arg1', arg2']
+      pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.SymbolContains args' Nothing]
+    solveSymbolContains _ = Nothing
+
+    -- contains pattern, symbol, boolean
+    containsSymbol :: SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType)
+    containsSymbol patt@(TypeLevelString _ patt') sym@(TypeLevelString _ sym') _ = do
+      flag <- T.isInfixOf <$> decodeString patt' <*> decodeString sym'
+      pure (patt, sym, TypeConstructor NullSourceAnn $ if flag then C.booleanTrue else C.booleanFalse)
+    containsSymbol _ _ _ = Nothing
+
+    solveSymbolBreakOn :: [SourceType] -> Maybe [TypeClassDict]
+    solveSymbolBreakOn [arg0, arg1, arg2, arg3] = do
+      (arg0', arg1', arg2', arg3') <- breakOnSymbol arg0 arg1 arg2 arg3
+      let args' = [arg0', arg1', arg2', arg3']
+      pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.SymbolBreakOn args' Nothing]
+    solveSymbolBreakOn _ = Nothing
+
+    -- breakOn by full, breaker, first, rest
+    -- purposefully does not resolve when the breaker is not contained
+    breakOnSymbol :: SourceType -> SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType, SourceType)
+    breakOnSymbol breaker@(TypeLevelString _ breaker') full@(TypeLevelString _ full') _ _ = do
+      (first, rest) <- T.breakOn <$> decodeString breaker' <*> decodeString full'
+      if T.null rest
+        then Nothing
+        else pure (breaker, full, mkTLString first, mkTLString rest)
+      where mkTLString = srcTypeLevelString . mkString
+    breakOnSymbol breaker@(TypeLevelString _ breaker') _ first@(TypeLevelString _ first') rest@(TypeLevelString _ rest') = do
+      first'' <- decodeString first'
+      breaker'' <- decodeString breaker'
+      rest'' <- decodeString rest'
+      guard $ not (T.isInfixOf breaker'' first'')
+      guard (T.isPrefixOf breaker'' rest'')
+      let full = first'' <> rest''
+      pure (breaker, srcTypeLevelString (mkString full), first, rest)
+    breakOnSymbol _ _ _ _ = Nothing
 
     solveUnion :: [SourceType] -> Maybe [TypeClassDict]
     solveUnion [l, r, u] = do

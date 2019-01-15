@@ -467,6 +467,8 @@ primSymbolTypes =
     [ (primSubName C.moduleSymbol "Append",  (kindSymbol -:> kindSymbol -:> kindSymbol -:> kindConstraint, ExternData))
     , (primSubName C.moduleSymbol "Compare", (kindSymbol -:> kindSymbol -:> kindOrdering -:> kindConstraint, ExternData))
     , (primSubName C.moduleSymbol "Cons",  (kindSymbol -:> kindSymbol -:> kindSymbol -:> kindConstraint, ExternData))
+    , (primSubName C.moduleSymbol "Contains",  (kindSymbol -:> kindSymbol -:> kindBoolean -:> kindConstraint, ExternData))
+    , (primSubName C.moduleSymbol "BreakOn",  (kindSymbol -:> kindSymbol -:> kindSymbol -:> kindSymbol -:> kindConstraint, ExternData))
     ]
 
 primTypeErrorTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceKind, TypeKind)
@@ -582,6 +584,26 @@ primSymbolClasses =
         ] [] []
         [ FunctionalDependency [0, 1] [2]
         , FunctionalDependency [2] [0, 1]
+        ])
+
+    -- class Contains (pattern :: Symbol) (symbol :: Symbol) (result :: Boolean) | pattern symbol -> result
+    , (primSubName C.moduleSymbol "Contains", makeTypeClassData
+        [ ("pattern", Just kindSymbol)
+        , ("symbol", Just kindSymbol)
+        , ("result", Just kindBoolean)
+        ] [] []
+        [ FunctionalDependency [0, 1] [2]
+        ])
+
+    -- class BreakOn (breakOn :: Symbol) (symbol :: Symbol) (first :: Symbol) (second :: Symbol) | breakOn symbol -> first second, breakOn first second -> symbol
+    , (primSubName C.moduleSymbol "BreakOn", makeTypeClassData
+        [ ("breakOn", Just kindSymbol)
+        , ("symbol", Just kindSymbol)
+        , ("first", Just kindSymbol)
+        , ("second", Just kindSymbol)
+        ] [] []
+        [ FunctionalDependency [0, 1] [2, 3]
+        , FunctionalDependency [0, 2, 3] [1]
         ])
     ]
 
