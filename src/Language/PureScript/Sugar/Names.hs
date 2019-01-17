@@ -193,20 +193,20 @@ renameInModule imports (Module modSS coms mn decls exps) =
     :: [Ident]
     -> Declaration
     -> m ([Ident], Declaration)
-  updateDecl bound (DataDeclaration sa@(ss, _) dtype name args dctors) =
+  updateDecl bound (DataDeclaration sa dtype name args dctors) =
     fmap (bound,) $
       DataDeclaration sa dtype name
-        <$> updateTypeArguments ss args
-        <*> traverse (sndM (traverse (updateTypesEverywhere ss))) dctors
-  updateDecl bound (TypeSynonymDeclaration sa@(ss, _) name ps ty) =
+        <$> updateTypeArguments args
+        <*> traverse (sndM (traverse updateTypesEverywhere)) dctors
+  updateDecl bound (TypeSynonymDeclaration sa name ps ty) =
     fmap (bound,) $
       TypeSynonymDeclaration sa name
-        <$> updateTypeArguments ss ps
-        <*> updateTypesEverywhere ss ty
+        <$> updateTypeArguments ps
+        <*> updateTypesEverywhere ty
   updateDecl bound (TypeClassDeclaration sa@(ss, _) className args implies deps ds) =
     fmap (bound,) $
       TypeClassDeclaration sa className
-        <$> updateTypeArguments ss args
+        <$> updateTypeArguments args
         <*> updateConstraints ss implies
         <*> pure deps
         <*> pure ds
@@ -215,20 +215,20 @@ renameInModule imports (Module modSS coms mn decls exps) =
       TypeInstanceDeclaration sa ch idx name
         <$> updateConstraints ss cs
         <*> updateClassName cn ss
-        <*> traverse (updateTypesEverywhere ss) ts
+        <*> traverse updateTypesEverywhere ts
         <*> pure ds
-  updateDecl bound (TypeDeclaration (TypeDeclarationData sa@(ss, _) name ty)) =
+  updateDecl bound (TypeDeclaration (TypeDeclarationData sa name ty)) =
     fmap (bound,) $
       TypeDeclaration . TypeDeclarationData sa name
-        <$> updateTypesEverywhere ss ty
-  updateDecl bound (ExternDeclaration sa@(ss, _) name ty) =
+        <$> updateTypesEverywhere ty
+  updateDecl bound (ExternDeclaration sa name ty) =
     fmap (name : bound,) $
       ExternDeclaration sa name
-        <$> updateTypesEverywhere ss ty
-  updateDecl bound (ExternDataDeclaration sa@(ss, _) name ki) =
+        <$> updateTypesEverywhere ty
+  updateDecl bound (ExternDataDeclaration sa name ki) =
     fmap (bound,) $
       ExternDataDeclaration sa name
-        <$> updateKindsEverywhere ss ki
+        <$> updateKindsEverywhere ki
   updateDecl bound (TypeFixityDeclaration sa@(ss, _) fixity alias op) =
     fmap (bound,) $
       TypeFixityDeclaration sa fixity
@@ -268,8 +268,8 @@ renameInModule imports (Module modSS coms mn decls exps) =
     (,) (ss, bound) <$> (Op ss <$> updateValueOpName op ss)
   updateValue (_, bound) (Constructor ss name) =
     (,) (ss, bound) <$> (Constructor ss <$> updateDataConstructorName name ss)
-  updateValue s@(pos, _) (TypedValue check val ty) =
-    (,) s <$> (TypedValue check val <$> updateTypesEverywhere pos ty)
+  updateValue s (TypedValue check val ty) =
+    (,) s <$> (TypedValue check val <$> updateTypesEverywhere ty)
   updateValue s v = return (s, v)
 
   updateBinder
@@ -282,8 +282,8 @@ renameInModule imports (Module modSS coms mn decls exps) =
     (,) (ss, bound) <$> (ConstructorBinder ss <$> updateDataConstructorName name ss <*> pure b)
   updateBinder (_, bound) (OpBinder ss op) =
     (,) (ss, bound) <$> (OpBinder ss <$> updateValueOpName op ss)
-  updateBinder s@(pos, _) (TypedBinder t b) = do
-    t' <- updateTypesEverywhere pos t
+  updateBinder s (TypedBinder t b) = do
+    t' <- updateTypesEverywhere t
     return (s, TypedBinder t' b)
   updateBinder s v =
     return (s, v)
@@ -306,37 +306,36 @@ renameInModule imports (Module modSS coms mn decls exps) =
   letBoundVariable :: Declaration -> Maybe Ident
   letBoundVariable = fmap valdeclIdent . getValueDeclaration
 
-  updateKindsEverywhere :: SourceSpan -> Kind a -> m (Kind a)
-  updateKindsEverywhere pos = everywhereOnKindsM updateKind
+  updateKindsEverywhere :: SourceKind -> m SourceKind
+  updateKindsEverywhere = everywhereOnKindsM updateKind
     where
-    updateKind :: Kind a -> m (Kind a)
-    updateKind (NamedKind ann name) = NamedKind ann <$> updateKindName name pos
+    updateKind :: SourceKind -> m SourceKind
+    updateKind (NamedKind ann@(ss, _) name) = NamedKind ann <$> updateKindName name ss
     updateKind k = return k
 
   updateTypeArguments
     :: (Traversable f, Traversable g)
-    => SourceSpan
-    -> f (a, g (Kind ann)) -> m (f (a, g (Kind ann)))
-  updateTypeArguments pos = traverse (sndM (traverse (updateKindsEverywhere pos)))
+    => f (a, g SourceKind) -> m (f (a, g SourceKind))
+  updateTypeArguments = traverse (sndM (traverse updateKindsEverywhere))
 
-  updateTypesEverywhere :: SourceSpan -> Type a -> m (Type a)
-  updateTypesEverywhere pos = everywhereOnTypesM updateType
+  updateTypesEverywhere :: SourceType -> m SourceType
+  updateTypesEverywhere = everywhereOnTypesM updateType
     where
-    updateType :: Type a -> m (Type a)
-    updateType (TypeOp ann name) = TypeOp ann <$> updateTypeOpName name pos
-    updateType (TypeConstructor ann name) = TypeConstructor ann <$> updateTypeName name pos
+    updateType :: SourceType -> m SourceType
+    updateType (TypeOp ann@(ss, _) name) = TypeOp ann <$> updateTypeOpName name ss
+    updateType (TypeConstructor ann@(ss, _) name) = TypeConstructor ann <$> updateTypeName name ss
     updateType (ConstrainedType ann c t) = ConstrainedType ann <$> updateInConstraint c <*> pure t
-    updateType (KindedType ann t k) = KindedType ann t <$> updateKindsEverywhere pos k
+    updateType (KindedType ann t k) = KindedType ann t <$> updateKindsEverywhere k
     updateType t = return t
-    updateInConstraint :: Constraint a -> m (Constraint a)
-    updateInConstraint (Constraint ann name ts info) =
-      Constraint ann <$> updateClassName name pos <*> pure ts <*> pure info
+    updateInConstraint :: SourceConstraint -> m SourceConstraint
+    updateInConstraint (Constraint ann@(ss, _) name ts info) =
+      Constraint ann <$> updateClassName name ss <*> pure ts <*> pure info
 
-  updateConstraints :: SourceSpan -> [Constraint a] -> m [Constraint a]
+  updateConstraints :: SourceSpan -> [SourceConstraint] -> m [SourceConstraint]
   updateConstraints pos = traverse $ \(Constraint ann name ts info) ->
     Constraint ann
       <$> updateClassName name pos
-      <*> traverse (updateTypesEverywhere pos) ts
+      <*> traverse updateTypesEverywhere ts
       <*> pure info
 
   updateTypeName
