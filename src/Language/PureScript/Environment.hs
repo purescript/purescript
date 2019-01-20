@@ -306,7 +306,7 @@ kindRowList :: SourceKind
 kindRowList = primSubKind C.moduleRowList C.kindRowList
 
 kindRow :: SourceKind -> SourceKind
-kindRow = Row nullSourceAnn
+kindRow srcKind = Row (getAnnForKind srcKind) srcKind
 
 -- | Construct a type in the Prim module
 primTy :: Text -> SourceType
@@ -358,7 +358,7 @@ isTypeOrApplied t1 t2 = eqType t1 t2
 
 -- | Smart constructor for function types
 function :: SourceType -> SourceType -> SourceType
-function t1 t2 = TypeApp nullSourceAnn (TypeApp nullSourceAnn tyFunction t1) t2
+function t1 t2 = TypeApp (getAnnForType t2) (TypeApp (getAnnForType t1) tyFunction t1) t2
 
 -- | Kinds in @Prim@
 primKinds :: S.Set (Qualified (ProperName 'KindName))
