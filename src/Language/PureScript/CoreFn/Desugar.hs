@@ -60,7 +60,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   declToCoreFn (A.DataDeclaration (ss, com) Data tyName _ ctors) =
     flip fmap ctors $ \(ctor, _) ->
       let (_, _, _, fields) = lookupConstructor env (Qualified (Just mn) ctor)
-      in NonRec (ssA ss) (properToIdent ctor) $ Constructor (ss, com, Nothing, Nothing) tyName ctor fields
+      in NonRec (ssA ss) (properToIdent ctor) $ Constructor (ss, com, Nothing, Just $ getConstructorMeta $ Qualified (Just mn) ctor) tyName ctor fields
   declToCoreFn (A.DataBindingGroupDeclaration ds) =
     concatMap declToCoreFn ds
   declToCoreFn (A.ValueDecl (ss, com) name _ _ [A.MkUnguarded e]) =
