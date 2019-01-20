@@ -188,9 +188,9 @@ resolveImport importModule exps imps impQual = resolveByType
     return $ imp { importedValueOps = valueOps' }
   importRef prov imp (TypeRef ss name dctors) = do
     let types' = updateImports (importedTypes imp) (exportedTypes exps) snd name ss prov
-    let (dctorNames, mn) = allExportedDataConstructors name
-        dctorLookup :: M.Map (ProperName 'ConstructorName) ModuleName
-        dctorLookup = M.fromList $ map (, mn) dctorNames
+    let (dctorNames, src) = allExportedDataConstructors name
+        dctorLookup :: M.Map (ProperName 'ConstructorName) ExportSource
+        dctorLookup = M.fromList $ map (, src) dctorNames
     traverse_ (traverse_ $ checkDctorExists ss name dctorNames) dctors
     let dctors' = foldl (\m d -> updateImports m dctorLookup id d ss prov) (importedDataConstructors imp) (fromMaybe dctorNames dctors)
     return $ imp { importedTypes = types', importedDataConstructors = dctors' }
@@ -210,7 +210,7 @@ resolveImport importModule exps imps impQual = resolveByType
   -- Find all exported data constructors for a given type
   allExportedDataConstructors
     :: ProperName 'TypeName
-    -> ([ProperName 'ConstructorName], ModuleName)
+    -> ([ProperName 'ConstructorName], ExportSource)
   allExportedDataConstructors name =
     fromMaybe (internalError "Invalid state in allExportedDataConstructors")
       $ name `M.lookup` exportedTypes exps
@@ -220,15 +220,15 @@ resolveImport importModule exps imps impQual = resolveByType
     :: Ord a
     => M.Map (Qualified a) [ImportRecord a]
     -> M.Map a b
-    -> (b -> ModuleName)
+    -> (b -> ExportSource)
     -> a
     -> SourceSpan
     -> ImportProvenance
     -> M.Map (Qualified a) [ImportRecord a]
   updateImports imps' exps' expName name ss prov =
     let
-      mnOrig = maybe (internalError "Invalid state in updateImports") expName (name `M.lookup` exps')
-      rec = ImportRecord (Qualified (Just importModule) name) mnOrig ss prov
+      src = maybe (internalError "Invalid state in updateImports") expName (name `M.lookup` exps')
+      rec = ImportRecord (Qualified (Just importModule) name) (exportSourceDefinedIn src) ss prov
     in
       M.alter
         (\currNames -> Just $ rec : fromMaybe [] currNames)

@@ -308,7 +308,7 @@ data DeclarationRef
   -- A value re-exported from another module. These will be inserted during
   -- elaboration in name desugaring.
   --
-  | ReExportRef SourceSpan ModuleName DeclarationRef
+  | ReExportRef SourceSpan ExportSource DeclarationRef
   deriving (Show, Generic, NFData)
 
 instance Eq DeclarationRef where
@@ -322,6 +322,13 @@ instance Eq DeclarationRef where
   (KindRef _ name) == (KindRef _ name') = name == name'
   (ReExportRef _ mn ref) == (ReExportRef _ mn' ref') = mn == mn' && ref == ref'
   _ == _ = False
+
+data ExportSource =
+  ExportSource
+  { exportSourceImportedFrom :: Maybe ModuleName
+  , exportSourceDefinedIn :: ModuleName
+  }
+  deriving (Eq, Ord, Show, Generic, NFData)
 
 -- enable sorting lists of explicitly imported refs when suggesting imports in linting, IDE, etc.
 -- not an Ord because this implementation is not consistent with its Eq instance.
@@ -902,6 +909,7 @@ newtype AssocList k t = AssocList { runAssocList :: [(k, t)] }
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''DeclarationRef)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ImportDeclarationType)
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExportSource)
 
 isTrueExpr :: Expr -> Bool
 isTrueExpr (Literal _ (BooleanLiteral True)) = True

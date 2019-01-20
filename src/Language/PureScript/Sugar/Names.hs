@@ -73,33 +73,41 @@ desugarImportsWithEnv externs modules = do
     return $ M.insert efModuleName (efSourceSpan, imps, exps) env
     where
 
-    exportedTypes :: M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ModuleName)
+    -- An ExportSource for declarations local to the module which the given
+    -- ExternsFile corresponds to.
+    localExportSource =
+      ExportSource { exportSourceDefinedIn = efModuleName
+                   , exportSourceImportedFrom = Nothing
+                   }
+
+    exportedTypes :: M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ExportSource)
     exportedTypes = M.fromList $ mapMaybe toExportedType efExports
       where
-      toExportedType (TypeRef _ tyCon dctors) = Just (tyCon, (fromMaybe (mapMaybe forTyCon efDeclarations) dctors, efModuleName))
+      toExportedType (TypeRef _ tyCon dctors) = Just (tyCon, (fromMaybe (mapMaybe forTyCon efDeclarations) dctors, localExportSource))
         where
         forTyCon :: ExternsDeclaration -> Maybe (ProperName 'ConstructorName)
         forTyCon (EDDataConstructor pn _ tNm _ _) | tNm == tyCon = Just pn
         forTyCon _ = Nothing
       toExportedType _ = Nothing
 
-    exportedTypeOps :: M.Map (OpName 'TypeOpName) ModuleName
+    exportedTypeOps :: M.Map (OpName 'TypeOpName) ExportSource
     exportedTypeOps = exportedRefs getTypeOpRef
 
-    exportedTypeClasses :: M.Map (ProperName 'ClassName) ModuleName
+    exportedTypeClasses :: M.Map (ProperName 'ClassName) ExportSource
     exportedTypeClasses = exportedRefs getTypeClassRef
 
-    exportedValues :: M.Map Ident ModuleName
+    exportedValues :: M.Map Ident ExportSource
     exportedValues = exportedRefs getValueRef
 
-    exportedValueOps :: M.Map (OpName 'ValueOpName) ModuleName
+    exportedValueOps :: M.Map (OpName 'ValueOpName) ExportSource
     exportedValueOps = exportedRefs getValueOpRef
 
-    exportedRefs :: Ord a => (DeclarationRef -> Maybe a) -> M.Map a ModuleName
-    exportedRefs f = M.fromList $ (, efModuleName) <$> mapMaybe f efExports
-
-    exportedKinds :: M.Map (ProperName 'KindName) ModuleName
+    exportedKinds :: M.Map (ProperName 'KindName) ExportSource
     exportedKinds = exportedRefs getKindRef
+
+    exportedRefs :: Ord a => (DeclarationRef -> Maybe a) -> M.Map a ExportSource
+    exportedRefs f =
+      M.fromList $ (, localExportSource) <$> mapMaybe f efExports
 
   updateEnv :: ([Module], Env) -> Module -> m ([Module], Env)
   updateEnv (ms, env) m@(Module ss _ mn _ refs) = do
@@ -141,14 +149,14 @@ elaborateExports exps (Module ss coms mn decls refs) =
 
   elaboratedTypeRefs :: [DeclarationRef]
   elaboratedTypeRefs =
-    flip map (M.toList (exportedTypes exps)) $ \(tctor, (dctors, mn')) ->
+    flip map (M.toList (exportedTypes exps)) $ \(tctor, (dctors, src)) ->
       let ref = TypeRef ss tctor (Just dctors)
-      in if mn == mn' then ref else ReExportRef ss mn' ref
+      in if mn == exportSourceDefinedIn src then ref else ReExportRef ss src ref
 
-  go :: (a -> DeclarationRef) -> (Exports -> M.Map a ModuleName) -> [DeclarationRef]
+  go :: (a -> DeclarationRef) -> (Exports -> M.Map a ExportSource) -> [DeclarationRef]
   go toRef select =
-    flip map (M.toList (select exps)) $ \(export, mn') ->
-      if mn == mn' then toRef export else ReExportRef ss mn' (toRef export)
+    flip map (M.toList (select exps)) $ \(export, src) ->
+      if mn == exportSourceDefinedIn src then toRef export else ReExportRef ss src (toRef export)
 
 -- |
 -- Given a list of declarations, an original exports list, and an elaborated
