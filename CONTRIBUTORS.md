@@ -128,6 +128,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@gabejohnson](https://github.com/gabejohnson) | Gabe Johnson | [MIT license](http://opensource.org/licenses/MIT) |
 | [@dariooddenino](https://github.com/dariooddenino) | Dario Oddenino | [MIT license](http://opensource.org/licenses/MIT) |
 | [@jordanmartinez](https://github.com/jordanmartinez) | Jordan Martinez | [MIT license](http://opensource.org/licenses/MIT) |
+| [@jmackie](https://github.com/jmackie) | Jordan Mackie | [MIT license](http://opensource.org/licenses/MIT) |
 
 ### Contributors using Modified Terms
 
