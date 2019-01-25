@@ -1,4 +1,4 @@
-resolver: lts-12.0
+resolver: lts-12.15 # ghc-8.4.4
 packages:
 - '.'
 extra-deps:
