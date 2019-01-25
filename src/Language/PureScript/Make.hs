@@ -33,6 +33,7 @@ import           Language.PureScript.Externs
 import           Language.PureScript.Linter
 import           Language.PureScript.ModuleDependencies
 import           Language.PureScript.Names
+import           Language.PureScript.Options (CodegenTarget, codegenTargetExt)
 import           Language.PureScript.Renamer
 import           Language.PureScript.Sugar
 import           Language.PureScript.TypeChecker
@@ -161,21 +162,28 @@ make ma@MakeActions{..} ms = do
     complete :: Maybe (MultipleErrors, ExternsFile) -> Maybe MultipleErrors -> m ()
     complete = BuildPlan.markComplete buildPlan moduleName
 
--- | Infer the module name for a module by looking for the same filename with
--- a .js extension.
+-- | Infer the foreign module names for a module by looking for the same filename
+-- with the extensions associated with the codegen targets.
 inferForeignModules
   :: forall m
    . MonadIO m
-  => M.Map ModuleName (Either RebuildPolicy FilePath)
-  -> m (M.Map ModuleName FilePath)
-inferForeignModules =
-    fmap (M.mapMaybe id) . traverse inferForeignModule
+  => S.Set CodegenTarget
+  -> M.Map ModuleName (Either RebuildPolicy FilePath)
+  -> m (M.Map ModuleName (M.Map CodegenTarget FilePath))
+inferForeignModules targets = traverse $ \e -> do
+  let exts = mapMaybeS (\t -> (t,) <$> codegenTargetExt t) targets
+  foldM (\m (target, ext) ->
+    maybe m (flip (M.insert target) m) <$> inferForeignModule e ext) M.empty exts
   where
-    inferForeignModule :: Either RebuildPolicy FilePath -> m (Maybe FilePath)
-    inferForeignModule (Left _) = return Nothing
-    inferForeignModule (Right path) = do
-      let jsFile = replaceExtension path "js"
-      exists <- liftIO $ doesFileExist jsFile
-      if exists
-        then return (Just jsFile)
-        else return Nothing
+  inferForeignModule :: Either RebuildPolicy FilePath -> String -> m (Maybe FilePath)
+  inferForeignModule (Left _) _ = return Nothing
+  inferForeignModule (Right path) ext = do
+    let foreignFile = replaceExtension path ext
+    exists <- liftIO $ doesFileExist foreignFile
+    if exists
+      then return (Just foreignFile)
+      else return Nothing
+
+  -- mapMaybe for Set
+  mapMaybeS :: Ord b => (a -> Maybe b) -> S.Set a -> S.Set b
+  mapMaybeS f = S.foldr (\a s -> maybe s (`S.insert` s) (f a)) S.empty

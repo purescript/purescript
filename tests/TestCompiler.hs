@@ -35,6 +35,7 @@ import qualified Data.Text as T
 import Data.Tuple (swap)
 
 import qualified Data.Map as M
+import qualified Data.Set as S
 
 import Control.Monad
 import Control.Arrow ((***), (>>>))
@@ -152,8 +153,8 @@ spec = do
 inferForeignModules
   :: MonadIO m
   => [(FilePath, P.Module)]
-  -> m (M.Map P.ModuleName FilePath)
-inferForeignModules = P.inferForeignModules . fromList
+  -> m (M.Map P.ModuleName (M.Map P.CodegenTarget FilePath))
+inferForeignModules = P.inferForeignModules (S.singleton P.JS) . fromList
   where
     fromList :: [(FilePath, P.Module)] -> M.Map P.ModuleName (Either P.RebuildPolicy FilePath)
     fromList = M.fromList . map ((P.getModuleName *** Right) . swap)
@@ -164,7 +165,10 @@ trim = dropWhile isSpace >>> reverse >>> dropWhile isSpace >>> reverse
 modulesDir :: FilePath
 modulesDir = ".test_modules" </> "node_modules"
 
-makeActions :: [P.Module] -> M.Map P.ModuleName FilePath -> P.MakeActions P.Make
+makeActions
+  :: [P.Module]
+  -> M.Map P.ModuleName (M.Map P.CodegenTarget FilePath)
+  -> P.MakeActions P.Make
 makeActions modules foreigns = (P.buildMakeActions modulesDir (P.internalError "makeActions: input file map was read.") foreigns False)
                                { P.getInputTimestamp = getInputTimestamp
                                , P.getOutputTimestamp = getOutputTimestamp
@@ -190,7 +194,7 @@ runTest = P.runMake P.defaultOptions
 compile
   :: [P.Module]
   -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
+  -> M.Map P.ModuleName (M.Map P.CodegenTarget FilePath)
   -> [FilePath]
   -> ([P.Module] -> IO ())
   -> IO (Either P.MultipleErrors [P.ExternsFile], P.MultipleErrors)
@@ -207,7 +211,7 @@ compile supportModules supportExterns supportForeigns inputFiles check = runTest
 assert
   :: [P.Module]
   -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
+  -> M.Map P.ModuleName (M.Map P.CodegenTarget FilePath)
   -> [FilePath]
   -> ([P.Module] -> IO ())
   -> (Either P.MultipleErrors P.MultipleErrors -> IO (Maybe String))
@@ -256,7 +260,7 @@ checkPositioned errs =
 assertCompiles
   :: [P.Module]
   -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
+  -> M.Map P.ModuleName (M.Map P.CodegenTarget FilePath)
   -> [FilePath]
   -> Handle
   -> Expectation
@@ -283,7 +287,7 @@ assertCompiles supportModules supportExterns supportForeigns inputFiles outputFi
 assertCompilesWithWarnings
   :: [P.Module]
   -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
+  -> M.Map P.ModuleName (M.Map P.CodegenTarget FilePath)
   -> [FilePath]
   -> [String]
   -> Expectation
@@ -304,7 +308,7 @@ assertCompilesWithWarnings supportModules supportExterns supportForeigns inputFi
 assertDoesNotCompile
   :: [P.Module]
   -> [P.ExternsFile]
-  -> M.Map P.ModuleName FilePath
+  -> M.Map P.ModuleName (M.Map P.CodegenTarget FilePath)
   -> [FilePath]
   -> [String]
   -> Expectation

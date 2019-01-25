@@ -108,8 +108,8 @@ buildMakeActions
   -- ^ the output directory
   -> M.Map ModuleName (Either RebuildPolicy FilePath)
   -- ^ a map between module names and paths to the file containing the PureScript module
-  -> M.Map ModuleName FilePath
-  -- ^ a map between module name and the file containing the foreign javascript for the module
+  -> M.Map ModuleName (M.Map CodegenTarget FilePath)
+  -- ^ a map between module name and associated foreign files
   -> Bool
   -- ^ Generate a prefix comment?
   -> MakeActions Make
@@ -121,8 +121,8 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   getInputTimestamp mn = do
     let path = fromMaybe (internalError "Module has no filename in 'make'") $ M.lookup mn filePathMap
     e1 <- traverse getTimestamp path
-    fPath <- maybe (return Nothing) getTimestamp $ M.lookup mn foreigns
-    return $ fmap (max fPath) e1
+    fPaths <- maybe (return mempty) (traverse getTimestamp . M.elems) $ M.lookup mn foreigns
+    return $ fmap (maximum . (:fPaths)) e1
 
   outputFilename :: ModuleName -> String -> FilePath
   outputFilename mn fn =
@@ -184,7 +184,8 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     when (S.member JS codegenTargets) $ do
       let mn = CF.moduleName m
           foreignFile = outputFilename mn "foreign.js"
-      case mn `M.lookup` foreigns of
+          foreignJS = M.lookup mn foreigns >>= M.lookup JS
+      case foreignJS of
         Just path
           | not $ requiresForeign m ->
               tell $ errorMessage' (CF.moduleSourceSpan m) $ UnnecessaryFFIModule mn path
@@ -192,7 +193,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
               checkForeignDecls m path
         Nothing | requiresForeign m -> throwError . errorMessage' (CF.moduleSourceSpan m) $ MissingFFIModule mn
                 | otherwise -> return ()
-      for_ (mn `M.lookup` foreigns) (readTextFile >=> writeTextFile foreignFile)
+      for_ foreignJS (readTextFile >=> writeTextFile foreignFile)
 
   genSourceMap :: String -> String -> Int -> [SMap] -> Make ()
   genSourceMap dir mapFile extraLines mappings = do

@@ -29,3 +29,10 @@ codegenTargets = Map.fromList
   , ("sourcemaps", JSSourceMap)
   , ("corefn", CoreFn)
   ]
+
+-- | Returns the file extension associated with a given @CodegenTarget@. Used
+-- for locating foreign modules, so returns @Nothing@ if the target has no ffi.
+codegenTargetExt :: CodegenTarget -> Maybe String
+codegenTargetExt JS = Just "js"
+codegenTargetExt JSSourceMap = Nothing
+codegenTargetExt CoreFn = Nothing

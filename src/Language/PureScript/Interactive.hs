@@ -78,11 +78,12 @@ make
   :: [(FilePath, P.Module)]
   -> P.Make ([P.ExternsFile], P.Environment)
 make ms = do
-    foreignFiles <- P.inferForeignModules filePathMap
+    targets <- asks P.optionsCodegenTargets
+    foreignFiles <- P.inferForeignModules targets filePathMap
     externs <- P.make (buildActions foreignFiles) (map snd ms)
     return (externs, foldl' (flip P.applyExternsFileToEnvironment) P.initEnvironment externs)
   where
-    buildActions :: M.Map P.ModuleName FilePath -> P.MakeActions P.Make
+    buildActions :: M.Map P.ModuleName (M.Map P.CodegenTarget FilePath) -> P.MakeActions P.Make
     buildActions foreignFiles =
       P.buildMakeActions modulesDir
                          filePathMap

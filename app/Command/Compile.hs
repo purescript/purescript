@@ -8,6 +8,7 @@ module Command.Compile (command) where
 
 import           Control.Applicative
 import           Control.Monad
+import           Control.Monad.Reader (asks)
 import qualified Data.Aeson as A
 import           Data.Bool (bool)
 import qualified Data.ByteString.Lazy.UTF8 as LBU8
@@ -67,7 +68,8 @@ compile PSCMakeOptions{..} = do
   (makeErrors, makeWarnings) <- runMake pscmOpts $ do
     ms <- P.parseModulesFromFiles id moduleFiles
     let filePathMap = M.fromList $ map (\(fp, P.Module _ _ mn _ _) -> (mn, Right fp)) ms
-    foreigns <- inferForeignModules filePathMap
+    targets <- asks P.optionsCodegenTargets
+    foreigns <- inferForeignModules targets filePathMap
     let makeActions = buildMakeActions pscmOutputDir filePathMap foreigns pscmUsePrefix
     P.make makeActions (map snd ms)
   printWarningsAndErrors (P.optionsVerboseErrors pscmOpts) pscmJSONErrors makeWarnings makeErrors
