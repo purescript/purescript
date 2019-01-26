@@ -117,11 +117,11 @@ resolveExports env ss mn imps exps refs =
     reValueOps <- extract ss' isPseudo name ValOpName (importedValueOps imps)
     reKinds <- extract ss' isPseudo name KiName (importedKinds imps)
     foldM (\exps' ((tctor, dctors), src) -> exportType ss' ReExport exps' tctor dctors src) result (resolveTypeExports reTypes reDctors)
-      >>= flip (foldM (uncurry . exportTypeOp ss')) (map (resolveTypeOp name) reTypeOps)
-      >>= flip (foldM (uncurry . exportTypeClass ss' ReExport)) (map (resolveClass name) reClasses)
-      >>= flip (foldM (uncurry . exportValue ss')) (map (resolveValue name) reValues)
-      >>= flip (foldM (uncurry . exportValueOp ss')) (map (resolveValueOp name) reValueOps)
-      >>= flip (foldM (uncurry . exportKind ss')) (map (resolveKind name) reKinds)
+      >>= flip (foldM (uncurry . exportTypeOp ss')) (map resolveTypeOp reTypeOps)
+      >>= flip (foldM (uncurry . exportTypeClass ss' ReExport)) (map resolveClass reClasses)
+      >>= flip (foldM (uncurry . exportValue ss')) (map resolveValue reValues)
+      >>= flip (foldM (uncurry . exportValueOp ss')) (map resolveValueOp reValueOps)
+      >>= flip (foldM (uncurry . exportKind ss')) (map resolveKind reKinds)
   elaborateModuleExports result _ = return result
 
   -- Extracts a list of values for a module based on a lookup table. If the
@@ -189,64 +189,49 @@ resolveExports env ss mn imps exps refs =
 
   -- Looks up an imported type operator and re-qualifies it with the original
   -- module it came from.
-  resolveTypeOp :: ModuleName -> Qualified (OpName 'TypeOpName) -> (OpName 'TypeOpName, ExportSource)
-  resolveTypeOp mnFrom op
-    = splitQual mnFrom
-    . fromMaybe (internalError "Missing value in resolveValue")
+  resolveTypeOp :: Qualified (OpName 'TypeOpName) -> (OpName 'TypeOpName, ExportSource)
+  resolveTypeOp op
+    = fromMaybe (internalError "Missing value in resolveValue")
     $ resolve exportedTypeOps op
 
   -- Looks up an imported class and re-qualifies it with the original module it
   -- came from.
-  resolveClass :: ModuleName -> Qualified (ProperName 'ClassName) -> (ProperName 'ClassName, ExportSource)
-  resolveClass mnFrom className
-    = splitQual mnFrom
-    . fromMaybe (internalError "Missing value in resolveClass")
+  resolveClass :: Qualified (ProperName 'ClassName) -> (ProperName 'ClassName, ExportSource)
+  resolveClass className
+    = fromMaybe (internalError "Missing value in resolveClass")
     $ resolve exportedTypeClasses className
 
   -- Looks up an imported value and re-qualifies it with the original module it
   -- came from.
-  resolveValue :: ModuleName -> Qualified Ident -> (Ident, ExportSource)
-  resolveValue mnFrom ident
-    = splitQual mnFrom
-    . fromMaybe (internalError "Missing value in resolveValue")
+  resolveValue :: Qualified Ident -> (Ident, ExportSource)
+  resolveValue ident
+    = fromMaybe (internalError "Missing value in resolveValue")
     $ resolve exportedValues ident
 
   -- Looks up an imported operator and re-qualifies it with the original
   -- module it came from.
-  resolveValueOp :: ModuleName -> Qualified (OpName 'ValueOpName) -> (OpName 'ValueOpName, ExportSource)
-  resolveValueOp mnFrom op
-    = splitQual mnFrom
-    . fromMaybe (internalError "Missing value in resolveValueOp")
+  resolveValueOp :: Qualified (OpName 'ValueOpName) -> (OpName 'ValueOpName, ExportSource)
+  resolveValueOp op
+    = fromMaybe (internalError "Missing value in resolveValueOp")
     $ resolve exportedValueOps op
 
   -- Looks up an imported kind and re-qualifies it with the original
   -- module it came from.
-  resolveKind :: ModuleName -> Qualified (ProperName 'KindName) -> (ProperName 'KindName, ExportSource)
-  resolveKind mnFrom kind
-    = splitQual mnFrom
-    . fromMaybe (internalError "Missing value in resolveKind")
+  resolveKind :: Qualified (ProperName 'KindName) -> (ProperName 'KindName, ExportSource)
+  resolveKind kind
+    = fromMaybe (internalError "Missing value in resolveKind")
     $ resolve exportedKinds kind
 
   resolve
     :: Ord a
     => (Exports -> M.Map a ExportSource)
     -> Qualified a
-    -> Maybe (Qualified a)
+    -> Maybe (a, ExportSource)
   resolve f (Qualified (Just mn'') a) = do
     exps' <- envModuleExports <$> mn'' `M.lookup` env
     src <- a `M.lookup` f exps'
-    return $ Qualified (Just (exportSourceDefinedIn src)) a
+    return $ (a, src { exportSourceImportedFrom = Just mn'' })
   resolve _ _ = internalError "Unqualified value in resolve"
-
-  -- A partial function that takes a module from something was imported and
-  -- a qualified value, and extracts the value and qualified module components.
-  splitQual :: ModuleName -> Qualified a -> (a, ExportSource)
-  splitQual mnFrom (Qualified (Just mnOrig) a) =
-    (a, ExportSource { exportSourceImportedFrom = Just mnFrom
-                     , exportSourceDefinedIn = mnOrig
-                     })
-  splitQual _ _ =
-    internalError "Unqualified value in splitQual"
 
 -- |
 -- Filters the full list of exportable values, types, and classes for a module
