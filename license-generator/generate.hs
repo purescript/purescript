@@ -9,7 +9,7 @@
 --
 -- It is recommended to run this as follows:
 --
--- stack list-dependencies --flag purescript:RELEASE | stack license-generator/generate.hs > LICENSE
+-- stack ls dependencies --flag purescript:RELEASE | stack license-generator/generate.hs > LICENSE
 --
 
 module Main (main) where
