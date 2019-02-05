@@ -312,15 +312,22 @@ kindRow srcKind = Row (getAnnForKind srcKind) srcKind
 primTy :: Text -> SourceType
 primTy = TypeConstructor nullSourceAnn . primName
 
+primTy' :: Text -> SourceAnn -> SourceType
+primTy' tyName ann = TypeConstructor ann (primName tyName)
+
 -- | Type constructor for functions
 tyFunction :: SourceType
 tyFunction = primTy "Function"
+
+-- | Type constructor for functions with a source ann
+tyFunction' :: SourceAnn -> SourceType
+tyFunction' = primTy' "Function"
 
 -- | Type constructor for strings
 tyString :: SourceType
 tyString = primTy "String"
 
--- | Type constructor for strings
+-- | Type constructor for chars
 tyChar :: SourceType
 tyChar = primTy "Char"
 
@@ -358,7 +365,10 @@ isTypeOrApplied t1 t2 = eqType t1 t2
 
 -- | Smart constructor for function types
 function :: SourceType -> SourceType -> SourceType
-function t1 t2 = TypeApp (getAnnForType t2) (TypeApp (getAnnForType t1) tyFunction t1) t2
+function t1 t2 =
+  let ann1 = getAnnForType t1
+      ann2 = getAnnForType t2
+  in TypeApp ann2 (TypeApp ann1 (tyFunction' (widenSourceAnn ann1 ann2)) t1) t2
 
 -- | Kinds in @Prim@
 primKinds :: S.Set (Qualified (ProperName 'KindName))
