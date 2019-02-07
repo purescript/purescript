@@ -124,10 +124,10 @@ collectDeclarations imports exports = do
     :: (Eq a, Show a)
     => (P.ModuleName -> a -> m (P.ModuleName, [b]))
     -> [P.ImportRecord a]
-    -> Map a P.ModuleName
+    -> Map a P.ExportSource
     -> m (Map P.ModuleName [b])
   collect lookup' imps exps = do
-    imps' <- traverse (findImport imps) $ Map.toList exps
+    imps' <- traverse (findImport imps) $ Map.toList $ fmap P.exportSourceDefinedIn exps
     Map.fromListWith (<>) <$> traverse (uncurry lookup') imps'
 
   expVals = P.exportedValues exports
