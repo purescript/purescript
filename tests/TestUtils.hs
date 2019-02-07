@@ -1,4 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 
 module TestUtils where
 
@@ -7,20 +9,29 @@ import Prelude.Compat
 
 import qualified Language.PureScript as P
 
+import Control.Arrow ((***), (>>>))
 import Control.Monad
+import Control.Monad.Reader
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
 import Control.Exception
-import Data.List (sort)
+import Data.Char (isSpace)
+import Data.Function (on)
+import Data.List (sort, sortBy, stripPrefix, groupBy)
+import qualified Data.Map as M
 import qualified Data.Text as T
-import System.Process
+import Data.Time.Clock (UTCTime())
+import Data.Tuple (swap)
+import System.Process hiding (cwd)
 import System.Directory
 import System.Info
 import System.IO.UTF8 (readUTF8FileT)
 import System.Exit (exitFailure)
-import System.FilePath ((</>))
+import System.FilePath
 import qualified System.FilePath.Glob as Glob
-import System.IO (stderr, hPutStrLn)
+import System.IO 
+import Test.Tasty.Hspec
+
 
 findNodeProcess :: IO (Maybe String)
 findNodeProcess = runMaybeT . msum $ map (MaybeT . findExecutable) names
@@ -86,3 +97,125 @@ pushd dir act = do
   result <- try act :: IO (Either IOException a)
   setCurrentDirectory original
   either throwIO return result
+
+
+createOutputFile :: FilePath -> IO Handle
+createOutputFile logfileName = do
+  tmp <- getTemporaryDirectory
+  createDirectoryIfMissing False (tmp </> logpath)
+  openFile (tmp </> logpath </> logfileName) WriteMode
+
+setUpTests :: [FilePath] -> IO ([P.Module], [P.ExternsFile], M.Map P.ModuleName FilePath, [[[FilePath]]]) 
+setUpTests testDirs = do
+  cwd <- getCurrentDirectory
+  let testPaths = map (\p -> cwd </> "tests" </> "purs" </> p) testDirs
+  testFiles <- mapM (\p -> getTestFiles p <$> testGlob p) testPaths
+  ms <- getSupportModuleTuples
+  let modules = map snd ms
+  supportExterns <- runExceptT $ do
+    foreigns <- inferForeignModules ms
+    externs <- ExceptT . fmap fst . runTest $ P.make (makeActions modules foreigns) modules
+    return (externs, foreigns)
+  case supportExterns of
+    Left errs -> fail (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
+    Right (externs, foreigns) -> return (modules, externs, foreigns, testFiles)
+  where
+  -- A glob for all purs and js files within a test directory
+  testGlob :: FilePath -> IO [FilePath]
+  testGlob = Glob.globDir1 (Glob.compile "**/*.purs")
+  -- Groups the test files so that a top-level file can have dependencies in a
+  -- subdirectory of the same name. The inner tuple contains a list of the
+  -- .purs files and the .js files for the test case.
+  getTestFiles :: FilePath -> [FilePath] -> [[FilePath]]
+  getTestFiles baseDir
+    = map (filter ((== ".purs") . takeExtensions) . map (baseDir </>))
+    . groupBy ((==) `on` extractPrefix)
+    . sortBy (compare `on` extractPrefix)
+    . map (makeRelative baseDir)
+  -- Extracts the filename part of a .purs file, or if the file is in a
+  -- subdirectory, the first part of that directory path.
+  extractPrefix :: FilePath -> FilePath
+  extractPrefix fp =
+    let dir = takeDirectory fp
+        ext = reverse ".purs"
+    in if dir == "."
+       then maybe fp reverse $ stripPrefix ext $ reverse fp
+       else dir
+
+compile
+  :: [P.Module]
+  -> [P.ExternsFile]
+  -> M.Map P.ModuleName FilePath
+  -> [FilePath]
+  -> ([P.Module] -> IO ())
+  -> IO (Either P.MultipleErrors [P.ExternsFile], P.MultipleErrors)
+compile supportModules supportExterns supportForeigns inputFiles check = runTest $ do
+  fs <- liftIO $ readInput inputFiles
+  ms <- P.parseModulesFromFiles id fs
+  foreigns <- inferForeignModules ms
+  liftIO (check (map snd ms))
+  let actions = makeActions supportModules (foreigns `M.union` supportForeigns)
+  case ms of
+    [singleModule] -> pure <$> P.rebuildModule actions supportExterns (snd singleModule)
+    _ -> P.make actions (supportModules ++ map snd ms)
+
+assert
+  :: [P.Module]
+  -> [P.ExternsFile]
+  -> M.Map P.ModuleName FilePath
+  -> [FilePath]
+  -> ([P.Module] -> IO ())
+  -> (Either P.MultipleErrors P.MultipleErrors -> IO (Maybe String))
+  -> Expectation
+assert supportModules supportExterns supportForeigns inputFiles check f = do
+  (e, w) <- compile supportModules supportExterns supportForeigns inputFiles check
+  maybeErr <- f (const w <$> e)
+  maybe (return ()) expectationFailure maybeErr
+
+checkMain :: [P.Module] -> IO ()
+checkMain ms =
+  unless (any ((== P.moduleNameFromString "Main") . P.getModuleName) ms)
+    (fail "Main module missing")
+
+
+makeActions :: [P.Module] -> M.Map P.ModuleName FilePath -> P.MakeActions P.Make
+makeActions modules foreigns = (P.buildMakeActions modulesDir (P.internalError "makeActions: input file map was read.") foreigns False)
+                               { P.getInputTimestamp = getInputTimestamp
+                               , P.getOutputTimestamp = getOutputTimestamp
+                               , P.progress = const (pure ())
+                               }
+  where
+  getInputTimestamp :: P.ModuleName -> P.Make (Either P.RebuildPolicy (Maybe UTCTime))
+  getInputTimestamp mn
+    | isSupportModule (P.runModuleName mn) = return (Left P.RebuildNever)
+    | otherwise = return (Left P.RebuildAlways)
+    where
+    isSupportModule = flip elem (map (P.runModuleName . P.getModuleName) modules)
+
+  getOutputTimestamp :: P.ModuleName -> P.Make (Maybe UTCTime)
+  getOutputTimestamp mn = do
+    let filePath = modulesDir </> T.unpack (P.runModuleName mn)
+    exists <- liftIO $ doesDirectoryExist filePath
+    return (if exists then Just (P.internalError "getOutputTimestamp: read timestamp") else Nothing)
+
+
+runTest :: P.Make a -> IO (Either P.MultipleErrors a, P.MultipleErrors)
+runTest = P.runMake P.defaultOptions
+
+inferForeignModules
+  :: MonadIO m
+  => [(FilePath, P.Module)]
+  -> m (M.Map P.ModuleName FilePath)
+inferForeignModules = P.inferForeignModules . fromList
+  where
+    fromList :: [(FilePath, P.Module)] -> M.Map P.ModuleName (Either P.RebuildPolicy FilePath)
+    fromList = M.fromList . map ((P.getModuleName *** Right) . swap)
+
+trim :: String -> String
+trim = dropWhile isSpace >>> reverse >>> dropWhile isSpace >>> reverse
+
+modulesDir :: FilePath
+modulesDir = ".test_modules" </> "node_modules"
+
+logpath :: FilePath
+logpath = "purescript-output"

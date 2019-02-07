@@ -18,6 +18,7 @@ import qualified TestPrimDocs
 import qualified TestPsci
 import qualified TestIde
 import qualified TestPscPublish
+import qualified TestBundle
 import qualified TestUtils
 
 import System.IO (hSetEncoding, stdout, stderr, utf8)
@@ -35,6 +36,7 @@ main = do
   ideTests <- TestIde.main
   compilerTests <- TestCompiler.main
   psciTests <- TestPsci.main
+  pscBundleTests <- TestBundle.main
   coreFnTests <- TestCoreFn.main
   docsTests <- TestDocs.main
   publishTests <- TestPscPublish.main
@@ -45,6 +47,7 @@ main = do
       "Tests"
       [ compilerTests
       , psciTests
+      , pscBundleTests
       , ideTests
       , coreFnTests
       , docsTests
