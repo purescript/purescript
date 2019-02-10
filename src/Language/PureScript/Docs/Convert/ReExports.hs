@@ -72,8 +72,8 @@ getReExports env mn =
   case Map.lookup mn env of
     Nothing ->
       internalError ("Module missing: " ++ T.unpack (P.runModuleName mn))
-    Just (_, imports, exports) -> do
-      allExports <- runReaderT (collectDeclarations imports exports) mn
+    Just (_, _, exports) -> do
+      allExports <- runReaderT (collectDeclarations exports) mn
       pure (filter notLocal allExports)
 
   where
@@ -100,16 +100,15 @@ getReExports env mn =
 --
 collectDeclarations :: forall m.
   (MonadState (Map P.ModuleName Module) m, MonadReader P.ModuleName m) =>
-  P.Imports ->
   P.Exports ->
   m [(P.ModuleName, [Declaration])]
-collectDeclarations imports exports = do
-  valsAndMembers <- collect lookupValueDeclaration impVals expVals
-  valOps <- collect lookupValueOpDeclaration impValOps expValOps
-  typeClasses <- collect lookupTypeClassDeclaration impTCs expTCs
-  types <- collect lookupTypeDeclaration impTypes expTypes
-  typeOps <- collect lookupTypeOpDeclaration impTypeOps expTypeOps
-  kinds <- collect lookupKindDeclaration impKinds expKinds
+collectDeclarations exports = do
+  valsAndMembers <- collect lookupValueDeclaration expVals
+  valOps <- collect lookupValueOpDeclaration expValOps
+  typeClasses <- collect lookupTypeClassDeclaration expTCs
+  types <- collect lookupTypeDeclaration expTypes
+  typeOps <- collect lookupTypeOpDeclaration expTypeOps
+  kinds <- collect lookupKindDeclaration expKinds
 
   (vals, classes) <- handleTypeClassMembers valsAndMembers typeClasses
 
@@ -123,72 +122,20 @@ collectDeclarations imports exports = do
   collect
     :: (Eq a, Show a)
     => (P.ModuleName -> a -> m (P.ModuleName, [b]))
-    -> [P.ImportRecord a]
     -> Map a P.ExportSource
     -> m (Map P.ModuleName [b])
-  collect lookup' imps exps = do
-    imps' <- traverse (findImport imps) $ Map.toList $ fmap P.exportSourceDefinedIn exps
-    Map.fromListWith (<>) <$> traverse (uncurry lookup') imps'
+  collect lookup' exps = do
+    let reExps = Map.toList $ Map.mapMaybe P.exportSourceImportedFrom exps
+    decls <- traverse (uncurry (flip lookup')) reExps
+    return $ Map.fromListWith (<>) decls
 
   expVals = P.exportedValues exports
-  impVals = concat (Map.elems (P.importedValues imports))
-
   expValOps = P.exportedValueOps exports
-  impValOps = concat (Map.elems (P.importedValueOps imports))
-
   expTypes = Map.map snd (P.exportedTypes exports)
-  impTypes = concat (Map.elems (P.importedTypes imports))
-
   expTypeOps = P.exportedTypeOps exports
-  impTypeOps = concat (Map.elems (P.importedTypeOps imports))
-
   expCtors = concatMap fst (Map.elems (P.exportedTypes exports))
-
   expTCs = P.exportedTypeClasses exports
-  impTCs = concat (Map.elems (P.importedTypeClasses imports))
-
   expKinds = P.exportedKinds exports
-  impKinds = concat (Map.elems (P.importedKinds imports))
-
--- |
--- Given a list of imported declarations (of a particular kind, ie. type, data,
--- class, value, etc), and the name of an exported declaration of the same
--- kind, together with the module it was originally defined in, return a tuple
--- of:
---
---      * the module that exported declaration was imported from (note that
---      this can be different from the module it was originally defined in, if
---      it is a re-export),
---      * that same declaration's name.
---
--- This function uses a type variable for names because we want to be able to
--- instantiate @name@ as both 'P.Ident' and 'P.ProperName'.
---
-findImport ::
-  (Show name, Eq name, MonadReader P.ModuleName m) =>
-  [P.ImportRecord name] ->
-  (name, P.ModuleName) ->
-  m (P.ModuleName, name)
-findImport imps (name, orig) =
-  let
-    matches (P.ImportRecord qual mn _ _) = P.disqualify qual == name && mn == orig
-    matching = filter matches imps
-    getQualified (P.Qualified mname _) = mname
-  in
-    case mapMaybe (getQualified . P.importName) matching of
-      -- A value can occur more than once if it is imported twice (eg, if it is
-      -- exported by A, re-exported from A by B, and C imports it from both A
-      -- and B). In this case, we just take its first appearance.
-      (importedFrom:_) ->
-        pure (importedFrom, name)
-
-      -- Builtin modules do not have any Imports in the Env, and therefore must
-      -- be handled specially here.
-      [] | P.isBuiltinModuleName orig ->
-        pure (orig, name)
-
-      [] ->
-        internalErrorInModule ("findImport: not found: " ++ show (name, orig))
 
 lookupValueDeclaration ::
   (MonadState (Map P.ModuleName Module) m,
