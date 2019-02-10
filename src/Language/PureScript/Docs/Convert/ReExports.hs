@@ -124,12 +124,10 @@ collectDeclarations exports = do
     => (P.ModuleName -> a -> m (P.ModuleName, [b]))
     -> Map a P.ExportSource
     -> m (Map P.ModuleName [b])
-  collect lookup' exps =
-    exps
-    |> Map.mapMaybe P.exportSourceImportedFrom
-    |> Map.toList
-    |> traverse (uncurry (flip lookup'))
-    |> fmap (Map.fromListWith (<>))
+  collect lookup' exps = do
+    let reExps = Map.toList $ Map.mapMaybe P.exportSourceImportedFrom exps
+    decls <- traverse (uncurry (flip lookup')) reExps
+    return $ Map.fromListWith (<>) decls
 
   expVals = P.exportedValues exports
   expValOps = P.exportedValueOps exports
