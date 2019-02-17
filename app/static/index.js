@@ -18,7 +18,7 @@ var evaluate = function evaluate(js) {
     };
     // Replace any require(...) statements with lookups on the PSCI object.
     var replaced = js.replace(/require\("[^"]*"\)/g, function(s) {
-        return "PSCI['" + s.substring(12, s.length - 2) + "']";
+        return "PSCI['" + s.split('/')[1] + "']";
     });
     // Wrap the module and evaluate it.
     var wrapped =
