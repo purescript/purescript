@@ -61,12 +61,13 @@ convertExterns :: P.ExternsFile -> ([IdeDeclarationAnn], [(P.ModuleName, P.Decla
 convertExterns ef =
   (decls, exportDecls)
   where
-    decls = map
+    decls = moduleDecl : map
       (IdeDeclarationAnn emptyAnn)
       (resolvedDeclarations <> operatorDecls <> tyOperatorDecls)
     exportDecls = mapMaybe convertExport (P.efExports ef)
     operatorDecls = convertOperator <$> P.efFixities ef
     tyOperatorDecls = convertTypeOperator <$> P.efTypeFixities ef
+    moduleDecl = IdeDeclarationAnn emptyAnn (IdeDeclModule (P.efModuleName ef))
     (toResolve, declarations) =
       second catMaybes (partitionEithers (map convertDecl (P.efDeclarations ef)))
 

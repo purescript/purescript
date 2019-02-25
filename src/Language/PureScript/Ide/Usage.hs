@@ -112,6 +112,9 @@ matchesRef declaration ref = case declaration of
   IdeDeclKind kind -> case ref of
     P.KindRef _ kindName -> kindName == kind
     _ -> False
+  IdeDeclModule m -> case ref of
+    P.ModuleRef _ mn -> m == mn
+    _ -> False
 
 eligibleModules
   :: (P.ModuleName, IdeDeclaration)

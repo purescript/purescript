@@ -121,6 +121,7 @@ completionFromMatch (Match (m, IdeDeclarationAnn ann decl), mns) =
       IdeDeclTypeOperator (IdeTypeOperator op ref precedence associativity kind) ->
         (P.runOpName op, maybe (showFixity precedence associativity (typeOperatorAliasT ref) op) P.prettyPrintKind kind)
       IdeDeclKind k -> (P.runProperName k, "kind")
+      IdeDeclModule mn -> (P.runModuleName mn, "module")
 
     complExportedFrom = mns
 

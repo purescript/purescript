@@ -11,7 +11,8 @@ import           Protolude                     hiding (isPrefixOf)
 import           Data.Aeson
 import qualified Language.PureScript.Ide.Types as PI
 
-data DeclarationType = Value
+data DeclarationType
+  = Value
   | Type
   | Synonym
   | DataConstructor
@@ -19,6 +20,7 @@ data DeclarationType = Value
   | ValueOperator
   | TypeOperator
   | Kind
+  | Module
   deriving (Show, Eq, Ord)
 
 instance FromJSON DeclarationType where
@@ -32,6 +34,7 @@ instance FromJSON DeclarationType where
       "valueoperator"     -> pure ValueOperator
       "typeoperator"      -> pure TypeOperator
       "kind"              -> pure Kind
+      "module"            -> pure Module
       _                   -> mzero
 
 newtype IdeDeclaration = IdeDeclaration
@@ -53,3 +56,4 @@ typeDeclarationForDeclaration decl = case decl of
   PI.IdeDeclValueOperator _ -> IdeDeclaration ValueOperator
   PI.IdeDeclTypeOperator _ -> IdeDeclaration TypeOperator
   PI.IdeDeclKind _ -> IdeDeclaration Kind
+  PI.IdeDeclModule _ -> IdeDeclaration Module

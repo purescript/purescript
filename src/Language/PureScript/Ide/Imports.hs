@@ -44,7 +44,7 @@ import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Prim
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
-import           Lens.Micro.Platform                ((^.), (%~), ix)
+import           Lens.Micro.Platform                ((^.), (%~), ix, has)
 import           System.IO.UTF8                     (writeUTF8FileT)
 import qualified Text.Parsec as Parsec
 
@@ -194,12 +194,14 @@ addExplicitImport' decl moduleName qualifier imports =
         not (any (\case
           Import C.Prim (P.Explicit _) Nothing -> True
           _ -> False) imports)
+    -- We can't import Modules from other modules
+    isModule = has _IdeDeclModule decl
 
     matches (Import mn (P.Explicit _) qualifier') = mn == moduleName && qualifier == qualifier'
     matches _ = False
     freshImport = Import moduleName (P.Explicit [refFromDeclaration decl]) qualifier
   in
-    if isImplicitlyImported || isNotExplicitlyImportedFromPrim
+    if isImplicitlyImported || isNotExplicitlyImportedFromPrim || isModule
     then imports
     else updateAtFirstOrPrepend matches (insertDeclIntoImport decl) freshImport imports
   where

@@ -65,3 +65,10 @@ spec = describe "Applying completion options" $ do
                   , typ "withType"
                   ]
     result `shouldSatisfy` \res -> complDocumentation res == Just "Doc *123*\n"
+
+  it "gets docs on module declaration" $ do
+    ([_, (Right (CompletionResult [ result ]))], _) <- Test.inProject $
+      Test.runIde [ load ["CompletionSpecDocs"]
+                  , typ "CompletionSpecDocs"
+                  ]
+    result `shouldSatisfy` \res -> complDocumentation res == Just "Module Documentation\n"
