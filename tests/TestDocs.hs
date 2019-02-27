@@ -275,7 +275,7 @@ displayAssertionFailure = \case
     "expected " <> decl <> " to be a " <> expected <> " declaration, but it" <>
     " was a " <> actual <> " declaration"
   DeclarationWrongType _ decl actual ->
-    decl <> " had the wrong type; got " <> T.pack (P.prettyPrintType actual)
+    decl <> " had the wrong type; got " <> T.pack (P.prettyPrintType maxBound actual)
   TypeSynonymMismatch _ decl expected actual ->
     "expected the RHS of " <> decl <> " to be " <> expected <>
     "; got " <> actual

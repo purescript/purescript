@@ -43,7 +43,7 @@ printModuleSignatures moduleName P.Environment{..} =
         findNameType envNames m = (P.disqualify m, M.lookup m envNames)
 
         showNameType :: (P.Ident, Maybe (P.SourceType, P.NameKind, P.NameVisibility)) -> Box.Box
-        showNameType (mIdent, Just (mType, _, _)) = textT (P.showIdent mIdent <> " :: ") Box.<> P.typeAsBox mType
+        showNameType (mIdent, Just (mType, _, _)) = textT (P.showIdent mIdent <> " :: ") Box.<> P.typeAsBox maxBound mType
         showNameType _ = P.internalError "The impossible happened in printModuleSignatures."
 
         findTypeClass
@@ -61,13 +61,13 @@ printModuleSignatures moduleName P.Environment{..} =
                     if null typeClassSuperclasses
                     then Box.text ""
                     else Box.text "("
-                         Box.<> Box.hcat Box.left (intersperse (Box.text ", ") $ map (\(P.Constraint _ (P.Qualified _ pn) lt _) -> textT (P.runProperName pn) Box.<+> Box.hcat Box.left (map P.typeAtomAsBox lt)) typeClassSuperclasses)
+                         Box.<> Box.hcat Box.left (intersperse (Box.text ", ") $ map (\(P.Constraint _ (P.Qualified _ pn) lt _) -> textT (P.runProperName pn) Box.<+> Box.hcat Box.left (map (P.typeAtomAsBox maxBound) lt)) typeClassSuperclasses)
                          Box.<> Box.text ") <= "
                 className =
                     textT (P.runProperName name)
                     Box.<> textT (foldMap ((" " <>) . fst) typeClassArguments)
                 classBody =
-                    Box.vcat Box.top (map (\(i, t) -> textT (P.showIdent i <> " ::") Box.<+> P.typeAsBox t) typeClassMembers)
+                    Box.vcat Box.top (map (\(i, t) -> textT (P.showIdent i <> " ::") Box.<+> P.typeAsBox maxBound t) typeClassMembers)
 
             in
               Just $
@@ -99,7 +99,7 @@ printModuleSignatures moduleName P.Environment{..} =
                 else
                   Just $
                     textT ("type " <> P.runProperName name <> foldMap ((" " <>) . fst) typevars)
-                    Box.// Box.moveRight 2 (Box.text "=" Box.<+> P.typeAsBox dtType)
+                    Box.// Box.moveRight 2 (Box.text "=" Box.<+> P.typeAsBox maxBound dtType)
 
             (Just (_, P.DataType typevars pt), _) ->
               let prefix =
@@ -122,7 +122,7 @@ printModuleSignatures moduleName P.Environment{..} =
                     mapFirstRest (Box.text "=" Box.<+>) (Box.text "|" Box.<+>) $
                     map (\(cons,idents) -> (textT (P.runProperName cons) Box.<> Box.hcat Box.left (map prettyPrintType idents))) pt
 
-                prettyPrintType t = Box.text " " Box.<> P.typeAtomAsBox t
+                prettyPrintType t = Box.text " " Box.<> P.typeAtomAsBox maxBound t
 
                 mapFirstRest _ _ [] = []
                 mapFirstRest f g (x:xs) = f x : map g xs

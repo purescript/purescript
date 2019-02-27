@@ -274,7 +274,7 @@ handleTypeOf print' val = do
     Left errs -> printErrors errs
     Right (_, env') ->
       case M.lookup (P.mkQualified (P.Ident "it") (P.ModuleName [P.ProperName "$PSCI"])) (P.names env') of
-        Just (ty, _, _) -> print' . P.prettyPrintType $ ty
+        Just (ty, _, _) -> print' . P.prettyPrintType maxBound $ ty
         Nothing -> print' "Could not find type"
 
 -- | Takes a type and prints its kind
