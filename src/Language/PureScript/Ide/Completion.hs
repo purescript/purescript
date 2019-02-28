@@ -22,8 +22,6 @@ import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 import           Lens.Micro.Platform hiding ((&))
 
-type Module = (P.ModuleName, [IdeDeclarationAnn])
-
 -- | Applies the CompletionFilters and the Matcher to the given Modules
 --   and sorts the found Completions according to the Matching Score
 getCompletions
@@ -35,7 +33,6 @@ getCompletions
 getCompletions filters matcher options modules =
   modules
   & applyFilters filters
-  & Map.toList
   & matchesFromModules
   & runMatcher matcher
   & applyCompletionOptions options
@@ -45,7 +42,6 @@ getExactMatches :: Text -> [Filter] -> ModuleMap [IdeDeclarationAnn] -> [Match I
 getExactMatches search filters modules =
   modules
   & applyFilters (Filter (Right (Exact search)) : filters)
-  & Map.toList
   & matchesFromModules
 
 getExactCompletions :: Text -> [Filter] -> ModuleMap [IdeDeclarationAnn] -> [Completion]
@@ -55,10 +51,10 @@ getExactCompletions search filters modules =
   <&> simpleExport
   <&> completionFromMatch
 
-matchesFromModules :: [Module] -> [Match IdeDeclarationAnn]
-matchesFromModules = foldMap completionFromModule
+matchesFromModules :: ModuleMap [IdeDeclarationAnn] -> [Match IdeDeclarationAnn]
+matchesFromModules = Map.foldMapWithKey completionFromModule
   where
-    completionFromModule (moduleName, decls) =
+    completionFromModule moduleName decls =
       map (\x -> Match (moduleName, x)) decls
 
 data CompletionOptions = CompletionOptions
