@@ -101,7 +101,11 @@ ideTypeOp opName ident precedence assoc k =
 ideKind :: Text -> IdeDeclarationAnn
 ideKind pn = ida (IdeDeclKind (P.ProperName pn))
 
-valueSS, synonymSS, typeSS, classSS, valueOpSS, typeOpSS :: P.SourceSpan
+ideModule :: Text -> IdeDeclarationAnn
+ideModule name = ida (IdeDeclModule (mn name))
+
+moduleSS, valueSS, synonymSS, typeSS, classSS, valueOpSS, typeOpSS :: P.SourceSpan
+moduleSS = ss 1 1
 valueSS = ss 3 1
 synonymSS = ss 5 1
 typeSS = ss 7 1

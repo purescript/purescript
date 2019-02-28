@@ -1,3 +1,4 @@
+-- | Module Documentation
 module CompletionSpecDocs where
 
 -- | Doc x

@@ -93,6 +93,9 @@ spec = do
     it "finds a type operator declaration" $ do
       Just r <- getLocation "~>"
       r `shouldBe` typeOpSS
+    it "finds a module declaration" $ do
+      Just r <- getLocation "SfModule"
+      r `shouldBe` moduleSS
 
 getLocation :: Text -> IO (Maybe P.SourceSpan)
 getLocation s = do
@@ -102,7 +105,8 @@ getLocation s = do
   where
     ideState = emptyIdeState `volatileState`
       [ ("Test",
-         [ ideValue "sfValue" Nothing `annLoc` valueSS
+         [ ideModule "SfModule" `annLoc` moduleSS
+         , ideValue "sfValue" Nothing `annLoc` valueSS
          , ideSynonym "SFType" Nothing Nothing `annLoc` synonymSS
          , ideType "SFData" Nothing [] `annLoc` typeSS
          , ideDtor "SFOne" "SFData" Nothing `annLoc` typeSS
