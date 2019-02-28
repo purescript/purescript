@@ -275,7 +275,7 @@ addImportForIdentifier
   -> [Filter] -- ^ Filters to apply before searching for the identifier
   -> m (Either [Match IdeDeclaration] [Text])
 addImportForIdentifier fp ident qual filters = do
-  let addPrim = Map.union (Map.fromList idePrimDeclarations)
+  let addPrim = Map.union idePrimDeclarations
   modules <- getAllModules Nothing
   case map (fmap discardAnn) (getExactMatches ident filters (addPrim modules)) of
     [] ->
