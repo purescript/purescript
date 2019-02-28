@@ -30,23 +30,25 @@ getCompletions
   :: [Filter]
   -> Matcher IdeDeclarationAnn
   -> CompletionOptions
-  -> [Module]
+  -> ModuleMap [IdeDeclarationAnn]
   -> [Completion]
 getCompletions filters matcher options modules =
   modules
   & applyFilters filters
+  & Map.toList
   & matchesFromModules
   & runMatcher matcher
   & applyCompletionOptions options
   <&> completionFromMatch
 
-getExactMatches :: Text -> [Filter] -> [Module] -> [Match IdeDeclarationAnn]
+getExactMatches :: Text -> [Filter] -> ModuleMap [IdeDeclarationAnn] -> [Match IdeDeclarationAnn]
 getExactMatches search filters modules =
   modules
-  & applyFilters (equalityFilter search : filters)
+  & applyFilters (Filter (Right (Exact search)) : filters)
+  & Map.toList
   & matchesFromModules
 
-getExactCompletions :: Text -> [Filter] -> [Module] -> [Completion]
+getExactCompletions :: Text -> [Filter] -> ModuleMap [IdeDeclarationAnn] -> [Completion]
 getExactCompletions search filters modules =
   modules
   & getExactMatches search filters
