@@ -41,7 +41,7 @@ getCompletions filters matcher options modules =
 getExactMatches :: Text -> [Filter] -> ModuleMap [IdeDeclarationAnn] -> [Match IdeDeclarationAnn]
 getExactMatches search filters modules =
   modules
-  & applyFilters (Filter (Right (Exact search)) : filters)
+  & applyFilters (exactFilter search : filters)
   & matchesFromModules
 
 getExactCompletions :: Text -> [Filter] -> ModuleMap [IdeDeclarationAnn] -> [Completion]
