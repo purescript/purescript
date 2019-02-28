@@ -102,68 +102,57 @@ spec = do
         [moduleA, moduleB, moduleC, moduleD]
         `shouldBe` [moduleA, moduleB, moduleC, moduleD]
   describe "declarationTypeFilter" $ do
-    let moduleADecl = D.Value
-        moduleCDecl = D.Type
-        moduleDDecl = D.Kind
-        moduleEDecl = D.Synonym
-        moduleFDecl = D.DataConstructor
-        moduleGDecl = D.TypeClass
-        moduleHDecl = D.ValueOperator
-        moduleIDecl = D.TypeOperator
-    it "keeps everything on empty list of declarations" $
-      runDeclaration []
-        [moduleA, moduleB, moduleD] `shouldBe` [moduleA, moduleB, moduleD]
     it "extracts modules by filtering `value` declarations" $
-      runDeclaration [moduleADecl]
+      runDeclaration [D.Value]
         [moduleA, moduleB, moduleD] `shouldBe` [moduleA, moduleB]
     it "removes everything if no `value` declarations has been found" $
-      runDeclaration [moduleADecl]
+      runDeclaration [D.Value]
         [moduleD, moduleG, moduleE, moduleH] `shouldBe` []
     it "extracts module by filtering `type` declarations" $
-      runDeclaration [moduleCDecl]
+      runDeclaration [D.Type]
         [moduleA, moduleB, moduleC, moduleD, moduleE] `shouldBe` [moduleC]
     it "removes everything if a `type` declaration have not been found" $
-      runDeclaration [moduleCDecl]
+      runDeclaration [D.Type]
         [moduleA, moduleG, moduleE, moduleH] `shouldBe` []
     it "extracts module by filtering `synonym` declarations" $
-      runDeclaration [moduleEDecl]
+      runDeclaration [D.Synonym]
         [moduleA, moduleB, moduleD, moduleE] `shouldBe` [moduleE]
     it "removes everything if a `synonym` declaration have not been found" $
-      runDeclaration [moduleEDecl]
+      runDeclaration [D.Synonym]
         [moduleA, moduleB, moduleC, moduleH] `shouldBe` []
     it "extracts module by filtering `constructor` declarations" $
-      runDeclaration [moduleFDecl]
+      runDeclaration [D.DataConstructor]
         [moduleA, moduleB, moduleC, moduleF] `shouldBe` [moduleF]
     it "removes everything if a `constructor` declaration have not been found" $
-      runDeclaration [moduleFDecl]
+      runDeclaration [D.DataConstructor]
         [moduleA, moduleB, moduleC, moduleH] `shouldBe` []
     it "extracts module by filtering `typeclass` declarations" $
-      runDeclaration [moduleGDecl]
+      runDeclaration [D.TypeClass]
         [moduleA, moduleC, moduleG] `shouldBe` [moduleG]
     it "removes everything if a `typeclass` declaration have not been found" $
-      runDeclaration [moduleGDecl]
+      runDeclaration [D.TypeClass]
         [moduleA, moduleB, moduleC, moduleH] `shouldBe` []
     it "extracts modules by filtering `valueoperator` declarations" $
-      runDeclaration [moduleHDecl]
+      runDeclaration [D.ValueOperator]
         [moduleA, moduleC, moduleG, moduleH, moduleF] `shouldBe` [moduleH]
     it "removes everything if a `valueoperator` declaration have not been found" $
-      runDeclaration [moduleHDecl]
+      runDeclaration [D.ValueOperator]
         [moduleA, moduleB, moduleC, moduleD] `shouldBe` []
     it "extracts modules by filtering `typeoperator` declarations" $
-      runDeclaration [moduleIDecl]
+      runDeclaration [D.TypeOperator]
         [moduleA, moduleC, moduleG, moduleI, moduleF] `shouldBe` [moduleI]
     it "removes everything if a `typeoperator` declaration have not been found" $
-      runDeclaration [moduleIDecl]
+      runDeclaration [D.TypeOperator]
         [moduleA, moduleD] `shouldBe` []
     it "extracts module by filtering `kind` declarations" $
-      runDeclaration [moduleCDecl]
-        [moduleA, moduleC, moduleG, moduleI, moduleF] `shouldBe` [moduleC]
+      runDeclaration [D.Kind]
+        [moduleA, moduleD, moduleG, moduleI, moduleF] `shouldBe` [moduleD]
     it "removes everything if a `kind` declaration have not been found" $
-      runDeclaration [moduleCDecl]
-        [moduleA, moduleD] `shouldBe` []
+      runDeclaration [D.Kind]
+        [moduleA, moduleC] `shouldBe` []
     it "extracts modules by filtering `value` and `synonym` declarations" $
-      runDeclaration [moduleADecl, moduleEDecl]
+      runDeclaration [D.Value, D.Synonym]
         [moduleA, moduleB, moduleD, moduleE] `shouldBe` [moduleA, moduleB, moduleE]
-    it "extracts modules by filtering `kind`, `synonym` and `valueoperator` declarations" $
-      runDeclaration [moduleADecl, moduleDDecl, moduleHDecl]
+    it "extracts modules by filtering `value`, `kind`, and `valueoperator` declarations" $
+      runDeclaration [D.Value, D.Kind, D.ValueOperator]
         [moduleA, moduleB, moduleD, moduleG, moduleE, moduleH] `shouldBe` [moduleA, moduleB, moduleD, moduleH]
