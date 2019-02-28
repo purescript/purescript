@@ -18,6 +18,7 @@ import Control.Monad.Supply.Class
 import Data.List ((\\), intersect)
 import qualified Data.Foldable as F
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Data.Maybe (fromMaybe, isNothing)
 import Data.String (fromString)
 import Data.Text (Text)
@@ -53,11 +54,14 @@ moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreign_ =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
     let mnLookup = renameImports usedNames imps
-    jsImports <- traverse (importToJs mnLookup)
-      . (\\ (mn : C.primModules)) $ ordNub $ map snd imps
     let decls' = renameModules mnLookup decls
     jsDecls <- mapM bindToJs decls'
     optimized <- traverse (traverse optimize) jsDecls
+    let mnReverseLookup = M.fromList $ map (\(origName, (_, safeName)) -> (moduleNameToJs safeName, origName)) $ M.toList mnLookup
+    let usedModuleNames = foldMap (foldMap (findModules mnReverseLookup)) optimized
+    jsImports <- traverse (importToJs mnLookup)
+      . filter (flip S.member usedModuleNames)
+      . (\\ (mn : C.primModules)) $ ordNub $ map snd imps
     F.traverse_ (F.traverse_ checkIntegers) optimized
     comments <- not <$> asks optionsNoComments
     let strict = AST.StringLiteral Nothing "use strict"
@@ -125,6 +129,15 @@ moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreign_ =
       let (_,mnSafe) = fromMaybe (internalError "Missing value in mnLookup") $ M.lookup mn' mnLookup
       in Qualified (Just mnSafe) a
     renameQual q = q
+
+  -- |
+  -- Find the set of ModuleNames referenced by an AST.
+  --
+  findModules :: M.Map Text ModuleName -> AST -> S.Set ModuleName
+  findModules mnReverseLookup = AST.everything mappend go
+    where
+    go (AST.Var _ name) = foldMap S.singleton $ M.lookup name mnReverseLookup
+    go _ = mempty
 
   -- |
   -- Generate code in the simplified JavaScript intermediate representation for a declaration
