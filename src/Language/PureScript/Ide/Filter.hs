@@ -50,18 +50,23 @@ data DeclarationFilter
   | DeclType (Set DeclarationType)
   deriving Show
 
+-- | Only keeps Declarations in the given modules
 moduleFilter :: Set P.ModuleName -> Filter
 moduleFilter = Filter . Left
 
+-- | Only keeps Identifiers in the given Namespaces
 namespaceFilter :: Set IdeNamespace -> Filter
 namespaceFilter nss = Filter (Right (Namespace nss))
 
+-- | Only keeps Identifiers that are equal to the search string
 exactFilter :: Text -> Filter
 exactFilter t = Filter (Right (Exact t))
 
+-- | Only keeps Identifiers that start with the given prefix
 prefixFilter :: Text -> Filter
 prefixFilter t = Filter (Right (Prefix t))
 
+-- | Only keeps Identifiers in the given type declarations
 declarationTypeFilter :: Set DeclarationType -> Filter
 declarationTypeFilter dts = Filter (Right (DeclType dts))
 
@@ -98,22 +103,18 @@ applyDeclarationFilter f = case f of
   Namespace namespaces -> namespaceFilter' namespaces
   DeclType dts -> declarationTypeFilter' dts
 
--- | Only keeps Identifiers in the given Namespaces
 namespaceFilter' :: Set IdeNamespace -> [IdeDeclarationAnn] -> [IdeDeclarationAnn]
 namespaceFilter' namespaces =
   filter (\decl -> elem (namespaceForDeclaration (discardAnn decl)) namespaces)
 
--- | Only keeps Identifiers that are equal to the search string
 exactFilter' :: Text -> [IdeDeclarationAnn] -> [IdeDeclarationAnn]
 exactFilter' search =
   filter (\decl -> identifierFromIdeDeclaration (discardAnn decl) == search)
 
--- | Only keeps Identifiers that start with the given prefix
 prefixFilter' :: Text -> [IdeDeclarationAnn] -> [IdeDeclarationAnn]
 prefixFilter' prefix =
   filter (\decl -> prefix `isPrefixOf` identifierFromIdeDeclaration (discardAnn decl))
 
--- | Only keeps Identifiers in the given type declarations
 declarationTypeFilter' :: Set DeclarationType -> [IdeDeclarationAnn] -> [IdeDeclarationAnn]
 declarationTypeFilter' declTypes =
   filter (\decl -> declarationType (discardAnn decl) `Set.member` declTypes)
@@ -121,24 +122,24 @@ declarationTypeFilter' declTypes =
 instance FromJSON Filter where
   parseJSON = withObject "filter" $ \o -> do
     (filter' :: Text) <- o .: "filter"
-    Filter <$> case filter' of
+    case filter' of
       "modules" -> do
         params <- o .: "params"
         modules <- map P.moduleNameFromString <$> params .: "modules"
-        pure (Left (Set.fromList modules))
+        pure (moduleFilter (Set.fromList modules))
       "exact" -> do
         params <- o .: "params"
         search <- params .: "search"
-        pure (Right (Exact search))
+        pure (exactFilter search)
       "prefix" -> do
         params <- o.: "params"
         search <- params .: "search"
-        pure (Right (Prefix search))
+        pure (prefixFilter search)
       "namespace" -> do
         params <- o .: "params"
         namespaces <- params .: "namespaces"
-        pure (Right (Namespace (Set.fromList namespaces)))
+        pure (namespaceFilter (Set.fromList namespaces))
       "declarations" -> do
         declarations <- o.: "params"
-        pure (Right (DeclType (Set.fromList declarations)))
+        pure (declarationTypeFilter (Set.fromList declarations))
       _ -> mzero
