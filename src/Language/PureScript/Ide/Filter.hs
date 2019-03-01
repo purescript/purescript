@@ -16,7 +16,6 @@
 
 module Language.PureScript.Ide.Filter
        ( Filter(..)
-       , DeclarationFilter(..)
        , moduleFilter
        , namespaceFilter
        , exactFilter
