@@ -395,7 +395,10 @@ In the Error case you get the errors in the compilers json format
 
 ### List
 
-#### Loaded Modules
+#### DEPRECATED Loaded Modules
+
+This command will be removed in the next breaking release after 0.13,
+use the completion command with a filter for modules instead.
 
 `list` of type `loadedModules` lists all loaded modules (This means they can be searched for completions etc)
 
