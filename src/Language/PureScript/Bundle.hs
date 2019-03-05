@@ -23,12 +23,15 @@ import Control.Monad
 import Control.Monad.Error.Class
 import Control.Arrow ((&&&))
 
+import Data.Array ((!))
 import Data.Char (chr, digitToInt)
+import Data.Foldable (fold)
 import Data.Generics (everything, everywhere, mkQ, mkT)
 import Data.Graph
 import Data.List (stripPrefix)
 import Data.Maybe (mapMaybe, catMaybes)
 import Data.Version (showVersion)
+import qualified Data.Map as M
 import qualified Data.Set as S
 
 import Language.JavaScript.Parser
@@ -398,7 +401,7 @@ compile :: [Module] -> [ModuleIdentifier] -> [Module]
 compile modules [] = modules
 compile modules entryPoints = filteredModules
   where
-  (graph, _, vertexFor) = graphFromEdges verts
+  (graph, vertexToNode, vertexFor) = graphFromEdges verts
 
   -- | The vertex set
   verts :: [(ModuleElement, Key, [Key])]
@@ -435,6 +438,13 @@ compile modules entryPoints = filteredModules
   reachableSet :: S.Set Vertex
   reachableSet = S.fromList (concatMap (reachable graph) entryPointVertices)
 
+  -- | A map from modules to the modules that are used by its reachable members.
+  moduleReferenceMap :: M.Map ModuleIdentifier (S.Set ModuleIdentifier)
+  moduleReferenceMap = M.fromAscListWith mappend $ map (vertToModule &&& vertToModuleRefs) $ S.toList reachableSet
+    where
+    vertToModuleRefs v = foldMap (S.singleton . vertToModule) $ graph ! v
+    vertToModule v = m where (_, (m, _), _) = vertexToNode v
+
   filteredModules :: [Module]
   filteredModules = map filterUsed modules
     where
@@ -461,12 +471,16 @@ compile modules entryPoints = filteredModules
 
       isDeclUsed :: ModuleElement -> Bool
       isDeclUsed (Member _ _ nm _ _) = isKeyUsed (mid, nm)
+      isDeclUsed (Require _ _ (Right midRef)) = midRef `S.member` modulesReferenced
       isDeclUsed _ = True
 
       isKeyUsed :: Key -> Bool
       isKeyUsed k
         | Just me <- vertexFor k = me `S.member` reachableSet
         | otherwise = False
+
+      modulesReferenced :: S.Set ModuleIdentifier
+      modulesReferenced = fold $ M.lookup mid moduleReferenceMap
 
 -- | Topologically sort the module dependency graph, so that when we generate code, modules can be
 -- defined in the right order.
