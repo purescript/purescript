@@ -382,7 +382,7 @@ entails SolverOptions{..} constraint context hints =
           -- reduce the first or second argument -- if the constraint is
           -- solvable, either path will yield the same outcome. Consequently we
           -- just try the first argument first and the second argument second.
-          ws <- coercibleWanteds env a b <|> coercibleWanteds env b a
+          ws <- coercibleWanteds env a' b' <|> coercibleWanteds env b' a'
           pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.Coercible [a, b] (Just ws)]
     solveCoercible _ _ = Nothing
 

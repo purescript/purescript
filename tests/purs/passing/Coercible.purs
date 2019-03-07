@@ -80,6 +80,21 @@ newtype RankN1 a b = RankN1 (forall r. r -> a)
 rankN1ToRankN1 :: RankN1 NTString1 Int -> RankN1 String Boolean
 rankN1ToRankN1 = coerce
 
+data RankN2 a = RankN2 (forall a. a -> a)
+
+rankN2ToRankN2 :: forall x y. RankN2 x -> RankN2 y
+rankN2ToRankN2 = coerce
+
+data RankN3 c = RankN3 (forall c. (forall c. c -> c) -> c)
+
+rankN3ToRankN3 :: forall x y. RankN3 x -> RankN3 y
+rankN3ToRankN3 = coerce
+
+data RankN4 z = RankN4 (forall c. (forall z. c -> z) -> c)
+
+rankN4ToRankN4 :: forall x y. RankN4 x -> RankN4 y
+rankN4ToRankN4 = coerce
+
 data Phantom2 a = Phantom
 
 data Maybe a = Nothing | Just a

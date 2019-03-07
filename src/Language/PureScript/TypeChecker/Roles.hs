@@ -9,6 +9,7 @@ import Prelude.Compat
 
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
+import qualified Data.Set as S
 import Data.Text (Text, pack)
 
 import Language.PureScript.Environment
@@ -35,7 +36,7 @@ inferRoles env tyName
       -- pairs. Then, walk the list of defined parameters, ensuring both that
       -- every parameter appears (with a default role of phantom) and that they
       -- appear in the right order.
-      let ctorRoles = foldMap (foldMap walk . snd) ctors
+      let ctorRoles = foldMap (foldMap (walk mempty) . snd) ctors
       in  map (\(tv, _) -> (tv, fromMaybe Phantom (lookup tv ctorRoles))) tvs
   | Just (k, ExternData) <- envMeta =
       -- A foreign data type. Since the type will have no defined constructors
@@ -50,19 +51,27 @@ inferRoles env tyName
     envMeta = M.lookup tyName envTypes
     -- This function is named walk to match the specification given in the "Role
     -- inference" section of the paper "Safe Zero-cost Coercions for Haskell".
-    walk (TypeVar _ v) =
+    walk :: S.Set Text -> SourceType -> [(Text, Role)]
+    walk btvs (TypeVar _ v)
       -- A type variable standing alone (e.g. `a` in `data D a b = D a`) is
-      -- representational.
-      [(v, Representational)]
-    walk (ForAll _ _ t _) =
-      -- We can walk under universal quantifiers. Note that this might appear
-      -- erroneous -- given a definition like `data D a = D (forall r. r -> a)`
-      -- we expect we'll produce `[("r", Representational)]` as part of the
-      -- recursive call's result. This is true, but fine, since this tuple will
-      -- never be looked up when building the final result, which only looks at
-      -- the variables defined as parameters to the type.
-      walk t
-    walk t
+      -- representational, _unless_ it has been bound by a quantifier, in which
+      -- case it is not actually a parameter to the type (e.g. `z` in
+      -- `data T z -- = T (forall z. z -> z)`).
+      | S.member v btvs =
+          []
+      | otherwise =
+        [(v, Representational)]
+    walk btvs (ForAll _ tv t _) =
+      -- We can walk under universal quantifiers as long as we make note of the
+      -- variables that they bind. For instance, given a definition
+      -- `data T z = T (forall z. z -> z)`, we will make note that `z` is bound
+      -- by a quantifier so that we do not mark `T`'s parameter as
+      -- representational later on. Similarly, given a definition like
+      -- `data D a = D (forall r. r -> a)`, we'll mark `r` as bound so that it
+      -- doesn't appear as a spurious parameter to `D` when we complete
+      -- inference.
+      walk (S.insert tv btvs) t
+    walk btvs t
       | Just (t1, t2s) <- splitTypeApp t =
           case t1 of
             -- If the type is an application of a type constructor to some
@@ -74,7 +83,7 @@ inferRoles env tyName
               let t1Roles = inferRoles env t1Name
                   k (_v, role) ti = case role of
                     Representational ->
-                      walk ti
+                      go ti
                     Phantom ->
                       []
               in  concat (zipWith k t1Roles t2s)
@@ -85,9 +94,11 @@ inferRoles env tyName
             -- function/constructor would trigger this case and both `a` and
             -- `G b` would be walked recursively).
             _ ->
-              walk t1 ++ foldMap walk t2s
+              go t1 ++ foldMap go t2s
       | otherwise =
           []
+      where
+        go = walk btvs
 
 rolesFromDeclaration :: [Role] -> [(Text, Role)]
 rolesFromDeclaration
