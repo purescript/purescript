@@ -202,8 +202,8 @@ returnEscaped = "$return"
 unit :: forall a. (IsString a) => a
 unit = "unit"
 
-hash :: forall a. (IsString a) => a
-hash = "hash"
+hashWithSalt :: forall a. (IsString a) => a
+hashWithSalt = "hashWithSalt"
 
 -- Core lib values
 

@@ -632,16 +632,17 @@ deriveHashable :: forall m
 deriveHashable ss mn syns ds tyConNm = do
   tyCon <- findTypeDecl ss tyConNm ds
   hashFun <- mkHashFunction tyCon
-  return [ ValueDecl (ss, []) (Ident C.hash) Public [] (unguarded hashFun) ]
+  return [ ValueDecl (ss, []) (Ident C.hashWithSalt) Public [] (unguarded hashFun) ]
   where
     mkHashFunction :: Declaration -> m Expr
     mkHashFunction (DataDeclaration (ss', _) _ _ _ args) = do
+      s <- freshIdent "s"
       x <- freshIdent "x"
-      lamCase ss' x <$> (concat <$> mapM mkCases (zip args [0..]))
+      lam ss s <$> lamCase ss' x <$> (concat <$> mapM (mkCases s) (zip args [0..]))
     mkHashFunction _ = internalError "mkHashFunction: expected DataDeclaration"
 
-    mkCases :: ((ProperName 'ConstructorName, [Type]), Int) -> m [CaseAlternative]
-    mkCases ((ctorName, tys), nth) = do
+    mkCases :: Ident -> ((ProperName 'ConstructorName, [SourceType]), Int) -> m [CaseAlternative]
+    mkCases s ((ctorName, tys), nth) = do
       xs <- replicateM (length tys) (freshIdent "x")
       let binder = ConstructorBinder ss (Qualified (Just mn) ctorName) (map (VarBinder ss) xs)
       tys' <- mapM (replaceAllTypeSynonymsM syns) tys
@@ -649,13 +650,13 @@ deriveHashable ss mn syns ds tyConNm = do
       -- collect all record and constructor fields
       let es = collectFields (zip (map var xs) tys')
       -- make recursive calls to `hash`
-      let hashEs = map (App (Var ss (Qualified (Just dataHashable) (Ident C.hash)))) es
+      let hashEs = map (App (App (Var ss (Qualified (Just dataHashable) (Ident C.hashWithSalt))) (var s))) es
       hs <- replicateM (length es) (freshIdent "h")
       -- unwrap all of the `Hash` newtypes
       let theCase = Case hashEs
                     [ CaseAlternative (map hashBinder hs)
                       -- combine hashes, then wrap in newtype
-                      (unguarded (wrapHash (foldl' combiningFunction (initialHash nth) (map var hs)))) ]
+                      (unguarded (wrapHash (foldl' combiningFunction (initialHash s nth) (map var hs)))) ]
 
       return [CaseAlternative [binder] (unguarded theCase)]
 
@@ -675,16 +676,18 @@ deriveHashable ss mn syns ds tyConNm = do
     hashBinder :: Ident -> Binder
     hashBinder hx = ConstructorBinder ss dataHashableHashNewtypeConstructor [ VarBinder ss hx ]
 
+    add = Var ss (Qualified (Just dataSemiring) (Ident C.add))
+
     -- acc * 31 + h -- for want of a better combining function
     combiningFunction :: Expr -> Expr -> Expr
     combiningFunction acc h = App (App add (App (App mul acc) thirtyone)) h
       where
-        add = Var ss (Qualified (Just dataSemiring) (Ident C.add))
         mul = Var ss (Qualified (Just dataSemiring) (Ident C.mul))
         thirtyone = Literal ss (NumericLiteral (Left 31))
 
-    -- initial hash is just the running number of constructor, for now
-    initialHash nth = Literal ss (NumericLiteral (Left (toEnum nth)))
+    initialHash s nth =
+      App (App add (var s))
+        (Literal ss (NumericLiteral (Left (toEnum nth))))
 
 deriveNewtype
   :: forall m
