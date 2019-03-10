@@ -1,0 +1,23 @@
+language: node_js
+dist: trusty
+sudo: required
+node_js: stable
+env:
+  - PATH=$HOME/purescript:$PATH
+install:
+  - TAG=$(wget -q -O - https://github.com/purescript/purescript/releases/latest --server-response --max-redirect 0 2>&1 | sed -n -e 's/.*Location:.*tag\///p')
+  - wget -O $HOME/purescript.tar.gz https://github.com/purescript/purescript/releases/download/$TAG/linux64.tar.gz
+  - tar -xvf $HOME/purescript.tar.gz -C $HOME/
+  - chmod a+x $HOME/purescript
+  - npm install -g bower
+  - npm install
+script:
+  - bower install --production
+  - npm run -s build
+  - bower install
+  - npm -s test
+after_success:
+- >-
+  test $TRAVIS_TAG &&
+  echo $GITHUB_TOKEN | pulp login &&
+  echo y | pulp publish --no-push
