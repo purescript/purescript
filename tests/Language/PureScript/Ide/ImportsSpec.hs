@@ -3,9 +3,10 @@
 module Language.PureScript.Ide.ImportsSpec where
 
 import           Protolude hiding (moduleName)
-import           Data.Maybe                      (fromJust)
+import           Data.Maybe (fromJust)
+import qualified Data.Set as Set
 
-import qualified Language.PureScript             as P
+import qualified Language.PureScript as P
 import           Language.PureScript.Ide.Command as Command
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Imports
@@ -346,7 +347,7 @@ addExplicitImport i =
 
 addExplicitImportFiltered :: Text -> [P.ModuleName] -> Command
 addExplicitImportFiltered i ms =
-  Command.Import ("src" </> "ImportsSpec.purs") Nothing [moduleFilter ms] (Command.AddImportForIdentifier i Nothing)
+  Command.Import ("src" </> "ImportsSpec.purs") Nothing [moduleFilter (Set.fromList ms)] (Command.AddImportForIdentifier i Nothing)
 
 importShouldBe :: [Text] -> [Text] -> Expectation
 importShouldBe res importSection =

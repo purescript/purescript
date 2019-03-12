@@ -601,37 +601,22 @@ Valid namespaces are `value`, `type` and `kind`.
 ### Declaration type filter
 A filter which allows to filter type declarations. Valid type declarations are
 `value`, `type`, `synonym`, `dataconstructor`, `typeclass`, `valueoperator`,
-`typeoperator` and `kind`.
+`typeoperator`, `kind`, and `module`.
 
 ```json
 {
   "filter": "declarations",
-  "params": [
-    {
-      "declarationtype": "value"
-    },
-    {
-      "declarationtype": "type"
-    },
-    {
-      "declarationtype": "synonym"
-    },
-    {
-      "declarationtype": "dataconstructor"
-    }
-    {
-      "declarationtype": "typeclass"
-    },
-    {
-      "declarationtype": "valueoperator"
-    },
-    {
-      "declarationtype": "typeoperator"
-    },
-    {
-      "declarationtype": "kind"
-    }
-  ]
+  "params":
+    [ "value"
+    , "type"
+    , "synonym"
+    , "dataconstructor"
+    , "typeclass"
+    , "valueoperator"
+    , "typeoperator"
+    , "kind"
+    , "module"
+    ]
 }
 ```
 

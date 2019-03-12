@@ -1,9 +1,8 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Language.PureScript.Ide.Filter.Declaration
-       ( IdeDeclaration(..)
-       , DeclarationType(..)
-       , typeDeclarationForDeclaration
+       ( DeclarationType(..)
+       , declarationType
        ) where
 
 import           Protolude                     hiding (isPrefixOf)
@@ -37,23 +36,14 @@ instance FromJSON DeclarationType where
       "module"            -> pure Module
       _                   -> mzero
 
-newtype IdeDeclaration = IdeDeclaration
-  { declarationtype :: DeclarationType
-  } deriving (Show, Eq, Ord)
-
-instance FromJSON IdeDeclaration where
-  parseJSON (Object o) =
-    IdeDeclaration <$> o .: "declarationtype"
-  parseJSON _ = mzero
-
-typeDeclarationForDeclaration :: PI.IdeDeclaration -> IdeDeclaration
-typeDeclarationForDeclaration decl = case decl of
-  PI.IdeDeclValue _ -> IdeDeclaration Value
-  PI.IdeDeclType _ -> IdeDeclaration Type
-  PI.IdeDeclTypeSynonym _ -> IdeDeclaration Synonym
-  PI.IdeDeclDataConstructor _ -> IdeDeclaration DataConstructor
-  PI.IdeDeclTypeClass _ -> IdeDeclaration TypeClass
-  PI.IdeDeclValueOperator _ -> IdeDeclaration ValueOperator
-  PI.IdeDeclTypeOperator _ -> IdeDeclaration TypeOperator
-  PI.IdeDeclKind _ -> IdeDeclaration Kind
-  PI.IdeDeclModule _ -> IdeDeclaration Module
+declarationType :: PI.IdeDeclaration -> DeclarationType
+declarationType decl = case decl of
+  PI.IdeDeclValue _ -> Value
+  PI.IdeDeclType _ -> Type
+  PI.IdeDeclTypeSynonym _ -> Synonym
+  PI.IdeDeclDataConstructor _ -> DataConstructor
+  PI.IdeDeclTypeClass _ -> TypeClass
+  PI.IdeDeclValueOperator _ -> ValueOperator
+  PI.IdeDeclTypeOperator _ -> TypeOperator
+  PI.IdeDeclKind _ -> Kind
+  PI.IdeDeclModule _ -> Module

@@ -115,8 +115,8 @@ findCompletions
   -> CompletionOptions
   -> m Success
 findCompletions filters matcher currentModule complOptions = do
-  modules <- Map.toList <$> getAllModules currentModule
-  let insertPrim = (++) idePrimDeclarations
+  modules <- getAllModules currentModule
+  let insertPrim = Map.union idePrimDeclarations
   pure (CompletionResult (getCompletions filters matcher complOptions (insertPrim modules)))
 
 findType
@@ -126,8 +126,8 @@ findType
   -> Maybe P.ModuleName
   -> m Success
 findType search filters currentModule = do
-  modules <- Map.toList <$> getAllModules currentModule
-  let insertPrim = (++) idePrimDeclarations
+  modules <- getAllModules currentModule
+  let insertPrim = Map.union idePrimDeclarations
   pure (CompletionResult (getExactCompletions search filters (insertPrim modules)))
 
 printModules :: Ide m => m Success
