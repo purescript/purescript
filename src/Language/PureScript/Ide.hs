@@ -62,7 +62,9 @@ handleCommand c = case c of
     findType search filters currentModule
   Complete filters matcher currentModule complOptions ->
     findCompletions filters matcher currentModule complOptions
-  List LoadedModules ->
+  List LoadedModules -> do
+    logWarnN
+      "Listing the loaded modules command is DEPRECATED, use the completion command and filter it to modules instead"
     printModules
   List AvailableModules ->
     listAvailableModules
