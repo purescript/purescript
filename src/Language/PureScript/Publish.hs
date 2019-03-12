@@ -24,6 +24,7 @@ import Protolude hiding (stdin)
 
 import Control.Arrow ((***))
 import Control.Category ((>>>))
+import Control.Monad.Fail (MonadFail)
 import Control.Monad.Writer.Strict (MonadWriter, WriterT, runWriterT, tell)
 
 import Data.Aeson.BetterErrors (Parse, parse, keyMay, eachInObjectWithKey, eachInObject, key, keyOrDefault, asBool, asString, asText)
@@ -90,7 +91,7 @@ newtype PrepareM a =
   PrepareM { unPrepareM :: WriterT [PackageWarning] (ExceptT PackageError IO) a }
   deriving (Functor, Applicative, Monad,
             MonadWriter [PackageWarning],
-            MonadError PackageError)
+            MonadError PackageError, MonadFail)
 
 -- This MonadIO instance ensures that IO errors don't crash the program.
 instance MonadIO PrepareM where
@@ -150,7 +151,8 @@ getModules paths = do
   (inputFiles, depsFiles) <- liftIO (getInputAndDepsFiles paths)
   (modules', moduleMap) <- parseFilesInPackages inputFiles depsFiles
 
-  case runExcept (D.convertModulesInPackage (map snd modules') moduleMap) of
+  converted <- runExceptT (D.convertModulesInPackage (map snd modules') moduleMap)
+  case converted of
     Right modules -> return (modules, moduleMap)
     Left err -> userError (CompileError err)
 

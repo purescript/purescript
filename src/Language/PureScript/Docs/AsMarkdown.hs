@@ -9,6 +9,7 @@ module Language.PureScript.Docs.AsMarkdown
 import Prelude.Compat
 
 import Control.Monad (unless, zipWithM_)
+import Control.Monad.Fail (MonadFail)
 import Control.Monad.Error.Class (MonadError)
 import Control.Monad.Writer (Writer, tell, execWriter)
 
@@ -28,7 +29,7 @@ import qualified Language.PureScript.Docs.Render as Render
 -- Markdown-formatted Text.
 --
 renderModulesAsMarkdown ::
-  (MonadError P.MultipleErrors m) =>
+  (MonadError P.MultipleErrors m, MonadFail m) =>
   [P.Module] ->
   m Text
 renderModulesAsMarkdown =

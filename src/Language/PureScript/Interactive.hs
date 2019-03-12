@@ -21,11 +21,12 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 
 import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Control.Monad.Fail (MonadFail)
 import           Control.Monad.State.Class
 import           Control.Monad.Reader.Class
 import           Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import           Control.Monad.Trans.State.Strict (StateT, runStateT, evalStateT)
-import           Control.Monad.Writer.Strict (Writer(), runWriter)
+import           Control.Monad.Writer.Strict (WriterT, runWriterT)
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Names as N
@@ -94,7 +95,7 @@ make ms = do
 
 -- | Performs a PSCi command
 handleCommand
-  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
+  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m, MonadFail m)
   => (String -> m ()) -- ^ evaluate JS
   -> m () -- ^ reload
   -> (String -> m ()) -- ^ print into console
@@ -279,7 +280,7 @@ handleTypeOf print' val = do
 
 -- | Takes a type and prints its kind
 handleKindOf
-  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
+  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m, MonadFail m)
   => (String -> m ())
   -> P.SourceType
   -> m ()
@@ -294,10 +295,10 @@ handleKindOf print' typ = do
       case M.lookup (P.Qualified (Just mName) $ P.ProperName "IT") (P.typeSynonyms env') of
         Just (_, typ') -> do
           let chk = (P.emptyCheckState env') { P.checkCurrentModule = Just mName }
-              k   = check (P.kindOf typ') chk
 
-              check :: StateT P.CheckState (ExceptT P.MultipleErrors (Writer P.MultipleErrors)) a -> P.CheckState -> Either P.MultipleErrors (a, P.CheckState)
-              check sew = fst . runWriter . runExceptT . runStateT sew
+              check :: StateT P.CheckState (ExceptT P.MultipleErrors (WriterT P.MultipleErrors IO)) a -> P.CheckState -> IO (Either P.MultipleErrors (a, P.CheckState))
+              check sew = fmap fst . runWriterT . runExceptT . runStateT sew
+          k <- liftIO $ check (P.kindOf typ') chk
           case k of
             Left err        -> printErrors err
             Right (kind, _) -> print' . T.unpack . P.prettyPrintKind $ kind

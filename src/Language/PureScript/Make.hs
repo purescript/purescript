@@ -12,6 +12,7 @@ import           Prelude.Compat
 
 import           Control.Concurrent.Lifted as C
 import           Control.Monad hiding (sequence)
+import           Control.Monad.Fail (MonadFail)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.IO.Class
 import           Control.Monad.Supply
@@ -49,7 +50,7 @@ import           System.FilePath (replaceExtension)
 -- This function is used for fast-rebuild workflows (PSCi and psc-ide are examples).
 rebuildModule
   :: forall m
-   . (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+   . (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadFail m)
   => MakeActions m
   -> [ExternsFile]
   -> Module
@@ -83,7 +84,7 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
 --
 -- If timestamps have not changed, the externs file can be used to provide the module's types without
 -- having to typecheck the module again.
-make :: forall m. (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+make :: forall m. (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadFail m)
      => MakeActions m
      -> [Module]
      -> m [ExternsFile]

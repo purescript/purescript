@@ -13,6 +13,7 @@ import Protolude hiding (check)
 
 import Control.Arrow ((&&&))
 import Control.Category ((>>>))
+import Control.Monad.Fail (MonadFail)
 import Control.Monad.Writer.Strict (runWriterT)
 import Data.Functor (($>))
 import qualified Data.Map as Map
@@ -33,7 +34,7 @@ import Text.Parsec (eof)
 -- file paths.
 --
 convertTaggedModulesInPackage ::
-  (MonadError P.MultipleErrors m) =>
+  (MonadError P.MultipleErrors m, MonadFail m) =>
   [(FilePath, P.Module)] ->
   Map P.ModuleName PackageName ->
   m [(FilePath, Module)]
@@ -59,7 +60,7 @@ convertTaggedModulesInPackage taggedModules modulesDeps =
 -- documentation.
 --
 convertModulesInPackage ::
-  (MonadError P.MultipleErrors m) =>
+  (MonadError P.MultipleErrors m, MonadFail m) =>
   [P.Module] ->
   Map P.ModuleName PackageName ->
   m [Module]
@@ -67,7 +68,7 @@ convertModulesInPackage modules modulesDeps =
   fmap fst (convertModulesInPackageWithEnv modules modulesDeps)
 
 convertModulesInPackageWithEnv ::
-  (MonadError P.MultipleErrors m) =>
+  (MonadError P.MultipleErrors m, MonadFail m) =>
   [P.Module] ->
   Map P.ModuleName PackageName ->
   m ([Module], P.Env)
@@ -102,7 +103,7 @@ convertModulesInPackageWithEnv modules modulesDeps =
 -- types.
 --
 convertModules ::
-  (MonadError P.MultipleErrors m) =>
+  (MonadError P.MultipleErrors m, MonadFail m) =>
   (P.ModuleName -> InPackage P.ModuleName) ->
   [P.Module] ->
   m [Module]
@@ -110,7 +111,7 @@ convertModules withPackage =
   fmap fst . convertModulesWithEnv withPackage
 
 convertModulesWithEnv ::
-  (MonadError P.MultipleErrors m) =>
+  (MonadError P.MultipleErrors m, MonadFail m) =>
   (P.ModuleName -> InPackage P.ModuleName) ->
   [P.Module] ->
   m ([Module], P.Env)
@@ -124,7 +125,7 @@ convertModulesWithEnv withPackage =
 -- modules and the Env produced during desugaring.
 --
 convertSorted ::
-  (MonadError P.MultipleErrors m) =>
+  (MonadError P.MultipleErrors m, MonadFail m) =>
   (P.ModuleName -> InPackage P.ModuleName) ->
   [P.Module] ->
   m ([Module], P.Env)
@@ -158,7 +159,7 @@ convertSorted withPackage modules = do
 -- types.
 --
 typeCheckIfNecessary ::
-  (MonadError P.MultipleErrors m) =>
+  (MonadError P.MultipleErrors m, MonadFail m) =>
   [P.Module] ->
   [Module] ->
   m [Module]
@@ -182,7 +183,7 @@ typeCheckIfNecessary modules convertedModules =
 -- were not provided.
 --
 typeCheck ::
-  (MonadError P.MultipleErrors m) =>
+  (MonadError P.MultipleErrors m, MonadFail m) =>
   [P.Module] ->
   m ([P.Module], P.Environment)
 typeCheck =
