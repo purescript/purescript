@@ -15,7 +15,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Language.PureScript.Ide.Filter
-       ( Filter(..)
+       ( Filter
        , moduleFilter
        , namespaceFilter
        , exactFilter
