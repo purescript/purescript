@@ -37,6 +37,7 @@ dependencies:
   - aeson >=1.0 && <1.5
   - aeson-better-errors >=0.8
   - ansi-terminal >=0.7.1 && <0.9
+  - array
   - base >=4.8 && <4.12
   - base-compat >=0.6.0
   - blaze-html >=0.8.1 && <0.10
