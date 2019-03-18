@@ -26,7 +26,7 @@ import           Control.Parallel.Strategies (withStrategy, parList, rseq)
 import           Data.Functor (($>))
 import           Data.Maybe (fromMaybe)
 import qualified Data.Set as S
-import           Data.Text (Text)
+import           Data.Text (Text, pack)
 import           Language.PureScript.AST
 import           Language.PureScript.Environment
 import           Language.PureScript.Errors
@@ -45,6 +45,9 @@ kindedIdent :: TokenParser (Text, Maybe SourceKind)
 kindedIdent = (, Nothing) <$> identifier
           <|> parens ((,) <$> identifier <*> (Just <$> (indented *> doubleColon *> indented *> parseKind)))
 
+fields :: [Ident]
+fields = [ Ident ("value" <> pack (show (n :: Integer))) | n <- [0..] ]
+
 parseDataDeclaration :: TokenParser Declaration
 parseDataDeclaration = withSourceAnnF $ do
   dtype <- (reserved "data" *> return Data) <|> (reserved "newtype" *> return Newtype)
@@ -52,7 +55,10 @@ parseDataDeclaration = withSourceAnnF $ do
   tyArgs <- many (indented *> kindedIdent)
   ctors <- P.option [] $ do
     indented *> equals
-    P.sepBy1 ((,) <$> dataConstructorName <*> P.many (indented *> noWildcards parseTypeAtom)) pipe
+    flip P.sepBy1 pipe $ do
+      ctorName <- dataConstructorName
+      tys <- P.many (indented *> noWildcards parseTypeAtom)
+      return (ctorName, zip fields tys)
   return $ \sa -> DataDeclaration sa dtype name tyArgs ctors
 
 parseTypeDeclaration :: TokenParser Declaration

@@ -485,7 +485,7 @@ data Declaration
   -- |
   -- A data type declaration (data or newtype, name, arguments, data constructors)
   --
-  = DataDeclaration SourceAnn DataDeclType (ProperName 'TypeName) [(Text, Maybe SourceKind)] [(ProperName 'ConstructorName, [SourceType])]
+  = DataDeclaration SourceAnn DataDeclType (ProperName 'TypeName) [(Text, Maybe SourceKind)] [(ProperName 'ConstructorName, [(Ident, SourceType)])]
   -- |
   -- A minimal mutually recursive set of data type declarations
   --
