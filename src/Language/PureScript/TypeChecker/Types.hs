@@ -701,9 +701,6 @@ check' e@(Literal ss (ObjectLiteral ps)) t@(TypeApp _ obj row) | obj == tyRecord
   ensureNoDuplicateProperties ps
   ps' <- checkProperties e ps row False
   return $ TypedValue True (Literal ss (ObjectLiteral ps')) t
-check' (TypeClassDictionaryConstructorApp name ps) t = do
-  ps' <- check' ps t
-  return $ TypedValue True (TypeClassDictionaryConstructorApp name ps') t
 check' e@(ObjectUpdate obj ps) t@(TypeApp _ o row) | o == tyRecord = do
   ensureNoDuplicateProperties ps
   -- We need to be careful to avoid duplicate labels here.

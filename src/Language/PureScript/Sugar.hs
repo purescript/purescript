@@ -70,4 +70,5 @@ desugar externs =
     >=> traverse checkFixityExports
     >=> traverse (deriveInstances externs)
     >=> desugarTypeClasses externs
+    >=> traverse desugarCasesModule -- TODO: can avoid this by avoiding sugar during `desugarTypeClasses`
     >=> traverse createBindingGroupsModule

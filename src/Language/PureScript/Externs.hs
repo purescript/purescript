@@ -219,10 +219,10 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
     = [ EDValue ident ty ]
   toExternsDeclaration (TypeClassRef _ className)
     | Just TypeClassData{..} <- Qualified (Just mn) className `M.lookup` typeClasses env
-    , Just (kind, TypeSynonym) <- Qualified (Just mn) (coerceProperName className) `M.lookup` types env
-    , Just (_, synTy) <- Qualified (Just mn) (coerceProperName className) `M.lookup` typeSynonyms env
-    = [ EDType (coerceProperName className) kind TypeSynonym
-      , EDTypeSynonym (coerceProperName className) typeClassArguments synTy
+    , Just (kind, tk) <- Qualified (Just mn) (coerceProperName className) `M.lookup` types env
+    , Just (dty, _, ty, args) <- Qualified (Just mn) (coerceProperName className) `M.lookup` dataConstructors env
+    = [ EDType (coerceProperName className) kind tk
+      , EDDataConstructor (coerceProperName className) dty (coerceProperName className) ty args
       , EDClass className typeClassArguments typeClassMembers typeClassSuperclasses typeClassDependencies
       ]
   toExternsDeclaration (TypeInstanceRef _ ident)

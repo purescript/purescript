@@ -352,13 +352,14 @@ entails SolverOptions{..} constraint context hints =
               -- So pass an empty placeholder (undefined) instead.
               return (useEmptyDict args)
             mkDictionary (IsSymbolInstance sym) _ =
-              let fields = [ ("reflectSymbol", Abs (VarBinder nullSourceSpan UnusedIdent) (Literal nullSourceSpan (StringLiteral sym))) ] in
-              return $ TypeClassDictionaryConstructorApp C.IsSymbol (Literal nullSourceSpan (ObjectLiteral fields))
+              let reflectSymbol = Abs (VarBinder nullSourceSpan UnusedIdent) (Literal nullSourceSpan (StringLiteral sym))
+              in return $ App (Constructor nullSourceSpan (coerceProperName <$> C.IsSymbol)) reflectSymbol
 
         -- Turn a DictionaryValue into a Expr
         subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr
         subclassDictionaryValue dict className index =
-          App (Accessor (mkString (superclassName className index)) dict) valUndefined
+          -- TODO: accessor here seems questionable, probably should be using a function like with normal class members
+          App (Accessor (mkString (runIdent (superclassName className index))) dict) valUndefined
 
     solveIsSymbol :: [SourceType] -> Maybe [TypeClassDict]
     solveIsSymbol [TypeLevelString ann sym] = Just [TypeClassDictionaryInScope [] 0 (IsSymbolInstance sym) [] C.IsSymbol [TypeLevelString ann sym] Nothing]

@@ -7,7 +7,7 @@ import Prelude.Compat
 
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
-import Data.Text (Text, pack)
+import Data.Text (pack)
 
 import Language.PureScript.Names
 import Language.PureScript.Types
@@ -40,5 +40,5 @@ type NamedDict = TypeClassDictionaryInScope (Qualified Ident)
 
 -- | Generate a name for a superclass reference which can be used in
 -- generated code.
-superclassName :: Qualified (ProperName 'ClassName) -> Integer -> Text
-superclassName pn index = runProperName (disqualify pn) <> pack (show index)
+superclassName :: Qualified (ProperName 'ClassName) -> Integer -> Ident
+superclassName pn index = Ident (runProperName (disqualify pn) <> pack (show index))
