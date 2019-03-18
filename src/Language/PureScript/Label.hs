@@ -17,6 +17,6 @@ import Language.PureScript.PSString (PSString)
 -- because records are indexable by PureScript strings at runtime.
 --
 newtype Label = Label { runLabel :: PSString }
-  deriving (Show, Eq, Ord, IsString, Monoid, A.ToJSON, A.FromJSON, Generic)
+  deriving (Show, Eq, Ord, IsString, Semigroup, Monoid, A.ToJSON, A.FromJSON, Generic)
 
 instance NFData Label

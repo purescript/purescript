@@ -52,7 +52,7 @@ encodeRebuildErrors = toJSON . map encodeRebuildError . P.runMultipleErrors
     encodeRebuildError err = case err of
       (P.ErrorMessage _
        ((P.HoleInferredType name _ _
-         (P.TSAfter{tsAfterIdentifiers=idents, tsAfterRecordFields=fields})))) ->
+         (Just (P.TSAfter{tsAfterIdentifiers=idents, tsAfterRecordFields=fields}))))) ->
         insertTSCompletions name idents (fromMaybe [] fields) (toJSON (toJSONError False P.Error err))
       _ ->
         (toJSON . toJSONError False P.Error) err
@@ -82,5 +82,5 @@ textError (ParseError parseError msg) = let escape = show
                                         in msg <> ": " <> escape parseError
 textError (RebuildError err)          = show err
 
-prettyPrintTypeSingleLine :: P.Type -> Text
-prettyPrintTypeSingleLine = T.unwords . map T.strip . T.lines . T.pack . P.prettyPrintTypeWithUnicode
+prettyPrintTypeSingleLine :: P.Type a -> Text
+prettyPrintTypeSingleLine = T.unwords . map T.strip . T.lines . T.pack . P.prettyPrintTypeWithUnicode maxBound

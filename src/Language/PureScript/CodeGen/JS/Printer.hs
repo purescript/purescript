@@ -13,7 +13,6 @@ import Control.PatternArrows
 import qualified Control.Arrow as A
 
 import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
 
@@ -58,7 +57,7 @@ literals = mkPattern' match'
     objectPropertyToString :: (Emit gen) => PSString -> gen
     objectPropertyToString s =
       emit $ case decodeString s of
-        Just s' | not (identNeedsEscaping s') ->
+        Just s' | isValidJsIdentifier s' ->
           s'
         _ ->
           prettyPrintStringJS s
@@ -155,7 +154,7 @@ accessor = mkPattern match
   where
   match (Indexer _ (StringLiteral _ prop) val) =
     case decodeString prop of
-      Just s | not (identNeedsEscaping s) -> Just (s, val)
+      Just s | isValidJsIdentifier s -> Just (s, val)
       _ -> Nothing
   match _ = Nothing
 

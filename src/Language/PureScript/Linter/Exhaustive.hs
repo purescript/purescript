@@ -20,7 +20,6 @@ import Control.Monad.Supply.Class (MonadSupply, fresh, freshName)
 import Data.Function (on)
 import Data.List (foldl', sortBy)
 import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
 import qualified Data.Map as M
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -64,15 +63,15 @@ qualifyName n defmn qn = Qualified (Just mn) n
 -- where: - ProperName is the name of the constructor (for example, "Nothing" in Maybe)
 --        - [Type] is the list of arguments, if it has (for example, "Just" has [TypeVar "a"])
 --
-getConstructors :: Environment -> ModuleName -> Qualified (ProperName 'ConstructorName) -> [(ProperName 'ConstructorName, [Type])]
+getConstructors :: Environment -> ModuleName -> Qualified (ProperName 'ConstructorName) -> [(ProperName 'ConstructorName, [SourceType])]
 getConstructors env defmn n = extractConstructors lnte
   where
 
-  extractConstructors :: Maybe (Kind, TypeKind) -> [(ProperName 'ConstructorName, [Type])]
+  extractConstructors :: Maybe (SourceKind, TypeKind) -> [(ProperName 'ConstructorName, [SourceType])]
   extractConstructors (Just (_, DataType _ pt)) = pt
   extractConstructors _ = internalError "Data name not in the scope of the current environment in extractConstructors"
 
-  lnte :: Maybe (Kind, TypeKind)
+  lnte :: Maybe (SourceKind, TypeKind)
   lnte = M.lookup qpn (types env)
 
   qpn :: Qualified (ProperName 'TypeName)
@@ -84,7 +83,7 @@ getConstructors env defmn n = extractConstructors lnte
       Nothing -> internalError $ "Constructor " ++ T.unpack (showQualified runProperName con) ++ " not in the scope of the current environment in getConsDataName."
       Just (_, pm, _, _) -> qualifyName pm defmn con
 
-  getConsInfo :: Qualified (ProperName 'ConstructorName) -> Maybe (DataDeclType, ProperName 'TypeName, Type, [Ident])
+  getConsInfo :: Qualified (ProperName 'ConstructorName) -> Maybe (DataDeclType, ProperName 'TypeName, SourceType, [Ident])
   getConsInfo con = M.lookup con (dataConstructors env)
 
 -- |
@@ -304,12 +303,12 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
            (ty tyVar))
         ]
 
-      ty :: Text -> Type
+      ty :: Text -> SourceType
       ty tyVar =
-        ForAll tyVar
-          ( ConstrainedType
-              (Constraint C.Partial [] (Just constraintData))
-              $ TypeApp (TypeApp tyFunction (TypeVar tyVar)) (TypeVar tyVar)
+        srcForAll tyVar
+          ( srcConstrainedType
+              (srcConstraint C.Partial [] (Just constraintData))
+              $ srcTypeApp (srcTypeApp tyFunction (srcTypeVar tyVar)) (srcTypeVar tyVar)
           )
           Nothing
 

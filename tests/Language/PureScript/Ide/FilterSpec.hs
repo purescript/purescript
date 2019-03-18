@@ -3,7 +3,8 @@
 module Language.PureScript.Ide.FilterSpec where
 
 import           Protolude
-import           Data.List.NonEmpty
+import qualified Data.Map as Map
+import qualified Data.Set as Set
 import           Language.PureScript.Ide.Filter
 import           Language.PureScript.Ide.Filter.Declaration as D
 import           Language.PureScript.Ide.Types
@@ -24,23 +25,23 @@ moduleG = (P.moduleNameFromString "Module.G", [T.ideTypeClass "MyClass" P.kindTy
 moduleH = (P.moduleNameFromString "Module.H", [T.ideValueOp "<$>" (P.Qualified Nothing (Left "")) 0 Nothing Nothing])
 moduleI = (P.moduleNameFromString "Module.I", [T.ideTypeOp "~>" (P.Qualified Nothing "") 0 Nothing Nothing])
 
-modules :: [Module]
-modules = [moduleA, moduleB]
+modules :: ModuleMap [IdeDeclarationAnn]
+modules = Map.fromList [moduleA, moduleB]
 
 runEq :: Text -> [Module]
-runEq s = applyFilters [equalityFilter s] modules
+runEq s = Map.toList (applyFilters [exactFilter s] modules)
 
 runPrefix :: Text -> [Module]
-runPrefix s = applyFilters [prefixFilter s] modules
+runPrefix s = Map.toList $ applyFilters [prefixFilter s] modules
 
 runModule :: [P.ModuleName] -> [Module]
-runModule ms = applyFilters [moduleFilter ms] modules
+runModule ms = Map.toList $ applyFilters [moduleFilter (Set.fromList ms)] modules
 
-runNamespace :: NonEmpty IdeNamespace -> [Module] -> [Module]
-runNamespace namespaces = applyFilters [namespaceFilter namespaces]
+runNamespace :: Set IdeNamespace -> [Module] -> [Module]
+runNamespace namespaces = Map.toList . applyFilters [namespaceFilter namespaces] . Map.fromList
 
-runDeclaration :: [D.IdeDeclaration] -> [Module] -> [Module]
-runDeclaration decls = applyFilters [declarationTypeFilter decls]
+runDeclaration :: [D.DeclarationType] -> [Module] -> [Module]
+runDeclaration decls = Map.toList . applyFilters [declarationTypeFilter (Set.fromList decls)] . Map.fromList
 
 spec :: Spec
 spec = do
@@ -53,7 +54,7 @@ spec = do
       runEq "data1" `shouldBe` [moduleB]
   describe "prefixFilter" $ do
     it "keeps everything on empty string" $
-      runPrefix "" `shouldBe` modules
+      runPrefix "" `shouldBe` Map.toList modules
     it "keeps functionname prefix matches" $
       runPrefix "fun" `shouldBe` [moduleA]
     it "keeps data decls prefix matches" $
@@ -67,102 +68,91 @@ spec = do
       runModule (P.moduleNameFromString <$> ["Module.A", "Unknown"]) `shouldBe` [moduleA]
   describe "namespaceFilter" $ do
     it "extracts modules by filtering `value` namespaces" $
-      runNamespace (fromList [IdeNSValue])
+      runNamespace (Set.fromList [IdeNSValue])
         [moduleA, moduleB, moduleD] `shouldBe` [moduleA, moduleB]
     it "extracts no modules by filtering `value` namespaces" $
-      runNamespace (fromList [IdeNSValue])
+      runNamespace (Set.fromList [IdeNSValue])
         [moduleD] `shouldBe` []
     it "extracts modules by filtering `type` namespaces" $
-      runNamespace (fromList [IdeNSType])
+      runNamespace (Set.fromList [IdeNSType])
         [moduleA, moduleB, moduleC] `shouldBe` [moduleC]
     it "extracts no modules by filtering `type` namespaces" $
-      runNamespace (fromList [IdeNSType])
+      runNamespace (Set.fromList [IdeNSType])
         [moduleA, moduleB] `shouldBe` []
     it "extracts modules by filtering `kind` namespaces" $
-      runNamespace (fromList [IdeNSKind])
+      runNamespace (Set.fromList [IdeNSKind])
         [moduleA, moduleB, moduleD] `shouldBe` [moduleD]
     it "extracts no modules by filtering `kind` namespaces" $
-      runNamespace (fromList [IdeNSKind])
+      runNamespace (Set.fromList [IdeNSKind])
         [moduleA, moduleB] `shouldBe` []
     it "extracts modules by filtering `value` and `type` namespaces" $
-      runNamespace (fromList [ IdeNSValue, IdeNSType])
+      runNamespace (Set.fromList [ IdeNSValue, IdeNSType])
         [moduleA, moduleB, moduleC, moduleD]
         `shouldBe` [moduleA, moduleB, moduleC]
     it "extracts modules by filtering `value` and `kind` namespaces" $
-      runNamespace (fromList [ IdeNSValue, IdeNSKind])
+      runNamespace (Set.fromList [ IdeNSValue, IdeNSKind])
         [moduleA, moduleB, moduleC, moduleD]
         `shouldBe` [moduleA, moduleB, moduleD]
     it "extracts modules by filtering `type` and `kind` namespaces" $
-      runNamespace (fromList [ IdeNSType, IdeNSKind])
+      runNamespace (Set.fromList [ IdeNSType, IdeNSKind])
         [moduleA, moduleB, moduleC, moduleD]
         `shouldBe` [moduleC, moduleD]
     it "extracts modules by filtering `value`, `type` and `kind` namespaces" $
-      runNamespace (fromList [ IdeNSValue, IdeNSType, IdeNSKind])
+      runNamespace (Set.fromList [ IdeNSValue, IdeNSType, IdeNSKind])
         [moduleA, moduleB, moduleC, moduleD]
         `shouldBe` [moduleA, moduleB, moduleC, moduleD]
   describe "declarationTypeFilter" $ do
-    let moduleADecl = D.IdeDeclaration D.Value
-        moduleCDecl = D.IdeDeclaration D.Type
-        moduleDDecl = D.IdeDeclaration D.Kind
-        moduleEDecl = D.IdeDeclaration D.Synonym
-        moduleFDecl = D.IdeDeclaration D.DataConstructor
-        moduleGDecl = D.IdeDeclaration D.TypeClass
-        moduleHDecl = D.IdeDeclaration D.ValueOperator
-        moduleIDecl = D.IdeDeclaration D.TypeOperator
-    it "keeps everything on empty list of declarations" $
-      runDeclaration []
-        [moduleA, moduleB, moduleD] `shouldBe` [moduleA, moduleB, moduleD]
     it "extracts modules by filtering `value` declarations" $
-      runDeclaration [moduleADecl]
+      runDeclaration [D.Value]
         [moduleA, moduleB, moduleD] `shouldBe` [moduleA, moduleB]
     it "removes everything if no `value` declarations has been found" $
-      runDeclaration [moduleADecl]
+      runDeclaration [D.Value]
         [moduleD, moduleG, moduleE, moduleH] `shouldBe` []
     it "extracts module by filtering `type` declarations" $
-      runDeclaration [moduleCDecl]
+      runDeclaration [D.Type]
         [moduleA, moduleB, moduleC, moduleD, moduleE] `shouldBe` [moduleC]
     it "removes everything if a `type` declaration have not been found" $
-      runDeclaration [moduleCDecl]
+      runDeclaration [D.Type]
         [moduleA, moduleG, moduleE, moduleH] `shouldBe` []
     it "extracts module by filtering `synonym` declarations" $
-      runDeclaration [moduleEDecl]
+      runDeclaration [D.Synonym]
         [moduleA, moduleB, moduleD, moduleE] `shouldBe` [moduleE]
     it "removes everything if a `synonym` declaration have not been found" $
-      runDeclaration [moduleEDecl]
+      runDeclaration [D.Synonym]
         [moduleA, moduleB, moduleC, moduleH] `shouldBe` []
     it "extracts module by filtering `constructor` declarations" $
-      runDeclaration [moduleFDecl]
+      runDeclaration [D.DataConstructor]
         [moduleA, moduleB, moduleC, moduleF] `shouldBe` [moduleF]
     it "removes everything if a `constructor` declaration have not been found" $
-      runDeclaration [moduleFDecl]
+      runDeclaration [D.DataConstructor]
         [moduleA, moduleB, moduleC, moduleH] `shouldBe` []
     it "extracts module by filtering `typeclass` declarations" $
-      runDeclaration [moduleGDecl]
+      runDeclaration [D.TypeClass]
         [moduleA, moduleC, moduleG] `shouldBe` [moduleG]
     it "removes everything if a `typeclass` declaration have not been found" $
-      runDeclaration [moduleGDecl]
+      runDeclaration [D.TypeClass]
         [moduleA, moduleB, moduleC, moduleH] `shouldBe` []
     it "extracts modules by filtering `valueoperator` declarations" $
-      runDeclaration [moduleHDecl]
+      runDeclaration [D.ValueOperator]
         [moduleA, moduleC, moduleG, moduleH, moduleF] `shouldBe` [moduleH]
     it "removes everything if a `valueoperator` declaration have not been found" $
-      runDeclaration [moduleHDecl]
+      runDeclaration [D.ValueOperator]
         [moduleA, moduleB, moduleC, moduleD] `shouldBe` []
     it "extracts modules by filtering `typeoperator` declarations" $
-      runDeclaration [moduleIDecl]
+      runDeclaration [D.TypeOperator]
         [moduleA, moduleC, moduleG, moduleI, moduleF] `shouldBe` [moduleI]
     it "removes everything if a `typeoperator` declaration have not been found" $
-      runDeclaration [moduleIDecl]
+      runDeclaration [D.TypeOperator]
         [moduleA, moduleD] `shouldBe` []
     it "extracts module by filtering `kind` declarations" $
-      runDeclaration [moduleCDecl]
-        [moduleA, moduleC, moduleG, moduleI, moduleF] `shouldBe` [moduleC]
+      runDeclaration [D.Kind]
+        [moduleA, moduleD, moduleG, moduleI, moduleF] `shouldBe` [moduleD]
     it "removes everything if a `kind` declaration have not been found" $
-      runDeclaration [moduleCDecl]
-        [moduleA, moduleD] `shouldBe` []
+      runDeclaration [D.Kind]
+        [moduleA, moduleC] `shouldBe` []
     it "extracts modules by filtering `value` and `synonym` declarations" $
-      runDeclaration [moduleADecl, moduleEDecl]
+      runDeclaration [D.Value, D.Synonym]
         [moduleA, moduleB, moduleD, moduleE] `shouldBe` [moduleA, moduleB, moduleE]
-    it "extracts modules by filtering `kind`, `synonym` and `valueoperator` declarations" $
-      runDeclaration [moduleADecl, moduleDDecl, moduleHDecl]
+    it "extracts modules by filtering `value`, `kind`, and `valueoperator` declarations" $
+      runDeclaration [D.Value, D.Kind, D.ValueOperator]
         [moduleA, moduleB, moduleD, moduleG, moduleE, moduleH] `shouldBe` [moduleA, moduleB, moduleD, moduleH]

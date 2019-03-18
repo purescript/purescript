@@ -138,13 +138,13 @@ usedTypeNames moduleName =
   let (f, _, _, _, _) = accumTypes (everythingOnTypes (++) usedNames)
   in ordNub . f
   where
-  usedNames :: Type -> [ProperName 'TypeName]
-  usedNames (ConstrainedType con _) =
+  usedNames :: SourceType -> [ProperName 'TypeName]
+  usedNames (ConstrainedType _ con _) =
     case con of
-      (Constraint (Qualified (Just moduleName') name) _ _)
+      (Constraint _ (Qualified (Just moduleName') name) _ _)
         | moduleName == moduleName' -> [coerceProperName name]
       _ -> []
-  usedNames (TypeConstructor (Qualified (Just moduleName') name))
+  usedNames (TypeConstructor _ (Qualified (Just moduleName') name))
     | moduleName == moduleName' = [name]
   usedNames _ = []
 

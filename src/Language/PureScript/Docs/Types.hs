@@ -39,6 +39,10 @@ import Language.PureScript.Docs.RenderedCode as ReExports
    RenderedCodeElement(..), asRenderedCodeElement,
    Namespace(..), FixityAlias)
 
+type Type' = P.Type ()
+type Kind' = P.Kind ()
+type Constraint' = P.Constraint ()
+
 --------------------
 -- Types
 
@@ -147,30 +151,30 @@ data DeclarationInfo
   -- |
   -- A value declaration, with its type.
   --
-  = ValueDeclaration P.Type
+  = ValueDeclaration Type'
 
   -- |
   -- A data/newtype declaration, with the kind of declaration (data or
   -- newtype) and its type arguments. Constructors are represented as child
   -- declarations.
   --
-  | DataDeclaration P.DataDeclType [(Text, Maybe P.Kind)]
+  | DataDeclaration P.DataDeclType [(Text, Maybe Kind')]
 
   -- |
   -- A data type foreign import, with its kind.
   --
-  | ExternDataDeclaration P.Kind
+  | ExternDataDeclaration Kind'
 
   -- |
   -- A type synonym, with its type arguments and its type.
   --
-  | TypeSynonymDeclaration [(Text, Maybe P.Kind)] P.Type
+  | TypeSynonymDeclaration [(Text, Maybe Kind')] Type'
 
   -- |
   -- A type class, with its type arguments, its superclasses and functional
   -- dependencies. Instances and members are represented as child declarations.
   --
-  | TypeClassDeclaration [(Text, Maybe P.Kind)] [P.Constraint] [([Text], [Text])]
+  | TypeClassDeclaration [(Text, Maybe Kind')] [Constraint'] [([Text], [Text])]
 
   -- |
   -- An operator alias declaration, with the member the alias is for and the
@@ -186,7 +190,7 @@ data DeclarationInfo
 
 instance NFData DeclarationInfo
 
-convertFundepsToStrings :: [(Text, Maybe P.Kind)] -> [P.FunctionalDependency] -> [([Text], [Text])]
+convertFundepsToStrings :: [(Text, Maybe Kind')] -> [P.FunctionalDependency] -> [([Text], [Text])]
 convertFundepsToStrings args fundeps =
   map (\(P.FunctionalDependency from to) -> toArgs from to) fundeps
   where
@@ -287,19 +291,19 @@ data ChildDeclarationInfo
   -- |
   -- A type instance declaration, with its dependencies and its type.
   --
-  = ChildInstance [P.Constraint] P.Type
+  = ChildInstance [Constraint'] Type'
 
   -- |
   -- A data constructor, with its type arguments.
   --
-  | ChildDataConstructor [P.Type]
+  | ChildDataConstructor [Type']
 
   -- |
   -- A type class member, with its type. Note that the type does not include
   -- the type class constraint; this may be added manually if desired. For
   -- example, `pure` from `Applicative` would be `forall a. a -> f a`.
   --
-  | ChildTypeClassMember P.Type
+  | ChildTypeClassMember Type'
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData ChildDeclarationInfo
@@ -410,18 +414,13 @@ data DocLink = DocLink
 instance NFData DocLink
 
 data LinkLocation
-  -- | A link to a declaration in the same module.
-  = SameModule
+  -- | A link to a declaration in the current package.
+  = LocalModule P.ModuleName
 
-  -- | A link to a declaration in a different module, but still in the current
-  -- package; we need to store the current module and the other declaration's
-  -- module.
-  | LocalModule P.ModuleName P.ModuleName
-
-  -- | A link to a declaration in a different package. We store: current module
-  -- name, name of the other package, version of the other package, and name of
-  -- the module in the other package that the declaration is in.
-  | DepsModule P.ModuleName PackageName Version P.ModuleName
+  -- | A link to a declaration in a different package. The arguments represent
+  -- the name of the other package, the version of the other package, and the
+  -- name of the module in the other package that the declaration is in.
+  | DepsModule PackageName Version P.ModuleName
 
   -- | A link to a declaration that is built in to the compiler, e.g. the Prim
   -- module. In this case we only need to store the module that the builtin
@@ -450,14 +449,14 @@ getLink LinksContext{..} curMn namespace target containingMod = do
   normalLinkLocation = do
     case containingMod of
       ThisModule ->
-        return SameModule
+        return $ LocalModule curMn
       OtherModule destMn ->
         case Map.lookup destMn ctxModuleMap of
           Nothing ->
-            return $ LocalModule curMn destMn
+            return $ LocalModule destMn
           Just pkgName -> do
             pkgVersion <- lookup pkgName ctxResolvedDependencies
-            return $ DepsModule curMn pkgName pkgVersion destMn
+            return $ DepsModule pkgName pkgVersion destMn
 
   builtinLinkLocation =
     case containingMod of
@@ -652,15 +651,15 @@ asDeclarationInfo = do
     other ->
       throwCustomError (InvalidDeclarationType other)
 
-asTypeArguments :: Parse PackageError [(Text, Maybe P.Kind)]
+asTypeArguments :: Parse PackageError [(Text, Maybe Kind')]
 asTypeArguments = eachInArray asTypeArgument
   where
   asTypeArgument = (,) <$> nth 0 asText <*> nth 1 (perhaps asKind)
 
-asKind :: Parse PackageError P.Kind
-asKind = P.kindFromJSON .! InvalidKind
+asKind :: Parse PackageError Kind'
+asKind = fromAesonParser .! InvalidKind
 
-asType :: Parse e P.Type
+asType :: Parse e Type'
 asType = fromAesonParser
 
 asFunDeps :: Parse PackageError [([Text], [Text])]
@@ -700,16 +699,19 @@ asSourcePos :: Parse e P.SourcePos
 asSourcePos = P.SourcePos <$> nth 0 asIntegral
                           <*> nth 1 asIntegral
 
-asConstraint :: Parse PackageError P.Constraint
-asConstraint = P.Constraint <$> key "constraintClass" asQualifiedProperName
-                            <*> key "constraintArgs" (eachInArray asType)
-                            <*> pure Nothing
+asConstraint :: Parse PackageError Constraint'
+asConstraint = P.Constraint () <$> key "constraintClass" asQualifiedProperName
+                               <*> key "constraintArgs" (eachInArray asType)
+                               <*> pure Nothing
 
 asQualifiedProperName :: Parse e (P.Qualified (P.ProperName a))
 asQualifiedProperName = fromAesonParser
 
 asQualifiedIdent :: Parse e (P.Qualified P.Ident)
 asQualifiedIdent = fromAesonParser
+
+asSourceAnn :: Parse e (P.SourceAnn)
+asSourceAnn = fromAesonParser
 
 asModuleMap :: Parse PackageError (Map P.ModuleName PackageName)
 asModuleMap =

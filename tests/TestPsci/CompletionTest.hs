@@ -47,8 +47,8 @@ completionTestData supportModuleNames =
   , (":reload ", [])
   , (":clear ", [])
 
-  -- :show should complete to "loaded" and "import"
-  , (":show ", [":show import", ":show loaded"])
+  -- :show should complete its available arguments
+  , (":show ", [":show import", ":show loaded", ":show print"])
   , (":show a", [])
 
   -- :type should complete next word from values and constructors in scope

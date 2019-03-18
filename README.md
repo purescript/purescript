@@ -2,7 +2,7 @@
 
 A small strongly typed programming language with expressive types that compiles to JavaScript, written in and inspired by Haskell.
 
-[![Hackage](https://img.shields.io/hackage/v/purescript.svg)](http://hackage.haskell.org/package/purescript) [![Build Status](https://api.travis-ci.org/purescript/purescript.svg?branch=master)](http://travis-ci.org/purescript/purescript)
+[![Hackage](https://img.shields.io/hackage/v/purescript.svg)](http://hackage.haskell.org/package/purescript) [![Build Status](https://api.travis-ci.org/purescript/purescript.svg?branch=master)](http://travis-ci.org/purescript/purescript) [![AppVeyor Build Status](https://ci.appveyor.com/api/projects/status/github/purescript/purescript?branch=master&svg=true)](https://ci.appveyor.com/project/hdgarrood/purescript-lfgff/history)
 
 ## Language info
 
@@ -20,7 +20,5 @@ A small strongly typed programming language with expressive types that compiles 
 ## Help!
 
 - [#purescript @ FP Slack](https://functionalprogramming.slack.com/)
-- [PureScript Language Forum](https://purescript-users.ml/)
+- [PureScript Language Forum](https://discourse.purescript.org/)
 - [PureScript on StackOverflow](http://stackoverflow.com/questions/tagged/purescript)
-- [Google Group](https://groups.google.com/forum/#!forum/purescript)
-- [Gitter Channel](https://gitter.im/purescript/purescript?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)

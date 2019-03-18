@@ -1,4 +1,12 @@
-resolver: lts-11.7
+resolver: lts-12.0
 packages:
 - '.'
 extra-deps:
+nix:
+  enable: false
+  packages:
+  - zlib
+  # Test dependencies
+  - nodejs
+  - nodePackages.npm
+  - nodePackages.bower

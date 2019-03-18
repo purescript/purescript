@@ -21,7 +21,6 @@ module Language.PureScript.Ide.Externs
 
 import           Protolude hiding (to, from, (&))
 
-import           Control.Lens
 import           "monad-logger" Control.Monad.Logger
 import           Data.Aeson (decodeStrict)
 import           Data.Aeson.Types (withObject, parseMaybe, (.:))
@@ -29,6 +28,7 @@ import qualified Data.ByteString as BS
 import           Data.Version (showVersion)
 import           Language.PureScript.Ide.Error (IdeError (..))
 import           Language.PureScript.Ide.Types
+import           Lens.Micro.Platform
 
 import qualified Language.PureScript as P
 
@@ -61,12 +61,13 @@ convertExterns :: P.ExternsFile -> ([IdeDeclarationAnn], [(P.ModuleName, P.Decla
 convertExterns ef =
   (decls, exportDecls)
   where
-    decls = map
+    decls = moduleDecl : map
       (IdeDeclarationAnn emptyAnn)
       (resolvedDeclarations <> operatorDecls <> tyOperatorDecls)
     exportDecls = mapMaybe convertExport (P.efExports ef)
     operatorDecls = convertOperator <$> P.efFixities ef
     tyOperatorDecls = convertTypeOperator <$> P.efTypeFixities ef
+    moduleDecl = IdeDeclarationAnn emptyAnn (IdeDeclModule (P.efModuleName ef))
     (toResolve, declarations) =
       second catMaybes (partitionEithers (map convertDecl (P.efDeclarations ef)))
 
@@ -116,10 +117,10 @@ findSynonym :: P.ProperName 'P.TypeName -> [IdeDeclaration] -> Maybe IdeTypeSyno
 -- involved. We collect these and resolve them at the end of the conversion process.
 data ToResolve
   = TypeClassToResolve (P.ProperName 'P.ClassName)
-  | SynonymToResolve (P.ProperName 'P.TypeName) P.Type
+  | SynonymToResolve (P.ProperName 'P.TypeName) P.SourceType
 
 convertExport :: P.DeclarationRef -> Maybe (P.ModuleName, P.DeclarationRef)
-convertExport (P.ReExportRef _ m r) = Just (m, r)
+convertExport (P.ReExportRef _ src r) = Just (P.exportSourceDefinedIn src, r)
 convertExport _ = Nothing
 
 convertDecl :: P.ExternsDeclaration -> Either ToResolve (Maybe IdeDeclaration)

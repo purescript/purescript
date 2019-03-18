@@ -9,6 +9,7 @@ import Language.PureScript.CoreFn.Ann
 import Language.PureScript.CoreFn.Expr
 import Language.PureScript.CoreFn.Module
 import Language.PureScript.CoreFn.Traversals
+import Language.PureScript.Names (Ident(UnusedIdent), Qualified(Qualified))
 import Language.PureScript.Label
 import Language.PureScript.Types
 import qualified Language.PureScript.Constants as C
@@ -23,7 +24,7 @@ optimizeModuleDecls :: [Bind Ann] -> [Bind Ann]
 optimizeModuleDecls = map transformBinds
   where
   (transformBinds, _, _) = everywhereOnValues identity transformExprs identity
-  transformExprs = optimizeClosedRecordUpdate
+  transformExprs = optimizeUnusedPartialFn . optimizeClosedRecordUpdate
 
 optimizeClosedRecordUpdate :: Expr Ann -> Expr Ann
 optimizeClosedRecordUpdate ou@(ObjectUpdate a@(_, _, Just t, _) r updatedFields) =
@@ -36,12 +37,20 @@ optimizeClosedRecordUpdate ou@(ObjectUpdate a@(_, _, Just t, _) r updatedFields)
 optimizeClosedRecordUpdate e = e
 
 -- | Return the labels of a closed record, or Nothing for other types or open records.
-closedRecordFields :: Type -> Maybe [Label]
-closedRecordFields (TypeApp (TypeConstructor C.Record) row) =
+closedRecordFields :: Type a -> Maybe [Label]
+closedRecordFields (TypeApp _ (TypeConstructor _ C.Record) row) =
   collect row
   where
-    collect :: Type -> Maybe [Label]
-    collect REmpty = Just []
-    collect (RCons l _ r) = collect r >>= return . (l :)
+    collect :: Type a -> Maybe [Label]
+    collect (REmpty _) = Just []
+    collect (RCons _ l _ r) = collect r >>= return . (l :)
     collect _ = Nothing
 closedRecordFields _ = Nothing
+
+-- | See https://github.com/purescript/purescript/issues/3157
+optimizeUnusedPartialFn :: Expr a -> Expr a
+optimizeUnusedPartialFn (Let _
+  [NonRec _ UnusedIdent _]
+  (App _ (App _ (Var _ (Qualified _ UnusedIdent)) _) originalCoreFn)) =
+  originalCoreFn
+optimizeUnusedPartialFn e = e

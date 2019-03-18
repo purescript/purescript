@@ -21,6 +21,8 @@ tests/support/package-lock.json
 .psc-ide-port
 .psc-package/
 purescript.cabal
+tags
+TAGS
 
 # Profiling related
 *.aux

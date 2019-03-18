@@ -24,19 +24,19 @@ import           Language.PureScript.TypeChecker.Monad
 import           Language.PureScript.Types
 
 -- | Type synonym information (arguments with kinds, aliased type), indexed by name
-type SynonymMap = M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe Kind)], Type)
+type SynonymMap = M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe SourceKind)], SourceType)
 
 replaceAllTypeSynonyms'
   :: SynonymMap
-  -> Type
-  -> Either MultipleErrors Type
+  -> SourceType
+  -> Either MultipleErrors SourceType
 replaceAllTypeSynonyms' syns = everywhereOnTypesTopDownM try
   where
-  try :: Type -> Either MultipleErrors Type
+  try :: SourceType -> Either MultipleErrors SourceType
   try t = fromMaybe t <$> go 0 [] t
 
-  go :: Int -> [Type] -> Type -> Either MultipleErrors (Maybe Type)
-  go c args (TypeConstructor ctor)
+  go :: Int -> [SourceType] -> SourceType -> Either MultipleErrors (Maybe SourceType)
+  go c args (TypeConstructor _ ctor)
     | Just (synArgs, body) <- M.lookup ctor syns
     , c == length synArgs
     = let repl = replaceAllTypeVars (zip (map fst synArgs) args) body
@@ -44,11 +44,11 @@ replaceAllTypeSynonyms' syns = everywhereOnTypesTopDownM try
     | Just (synArgs, _) <- M.lookup ctor syns
     , length synArgs > c
     = throwError . errorMessage $ PartiallyAppliedSynonym ctor
-  go c args (TypeApp f arg) = go (c + 1) (arg : args) f
+  go c args (TypeApp _ f arg) = go (c + 1) (arg : args) f
   go _ _ _ = return Nothing
 
 -- | Replace fully applied type synonyms
-replaceAllTypeSynonyms :: (e ~ MultipleErrors, MonadState CheckState m, MonadError e m) => Type -> m Type
+replaceAllTypeSynonyms :: (e ~ MultipleErrors, MonadState CheckState m, MonadError e m) => SourceType -> m SourceType
 replaceAllTypeSynonyms d = do
   env <- getEnv
   either throwError return $ replaceAllTypeSynonyms' (typeSynonyms env) d
@@ -57,6 +57,6 @@ replaceAllTypeSynonyms d = do
 replaceAllTypeSynonymsM
   :: MonadError MultipleErrors m
   => SynonymMap
-  -> Type
-  -> m Type
+  -> SourceType
+  -> m SourceType
 replaceAllTypeSynonymsM syns = either throwError pure . replaceAllTypeSynonyms' syns

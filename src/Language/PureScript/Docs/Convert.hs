@@ -14,6 +14,7 @@ import Protolude hiding (check)
 import Control.Arrow ((&&&))
 import Control.Category ((>>>))
 import Control.Monad.Writer.Strict (runWriterT)
+import Data.Functor (($>))
 import qualified Data.Map as Map
 import Data.String (String)
 
@@ -213,7 +214,7 @@ insertValueTypes env m =
       ident = parseIdent (declTitle d)
       ty = lookupName ident
     in
-      d { declInfo = ValueDeclaration ty }
+      d { declInfo = ValueDeclaration (ty $> ()) }
   go other =
     other
 
@@ -248,6 +249,7 @@ partiallyDesugar = P.evalSupplyT 0 . desugar'
   where
   desugar' =
     traverse P.desugarDoModule
+      >=> traverse P.desugarAdoModule
       >=> map P.desugarLetPatternModule
       >>> traverse P.desugarCasesModule
       >=> traverse P.desugarTypeDeclarationsModule

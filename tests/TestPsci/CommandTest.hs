@@ -1,10 +1,16 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module TestPsci.CommandTest where
 
 import Prelude ()
 import Prelude.Compat
 
+import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.RWS.Strict (get)
+import Language.PureScript (moduleNameFromString)
 import Language.PureScript.Interactive
+import System.FilePath ((</>))
+import System.Directory (getCurrentDirectory)
 import Test.Hspec
 import TestPsci.TestEnv
 
@@ -42,5 +48,35 @@ commandTests = context "commandTests" $ do
     ":complete M.a" `prints` unlines ["M.ap", "M.apply"]
 
   specPSCi ":browse" $ do
+    ":browse Data.Void" `printed` flip shouldContain "data Void"
+    ":browse Data.Void" `printed` flip shouldContain "absurd ::"
+
+  specPSCi ":reload, :browse" $ do
+    cwd <- liftIO getCurrentDirectory
+    let new = cwd </> "tests" </> "support" </> "psci" </> "Reload.edit"
+
+    ":browse Reload" `printed` flip shouldContain    "reload ::"
+    ":browse Reload" `printed` flip shouldNotContain "edited ::"
+
+    simulateModuleEdit (moduleNameFromString "Reload") new $ do
+      run ":reload"
+      ":browse Reload" `printed` flip shouldNotContain "reload ::"
+      ":browse Reload" `printed` flip shouldContain    "edited ::"
+
     ":browse Mirp" `printed` flip shouldContain "is not valid"
     ":browse Prim" `printed` flip shouldContain "class Partial"
+
+  specPSCi ":print" $ do
+    let failMsg = "Unable to set the repl's printing function"
+    let interactivePrintModuleShouldBe modName = do
+          modName' <- (fst . psciInteractivePrint) <$> get
+          modName' `equalsTo` modName
+
+    run "import Prelude"
+    ":print Prelude.show" `printed` flip shouldContain failMsg
+    interactivePrintModuleShouldBe (moduleNameFromString "PSCI.Support")
+
+    ":print InteractivePrint.unsafeEval" `printed` flip shouldNotContain failMsg
+    "(identity :: _ -> _)" `printed` flip shouldContain "[Function]"
+    interactivePrintModuleShouldBe (moduleNameFromString "InteractivePrint")
+    ":print" `printed` flip shouldContain "InteractivePrint"

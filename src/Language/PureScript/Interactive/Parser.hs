@@ -33,11 +33,11 @@ parseDotFile filePath s = first show $ do
 -- |
 -- Parses PSCI metacommands or expressions input from the user.
 --
-parseCommand :: String -> Either String Command
+parseCommand :: String -> Either String [Command]
 parseCommand cmdString =
   case cmdString of
-    (':' : cmd) -> parseDirective cmd
-    _ -> parseRest psciCommand cmdString
+    (':' : cmd) -> pure <$> parseDirective cmd
+    _ -> parseRest (many1 psciCommand) cmdString
 
 parseRest :: P.TokenParser a -> String -> Either String a
 parseRest p s = first show $ do
@@ -84,6 +84,10 @@ parseDirective cmd =
     Type     -> TypeOf <$> parseRest P.parseValue arg
     Kind     -> KindOf <$> parseRest P.parseType arg
     Complete -> return (CompleteStr arg)
+    Print    -> parseRest
+                  ((eof *> return (ShowInfo QueryPrint))
+                  <|> (SetInteractivePrint <$> parseFullyQualifiedIdent))
+                  arg
 
 -- |
 -- Parses expressions entered at the PSCI repl.
@@ -136,3 +140,12 @@ psciDeprecatedLet = do
   _ <- mark (many1 (same *> P.parseLocalDeclaration))
   notFollowedBy $ P.reserved "in"
   fail "Declarations in PSCi no longer require \"let\", as of version 0.11.0"
+
+parseFullyQualifiedIdent :: P.TokenParser (P.ModuleName, P.Ident)
+parseFullyQualifiedIdent = do
+  qname <- P.parseQualified P.parseIdent
+  case qname of
+    P.Qualified (Just mn) ident ->
+      pure (mn, ident)
+    P.Qualified Nothing _ ->
+      fail "Expected a fully-qualified name (eg: PSCI.Support.eval)"

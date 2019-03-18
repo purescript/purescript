@@ -4,6 +4,8 @@ module Language.PureScript.Ide.RebuildSpec where
 
 import           Protolude
 
+import qualified Data.Set as Set
+import qualified Language.PureScript as P
 import           Language.PureScript.AST.SourcePos (spanName)
 import           Language.PureScript.Ide.Command
 import           Language.PureScript.Ide.Completion
@@ -11,16 +13,20 @@ import           Language.PureScript.Ide.Matcher
 import           Language.PureScript.Ide.Types
 import qualified Language.PureScript.Ide.Test as Test
 import           System.FilePath
+import           System.Directory (doesFileExist, removePathForcibly)
 import           Test.Hspec
+
+defaultTarget :: Set P.CodegenTarget
+defaultTarget = Set.singleton P.JS
 
 load :: [Text] -> Command
 load = LoadSync . map Test.mn
 
 rebuild :: FilePath -> Command
-rebuild fp = Rebuild ("src" </> fp) Nothing
+rebuild fp = Rebuild ("src" </> fp) Nothing defaultTarget
 
 rebuildSync :: FilePath -> Command
-rebuildSync fp = RebuildSync ("src" </> fp) Nothing
+rebuildSync fp = RebuildSync ("src" </> fp) Nothing defaultTarget
 
 spec :: Spec
 spec = describe "Rebuilding single modules" $ do
@@ -67,6 +73,20 @@ spec = describe "Rebuilding single modules" $ do
         Test.runIde'
           editorConfig
           emptyIdeState
-          [ RebuildSync ("src" </> "RebuildSpecWithHiddenIdent.purs") (Just "actualFile")
+          [ RebuildSync ("src" </> "RebuildSpecWithHiddenIdent.purs") (Just "actualFile") defaultTarget
           , Complete [] (flexMatcher "hid") (Just (Test.mn "RebuildSpecWithHiddenIdent")) defaultCompletionOptions]
       map spanName (complLocation result) `shouldBe` Just "actualFile"
+    it "doesn't produce JS when an empty target list is supplied" $ do
+      exists <- Test.inProject $ do
+        let indexJs = "output" </> "RebuildSpecSingleModule" </> "index.js"
+        removePathForcibly ("output" </> "RebuildSpecSingleModule")
+        _ <- Test.runIde [ RebuildSync ("src" </> "RebuildSpecSingleModule.purs") Nothing Set.empty ]
+        doesFileExist indexJs
+      exists `shouldBe` False
+    it "does produce corefn if it's a codegen target" $ do
+      exists <- Test.inProject $ do
+        let corefn = "output" </> "RebuildSpecSingleModule" </> "corefn.json"
+        removePathForcibly ("output" </> "RebuildSpecSingleModule")
+        _ <- Test.runIde [ RebuildSync ("src" </> "RebuildSpecSingleModule.purs") Nothing (Set.singleton P.CoreFn) ]
+        doesFileExist corefn
+      exists `shouldBe` True

@@ -12,31 +12,23 @@ import Language.PureScript.Parser.Lexer
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
-parseStar :: TokenParser Kind
-parseStar = symbol' "*" *>
-  P.parserFail "The `*` symbol is no longer used for the kind of types.\n  The new equivalent is the named kind `Type`."
+parseNamedKind :: TokenParser SourceKind
+parseNamedKind = withSourceAnnF $ do
+  name <- parseQualified kindName
+  return $ \ann -> NamedKind ann name
 
-parseBang :: TokenParser Kind
-parseBang = symbol' "!" *>
-  P.parserFail "The `!` symbol is no longer used for the kind of effects.\n  The new equivalent is the named kind `Effect`, defined in `Control.Monad.Eff` in the `purescript-eff` library."
-
-parseNamedKind :: TokenParser Kind
-parseNamedKind = NamedKind <$> parseQualified kindName
-
-parseKindAtom :: TokenParser Kind
+parseKindAtom :: TokenParser SourceKind
 parseKindAtom =
   indented *> P.choice
-    [ parseStar
-    , parseBang
-    , parseNamedKind
+    [ parseNamedKind
     , parens parseKind
     ]
 
 -- |
 -- Parse a kind
 --
-parseKind :: TokenParser Kind
+parseKind :: TokenParser SourceKind
 parseKind = P.buildExpressionParser operators parseKindAtom P.<?> "kind"
   where
-  operators = [ [ P.Prefix (symbol' "#" >> return Row) ]
-              , [ P.Infix (rarrow >> return FunKind) P.AssocRight ] ]
+  operators = [ [ P.Prefix (withSourceAnnF $ symbol' "#" >> return Row) ]
+              , [ P.Infix (withSourceAnnF $ rarrow >> return FunKind) P.AssocRight ] ]

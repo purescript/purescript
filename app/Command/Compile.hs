@@ -8,11 +8,9 @@ module Command.Compile (command) where
 
 import           Control.Applicative
 import           Control.Monad
-import           Control.Monad.Writer.Strict
 import qualified Data.Aeson as A
 import           Data.Bool (bool)
-import qualified Data.ByteString.Lazy as B
-import qualified Data.ByteString.UTF8 as BU8
+import qualified Data.ByteString.Lazy.UTF8 as LBU8
 import           Data.List (intercalate)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -52,7 +50,7 @@ printWarningsAndErrors verbose False warnings errors = do
       exitFailure
     Right _ -> return ()
 printWarningsAndErrors verbose True warnings errors = do
-  hPutStrLn stderr . BU8.toString . B.toStrict . A.encode $
+  hPutStrLn stderr . LBU8.toString . A.encode $
     JSONResult (toJSONErrors verbose P.Warning warnings)
                (either (toJSONErrors verbose P.Error) (const []) errors)
   either (const exitFailure) (const (return ())) errors
@@ -137,22 +135,15 @@ codegenTargets = Opts.option targetParser $
       <> " The default target is 'js', but if this option is used only the targets specified will be used."
       )
 
-targets :: M.Map String P.CodegenTarget
-targets = M.fromList
-  [ ("js", P.JS)
-  , ("sourcemaps", P.JSSourceMap)
-  , ("corefn", P.CoreFn)
-  ]
-
 targetsMessage :: String
-targetsMessage = "Accepted codegen targets are '" <> intercalate "', '" (M.keys targets) <> "'."
+targetsMessage = "Accepted codegen targets are '" <> intercalate "', '" (M.keys P.codegenTargets) <> "'."
 
 targetParser :: Opts.ReadM [P.CodegenTarget]
 targetParser =
   Opts.str >>= \s ->
     for (T.split (== ',') s)
       $ maybe (Opts.readerError targetsMessage) pure
-      . flip M.lookup targets
+      . flip M.lookup P.codegenTargets
       . T.unpack
       . T.strip
 

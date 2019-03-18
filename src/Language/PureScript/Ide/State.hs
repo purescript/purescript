@@ -41,7 +41,6 @@ import           Protolude hiding (moduleName)
 
 import           Control.Arrow
 import           Control.Concurrent.STM
-import           Control.Lens                       hiding (op, (&))
 import           "monad-logger" Control.Monad.Logger
 import qualified Data.Map.Lazy                      as Map
 import qualified Language.PureScript                as P
@@ -52,6 +51,7 @@ import           Language.PureScript.Ide.Reexports
 import           Language.PureScript.Ide.SourceFile
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
+import           Lens.Micro.Platform                hiding ((&))
 
 -- | Resets all State inside psc-ide
 resetIdeState :: Ide m => m ()
@@ -224,7 +224,13 @@ resolveLocationsForModule (defs, types) decls =
   map convertDeclaration decls
   where
     convertDeclaration :: IdeDeclarationAnn -> IdeDeclarationAnn
-    convertDeclaration (IdeDeclarationAnn ann d) = convertDeclaration' annotateFunction annotateValue annotateType annotateKind d
+    convertDeclaration (IdeDeclarationAnn ann d) = convertDeclaration'
+      annotateFunction
+      annotateValue
+      annotateType
+      annotateKind
+      annotateModule
+      d
       where
         annotateFunction x = IdeDeclarationAnn (ann { _annLocation = Map.lookup (IdeNamespaced IdeNSValue (P.runIdent x)) defs
                                                     , _annTypeAnnotation = Map.lookup x types
@@ -232,15 +238,17 @@ resolveLocationsForModule (defs, types) decls =
         annotateValue x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSValue x) defs})
         annotateType x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSType x) defs})
         annotateKind x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSKind x) defs})
+        annotateModule x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSModule x) defs})
 
 convertDeclaration'
   :: (P.Ident -> IdeDeclaration -> IdeDeclarationAnn)
   -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
   -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
   -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
+  -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
   -> IdeDeclaration
   -> IdeDeclarationAnn
-convertDeclaration' annotateFunction annotateValue annotateType annotateKind d =
+convertDeclaration' annotateFunction annotateValue annotateType annotateKind annotateModule d =
   case d of
     IdeDeclValue v ->
       annotateFunction (v ^. ideValueIdent) d
@@ -258,6 +266,8 @@ convertDeclaration' annotateFunction annotateValue annotateType annotateKind d =
       annotateType (operator ^. ideTypeOpName . opNameT) d
     IdeDeclKind i ->
       annotateKind (i ^. properNameT) d
+    IdeDeclModule mn ->
+      annotateModule (P.runModuleName mn) d
 
 resolveDocumentation
   :: ModuleMap P.Module
@@ -271,26 +281,27 @@ resolveDocumentationForModule
   :: P.Module
     -> [IdeDeclarationAnn]
     -> [IdeDeclarationAnn]
-resolveDocumentationForModule (P.Module _ _ _ sdecls _) decls = map convertDecl decls
-  where 
+resolveDocumentationForModule (P.Module _ moduleComments moduleName sdecls _) decls = map convertDecl decls
+  where
   comments :: Map P.Name [P.Comment]
-  comments = Map.fromListWith (flip (<>)) $ mapMaybe (\d -> 
-    case name d of 
+  comments = Map.insert (P.ModName moduleName) moduleComments $ Map.fromListWith (flip (<>)) $ mapMaybe (\d ->
+    case name d of
       Just name' -> Just (name', snd $ P.declSourceAnn d)
       _ -> Nothing)
-    sdecls 
+    sdecls
 
   name :: P.Declaration -> Maybe P.Name
   name (P.TypeDeclaration d) = Just $ P.IdentName $ P.tydeclIdent d
   name decl = P.declName decl
 
   convertDecl :: IdeDeclarationAnn -> IdeDeclarationAnn
-  convertDecl (IdeDeclarationAnn ann d) = 
+  convertDecl (IdeDeclarationAnn ann d) =
     convertDeclaration'
       (annotateValue . P.IdentName)
-      (annotateValue . P.IdentName . P.Ident) 
+      (annotateValue . P.IdentName . P.Ident)
       (annotateValue . P.TyName . P.ProperName)
       (annotateValue . P.KiName . P.ProperName)
+      (annotateValue . P.ModName . P.moduleNameFromString)
       d
     where
       docs :: P.Name -> Text
@@ -329,7 +340,7 @@ resolveInstances externs declarations =
           mapIf matchTC (idaDeclaration
                          . _IdeDeclTypeClass
                          . ideTCInstances
-                         %~ cons ideInstance)
+                         %~ (ideInstance :))
       in
         acc' & ix classModule %~ updateDeclaration
 

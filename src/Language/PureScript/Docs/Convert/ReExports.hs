@@ -14,7 +14,6 @@ import Control.Monad.Trans.State.Strict (execState)
 import Data.Either
 import Data.Map (Map)
 import Data.Maybe (mapMaybe)
-import Data.Monoid ((<>))
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -73,8 +72,8 @@ getReExports env mn =
   case Map.lookup mn env of
     Nothing ->
       internalError ("Module missing: " ++ T.unpack (P.runModuleName mn))
-    Just (_, imports, exports) -> do
-      allExports <- runReaderT (collectDeclarations imports exports) mn
+    Just (_, _, exports) -> do
+      allExports <- runReaderT (collectDeclarations exports) mn
       pure (filter notLocal allExports)
 
   where
@@ -101,16 +100,15 @@ getReExports env mn =
 --
 collectDeclarations :: forall m.
   (MonadState (Map P.ModuleName Module) m, MonadReader P.ModuleName m) =>
-  P.Imports ->
   P.Exports ->
   m [(P.ModuleName, [Declaration])]
-collectDeclarations imports exports = do
-  valsAndMembers <- collect lookupValueDeclaration impVals expVals
-  valOps <- collect lookupValueOpDeclaration impValOps expValOps
-  typeClasses <- collect lookupTypeClassDeclaration impTCs expTCs
-  types <- collect lookupTypeDeclaration impTypes expTypes
-  typeOps <- collect lookupTypeOpDeclaration impTypeOps expTypeOps
-  kinds <- collect lookupKindDeclaration impKinds expKinds
+collectDeclarations exports = do
+  valsAndMembers <- collect lookupValueDeclaration expVals
+  valOps <- collect lookupValueOpDeclaration expValOps
+  typeClasses <- collect lookupTypeClassDeclaration expTCs
+  types <- collect lookupTypeDeclaration expTypes
+  typeOps <- collect lookupTypeOpDeclaration expTypeOps
+  kinds <- collect lookupKindDeclaration expKinds
 
   (vals, classes) <- handleTypeClassMembers valsAndMembers typeClasses
 
@@ -124,79 +122,27 @@ collectDeclarations imports exports = do
   collect
     :: (Eq a, Show a)
     => (P.ModuleName -> a -> m (P.ModuleName, [b]))
-    -> [P.ImportRecord a]
-    -> Map a P.ModuleName
+    -> Map a P.ExportSource
     -> m (Map P.ModuleName [b])
-  collect lookup' imps exps = do
-    imps' <- traverse (findImport imps) $ Map.toList exps
-    Map.fromListWith (<>) <$> traverse (uncurry lookup') imps'
+  collect lookup' exps = do
+    let reExps = Map.toList $ Map.mapMaybe P.exportSourceImportedFrom exps
+    decls <- traverse (uncurry (flip lookup')) reExps
+    return $ Map.fromListWith (<>) decls
 
   expVals = P.exportedValues exports
-  impVals = concat (Map.elems (P.importedValues imports))
-
   expValOps = P.exportedValueOps exports
-  impValOps = concat (Map.elems (P.importedValueOps imports))
-
   expTypes = Map.map snd (P.exportedTypes exports)
-  impTypes = concat (Map.elems (P.importedTypes imports))
-
   expTypeOps = P.exportedTypeOps exports
-  impTypeOps = concat (Map.elems (P.importedTypeOps imports))
-
   expCtors = concatMap fst (Map.elems (P.exportedTypes exports))
-
   expTCs = P.exportedTypeClasses exports
-  impTCs = concat (Map.elems (P.importedTypeClasses imports))
-
   expKinds = P.exportedKinds exports
-  impKinds = concat (Map.elems (P.importedKinds imports))
-
--- |
--- Given a list of imported declarations (of a particular kind, ie. type, data,
--- class, value, etc), and the name of an exported declaration of the same
--- kind, together with the module it was originally defined in, return a tuple
--- of:
---
---      * the module that exported declaration was imported from (note that
---      this can be different from the module it was originally defined in, if
---      it is a re-export),
---      * that same declaration's name.
---
--- This function uses a type variable for names because we want to be able to
--- instantiate @name@ as both 'P.Ident' and 'P.ProperName'.
---
-findImport ::
-  (Show name, Eq name, MonadReader P.ModuleName m) =>
-  [P.ImportRecord name] ->
-  (name, P.ModuleName) ->
-  m (P.ModuleName, name)
-findImport imps (name, orig) =
-  let
-    matches (P.ImportRecord qual mn _ _) = P.disqualify qual == name && mn == orig
-    matching = filter matches imps
-    getQualified (P.Qualified mname _) = mname
-  in
-    case mapMaybe (getQualified . P.importName) matching of
-      -- A value can occur more than once if it is imported twice (eg, if it is
-      -- exported by A, re-exported from A by B, and C imports it from both A
-      -- and B). In this case, we just take its first appearance.
-      (importedFrom:_) ->
-        pure (importedFrom, name)
-
-      -- Builtin modules do not have any Imports in the Env, and therefore must
-      -- be handled specially here.
-      [] | P.isBuiltinModuleName orig ->
-        pure (orig, name)
-
-      [] ->
-        internalErrorInModule ("findImport: not found: " ++ show (name, orig))
 
 lookupValueDeclaration ::
   (MonadState (Map P.ModuleName Module) m,
    MonadReader P.ModuleName m) =>
   P.ModuleName ->
   P.Ident ->
-  m (P.ModuleName, [Either (Text, P.Constraint, ChildDeclaration) Declaration])
+  m (P.ModuleName, [Either (Text, Constraint', ChildDeclaration) Declaration])
 lookupValueDeclaration importedFrom ident = do
   decls <- lookupModuleDeclarations "lookupValueDeclaration" importedFrom
   let
@@ -361,7 +307,7 @@ lookupModuleDeclarations definedIn moduleName = do
 
 handleTypeClassMembers ::
   (MonadReader P.ModuleName m) =>
-  Map P.ModuleName [Either (Text, P.Constraint, ChildDeclaration) Declaration] ->
+  Map P.ModuleName [Either (Text, Constraint', ChildDeclaration) Declaration] ->
   Map P.ModuleName [Declaration] ->
   m (Map P.ModuleName [Declaration], Map P.ModuleName [Declaration])
 handleTypeClassMembers valsAndMembers typeClasses =
@@ -376,7 +322,7 @@ handleTypeClassMembers valsAndMembers typeClasses =
       |> fmap splitMap
 
 valsAndMembersToEnv ::
-  [Either (Text, P.Constraint, ChildDeclaration) Declaration] -> TypeClassEnv
+  [Either (Text, Constraint', ChildDeclaration) Declaration] -> TypeClassEnv
 valsAndMembersToEnv xs =
   let (envUnhandledMembers, envValues) = partitionEithers xs
       envTypeClasses = []
@@ -401,7 +347,7 @@ data TypeClassEnv = TypeClassEnv
     -- name of the type class they belong to, and the constraint is used to
     -- make sure that they have the correct type if they get promoted.
     --
-    envUnhandledMembers :: [(Text, P.Constraint, ChildDeclaration)]
+    envUnhandledMembers :: [(Text, Constraint', ChildDeclaration)]
     -- |
     -- A list of normal value declarations. Type class members will be added to
     -- this list if their parent type class is not available.
@@ -415,12 +361,13 @@ data TypeClassEnv = TypeClassEnv
   }
   deriving (Show)
 
+instance Semigroup TypeClassEnv where
+  (TypeClassEnv a1 b1 c1) <> (TypeClassEnv a2 b2 c2) =
+    TypeClassEnv (a1 <> a2) (b1 <> b2) (c1 <> c2)
+
 instance Monoid TypeClassEnv where
   mempty =
     TypeClassEnv mempty mempty mempty
-  mappend (TypeClassEnv a1 b1 c1)
-          (TypeClassEnv a2 b2 c2) =
-    TypeClassEnv (a1 <> a2) (b1 <> b2) (c1 <> c2)
 
 -- |
 -- Take a TypeClassEnv and handle all of the type class members in it, either
@@ -468,7 +415,7 @@ handleEnv TypeClassEnv{..} =
           ++ T.unpack cdeclTitle)
 
   addConstraint constraint =
-    P.quantify . P.moveQuantifiersToFront . P.ConstrainedType constraint
+    P.quantify . P.moveQuantifiersToFront . P.ConstrainedType () constraint
 
 splitMap :: Map k (v1, v2) -> (Map k v1, Map k v2)
 splitMap = fmap fst &&& fmap snd
@@ -534,12 +481,12 @@ internalErrorInModule msg = do
 -- If the provided Declaration is a TypeClassDeclaration, construct an
 -- appropriate Constraint for use with the types of its members.
 --
-typeClassConstraintFor :: Declaration -> Maybe P.Constraint
+typeClassConstraintFor :: Declaration -> Maybe Constraint'
 typeClassConstraintFor Declaration{..} =
   case declInfo of
     TypeClassDeclaration tyArgs _ _ ->
-      Just (P.Constraint (P.Qualified Nothing (P.ProperName declTitle)) (mkConstraint tyArgs) Nothing)
+      Just (P.Constraint () (P.Qualified Nothing (P.ProperName declTitle)) (mkConstraint tyArgs) Nothing)
     _ ->
       Nothing
   where
-  mkConstraint = map (P.TypeVar . fst)
+  mkConstraint = map (P.TypeVar () . fst)

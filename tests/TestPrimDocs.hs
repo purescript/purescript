@@ -3,7 +3,6 @@ module TestPrimDocs where
 import Prelude
 
 import Control.Monad
-import Data.Monoid ((<>))
 import Data.List ((\\))
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -21,6 +20,7 @@ main = do
         -- note that prim type classes are listed in P.primTypes
         (map (P.runProperName . P.disqualify . fst) $ Map.toList
           ( P.primTypes <>
+            P.primBooleanTypes <>
             P.primOrderingTypes <>
             P.primRowTypes <>
             P.primRowListTypes <>

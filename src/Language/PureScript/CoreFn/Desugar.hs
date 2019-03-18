@@ -72,7 +72,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   declToCoreFn _ = []
 
   -- | Desugars expressions from AST to CoreFn representation.
-  exprToCoreFn :: SourceSpan -> [Comment] -> Maybe Type -> A.Expr -> Expr Ann
+  exprToCoreFn :: SourceSpan -> [Comment] -> Maybe SourceType -> A.Expr -> Expr Ann
   exprToCoreFn _ com ty (A.Literal ss lit) =
     Literal (ss, com, ty, Nothing) (fmap (exprToCoreFn ss com Nothing) lit)
   exprToCoreFn ss com ty (A.Accessor name v) =
@@ -178,12 +178,12 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     where
 
     numConstructors
-      :: (Qualified (ProperName 'ConstructorName), (DataDeclType, ProperName 'TypeName, Type, [Ident]))
+      :: (Qualified (ProperName 'ConstructorName), (DataDeclType, ProperName 'TypeName, SourceType, [Ident]))
       -> Int
     numConstructors ty = length $ filter (((==) `on` typeConstructor) ty) $ M.toList $ dataConstructors env
 
     typeConstructor
-      :: (Qualified (ProperName 'ConstructorName), (DataDeclType, ProperName 'TypeName, Type, [Ident]))
+      :: (Qualified (ProperName 'ConstructorName), (DataDeclType, ProperName 'TypeName, SourceType, [Ident]))
       -> (ModuleName, ProperName 'TypeName)
     typeConstructor (Qualified (Just mn') _, (_, tyCtor, _, _)) = (mn', tyCtor)
     typeConstructor _ = internalError "Invalid argument to typeConstructor"
@@ -241,7 +241,7 @@ exportToCoreFn _ = []
 -- | Makes a typeclass dictionary constructor function. The returned expression
 -- is a function that accepts the superclass instances and member
 -- implementations and returns a record for the instance dictionary.
-mkTypeClassConstructor :: SourceAnn -> [Constraint] -> [A.Declaration] -> Expr Ann
+mkTypeClassConstructor :: SourceAnn -> [SourceConstraint] -> [A.Declaration] -> Expr Ann
 mkTypeClassConstructor (ss, com) [] [] = Literal (ss, com, Nothing, Just IsTypeClassConstructor) (ObjectLiteral [])
 mkTypeClassConstructor (ss, com) supers members =
   let args@(a:as) = sort $ fmap typeClassMemberName members ++ superClassDictionaryNames supers

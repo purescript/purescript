@@ -22,11 +22,11 @@ module Language.PureScript.Ide.Types where
 import           Protolude hiding (moduleName)
 
 import           Control.Concurrent.STM
-import           Control.Lens.TH
 import           Data.Aeson
 import qualified Data.Map.Lazy as M
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Errors.JSON as P
+import           Lens.Micro.Platform hiding ((.=))
 
 type ModuleIdent = Text
 type ModuleMap a = Map P.ModuleName a
@@ -39,43 +39,44 @@ data IdeDeclaration
   | IdeDeclTypeClass IdeTypeClass
   | IdeDeclValueOperator IdeValueOperator
   | IdeDeclTypeOperator IdeTypeOperator
+  | IdeDeclModule P.ModuleName
   | IdeDeclKind (P.ProperName 'P.KindName)
   deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeValue = IdeValue
   { _ideValueIdent :: P.Ident
-  , _ideValueType  :: P.Type
+  , _ideValueType  :: P.SourceType
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeType = IdeType
  { _ideTypeName :: P.ProperName 'P.TypeName
- , _ideTypeKind :: P.Kind
- , _ideTypeDtors :: [(P.ProperName 'P.ConstructorName, P.Type)]
+ , _ideTypeKind :: P.SourceKind
+ , _ideTypeDtors :: [(P.ProperName 'P.ConstructorName, P.SourceType)]
  } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeTypeSynonym = IdeTypeSynonym
   { _ideSynonymName :: P.ProperName 'P.TypeName
-  , _ideSynonymType :: P.Type
-  , _ideSynonymKind :: P.Kind
+  , _ideSynonymType :: P.SourceType
+  , _ideSynonymKind :: P.SourceKind
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeDataConstructor = IdeDataConstructor
   { _ideDtorName     :: P.ProperName 'P.ConstructorName
   , _ideDtorTypeName :: P.ProperName 'P.TypeName
-  , _ideDtorType     :: P.Type
+  , _ideDtorType     :: P.SourceType
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeTypeClass = IdeTypeClass
   { _ideTCName :: P.ProperName 'P.ClassName
-  , _ideTCKind :: P.Kind
+  , _ideTCKind :: P.SourceKind
   , _ideTCInstances :: [IdeInstance]
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeInstance = IdeInstance
   { _ideInstanceModule      :: P.ModuleName
   , _ideInstanceName        :: P.Ident
-  , _ideInstanceTypes       :: [P.Type]
-  , _ideInstanceConstraints :: Maybe [P.Constraint]
+  , _ideInstanceTypes       :: [P.SourceType]
+  , _ideInstanceConstraints :: Maybe [P.SourceConstraint]
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeValueOperator = IdeValueOperator
@@ -83,7 +84,7 @@ data IdeValueOperator = IdeValueOperator
   , _ideValueOpAlias         :: P.Qualified (Either P.Ident (P.ProperName 'P.ConstructorName))
   , _ideValueOpPrecedence    :: P.Precedence
   , _ideValueOpAssociativity :: P.Associativity
-  , _ideValueOpType          :: Maybe P.Type
+  , _ideValueOpType          :: Maybe P.SourceType
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeTypeOperator = IdeTypeOperator
@@ -91,10 +92,48 @@ data IdeTypeOperator = IdeTypeOperator
   , _ideTypeOpAlias         :: P.Qualified (P.ProperName 'P.TypeName)
   , _ideTypeOpPrecedence    :: P.Precedence
   , _ideTypeOpAssociativity :: P.Associativity
-  , _ideTypeOpKind          :: Maybe P.Kind
+  , _ideTypeOpKind          :: Maybe P.SourceKind
   } deriving (Show, Eq, Ord, Generic, NFData)
 
-makePrisms ''IdeDeclaration
+_IdeDeclValue :: Traversal' IdeDeclaration IdeValue
+_IdeDeclValue f (IdeDeclValue x) = map IdeDeclValue (f x)
+_IdeDeclValue _ x = pure x
+
+_IdeDeclType :: Traversal' IdeDeclaration IdeType
+_IdeDeclType f (IdeDeclType x) = map IdeDeclType (f x)
+_IdeDeclType _ x = pure x
+
+_IdeDeclTypeSynonym :: Traversal' IdeDeclaration IdeTypeSynonym
+_IdeDeclTypeSynonym f (IdeDeclTypeSynonym x) = map IdeDeclTypeSynonym (f x)
+_IdeDeclTypeSynonym _ x = pure x
+
+_IdeDeclDataConstructor :: Traversal' IdeDeclaration IdeDataConstructor
+_IdeDeclDataConstructor f (IdeDeclDataConstructor x) = map IdeDeclDataConstructor (f x)
+_IdeDeclDataConstructor _ x = pure x
+
+_IdeDeclTypeClass :: Traversal' IdeDeclaration IdeTypeClass
+_IdeDeclTypeClass f (IdeDeclTypeClass x) = map IdeDeclTypeClass (f x)
+_IdeDeclTypeClass _ x = pure x
+
+_IdeDeclValueOperator :: Traversal' IdeDeclaration IdeValueOperator
+_IdeDeclValueOperator f (IdeDeclValueOperator x) = map IdeDeclValueOperator (f x)
+_IdeDeclValueOperator _ x = pure x
+
+_IdeDeclTypeOperator :: Traversal' IdeDeclaration IdeTypeOperator
+_IdeDeclTypeOperator f (IdeDeclTypeOperator x) = map IdeDeclTypeOperator (f x)
+_IdeDeclTypeOperator _ x = pure x
+
+_IdeDeclKind :: Traversal' IdeDeclaration (P.ProperName 'P.KindName)
+_IdeDeclKind f (IdeDeclKind x) = map IdeDeclKind (f x)
+_IdeDeclKind _ x = pure x
+
+_IdeDeclModule :: Traversal' IdeDeclaration P.ModuleName
+_IdeDeclModule f (IdeDeclModule x) = map IdeDeclModule (f x)
+_IdeDeclModule _ x = pure x
+
+anyOf :: Getting Any s a -> (a -> Bool) -> s -> Bool
+anyOf g p = getAny . getConst . g (Const . Any . p)
+
 makeLenses ''IdeValue
 makeLenses ''IdeType
 makeLenses ''IdeTypeSynonym
@@ -113,7 +152,7 @@ data Annotation
   = Annotation
   { _annLocation       :: Maybe P.SourceSpan
   , _annExportedFrom   :: Maybe P.ModuleName
-  , _annTypeAnnotation :: Maybe P.Type
+  , _annTypeAnnotation :: Maybe P.SourceType
   , _annDocumentation  :: Maybe Text
   } deriving (Show, Eq, Ord, Generic, NFData)
 
@@ -124,7 +163,7 @@ emptyAnn :: Annotation
 emptyAnn = Annotation Nothing Nothing Nothing Nothing
 
 type DefinitionSites a = Map IdeNamespaced a
-type TypeAnnotations = Map P.Ident P.Type
+type TypeAnnotations = Map P.Ident P.SourceType
 newtype AstData a = AstData (ModuleMap (DefinitionSites a, TypeAnnotations))
   -- ^ SourceSpans for the definition sites of values and types as well as type
   -- annotations found in a module
@@ -264,14 +303,15 @@ encodeImport (P.runModuleName -> mn, importType, map P.runModuleName -> qualifie
              ] ++ map (\x -> "qualifier" .= x) (maybeToList qualifier)
 
 -- | Denotes the different namespaces a name in PureScript can reside in.
-data IdeNamespace = IdeNSValue | IdeNSType | IdeNSKind
+data IdeNamespace = IdeNSValue | IdeNSType | IdeNSKind | IdeNSModule
   deriving (Show, Eq, Ord, Generic, NFData)
 
 instance FromJSON IdeNamespace where
   parseJSON (String s) = case s of
     "value" -> pure IdeNSValue
-    "type"  -> pure IdeNSType
-    "kind"  -> pure IdeNSKind
+    "type" -> pure IdeNSType
+    "kind" -> pure IdeNSKind
+    "module" -> pure IdeNSModule
     _       -> mzero
   parseJSON _ = mzero
 

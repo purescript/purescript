@@ -16,6 +16,7 @@ import Control.Monad.Writer.Class (MonadWriter(..), censor)
 import Data.Maybe
 import qualified Data.Map as M
 import Data.Text (Text)
+import qualified Data.List.NonEmpty as NEL
 
 import Language.PureScript.Environment
 import Language.PureScript.Errors
@@ -26,8 +27,8 @@ import Language.PureScript.Types
 
 -- | A substitution of unification variables for types or kinds
 data Substitution = Substitution
-  { substType :: M.Map Int Type -- ^ Type substitution
-  , substKind :: M.Map Int Kind -- ^ Kind substitution
+  { substType :: M.Map Int SourceType -- ^ Type substitution
+  , substKind :: M.Map Int SourceKind -- ^ Kind substitution
   }
 
 -- | An empty substitution
@@ -67,7 +68,7 @@ type Unknown = Int
 -- | Temporarily bind a collection of names to values
 bindNames
   :: MonadState CheckState m
-  => M.Map (Qualified Ident) (Type, NameKind, NameVisibility)
+  => M.Map (Qualified Ident) (SourceType, NameKind, NameVisibility)
   -> m a
   -> m a
 bindNames newNames action = do
@@ -80,7 +81,7 @@ bindNames newNames action = do
 -- | Temporarily bind a collection of names to types
 bindTypes
   :: MonadState CheckState m
-  => M.Map (Qualified (ProperName 'TypeName)) (Kind, TypeKind)
+  => M.Map (Qualified (ProperName 'TypeName)) (SourceKind, TypeKind)
   -> m a
   -> m a
 bindTypes newNames action = do
@@ -94,7 +95,7 @@ bindTypes newNames action = do
 withScopedTypeVars
   :: (MonadState CheckState m, MonadWriter MultipleErrors m)
   => ModuleName
-  -> [(Text, Kind)]
+  -> [(Text, SourceKind)]
   -> m a
   -> m a
 withScopedTypeVars mn ks ma = do
@@ -144,8 +145,15 @@ withTypeClassDictionaries
   -> m a
 withTypeClassDictionaries entries action = do
   orig <- get
-  let mentries = M.fromListWith (M.unionWith M.union) [ (mn, M.singleton className (M.singleton (tcdValue entry) entry)) | entry@TypeClassDictionaryInScope{ tcdValue = Qualified mn _, tcdClassName = className }  <- entries ]
-  modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = M.unionWith (M.unionWith M.union) (typeClassDictionaries . checkEnv $ st) mentries } }
+
+  let mentries =
+        M.fromListWith (M.unionWith (M.unionWith (<>)))
+          [ (mn, M.singleton className (M.singleton (tcdValue entry) (pure entry)))
+          | entry@TypeClassDictionaryInScope{ tcdValue = Qualified mn _, tcdClassName = className }
+              <- entries
+          ]
+
+  modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = M.unionWith (M.unionWith (M.unionWith (<>))) (typeClassDictionaries . checkEnv $ st) mentries } }
   a <- action
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClassDictionaries = typeClassDictionaries . checkEnv $ orig } }
   return a
@@ -153,14 +161,14 @@ withTypeClassDictionaries entries action = do
 -- | Get the currently available map of type class dictionaries
 getTypeClassDictionaries
   :: (MonadState CheckState m)
-  => m (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict)))
+  => m (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))))
 getTypeClassDictionaries = typeClassDictionaries . checkEnv <$> get
 
 -- | Lookup type class dictionaries in a module.
 lookupTypeClassDictionaries
   :: (MonadState CheckState m)
   => Maybe ModuleName
-  -> m (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict))
+  -> m (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict)))
 lookupTypeClassDictionaries mn = fromMaybe M.empty . M.lookup mn . typeClassDictionaries . checkEnv <$> get
 
 -- | Lookup type class dictionaries in a module.
@@ -168,13 +176,13 @@ lookupTypeClassDictionariesForClass
   :: (MonadState CheckState m)
   => Maybe ModuleName
   -> Qualified (ProperName 'ClassName)
-  -> m (M.Map (Qualified Ident) NamedDict)
+  -> m (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))
 lookupTypeClassDictionariesForClass mn cn = fromMaybe M.empty . M.lookup cn <$> lookupTypeClassDictionaries mn
 
 -- | Temporarily bind a collection of names to local variables
 bindLocalVariables
   :: (MonadState CheckState m)
-  => [(Ident, Type, NameVisibility)]
+  => [(Ident, SourceType, NameVisibility)]
   -> m a
   -> m a
 bindLocalVariables bindings =
@@ -184,7 +192,7 @@ bindLocalVariables bindings =
 bindLocalTypeVariables
   :: (MonadState CheckState m)
   => ModuleName
-  -> [(ProperName 'TypeName, Kind)]
+  -> [(ProperName 'TypeName, SourceKind)]
   -> m a
   -> m a
 bindLocalTypeVariables moduleName bindings =
@@ -210,7 +218,7 @@ preservingNames action = do
 lookupVariable
   :: (e ~ MultipleErrors, MonadState CheckState m, MonadError e m)
   => Qualified Ident
-  -> m Type
+  -> m SourceType
 lookupVariable qual = do
   env <- getEnv
   case M.lookup qual (names env) of
@@ -244,7 +252,7 @@ lookupTypeVariable
   :: (e ~ MultipleErrors, MonadState CheckState m, MonadError e m)
   => ModuleName
   -> Qualified (ProperName 'TypeName)
-  -> m Kind
+  -> m SourceKind
 lookupTypeVariable currentModule (Qualified moduleName name) = do
   env <- getEnv
   case M.lookup (Qualified (Just $ fromMaybe currentModule moduleName) name) (types env) of

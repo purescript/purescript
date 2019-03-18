@@ -13,7 +13,7 @@ import           System.IO.UTF8 (readUTF8FileT)
 
 -- | The name of the PSCI support module
 supportModuleName :: P.ModuleName
-supportModuleName = P.moduleNameFromString "PSCI.Support"
+supportModuleName = fst initialInteractivePrint
 
 -- | Checks if the Console module is defined
 supportModuleIsDefined :: [P.Module] -> Bool
@@ -50,16 +50,16 @@ createTemporaryModule exec st val =
     moduleName    = P.ModuleName [P.ProperName "$PSCI"]
     effModuleName = P.moduleNameFromString "Effect"
     effImport     = (effModuleName, P.Implicit, Just (P.ModuleName [P.ProperName "$Effect"]))
-    supportImport = (supportModuleName, P.Implicit, Just (P.ModuleName [P.ProperName "$Support"]))
-    eval          = P.Var internalSpan (P.Qualified (Just (P.ModuleName [P.ProperName "$Support"])) (P.Ident "eval"))
+    supportImport = (fst (psciInteractivePrint st), P.Implicit, Just (P.ModuleName [P.ProperName "$Support"]))
+    eval          = P.Var internalSpan (P.Qualified (Just (P.ModuleName [P.ProperName "$Support"])) (snd (psciInteractivePrint st)))
     mainValue     = P.App eval (P.Var internalSpan (P.Qualified Nothing (P.Ident "it")))
     itDecl        = P.ValueDecl (internalSpan, []) (P.Ident "it") P.Public [] [P.MkUnguarded val]
     typeDecl      = P.TypeDeclaration
                       (P.TypeDeclarationData (internalSpan, []) (P.Ident "$main")
-                        (P.TypeApp
-                          (P.TypeConstructor
+                        (P.srcTypeApp
+                          (P.srcTypeConstructor
                             (P.Qualified (Just (P.ModuleName [P.ProperName "$Effect"])) (P.ProperName "Effect")))
-                                  (P.TypeWildcard internalSpan)))
+                                  P.srcTypeWildcard))
     mainDecl      = P.ValueDecl (internalSpan, []) (P.Ident "$main") P.Public [] [P.MkUnguarded mainValue]
     decls         = if exec then [itDecl, typeDecl, mainDecl] else [itDecl]
   in
@@ -72,7 +72,7 @@ createTemporaryModule exec st val =
 -- |
 -- Makes a volatile module to hold a non-qualified type synonym for a fully-qualified data type declaration.
 --
-createTemporaryModuleForKind :: PSCiState -> P.Type -> P.Module
+createTemporaryModuleForKind :: PSCiState -> P.SourceType -> P.Module
 createTemporaryModuleForKind st typ =
   let
     imports    = psciImportedModules st

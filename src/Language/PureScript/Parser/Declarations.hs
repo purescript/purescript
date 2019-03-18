@@ -25,9 +25,8 @@ import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Parallel.Strategies (withStrategy, parList, rseq)
 import           Data.Functor (($>))
 import           Data.Maybe (fromMaybe)
-import           Data.Monoid ((<>))
 import qualified Data.Set as S
-import           Data.Text (Text)
+import           Data.Text (Text, pack)
 import           Language.PureScript.AST
 import           Language.PureScript.Environment
 import           Language.PureScript.Errors
@@ -42,9 +41,12 @@ import           Language.PureScript.Types
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
 
-kindedIdent :: TokenParser (Text, Maybe Kind)
+kindedIdent :: TokenParser (Text, Maybe SourceKind)
 kindedIdent = (, Nothing) <$> identifier
           <|> parens ((,) <$> identifier <*> (Just <$> (indented *> doubleColon *> indented *> parseKind)))
+
+fields :: [Ident]
+fields = [ Ident ("value" <> pack (show (n :: Integer))) | n <- [0..] ]
 
 parseDataDeclaration :: TokenParser Declaration
 parseDataDeclaration = withSourceAnnF $ do
@@ -53,7 +55,10 @@ parseDataDeclaration = withSourceAnnF $ do
   tyArgs <- many (indented *> kindedIdent)
   ctors <- P.option [] $ do
     indented *> equals
-    P.sepBy1 ((,) <$> dataConstructorName <*> P.many (indented *> noWildcards parseTypeAtom)) pipe
+    flip P.sepBy1 pipe $ do
+      ctorName <- dataConstructorName
+      tys <- P.many (indented *> noWildcards parseTypeAtom)
+      return (ctorName, zip fields tys)
   return $ \sa -> DataDeclaration sa dtype name tyArgs ctors
 
 parseTypeDeclaration :: TokenParser Declaration
@@ -205,10 +210,11 @@ parseTypeClassDeclaration = withSourceAnnF $ do
     indented *> mark (P.many (same *> parseTypeDeclaration))
   return $ \sa -> TypeClassDeclaration sa className idents implies dependencies members
 
-parseConstraint :: TokenParser Constraint
-parseConstraint = Constraint <$> parseQualified properName
-                             <*> P.many (noWildcards $ noForAll parseTypeAtom)
-                             <*> pure Nothing
+parseConstraint :: TokenParser SourceConstraint
+parseConstraint = withSourceAnnF $ do
+  name <- parseQualified properName
+  args <- P.many (noWildcards $ noForAll parseTypeAtom)
+  return $ \ann -> Constraint ann name args Nothing
 
 parseInstanceDeclaration :: TokenParser (TypeInstanceBody -> Declaration)
 parseInstanceDeclaration = withSourceAnnF $ do
@@ -484,17 +490,17 @@ parseAccessor obj = P.try $ Accessor <$> (indented *> dot *> indented *> parseLa
 
 parseDo :: TokenParser Expr
 parseDo = do
-  reserved "do"
+  m <- P.try (getQual <$> parseQualified (reserved "do")) <|> (reserved "do" *> pure Nothing)
   indented
-  Do <$> mark (P.many1 (same *> mark parseDoNotationElement))
+  Do m <$> mark (P.many1 (same *> mark parseDoNotationElement))
 
 parseAdo :: TokenParser Expr
 parseAdo = do
-  reserved "ado"
+  m <- P.try (getQual <$> parseQualified (reserved "ado")) <|> (reserved "ado" *> pure Nothing)
   indented
   elements <- mark (P.many (same *> mark parseDoNotationElement))
   yield <- mark (reserved "in" *> parseValue)
-  pure $ Ado elements yield
+  pure $ Ado m elements yield
 
 parseDoNotationLet :: TokenParser DoNotationElement
 parseDoNotationLet = DoNotationLet <$> (reserved "let" *> indented *> mark (P.many1 (same *> parseLocalDeclaration)))

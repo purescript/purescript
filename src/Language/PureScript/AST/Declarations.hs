@@ -39,16 +39,16 @@ import qualified Language.PureScript.Constants as C
 import qualified Text.Parsec as P
 
 -- | A map of locally-bound names in scope.
-type Context = [(Ident, Type)]
+type Context = [(Ident, SourceType)]
 
 -- | Holds the data necessary to do type directed search for typed holes
 data TypeSearch
   = TSBefore Environment
   -- ^ An Environment captured for later consumption by type directed search
   | TSAfter
-    { tsAfterIdentifiers :: [(Qualified Text, Type)]
+    { tsAfterIdentifiers :: [(Qualified Text, SourceType)]
     -- ^ The identifiers that fully satisfy the subsumption check
-    , tsAfterRecordFields :: Maybe [(Label, Type)]
+    , tsAfterRecordFields :: Maybe [(Label, SourceType)]
     -- ^ Record fields that are available on the first argument to the typed
     -- hole
     }
@@ -56,10 +56,10 @@ data TypeSearch
   -- Environment
   deriving Show
 
-onTypeSearchTypes :: (Type -> Type) -> TypeSearch -> TypeSearch
+onTypeSearchTypes :: (SourceType -> SourceType) -> TypeSearch -> TypeSearch
 onTypeSearchTypes f = runIdentity . onTypeSearchTypesM (Identity . f)
 
-onTypeSearchTypesM :: (Applicative m) => (Type -> m Type) -> TypeSearch -> m TypeSearch
+onTypeSearchTypesM :: (Applicative m) => (SourceType -> m SourceType) -> TypeSearch -> m TypeSearch
 onTypeSearchTypesM f (TSAfter i r) = TSAfter <$> traverse (traverse f) i <*> traverse (traverse (traverse f)) r
 onTypeSearchTypesM _ (TSBefore env) = pure (TSBefore env)
 
@@ -76,8 +76,8 @@ data SimpleErrorMessage
   | CannotGetFileInfo FilePath
   | CannotReadFile FilePath
   | CannotWriteFile FilePath
-  | InfiniteType Type
-  | InfiniteKind Kind
+  | InfiniteType SourceType
+  | InfiniteKind SourceKind
   | MultipleValueOpFixities (OpName 'ValueOpName)
   | MultipleTypeOpFixities (OpName 'TypeOpName)
   | OrphanTypeDeclaration Ident
@@ -105,46 +105,46 @@ data SimpleErrorMessage
   | NameIsUndefined Ident
   | UndefinedTypeVariable (ProperName 'TypeName)
   | PartiallyAppliedSynonym (Qualified (ProperName 'TypeName))
-  | EscapedSkolem Text (Maybe SourceSpan) Type
-  | TypesDoNotUnify Type Type
-  | KindsDoNotUnify Kind Kind
-  | ConstrainedTypeUnified Type Type
-  | OverlappingInstances (Qualified (ProperName 'ClassName)) [Type] [Qualified Ident]
-  | NoInstanceFound Constraint
-  | AmbiguousTypeVariables Type Constraint
+  | EscapedSkolem Text (Maybe SourceSpan) SourceType
+  | TypesDoNotUnify SourceType SourceType
+  | KindsDoNotUnify SourceKind SourceKind
+  | ConstrainedTypeUnified SourceType SourceType
+  | OverlappingInstances (Qualified (ProperName 'ClassName)) [SourceType] [Qualified Ident]
+  | NoInstanceFound SourceConstraint
+  | AmbiguousTypeVariables SourceType SourceConstraint
   | UnknownClass (Qualified (ProperName 'ClassName))
-  | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [Type]
-  | CannotDerive (Qualified (ProperName 'ClassName)) [Type]
-  | InvalidDerivedInstance (Qualified (ProperName 'ClassName)) [Type] Int
-  | ExpectedTypeConstructor (Qualified (ProperName 'ClassName)) [Type] Type
-  | InvalidNewtypeInstance (Qualified (ProperName 'ClassName)) [Type]
-  | MissingNewtypeSuperclassInstance (Qualified (ProperName 'ClassName)) (Qualified (ProperName 'ClassName)) [Type]
-  | UnverifiableSuperclassInstance (Qualified (ProperName 'ClassName)) (Qualified (ProperName 'ClassName)) [Type]
+  | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [SourceType]
+  | CannotDerive (Qualified (ProperName 'ClassName)) [SourceType]
+  | InvalidDerivedInstance (Qualified (ProperName 'ClassName)) [SourceType] Int
+  | ExpectedTypeConstructor (Qualified (ProperName 'ClassName)) [SourceType] SourceType
+  | InvalidNewtypeInstance (Qualified (ProperName 'ClassName)) [SourceType]
+  | MissingNewtypeSuperclassInstance (Qualified (ProperName 'ClassName)) (Qualified (ProperName 'ClassName)) [SourceType]
+  | UnverifiableSuperclassInstance (Qualified (ProperName 'ClassName)) (Qualified (ProperName 'ClassName)) [SourceType]
   | CannotFindDerivingType (ProperName 'TypeName)
   | DuplicateLabel Label (Maybe Expr)
   | DuplicateValueDeclaration Ident
   | ArgListLengthsDiffer Ident
   | OverlappingArgNames (Maybe Ident)
-  | MissingClassMember Ident
+  | MissingClassMember (NEL.NonEmpty (Ident, SourceType))
   | ExtraneousClassMember Ident (Qualified (ProperName 'ClassName))
-  | ExpectedType Type Kind
+  | ExpectedType SourceType SourceKind
   -- | constructor name, expected argument count, actual argument count
   | IncorrectConstructorArity (Qualified (ProperName 'ConstructorName)) Int Int
-  | ExprDoesNotHaveType Expr Type
+  | ExprDoesNotHaveType Expr SourceType
   | PropertyIsMissing Label
   | AdditionalProperty Label
   | TypeSynonymInstance
-  | OrphanInstance Ident (Qualified (ProperName 'ClassName)) (Set ModuleName) [Type]
+  | OrphanInstance Ident (Qualified (ProperName 'ClassName)) (Set ModuleName) [SourceType]
   | InvalidNewtype (ProperName 'TypeName)
-  | InvalidInstanceHead Type
+  | InvalidInstanceHead SourceType
   | TransitiveExportError DeclarationRef [DeclarationRef]
   | TransitiveDctorExportError DeclarationRef (ProperName 'ConstructorName)
   | ShadowedName Ident
   | ShadowedTypeVar Text
   | UnusedTypeVar Text
-  | WildcardInferredType Type Context
-  | HoleInferredType Text Type Context TypeSearch
-  | MissingTypeDeclaration Ident Type
+  | WildcardInferredType SourceType Context
+  | HoleInferredType Text SourceType Context (Maybe TypeSearch)
+  | MissingTypeDeclaration Ident SourceType
   | OverlappingPattern [[Binder]] Bool
   | IncompleteExhaustivityCheck
   | MisleadingEmptyTypeImport ModuleName (ProperName 'TypeName)
@@ -165,14 +165,14 @@ data SimpleErrorMessage
   | CaseBinderLengthDiffers Int [Binder]
   | IncorrectAnonymousArgument
   | InvalidOperatorInBinder (Qualified (OpName 'ValueOpName)) (Qualified Ident)
-  | CannotGeneralizeRecursiveFunction Ident Type
+  | CannotGeneralizeRecursiveFunction Ident SourceType
   | CannotDeriveNewtypeForData (ProperName 'TypeName)
   | ExpectedWildcard (ProperName 'TypeName)
   | CannotUseBindWithDo Ident
   -- | instance name, type class, expected argument count, actual argument count
   | ClassInstanceArityMismatch Ident (Qualified (ProperName 'ClassName)) Int Int
   -- | a user-defined warning raised by using the Warn type class
-  | UserDefinedWarning Type
+  | UserDefinedWarning SourceType
   -- | a declaration couldn't be used because it contained free variables
   | UnusableDeclaration Ident [[Text]]
   | CannotDefinePrimModules ModuleName
@@ -182,17 +182,17 @@ data SimpleErrorMessage
 
 -- | Error message hints, providing more detailed information about failure.
 data ErrorMessageHint
-  = ErrorUnifyingTypes Type Type
+  = ErrorUnifyingTypes SourceType SourceType
   | ErrorInExpression Expr
   | ErrorInModule ModuleName
-  | ErrorInInstance (Qualified (ProperName 'ClassName)) [Type]
-  | ErrorInSubsumption Type Type
+  | ErrorInInstance (Qualified (ProperName 'ClassName)) [SourceType]
+  | ErrorInSubsumption SourceType SourceType
   | ErrorCheckingAccessor Expr PSString
-  | ErrorCheckingType Expr Type
-  | ErrorCheckingKind Type
+  | ErrorCheckingType Expr SourceType
+  | ErrorCheckingKind SourceType
   | ErrorCheckingGuard
   | ErrorInferringType Expr
-  | ErrorInApplication Expr Type Expr
+  | ErrorInApplication Expr SourceType Expr
   | ErrorInDataConstructor (ProperName 'ConstructorName)
   | ErrorInTypeConstructor (ProperName 'TypeName)
   | ErrorInBindingGroup (NEL.NonEmpty Ident)
@@ -202,7 +202,7 @@ data ErrorMessageHint
   | ErrorInTypeDeclaration Ident
   | ErrorInTypeClassDeclaration (ProperName 'ClassName)
   | ErrorInForeignImport Ident
-  | ErrorSolvingConstraint Constraint
+  | ErrorSolvingConstraint SourceConstraint
   | PositionedError (NEL.NonEmpty SourceSpan)
   deriving (Show)
 
@@ -309,7 +309,7 @@ data DeclarationRef
   -- A value re-exported from another module. These will be inserted during
   -- elaboration in name desugaring.
   --
-  | ReExportRef SourceSpan ModuleName DeclarationRef
+  | ReExportRef SourceSpan ExportSource DeclarationRef
   deriving (Show, Generic, NFData)
 
 instance Eq DeclarationRef where
@@ -323,6 +323,13 @@ instance Eq DeclarationRef where
   (KindRef _ name) == (KindRef _ name') = name == name'
   (ReExportRef _ mn ref) == (ReExportRef _ mn' ref') = mn == mn' && ref == ref'
   _ == _ = False
+
+data ExportSource =
+  ExportSource
+  { exportSourceImportedFrom :: Maybe ModuleName
+  , exportSourceDefinedIn :: ModuleName
+  }
+  deriving (Eq, Ord, Show, Generic, NFData)
 
 -- enable sorting lists of explicitly imported refs when suggesting imports in linting, IDE, etc.
 -- not an Ord because this implementation is not consistent with its Eq instance.
@@ -433,7 +440,7 @@ isExplicit _ = False
 data TypeDeclarationData = TypeDeclarationData
   { tydeclSourceAnn :: !SourceAnn
   , tydeclIdent :: !Ident
-  , tydeclType :: !Type
+  , tydeclType :: !SourceType
   } deriving (Show, Eq)
 
 overTypeDeclaration :: (TypeDeclarationData -> TypeDeclarationData) -> Declaration -> Declaration
@@ -443,7 +450,7 @@ getTypeDeclaration :: Declaration -> Maybe TypeDeclarationData
 getTypeDeclaration (TypeDeclaration d) = Just d
 getTypeDeclaration _ = Nothing
 
-unwrapTypeDeclaration :: TypeDeclarationData -> (Ident, Type)
+unwrapTypeDeclaration :: TypeDeclarationData -> (Ident, SourceType)
 unwrapTypeDeclaration td = (tydeclIdent td, tydeclType td)
 
 -- | A value declaration assigns a name and potential binders, to an expression (or multiple guarded expressions).
@@ -479,7 +486,7 @@ data Declaration
   -- |
   -- A data type declaration (data or newtype, name, arguments, data constructors)
   --
-  = DataDeclaration SourceAnn DataDeclType (ProperName 'TypeName) [(Text, Maybe Kind)] [(ProperName 'ConstructorName, [Type])]
+  = DataDeclaration SourceAnn DataDeclType (ProperName 'TypeName) [(Text, Maybe SourceKind)] [(ProperName 'ConstructorName, [(Ident, SourceType)])]
   -- |
   -- A minimal mutually recursive set of data type declarations
   --
@@ -487,7 +494,7 @@ data Declaration
   -- |
   -- A type synonym declaration (name, arguments, type)
   --
-  | TypeSynonymDeclaration SourceAnn (ProperName 'TypeName) [(Text, Maybe Kind)] Type
+  | TypeSynonymDeclaration SourceAnn (ProperName 'TypeName) [(Text, Maybe SourceKind)] SourceType
   -- |
   -- A type declaration for a value (name, ty)
   --
@@ -506,11 +513,11 @@ data Declaration
   -- |
   -- A foreign import declaration (name, type)
   --
-  | ExternDeclaration SourceAnn Ident Type
+  | ExternDeclaration SourceAnn Ident SourceType
   -- |
   -- A data type foreign import (name, kind)
   --
-  | ExternDataDeclaration SourceAnn (ProperName 'TypeName) Kind
+  | ExternDataDeclaration SourceAnn (ProperName 'TypeName) SourceKind
   -- |
   -- A foreign kind import (name)
   --
@@ -526,12 +533,12 @@ data Declaration
   -- |
   -- A type class declaration (name, argument, implies, member declarations)
   --
-  | TypeClassDeclaration SourceAnn (ProperName 'ClassName) [(Text, Maybe Kind)] [Constraint] [FunctionalDependency] [Declaration]
+  | TypeClassDeclaration SourceAnn (ProperName 'ClassName) [(Text, Maybe SourceKind)] [SourceConstraint] [FunctionalDependency] [Declaration]
   -- |
   -- A type instance declaration (instance chain, chain index, name,
   -- dependencies, class name, instance types, member declarations)
   --
-  | TypeInstanceDeclaration SourceAnn [Ident] Integer Ident [Constraint] (Qualified (ProperName 'ClassName)) [Type] TypeInstanceBody
+  | TypeInstanceDeclaration SourceAnn [Ident] Integer Ident [SourceConstraint] (Qualified (ProperName 'ClassName)) [SourceType] TypeInstanceBody
   deriving (Show)
 
 data ValueFixity = ValueFixity Fixity (Qualified (Either Ident (ProperName 'ConstructorName))) (OpName 'ValueOpName)
@@ -768,7 +775,7 @@ data Expr
   -- |
   -- A value with a type annotation
   --
-  | TypedValue Bool Expr Type
+  | TypedValue Bool Expr SourceType
   -- |
   -- A let binding
   --
@@ -776,11 +783,11 @@ data Expr
   -- |
   -- A do-notation block
   --
-  | Do [DoNotationElement]
+  | Do (Maybe ModuleName) [DoNotationElement]
   -- |
   -- An ado-notation block
   --
-  | Ado [DoNotationElement] Expr
+  | Ado (Maybe ModuleName) [DoNotationElement] Expr
   -- |
   -- An application of a typeclass dictionary constructor. The value should be
   -- an ObjectLiteral.
@@ -793,8 +800,8 @@ data Expr
   -- at superclass implementations when searching for a dictionary, the type class name and
   -- instance type, and the type class dictionaries in scope.
   --
-  | TypeClassDictionary Constraint
-                        (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) NamedDict)))
+  | TypeClassDictionary SourceConstraint
+                        (M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))))
                         [ErrorMessageHint]
   -- |
   -- A typeclass dictionary accessor, the implementation is left unspecified until CoreFn desugaring.
@@ -803,7 +810,7 @@ data Expr
   -- |
   -- A placeholder for a superclass dictionary to be turned into a TypeClassDictionary during typechecking
   --
-  | DeferredDictionary (Qualified (ProperName 'ClassName)) [Type]
+  | DeferredDictionary (Qualified (ProperName 'ClassName)) [SourceType]
   -- |
   -- A placeholder for an anonymous function argument
   --
@@ -903,6 +910,7 @@ newtype AssocList k t = AssocList { runAssocList :: [(k, t)] }
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''DeclarationRef)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ImportDeclarationType)
+$(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExportSource)
 
 isTrueExpr :: Expr -> Bool
 isTrueExpr (Literal _ (BooleanLiteral True)) = True

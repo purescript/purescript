@@ -10,13 +10,11 @@ import Prelude.Compat
 import Control.Monad.State (StateT, modify, get)
 
 import Data.List (elemIndices, intersperse)
-import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Char (isUpper)
 
 import Language.PureScript.AST (SourcePos(..), SourceSpan(..))
-import Language.PureScript.Parser.Lexer (isUnquotedKey, reservedPsNames)
+import Language.PureScript.Parser.Lexer (isUnquotedKey)
 
 import Text.PrettyPrint.Boxes hiding ((<>))
 import qualified Text.PrettyPrint.Boxes as Box
@@ -55,10 +53,11 @@ newtype StrPos = StrPos (SourcePos, Text, [SMap])
 -- appropriately and advancing source mappings on the right hand side to account for
 -- the length of the left.
 --
+instance Semigroup StrPos where
+  StrPos (a,b,c) <> StrPos (a',b',c') = StrPos (a `addPos` a', b <> b', c ++ (bumpPos a <$> c'))
+
 instance Monoid StrPos where
   mempty = StrPos (SourcePos 0 0, "", [])
-
-  StrPos (a,b,c) `mappend` StrPos (a',b',c') = StrPos (a `addPos` a', b <> b', c ++ (bumpPos a <$> c'))
 
   mconcat ms =
     let s' = foldMap (\(StrPos(_, s, _)) -> s) ms
@@ -88,7 +87,7 @@ instance Emit StrPos where
       mapping = SMap (T.pack file) startPos zeroPos
       zeroPos = SourcePos 0 0
 
-newtype PlainString = PlainString Text deriving Monoid
+newtype PlainString = PlainString Text deriving (Semigroup, Monoid)
 
 runPlainString :: PlainString -> Text
 runPlainString (PlainString s) = s
@@ -148,11 +147,7 @@ prettyPrintMany f xs = do
   return $ intercalate (emit "\n") $ map (mappend indentString) ss
 
 objectKeyRequiresQuoting :: Text -> Bool
-objectKeyRequiresQuoting s =
-  s `elem` reservedPsNames || not (isUnquotedKey s) || startsUppercase s where
-    startsUppercase label = case T.uncons label of
-      Just (c, _) -> isUpper c
-      _ -> False
+objectKeyRequiresQuoting = not . isUnquotedKey
 
 -- | Place a box before another, vertically when the first box takes up multiple lines.
 before :: Box -> Box -> Box

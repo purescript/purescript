@@ -62,7 +62,9 @@ handleCommand c = case c of
     findType search filters currentModule
   Complete filters matcher currentModule complOptions ->
     findCompletions filters matcher currentModule complOptions
-  List LoadedModules ->
+  List LoadedModules -> do
+    logWarnN
+      "Listing the loaded modules command is DEPRECATED, use the completion command and filter it to modules instead"
     printModules
   List AvailableModules ->
     listAvailableModules
@@ -94,10 +96,10 @@ handleCommand c = case c of
       Right rs' -> answerRequest outfp rs'
       Left question ->
         pure (CompletionResult (map (completionFromMatch . simpleExport . map withEmptyAnn) question))
-  Rebuild file actualFile ->
-    rebuildFileAsync file actualFile
-  RebuildSync file actualFile ->
-    rebuildFileSync file actualFile
+  Rebuild file actualFile targets ->
+    rebuildFileAsync file actualFile targets
+  RebuildSync file actualFile targets ->
+    rebuildFileSync file actualFile targets
   Cwd ->
     TextResult . T.pack <$> liftIO getCurrentDirectory
   Reset ->
@@ -113,8 +115,8 @@ findCompletions
   -> CompletionOptions
   -> m Success
 findCompletions filters matcher currentModule complOptions = do
-  modules <- Map.toList <$> getAllModules currentModule
-  let insertPrim = (++) idePrimDeclarations
+  modules <- getAllModules currentModule
+  let insertPrim = Map.union idePrimDeclarations
   pure (CompletionResult (getCompletions filters matcher complOptions (insertPrim modules)))
 
 findType
@@ -124,8 +126,8 @@ findType
   -> Maybe P.ModuleName
   -> m Success
 findType search filters currentModule = do
-  modules <- Map.toList <$> getAllModules currentModule
-  let insertPrim = (++) idePrimDeclarations
+  modules <- getAllModules currentModule
+  let insertPrim = Map.union idePrimDeclarations
   pure (CompletionResult (getExactCompletions search filters (insertPrim modules)))
 
 printModules :: Ide m => m Success

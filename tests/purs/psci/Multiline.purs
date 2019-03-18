@@ -1,5 +1,7 @@
+-- @paste
 import Prelude
 import Data.Array
+-- @paste
 
 -- @paste
 fac :: Int -> Int

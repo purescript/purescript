@@ -4,7 +4,8 @@ module Language.PureScript.Ide.CompletionSpec where
 
 import Protolude
 
-import Language.PureScript as P
+import qualified Data.Set as Set
+import qualified Language.PureScript as P
 import Language.PureScript.Ide.Test as Test
 import Language.PureScript.Ide.Command as Command
 import Language.PureScript.Ide.Completion
@@ -30,7 +31,7 @@ load :: [Text] -> Command
 load = LoadSync . map Test.mn
 
 rebuildSync :: FilePath -> Command
-rebuildSync fp = RebuildSync ("src" </> fp) Nothing
+rebuildSync fp = RebuildSync ("src" </> fp) Nothing (Set.singleton P.JS)
 
 spec :: Spec
 spec = describe "Applying completion options" $ do
@@ -64,3 +65,10 @@ spec = describe "Applying completion options" $ do
                   , typ "withType"
                   ]
     result `shouldSatisfy` \res -> complDocumentation res == Just "Doc *123*\n"
+
+  it "gets docs on module declaration" $ do
+    ([_, (Right (CompletionResult [ result ]))], _) <- Test.inProject $
+      Test.runIde [ load ["CompletionSpecDocs"]
+                  , typ "CompletionSpecDocs"
+                  ]
+    result `shouldSatisfy` \res -> complDocumentation res == Just "Module Documentation\n"
