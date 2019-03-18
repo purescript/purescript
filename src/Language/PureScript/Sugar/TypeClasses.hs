@@ -15,7 +15,7 @@ import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.State
 import           Control.Monad.Supply.Class
 import           Data.Graph
-import           Data.List ((\\), find)
+import           Data.List ((\\), find, partition)
 import qualified Data.Map as M
 import           Data.Maybe (catMaybes, mapMaybe, isJust, fromMaybe)
 import           Data.Text (Text)
@@ -71,8 +71,7 @@ desugarModule
   => Module
   -> Desugar m Module
 desugarModule (Module ss coms name decls (Just exps)) = do
-  let classDecls = filter isTypeClassDeclaration decls
-      restDecls = filter (not . isTypeClassDeclaration) decls
+  let (classDecls, restDecls) = partition isTypeClassDeclaration decls
       classVerts = fmap (\d -> (d, classDeclName d, superClassesNames d)) classDecls
   (classNewExpss, classDeclss) <- unzip <$> parU (stronglyConnComp classVerts) (desugarClassDecl name exps)
   (restNewExpss, restDeclss) <- unzip <$> parU restDecls (desugarDecl name exps)
@@ -84,8 +83,8 @@ desugarModule (Module ss coms name decls (Just exps)) = do
     -> SCC Declaration
     -> Desugar m (Maybe DeclarationRef, [Declaration])
   desugarClassDecl name' exps' (AcyclicSCC d) = desugarDecl name' exps' d
-  desugarClassDecl _ _ (CyclicSCC [d]) = throwError . errorMessage' (declSourceSpan d) $ CycleInTypeClassDeclaration (Just (classDeclName d))
-  desugarClassDecl _ _ (CyclicSCC ds') = throwError . errorMessage' (declSourceSpan (head ds')) $ CycleInTypeClassDeclaration Nothing
+  desugarClassDecl _ _ (CyclicSCC [d]) = throwError . errorMessage' (declSourceSpan d) $ CycleInTypeClassDeclaration [(classDeclName d)]
+  desugarClassDecl _ _ (CyclicSCC ds') = throwError . errorMessage' (declSourceSpan (head ds')) $ CycleInTypeClassDeclaration (map classDeclName ds')
 
   superClassesNames :: Declaration -> [ProperName 'ClassName]
   superClassesNames (TypeClassDeclaration _ _ _ implies _ _) = fmap superClassName implies
