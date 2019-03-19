@@ -85,7 +85,6 @@ desugarModule (Module ss coms name decls (Just exps)) = do
     -> SCC Declaration
     -> Desugar m (Maybe DeclarationRef, [Declaration])
   desugarClassDecl name' exps' (AcyclicSCC d) = desugarDecl name' exps' d
-  desugarClassDecl _ _ (CyclicSCC [d]) = throwError . errorMessage' (declSourceSpan d) $ CycleInTypeClassDeclaration [(classDeclName d)]
   desugarClassDecl _ _ (CyclicSCC ds') = throwError . errorMessage' (declSourceSpan (head ds')) $ CycleInTypeClassDeclaration (map classDeclName ds')
 
   superClassesNames :: Declaration -> [ProperName 'ClassName]
