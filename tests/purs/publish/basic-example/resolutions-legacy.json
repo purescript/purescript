@@ -26,7 +26,7 @@
         "source": "purescript-console",
         "target": "^4.2.0"
       },
-      "canonicalDir": "./bower_components/purescript-console",
+      "canonicalDir": "../../../support/bower_components/purescript-console",
       "pkgMeta": {
         "name": "purescript-console",
         "homepage": "https://github.com/purescript/purescript-console",
@@ -67,7 +67,7 @@
             "source": "purescript-effect",
             "target": "^2.0.0"
           },
-          "canonicalDir": "./bower_components/purescript-effect",
+          "canonicalDir": "../../../support/bower_components/purescript-effect",
           "pkgMeta": {
             "name": "purescript-effect",
             "homepage": "https://github.com/purescript/purescript-effect",
@@ -106,7 +106,7 @@
                 "source": "purescript-prelude",
                 "target": "^4.0.0"
               },
-              "canonicalDir": "./bower_components/purescript-prelude",
+              "canonicalDir": "../../../support/bower_components/purescript-prelude",
               "pkgMeta": {
                 "name": "purescript-prelude",
                 "homepage": "https://github.com/purescript/purescript-prelude",
@@ -148,7 +148,7 @@
             "source": "purescript-prelude",
             "target": "^4.0.0"
           },
-          "canonicalDir": "./bower_components/purescript-prelude",
+          "canonicalDir": "../../../support/bower_components/purescript-prelude",
           "pkgMeta": {
             "name": "purescript-prelude",
             "homepage": "https://github.com/purescript/purescript-prelude",
@@ -190,7 +190,7 @@
         "source": "purescript-effect",
         "target": "^2.0.1"
       },
-      "canonicalDir": "./bower_components/purescript-effect",
+      "canonicalDir": "../../../support/bower_components/purescript-effect",
       "pkgMeta": {
         "name": "purescript-effect",
         "homepage": "https://github.com/purescript/purescript-effect",
@@ -231,7 +231,7 @@
         "source": "purescript-prelude",
         "target": "^4.1.0"
       },
-      "canonicalDir": "./bower_components/purescript-prelude",
+      "canonicalDir": "../../../support/bower_components/purescript-prelude",
       "pkgMeta": {
         "name": "purescript-prelude",
         "homepage": "https://github.com/purescript/purescript-prelude",
