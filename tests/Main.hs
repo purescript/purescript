@@ -29,14 +29,13 @@ main = do
 
   heading "Updating support code"
   TestUtils.updateSupportCode
-  heading "Prim documentation test suite"
-  TestPrimDocs.main
 
   ideTests <- TestIde.main
   compilerTests <- TestCompiler.main
   psciTests <- TestPsci.main
   coreFnTests <- TestCoreFn.main
   docsTests <- TestDocs.main
+  primDocsTests <- TestPrimDocs.main
   publishTests <- TestPscPublish.main
   hierarchyTests <- TestHierarchy.main
 
@@ -48,6 +47,7 @@ main = do
       , ideTests
       , coreFnTests
       , docsTests
+      , primDocsTests
       , publishTests
       , hierarchyTests
       ]

@@ -205,7 +205,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
     fmap (bound,) $
       DataDeclaration sa dtype name
         <$> updateTypeArguments args
-        <*> traverse (sndM (traverse updateTypesEverywhere)) dctors
+        <*> traverse (sndM (traverse (sndM updateTypesEverywhere))) dctors
   updateDecl bound (TypeSynonymDeclaration sa name ps ty) =
     fmap (bound,) $
       TypeSynonymDeclaration sa name
