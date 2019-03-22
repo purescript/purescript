@@ -1,0 +1,13 @@
+{
+  "name": "basic-example",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/purescript/test.git"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "purescript-console": "^1.0.0",
+    "purescript-prelude": "^1.0.0",
+    "purescript-effect": "^1.0.0"
+  }
+}
