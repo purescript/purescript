@@ -10,5 +10,8 @@
   "purescript-prelude": {
     "version": "1.0.0",
     "path": "../../../support/bower_components/purescript-prelude"
+  },
+  "purescript-newtype": {
+    "path": "../../../support/bower_components/purescript-newtype"
   }
 }
