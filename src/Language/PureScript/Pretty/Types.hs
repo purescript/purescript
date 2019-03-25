@@ -78,12 +78,12 @@ convertPrettyPrintType = go
   go (ParensInType _ ty) = PPParensInType (go ty)
   go (REmpty _) = PPREmpty
   go (RCons _ l ty1 ty2) = PPRCons l (go ty1) (go ty2)
-  go (ForAll _ v ty _) = goForAll [v] ty
+  go (ForAll _ v _ ty _) = goForAll [v] ty
   go (TypeApp _ (TypeApp _ f arg) ret) | eqType f tyFunction = PPFunction (go arg) (go ret)
   go (TypeApp _ o r) | eqType o tyRecord = PPRecord (go r)
   go (TypeApp _ a b) = PPTypeApp (go a) (go b)
 
-  goForAll vs (ForAll _ v ty _) = goForAll (v : vs) ty
+  goForAll vs (ForAll _ v _ ty _) = goForAll (v : vs) ty
   goForAll vs ty = PPForAll vs (go ty)
 
 -- TODO(Christoph): get rid of T.unpack s
