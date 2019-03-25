@@ -217,7 +217,11 @@ infer'
   => SourceType
   -> m (SourceKind, [(Text, SourceKind)])
 infer' (ForAll ann ident mbK ty _) = do
-  k1 <- freshKind ann
+  k1 <- case mbK of
+    Nothing ->
+      freshKind ann
+    Just k ->
+      pure k
   Just moduleName <- checkCurrentModule <$> get
   (k2, args) <- bindLocalTypeVariables moduleName [(ProperName ident, k1)] $ infer ty
   unifyKinds k2 kindType
@@ -230,7 +234,11 @@ infer' other = (, []) <$> go other
   where
   go :: SourceType -> m SourceKind
   go (ForAll ann ident mbK ty _) = do
-    k1 <- freshKind ann
+    k1 <- case mbK of
+      Nothing ->
+        freshKind ann
+      Just k ->
+        pure k
     Just moduleName <- checkCurrentModule <$> get
     k2 <- bindLocalTypeVariables moduleName [(ProperName ident, k1)] $ go ty
     unifyKinds k2 kindType
