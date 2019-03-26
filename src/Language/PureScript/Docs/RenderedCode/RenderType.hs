@@ -138,15 +138,15 @@ matchType = buildPrettyPrinter operators matchTypeAtom
     OperatorTable [ [ AssocL typeApp $ \f x -> f <> sp <> x ]
                   , [ AssocR appliedFunction $ \arg ret -> mintersperse sp [arg, syntax "->", ret] ]
                   , [ Wrap constrained $ \deps ty -> renderConstraints deps ty ]
-                  , [ Wrap forall_ $ \tyVars ty -> mconcat [keywordForall, sp, mintersperse sp (map typeVar tyVars), syntax ".", sp, ty] ]
+                  , [ Wrap forall_ $ \tyVars ty -> mconcat [keywordForall, sp, mintersperse sp (map (\(v, mbK) -> maybe (typeVar v) (\k -> mintersperse sp [mconcat [syntax "(", typeVar v], syntax "::", mconcat [renderKind k, syntax ")"]] ) mbK) tyVars), syntax ".", sp, ty] ]
                   , [ Wrap kinded $ \k ty -> mintersperse sp [ty, syntax "::", renderKind k] ]
                   , [ Wrap explicitParens $ \_ ty -> ty ]
                   ]
 
-forall_ :: Pattern () PrettyPrintType ([Text], PrettyPrintType)
+forall_ :: Pattern () PrettyPrintType ([(Text, Maybe (Kind ()))], PrettyPrintType)
 forall_ = mkPattern match
   where
-  match (PPForAll idents ty) = Just (idents, ty)
+  match (PPForAll mbKindedIdents ty) = Just (mbKindedIdents, ty)
   match _ = Nothing
 
 -- |
