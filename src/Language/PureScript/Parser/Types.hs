@@ -1,5 +1,6 @@
 module Language.PureScript.Parser.Types
-  ( parseType
+  ( kindedIdent
+  , parseType
   , parsePolyType
   , noForAll
   , noWildcards
@@ -51,15 +52,15 @@ parseTypeVariable = withSourceAnnF $ do
 parseTypeConstructor :: TokenParser SourceType
 parseTypeConstructor = withSourceAnnF $ flip TypeConstructor <$> parseQualified typeName
 
-parseKindedIdent :: TokenParser (T.Text, Maybe SourceKind)
-parseKindedIdent = (, Nothing) <$> identifier
+kindedIdent :: TokenParser (T.Text, Maybe SourceKind)
+kindedIdent = (, Nothing) <$> identifier
           <|> parens ((,) <$> identifier <*> (Just <$> (indented *> doubleColon *> indented *> parseKind)))
 
 parseForAll :: TokenParser SourceType
 parseForAll =
   mkForAll
     <$> ((reserved "forall" <|> reserved "∀")
-          *> (P.many1 $ indented *> (withSourceAnnF $ flip (,) <$> parseKindedIdent))
+          *> (P.many1 $ indented *> (withSourceAnnF $ flip (,) <$> kindedIdent))
           <* indented <* dot)
     <*> parseType
 

@@ -30,7 +30,6 @@ import           Data.Text (Text, pack)
 import           Language.PureScript.AST
 import           Language.PureScript.Environment
 import           Language.PureScript.Errors
-import           Language.PureScript.Kinds
 import           Language.PureScript.Names
 import           Language.PureScript.Parser.Common
 import           Language.PureScript.Parser.Kinds
@@ -40,10 +39,6 @@ import           Language.PureScript.PSString (PSString, mkString)
 import           Language.PureScript.Types
 import qualified Text.Parsec as P
 import qualified Text.Parsec.Expr as P
-
-kindedIdent :: TokenParser (Text, Maybe SourceKind)
-kindedIdent = (, Nothing) <$> identifier
-          <|> parens ((,) <$> identifier <*> (Just <$> (indented *> doubleColon *> indented *> parseKind)))
 
 fields :: [Ident]
 fields = [ Ident ("value" <> pack (show (n :: Integer))) | n <- [0..] ]
