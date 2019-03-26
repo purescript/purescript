@@ -315,7 +315,7 @@ updateTypes goType = (goDecl, goExpr, goBinder)
 
   goDecl :: Declaration -> m Declaration
   goDecl (DataDeclaration sa@(ss, _) ddt name args dctors) =
-    DataDeclaration sa ddt name args <$> traverse (sndM (traverse (goType' ss))) dctors
+    DataDeclaration sa ddt name args <$> traverse (sndM (traverse (sndM (goType' ss)))) dctors
   goDecl (ExternDeclaration sa@(ss, _) name ty) =
     ExternDeclaration sa name <$> goType' ss ty
   goDecl (TypeClassDeclaration sa@(ss, _) name args implies deps decls) = do

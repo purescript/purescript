@@ -59,8 +59,11 @@ parseModulesFromFiles paths = do
 extractAstInformation
   :: P.Module
   -> (DefinitionSites P.SourceSpan, TypeAnnotations)
-extractAstInformation (P.Module _ _ _ decls _) =
-  let definitions = Map.fromList (concatMap extractSpans decls)
+extractAstInformation (P.Module moduleSpan _ mn decls _) =
+  let definitions =
+        Map.insert
+          (IdeNamespaced IdeNSModule (P.runModuleName mn)) moduleSpan
+          (Map.fromList (concatMap extractSpans decls))
       typeAnnotations = Map.fromList (extractTypeAnnotations decls)
   in (definitions, typeAnnotations)
 

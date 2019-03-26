@@ -29,10 +29,21 @@ main = testSpec "publish" spec
 
 spec :: Spec
 spec = do
-  it "roundtrips the json for purescript-prelude" $ do
-    testPackage
-      "tests/support/bower_components/purescript-prelude"
-      "../../prelude-resolutions.json"
+  context "preparePackage with json roundtrips" $ do
+    it "purescript-prelude" $ do
+      testPackage
+        "tests/support/bower_components/purescript-prelude"
+        "../../prelude-resolutions.json"
+
+    it "basic example" $ do
+      testPackage
+        "tests/purs/publish/basic-example"
+        "resolutions.json"
+
+    it "basic example with legacy resolutions file" $ do
+      testPackage
+        "tests/purs/publish/basic-example"
+        "resolutions-legacy.json"
 
   context "json compatibility" $ do
     let compatDir = "tests" </> "json-compat"

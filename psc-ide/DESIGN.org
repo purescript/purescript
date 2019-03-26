@@ -165,9 +165,11 @@
     the PROTOCOL.md file.
     
 *** Filters
-    Filters are functions of type =Map ModuleName [IdeDeclaration] -> Map
-    ModuleName [IdeDeclaration]=. We keep the =Map= structure around to make the
-    common case of filtering by module names fast.
+    Filters are functions of type =Map ModuleName [IdeDeclaration] ->
+    Map ModuleName [IdeDeclaration]=. They only ever keep or remove
+    declarations, they never modify or add them. We keep the =Map=
+    structure around to make the common case of filtering by module
+    names fast. Filters are commutative.
 
 *** Matchers
     Matchers operate on individual declarations rather than a =Map=. They also

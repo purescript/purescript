@@ -39,6 +39,7 @@ data IdeDeclaration
   | IdeDeclTypeClass IdeTypeClass
   | IdeDeclValueOperator IdeValueOperator
   | IdeDeclTypeOperator IdeTypeOperator
+  | IdeDeclModule P.ModuleName
   | IdeDeclKind (P.ProperName 'P.KindName)
   deriving (Show, Eq, Ord, Generic, NFData)
 
@@ -125,6 +126,10 @@ _IdeDeclTypeOperator _ x = pure x
 _IdeDeclKind :: Traversal' IdeDeclaration (P.ProperName 'P.KindName)
 _IdeDeclKind f (IdeDeclKind x) = map IdeDeclKind (f x)
 _IdeDeclKind _ x = pure x
+
+_IdeDeclModule :: Traversal' IdeDeclaration P.ModuleName
+_IdeDeclModule f (IdeDeclModule x) = map IdeDeclModule (f x)
+_IdeDeclModule _ x = pure x
 
 anyOf :: Getting Any s a -> (a -> Bool) -> s -> Bool
 anyOf g p = getAny . getConst . g (Const . Any . p)
@@ -298,14 +303,15 @@ encodeImport (P.runModuleName -> mn, importType, map P.runModuleName -> qualifie
              ] ++ map (\x -> "qualifier" .= x) (maybeToList qualifier)
 
 -- | Denotes the different namespaces a name in PureScript can reside in.
-data IdeNamespace = IdeNSValue | IdeNSType | IdeNSKind
+data IdeNamespace = IdeNSValue | IdeNSType | IdeNSKind | IdeNSModule
   deriving (Show, Eq, Ord, Generic, NFData)
 
 instance FromJSON IdeNamespace where
   parseJSON (String s) = case s of
     "value" -> pure IdeNSValue
-    "type"  -> pure IdeNSType
-    "kind"  -> pure IdeNSKind
+    "type" -> pure IdeNSType
+    "kind" -> pure IdeNSKind
+    "module" -> pure IdeNSModule
     _       -> mzero
   parseJSON _ = mzero
 

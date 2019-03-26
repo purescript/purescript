@@ -395,7 +395,10 @@ In the Error case you get the errors in the compilers json format
 
 ### List
 
-#### Loaded Modules
+#### DEPRECATED Loaded Modules
+
+This command will be removed in the next breaking release after 0.13,
+use the completion command with a filter for modules instead.
 
 `list` of type `loadedModules` lists all loaded modules (This means they can be searched for completions etc)
 
@@ -598,37 +601,22 @@ Valid namespaces are `value`, `type` and `kind`.
 ### Declaration type filter
 A filter which allows to filter type declarations. Valid type declarations are
 `value`, `type`, `synonym`, `dataconstructor`, `typeclass`, `valueoperator`,
-`typeoperator` and `kind`.
+`typeoperator`, `kind`, and `module`.
 
 ```json
 {
   "filter": "declarations",
-  "params": [
-    {
-      "declarationtype": "value"
-    },
-    {
-      "declarationtype": "type"
-    },
-    {
-      "declarationtype": "synonym"
-    },
-    {
-      "declarationtype": "dataconstructor"
-    }
-    {
-      "declarationtype": "typeclass"
-    },
-    {
-      "declarationtype": "valueoperator"
-    },
-    {
-      "declarationtype": "typeoperator"
-    },
-    {
-      "declarationtype": "kind"
-    }
-  ]
+  "params":
+    [ "value"
+    , "type"
+    , "synonym"
+    , "dataconstructor"
+    , "typeclass"
+    , "valueoperator"
+    , "typeoperator"
+    , "kind"
+    , "module"
+    ]
 }
 ```
 

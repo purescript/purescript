@@ -6,3 +6,7 @@ nix:
   enable: false
   packages:
   - zlib
+  # Test dependencies
+  - nodejs
+  - nodePackages.npm
+  - nodePackages.bower

@@ -1,5 +1,5 @@
 name: purescript
-version: '0.12.2'
+version: '0.12.3'
 synopsis: PureScript Programming Language Compiler
 description: A small strongly, statically typed programming language with expressive
   types, inspired by Haskell and compiling to JavaScript.
@@ -34,9 +34,10 @@ extra-source-files:
   - CONTRIBUTORS.md
   - CONTRIBUTING.md
 dependencies:
-  - aeson >=1.0 && <1.4
+  - aeson >=1.0 && <1.5
   - aeson-better-errors >=0.8
   - ansi-terminal >=0.7.1 && <0.9
+  - array
   - base >=4.8 && <4.12
   - base-compat >=0.6.0
   - blaze-html >=0.8.1 && <0.10

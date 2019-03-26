@@ -126,29 +126,29 @@ data Exports = Exports
   -- |
   -- The exported types along with the module they originally came from.
   --
-    exportedTypes :: M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ModuleName)
+    exportedTypes :: M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ExportSource)
   -- |
   -- The exported type operators along with the module they originally came
   -- from.
   --
-  , exportedTypeOps :: M.Map (OpName 'TypeOpName) ModuleName
+  , exportedTypeOps :: M.Map (OpName 'TypeOpName) ExportSource
   -- |
   -- The exported classes along with the module they originally came from.
   --
-  , exportedTypeClasses :: M.Map (ProperName 'ClassName) ModuleName
+  , exportedTypeClasses :: M.Map (ProperName 'ClassName) ExportSource
   -- |
   -- The exported values along with the module they originally came from.
   --
-  , exportedValues :: M.Map Ident ModuleName
+  , exportedValues :: M.Map Ident ExportSource
   -- |
   -- The exported value operators along with the module they originally came
   -- from.
   --
-  , exportedValueOps :: M.Map (OpName 'ValueOpName) ModuleName
+  , exportedValueOps :: M.Map (OpName 'ValueOpName) ExportSource
   -- |
   -- The exported kinds along with the module they originally came from.
   --
-  , exportedKinds :: M.Map (ProperName 'KindName) ModuleName
+  , exportedKinds :: M.Map (ProperName 'KindName) ExportSource
   } deriving (Show)
 
 -- |
@@ -239,9 +239,15 @@ mkPrimExports ts cs ks =
     , exportedKinds = M.fromList $ mkKindEntry `map` S.toList ks
     }
   where
-  mkTypeEntry (Qualified mn name) = (name, ([], fromJust mn))
-  mkClassEntry (Qualified mn name) = (name, fromJust mn)
-  mkKindEntry (Qualified mn name) = (name, fromJust mn)
+  mkTypeEntry (Qualified mn name) = (name, ([], primExportSource mn))
+  mkClassEntry (Qualified mn name) = (name, primExportSource mn)
+  mkKindEntry (Qualified mn name) = (name, primExportSource mn)
+
+  primExportSource mn =
+    ExportSource
+      { exportSourceImportedFrom = Nothing
+      , exportSourceDefinedIn = fromJust mn
+      }
 
 -- | Environment which only contains the Prim modules.
 primEnv :: Env
@@ -289,9 +295,9 @@ exportType
   -> Exports
   -> ProperName 'TypeName
   -> [ProperName 'ConstructorName]
-  -> ModuleName
+  -> ExportSource
   -> m Exports
-exportType ss exportMode exps name dctors mn = do
+exportType ss exportMode exps name dctors src = do
   let exTypes = exportedTypes exps
       exClasses = exportedTypeClasses exps
       dctorNameCounts :: [(ProperName 'ConstructorName, Int)]
@@ -311,17 +317,20 @@ exportType ss exportMode exps name dctors mn = do
         when (coerceProperName dctor `M.member` exClasses) $
           throwDeclConflict (DctorName dctor) (TyClassName (coerceProperName dctor))
     ReExport -> do
-      forM_ (name `M.lookup` exTypes) $ \(_, mn') ->
+      let mn = exportSourceDefinedIn src
+      forM_ (name `M.lookup` exTypes) $ \(_, src') ->
+        let mn' = exportSourceDefinedIn src' in
         when (mn /= mn') $
           throwExportConflict ss mn mn' (TyName name)
       forM_ dctors $ \dctor ->
-        forM_ ((elem dctor . fst) `find` exTypes) $ \(_, mn') ->
+        forM_ ((elem dctor . fst) `find` exTypes) $ \(_, src') ->
+          let mn' = exportSourceDefinedIn src' in
           when (mn /= mn') $
             throwExportConflict ss mn mn' (DctorName dctor)
   return $ exps { exportedTypes = M.alter updateOrInsert name exTypes }
   where
-  updateOrInsert Nothing = Just (dctors, mn)
-  updateOrInsert (Just (dctors', _)) = Just (dctors ++ dctors', mn)
+  updateOrInsert Nothing = Just (dctors, src)
+  updateOrInsert (Just (dctors', _)) = Just (dctors ++ dctors', src)
 
 -- |
 -- Safely adds a type operator to some exports, returning an error if a
@@ -332,10 +341,10 @@ exportTypeOp
   => SourceSpan
   -> Exports
   -> OpName 'TypeOpName
-  -> ModuleName
+  -> ExportSource
   -> m Exports
-exportTypeOp ss exps op mn = do
-  typeOps <- addExport ss TyOpName op mn (exportedTypeOps exps)
+exportTypeOp ss exps op src = do
+  typeOps <- addExport ss TyOpName op src (exportedTypeOps exps)
   return $ exps { exportedTypeOps = typeOps }
 
 -- |
@@ -347,16 +356,16 @@ exportTypeClass
   -> ExportMode
   -> Exports
   -> ProperName 'ClassName
-  -> ModuleName
+  -> ExportSource
   -> m Exports
-exportTypeClass ss exportMode exps name mn = do
+exportTypeClass ss exportMode exps name src = do
   let exTypes = exportedTypes exps
   when (exportMode == Internal) $ do
     when (coerceProperName name `M.member` exTypes) $
       throwDeclConflict (TyClassName name) (TyName (coerceProperName name))
     when ((elem (coerceProperName name) . fst) `any` exTypes) $
       throwDeclConflict (TyClassName name) (DctorName (coerceProperName name))
-  classes <- addExport ss TyClassName name mn (exportedTypeClasses exps)
+  classes <- addExport ss TyClassName name src (exportedTypeClasses exps)
   return $ exps { exportedTypeClasses = classes }
 
 -- |
@@ -367,10 +376,10 @@ exportValue
   => SourceSpan
   -> Exports
   -> Ident
-  -> ModuleName
+  -> ExportSource
   -> m Exports
-exportValue ss exps name mn = do
-  values <- addExport ss IdentName name mn (exportedValues exps)
+exportValue ss exps name src = do
+  values <- addExport ss IdentName name src (exportedValues exps)
   return $ exps { exportedValues = values }
 
 -- |
@@ -382,10 +391,10 @@ exportValueOp
   => SourceSpan
   -> Exports
   -> OpName 'ValueOpName
-  -> ModuleName
+  -> ExportSource
   -> m Exports
-exportValueOp ss exps op mn = do
-  valueOps <- addExport ss ValOpName op mn (exportedValueOps exps)
+exportValueOp ss exps op src = do
+  valueOps <- addExport ss ValOpName op src (exportedValueOps exps)
   return $ exps { exportedValueOps = valueOps }
 
 -- |
@@ -396,10 +405,10 @@ exportKind
   => SourceSpan
   -> Exports
   -> ProperName 'KindName
-  -> ModuleName
+  -> ExportSource
   -> m Exports
-exportKind ss exps name mn = do
-  kinds <- addExport ss KiName name mn (exportedKinds exps)
+exportKind ss exps name src = do
+  kinds <- addExport ss KiName name src (exportedKinds exps)
   return $ exps { exportedKinds = kinds }
 
 -- |
@@ -411,16 +420,21 @@ addExport
   => SourceSpan
   -> (a -> Name)
   -> a
-  -> ModuleName
-  -> M.Map a ModuleName
-  -> m (M.Map a ModuleName)
-addExport ss toName name mn exports =
+  -> ExportSource
+  -> M.Map a ExportSource
+  -> m (M.Map a ExportSource)
+addExport ss toName name src exports =
   case M.lookup name exports of
-    Just mn'
-      | mn == mn' -> return exports
-      | otherwise -> throwExportConflict ss mn mn' (toName name)
+    Just src' ->
+      let
+        mn = exportSourceDefinedIn src
+        mn' = exportSourceDefinedIn src'
+      in
+        if mn == mn'
+          then return exports
+          else throwExportConflict ss mn mn' (toName name)
     Nothing ->
-      return $ M.insert name mn exports
+      return $ M.insert name src exports
 
 -- |
 -- Raises an error for when there is more than one definition for something.

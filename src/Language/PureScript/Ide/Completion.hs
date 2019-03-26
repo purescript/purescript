@@ -22,15 +22,13 @@ import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 import           Lens.Micro.Platform hiding ((&))
 
-type Module = (P.ModuleName, [IdeDeclarationAnn])
-
 -- | Applies the CompletionFilters and the Matcher to the given Modules
 --   and sorts the found Completions according to the Matching Score
 getCompletions
   :: [Filter]
   -> Matcher IdeDeclarationAnn
   -> CompletionOptions
-  -> [Module]
+  -> ModuleMap [IdeDeclarationAnn]
   -> [Completion]
 getCompletions filters matcher options modules =
   modules
@@ -40,23 +38,23 @@ getCompletions filters matcher options modules =
   & applyCompletionOptions options
   <&> completionFromMatch
 
-getExactMatches :: Text -> [Filter] -> [Module] -> [Match IdeDeclarationAnn]
+getExactMatches :: Text -> [Filter] -> ModuleMap [IdeDeclarationAnn] -> [Match IdeDeclarationAnn]
 getExactMatches search filters modules =
   modules
-  & applyFilters (equalityFilter search : filters)
+  & applyFilters (exactFilter search : filters)
   & matchesFromModules
 
-getExactCompletions :: Text -> [Filter] -> [Module] -> [Completion]
+getExactCompletions :: Text -> [Filter] -> ModuleMap [IdeDeclarationAnn] -> [Completion]
 getExactCompletions search filters modules =
   modules
   & getExactMatches search filters
   <&> simpleExport
   <&> completionFromMatch
 
-matchesFromModules :: [Module] -> [Match IdeDeclarationAnn]
-matchesFromModules = foldMap completionFromModule
+matchesFromModules :: ModuleMap [IdeDeclarationAnn] -> [Match IdeDeclarationAnn]
+matchesFromModules = Map.foldMapWithKey completionFromModule
   where
-    completionFromModule (moduleName, decls) =
+    completionFromModule moduleName decls =
       map (\x -> Match (moduleName, x)) decls
 
 data CompletionOptions = CompletionOptions
@@ -121,6 +119,7 @@ completionFromMatch (Match (m, IdeDeclarationAnn ann decl), mns) =
       IdeDeclTypeOperator (IdeTypeOperator op ref precedence associativity kind) ->
         (P.runOpName op, maybe (showFixity precedence associativity (typeOperatorAliasT ref) op) P.prettyPrintKind kind)
       IdeDeclKind k -> (P.runProperName k, "kind")
+      IdeDeclModule mn -> (P.runModuleName mn, "module")
 
     complExportedFrom = mns
 

@@ -93,7 +93,7 @@ prettyPrintWildcard (WildcardAnnotations True) = prettyWildcard
 prettyPrintWildcard (WildcardAnnotations False) = const "_"
 
 prettyWildcard :: P.Type a -> Text
-prettyWildcard t = "( _ :: " <> T.strip (T.pack (P.prettyPrintTypeAtom t)) <> ")"
+prettyWildcard t = "( _ :: " <> T.strip (T.pack (P.prettyPrintTypeAtom maxBound t)) <> ")"
 
 -- | Constructs Patterns to insert into a sourcefile
 makePattern :: Text -- ^ Current line

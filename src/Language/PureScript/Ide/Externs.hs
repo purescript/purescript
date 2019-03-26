@@ -61,12 +61,13 @@ convertExterns :: P.ExternsFile -> ([IdeDeclarationAnn], [(P.ModuleName, P.Decla
 convertExterns ef =
   (decls, exportDecls)
   where
-    decls = map
+    decls = moduleDecl : map
       (IdeDeclarationAnn emptyAnn)
       (resolvedDeclarations <> operatorDecls <> tyOperatorDecls)
     exportDecls = mapMaybe convertExport (P.efExports ef)
     operatorDecls = convertOperator <$> P.efFixities ef
     tyOperatorDecls = convertTypeOperator <$> P.efTypeFixities ef
+    moduleDecl = IdeDeclarationAnn emptyAnn (IdeDeclModule (P.efModuleName ef))
     (toResolve, declarations) =
       second catMaybes (partitionEithers (map convertDecl (P.efDeclarations ef)))
 
@@ -119,7 +120,7 @@ data ToResolve
   | SynonymToResolve (P.ProperName 'P.TypeName) P.SourceType
 
 convertExport :: P.DeclarationRef -> Maybe (P.ModuleName, P.DeclarationRef)
-convertExport (P.ReExportRef _ m r) = Just (m, r)
+convertExport (P.ReExportRef _ src r) = Just (P.exportSourceDefinedIn src, r)
 convertExport _ = Nothing
 
 convertDecl :: P.ExternsDeclaration -> Either ToResolve (Maybe IdeDeclaration)

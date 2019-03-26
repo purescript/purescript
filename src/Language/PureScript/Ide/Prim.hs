@@ -8,8 +8,8 @@ import qualified Language.PureScript.Constants as C
 import qualified Language.PureScript.Environment as PEnv
 import           Language.PureScript.Ide.Types
 
-idePrimDeclarations :: [(P.ModuleName, [IdeDeclarationAnn])]
-idePrimDeclarations =
+idePrimDeclarations :: ModuleMap [IdeDeclarationAnn]
+idePrimDeclarations = Map.fromList
   [ ( C.Prim
     , mconcat [primTypes, primKinds, primClasses]
     )
