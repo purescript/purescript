@@ -197,10 +197,7 @@ matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
   rightArrow = if troUnicode tro then "→" else "->"
   forall' = if troUnicode tro then "∀" else "forall"
   doubleColon = if troUnicode tro then "∷" else "::"
-  printMbKindedType (v, mbK) = case mbK of
-    Nothing -> v
-    Just k -> unwords ["(" ++ v, doubleColon, T.unpack (prettyPrintKind k) ++ ")"]
-
+  printMbKindedType (v, mbK) = maybe v (\k -> unwords ["(" ++ v, doubleColon, T.unpack (prettyPrintKind k) ++ ")"]) mbK
 
   -- If both boxes span a single line, keep them on the same line, or else
   -- use the specified function to modify the second box, then combine vertically.

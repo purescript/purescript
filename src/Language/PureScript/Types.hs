@@ -430,9 +430,9 @@ quantify ty = foldr (\arg t -> ForAll (getAnnForType ty) arg Nothing t Nothing) 
 -- | Move all universal quantifiers to the front of a type
 moveQuantifiersToFront :: Type a -> Type a
 moveQuantifiersToFront = go [] [] where
-  go qs cs (ForAll ann q _ ty sco) = go ((ann, q, sco) : qs) cs ty
+  go qs cs (ForAll ann q mbK ty sco) = go ((ann, q, sco, mbK) : qs) cs ty
   go qs cs (ConstrainedType ann c ty) = go qs ((ann, c) : cs) ty
-  go qs cs ty = foldl (\ty' (ann, q, sco) -> ForAll ann q Nothing ty' sco) (foldl (\ty' (ann, c) -> ConstrainedType ann c ty') ty cs) qs
+  go qs cs ty = foldl (\ty' (ann, q, sco, mbK) -> ForAll ann q mbK ty' sco) (foldl (\ty' (ann, c) -> ConstrainedType ann c ty') ty cs) qs
 
 -- | Check if a type contains wildcards
 containsWildcards :: Type a -> Bool
