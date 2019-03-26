@@ -21,7 +21,8 @@ import Data.Aeson.BetterErrors (ParseError, displayError)
 import Data.List (intersperse)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe
-import Data.Monoid
+import Data.Monoid hiding (First, getFirst)
+import Data.Semigroup (First(..))
 import Data.Version
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Text (Text)
@@ -45,6 +46,7 @@ data PackageWarning
   = NoResolvedVersion PackageName
   | UnacceptableVersion (PackageName, Text)
   | DirtyWorkingTree_Warn
+  | LegacyResolutionsFormat FilePath
   deriving (Show)
 
 -- | An error that should be fixed by the user.
@@ -292,36 +294,43 @@ displayOtherError e = case e of
       [ "An IO exception occurred:", show exc ]
 
 data CollectedWarnings = CollectedWarnings
-  { noResolvedVersions     :: [PackageName]
-  , unacceptableVersions   :: [(PackageName, Text)]
-  , dirtyWorkingTree       :: Any
+  { noResolvedVersions      :: [PackageName]
+  , unacceptableVersions    :: [(PackageName, Text)]
+  , dirtyWorkingTree        :: Any
+  , legacyResolutionsFormat :: Maybe (First FilePath)
   }
   deriving (Show, Eq, Ord)
 
 instance Semigroup CollectedWarnings where
-  (<>) (CollectedWarnings a b c) (CollectedWarnings a' b' c') =
-    CollectedWarnings (a <> a') (b <> b') (c <> c')
+  (<>) (CollectedWarnings a b c d) (CollectedWarnings a' b' c' d') =
+    CollectedWarnings (a <> a') (b <> b') (c <> c') (d <> d')
 
 instance Monoid CollectedWarnings where
-  mempty = CollectedWarnings mempty mempty mempty
+  mempty = CollectedWarnings mempty mempty mempty mempty
 
 collectWarnings :: [PackageWarning] -> CollectedWarnings
 collectWarnings = foldMap singular
   where
   singular w = case w of
-    NoResolvedVersion pn  -> mempty { noResolvedVersions = [pn] }
-    UnacceptableVersion t -> mempty { unacceptableVersions = [t] }
-    DirtyWorkingTree_Warn -> mempty { dirtyWorkingTree = Any True }
+    NoResolvedVersion pn ->
+      mempty { noResolvedVersions = [pn] }
+    UnacceptableVersion t ->
+      mempty { unacceptableVersions = [t] }
+    DirtyWorkingTree_Warn ->
+      mempty { dirtyWorkingTree = Any True }
+    LegacyResolutionsFormat path ->
+      mempty { legacyResolutionsFormat = Just (First path) }
 
 renderWarnings :: [PackageWarning] -> Box
 renderWarnings warns =
   let CollectedWarnings{..} = collectWarnings warns
       go toBox warns' = toBox <$> NonEmpty.nonEmpty warns'
-      mboxes = [ go warnNoResolvedVersions     noResolvedVersions
-               , go warnUnacceptableVersions   unacceptableVersions
+      mboxes = [ go warnNoResolvedVersions noResolvedVersions
+               , go warnUnacceptableVersions unacceptableVersions
                , if getAny dirtyWorkingTree
                    then Just warnDirtyWorkingTree
                    else Nothing
+               , fmap (warnLegacyResolutions . getFirst) legacyResolutionsFormat
                ]
   in case catMaybes mboxes of
        []    -> nullBox
@@ -386,6 +395,21 @@ warnDirtyWorkingTree =
     "Your working tree is dirty. (Note: this would be an error if it "
     ++ "were not a dry run)"
     )
+
+warnLegacyResolutions :: FilePath -> Box
+warnLegacyResolutions path =
+  vcat $
+    [ para (concat
+        [ "Your resolutions file (" ++ path ++ ") is using the deprecated "
+        , "legacy format. Support for this format will be dropped in a future "
+        , "version."
+        ])
+    , spacer
+    , para (concat
+        [ "In most cases, all you need to do to use the new format and silence "
+        , "this warning is to upgrade Pulp."
+        ])
+    ]
 
 printWarnings :: [PackageWarning] -> IO ()
 printWarnings = printToStderr . renderWarnings
