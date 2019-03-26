@@ -590,7 +590,7 @@ compareType (TypeApp _ a b) (TypeApp _ a' b') = compareType a a' <> compareType 
 compareType (TypeApp {}) _ = LT
 compareType _ (TypeApp {}) = GT
 
-compareType (ForAll _ a _ b c) (ForAll _ a' _ b' c') = compare a a' <> compareType b b' <> compare c c'
+compareType (ForAll _ a b c d) (ForAll _ a' b' c' d') = compare a a' <> fromMaybe LT (compareKind <$> b <*> b') <> compareType c c' <> compare d d'
 compareType (ForAll {}) _ = LT
 compareType _ (ForAll {}) = GT
 
