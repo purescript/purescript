@@ -12,7 +12,6 @@ import           Prelude
 
 import           Control.Monad.Base (MonadBase(..))
 import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.Fail (MonadFail)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
 import           Control.Monad.Reader (MonadReader(..), ReaderT(..))
@@ -28,7 +27,7 @@ import           System.IO.Error (tryIOError)
 -- | A monad for running make actions
 newtype Make a = Make
   { unMake :: ReaderT Options (ExceptT MultipleErrors (Logger MultipleErrors)) a
-  } deriving (Functor, Applicative, Monad, MonadIO, MonadError MultipleErrors, MonadWriter MultipleErrors, MonadReader Options, MonadFail)
+  } deriving (Functor, Applicative, Monad, MonadIO, MonadError MultipleErrors, MonadWriter MultipleErrors, MonadReader Options)
 
 instance MonadBase IO Make where
   liftBase = liftIO

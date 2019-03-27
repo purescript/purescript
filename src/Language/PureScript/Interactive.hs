@@ -21,7 +21,6 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 
 import           Control.Monad.IO.Class (MonadIO, liftIO)
-import           Control.Monad.Fail (MonadFail)
 import           Control.Monad.State.Class
 import           Control.Monad.Reader.Class
 import           Control.Monad.Trans.Except (ExceptT(..), runExceptT)
@@ -95,7 +94,7 @@ make ms = do
 
 -- | Performs a PSCi command
 handleCommand
-  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m, MonadFail m)
+  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
   => (String -> m ()) -- ^ evaluate JS
   -> m () -- ^ reload
   -> (String -> m ()) -- ^ print into console
@@ -280,7 +279,7 @@ handleTypeOf print' val = do
 
 -- | Takes a type and prints its kind
 handleKindOf
-  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m, MonadFail m)
+  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
   => (String -> m ())
   -> P.SourceType
   -> m ()

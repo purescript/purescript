@@ -24,7 +24,6 @@ import Protolude hiding (stdin)
 
 import Control.Arrow ((***))
 import Control.Category ((>>>))
-import Control.Monad.Fail (MonadFail)
 import Control.Monad.Writer.Strict (MonadWriter, WriterT, runWriterT, tell)
 
 import Data.Aeson.BetterErrors (Parse, parse, keyMay, eachInObjectWithKey, eachInObject, key, keyOrDefault, asBool, asString, asText)
@@ -91,7 +90,7 @@ newtype PrepareM a =
   PrepareM { unPrepareM :: WriterT [PackageWarning] (ExceptT PackageError IO) a }
   deriving (Functor, Applicative, Monad,
             MonadWriter [PackageWarning],
-            MonadError PackageError, MonadFail)
+            MonadError PackageError)
 
 -- This MonadIO instance ensures that IO errors don't crash the program.
 instance MonadIO PrepareM where

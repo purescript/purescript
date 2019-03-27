@@ -14,7 +14,6 @@ import Protolude (ordNub)
 
 import Control.Arrow (second)
 import Control.Monad (when, unless, void, forM)
-import Control.Monad.Fail (MonadFail)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), modify, gets)
 import Control.Monad.Supply.Class (MonadSupply)
@@ -226,7 +225,7 @@ checkTypeSynonyms = void . replaceAllTypeSynonyms
 --
 typeCheckAll
   :: forall m
-   . (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadFail m)
+   . (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
   -> [DeclarationRef]
   -> [Declaration]
@@ -507,7 +506,7 @@ checkNewtype name _ = throwError . errorMessage $ InvalidNewtype name
 --
 typeCheckModule
   :: forall m
-   . (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m, MonadFail m)
+   . (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => Module
   -> m Module
 typeCheckModule (Module _ _ _ _ Nothing) =

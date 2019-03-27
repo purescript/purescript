@@ -109,6 +109,7 @@ library:
     - ScopedTypeVariables
     - TupleSections
     - ViewPatterns
+    - NoMonadFailDesugaring
 
 executables:
   purs:

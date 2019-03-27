@@ -14,7 +14,6 @@ import Prelude.Compat
 
 import Control.Arrow (second)
 import Control.Monad
-import Control.Monad.Fail
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 
@@ -103,14 +102,14 @@ unifyKinds k1 k2 = do
 
 -- | Infer the kind of a single type
 kindOf
-  :: (MonadError MultipleErrors m, MonadState CheckState m, MonadFail m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m)
   => SourceType
   -> m SourceKind
 kindOf ty = fst <$> kindOfWithScopedVars ty
 
 -- | Infer the kind of a single type, returning the kinds of any scoped type variables
 kindOfWithScopedVars ::
-  (MonadError MultipleErrors m, MonadState CheckState m, MonadFail m) =>
+  (MonadError MultipleErrors m, MonadState CheckState m) =>
   SourceType ->
   m (SourceKind, [(Text, SourceKind)])
 kindOfWithScopedVars ty =
@@ -123,7 +122,7 @@ kindOfWithScopedVars ty =
 
 -- | Infer the kind of a type constructor with a collection of arguments and a collection of associated data constructors
 kindsOf
-  :: (MonadError MultipleErrors m, MonadState CheckState m, MonadFail m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m)
   => Bool
   -> ModuleName
   -> ProperName 'TypeName
@@ -152,7 +151,7 @@ freshKindVar (arg, Just kind') kind = do
 
 -- | Simultaneously infer the kinds of several mutually recursive type constructors
 kindsOfAll
-  :: (MonadError MultipleErrors m, MonadState CheckState m, MonadFail m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m)
   => ModuleName
   -> [(SourceAnn, ProperName 'TypeName, [(Text, Maybe SourceKind)], SourceType)]
   -> [(SourceAnn, ProperName 'TypeName, [(Text, Maybe SourceKind)], [SourceType])]
@@ -180,7 +179,7 @@ kindsOfAll moduleName syns tys = fmap tidyUp . withFreshSubstitution . captureSu
 
 -- | Solve the set of kind constraints associated with the data constructors for a type constructor
 solveTypes
-  :: (MonadError MultipleErrors m, MonadState CheckState m, MonadFail m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m)
   => Bool
   -> [SourceType]
   -> [SourceKind]
@@ -204,7 +203,7 @@ starIfUnknown k = k
 
 -- | Infer a kind for a type
 infer
-  :: (MonadError MultipleErrors m, MonadState CheckState m, MonadFail m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m)
   => SourceType
   -> m (SourceKind, [(Text, SourceKind)])
 infer ty =
@@ -214,7 +213,7 @@ infer ty =
 
 infer'
   :: forall m
-   . (MonadError MultipleErrors m, MonadState CheckState m, MonadFail m)
+   . (MonadError MultipleErrors m, MonadState CheckState m)
   => SourceType
   -> m (SourceKind, [(Text, SourceKind)])
 infer' (ForAll ann ident ty _) = do

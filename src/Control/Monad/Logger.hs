@@ -10,7 +10,6 @@ import Prelude.Compat hiding (fail)
 
 import Control.Monad (ap)
 import Control.Monad.Base (MonadBase(..))
-import Control.Monad.Fail (MonadFail(..))
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Control (MonadBaseControl(..))
 import Control.Monad.Writer.Class
@@ -58,6 +57,3 @@ instance (Monoid w) => MonadBaseControl IO (Logger w) where
   type StM (Logger w) a = a
   liftBaseWith f = Logger $ \r -> liftBaseWith $ \q -> f (q . flip runLogger r)
   restoreM = return
-
-instance (Monoid w) => MonadFail (Logger w) where
-  fail s = Logger $ \_ -> fail s
