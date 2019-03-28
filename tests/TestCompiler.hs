@@ -51,8 +51,14 @@ main = testSpec "compiler" spec
 
 spec :: Spec
 spec = do
-  (supportModules, supportExterns, supportForeigns, [passingTestCases, warningTestCases, failingTestCases]) <- runIO $ setUpTests ["passing", "warning", "failing"]
-  outputFile <- runIO $ createOutputFile logfile 
+  (supportModules, supportExterns, supportForeigns) <- runIO $ setupSupportModules
+
+  (passingTestCases, warningTestCases, failingTestCases) <- runIO $
+    (,,) <$> getTestFiles "passing"
+         <*> getTestFiles "warning"
+         <*> getTestFiles "failing"
+
+  outputFile <- runIO $ createOutputFile logfile
 
   context "Passing examples" $
     forM_ passingTestCases $ \testPurs ->
