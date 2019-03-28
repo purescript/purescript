@@ -586,7 +586,7 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
         JSVariable lfsp
           (cList [
             JSVarInitExpression (JSIdentifier sp nm)
-              (JSVarInit sp $ either require (moduleReference sp . moduleName) req )
+              (JSVarInit sp $ either require (innerModuleReference sp . moduleName) req )
           ]) (JSSemi JSNoAnnot)
       ]
     declToJS (ExportsList exps) = withLength $ map toExport exps
@@ -642,6 +642,12 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
     JSMemberSquare (JSIdentifier a optionsNamespace) JSNoAnnot
       (str mn) JSNoAnnot
 
+  innerModuleReference :: JSAnnot -> String -> JSExpression
+  innerModuleReference a mn =
+    JSMemberSquare (JSIdentifier a "$PS") JSNoAnnot
+      (str mn) JSNoAnnot
+
+
   str :: String -> JSExpression
   str s = JSStringLiteral JSNoAnnot $ "\"" ++ s ++ "\""
 
@@ -652,17 +658,27 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
   wrap :: String -> [JSStatement] -> [JSStatement]
   wrap mn ds =
     [
-    JSMethodCall (JSExpressionParen lf (JSFunctionExpression JSNoAnnot JSIdentNone JSNoAnnot
-                                                (JSLOne (JSIdentName JSNoAnnot "exports")) JSNoAnnot
-                                                (JSBlock sp (lfHead ds) lf)) -- \n not quite in right place
+    JSMethodCall (JSExpressionParen lf (JSFunctionExpression JSNoAnnot JSIdentNone JSNoAnnot (JSLOne (JSIdentName JSNoAnnot "$PS")) JSNoAnnot
+                                                (JSBlock sp (addModuleExports ds) lf)) -- \n not quite in right place
                                     JSNoAnnot)
                   JSNoAnnot
-                  (JSLOne (JSAssignExpression (moduleReference JSNoAnnot mn) (JSAssign sp)
-                            (JSExpressionBinary (moduleReference sp mn) (JSBinOpOr sp) (emptyObj sp))))
+                  (JSLOne (JSIdentifier JSNoAnnot optionsNamespace))
                   JSNoAnnot
                   (JSSemi JSNoAnnot)
     ]
     where
+      addModuleExports :: [JSStatement] -> [JSStatement]
+      addModuleExports [] = lfHead moduleExports 
+      addModuleExports (x:xs) = lfHead [x] ++ moduleExports ++ xs
+      moduleExports = 
+        [
+        JSExpressionStatement (JSAssignExpression (innerModuleReference lfsp mn) 
+                                                  (JSAssign sp) 
+                                                  (JSExpressionBinary (innerModuleReference sp mn) (JSBinOpOr sp) (emptyObj sp))) 
+                              (JSSemi JSAnnotSpace), 
+        JSVariable lfsp (JSLOne $ JSVarInitExpression (JSIdentifier sp "exports") $ JSVarInit sp (innerModuleReference sp mn)) 
+                        (JSSemi JSNoAnnot) 
+        ]
       lfHead (h:t) = addAnn (WhiteSpace tokenPosnEmpty "\n  ") h : t
       lfHead x = x
 

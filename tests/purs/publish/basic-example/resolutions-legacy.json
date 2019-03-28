@@ -1,0 +1,640 @@
+{
+  "endpoint": {
+    "name": "basic-example",
+    "source": ".",
+    "target": "*"
+  },
+  "canonicalDir": ".",
+  "pkgMeta": {
+    "name": "basic-example",
+    "ignore": [
+      "**/.*",
+      "node_modules",
+      "bower_components",
+      "output"
+    ],
+    "dependencies": {
+      "purescript-prelude": "^4.1.0",
+      "purescript-console": "^4.2.0",
+      "purescript-effect": "^2.0.1",
+      "purescript-newtype": "#master"
+    },
+    "devDependencies": {
+      "purescript-psci-support": "^4.0.0"
+    }
+  },
+  "dependencies": {
+    "purescript-console": {
+      "endpoint": {
+        "name": "purescript-console",
+        "source": "purescript-console",
+        "target": "^4.2.0"
+      },
+      "canonicalDir": "../../../support/bower_components/purescript-console",
+      "pkgMeta": {
+        "name": "purescript-console",
+        "homepage": "https://github.com/purescript/purescript-console",
+        "license": "BSD-3-Clause",
+        "repository": {
+          "type": "git",
+          "url": "git://github.com/purescript/purescript-console.git"
+        },
+        "ignore": [
+          "**/.*",
+          "bower_components",
+          "node_modules",
+          "output",
+          "test",
+          "bower.json",
+          "package.json"
+        ],
+        "dependencies": {
+          "purescript-effect": "^2.0.0",
+          "purescript-prelude": "^4.0.0"
+        },
+        "version": "4.2.0",
+        "_release": "4.2.0",
+        "_resolution": {
+          "type": "version",
+          "tag": "v4.2.0",
+          "commit": "add2bdb8a4af2213d993b728805f1f2a5e76deb8"
+        },
+        "_source": "https://github.com/purescript/purescript-console.git",
+        "_target": "^4.2.0",
+        "_originalSource": "purescript-console"
+      },
+      "dependencies": {
+        "purescript-effect": {
+          "endpoint": {
+            "name": "purescript-effect",
+            "source": "purescript-effect",
+            "target": "^2.0.0"
+          },
+          "canonicalDir": "../../../support/bower_components/purescript-effect",
+          "pkgMeta": {
+            "name": "purescript-effect",
+            "homepage": "https://github.com/purescript/purescript-effect",
+            "license": "BSD-3-Clause",
+            "repository": {
+              "type": "git",
+              "url": "git://github.com/purescript/purescript-effect.git"
+            },
+            "ignore": [
+              "**/.*",
+              "bower_components",
+              "node_modules",
+              "output",
+              "test",
+              "bower.json",
+              "package.json"
+            ],
+            "dependencies": {
+              "purescript-prelude": "^4.0.0"
+            },
+            "version": "2.0.1",
+            "_release": "2.0.1",
+            "_resolution": {
+              "type": "version",
+              "tag": "v2.0.1",
+              "commit": "d2a11e69abcda3b81c750e86e8746cda278f47bf"
+            },
+            "_source": "https://github.com/purescript/purescript-effect.git",
+            "_target": "^2.0.1",
+            "_originalSource": "purescript-effect"
+          },
+          "dependencies": {
+            "purescript-prelude": {
+              "endpoint": {
+                "name": "purescript-prelude",
+                "source": "purescript-prelude",
+                "target": "^4.0.0"
+              },
+              "canonicalDir": "../../../support/bower_components/purescript-prelude",
+              "pkgMeta": {
+                "name": "purescript-prelude",
+                "homepage": "https://github.com/purescript/purescript-prelude",
+                "description": "The PureScript Prelude",
+                "license": "BSD-3-Clause",
+                "repository": {
+                  "type": "git",
+                  "url": "git://github.com/purescript/purescript-prelude.git"
+                },
+                "ignore": [
+                  "**/.*",
+                  "bower_components",
+                  "node_modules",
+                  "output",
+                  "test",
+                  "bower.json",
+                  "package.json"
+                ],
+                "version": "4.1.0",
+                "_release": "4.1.0",
+                "_resolution": {
+                  "type": "version",
+                  "tag": "v4.1.0",
+                  "commit": "7a691ce2658bd8eaf28439391e29506dd154fb3d"
+                },
+                "_source": "https://github.com/purescript/purescript-prelude.git",
+                "_target": "^4.1.0",
+                "_originalSource": "purescript-prelude"
+              },
+              "dependencies": {},
+              "nrDependants": 1
+            }
+          },
+          "nrDependants": 1
+        },
+        "purescript-prelude": {
+          "endpoint": {
+            "name": "purescript-prelude",
+            "source": "purescript-prelude",
+            "target": "^4.0.0"
+          },
+          "canonicalDir": "../../../support/bower_components/purescript-prelude",
+          "pkgMeta": {
+            "name": "purescript-prelude",
+            "homepage": "https://github.com/purescript/purescript-prelude",
+            "description": "The PureScript Prelude",
+            "license": "BSD-3-Clause",
+            "repository": {
+              "type": "git",
+              "url": "git://github.com/purescript/purescript-prelude.git"
+            },
+            "ignore": [
+              "**/.*",
+              "bower_components",
+              "node_modules",
+              "output",
+              "test",
+              "bower.json",
+              "package.json"
+            ],
+            "version": "4.1.0",
+            "_release": "4.1.0",
+            "_resolution": {
+              "type": "version",
+              "tag": "v4.1.0",
+              "commit": "7a691ce2658bd8eaf28439391e29506dd154fb3d"
+            },
+            "_source": "https://github.com/purescript/purescript-prelude.git",
+            "_target": "^4.1.0",
+            "_originalSource": "purescript-prelude"
+          },
+          "dependencies": {},
+          "nrDependants": 1
+        }
+      },
+      "nrDependants": 1
+    },
+    "purescript-effect": {
+      "endpoint": {
+        "name": "purescript-effect",
+        "source": "purescript-effect",
+        "target": "^2.0.1"
+      },
+      "canonicalDir": "../../../support/bower_components/purescript-effect",
+      "pkgMeta": {
+        "name": "purescript-effect",
+        "homepage": "https://github.com/purescript/purescript-effect",
+        "license": "BSD-3-Clause",
+        "repository": {
+          "type": "git",
+          "url": "git://github.com/purescript/purescript-effect.git"
+        },
+        "ignore": [
+          "**/.*",
+          "bower_components",
+          "node_modules",
+          "output",
+          "test",
+          "bower.json",
+          "package.json"
+        ],
+        "dependencies": {
+          "purescript-prelude": "^4.0.0"
+        },
+        "version": "2.0.1",
+        "_release": "2.0.1",
+        "_resolution": {
+          "type": "version",
+          "tag": "v2.0.1",
+          "commit": "d2a11e69abcda3b81c750e86e8746cda278f47bf"
+        },
+        "_source": "https://github.com/purescript/purescript-effect.git",
+        "_target": "^2.0.1",
+        "_originalSource": "purescript-effect"
+      },
+      "dependencies": {},
+      "nrDependants": 1
+    },
+    "purescript-newtype": {
+      "endpoint": {
+        "name": "purescript-newtype",
+        "source": "purescript-newtype",
+        "target": "master"
+      },
+      "canonicalDir": "../../../support/bower_components/purescript-newtype",
+      "pkgMeta": {
+        "name": "purescript-newtype",
+        "homepage": "https://github.com/purescript/purescript-newtype",
+        "description": "Type class and functions for working with newtypes",
+        "license": "BSD-3-Clause",
+        "repository": {
+          "type": "git",
+          "url": "git://github.com/purescript/purescript-newtype.git"
+        },
+        "ignore": [
+          "**/.*",
+          "bower_components",
+          "node_modules",
+          "output",
+          "test",
+          "bower.json",
+          "package.json"
+        ],
+        "dependencies": {
+          "purescript-prelude": "^4.0.0"
+        },
+        "_release": "7d85fa6a04",
+        "_resolution": {
+          "type": "branch",
+          "branch": "master",
+          "commit": "7d85fa6a040208c010b05f7c23af6a943ba08763"
+        },
+        "_source": "https://github.com/garyb/purescript-newtype.git",
+        "_target": "master",
+        "_originalSource": "purescript-newtype"
+      },
+      "dependencies": {
+        "purescript-prelude": {
+          "endpoint": {
+            "name": "purescript-prelude",
+            "source": "purescript-prelude",
+            "target": "^4.0.0"
+          },
+          "canonicalDir": "../../../support/bower_components/purescript-prelude",
+          "pkgMeta": {
+            "name": "purescript-prelude",
+            "homepage": "https://github.com/purescript/purescript-prelude",
+            "description": "The PureScript Prelude",
+            "license": "BSD-3-Clause",
+            "repository": {
+              "type": "git",
+              "url": "git://github.com/purescript/purescript-prelude.git"
+            },
+            "ignore": [
+              "**/.*",
+              "bower_components",
+              "node_modules",
+              "output",
+              "test",
+              "bower.json",
+              "package.json"
+            ],
+            "version": "4.1.0",
+            "_release": "4.1.0",
+            "_resolution": {
+              "type": "version",
+              "tag": "v4.1.0",
+              "commit": "7a691ce2658bd8eaf28439391e29506dd154fb3d"
+            },
+            "_source": "https://github.com/purescript/purescript-prelude.git",
+            "_target": "^4.1.0",
+            "_originalSource": "purescript-prelude"
+          },
+          "dependencies": {},
+          "nrDependants": 1
+        }
+      },
+      "nrDependants": 1
+    },
+    "purescript-prelude": {
+      "endpoint": {
+        "name": "purescript-prelude",
+        "source": "purescript-prelude",
+        "target": "^4.1.0"
+      },
+      "canonicalDir": "../../../support/bower_components/purescript-prelude",
+      "pkgMeta": {
+        "name": "purescript-prelude",
+        "homepage": "https://github.com/purescript/purescript-prelude",
+        "description": "The PureScript Prelude",
+        "license": "BSD-3-Clause",
+        "repository": {
+          "type": "git",
+          "url": "git://github.com/purescript/purescript-prelude.git"
+        },
+        "ignore": [
+          "**/.*",
+          "bower_components",
+          "node_modules",
+          "output",
+          "test",
+          "bower.json",
+          "package.json"
+        ],
+        "version": "4.1.0",
+        "_release": "4.1.0",
+        "_resolution": {
+          "type": "version",
+          "tag": "v4.1.0",
+          "commit": "7a691ce2658bd8eaf28439391e29506dd154fb3d"
+        },
+        "_source": "https://github.com/purescript/purescript-prelude.git",
+        "_target": "^4.1.0",
+        "_originalSource": "purescript-prelude"
+      },
+      "dependencies": {},
+      "nrDependants": 1
+    },
+    "purescript-psci-support": {
+      "endpoint": {
+        "name": "purescript-psci-support",
+        "source": "purescript-psci-support",
+        "target": "^4.0.0"
+      },
+      "canonicalDir": "../../../support/bower_components/purescript-psci-support",
+      "pkgMeta": {
+        "name": "purescript-psci-support",
+        "homepage": "https://github.com/purescript/purescript-psci-support",
+        "description": "Support module for the PSCI interactive mode",
+        "license": "BSD-3-Clause",
+        "repository": {
+          "type": "git",
+          "url": "git://github.com/purescript/purescript-psci-support.git"
+        },
+        "ignore": [
+          "**/.*",
+          "bower_components",
+          "node_modules",
+          "output",
+          "bower.json",
+          "package.json"
+        ],
+        "dependencies": {
+          "purescript-console": "^4.0.0",
+          "purescript-effect": "^2.0.0",
+          "purescript-prelude": "^4.0.0"
+        },
+        "version": "4.0.0",
+        "_release": "4.0.0",
+        "_resolution": {
+          "type": "version",
+          "tag": "v4.0.0",
+          "commit": "a66a0fa8661eb8b5fe75cc862f4e2df2835c058d"
+        },
+        "_source": "https://github.com/purescript/purescript-psci-support.git",
+        "_target": "^4.0.0",
+        "_originalSource": "purescript-psci-support"
+      },
+      "dependencies": {
+        "purescript-console": {
+          "endpoint": {
+            "name": "purescript-console",
+            "source": "purescript-console",
+            "target": "^4.0.0"
+          },
+          "canonicalDir": "../../../support/bower_components/purescript-console",
+          "pkgMeta": {
+            "name": "purescript-console",
+            "homepage": "https://github.com/purescript/purescript-console",
+            "license": "BSD-3-Clause",
+            "repository": {
+              "type": "git",
+              "url": "git://github.com/purescript/purescript-console.git"
+            },
+            "ignore": [
+              "**/.*",
+              "bower_components",
+              "node_modules",
+              "output",
+              "test",
+              "bower.json",
+              "package.json"
+            ],
+            "dependencies": {
+              "purescript-effect": "^2.0.0",
+              "purescript-prelude": "^4.0.0"
+            },
+            "version": "4.2.0",
+            "_release": "4.2.0",
+            "_resolution": {
+              "type": "version",
+              "tag": "v4.2.0",
+              "commit": "add2bdb8a4af2213d993b728805f1f2a5e76deb8"
+            },
+            "_source": "https://github.com/purescript/purescript-console.git",
+            "_target": "^4.2.0",
+            "_originalSource": "purescript-console"
+          },
+          "dependencies": {
+            "purescript-effect": {
+              "endpoint": {
+                "name": "purescript-effect",
+                "source": "purescript-effect",
+                "target": "^2.0.0"
+              },
+              "canonicalDir": "../../../support/bower_components/purescript-effect",
+              "pkgMeta": {
+                "name": "purescript-effect",
+                "homepage": "https://github.com/purescript/purescript-effect",
+                "license": "BSD-3-Clause",
+                "repository": {
+                  "type": "git",
+                  "url": "git://github.com/purescript/purescript-effect.git"
+                },
+                "ignore": [
+                  "**/.*",
+                  "bower_components",
+                  "node_modules",
+                  "output",
+                  "test",
+                  "bower.json",
+                  "package.json"
+                ],
+                "dependencies": {
+                  "purescript-prelude": "^4.0.0"
+                },
+                "version": "2.0.1",
+                "_release": "2.0.1",
+                "_resolution": {
+                  "type": "version",
+                  "tag": "v2.0.1",
+                  "commit": "d2a11e69abcda3b81c750e86e8746cda278f47bf"
+                },
+                "_source": "https://github.com/purescript/purescript-effect.git",
+                "_target": "^2.0.1",
+                "_originalSource": "purescript-effect"
+              },
+              "dependencies": {
+                "purescript-prelude": {
+                  "endpoint": {
+                    "name": "purescript-prelude",
+                    "source": "purescript-prelude",
+                    "target": "^4.0.0"
+                  },
+                  "canonicalDir": "../../../support/bower_components/purescript-prelude",
+                  "pkgMeta": {
+                    "name": "purescript-prelude",
+                    "homepage": "https://github.com/purescript/purescript-prelude",
+                    "description": "The PureScript Prelude",
+                    "license": "BSD-3-Clause",
+                    "repository": {
+                      "type": "git",
+                      "url": "git://github.com/purescript/purescript-prelude.git"
+                    },
+                    "ignore": [
+                      "**/.*",
+                      "bower_components",
+                      "node_modules",
+                      "output",
+                      "test",
+                      "bower.json",
+                      "package.json"
+                    ],
+                    "version": "4.1.0",
+                    "_release": "4.1.0",
+                    "_resolution": {
+                      "type": "version",
+                      "tag": "v4.1.0",
+                      "commit": "7a691ce2658bd8eaf28439391e29506dd154fb3d"
+                    },
+                    "_source": "https://github.com/purescript/purescript-prelude.git",
+                    "_target": "^4.1.0",
+                    "_originalSource": "purescript-prelude"
+                  },
+                  "dependencies": {},
+                  "nrDependants": 1
+                }
+              },
+              "nrDependants": 1
+            },
+            "purescript-prelude": {
+              "endpoint": {
+                "name": "purescript-prelude",
+                "source": "purescript-prelude",
+                "target": "^4.0.0"
+              },
+              "canonicalDir": "../../../support/bower_components/purescript-prelude",
+              "pkgMeta": {
+                "name": "purescript-prelude",
+                "homepage": "https://github.com/purescript/purescript-prelude",
+                "description": "The PureScript Prelude",
+                "license": "BSD-3-Clause",
+                "repository": {
+                  "type": "git",
+                  "url": "git://github.com/purescript/purescript-prelude.git"
+                },
+                "ignore": [
+                  "**/.*",
+                  "bower_components",
+                  "node_modules",
+                  "output",
+                  "test",
+                  "bower.json",
+                  "package.json"
+                ],
+                "version": "4.1.0",
+                "_release": "4.1.0",
+                "_resolution": {
+                  "type": "version",
+                  "tag": "v4.1.0",
+                  "commit": "7a691ce2658bd8eaf28439391e29506dd154fb3d"
+                },
+                "_source": "https://github.com/purescript/purescript-prelude.git",
+                "_target": "^4.1.0",
+                "_originalSource": "purescript-prelude"
+              },
+              "dependencies": {},
+              "nrDependants": 1
+            }
+          },
+          "nrDependants": 1
+        },
+        "purescript-effect": {
+          "endpoint": {
+            "name": "purescript-effect",
+            "source": "purescript-effect",
+            "target": "^2.0.0"
+          },
+          "canonicalDir": "../../../support/bower_components/purescript-effect",
+          "pkgMeta": {
+            "name": "purescript-effect",
+            "homepage": "https://github.com/purescript/purescript-effect",
+            "license": "BSD-3-Clause",
+            "repository": {
+              "type": "git",
+              "url": "git://github.com/purescript/purescript-effect.git"
+            },
+            "ignore": [
+              "**/.*",
+              "bower_components",
+              "node_modules",
+              "output",
+              "test",
+              "bower.json",
+              "package.json"
+            ],
+            "dependencies": {
+              "purescript-prelude": "^4.0.0"
+            },
+            "version": "2.0.1",
+            "_release": "2.0.1",
+            "_resolution": {
+              "type": "version",
+              "tag": "v2.0.1",
+              "commit": "d2a11e69abcda3b81c750e86e8746cda278f47bf"
+            },
+            "_source": "https://github.com/purescript/purescript-effect.git",
+            "_target": "^2.0.1",
+            "_originalSource": "purescript-effect"
+          },
+          "dependencies": {},
+          "nrDependants": 1
+        },
+        "purescript-prelude": {
+          "endpoint": {
+            "name": "purescript-prelude",
+            "source": "purescript-prelude",
+            "target": "^4.0.0"
+          },
+          "canonicalDir": "../../../support/bower_components/purescript-prelude",
+          "pkgMeta": {
+            "name": "purescript-prelude",
+            "homepage": "https://github.com/purescript/purescript-prelude",
+            "description": "The PureScript Prelude",
+            "license": "BSD-3-Clause",
+            "repository": {
+              "type": "git",
+              "url": "git://github.com/purescript/purescript-prelude.git"
+            },
+            "ignore": [
+              "**/.*",
+              "bower_components",
+              "node_modules",
+              "output",
+              "test",
+              "bower.json",
+              "package.json"
+            ],
+            "version": "4.1.0",
+            "_release": "4.1.0",
+            "_resolution": {
+              "type": "version",
+              "tag": "v4.1.0",
+              "commit": "7a691ce2658bd8eaf28439391e29506dd154fb3d"
+            },
+            "_source": "https://github.com/purescript/purescript-prelude.git",
+            "_target": "^4.1.0",
+            "_originalSource": "purescript-prelude"
+          },
+          "dependencies": {},
+          "nrDependants": 1
+        }
+      },
+      "nrDependants": 1
+    }
+  },
+  "nrDependants": 0
+}
