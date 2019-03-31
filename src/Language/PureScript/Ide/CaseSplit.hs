@@ -45,18 +45,24 @@ explicitAnnotations = WildcardAnnotations True
 noAnnotations :: WildcardAnnotations
 noAnnotations = WildcardAnnotations False
 
-caseSplit :: (Ide m, MonadError IdeError m) =>
-             Text -> m [Constructor]
+type DataType = ([(Text, Maybe P.SourceKind)], [(P.ProperName 'P.ConstructorName, [P.SourceType])])
+
+caseSplit
+  :: (Ide m, MonadError IdeError m)
+  => Text
+  -> m [Constructor]
 caseSplit q = do
   type' <- parseType' q
   (tc, args) <- splitTypeConstructor type'
-  (EDType _ _ (P.DataType typeVars ctors)) <- findTypeDeclaration tc
+  (typeVars, ctors) <- findTypeDeclaration tc
   let applyTypeVars = P.everywhereOnTypes (P.replaceAllTypeVars (zip (map fst typeVars) args))
   let appliedCtors = map (second (map applyTypeVars)) ctors
   pure appliedCtors
 
-findTypeDeclaration :: (Ide m, MonadError IdeError m) =>
-                         P.ProperName 'P.TypeName -> m ExternsDeclaration
+findTypeDeclaration
+  :: (Ide m, MonadError IdeError m)
+  => P.ProperName 'P.TypeName
+  -> m DataType
 findTypeDeclaration q = do
   efs <- getExternFiles
   efs' <- maybe efs (flip (uncurry M.insert) efs) <$> cachedRebuild
@@ -65,14 +71,15 @@ findTypeDeclaration q = do
     Just mn -> pure mn
     Nothing -> throwError (GeneralError "Not Found")
 
-findTypeDeclaration' ::
-  P.ProperName 'P.TypeName
+findTypeDeclaration'
+  :: P.ProperName 'P.TypeName
   -> ExternsFile
-  -> First ExternsDeclaration
+  -> First DataType
 findTypeDeclaration' t ExternsFile{..} =
-  First $ find (\case
-            EDType tn _ _ -> tn == t
-            _ -> False) efDeclarations
+  First $ head $ mapMaybe (\case
+            EDType tn _ (P.DataType typeVars ctors)
+              | tn == t -> Just (typeVars, ctors)
+            _ -> Nothing) efDeclarations
 
 splitTypeConstructor :: (MonadError IdeError m) =>
                         P.Type a -> m (P.ProperName 'P.TypeName, [P.Type a])

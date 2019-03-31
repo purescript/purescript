@@ -105,11 +105,8 @@ createOutputFile logfileName = do
   createDirectoryIfMissing False (tmp </> logpath)
   openFile (tmp </> logpath </> logfileName) WriteMode
 
-setUpTests :: [FilePath] -> IO ([P.Module], [P.ExternsFile], M.Map P.ModuleName FilePath, [[[FilePath]]]) 
-setUpTests testDirs = do
-  cwd <- getCurrentDirectory
-  let testPaths = map (\p -> cwd </> "tests" </> "purs" </> p) testDirs
-  testFiles <- mapM (\p -> getTestFiles p <$> testGlob p) testPaths
+setupSupportModules :: IO ([P.Module], [P.ExternsFile], M.Map P.ModuleName FilePath)
+setupSupportModules = do
   ms <- getSupportModuleTuples
   let modules = map snd ms
   supportExterns <- runExceptT $ do
@@ -118,7 +115,13 @@ setUpTests testDirs = do
     return (externs, foreigns)
   case supportExterns of
     Left errs -> fail (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
-    Right (externs, foreigns) -> return (modules, externs, foreigns, testFiles)
+    Right (externs, foreigns) -> return (modules, externs, foreigns)
+
+getTestFiles :: FilePath -> IO [[FilePath]]
+getTestFiles testDir = do
+  cwd <- getCurrentDirectory
+  let dir = cwd </> "tests" </> "purs" </> testDir
+  getFiles dir <$> testGlob dir
   where
   -- A glob for all purs and js files within a test directory
   testGlob :: FilePath -> IO [FilePath]
@@ -126,8 +129,8 @@ setUpTests testDirs = do
   -- Groups the test files so that a top-level file can have dependencies in a
   -- subdirectory of the same name. The inner tuple contains a list of the
   -- .purs files and the .js files for the test case.
-  getTestFiles :: FilePath -> [FilePath] -> [[FilePath]]
-  getTestFiles baseDir
+  getFiles :: FilePath -> [FilePath] -> [[FilePath]]
+  getFiles baseDir
     = map (filter ((== ".purs") . takeExtensions) . map (baseDir </>))
     . groupBy ((==) `on` extractPrefix)
     . sortBy (compare `on` extractPrefix)

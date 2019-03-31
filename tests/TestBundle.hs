@@ -37,7 +37,8 @@ main = testSpec "bundle" spec
 
 spec :: Spec
 spec = do
-  (supportModules, supportExterns, supportForeigns, [bundleTestCases]) <- runIO $ setUpTests ["bundle"]
+  (supportModules, supportExterns, supportForeigns) <- runIO $ setupSupportModules
+  bundleTestCases <- runIO $ getTestFiles "bundle"
   outputFile <- runIO $ createOutputFile logfile 
 
   context "Bundle examples" $
