@@ -25,7 +25,7 @@ import           Control.Monad.State.Class
 import           Control.Monad.Reader.Class
 import           Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import           Control.Monad.Trans.State.Strict (StateT, runStateT, evalStateT)
-import           Control.Monad.Writer.Strict (WriterT, runWriterT)
+import           Control.Monad.Writer.Strict (Writer(), runWriter)
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Names as N
@@ -294,10 +294,10 @@ handleKindOf print' typ = do
       case M.lookup (P.Qualified (Just mName) $ P.ProperName "IT") (P.typeSynonyms env') of
         Just (_, typ') -> do
           let chk = (P.emptyCheckState env') { P.checkCurrentModule = Just mName }
+              k   = check (P.kindOf typ') chk
 
-              check :: StateT P.CheckState (ExceptT P.MultipleErrors (WriterT P.MultipleErrors IO)) a -> P.CheckState -> IO (Either P.MultipleErrors (a, P.CheckState))
-              check sew = fmap fst . runWriterT . runExceptT . runStateT sew
-          k <- liftIO $ check (P.kindOf typ') chk
+              check :: StateT P.CheckState (ExceptT P.MultipleErrors (Writer P.MultipleErrors)) a -> P.CheckState -> Either P.MultipleErrors (a, P.CheckState)
+              check sew = fst . runWriter . runExceptT . runStateT sew
           case k of
             Left err        -> printErrors err
             Right (kind, _) -> print' . T.unpack . P.prettyPrintKind $ kind

@@ -152,8 +152,7 @@ getModules paths = do
   (inputFiles, depsFiles) <- liftIO (getInputAndDepsFiles paths)
   (modules', moduleMap) <- parseFilesInPackages inputFiles depsFiles
 
-  converted <- runExceptT (D.convertModulesInPackage (map snd modules') moduleMap)
-  case converted of
+  case runExcept (D.convertModulesInPackage (map snd modules') moduleMap) of
     Right modules -> return (modules, moduleMap)
     Left err -> userError (CompileError err)
 
