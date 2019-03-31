@@ -6,7 +6,7 @@
 --
 module Control.Monad.Logger where
 
-import Prelude.Compat hiding (fail)
+import Prelude.Compat
 
 import Control.Monad (ap)
 import Control.Monad.Base (MonadBase(..))
