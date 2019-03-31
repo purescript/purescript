@@ -552,7 +552,7 @@ eqType (TypeWildcard _ a) (TypeWildcard _ a') = a == a'
 eqType (TypeConstructor _ a) (TypeConstructor _ a') = a == a'
 eqType (TypeOp _ a) (TypeOp _ a') = a == a'
 eqType (TypeApp _ a b) (TypeApp _ a' b') = eqType a a' && eqType b b'
-eqType (ForAll _ a b c d) (ForAll _ a' b' c' d') = a == a' && fromMaybe True (eqKind <$> b <*> b') && eqType c c' && d == d'
+eqType (ForAll _ a b c d) (ForAll _ a' b' c' d') = a == a' && fromMaybe False (eqKind <$> b <*> b') && eqType c c' && d == d'
 eqType (ConstrainedType _ a b) (ConstrainedType _ a' b') = eqConstraint a a' && eqType b b'
 eqType (Skolem _ a b c) (Skolem _ a' b' c') = a == a' && b == b' && c == c'
 eqType (REmpty _) (REmpty _) = True
@@ -590,7 +590,7 @@ compareType (TypeApp _ a b) (TypeApp _ a' b') = compareType a a' <> compareType 
 compareType (TypeApp {}) _ = LT
 compareType _ (TypeApp {}) = GT
 
-compareType (ForAll _ a b c d) (ForAll _ a' b' c' d') = compare a a' <> fromMaybe LT (compareKind <$> b <*> b') <> compareType c c' <> compare d d'
+compareType (ForAll _ a b c d) (ForAll _ a' b' c' d') = compare a a' <> compareMaybeKind b b' <> compareType c c' <> compare d d'
 compareType (ForAll {}) _ = LT
 compareType _ (ForAll {}) = GT
 

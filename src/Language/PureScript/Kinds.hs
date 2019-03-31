@@ -169,3 +169,9 @@ compareKind _ (FunKind {}) = GT
 
 compareKind (NamedKind _ a) (NamedKind _ a') = compare a a'
 compareKind (NamedKind {}) _ = GT
+
+compareMaybeKind :: Maybe (Kind a) -> Maybe (Kind b) -> Ordering
+compareMaybeKind Nothing Nothing = EQ
+compareMaybeKind Nothing (Just _) = LT
+compareMaybeKind (Just _) Nothing = GT
+compareMaybeKind (Just a) (Just b) = compareKind a b
