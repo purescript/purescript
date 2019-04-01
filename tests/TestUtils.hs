@@ -121,7 +121,21 @@ getTestFiles :: FilePath -> IO [[FilePath]]
 getTestFiles testDir = do
   cwd <- getCurrentDirectory
   let dir = cwd </> "tests" </> "purs" </> testDir
-  getFiles dir <$> testGlob dir
+  testsInPath <- getFiles dir <$> testGlob dir
+  let rerunPath = dir </> "RerunCompilerTests.txt"
+  hasRerunFile <- doesFileExist rerunPath
+  rerunTests <-
+    if hasRerunFile
+    then let compilerTestDir = cwd </> "tests" </> "purs" </> "passing"
+             textToTestFiles
+               = mapM (\path -> ((path ++ ".purs") :) <$> testGlob path)
+               . map ((compilerTestDir </>) . T.unpack)
+               . filter (not . T.null)
+               . map (T.strip . fst . T.breakOn "--")
+               . T.lines
+         in readUTF8FileT rerunPath >>= textToTestFiles
+    else return []
+  return $ testsInPath ++ rerunTests
   where
   -- A glob for all purs and js files within a test directory
   testGlob :: FilePath -> IO [FilePath]
