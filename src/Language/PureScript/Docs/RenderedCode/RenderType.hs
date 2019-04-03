@@ -159,7 +159,7 @@ renderTypeVars tyVars = mintersperse sp (map renderTypeVar tyVars)
 renderTypeVar :: (Text, Maybe (Kind a)) -> RenderedCode
 renderTypeVar (v, mbK) = case mbK of
   Nothing -> typeVar v
-    Just k -> mintersperse sp [ mconcat [syntax "(", typeVar v], syntax "::", mconcat [renderKind k, syntax ")"] ]
+  Just k -> mintersperse sp [ mconcat [syntax "(", typeVar v], syntax "::", mconcat [renderKind k, syntax ")"] ]
 
 -- |
 -- Render code representing a Type, as it should appear inside parentheses
