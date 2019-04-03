@@ -5,11 +5,11 @@
 
 Collatz
 DctorOperatorAlias
---EffFn
+EffFn
 ExtendedInfixOperators
 Fib
 ForeignKind
---FunWithFunDeps
+FunWithFunDeps
 GenericsRep
 Import
 ImportExplicit
