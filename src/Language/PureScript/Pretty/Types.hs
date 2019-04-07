@@ -77,9 +77,7 @@ convertPrettyPrintType = go
   go _ (REmpty _) = PPRow [] Nothing
   go d ty@RCons{} = uncurry PPRow (goRow d ty)
   go d (ForAll _ v ty _) = goForAll d [v] ty
-  go d (TypeApp _ (TypeApp _ f arg) ret) | eqType f tyFunction = PPFunction (go (d-1) arg) (go (d-1) ret)
-  go d (TypeApp _ o ty@RCons{}) | eqType o tyRecord = uncurry PPRecord (goRow d ty)
-  go d (TypeApp _ a b) = PPTypeApp (go (d-1) a) (go (d-1) b)
+  go d (TypeApp _ a b) = goTypeApp d a b
 
   goForAll d vs (ForAll _ v ty _) = goForAll d (v : vs) ty
   goForAll d vs ty = PPForAll vs (go (d-1) ty)
@@ -91,6 +89,13 @@ convertPrettyPrintType = go
            REmpty _ -> Nothing
            _ -> Just (go (d-1) tail_)
        )
+
+  goTypeApp d (TypeApp _ f a) b
+    | eqType f tyFunction = PPFunction (go (d-1) a) (go (d-1) b)
+    | otherwise = PPTypeApp (goTypeApp d f a) (go (d-1) b)
+  goTypeApp d o ty@RCons{}
+    | eqType o tyRecord = uncurry PPRecord (goRow d ty)
+  goTypeApp d a b = PPTypeApp (go (d-1) a) (go (d-1) b)
 
 -- TODO(Christoph): get rid of T.unpack s
 
