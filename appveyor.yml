@@ -51,7 +51,7 @@ install:
 build_script:
 - set BUILD_TYPE=normal
 - if defined APPVEYOR_REPO_TAG_NAME ( set CI_RELEASE=true )
-- c:\msys64\usr\bin\bash travis\build.sh
+- c:\msys64\usr\bin\bash ci\build.sh
 on_success:
 - ps: |
     function UploadFile
