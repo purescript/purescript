@@ -55,11 +55,11 @@ esac
 STACK_EXTRA_FLAGS=""
 if [ "$CI_RELEASE" = "true" ]
 then
-  # On non-release builds, disable optimizations.
-  STACK_EXTRA_FLAGS="--fast"
-else
   # On release builds, set the 'release' cabal flag.
   STACK_EXTRA_FLAGS="--flag purescript:RELEASE"
+else
+  # On non-release builds, disable optimizations.
+  STACK_EXTRA_FLAGS="--fast"
 fi
 
 if [ "$STACKAGE_NIGHTLY" = "true" ]
