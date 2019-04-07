@@ -19,6 +19,15 @@ set -e
 STACK="stack --no-terminal --jobs=1"
 [[ "$BUILD_TYPE" == "haddock" ]] && DEPS_HADDOCK="--haddock"
 
+# This command is ludicrously verbose on Windows, so we pipe the output to a
+# file and only display it if the command fails.
+if ! $STACK --verbosity=error setup 1>stack-setup.log 2>&1
+then
+  cat stack-setup.log
+  echo "Failed to run 'stack setup'"
+  exit 1
+fi
+
 # Setup & install dependencies or abort
 ret=0
 if [ -x "C:\\msys64\\usr\\bin\\timeout.exe" ]
@@ -34,7 +43,7 @@ else
   echo "timeout command not found (nor gtimeout)"
   exit 1
 fi
-$TIMEOUT 40m $STACK --install-ghc build \
+$TIMEOUT 40m $STACK build \
   --only-dependencies --test $DEPS_HADDOCK \
   || ret=$?
 case "$ret" in
