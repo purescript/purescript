@@ -6,6 +6,16 @@ STACK="stack --no-terminal --jobs=1"
 
 # Setup & install dependencies or abort
 ret=0
+if which timeout >/dev/null
+then
+  TIMEOUT=timeout
+elif which gtimeout >/dev/null
+then
+  TIMEOUT=gtimeout
+else
+  echo "timeout command not found (nor gtimeout)"
+  exit 1
+fi
 $TIMEOUT 40m $STACK --install-ghc build \
   --only-dependencies --test $DEPS_HADDOCK \
   || ret=$?
