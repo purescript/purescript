@@ -33,7 +33,7 @@ cache:
 # cache for any reason, the cache can be invalidated by committing a change to
 # this file. See https://www.appveyor.com/docs/build-cache/ for more
 # information.
-- c:\s -> appveyor/cache-buster.txt
+- c:\s -> ci/appveyor-cache-buster.txt
 install:
 - ps: Install-Product node 10
 - npm install -g bower
@@ -49,6 +49,8 @@ install:
     popd
 
 build_script:
+- set BUILD_TYPE=normal
+- if defined APPVEYOR_REPO_TAG_NAME ( set CI_RELEASE=true )
 - c:\msys64\usr\bin\bash travis\build.sh
 on_success:
 - ps: |

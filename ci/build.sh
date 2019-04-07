@@ -1,6 +1,21 @@
 #!/bin/bash
 set -e
 
+# This is the main CI build script. It is intended to run on all platforms we
+# run CI on: linux, mac os, and windows (via msys). It makes use of the
+# following environment variables:
+#
+# BUILD_TYPE
+# Must be one of the following:
+#  - "normal": Compile & run tests normally
+#  - "sdist": Create a source distribution and check that everything still
+#    compiles and works
+#  - "haddock": Check that haddock documentation builds correctly.
+#
+# CI_RELEASE
+# If set to "true", passes the RELEASE flag to the compiler and enables
+# optimizations.
+
 STACK="stack --no-terminal --jobs=1"
 [[ "$BUILD_TYPE" == "haddock" ]] && DEPS_HADDOCK="--haddock"
 
@@ -38,7 +53,7 @@ esac
 
 # Set up configuration
 STACK_EXTRA_FLAGS=""
-if [ -z "$TRAVIS_TAG" ]
+if [ "$CI_RELEASE" = "true" ]
 then
   # On non-release builds, disable optimizations.
   STACK_EXTRA_FLAGS="--fast"
