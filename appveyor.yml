@@ -37,7 +37,8 @@ cache:
 install:
 - ps: Install-Product node 10
 - npm install -g bower
-- dir c:\msys64
+- dir c:\msys64\usr\bin
+- dir c:\msys64\usr\local\bin
 
 - ps: |
     New-Item -ItemType Directory -Force -Path C:\tools
