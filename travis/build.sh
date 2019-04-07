@@ -6,7 +6,10 @@ STACK="stack --no-terminal --jobs=1"
 
 # Setup & install dependencies or abort
 ret=0
-if which timeout >/dev/null
+if [ -x "C:\\msys64\\usr\\bin\\timeout.exe" ]
+then
+  TIMEOUT=C:\\msys64\\usr\\bin\\timeout.exe
+elif which timeout >/dev/null
 then
   TIMEOUT=timeout
 elif which gtimeout >/dev/null
