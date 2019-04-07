@@ -35,9 +35,9 @@ cache:
 # information.
 - c:\s -> appveyor/cache-buster.txt
 install:
-- git submodule update --init
-- ps: Install-Product node 8
+- ps: Install-Product node 10
 - npm install -g bower
+- dir c:\msys64
 
 - ps: |
     New-Item -ItemType Directory -Force -Path C:\tools
@@ -49,28 +49,8 @@ install:
     7z x c:\tools\stack.zip stack.exe
     popd
 
-- stack --no-terminal --verbosity=error setup 1>stack-setup.log 2>&1 || type stack-setup.log
-
 build_script:
-# Override the default build script.
-# In PowerShell it seems to be necessary to redirect stderr to stdout because
-# any text sent to stderr seems to cause appveyor to think the build has
-# failed.
-- echo ""
-test_script:
-- ps: |
-    $stack_extra_flags=""
-    if ($env:APPVEYOR_REPO_TAG_NAME)
-    {
-      $stack_extra_flags+="--flag purescript:RELEASE"
-    }
-    echo "stack_extra_flags = $stack_extra_flags"
-
-    # This is an incredibly stupid workaround for a bizarre PowerShell
-    # 'feature' where any text printed to stderr is treated as the command
-    # having failed; see
-    # https://stackoverflow.com/questions/10666101/lastexitcode-0-but-false-in-powershell-redirecting-stderr-to-stdout-gives-n
-    cmd /c "stack --jobs=1 --no-terminal test --pedantic $stack_extra_flags 2>&1"
+- bash travis\build.sh
 on_success:
 - ps: |
     function UploadFile
