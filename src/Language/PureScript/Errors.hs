@@ -879,7 +879,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
           _ -> []
       in
         paras $ [ line $ "Hole '" <> markCode name <> "' has the inferred type "
-                , markCodeBox (indent (typeAsBox prettyDepth ty))
+                , markCodeBox (indent (typeAsBox maxBound ty))
                 ] ++ tsResult ++ renderContext ctx
     renderSimpleErrorMessage (MissingTypeDeclaration ident ty) =
       paras [ line $ "No type declaration was provided for the top-level declaration of " <> markCode (showIdent ident) <> "."
