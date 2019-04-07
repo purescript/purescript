@@ -76,7 +76,7 @@ install:
   fi
 script:
 - |
-  [ -n "$TRAVIS_TAG" ] && export CI_RELEASE=true
+  [ -n "$TRAVIS_TAG" ] && export CI_RELEASE=true || true
 - ci/build.sh
 before_deploy:
 - ./bundle/build.sh $OS_NAME
