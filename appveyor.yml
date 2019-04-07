@@ -49,7 +49,7 @@ install:
     popd
 
 build_script:
-- bash travis\build.sh
+- c:\msys64\usr\bin\bash travis\build.sh
 on_success:
 - ps: |
     function UploadFile
