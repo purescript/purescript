@@ -6,7 +6,16 @@ environment:
   STACK_VER: 1.7.1
   RELEASE_USER: purescript
   RELEASE_REPO: purescript
-  # See https://github.com/commercialhaskell/stack/issues/3944, might no 
+  # We want to save the build cache on all builds, including those that failed,
+  # because this allows us to pick up where we left off in subsequent builds
+  # (in particular, compiling all of the Haskell dependencies of the compiler
+  # can take long enough that the build is terminated before we can finish).
+  # By default AppVeyor only saves the build cache on builds which succeed, so
+  # we ask to save the cache on failures too by setting this environment
+  # variable; see
+  # https://www.appveyor.com/docs/build-cache/#saving-cache-for-failed-build
+  APPVEYOR_SAVE_CACHE_ON_ERROR: true
+  # See https://github.com/commercialhaskell/stack/issues/3944, might no
   # longer be necessary after we've moved to a snapshot with network >= 0.2.7.1
   TMP: "c:\\tmp"
 branches:
@@ -19,10 +28,14 @@ branches:
   only:
     - master
 cache:
-- c:\s -> appveyor/cache-buster.txt
+# appveyor/cache-buster.txt is a file which, if modified, invalidates the
+# cached version of "c:\\s" (i.e. stack's cache). If bad data gets into the
+# cache for any reason, the cache can be invalidated by committing a change to
+# this file. See https://www.appveyor.com/docs/build-cache/ for more
+# information.
+- c:\s -> ci/appveyor-cache-buster.txt
 install:
-- git submodule update --init
-- ps: Install-Product node 8
+- ps: Install-Product node 10
 - npm install -g bower
 
 - ps: |
@@ -35,28 +48,10 @@ install:
     7z x c:\tools\stack.zip stack.exe
     popd
 
-- stack --no-terminal --verbosity=error setup 1>stack-setup.log 2>&1 || type stack-setup.log
-
 build_script:
-# Override the default build script.
-# In PowerShell it seems to be necessary to redirect stderr to stdout because
-# any text sent to stderr seems to cause appveyor to think the build has
-# failed.
-- echo ""
-test_script:
-- ps: |
-    $stack_extra_flags=""
-    if ($env:APPVEYOR_REPO_TAG_NAME)
-    {
-      $stack_extra_flags+="--flag purescript:RELEASE"
-    }
-    echo "stack_extra_flags = $stack_extra_flags"
-
-    # This is an incredibly stupid workaround for a bizarre PowerShell
-    # 'feature' where any text printed to stderr is treated as the command
-    # having failed; see
-    # https://stackoverflow.com/questions/10666101/lastexitcode-0-but-false-in-powershell-redirecting-stderr-to-stdout-gives-n
-    cmd /c "stack --jobs=1 --no-terminal test --pedantic $stack_extra_flags 2>&1"
+- set BUILD_TYPE=normal
+- if defined APPVEYOR_REPO_TAG_NAME ( set CI_RELEASE=true )
+- c:\msys64\usr\bin\bash ci\build.sh
 on_success:
 - ps: |
     function UploadFile

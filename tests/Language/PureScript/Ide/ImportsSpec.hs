@@ -49,9 +49,9 @@ syntaxErrorFile =
   ]
 
 testSliceImportSection :: [Text] -> (P.ModuleName, [Text], [Import], [Text])
-testSliceImportSection = fromRight . sliceImportSection
+testSliceImportSection = unsafeFromRight . sliceImportSection
   where
-    fromRight = fromJust . rightToMaybe
+    unsafeFromRight = fromJust . rightToMaybe
 
 withImports :: [Text] -> [Text]
 withImports is =

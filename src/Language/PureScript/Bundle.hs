@@ -26,10 +26,10 @@ import Control.Arrow ((&&&))
 import Data.Array ((!))
 import Data.Char (chr, digitToInt)
 import Data.Foldable (fold)
-import Data.Generics (everything, everywhere, mkQ, mkT)
+import Data.Generics (GenericM, everything, everywhere, gmapMo, mkMp, mkQ, mkT)
 import Data.Graph
 import Data.List (stripPrefix)
-import Data.Maybe (mapMaybe, catMaybes)
+import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
 import Data.Version (showVersion)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -570,7 +570,7 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
   modulesJS = map moduleToJS ms
 
   moduleToJS :: Module -> ([JSStatement], [Either Int Int])
-  moduleToJS (Module mn _ ds) = (wrap (moduleName mn) (indent (concat jsDecls)), lengths)
+  moduleToJS (Module mid _ ds) = (wrap mid (indent (concat jsDecls)), lengths)
     where
     (jsDecls, lengths) = unzip $ map declToJS ds
 
@@ -586,7 +586,7 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
         JSVariable lfsp
           (cList [
             JSVarInitExpression (JSIdentifier sp nm)
-              (JSVarInit sp $ either require (moduleReference sp . moduleName) req )
+              (JSVarInit sp $ either require (innerModuleReference sp . moduleName) req )
           ]) (JSSemi JSNoAnnot)
       ]
     declToJS (ExportsList exps) = withLength $ map toExport exps
@@ -642,6 +642,12 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
     JSMemberSquare (JSIdentifier a optionsNamespace) JSNoAnnot
       (str mn) JSNoAnnot
 
+  innerModuleReference :: JSAnnot -> String -> JSExpression
+  innerModuleReference a mn =
+    JSMemberSquare (JSIdentifier a "$PS") JSNoAnnot
+      (str mn) JSNoAnnot
+
+
   str :: String -> JSExpression
   str s = JSStringLiteral JSNoAnnot $ "\"" ++ s ++ "\""
 
@@ -649,31 +655,54 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
   emptyObj :: JSAnnot -> JSExpression
   emptyObj a = JSObjectLiteral a (JSCTLNone JSLNil) JSNoAnnot
 
-  wrap :: String -> [JSStatement] -> [JSStatement]
-  wrap mn ds =
-    [
-    JSMethodCall (JSExpressionParen lf (JSFunctionExpression JSNoAnnot JSIdentNone JSNoAnnot
-                                                (JSLOne (JSIdentName JSNoAnnot "exports")) JSNoAnnot
-                                                (JSBlock sp (lfHead ds) lf)) -- \n not quite in right place
-                                    JSNoAnnot)
-                  JSNoAnnot
-                  (JSLOne (JSAssignExpression (moduleReference JSNoAnnot mn) (JSAssign sp)
-                            (JSExpressionBinary (moduleReference sp mn) (JSBinOpOr sp) (emptyObj sp))))
-                  JSNoAnnot
-                  (JSSemi JSNoAnnot)
-    ]
+  initializeObject :: JSAnnot -> (JSAnnot -> String -> JSExpression) -> String -> JSExpression
+  initializeObject a makeReference mn =
+    JSAssignExpression (makeReference a mn) (JSAssign sp)
+    $ JSExpressionBinary (makeReference sp mn) (JSBinOpOr sp)
+    $ emptyObj sp
+
+  -- Like `somewhere`, but stops after the first successful transformation
+  firstwhere :: MonadPlus m => GenericM m -> GenericM m
+  firstwhere f x = f x `mplus` gmapMo (firstwhere f) x
+
+  prependWhitespace :: String -> [JSStatement] -> [JSStatement]
+  prependWhitespace val = fromMaybe <*> firstwhere (mkMp $ Just . reannotate)
     where
-      lfHead (h:t) = addAnn (WhiteSpace tokenPosnEmpty "\n  ") h : t
-      lfHead x = x
+    reannotate (JSAnnot rpos annots) = JSAnnot rpos (ws : annots)
+    reannotate _ = JSAnnot tokenPosnEmpty [ws]
 
-      addAnn :: CommentAnnotation -> JSStatement -> JSStatement
-      addAnn a (JSExpressionStatement (JSStringLiteral ann s) _) =
-        JSExpressionStatement (JSStringLiteral (appendAnn a ann) s) (JSSemi JSNoAnnot)
-      addAnn _ x = x
+    ws = WhiteSpace tokenPosnEmpty val
 
-      appendAnn a JSNoAnnot = JSAnnot tokenPosnEmpty [a]
-      appendAnn a (JSAnnot _ anns) = JSAnnot tokenPosnEmpty (a:anns ++ [WhiteSpace tokenPosnEmpty "  "])
-      appendAnn a JSAnnotSpace = JSAnnot tokenPosnEmpty [a]
+  iife :: [JSStatement] -> String -> JSExpression -> JSStatement
+  iife body param arg =
+    JSMethodCall (JSExpressionParen lf (JSFunctionExpression JSNoAnnot JSIdentNone JSNoAnnot (JSLOne (JSIdentName JSNoAnnot param)) JSNoAnnot
+                                                             (JSBlock sp (prependWhitespace "\n  " body) lf))
+                                    JSNoAnnot)
+                 JSNoAnnot
+                 (JSLOne arg)
+                 JSNoAnnot
+                 (JSSemi JSNoAnnot)
+
+  wrap :: ModuleIdentifier -> [JSStatement] -> [JSStatement]
+  wrap (ModuleIdentifier mn mtype) ds =
+    case mtype of
+      Regular -> [iife (addModuleExports ds) "$PS" (JSIdentifier JSNoAnnot optionsNamespace)]
+      Foreign -> [iife ds "exports" (initializeObject JSNoAnnot moduleReference mn)]
+    where
+      -- Insert the exports var after a directive prologue, if one is present.
+      -- Per ECMA-262 5.1, "A Directive Prologue is the longest sequence of
+      -- ExpressionStatement productions [...] where each ExpressionStatement
+      -- [...] consists entirely of a StringLiteral [...]."
+      -- (http://ecma-international.org/ecma-262/5.1/#sec-14.1)
+      addModuleExports :: [JSStatement] -> [JSStatement]
+      addModuleExports (x:xs) | isDirective x = x : addModuleExports xs
+      addModuleExports xs
+        = JSExpressionStatement (initializeObject lfsp innerModuleReference mn) (JSSemi JSNoAnnot)
+        : JSVariable lfsp (JSLOne $ JSVarInitExpression (JSIdentifier sp "exports") $ JSVarInit sp (innerModuleReference sp mn)) (JSSemi JSNoAnnot)
+        : xs
+
+      isDirective (JSExpressionStatement (JSStringLiteral _ _) _) = True
+      isDirective _ = False
 
   runMain :: String -> [JSStatement]
   runMain mn =

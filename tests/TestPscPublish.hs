@@ -72,10 +72,10 @@ roundTrip pkg =
   in case A.eitherDecode before of
        Left err -> ParseFailed err
        Right parsed -> do
-         let after = A.encode (parsed :: UploadedPackage)
-         if before == after
+         let after' = A.encode (parsed :: UploadedPackage)
+         if before == after'
            then Pass before
-           else Mismatch before after
+           else Mismatch before after'
 
 testRunOptions :: PublishOptions
 testRunOptions = defaultPublishOptions

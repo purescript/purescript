@@ -25,8 +25,7 @@ import Control.Arrow ((***))
 import Control.Category ((>>>))
 import Control.Monad.Writer.Strict (MonadWriter, WriterT, runWriterT, tell)
 
-import Data.Aeson.BetterErrors (Parse, parse, keyMay, eachInObjectWithKey, eachInObject, key, keyOrDefault, asBool, asString, asText)
-import Data.Aeson.BetterErrors as ABE
+import Data.Aeson.BetterErrors (Parse, parse, keyMay, eachInObjectWithKey, eachInObject, key, keyOrDefault, asBool, asString, withString, asText, withText)
 import qualified Data.ByteString.Lazy as BL
 import Data.Char (isSpace)
 import Data.String (String, lines)
@@ -288,18 +287,16 @@ parseResolutionsFile resolutionsFile = do
   unlessM (liftIO (doesFileExist resolutionsFile)) (userError ResolutionsFileNotFound)
   depsBS <- liftIO (BL.readFile resolutionsFile)
 
-  -- We use the legacy resolutions parser on the left of <|>, because if both
-  -- fail, <|> gives us the error from the parser on the right (i.e. from the
-  -- new-style parser).
-  --
-  -- Note that the legacy parser is pretty much guaranteed to fail in the case
-  -- where we have been provided a new-style resolutions file because it always
-  -- has a few keys such as `canonicalDir` or `endpoint` which do not conform
-  -- to the format expected of new-style resolutions files.
-  catchJSON (parse (asLegacyResolutions ABE.<|> asResolutions) depsBS)
-
-  where
-  catchJSON = flip catchLeft (userError . ResolutionsFileError resolutionsFile)
+  case parse asResolutions depsBS of
+    Right res ->
+      pure res
+    Left err ->
+      case parse asLegacyResolutions depsBS of
+        Right res -> do
+          warn $ LegacyResolutionsFormat resolutionsFile
+          pure res
+        Left _ ->
+          userError $ ResolutionsFileError resolutionsFile err
 
 -- | Parser for resolutions files, which contain information about the packages
 -- which this package depends on. A resolutions file should look something like

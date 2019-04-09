@@ -66,22 +66,18 @@ install:
     mv stack "$HOME/.local/bin/"
   fi
 - npm install -g bower # for psc-docs / psc-publish tests
-- export OS_NAME=$(./travis/convert-os-name.sh)
-# Install 'timeout'
+- export OS_NAME=$(./ci/convert-os-name.sh)
+# Install 'gtimeout' if we need it
 - |
-  if [ "$TRAVIS_OS_NAME" == "osx" ]
+  if [ "$TRAVIS_OS_NAME" == "osx" ] && ! which gtimeout >/dev/null
   then
-    if ! which gtimeout >/dev/null
-    then
-      brew update
-      brew install coreutils
-    fi
-    export TIMEOUT=gtimeout
-  else
-    export TIMEOUT=timeout
+    brew update
+    brew install coreutils
   fi
 script:
-- travis/build.sh
+- |
+  [ -n "$TRAVIS_TAG" ] && export CI_RELEASE=true || true
+- ci/build.sh
 before_deploy:
 - ./bundle/build.sh $OS_NAME
 deploy:

@@ -110,6 +110,7 @@ errorCode em = case unwrapErrorMessage em of
   InvalidDoLet -> "InvalidDoLet"
   CycleInDeclaration{} -> "CycleInDeclaration"
   CycleInTypeSynonym{} -> "CycleInTypeSynonym"
+  CycleInTypeClassDeclaration{} -> "CycleInTypeClassDeclaration"
   CycleInModules{} -> "CycleInModules"
   NameIsUndefined{} -> "NameIsUndefined"
   UndefinedTypeVariable{} -> "UndefinedTypeVariable"
@@ -574,6 +575,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , line "Cycles are disallowed because they can lead to loops in the type checker."
             , line "Consider using a 'newtype' instead."
             ]
+    renderSimpleErrorMessage (CycleInTypeClassDeclaration [name]) =
+      paras [ line $ "A type class '" <> markCode (runProperName name) <> "' may not have itself as a superclass." ]
+    renderSimpleErrorMessage (CycleInTypeClassDeclaration names) =
+      paras [ line $ "A cycle appears in a set of type class definitions:"
+            , indent $ line $ "{" <> (T.intercalate ", " (map (markCode . runProperName) names)) <> "}"
+            , line "Cycles are disallowed because they can lead to loops in the type checker."
+            ]  
     renderSimpleErrorMessage (NameIsUndefined ident) =
       line $ "Value " <> markCode (showIdent ident) <> " is undefined."
     renderSimpleErrorMessage (UndefinedTypeVariable name) =
@@ -871,7 +879,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
           _ -> []
       in
         paras $ [ line $ "Hole '" <> markCode name <> "' has the inferred type "
-                , markCodeBox (indent (typeAsBox prettyDepth ty))
+                , markCodeBox (indent (typeAsBox maxBound ty))
                 ] ++ tsResult ++ renderContext ctx
     renderSimpleErrorMessage (MissingTypeDeclaration ident ty) =
       paras [ line $ "No type declaration was provided for the top-level declaration of " <> markCode (showIdent ident) <> "."
