@@ -35,6 +35,7 @@ import Language.PureScript.Comments
 import Language.PureScript.Environment
 import qualified Language.PureScript.Bundle as Bundle
 import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.CST.Errors as CST
 
 import qualified Text.Parsec as P
 
@@ -68,6 +69,7 @@ data SimpleErrorMessage
   = ModuleNotFound ModuleName
   | ErrorParsingFFIModule FilePath (Maybe Bundle.ErrorMessage)
   | ErrorParsingModule P.ParseError
+  | ErrorParsingCSTModule CST.ParserError
   | MissingFFIModule ModuleName
   | UnnecessaryFFIModule ModuleName FilePath
   | MissingFFIImplementations ModuleName [Ident]

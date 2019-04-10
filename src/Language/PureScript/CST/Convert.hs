@@ -6,6 +6,10 @@ module Language.PureScript.CST.Convert
   , convertBinder
   , convertDeclaration
   , convertModule
+  , sourcePos
+  , sourceSpan
+  , comment
+  , comments
   ) where
 
 import Prelude
