@@ -95,6 +95,9 @@ library:
     - ConstraintKinds
     - DataKinds
     - DeriveFunctor
+    - DeriveFoldable
+    - DeriveTraversable
+    - DeriveGeneric
     - EmptyDataDecls
     - FlexibleContexts
     - KindSignatures
