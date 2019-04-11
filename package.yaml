@@ -132,7 +132,8 @@ executables:
       - ansi-wl-pprint
       - file-embed
       - http-types
-      - network
+      - network >= 3.0.0
+      - network-bsd >= 2.8.1
       - optparse-applicative >=0.13.0
       - purescript
       - wai ==3.*
