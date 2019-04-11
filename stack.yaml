@@ -1,8 +1,9 @@
 resolver: lts-13.12
+allow-newer: true
 packages:
 - '.'
 extra-deps:
-- network-3.0.0.1@sha256:365a693d4b78bf162a66be310901cb8254d941c1e54a76dcf63a4d333c305a01
+- network-3.0.1.1
 - network-bsd-2.8.1.0@sha256:6508a3fceb0d144cc7f4a80fc8d581cf8925a067d812cf5c194e8760a850990c 
 nix:
   enable: false
