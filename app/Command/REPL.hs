@@ -14,6 +14,7 @@ module Command.REPL (command) where
 
 import           Prelude ()
 import           Prelude.Compat
+import           Protolude (fromRight)
 import           Control.Applicative (many, (<|>))
 import           Control.Concurrent (forkIO)
 import           Control.Concurrent.MVar (MVar, newEmptyMVar, putMVar, takeMVar,
@@ -36,6 +37,7 @@ import           Data.Text (Text, unpack)
 import           Data.Traversable (for)
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Bundle as Bundle
+import qualified Language.PureScript.CST as CST
 import           Language.PureScript.Interactive
 import           Network.HTTP.Types.Header (hContentType, hCacheControl,
                                             hPragma, hExpires)
@@ -315,11 +317,11 @@ command = loop <$> options
           when (null modules) . liftIO $ do
             putStr noInputMessage
             exitFailure
-          unless (supportModuleIsDefined (map snd modules)) . liftIO $ do
+          unless (supportModuleIsDefined (map (P.getModuleName . CST.resPartial . snd) modules)) . liftIO $ do
             putStr supportModuleMessage
             exitFailure
           (externs, _) <- ExceptT . runMake . make $ modules
-          return (modules, externs)
+          return (map (fmap (fromRight (P.internalError "repl: unexpected parse error") . CST.resFull)) modules, externs)
         case psciBackend of
           Backend setup eval reload (shutdown :: state -> IO ()) ->
             case e of

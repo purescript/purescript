@@ -4,6 +4,7 @@ import           Prelude.Compat
 
 import           Control.Monad
 import qualified Language.PureScript as P
+import qualified Language.PureScript.CST as CST
 import           Language.PureScript.Interactive.Types
 import           System.Directory (getCurrentDirectory)
 import           System.FilePath (pathSeparator, makeRelative)
@@ -16,8 +17,8 @@ supportModuleName :: P.ModuleName
 supportModuleName = fst initialInteractivePrint
 
 -- | Checks if the Console module is defined
-supportModuleIsDefined :: [P.Module] -> Bool
-supportModuleIsDefined = any ((== supportModuleName) . P.getModuleName)
+supportModuleIsDefined :: [P.ModuleName] -> Bool
+supportModuleIsDefined = any ((== supportModuleName))
 
 -- * Module Management
 
@@ -31,13 +32,13 @@ loadModule filename = do
       P.parseModulesFromFiles id [(filename, content)]
 
 -- | Load all modules.
-loadAllModules :: [FilePath] -> IO (Either P.MultipleErrors [(FilePath, P.Module)])
+loadAllModules :: [FilePath] -> IO (Either P.MultipleErrors [(FilePath, CST.PartialResult P.Module)])
 loadAllModules files = do
   pwd <- getCurrentDirectory
   filesAndContent <- forM files $ \filename -> do
     content <- readUTF8FileT filename
     return (filename, content)
-  return $ P.parseModulesFromFiles (makeRelative pwd) filesAndContent
+  return $ CST.parseModulesFromFiles (makeRelative pwd) filesAndContent
 
 -- |
 -- Makes a volatile module to execute the current expression.

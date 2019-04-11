@@ -1,6 +1,7 @@
 module Language.PureScript.CST
   ( parseModuleFromFile
   , parseModulesFromFiles
+  , unwrapParserError
   , module Language.PureScript.CST.Convert
   , module Language.PureScript.CST.Errors
   , module Language.PureScript.CST.Parser
@@ -25,24 +26,33 @@ parseModulesFromFiles
    . MonadError E.MultipleErrors m
   => (k -> FilePath)
   -> [(k, Text)]
-  -> m [(k, AST.Module)]
+  -> m [(k, PartialResult AST.Module)]
 parseModulesFromFiles toFilePath input =
-  flip E.parU wrapError . inParallel . flip fmap input $ parseModuleFromFile toFilePath
+  flip E.parU handleError . inParallel . flip fmap input $ parseModuleFromFile toFilePath
   where
-  wrapError :: (k, Either (NE.NonEmpty ParserError) a) -> m (k, a)
-  wrapError (k, res) =
-    either (throwError . E.MultipleErrors . NE.toList . fmap (toPositionedError (toFilePath k))) (return . (k,)) res
+  handleError :: (k, Either (NE.NonEmpty ParserError) a) -> m (k, a)
+  handleError (k, res) = (k,) <$> unwrapParserError (toFilePath k) res
 
   inParallel :: [(k, Either (NE.NonEmpty ParserError) a)] -> [(k, Either (NE.NonEmpty ParserError) a)]
   inParallel = withStrategy (parList (evalTuple2 r0 rseq))
 
 parseModuleFromFile
-  :: (k -> FilePath)
+  :: forall k
+   . (k -> FilePath)
   -> (k, Text)
-  -> (k, Either (NE.NonEmpty ParserError) AST.Module)
+  -> (k, Either (NE.NonEmpty ParserError) (PartialResult AST.Module))
 parseModuleFromFile toFilePath (k, content) =
-  (k, convertModule (toFilePath k) <$> parse content)
+  (k, fmap (convertModule (toFilePath k)) <$> parseModule content)
 
-toPositionedError :: String -> ParserError -> E.ErrorMessage
+unwrapParserError
+  :: forall m a
+   . MonadError E.MultipleErrors m
+  => FilePath
+  -> Either (NE.NonEmpty ParserError) a
+  -> m a
+unwrapParserError fp =
+  either (throwError . E.MultipleErrors . NE.toList . fmap (toPositionedError fp)) pure
+
+toPositionedError :: FilePath -> ParserError -> E.ErrorMessage
 toPositionedError name perr =
   E.ErrorMessage [E.positionedError $ sourceSpan name $ errRange perr] (E.ErrorParsingCSTModule perr)

@@ -5,7 +5,7 @@ module Language.PureScript.CST.Parser
   , parseExpr
   , parseModule
   , parse
-  , ModuleResult(..)
+  , PartialResult(..)
   ) where
 
 import Prelude hiding (lex)
@@ -714,15 +714,15 @@ lexer :: (SourceToken -> Parser a) -> Parser a
 lexer k = munch >>= k
 
 parse :: Text -> Either (NE.NonEmpty ParserError) (Module ())
-parse = parseModule >=> modFull
+parse = parseModule >=> resFull
 
-data ModuleResult = ModuleResult
-  { modHeaderOnly :: Module ()
-  , modFull :: Either (NE.NonEmpty ParserError) (Module ())
-  }
+data PartialResult a = PartialResult
+  { resPartial :: a
+  , resFull :: Either (NE.NonEmpty ParserError) a
+  } deriving (Functor)
 
-parseModule :: Text -> Either (NE.NonEmpty ParserError) ModuleResult
-parseModule src = fmap (\header -> ModuleResult header (parseFull header)) headerRes
+parseModule :: Text -> Either (NE.NonEmpty ParserError) (PartialResult (Module ()))
+parseModule src = fmap (\header -> PartialResult header (parseFull header)) headerRes
   where
   (st, headerRes) =
     runParser (ParserState (lex src) []) parseModuleHeader

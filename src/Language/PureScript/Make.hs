@@ -27,6 +27,7 @@ import qualified Data.Map as M
 import qualified Data.Set as S
 import           Language.PureScript.AST
 import           Language.PureScript.Crash
+import qualified Language.PureScript.CST as CST
 import           Language.PureScript.Environment
 import           Language.PureScript.Errors
 import           Language.PureScript.Externs
@@ -85,19 +86,20 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
 -- having to typecheck the module again.
 make :: forall m. (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
      => MakeActions m
-     -> [Module]
+     -> [CST.PartialResult Module]
      -> m [ExternsFile]
 make ma@MakeActions{..} ms = do
   checkModuleNames
 
-  (sorted, graph) <- sortModules ms
+  (sorted, graph) <- sortModules (moduleSignature . CST.resPartial) ms
 
   buildPlan <- BuildPlan.construct ma (sorted, graph)
 
-  let toBeRebuilt = filter (BuildPlan.needsRebuild buildPlan . getModuleName) sorted
+  let toBeRebuilt = filter (BuildPlan.needsRebuild buildPlan . getModuleName . CST.resPartial) sorted
   for_ toBeRebuilt $ \m -> fork $ do
-    let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup (getModuleName m) graph)
-    buildModule buildPlan (importPrim m) (deps `inOrderOf` map getModuleName sorted)
+    full <- CST.unwrapParserError (spanName . getModuleSourceSpan . CST.resPartial $ m) $ CST.resFull m
+    let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup (getModuleName full) graph)
+    buildModule buildPlan (importPrim full) (deps `inOrderOf` map (getModuleName . CST.resPartial) sorted)
 
   -- Wait for all threads to complete, and collect errors.
   errors <- BuildPlan.collectErrors buildPlan
@@ -112,7 +114,7 @@ make ma@MakeActions{..} ms = do
   -- so they can be folded into an Environment. This result is used in the tests
   -- and in PSCI.
   let lookupResult mn = fromMaybe (internalError "make: module not found in results") (M.lookup mn results)
-  return (map (lookupResult . getModuleName) sorted)
+  return (map (lookupResult . getModuleName . CST.resPartial) sorted)
 
   where
   checkModuleNames :: m ()
@@ -121,18 +123,18 @@ make ma@MakeActions{..} ms = do
   checkNoPrim :: m ()
   checkNoPrim =
     for_ ms $ \m ->
-      let mn = getModuleName m
+      let mn = getModuleName $ CST.resPartial m
       in when (isBuiltinModuleName mn) $
            throwError
-             . errorMessage' (getModuleSourceSpan m)
+             . errorMessage' (getModuleSourceSpan $ CST.resPartial m)
              $ CannotDefinePrimModules mn
 
   checkModuleNamesAreUnique :: m ()
   checkModuleNamesAreUnique =
-    for_ (findDuplicates getModuleName ms) $ \mss ->
+    for_ (findDuplicates (getModuleName . CST.resPartial) ms) $ \mss ->
       throwError . flip foldMap mss $ \ms' ->
-        let mn = getModuleName (NEL.head ms')
-        in errorMessage'' (fmap getModuleSourceSpan ms') $ DuplicateModule mn
+        let mn = getModuleName . CST.resPartial . NEL.head $ ms'
+        in errorMessage'' (fmap (getModuleSourceSpan . CST.resPartial) ms') $ DuplicateModule mn
 
   -- Find all groups of duplicate values in a list based on a projection.
   findDuplicates :: Ord b => (a -> b) -> [a] -> Maybe [NEL.NonEmpty a]
