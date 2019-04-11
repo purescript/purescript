@@ -2,6 +2,9 @@
 set -e
 
 echo $STACK_ROOT
+stack path
+ls $STACK_ROOT
+exit 1
 
 # This is the main CI build script. It is intended to run on all platforms we
 # run CI on: linux, mac os, and windows (via msys). It makes use of the
