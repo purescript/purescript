@@ -38,7 +38,6 @@ import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Watcher
 import qualified Network.Socket                    as Network
-import qualified Network.BSD
 import qualified Options.Applicative               as Opts
 import           System.Directory
 import           System.Info                       as SysInfo
@@ -48,11 +47,9 @@ import           System.IO.Error                   (isEOFError)
 
 listenOnLocalhost :: Network.PortNumber -> IO Network.Socket
 listenOnLocalhost port = do
-  proto <- Network.BSD.getProtocolNumber "tcp"
   let hints = Network.defaultHints
         { Network.addrFamily = Network.AF_INET
         , Network.addrSocketType = Network.Stream
-        , Network.addrProtocol = proto
         }
   addr:_ <- Network.getAddrInfo (Just hints) (Just "127.0.0.1") (Just (show port))
   bracketOnError
@@ -99,11 +96,9 @@ command = Opts.helper <*> subcommands where
           T.putStrLn ("Couldn't connect to purs ide server on port " <> show clientPort <> ":")
           print e
           exitFailure
-    proto <- Network.BSD.getProtocolNumber "tcp"
     let hints = Network.defaultHints
           { Network.addrFamily = Network.AF_INET
           , Network.addrSocketType = Network.Stream
-          , Network.addrProtocol = proto
           }
     addr:_ <- Network.getAddrInfo (Just hints) (Just "127.0.0.1") (Just (show clientPort))
     sock <- Network.socket (Network.addrFamily addr) (Network.addrSocketType addr) (Network.addrProtocol addr)
