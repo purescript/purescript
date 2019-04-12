@@ -19,7 +19,7 @@ import Control.Monad.State.Class (MonadState(..), modify, gets)
 import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Writer.Class (MonadWriter(..), censor)
 
-import Data.Foldable (for_, traverse_, toList)
+import Data.Foldable (fold, for_, traverse_, toList)
 import Data.List (nub, nubBy, (\\), sort, group, intersect)
 import Data.Maybe
 import Data.Text (Text)
@@ -341,7 +341,7 @@ typeCheckAll moduleName _ = traverse go
           let nonOrphanModules = findNonOrphanModules className typeClass tys
           checkOrphanInstance dictName className tys nonOrphanModules
           let qualifiedChain = Qualified (Just moduleName) <$> ch
-          checkOverlappingInstance qualifiedChain dictName className typeClass tys nonOrphanModules
+          checkOverlappingInstance qualifiedChain dictName className typeClass tys deps nonOrphanModules
           _ <- traverseTypeInstanceBody checkInstanceMembers body
           deps' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms deps
           let dict = TypeClassDictionaryInScope qualifiedChain idx qualifiedDictName [] className tys (Just deps')
@@ -418,9 +418,10 @@ typeCheckAll moduleName _ = traverse go
     -> Qualified (ProperName 'ClassName)
     -> TypeClassData
     -> [SourceType]
+    -> [SourceConstraint]
     -> S.Set ModuleName
     -> m ()
-  checkOverlappingInstance ch dictName className typeClass tys' nonOrphanModules = do
+  checkOverlappingInstance ch dictName className typeClass tys' deps nonOrphanModules = do
     for_ nonOrphanModules $ \m -> do
       dicts <- M.toList <$> lookupTypeClassDictionariesForClass (Just m) className
 
@@ -428,7 +429,7 @@ typeCheckAll moduleName _ = traverse go
         for_ dictNel $ \dict -> do
           -- ignore instances in the same instance chain
           if ch == tcdChain dict ||
-            instancesAreApart (typeClassCoveringSets typeClass) tys' (tcdInstanceTypes dict)
+            instancesAreApart (typeClassCoveringSets typeClass) tys' deps (tcdInstanceTypes dict) (fold $ tcdDependencies dict)
           then return ()
           else throwError . errorMessage $
                 OverlappingInstances className
@@ -438,9 +439,11 @@ typeCheckAll moduleName _ = traverse go
   instancesAreApart
     :: S.Set (S.Set Int)
     -> [SourceType]
+    -> [SourceConstraint]
     -> [SourceType]
+    -> [SourceConstraint]
     -> Bool
-  instancesAreApart sets lhs rhs = all (any typesApart . S.toList) (S.toList sets)
+  instancesAreApart sets lhs lhsDeps rhs rhsDeps = all (any typesApart . S.toList) (S.toList sets)
     where
       typesApart :: Int -> Bool
       typesApart i = typeHeadsApart (lhs !! i) (rhs !! i)
@@ -449,8 +452,9 @@ typeCheckAll moduleName _ = traverse go
       -- TUnknown, Skolem, etc.
       typeHeadsApart :: SourceType -> SourceType -> Bool
       typeHeadsApart l                   r             | eqType l r = False
-      typeHeadsApart (TypeVar _ _)       _                          = False
-      typeHeadsApart _                   (TypeVar _ _)              = False
+      typeHeadsApart (TypeVar _ _)       (TypeVar _ _)              = False
+      typeHeadsApart l@(TypeVar _ _)     _                          = any (any (eqType l) . constraintArgs) lhsDeps
+      typeHeadsApart _                   r@(TypeVar _ _)            = any (any (eqType r) . constraintArgs) rhsDeps
       typeHeadsApart (KindedType _ t1 _) t2                         = typeHeadsApart t1 t2
       typeHeadsApart t1                  (KindedType _ t2 _)        = typeHeadsApart t1 t2
       typeHeadsApart (TypeApp _ h1 t1)   (TypeApp _ h2 t2)          = typeHeadsApart h1 h2 || typeHeadsApart t1 t2

@@ -1,3 +1,4 @@
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE NamedFieldPuns #-}
 
 -- |
@@ -12,17 +13,18 @@ module Language.PureScript.TypeChecker.Entailment
   ) where
 
 import Prelude.Compat
-import Protolude (ordNub)
+import Protolude (catMaybes, ordNub)
 
 import Control.Arrow (second, (&&&))
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 import Control.Monad.Supply.Class (MonadSupply(..))
+import Control.Monad.Trans.Control (liftWith, restoreT)
 import Control.Monad.Writer
 
 import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
-import Data.Functor (($>))
+import Data.Functor (($>), (<&>))
 import Data.List (minimumBy, groupBy, nubBy, sortBy)
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
@@ -120,6 +122,8 @@ data EntailsResult a
   -- ^ We couldn't solve this constraint right now, it will be generalized
   | Deferred
   -- ^ We couldn't solve this constraint right now, so it has been deferred
+  | PotentialOverlap SimpleErrorMessage
+  -- ^ We couldn't uniquely solve this constraint looking only at instance heads
   deriving Show
 
 -- | Options for the constraint solver
@@ -145,6 +149,22 @@ instance Semigroup t => Semigroup (Matched t) where
 instance Monoid t => Monoid (Matched t) where
   mempty = Match mempty
 
+-- | Add the state of the current monad transformer stack to the monad value.
+-- First argument should be one or more `liftWith`s composed with `^.^`,
+-- indicating how deep in the stack to capture.
+captureFrom :: Monad m => (((m () -> x) -> x) -> m s) -> m a -> m (a, s)
+captureFrom lifter ma = (,) <$> ma <*> lifter ($ void ma)
+
+-- | A composition-like operator for nesting `liftWith`s, instead of relying on
+-- a `MonadBaseControl`.
+(^.^) :: (((e -> f) -> c) -> b)
+      -> (((d -> e) -> b) -> a)
+      ->  ((d -> f) -> c) -> a
+(^.^) efcb deba dfc =
+  deba $ \de ->
+    efcb $ \ef ->
+      dfc (ef . de)
+
 -- | Check that the current set of type class dictionaries entail the specified type class goal, and, if so,
 -- return a type class dictionary reference.
 entails
@@ -159,7 +179,7 @@ entails
   -> [ErrorMessageHint]
   -- ^ Error message hints to apply to any instance errors
   -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
-entails SolverOptions{..} constraint context hints =
+entails solverOptions constraint context hints =
     solve constraint
   where
     forClassName :: InstanceContext -> Qualified (ProperName 'ClassName) -> [SourceType] -> [TypeClassDict]
@@ -193,11 +213,11 @@ entails SolverOptions{..} constraint context hints =
     valUndefined = Var nullSourceSpan (Qualified (Just (ModuleName [ProperName C.prim])) (Ident C.undefined))
 
     solve :: SourceConstraint -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
-    solve con = go 0 con
+    solve con = go 0 solverOptions con
       where
-        go :: Int -> SourceConstraint -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
-        go work (Constraint _ className' tys' _) | work > 1000 = throwError . errorMessage $ PossiblyInfiniteInstance className' tys'
-        go work con'@(Constraint _ className' tys' conInfo) = WriterT . StateT . (withErrorMessageHint (ErrorSolvingConstraint con') .) . runStateT . runWriterT $ do
+        go :: Int -> SolverOptions -> SourceConstraint -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
+        go work _ (Constraint _ className' tys' _) | work > 1000 = throwError . errorMessage $ PossiblyInfiniteInstance className' tys'
+        go work SolverOptions{..} con'@(Constraint _ className' tys' conInfo) = WriterT . StateT . (withErrorMessageHint (ErrorSolvingConstraint con') .) . runStateT . runWriterT $ do
             -- We might have unified types by solving other constraints, so we need to
             -- apply the latest substitution.
             latestSubst <- lift . lift $ gets checkSubstitution
@@ -226,30 +246,52 @@ entails SolverOptions{..} constraint context hints =
                     Left Nothing          -> []          -- last unknown
                     Left (Just substsTcd) -> [substsTcd] -- found a match
             solution <- lift . lift $ unique tys'' instances
+
+            let generateExprForSolution patience substs tcd = do
+                  -- Note that we solved something.
+                  tell (Any True, mempty)
+                  -- Make sure the substitution is valid:
+                  lift . lift . for_ substs $ pairwiseM unifyTypes
+                  -- Now enforce any functional dependencies, using unification
+                  -- Note: we need to generate fresh types for any unconstrained
+                  -- type variables before unifying.
+                  let subst = fmap head substs
+                  currentSubst <- lift . lift $ gets checkSubstitution
+                  subst' <- lift . lift $ withFreshTypes tcd (fmap (substituteType currentSubst) subst)
+                  lift . lift $ zipWithM_ (\t1 t2 -> do
+                    let inferredType = replaceAllTypeVars (M.toList subst') t1
+                    unifyTypes inferredType t2) (tcdInstanceTypes tcd) tys''
+                  currentSubst' <- lift . lift $ gets checkSubstitution
+                  let subst'' = fmap (substituteType currentSubst') subst'
+                  -- Solve any necessary subgoals
+                  args <- solveSubgoals patience subst'' (tcdDependencies tcd)
+                  initDict <- lift . lift $ mkDictionary (tcdValue tcd) args
+                  let match = foldr (\(className, index) dict -> subclassDictionaryValue dict className index)
+                                    initDict
+                                    (tcdPath tcd)
+                  return match
+
             case solution of
-              Solved substs tcd -> do
-                -- Note that we solved something.
-                tell (Any True, mempty)
-                -- Make sure the substitution is valid:
-                lift . lift . for_ substs $ pairwiseM unifyTypes
-                -- Now enforce any functional dependencies, using unification
-                -- Note: we need to generate fresh types for any unconstrained
-                -- type variables before unifying.
-                let subst = fmap head substs
-                currentSubst <- lift . lift $ gets checkSubstitution
-                subst' <- lift . lift $ withFreshTypes tcd (fmap (substituteType currentSubst) subst)
-                lift . lift $ zipWithM_ (\t1 t2 -> do
-                  let inferredType = replaceAllTypeVars (M.toList subst') t1
-                  unifyTypes inferredType t2) (tcdInstanceTypes tcd) tys''
-                currentSubst' <- lift . lift $ gets checkSubstitution
-                let subst'' = fmap (substituteType currentSubst') subst'
-                -- Solve any necessary subgoals
-                args <- solveSubgoals subst'' (tcdDependencies tcd)
-                initDict <- lift . lift $ mkDictionary (tcdValue tcd) args
-                let match = foldr (\(className, index) dict -> subclassDictionaryValue dict className index)
-                                  initDict
-                                  (tcdPath tcd)
-                return match
+              PotentialOverlap err -> do
+                -- Filter the potential instances to those whose subgoals can
+                -- be solved right now. If the set of such instances is no
+                -- longer overlapping, proceed with the best one. Otherwise,
+                -- throw the original OverlappingInstances error.
+                successes <-
+                    fmap catMaybes
+                  . traverse (\m -> (Just <$> m) `catchError` (const $ return Nothing))
+                  . map (\(substs, tcd) -> captureFrom (liftWith ^.^ liftWith) (generateExprForSolution False substs tcd) <&> (, tcd))
+                  $ instances
+                (result, capturedState) <-
+                  if | [(resultAndState, _)] <- successes
+                      -> return resultAndState
+                     | null successes || pairwiseAny overlapping (map snd successes)
+                      -> throwError . errorMessage $ err
+                     | otherwise
+                      -> return . fst $ minimumBy (compare `on` length . tcdPath . snd) successes
+                restoreT . restoreT $ return capturedState
+                return result
+              Solved substs tcd -> generateExprForSolution True substs tcd
               Unsolved unsolved -> do
                 -- Generate a fresh name for the unsolved constraint's new dictionary
                 ident <- freshIdent ("dict" <> runProperName (disqualify (constraintClass unsolved)))
@@ -308,7 +350,7 @@ entails SolverOptions{..} constraint context hints =
             unique _      [(a, dict)] = return $ Solved a dict
             unique tyArgs tcds
               | pairwiseAny overlapping (map snd tcds) =
-                  throwError . errorMessage $ OverlappingInstances className' tyArgs (tcds >>= (toList . namedInstanceIdentifier . tcdValue . snd))
+                  return $ PotentialOverlap $ OverlappingInstances className' tyArgs (tcds >>= (toList . namedInstanceIdentifier . tcdValue . snd))
               | otherwise = return $ uncurry Solved (minimumBy (compare `on` length . tcdPath . snd) tcds)
 
             canBeGeneralized :: Type a -> Bool
@@ -331,10 +373,10 @@ entails SolverOptions{..} constraint context hints =
             -- Create dictionaries for subgoals which still need to be solved by calling go recursively
             -- E.g. the goal (Show a, Show b) => Show (Either a b) can be satisfied if the current type
             -- unifies with Either a b, and we can satisfy the subgoals Show a and Show b recursively.
-            solveSubgoals :: Matching SourceType -> Maybe [SourceConstraint] -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) (Maybe [Expr])
-            solveSubgoals _ Nothing = return Nothing
-            solveSubgoals subst (Just subgoals) =
-              Just <$> traverse (go (work + 1) . mapConstraintArgs (map (replaceAllTypeVars (M.toList subst)))) subgoals
+            solveSubgoals :: Bool -> Matching SourceType -> Maybe [SourceConstraint] -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) (Maybe [Expr])
+            solveSubgoals _ _ Nothing = return Nothing
+            solveSubgoals patience subst (Just subgoals) =
+              Just <$> traverse (go (work + 1) (if patience then solverOptions else SolverOptions False False) . mapConstraintArgs (map (replaceAllTypeVars (M.toList subst)))) subgoals
 
             -- We need subgoal dictionaries to appear in the term somewhere
             -- If there aren't any then the dictionary is just undefined
