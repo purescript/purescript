@@ -12,7 +12,7 @@ import Language.PureScript.Names
 
 moduleNameToJs :: ModuleName -> Text
 moduleNameToJs (ModuleName pns) =
-  let name = T.intercalate "_" (runProperName `map` pns)
+  let name = T.intercalate "_" (properToJs `map` pns)
   in if nameIsJsBuiltIn name then "$$" <> name else name
 
 -- | Convert an 'Ident' into a valid JavaScript identifier:

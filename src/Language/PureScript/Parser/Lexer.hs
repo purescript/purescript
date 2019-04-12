@@ -232,7 +232,7 @@ parseToken = P.choice
   , HoleLit <$> P.try (P.char '?' *> (T.pack <$> P.many1 identLetter))
   , LName         <$> parseLName
   , parseUName >>= \uName ->
-      guard (validModuleName uName) *> (Qualifier uName <$ P.char '.')
+      guard (validModuleNameOrQualifier uName) *> (Qualifier uName <$ P.char '.')
       <|> pure (UName uName)
   , Symbol        <$> parseSymbol
   , CharLiteral   <$> parseCharLiteral
@@ -488,7 +488,7 @@ dconsname = token go P.<?> "data constructor name"
 mname :: TokenParser Text
 mname = token go P.<?> "module name"
   where
-  go (UName s) | validModuleName s = Just s
+  go (UName s) | validModuleNameOrQualifier s = Just s
   go _ = Nothing
 
 symbol :: TokenParser Text
@@ -538,14 +538,17 @@ identifier = token go P.<?> "identifier"
   go (LName s) | s `notElem` reservedPsNames = Just s
   go _ = Nothing
 
-validModuleName :: Text -> Bool
-validModuleName s = '_' `notElemT` s
+validModuleNameOrQualifier :: Text -> Bool
+validModuleNameOrQualifier s = ['_', '\''] `noneElemsT` s
 
 validUName :: Text -> Bool
 validUName s = '\'' `notElemT` s
 
 notElemT :: Char -> Text -> Bool
 notElemT c = not . T.any (== c)
+
+noneElemsT :: [Char] -> Text -> Bool
+noneElemsT cs s = and $ map (flip notElemT s) cs
 
 -- |
 -- A list of purescript reserved identifiers

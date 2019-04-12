@@ -1,5 +1,5 @@
 -- @shouldFailWith ErrorParsingModule
-module Bad_Module where
+module ModuleNameEndsWithPrime' where
 
 import Effect.Console (log)
 
