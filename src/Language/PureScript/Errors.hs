@@ -184,6 +184,7 @@ errorCode em = case unwrapErrorMessage em of
   CannotDefinePrimModules{} -> "CannotDefinePrimModules"
   MixedAssociativityError{} -> "MixedAssociativityError"
   NonAssociativeError{} -> "NonAssociativeError"
+  NoItInREPL{} -> "NoItInREPL"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -1045,6 +1046,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , indent $ paras $ map (line . markCode . showQualified showOp) (NEL.toList ops)
             , line "Use parentheses to resolve this ambiguity."
             ]
+
+    renderSimpleErrorMessage NoItInREPL =
+      line $ markCode (T.pack "it") <> " is a variable used to refer to the previously evaluated expression in the REPL. Redefining it is not allowed."
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1 t2) detail =

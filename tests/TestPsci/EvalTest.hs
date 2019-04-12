@@ -34,6 +34,7 @@ data EvalLine = Line String
 
 data EvalContext = ShouldEvaluateTo String
                  | Paste [String]
+                 | Prints String
                  | None
                  deriving (Show)
 
@@ -48,6 +49,7 @@ parseEvalLine line =
       case splitOn " " rest of
         "shouldEvaluateTo" : args -> Comment (ShouldEvaluateTo $ intercalate " " args)
         "paste" : [] -> Comment (Paste [])
+        "prints" : args -> Comment (Prints $ intercalate " " args)
         _ -> Invalid line
     Nothing -> Line line
 
@@ -63,4 +65,5 @@ handleLine None (Comment ctx) = pure ctx
 handleLine (ShouldEvaluateTo expected) (Line expr) = expr `evaluatesTo` expected >> pure None
 handleLine (Paste ls) (Line l) = pure . Paste $ ls ++ [l]
 handleLine (Paste ls) (Comment (Paste _)) = run (intercalate "\n" ls) >> pure None
+handleLine (Prints expected) (Line expr) = expr `prints` expected >> pure None
 handleLine _ line = liftIO $ putStrLn ("unexpected: " ++ show line) >> exitFailure

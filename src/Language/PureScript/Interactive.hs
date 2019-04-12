@@ -14,12 +14,13 @@ import           Prelude.Compat
 import           Protolude (ordNub)
 
 import           Data.List (sort, find, foldl')
-import           Data.Maybe (fromMaybe, mapMaybe)
+import           Data.Maybe (fromMaybe, mapMaybe, isJust)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
 
+import           Control.Monad ((>=>))
 import           Control.Monad.IO.Class (MonadIO, liftIO)
 import           Control.Monad.State.Class
 import           Control.Monad.Reader.Class
@@ -168,7 +169,10 @@ handleDecls
   :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
   => [P.Declaration]
   -> m ()
-handleDecls ds = do
+handleDecls ds
+  | isJust (badDeclarationErrors ds) =
+    printErrors $ maybe mempty mconcat (badDeclarationErrors ds)
+  | otherwise = do
   st <- gets (updateLets (++ ds))
   let m = createTemporaryModule False st (P.Literal P.nullSourceSpan (P.ObjectLiteral []))
   e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
@@ -361,3 +365,11 @@ handleSetInteractivePrint print' new = do
       printErrors errs
     Right _ ->
       pure ()
+
+maybeBadDeclaration :: N.Ident -> Maybe P.MultipleErrors
+maybeBadDeclaration (N.Ident "it") = Just $ P.errorMessage P.NoItInREPL
+maybeBadDeclaration _ = Nothing
+
+badDeclarationErrors :: [P.Declaration] -> Maybe [P.MultipleErrors]
+badDeclarationErrors =
+  sequence . map (P.getValueDeclaration >=> maybeBadDeclaration . P.valdeclIdent)

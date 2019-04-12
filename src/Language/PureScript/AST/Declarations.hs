@@ -178,6 +178,7 @@ data SimpleErrorMessage
   | CannotDefinePrimModules ModuleName
   | MixedAssociativityError (NEL.NonEmpty (Qualified (OpName 'AnyOpName), Associativity))
   | NonAssociativeError (NEL.NonEmpty (Qualified (OpName 'AnyOpName)))
+  | NoItInREPL
   deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
