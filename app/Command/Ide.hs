@@ -47,7 +47,11 @@ import           System.IO.Error                   (isEOFError)
 
 listenOnLocalhost :: Network.PortNumber -> IO Network.Socket
 listenOnLocalhost port = do
-  addr:_ <- Network.getAddrInfo Nothing (Just "127.0.0.1") (Just (show port))
+  let hints = Network.defaultHints
+        { Network.addrFamily = Network.AF_INET
+        , Network.addrSocketType = Network.Stream
+        }
+  addr:_ <- Network.getAddrInfo (Just hints) (Just "127.0.0.1") (Just (show port))
   bracketOnError
     (Network.socket (Network.addrFamily addr) (Network.addrSocketType addr) (Network.addrProtocol addr))
     Network.close
@@ -92,7 +96,11 @@ command = Opts.helper <*> subcommands where
           T.putStrLn ("Couldn't connect to purs ide server on port " <> show clientPort <> ":")
           print e
           exitFailure
-    addr:_ <- Network.getAddrInfo Nothing (Just "127.0.0.1") (Just (show clientPort))
+    let hints = Network.defaultHints
+          { Network.addrFamily = Network.AF_INET
+          , Network.addrSocketType = Network.Stream
+          }
+    addr:_ <- Network.getAddrInfo (Just hints) (Just "127.0.0.1") (Just (show clientPort))
     sock <- Network.socket (Network.addrFamily addr) (Network.addrSocketType addr) (Network.addrProtocol addr)
     Network.connect sock (Network.addrAddress addr) `catch` handler
     h <- Network.socketToHandle sock ReadWriteMode
