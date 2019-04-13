@@ -171,7 +171,7 @@ handleDecls
   -> m ()
 handleDecls ds
   | isJust (badDeclarationErrors ds) =
-    printErrors $ maybe mempty mconcat (badDeclarationErrors ds)
+    printErrors $ foldMap mconcat (badDeclarationErrors ds)
   | otherwise = do
   st <- gets (updateLets (++ ds))
   let m = createTemporaryModule False st (P.Literal P.nullSourceSpan (P.ObjectLiteral []))
