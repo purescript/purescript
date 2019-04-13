@@ -15,21 +15,10 @@ matrix:
       sudo: required
       env: BUILD_TYPE=normal DEPLOY=true
 
-    # - os: linux
-    #   dist: trusty
-    #   sudo: required
-    #   env: BUILD_TYPE=normal STACKAGE_NIGHTLY=true
-    #   allow_failures: true
-
     - os: linux
       dist: trusty
       sudo: required
-      env: BUILD_TYPE=normal
-
-    # - os: linux
-    #   dist: trusty
-    #   sudo: required
-    #   env: BUILD_TYPE=sdist COVERAGE=true
+      env: BUILD_TYPE=sdist
 
     - os: linux
       dist: trusty
@@ -67,16 +56,9 @@ install:
   fi
 - npm install -g bower # for psc-docs / psc-publish tests
 - export OS_NAME=$(./ci/convert-os-name.sh)
-# Install 'gtimeout' if we need it
-- |
-  if [ "$TRAVIS_OS_NAME" == "osx" ] && ! which gtimeout >/dev/null
-  then
-    brew update
-    brew install coreutils
-  fi
-script:
 - |
   [ -n "$TRAVIS_TAG" ] && export CI_RELEASE=true || true
+script:
 - ci/build.hs
 before_deploy:
 - ./bundle/build.sh $OS_NAME

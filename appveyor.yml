@@ -3,7 +3,7 @@ version: '{build}'
 environment:
   # Keep the path as short as possible, just in case.
   STACK_ROOT: c:\s
-  STACK_VER: 1.7.1
+  STACK_VER: 1.9.3
   RELEASE_USER: purescript
   RELEASE_REPO: purescript
   # We want to save the build cache on all builds, including those that failed,
