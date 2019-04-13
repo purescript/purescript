@@ -30,6 +30,12 @@ matrix:
 
     - os: osx
       env: BUILD_TYPE=sdist
+
+    - os: windows
+      env: BUILD_TYPE=normal
+
+    - os: windows
+      env: BUILD_TYPE=sdist
 addons:
   apt:
     packages:
