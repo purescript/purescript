@@ -277,7 +277,13 @@ addImportForIdentifier
 addImportForIdentifier fp ident qual filters = do
   let addPrim = Map.union idePrimDeclarations
   modules <- getAllModules Nothing
-  case map (fmap discardAnn) (getExactMatches ident filters (addPrim modules)) of
+  let
+    matches =
+      getExactMatches ident filters (addPrim modules)
+        & map (fmap discardAnn)
+        & filter (\(Match (_, d)) -> not (has _IdeDeclModule d))
+
+  case matches of
     [] ->
       throwError (NotFound "Couldn't find the given identifier. \
                            \Have you loaded the corresponding module?")
