@@ -1,7 +1,12 @@
 module Language.PureScript.CST
-  ( parseModuleFromFile
+  ( parseFromFile
+  , parseFromFiles
+  , parseModuleFromFile
   , parseModulesFromFiles
   , unwrapParserError
+  , toMultipleErrors
+  , toPositionedError
+  , pureResult
   , module Language.PureScript.CST.Convert
   , module Language.PureScript.CST.Errors
   , module Language.PureScript.CST.Parser
@@ -21,6 +26,9 @@ import Language.PureScript.CST.Errors
 import Language.PureScript.CST.Parser
 import Language.PureScript.CST.Types
 
+pureResult :: a -> PartialResult a
+pureResult a = PartialResult a (pure a)
+
 parseModulesFromFiles
   :: forall m k
    . MonadError E.MultipleErrors m
@@ -28,21 +36,37 @@ parseModulesFromFiles
   -> [(k, Text)]
   -> m [(k, PartialResult AST.Module)]
 parseModulesFromFiles toFilePath input =
-  flip E.parU handleError . inParallel . flip fmap input $ parseModuleFromFile toFilePath
-  where
-  handleError :: (k, Either (NE.NonEmpty ParserError) a) -> m (k, a)
-  handleError (k, res) = (k,) <$> unwrapParserError (toFilePath k) res
+  flip E.parU (handleParserError toFilePath)
+    . inParallel
+    . flip fmap input
+    $ \(k, a) -> (k, parseModuleFromFile (toFilePath k) a)
 
-  inParallel :: [(k, Either (NE.NonEmpty ParserError) a)] -> [(k, Either (NE.NonEmpty ParserError) a)]
-  inParallel = withStrategy (parList (evalTuple2 r0 rseq))
+parseFromFiles
+  :: forall m k
+   . MonadError E.MultipleErrors m
+  => (k -> FilePath)
+  -> [(k, Text)]
+  -> m [(k, AST.Module)]
+parseFromFiles toFilePath input =
+  flip E.parU (handleParserError toFilePath)
+    . inParallel
+    . flip fmap input
+    $ \(k, a) -> (k, parseFromFile (toFilePath k) a)
 
-parseModuleFromFile
-  :: forall k
-   . (k -> FilePath)
-  -> (k, Text)
-  -> (k, Either (NE.NonEmpty ParserError) (PartialResult AST.Module))
-parseModuleFromFile toFilePath (k, content) =
-  (k, fmap (convertModule (toFilePath k)) <$> parseModule content)
+parseModuleFromFile :: FilePath -> Text -> Either (NE.NonEmpty ParserError) (PartialResult AST.Module)
+parseModuleFromFile fp content = fmap (convertModule fp) <$> parseModule content
+
+parseFromFile :: FilePath -> Text -> Either (NE.NonEmpty ParserError) AST.Module
+parseFromFile fp content = convertModule fp <$> parse content
+
+handleParserError
+  :: forall m k a
+   . MonadError E.MultipleErrors m
+  => (k -> FilePath)
+  -> (k, Either (NE.NonEmpty ParserError) a)
+  -> m (k, a)
+handleParserError toFilePath (k, res) =
+  (k,) <$> unwrapParserError (toFilePath k) res
 
 unwrapParserError
   :: forall m a
@@ -51,8 +75,15 @@ unwrapParserError
   -> Either (NE.NonEmpty ParserError) a
   -> m a
 unwrapParserError fp =
-  either (throwError . E.MultipleErrors . NE.toList . fmap (toPositionedError fp)) pure
+  either (throwError . toMultipleErrors fp) pure
+
+toMultipleErrors :: FilePath -> NE.NonEmpty ParserError -> E.MultipleErrors
+toMultipleErrors fp =
+  E.MultipleErrors . NE.toList . fmap (toPositionedError fp)
 
 toPositionedError :: FilePath -> ParserError -> E.ErrorMessage
 toPositionedError name perr =
   E.ErrorMessage [E.positionedError $ sourceSpan name $ errRange perr] (E.ErrorParsingCSTModule perr)
+
+inParallel :: [(k, Either (NE.NonEmpty ParserError) a)] -> [(k, Either (NE.NonEmpty ParserError) a)]
+inParallel = withStrategy (parList (evalTuple2 r0 rseq))

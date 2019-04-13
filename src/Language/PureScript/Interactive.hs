@@ -11,7 +11,7 @@ module Language.PureScript.Interactive
 
 import           Prelude ()
 import           Prelude.Compat
-import           Protolude (ordNub, fromRight)
+import           Protolude (ordNub)
 
 import           Data.List (sort, find, foldl')
 import           Data.Maybe (fromMaybe, mapMaybe)
@@ -128,8 +128,8 @@ handleReloadState reload = do
   files <- liftIO $ concat <$> traverse glob globs
   e <- runExceptT $ do
     modules <- ExceptT . liftIO $ loadAllModules files
-    (externs, _) <- ExceptT . liftIO . runMake . make $ modules
-    return (map (fromRight (P.internalError "handleReloadState: unexpected parse error") . CST.resFull . snd) modules, externs)
+    (externs, _) <- ExceptT . liftIO . runMake . make $ fmap CST.pureResult <$> modules
+    return (map snd modules, externs)
   case e of
     Left errs -> printErrors errs
     Right (modules, externs) -> do

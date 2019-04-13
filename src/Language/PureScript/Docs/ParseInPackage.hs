@@ -8,6 +8,7 @@ import qualified Data.Map as M
 
 import Language.PureScript.Docs.Types
 import qualified Language.PureScript as P
+import qualified Language.PureScript.CST as CST
 import System.IO.UTF8 (readUTF8FileT)
 import Web.Bower.PackageMeta (PackageName)
 
@@ -48,7 +49,7 @@ parseFilesInPackages inputFiles depsFiles = do
     [(FileInfo, Text)]
     -> m [(FileInfo, P.Module)]
   parse =
-    throwLeft . P.parseModulesFromFiles fileInfoToString
+    throwLeft . CST.parseFromFiles fileInfoToString
 
   inPkgToMaybe = \case
     Local _ -> Nothing

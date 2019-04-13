@@ -29,16 +29,16 @@ loadModule filename = do
   content <- readUTF8FileT filename
   return $
     either (Left . P.prettyPrintMultipleErrors P.defaultPPEOptions {P.ppeRelativeDirectory = pwd}) (Right . map snd) $
-      P.parseModulesFromFiles id [(filename, content)]
+      CST.parseFromFiles id [(filename, content)]
 
 -- | Load all modules.
-loadAllModules :: [FilePath] -> IO (Either P.MultipleErrors [(FilePath, CST.PartialResult P.Module)])
+loadAllModules :: [FilePath] -> IO (Either P.MultipleErrors [(FilePath, P.Module)])
 loadAllModules files = do
   pwd <- getCurrentDirectory
   filesAndContent <- forM files $ \filename -> do
     content <- readUTF8FileT filename
     return (filename, content)
-  return $ CST.parseModulesFromFiles (makeRelative pwd) filesAndContent
+  return $ CST.parseFromFiles (makeRelative pwd) filesAndContent
 
 -- |
 -- Makes a volatile module to execute the current expression.
