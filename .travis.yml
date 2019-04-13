@@ -54,6 +54,7 @@ install:
     mkdir -p "$HOME/.local/bin"
     mv stack "$HOME/.local/bin/"
   fi
+- stack --no-terminal setup
 - npm install -g bower # for psc-docs / psc-publish tests
 - export OS_NAME=$(./ci/convert-os-name.sh)
 - |

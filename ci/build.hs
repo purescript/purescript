@@ -111,7 +111,7 @@ buildScript Options{..} =
 
   installStep =
     (stack
-      (["build", "--install-ghc", "--only-dependencies", "--test"]
+      (["build", "--only-dependencies", "--test"]
        ++ optHaddock ++ optFast))
       { buildStepTimeout = Just (Minutes 40)
       }

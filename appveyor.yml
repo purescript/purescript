@@ -48,6 +48,10 @@ install:
     7z x c:\tools\stack.zip stack.exe
     popd
 
+# The output of `stack setup` is incredibly verbose on Windows, so suppress it
+# unless something goes wrong.
+- echo "Installing GHC..."
+- stack --no-terminal --verbosity=error setup 1>stack-setup.log 2>&1 || type stack-setup.log
 build_script:
 - set BUILD_TYPE=normal
 - if defined APPVEYOR_REPO_TAG_NAME ( set CI_RELEASE=true )
