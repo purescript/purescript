@@ -5,4 +5,4 @@ change to the number at the end of this file and commit.
 See http://www.appveyor.com/docs/build-cache#cache-dependencies for more
 information.
 
-Increment me to invalidate the cache: 0
+Increment me to invalidate the cache: 1
