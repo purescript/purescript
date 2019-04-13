@@ -45,6 +45,8 @@ install:
     7z x c:\tools\stack.zip stack.exe
     popd
 - stack --no-terminal setup
+- stack path
+- stack exec where ghc
 - ps: Install-Product node 10
 - npm install -g bower
 build_script:

@@ -100,8 +100,8 @@ command cmd = BuildStep
 
 displayCommand :: BuildStep -> String
 displayCommand BuildStep{..} =
-  intercalate " " (buildStepCommand : buildStepArgs)
-  ++ maybe "" (\d -> "(in directory: " ++ d ++ ")") buildStepWorkingDirectory
+  maybe "" (\d -> "(in directory: " ++ d ++ ") ") buildStepWorkingDirectory
+  ++ intercalate " " (buildStepCommand : buildStepArgs)
 
 stack :: [String] -> BuildStep
 stack args =
