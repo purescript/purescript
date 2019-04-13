@@ -34,6 +34,8 @@ cache:
 # this file. See https://www.appveyor.com/docs/build-cache/ for more
 # information.
 - c:\s -> ci/appveyor-cache-buster.txt
+# For some reason, GHCs get installed here instead of in $STACK_ROOT.
+- C:\Users\appveyor\AppData\Local\Programs\stack
 install:
 - ps: |
     New-Item -ItemType Directory -Force -Path C:\tools
