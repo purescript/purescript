@@ -87,15 +87,15 @@ desugarModule (Module ss coms name decls (Just exps)) = do
   desugarClassDecl name' exps' (AcyclicSCC d) = desugarDecl name' exps' d
   desugarClassDecl _ _ (CyclicSCC ds') = throwError . errorMessage' (declSourceSpan (head ds')) $ CycleInTypeClassDeclaration (map classDeclName ds')
 
-  superClassesNames :: Declaration -> [ProperName 'ClassName]
-  superClassesNames (TypeClassDeclaration _ _ _ implies _ _) = fmap superClassName implies
+  superClassesNames :: Declaration -> [Qualified (ProperName 'ClassName)]
+  superClassesNames (TypeClassDeclaration _ _ _ implies _ _) = fmap constraintName implies
   superClassesNames _ = []
 
-  superClassName :: SourceConstraint -> ProperName 'ClassName
-  superClassName (Constraint _ (Qualified _ cName) _ _) = cName
+  constraintName :: SourceConstraint -> Qualified (ProperName 'ClassName)
+  constraintName (Constraint _ cName _ _) = cName
 
-  classDeclName :: Declaration -> ProperName 'ClassName
-  classDeclName (TypeClassDeclaration _ pn _ _ _ _) = pn
+  classDeclName :: Declaration -> Qualified (ProperName 'ClassName)
+  classDeclName (TypeClassDeclaration _ pn _ _ _ _) = Qualified (Just name) pn
   classDeclName _ = internalError "Expected TypeClassDeclaration"
 
 desugarModule _ = internalError "Exports should have been elaborated in name desugaring"

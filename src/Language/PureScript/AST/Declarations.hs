@@ -100,7 +100,7 @@ data SimpleErrorMessage
   | InvalidDoLet
   | CycleInDeclaration Ident
   | CycleInTypeSynonym (Maybe (ProperName 'TypeName))
-  | CycleInTypeClassDeclaration [(ProperName 'ClassName)]
+  | CycleInTypeClassDeclaration [Qualified (ProperName 'ClassName)]
   | CycleInModules [ModuleName]
   | NameIsUndefined Ident
   | UndefinedTypeVariable (ProperName 'TypeName)
