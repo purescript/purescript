@@ -18,24 +18,13 @@ matrix:
     - os: linux
       dist: trusty
       sudo: required
-      env: BUILD_TYPE=sdist
-
-    - os: linux
-      dist: trusty
-      sudo: required
       env: BUILD_TYPE=haddock
 
     - os: osx
       env: BUILD_TYPE=normal DEPLOY=true
 
-    - os: osx
-      env: BUILD_TYPE=sdist
-
     - os: windows
-      env: BUILD_TYPE=normal
-
-    - os: windows
-      env: BUILD_TYPE=sdist
+      env: BUILD_TYPE=normal DEPLOY=true
 addons:
   apt:
     packages:
@@ -55,8 +44,7 @@ install:
   then
     URL="https://www.stackage.org/stack/$TRAVIS_OS_NAME-x86_64"
     curl --location "$URL" > stack.tar.gz
-    gunzip stack.tar.gz
-    tar -x -f stack.tar --strip-components 1
+    tar -xzf stack.tar.gz --strip-components=1
     mkdir -p "$HOME/.local/bin"
     mv stack "$HOME/.local/bin/"
   fi

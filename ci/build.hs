@@ -9,10 +9,8 @@ variables:
 
 - BUILD_TYPE
 
-  May be one of the following:
-   - "normal": Compile & run tests normally
-   - "sdist": Create a source distribution and check that everything still
-     compiles and works
+  Should be one of the following:
+   - "normal": Compile & run tests normally.
    - "haddock": Check that haddock documentation builds correctly.
 
   If unset, the build type defaults to "normal".
@@ -55,6 +53,14 @@ force-pushing DOES NOT WORK. I suspect this is because CI platforms will only
 consider a particular build cache to be appropriate to use when building a
 given commit with if the cache was created by a parent of the commit being
 built (which is sensible of them).
+
+# Source distributions
+
+During a normal build, we create a source distribution with `stack sdist`, and
+then compile and run tests inside that. The reason for this is that it helps
+catch issues arising from forgetting to list files which are necessary for
+compilation or for tests in our package.yaml file (these sorts of issues don't
+test to get noticed until after releasing otherwise).
 -}
 
 {-# LANGUAGE RecordWildCards #-}
@@ -111,7 +117,6 @@ stack args =
 
 data BuildType
   = Normal
-  | Sdist
   | Haddock
   deriving (Eq, Show)
 
@@ -120,8 +125,6 @@ parseBuildType str =
   case map toLower str of
     "normal" ->
       Just Normal
-    "sdist" ->
-      Just Sdist
     "haddock" ->
       Just Haddock
     _ ->
@@ -140,9 +143,6 @@ buildScript :: Options -> [BuildStep]
 buildScript Options{..} =
   installStep : case optsBuildType of
     Normal ->
-      [ buildAndTestStep
-      ]
-    Sdist ->
       [ stack ["sdist", "--tar-dir", "sdist-test"]
       , (command "tar")
           { buildStepArgs =
