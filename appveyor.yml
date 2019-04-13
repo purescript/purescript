@@ -51,7 +51,7 @@ install:
 build_script:
 - set BUILD_TYPE=normal
 - if defined APPVEYOR_REPO_TAG_NAME ( set CI_RELEASE=true )
-- c:\msys64\usr\bin\bash ci\build.sh
+- stack ci\build.hs
 on_success:
 - ps: |
     function UploadFile

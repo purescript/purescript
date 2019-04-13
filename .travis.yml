@@ -77,7 +77,7 @@ install:
 script:
 - |
   [ -n "$TRAVIS_TAG" ] && export CI_RELEASE=true || true
-- ci/build.sh
+- ci/build.hs
 before_deploy:
 - ./bundle/build.sh $OS_NAME
 deploy:
