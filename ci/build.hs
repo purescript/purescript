@@ -20,7 +20,7 @@ variables:
 - CI_RELEASE
 
   If set to "true", passes the RELEASE flag to the compiler, and enables
-  optimizations. Otherwise, we disable optimizations (to speed builds up). 
+  optimizations. Otherwise, we disable optimizations (to speed builds up).
 
 # Stack & GHC
 
@@ -101,6 +101,7 @@ command cmd = BuildStep
 displayCommand :: BuildStep -> String
 displayCommand BuildStep{..} =
   intercalate " " (buildStepCommand : buildStepArgs)
+  ++ maybe "" (\d -> "(in directory: " ++ d ++ ")") buildStepWorkingDirectory
 
 stack :: [String] -> BuildStep
 stack args =
@@ -151,7 +152,7 @@ buildScript Options{..} =
               ]
           }
       , buildAndTestStep
-          { buildStepWorkingDirectory = Just "sdist"
+          { buildStepWorkingDirectory = Just "sdist-test"
           }
       ]
     Haddock ->
