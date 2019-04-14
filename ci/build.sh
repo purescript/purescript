@@ -1,118 +1,49 @@
 #!/bin/bash
-set -e
+
+set -ex
 
 # This is the main CI build script. It is intended to run on all platforms we
-# run CI on: linux, mac os, and windows (via msys). It makes use of the
-# following environment variables:
+# run CI on: linux, mac os, and windows. It makes use of the following
+# environment variables:
 #
-# BUILD_TYPE
-# Must be one of the following:
-#  - "normal": Compile & run tests normally
-#  - "sdist": Create a source distribution and check that everything still
-#    compiles and works
-#  - "haddock": Check that haddock documentation builds correctly.
+# - CI_RELEASE
 #
-# CI_RELEASE
-# If set to "true", passes the RELEASE flag to the compiler and enables
-# optimizations.
+#   If set to "true", passes the RELEASE flag to the compiler, and enables
+#   optimizations. Otherwise, we disable optimizations (to speed builds up).
+#
+# = Source distributions
+#
+# During a normal build, we create a source distribution with `stack sdist`,
+# and then compile and run tests inside that. The reason for this is that it
+# helps catch issues arising from forgetting to list files which are necessary
+# for compilation or for tests in our package.yaml file (these sorts of issues
+# don't test to get noticed until after releasing otherwise).
 
-STACK="stack --no-terminal --jobs=1"
-[[ "$BUILD_TYPE" == "haddock" ]] && DEPS_HADDOCK="--haddock"
+STACK="stack --no-terminal --jobs=2"
 
-# This command is ludicrously verbose on Windows, so we pipe the output to a
-# file and only display it if the command fails.
-if ! $STACK --verbosity=error setup 1>stack-setup.log 2>&1
+if [ -f "c:\\msys64\\usr\\bin\\tar.exe" ]
 then
-  cat stack-setup.log
-  echo "Failed to run 'stack setup'"
-  exit 1
-fi
-
-# Setup & install dependencies or abort
-ret=0
-if [ -x "C:\\msys64\\usr\\bin\\timeout.exe" ]
-then
-  TIMEOUT=C:\\msys64\\usr\\bin\\timeout.exe
-elif which timeout >/dev/null
-then
-  TIMEOUT=timeout
-elif which gtimeout >/dev/null
-then
-  TIMEOUT=gtimeout
+  # Workaround for appveyor cygwin dll mismatch issue
+  TAR="c:\\msys64\\usr\\bin\\tar.exe"
 else
-  echo "timeout command not found (nor gtimeout)"
-  exit 1
+  TAR=tar
 fi
-$TIMEOUT 40m $STACK build \
-  --only-dependencies --test $DEPS_HADDOCK \
-  || ret=$?
-case "$ret" in
-  0) # continue
-    ;;
-  124)
-    echo "Timed out while installing dependencies."
-    echo "Try pushing a new commit to build again."
-    exit 1
-    ;;
-  *)
-    echo "Failed to install dependencies."
-    exit 1
-    ;;
-esac
 
-# Set up configuration
-STACK_EXTRA_FLAGS=""
+STACK_OPTS="--test"
 if [ "$CI_RELEASE" = "true" ]
 then
-  # On release builds, set the 'release' cabal flag.
-  STACK_EXTRA_FLAGS="--flag purescript:RELEASE"
+  STACK_OPTS="$STACK_OPTS --flag=purescript:RELEASE"
 else
-  # On non-release builds, disable optimizations.
-  STACK_EXTRA_FLAGS="--fast"
+  STACK_OPTS="$STACK_OPTS --fast"
 fi
 
-if [ "$STACKAGE_NIGHTLY" = "true" ]
-then
-  STACK_EXTRA_FLAGS="$STACK_EXTRA_FLAGS --resolver=nightly"
-fi
+# Install snapshot dependencies (since these will be cached globally and thus
+# can be reused during the sdist build step)
+$STACK build --only-snapshot $STACK_OPTS
 
-if [ "$COVERAGE" = "true" ]
-then
-  STACK_EXTRA_FLAGS="$STACK_EXTRA_FLAGS --coverage"
-fi
-
-echo "STACK_EXTRA_FLAGS=\"$STACK_EXTRA_FLAGS\""
-BUILD_COMMAND="$STACK build --pedantic --test $STACK_EXTRA_FLAGS"
-
-if [ "$BUILD_TYPE" = "normal" ]
-then
-  echo ">>> Building & testing..."
-  echo "> $BUILD_COMMAND"
-  $BUILD_COMMAND
-
-elif [ "$BUILD_TYPE" = "sdist" ]
-then
-  echo ">>> Testing the source distribution..."
-  $STACK sdist
-  mkdir sdist-test
-  tar -xzf $(stack path --dist-dir)/purescript-*.tar.gz -C sdist-test --strip-components=1
-  pushd sdist-test
-  echo "> $BUILD_COMMAND"
-  $BUILD_COMMAND
-  popd
-
-elif [ "$BUILD_TYPE" = "haddock" ]
-then
-  echo ">>> Checking haddock documentation..."
-  $STACK haddock --fast
-else
-  echo "Unrecognised BUILD_TYPE: $BUILD_TYPE"
-  exit 1
-fi
-
-if [ "$COVERAGE" = "true" ]
-then
-  echo ">>> Uploading test coverage report..."
-  which shc || $STACK install stack-hpc-coveralls
-  shc purescript tests || echo "Failed to upload coverage"
-fi
+# Test in a source distribution (see above)
+$STACK sdist --tar-dir sdist-test;
+$TAR -xzf sdist-test/purescript-*.tar.gz -C sdist-test --strip-components=1
+pushd sdist-test
+$STACK build --pedantic $STACK_OPTS
+popd

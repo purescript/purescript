@@ -1,6 +1,6 @@
-language: c
-dist: trusty # because of perf issues
-sudo: required
+language: node_js
+node_js:
+  - "10"
 branches:
   # Only build master and tagged versions, i.e. not feature branches; feature
   # branches already get built after opening a pull request.
@@ -13,71 +13,119 @@ matrix:
     - os: linux
       dist: trusty
       sudo: required
-      env: BUILD_TYPE=normal DEPLOY=true
-
-    # - os: linux
-    #   dist: trusty
-    #   sudo: required
-    #   env: BUILD_TYPE=normal STACKAGE_NIGHTLY=true
-    #   allow_failures: true
-
-    - os: linux
-      dist: trusty
-      sudo: required
-      env: BUILD_TYPE=normal
-
-    # - os: linux
-    #   dist: trusty
-    #   sudo: required
-    #   env: BUILD_TYPE=sdist COVERAGE=true
-
-    - os: linux
-      dist: trusty
-      sudo: required
-      env: BUILD_TYPE=haddock
 
     - os: osx
-      env: BUILD_TYPE=normal DEPLOY=true
 
-    - os: osx
-      env: BUILD_TYPE=sdist
+    - os: windows
+      # Workaround for a Travis caching bug on Windows where absolute paths
+      # are not restored from caches properly:
+      # https://github.com/travis-ci/casher/pull/38
+      env: STACK_ROOT=$TRAVIS_BUILD_DIR/.stack_root RELEASE_KEY=
+      # workaround for https://travis-ci.community/t/windows-instances-hanging-before-install/250/15
+      # We also zero out the RELEASE_KEY environment variable above to reduce
+      # the risk of accidentally leaking it.
+      filter_secrets: false
 addons:
   apt:
     packages:
     - libgmp-dev
 cache:
+# Travis CI's build cache mechanism allows you to cache compiled artifacts in
+# order to speed subsequent builds up; this is essential for us, because
+# installing all of the compiler's Haskell dependencies takes longer than the
+# allotted time for a single build.
+#
+# Unfortunately, if we allow a build to reach the Travis timeout limit, we
+# don't get the opportunity to upload a cache (since uploading is included in
+# the time limit, and we've already run out of time).  Therefore, if we want
+# the progress we have made in a build to be saved to the build cache, we need
+# to make sure we abort the build early to allow time to upload the cache.
+# Then, the next commit can pick up where the previous commit left off.
+#
+# If a CI build times out, you need to push a new commit. Amending and
+# force-pushing DOES NOT WORK. I suspect this is because Travis will only
+# consider a particular build cache to be appropriate to use when building a
+# given commit with if the cache was created by a parent of the commit being
+# built (which is sensible of them).
   directories:
   - $HOME/.local/bin
   - $HOME/.stack
+
+  # Workaround for a Travis caching bug on Windows where absolute paths
+  # are not restored from caches properly:
+  # https://github.com/travis-ci/casher/pull/38
+  - .stack_root
   # Maximum amount of time in seconds spent attempting to upload a new cache
   # before aborting. Since our cache can get rather large, increasing this
   # value helps avoid situations where caches fail to be stored. The default
   # value is 180 (at the time of writing).
   timeout: 1000
 install:
+- |
+  if [ "$TRAVIS_OS_NAME" = "windows" ]
+  then
+    ci/disable-windows-defender.sh
+  fi
+- mkdir -p "$HOME/.local/bin"
+- export PATH="$PATH:$HOME/.local/bin"
 - | # Install stack.
-  if test ! -f "$HOME/.local/bin/stack"
+  if ! which stack >/dev/null
   then
     URL="https://www.stackage.org/stack/$TRAVIS_OS_NAME-x86_64"
-    curl --location "$URL" > stack.tar.gz
-    gunzip stack.tar.gz
-    tar -x -f stack.tar --strip-components 1
-    mkdir -p "$HOME/.local/bin"
-    mv stack "$HOME/.local/bin/"
+    mkdir "$HOME/stack"
+    pushd "$HOME/stack"
+    if [ "$TRAVIS_OS_NAME" = "windows" ]
+    then
+      curl --location "$URL" > stack.zip
+      unzip stack.zip
+      mv stack.exe "$HOME/.local/bin/"
+    else
+      curl --location "$URL" > stack.tar.gz
+      tar -xzf stack.tar.gz --strip-components=1
+      mv stack "$HOME/.local/bin/"
+    fi
+    popd
   fi
+- | # Set up the timeout command
+  if which timeout >/dev/null
+  then
+    TIMEOUT=timeout
+  elif [ "$TRAVIS_OS_NAME" == "osx" ]
+  then
+    if ! which gtimeout >/dev/null
+    then
+      brew update
+      brew install coreutils
+    fi
+    TIMEOUT=gtimeout
+  else
+    echo "Unable to set up timeout command"
+    exit 1
+  fi
+- |
+  if ! stack --no-terminal setup 2>&1 > stack-setup.log
+  then
+    cat stack-setup.log
+    exit 1
+  else
+    # stack setup is very verbose on windows
+    tail stack-setup.log
+  fi
+- head stack-setup.log
+- stack --version
+- stack path
 - npm install -g bower # for psc-docs / psc-publish tests
 - export OS_NAME=$(./ci/convert-os-name.sh)
-# Install 'gtimeout' if we need it
 - |
-  if [ "$TRAVIS_OS_NAME" == "osx" ] && ! which gtimeout >/dev/null
+  if [ -n "$TRAVIS_TAG" ]
   then
-    brew update
-    brew install coreutils
+    export CI_RELEASE=true
   fi
 script:
-- |
-  [ -n "$TRAVIS_TAG" ] && export CI_RELEASE=true || true
-- ci/build.sh
+# Set a timeout of 35 minutes. We could use travis_wait here, but travis_wait
+# doesn't produce any output until the command finishes, and also doesn't
+# always show all of the command's output.
+- $TIMEOUT 35m ci/build.sh
 before_deploy:
 - ./bundle/build.sh $OS_NAME
 deploy:
@@ -90,4 +138,3 @@ deploy:
   on:
     all_branches: true
     tags: true
-    condition: "$DEPLOY = true"
