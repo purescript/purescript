@@ -35,8 +35,9 @@ else
   STACK_OPTS="$STACK_OPTS --fast"
 fi
 
-# Install dependencies
-$STACK build --only-dependencies $STACK_OPTS
+# Install snapshot dependencies (since these will be cached globally and thus
+# can be reused during the sdist build step)
+$STACK build --only-snapshot $STACK_OPTS
 
 # Test in a source distribution (see above)
 $STACK sdist --tar-dir sdist-test;
