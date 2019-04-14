@@ -1,6 +1,4 @@
-language: c
-dist: trusty # because of perf issues
-sudo: required
+language: node_js
 branches:
   # Only build master and tagged versions, i.e. not feature branches; feature
   # branches already get built after opening a pull request.
