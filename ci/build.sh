@@ -21,14 +21,6 @@ set -ex
 
 STACK="stack --no-terminal --jobs=2"
 
-if [ -f "c:\\msys64\\usr\\bin\\tar.exe" ]
-then
-  # Workaround for appveyor cygwin dll mismatch issue
-  TAR="c:\\msys64\\usr\\bin\\tar.exe"
-else
-  TAR=tar
-fi
-
 STACK_OPTS="--test"
 if [ "$CI_RELEASE" = "true" ]
 then
@@ -43,7 +35,7 @@ $STACK build --only-snapshot $STACK_OPTS
 
 # Test in a source distribution (see above)
 $STACK sdist --tar-dir sdist-test;
-$TAR -xzf sdist-test/purescript-*.tar.gz -C sdist-test --strip-components=1
+tar -xzf sdist-test/purescript-*.tar.gz -C sdist-test --strip-components=1
 pushd sdist-test
 $STACK build --pedantic $STACK_OPTS
 popd
