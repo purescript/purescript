@@ -8,9 +8,11 @@ import Prelude hiding (lex, exp, exponent, lines)
 
 import Control.Monad (join)
 import qualified Data.Char as Char
+import qualified Data.DList as DList
 import Data.Foldable (foldl')
 import Data.Functor (($>))
 import qualified Data.Scientific as Sci
+import Data.String (fromString)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Language.PureScript.CST.Errors
@@ -419,9 +421,9 @@ token = peek >>= maybe (pure TokEof) k0
             chs <- nextWhile isNormalStringChar
             let
               raw' = raw <> chs
-              acc' = acc <> chs
+              acc' = acc <> DList.fromList (Text.unpack chs)
             peek >>= \case
-              Just '"'  -> next $> TokString raw' acc'
+              Just '"'  -> next $> TokString raw' (fromString (DList.toList acc'))
               Just '\\' -> next *> goEscape (raw' <> "\\") acc'
               Just _    -> throw ErrLineFeedInString
               Nothing   -> throw ErrEof
@@ -432,19 +434,19 @@ token = peek >>= maybe (pure TokEof) k0
               Just ch1 | isStringGapChar ch1 -> do
                 gap <- nextWhile isStringGapChar
                 peek >>= \case
-                  Just '"'  -> next $> TokString (raw <> gap) acc
+                  Just '"'  -> next $> TokString (raw <> gap) (fromString (DList.toList acc))
                   Just '\\' -> next *> go (raw <> gap <> "\\") acc
                   Just ch   -> throw $ ErrCharInGap ch
                   Nothing   -> throw ErrEof
               _ -> do
                 (raw', ch) <- escape
-                go (raw <> raw') (acc <> Text.singleton ch)
-        go "" ""
+                go (raw <> raw') (acc <> DList.singleton ch)
+        go "" mempty
       1 ->
         pure $ TokString "" ""
       n | n >= 5 -> do
         let str = Text.take 5 quotes1
-        pure $ TokString str str
+        pure $ TokString str (fromString (Text.unpack str))
       _ -> do
         let
           go acc = do

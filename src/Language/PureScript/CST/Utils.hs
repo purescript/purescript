@@ -1,3 +1,4 @@
+{-# LANGUAGE MonoLocalBinds #-}
 module Language.PureScript.CST.Utils where
 
 import Prelude
@@ -17,6 +18,7 @@ import Language.PureScript.CST.Positions
 import Language.PureScript.CST.Traversals.Type
 import Language.PureScript.CST.Types
 import qualified Language.PureScript.Names as N
+import Language.PureScript.PSString (PSString, mkString)
 
 placeholder :: SourceToken
 placeholder = SourceToken
@@ -113,19 +115,19 @@ toName k tok = case tokValue tok of
 
 toLabel :: SourceToken -> Label
 toLabel tok = case tokValue tok of
-  TokLowerName [] a -> Label tok a
+  TokLowerName [] a -> Label tok $ mkString a
   TokString _ a     -> Label tok a
-  TokRawString a    -> Label tok a
-  TokForall ASCII   -> Label tok "forall"
+  TokRawString a    -> Label tok $ mkString a
+  TokForall ASCII   -> Label tok $ mkString "forall"
   _                 -> internalError $ "Invalid label: " <> show tok
 
 labelToIdent :: Label -> Parser (Name Ident)
 labelToIdent (Label tok _) = toName Ident tok
 
-toString :: SourceToken -> (SourceToken, Text)
+toString :: SourceToken -> (SourceToken, PSString)
 toString tok = case tokValue tok of
   TokString _ a  -> (tok, a)
-  TokRawString a -> (tok, a)
+  TokRawString a -> (tok, mkString a)
   _              -> internalError $ "Invalid string literal: " <> show tok
 
 toChar :: SourceToken -> (SourceToken, Char)

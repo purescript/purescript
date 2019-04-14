@@ -7,6 +7,7 @@ import Data.Text (Text)
 import Data.Void (Void)
 import GHC.Generics (Generic)
 import qualified Language.PureScript.Names as N
+import Language.PureScript.PSString (PSString)
 
 data SourcePos = SourcePos
   { srcLine :: {-# UNPACK #-} !Int
@@ -62,7 +63,7 @@ data Token
   | TokSymbolArr !SourceStyle
   | TokHole !Text
   | TokChar !Text !Char
-  | TokString !Text !Text
+  | TokString !Text !PSString
   | TokRawString !Text
   | TokInt !Text !Integer
   | TokNumber !Text !Double
@@ -94,7 +95,7 @@ data QualifiedName a = QualifiedName
 
 data Label = Label
   { lblTok :: SourceToken
-  , lblName :: Text
+  , lblName :: PSString
   } deriving (Show, Eq, Ord, Generic)
 
 data Wrapped a = Wrapped
@@ -134,7 +135,7 @@ data Type a
   | TypeConstructor a (QualifiedName (N.ProperName 'N.TypeName))
   | TypeWildcard a SourceToken
   | TypeHole a (Name Ident)
-  | TypeString a SourceToken Text
+  | TypeString a SourceToken PSString
   | TypeRow a (Wrapped (Row a))
   | TypeRecord a (Wrapped (Row a))
   | TypeForall a SourceToken (NonEmpty (TypeVarBinding a)) SourceToken (Type a)
@@ -316,7 +317,7 @@ data Expr a
   | ExprConstructor a (QualifiedName (N.ProperName 'N.ConstructorName))
   | ExprBoolean a SourceToken Bool
   | ExprChar a SourceToken Char
-  | ExprString a SourceToken Text
+  | ExprString a SourceToken PSString
   | ExprNumber a SourceToken (Either Integer Double)
   | ExprArray a (Delimited (Expr a))
   | ExprRecord a (Delimited (RecordLabeled (Expr a)))
@@ -419,7 +420,7 @@ data Binder a
   | BinderConstructor a (QualifiedName (N.ProperName 'N.ConstructorName)) [Binder a]
   | BinderBoolean a SourceToken Bool
   | BinderChar a SourceToken Char
-  | BinderString a SourceToken Text
+  | BinderString a SourceToken PSString
   | BinderNumber a (Maybe SourceToken) SourceToken (Either Integer Double)
   | BinderArray a (Delimited (Binder a))
   | BinderRecord a (Delimited (RecordLabeled (Binder a)))

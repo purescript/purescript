@@ -22,6 +22,7 @@ import Language.PureScript.CST.Positions
 import Language.PureScript.CST.Types
 import Language.PureScript.CST.Utils
 import qualified Language.PureScript.Names as N
+import Language.PureScript.PSString (PSString)
 }
 
 %expect 98
@@ -236,7 +237,7 @@ label :: { Label }
 hole :: { Name Ident }
   : LIT_HOLE {% toName Ident $1 }
 
-string :: { (SourceToken, Text) }
+string :: { (SourceToken, PSString) }
   : LIT_STRING { toString $1 }
   | LIT_RAW_STRING { toString $1 }
 

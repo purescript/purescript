@@ -119,7 +119,7 @@ convertType fileName = go
         Nothing -> T.REmpty $ sourceAnnCommented fileName b b
       rowCons (Labeled a _ ty) c = do
         let ann = sourceAnnCommented fileName (lblTok a) (snd $ typeRange ty)
-        T.RCons ann (L.Label . mkString $ lblName a) (go ty) c
+        T.RCons ann (L.Label $ lblName a) (go ty) c
     case labels of
       Just (Separated h t) ->
         rowCons h $ foldr (rowCons . snd) rowTail t
@@ -136,7 +136,7 @@ convertType fileName = go
     TypeHole _ a ->
       T.TypeWildcard (sourceName fileName a) . Just . getIdent $ nameValue a
     TypeString _ a b ->
-      T.TypeLevelString (sourceAnnCommented fileName a a) $ mkString b
+      T.TypeLevelString (sourceAnnCommented fileName a a) $ b
     TypeRow _ (Wrapped _ row b) ->
       goRow row b
     TypeRecord _ (Wrapped a row b) -> do
@@ -276,7 +276,7 @@ convertExpr fileName = go
       positioned ann . AST.Literal (fst ann) $ AST.CharLiteral b
     ExprString _ a b -> do
       let ann = sourceAnnCommented fileName a a
-      positioned ann . AST.Literal (fst ann) . AST.StringLiteral $ mkString b
+      positioned ann . AST.Literal (fst ann) . AST.StringLiteral $ b
     ExprNumber _ a b -> do
       let ann = sourceAnnCommented fileName a a
       positioned ann . AST.Literal (fst ann) $ AST.NumericLiteral b
@@ -292,7 +292,7 @@ convertExpr fileName = go
         ann = sourceAnnCommented fileName a c
         lbl = \case
           RecordPun f -> (mkString . getIdent $ nameValue f, go . ExprIdent z $ QualifiedName (nameTok f) Nothing (nameValue f))
-          RecordField f _ v -> (mkString $ lblName f, go v)
+          RecordField f _ v -> (lblName f, go v)
         vals = case bs of
           Just (Separated x xs) -> lbl x : (lbl . snd <$> xs)
           Nothing -> []
@@ -329,13 +329,13 @@ convertExpr fileName = go
     expr@(ExprRecordAccessor _ (RecordAccessor a _ (Separated h t))) -> do
       let
         ann = uncurry (sourceAnnCommented fileName) $ exprRange expr
-        field x f = AST.Accessor (mkString $ lblName f) x
+        field x f = AST.Accessor (lblName f) x
       positioned ann $ foldl' (\x (_, f) -> field x f) (field (go a) h) t
     expr@(ExprRecordUpdate _ a b) -> do
       let
         ann = uncurry (sourceAnnCommented fileName) $ exprRange expr
-        k (RecordUpdateLeaf f _ x) = (mkString $ lblName f, AST.Leaf $ go x)
-        k (RecordUpdateBranch f xs) = (mkString $ lblName f, AST.Branch $ toTree xs)
+        k (RecordUpdateLeaf f _ x) = (lblName f, AST.Leaf $ go x)
+        k (RecordUpdateBranch f xs) = (lblName f, AST.Branch $ toTree xs)
         toTree (Wrapped _ xs _) = AST.PathTree . AST.AssocList . map k $ toList xs
       positioned ann . AST.ObjectUpdateNested (go a) $ toTree b
     expr@(ExprApp _ a b) -> do
@@ -395,7 +395,7 @@ convertBinder fileName = go
       positioned ann . AST.LiteralBinder (fst ann) $ AST.CharLiteral b
     BinderString _ a b -> do
       let ann = sourceAnnCommented fileName a a
-      positioned ann . AST.LiteralBinder (fst ann) . AST.StringLiteral $ mkString b
+      positioned ann . AST.LiteralBinder (fst ann) . AST.StringLiteral $ b
     BinderNumber _ n a b -> do
       let
         ann = sourceAnnCommented fileName a a
@@ -415,7 +415,7 @@ convertBinder fileName = go
         ann = sourceAnnCommented fileName a c
         lbl = \case
           RecordPun f -> (mkString . getIdent $ nameValue f, go $ BinderVar z f)
-          RecordField f _ v -> (mkString $ lblName f, go v)
+          RecordField f _ v -> (lblName f, go v)
         vals = case bs of
           Just (Separated x xs) -> lbl x : (lbl . snd <$> xs)
           Nothing -> []
