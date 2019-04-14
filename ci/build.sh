@@ -18,16 +18,10 @@ set -ex
 # helps catch issues arising from forgetting to list files which are necessary
 # for compilation or for tests in our package.yaml file (these sorts of issues
 # don't test to get noticed until after releasing otherwise).
-#
-# = Haddock docs
-#
-# We build with haddock docs because haddock syntax can be malformed and cause
-# building HTML docs (for Hackage) to fail; ideally we want to hear about this
-# before publishing a release to Hackage.
 
 STACK="stack --no-terminal --jobs=1"
 
-STACK_OPTS="--test --haddock --no-haddock-deps"
+STACK_OPTS="--test"
 if [ "$CI_RELEASE" = "true" ]
 then
   STACK_OPTS="$STACK_OPTS --flag=purescript:RELEASE"
