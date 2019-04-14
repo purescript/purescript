@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Intended to speed up builds by disabling Windows Defender.
+# See https://travis-ci.community/t/current-known-issues-please-read-this-before-posting-a-new-topic/264/15
+
 export NODEPATH=$(where.exe node.exe)
 export PROJECTDIR=$(pwd)
 export TEMPDIR=$LOCALAPPDATA\\Temp
