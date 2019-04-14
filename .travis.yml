@@ -45,7 +45,10 @@ cache:
   timeout: 1000
 install:
 - |
-  [ "$TRAVIS_OS_NAME" = "windows" ] && ci/disable-windows-defender.sh
+  if [ "$TRAVIS_OS_NAME" = "windows" ]
+  then
+    ci/disable-windows-defender.sh
+  fi
 - mkdir -p "$HOME/.local/bin"
 - export PATH="$PATH:$HOME/.local/bin"
 - | # Install stack.
@@ -71,7 +74,10 @@ install:
 - npm install -g bower # for psc-docs / psc-publish tests
 - export OS_NAME=$(./ci/convert-os-name.sh)
 - |
-  [ -n "$TRAVIS_TAG" ] && export CI_RELEASE=true || true
+  if [ -n "$TRAVIS_TAG" ]
+  then
+    export CI_RELEASE=true
+  fi
 script:
 - ci/build.hs
 before_deploy:
