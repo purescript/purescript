@@ -47,6 +47,8 @@ install:
   if test ! -f "$HOME/.local/bin/stack"
   then
     URL="https://www.stackage.org/stack/$TRAVIS_OS_NAME-x86_64"
+    mkdir "$HOME/stack"
+    cd "$HOME/stack"
     mkdir -p "$HOME/.local/bin"
     if [ "$TRAVIS_OS_NAME" = "windows" ]
     then
