@@ -43,10 +43,17 @@ install:
   if test ! -f "$HOME/.local/bin/stack"
   then
     URL="https://www.stackage.org/stack/$TRAVIS_OS_NAME-x86_64"
-    curl --location "$URL" > stack.tar.gz
-    tar -xzf stack.tar.gz --strip-components=1
     mkdir -p "$HOME/.local/bin"
-    mv stack "$HOME/.local/bin/"
+    if [ "$TRAVIS_OS_NAME" = "windows" ]
+    then
+      curl --location "$URL" > stack.zip
+      unzip stack.zip
+      mv stack.exe "$HOME/.local/bin/"
+    else
+      curl --location "$URL" > stack.tar.gz
+      tar -xzf stack.tar.gz --strip-components=1
+      mv stack "$HOME/.local/bin/"
+    fi
   fi
 - stack --no-terminal setup
 - npm install -g bower # for psc-docs / psc-publish tests

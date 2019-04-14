@@ -8,6 +8,8 @@ case "$TRAVIS_OS_NAME" in
     echo linux64;;
   "osx")
     echo macos;;
+  "windows")
+    echo win64;;
   *)
     echo "Unknown TRAVIS_OS_NAME: $TRAVIS_OS_NAME";
     exit 1;;
