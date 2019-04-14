@@ -82,7 +82,7 @@ install:
     export CI_RELEASE=true
   fi
 script:
-- ci/build.hs
+- travis_wait ci/build.hs
 before_deploy:
 - ./bundle/build.sh $OS_NAME
 deploy:
