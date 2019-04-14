@@ -57,6 +57,7 @@ install:
   if [ "$TRAVIS_OS_NAME" = "windows" ]
   then
     ci/disable-windows-defender.sh
+    echo "skip-msys: true" >> $HOME/.stack/config.yaml
   fi
 - mkdir -p "$HOME/.local/bin"
 - export PATH="$PATH:$HOME/.local/bin"
@@ -78,13 +79,7 @@ install:
     fi
     popd
   fi
-- | # Install 'gtimeout' if we need it
-  if [ "$TRAVIS_OS_NAME" == "osx" ] && ! which gtimeout >/dev/null
-  then
-    brew update
-    brew install coreutils
-  fi
-- stack --skip-msys --no-terminal setup
+- stack --no-terminal setup
 - stack --version
 - stack path
 - npm install -g bower # for psc-docs / psc-publish tests
