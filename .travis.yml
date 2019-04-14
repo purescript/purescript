@@ -65,7 +65,7 @@ install:
 - mkdir -p "$HOME/.local/bin"
 - export PATH="$PATH:$HOME/.local/bin"
 - | # Install stack.
-  if test ! -f "$HOME/.local/bin/stack"
+  if ! which stack >/dev/null
   then
     URL="https://www.stackage.org/stack/$TRAVIS_OS_NAME-x86_64"
     mkdir "$HOME/stack"
@@ -99,13 +99,8 @@ install:
     export CI_RELEASE=true
   fi
 script:
-# Set a timeout of 40 minutes.
-- travis_wait 40 ci/build.sh
-- |
-  if [ "$?" -eq 127 ]
-  then
-    echo "Timed out. Try pushing a new commit to pick up where you left off."
-  fi
+# Set a timeout of 30 minutes.
+- travis_wait 30 ci/build.sh
 before_deploy:
 - ./bundle/build.sh $OS_NAME
 deploy:
