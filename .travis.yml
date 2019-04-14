@@ -61,7 +61,7 @@ install:
   if [ "$TRAVIS_OS_NAME" = "windows" ]
   then
     ci/disable-windows-defender.sh
-    echo "skip-msys: true" >> $HOME/.stack/config.yaml
+    echo "skip-msys: true" > $STACK_ROOT/config.yaml
   fi
 - mkdir -p "$HOME/.local/bin"
 - export PATH="$PATH:$HOME/.local/bin"
