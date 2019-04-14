@@ -17,7 +17,10 @@ matrix:
     - os: osx
 
     - os: windows
-      env: STACK_ROOT=$HOME/.stack RELEASE_KEY=
+      # Workaround for a Travis caching bug on Windows where absolute paths
+      # are not restored from caches properly:
+      # https://github.com/travis-ci/casher/pull/38
+      env: STACK_ROOT=$TRAVIS_BUILD_DIR/.stack_root RELEASE_KEY=
       # workaround for https://travis-ci.community/t/windows-instances-hanging-before-install/250/15
       # We also zero out the RELEASE_KEY environment variable above to reduce
       # the risk of accidentally leaking it.
@@ -47,6 +50,7 @@ cache:
   directories:
   - $HOME/.local/bin
   - $HOME/.stack
+  - .stack_root
   # Maximum amount of time in seconds spent attempting to upload a new cache
   # before aborting. Since our cache can get rather large, increasing this
   # value helps avoid situations where caches fail to be stored. The default
