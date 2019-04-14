@@ -24,7 +24,7 @@ matrix:
       env: BUILD_TYPE=normal DEPLOY=true
 
     - os: windows
-      env: BUILD_TYPE=normal DEPLOY=true STACK_ROOT=C:\sr RELEASE_KEY=
+      env: BUILD_TYPE=normal DEPLOY=true STACK_ROOT=C:/sr RELEASE_KEY=
       # workaround for https://travis-ci.community/t/windows-instances-hanging-before-install/250/15
       # We also zero out the RELEASE_KEY environment variable above to reduce
       # the risk of accidentally leaking it.
@@ -37,7 +37,7 @@ cache:
   directories:
   - $HOME/.local/bin
   - $HOME/.stack
-  - C:\sr
+  - C:/sr
   # Maximum amount of time in seconds spent attempting to upload a new cache
   # before aborting. Since our cache can get rather large, increasing this
   # value helps avoid situations where caches fail to be stored. The default
