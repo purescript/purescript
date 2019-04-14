@@ -50,7 +50,12 @@ cache:
   directories:
   - $HOME/.local/bin
   - $HOME/.stack
+
+  # Workaround for a Travis caching bug on Windows where absolute paths
+  # are not restored from caches properly:
+  # https://github.com/travis-ci/casher/pull/38
   - .stack_root
+  - ../../../AppData/Local/Programs/stack/x86_64-windows
   # Maximum amount of time in seconds spent attempting to upload a new cache
   # before aborting. Since our cache can get rather large, increasing this
   # value helps avoid situations where caches fail to be stored. The default
@@ -61,7 +66,6 @@ install:
   if [ "$TRAVIS_OS_NAME" = "windows" ]
   then
     ci/disable-windows-defender.sh
-    echo "skip-msys: true" > $STACK_ROOT/config.yaml
   fi
 - mkdir -p "$HOME/.local/bin"
 - export PATH="$PATH:$HOME/.local/bin"
