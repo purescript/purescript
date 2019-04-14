@@ -55,7 +55,6 @@ cache:
   # are not restored from caches properly:
   # https://github.com/travis-ci/casher/pull/38
   - .stack_root
-  - ../../../AppData/Local/Programs/stack/x86_64-windows
   # Maximum amount of time in seconds spent attempting to upload a new cache
   # before aborting. Since our cache can get rather large, increasing this
   # value helps avoid situations where caches fail to be stored. The default
@@ -103,7 +102,16 @@ install:
     echo "Unable to set up timeout command"
     exit 1
   fi
-- stack --no-terminal setup
+- |
+  if ! stack --no-terminal setup 2>&1 > stack-setup.log
+  then
+    cat stack-setup.log
+    exit 1
+  else
+    # stack setup is very verbose on windows
+    tail stack-setup.log
+  fi
+- head stack-setup.log
 - stack --version
 - stack path
 - npm install -g bower # for psc-docs / psc-publish tests
