@@ -43,14 +43,14 @@ cache:
   # value is 180 (at the time of writing).
   timeout: 1000
 install:
-- echo "$PATH"
+- mkdir -p "$HOME/.local/bin"
+- export PATH="$PATH:$HOME/.local/bin"
 - | # Install stack.
   if test ! -f "$HOME/.local/bin/stack"
   then
     URL="https://www.stackage.org/stack/$TRAVIS_OS_NAME-x86_64"
     mkdir "$HOME/stack"
     cd "$HOME/stack"
-    mkdir -p "$HOME/.local/bin"
     if [ "$TRAVIS_OS_NAME" = "windows" ]
     then
       curl --location "$URL" > stack.zip
