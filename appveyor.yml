@@ -52,9 +52,8 @@ install:
 - ps: Install-Product node 10
 - npm install -g bower
 build_script:
-- set BUILD_TYPE=normal
 - if defined APPVEYOR_REPO_TAG_NAME ( set CI_RELEASE=true )
-- stack ci\build.hs
+- c:\msys64\usr\bin\timeout 40m c:\msys64\usr\bin\bash ci\build.sh
 on_success:
 - ps: |
     function UploadFile
