@@ -43,6 +43,8 @@ cache:
   # value is 180 (at the time of writing).
   timeout: 1000
 install:
+- |
+  [ "$TRAVIS_OS_NAME" = "windows" ] && ci/disable-windows-defender.sh
 - mkdir -p "$HOME/.local/bin"
 - export PATH="$PATH:$HOME/.local/bin"
 - | # Install stack.
@@ -63,6 +65,7 @@ install:
     fi
     popd
   fi
+- stack path
 - stack --no-terminal setup
 - npm install -g bower # for psc-docs / psc-publish tests
 - export OS_NAME=$(./ci/convert-os-name.sh)
