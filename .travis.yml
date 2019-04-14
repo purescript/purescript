@@ -43,6 +43,7 @@ cache:
   # value is 180 (at the time of writing).
   timeout: 1000
 install:
+- echo "$PATH"
 - | # Install stack.
   if test ! -f "$HOME/.local/bin/stack"
   then
