@@ -13,18 +13,11 @@ matrix:
     - os: linux
       dist: trusty
       sudo: required
-      env: BUILD_TYPE=normal DEPLOY=true
-
-    - os: linux
-      dist: trusty
-      sudo: required
-      env: BUILD_TYPE=haddock
 
     - os: osx
-      env: BUILD_TYPE=normal DEPLOY=true
 
     - os: windows
-      env: BUILD_TYPE=normal DEPLOY=true STACK_ROOT=C:/sr RELEASE_KEY=
+      env: STACK_ROOT=C:/sr RELEASE_KEY=
       # workaround for https://travis-ci.community/t/windows-instances-hanging-before-install/250/15
       # We also zero out the RELEASE_KEY environment variable above to reduce
       # the risk of accidentally leaking it.
@@ -72,8 +65,15 @@ install:
     fi
     popd
   fi
-- stack path
+- | # Install 'gtimeout' if we need it
+  if [ "$TRAVIS_OS_NAME" == "osx" ] && ! which gtimeout >/dev/null
+  then
+    brew update
+    brew install coreutils
+  fi
 - stack --no-terminal setup
+- stack --version
+- stack path
 - npm install -g bower # for psc-docs / psc-publish tests
 - export OS_NAME=$(./ci/convert-os-name.sh)
 - |
@@ -82,7 +82,7 @@ install:
     export CI_RELEASE=true
   fi
 script:
-- travis_wait ci/build.hs
+- ci/build.sh
 before_deploy:
 - ./bundle/build.sh $OS_NAME
 deploy:
@@ -95,4 +95,3 @@ deploy:
   on:
     all_branches: true
     tags: true
-    condition: "$DEPLOY = true"
