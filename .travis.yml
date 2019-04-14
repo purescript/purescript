@@ -24,7 +24,11 @@ matrix:
       env: BUILD_TYPE=normal DEPLOY=true
 
     - os: windows
-      env: BUILD_TYPE=normal DEPLOY=true
+      env: BUILD_TYPE=normal DEPLOY=true RELEASE_KEY=
+      # workaround for https://travis-ci.community/t/windows-instances-hanging-before-install/250/15
+      # We also zero out the RELEASE_KEY environment variable above to reduce
+      # the risk of accidentally leaking it.
+      filter_secrets: false
 addons:
   apt:
     packages:
