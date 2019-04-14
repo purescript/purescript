@@ -1,4 +1,3 @@
-{-# LANGUAGE MonoLocalBinds #-}
 module Language.PureScript.CST.Utils where
 
 import Prelude
@@ -109,6 +108,7 @@ toName k tok = case tokValue tok of
   TokUpperName [] a  -> pure $ Name tok (k a)
   TokSymbolName [] a -> pure $ Name tok (k a)
   TokOperator [] a   -> pure $ Name tok (k a)
+  TokHole a          -> pure $ Name tok (k a)
   _                  -> internalError $ "Invalid name: " <> show tok
 
 toLabel :: SourceToken -> Label
@@ -163,7 +163,9 @@ toConstraint = convertParens
   convert :: a -> [Type a] -> Type a -> Parser (Constraint a)
   convert ann acc = \case
     TypeApp a lhs rhs -> convert (a <> ann) (rhs : acc) lhs
-    TypeConstructor a name -> pure $ Constraint (a <> ann) (coerce name) acc
+    TypeConstructor a name -> do
+      for_ acc checkNoForalls
+      pure $ Constraint (a <> ann) (coerce name) acc
     ty -> do
       let (tok1, tok2) = typeRange ty
       addFailure [tok1, tok2] ErrTypeInConstraint
@@ -175,23 +177,6 @@ toBinderConstructor = \case
     pure $ BinderConstructor a name bs
   a NE.:| [] -> pure a
   a NE.:| _ -> unexpectedToks binderRange (unexpectedBinder) ErrExprInBinder a
-
-toLetBinding :: Monoid a => NE.NonEmpty (Binder a) -> Guarded a -> Parser (LetBinding a)
-toLetBinding lhs guarded = case lhs of
-  BinderVar ann ident NE.:| binders ->
-    pure $ LetBindingName ann (ValueBindingFields ident binders guarded)
-  BinderConstructor ann name [] NE.:| binders -> do
-    mkLetBindingPattern $ BinderConstructor ann name binders
-  binder NE.:| [] ->
-    mkLetBindingPattern binder
-  binders ->
-    unexpectedToks binderRange unexpectedLetBinding ErrExprInDeclOrBinder (NE.head binders)
-  where
-  mkLetBindingPattern binder = case guarded of
-    Unconditional tok wh ->
-      pure $ LetBindingPattern mempty binder tok wh
-    Guarded gs ->
-      unexpectedToks guardedExprRange unexpectedLetBinding ErrGuardInLetBinder (NE.head gs)
 
 toRecordFields
   :: Monoid a
@@ -233,8 +218,8 @@ checkFundeps (ClassHead _ _ _ vars (Just (_, fundeps))) = do
 
 data TmpModuleDecl a
   = TmpImport (ImportDecl a)
-  | TmpDecl (Declaration a)
-  | TmpChain SourceToken (Declaration a)
+  | TmpChain (Separated (Declaration a))
+  deriving (Show)
 
 toModuleDecls :: Monoid a => [TmpModuleDecl a] -> Parser ([ImportDecl a], [Declaration a])
 toModuleDecls = goImport []
@@ -243,13 +228,29 @@ toModuleDecls = goImport []
   goImport acc xs = (reverse acc,) <$> goDecl [] xs
 
   goDecl acc [] = pure $ reverse acc
-  goDecl acc (TmpDecl x : xs) = goDecl (x : acc) xs
-  goDecl (DeclInstanceChain a (Separated h t) : acc) (TmpChain tok (DeclInstanceChain a' (Separated h' t')) : xs) = do
-    let getName = instName . instHead
-    when (getName h == getName h') $ addFailure [nameTok $ getName h'] ErrInstanceNameMismatch
-    goDecl (DeclInstanceChain (a <> a') (Separated h (t <> ((tok, h') : t'))) : acc) xs
-  goDecl _ (TmpChain tok _ : _) = addFailure [tok] ErrElseInDecl $> [unexpectedDecl [tok]]
-  goDecl _ (TmpImport imp : _) = unexpectedToks importDeclRange (pure . unexpectedDecl) ErrImportInDecl imp
+  goDecl acc (TmpChain (Separated x []) : xs) = goDecl (x : acc) xs
+  goDecl acc (TmpChain (Separated (DeclInstanceChain a (Separated h t)) t') : xs) = do
+    (a', instances) <- goChain (getName h) a [] t'
+    goDecl (DeclInstanceChain a' (Separated h (t <> instances)) : acc) xs
+  goDecl acc (TmpChain (Separated _ t) : xs) = do
+    for_ t $ \(tok, _) -> addFailure [tok] ErrElseInDecl
+    goDecl acc xs
+  goDecl acc (TmpImport imp : xs) = do
+    unexpectedToks importDeclRange (const ()) ErrImportInDecl imp
+    goDecl acc xs
+
+  goChain _ ann acc [] = pure (ann, reverse acc)
+  goChain name ann acc ((tok, DeclInstanceChain a (Separated h t)) : xs)
+    | eqName (getName h) name = goChain name (ann <> a) (reverse ((tok, h) : t) <> acc) xs
+    | otherwise = do
+        addFailure [qualTok $ getName h] ErrInstanceNameMismatch
+        goChain name ann acc xs
+  goChain name ann acc ((tok, _) : xs) = do
+    addFailure [tok] ErrElseInDecl
+    goChain name ann acc xs
+
+  getName = instClass . instHead
+  eqName (QualifiedName _ a b) (QualifiedName _ c d) = a == c && b == d
 
 checkNoWildcards :: Type a -> Parser ()
 checkNoWildcards ty = do
@@ -257,6 +258,14 @@ checkNoWildcards ty = do
     k = \case
       TypeWildcard _ a -> [addFailure [a] ErrWildcardInType]
       TypeHole _ a -> [addFailure [nameTok a] ErrHoleInType]
+      _ -> []
+  sequence_ $ everythingOnTypes (<>) k ty
+
+checkNoForalls :: Type a -> Parser ()
+checkNoForalls ty = do
+  let
+    k = \case
+      TypeForall _ a _ _ _ -> [addFailure [a] ErrToken]
       _ -> []
   sequence_ $ everythingOnTypes (<>) k ty
 

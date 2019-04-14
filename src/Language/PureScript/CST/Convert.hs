@@ -150,9 +150,10 @@ convertType fileName = go
           let ann' = widenLeft (tokAnn $ nameTok a) $ T.getAnnForType t
           T.ForAll ann' (getIdent $ nameValue a) t Nothing
         -- TODO: fix forall in the compiler
-        k (TypeVarKinded (Wrapped _ (Labeled a _ _) _)) = mkForAll a
-        k (TypeVarName a) = mkForAll a
-        ty' = foldr k (go ty) bindings
+        k t (TypeVarKinded (Wrapped _ (Labeled a _ _) _)) = mkForAll a t
+        k t (TypeVarName a) = mkForAll a t
+        -- The existing parser builds variables in reverse order
+        ty' = foldl k (go ty) bindings
         ann = widenLeft (tokAnn kw) $ T.getAnnForType ty'
       T.setAnnForType ann ty'
     TypeKinded _ ty _ kd -> do

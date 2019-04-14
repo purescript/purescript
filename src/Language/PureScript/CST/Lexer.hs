@@ -562,16 +562,18 @@ token = peek >>= maybe (pure TokEof) k0
 
   {-
     fraction
-      : '.' [0-9] digits
+      : '.' [0-9_]+
   -}
   fraction :: Lexer (Maybe (Text, String))
-  fraction = peek >>= \case
-    Just '.' -> do
-      (raw, chs) <- next *> digits
-      if Text.null raw
-        then throw ErrExpectedFraction
-        else pure $ Just ("." <> raw, chs)
-    _ -> pure $ Nothing
+  fraction = Parser $ \inp _ ksucc ->
+    -- We need more than a single char lookahead for things like `1..10`.
+    case Text.uncons inp of
+      Just ('.', inp')
+        | (raw, inp'') <- Text.span isNumberChar inp'
+        , not (Text.null raw) ->
+            ksucc inp'' $ Just ("." <> raw, filter (/= '_') $ Text.unpack raw)
+      _ ->
+        ksucc inp Nothing
 
   {-
     digits

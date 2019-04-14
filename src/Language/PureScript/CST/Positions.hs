@@ -207,8 +207,8 @@ instanceRange (Instance hd bd)
 
 instanceHeadRange :: InstanceHead a -> TokenRange
 instanceHeadRange (InstanceHead kw _ _ _ cls types)
-  | [] <- types = (kw, snd . typeRange $ last types)
-  | otherwise = (kw, qualTok cls)
+  | [] <- types = (kw, qualTok cls)
+  | otherwise = (kw, snd . typeRange $ last types)
 
 instanceBindingRange :: InstanceBinding a -> TokenRange
 instanceBindingRange = \case
