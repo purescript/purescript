@@ -1,4 +1,6 @@
 language: node_js
+node_js:
+  - "10"
 branches:
   # Only build master and tagged versions, i.e. not feature branches; feature
   # branches already get built after opening a pull request.
@@ -48,7 +50,7 @@ install:
   then
     URL="https://www.stackage.org/stack/$TRAVIS_OS_NAME-x86_64"
     mkdir "$HOME/stack"
-    cd "$HOME/stack"
+    pushd "$HOME/stack"
     if [ "$TRAVIS_OS_NAME" = "windows" ]
     then
       curl --location "$URL" > stack.zip
@@ -59,6 +61,7 @@ install:
       tar -xzf stack.tar.gz --strip-components=1
       mv stack "$HOME/.local/bin/"
     fi
+    popd
   fi
 - stack --no-terminal setup
 - npm install -g bower # for psc-docs / psc-publish tests
