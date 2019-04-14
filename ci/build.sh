@@ -27,7 +27,7 @@ set -ex
 
 STACK="stack --no-terminal --jobs=1"
 
-STACK_OPTS="--test --haddock"
+STACK_OPTS="--test --haddock --no-haddock-deps"
 if [ "$CI_RELEASE" = "true" ]
 then
   STACK_OPTS="$STACK_OPTS --flag=purescript:RELEASE"
