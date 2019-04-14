@@ -158,7 +158,9 @@ tests:
     dependencies:
       - purescript
       - tasty
+      - tasty-golden
       - tasty-hspec
+      - tasty-quickcheck
       - hspec
       - hspec-discover
       - HUnit
