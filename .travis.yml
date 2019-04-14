@@ -110,10 +110,10 @@ install:
     export CI_RELEASE=true
   fi
 script:
-# Set a timeout of 30 minutes. We could also use travis_wait here, but
-# travis_wait doesn't produce any output until the command finishes, and also
-# doesn't always show all of the command's output.
-- $TIMEOUT 30m ci/build.sh
+# Set a timeout of 35 minutes. We could use travis_wait here, but travis_wait
+# doesn't produce any output until the command finishes, and also doesn't
+# always show all of the command's output.
+- $TIMEOUT 35m ci/build.sh
 before_deploy:
 - ./bundle/build.sh $OS_NAME
 deploy:
