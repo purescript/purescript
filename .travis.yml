@@ -20,7 +20,7 @@ matrix:
       # Workaround for a Travis caching bug on Windows where absolute paths
       # are not restored from caches properly:
       # https://github.com/travis-ci/casher/pull/38
-      env: STACK_ROOT=$TRAVIS_BUILD_DIR/.stack_root RELEASE_KEY=
+      env: STACK_ROOT=$TRAVIS_BUILD_DIR/.stack_root
       # workaround for https://travis-ci.community/t/windows-instances-hanging-before-install/250/15
       # We also zero out the RELEASE_KEY environment variable above to reduce
       # the risk of accidentally leaking it.
