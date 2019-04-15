@@ -124,7 +124,9 @@ script:
 # always show all of the command's output.
 - $TIMEOUT 35m ci/build.sh
 before_deploy:
-- ./sdist-test/bundle/build.sh $OS_NAME
+- pushd sdist-test
+- bundle/build.sh $OS_NAME
+- popd
 deploy:
   provider: releases
   api_key: $RELEASE_KEY
