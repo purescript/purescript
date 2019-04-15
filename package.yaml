@@ -17,6 +17,8 @@ github: purescript/purescript
 homepage: http://www.purescript.org/
 extra-source-files:
   - app/static/*
+  - bundle/build.sh
+  - bundle/README
   - tests/purs/**/*.js
   - tests/purs/**/*.purs
   - tests/purs/**/*.json

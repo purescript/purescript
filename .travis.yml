@@ -22,8 +22,6 @@ matrix:
       # https://github.com/travis-ci/casher/pull/38
       env: STACK_ROOT=$TRAVIS_BUILD_DIR/.stack_root
       # workaround for https://travis-ci.community/t/windows-instances-hanging-before-install/250/15
-      # We also zero out the RELEASE_KEY environment variable above to reduce
-      # the risk of accidentally leaking it.
       filter_secrets: false
 addons:
   apt:
@@ -48,7 +46,6 @@ cache:
 # given commit with if the cache was created by a parent of the commit being
 # built (which is sensible of them).
   directories:
-  - $HOME/.local/bin
   - $HOME/.stack
 
   # Workaround for a Travis caching bug on Windows where absolute paths
@@ -127,13 +124,13 @@ script:
 # always show all of the command's output.
 - $TIMEOUT 35m ci/build.sh
 before_deploy:
-- ./bundle/build.sh $OS_NAME
+- ./sdist-test/bundle/build.sh $OS_NAME
 deploy:
   provider: releases
   api_key: $RELEASE_KEY
   file:
-    - bundle/$OS_NAME.tar.gz
-    - bundle/$OS_NAME.sha
+    - sdist-test/bundle/$OS_NAME.tar.gz
+    - sdist-test/bundle/$OS_NAME.sha
   skip_cleanup: true
   on:
     all_branches: true
