@@ -813,8 +813,8 @@ checkFunctionApplication'
   -> SourceType
   -> Expr
   -> m (SourceType, Expr)
-checkFunctionApplication' fn (TypeApp _ (TypeApp _ tyFunction' argTy) retTy) arg = do
-  unifyTypes tyFunction' tyFunction
+checkFunctionApplication' fn (TypeApp _ (TypeApp _ tyFn argTy) retTy) arg = do
+  unifyTypes tyFn tyFunction
   arg' <- check arg argTy
   return (retTy, App fn arg')
 checkFunctionApplication' fn (ForAll _ ident ty _) arg = do
