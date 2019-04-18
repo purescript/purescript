@@ -216,8 +216,8 @@ infer'
    . (MonadError MultipleErrors m, MonadState CheckState m)
   => SourceType
   -> m (SourceKind, [(Text, SourceKind)])
-infer' (ForAll ann ident ty _) = do
-  k1 <- freshKind ann
+infer' (ForAll ann ident mbK ty _) = do
+  k1 <- maybe (freshKind ann) pure mbK
   Just moduleName <- checkCurrentModule <$> get
   (k2, args) <- bindLocalTypeVariables moduleName [(ProperName ident, k1)] $ infer ty
   unifyKinds k2 kindType
@@ -229,8 +229,8 @@ infer' (KindedType _ ty k) = do
 infer' other = (, []) <$> go other
   where
   go :: SourceType -> m SourceKind
-  go (ForAll ann ident ty _) = do
-    k1 <- freshKind ann
+  go (ForAll ann ident mbK ty _) = do
+    k1 <- maybe (freshKind ann) pure mbK
     Just moduleName <- checkCurrentModule <$> get
     k2 <- bindLocalTypeVariables moduleName [(ProperName ident, k1)] $ go ty
     unifyKinds k2 kindType

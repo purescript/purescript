@@ -75,10 +75,10 @@ subsumes'
   -> SourceType
   -> SourceType
   -> m (Coercion mode)
-subsumes' mode (ForAll _ ident ty1 _) ty2 = do
+subsumes' mode (ForAll _ ident _ ty1 _) ty2 = do
   replaced <- replaceVarWithUnknown ident ty1
   subsumes' mode replaced ty2
-subsumes' mode ty1 (ForAll _ ident ty2 sco) =
+subsumes' mode ty1 (ForAll _ ident _ ty2 sco) =
   case sco of
     Just sco' -> do
       sko <- newSkolemConstant

@@ -51,7 +51,7 @@ data PrettyPrintType
   | PPKindedType PrettyPrintType (Kind ())
   | PPBinaryNoParensType PrettyPrintType PrettyPrintType PrettyPrintType
   | PPParensInType PrettyPrintType
-  | PPForAll [Text] PrettyPrintType
+  | PPForAll [(Text, Maybe (Kind ()))] PrettyPrintType
   | PPFunction PrettyPrintType PrettyPrintType
   | PPRecord [(Label, PrettyPrintType)] (Maybe PrettyPrintType)
   | PPRow [(Label, PrettyPrintType)] (Maybe PrettyPrintType)
@@ -76,10 +76,10 @@ convertPrettyPrintType = go
   go d (ParensInType _ ty) = PPParensInType (go (d-1) ty)
   go _ (REmpty _) = PPRow [] Nothing
   go d ty@RCons{} = uncurry PPRow (goRow d ty)
-  go d (ForAll _ v ty _) = goForAll d [v] ty
+  go d (ForAll _ v mbK ty _) = goForAll d [(v, fmap ($> ()) mbK)] ty
   go d (TypeApp _ a b) = goTypeApp d a b
 
-  goForAll d vs (ForAll _ v ty _) = goForAll d (v : vs) ty
+  goForAll d vs (ForAll _ v mbK ty _) = goForAll d ((v, fmap ($> ()) mbK) : vs) ty
   goForAll d vs ty = PPForAll vs (go (d-1) ty)
 
   goRow d ty =
@@ -194,7 +194,7 @@ matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
     OperatorTable [ [ AssocL typeApp $ \f x -> keepSingleLinesOr (moveRight 2) f x ]
                   , [ AssocR appliedFunction $ \arg ret -> keepSingleLinesOr id arg (text rightArrow <> " " <> ret) ]
                   , [ Wrap constrained $ \deps ty -> constraintsAsBox tro deps ty ]
-                  , [ Wrap forall_ $ \idents ty -> keepSingleLinesOr (moveRight 2) (text (forall' ++ " " ++ unwords idents ++ ".")) ty ]
+                  , [ Wrap forall_ $ \idents ty -> keepSingleLinesOr (moveRight 2) (text (forall' ++ " " ++ unwords (fmap printMbKindedType idents) ++ ".")) ty ]
                   , [ Wrap kinded $ \k ty -> keepSingleLinesOr (moveRight 2) ty (text (doubleColon ++ " " ++ T.unpack (prettyPrintKind k))) ]
                   , [ Wrap explicitParens $ \_ ty -> ty ]
                   ]
@@ -202,6 +202,7 @@ matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
   rightArrow = if troUnicode tro then "→" else "->"
   forall' = if troUnicode tro then "∀" else "forall"
   doubleColon = if troUnicode tro then "∷" else "::"
+  printMbKindedType (v, mbK) = maybe v (\k -> unwords ["(" ++ v, doubleColon, T.unpack (prettyPrintKind k) ++ ")"]) mbK
 
   -- If both boxes span a single line, keep them on the same line, or else
   -- use the specified function to modify the second box, then combine vertically.
@@ -210,10 +211,10 @@ matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
     | rows b1 > 1 || rows b2 > 1 = vcat left [ b1, f b2 ]
     | otherwise = hcat top [ b1, text " ", b2]
 
-forall_ :: Pattern () PrettyPrintType ([String], PrettyPrintType)
+forall_ :: Pattern () PrettyPrintType ([(String, Maybe (Kind ()))], PrettyPrintType)
 forall_ = mkPattern match
   where
-  match (PPForAll idents ty) = Just (map T.unpack idents, ty)
+  match (PPForAll idents ty) = Just (map (\(v, mbK) -> (T.unpack v, mbK)) idents, ty)
   match _ = Nothing
 
 typeAtomAsBox' :: PrettyPrintType -> Box
