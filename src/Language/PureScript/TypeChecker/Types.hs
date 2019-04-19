@@ -842,13 +842,13 @@ checkFunctionApplication' fn (ConstrainedType _ con fnTy) arg = do
 checkFunctionApplication' fn fnTy dict@TypeClassDictionary{} =
   return (fnTy, App fn dict)
 checkFunctionApplication' fn u arg = do
-  TypedValue' checkType expr ty <- do
+  tv@(TypedValue' _ _ ty) <- do
     TypedValue' _ arg' t <- infer arg
     (arg'', t') <- instantiatePolyTypeWithUnknowns arg' t
     return $ TypedValue' True arg'' t'
   ret <- freshType
   unifyTypes u (function ty ret)
-  return (ret, App fn (TypedValue checkType expr ty))
+  return (ret, App fn (tvToExpr tv))
 
 -- |
 -- Ensure a set of property names and value does not contain duplicate labels
