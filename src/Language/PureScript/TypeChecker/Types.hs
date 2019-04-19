@@ -5,7 +5,6 @@
 --
 module Language.PureScript.TypeChecker.Types
   ( BindingGroupType(..)
-  , TypedValue'(..)
   , typesOf
   ) where
 
