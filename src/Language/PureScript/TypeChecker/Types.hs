@@ -69,8 +69,10 @@ data BindingGroupType
   | NonRecursiveBindingGroup
   deriving (Show, Eq, Ord)
 
+-- | The result of a successful type check.
 data Inferred = Inferred Bool Expr SourceType
 
+-- | Convert an inferred value into an expression.
 inferredToExpr :: Inferred -> Expr
 inferredToExpr (Inferred c e t) = TypedValue c e t
 
@@ -437,7 +439,7 @@ inferLetBinding
   -> (Expr -> m Inferred)
   -> m ([Declaration], Inferred)
 inferLetBinding seen [] ret j = (,) seen <$> withBindingGroupVisible (j ret)
-inferLetBinding seen (ValueDecl sa@(ss, _) ident nameKind [] [MkUnguarded tv@(TypedValue checkType val ty)] : rest) ret j = do
+inferLetBinding seen (ValueDecl sa@(ss, _) ident nameKind [] [MkUnguarded (TypedValue checkType val ty)] : rest) ret j = do
   moduleName <- unsafeCheckCurrentModule
   Inferred _ val' ty'' <- warnAndRethrowWithPositionTC ss $ do
     (kind, args) <- kindOfWithScopedVars ty
@@ -631,7 +633,7 @@ check' val (ForAll ann ident mbK ty _) = do
              _ -> NullSourceAnn
       sk = skolemize ss ident sko scope ty
       skVal = skolemizeTypesInValue ss ident sko scope val
-  val' <- check skVal sk
+  val' <- inferredToExpr <$> check skVal sk
   return $ Inferred True val' (ForAll ann ident mbK ty (Just scope))
 check' val t@(ConstrainedType _ con@(Constraint _ (Qualified _ (ProperName className)) _ _) ty) = do
   dictName <- freshIdent ("dict" <> className)
@@ -763,9 +765,9 @@ checkProperties
   -> SourceType
   -> Bool
   -> m [(PSString, Expr)]
-checkProperties expr ps row lax = convert <$> go ps (toRowPair <$> ts) r' where
+checkProperties expr ps row lax = convert <$> go ps (toRowPair <$> ts') r' where
   convert = fmap (fmap inferredToExpr)
-  (ts, r') = rowToList row
+  (ts', r') = rowToList row
   toRowPair (RowListItem _ lbl ty) = (lbl, ty)
   go [] [] (REmpty _) = return []
   go [] [] u@(TUnknown _ _)
@@ -840,13 +842,13 @@ checkFunctionApplication' fn (ConstrainedType _ con fnTy) arg = do
 checkFunctionApplication' fn fnTy dict@TypeClassDictionary{} =
   return (fnTy, App fn dict)
 checkFunctionApplication' fn u arg = do
-  Inferred check expr ty <- do
+  Inferred checkType expr ty <- do
     Inferred _ arg' t <- infer arg
     (arg'', t') <- instantiatePolyTypeWithUnknowns arg' t
     return $ Inferred True arg'' t'
   ret <- freshType
   unifyTypes u (function ty ret)
-  return (ret, App fn (TypedValue check expr ty))
+  return (ret, App fn (TypedValue checkType expr ty))
 
 -- |
 -- Ensure a set of property names and value does not contain duplicate labels
