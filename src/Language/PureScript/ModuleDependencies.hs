@@ -7,12 +7,11 @@ module Language.PureScript.ModuleDependencies
 import           Protolude hiding (head)
 
 import           Data.Graph
-import           Data.List.NonEmpty (NonEmpty((:|)))
 import qualified Data.Set as S
 import           Language.PureScript.AST
 import qualified Language.PureScript.Constants as C
 import           Language.PureScript.Crash
-import           Language.PureScript.Errors
+import           Language.PureScript.Errors hiding (nonEmpty)
 import           Language.PureScript.Names
 
 -- | A list of modules with their transitive dependencies
@@ -59,9 +58,11 @@ usedModules _ = Nothing
 -- | Convert a strongly connected component of the module graph to a module
 toModule :: MonadError MultipleErrors m => SCC Module -> m Module
 toModule (AcyclicSCC m) = return m
-toModule (CyclicSCC []) = internalError "toModule: empty CyclicSCC"
-toModule (CyclicSCC [m]) = return m
-toModule (CyclicSCC (m : ms)) =
-  throwError
-    . errorMessage'' (fmap getModuleSourceSpan (m :| ms))
-    $ CycleInModules (map getModuleName ms)
+toModule (CyclicSCC ms) =
+  case nonEmpty ms of
+    Nothing ->
+      internalError "toModule: empty CyclicSCC"
+    Just ms' ->
+      throwError
+        . errorMessage'' (fmap getModuleSourceSpan ms')
+        $ CycleInModules (map getModuleName ms)
