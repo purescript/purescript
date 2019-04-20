@@ -112,7 +112,7 @@ construct
   -> ([Module], [(ModuleName, [ModuleName])])
   -> m BuildPlan
 construct MakeActions{..} (sorted, graph) = do
-  prebuilt <- foldl' prunePrebuiltModules M.empty . catMaybes <$> A.forConcurrently sorted findExistingExtern
+  prebuilt <- foldl' collectPrebuiltModules M.empty . catMaybes <$> A.forConcurrently sorted findExistingExtern
   let toBeRebuilt = filter (not . flip M.member prebuilt . getModuleName) sorted
   buildJobs <- foldM makeBuildJob M.empty (map getModuleName toBeRebuilt)
   pure $ BuildPlan prebuilt buildJobs
@@ -121,33 +121,37 @@ construct MakeActions{..} (sorted, graph) = do
       buildJob <- BuildJob <$> C.newEmptyMVar <*> C.newEmptyMVar
       pure (M.insert moduleName buildJob prev)
 
-    findExistingExtern :: Module -> m (Maybe (ModuleName, Prebuilt))
+    findExistingExtern :: Module -> m (Maybe (ModuleName, Bool, Prebuilt))
     findExistingExtern (getModuleName -> moduleName) = runMaybeT $ do
-      outputTimestamp <- MaybeT $ getOutputTimestamp moduleName
       inputTimestamp <- lift $ getInputTimestamp moduleName
-      existingTimestamp <- MaybeT $ pure $ case inputTimestamp of
-        Left RebuildNever ->
-          Just outputTimestamp
-        Right (Just t1) | t1 < outputTimestamp ->
-          Just outputTimestamp
-        _ -> Nothing
+      (rebuildNever, existingTimestamp) <-
+        case inputTimestamp of
+          Left RebuildNever ->
+            fmap (True,) $ MaybeT $ getOutputTimestamp moduleName
+          Right (Just t1) -> do
+            outputTimestamp <- MaybeT $ getOutputTimestamp moduleName
+            guard (t1 < outputTimestamp)
+            pure (False, outputTimestamp)
+          _ -> mzero
       externsFile <- MaybeT $ decodeExterns . snd <$> readExterns moduleName
-      pure (moduleName, Prebuilt existingTimestamp externsFile)
+      pure (moduleName, rebuildNever, Prebuilt existingTimestamp externsFile)
 
-    prunePrebuiltModules :: M.Map ModuleName Prebuilt -> (ModuleName, Prebuilt) -> M.Map ModuleName Prebuilt
-    prunePrebuiltModules prev (moduleName, pb) = do
-      let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
-      case traverse (fmap pbModificationTime . flip M.lookup prev) deps of
-        Nothing ->
-          -- If we end up here, one of the dependencies didn't exist in the
-          -- prebuilt map and so we know a dependency needs to be rebuilt, which
-          -- means we need to be rebuilt in turn.
-          prev
-        Just modTimes ->
-          case maximumMaybe modTimes of
-            Just depModTime | pbModificationTime pb < depModTime ->
+    collectPrebuiltModules :: M.Map ModuleName Prebuilt -> (ModuleName, Bool, Prebuilt) -> M.Map ModuleName Prebuilt
+    collectPrebuiltModules prev (moduleName, rebuildNever, pb)
+      | rebuildNever = M.insert moduleName pb prev
+      | otherwise = do
+          let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
+          case traverse (fmap pbModificationTime . flip M.lookup prev) deps of
+            Nothing ->
+              -- If we end up here, one of the dependencies didn't exist in the
+              -- prebuilt map and so we know a dependency needs to be rebuilt, which
+              -- means we need to be rebuilt in turn.
               prev
-            _ -> M.insert moduleName pb prev
+            Just modTimes ->
+              case maximumMaybe modTimes of
+                Just depModTime | pbModificationTime pb < depModTime ->
+                  prev
+                _ -> M.insert moduleName pb prev
 
 maximumMaybe :: Ord a => [a] -> Maybe a
 maximumMaybe [] = Nothing
