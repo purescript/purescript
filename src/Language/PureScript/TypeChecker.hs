@@ -75,7 +75,7 @@ addDataConstructor moduleName dtype name args dctor dctorArgs = do
   traverse_ checkTypeSynonyms tys
   let retTy = foldl srcTypeApp (srcTypeConstructor (Qualified (Just moduleName) name)) (map srcTypeVar args)
   let dctorTy = foldr function retTy tys
-  let polyType = mkForAll (map (NullSourceAnn,) args) dctorTy
+  let polyType = mkForAll (map (\i -> (NullSourceAnn, (i, Nothing))) args) dctorTy
   putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (dtype, name, polyType, fields) (dataConstructors env) }
 
 addTypeSynonym

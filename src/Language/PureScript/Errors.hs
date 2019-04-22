@@ -571,9 +571,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (CycleInDeclaration nm) =
       line $ "The value of " <> markCode (showIdent nm) <> " is undefined here, so this reference is not allowed."
     renderSimpleErrorMessage (CycleInModules mns) =
-      paras [ line "There is a cycle in module dependencies in these modules: "
-            , indent $ paras (map (line . markCode . runModuleName) mns)
-            ]
+      case mns of
+        [mn] ->
+          line $ "Module " <> markCode (runModuleName mn) <> " imports itself."
+        _ ->
+          paras [ line "There is a cycle in module dependencies in these modules: "
+                , indent $ paras (map (line . markCode . runModuleName) mns)
+                ]
     renderSimpleErrorMessage (CycleInTypeSynonym name) =
       paras [ line $ case name of
                        Just pn -> "A cycle appears in the definition of type synonym " <> markCode (runProperName pn)
@@ -582,10 +586,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , line "Consider using a 'newtype' instead."
             ]
     renderSimpleErrorMessage (CycleInTypeClassDeclaration [name]) =
-      paras [ line $ "A type class '" <> markCode (runProperName name) <> "' may not have itself as a superclass." ]
+      paras [ line $ "A type class '" <> markCode (runProperName (disqualify name)) <> "' may not have itself as a superclass." ]
     renderSimpleErrorMessage (CycleInTypeClassDeclaration names) =
       paras [ line $ "A cycle appears in a set of type class definitions:"
-            , indent $ line $ "{" <> (T.intercalate ", " (map (markCode . runProperName) names)) <> "}"
+            , indent $ line $ "{" <> (T.intercalate ", " (map (markCode . runProperName . disqualify) names)) <> "}"
             , line "Cycles are disallowed because they can lead to loops in the type checker."
             ]
     renderSimpleErrorMessage (NameIsUndefined ident) =

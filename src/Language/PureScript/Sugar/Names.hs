@@ -333,6 +333,9 @@ renameInModule imports (Module modSS coms mn decls exps) =
     updateType (TypeOp ann@(ss, _) name) = TypeOp ann <$> updateTypeOpName name ss
     updateType (TypeConstructor ann@(ss, _) name) = TypeConstructor ann <$> updateTypeName name ss
     updateType (ConstrainedType ann c t) = ConstrainedType ann <$> updateInConstraint c <*> pure t
+    updateType (ForAll ann v mbK t sco) = case mbK of
+      Nothing -> pure $ ForAll ann v Nothing t sco
+      Just k -> ForAll ann v <$> fmap pure (updateKindsEverywhere k) <*> pure t <*> pure sco
     updateType (KindedType ann t k) = KindedType ann t <$> updateKindsEverywhere k
     updateType t = return t
     updateInConstraint :: SourceConstraint -> m SourceConstraint

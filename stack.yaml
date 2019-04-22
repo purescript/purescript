@@ -2,6 +2,7 @@ resolver: lts-13.12
 packages:
 - '.'
 extra-deps:
+- network-3.0.1.1
 nix:
   enable: false
   packages:

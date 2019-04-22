@@ -146,12 +146,11 @@ convertType fileName = go
       T.TypeApp ann (Env.tyRecord $> annRec) $ goRow row b
     TypeForall _ kw bindings _ ty -> do
       let
-        mkForAll a t = do
+        mkForAll a b t = do
           let ann' = widenLeft (tokAnn $ nameTok a) $ T.getAnnForType t
-          T.ForAll ann' (getIdent $ nameValue a) t Nothing
-        -- TODO: fix forall in the compiler
-        k t (TypeVarKinded (Wrapped _ (Labeled a _ _) _)) = mkForAll a t
-        k t (TypeVarName a) = mkForAll a t
+          T.ForAll ann' (getIdent $ nameValue a) b t Nothing
+        k t (TypeVarKinded (Wrapped _ (Labeled a _ b) _)) = mkForAll a (Just (convertKind fileName b)) t
+        k t (TypeVarName a) = mkForAll a Nothing t
         -- The existing parser builds variables in reverse order
         ty' = foldl k (go ty) bindings
         ann = widenLeft (tokAnn kw) $ T.getAnnForType ty'

@@ -131,15 +131,15 @@ matchType = buildPrettyPrinter operators matchTypeAtom
     OperatorTable [ [ AssocL typeApp $ \f x -> f <> sp <> x ]
                   , [ AssocR appliedFunction $ \arg ret -> mintersperse sp [arg, syntax "->", ret] ]
                   , [ Wrap constrained $ \deps ty -> renderConstraints deps ty ]
-                  , [ Wrap forall_ $ \tyVars ty -> mconcat [keywordForall, sp, mintersperse sp (map typeVar tyVars), syntax ".", sp, ty] ]
+                  , [ Wrap forall_ $ \tyVars ty -> mconcat [ keywordForall, sp, renderTypeVars tyVars, syntax ".", sp, ty ] ]
                   , [ Wrap kinded $ \k ty -> mintersperse sp [ty, syntax "::", renderKind k] ]
                   , [ Wrap explicitParens $ \_ ty -> ty ]
                   ]
 
-forall_ :: Pattern () PrettyPrintType ([Text], PrettyPrintType)
+forall_ :: Pattern () PrettyPrintType ([(Text, Maybe (Kind ()))], PrettyPrintType)
 forall_ = mkPattern match
   where
-  match (PPForAll idents ty) = Just (idents, ty)
+  match (PPForAll mbKindedIdents ty) = Just (mbKindedIdents, ty)
   match _ = Nothing
 
 -- |
@@ -152,6 +152,14 @@ renderType' :: PrettyPrintType -> RenderedCode
 renderType'
   = fromMaybe (internalError "Incomplete pattern")
   . PA.pattern matchType ()
+
+renderTypeVars :: [(Text, Maybe (Kind a))] -> RenderedCode
+renderTypeVars tyVars = mintersperse sp (map renderTypeVar tyVars)
+
+renderTypeVar :: (Text, Maybe (Kind a)) -> RenderedCode
+renderTypeVar (v, mbK) = case mbK of
+  Nothing -> typeVar v
+  Just k -> mintersperse sp [ mconcat [syntax "(", typeVar v], syntax "::", mconcat [renderKind k, syntax ")"] ]
 
 -- |
 -- Render code representing a Type, as it should appear inside parentheses

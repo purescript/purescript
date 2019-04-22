@@ -282,7 +282,7 @@ instantiatePolyTypeWithUnknowns
   => Expr
   -> SourceType
   -> m (Expr, SourceType)
-instantiatePolyTypeWithUnknowns val (ForAll _ ident ty _) = do
+instantiatePolyTypeWithUnknowns val (ForAll _ ident _ ty _) = do
   ty' <- replaceVarWithUnknown ident ty
   instantiatePolyTypeWithUnknowns val ty'
 instantiatePolyTypeWithUnknowns val (ConstrainedType _ con ty) = do
@@ -614,7 +614,7 @@ check'
   => Expr
   -> SourceType
   -> m Expr
-check' val (ForAll ann ident ty _) = do
+check' val (ForAll ann ident mbK ty _) = do
   scope <- newSkolemScope
   sko <- newSkolemConstant
   let ss = case val of
@@ -623,7 +623,7 @@ check' val (ForAll ann ident ty _) = do
       sk = skolemize ss ident sko scope ty
       skVal = skolemizeTypesInValue ss ident sko scope val
   val' <- check skVal sk
-  return $ TypedValue True val' (ForAll ann ident ty (Just scope))
+  return $ TypedValue True val' (ForAll ann ident mbK ty (Just scope))
 check' val t@(ConstrainedType _ con@(Constraint _ (Qualified _ (ProperName className)) _ _) ty) = do
   dictName <- freshIdent ("dict" <> className)
   dicts <- newDictionaries [] (Qualified Nothing dictName) con
@@ -817,7 +817,7 @@ checkFunctionApplication' fn (TypeApp _ (TypeApp _ tyFunction' argTy) retTy) arg
   unifyTypes tyFunction' tyFunction
   arg' <- check arg argTy
   return (retTy, App fn arg')
-checkFunctionApplication' fn (ForAll _ ident ty _) arg = do
+checkFunctionApplication' fn (ForAll _ ident _ ty _) arg = do
   replaced <- replaceVarWithUnknown ident ty
   checkFunctionApplication fn replaced arg
 checkFunctionApplication' fn (KindedType _ ty _) arg =
