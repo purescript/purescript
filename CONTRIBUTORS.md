@@ -131,6 +131,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@dariooddenino](https://github.com/dariooddenino) | Dario Oddenino | [MIT license](http://opensource.org/licenses/MIT) |
 | [@jordanmartinez](https://github.com/jordanmartinez) | Jordan Martinez | [MIT license](http://opensource.org/licenses/MIT) |
 | [@Saulukass](https://github.com/Saulukass) | Saulius Skliutas | [MIT license](http://opensource.org/licenses/MIT) |
+| [@adnelson](https://github.com/adnelson) | Allen Nelson | [MIT license](http://opensource.org/licenses/MIT) |
 
 ### Contributors using Modified Terms
 

@@ -60,8 +60,9 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
       withPrim = importPrim m
   lint withPrim
   ((Module ss coms _ elaborated exps, env'), nextVar) <- runSupplyT 0 $ do
-    [desugared] <- desugar externs [withPrim]
-    runCheck' (emptyCheckState env) $ typeCheckModule desugared
+    desugar externs [withPrim] >>= \case
+      [desugared] -> runCheck' (emptyCheckState env) $ typeCheckModule desugared
+      _ -> internalError "desugar did not return a singleton"
 
   -- desugar case declarations *after* type- and exhaustiveness checking
   -- since pattern guards introduces cases which the exhaustiveness checker
