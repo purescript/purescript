@@ -648,7 +648,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
   checkClassMembersAreExported dr@(TypeClassRef ss' name) = do
     let members = ValueRef ss' `map` head (mapMaybe findClassMembers decls)
     let missingMembers = members \\ exps
-    unless (null missingMembers) . throwError . errorMessage' ss' $ TransitiveExportError dr members
+    unless (null missingMembers) . throwError . errorMessage' ss' $ TransitiveExportError dr missingMembers
     where
     findClassMembers :: Declaration -> Maybe [Ident]
     findClassMembers (TypeClassDeclaration _ name' _ _ _ ds) | name == name' = Just $ map extractMemberName ds
