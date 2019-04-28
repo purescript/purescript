@@ -1,3 +1,10 @@
+-- | This module contains data types for the entire PureScript surface language. Every
+-- token is represented in the tree, and every token is annotated with
+-- whitespace and comments (both leading and trailing). This means one can write
+-- an exact printer so that `print . parse = id`. Every constructor is laid out
+-- with tokens in left-to-right order. The core productions are given a slot for
+-- arbitrary annotations, however this is not used by the parser.
+
 module Language.PureScript.CST.Types where
 
 import Prelude

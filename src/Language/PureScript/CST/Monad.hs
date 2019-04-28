@@ -25,6 +25,7 @@ data ParserState = ParserState
   , parserErrors :: [ParserError]
   } deriving (Show)
 
+-- | A bare bones, CPS'ed `StateT s (Except e) a`.
 newtype ParserM e s a =
   Parser (forall r. s -> (s -> e -> r) -> (s -> a -> r) -> r)
 

@@ -1,3 +1,23 @@
+-- | The parser itself is unaware of indentation, and instead only parses explicit
+-- delimiters which are inserted by this layout algorithm (much like Haskell).
+-- This is convenient because the actual grammar can be specified apart from the
+-- indentation rules. Haskell has a few problematic productions which make it
+-- impossible to implement a purely lexical layout algorithm, so it also has an
+-- additional (and somewhat contentious) parser error side condition. PureScript
+-- does not have these problematic productions (particularly foo, bar ::
+-- SomeType syntax in declarations), but it does have a few gotchas of it's own.
+-- The algorithm is "non-trivial" to say the least, but it is implemented as a
+-- purely lexical delimiter parser on a token-by-token basis, which is highly
+-- convenient, since it can be replicated in any language or toolchain. There is
+-- likely room to simplify it, but there are some seemingly innocuous things
+-- that complicate it.
+--
+-- "Naked" commas (case, patterns, guards, fundeps) are a constant source of
+-- complexity, and indeed too much of this is what prevents Haskell from having
+-- such an algorithm. Unquoted properties for layout keywords introduce a domino
+-- effect of complexity since we have to mask and unmask any usage of . (also in
+-- foralls!) or labels in record literals.
+
 module Language.PureScript.CST.Layout where
 
 import Prelude

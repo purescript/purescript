@@ -1,4 +1,13 @@
-module Language.PureScript.CST.Print where
+-- | This is just a simple token printer. It's not a full fledged formatter, but
+-- it is used by the layout golden tests. Printing each token in the tree with
+-- this printer will result in the exact input that was given to the lexer.
+
+module Language.PureScript.CST.Print
+  ( printToken
+  , printTokens
+  , printLeadingComment
+  , printTrailingComment
+  ) where
 
 import Prelude
 
@@ -55,17 +64,19 @@ printTokens :: [SourceToken] -> Text
 printTokens toks = Text.concat (map pp toks)
   where
   pp (SourceToken (TokenAnn _ leading trailing) tok) =
-    Text.concat (map ppLc leading)
+    Text.concat (map printLeadingComment leading)
       <> printToken tok
-      <> Text.concat (map ppTc trailing)
+      <> Text.concat (map printTrailingComment trailing)
 
-  ppLc = \case
-    Comment raw -> raw
-    Space n -> Text.replicate n " "
-    Line LF -> "\n"
-    Line CRLF -> "\r\n"
+printLeadingComment :: Comment LineFeed -> Text
+printLeadingComment = \case
+  Comment raw -> raw
+  Space n -> Text.replicate n " "
+  Line LF -> "\n"
+  Line CRLF -> "\r\n"
 
-  ppTc = \case
-    Comment raw -> raw
-    Space n -> Text.replicate n " "
-    Line _ -> ""
+printTrailingComment :: Comment void -> Text
+printTrailingComment = \case
+  Comment raw -> raw
+  Space n -> Text.replicate n " "
+  Line _ -> ""
