@@ -97,9 +97,12 @@ make ma@MakeActions{..} ms = do
 
   let toBeRebuilt = filter (BuildPlan.needsRebuild buildPlan . getModuleName . CST.resPartial) sorted
   for_ toBeRebuilt $ \m -> fork $ do
-    full <- CST.unwrapParserError (spanName . getModuleSourceSpan . CST.resPartial $ m) $ CST.resFull m
-    let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup (getModuleName full) graph)
-    buildModule buildPlan (importPrim full) (deps `inOrderOf` map (getModuleName . CST.resPartial) sorted)
+    let moduleName = getModuleName . CST.resPartial $ m
+    let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
+    buildModule buildPlan moduleName
+      (spanName . getModuleSourceSpan . CST.resPartial $ m)
+      (importPrim <$> CST.resFull m)
+      (deps `inOrderOf` map (getModuleName . CST.resPartial) sorted)
 
   -- Wait for all threads to complete, and collect errors.
   errors <- BuildPlan.collectErrors buildPlan
@@ -147,8 +150,9 @@ make ma@MakeActions{..} ms = do
   inOrderOf :: (Ord a) => [a] -> [a] -> [a]
   inOrderOf xs ys = let s = S.fromList xs in filter (`S.member` s) ys
 
-  buildModule :: BuildPlan -> Module -> [ModuleName] -> m ()
-  buildModule buildPlan m@(Module _ _ moduleName _ _) deps = flip catchError (complete Nothing . Just) $ do
+  buildModule :: BuildPlan -> ModuleName -> FilePath -> Either (NEL.NonEmpty CST.ParserError) Module -> [ModuleName] -> m ()
+  buildModule buildPlan moduleName fp mres deps = flip catchError (complete Nothing . Just) $ do
+    m <- CST.unwrapParserError fp mres
     -- We need to wait for dependencies to be built, before checking if the current
     -- module should be rebuilt, so the first thing to do is to wait on the
     -- MVars for the module's dependencies.
