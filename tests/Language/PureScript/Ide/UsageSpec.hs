@@ -77,6 +77,4 @@ spec = describe "Finding Usages" $ do
         Test.runIde [ load ["FindUsage", "FindUsage.Definition", "FindUsage.Reexport"]
                     , usage (Test.mn "FindUsage.Reexport") "toBeReexported" IdeNSValue
                     ]
-        -- TODO(Christoph): Interesting parser bug here. It seems the position
-        -- of the last token in the file has the wrong ending span
       usage1 `shouldBeUsage` ("src" </> "FindUsage.purs", "12:19-12:33")
