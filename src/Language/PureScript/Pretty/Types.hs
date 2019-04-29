@@ -70,8 +70,11 @@ convertPrettyPrintType = go
   go _ (TypeOp _ o) = PPTypeOp o
   go _ (Skolem _ t n _) = PPSkolem t n
   go _ (REmpty _) = PPRow [] Nothing
+  -- Guard the remaining "complex" type atoms on the current depth value. The
+  -- prior  constructors can all be printed simply so it's not really helpful to
+  -- truncate them.
   go d _ | d < 0 = PPTruncated
-  go d (ConstrainedType _ (Constraint _ cls args _) ty) = PPConstrainedType (cls, go d <$> args) (go d ty)
+  go d (ConstrainedType _ (Constraint _ cls args _) ty) = PPConstrainedType (cls, go (d-1) <$> args) (go d ty)
   go d (KindedType _ ty k) = PPKindedType (go (d-1) ty) (k $> ())
   go d (BinaryNoParensType _ ty1 ty2 ty3) = PPBinaryNoParensType (go (d-1) ty1) (go (d-1) ty2) (go (d-1) ty3)
   go d (ParensInType _ ty) = PPParensInType (go (d-1) ty)
