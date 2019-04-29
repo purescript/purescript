@@ -62,7 +62,6 @@ type PrettyPrintConstraint = (Qualified (ProperName 'ClassName), [PrettyPrintTyp
 convertPrettyPrintType :: Int -> Type a -> PrettyPrintType
 convertPrettyPrintType = go
   where
-  go d _ | d < 0 = PPTruncated
   go _ (TUnknown _ n) = PPTUnknown n
   go _ (TypeVar _ t) = PPTypeVar t
   go _ (TypeLevelString _ s) = PPTypeLevelString s
@@ -70,11 +69,15 @@ convertPrettyPrintType = go
   go _ (TypeConstructor _ c) = PPTypeConstructor c
   go _ (TypeOp _ o) = PPTypeOp o
   go _ (Skolem _ t n _) = PPSkolem t n
-  go d (ConstrainedType _ (Constraint _ cls args _) ty) = PPConstrainedType (cls, go (d-1) <$> args) (go (d-1) ty)
+  go _ (REmpty _) = PPRow [] Nothing
+  -- Guard the remaining "complex" type atoms on the current depth value. The
+  -- prior  constructors can all be printed simply so it's not really helpful to
+  -- truncate them.
+  go d _ | d < 0 = PPTruncated
+  go d (ConstrainedType _ (Constraint _ cls args _) ty) = PPConstrainedType (cls, go (d-1) <$> args) (go d ty)
   go d (KindedType _ ty k) = PPKindedType (go (d-1) ty) (k $> ())
   go d (BinaryNoParensType _ ty1 ty2 ty3) = PPBinaryNoParensType (go (d-1) ty1) (go (d-1) ty2) (go (d-1) ty3)
   go d (ParensInType _ ty) = PPParensInType (go (d-1) ty)
-  go _ (REmpty _) = PPRow [] Nothing
   go d ty@RCons{} = uncurry PPRow (goRow d ty)
   go d (ForAll _ v mbK ty _) = goForAll d [(v, fmap ($> ()) mbK)] ty
   go d (TypeApp _ a b) = goTypeApp d a b
