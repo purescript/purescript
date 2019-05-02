@@ -157,6 +157,12 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
               (substituteType subst)
               (uncurry TSAfter (typeSearch cons env st (substituteType subst ty)))
         in ErrorMessage hints (HoleInferredType x ty y (Just searchResult))
+      ErrorMessage hints (UnknownValueHint x ty y (Just (TSBefore env))) ->
+        let subst = checkSubstitution st
+            searchResult = onTypeSearchTypes
+              (substituteType subst)
+              (uncurry TSAfter (typeSearch cons env st (substituteType subst ty)))
+        in ErrorMessage hints (UnknownValueHint x ty y (Just searchResult))
       other -> other
 
     -- | Generalize type vars using forall and add inferred constraints
@@ -170,6 +176,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
 
     isHoleError :: ErrorMessage -> Bool
     isHoleError (ErrorMessage _ HoleInferredType{}) = True
+    isHoleError (ErrorMessage _ UnknownValueHint{}) = True
     isHoleError _ = False
 
 -- | A binding group contains multiple value definitions, some of which are typed
@@ -417,6 +424,12 @@ infer' (Hole name) = do
   env <- getEnv
   tell . errorMessage $ HoleInferredType name ty ctx . Just $ TSBefore env
   return $ TypedValue True (Hole name) ty
+infer' (UnknownValue name) = do
+  ty <- freshType
+  ctx <- getLocalContext
+  env <- getEnv
+  tell . errorMessage $ UnknownValueHint name ty ctx . Just $ TSBefore env
+  return $ TypedValue True (UnknownValue name) ty
 infer' (PositionedValue pos c val) = warnAndRethrowWithPositionTC pos $ do
   TypedValue t v ty <- infer' val
   return $ TypedValue t (PositionedValue pos c v) ty

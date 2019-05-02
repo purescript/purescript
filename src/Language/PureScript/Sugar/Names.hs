@@ -10,7 +10,7 @@ module Language.PureScript.Sugar.Names
   ) where
 
 import Prelude.Compat
-import Protolude (ordNub, sortBy, on)
+import Protolude (ordNub, sortBy, on, Text)
 
 import Control.Arrow (first)
 import Control.Monad
@@ -268,17 +268,30 @@ renameInModule imports (Module modSS coms mn decls exps) =
     unless (length (ordNub args) == length args) .
       throwError . errorMessage' pos $ OverlappingNamesInLet
     return ((pos, args ++ bound), Let w ds val')
-  updateValue (_, bound) (Var ss name'@(Qualified Nothing ident)) | ident `notElem` bound =
-    (,) (ss, bound) <$> (Var ss <$> updateValueName name' ss)
-  updateValue (_, bound) (Var ss name'@(Qualified (Just _) _)) =
-    (,) (ss, bound) <$> (Var ss <$> updateValueName name' ss)
-  updateValue (_, bound) (Op ss op) =
-    (,) (ss, bound) <$> (Op ss <$> updateValueOpName op ss)
-  updateValue (_, bound) (Constructor ss name) =
-    (,) (ss, bound) <$> (Constructor ss <$> updateDataConstructorName name ss)
+  updateValue (_, bound) (Var ss name'@(Qualified Nothing ident)) | ident `notElem` bound = do
+    updateOrReplaceValue (ss, bound) name' updateValueName' (Var ss) showIdent
+  updateValue (_, bound) (Var ss name'@(Qualified (Just _) _)) = do
+    updateOrReplaceValue (ss, bound) name' updateValueName' (Var ss) showIdent
+  updateValue (_, bound) (Op ss op) = do
+    updateOrReplaceValue (ss, bound) op updateValueOpName' (Op ss) showOp
+  updateValue (_, bound) (Constructor ss name) = do
+    updateOrReplaceValue (ss, bound) name updateDataConstructorName' (Constructor ss) runProperName
   updateValue s (TypedValue check val ty) =
     (,) s <$> (TypedValue check val <$> updateTypesEverywhere ty)
   updateValue s v = return (s, v)
+
+  updateOrReplaceValue
+    :: (SourceSpan, [Ident])
+    -> Qualified a
+    -> (Qualified a -> SourceSpan -> m (Maybe (Qualified a)))
+    -> (Qualified a -> Expr)
+    -> (a -> Text)
+    -> m ((SourceSpan, [Ident]), Expr)
+  updateOrReplaceValue (ss, bounds) name updateExpr mkExpr showA = do
+    updated <- updateExpr name ss
+    return $ case updated of
+      Just updated' -> ((ss, bounds), mkExpr updated')
+      Nothing -> ((ss, bounds), UnknownValue (showQualified showA name))
 
   updateBinder
     :: (SourceSpan, [Ident])
@@ -367,6 +380,12 @@ renameInModule imports (Module modSS coms mn decls exps) =
     -> m (Qualified (ProperName 'ConstructorName))
   updateDataConstructorName = update (importedDataConstructors imports) DctorName
 
+  updateDataConstructorName'
+    :: Qualified (ProperName 'ConstructorName)
+    -> SourceSpan
+    -> m (Maybe (Qualified (ProperName 'ConstructorName)))
+  updateDataConstructorName' = update' (importedDataConstructors imports) DctorName
+
   updateClassName
     :: Qualified (ProperName 'ClassName)
     -> SourceSpan
@@ -376,11 +395,20 @@ renameInModule imports (Module modSS coms mn decls exps) =
   updateValueName :: Qualified Ident -> SourceSpan -> m (Qualified Ident)
   updateValueName = update (importedValues imports) IdentName
 
+  updateValueName' :: Qualified Ident -> SourceSpan -> m (Maybe (Qualified Ident))
+  updateValueName' = update' (importedValues imports) IdentName
+
   updateValueOpName
     :: Qualified (OpName 'ValueOpName)
     -> SourceSpan
     -> m (Qualified (OpName 'ValueOpName))
   updateValueOpName = update (importedValueOps imports) ValOpName
+
+  updateValueOpName'
+    :: Qualified (OpName 'ValueOpName)
+    -> SourceSpan
+    -> m (Maybe (Qualified (OpName 'ValueOpName)))
+  updateValueOpName' = update' (importedValueOps imports) ValOpName
 
   updateKindName
     :: Qualified (ProperName 'KindName)
@@ -427,3 +455,23 @@ renameInModule imports (Module modSS coms mn decls exps) =
 
     where
     throwUnknown = throwError . errorMessage . UnknownName . fmap toName $ qname
+
+  -- Update names so unqualified references become qualified, and locally
+  -- qualified references are replaced with their canoncial qualified names
+  -- (e.g. M.Map -> Data.Map.Map).
+  update'
+    :: (Ord a)
+    => M.Map (Qualified a) [ImportRecord a]
+    -> (a -> Name)
+    -> Qualified a
+    -> SourceSpan
+    -> m (Maybe (Qualified a))
+  update' imps toName qname@(Qualified mn' name) pos = warnAndRethrowWithPosition pos $
+    case (M.lookup qname imps, mn') of
+      (Just options, _) -> do
+        (mnNew, mnOrig) <- checkImportConflicts pos mn toName options
+        modify $ \usedImports ->
+          M.insertWith (++) mnNew [fmap toName qname] usedImports
+        return $ Just $ Qualified (Just mnOrig) name
+
+      _ -> return Nothing

@@ -1,4 +1,4 @@
--- @shouldFailWith UnknownName
+-- @shouldFailWith UnknownValueHint
 module Main where
 
 import M1 as M

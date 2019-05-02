@@ -1,5 +1,4 @@
--- @shouldFailWith UnknownName
--- @shouldFailWith UnknownName
+-- @shouldFailWith UnknownValueHint
 module MultipleErrors2 where
 
 import Prelude
