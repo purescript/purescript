@@ -268,13 +268,13 @@ renameInModule imports (Module modSS coms mn decls exps) =
     unless (length (ordNub args) == length args) .
       throwError . errorMessage' pos $ OverlappingNamesInLet
     return ((pos, args ++ bound), Let w ds val')
-  updateValue (_, bound) (Var ss name'@(Qualified Nothing ident)) | ident `notElem` bound = do
+  updateValue (_, bound) (Var ss name'@(Qualified Nothing ident)) | ident `notElem` bound =
     updateOrReplaceValue (ss, bound) name' updateValueName' (Var ss) showIdent
-  updateValue (_, bound) (Var ss name'@(Qualified (Just _) _)) = do
+  updateValue (_, bound) (Var ss name'@(Qualified (Just _) _)) =
     updateOrReplaceValue (ss, bound) name' updateValueName' (Var ss) showIdent
-  updateValue (_, bound) (Op ss op) = do
+  updateValue (_, bound) (Op ss op) =
     updateOrReplaceValue (ss, bound) op updateValueOpName' (Op ss) showOp
-  updateValue (_, bound) (Constructor ss name) = do
+  updateValue (_, bound) (Constructor ss name) =
     updateOrReplaceValue (ss, bound) name updateDataConstructorName' (Constructor ss) runProperName
   updateValue s (TypedValue check val ty) =
     (,) s <$> (TypedValue check val <$> updateTypesEverywhere ty)
@@ -287,11 +287,11 @@ renameInModule imports (Module modSS coms mn decls exps) =
     -> (Qualified a -> Expr)
     -> (a -> Text)
     -> m ((SourceSpan, [Ident]), Expr)
-  updateOrReplaceValue (ss, bounds) name updateExpr mkExpr showA = do
+  updateOrReplaceValue (ss, bounds) name updateExpr mkExpr showName = do
     updated <- updateExpr name ss
     return $ case updated of
       Just updated' -> ((ss, bounds), mkExpr updated')
-      Nothing -> ((ss, bounds), UnknownValue (showQualified showA name))
+      Nothing -> ((ss, bounds), UnknownValue (showQualified showName name))
 
   updateBinder
     :: (SourceSpan, [Ident])
