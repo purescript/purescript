@@ -428,7 +428,6 @@ infer' (Hole name) = do
 infer' (UnknownValue name) = do
   ty <- freshType
   ctx <- getLocalContext
-  env <- getEnv
   tell . errorMessage $ UnknownValueHint name ty ctx
   return $ TypedValue' True (UnknownValue name) ty
 infer' (PositionedValue pos c val) = warnAndRethrowWithPositionTC pos $ do
