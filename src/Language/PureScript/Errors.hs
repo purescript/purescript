@@ -299,6 +299,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (OrphanInstance nm cl noms ts) = OrphanInstance nm cl noms <$> traverse f ts
   gSimple (WildcardInferredType ty ctx) = WildcardInferredType <$> f ty <*> traverse (sndM f) ctx
   gSimple (HoleInferredType name ty ctx env) = HoleInferredType name <$> f ty <*> traverse (sndM f) ctx  <*> traverse (onTypeSearchTypesM f) env
+  gSimple (UnknownValueHint name ty ctx) = UnknownValueHint name <$> f ty <*> traverse (sndM f) ctx
   gSimple (MissingTypeDeclaration nm ty) = MissingTypeDeclaration nm <$> f ty
   gSimple (CannotGeneralizeRecursiveFunction nm ty) = CannotGeneralizeRecursiveFunction nm <$> f ty
   gSimple other = pure other
