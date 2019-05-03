@@ -886,31 +886,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
         paras $ [ line $ "Hole '" <> markCode name <> "' has the inferred type "
                 , markCodeBox (indent (typeAsBox maxBound ty))
                 ] ++ tsResult ++ renderContext ctx
-    renderSimpleErrorMessage (UnknownValueHint name ty ctx ts) =
-      let
-        maxTSResults = 15
-        tsResult = case ts of
-          Just (TSAfter{tsAfterIdentifiers=idents}) | not (null idents) ->
-            let
-              formatTS (names, types) =
-                let
-                  idBoxes = Box.text . T.unpack . showQualified id <$> names
-                  tyBoxes = (\t -> BoxHelpers.indented
-                              (Box.text ":: " Box.<> typeAsBox prettyDepth t)) <$> types
-                  longestId = maximum (map Box.cols idBoxes)
-                in
-                  Box.vcat Box.top $
-                      zipWith (Box.<>)
-                      (Box.alignHoriz Box.left longestId <$> idBoxes)
-                      tyBoxes
-            in [ line "You could substitute the unknown value with one of these values:"
-               , markCodeBox (indent (formatTS (unzip (take maxTSResults idents))))
-               ]
-          _ -> []
-      in
-        paras $ [ line $ "Unknown name '" <> markCode name <> "' has the inferred type "
-                , markCodeBox (indent (typeAsBox maxBound ty))
-                ] ++ tsResult ++ renderContext ctx
+    renderSimpleErrorMessage (UnknownValueHint name ty ctx) =
+      paras $ [ line $ "Unknown name '" <> markCode name <> "' has the inferred type "
+              , markCodeBox (indent (typeAsBox maxBound ty))
+              ] ++ renderContext ctx
     renderSimpleErrorMessage (MissingTypeDeclaration ident ty) =
       paras [ line $ "No type declaration was provided for the top-level declaration of " <> markCode (showIdent ident) <> "."
             , line "It is good practice to provide type declarations as a form of documentation."
