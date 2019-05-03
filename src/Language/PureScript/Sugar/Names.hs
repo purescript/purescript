@@ -289,9 +289,8 @@ renameInModule imports (Module modSS coms mn decls exps) =
     -> m ((SourceSpan, [Ident]), Expr)
   updateOrReplaceValue (ss, bounds) name updateExpr mkExpr showName = do
     updated <- updateExpr name ss
-    return $ case updated of
-      Just updated' -> ((ss, bounds), mkExpr updated')
-      Nothing -> ((ss, bounds), UnknownValue (showQualified showName name))
+    let expr = maybe (UnknownValue (showQualified showName name)) mkExpr updated
+    return ((ss, bounds), expr)
 
   updateBinder
     :: (SourceSpan, [Ident])
