@@ -516,7 +516,7 @@ typeCheckModule (Module _ _ _ _ Nothing) =
 typeCheckModule (Module ss coms mn decls (Just exps)) =
   warnAndRethrow (addHint (ErrorInModule mn)) $ do
     modify (\s -> s { checkCurrentModule = Just mn })
-    decls' <- escalateWarningWhen unknownValueHintError $ typeCheckAll mn exps decls
+    decls' <- escalateWarningWhen unknownNameError $ typeCheckAll mn exps decls
     checkSuperClassesAreExported <- getSuperClassExportCheck
     for_ exps $ \e -> do
       checkTypesAreExported e
@@ -525,9 +525,10 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
       checkSuperClassesAreExported e
     return $ Module ss coms mn decls' (Just exps)
   where
-  unknownValueHintError :: ErrorMessage -> Bool
-  unknownValueHintError (ErrorMessage _ UnknownValueHint{}) = True
-  unknownValueHintError _ = False
+  -- Escalate inferred UnknownName warnings to errors
+  unknownNameError :: ErrorMessage -> Bool
+  unknownNameError (ErrorMessage _ (UnknownName (Right _))) = True
+  unknownNameError _ = False
 
   qualify' :: a -> Qualified a
   qualify' = Qualified (Just mn)

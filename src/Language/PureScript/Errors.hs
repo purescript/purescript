@@ -153,7 +153,6 @@ errorCode em = case unwrapErrorMessage em of
   UnusedTypeVar{} -> "UnusedTypeVar"
   WildcardInferredType{} -> "WildcardInferredType"
   HoleInferredType{} -> "HoleInferredType"
-  UnknownValueHint{} -> "UnknownValueHint"
   MissingTypeDeclaration{} -> "MissingTypeDeclaration"
   OverlappingPattern{} -> "OverlappingPattern"
   IncompleteExhaustivityCheck{} -> "IncompleteExhaustivityCheck"
@@ -288,6 +287,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (NoInstanceFound con) = NoInstanceFound <$> overConstraintArgs (traverse f) con
   gSimple (AmbiguousTypeVariables t con) = AmbiguousTypeVariables <$> f t <*> pure con
   gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> pure insts
+  gSimple (UnknownName (Right (UnknownValueHint name ts ctx))) = UnknownName . Right <$> (UnknownValueHint name <$> f ts <*> traverse (sndM f) ctx)
   gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
   gSimple (CannotDerive cl ts) = CannotDerive cl <$> traverse f ts
   gSimple (InvalidNewtypeInstance cl ts) = InvalidNewtypeInstance cl <$> traverse f ts
@@ -299,7 +299,6 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (OrphanInstance nm cl noms ts) = OrphanInstance nm cl noms <$> traverse f ts
   gSimple (WildcardInferredType ty ctx) = WildcardInferredType <$> f ty <*> traverse (sndM f) ctx
   gSimple (HoleInferredType name ty ctx env) = HoleInferredType name <$> f ty <*> traverse (sndM f) ctx  <*> traverse (onTypeSearchTypesM f) env
-  gSimple (UnknownValueHint name ty ctx) = UnknownValueHint name <$> f ty <*> traverse (sndM f) ctx
   gSimple (MissingTypeDeclaration nm ty) = MissingTypeDeclaration nm <$> f ty
   gSimple (CannotGeneralizeRecursiveFunction nm ty) = CannotGeneralizeRecursiveFunction nm <$> f ty
   gSimple other = pure other
@@ -525,10 +524,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line $ "The type declaration for " <> markCode (showIdent nm) <> " should be followed by its definition."
     renderSimpleErrorMessage (RedefinedIdent name) =
       line $ "The value " <> markCode (showIdent name) <> " has been defined multiple times"
-    renderSimpleErrorMessage (UnknownName name@(Qualified Nothing (IdentName (Ident i)))) | i `elem` [ C.bind, C.discard ] =
+    renderSimpleErrorMessage (UnknownName (Left name@(Qualified Nothing (IdentName (Ident i))))) | i `elem` [ C.bind, C.discard ] =
       line $ "Unknown " <> printName name <> ". You're probably using do-notation, which the compiler replaces with calls to the " <> markCode i <> " function. Please import " <> markCode i <> " from module " <> markCode "Prelude"
-    renderSimpleErrorMessage (UnknownName name) =
+    renderSimpleErrorMessage (UnknownName (Left name)) =
       line $ "Unknown " <> printName name
+    renderSimpleErrorMessage (UnknownName (Right (UnknownValueHint name ty ctx)))=
+      paras $ [ line $ "Unknown " <> markCode name <> " has the inferred type "
+              , markCodeBox (indent (typeAsBox maxBound ty))
+              ] ++ renderContext ctx
     renderSimpleErrorMessage (UnknownImport mn name) =
       paras [ line $ "Cannot import " <> printName (Qualified Nothing name) <> " from module " <> markCode (runModuleName mn)
             , line "It either does not exist or the module does not export it."
@@ -887,10 +890,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
         paras $ [ line $ "Hole '" <> markCode name <> "' has the inferred type "
                 , markCodeBox (indent (typeAsBox maxBound ty))
                 ] ++ tsResult ++ renderContext ctx
-    renderSimpleErrorMessage (UnknownValueHint name ty ctx) =
-      paras $ [ line $ "Unknown name '" <> markCode name <> "' has the inferred type "
-              , markCodeBox (indent (typeAsBox maxBound ty))
-              ] ++ renderContext ctx
     renderSimpleErrorMessage (MissingTypeDeclaration ident ty) =
       paras [ line $ "No type declaration was provided for the top-level declaration of " <> markCode (showIdent ident) <> "."
             , line "It is good practice to provide type declarations as a form of documentation."

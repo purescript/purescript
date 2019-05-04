@@ -1,4 +1,4 @@
--- @shouldFailWith UnknownValueHint
+-- @shouldFailWith UnknownName
 
 module Main where
 

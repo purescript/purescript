@@ -446,14 +446,14 @@ renameInModule imports (Module modSS coms mn decls exps) =
       (Nothing, Just mn'') ->
         if mn'' `S.member` importedQualModules imports || mn'' `S.member` importedModules imports
         then throwUnknown
-        else throwError . errorMessage . UnknownName . Qualified Nothing $ ModName mn''
+        else throwError . errorMessage . UnknownName . Left . Qualified Nothing $ ModName mn''
 
       -- If neither of the above cases are true then it's an undefined or
       -- unimported symbol.
       _ -> throwUnknown
 
     where
-    throwUnknown = throwError . errorMessage . UnknownName . fmap toName $ qname
+    throwUnknown = throwError . errorMessage . UnknownName . Left . fmap toName $ qname
 
   -- Update names so unqualified references become qualified, and locally
   -- qualified references are replaced with their canoncial qualified names
