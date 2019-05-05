@@ -18,6 +18,7 @@ import qualified Data.Map as M
 import Data.Text (Text)
 import qualified Data.List.NonEmpty as NEL
 
+import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Kinds
@@ -323,3 +324,11 @@ withoutWarnings
   => m a
   -> m (a, w)
 withoutWarnings = censor (const mempty) . listen
+
+unsafeCheckCurrentModule
+  :: forall m
+   . (MonadError MultipleErrors m, MonadState CheckState m)
+  => m ModuleName
+unsafeCheckCurrentModule = checkCurrentModule <$> get >>= \case
+  Nothing -> internalError "No module name set in scope"
+  Just name -> pure name

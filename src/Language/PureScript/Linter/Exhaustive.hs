@@ -306,6 +306,7 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
       ty :: Text -> SourceType
       ty tyVar =
         srcForAll tyVar
+          Nothing
           ( srcConstrainedType
               (srcConstraint C.Partial [] (Just constraintData))
               $ srcTypeApp (srcTypeApp tyFunction (srcTypeVar tyVar)) (srcTypeVar tyVar)

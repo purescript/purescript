@@ -39,5 +39,5 @@ main = do
   logShow (X 1 == X 1)
   logShow (Z 1 Y == Z 1 Y)
   logShow (Z 1 Y == Y)
-  logShow (Y == Y :: Y Z)
+  logShow (Y == (Y :: Y Z))
   log "Done"

@@ -3,12 +3,12 @@ module Main where
 import Prelude hiding (add)
 import Effect.Console (log)
 
-data Id = Id forall a. a -> a
+data Id = Id (forall a. a -> a)
 
 runId = \id a -> case id of
   Id f -> f a
 
-data Nat = Nat forall r. r -> (r -> r) -> r
+data Nat = Nat (forall r. r -> (r -> r) -> r)
 
 runNat = \nat -> case nat of
   Nat f -> f 0.0 (\n -> n + 1.0)

@@ -1,6 +1,6 @@
 -- @shouldFailWith NoInstanceFound
 module Main where
-	
+
 import Prelude
 
 newtype Foo r = Foo { | r }

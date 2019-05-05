@@ -216,9 +216,9 @@ infer'
    . (MonadError MultipleErrors m, MonadState CheckState m)
   => SourceType
   -> m (SourceKind, [(Text, SourceKind)])
-infer' (ForAll ann ident ty _) = do
-  k1 <- freshKind ann
-  Just moduleName <- checkCurrentModule <$> get
+infer' (ForAll ann ident mbK ty _) = do
+  k1 <- maybe (freshKind ann) pure mbK
+  moduleName <- unsafeCheckCurrentModule
   (k2, args) <- bindLocalTypeVariables moduleName [(ProperName ident, k1)] $ infer ty
   unifyKinds k2 kindType
   return (kindType, (ident, k1) : args)
@@ -229,9 +229,9 @@ infer' (KindedType _ ty k) = do
 infer' other = (, []) <$> go other
   where
   go :: SourceType -> m SourceKind
-  go (ForAll ann ident ty _) = do
-    k1 <- freshKind ann
-    Just moduleName <- checkCurrentModule <$> get
+  go (ForAll ann ident mbK ty _) = do
+    k1 <- maybe (freshKind ann) pure mbK
+    moduleName <- unsafeCheckCurrentModule
     k2 <- bindLocalTypeVariables moduleName [(ProperName ident, k1)] $ go ty
     unifyKinds k2 kindType
     return $ kindType $> ann
@@ -243,10 +243,10 @@ infer' other = (, []) <$> go other
   go (TUnknown ann _) = freshKind ann
   go (TypeLevelString ann _) = return $ kindSymbol $> ann
   go (TypeVar ann v) = do
-    Just moduleName <- checkCurrentModule <$> get
+    moduleName <- unsafeCheckCurrentModule
     ($> ann) <$> lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
   go (Skolem ann v _ _) = do
-    Just moduleName <- checkCurrentModule <$> get
+    moduleName <- unsafeCheckCurrentModule
     ($> ann) <$> lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
   go (TypeConstructor ann v) = do
     env <- getEnv

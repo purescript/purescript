@@ -25,6 +25,7 @@ import           Data.Time.Clock (UTCTime)
 import           Data.Version (showVersion)
 import           Language.PureScript.AST
 import           Language.PureScript.Crash
+import qualified Language.PureScript.CST as CST
 import           Language.PureScript.Errors
 import           Language.PureScript.Externs
 import           Language.PureScript.Make.Actions as Actions
@@ -109,20 +110,20 @@ getResult buildPlan moduleName =
 construct
   :: forall m. (Monad m, MonadBaseControl IO m)
   => MakeActions m
-  -> ([Module], [(ModuleName, [ModuleName])])
+  -> ([CST.PartialResult Module], [(ModuleName, [ModuleName])])
   -> m BuildPlan
 construct MakeActions{..} (sorted, graph) = do
   prebuilt <- foldl' collectPrebuiltModules M.empty . catMaybes <$> A.forConcurrently sorted findExistingExtern
-  let toBeRebuilt = filter (not . flip M.member prebuilt . getModuleName) sorted
-  buildJobs <- foldM makeBuildJob M.empty (map getModuleName toBeRebuilt)
+  let toBeRebuilt = filter (not . flip M.member prebuilt . getModuleName . CST.resPartial) sorted
+  buildJobs <- foldM makeBuildJob M.empty (map (getModuleName . CST.resPartial) toBeRebuilt)
   pure $ BuildPlan prebuilt buildJobs
   where
     makeBuildJob prev moduleName = do
       buildJob <- BuildJob <$> C.newEmptyMVar <*> C.newEmptyMVar
       pure (M.insert moduleName buildJob prev)
 
-    findExistingExtern :: Module -> m (Maybe (ModuleName, Bool, Prebuilt))
-    findExistingExtern (getModuleName -> moduleName) = runMaybeT $ do
+    findExistingExtern :: CST.PartialResult Module -> m (Maybe (ModuleName, Bool, Prebuilt))
+    findExistingExtern (getModuleName . CST.resPartial -> moduleName) = runMaybeT $ do
       inputTimestamp <- lift $ getInputTimestamp moduleName
       (rebuildNever, existingTimestamp) <-
         case inputTimestamp of

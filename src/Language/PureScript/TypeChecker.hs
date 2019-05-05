@@ -75,7 +75,7 @@ addDataConstructor moduleName dtype name args dctor dctorArgs = do
   traverse_ checkTypeSynonyms tys
   let retTy = foldl srcTypeApp (srcTypeConstructor (Qualified (Just moduleName) name)) (map srcTypeVar args)
   let dctorTy = foldr function retTy tys
-  let polyType = mkForAll (map (NullSourceAnn,) args) dctorTy
+  let polyType = mkForAll (map (\i -> (NullSourceAnn, (i, Nothing))) args) dctorTy
   putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (dtype, name, polyType, fields) (dataConstructors env) }
 
 addTypeSynonym
@@ -278,9 +278,11 @@ typeCheckAll moduleName _ = traverse go
     warnAndRethrow (addHint (ErrorInValueDeclaration name) . addHint (positionedError ss)) . censorLocalUnnamedWildcards val $ do
       val' <- checkExhaustiveExpr ss env moduleName val
       valueIsNotDefined moduleName name
-      [(_, (val'', ty))] <- typesOf NonRecursiveBindingGroup moduleName [((sa, name), val')]
-      addValue moduleName name ty nameKind
-      return $ ValueDecl sa name nameKind [] [MkUnguarded val'']
+      typesOf NonRecursiveBindingGroup moduleName [((sa, name), val')] >>= \case
+        [(_, (val'', ty))] -> do
+          addValue moduleName name ty nameKind
+          return $ ValueDecl sa name nameKind [] [MkUnguarded val'']
+        _ -> internalError "typesOf did not return a singleton"
     where
   go ValueDeclaration{} = internalError "Binders were not desugared"
   go BoundValueDeclaration{} = internalError "BoundValueDeclaration should be desugared"
@@ -648,7 +650,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
   checkClassMembersAreExported dr@(TypeClassRef ss' name) = do
     let members = ValueRef ss' `map` head (mapMaybe findClassMembers decls)
     let missingMembers = members \\ exps
-    unless (null missingMembers) . throwError . errorMessage' ss' $ TransitiveExportError dr members
+    unless (null missingMembers) . throwError . errorMessage' ss' $ TransitiveExportError dr missingMembers
     where
     findClassMembers :: Declaration -> Maybe [Ident]
     findClassMembers (TypeClassDeclaration _ name' _ _ _ ds) | name == name' = Just $ map extractMemberName ds

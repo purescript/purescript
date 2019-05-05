@@ -6,7 +6,7 @@ import Effect.Console (log, logShow)
 f x y =
   let
     g = case y of
-	  0.0 -> x
+          0.0 -> x
           x -> 1.0 + x * x
   in g + x + y
 

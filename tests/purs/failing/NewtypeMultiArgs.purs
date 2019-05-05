@@ -1,4 +1,4 @@
--- @shouldFailWith InvalidNewtype
+-- @shouldFailWith ErrorParsingModule
 module Main where
 
 import Prelude

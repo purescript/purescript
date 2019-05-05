@@ -98,6 +98,9 @@ library:
     - ConstraintKinds
     - DataKinds
     - DeriveFunctor
+    - DeriveFoldable
+    - DeriveTraversable
+    - DeriveGeneric
     - EmptyDataDecls
     - FlexibleContexts
     - KindSignatures
@@ -112,7 +115,6 @@ library:
     - ScopedTypeVariables
     - TupleSections
     - ViewPatterns
-    - NoMonadFailDesugaring
 
 executables:
   purs:
@@ -158,7 +160,9 @@ tests:
     dependencies:
       - purescript
       - tasty
+      - tasty-golden
       - tasty-hspec
+      - tasty-quickcheck
       - hspec
       - hspec-discover
       - HUnit

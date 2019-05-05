@@ -28,6 +28,7 @@ import           Control.Monad.Trans.State.Strict (StateT, runStateT, evalStateT
 import           Control.Monad.Writer.Strict (Writer(), runWriter)
 
 import qualified Language.PureScript as P
+import qualified Language.PureScript.CST as CST
 import qualified Language.PureScript.Names as N
 import qualified Language.PureScript.Constants as C
 
@@ -75,7 +76,7 @@ rebuild loadedExterns m = do
 
 -- | Build the collection of modules from scratch. This is usually done on startup.
 make
-  :: [(FilePath, P.Module)]
+  :: [(FilePath, CST.PartialResult P.Module)]
   -> P.Make ([P.ExternsFile], P.Environment)
 make ms = do
     foreignFiles <- P.inferForeignModules filePathMap
@@ -90,7 +91,7 @@ make ms = do
                          False
 
     filePathMap :: M.Map P.ModuleName (Either P.RebuildPolicy FilePath)
-    filePathMap = M.fromList $ map (\(fp, m) -> (P.getModuleName m, Right fp)) ms
+    filePathMap = M.fromList $ map (\(fp, m) -> (P.getModuleName $ CST.resPartial m, Right fp)) ms
 
 -- | Performs a PSCi command
 handleCommand
@@ -127,7 +128,7 @@ handleReloadState reload = do
   files <- liftIO $ concat <$> traverse glob globs
   e <- runExceptT $ do
     modules <- ExceptT . liftIO $ loadAllModules files
-    (externs, _) <- ExceptT . liftIO . runMake . make $ modules
+    (externs, _) <- ExceptT . liftIO . runMake . make $ fmap CST.pureResult <$> modules
     return (map snd modules, externs)
   case e of
     Left errs -> printErrors errs

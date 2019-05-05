@@ -15,6 +15,7 @@ import qualified Data.Map.Lazy                   as M
 import           Data.Maybe                      (fromJust)
 import qualified Data.Set                        as S
 import qualified Language.PureScript             as P
+import qualified Language.PureScript.CST         as CST
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.State
@@ -48,12 +49,11 @@ rebuildFile
   -- ^ A runner for the second build with open exports
   -> m Success
 rebuildFile file actualFile codegenTargets runOpenBuild = do
-
-  input <- ideReadFile file
-
-  m <- case snd <$> P.parseModuleFromFile (maybe identity const actualFile) input of
+  (fp, input) <- ideReadFile file
+  let fp' = fromMaybe fp actualFile
+  m <- case CST.parseFromFile fp' input of
     Left parseError ->
-      throwError (RebuildError (P.MultipleErrors [P.toPositionedError parseError]))
+      throwError $ RebuildError $ CST.toMultipleErrors fp' parseError
     Right m -> pure m
 
   -- Externs files must be sorted ahead of time, so that they get applied
@@ -173,7 +173,7 @@ sortExterns
   -> m [P.ExternsFile]
 sortExterns m ex = do
   sorted' <- runExceptT
-           . P.sortModules
+           . P.sortModules P.moduleSignature
            . (:) m
            . map mkShallowModule
            . M.elems
