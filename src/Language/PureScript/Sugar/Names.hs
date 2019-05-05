@@ -416,8 +416,8 @@ renameInModule imports (Module modSS coms mn decls exps) =
   updateKindName = update (importedKinds imports) KiName
 
   -- Update names so unqualified references become qualified, and locally
-  -- qualified references are replaced with their canoncial qualified names
-  -- (e.g. M.Map -> Data.Map.Map).
+  -- qualified references are replaced with their canoncial qualified names.
+  -- Throws UnknownName error if a name can't be qualified.
   update
     :: (Ord a)
     => M.Map (Qualified a) [ImportRecord a]
@@ -425,38 +425,30 @@ renameInModule imports (Module modSS coms mn decls exps) =
     -> Qualified a
     -> SourceSpan
     -> m (Qualified a)
-  update imps toName qname@(Qualified mn' name) pos = warnAndRethrowWithPosition pos $
-    case (M.lookup qname imps, mn') of
-
-      -- We found the name in our imports, so we return the name for it,
-      -- qualifying with the name of the module it was originally defined in
-      -- rather than the module we're importing from, to handle the case of
-      -- re-exports. If there are multiple options for the name to resolve to
-      -- in scope, we throw an error.
-      (Just options, _) -> do
-        (mnNew, mnOrig) <- checkImportConflicts pos mn toName options
-        modify $ \usedImports ->
-          M.insertWith (++) mnNew [fmap toName qname] usedImports
-        return $ Qualified (Just mnOrig) name
-
-      -- If the name wasn't found in our imports but was qualified then we need
-      -- to check whether it's a failed import from a "pseudo" module (created
-      -- by qualified importing). If that's not the case, then we just need to
-      -- check it refers to a symbol in another module.
-      (Nothing, Just mn'') ->
-        if mn'' `S.member` importedQualModules imports || mn'' `S.member` importedModules imports
-        then throwUnknown
-        else throwError . errorMessage . UnknownName . Left . Qualified Nothing $ ModName mn''
-
-      -- If neither of the above cases are true then it's an undefined or
-      -- unimported symbol.
-      _ -> throwUnknown
-
+  update imps toName qname@(Qualified mn' _) pos = warnAndRethrowWithPosition pos $ do
+    mbQualified <- update' imps toName qname pos
+    maybe reportError pure mbQualified
     where
+    reportError =
+      case mn' of
+
+        -- If the name wasn't found in our imports but was qualified then we need
+        -- to check whether it's a failed import from a "pseudo" module (created
+        -- by qualified importing). If that's not the case, then we just need to
+        -- check it refers to a symbol in another module.
+        Just mn'' ->
+          if mn'' `S.member` importedQualModules imports || mn'' `S.member` importedModules imports
+          then throwUnknown
+          else throwError . errorMessage . UnknownName . Left . Qualified Nothing $ ModName mn''
+
+        Nothing -> throwUnknown
+
     throwUnknown = throwError . errorMessage . UnknownName . Left . fmap toName $ qname
 
   -- Update names so unqualified references become qualified, and locally
-  -- qualified references are replaced with their canoncial qualified names
+  -- qualified references are replaced with their canoncial qualified names.
+  -- Returns Nothing if name can't be qualified, so that errors can be thrown
+  -- or substitutions can be made.
   -- (e.g. M.Map -> Data.Map.Map).
   update'
     :: (Ord a)
@@ -465,12 +457,16 @@ renameInModule imports (Module modSS coms mn decls exps) =
     -> Qualified a
     -> SourceSpan
     -> m (Maybe (Qualified a))
-  update' imps toName qname@(Qualified mn' name) pos = warnAndRethrowWithPosition pos $
-    case (M.lookup qname imps, mn') of
-      (Just options, _) -> do
-        (mnNew, mnOrig) <- checkImportConflicts pos mn toName options
-        modify $ \usedImports ->
-          M.insertWith (++) mnNew [fmap toName qname] usedImports
-        return $ Just $ Qualified (Just mnOrig) name
-
-      _ -> return Nothing
+  update' imps toName qname@(Qualified _ name) pos = warnAndRethrowWithPosition pos $
+    traverse updateName (M.lookup qname imps)
+    where
+    updateName options = do
+      -- We found the name in our imports, so we return the name for it,
+      -- qualifying with the name of the module it was originally defined in
+      -- rather than the module we're importing from, to handle the case of
+      -- re-exports. If there are multiple options for the name to resolve to
+      -- in scope, we throw an error.
+      (mnNew, mnOrig) <- checkImportConflicts pos mn toName options
+      modify $ \usedImports ->
+        M.insertWith (++) mnNew [fmap toName qname] usedImports
+      return $ Qualified (Just mnOrig) name
