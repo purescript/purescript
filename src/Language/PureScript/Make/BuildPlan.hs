@@ -21,6 +21,7 @@ import           Data.Time.Clock (UTCTime)
 import           Data.Version (showVersion)
 import           Language.PureScript.AST
 import           Language.PureScript.Crash
+import qualified Language.PureScript.CST as CST
 import           Language.PureScript.Errors
 import           Language.PureScript.Externs
 import           Language.PureScript.Make.Actions as Actions
@@ -105,20 +106,20 @@ getResult buildPlan moduleName =
 construct
   :: forall m. (Monad m, MonadBaseControl IO m)
   => MakeActions m
-  -> ([Module], [(ModuleName, [ModuleName])])
+  -> ([CST.PartialResult Module], [(ModuleName, [ModuleName])])
   -> m BuildPlan
 construct MakeActions{..} (sorted, graph) = do
   prebuilt <- foldM findExistingExtern M.empty sorted
-  let toBeRebuilt = filter (not . flip M.member prebuilt . getModuleName) sorted
-  buildJobs <- foldM makeBuildJob M.empty (map getModuleName toBeRebuilt)
+  let toBeRebuilt = filter (not . flip M.member prebuilt . getModuleName . CST.resPartial) sorted
+  buildJobs <- foldM makeBuildJob M.empty (map (getModuleName . CST.resPartial) toBeRebuilt)
   pure $ BuildPlan prebuilt buildJobs
   where
     makeBuildJob prev moduleName = do
       buildJob <- BuildJob <$> C.newEmptyMVar <*> C.newEmptyMVar
       pure (M.insert moduleName buildJob prev)
 
-    findExistingExtern :: M.Map ModuleName Prebuilt -> Module -> m (M.Map ModuleName Prebuilt)
-    findExistingExtern prev (getModuleName -> moduleName) = do
+    findExistingExtern :: M.Map ModuleName Prebuilt -> CST.PartialResult Module -> m (M.Map ModuleName Prebuilt)
+    findExistingExtern prev (getModuleName . CST.resPartial -> moduleName) = do
       outputTimestamp <- getOutputTimestamp moduleName
       let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
       case traverse (fmap pbModificationTime . flip M.lookup prev) deps of

@@ -13,6 +13,7 @@ import           Data.Foldable (traverse_)
 import           Data.List (isSuffixOf)
 import qualified Data.Text as T
 import qualified Language.PureScript as P
+import qualified Language.PureScript.CST as CST
 import           Language.PureScript.Interactive
 import           System.Directory (getCurrentDirectory, doesPathExist, removeFile)
 import           System.Exit
@@ -39,7 +40,7 @@ initTestPSCiEnv = do
       print err >> exitFailure
     Right modules -> do
       -- Make modules
-      makeResultOrError <- runMake . make $ modules
+      makeResultOrError <- runMake . make $ fmap CST.pureResult <$> modules
       case makeResultOrError of
         Left errs -> putStrLn (P.prettyPrintMultipleErrors P.defaultPPEOptions errs) >> exitFailure
         Right (externs, _) ->

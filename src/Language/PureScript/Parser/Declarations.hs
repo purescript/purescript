@@ -4,15 +4,12 @@ module Language.PureScript.Parser.Declarations
   , parseDeclarationRef
   , parseModule
   , parseModuleDeclaration
-  , parseModulesFromFiles
-  , parseModuleFromFile
   , parseValue
   , parseGuard
   , parseBinder
   , parseBinderNoParens
   , parseImportDeclaration'
   , parseLocalDeclaration
-  , toPositionedError
   ) where
 
 import           Prelude hiding (lex)
@@ -21,15 +18,12 @@ import           Protolude (ordNub)
 import           Control.Applicative
 import           Control.Arrow ((+++))
 import           Control.Monad (foldM, join, zipWithM)
-import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Parallel.Strategies (withStrategy, parList, rseq)
 import           Data.Functor (($>))
 import           Data.Maybe (fromMaybe)
 import qualified Data.Set as S
-import           Data.Text (Text, pack)
+import           Data.Text (pack)
 import           Language.PureScript.AST
 import           Language.PureScript.Environment
-import           Language.PureScript.Errors
 import           Language.PureScript.Names
 import           Language.PureScript.Parser.Common
 import           Language.PureScript.Parser.Kinds
@@ -320,43 +314,6 @@ parseModule = do
   end <- P.getPosition
   let ss = SourceSpan (P.sourceName start) (toSourcePos start) (toSourcePos end)
   return $ Module ss comments name decls exports
-
--- | Parse a collection of modules in parallel
-parseModulesFromFiles
-  :: forall m k
-   . MonadError MultipleErrors m
-  => (k -> FilePath)
-  -> [(k, Text)]
-  -> m [(k, Module)]
-parseModulesFromFiles toFilePath input =
-  flip parU wrapError . inParallel . flip fmap input $ parseModuleFromFile toFilePath
-  where
-  wrapError :: Either P.ParseError a -> m a
-  wrapError = either (throwError . MultipleErrors . pure . toPositionedError) return
-  -- It is enough to force each parse result to WHNF, since success or failure can't be
-  -- determined until the end of the file, so this effectively distributes parsing of each file
-  -- to a different spark.
-  inParallel :: [Either P.ParseError (k, a)] -> [Either P.ParseError (k, a)]
-  inParallel = withStrategy (parList rseq)
-
--- | Parses a single module with FilePath for eventual parsing errors
-parseModuleFromFile
-  :: (k -> FilePath)
-  -> (k, Text)
-  -> Either P.ParseError (k, Module)
-parseModuleFromFile toFilePath (k, content) = do
-    let filename = toFilePath k
-    ts <- lex filename content
-    m <- runTokenParser filename parseModule ts
-    pure (k, m)
-
--- | Converts a 'ParseError' into a 'PositionedError'
-toPositionedError :: P.ParseError -> ErrorMessage
-toPositionedError perr = ErrorMessage [ positionedError (SourceSpan name start end) ] (ErrorParsingModule perr)
-  where
-  name   = (P.sourceName  . P.errorPos) perr
-  start  = (toSourcePos . P.errorPos) perr
-  end    = start
 
 booleanLiteral :: TokenParser Bool
 booleanLiteral = (reserved "true" >> return True) P.<|> (reserved "false" >> return False)

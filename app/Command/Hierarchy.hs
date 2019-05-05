@@ -33,6 +33,7 @@ import           System.Exit (exitFailure, exitSuccess)
 import           System.IO (hPutStr, stderr)
 import           System.IO.UTF8 (readUTF8FileT)
 import qualified Language.PureScript as P
+import qualified Language.PureScript.CST as CST
 import           Language.PureScript.Hierarchy (Graph(..), _unDigraph, _unGraphName, typeClasses)
 
 data HierarchyOptions = HierarchyOptions
@@ -43,7 +44,7 @@ data HierarchyOptions = HierarchyOptions
 readInput :: [FilePath] -> IO (Either P.MultipleErrors [P.Module])
 readInput paths = do
   content <- mapM (\path -> (path, ) <$> readUTF8FileT path) paths
-  return $ map snd <$> P.parseModulesFromFiles id content
+  return $ map snd <$> CST.parseFromFiles id content
 
 compile :: HierarchyOptions -> IO ()
 compile (HierarchyOptions inputGlob mOutput) = do

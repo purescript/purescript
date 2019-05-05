@@ -97,6 +97,9 @@ library:
     - ConstraintKinds
     - DataKinds
     - DeriveFunctor
+    - DeriveFoldable
+    - DeriveTraversable
+    - DeriveGeneric
     - EmptyDataDecls
     - FlexibleContexts
     - KindSignatures
@@ -156,7 +159,9 @@ tests:
     dependencies:
       - purescript
       - tasty
+      - tasty-golden
       - tasty-hspec
+      - tasty-quickcheck
       - hspec
       - hspec-discover
       - HUnit

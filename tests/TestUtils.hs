@@ -8,6 +8,7 @@ import Prelude ()
 import Prelude.Compat
 
 import qualified Language.PureScript as P
+import qualified Language.PureScript.CST as CST
 
 import Control.Arrow ((***), (>>>))
 import Control.Monad
@@ -29,7 +30,7 @@ import System.IO.UTF8 (readUTF8FileT)
 import System.Exit (exitFailure)
 import System.FilePath
 import qualified System.FilePath.Glob as Glob
-import System.IO 
+import System.IO
 import Test.Tasty.Hspec
 
 
@@ -82,7 +83,7 @@ getSupportModuleTuples = do
   libraries <- Glob.globDir1 (Glob.compile "purescript-*/src/**/*.purs") (supportDir </> "bower_components")
   let pursFiles = psciFiles ++ libraries
   fileContents <- readInput pursFiles
-  modules <- runExceptT $ ExceptT . return $ P.parseModulesFromFiles id fileContents
+  modules <- runExceptT $ ExceptT . return $ CST.parseFromFiles id fileContents
   case modules of
     Right ms -> return ms
     Left errs -> fail (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
@@ -111,7 +112,7 @@ setupSupportModules = do
   let modules = map snd ms
   supportExterns <- runExceptT $ do
     foreigns <- inferForeignModules ms
-    externs <- ExceptT . fmap fst . runTest $ P.make (makeActions modules foreigns) modules
+    externs <- ExceptT . fmap fst . runTest $ P.make (makeActions modules foreigns) (CST.pureResult <$> modules)
     return (externs, foreigns)
   case supportExterns of
     Left errs -> fail (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
@@ -168,13 +169,13 @@ compile
   -> IO (Either P.MultipleErrors [P.ExternsFile], P.MultipleErrors)
 compile supportModules supportExterns supportForeigns inputFiles check = runTest $ do
   fs <- liftIO $ readInput inputFiles
-  ms <- P.parseModulesFromFiles id fs
+  ms <- CST.parseFromFiles id fs
   foreigns <- inferForeignModules ms
   liftIO (check (map snd ms))
   let actions = makeActions supportModules (foreigns `M.union` supportForeigns)
   case ms of
     [singleModule] -> pure <$> P.rebuildModule actions supportExterns (snd singleModule)
-    _ -> P.make actions (supportModules ++ map snd ms)
+    _ -> P.make actions (CST.pureResult <$> supportModules ++ map snd ms)
 
 assert
   :: [P.Module]

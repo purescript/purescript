@@ -30,6 +30,7 @@ import           Language.PureScript.AST
 import qualified Language.PureScript.Bundle as Bundle
 import qualified Language.PureScript.Constants as C
 import           Language.PureScript.Crash
+import qualified Language.PureScript.CST.Errors as CST
 import           Language.PureScript.Environment
 import           Language.PureScript.Label (Label(..))
 import           Language.PureScript.Names
@@ -78,6 +79,7 @@ errorCode em = case unwrapErrorMessage em of
   ModuleNotFound{} -> "ModuleNotFound"
   ErrorParsingFFIModule{} -> "ErrorParsingFFIModule"
   ErrorParsingModule{} -> "ErrorParsingModule"
+  ErrorParsingCSTModule{} -> "ErrorParsingModule"
   MissingFFIModule{} -> "MissingFFIModule"
   UnnecessaryFFIModule{} -> "UnnecessaryFFIModule"
   MissingFFIImplementations{} -> "MissingFFIImplementations"
@@ -479,6 +481,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line "Unable to parse module: "
             , prettyPrintParseError err
             ]
+    renderSimpleErrorMessage (ErrorParsingCSTModule err) =
+      paras [ line "Unable to parse module: "
+            , line $ T.pack $ CST.prettyPrintErrorMessage err
+            ]
     renderSimpleErrorMessage (MissingFFIModule mn) =
       line $ "The foreign module implementation for module " <> markCode (runModuleName mn) <> " is missing."
     renderSimpleErrorMessage (UnnecessaryFFIModule mn path) =
@@ -585,7 +591,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line $ "A cycle appears in a set of type class definitions:"
             , indent $ line $ "{" <> (T.intercalate ", " (map (markCode . runProperName . disqualify) names)) <> "}"
             , line "Cycles are disallowed because they can lead to loops in the type checker."
-            ]  
+            ]
     renderSimpleErrorMessage (NameIsUndefined ident) =
       line $ "Value " <> markCode (showIdent ident) <> " is undefined."
     renderSimpleErrorMessage (UndefinedTypeVariable name) =
