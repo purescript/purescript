@@ -10,10 +10,14 @@ module Language.PureScript.Make.BuildPlan
 
 import           Prelude
 
+import           Control.Concurrent.Async.Lifted as A
 import           Control.Concurrent.Lifted as C
 import           Control.Monad hiding (sequence)
+import           Control.Monad.Trans.Class (lift)
 import           Control.Monad.Trans.Control (MonadBaseControl(..))
+import           Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
 import           Data.Aeson (decode)
+import           Data.Foldable (foldl')
 import qualified Data.Map as M
 import           Data.Maybe (catMaybes, fromMaybe)
 import qualified Data.Text as T
@@ -109,7 +113,7 @@ construct
   -> ([CST.PartialResult Module], [(ModuleName, [ModuleName])])
   -> m BuildPlan
 construct MakeActions{..} (sorted, graph) = do
-  prebuilt <- foldM findExistingExtern M.empty sorted
+  prebuilt <- foldl' collectPrebuiltModules M.empty . catMaybes <$> A.forConcurrently sorted findExistingExtern
   let toBeRebuilt = filter (not . flip M.member prebuilt . getModuleName . CST.resPartial) sorted
   buildJobs <- foldM makeBuildJob M.empty (map (getModuleName . CST.resPartial) toBeRebuilt)
   pure $ BuildPlan prebuilt buildJobs
@@ -118,37 +122,37 @@ construct MakeActions{..} (sorted, graph) = do
       buildJob <- BuildJob <$> C.newEmptyMVar <*> C.newEmptyMVar
       pure (M.insert moduleName buildJob prev)
 
-    findExistingExtern :: M.Map ModuleName Prebuilt -> CST.PartialResult Module -> m (M.Map ModuleName Prebuilt)
-    findExistingExtern prev (getModuleName . CST.resPartial -> moduleName) = do
-      outputTimestamp <- getOutputTimestamp moduleName
-      let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
-      case traverse (fmap pbModificationTime . flip M.lookup prev) deps of
-        Nothing ->
-          -- If we end up here, one of the dependencies didn't exist in the
-          -- prebuilt map and so we know a dependency needs to be rebuilt, which
-          -- means we need to be rebuilt in turn.
-          pure prev
-        Just modTimes -> do
-          let dependencyTimestamp = maximumMaybe modTimes
-          inputTimestamp <- getInputTimestamp moduleName
-          let
-            existingExtern = case (inputTimestamp, dependencyTimestamp, outputTimestamp) of
-              (Right (Just t1), Just t3, Just t2) ->
-                if t1 > t2 || t3 > t2 then Nothing else Just t2
-              (Right (Just t1), Nothing, Just t2) ->
-                if t1 > t2 then Nothing else Just t2
-              (Left RebuildNever, _, Just t2) ->
-                Just t2
-              _ ->
-                Nothing
-          case existingExtern of
-            Nothing -> pure prev
-            Just outputTime -> do
-              mexts <- decodeExterns . snd <$> readExterns moduleName
-              case mexts of
-                Just exts ->
-                  pure (M.insert moduleName (Prebuilt outputTime exts) prev)
-                Nothing -> pure prev
+    findExistingExtern :: CST.PartialResult Module -> m (Maybe (ModuleName, Bool, Prebuilt))
+    findExistingExtern (getModuleName . CST.resPartial -> moduleName) = runMaybeT $ do
+      inputTimestamp <- lift $ getInputTimestamp moduleName
+      (rebuildNever, existingTimestamp) <-
+        case inputTimestamp of
+          Left RebuildNever ->
+            fmap (True,) $ MaybeT $ getOutputTimestamp moduleName
+          Right (Just t1) -> do
+            outputTimestamp <- MaybeT $ getOutputTimestamp moduleName
+            guard (t1 < outputTimestamp)
+            pure (False, outputTimestamp)
+          _ -> mzero
+      externsFile <- MaybeT $ decodeExterns . snd <$> readExterns moduleName
+      pure (moduleName, rebuildNever, Prebuilt existingTimestamp externsFile)
+
+    collectPrebuiltModules :: M.Map ModuleName Prebuilt -> (ModuleName, Bool, Prebuilt) -> M.Map ModuleName Prebuilt
+    collectPrebuiltModules prev (moduleName, rebuildNever, pb)
+      | rebuildNever = M.insert moduleName pb prev
+      | otherwise = do
+          let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
+          case traverse (fmap pbModificationTime . flip M.lookup prev) deps of
+            Nothing ->
+              -- If we end up here, one of the dependencies didn't exist in the
+              -- prebuilt map and so we know a dependency needs to be rebuilt, which
+              -- means we need to be rebuilt in turn.
+              prev
+            Just modTimes ->
+              case maximumMaybe modTimes of
+                Just depModTime | pbModificationTime pb < depModTime ->
+                  prev
+                _ -> M.insert moduleName pb prev
 
 maximumMaybe :: Ord a => [a] -> Maybe a
 maximumMaybe [] = Nothing
