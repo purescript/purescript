@@ -154,5 +154,6 @@ prettyPrintErrorMessage (ParserError {..}) = case errType of
     TokEof         -> "Unexpected end of input"
     tok            -> "Unexpected token '" <> Text.unpack (printToken tok) <> "'"
 
+  displayCodePoint :: Char -> String
   displayCodePoint x =
     "U+" <> map toUpper (printf "%0.4x" (fromEnum x))
