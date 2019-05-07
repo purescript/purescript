@@ -80,7 +80,7 @@ prettyPrintErrorMessage (ParserError {..}) = case errType of
   ErrBinderInDecl ->
     "Expected declaration, saw pattern"
   ErrRecordUpdateInCtr ->
-    "Expected ':', saw '='"
+    "Expected ':' or '}', saw '='"
   ErrRecordPunInUpdate ->
     "Expected record update, saw pun"
   ErrRecordCtrInUpdate ->
