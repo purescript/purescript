@@ -10,7 +10,7 @@ module Language.PureScript.Sugar.Names
   ) where
 
 import Prelude.Compat
-import Protolude (ordNub, sortBy, on, Text)
+import Protolude (ordNub, sortBy, on)
 
 import Control.Arrow (first)
 import Control.Monad
@@ -269,13 +269,13 @@ renameInModule imports (Module modSS coms mn decls exps) =
       throwError . errorMessage' pos $ OverlappingNamesInLet
     return ((pos, args ++ bound), Let w ds val')
   updateValue (_, bound) (Var ss name'@(Qualified Nothing ident)) | ident `notElem` bound =
-    updateOrReplaceValue (ss, bound) name' updateValueName' (Var ss) showIdent
+    updateOrReplaceValue (ss, bound) name' updateValueName' (Var ss) IdentName
   updateValue (_, bound) (Var ss name'@(Qualified (Just _) _)) =
-    updateOrReplaceValue (ss, bound) name' updateValueName' (Var ss) showIdent
+    updateOrReplaceValue (ss, bound) name' updateValueName' (Var ss) IdentName
   updateValue (_, bound) (Op ss op) =
-    updateOrReplaceValue (ss, bound) op updateValueOpName' (Op ss) showOp
+    updateOrReplaceValue (ss, bound) op updateValueOpName' (Op ss) ValOpName
   updateValue (_, bound) (Constructor ss name) =
-    updateOrReplaceValue (ss, bound) name updateDataConstructorName' (Constructor ss) runProperName
+    updateOrReplaceValue (ss, bound) name updateDataConstructorName' (Constructor ss) DctorName
   updateValue s (TypedValue check val ty) =
     (,) s <$> (TypedValue check val <$> updateTypesEverywhere ty)
   updateValue s v = return (s, v)
@@ -285,11 +285,11 @@ renameInModule imports (Module modSS coms mn decls exps) =
     -> Qualified a
     -> (Qualified a -> SourceSpan -> m (Maybe (Qualified a)))
     -> (Qualified a -> Expr)
-    -> (a -> Text)
+    -> (a -> Name)
     -> m ((SourceSpan, [Ident]), Expr)
-  updateOrReplaceValue (ss, bounds) name updateExpr mkExpr showName = do
-    updated <- updateExpr name ss
-    let expr = maybe (UnknownValue (showQualified showName name)) mkExpr updated
+  updateOrReplaceValue (ss, bounds) name updateName mkExpr mkName = do
+    updated <- updateName name ss
+    let expr = maybe (UnknownValue (fmap mkName name)) mkExpr updated
     return ((ss, bounds), expr)
 
   updateBinder
@@ -439,11 +439,11 @@ renameInModule imports (Module modSS coms mn decls exps) =
         Just mn'' ->
           if mn'' `S.member` importedQualModules imports || mn'' `S.member` importedModules imports
           then throwUnknown
-          else throwError . errorMessage . UnknownName . Left . Qualified Nothing $ ModName mn''
+          else throwError . errorMessage $ UnknownName (Qualified Nothing (ModName mn'')) Nothing
 
         Nothing -> throwUnknown
 
-    throwUnknown = throwError . errorMessage . UnknownName . Left . fmap toName $ qname
+    throwUnknown = throwError . errorMessage $ UnknownName (fmap toName qname) Nothing
 
   -- Update names so unqualified references become qualified, and locally
   -- qualified references are replaced with their canoncial qualified names.

@@ -527,7 +527,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
   where
   -- Escalate inferred UnknownName warnings to errors
   unknownNameError :: ErrorMessage -> Bool
-  unknownNameError (ErrorMessage _ (UnknownName (Right _))) = True
+  unknownNameError (ErrorMessage _ (UnknownName _ _)) = True
   unknownNameError _ = False
 
   qualify' :: a -> Qualified a

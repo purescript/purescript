@@ -467,7 +467,7 @@ throwExportConflict ss new existing name =
 getExports :: MonadError MultipleErrors m => Env -> ModuleName -> m Exports
 getExports env mn =
   maybe
-    (throwError . errorMessage . UnknownName . Left . Qualified Nothing $ ModName mn)
+    (throwError . errorMessage $ UnknownName (Qualified Nothing (ModName mn)) Nothing)
     (return . envModuleExports)
   $ M.lookup mn env
 

@@ -63,14 +63,6 @@ onTypeSearchTypesM :: (Applicative m) => (SourceType -> m SourceType) -> TypeSea
 onTypeSearchTypesM f (TSAfter i r) = TSAfter <$> traverse (traverse f) i <*> traverse (traverse (traverse f)) r
 onTypeSearchTypesM _ (TSBefore env) = pure (TSBefore env)
 
--- | Data for the inferring the type of an unknown value
-data UnknownValueHint
-  = UnknownValueHint Text SourceType Context
-  deriving Show
-
--- | Parameters for an UnknownName error
-type UnknownNameParams = Either (Qualified Name) UnknownValueHint
-
 -- | A type of error messages
 data SimpleErrorMessage
   = ModuleNotFound ModuleName
@@ -91,7 +83,7 @@ data SimpleErrorMessage
   | OrphanTypeDeclaration Ident
   | RedefinedIdent Ident
   | OverlappingNamesInLet
-  | UnknownName UnknownNameParams
+  | UnknownName (Qualified Name) (Maybe (SourceType, Context))
   | UnknownImport ModuleName Name
   | UnknownImportDataConstructor ModuleName (ProperName 'TypeName) (ProperName 'ConstructorName)
   | UnknownExport Name
@@ -830,7 +822,7 @@ data Expr
   -- |
   -- An unknown name that will be turned into a hint/error during typechecking
   --
-  | UnknownValue Text
+  | UnknownValue (Qualified Name)
   -- |
   -- A value with source position information
   --
