@@ -10,6 +10,7 @@ import Prelude.Compat
 
 import Test.Tasty
 
+import qualified TestCst
 import qualified TestCompiler
 import qualified TestCoreFn
 import qualified TestDocs
@@ -31,6 +32,7 @@ main = do
   heading "Updating support code"
   TestUtils.updateSupportCode
 
+  cstTests <- TestCst.main
   ideTests <- TestIde.main
   compilerTests <- TestCompiler.main
   psciTests <- TestPsci.main
@@ -44,7 +46,8 @@ main = do
   defaultMain $
     testGroup
       "Tests"
-      [ compilerTests
+      [ cstTests
+      , compilerTests
       , psciTests
       , pscBundleTests
       , ideTests

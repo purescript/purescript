@@ -18,6 +18,7 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Traversable (for)
 import qualified Language.PureScript as P
+import qualified Language.PureScript.CST as CST
 import           Language.PureScript.Errors.JSON
 import           Language.PureScript.Make
 import qualified Options.Applicative as Opts
@@ -65,8 +66,8 @@ compile PSCMakeOptions{..} = do
     exitFailure
   moduleFiles <- readInput input
   (makeErrors, makeWarnings) <- runMake pscmOpts $ do
-    ms <- P.parseModulesFromFiles id moduleFiles
-    let filePathMap = M.fromList $ map (\(fp, P.Module _ _ mn _ _) -> (mn, Right fp)) ms
+    ms <- CST.parseModulesFromFiles id moduleFiles
+    let filePathMap = M.fromList $ map (\(fp, pm) -> (P.getModuleName $ CST.resPartial pm, Right fp)) ms
     foreigns <- inferForeignModules filePathMap
     let makeActions = buildMakeActions pscmOutputDir filePathMap foreigns pscmUsePrefix
     P.make makeActions (map snd ms)
