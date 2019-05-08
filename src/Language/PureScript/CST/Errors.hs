@@ -9,10 +9,11 @@ module Language.PureScript.CST.Errors
 import Prelude
 
 import qualified Data.Text as Text
-import Data.Char (isSpace)
+import Data.Char (isSpace, toUpper)
 import Language.PureScript.CST.Layout
 import Language.PureScript.CST.Print
 import Language.PureScript.CST.Types
+import Text.Printf (printf)
 
 data ParserErrorType
   = ErrWildcardInType
@@ -104,7 +105,7 @@ prettyPrintErrorMessage (ParserError {..}) = case errType of
   ErrEof ->
     "Unexpected end of input"
   ErrLexeme (Just (hd : _)) _ | isSpace hd ->
-    "Illegal whitespace character " <> show hd
+    "Illegal whitespace character " <> displayCodePoint hd
   ErrLexeme (Just a) _ ->
     "Unexpected " <> a
   ErrLineFeedInString ->
@@ -152,3 +153,7 @@ prettyPrintErrorMessage (ParserError {..}) = case errType of
     TokLayoutEnd   -> "Unexpected or mismatched indentation"
     TokEof         -> "Unexpected end of input"
     tok            -> "Unexpected token '" <> Text.unpack (printToken tok) <> "'"
+
+  displayCodePoint :: Char -> String
+  displayCodePoint x =
+    "U+" <> map toUpper (printf "%0.4x" (fromEnum x))
