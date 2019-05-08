@@ -48,6 +48,7 @@ data LayoutDelim
   | LytForall
   | LytTick
   | LytLet
+  | LytLetStmt
   | LytWhere
   | LytOf
   | LytDo
@@ -56,12 +57,13 @@ data LayoutDelim
 
 isIndented :: LayoutDelim -> Bool
 isIndented = \case
-  LytLet   -> True
-  LytWhere -> True
-  LytOf    -> True
-  LytDo    -> True
-  LytAdo   -> True
-  _        -> False
+  LytLet     -> True
+  LytLetStmt -> True
+  LytWhere   -> True
+  LytOf      -> True
+  LytDo      -> True
+  LytAdo     -> True
+  _          -> False
 
 isTopDecl :: SourcePos -> LayoutStack -> Bool
 isTopDecl tokPos = \case
@@ -132,7 +134,7 @@ insertLayout src@(SourceToken tokAnn tok) nextPos stack =
         --      foo <- ...
         --      let bar = ...
         --      in ...
-        ((_, LytLet) : (_, LytAdo) : stk', acc') ->
+        ((_, LytLetStmt) : (_, LytAdo) : stk', acc') ->
           (stk', acc') & insertEnd & insertEnd & insertToken src
         ((_, lyt) : stk', acc') | isIndented lyt ->
           (stk', acc') & insertEnd & insertToken src
@@ -144,7 +146,13 @@ insertLayout src@(SourceToken tokAnn tok) nextPos stack =
       inP _ lyt    = isIndented lyt
 
     TokLowerName [] "let" ->
-      state & insertKwProperty (insertStart LytLet)
+      case stk of
+        (p, LytDo) : _ | srcColumn p == srcColumn tokPos ->
+          state & insertKwProperty (insertStart LytLetStmt)
+        (p, LytAdo) : _ | srcColumn p == srcColumn tokPos ->
+          state & insertKwProperty (insertStart LytLetStmt)
+        _ ->
+          state & insertKwProperty (insertStart LytLet)
 
     TokLowerName _ "do" ->
       state & insertKwProperty (insertStart LytDo)

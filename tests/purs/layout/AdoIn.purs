@@ -6,3 +6,8 @@ test = ado
    in bar
 
 test = ado in foo
+
+test = ado
+  foo <- bar $ let a = 42 in a
+  baz <- b
+  in bar
