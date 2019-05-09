@@ -269,13 +269,13 @@ renameInModule imports (Module modSS coms mn decls exps) =
       throwError . errorMessage' pos $ OverlappingNamesInLet
     return ((pos, args ++ bound), Let w ds val')
   updateValue (_, bound) (Var ss name'@(Qualified Nothing ident)) | ident `notElem` bound =
-    updateOrReplaceValue (ss, bound) name' updateValueName' (Var ss) IdentName
+    updateOrReplaceValue (ss, bound) name' updateValueName' (Var ss)
   updateValue (_, bound) (Var ss name'@(Qualified (Just _) _)) =
-    updateOrReplaceValue (ss, bound) name' updateValueName' (Var ss) IdentName
+    updateOrReplaceValue (ss, bound) name' updateValueName' (Var ss)
   updateValue (_, bound) (Op ss op) =
-    updateOrReplaceValue (ss, bound) op updateValueOpName' (Op ss) ValOpName
+    updateOrReplaceValue (ss, bound) op updateValueOpName' (Op ss)
   updateValue (_, bound) (Constructor ss name) =
-    updateOrReplaceValue (ss, bound) name updateDataConstructorName' (Constructor ss) DctorName
+    updateOrReplaceValue (ss, bound) name updateDataConstructorName' (Constructor ss)
   updateValue s (TypedValue check val ty) =
     (,) s <$> (TypedValue check val <$> updateTypesEverywhere ty)
   updateValue s v = return (s, v)
@@ -283,13 +283,12 @@ renameInModule imports (Module modSS coms mn decls exps) =
   updateOrReplaceValue
     :: (SourceSpan, [Ident])
     -> Qualified a
-    -> (Qualified a -> SourceSpan -> m (Maybe (Qualified a)))
+    -> (Qualified a -> SourceSpan -> m (Either (Qualified Name) (Qualified a)))
     -> (Qualified a -> Expr)
-    -> (a -> Name)
     -> m ((SourceSpan, [Ident]), Expr)
-  updateOrReplaceValue (ss, bounds) name updateName mkExpr mkName = do
+  updateOrReplaceValue (ss, bounds) name updateName mkExpr = do
     updated <- updateName name ss
-    let expr = maybe (UnknownValue (fmap mkName name)) mkExpr updated
+    let expr = either UnknownValue mkExpr updated
     return ((ss, bounds), expr)
 
   updateBinder
@@ -382,7 +381,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
   updateDataConstructorName'
     :: Qualified (ProperName 'ConstructorName)
     -> SourceSpan
-    -> m (Maybe (Qualified (ProperName 'ConstructorName)))
+    -> m (Either (Qualified Name) (Qualified (ProperName 'ConstructorName)))
   updateDataConstructorName' = update' (importedDataConstructors imports) DctorName
 
   updateClassName
@@ -394,7 +393,10 @@ renameInModule imports (Module modSS coms mn decls exps) =
   updateValueName :: Qualified Ident -> SourceSpan -> m (Qualified Ident)
   updateValueName = update (importedValues imports) IdentName
 
-  updateValueName' :: Qualified Ident -> SourceSpan -> m (Maybe (Qualified Ident))
+  updateValueName'
+    :: Qualified Ident
+    -> SourceSpan
+    -> m (Either (Qualified Name) (Qualified Ident))
   updateValueName' = update' (importedValues imports) IdentName
 
   updateValueOpName
@@ -406,7 +408,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
   updateValueOpName'
     :: Qualified (OpName 'ValueOpName)
     -> SourceSpan
-    -> m (Maybe (Qualified (OpName 'ValueOpName)))
+    -> m (Either (Qualified Name) (Qualified (OpName 'ValueOpName)))
   updateValueOpName' = update' (importedValueOps imports) ValOpName
 
   updateKindName
@@ -426,8 +428,8 @@ renameInModule imports (Module modSS coms mn decls exps) =
     -> SourceSpan
     -> m (Qualified a)
   update imps toName qname@(Qualified mn' _) pos = warnAndRethrowWithPosition pos $ do
-    mbQualified <- update' imps toName qname pos
-    maybe reportError pure mbQualified
+    qualified <- update' imps toName qname pos
+    either (const reportError) pure qualified
     where
     reportError =
       case mn' of
@@ -456,9 +458,9 @@ renameInModule imports (Module modSS coms mn decls exps) =
     -> (a -> Name)
     -> Qualified a
     -> SourceSpan
-    -> m (Maybe (Qualified a))
-  update' imps toName qname@(Qualified _ name) pos = warnAndRethrowWithPosition pos $
-    traverse updateName (M.lookup qname imps)
+    -> m (Either (Qualified Name) (Qualified a))
+  update' imps toName qname@(Qualified _ name) pos = warnAndRethrowWithPosition pos $ do
+    maybe (pure . Left . fmap toName $ qname) updateName (M.lookup qname imps)
     where
     updateName options = do
       -- We found the name in our imports, so we return the name for it,
@@ -469,4 +471,4 @@ renameInModule imports (Module modSS coms mn decls exps) =
       (mnNew, mnOrig) <- checkImportConflicts pos mn toName options
       modify $ \usedImports ->
         M.insertWith (++) mnNew [fmap toName qname] usedImports
-      return $ Qualified (Just mnOrig) name
+      return . Right $ Qualified (Just mnOrig) name
