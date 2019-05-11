@@ -16,13 +16,10 @@ import           Control.Monad hiding (sequence)
 import           Control.Monad.Trans.Class (lift)
 import           Control.Monad.Trans.Control (MonadBaseControl(..))
 import           Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
-import           Data.Aeson (decode)
 import           Data.Foldable (foldl')
 import qualified Data.Map as M
 import           Data.Maybe (catMaybes, fromMaybe)
-import qualified Data.Text as T
 import           Data.Time.Clock (UTCTime)
-import           Data.Version (showVersion)
 import           Language.PureScript.AST
 import           Language.PureScript.Crash
 import qualified Language.PureScript.CST as CST
@@ -30,7 +27,6 @@ import           Language.PureScript.Errors
 import           Language.PureScript.Externs
 import           Language.PureScript.Make.Actions as Actions
 import           Language.PureScript.Names (ModuleName)
-import qualified Paths_purescript as Paths
 
 -- | The BuildPlan tracks information about our build progress, and holds all
 -- prebuilt modules for incremental builds.
@@ -157,9 +153,3 @@ construct MakeActions{..} (sorted, graph) = do
 maximumMaybe :: Ord a => [a] -> Maybe a
 maximumMaybe [] = Nothing
 maximumMaybe xs = Just $ maximum xs
-
-decodeExterns :: Externs -> Maybe ExternsFile
-decodeExterns bs = do
-  externs <- decode bs
-  guard $ T.unpack (efVersion externs) == showVersion Paths.version
-  return externs

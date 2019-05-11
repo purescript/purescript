@@ -186,6 +186,7 @@ errorCode em = case unwrapErrorMessage em of
   CannotDefinePrimModules{} -> "CannotDefinePrimModules"
   MixedAssociativityError{} -> "MixedAssociativityError"
   NonAssociativeError{} -> "NonAssociativeError"
+  NeedToBuildDocs{} -> "NeedToBuildDocs"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -1060,6 +1061,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , indent $ paras $ map (line . markCode . showQualified showOp) (NEL.toList ops)
             , line "Use parentheses to resolve this ambiguity."
             ]
+    renderSimpleErrorMessage NeedToBuildDocs =
+      paras
+        [ line "Some of the input modules are missing up-to-date documentation data in the compiler output directory. Please compile all of the relevant modules using `purs compile' with the `docs' codegen target."
+        , line "For example:"
+        , indent $ line "$ purs compile --codegen docs SOURCE_FILES"
+        ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1 t2) detail =

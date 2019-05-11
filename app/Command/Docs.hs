@@ -31,12 +31,13 @@ data Format
 data PSCDocsOptions = PSCDocsOptions
   { _pscdFormat :: Format
   , _pscdOutput :: Maybe FilePath
+  , _pscdCompileOutputDir :: FilePath
   , _pscdInputFiles  :: [FilePath]
   }
   deriving (Show)
 
 docgen :: PSCDocsOptions -> IO ()
-docgen (PSCDocsOptions fmt moutput inputGlob) = do
+docgen (PSCDocsOptions fmt moutput compileOutput inputGlob) = do
   input <- concat <$> mapM glob inputGlob
   when (null input) $ do
     hPutStrLn stderr "purs docs: no input files."
@@ -75,8 +76,7 @@ docgen (PSCDocsOptions fmt moutput inputGlob) = do
         exitFailure
 
   parseAndConvert input =
-    runExceptT (D.parseFilesInPackages input []
-                >>= uncurry D.convertTaggedModulesInPackage)
+    runExceptT (fmap fst (D.collectDocs compileOutput input []))
     >>= successOrExit
 
   writeTagsToFile :: String -> [String] -> IO ()
@@ -102,7 +102,7 @@ defaultOutputForFormat fmt =
     Ctags -> "tags"
 
 pscDocsOptions :: Opts.Parser PSCDocsOptions
-pscDocsOptions = PSCDocsOptions <$> format <*> output <*> many inputFile
+pscDocsOptions = PSCDocsOptions <$> format <*> output <*> compileOutputDir <*> many inputFile
   where
   format :: Opts.Parser Format
   format = Opts.option Opts.auto $
@@ -112,11 +112,19 @@ pscDocsOptions = PSCDocsOptions <$> format <*> output <*> many inputFile
     <> Opts.help "Set output FORMAT (markdown | html | etags | ctags)"
 
   output :: Opts.Parser (Maybe FilePath)
-  output = optional $ Opts.option Opts.auto $
+  output = optional $ Opts.strOption $
        Opts.long "output"
     <> Opts.short 'o'
     <> Opts.metavar "DEST"
     <> Opts.help "File/directory path for docs to be written to"
+
+  compileOutputDir :: Opts.Parser FilePath
+  compileOutputDir = Opts.strOption $
+       Opts.value "output"
+    <> Opts.showDefault
+    <> Opts.long "compile-output"
+    <> Opts.metavar "DIR"
+    <> Opts.help "Compiler output directory"
 
   inputFile :: Opts.Parser FilePath
   inputFile = Opts.strArgument $
