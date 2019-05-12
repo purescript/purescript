@@ -92,7 +92,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
 
     inferred <- forM tys $ \(shouldGeneralize, ((sai@((ss, _), ident), (val, ty)), _)) -> do
       -- Replace type class dictionary placeholders with actual dictionaries
-      (val', unsolved) <- replaceTypeClassDictionaries shouldGeneralize val
+      (val', unsolved) <- rethrowInferringHoleError $ replaceTypeClassDictionaries shouldGeneralize val
       -- Generalize and constrain the type
       currentSubst <- gets checkSubstitution
       let ty' = substituteType currentSubst ty
@@ -107,7 +107,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
         -- For non-recursive binding groups, can generalize over constraints.
         -- For recursive binding groups, we throw an error here for now.
         when (bindingGroupType == RecursiveBindingGroup && not (null unsolved))
-          . throwError
+          . throwInferringHoleError
           . errorMessage' ss
           $ CannotGeneralizeRecursiveFunction ident generalized
         -- Make sure any unsolved type constraints only use type variables which appear
@@ -121,7 +121,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           let solved = foldMap (S.fromList . fdDetermined) typeClassDependencies
           let constraintTypeVars = ordNub . foldMap (unknownsInType . fst) . filter ((`notElem` solved) . snd) $ zip (constraintArgs con) [0..]
           when (any (`notElem` unsolvedTypeVars) constraintTypeVars) .
-            throwError
+            throwInferringHoleError
               . onErrorMessages (replaceTypes currentSubst)
               . errorMessage' ss
               $ AmbiguousTypeVariables generalized con
@@ -419,17 +419,19 @@ infer' (TypedValue checkType val ty) = do
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   tv <- if checkType then withScopedTypeVars moduleName args (check val ty') else return (TypedValue' False val ty)
   return $ TypedValue' True (tvToExpr tv) ty'
-infer' (Hole name) = do
+infer' (Hole ss name) = do
   ty <- freshType
   ctx <- getLocalContext
   env <- getEnv
+  setInferringHoleError (errorMessage' ss $ HoleCannotInferType name)
   tell . errorMessage $ HoleInferredType name ty ctx . Just $ TSBefore env
-  return $ TypedValue' True (Hole name) ty
-infer' (UnknownValue name) = do
+  return $ TypedValue' True (Hole ss name) ty
+infer' (UnknownValue ss name) = do
   ty <- freshType
   ctx <- getLocalContext
+  setInferringHoleError (errorMessage' ss $ UnknownName name Nothing)
   tell . errorMessage . UnknownName name $ Just (ty, ctx)
-  return $ TypedValue' True (UnknownValue name) ty
+  return $ TypedValue' True (UnknownValue ss name) ty
 infer' (PositionedValue pos c val) = warnAndRethrowWithPositionTC pos $ do
   TypedValue' t v ty <- infer' val
   return $ TypedValue' t (PositionedValue pos c v) ty

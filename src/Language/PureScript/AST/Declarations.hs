@@ -146,6 +146,7 @@ data SimpleErrorMessage
   | UnusedTypeVar Text
   | WildcardInferredType SourceType Context
   | HoleInferredType Text SourceType Context (Maybe TypeSearch)
+  | HoleCannotInferType Text
   | MissingTypeDeclaration Ident SourceType
   | OverlappingPattern [[Binder]] Bool
   | IncompleteExhaustivityCheck
@@ -820,11 +821,11 @@ data Expr
   -- |
   -- A typed hole that will be turned into a hint/error during typechecking
   --
-  | Hole Text
+  | Hole SourceSpan Text
   -- |
   -- An unknown name that will be turned into a hint/error during typechecking
   --
-  | UnknownValue (Qualified Name)
+  | UnknownValue SourceSpan (Qualified Name)
   -- |
   -- A value with source position information
   --

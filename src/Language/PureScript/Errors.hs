@@ -155,6 +155,7 @@ errorCode em = case unwrapErrorMessage em of
   UnusedTypeVar{} -> "UnusedTypeVar"
   WildcardInferredType{} -> "WildcardInferredType"
   HoleInferredType{} -> "HoleInferredType"
+  HoleCannotInferType{} -> "HoleCannotInferType"
   MissingTypeDeclaration{} -> "MissingTypeDeclaration"
   OverlappingPattern{} -> "OverlappingPattern"
   IncompleteExhaustivityCheck{} -> "IncompleteExhaustivityCheck"
@@ -896,6 +897,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
         paras $ [ line $ "Hole '" <> markCode name <> "' has the inferred type "
                 , markCodeBox (indent (typeAsBox maxBound ty))
                 ] ++ tsResult ++ renderContext ctx
+    renderSimpleErrorMessage (HoleCannotInferType name) =
+      paras [ line $ "Cannot infer type for hole '" <> markCode name <> "'."]
     renderSimpleErrorMessage (MissingTypeDeclaration ident ty) =
       paras [ line $ "No type declaration was provided for the top-level declaration of " <> markCode (showIdent ident) <> "."
             , line "It is good practice to provide type declarations as a form of documentation."
