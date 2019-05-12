@@ -136,6 +136,7 @@ executables:
       - Command.Docs
       - Command.Docs.Html
       - Command.Docs.Markdown
+      - Command.Graph
       - Command.Hierarchy
       - Command.Ide
       - Command.Publish

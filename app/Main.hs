@@ -10,6 +10,7 @@ module Main where
 import qualified Command.Bundle as Bundle
 import qualified Command.Compile as Compile
 import qualified Command.Docs as Docs
+import qualified Command.Graph as Graph
 import qualified Command.Hierarchy as Hierarchy
 import qualified Command.Ide as Ide
 import qualified Command.Publish as Publish
@@ -69,6 +70,9 @@ main = do
         , Opts.command "docs"
             (Opts.info Docs.command
               (Opts.progDesc "Generate documentation from PureScript source files in a variety of formats, including Markdown and HTML" <> Docs.infoModList))
+        , Opts.command "graph"
+            (Opts.info Graph.command
+              (Opts.progDesc "Module dependency graph"))
         , Opts.command "hierarchy"
             (Opts.info Hierarchy.command
               (Opts.progDesc "Generate a GraphViz directed graph of PureScript type classes"))
