@@ -46,6 +46,9 @@ import qualified Text.Parsec.Error as PE
 import           Text.Parsec.Error (Message(..))
 import qualified Text.PrettyPrint.Boxes as Box
 
+noErrors :: MultipleErrors
+noErrors = MultipleErrors []
+
 newtype ErrorSuggestion = ErrorSuggestion Text
 
 -- | Get the source span for an error
@@ -111,6 +114,8 @@ errorCode em = case unwrapErrorMessage em of
   InvalidDoBind -> "InvalidDoBind"
   InvalidDoLet -> "InvalidDoLet"
   CycleInDeclaration{} -> "CycleInDeclaration"
+  CycleInDictDeclaration{} -> "CycleInDictDeclaration"
+  MissingEtaExpansion{} -> "MissingEtaExpansion"
   CycleInTypeSynonym{} -> "CycleInTypeSynonym"
   CycleInTypeClassDeclaration{} -> "CycleInTypeClassDeclaration"
   CycleInModules{} -> "CycleInModules"
@@ -569,7 +574,47 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , indent $ line $ displaySourceSpan relPath ss
             ]
     renderSimpleErrorMessage (CycleInDeclaration nm) =
-      line $ "The value of " <> markCode (showIdent nm) <> " is undefined here, so this reference is not allowed."
+      line $ "The value of " <> markCode (showIdent nm) <> " is undefined here because of cyclical dependencies, so this reference is not allowed."
+    renderSimpleErrorMessage (CycleInDictDeclaration inst fields) =
+      let label' dmt = if dmt == Fn then "function " else "value "
+          label (i, ss, dmt) =
+            indent' . line $
+              label' dmt <> markCode (showIdent i) <> " at " <> displaySourceSpan relPath ss
+          prelude = line $ "The definition of instance " <> markCode (showIdent inst) <> " is invalid because of cyclical dependencies."
+          addendum =
+            [ line ""
+            , line $ "Note that cycles in the member functions of " <> markCode (showIdent inst) <> " may lead to non-terminating runtime behavior."
+            , line ""
+            , line $ "Consider replacing the functions' circular dependencies with independent terms."
+            , line ""
+            , line $ "If their definitions cannot be rewritten, eta-expansion is necessary to accommodate purescript's non-strict style of evaluation."
+            ]
+          addendum' = if (any (\(_, _, dmt) -> dmt == Fn) fields)
+                         then addendum
+                         else []
+      in case fields of
+        [] -> prelude
+        [field] ->
+          paras $ [ prelude
+                  , line ""
+                  , line $ "In particular, its member"
+                  , label field
+                  , line $ "implicitly references the instance itself."
+                  ] ++ addendum'
+        _ ->
+          paras $ [ prelude
+                  , line ""
+                  , line $ "In particular, its following members implicitly reference the instance itself."
+                  ] ++ map label fields ++ addendum'
+    renderSimpleErrorMessage (MissingEtaExpansion ident) =
+      paras [ line $ "A cycle appears in the definition of function " <> markCode (showIdent ident) <> "."
+            , line ""
+            , line $ "Note that cycles in functions may lead to non-terminating runtime behavior."
+            , line ""
+            , line $ "Consider replacing the circular dependencies in the definition of " <> markCode (showIdent ident) <> " with independent terms."
+            , line ""
+            , line "If the definition cannot be rewritten, eta-expansion is necessary to accommodate purescript's non-strict style of evaluation."
+            ]
     renderSimpleErrorMessage (CycleInModules mns) =
       case mns of
         [mn] ->
@@ -1415,6 +1460,10 @@ prettyPrintParseErrorMessages msgOr msgUnknown msgExpecting msgUnExpected msgEnd
 -- | Indent to the right, and pad on top and bottom.
 indent :: Box.Box -> Box.Box
 indent = Box.moveUp 1 . Box.moveDown 1 . Box.moveRight 2
+
+-- | Indent to the right without vertical padding.
+indent' :: Box.Box -> Box.Box
+indent' = Box.moveRight 2
 
 line :: Text -> Box.Box
 line = Box.text . T.unpack

@@ -356,6 +356,14 @@ isTypeOrApplied :: Type a -> Type b -> Bool
 isTypeOrApplied t1 (TypeApp _ t2 _) = eqType t1 t2
 isTypeOrApplied t1 t2 = eqType t1 t2
 
+isFunctionType :: SourceType -> Bool
+isFunctionType = eqType tyFunction . stripForAllAndTypeApp
+
+stripForAllAndTypeApp :: SourceType -> SourceType
+stripForAllAndTypeApp (ForAll _ _ _ st _) = stripForAllAndTypeApp st
+stripForAllAndTypeApp (TypeApp _ st _) = stripForAllAndTypeApp st
+stripForAllAndTypeApp st = st
+
 -- | Smart constructor for function types
 function :: SourceType -> SourceType -> SourceType
 function t1 t2 = TypeApp nullSourceAnn (TypeApp nullSourceAnn tyFunction t1) t2

@@ -332,6 +332,7 @@ everythingWithContextOnValues
   -> (r -> r -> r)
   -> (s -> Declaration       -> (s, r))
   -> (s -> Expr              -> (s, r))
+  -> (s -> Expr              -> (s, r))
   -> (s -> Binder            -> (s, r))
   -> (s -> CaseAlternative   -> (s, r))
   -> (s -> DoNotationElement -> (s, r))
@@ -340,7 +341,8 @@ everythingWithContextOnValues
      , Binder            -> r
      , CaseAlternative   -> r
      , DoNotationElement -> r)
-everythingWithContextOnValues s0 r0 (<>.) f g h i j = (f'' s0, g'' s0, h'' s0, i'' s0, j'' s0)
+everythingWithContextOnValues s0 r0 (<>.) f g gLit h i j =
+  (f'' s0, g'' s0, h'' s0, i'' s0, j'' s0)
   where
 
   f'' :: s -> Declaration -> r
@@ -358,7 +360,7 @@ everythingWithContextOnValues s0 r0 (<>.) f g h i j = (f'' s0, g'' s0, h'' s0, i
   g'' s v = let (s', r) = g s v in r <>. g' s' v
 
   g' :: s -> Expr -> r
-  g' s (Literal _ l) = lit g'' s l
+  g' s (Literal _ l) = lit gLit'' s l
   g' s (UnaryMinus _ v1) = g'' s v1
   g' s (BinaryNoParens op v1 v2) = g'' s op <>. g'' s v1 <>. g'' s v2
   g' s (Parens v1) = g'' s v1
@@ -376,6 +378,29 @@ everythingWithContextOnValues s0 r0 (<>.) f g h i j = (f'' s0, g'' s0, h'' s0, i
   g' s (Ado _ es v1) = foldl (<>.) r0 (fmap (j'' s) es) <>. g'' s v1
   g' s (PositionedValue _ _ v1) = g'' s v1
   g' _ _ = r0
+
+  gLit'' :: s -> Expr -> r
+  gLit'' s v = let (s', r) = gLit s v in r <>. gLit' s' v
+
+  gLit' :: s -> Expr -> r
+  gLit' s (Literal _ l) = lit gLit'' s l
+  gLit' s (UnaryMinus _ v1) = gLit'' s v1
+  gLit' s (BinaryNoParens op v1 v2) = gLit'' s op <>. gLit'' s v1 <>. gLit'' s v2
+  gLit' s (Parens v1) = gLit'' s v1
+  gLit' s (TypeClassDictionaryConstructorApp _ v1) = gLit'' s v1
+  gLit' s (Accessor _ v1) = gLit'' s v1
+  gLit' s (ObjectUpdate obj vs) = foldl (<>.) (gLit'' s obj) (fmap (gLit'' s . snd) vs)
+  gLit' s (ObjectUpdateNested obj vs) = foldl (<>.) (gLit'' s obj) (fmap (gLit'' s) vs)
+  gLit' s (Abs binder v1) = h'' s binder <>. gLit'' s v1
+  gLit' s (App v1 v2) = gLit'' s v1 <>. gLit'' s v2
+  gLit' s (IfThenElse v1 v2 v3) = gLit'' s v1 <>. gLit'' s v2 <>. gLit'' s v3
+  gLit' s (Case vs alts) = foldl (<>.) (foldl (<>.) r0 (fmap (gLit'' s) vs)) (fmap (i'' s) alts)
+  gLit' s (TypedValue _ v1 _) = gLit'' s v1
+  gLit' s (Let _ ds v1) = foldl (<>.) r0 (fmap (f'' s) ds) <>. gLit'' s v1
+  gLit' s (Do _ es) = foldl (<>.) r0 (fmap (j'' s) es)
+  gLit' s (Ado _ es v1) = foldl (<>.) r0 (fmap (j'' s) es) <>. gLit'' s v1
+  gLit' s (PositionedValue _ _ v1) = gLit'' s v1
+  gLit' _ _ = r0
 
   h'' :: s -> Binder -> r
   h'' s b = let (s', r) = h s b in r <>. h' s' b

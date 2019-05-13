@@ -64,6 +64,9 @@ onTypeSearchTypesM :: (Applicative m) => (SourceType -> m SourceType) -> TypeSea
 onTypeSearchTypesM f (TSAfter i r) = TSAfter <$> traverse (traverse f) i <*> traverse (traverse (traverse f)) r
 onTypeSearchTypesM _ (TSBefore env) = pure (TSBefore env)
 
+data DictMemberType = Fn | NonFn
+  deriving (Eq, Ord, Show)
+
 -- | A type of error messages
 data SimpleErrorMessage
   = ModuleNotFound ModuleName
@@ -101,6 +104,8 @@ data SimpleErrorMessage
   | InvalidDoBind
   | InvalidDoLet
   | CycleInDeclaration Ident
+  | CycleInDictDeclaration Ident [(Ident, SourceSpan, DictMemberType)]
+  | MissingEtaExpansion Ident
   | CycleInTypeSynonym (Maybe (ProperName 'TypeName))
   | CycleInTypeClassDeclaration [Qualified (ProperName 'ClassName)]
   | CycleInModules [ModuleName]
@@ -476,6 +481,22 @@ overValueDeclaration f d = maybe d (ValueDeclaration . f) (getValueDeclaration d
 getValueDeclaration :: Declaration -> Maybe (ValueDeclarationData [GuardedExpr])
 getValueDeclaration (ValueDeclaration d) = Just d
 getValueDeclaration _ = Nothing
+
+isDictExpr :: Expr -> Bool
+isDictExpr expr = case stripTypedAndPositioned expr of
+  TypeClassDictionaryConstructorApp _ _ -> True
+  Abs _ expr' -> isDictExpr expr'
+  _ -> False
+
+getDictDeclaration :: Declaration -> Maybe (ValueDeclarationData [GuardedExpr])
+getDictDeclaration (ValueDeclaration d@(ValueDeclarationData _ _ Private _ [MkUnguarded expr]))
+  | isDictExpr expr = Just d
+getDictDeclaration _ = Nothing
+
+stripTypedAndPositioned :: Expr -> Expr
+stripTypedAndPositioned (TypedValue _ e _) = stripTypedAndPositioned e
+stripTypedAndPositioned (PositionedValue _ _ e) = stripTypedAndPositioned e
+stripTypedAndPositioned e = e
 
 pattern ValueDecl :: SourceAnn -> Ident -> NameKind -> [Binder] -> [GuardedExpr] -> Declaration
 pattern ValueDecl sann ident name binders expr
