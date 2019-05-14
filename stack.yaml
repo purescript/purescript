@@ -5,9 +5,5 @@ extra-deps:
 - network-3.0.1.1
 nix:
   enable: false
-  packages:
-  - zlib
-  # Test dependencies
-  - nodejs
-  - nodePackages.npm
-  - nodePackages.bower
+  shell-file: nix/init.nix
+  add-gc-roots: true
