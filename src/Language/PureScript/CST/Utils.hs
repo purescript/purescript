@@ -304,3 +304,10 @@ reservedNames = Set.fromList
 
 isValidModuleNamespace :: Text -> Bool
 isValidModuleNamespace = Text.null . snd . Text.span (\c -> c /= '_' && c /= '\'')
+
+-- | This is to keep the @Parser.y@ file ASCII, otherwise @happy@ will break
+-- in non-unicode locales.
+--
+-- Related GHC issue: https://gitlab.haskell.org/ghc/ghc/issues/8167
+isLeftFatArrow :: Text -> Bool
+isLeftFatArrow str = str == "<=" || str == "⇐"
