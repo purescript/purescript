@@ -58,7 +58,7 @@ import Language.PureScript.PSString (PSString)
   '\;'            { SourceToken _ TokLayoutSep }
   '<-'            { SourceToken _ (TokLeftArrow _) }
   '->'            { SourceToken _ (TokRightArrow _) }
-  '<='            { SourceToken _ (TokOperator [] sym) | sym == "<=" || sym == "⇐" }
+  '<='            { SourceToken _ (TokOperator [] sym) | isLeftFatArrow sym }
   '=>'            { SourceToken _ (TokRightFatArrow _) }
   ':'             { SourceToken _ (TokOperator [] ":") }
   '::'            { SourceToken _ (TokDoubleColon _) }
