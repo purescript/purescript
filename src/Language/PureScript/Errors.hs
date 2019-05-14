@@ -461,7 +461,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , line $
                 if isBuiltinModuleName mn
                   then
-                    "Module names in the Prim namespace are reserved for built-in modules, but this version of the compiler does not provide module " <> markCode (runModuleName mn) <> ". Please, consider upgrading your compiler to a newer version."
+                    "Module names in the Prim namespace are reserved for built-in modules, but this version of the compiler does not provide module " <> markCode (runModuleName mn) <> ". You may be able to fix this by updating your compiler to a newer version."
                   else
                     "Make sure the source file exists, and that it has been provided as an input to the compiler."
             ]
