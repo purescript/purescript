@@ -6,7 +6,6 @@ import           Command.Docs.Markdown
 import           Control.Applicative
 import           Control.Monad.Writer
 import           Control.Monad.Trans.Except (runExceptT)
-import           Data.Functor ((<&>))
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Docs as D
 import           Language.PureScript.Docs.Tags (dumpCtags, dumpEtags)
@@ -14,7 +13,7 @@ import qualified Options.Applicative as Opts
 import qualified Text.PrettyPrint.ANSI.Leijen as PP
 import           System.Directory (createDirectoryIfMissing, removeFile)
 import           System.Exit (exitFailure)
-import           System.FilePath.Glob (compile, glob, globDir)
+import           System.FilePath.Glob (compile, glob, globDir1)
 import           System.IO (hPutStrLn, stderr)
 
 -- | Available output formats
@@ -39,24 +38,24 @@ docgen (PSCDocsOptions fmt inputGlob) = do
     exitFailure
 
   fileMs <- parseAndConvert input
-  let ms = map snd fileMs
+  let ms = D.primModules ++ map snd fileMs
   case fmt of
     Etags -> mapM_ putStrLn $ dumpEtags fileMs
     Ctags -> mapM_ putStrLn $ dumpCtags fileMs
-    _ -> do
-      let outputDir = "./generated-docs" -- TODO: make this configurable
-      let ms' = D.primModules ++ ms
-      let exts = map compile ["*.html", "*.md"]
-      createDirectoryIfMissing False outputDir
-      globDir exts outputDir <&> concat >>= mapM_ removeFile
-      case fmt of
-        Html -> do
-          let msHtml = map asHtml ms'
-          writeHtmlModules outputDir msHtml
-        Markdown -> do
-          let msMarkdown = map asMarkdown ms'
-          writeMarkdownModules outputDir msMarkdown
-        _ -> return ()
+    Html -> do
+      let outputDir = "./generated-docs/html" -- TODO: make this configurable
+      let ext = compile "*.html"
+      let msHtml = map asHtml ms
+      createDirectoryIfMissing True outputDir
+      globDir1 ext outputDir >>= mapM_ removeFile
+      writeHtmlModules outputDir msHtml
+    Markdown -> do
+      let outputDir = "./generated-docs/md" -- TODO: make this configurable
+      let ext = compile "*.md"
+      let msMarkdown = map asMarkdown ms
+      createDirectoryIfMissing True outputDir
+      globDir1 ext outputDir >>= mapM_ removeFile
+      writeMarkdownModules outputDir msMarkdown
 
   where
   successOrExit :: Either P.MultipleErrors a -> IO a
