@@ -1,30 +1,20 @@
-{-# LANGUAGE TupleSections #-}
 
 module Command.Docs (command, infoModList) where
 
 import           Command.Docs.Html
+import           Command.Docs.Markdown
 import           Control.Applicative
-import           Control.Arrow (first, second)
-import           Control.Category ((>>>))
 import           Control.Monad.Writer
 import           Control.Monad.Trans.Except (runExceptT)
-import qualified Data.Text as T
-import qualified Data.Text.IO as T
-import           Data.Function (on)
-import           Data.List
-import           Data.Tuple (swap)
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Docs as D
-import qualified Language.PureScript.Docs.AsMarkdown as D
 import           Language.PureScript.Docs.Tags (dumpCtags, dumpEtags)
 import qualified Options.Applicative as Opts
 import qualified Text.PrettyPrint.ANSI.Leijen as PP
-import           System.Directory (createDirectoryIfMissing)
+import           System.Directory (createDirectoryIfMissing, removeFile)
 import           System.Exit (exitFailure)
-import           System.FilePath (takeDirectory)
-import           System.FilePath.Glob (glob)
+import           System.FilePath.Glob (compile, glob, globDir1)
 import           System.IO (hPutStrLn, stderr)
-import           System.IO.UTF8 (writeUTF8FileT)
 
 -- | Available output formats
 data Format
@@ -34,67 +24,40 @@ data Format
   | Etags -- Output etags symbol index suitable for use with emacs
   deriving (Show, Eq, Ord)
 
--- | Available methods of outputting Markdown documentation
-data DocgenOutput
-  = EverythingToStdOut
-  | ToStdOut [P.ModuleName]
-  | ToFiles [(P.ModuleName, FilePath)]
-  deriving (Show)
-
 data PSCDocsOptions = PSCDocsOptions
   { _pscdFormat :: Format
   , _pscdInputFiles  :: [FilePath]
-  , _pscdDocgen :: DocgenOutput
   }
   deriving (Show)
 
 docgen :: PSCDocsOptions -> IO ()
-docgen (PSCDocsOptions fmt inputGlob output) = do
+docgen (PSCDocsOptions fmt inputGlob) = do
   input <- concat <$> mapM glob inputGlob
   when (null input) $ do
     hPutStrLn stderr "purs docs: no input files."
     exitFailure
 
   fileMs <- parseAndConvert input
-  let ms = map snd fileMs
+  let ms = D.primModules ++ map snd fileMs
   case fmt of
     Etags -> mapM_ putStrLn $ dumpEtags fileMs
     Ctags -> mapM_ putStrLn $ dumpCtags fileMs
     Html -> do
-      let outputDir = "./generated-docs" -- TODO: make this configurable
-      let msHtml = map asHtml (D.primModules ++ ms)
-      createDirectoryIfMissing False outputDir
+      let outputDir = "./generated-docs/html" -- TODO: make this configurable
+      let ext = compile "*.html"
+      let msHtml = map asHtml ms
+      createDirectoryIfMissing True outputDir
+      globDir1 ext outputDir >>= mapM_ removeFile
       writeHtmlModules outputDir msHtml
-
-    Markdown ->
-      case output of
-        EverythingToStdOut ->
-          T.putStrLn (D.runDocs (D.modulesAsMarkdown ms))
-        ToStdOut names -> do
-          let (ms', missing) = takeByName ms names
-          guardMissing missing
-          T.putStrLn (D.runDocs (D.modulesAsMarkdown ms'))
-        ToFiles names -> do
-          let (ms', missing) = takeByName' ms names
-          guardMissing missing
-
-          let ms'' = groupBy ((==) `on` fst) . sortBy (compare `on` fst) $ map swap ms'
-          forM_ ms'' $ \grp -> do
-            let fp = fst (head grp)
-            createDirectoryIfMissing True (takeDirectory fp)
-            writeUTF8FileT fp (D.runDocs (D.modulesAsMarkdown (map snd grp)))
+    Markdown -> do
+      let outputDir = "./generated-docs/md" -- TODO: make this configurable
+      let ext = compile "*.md"
+      let msMarkdown = map asMarkdown ms
+      createDirectoryIfMissing True outputDir
+      globDir1 ext outputDir >>= mapM_ removeFile
+      writeMarkdownModules outputDir msMarkdown
 
   where
-  guardMissing [] = return ()
-  guardMissing [mn] = do
-    hPutStrLn stderr ("purs docs: error: unknown module \"" ++ T.unpack (P.runModuleName mn) ++ "\"")
-    exitFailure
-  guardMissing mns = do
-    hPutStrLn stderr "purs docs: error: unknown modules:"
-    forM_ mns $ \mn ->
-      hPutStrLn stderr ("  * " ++ T.unpack (P.runModuleName mn))
-    exitFailure
-
   successOrExit :: Either P.MultipleErrors a -> IO a
   successOrExit act =
     case act of
@@ -104,34 +67,10 @@ docgen (PSCDocsOptions fmt inputGlob output) = do
         hPutStrLn stderr $ P.prettyPrintMultipleErrors P.defaultPPEOptions err
         exitFailure
 
-  takeByName = takeModulesByName D.modName
-  takeByName' = takeModulesByName' D.modName
-
   parseAndConvert input =
     runExceptT (D.parseFilesInPackages input []
                 >>= uncurry D.convertTaggedModulesInPackage)
     >>= successOrExit
-
--- |
--- Given a list of module names and a list of modules, return a list of modules
--- whose names appeared in the given name list, together with a list of names
--- for which no module could be found in the module list.
---
-takeModulesByName :: (Eq n) => (m -> n) -> [m] -> [n] -> ([m], [n])
-takeModulesByName getModuleName modules names =
-  first (map fst) (takeModulesByName' getModuleName modules (map (,()) names))
-
--- |
--- Like takeModulesByName, but also keeps some extra information with each
--- module.
---
-takeModulesByName' :: (Eq n) => (m -> n) -> [m] -> [(n, a)] -> ([(m, a)], [n])
-takeModulesByName' getModuleName modules = foldl go ([], [])
-  where
-  go (ms, missing) (name, x) =
-    case find ((== name) . getModuleName) modules of
-      Just m  -> ((m, x) : ms, missing)
-      Nothing -> (ms, name : missing)
 
 inputFile :: Opts.Parser FilePath
 inputFile = Opts.strArgument $
@@ -151,64 +90,11 @@ format = Opts.option Opts.auto $ Opts.value Markdown
          <> Opts.metavar "FORMAT"
          <> Opts.help "Set output FORMAT (markdown | html | etags | ctags)"
 
-docgenModule :: Opts.Parser String
-docgenModule = Opts.strOption $
-                   Opts.long "docgen"
-                <> Opts.help "A list of module names which should appear in the output. This can optionally include file paths to write individual modules to, by separating with a colon ':'. For example, Prelude:docs/Prelude.md. This option may be specified multiple times."
-
-pscDocsOptions :: Opts.Parser (Format, [FilePath], [String])
-pscDocsOptions = (,,) <$> format <*> many inputFile <*> many docgenModule
-
-parseDocgen :: [String] -> Either String DocgenOutput
-parseDocgen [] = Right EverythingToStdOut
-parseDocgen xs = go xs
-  where
-  go = intersperse " "
-    >>> concat
-    >>> words
-    >>> map parseItem
-    >>> combine
-
-data DocgenOutputItem
-  = IToStdOut P.ModuleName
-  | IToFile (P.ModuleName, FilePath)
-
-parseItem :: String -> DocgenOutputItem
-parseItem s = case elemIndex ':' s of
-  Just i ->
-    s # splitAt i
-        >>> first (P.moduleNameFromString . T.pack)
-        >>> second (drop 1)
-        >>> IToFile
-  Nothing ->
-    IToStdOut (P.moduleNameFromString (T.pack s))
-
-  where
-  infixr 1 #
-  (#) = flip ($)
-
-combine :: [DocgenOutputItem] -> Either String DocgenOutput
-combine [] = Right EverythingToStdOut
-combine (x:xs) = foldM go (initial x) xs
-  where
-  initial (IToStdOut m) = ToStdOut [m]
-  initial (IToFile m)   = ToFiles [m]
-
-  go (ToStdOut ms) (IToStdOut m) = Right (ToStdOut (m:ms))
-  go (ToFiles ms) (IToFile m)    = Right (ToFiles (m:ms))
-  go _ _ = Left "Can't mix module names and module name/file path pairs in the same invocation."
-
-buildOptions :: (Format, [FilePath], [String]) -> IO PSCDocsOptions
-buildOptions (fmt, input, mapping) =
-  case parseDocgen mapping of
-    Right mapping' -> return (PSCDocsOptions fmt input mapping')
-    Left err -> do
-      hPutStrLn stderr "purs docs: error in --docgen option:"
-      hPutStrLn stderr ("  " ++ err)
-      exitFailure
+pscDocsOptions :: Opts.Parser PSCDocsOptions
+pscDocsOptions = PSCDocsOptions <$> format <*> many inputFile
 
 command :: Opts.Parser (IO ())
-command = (buildOptions >=> docgen) <$> (Opts.helper <*> pscDocsOptions)
+command = docgen <$> (Opts.helper <*> pscDocsOptions)
 
 infoModList :: Opts.InfoMod a
 infoModList = Opts.fullDesc <> footerInfo where
@@ -218,17 +104,9 @@ examples :: PP.Doc
 examples =
   PP.vcat $ map PP.text
     [ "Examples:"
-    , "  print documentation for Data.List to stdout:"
-    , "    purs docs \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\" \\"
-    , "      --docgen Data.List"
+    , "  write documentation for all modules to ./generated-docs:"
+    , "    purs docs \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\""
     , ""
-    , "  write documentation for Data.List to docs/Data.List.md:"
-    , "    purs docs \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\" \\"
-    , "      --docgen Data.List:docs/Data.List.md"
-    , ""
-    , "  write documentation for Data.List to docs/Data.List.md, and"
-    , "  documentation for Data.List.Lazy to docs/Data.List.Lazy.md:"
-    , "    purs docs \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\" \\"
-    , "      --docgen Data.List:docs/Data.List.md \\"
-    , "      --docgen Data.List.Lazy:docs/Data.List.Lazy.md"
+    , "  write documentation in HTML format for all modules to ./generated-docs:"
+    , "    purs docs --format html \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\""
     ]
