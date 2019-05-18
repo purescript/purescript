@@ -13,9 +13,12 @@ import           Control.Monad (join)
 import           Data.Bifunctor (first)
 import           Data.Char (isSpace)
 import           Data.List (intercalate)
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
 import           Text.Parsec hiding ((<|>))
 import qualified Language.PureScript as P
+import qualified Language.PureScript.CST as CST
+import qualified Language.PureScript.Monad as CSTM
 import qualified Language.PureScript.Interactive.Directive as D
 import           Language.PureScript.Interactive.Types
 import           Language.PureScript.Parser.Common (mark, same)
@@ -24,11 +27,18 @@ import           Language.PureScript.Parser.Common (mark, same)
 -- Parses a limited set of commands from from .purs-repl
 --
 parseDotFile :: FilePath -> String -> Either String [Command]
-parseDotFile filePath s = first show $ do
-  ts <- P.lex filePath (T.pack s)
-  P.runTokenParser filePath (many parser <* eof) ts
+parseDotFile filePath =
+  either (CST.prettyPrintError . NE.head) id
+    . CST.runTokenParser (parseMany p <* CSTM.token CST.TokEof)
+    . CST.lexTopLevel
+    . T.pack
   where
-  parser  = psciImport <|> fail "The .purs-repl file only supports import declarations"
+  parser = CST.oneOf $ NE.fromList
+    [ psciImport fileName
+    , do
+        tok <- CSTM.munch
+        CSTM.parseFail tok $ CST.ErrCustom "The .purs-repl file only supports import declarations"
+    ]
 
 -- |
 -- Parses PSCI metacommands or expressions input from the user.
@@ -37,21 +47,33 @@ parseCommand :: String -> Either String [Command]
 parseCommand cmdString =
   case cmdString of
     (':' : cmd) -> pure <$> parseDirective cmd
-    _ -> parseRest (many1 psciCommand) cmdString
-
-parseRest :: P.TokenParser a -> String -> Either String a
-parseRest p s = first show $ do
-  ts <- P.lex "" (T.pack s)
-  P.runTokenParser "" (p <* eof) ts
-
-psciCommand :: P.TokenParser Command
-psciCommand = choice (map try parsers)
+    _ -> parseRest (mergeDecls <$> parseMany psciCommand) cmdString
   where
-  parsers =
-    [ psciImport
+  mergeDecls (Decls as : bs) =
+    case mergeDecls bs of
+      Decls bs' : cs' ->
+        Decls (as <> bs') : cs
+      cs' ->
+        Decls as : cs'
+  mergeDecls (a : bs) =
+    a : mergeDecls bs
+
+parseMany :: Parser a -> Parser [a]
+parseMany = CSTM.manyDelimited CST.TokLayoutStart CST.TokLayoutEnd CST.TokLayoutSep
+
+parseRest :: CST.Parser a -> String -> Either String a
+parseRest p =
+  either (CST.prettyPrintError . NE.head) id
+    . CST.runTokenParser (p <* CSTM.token CST.TokEof)
+    . CST.lexTopLevel
+    . T.pack
+
+psciCommand :: CST.Parser Command
+psciCommand =
+  CSTM.oneOf $ NE.fromList
+    [ psciImport ""
     , psciDeclaration
     , psciExpression
-    , psciDeprecatedLet
     ]
 
 trim :: String -> String
@@ -79,38 +101,43 @@ parseDirective cmd =
     Reload   -> return ReloadState
     Clear    -> return ClearState
     Paste    -> return PasteLines
-    Browse   -> BrowseModule <$> parseRest P.moduleName arg
+    Browse   -> BrowseModule . CST.nameValue <$> parseRest CST.parseModuleNameP arg
     Show     -> ShowInfo <$> parseReplQuery' arg
-    Type     -> TypeOf <$> parseRest P.parseValue arg
-    Kind     -> KindOf <$> parseRest P.parseType arg
+    Type     -> TypeOf . CST.convertExpr "" <$> parseRest CST.parseExprP arg
+    Kind     -> KindOf . CST.convertType "" <$> parseRest CST.parseTypeP arg
     Complete -> return (CompleteStr arg)
-    Print    -> parseRest
-                  ((eof *> return (ShowInfo QueryPrint))
-                  <|> (SetInteractivePrint <$> parseFullyQualifiedIdent))
-                  arg
+    Print
+      | arg == "" -> ShowInfo QueryPrint
+      | otherwise -> SetInteractivePrint <$> parseRest parseFullyQualifiedIdent arg
 
 -- |
 -- Parses expressions entered at the PSCI repl.
 --
-psciExpression :: P.TokenParser Command
-psciExpression = Expression <$> P.parseValue
+psciExpression :: CST.Parser Command
+psciExpression = Expression . CST.convertExpr "" <$> CST.parseExprP
 
 -- | Imports must be handled separately from other declarations, so that
 -- :show import works, for example.
-psciImport :: P.TokenParser Command
-psciImport = do
-  (mn, declType, asQ) <- P.parseImportDeclaration'
-  return $ Import (mn, declType, asQ)
+psciImport :: FilePath -> CST.Parser Command
+psciImport fileName = do
+  decl <- CST.convertImportDecl fileName <$> CST.parseImportDeclP
+  case decl of
+    ImportDeclaration _ mn declType asQ ->
+      pure $ Import (mn, declType, asQ)
+    _ -> error "Not an import"
 
 -- | Any declaration that we don't need a 'special case' parser for
 -- (like import declarations).
-psciDeclaration :: P.TokenParser Command
-psciDeclaration = fmap Decls $ mark $ fmap join (many1 $ same *>
-  (traverse accept =<< P.parseDeclaration))
-  where
-  accept decl
-    | acceptable decl = return decl
-    | otherwise = fail "this kind of declaration is not supported in psci"
+psciDeclaration :: CST.Parser Command
+psciDeclaration = do
+  decl <- CST.convertDeclaration "" <$> CST.parseDeclP
+  unless (acceptable decl) $ do
+    let
+      tok  = fst $ CST.declarationRange decl
+      tok' = T.unpack $ CST.printToken tok
+      msg  = tok' <> "; this kind of declaration is not supported in psci"
+    CSTM.parseFail tok $ CST.ErrLexeme (Just msg)
+  pure $ Decls [decl]
 
 acceptable :: P.Declaration -> Bool
 acceptable P.DataDeclaration{} = True
@@ -131,21 +158,12 @@ parseReplQuery' str =
                       intercalate ", " replQueryStrings ++ ".")
     Just query -> Right query
 
--- | To show error message when 'let' is used for declaration in PSCI,
--- which is deprecated.
-psciDeprecatedLet :: P.TokenParser Command
-psciDeprecatedLet = do
-  P.reserved "let"
-  P.indented
-  _ <- mark (many1 (same *> P.parseLocalDeclaration))
-  notFollowedBy $ P.reserved "in"
-  fail "Declarations in PSCi no longer require \"let\", as of version 0.11.0"
-
-parseFullyQualifiedIdent :: P.TokenParser (P.ModuleName, P.Ident)
-parseFullyQualifiedIdent = do
-  qname <- P.parseQualified P.parseIdent
-  case qname of
-    P.Qualified (Just mn) ident ->
-      pure (mn, ident)
-    P.Qualified Nothing _ ->
-      fail "Expected a fully-qualified name (eg: PSCI.Support.eval)"
+parseFullyQualifiedIdent :: CST.Parser (P.ModuleName, P.Ident)
+parseFullyQualifiedIdent = join $ CST.Parser $ \st kerr ksucc ->
+  case CST.runParser st CST.parseFullyQualifiedIdent of
+    (st', Right (CST.QualifiedName _ mn ident)) ->
+      ksucc st' $ pure (mn, ident)
+    _ ->
+      ksucc st $ do
+        tok <- CSTM.munch
+        CSTM.parseFail tok $ CST.ErrCustom "Expected a fully-qualified name (eg: PSCI.Support.eval)"

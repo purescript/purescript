@@ -67,6 +67,9 @@ runParser st (Parser k) = k st left right
     | null parserErrors = (st', Right res)
     | otherwise = (st', Left $ NE.fromList $ sortBy (comparing errRange) parserErrors)
 
+runTokenParser :: Parser a -> [LexResult] -> Either (NE.NonEmpty ParserError) a
+runTokenParser p = snd . flip runParser p . flip ParserState []
+
 {-# INLINE throw #-}
 throw :: e -> ParserM e s a
 throw e = Parser $ \st kerr _ -> kerr st e
@@ -121,3 +124,51 @@ tryPrefix (Parser lhs) rhs = Parser $ \st kerr ksucc ->
     (\st' res -> do
       let Parser k = (Just res,) <$> rhs
       k st' kerr ksucc)
+
+oneOf :: NE.NonEmpty (Parser a) -> Parser a
+oneOf parsers = Parser $ \st kerr ksucc -> do
+  let
+    go (st', Right a) _ = (st', Right a)
+    go _ (st', Right a) = (st', Right a)
+    go (st1, Left errs1) (st2, Left errs2)
+      | errRange (NE.last errs2) > errRange (NE.last errs1) = (st2, Left errs2)
+      | otherwise = (st1, Left errs1)
+  case foldr1 go $ runParser st <$> parsers of
+    (st', Left errs) -> kerr (st' { parserErrors = NE.tail errs }) $ NE.head errs
+    (st', Right res) -> ksucc st' res
+
+manyDelimited :: Token -> Token -> Token -> Parser a -> Parser [a]
+manyDelimited open close sep p = do
+  _   <- token open
+  res <- go1
+  _   <- token close
+  pure $ res
+  where
+  go1 =
+    oneOf $ NE.fromList
+      [ go2 . pure =<< p
+      , pure []
+      ]
+
+  go2 acc =
+    oneOf $ NE.fromList
+      [ token sep *> (go2 . (: acc) =<< p)
+      , pure (reverse acc)
+      ]
+
+token :: Token -> Parser SourceToken
+token t = do
+  t' <- munch
+  if t == tokValue t'
+    then pure t'
+    else parseError t'
+
+munch :: Parser SourceToken
+munch = Parser $ \state@(ParserState {..}) kerr ksucc ->
+  case parserBuff of
+    Right tok : parserBuff' ->
+      ksucc (state { parserBuff = parserBuff' }) tok
+    Left (_,  err) : _ ->
+      kerr state err
+    [] ->
+      error "Empty input"

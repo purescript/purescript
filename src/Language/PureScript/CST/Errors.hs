@@ -49,6 +49,7 @@ data ParserErrorType
   | ErrEmptyDo
   | ErrLexeme (Maybe String) [String]
   | ErrEof
+  | ErrCustom String
   deriving (Show, Eq, Ord)
 
 data ParserError = ParserError
@@ -141,6 +142,8 @@ prettyPrintErrorMessage (ParserError {..}) = case errType of
         "Unexpected \"<-\" in expression, perhaps due to a missing 'do' or 'ado' keyword"
   ErrToken ->
     basicError
+  ErrCustom err ->
+    err
 
   where
   basicError = case errToks of

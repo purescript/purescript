@@ -8,6 +8,7 @@ module Language.PureScript.CST.Convert
   , convertExpr
   , convertBinder
   , convertDeclaration
+  , convertImportDecl
   , convertModule
   , sourcePos
   , sourceSpan

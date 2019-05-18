@@ -3,7 +3,14 @@ module Language.PureScript.CST.Parser
   ( parseType
   , parseKind
   , parseExpr
+  , parseIdent
+  , parseFullyQualifiedIdent
   , parseModule
+  , parseImportDeclP
+  , parseDeclP
+  , parseExprP
+  , parseTypeP
+  , parseModuleNameP
   , parse
   , PartialResult(..)
   ) where
@@ -30,7 +37,14 @@ import Language.PureScript.PSString (PSString)
 %name parseKind kind
 %name parseType type
 %name parseExpr expr
+%name parseIdent ident
+%name parseFullyQualifiedIdent fullQualIdent
 %name parseModuleBody moduleBody
+%partial parseImportDeclP importDeclP
+%partial parseDeclP declP
+%partial parseExprP exprP
+%partial parseTypeP typeP
+%partial parseModuleNameP moduleNameP
 %partial parseModuleHeader moduleHeader
 %partial parseDoStatement doStatement
 %partial parseDoExpr doExpr
@@ -170,6 +184,9 @@ qualIdent :: { QualifiedName Ident }
   | 'as' {% toQualifiedName Ident $1 }
   | 'hiding' {% toQualifiedName Ident $1 }
   | 'kind' {% toQualifiedName Ident $1 }
+
+fullQualIdent :: { QualifiedName Ident }
+  : QUAL_LOWER { % toQualifiedName Ident $1 }
 
 ident :: { Name Ident }
   : LOWER {% toName Ident $1 }
@@ -718,6 +735,25 @@ foreign :: { Foreign () }
   : ident '::' type { ForeignValue (Labeled $1 $2 $3) }
   | 'data' properName '::' kind { ForeignData $1 (Labeled $2 $3 $4) }
   | 'kind' properName { ForeignKind $1 $2 }
+
+-- Partial parsers which can be combined with combinators for adhoc use. We need
+-- to revert the lookahead token so that it doesn't consume an extra token
+-- before succeeding.
+
+importDeclP :: { ImportDecl () }
+  : importDecl {%^ revert $ pure $1 }
+
+declP :: { Declaration () }
+  : decl {%^ revert $ pure $1 }
+
+exprP :: { Expr () }
+  : expr {%^ revert $ pure $1 }
+
+typeP :: { Type () }
+  : type {%^ revert $ pure $1 }
+
+moduleNameP :: { Name N.ModuleName }
+  : moduleName {%^ revert $ pure $1 }
 
 {
 lexer :: (SourceToken -> Parser a) -> Parser a
