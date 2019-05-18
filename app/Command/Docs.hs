@@ -6,6 +6,7 @@ import           Command.Docs.Markdown
 import           Control.Applicative
 import           Control.Monad.Writer
 import           Control.Monad.Trans.Except (runExceptT)
+import qualified Data.Text as T
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Docs as D
 import           Language.PureScript.Docs.Tags (dumpCtags, dumpEtags)
@@ -15,6 +16,7 @@ import           System.Directory (createDirectoryIfMissing, removeFile)
 import           System.Exit (exitFailure)
 import           System.FilePath.Glob (compile, glob, globDir1)
 import           System.IO (hPutStrLn, stderr)
+import           System.IO.UTF8 (writeUTF8FileT)
 
 -- | Available output formats
 data Format
@@ -39,18 +41,32 @@ docgen (PSCDocsOptions fmt inputGlob) = do
 
   fileMs <- parseAndConvert input
   let ms = D.primModules ++ map snd fileMs
+  let generatedDocsDir = "./generated-docs" -- TODO: make this configurable
+  createDirectoryIfMissing False generatedDocsDir
   case fmt of
-    Etags -> mapM_ putStrLn $ dumpEtags fileMs
-    Ctags -> mapM_ putStrLn $ dumpCtags fileMs
+    Etags -> do
+      let filename = "TAGS" -- TODO: make this configurable
+      let outputFile = generatedDocsDir ++ "/" ++ filename
+      let pattern = compile filename
+      let text = T.pack . unlines . dumpEtags $ fileMs
+      globDir1 pattern generatedDocsDir >>= mapM_ removeFile
+      writeUTF8FileT outputFile text
+    Ctags -> do
+      let filename = "tags" -- TODO: make this configurable
+      let outputFile = generatedDocsDir ++ "/" ++ filename
+      let pattern = compile filename
+      let text = T.pack . unlines . dumpCtags $ fileMs
+      globDir1 pattern generatedDocsDir >>= mapM_ removeFile
+      writeUTF8FileT outputFile text
     Html -> do
-      let outputDir = "./generated-docs/html" -- TODO: make this configurable
+      let outputDir = generatedDocsDir ++ "/html"
       let ext = compile "*.html"
       let msHtml = map asHtml ms
       createDirectoryIfMissing True outputDir
       globDir1 ext outputDir >>= mapM_ removeFile
       writeHtmlModules outputDir msHtml
     Markdown -> do
-      let outputDir = "./generated-docs/md" -- TODO: make this configurable
+      let outputDir = generatedDocsDir ++ "/md"
       let ext = compile "*.md"
       let msMarkdown = map asMarkdown ms
       createDirectoryIfMissing True outputDir
