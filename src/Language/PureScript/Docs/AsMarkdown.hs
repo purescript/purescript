@@ -3,6 +3,7 @@ module Language.PureScript.Docs.AsMarkdown
   , Docs
   , runDocs
   , modulesAsMarkdown
+  , moduleAsMarkdown
   , codeToString
   ) where
 

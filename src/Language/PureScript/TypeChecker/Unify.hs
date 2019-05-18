@@ -24,6 +24,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets, modify)
 import Control.Monad.Writer.Class (MonadWriter(..))
 
+import Data.Foldable (traverse_)
 import Data.Function (on)
 import Data.List (sortBy, nubBy)
 import qualified Data.Map as M
@@ -118,6 +119,10 @@ unifyTypes t1 t2 = do
   unifyTypes' r1 r2@RCons{} = unifyRows r1 r2
   unifyTypes' r1@REmpty{} r2 = unifyRows r1 r2
   unifyTypes' r1 r2@REmpty{} = unifyRows r1 r2
+  unifyTypes' (ConstrainedType _ c1 ty1) (ConstrainedType _ c2 ty2)
+    | constraintClass c1 == constraintClass c2 && constraintData c1 == constraintData c2 = do
+        traverse_ (uncurry unifyTypes) (constraintArgs c1 `zip` constraintArgs c2)
+        ty1 `unifyTypes` ty2
   unifyTypes' ty1@ConstrainedType{} ty2 =
     throwError . errorMessage $ ConstrainedTypeUnified ty1 ty2
   unifyTypes' t3 t4@ConstrainedType{} = unifyTypes' t4 t3
