@@ -4,6 +4,7 @@ module Language.PureScript.CST.Parser
   , parseKind
   , parseExpr
   , parseIdent
+  , parseOperator
   , parseFullyQualifiedIdent
   , parseModule
   , parseImportDeclP
@@ -38,6 +39,7 @@ import Language.PureScript.PSString (PSString)
 %name parseType type
 %name parseExpr expr
 %name parseIdent ident
+%name parseOperator op
 %name parseFullyQualifiedIdent fullQualIdent
 %name parseModuleBody moduleBody
 %partial parseImportDeclP importDeclP

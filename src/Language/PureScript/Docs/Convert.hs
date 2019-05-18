@@ -15,6 +15,7 @@ import Control.Arrow ((&&&))
 import Control.Category ((>>>))
 import Control.Monad.Writer.Strict (runWriterT)
 import Data.Functor (($>))
+import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import Data.String (String)
 
@@ -22,7 +23,7 @@ import Language.PureScript.Docs.Convert.ReExports (updateReExports)
 import Language.PureScript.Docs.Convert.Single (convertSingleModule)
 import Language.PureScript.Docs.Prim (primModules)
 import Language.PureScript.Docs.Types
-import qualified Language.PureScript as P
+import qualified Language.PureScript.CST as CST
 
 import Web.Bower.PackageMeta (PackageName)
 
@@ -232,10 +233,11 @@ insertValueTypes env m =
   err msg =
     P.internalError ("Docs.Convert.insertValueTypes: " ++ msg)
 
-runParser :: P.TokenParser a -> Text -> Either String a
-runParser p s = either (Left . show) Right $ do
-  ts <- P.lex "" s
-  P.runTokenParser "" (p <* eof) ts
+runParser :: CST.Parser a -> Text -> Either String a
+runParser p =
+  either (CST.prettyPrintError . NE.head) id
+    . CST.runTokenParser p
+    . CST.lex
 
 -- |
 -- Partially desugar modules so that they are suitable for extracting

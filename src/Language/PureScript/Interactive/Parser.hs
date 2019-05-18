@@ -18,7 +18,7 @@ import qualified Data.Text as T
 import           Text.Parsec hiding ((<|>))
 import qualified Language.PureScript as P
 import qualified Language.PureScript.CST as CST
-import qualified Language.PureScript.Monad as CSTM
+import qualified Language.PureScript.CST.Monad as CSTM
 import qualified Language.PureScript.Interactive.Directive as D
 import           Language.PureScript.Interactive.Types
 import           Language.PureScript.Parser.Common (mark, same)
@@ -33,7 +33,7 @@ parseDotFile filePath =
     . CST.lexTopLevel
     . T.pack
   where
-  parser = CST.oneOf $ NE.fromList
+  parser = CSTM.oneOf $ NE.fromList
     [ psciImport fileName
     , do
         tok <- CSTM.munch
@@ -58,7 +58,7 @@ parseCommand cmdString =
   mergeDecls (a : bs) =
     a : mergeDecls bs
 
-parseMany :: Parser a -> Parser [a]
+parseMany :: CST.Parser a -> CST.Parser [a]
 parseMany = CSTM.manyDelimited CST.TokLayoutStart CST.TokLayoutEnd CST.TokLayoutSep
 
 parseRest :: CST.Parser a -> String -> Either String a
@@ -122,7 +122,7 @@ psciImport :: FilePath -> CST.Parser Command
 psciImport fileName = do
   decl <- CST.convertImportDecl fileName <$> CST.parseImportDeclP
   case decl of
-    ImportDeclaration _ mn declType asQ ->
+    P.ImportDeclaration _ mn declType asQ ->
       pure $ Import (mn, declType, asQ)
     _ -> error "Not an import"
 
@@ -133,7 +133,7 @@ psciDeclaration = do
   decl <- CST.convertDeclaration "" <$> CST.parseDeclP
   unless (acceptable decl) $ do
     let
-      tok  = fst $ CST.declarationRange decl
+      tok  = fst $ CST.declRange decl
       tok' = T.unpack $ CST.printToken tok
       msg  = tok' <> "; this kind of declaration is not supported in psci"
     CSTM.parseFail tok $ CST.ErrLexeme (Just msg)
