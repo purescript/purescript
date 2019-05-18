@@ -85,7 +85,7 @@ instance Read Format where
   readsPrec _ _ = []
 
 format :: Opts.Parser Format
-format = Opts.option Opts.auto $ Opts.value Markdown
+format = Opts.option Opts.auto $ Opts.value Html
          <> Opts.long "format"
          <> Opts.metavar "FORMAT"
          <> Opts.help "Set output FORMAT (markdown | html | etags | ctags)"
@@ -107,6 +107,6 @@ examples =
     , "  write documentation for all modules to ./generated-docs:"
     , "    purs docs \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\""
     , ""
-    , "  write documentation in HTML format for all modules to ./generated-docs:"
-    , "    purs docs --format html \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\""
+    , "  write documentation in Markdown format for all modules to ./generated-docs:"
+    , "    purs docs --format markdown \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\""
     ]
