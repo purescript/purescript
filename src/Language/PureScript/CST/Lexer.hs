@@ -1,8 +1,8 @@
 {-# LANGUAGE BangPatterns #-}
 module Language.PureScript.CST.Lexer
-  ( lex
+  ( lenient
+  , lex
   , lexTopLevel
-  , lexWithStack
   , lexWithState
   , isUnquotedKey
   ) where
@@ -24,6 +24,20 @@ import Language.PureScript.CST.Layout
 import Language.PureScript.CST.Positions
 import Language.PureScript.CST.Types
 
+-- | Stops at the first lexing error and replaces it with TokEof. Otherwise,
+-- the parser will fail when it attempts to draw a lookahead token.
+lenient :: [LexResult] -> [LexResult]
+lenient = go
+  where
+  go [] = []
+  go (Right a : as) = Right a : go as
+  go (Left (st, _) : _) = do
+    let
+      pos = lexPos st
+      ann = TokenAnn (SourceRange pos pos) (lexLeading st) []
+    [Right (SourceToken ann TokEof)]
+
+-- | Lexes according to root layout rules.
 lex :: Text -> [LexResult]
 lex src = do
   let (leading, src') = comments src
@@ -34,12 +48,9 @@ lex src = do
     , lexStack = [(SourcePos 0 0, LytRoot)]
     }
 
+-- | Lexes according to top-level declaration context rules.
 lexTopLevel :: Text -> [LexResult]
-lexTopLevel = lexWithStack $ \pos ->
-  [(pos, LytWhere), (SourcePos 0 0, LytRoot)]
-
-lexWithStack :: (SourcePos -> LayoutStack) -> Text -> [LexResult]
-lexWithStack k src = do
+lexTopLevel src = do
   let
     (leading, src') = comments src
     lexPos = advanceLeading (SourcePos 1 1) leading
@@ -48,10 +59,11 @@ lexWithStack k src = do
       { lexPos = lexPos
       , lexLeading = leading
       , lexSource = src'
-      , lexStack = k lexPos
+      , lexStack = [(lexPos, LytWhere), (SourcePos 0 0, LytRoot)]
       }
   hd : tl
 
+-- | Lexes according to some LexState.
 lexWithState :: LexState -> [LexResult]
 lexWithState = go
   where
@@ -690,6 +702,7 @@ isStringGapChar c = c == ' ' || c == '\r' || c == '\n'
 isLineFeed :: Char -> Bool
 isLineFeed c = c == '\r' || c == '\n'
 
+-- | Checks if some identifier is a valid unquoted key.
 isUnquotedKey :: Text -> Bool
 isUnquotedKey t =
   case Text.uncons t of

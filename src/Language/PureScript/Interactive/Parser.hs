@@ -8,33 +8,31 @@ module Language.PureScript.Interactive.Parser
 
 import           Prelude.Compat hiding (lex)
 
-import           Control.Applicative ((<|>))
-import           Control.Monad (join)
+import           Control.Monad (join, unless)
 import           Data.Bifunctor (first)
 import           Data.Char (isSpace)
 import           Data.List (intercalate)
 import qualified Data.List.NonEmpty as NE
 import qualified Data.Text as T
-import           Text.Parsec hiding ((<|>))
 import qualified Language.PureScript as P
 import qualified Language.PureScript.CST as CST
 import qualified Language.PureScript.CST.Monad as CSTM
+import qualified Language.PureScript.CST.Positions as CST
 import qualified Language.PureScript.Interactive.Directive as D
 import           Language.PureScript.Interactive.Types
-import           Language.PureScript.Parser.Common (mark, same)
 
 -- |
 -- Parses a limited set of commands from from .purs-repl
 --
 parseDotFile :: FilePath -> String -> Either String [Command]
 parseDotFile filePath =
-  either (CST.prettyPrintError . NE.head) id
-    . CST.runTokenParser (parseMany p <* CSTM.token CST.TokEof)
+  first (CST.prettyPrintError . NE.head)
+    . CST.runTokenParser (parseMany parser <* CSTM.token CST.TokEof)
     . CST.lexTopLevel
     . T.pack
   where
   parser = CSTM.oneOf $ NE.fromList
-    [ psciImport fileName
+    [ psciImport filePath
     , do
         tok <- CSTM.munch
         CSTM.parseFail tok $ CST.ErrCustom "The .purs-repl file only supports import declarations"
@@ -52,18 +50,19 @@ parseCommand cmdString =
   mergeDecls (Decls as : bs) =
     case mergeDecls bs of
       Decls bs' : cs' ->
-        Decls (as <> bs') : cs
+        Decls (as <> bs') : cs'
       cs' ->
         Decls as : cs'
   mergeDecls (a : bs) =
     a : mergeDecls bs
+  mergeDecls [] = []
 
 parseMany :: CST.Parser a -> CST.Parser [a]
 parseMany = CSTM.manyDelimited CST.TokLayoutStart CST.TokLayoutEnd CST.TokLayoutSep
 
 parseRest :: CST.Parser a -> String -> Either String a
 parseRest p =
-  either (CST.prettyPrintError . NE.head) id
+   first (CST.prettyPrintError . NE.head)
     . CST.runTokenParser (p <* CSTM.token CST.TokEof)
     . CST.lexTopLevel
     . T.pack
@@ -107,7 +106,7 @@ parseDirective cmd =
     Kind     -> KindOf . CST.convertType "" <$> parseRest CST.parseTypeP arg
     Complete -> return (CompleteStr arg)
     Print
-      | arg == "" -> ShowInfo QueryPrint
+      | arg == "" -> return $ ShowInfo QueryPrint
       | otherwise -> SetInteractivePrint <$> parseRest parseFullyQualifiedIdent arg
 
 -- |
@@ -119,8 +118,8 @@ psciExpression = Expression . CST.convertExpr "" <$> CST.parseExprP
 -- | Imports must be handled separately from other declarations, so that
 -- :show import works, for example.
 psciImport :: FilePath -> CST.Parser Command
-psciImport fileName = do
-  decl <- CST.convertImportDecl fileName <$> CST.parseImportDeclP
+psciImport filePath = do
+  decl <- CST.convertImportDecl filePath <$> CST.parseImportDeclP
   case decl of
     P.ImportDeclaration _ mn declType asQ ->
       pure $ Import (mn, declType, asQ)
@@ -130,14 +129,15 @@ psciImport fileName = do
 -- (like import declarations).
 psciDeclaration :: CST.Parser Command
 psciDeclaration = do
-  decl <- CST.convertDeclaration "" <$> CST.parseDeclP
-  unless (acceptable decl) $ do
+  decl <- CST.parseDeclP
+  let decl' = CST.convertDeclaration "" decl
+  unless (all acceptable decl') $ do
     let
       tok  = fst $ CST.declRange decl
-      tok' = T.unpack $ CST.printToken tok
+      tok' = T.unpack $ CST.printToken $ CST.tokValue tok
       msg  = tok' <> "; this kind of declaration is not supported in psci"
-    CSTM.parseFail tok $ CST.ErrLexeme (Just msg)
-  pure $ Decls [decl]
+    CSTM.parseFail tok $ CST.ErrLexeme (Just msg) []
+  pure $ Decls decl'
 
 acceptable :: P.Declaration -> Bool
 acceptable P.DataDeclaration{} = True
@@ -159,10 +159,10 @@ parseReplQuery' str =
     Just query -> Right query
 
 parseFullyQualifiedIdent :: CST.Parser (P.ModuleName, P.Ident)
-parseFullyQualifiedIdent = join $ CST.Parser $ \st kerr ksucc ->
+parseFullyQualifiedIdent = join $ CST.Parser $ \st _ ksucc ->
   case CST.runParser st CST.parseFullyQualifiedIdent of
-    (st', Right (CST.QualifiedName _ mn ident)) ->
-      ksucc st' $ pure (mn, ident)
+    (st', Right (CST.QualifiedName _ (Just mn) ident)) ->
+      ksucc st' $ pure (mn, P.Ident $ CST.getIdent ident)
     _ ->
       ksucc st $ do
         tok <- CSTM.munch

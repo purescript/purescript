@@ -3,6 +3,7 @@ module Language.PureScript.CST.Parser
   ( parseType
   , parseKind
   , parseExpr
+  , parseDecl
   , parseIdent
   , parseOperator
   , parseFullyQualifiedIdent
@@ -18,7 +19,7 @@ module Language.PureScript.CST.Parser
 
 import Prelude hiding (lex)
 
-import Control.Monad ((>=>), when)
+import Control.Monad ((<=<), when)
 import Data.Foldable (foldl', for_)
 import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)
@@ -42,6 +43,7 @@ import Language.PureScript.PSString (PSString)
 %name parseOperator op
 %name parseFullyQualifiedIdent fullQualIdent
 %name parseModuleBody moduleBody
+%name parseDecl decl
 %partial parseImportDeclP importDeclP
 %partial parseDeclP declP
 %partial parseExprP exprP
@@ -762,18 +764,18 @@ lexer :: (SourceToken -> Parser a) -> Parser a
 lexer k = munch >>= k
 
 parse :: Text -> Either (NE.NonEmpty ParserError) (Module ())
-parse = parseModule >=> resFull
+parse = resFull <=< parseModule . lex
 
 data PartialResult a = PartialResult
   { resPartial :: a
   , resFull :: Either (NE.NonEmpty ParserError) a
   } deriving (Functor)
 
-parseModule :: Text -> Either (NE.NonEmpty ParserError) (PartialResult (Module ()))
-parseModule src = fmap (\header -> PartialResult header (parseFull header)) headerRes
+parseModule :: [LexResult] -> Either (NE.NonEmpty ParserError) (PartialResult (Module ()))
+parseModule toks = fmap (\header -> PartialResult header (parseFull header)) headerRes
   where
   (st, headerRes) =
-    runParser (ParserState (lex src) []) parseModuleHeader
+    runParser (ParserState (toks) []) parseModuleHeader
 
   parseFull header = do
     (decls, trailing) <- snd $ runParser st parseModuleBody

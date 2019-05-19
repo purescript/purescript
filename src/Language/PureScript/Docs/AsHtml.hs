@@ -17,6 +17,7 @@ module Language.PureScript.Docs.AsHtml (
 import Prelude
 import Control.Category ((>>>))
 import Control.Monad (unless)
+import Data.Bifunctor (first)
 import Data.Char (isUpper)
 import Data.Either (isRight)
 import qualified Data.List.NonEmpty as NE
@@ -30,7 +31,6 @@ import qualified Data.Text as T
 import Text.Blaze.Html5 as H hiding (map)
 import qualified Text.Blaze.Html5.Attributes as A
 import qualified Cheapskate
-import Text.Parsec (eof)
 
 import qualified Language.PureScript as P
 
@@ -224,9 +224,9 @@ codeAsHtml r = outputWith elemAsHtml
   isOp = isRight . runParser CST.parseOperator
 
   runParser :: CST.Parser a -> Text -> Either String a
-  runParser p =
-    either (CST.prettyPrintError . NE.head) id
-      . CST.runTokenParser p
+  runParser p' =
+    first (CST.prettyPrintError . NE.head)
+      . CST.runTokenParser p'
       . CST.lex
 
 renderLink :: HtmlRenderContext -> DocLink -> Html -> Html

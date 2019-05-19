@@ -19,6 +19,7 @@ import qualified Data.List.NonEmpty as NE
 import qualified Data.Map as Map
 import Data.String (String)
 
+import qualified Language.PureScript as P
 import Language.PureScript.Docs.Convert.ReExports (updateReExports)
 import Language.PureScript.Docs.Convert.Single (convertSingleModule)
 import Language.PureScript.Docs.Prim (primModules)
@@ -26,8 +27,6 @@ import Language.PureScript.Docs.Types
 import qualified Language.PureScript.CST as CST
 
 import Web.Bower.PackageMeta (PackageName)
-
-import Text.Parsec (eof)
 
 -- |
 -- Like convertModuleInPackage, but with the modules tagged by their
@@ -212,7 +211,7 @@ insertValueTypes env m =
   where
   go (d@Declaration { declInfo = ValueDeclaration P.TypeWildcard{} }) =
     let
-      ident = parseIdent (declTitle d)
+      ident = P.Ident . CST.getIdent . CST.nameValue . parseIdent $ declTitle d
       ty = lookupName ident
     in
       d { declInfo = ValueDeclaration (ty $> ()) }
@@ -220,7 +219,7 @@ insertValueTypes env m =
     other
 
   parseIdent =
-    either (err . ("failed to parse Ident: " ++)) identity . runParser P.parseIdent
+    either (err . ("failed to parse Ident: " ++)) identity . runParser CST.parseIdent
 
   lookupName name =
     let key = P.Qualified (Just (modName m)) name
@@ -235,7 +234,7 @@ insertValueTypes env m =
 
 runParser :: CST.Parser a -> Text -> Either String a
 runParser p =
-  either (CST.prettyPrintError . NE.head) id
+  first (CST.prettyPrintError . NE.head)
     . CST.runTokenParser p
     . CST.lex
 
