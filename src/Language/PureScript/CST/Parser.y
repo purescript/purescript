@@ -6,13 +6,13 @@ module Language.PureScript.CST.Parser
   , parseDecl
   , parseIdent
   , parseOperator
-  , parseFullyQualifiedIdent
   , parseModule
   , parseImportDeclP
   , parseDeclP
   , parseExprP
   , parseTypeP
   , parseModuleNameP
+  , parseQualIdentP
   , parse
   , PartialResult(..)
   ) where
@@ -41,7 +41,6 @@ import Language.PureScript.PSString (PSString)
 %name parseExpr expr
 %name parseIdent ident
 %name parseOperator op
-%name parseFullyQualifiedIdent fullQualIdent
 %name parseModuleBody moduleBody
 %name parseDecl decl
 %partial parseImportDeclP importDeclP
@@ -49,6 +48,7 @@ import Language.PureScript.PSString (PSString)
 %partial parseExprP exprP
 %partial parseTypeP typeP
 %partial parseModuleNameP moduleNameP
+%partial parseQualIdentP qualIdentP
 %partial parseModuleHeader moduleHeader
 %partial parseDoStatement doStatement
 %partial parseDoExpr doExpr
@@ -188,9 +188,6 @@ qualIdent :: { QualifiedName Ident }
   | 'as' {% toQualifiedName Ident $1 }
   | 'hiding' {% toQualifiedName Ident $1 }
   | 'kind' {% toQualifiedName Ident $1 }
-
-fullQualIdent :: { QualifiedName Ident }
-  : QUAL_LOWER { % toQualifiedName Ident $1 }
 
 ident :: { Name Ident }
   : LOWER {% toName Ident $1 }
@@ -758,6 +755,9 @@ typeP :: { Type () }
 
 moduleNameP :: { Name N.ModuleName }
   : moduleName {%^ revert $ pure $1 }
+
+qualIdentP :: { QualifiedName Ident }
+  : qualIdent {%^ revert $ pure $1 }
 
 {
 lexer :: (SourceToken -> Parser a) -> Parser a

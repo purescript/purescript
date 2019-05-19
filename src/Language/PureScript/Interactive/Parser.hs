@@ -60,6 +60,9 @@ parseCommand cmdString =
 parseMany :: CST.Parser a -> CST.Parser [a]
 parseMany = CSTM.manyDelimited CST.TokLayoutStart CST.TokLayoutEnd CST.TokLayoutSep
 
+parseOne :: CST.Parser a -> CST.Parser a
+parseOne p = CSTM.token CST.TokLayoutStart *> p <* CSTM.token CST.TokLayoutEnd
+
 parseRest :: CST.Parser a -> String -> Either String a
 parseRest p =
    first (CST.prettyPrintError . NE.head)
@@ -100,14 +103,14 @@ parseDirective cmd =
     Reload   -> return ReloadState
     Clear    -> return ClearState
     Paste    -> return PasteLines
-    Browse   -> BrowseModule . CST.nameValue <$> parseRest CST.parseModuleNameP arg
+    Browse   -> BrowseModule . CST.nameValue <$> parseRest (parseOne CST.parseModuleNameP) arg
     Show     -> ShowInfo <$> parseReplQuery' arg
-    Type     -> TypeOf . CST.convertExpr "" <$> parseRest CST.parseExprP arg
-    Kind     -> KindOf . CST.convertType "" <$> parseRest CST.parseTypeP arg
+    Type     -> TypeOf . CST.convertExpr "" <$> parseRest (parseOne CST.parseExprP) arg
+    Kind     -> KindOf . CST.convertType "" <$> parseRest (parseOne CST.parseTypeP) arg
     Complete -> return (CompleteStr arg)
     Print
       | arg == "" -> return $ ShowInfo QueryPrint
-      | otherwise -> SetInteractivePrint <$> parseRest parseFullyQualifiedIdent arg
+      | otherwise -> SetInteractivePrint <$> parseRest (parseOne parseFullyQualifiedIdent) arg
 
 -- |
 -- Parses expressions entered at the PSCI repl.
@@ -160,7 +163,7 @@ parseReplQuery' str =
 
 parseFullyQualifiedIdent :: CST.Parser (P.ModuleName, P.Ident)
 parseFullyQualifiedIdent = join $ CST.Parser $ \st _ ksucc ->
-  case CST.runParser st CST.parseFullyQualifiedIdent of
+  case CST.runParser st CST.parseQualIdentP of
     (st', Right (CST.QualifiedName _ (Just mn) ident)) ->
       ksucc st' $ pure (mn, P.Ident $ CST.getIdent ident)
     _ ->
