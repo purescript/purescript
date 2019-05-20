@@ -147,7 +147,7 @@ addImplicitImport
 addImplicitImport fp mn = do
   (_, pre, imports, post) <- parseImportsFromFile' fp
   let newImportSection = addImplicitImport' imports mn
-  pure (pre ++ newImportSection ++ post)
+  pure $ joinSections (pre, newImportSection, post)
 
 addImplicitImport' :: [Import] -> P.ModuleName -> [Text]
 addImplicitImport' imports mn =
@@ -166,7 +166,7 @@ addQualifiedImport
 addQualifiedImport fp mn qualifier = do
   (_, pre, imports, post) <- parseImportsFromFile' fp
   let newImportSection = addQualifiedImport' imports mn qualifier
-  pure (pre ++ newImportSection ++ post)
+  pure $ joinSections (pre, newImportSection, post)
 
 addQualifiedImport' :: [Import] -> P.ModuleName -> P.ModuleName -> [Text]
 addQualifiedImport' imports mn qualifier =
@@ -189,7 +189,7 @@ addExplicitImport fp decl moduleName qualifier = do
         if mn == moduleName
         then imports
         else addExplicitImport' decl moduleName qualifier imports
-  pure (pre ++ prettyPrintImportSection newImportSection ++ post)
+  pure $ joinSections (pre, prettyPrintImportSection newImportSection, post)
 
 addExplicitImport' :: IdeDeclaration -> P.ModuleName -> Maybe P.ModuleName -> [Import] -> [Import]
 addExplicitImport' decl moduleName qualifier imports =
@@ -379,3 +379,15 @@ parseImport t =
     Right (P.ImportDeclaration _ mn idt mmn) ->
       Just (Import mn idt mmn)
     _ -> Nothing
+
+joinSections :: ([Text], [Text], [Text]) -> [Text]
+joinSections (pre, decls, post) = pre `joinLine` (decls `joinLine` post)
+  where
+  isBlank = T.all (== ' ')
+  joinLine as bs
+    | Just ln1 <- lastMay as
+    , Just ln2 <- head bs
+    , not (isBlank ln1) && not (isBlank ln2) =
+        as ++ [""] ++ bs
+    | otherwise =
+        as ++ bs
