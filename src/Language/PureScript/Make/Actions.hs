@@ -17,6 +17,7 @@ import           Control.Monad.Supply
 import           Control.Monad.Trans.Class (MonadTrans(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
 import           Data.Aeson (encode)
+import           Data.Bifunctor (bimap)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.Lazy as LB
 import qualified Data.ByteString.Lazy.UTF8 as LBU8
@@ -39,20 +40,19 @@ import qualified Language.PureScript.CoreFn as CF
 import qualified Language.PureScript.CoreFn.ToJSON as CFJ
 import qualified Language.PureScript.CoreImp.AST as Imp
 import           Language.PureScript.Crash
+import qualified Language.PureScript.CST as CST
 import           Language.PureScript.Environment
 import           Language.PureScript.Errors
 import           Language.PureScript.Make.Monad
 import           Language.PureScript.Names
 import           Language.PureScript.Names (runModuleName, ModuleName)
 import           Language.PureScript.Options hiding (codegenTargets)
-import qualified Language.PureScript.Parser as PSParser
 import           Language.PureScript.Pretty.Common (SMap(..))
 import qualified Paths_purescript as Paths
 import           SourceMap
 import           SourceMap.Types
 import           System.Directory (doesFileExist, getModificationTime, createDirectoryIfMissing, getCurrentDirectory)
 import           System.FilePath ((</>), takeDirectory, makeRelative, splitPath, normalise)
-import qualified Text.Parsec as Parsec
 
 -- | Determines when to rebuild a module
 data RebuildPolicy
@@ -288,8 +288,8 @@ checkForeignDecls m path = do
   -- We ignore the error message here, just being told it's an invalid
   -- identifier should be enough.
   parseIdent :: String -> Either String Ident
-  parseIdent str = try (T.pack str)
-    where
-    try s = either (const (Left str)) Right $ do
-      ts <- PSParser.lex "" s
-      PSParser.runTokenParser "" (PSParser.parseIdent <* Parsec.eof) ts
+  parseIdent str =
+    bimap (const str) (Ident . CST.getIdent . CST.nameValue)
+      . CST.runTokenParser CST.parseIdent
+      . CST.lex
+      $ T.pack str
