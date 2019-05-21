@@ -12,8 +12,9 @@ import qualified Language.PureScript.Docs as D
 import           Language.PureScript.Docs.Tags (dumpCtags, dumpEtags)
 import qualified Options.Applicative as Opts
 import qualified Text.PrettyPrint.ANSI.Leijen as PP
-import           System.Directory (createDirectoryIfMissing, removeFile)
+import           System.Directory (getCurrentDirectory, createDirectoryIfMissing, removeFile)
 import           System.Exit (exitFailure)
+import           System.FilePath ((</>))
 import           System.FilePath.Glob (compile, glob, globDir1)
 import           System.IO (hPutStrLn, stderr)
 import           System.IO.UTF8 (writeUTF8FileT)
@@ -41,32 +42,32 @@ docgen (PSCDocsOptions fmt inputGlob) = do
 
   fileMs <- parseAndConvert input
   let ms = D.primModules ++ map snd fileMs
-  let generatedDocsDir = "./generated-docs" -- TODO: make this configurable
-  createDirectoryIfMissing False generatedDocsDir
+  currentDir <- getCurrentDirectory
+  let generatedDocsDir = currentDir </> "generated-docs" -- TODO: make this configurable
   case fmt of
     Etags -> do
-      let filename = "TAGS" -- TODO: make this configurable
-      let outputFile = generatedDocsDir ++ "/" ++ filename
-      let pattern = compile filename
+      let outputFilename = "TAGS" -- TODO: make this configurable
+      let outputFile = currentDir </> outputFilename
+      let pattern = compile outputFilename
       let text = T.pack . unlines . dumpEtags $ fileMs
-      globDir1 pattern generatedDocsDir >>= mapM_ removeFile
+      globDir1 pattern currentDir >>= mapM_ removeFile
       writeUTF8FileT outputFile text
     Ctags -> do
-      let filename = "tags" -- TODO: make this configurable
-      let outputFile = generatedDocsDir ++ "/" ++ filename
-      let pattern = compile filename
+      let outputFilename = "tags" -- TODO: make this configurable
+      let outputFile = currentDir </> outputFilename
+      let pattern = compile outputFilename
       let text = T.pack . unlines . dumpCtags $ fileMs
-      globDir1 pattern generatedDocsDir >>= mapM_ removeFile
+      globDir1 pattern currentDir >>= mapM_ removeFile
       writeUTF8FileT outputFile text
     Html -> do
-      let outputDir = generatedDocsDir ++ "/html"
+      let outputDir = generatedDocsDir </> "html"
       let ext = compile "*.html"
       let msHtml = map asHtml ms
       createDirectoryIfMissing True outputDir
       globDir1 ext outputDir >>= mapM_ removeFile
       writeHtmlModules outputDir msHtml
     Markdown -> do
-      let outputDir = generatedDocsDir ++ "/md"
+      let outputDir = generatedDocsDir </> "md"
       let ext = compile "*.md"
       let msMarkdown = map asMarkdown ms
       createDirectoryIfMissing True outputDir
@@ -125,4 +126,10 @@ examples =
     , ""
     , "  write documentation in Markdown format for all modules to ./generated-docs:"
     , "    purs docs --format markdown \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\""
+    , ""
+    , "  write CTags to ./tags:"
+    , "    purs docs --format ctags \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\""
+    , ""
+    , "  write ETags to ./TAGS:"
+    , "    purs docs --format etags \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\""
     ]
