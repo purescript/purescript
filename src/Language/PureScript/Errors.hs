@@ -287,8 +287,10 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ConstrainedTypeUnified t1 t2) = ConstrainedTypeUnified <$> f t1 <*> f t2
   gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
-  gSimple (NoInstanceFound con) = NoInstanceFound <$> overConstraintArgs (traverse f) con
-  gSimple (AmbiguousTypeVariables t con) = AmbiguousTypeVariables <$> f t <*> pure con
+  gSimple (NoInstanceFound con (Just reason)) = NoInstanceFound <$> overConstraintArgs (traverse f) con <*> (fmap Just . gSimple) reason
+  gSimple (NoInstanceFound con Nothing) = NoInstanceFound <$> overConstraintArgs (traverse f) con <*> pure Nothing
+  gSimple (AmbiguousTypeVariables t con (Just reason)) = AmbiguousTypeVariables <$> f t <*> pure con <*> (fmap Just . gSimple) reason
+  gSimple (AmbiguousTypeVariables t con Nothing) = AmbiguousTypeVariables <$> f t <*> pure con <*> pure Nothing
   gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> pure insts
   gSimple (UnknownName name (Just (ts, ctx))) = fmap (UnknownName name . Just) $ (,) <$> f ts <*> traverse (sndM f) ctx
   gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
@@ -666,13 +668,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , markCodeBox $ indent $ line (showQualified runProperName nm)
             , line "because the class was not in scope. Perhaps it was not exported."
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Fail [ ty ] _)) | Just box <- toTypelevelString ty =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Fail [ ty ] _) _) | Just box <- toTypelevelString ty =
       paras [ line "A custom type error occurred while solving type class constraints:"
             , indent box
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Partial
                                                           _
-                                                          (Just (PartialConstraintData bs b)))) =
+                                                          (Just (PartialConstraintData bs b))) _) =
       paras [ line "A case expression could not be determined to cover all inputs."
             , line "The following additional cases are required to cover all inputs:"
             , indent $ paras $
@@ -681,13 +683,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                   : [line "..." | not b]
             , line "Alternatively, add a Partial constraint to the type of the enclosing value."
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Discard [ty] _)) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Discard [ty] _) _) =
       paras [ line "A result of type"
             , markCodeBox $ indent $ typeAsBox prettyDepth ty
             , line "was implicitly discarded in a do notation block."
             , line ("You can use " <> markCode "_ <- ..." <> " to explicitly discard the result.")
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm ts _)) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm ts _) Nothing) =
       paras [ line "No type class instance was found for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
@@ -703,7 +705,34 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
         where
         go TUnknown{} = True
         go _ = False
-    renderSimpleErrorMessage (AmbiguousTypeVariables t _) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm ts _) (Just reason)) =
+      paras [ line "No type class instance was found for"
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName nm)
+                , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
+                ]
+            , paras [ line "The instance head contains unknown type variables."
+                    | any containsUnknowns ts
+                    ]
+            , line "This could be caused by"
+            , renderSimpleErrorMessage reason
+            , "Consider adding a type annotation."
+            ]
+      where
+      containsUnknowns :: Type a -> Bool
+      containsUnknowns = everythingOnTypes (||) go
+        where
+        go TUnknown{} = True
+        go _ = False
+    renderSimpleErrorMessage (AmbiguousTypeVariables t _ (Just reason)) =
+      paras [ line "The inferred type"
+            , markCodeBox $ indent $ typeAsBox prettyDepth t
+            , line "has type variables which are not mentioned in the body of the type."
+            , line "This could be caused by"
+            , renderSimpleErrorMessage reason
+            , line "Consider adding a type annotation."
+            ]
+    renderSimpleErrorMessage (AmbiguousTypeVariables t _ Nothing) =
       paras [ line "The inferred type"
             , markCodeBox $ indent $ typeAsBox prettyDepth t
             , line "has type variables which are not mentioned in the body of the type. Consider adding a type annotation."
@@ -898,7 +927,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 , markCodeBox (indent (typeAsBox maxBound ty))
                 ] ++ tsResult ++ renderContext ctx
     renderSimpleErrorMessage (HoleCannotInferType name) =
-      paras [ line $ "Cannot infer type for hole '" <> markCode name <> "'."]
+      paras [ line $ "Hole '" <> markCode name <> "'."]
     renderSimpleErrorMessage (MissingTypeDeclaration ident ty) =
       paras [ line $ "No type declaration was provided for the top-level declaration of " <> markCode (showIdent ident) <> "."
             , line "It is good practice to provide type declarations as a form of documentation."

@@ -422,7 +422,7 @@ parseInfixExpr
   <|> withSourceSpan' Op (parseQualified parseOperator)
 
 parseHole :: TokenParser Expr
-parseHole = withSourceSpan' Hole holeLit
+parseHole = Hole <$> holeLit
 
 parsePropertyUpdate :: TokenParser (PSString, PathNode Expr)
 parsePropertyUpdate = do

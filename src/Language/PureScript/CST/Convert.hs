@@ -260,8 +260,8 @@ convertExpr fileName = go
       uncurry AST.PositionedDoNotationElement ann $ AST.DoNotationBind a' b'
 
   go = \case
-    expr@(ExprHole _ a) ->
-      positioned (sourceName fileName a) . AST.Hole (sourceSpan fileName . toSourceRange $ exprRange expr) . getIdent $ nameValue a
+    ExprHole _ a ->
+      positioned (sourceName fileName a) . AST.Hole . getIdent $ nameValue a
     ExprSection _ a ->
       positioned (sourceAnnCommented fileName a a) AST.AnonymousArgument
     ExprIdent _ a -> do

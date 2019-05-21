@@ -1,4 +1,4 @@
--- @shouldFailWith UnknownName
+-- @shouldFailWith AmbiguousTypeVariables
 module Main where
 
 import Control.Applicative (pure)

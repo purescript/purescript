@@ -1,4 +1,4 @@
--- @shouldFailWith UnknownName
+-- @shouldFailWith NoInstanceFound
 module Main where
 
 import Control.Applicative (pure)

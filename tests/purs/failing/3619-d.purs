@@ -1,4 +1,4 @@
--- @shouldFailWith HoleCannotInferType
+-- @shouldFailWith NoInstanceFound
 module Main where
 
 import Control.Applicative (pure)

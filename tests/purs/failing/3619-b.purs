@@ -1,4 +1,4 @@
--- @shouldFailWith HoleCannotInferType
+-- @shouldFailWith AmbiguousTypeVariables
 module Main where
 
 import Control.Applicative (pure)

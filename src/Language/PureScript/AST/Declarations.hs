@@ -112,8 +112,8 @@ data SimpleErrorMessage
   | KindsDoNotUnify SourceKind SourceKind
   | ConstrainedTypeUnified SourceType SourceType
   | OverlappingInstances (Qualified (ProperName 'ClassName)) [SourceType] [Qualified Ident]
-  | NoInstanceFound SourceConstraint
-  | AmbiguousTypeVariables SourceType SourceConstraint
+  | NoInstanceFound SourceConstraint (Maybe SimpleErrorMessage)
+  | AmbiguousTypeVariables SourceType SourceConstraint (Maybe SimpleErrorMessage)
   | UnknownClass (Qualified (ProperName 'ClassName))
   | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [SourceType]
   | CannotDerive (Qualified (ProperName 'ClassName)) [SourceType]
@@ -821,11 +821,11 @@ data Expr
   -- |
   -- A typed hole that will be turned into a hint/error during typechecking
   --
-  | Hole SourceSpan Text
+  | Hole Text
   -- |
   -- An unknown name that will be turned into a hint/error during typechecking
   --
-  | UnknownValue SourceSpan (Qualified Name)
+  | UnknownValue (Qualified Name)
   -- |
   -- A value with source position information
   --

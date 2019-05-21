@@ -304,7 +304,9 @@ entails SolverOptions{..} constraint context hints =
               -- We need a special case for nullary type classes, since we want
               -- to generalize over Partial constraints.
               | solverShouldGeneralize && (null tyArgs || any canBeGeneralized tyArgs) = return (Unsolved (srcConstraint className' tyArgs conInfo))
-              | otherwise = throwError . errorMessage $ NoInstanceFound (srcConstraint className' tyArgs conInfo)
+              | otherwise = do
+                  mbReason <- getInferringHoleError
+                  throwError . errorMessage $ NoInstanceFound (srcConstraint className' tyArgs conInfo) mbReason
             unique _      [(a, dict)] = return $ Solved a dict
             unique tyArgs tcds
               | pairwiseAny overlapping (map snd tcds) =

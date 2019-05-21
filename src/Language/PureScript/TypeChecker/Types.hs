@@ -92,7 +92,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
 
     inferred <- forM tys $ \(shouldGeneralize, ((sai@((ss, _), ident), (val, ty)), _)) -> do
       -- Replace type class dictionary placeholders with actual dictionaries
-      (val', unsolved) <- rethrowInferringHoleError $ replaceTypeClassDictionaries shouldGeneralize val
+      (val', unsolved) <- replaceTypeClassDictionaries shouldGeneralize val
       -- Generalize and constrain the type
       currentSubst <- gets checkSubstitution
       let ty' = substituteType currentSubst ty
@@ -107,7 +107,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
         -- For non-recursive binding groups, can generalize over constraints.
         -- For recursive binding groups, we throw an error here for now.
         when (bindingGroupType == RecursiveBindingGroup && not (null unsolved))
-          . throwInferringHoleError
+          . throwError
           . errorMessage' ss
           $ CannotGeneralizeRecursiveFunction ident generalized
         -- Make sure any unsolved type constraints only use type variables which appear
@@ -120,11 +120,12 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           TypeClassData{ typeClassDependencies } <- gets (findClass . typeClasses . checkEnv)
           let solved = foldMap (S.fromList . fdDetermined) typeClassDependencies
           let constraintTypeVars = ordNub . foldMap (unknownsInType . fst) . filter ((`notElem` solved) . snd) $ zip (constraintArgs con) [0..]
-          when (any (`notElem` unsolvedTypeVars) constraintTypeVars) .
-            throwInferringHoleError
+          when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $ do
+            mbErr <- getInferringHoleError
+            throwError
               . onErrorMessages (replaceTypes currentSubst)
               . errorMessage' ss
-              $ AmbiguousTypeVariables generalized con
+              $ AmbiguousTypeVariables generalized con mbErr
 
       -- Check skolem variables did not escape their scope
       skolemEscapeCheck val'
@@ -419,19 +420,19 @@ infer' (TypedValue checkType val ty) = do
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   tv <- if checkType then withScopedTypeVars moduleName args (check val ty') else return (TypedValue' False val ty)
   return $ TypedValue' True (tvToExpr tv) ty'
-infer' (Hole ss name) = do
+infer' (Hole name) = do
   ty <- freshType
   ctx <- getLocalContext
   env <- getEnv
-  setInferringHoleError (errorMessage' ss $ HoleCannotInferType name)
+  setInferringHoleError $ HoleCannotInferType name
   tell . errorMessage $ HoleInferredType name ty ctx . Just $ TSBefore env
-  return $ TypedValue' True (Hole ss name) ty
-infer' (UnknownValue ss name) = do
+  return $ TypedValue' True (Hole name) ty
+infer' (UnknownValue name) = do
   ty <- freshType
   ctx <- getLocalContext
-  setInferringHoleError (errorMessage' ss $ UnknownName name Nothing)
+  setInferringHoleError $ UnknownName name Nothing
   tell . errorMessage . UnknownName name $ Just (ty, ctx)
-  return $ TypedValue' True (UnknownValue ss name) ty
+  return $ TypedValue' True (UnknownValue name) ty
 infer' (PositionedValue pos c val) = warnAndRethrowWithPositionTC pos $ do
   TypedValue' t v ty <- infer' val
   return $ TypedValue' t (PositionedValue pos c v) ty
