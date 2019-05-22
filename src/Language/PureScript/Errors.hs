@@ -155,7 +155,6 @@ errorCode em = case unwrapErrorMessage em of
   UnusedTypeVar{} -> "UnusedTypeVar"
   WildcardInferredType{} -> "WildcardInferredType"
   HoleInferredType{} -> "HoleInferredType"
-  HoleCannotInferType{} -> "HoleCannotInferType"
   MissingTypeDeclaration{} -> "MissingTypeDeclaration"
   OverlappingPattern{} -> "OverlappingPattern"
   IncompleteExhaustivityCheck{} -> "IncompleteExhaustivityCheck"
@@ -459,6 +458,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       unknownInfo :: Int -> Box.Box
       unknownInfo u = line $ markCode ("t" <> T.pack (show u)) <> " is an unknown type"
 
+    containsUnknowns :: Type a -> Bool
+    containsUnknowns = everythingOnTypes (||) go
+      where
+      go TUnknown{} = True
+      go _ = False
+
     renderSimpleErrorMessage :: SimpleErrorMessage -> Box.Box
     renderSimpleErrorMessage (ModuleNotFound mn) =
       paras [ line $ "Module " <> markCode (runModuleName mn) <> " was not found."
@@ -689,7 +694,29 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , line "was implicitly discarded in a do notation block."
             , line ("You can use " <> markCode "_ <- ..." <> " to explicitly discard the result.")
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm ts _) Nothing) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm ts _) (Just (HoleInferredType name _ _ _))) =
+      paras [ line "No type class instance was found for"
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName nm)
+                , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
+                ]
+            , paras [ line "The instance head contains unknown type variables."
+                    | any containsUnknowns ts
+                    ]
+            , line $ "This could have been caused by the hole '" <> name <> "'. Consider adding a type annotation."
+            ]
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm ts _) (Just (UnknownName name _))) =
+      paras [ line "No type class instance was found for"
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName nm)
+                , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
+                ]
+            , paras [ line "The instance head contains unknown type variables."
+                    | any containsUnknowns ts
+                    ]
+            , line $ "This could have been caused by the unknown " <> printName name <> ". Consider adding a type annotation."
+            ]
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm ts _) _) =
       paras [ line "No type class instance was found for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
@@ -699,40 +726,19 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                     | any containsUnknowns ts
                     ]
             ]
-      where
-      containsUnknowns :: Type a -> Bool
-      containsUnknowns = everythingOnTypes (||) go
-        where
-        go TUnknown{} = True
-        go _ = False
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm ts _) (Just reason)) =
-      paras [ line "No type class instance was found for"
-            , markCodeBox $ indent $ Box.hsep 1 Box.left
-                [ line (showQualified runProperName nm)
-                , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
-                ]
-            , paras [ line "The instance head contains unknown type variables."
-                    | any containsUnknowns ts
-                    ]
-            , line "This could be caused by"
-            , renderSimpleErrorMessage reason
-            , "Consider adding a type annotation."
-            ]
-      where
-      containsUnknowns :: Type a -> Bool
-      containsUnknowns = everythingOnTypes (||) go
-        where
-        go TUnknown{} = True
-        go _ = False
-    renderSimpleErrorMessage (AmbiguousTypeVariables t _ (Just reason)) =
+    renderSimpleErrorMessage (AmbiguousTypeVariables t _ (Just (HoleInferredType name _ _ _))) =
       paras [ line "The inferred type"
             , markCodeBox $ indent $ typeAsBox prettyDepth t
             , line "has type variables which are not mentioned in the body of the type."
-            , line "This could be caused by"
-            , renderSimpleErrorMessage reason
-            , line "Consider adding a type annotation."
+            , line $ "This could have been caused by the hole '" <> name <> "'. Consider adding a type annotation."
             ]
-    renderSimpleErrorMessage (AmbiguousTypeVariables t _ Nothing) =
+    renderSimpleErrorMessage (AmbiguousTypeVariables t _ (Just (UnknownName name _))) =
+      paras [ line "The inferred type"
+            , markCodeBox $ indent $ typeAsBox prettyDepth t
+            , line "has type variables which are not mentioned in the body of the type."
+            , line $ "This could have been caused by the unknown " <> printName name <> ". Consider adding a type annotation."
+            ]
+    renderSimpleErrorMessage (AmbiguousTypeVariables t _ _) =
       paras [ line "The inferred type"
             , markCodeBox $ indent $ typeAsBox prettyDepth t
             , line "has type variables which are not mentioned in the body of the type. Consider adding a type annotation."
@@ -926,8 +932,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
         paras $ [ line $ "Hole '" <> markCode name <> "' has the inferred type "
                 , markCodeBox (indent (typeAsBox maxBound ty))
                 ] ++ tsResult ++ renderContext ctx
-    renderSimpleErrorMessage (HoleCannotInferType name) =
-      paras [ line $ "Hole '" <> markCode name <> "'."]
     renderSimpleErrorMessage (MissingTypeDeclaration ident ty) =
       paras [ line $ "No type declaration was provided for the top-level declaration of " <> markCode (showIdent ident) <> "."
             , line "It is good practice to provide type declarations as a form of documentation."

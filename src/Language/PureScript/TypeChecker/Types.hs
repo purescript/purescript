@@ -424,7 +424,7 @@ infer' (Hole name) = do
   ty <- freshType
   ctx <- getLocalContext
   env <- getEnv
-  setInferringHoleError $ HoleCannotInferType name
+  setInferringHoleError $ HoleInferredType name ty ctx . Just $ TSBefore env
   tell . errorMessage $ HoleInferredType name ty ctx . Just $ TSBefore env
   return $ TypedValue' True (Hole name) ty
 infer' (UnknownValue name) = do
