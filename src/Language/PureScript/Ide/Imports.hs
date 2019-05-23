@@ -96,11 +96,9 @@ parseModuleHeader src = do
   CST.PartialResult md _ <- CST.parseModule $ CST.lenient $ CST.lex src
   let
     mn = CST.nameValue $ CST.modNamespace md
-    decls = flip mapMaybe (CST.modImports md) $ \decl ->
-      case CST.convertImportDecl "<purs-ide>" decl of
-        P.ImportDeclaration (ss, _) mn' it qual ->
-          Just (ss, Import mn' it qual)
-        _ -> Nothing
+    decls = flip fmap (CST.modImports md) $ \decl -> do
+      let ((ss, _), mn', it, qual) = CST.convertImportDecl "<purs-ide>" decl
+      (ss, Import mn' it qual)
   case (head decls, lastMay decls) of
     (Just hd, Just ls) -> do
       let
@@ -376,7 +374,7 @@ parseImport t =
   case fmap (CST.convertImportDecl "<purs-ide>")
         $ CST.runTokenParser CST.parseImportDeclP
         $ CST.lex t of
-    Right (P.ImportDeclaration _ mn idt mmn) ->
+    Right (_, mn, idt, mmn) ->
       Just (Import mn idt mmn)
     _ -> Nothing
 
