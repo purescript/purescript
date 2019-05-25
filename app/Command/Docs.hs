@@ -43,10 +43,8 @@ docgen (PSCDocsOptions fmt inputGlob) = do
   fileMs <- parseAndConvert input
   let ms = D.primModules ++ map snd fileMs
   case fmt of
-    Etags -> do
-      writeTagsToFile "TAGS" $ dumpEtags fileMs
-    Ctags -> do
-      writeTagsToFile "tags" $ dumpCtags fileMs
+    Etags -> writeTagsToFile "TAGS" $ dumpEtags fileMs
+    Ctags -> writeTagsToFile "tags" $ dumpCtags fileMs
     Html -> do
       let outputDir = "./generated-docs/html" -- TODO: make this configurable
       let ext = compile "*.html"
