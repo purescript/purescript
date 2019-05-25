@@ -42,32 +42,22 @@ docgen (PSCDocsOptions fmt inputGlob) = do
 
   fileMs <- parseAndConvert input
   let ms = D.primModules ++ map snd fileMs
-  currentDir <- getCurrentDirectory
-  let generatedDocsDir = currentDir </> "generated-docs" -- TODO: make this configurable
   case fmt of
     Etags -> do
       let outputFilename = "TAGS" -- TODO: make this configurable
-      let outputFile = currentDir </> outputFilename
-      let pattern = compile outputFilename
-      let text = T.pack . unlines . dumpEtags $ fileMs
-      globDir1 pattern currentDir >>= mapM_ removeFile
-      writeUTF8FileT outputFile text
+      writeTagsToFile outputFilename $ dumpEtags fileMs
     Ctags -> do
       let outputFilename = "tags" -- TODO: make this configurable
-      let outputFile = currentDir </> outputFilename
-      let pattern = compile outputFilename
-      let text = T.pack . unlines . dumpCtags $ fileMs
-      globDir1 pattern currentDir >>= mapM_ removeFile
-      writeUTF8FileT outputFile text
+      writeTagsToFile outputFilename $ dumpCtags fileMs
     Html -> do
-      let outputDir = generatedDocsDir </> "html"
+      let outputDir = "./generated-docs/html" -- TODO: make this configurable
       let ext = compile "*.html"
       let msHtml = map asHtml ms
       createDirectoryIfMissing True outputDir
       globDir1 ext outputDir >>= mapM_ removeFile
       writeHtmlModules outputDir msHtml
     Markdown -> do
-      let outputDir = generatedDocsDir </> "md"
+      let outputDir = "./generated-docs/md" -- TODO: make this configurable
       let ext = compile "*.md"
       let msMarkdown = map asMarkdown ms
       createDirectoryIfMissing True outputDir
@@ -88,6 +78,15 @@ docgen (PSCDocsOptions fmt inputGlob) = do
     runExceptT (D.parseFilesInPackages input []
                 >>= uncurry D.convertTaggedModulesInPackage)
     >>= successOrExit
+
+  writeTagsToFile :: String -> [String] -> IO ()
+  writeTagsToFile outputFilename tags = do
+    currentDir <- getCurrentDirectory
+    let outputFile = currentDir </> outputFilename
+    let pattern = compile outputFilename
+    let text = T.pack . unlines $ tags
+    globDir1 pattern currentDir >>= mapM_ removeFile
+    writeUTF8FileT outputFile text
 
 inputFile :: Opts.Parser FilePath
 inputFile = Opts.strArgument $
