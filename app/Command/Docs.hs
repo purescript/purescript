@@ -44,11 +44,9 @@ docgen (PSCDocsOptions fmt inputGlob) = do
   let ms = D.primModules ++ map snd fileMs
   case fmt of
     Etags -> do
-      let outputFilename = "TAGS" -- TODO: make this configurable
-      writeTagsToFile outputFilename $ dumpEtags fileMs
+      writeTagsToFile "TAGS" $ dumpEtags fileMs
     Ctags -> do
-      let outputFilename = "tags" -- TODO: make this configurable
-      writeTagsToFile outputFilename $ dumpCtags fileMs
+      writeTagsToFile "tags" $ dumpCtags fileMs
     Html -> do
       let outputDir = "./generated-docs/html" -- TODO: make this configurable
       let ext = compile "*.html"
@@ -83,9 +81,7 @@ docgen (PSCDocsOptions fmt inputGlob) = do
   writeTagsToFile outputFilename tags = do
     currentDir <- getCurrentDirectory
     let outputFile = currentDir </> outputFilename
-    let pattern = compile outputFilename
     let text = T.pack . unlines $ tags
-    globDir1 pattern currentDir >>= mapM_ removeFile
     writeUTF8FileT outputFile text
 
 inputFile :: Opts.Parser FilePath
