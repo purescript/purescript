@@ -3,14 +3,23 @@ module Language.PureScript.CST.Parser
   ( parseType
   , parseKind
   , parseExpr
+  , parseDecl
+  , parseIdent
+  , parseOperator
   , parseModule
+  , parseImportDeclP
+  , parseDeclP
+  , parseExprP
+  , parseTypeP
+  , parseModuleNameP
+  , parseQualIdentP
   , parse
   , PartialResult(..)
   ) where
 
 import Prelude hiding (lex)
 
-import Control.Monad ((>=>), when)
+import Control.Monad ((<=<), when)
 import Data.Foldable (foldl', for_)
 import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)
@@ -30,7 +39,16 @@ import Language.PureScript.PSString (PSString)
 %name parseKind kind
 %name parseType type
 %name parseExpr expr
+%name parseIdent ident
+%name parseOperator op
 %name parseModuleBody moduleBody
+%name parseDecl decl
+%partial parseImportDeclP importDeclP
+%partial parseDeclP declP
+%partial parseExprP exprP
+%partial parseTypeP typeP
+%partial parseModuleNameP moduleNameP
+%partial parseQualIdentP qualIdentP
 %partial parseModuleHeader moduleHeader
 %partial parseDoStatement doStatement
 %partial parseDoExpr doExpr
@@ -719,23 +737,45 @@ foreign :: { Foreign () }
   | 'data' properName '::' kind { ForeignData $1 (Labeled $2 $3 $4) }
   | 'kind' properName { ForeignKind $1 $2 }
 
+-- Partial parsers which can be combined with combinators for adhoc use. We need
+-- to revert the lookahead token so that it doesn't consume an extra token
+-- before succeeding.
+
+importDeclP :: { ImportDecl () }
+  : importDecl {%^ revert $ pure $1 }
+
+declP :: { Declaration () }
+  : decl {%^ revert $ pure $1 }
+
+exprP :: { Expr () }
+  : expr {%^ revert $ pure $1 }
+
+typeP :: { Type () }
+  : type {%^ revert $ pure $1 }
+
+moduleNameP :: { Name N.ModuleName }
+  : moduleName {%^ revert $ pure $1 }
+
+qualIdentP :: { QualifiedName Ident }
+  : qualIdent {%^ revert $ pure $1 }
+
 {
 lexer :: (SourceToken -> Parser a) -> Parser a
 lexer k = munch >>= k
 
 parse :: Text -> Either (NE.NonEmpty ParserError) (Module ())
-parse = parseModule >=> resFull
+parse = resFull <=< parseModule . lex
 
 data PartialResult a = PartialResult
   { resPartial :: a
   , resFull :: Either (NE.NonEmpty ParserError) a
   } deriving (Functor)
 
-parseModule :: Text -> Either (NE.NonEmpty ParserError) (PartialResult (Module ()))
-parseModule src = fmap (\header -> PartialResult header (parseFull header)) headerRes
+parseModule :: [LexResult] -> Either (NE.NonEmpty ParserError) (PartialResult (Module ()))
+parseModule toks = fmap (\header -> PartialResult header (parseFull header)) headerRes
   where
   (st, headerRes) =
-    runParser (ParserState (lex src) []) parseModuleHeader
+    runParser (ParserState (toks) []) parseModuleHeader
 
   parseFull header = do
     (decls, trailing) <- snd $ runParser st parseModuleBody

@@ -72,9 +72,9 @@ spec = do
   describe "determining the importsection" $ do
     let moduleSkeleton imports =
           Right (P.moduleNameFromString "Main", take 1 simpleFile, imports, drop 2 simpleFile)
-    it "slices a file without imports and adds a newline after the module declaration" $
+    it "slices a file without imports" $
       shouldBe (sliceImportSection noImportsFile)
-          (Right (P.moduleNameFromString "Main", take 1 noImportsFile ++ [""], [], drop 1 noImportsFile))
+          (Right (P.moduleNameFromString "Main", take 1 noImportsFile, [], drop 1 noImportsFile))
 
     it "handles a file with syntax errors just fine" $
       shouldBe (sliceImportSection syntaxErrorFile)
@@ -351,7 +351,12 @@ addExplicitImportFiltered i ms =
 
 importShouldBe :: [Text] -> [Text] -> Expectation
 importShouldBe res importSection =
-  res `shouldBe` [ "module ImportsSpec where" , ""] ++ importSection ++ [ "" , "myId x = x"]
+  res `shouldBe`
+    [ "module ImportsSpec where" ]
+    ++ (if null importSection then [] else "" : importSection)
+    ++ [ ""
+       , "myId x = x"
+       ]
 
 runIdeLoaded :: Command -> IO (Either IdeError Success)
 runIdeLoaded c = do

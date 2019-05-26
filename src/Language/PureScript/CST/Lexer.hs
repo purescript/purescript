@@ -1,7 +1,10 @@
 {-# LANGUAGE BangPatterns #-}
 module Language.PureScript.CST.Lexer
-  ( lex
-  , munch
+  ( lenient
+  , lex
+  , lexTopLevel
+  , lexWithState
+  , isUnquotedKey
   ) where
 
 import Prelude hiding (lex, exp, exponent, lines)
@@ -16,27 +19,58 @@ import Data.String (fromString)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Language.PureScript.CST.Errors
-import Language.PureScript.CST.Monad
+import Language.PureScript.CST.Monad hiding (token)
 import Language.PureScript.CST.Layout
 import Language.PureScript.CST.Positions
 import Language.PureScript.CST.Types
 
+-- | Stops at the first lexing error and replaces it with TokEof. Otherwise,
+-- the parser will fail when it attempts to draw a lookahead token.
+lenient :: [LexResult] -> [LexResult]
+lenient = go
+  where
+  go [] = []
+  go (Right a : as) = Right a : go as
+  go (Left (st, _) : _) = do
+    let
+      pos = lexPos st
+      ann = TokenAnn (SourceRange pos pos) (lexLeading st) []
+    [Right (SourceToken ann TokEof)]
+
+-- | Lexes according to root layout rules.
 lex :: Text -> [LexResult]
-lex = go1
+lex src = do
+  let (leading, src') = comments src
+  lexWithState $ LexState
+    { lexPos = advanceLeading (SourcePos 1 1) leading
+    , lexLeading = leading
+    , lexSource = src'
+    , lexStack = [(SourcePos 0 0, LytRoot)]
+    }
+
+-- | Lexes according to top-level declaration context rules.
+lexTopLevel :: Text -> [LexResult]
+lexTopLevel src = do
+  let
+    (leading, src') = comments src
+    lexPos = advanceLeading (SourcePos 1 1) leading
+    hd = Right $ lytToken lexPos TokLayoutStart
+    tl = lexWithState $ LexState
+      { lexPos = lexPos
+      , lexLeading = leading
+      , lexSource = src'
+      , lexStack = [(lexPos, LytWhere), (SourcePos 0 0, LytRoot)]
+      }
+  hd : tl
+
+-- | Lexes according to some LexState.
+lexWithState :: LexState -> [LexResult]
+lexWithState = go
   where
   Parser lexK =
     tokenAndComments
 
-  go1 src = do
-    let (leading, src') = comments src
-    go2 $ LexState
-      { lexPos = advanceLeading (SourcePos 1 1) leading
-      , lexLeading = leading
-      , lexSource = src'
-      , lexStack = [(SourcePos 0 0, LytRoot)]
-      }
-
-  go2 state@(LexState {..}) =
+  go state@(LexState {..}) =
     lexK lexSource onError onSuccess
     where
     onError lexSource' err = do
@@ -70,20 +104,10 @@ lex = go1
           , lexSource = lexSource'
           , lexStack = lexStack'
           }
-      go3 state' toks
+      go2 state' toks
 
-  go3 state [] = go2 state
-  go3 state (t : ts) = Right t : go3 state ts
-
-munch :: Parser SourceToken
-munch = Parser $ \state@(ParserState {..}) kerr ksucc ->
-  case parserBuff of
-    Right tok : parserBuff' ->
-      ksucc (state { parserBuff = parserBuff' }) tok
-    Left (_,  err) : _ ->
-      kerr state err
-    [] ->
-      error "Empty input"
+  go2 state [] = go state
+  go2 state (t : ts) = Right t : go2 state ts
 
 type Lexer = ParserM ParserErrorType Text
 
@@ -677,3 +701,12 @@ isStringGapChar c = c == ' ' || c == '\r' || c == '\n'
 
 isLineFeed :: Char -> Bool
 isLineFeed c = c == '\r' || c == '\n'
+
+-- | Checks if some identifier is a valid unquoted key.
+isUnquotedKey :: Text -> Bool
+isUnquotedKey t =
+  case Text.uncons t of
+    Nothing ->
+      False
+    Just (hd, tl) ->
+      isIdentStart hd && Text.all isIdentChar tl
