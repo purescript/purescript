@@ -6,15 +6,18 @@ import           Command.Docs.Markdown
 import           Control.Applicative
 import           Control.Monad.Writer
 import           Control.Monad.Trans.Except (runExceptT)
+import qualified Data.Text as T
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Docs as D
 import           Language.PureScript.Docs.Tags (dumpCtags, dumpEtags)
 import qualified Options.Applicative as Opts
 import qualified Text.PrettyPrint.ANSI.Leijen as PP
-import           System.Directory (createDirectoryIfMissing, removeFile)
+import           System.Directory (getCurrentDirectory, createDirectoryIfMissing, removeFile)
 import           System.Exit (exitFailure)
+import           System.FilePath ((</>))
 import           System.FilePath.Glob (compile, glob, globDir1)
 import           System.IO (hPutStrLn, stderr)
+import           System.IO.UTF8 (writeUTF8FileT)
 
 -- | Available output formats
 data Format
@@ -40,8 +43,8 @@ docgen (PSCDocsOptions fmt inputGlob) = do
   fileMs <- parseAndConvert input
   let ms = D.primModules ++ map snd fileMs
   case fmt of
-    Etags -> mapM_ putStrLn $ dumpEtags fileMs
-    Ctags -> mapM_ putStrLn $ dumpCtags fileMs
+    Etags -> writeTagsToFile "TAGS" $ dumpEtags fileMs
+    Ctags -> writeTagsToFile "tags" $ dumpCtags fileMs
     Html -> do
       let outputDir = "./generated-docs/html" -- TODO: make this configurable
       let ext = compile "*.html"
@@ -71,6 +74,13 @@ docgen (PSCDocsOptions fmt inputGlob) = do
     runExceptT (D.parseFilesInPackages input []
                 >>= uncurry D.convertTaggedModulesInPackage)
     >>= successOrExit
+
+  writeTagsToFile :: String -> [String] -> IO ()
+  writeTagsToFile outputFilename tags = do
+    currentDir <- getCurrentDirectory
+    let outputFile = currentDir </> outputFilename
+    let text = T.pack . unlines $ tags
+    writeUTF8FileT outputFile text
 
 inputFile :: Opts.Parser FilePath
 inputFile = Opts.strArgument $
@@ -109,4 +119,10 @@ examples =
     , ""
     , "  write documentation in Markdown format for all modules to ./generated-docs:"
     , "    purs docs --format markdown \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\""
+    , ""
+    , "  write CTags to ./tags:"
+    , "    purs docs --format ctags \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\""
+    , ""
+    , "  write ETags to ./TAGS:"
+    , "    purs docs --format etags \"src/**/*.purs\" \".psc-package/*/*/*/src/**/*.purs\""
     ]
