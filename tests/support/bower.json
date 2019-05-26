@@ -33,7 +33,7 @@
     "purescript-tailrec": "4.0.0",
     "purescript-tuples": "5.0.0",
     "purescript-type-equality": "3.0.0",
-    "purescript-typelevel-prelude": "4.0.1",
+    "purescript-typelevel-prelude": "5.0.0",
     "purescript-unfoldable": "4.0.0",
     "purescript-unsafe-coerce": "4.0.0"
   }
