@@ -24,7 +24,7 @@
     "purescript-newtype": "3.0.0",
     "purescript-nonempty": "5.0.0",
     "purescript-partial": "2.0.0",
-    "purescript-prelude": "4.0.0",
+    "purescript-prelude": "4.1.0",
     "purescript-proxy": "3.0.0",
     "purescript-psci-support": "4.0.0",
     "purescript-refs": "4.1.0",
@@ -33,7 +33,7 @@
     "purescript-tailrec": "4.0.0",
     "purescript-tuples": "5.0.0",
     "purescript-type-equality": "3.0.0",
-    "purescript-typelevel-prelude": "3.0.0",
+    "purescript-typelevel-prelude": "4.0.1",
     "purescript-unfoldable": "4.0.0",
     "purescript-unsafe-coerce": "4.0.0"
   }
