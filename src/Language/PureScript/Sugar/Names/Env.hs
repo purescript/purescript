@@ -318,6 +318,10 @@ exportType ss exportMode exps name dctors src = do
           throwDeclConflict (DctorName dctor) (TyClassName (coerceProperName dctor))
     ReExport -> do
       let mn = exportSourceDefinedIn src
+      forM_ (coerceProperName name `M.lookup` exClasses) $ \src' ->
+        let mn' = exportSourceDefinedIn src' in
+        when (mn /= mn') $
+          throwExportConflict ss mn mn' (TyName name)
       forM_ (name `M.lookup` exTypes) $ \(_, src') ->
         let mn' = exportSourceDefinedIn src' in
         when (mn /= mn') $
