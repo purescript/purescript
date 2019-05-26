@@ -6,6 +6,7 @@ import           Command.Docs.Markdown
 import           Control.Applicative
 import           Control.Monad.Writer
 import           Control.Monad.Trans.Except (runExceptT)
+import           Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Docs as D
@@ -29,36 +30,39 @@ data Format
 
 data PSCDocsOptions = PSCDocsOptions
   { _pscdFormat :: Format
+  , _pscdOutput :: Maybe FilePath
   , _pscdInputFiles  :: [FilePath]
   }
   deriving (Show)
 
 docgen :: PSCDocsOptions -> IO ()
-docgen (PSCDocsOptions fmt inputGlob) = do
+docgen (PSCDocsOptions fmt moutput inputGlob) = do
   input <- concat <$> mapM glob inputGlob
   when (null input) $ do
     hPutStrLn stderr "purs docs: no input files."
     exitFailure
 
+  let output = fromMaybe (defaultOutputForFormat fmt) moutput
+
   fileMs <- parseAndConvert input
   let ms = D.primModules ++ map snd fileMs
   case fmt of
-    Etags -> writeTagsToFile "TAGS" $ dumpEtags fileMs
-    Ctags -> writeTagsToFile "tags" $ dumpCtags fileMs
+    Etags -> writeTagsToFile output $ dumpEtags fileMs
+    Ctags -> writeTagsToFile output $ dumpCtags fileMs
     Html -> do
-      let outputDir = "./generated-docs/html" -- TODO: make this configurable
       let ext = compile "*.html"
       let msHtml = map asHtml ms
-      createDirectoryIfMissing True outputDir
-      globDir1 ext outputDir >>= mapM_ removeFile
-      writeHtmlModules outputDir msHtml
+      createDirectoryIfMissing True output
+      globDir1 ext output >>= mapM_ removeFile
+      writeHtmlModules output msHtml
     Markdown -> do
-      let outputDir = "./generated-docs/md" -- TODO: make this configurable
       let ext = compile "*.md"
       let msMarkdown = map asMarkdown ms
-      createDirectoryIfMissing True outputDir
-      globDir1 ext outputDir >>= mapM_ removeFile
-      writeMarkdownModules outputDir msMarkdown
+      createDirectoryIfMissing True output
+      globDir1 ext output >>= mapM_ removeFile
+      writeMarkdownModules output msMarkdown
+
+  putStrLn $ "Documentation written to: " ++ output
 
   where
   successOrExit :: Either P.MultipleErrors a -> IO a
@@ -82,11 +86,6 @@ docgen (PSCDocsOptions fmt inputGlob) = do
     let text = T.pack . unlines $ tags
     writeUTF8FileT outputFile text
 
-inputFile :: Opts.Parser FilePath
-inputFile = Opts.strArgument $
-     Opts.metavar "FILE"
-  <> Opts.help "The input .purs file(s)"
-
 instance Read Format where
   readsPrec _ "etags" = [(Etags, "")]
   readsPrec _ "ctags" = [(Ctags, "")]
@@ -94,14 +93,35 @@ instance Read Format where
   readsPrec _ "html" = [(Html, "")]
   readsPrec _ _ = []
 
-format :: Opts.Parser Format
-format = Opts.option Opts.auto $ Opts.value Html
-         <> Opts.long "format"
-         <> Opts.metavar "FORMAT"
-         <> Opts.help "Set output FORMAT (markdown | html | etags | ctags)"
+defaultOutputForFormat :: Format -> FilePath
+defaultOutputForFormat fmt =
+  case fmt of
+    Markdown -> "generated-docs/md"
+    Html -> "generated-docs/html"
+    Etags -> "TAGS"
+    Ctags -> "tags"
 
 pscDocsOptions :: Opts.Parser PSCDocsOptions
-pscDocsOptions = PSCDocsOptions <$> format <*> many inputFile
+pscDocsOptions = PSCDocsOptions <$> format <*> output <*> many inputFile
+  where
+  format :: Opts.Parser Format
+  format = Opts.option Opts.auto $
+       Opts.value Html
+    <> Opts.long "format"
+    <> Opts.metavar "FORMAT"
+    <> Opts.help "Set output FORMAT (markdown | html | etags | ctags)"
+
+  output :: Opts.Parser (Maybe FilePath)
+  output = optional $ Opts.option Opts.auto $
+       Opts.long "output"
+    <> Opts.short 'o'
+    <> Opts.metavar "DEST"
+    <> Opts.help "File/directory path for docs to be written to"
+
+  inputFile :: Opts.Parser FilePath
+  inputFile = Opts.strArgument $
+       Opts.metavar "FILE"
+    <> Opts.help "The input .purs file(s)"
 
 command :: Opts.Parser (IO ())
 command = docgen <$> (Opts.helper <*> pscDocsOptions)
