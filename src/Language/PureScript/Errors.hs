@@ -562,7 +562,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (DeclConflict new existing) =
       line $ "Declaration for " <> printName (Qualified Nothing new) <> " conflicts with an existing " <> nameType existing <> " of the same name."
     renderSimpleErrorMessage (ExportConflict new existing) =
-      line $ "Export for " <> printName new <> " conflicts with " <> runName existing
+      line $ "Export for " <> printName new <> " conflicts with " <> printName existing
     renderSimpleErrorMessage (DuplicateModule mn) =
       line $ "Module " <> markCode (runModuleName mn) <> " has been defined multiple times"
     renderSimpleErrorMessage (DuplicateTypeClass pn ss) =
