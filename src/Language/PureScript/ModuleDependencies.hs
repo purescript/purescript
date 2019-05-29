@@ -23,7 +23,7 @@ type ModuleGraph = [(ModuleName, [ModuleName])]
 data ModuleSignature = ModuleSignature
   { sigSourceSpan :: SourceSpan
   , sigModuleName :: ModuleName
-  , sigDecls :: [Declaration]
+  , sigImports :: [(ModuleName, SourceSpan)]
   }
 
 -- | Sort a collection of modules based on module dependencies.
@@ -50,8 +50,7 @@ sortModules toSig ms = do
     return (fst <$> ms'', moduleGraph)
   where
     toGraphNode :: S.Set ModuleName -> (a, ModuleSignature) -> m ((a, ModuleSignature), ModuleName, [ModuleName])
-    toGraphNode mns m@(_, ModuleSignature _ mn ds) = do
-      let deps = ordNub (mapMaybe usedModules ds)
+    toGraphNode mns m@(_, ModuleSignature _ mn deps) = do
       void . parU deps $ \(dep, pos) ->
         when (dep `notElem` C.primModules && S.notMember dep mns) .
           throwError
@@ -80,4 +79,4 @@ toModule (CyclicSCC ms) =
         $ CycleInModules (map (sigModuleName . snd) ms)
 
 moduleSignature :: Module -> ModuleSignature
-moduleSignature (Module ss _ mn ds _) = ModuleSignature ss mn ds
+moduleSignature (Module ss _ mn ds _) = ModuleSignature ss mn (ordNub (mapMaybe usedModules ds))

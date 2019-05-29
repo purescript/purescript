@@ -25,9 +25,11 @@ import qualified Data.List.NonEmpty as NEL
 import           Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.Text as T
 import           Language.PureScript.AST
 import           Language.PureScript.Crash
 import qualified Language.PureScript.CST as CST
+import qualified Language.PureScript.Docs.Convert as Docs
 import           Language.PureScript.Environment
 import           Language.PureScript.Errors
 import           Language.PureScript.Externs
@@ -78,7 +80,21 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
       [renamed] = renameInModules [optimized]
       exts = moduleToExternsFile mod' env'
   ffiCodegen renamed
-  evalSupplyT nextVar' . codegen renamed env' . encode $ exts
+
+  -- It may seem more obvious to write `docs <- Docs.convertModule m env' here,
+  -- but I have not done so for two reasons:
+  -- 1. This should never fail; any genuine errors in the code should have been
+  -- caught earlier in this function. Therefore if we do fail here it indicates
+  -- a bug in the compiler, which should be reported as such.
+  -- 2. We do not want to perform any extra work generating docs unless the
+  -- user has asked for docs to be generated.
+  let docs = case Docs.convertModule externs env' m of
+               Left errs -> internalError $
+                 "Failed to produce docs for " ++ T.unpack (runModuleName moduleName)
+                 ++ "; details:\n" ++ prettyPrintMultipleErrors defaultPPEOptions errs
+               Right d -> d
+
+  evalSupplyT nextVar' . codegen renamed docs . encode $ exts
   return exts
 
 -- | Compiles in "make" mode, compiling each module separately to a @.js@ file and an @externs.json@ file.

@@ -18,7 +18,11 @@ import qualified Data.Text as T
 import Language.PureScript.Docs.RenderedCode
 import Language.PureScript.Docs.Types
 import Language.PureScript.Docs.Utils.MonoidExtras
-import qualified Language.PureScript as P
+
+import qualified Language.PureScript.AST as P
+import qualified Language.PureScript.Environment as P
+import qualified Language.PureScript.Names as P
+import qualified Language.PureScript.Types as P
 
 renderDeclaration :: Declaration -> RenderedCode
 renderDeclaration Declaration{..} =

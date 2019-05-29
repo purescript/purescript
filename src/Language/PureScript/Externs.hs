@@ -12,11 +12,15 @@ module Language.PureScript.Externs
   , ExternsDeclaration(..)
   , moduleToExternsFile
   , applyExternsFileToEnvironment
+  , decodeExterns
   ) where
 
 import Prelude.Compat
 
+import Control.Monad (guard)
+import Data.Aeson (decode)
 import Data.Aeson.TH
+import Data.ByteString.Lazy (ByteString)
 import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.List (foldl', find)
 import Data.Foldable (fold)
@@ -242,3 +246,10 @@ $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsF
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsTypeFixity)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsDeclaration)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsFile)
+
+
+decodeExterns :: ByteString -> Maybe ExternsFile
+decodeExterns bs = do
+  externs <- decode bs
+  guard $ T.unpack (efVersion externs) == showVersion Paths.version
+  return externs

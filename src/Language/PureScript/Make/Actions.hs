@@ -41,7 +41,7 @@ import qualified Language.PureScript.CoreFn.ToJSON as CFJ
 import qualified Language.PureScript.CoreImp.AST as Imp
 import           Language.PureScript.Crash
 import qualified Language.PureScript.CST as CST
-import           Language.PureScript.Environment
+import qualified Language.PureScript.Docs.Types as Docs
 import           Language.PureScript.Errors
 import           Language.PureScript.Make.Monad
 import           Language.PureScript.Names
@@ -94,7 +94,7 @@ data MakeActions m = MakeActions
   , readExterns :: ModuleName -> m (FilePath, Externs)
   -- ^ Read the externs file for a module as a string and also return the actual
   -- path for the file.
-  , codegen :: CF.Module CF.Ann -> Environment -> Externs -> SupplyT m ()
+  , codegen :: CF.Module CF.Ann -> Docs.Module -> Externs -> SupplyT m ()
   -- ^ Run the code generator for the module and write any required output files.
   , ffiCodegen :: CF.Module CF.Ann -> m ()
   -- ^ Check ffi and print it in the output directory.
@@ -134,6 +134,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     JS -> outputFilename mn "index.js"
     JSSourceMap -> outputFilename mn "index.js.map"
     CoreFn -> outputFilename mn "corefn.json"
+    Docs -> outputFilename mn "docs.json"
 
   getOutputTimestamp :: ModuleName -> Make (Maybe UTCTime)
   getOutputTimestamp mn = do
@@ -147,8 +148,8 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     let path = outputDir </> T.unpack (runModuleName mn) </> "externs.json"
     (path, ) <$> readTextFile path
 
-  codegen :: CF.Module CF.Ann -> Environment -> Externs -> SupplyT Make ()
-  codegen m _ exts = do
+  codegen :: CF.Module CF.Ann -> Docs.Module -> Externs -> SupplyT Make ()
+  codegen m docs exts = do
     let mn = CF.moduleName m
     lift $ writeTextFile (outputFilename mn "externs.json") exts
     codegenTargets <- lift $ asks optionsCodegenTargets
@@ -177,6 +178,8 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
       lift $ do
         writeTextFile jsFile (B.fromStrict $ TE.encodeUtf8 $ js <> mapRef)
         when sourceMaps $ genSourceMap dir mapFile (length prefix) mappings
+    when (S.member Docs codegenTargets) $ do
+      lift $ writeTextFile (outputFilename mn "docs.json") (encode docs)
 
   ffiCodegen :: CF.Module CF.Ann -> Make ()
   ffiCodegen m = do

@@ -1,11 +1,13 @@
-{-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase #-}
 
 module TestPscPublish where
 
 import Prelude
 
+import Control.Exception (tryJust)
+import Control.Monad (void, guard)
 import Control.Monad.IO.Class (liftIO)
 import Data.ByteString.Lazy (ByteString)
 import Data.Time.Clock (getCurrentTime)
@@ -13,16 +15,18 @@ import qualified Data.Aeson as A
 import Data.Version
 import Data.Foldable (forM_)
 import qualified Text.PrettyPrint.Boxes as Boxes
-import System.Directory (listDirectory)
+import System.Directory (listDirectory, removeDirectoryRecursive)
 import System.FilePath ((</>))
+import System.IO.Error (isDoesNotExistError)
 
 import Language.PureScript.Docs
-import Language.PureScript.Publish
-import Language.PureScript.Publish.ErrorsWarnings as Publish
+import Language.PureScript.Publish (PublishOptions(..), defaultPublishOptions)
+import qualified Language.PureScript.Publish as Publish
+import qualified Language.PureScript.Publish.ErrorsWarnings as Publish
 
 import Test.Tasty
 import Test.Tasty.Hspec (Spec, Expectation, runIO, context, it, expectationFailure, testSpec)
-import TestUtils
+import TestUtils hiding (inferForeignModules, makeActions)
 
 main :: IO TestTree
 main = testSpec "publish" spec
@@ -77,9 +81,10 @@ roundTrip pkg =
            then Pass before
            else Mismatch before after'
 
-testRunOptions :: PublishOptions
-testRunOptions = defaultPublishOptions
-  { publishGetVersion = return testVersion
+testRunOptions :: FilePath -> PublishOptions
+testRunOptions resolutionsFile = defaultPublishOptions
+  { publishResolutionsFile = resolutionsFile
+  , publishGetVersion = return testVersion
   , publishGetTagTime = const (liftIO getCurrentTime)
   , publishWorkingTreeDirty = return ()
   }
@@ -88,12 +93,12 @@ testRunOptions = defaultPublishOptions
 -- | Given a directory which contains a package, produce JSON from it, and then
 -- | attempt to parse it again, and ensure that it doesn't change.
 testPackage :: FilePath -> FilePath -> Expectation
-testPackage dir resolutionsFile = do
-  res <- pushd dir (preparePackage "bower.json" resolutionsFile testRunOptions)
+testPackage packageDir resolutionsFile = do
+  res <- preparePackage packageDir resolutionsFile
   case res of
     Left err ->
       expectationFailure $
-        "Failed to produce JSON from " ++ dir ++ ":\n" ++
+        "Failed to produce JSON from " ++ packageDir ++ ":\n" ++
         Boxes.render (Publish.renderError err)
     Right package ->
       case roundTrip package of
@@ -103,3 +108,17 @@ testPackage dir resolutionsFile = do
           expectationFailure ("Failed to re-parse: " ++ msg)
         Mismatch _ _ ->
           expectationFailure "JSON did not match"
+
+-- A version of Publish.preparePackage suitable for use in tests. We remove the
+-- output directory each time to ensure that we are actually testing the docs
+-- code in the working tree as it is now (as opposed to how it was at some
+-- point in the past when the tests were previously successfully run).
+preparePackage :: FilePath -> FilePath -> IO (Either Publish.PackageError UploadedPackage)
+preparePackage packageDir resolutionsFile =
+  pushd packageDir $ do
+    removeDirectoryRecursiveIfPresent "output"
+    Publish.preparePackage (testRunOptions resolutionsFile)
+
+removeDirectoryRecursiveIfPresent :: FilePath -> IO ()
+removeDirectoryRecursiveIfPresent =
+  void . tryJust (guard . isDoesNotExistError) . removeDirectoryRecursive
