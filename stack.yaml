@@ -1,4 +1,5 @@
 resolver: lts-13.12
+pvp-bounds: upper
 packages:
 - '.'
 extra-deps:
