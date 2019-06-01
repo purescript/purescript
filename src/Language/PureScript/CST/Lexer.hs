@@ -495,9 +495,9 @@ token = peek >>= maybe (pure TokEof) k0
   escape = do
     ch <- peek
     case ch of
-      Just 't'  -> next $> ("\t", '\t')
-      Just 'r'  -> next $> ("\\r", '\r')
-      Just 'n'  -> next $> ("\\n", '\n')
+      Just 't'  -> next $> ("t", '\t')
+      Just 'r'  -> next $> ("r", '\r')
+      Just 'n'  -> next $> ("n", '\n')
       Just '"'  -> next $> ("\"", '"')
       Just '\'' -> next $> ("'", '\'')
       Just '\\' -> next $> ("\\", '\\')
@@ -508,7 +508,7 @@ token = peek >>= maybe (pure TokEof) k0
           go n acc _
             | n <= 0x10FFFF =
                 ksucc (Text.drop (length acc) inp)
-                  (Text.pack $ reverse acc, Char.chr n)
+                  ("x" <> Text.pack (reverse acc), Char.chr n)
             | otherwise =
                 kerr inp ErrCharEscape -- TODO
         go 0 [] $ Text.unpack $ Text.take 6 inp
