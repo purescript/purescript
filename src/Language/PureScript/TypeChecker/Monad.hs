@@ -57,14 +57,11 @@ data CheckState = CheckState
   -- This goes into state, rather than using 'rethrow',
   -- since this way, we can provide good error messages
   -- during instance resolution.
-  , inferringHoleError :: Maybe SimpleErrorMessage
-  -- ^ The error message to report first if a different type error is detected later
-  -- This is needed for when inferring the type of a hole/unknown name causes some other error.
   }
 
 -- | Create an empty @CheckState@
 emptyCheckState :: Environment -> CheckState
-emptyCheckState env = CheckState env 0 0 0 0 Nothing emptySubstitution [] Nothing
+emptyCheckState env = CheckState env 0 0 0 0 Nothing emptySubstitution []
 
 -- | Unification variables
 type Unknown = Int
@@ -280,12 +277,6 @@ putEnv env = modify (\s -> s { checkEnv = env })
 -- | Modify the @Environment@
 modifyEnv :: (MonadState CheckState m) => (Environment -> Environment) -> m ()
 modifyEnv f = modify (\s -> s { checkEnv = f (checkEnv s) })
-
-getInferringHoleError :: MonadState CheckState m => m (Maybe SimpleErrorMessage)
-getInferringHoleError = inferringHoleError <$> get
-
-setInferringHoleError :: MonadState CheckState m => SimpleErrorMessage -> m ()
-setInferringHoleError err = modify (\s -> s { inferringHoleError = Just err })
 
 -- | Run a computation in the typechecking monad, starting with an empty @Environment@
 runCheck :: (Functor m) => StateT CheckState m a -> m (a, Environment)

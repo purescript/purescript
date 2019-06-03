@@ -261,7 +261,7 @@ convertExpr fileName = go
 
   go = \case
     ExprHole _ a ->
-      positioned (sourceName fileName a) . AST.Hole . getIdent $ nameValue a
+      positioned (sourceName fileName a) . AST.ExprHole . AST.Hole . getIdent $ nameValue a
     ExprSection _ a ->
       positioned (sourceAnnCommented fileName a a) AST.AnonymousArgument
     ExprIdent _ a -> do

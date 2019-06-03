@@ -121,11 +121,15 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           let solved = foldMap (S.fromList . fdDetermined) typeClassDependencies
           let constraintTypeVars = ordNub . foldMap (unknownsInType . fst) . filter ((`notElem` solved) . snd) $ zip (constraintArgs con) [0..]
           when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $ do
-            mbErr <- getInferringHoleError
+            let mbHole = case getExprHoles val' of
+                           (e:_) -> Just $ case e of
+                             Hole t -> HoleNoType t
+                             UnknownValue n -> UnknownName n Nothing
+                           [] -> Nothing
             throwError
               . onErrorMessages (replaceTypes currentSubst)
               . errorMessage' ss
-              $ AmbiguousTypeVariables generalized con mbErr
+              $ AmbiguousTypeVariables generalized con mbHole
 
       -- Check skolem variables did not escape their scope
       skolemEscapeCheck val'
@@ -420,19 +424,17 @@ infer' (TypedValue checkType val ty) = do
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   tv <- if checkType then withScopedTypeVars moduleName args (check val ty') else return (TypedValue' False val ty)
   return $ TypedValue' True (tvToExpr tv) ty'
-infer' (Hole name) = do
+infer' (ExprHole (Hole name)) = do
   ty <- freshType
   ctx <- getLocalContext
   env <- getEnv
-  setInferringHoleError $ HoleInferredType name ty ctx . Just $ TSBefore env
   tell . errorMessage $ HoleInferredType name ty ctx . Just $ TSBefore env
-  return $ TypedValue' True (Hole name) ty
-infer' (UnknownValue name) = do
+  return $ TypedValue' True (ExprHole (Hole name)) ty
+infer' (ExprHole (UnknownValue name)) = do
   ty <- freshType
   ctx <- getLocalContext
-  setInferringHoleError $ UnknownName name Nothing
   tell . errorMessage . UnknownName name $ Just (ty, ctx)
-  return $ TypedValue' True (UnknownValue name) ty
+  return $ TypedValue' True (ExprHole (UnknownValue name)) ty
 infer' (PositionedValue pos c val) = warnAndRethrowWithPositionTC pos $ do
   TypedValue' t v ty <- infer' val
   return $ TypedValue' t (PositionedValue pos c v) ty

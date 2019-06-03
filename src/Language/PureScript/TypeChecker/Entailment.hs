@@ -109,7 +109,7 @@ replaceTypeClassDictionaries shouldGeneralize expr = flip evalStateT M.empty $ d
 
     go :: Bool -> Expr -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
     go deferErrors (TypeClassDictionary constraint context hints) =
-      rethrow (addHints hints) $ entails (SolverOptions shouldGeneralize deferErrors) constraint context hints
+      rethrow (addHints hints) $ entails (SolverOptions shouldGeneralize deferErrors) constraint context hints expr
     go _ other = return other
 
 -- | Three options for how we can handle a constraint, depending on the mode we're in.
@@ -158,8 +158,9 @@ entails
   -- ^ The contexts in which to solve the constraint
   -> [ErrorMessageHint]
   -- ^ Error message hints to apply to any instance errors
+  -> Expr
   -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
-entails SolverOptions{..} constraint context hints =
+entails SolverOptions{..} constraint context hints expr =
     solve constraint
   where
     forClassName :: InstanceContext -> Qualified (ProperName 'ClassName) -> [SourceType] -> [TypeClassDict]
@@ -305,7 +306,11 @@ entails SolverOptions{..} constraint context hints =
               -- to generalize over Partial constraints.
               | solverShouldGeneralize && (null tyArgs || any canBeGeneralized tyArgs) = return (Unsolved (srcConstraint className' tyArgs conInfo))
               | otherwise = do
-                  mbReason <- getInferringHoleError
+                  let mbReason = case getExprHoles expr of
+                                 (e:_) -> Just $ case e of
+                                   Hole t -> HoleNoType t
+                                   UnknownValue n -> UnknownName n Nothing
+                                 [] -> Nothing
                   throwError . errorMessage $ NoInstanceFound (srcConstraint className' tyArgs conInfo) mbReason
             unique _      [(a, dict)] = return $ Solved a dict
             unique tyArgs tcds

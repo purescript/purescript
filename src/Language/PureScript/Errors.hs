@@ -155,6 +155,7 @@ errorCode em = case unwrapErrorMessage em of
   UnusedTypeVar{} -> "UnusedTypeVar"
   WildcardInferredType{} -> "WildcardInferredType"
   HoleInferredType{} -> "HoleInferredType"
+  HoleNoType{} -> "HoleNoType"
   MissingTypeDeclaration{} -> "MissingTypeDeclaration"
   OverlappingPattern{} -> "OverlappingPattern"
   IncompleteExhaustivityCheck{} -> "IncompleteExhaustivityCheck"
@@ -694,7 +695,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , line "was implicitly discarded in a do notation block."
             , line ("You can use " <> markCode "_ <- ..." <> " to explicitly discard the result.")
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm ts _) (Just (HoleInferredType name _ _ _))) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm ts _) (Just (HoleNoType name))) =
       paras [ line "No type class instance was found for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
@@ -726,7 +727,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                     | any containsUnknowns ts
                     ]
             ]
-    renderSimpleErrorMessage (AmbiguousTypeVariables t _ (Just (HoleInferredType name _ _ _))) =
+    renderSimpleErrorMessage (AmbiguousTypeVariables t _ (Just (HoleNoType name))) =
       paras [ line "The inferred type"
             , markCodeBox $ indent $ typeAsBox prettyDepth t
             , line "has type variables which are not mentioned in the body of the type."
@@ -907,6 +908,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras $ [ line "Wildcard type definition has the inferred type "
               , markCodeBox $ indent $ typeAsBox prettyDepth ty
               ] <> renderContext ctx
+    renderSimpleErrorMessage (HoleNoType name) =
+      paras [ line $ "Hole " <> markCode name ]
     renderSimpleErrorMessage (HoleInferredType name ty ctx ts) =
       let
         maxTSResults = 15
