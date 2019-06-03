@@ -4,14 +4,15 @@ synopsis: PureScript Programming Language Compiler
 description: A small strongly, statically typed programming language with expressive
   types, inspired by Haskell and compiling to JavaScript.
 category: Language
-author: >
-  Phil Freeman <paf31@cantab.net>,
+author: Phil Freeman <paf31@cantab.net>
+maintainer: >
   Gary Burgess <gary.burgess@gmail.com>,
   Hardy Jones <jones3.hardy@gmail.com>,
   Harry Garrood <harry@garrood.me>,
-  Christoph Hegemann <christoph.hegemann1337@gmail.com>
-maintainer: Phil Freeman <paf31@cantab.net>
-copyright: (c) 2013-17 Phil Freeman, (c) 2014-17 Gary Burgess
+  Christoph Hegemann <christoph.hegemann1337@gmail.com>,
+  Liam Goodacre <goodacre.liam@gmail.com>,
+  Nathan Faubion <nathan@n-son.com>
+copyright: (c) 2013-17 Phil Freeman, (c) 2014-19 Gary Burgess, (c) other contributors (see CONTRIBUTORS.md)
 license: BSD3
 github: purescript/purescript
 homepage: http://www.purescript.org/
