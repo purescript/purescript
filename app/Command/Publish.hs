@@ -12,6 +12,13 @@ import           Language.PureScript.Publish.ErrorsWarnings
 import           Options.Applicative (Parser)
 import qualified Options.Applicative as Opts
 
+data PublishOptionsCLI = PublishOptionsCLI
+  { cliManifestPath :: FilePath
+  , cliResolutionsPath :: FilePath
+  , cliCompileOutputDir :: FilePath
+  , cliDryRun :: Bool
+  }
+
 manifestPath :: Parser FilePath
 manifestPath = Opts.strOption $
      Opts.long "manifest"
@@ -29,23 +36,45 @@ dryRun = Opts.switch $
      Opts.long "dry-run"
   <> Opts.help "Produce no output, and don't require a tagged version to be checked out."
 
-dryRunOptions :: PublishOptions
-dryRunOptions = defaultPublishOptions
-  { publishGetVersion = return dummyVersion
-  , publishWorkingTreeDirty = warn DirtyWorkingTree_Warn
-  , publishGetTagTime = const (liftIO getCurrentTime)
-  }
-  where dummyVersion = ("0.0.0", Version [0,0,0] [])
+compileOutputDir :: Opts.Parser FilePath
+compileOutputDir = Opts.option Opts.auto $
+     Opts.value "output"
+  <> Opts.showDefault
+  <> Opts.long "compile-output"
+  <> Opts.metavar "DIR"
+  <> Opts.help "Compiler output directory"
+
+cliOptions :: Opts.Parser PublishOptionsCLI
+cliOptions =
+  PublishOptionsCLI <$> manifestPath <*> resolutionsPath <*> compileOutputDir <*> dryRun
+
+mkPublishOptions :: PublishOptionsCLI -> PublishOptions
+mkPublishOptions cliOpts =
+  let
+    opts =
+      defaultPublishOptions
+        { publishManifestFile = cliManifestPath cliOpts
+        , publishResolutionsFile = cliResolutionsPath cliOpts
+        , publishCompileOutputDir = cliCompileOutputDir cliOpts
+        }
+  in
+    if cliDryRun cliOpts
+      then
+        opts
+          { publishGetVersion = return ("0.0.0", Version [0,0,0] [])
+          , publishGetTagTime = const (liftIO getCurrentTime)
+          , publishWorkingTreeDirty = warn DirtyWorkingTree_Warn
+          }
+      else
+        opts
 
 command :: Opts.Parser (IO ())
-command = publish <$> manifestPath <*> resolutionsPath <*> (Opts.helper <*> dryRun)
+command = publish <$> (Opts.helper <*> cliOptions)
 
-publish :: FilePath -> FilePath -> Bool -> IO ()
-publish manifestFile resolutionsFile isDryRun =
-  if isDryRun
-    then do
-      _ <- unsafePreparePackage manifestFile resolutionsFile dryRunOptions
-      putStrLn "Dry run completed, no errors."
-    else do
-      pkg <- unsafePreparePackage manifestFile resolutionsFile defaultPublishOptions
-      BL.putStrLn (A.encode pkg)
+publish :: PublishOptionsCLI -> IO ()
+publish cliOpts = do
+  let opts = mkPublishOptions cliOpts
+  pkg <- unsafePreparePackage opts
+  if cliDryRun cliOpts
+    then putStrLn "Dry run completed, no errors."
+    else BL.putStrLn (A.encode pkg)

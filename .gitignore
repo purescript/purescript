@@ -2,6 +2,8 @@ dist
 cabal-dev
 .cabal-sandbox
 cabal.sandbox.config
+dist-newstyle/
+cabal.project.local*
 *.o
 *.hi
 *.chi

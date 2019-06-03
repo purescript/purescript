@@ -17,8 +17,10 @@ module Language.PureScript.Docs.AsHtml (
 import Prelude
 import Control.Category ((>>>))
 import Control.Monad (unless)
+import Data.Bifunctor (first)
 import Data.Char (isUpper)
 import Data.Either (isRight)
+import qualified Data.List.NonEmpty as NE
 import Data.Maybe (fromMaybe)
 import Data.Foldable (for_)
 import Data.String (fromString)
@@ -29,13 +31,13 @@ import qualified Data.Text as T
 import Text.Blaze.Html5 as H hiding (map)
 import qualified Text.Blaze.Html5.Attributes as A
 import qualified Cheapskate
-import Text.Parsec (eof)
 
 import qualified Language.PureScript as P
 
 import Language.PureScript.Docs.Types
 import Language.PureScript.Docs.RenderedCode hiding (sp)
 import qualified Language.PureScript.Docs.Render as Render
+import qualified Language.PureScript.CST as CST
 
 declNamespace :: Declaration -> Namespace
 declNamespace = declInfoNamespace . declInfo
@@ -219,12 +221,13 @@ codeAsHtml r = outputWith elemAsHtml
       then False
       else isUpper (T.index str 0)
 
-  isOp = isRight . runParser P.symbol
+  isOp = isRight . runParser CST.parseOperator
 
-  runParser :: P.TokenParser a -> Text -> Either String a
-  runParser p' s = either (Left . show) Right $ do
-    ts <- P.lex "" s
-    P.runTokenParser "" (p' <* eof) ts
+  runParser :: CST.Parser a -> Text -> Either String a
+  runParser p' =
+    first (CST.prettyPrintError . NE.head)
+      . CST.runTokenParser p'
+      . CST.lex
 
 renderLink :: HtmlRenderContext -> DocLink -> Html -> Html
 renderLink r link_@DocLink{..} =

@@ -318,6 +318,9 @@ exportType ss exportMode exps name dctors src = do
           throwDeclConflict (DctorName dctor) (TyClassName (coerceProperName dctor))
     ReExport -> do
       let mn = exportSourceDefinedIn src
+      forM_ (coerceProperName name `M.lookup` exClasses) $ \src' ->
+        let mn' = exportSourceDefinedIn src' in
+        throwExportConflict' ss mn mn' (TyName name) (TyClassName (coerceProperName name))
       forM_ (name `M.lookup` exTypes) $ \(_, src') ->
         let mn' = exportSourceDefinedIn src' in
         when (mn /= mn') $
@@ -458,8 +461,23 @@ throwExportConflict
   -> Name
   -> m a
 throwExportConflict ss new existing name =
+  throwExportConflict' ss new existing name name
+
+-- |
+-- Raises an error for when there are conflicting names in the exports. Allows
+-- different categories of names. E.g. class and type names conflicting.
+--
+throwExportConflict'
+  :: MonadError MultipleErrors m
+  => SourceSpan
+  -> ModuleName
+  -> ModuleName
+  -> Name
+  -> Name
+  -> m a
+throwExportConflict' ss new existing newName existingName =
   throwError . errorMessage' ss $
-    ExportConflict (Qualified (Just new) name) (Qualified (Just existing) name)
+    ExportConflict (Qualified (Just new) newName) (Qualified (Just existing) existingName)
 
 -- |
 -- Gets the exports for a module, or raise an error if the module doesn't exist.

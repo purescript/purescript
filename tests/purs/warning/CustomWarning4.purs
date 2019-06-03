@@ -6,7 +6,7 @@ module Main where
 
 import Prim.TypeError (class Warn, Beside, QuoteLabel, Text)
 import Prim
-import Type.Row (class RowToList, Cons, Nil)
+import Type.RowList (class RowToList, Cons, Nil)
 
 data Label (l :: Symbol) = Label
 

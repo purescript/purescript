@@ -57,6 +57,15 @@ data PublishOptions = PublishOptions
   , publishGetTagTime :: Text -> PrepareM UTCTime
   , -- | What to do when the working tree is dirty
     publishWorkingTreeDirty :: PrepareM ()
+  , -- | Compiler output directory (which must include up-to-date docs.json
+    -- files for any modules we are producing docs for).
+    publishCompileOutputDir :: FilePath
+  , -- | Path to the manifest file; a JSON file including information about the
+    -- package, such as name, author, dependency version bounds.
+    publishManifestFile :: FilePath
+  , -- | Path to the resolutions file; a JSON file containing all of the
+    -- package's dependencies, their versions, and their paths on the disk.
+    publishResolutionsFile :: FilePath
   }
 
 defaultPublishOptions :: PublishOptions
@@ -64,20 +73,23 @@ defaultPublishOptions = PublishOptions
   { publishGetVersion = getVersionFromGitTag
   , publishGetTagTime = getTagTime
   , publishWorkingTreeDirty = userError DirtyWorkingTree
+  , publishCompileOutputDir = "output"
+  , publishManifestFile = "bower.json"
+  , publishResolutionsFile = "resolutions.json"
   }
 
 -- | Attempt to retrieve package metadata from the current directory.
 -- Calls exitFailure if no package metadata could be retrieved.
-unsafePreparePackage :: FilePath -> FilePath -> PublishOptions -> IO D.UploadedPackage
-unsafePreparePackage manifestFile resolutionsFile opts =
+unsafePreparePackage :: PublishOptions -> IO D.UploadedPackage
+unsafePreparePackage opts =
   either (\e -> printError e >> exitFailure) pure
-    =<< preparePackage manifestFile resolutionsFile opts
+    =<< preparePackage opts
 
 -- | Attempt to retrieve package metadata from the current directory.
 -- Returns a PackageError on failure
-preparePackage :: FilePath -> FilePath -> PublishOptions -> IO (Either PackageError D.UploadedPackage)
-preparePackage manifestFile resolutionsFile opts =
-  runPrepareM (preparePackage' manifestFile resolutionsFile opts)
+preparePackage :: PublishOptions -> IO (Either PackageError D.UploadedPackage)
+preparePackage opts =
+  runPrepareM (preparePackage' opts)
     >>= either (pure . Left) (fmap Right . handleWarnings)
 
   where
@@ -117,12 +129,12 @@ otherError = throwError . OtherError
 catchLeft :: Applicative f => Either a b -> (a -> f b) -> f b
 catchLeft a f = either f pure a
 
-preparePackage' :: FilePath -> FilePath -> PublishOptions -> PrepareM D.UploadedPackage
-preparePackage' manifestFile resolutionsFile opts = do
-  unlessM (liftIO (doesFileExist manifestFile)) (userError PackageManifestNotFound)
+preparePackage' :: PublishOptions -> PrepareM D.UploadedPackage
+preparePackage' opts = do
+  unlessM (liftIO (doesFileExist (publishManifestFile opts))) (userError PackageManifestNotFound)
   checkCleanWorkingTree opts
 
-  pkgMeta <- liftIO (Bower.decodeFile manifestFile)
+  pkgMeta <- liftIO (Bower.decodeFile (publishManifestFile opts))
                >>= flip catchLeft (userError . CouldntDecodePackageManifest)
   checkLicense pkgMeta
 
@@ -130,9 +142,9 @@ preparePackage' manifestFile resolutionsFile opts = do
   pkgTagTime <- Just <$> publishGetTagTime opts pkgVersionTag
   pkgGithub <- getManifestRepositoryInfo pkgMeta
 
-  resolvedDeps <- parseResolutionsFile resolutionsFile
+  resolvedDeps <- parseResolutionsFile (publishResolutionsFile opts)
 
-  (pkgModules, pkgModuleMap)  <- getModules (map (second fst) resolvedDeps)
+  (pkgModules, pkgModuleMap)  <- getModules opts (map (second fst) resolvedDeps)
 
   let declaredDeps = map fst $
                        Bower.bowerDependencies pkgMeta
@@ -146,24 +158,17 @@ preparePackage' manifestFile resolutionsFile opts = do
   return D.Package{..}
 
 getModules
-  :: [(PackageName, FilePath)]
+  :: PublishOptions
+  -> [(PackageName, FilePath)]
   -> PrepareM ([D.Module], Map P.ModuleName PackageName)
-getModules paths = do
+getModules opts paths = do
   (inputFiles, depsFiles) <- liftIO (getInputAndDepsFiles paths)
-  (modules', moduleMap) <- parseFilesInPackages inputFiles depsFiles
 
-  case runExcept (D.convertModulesInPackage (map snd modules') moduleMap) of
-    Right modules -> return (modules, moduleMap)
-    Left err -> userError (CompileError err)
+  (modules, moduleMap) <-
+    (liftIO (runExceptT (D.collectDocs (publishCompileOutputDir opts) inputFiles depsFiles)))
+    >>= either (userError . CompileError) return
 
-  where
-  parseFilesInPackages inputFiles depsFiles = do
-    r <- liftIO . runExceptT $ D.parseFilesInPackages inputFiles depsFiles
-    case r of
-      Right r' ->
-        return r'
-      Left err ->
-        userError (CompileError err)
+  pure (map snd modules, moduleMap)
 
 data TreeStatus = Clean | Dirty deriving (Show, Eq, Ord, Enum)
 

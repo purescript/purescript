@@ -11,7 +11,12 @@ import Data.Functor (($>))
 import qualified Data.Text as T
 
 import Language.PureScript.Docs.Types
-import qualified Language.PureScript as P
+
+import qualified Language.PureScript.AST as P
+import qualified Language.PureScript.Comments as P
+import qualified Language.PureScript.Crash as P
+import qualified Language.PureScript.Names as P
+import qualified Language.PureScript.Types as P
 
 -- |
 -- Convert a single Module, but ignore re-exports; any re-exported types or
