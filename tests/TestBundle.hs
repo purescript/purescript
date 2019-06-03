@@ -74,7 +74,7 @@ assertBundles supportModules supportExterns supportForeigns inputFiles outputFil
             js <- liftIO $ readUTF8File filename
             mid <- guessModuleIdentifier filename
             length js `seq` return (mid, Just filename, js) 
-          bundleSM input entryModule (Just $ "Main") "PS" (Just entryPoint)
+          bundleSM input entryModule (Just $ "Main") "PS" (Just entryPoint) Nothing
         case bundled of
             Right (_, js) -> do
               writeUTF8File entryPoint js
