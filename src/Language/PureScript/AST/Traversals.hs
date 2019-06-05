@@ -692,38 +692,7 @@ overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
 getExprHoles :: Expr -> [ExprHole]
 getExprHoles expr = f expr
   where
-  (_, f, _, _ , _) = everythingOnValues (++) goDecl goExpr goBinder goCase goDo
+  (_, f, _, _ , _) = everythingOnValues (++) (const []) goExpr (const []) (const []) (const [])
 
-  goDecl (DataBindingGroupDeclaration ds) = foldMap goDecl ds
-  goDecl (BoundValueDeclaration _ _ e) = goExpr e
-  goDecl (BindingGroupDeclaration as) = foldMap (\(_, _, e) -> goExpr e) as
-  goDecl (TypeClassDeclaration _ _ _ _ _ ds) = foldMap goDecl ds
-  goDecl _ = []
-
-  goExpr (Literal _ (ArrayLiteral es)) = foldMap goExpr es
-  goExpr (Literal _ (ObjectLiteral es)) = foldMap (goExpr . snd) es
-  goExpr (UnaryMinus _ e) = goExpr e
-  goExpr (BinaryNoParens e1 e2 e3) = foldMap goExpr [e1,e2,e3]
-  goExpr (Parens e) = goExpr e
-  goExpr (Accessor _ e) = goExpr e
-  goExpr (ObjectUpdate e es) = foldMap goExpr $ [e] ++ map snd es
-  goExpr (ObjectUpdateNested e pe) = goExpr e ++ foldMap goExpr pe
-  goExpr (Abs _ e) = goExpr e
-  goExpr (App e1 e2) = foldMap goExpr [e1,e2]
-  goExpr (IfThenElse e1 e2 e3) = foldMap goExpr [e1,e2,e3]
-  goExpr (Case es cas) = foldMap goExpr es ++ foldMap goCase cas
-  goExpr (TypedValue _ e _) = goExpr e
-  goExpr (Let _ ds e) = foldMap goDecl ds ++ goExpr e
-  goExpr (TypeClassDictionaryConstructorApp _ e) = goExpr e
-  goExpr (PositionedValue _ _ e) = goExpr e
   goExpr (ExprHole a) = [a]
   goExpr _ = []
-
-  goBinder _ = []
-
-  goCase (CaseAlternative _ res) = foldMap (\(GuardedExpr _ e) -> goExpr e) res
-
-  goDo (DoNotationValue e) = goExpr e
-  goDo (DoNotationBind _ e) = goExpr e
-  goDo (DoNotationLet ds) = foldMap goDecl ds
-  goDo (PositionedDoNotationElement _ _ d) = goDo d

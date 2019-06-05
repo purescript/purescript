@@ -37,7 +37,7 @@ import Control.Monad.Writer.Class (MonadWriter(..))
 import Data.Bifunctor (bimap)
 import Data.Either (partitionEithers)
 import Data.Functor (($>))
-import Data.List (transpose, (\\), partition, delete)
+import Data.List (transpose, (\\), partition, delete, nub)
 import Data.Maybe (fromMaybe)
 import Data.Traversable (for)
 import qualified Data.List.NonEmpty as NEL
@@ -62,6 +62,8 @@ import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.Types
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString)
+
+import Debug.Trace (trace)
 
 data BindingGroupType
   = RecursiveBindingGroup
@@ -121,15 +123,19 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           let solved = foldMap (S.fromList . fdDetermined) typeClassDependencies
           let constraintTypeVars = ordNub . foldMap (unknownsInType . fst) . filter ((`notElem` solved) . snd) $ zip (constraintArgs con) [0..]
           when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $ do
-            let mbHole = case getExprHoles val' of
-                           (e:_) -> Just $ case e of
-                             Hole t -> HoleNoType t
-                             UnknownValue n -> UnknownName n Nothing
-                           [] -> Nothing
+            -- transform all UnknownValues into UnknownName errors
+            let holeError hole = case hole of
+                  Hole t -> errorMessage $ HoleNoType t
+                  UnknownValue n -> errorMessage $ UnknownName n Nothing
+                isUnknown hole = case hole of
+                  Hole _ -> False
+                  UnknownValue _ -> True
+                errors = runMultipleErrors . foldMap holeError . filter isUnknown $ getExprHoles val'
+            unless (null errors) $ throwError $ MultipleErrors errors
             throwError
               . onErrorMessages (replaceTypes currentSubst)
               . errorMessage' ss
-              $ AmbiguousTypeVariables generalized con mbHole
+              $ AmbiguousTypeVariables generalized con Nothing
 
       -- Check skolem variables did not escape their scope
       skolemEscapeCheck val'

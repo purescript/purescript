@@ -306,12 +306,15 @@ entails SolverOptions{..} constraint context hints expr =
               -- to generalize over Partial constraints.
               | solverShouldGeneralize && (null tyArgs || any canBeGeneralized tyArgs) = return (Unsolved (srcConstraint className' tyArgs conInfo))
               | otherwise = do
-                  let mbReason = case getExprHoles expr of
-                                 (e:_) -> Just $ case e of
-                                   Hole t -> HoleNoType t
-                                   UnknownValue n -> UnknownName n Nothing
-                                 [] -> Nothing
-                  throwError . errorMessage $ NoInstanceFound (srcConstraint className' tyArgs conInfo) mbReason
+                  let holeError hole = case hole of
+                       Hole t -> errorMessage $ HoleNoType t
+                       UnknownValue n -> errorMessage $ UnknownName n Nothing
+                      isUnknown hole = case hole of
+                        Hole _ -> False
+                        UnknownValue _ -> True
+                      errors = runMultipleErrors . foldMap holeError . filter isUnknown $ getExprHoles expr
+                  unless (null errors) $ throwError $ MultipleErrors errors
+                  throwError . errorMessage $ NoInstanceFound (srcConstraint className' tyArgs conInfo) Nothing
             unique _      [(a, dict)] = return $ Solved a dict
             unique tyArgs tcds
               | pairwiseAny overlapping (map snd tcds) =
