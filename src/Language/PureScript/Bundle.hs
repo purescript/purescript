@@ -36,9 +36,11 @@ import Data.Version (showVersion)
 import qualified Data.Aeson as A
 import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.Text.Lazy as T
 
 import Language.JavaScript.Parser
 import Language.JavaScript.Parser.AST
+import Language.JavaScript.Process.Minify
 
 import qualified Paths_purescript as Paths
 
@@ -141,10 +143,14 @@ instance A.ToJSON ModuleElement where
       A.object [ "type"    .= A.String "ExportsList"
                , "exports" .= map exportToJSON exports
                ]
-    (Other _) ->
-      A.object [ "type" .= A.String "Other" ]
-    (Skip _) ->
-      A.object [ "type" .= A.String "Skip" ]
+    (Other stmt) ->
+      A.object [ "type" .= A.String "Other"
+               , "js"   .= getFragment stmt
+               ]
+    (Skip stmt) ->
+      A.object [ "type" .= A.String "Skip"
+               , "js"   .= getFragment stmt
+               ]
 
     where
 
@@ -164,6 +170,11 @@ instance A.ToJSON ModuleElement where
                , "name"      .= name
                , "dependsOn" .= map keyToJSON dependsOn
                ]
+
+    getFragment = ellipsize . renderToText . minifyJS . flip JSAstStatement JSNoAnnot
+      where
+      ellipsize text = if T.compareLength text 20 == GT then T.take 19 text `T.snoc` ellipsis else text
+      ellipsis = '\x2026'
 
 -- | A module is just a list of elements of the types listed above.
 data Module = Module ModuleIdentifier (Maybe FilePath) [ModuleElement] deriving (Show)
