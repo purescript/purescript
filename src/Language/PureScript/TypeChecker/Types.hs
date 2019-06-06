@@ -37,7 +37,7 @@ import Control.Monad.Writer.Class (MonadWriter(..))
 import Data.Bifunctor (bimap)
 import Data.Either (partitionEithers)
 import Data.Functor (($>))
-import Data.List (transpose, (\\), partition, delete, nub)
+import Data.List (transpose, (\\), partition, delete)
 import Data.Maybe (fromMaybe)
 import Data.Traversable (for)
 import qualified Data.List.NonEmpty as NEL
@@ -62,8 +62,6 @@ import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.Types
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString)
-
-import Debug.Trace (trace)
 
 data BindingGroupType
   = RecursiveBindingGroup
@@ -125,17 +123,20 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $ do
             -- transform all UnknownValues into UnknownName errors
             let holeError hole = case hole of
-                  Hole t -> errorMessage $ HoleNoType t
+                  Hole t -> errorMessage $ HoleInferredType t Nothing
                   UnknownValue n -> errorMessage $ UnknownName n Nothing
                 isUnknown hole = case hole of
                   Hole _ -> False
                   UnknownValue _ -> True
                 errors = runMultipleErrors . foldMap holeError . filter isUnknown $ getExprHoles val'
+                holes = map unwrapErrorMessage . foldMap (runMultipleErrors . holeError) . filter (not . isUnknown) $ getExprHoles val'
             unless (null errors) $ throwError $ MultipleErrors errors
             throwError
               . onErrorMessages (replaceTypes currentSubst)
               . errorMessage' ss
-              $ AmbiguousTypeVariables generalized con Nothing
+              $ case holes of
+                  [] -> AmbiguousTypeVariables generalized con Nothing
+                  h:hs -> AmbiguousTypeVariables generalized con (Just h)
 
       -- Check skolem variables did not escape their scope
       skolemEscapeCheck val'
@@ -169,12 +170,12 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
       -> ErrorMessage
       -> ErrorMessage
     runTypeSearch cons st = \case
-      ErrorMessage hints (HoleInferredType x ty y (Just (TSBefore env))) ->
+      ErrorMessage hints (HoleInferredType x (Just (ty, y, (Just (TSBefore env))))) ->
         let subst = checkSubstitution st
             searchResult = onTypeSearchTypes
               (substituteType subst)
               (uncurry TSAfter (typeSearch cons env st (substituteType subst ty)))
-        in ErrorMessage hints (HoleInferredType x ty y (Just searchResult))
+        in ErrorMessage hints (HoleInferredType x (Just (ty, y, (Just searchResult))))
       other -> other
 
     -- | Generalize type vars using forall and add inferred constraints
@@ -434,7 +435,7 @@ infer' (ExprHole (Hole name)) = do
   ty <- freshType
   ctx <- getLocalContext
   env <- getEnv
-  tell . errorMessage $ HoleInferredType name ty ctx . Just $ TSBefore env
+  tell . errorMessage $ HoleInferredType name (Just (ty, ctx, Just (TSBefore env)))
   return $ TypedValue' True (ExprHole (Hole name)) ty
 infer' (ExprHole (UnknownValue name)) = do
   ty <- freshType

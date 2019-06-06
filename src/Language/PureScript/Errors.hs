@@ -155,7 +155,6 @@ errorCode em = case unwrapErrorMessage em of
   UnusedTypeVar{} -> "UnusedTypeVar"
   WildcardInferredType{} -> "WildcardInferredType"
   HoleInferredType{} -> "HoleInferredType"
-  HoleNoType{} -> "HoleNoType"
   MissingTypeDeclaration{} -> "MissingTypeDeclaration"
   OverlappingPattern{} -> "OverlappingPattern"
   IncompleteExhaustivityCheck{} -> "IncompleteExhaustivityCheck"
@@ -303,7 +302,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
   gSimple (OrphanInstance nm cl noms ts) = OrphanInstance nm cl noms <$> traverse f ts
   gSimple (WildcardInferredType ty ctx) = WildcardInferredType <$> f ty <*> traverse (sndM f) ctx
-  gSimple (HoleInferredType name ty ctx env) = HoleInferredType name <$> f ty <*> traverse (sndM f) ctx  <*> traverse (onTypeSearchTypesM f) env
+  gSimple (HoleInferredType name (Just (ty, ctx, env))) = fmap (HoleInferredType name . Just) $ (,,) <$> f ty <*> traverse (sndM f) ctx <*> traverse (onTypeSearchTypesM f) env
   gSimple (MissingTypeDeclaration nm ty) = MissingTypeDeclaration nm <$> f ty
   gSimple (CannotGeneralizeRecursiveFunction nm ty) = CannotGeneralizeRecursiveFunction nm <$> f ty
   gSimple other = pure other
@@ -700,7 +699,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , line "was implicitly discarded in a do notation block."
             , line ("You can use " <> markCode "_ <- ..." <> " to explicitly discard the result.")
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm ts _) (Just (HoleNoType name))) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm ts _) (Just (HoleInferredType name _))) =
       paras [ line "No type class instance was found for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
@@ -732,7 +731,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                     | any containsUnknowns ts
                     ]
             ]
-    renderSimpleErrorMessage (AmbiguousTypeVariables t _ (Just (HoleNoType name))) =
+    renderSimpleErrorMessage (AmbiguousTypeVariables t _ (Just (HoleInferredType name _))) =
       paras [ line "The inferred type"
             , markCodeBox $ indent $ typeAsBox prettyDepth t
             , line "has type variables which are not mentioned in the body of the type."
@@ -913,9 +912,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras $ [ line "Wildcard type definition has the inferred type "
               , markCodeBox $ indent $ typeAsBox prettyDepth ty
               ] <> renderContext ctx
-    renderSimpleErrorMessage (HoleNoType name) =
-      paras [ line $ "Hole " <> markCode name ]
-    renderSimpleErrorMessage (HoleInferredType name ty ctx ts) =
+    renderSimpleErrorMessage (HoleInferredType name Nothing) =
+      paras [ line $ "Cannot infer type for hole " <> markCode name ]
+    renderSimpleErrorMessage (HoleInferredType name (Just (ty, ctx, ts))) =
       let
         maxTSResults = 15
         tsResult = case ts of

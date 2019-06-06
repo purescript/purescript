@@ -145,8 +145,7 @@ data SimpleErrorMessage
   | ShadowedTypeVar Text
   | UnusedTypeVar Text
   | WildcardInferredType SourceType Context
-  | HoleInferredType Text SourceType Context (Maybe TypeSearch)
-  | HoleNoType Text
+  | HoleInferredType Text (Maybe (SourceType, Context, Maybe TypeSearch))
   | MissingTypeDeclaration Ident SourceType
   | OverlappingPattern [[Binder]] Bool
   | IncompleteExhaustivityCheck
