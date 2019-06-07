@@ -1561,3 +1561,29 @@ parU xs f =
     collectErrors es = case partitionEithers es of
       ([], rs) -> return rs
       (errs, _) -> throwError $ fold errs
+
+-- Throw all UnknownValue errors in an Expr
+-- Useful for ensuring that UnknownValue errors are thrown
+-- before errors which may be caused by them are thrown.
+throwExprHoles
+  :: (MonadError MultipleErrors m)
+  => Expr
+  -> m ()
+throwExprHoles expr = unless (null errors) $ throwError $ MultipleErrors errors
+  where
+  (_, f, _, _ , _) = everythingOnValues (++) (const []) goExpr (const []) (const []) (const [])
+
+  goExpr (ExprHole a) = [a]
+  goExpr _ = []
+
+  holes = f expr
+
+  holeError hole = case hole of
+    Hole t -> errorMessage $ HoleInferredType t Nothing
+    UnknownValue n -> errorMessage $ UnknownName n Nothing
+
+  isUnknown hole = case hole of
+    Hole _ -> False
+    UnknownValue _ -> True
+
+  errors = runMultipleErrors . foldMap holeError . filter isUnknown $ holes

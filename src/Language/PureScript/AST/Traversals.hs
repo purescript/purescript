@@ -688,11 +688,3 @@ overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
   g (TypedValue checkTy val t) = TypedValue checkTy val (f t)
   g (TypeClassDictionary c sco hints) = TypeClassDictionary (mapConstraintArgs (fmap f) c) sco hints
   g other = other
-
-getExprHoles :: Expr -> [ExprHole]
-getExprHoles expr = f expr
-  where
-  (_, f, _, _ , _) = everythingOnValues (++) (const []) goExpr (const []) (const []) (const [])
-
-  goExpr (ExprHole a) = [a]
-  goExpr _ = []

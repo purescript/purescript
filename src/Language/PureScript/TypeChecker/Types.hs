@@ -121,22 +121,11 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           let solved = foldMap (S.fromList . fdDetermined) typeClassDependencies
           let constraintTypeVars = ordNub . foldMap (unknownsInType . fst) . filter ((`notElem` solved) . snd) $ zip (constraintArgs con) [0..]
           when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $ do
-            -- transform all UnknownValues into UnknownName errors
-            let holeError hole = case hole of
-                  Hole t -> errorMessage $ HoleInferredType t Nothing
-                  UnknownValue n -> errorMessage $ UnknownName n Nothing
-                isUnknown hole = case hole of
-                  Hole _ -> False
-                  UnknownValue _ -> True
-                errors = runMultipleErrors . foldMap holeError . filter isUnknown $ getExprHoles val'
-                holes = map unwrapErrorMessage . foldMap (runMultipleErrors . holeError) . filter (not . isUnknown) $ getExprHoles val'
-            unless (null errors) $ throwError $ MultipleErrors errors
+            throwExprHoles val'
             throwError
               . onErrorMessages (replaceTypes currentSubst)
               . errorMessage' ss
-              $ case holes of
-                  [] -> AmbiguousTypeVariables generalized con Nothing
-                  h:hs -> AmbiguousTypeVariables generalized con (Just h)
+              $ AmbiguousTypeVariables generalized con Nothing
 
       -- Check skolem variables did not escape their scope
       skolemEscapeCheck val'
