@@ -111,9 +111,22 @@ foreign1ToForeign1 = coerce
 
 foreign import data Foreign2 :: Type -> Type -> Type
 
-role Foreign2 phantom representational
+type role Foreign2 phantom representational
 
 foreign2ToForeign2 :: Foreign2 NTString2 (Phantom2 Int) -> Foreign2 Int (Phantom2 Boolean)
 foreign2ToForeign2 = coerce
+
+data MyMap k v = MyMap k v
+
+type role MyMap nominal representational
+
+mapToMap :: MyMap String String -> MyMap String NTString1
+mapToMap = coerce
+
+-- "role" should only be a reserved word after "type"
+testRoleNotReserved :: String -> String
+testRoleNotReserved role = role
+
+data RoleNotReserved role = RoleNotReserved role
 
 main = log (coerce (NTString1 "Done") :: String)

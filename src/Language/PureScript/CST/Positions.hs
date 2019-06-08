@@ -183,6 +183,7 @@ declRange = \case
   DeclFixity _ (FixityFields a _ (FixityValue _ _ b)) -> (fst a, nameTok b)
   DeclFixity _ (FixityFields a _ (FixityType _ _ _ b)) -> (fst a, nameTok b)
   DeclForeign _ a _ b -> (a, snd $ foreignRange b)
+  DeclRole _ a _ _ b -> (a, roleTok $ NE.last b)
 
 dataHeadRange :: DataHead a -> TokenRange
 dataHeadRange (DataHead kw name vars)

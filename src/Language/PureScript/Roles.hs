@@ -18,13 +18,16 @@ import GHC.Generics (Generic)
 -- |
 -- The role of a type constructor's parameter.
 data Role
-  = Representational
+  = Nominal
+  -- ^ This parameter's identity affects the representation of the type it is
+  -- parameterising.
+  | Representational
   -- ^ This parameter's representation affects the representation of the type it
   -- is parameterising.
   | Phantom
   -- ^ This parameter has no effect on the representation of the type it is
   -- parameterising.
-  deriving (Show, Eq, Generic)
+  deriving (Show, Eq, Ord, Generic)
 
 instance NFData Role
 

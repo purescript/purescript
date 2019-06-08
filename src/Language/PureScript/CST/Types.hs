@@ -14,6 +14,7 @@ import Data.Text (Text)
 import Data.Void (Void)
 import GHC.Generics (Generic)
 import qualified Language.PureScript.Names as N
+import qualified Language.PureScript.Roles as R
 import Language.PureScript.PSString (PSString)
 
 data SourcePos = SourcePos
@@ -208,6 +209,7 @@ data Declaration a
   | DeclValue a (ValueBindingFields a)
   | DeclFixity a FixityFields
   | DeclForeign a SourceToken SourceToken (Foreign a)
+  | DeclRole a SourceToken SourceToken (Name (N.ProperName 'N.TypeName)) (NonEmpty Role)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data Instance a = Instance
@@ -316,6 +318,11 @@ data Foreign a
   | ForeignData SourceToken (Labeled (Name (N.ProperName 'N.TypeName)) (Kind a))
   | ForeignKind SourceToken (Name (N.ProperName 'N.KindName))
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
+
+data Role = Role
+  { roleTok :: SourceToken
+  , roleValue :: R.Role
+  } deriving (Show, Eq, Ord, Generic)
 
 data Expr a
   = ExprHole a (Name Ident)

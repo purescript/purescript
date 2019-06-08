@@ -61,7 +61,7 @@ inferRoles env tyName
           []
       | otherwise =
         [(v, Representational)]
-    walk btvs (ForAll _ tv t _) =
+    walk btvs (ForAll _ tv _ t _) =
       -- We can walk under universal quantifiers as long as we make note of the
       -- variables that they bind. For instance, given a definition
       -- `data T z = T (forall z. z -> z)`, we will make note that `z` is bound

@@ -410,11 +410,22 @@ entails SolverOptions{..} constraint context hints =
             -- appropriately (e.g. here `a` is representational and `b` is
             -- phantom, yielding `Coercible a a'`).
             let k (_v, role) ax bx = case role of
+                  Nominal
+                    -- If we had first-class equality constraints, we'd just
+                    -- emit of the form `(a ~ b)` here and let the solver
+                    -- recurse. Since we don't we must compare the types at
+                    -- this point and fail if they don't match. This likely
+                    -- means there are cases we should be able to handle that
+                    -- we currently can't, but is at least sound.
+                    | ax == bx ->
+                        Just []
+                    | otherwise ->
+                        Nothing
                   Representational ->
-                    [Constraint nullSourceAnn C.Coercible [ax, bx] Nothing]
+                    Just [Constraint nullSourceAnn C.Coercible [ax, bx] Nothing]
                   Phantom ->
-                    []
-            pure $ concat $ zipWith3 k tyRoles axs bxs
+                    Just []
+            fmap concat $ sequence $ zipWith3 k tyRoles axs bxs
         | Just (TypeConstructor _ tyName, xs) <- splitTypeApp t
         , Just (tvs, wrappedTy, _) <- lookupNewtypeConstructor env tyName -> do
             -- If the first argument is a newtype applied to some other types
