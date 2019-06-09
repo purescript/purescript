@@ -72,7 +72,7 @@ inferRoles env tyName
       -- A type variable standing alone (e.g. @a@ in @data D a b = D a@) is
       -- representational, _unless_ it has been bound by a quantifier, in which
       -- case it is not actually a parameter to the type (e.g. @z@ in
-      -- @data T z -- = T (forall z. z -> z)@).
+      -- @data T z = T (forall z. z -> z)@).
       | S.member v btvs =
           mempty
       | otherwise =
