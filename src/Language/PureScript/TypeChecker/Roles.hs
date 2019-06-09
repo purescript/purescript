@@ -24,10 +24,10 @@ import Language.PureScript.Types
 
 -- |
 -- A map of a type's formal parameter names to their roles. This type's
--- `Semigroup` and `Monoid` instances preserve the least-permissive role
--- ascribed to any given variable, as defined by the `Role` type's `Ord`
+-- @Semigroup@ and @Monoid@ instances preserve the least-permissive role
+-- ascribed to any given variable, as defined by the @Role@ type's @Ord@
 -- instance. That is, a variable that has been marked as `Nominal` can not
--- later be marked `Representation`, and so on.
+-- later be marked @Representational@, and so on.
 newtype RoleMap = RoleMap { getRoleMap :: M.Map Text Role }
 
 instance Semigroup RoleMap where
@@ -73,10 +73,10 @@ inferRoles env tyName
     -- inference" section of the paper "Safe Zero-cost Coercions for Haskell".
     walk :: S.Set Text -> SourceType -> RoleMap
     walk btvs (TypeVar _ v)
-      -- A type variable standing alone (e.g. `a` in `data D a b = D a`) is
+      -- A type variable standing alone (e.g. @a@ in @data D a b = D a@) is
       -- representational, _unless_ it has been bound by a quantifier, in which
-      -- case it is not actually a parameter to the type (e.g. `z` in
-      -- `data T z -- = T (forall z. z -> z)`).
+      -- case it is not actually a parameter to the type (e.g. @z@ in
+      -- @data T z -- = T (forall z. z -> z)@).
       | S.member v btvs =
           mempty
       | otherwise =
@@ -84,11 +84,11 @@ inferRoles env tyName
     walk btvs (ForAll _ tv _ t _) =
       -- We can walk under universal quantifiers as long as we make note of the
       -- variables that they bind. For instance, given a definition
-      -- `data T z = T (forall z. z -> z)`, we will make note that `z` is bound
-      -- by a quantifier so that we do not mark `T`'s parameter as
+      -- @data T z = T (forall z. z -> z)@, we will make note that @z@ is bound
+      -- by a quantifier so that we do not mark @T@'s parameter as
       -- representational later on. Similarly, given a definition like
-      -- `data D a = D (forall r. r -> a)`, we'll mark `r` as bound so that it
-      -- doesn't appear as a spurious parameter to `D` when we complete
+      -- @data D a = D (forall r. r -> a)@, we'll mark @r@ as bound so that it
+      -- doesn't appear as a spurious parameter to @D@ when we complete
       -- inference.
       walk (S.insert tv btvs) t
     walk btvs t
@@ -125,14 +125,14 @@ inferRoles env tyName
       where
         go = walk btvs
         -- Given a type, computes the list of free variables in that type
-        -- (taking into account those bound in `walk`) and returns a `RoleMap`
+        -- (taking into account those bound in @walk@) and returns a @RoleMap@
         -- ascribing a nominal role to each of those variables.
         freeNominals x =
           let ftvs = filter (flip S.notMember btvs) (freeTypeVariables x)
           in  RoleMap (M.fromList $ map (, Nominal) ftvs)
 
 -- |
--- Given the kind of a foreign type, generate a list `Representational` roles
+-- Given the kind of a foreign type, generate a list @Representational@ roles
 -- which, in the absence of a role signature, provides a sensible default for a
 -- type whose constructors are opaque to us.
 rolesFromForeignTypeKind :: SourceKind -> [Role]

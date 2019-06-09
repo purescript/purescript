@@ -438,7 +438,7 @@ isExplicit _ = False
 -- | A role declaration assigns a list of roles to a type constructor's
 -- parameters, e.g.:
 --
--- @role T representational phantom@
+-- @type role T representational phantom@
 --
 -- In this example, @T@ is the identifier and @[representational, phantom]@ is
 -- the list of roles (@T@ presumably having two parameters).
