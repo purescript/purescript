@@ -409,7 +409,7 @@ entails SolverOptions{..} constraint context hints =
             -- constructor's arguments and generate wanted constraints
             -- appropriately (e.g. here `a` is representational and `b` is
             -- phantom, yielding `Coercible a a'`).
-            let k (_v, role) ax bx = case role of
+            let k role ax bx = case role of
                   Nominal
                     -- If we had first-class equality constraints, we'd just
                     -- emit of the form `(a ~ b)` here and let the solver

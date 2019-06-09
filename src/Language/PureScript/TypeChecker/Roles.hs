@@ -10,7 +10,7 @@ import Prelude.Compat
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import qualified Data.Set as S
-import Data.Text (Text, pack)
+import Data.Text (Text)
 
 import Language.PureScript.Environment
 import Language.PureScript.Kinds
@@ -20,16 +20,16 @@ import Language.PureScript.Types
 
 -- |
 -- Given an environment and the qualified name of a type constructor in that
--- environment, returns a list of (formal parameter name, role) pairs, in the
--- order they are defined in the type definition.
-inferRoles :: Environment -> Qualified (ProperName 'TypeName) -> [(Text, Role)]
+-- environment, returns a list of roles, in the order they are defined in the
+-- type definition.
+inferRoles :: Environment -> Qualified (ProperName 'TypeName) -> [Role]
 inferRoles env tyName
   | Just roles <- lookup tyName primRoles =
       -- A built-in type constructor for which we have an explicit role
       -- signature.
       roles
   | Just roles <- M.lookup tyName (roleDeclarations env) =
-      rolesFromDeclaration roles
+      roles
   | Just (_, DataType tvs ctors) <- envMeta =
       -- A plain data type. For each constructor the type has, walk its list of
       -- field types and accumulate a list of (formal parameter name, role)
@@ -37,7 +37,7 @@ inferRoles env tyName
       -- every parameter appears (with a default role of phantom) and that they
       -- appear in the right order.
       let ctorRoles = foldMap (foldMap (walk mempty) . snd) ctors
-      in  map (\(tv, _) -> (tv, fromMaybe Phantom (lookup tv ctorRoles))) tvs
+      in  map (\(tv, _) -> fromMaybe Phantom (lookup tv ctorRoles)) tvs
   | Just (k, ExternData) <- envMeta =
       -- A foreign data type. Since the type will have no defined constructors
       -- nor associated data types, infer the set of type parameters from its
@@ -81,7 +81,7 @@ inferRoles env tyName
             -- important) and terminate if the argument is phantom.
             TypeConstructor _ t1Name ->
               let t1Roles = inferRoles env t1Name
-                  k (_v, role) ti = case role of
+                  k role ti = case role of
                     Representational ->
                       go ti
                     Phantom ->
@@ -100,38 +100,26 @@ inferRoles env tyName
       where
         go = walk btvs
 
-rolesFromDeclaration :: [Role] -> [(Text, Role)]
-rolesFromDeclaration
-  = zipWith mkPair [0..]
-  where
-    mkPair :: Int -> Role -> (Text, Role)
-    mkPair i r =
-      (pack ("a" ++ show i), r)
-
 -- |
--- Given the kind of a foreign type, generate a list of formal parameter names
--- each tied to a `Representational` role which, in the absence of role
--- signatures, provides the safest role signature which can be assigned to a
+-- Given the kind of a foreign type, generate a list `Representational` roles
+-- which, in the absence of a role signature, provides a sensible default for a
 -- type whose constructors are opaque to us.
-rolesFromForeignTypeKind :: SourceKind -> [(Text, Role)]
+rolesFromForeignTypeKind :: SourceKind -> [Role]
 rolesFromForeignTypeKind
-  = zipWith mkPair [0..] . go []
+  = go []
   where
-    mkPair :: Int -> SourceKind -> (Text, Role)
-    mkPair i _k =
-      (pack ("a" ++ show i), Representational)
     go acc = \case
-      FunKind _ k1 k2 ->
-        go (k2 : acc) k1
-      k ->
-        k : acc
+      FunKind _ k1 _k2 ->
+        go (Representational : acc) k1
+      _k ->
+        Representational : acc
 
 -- |
 -- A lookup table of role definitions for primitive types whose constructors
 -- won't be present in any environment.
-primRoles :: [(Qualified (ProperName 'TypeName), [(Text, Role)])]
+primRoles :: [(Qualified (ProperName 'TypeName), [Role])]
 primRoles
-  = [ (primName "Function", [("a", Representational), ("b", Representational)])
-    , (primName "Array", [("a", Representational)])
-    , (primName "Record", [("r", Representational)])
+  = [ (primName "Function", [Representational, Representational])
+    , (primName "Array", [Representational])
+    , (primName "Record", [Representational])
     ]

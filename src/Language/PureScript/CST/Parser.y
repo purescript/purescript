@@ -35,7 +35,7 @@ import qualified Language.PureScript.Roles as R
 import Language.PureScript.PSString (PSString)
 }
 
-%expect 102
+%expect 114
 
 %name parseKind kind
 %name parseType type
@@ -194,6 +194,9 @@ qualIdent :: { QualifiedName Ident }
   | 'hiding' {% toQualifiedName Ident $1 }
   | 'kind' {% toQualifiedName Ident $1 }
   | 'role' {% toQualifiedName Ident $1 }
+  | 'nominal' {% toQualifiedName Ident $1 }
+  | 'representational' {% toQualifiedName Ident $1 }
+  | 'phantom' {% toQualifiedName Ident $1 }
 
 ident :: { Name Ident }
   : LOWER {% toName Ident $1 }
@@ -201,6 +204,9 @@ ident :: { Name Ident }
   | 'hiding' {% toName Ident $1 }
   | 'kind' {% toName Ident $1 }
   | 'role' {% toName Ident $1 }
+  | 'nominal' {% toName Ident $1 }
+  | 'representational' {% toName Ident $1 }
+  | 'phantom' {% toName Ident $1 }
 
 qualOp :: { QualifiedName (N.OpName a) }
   : OPERATOR {% toQualifiedName N.OpName $1 }

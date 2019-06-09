@@ -127,6 +127,11 @@ mapToMap = coerce
 testRoleNotReserved :: String -> String
 testRoleNotReserved role = role
 
+-- "nominal", "representational" and "phantom" should only be reserved when in
+-- role signatures
+testRolesNotReserved :: String -> String -> String -> String
+testRolesNotReserved nominal representational phantom = ""
+
 data RoleNotReserved role = RoleNotReserved role
 
 main = log (coerce (NTString1 "Done") :: String)
