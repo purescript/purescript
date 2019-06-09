@@ -1,3 +1,6 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeApplications #-}
+
 -- |
 -- Role inference
 --
@@ -7,6 +10,7 @@ module Language.PureScript.TypeChecker.Roles
 
 import Prelude.Compat
 
+import Data.Coerce (coerce)
 import qualified Data.Map as M
 import Data.Maybe (fromMaybe)
 import qualified Data.Set as S
@@ -17,6 +21,22 @@ import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.Roles
 import Language.PureScript.Types
+
+-- |
+-- A map of a type's formal parameter names to their roles. This type's
+-- `Semigroup` and `Monoid` instances preserve the least-permissive role
+-- ascribed to any given variable, as defined by the `Role` type's `Ord`
+-- instance. That is, a variable that has been marked as `Nominal` can not
+-- later be marked `Representation`, and so on.
+newtype RoleMap = RoleMap { getRoleMap :: M.Map Text Role }
+
+instance Semigroup RoleMap where
+  (<>) =
+    coerce @(M.Map Text Role -> _ -> _) @(RoleMap -> _ -> _) (M.unionWith min)
+
+instance Monoid RoleMap where
+  mempty =
+    RoleMap M.empty
 
 -- |
 -- Given an environment and the qualified name of a type constructor in that
@@ -36,8 +56,8 @@ inferRoles env tyName
       -- pairs. Then, walk the list of defined parameters, ensuring both that
       -- every parameter appears (with a default role of phantom) and that they
       -- appear in the right order.
-      let ctorRoles = foldMap (foldMap (walk mempty) . snd) ctors
-      in  map (\(tv, _) -> fromMaybe Phantom (lookup tv ctorRoles)) tvs
+      let ctorRoles = getRoleMap $ foldMap (foldMap (walk mempty) . snd) ctors
+      in  map (\(tv, _) -> fromMaybe Phantom (M.lookup tv ctorRoles)) tvs
   | Just (k, ExternData) <- envMeta =
       -- A foreign data type. Since the type will have no defined constructors
       -- nor associated data types, infer the set of type parameters from its
@@ -51,16 +71,16 @@ inferRoles env tyName
     envMeta = M.lookup tyName envTypes
     -- This function is named walk to match the specification given in the "Role
     -- inference" section of the paper "Safe Zero-cost Coercions for Haskell".
-    walk :: S.Set Text -> SourceType -> [(Text, Role)]
+    walk :: S.Set Text -> SourceType -> RoleMap
     walk btvs (TypeVar _ v)
       -- A type variable standing alone (e.g. `a` in `data D a b = D a`) is
       -- representational, _unless_ it has been bound by a quantifier, in which
       -- case it is not actually a parameter to the type (e.g. `z` in
       -- `data T z -- = T (forall z. z -> z)`).
       | S.member v btvs =
-          []
+          mempty
       | otherwise =
-        [(v, Representational)]
+          RoleMap $ M.singleton v Representational
     walk btvs (ForAll _ tv _ t _) =
       -- We can walk under universal quantifiers as long as we make note of the
       -- variables that they bind. For instance, given a definition
@@ -76,29 +96,40 @@ inferRoles env tyName
           case t1 of
             -- If the type is an application of a type constructor to some
             -- arguments, recursively infer the roles of the type constructor's
-            -- arguments. For each (role, argument) pair, recurse if the
-            -- argument is representational (since its use of our parameters is
-            -- important) and terminate if the argument is phantom.
+            -- arguments. For each (role, argument) pair:
+            --
+            -- * If the role is nominal, mark all free variables in the
+            --   argument as nominal also, since they cannot be coerced if the
+            --   argument's nominality is to be preserved.
+            -- * If the role is representational, recurse on the argument, since
+            --   its use of our parameters is important.
+            -- * If the role is phantom, terminate, since the argument's use of
+            --   our parameters is unimportant.
             TypeConstructor _ t1Name ->
               let t1Roles = inferRoles env t1Name
                   k role ti = case role of
+                    Nominal ->
+                      freeNominals ti
                     Representational ->
                       go ti
                     Phantom ->
-                      []
-              in  concat (zipWith k t1Roles t2s)
+                      mempty
+              in  mconcat (zipWith k t1Roles t2s)
             -- If the type is an application of any other type-level term, walk
-            -- both the first and argument types to determine what role
-            -- contributions they make (e.g. in the case
-            -- `data F a b = F (a (G b))`, the use of `a` as a
-            -- function/constructor would trigger this case and both `a` and
-            -- `G b` would be walked recursively).
+            -- that term to collect its roles and mark all free variables in
+            -- its argument as nominal.
             _ ->
-              go t1 ++ foldMap go t2s
+              go t1 <> foldMap freeNominals t2s
       | otherwise =
-          []
+          mempty
       where
         go = walk btvs
+        -- Given a type, computes the list of free variables in that type
+        -- (taking into account those bound in `walk`) and returns a `RoleMap`
+        -- ascribing a nominal role to each of those variables.
+        freeNominals x =
+          let ftvs = filter (flip S.notMember btvs) (freeTypeVariables x)
+          in  RoleMap (M.fromList $ map (, Nominal) ftvs)
 
 -- |
 -- Given the kind of a foreign type, generate a list `Representational` roles
