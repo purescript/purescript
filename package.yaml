@@ -39,6 +39,7 @@ extra-source-files:
 dependencies:
   - aeson >=1.0 && <1.5
   - aeson-better-errors >=0.8
+  - aeson-pretty
   - ansi-terminal >=0.7.1 && <0.9
   - array
   - base >=4.11 && <4.13

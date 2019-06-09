@@ -14,6 +14,7 @@ module Language.PureScript.Bundle
   , ErrorMessage(..)
   , printErrorMessage
   , getExportedIdentifiers
+  , Module
   ) where
 
 import Prelude.Compat
@@ -23,6 +24,7 @@ import Control.Monad
 import Control.Monad.Error.Class
 import Control.Arrow ((&&&))
 
+import Data.Aeson ((.=))
 import Data.Array ((!))
 import Data.Char (chr, digitToInt)
 import Data.Foldable (fold)
@@ -31,11 +33,14 @@ import Data.Graph
 import Data.List (stripPrefix)
 import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
 import Data.Version (showVersion)
+import qualified Data.Aeson as A
 import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.Text.Lazy as T
 
 import Language.JavaScript.Parser
 import Language.JavaScript.Parser.AST
+import Language.JavaScript.Process.Minify
 
 import qualified Paths_purescript as Paths
 
@@ -68,6 +73,12 @@ showModuleType Foreign = "Foreign"
 
 -- | A module is identified by its module name and its type.
 data ModuleIdentifier = ModuleIdentifier String ModuleType deriving (Show, Eq, Ord)
+
+instance A.ToJSON ModuleIdentifier where
+  toJSON (ModuleIdentifier name mt) =
+    A.object [ "name" .= name
+             , "type" .= show mt
+             ]
 
 moduleName :: ModuleIdentifier -> String
 moduleName (ModuleIdentifier name _) = name
@@ -110,8 +121,70 @@ data ModuleElement
   | Skip JSStatement
   deriving (Show)
 
+instance A.ToJSON ModuleElement where
+  toJSON = \case
+    (Require _ name (Right target)) ->
+      A.object [ "type"   .= A.String "Require"
+               , "name"   .= name
+               , "target" .= target
+               ]
+    (Require _ name (Left targetPath)) ->
+      A.object [ "type"       .= A.String "Require"
+               , "name"       .= name
+               , "targetPath" .= targetPath
+               ]
+    (Member _ public name _ dependsOn) ->
+      A.object [ "type"       .= A.String "Member"
+               , "name"       .= name
+               , "visibility" .= A.String (if public then "Public" else "Internal")
+               , "dependsOn"  .= map keyToJSON dependsOn
+               ]
+    (ExportsList exports) ->
+      A.object [ "type"    .= A.String "ExportsList"
+               , "exports" .= map exportToJSON exports
+               ]
+    (Other stmt) ->
+      A.object [ "type" .= A.String "Other"
+               , "js"   .= getFragment stmt
+               ]
+    (Skip stmt) ->
+      A.object [ "type" .= A.String "Skip"
+               , "js"   .= getFragment stmt
+               ]
+
+    where
+
+    keyToJSON (mid, member) =
+      A.object [ "module" .= mid
+               , "member" .= member
+               ]
+
+    exportToJSON (RegularExport sourceName, name, _, dependsOn) =
+      A.object [ "type"       .= A.String "RegularExport"
+               , "name"       .= name
+               , "sourceName" .= sourceName
+               , "dependsOn"  .= map keyToJSON dependsOn
+               ]
+    exportToJSON (ForeignReexport, name, _, dependsOn) =
+      A.object [ "type"      .= A.String "ForeignReexport"
+               , "name"      .= name
+               , "dependsOn" .= map keyToJSON dependsOn
+               ]
+
+    getFragment = ellipsize . renderToText . minifyJS . flip JSAstStatement JSNoAnnot
+      where
+      ellipsize text = if T.compareLength text 20 == GT then T.take 19 text `T.snoc` ellipsis else text
+      ellipsis = '\x2026'
+
 -- | A module is just a list of elements of the types listed above.
 data Module = Module ModuleIdentifier (Maybe FilePath) [ModuleElement] deriving (Show)
+
+instance A.ToJSON Module where
+  toJSON (Module moduleId filePath elements) =
+    A.object [ "moduleId" .= moduleId
+             , "filePath" .= filePath
+             , "elements" .= elements
+             ]
 
 -- | Prepare an error message for consumption by humans.
 printErrorMessage :: ErrorMessage -> [String]
@@ -730,8 +803,9 @@ bundleSM :: (MonadError ErrorMessage m)
        -> Maybe String -- ^ An optional main module.
        -> String -- ^ The namespace (e.g. PS).
        -> Maybe FilePath -- ^ The output file name (if there is one - in which case generate source map)
+       -> Maybe ([Module] -> m ()) -- ^ Optionally report the parsed modules prior to DCE -- used by "bundle --debug"
        -> m (Maybe SourceMapping, String)
-bundleSM inputStrs entryPoints mainModule namespace outFilename = do
+bundleSM inputStrs entryPoints mainModule namespace outFilename reportRawModules = do
   let mid (a,_,_) = a
   forM_ mainModule $ \mname ->
     when (mname `notElem` map (moduleName . mid) inputStrs) (throwError (MissingMainModule mname))
@@ -744,6 +818,8 @@ bundleSM inputStrs entryPoints mainModule namespace outFilename = do
   let mids = S.fromList (map (moduleName . mid) input)
 
   modules <- traverse (fmap withDeps . (\(a,fn,c) -> toModule mids a fn c)) input
+
+  forM_ reportRawModules ($ modules)
 
   let compiled = compile modules entryPoints
       sorted   = sortModules (filter (not . isModuleEmpty) compiled)
@@ -759,4 +835,4 @@ bundle :: (MonadError ErrorMessage m)
        -> Maybe String -- ^ An optional main module.
        -> String -- ^ The namespace (e.g. PS).
        -> m String
-bundle inputStrs entryPoints mainModule namespace = snd <$> bundleSM (map (\(a,b) -> (a,Nothing,b)) inputStrs) entryPoints mainModule namespace Nothing
+bundle inputStrs entryPoints mainModule namespace = snd <$> bundleSM (map (\(a,b) -> (a,Nothing,b)) inputStrs) entryPoints mainModule namespace Nothing Nothing

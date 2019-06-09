@@ -12,3 +12,6 @@ nix:
   - nodejs
   - nodePackages.npm
   - nodePackages.bower
+flags:
+  aeson-pretty:
+    lib-only: true
