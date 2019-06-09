@@ -26,7 +26,7 @@ import Language.PureScript.Types
 -- A map of a type's formal parameter names to their roles. This type's
 -- @Semigroup@ and @Monoid@ instances preserve the least-permissive role
 -- ascribed to any given variable, as defined by the @Role@ type's @Ord@
--- instance. That is, a variable that has been marked as `Nominal` can not
+-- instance. That is, a variable that has been marked as @Nominal@ can not
 -- later be marked @Representational@, and so on.
 newtype RoleMap = RoleMap { getRoleMap :: M.Map Text Role }
 
@@ -44,10 +44,6 @@ instance Monoid RoleMap where
 -- type definition.
 inferRoles :: Environment -> Qualified (ProperName 'TypeName) -> [Role]
 inferRoles env tyName
-  | Just roles <- lookup tyName primRoles =
-      -- A built-in type constructor for which we have an explicit role
-      -- signature.
-      roles
   | Just roles <- M.lookup tyName (roleDeclarations env) =
       roles
   | Just (_, DataType tvs ctors) <- envMeta =
@@ -62,7 +58,7 @@ inferRoles env tyName
       -- A foreign data type. Since the type will have no defined constructors
       -- nor associated data types, infer the set of type parameters from its
       -- kind and assume in the absence of role signatures that all such
-      -- parameters are representational.
+      -- parameters are nominal.
       rolesFromForeignTypeKind k
   | otherwise =
       []
@@ -91,6 +87,13 @@ inferRoles env tyName
       -- doesn't appear as a spurious parameter to @D@ when we complete
       -- inference.
       walk (S.insert tv btvs) t
+    walk btvs (RCons _ _ thead ttail) =
+      -- For row types, we just walk along them and collect the results.
+      walk btvs thead <> walk btvs ttail
+    walk btvs (KindedType _ t _k) =
+      -- For kind-annotated types, discard the annotation and recurse on the
+      -- type beneath.
+      walk btvs t
     walk btvs t
       | Just (t1, t2s) <- splitTypeApp t =
           case t1 of
@@ -132,25 +135,15 @@ inferRoles env tyName
           in  RoleMap (M.fromList $ map (, Nominal) ftvs)
 
 -- |
--- Given the kind of a foreign type, generate a list @Representational@ roles
--- which, in the absence of a role signature, provides a sensible default for a
--- type whose constructors are opaque to us.
+-- Given the kind of a foreign type, generate a list @Nominal@ roles which, in
+-- the absence of a role signature, provides the safest default for a type whose
+-- constructors are opaque to us.
 rolesFromForeignTypeKind :: SourceKind -> [Role]
 rolesFromForeignTypeKind
   = go []
   where
     go acc = \case
       FunKind _ k1 _k2 ->
-        go (Representational : acc) k1
+        go (Nominal : acc) k1
       _k ->
-        Representational : acc
-
--- |
--- A lookup table of role definitions for primitive types whose constructors
--- won't be present in any environment.
-primRoles :: [(Qualified (ProperName 'TypeName), [Role])]
-primRoles
-  = [ (primName "Function", [Representational, Representational])
-    , (primName "Array", [Representational])
-    , (primName "Record", [Representational])
-    ]
+        Nominal : acc

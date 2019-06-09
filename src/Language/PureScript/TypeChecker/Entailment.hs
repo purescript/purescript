@@ -386,16 +386,16 @@ entails SolverOptions{..} constraint context hints =
           pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.Coercible [a, b] (Just ws)]
     solveCoercible _ _ = Nothing
 
-    -- | Take two types, `a` and `b` representing a desired constraint
-    -- `Coercible a b` and reduce them to a set of simpler wanted constraints
+    -- | Take two types, @a@ and @b@ representing a desired constraint
+    -- @Coercible a b@ and reduce them to a set of simpler wanted constraints
     -- whose satisfaction will yield the goal.
     coercibleWanteds :: Environment -> SourceType -> SourceType -> Maybe [SourceConstraint]
     coercibleWanteds env a b = case a of
       TypeConstructor _ tyName -> do
-        -- If the first argument is a plain newtype (e.g. `newtype T = T U` and
-        -- the constraint `Coercible T b`), look up the type of its wrapped
+        -- If the first argument is a plain newtype (e.g. @newtype T = T U@ and
+        -- the constraint @Coercible T b@), look up the type of its wrapped
         -- field and yield a new wanted constraint in terms of that type
-        -- (`Coercible U b` in the example).
+        -- (@Coercible U b@ in the example).
         (_, wrappedTy, _) <- lookupNewtypeConstructor env tyName
         pure [Constraint nullSourceAnn C.Coercible [wrappedTy, b] Nothing]
       t
@@ -404,15 +404,15 @@ entails SolverOptions{..} constraint context hints =
         , aTyName == bTyName
         , tyRoles <- inferRoles env aTyName -> do
             -- If both arguments are applications of the same type constructor
-            -- (e.g. `data D a b = D a` in the constraint
-            -- `Coercible (D a b) (D a' b')`), infer the roles of the type
+            -- (e.g. @data D a b = D a@ in the constraint
+            -- @Coercible (D a b) (D a' b')@), infer the roles of the type
             -- constructor's arguments and generate wanted constraints
-            -- appropriately (e.g. here `a` is representational and `b` is
-            -- phantom, yielding `Coercible a a'`).
+            -- appropriately (e.g. here @a@ is representational and @b@ is
+            -- phantom, yielding @Coercible a a'@).
             let k role ax bx = case role of
                   Nominal
                     -- If we had first-class equality constraints, we'd just
-                    -- emit of the form `(a ~ b)` here and let the solver
+                    -- emit of the form @(a ~ b)@ here and let the solver
                     -- recurse. Since we don't we must compare the types at
                     -- this point and fail if they don't match. This likely
                     -- means there are cases we should be able to handle that
@@ -429,10 +429,10 @@ entails SolverOptions{..} constraint context hints =
         | Just (TypeConstructor _ tyName, xs) <- splitTypeApp t
         , Just (tvs, wrappedTy, _) <- lookupNewtypeConstructor env tyName -> do
             -- If the first argument is a newtype applied to some other types
-            -- (e.g. `newtype T a = T a` in `Coercible (T X) b`), look up the
+            -- (e.g. @newtype T a = T a@ in @Coercible (T X) b@), look up the
             -- type of its wrapped field and yield a new wanted constraint in
             -- terms of that type with the type arguments substituted in (e.g.
-            -- `Coercible (T[X/a]) b = Coercible X b` in the example).
+            -- @Coercible (T[X/a]) b = Coercible X b@ in the example).
             let wrappedTySub = replaceAllTypeVars (zip tvs xs) wrappedTy
             pure [Constraint nullSourceAnn C.Coercible [wrappedTySub, b] Nothing]
       _ ->

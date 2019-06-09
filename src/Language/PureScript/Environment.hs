@@ -101,7 +101,17 @@ instance A.ToJSON FunctionalDependency where
 
 -- | The initial environment with no values and only the default javascript types defined
 initEnvironment :: Environment
-initEnvironment = Environment M.empty allPrimTypes M.empty M.empty M.empty M.empty allPrimClasses allPrimKinds
+initEnvironment = Environment M.empty allPrimTypes M.empty primRoles M.empty M.empty allPrimClasses allPrimKinds
+
+-- |
+-- A lookup table of role definitions for primitive types whose constructors
+-- won't be present in any environment.
+primRoles :: M.Map (Qualified (ProperName 'TypeName)) [Role]
+primRoles = M.fromList
+  [ (primName "Function", [Representational, Representational])
+  , (primName "Array", [Representational])
+  , (primName "Record", [Representational])
+  ]
 
 -- | A constructor for TypeClassData that computes which type class arguments are fully determined
 -- and argument covering sets.

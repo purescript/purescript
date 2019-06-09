@@ -97,7 +97,32 @@ rankN4ToRankN4 = coerce
 
 data Phantom2 a = Phantom
 
+data Rec1 a = Rec1 { f :: a }
+
+rec1ToRec1 :: Rec1 Int -> Rec1 (Id1 Int)
+rec1ToRec1 = coerce
+
+data Rec2 a b = Rec2 { f :: a, g :: Int, h :: b }
+
+rec2ToRec2 :: Rec2 Int (Phantom2 String) -> Rec2 (Id1 Int) (Phantom2 Int)
+rec2ToRec2 = coerce
+
+data Rec3 a = Rec3 {}
+
+rec3ToRec3 :: forall m n. Rec3 m -> Rec3 n
+rec3ToRec3 = coerce
+
+data Arr1 a b = Arr1 (Array a) (Array b)
+
+arr1ToArr1 :: Arr1 Int String -> Arr1 (Id1 Int) (Id2 String)
+arr1ToArr1 = coerce
+
+arr1ToArr1Phantom :: forall a. Arr1 (Phantom2 Int) String -> Arr1 (Phantom2 a) (Id2 String)
+arr1ToArr1Phantom = coerce
+
 foreign import data Foreign1 :: Type -> Type -> Type
+
+type role Foreign1 representational representational
 
 foreign1ToForeign1 :: Foreign1 NTString1 (Phantom2 Int) -> Foreign1 String (Phantom2 Boolean)
 foreign1ToForeign1 = coerce
