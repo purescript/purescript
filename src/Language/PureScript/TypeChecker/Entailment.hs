@@ -412,7 +412,7 @@ entails SolverOptions{..} constraint context hints =
             let k role ax bx = case role of
                   Nominal
                     -- If we had first-class equality constraints, we'd just
-                    -- emit of the form @(a ~ b)@ here and let the solver
+                    -- emit one of the form @(a ~ b)@ here and let the solver
                     -- recurse. Since we don't we must compare the types at
                     -- this point and fail if they don't match. This likely
                     -- means there are cases we should be able to handle that
