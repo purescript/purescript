@@ -112,8 +112,8 @@ data SimpleErrorMessage
   | KindsDoNotUnify SourceKind SourceKind
   | ConstrainedTypeUnified SourceType SourceType
   | OverlappingInstances (Qualified (ProperName 'ClassName)) [SourceType] [Qualified Ident]
-  | NoInstanceFound SourceConstraint (Maybe SimpleErrorMessage)
-  | AmbiguousTypeVariables SourceType SourceConstraint (Maybe SimpleErrorMessage)
+  | NoInstanceFound SourceConstraint
+  | AmbiguousTypeVariables SourceType SourceConstraint
   | UnknownClass (Qualified (ProperName 'ClassName))
   | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [SourceType]
   | CannotDerive (Qualified (ProperName 'ClassName)) [SourceType]

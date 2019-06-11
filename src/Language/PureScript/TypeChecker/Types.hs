@@ -125,7 +125,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
             throwError
               . onErrorMessages (replaceTypes currentSubst)
               . errorMessage' ss
-              $ AmbiguousTypeVariables generalized con Nothing
+              $ AmbiguousTypeVariables generalized con
 
       -- Check skolem variables did not escape their scope
       skolemEscapeCheck val'

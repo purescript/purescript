@@ -307,7 +307,7 @@ entails SolverOptions{..} constraint context hints expr =
               | solverShouldGeneralize && (null tyArgs || any canBeGeneralized tyArgs) = return (Unsolved (srcConstraint className' tyArgs conInfo))
               | otherwise = do
                   throwExprHoles expr
-                  throwError . errorMessage $ NoInstanceFound (srcConstraint className' tyArgs conInfo) Nothing
+                  throwError . errorMessage $ NoInstanceFound (srcConstraint className' tyArgs conInfo)
 
             unique _      [(a, dict)] = return $ Solved a dict
             unique tyArgs tcds

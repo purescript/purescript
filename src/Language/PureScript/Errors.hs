@@ -286,10 +286,8 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ConstrainedTypeUnified t1 t2) = ConstrainedTypeUnified <$> f t1 <*> f t2
   gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
-  gSimple (NoInstanceFound con (Just reason)) = NoInstanceFound <$> overConstraintArgs (traverse f) con <*> (fmap Just . gSimple) reason
-  gSimple (NoInstanceFound con Nothing) = NoInstanceFound <$> overConstraintArgs (traverse f) con <*> pure Nothing
-  gSimple (AmbiguousTypeVariables t con (Just reason)) = AmbiguousTypeVariables <$> f t <*> pure con <*> (fmap Just . gSimple) reason
-  gSimple (AmbiguousTypeVariables t con Nothing) = AmbiguousTypeVariables <$> f t <*> pure con <*> pure Nothing
+  gSimple (NoInstanceFound con) = NoInstanceFound <$> overConstraintArgs (traverse f) con
+  gSimple (AmbiguousTypeVariables t con) = AmbiguousTypeVariables <$> f t <*> pure con
   gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> pure insts
   gSimple (UnknownName name (Just (ts, ctx))) = fmap (UnknownName name . Just) $ (,) <$> f ts <*> traverse (sndM f) ctx
   gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
@@ -678,13 +676,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , markCodeBox $ indent $ line (showQualified runProperName nm)
             , line "because the class was not in scope. Perhaps it was not exported."
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Fail [ ty ] _) _) | Just box <- toTypelevelString ty =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Fail [ ty ] _)) | Just box <- toTypelevelString ty =
       paras [ line "A custom type error occurred while solving type class constraints:"
             , indent box
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Partial
                                                           _
-                                                          (Just (PartialConstraintData bs b))) _) =
+                                                          (Just (PartialConstraintData bs b)))) =
       paras [ line "A case expression could not be determined to cover all inputs."
             , line "The following additional cases are required to cover all inputs:"
             , indent $ paras $
@@ -693,35 +691,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                   : [line "..." | not b]
             , line "Alternatively, add a Partial constraint to the type of the enclosing value."
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Discard [ty] _) _) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Discard [ty] _)) =
       paras [ line "A result of type"
             , markCodeBox $ indent $ typeAsBox prettyDepth ty
             , line "was implicitly discarded in a do notation block."
             , line ("You can use " <> markCode "_ <- ..." <> " to explicitly discard the result.")
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm ts _) (Just (HoleInferredType name _))) =
-      paras [ line "No type class instance was found for"
-            , markCodeBox $ indent $ Box.hsep 1 Box.left
-                [ line (showQualified runProperName nm)
-                , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
-                ]
-            , paras [ line "The instance head contains unknown type variables."
-                    | any containsUnknowns ts
-                    ]
-            , line $ "This could have been caused by the hole '" <> name <> "'. Consider adding a type annotation."
-            ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm ts _) (Just (UnknownName name _))) =
-      paras [ line "No type class instance was found for"
-            , markCodeBox $ indent $ Box.hsep 1 Box.left
-                [ line (showQualified runProperName nm)
-                , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
-                ]
-            , paras [ line "The instance head contains unknown type variables."
-                    | any containsUnknowns ts
-                    ]
-            , line $ "This could have been caused by the unknown " <> printName name <> ". Consider adding a type annotation."
-            ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm ts _) _) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm ts _)) =
       paras [ line "No type class instance was found for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
@@ -731,19 +707,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                     | any containsUnknowns ts
                     ]
             ]
-    renderSimpleErrorMessage (AmbiguousTypeVariables t _ (Just (HoleInferredType name _))) =
-      paras [ line "The inferred type"
-            , markCodeBox $ indent $ typeAsBox prettyDepth t
-            , line "has type variables which are not mentioned in the body of the type."
-            , line $ "This could have been caused by the hole '" <> name <> "'. Consider adding a type annotation."
-            ]
-    renderSimpleErrorMessage (AmbiguousTypeVariables t _ (Just (UnknownName name _))) =
-      paras [ line "The inferred type"
-            , markCodeBox $ indent $ typeAsBox prettyDepth t
-            , line "has type variables which are not mentioned in the body of the type."
-            , line $ "This could have been caused by the unknown " <> printName name <> ". Consider adding a type annotation."
-            ]
-    renderSimpleErrorMessage (AmbiguousTypeVariables t _ _) =
+    renderSimpleErrorMessage (AmbiguousTypeVariables t _) =
       paras [ line "The inferred type"
             , markCodeBox $ indent $ typeAsBox prettyDepth t
             , line "has type variables which are not mentioned in the body of the type. Consider adding a type annotation."
