@@ -420,17 +420,17 @@ infer' (TypedValue checkType val ty) = do
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   tv <- if checkType then withScopedTypeVars moduleName args (check val ty') else return (TypedValue' False val ty)
   return $ TypedValue' True (tvToExpr tv) ty'
-infer' (ExprHole (Hole name)) = do
+infer' (Hole name) = do
   ty <- freshType
   ctx <- getLocalContext
   env <- getEnv
   tell . errorMessage $ HoleInferredType name (Just (ty, ctx, Just (TSBefore env)))
-  return $ TypedValue' True (ExprHole (Hole name)) ty
-infer' (ExprHole (UnknownValue name)) = do
+  return $ TypedValue' True (Hole name) ty
+infer' (UnknownValue name) = do
   ty <- freshType
   ctx <- getLocalContext
   tell . errorMessage . UnknownName name $ Just (ty, ctx)
-  return $ TypedValue' True (ExprHole (UnknownValue name)) ty
+  return $ TypedValue' True (UnknownValue name) ty
 infer' (PositionedValue pos c val) = warnAndRethrowWithPositionTC pos $ do
   TypedValue' t v ty <- infer' val
   return $ TypedValue' t (PositionedValue pos c v) ty

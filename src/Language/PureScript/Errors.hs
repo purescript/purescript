@@ -1537,7 +1537,7 @@ throwExprHoles expr = when (nonEmpty errors) $ throwError errors
   where
   (_, f, _, _ , _) = everythingOnValues (++) mempty goExpr mempty mempty mempty
 
-  goExpr (ExprHole (UnknownValue name)) = [ ErrorMessage [] (UnknownName name Nothing) ]
+  goExpr (UnknownValue name) = [ ErrorMessage [] (UnknownName name Nothing) ]
   goExpr _ = []
 
   errors = MultipleErrors . f $ expr

@@ -820,16 +820,15 @@ data Expr
   -- |
   -- A typed hole that will be turned into a hint/error during typechecking
   --
-  | ExprHole ExprHole
+  | Hole Text
+  -- |
+  -- A hole representing an unknown value that will be turned into an error during typechecking
+  --
+  | UnknownValue (Qualified Name)
   -- |
   -- A value with source position information
   --
   | PositionedValue SourceSpan [Comment] Expr
-  deriving (Show)
-
-data ExprHole
-  = Hole Text
-  | UnknownValue (Qualified Name)
   deriving (Show)
 
 -- |

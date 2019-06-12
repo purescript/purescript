@@ -288,7 +288,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
     -> m ((SourceSpan, [Ident]), Expr)
   updateOrReplaceValue (ss, bounds) name updateName mkExpr = do
     updated <- updateName name ss
-    let expr = either (ExprHole . UnknownValue) mkExpr updated
+    let expr = either UnknownValue mkExpr updated
     return ((ss, bounds), expr)
 
   updateBinder
