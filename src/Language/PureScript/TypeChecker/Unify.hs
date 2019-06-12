@@ -192,7 +192,7 @@ replaceTypeWildcards = everywhereOnTypesM replace
   replace (TypeWildcard ann name) = do
     t <- freshType
     ctx <- getLocalContext
-    let err = maybe (WildcardInferredType t ctx) (\n -> HoleInferredType n (Just (t, ctx, Nothing))) name
+    let err = maybe (WildcardInferredType t ctx) (\n -> HoleInferredType n t ctx Nothing) name
     warnWithPosition (fst ann) $ tell $ errorMessage err
     return t
   replace other = return other

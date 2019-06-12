@@ -300,7 +300,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
   gSimple (OrphanInstance nm cl noms ts) = OrphanInstance nm cl noms <$> traverse f ts
   gSimple (WildcardInferredType ty ctx) = WildcardInferredType <$> f ty <*> traverse (sndM f) ctx
-  gSimple (HoleInferredType name (Just (ty, ctx, env))) = fmap (HoleInferredType name . Just) $ (,,) <$> f ty <*> traverse (sndM f) ctx <*> traverse (onTypeSearchTypesM f) env
+  gSimple (HoleInferredType name ty ctx env) = HoleInferredType name <$> f ty <*> traverse (sndM f) ctx  <*> traverse (onTypeSearchTypesM f) env
   gSimple (MissingTypeDeclaration nm ty) = MissingTypeDeclaration nm <$> f ty
   gSimple (CannotGeneralizeRecursiveFunction nm ty) = CannotGeneralizeRecursiveFunction nm <$> f ty
   gSimple other = pure other
@@ -876,9 +876,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras $ [ line "Wildcard type definition has the inferred type "
               , markCodeBox $ indent $ typeAsBox prettyDepth ty
               ] <> renderContext ctx
-    renderSimpleErrorMessage (HoleInferredType name Nothing) =
-      paras [ line $ "Cannot infer type for hole " <> markCode name ]
-    renderSimpleErrorMessage (HoleInferredType name (Just (ty, ctx, ts))) =
+    renderSimpleErrorMessage (HoleInferredType name ty ctx ts) =
       let
         maxTSResults = 15
         tsResult = case ts of
