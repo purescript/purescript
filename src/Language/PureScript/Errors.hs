@@ -1533,21 +1533,11 @@ throwExprHoles
   :: (MonadError MultipleErrors m)
   => Expr
   -> m ()
-throwExprHoles expr = unless (null errors) $ throwError $ MultipleErrors errors
+throwExprHoles expr = when (nonEmpty errors) $ throwError errors
   where
-  (_, f, _, _ , _) = everythingOnValues (++) (const []) goExpr (const []) (const []) (const [])
+  (_, f, _, _ , _) = everythingOnValues (++) mempty goExpr mempty mempty mempty
 
-  goExpr (ExprHole a) = [a]
+  goExpr (ExprHole (UnknownValue name)) = [ ErrorMessage [] (UnknownName name Nothing) ]
   goExpr _ = []
 
-  holes = f expr
-
-  holeError hole = case hole of
-    Hole t -> errorMessage $ HoleInferredType t Nothing
-    UnknownValue n -> errorMessage $ UnknownName n Nothing
-
-  isUnknown hole = case hole of
-    Hole _ -> False
-    UnknownValue _ -> True
-
-  errors = runMultipleErrors . foldMap holeError . filter isUnknown $ holes
+  errors = MultipleErrors . f $ expr
