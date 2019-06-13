@@ -11,7 +11,7 @@ import           Control.Monad
 import qualified Data.Aeson as A
 import           Data.Bool (bool)
 import qualified Data.ByteString.Lazy.UTF8 as LBU8
-import           Data.List (intercalate)
+import           Data.List (intercalate, nub)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import           Data.Text (Text)
@@ -37,7 +37,7 @@ data PSCMakeOptions = PSCMakeOptions
   , pscmJSONErrors   :: Bool
   }
 
--- | Argumnets: verbose, use JSON, warnings, errors
+-- | Arguments: verbose, use JSON, warnings, errors
 printWarningsAndErrors :: Bool -> Bool -> P.MultipleErrors -> Either P.MultipleErrors a -> IO ()
 printWarningsAndErrors verbose False warnings errors = do
   pwd <- getCurrentDirectory
@@ -64,7 +64,7 @@ compile PSCMakeOptions{..} = do
                              , "Usage: For basic information, try the `--help' option."
                              ]
     exitFailure
-  moduleFiles <- readInput input
+  moduleFiles <- readInput (nub input)
   (makeErrors, makeWarnings) <- runMake pscmOpts $ do
     ms <- CST.parseModulesFromFiles id moduleFiles
     let filePathMap = M.fromList $ map (\(fp, pm) -> (P.getModuleName $ CST.resPartial pm, Right fp)) ms
