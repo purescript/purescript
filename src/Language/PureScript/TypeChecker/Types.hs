@@ -279,25 +279,6 @@ checkTypeKind
   -> m ()
 checkTypeKind ty kind = guardWith (errorMessage (ExpectedType ty kind)) $ isKindType kind
 
--- | Remove any ForAlls and ConstrainedType constructors in a type by introducing new unknowns
--- or TypeClassDictionary values.
---
--- This is necessary during type checking to avoid unifying a polymorphic type with a
--- unification variable.
-instantiatePolyTypeWithUnknowns
-  :: (MonadState CheckState m, MonadError MultipleErrors m)
-  => Expr
-  -> SourceType
-  -> m (Expr, SourceType)
-instantiatePolyTypeWithUnknowns val (ForAll _ ident _ ty _) = do
-  ty' <- replaceVarWithUnknown ident ty
-  instantiatePolyTypeWithUnknowns val ty'
-instantiatePolyTypeWithUnknowns val (ConstrainedType _ con ty) = do
-   dicts <- getTypeClassDictionaries
-   hints <- getHints
-   instantiatePolyTypeWithUnknowns (App val (TypeClassDictionary con dicts hints)) ty
-instantiatePolyTypeWithUnknowns val ty = return (val, ty)
-
 -- | Infer a type for a value, rethrowing any error to provide a more useful error message
 infer
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
@@ -320,7 +301,7 @@ infer' (Literal ss (ArrayLiteral vals)) = do
   ts <- traverse infer vals
   els <- freshType
   ts' <- forM ts $ \(TypedValue' ch val t) -> do
-    (val', t') <- instantiatePolyTypeWithUnknowns val t
+    (val', t') <- instantiateValAndPolyTypeWithUnknowns val t
     unifyTypes els t'
     return (TypedValue ch val' t')
   return $ TypedValue' True (Literal ss (ArrayLiteral ts')) (srcTypeApp tyArray els)
@@ -338,7 +319,7 @@ infer' (Literal ss (ObjectLiteral ps)) = do
       inferProperty (name, val) = do
         TypedValue' _ val' ty <- infer val
         valAndType <- if shouldInstantiate val
-                        then instantiatePolyTypeWithUnknowns val' ty
+                        then instantiateValAndPolyTypeWithUnknowns val' ty
                         else pure (val', ty)
         pure (name, valAndType)
 
@@ -368,7 +349,7 @@ infer' (Abs binder ret)
       ty <- freshType
       withBindingGroupVisible $ bindLocalVariables [(arg, ty, Defined)] $ do
         body@(TypedValue' _ _ bodyTy) <- infer' ret
-        (body', bodyTy') <- instantiatePolyTypeWithUnknowns (tvToExpr body) bodyTy
+        (body', bodyTy') <- instantiateValAndPolyTypeWithUnknowns (tvToExpr body) bodyTy
         return $ TypedValue' True (Abs (VarBinder ss arg) body') (function ty bodyTy')
   | otherwise = internalError "Binder was not desugared"
 infer' (App f arg) = do
@@ -380,15 +361,14 @@ infer' (Var ss var) = do
   ty <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards <=< lookupVariable $ var
   case ty of
     ConstrainedType _ con ty' -> do
-      dicts <- getTypeClassDictionaries
-      hints <- getHints
-      return $ TypedValue' True (App (Var ss var) (TypeClassDictionary con dicts hints)) ty'
+      dict <- getTypeClassDictionary con
+      return $ TypedValue' True (App (Var ss var) dict) ty'
     _ -> return $ TypedValue' True (Var ss var) ty
 infer' v@(Constructor _ c) = do
   env <- getEnv
   case M.lookup c (dataConstructors env) of
     Nothing -> throwError . errorMessage . UnknownName . fmap DctorName $ c
-    Just (_, _, ty, _) -> do (v', ty') <- sndM (introduceSkolemScope <=< replaceAllTypeSynonyms) <=< instantiatePolyTypeWithUnknowns v $ ty
+    Just (_, _, ty, _) -> do (v', ty') <- sndM (introduceSkolemScope <=< replaceAllTypeSynonyms) <=< instantiateValAndPolyTypeWithUnknowns v $ ty
                              return $ TypedValue' True v' ty'
 infer' (Case vals binders) = do
   (vals', ts) <- instantiateForBinders vals binders
@@ -399,18 +379,16 @@ infer' (IfThenElse cond th el) = do
   cond' <- tvToExpr <$> check cond tyBoolean
   th'@(TypedValue' _ _ thTy) <- infer th
   el'@(TypedValue' _ _ elTy) <- infer el
-  (th'', thTy') <- instantiatePolyTypeWithUnknowns (tvToExpr th') thTy
-  (el'', elTy') <- instantiatePolyTypeWithUnknowns (tvToExpr el') elTy
+  (th'', thTy') <- instantiateValAndPolyTypeWithUnknowns (tvToExpr th') thTy
+  (el'', elTy') <- instantiateValAndPolyTypeWithUnknowns (tvToExpr el') elTy
   unifyTypes thTy' elTy'
   return $ TypedValue' True (IfThenElse cond' th'' el'') thTy'
 infer' (Let w ds val) = do
   (ds', tv@(TypedValue' _ _ valTy)) <- inferLetBinding [] ds val infer
   return $ TypedValue' True (Let w ds' (tvToExpr tv)) valTy
 infer' (DeferredDictionary className tys) = do
-  dicts <- getTypeClassDictionaries
-  hints <- getHints
-  return $ TypedValue' False
-             (TypeClassDictionary (srcConstraint className tys Nothing) dicts hints)
+  dict <- getTypeClassDictionary $ srcConstraint className tys Nothing
+  return $ TypedValue' False dict
              (foldl srcTypeApp (srcTypeConstructor (fmap coerceProperName className)) tys)
 infer' (TypedValue checkType val ty) = do
   moduleName <- unsafeCheckCurrentModule
@@ -487,7 +465,7 @@ inferBinder val (ConstructorBinder ss ctor binders) = do
   env <- getEnv
   case M.lookup ctor (dataConstructors env) of
     Just (_, _, ty, _) -> do
-      (_, fn) <- instantiatePolyTypeWithUnknowns (internalError "Data constructor types cannot contain constraints") ty
+      (_, fn) <- instantiateValAndPolyTypeWithUnknowns (internalError "Data constructor types cannot contain constraints") ty
       fn' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ fn
       let (args, ret) = peelArgs fn'
           expected = length args
@@ -559,7 +537,7 @@ instantiateForBinders
 instantiateForBinders vals cas = unzip <$> zipWithM (\val inst -> do
   TypedValue' _ val' ty <- infer val
   if inst
-    then instantiatePolyTypeWithUnknowns val' ty
+    then instantiateValAndPolyTypeWithUnknowns val' ty
     else return (val', ty)) vals shouldInstantiate
   where
   shouldInstantiate :: [Bool]
@@ -642,7 +620,7 @@ check' val t@(ConstrainedType _ con@(Constraint _ (Qualified _ (ProperName class
 check' val u@(TUnknown _ _) = do
   val'@(TypedValue' _ _ ty) <- infer val
   -- Don't unify an unknown with an inferred polytype
-  (val'', ty') <- instantiatePolyTypeWithUnknowns (tvToExpr val') ty
+  (val'', ty') <- instantiateValAndPolyTypeWithUnknowns (tvToExpr val') ty
   unifyTypes ty' u
   return $ TypedValue' True val'' ty'
 check' v@(Literal _ (NumericLiteral (Left _))) t | t == tyInt =
@@ -683,11 +661,8 @@ check' (DeferredDictionary className tys) ty = do
   -- correct super instance dictionaries in scope, and these are not available when the type class
   -- declaration gets desugared.
   -}
-  dicts <- getTypeClassDictionaries
-  hints <- getHints
-  return $ TypedValue' False
-             (TypeClassDictionary (srcConstraint className tys Nothing) dicts hints)
-             ty
+  dict <- getTypeClassDictionary $ srcConstraint className tys Nothing
+  return $ TypedValue' False dict ty
 check' (TypedValue checkType val ty1) ty2 = do
   kind <- kindOf ty1
   checkTypeKind ty1 kind
@@ -780,15 +755,16 @@ checkProperties expr ps row lax = convert <$> go ps (toRowPair <$> ts') r' where
   go ((p,v):ps') ts r =
     case lookup (Label p) ts of
       Nothing -> do
-        v'@(TypedValue' _ _ ty) <- infer v
+        tv@(TypedValue' _ _ ty) <- infer v
         rest <- freshType
-        unifyTypes r (srcRCons (Label p) ty rest)
+        ty' <- instantiatePolyTypeWithUnknowns ty
+        unifyTypes r (srcRCons (Label p) ty' rest)
         ps'' <- go ps' ts rest
-        return $ (p, v') : ps''
+        return $ (p, tv) : ps''
       Just ty -> do
-        v' <- check v ty
+        tv <- check v ty
         ps'' <- go ps' (delete (Label p, ty) ts) r
-        return $ (p, v') : ps''
+        return $ (p, tv) : ps''
   go _ _ _ = throwError . errorMessage $ ExprDoesNotHaveType expr (srcTypeApp tyRecord row)
 
 -- | Check the type of a function application, rethrowing errors to provide a better error message.
@@ -835,15 +811,14 @@ checkFunctionApplication' fn (ForAll _ ident _ ty _) arg = do
 checkFunctionApplication' fn (KindedType _ ty _) arg =
   checkFunctionApplication fn ty arg
 checkFunctionApplication' fn (ConstrainedType _ con fnTy) arg = do
-  dicts <- getTypeClassDictionaries
-  hints <- getHints
-  checkFunctionApplication' (App fn (TypeClassDictionary con dicts hints)) fnTy arg
+  dict <- getTypeClassDictionary con
+  checkFunctionApplication' (App fn dict) fnTy arg
 checkFunctionApplication' fn fnTy dict@TypeClassDictionary{} =
   return (fnTy, App fn dict)
 checkFunctionApplication' fn u arg = do
   tv@(TypedValue' _ _ ty) <- do
     TypedValue' _ arg' t <- infer arg
-    (arg'', t') <- instantiatePolyTypeWithUnknowns arg' t
+    (arg'', t') <- instantiateValAndPolyTypeWithUnknowns arg' t
     return $ TypedValue' True arg'' t'
   ret <- freshType
   unifyTypes u (function ty ret)

@@ -5,6 +5,8 @@
 --
 module Language.PureScript.TypeChecker.Unify
   ( freshType
+  , instantiatePolyTypeWithUnknowns
+  , instantiateValAndPolyTypeWithUnknowns
   , solveType
   , substituteType
   , unknownsInType
@@ -44,6 +46,36 @@ freshType = do
   t <- gets checkNextType
   modify $ \st -> st { checkNextType = t + 1 }
   return $ srcTUnknown t
+
+-- | Remove any ForAlls and ConstrainedType constructors in a type by introducing new unknowns.
+--
+-- This is necessary during type checking to avoid unifying a polymorphic type with a
+-- unification variable.
+instantiatePolyTypeWithUnknowns :: MonadState CheckState m => SourceType -> m SourceType
+instantiatePolyTypeWithUnknowns (ForAll _ ident _ ty _) = do
+  ty' <- replaceVarWithUnknown ident ty
+  instantiatePolyTypeWithUnknowns ty'
+instantiatePolyTypeWithUnknowns (ConstrainedType _ _ ty) = do
+   instantiatePolyTypeWithUnknowns ty
+instantiatePolyTypeWithUnknowns ty = return ty
+
+-- | Remove any ForAlls and ConstrainedType constructors in a type by introducing new unknowns
+-- or TypeClassDictionary values.
+--
+-- This is necessary during type checking to avoid unifying a polymorphic type with a
+-- unification variable.
+instantiateValAndPolyTypeWithUnknowns
+  :: (MonadState CheckState m, MonadError MultipleErrors m)
+  => Expr
+  -> SourceType
+  -> m (Expr, SourceType)
+instantiateValAndPolyTypeWithUnknowns val (ForAll _ ident _ ty _) = do
+  ty' <- replaceVarWithUnknown ident ty
+  instantiateValAndPolyTypeWithUnknowns val ty'
+instantiateValAndPolyTypeWithUnknowns val (ConstrainedType _ con ty) = do
+   dict <- getTypeClassDictionary con
+   instantiateValAndPolyTypeWithUnknowns (App val dict) ty
+instantiateValAndPolyTypeWithUnknowns val ty = return (val, ty)
 
 -- | Update the substitution to solve a type constraint
 solveType :: (MonadError MultipleErrors m, MonadState CheckState m) => Int -> SourceType -> m ()

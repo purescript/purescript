@@ -97,10 +97,9 @@ subsumes' mode ty1 (KindedType _ ty2 _) =
 -- Only check subsumption for constrained types when elaborating.
 -- Otherwise fall back to unification.
 subsumes' SElaborate (ConstrainedType _ con ty1) ty2 = do
-  dicts <- getTypeClassDictionaries
-  hints <- getHints
+  dict <- getTypeClassDictionary con
   elaborate <- subsumes' SElaborate ty1 ty2
-  let addDicts val = App val (TypeClassDictionary con dicts hints)
+  let addDicts val = App val dict
   return (elaborate . addDicts)
 subsumes' mode (TypeApp _ f1 r1) (TypeApp _ f2 r2) | eqType f1 tyRecord && eqType f2 tyRecord = do
     let (common, ((ts1', r1'), (ts2', r2'))) = alignRowsWith (subsumes' SNoElaborate) r1 r2
@@ -112,14 +111,22 @@ subsumes' mode (TypeApp _ f1 r1) (TypeApp _ f2 r2) | eqType f1 tyRecord && eqTyp
       (for_ (firstMissingProp ts2' ts1') (throwError . errorMessage . PropertyIsMissing . rowListLabel))
     when (eqType r2' $ REmpty ())
       (for_ (firstMissingProp ts1' ts2') (throwError . errorMessage . AdditionalProperty . rowListLabel))
+    ts1'' <- traverse removePolyTypes ts1'
+    ts2'' <- traverse removePolyTypes ts2'
     -- Check subsumption for common labels
     sequence_ common
-    unifyTypes (rowFromList (ts1', r1')) (rowFromList (ts2', r2'))
+    unifyTypes (rowFromList (ts1'', r1')) (rowFromList (ts2'', r2'))
     -- Nothing was elaborated, return the default coercion
     return (defaultCoercion mode)
   where
     -- Find the first property that's in the first list (of tuples) but not in the second
     firstMissingProp t1 t2 = fst <$> uncons (minusBy' (comparing rowListLabel) t1 t2)
+    mapRowListItem :: Monad m => (Type a -> m (Type a)) -> RowListItem a -> m (RowListItem a)
+    mapRowListItem f rli = do
+      ty' <- f (rowListType rli)
+      return $ rli { rowListType = ty' }
+    removePolyTypes :: MonadState CheckState m => RowListItem SourceAnn -> m (RowListItem SourceAnn)
+    removePolyTypes = mapRowListItem instantiatePolyTypeWithUnknowns
 subsumes' mode ty1 ty2@(TypeApp _ obj _) | obj == tyRecord =
   subsumes' mode ty2 ty1
 subsumes' mode ty1 ty2 = do

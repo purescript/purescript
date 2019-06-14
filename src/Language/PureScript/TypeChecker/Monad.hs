@@ -180,6 +180,13 @@ lookupTypeClassDictionariesForClass
   -> m (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict))
 lookupTypeClassDictionariesForClass mn cn = fromMaybe M.empty . M.lookup cn <$> lookupTypeClassDictionaries mn
 
+-- | Generate the type class dictionary for a given constraint and CheckState.
+getTypeClassDictionary :: MonadState CheckState m => SourceConstraint -> m Expr
+getTypeClassDictionary con = do
+  dicts <- getTypeClassDictionaries
+  hints <- getHints
+  return $ TypeClassDictionary con dicts hints
+
 -- | Temporarily bind a collection of names to local variables
 bindLocalVariables
   :: (MonadState CheckState m)
