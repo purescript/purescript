@@ -57,6 +57,7 @@ dependencies:
   - directory >=1.2.3
   - dlist
   - edit-distance
+  - extra
   - file-embed
   - filepath
   - fsnotify >=0.2.1
