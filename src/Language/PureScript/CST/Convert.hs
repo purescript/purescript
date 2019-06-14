@@ -446,9 +446,9 @@ convertDeclaration :: String -> Declaration a -> [AST.Declaration]
 convertDeclaration fileName decl = case decl of
   DeclData _ (DataHead _ a vars) bd -> do
     let
-      ctrs :: SourceToken -> DataCtor a -> [(SourceToken, DataCtor a)] -> [AST.DataCtorDeclarationData]
+      ctrs :: SourceToken -> DataCtor a -> [(SourceToken, DataCtor a)] -> [AST.DataConstructorDeclaration]
       ctrs st (DataCtor _ name fields) tl
-        = AST.DataCtorDeclarationData (sourceAnnCommented fileName st (nameTok name)) (nameValue name) (zip ctrFields $ convertType fileName <$> fields)
+        = AST.DataConstructorDeclaration (sourceAnnCommented fileName st (nameTok name)) (nameValue name) (zip ctrFields $ convertType fileName <$> fields)
         : (case tl of
             [] -> []
             hd : tl' -> ctrs (fst hd) (snd hd) tl'
@@ -460,7 +460,7 @@ convertDeclaration fileName decl = case decl of
       (goTypeVar <$> vars)
       (convertType fileName bd)
   DeclNewtype _ (DataHead _ a vars) _ x ys -> do
-    let ctrs = [AST.DataCtorDeclarationData (uncurry (sourceAnnCommented fileName) $ declRange decl) (nameValue x) [(head ctrFields, convertType fileName ys)]]
+    let ctrs = [AST.DataConstructorDeclaration (uncurry (sourceAnnCommented fileName) $ declRange decl) (nameValue x) [(head ctrFields, convertType fileName ys)]]
     pure $ AST.DataDeclaration ann Env.Newtype (nameValue a) (goTypeVar <$> vars) ctrs
   DeclClass _ (ClassHead _ sup name vars fdeps) bd -> do
     let

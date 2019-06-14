@@ -49,14 +49,14 @@ addDataType
   -> DataDeclType
   -> ProperName 'TypeName
   -> [(Text, Maybe SourceKind)]
-  -> [DataCtorDeclarationData]
+  -> [DataConstructorDeclaration]
   -> SourceKind
   -> m ()
 addDataType moduleName dtype name args dctors ctorKind = do
   env <- getEnv
-  let mapDataCtor (DataCtorDeclarationData _ ctorName vars) = (ctorName, snd <$> vars)
+  let mapDataCtor (DataConstructorDeclaration _ ctorName vars) = (ctorName, snd <$> vars)
   putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (ctorKind, DataType args (map mapDataCtor dctors)) (types env) }
-  for_ dctors $ \(DataCtorDeclarationData _ dctor fields) ->
+  for_ dctors $ \(DataConstructorDeclaration _ dctor fields) ->
     warnAndRethrow (addHint (ErrorInDataConstructor dctor)) $
       addDataConstructor moduleName dtype name (map fst args) dctor fields
 
@@ -497,10 +497,9 @@ checkNewtype
   :: forall m
    . MonadError MultipleErrors m
   => ProperName 'TypeName
-  -- -> [(ProperName 'ConstructorName, [(Ident, SourceType)])]
-  -> [DataCtorDeclarationData]
+  -> [DataConstructorDeclaration]
   -> m ()
-checkNewtype _ [(DataCtorDeclarationData _ _ [_])] = return ()
+checkNewtype _ [(DataConstructorDeclaration _ _ [_])] = return ()
 checkNewtype name _ = throwError . errorMessage $ InvalidNewtype name
 
 -- |
