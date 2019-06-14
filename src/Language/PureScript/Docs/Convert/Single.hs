@@ -130,7 +130,7 @@ convertDeclaration (P.DataDeclaration sa dtype _ args ctors) title =
   children = map convertCtor ctors
   convertCtor :: P.DataCtorDeclarationData -> ChildDeclaration
   convertCtor P.DataCtorDeclarationData{..} =
-    ChildDeclaration (P.runProperName dataCtorProperName) Nothing Nothing (ChildDataConstructor (fmap (($> ()) . snd) dataCtorVars))
+    ChildDeclaration (P.runProperName dataCtorProperName) (convertComments $ snd dataCtorAnn) Nothing (ChildDataConstructor (fmap (($> ()) . snd) dataCtorVars))
 convertDeclaration (P.ExternDataDeclaration sa _ kind') title =
   basicDeclaration sa title (ExternDataDeclaration (kind' $> ()))
 convertDeclaration (P.ExternKindDeclaration sa _) title =
