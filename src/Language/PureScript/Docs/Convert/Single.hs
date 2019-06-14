@@ -128,9 +128,9 @@ convertDeclaration (P.DataDeclaration sa dtype _ args ctors) title =
   where
   info = DataDeclaration dtype (fmap (fmap (fmap ($> ()))) args)
   children = map convertCtor ctors
-  convertCtor :: (P.ProperName 'P.ConstructorName, [(P.Ident, P.SourceType)]) -> ChildDeclaration
-  convertCtor (ctor', tys) =
-    ChildDeclaration (P.runProperName ctor') Nothing Nothing (ChildDataConstructor (fmap (($> ()) . snd) tys))
+  convertCtor :: P.DataCtorDeclarationData -> ChildDeclaration
+  convertCtor P.DataCtorDeclarationData{..} =
+    ChildDeclaration (P.runProperName dataCtorProperName) Nothing Nothing (ChildDataConstructor (fmap (($> ()) . snd) dataCtorVars))
 convertDeclaration (P.ExternDataDeclaration sa _ kind') title =
   basicDeclaration sa title (ExternDataDeclaration (kind' $> ()))
 convertDeclaration (P.ExternKindDeclaration sa _) title =

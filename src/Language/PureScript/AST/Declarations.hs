@@ -481,6 +481,15 @@ pattern ValueDecl :: SourceAnn -> Ident -> NameKind -> [Binder] -> [GuardedExpr]
 pattern ValueDecl sann ident name binders expr
   = ValueDeclaration (ValueDeclarationData sann ident name binders expr)
 
+data DataCtorDeclarationData = DataCtorDeclarationData
+  { dataCtorAnn :: !SourceAnn
+  , dataCtorProperName :: !(ProperName 'ConstructorName)
+  , dataCtorVars :: ![(Ident, SourceType)]
+  } deriving (Show, Eq)
+
+traverseDataCtorVars :: Monad m => ([(Ident, SourceType)] -> m [(Ident, SourceType)]) -> DataCtorDeclarationData -> m DataCtorDeclarationData
+traverseDataCtorVars f DataCtorDeclarationData{..} = DataCtorDeclarationData dataCtorAnn dataCtorProperName <$> f dataCtorVars
+
 -- |
 -- The data type of declarations
 --
@@ -488,7 +497,7 @@ data Declaration
   -- |
   -- A data type declaration (data or newtype, name, arguments, data constructors)
   --
-  = DataDeclaration SourceAnn DataDeclType (ProperName 'TypeName) [(Text, Maybe SourceKind)] [(ProperName 'ConstructorName, [(Ident, SourceType)])]
+  = DataDeclaration SourceAnn DataDeclType (ProperName 'TypeName) [(Text, Maybe SourceKind)] [DataCtorDeclarationData]
   -- |
   -- A minimal mutually recursive set of data type declarations
   --

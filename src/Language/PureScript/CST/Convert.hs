@@ -446,18 +446,21 @@ convertDeclaration :: String -> Declaration a -> [AST.Declaration]
 convertDeclaration fileName decl = case decl of
   DeclData _ (DataHead _ a vars) bd -> do
     let
-      ctr (DataCtor _ x ys) = (nameValue x, zip ctrFields $ convertType fileName <$> ys)
-      ctrs = case bd of
-        Nothing -> []
-        Just (_, cs) -> ctr <$> toList cs
-    pure $ AST.DataDeclaration ann Env.Data (nameValue a) (goTypeVar <$> vars) ctrs
+      ctrs :: SourceToken -> DataCtor a -> [(SourceToken, DataCtor a)] -> [AST.DataCtorDeclarationData]
+      ctrs st (DataCtor _ name fields) tl
+        = AST.DataCtorDeclarationData (sourceAnnCommented fileName st (nameTok name)) (nameValue name) (zip ctrFields $ convertType fileName <$> fields)
+        : (case tl of
+            [] -> []
+            hd : tl' -> ctrs (fst hd) (snd hd) tl'
+          )
+    pure $ AST.DataDeclaration ann Env.Data (nameValue a) (goTypeVar <$> vars) (maybe [] (\(st, Separated hd tl) -> ctrs st hd tl) bd)
   DeclType _ (DataHead _ a vars) _ bd ->
     pure $ AST.TypeSynonymDeclaration ann
       (nameValue a)
       (goTypeVar <$> vars)
       (convertType fileName bd)
   DeclNewtype _ (DataHead _ a vars) _ x ys -> do
-    let ctrs = [(nameValue x, [(head ctrFields, convertType fileName ys)])]
+    let ctrs = [AST.DataCtorDeclarationData (uncurry (sourceAnnCommented fileName) $ declRange decl) (nameValue x) [(head ctrFields, convertType fileName ys)]]
     pure $ AST.DataDeclaration ann Env.Newtype (nameValue a) (goTypeVar <$> vars) ctrs
   DeclClass _ (ClassHead _ sup name vars fdeps) bd -> do
     let

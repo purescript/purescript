@@ -88,7 +88,7 @@ extractSpans d = case d of
     (IdeNamespaced IdeNSType (P.runProperName name), ss) : concatMap extractSpans' members
   P.DataDeclaration (ss, _) _ name _ ctors ->
     (IdeNamespaced IdeNSType (P.runProperName name), ss)
-    : map (\(cname, _) -> (IdeNamespaced IdeNSValue (P.runProperName cname), ss)) ctors
+    : map (\dcdd -> (IdeNamespaced IdeNSValue (P.runProperName $ P.dataCtorProperName dcdd), ss)) ctors
   P.FixityDeclaration (ss, _) (Left (P.ValueFixity _ _ opName)) ->
     [(IdeNamespaced IdeNSValue (P.runOpName opName), ss)]
   P.FixityDeclaration (ss, _) (Right (P.TypeFixity _ _ opName)) ->
