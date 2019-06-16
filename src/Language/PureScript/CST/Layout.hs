@@ -146,13 +146,15 @@ insertLayout src@(SourceToken tokAnn tok) nextPos stack =
       inP _ lyt    = isIndented lyt
 
     TokLowerName [] "let" ->
-      case stk of
+      state & insertKwProperty next
+      where
+      next state'@(stk', _) = case stk' of
         (p, LytDo) : _ | srcColumn p == srcColumn tokPos ->
-          state & insertKwProperty (insertStart LytLetStmt)
+          state' & insertStart LytLetStmt
         (p, LytAdo) : _ | srcColumn p == srcColumn tokPos ->
-          state & insertKwProperty (insertStart LytLetStmt)
+          state' & insertStart LytLetStmt
         _ ->
-          state & insertKwProperty (insertStart LytLet)
+          state' & insertStart LytLet
 
     TokLowerName _ "do" ->
       state & insertKwProperty (insertStart LytDo)
