@@ -51,6 +51,7 @@ import Language.PureScript.Errors
 import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.Traversals
+import Language.PureScript.TypeClassDictionaries (TypeClassDictionaryInScope(..))
 import Language.PureScript.TypeChecker.Entailment
 import Language.PureScript.TypeChecker.Kinds
 import Language.PureScript.TypeChecker.Monad
@@ -173,11 +174,30 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
     constrain cs ty = foldr srcConstrainedType ty (map (\(_, _, x) -> x) cs)
 
     -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
-    tidyUp ts sub = first (map (second (first (second (overTypes (substituteType sub) *** substituteType sub))))) ts
+    tidyUp ts sub = first (map (second (first (second (updateExpr sub *** substituteType sub))))) ts
 
     isHoleError :: ErrorMessage -> Bool
     isHoleError (ErrorMessage _ HoleInferredType{}) = True
     isHoleError _ = False
+
+    updateContextsInExpr :: Substitution -> Expr -> Expr
+    updateContextsInExpr subst = go
+      where
+      (_, go, _) = everywhereOnValues id g id
+      g (TypeClassDictionary con ctx hints) =
+          TypeClassDictionary con (update ctx) hints
+      g expr = expr
+      getLocal = fromMaybe M.empty . M.lookup localScope
+      localScope = Nothing
+      modifyDict f dict = dict { tcdInstanceTypes = f (tcdInstanceTypes dict) }
+      modifyLocal = M.map . M.map . fmap $ modifyDict $ fmap $ substituteType subst
+      update ctx = M.insert localScope (modifyLocal . getLocal $ ctx) ctx
+
+    updateTypeAnnotations :: Substitution -> Expr -> Expr
+    updateTypeAnnotations subst = overTypes $ substituteType subst
+
+    updateExpr :: Substitution -> Expr -> Expr
+    updateExpr subst = updateContextsInExpr subst . updateTypeAnnotations subst
 
 -- | A binding group contains multiple value definitions, some of which are typed
 -- and some which are not.
