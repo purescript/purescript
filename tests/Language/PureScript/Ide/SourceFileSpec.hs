@@ -28,7 +28,7 @@ synonym1 = P.TypeSynonymDeclaration ann1 (P.ProperName "Synonym1") [] P.srcREmpt
 class1 = P.TypeClassDeclaration ann1 (P.ProperName "Class1") [] [] [] []
 class2 = P.TypeClassDeclaration ann1 (P.ProperName "Class2") [] [] [] [member1]
 data1 = P.DataDeclaration ann1 P.Newtype (P.ProperName "Data1") [] []
-data2 = P.DataDeclaration ann1 P.Data (P.ProperName "Data2") [] [(P.ProperName "Cons1", [])]
+data2 = P.DataDeclaration ann1 P.Data (P.ProperName "Data2") [] [P.DataConstructorDeclaration ann1 (P.ProperName "Cons1") []]
 valueFixity =
   P.ValueFixityDeclaration
     ann1
