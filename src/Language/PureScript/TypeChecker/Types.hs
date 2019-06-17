@@ -185,13 +185,11 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
       where
       (_, go, _) = everywhereOnValues id g id
       g (TypeClassDictionary con ctx hints) =
-          TypeClassDictionary con (update ctx) hints
+          TypeClassDictionary con (updateCtx ctx) hints
       g expr = expr
-      getLocal = fromMaybe M.empty . M.lookup localScope
-      localScope = Nothing
-      modifyDict f dict = dict { tcdInstanceTypes = f (tcdInstanceTypes dict) }
-      modifyLocal = M.map . M.map . fmap $ modifyDict $ fmap $ substituteType subst
-      update ctx = M.insert localScope (modifyLocal . getLocal $ ctx) ctx
+      updateDict f dict = dict { tcdInstanceTypes = f (tcdInstanceTypes dict) }
+      updateScope = fmap . fmap . fmap . fmap $ updateDict $ fmap $ substituteType subst
+      updateCtx = M.alter updateScope Nothing
 
     updateTypeAnnotations :: Substitution -> Expr -> Expr
     updateTypeAnnotations subst = overTypes $ substituteType subst
