@@ -129,6 +129,9 @@ data DocsAssertion
   -- | Assert that a documented declaration includes a documentation comment
   -- containing a particular string
   | ShouldHaveDocComment P.ModuleName Text Text
+  -- | Assert that a documented data declaration includes a documentation comment
+  -- | containing a particular string
+  | ShouldHaveDataConstructorDocComment P.ModuleName Text Text Text
   -- | Assert that there should be some declarations re-exported from a
   -- particular module in a particular package.
   | ShouldHaveReExport (Docs.InPackage P.ModuleName)
@@ -173,6 +176,9 @@ displayAssertion = \case
   ShouldHaveDocComment mn decl excerpt ->
     "the string " <> T.pack (show excerpt) <> " should appear in the" <>
     " doc-comments for " <> showQual mn decl
+  ShouldHaveDataConstructorDocComment mn decl constr excerpt ->
+    "the string " <> T.pack (show excerpt) <> " should appear in the" <>
+    " doc-comments for data constructor " <> T.pack (show constr) <> " for " <> showQual mn decl
   ShouldHaveReExport inPkg ->
     "there should be some re-exports from " <>
     showInPkg P.runModuleName inPkg
@@ -402,6 +408,12 @@ runAssertion assertion linksCtx Docs.Module{..} =
           then Pass
           else Fail (DocCommentMissing mn decl declComments)
 
+    ShouldHaveDataConstructorDocComment mn decl constr expected ->
+      findDeclChildren mn decl constr $ \Docs.ChildDeclaration{..} ->
+        if maybe False (expected `T.isInfixOf`) cdeclComments
+          then Pass
+          else Fail (DocCommentMissing mn constr cdeclComments)
+
     ShouldHaveReExport reExp ->
       let
         reExps = map fst modReExports
@@ -453,6 +465,14 @@ runAssertion assertion linksCtx Docs.Module{..} =
       case find ((==) title . Docs.declTitle) (declarationsFor mn) of
         Nothing ->
           Fail (NotDocumented mn title)
+        Just decl ->
+          f decl
+
+  findDeclChildren mn title child f =
+    findDecl mn title $ \Docs.Declaration{..} ->
+      case find ((==) child . Docs.cdeclTitle) declChildren of
+        Nothing ->
+          Fail (NotDocumented mn child)
         Just decl ->
           f decl
 
@@ -606,6 +626,10 @@ testCases =
 
   , ("DocComments",
       [ ShouldHaveDocComment (n "DocComments") "example" "    example == 0"
+      ])
+
+  , ("DocCommentsDataConstructor",
+      [ ShouldHaveDataConstructorDocComment (n "DocCommentsDataConstructor") "Foo" "Bar" "data constructor comment"
       ])
 
   , ("TypeLevelString",
