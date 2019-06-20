@@ -911,8 +911,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line "An exhaustivity check was abandoned due to too many possible cases."
             , line "You may want to decompose your data types into smaller types."
             ]
-    renderSimpleErrorMessage (UnusedImport name) =
-      line $ "The import of module " <> markCode (runModuleName name) <> " is redundant"
+
+    renderSimpleErrorMessage (UnusedImport mn qualifier) =
+      let
+        mark = markCode . runModuleName
+        qualify' q = " (qualified as " <> mark q <> ")"
+        qualify = maybe "" qualify'
+      in line $ "The import of module " <> mark mn <> qualify qualifier <> " is redundant"
 
     renderSimpleErrorMessage msg@(UnusedExplicitImport mn names _ _) =
       paras [ line $ "The import of module " <> markCode (runModuleName mn) <> " contains the following unused references:"
