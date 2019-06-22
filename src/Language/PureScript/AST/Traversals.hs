@@ -325,6 +325,34 @@ everythingOnValues (<>.) f g h i j = (f', g', h', i', j')
   k' (ConditionGuard e) = g' e
   k' (PatternGuard b e) = h' b <>. g' e
 
+-- |
+-- A fold for paramorphisms associated with (1) an initial object represented
+-- by the coproduct 'Node'
+-- @
+--   data Node
+--     = A Declaration
+--     | NonLiteral Expr
+--     | Literal Expr
+--     | B Binder
+--     | C CaseAlternative
+--     | D DoNotationElement
+-- @
+-- and (2) the functorial context
+-- > type Context s r = (s, r, r -> r -> r, s -> Node -> (s, r))
+--
+-- Given an initial state, a default output value, a binary action on the
+-- output type, and six independent state-transition transformers (one each for
+-- 'Declaration's, 'Binder's, 'CaseAlternative's, and 'DoNotationElement's; and
+-- two for 'Expr's), determine five corresponding mutually recursive data-
+-- gathering functions that generate "measurements" of type 'r' for values of
+-- any of the constituent types of the coproduct 'Node'.
+--
+-- Two input functions for 'Expr' are required in order to allow distinguishing
+-- of values inside 'Literal' 'Expr's from values independent of literal objects
+-- and arrays. (The function 'immediateLitIdentsAndAllOtherIdents' in module
+-- 'Language.PureScript.Sugar.BindingGroups' is an example of a client for
+-- this feature.)
+--
 everythingWithContextOnValues
   :: forall s r
    . s
@@ -332,7 +360,9 @@ everythingWithContextOnValues
   -> (r -> r -> r)
   -> (s -> Declaration       -> (s, r))
   -> (s -> Expr              -> (s, r))
+  -- ^ Transformer of 'Expr' nodes without 'Literal' ancestors
   -> (s -> Expr              -> (s, r))
+  -- ^ Transformer of 'Expr' nodes strictly dominated by a 'Literal' 'Expr'
   -> (s -> Binder            -> (s, r))
   -> (s -> CaseAlternative   -> (s, r))
   -> (s -> DoNotationElement -> (s, r))
