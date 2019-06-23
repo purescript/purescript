@@ -17,10 +17,9 @@ matrix:
     - os: osx
 
     - os: windows
-      # Workaround for a Travis caching bug on Windows where absolute paths
-      # are not restored from caches properly:
-      # https://github.com/travis-ci/casher/pull/38
-      env: STACK_ROOT=$TRAVIS_BUILD_DIR/.stack_root
+      # Override the default stack root directory to ensure that it will be
+      # cached
+      env: STACK_ROOT=$HOME/.stack
       # workaround for https://travis-ci.community/t/windows-instances-hanging-before-install/250/15
       filter_secrets: false
 addons:
@@ -47,11 +46,6 @@ cache:
 # built (which is sensible of them).
   directories:
   - $HOME/.stack
-
-  # Workaround for a Travis caching bug on Windows where absolute paths
-  # are not restored from caches properly:
-  # https://github.com/travis-ci/casher/pull/38
-  - .stack_root
   # Maximum amount of time in seconds spent attempting to upload a new cache
   # before aborting. Since our cache can get rather large, increasing this
   # value helps avoid situations where caches fail to be stored. The default
