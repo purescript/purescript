@@ -66,16 +66,9 @@ install:
   URL="https://github.com/commercialhaskell/stack/releases/download/v${STACK_VERSION}/stack-${STACK_VERSION}-${TRAVIS_OS_NAME}-x86_64.tar.gz"
   mkdir "$HOME/stack"
   pushd "$HOME/stack"
-  if [ "$TRAVIS_OS_NAME" = "windows" ]
-  then
-    curl --location "$URL" > stack.zip
-    unzip stack.zip
-    mv stack.exe "$HOME/.local/bin/"
-  else
-    curl --location "$URL" > stack.tar.gz
-    tar -xzf stack.tar.gz --strip-components=1
-    mv stack "$HOME/.local/bin/"
-  fi
+  curl --location "$URL" > stack.tar.gz
+  tar -xzf stack.tar.gz --strip-components=1
+  mv stack "$HOME/.local/bin/"
   popd
 - | # Set up the timeout command
   if which timeout >/dev/null
