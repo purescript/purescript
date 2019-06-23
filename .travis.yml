@@ -86,18 +86,9 @@ install:
     echo "Unable to set up timeout command"
     exit 1
   fi
-- |
-  if ! stack --no-terminal setup 2>&1 > stack-setup.log
-  then
-    cat stack-setup.log
-    exit 1
-  else
-    # stack setup is very verbose on windows
-    tail stack-setup.log
-  fi
-- head stack-setup.log
 - stack --version
 - stack path
+- stack --no-terminal setup
 - npm install -g bower # for psc-docs / psc-publish tests
 - export OS_NAME=$(./ci/convert-os-name.sh)
 - |
