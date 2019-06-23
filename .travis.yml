@@ -87,8 +87,8 @@ install:
     exit 1
   fi
 - stack --version
-- stack path
 - stack --no-terminal setup
+- stack path
 - npm install -g bower # for psc-docs / psc-publish tests
 - export OS_NAME=$(./ci/convert-os-name.sh)
 - |
