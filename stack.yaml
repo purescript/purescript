@@ -3,8 +3,9 @@ pvp-bounds: upper
 packages:
 - '.'
 extra-deps:
-- network-3.0.1.1
+- happy-1.19.9
 - language-javascript-0.6.0.13
+- network-3.0.1.1
 nix:
   enable: false
   packages:

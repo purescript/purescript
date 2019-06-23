@@ -92,7 +92,7 @@ dependencies:
   - utf8-string >=1 && <2
   - vector
 build-tools:
-  - happy ==1.19.11
+  - happy ==1.19.9
 
 library:
   source-dirs: src
