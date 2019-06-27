@@ -30,7 +30,7 @@ import           System.FilePath ((</>))
 import           System.FilePath.Glob (glob)
 import           System.Exit (exitFailure, exitSuccess)
 import           System.IO (hPutStr, stderr)
-import           System.IO.UTF8 (readUTF8FilesTUnique)
+import           System.IO.UTF8 (readUTF8FilesT)
 import qualified Language.PureScript as P
 import qualified Language.PureScript.CST as CST
 import           Language.PureScript.Hierarchy (Graph(..), _unDigraph, _unGraphName, typeClasses)
@@ -42,7 +42,7 @@ data HierarchyOptions = HierarchyOptions
 
 parseInput :: [FilePath] -> IO (Either P.MultipleErrors [P.Module])
 parseInput paths = do
-  content <- readUTF8FilesTUnique paths
+  content <- readUTF8FilesT paths
   return $ map snd <$> CST.parseFromFiles id content
 
 compile :: HierarchyOptions -> IO ()

@@ -7,7 +7,7 @@ import qualified Language.PureScript.CST as CST
 import           Language.PureScript.Interactive.Types
 import           System.Directory (getCurrentDirectory)
 import           System.FilePath (pathSeparator, makeRelative)
-import           System.IO.UTF8 (readUTF8FileT, readUTF8FilesTUnique)
+import           System.IO.UTF8 (readUTF8FileT, readUTF8FilesT)
 
 -- * Support Module
 
@@ -34,7 +34,7 @@ loadModule filename = do
 loadAllModules :: [FilePath] -> IO (Either P.MultipleErrors [(FilePath, P.Module)])
 loadAllModules files = do
   pwd <- getCurrentDirectory
-  filesAndContent <- readUTF8FilesTUnique files
+  filesAndContent <- readUTF8FilesT files
   return $ CST.parseFromFiles (makeRelative pwd) filesAndContent
 
 -- |

@@ -4,25 +4,22 @@ module System.IO.UTF8 where
 
 import Prelude.Compat
 
-import           Control.Monad
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Search as BSS
 import qualified Data.ByteString.UTF8 as UTF8
-import           Data.List.Extra (nubOrd)
 import           Data.Text (Text)
 import qualified Data.Text.Encoding as TE
+import           Protolude (ordNub)
 
 -- | Unfortunately ByteString's readFile does not convert line endings on
 -- Windows, so we have to do it ourselves
 fixCRLF :: BS.ByteString -> BS.ByteString
 fixCRLF = BSL.toStrict . BSS.replace "\r\n" ("\n" :: BS.ByteString)
 
-readUTF8FilesTUnique :: [FilePath] -> IO [(FilePath, Text)]
-readUTF8FilesTUnique =  readUTF8FilesT . nubOrd
-
 readUTF8FilesT :: [FilePath] -> IO [(FilePath, Text)]
-readUTF8FilesT inputFiles = forM inputFiles $ \inFile -> (inFile, ) <$> readUTF8FileT inFile
+readUTF8FilesT =
+  traverse (\inFile -> (inFile, ) <$> readUTF8FileT inFile) . ordNub
 
 readUTF8FileT :: FilePath -> IO Text
 readUTF8FileT inFile =

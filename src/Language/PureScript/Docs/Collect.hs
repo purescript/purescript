@@ -13,7 +13,7 @@ import Data.String (String)
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import System.FilePath ((</>))
-import System.IO.UTF8 (readUTF8FileT, readUTF8FilesTUnique)
+import System.IO.UTF8 (readUTF8FileT, readUTF8FilesT)
 
 import Language.PureScript.Docs.Convert.ReExports (updateReExports)
 import Language.PureScript.Docs.Prim (primModules)
@@ -89,7 +89,7 @@ compileForDocs ::
   m [P.ExternsFile]
 compileForDocs outputDir inputFiles = do
   result <- liftIO $ do
-    moduleFiles <- readUTF8FilesTUnique inputFiles
+    moduleFiles <- readUTF8FilesT inputFiles
     fmap fst $ P.runMake testOptions $ do
       ms <- P.parseModulesFromFiles identity moduleFiles
       let filePathMap = Map.fromList $ map (\(fp, pm) -> (P.getModuleName $ P.resPartial pm, Right fp)) ms
