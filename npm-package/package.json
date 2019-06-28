@@ -1,6 +1,6 @@
 {
   "name": "purescript",
-  "version": "0.13.0",
+  "version": "0.13.1",
   "license": "ISC",
   "description": "PureScript wrapper that makes it available as a local dependency",
   "author": {
@@ -42,7 +42,7 @@
     "wrapper"
   ],
   "scripts": {
-    "postinstall": "install-purescript --purs-ver=0.13.0",
+    "postinstall": "install-purescript --purs-ver=0.13.1",
     "test": "echo 'Error: no test specified' && exit 1"
   }
 }
