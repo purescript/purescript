@@ -1,6 +1,6 @@
 {
   "name": "purescript",
-  "version": "0.13.2-pre.2",
+  "version": "0.13.2-pre.3",
   "license": "ISC",
   "description": "PureScript wrapper that makes it available as a local dependency",
   "author": {
