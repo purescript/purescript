@@ -451,7 +451,7 @@ convertDeclaration fileName decl = case decl of
         = AST.DataConstructorDeclaration (sourceAnnCommented fileName st (nameTok name)) (nameValue name) (zip ctrFields $ convertType fileName <$> fields)
         : (case tl of
             [] -> []
-            hd : tl' -> ctrs (fst hd) (snd hd) tl'
+            (st', ctor) : tl' -> ctrs st' ctor tl'
           )
     pure $ AST.DataDeclaration ann Env.Data (nameValue a) (goTypeVar <$> vars) (maybe [] (\(st, Separated hd tl) -> ctrs st hd tl) bd)
   DeclType _ (DataHead _ a vars) _ bd ->
