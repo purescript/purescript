@@ -295,7 +295,7 @@ resolveDocumentationForModule (P.Module _ moduleComments moduleName sdecls _) de
     sdecls
 
   dtorComments :: P.DataConstructorDeclaration -> (P.Name, [P.Comment])
-  dtorComments dcd = (P.DctorName (P.dataCtorProperName dcd), snd (P.dataCtorAnn dcd))
+  dtorComments dcd = (P.DctorName (P.dataCtorName dcd), snd (P.dataCtorAnn dcd))
 
   name :: P.Declaration -> Maybe P.Name
   name (P.TypeDeclaration d) = Just $ P.IdentName $ P.tydeclIdent d

@@ -101,7 +101,7 @@ extractSpans d = case d of
   _ -> []
   where
     dtorSpan :: P.DataConstructorDeclaration -> (IdeNamespaced, P.SourceSpan)
-    dtorSpan P.DataConstructorDeclaration{ P.dataCtorProperName = name, P.dataCtorAnn = (ss, _) } =
+    dtorSpan P.DataConstructorDeclaration{ P.dataCtorName = name, P.dataCtorAnn = (ss, _) } =
       (IdeNamespaced IdeNSValue (P.runProperName name), ss)
     -- We need this special case to be able to also get the position info for
     -- typeclass member functions. Typedeclarations would clash with value

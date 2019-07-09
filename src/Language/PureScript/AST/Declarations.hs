@@ -483,12 +483,12 @@ pattern ValueDecl sann ident name binders expr
 
 data DataConstructorDeclaration = DataConstructorDeclaration
   { dataCtorAnn :: !SourceAnn
-  , dataCtorProperName :: !(ProperName 'ConstructorName)
-  , dataCtorVars :: ![(Ident, SourceType)]
+  , dataCtorName :: !(ProperName 'ConstructorName)
+  , dataCtorFields :: ![(Ident, SourceType)]
   } deriving (Show, Eq)
 
 traverseDataCtorVars :: Monad m => ([(Ident, SourceType)] -> m [(Ident, SourceType)]) -> DataConstructorDeclaration -> m DataConstructorDeclaration
-traverseDataCtorVars f DataConstructorDeclaration{..} = DataConstructorDeclaration dataCtorAnn dataCtorProperName <$> f dataCtorVars
+traverseDataCtorVars f DataConstructorDeclaration{..} = DataConstructorDeclaration dataCtorAnn dataCtorName <$> f dataCtorFields
 
 -- |
 -- The data type of declarations
