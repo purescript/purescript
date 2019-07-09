@@ -459,8 +459,8 @@ convertDeclaration fileName decl = case decl of
       (nameValue a)
       (goTypeVar <$> vars)
       (convertType fileName bd)
-  DeclNewtype _ (DataHead _ a vars) _ x ys -> do
-    let ctrs = [AST.DataConstructorDeclaration (uncurry (sourceAnnCommented fileName) $ declRange decl) (nameValue x) [(head ctrFields, convertType fileName ys)]]
+  DeclNewtype _ (DataHead _ a vars) st x ys -> do
+    let ctrs = [AST.DataConstructorDeclaration (sourceAnnCommented fileName st (snd $ declRange decl)) (nameValue x) [(head ctrFields, convertType fileName ys)]]
     pure $ AST.DataDeclaration ann Env.Newtype (nameValue a) (goTypeVar <$> vars) ctrs
   DeclClass _ (ClassHead _ sup name vars fdeps) bd -> do
     let
