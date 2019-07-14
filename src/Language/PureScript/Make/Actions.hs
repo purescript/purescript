@@ -9,6 +9,7 @@ module Language.PureScript.Make.Actions
 
 import           Prelude
 
+import           Control.Exception (tryJust)
 import           Control.Monad hiding (sequence)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.IO.Class
@@ -16,7 +17,7 @@ import           Control.Monad.Reader (asks)
 import           Control.Monad.Supply
 import           Control.Monad.Trans.Class (MonadTrans(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
-import           Data.Aeson (encode)
+import qualified Data.Aeson as Aeson
 import           Data.Bifunctor (bimap)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.Lazy as LB
@@ -25,7 +26,7 @@ import           Data.Either (partitionEithers)
 import           Data.Foldable (for_, minimum)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as M
-import           Data.Maybe (fromMaybe)
+import           Data.Maybe (fromMaybe, maybeToList)
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
@@ -44,6 +45,7 @@ import qualified Language.PureScript.CST as CST
 import qualified Language.PureScript.Docs.Types as Docs
 import           Language.PureScript.Errors
 import           Language.PureScript.Make.Monad
+import           Language.PureScript.Make.Cache
 import           Language.PureScript.Names
 import           Language.PureScript.Names (runModuleName, ModuleName)
 import           Language.PureScript.Options hiding (codegenTargets)
@@ -53,6 +55,7 @@ import           SourceMap
 import           SourceMap.Types
 import           System.Directory (doesFileExist, getModificationTime, createDirectoryIfMissing, getCurrentDirectory)
 import           System.FilePath ((</>), takeDirectory, makeRelative, splitPath, normalise)
+import           System.IO.Error (isDoesNotExistError)
 
 -- | Determines when to rebuild a module
 data RebuildPolicy
@@ -83,10 +86,10 @@ renderProgressMessage (CompilingModule mn) = "Compiling " ++ T.unpack (runModule
 --
 -- * The details of how files are read/written etc.
 data MakeActions m = MakeActions
-  { getInputTimestamp :: ModuleName -> m (Either RebuildPolicy (Maybe UTCTime))
-  -- ^ Get the timestamp for the input file(s) for a module. If there are multiple
-  -- files (@.purs@ and foreign files, for example) the timestamp should be for
-  -- the most recently modified file.
+  { getInputTimestampsAndHashes :: ModuleName -> m (Either RebuildPolicy (M.Map FilePath (UTCTime, m ContentHash)))
+  -- ^ Get the timestamps and content hashes for the input files for a module.
+  -- The content hash is returned as a monadic action so that the file does not
+  -- have to be read if it's not necessary.
   , getOutputTimestamp :: ModuleName -> m (Maybe UTCTime)
   -- ^ Get the timestamp for the output files for a module. This should be the
   -- timestamp for the oldest modified file, or 'Nothing' if any of the required
@@ -100,6 +103,12 @@ data MakeActions m = MakeActions
   -- ^ Check ffi and print it in the output directory.
   , progress :: ProgressMessage -> m ()
   -- ^ Respond to a progress update.
+  , readCacheDb :: m CacheDb
+  -- ^ Read the cache database (which contains timestamps and hashes for input
+  -- files) from some external source, e.g. a file on disk.
+  , writeCacheDb :: CacheDb -> m ()
+  -- ^ Write the given cache database to some external source (e.g. a file on
+  -- disk).
   }
 
 -- | A set of make actions that read and write modules from the given directory.
@@ -114,15 +123,24 @@ buildMakeActions
   -- ^ Generate a prefix comment?
   -> MakeActions Make
 buildMakeActions outputDir filePathMap foreigns usePrefix =
-    MakeActions getInputTimestamp getOutputTimestamp readExterns codegen ffiCodegen progress
+    MakeActions getInputTimestampsAndHashes getOutputTimestamp readExterns codegen ffiCodegen progress readCacheDb writeCacheDb
   where
 
-  getInputTimestamp :: ModuleName -> Make (Either RebuildPolicy (Maybe UTCTime))
-  getInputTimestamp mn = do
+  getInputTimestampsAndHashes
+    :: ModuleName
+    -> Make (Either RebuildPolicy (M.Map FilePath (UTCTime, Make ContentHash)))
+  getInputTimestampsAndHashes mn = do
     let path = fromMaybe (internalError "Module has no filename in 'make'") $ M.lookup mn filePathMap
-    e1 <- traverse getTimestamp path
-    fPath <- maybe (return Nothing) getTimestamp $ M.lookup mn foreigns
-    return $ fmap (max fPath) e1
+    case path of
+      Left policy ->
+        return (Left policy)
+      Right filePath -> do
+        let inputPaths = filePath : maybeToList (M.lookup mn foreigns)
+            getInfo fp = do
+              ts <- getTimestamp fp >>= maybe (throwError (singleError (cannotReadFile fp))) pure
+              return (ts, hash <$> readTextFile fp)
+        pathsWithInfo <- traverse (\fp -> (fp,) <$> getInfo fp) inputPaths
+        return $ Right $ M.fromList pathsWithInfo
 
   outputFilename :: ModuleName -> String -> FilePath
   outputFilename mn fn =
@@ -156,7 +174,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     when (S.member CoreFn codegenTargets) $ do
       let coreFnFile = targetFilename mn CoreFn
           json = CFJ.moduleToJSON Paths.version m
-      lift $ writeTextFile coreFnFile (encode json)
+      lift $ writeTextFile coreFnFile (Aeson.encode json)
     when (S.member JS codegenTargets) $ do
       foreignInclude <- case mn `M.lookup` foreigns of
         Just _
@@ -167,7 +185,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
         Nothing | requiresForeign m -> throwError . errorMessage' (CF.moduleSourceSpan m) $ MissingFFIModule mn
                 | otherwise -> return Nothing
       rawJs <- J.moduleToJs m foreignInclude
-      dir <- lift $ makeIO (const (ErrorMessage [] $ CannotGetFileInfo ".")) getCurrentDirectory
+      dir <- lift $ makeIO (const (cannotGetFileInfo ".")) getCurrentDirectory
       let sourceMaps = S.member JSSourceMap codegenTargets
           (pjs, mappings) = if sourceMaps then prettyPrintJSWithSourceMaps rawJs else (prettyPrintJS rawJs, [])
           jsFile = targetFilename mn JS
@@ -179,7 +197,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
         writeTextFile jsFile (B.fromStrict $ TE.encodeUtf8 $ js <> mapRef)
         when sourceMaps $ genSourceMap dir mapFile (length prefix) mappings
     when (S.member Docs codegenTargets) $ do
-      lift $ writeTextFile (outputFilename mn "docs.json") (encode docs)
+      lift $ writeTextFile (outputFilename mn "docs.json") (Aeson.encode docs)
 
   ffiCodegen :: CF.Module CF.Ann -> Make ()
   ffiCodegen m = do
@@ -212,7 +230,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
         }) mappings
     }
     let mapping = generate rawMapping
-    writeTextFile mapFile (encode mapping)
+    writeTextFile mapFile (Aeson.encode mapping)
     where
     add :: Int -> Int -> SourcePos -> SourcePos
     add n m (SourcePos n' m') = SourcePos (n+n') (m+m')
@@ -225,14 +243,14 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   requiresForeign = not . null . CF.moduleForeign
 
   getTimestamp :: FilePath -> Make (Maybe UTCTime)
-  getTimestamp path = makeIO (const (ErrorMessage [] $ CannotGetFileInfo path)) $ do
+  getTimestamp path = makeIO (const (cannotReadFile path)) $ do
     exists <- doesFileExist path
     if exists
       then Just <$> getModificationTime path
       else pure Nothing
 
   writeTextFile :: FilePath -> B.ByteString -> Make ()
-  writeTextFile path text = makeIO (const (ErrorMessage [] $ CannotWriteFile path)) $ do
+  writeTextFile path text = makeIO (const (cannotWriteFile path)) $ do
     mkdirp path
     B.writeFile path text
     where
@@ -241,6 +259,31 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 
   progress :: ProgressMessage -> Make ()
   progress = liftIO . putStrLn . renderProgressMessage
+
+  readCacheDb :: Make CacheDb
+  readCacheDb = do
+    let path = outputDir </> cacheDbFile
+    makeIO (const (cannotReadFile path)) $ do
+      r <- tryJust
+             (guard . isDoesNotExistError)
+             (Aeson.decodeFileStrict' path)
+      case r of
+        Left () ->
+          pure mempty
+        Right mdb ->
+          pure (fromMaybe mempty mdb)
+
+  writeCacheDb :: CacheDb -> Make ()
+  writeCacheDb db = do
+    let path = outputDir </> cacheDbFile
+    makeIO (const (cannotWriteFile path)) $
+      Aeson.encodeFile path db
+
+  cannotWriteFile = ErrorMessage [] . CannotWriteFile
+  cannotReadFile = ErrorMessage [] . CannotReadFile
+  cannotGetFileInfo = ErrorMessage [] . CannotGetFileInfo
+
+  cacheDbFile = "cache-db.json"
 
 -- | Check that the declarations in a given PureScript module match with those
 -- in its corresponding foreign module.

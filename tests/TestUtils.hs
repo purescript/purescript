@@ -198,13 +198,13 @@ checkMain ms =
 
 makeActions :: [P.Module] -> M.Map P.ModuleName FilePath -> P.MakeActions P.Make
 makeActions modules foreigns = (P.buildMakeActions modulesDir (P.internalError "makeActions: input file map was read.") foreigns False)
-                               { P.getInputTimestamp = getInputTimestamp
+                               { P.getInputTimestampsAndHashes = getInputTimestampsAndHashes
                                , P.getOutputTimestamp = getOutputTimestamp
                                , P.progress = const (pure ())
                                }
   where
-  getInputTimestamp :: P.ModuleName -> P.Make (Either P.RebuildPolicy (Maybe UTCTime))
-  getInputTimestamp mn
+  getInputTimestampsAndHashes :: P.ModuleName -> P.Make (Either P.RebuildPolicy a)
+  getInputTimestampsAndHashes mn
     | isSupportModule (P.runModuleName mn) = return (Left P.RebuildNever)
     | otherwise = return (Left P.RebuildAlways)
     where

@@ -20,6 +20,7 @@ import qualified TestPsci
 import qualified TestIde
 import qualified TestPscPublish
 import qualified TestBundle
+import qualified TestMake
 import qualified TestUtils
 
 import System.IO (hSetEncoding, stdout, stderr, utf8)
@@ -35,6 +36,7 @@ main = do
   cstTests <- TestCst.main
   ideTests <- TestIde.main
   compilerTests <- TestCompiler.main
+  makeTests <- TestMake.main
   psciTests <- TestPsci.main
   pscBundleTests <- TestBundle.main
   coreFnTests <- TestCoreFn.main
@@ -48,6 +50,7 @@ main = do
       "Tests"
       [ cstTests
       , compilerTests
+      , makeTests
       , psciTests
       , pscBundleTests
       , ideTests

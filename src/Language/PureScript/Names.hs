@@ -12,6 +12,7 @@ import Prelude.Compat
 
 import Control.Monad.Supply.Class
 import Control.DeepSeq (NFData)
+import Data.Functor.Contravariant (contramap)
 
 import GHC.Generics (Generic)
 import Data.Aeson
@@ -243,3 +244,9 @@ isQualifiedWith _ _ = False
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Qualified)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Ident)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ModuleName)
+
+instance ToJSONKey ModuleName where
+  toJSONKey = contramap runModuleName toJSONKey
+
+instance FromJSONKey ModuleName where
+  fromJSONKey = fmap moduleNameFromString fromJSONKey
