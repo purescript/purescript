@@ -487,8 +487,8 @@ data DataConstructorDeclaration = DataConstructorDeclaration
   , dataCtorFields :: ![(Ident, SourceType)]
   } deriving (Show, Eq)
 
-traverseDataCtorVars :: Monad m => ([(Ident, SourceType)] -> m [(Ident, SourceType)]) -> DataConstructorDeclaration -> m DataConstructorDeclaration
-traverseDataCtorVars f DataConstructorDeclaration{..} = DataConstructorDeclaration dataCtorAnn dataCtorName <$> f dataCtorFields
+traverseDataCtorFields :: Monad m => ([(Ident, SourceType)] -> m [(Ident, SourceType)]) -> DataConstructorDeclaration -> m DataConstructorDeclaration
+traverseDataCtorFields f DataConstructorDeclaration{..} = DataConstructorDeclaration dataCtorAnn dataCtorName <$> f dataCtorFields
 
 -- |
 -- The data type of declarations
