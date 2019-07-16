@@ -28,6 +28,7 @@ import Language.PureScript.Sugar.TypeClasses (typeClassMemberName, superClassDic
 import Language.PureScript.Types
 import Language.PureScript.PSString (mkString)
 import qualified Language.PureScript.AST as A
+import qualified Language.PureScript.Constants as C
 
 -- | Desugars a module from AST to CoreFn representation.
 moduleToCoreFn :: Environment -> A.Module -> Module Ann
@@ -85,6 +86,8 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     internalError "Abs with Binder argument was not desugared before exprToCoreFn mn"
   exprToCoreFn ss com ty (A.App v1 v2) =
     App (ss, com, ty, Nothing) (exprToCoreFn ss [] Nothing v1) (exprToCoreFn ss [] Nothing v2)
+  exprToCoreFn ss com ty (A.Unused _) =
+    Var (ss, com, ty, Nothing) (Qualified (Just (ModuleName [ProperName C.prim])) (Ident C.undefined))
   exprToCoreFn _ com ty (A.Var ss ident) =
     Var (ss, com, ty, getValueMeta ident) ident
   exprToCoreFn ss com ty (A.IfThenElse v1 v2 v3) =

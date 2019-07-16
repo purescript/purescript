@@ -4,6 +4,7 @@ module Language.PureScript.CoreImp.Optimizer.TCO (tco) where
 import Prelude.Compat
 
 import Data.Text (Text)
+import qualified Language.PureScript.Constants as C
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.AST.SourcePos (SourceSpan)
 import Safe (headDef, tailSafe)
@@ -120,6 +121,9 @@ tco = everywhere convert where
     markDone ss = Assignment ss (Var ss tcoDone) (BooleanLiteral ss True)
 
     collectArgs :: [[AST]] -> AST -> [[AST]]
+    collectArgs acc (App _ fn []) =
+      -- count 0-argument applications as single-argument so we get the correct number of args
+      collectArgs ([Var Nothing C.undefined] : acc) fn
     collectArgs acc (App _ fn args') = collectArgs (args' : acc) fn
     collectArgs acc _ = acc
 

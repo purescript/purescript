@@ -125,17 +125,23 @@ addTypeClass
   -> m ()
 addTypeClass qualifiedClassName args implies dependencies ds = do
   env <- getEnv
-  traverse_ (checkMemberIsUsable (typeSynonyms env)) classMembers
+  let newClass = mkNewClass env
+  traverse_ (checkMemberIsUsable newClass (typeSynonyms env)) classMembers
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert qualifiedClassName newClass (typeClasses . checkEnv $ st) } }
   where
     classMembers :: [(Ident, SourceType)]
     classMembers = map toPair ds
 
-    newClass :: TypeClassData
-    newClass = makeTypeClassData args classMembers implies dependencies
+    mkNewClass :: Environment -> TypeClassData
+    mkNewClass env = makeTypeClassData args classMembers implies dependencies ctIsEmpty
+      where
+      ctIsEmpty = null classMembers && all (typeClassIsEmpty . findSuperClass) implies
+      findSuperClass c = case M.lookup (constraintClass c) (typeClasses env) of
+        Just tcd -> tcd
+        Nothing -> internalError "Unknown super class in TypeClassDeclaration"
 
-    coveringSets :: [S.Set Int]
-    coveringSets = S.toList (typeClassCoveringSets newClass)
+    coveringSets :: TypeClassData -> [S.Set Int]
+    coveringSets = S.toList . typeClassCoveringSets
 
     argToIndex :: Text -> Maybe Int
     argToIndex = flip M.lookup $ M.fromList (zipWith ((,) . fst) args [0..])
@@ -146,11 +152,11 @@ addTypeClass qualifiedClassName args implies dependencies ds = do
     -- Currently we are only checking usability based on the type class currently
     -- being defined.  If the mentioned arguments don't include a covering set,
     -- then we won't be able to find a instance.
-    checkMemberIsUsable :: T.SynonymMap -> (Ident, SourceType) -> m ()
-    checkMemberIsUsable syns (ident, memberTy) = do
+    checkMemberIsUsable :: TypeClassData -> T.SynonymMap -> (Ident, SourceType) -> m ()
+    checkMemberIsUsable newClass syns (ident, memberTy) = do
       memberTy' <- T.replaceAllTypeSynonymsM syns memberTy
       let mentionedArgIndexes = S.fromList (mapMaybe argToIndex (freeTypeVariables memberTy'))
-      let leftovers = map (`S.difference` mentionedArgIndexes) coveringSets
+      let leftovers = map (`S.difference` mentionedArgIndexes) (coveringSets newClass)
 
       unless (any null leftovers) . throwError . errorMessage $
         let
