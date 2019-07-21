@@ -73,7 +73,7 @@ checkSubsume unsolved env st userT envT = checkInEnvironment env st $ do
         (Entailment.SolverOptions
           { solverShouldGeneralize = True
           , solverDeferErrors      = False
-          }) constraint' context [] expP) unsolved
+          }) constraint' context []) unsolved
 
   -- Finally, check any constraints which were found during elaboration
   Entailment.replaceTypeClassDictionaries (isJust unsolved) expP

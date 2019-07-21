@@ -1523,19 +1523,3 @@ parU xs f =
     collectErrors es = case partitionEithers es of
       ([], rs) -> return rs
       (errs, _) -> throwError $ fold errs
-
--- Throw all UnknownValue errors in an Expr
--- Useful for ensuring that UnknownValue errors are thrown
--- before errors which may be caused by them are thrown.
-throwExprHoles
-  :: (MonadError MultipleErrors m)
-  => Expr
-  -> m ()
-throwExprHoles expr = when (nonEmpty errors) $ throwError errors
-  where
-  (_, f, _, _ , _) = everythingOnValues (++) mempty goExpr mempty mempty mempty
-
-  goExpr (UnknownValue name) = [ ErrorMessage [] (UnknownName name Nothing) ]
-  goExpr _ = []
-
-  errors = MultipleErrors . f $ expr

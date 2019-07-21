@@ -93,7 +93,20 @@ replaceTypeClassDictionaries shouldGeneralize expr = flip evalStateT M.empty $ d
           if getAny solved
             then loop e'
             else return e'
-    loop expr >>= generalizePass
+
+        containsUnknownNames :: Expr -> Bool
+        containsUnknownNames =
+          let
+            goExpr (UnknownValue name) = [ ErrorMessage [] (UnknownName name Nothing) ]
+            goExpr _ = []
+
+            (_, f, _, _ , _) = everythingOnValues (++) mempty goExpr mempty mempty mempty
+          in
+            not . null . f
+
+    if containsUnknownNames expr
+      then pure (expr, [])
+      else loop expr >>= generalizePass
   where
     -- This pass solves constraints where possible, deferring constraints if not.
     deferPass :: Expr -> StateT InstanceContext m (Expr, Any)
@@ -109,7 +122,7 @@ replaceTypeClassDictionaries shouldGeneralize expr = flip evalStateT M.empty $ d
 
     go :: Bool -> Expr -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
     go deferErrors (TypeClassDictionary constraint context hints) =
-      rethrow (addHints hints) $ entails (SolverOptions shouldGeneralize deferErrors) constraint context hints expr
+      rethrow (addHints hints) $ entails (SolverOptions shouldGeneralize deferErrors) constraint context hints
     go _ other = return other
 
 -- | Three options for how we can handle a constraint, depending on the mode we're in.
@@ -158,9 +171,8 @@ entails
   -- ^ The contexts in which to solve the constraint
   -> [ErrorMessageHint]
   -- ^ Error message hints to apply to any instance errors
-  -> Expr
   -> WriterT (Any, [(Ident, InstanceContext, SourceConstraint)]) (StateT InstanceContext m) Expr
-entails SolverOptions{..} constraint context hints expr =
+entails SolverOptions{..} constraint context hints =
     solve constraint
   where
     forClassName :: InstanceContext -> Qualified (ProperName 'ClassName) -> [SourceType] -> [TypeClassDict]
@@ -305,9 +317,7 @@ entails SolverOptions{..} constraint context hints expr =
               -- We need a special case for nullary type classes, since we want
               -- to generalize over Partial constraints.
               | solverShouldGeneralize && (null tyArgs || any canBeGeneralized tyArgs) = return (Unsolved (srcConstraint className' tyArgs conInfo))
-              | otherwise = do
-                  throwExprHoles expr
-                  throwError . errorMessage $ NoInstanceFound (srcConstraint className' tyArgs conInfo)
+              | otherwise = throwError . errorMessage $ NoInstanceFound (srcConstraint className' tyArgs conInfo)
 
             unique _      [(a, dict)] = return $ Solved a dict
             unique tyArgs tcds

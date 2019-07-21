@@ -121,7 +121,6 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           let solved = foldMap (S.fromList . fdDetermined) typeClassDependencies
           let constraintTypeVars = ordNub . foldMap (unknownsInType . fst) . filter ((`notElem` solved) . snd) $ zip (constraintArgs con) [0..]
           when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $ do
-            throwExprHoles val'
             throwError
               . onErrorMessages (replaceTypes currentSubst)
               . errorMessage' ss
