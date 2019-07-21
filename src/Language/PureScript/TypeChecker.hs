@@ -12,7 +12,6 @@ module Language.PureScript.TypeChecker
 import Prelude.Compat
 import Protolude (ordNub)
 
-import Control.Arrow (second)
 import Control.Monad (when, unless, void, forM)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), modify, gets)
@@ -50,13 +49,14 @@ addDataType
   -> DataDeclType
   -> ProperName 'TypeName
   -> [(Text, Maybe SourceKind)]
-  -> [(ProperName 'ConstructorName, [(Ident, SourceType)])]
+  -> [DataConstructorDeclaration]
   -> SourceKind
   -> m ()
 addDataType moduleName dtype name args dctors ctorKind = do
   env <- getEnv
-  putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (ctorKind, DataType args (map (second (map snd)) dctors)) (types env) }
-  for_ dctors $ \(dctor, fields) ->
+  let mapDataCtor (DataConstructorDeclaration _ ctorName vars) = (ctorName, snd <$> vars)
+  putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (ctorKind, DataType args (map mapDataCtor dctors)) (types env) }
+  for_ dctors $ \(DataConstructorDeclaration _ dctor fields) ->
     warnAndRethrow (addHint (ErrorInDataConstructor dctor)) $
       addDataConstructor moduleName dtype name (map fst args) dctor fields
 
@@ -243,7 +243,7 @@ typeCheckAll moduleName _ = traverse go
     warnAndRethrow (addHint (ErrorInTypeConstructor name) . addHint (positionedError ss)) $ do
       when (dtype == Newtype) $ checkNewtype name dctors
       checkDuplicateTypeArguments $ map fst args
-      ctorKind <- kindsOf True moduleName name args (concatMap (fmap snd . snd) dctors)
+      ctorKind <- kindsOf True moduleName name args (concatMap (fmap snd . dataCtorFields) dctors)
       let args' = args `withKinds` ctorKind
       addDataType moduleName dtype name args' dctors ctorKind
     return $ DataDeclaration sa dtype name args dctors
@@ -254,7 +254,7 @@ typeCheckAll moduleName _ = traverse go
         bindingGroupNames = ordNub ((syns^..traverse._2) ++ (dataDecls^..traverse._3))
         sss = fmap declSourceSpan tys
     warnAndRethrow (addHint (ErrorInDataBindingGroup bindingGroupNames) . addHint (PositionedError sss)) $ do
-      (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(sa, _, name, args, dctors) -> (sa, name, args, concatMap (fmap snd . snd) dctors)) dataDecls)
+      (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(sa, _, name, args, dctors) -> (sa, name, args, concatMap (fmap snd . dataCtorFields) dctors)) dataDecls)
       for_ (zip dataDecls data_ks) $ \((_, dtype, name, args, dctors), ctorKind) -> do
         when (dtype == Newtype) $ checkNewtype name dctors
         checkDuplicateTypeArguments $ map fst args
@@ -503,9 +503,9 @@ checkNewtype
   :: forall m
    . MonadError MultipleErrors m
   => ProperName 'TypeName
-  -> [(ProperName 'ConstructorName, [(Ident, SourceType)])]
+  -> [DataConstructorDeclaration]
   -> m ()
-checkNewtype _ [(_, [_])] = return ()
+checkNewtype _ [(DataConstructorDeclaration _ _ [_])] = return ()
 checkNewtype name _ = throwError . errorMessage $ InvalidNewtype name
 
 -- |
