@@ -27,7 +27,13 @@ import qualified Data.Aeson as A
 import qualified Data.Text as T
 import qualified Data.Vector as V
 
-import qualified Language.PureScript as P
+import qualified Language.PureScript.AST as P
+import qualified Language.PureScript.Crash as P
+import qualified Language.PureScript.Environment as P
+import qualified Language.PureScript.Kinds as P
+import qualified Language.PureScript.Names as P
+import qualified Language.PureScript.Types as P
+import qualified Paths_purescript as Paths
 
 import Text.ParserCombinators.ReadP (readP_to_S)
 
@@ -773,7 +779,7 @@ instance A.ToJSON a => A.ToJSON (Package a) where
                                                   pkgResolvedDependencies
       , "github"               .= pkgGithub
       , "uploader"             .= pkgUploader
-      , "compilerVersion"      .= showVersion P.version
+      , "compilerVersion"      .= showVersion Paths.version
       ] ++
       fmap (\t -> "tagTime" .= formatTime t) (maybeToList pkgTagTime)
 

@@ -24,6 +24,7 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets, modify)
 import Control.Monad.Writer.Class (MonadWriter(..))
 
+import Data.Foldable (traverse_)
 import Data.Function (on)
 import Data.List (sortBy, nubBy)
 import qualified Data.Map as M
@@ -90,7 +91,7 @@ unifyTypes t1 t2 = do
   unifyTypes' (TUnknown _ u1) (TUnknown _ u2) | u1 == u2 = return ()
   unifyTypes' (TUnknown _ u) t = solveType u t
   unifyTypes' t (TUnknown _ u) = solveType u t
-  unifyTypes' (ForAll ann1 ident1 ty1 sc1) (ForAll ann2 ident2 ty2 sc2) =
+  unifyTypes' (ForAll ann1 ident1 _ ty1 sc1) (ForAll ann2 ident2 _ ty2 sc2) =
     case (sc1, sc2) of
       (Just sc1', Just sc2') -> do
         sko <- newSkolemConstant
@@ -98,7 +99,7 @@ unifyTypes t1 t2 = do
         let sk2 = skolemize ann2 ident2 sko sc2' ty2
         sk1 `unifyTypes` sk2
       _ -> internalError "unifyTypes: unspecified skolem scope"
-  unifyTypes' (ForAll ann ident ty1 (Just sc)) ty2 = do
+  unifyTypes' (ForAll ann ident _ ty1 (Just sc)) ty2 = do
     sko <- newSkolemConstant
     let sk = skolemize ann ident sko sc ty1
     sk `unifyTypes` ty2
@@ -118,6 +119,10 @@ unifyTypes t1 t2 = do
   unifyTypes' r1 r2@RCons{} = unifyRows r1 r2
   unifyTypes' r1@REmpty{} r2 = unifyRows r1 r2
   unifyTypes' r1 r2@REmpty{} = unifyRows r1 r2
+  unifyTypes' (ConstrainedType _ c1 ty1) (ConstrainedType _ c2 ty2)
+    | constraintClass c1 == constraintClass c2 && constraintData c1 == constraintData c2 = do
+        traverse_ (uncurry unifyTypes) (constraintArgs c1 `zip` constraintArgs c2)
+        ty1 `unifyTypes` ty2
   unifyTypes' ty1@ConstrainedType{} ty2 =
     throwError . errorMessage $ ConstrainedTypeUnified ty1 ty2
   unifyTypes' t3 t4@ConstrainedType{} = unifyTypes' t4 t3
@@ -200,8 +205,9 @@ varIfUnknown :: SourceType -> SourceType
 varIfUnknown ty =
   let unks = nubBy ((==) `on` snd) $ unknownsInType ty
       toName = T.cons 't' . T.pack .  show
+      addKind a = (a, Nothing)
       ty' = everywhereOnTypes typeToVar ty
       typeToVar :: SourceType -> SourceType
       typeToVar (TUnknown ann u) = TypeVar ann (toName u)
       typeToVar t = t
-  in mkForAll (sortBy (comparing snd) . fmap (fmap toName) $ unks) ty'
+  in mkForAll (fmap (fmap addKind) . sortBy (comparing snd) . fmap (fmap toName) $ unks) ty'

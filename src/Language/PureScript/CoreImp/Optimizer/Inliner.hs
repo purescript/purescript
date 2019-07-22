@@ -15,6 +15,7 @@ import Prelude.Compat
 
 import Control.Monad.Supply.Class (MonadSupply, freshName)
 
+import Data.Either (rights)
 import Data.Maybe (fromMaybe)
 import Data.String (IsString, fromString)
 import Data.Text (Text)
@@ -264,20 +265,36 @@ inlineFnComposition = everywhereTopDownM convert where
   convert (App s1 (App s2 (App _ (App _ fn [dict']) [x]) [y]) [z])
     | isFnCompose dict' fn = return $ App s1 x [App s2 y [z]]
     | isFnComposeFlipped dict' fn = return $ App s2 y [App s1 x [z]]
-  convert (App ss (App _ (App _ fn [dict']) [x]) [y])
-    | isFnCompose dict' fn = do
-        arg <- freshName
-        return $ Function ss Nothing [arg] (Block ss [Return Nothing $ App Nothing x [App Nothing y [Var Nothing arg]]])
-    | isFnComposeFlipped dict' fn = do
-        arg <- freshName
-        return $ Function ss Nothing [arg] (Block ss [Return Nothing $ App Nothing y [App Nothing x [Var Nothing arg]]])
+  convert app@(App ss (App _ (App _ fn [dict']) _) _)
+    | isFnCompose dict' fn || isFnComposeFlipped dict' fn = mkApps ss <$> goApps app <*> freshName
   convert other = return other
+
+  mkApps :: Maybe SourceSpan -> [Either AST (Text, AST)] -> Text -> AST
+  mkApps ss fns a = App ss (Function ss Nothing [] (Block ss $ vars <> [Return Nothing comp])) []
+    where
+    vars = uncurry (VariableIntroduction ss) . fmap Just <$> rights fns
+    comp = Function ss Nothing [a] (Block ss [Return Nothing apps])
+    apps = foldr (\fn acc -> App ss (mkApp fn) [acc]) (Var ss a) fns
+
+  mkApp :: Either AST (Text, AST) -> AST
+  mkApp = either id $ \(name, arg) -> Var (getSourceSpan arg) name
+
+  goApps :: AST -> m [Either AST (Text, AST)]
+  goApps (App _ (App _ (App _ fn [dict']) [x]) [y])
+    | isFnCompose dict' fn = mappend <$> goApps x <*> goApps y
+    | isFnComposeFlipped dict' fn = mappend <$> goApps y <*> goApps x
+  goApps app@(App {}) = pure . Right . (,app) <$> freshName
+  goApps other = pure [Left other]
+
   isFnCompose :: AST -> AST -> Bool
   isFnCompose dict' fn = isDict semigroupoidFn dict' && isDict fnCompose fn
+
   isFnComposeFlipped :: AST -> AST -> Bool
   isFnComposeFlipped dict' fn = isDict semigroupoidFn dict' && isDict fnComposeFlipped fn
+
   fnCompose :: forall a b. (IsString a, IsString b) => (a, b)
   fnCompose = (C.controlSemigroupoid, C.compose)
+
   fnComposeFlipped :: forall a b. (IsString a, IsString b) => (a, b)
   fnComposeFlipped = (C.controlSemigroupoid, C.composeFlipped)
 

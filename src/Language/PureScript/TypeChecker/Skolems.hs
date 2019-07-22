@@ -34,7 +34,7 @@ newSkolemConstant = do
 introduceSkolemScope :: MonadState CheckState m => Type a -> m (Type a)
 introduceSkolemScope = everywhereOnTypesM go
   where
-  go (ForAll ann ident ty Nothing) = ForAll ann ident ty <$> (Just <$> newSkolemScope)
+  go (ForAll ann ident mbK ty Nothing) = ForAll ann ident mbK ty <$> (Just <$> newSkolemScope)
   go other = return other
 
 -- | Generate a new skolem scope
@@ -71,7 +71,7 @@ skolemizeTypesInValue ann ident sko scope =
     onBinder sco other = return (sco, other)
 
     peelTypeVars :: SourceType -> [Text]
-    peelTypeVars (ForAll _ i ty _) = i : peelTypeVars ty
+    peelTypeVars (ForAll _ i _ ty _) = i : peelTypeVars ty
     peelTypeVars _ = []
 
 -- | Ensure skolem variables do not escape their scope
@@ -116,7 +116,7 @@ skolemEscapeCheck expr@TypedValue{} =
 
         -- Collect any scopes appearing in quantifiers at the top level
         collectScopes :: SourceType -> [SkolemScope]
-        collectScopes (ForAll _ _ t (Just sco)) = sco : collectScopes t
+        collectScopes (ForAll _ _ _ t (Just sco)) = sco : collectScopes t
         collectScopes ForAll{} = internalError "skolemEscapeCheck: No skolem scope"
         collectScopes _ = []
 

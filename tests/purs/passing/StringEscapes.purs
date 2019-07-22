@@ -4,9 +4,8 @@ import Prelude ((==), (/=), (<>), discard)
 import Test.Assert (assert, assert')
 import Effect.Console (log)
 
-singleCharacter = "\0\b\t\n\v\f\r\"\\" == "\x0\x8\x9\xA\xB\xC\xD\x22\x5C"
-hex = "\x1D306\x2603\x3C6\xE0\x0" == "𝌆☃φà\0"
-decimal  = "\119558\9731\966\224\0" == "𝌆☃φà\0"
+singleCharacter = "\t\n\r\"\\" == "\x9\xA\xD\x22\x5C"
+hex = "\x1D306\x2603\x3C6\xE0" == "𝌆☃φà"
 surrogatePair = "\xD834\xDF06" == "\x1D306"
 highSurrogate = "\xD834"
 lowSurrogate = "\xDF06"
@@ -18,7 +17,6 @@ notReplacing = replacement /= highSurrogate
 main = do
   assert' "single-character escape sequences" singleCharacter
   assert' "hex escape sequences" hex
-  assert' "decimal escape sequences" decimal
   assert' "astral code points are represented as a UTF-16 surrogate pair" surrogatePair
   assert' "lone surrogates may be combined into a surrogate pair" loneSurrogates
   assert' "lone surrogates may be combined out of order to remain lone surrogates" outOfOrderSurrogates

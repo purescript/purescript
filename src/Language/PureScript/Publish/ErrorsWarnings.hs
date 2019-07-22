@@ -21,18 +21,18 @@ import Data.Aeson.BetterErrors (ParseError, displayError)
 import Data.List (intersperse)
 import Data.List.NonEmpty (NonEmpty(..))
 import Data.Maybe
-import Data.Monoid
+import Data.Monoid hiding (First, getFirst)
+import Data.Semigroup (First(..))
 import Data.Version
 import qualified Data.List.NonEmpty as NonEmpty
 import Data.Text (Text)
 import qualified Data.Text as T
 
-import Language.PureScript.Docs.Types (ManifestError)
-import Language.PureScript.Publish.BoxesHelpers
+import qualified Language.PureScript.Docs.Types as D
 import qualified Language.PureScript as P
+import Language.PureScript.Publish.BoxesHelpers
 
 import Web.Bower.PackageMeta (PackageName, runPackageName, showBowerError)
-import qualified Web.Bower.PackageMeta as Bower
 
 -- | An error which meant that it was not possible to retrieve metadata for a
 -- package.
@@ -44,17 +44,16 @@ data PackageError
 
 data PackageWarning
   = NoResolvedVersion PackageName
-  | UndeclaredDependency PackageName
   | UnacceptableVersion (PackageName, Text)
   | DirtyWorkingTree_Warn
-  | MissingPath PackageName
+  | LegacyResolutionsFormat FilePath
   deriving (Show)
 
 -- | An error that should be fixed by the user.
 data UserError
   = PackageManifestNotFound
   | ResolutionsFileNotFound
-  | CouldntDecodePackageManifest (ParseError ManifestError)
+  | CouldntDecodePackageManifest (ParseError D.ManifestError)
   | TagMustBeCheckedOut
   | AmbiguousVersions [Version] -- Invariant: should contain at least two elements
   | BadRepositoryField RepositoryFieldError
@@ -63,6 +62,7 @@ data UserError
   | MissingDependencies (NonEmpty PackageName)
   | CompileError P.MultipleErrors
   | DirtyWorkingTree
+  | ResolutionsFileError FilePath (ParseError D.PackageError)
   deriving (Show)
 
 data RepositoryFieldError
@@ -71,11 +71,9 @@ data RepositoryFieldError
   | NotOnGithub
   deriving (Show)
 
-
 -- | An error that probably indicates a bug in this module.
 data InternalError
-  = JSONError JSONSource (ParseError ManifestError)
-  | CouldntParseGitTagDate Text
+  = CouldntParseGitTagDate Text
   deriving (Show)
 
 data JSONSource
@@ -221,6 +219,10 @@ displayUserError e = case e of
         "Your git working tree is dirty. Please commit, discard, or stash " ++
         "your changes first."
         )
+  ResolutionsFileError path err ->
+    successivelyIndented $
+      [ "Error in resolutions file (" ++ path ++ "):" ]
+      ++ map T.unpack (displayError D.displayPackageError err)
 
 spdxExamples :: [Box]
 spdxExamples =
@@ -276,20 +278,9 @@ displayRepositoryError err = case err of
 
 displayInternalError :: InternalError -> [String]
 displayInternalError e = case e of
-  JSONError src r ->
-    [ "Error in JSON " ++ displayJSONSource src ++ ":"
-    , T.unpack (Bower.displayError r)
-    ]
   CouldntParseGitTagDate tag ->
     [ "Unable to parse the date for a git tag: " ++ T.unpack tag
     ]
-
-displayJSONSource :: JSONSource -> String
-displayJSONSource s = case s of
-  FromFile fp ->
-    "in file " ++ show fp
-  FromResolutions ->
-    "in resolutions file"
 
 displayOtherError :: OtherError -> Box
 displayOtherError e = case e of
@@ -303,42 +294,43 @@ displayOtherError e = case e of
       [ "An IO exception occurred:", show exc ]
 
 data CollectedWarnings = CollectedWarnings
-  { noResolvedVersions     :: [PackageName]
-  , undeclaredDependencies :: [PackageName]
-  , unacceptableVersions   :: [(PackageName, Text)]
-  , dirtyWorkingTree       :: Any
-  , missingPaths           :: [PackageName]
+  { noResolvedVersions      :: [PackageName]
+  , unacceptableVersions    :: [(PackageName, Text)]
+  , dirtyWorkingTree        :: Any
+  , legacyResolutionsFormat :: Maybe (First FilePath)
   }
   deriving (Show, Eq, Ord)
 
 instance Semigroup CollectedWarnings where
-  (CollectedWarnings as bs cs d es) <> (CollectedWarnings as' bs' cs' d' es') =
-    CollectedWarnings (as <> as') (bs <> bs') (cs <> cs') (d <> d') (es <> es')
+  (<>) (CollectedWarnings a b c d) (CollectedWarnings a' b' c' d') =
+    CollectedWarnings (a <> a') (b <> b') (c <> c') (d <> d')
 
 instance Monoid CollectedWarnings where
-  mempty = CollectedWarnings mempty mempty mempty mempty mempty
+  mempty = CollectedWarnings mempty mempty mempty mempty
 
 collectWarnings :: [PackageWarning] -> CollectedWarnings
 collectWarnings = foldMap singular
   where
   singular w = case w of
-    NoResolvedVersion    pn -> CollectedWarnings [pn] mempty mempty mempty mempty
-    UndeclaredDependency pn -> CollectedWarnings mempty [pn] mempty mempty mempty
-    UnacceptableVersion t   -> CollectedWarnings mempty mempty [t] mempty mempty
-    DirtyWorkingTree_Warn   -> CollectedWarnings mempty mempty mempty (Any True) mempty
-    MissingPath pn          -> CollectedWarnings mempty mempty mempty mempty [pn]
+    NoResolvedVersion pn ->
+      mempty { noResolvedVersions = [pn] }
+    UnacceptableVersion t ->
+      mempty { unacceptableVersions = [t] }
+    DirtyWorkingTree_Warn ->
+      mempty { dirtyWorkingTree = Any True }
+    LegacyResolutionsFormat path ->
+      mempty { legacyResolutionsFormat = Just (First path) }
 
 renderWarnings :: [PackageWarning] -> Box
 renderWarnings warns =
   let CollectedWarnings{..} = collectWarnings warns
       go toBox warns' = toBox <$> NonEmpty.nonEmpty warns'
-      mboxes = [ go warnNoResolvedVersions     noResolvedVersions
-               , go warnUndeclaredDependencies undeclaredDependencies
-               , go warnUnacceptableVersions   unacceptableVersions
+      mboxes = [ go warnNoResolvedVersions noResolvedVersions
+               , go warnUnacceptableVersions unacceptableVersions
                , if getAny dirtyWorkingTree
                    then Just warnDirtyWorkingTree
                    else Nothing
-               , go warnMissingPaths           missingPaths
+               , fmap (warnLegacyResolutions . getFirst) legacyResolutionsFormat
                ]
   in case catMaybes mboxes of
        []    -> nullBox
@@ -368,21 +360,6 @@ warnNoResolvedVersions pkgNames =
       , " or a version range for ", these, " ", packages, "."
       ])
     ]
-
-warnUndeclaredDependencies :: NonEmpty PackageName -> Box
-warnUndeclaredDependencies pkgNames =
-  let singular = NonEmpty.length pkgNames == 1
-      pl a b = if singular then b else a
-
-      packages     = pl "packages" "package"
-      are          = pl "are" "is"
-      dependencies = pl "dependencies" "a dependency"
-  in vcat $
-    para (concat
-      [ "The following ", packages, " ", are, " installed, but not "
-      , "declared as ", dependencies, " in your package manifest file:"
-      ])
-    : bulletedListT runPackageName (NonEmpty.toList pkgNames)
 
 warnUnacceptableVersions :: NonEmpty (PackageName, Text) -> Box
 warnUnacceptableVersions pkgs =
@@ -419,18 +396,20 @@ warnDirtyWorkingTree =
     ++ "were not a dry run)"
     )
 
-warnMissingPaths :: NonEmpty PackageName -> Box
-warnMissingPaths pkgs =
-  let singular = NonEmpty.length pkgs == 1
-      pl a b = if singular then b else a
-
-      packages   = pl "packages" "package"
-  in vcat $
-    para (concat
-      [ "The following installed ", packages, " were "
-      , "missing path information in the resolutions file:"
-      ])
-    : bulletedListT runPackageName (NonEmpty.toList pkgs)
+warnLegacyResolutions :: FilePath -> Box
+warnLegacyResolutions path =
+  vcat $
+    [ para (concat
+        [ "Your resolutions file (" ++ path ++ ") is using the deprecated "
+        , "legacy format. Support for this format will be dropped in a future "
+        , "version."
+        ])
+    , spacer
+    , para (concat
+        [ "In most cases, all you need to do to use the new format and silence "
+        , "this warning is to upgrade Pulp."
+        ])
+    ]
 
 printWarnings :: [PackageWarning] -> IO ()
 printWarnings = printToStderr . renderWarnings

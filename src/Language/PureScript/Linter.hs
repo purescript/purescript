@@ -85,7 +85,7 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
     where
 
     step :: S.Set Text -> SourceType -> (S.Set Text, MultipleErrors)
-    step s (ForAll _ tv _ _) = bindVar s tv
+    step s (ForAll _ tv _ _ _) = bindVar s tv
     step s _ = (s, mempty)
 
     bindVar :: S.Set Text -> Text -> (S.Set Text, MultipleErrors)
@@ -96,7 +96,7 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
       -- Recursively walk the type and prune used variables from `unused`
       go :: S.Set Text -> SourceType -> (S.Set Text, MultipleErrors)
       go unused (TypeVar _ v) = (S.delete v unused, mempty)
-      go unused (ForAll _ tv t1 _) =
+      go unused (ForAll _ tv _ t1 _) =
         let (nowUnused, errors) = go (S.insert tv unused) t1
             restoredUnused = if S.member tv unused then S.insert tv nowUnused else nowUnused
             combinedErrors = if S.member tv nowUnused then errors <> errorMessage' ss (UnusedTypeVar tv) else errors

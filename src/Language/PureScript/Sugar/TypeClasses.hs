@@ -14,7 +14,8 @@ import           Control.Arrow (first, second)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.State
 import           Control.Monad.Supply.Class
-import           Data.List (find, sortBy)
+import           Data.Graph
+import           Data.List (find, partition)
 import qualified Data.Map as M
 import           Data.Maybe (catMaybes, mapMaybe, isJust, fromMaybe)
 import qualified Data.List.NonEmpty as NEL
@@ -63,8 +64,8 @@ desugarTypeClasses externs = flip evalStateT initialState . traverse desugarModu
     :: ModuleName
     -> ExternsDeclaration
     -> Maybe ((ModuleName, ProperName 'ClassName), TypeClassData)
-  fromExternsDecl mn (EDClass name args members implies deps) = Just ((mn, name), typeClass) where
-    typeClass = makeTypeClassData args members implies deps
+  fromExternsDecl mn (EDClass name args members implies deps tcIsEmpty) = Just ((mn, name), typeClass) where
+    typeClass = makeTypeClassData args members implies deps tcIsEmpty
   fromExternsDecl _ _ = Nothing
 
 desugarModule
@@ -72,14 +73,31 @@ desugarModule
   => Module
   -> Desugar m Module
 desugarModule (Module ss coms name decls (Just exps)) = do
-  (newExpss, declss) <- unzip <$> parU (sortBy classesFirst decls) (desugarDecl name exps)
-  return $ Module ss coms name (concat declss) $ Just (exps ++ catMaybes newExpss)
+  let (classDecls, restDecls) = partition isTypeClassDeclaration decls
+      classVerts = fmap (\d -> (d, classDeclName d, superClassesNames d)) classDecls
+  (classNewExpss, classDeclss) <- unzip <$> parU (stronglyConnComp classVerts) (desugarClassDecl name exps)
+  (restNewExpss, restDeclss) <- unzip <$> parU restDecls (desugarDecl name exps)
+  return $ Module ss coms name (concat restDeclss ++ concat classDeclss) $ Just (exps ++ catMaybes restNewExpss ++ catMaybes classNewExpss)
   where
-  classesFirst :: Declaration -> Declaration -> Ordering
-  classesFirst d1 d2
-    | isTypeClassDeclaration d1 && not (isTypeClassDeclaration d2) = LT
-    | not (isTypeClassDeclaration d1) && isTypeClassDeclaration d2 = GT
-    | otherwise = EQ
+  desugarClassDecl :: (MonadSupply m, MonadError MultipleErrors m)
+    => ModuleName
+    -> [DeclarationRef]
+    -> SCC Declaration
+    -> Desugar m (Maybe DeclarationRef, [Declaration])
+  desugarClassDecl name' exps' (AcyclicSCC d) = desugarDecl name' exps' d
+  desugarClassDecl _ _ (CyclicSCC ds') = throwError . errorMessage' (declSourceSpan (head ds')) $ CycleInTypeClassDeclaration (map classDeclName ds')
+
+  superClassesNames :: Declaration -> [Qualified (ProperName 'ClassName)]
+  superClassesNames (TypeClassDeclaration _ _ _ implies _ _) = fmap constraintName implies
+  superClassesNames _ = []
+
+  constraintName :: SourceConstraint -> Qualified (ProperName 'ClassName)
+  constraintName (Constraint _ cName _ _) = cName
+
+  classDeclName :: Declaration -> Qualified (ProperName 'ClassName)
+  classDeclName (TypeClassDeclaration _ pn _ _ _ _) = Qualified (Just name) pn
+  classDeclName _ = internalError "Expected TypeClassDeclaration"
+
 desugarModule _ = internalError "Exports should have been elaborated in name desugaring"
 
 {- Desugar type class and type class instance declarations
@@ -185,7 +203,7 @@ desugarDecl
 desugarDecl mn exps = go
   where
   go d@(TypeClassDeclaration sa name args implies deps members) = do
-    modify (M.insert (mn, name) (makeTypeClassData args (map memberToNameAndType members) implies deps))
+    modify (M.insert (mn, name) (makeTypeClassData args (map memberToNameAndType members) implies deps False))
     return (Nothing, d : typeClassDictionaryDeclaration sa name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
   go (TypeInstanceDeclaration _ _ _ _ _ _ _ DerivedInstance) = internalError "Derived instanced should have been desugared"
   go d@(TypeInstanceDeclaration sa _ _ name deps className tys (ExplicitInstance members)) = do

@@ -30,6 +30,7 @@ import           Language.PureScript.AST
 import qualified Language.PureScript.Bundle as Bundle
 import qualified Language.PureScript.Constants as C
 import           Language.PureScript.Crash
+import qualified Language.PureScript.CST.Errors as CST
 import           Language.PureScript.Environment
 import           Language.PureScript.Label (Label(..))
 import           Language.PureScript.Names
@@ -78,6 +79,7 @@ errorCode em = case unwrapErrorMessage em of
   ModuleNotFound{} -> "ModuleNotFound"
   ErrorParsingFFIModule{} -> "ErrorParsingFFIModule"
   ErrorParsingModule{} -> "ErrorParsingModule"
+  ErrorParsingCSTModule{} -> "ErrorParsingModule"
   MissingFFIModule{} -> "MissingFFIModule"
   UnnecessaryFFIModule{} -> "UnnecessaryFFIModule"
   MissingFFIImplementations{} -> "MissingFFIImplementations"
@@ -110,6 +112,7 @@ errorCode em = case unwrapErrorMessage em of
   InvalidDoLet -> "InvalidDoLet"
   CycleInDeclaration{} -> "CycleInDeclaration"
   CycleInTypeSynonym{} -> "CycleInTypeSynonym"
+  CycleInTypeClassDeclaration{} -> "CycleInTypeClassDeclaration"
   CycleInModules{} -> "CycleInModules"
   NameIsUndefined{} -> "NameIsUndefined"
   UndefinedTypeVariable{} -> "UndefinedTypeVariable"
@@ -455,7 +458,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage :: SimpleErrorMessage -> Box.Box
     renderSimpleErrorMessage (ModuleNotFound mn) =
       paras [ line $ "Module " <> markCode (runModuleName mn) <> " was not found."
-            , line "Make sure the source file exists, and that it has been provided as an input to the compiler."
+            , line $
+                if isBuiltinModuleName mn
+                  then
+                    "Module names in the Prim namespace are reserved for built-in modules, but this version of the compiler does not provide module " <> markCode (runModuleName mn) <> ". You may be able to fix this by updating your compiler to a newer version."
+                  else
+                    "Make sure the source file exists, and that it has been provided as an input to the compiler."
             ]
     renderSimpleErrorMessage (CannotGetFileInfo path) =
       paras [ line "Unable to read file info: "
@@ -477,6 +485,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (ErrorParsingModule err) =
       paras [ line "Unable to parse module: "
             , prettyPrintParseError err
+            ]
+    renderSimpleErrorMessage (ErrorParsingCSTModule err) =
+      paras [ line "Unable to parse module: "
+            , line $ T.pack $ CST.prettyPrintErrorMessage err
             ]
     renderSimpleErrorMessage (MissingFFIModule mn) =
       line $ "The foreign module implementation for module " <> markCode (runModuleName mn) <> " is missing."
@@ -550,7 +562,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (DeclConflict new existing) =
       line $ "Declaration for " <> printName (Qualified Nothing new) <> " conflicts with an existing " <> nameType existing <> " of the same name."
     renderSimpleErrorMessage (ExportConflict new existing) =
-      line $ "Export for " <> printName new <> " conflicts with " <> runName existing
+      line $ "Export for " <> printName new <> " conflicts with " <> printName existing
     renderSimpleErrorMessage (DuplicateModule mn) =
       line $ "Module " <> markCode (runModuleName mn) <> " has been defined multiple times"
     renderSimpleErrorMessage (DuplicateTypeClass pn ss) =
@@ -564,15 +576,26 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (CycleInDeclaration nm) =
       line $ "The value of " <> markCode (showIdent nm) <> " is undefined here, so this reference is not allowed."
     renderSimpleErrorMessage (CycleInModules mns) =
-      paras [ line "There is a cycle in module dependencies in these modules: "
-            , indent $ paras (map (line . markCode . runModuleName) mns)
-            ]
+      case mns of
+        [mn] ->
+          line $ "Module " <> markCode (runModuleName mn) <> " imports itself."
+        _ ->
+          paras [ line "There is a cycle in module dependencies in these modules: "
+                , indent $ paras (map (line . markCode . runModuleName) mns)
+                ]
     renderSimpleErrorMessage (CycleInTypeSynonym name) =
       paras [ line $ case name of
                        Just pn -> "A cycle appears in the definition of type synonym " <> markCode (runProperName pn)
                        Nothing -> "A cycle appears in a set of type synonym definitions."
             , line "Cycles are disallowed because they can lead to loops in the type checker."
             , line "Consider using a 'newtype' instead."
+            ]
+    renderSimpleErrorMessage (CycleInTypeClassDeclaration [name]) =
+      paras [ line $ "A type class '" <> markCode (runProperName (disqualify name)) <> "' may not have itself as a superclass." ]
+    renderSimpleErrorMessage (CycleInTypeClassDeclaration names) =
+      paras [ line $ "A cycle appears in a set of type class definitions:"
+            , indent $ line $ "{" <> (T.intercalate ", " (map (markCode . runProperName . disqualify) names)) <> "}"
+            , line "Cycles are disallowed because they can lead to loops in the type checker."
             ]
     renderSimpleErrorMessage (NameIsUndefined ident) =
       line $ "Value " <> markCode (showIdent ident) <> " is undefined."
@@ -857,7 +880,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
           _ -> []
       in
         paras $ [ line $ "Hole '" <> markCode name <> "' has the inferred type "
-                , markCodeBox (indent (typeAsBox prettyDepth ty))
+                , markCodeBox (indent (typeAsBox maxBound ty))
                 ] ++ tsResult ++ renderContext ctx
     renderSimpleErrorMessage (MissingTypeDeclaration ident ty) =
       paras [ line $ "No type declaration was provided for the top-level declaration of " <> markCode (showIdent ident) <> "."

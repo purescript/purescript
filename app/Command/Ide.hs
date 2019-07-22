@@ -37,10 +37,7 @@ import           Language.PureScript.Ide.Util
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Watcher
-import           Network                           hiding (socketPort, accept)
-import           Network.BSD                       (getProtocolNumber)
-import           Network.Socket                    hiding (PortNumber, Type,
-                                                    sClose)
+import qualified Network.Socket                    as Network
 import qualified Options.Applicative               as Opts
 import           System.Directory
 import           System.Info                       as SysInfo
@@ -48,24 +45,27 @@ import           System.FilePath
 import           System.IO                         hiding (putStrLn, print)
 import           System.IO.Error                   (isEOFError)
 
-listenOnLocalhost :: PortNumber -> IO Socket
+listenOnLocalhost :: Network.PortNumber -> IO Network.Socket
 listenOnLocalhost port = do
-  proto <- getProtocolNumber "tcp"
-  localhost <- inet_addr "127.0.0.1"
+  let hints = Network.defaultHints
+        { Network.addrFamily = Network.AF_INET
+        , Network.addrSocketType = Network.Stream
+        }
+  addr:_ <- Network.getAddrInfo (Just hints) (Just "127.0.0.1") (Just (show port))
   bracketOnError
-    (socket AF_INET Stream proto)
-    sClose
+    (Network.socket (Network.addrFamily addr) (Network.addrSocketType addr) (Network.addrProtocol addr))
+    Network.close
     (\sock -> do
-      setSocketOption sock ReuseAddr 1
-      bind sock (SockAddrInet port localhost)
-      listen sock maxListenQueue
+      Network.setSocketOption sock Network.ReuseAddr 1
+      Network.bind sock (Network.addrAddress addr)
+      Network.listen sock Network.maxListenQueue
       pure sock)
 
 data ServerOptions = ServerOptions
   { _serverDirectory  :: Maybe FilePath
   , _serverGlobs      :: [FilePath]
   , _serverOutputPath :: FilePath
-  , _serverPort       :: PortNumber
+  , _serverPort       :: Network.PortNumber
   , _serverNoWatch    :: Bool
   , _serverPolling    :: Bool
   , _serverLoglevel   :: IdeLogLevel
@@ -73,7 +73,7 @@ data ServerOptions = ServerOptions
   } deriving (Show)
 
 data ClientOptions = ClientOptions
-  { clientPort :: PortID
+  { clientPort :: Network.PortNumber
   }
 
 command :: Opts.Parser (IO ())
@@ -96,15 +96,22 @@ command = Opts.helper <*> subcommands where
           T.putStrLn ("Couldn't connect to purs ide server on port " <> show clientPort <> ":")
           print e
           exitFailure
-    h <- connectTo "127.0.0.1" clientPort `catch` handler
+    let hints = Network.defaultHints
+          { Network.addrFamily = Network.AF_INET
+          , Network.addrSocketType = Network.Stream
+          }
+    addr:_ <- Network.getAddrInfo (Just hints) (Just "127.0.0.1") (Just (show clientPort))
+    sock <- Network.socket (Network.addrFamily addr) (Network.addrSocketType addr) (Network.addrProtocol addr)
+    Network.connect sock (Network.addrAddress addr) `catch` handler
+    h <- Network.socketToHandle sock ReadWriteMode
     T.hPutStrLn h =<< T.getLine
     BS8.putStrLn =<< BS8.hGetLine h
     hFlush stdout
     hClose h
 
   clientOptions :: Opts.Parser ClientOptions
-  clientOptions = ClientOptions . PortNumber . fromIntegral <$>
-    Opts.option Opts.auto (Opts.long "port" <> Opts.short 'p' <> Opts.value (4242 :: Integer))
+  clientOptions = ClientOptions . fromIntegral <$>
+    Opts.option Opts.auto (Opts.long "port" `mappend` Opts.short 'p' `mappend` Opts.value (4242 :: Integer))
 
   server :: ServerOptions -> IO ()
   server opts'@(ServerOptions dir globs outputPath port noWatch polling logLevel editorMode) = do
@@ -159,12 +166,12 @@ command = Opts.helper <*> subcommands where
   -- #2209 and #2414 for explanations
   flipIfWindows = map (if SysInfo.os == "mingw32" then not else identity)
 
-startServer :: PortNumber -> IdeEnvironment -> IO ()
-startServer port env = withSocketsDo $ do
+startServer :: Network.PortNumber -> IdeEnvironment -> IO ()
+startServer port env = Network.withSocketsDo $ do
   sock <- listenOnLocalhost port
   runLogger (confLogLevel (ideConfiguration env)) (runReaderT (forever (loop sock)) env)
   where
-    loop :: (Ide m, MonadLogger m) => Socket -> m ()
+    loop :: (Ide m, MonadLogger m) => Network.Socket -> m ()
     loop sock = do
       accepted <- runExceptT (acceptCommand sock)
       case accepted of
@@ -197,8 +204,10 @@ catchGoneHandle =
       putText ("[Error] psc-ide-server tried interact with the handle, but the connection was already gone.")
     _ -> throwIO e)
 
-acceptCommand :: (MonadIO m, MonadLogger m, MonadError Text m)
-                 => Socket -> m (Text, Handle)
+acceptCommand
+  :: (MonadIO m, MonadLogger m, MonadError Text m)
+  => Network.Socket
+  -> m (Text, Handle)
 acceptCommand sock = do
   h <- acceptConnection
   $(logDebug) "Accepted a connection"
@@ -216,8 +225,8 @@ acceptCommand sock = do
   where
    acceptConnection = liftIO $ do
      -- Use low level accept to prevent accidental reverse name resolution
-     (s,_) <- accept sock
-     h     <- socketToHandle s ReadWriteMode
+     (s,_) <- Network.accept sock
+     h     <- Network.socketToHandle s ReadWriteMode
      hSetEncoding h utf8
      hSetBuffering h LineBuffering
      pure h

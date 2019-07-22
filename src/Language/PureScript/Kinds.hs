@@ -155,6 +155,12 @@ eqKind (FunKind _ a b) (FunKind _ a' b') = eqKind a a' && eqKind b b'
 eqKind (NamedKind _ a) (NamedKind _ a') = a == a'
 eqKind _ _ = False
 
+eqMaybeKind :: Maybe (Kind a) -> Maybe (Kind b) -> Bool
+eqMaybeKind Nothing (Just _) = False
+eqMaybeKind (Just _) Nothing = False
+eqMaybeKind Nothing Nothing = True
+eqMaybeKind (Just a) (Just b) = eqKind a b
+
 compareKind :: Kind a -> Kind b -> Ordering
 compareKind (KUnknown _ a) (KUnknown _ a') = compare a a'
 compareKind (KUnknown {}) _ = LT
@@ -169,3 +175,9 @@ compareKind _ (FunKind {}) = GT
 
 compareKind (NamedKind _ a) (NamedKind _ a') = compare a a'
 compareKind (NamedKind {}) _ = GT
+
+compareMaybeKind :: Maybe (Kind a) -> Maybe (Kind b) -> Ordering
+compareMaybeKind Nothing Nothing = EQ
+compareMaybeKind Nothing (Just _) = LT
+compareMaybeKind (Just _) Nothing = GT
+compareMaybeKind (Just a) (Just b) = compareKind a b
