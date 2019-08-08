@@ -164,13 +164,13 @@ indexer = mkPattern' match
   match (Indexer _ index val) = (,) <$> prettyPrintJS' index <*> pure val
   match _ = mzero
 
-lam :: Pattern PrinterState AST ((Maybe Text, [Text], Maybe SourceSpan), AST)
+lam :: Pattern PrinterState AST ((Maybe Text, [Text], Maybe SourceSpan, Bool), AST)
 lam = mkPattern match
   where
-    -- exclude Object in Return from arrow function syntax to avoid () => {a : 1}
-  match (Function ss Nothing args ret@(Block _ [Return _ (ObjectLiteral _ _)])) = Just ((Nothing, args, ss), ret)
-  match (Function ss Nothing args (Block _ [Return _ expr])) = Just ((Nothing, args, ss), expr)
-  match (Function ss name args ret) = Just ((name, args, ss), ret)
+    -- ensure, that object literals are wrapped in parents to avoid () => {a:1}
+  match (Function ss Nothing args (Block _ [Return _ expr@(ObjectLiteral _ _)])) = Just ((Nothing, args, ss, True), expr)
+  match (Function ss Nothing args (Block _ [Return _ expr])) = Just ((Nothing, args, ss, False), expr)
+  match (Function ss name args ret) = Just ((name, args, ss, False), ret)
   match _ = Nothing
 
 lamC :: Pattern PrinterState AST ((Maybe Text, [Text], Maybe SourceSpan), AST)
@@ -259,8 +259,8 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
                         <> fromMaybe "" name
                         <> "(" <> intercalate ", " args <> ") ")
                         <> ret ]
-                  , [ Wrap lam $ \(name, args, ss) ret -> addMapping' ss <> (emit (prettyPrintFunction name args))
-                      <> ret ]
+                  , [ Wrap lam $ \(name, args, ss, wrapParens) ret -> addMapping' ss <> (emit (prettyPrintFunction name args))
+                      <> (if wrapParens then emit "(" <> ret <> emit ")" else ret) ]
                   , [ unary     Not                  "!"
                     , unary     BitwiseNot           "~"
                     , unary     Positive             "+"
