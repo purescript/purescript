@@ -167,7 +167,16 @@ indexer = mkPattern' match
 lam :: Pattern PrinterState AST ((Maybe Text, [Text], Maybe SourceSpan), AST)
 lam = mkPattern match
   where
+    -- exclude Object in Return from arrow function syntax to avoid () => {a : 1}
+  match (Function ss Nothing args ret@(Block _ [Return _ (ObjectLiteral _ _)])) = Just ((Nothing, args, ss), ret)
+  match (Function ss Nothing args (Block _ [Return _ expr])) = Just ((Nothing, args, ss), expr)
   match (Function ss name args ret) = Just ((name, args, ss), ret)
+  match _ = Nothing
+
+lamC :: Pattern PrinterState AST ((Maybe Text, [Text], Maybe SourceSpan), AST)
+lamC = mkPattern match
+  where
+  match (Constructor ss name args ret) = Just ((name, args, ss), ret)
   match _ = Nothing
 
 app :: (Emit gen) => Pattern PrinterState AST (gen, AST)
@@ -217,6 +226,13 @@ prettyStatements sts = do
   indentString <- currentIndent
   return $ intercalate (emit "\n") $ map ((<> emit ";") . (indentString <>)) jss
 
+prettyPrintFunction :: Maybe Text -> [Text] -> Text
+prettyPrintFunction Nothing [arg] = arg <> " => "
+prettyPrintFunction Nothing args = "(" <> intercalate ", " args <> ") => "
+prettyPrintFunction (Just name) args = "function "
+                          <> name
+                          <> "(" <> intercalate ", " args <> ") "
+
 -- | Generate a pretty-printed string representing a collection of JavaScript expressions at the same indentation level
 prettyPrintJSWithSourceMaps :: [AST] -> (Text, [SMap])
 prettyPrintJSWithSourceMaps js =
@@ -238,11 +254,13 @@ prettyPrintJS' = A.runKleisli $ runPattern matchValue
                   , [ Wrap accessor $ \prop val -> val <> emit "." <> emit prop ]
                   , [ Wrap app $ \args val -> val <> emit "(" <> args <> emit ")" ]
                   , [ unary New "new " ]
-                  , [ Wrap lam $ \(name, args, ss) ret -> addMapping' ss <>
+                  , [ Wrap lamC $ \(name, args, ss) ret -> addMapping' ss <>
                       emit ("function "
                         <> fromMaybe "" name
                         <> "(" <> intercalate ", " args <> ") ")
                         <> ret ]
+                  , [ Wrap lam $ \(name, args, ss) ret -> addMapping' ss <> (emit (prettyPrintFunction name args))
+                      <> ret ]
                   , [ unary     Not                  "!"
                     , unary     BitwiseNot           "~"
                     , unary     Positive             "+"

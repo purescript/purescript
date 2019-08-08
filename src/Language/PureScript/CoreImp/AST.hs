@@ -64,6 +64,8 @@ data AST
   -- ^ An object literal
   | Function (Maybe SourceSpan) (Maybe Text) [Text] AST
   -- ^ A function introduction (optional name, arguments, body)
+  | Constructor (Maybe SourceSpan) (Maybe Text) [Text] AST
+  -- ^ A function constructing an object
   | App (Maybe SourceSpan) AST [AST]
   -- ^ Function application
   | Var (Maybe SourceSpan) Text
@@ -109,6 +111,7 @@ withSourceSpan withSpan = go where
   go (Indexer _ j1 j2) = Indexer ss j1 j2
   go (ObjectLiteral _ js) = ObjectLiteral ss js
   go (Function _ name args j) = Function ss name args j
+  go (Constructor _ name args j) = Constructor ss name args j
   go (App _ j js) = App ss j js
   go (Var _ s) = Var ss s
   go (Block _ js) = Block ss js
@@ -136,6 +139,7 @@ getSourceSpan = go where
   go (Indexer ss _ _) = ss
   go (ObjectLiteral ss _) = ss
   go (Function ss _ _ _) = ss
+  go (Constructor ss _ _ _) = ss
   go (App ss _ _) = ss
   go (Var ss _) = ss
   go (Block ss _) = ss
@@ -160,6 +164,7 @@ everywhere f = go where
   go (Indexer ss j1 j2) = f (Indexer ss (go j1) (go j2))
   go (ObjectLiteral ss js) = f (ObjectLiteral ss (map (fmap go) js))
   go (Function ss name args j) = f (Function ss name args (go j))
+  go (Constructor ss name args j) = f (Constructor ss name args (go j))
   go (App ss j js) = f (App ss (go j) (map go js))
   go (Block ss js) = f (Block ss (map go js))
   go (VariableIntroduction ss name j) = f (VariableIntroduction ss name (fmap go j))
@@ -186,6 +191,7 @@ everywhereTopDownM f = f >=> go where
   go (Indexer ss j1 j2) = Indexer ss <$> f' j1 <*> f' j2
   go (ObjectLiteral ss js) = ObjectLiteral ss <$> traverse (sndM f') js
   go (Function ss name args j) = Function ss name args <$> f' j
+  go (Constructor ss name args j) = Constructor ss name args <$> f' j
   go (App ss j js) = App ss <$> f' j <*> traverse f' js
   go (Block ss js) = Block ss <$> traverse f' js
   go (VariableIntroduction ss name j) = VariableIntroduction ss name <$> traverse f' j
@@ -208,6 +214,7 @@ everything (<>.) f = go where
   go j@(Indexer _ j1 j2) = f j <>. go j1 <>. go j2
   go j@(ObjectLiteral _ js) = foldl (<>.) (f j) (map (go . snd) js)
   go j@(Function _ _ _ j1) = f j <>. go j1
+  go j@(Constructor _ _ _ j1) = f j <>. go j1
   go j@(App _ j1 js) = foldl (<>.) (f j <>. go j1) (map go js)
   go j@(Block _ js) = foldl (<>.) (f j) (map go js)
   go j@(VariableIntroduction _ _ (Just j1)) = f j <>. go j1
