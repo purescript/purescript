@@ -11,6 +11,7 @@ import Data.Foldable (fold)
 import Data.List (mapAccumL)
 import Data.Maybe (mapMaybe)
 import qualified Data.List.NonEmpty as NEL
+import qualified Data.Map as M
 import qualified Data.Set as S
 
 import Language.PureScript.AST.Binders
@@ -19,6 +20,7 @@ import Language.PureScript.AST.Literals
 import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.Traversals
+import Language.PureScript.TypeClassDictionaries (TypeClassDictionaryInScope(..))
 import Language.PureScript.Types
 
 guardedExprM :: Applicative m
@@ -693,5 +695,12 @@ overTypes f = let (_, f', _) = everywhereOnValues id g id in f'
   where
   g :: Expr -> Expr
   g (TypedValue checkTy val t) = TypedValue checkTy val (f t)
-  g (TypeClassDictionary c sco hints) = TypeClassDictionary (mapConstraintArgs (fmap f) c) sco hints
+  g (TypeClassDictionary c sco hints) =
+    TypeClassDictionary
+      (mapConstraintArgs (fmap f) c)
+      (updateCtx sco)
+      hints
   g other = other
+  updateDict fn dict = dict { tcdInstanceTypes = fn (tcdInstanceTypes dict) }
+  updateScope = fmap . fmap . fmap . fmap $ updateDict $ fmap f
+  updateCtx = M.alter updateScope Nothing
