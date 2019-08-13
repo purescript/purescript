@@ -901,9 +901,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (UnusedImport mn qualifier) =
       let
         mark = markCode . runModuleName
-        qualify' q = " (qualified as " <> mark q <> ")"
-        qualify = maybe "" qualify'
-      in line $ "The import of module " <> mark mn <> qualify qualifier <> " is redundant"
+        unqualified = "The import of " <> mark mn <> " is redundant"
+        msg' q = "The qualified import of " <> mark mn <> " as " <> mark q <> " is redundant"
+        msg = maybe unqualified msg'
+      in line $ msg qualifier
 
     renderSimpleErrorMessage msg@(UnusedExplicitImport mn names _ _) =
       paras [ line $ "The import of module " <> markCode (runModuleName mn) <> " contains the following unused references:"
