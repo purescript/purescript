@@ -33,10 +33,12 @@ module Language.PureScript.Ide.Imports
 import           Protolude hiding (moduleName)
 
 import           Data.List                          (findIndex, nubBy, partition)
+import qualified Data.List.NonEmpty                 as NE
 import qualified Data.Map                           as Map
 import qualified Data.Text                          as T
 import qualified Language.PureScript                as P
 import qualified Language.PureScript.Constants      as C
+import qualified Language.PureScript.CST            as CST
 import           Language.PureScript.Ide.Completion
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Filter
@@ -46,7 +48,6 @@ import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 import           Lens.Micro.Platform                ((^.), (%~), ix, has)
 import           System.IO.UTF8                     (writeUTF8FileT)
-import qualified Text.Parsec as Parsec
 
 data Import = Import P.ModuleName P.ImportDeclarationType (Maybe P.ModuleName)
               deriving (Eq, Show)
@@ -90,21 +91,27 @@ data ImportParse = ImportParse
   -- ^ the extracted import declarations
   }
 
-parseModuleHeader :: P.TokenParser ImportParse
-parseModuleHeader = do
-  _ <- P.readComments
-  (mn, _) <- P.parseModuleDeclaration
-  (ipStart, ipEnd, decls) <- P.withSourceSpan (\(P.SourceSpan _ start end) _ -> (start, end,))
-    (P.mark (Parsec.many (P.same *> P.parseImportDeclaration')))
-  pure (ImportParse mn ipStart ipEnd (map mkImport decls))
-  where
-    mkImport (mn, (P.Explicit refs), qual) = Import mn (P.Explicit refs) qual
-    mkImport (mn, it, qual) = Import mn it qual
+parseModuleHeader :: Text -> Either (NE.NonEmpty CST.ParserError) ImportParse
+parseModuleHeader src = do
+  CST.PartialResult md _ <- CST.parseModule $ CST.lenient $ CST.lex src
+  let
+    mn = CST.nameValue $ CST.modNamespace md
+    decls = flip fmap (CST.modImports md) $ \decl -> do
+      let ((ss, _), mn', it, qual) = CST.convertImportDecl "<purs-ide>" decl
+      (ss, Import mn' it qual)
+  case (head decls, lastMay decls) of
+    (Just hd, Just ls) -> do
+      let
+        ipStart = P.spanStart $ fst hd
+        ipEnd = P.spanEnd $ fst ls
+      pure $ ImportParse mn ipStart ipEnd $ snd <$> decls
+    _ -> do
+      let pos = CST.sourcePos . CST.srcEnd . CST.tokRange . CST.tokAnn $ CST.modWhere md
+      pure $ ImportParse mn pos pos []
 
 sliceImportSection :: [Text] -> Either Text (P.ModuleName, [Text], [Import], [Text])
-sliceImportSection fileLines = first show $ do
-  tokens <- P.lexLenient "<psc-ide>" file
-  ImportParse{..} <- P.runTokenParser "<psc-ide>" parseModuleHeader tokens
+sliceImportSection fileLines = first (toS . CST.prettyPrintError . NE.head) $ do
+  ImportParse{..} <- parseModuleHeader file
   pure
     ( ipModuleName
     , sliceFile (P.SourcePos 1 1) (prevPos ipStart)
@@ -138,7 +145,7 @@ addImplicitImport
 addImplicitImport fp mn = do
   (_, pre, imports, post) <- parseImportsFromFile' fp
   let newImportSection = addImplicitImport' imports mn
-  pure (pre ++ newImportSection ++ post)
+  pure $ joinSections (pre, newImportSection, post)
 
 addImplicitImport' :: [Import] -> P.ModuleName -> [Text]
 addImplicitImport' imports mn =
@@ -157,7 +164,7 @@ addQualifiedImport
 addQualifiedImport fp mn qualifier = do
   (_, pre, imports, post) <- parseImportsFromFile' fp
   let newImportSection = addQualifiedImport' imports mn qualifier
-  pure (pre ++ newImportSection ++ post)
+  pure $ joinSections (pre, newImportSection, post)
 
 addQualifiedImport' :: [Import] -> P.ModuleName -> P.ModuleName -> [Text]
 addQualifiedImport' imports mn qualifier =
@@ -180,7 +187,7 @@ addExplicitImport fp decl moduleName qualifier = do
         if mn == moduleName
         then imports
         else addExplicitImport' decl moduleName qualifier imports
-  pure (pre ++ prettyPrintImportSection newImportSection ++ post)
+  pure $ joinSections (pre, prettyPrintImportSection newImportSection, post)
 
 addExplicitImport' :: IdeDeclaration -> P.ModuleName -> Maybe P.ModuleName -> [Import] -> [Import]
 addExplicitImport' decl moduleName qualifier imports =
@@ -364,9 +371,21 @@ answerRequest outfp rs  =
 -- | Test and ghci helper
 parseImport :: Text -> Maybe Import
 parseImport t =
-  case P.lex "<psc-ide>" t
-       >>= P.runTokenParser "<psc-ide>" P.parseImportDeclaration' of
-    Right (mn, P.Explicit refs, mmn) ->
-      Just (Import mn (P.Explicit refs) mmn)
-    Right (mn, idt, mmn) -> Just (Import mn idt mmn)
-    Left _ -> Nothing
+  case fmap (CST.convertImportDecl "<purs-ide>")
+        $ CST.runTokenParser CST.parseImportDeclP
+        $ CST.lex t of
+    Right (_, mn, idt, mmn) ->
+      Just (Import mn idt mmn)
+    _ -> Nothing
+
+joinSections :: ([Text], [Text], [Text]) -> [Text]
+joinSections (pre, decls, post) = pre `joinLine` (decls `joinLine` post)
+  where
+  isBlank = T.all (== ' ')
+  joinLine as bs
+    | Just ln1 <- lastMay as
+    , Just ln2 <- head bs
+    , not (isBlank ln1) && not (isBlank ln2) =
+        as ++ [""] ++ bs
+    | otherwise =
+        as ++ bs

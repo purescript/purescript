@@ -1,17 +1,18 @@
 name: purescript
-version: '0.12.5'
+version: '0.13.2'
 synopsis: PureScript Programming Language Compiler
 description: A small strongly, statically typed programming language with expressive
   types, inspired by Haskell and compiling to JavaScript.
 category: Language
-author: >
-  Phil Freeman <paf31@cantab.net>,
+author: Phil Freeman <paf31@cantab.net>
+maintainer: >
   Gary Burgess <gary.burgess@gmail.com>,
   Hardy Jones <jones3.hardy@gmail.com>,
   Harry Garrood <harry@garrood.me>,
-  Christoph Hegemann <christoph.hegemann1337@gmail.com>
-maintainer: Phil Freeman <paf31@cantab.net>
-copyright: (c) 2013-17 Phil Freeman, (c) 2014-17 Gary Burgess
+  Christoph Hegemann <christoph.hegemann1337@gmail.com>,
+  Liam Goodacre <goodacre.liam@gmail.com>,
+  Nathan Faubion <nathan@n-son.com>
+copyright: (c) 2013-17 Phil Freeman, (c) 2014-19 Gary Burgess, (c) other contributors (see CONTRIBUTORS.md)
 license: BSD3
 github: purescript/purescript
 homepage: http://www.purescript.org/
@@ -38,9 +39,10 @@ extra-source-files:
 dependencies:
   - aeson >=1.0 && <1.5
   - aeson-better-errors >=0.8
+  - aeson-pretty
   - ansi-terminal >=0.7.1 && <0.9
   - array
-  - base >=4.8 && <4.13
+  - base >=4.11 && <4.13
   - base-compat >=0.6.0
   - blaze-html >=0.8.1 && <0.10
   - bower-json >=1.0.0.1 && <1.1
@@ -60,7 +62,7 @@ dependencies:
   - fsnotify >=0.2.1
   - Glob >=0.9 && <0.10
   - haskeline >=0.7.0.0
-  - language-javascript >=0.6.0.9 && <0.7
+  - language-javascript >=0.6.0.13
   - lifted-async >=0.10.0.3 && <0.10.1
   - lifted-base >=0.2.3 && <0.2.4
   - microlens-platform >=0.3.9.0 && <0.4
@@ -89,6 +91,8 @@ dependencies:
   - unordered-containers
   - utf8-string >=1 && <2
   - vector
+build-tools:
+  - happy ==1.19.9
 
 library:
   source-dirs: src
@@ -126,6 +130,7 @@ executables:
       - Command.Compile
       - Command.Docs
       - Command.Docs.Html
+      - Command.Docs.Markdown
       - Command.Hierarchy
       - Command.Ide
       - Command.Publish

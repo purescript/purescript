@@ -41,6 +41,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@DavidLindbom](https://github.com/DavidLindbom) | David Lindbom | [MIT license](http://opensource.org/licenses/MIT) |
 | [@dckc](https://github.com/dckc) | Dan Connolly | [MIT license](http://opensource.org/licenses/MIT) |
 | [@kleeneplus](https://github.com/dgendill) | Dominick Gendill | [MIT license](http://opensource.org/licenses/MIT) |
+| [@ealmansi](https://github.com/ealmansi) | Emilio Almansi | MIT license |
 | [@eamelink](https://github.com/eamelink) | Erik Bakker | MIT license |
 | [@epost](https://github.com/epost) | Erik Post | MIT license |
 | [@erdeszt](https://github.com/erdeszt) | Tibor Erdesz | [MIT license](http://opensource.org/licenses/MIT) |
@@ -132,6 +133,8 @@ If you would prefer to use different terms, please use the section below instead
 | [@jordanmartinez](https://github.com/jordanmartinez) | Jordan Martinez | [MIT license](http://opensource.org/licenses/MIT) |
 | [@Saulukass](https://github.com/Saulukass) | Saulius Skliutas | [MIT license](http://opensource.org/licenses/MIT) |
 | [@adnelson](https://github.com/adnelson) | Allen Nelson | [MIT license](http://opensource.org/licenses/MIT) |
+| [@dyerw](https://github.com/dyerw) | Liam Dyer | [MIT license](http://opensource.org/licenses/MIT) |
+| [@marcosh](https://github.com/marcosh) | Marco Perone | [MIT license](http://opensource.org/licenses/MIT) |
 | [@matthew-hilty](https://github.com/matthew-hilty) | Matthew Hilty | [MIT license](http://opensource.org/licenses/MIT) |
 
 ### Contributors using Modified Terms

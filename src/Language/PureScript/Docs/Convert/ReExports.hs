@@ -13,38 +13,45 @@ import Control.Monad.Trans.State.Strict (execState)
 
 import Data.Either
 import Data.Map (Map)
-import Data.Maybe (mapMaybe)
+import Data.Maybe (mapMaybe, fromMaybe)
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.Docs.Types
-import qualified Language.PureScript as P
+
+import qualified Language.PureScript.AST as P
+import qualified Language.PureScript.Crash as P
+import qualified Language.PureScript.Errors as P
+import qualified Language.PureScript.Externs as P
+import qualified Language.PureScript.ModuleDependencies as P
+import qualified Language.PureScript.Names as P
+import qualified Language.PureScript.Types as P
+
 
 -- |
 -- Given:
 --
---      * The Imports/Exports Env
---      * An order to traverse the modules (which must be topological)
+--      * A list of externs files
+--      * A function for tagging a module with the package it comes from
 --      * A map of modules, indexed by their names, which are assumed to not
 --      have their re-exports listed yet
 --
 -- This function adds all the missing re-exports.
 --
 updateReExports ::
-  P.Env ->
-  [P.ModuleName] ->
+  [P.ExternsFile] ->
   (P.ModuleName -> InPackage P.ModuleName) ->
   Map P.ModuleName Module ->
   Map P.ModuleName Module
-updateReExports env order withPackage = execState action
+updateReExports externs withPackage = execState action
   where
   action =
-    void (traverse go order)
+    void (traverse go traversalOrder)
 
   go mn = do
     mdl <- lookup' mn
-    reExports <- getReExports env mn
+    reExports <- getReExports externsEnv mn
     let mdl' = mdl { modReExports = map (first withPackage) reExports }
     modify (Map.insert mn mdl')
 
@@ -56,6 +63,25 @@ updateReExports env order withPackage = execState action
       Nothing ->
         internalError ("Module missing: " ++ T.unpack (P.runModuleName mn))
 
+  externsEnv :: Map P.ModuleName P.ExternsFile
+  externsEnv = Map.fromList $ map (P.efModuleName &&& id) externs
+
+  traversalOrder :: [P.ModuleName]
+  traversalOrder =
+    case P.sortModules externsSignature externs of
+      Right (es, _) -> map P.efModuleName es
+      Left errs -> internalError $
+        "failed to sortModules: " ++
+        P.prettyPrintMultipleErrors P.defaultPPEOptions errs
+
+  externsSignature :: P.ExternsFile -> P.ModuleSignature
+  externsSignature ef =
+    P.ModuleSignature
+      { P.sigSourceSpan = P.efSourceSpan ef
+      , P.sigModuleName = P.efModuleName ef
+      , P.sigImports = map (\ei -> (P.eiModule ei, P.nullSourceSpan)) (P.efImports ef)
+      }
+
 -- |
 -- Collect all of the re-exported declarations for a single module.
 --
@@ -65,19 +91,20 @@ updateReExports env order withPackage = execState action
 --
 getReExports ::
   (MonadState (Map P.ModuleName Module) m) =>
-  P.Env ->
+  Map P.ModuleName P.ExternsFile ->
   P.ModuleName ->
   m [(P.ModuleName, [Declaration])]
-getReExports env mn =
-  case Map.lookup mn env of
+getReExports externsEnv mn =
+  case Map.lookup mn externsEnv of
     Nothing ->
       internalError ("Module missing: " ++ T.unpack (P.runModuleName mn))
-    Just (_, _, exports) -> do
-      allExports <- runReaderT (collectDeclarations exports) mn
-      pure (filter notLocal allExports)
+    Just (P.ExternsFile { P.efExports = refs }) -> do
+      let reExpRefs = mapMaybe toReExportRef refs
+      runReaderT (collectDeclarations reExpRefs) mn
 
-  where
-  notLocal = (/= mn) . fst
+toReExportRef :: P.DeclarationRef -> Maybe (P.ExportSource, P.DeclarationRef)
+toReExportRef (P.ReExportRef _ source ref) = Just (source, ref)
+toReExportRef _ = Nothing
 
 -- |
 -- Assemble a list of declarations re-exported from a particular module, based
@@ -100,9 +127,9 @@ getReExports env mn =
 --
 collectDeclarations :: forall m.
   (MonadState (Map P.ModuleName Module) m, MonadReader P.ModuleName m) =>
-  P.Exports ->
+  [(P.ExportSource, P.DeclarationRef)] ->
   m [(P.ModuleName, [Declaration])]
-collectDeclarations exports = do
+collectDeclarations reExports = do
   valsAndMembers <- collect lookupValueDeclaration expVals
   valOps <- collect lookupValueOpDeclaration expValOps
   typeClasses <- collect lookupTypeClassDeclaration expTCs
@@ -129,13 +156,31 @@ collectDeclarations exports = do
     decls <- traverse (uncurry (flip lookup')) reExps
     return $ Map.fromListWith (<>) decls
 
-  expVals = P.exportedValues exports
-  expValOps = P.exportedValueOps exports
-  expTypes = Map.map snd (P.exportedTypes exports)
-  expTypeOps = P.exportedTypeOps exports
-  expCtors = concatMap fst (Map.elems (P.exportedTypes exports))
-  expTCs = P.exportedTypeClasses exports
-  expKinds = P.exportedKinds exports
+  expVals :: Map P.Ident P.ExportSource
+  expVals = mkExportMap P.getValueRef
+
+  expValOps :: Map (P.OpName 'P.ValueOpName) P.ExportSource
+  expValOps = mkExportMap P.getValueOpRef
+
+  expTCs :: Map (P.ProperName 'P.ClassName) P.ExportSource
+  expTCs = mkExportMap P.getTypeClassRef
+
+  expTypes :: Map (P.ProperName 'P.TypeName) P.ExportSource
+  expTypes = mkExportMap (fmap fst . P.getTypeRef)
+
+  expTypeOps :: Map (P.OpName 'P.TypeOpName) P.ExportSource
+  expTypeOps = mkExportMap P.getTypeOpRef
+
+  expKinds :: Map (P.ProperName 'P.KindName) P.ExportSource
+  expKinds = mkExportMap P.getKindRef
+
+  mkExportMap :: Ord name => (P.DeclarationRef -> Maybe name) -> Map name P.ExportSource
+  mkExportMap f =
+    Map.fromList $
+      mapMaybe (\(exportSrc, ref) -> (,exportSrc) <$> f ref) reExports
+
+  expCtors :: [P.ProperName 'P.ConstructorName]
+  expCtors = concatMap (fromMaybe [] . (>>= snd) . P.getTypeRef . snd) reExports
 
 lookupValueDeclaration ::
   (MonadState (Map P.ModuleName Module) m,

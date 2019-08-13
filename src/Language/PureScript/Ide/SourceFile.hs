@@ -87,8 +87,7 @@ extractSpans d = case d of
   P.TypeClassDeclaration (ss, _) name _ _ _ members ->
     (IdeNamespaced IdeNSType (P.runProperName name), ss) : concatMap extractSpans' members
   P.DataDeclaration (ss, _) _ name _ ctors ->
-    (IdeNamespaced IdeNSType (P.runProperName name), ss)
-    : map (\(cname, _) -> (IdeNamespaced IdeNSValue (P.runProperName cname), ss)) ctors
+    (IdeNamespaced IdeNSType (P.runProperName name), ss) : map dtorSpan ctors
   P.FixityDeclaration (ss, _) (Left (P.ValueFixity _ _ opName)) ->
     [(IdeNamespaced IdeNSValue (P.runOpName opName), ss)]
   P.FixityDeclaration (ss, _) (Right (P.TypeFixity _ _ opName)) ->
@@ -101,6 +100,9 @@ extractSpans d = case d of
     [(IdeNamespaced IdeNSKind (P.runProperName name), ss)]
   _ -> []
   where
+    dtorSpan :: P.DataConstructorDeclaration -> (IdeNamespaced, P.SourceSpan)
+    dtorSpan P.DataConstructorDeclaration{ P.dataCtorName = name, P.dataCtorAnn = (ss, _) } =
+      (IdeNamespaced IdeNSValue (P.runProperName name), ss)
     -- We need this special case to be able to also get the position info for
     -- typeclass member functions. Typedeclarations would clash with value
     -- declarations for non-typeclass members, which is why we can't handle them

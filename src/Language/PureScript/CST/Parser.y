@@ -3,14 +3,23 @@ module Language.PureScript.CST.Parser
   ( parseType
   , parseKind
   , parseExpr
+  , parseDecl
+  , parseIdent
+  , parseOperator
   , parseModule
+  , parseImportDeclP
+  , parseDeclP
+  , parseExprP
+  , parseTypeP
+  , parseModuleNameP
+  , parseQualIdentP
   , parse
   , PartialResult(..)
   ) where
 
 import Prelude hiding (lex)
 
-import Control.Monad ((>=>), when)
+import Control.Monad ((<=<), when)
 import Data.Foldable (foldl', for_)
 import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)
@@ -30,7 +39,16 @@ import Language.PureScript.PSString (PSString)
 %name parseKind kind
 %name parseType type
 %name parseExpr expr
+%name parseIdent ident
+%name parseOperator op
 %name parseModuleBody moduleBody
+%name parseDecl decl
+%partial parseImportDeclP importDeclP
+%partial parseDeclP declP
+%partial parseExprP exprP
+%partial parseTypeP typeP
+%partial parseModuleNameP moduleNameP
+%partial parseQualIdentP qualIdentP
 %partial parseModuleHeader moduleHeader
 %partial parseDoStatement doStatement
 %partial parseDoExpr doExpr
@@ -58,7 +76,7 @@ import Language.PureScript.PSString (PSString)
   '\;'            { SourceToken _ TokLayoutSep }
   '<-'            { SourceToken _ (TokLeftArrow _) }
   '->'            { SourceToken _ (TokRightArrow _) }
-  '<='            { SourceToken _ (TokOperator [] sym) | sym == "<=" || sym == "⇐" }
+  '<='            { SourceToken _ (TokOperator [] sym) | isLeftFatArrow sym }
   '=>'            { SourceToken _ (TokRightFatArrow _) }
   ':'             { SourceToken _ (TokOperator [] ":") }
   '::'            { SourceToken _ (TokDoubleColon _) }
@@ -120,36 +138,36 @@ import Language.PureScript.PSString (PSString)
 
 %%
 
-many(a) :: { NE.NonEmpty _ }
+many(a) :: { NE.NonEmpty a }
   : many1(a) { NE.reverse $1 }
 
-many1(a) :: { NE.NonEmpty _ }
+many1(a) :: { NE.NonEmpty a }
   : a { pure $1 }
   | many1(a) a { NE.cons $2 $1 }
 
-manySep(a, sep) :: { NE.NonEmpty _ }
+manySep(a, sep) :: { NE.NonEmpty a }
   : manySep1(a, sep) { NE.reverse $1 }
 
-manySep1(a, sep) :: { NE.NonEmpty _ }
+manySep1(a, sep) :: { NE.NonEmpty a }
   : a { pure $1 }
   | manySep1(a, sep) sep a { NE.cons $3 $1 }
 
-manySepOrEmpty(a, sep) :: { [_] }
+manySepOrEmpty(a, sep) :: { [a] }
   : {- empty -} { [] }
   | manySep(a, sep) { NE.toList $1 }
 
-manyOrEmpty(a) :: { [_] }
+manyOrEmpty(a) :: { [a] }
   : {- empty -} { [] }
   | many(a) { NE.toList $1 }
 
-sep(a, s) :: { Separated _ }
+sep(a, s) :: { Separated a }
   : sep1(a, s) { separated $1 }
 
-sep1(a, s) :: { [(SourceToken, _)] }
+sep1(a, s) :: { [(SourceToken, a)] }
   : a { [(placeholder, $1)] }
   | sep1(a, s) s a { ($2, $3) : $1 }
 
-delim(a, b, c, d) :: { Delimited _ }
+delim(a, b, c, d) :: { Delimited b }
   : a d { Wrapped $1 Nothing $2 }
   | a sep(b, c) d { Wrapped $1 (Just $2) $3 }
 
@@ -377,7 +395,7 @@ expr5 :: { Expr () }
   -- case, since this is used in the wild.
   | 'case' sep(expr, ',') 'of' '\{' sep(binder1, ',') '->' '\}' exprWhere
       { ExprCase () (CaseOf $1 $2 $3 (pure ($5, Unconditional $6 $8))) }
-  | 'case' sep(expr, ',') 'of' '\{' sep(binder1, ',') '\}' guarded('->')
+  | 'case' sep(expr, ',') 'of' '\{' sep(binder1, ',') '\}' guardedCase
       { ExprCase () (CaseOf $1 $2 $3 (pure ($5, $7))) }
 
 expr6 :: { Expr () }
@@ -424,19 +442,26 @@ recordUpdate :: { RecordUpdate () }
 
 letBinding :: { LetBinding () }
   : ident '::' type { LetBindingSignature () (Labeled $1 $2 $3) }
-  | ident guarded('=') { LetBindingName () (ValueBindingFields $1 [] $2) }
-  | ident many(binderAtom) guarded('=') { LetBindingName () (ValueBindingFields $1 (NE.toList $2) $3) }
+  | ident guardedDecl { LetBindingName () (ValueBindingFields $1 [] $2) }
+  | ident many(binderAtom) guardedDecl { LetBindingName () (ValueBindingFields $1 (NE.toList $2) $3) }
   | binder1 '=' exprWhere { LetBindingPattern () $1 $2 $3 }
 
 caseBranch :: { (Separated (Binder ()), Guarded ()) }
-  : sep(binder1, ',') guarded('->') { ($1, $2) }
+  : sep(binder1, ',') guardedCase { ($1, $2) }
 
-guarded(a) :: { Guarded () }
-  : a exprWhere { Unconditional $1 $2 }
-  | many(guardedExpr(a)) { Guarded $1 }
+guardedDecl :: { Guarded () }
+  : '=' exprWhere { Unconditional $1 $2 }
+  | many(guardedDeclExpr) { Guarded $1 }
 
-guardedExpr(a) :: { GuardedExpr () }
-  : guard a exprWhere { uncurry GuardedExpr $1 $2 $3 }
+guardedDeclExpr :: { GuardedExpr () }
+  : guard '=' exprWhere { uncurry GuardedExpr $1 $2 $3 }
+
+guardedCase :: { Guarded () }
+  : '->' exprWhere { Unconditional $1 $2 }
+  | many(guardedCaseExpr) { Guarded $1 }
+
+guardedCaseExpr :: { GuardedExpr () }
+  : guard '->' exprWhere { uncurry GuardedExpr $1 $2 $3 }
 
 -- Do/Ado statements and pattern guards require unbounded lookahead due to many
 -- conflicts between `binder` and `expr` syntax. For example `Foo a b c` can
@@ -634,7 +659,7 @@ decl :: { Declaration () }
   | 'derive' instHead { DeclDerive () $1 Nothing $2 }
   | 'derive' 'newtype' instHead { DeclDerive () $1 (Just $2) $3 }
   | ident '::' type { DeclSignature () (Labeled $1 $2 $3) }
-  | ident manyOrEmpty(binderAtom) guarded('=') { DeclValue () (ValueBindingFields $1 $2 $3) }
+  | ident manyOrEmpty(binderAtom) guardedDecl { DeclValue () (ValueBindingFields $1 $2 $3) }
   | fixity { DeclFixity () $1 }
   | 'foreign' 'import' foreign { DeclForeign () $1 $2 $3 }
 
@@ -702,7 +727,7 @@ constraint :: { Constraint () }
 
 instBinding :: { InstanceBinding () }
   : ident '::' type { InstanceBindingSignature () (Labeled $1 $2 $3) }
-  | ident manyOrEmpty(binderAtom) guarded('=') { InstanceBindingName () (ValueBindingFields $1 $2 $3) }
+  | ident manyOrEmpty(binderAtom) guardedDecl { InstanceBindingName () (ValueBindingFields $1 $2 $3) }
 
 fixity :: { FixityFields }
   : infix int qualIdent 'as' op { FixityFields $1 $2 (FixityValue (fmap Left $3) $4 $5) }
@@ -719,23 +744,45 @@ foreign :: { Foreign () }
   | 'data' properName '::' kind { ForeignData $1 (Labeled $2 $3 $4) }
   | 'kind' properName { ForeignKind $1 $2 }
 
+-- Partial parsers which can be combined with combinators for adhoc use. We need
+-- to revert the lookahead token so that it doesn't consume an extra token
+-- before succeeding.
+
+importDeclP :: { ImportDecl () }
+  : importDecl {%^ revert $ pure $1 }
+
+declP :: { Declaration () }
+  : decl {%^ revert $ pure $1 }
+
+exprP :: { Expr () }
+  : expr {%^ revert $ pure $1 }
+
+typeP :: { Type () }
+  : type {%^ revert $ pure $1 }
+
+moduleNameP :: { Name N.ModuleName }
+  : moduleName {%^ revert $ pure $1 }
+
+qualIdentP :: { QualifiedName Ident }
+  : qualIdent {%^ revert $ pure $1 }
+
 {
 lexer :: (SourceToken -> Parser a) -> Parser a
 lexer k = munch >>= k
 
 parse :: Text -> Either (NE.NonEmpty ParserError) (Module ())
-parse = parseModule >=> resFull
+parse = resFull <=< parseModule . lex
 
 data PartialResult a = PartialResult
   { resPartial :: a
   , resFull :: Either (NE.NonEmpty ParserError) a
   } deriving (Functor)
 
-parseModule :: Text -> Either (NE.NonEmpty ParserError) (PartialResult (Module ()))
-parseModule src = fmap (\header -> PartialResult header (parseFull header)) headerRes
+parseModule :: [LexResult] -> Either (NE.NonEmpty ParserError) (PartialResult (Module ()))
+parseModule toks = fmap (\header -> PartialResult header (parseFull header)) headerRes
   where
   (st, headerRes) =
-    runParser (ParserState (lex src) []) parseModuleHeader
+    runParser (ParserState (toks) []) parseModuleHeader
 
   parseFull header = do
     (decls, trailing) <- snd $ runParser st parseModuleBody

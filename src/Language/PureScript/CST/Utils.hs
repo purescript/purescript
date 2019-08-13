@@ -107,6 +107,8 @@ toName k tok = case tokValue tok of
   TokLowerName [] a
     | not (Set.member a reservedNames) -> pure $ Name tok (k a)
     | otherwise -> addFailure [tok] ErrKeywordVar $> Name tok (k "<unexpected>")
+  TokString _ _ -> parseFail tok ErrQuotedPun
+  TokRawString _ -> parseFail tok ErrQuotedPun
   TokUpperName [] a  -> pure $ Name tok (k a)
   TokSymbolName [] a -> pure $ Name tok (k a)
   TokOperator [] a   -> pure $ Name tok (k a)
@@ -304,3 +306,10 @@ reservedNames = Set.fromList
 
 isValidModuleNamespace :: Text -> Bool
 isValidModuleNamespace = Text.null . snd . Text.span (\c -> c /= '_' && c /= '\'')
+
+-- | This is to keep the @Parser.y@ file ASCII, otherwise @happy@ will break
+-- in non-unicode locales.
+--
+-- Related GHC issue: https://gitlab.haskell.org/ghc/ghc/issues/8167
+isLeftFatArrow :: Text -> Bool
+isLeftFatArrow str = str == "<=" || str == "⇐"

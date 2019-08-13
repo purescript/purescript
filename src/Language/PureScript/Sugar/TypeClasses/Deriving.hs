@@ -205,7 +205,7 @@ deriveNewtypeInstance ss mn syns ndis className ds tys tyConNm dargs = do
     tyCon <- findTypeDecl ss tyConNm ds
     go tyCon
   where
-    go (DataDeclaration _ Newtype _ tyArgNames [(_, [(_, wrapped)])]) = do
+    go (DataDeclaration _ Newtype _ tyArgNames [(DataConstructorDeclaration _ _ [(_, wrapped)])]) = do
       -- The newtype might not be applied to all type arguments.
       -- This is okay as long as the newtype wraps something which ends with
       -- sufficiently many type applications to variables.
@@ -337,9 +337,9 @@ deriveGenericRep ss mn syns ds tyConNm tyConArgs repTy = do
     compN n f = f . compN (n - 1) f
 
     makeInst
-      :: (ProperName 'ConstructorName, [(Ident, SourceType)])
+      :: DataConstructorDeclaration
       -> m (SourceType, CaseAlternative, CaseAlternative)
-    makeInst (ctorName, args) = do
+    makeInst (DataConstructorDeclaration _ ctorName args) = do
         args' <- mapM (replaceAllTypeSynonymsM syns . snd) args
         (ctorTy, matchProduct, ctorArgs, matchCtor, mkProduct) <- makeProduct args'
         return ( srcTypeApp (srcTypeApp (srcTypeConstructor constructor)
@@ -468,8 +468,8 @@ deriveEq ss mn syns ds tyConNm = do
       where
       catchAll = CaseAlternative [NullBinder, NullBinder] (unguarded (Literal ss (BooleanLiteral False)))
 
-    mkCtorClause :: (ProperName 'ConstructorName, [(Ident, SourceType)]) -> m CaseAlternative
-    mkCtorClause (ctorName, tys) = do
+    mkCtorClause :: DataConstructorDeclaration -> m CaseAlternative
+    mkCtorClause (DataConstructorDeclaration _ ctorName tys) = do
       identsL <- replicateM (length tys) (freshIdent "l")
       identsR <- replicateM (length tys) (freshIdent "r")
       tys' <- mapM (replaceAllTypeSynonymsM syns . snd) tys
@@ -547,8 +547,8 @@ deriveOrd ss mn syns ds tyConNm = do
     ordCompare1 :: Expr -> Expr -> Expr
     ordCompare1 = App . App (Var ss (Qualified (Just dataOrd) (Ident C.compare1)))
 
-    mkCtorClauses :: ((ProperName 'ConstructorName, [(Ident, SourceType)]), Bool) -> m [CaseAlternative]
-    mkCtorClauses ((ctorName, tys), isLast) = do
+    mkCtorClauses :: (DataConstructorDeclaration, Bool) -> m [CaseAlternative]
+    mkCtorClauses ((DataConstructorDeclaration _ ctorName tys), isLast) = do
       identsL <- replicateM (length tys) (freshIdent "l")
       identsR <- replicateM (length tys) (freshIdent "r")
       tys' <- mapM (replaceAllTypeSynonymsM syns . snd) tys
@@ -622,7 +622,7 @@ deriveNewtype ss mn syns ds tyConNm tyConArgs unwrappedTy = do
       checkNewtype name dctors
       wrappedIdent <- freshIdent "n"
       unwrappedIdent <- freshIdent "a"
-      let (ctorName, [(_, ty)]) = head dctors
+      let (DataConstructorDeclaration _ ctorName [(_, ty)]) = head dctors
       ty' <- replaceAllTypeSynonymsM syns ty
       let inst =
             [ ValueDecl (ss', []) (Ident "wrap") Public [] $ unguarded $
@@ -707,8 +707,8 @@ deriveFunctor ss mn syns ds tyConNm = do
         lam ss' f . lamCase ss' m <$> mapM (mkCtorClause iTy f) ctors
     mkMapFunction _ = internalError "mkMapFunction: expected DataDeclaration"
 
-    mkCtorClause :: Text -> Ident -> (ProperName 'ConstructorName, [(Ident, SourceType)]) -> m CaseAlternative
-    mkCtorClause iTyName f (ctorName, ctorTys) = do
+    mkCtorClause :: Text -> Ident -> DataConstructorDeclaration -> m CaseAlternative
+    mkCtorClause iTyName f (DataConstructorDeclaration _ ctorName ctorTys) = do
       idents <- replicateM (length ctorTys) (freshIdent "v")
       ctorTys' <- mapM (replaceAllTypeSynonymsM syns . snd) ctorTys
       args <- zipWithM transformArg idents ctorTys'

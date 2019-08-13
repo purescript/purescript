@@ -227,6 +227,7 @@ resolveLocationsForModule (defs, types) decls =
     convertDeclaration (IdeDeclarationAnn ann d) = convertDeclaration'
       annotateFunction
       annotateValue
+      annotateDataConstructor
       annotateType
       annotateKind
       annotateModule
@@ -236,6 +237,7 @@ resolveLocationsForModule (defs, types) decls =
                                                     , _annTypeAnnotation = Map.lookup x types
                                                     })
         annotateValue x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSValue x) defs})
+        annotateDataConstructor x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSValue x) defs})
         annotateType x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSType x) defs})
         annotateKind x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSKind x) defs})
         annotateModule x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSModule x) defs})
@@ -246,9 +248,10 @@ convertDeclaration'
   -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
   -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
   -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
+  -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
   -> IdeDeclaration
   -> IdeDeclarationAnn
-convertDeclaration' annotateFunction annotateValue annotateType annotateKind annotateModule d =
+convertDeclaration' annotateFunction annotateValue annotateDataConstructor annotateType annotateKind annotateModule d =
   case d of
     IdeDeclValue v ->
       annotateFunction (v ^. ideValueIdent) d
@@ -257,7 +260,7 @@ convertDeclaration' annotateFunction annotateValue annotateType annotateKind ann
     IdeDeclTypeSynonym s ->
       annotateType (s ^. ideSynonymName . properNameT) d
     IdeDeclDataConstructor dtor ->
-      annotateValue (dtor ^. ideDtorName . properNameT) d
+      annotateDataConstructor (dtor ^. ideDtorName . properNameT) d
     IdeDeclTypeClass tc ->
       annotateType (tc ^. ideTCName . properNameT) d
     IdeDeclValueOperator operator ->
@@ -284,11 +287,15 @@ resolveDocumentationForModule
 resolveDocumentationForModule (P.Module _ moduleComments moduleName sdecls _) decls = map convertDecl decls
   where
   comments :: Map P.Name [P.Comment]
-  comments = Map.insert (P.ModName moduleName) moduleComments $ Map.fromListWith (flip (<>)) $ mapMaybe (\d ->
-    case name d of
-      Just name' -> Just (name', snd $ P.declSourceAnn d)
-      _ -> Nothing)
+  comments = Map.insert (P.ModName moduleName) moduleComments $ Map.fromListWith (flip (<>)) $ concatMap (\case
+    P.DataDeclaration (_, cs) _ ctorName _ ctors ->
+      (P.TyName ctorName, cs) : map dtorComments ctors
+    decl ->
+      maybe [] (\name' -> [(name', snd (P.declSourceAnn decl))]) (name decl))
     sdecls
+
+  dtorComments :: P.DataConstructorDeclaration -> (P.Name, [P.Comment])
+  dtorComments dcd = (P.DctorName (P.dataCtorName dcd), snd (P.dataCtorAnn dcd))
 
   name :: P.Declaration -> Maybe P.Name
   name (P.TypeDeclaration d) = Just $ P.IdentName $ P.tydeclIdent d
@@ -299,6 +306,7 @@ resolveDocumentationForModule (P.Module _ moduleComments moduleName sdecls _) de
     convertDeclaration'
       (annotateValue . P.IdentName)
       (annotateValue . P.IdentName . P.Ident)
+      (annotateValue . P.DctorName . P.ProperName)
       (annotateValue . P.TyName . P.ProperName)
       (annotateValue . P.KiName . P.ProperName)
       (annotateValue . P.ModName . P.moduleNameFromString)

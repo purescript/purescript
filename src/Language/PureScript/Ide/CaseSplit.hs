@@ -23,17 +23,16 @@ module Language.PureScript.Ide.CaseSplit
 
 import           Protolude                     hiding (Constructor)
 
+import qualified Data.List.NonEmpty            as NE
 import qualified Data.Map                      as M
 import qualified Data.Text                     as T
 import qualified Language.PureScript           as P
+import qualified Language.PureScript.CST       as CST
 
 import           Language.PureScript.Externs
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
-
-import           Text.Parsec                   as Parsec
-import qualified Text.PrettyPrint.Boxes        as Box
 
 type Constructor = (P.ProperName 'P.ConstructorName, [P.SourceType])
 
@@ -125,24 +124,24 @@ addClause s wca = do
 parseType' :: (MonadError IdeError m) =>
               Text -> m P.SourceType
 parseType' s =
-  case P.lex "<psc-ide>" (toS s) >>= P.runTokenParser "<psc-ide>" (P.parseType <* Parsec.eof) of
-    Right type' -> pure type'
+  case CST.runTokenParser CST.parseType $ CST.lex s of
+    Right type' -> pure $ CST.convertType "<purs-ide>" type'
     Left err ->
       throwError (GeneralError ("Parsing the splittype failed with:"
                                 <> show err))
 
 parseTypeDeclaration' :: (MonadError IdeError m) => Text -> m (P.Ident, P.SourceType)
 parseTypeDeclaration' s =
-  let x = do
-        ts <- P.lex "" (toS s)
-        P.runTokenParser "" (P.parseDeclaration <* Parsec.eof) ts
+  let x = fmap (CST.convertDeclaration "<purs-ide>")
+        $ CST.runTokenParser CST.parseDecl
+        $ CST.lex s
   in
     case x of
-      Right (P.TypeDeclaration td : _) -> pure (P.unwrapTypeDeclaration td)
+      Right [P.TypeDeclaration td] -> pure (P.unwrapTypeDeclaration td)
       Right _ -> throwError (GeneralError "Found a non-type-declaration")
-      Left err ->
+      Left errs ->
         throwError (GeneralError ("Parsing the type signature failed with: "
-                                   <> toS (Box.render (P.prettyPrintParseError err))))
+                                   <> toS (CST.prettyPrintErrorMessage $ NE.head errs)))
 
 splitFunctionType :: P.Type a -> [P.Type a]
 splitFunctionType t = fromMaybe [] arguments

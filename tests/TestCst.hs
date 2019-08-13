@@ -67,14 +67,17 @@ litTests = testGroup "Literals"
   , testProperty "Raw String (round trip)" $ roundTripTok . unRawString
   ]
 
-readTok :: Text -> Gen SourceToken
-readTok t = case CST.lex t of
+readTok' :: String -> Text -> Gen SourceToken
+readTok' failMsg t = case CST.lex t of
   Right tok : _ ->
     pure tok
   Left (_, err) : _ ->
-    fail $ "Failed to parse: " <> CST.prettyPrintError err
+    fail $ failMsg <> ": " <> CST.prettyPrintError err
   [] ->
     fail "Empty token stream"
+
+readTok :: Text -> Gen SourceToken
+readTok = readTok' "Failed to parse"
 
 checkTok
   :: (Text -> a -> Gen Bool)
@@ -91,7 +94,7 @@ roundTripTok :: Text -> Gen Bool
 roundTripTok t = do
   tok <- readTok t
   let t' = CST.printTokens [tok]
-  tok' <- readTok t'
+  tok' <- readTok' "Failed to re-parse" t'
   pure $ tok == tok'
 
 checkReadNum :: (Eq a, Read a) => Text -> a -> Gen Bool
@@ -168,22 +171,22 @@ genHex = PSSourceHex <$> do
 
 genChar :: Gen PSSourceChar
 genChar = PSSourceChar <$> do
-  ch  <- (toEnum :: Int -> Char) <$> resize 0xFFFF arbitrarySizedNatural
-  ch' <- case ch of
-    '\'' -> discard
-    '\\' -> genCharEscape
-    c    ->  pure $ Text.singleton c
-  pure $ "'" <> ch' <> "'"
+  ch <- resize 0xFFFF arbitrarySizedNatural >>= (genStringChar '\'' . toEnum)
+  pure $ "'" <> ch <> "'"
 
 genString :: Gen PSSourceString
 genString = PSSourceString <$> do
-  chs <- listOf $ arbitraryUnicodeChar >>= \case
-    '"'  -> discard
-    '\n' -> discard
-    '\r' -> discard
-    '\\' -> genCharEscape
-    c    -> pure $ Text.singleton c
+  chs <- listOf $ arbitraryUnicodeChar >>= genStringChar '"'
   pure $ "\"" <> Text.concat chs <> "\""
+
+genStringChar :: Char -> Char -> Gen Text
+genStringChar delimiter ch = frequency
+  [ (1, genCharEscape)
+  , (10, if ch `elem` [delimiter, '\n', '\r', '\\']
+           then discard
+           else pure $ Text.singleton ch
+    )
+  ]
 
 genRawString :: Gen PSSourceRawString
 genRawString = PSSourceRawString <$> do

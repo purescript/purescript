@@ -9,11 +9,14 @@ module Language.PureScript.CST
   , pureResult
   , module Language.PureScript.CST.Convert
   , module Language.PureScript.CST.Errors
+  , module Language.PureScript.CST.Lexer
+  , module Language.PureScript.CST.Monad
   , module Language.PureScript.CST.Parser
+  , module Language.PureScript.CST.Print
   , module Language.PureScript.CST.Types
   ) where
 
-import Prelude
+import Prelude hiding (lex)
 
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Parallel.Strategies (withStrategy, parList, evalTuple2, r0, rseq)
@@ -23,7 +26,10 @@ import qualified Language.PureScript.AST as AST
 import qualified Language.PureScript.Errors as E
 import Language.PureScript.CST.Convert
 import Language.PureScript.CST.Errors
+import Language.PureScript.CST.Lexer
+import Language.PureScript.CST.Monad (Parser, ParserM(..), ParserState(..), LexResult, runParser, runTokenParser)
 import Language.PureScript.CST.Parser
+import Language.PureScript.CST.Print
 import Language.PureScript.CST.Types
 
 pureResult :: a -> PartialResult a
@@ -54,7 +60,7 @@ parseFromFiles toFilePath input =
     $ \(k, a) -> (k, parseFromFile (toFilePath k) a)
 
 parseModuleFromFile :: FilePath -> Text -> Either (NE.NonEmpty ParserError) (PartialResult AST.Module)
-parseModuleFromFile fp content = fmap (convertModule fp) <$> parseModule content
+parseModuleFromFile fp content = fmap (convertModule fp) <$> parseModule (lex content)
 
 parseFromFile :: FilePath -> Text -> Either (NE.NonEmpty ParserError) AST.Module
 parseFromFile fp content = convertModule fp <$> parse content

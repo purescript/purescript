@@ -463,7 +463,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage :: SimpleErrorMessage -> Box.Box
     renderSimpleErrorMessage (ModuleNotFound mn) =
       paras [ line $ "Module " <> markCode (runModuleName mn) <> " was not found."
-            , line "Make sure the source file exists, and that it has been provided as an input to the compiler."
+            , line $
+                if isBuiltinModuleName mn
+                  then
+                    "Module names in the Prim namespace are reserved for built-in modules, but this version of the compiler does not provide module " <> markCode (runModuleName mn) <> ". You may be able to fix this by updating your compiler to a newer version."
+                  else
+                    "Make sure the source file exists, and that it has been provided as an input to the compiler."
             ]
     renderSimpleErrorMessage (CannotGetFileInfo path) =
       paras [ line "Unable to read file info: "
@@ -562,7 +567,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (DeclConflict new existing) =
       line $ "Declaration for " <> printName (Qualified Nothing new) <> " conflicts with an existing " <> nameType existing <> " of the same name."
     renderSimpleErrorMessage (ExportConflict new existing) =
-      line $ "Export for " <> printName new <> " conflicts with " <> runName existing
+      line $ "Export for " <> printName new <> " conflicts with " <> printName existing
     renderSimpleErrorMessage (DuplicateModule mn) =
       line $ "Module " <> markCode (runModuleName mn) <> " has been defined multiple times"
     renderSimpleErrorMessage (DuplicateTypeClass pn ss) =
@@ -656,26 +661,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , markCodeBox $ indent $ typeAsBox prettyDepth ty
             ]
     renderSimpleErrorMessage (TypesDoNotUnify u1 u2)
-      = let (sorted1, sorted2) = sortRows u1 u2
+      = let (row1Box, row2Box) = printRows u1 u2
 
-            sortRows :: Ord a => Type a -> Type a -> (Type a, Type a)
-            sortRows r1@RCons{} r2@RCons{} = sortRows' (rowToList r1) (rowToList r2)
-            sortRows t1 t2 = (t1, t2)
-
-            -- Put the common labels last
-            sortRows' :: Ord a => ([RowListItem a], Type a) -> ([RowListItem a], Type a) -> (Type a, Type a)
-            sortRows' (s1, r1) (s2, r2) =
-                  let elem' s (RowListItem _ name ty) = any (\(RowListItem _ name' ty') -> name == name' && eqType ty ty') s
-                      sort' = sortBy (comparing $ \(RowListItem _ name ty) -> (name, ty))
-                      (common1, unique1) = partition (elem' s2) s1
-                      (common2, unique2) = partition (elem' s1) s2
-                  in ( rowFromList (sort' unique1 ++ sort' common1, r1)
-                     , rowFromList (sort' unique2 ++ sort' common2, r2)
-                     )
         in paras [ line "Could not match type"
-                 , markCodeBox $ indent $ typeAsBox prettyDepth sorted1
+                 , row1Box
                  , line "with type"
-                 , markCodeBox $ indent $ typeAsBox prettyDepth sorted2
+                 , row2Box
                  ]
 
     renderSimpleErrorMessage (KindsDoNotUnify k1 k2) =
@@ -1102,6 +1093,16 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
+    renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =
+      let (row1Box, row2Box) = printRows t1 t2
+      in paras [ detail
+            , Box.hsep 1 Box.top [ line "while trying to match type"
+                                 , row1Box
+                                 ]
+            , Box.moveRight 2 $ Box.hsep 1 Box.top [ line "with type"
+                                                   , row2Box
+                                                   ]
+            ]
     renderHint (ErrorUnifyingTypes t1 t2) detail =
       paras [ detail
             , Box.hsep 1 Box.top [ line "while trying to match type"
@@ -1229,6 +1230,27 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line $ "at " <> displaySourceSpan relPath (NEL.head srcSpan)
             , detail
             ]
+
+    printRow :: (Int -> Type a -> Box.Box) -> Type a -> Box.Box
+    printRow f t = markCodeBox $ indent $ f prettyDepth t
+
+    -- If both rows are not empty, print them as diffs
+    printRows :: Type a -> Type a -> (Box.Box, Box.Box)
+    printRows r1@RCons{} r2@RCons{} = let
+      (sorted1, sorted2) = filterRows (rowToList r1) (rowToList r2)
+      in (printRow typeDiffAsBox sorted1, printRow typeDiffAsBox sorted2)
+    printRows r1 r2 = (printRow typeAsBox r1, printRow typeAsBox r2)
+
+    -- Keep the unique labels only
+    filterRows :: ([RowListItem a], Type a) -> ([RowListItem a], Type a) -> (Type a, Type a)
+    filterRows (s1, r1) (s2, r2) =
+         let sort' = sortBy (comparing $ \(RowListItem _ name ty) -> (name, ty))
+             notElem' s (RowListItem _ name ty) = all (\(RowListItem _ name' ty') -> name /= name' || not (eqType ty ty')) s
+             unique1 = filter (notElem' s2) s1
+             unique2 = filter (notElem' s1) s2
+          in ( rowFromList (sort' unique1, r1)
+             , rowFromList (sort' unique2, r2)
+             )
 
     renderContext :: Context -> [Box.Box]
     renderContext [] = []

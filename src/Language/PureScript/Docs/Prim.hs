@@ -13,7 +13,10 @@ import qualified Data.Text as T
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Language.PureScript.Docs.Types
-import qualified Language.PureScript as P
+
+import qualified Language.PureScript.Crash as P
+import qualified Language.PureScript.Environment as P
+import qualified Language.PureScript.Names as P
 
 primModules :: [Module]
 primModules =

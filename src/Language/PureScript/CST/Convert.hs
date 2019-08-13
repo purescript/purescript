@@ -8,6 +8,7 @@ module Language.PureScript.CST.Convert
   , convertExpr
   , convertBinder
   , convertDeclaration
+  , convertImportDecl
   , convertModule
   , sourcePos
   , sourceSpan
@@ -445,18 +446,21 @@ convertDeclaration :: String -> Declaration a -> [AST.Declaration]
 convertDeclaration fileName decl = case decl of
   DeclData _ (DataHead _ a vars) bd -> do
     let
-      ctr (DataCtor _ x ys) = (nameValue x, zip ctrFields $ convertType fileName <$> ys)
-      ctrs = case bd of
-        Nothing -> []
-        Just (_, cs) -> ctr <$> toList cs
-    pure $ AST.DataDeclaration ann Env.Data (nameValue a) (goTypeVar <$> vars) ctrs
+      ctrs :: SourceToken -> DataCtor a -> [(SourceToken, DataCtor a)] -> [AST.DataConstructorDeclaration]
+      ctrs st (DataCtor _ name fields) tl
+        = AST.DataConstructorDeclaration (sourceAnnCommented fileName st (nameTok name)) (nameValue name) (zip ctrFields $ convertType fileName <$> fields)
+        : (case tl of
+            [] -> []
+            (st', ctor) : tl' -> ctrs st' ctor tl'
+          )
+    pure $ AST.DataDeclaration ann Env.Data (nameValue a) (goTypeVar <$> vars) (maybe [] (\(st, Separated hd tl) -> ctrs st hd tl) bd)
   DeclType _ (DataHead _ a vars) _ bd ->
     pure $ AST.TypeSynonymDeclaration ann
       (nameValue a)
       (goTypeVar <$> vars)
       (convertType fileName bd)
-  DeclNewtype _ (DataHead _ a vars) _ x ys -> do
-    let ctrs = [(nameValue x, [(head ctrFields, convertType fileName ys)])]
+  DeclNewtype _ (DataHead _ a vars) st x ys -> do
+    let ctrs = [AST.DataConstructorDeclaration (sourceAnnCommented fileName st (snd $ declRange decl)) (nameValue x) [(head ctrFields, convertType fileName ys)]]
     pure $ AST.DataDeclaration ann Env.Newtype (nameValue a) (goTypeVar <$> vars) ctrs
   DeclClass _ (ClassHead _ sup name vars fdeps) bd -> do
     let
@@ -554,7 +558,10 @@ convertValueBindingFields fileName ann (ValueBindingFields a bs c) = do
     cs' = convertGuarded fileName c
   AST.ValueDeclaration $ AST.ValueDeclarationData ann (ident $ nameValue a) Env.Public bs' cs'
 
-convertImportDecl :: String -> ImportDecl a -> AST.Declaration
+convertImportDecl
+  :: String
+  -> ImportDecl a
+  -> (Pos.SourceAnn, N.ModuleName, AST.ImportDeclarationType, Maybe N.ModuleName)
 convertImportDecl fileName decl@(ImportDecl _ _ modName mbNames mbQual) = do
   let
     ann = uncurry (sourceAnnCommented fileName) $ importDeclRange decl
@@ -565,7 +572,7 @@ convertImportDecl fileName decl@(ImportDecl _ _ modName mbNames mbQual) = do
         if isJust hiding
           then AST.Hiding imps'
           else AST.Explicit imps'
-  AST.ImportDeclaration ann (nameValue modName) importTy (nameValue . snd <$> mbQual)
+  (ann, nameValue modName, importTy, nameValue . snd <$> mbQual)
 
 convertImport :: String -> Import a -> AST.DeclarationRef
 convertImport fileName imp = case imp of
@@ -621,10 +628,12 @@ convertModule :: String -> Module a -> AST.Module
 convertModule fileName module'@(Module _ _ modName exps _ imps decls _) = do
   let
     ann = uncurry (sourceAnnCommented fileName) $ moduleRange module'
-    imps' = convertImportDecl fileName <$> imps
+    imps' = importCtr. convertImportDecl fileName <$> imps
     decls' = convertDeclaration fileName =<< decls
     exps' = map (convertExport fileName) . toList . wrpValue <$> exps
   uncurry AST.Module ann (nameValue modName) (imps' <> decls') exps'
+  where
+  importCtr (a, b, c, d) = AST.ImportDeclaration a b c d
 
 ctrFields :: [N.Ident]
 ctrFields = [N.Ident ("value" <> Text.pack (show (n :: Integer))) | n <- [0..]]
