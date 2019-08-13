@@ -69,6 +69,8 @@ data TypeClassData = TypeClassData
   -- typeClassArguments and typeClassDependencies.
   , typeClassCoveringSets :: S.Set (S.Set Int)
   -- ^ A sets of arguments that can be used to infer all other arguments.
+  , typeClassIsEmpty :: Bool
+  -- ^ Whether or not dictionaries for this type class are necessarily empty.
   } deriving (Show, Generic)
 
 instance NFData TypeClassData
@@ -125,8 +127,9 @@ makeTypeClassData
   -> [(Ident, SourceType)]
   -> [SourceConstraint]
   -> [FunctionalDependency]
+  -> Bool
   -> TypeClassData
-makeTypeClassData args m s deps = TypeClassData args m s deps determinedArgs coveringSets
+makeTypeClassData args m s deps tcIsEmpty = TypeClassData args m s deps determinedArgs coveringSets tcIsEmpty
   where
     argumentIndicies = [0 .. length args - 1]
 
@@ -486,7 +489,7 @@ primTypeErrorTypes =
 primClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primClasses =
   M.fromList
-    [ (primName "Partial", (makeTypeClassData [] [] [] []))
+    [ (primName "Partial", (makeTypeClassData [] [] [] [] True))
     ]
 
 -- | This contains all of the type classes from all Prim modules.
@@ -511,7 +514,7 @@ primRowClasses =
         [ FunctionalDependency [0, 1] [2]
         , FunctionalDependency [1, 2] [0]
         , FunctionalDependency [2, 0] [1]
-        ])
+        ] True)
 
     -- class Nub (original :: # Type) (nubbed :: # Type) | i -> o
     , (primSubName C.moduleRow "Nub", makeTypeClassData
@@ -519,13 +522,13 @@ primRowClasses =
         , ("nubbed", Just (kindRow kindType))
         ] [] []
         [ FunctionalDependency [0] [1]
-        ])
+        ] True)
 
     -- class Lacks (label :: Symbol) (row :: # Type)
     , (primSubName C.moduleRow "Lacks", makeTypeClassData
         [ ("label", Just kindSymbol)
         , ("row", Just (kindRow kindType))
-        ] [] [] [])
+        ] [] [] [] True)
 
     -- class RowCons (label :: Symbol) (a :: Type) (tail :: # Type) (row :: # Type) | label tail a -> row, label row -> tail a
     , (primSubName C.moduleRow "Cons", makeTypeClassData
@@ -536,7 +539,7 @@ primRowClasses =
         ] [] []
         [ FunctionalDependency [0, 1, 2] [3]
         , FunctionalDependency [0, 3] [1, 2]
-        ])
+        ] True)
     ]
 
 primRowListClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
@@ -548,7 +551,7 @@ primRowListClasses =
         , ("list", Just kindRowList)
         ] [] []
         [ FunctionalDependency [0] [1]
-        ])
+        ] True)
     ]
 
 primSymbolClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
@@ -563,7 +566,7 @@ primSymbolClasses =
         [ FunctionalDependency [0, 1] [2]
         , FunctionalDependency [1, 2] [0]
         , FunctionalDependency [2, 0] [1]
-        ])
+        ] True)
 
     -- class Compare (left :: Symbol) (right :: Symbol) (ordering :: Ordering) | left right -> ordering
     , (primSubName C.moduleSymbol "Compare", makeTypeClassData
@@ -572,7 +575,7 @@ primSymbolClasses =
         , ("ordering", Just kindOrdering)
         ] [] []
         [ FunctionalDependency [0, 1] [2]
-        ])
+        ] True)
 
     -- class Cons (head :: Symbol) (tail :: Symbol) (symbol :: Symbol) | head tail -> symbol, symbol -> head tail
     , (primSubName C.moduleSymbol "Cons", makeTypeClassData
@@ -582,7 +585,7 @@ primSymbolClasses =
         ] [] []
         [ FunctionalDependency [0, 1] [2]
         , FunctionalDependency [2] [0, 1]
-        ])
+        ] True)
     ]
 
 primTypeErrorClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
@@ -590,11 +593,11 @@ primTypeErrorClasses =
   M.fromList
     -- class Fail (message :: Symbol)
     [ (primSubName C.typeError "Fail", makeTypeClassData
-        [("message", Just kindDoc)] [] [] [])
+        [("message", Just kindDoc)] [] [] [] True)
 
     -- class Warn (message :: Symbol)
     , (primSubName C.typeError "Warn", makeTypeClassData
-        [("message", Just kindDoc)] [] [] [])
+        [("message", Just kindDoc)] [] [] [] True)
     ]
 
 -- | Finds information about data constructors from the current environment.

@@ -1,8 +1,10 @@
 module Language.PureScript.Make.BuildPlan
   ( BuildPlan()
+  , BuildJobResult(..)
+  , buildJobSuccess
+  , buildJobFailure
   , construct
   , getResult
-  , collectErrors
   , collectResults
   , markComplete
   , needsRebuild
@@ -40,10 +42,28 @@ data Prebuilt = Prebuilt
   , pbExternsFile :: ExternsFile
   }
 
-data BuildJob = BuildJob
-  { bjResult :: C.MVar (Maybe (MultipleErrors, ExternsFile))
-  , bjErrors :: C.MVar (Maybe MultipleErrors)
+newtype BuildJob = BuildJob
+  { bjResult :: C.MVar BuildJobResult
+    -- ^ Note: an empty MVar indicates that the build job has not yet finished.
   }
+
+data BuildJobResult
+  = BuildJobSucceeded !MultipleErrors !ExternsFile
+  -- ^ Succeeded, with warnings and externs
+  --
+  | BuildJobFailed !MultipleErrors
+  -- ^ Failed, with errors
+
+  | BuildJobSkipped
+  -- ^ The build job was not run, because an upstream build job failed
+
+buildJobSuccess :: BuildJobResult -> Maybe (MultipleErrors, ExternsFile)
+buildJobSuccess (BuildJobSucceeded warnings externs) = Just (warnings, externs)
+buildJobSuccess _ = Nothing
+
+buildJobFailure :: BuildJobResult -> Maybe MultipleErrors
+buildJobFailure (BuildJobFailed errors) = Just errors
+buildJobFailure _ = Nothing
 
 -- | Called when we finished compiling a module and want to report back the
 -- compilation result, as well as any potential errors that were thrown.
@@ -51,39 +71,27 @@ markComplete
   :: (MonadBaseControl IO m)
   => BuildPlan
   -> ModuleName
-  -> Maybe (MultipleErrors, ExternsFile)
-  -> Maybe MultipleErrors
+  -> BuildJobResult
   -> m ()
-markComplete buildPlan moduleName result errors = do
-  let BuildJob rVar eVar = fromMaybe (internalError "make: markComplete no barrier") $ M.lookup moduleName (bpBuildJobs buildPlan)
+markComplete buildPlan moduleName result = do
+  let BuildJob rVar = fromMaybe (internalError "make: markComplete no barrier") $ M.lookup moduleName (bpBuildJobs buildPlan)
   putMVar rVar result
-  putMVar eVar errors
 
 -- | Whether or not the module with the given ModuleName needs to be rebuilt
 needsRebuild :: BuildPlan -> ModuleName -> Bool
 needsRebuild bp moduleName = M.member moduleName (bpBuildJobs bp)
 
--- | Collects errors for all modules that have been rebuilt. This will block
--- until all outstanding build jobs are finished.
-collectErrors
-  :: (MonadBaseControl IO m)
-  => BuildPlan
-  -> m [MultipleErrors]
-collectErrors buildPlan  = do
-  errors <- traverse readMVar $ map bjErrors $ M.elems (bpBuildJobs buildPlan)
-  pure (catMaybes errors)
-
--- | Collects ExternsFiles for all prebuilt as well as rebuilt modules. Panics
--- if any build job returned an error.
+-- | Collects results for all prebuilt as well as rebuilt modules. This will
+-- block until all build jobs are finished. Prebuilt modules always return no
+-- warnings.
 collectResults
   :: (MonadBaseControl IO m)
   => BuildPlan
-  -> m (M.Map ModuleName ExternsFile)
+  -> m (M.Map ModuleName BuildJobResult)
 collectResults buildPlan = do
-  let externs = M.map pbExternsFile (bpPrebuilt buildPlan)
-  barrierResults <- traverse (takeMVar . bjResult) $ bpBuildJobs buildPlan
-  let barrierExterns = M.map (snd . fromMaybe (internalError "make: externs were missing but no errors reported.")) barrierResults
-  pure (M.union externs barrierExterns)
+  let prebuiltResults = M.map (BuildJobSucceeded (MultipleErrors []) . pbExternsFile) (bpPrebuilt buildPlan)
+  barrierResults <- traverse (readMVar . bjResult) $ bpBuildJobs buildPlan
+  pure (M.union prebuiltResults barrierResults)
 
 -- | Gets the the build result for a given module name independent of whether it
 -- was rebuilt or prebuilt. Prebuilt modules always return no warnings.
@@ -96,8 +104,9 @@ getResult buildPlan moduleName =
   case M.lookup moduleName (bpPrebuilt buildPlan) of
     Just es ->
       pure (Just (MultipleErrors [], pbExternsFile es))
-    Nothing ->
-      readMVar $ bjResult $ fromMaybe (internalError "make: no barrier") $ M.lookup moduleName (bpBuildJobs buildPlan)
+    Nothing -> do
+      r <- readMVar $ bjResult $ fromMaybe (internalError "make: no barrier") $ M.lookup moduleName (bpBuildJobs buildPlan)
+      pure $ buildJobSuccess r
 
 -- | Constructs a BuildPlan for the given module graph.
 --
@@ -115,7 +124,7 @@ construct MakeActions{..} (sorted, graph) = do
   pure $ BuildPlan prebuilt buildJobs
   where
     makeBuildJob prev moduleName = do
-      buildJob <- BuildJob <$> C.newEmptyMVar <*> C.newEmptyMVar
+      buildJob <- BuildJob <$> C.newEmptyMVar
       pure (M.insert moduleName buildJob prev)
 
     findExistingExtern :: CST.PartialResult Module -> m (Maybe (ModuleName, Bool, Prebuilt))

@@ -2,7 +2,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TupleSections #-}
 
 module Command.Compile (command) where
 
@@ -14,7 +13,6 @@ import qualified Data.ByteString.Lazy.UTF8 as LBU8
 import           Data.List (intercalate)
 import qualified Data.Map as M
 import qualified Data.Set as S
-import           Data.Text (Text)
 import qualified Data.Text as T
 import           Data.Traversable (for)
 import qualified Language.PureScript as P
@@ -27,7 +25,7 @@ import           System.Exit (exitSuccess, exitFailure)
 import           System.Directory (getCurrentDirectory)
 import           System.FilePath.Glob (glob)
 import           System.IO (hPutStr, hPutStrLn, stderr)
-import           System.IO.UTF8 (readUTF8FileT)
+import           System.IO.UTF8 (readUTF8FilesT)
 
 data PSCMakeOptions = PSCMakeOptions
   { pscmInput        :: [FilePath]
@@ -37,7 +35,7 @@ data PSCMakeOptions = PSCMakeOptions
   , pscmJSONErrors   :: Bool
   }
 
--- | Argumnets: verbose, use JSON, warnings, errors
+-- | Arguments: verbose, use JSON, warnings, errors
 printWarningsAndErrors :: Bool -> Bool -> P.MultipleErrors -> Either P.MultipleErrors a -> IO ()
 printWarningsAndErrors verbose False warnings errors = do
   pwd <- getCurrentDirectory
@@ -64,7 +62,7 @@ compile PSCMakeOptions{..} = do
                              , "Usage: For basic information, try the `--help' option."
                              ]
     exitFailure
-  moduleFiles <- readInput input
+  moduleFiles <- readUTF8FilesT input
   (makeErrors, makeWarnings) <- runMake pscmOpts $ do
     ms <- CST.parseModulesFromFiles id moduleFiles
     let filePathMap = M.fromList $ map (\(fp, pm) -> (P.getModuleName $ CST.resPartial pm, Right fp)) ms
@@ -85,9 +83,6 @@ globWarningOnMisses warn = concatMapM globWithWarning
     when (null paths) $ warn pattern'
     return paths
   concatMapM f = fmap concat . mapM f
-
-readInput :: [FilePath] -> IO [(FilePath, Text)]
-readInput inputFiles = forM inputFiles $ \inFile -> (inFile, ) <$> readUTF8FileT inFile
 
 inputFile :: Opts.Parser FilePath
 inputFile = Opts.strArgument $

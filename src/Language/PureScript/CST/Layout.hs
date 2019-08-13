@@ -238,9 +238,10 @@ insertLayout src@(SourceToken tokAnn tok) nextPos stack =
         _ ->
           state & insertDefault
       where
-      equalsP _ LytWhere = True
-      equalsP _ LytLet   = True
-      equalsP _ _        = False
+      equalsP _ LytWhere   = True
+      equalsP _ LytLet     = True
+      equalsP _ LytLetStmt = True
+      equalsP _ _          = False
 
     -- Guards need masking because of commas.
     TokPipe ->
@@ -248,6 +249,8 @@ insertLayout src@(SourceToken tokAnn tok) nextPos stack =
         state'@((_, LytOf) : _, _) ->
           state' & pushStack tokPos LytCaseGuard & insertToken src
         state'@((_, LytLet) : _, _) ->
+          state' & pushStack tokPos LytDeclGuard & insertToken src
+        state'@((_, LytLetStmt) : _, _) ->
           state' & pushStack tokPos LytDeclGuard & insertToken src
         state'@((_, LytWhere) : _, _) ->
           state' & pushStack tokPos LytDeclGuard & insertToken src

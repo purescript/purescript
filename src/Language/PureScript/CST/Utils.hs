@@ -107,6 +107,8 @@ toName k tok = case tokValue tok of
   TokLowerName [] a
     | not (Set.member a reservedNames) -> pure $ Name tok (k a)
     | otherwise -> addFailure [tok] ErrKeywordVar $> Name tok (k "<unexpected>")
+  TokString _ _ -> parseFail tok ErrQuotedPun
+  TokRawString _ -> parseFail tok ErrQuotedPun
   TokUpperName [] a  -> pure $ Name tok (k a)
   TokSymbolName [] a -> pure $ Name tok (k a)
   TokOperator [] a   -> pure $ Name tok (k a)

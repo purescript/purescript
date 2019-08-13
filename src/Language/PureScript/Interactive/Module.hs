@@ -2,13 +2,12 @@ module Language.PureScript.Interactive.Module where
 
 import           Prelude.Compat
 
-import           Control.Monad
 import qualified Language.PureScript as P
 import qualified Language.PureScript.CST as CST
 import           Language.PureScript.Interactive.Types
 import           System.Directory (getCurrentDirectory)
 import           System.FilePath (pathSeparator, makeRelative)
-import           System.IO.UTF8 (readUTF8FileT)
+import           System.IO.UTF8 (readUTF8FileT, readUTF8FilesT)
 
 -- * Support Module
 
@@ -35,9 +34,7 @@ loadModule filename = do
 loadAllModules :: [FilePath] -> IO (Either P.MultipleErrors [(FilePath, P.Module)])
 loadAllModules files = do
   pwd <- getCurrentDirectory
-  filesAndContent <- forM files $ \filename -> do
-    content <- readUTF8FileT filename
-    return (filename, content)
+  filesAndContent <- readUTF8FilesT files
   return $ CST.parseFromFiles (makeRelative pwd) filesAndContent
 
 -- |
