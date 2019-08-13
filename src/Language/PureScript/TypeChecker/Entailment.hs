@@ -207,9 +207,14 @@ entails SolverOptions{..} constraint context hints =
             -- We need information about functional dependencies, so we have to look up the class
             -- name in the environment:
             classesInScope <- lift . lift $ gets (typeClasses . checkEnv)
-            TypeClassData{ typeClassDependencies } <- case M.lookup className' classesInScope of
-              Nothing -> throwError . errorMessage $ UnknownClass className'
-              Just tcd -> pure tcd
+
+            TypeClassData
+              { typeClassDependencies
+              , typeClassIsEmpty
+              } <- case M.lookup className' classesInScope of
+                Nothing -> throwError . errorMessage $ UnknownClass className'
+                Just tcd -> pure tcd
+
             let instances = do
                   chain <- groupBy ((==) `on` tcdChain) $
                            sortBy (compare `on` (tcdChain &&& tcdIndex)) $
@@ -245,11 +250,14 @@ entails SolverOptions{..} constraint context hints =
                 let subst'' = fmap (substituteType currentSubst') subst'
                 -- Solve any necessary subgoals
                 args <- solveSubgoals subst'' (tcdDependencies tcd)
+
                 initDict <- lift . lift $ mkDictionary (tcdValue tcd) args
+
                 let match = foldr (\(className, index) dict -> subclassDictionaryValue dict className index)
                                   initDict
                                   (tcdPath tcd)
-                return match
+
+                return (if typeClassIsEmpty then Unused match else match)
               Unsolved unsolved -> do
                 -- Generate a fresh name for the unsolved constraint's new dictionary
                 ident <- freshIdent ("dict" <> runProperName (disqualify (constraintClass unsolved)))
@@ -339,7 +347,7 @@ entails SolverOptions{..} constraint context hints =
             -- We need subgoal dictionaries to appear in the term somewhere
             -- If there aren't any then the dictionary is just undefined
             useEmptyDict :: Maybe [Expr] -> Expr
-            useEmptyDict args = foldl (App . Abs (VarBinder nullSourceSpan UnusedIdent)) valUndefined (fold args)
+            useEmptyDict args = Unused (foldl (App . Abs (VarBinder nullSourceSpan UnusedIdent)) valUndefined (fold args))
 
             -- Make a dictionary from subgoal dictionaries by applying the correct function
             mkDictionary :: Evidence -> Maybe [Expr] -> m Expr

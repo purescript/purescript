@@ -1,0 +1,49 @@
+{
+  "name": "purescript",
+  "version": "0.13.2",
+  "license": "ISC",
+  "description": "PureScript wrapper that makes it available as a local dependency",
+  "author": {
+    "name": "Watanabe Shinnosuke",
+    "url": "http://github.com/shinnn"
+  },
+  "files": [
+    "index.js",
+    "purs.bin"
+  ],
+  "bin": {
+    "purs": "purs.bin"
+  },
+  "dependencies": {
+    "purescript-installer": "^0.2.0"
+  },
+  "homepage": "https://github.com/purescript/purescript",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/purescript/purescript.git"
+  },
+  "bugs": {
+    "url": "https://github.com/purescript/npm-installer/issues"
+  },
+  "keywords": [
+    "cli",
+    "build",
+    "install",
+    "installation",
+    "fallback",
+    "purs",
+    "purescript",
+    "haskell",
+    "language",
+    "compile",
+    "compiler",
+    "bin",
+    "binary",
+    "wrapper"
+  ],
+  "scripts": {
+    "prepublishOnly": "node -e \"require('fs').copyFileSync('purs.bin.placeholder', 'purs.bin');\"",
+    "postinstall": "install-purescript --purs-ver=0.13.2",
+    "test": "echo 'Error: no test specified' && exit 1"
+  }
+}

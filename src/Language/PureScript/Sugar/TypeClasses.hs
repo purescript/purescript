@@ -64,8 +64,8 @@ desugarTypeClasses externs = flip evalStateT initialState . traverse desugarModu
     :: ModuleName
     -> ExternsDeclaration
     -> Maybe ((ModuleName, ProperName 'ClassName), TypeClassData)
-  fromExternsDecl mn (EDClass name args members implies deps) = Just ((mn, name), typeClass) where
-    typeClass = makeTypeClassData args members implies deps
+  fromExternsDecl mn (EDClass name args members implies deps tcIsEmpty) = Just ((mn, name), typeClass) where
+    typeClass = makeTypeClassData args members implies deps tcIsEmpty
   fromExternsDecl _ _ = Nothing
 
 desugarModule
@@ -203,7 +203,7 @@ desugarDecl
 desugarDecl mn exps = go
   where
   go d@(TypeClassDeclaration sa name args implies deps members) = do
-    modify (M.insert (mn, name) (makeTypeClassData args (map memberToNameAndType members) implies deps))
+    modify (M.insert (mn, name) (makeTypeClassData args (map memberToNameAndType members) implies deps False))
     return (Nothing, d : typeClassDictionaryDeclaration sa name args implies members : map (typeClassMemberToDictionaryAccessor mn name args) members)
   go (TypeInstanceDeclaration _ _ _ _ _ _ _ DerivedInstance) = internalError "Derived instanced should have been desugared"
   go d@(TypeInstanceDeclaration sa _ _ name deps className tys (ExplicitInstance members)) = do

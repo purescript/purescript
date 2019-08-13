@@ -33,6 +33,7 @@ data ParserErrorType
   | ErrGuardInLetBinder
   | ErrKeywordVar
   | ErrKeywordSymbol
+  | ErrQuotedPun
   | ErrToken
   | ErrLineFeedInString
   | ErrAstralCodePointInChar
@@ -103,6 +104,8 @@ prettyPrintErrorMessage (ParserError {..}) = case errType of
     "Expected variable, saw keyword"
   ErrKeywordSymbol ->
     "Expected symbol, saw reserved symbol"
+  ErrQuotedPun ->
+    "Unexpected quoted label in record pun, perhaps due to a missing ':'"
   ErrEof ->
     "Unexpected end of input"
   ErrLexeme (Just (hd : _)) _ | isSpace hd ->

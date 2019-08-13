@@ -14,7 +14,7 @@ import Data.List (findIndex)
 import Data.Foldable
 import Safe (headMay)
 import qualified Data.Map as Map
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Maybe (fromMaybe, isNothing, mapMaybe)
 import Data.Monoid
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -129,6 +129,16 @@ data DocsAssertion
   -- | Assert that a documented declaration includes a documentation comment
   -- containing a particular string
   | ShouldHaveDocComment P.ModuleName Text Text
+  -- | Assert that a documented data declaration includes a documentation comment
+  -- | containing a particular string
+  | ShouldHaveDataConstructorDocComment P.ModuleName Text Text Text
+  -- | Assert that a documented data declaration has no documentation comment
+  | ShouldHaveNoDataConstructorDocComment P.ModuleName Text Text
+  -- | Assert that a documented class method includes a documentation comment
+  -- | containing a particular string
+  | ShouldHaveClassMethodDocComment P.ModuleName Text Text Text
+  -- | Assert that a class method has no documentation comment
+  | ShouldNotHaveClassMethodDocComment P.ModuleName Text Text
   -- | Assert that there should be some declarations re-exported from a
   -- particular module in a particular package.
   | ShouldHaveReExport (Docs.InPackage P.ModuleName)
@@ -173,6 +183,18 @@ displayAssertion = \case
   ShouldHaveDocComment mn decl excerpt ->
     "the string " <> T.pack (show excerpt) <> " should appear in the" <>
     " doc-comments for " <> showQual mn decl
+  ShouldHaveDataConstructorDocComment mn decl constr excerpt ->
+    "the string " <> T.pack (show excerpt) <> " should appear in the" <>
+    " doc-comments for data constructor " <> T.pack (show constr) <> " for " <> showQual mn decl
+  ShouldHaveNoDataConstructorDocComment mn decl constr ->
+    "Doc-comments for data constructor " <> T.pack (show constr) <> " for " <> showQual mn decl <>
+    " should be empty"
+  ShouldHaveClassMethodDocComment mn decl method excerpt ->
+    "the string " <> T.pack (show excerpt) <> " should appear in the" <>
+    " doc-comment for class method " <> T.pack (show method) <> " for " <> showQual mn decl 
+  ShouldNotHaveClassMethodDocComment mn decl method ->
+    "Doc-comments for class method " <> T.pack (show method) <> " for " <> showQual mn decl <>
+    " should be empty"
   ShouldHaveReExport inPkg ->
     "there should be some re-exports from " <>
     showInPkg P.runModuleName inPkg
@@ -217,6 +239,9 @@ data DocsAssertionFailure
   -- | A doc comment was not found or did not match what was expected
   -- Fields: module name, declaration, actual comments
   | DocCommentMissing P.ModuleName Text (Maybe Text)
+  -- | A doc comment was found where none was expected
+  -- Fields: module name, declaration, actual comments
+  | DocCommentPresent P.ModuleName Text (Maybe Text)
   -- | A module was missing re-exports from a particular module.
   -- Fields: module name, expected re-export, actual re-exports.
   | ReExportMissing P.ModuleName (Docs.InPackage P.ModuleName) [Docs.InPackage P.ModuleName]
@@ -267,6 +292,8 @@ displayAssertionFailure = \case
   DocCommentMissing _ decl actual ->
     "the doc-comment for " <> decl <> " did not contain the expected substring;" <>
     " got " <> T.pack (show actual)
+  DocCommentPresent _ decl actual ->
+    "the doc-comment for " <> decl <> " was not empty. Got " <> T.pack (show actual)
   ReExportMissing _ expected actuals ->
     "expected to see some re-exports from " <>
     showInPkg P.runModuleName expected <>
@@ -402,6 +429,18 @@ runAssertion assertion linksCtx Docs.Module{..} =
           then Pass
           else Fail (DocCommentMissing mn decl declComments)
 
+    ShouldHaveDataConstructorDocComment mn decl constr expected ->
+      findDeclChildrenComment mn decl constr expected
+
+    ShouldHaveNoDataConstructorDocComment mn decl constr ->
+      findDeclChildrenNoComment mn decl constr
+
+    ShouldHaveClassMethodDocComment mn decl constr expected ->
+      findDeclChildrenComment mn decl constr expected
+
+    ShouldNotHaveClassMethodDocComment mn decl method ->
+      findDeclChildrenNoComment mn decl method
+
     ShouldHaveReExport reExp ->
       let
         reExps = map fst modReExports
@@ -455,6 +494,26 @@ runAssertion assertion linksCtx Docs.Module{..} =
           Fail (NotDocumented mn title)
         Just decl ->
           f decl
+
+  findDeclChildren mn title child f =
+    findDecl mn title $ \Docs.Declaration{..} ->
+      case find ((==) child . Docs.cdeclTitle) declChildren of
+        Nothing ->
+          Fail (NotDocumented mn child)
+        Just decl ->
+          f decl
+
+  findDeclChildrenComment mn decl constr expected =
+    findDeclChildren mn decl constr $ \Docs.ChildDeclaration{..} ->
+      if maybe False (expected `T.isInfixOf`) cdeclComments
+        then Pass
+        else Fail (DocCommentMissing mn constr cdeclComments)
+
+  findDeclChildrenNoComment mn decl constr =
+    findDeclChildren mn decl constr $ \Docs.ChildDeclaration{..} ->
+      if isNothing cdeclComments
+      then Pass
+      else Fail (DocCommentPresent mn constr cdeclComments)
 
   childrenTitles = map Docs.cdeclTitle . Docs.declChildren
 
@@ -606,6 +665,19 @@ testCases =
 
   , ("DocComments",
       [ ShouldHaveDocComment (n "DocComments") "example" "    example == 0"
+      ])
+
+  , ("DocCommentsDataConstructor",
+      [ ShouldHaveDataConstructorDocComment (n "DocCommentsDataConstructor") "Foo" "Bar" "data constructor comment"
+      , ShouldHaveNoDataConstructorDocComment (n "DocCommentsDataConstructor") "Foo" "Baz"
+      , ShouldHaveNoDataConstructorDocComment (n "DocCommentsDataConstructor") "ComplexFoo" "ComplexBar"
+      , ShouldHaveDataConstructorDocComment (n "DocCommentsDataConstructor") "ComplexFoo" "ComplexBaz" "another data constructor comment"
+      , ShouldHaveDataConstructorDocComment (n "DocCommentsDataConstructor") "NewtypeFoo" "NewtypeFoo" "newtype data constructor comment"
+      ])
+
+  , ("DocCommentsClassMethod",
+      [ ShouldHaveClassMethodDocComment (n "DocCommentsClassMethod") "Foo" "bar" "class method comment"
+      , ShouldNotHaveClassMethodDocComment (n "DocCommentsClassMethod") "Foo" "baz"
       ])
 
   , ("TypeLevelString",

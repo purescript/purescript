@@ -6,6 +6,7 @@ module Language.PureScript.Pretty.Types
   , PrettyPrintConstraint
   , convertPrettyPrintType
   , typeAsBox
+  , typeDiffAsBox
   , suggestedTypeAsBox
   , prettyPrintType
   , prettyPrintTypeWithUnicode
@@ -22,7 +23,7 @@ import Control.Arrow ((<+>))
 import Control.PatternArrows as PA
 
 import Data.Functor (($>))
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, catMaybes)
 import Data.Text (Text)
 import qualified Data.Text as T
 
@@ -118,19 +119,21 @@ prettyPrintRowWith :: TypeRenderOptions -> Char -> Char -> [(Label, PrettyPrintT
 prettyPrintRowWith tro open close labels rest =
   case (labels, rest) of
     ([], Nothing) ->
-      text [open, close]
+      if troRowAsDiff tro then text [ open, ' ' ] <> text "..." <> text [ ' ', close ] else text [ open, close ]
     ([], Just _) ->
       text [ open, ' ' ] <> tailToPs rest <> text [ ' ', close ]
     _ ->
       vcat left $
         zipWith (\(nm, ty) i -> nameAndTypeToPs (if i == 0 then open else ',') nm ty) labels [0 :: Int ..] ++
-        [ tailToPs rest, text [close] ]
+        catMaybes [ rowDiff, pure $ tailToPs rest, pure $ text [close] ]
 
   where
   nameAndTypeToPs :: Char -> Label -> PrettyPrintType -> Box
   nameAndTypeToPs start name ty = text (start : ' ' : T.unpack (prettyPrintLabel name) ++ " " ++ doubleColon ++ " ") <> typeAsBox' ty
 
   doubleColon = if troUnicode tro then "∷" else "::"
+
+  rowDiff = if troRowAsDiff tro then Just (text "...") else Nothing
 
   tailToPs :: Maybe PrettyPrintType -> Box
   tailToPs Nothing = nullBox
@@ -238,22 +241,32 @@ typeAsBox' = typeAsBoxImpl defaultOptions
 typeAsBox :: Int -> Type a -> Box
 typeAsBox maxDepth = typeAsBox' . convertPrettyPrintType maxDepth
 
+typeDiffAsBox' :: PrettyPrintType -> Box
+typeDiffAsBox' = typeAsBoxImpl diffOptions
+
+typeDiffAsBox :: Int -> Type a -> Box
+typeDiffAsBox maxDepth = typeDiffAsBox' . convertPrettyPrintType maxDepth
+
 suggestedTypeAsBox :: PrettyPrintType -> Box
 suggestedTypeAsBox = typeAsBoxImpl suggestingOptions
 
 data TypeRenderOptions = TypeRenderOptions
   { troSuggesting :: Bool
   , troUnicode :: Bool
+  , troRowAsDiff :: Bool
   }
 
 suggestingOptions :: TypeRenderOptions
-suggestingOptions = TypeRenderOptions True False
+suggestingOptions = TypeRenderOptions True False False
 
 defaultOptions :: TypeRenderOptions
-defaultOptions = TypeRenderOptions False False
+defaultOptions = TypeRenderOptions False False False
+
+diffOptions :: TypeRenderOptions
+diffOptions = TypeRenderOptions False False True
 
 unicodeOptions :: TypeRenderOptions
-unicodeOptions = TypeRenderOptions False True
+unicodeOptions = TypeRenderOptions False True False
 
 typeAsBoxImpl :: TypeRenderOptions -> PrettyPrintType -> Box
 typeAsBoxImpl tro
