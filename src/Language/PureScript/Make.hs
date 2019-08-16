@@ -34,6 +34,7 @@ import           Language.PureScript.Environment
 import           Language.PureScript.Errors
 import           Language.PureScript.Externs
 import           Language.PureScript.Linter
+import           Language.PureScript.Suggest
 import           Language.PureScript.ModuleDependencies
 import           Language.PureScript.Names
 import           Language.PureScript.Renamer
@@ -125,7 +126,8 @@ make ma@MakeActions{..} ms = do
   results <- BuildPlan.collectResults buildPlan
 
   -- All threads have completed, rethrow any caught errors.
-  let errors = mapMaybe buildJobFailure $ M.elems results
+  let errors = decorateSuggestions (M.elems results) $ mapMaybe buildJobFailure $ M.elems results
+  
   unless (null errors) $ throwError (mconcat errors)
 
   -- Here we return all the ExternsFile in the ordering of the topological sort,

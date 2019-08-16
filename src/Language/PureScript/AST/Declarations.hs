@@ -205,6 +205,7 @@ data ErrorMessageHint
   | ErrorInTypeClassDeclaration (ProperName 'ClassName)
   | ErrorInForeignImport Ident
   | ErrorSolvingConstraint SourceConstraint
+  | ErrorMissingImport (NEL.NonEmpty (ModuleName, DeclarationRef)) -- List of possible import matching the expected name
   | PositionedError (NEL.NonEmpty SourceSpan)
   deriving (Show)
 

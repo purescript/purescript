@@ -338,12 +338,12 @@ errorSuggestion err =
     emptySuggestion = Just $ ErrorSuggestion ""
     suggest = Just . ErrorSuggestion
 
-    importSuggestion :: ModuleName -> [ DeclarationRef ] -> Maybe ModuleName -> Text
-    importSuggestion mn refs qual =
-      "import " <> runModuleName mn <> " (" <> T.intercalate ", " (mapMaybe prettyPrintRef refs) <> ")" <> qstr qual
-
+importSuggestion :: ModuleName -> [ DeclarationRef ] -> Maybe ModuleName -> Text
+importSuggestion mn refs qual =
+    "import " <> runModuleName mn <> " (" <> T.intercalate ", " (mapMaybe prettyPrintRef refs) <> ")" <> qstr qual
+  where
     qstr :: Maybe ModuleName -> Text
-    qstr (Just mn) = " as " <> runModuleName mn
+    qstr (Just moduleName) = " as " <> runModuleName moduleName
     qstr Nothing = ""
 
 suggestionSpan :: ErrorMessage -> Maybe SourceSpan
@@ -1185,6 +1185,17 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line $ "at " <> displaySourceSpan relPath (NEL.head srcSpan)
             , detail
             ]
+    renderHint (ErrorMissingImport importOptions) detail =
+      paras [ detail
+            , line $ "Perhaps you want to add it to the import list? " <> message
+            , markCodeBox $ indent $ Box.vcat Box.left $ (line . renderImport) <$> importOptions
+            ]
+      where
+        renderImport (mn, (ReExportRef _ _ ref)) = importSuggestion mn [ref] Nothing
+        renderImport (mn, ref) = importSuggestion mn [ref] Nothing
+        message = case length importOptions of
+          1 -> "1 possible import was found:"
+          n -> T.pack (show n) <> " possible imports were found:"
 
     printRow :: (Int -> Type a -> Box.Box) -> Type a -> Box.Box
     printRow f t = markCodeBox $ indent $ f prettyDepth t
