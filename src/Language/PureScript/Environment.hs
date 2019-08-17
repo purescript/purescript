@@ -529,7 +529,7 @@ primCoerceClasses =
     [ (primSubName C.moduleCoerce "Coercible", makeTypeClassData
         [ ("a", Just kindType)
         , ("b", Just kindType)
-        ] [] [] [])
+        ] [] [] [] True)
     ]
 
 primRowClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
