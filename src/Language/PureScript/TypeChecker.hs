@@ -12,7 +12,6 @@ module Language.PureScript.TypeChecker
 import Prelude.Compat
 import Protolude (ordNub)
 
-import Control.Arrow (second)
 import Control.Monad (when, unless, void, forM)
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), modify, gets)
@@ -51,13 +50,14 @@ addDataType
   -> DataDeclType
   -> ProperName 'TypeName
   -> [(Text, Maybe SourceKind)]
-  -> [(ProperName 'ConstructorName, [(Ident, SourceType)])]
+  -> [DataConstructorDeclaration]
   -> SourceKind
   -> m ()
 addDataType moduleName dtype name args dctors ctorKind = do
   env <- getEnv
-  putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (ctorKind, DataType args (map (second (map snd)) dctors)) (types env) }
-  for_ dctors $ \(dctor, fields) ->
+  let mapDataCtor (DataConstructorDeclaration _ ctorName vars) = (ctorName, snd <$> vars)
+  putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (ctorKind, DataType args (map mapDataCtor dctors)) (types env) }
+  for_ dctors $ \(DataConstructorDeclaration _ dctor fields) ->
     warnAndRethrow (addHint (ErrorInDataConstructor dctor)) $
       addDataConstructor moduleName dtype name (map fst args) dctor fields
 
@@ -136,17 +136,23 @@ addTypeClass
   -> m ()
 addTypeClass qualifiedClassName args implies dependencies ds = do
   env <- getEnv
-  traverse_ (checkMemberIsUsable (typeSynonyms env)) classMembers
+  let newClass = mkNewClass env
+  traverse_ (checkMemberIsUsable newClass (typeSynonyms env)) classMembers
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert qualifiedClassName newClass (typeClasses . checkEnv $ st) } }
   where
     classMembers :: [(Ident, SourceType)]
     classMembers = map toPair ds
 
-    newClass :: TypeClassData
-    newClass = makeTypeClassData args classMembers implies dependencies
+    mkNewClass :: Environment -> TypeClassData
+    mkNewClass env = makeTypeClassData args classMembers implies dependencies ctIsEmpty
+      where
+      ctIsEmpty = null classMembers && all (typeClassIsEmpty . findSuperClass) implies
+      findSuperClass c = case M.lookup (constraintClass c) (typeClasses env) of
+        Just tcd -> tcd
+        Nothing -> internalError "Unknown super class in TypeClassDeclaration"
 
-    coveringSets :: [S.Set Int]
-    coveringSets = S.toList (typeClassCoveringSets newClass)
+    coveringSets :: TypeClassData -> [S.Set Int]
+    coveringSets = S.toList . typeClassCoveringSets
 
     argToIndex :: Text -> Maybe Int
     argToIndex = flip M.lookup $ M.fromList (zipWith ((,) . fst) args [0..])
@@ -157,11 +163,11 @@ addTypeClass qualifiedClassName args implies dependencies ds = do
     -- Currently we are only checking usability based on the type class currently
     -- being defined.  If the mentioned arguments don't include a covering set,
     -- then we won't be able to find a instance.
-    checkMemberIsUsable :: T.SynonymMap -> (Ident, SourceType) -> m ()
-    checkMemberIsUsable syns (ident, memberTy) = do
+    checkMemberIsUsable :: TypeClassData -> T.SynonymMap -> (Ident, SourceType) -> m ()
+    checkMemberIsUsable newClass syns (ident, memberTy) = do
       memberTy' <- T.replaceAllTypeSynonymsM syns memberTy
       let mentionedArgIndexes = S.fromList (mapMaybe argToIndex (freeTypeVariables memberTy'))
-      let leftovers = map (`S.difference` mentionedArgIndexes) coveringSets
+      let leftovers = map (`S.difference` mentionedArgIndexes) (coveringSets newClass)
 
       unless (any null leftovers) . throwError . errorMessage $
         let
@@ -248,7 +254,7 @@ typeCheckAll moduleName _ = traverse go
     warnAndRethrow (addHint (ErrorInTypeConstructor name) . addHint (positionedError ss)) $ do
       when (dtype == Newtype) $ checkNewtype name dctors
       checkDuplicateTypeArguments $ map fst args
-      ctorKind <- kindsOf True moduleName name args (concatMap (fmap snd . snd) dctors)
+      ctorKind <- kindsOf True moduleName name args (concatMap (fmap snd . dataCtorFields) dctors)
       let args' = args `withKinds` ctorKind
       addDataType moduleName dtype name args' dctors ctorKind
     return $ DataDeclaration sa dtype name args dctors
@@ -259,7 +265,7 @@ typeCheckAll moduleName _ = traverse go
         bindingGroupNames = ordNub ((syns^..traverse._2) ++ (dataDecls^..traverse._3))
         sss = fmap declSourceSpan tys
     warnAndRethrow (addHint (ErrorInDataBindingGroup bindingGroupNames) . addHint (PositionedError sss)) $ do
-      (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(sa, _, name, args, dctors) -> (sa, name, args, concatMap (fmap snd . snd) dctors)) dataDecls)
+      (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(sa, _, name, args, dctors) -> (sa, name, args, concatMap (fmap snd . dataCtorFields) dctors)) dataDecls)
       for_ (zip dataDecls data_ks) $ \((_, dtype, name, args, dctors), ctorKind) -> do
         when (dtype == Newtype) $ checkNewtype name dctors
         checkDuplicateTypeArguments $ map fst args
@@ -511,9 +517,9 @@ checkNewtype
   :: forall m
    . MonadError MultipleErrors m
   => ProperName 'TypeName
-  -> [(ProperName 'ConstructorName, [(Ident, SourceType)])]
+  -> [DataConstructorDeclaration]
   -> m ()
-checkNewtype _ [(_, [_])] = return ()
+checkNewtype _ [(DataConstructorDeclaration _ _ [_])] = return ()
 checkNewtype name _ = throwError . errorMessage $ InvalidNewtype name
 
 -- |

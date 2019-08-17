@@ -495,6 +495,15 @@ pattern ValueDecl :: SourceAnn -> Ident -> NameKind -> [Binder] -> [GuardedExpr]
 pattern ValueDecl sann ident name binders expr
   = ValueDeclaration (ValueDeclarationData sann ident name binders expr)
 
+data DataConstructorDeclaration = DataConstructorDeclaration
+  { dataCtorAnn :: !SourceAnn
+  , dataCtorName :: !(ProperName 'ConstructorName)
+  , dataCtorFields :: ![(Ident, SourceType)]
+  } deriving (Show, Eq)
+
+traverseDataCtorFields :: Monad m => ([(Ident, SourceType)] -> m [(Ident, SourceType)]) -> DataConstructorDeclaration -> m DataConstructorDeclaration
+traverseDataCtorFields f DataConstructorDeclaration{..} = DataConstructorDeclaration dataCtorAnn dataCtorName <$> f dataCtorFields
+
 -- |
 -- The data type of declarations
 --
@@ -502,7 +511,7 @@ data Declaration
   -- |
   -- A data type declaration (data or newtype, name, arguments, data constructors)
   --
-  = DataDeclaration SourceAnn DataDeclType (ProperName 'TypeName) [(Text, Maybe SourceKind)] [(ProperName 'ConstructorName, [(Ident, SourceType)])]
+  = DataDeclaration SourceAnn DataDeclType (ProperName 'TypeName) [(Text, Maybe SourceKind)] [DataConstructorDeclaration]
   -- |
   -- A minimal mutually recursive set of data type declarations
   --
@@ -779,6 +788,12 @@ data Expr
   -- Function application
   --
   | App Expr Expr
+  -- |
+  -- Hint that an expression is unused.
+  -- This is used to ignore type class dictionaries that are necessarily empty.
+  -- The inner expression lets us solve subgoals before eliminating the whole expression.
+  -- The code gen will render this as `undefined`, regardless of what the inner expression is.
+  | Unused Expr
   -- |
   -- Variable
   --

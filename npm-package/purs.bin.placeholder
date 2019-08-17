@@ -1,0 +1,7 @@
+# This is a placeholder file of a PureScript binary installed with npm. If you
+# see this file, that means the installation has failed and the placeholder has
+# not been replaced with a valid binary.  Try installing the `purescript` npm
+# package again.
+
+echo >&2 "purescript npm installer: installation failed; please try installing again"
+exit 1

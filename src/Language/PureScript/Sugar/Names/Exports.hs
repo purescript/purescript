@@ -46,7 +46,7 @@ findExportable (Module _ _ mn ds _) =
     go exps'' (TypeDeclaration (TypeDeclarationData (ss', _) name _)) = exportValue ss' exps'' name source
     go _ _ = internalError "Invalid declaration in TypeClassDeclaration"
   updateExports exps (DataDeclaration (ss, _) _ tn _ dcs) =
-    exportType ss Internal exps tn (map fst dcs) source
+    exportType ss Internal exps tn (map dataCtorName dcs) source
   updateExports exps (TypeSynonymDeclaration (ss, _) tn _ _) =
     exportType ss Internal exps tn [] source
   updateExports exps (ExternDataDeclaration (ss, _) tn _) =

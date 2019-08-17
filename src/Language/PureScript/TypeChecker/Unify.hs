@@ -173,7 +173,8 @@ unifyRows r1 r2 = sequence_ matches *> uncurry unifyTails rest where
     solveType u1 (rowFromList (sd2, rest'))
     solveType u2 (rowFromList (sd1, rest'))
   unifyTails _ _ =
-    throwError . errorMessage $ TypesDoNotUnify r1 r2
+    withErrorMessageHint (ErrorUnifyingTypes r1 r2) $
+      throwError . errorMessage $ TypesDoNotUnify r1 r2
 
 -- |
 -- Replace a single type variable with a new unification variable

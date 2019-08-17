@@ -134,6 +134,8 @@ If you would prefer to use different terms, please use the section below instead
 | [@jordanmartinez](https://github.com/jordanmartinez) | Jordan Martinez | [MIT license](http://opensource.org/licenses/MIT) |
 | [@Saulukass](https://github.com/Saulukass) | Saulius Skliutas | [MIT license](http://opensource.org/licenses/MIT) |
 | [@adnelson](https://github.com/adnelson) | Allen Nelson | [MIT license](http://opensource.org/licenses/MIT) |
+| [@dyerw](https://github.com/dyerw) | Liam Dyer | [MIT license](http://opensource.org/licenses/MIT) |
+| [@marcosh](https://github.com/marcosh) | Marco Perone | [MIT license](http://opensource.org/licenses/MIT) |
 
 ### Contributors using Modified Terms
 

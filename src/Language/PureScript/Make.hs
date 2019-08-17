@@ -22,7 +22,7 @@ import           Data.Function (on)
 import           Data.Foldable (for_)
 import           Data.List (foldl', sortBy)
 import qualified Data.List.NonEmpty as NEL
-import           Data.Maybe (fromMaybe)
+import           Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -121,19 +121,22 @@ make ma@MakeActions{..} ms = do
       (importPrim <$> CST.resFull m)
       (deps `inOrderOf` map (getModuleName . CST.resPartial) sorted)
 
-  -- Wait for all threads to complete, and collect errors.
-  errors <- BuildPlan.collectErrors buildPlan
+  -- Wait for all threads to complete, and collect results (and errors).
+  results <- BuildPlan.collectResults buildPlan
 
   -- All threads have completed, rethrow any caught errors.
+  let errors = mapMaybe buildJobFailure $ M.elems results
   unless (null errors) $ throwError (mconcat errors)
-
-  -- Collect all ExternsFiles
-  results <- BuildPlan.collectResults buildPlan
 
   -- Here we return all the ExternsFile in the ordering of the topological sort,
   -- so they can be folded into an Environment. This result is used in the tests
   -- and in PSCI.
-  let lookupResult mn = fromMaybe (internalError "make: module not found in results") (M.lookup mn results)
+  let lookupResult mn =
+        snd
+        . fromMaybe (internalError "make: module's build job did not succeed")
+        . buildJobSuccess
+        . fromMaybe (internalError "make: module not found in results")
+        $ M.lookup mn results
   return (map (lookupResult . getModuleName . CST.resPartial) sorted)
 
   where
@@ -168,21 +171,21 @@ make ma@MakeActions{..} ms = do
   inOrderOf xs ys = let s = S.fromList xs in filter (`S.member` s) ys
 
   buildModule :: BuildPlan -> ModuleName -> FilePath -> Either (NEL.NonEmpty CST.ParserError) Module -> [ModuleName] -> m ()
-  buildModule buildPlan moduleName fp mres deps = flip catchError (complete Nothing . Just) $ do
-    m <- CST.unwrapParserError fp mres
-    -- We need to wait for dependencies to be built, before checking if the current
-    -- module should be rebuilt, so the first thing to do is to wait on the
-    -- MVars for the module's dependencies.
-    mexterns <- fmap unzip . sequence <$> traverse (getResult buildPlan) deps
+  buildModule buildPlan moduleName fp mres deps = do
+    result <- flip catchError (return . BuildJobFailed) $ do
+      m <- CST.unwrapParserError fp mres
+      -- We need to wait for dependencies to be built, before checking if the current
+      -- module should be rebuilt, so the first thing to do is to wait on the
+      -- MVars for the module's dependencies.
+      mexterns <- fmap unzip . sequence <$> traverse (getResult buildPlan) deps
 
-    case mexterns of
-      Just (_, externs) -> do
-        (exts, warnings) <- listen $ rebuildModule ma externs m
-        complete (Just (warnings, exts)) Nothing
-      Nothing -> complete Nothing Nothing
-    where
-    complete :: Maybe (MultipleErrors, ExternsFile) -> Maybe MultipleErrors -> m ()
-    complete = BuildPlan.markComplete buildPlan moduleName
+      case mexterns of
+        Just (_, externs) -> do
+          (exts, warnings) <- listen $ rebuildModule ma externs m
+          return $ BuildJobSucceeded warnings exts
+        Nothing -> return BuildJobSkipped
+
+    BuildPlan.markComplete buildPlan moduleName result
 
 -- | Infer the module name for a module by looking for the same filename with
 -- a .js extension.

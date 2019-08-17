@@ -14,6 +14,7 @@ module Language.PureScript.Bundle
   , ErrorMessage(..)
   , printErrorMessage
   , getExportedIdentifiers
+  , Module
   ) where
 
 import Prelude.Compat
@@ -23,19 +24,23 @@ import Control.Monad
 import Control.Monad.Error.Class
 import Control.Arrow ((&&&))
 
+import Data.Aeson ((.=))
 import Data.Array ((!))
 import Data.Char (chr, digitToInt)
 import Data.Foldable (fold)
-import Data.Generics (GenericM, everything, everywhere, gmapMo, mkMp, mkQ, mkT)
+import Data.Generics (GenericM, everything, everythingWithContext, everywhere, gmapMo, mkMp, mkQ, mkT)
 import Data.Graph
-import Data.List (stripPrefix)
+import Data.List (stripPrefix, (\\))
 import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
 import Data.Version (showVersion)
+import qualified Data.Aeson as A
 import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.Text.Lazy as T
 
 import Language.JavaScript.Parser
 import Language.JavaScript.Parser.AST
+import Language.JavaScript.Process.Minify
 
 import qualified Paths_purescript as Paths
 
@@ -69,6 +74,12 @@ showModuleType Foreign = "Foreign"
 -- | A module is identified by its module name and its type.
 data ModuleIdentifier = ModuleIdentifier String ModuleType deriving (Show, Eq, Ord)
 
+instance A.ToJSON ModuleIdentifier where
+  toJSON (ModuleIdentifier name mt) =
+    A.object [ "name" .= name
+             , "type" .= show mt
+             ]
+
 moduleName :: ModuleIdentifier -> String
 moduleName (ModuleIdentifier name _) = name
 
@@ -80,9 +91,14 @@ guessModuleIdentifier filename = ModuleIdentifier (takeFileName (takeDirectory f
     guessModuleType "foreign.js" = pure Foreign
     guessModuleType name = throwError $ UnsupportedModulePath name
 
--- | A piece of code is identified by its module and its name. These keys are used to label vertices
--- in the dependency graph.
-type Key = (ModuleIdentifier, String)
+data Visibility
+  = Public
+  | Internal
+  deriving (Show, Eq, Ord)
+
+-- | A piece of code is identified by its module, its name, and whether it is an internal variable
+-- or a public member. These keys are used to label vertices in the dependency graph.
+type Key = (ModuleIdentifier, String, Visibility)
 
 -- | An export is either a "regular export", which exports a name from the regular module we are in,
 -- or a reexport of a declaration in the corresponding foreign module.
@@ -104,14 +120,77 @@ data ExportType
 -- into the output during codegen.
 data ModuleElement
   = Require JSStatement String (Either String ModuleIdentifier)
-  | Member JSStatement Bool String JSExpression [Key]
+  | Member JSStatement Visibility String JSExpression [Key]
   | ExportsList [(ExportType, String, JSExpression, [Key])]
   | Other JSStatement
   | Skip JSStatement
   deriving (Show)
 
+instance A.ToJSON ModuleElement where
+  toJSON = \case
+    (Require _ name (Right target)) ->
+      A.object [ "type"   .= A.String "Require"
+               , "name"   .= name
+               , "target" .= target
+               ]
+    (Require _ name (Left targetPath)) ->
+      A.object [ "type"       .= A.String "Require"
+               , "name"       .= name
+               , "targetPath" .= targetPath
+               ]
+    (Member _ visibility name _ dependsOn) ->
+      A.object [ "type"       .= A.String "Member"
+               , "name"       .= name
+               , "visibility" .= show visibility
+               , "dependsOn"  .= map keyToJSON dependsOn
+               ]
+    (ExportsList exports) ->
+      A.object [ "type"    .= A.String "ExportsList"
+               , "exports" .= map exportToJSON exports
+               ]
+    (Other stmt) ->
+      A.object [ "type" .= A.String "Other"
+               , "js"   .= getFragment stmt
+               ]
+    (Skip stmt) ->
+      A.object [ "type" .= A.String "Skip"
+               , "js"   .= getFragment stmt
+               ]
+
+    where
+
+    keyToJSON (mid, member, visibility) =
+      A.object [ "module"     .= mid
+               , "member"     .= member
+               , "visibility" .= show visibility
+               ]
+
+    exportToJSON (RegularExport sourceName, name, _, dependsOn) =
+      A.object [ "type"       .= A.String "RegularExport"
+               , "name"       .= name
+               , "sourceName" .= sourceName
+               , "dependsOn"  .= map keyToJSON dependsOn
+               ]
+    exportToJSON (ForeignReexport, name, _, dependsOn) =
+      A.object [ "type"      .= A.String "ForeignReexport"
+               , "name"      .= name
+               , "dependsOn" .= map keyToJSON dependsOn
+               ]
+
+    getFragment = ellipsize . renderToText . minifyJS . flip JSAstStatement JSNoAnnot
+      where
+      ellipsize text = if T.compareLength text 20 == GT then T.take 19 text `T.snoc` ellipsis else text
+      ellipsis = '\x2026'
+
 -- | A module is just a list of elements of the types listed above.
 data Module = Module ModuleIdentifier (Maybe FilePath) [ModuleElement] deriving (Show)
+
+instance A.ToJSON Module where
+  toJSON (Module moduleId filePath elements) =
+    A.object [ "moduleId" .= moduleId
+             , "filePath" .= filePath
+             , "elements" .= elements
+             ]
 
 -- | Prepare an error message for consumption by humans.
 printErrorMessage :: ErrorMessage -> [String]
@@ -202,24 +281,33 @@ withDeps (Module modulePath fn es) = Module modulePath fn (map expandDeps es)
       expand (ty, nm, n1, _) = (ty, nm, n1, ordNub (dependencies modulePath n1))
   expandDeps other = other
 
-  dependencies :: ModuleIdentifier -> JSExpression -> [(ModuleIdentifier, String)]
-  dependencies m = everything (++) (mkQ [] toReference)
+  dependencies :: ModuleIdentifier -> JSExpression -> [Key]
+  dependencies m = everythingWithContext boundNames (++) (mkQ (const [] &&& id) toReference)
     where
-    toReference :: JSExpression -> [(ModuleIdentifier, String)]
-    toReference (JSMemberDot mn _ nm)
+    toReference :: JSExpression -> [String] -> ([Key], [String])
+    toReference (JSMemberDot mn _ nm) bn
       | JSIdentifier _ mn' <- mn
       , JSIdentifier _ nm' <- nm
       , Just mid <- lookup mn' imports
-      = [(mid, nm')]
-    toReference (JSMemberSquare mn _ nm _)
+      = ([(mid, nm', Public)], bn)
+    toReference (JSMemberSquare mn _ nm _) bn
       | JSIdentifier _ mn' <- mn
       , Just nm' <- fromStringLiteral nm
       , Just mid <- lookup mn' imports
-      = [(mid, nm')]
-    toReference (JSIdentifier _ nm)
-      | nm `elem` boundNames
-      = [(m, nm)]
-    toReference _ = []
+      = ([(mid, nm', Public)], bn)
+    toReference (JSIdentifier _ nm) bn
+      | nm `elem` bn
+      -- ^ only add a dependency if this name is still in the list of names
+      -- bound to the module level (i.e., hasn't been shadowed by a function
+      -- parameter)
+      = ([(m, nm, Internal)], bn)
+    toReference (JSFunctionExpression _ _ _ params _ _) bn
+      = ([], bn \\ (mapMaybe unIdent $ commaList params))
+    toReference _ bn = ([], bn)
+
+    unIdent :: JSIdent -> Maybe String
+    unIdent (JSIdentName _ name) = Just name
+    unIdent _ = Nothing
 
 -- String literals include the quote chars
 fromStringLiteral :: JSExpression -> Maybe String
@@ -277,8 +365,8 @@ toModule mids mid filename top
     | Just (importName, importPath) <- matchRequire mids mid stmt
     = pure (Require stmt importName importPath)
   toModuleElement stmt
-    | Just (exported, name, decl) <- matchMember stmt
-    = pure (Member stmt exported name decl [])
+    | Just (visibility, name, decl) <- matchMember stmt
+    = pure (Member stmt visibility name decl [])
   toModuleElement stmt
     | Just props <- matchExportsAssignment stmt
     = ExportsList <$> traverse toExport (trailingCommaList props)
@@ -320,7 +408,7 @@ getExportedIdentifiers mname top
   go stmt
     | Just props <- matchExportsAssignment stmt
     = traverse toIdent (trailingCommaList props)
-    | Just (True, name, _) <- matchMember stmt
+    | Just (Public, name, _) <- matchMember stmt
     = pure [name]
     | otherwise
     = pure []
@@ -352,18 +440,18 @@ matchRequire mids mid stmt
   = Nothing
 
 -- Matches JS member declarations.
-matchMember :: JSStatement -> Maybe (Bool, String, JSExpression)
+matchMember :: JSStatement -> Maybe (Visibility, String, JSExpression)
 matchMember stmt
   -- var foo = expr;
   | JSVariable _ jsInit _ <- stmt
   , [JSVarInitExpression var varInit] <- commaList jsInit
   , JSIdentifier _ name <- var
   , JSVarInit _ decl <- varInit
-  = Just (False, name, decl)
+  = Just (Internal, name, decl)
   -- exports.foo = expr; exports["foo"] = expr;
   | JSAssignStatement e (JSAssign _) decl _ <- stmt
   , Just name <- accessor e
-  = Just (True, name, decl)
+  = Just (Public, name, decl)
   | otherwise
   = Nothing
   where
@@ -411,26 +499,20 @@ compile modules entryPoints = filteredModules
     where
     -- | Create a set of vertices for a module element.
     --
-    -- Some special cases worth commenting on:
-    --
-    -- 1) Regular exports which simply export their own name do not count as dependencies.
-    --    Regular exports which rename and reexport an operator do count, however.
-    --
-    -- 2) Require statements don't contribute towards dependencies, since they effectively get
-    --    inlined wherever they are used inside other module elements.
+    -- Require statements don't contribute towards dependencies, since they effectively get
+    -- inlined wherever they are used inside other module elements.
     toVertices :: ModuleIdentifier -> ModuleElement -> [(ModuleElement, Key, [Key])]
-    toVertices p m@(Member _ _ nm _ deps) = [(m, (p, nm), deps)]
-    toVertices p m@(ExportsList exps) = mapMaybe toVertex exps
+    toVertices p m@(Member _ visibility nm _ deps) = [(m, (p, nm, visibility), deps)]
+    toVertices p m@(ExportsList exps) = map toVertex exps
       where
-      toVertex (ForeignReexport, nm, _, ks) = Just (m, (p, nm), ks)
-      toVertex (RegularExport nm, nm1, _, ks) | nm /= nm1 = Just (m, (p, nm1), ks)
-      toVertex _ = Nothing
+      toVertex (ForeignReexport, nm, _, ks) = (m, (p, nm, Public), ks)
+      toVertex (RegularExport _, nm, _, ks) = (m, (p, nm, Public), ks)
     toVertices _ _ = []
 
   -- | The set of vertices whose connected components we are interested in keeping.
   entryPointVertices :: [Vertex]
   entryPointVertices = catMaybes $ do
-    (_, k@(mid, _), _) <- verts
+    (_, k@(mid, _, Public), _) <- verts
     guard $ mid `elem` entryPoints
     return (vertexFor k)
 
@@ -443,7 +525,7 @@ compile modules entryPoints = filteredModules
   moduleReferenceMap = M.fromAscListWith mappend $ map (vertToModule &&& vertToModuleRefs) $ S.toList reachableSet
     where
     vertToModuleRefs v = foldMap (S.singleton . vertToModule) $ graph ! v
-    vertToModule v = m where (_, (m, _), _) = vertexToNode v
+    vertToModule v = m where (_, (m, _, _), _) = vertexToNode v
 
   filteredModules :: [Module]
   filteredModules = map filterUsed modules
@@ -466,11 +548,11 @@ compile modules entryPoints = filteredModules
 
       -- | Filter out the exports for members which aren't used.
       filterExports :: ModuleElement -> ModuleElement
-      filterExports (ExportsList exps) = ExportsList (filter (\(_, nm, _, _) -> isKeyUsed (mid, nm)) exps)
+      filterExports (ExportsList exps) = ExportsList (filter (\(_, nm, _, _) -> isKeyUsed (mid, nm, Public)) exps)
       filterExports me = me
 
       isDeclUsed :: ModuleElement -> Bool
-      isDeclUsed (Member _ _ nm _ _) = isKeyUsed (mid, nm)
+      isDeclUsed (Member _ visibility nm _ _) = isKeyUsed (mid, nm, visibility)
       isDeclUsed (Require _ _ (Right midRef)) = midRef `S.member` modulesReferenced
       isDeclUsed _ = True
 
@@ -730,8 +812,9 @@ bundleSM :: (MonadError ErrorMessage m)
        -> Maybe String -- ^ An optional main module.
        -> String -- ^ The namespace (e.g. PS).
        -> Maybe FilePath -- ^ The output file name (if there is one - in which case generate source map)
+       -> Maybe ([Module] -> m ()) -- ^ Optionally report the parsed modules prior to DCE -- used by "bundle --debug"
        -> m (Maybe SourceMapping, String)
-bundleSM inputStrs entryPoints mainModule namespace outFilename = do
+bundleSM inputStrs entryPoints mainModule namespace outFilename reportRawModules = do
   let mid (a,_,_) = a
   forM_ mainModule $ \mname ->
     when (mname `notElem` map (moduleName . mid) inputStrs) (throwError (MissingMainModule mname))
@@ -744,6 +827,8 @@ bundleSM inputStrs entryPoints mainModule namespace outFilename = do
   let mids = S.fromList (map (moduleName . mid) input)
 
   modules <- traverse (fmap withDeps . (\(a,fn,c) -> toModule mids a fn c)) input
+
+  forM_ reportRawModules ($ modules)
 
   let compiled = compile modules entryPoints
       sorted   = sortModules (filter (not . isModuleEmpty) compiled)
@@ -759,4 +844,4 @@ bundle :: (MonadError ErrorMessage m)
        -> Maybe String -- ^ An optional main module.
        -> String -- ^ The namespace (e.g. PS).
        -> m String
-bundle inputStrs entryPoints mainModule namespace = snd <$> bundleSM (map (\(a,b) -> (a,Nothing,b)) inputStrs) entryPoints mainModule namespace Nothing
+bundle inputStrs entryPoints mainModule namespace = snd <$> bundleSM (map (\(a,b) -> (a,Nothing,b)) inputStrs) entryPoints mainModule namespace Nothing Nothing
