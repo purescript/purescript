@@ -348,7 +348,7 @@ partial = primClass "Partial" $ T.unlines
   , "a partial function with a bad input will usually cause an error to be"
   , "thrown, although it is not safe to assume that this will happen in all"
   , "cases. For more information, see"
-  , "[the Partial type class guide](https://github.com/purescript/documentation/blob/master/guides/The-Partial-type-class.md)."
+  , "[purescript-partial](https://pursuit.purescript.org/packages/purescript-partial/)."
   ]
 
 kindBoolean :: Declaration
