@@ -70,7 +70,7 @@ resolveModuleImport env ie (mn, imps) = foldM go ie imps
   go ie' (ss, typ, impQual) = do
     modExports <-
       maybe
-        (throwError . errorMessage' ss . UnknownName . Qualified Nothing $ ModName mn)
+        (throwError . errorMessage' ss . UnknownName [] . Qualified Nothing $ ModName mn)
         (return . envModuleExports)
         (mn `M.lookup` env)
     let impModules = importedModules ie'

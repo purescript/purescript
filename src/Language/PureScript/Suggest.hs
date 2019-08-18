@@ -25,12 +25,12 @@ decorateSuggestions jobs multipleErrors = decorateMultipleErrors <$> multipleErr
       decorateMultipleErrors (MultipleErrors errs) = MultipleErrors $ decorateErrorMessage <$> errs
 
       decorateErrorMessage :: ErrorMessage -> ErrorMessage
-      decorateErrorMessage (ErrorMessage hints err@(UnknownName (Qualified Nothing name))) = ErrorMessage (hints ++ maybeToList (importHintsForModule name)) err
+      decorateErrorMessage (ErrorMessage hints err) = ErrorMessage hints (suggestionForSimpleError err)
       decorateErrorMessage others = others
 
-      importHintsForModule :: Name -> Maybe ErrorMessageHint
-      importHintsForModule name = ErrorMissingImport <$> NEL.nonEmpty qualifiedValues 
-        where qualifiedValues = findImportForName name 
+      suggestionForSimpleError ::  SimpleErrorMessage -> SimpleErrorMessage
+      suggestionForSimpleError (UnknownName imports qualName@(Qualified Nothing name)) = UnknownName (imports ++ findImportForName name) qualName
+      suggestionForSimpleError others = others
 
       findImportForName :: Name -> [(ModuleName, DeclarationRef)]
       findImportForName name = 

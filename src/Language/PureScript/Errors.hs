@@ -333,6 +333,7 @@ errorSuggestion err =
       HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
       MissingTypeDeclaration ident ty -> suggest $ showIdent ident <> " :: " <> T.pack (prettyPrintSuggestedType ty)
       WildcardInferredType ty _ -> suggest $ T.pack (prettyPrintSuggestedType ty)
+      UnknownName alternatives unknownName -> suggest $ T.unlines $ (\(mn, ref) -> importSuggestion mn [ref] Nothing) <$> alternatives
       _ -> Nothing
   where
     emptySuggestion = Just $ ErrorSuggestion ""
@@ -534,10 +535,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line $ "The type declaration for " <> markCode (showIdent nm) <> " should be followed by its definition."
     renderSimpleErrorMessage (RedefinedIdent name) =
       line $ "The value " <> markCode (showIdent name) <> " has been defined multiple times"
-    renderSimpleErrorMessage (UnknownName name@(Qualified Nothing (IdentName (Ident i)))) | i `elem` [ C.bind, C.discard ] =
+    renderSimpleErrorMessage (UnknownName _ name@(Qualified Nothing (IdentName (Ident i)))) | i `elem` [ C.bind, C.discard ] =
       line $ "Unknown " <> printName name <> ". You're probably using do-notation, which the compiler replaces with calls to the " <> markCode i <> " function. Please import " <> markCode i <> " from module " <> markCode "Prelude"
-    renderSimpleErrorMessage (UnknownName name) =
-      line $ "Unknown " <> printName name
+    renderSimpleErrorMessage msg@(UnknownName _ name) =
+      paras [ line $ "Unknown " <> printName name
+            , indent $ line $ markCode $ showSuggestion msg
+            ]
     renderSimpleErrorMessage (UnknownImport mn name) =
       paras [ line $ "Cannot import " <> printName (Qualified Nothing name) <> " from module " <> markCode (runModuleName mn)
             , line "It either does not exist or the module does not export it."
@@ -1185,17 +1188,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line $ "at " <> displaySourceSpan relPath (NEL.head srcSpan)
             , detail
             ]
-    renderHint (ErrorMissingImport importOptions) detail =
-      paras [ detail
-            , line $ "Perhaps you want to add it to the import list? " <> message
-            , markCodeBox $ indent $ Box.vcat Box.left $ (line . renderImport) <$> importOptions
-            ]
-      where
-        renderImport (mn, (ReExportRef _ _ ref)) = importSuggestion mn [ref] Nothing
-        renderImport (mn, ref) = importSuggestion mn [ref] Nothing
-        message = case length importOptions of
-          1 -> "1 possible import was found:"
-          n -> T.pack (show n) <> " possible imports were found:"
+      
 
     printRow :: (Int -> Type a -> Box.Box) -> Type a -> Box.Box
     printRow f t = markCodeBox $ indent $ f prettyDepth t

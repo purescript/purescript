@@ -85,7 +85,8 @@ data SimpleErrorMessage
   | OrphanTypeDeclaration Ident
   | RedefinedIdent Ident
   | OverlappingNamesInLet
-  | UnknownName (Qualified Name)
+  | UnknownName [(ModuleName, DeclarationRef)] (Qualified Name)
+  -- ^ possible imports (filled with values in Make); missing name
   | UnknownImport ModuleName Name
   | UnknownImportDataConstructor ModuleName (ProperName 'TypeName) (ProperName 'ConstructorName)
   | UnknownExport Name
@@ -205,7 +206,6 @@ data ErrorMessageHint
   | ErrorInTypeClassDeclaration (ProperName 'ClassName)
   | ErrorInForeignImport Ident
   | ErrorSolvingConstraint SourceConstraint
-  | ErrorMissingImport (NEL.NonEmpty (ModuleName, DeclarationRef)) -- List of possible import matching the expected name
   | PositionedError (NEL.NonEmpty SourceSpan)
   deriving (Show)
 

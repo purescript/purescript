@@ -251,7 +251,7 @@ infer' other = (, []) <$> go other
   go (TypeConstructor ann v) = do
     env <- getEnv
     case M.lookup v (types env) of
-      Nothing -> throwError . errorMessage' (fst ann) . UnknownName $ fmap TyName v
+      Nothing -> throwError . errorMessage' (fst ann) . UnknownName [] $ fmap TyName v
       Just (kind, _) -> return $ kind $> ann
   go (TypeApp ann t1 t2) = do
     k0 <- freshKind ann
