@@ -4,6 +4,17 @@ import Prelude
 import Prim.Row
 import Effect
 import Effect.Console
+import Unsafe.Coerce (unsafeCoerce)
+
+solveUnionBackwardsNil :: Record _ -> Record _
+solveUnionBackwardsNil = (unsafeCoerce :: forall r. Union r () () => {} -> Record r)
+
+solveUnionBackwardsCons :: Record _ -> Record _
+solveUnionBackwardsCons = (unsafeCoerce :: forall r. Union r ( a :: Int ) ( a :: Int, b :: String ) => { b :: String } -> Record r)
+
+solveUnionBackwardsDblCons :: Record _ -> Record _
+solveUnionBackwardsDblCons =
+  (unsafeCoerce :: forall r. Union r ( a :: Int, a :: String ) ( a :: String, a :: Int, a :: String ) => { a :: String } -> Record r)
 
 foreign import merge
   :: forall r1 r2 r3

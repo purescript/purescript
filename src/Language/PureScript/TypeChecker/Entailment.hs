@@ -23,7 +23,7 @@ import Control.Monad.Writer
 import Data.Foldable (for_, fold, toList)
 import Data.Function (on)
 import Data.Functor (($>))
-import Data.List (minimumBy, groupBy, nubBy, sortBy)
+import Data.List (minimumBy, groupBy, nubBy, sortBy, elem, delete)
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -431,25 +431,42 @@ entails SolverOptions{..} constraint context hints =
 
     -- | Left biased union of two row types
     unionRows :: SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType, Maybe [SourceConstraint])
-    unionRows l r _ =
-        guard canMakeProgress $> (l, r, rowFromList out, cons)
+    unionRows l r u = result
       where
         (fixed, rest) = rowToList l
 
         rowVar = srcTypeVar "r"
 
-        (canMakeProgress, out, cons) =
+        result =
           case rest of
             -- If the left hand side is a closed row, then we can merge
             -- its labels into the right hand side.
-            REmpty _ -> (True, (fixed, r), Nothing)
+            REmpty _ -> Just (l, r, rowFromList (fixed, r), Nothing)
+            -- If the right hand side and output are closed rows, then we can
+            -- compute the left hand side by subtracting the right hand side
+            -- from the output.
+            _ | (right, REmpty _) <- rowToList r
+              , (output, restu@(REmpty _)) <- rowToList u ->
+              let
+                -- Partition the output rows into those that belong in right
+                -- (taken off the end) and those that must end up in left.
+                grabLabel e (left', right', remaining)
+                  | rowListLabel e `elem` remaining =
+                    (left', e : right', delete (rowListLabel e) remaining)
+                  | otherwise =
+                    (e : left', right', remaining)
+                (outL, outR, leftover) =
+                  foldr grabLabel ([], [], fmap rowListLabel right) output
+              in guard (null leftover) $>
+                (rowFromList (outL, restu), rowFromList (outR, restu), u, Nothing)
             -- If the left hand side is not definitely closed, then the only way we
             -- can safely make progress is to move any known labels from the left
             -- input into the output, and add a constraint for any remaining labels.
             -- Otherwise, the left hand tail might contain the same labels as on
             -- the right hand side, and we can't be certain we won't reorder the
             -- types for such labels.
-            _ -> (not (null fixed), (fixed, rowVar), Just [ srcConstraint C.RowUnion [rest, r, rowVar] Nothing ])
+            _ -> guard (not (null fixed)) $>
+              (l, r, rowFromList (fixed, rowVar), Just [ srcConstraint C.RowUnion [rest, r, rowVar] Nothing ])
 
     solveRowCons :: [SourceType] -> Maybe [TypeClassDict]
     solveRowCons [TypeLevelString ann sym, ty, r, _] =
