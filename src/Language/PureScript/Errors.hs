@@ -333,7 +333,7 @@ errorSuggestion err =
       HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
       MissingTypeDeclaration ident ty -> suggest $ showIdent ident <> " :: " <> T.pack (prettyPrintSuggestedType ty)
       WildcardInferredType ty _ -> suggest $ T.pack (prettyPrintSuggestedType ty)
-      UnknownName alternatives unknownName -> suggest $ T.unlines $ (\(mn, ref) -> importSuggestion mn [ref] Nothing) <$> alternatives
+      UnknownName alternatives _ -> suggest $ T.unlines $ (\(mn, ref) -> importSuggestion mn [ref] Nothing) <$> alternatives
       _ -> Nothing
   where
     emptySuggestion = Just $ ErrorSuggestion ""
