@@ -319,11 +319,11 @@ errorDocUri e = "https://github.com/purescript/documentation/blob/master/errors/
 -- TODO Other possible suggestions:
 -- WildcardInferredType - source span not small enough
 -- DuplicateSelectiveImport - would require 2 ranges to remove and 1 insert
-errorSuggestion :: SimpleErrorMessage -> Maybe ErrorSuggestion
+errorSuggestion :: SimpleErrorMessage -> [ErrorSuggestion]
 errorSuggestion err =
     case err of
-      UnusedImport{} -> emptySuggestion
-      DuplicateImport{} -> emptySuggestion
+      UnusedImport{} -> []
+      DuplicateImport{} -> []
       UnusedExplicitImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
       UnusedDctorImport mn _ qual refs -> suggest $ importSuggestion mn refs qual
       UnusedDctorExplicitImport mn _ _ qual refs -> suggest $ importSuggestion mn refs qual
@@ -333,11 +333,14 @@ errorSuggestion err =
       HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
       MissingTypeDeclaration ident ty -> suggest $ showIdent ident <> " :: " <> T.pack (prettyPrintSuggestedType ty)
       WildcardInferredType ty _ -> suggest $ T.pack (prettyPrintSuggestedType ty)
-      UnknownName alternatives _ -> suggest $ T.unlines $ (\(mn, ref) -> importSuggestion mn [ref] Nothing) <$> alternatives
-      _ -> Nothing
+      UnknownName alternatives _ -> suggestMultiple $ (\(mn, ref) -> importSuggestionWithReexport mn ref) <$> alternatives
+      _ -> []
   where
-    emptySuggestion = Just $ ErrorSuggestion ""
-    suggest = Just . ErrorSuggestion
+    suggest a = [ErrorSuggestion a]
+    suggestMultiple = map ErrorSuggestion
+    importSuggestionWithReexport :: ModuleName -> DeclarationRef -> Text
+    importSuggestionWithReexport mn (ReExportRef _ _ ref) = importSuggestionWithReexport mn ref
+    importSuggestionWithReexport mn other = importSuggestion mn [other] Nothing
 
 importSuggestion :: ModuleName -> [ DeclarationRef ] -> Maybe ModuleName -> Text
 importSuggestion mn refs qual =
@@ -361,10 +364,8 @@ suggestionSpan e =
         MissingTypeDeclaration{} -> startOnly ss
         _ -> ss
 
-showSuggestion :: SimpleErrorMessage -> Text
-showSuggestion suggestion = case errorSuggestion suggestion of
-  Just (ErrorSuggestion x) -> x
-  _ -> ""
+showSuggestions :: SimpleErrorMessage -> [Text]
+showSuggestions suggestion = (\(ErrorSuggestion message) -> message) <$> errorSuggestion suggestion
 
 ansiColor :: (ANSI.ColorIntensity, ANSI.Color) -> String
 ansiColor (intesity, color) =
@@ -539,7 +540,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line $ "Unknown " <> printName name <> ". You're probably using do-notation, which the compiler replaces with calls to the " <> markCode i <> " function. Please import " <> markCode i <> " from module " <> markCode "Prelude"
     renderSimpleErrorMessage msg@(UnknownName _ name) =
       paras [ line $ "Unknown " <> printName name
-            , indent $ line $ markCode $ showSuggestion msg
+            , indent $ Box.vcat Box.left $ line . markCode <$> showSuggestions msg
             ]
     renderSimpleErrorMessage (UnknownImport mn name) =
       paras [ line $ "Cannot import " <> printName (Qualified Nothing name) <> " from module " <> markCode (runModuleName mn)
@@ -907,20 +908,20 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line $ "The import of module " <> markCode (runModuleName mn) <> " contains the following unused references:"
             , indent $ paras $ map (line . markCode . runName . Qualified Nothing) names
             , line "It could be replaced with:"
-            , indent $ line $ markCode $ showSuggestion msg ]
+            , indent $ Box.vcat Box.left $ line . markCode <$> showSuggestions msg ]
 
     renderSimpleErrorMessage msg@(UnusedDctorImport mn name _ _) =
       paras [line $ "The import of type " <> markCode (runProperName name)
                     <> " from module " <> markCode (runModuleName mn) <> " includes data constructors but only the type is used"
             , line "It could be replaced with:"
-            , indent $ line $ markCode $ showSuggestion msg ]
+            , indent $ Box.vcat Box.left $ line . markCode <$> showSuggestions msg ]
 
     renderSimpleErrorMessage msg@(UnusedDctorExplicitImport mn name names _ _) =
       paras [ line $ "The import of type " <> markCode (runProperName name)
                      <> " from module " <> markCode (runModuleName mn) <> " includes the following unused data constructors:"
             , indent $ paras $ map (line . markCode . runProperName) names
             , line "It could be replaced with:"
-            , indent $ line $ markCode $ showSuggestion msg ]
+            , indent $ Box.vcat Box.left $ line . markCode <$> showSuggestions msg ]
 
     renderSimpleErrorMessage (DuplicateSelectiveImport name) =
       line $ "There is an existing import of " <> markCode (runModuleName name) <> ", consider merging the import lists"
@@ -941,22 +942,22 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage msg@(ImplicitQualifiedImport importedModule asModule _) =
       paras [ line $ "Module " <> markCode (runModuleName importedModule) <> " was imported as " <> markCode (runModuleName asModule) <> " with unspecified imports."
             , line $ "As there are multiple modules being imported as " <> markCode (runModuleName asModule) <> ", consider using the explicit form:"
-            , indent $ line $ markCode $ showSuggestion msg
+            , indent $ Box.vcat Box.left $ line . markCode <$> showSuggestions msg
             ]
     renderSimpleErrorMessage msg@(ImplicitQualifiedImportReExport importedModule asModule _) =
       paras [ line $ "Module " <> markCode (runModuleName importedModule) <> " was imported as " <> markCode (runModuleName asModule) <> " with unspecified imports."
             , line $ "As this module is being re-exported, consider using the explicit form:"
-            , indent $ line $ markCode $ showSuggestion msg
+            , indent $ Box.vcat Box.left $ line . markCode <$> showSuggestions msg
             ]
 
     renderSimpleErrorMessage msg@(ImplicitImport mn _) =
       paras [ line $ "Module " <> markCode (runModuleName mn) <> " has unspecified imports, consider using the explicit form: "
-            , indent $ line $ markCode $ showSuggestion msg
+            , indent $ Box.vcat Box.left $ line . markCode <$> showSuggestions msg
             ]
 
     renderSimpleErrorMessage msg@(HidingImport mn _) =
       paras [ line $ "Module " <> markCode (runModuleName mn) <> " has unspecified imports, consider using the inclusive form: "
-            , indent $ line $ markCode $ showSuggestion msg
+            , indent $ Box.vcat Box.left $ line . markCode <$> showSuggestions msg
             ]
 
     renderSimpleErrorMessage (CaseBinderLengthDiffers l bs) =

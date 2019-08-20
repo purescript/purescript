@@ -70,8 +70,8 @@ toJSONError verbose level e =
   toSuggestion :: P.ErrorMessage -> Maybe ErrorSuggestion
   toSuggestion em =
     case P.errorSuggestion $ P.unwrapErrorMessage em of
-      Nothing -> Nothing
-      Just s -> Just $ ErrorSuggestion (suggestionText s) (toErrorPosition <$> P.suggestionSpan em)
+      [] -> Nothing
+      s -> Just $ ErrorSuggestion (T.unlines $ suggestionText <$> s) (toErrorPosition <$> P.suggestionSpan em)
 
   -- TODO: Adding a newline because source spans chomp everything up to the next character
   suggestionText (P.ErrorSuggestion s) = if T.null s then s else s <> "\n"
