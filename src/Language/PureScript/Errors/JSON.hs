@@ -69,7 +69,7 @@ toJSONError verbose level e =
                   (P.sourcePosColumn (P.spanEnd   ss))
   toSuggestion :: P.ErrorMessage -> Maybe ErrorSuggestion
   toSuggestion em =
-    case P.errorSuggestion $ P.unwrapErrorMessage em of
+    case P.errorSuggestions $ P.unwrapErrorMessage em of
       [] -> Nothing
       s -> Just $ ErrorSuggestion (T.unlines $ suggestionText <$> s) (toErrorPosition <$> P.suggestionSpan em)
 

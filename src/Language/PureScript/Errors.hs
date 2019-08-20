@@ -319,8 +319,8 @@ errorDocUri e = "https://github.com/purescript/documentation/blob/master/errors/
 -- TODO Other possible suggestions:
 -- WildcardInferredType - source span not small enough
 -- DuplicateSelectiveImport - would require 2 ranges to remove and 1 insert
-errorSuggestion :: SimpleErrorMessage -> [ErrorSuggestion]
-errorSuggestion err =
+errorSuggestions :: SimpleErrorMessage -> [ErrorSuggestion]
+errorSuggestions err =
     case err of
       UnusedImport{} -> []
       DuplicateImport{} -> []
@@ -365,7 +365,7 @@ suggestionSpan e =
         _ -> ss
 
 showSuggestions :: SimpleErrorMessage -> [Text]
-showSuggestions suggestion = (\(ErrorSuggestion message) -> message) <$> errorSuggestion suggestion
+showSuggestions simpleError = (\(ErrorSuggestion message) -> message) <$> errorSuggestions simpleError
 
 ansiColor :: (ANSI.ColorIntensity, ANSI.Color) -> String
 ansiColor (intesity, color) =
