@@ -16,7 +16,7 @@ import Protolude (ordNub)
 import Control.Applicative ((<|>))
 import Control.Arrow (first)
 import Control.DeepSeq (NFData)
-import Control.Monad ((<=<))
+import Control.Monad ((<=<), (>=>))
 import Data.Aeson ((.:), (.=))
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Types as A
@@ -29,7 +29,6 @@ import qualified Data.Text as T
 import GHC.Generics (Generic)
 
 import Language.PureScript.AST.SourcePos
-import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.Label (Label)
 import Language.PureScript.PSString (PSString)
@@ -67,7 +66,7 @@ data Type a
   -- | A type application
   | TypeApp a (Type a) (Type a)
   -- | Forall quantifier
-  | ForAll a Text (Maybe (Kind a)) (Type a) (Maybe SkolemScope)
+  | ForAll a Text (Maybe (Type a)) (Type a) (Maybe SkolemScope)
   -- | A type with a set of type class constraints
   | ConstrainedType a (Constraint a) (Type a)
   -- | A skolem constant
@@ -77,7 +76,7 @@ data Type a
   -- | A non-empty row
   | RCons a Label (Type a) (Type a)
   -- | A type with a kind annotation
-  | KindedType a (Type a) (Kind a)
+  | KindedType a (Type a) (Type a)
   -- | Binary operator application. During the rebracketing phase of desugaring,
   -- this data constructor will be removed.
   | BinaryNoParensType a (Type a) (Type a) (Type a)
@@ -112,7 +111,7 @@ srcTypeOp = TypeOp NullSourceAnn
 srcTypeApp :: SourceType -> SourceType -> SourceType
 srcTypeApp = TypeApp NullSourceAnn
 
-srcForAll :: Text -> Maybe SourceKind -> SourceType -> Maybe SkolemScope -> SourceType
+srcForAll :: Text -> Maybe SourceType -> SourceType -> Maybe SkolemScope -> SourceType
 srcForAll = ForAll NullSourceAnn
 
 srcConstrainedType :: SourceConstraint -> SourceType -> SourceType
@@ -127,7 +126,7 @@ srcREmpty = REmpty NullSourceAnn
 srcRCons :: Label -> SourceType -> SourceType -> SourceType
 srcRCons = RCons NullSourceAnn
 
-srcKindedType :: SourceType -> SourceKind -> SourceType
+srcKindedType :: SourceType -> SourceType -> SourceType
 srcKindedType = KindedType NullSourceAnn
 
 srcBinaryNoParensType :: SourceType -> SourceType -> SourceType -> SourceType
@@ -206,7 +205,7 @@ typeToJSON annToJSON ty =
     ForAll a b c d e ->
       case c of
         Nothing -> variant "ForAll" a (b, go d, e)
-        Just k -> variant "ForAll" a (b, kindToJSON annToJSON k, go d, e)
+        Just k -> variant "ForAll" a (b, go k, go d, e)
     ConstrainedType a b c ->
       variant "ConstrainedType" a (constraintToJSON annToJSON b, go c)
     Skolem a b c d ->
@@ -216,7 +215,7 @@ typeToJSON annToJSON ty =
     RCons a b c d ->
       variant "RCons" a (b, go c, go d)
     KindedType a b c ->
-      variant "KindedType" a (go b, kindToJSON annToJSON c)
+      variant "KindedType" a (go b, go c)
     BinaryNoParensType a b c d ->
       variant "BinaryNoParensType" a (go b, go c, go d)
     ParensInType a b ->
@@ -293,7 +292,7 @@ typeFromJSON defaultAnn annFromJSON = A.withObject "Type" $ \o -> do
           ForAll a b Nothing <$> go c <*> pure d
         withMbKind = do
           (b, c, d, e) <- contents
-          ForAll a b <$> (Just <$> kindFromJSON defaultAnn annFromJSON c) <*> go d <*> pure e
+          ForAll a b <$> (Just <$> go c) <*> go d <*> pure e
       withMbKind <|> withoutMbKind
     "ConstrainedType" -> do
       (b, c) <- contents
@@ -308,7 +307,7 @@ typeFromJSON defaultAnn annFromJSON = A.withObject "Type" $ \o -> do
       RCons a b <$> go c <*> go d
     "KindedType" -> do
       (b, c) <- contents
-      KindedType a <$> go b <*> kindFromJSON defaultAnn annFromJSON c
+      KindedType a <$> go b <*> go c
     "BinaryNoParensType" -> do
       (b, c, d) <- contents
       BinaryNoParensType a <$> go b <*> go c <*> go d
@@ -376,7 +375,7 @@ isMonoType (KindedType _ t _) = isMonoType t
 isMonoType _        = True
 
 -- | Universally quantify a type
-mkForAll :: [(a, (Text, Maybe (Kind a)))] -> Type a -> Type a
+mkForAll :: [(a, (Text, Maybe (Type a)))] -> Type a -> Type a
 mkForAll args ty = foldl (\t (ann, (arg, mbK)) -> ForAll ann arg mbK t Nothing) ty args
 
 -- | Replace a type variable, taking into account variable shadowing
@@ -401,7 +400,7 @@ replaceAllTypeVars = go [] where
       usedVars = concatMap (usedTypeVariables . snd) m
   go bs m (ConstrainedType ann c t) = ConstrainedType ann (mapConstraintArgs (map (go bs m)) c) (go bs m t)
   go bs m (RCons ann name' t r) = RCons ann name' (go bs m t) (go bs m r)
-  go bs m (KindedType ann t k) = KindedType ann (go bs m t) k
+  go bs m (KindedType ann t k) = KindedType ann (go bs m t) (go bs m k)
   go bs m (BinaryNoParensType ann t1 t2 t3) = BinaryNoParensType ann (go bs m t1) (go bs m t2) (go bs m t3)
   go bs m (ParensInType ann t) = ParensInType ann (go bs m t)
   go _  _ ty = ty
@@ -426,7 +425,7 @@ freeTypeVariables = ordNub . go [] where
   go bound (ForAll _ v _ t _) = go (v : bound) t
   go bound (ConstrainedType _ c t) = concatMap (go bound) (constraintArgs c) ++ go bound t
   go bound (RCons _ _ t r) = go bound t ++ go bound r
-  go bound (KindedType _ t _) = go bound t
+  go bound (KindedType _ t k) = go bound t ++ go bound k
   go bound (BinaryNoParensType _ t1 t2 t3) = go bound t1 ++ go bound t2 ++ go bound t3
   go bound (ParensInType _ t) = go bound t
   go _ _ = []
@@ -459,10 +458,10 @@ containsForAll = everythingOnTypes (||) go where
 everywhereOnTypes :: (Type a -> Type a) -> Type a -> Type a
 everywhereOnTypes f = go where
   go (TypeApp ann t1 t2) = f (TypeApp ann (go t1) (go t2))
-  go (ForAll ann arg mbK ty sco) = f (ForAll ann arg mbK (go ty) sco)
+  go (ForAll ann arg mbK ty sco) = f (ForAll ann arg (go <$> mbK) (go ty) sco)
   go (ConstrainedType ann c ty) = f (ConstrainedType ann (mapConstraintArgs (map go) c) (go ty))
   go (RCons ann name ty rest) = f (RCons ann name (go ty) (go rest))
-  go (KindedType ann ty k) = f (KindedType ann (go ty) k)
+  go (KindedType ann ty k) = f (KindedType ann (go ty) (go k))
   go (BinaryNoParensType ann t1 t2 t3) = f (BinaryNoParensType ann (go t1) (go t2) (go t3))
   go (ParensInType ann t) = f (ParensInType ann (go t))
   go other = f other
@@ -470,10 +469,10 @@ everywhereOnTypes f = go where
 everywhereOnTypesTopDown :: (Type a -> Type a) -> Type a -> Type a
 everywhereOnTypesTopDown f = go . f where
   go (TypeApp ann t1 t2) = TypeApp ann (go (f t1)) (go (f t2))
-  go (ForAll ann arg mbK ty sco) = ForAll ann arg mbK (go (f ty)) sco
+  go (ForAll ann arg mbK ty sco) = ForAll ann arg (go . f <$> mbK) (go (f ty)) sco
   go (ConstrainedType ann c ty) = ConstrainedType ann (mapConstraintArgs (map (go . f)) c) (go (f ty))
   go (RCons ann name ty rest) = RCons ann name (go (f ty)) (go (f rest))
-  go (KindedType ann ty k) = KindedType ann (go (f ty)) k
+  go (KindedType ann ty k) = KindedType ann (go (f ty)) (go (f k))
   go (BinaryNoParensType ann t1 t2 t3) = BinaryNoParensType ann (go (f t1)) (go (f t2)) (go (f t3))
   go (ParensInType ann t) = ParensInType ann (go (f t))
   go other = f other
@@ -481,10 +480,10 @@ everywhereOnTypesTopDown f = go . f where
 everywhereOnTypesM :: Monad m => (Type a -> m (Type a)) -> Type a -> m (Type a)
 everywhereOnTypesM f = go where
   go (TypeApp ann t1 t2) = (TypeApp ann <$> go t1 <*> go t2) >>= f
-  go (ForAll ann arg mbK ty sco) = (ForAll ann arg mbK <$> go ty <*> pure sco) >>= f
+  go (ForAll ann arg mbK ty sco) = (ForAll ann arg <$> traverse go mbK <*> go ty <*> pure sco) >>= f
   go (ConstrainedType ann c ty) = (ConstrainedType ann <$> overConstraintArgs (mapM go) c <*> go ty) >>= f
   go (RCons ann name ty rest) = (RCons ann name <$> go ty <*> go rest) >>= f
-  go (KindedType ann ty k) = (KindedType ann <$> go ty <*> pure k) >>= f
+  go (KindedType ann ty k) = (KindedType ann <$> go ty <*> go k) >>= f
   go (BinaryNoParensType ann t1 t2 t3) = (BinaryNoParensType ann <$> go t1 <*> go t2 <*> go t3) >>= f
   go (ParensInType ann t) = (ParensInType ann <$> go t) >>= f
   go other = f other
@@ -492,10 +491,10 @@ everywhereOnTypesM f = go where
 everywhereOnTypesTopDownM :: Monad m => (Type a -> m (Type a)) -> Type a -> m (Type a)
 everywhereOnTypesTopDownM f = go <=< f where
   go (TypeApp ann t1 t2) = TypeApp ann <$> (f t1 >>= go) <*> (f t2 >>= go)
-  go (ForAll ann arg mbK ty sco) = ForAll ann arg mbK <$> (f ty >>= go) <*> pure sco
+  go (ForAll ann arg mbK ty sco) = ForAll ann arg <$> (traverse (f >=> go) mbK) <*> (f ty >>= go) <*> pure sco
   go (ConstrainedType ann c ty) = ConstrainedType ann <$> overConstraintArgs (mapM (go <=< f)) c <*> (f ty >>= go)
   go (RCons ann name ty rest) = RCons ann name <$> (f ty >>= go) <*> (f rest >>= go)
-  go (KindedType ann ty k) = KindedType ann <$> (f ty >>= go) <*> pure k
+  go (KindedType ann ty k) = KindedType ann <$> (f ty >>= go) <*> (f k >>= go)
   go (BinaryNoParensType ann t1 t2 t3) = BinaryNoParensType ann <$> (f t1 >>= go) <*> (f t2 >>= go) <*> (f t3 >>= go)
   go (ParensInType ann t) = ParensInType ann <$> (f t >>= go)
   go other = f other
@@ -503,10 +502,11 @@ everywhereOnTypesTopDownM f = go <=< f where
 everythingOnTypes :: (r -> r -> r) -> (Type a -> r) -> Type a -> r
 everythingOnTypes (<+>) f = go where
   go t@(TypeApp _ t1 t2) = f t <+> go t1 <+> go t2
+  go t@(ForAll _ _ (Just k) ty _) = f t <+> go k <+> go ty
   go t@(ForAll _ _ _ ty _) = f t <+> go ty
   go t@(ConstrainedType _ c ty) = foldl (<+>) (f t) (map go (constraintArgs c)) <+> go ty
   go t@(RCons _ _ ty rest) = f t <+> go ty <+> go rest
-  go t@(KindedType _ ty _) = f t <+> go ty
+  go t@(KindedType _ ty k) = f t <+> go ty <+> go k
   go t@(BinaryNoParensType _ t1 t2 t3) = f t <+> go t1 <+> go t2 <+> go t3
   go t@(ParensInType _ t1) = f t <+> go t1
   go other = f other
@@ -515,10 +515,11 @@ everythingWithContextOnTypes :: s -> r -> (r -> r -> r) -> (s -> Type a -> (s, r
 everythingWithContextOnTypes s0 r0 (<+>) f = go' s0 where
   go' s t = let (s', r) = f s t in r <+> go s' t
   go s (TypeApp _ t1 t2) = go' s t1 <+> go' s t2
+  go s (ForAll _ _ (Just k) ty _) = go' s k <+> go' s ty
   go s (ForAll _ _ _ ty _) = go' s ty
   go s (ConstrainedType _ c ty) = foldl (<+>) r0 (map (go' s) (constraintArgs c)) <+> go' s ty
   go s (RCons _ _ ty rest) = go' s ty <+> go' s rest
-  go s (KindedType _ ty _) = go' s ty
+  go s (KindedType _ ty k) = go' s ty <+> go' s k
   go s (BinaryNoParensType _ t1 t2 t3) = go' s t1 <+> go' s t2 <+> go' s t3
   go s (ParensInType _ t1) = go' s t1
   go _ _ = r0
@@ -560,15 +561,20 @@ eqType (TypeWildcard _ a) (TypeWildcard _ a') = a == a'
 eqType (TypeConstructor _ a) (TypeConstructor _ a') = a == a'
 eqType (TypeOp _ a) (TypeOp _ a') = a == a'
 eqType (TypeApp _ a b) (TypeApp _ a' b') = eqType a a' && eqType b b'
-eqType (ForAll _ a b c d) (ForAll _ a' b' c' d') = a == a' && eqMaybeKind b b' && eqType c c' && d == d'
+eqType (ForAll _ a b c d) (ForAll _ a' b' c' d') = a == a' && eqMaybeType b b' && eqType c c' && d == d'
 eqType (ConstrainedType _ a b) (ConstrainedType _ a' b') = eqConstraint a a' && eqType b b'
 eqType (Skolem _ a b c) (Skolem _ a' b' c') = a == a' && b == b' && c == c'
 eqType (REmpty _) (REmpty _) = True
 eqType (RCons _ a b c) (RCons _ a' b' c') = a == a' && eqType b b' && eqType c c'
-eqType (KindedType _ a b) (KindedType _ a' b') = eqType a a' && eqKind b b'
+eqType (KindedType _ a b) (KindedType _ a' b') = eqType a a' && eqType b b'
 eqType (BinaryNoParensType _ a b c) (BinaryNoParensType _ a' b' c') = eqType a a' && eqType b b' && eqType c c'
 eqType (ParensInType _ a) (ParensInType _ a') = eqType a a'
 eqType _ _ = False
+
+eqMaybeType :: Maybe (Type a) -> Maybe (Type b) -> Bool
+eqMaybeType (Just a) (Just b) = eqType a b
+eqMaybeType Nothing Nothing = True
+eqMaybeType _ _ = False
 
 compareType :: Type a -> Type b -> Ordering
 compareType (TUnknown _ a) (TUnknown _ a') = compare a a'
@@ -598,7 +604,7 @@ compareType (TypeApp _ a b) (TypeApp _ a' b') = compareType a a' <> compareType 
 compareType (TypeApp {}) _ = LT
 compareType _ (TypeApp {}) = GT
 
-compareType (ForAll _ a b c d) (ForAll _ a' b' c' d') = compare a a' <> compareMaybeKind b b' <> compareType c c' <> compare d d'
+compareType (ForAll _ a b c d) (ForAll _ a' b' c' d') = compare a a' <> compareMaybeType b b' <> compareType c c' <> compare d d'
 compareType (ForAll {}) _ = LT
 compareType _ (ForAll {}) = GT
 
@@ -618,7 +624,7 @@ compareType (RCons _ a b c) (RCons _ a' b' c') = compare a a' <> compareType b b
 compareType (RCons {}) _ = LT
 compareType _ (RCons {}) = GT
 
-compareType (KindedType _ a b) (KindedType _ a' b') = compareType a a' <> compareKind b b'
+compareType (KindedType _ a b) (KindedType _ a' b') = compareType a a' <> compareType b b'
 compareType (KindedType {}) _ = LT
 compareType _ (KindedType {}) = GT
 
@@ -628,6 +634,12 @@ compareType _ (BinaryNoParensType {}) = GT
 
 compareType (ParensInType _ a) (ParensInType _ a') = compareType a a'
 compareType (ParensInType {}) _ = GT
+
+compareMaybeType :: Maybe (Type a) -> Maybe (Type b) -> Ordering
+compareMaybeType (Just a) (Just b) = compareType a b
+compareMaybeType Nothing Nothing = EQ
+compareMaybeType Nothing _ = LT
+compareMaybeType _ _ = GT
 
 instance Eq (Constraint a) where
   (==) = eqConstraint

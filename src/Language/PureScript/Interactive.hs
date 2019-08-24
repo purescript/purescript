@@ -295,7 +295,7 @@ handleKindOf print' typ = do
       case M.lookup (P.Qualified (Just mName) $ P.ProperName "IT") (P.typeSynonyms env') of
         Just (_, typ') -> do
           let chk = (P.emptyCheckState env') { P.checkCurrentModule = Just mName }
-              k   = check (P.kindOf typ') chk
+              k   = undefined -- TODO: check (P.kindOf typ') chk
 
               check :: StateT P.CheckState (ExceptT P.MultipleErrors (Writer P.MultipleErrors)) a -> P.CheckState -> Either P.MultipleErrors (a, P.CheckState)
               check sew = fst . runWriter . runExceptT . runStateT sew

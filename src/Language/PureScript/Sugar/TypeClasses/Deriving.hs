@@ -22,7 +22,6 @@ import           Language.PureScript.Crash
 import           Language.PureScript.Environment
 import           Language.PureScript.Errors
 import           Language.PureScript.Externs
-import           Language.PureScript.Kinds
 import           Language.PureScript.Names
 import           Language.PureScript.Label (Label(..))
 import           Language.PureScript.PSString (mkString)
@@ -700,7 +699,7 @@ deriveFunctor ss mn syns ds tyConNm = do
   where
     mkMapFunction :: Declaration -> m Expr
     mkMapFunction (DataDeclaration (ss', _) _ _ tys ctors) = case reverse tys of
-      [] -> throwError . errorMessage' ss' $ KindsDoNotUnify (FunKind nullSourceAnn kindType kindType) kindType
+      [] -> throwError . errorMessage' ss' $ KindsDoNotUnify (kindType -:> kindType) kindType
       ((iTy, _) : _) -> do
         f <- freshIdent "f"
         m <- freshIdent "m"

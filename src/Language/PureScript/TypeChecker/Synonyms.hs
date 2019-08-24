@@ -18,13 +18,12 @@ import qualified Data.Map as M
 import           Data.Text (Text)
 import           Language.PureScript.Environment
 import           Language.PureScript.Errors
-import           Language.PureScript.Kinds
 import           Language.PureScript.Names
 import           Language.PureScript.TypeChecker.Monad
 import           Language.PureScript.Types
 
 -- | Type synonym information (arguments with kinds, aliased type), indexed by name
-type SynonymMap = M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe SourceKind)], SourceType)
+type SynonymMap = M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe SourceType)], SourceType)
 
 replaceAllTypeSynonyms'
   :: SynonymMap

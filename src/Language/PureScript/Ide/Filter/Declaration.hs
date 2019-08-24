@@ -45,5 +45,4 @@ declarationType decl = case decl of
   PI.IdeDeclTypeClass _ -> TypeClass
   PI.IdeDeclValueOperator _ -> ValueOperator
   PI.IdeDeclTypeOperator _ -> TypeOperator
-  PI.IdeDeclKind _ -> Kind
   PI.IdeDeclModule _ -> Module

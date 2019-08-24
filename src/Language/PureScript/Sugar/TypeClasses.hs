@@ -26,7 +26,6 @@ import           Language.PureScript.Crash
 import           Language.PureScript.Environment
 import           Language.PureScript.Errors hiding (isExported)
 import           Language.PureScript.Externs
-import           Language.PureScript.Kinds
 import           Language.PureScript.Label (Label(..))
 import           Language.PureScript.Names
 import           Language.PureScript.PSString (mkString)
@@ -254,7 +253,7 @@ memberToNameAndType _ = internalError "Invalid declaration in type class definit
 typeClassDictionaryDeclaration
   :: SourceAnn
   -> ProperName 'ClassName
-  -> [(Text, Maybe SourceKind)]
+  -> [(Text, Maybe SourceType)]
   -> [SourceConstraint]
   -> [Declaration]
   -> Declaration
@@ -271,7 +270,7 @@ typeClassDictionaryDeclaration sa name args implies members =
 typeClassMemberToDictionaryAccessor
   :: ModuleName
   -> ProperName 'ClassName
-  -> [(Text, Maybe SourceKind)]
+  -> [(Text, Maybe SourceType)]
   -> Declaration
   -> Declaration
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarationData sa ident ty)) =

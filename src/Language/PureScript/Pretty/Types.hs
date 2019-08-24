@@ -21,17 +21,14 @@ import Prelude.Compat hiding ((<>))
 import Control.Arrow ((<+>))
 import Control.PatternArrows as PA
 
-import Data.Functor (($>))
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.Crash
 import Language.PureScript.Environment
-import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.Pretty.Common
-import Language.PureScript.Pretty.Kinds
 import Language.PureScript.Types
 import Language.PureScript.PSString (PSString, prettyPrintString, decodeString)
 import Language.PureScript.Label (Label(..))
@@ -48,10 +45,10 @@ data PrettyPrintType
   | PPSkolem Text Int
   | PPTypeApp PrettyPrintType PrettyPrintType
   | PPConstrainedType PrettyPrintConstraint PrettyPrintType
-  | PPKindedType PrettyPrintType (Kind ())
+  | PPKindedType PrettyPrintType PrettyPrintType
   | PPBinaryNoParensType PrettyPrintType PrettyPrintType PrettyPrintType
   | PPParensInType PrettyPrintType
-  | PPForAll [(Text, Maybe (Kind ()))] PrettyPrintType
+  | PPForAll [(Text, Maybe PrettyPrintType)] PrettyPrintType
   | PPFunction PrettyPrintType PrettyPrintType
   | PPRecord [(Label, PrettyPrintType)] (Maybe PrettyPrintType)
   | PPRow [(Label, PrettyPrintType)] (Maybe PrettyPrintType)
@@ -75,14 +72,14 @@ convertPrettyPrintType = go
   -- truncate them.
   go d _ | d < 0 = PPTruncated
   go d (ConstrainedType _ (Constraint _ cls args _) ty) = PPConstrainedType (cls, go (d-1) <$> args) (go d ty)
-  go d (KindedType _ ty k) = PPKindedType (go (d-1) ty) (k $> ())
+  go d (KindedType _ ty k) = PPKindedType (go (d-1) ty) (go (d-1) k)
   go d (BinaryNoParensType _ ty1 ty2 ty3) = PPBinaryNoParensType (go (d-1) ty1) (go (d-1) ty2) (go (d-1) ty3)
   go d (ParensInType _ ty) = PPParensInType (go (d-1) ty)
   go d ty@RCons{} = uncurry PPRow (goRow d ty)
-  go d (ForAll _ v mbK ty _) = goForAll d [(v, fmap ($> ()) mbK)] ty
+  go d (ForAll _ v mbK ty _) = goForAll d [(v, fmap (go (d-1)) mbK)] ty
   go d (TypeApp _ a b) = goTypeApp d a b
 
-  goForAll d vs (ForAll _ v mbK ty _) = goForAll d ((v, fmap ($> ()) mbK) : vs) ty
+  goForAll d vs (ForAll _ v mbK ty _) = goForAll d ((v, fmap (go (d-1)) mbK) : vs) ty
   goForAll d vs ty = PPForAll vs (go (d-1) ty)
 
   goRow d ty =
@@ -148,10 +145,10 @@ appliedFunction = mkPattern match
   match (PPFunction arg ret) = Just (arg, ret)
   match _ = Nothing
 
-kinded :: Pattern () PrettyPrintType (Kind (), PrettyPrintType)
+kinded :: Pattern () PrettyPrintType (PrettyPrintType, PrettyPrintType)
 kinded = mkPattern match
   where
-  match (PPKindedType t k) = Just (k, t)
+  match (PPKindedType t k) = Just (t, k)
   match _ = Nothing
 
 constrained :: Pattern () PrettyPrintType (PrettyPrintConstraint, PrettyPrintType)
@@ -198,14 +195,14 @@ matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
                   , [ AssocR appliedFunction $ \arg ret -> keepSingleLinesOr id arg (text rightArrow <> " " <> ret) ]
                   , [ Wrap constrained $ \deps ty -> constraintsAsBox tro deps ty ]
                   , [ Wrap forall_ $ \idents ty -> keepSingleLinesOr (moveRight 2) (text (forall' ++ " " ++ unwords (fmap printMbKindedType idents) ++ ".")) ty ]
-                  , [ Wrap kinded $ \k ty -> keepSingleLinesOr (moveRight 2) ty (text (doubleColon ++ " " ++ T.unpack (prettyPrintKind k))) ]
+                  , [ Wrap kinded $ \ty k -> keepSingleLinesOr (moveRight 2) (typeAsBox' ty) (text (doubleColon ++ " ") <> k) ]
                   , [ Wrap explicitParens $ \_ ty -> ty ]
                   ]
 
   rightArrow = if troUnicode tro then "→" else "->"
   forall' = if troUnicode tro then "∀" else "forall"
   doubleColon = if troUnicode tro then "∷" else "::"
-  printMbKindedType (v, mbK) = maybe v (\k -> unwords ["(" ++ v, doubleColon, T.unpack (prettyPrintKind k) ++ ")"]) mbK
+  printMbKindedType (v, mbK) = maybe v (\k -> unwords ["(" ++ v, doubleColon, render (typeAsBox' k) ++ ")"]) mbK
 
   -- If both boxes span a single line, keep them on the same line, or else
   -- use the specified function to modify the second box, then combine vertically.
@@ -214,7 +211,7 @@ matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
     | rows b1 > 1 || rows b2 > 1 = vcat left [ b1, f b2 ]
     | otherwise = hcat top [ b1, text " ", b2]
 
-forall_ :: Pattern () PrettyPrintType ([(String, Maybe (Kind ()))], PrettyPrintType)
+forall_ :: Pattern () PrettyPrintType ([(String, Maybe PrettyPrintType)], PrettyPrintType)
 forall_ = mkPattern match
   where
   match (PPForAll idents ty) = Just (map (\(v, mbK) -> (T.unpack v, mbK)) idents, ty)

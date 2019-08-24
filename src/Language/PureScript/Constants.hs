@@ -497,6 +497,9 @@ symbol = "Symbol"
 doc :: forall a. (IsString a) => a
 doc = "Doc"
 
+row :: forall a. (IsString a) => a
+row = "Row"
+
 -- Modules
 
 prim :: forall a. (IsString a) => a

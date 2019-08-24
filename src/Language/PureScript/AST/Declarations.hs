@@ -29,7 +29,6 @@ import Language.PureScript.Types
 import Language.PureScript.PSString (PSString)
 import Language.PureScript.Label (Label)
 import Language.PureScript.Names
-import Language.PureScript.Kinds
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Comments
 import Language.PureScript.Environment
@@ -79,7 +78,7 @@ data SimpleErrorMessage
   | CannotReadFile FilePath
   | CannotWriteFile FilePath
   | InfiniteType SourceType
-  | InfiniteKind SourceKind
+  | InfiniteKind SourceType
   | MultipleValueOpFixities (OpName 'ValueOpName)
   | MultipleTypeOpFixities (OpName 'TypeOpName)
   | OrphanTypeDeclaration Ident
@@ -109,7 +108,7 @@ data SimpleErrorMessage
   | PartiallyAppliedSynonym (Qualified (ProperName 'TypeName))
   | EscapedSkolem Text (Maybe SourceSpan) SourceType
   | TypesDoNotUnify SourceType SourceType
-  | KindsDoNotUnify SourceKind SourceKind
+  | KindsDoNotUnify SourceType SourceType
   | ConstrainedTypeUnified SourceType SourceType
   | OverlappingInstances (Qualified (ProperName 'ClassName)) [SourceType] [Qualified Ident]
   | NoInstanceFound SourceConstraint
@@ -129,7 +128,7 @@ data SimpleErrorMessage
   | OverlappingArgNames (Maybe Ident)
   | MissingClassMember (NEL.NonEmpty (Ident, SourceType))
   | ExtraneousClassMember Ident (Qualified (ProperName 'ClassName))
-  | ExpectedType SourceType SourceKind
+  | ExpectedType SourceType SourceType
   -- | constructor name, expected argument count, actual argument count
   | IncorrectConstructorArity (Qualified (ProperName 'ConstructorName)) Int Int
   | ExprDoesNotHaveType Expr SourceType
@@ -306,7 +305,7 @@ data DeclarationRef
   -- |
   -- A named kind
   --
-  | KindRef SourceSpan (ProperName 'KindName)
+  | KindRef SourceSpan (ProperName 'TypeName)
   -- |
   -- A value re-exported from another module. These will be inserted during
   -- elaboration in name desugaring.
@@ -377,7 +376,7 @@ declRefName (ValueOpRef _ n) = ValOpName n
 declRefName (TypeClassRef _ n) = TyClassName n
 declRefName (TypeInstanceRef _ n) = IdentName n
 declRefName (ModuleRef _ n) = ModName n
-declRefName (KindRef _ n) = KiName n
+declRefName (KindRef _ n) = TyName n
 declRefName (ReExportRef _ _ ref) = declRefName ref
 
 getTypeRef :: DeclarationRef -> Maybe (ProperName 'TypeName, Maybe [ProperName 'ConstructorName])
@@ -400,7 +399,7 @@ getTypeClassRef :: DeclarationRef -> Maybe (ProperName 'ClassName)
 getTypeClassRef (TypeClassRef _ name) = Just name
 getTypeClassRef _ = Nothing
 
-getKindRef :: DeclarationRef -> Maybe (ProperName 'KindName)
+getKindRef :: DeclarationRef -> Maybe (ProperName 'TypeName)
 getKindRef (KindRef _ name) = Just name
 getKindRef _ = Nothing
 
@@ -488,7 +487,7 @@ data Declaration
   -- |
   -- A data type declaration (data or newtype, name, arguments, data constructors)
   --
-  = DataDeclaration SourceAnn DataDeclType (ProperName 'TypeName) [(Text, Maybe SourceKind)] [(ProperName 'ConstructorName, [(Ident, SourceType)])]
+  = DataDeclaration SourceAnn DataDeclType (ProperName 'TypeName) [(Text, Maybe SourceType)] [(ProperName 'ConstructorName, [(Ident, SourceType)])]
   -- |
   -- A minimal mutually recursive set of data type declarations
   --
@@ -496,7 +495,7 @@ data Declaration
   -- |
   -- A type synonym declaration (name, arguments, type)
   --
-  | TypeSynonymDeclaration SourceAnn (ProperName 'TypeName) [(Text, Maybe SourceKind)] SourceType
+  | TypeSynonymDeclaration SourceAnn (ProperName 'TypeName) [(Text, Maybe SourceType)] SourceType
   -- |
   -- A type declaration for a value (name, ty)
   --
@@ -519,11 +518,11 @@ data Declaration
   -- |
   -- A data type foreign import (name, kind)
   --
-  | ExternDataDeclaration SourceAnn (ProperName 'TypeName) SourceKind
+  | ExternDataDeclaration SourceAnn (ProperName 'TypeName) SourceType
   -- |
   -- A foreign kind import (name)
   --
-  | ExternKindDeclaration SourceAnn (ProperName 'KindName)
+  | ExternKindDeclaration SourceAnn (ProperName 'TypeName)
   -- |
   -- A fixity declaration
   --
@@ -535,7 +534,7 @@ data Declaration
   -- |
   -- A type class declaration (name, argument, implies, member declarations)
   --
-  | TypeClassDeclaration SourceAnn (ProperName 'ClassName) [(Text, Maybe SourceKind)] [SourceConstraint] [FunctionalDependency] [Declaration]
+  | TypeClassDeclaration SourceAnn (ProperName 'ClassName) [(Text, Maybe SourceType)] [SourceConstraint] [FunctionalDependency] [Declaration]
   -- |
   -- A type instance declaration (instance chain, chain index, name,
   -- dependencies, class name, instance types, member declarations)
@@ -601,7 +600,7 @@ declName (TypeSynonymDeclaration _ n _ _) = Just (TyName n)
 declName (ValueDeclaration vd) = Just (IdentName (valdeclIdent vd))
 declName (ExternDeclaration _ n _) = Just (IdentName n)
 declName (ExternDataDeclaration _ n _) = Just (TyName n)
-declName (ExternKindDeclaration _ n) = Just (KiName n)
+declName (ExternKindDeclaration _ n) = Just (TyName n)
 declName (FixityDeclaration _ (Left (ValueFixity _ _ n))) = Just (ValOpName n)
 declName (FixityDeclaration _ (Right (TypeFixity _ _ n))) = Just (TyOpName n)
 declName (TypeClassDeclaration _ n _ _ _ _) = Just (TyClassName n)

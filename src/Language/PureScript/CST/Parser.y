@@ -1,7 +1,6 @@
 {
 module Language.PureScript.CST.Parser
   ( parseType
-  , parseKind
   , parseExpr
   , parseDecl
   , parseIdent
@@ -36,7 +35,6 @@ import Language.PureScript.PSString (PSString)
 
 %expect 98
 
-%name parseKind kind
 %name parseType type
 %name parseExpr expr
 %name parseIdent ident
@@ -273,18 +271,9 @@ boolean :: { (SourceToken, Bool) }
   : 'true' { toBoolean $1 }
   | 'false' { toBoolean $1 }
 
-kind :: { Kind () }
-  : kind1 { $1 }
-  | kind1 '->' kind { KindArr () $1 $2 $3 }
-
-kind1 :: { Kind () }
-  : qualProperName { KindName () $1 }
-  | '#' kind1 { KindRow () $1 $2 }
-  | '(' kind ')' { KindParens () (Wrapped $1 $2 $3) }
-
 type :: { Type () }
   : type1 { $1 }
-  | type1 '::' kind { TypeKinded () $1 $2 $3 }
+  | type1 '::' type { TypeKinded () $1 $2 $3 }
 
 type1 :: { Type () }
   : type2 { $1 }
@@ -314,7 +303,7 @@ typeAtom :: { Type ()}
   | '{' row '}' { TypeRecord () (Wrapped $1 $2 $3) }
   | '(' row ')' { TypeRow () (Wrapped $1 $2 $3) }
   | '(' type1 ')' { TypeParens () (Wrapped $1 $2 $3) }
-  | '(' typeKindedAtom '::' kind ')' { TypeParens () (Wrapped $1 (TypeKinded () $2 $3 $4) $5) }
+  | '(' typeKindedAtom '::' type ')' { TypeParens () (Wrapped $1 (TypeKinded () $2 $3 $4) $5) }
 
 -- Due to a conflict between row syntax and kinded type syntax, we require
 -- kinded type variables to be wrapped in parens. Thus `(a :: Foo)` is always a
@@ -327,7 +316,7 @@ typeKindedAtom :: { Type () }
   | '{' row '}' { TypeRecord () (Wrapped $1 $2 $3) }
   | '(' row ')' { TypeRow () (Wrapped $1 $2 $3) }
   | '(' type1 ')' { TypeParens () (Wrapped $1 $2 $3) }
-  | '(' typeKindedAtom '::' kind ')' { TypeParens () (Wrapped $1 (TypeKinded () $2 $3 $4) $5) }
+  | '(' typeKindedAtom '::' type ')' { TypeParens () (Wrapped $1 (TypeKinded () $2 $3 $4) $5) }
 
 row :: { Row () }
   : {- empty -} { Row Nothing Nothing }
@@ -340,7 +329,7 @@ rowLabel :: { Labeled Label (Type ()) }
 
 typeVarBinding :: { TypeVarBinding () }
   : ident { TypeVarName $1 }
-  | '(' ident '::' kind ')' { TypeVarKinded (Wrapped $1 (Labeled $2 $3 $4) $5) }
+  | '(' ident '::' type ')' { TypeVarKinded (Wrapped $1 (Labeled $2 $3 $4) $5) }
 
 forall :: { SourceToken }
   : 'forall' { $1 }
@@ -741,7 +730,7 @@ infix :: { (SourceToken, Fixity) }
 
 foreign :: { Foreign () }
   : ident '::' type { ForeignValue (Labeled $1 $2 $3) }
-  | 'data' properName '::' kind { ForeignData $1 (Labeled $2 $3 $4) }
+  | 'data' properName '::' type { ForeignData $1 (Labeled $2 $3 $4) }
   | 'kind' properName { ForeignKind $1 $2 }
 
 -- Partial parsers which can be combined with combinators for adhoc use. We need

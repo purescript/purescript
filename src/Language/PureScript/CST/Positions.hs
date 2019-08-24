@@ -224,7 +224,7 @@ instanceBindingRange = \case
 foreignRange :: Foreign a -> TokenRange
 foreignRange = \case
   ForeignValue (Labeled a _ b) -> (nameTok a, snd $ typeRange b)
-  ForeignData a (Labeled _ _ b) -> (a, snd $ kindRange b)
+  ForeignData a (Labeled _ _ b) -> (a, snd $ typeRange b)
   ForeignKind a b -> (a, nameTok b)
 
 valueBindingFieldsRange :: ValueBindingFields a -> TokenRange
@@ -243,13 +243,6 @@ whereRange (Where a bs)
   | Just (_, ls) <- bs = (fst $ exprRange a, snd . letBindingRange $ NE.last ls)
   | otherwise = exprRange a
 
-kindRange :: Kind a -> TokenRange
-kindRange = \case
-  KindName _ a -> qualRange a
-  KindArr _ a _ b -> (fst $ kindRange a, snd $ kindRange b)
-  KindRow _ a b -> (a, snd $ kindRange b)
-  KindParens _ a -> wrappedRange a
-
 typeRange :: Type a -> TokenRange
 typeRange = \case
   TypeVar _ a -> nameRange a
@@ -260,7 +253,7 @@ typeRange = \case
   TypeRow _ a -> wrappedRange a
   TypeRecord _ a -> wrappedRange a
   TypeForall _ a _ _ b -> (a, snd $ typeRange b)
-  TypeKinded _ a _ b -> (fst $ typeRange a, snd $ kindRange b)
+  TypeKinded _ a _ b -> (fst $ typeRange a, snd $ typeRange b)
   TypeApp _ a b -> (fst $ typeRange a, snd $ typeRange b)
   TypeOp _ a _ b -> (fst $ typeRange a, snd $ typeRange b)
   TypeOpName _ a -> qualRange a

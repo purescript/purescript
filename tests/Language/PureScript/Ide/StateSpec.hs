@@ -19,7 +19,7 @@ ctorOperator :: Maybe P.SourceType -> IdeDeclarationAnn
 ctorOperator =
   ideValueOp ":" (P.Qualified (Just (mn "Test")) (Right "Cons")) 2 Nothing
 
-typeOperator :: Maybe P.SourceKind -> IdeDeclarationAnn
+typeOperator :: Maybe P.SourceType -> IdeDeclarationAnn
 typeOperator =
   ideTypeOp ":" (P.Qualified (Just (mn "Test")) "List") 2 Nothing
 

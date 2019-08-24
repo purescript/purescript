@@ -82,7 +82,7 @@ bindNames newNames action = do
 -- | Temporarily bind a collection of names to types
 bindTypes
   :: MonadState CheckState m
-  => M.Map (Qualified (ProperName 'TypeName)) (SourceKind, TypeKind)
+  => M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
   -> m a
   -> m a
 bindTypes newNames action = do
@@ -96,7 +96,7 @@ bindTypes newNames action = do
 withScopedTypeVars
   :: (MonadState CheckState m, MonadWriter MultipleErrors m)
   => ModuleName
-  -> [(Text, SourceKind)]
+  -> [(Text, SourceType)]
   -> m a
   -> m a
 withScopedTypeVars mn ks ma = do
@@ -193,7 +193,7 @@ bindLocalVariables bindings =
 bindLocalTypeVariables
   :: (MonadState CheckState m)
   => ModuleName
-  -> [(ProperName 'TypeName, SourceKind)]
+  -> [(ProperName 'TypeName, SourceType)]
   -> m a
   -> m a
 bindLocalTypeVariables moduleName bindings =
@@ -253,7 +253,7 @@ lookupTypeVariable
   :: (e ~ MultipleErrors, MonadState CheckState m, MonadError e m)
   => ModuleName
   -> Qualified (ProperName 'TypeName)
-  -> m SourceKind
+  -> m SourceType
 lookupTypeVariable currentModule (Qualified moduleName name) = do
   env <- getEnv
   case M.lookup (Qualified (Just $ fromMaybe currentModule moduleName) name) (types env) of

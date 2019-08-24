@@ -222,8 +222,6 @@ addExplicitImport' decl moduleName qualifier imports =
       P.ValueOpRef ideSpan (op ^. ideValueOpName)
     refFromDeclaration (IdeDeclTypeOperator op) =
       P.TypeOpRef ideSpan (op ^. ideTypeOpName)
-    refFromDeclaration (IdeDeclKind kn) =
-      P.KindRef ideSpan kn
     refFromDeclaration d =
       P.ValueRef ideSpan (P.Ident (identifierFromIdeDeclaration d))
 

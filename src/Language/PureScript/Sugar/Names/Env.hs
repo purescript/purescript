@@ -17,7 +17,6 @@ module Language.PureScript.Sugar.Names.Env
   , exportTypeClass
   , exportValue
   , exportValueOp
-  , exportKind
   , getExports
   , checkImportConflicts
   ) where
@@ -112,7 +111,7 @@ data Imports = Imports
   -- |
   -- Local names for kinds within a module mapped to their qualified names
   --
-  , importedKinds :: ImportMap (ProperName 'KindName)
+  , importedKinds :: ImportMap (ProperName 'TypeName)
   } deriving (Show)
 
 nullImports :: Imports
@@ -145,17 +144,13 @@ data Exports = Exports
   -- from.
   --
   , exportedValueOps :: M.Map (OpName 'ValueOpName) ExportSource
-  -- |
-  -- The exported kinds along with the module they originally came from.
-  --
-  , exportedKinds :: M.Map (ProperName 'KindName) ExportSource
   } deriving (Show)
 
 -- |
 -- An empty 'Exports' value.
 --
 nullExports :: Exports
-nullExports = Exports M.empty M.empty M.empty M.empty M.empty M.empty
+nullExports = Exports M.empty M.empty M.empty M.empty M.empty
 
 -- |
 -- The imports and exports for a collection of modules. The 'SourceSpan' is used
@@ -230,13 +225,14 @@ primTypeErrorExports = mkPrimExports primTypeErrorTypes primTypeErrorClasses pri
 mkPrimExports
   :: M.Map (Qualified (ProperName 'TypeName)) a
   -> M.Map (Qualified (ProperName 'ClassName)) b
-  -> S.Set (Qualified (ProperName 'KindName))
+  -> S.Set (Qualified (ProperName 'TypeName))
   -> Exports
 mkPrimExports ts cs ks =
   nullExports
     { exportedTypes = M.fromList $ mkTypeEntry `map` M.keys ts
     , exportedTypeClasses = M.fromList $ mkClassEntry `map` M.keys cs
-    , exportedKinds = M.fromList $ mkKindEntry `map` S.toList ks
+    -- TODO
+    -- , exportedKinds = M.fromList $ mkKindEntry `map` S.toList ks
     }
   where
   mkTypeEntry (Qualified mn name) = (name, ([], primExportSource mn))
@@ -399,20 +395,6 @@ exportValueOp
 exportValueOp ss exps op src = do
   valueOps <- addExport ss ValOpName op src (exportedValueOps exps)
   return $ exps { exportedValueOps = valueOps }
-
--- |
--- Safely adds a kind to some exports, returning an error if a conflict occurs.
---
-exportKind
-  :: MonadError MultipleErrors m
-  => SourceSpan
-  -> Exports
-  -> ProperName 'KindName
-  -> ExportSource
-  -> m Exports
-exportKind ss exps name src = do
-  kinds <- addExport ss KiName name src (exportedKinds exps)
-  return $ exps { exportedKinds = kinds }
 
 -- |
 -- Adds an entry to a list of exports unless it is already present, in which

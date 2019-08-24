@@ -171,7 +171,7 @@ collectDeclarations reExports = do
   expTypeOps :: Map (P.OpName 'P.TypeOpName) P.ExportSource
   expTypeOps = mkExportMap P.getTypeOpRef
 
-  expKinds :: Map (P.ProperName 'P.KindName) P.ExportSource
+  expKinds :: Map (P.ProperName 'P.TypeName) P.ExportSource
   expKinds = mkExportMap P.getKindRef
 
   mkExportMap :: Ord name => (P.DeclarationRef -> Maybe name) -> Map name P.ExportSource
@@ -315,7 +315,7 @@ lookupTypeClassDeclaration importedFrom tyClass = do
 lookupKindDeclaration
   :: (MonadState (Map P.ModuleName Module) m, MonadReader P.ModuleName m)
   => P.ModuleName
-  -> P.ProperName 'P.KindName
+  -> P.ProperName 'P.TypeName
   -> m (P.ModuleName, [Declaration])
 lookupKindDeclaration importedFrom kind = do
   decls <- lookupModuleDeclarations "lookupKindDeclaration" importedFrom

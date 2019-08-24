@@ -59,16 +59,16 @@ idePrimDeclarations = Map.fromList
     primTypeErrorClasses = annClass PEnv.primTypeErrorClasses
 
     primKinds = foreach (Set.toList PEnv.primKinds) $ \kn ->
-      IdeDeclarationAnn emptyAnn (IdeDeclKind (P.disqualify kn))
+      IdeDeclarationAnn emptyAnn (IdeDeclType $ IdeType (P.disqualify kn) P.kindType [])
 
     primBooleanKinds = foreach (Set.toList PEnv.primBooleanKinds) $ \kn ->
-      IdeDeclarationAnn emptyAnn (IdeDeclKind (P.disqualify kn))
+      IdeDeclarationAnn emptyAnn (IdeDeclType $ IdeType (P.disqualify kn) P.kindType [])
 
     primOrderingKinds = foreach (Set.toList PEnv.primOrderingKinds) $ \kn ->
-      IdeDeclarationAnn emptyAnn (IdeDeclKind (P.disqualify kn))
+      IdeDeclarationAnn emptyAnn (IdeDeclType $ IdeType (P.disqualify kn) P.kindType [])
 
     primRowListKinds = foreach (Set.toList PEnv.primRowListKinds) $ \kn ->
-      IdeDeclarationAnn emptyAnn (IdeDeclKind (P.disqualify kn))
+      IdeDeclarationAnn emptyAnn (IdeDeclType $ IdeType (P.disqualify kn) P.kindType [])
 
     primTypeErrorKinds = foreach (Set.toList PEnv.primTypeErrorKinds) $ \kn ->
-      IdeDeclarationAnn emptyAnn (IdeDeclKind (P.disqualify kn))
+      IdeDeclarationAnn emptyAnn (IdeDeclType $ IdeType (P.disqualify kn) P.kindType [])

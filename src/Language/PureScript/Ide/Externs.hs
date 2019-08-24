@@ -138,8 +138,6 @@ convertDecl ed = case ed of
     Right (Just (IdeDeclValue (IdeValue edValueName edValueType)))
   P.EDClass{..} ->
     Left (TypeClassToResolve edClassName)
-  P.EDKind{..} ->
-    Right (Just (IdeDeclKind edKindName))
   P.EDInstance{} ->
     Right Nothing
 

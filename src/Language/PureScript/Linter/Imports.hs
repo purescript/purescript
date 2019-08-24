@@ -328,7 +328,7 @@ findUsedRefs ss env mni qn names =
     valueOpRefs = ValueOpRef ss <$> mapMaybe (getValOpName <=< disqualifyFor qn) names
     typeOpRefs = TypeOpRef ss <$> mapMaybe (getTypeOpName <=< disqualifyFor qn) names
     types = mapMaybe (getTypeName <=< disqualifyFor qn) names
-    kindRefs = KindRef ss <$> mapMaybe (getKindName <=< disqualifyFor qn) names
+    kindRefs = KindRef ss <$> mapMaybe (getTypeName <=< disqualifyFor qn) names
     dctors = mapMaybe (getDctorName <=< disqualifyFor qn) names
     typesWithDctors = reconstructTypeRefs dctors
     typesWithoutDctors = filter (`M.notMember` typesWithDctors) types

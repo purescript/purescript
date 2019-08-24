@@ -150,7 +150,7 @@ unsafeLookupOf k m errorMsg name = go name
   fromJust' _ = P.internalError $ errorMsg ++ show name
 
 primKindOf
-  :: NameGen 'P.KindName
+  :: NameGen 'P.TypeName
   -> Text
   -> Text
   -> Declaration
@@ -171,7 +171,7 @@ primKind = primKindOf P.primName
 lookupPrimTypeKindOf
   :: NameGen 'P.TypeName
   -> Text
-  -> Kind'
+  -> Type'
 lookupPrimTypeKindOf k = ($> ()) . fst . unsafeLookupOf k
   ( P.primTypes <>
     P.primBooleanTypes <>

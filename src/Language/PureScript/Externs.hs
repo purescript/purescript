@@ -34,7 +34,6 @@ import qualified Data.List.NonEmpty as NEL
 import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Environment
-import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
@@ -103,13 +102,13 @@ data ExternsDeclaration =
   -- | A type declaration
     EDType
       { edTypeName                :: ProperName 'TypeName
-      , edTypeKind                :: SourceKind
+      , edTypeKind                :: SourceType
       , edTypeDeclarationKind     :: TypeKind
       }
   -- | A type synonym
   | EDTypeSynonym
       { edTypeSynonymName         :: ProperName 'TypeName
-      , edTypeSynonymArguments    :: [(Text, Maybe SourceKind)]
+      , edTypeSynonymArguments    :: [(Text, Maybe SourceType)]
       , edTypeSynonymType         :: SourceType
       }
   -- | A data construtor
@@ -128,7 +127,7 @@ data ExternsDeclaration =
   -- | A type class declaration
   | EDClass
       { edClassName               :: ProperName 'ClassName
-      , edClassTypeArguments      :: [(Text, Maybe SourceKind)]
+      , edClassTypeArguments      :: [(Text, Maybe SourceType)]
       , edClassMembers            :: [(Ident, SourceType)]
       , edClassConstraints        :: [SourceConstraint]
       , edFunctionalDependencies  :: [FunctionalDependency]
@@ -142,10 +141,6 @@ data ExternsDeclaration =
       , edInstanceChain           :: [Qualified Ident]
       , edInstanceChainIndex      :: Integer
       }
-  -- | A kind declaration
-  | EDKind
-      { edKindName                :: ProperName 'KindName
-      }
   deriving Show
 
 -- | Convert an externs file back into a module
@@ -158,7 +153,6 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   applyDecl env (EDDataConstructor pn dTy tNm ty nms) = env { dataConstructors = M.insert (qual pn) (dTy, tNm, ty, nms) (dataConstructors env) }
   applyDecl env (EDValue ident ty) = env { names = M.insert (Qualified (Just efModuleName) ident) (ty, External, Defined) (names env) }
   applyDecl env (EDClass pn args members cs deps) = env { typeClasses = M.insert (qual pn) (makeTypeClassData args members cs deps) (typeClasses env) }
-  applyDecl env (EDKind pn) = env { kinds = S.insert (qual pn) (kinds env) }
   applyDecl env (EDInstance className ident tys cs ch idx) =
     env { typeClassDictionaries =
             updateMap
@@ -238,7 +232,7 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
       ]
   toExternsDeclaration (KindRef _ pn)
     | Qualified (Just mn) pn `S.member` kinds env
-    = [ EDKind pn ]
+    = [ EDType pn kindType ExternData ]
   toExternsDeclaration _ = []
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsImport)

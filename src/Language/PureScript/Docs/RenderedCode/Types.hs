@@ -335,7 +335,7 @@ typeOp (fromQualified -> (mn, name)) =
 typeVar :: Text -> RenderedCode
 typeVar x = RC [Symbol TypeLevel x NoLink]
 
-kind :: Qualified (ProperName 'KindName) -> RenderedCode
+kind :: Qualified (ProperName 'TypeName) -> RenderedCode
 kind (fromQualified -> (mn, name)) =
   RC [Symbol KindLevel (runProperName name) (Link mn)]
 

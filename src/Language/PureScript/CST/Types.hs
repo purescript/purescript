@@ -130,13 +130,6 @@ data OneOrDelimited a
   | Many (DelimitedNonEmpty a)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
-data Kind a
-  = KindName a (QualifiedName (N.ProperName 'N.KindName))
-  | KindArr a (Kind a) SourceToken (Kind a)
-  | KindRow a SourceToken (Kind a)
-  | KindParens a (Wrapped (Kind a))
-  deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
-
 data Type a
   = TypeVar a (Name Ident)
   | TypeConstructor a (QualifiedName (N.ProperName 'N.TypeName))
@@ -146,7 +139,7 @@ data Type a
   | TypeRow a (Wrapped (Row a))
   | TypeRecord a (Wrapped (Row a))
   | TypeForall a SourceToken (NonEmpty (TypeVarBinding a)) SourceToken (Type a)
-  | TypeKinded a (Type a) SourceToken (Kind a)
+  | TypeKinded a (Type a) SourceToken (Type a)
   | TypeApp a (Type a) (Type a)
   | TypeOp a (Type a) (QualifiedName (N.OpName 'N.TypeOpName)) (Type a)
   | TypeOpName a (QualifiedName (N.OpName 'N.TypeOpName))
@@ -157,7 +150,7 @@ data Type a
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data TypeVarBinding a
-  = TypeVarKinded (Wrapped (Labeled (Name Ident) (Kind a)))
+  = TypeVarKinded (Wrapped (Labeled (Name Ident) (Type a)))
   | TypeVarName (Name Ident)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
@@ -188,7 +181,7 @@ data Export a
   | ExportType a (Name (N.ProperName 'N.TypeName)) (Maybe (DataMembers a))
   | ExportTypeOp a SourceToken (Name (N.OpName 'N.TypeOpName))
   | ExportClass a SourceToken (Name (N.ProperName 'N.ClassName))
-  | ExportKind a SourceToken (Name (N.ProperName 'N.KindName))
+  | ExportKind a SourceToken (Name (N.ProperName 'N.TypeName))
   | ExportModule a SourceToken (Name N.ModuleName)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
@@ -234,7 +227,7 @@ data Import a
   | ImportType a (Name (N.ProperName 'N.TypeName)) (Maybe (DataMembers a))
   | ImportTypeOp a SourceToken (Name (N.OpName 'N.TypeOpName))
   | ImportClass a SourceToken (Name (N.ProperName 'N.ClassName))
-  | ImportKind a SourceToken (Name (N.ProperName 'N.KindName))
+  | ImportKind a SourceToken (Name (N.ProperName 'N.TypeName))
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data DataHead a = DataHead
@@ -313,8 +306,8 @@ data PatternGuard a = PatternGuard
 
 data Foreign a
   = ForeignValue (Labeled (Name Ident) (Type a))
-  | ForeignData SourceToken (Labeled (Name (N.ProperName 'N.TypeName)) (Kind a))
-  | ForeignKind SourceToken (Name (N.ProperName 'N.KindName))
+  | ForeignData SourceToken (Labeled (Name (N.ProperName 'N.TypeName)) (Type a))
+  | ForeignKind SourceToken (Name (N.ProperName 'N.TypeName))
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data Expr a

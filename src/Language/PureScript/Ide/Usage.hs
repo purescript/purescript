@@ -109,9 +109,6 @@ matchesRef declaration ref = case declaration of
   IdeDeclTypeOperator typeOperator -> case ref of
     P.TypeOpRef _ opName -> opName == _ideTypeOpName typeOperator
     _ -> False
-  IdeDeclKind kind -> case ref of
-    P.KindRef _ kindName -> kindName == kind
-    _ -> False
   IdeDeclModule m -> case ref of
     P.ModuleRef _ mn -> m == mn
     _ -> False

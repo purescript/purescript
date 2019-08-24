@@ -524,7 +524,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
     renderSimpleErrorMessage (InfiniteKind ki) =
       paras [ line "An infinite kind was inferred for a type: "
-            , indent $ line $ markCode $ prettyPrintKind ki
+            , markCodeBox $ indent $ typeAsBox prettyDepth ki
             ]
     renderSimpleErrorMessage (MultipleValueOpFixities op) =
       line $ "There are multiple fixity/precedence declarations for operator " <> markCode (showOp op)
@@ -640,9 +640,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
 
     renderSimpleErrorMessage (KindsDoNotUnify k1 k2) =
       paras [ line "Could not match kind"
-            , indent $ line $ markCode $ prettyPrintKind k1
+            , markCodeBox $ indent $ typeAsBox prettyDepth k1
             , line "with kind"
-            , indent $ line $ markCode $ prettyPrintKind k2
+            , markCodeBox $ indent $ typeAsBox prettyDepth k2
             ]
     renderSimpleErrorMessage (ConstrainedTypeUnified t1 t2) =
       paras [ line "Could not match constrained type"
@@ -797,11 +797,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (ExtraneousClassMember ident className) =
       line $ "" <> markCode (showIdent ident) <> " is not a member of type class " <> markCode (showQualified runProperName className)
     renderSimpleErrorMessage (ExpectedType ty kind) =
-      paras [ line $ "In a type-annotated expression " <> markCode "x :: t" <> ", the type " <> markCode "t" <> " must have kind " <> markCode (prettyPrintKind kindType) <> "."
+      paras [ line $ "In a type-annotated expression " <> markCode "x :: t" <> ", the type " <> markCode "t" <> " must have kind " <> markCode C.typ <> "."
             , line "The error arises from the type"
             , markCodeBox $ indent $ typeAsBox prettyDepth ty
             , line "having the kind"
-            , indent $ line $ markCode $ prettyPrintKind kind
+            , markCodeBox $ indent $ typeAsBox prettyDepth kind
             , line "instead."
             ]
     renderSimpleErrorMessage (IncorrectConstructorArity nm expected actual) =
@@ -1213,7 +1213,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     nameType (DctorName _) = "data constructor"
     nameType (TyClassName _) = "type class"
     nameType (ModName _) = "module"
-    nameType (KiName _) = "kind"
 
     runName :: Qualified Name -> Text
     runName (Qualified mn (IdentName name)) =
@@ -1227,8 +1226,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     runName (Qualified mn (DctorName name)) =
       showQualified runProperName (Qualified mn name)
     runName (Qualified mn (TyClassName name)) =
-      showQualified runProperName (Qualified mn name)
-    runName (Qualified mn (KiName name)) =
       showQualified runProperName (Qualified mn name)
     runName (Qualified Nothing (ModName name)) =
       runModuleName name

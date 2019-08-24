@@ -18,7 +18,7 @@ moduleA, moduleB, moduleC, moduleD, moduleE, moduleF, moduleG, moduleH, moduleI 
 moduleA = (P.moduleNameFromString "Module.A", [T.ideValue "function1" Nothing])
 moduleB = (P.moduleNameFromString "Module.B", [T.ideValue "data1" Nothing])
 moduleC = (P.moduleNameFromString "Module.C", [T.ideType "List" Nothing []])
-moduleD = (P.moduleNameFromString "Module.D", [T.ideKind "kind1"])
+moduleD = (P.moduleNameFromString "Module.D", [T.ideType "kind1" Nothing []])
 moduleE = (P.moduleNameFromString "Module.E", [T.ideSynonym "SFType" Nothing Nothing `annLoc` synonymSS])
 moduleF = (P.moduleNameFromString "Module.F", [T.ideDtor "DtorA" "TypeA" Nothing])
 moduleG = (P.moduleNameFromString "Module.G", [T.ideTypeClass "MyClass" P.kindType []])

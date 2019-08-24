@@ -243,9 +243,10 @@ checkTypedBindingGroupElement
   -- ^ Names brought into scope in this binding group
   -> m ((SourceAnn, Ident), (Expr, SourceType))
 checkTypedBindingGroupElement mn (ident, (val, ty, checkType)) dict = do
-  -- Kind check
-  (kind, args) <- kindOfWithScopedVars ty
-  checkTypeKind ty kind
+  -- TOOD: Kind check
+  -- (kind, args) <- kindOfWithScopedVars ty
+  -- checkTypeKind ty kind
+  let args = []
   -- We replace type synonyms _after_ kind-checking, since we don't want type
   -- synonym expansion to bring type variables into scope. See #2542.
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
@@ -275,7 +276,7 @@ typeForBindingGroupElement (ident, (val, ty)) dict = do
 checkTypeKind
   :: MonadError MultipleErrors m
   => SourceType
-  -> SourceKind
+  -> SourceType
   -> m ()
 checkTypeKind ty kind = guardWith (errorMessage (ExpectedType ty kind)) $ isKindType kind
 
@@ -414,8 +415,10 @@ infer' (DeferredDictionary className tys) = do
              (foldl srcTypeApp (srcTypeConstructor (fmap coerceProperName className)) tys)
 infer' (TypedValue checkType val ty) = do
   moduleName <- unsafeCheckCurrentModule
-  (kind, args) <- kindOfWithScopedVars ty
-  checkTypeKind ty kind
+  -- TODO: Kind check
+  -- (kind, args) <- kindOfWithScopedVars ty
+  -- checkTypeKind ty kind
+  let args = []
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   tv <- if checkType then withScopedTypeVars moduleName args (check val ty') else return (TypedValue' False val ty)
   return $ TypedValue' True (tvToExpr tv) ty'
@@ -441,8 +444,10 @@ inferLetBinding seen [] ret j = (,) seen <$> withBindingGroupVisible (j ret)
 inferLetBinding seen (ValueDecl sa@(ss, _) ident nameKind [] [MkUnguarded (TypedValue checkType val ty)] : rest) ret j = do
   moduleName <- unsafeCheckCurrentModule
   TypedValue' _ val' ty'' <- warnAndRethrowWithPositionTC ss $ do
-    (kind, args) <- kindOfWithScopedVars ty
-    checkTypeKind ty kind
+    -- TODO: Kind check
+    -- (kind, args) <- kindOfWithScopedVars ty
+    -- checkTypeKind ty kind
+    let args = []
     let dict = M.singleton (Qualified Nothing ident) (ty, nameKind, Undefined)
     ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
     if checkType
@@ -528,8 +533,9 @@ inferBinder val (NamedBinder ss name binder) =
 inferBinder val (PositionedBinder pos _ binder) =
   warnAndRethrowWithPositionTC pos $ inferBinder val binder
 inferBinder val (TypedBinder ty binder) = do
-  kind <- kindOf ty
-  checkTypeKind ty kind
+  -- TODO: Kind check
+  -- kind <- kindOf ty
+  -- checkTypeKind ty kind
   ty1 <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty
   unifyTypes val ty1
   inferBinder ty1 binder
@@ -689,8 +695,9 @@ check' (DeferredDictionary className tys) ty = do
              (TypeClassDictionary (srcConstraint className tys Nothing) dicts hints)
              ty
 check' (TypedValue checkType val ty1) ty2 = do
-  kind <- kindOf ty1
-  checkTypeKind ty1 kind
+  -- TODO: Kind check
+  -- kind <- kindOf ty1
+  -- checkTypeKind ty1 kind
   ty1' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty1
   ty2' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ ty2
   elaborate <- subsumes ty1' ty2'
@@ -741,7 +748,7 @@ check' (Let w ds val) ty = do
   (ds', val') <- inferLetBinding [] ds val (`check` ty)
   return $ TypedValue' True (Let w ds' (tvToExpr val')) ty
 check' val kt@(KindedType _ ty kind) = do
-  checkTypeKind ty kind
+  -- TODO: checkTypeKind ty kind
   val' <- tvToExpr <$> check' val ty
   return $ TypedValue' True val' kt
 check' (PositionedValue pos c val) ty = warnAndRethrowWithPositionTC pos $ do

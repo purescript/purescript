@@ -32,10 +32,8 @@ import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
-import Language.PureScript.Kinds
 import Language.PureScript.Linter
 import Language.PureScript.Names
-import Language.PureScript.TypeChecker.Kinds as T
 import Language.PureScript.TypeChecker.Monad as T
 import Language.PureScript.TypeChecker.Synonyms as T
 import Language.PureScript.TypeChecker.Types as T
@@ -49,9 +47,9 @@ addDataType
   => ModuleName
   -> DataDeclType
   -> ProperName 'TypeName
-  -> [(Text, Maybe SourceKind)]
+  -> [(Text, Maybe SourceType)]
   -> [(ProperName 'ConstructorName, [(Ident, SourceType)])]
-  -> SourceKind
+  -> SourceType
   -> m ()
 addDataType moduleName dtype name args dctors ctorKind = do
   env <- getEnv
@@ -82,9 +80,9 @@ addTypeSynonym
   :: (MonadState CheckState m, MonadError MultipleErrors m)
   => ModuleName
   -> ProperName 'TypeName
-  -> [(Text, Maybe SourceKind)]
+  -> [(Text, Maybe SourceType)]
   -> SourceType
-  -> SourceKind
+  -> SourceType
   -> m ()
 addTypeSynonym moduleName name args ty kind = do
   env <- getEnv
@@ -118,7 +116,7 @@ addTypeClass
   :: forall m
    . (MonadState CheckState m, MonadError MultipleErrors m)
   => Qualified (ProperName 'ClassName)
-  -> [(Text, Maybe SourceKind)]
+  -> [(Text, Maybe SourceType)]
   -> [SourceConstraint]
   -> [FunctionalDependency]
   -> [Declaration]
@@ -237,7 +235,7 @@ typeCheckAll moduleName _ = traverse go
     warnAndRethrow (addHint (ErrorInTypeConstructor name) . addHint (positionedError ss)) $ do
       when (dtype == Newtype) $ checkNewtype name dctors
       checkDuplicateTypeArguments $ map fst args
-      ctorKind <- kindsOf True moduleName name args (concatMap (fmap snd . snd) dctors)
+      ctorKind <- undefined -- TODO: kindsOf True moduleName name args (concatMap (fmap snd . snd) dctors)
       let args' = args `withKinds` ctorKind
       addDataType moduleName dtype name args' dctors ctorKind
     return $ DataDeclaration sa dtype name args dctors
@@ -248,7 +246,7 @@ typeCheckAll moduleName _ = traverse go
         bindingGroupNames = ordNub ((syns^..traverse._2) ++ (dataDecls^..traverse._3))
         sss = fmap declSourceSpan tys
     warnAndRethrow (addHint (ErrorInDataBindingGroup bindingGroupNames) . addHint (PositionedError sss)) $ do
-      (syn_ks, data_ks) <- kindsOfAll moduleName syns (map (\(sa, _, name, args, dctors) -> (sa, name, args, concatMap (fmap snd . snd) dctors)) dataDecls)
+      (syn_ks, data_ks) <- undefined -- TODO: kindsOfAll moduleName syns (map (\(sa, _, name, args, dctors) -> (sa, name, args, concatMap (fmap snd . snd) dctors)) dataDecls)
       for_ (zip dataDecls data_ks) $ \((_, dtype, name, args, dctors), ctorKind) -> do
         when (dtype == Newtype) $ checkNewtype name dctors
         checkDuplicateTypeArguments $ map fst args
@@ -267,7 +265,7 @@ typeCheckAll moduleName _ = traverse go
   go (TypeSynonymDeclaration sa@(ss, _) name args ty) = do
     warnAndRethrow (addHint (ErrorInTypeSynonym name) . addHint (positionedError ss) ) $ do
       checkDuplicateTypeArguments $ map fst args
-      kind <- kindsOf False moduleName name args [ty]
+      kind <- undefined -- TODO: kindsOf False moduleName name args [ty]
       let args' = args `withKinds` kind
       addTypeSynonym moduleName name args' ty kind
     return $ TypeSynonymDeclaration sa name args ty
@@ -312,7 +310,7 @@ typeCheckAll moduleName _ = traverse go
   go (d@(ExternDeclaration (ss, _) name ty)) = do
     warnAndRethrow (addHint (ErrorInForeignImport name) . addHint (positionedError ss)) $ do
       env <- getEnv
-      kind <- kindOf ty
+      kind <- undefined -- TODO: kindOf ty
       guardWith (errorMessage (ExpectedType ty kind)) $ kind == kindType
       case M.lookup (Qualified (Just moduleName) name) (names env) of
         Just _ -> throwError . errorMessage $ RedefinedIdent name
@@ -487,11 +485,12 @@ typeCheckAll moduleName _ = traverse go
   -- This function adds the argument kinds for a type constructor so that they may appear in the externs file,
   -- extracted from the kind of the type constructor itself.
   --
-  withKinds :: [(Text, Maybe SourceKind)] -> SourceKind -> [(Text, Maybe SourceKind)]
-  withKinds []                  _               = []
-  withKinds (s@(_, Just _ ):ss) (FunKind _ _   k) = s : withKinds ss k
-  withKinds (  (s, Nothing):ss) (FunKind _ k1 k2) = (s, Just k1) : withKinds ss k2
-  withKinds _                   _                 = internalError "Invalid arguments to peelKinds"
+  withKinds :: [(Text, Maybe SourceType)] -> SourceType -> [(Text, Maybe SourceType)]
+  withKinds = undefined -- TODO
+  -- withKinds []                  _               = []
+  -- withKinds (s@(_, Just _ ):ss) (FunKind _ _   k) = s : withKinds ss k
+  -- withKinds (  (s, Nothing):ss) (FunKind _ k1 k2) = (s, Just k1) : withKinds ss k2
+  -- withKinds _                   _                 = internalError "Invalid arguments to peelKinds"
 
 checkNewtype
   :: forall m
@@ -567,8 +566,8 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
   checkMemberExport extract dr@(TypeRef _ name dctors) = do
     env <- getEnv
     for_ (M.lookup (qualify' name) (types env)) $ \(k, _) -> do
-      let findModuleKinds = everythingOnKinds (++) $ \case
-            NamedKind _ (Qualified (Just mn') kindName) | mn' == mn -> [kindName]
+      let findModuleKinds = everythingOnTypes (++) $ \case
+            TypeConstructor _ (Qualified (Just mn') kindName) | mn' == mn -> [kindName]
             _ -> []
       checkExport dr $ KindRef (declRefSourceSpan dr) <$> findModuleKinds k
     for_ (M.lookup (qualify' name) (typeSynonyms env)) $ \(_, ty) ->

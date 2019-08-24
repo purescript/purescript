@@ -40,7 +40,7 @@ renderDeclaration Declaration{..} =
       [ keywordData
       , renderType (P.TypeConstructor () (notQualified declTitle))
       , syntax "::"
-      , renderKind kind'
+      , renderType kind'
       ]
     TypeSynonymDeclaration args ty ->
       [ keywordType
@@ -125,12 +125,12 @@ ident' = ident . P.Qualified Nothing . P.Ident
 dataCtor' :: Text -> RenderedCode
 dataCtor' = dataCtor . notQualified
 
-typeApp :: Text -> [(Text, Maybe Kind')] -> Type'
+typeApp :: Text -> [(Text, Maybe Type')] -> Type'
 typeApp title typeArgs =
   foldl (P.TypeApp ())
         (P.TypeConstructor () (notQualified title))
         (map toTypeVar typeArgs)
 
-toTypeVar :: (Text, Maybe Kind') -> Type'
+toTypeVar :: (Text, Maybe Type') -> Type'
 toTypeVar (s, Nothing) = P.TypeVar () s
 toTypeVar (s, Just k) = P.KindedType () (P.TypeVar () s) k

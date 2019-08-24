@@ -228,7 +228,6 @@ resolveLocationsForModule (defs, types) decls =
       annotateFunction
       annotateValue
       annotateType
-      annotateKind
       annotateModule
       d
       where
@@ -237,7 +236,6 @@ resolveLocationsForModule (defs, types) decls =
                                                     })
         annotateValue x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSValue x) defs})
         annotateType x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSType x) defs})
-        annotateKind x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSKind x) defs})
         annotateModule x = IdeDeclarationAnn (ann {_annLocation = Map.lookup (IdeNamespaced IdeNSModule x) defs})
 
 convertDeclaration'
@@ -245,10 +243,9 @@ convertDeclaration'
   -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
   -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
   -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
-  -> (Text -> IdeDeclaration -> IdeDeclarationAnn)
   -> IdeDeclaration
   -> IdeDeclarationAnn
-convertDeclaration' annotateFunction annotateValue annotateType annotateKind annotateModule d =
+convertDeclaration' annotateFunction annotateValue annotateType annotateModule d =
   case d of
     IdeDeclValue v ->
       annotateFunction (v ^. ideValueIdent) d
@@ -264,8 +261,6 @@ convertDeclaration' annotateFunction annotateValue annotateType annotateKind ann
       annotateValue (operator ^. ideValueOpName . opNameT) d
     IdeDeclTypeOperator operator ->
       annotateType (operator ^. ideTypeOpName . opNameT) d
-    IdeDeclKind i ->
-      annotateKind (i ^. properNameT) d
     IdeDeclModule mn ->
       annotateModule (P.runModuleName mn) d
 
@@ -300,7 +295,6 @@ resolveDocumentationForModule (P.Module _ moduleComments moduleName sdecls _) de
       (annotateValue . P.IdentName)
       (annotateValue . P.IdentName . P.Ident)
       (annotateValue . P.TyName . P.ProperName)
-      (annotateValue . P.KiName . P.ProperName)
       (annotateValue . P.ModName . P.moduleNameFromString)
       d
     where

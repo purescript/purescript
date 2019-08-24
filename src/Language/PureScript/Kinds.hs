@@ -32,7 +32,7 @@ data Kind a
   -- | Function kinds
   | FunKind a (Kind a) (Kind a)
   -- | A named kind
-  | NamedKind a (Qualified (ProperName 'KindName))
+  | NamedKind a (Qualified (ProperName 'TypeName))
   deriving (Show, Generic, Functor, Foldable, Traversable)
 
 instance NFData a => NFData (Kind a)
@@ -46,7 +46,7 @@ srcRow = Row NullSourceAnn
 srcFunKind :: SourceKind -> SourceKind -> SourceKind
 srcFunKind = FunKind NullSourceAnn
 
-srcNamedKind :: Qualified (ProperName 'KindName) -> SourceKind
+srcNamedKind :: Qualified (ProperName 'TypeName) -> SourceKind
 srcNamedKind = NamedKind NullSourceAnn
 
 kindToJSON :: forall a. (a -> Value) -> Kind a -> Value

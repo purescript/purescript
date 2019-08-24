@@ -3,8 +3,7 @@
 -- and attaching comments.
 
 module Language.PureScript.CST.Convert
-  ( convertKind
-  , convertType
+  ( convertType
   , convertExpr
   , convertBinder
   , convertDeclaration
@@ -28,7 +27,6 @@ import qualified Language.PureScript.AST as AST
 import qualified Language.PureScript.AST.SourcePos as Pos
 import qualified Language.PureScript.Comments as C
 import qualified Language.PureScript.Environment as Env
-import qualified Language.PureScript.Kinds as K
 import qualified Language.PureScript.Label as L
 import qualified Language.PureScript.Names as N
 import Language.PureScript.PSString (mkString)
@@ -93,26 +91,6 @@ qualified q = N.Qualified (qualModule q) (qualName q)
 ident :: Ident -> N.Ident
 ident = N.Ident . getIdent
 
-convertKind :: String -> Kind a -> K.SourceKind
-convertKind fileName = go
-  where
-  go = \case
-    KindName _ a ->
-      K.NamedKind (sourceQualName fileName a) $ qualified a
-    KindArr _ a _ b -> do
-      let
-        lhs = go a
-        rhs = go b
-        ann = Pos.widenSourceAnn (K.getAnnForKind lhs) (K.getAnnForKind rhs)
-      K.FunKind ann lhs rhs
-    KindRow _ tok a -> do
-      let
-        kind = go a
-        ann = widenLeft (tokAnn tok) $ K.getAnnForKind kind
-      K.Row ann kind
-    KindParens _ (Wrapped _ a _) ->
-      go a
-
 convertType :: String -> Type a -> T.SourceType
 convertType fileName = go
   where
@@ -153,7 +131,7 @@ convertType fileName = go
         mkForAll a b t = do
           let ann' = widenLeft (tokAnn $ nameTok a) $ T.getAnnForType t
           T.ForAll ann' (getIdent $ nameValue a) b t Nothing
-        k t (TypeVarKinded (Wrapped _ (Labeled a _ b) _)) = mkForAll a (Just (convertKind fileName b)) t
+        k t (TypeVarKinded (Wrapped _ (Labeled a _ b) _)) = mkForAll a (Just (go b)) t
         k t (TypeVarName a) = mkForAll a Nothing t
         -- The existing parser builds variables in reverse order
         ty' = foldl k (go ty) bindings
@@ -162,8 +140,8 @@ convertType fileName = go
     TypeKinded _ ty _ kd -> do
       let
         ty' = go ty
-        kd' = convertKind fileName kd
-        ann = Pos.widenSourceAnn (T.getAnnForType ty') (K.getAnnForKind kd')
+        kd' = go kd
+        ann = Pos.widenSourceAnn (T.getAnnForType ty') (T.getAnnForType kd')
       T.KindedType ann ty' kd'
     TypeApp _ a b -> do
       let
@@ -523,7 +501,7 @@ convertDeclaration fileName decl = case decl of
       ForeignValue (Labeled a _ b) ->
         AST.ExternDeclaration ann (ident $ nameValue a) $ convertType fileName b
       ForeignData _ (Labeled a _ b) ->
-        AST.ExternDataDeclaration ann (nameValue a) $ convertKind fileName b
+        AST.ExternDataDeclaration ann (nameValue a) $ convertType fileName b
       ForeignKind _ a ->
         AST.ExternKindDeclaration ann (nameValue a)
   where
@@ -531,7 +509,7 @@ convertDeclaration fileName decl = case decl of
     uncurry (sourceAnnCommented fileName) $ declRange decl
 
   goTypeVar = \case
-    TypeVarKinded (Wrapped _ (Labeled x _ y) _) -> (getIdent $ nameValue x, Just $ convertKind fileName y)
+    TypeVarKinded (Wrapped _ (Labeled x _ y) _) -> (getIdent $ nameValue x, Just $ convertType fileName y)
     TypeVarName x -> (getIdent $ nameValue x, Nothing)
 
   goInstanceBinding = \case
