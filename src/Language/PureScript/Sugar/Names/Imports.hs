@@ -124,8 +124,6 @@ resolveImport importModule exps imps impQual = resolveByType
       checkImportExists ss TyClassName (exportedTypeClasses exps) name
     check (ModuleRef ss name) | isHiding =
       throwError . errorMessage' ss $ ImportHidingModule name
-    check (KindRef ss name) =
-      checkImportExists ss TyName (exportedTypes exps) name
     check r = internalError $ "Invalid argument to checkRefs: " ++ show r
 
   -- Check that an explicitly imported item exists in the module it is being imported from
@@ -199,9 +197,6 @@ resolveImport importModule exps imps impQual = resolveByType
   importRef prov imp (TypeClassRef ss name) = do
     let typeClasses' = updateImports (importedTypeClasses imp) (exportedTypeClasses exps) id name ss prov
     return $ imp { importedTypeClasses = typeClasses' }
-  importRef prov imp (KindRef ss name) = do
-    let kinds' = updateImports (importedTypes imp) (exportedTypes exps) snd name ss prov
-    return $ imp { importedTypes = kinds' }
   importRef _ _ TypeInstanceRef{} = internalError "TypeInstanceRef in importRef"
   importRef _ _ ModuleRef{} = internalError "ModuleRef in importRef"
   importRef _ _ ReExportRef{} = internalError "ReExportRef in importRef"

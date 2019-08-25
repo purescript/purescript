@@ -569,7 +569,7 @@ convertImport fileName imp = case imp of
   ImportClass _ _ a ->
     AST.TypeClassRef ann $ nameValue a
   ImportKind _ _ a ->
-    AST.KindRef ann $ nameValue a
+    AST.TypeRef ann (nameValue a) Nothing
   where
   ann = sourceSpan fileName . toSourceRange $ importRange imp
 
@@ -593,7 +593,7 @@ convertExport fileName export = case export of
   ExportClass _ _ a ->
     AST.TypeClassRef ann $ nameValue a
   ExportKind _ _ a ->
-    AST.KindRef ann $ nameValue a
+    AST.TypeRef ann (nameValue a) Nothing
   ExportModule _ _ a ->
     AST.ModuleRef ann (nameValue a)
   where

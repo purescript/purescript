@@ -222,8 +222,6 @@ handleShowImportedModules print' = do
     Just $ N.runIdent ident
   showRef (P.ModuleRef _ name) =
     Just $ "module " <> N.runModuleName name
-  showRef (P.KindRef _ pn) =
-    Just $ "kind " <> N.runProperName pn
   showRef (P.ReExportRef _ _ _) =
     Nothing
 

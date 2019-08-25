@@ -303,10 +303,6 @@ typeCheckAll moduleName _ = traverse go
     env <- getEnv
     putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (kind, ExternData) (types env) }
     return d
-  go (d@(ExternKindDeclaration _ name)) = do
-    env <- getEnv
-    putEnv $ env { kinds = S.insert (Qualified (Just moduleName) name) (kinds env) }
-    return d
   go (d@(ExternDeclaration (ss, _) name ty)) = do
     warnAndRethrow (addHint (ErrorInForeignImport name) . addHint (positionedError ss)) $ do
       env <- getEnv
@@ -569,7 +565,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
       let findModuleKinds = everythingOnTypes (++) $ \case
             TypeConstructor _ (Qualified (Just mn') kindName) | mn' == mn -> [kindName]
             _ -> []
-      checkExport dr $ KindRef (declRefSourceSpan dr) <$> findModuleKinds k
+      undefined -- TODO: checkExport dr $ KindRef (declRefSourceSpan dr) <$> findModuleKinds k
     for_ (M.lookup (qualify' name) (typeSynonyms env)) $ \(_, ty) ->
       checkExport dr (extract ty)
     for_ dctors $ \dctors' ->
@@ -609,7 +605,6 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     where
     exported e = any (exports e) exps
     exports (TypeRef _ pn1 _) (TypeRef _ pn2 _) = pn1 == pn2
-    exports (KindRef _ pn1) (KindRef _ pn2) = pn1 == pn2
     exports (ValueRef _ id1) (ValueRef _ id2) = id1 == id2
     exports (TypeClassRef _ pn1) (TypeClassRef _ pn2) = pn1 == pn2
     exports _ _ = False

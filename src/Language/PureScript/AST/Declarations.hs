@@ -303,10 +303,6 @@ data DeclarationRef
   --
   | ModuleRef SourceSpan ModuleName
   -- |
-  -- A named kind
-  --
-  | KindRef SourceSpan (ProperName 'TypeName)
-  -- |
   -- A value re-exported from another module. These will be inserted during
   -- elaboration in name desugaring.
   --
@@ -321,7 +317,6 @@ instance Eq DeclarationRef where
   (TypeClassRef _ name) == (TypeClassRef _ name') = name == name'
   (TypeInstanceRef _ name) == (TypeInstanceRef _ name') = name == name'
   (ModuleRef _ name) == (ModuleRef _ name') = name == name'
-  (KindRef _ name) == (KindRef _ name') = name == name'
   (ReExportRef _ mn ref) == (ReExportRef _ mn' ref') = mn == mn' && ref == ref'
   _ == _ = False
 
@@ -343,7 +338,6 @@ compDecRef (ValueOpRef _ name) (ValueOpRef _ name') = compare name name'
 compDecRef (TypeClassRef _ name) (TypeClassRef _ name') = compare name name'
 compDecRef (TypeInstanceRef _ ident) (TypeInstanceRef _ ident') = compare ident ident'
 compDecRef (ModuleRef _ name) (ModuleRef _ name') = compare name name'
-compDecRef (KindRef _ name) (KindRef _ name') = compare name name'
 compDecRef (ReExportRef _ name _) (ReExportRef _ name' _) = compare name name'
 compDecRef ref ref' = compare
   (orderOf ref) (orderOf ref')
@@ -354,7 +348,6 @@ compDecRef ref ref' = compare
       orderOf TypeRef{} = 2
       orderOf ValueRef{} = 3
       orderOf ValueOpRef{} = 4
-      orderOf KindRef{} = 5
       orderOf _ = 6
 
 declRefSourceSpan :: DeclarationRef -> SourceSpan
@@ -365,7 +358,6 @@ declRefSourceSpan (ValueOpRef ss _) = ss
 declRefSourceSpan (TypeClassRef ss _) = ss
 declRefSourceSpan (TypeInstanceRef ss _) = ss
 declRefSourceSpan (ModuleRef ss _) = ss
-declRefSourceSpan (KindRef ss _) = ss
 declRefSourceSpan (ReExportRef ss _ _) = ss
 
 declRefName :: DeclarationRef -> Name
@@ -376,7 +368,6 @@ declRefName (ValueOpRef _ n) = ValOpName n
 declRefName (TypeClassRef _ n) = TyClassName n
 declRefName (TypeInstanceRef _ n) = IdentName n
 declRefName (ModuleRef _ n) = ModName n
-declRefName (KindRef _ n) = TyName n
 declRefName (ReExportRef _ _ ref) = declRefName ref
 
 getTypeRef :: DeclarationRef -> Maybe (ProperName 'TypeName, Maybe [ProperName 'ConstructorName])
@@ -398,10 +389,6 @@ getValueOpRef _ = Nothing
 getTypeClassRef :: DeclarationRef -> Maybe (ProperName 'ClassName)
 getTypeClassRef (TypeClassRef _ name) = Just name
 getTypeClassRef _ = Nothing
-
-getKindRef :: DeclarationRef -> Maybe (ProperName 'TypeName)
-getKindRef (KindRef _ name) = Just name
-getKindRef _ = Nothing
 
 isModuleRef :: DeclarationRef -> Bool
 isModuleRef ModuleRef{} = True

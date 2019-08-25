@@ -28,7 +28,6 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Version (showVersion)
 import qualified Data.Map as M
-import qualified Data.Set as S
 import qualified Data.List.NonEmpty as NEL
 
 import Language.PureScript.AST
@@ -230,9 +229,6 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
       , nel <- maybeToList (M.lookup (Qualified (Just mn) ident) m2)
       , TypeClassDictionaryInScope{..} <- NEL.toList nel
       ]
-  toExternsDeclaration (KindRef _ pn)
-    | Qualified (Just mn) pn `S.member` kinds env
-    = [ EDType pn kindType ExternData ]
   toExternsDeclaration _ = []
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsImport)

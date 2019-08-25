@@ -1331,8 +1331,6 @@ prettyPrintRef (TypeInstanceRef _ ident) =
   Just $ showIdent ident
 prettyPrintRef (ModuleRef _ name) =
   Just $ "module " <> runModuleName name
-prettyPrintRef (KindRef _ pn) =
-  Just $ "kind " <> runProperName pn
 prettyPrintRef ReExportRef{} =
   Nothing
 

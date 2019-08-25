@@ -181,43 +181,43 @@ envModuleExports (_, _, exps) = exps
 -- The exported types from the @Prim@ module
 --
 primExports :: Exports
-primExports = mkPrimExports primTypes primClasses primKinds
+primExports = mkPrimExports primTypes primClasses
 
 -- |
 -- The exported types from the @Prim.Boolean@ module
 --
 primBooleanExports :: Exports
-primBooleanExports = mkPrimExports primBooleanTypes mempty primBooleanKinds
+primBooleanExports = mkPrimExports primBooleanTypes mempty
 
 -- |
 -- The exported types from the @Prim.Ordering@ module
 --
 primOrderingExports :: Exports
-primOrderingExports = mkPrimExports primOrderingTypes mempty primOrderingKinds
+primOrderingExports = mkPrimExports primOrderingTypes mempty
 
 -- |
 -- The exported types from the @Prim.Row@ module
 --
 primRowExports :: Exports
-primRowExports = mkPrimExports primRowTypes primRowClasses mempty
+primRowExports = mkPrimExports primRowTypes primRowClasses
 
 -- |
 -- The exported types from the @Prim.RowList@ module
 --
 primRowListExports :: Exports
-primRowListExports = mkPrimExports primRowListTypes primRowListClasses primRowListKinds
+primRowListExports = mkPrimExports primRowListTypes primRowListClasses
 
 -- |
 -- The exported types from the @Prim.Symbol@ module
 --
 primSymbolExports :: Exports
-primSymbolExports = mkPrimExports primSymbolTypes primSymbolClasses mempty
+primSymbolExports = mkPrimExports primSymbolTypes primSymbolClasses
 
 -- |
 -- The exported types from the @Prim.TypeError@ module
 --
 primTypeErrorExports :: Exports
-primTypeErrorExports = mkPrimExports primTypeErrorTypes primTypeErrorClasses primTypeErrorKinds
+primTypeErrorExports = mkPrimExports primTypeErrorTypes primTypeErrorClasses
 
 -- |
 -- Create a set of exports for a Prim module.
@@ -225,19 +225,15 @@ primTypeErrorExports = mkPrimExports primTypeErrorTypes primTypeErrorClasses pri
 mkPrimExports
   :: M.Map (Qualified (ProperName 'TypeName)) a
   -> M.Map (Qualified (ProperName 'ClassName)) b
-  -> S.Set (Qualified (ProperName 'TypeName))
   -> Exports
-mkPrimExports ts cs ks =
+mkPrimExports ts cs =
   nullExports
     { exportedTypes = M.fromList $ mkTypeEntry `map` M.keys ts
     , exportedTypeClasses = M.fromList $ mkClassEntry `map` M.keys cs
-    -- TODO
-    -- , exportedKinds = M.fromList $ mkKindEntry `map` S.toList ks
     }
   where
   mkTypeEntry (Qualified mn name) = (name, ([], primExportSource mn))
   mkClassEntry (Qualified mn name) = (name, primExportSource mn)
-  mkKindEntry (Qualified mn name) = (name, primExportSource mn)
 
   primExportSource mn =
     ExportSource
