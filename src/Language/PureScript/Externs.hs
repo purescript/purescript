@@ -130,6 +130,7 @@ data ExternsDeclaration =
       , edClassMembers            :: [(Ident, SourceType)]
       , edClassConstraints        :: [SourceConstraint]
       , edFunctionalDependencies  :: [FunctionalDependency]
+      , edIsEmpty                 :: Bool
       }
   -- | An instance declaration
   | EDInstance
@@ -151,7 +152,7 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   applyDecl env (EDTypeSynonym pn args ty) = env { typeSynonyms = M.insert (qual pn) (args, ty) (typeSynonyms env) }
   applyDecl env (EDDataConstructor pn dTy tNm ty nms) = env { dataConstructors = M.insert (qual pn) (dTy, tNm, ty, nms) (dataConstructors env) }
   applyDecl env (EDValue ident ty) = env { names = M.insert (Qualified (Just efModuleName) ident) (ty, External, Defined) (names env) }
-  applyDecl env (EDClass pn args members cs deps) = env { typeClasses = M.insert (qual pn) (makeTypeClassData args members cs deps) (typeClasses env) }
+  applyDecl env (EDClass pn args members cs deps tcIsEmpty) = env { typeClasses = M.insert (qual pn) (makeTypeClassData args members cs deps tcIsEmpty) (typeClasses env) }
   applyDecl env (EDInstance className ident tys cs ch idx) =
     env { typeClassDictionaries =
             updateMap
@@ -220,7 +221,7 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
     , Just (_, synTy) <- Qualified (Just mn) (coerceProperName className) `M.lookup` typeSynonyms env
     = [ EDType (coerceProperName className) kind TypeSynonym
       , EDTypeSynonym (coerceProperName className) typeClassArguments synTy
-      , EDClass className typeClassArguments typeClassMembers typeClassSuperclasses typeClassDependencies
+      , EDClass className typeClassArguments typeClassMembers typeClassSuperclasses typeClassDependencies typeClassIsEmpty
       ]
   toExternsDeclaration (TypeInstanceRef _ ident)
     = [ EDInstance tcdClassName ident tcdInstanceTypes tcdDependencies tcdChain tcdIndex

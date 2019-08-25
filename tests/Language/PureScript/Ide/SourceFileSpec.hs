@@ -28,7 +28,7 @@ synonym1 = P.TypeSynonymDeclaration ann1 (P.ProperName "Synonym1") [] P.srcREmpt
 class1 = P.TypeClassDeclaration ann1 (P.ProperName "Class1") [] [] [] []
 class2 = P.TypeClassDeclaration ann1 (P.ProperName "Class2") [] [] [] [member1]
 data1 = P.DataDeclaration ann1 P.Newtype (P.ProperName "Data1") [] []
-data2 = P.DataDeclaration ann1 P.Data (P.ProperName "Data2") [] [(P.ProperName "Cons1", [])]
+data2 = P.DataDeclaration ann1 P.Data (P.ProperName "Data2") [] [P.DataConstructorDeclaration ann2 (P.ProperName "Cons1") []]
 valueFixity =
   P.ValueFixityDeclaration
     ann1
@@ -60,7 +60,7 @@ spec = do
     it "extracts a span for a data declaration" $
       extractSpans data1 `shouldBe` [(IdeNamespaced IdeNSType "Data1", span1)]
     it "extracts spans for a data declaration and its constructors" $
-      extractSpans data2 `shouldBe` [(IdeNamespaced IdeNSType "Data2", span1), (IdeNamespaced IdeNSValue "Cons1", span1)]
+      extractSpans data2 `shouldBe` [(IdeNamespaced IdeNSType "Data2", span1), (IdeNamespaced IdeNSValue "Cons1", span2)]
     it "extracts a span for a value operator fixity declaration" $
       extractSpans valueFixity `shouldBe` [(IdeNamespaced IdeNSValue "<$>", span1)]
     it "extracts a span for a type operator fixity declaration" $

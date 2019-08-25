@@ -173,6 +173,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
     constrain cs ty = foldr srcConstrainedType ty (map (\(_, _, x) -> x) cs)
 
     -- Apply the substitution that was returned from runUnify to both types and (type-annotated) values
+
     tidyUp ts sub = first (map (second (first (second (overTypes (substituteType sub) *** substituteType sub))))) ts
 
     isHoleError :: ErrorMessage -> Bool
