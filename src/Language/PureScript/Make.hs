@@ -22,7 +22,7 @@ import           Data.Function (on)
 import           Data.Foldable (for_)
 import           Data.List (foldl', sortBy)
 import qualified Data.List.NonEmpty as NEL
-import           Data.Maybe (fromMaybe, mapMaybe)
+import           Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -41,6 +41,7 @@ import           Language.PureScript.Sugar
 import           Language.PureScript.TypeChecker
 import           Language.PureScript.Make.BuildPlan
 import qualified Language.PureScript.Make.BuildPlan as BuildPlan
+import qualified Language.PureScript.Make.Cache as Cache
 import           Language.PureScript.Make.Actions as Actions
 import           Language.PureScript.Make.Monad as Monad
 import qualified Language.PureScript.CoreFn as CF
@@ -99,18 +100,19 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
 
 -- | Compiles in "make" mode, compiling each module separately to a @.js@ file and an @externs.json@ file.
 --
--- If timestamps have not changed, the externs file can be used to provide the module's types without
--- having to typecheck the module again.
+-- If timestamps or hashes have not changed, existing externs files can be used to provide upstream modules' types without
+-- having to typecheck those modules again.
 make :: forall m. (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
      => MakeActions m
      -> [CST.PartialResult Module]
      -> m [ExternsFile]
 make ma@MakeActions{..} ms = do
   checkModuleNames
+  cacheDb <- readCacheDb
 
   (sorted, graph) <- sortModules (moduleSignature . CST.resPartial) ms
 
-  buildPlan <- BuildPlan.construct ma (sorted, graph)
+  (buildPlan, newCacheDb) <- BuildPlan.construct ma cacheDb (sorted, graph)
 
   let toBeRebuilt = filter (BuildPlan.needsRebuild buildPlan . getModuleName . CST.resPartial) sorted
   for_ toBeRebuilt $ \m -> fork $ do
@@ -122,21 +124,31 @@ make ma@MakeActions{..} ms = do
       (deps `inOrderOf` map (getModuleName . CST.resPartial) sorted)
 
   -- Wait for all threads to complete, and collect results (and errors).
-  results <- BuildPlan.collectResults buildPlan
+  (failures, successes) <-
+    let
+      splitResults = \case
+        BuildJobSucceeded _ exts ->
+          Right exts
+        BuildJobFailed errs ->
+          Left errs
+        BuildJobSkipped ->
+          Left mempty
+    in
+      M.mapEither splitResults <$> BuildPlan.collectResults buildPlan
+
+  -- Write the updated build cache database to disk
+  writeCacheDb $ Cache.removeModules (M.keysSet failures) newCacheDb
 
   -- All threads have completed, rethrow any caught errors.
-  let errors = mapMaybe buildJobFailure $ M.elems results
+  let errors = M.elems failures
   unless (null errors) $ throwError (mconcat errors)
 
   -- Here we return all the ExternsFile in the ordering of the topological sort,
   -- so they can be folded into an Environment. This result is used in the tests
   -- and in PSCI.
   let lookupResult mn =
-        snd
-        . fromMaybe (internalError "make: module's build job did not succeed")
-        . buildJobSuccess
-        . fromMaybe (internalError "make: module not found in results")
-        $ M.lookup mn results
+        fromMaybe (internalError "make: module not found in results")
+        $ M.lookup mn successes
   return (map (lookupResult . getModuleName . CST.resPartial) sorted)
 
   where
