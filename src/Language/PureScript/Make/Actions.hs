@@ -251,11 +251,8 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 
   writeTextFile :: FilePath -> B.ByteString -> Make ()
   writeTextFile path text = makeIO (const (cannotWriteFile path)) $ do
-    mkdirp path
+    createParentDirectory path
     B.writeFile path text
-    where
-    mkdirp :: FilePath -> IO ()
-    mkdirp = createDirectoryIfMissing True . takeDirectory
 
   progress :: ProgressMessage -> Make ()
   progress = liftIO . putStrLn . renderProgressMessage
@@ -276,8 +273,12 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   writeCacheDb :: CacheDb -> Make ()
   writeCacheDb db = do
     let path = outputDir </> cacheDbFile
-    makeIO (const (cannotWriteFile path)) $
+    makeIO (const (cannotWriteFile path)) $ do
+      createParentDirectory path
       Aeson.encodeFile path db
+
+  createParentDirectory :: FilePath -> IO ()
+  createParentDirectory = createDirectoryIfMissing True . takeDirectory
 
   cannotWriteFile = ErrorMessage [] . CannotWriteFile
   cannotReadFile = ErrorMessage [] . CannotReadFile
