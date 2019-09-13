@@ -10,6 +10,7 @@ import           Prelude.Compat
 import           Protolude (ordNub)
 
 import           Control.Arrow ((&&&))
+import           Control.Exception (displayException)
 import           Control.Monad
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Trans.State.Lazy
@@ -85,9 +86,7 @@ errorCode em = case unwrapErrorMessage em of
   MissingFFIImplementations{} -> "MissingFFIImplementations"
   UnusedFFIImplementations{} -> "UnusedFFIImplementations"
   InvalidFFIIdentifier{} -> "InvalidFFIIdentifier"
-  CannotGetFileInfo{} -> "CannotGetFileInfo"
-  CannotReadFile{} -> "CannotReadFile"
-  CannotWriteFile{} -> "CannotWriteFile"
+  FileIOError{} -> "FileIOError"
   InfiniteType{} -> "InfiniteType"
   InfiniteKind{} -> "InfiniteKind"
   MultipleValueOpFixities{} -> "MultipleValueOpFixities"
@@ -465,17 +464,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                   else
                     "Make sure the source file exists, and that it has been provided as an input to the compiler."
             ]
-    renderSimpleErrorMessage (CannotGetFileInfo path) =
-      paras [ line "Unable to read file info: "
-            , indent . lineS $ path
-            ]
-    renderSimpleErrorMessage (CannotReadFile path) =
-      paras [ line "Unable to read file: "
-            , indent . lineS $ path
-            ]
-    renderSimpleErrorMessage (CannotWriteFile path) =
-      paras [ line "Unable to write file: "
-            , indent . lineS $ path
+    renderSimpleErrorMessage (FileIOError doWhat err) =
+      paras [ line $ "I/O error while trying to " <> doWhat
+            , indent . lineS $ displayException err
             ]
     renderSimpleErrorMessage (ErrorParsingFFIModule path extra) =
       paras $ [ line "Unable to parse foreign module:"

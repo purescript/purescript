@@ -75,9 +75,7 @@ data SimpleErrorMessage
   | MissingFFIImplementations ModuleName [Ident]
   | UnusedFFIImplementations ModuleName [Ident]
   | InvalidFFIIdentifier ModuleName Text
-  | CannotGetFileInfo FilePath
-  | CannotReadFile FilePath
-  | CannotWriteFile FilePath
+  | FileIOError Text IOError -- ^ A description of what we were trying to do, and the error which occurred
   | InfiniteType SourceType
   | InfiniteKind SourceKind
   | MultipleValueOpFixities (OpName 'ValueOpName)
