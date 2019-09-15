@@ -616,7 +616,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , markCodeBox $ indent $ typeAsBox prettyDepth ty
             ]
     renderSimpleErrorMessage (TypesDoNotUnify u1 u2)
-      = let (row1Box, row2Box) = printRows u1 u2
+      = let (row1Box, row2Box) = printRows full u1 u2
 
         in paras [ line "Could not match type"
                  , row1Box
@@ -1049,7 +1049,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =
-      let (row1Box, row2Box) = printRows t1 t2
+      let (row1Box, row2Box) = printRows full t1 t2
       in paras [ detail
             , Box.hsep 1 Box.top [ line "while trying to match type"
                                  , row1Box
@@ -1190,11 +1190,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     printRow f t = markCodeBox $ indent $ f prettyDepth t
 
     -- If both rows are not empty, print them as diffs
-    printRows :: Type a -> Type a -> (Box.Box, Box.Box)
-    printRows r1@RCons{} r2@RCons{} = let
+    -- If verbose print all rows else only print unique rows
+    printRows :: Bool -> Type a -> Type a -> (Box.Box, Box.Box)
+    printRows True r1@RCons{} r2@RCons{} = (printRow typeDiffAsBox r1, printRow typeDiffAsBox r2)
+    printRows False r1@RCons{} r2@RCons{} = let
       (sorted1, sorted2) = filterRows (rowToList r1) (rowToList r2)
       in (printRow typeDiffAsBox sorted1, printRow typeDiffAsBox sorted2)
-    printRows r1 r2 = (printRow typeAsBox r1, printRow typeAsBox r2)
+    printRows _ r1 r2 = (printRow typeAsBox r1, printRow typeAsBox r2)
 
     -- Keep the unique labels only
     filterRows :: ([RowListItem a], Type a) -> ([RowListItem a], Type a) -> (Type a, Type a)
