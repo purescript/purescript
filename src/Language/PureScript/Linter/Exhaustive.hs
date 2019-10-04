@@ -28,7 +28,7 @@ import Language.PureScript.AST.Binders
 import Language.PureScript.AST.Declarations
 import Language.PureScript.AST.Literals
 import Language.PureScript.Crash
-import Language.PureScript.Environment
+import Language.PureScript.Environment hiding (tyVar)
 import Language.PureScript.Errors
 import Language.PureScript.Names as P
 import Language.PureScript.Pretty.Values (prettyPrintBinderAtom)

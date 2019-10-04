@@ -161,7 +161,7 @@ primKindOf g title comments =
           , declComments = Just comments
           , declSourceSpan = Nothing
           , declChildren = []
-          , declInfo = ExternKindDeclaration
+          , declInfo = undefined -- TODO: ExternKindDeclaration
           }
     else P.internalError $ "Docs.Prim: No such Prim kind: " ++ T.unpack title
 

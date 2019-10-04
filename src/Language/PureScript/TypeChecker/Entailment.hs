@@ -45,6 +45,9 @@ import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString, mkString, decodeString)
 import qualified Language.PureScript.Constants as C
 
+import Debug.Trace
+import Language.PureScript.Pretty.Types
+
 -- | Describes what sort of dictionary to generate for type class instances
 data Evidence
   -- | An existing named instance
@@ -202,6 +205,15 @@ entails SolverOptions{..} constraint context hints =
             -- apply the latest substitution.
             latestSubst <- lift . lift $ gets checkSubstitution
             let tys'' = map (substituteType latestSubst) tys'
+
+            traceM $ unlines
+              [ "solve"
+              , "  " <> show className'
+              , foldr (<>) "" $ fmap (("  " <>) . prettyPrintType 100 . fmap (const ())) tys'
+              , "  "
+              , foldr (<>) "" $ fmap (("  " <>) . prettyPrintType 100 . fmap (const ())) tys''
+              ]
+
             -- Get the inferred constraint context so far, and merge it with the global context
             inferred <- lift get
             -- We need information about functional dependencies, so we have to look up the class
@@ -554,6 +566,8 @@ matches deps TypeClassDictionaryInScope{..} tys =
     typeHeadsAreEqual :: Type a -> Type a -> (Matched (), Matching [Type a])
     typeHeadsAreEqual (KindedType _  t1 _) t2                                  = typeHeadsAreEqual t1 t2
     typeHeadsAreEqual t1                     (KindedType _ t2 _)               = typeHeadsAreEqual t1 t2
+    typeHeadsAreEqual (KindApp _ t1 _)       t2                                = typeHeadsAreEqual t1 t2
+    typeHeadsAreEqual t1                     (KindApp _ t2 _)                  = typeHeadsAreEqual t1 t2
     typeHeadsAreEqual (TUnknown _ u1)        (TUnknown _ u2)      | u1 == u2   = (Match (), M.empty)
     typeHeadsAreEqual (Skolem _ _ s1 _)      (Skolem _ _ s2 _)    | s1 == s2   = (Match (), M.empty)
     typeHeadsAreEqual t                      (TypeVar _ v)                     = (Match (), M.singleton v [t])
@@ -570,6 +584,8 @@ matches deps TypeClassDictionaryInScope{..} tys =
         go :: ([RowListItem a], Type a) -> ([RowListItem a], Type a) -> (Matched (), Matching [Type a])
         go (l,  KindedType _ t1 _) (r,  t2)                            = go (l, t1) (r, t2)
         go (l,  t1)                (r,  KindedType _ t2 _)             = go (l, t1) (r, t2)
+        go (l,  KindApp _ t1 _)    (r,  t2)                            = go (l, t1) (r, t2)
+        go (l,  t1)                (r,  KindApp _ t2 _)                = go (l, t1) (r, t2)
         go ([], REmpty _)          ([], REmpty _)                      = (Match (), M.empty)
         go ([], TUnknown _ u1)     ([], TUnknown _ u2)      | u1 == u2 = (Match (), M.empty)
         go ([], TypeVar _ v1)      ([], TypeVar _ v2)       | v1 == v2 = (Match (), M.empty)

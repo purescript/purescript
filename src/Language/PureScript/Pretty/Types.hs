@@ -45,6 +45,7 @@ data PrettyPrintType
   | PPTypeOp (Qualified (OpName 'TypeOpName))
   | PPSkolem Text Int
   | PPTypeApp PrettyPrintType PrettyPrintType
+  | PPKindApp PrettyPrintType PrettyPrintType
   | PPConstrainedType PrettyPrintConstraint PrettyPrintType
   | PPKindedType PrettyPrintType PrettyPrintType
   | PPBinaryNoParensType PrettyPrintType PrettyPrintType PrettyPrintType
@@ -79,6 +80,7 @@ convertPrettyPrintType = go
   go d ty@RCons{} = uncurry PPRow (goRow d ty)
   go d (ForAll _ v mbK ty _) = goForAll d [(v, fmap (go (d-1)) mbK)] ty
   go d (TypeApp _ a b) = goTypeApp d a b
+  go d (KindApp _ a b) = PPKindApp (go (d-1) a) (go (d-1) b)
 
   goForAll d vs (ForAll _ v mbK ty _) = goForAll d ((v, fmap (go (d-1)) mbK) : vs) ty
   goForAll d vs ty = PPForAll vs (go (d-1) ty)
@@ -142,6 +144,12 @@ typeApp = mkPattern match
   match (PPTypeApp f x) = Just (f, x)
   match _ = Nothing
 
+kindApp :: Pattern () PrettyPrintType (PrettyPrintType, PrettyPrintType)
+kindApp = mkPattern match
+  where
+  match (PPKindApp f x) = Just (f, x)
+  match _ = Nothing
+
 appliedFunction :: Pattern () PrettyPrintType (PrettyPrintType, PrettyPrintType)
 appliedFunction = mkPattern match
   where
@@ -178,7 +186,7 @@ matchTypeAtom tro@TypeRenderOptions{troSuggesting = suggesting} =
       match (PPTypeConstructor ctor) = Just $ text $ T.unpack $ runProperName $ disqualify ctor
       match (PPTUnknown u)
         | suggesting = Just $ text "_"
-        | otherwise = Just $ text $ 't' : show u
+        | otherwise = Just $ text $ '?' : show u
       match (PPSkolem name s)
         | suggesting =  Just $ text $ T.unpack name
         | otherwise = Just $ text $ T.unpack name ++ show s
@@ -195,9 +203,10 @@ matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
   operators :: OperatorTable () PrettyPrintType Box
   operators =
     OperatorTable [ [ AssocL typeApp $ \f x -> keepSingleLinesOr (moveRight 2) f x ]
+                  , [ AssocL kindApp $ \f x -> keepSingleLinesOr (moveRight 2) f (text "@" <> x) ]
                   , [ AssocR appliedFunction $ \arg ret -> keepSingleLinesOr id arg (text rightArrow <> " " <> ret) ]
                   , [ Wrap constrained $ \deps ty -> constraintsAsBox tro deps ty ]
-                  , [ Wrap forall_ $ \idents ty -> keepSingleLinesOr (moveRight 2) (text (forall' ++ " " ++ unwords (fmap printMbKindedType idents) ++ ".")) ty ]
+                  , [ Wrap forall_ $ \idents ty -> keepSingleLinesOr (moveRight 2) (hsep 1 top (text forall' : fmap printMbKindedType idents) <> text ".") ty ]
                   , [ Wrap kinded $ \ty k -> keepSingleLinesOr (moveRight 2) (typeAsBox' ty) (text (doubleColon ++ " ") <> k) ]
                   , [ Wrap explicitParens $ \_ ty -> ty ]
                   ]
@@ -205,7 +214,9 @@ matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
   rightArrow = if troUnicode tro then "→" else "->"
   forall' = if troUnicode tro then "∀" else "forall"
   doubleColon = if troUnicode tro then "∷" else "::"
-  printMbKindedType (v, mbK) = maybe v (\k -> unwords ["(" ++ v, doubleColon, render (typeAsBox' k) ++ ")"]) mbK
+
+  printMbKindedType (v, Nothing) = text v
+  printMbKindedType (v, Just k) = text ("(" ++ v ++ " " ++ doubleColon ++ " ") <> typeAsBox' k <> text ")"
 
   -- If both boxes span a single line, keep them on the same line, or else
   -- use the specified function to modify the second box, then combine vertically.
@@ -217,7 +228,7 @@ matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
 forall_ :: Pattern () PrettyPrintType ([(String, Maybe PrettyPrintType)], PrettyPrintType)
 forall_ = mkPattern match
   where
-  match (PPForAll idents ty) = Just (map (\(v, mbK) -> (T.unpack v, mbK)) idents, ty)
+  match (PPForAll idents ty) = Just (reverse $ map (\(v, mbK) -> (T.unpack v, mbK)) idents, ty)
   match _ = Nothing
 
 typeAtomAsBox' :: PrettyPrintType -> Box

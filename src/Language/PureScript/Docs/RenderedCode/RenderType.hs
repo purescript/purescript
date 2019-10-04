@@ -17,7 +17,6 @@ import Control.Arrow ((<+>))
 import Control.PatternArrows as PA
 
 import Language.PureScript.Crash
-import Language.PureScript.Kinds
 import Language.PureScript.Label
 import Language.PureScript.Names
 import Language.PureScript.Pretty.Types
@@ -26,7 +25,6 @@ import Language.PureScript.PSString (prettyPrintString)
 
 import Language.PureScript.Docs.RenderedCode.Types
 import Language.PureScript.Docs.Utils.MonoidExtras
-import Language.PureScript.Docs.RenderedCode.RenderKind (renderKind)
 
 typeLiterals :: Pattern () PrettyPrintType RenderedCode
 typeLiterals = mkPattern match
@@ -94,6 +92,12 @@ typeApp = mkPattern match
   match (PPTypeApp f x) = Just (f, x)
   match _ = Nothing
 
+kindApp :: Pattern () PrettyPrintType (PrettyPrintType, PrettyPrintType)
+kindApp = mkPattern match
+  where
+  match (PPKindApp f x) = Just (f, x)
+  match _ = Nothing
+
 appliedFunction :: Pattern () PrettyPrintType (PrettyPrintType, PrettyPrintType)
 appliedFunction = mkPattern match
   where
@@ -129,6 +133,7 @@ matchType = buildPrettyPrinter operators matchTypeAtom
   operators :: OperatorTable () PrettyPrintType RenderedCode
   operators =
     OperatorTable [ [ AssocL typeApp $ \f x -> f <> sp <> x ]
+                  , [ AssocL kindApp $ \f x -> f <> sp <> syntax "@(" <> x <> syntax ")" ] -- TODO
                   , [ AssocR appliedFunction $ \arg ret -> mintersperse sp [arg, syntax "->", ret] ]
                   , [ Wrap constrained $ \deps ty -> renderConstraints deps ty ]
                   , [ Wrap forall_ $ \tyVars ty -> mconcat [ keywordForall, sp, renderTypeVars tyVars, syntax ".", sp, ty ] ]

@@ -79,28 +79,10 @@ spec = do
     it "extracts no modules by filtering `type` namespaces" $
       runNamespace (Set.fromList [IdeNSType])
         [moduleA, moduleB] `shouldBe` []
-    it "extracts modules by filtering `kind` namespaces" $
-      runNamespace (Set.fromList [IdeNSKind])
-        [moduleA, moduleB, moduleD] `shouldBe` [moduleD]
-    it "extracts no modules by filtering `kind` namespaces" $
-      runNamespace (Set.fromList [IdeNSKind])
-        [moduleA, moduleB] `shouldBe` []
     it "extracts modules by filtering `value` and `type` namespaces" $
       runNamespace (Set.fromList [ IdeNSValue, IdeNSType])
         [moduleA, moduleB, moduleC, moduleD]
         `shouldBe` [moduleA, moduleB, moduleC]
-    it "extracts modules by filtering `value` and `kind` namespaces" $
-      runNamespace (Set.fromList [ IdeNSValue, IdeNSKind])
-        [moduleA, moduleB, moduleC, moduleD]
-        `shouldBe` [moduleA, moduleB, moduleD]
-    it "extracts modules by filtering `type` and `kind` namespaces" $
-      runNamespace (Set.fromList [ IdeNSType, IdeNSKind])
-        [moduleA, moduleB, moduleC, moduleD]
-        `shouldBe` [moduleC, moduleD]
-    it "extracts modules by filtering `value`, `type` and `kind` namespaces" $
-      runNamespace (Set.fromList [ IdeNSValue, IdeNSType, IdeNSKind])
-        [moduleA, moduleB, moduleC, moduleD]
-        `shouldBe` [moduleA, moduleB, moduleC, moduleD]
   describe "declarationTypeFilter" $ do
     it "extracts modules by filtering `value` declarations" $
       runDeclaration [D.Value]

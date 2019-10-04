@@ -297,14 +297,13 @@ encodeImport (P.runModuleName -> mn, importType, map P.runModuleName -> qualifie
              ] ++ map (\x -> "qualifier" .= x) (maybeToList qualifier)
 
 -- | Denotes the different namespaces a name in PureScript can reside in.
-data IdeNamespace = IdeNSValue | IdeNSType | IdeNSKind | IdeNSModule
+data IdeNamespace = IdeNSValue | IdeNSType | IdeNSModule
   deriving (Show, Eq, Ord, Generic, NFData)
 
 instance FromJSON IdeNamespace where
   parseJSON (String s) = case s of
     "value" -> pure IdeNSValue
     "type" -> pure IdeNSType
-    "kind" -> pure IdeNSKind
     "module" -> pure IdeNSModule
     _       -> mzero
   parseJSON _ = mzero

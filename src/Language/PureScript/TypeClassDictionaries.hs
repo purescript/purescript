@@ -12,7 +12,7 @@ import Data.Text (Text, pack)
 import Language.PureScript.Names
 import Language.PureScript.Types
 
--- |
+--
 -- Data representing a type class dictionary which is in scope
 --
 data TypeClassDictionaryInScope v

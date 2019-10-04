@@ -248,7 +248,6 @@ makeFragment ns = (prefix <>) . escape
   prefix = case ns of
     TypeLevel -> "#t:"
     ValueLevel -> "#v:"
-    KindLevel -> "#k:"
 
   -- TODO
   escape = id

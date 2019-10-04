@@ -59,8 +59,6 @@ findExportable (Module _ _ mn ds _) =
     exportTypeOp ss exps op source
   updateExports exps (ExternDeclaration (ss, _) name _) =
     exportValue ss exps name source
-  updateExports exps (ExternKindDeclaration (ss, _) pn) =
-    exportType ss Internal exps pn [] source
   updateExports exps _ = return exps
 
 -- |

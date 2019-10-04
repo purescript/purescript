@@ -185,11 +185,6 @@ data DeclarationInfo
   -- operator's fixity.
   --
   | AliasDeclaration P.Fixity FixityAlias
-
-  -- |
-  -- A kind declaration
-  --
-  | ExternKindDeclaration
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData DeclarationInfo
@@ -219,7 +214,6 @@ declInfoToString (ExternDataDeclaration _) = "externData"
 declInfoToString (TypeSynonymDeclaration _ _) = "typeSynonym"
 declInfoToString (TypeClassDeclaration _ _ _) = "typeClass"
 declInfoToString (AliasDeclaration _ _) = "alias"
-declInfoToString ExternKindDeclaration = "kind"
 
 declInfoNamespace :: DeclarationInfo -> Namespace
 declInfoNamespace = \case
@@ -235,8 +229,6 @@ declInfoNamespace = \case
     TypeLevel
   AliasDeclaration _ alias ->
     either (const TypeLevel) (const ValueLevel) (P.disqualify alias)
-  ExternKindDeclaration{} ->
-    KindLevel
 
 isTypeClass :: Declaration -> Bool
 isTypeClass Declaration{..} =
@@ -268,12 +260,6 @@ isTypeAlias :: Declaration -> Bool
 isTypeAlias Declaration{..} =
   case declInfo of
     AliasDeclaration _ (P.Qualified _ d) -> isLeft d
-    _ -> False
-
-isKind :: Declaration -> Bool
-isKind Declaration{..} =
-  case declInfo of
-    ExternKindDeclaration{} -> True
     _ -> False
 
 -- | Discard any children which do not satisfy the given predicate.
@@ -650,8 +636,6 @@ asDeclarationInfo = do
     "alias" ->
       AliasDeclaration <$> key "fixity" asFixity
                        <*> key "alias" asFixityAlias
-    "kind" ->
-      pure ExternKindDeclaration
     other ->
       throwCustomError (InvalidDeclarationType other)
 
@@ -820,7 +804,6 @@ instance A.ToJSON DeclarationInfo where
       TypeSynonymDeclaration args ty -> ["arguments" .= args, "type" .= ty]
       TypeClassDeclaration args super fundeps -> ["arguments" .= args, "superclasses" .= super, "fundeps" .= fundeps]
       AliasDeclaration fixity alias -> ["fixity" .= fixity, "alias" .= alias]
-      ExternKindDeclaration -> []
 
 instance A.ToJSON ChildDeclarationInfo where
   toJSON info = A.object $ "declType" .= childDeclInfoToString info : props

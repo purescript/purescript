@@ -21,15 +21,19 @@ import qualified Data.List.NonEmpty as NEL
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment
 import Language.PureScript.Errors
-import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 
--- | A substitution of unification variables for types or kinds
+newtype UnkLevel = UnkLevel (NEL.NonEmpty Int)
+  deriving (Eq, Ord, Show)
+
+-- | A substitution of unification variables for types.
 data Substitution = Substitution
-  { substType :: M.Map Int SourceType -- ^ Type substitution
-  , substKind :: M.Map Int SourceKind -- ^ Kind substitution
+  { substType :: M.Map Int SourceType
+  -- ^ Type substitution
+  , substUnsolved :: M.Map Int (UnkLevel, SourceType)
+  -- ^ Unsolved unification variables with their level (scope ordering) and kind
   }
 
 -- | An empty substitution
@@ -42,8 +46,6 @@ data CheckState = CheckState
   -- ^ The current @Environment@
   , checkNextType :: Int
   -- ^ The next type unification variable
-  , checkNextKind :: Int
-  -- ^ The next kind unification variable
   , checkNextSkolem :: Int
   -- ^ The next skolem variable
   , checkNextSkolemScope :: Int
@@ -61,7 +63,7 @@ data CheckState = CheckState
 
 -- | Create an empty @CheckState@
 emptyCheckState :: Environment -> CheckState
-emptyCheckState env = CheckState env 0 0 0 0 Nothing emptySubstitution []
+emptyCheckState env = CheckState env 0 0 0 Nothing emptySubstitution []
 
 -- | Unification variables
 type Unknown = Int

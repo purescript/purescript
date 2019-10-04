@@ -102,6 +102,7 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
             combinedErrors = if S.member tv nowUnused then errors <> errorMessage' ss (UnusedTypeVar tv) else errors
         in (restoredUnused, combinedErrors)
       go unused (TypeApp _ f x) = go unused f `combine` go unused x
+      go unused (KindApp _ f x) = go unused f `combine` go unused x
       go unused (ConstrainedType _ c t1) = foldl combine (unused, mempty) $ map (go unused) (constraintArgs c <> [t1])
       go unused (RCons _ _ t1 rest) = go unused t1 `combine` go unused rest
       go unused (KindedType _ t1 _) = go unused t1

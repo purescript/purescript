@@ -378,7 +378,7 @@ primTypes =
   M.fromList
     [ (primName "Type",             (kindType, ExternData))
     , (primName "Symbol",           (kindType, ExternData))
-    , (primName "Row",              (tyForall "a" kindType (tyVar "a" -:> kindType), ExternData))
+    , (primName "Row",              (kindType -:> kindType, ExternData))
     , (primName "Constraint",       (kindType, ExternData))
     , (primName "ConstrainedValue", (kindConstraint -:> kindType -:> kindType, ExternData))
     , (primName "Function",         (kindType -:> kindType -:> kindType, ExternData))
@@ -432,7 +432,7 @@ primRowTypes =
 primRowListTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primRowListTypes =
   M.fromList
-    [ (primSubName C.moduleRowList "RowList", (tyForall "k" kindType $ tyVar "k" -:> kindType, ExternData))
+    [ (primSubName C.moduleRowList "RowList", (kindType -:> kindType, ExternData))
     , (primSubName C.moduleRowList "Cons", (tyForall "k" kindType $ kindSymbol -:> tyVar "k" -:> kindRowList (tyVar "k") -:> kindRowList (tyVar "k"), ExternData))
     , (primSubName C.moduleRowList "Nil", (tyForall "k" kindType $ kindRowList (tyVar "k"), ExternData))
     , (primSubName C.moduleRowList "RowToList",  (tyForall "k" kindType $ kindRow (tyVar "k") -:> kindRowList (tyVar "k") -:> kindConstraint, ExternData))

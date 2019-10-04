@@ -33,13 +33,17 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Linter
 import Language.PureScript.Names
+import Language.PureScript.TypeChecker.Kinds as T
 import Language.PureScript.TypeChecker.Monad as T
 import Language.PureScript.TypeChecker.Synonyms as T
 import Language.PureScript.TypeChecker.Types as T
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 
-import Lens.Micro.Platform ((^..), _2, _3)
+import Lens.Micro.Platform ((^..), _2)
+
+import Language.PureScript.Pretty.Types
+import Debug.Trace
 
 addDataType
   :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
@@ -47,33 +51,30 @@ addDataType
   -> DataDeclType
   -> ProperName 'TypeName
   -> [(Text, Maybe SourceType)]
-  -> [DataConstructorDeclaration]
+  -> [(DataConstructorDeclaration, SourceType)]
   -> SourceType
   -> m ()
 addDataType moduleName dtype name args dctors ctorKind = do
   env <- getEnv
   let mapDataCtor (DataConstructorDeclaration _ ctorName vars) = (ctorName, snd <$> vars)
-  putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (ctorKind, DataType args (map mapDataCtor dctors)) (types env) }
-  for_ dctors $ \(DataConstructorDeclaration _ dctor fields) ->
+  putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (ctorKind, DataType args (map (mapDataCtor . fst) dctors)) (types env) }
+  for_ dctors $ \(DataConstructorDeclaration _ dctor fields, polyType) ->
     warnAndRethrow (addHint (ErrorInDataConstructor dctor)) $
-      addDataConstructor moduleName dtype name (map fst args) dctor fields
+      addDataConstructor moduleName dtype name dctor fields polyType
 
 addDataConstructor
   :: (MonadState CheckState m, MonadError MultipleErrors m)
   => ModuleName
   -> DataDeclType
   -> ProperName 'TypeName
-  -> [Text]
   -> ProperName 'ConstructorName
   -> [(Ident, SourceType)]
+  -> SourceType
   -> m ()
-addDataConstructor moduleName dtype name args dctor dctorArgs = do
+addDataConstructor moduleName dtype name dctor dctorArgs polyType = do
   let (fields, tys) = unzip dctorArgs
   env <- getEnv
   traverse_ checkTypeSynonyms tys
-  let retTy = foldl srcTypeApp (srcTypeConstructor (Qualified (Just moduleName) name)) (map srcTypeVar args)
-  let dctorTy = foldr function retTy tys
-  let polyType = mkForAll (map (\i -> (NullSourceAnn, (i, Nothing))) args) dctorTy
   putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (dtype, name, polyType, fields) (dataConstructors env) }
 
 addTypeSynonym
@@ -87,6 +88,12 @@ addTypeSynonym
 addTypeSynonym moduleName name args ty kind = do
   env <- getEnv
   checkTypeSynonyms ty
+  traceM $ unlines
+    [ "addTypeSynonym"
+    , "  " <> show name
+    , "  " <> prettyPrintType 100 kind
+    , "  " <> show (fmap (const ()) kind)
+    ]
   putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (kind, TypeSynonym) (types env)
                , typeSynonyms = M.insert (Qualified (Just moduleName) name) (args, ty) (typeSynonyms env) }
 
@@ -241,39 +248,39 @@ typeCheckAll moduleName _ = traverse go
     warnAndRethrow (addHint (ErrorInTypeConstructor name) . addHint (positionedError ss)) $ do
       when (dtype == Newtype) $ checkNewtype name dctors
       checkDuplicateTypeArguments $ map fst args
-      ctorKind <- undefined -- TODO: kindsOf True moduleName name args (concatMap (fmap snd . dataCtorFields) dctors)
+      (dataCtors, ctorKind) <- kindOfData moduleName (sa, name, args, dctors)
       let args' = args `withKinds` ctorKind
-      addDataType moduleName dtype name args' dctors ctorKind
+      addDataType moduleName dtype name args' dataCtors ctorKind
     return $ DataDeclaration sa dtype name args dctors
   go (d@(DataBindingGroupDeclaration tys)) = do
     let tysList = NEL.toList tys
         syns = mapMaybe toTypeSynonym tysList
         dataDecls = mapMaybe toDataDecl tysList
-        bindingGroupNames = ordNub ((syns^..traverse._2) ++ (dataDecls^..traverse._3))
+        bindingGroupNames = ordNub ((syns^..traverse._2) ++ (dataDecls^..traverse._2._2))
         sss = fmap declSourceSpan tys
     warnAndRethrow (addHint (ErrorInDataBindingGroup bindingGroupNames) . addHint (PositionedError sss)) $ do
-      (syn_ks, data_ks) <- undefined -- TODO: kindsOfAll moduleName syns (map (\(sa, _, name, args, dctors) -> (sa, name, args, concatMap (fmap snd . dataCtorFields) dctors)) dataDecls)
-      for_ (zip dataDecls data_ks) $ \((_, dtype, name, args, dctors), ctorKind) -> do
+      (syn_ks, data_ks) <- kindsOfAll moduleName syns (fmap snd dataDecls)
+      for_ (zip dataDecls data_ks) $ \((dtype, (_, name, args, dctors)), (dataCtors, ctorKind)) -> do
         when (dtype == Newtype) $ checkNewtype name dctors
         checkDuplicateTypeArguments $ map fst args
         let args' = args `withKinds` ctorKind
-        addDataType moduleName dtype name args' dctors ctorKind
-      for_ (zip syns syn_ks) $ \((_, name, args, ty), kind) -> do
+        addDataType moduleName dtype name args' dataCtors ctorKind
+      for_ (zip syns syn_ks) $ \((_, name, args, _), (elabTy, kind)) -> do
         checkDuplicateTypeArguments $ map fst args
         let args' = args `withKinds` kind
-        addTypeSynonym moduleName name args' ty kind
+        addTypeSynonym moduleName name args' elabTy kind
     return d
     where
     toTypeSynonym (TypeSynonymDeclaration sa nm args ty) = Just (sa, nm, args, ty)
     toTypeSynonym _ = Nothing
-    toDataDecl (DataDeclaration sa dtype nm args dctors) = Just (sa, dtype, nm, args, dctors)
+    toDataDecl (DataDeclaration sa dtype nm args dctors) = Just (dtype, (sa, nm, args, dctors))
     toDataDecl _ = Nothing
   go (TypeSynonymDeclaration sa@(ss, _) name args ty) = do
     warnAndRethrow (addHint (ErrorInTypeSynonym name) . addHint (positionedError ss) ) $ do
       checkDuplicateTypeArguments $ map fst args
-      kind <- undefined -- TODO: kindsOf False moduleName name args [ty]
+      (elabTy, kind) <- kindOfTypeSynonym moduleName (sa, name, args, ty)
       let args' = args `withKinds` kind
-      addTypeSynonym moduleName name args' ty kind
+      addTypeSynonym moduleName name args' elabTy kind
     return $ TypeSynonymDeclaration sa name args ty
   go TypeDeclaration{} =
     internalError "Type declarations should have been removed before typeCheckAlld"
@@ -312,11 +319,11 @@ typeCheckAll moduleName _ = traverse go
   go (d@(ExternDeclaration (ss, _) name ty)) = do
     warnAndRethrow (addHint (ErrorInForeignImport name) . addHint (positionedError ss)) $ do
       env <- getEnv
-      kind <- undefined -- TODO: kindOf ty
+      (elabTy, kind) <- kindOf ty
       guardWith (errorMessage (ExpectedType ty kind)) $ kind == kindType
       case M.lookup (Qualified (Just moduleName) name) (names env) of
         Just _ -> throwError . errorMessage $ RedefinedIdent name
-        Nothing -> putEnv (env { names = M.insert (Qualified (Just moduleName) name) (ty, External, Defined) (names env) })
+        Nothing -> putEnv (env { names = M.insert (Qualified (Just moduleName) name) (elabTy, External, Defined) (names env) })
     return d
   go d@FixityDeclaration{} = return d
   go d@ImportDeclaration{} = return d
@@ -488,11 +495,11 @@ typeCheckAll moduleName _ = traverse go
   -- extracted from the kind of the type constructor itself.
   --
   withKinds :: [(Text, Maybe SourceType)] -> SourceType -> [(Text, Maybe SourceType)]
-  withKinds = undefined -- TODO
-  -- withKinds []                  _               = []
-  -- withKinds (s@(_, Just _ ):ss) (FunKind _ _   k) = s : withKinds ss k
-  -- withKinds (  (s, Nothing):ss) (FunKind _ k1 k2) = (s, Just k1) : withKinds ss k2
-  -- withKinds _                   _                 = internalError "Invalid arguments to peelKinds"
+  withKinds [] _ = []
+  withKinds ss (ForAll _ _ _ k _) = withKinds ss k
+  withKinds (s@(_, Just _):ss) (TypeApp _ (TypeApp _ tyFn _) k2) | eqType tyFn tyFunction = s : withKinds ss k2
+  withKinds ((s, Nothing):ss) (TypeApp _ (TypeApp _ tyFn k1) k2) | eqType tyFn tyFunction = (s, Just k1) : withKinds ss k2
+  withKinds _ _ = internalError "Invalid arguments to withKinds"
 
 checkNewtype
   :: forall m
@@ -568,10 +575,11 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
   checkMemberExport extract dr@(TypeRef _ name dctors) = do
     env <- getEnv
     for_ (M.lookup (qualify' name) (types env)) $ \(k, _) -> do
-      let findModuleKinds = everythingOnTypes (++) $ \case
-            TypeConstructor _ (Qualified (Just mn') kindName) | mn' == mn -> [kindName]
-            _ -> []
-      undefined -- TODO: checkExport dr $ KindRef (declRefSourceSpan dr) <$> findModuleKinds k
+      -- TODO: remove?
+      -- let findModuleKinds = everythingOnTypes (++) $ \case
+      --       TypeConstructor _ (Qualified (Just mn') kindName) | mn' == mn -> [kindName]
+      --       _ -> []
+      checkExport dr (extract k)
     for_ (M.lookup (qualify' name) (typeSynonyms env)) $ \(_, ty) ->
       checkExport dr (extract ty)
     for_ dctors $ \dctors' ->

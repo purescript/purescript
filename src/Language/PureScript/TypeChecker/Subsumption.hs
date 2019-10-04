@@ -75,8 +75,9 @@ subsumes'
   -> SourceType
   -> SourceType
   -> m (Coercion mode)
-subsumes' mode (ForAll _ ident _ ty1 _) ty2 = do
-  replaced <- replaceVarWithUnknown ident ty1
+subsumes' mode (ForAll _ ident mbK ty1 _) ty2 = do
+  u <- freshTypeWithKind . maybe kindType id $ mbK
+  let replaced = replaceTypeVars ident u ty1
   subsumes' mode replaced ty2
 subsumes' mode ty1 (ForAll _ ident _ ty2 sco) =
   case sco of

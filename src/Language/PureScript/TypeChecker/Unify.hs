@@ -5,13 +5,13 @@
 --
 module Language.PureScript.TypeChecker.Unify
   ( freshType
+  , freshTypeWithKind
   , solveType
   , substituteType
   , unknownsInType
   , unifyTypes
   , unifyRows
   , alignRowsWith
-  , replaceVarWithUnknown
   , replaceTypeWildcards
   , varIfUnknown
   ) where
@@ -29,11 +29,12 @@ import Data.Function (on)
 import Data.List (sortBy, nubBy)
 import qualified Data.Map as M
 import Data.Ord (comparing)
-import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.Crash
+import qualified Language.PureScript.Environment as E
 import Language.PureScript.Errors
+import Language.PureScript.TypeChecker.Kinds (unifyKinds)
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Skolems
 import Language.PureScript.Types
@@ -41,8 +42,21 @@ import Language.PureScript.Types
 -- | Generate a fresh type variable
 freshType :: (MonadState CheckState m) => m SourceType
 freshType = do
+  freshTypeWithKind E.kindType
+  -- t <- gets checkNextType
+  -- modify $ \st -> st { checkNextType = t + 1
+  --                    , checkSubstitution =
+  --                        (checkSubstitution st) { substUnsolved = M.insert t (UnkLevel (pure t), E.kindType) (substUnsolved (checkSubstitution st)) }
+  --                    }
+  -- return $ srcTUnknown t
+
+freshTypeWithKind :: (MonadState CheckState m) => SourceType -> m SourceType
+freshTypeWithKind kind = do
   t <- gets checkNextType
-  modify $ \st -> st { checkNextType = t + 1 }
+  modify $ \st -> st { checkNextType = t + 1
+                     , checkSubstitution =
+                         (checkSubstitution st) { substUnsolved = M.insert t (UnkLevel (pure t), kind) (substUnsolved (checkSubstitution st)) }
+                     }
   return $ srcTUnknown t
 
 -- | Update the substitution to solve a type constraint
@@ -112,6 +126,9 @@ unifyTypes t1 t2 = do
   unifyTypes' (TypeApp _ t3 t4) (TypeApp _ t5 t6) = do
     t3 `unifyTypes` t5
     t4 `unifyTypes` t6
+  unifyTypes' (KindApp _ t3 t4) (KindApp _ t5 t6) = do
+    t3 `unifyKinds` t5
+    t4 `unifyTypes` t6
   unifyTypes' (Skolem _ _ s1 _) (Skolem _ _ s2 _) | s1 == s2 = return ()
   unifyTypes' (KindedType _ ty1 _) ty2 = ty1 `unifyTypes` ty2
   unifyTypes' ty1 (KindedType _ ty2 _) = ty1 `unifyTypes` ty2
@@ -175,14 +192,6 @@ unifyRows r1 r2 = sequence_ matches *> uncurry unifyTails rest where
   unifyTails _ _ =
     withErrorMessageHint (ErrorUnifyingTypes r1 r2) $
       throwError . errorMessage $ TypesDoNotUnify r1 r2
-
--- |
--- Replace a single type variable with a new unification variable
---
-replaceVarWithUnknown :: (MonadState CheckState m) => Text -> SourceType -> m SourceType
-replaceVarWithUnknown ident ty = do
-  tu <- freshType
-  return $ replaceTypeVars ident tu ty
 
 -- |
 -- Replace type wildcards with unknowns

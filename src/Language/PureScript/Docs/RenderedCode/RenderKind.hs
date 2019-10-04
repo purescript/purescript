@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+-- TODO: Remove
 -- | Functions for producing RenderedCode values from PureScript Kind values.
 --
 module Language.PureScript.Docs.RenderedCode.RenderKind
@@ -26,8 +27,6 @@ typeLiterals = mkPattern match
   where
   match (KUnknown _ u) =
     Just $ typeVar $ T.cons 'k' (T.pack (show u))
-  match (NamedKind _ n) =
-    Just $ kind n
   match _ = Nothing
 
 matchRow :: Pattern () (Kind a) ((), Kind a)

@@ -96,8 +96,6 @@ extractSpans d = case d of
     [(IdeNamespaced IdeNSValue (P.runIdent ident), ss)]
   P.ExternDataDeclaration (ss, _) name _ ->
     [(IdeNamespaced IdeNSType (P.runProperName name), ss)]
-  P.ExternKindDeclaration (ss, _) name ->
-    [(IdeNamespaced IdeNSKind (P.runProperName name), ss)]
   _ -> []
   where
     dtorSpan :: P.DataConstructorDeclaration -> (IdeNamespaced, P.SourceSpan)

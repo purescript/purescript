@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MonoLocalBinds #-}
 
 -- |
 -- This module implements the kind checker
@@ -6,273 +7,536 @@
 module Language.PureScript.TypeChecker.Kinds
   ( kindOf
   , kindOfWithScopedVars
-  , kindsOf
+  , kindOfData
+  , kindOfTypeSynonym
   , kindsOfAll
+  , unifyKinds
+  , checkKind
+  , inferKind
   ) where
 
 import Prelude.Compat
 
-import Control.Arrow (second)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 
+import Data.Bifunctor (first)
+import Data.Bitraversable (bitraverse)
+import Data.Foldable (for_)
+import Data.Functor (($>))
+import Data.Graph (stronglyConnComp, flattenSCCs)
+import qualified Data.IntSet as IS
+import Data.List (sortBy)
 import qualified Data.Map as M
+import Data.Maybe (fromJust)
+import Data.Ord (comparing)
 import Data.Text (Text)
+import qualified Data.Text as T
 import Data.Traversable (for)
 
 import Language.PureScript.Crash
+import qualified Language.PureScript.Environment as E
 import Language.PureScript.Errors
-import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.Types
 
--- | Generate a fresh kind variable
-freshKind :: (MonadState CheckState m) => SourceAnn -> m SourceKind
-freshKind ann = do
-  k <- gets checkNextKind
-  modify $ \st -> st { checkNextKind = k + 1 }
-  return $ KUnknown ann k
+import Language.PureScript.Pretty.Types
 
-freshKind' :: (MonadState CheckState m) => m SourceKind
-freshKind' = freshKind NullSourceAnn
+generalizeUnknowns :: [(Unknown, SourceType)] -> SourceType -> SourceType
+generalizeUnknowns unks ty =
+  generalizeUnknownsWithVars (unknownVarsForType unks ty) ty
 
--- | Update the substitution to solve a kind constraint
-solveKind
+generalizeUnknownsWithVars :: [(Unknown, (Text, Maybe SourceType))] -> SourceType -> SourceType
+generalizeUnknownsWithVars binders ty =
+  mkForAll ((getAnnForType ty,) . snd <$> binders) . replaceUnknownsWithVars binders $ ty
+
+replaceUnknownsWithVars :: [(Unknown, (Text, Maybe SourceType))] -> SourceType -> SourceType
+replaceUnknownsWithVars binders ty
+  | null binders = ty
+  | otherwise = go ty
+  where
+  go :: SourceType -> SourceType
+  go = everywhereOnTypes $ \case
+    TUnknown ann unk | Just (name, _) <- lookup unk binders -> TypeVar ann name
+    other -> other
+
+unknownVarsForType :: [(Unknown, SourceType)] -> SourceType -> [(Unknown, (Text, Maybe SourceType))]
+unknownVarsForType unks ty =
+  fmap (\(a, b) -> (a, (genName a, Just b))) unks
+  where
+  inUse :: [Text]
+  inUse = usedTypeVariables ty
+
+  genName :: Int -> T.Text
+  genName i = do
+    let name = "k" <> T.pack (show i)
+    if name `elem` inUse then genName (i + 1) else name
+
+completeBinderList :: Type a -> Maybe ([(a, (Text, Type a))], Type a)
+completeBinderList = go []
+  where
+  go acc = \case
+    ForAll _ _ Nothing _ _ -> Nothing
+    ForAll ann var (Just k) ty _ -> go ((ann, (var, k)) : acc) ty
+    ty -> Just (reverse acc, ty)
+
+sortBinderList :: [(a, (Text, Type a))] -> [(a, (Text, Type a))]
+sortBinderList = flattenSCCs . stronglyConnComp . fmap go
+  where
+  go binding@(_, (var, k)) =
+    (binding, var, usedTypeVariables k)
+
+apply :: (MonadState CheckState m) => SourceType -> m SourceType
+apply ty = flip substituteType ty <$> gets checkSubstitution
+
+substituteType :: Substitution -> SourceType -> SourceType
+substituteType sub = everywhereOnTypes $ \case
+  TUnknown ann u ->
+    case M.lookup u (substType sub) of
+      Nothing -> TUnknown ann u
+      Just (TUnknown ann' u1) | u1 == u -> TUnknown ann' u1
+      Just t -> substituteType sub t
+  other ->
+    other
+
+freshUnknown :: (MonadState CheckState m) => m Unknown
+freshUnknown = do
+  k <- gets checkNextType
+  modify $ \st -> st { checkNextType = k + 1 }
+  pure k
+
+freshKind :: (MonadState CheckState m) => m SourceType
+freshKind = freshKindWithKind E.kindType
+
+freshKindWithKind :: (MonadState CheckState m) => SourceType -> m SourceType
+freshKindWithKind kind = do
+  u <- freshUnknown
+  addUnsolved Nothing u kind
+  pure $ TUnknown nullSourceAnn u
+
+addUnsolved :: (MonadState CheckState m) => Maybe UnkLevel -> Unknown -> SourceType -> m ()
+addUnsolved lvl unk kind = modify $ \st -> do
+  let
+    newLvl = UnkLevel $ case lvl of
+      Nothing -> pure unk
+      Just (UnkLevel lvl') -> lvl' <> pure unk
+    subs = checkSubstitution st
+    uns = M.insert unk (newLvl, kind) $ substUnsolved subs
+  st { checkSubstitution = subs { substUnsolved = uns } }
+
+solve :: (MonadState CheckState m) => Unknown -> SourceType -> m ()
+solve unk solution = modify $ \st -> do
+  let
+    subs = checkSubstitution st
+    tys = M.insert unk solution $ substType subs
+  st { checkSubstitution = subs { substType = tys } }
+
+lookupUnsolved
+  :: (MonadState CheckState m, MonadError MultipleErrors m, HasCallStack)
+  => Unknown
+  -> m (UnkLevel, SourceType)
+lookupUnsolved u = do
+  uns <- gets (substUnsolved . checkSubstitution)
+  case M.lookup u uns of
+    Nothing -> internalError "Unsolved variable is not bound" -- TODO
+    Just res -> return res
+
+unknownsWithKinds
+  :: forall m. (MonadState CheckState m, MonadError MultipleErrors m)
+  => [Unknown]
+  -> m [(Unknown, SourceType)]
+unknownsWithKinds = fmap (fmap snd . sortBy (comparing fst) . join) . traverse go
+  where
+  go u = do
+    (lvl, ty) <- traverse apply =<< lookupUnsolved u
+    rest <- fmap join . traverse go . IS.toList . unknowns $ ty
+    pure $ (lvl, (u, ty)) : rest
+
+inferKind
+  :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
+  => SourceType
+  -> m (SourceType, SourceType)
+inferKind = \case
+  ty@(TypeConstructor ann v) -> do
+    env <- getEnv
+    case M.lookup v (E.types env) of
+      Nothing ->
+        throwError . errorMessage' (fst ann) . UnknownName . fmap TyName $ v
+      Just (kind, E.LocalTypeVariable) -> do
+        kind' <- apply kind
+        pure (ty, kind' $> ann)
+      Just (kind, _) -> do
+        pure (ty, kind $> ann)
+  ConstrainedType _ (Constraint ann v args dat) ty -> do
+    env <- getEnv
+    args' <- case M.lookup (coerceProperName <$> v) (E.types env) of
+      Nothing ->
+        throwError . errorMessage' (fst ann) . UnknownName . fmap TyClassName $ v
+      Just (kind, _) -> do
+        args' <- traverse inferKind args
+        unifyKinds kind $ foldr ((E.-:>) . snd) E.kindType args'
+        pure $ fst <$> args'
+    ty' <- checkKind ty E.kindType
+    pure (ConstrainedType ann (Constraint ann v args' dat) ty', E.kindType $> ann)
+  ty@(TypeLevelString ann _) ->
+    pure (ty, E.kindSymbol $> ann)
+  ty@(TypeVar ann v) -> do
+    moduleName <- unsafeCheckCurrentModule
+    kind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing $ ProperName v)
+    pure (ty, kind $> ann)
+  ty@(Skolem ann v _ _) -> do
+    moduleName <- unsafeCheckCurrentModule
+    kind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing $ ProperName v)
+    pure (ty, kind $> ann)
+  ty@(TUnknown ann u) -> do
+    (_, kind) <- lookupUnsolved u
+    pure (ty, kind $> ann)
+  ty@(TypeWildcard ann _) -> do
+    -- TODO: Warning?
+    k <- freshKind
+    pure (ty, k $> ann)
+  ty@(REmpty ann) -> do
+    k <- freshKind
+    pure (ty, E.kindRow k $> ann)
+  RCons ann lbl t1 t2 -> do
+    (t1', k1) <- inferKind t1
+    (t2', k2) <- inferKind t2
+    unifyKinds k2 (E.kindRow k1)
+    -- TODO: Do we need to apply p1?
+    pure (RCons ann lbl t1' t2', E.kindRow k1 $> ann)
+  TypeApp ann t1 t2 -> do
+    (t1', k1) <- inferKind t1
+    inferAppKind ann (t1', k1) t2
+  KindApp ann t1 t2 -> do
+    (t1', kind) <- bitraverse pure apply =<< inferKind t1
+    case kind of
+      ForAll _ arg (Just argKind) resKind _ -> do
+        t2' <- checkKind t2 argKind
+        pure (KindApp ann t1' t2', replaceTypeVars arg t2' resKind)
+      _ ->
+        -- TODO: Better error for bad KindApp
+        internalError "inferKind: unkinded forall binder"
+  KindedType _ t1 t2 -> do
+    t1' <- checkKind t1 t2
+    t2' <- apply t2
+    pure (t1', t2')
+  ForAll ann arg mbKind ty sc -> do
+    moduleName <- unsafeCheckCurrentModule
+    kind <- case mbKind of
+      Just k -> checkKind k E.kindType
+      Nothing -> fmap ($> ann) freshKind
+    (ty', unks) <- bindLocalTypeVariables moduleName [(ProperName arg, kind)] $ do
+      ty' <- apply =<< checkKind ty E.kindType
+      unks <- for (IS.toList $ unknowns ty') $ \u ->
+        fmap (u,) . apply . snd =<< lookupUnsolved u
+      pure (ty', unks)
+    unless (not . elem arg $ foldMap (freeTypeVariables . snd) unks) $
+      internalError "Quantification check failure" -- TODO
+    for_ unks . uncurry $ addUnsolved Nothing
+    pure (ForAll ann arg (Just kind) ty' sc, E.kindType $> ann)
+  ty ->
+    internalError $ "inferKind: Unimplemented case \n" <> prettyPrintType 100 ty <> show ty
+
+inferAppKind
+  :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
+  => SourceAnn
+  -> (SourceType, SourceType)
+  -> SourceType
+  -> m (SourceType, SourceType)
+inferAppKind ann (fn, fnKind) arg = case fnKind of
+  TypeApp _ (TypeApp _ arrKind argKind) resKind
+    | eqType arrKind E.tyFunction || eqType arrKind E.tyConstrainedValue -> do
+        arg' <- checkKind arg argKind
+        (TypeApp ann fn arg',) <$> apply resKind
+  TUnknown _ u -> do
+    (lvl, _) <- lookupUnsolved u
+    u1 <- freshUnknown
+    u2 <- freshUnknown
+    addUnsolved (Just lvl) u1 E.kindType
+    addUnsolved (Just lvl) u2 E.kindType
+    solve u $ (TUnknown ann u1 E.-:> TUnknown ann u2) $> ann
+    arg' <- checkKind arg $ TUnknown ann u1
+    pure (TypeApp ann fn arg', TUnknown ann u2)
+  ForAll _ a (Just k) ty _ -> do
+    u <- freshUnknown
+    addUnsolved Nothing u k
+    inferAppKind ann (KindApp ann fn (TUnknown ann u), replaceTypeVars a (TUnknown ann u) ty) arg
+  _ -> -- TODO
+    internalError "Cannot apply type"
+
+checkKind
+  :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
+  => SourceType
+  -> SourceType
+  -> m SourceType
+checkKind ty kind2 = do
+  (ty', kind1) <- inferKind ty
+  kind1' <- apply kind1
+  kind2' <- apply kind2
+  instantiateKind (ty', kind1') kind2'
+
+instantiateKind
   :: (MonadError MultipleErrors m, MonadState CheckState m)
-  => Int
-  -> SourceKind
-  -> m ()
-solveKind u k = do
-  occursCheck u k
-  modify $ \cs -> cs { checkSubstitution =
-                         (checkSubstitution cs) { substKind =
-                                                    M.insert u k $ substKind $ checkSubstitution cs
-                                                }
-                     }
+  => (SourceType, SourceType)
+  -> SourceType
+  -> m SourceType
+instantiateKind (ty, kind1) kind2 = case kind1 of
+  ForAll _ a (Just k) t _ -> do
+    let ann = getAnnForType ty
+    u <- freshKindWithKind k
+    instantiateKind (KindApp ann ty u, replaceTypeVars a u t) kind2
+  _ -> do
+    unifyKinds kind1 kind2
+    pure ty
 
--- | Apply a substitution to a kind
-substituteKind :: Substitution -> SourceKind -> SourceKind
-substituteKind sub = everywhereOnKinds go
-  where
-  go (KUnknown ann u) =
-    case M.lookup u (substKind sub) of
-      Nothing -> KUnknown ann u
-      Just (KUnknown ann' u1) | u1 == u -> KUnknown ann' u1
-      Just t -> substituteKind sub t
-  go other = other
-
--- | Make sure that an unknown does not occur in a kind
-occursCheck
-  :: (MonadError MultipleErrors m)
-  => Int
-  -> SourceKind
-  -> m ()
-occursCheck _ KUnknown{} = return ()
-occursCheck u k = void $ everywhereOnKindsM go k
-  where
-  -- go (KUnknown _ u') | u == u' = throwError . errorMessage . InfiniteKind $ k
-  go other = return other
-
--- | Unify two kinds
 unifyKinds
   :: (MonadError MultipleErrors m, MonadState CheckState m)
-  => SourceKind
-  -> SourceKind
+  => SourceType
+  -> SourceType
   -> m ()
-unifyKinds k1 k2 = do
-  sub <- gets checkSubstitution
-  go (substituteKind sub k1) (substituteKind sub k2)
+unifyKinds = curry $ \case
+  (TypeApp _ p1 p2, TypeApp _ p3 p4) -> do
+    unifyKinds p1 p3
+    join $ unifyKinds <$> apply p2 <*> apply p4
+  (KindApp _ p1 p2, KindApp _ p3 p4) -> do
+    unifyKinds p1 p3
+    join $ unifyKinds <$> apply p2 <*> apply p4
+  (w1, w2) | eqType w1 w2 ->
+    pure ()
+  (TUnknown ss a', p1) ->
+    unifyUnknown ss a' p1
+  (p1, TUnknown ss a') ->
+    unifyUnknown ss a' p1
+  (w1, w2) ->
+    throwError
+      . errorMessage''' (fst . getAnnForType <$> [w1, w2])
+      $ KindsDoNotUnify w1 w2
   where
-  go (KUnknown _ u1) (KUnknown _ u2) | u1 == u2 = return ()
-  go (KUnknown _ u) k = solveKind u k
-  go k (KUnknown _ u) = solveKind u k
-  go (NamedKind _ k1') (NamedKind _ k2') | k1' == k2' = return ()
-  go (Row _ k1') (Row _ k2') = unifyKinds k1' k2'
-  go (FunKind _ k1' k2') (FunKind _ k3 k4) = do
-    unifyKinds k1' k3
-    unifyKinds k2' k4
-  go k1' k2' =
-    undefined
-    -- throwError
-    --   . errorMessage''' (fst . getAnnForKind <$> [k1', k2'])
-    --   $ KindsDoNotUnify k1' k2'
+  unifyUnknown _ a' p1 = do
+    p2 <- promoteKind a' p1
+    w1 <- snd <$> lookupUnsolved a'
+    join $ unifyKinds <$> apply w1 <*> elaborateKind p2
+    solve a' p2
+
+promoteKind
+  :: (MonadError MultipleErrors m, MonadState CheckState m)
+  => Unknown
+  -> SourceType
+  -> m SourceType
+promoteKind u2 ty = do
+  lvl2 <- fst <$> lookupUnsolved u2
+  flip everywhereOnTypesM ty $ \case
+    -- TODO: Do we need to check free type variables?
+    ty'@(TUnknown ann u1) -> do
+      when (u1 == u2) . throwError . errorMessage . InfiniteKind $ ty
+      (lvl1, k) <- lookupUnsolved u1
+      if lvl1 < lvl2 then
+        pure ty'
+      else do
+        k'  <- promoteKind u2 =<< apply k
+        u1' <- freshUnknown
+        addUnsolved (Just lvl2) u1' k'
+        solve u1 $ TUnknown ann u1'
+        pure $ TUnknown ann u1'
+    ty' ->
+      pure ty'
+
+elaborateKind
+  :: (MonadError MultipleErrors m, MonadState CheckState m)
+  => SourceType
+  -> m SourceType
+elaborateKind = \case
+  TypeLevelString ann _ ->
+    pure $ E.kindType $> ann
+  TypeConstructor ann v -> do
+    env <- getEnv
+    case M.lookup v (E.types env) of
+      Nothing ->
+        throwError . errorMessage' (fst ann) . UnknownName . fmap TyName $ v
+      Just (kind, _) ->
+        ($> ann) <$> apply kind
+  TypeVar ann a -> do
+    moduleName <- unsafeCheckCurrentModule
+    kind <- lookupTypeVariable moduleName . Qualified Nothing $ ProperName a
+    ($> ann) <$> apply kind
+  TUnknown ann a' -> do
+    kind <- snd <$> lookupUnsolved a'
+    ($> ann) <$> apply kind
+  TypeApp ann t1 t2 -> do
+    k1 <- elaborateKind t1
+    case k1 of
+      TypeApp _ (TypeApp _ k w1) w2 | eqType k E.tyFunction -> do
+        k2 <- elaborateKind t2
+        unless (eqType k2 w1) $ internalError "Cannot apply type" -- TODO
+        pure $ w2 $> ann
+      _ ->
+        internalError "Cannot apply type" -- TODO
+  KindApp ann t1 t2 -> do
+    k1 <- elaborateKind t1
+    case k1 of
+      ForAll _ a (Just w) n _ -> do
+        k2 <- elaborateKind t2
+        unless (eqType k2 w) $ internalError "Cannot apply kind" -- TODO
+        flip (replaceTypeVars a) n . ($> ann) <$> apply t2
+      _ ->
+        internalError "Cannot apply kind" -- TODO
+  ForAll ann a (Just w) u _ -> do
+    wIsStar <- elaborateKind w
+    unless (eqType wIsStar E.kindType) $ internalError "Elaborated kind is not Type" -- TODO
+    moduleName <- unsafeCheckCurrentModule
+    uIsStar <- bindLocalTypeVariables moduleName [(ProperName a, w)] $ elaborateKind u
+    unless (eqType uIsStar E.kindType) $ internalError "Elaborated kind is not Type" -- TODO
+    pure $ E.kindType $> ann
+  ty ->
+    internalError "elaboratedKind: Unimplemented case" -- TODO
 
 -- | Infer the kind of a single type
 kindOf
-  :: (MonadError MultipleErrors m, MonadState CheckState m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
   => SourceType
-  -> m SourceKind
-kindOf ty = fst <$> kindOfWithScopedVars ty
+  -> m (SourceType, SourceType)
+kindOf = fmap (first snd) . kindOfWithScopedVars
 
 -- | Infer the kind of a single type, returning the kinds of any scoped type variables
-kindOfWithScopedVars ::
-  (MonadError MultipleErrors m, MonadState CheckState m) =>
-  SourceType ->
-  m (SourceKind, [(Text, SourceKind)])
-kindOfWithScopedVars ty =
-  withErrorMessageHint (ErrorCheckingKind ty) $
-    fmap tidyUp . withFreshSubstitution . captureSubstitution $ infer ty
-  where
-  tidyUp ((k, args), sub) = ( starIfUnknown (substituteKind sub k)
-                            , map (second (starIfUnknown . substituteKind sub)) args
-                            )
+kindOfWithScopedVars
+  :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
+  => SourceType ->
+  m (([(Text, SourceType)], SourceType), SourceType)
+kindOfWithScopedVars ty = do
+  (ty', kind) <- bindTypes mempty $ inferKind ty
+  (binders, ty'') <- first sortBinderList . fromJust . completeBinderList <$> apply ty'
+  let ty''' = foldr (\(ann, (ident, k)) t -> ForAll ann ident (Just k) t Nothing) ty'' binders
+  pure ((fmap snd binders, ty'''), kind)
 
--- | Infer the kind of a type constructor with a collection of arguments and a collection of associated data constructors
-kindsOf
-  :: (MonadError MultipleErrors m, MonadState CheckState m)
-  => Bool
-  -> ModuleName
-  -> ProperName 'TypeName
-  -> [(Text, Maybe SourceKind)]
-  -> [SourceType]
-  -> m SourceKind
-kindsOf isData moduleName name args ts = fmap tidyUp . withFreshSubstitution . captureSubstitution $ do
-  tyCon <- freshKind'
-  kargs <- replicateM (length args) $ freshKind'
-  rest <- zipWithM freshKindVar args kargs
-  let dict = (name, tyCon) : rest
-  -- bindLocalTypeVariables moduleName dict $
-  --   solveTypes isData ts kargs tyCon
-  undefined
-  where
-  tidyUp (k, sub) = starIfUnknown $ substituteKind sub k
+type DataDeclarationArgs =
+  ( SourceAnn
+  , ProperName 'TypeName
+  , [(Text, Maybe SourceType)]
+  , [DataConstructorDeclaration]
+  )
 
-freshKindVar
-  :: (MonadError MultipleErrors m, MonadState CheckState m)
-  => (Text, Maybe SourceKind)
-  -> SourceKind
-  -> m (ProperName 'TypeName, SourceKind)
-freshKindVar (arg, Nothing) kind = return (ProperName arg, kind)
-freshKindVar (arg, Just kind') kind = do
-  unifyKinds kind kind'
-  return (ProperName arg, kind')
+type DataDeclarationResult =
+  ( [(DataConstructorDeclaration, SourceType)]
+  -- ^ The infered type signatures of data constructors
+  , SourceType
+  -- ^ The inferred kind of the declaration
+  )
 
--- | Simultaneously infer the kinds of several mutually recursive type constructors
-kindsOfAll
-  :: (MonadError MultipleErrors m, MonadState CheckState m)
+kindOfData
+  :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)
   => ModuleName
-  -> [(SourceAnn, ProperName 'TypeName, [(Text, Maybe SourceKind)], SourceType)]
-  -> [(SourceAnn, ProperName 'TypeName, [(Text, Maybe SourceKind)], [SourceType])]
-  -> m ([SourceKind], [SourceKind])
-kindsOfAll moduleName syns tys = fmap tidyUp . withFreshSubstitution . captureSubstitution $ do
-  synVars <- for syns $ \(sa, _, _, _) -> freshKind sa
-  let dict = zipWith (\(_, name, _, _) var -> (name, var)) syns synVars
-  undefined
-  -- bindLocalTypeVariables moduleName dict $ do
-  --   tyCons <- for tys $ \(sa, _, _, _) -> freshKind sa
-  --   let dict' = zipWith (\(_, name, _, _) tyCon -> (name, tyCon)) tys tyCons
-  --   bindLocalTypeVariables moduleName dict' $ do
-  --     data_ks <- zipWithM (\tyCon (_, _, args, ts) -> do
-  --       kargs <- for args $ \(_, kind) -> maybe freshKind' (freshKind . getAnnForKind) kind
-  --       argDict <- zipWithM freshKindVar args kargs
-  --       bindLocalTypeVariables moduleName argDict $
-  --         solveTypes True ts kargs tyCon) tyCons tys
-  --     syn_ks <- zipWithM (\synVar (_, _, args, ty) -> do
-  --       kargs <- for args $ \(_, kind) -> maybe freshKind' (freshKind . getAnnForKind) kind
-  --       argDict <- zipWithM freshKindVar args kargs
-  --       bindLocalTypeVariables moduleName argDict $
-  --         solveTypes False [ty] kargs synVar) synVars syns
-  --     return (syn_ks, data_ks)
-  where
-  tidyUp ((ks1, ks2), sub) = (map (starIfUnknown . substituteKind sub) ks1, map (starIfUnknown . substituteKind sub) ks2)
+  -> DataDeclarationArgs
+  -> m DataDeclarationResult
+kindOfData moduleName dataDecl =
+  head . snd <$> kindsOfAll moduleName [] [dataDecl]
 
--- | Solve the set of kind constraints associated with the data constructors for a type constructor
-solveTypes
-  :: (MonadError MultipleErrors m, MonadState CheckState m)
-  => Bool
-  -> [SourceType]
-  -> [SourceKind]
-  -> SourceKind
-  -> m SourceKind
-solveTypes isData ts kargs tyCon = do
-  -- ks <- traverse (fmap fst . infer) ts
-  -- when isData $ do
-  --   unifyKinds tyCon (foldr srcFunKind kindType kargs)
-  --   forM_ ks $ \k -> unifyKinds k (kindType $> getAnnForKind k)
-  -- unless isData $
-  --   unifyKinds tyCon (foldr srcFunKind (head ks) kargs)
-  -- return tyCon
-  undefined
+inferDataDeclaration
+  :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)
+  => ModuleName
+  -> DataDeclarationArgs
+  -> m [(DataConstructorDeclaration, SourceType)]
+inferDataDeclaration moduleName (_, tyName, tyArgs, ctors) = do
+  tyKind <- lookupTypeVariable moduleName (Qualified Nothing tyName)
+  let (sigBinders, tyKind') = fromJust . completeBinderList $ tyKind
+  bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
+    tyArgs' <- for tyArgs . traverse . maybe freshKind $ flip checkKind E.kindType
+    unifyKinds tyKind' $ foldr ((E.-:>) . snd) E.kindType tyArgs'
+    bindLocalTypeVariables moduleName (first ProperName <$> tyArgs') $ do
+      let tyCtorName = srcTypeConstructor $ mkQualified tyName moduleName
+          tyCtor = foldl (\ty -> srcKindApp ty . srcTypeVar . fst . snd) tyCtorName sigBinders
+          tyCtor' = foldl (\ty -> srcTypeApp ty . srcTypeVar . fst) tyCtor tyArgs'
+          ctorBinders = fmap (fmap (fmap Just)) $ sigBinders <> fmap (nullSourceAnn,) tyArgs'
+      for ctors $ \ctor ->
+        fmap ((ctor,) . mkForAll ctorBinders) $ inferDataConstructor tyCtor' ctor
 
--- | Default all unknown kinds to the kindType kind of types
-starIfUnknown :: Kind a -> Kind a
--- starIfUnknown (KUnknown ann _) = kindType $> ann
--- starIfUnknown (Row ann k) = Row ann (starIfUnknown k)
--- starIfUnknown (FunKind ann k1 k2) = FunKind ann (starIfUnknown k1) (starIfUnknown k2)
-starIfUnknown k = k
-
--- | Infer a kind for a type
-infer
-  :: (MonadError MultipleErrors m, MonadState CheckState m)
+inferDataConstructor
+  :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)
   => SourceType
-  -> m (SourceKind, [(Text, SourceKind)])
-infer ty =
-  withErrorMessageHint (ErrorCheckingKind ty)
-    . rethrowWithPosition (fst $ getAnnForType ty)
-    $ infer' ty
+  -> DataConstructorDeclaration
+  -> m SourceType
+inferDataConstructor tyCtor =
+  flip checkKind E.kindType . foldr ((E.-:>) . snd) tyCtor . dataCtorFields
 
-infer'
-  :: forall m
-   . (MonadError MultipleErrors m, MonadState CheckState m)
-  => SourceType
-  -> m (SourceKind, [(Text, SourceKind)])
--- infer' (ForAll ann ident mbK ty _) = do
---   k1 <- maybe (freshKind ann) pure mbK
---   moduleName <- unsafeCheckCurrentModule
---   (k2, args) <- bindLocalTypeVariables moduleName [(ProperName ident, k1)] $ infer ty
---   unifyKinds k2 kindType
---   return (kindType, (ident, k1) : args)
--- infer' (KindedType _ ty k) = do
---   (k', args) <- infer ty
---   unifyKinds k k'
---   return (k', args)
-infer' other = (, []) <$> go other
-  where
-  go :: SourceType -> m SourceKind
-  -- go (ForAll ann ident mbK ty _) = do
-  --   k1 <- maybe (freshKind ann) pure mbK
-  --   moduleName <- unsafeCheckCurrentModule
-  --   k2 <- bindLocalTypeVariables moduleName [(ProperName ident, k1)] $ go ty
-  --   unifyKinds k2 kindType
-  --   return $ kindType $> ann
-  -- go (KindedType _ ty k) = do
-  --   k' <- go ty
-  --   unifyKinds k k'
-  --   return k'
-  -- go (TypeWildcard ann _) = freshKind ann
-  -- go (TUnknown ann _) = freshKind ann
-  -- go (TypeLevelString ann _) = return $ kindSymbol $> ann
-  -- go (TypeVar ann v) = do
-  --   moduleName <- unsafeCheckCurrentModule
-  --   ($> ann) <$> lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
-  -- go (Skolem ann v _ _) = do
-  --   moduleName <- unsafeCheckCurrentModule
-  --   ($> ann) <$> lookupTypeVariable moduleName (Qualified Nothing (ProperName v))
-  -- go (TypeConstructor ann v) = do
-  --   env <- getEnv
-  --   case M.lookup v (types env) of
-  --     Nothing -> throwError . errorMessage' (fst ann) . UnknownName $ fmap TyName v
-  --     Just (kind, _) -> return $ kind $> ann
-  -- go (TypeApp ann t1 t2) = do
-  --   k0 <- freshKind ann
-  --   k1 <- go t1
-  --   k2 <- go t2
-  --   unifyKinds k1 (FunKind ann k2 k0)
-  --   return k0
-  -- go (REmpty ann) = do
-  --   k <- freshKind ann
-  --   return $ Row ann k
-  -- go (RCons ann _ ty row) = do
-  --   k1 <- go ty
-  --   k2 <- go row
-  --   unifyKinds k2 (Row ann k1)
-  --   return $ Row ann k1
-  -- go (ConstrainedType ann2 (Constraint ann1 className tys _) ty) = do
-  --   k1 <- go $ foldl (TypeApp ann2) (TypeConstructor ann1 (fmap coerceProperName className)) tys
-  --   unifyKinds k1 kindType
-  --   k2 <- go ty
-  --   unifyKinds k2 kindType
-  --   return $ kindType $> ann2
-  go ty = internalError $ "Invalid argument to infer: " ++ show ty
+type TypeDeclarationArgs =
+  ( SourceAnn
+  , ProperName 'TypeName
+  , [(Text, Maybe SourceType)]
+  , SourceType
+  )
+
+type TypeDeclarationResult =
+  ( SourceType
+  -- ^ The elaborated rhs of the declaration
+  , SourceType
+  -- ^ The inferred kind of the declaration
+  )
+
+kindOfTypeSynonym
+  :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)
+  => ModuleName
+  -> TypeDeclarationArgs
+  -> m TypeDeclarationResult
+kindOfTypeSynonym moduleName typeDecl =
+  head . fst <$> kindsOfAll moduleName [typeDecl] []
+
+inferTypeSynonym
+  :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)
+  => ModuleName
+  -> TypeDeclarationArgs
+  -> m SourceType
+inferTypeSynonym moduleName (_, tyName, tyArgs, tyBody) = do
+  tyKind <- lookupTypeVariable moduleName (Qualified Nothing tyName)
+  let (sigBinders, tyKind') = fromJust . completeBinderList $ tyKind
+  bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
+    kindRes <- freshKind
+    tyArgs' <- for tyArgs . traverse . maybe freshKind $ flip checkKind E.kindType
+    unifyKinds tyKind' $ foldr ((E.-:>) . snd) kindRes tyArgs'
+    bindLocalTypeVariables moduleName (first ProperName <$> tyArgs') $ do
+      body <- inferKind tyBody
+      apply =<< instantiateKind body =<< apply kindRes
+
+kindsOfAll
+  :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)
+  => ModuleName
+  -> [TypeDeclarationArgs]
+  -> [DataDeclarationArgs]
+  -> m ([TypeDeclarationResult], [DataDeclarationResult])
+kindsOfAll moduleName syns dats = withFreshSubstitution $ do
+  synDict <- for syns $ \(_, synName, _, _) -> fmap (synName,) freshKind
+  datDict <- for dats $ \(_, datName, _, _) -> fmap (datName,) freshKind
+  let bindingGroup = synDict <> datDict
+  bindLocalTypeVariables moduleName bindingGroup $ do
+    synResults <- for syns (inferTypeSynonym moduleName)
+    datResults <- for dats (inferDataDeclaration moduleName)
+    synResultsWithUnks <- for (zip synDict synResults) $ \((synName, synKind), synBody) -> do
+      synKind' <- apply synKind
+      pure (((synName, synKind'), synBody), unknowns synKind')
+    datResultsWithUnks <- for (zip datDict datResults) $ \((datName, datKind), ctors) -> do
+      datKind' <- apply datKind
+      ctors' <- traverse (traverse apply) ctors
+      pure (((datName, datKind'), ctors'), unknowns datKind')
+    let synUnks = fmap (\(((synName, _), _), unks) -> (synName, unks)) synResultsWithUnks
+        datUnks = fmap (\(((datName, _), _), unks) -> (datName, unks)) datResultsWithUnks
+        tysUnks = synUnks <> datUnks
+    allUnks <- unknownsWithKinds . IS.toList $ foldMap snd tysUnks
+    let mkTySub (name, unks) = do
+          let tyCtorName = mkQualified name moduleName
+              tyUnks = filter (flip IS.member unks . fst) allUnks
+              tyCtor = foldl (\ty -> srcKindApp ty . TUnknown nullSourceAnn . fst) (srcTypeConstructor tyCtorName) tyUnks
+          (tyCtorName, (tyCtor, tyUnks))
+        tySubs = fmap mkTySub tysUnks
+        replaceTypeCtors = everywhereOnTypes $ \case
+          TypeConstructor _ name
+            | Just (tyCtor, _) <- lookup name tySubs -> tyCtor
+          other -> other
+        synResultsWithKinds = flip fmap synResultsWithUnks $ \(((synName, synKind), synBody), _) -> do
+          let tyUnks = snd . fromJust $ lookup (mkQualified synName moduleName) tySubs
+              unkBinders = unknownVarsForType tyUnks synKind
+          (replaceUnknownsWithVars unkBinders $ replaceTypeCtors synBody, generalizeUnknownsWithVars unkBinders synKind)
+        datResultsWithKinds = flip fmap datResultsWithUnks $ \(((datName, datKind), ctors), _) -> do
+          let tyUnks = snd . fromJust $ lookup (mkQualified datName moduleName) tySubs
+              ctors' = fmap (fmap (generalizeUnknowns tyUnks . replaceTypeCtors)) ctors
+          (ctors', generalizeUnknowns tyUnks datKind)
+    pure (synResultsWithKinds, datResultsWithKinds)

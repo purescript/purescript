@@ -146,7 +146,6 @@ acceptable P.ExternDeclaration{} = True
 acceptable P.ExternDataDeclaration{} = True
 acceptable P.TypeClassDeclaration{} = True
 acceptable P.TypeInstanceDeclaration{} = True
-acceptable P.ExternKindDeclaration{} = True
 acceptable P.TypeDeclaration{} = True
 acceptable P.ValueDeclaration{} = True
 acceptable _ = False

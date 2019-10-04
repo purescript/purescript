@@ -131,10 +131,9 @@ convertType fileName = go
         mkForAll a b t = do
           let ann' = widenLeft (tokAnn $ nameTok a) $ T.getAnnForType t
           T.ForAll ann' (getIdent $ nameValue a) b t Nothing
-        k t (TypeVarKinded (Wrapped _ (Labeled a _ b) _)) = mkForAll a (Just (go b)) t
-        k t (TypeVarName a) = mkForAll a Nothing t
-        -- The existing parser builds variables in reverse order
-        ty' = foldl k (go ty) bindings
+        k (TypeVarKinded (Wrapped _ (Labeled a _ b) _)) = mkForAll a (Just (go b))
+        k (TypeVarName a) = mkForAll a Nothing
+        ty' = foldr k (go ty) bindings
         ann = widenLeft (tokAnn kw) $ T.getAnnForType ty'
       T.setAnnForType ann ty'
     TypeKinded _ ty _ kd -> do
@@ -506,7 +505,7 @@ convertDeclaration fileName decl = case decl of
       ForeignData _ (Labeled a _ b) ->
         AST.ExternDataDeclaration ann (nameValue a) $ convertType fileName b
       ForeignKind _ a ->
-        AST.ExternKindDeclaration ann (nameValue a)
+        AST.ExternDataDeclaration ann (nameValue a) $ Env.kindType $> ann
   where
   ann =
     uncurry (sourceAnnCommented fileName) $ declRange decl

@@ -25,6 +25,7 @@ import qualified Data.IntSet as IS
 import Data.List (sortBy)
 import Data.Ord (comparing)
 import Data.Maybe (fromMaybe)
+import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Data.Text as T
 import GHC.Generics (Generic)
@@ -400,14 +401,15 @@ replaceAllTypeVars = go [] where
   go _  m (TypeVar ann v) = fromMaybe (TypeVar ann v) (v `lookup` m)
   go bs m (TypeApp ann t1 t2) = TypeApp ann (go bs m t1) (go bs m t2)
   go bs m (KindApp ann t1 t2) = KindApp ann (go bs m t1) (go bs m t2)
-  go bs m f@(ForAll ann v mbK t sco)
-    | v `elem` keys = go bs (filter ((/= v) . fst) m) f
+  go bs m (ForAll ann v mbK t sco)
+    | v `elem` keys = go bs (filter ((/= v) . fst) m) $ ForAll ann v mbK' t sco
     | v `elem` usedVars =
       let v' = genName v (keys ++ bs ++ usedVars)
           t' = go bs [(v, TypeVar ann v')] t
-      in ForAll ann v' mbK (go (v' : bs) m t') sco
-    | otherwise = ForAll ann v mbK (go (v : bs) m t) sco
+      in ForAll ann v' mbK' (go (v' : bs) m t') sco
+    | otherwise = ForAll ann v mbK' (go (v : bs) m t) sco
     where
+      mbK' = go bs m <$> mbK
       keys = map fst m
       usedVars = concatMap (usedTypeVariables . snd) m
   go bs m (ConstrainedType ann c t) = ConstrainedType ann (mapConstraintArgs (map (go bs m)) c) (go bs m t)
@@ -473,6 +475,11 @@ unknowns = everythingOnTypes (<>) go where
   go (TUnknown _ u) = IS.singleton u
   go _ = mempty
 
+eraseKindApps :: Type a -> Type a
+eraseKindApps = everywhereOnTypes $ \case
+  KindApp _ ty _ -> ty
+  other -> other
+
 everywhereOnTypes :: (Type a -> Type a) -> Type a -> Type a
 everywhereOnTypes f = go where
   go (TypeApp ann t1 t2) = f (TypeApp ann (go t1) (go t2))
@@ -508,6 +515,18 @@ everywhereOnTypesM f = go where
   go (BinaryNoParensType ann t1 t2 t3) = (BinaryNoParensType ann <$> go t1 <*> go t2 <*> go t3) >>= f
   go (ParensInType ann t) = (ParensInType ann <$> go t) >>= f
   go other = f other
+
+everywhereWithScopeOnTypesM :: Monad m => S.Set Text -> (S.Set Text -> Type a -> m (Type a)) -> Type a -> m (Type a)
+everywhereWithScopeOnTypesM s0 f = go s0 where
+  go s (TypeApp ann t1 t2) = (TypeApp ann <$> go s t1 <*> go s t2) >>= f s
+  go s (KindApp ann t1 t2) = (KindApp ann <$> go s t1 <*> go s t2) >>= f s
+  go s (ForAll ann arg mbK ty sco) = (ForAll ann arg <$> traverse (go s) mbK <*> go (S.insert arg s) ty <*> pure sco) >>= f s
+  go s (ConstrainedType ann c ty) = (ConstrainedType ann <$> overConstraintArgs (traverse (go s)) c <*> go s ty) >>= f s
+  go s (RCons ann name ty rest) = (RCons ann name <$> go s ty <*> go s rest) >>= f s
+  go s (KindedType ann ty k) = (KindedType ann <$> go s ty <*> go s k) >>= f s
+  go s (BinaryNoParensType ann t1 t2 t3) = (BinaryNoParensType ann <$> go s t1 <*> go s t2 <*> go s t3) >>= f s
+  go s (ParensInType ann t) = (ParensInType ann <$> go s t) >>= f s
+  go s other = f s other
 
 everywhereOnTypesTopDownM :: Monad m => (Type a -> m (Type a)) -> Type a -> m (Type a)
 everywhereOnTypesTopDownM f = go <=< f where

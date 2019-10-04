@@ -80,11 +80,6 @@ renderDeclaration Declaration{..} =
       , aliasName for declTitle
       ]
 
-    ExternKindDeclaration ->
-      [ keywordKind
-      , kind (notQualified declTitle)
-      ]
-
 renderChildDeclaration :: ChildDeclaration -> RenderedCode
 renderChildDeclaration ChildDeclaration{..} =
   mintersperse sp $ case cdeclInfo of

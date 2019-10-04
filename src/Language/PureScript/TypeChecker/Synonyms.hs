@@ -32,10 +32,10 @@ replaceAllTypeSynonyms'
 replaceAllTypeSynonyms' syns = everywhereOnTypesTopDownM try
   where
   try :: SourceType -> Either MultipleErrors SourceType
-  try t = fromMaybe t <$> go 0 [] t
+  try t = fromMaybe t <$> go 0 [] [] t
 
-  go :: Int -> [SourceType] -> SourceType -> Either MultipleErrors (Maybe SourceType)
-  go c args (TypeConstructor _ ctor)
+  go :: Int -> [SourceType] -> [SourceType] -> SourceType -> Either MultipleErrors (Maybe SourceType)
+  go c kargs args (TypeConstructor _ ctor)
     | Just (synArgs, body) <- M.lookup ctor syns
     , c == length synArgs
     = let repl = replaceAllTypeVars (zip (map fst synArgs) args) body
@@ -43,8 +43,9 @@ replaceAllTypeSynonyms' syns = everywhereOnTypesTopDownM try
     | Just (synArgs, _) <- M.lookup ctor syns
     , length synArgs > c
     = throwError . errorMessage $ PartiallyAppliedSynonym ctor
-  go c args (TypeApp _ f arg) = go (c + 1) (arg : args) f
-  go _ _ _ = return Nothing
+  go c kargs args (TypeApp _ f arg) = go (c + 1) kargs (arg : args) f
+  go c kargs args (KindApp _ f arg) = go c (arg : kargs) args f
+  go _ _ _ _ = return Nothing
 
 -- | Replace fully applied type synonyms
 replaceAllTypeSynonyms :: (e ~ MultipleErrors, MonadState CheckState m, MonadError e m) => SourceType -> m SourceType
