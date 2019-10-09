@@ -302,7 +302,7 @@ withDeps (Module modulePath fn es) = Module modulePath fn (map expandDeps es)
       -- parameter)
       = ([(m, nm, Internal)], bn)
     toReference (JSFunctionExpression _ _ _ params _ _) bn
-      = ([], bn \\ (mapMaybe unIdent $ commaList params))
+      = ([], bn \\ (mapMaybe unIdentifier $ commaList params))
     toReference e bn
       | Just nm <- exportsAccessor e
       -- ^ exports.foo means there's a dependency on the public member "foo" of
@@ -310,9 +310,9 @@ withDeps (Module modulePath fn es) = Module modulePath fn (map expandDeps es)
       = ([(m, nm, Public)], bn)
     toReference _ bn = ([], bn)
 
-    unIdent :: JSIdent -> Maybe String
-    unIdent (JSIdentName _ name) = Just name
-    unIdent _ = Nothing
+    unIdentifier :: JSExpression -> Maybe String
+    unIdentifier (JSIdentifier _ name) = Just name
+    unIdentifier _ = Nothing
 
 -- String literals include the quote chars
 fromStringLiteral :: JSExpression -> Maybe String
@@ -763,7 +763,7 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
 
   iife :: [JSStatement] -> String -> JSExpression -> JSStatement
   iife body param arg =
-    JSMethodCall (JSExpressionParen lf (JSFunctionExpression JSNoAnnot JSIdentNone JSNoAnnot (JSLOne (JSIdentName JSNoAnnot param)) JSNoAnnot
+    JSMethodCall (JSExpressionParen lf (JSFunctionExpression JSNoAnnot JSIdentNone JSNoAnnot (JSLOne (JSIdentifier JSNoAnnot param)) JSNoAnnot
                                                              (JSBlock sp (prependWhitespace "\n  " body) lf))
                                     JSNoAnnot)
                  JSNoAnnot

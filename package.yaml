@@ -63,7 +63,7 @@ dependencies:
   - fsnotify >=0.2.1
   - Glob >=0.9 && <0.10
   - haskeline >=0.7.0.0
-  - language-javascript >=0.6.0.13
+  - language-javascript >=0.6.0.14
   - lifted-async >=0.10.0.3 && <0.10.1
   - lifted-base >=0.2.3 && <0.2.4
   - memory >=0.14 && <0.15
