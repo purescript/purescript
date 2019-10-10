@@ -12,7 +12,7 @@ module Language.PureScript.Sugar.BindingGroups
 import Prelude.Compat
 import Protolude (ordNub)
 
-import Control.Monad ((<=<))
+import Control.Monad (void, (<=<))
 import Control.Monad.Error.Class (MonadError(..))
 
 import Data.Graph
@@ -26,6 +26,7 @@ import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Names
+import Language.PureScript.PSString (PSString, prettyPrintString)
 import Language.PureScript.Types
 
 -- |
@@ -53,7 +54,6 @@ createBindingGroups
   -> [Declaration]
   -> m [Declaration]
 createBindingGroups moduleName = mapM f <=< handleDecls
-
   where
   (f, _, _) = everywhereOnValuesTopDownM return handleExprs return
 
@@ -66,14 +66,22 @@ createBindingGroups moduleName = mapM f <=< handleDecls
   --
   handleDecls :: [Declaration] -> m [Declaration]
   handleDecls ds = do
-    let values = mapMaybe (fmap (fmap extractGuardedExpr) . getValueDeclaration) ds
-        dataDecls = filter isDataDecl ds
+    let dataDecls = filter isDataDecl ds
         allProperNames = fmap declTypeName dataDecls
         dataVerts = fmap (\d -> (d, declTypeName d, usedTypeNames moduleName d `intersect` allProperNames)) dataDecls
     dataBindingGroupDecls <- parU (stronglyConnComp dataVerts) toDataBindingGroup
-    let allIdents = fmap valdeclIdent values
+
+    let values = mapMaybe (fmap (fmap extractGuardedExpr) . getValueDeclaration) ds
+        allIdents = fmap valdeclIdent values
         valueVerts = fmap (\d -> (d, valdeclIdent d, usedIdents moduleName d `intersect` allIdents)) values
-    bindingGroupDecls <- parU (stronglyConnComp valueVerts) (toBindingGroup moduleName)
+    bindingGroupDecls <- parU (stronglyConnComp valueVerts) (toBindingGroups usedImmediateIdents moduleName)
+
+    let dictValues = mapMaybe (fmap (fmap extractGuardedExpr) . getDictDeclaration) ds
+        dictIdents = fmap valdeclIdent dictValues
+        dictValueVerts = fmap (\d -> (d, valdeclIdent d, usedIdents moduleName d `intersect` dictIdents)) dictValues
+        checkDeclsForInvalidCycles = toBindingGroups
+    void $ parU (stronglyConnComp dictValueVerts) (checkDeclsForInvalidCycles immediateLitIdentsAndAllOtherIdents moduleName)
+
     return $ filter isImportDecl ds ++
              filter isExternKindDecl ds ++
              filter isExternDataDecl ds ++
@@ -119,11 +127,32 @@ usedIdents moduleName = ordNub . usedIdents' S.empty . valdeclExpression
     | moduleName == moduleName' && ToplevelIdent name `S.notMember` scope = [name]
   usedNamesE _ _ = []
 
-usedImmediateIdents :: ModuleName -> Declaration -> [Ident]
-usedImmediateIdents moduleName =
-  let (f, _, _, _, _) = everythingWithContextOnValues True [] (++) def usedNamesE def def def
-  in ordNub . f
+immediateLitIdentsAndAllOtherIdents :: ModuleName -> Expr -> [Ident]
+immediateLitIdentsAndAllOtherIdents moduleName = ordNub . g
   where
+  (_, g, _, _, _) = everythingWithContextOnValues True [] (++) def usedNamesE usedNamesLitE def def def
+
+  def s _ = (s, [])
+
+  usedNamesE :: Bool -> Expr -> (Bool, [Ident])
+  usedNamesE True (Var _ (Qualified Nothing name)) = (True, [name])
+  usedNamesE True (Var _ (Qualified (Just moduleName') name))
+    | moduleName == moduleName' = (True, [name])
+  usedNamesE scope _ = (scope, [])
+
+  usedNamesLitE :: Bool -> Expr -> (Bool, [Ident])
+  usedNamesLitE True (Var _ (Qualified Nothing name)) = (True, [name])
+  usedNamesLitE True (Var _ (Qualified (Just moduleName') name))
+    | moduleName == moduleName' = (True, [name])
+  usedNamesLitE True (App (stripTypedAndPositioned -> (Abs _ e0)) e1) = (True, g e0 ++ g e1)
+  usedNamesLitE True (Abs _ _) = (False, [])
+  usedNamesLitE scope _ = (scope, [])
+
+usedImmediateIdents :: ModuleName -> Expr -> [Ident]
+usedImmediateIdents moduleName = ordNub . g
+  where
+  (_, g, _, _, _) = everythingWithContextOnValues True [] (++) def usedNamesE usedNamesE def def def
+
   def s _ = (s, [])
 
   usedNamesE :: Bool -> Expr -> (Bool, [Ident])
@@ -134,10 +163,10 @@ usedImmediateIdents moduleName =
   usedNamesE scope _ = (scope, [])
 
 usedTypeNames :: ModuleName -> Declaration -> [ProperName 'TypeName]
-usedTypeNames moduleName =
-  let (f, _, _, _, _) = accumTypes (everythingOnTypes (++) usedNames)
-  in ordNub . f
+usedTypeNames moduleName = ordNub . f
   where
+  (f, _, _, _, _) = accumTypes (everythingOnTypes (++) usedNames)
+
   usedNames :: SourceType -> [ProperName 'TypeName]
   usedNames (ConstrainedType _ con _) =
     case con of
@@ -157,37 +186,83 @@ declTypeName _ = internalError "Expected DataDeclaration"
 -- Convert a group of mutually-recursive dependencies into a BindingGroupDeclaration (or simple ValueDeclaration).
 --
 --
-toBindingGroup
+toBindingGroups
   :: forall m
    . (MonadError MultipleErrors m)
-   => ModuleName
+   => (ModuleName -> Expr -> [Ident])
+   -> ModuleName
    -> SCC (ValueDeclarationData Expr)
    -> m Declaration
-toBindingGroup _ (AcyclicSCC d) = return (mkDeclaration d)
-toBindingGroup moduleName (CyclicSCC ds') = do
+toBindingGroups _ _ (AcyclicSCC d) = return (mkDeclaration d)
+toBindingGroups getIdents moduleName (CyclicSCC ds') = do
   -- Once we have a mutually-recursive group of declarations, we need to sort
-  -- them further by their immediate dependencies (those outside function
-  -- bodies). In particular, this is relevant for type instance dictionaries
-  -- whose members require other type instances (for example, functorEff
-  -- defines (<$>) = liftA1, which depends on applicativeEff). Note that
-  -- superclass references are still inside functions, so don't count here.
+  -- them further by appropriate subsets of their dependencies (generally, those
+  -- outside function bodies). In particular, this is relevant for type instance
+  -- dictionaries whose members require other type instances (for example,
+  -- functorEff defines (<$>) = liftA1, which depends on applicativeEff). Note
+  -- that superclass references are still inside functions, so don't count here.
   -- If we discover declarations that still contain mutually-recursive
   -- immediate references, we're guaranteed to get an undefined reference at
-  -- runtime, so treat this as an error. See also github issue #365.
+  -- runtime, so treat this as an error.
+  -- (See also github issues #365, #2975, and #3429.)
   BindingGroupDeclaration . NEL.fromList <$> mapM toBinding (stronglyConnComp valueVerts)
   where
+  cycleErrors :: ValueDeclarationData Expr -> MultipleErrors
+  cycleErrors (ValueDeclarationData (ss, _) n _ _ e) =
+    case (e, stripAbs e) of
+      (TypedValue _ (stripTypedAndPositioned -> (Var _ _)) st, _)
+        | isFunctionType st -> errorMessage' ss $ MissingEtaExpansion n
+      (_, TypeClassDictionaryConstructorApp _ (getFields -> Just fields)) ->
+        let getData = map getFieldData . filter (refersToIdent n . snd)
+        in errorMessage' ss $ CycleInDictDeclaration n $ getData fields
+      _ -> errorMessage' ss $ CycleInDeclaration n
+
+  getFieldData :: (PSString, Expr) -> (Ident, SourceSpan, DictMemberType)
+  getFieldData (psString, expr) = case separateValAndType expr of
+    (expr', mSt) -> (ident, getSourceSpan expr', isFn mSt)
+    where
+    ident = Ident $ prettyPrintString psString
+    isFn = maybe NonFn (\st -> if isFunctionType st then Fn else NonFn)
+
+  getFields :: Expr -> Maybe [(PSString, Expr)]
+  getFields expr = case stripTypedAndPositioned expr of
+    Literal _ (ObjectLiteral fields) -> Just fields
+    _ -> Nothing
+
+  getSourceSpan :: Expr -> SourceSpan
+  getSourceSpan (PositionedValue ss _ _) = ss
+  getSourceSpan (Literal ss _) = ss
+  getSourceSpan (UnaryMinus ss _) = ss
+  getSourceSpan (Var ss _) = ss
+  getSourceSpan (Op ss _) = ss
+  getSourceSpan (Constructor ss _) = ss
+  getSourceSpan (App (stripTypedAndPositioned -> (Abs _ expr)) _) = getSourceSpan expr
+  getSourceSpan (TypedValue _ expr _) = getSourceSpan expr
+  getSourceSpan _ = NullSourceSpan
+
   idents :: [Ident]
   idents = fmap (\(_, i, _) -> i) valueVerts
 
-  valueVerts :: [(ValueDeclarationData Expr, Ident, [Ident])]
-  valueVerts = fmap (\d -> (d, valdeclIdent d, usedImmediateIdents moduleName (mkDeclaration d) `intersect` idents)) ds'
+  refersToIdent :: Ident -> Expr -> Bool
+  refersToIdent ident = elem ident . getIdents moduleName
+
+  separateValAndType :: Expr -> (Expr, Maybe SourceType)
+  separateValAndType (TypedValue _ e st) =
+    let (e', _) = separateValAndType e
+    in  (e', Just st)
+  separateValAndType e = (e, Nothing)
+
+  stripAbs :: Expr -> Expr
+  stripAbs e = case stripTypedAndPositioned e of
+    Abs _ e' -> stripAbs e'
+    e' -> e'
 
   toBinding :: SCC (ValueDeclarationData Expr) -> m ((SourceAnn, Ident), NameKind, Expr)
   toBinding (AcyclicSCC d) = return $ fromValueDecl d
-  toBinding (CyclicSCC ds) = throwError $ foldMap cycleError ds
+  toBinding (CyclicSCC ds) = throwError $ foldMap cycleErrors ds
 
-  cycleError :: ValueDeclarationData Expr -> MultipleErrors
-  cycleError (ValueDeclarationData (ss, _) n _ _ _) = errorMessage' ss $ CycleInDeclaration n
+  valueVerts :: [(ValueDeclarationData Expr, Ident, [Ident])]
+  valueVerts = fmap (\d -> (d, valdeclIdent d, getIdents moduleName (valdeclExpression d) `intersect` idents)) ds'
 
 toDataBindingGroup
   :: MonadError MultipleErrors m

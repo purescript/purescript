@@ -1,8 +1,8 @@
--- @shouldFailWith CycleInDictDeclaration
--- Cf. 3429-*.purs and passing/365.purs
+-- Cf. 3429/*.purs and failing/365.purs
 module Main where
 
 import Prelude
+import Effect.Console (log)
 
 class C a where
   f :: a -> a
@@ -10,6 +10,6 @@ class C a where
 
 instance cS :: C String where
   f s = s
-  g = f
+  g s = f s
 
-main = g "Done"
+main = log "Done"

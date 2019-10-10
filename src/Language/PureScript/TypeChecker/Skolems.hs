@@ -89,7 +89,7 @@ skolemEscapeCheck expr@TypedValue{} =
     traverse_ (throwError . singleError) (toSkolemErrors expr)
   where
     toSkolemErrors :: Expr -> [ErrorMessage]
-    (_, toSkolemErrors, _, _, _) = everythingWithContextOnValues (mempty, Nothing) [] (<>) def go def def def
+    (_, toSkolemErrors, _, _, _) = everythingWithContextOnValues (mempty, Nothing) [] (<>) def go go def def def
 
     def s _ = (s, [])
 

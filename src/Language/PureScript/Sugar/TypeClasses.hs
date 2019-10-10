@@ -338,7 +338,7 @@ typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
   memberToValue :: [(Ident, SourceType)] -> Declaration -> Desugar m Expr
   memberToValue tys' (ValueDecl (ss', _) ident _ [] [MkUnguarded val]) = do
     _ <- maybe (throwError . errorMessage' ss' $ ExtraneousClassMember ident className) return $ lookup ident tys'
-    return val
+    return (PositionedValue ss' [] val)
   memberToValue _ _ = internalError "Invalid declaration in type instance definition"
 
 declIdent :: Declaration -> Maybe Ident
