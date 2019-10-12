@@ -4,7 +4,7 @@ packages:
 - '.'
 extra-deps:
 - happy-1.19.9
-- language-javascript-0.6.0.14
+- language-javascript-0.7.0.0
 - network-3.0.1.1
 - these-1.0.1
 - semialign-1
