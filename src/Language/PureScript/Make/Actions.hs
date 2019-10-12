@@ -9,7 +9,6 @@ module Language.PureScript.Make.Actions
 
 import           Prelude
 
-import           Control.Exception (tryJust)
 import           Control.Monad hiding (sequence)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.IO.Class
@@ -53,9 +52,8 @@ import           Language.PureScript.Pretty.Common (SMap(..))
 import qualified Paths_purescript as Paths
 import           SourceMap
 import           SourceMap.Types
-import           System.Directory (doesFileExist, getModificationTime, createDirectoryIfMissing, getCurrentDirectory)
-import           System.FilePath ((</>), takeDirectory, makeRelative, splitPath, normalise)
-import           System.IO.Error (isDoesNotExistError)
+import           System.Directory (getCurrentDirectory)
+import           System.FilePath ((</>), makeRelative, splitPath, normalise)
 
 -- | Determines when to rebuild a module
 data RebuildPolicy
@@ -137,7 +135,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
       Right filePath -> do
         let inputPaths = filePath : maybeToList (M.lookup mn foreigns)
             getInfo fp = do
-              ts <- getTimestamp fp >>= maybe (throwError (singleError (cannotReadFile fp))) pure
+              ts <- getTimestamp fp
               return (ts, hash <$> readTextFile fp)
         pathsWithInfo <- traverse (\fp -> (fp,) <$> getInfo fp) inputPaths
         return $ Right $ M.fromList pathsWithInfo
@@ -158,7 +156,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   getOutputTimestamp mn = do
     codegenTargets <- asks optionsCodegenTargets
     let outputPaths = [outputFilename mn "externs.json"] <> fmap (targetFilename mn) (S.toList codegenTargets)
-    timestamps <- traverse getTimestamp outputPaths
+    timestamps <- traverse getTimestampMaybe outputPaths
     pure $ fmap minimum . NEL.nonEmpty =<< sequence timestamps
 
   readExterns :: ModuleName -> Make (FilePath, Externs)
@@ -185,7 +183,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
         Nothing | requiresForeign m -> throwError . errorMessage' (CF.moduleSourceSpan m) $ MissingFFIModule mn
                 | otherwise -> return Nothing
       rawJs <- J.moduleToJs m foreignInclude
-      dir <- lift $ makeIO (const (cannotGetFileInfo ".")) getCurrentDirectory
+      dir <- lift $ makeIO "get the current directory" getCurrentDirectory
       let sourceMaps = S.member JSSourceMap codegenTargets
           (pjs, mappings) = if sourceMaps then prettyPrintJSWithSourceMaps rawJs else (prettyPrintJS rawJs, [])
           jsFile = targetFilename mn JS
@@ -242,49 +240,16 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   requiresForeign :: CF.Module a -> Bool
   requiresForeign = not . null . CF.moduleForeign
 
-  getTimestamp :: FilePath -> Make (Maybe UTCTime)
-  getTimestamp path = makeIO (const (cannotReadFile path)) $ do
-    exists <- doesFileExist path
-    if exists
-      then Just <$> getModificationTime path
-      else pure Nothing
-
-  writeTextFile :: FilePath -> B.ByteString -> Make ()
-  writeTextFile path text = makeIO (const (cannotWriteFile path)) $ do
-    createParentDirectory path
-    B.writeFile path text
-
   progress :: ProgressMessage -> Make ()
   progress = liftIO . putStrLn . renderProgressMessage
 
   readCacheDb :: Make CacheDb
-  readCacheDb = do
-    let path = outputDir </> cacheDbFile
-    makeIO (const (cannotReadFile path)) $ do
-      r <- tryJust
-             (guard . isDoesNotExistError)
-             (Aeson.decodeFileStrict' path)
-      case r of
-        Left () ->
-          pure mempty
-        Right mdb ->
-          pure (fromMaybe mempty mdb)
+  readCacheDb = fmap (fromMaybe mempty) $ readJSONFile cacheDbFile
 
   writeCacheDb :: CacheDb -> Make ()
-  writeCacheDb db = do
-    let path = outputDir </> cacheDbFile
-    makeIO (const (cannotWriteFile path)) $ do
-      createParentDirectory path
-      Aeson.encodeFile path db
+  writeCacheDb = writeJSONFile cacheDbFile
 
-  createParentDirectory :: FilePath -> IO ()
-  createParentDirectory = createDirectoryIfMissing True . takeDirectory
-
-  cannotWriteFile = ErrorMessage [] . CannotWriteFile
-  cannotReadFile = ErrorMessage [] . CannotReadFile
-  cannotGetFileInfo = ErrorMessage [] . CannotGetFileInfo
-
-  cacheDbFile = "cache-db.json"
+  cacheDbFile = outputDir </> "cache-db.json"
 
 -- | Check that the declarations in a given PureScript module match with those
 -- in its corresponding foreign module.
