@@ -279,7 +279,7 @@ lintImportDecl env mni qualifierName names ss declType allowImplicit =
           isMatch _ _ = False
 
   unused :: m Bool
-  unused = warn (UnusedImport mni)
+  unused = warn (UnusedImport mni qualifierName)
 
   warn :: SimpleErrorMessage -> m Bool
   warn err = tell (errorMessage' ss err) >> return True
@@ -373,6 +373,7 @@ runDeclRef (ValueOpRef _ op) = Just $ ValOpName op
 runDeclRef (TypeRef _ pn _) = Just $ TyName pn
 runDeclRef (TypeOpRef _ op) = Just $ TyOpName op
 runDeclRef (TypeClassRef _ pn) = Just $ TyClassName pn
+runDeclRef (KindRef _ pn) = Just $ KiName pn
 runDeclRef _ = Nothing
 
 checkDuplicateImports
