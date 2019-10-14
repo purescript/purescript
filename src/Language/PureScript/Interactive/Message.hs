@@ -45,7 +45,7 @@ noInputMessage :: String
 noInputMessage = unlines
   [ "purs repl: No input files; try running `pulp psci` instead."
   , "For help getting started, visit " ++ guideURL
-  , "Usage: For basic information, try the `--help' option."
+  , "Usage: For basic information, try the `--help` option."
   ]
 
 supportModuleMessage :: String

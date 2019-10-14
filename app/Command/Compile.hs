@@ -59,7 +59,7 @@ compile PSCMakeOptions{..} = do
   input <- globWarningOnMisses (unless pscmJSONErrors . warnFileTypeNotFound) pscmInput
   when (null input && not pscmJSONErrors) $ do
     hPutStr stderr $ unlines [ "purs compile: No input files."
-                             , "Usage: For basic information, try the `--help' option."
+                             , "Usage: For basic information, try the `--help` option."
                              ]
     exitFailure
   moduleFiles <- readUTF8FilesT input
