@@ -1195,8 +1195,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     printRows r1 r2 = case (full, r1, r2) of 
       (True, _ , _) -> (printRow typeAsBox r1, printRow typeAsBox r2)
 
-      (_, r1'@RCons{}, r2'@RCons{}) -> let 
-        (sorted1, sorted2) = filterRows (rowToList r1') (rowToList r2')
+      (_, RCons{}, RCons{}) -> 
+        let (sorted1, sorted2) = filterRows (rowToList r1) (rowToList r2)
         in (printRow typeDiffAsBox sorted1, printRow typeDiffAsBox sorted2)
         
       (_, _, _) -> (printRow typeAsBox r1, printRow typeAsBox r2)
