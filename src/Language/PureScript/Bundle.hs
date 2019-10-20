@@ -301,6 +301,17 @@ withDeps (Module modulePath fn es) = Module modulePath fn (map expandDeps es)
       -- bound to the module level (i.e., hasn't been shadowed by a function
       -- parameter)
       = ([(m, nm, Internal)], bn)
+    toReference (JSObjectLiteral _ props _) bn
+      = let
+          shorthandNames =
+            filter (`elem` bn) $
+            -- ^ only add a dependency if this name is still in the list of
+            -- names bound to the module level (i.e., hasn't been shadowed by a
+            -- function parameter)
+            mapMaybe unPropertyIdentRef $
+            trailingCommaList props
+        in
+          (map (\name -> (m, name, Internal)) shorthandNames, bn)
     toReference (JSFunctionExpression _ _ _ params _ _) bn
       = ([], bn \\ (mapMaybe unIdentifier $ commaList params))
     toReference e bn
@@ -308,11 +319,6 @@ withDeps (Module modulePath fn es) = Module modulePath fn (map expandDeps es)
       -- ^ exports.foo means there's a dependency on the public member "foo" of
       -- this module.
       = ([(m, nm, Public)], bn)
-    toReference (JSObjectLiteral _ props _) bn
-      = let
-          shorthandNames = mapMaybe unPropertyIdentRef (trailingCommaList props)
-        in
-          (map (\name -> (m, name, Internal)) shorthandNames, bn)
     toReference _ bn = ([], bn)
 
     unIdentifier :: JSExpression -> Maybe String
