@@ -308,11 +308,20 @@ withDeps (Module modulePath fn es) = Module modulePath fn (map expandDeps es)
       -- ^ exports.foo means there's a dependency on the public member "foo" of
       -- this module.
       = ([(m, nm, Public)], bn)
+    toReference (JSObjectLiteral _ props _) bn
+      = let
+          shorthandNames = mapMaybe unPropertyIdentRef (trailingCommaList props)
+        in
+          (map (\name -> (m, name, Internal)) shorthandNames, bn)
     toReference _ bn = ([], bn)
 
     unIdentifier :: JSExpression -> Maybe String
     unIdentifier (JSIdentifier _ name) = Just name
     unIdentifier _ = Nothing
+
+    unPropertyIdentRef :: JSObjectProperty -> Maybe String
+    unPropertyIdentRef (JSPropertyIdentRef _ name) = Just name
+    unPropertyIdentRef _ = Nothing
 
 -- String literals include the quote chars
 fromStringLiteral :: JSExpression -> Maybe String
