@@ -301,6 +301,17 @@ withDeps (Module modulePath fn es) = Module modulePath fn (map expandDeps es)
       -- bound to the module level (i.e., hasn't been shadowed by a function
       -- parameter)
       = ([(m, nm, Internal)], bn)
+    toReference (JSObjectLiteral _ props _) bn
+      = let
+          shorthandNames =
+            filter (`elem` bn) $
+            -- ^ only add a dependency if this name is still in the list of
+            -- names bound to the module level (i.e., hasn't been shadowed by a
+            -- function parameter)
+            mapMaybe unPropertyIdentRef $
+            trailingCommaList props
+        in
+          (map (\name -> (m, name, Internal)) shorthandNames, bn)
     toReference (JSFunctionExpression _ _ _ params _ _) bn
       = ([], bn \\ (mapMaybe unIdentifier $ commaList params))
     toReference e bn
@@ -313,6 +324,10 @@ withDeps (Module modulePath fn es) = Module modulePath fn (map expandDeps es)
     unIdentifier :: JSExpression -> Maybe String
     unIdentifier (JSIdentifier _ name) = Just name
     unIdentifier _ = Nothing
+
+    unPropertyIdentRef :: JSObjectProperty -> Maybe String
+    unPropertyIdentRef (JSPropertyIdentRef _ name) = Just name
+    unPropertyIdentRef _ = Nothing
 
 -- String literals include the quote chars
 fromStringLiteral :: JSExpression -> Maybe String
