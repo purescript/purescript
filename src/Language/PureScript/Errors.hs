@@ -1187,11 +1187,17 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     printRow f t = markCodeBox $ indent $ f prettyDepth t
 
     -- If both rows are not empty, print them as diffs
+    -- If verbose print all rows else only print unique rows
     printRows :: Type a -> Type a -> (Box.Box, Box.Box)
-    printRows r1@RCons{} r2@RCons{} = let
-      (sorted1, sorted2) = filterRows (rowToList r1) (rowToList r2)
-      in (printRow typeDiffAsBox sorted1, printRow typeDiffAsBox sorted2)
-    printRows r1 r2 = (printRow typeAsBox r1, printRow typeAsBox r2)
+    printRows r1 r2 = case (full, r1, r2) of 
+      (True, _ , _) -> (printRow typeAsBox r1, printRow typeAsBox r2)
+
+      (_, RCons{}, RCons{}) -> 
+        let (sorted1, sorted2) = filterRows (rowToList r1) (rowToList r2)
+        in (printRow typeDiffAsBox sorted1, printRow typeDiffAsBox sorted2)
+        
+      (_, _, _) -> (printRow typeAsBox r1, printRow typeAsBox r2)
+
 
     -- Keep the unique labels only
     filterRows :: ([RowListItem a], Type a) -> ([RowListItem a], Type a) -> (Type a, Type a)
