@@ -15,8 +15,8 @@ import Prelude.Compat
 
 import Control.Monad.Supply.Class (MonadSupply, freshName)
 
+import Data.Either (rights)
 import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
 import Data.String (IsString, fromString)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -95,7 +95,6 @@ inlineCommonValues = everywhere convert
   convert (App ss (App _ (App _ fn [dict]) [x]) [y])
     | isDict semiringInt dict && isDict fnAdd fn = intOp ss Add x y
     | isDict semiringInt dict && isDict fnMultiply fn = intOp ss Multiply x y
-    | isDict euclideanRingInt dict && isDict fnDivide fn = intOp ss Divide x y
     | isDict ringInt dict && isDict fnSubtract fn = intOp ss Subtract x y
   convert other = other
   fnZero = (C.dataSemiring, C.zero)
@@ -103,7 +102,6 @@ inlineCommonValues = everywhere convert
   fnBottom = (C.dataBounded, C.bottom)
   fnTop = (C.dataBounded, C.top)
   fnAdd = (C.dataSemiring, C.add)
-  fnDivide = (C.dataEuclideanRing, C.div)
   fnMultiply = (C.dataSemiring, C.mul)
   fnSubtract = (C.dataRing, C.sub)
   fnNegate = (C.dataRing, C.negate)
@@ -118,7 +116,6 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
   , unary  ringNumber opNegate Negate
 
   , binary euclideanRingNumber opDiv Divide
-  , binary euclideanRingInt opMod Modulus
 
   , binary eqNumber opEq EqualTo
   , binary eqNumber opNotEq NotEqualTo
@@ -171,7 +168,8 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
   , inlineNonClassFunction (isModFnWithDict (C.dataArray, C.unsafeIndex)) $ flip (Indexer Nothing)
   ] ++
   [ fn | i <- [0..10], fn <- [ mkFn i, runFn i ] ] ++
-  [ fn | i <- [0..10], fn <- [ mkEffFn i, runEffFn i ] ]
+  [ fn | i <- [0..10], fn <- [ mkEffFn C.controlMonadEffUncurried C.mkEffFn i, runEffFn C.controlMonadEffUncurried C.runEffFn i ] ] ++
+  [ fn | i <- [0..10], fn <- [ mkEffFn C.effectUncurried C.mkEffectFn i, runEffFn C.effectUncurried C.runEffectFn i ] ]
   where
   binary :: (Text, PSString) -> (Text, PSString) -> BinaryOperator -> AST -> AST
   binary dict fns op = convert where
@@ -198,8 +196,8 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
   mkFn = mkFn' C.dataFunctionUncurried C.mkFn $ \ss1 ss2 ss3 args js ->
     Function ss1 Nothing args (Block ss2 [Return ss3 js])
 
-  mkEffFn :: Int -> AST -> AST
-  mkEffFn = mkFn' C.controlMonadEffUncurried C.mkEffFn $ \ss1 ss2 ss3 args js ->
+  mkEffFn :: Text -> Text -> Int -> AST -> AST
+  mkEffFn modName fnName = mkFn' modName fnName $ \ss1 ss2 ss3 args js ->
     Function ss1 Nothing args (Block ss2 [Return ss3 (App ss3 js [])])
 
   mkFn' :: Text -> Text -> (Maybe SourceSpan -> Maybe SourceSpan -> Maybe SourceSpan -> [Text] -> AST -> AST) -> Int -> AST -> AST
@@ -228,8 +226,8 @@ inlineCommonOperators = everywhereTopDown $ applyAll $
   runFn :: Int -> AST -> AST
   runFn = runFn' C.dataFunctionUncurried C.runFn App
 
-  runEffFn :: Int -> AST -> AST
-  runEffFn = runFn' C.controlMonadEffUncurried C.runEffFn $ \ss fn acc ->
+  runEffFn :: Text -> Text -> Int -> AST -> AST
+  runEffFn modName fnName = runFn' modName fnName $ \ss fn acc ->
     Function ss Nothing [] (Block ss [Return ss (App ss fn acc)])
 
   runFn' :: Text -> Text -> (Maybe SourceSpan -> AST -> [AST] -> AST) -> Int -> AST -> AST
@@ -267,20 +265,36 @@ inlineFnComposition = everywhereTopDownM convert where
   convert (App s1 (App s2 (App _ (App _ fn [dict']) [x]) [y]) [z])
     | isFnCompose dict' fn = return $ App s1 x [App s2 y [z]]
     | isFnComposeFlipped dict' fn = return $ App s2 y [App s1 x [z]]
-  convert (App ss (App _ (App _ fn [dict']) [x]) [y])
-    | isFnCompose dict' fn = do
-        arg <- freshName
-        return $ Function ss Nothing [arg] (Block ss [Return Nothing $ App Nothing x [App Nothing y [Var Nothing arg]]])
-    | isFnComposeFlipped dict' fn = do
-        arg <- freshName
-        return $ Function ss Nothing [arg] (Block ss [Return Nothing $ App Nothing y [App Nothing x [Var Nothing arg]]])
+  convert app@(App ss (App _ (App _ fn [dict']) _) _)
+    | isFnCompose dict' fn || isFnComposeFlipped dict' fn = mkApps ss <$> goApps app <*> freshName
   convert other = return other
+
+  mkApps :: Maybe SourceSpan -> [Either AST (Text, AST)] -> Text -> AST
+  mkApps ss fns a = App ss (Function ss Nothing [] (Block ss $ vars <> [Return Nothing comp])) []
+    where
+    vars = uncurry (VariableIntroduction ss) . fmap Just <$> rights fns
+    comp = Function ss Nothing [a] (Block ss [Return Nothing apps])
+    apps = foldr (\fn acc -> App ss (mkApp fn) [acc]) (Var ss a) fns
+
+  mkApp :: Either AST (Text, AST) -> AST
+  mkApp = either id $ \(name, arg) -> Var (getSourceSpan arg) name
+
+  goApps :: AST -> m [Either AST (Text, AST)]
+  goApps (App _ (App _ (App _ fn [dict']) [x]) [y])
+    | isFnCompose dict' fn = mappend <$> goApps x <*> goApps y
+    | isFnComposeFlipped dict' fn = mappend <$> goApps y <*> goApps x
+  goApps app@(App {}) = pure . Right . (,app) <$> freshName
+  goApps other = pure [Left other]
+
   isFnCompose :: AST -> AST -> Bool
   isFnCompose dict' fn = isDict semigroupoidFn dict' && isDict fnCompose fn
+
   isFnComposeFlipped :: AST -> AST -> Bool
   isFnComposeFlipped dict' fn = isDict semigroupoidFn dict' && isDict fnComposeFlipped fn
+
   fnCompose :: forall a b. (IsString a, IsString b) => (a, b)
   fnCompose = (C.controlSemigroupoid, C.compose)
+
   fnComposeFlipped :: forall a b. (IsString a, IsString b) => (a, b)
   fnComposeFlipped = (C.controlSemigroupoid, C.composeFlipped)
 
@@ -314,9 +328,6 @@ ringInt = (C.dataRing, C.ringInt)
 
 euclideanRingNumber :: forall a b. (IsString a, IsString b) => (a, b)
 euclideanRingNumber = (C.dataEuclideanRing, C.euclideanRingNumber)
-
-euclideanRingInt :: forall a b. (IsString a, IsString b) => (a, b)
-euclideanRingInt = (C.dataEuclideanRing, C.euclideanRingInt)
 
 eqNumber :: forall a b. (IsString a, IsString b) => (a, b)
 eqNumber = (C.dataEq, C.eqNumber)
@@ -395,9 +406,6 @@ opNegate = (C.dataRing, C.negate)
 
 opDiv :: forall a b. (IsString a, IsString b) => (a, b)
 opDiv = (C.dataEuclideanRing, C.div)
-
-opMod :: forall a b. (IsString a, IsString b) => (a, b)
-opMod = (C.dataEuclideanRing, C.mod)
 
 opConj :: forall a b. (IsString a, IsString b) => (a, b)
 opConj = (C.dataHeytingAlgebra, C.conj)

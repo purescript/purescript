@@ -2,6 +2,8 @@ dist
 cabal-dev
 .cabal-sandbox
 cabal.sandbox.config
+dist-newstyle/
+cabal.project.local*
 *.o
 *.hi
 *.chi
@@ -15,8 +17,19 @@ node_modules
 tmp/
 .stack-work/
 output
-examples/docs/docs/
+tests/purs/docs/docs/
 core-tests/full-core-docs.md
+tests/support/package-lock.json
 .psc-ide-port
 .psc-package/
 purescript.cabal
+tags
+TAGS
+
+# Profiling related
+*.aux
+*.hp
+*.prof
+*.ps
+*.svg
+tests/purs/make/

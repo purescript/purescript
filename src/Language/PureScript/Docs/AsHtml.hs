@@ -17,10 +17,11 @@ module Language.PureScript.Docs.AsHtml (
 import Prelude
 import Control.Category ((>>>))
 import Control.Monad (unless)
+import Data.Bifunctor (first)
 import Data.Char (isUpper)
 import Data.Either (isRight)
+import qualified Data.List.NonEmpty as NE
 import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
 import Data.Foldable (for_)
 import Data.String (fromString)
 
@@ -30,13 +31,13 @@ import qualified Data.Text as T
 import Text.Blaze.Html5 as H hiding (map)
 import qualified Text.Blaze.Html5.Attributes as A
 import qualified Cheapskate
-import Text.Parsec (eof)
 
 import qualified Language.PureScript as P
 
 import Language.PureScript.Docs.Types
 import Language.PureScript.Docs.RenderedCode hiding (sp)
 import qualified Language.PureScript.Docs.Render as Render
+import qualified Language.PureScript.CST as CST
 
 declNamespace :: Declaration -> Namespace
 declNamespace = declInfoNamespace . declInfo
@@ -54,18 +55,16 @@ data HtmlOutputModule a = HtmlOutputModule
   deriving (Show, Functor)
 
 data HtmlRenderContext = HtmlRenderContext
-  { currentModuleName :: P.ModuleName
-  , buildDocLink :: Namespace -> Text -> ContainingModule -> Maybe DocLink
+  { buildDocLink :: Namespace -> Text -> ContainingModule -> Maybe DocLink
   , renderDocLink :: DocLink -> Text
   , renderSourceLink :: P.SourceSpan -> Maybe Text
   }
 
 -- |
 -- An HtmlRenderContext for when you don't want to render any links.
-nullRenderContext :: P.ModuleName -> HtmlRenderContext
-nullRenderContext mn = HtmlRenderContext
-  { currentModuleName = mn
-  , buildDocLink = const (const (const Nothing))
+nullRenderContext :: HtmlRenderContext
+nullRenderContext = HtmlRenderContext
+  { buildDocLink = const (const (const Nothing))
   , renderDocLink = const ""
   , renderSourceLink = const Nothing
   }
@@ -84,16 +83,16 @@ moduleAsHtml
     :: (InPackage P.ModuleName -> Maybe HtmlRenderContext)
     -> Module
     -> (P.ModuleName, HtmlOutputModule Html)
-moduleAsHtml getR Module{..} = (modName, HtmlOutputModule modHtml reexports)
+moduleAsHtml getHtmlCtx Module{..} = (modName, HtmlOutputModule modHtml reexports)
   where
   modHtml = do
-    let r = fromMaybe (nullRenderContext modName) $ getR (Local modName)
+    let r = fromMaybe nullRenderContext $ getHtmlCtx (Local modName)
      in do
         for_ modComments renderMarkdown
         for_ modDeclarations (declAsHtml r)
   reexports =
     flip map modReExports $ \(pkg, decls) ->
-        let r = fromMaybe (nullRenderContext modName) $ getR pkg
+        let r = fromMaybe nullRenderContext $ getHtmlCtx pkg
          in (pkg, foldMap (declAsHtml r) decls)
 
 -- renderIndex :: LinksContext -> [(Maybe Char, Html)]
@@ -102,17 +101,17 @@ moduleAsHtml getR Module{..} = (modName, HtmlOutputModule modHtml reexports)
 --   go = takeLocals
 --      >>> groupIndex getIndex renderEntry
 --      >>> map (second (ul . mconcat))
--- 
+--
 --   getIndex (_, title_) = do
 --     c <- textHeadMay title_
 --     guard (toUpper c `elem` ['A'..'Z'])
 --     pure c
--- 
+--
 --   textHeadMay t =
 --     case T.length t of
 --       0 -> Nothing
 --       _ -> Just (T.index t 0)
--- 
+--
 --   renderEntry (mn, title_) =
 --     li $ do
 --       let url = T.pack (filePathFor mn `relativeTo` "index") <> "#" <> title_
@@ -120,7 +119,7 @@ moduleAsHtml getR Module{..} = (modName, HtmlOutputModule modHtml reexports)
 --         a ! A.href (v url) $ text title_
 --       sp
 --       text ("(" <> P.runModuleName mn <> ")")
--- 
+--
 --   groupIndex :: Ord i => (a -> Maybe i) -> (a -> b) -> [a] -> [(Maybe i, [b])]
 --   groupIndex f g =
 --     map (second DList.toList) . M.toList . foldr go' M.empty . sortBy (comparing f)
@@ -222,25 +221,26 @@ codeAsHtml r = outputWith elemAsHtml
       then False
       else isUpper (T.index str 0)
 
-  isOp = isRight . runParser P.symbol
+  isOp = isRight . runParser CST.parseOperator
 
-  runParser :: P.TokenParser a -> Text -> Either String a
-  runParser p' s = either (Left . show) Right $ do
-    ts <- P.lex "" s
-    P.runTokenParser "" (p' <* eof) ts
+  runParser :: CST.Parser a -> Text -> Either String a
+  runParser p' =
+    first (CST.prettyPrintError . NE.head)
+      . CST.runTokenParser p'
+      . CST.lex
 
 renderLink :: HtmlRenderContext -> DocLink -> Html -> Html
 renderLink r link_@DocLink{..} =
   a ! A.href (v (renderDocLink r link_ <> fragmentFor link_))
     ! A.title (v fullyQualifiedName)
   where
-  fullyQualifiedName = case linkLocation of
-    SameModule                -> fq (currentModuleName r) linkTitle
-    LocalModule _ modName     -> fq modName linkTitle
-    DepsModule _ _ _ modName  -> fq modName linkTitle
-    BuiltinModule modName     -> fq modName linkTitle
+  fullyQualifiedName =
+    P.runModuleName modName <> "." <> linkTitle
 
-  fq mn str = P.runModuleName mn <> "." <> str
+  modName = case linkLocation of
+    LocalModule m    -> m
+    DepsModule _ _ m -> m
+    BuiltinModule m  -> m
 
 makeFragment :: Namespace -> Text -> Text
 makeFragment ns = (prefix <>) . escape

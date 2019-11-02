@@ -14,9 +14,9 @@ import           Prelude.Compat
 import           Protolude (ordNub)
 
 import           Data.List (sort, find, foldl')
-import           Data.Maybe (mapMaybe)
+import           Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
-import           Data.Monoid ((<>))
+import qualified Data.Set as S
 import           Data.Text (Text)
 import qualified Data.Text as T
 
@@ -28,7 +28,9 @@ import           Control.Monad.Trans.State.Strict (StateT, runStateT, evalStateT
 import           Control.Monad.Writer.Strict (Writer(), runWriter)
 
 import qualified Language.PureScript as P
+import qualified Language.PureScript.CST as CST
 import qualified Language.PureScript.Names as N
+import qualified Language.PureScript.Constants as C
 
 import           Language.PureScript.Interactive.Completion   as Interactive
 import           Language.PureScript.Interactive.IO           as Interactive
@@ -74,7 +76,7 @@ rebuild loadedExterns m = do
 
 -- | Build the collection of modules from scratch. This is usually done on startup.
 make
-  :: [(FilePath, P.Module)]
+  :: [(FilePath, CST.PartialResult P.Module)]
   -> P.Make ([P.ExternsFile], P.Environment)
 make ms = do
     foreignFiles <- P.inferForeignModules filePathMap
@@ -89,7 +91,7 @@ make ms = do
                          False
 
     filePathMap :: M.Map P.ModuleName (Either P.RebuildPolicy FilePath)
-    filePathMap = M.fromList $ map (\(fp, m) -> (P.getModuleName m, Right fp)) ms
+    filePathMap = M.fromList $ map (\(fp, m) -> (P.getModuleName $ CST.resPartial m, Right fp)) ms
 
 -- | Performs a PSCi command
 handleCommand
@@ -110,7 +112,9 @@ handleCommand _ _ p (KindOf typ)              = handleKindOf p typ
 handleCommand _ _ p (BrowseModule moduleName) = handleBrowse p moduleName
 handleCommand _ _ p (ShowInfo QueryLoaded)    = handleShowLoadedModules p
 handleCommand _ _ p (ShowInfo QueryImport)    = handleShowImportedModules p
+handleCommand _ _ p (ShowInfo QueryPrint)     = handleShowPrint p
 handleCommand _ _ p (CompleteStr prefix)      = handleComplete p prefix
+handleCommand _ _ p (SetInteractivePrint ip)  = handleSetInteractivePrint p ip
 handleCommand _ _ _ _                         = P.internalError "handleCommand: unexpected command"
 
 -- | Reload the application state
@@ -124,7 +128,7 @@ handleReloadState reload = do
   files <- liftIO $ concat <$> traverse glob globs
   e <- runExceptT $ do
     modules <- ExceptT . liftIO $ loadAllModules files
-    (externs, _) <- ExceptT . liftIO . runMake . make $ modules
+    (externs, _) <- ExceptT . liftIO . runMake . make $ fmap CST.pureResult <$> modules
     return (map snd modules, externs)
   case e of
     Left errs -> printErrors errs
@@ -167,7 +171,7 @@ handleDecls
   -> m ()
 handleDecls ds = do
   st <- gets (updateLets (++ ds))
-  let m = createTemporaryModule False st (P.Literal (P.ObjectLiteral []))
+  let m = createTemporaryModule False st (P.Literal P.nullSourceSpan (P.ObjectLiteral []))
   e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
   case e of
     Left err -> printErrors err
@@ -190,9 +194,8 @@ handleShowImportedModules
   => (String -> m ())
   -> m ()
 handleShowImportedModules print' = do
-  PSCiState { psciImportedModules = importedModules } <- get
+  importedModules <- psciImportedModules <$> get
   print' $ showModules importedModules
-  return ()
   where
   showModules = unlines . sort . map (T.unpack . showModule)
   showModule (mn, declType, asQ) =
@@ -227,6 +230,24 @@ handleShowImportedModules print' = do
   commaList :: [Text] -> Text
   commaList = T.intercalate ", "
 
+handleShowPrint
+  :: (MonadState PSCiState m, MonadIO m)
+  => (String -> m ())
+  -> m ()
+handleShowPrint print' = do
+  current <- psciInteractivePrint <$> get
+  if current == initialInteractivePrint
+    then
+      print' $
+        "The interactive print function is currently set to the default (`" ++ showPrint current ++ "`)"
+    else
+      print' $
+        "The interactive print function is currently set to `" ++ showPrint current ++ "`\n" ++
+        "The default can be restored with `:print " ++ showPrint initialInteractivePrint ++ "`"
+
+  where
+  showPrint (mn, ident) = T.unpack (N.runModuleName mn <> "." <> N.runIdent ident)
+
 -- | Imports a module, preserving the initial state on failure.
 handleImport
   :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
@@ -254,14 +275,14 @@ handleTypeOf print' val = do
     Left errs -> printErrors errs
     Right (_, env') ->
       case M.lookup (P.mkQualified (P.Ident "it") (P.ModuleName [P.ProperName "$PSCI"])) (P.names env') of
-        Just (ty, _, _) -> print' . P.prettyPrintType $ ty
+        Just (ty, _, _) -> print' . P.prettyPrintType maxBound $ ty
         Nothing -> print' "Could not find type"
 
 -- | Takes a type and prints its kind
 handleKindOf
   :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
   => (String -> m ())
-  -> P.Type
+  -> P.SourceType
   -> m ()
 handleKindOf print' typ = do
   st <- get
@@ -291,23 +312,21 @@ handleBrowse
   -> m ()
 handleBrowse print' moduleName = do
   st <- get
-  env <- asks psciEnvironment
-  if isModInEnv moduleName st
-    then print' $ printModuleSignatures moduleName env
-    else case lookupUnQualifiedModName moduleName st of
-      Just unQualifiedName ->
-        if isModInEnv unQualifiedName st
-          then print' $ printModuleSignatures unQualifiedName env
-          else failNotInEnv moduleName
-      Nothing ->
-        failNotInEnv moduleName
+  let env = psciEnvironment st
+  case findMod moduleName (psciLoadedExterns st) (psciImportedModules st) of
+    Just qualName -> print' $ printModuleSignatures qualName env
+    Nothing       -> failNotInEnv moduleName
   where
-    isModInEnv modName =
-        any ((== modName) . P.getModuleName . fst) . psciLoadedExterns
-    failNotInEnv modName =
-        print' $ T.unpack $ "Module '" <> N.runModuleName modName <> "' is not valid."
-    lookupUnQualifiedModName quaModName st =
-        (\(modName,_,_) -> modName) <$> find ( \(_, _, mayQuaName) -> mayQuaName == Just quaModName) (psciImportedModules st)
+    findMod needle externs imports =
+      let qualMod = fromMaybe needle (lookupUnQualifiedModName needle imports)
+          modules = S.fromList (C.primModules <> (P.getModuleName . fst <$> externs))
+      in if qualMod `S.member` modules
+           then Just qualMod
+           else Nothing
+
+    failNotInEnv modName = print' $ T.unpack $ "Module '" <> N.runModuleName modName <> "' is not valid."
+    lookupUnQualifiedModName needle imports =
+        (\(modName,_,_) -> modName) <$> find (\(_,_,mayQuaName) -> mayQuaName == Just needle) imports
 
 -- | Return output as would be returned by tab completion, for tools integration etc.
 handleComplete
@@ -320,3 +339,26 @@ handleComplete print' prefix = do
   let act = liftCompletionM (completion' (reverse prefix, ""))
   results <- evalStateT act st
   print' $ unlines (formatCompletions results)
+
+-- | Attempt to set the interactive print function. Note that the state will
+-- only be updated if the interactive print function exists and appears to
+-- work; we test it by attempting to evaluate '0'.
+handleSetInteractivePrint
+  :: (MonadState PSCiState m, MonadIO m)
+  => (String -> m ())
+  -> (P.ModuleName, P.Ident)
+  -> m ()
+handleSetInteractivePrint print' new = do
+  current <- gets psciInteractivePrint
+  modify (setInteractivePrint new)
+  st <- get
+  let expr = P.Literal internalSpan (P.NumericLiteral (Left 0))
+  let m = createTemporaryModule True st expr
+  e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
+  case e of
+    Left errs -> do
+      modify (setInteractivePrint current)
+      print' "Unable to set the repl's printing function:"
+      printErrors errs
+    Right _ ->
+      pure ()

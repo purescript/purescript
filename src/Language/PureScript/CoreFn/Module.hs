@@ -2,6 +2,7 @@ module Language.PureScript.CoreFn.Module where
 
 import Prelude.Compat
 
+import Language.PureScript.AST.SourcePos
 import Language.PureScript.Comments
 import Language.PureScript.CoreFn.Expr
 import Language.PureScript.Names
@@ -13,7 +14,8 @@ import Language.PureScript.Names
 -- parsing it one gets back `ModuleT () Ann` rathern than `ModuleT Type Ann`,
 -- which is enough for `moduleToJs`.
 data Module a = Module
-  { moduleComments :: [Comment]
+  { moduleSourceSpan :: SourceSpan
+  , moduleComments :: [Comment]
   , moduleName :: ModuleName
   , modulePath :: FilePath
   , moduleImports :: [(a, ModuleName)]

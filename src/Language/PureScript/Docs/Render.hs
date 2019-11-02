@@ -12,46 +12,46 @@ module Language.PureScript.Docs.Render where
 import Prelude.Compat
 
 import Data.Maybe (maybeToList)
-import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.Docs.RenderedCode
 import Language.PureScript.Docs.Types
 import Language.PureScript.Docs.Utils.MonoidExtras
-import qualified Language.PureScript as P
+
+import qualified Language.PureScript.AST as P
+import qualified Language.PureScript.Environment as P
+import qualified Language.PureScript.Names as P
+import qualified Language.PureScript.Types as P
 
 renderDeclaration :: Declaration -> RenderedCode
-renderDeclaration = renderDeclarationWithOptions defaultRenderTypeOptions
-
-renderDeclarationWithOptions :: RenderTypeOptions -> Declaration -> RenderedCode
-renderDeclarationWithOptions opts Declaration{..} =
+renderDeclaration Declaration{..} =
   mintersperse sp $ case declInfo of
     ValueDeclaration ty ->
       [ ident' declTitle
       , syntax "::"
-      , renderType' ty
+      , renderType ty
       ]
     DataDeclaration dtype args ->
       [ keyword (P.showDataDeclType dtype)
-      , renderType' (typeApp declTitle args)
+      , renderType (typeApp declTitle args)
       ]
     ExternDataDeclaration kind' ->
       [ keywordData
-      , renderType' (P.TypeConstructor (notQualified declTitle))
+      , renderType (P.TypeConstructor () (notQualified declTitle))
       , syntax "::"
       , renderKind kind'
       ]
     TypeSynonymDeclaration args ty ->
       [ keywordType
-      , renderType' (typeApp declTitle args)
+      , renderType (typeApp declTitle args)
       , syntax "="
-      , renderType' ty
+      , renderType ty
       ]
     TypeClassDeclaration args implies fundeps ->
       [ keywordClass ]
       ++ maybeToList superclasses
-      ++ [renderType' (typeApp declTitle args)]
+      ++ [renderType (typeApp declTitle args)]
       ++ fundepsList
       ++ [keywordWhere | any isTypeClassMember declChildren]
 
@@ -85,43 +85,27 @@ renderDeclarationWithOptions opts Declaration{..} =
       , kind (notQualified declTitle)
       ]
 
-  where
-  renderType' :: P.Type -> RenderedCode
-  renderType' = renderTypeWithOptions opts
-
 renderChildDeclaration :: ChildDeclaration -> RenderedCode
-renderChildDeclaration = renderChildDeclarationWithOptions defaultRenderTypeOptions
-
-renderChildDeclarationWithOptions :: RenderTypeOptions -> ChildDeclaration -> RenderedCode
-renderChildDeclarationWithOptions opts ChildDeclaration{..} =
+renderChildDeclaration ChildDeclaration{..} =
   mintersperse sp $ case cdeclInfo of
     ChildInstance constraints ty ->
-      maybeToList (renderConstraints constraints) ++ [ renderType' ty ]
+      maybeToList (renderConstraints constraints) ++ [ renderType ty ]
     ChildDataConstructor args ->
       [ dataCtor' cdeclTitle ]
-      ++ map renderTypeAtom' args
+      ++ map renderTypeAtom args
 
     ChildTypeClassMember ty ->
       [ ident' cdeclTitle
       , syntax "::"
-      , renderType' ty
+      , renderType ty
       ]
-  where
-  renderType' = renderTypeWithOptions opts
-  renderTypeAtom' = renderTypeAtomWithOptions opts
 
-renderConstraint :: P.Constraint -> RenderedCode
-renderConstraint = renderConstraintWithOptions defaultRenderTypeOptions
+renderConstraint :: Constraint' -> RenderedCode
+renderConstraint (P.Constraint ann pn tys _) =
+  renderType $ foldl (P.TypeApp ann) (P.TypeConstructor ann (fmap P.coerceProperName pn)) tys
 
-renderConstraintWithOptions :: RenderTypeOptions -> P.Constraint -> RenderedCode
-renderConstraintWithOptions opts (P.Constraint pn tys _) =
-  renderTypeWithOptions opts $ foldl P.TypeApp (P.TypeConstructor (fmap P.coerceProperName pn)) tys
-
-renderConstraints :: [P.Constraint] -> Maybe RenderedCode
-renderConstraints = renderConstraintsWithOptions defaultRenderTypeOptions
-
-renderConstraintsWithOptions :: RenderTypeOptions -> [P.Constraint] -> Maybe RenderedCode
-renderConstraintsWithOptions opts constraints
+renderConstraints :: [Constraint'] -> Maybe RenderedCode
+renderConstraints constraints
   | null constraints = Nothing
   | otherwise = Just $
         syntax "("
@@ -130,7 +114,7 @@ renderConstraintsWithOptions opts constraints
   where
   renderedConstraints =
     mintersperse (syntax "," <> sp)
-                 (map (renderConstraintWithOptions opts) constraints)
+                 (map renderConstraint constraints)
 
 notQualified :: Text -> P.Qualified (P.ProperName a)
 notQualified = P.Qualified Nothing . P.ProperName
@@ -141,12 +125,12 @@ ident' = ident . P.Qualified Nothing . P.Ident
 dataCtor' :: Text -> RenderedCode
 dataCtor' = dataCtor . notQualified
 
-typeApp :: Text -> [(Text, Maybe P.Kind)] -> P.Type
+typeApp :: Text -> [(Text, Maybe Kind')] -> Type'
 typeApp title typeArgs =
-  foldl P.TypeApp
-        (P.TypeConstructor (notQualified title))
+  foldl (P.TypeApp ())
+        (P.TypeConstructor () (notQualified title))
         (map toTypeVar typeArgs)
 
-toTypeVar :: (Text, Maybe P.Kind) -> P.Type
-toTypeVar (s, Nothing) = P.TypeVar s
-toTypeVar (s, Just k) = P.KindedType (P.TypeVar s) k
+toTypeVar :: (Text, Maybe Kind') -> Type'
+toTypeVar (s, Nothing) = P.TypeVar () s
+toTypeVar (s, Just k) = P.KindedType () (P.TypeVar () s) k

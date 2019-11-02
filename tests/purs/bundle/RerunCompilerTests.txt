@@ -1,0 +1,27 @@
+-- Each line in this file that doesn't start with "--" is the name of a test
+-- in purs/passing which should be rerun during bundle testing. Rerunning
+-- every test in purs/passing would take more time than it's worth, so these
+-- tests have been cherry-picked for having moderately complex imports.
+
+Collatz
+DctorOperatorAlias
+EffFn
+ExtendedInfixOperators
+Fib
+ForeignKind
+FunWithFunDeps
+GenericsRep
+Import
+ImportExplicit
+ImportQualified
+Let
+Operators
+QualifiedAdo
+QualifiedDo
+SolvingAppendSymbol
+SolvingCompareSymbol
+SolvingIsSymbol
+TCO
+TransitiveImport
+TypeOperators
+TypeWithoutParens

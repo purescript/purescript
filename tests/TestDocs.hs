@@ -10,59 +10,44 @@ import Prelude ()
 import Prelude.Compat
 
 import Control.Arrow (first)
-import Control.Monad.IO.Class (liftIO)
-
 import Data.List (findIndex)
 import Data.Foldable
 import Safe (headMay)
 import qualified Data.Map as Map
-import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Maybe (fromMaybe, isNothing, mapMaybe)
 import Data.Monoid
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Time.Clock (getCurrentTime)
-import Data.Version (Version(..))
-import System.Exit
+import qualified Text.PrettyPrint.Boxes as Boxes
 
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Docs as Docs
 import Language.PureScript.Docs.AsMarkdown (codeToString)
-import qualified Language.PureScript.Publish as Publish
 import qualified Language.PureScript.Publish.ErrorsWarnings as Publish
 
 import Web.Bower.PackageMeta (parsePackageName, runPackageName)
 
-import TestUtils
+import TestPscPublish (preparePackage)
 
 import Test.Tasty
 import Test.Tasty.Hspec (Spec, it, context, expectationFailure, runIO, testSpec)
-
-publishOpts :: Publish.PublishOptions
-publishOpts = Publish.defaultPublishOptions
-  { Publish.publishGetVersion = return testVersion
-  , Publish.publishGetTagTime = const (liftIO getCurrentTime)
-  , Publish.publishWorkingTreeDirty = return ()
-  }
-  where testVersion = ("v999.0.0", Version [999,0,0] [])
-
-getPackage :: IO (Either Publish.PackageError (Docs.Package Docs.NotYetKnown))
-getPackage =
-  pushd "examples/docs" $
-    Publish.preparePackage "bower.json" "resolutions.json" publishOpts
 
 main :: IO TestTree
 main = testSpec "docs" spec
 
 spec :: Spec
 spec = do
-  pkg@Docs.Package{..} <- runIO $ do
-    res <- getPackage
-    case res of
-      Left e ->
-        Publish.printErrorToStdout e >> exitFailure
-      Right p ->
-        pure p
+  packageResult <- runIO (preparePackage "tests/purs/docs" "resolutions.json")
 
+  case packageResult of
+    Left e ->
+      it "failed to produce docs" $ do
+        expectationFailure (Boxes.render (Publish.renderError e))
+    Right pkg ->
+      mkSpec pkg
+
+mkSpec :: Docs.Package Docs.NotYetKnown -> Spec
+mkSpec pkg@Docs.Package{..} = do
   let linksCtx = Docs.getLinksContext pkg
 
   context "Language.PureScript.Docs" $ do
@@ -133,10 +118,10 @@ data DocsAssertion
   | ShouldHaveFunDeps P.ModuleName Text [([Text],[Text])]
   -- | Assert that a particular value declaration exists, and its type
   -- satisfies the given predicate.
-  | ValueShouldHaveTypeSignature P.ModuleName Text (P.Type -> Bool)
+  | ValueShouldHaveTypeSignature P.ModuleName Text (Docs.Type' -> Bool)
   -- | Assert that a particular instance declaration exists under some class or
   -- type declaration, and that its type satisfies the given predicate.
-  | InstanceShouldHaveTypeSignature P.ModuleName Text Text (P.Type -> Bool)
+  | InstanceShouldHaveTypeSignature P.ModuleName Text Text (Docs.Type' -> Bool)
   -- | Assert that a particular type alias exists, and its corresponding
   -- type, when rendered, matches a given string exactly
   -- fields: module, type synonym name, expected type
@@ -144,6 +129,16 @@ data DocsAssertion
   -- | Assert that a documented declaration includes a documentation comment
   -- containing a particular string
   | ShouldHaveDocComment P.ModuleName Text Text
+  -- | Assert that a documented data declaration includes a documentation comment
+  -- | containing a particular string
+  | ShouldHaveDataConstructorDocComment P.ModuleName Text Text Text
+  -- | Assert that a documented data declaration has no documentation comment
+  | ShouldHaveNoDataConstructorDocComment P.ModuleName Text Text
+  -- | Assert that a documented class method includes a documentation comment
+  -- | containing a particular string
+  | ShouldHaveClassMethodDocComment P.ModuleName Text Text Text
+  -- | Assert that a class method has no documentation comment
+  | ShouldNotHaveClassMethodDocComment P.ModuleName Text Text
   -- | Assert that there should be some declarations re-exported from a
   -- particular module in a particular package.
   | ShouldHaveReExport (Docs.InPackage P.ModuleName)
@@ -188,6 +183,18 @@ displayAssertion = \case
   ShouldHaveDocComment mn decl excerpt ->
     "the string " <> T.pack (show excerpt) <> " should appear in the" <>
     " doc-comments for " <> showQual mn decl
+  ShouldHaveDataConstructorDocComment mn decl constr excerpt ->
+    "the string " <> T.pack (show excerpt) <> " should appear in the" <>
+    " doc-comments for data constructor " <> T.pack (show constr) <> " for " <> showQual mn decl
+  ShouldHaveNoDataConstructorDocComment mn decl constr ->
+    "Doc-comments for data constructor " <> T.pack (show constr) <> " for " <> showQual mn decl <>
+    " should be empty"
+  ShouldHaveClassMethodDocComment mn decl method excerpt ->
+    "the string " <> T.pack (show excerpt) <> " should appear in the" <>
+    " doc-comment for class method " <> T.pack (show method) <> " for " <> showQual mn decl 
+  ShouldNotHaveClassMethodDocComment mn decl method ->
+    "Doc-comments for class method " <> T.pack (show method) <> " for " <> showQual mn decl <>
+    " should be empty"
   ShouldHaveReExport inPkg ->
     "there should be some re-exports from " <>
     showInPkg P.runModuleName inPkg
@@ -225,13 +232,16 @@ data DocsAssertionFailure
   -- because the inferred type was used when the explicit type should have
   -- been.
   -- Fields: module name, declaration name, actual type.
-  | DeclarationWrongType P.ModuleName Text P.Type
+  | DeclarationWrongType P.ModuleName Text Docs.Type'
   -- | A Type synonym has been rendered in an unexpected format
   -- Fields: module name, declaration name, expected rendering, actual rendering
   | TypeSynonymMismatch P.ModuleName Text Text Text
   -- | A doc comment was not found or did not match what was expected
   -- Fields: module name, declaration, actual comments
   | DocCommentMissing P.ModuleName Text (Maybe Text)
+  -- | A doc comment was found where none was expected
+  -- Fields: module name, declaration, actual comments
+  | DocCommentPresent P.ModuleName Text (Maybe Text)
   -- | A module was missing re-exports from a particular module.
   -- Fields: module name, expected re-export, actual re-exports.
   | ReExportMissing P.ModuleName (Docs.InPackage P.ModuleName) [Docs.InPackage P.ModuleName]
@@ -275,13 +285,15 @@ displayAssertionFailure = \case
     "expected " <> decl <> " to be a " <> expected <> " declaration, but it" <>
     " was a " <> actual <> " declaration"
   DeclarationWrongType _ decl actual ->
-    decl <> " had the wrong type; got " <> T.pack (P.prettyPrintType actual)
+    decl <> " had the wrong type; got " <> T.pack (P.prettyPrintType maxBound actual)
   TypeSynonymMismatch _ decl expected actual ->
     "expected the RHS of " <> decl <> " to be " <> expected <>
     "; got " <> actual
   DocCommentMissing _ decl actual ->
     "the doc-comment for " <> decl <> " did not contain the expected substring;" <>
     " got " <> T.pack (show actual)
+  DocCommentPresent _ decl actual ->
+    "the doc-comment for " <> decl <> " was not empty. Got " <> T.pack (show actual)
   ReExportMissing _ expected actuals ->
     "expected to see some re-exports from " <>
     showInPkg P.runModuleName expected <>
@@ -294,8 +306,8 @@ displayAssertionFailure = \case
     "in rendered code for " <> decl <> ", bad link location for " <> target <>
     ": expected " <> T.pack (show expected) <>
     " got " <> T.pack (show actual)
-  WrongOrder _ before after ->
-    "expected to see " <> before <> " before " <> after
+  WrongOrder _ before after' ->
+    "expected to see " <> before <> " before " <> after'
 
 displayTagsAssertionFailure :: TagsAssertionFailure -> Text
 displayTagsAssertionFailure = \case
@@ -417,6 +429,18 @@ runAssertion assertion linksCtx Docs.Module{..} =
           then Pass
           else Fail (DocCommentMissing mn decl declComments)
 
+    ShouldHaveDataConstructorDocComment mn decl constr expected ->
+      findDeclChildrenComment mn decl constr expected
+
+    ShouldHaveNoDataConstructorDocComment mn decl constr ->
+      findDeclChildrenNoComment mn decl constr
+
+    ShouldHaveClassMethodDocComment mn decl constr expected ->
+      findDeclChildrenComment mn decl constr expected
+
+    ShouldNotHaveClassMethodDocComment mn decl method ->
+      findDeclChildrenNoComment mn decl method
+
     ShouldHaveReExport reExp ->
       let
         reExps = map fst modReExports
@@ -438,22 +462,22 @@ runAssertion assertion linksCtx Docs.Module{..} =
             Nothing ->
               Fail (LinkedDeclarationMissing mn decl destTitle)
 
-    ShouldComeBefore mn before after ->
+    ShouldComeBefore mn before after' ->
       let
         decls = declarationsFor mn
 
         indexOf :: Text -> Maybe Int
         indexOf title = findIndex ((==) title . Docs.declTitle) decls
       in
-        case (indexOf before, indexOf after) of
+        case (indexOf before, indexOf after') of
           (Just i, Just j) ->
             if i < j
               then Pass
-              else Fail (WrongOrder mn before after)
+              else Fail (WrongOrder mn before after')
           (Nothing, _) ->
             Fail (NotDocumented mn before)
           (_, Nothing) ->
-            Fail (NotDocumented mn after)
+            Fail (NotDocumented mn after')
 
   where
   declarationsFor mn =
@@ -470,6 +494,26 @@ runAssertion assertion linksCtx Docs.Module{..} =
           Fail (NotDocumented mn title)
         Just decl ->
           f decl
+
+  findDeclChildren mn title child f =
+    findDecl mn title $ \Docs.Declaration{..} ->
+      case find ((==) child . Docs.cdeclTitle) declChildren of
+        Nothing ->
+          Fail (NotDocumented mn child)
+        Just decl ->
+          f decl
+
+  findDeclChildrenComment mn decl constr expected =
+    findDeclChildren mn decl constr $ \Docs.ChildDeclaration{..} ->
+      if maybe False (expected `T.isInfixOf`) cdeclComments
+        then Pass
+        else Fail (DocCommentMissing mn constr cdeclComments)
+
+  findDeclChildrenNoComment mn decl constr =
+    findDeclChildren mn decl constr $ \Docs.ChildDeclaration{..} ->
+      if isNothing cdeclComments
+      then Pass
+      else Fail (DocCommentPresent mn constr cdeclComments)
 
   childrenTitles = map Docs.cdeclTitle . Docs.declChildren
 
@@ -500,13 +544,13 @@ runTagsAssertion assertion tags =
         Just taggedLine -> TagsFail $ Tagged decl taggedLine
         Nothing -> TagsPass
 
-checkConstrained :: P.Type -> Text -> Bool
+checkConstrained :: P.Type a -> Text -> Bool
 checkConstrained ty tyClass =
   case ty of
-    P.ConstrainedType c ty'
+    P.ConstrainedType _ c ty'
       | matches tyClass c -> True
       | otherwise -> checkConstrained ty' tyClass
-    P.ForAll _ ty' _ ->
+    P.ForAll _ _ _ ty' _ ->
       checkConstrained ty' tyClass
     _ ->
       False
@@ -593,8 +637,8 @@ testCases =
 
   , ("ExplicitTypeSignatures",
       [ ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "explicit" (hasTypeVar "something")
-      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "anInt"    (P.tyInt ==)
-      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "aNumber"  (P.tyNumber ==)
+      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "anInt"    (P.tyInt `P.eqType`)
+      , ValueShouldHaveTypeSignature (n "ExplicitTypeSignatures") "aNumber"  (P.tyNumber `P.eqType`)
       ])
 
   , ("ConstrainedArgument",
@@ -623,6 +667,19 @@ testCases =
       [ ShouldHaveDocComment (n "DocComments") "example" "    example == 0"
       ])
 
+  , ("DocCommentsDataConstructor",
+      [ ShouldHaveDataConstructorDocComment (n "DocCommentsDataConstructor") "Foo" "Bar" "data constructor comment"
+      , ShouldHaveNoDataConstructorDocComment (n "DocCommentsDataConstructor") "Foo" "Baz"
+      , ShouldHaveNoDataConstructorDocComment (n "DocCommentsDataConstructor") "ComplexFoo" "ComplexBar"
+      , ShouldHaveDataConstructorDocComment (n "DocCommentsDataConstructor") "ComplexFoo" "ComplexBaz" "another data constructor comment"
+      , ShouldHaveDataConstructorDocComment (n "DocCommentsDataConstructor") "NewtypeFoo" "NewtypeFoo" "newtype data constructor comment"
+      ])
+
+  , ("DocCommentsClassMethod",
+      [ ShouldHaveClassMethodDocComment (n "DocCommentsClassMethod") "Foo" "bar" "class method comment"
+      , ShouldNotHaveClassMethodDocComment (n "DocCommentsClassMethod") "Foo" "baz"
+      ])
+
   , ("TypeLevelString",
       [ ShouldBeDocumented (n "TypeLevelString") "Foo" ["fooBar"]
       ])
@@ -643,6 +700,16 @@ testCases =
   , ("DeclOrderNoExportList",
       shouldBeOrdered (n "DeclOrderNoExportList")
         [ "x1", "x3", "X2", "X4", "A", "B" ])
+
+  , ("Ado",
+      [ ValueShouldHaveTypeSignature (n "Ado") "test" (renderedType "Int")
+      ]
+    )
+
+  , ("TypeSynonymInstance",
+      [ ShouldBeDocumented (n "TypeSynonymInstance") "MyNT" ["MyNT", "ntMyNT"]
+      ]
+    )
   ]
 
   where
@@ -652,7 +719,7 @@ testCases =
   hasTypeVar varName =
     getAny . P.everythingOnTypes (<>) (Any . isVar varName)
 
-  isVar varName (P.TypeVar name) | varName == T.unpack name = True
+  isVar varName (P.TypeVar _ name) | varName == T.unpack name = True
   isVar _ _ = False
 
   renderedType expected ty =

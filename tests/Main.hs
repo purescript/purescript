@@ -10,6 +10,7 @@ import Prelude.Compat
 
 import Test.Tasty
 
+import qualified TestCst
 import qualified TestCompiler
 import qualified TestCoreFn
 import qualified TestDocs
@@ -18,6 +19,8 @@ import qualified TestPrimDocs
 import qualified TestPsci
 import qualified TestIde
 import qualified TestPscPublish
+import qualified TestBundle
+import qualified TestMake
 import qualified TestUtils
 
 import System.IO (hSetEncoding, stdout, stderr, utf8)
@@ -29,26 +32,32 @@ main = do
 
   heading "Updating support code"
   TestUtils.updateSupportCode
-  heading "Prim documentation test suite"
-  TestPrimDocs.main
-  heading "psc-publish test suite"
-  TestPscPublish.main
 
+  cstTests <- TestCst.main
   ideTests <- TestIde.main
   compilerTests <- TestCompiler.main
+  makeTests <- TestMake.main
   psciTests <- TestPsci.main
+  pscBundleTests <- TestBundle.main
   coreFnTests <- TestCoreFn.main
   docsTests <- TestDocs.main
+  primDocsTests <- TestPrimDocs.main
+  publishTests <- TestPscPublish.main
   hierarchyTests <- TestHierarchy.main
 
   defaultMain $
     testGroup
       "Tests"
-      [ compilerTests
+      [ cstTests
+      , compilerTests
+      , makeTests
       , psciTests
+      , pscBundleTests
       , ideTests
       , coreFnTests
       , docsTests
+      , primDocsTests
+      , publishTests
       , hierarchyTests
       ]
 

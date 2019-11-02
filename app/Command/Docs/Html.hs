@@ -23,13 +23,10 @@ import qualified Text.Blaze.Html5 as H
 import qualified Text.Blaze.Html5.Attributes as A
 import qualified Text.Blaze.Html.Renderer.Text as Blaze
 import           System.IO.UTF8 (writeUTF8FileT)
-import           System.FilePath.Glob (glob)
-import           System.Directory (removeFile)
 import           Version (versionString)
 
 writeHtmlModules :: FilePath -> [(P.ModuleName, D.HtmlOutputModule Html)] -> IO ()
 writeHtmlModules outputDir modules = do
-  glob (outputDir <> "/*.html") >>= mapM_ removeFile
   let moduleList = sort $ map fst modules
   writeHtmlFile (outputDir ++ "/index.html") (renderIndexModule moduleList)
   mapM_ (writeHtmlModule outputDir . (fst &&& layout moduleList)) modules
@@ -48,8 +45,7 @@ writeHtmlFile filepath =
 
 getHtmlRenderContext :: P.ModuleName -> D.HtmlRenderContext
 getHtmlRenderContext mn = D.HtmlRenderContext
-  { D.currentModuleName = mn
-  , D.buildDocLink = getLink mn
+  { D.buildDocLink = getLink mn
   , D.renderDocLink = renderLink
   , D.renderSourceLink = const Nothing
   }
@@ -70,11 +66,11 @@ getLink curMn namespace target containingMod = do
   normalLinkLocation = do
     case containingMod of
       D.ThisModule ->
-        return D.SameModule
+        return $ D.LocalModule curMn
       D.OtherModule destMn ->
         -- This is OK because all modules count as 'local' for purs docs in
         -- html mode
-        return $ D.LocalModule curMn destMn
+        return $ D.LocalModule destMn
 
   builtinLinkLocation = do
     let primMn = P.moduleNameFromString "Prim"
@@ -84,9 +80,7 @@ getLink curMn namespace target containingMod = do
 renderLink :: D.DocLink -> Text
 renderLink l =
   case D.linkLocation l of
-    D.SameModule ->
-      ""
-    D.LocalModule _ dest ->
+    D.LocalModule dest ->
       P.runModuleName dest <> ".html"
     D.DepsModule{} ->
       P.internalError "DepsModule: not implemented"

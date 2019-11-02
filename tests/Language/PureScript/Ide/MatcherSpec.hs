@@ -12,7 +12,7 @@ import           Language.PureScript.Ide.Util
 import           Test.Hspec
 
 value :: Text -> IdeDeclarationAnn
-value s = withEmptyAnn (IdeDeclValue (IdeValue (P.Ident (toS s)) P.REmpty))
+value s = withEmptyAnn (IdeDeclValue (IdeValue (P.Ident (toS s)) P.srcREmpty))
 
 firstResult, secondResult, fiult :: Match IdeDeclarationAnn
 firstResult = Match (P.moduleNameFromString "Match", value "firstResult")

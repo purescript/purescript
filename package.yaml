@@ -1,28 +1,33 @@
 name: purescript
-version: '0.11.7'
+version: '0.13.4'
 synopsis: PureScript Programming Language Compiler
 description: A small strongly, statically typed programming language with expressive
   types, inspired by Haskell and compiling to JavaScript.
 category: Language
-author: >
-  Phil Freeman <paf31@cantab.net>,
+author: Phil Freeman <paf31@cantab.net>
+maintainer: >
   Gary Burgess <gary.burgess@gmail.com>,
   Hardy Jones <jones3.hardy@gmail.com>,
   Harry Garrood <harry@garrood.me>,
-  Christoph Hegemann <christoph.hegemann1337@gmail.com>
-maintainer: Phil Freeman <paf31@cantab.net>
-copyright: (c) 2013-17 Phil Freeman, (c) 2014-17 Gary Burgess
+  Christoph Hegemann <christoph.hegemann1337@gmail.com>,
+  Liam Goodacre <goodacre.liam@gmail.com>,
+  Nathan Faubion <nathan@n-son.com>
+copyright: (c) 2013-17 Phil Freeman, (c) 2014-19 Gary Burgess, (c) other contributors (see CONTRIBUTORS.md)
 license: BSD3
 github: purescript/purescript
 homepage: http://www.purescript.org/
 extra-source-files:
-  - examples/**/*.js
-  - examples/**/*.purs
-  - examples/**/*.json
   - app/static/*
+  - bundle/build.sh
+  - bundle/README
+  - tests/purs/**/*.js
+  - tests/purs/**/*.purs
+  - tests/purs/**/*.json
+  - tests/json-compat/**/*.json
   - tests/support/*.json
   - tests/support/setup-win.cmd
-  - tests/support/psci/*.purs
+  - tests/support/psci/**.purs
+  - tests/support/psci/**.edit
   - tests/support/pscide/src/**/*.purs
   - tests/support/pscide/src/**/*.js
   - tests/support/pscide/src/**/*.fail
@@ -32,18 +37,22 @@ extra-source-files:
   - CONTRIBUTORS.md
   - CONTRIBUTING.md
 dependencies:
-  - aeson >=1.0 && <1.3
+  - aeson >=1.0 && <1.5
   - aeson-better-errors >=0.8
-  - ansi-terminal >=0.7.1 && <0.8
-  - base >=4.8 && <5
+  - aeson-pretty
+  - ansi-terminal >=0.7.1 && <0.9
+  - array
+  - base >=4.11 && <4.13
   - base-compat >=0.6.0
   - blaze-html >=0.8.1 && <0.10
   - bower-json >=1.0.0.1 && <1.1
   - boxes >=0.1.4 && <0.2.0
   - bytestring
+  - Cabal >= 2.2
   - cheapskate >=0.1 && <0.2
   - clock
   - containers
+  - cryptonite >=0.25
   - data-ordlist >=0.4.7.0
   - deepseq
   - directory >=1.2.3
@@ -54,32 +63,31 @@ dependencies:
   - fsnotify >=0.2.1
   - Glob >=0.9 && <0.10
   - haskeline >=0.7.0.0
-  - http-client >=0.4.30 && <0.6.0
-  - http-types
-  - language-javascript >=0.6.0.9 && <0.7
-  - lens ==4.*
+  - language-javascript >=0.7.0.0
+  - lifted-async >=0.10.0.3 && <0.10.1
   - lifted-base >=0.2.3 && <0.2.4
+  - memory >=0.14 && <0.15
+  - microlens-platform >=0.3.9.0 && <0.4
   - monad-control >=1.0.0.0 && <1.1
   - monad-logger >=0.3 && <0.4
   - mtl >=2.1.0 && <2.3.0
   - parallel >=3.2 && <3.3
   - parsec >=3.1.10
   - pattern-arrows >=0.0.2 && <0.1
-  - pipes >=4.0.0 && <4.4.0
-  - pipes-http
   - process >=1.2.0 && <1.7
   - protolude >=0.1.6
   - regex-tdfa
   - safe >=0.3.9 && <0.4
   - scientific >=0.3.4.9 && <0.4
   - semigroups >=0.16.2 && <0.19
+  - semialign >=1 && <1.1
   - sourcemap >=0.1.6
-  - spdx ==0.2.*
   - split
   - stm >=0.2.4.0
   - stringsearch
   - syb
   - text
+  - these >= 1 && <1.1
   - time
   - transformers >=0.3.0 && <0.6
   - transformers-base >=0.4.0 && <0.5
@@ -87,6 +95,8 @@ dependencies:
   - unordered-containers
   - utf8-string >=1 && <2
   - vector
+build-tools:
+  - happy ==1.19.9
 
 library:
   source-dirs: src
@@ -96,6 +106,10 @@ library:
     - ConstraintKinds
     - DataKinds
     - DeriveFunctor
+    - DeriveFoldable
+    - DeriveTraversable
+    - DeriveGeneric
+    - DerivingStrategies
     - EmptyDataDecls
     - FlexibleContexts
     - KindSignatures
@@ -121,6 +135,7 @@ executables:
       - Command.Compile
       - Command.Docs
       - Command.Docs.Html
+      - Command.Docs.Markdown
       - Command.Hierarchy
       - Command.Ide
       - Command.Publish
@@ -131,7 +146,8 @@ executables:
     dependencies:
       - ansi-wl-pprint
       - file-embed
-      - network
+      - http-types
+      - network >= 3.0.1.1
       - optparse-applicative >=0.13.0
       - purescript
       - wai ==3.*
@@ -154,10 +170,16 @@ tests:
     dependencies:
       - purescript
       - tasty
+      - tasty-golden
       - tasty-hspec
+      - tasty-quickcheck
       - hspec
       - hspec-discover
       - HUnit
+    default-extensions:
+      - NoImplicitPrelude
+      - LambdaCase
+      - OverloadedStrings
 
 flags:
   release:

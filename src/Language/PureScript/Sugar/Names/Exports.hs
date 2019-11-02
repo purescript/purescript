@@ -32,29 +32,35 @@ findExportable (Module _ _ mn ds _) =
   updateExports' :: Exports -> Declaration -> m Exports
   updateExports' exps decl = rethrowWithPosition (declSourceSpan decl) $ updateExports exps decl
 
+  source =
+    ExportSource
+    { exportSourceDefinedIn = mn
+    , exportSourceImportedFrom = Nothing
+    }
+
   updateExports :: Exports -> Declaration -> m Exports
   updateExports exps (TypeClassDeclaration (ss, _) tcn _ _ _ ds') = do
-    exps' <- rethrowWithPosition ss $ exportTypeClass ss Internal exps tcn mn
+    exps' <- rethrowWithPosition ss $ exportTypeClass ss Internal exps tcn source
     foldM go exps' ds'
     where
-    go exps'' (TypeDeclaration (TypeDeclarationData (ss', _) name _)) = exportValue ss' exps'' name mn
+    go exps'' (TypeDeclaration (TypeDeclarationData (ss', _) name _)) = exportValue ss' exps'' name source
     go _ _ = internalError "Invalid declaration in TypeClassDeclaration"
   updateExports exps (DataDeclaration (ss, _) _ tn _ dcs) =
-    exportType ss Internal exps tn (map fst dcs) mn
+    exportType ss Internal exps tn (map dataCtorName dcs) source
   updateExports exps (TypeSynonymDeclaration (ss, _) tn _ _) =
-    exportType ss Internal exps tn [] mn
+    exportType ss Internal exps tn [] source
   updateExports exps (ExternDataDeclaration (ss, _) tn _) =
-    exportType ss Internal exps tn [] mn
+    exportType ss Internal exps tn [] source
   updateExports exps (ValueDeclaration vd) =
-    exportValue (fst (valdeclSourceAnn vd)) exps (valdeclIdent vd) mn
+    exportValue (fst (valdeclSourceAnn vd)) exps (valdeclIdent vd) source
   updateExports exps (ValueFixityDeclaration (ss, _) _ _ op) =
-    exportValueOp ss exps op mn
+    exportValueOp ss exps op source
   updateExports exps (TypeFixityDeclaration (ss, _) _ _ op) =
-    exportTypeOp ss exps op mn
+    exportTypeOp ss exps op source
   updateExports exps (ExternDeclaration (ss, _) name _) =
-    exportValue ss exps name mn
+    exportValue ss exps name source
   updateExports exps (ExternKindDeclaration (ss, _) pn) =
-    exportKind ss exps pn mn
+    exportKind ss exps pn source
   updateExports exps _ = return exps
 
 -- |
@@ -103,14 +109,14 @@ resolveExports env ss mn imps exps refs =
     let isPseudo = isPseudoModule name
     when (not isPseudo && not (isImportedModule name))
       . throwError . errorMessage' ss' . UnknownExport $ ModName name
-    reTypes <- extract isPseudo name TyName (importedTypes imps)
-    reTypeOps <- extract isPseudo name TyOpName (importedTypeOps imps)
-    reDctors <- extract isPseudo name DctorName (importedDataConstructors imps)
-    reClasses <- extract isPseudo name TyClassName (importedTypeClasses imps)
-    reValues <- extract isPseudo name IdentName (importedValues imps)
-    reValueOps <- extract isPseudo name ValOpName (importedValueOps imps)
-    reKinds <- extract isPseudo name KiName (importedKinds imps)
-    foldM (\exps' ((tctor, dctors), mn') -> exportType ss' ReExport exps' tctor dctors mn') result (resolveTypeExports reTypes reDctors)
+    reTypes <- extract ss' isPseudo name TyName (importedTypes imps)
+    reTypeOps <- extract ss' isPseudo name TyOpName (importedTypeOps imps)
+    reDctors <- extract ss' isPseudo name DctorName (importedDataConstructors imps)
+    reClasses <- extract ss' isPseudo name TyClassName (importedTypeClasses imps)
+    reValues <- extract ss' isPseudo name IdentName (importedValues imps)
+    reValueOps <- extract ss' isPseudo name ValOpName (importedValueOps imps)
+    reKinds <- extract ss' isPseudo name KiName (importedKinds imps)
+    foldM (\exps' ((tctor, dctors), src) -> exportType ss' ReExport exps' tctor dctors src) result (resolveTypeExports reTypes reDctors)
       >>= flip (foldM (uncurry . exportTypeOp ss')) (map resolveTypeOp reTypeOps)
       >>= flip (foldM (uncurry . exportTypeClass ss' ReExport)) (map resolveClass reClasses)
       >>= flip (foldM (uncurry . exportValue ss')) (map resolveValue reValues)
@@ -121,16 +127,17 @@ resolveExports env ss mn imps exps refs =
   -- Extracts a list of values for a module based on a lookup table. If the
   -- boolean is true the values are filtered by the qualification
   extract
-    :: Bool
+    :: SourceSpan
+    -> Bool
     -> ModuleName
     -> (a -> Name)
     -> M.Map (Qualified a) [ImportRecord a]
     -> m [Qualified a]
-  extract useQual name toName = fmap (map (importName . head . snd)) . go . M.toList
+  extract ss' useQual name toName = fmap (map (importName . head . snd)) . go . M.toList
     where
     go = filterM $ \(name', options) -> do
       let isMatch = if useQual then isQualifiedWith name name' else any (checkUnqual name') options
-      when (isMatch && length options > 1) $ void $ checkImportConflicts mn toName options
+      when (isMatch && length options > 1) $ void $ checkImportConflicts ss' mn toName options
       return isMatch
     checkUnqual name' ir = isUnqualified name' && isQualifiedWith name (importName ir)
 
@@ -146,6 +153,7 @@ resolveExports env ss mn imps exps refs =
     -- values if that fails to see whether the value has been imported at all.
     testQuals :: (forall a b. M.Map (Qualified a) b -> [Qualified a]) -> ModuleName -> Bool
     testQuals f mn' = any (isQualifiedWith mn') (f (importedTypes imps))
+                   || any (isQualifiedWith mn') (f (importedTypeOps imps))
                    || any (isQualifiedWith mn') (f (importedDataConstructors imps))
                    || any (isQualifiedWith mn') (f (importedTypeClasses imps))
                    || any (isQualifiedWith mn') (f (importedValues imps))
@@ -162,76 +170,68 @@ resolveExports env ss mn imps exps refs =
   resolveTypeExports
     :: [Qualified (ProperName 'TypeName)]
     -> [Qualified (ProperName 'ConstructorName)]
-    -> [((ProperName 'TypeName, [ProperName 'ConstructorName]), ModuleName)]
+    -> [((ProperName 'TypeName, [ProperName 'ConstructorName]), ExportSource)]
   resolveTypeExports tctors dctors = map go tctors
     where
     go
       :: Qualified (ProperName 'TypeName)
-      -> ((ProperName 'TypeName, [ProperName 'ConstructorName]), ModuleName)
+      -> ((ProperName 'TypeName, [ProperName 'ConstructorName]), ExportSource)
     go (Qualified (Just mn'') name) =
       fromMaybe (internalError "Missing value in resolveTypeExports") $ do
         exps' <- envModuleExports <$> mn'' `M.lookup` env
-        (dctors', mnOrig) <- name `M.lookup` exportedTypes exps'
+        (dctors', src) <- name `M.lookup` exportedTypes exps'
         let relevantDctors = mapMaybe (disqualifyFor (Just mn'')) dctors
-        return ((name, relevantDctors `intersect` dctors'), mnOrig)
+        return
+          ( (name, relevantDctors `intersect` dctors')
+          , src { exportSourceImportedFrom = Just mn'' }
+          )
     go (Qualified Nothing _) = internalError "Unqualified value in resolveTypeExports"
 
   -- Looks up an imported type operator and re-qualifies it with the original
   -- module it came from.
-  resolveTypeOp :: Qualified (OpName 'TypeOpName) -> (OpName 'TypeOpName, ModuleName)
+  resolveTypeOp :: Qualified (OpName 'TypeOpName) -> (OpName 'TypeOpName, ExportSource)
   resolveTypeOp op
-    = splitQual
-    . fromMaybe (internalError "Missing value in resolveValue")
+    = fromMaybe (internalError "Missing value in resolveValue")
     $ resolve exportedTypeOps op
 
   -- Looks up an imported class and re-qualifies it with the original module it
   -- came from.
-  resolveClass :: Qualified (ProperName 'ClassName) -> (ProperName 'ClassName, ModuleName)
+  resolveClass :: Qualified (ProperName 'ClassName) -> (ProperName 'ClassName, ExportSource)
   resolveClass className
-    = splitQual
-    . fromMaybe (internalError "Missing value in resolveClass")
+    = fromMaybe (internalError "Missing value in resolveClass")
     $ resolve exportedTypeClasses className
 
   -- Looks up an imported value and re-qualifies it with the original module it
   -- came from.
-  resolveValue :: Qualified Ident -> (Ident, ModuleName)
+  resolveValue :: Qualified Ident -> (Ident, ExportSource)
   resolveValue ident
-    = splitQual
-    . fromMaybe (internalError "Missing value in resolveValue")
+    = fromMaybe (internalError "Missing value in resolveValue")
     $ resolve exportedValues ident
 
   -- Looks up an imported operator and re-qualifies it with the original
   -- module it came from.
-  resolveValueOp :: Qualified (OpName 'ValueOpName) -> (OpName 'ValueOpName, ModuleName)
+  resolveValueOp :: Qualified (OpName 'ValueOpName) -> (OpName 'ValueOpName, ExportSource)
   resolveValueOp op
-    = splitQual
-    . fromMaybe (internalError "Missing value in resolveValueOp")
+    = fromMaybe (internalError "Missing value in resolveValueOp")
     $ resolve exportedValueOps op
 
   -- Looks up an imported kind and re-qualifies it with the original
   -- module it came from.
-  resolveKind :: Qualified (ProperName 'KindName) -> (ProperName 'KindName, ModuleName)
+  resolveKind :: Qualified (ProperName 'KindName) -> (ProperName 'KindName, ExportSource)
   resolveKind kind
-    = splitQual
-    . fromMaybe (internalError "Missing value in resolveKind")
+    = fromMaybe (internalError "Missing value in resolveKind")
     $ resolve exportedKinds kind
 
   resolve
     :: Ord a
-    => (Exports -> M.Map a ModuleName)
+    => (Exports -> M.Map a ExportSource)
     -> Qualified a
-    -> Maybe (Qualified a)
+    -> Maybe (a, ExportSource)
   resolve f (Qualified (Just mn'') a) = do
     exps' <- envModuleExports <$> mn'' `M.lookup` env
-    mn''' <- a `M.lookup` f exps'
-    return $ Qualified (Just mn''') a
+    src <- a `M.lookup` f exps'
+    return $ (a, src { exportSourceImportedFrom = Just mn'' })
   resolve _ _ = internalError "Unqualified value in resolve"
-
-  -- A partial function that takes a qualified value and extracts the value and
-  -- qualified module components.
-  splitQual :: Qualified a -> (a, ModuleName)
-  splitQual (Qualified (Just mn'') a) = (a, mn'')
-  splitQual _ = internalError "Unqualified value in splitQual"
 
 -- |
 -- Filters the full list of exportable values, types, and classes for a module
@@ -275,16 +275,16 @@ filterModule mn exps refs = do
     . mapMaybe (\ref -> (declRefSourceSpan ref,) <$> getTypeRef ref)
 
   filterTypes
-    :: M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ModuleName)
+    :: M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ExportSource)
     -> DeclarationRef
-    -> m (M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ModuleName))
+    -> m (M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ExportSource))
   filterTypes result (TypeRef ss name expDcons) =
     case name `M.lookup` exportedTypes exps of
       Nothing -> throwError . errorMessage' ss . UnknownExport $ TyName name
-      Just (dcons, _) -> do
+      Just (dcons, src) -> do
         let expDcons' = fromMaybe dcons expDcons
         traverse_ (checkDcon name dcons) expDcons'
-        return $ M.insert name (expDcons', mn) result
+        return $ M.insert name (expDcons', src) result
     where
     -- Ensures a data constructor is exportable for a given type. Takes a type
     -- name, a list of exportable data constructors for the type, and the name of
@@ -303,14 +303,17 @@ filterModule mn exps refs = do
     :: Ord a
     => (a -> Name)
     -> (DeclarationRef -> Maybe a)
-    -> (Exports -> M.Map a ModuleName)
-    -> M.Map a ModuleName
+    -> (Exports -> M.Map a ExportSource)
+    -> M.Map a ExportSource
     -> DeclarationRef
-    -> m (M.Map a ModuleName)
+    -> m (M.Map a ExportSource)
   filterExport toName get fromExps result ref
     | Just name <- get ref =
         case name `M.lookup` fromExps exps of
-          -- TODO: I'm not sure if we actually need to check mn == mn' here -gb
-          Just mn' | mn == mn' -> return $ M.insert name mn result
-          _ -> throwError . errorMessage' (declRefSourceSpan ref) . UnknownExport $ toName name
+          -- TODO: I'm not sure if we actually need to check that these modules
+          -- are the same here -gb
+          Just source' | mn == exportSourceDefinedIn source' ->
+            return $ M.insert name source' result
+          _ ->
+            throwError . errorMessage' (declRefSourceSpan ref) . UnknownExport $ toName name
   filterExport _ _ _ result _ = return result

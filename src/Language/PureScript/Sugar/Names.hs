@@ -2,6 +2,7 @@ module Language.PureScript.Sugar.Names
   ( desugarImports
   , desugarImportsWithEnv
   , Env
+  , primEnv
   , ImportRecord(..)
   , ImportProvenance(..)
   , Imports(..)
@@ -72,33 +73,41 @@ desugarImportsWithEnv externs modules = do
     return $ M.insert efModuleName (efSourceSpan, imps, exps) env
     where
 
-    exportedTypes :: M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ModuleName)
+    -- An ExportSource for declarations local to the module which the given
+    -- ExternsFile corresponds to.
+    localExportSource =
+      ExportSource { exportSourceDefinedIn = efModuleName
+                   , exportSourceImportedFrom = Nothing
+                   }
+
+    exportedTypes :: M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ExportSource)
     exportedTypes = M.fromList $ mapMaybe toExportedType efExports
       where
-      toExportedType (TypeRef _ tyCon dctors) = Just (tyCon, (fromMaybe (mapMaybe forTyCon efDeclarations) dctors, efModuleName))
+      toExportedType (TypeRef _ tyCon dctors) = Just (tyCon, (fromMaybe (mapMaybe forTyCon efDeclarations) dctors, localExportSource))
         where
         forTyCon :: ExternsDeclaration -> Maybe (ProperName 'ConstructorName)
         forTyCon (EDDataConstructor pn _ tNm _ _) | tNm == tyCon = Just pn
         forTyCon _ = Nothing
       toExportedType _ = Nothing
 
-    exportedTypeOps :: M.Map (OpName 'TypeOpName) ModuleName
+    exportedTypeOps :: M.Map (OpName 'TypeOpName) ExportSource
     exportedTypeOps = exportedRefs getTypeOpRef
 
-    exportedTypeClasses :: M.Map (ProperName 'ClassName) ModuleName
+    exportedTypeClasses :: M.Map (ProperName 'ClassName) ExportSource
     exportedTypeClasses = exportedRefs getTypeClassRef
 
-    exportedValues :: M.Map Ident ModuleName
+    exportedValues :: M.Map Ident ExportSource
     exportedValues = exportedRefs getValueRef
 
-    exportedValueOps :: M.Map (OpName 'ValueOpName) ModuleName
+    exportedValueOps :: M.Map (OpName 'ValueOpName) ExportSource
     exportedValueOps = exportedRefs getValueOpRef
 
-    exportedRefs :: Ord a => (DeclarationRef -> Maybe a) -> M.Map a ModuleName
-    exportedRefs f = M.fromList $ (, efModuleName) <$> mapMaybe f efExports
-
-    exportedKinds :: M.Map (ProperName 'KindName) ModuleName
+    exportedKinds :: M.Map (ProperName 'KindName) ExportSource
     exportedKinds = exportedRefs getKindRef
+
+    exportedRefs :: Ord a => (DeclarationRef -> Maybe a) -> M.Map a ExportSource
+    exportedRefs f =
+      M.fromList $ (, localExportSource) <$> mapMaybe f efExports
 
   updateEnv :: ([Module], Env) -> Module -> m ([Module], Env)
   updateEnv (ms, env) m@(Module ss _ mn _ refs) = do
@@ -140,14 +149,14 @@ elaborateExports exps (Module ss coms mn decls refs) =
 
   elaboratedTypeRefs :: [DeclarationRef]
   elaboratedTypeRefs =
-    flip map (M.toList (exportedTypes exps)) $ \(tctor, (dctors, mn')) ->
+    flip map (M.toList (exportedTypes exps)) $ \(tctor, (dctors, src)) ->
       let ref = TypeRef ss tctor (Just dctors)
-      in if mn == mn' then ref else ReExportRef ss mn' ref
+      in if mn == exportSourceDefinedIn src then ref else ReExportRef ss src ref
 
-  go :: (a -> DeclarationRef) -> (Exports -> M.Map a ModuleName) -> [DeclarationRef]
+  go :: (a -> DeclarationRef) -> (Exports -> M.Map a ExportSource) -> [DeclarationRef]
   go toRef select =
-    flip map (M.toList (select exps)) $ \(export, mn') ->
-      if mn == mn' then toRef export else ReExportRef ss mn' (toRef export)
+    flip map (M.toList (select exps)) $ \(export, src) ->
+      if mn == exportSourceDefinedIn src then toRef export else ReExportRef ss src (toRef export)
 
 -- |
 -- Given a list of declarations, an original exports list, and an elaborated
@@ -192,20 +201,20 @@ renameInModule imports (Module modSS coms mn decls exps) =
     :: [Ident]
     -> Declaration
     -> m ([Ident], Declaration)
-  updateDecl bound (DataDeclaration sa@(ss, _) dtype name args dctors) =
+  updateDecl bound (DataDeclaration sa dtype name args dctors) =
     fmap (bound,) $
       DataDeclaration sa dtype name
-        <$> updateTypeArguments ss args
-        <*> traverse (sndM (traverse (updateTypesEverywhere ss))) dctors
-  updateDecl bound (TypeSynonymDeclaration sa@(ss, _) name ps ty) =
+        <$> updateTypeArguments args
+        <*> traverse (traverseDataCtorFields (traverse (sndM updateTypesEverywhere))) dctors
+  updateDecl bound (TypeSynonymDeclaration sa name ps ty) =
     fmap (bound,) $
       TypeSynonymDeclaration sa name
-        <$> updateTypeArguments ss ps
-        <*> updateTypesEverywhere ss ty
+        <$> updateTypeArguments ps
+        <*> updateTypesEverywhere ty
   updateDecl bound (TypeClassDeclaration sa@(ss, _) className args implies deps ds) =
     fmap (bound,) $
       TypeClassDeclaration sa className
-        <$> updateTypeArguments ss args
+        <$> updateTypeArguments args
         <*> updateConstraints ss implies
         <*> pure deps
         <*> pure ds
@@ -214,20 +223,20 @@ renameInModule imports (Module modSS coms mn decls exps) =
       TypeInstanceDeclaration sa ch idx name
         <$> updateConstraints ss cs
         <*> updateClassName cn ss
-        <*> traverse (updateTypesEverywhere ss) ts
+        <*> traverse updateTypesEverywhere ts
         <*> pure ds
-  updateDecl bound (TypeDeclaration (TypeDeclarationData sa@(ss, _) name ty)) =
+  updateDecl bound (TypeDeclaration (TypeDeclarationData sa name ty)) =
     fmap (bound,) $
       TypeDeclaration . TypeDeclarationData sa name
-        <$> updateTypesEverywhere ss ty
-  updateDecl bound (ExternDeclaration sa@(ss, _) name ty) =
+        <$> updateTypesEverywhere ty
+  updateDecl bound (ExternDeclaration sa name ty) =
     fmap (name : bound,) $
       ExternDeclaration sa name
-        <$> updateTypesEverywhere ss ty
-  updateDecl bound (ExternDataDeclaration sa@(ss, _) name ki) =
+        <$> updateTypesEverywhere ty
+  updateDecl bound (ExternDataDeclaration sa name ki) =
     fmap (bound,) $
       ExternDataDeclaration sa name
-        <$> updateKindsEverywhere ss ki
+        <$> updateKindsEverywhere ki
   updateDecl bound (TypeFixityDeclaration sa@(ss, _) fixity alias op) =
     fmap (bound,) $
       TypeFixityDeclaration sa fixity
@@ -254,11 +263,11 @@ renameInModule imports (Module modSS coms mn decls exps) =
     return ((pos', bound), v)
   updateValue (pos, bound) (Abs (VarBinder ss arg) val') =
     return ((pos, arg : bound), Abs (VarBinder ss arg) val')
-  updateValue (pos, bound) (Let ds val') = do
+  updateValue (pos, bound) (Let w ds val') = do
     let args = mapMaybe letBoundVariable ds
     unless (length (ordNub args) == length args) .
       throwError . errorMessage' pos $ OverlappingNamesInLet
-    return ((pos, args ++ bound), Let ds val')
+    return ((pos, args ++ bound), Let w ds val')
   updateValue (_, bound) (Var ss name'@(Qualified Nothing ident)) | ident `notElem` bound =
     (,) (ss, bound) <$> (Var ss <$> updateValueName name' ss)
   updateValue (_, bound) (Var ss name'@(Qualified (Just _) _)) =
@@ -267,8 +276,8 @@ renameInModule imports (Module modSS coms mn decls exps) =
     (,) (ss, bound) <$> (Op ss <$> updateValueOpName op ss)
   updateValue (_, bound) (Constructor ss name) =
     (,) (ss, bound) <$> (Constructor ss <$> updateDataConstructorName name ss)
-  updateValue s@(pos, _) (TypedValue check val ty) =
-    (,) s <$> (TypedValue check val <$> updateTypesEverywhere pos ty)
+  updateValue s (TypedValue check val ty) =
+    (,) s <$> (TypedValue check val <$> updateTypesEverywhere ty)
   updateValue s v = return (s, v)
 
   updateBinder
@@ -281,8 +290,8 @@ renameInModule imports (Module modSS coms mn decls exps) =
     (,) (ss, bound) <$> (ConstructorBinder ss <$> updateDataConstructorName name ss <*> pure b)
   updateBinder (_, bound) (OpBinder ss op) =
     (,) (ss, bound) <$> (OpBinder ss <$> updateValueOpName op ss)
-  updateBinder s@(pos, _) (TypedBinder t b) = do
-    t' <- updateTypesEverywhere pos t
+  updateBinder s (TypedBinder t b) = do
+    t' <- updateTypesEverywhere t
     return (s, TypedBinder t' b)
   updateBinder s v =
     return (s, v)
@@ -305,37 +314,39 @@ renameInModule imports (Module modSS coms mn decls exps) =
   letBoundVariable :: Declaration -> Maybe Ident
   letBoundVariable = fmap valdeclIdent . getValueDeclaration
 
-  updateKindsEverywhere :: SourceSpan -> Kind -> m Kind
-  updateKindsEverywhere pos = everywhereOnKindsM updateKind
+  updateKindsEverywhere :: SourceKind -> m SourceKind
+  updateKindsEverywhere = everywhereOnKindsM updateKind
     where
-    updateKind :: Kind -> m Kind
-    updateKind (NamedKind name) = NamedKind <$> updateKindName name pos
+    updateKind :: SourceKind -> m SourceKind
+    updateKind (NamedKind ann@(ss, _) name) = NamedKind ann <$> updateKindName name ss
     updateKind k = return k
 
   updateTypeArguments
     :: (Traversable f, Traversable g)
-    => SourceSpan
-    -> f (a, g Kind) -> m (f (a, g Kind))
-  updateTypeArguments pos = traverse (sndM (traverse (updateKindsEverywhere pos)))
+    => f (a, g SourceKind) -> m (f (a, g SourceKind))
+  updateTypeArguments = traverse (sndM (traverse updateKindsEverywhere))
 
-  updateTypesEverywhere :: SourceSpan -> Type -> m Type
-  updateTypesEverywhere pos = everywhereOnTypesM updateType
+  updateTypesEverywhere :: SourceType -> m SourceType
+  updateTypesEverywhere = everywhereOnTypesM updateType
     where
-    updateType :: Type -> m Type
-    updateType (TypeOp name) = TypeOp <$> updateTypeOpName name pos
-    updateType (TypeConstructor name) = TypeConstructor <$> updateTypeName name pos
-    updateType (ConstrainedType c t) = ConstrainedType <$> updateInConstraint c <*> pure t
-    updateType (KindedType t k) = KindedType t <$> updateKindsEverywhere pos k
+    updateType :: SourceType -> m SourceType
+    updateType (TypeOp ann@(ss, _) name) = TypeOp ann <$> updateTypeOpName name ss
+    updateType (TypeConstructor ann@(ss, _) name) = TypeConstructor ann <$> updateTypeName name ss
+    updateType (ConstrainedType ann c t) = ConstrainedType ann <$> updateInConstraint c <*> pure t
+    updateType (ForAll ann v mbK t sco) = case mbK of
+      Nothing -> pure $ ForAll ann v Nothing t sco
+      Just k -> ForAll ann v <$> fmap pure (updateKindsEverywhere k) <*> pure t <*> pure sco
+    updateType (KindedType ann t k) = KindedType ann t <$> updateKindsEverywhere k
     updateType t = return t
-    updateInConstraint :: Constraint -> m Constraint
-    updateInConstraint (Constraint name ts info) =
-      Constraint <$> updateClassName name pos <*> pure ts <*> pure info
+    updateInConstraint :: SourceConstraint -> m SourceConstraint
+    updateInConstraint (Constraint ann@(ss, _) name ts info) =
+      Constraint ann <$> updateClassName name ss <*> pure ts <*> pure info
 
-  updateConstraints :: SourceSpan -> [Constraint] -> m [Constraint]
-  updateConstraints pos = traverse $ \(Constraint name ts info) ->
-    Constraint
+  updateConstraints :: SourceSpan -> [SourceConstraint] -> m [SourceConstraint]
+  updateConstraints pos = traverse $ \(Constraint ann name ts info) ->
+    Constraint ann
       <$> updateClassName name pos
-      <*> traverse (updateTypesEverywhere pos) ts
+      <*> traverse updateTypesEverywhere ts
       <*> pure info
 
   updateTypeName
@@ -396,7 +407,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
       -- re-exports. If there are multiple options for the name to resolve to
       -- in scope, we throw an error.
       (Just options, _) -> do
-        (mnNew, mnOrig) <- checkImportConflicts mn toName options
+        (mnNew, mnOrig) <- checkImportConflicts pos mn toName options
         modify $ \usedImports ->
           M.insertWith (++) mnNew [fmap toName qname] usedImports
         return $ Qualified (Just mnOrig) name

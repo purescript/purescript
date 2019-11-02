@@ -1,0 +1,10 @@
+{
+  "purescript-prelude": {
+    "version": "1.0.0",
+    "path": "bower_components/purescript-prelude"
+  },
+  "purescript-newtype": {
+    "version": "1.0.0",
+    "path": "bower_components/purescript-newtype"
+  }
+}

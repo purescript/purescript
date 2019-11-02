@@ -19,7 +19,6 @@ import           Prelude.Compat
 import           Protolude (ordNub)
 
 import           Data.List (sort)
-import           Data.Monoid ((<>))
 import qualified Data.Text as T
 import qualified Language.PureScript as P
 
@@ -81,6 +80,6 @@ typeClassEpilogue = "\n}"
 
 superClasses :: P.Declaration -> [SuperMap]
 superClasses (P.TypeClassDeclaration _ sub _ supers@(_:_) _ _) =
-  fmap (\(P.Constraint (P.Qualified _ super) _ _) -> SuperMap (Right (super, sub))) supers
+  fmap (\(P.Constraint _ (P.Qualified _ super) _ _) -> SuperMap (Right (super, sub))) supers
 superClasses (P.TypeClassDeclaration _ sub _ _ _ _) = [SuperMap (Left sub)]
 superClasses _ = []

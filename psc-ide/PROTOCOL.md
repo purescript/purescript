@@ -372,13 +372,17 @@ Arguments:
   - `actualFile :: Maybe String` Specifies the path to be used for location
     information and parse errors. This is useful in case a temp file is used as
     the source for a rebuild.
+  - `codegen :: Maybe [String]` Specified the codegen targets the
+    rebuild should produce. Uses the same target names as the command
+    line compiler. Defaults to just JS output
 
 ```json
 {
   "command": "rebuild",
   "params": {
-    "file": "/path/to/file.purs"
-    "actualFile": "/path/to/actualFile.purs"
+    "file": "/path/to/file.purs",
+    "actualFile": "/path/to/actualFile.purs",
+    "codegen": ["js", "corefn"]
   }
 }
 ```
@@ -389,55 +393,12 @@ In the Success case you get a list of warnings in the compilers json format.
 
 In the Error case you get the errors in the compilers json format
 
-### Pursuit
-The `pursuit` command looks up the packages/completions for a given identifier from Pursuit.
-
-**Params:**
- - `query :: String`: With `type: "package"` this should be a module name. With
-   `type: "completion"` this can be any string to look up.
- - `type :: String`: Takes the following values:
-   - `package`: Looks for packages that contain the given module name.
-   - `completion` Looks for declarations for the query from Pursuit.
-
-```json
-{
-  "command": "pursuit",
-  "params": {
-    "query": "Data.Array",
-    "type": "package"
-  }
-}
-```
-
-**Result:**
-
-`package` returns:
-
-```json
-[
-  {
-  "module": "Module1.Name",
-  "package": "purescript-packagename"
-  }
-]
-```
-
-`completion` returns:
-
-```json
-[
-  {
-  "module": "Data.Array",
-  "identifier": "filter",
-  "type": "forall a. (a -> Boolean) -> Array a -> Array a",
-  "package": "purescript-arrays"
-  }
-]
-```
-
 ### List
 
-#### Loaded Modules
+#### DEPRECATED Loaded Modules
+
+This command will be removed in the next breaking release after 0.13,
+use the completion command with a filter for modules instead.
 
 `list` of type `loadedModules` lists all loaded modules (This means they can be searched for completions etc)
 
@@ -640,37 +601,22 @@ Valid namespaces are `value`, `type` and `kind`.
 ### Declaration type filter
 A filter which allows to filter type declarations. Valid type declarations are
 `value`, `type`, `synonym`, `dataconstructor`, `typeclass`, `valueoperator`,
-`typeoperator` and `kind`.
+`typeoperator`, `kind`, and `module`.
 
 ```json
 {
   "filter": "declarations",
-  "params": [
-    {
-      "declarationtype": "value"
-    },
-    {
-      "declarationtype": "type"
-    },
-    {
-      "declarationtype": "synonym"
-    },
-    {
-      "declarationtype": "dataconstructor"
-    }
-    {
-      "declarationtype": "typeclass"
-    },
-    {
-      "declarationtype": "valueoperator"
-    },
-    {
-      "declarationtype": "typeoperator"
-    },
-    {
-      "declarationtype": "kind"
-    }
-  ]
+  "params":
+    [ "value"
+    , "type"
+    , "synonym"
+    , "dataconstructor"
+    , "typeclass"
+    , "valueoperator"
+    , "typeoperator"
+    , "kind"
+    , "module"
+    ]
 }
 ```
 

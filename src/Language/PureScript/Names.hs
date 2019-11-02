@@ -12,11 +12,11 @@ import Prelude.Compat
 
 import Control.Monad.Supply.Class
 import Control.DeepSeq (NFData)
+import Data.Functor.Contravariant (contramap)
 
 import GHC.Generics (Generic)
 import Data.Aeson
 import Data.Aeson.TH
-import Data.Monoid ((<>))
 import Data.Text (Text)
 import qualified Data.Text as T
 
@@ -121,7 +121,10 @@ showOp op = "(" <> runOpName op <> ")"
 -- |
 -- The closed set of operator alias types.
 --
-data OpNameType = ValueOpName | TypeOpName
+data OpNameType = ValueOpName | TypeOpName | AnyOpName
+
+eraseOpName :: OpName a -> OpName 'AnyOpName
+eraseOpName = OpName . runOpName
 
 -- |
 -- Proper names, i.e. capitalized names for e.g. module names, type//data constructors.
@@ -173,6 +176,10 @@ moduleNameFromString = ModuleName . splitProperNames
     "" -> []
     s' -> ProperName w : splitProperNames s''
       where (w, s'') = T.break (== '.') s'
+
+isBuiltinModuleName :: ModuleName -> Bool
+isBuiltinModuleName (ModuleName (ProperName "Prim" : _)) = True
+isBuiltinModuleName _ = False
 
 -- |
 -- A qualified name, i.e. a name with an optional module name
@@ -237,3 +244,9 @@ isQualifiedWith _ _ = False
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Qualified)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Ident)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ModuleName)
+
+instance ToJSONKey ModuleName where
+  toJSONKey = contramap runModuleName toJSONKey
+
+instance FromJSONKey ModuleName where
+  fromJSONKey = fmap moduleNameFromString fromJSONKey

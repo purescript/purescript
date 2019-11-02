@@ -1,5 +1,7 @@
 module TestIde where
 
+import           Prelude
+
 import           Control.Monad (unless)
 import           Language.PureScript.Ide.Test
 import qualified PscIdeSpec

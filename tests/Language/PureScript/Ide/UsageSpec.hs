@@ -11,7 +11,7 @@ import qualified Language.PureScript.Ide.Test as Test
 import qualified Language.PureScript as P
 import           Test.Hspec
 import           Data.Text.Read (decimal)
-import System.FilePath
+import           System.FilePath
 
 load :: [Text] -> Command
 load = LoadSync . map Test.mn
@@ -28,7 +28,8 @@ shouldBeUsage usage' (fp, range) =
     [ endLine, endColumn ] = map unsafeReadInt (Text.splitOn ":" end)
   in
     do
-      fp `shouldBe` P.spanName usage'
+      projectDir <- Test.getProjectDirectory
+      projectDir </> fp `shouldBe` P.spanName usage'
 
       (P.sourcePosLine (P.spanStart usage'), P.sourcePosColumn (P.spanStart usage'))
         `shouldBe`
@@ -41,11 +42,24 @@ shouldBeUsage usage' (fp, range) =
 spec :: Spec
 spec = describe "Finding Usages" $ do
     it "finds a simple usage" $ do
-      ([_, Right (UsagesResult [usage1])], _) <- Test.inProject $
+      ([_, Right (UsagesResult [usage1, usage2])], _) <- Test.inProject $
         Test.runIde [ load ["FindUsage", "FindUsage.Definition", "FindUsage.Reexport"]
                     , usage (Test.mn "FindUsage.Definition") "usageId" IdeNSValue
                     ]
       usage1 `shouldBeUsage` ("src" </> "FindUsage.purs", "12:11-12:18")
+      usage2 `shouldBeUsage` ("src" </> "FindUsage" </> "Definition.purs", "13:18-13:25")
+    it "finds a simple recursive usage" $ do
+      ([_, Right (UsagesResult [usage1])], _) <- Test.inProject $
+        Test.runIde [ load ["FindUsage.Recursive"]
+                    , usage (Test.mn "FindUsage.Recursive") "recursiveUsage" IdeNSValue
+                    ]
+      usage1 `shouldBeUsage` ("src" </> "FindUsage" </> "Recursive.purs", "7:12-7:26")
+    it "ignores a locally shadowed recursive usage" $ do
+      ([_, Right (UsagesResult usageResult)], _) <- Test.inProject $
+        Test.runIde [ load ["FindUsage.RecursiveShadowed"]
+                    , usage (Test.mn "FindUsage.RecursiveShadowed") "recursiveUsage" IdeNSValue
+                    ]
+      usageResult `shouldBe` []
     it "finds a constructor usage" $ do
       ([_, Right (UsagesResult [usage1])], _) <- Test.inProject $
         Test.runIde [ load ["FindUsage", "FindUsage.Definition", "FindUsage.Reexport"]
@@ -63,6 +77,4 @@ spec = describe "Finding Usages" $ do
         Test.runIde [ load ["FindUsage", "FindUsage.Definition", "FindUsage.Reexport"]
                     , usage (Test.mn "FindUsage.Reexport") "toBeReexported" IdeNSValue
                     ]
-        -- TODO(Christoph): Interesting parser bug here. It seems the position
-        -- of the last token in the file has the wrong ending span
-      usage1 `shouldBeUsage` ("src" </> "FindUsage.purs", "12:19-12:19")
+      usage1 `shouldBeUsage` ("src" </> "FindUsage.purs", "12:19-12:33")

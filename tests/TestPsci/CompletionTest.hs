@@ -17,8 +17,9 @@ import           TestUtils (getSupportModuleNames)
 
 completionTests :: Spec
 completionTests = context "completionTests" $ do
-  mns <- runIO $ getSupportModuleNames
-  mapM_ assertCompletedOk (completionTestData mns)
+  mns       <- runIO getSupportModuleNames
+  psciState <- runIO getPSCiStateForCompletion
+  mapM_ (assertCompletedOk psciState) (completionTestData mns)
 
 -- If the cursor is at the right end of the line, with the 1st element of the
 -- pair as the text in the line, then pressing tab should offer all the
@@ -33,12 +34,12 @@ completionTestData supportModuleNames =
   , (":b",  [":browse"])
 
   -- :browse should complete module names
-  , (":b Control.Monad.E",    map (":b Control.Monad.Eff" ++) ["", ".Unsafe", ".Class", ".Console", ".Uncurried", ".Ref", ".Ref.Unsafe"])
-  , (":b Control.Monad.Eff.", map (":b Control.Monad.Eff" ++) [".Unsafe", ".Class", ".Console", ".Uncurried", ".Ref", ".Ref.Unsafe"])
+  , (":b Eff",    map (":b Effect" ++) ["", ".Unsafe", ".Class", ".Class.Console", ".Console", ".Uncurried", ".Ref"])
+  , (":b Effect.", map (":b Effect" ++) [".Unsafe", ".Class", ".Class.Console", ".Console", ".Uncurried", ".Ref"])
 
   -- import should complete module names
-  , ("import Control.Monad.E",    map ("import Control.Monad.Eff" ++) ["", ".Unsafe", ".Class", ".Console", ".Uncurried", ".Ref", ".Ref.Unsafe"])
-  , ("import Control.Monad.Eff.", map ("import Control.Monad.Eff" ++) [".Unsafe", ".Class", ".Console", ".Uncurried", ".Ref", ".Ref.Unsafe"])
+  , ("import Eff",    map ("import Effect" ++) ["", ".Unsafe", ".Class", ".Class.Console", ".Console", ".Uncurried", ".Ref"])
+  , ("import Effect.", map ("import Effect" ++) [".Unsafe", ".Class", ".Class.Console", ".Console", ".Uncurried", ".Ref"])
 
   -- :quit, :help, :reload, :clear should not complete
   , (":help ", [])
@@ -46,23 +47,30 @@ completionTestData supportModuleNames =
   , (":reload ", [])
   , (":clear ", [])
 
-  -- :show should complete to "loaded" and "import"
-  , (":show ", [":show import", ":show loaded"])
+  -- :show should complete its available arguments
+  , (":show ", [":show import", ":show loaded", ":show print"])
   , (":show a", [])
 
-  -- :type should complete values and data constructors in scope
-  , (":type Control.Monad.Eff.Console.lo", [":type Control.Monad.Eff.Console.log", ":type Control.Monad.Eff.Console.logShow"])
-  --, (":type uni", [":type unit"])
-  --, (":type E", [":type EQ"])
+  -- :type should complete next word from values and constructors in scope
+  , (":type uni", [":type unit"])
+  , (":type E", [":type EQ"])
+  , (":type P.", map (":type P." ++) ["EQ", "GT", "LT", "unit"]) -- import Prelude (unit, Ordering(..)) as P
+  , (":type Effect.Console.lo", [])
+  , (":type voi", [])
 
-  -- :kind should complete types in scope
-  --, (":kind C", [":kind Control.Monad.Eff.Pure"])
-  --, (":kind O", [":kind Ordering"])
+  -- :kind should complete next word from types in scope
+  , (":kind Str", [":kind String"])
+  , (":kind ST.", [":kind ST.ST"]) -- import Control.Monad.ST as ST
+  , (":kind STRef.", [":kind STRef.STRef"]) -- import Control.Monad.ST.Ref as STRef
+  , (":kind Effect.", [])
 
-  -- Only one argument for directives should be completed
+  -- Only one argument for these directives should be completed
   , (":show import ", [])
-  , (":type EQ ", [])
-  , (":kind Ordering ", [])
+  , (":browse Data.List ", [])
+
+  -- These directives take any number of completable terms
+  , (":type const compa", [":type const compare", ":type const comparing"])
+  , (":kind Array In", [":kind Array Int"])
 
   -- a few other import tests
   , ("impor", ["import"])
@@ -73,36 +81,57 @@ completionTestData supportModuleNames =
   , ("\"hi", [])
   , ("34", [])
 
-  -- Identifiers and data constructors should be completed
-  --, ("uni", ["unit"])
-  , ("Control.Monad.Eff.Class.", ["Control.Monad.Eff.Class.liftEff"])
-  --, ("G", ["GT"])
-  , ("Data.Ordering.L", ["Data.Ordering.LT"])
+  -- Identifiers and data constructors in scope should be completed
+  , ("uni", ["unit"])
+  , ("G", ["GT"])
+  , ("P.G", ["P.GT"])
+  , ("P.uni", ["P.unit"])
+  , ("voi", []) -- import Prelude hiding (void)
+  , ("Effect.Class.", [])
 
-  -- if a module is imported qualified, values should complete under the
-  -- qualified name, as well as the original name.
-  , ("ST.new", ["ST.newSTRef"])
-  , ("Control.Monad.ST.new", ["Control.Monad.ST.newSTRef"])
+  -- complete first name after type annotation symbol
+  , ("1 :: I", ["1 :: Int"])
+  , ("1 ::I",  ["1 ::Int"])
+  , ("1:: I",  ["1:: Int"])
+  , ("1::I",   ["1::Int"])
+  , ("(1::Int) uni", ["(1::Int) unit"]) -- back to completing values
+
+  -- Parens and brackets aren't considered part of the current identifier
+  , ("map id [uni", ["map id [unit"])
+  , ("map (cons", ["map (const"])
   ]
 
-assertCompletedOk :: (String, [String]) -> Spec
-assertCompletedOk (line, expecteds) = specify line $ do
-  results <- runCM (completion' (reverse line, ""))
+assertCompletedOk :: PSCiState -> (String, [String]) -> Spec
+assertCompletedOk psciState (line, expecteds) = specify line $ do
+  results <- runCM psciState (completion' (reverse line, ""))
   let actuals = formatCompletions results
   sort actuals `shouldBe` sort expecteds
 
-runCM :: CompletionM a -> IO a
-runCM act = do
-  psciState <- getPSCiStateForCompletion
-  evalStateT (liftCompletionM act) psciState
+runCM :: PSCiState -> CompletionM a -> IO a
+runCM psciState act = evalStateT (liftCompletionM act) psciState
 
 getPSCiStateForCompletion :: IO PSCiState
 getPSCiStateForCompletion = do
-  (PSCiState _ bs es, _) <- initTestPSCiEnv
-  let imports = [controlMonadSTasST, (P.ModuleName [P.ProperName "Prelude"], P.Implicit, Nothing)]
-  return $ PSCiState imports bs es
-
-controlMonadSTasST :: ImportedModule
-controlMonadSTasST = (s "Control.Monad.ST", P.Implicit, Just (s "ST"))
+  (st, _) <- initTestPSCiEnv
+  let imports = [-- import Control.Monad.ST as S
+                 (qualName "Control.Monad.ST"
+                    ,P.Implicit
+                    ,Just (qualName "ST"))
+                , -- import Control.Monad.ST.Ref as STRef
+                 (qualName "Control.Monad.ST.Ref"
+                    ,P.Implicit
+                    ,Just (qualName "STRef"))
+                 -- import Prelude hiding (void)
+                ,(qualName "Prelude"
+                    ,P.Hiding [valName "void"]
+                    ,Nothing)
+                 -- import Prelude (unit, Ordering(..)) as P
+                ,(qualName "Prelude"
+                    ,P.Explicit [valName "unit", typeName "Ordering"]
+                    ,Just (qualName "P"))]
+  return $ updateImportedModules (const imports) st
   where
-  s = P.moduleNameFromString
+    qualName   = P.moduleNameFromString
+    valName    = P.ValueRef srcSpan . P.Ident
+    typeName t = P.TypeRef srcSpan (P.ProperName t) Nothing
+    srcSpan    = P.internalModuleSourceSpan "<internal>"

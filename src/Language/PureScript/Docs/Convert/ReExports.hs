@@ -13,39 +13,45 @@ import Control.Monad.Trans.State.Strict (execState)
 
 import Data.Either
 import Data.Map (Map)
-import Data.Maybe (mapMaybe)
-import Data.Monoid ((<>))
+import Data.Maybe (mapMaybe, fromMaybe)
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as T
 
 import Language.PureScript.Docs.Types
-import qualified Language.PureScript as P
+
+import qualified Language.PureScript.AST as P
+import qualified Language.PureScript.Crash as P
+import qualified Language.PureScript.Errors as P
+import qualified Language.PureScript.Externs as P
+import qualified Language.PureScript.ModuleDependencies as P
+import qualified Language.PureScript.Names as P
+import qualified Language.PureScript.Types as P
+
 
 -- |
 -- Given:
 --
---      * The Imports/Exports Env
---      * An order to traverse the modules (which must be topological)
+--      * A list of externs files
+--      * A function for tagging a module with the package it comes from
 --      * A map of modules, indexed by their names, which are assumed to not
 --      have their re-exports listed yet
 --
 -- This function adds all the missing re-exports.
 --
 updateReExports ::
-  P.Env ->
-  [P.ModuleName] ->
+  [P.ExternsFile] ->
   (P.ModuleName -> InPackage P.ModuleName) ->
   Map P.ModuleName Module ->
   Map P.ModuleName Module
-updateReExports env order withPackage = execState action
+updateReExports externs withPackage = execState action
   where
   action =
-    void (traverse go order)
+    void (traverse go traversalOrder)
 
   go mn = do
     mdl <- lookup' mn
-    reExports <- getReExports env mn
+    reExports <- getReExports externsEnv mn
     let mdl' = mdl { modReExports = map (first withPackage) reExports }
     modify (Map.insert mn mdl')
 
@@ -57,6 +63,25 @@ updateReExports env order withPackage = execState action
       Nothing ->
         internalError ("Module missing: " ++ T.unpack (P.runModuleName mn))
 
+  externsEnv :: Map P.ModuleName P.ExternsFile
+  externsEnv = Map.fromList $ map (P.efModuleName &&& id) externs
+
+  traversalOrder :: [P.ModuleName]
+  traversalOrder =
+    case P.sortModules externsSignature externs of
+      Right (es, _) -> map P.efModuleName es
+      Left errs -> internalError $
+        "failed to sortModules: " ++
+        P.prettyPrintMultipleErrors P.defaultPPEOptions errs
+
+  externsSignature :: P.ExternsFile -> P.ModuleSignature
+  externsSignature ef =
+    P.ModuleSignature
+      { P.sigSourceSpan = P.efSourceSpan ef
+      , P.sigModuleName = P.efModuleName ef
+      , P.sigImports = map (\ei -> (P.eiModule ei, P.nullSourceSpan)) (P.efImports ef)
+      }
+
 -- |
 -- Collect all of the re-exported declarations for a single module.
 --
@@ -66,19 +91,20 @@ updateReExports env order withPackage = execState action
 --
 getReExports ::
   (MonadState (Map P.ModuleName Module) m) =>
-  P.Env ->
+  Map P.ModuleName P.ExternsFile ->
   P.ModuleName ->
   m [(P.ModuleName, [Declaration])]
-getReExports env mn =
-  case Map.lookup mn env of
+getReExports externsEnv mn =
+  case Map.lookup mn externsEnv of
     Nothing ->
       internalError ("Module missing: " ++ T.unpack (P.runModuleName mn))
-    Just (_, imports, exports) -> do
-      allExports <- runReaderT (collectDeclarations imports exports) mn
-      pure (filter notLocal allExports)
+    Just (P.ExternsFile { P.efExports = refs }) -> do
+      let reExpRefs = mapMaybe toReExportRef refs
+      runReaderT (collectDeclarations reExpRefs) mn
 
-  where
-  notLocal = (/= mn) . fst
+toReExportRef :: P.DeclarationRef -> Maybe (P.ExportSource, P.DeclarationRef)
+toReExportRef (P.ReExportRef _ source ref) = Just (source, ref)
+toReExportRef _ = Nothing
 
 -- |
 -- Assemble a list of declarations re-exported from a particular module, based
@@ -101,16 +127,15 @@ getReExports env mn =
 --
 collectDeclarations :: forall m.
   (MonadState (Map P.ModuleName Module) m, MonadReader P.ModuleName m) =>
-  P.Imports ->
-  P.Exports ->
+  [(P.ExportSource, P.DeclarationRef)] ->
   m [(P.ModuleName, [Declaration])]
-collectDeclarations imports exports = do
-  valsAndMembers <- collect lookupValueDeclaration impVals expVals
-  valOps <- collect lookupValueOpDeclaration impValOps expValOps
-  typeClasses <- collect lookupTypeClassDeclaration impTCs expTCs
-  types <- collect lookupTypeDeclaration impTypes expTypes
-  typeOps <- collect lookupTypeOpDeclaration impTypeOps expTypeOps
-  kinds <- collect lookupKindDeclaration impKinds expKinds
+collectDeclarations reExports = do
+  valsAndMembers <- collect lookupValueDeclaration expVals
+  valOps <- collect lookupValueOpDeclaration expValOps
+  typeClasses <- collect lookupTypeClassDeclaration expTCs
+  types <- collect lookupTypeDeclaration expTypes
+  typeOps <- collect lookupTypeOpDeclaration expTypeOps
+  kinds <- collect lookupKindDeclaration expKinds
 
   (vals, classes) <- handleTypeClassMembers valsAndMembers typeClasses
 
@@ -124,73 +149,45 @@ collectDeclarations imports exports = do
   collect
     :: (Eq a, Show a)
     => (P.ModuleName -> a -> m (P.ModuleName, [b]))
-    -> [P.ImportRecord a]
-    -> Map a P.ModuleName
+    -> Map a P.ExportSource
     -> m (Map P.ModuleName [b])
-  collect lookup' imps exps = do
-    imps' <- traverse (findImport imps) $ Map.toList exps
-    Map.fromListWith (<>) <$> traverse (uncurry lookup') imps'
+  collect lookup' exps = do
+    let reExps = Map.toList $ Map.mapMaybe P.exportSourceImportedFrom exps
+    decls <- traverse (uncurry (flip lookup')) reExps
+    return $ Map.fromListWith (<>) decls
 
-  expVals = P.exportedValues exports
-  impVals = concat (Map.elems (P.importedValues imports))
+  expVals :: Map P.Ident P.ExportSource
+  expVals = mkExportMap P.getValueRef
 
-  expValOps = P.exportedValueOps exports
-  impValOps = concat (Map.elems (P.importedValueOps imports))
+  expValOps :: Map (P.OpName 'P.ValueOpName) P.ExportSource
+  expValOps = mkExportMap P.getValueOpRef
 
-  expTypes = Map.map snd (P.exportedTypes exports)
-  impTypes = concat (Map.elems (P.importedTypes imports))
+  expTCs :: Map (P.ProperName 'P.ClassName) P.ExportSource
+  expTCs = mkExportMap P.getTypeClassRef
 
-  expTypeOps = P.exportedTypeOps exports
-  impTypeOps = concat (Map.elems (P.importedTypeOps imports))
+  expTypes :: Map (P.ProperName 'P.TypeName) P.ExportSource
+  expTypes = mkExportMap (fmap fst . P.getTypeRef)
 
-  expCtors = concatMap fst (Map.elems (P.exportedTypes exports))
+  expTypeOps :: Map (P.OpName 'P.TypeOpName) P.ExportSource
+  expTypeOps = mkExportMap P.getTypeOpRef
 
-  expTCs = P.exportedTypeClasses exports
-  impTCs = concat (Map.elems (P.importedTypeClasses imports))
+  expKinds :: Map (P.ProperName 'P.KindName) P.ExportSource
+  expKinds = mkExportMap P.getKindRef
 
-  expKinds = P.exportedKinds exports
-  impKinds = concat (Map.elems (P.importedKinds imports))
+  mkExportMap :: Ord name => (P.DeclarationRef -> Maybe name) -> Map name P.ExportSource
+  mkExportMap f =
+    Map.fromList $
+      mapMaybe (\(exportSrc, ref) -> (,exportSrc) <$> f ref) reExports
 
--- |
--- Given a list of imported declarations (of a particular kind, ie. type, data,
--- class, value, etc), and the name of an exported declaration of the same
--- kind, together with the module it was originally defined in, return a tuple
--- of:
---
---      * the module that exported declaration was imported from (note that
---      this can be different from the module it was originally defined in, if
---      it is a re-export),
---      * that same declaration's name.
---
--- This function uses a type variable for names because we want to be able to
--- instantiate @name@ as both 'P.Ident' and 'P.ProperName'.
---
-findImport ::
-  (Show name, Eq name, MonadReader P.ModuleName m) =>
-  [P.ImportRecord name] ->
-  (name, P.ModuleName) ->
-  m (P.ModuleName, name)
-findImport imps (name, orig) =
-  let
-    matches (P.ImportRecord qual mn _) = P.disqualify qual == name && mn == orig
-    matching = filter matches imps
-    getQualified (P.Qualified mname _) = mname
-  in
-    case mapMaybe (getQualified . P.importName) matching of
-      -- A value can occur more than once if it is imported twice (eg, if it is
-      -- exported by A, re-exported from A by B, and C imports it from both A
-      -- and B). In this case, we just take its first appearance.
-      (importedFrom:_) ->
-        pure (importedFrom, name)
-      [] ->
-        internalErrorInModule ("findImport: not found: " ++ show (name, orig))
+  expCtors :: [P.ProperName 'P.ConstructorName]
+  expCtors = concatMap (fromMaybe [] . (>>= snd) . P.getTypeRef . snd) reExports
 
 lookupValueDeclaration ::
   (MonadState (Map P.ModuleName Module) m,
    MonadReader P.ModuleName m) =>
   P.ModuleName ->
   P.Ident ->
-  m (P.ModuleName, [Either (Text, P.Constraint, ChildDeclaration) Declaration])
+  m (P.ModuleName, [Either (Text, Constraint', ChildDeclaration) Declaration])
 lookupValueDeclaration importedFrom ident = do
   decls <- lookupModuleDeclarations "lookupValueDeclaration" importedFrom
   let
@@ -269,9 +266,15 @@ lookupTypeDeclaration importedFrom ty = do
   case ds of
     [d] ->
       pure (importedFrom, [d])
+    [] | P.isBuiltinModuleName importedFrom ->
+      -- Type classes in builtin modules (i.e. submodules of Prim) also have
+      -- corresponding pseudo-types in the primEnv, but since these are an
+      -- implementation detail they do not exist in the Modules, and hence in
+      -- this case, `ds` will be empty.
+      pure (importedFrom, [])
     other ->
       internalErrorInModule
-        ("lookupTypeDeclaration: unexpected result: " ++ show other)
+        ("lookupTypeDeclaration: unexpected result for " ++ show ty ++ ": " ++ show other)
 
 lookupTypeOpDeclaration
   :: (MonadState (Map P.ModuleName Module) m,MonadReader P.ModuleName m)
@@ -305,7 +308,8 @@ lookupTypeClassDeclaration importedFrom tyClass = do
       pure (importedFrom, [d])
     other ->
       internalErrorInModule
-        ("lookupTypeClassDeclaration: unexpected result: "
+        ("lookupTypeClassDeclaration: unexpected result for "
+         ++ show tyClass ++ ": "
          ++ (unlines . map show) other)
 
 lookupKindDeclaration
@@ -348,7 +352,7 @@ lookupModuleDeclarations definedIn moduleName = do
 
 handleTypeClassMembers ::
   (MonadReader P.ModuleName m) =>
-  Map P.ModuleName [Either (Text, P.Constraint, ChildDeclaration) Declaration] ->
+  Map P.ModuleName [Either (Text, Constraint', ChildDeclaration) Declaration] ->
   Map P.ModuleName [Declaration] ->
   m (Map P.ModuleName [Declaration], Map P.ModuleName [Declaration])
 handleTypeClassMembers valsAndMembers typeClasses =
@@ -363,7 +367,7 @@ handleTypeClassMembers valsAndMembers typeClasses =
       |> fmap splitMap
 
 valsAndMembersToEnv ::
-  [Either (Text, P.Constraint, ChildDeclaration) Declaration] -> TypeClassEnv
+  [Either (Text, Constraint', ChildDeclaration) Declaration] -> TypeClassEnv
 valsAndMembersToEnv xs =
   let (envUnhandledMembers, envValues) = partitionEithers xs
       envTypeClasses = []
@@ -388,7 +392,7 @@ data TypeClassEnv = TypeClassEnv
     -- name of the type class they belong to, and the constraint is used to
     -- make sure that they have the correct type if they get promoted.
     --
-    envUnhandledMembers :: [(Text, P.Constraint, ChildDeclaration)]
+    envUnhandledMembers :: [(Text, Constraint', ChildDeclaration)]
     -- |
     -- A list of normal value declarations. Type class members will be added to
     -- this list if their parent type class is not available.
@@ -402,12 +406,13 @@ data TypeClassEnv = TypeClassEnv
   }
   deriving (Show)
 
+instance Semigroup TypeClassEnv where
+  (TypeClassEnv a1 b1 c1) <> (TypeClassEnv a2 b2 c2) =
+    TypeClassEnv (a1 <> a2) (b1 <> b2) (c1 <> c2)
+
 instance Monoid TypeClassEnv where
   mempty =
     TypeClassEnv mempty mempty mempty
-  mappend (TypeClassEnv a1 b1 c1)
-          (TypeClassEnv a2 b2 c2) =
-    TypeClassEnv (a1 <> a2) (b1 <> b2) (c1 <> c2)
 
 -- |
 -- Take a TypeClassEnv and handle all of the type class members in it, either
@@ -455,7 +460,7 @@ handleEnv TypeClassEnv{..} =
           ++ T.unpack cdeclTitle)
 
   addConstraint constraint =
-    P.quantify . P.moveQuantifiersToFront . P.ConstrainedType constraint
+    P.quantify . P.moveQuantifiersToFront . P.ConstrainedType () constraint
 
 splitMap :: Map k (v1, v2) -> (Map k v1, Map k v2)
 splitMap = fmap fst &&& fmap snd
@@ -521,12 +526,12 @@ internalErrorInModule msg = do
 -- If the provided Declaration is a TypeClassDeclaration, construct an
 -- appropriate Constraint for use with the types of its members.
 --
-typeClassConstraintFor :: Declaration -> Maybe P.Constraint
+typeClassConstraintFor :: Declaration -> Maybe Constraint'
 typeClassConstraintFor Declaration{..} =
   case declInfo of
     TypeClassDeclaration tyArgs _ _ ->
-      Just (P.Constraint (P.Qualified Nothing (P.ProperName declTitle)) (mkConstraint tyArgs) Nothing)
+      Just (P.Constraint () (P.Qualified Nothing (P.ProperName declTitle)) (mkConstraint tyArgs) Nothing)
     _ ->
       Nothing
   where
-  mkConstraint = map (P.TypeVar . fst)
+  mkConstraint = map (P.TypeVar () . fst)

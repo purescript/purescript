@@ -12,11 +12,15 @@ module Language.PureScript.Externs
   , ExternsDeclaration(..)
   , moduleToExternsFile
   , applyExternsFileToEnvironment
+  , decodeExterns
   ) where
 
 import Prelude.Compat
 
+import Control.Monad (guard)
+import Data.Aeson (decode)
 import Data.Aeson.TH
+import Data.ByteString.Lazy (ByteString)
 import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.List (foldl', find)
 import Data.Foldable (fold)
@@ -25,6 +29,7 @@ import qualified Data.Text as T
 import Data.Version (showVersion)
 import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.List.NonEmpty as NEL
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -98,42 +103,43 @@ data ExternsDeclaration =
   -- | A type declaration
     EDType
       { edTypeName                :: ProperName 'TypeName
-      , edTypeKind                :: Kind
+      , edTypeKind                :: SourceKind
       , edTypeDeclarationKind     :: TypeKind
       }
   -- | A type synonym
   | EDTypeSynonym
       { edTypeSynonymName         :: ProperName 'TypeName
-      , edTypeSynonymArguments    :: [(Text, Maybe Kind)]
-      , edTypeSynonymType         :: Type
+      , edTypeSynonymArguments    :: [(Text, Maybe SourceKind)]
+      , edTypeSynonymType         :: SourceType
       }
   -- | A data construtor
   | EDDataConstructor
       { edDataCtorName            :: ProperName 'ConstructorName
       , edDataCtorOrigin          :: DataDeclType
       , edDataCtorTypeCtor        :: ProperName 'TypeName
-      , edDataCtorType            :: Type
+      , edDataCtorType            :: SourceType
       , edDataCtorFields          :: [Ident]
       }
   -- | A value declaration
   | EDValue
       { edValueName               :: Ident
-      , edValueType               :: Type
+      , edValueType               :: SourceType
       }
   -- | A type class declaration
   | EDClass
       { edClassName               :: ProperName 'ClassName
-      , edClassTypeArguments      :: [(Text, Maybe Kind)]
-      , edClassMembers            :: [(Ident, Type)]
-      , edClassConstraints        :: [Constraint]
+      , edClassTypeArguments      :: [(Text, Maybe SourceKind)]
+      , edClassMembers            :: [(Ident, SourceType)]
+      , edClassConstraints        :: [SourceConstraint]
       , edFunctionalDependencies  :: [FunctionalDependency]
+      , edIsEmpty                 :: Bool
       }
   -- | An instance declaration
   | EDInstance
       { edInstanceClassName       :: Qualified (ProperName 'ClassName)
       , edInstanceName            :: Ident
-      , edInstanceTypes           :: [Type]
-      , edInstanceConstraints     :: Maybe [Constraint]
+      , edInstanceTypes           :: [SourceType]
+      , edInstanceConstraints     :: Maybe [SourceConstraint]
       , edInstanceChain           :: [Qualified Ident]
       , edInstanceChainIndex      :: Integer
       }
@@ -152,9 +158,13 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   applyDecl env (EDTypeSynonym pn args ty) = env { typeSynonyms = M.insert (qual pn) (args, ty) (typeSynonyms env) }
   applyDecl env (EDDataConstructor pn dTy tNm ty nms) = env { dataConstructors = M.insert (qual pn) (dTy, tNm, ty, nms) (dataConstructors env) }
   applyDecl env (EDValue ident ty) = env { names = M.insert (Qualified (Just efModuleName) ident) (ty, External, Defined) (names env) }
-  applyDecl env (EDClass pn args members cs deps) = env { typeClasses = M.insert (qual pn) (makeTypeClassData args members cs deps) (typeClasses env) }
+  applyDecl env (EDClass pn args members cs deps tcIsEmpty) = env { typeClasses = M.insert (qual pn) (makeTypeClassData args members cs deps tcIsEmpty) (typeClasses env) }
   applyDecl env (EDKind pn) = env { kinds = S.insert (qual pn) (kinds env) }
-  applyDecl env (EDInstance className ident tys cs ch idx) = env { typeClassDictionaries = updateMap (updateMap (M.insert (qual ident) dict) className) (Just efModuleName) (typeClassDictionaries env) }
+  applyDecl env (EDInstance className ident tys cs ch idx) =
+    env { typeClassDictionaries =
+            updateMap
+              (updateMap (M.insertWith (<>) (qual ident) (pure dict)) className)
+              (Just efModuleName) (typeClassDictionaries env) }
     where
     dict :: NamedDict
     dict = TypeClassDictionaryInScope ch idx (qual ident) [] className tys cs
@@ -218,13 +228,14 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
     , Just (_, synTy) <- Qualified (Just mn) (coerceProperName className) `M.lookup` typeSynonyms env
     = [ EDType (coerceProperName className) kind TypeSynonym
       , EDTypeSynonym (coerceProperName className) typeClassArguments synTy
-      , EDClass className typeClassArguments typeClassMembers typeClassSuperclasses typeClassDependencies
+      , EDClass className typeClassArguments typeClassMembers typeClassSuperclasses typeClassDependencies typeClassIsEmpty
       ]
   toExternsDeclaration (TypeInstanceRef _ ident)
     = [ EDInstance tcdClassName ident tcdInstanceTypes tcdDependencies tcdChain tcdIndex
       | m1 <- maybeToList (M.lookup (Just mn) (typeClassDictionaries env))
       , m2 <- M.elems m1
-      , TypeClassDictionaryInScope{..} <- maybeToList (M.lookup (Qualified (Just mn) ident) m2)
+      , nel <- maybeToList (M.lookup (Qualified (Just mn) ident) m2)
+      , TypeClassDictionaryInScope{..} <- NEL.toList nel
       ]
   toExternsDeclaration (KindRef _ pn)
     | Qualified (Just mn) pn `S.member` kinds env
@@ -236,3 +247,10 @@ $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsF
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsTypeFixity)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsDeclaration)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsFile)
+
+
+decodeExterns :: ByteString -> Maybe ExternsFile
+decodeExterns bs = do
+  externs <- decode bs
+  guard $ T.unpack (efVersion externs) == showVersion Paths.version
+  return externs

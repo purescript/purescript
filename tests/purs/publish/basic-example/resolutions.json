@@ -1,0 +1,17 @@
+{
+  "purescript-console": {
+    "version": "1.0.0",
+    "path": "../../../support/bower_components/purescript-console"
+  },
+  "purescript-effect": {
+    "version": "1.0.0",
+    "path": "../../../support/bower_components/purescript-effect"
+  },
+  "purescript-prelude": {
+    "version": "1.0.0",
+    "path": "../../../support/bower_components/purescript-prelude"
+  },
+  "purescript-newtype": {
+    "path": "../../../support/bower_components/purescript-newtype"
+  }
+}

@@ -41,7 +41,7 @@ desugarDecl d = rethrowWithPosition (declSourceSpan d) $ fn d
     , BinaryNoParens op u val <- b'
     , isAnonymousArgument u = do arg <- freshIdent'
                                  return $ Abs (VarBinder nullSourceSpan arg) $ App (App op (Var nullSourceSpan (Qualified Nothing arg))) val
-  desugarExpr (Literal (ObjectLiteral ps)) = wrapLambdaAssoc (Literal . ObjectLiteral) ps
+  desugarExpr (Literal ss (ObjectLiteral ps)) = wrapLambdaAssoc (Literal ss . ObjectLiteral) ps
   desugarExpr (ObjectUpdateNested obj ps) = transformNestedUpdate obj ps
   desugarExpr (Accessor prop u)
     | Just props <- peelAnonAccessorChain u = do
@@ -69,7 +69,7 @@ desugarDecl d = rethrowWithPosition (declSourceSpan d) $ fn d
       then Abs (VarBinder nullSourceSpan val) <$> wrapLambda (buildUpdates valExpr) ps
       else wrapLambda (buildLet val . buildUpdates valExpr) ps
     where
-      buildLet val = Let [ValueDecl (declSourceSpan d, []) val Public [] [MkUnguarded obj]]
+      buildLet val = Let FromLet [ValueDecl (declSourceSpan d, []) val Public [] [MkUnguarded obj]]
 
       -- recursively build up the nested `ObjectUpdate` expressions
       buildUpdates :: Expr -> PathTree Expr -> Expr

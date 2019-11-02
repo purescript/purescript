@@ -2,22 +2,22 @@ module Language.PureScript.Interactive.Module where
 
 import           Prelude.Compat
 
-import           Control.Monad
 import qualified Language.PureScript as P
+import qualified Language.PureScript.CST as CST
 import           Language.PureScript.Interactive.Types
 import           System.Directory (getCurrentDirectory)
 import           System.FilePath (pathSeparator, makeRelative)
-import           System.IO.UTF8 (readUTF8FileT)
+import           System.IO.UTF8 (readUTF8FileT, readUTF8FilesT)
 
 -- * Support Module
 
 -- | The name of the PSCI support module
 supportModuleName :: P.ModuleName
-supportModuleName = P.moduleNameFromString "PSCI.Support"
+supportModuleName = fst initialInteractivePrint
 
 -- | Checks if the Console module is defined
-supportModuleIsDefined :: [P.Module] -> Bool
-supportModuleIsDefined = any ((== supportModuleName) . P.getModuleName)
+supportModuleIsDefined :: [P.ModuleName] -> Bool
+supportModuleIsDefined = any ((== supportModuleName))
 
 -- * Module Management
 
@@ -28,38 +28,36 @@ loadModule filename = do
   content <- readUTF8FileT filename
   return $
     either (Left . P.prettyPrintMultipleErrors P.defaultPPEOptions {P.ppeRelativeDirectory = pwd}) (Right . map snd) $
-      P.parseModulesFromFiles id [(filename, content)]
+      CST.parseFromFiles id [(filename, content)]
 
 -- | Load all modules.
 loadAllModules :: [FilePath] -> IO (Either P.MultipleErrors [(FilePath, P.Module)])
 loadAllModules files = do
   pwd <- getCurrentDirectory
-  filesAndContent <- forM files $ \filename -> do
-    content <- readUTF8FileT filename
-    return (filename, content)
-  return $ P.parseModulesFromFiles (makeRelative pwd) filesAndContent
+  filesAndContent <- readUTF8FilesT files
+  return $ CST.parseFromFiles (makeRelative pwd) filesAndContent
 
 -- |
 -- Makes a volatile module to execute the current expression.
 --
 createTemporaryModule :: Bool -> PSCiState -> P.Expr -> P.Module
-createTemporaryModule exec PSCiState{psciImportedModules = imports, psciLetBindings = lets} val =
+createTemporaryModule exec st val =
   let
+    imports       = psciImportedModules st
+    lets          = psciLetBindings st
     moduleName    = P.ModuleName [P.ProperName "$PSCI"]
-    effModuleName = P.moduleNameFromString "Control.Monad.Eff"
-    effImport     = (effModuleName, P.Implicit, Just (P.ModuleName [P.ProperName "$Eff"]))
-    supportImport = (supportModuleName, P.Implicit, Just (P.ModuleName [P.ProperName "$Support"]))
-    eval          = P.Var internalSpan (P.Qualified (Just (P.ModuleName [P.ProperName "$Support"])) (P.Ident "eval"))
+    effModuleName = P.moduleNameFromString "Effect"
+    effImport     = (effModuleName, P.Implicit, Just (P.ModuleName [P.ProperName "$Effect"]))
+    supportImport = (fst (psciInteractivePrint st), P.Implicit, Just (P.ModuleName [P.ProperName "$Support"]))
+    eval          = P.Var internalSpan (P.Qualified (Just (P.ModuleName [P.ProperName "$Support"])) (snd (psciInteractivePrint st)))
     mainValue     = P.App eval (P.Var internalSpan (P.Qualified Nothing (P.Ident "it")))
     itDecl        = P.ValueDecl (internalSpan, []) (P.Ident "it") P.Public [] [P.MkUnguarded val]
     typeDecl      = P.TypeDeclaration
                       (P.TypeDeclarationData (internalSpan, []) (P.Ident "$main")
-                        (P.TypeApp
-                          (P.TypeApp
-                            (P.TypeConstructor
-                              (P.Qualified (Just (P.ModuleName [P.ProperName "$Eff"])) (P.ProperName "Eff")))
-                                (P.TypeWildcard internalSpan))
-                                  (P.TypeWildcard internalSpan)))
+                        (P.srcTypeApp
+                          (P.srcTypeConstructor
+                            (P.Qualified (Just (P.ModuleName [P.ProperName "$Effect"])) (P.ProperName "Effect")))
+                                  P.srcTypeWildcard))
     mainDecl      = P.ValueDecl (internalSpan, []) (P.Ident "$main") P.Public [] [P.MkUnguarded mainValue]
     decls         = if exec then [itDecl, typeDecl, mainDecl] else [itDecl]
   in
@@ -72,11 +70,13 @@ createTemporaryModule exec PSCiState{psciImportedModules = imports, psciLetBindi
 -- |
 -- Makes a volatile module to hold a non-qualified type synonym for a fully-qualified data type declaration.
 --
-createTemporaryModuleForKind :: PSCiState -> P.Type -> P.Module
-createTemporaryModuleForKind PSCiState{psciImportedModules = imports, psciLetBindings = lets} typ =
+createTemporaryModuleForKind :: PSCiState -> P.SourceType -> P.Module
+createTemporaryModuleForKind st typ =
   let
+    imports    = psciImportedModules st
+    lets       = psciLetBindings st
     moduleName = P.ModuleName [P.ProperName "$PSCI"]
-    itDecl = P.TypeSynonymDeclaration (internalSpan, []) (P.ProperName "IT") [] typ
+    itDecl     = P.TypeSynonymDeclaration (internalSpan, []) (P.ProperName "IT") [] typ
   in
     P.Module internalSpan [] moduleName ((importDecl `map` imports) ++ lets ++ [itDecl]) Nothing
 
@@ -84,8 +84,9 @@ createTemporaryModuleForKind PSCiState{psciImportedModules = imports, psciLetBin
 -- Makes a volatile module to execute the current imports.
 --
 createTemporaryModuleForImports :: PSCiState -> P.Module
-createTemporaryModuleForImports PSCiState{psciImportedModules = imports} =
+createTemporaryModuleForImports st =
   let
+    imports    = psciImportedModules st
     moduleName = P.ModuleName [P.ProperName "$PSCI"]
   in
     P.Module internalSpan [] moduleName (importDecl `map` imports) Nothing

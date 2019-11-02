@@ -3,12 +3,14 @@
 module Language.PureScript.Ide.ImportsSpec where
 
 import           Protolude hiding (moduleName)
-import           Data.Maybe                      (fromJust)
+import           Data.Maybe (fromJust)
+import qualified Data.Set as Set
 
-import qualified Language.PureScript             as P
+import qualified Language.PureScript as P
 import           Language.PureScript.Ide.Command as Command
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Imports
+import           Language.PureScript.Ide.Filter (moduleFilter)
 import qualified Language.PureScript.Ide.Test as Test
 import           Language.PureScript.Ide.Types
 import           System.FilePath
@@ -47,9 +49,9 @@ syntaxErrorFile =
   ]
 
 testSliceImportSection :: [Text] -> (P.ModuleName, [Text], [Import], [Text])
-testSliceImportSection = fromRight . sliceImportSection
+testSliceImportSection = unsafeFromRight . sliceImportSection
   where
-    fromRight = fromJust . rightToMaybe
+    unsafeFromRight = fromJust . rightToMaybe
 
 withImports :: [Text] -> [Text]
 withImports is =
@@ -62,7 +64,7 @@ preludeImport, arrayImport, listImport, consoleImport, maybeImport :: Import
 preludeImport = testParseImport "import Prelude"
 arrayImport = testParseImport "import Data.Array (head, cons)"
 listImport = testParseImport "import Data.List as List"
-consoleImport = testParseImport "import Control.Monad.Eff.Console (log) as Console"
+consoleImport = testParseImport "import Effect.Console (log) as Console"
 maybeImport = testParseImport "import Data.Maybe (Maybe(Just))"
 
 spec :: Spec
@@ -70,9 +72,9 @@ spec = do
   describe "determining the importsection" $ do
     let moduleSkeleton imports =
           Right (P.moduleNameFromString "Main", take 1 simpleFile, imports, drop 2 simpleFile)
-    it "slices a file without imports and adds a newline after the module declaration" $
+    it "slices a file without imports" $
       shouldBe (sliceImportSection noImportsFile)
-          (Right (P.moduleNameFromString "Main", take 1 noImportsFile ++ [""], [], drop 1 noImportsFile))
+          (Right (P.moduleNameFromString "Main", take 1 noImportsFile, [], drop 1 noImportsFile))
 
     it "handles a file with syntax errors just fine" $
       shouldBe (sliceImportSection syntaxErrorFile)
@@ -103,7 +105,7 @@ spec = do
     it "pretty prints a qualified import" $
       shouldBe (prettyPrintImport' listImport) "import Data.List as List"
     it "pretty prints a qualified explicit import" $
-      shouldBe (prettyPrintImport' consoleImport) "import Control.Monad.Eff.Console (log) as Console"
+      shouldBe (prettyPrintImport' consoleImport) "import Effect.Console (log) as Console"
     it "pretty prints an import with a datatype (and PositionedRef's for the dtors)" $
       shouldBe (prettyPrintImport' maybeImport) "import Data.Maybe (Maybe(Just))"
 
@@ -343,9 +345,18 @@ addExplicitImport :: Text -> Command
 addExplicitImport i =
   Command.Import ("src" </> "ImportsSpec.purs") Nothing [] (Command.AddImportForIdentifier i Nothing)
 
+addExplicitImportFiltered :: Text -> [P.ModuleName] -> Command
+addExplicitImportFiltered i ms =
+  Command.Import ("src" </> "ImportsSpec.purs") Nothing [moduleFilter (Set.fromList ms)] (Command.AddImportForIdentifier i Nothing)
+
 importShouldBe :: [Text] -> [Text] -> Expectation
 importShouldBe res importSection =
-  res `shouldBe` [ "module ImportsSpec where" , ""] ++ importSection ++ [ "" , "myId x = x"]
+  res `shouldBe`
+    [ "module ImportsSpec where" ]
+    ++ (if null importSection then [] else "" : importSection)
+    ++ [ ""
+       , "myId x = x"
+       ]
 
 runIdeLoaded :: Command -> IO (Either IdeError Success)
 runIdeLoaded c = do
@@ -393,3 +404,12 @@ importFromIdeState = do
      \write to the output file" $ do
     result <- runIdeLoaded (addExplicitImport "doesnExist")
     result `shouldSatisfy` isLeft
+  it "doesn't import things from the Prim modules" $ do
+    Right (MultilineTextResult result) <- runIdeLoaded (addExplicitImport "String")
+    result `importShouldBe` []
+  it "imports classes from Prim.* modules" $ do
+    Right (MultilineTextResult result) <- runIdeLoaded (addExplicitImportFiltered "Cons" [Test.mn "Prim.Row"])
+    result `importShouldBe` ["import Prim.Row (class Cons)"]
+  it "imports types from Prim.* modules" $ do
+    Right (MultilineTextResult result) <- runIdeLoaded (addExplicitImportFiltered "Cons" [Test.mn "Prim.RowList"])
+    result `importShouldBe` ["import Prim.RowList (Cons)"]

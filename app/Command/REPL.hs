@@ -31,12 +31,12 @@ import           Control.Monad.Trans.State.Strict (StateT, evalStateT)
 import           Control.Monad.Trans.Reader (ReaderT, runReaderT)
 import           Data.FileEmbed (embedStringFile)
 import           Data.Foldable (for_)
-import           Data.Monoid ((<>))
 import           Data.String (IsString(..))
 import           Data.Text (Text, unpack)
 import           Data.Traversable (for)
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Bundle as Bundle
+import qualified Language.PureScript.CST as CST
 import           Language.PureScript.Interactive
 import           Network.HTTP.Types.Header (hContentType, hCacheControl,
                                             hPragma, hExpires)
@@ -97,15 +97,15 @@ psciOptions = PSCiOptions <$> many inputFile
                           <*> backend
 
 -- | Parses the input and returns either a command, or an error as a 'String'.
-getCommand :: forall m. MonadException m => InputT m (Either String (Maybe Command))
-getCommand = handleInterrupt (return (Right Nothing)) $ do
+getCommand :: forall m. MonadException m => InputT m (Either String [Command])
+getCommand = handleInterrupt (return (Right [])) $ do
   line <- withInterrupt $ getInputLine "> "
   case line of
-    Nothing -> return (Right (Just QuitPSCi)) -- Ctrl-D when input is empty
-    Just "" -> return (Right Nothing)
-    Just s  -> return . fmap Just $ parseCommand s
+    Nothing -> return (Right [QuitPSCi]) -- Ctrl-D when input is empty
+    Just "" -> return (Right [])
+    Just s  -> return (parseCommand s)
 
-pasteMode :: forall m. MonadException m => InputT m (Either String Command)
+pasteMode :: forall m. MonadException m => InputT m (Either String [Command])
 pasteMode =
     parseCommand <$> go []
   where
@@ -293,7 +293,7 @@ nodeBackend nodePath nodeArgs = Backend setup eval reload shutdown
       case result of
         Just (ExitSuccess, out, _)   -> putStrLn out
         Just (ExitFailure _, _, err) -> putStrLn err
-        Nothing                      -> putStrLn "Couldn't find node.js"
+        Nothing                      -> putStrLn "Could not find node.js. Do you have node.js installed and available in your PATH?"
 
     reload :: () -> IO ()
     reload _ = return ()
@@ -316,22 +316,22 @@ command = loop <$> options
           when (null modules) . liftIO $ do
             putStr noInputMessage
             exitFailure
-          unless (supportModuleIsDefined (map snd modules)) . liftIO $ do
+          unless (supportModuleIsDefined (map (P.getModuleName . snd) modules)) . liftIO $ do
             putStr supportModuleMessage
             exitFailure
-          (externs, env) <- ExceptT . runMake . make $ modules
-          return (modules, externs, env)
+          (externs, _) <- ExceptT . runMake . make $ fmap CST.pureResult <$> modules
+          return (modules, externs)
         case psciBackend of
           Backend setup eval reload (shutdown :: state -> IO ()) ->
             case e of
               Left errs -> do
                 pwd <- getCurrentDirectory
                 putStrLn (P.prettyPrintMultipleErrors P.defaultPPEOptions {P.ppeRelativeDirectory = pwd} errs) >> exitFailure
-              Right (modules, externs, env) -> do
+              Right (modules, externs) -> do
                 historyFilename <- getHistoryFilename
                 let settings = defaultSettings { historyFile = Just historyFilename }
-                    initialState = PSCiState [] [] (zip (map snd modules) externs)
-                    config = PSCiConfig psciInputGlob env
+                    initialState = updateLoadedExterns (const (zip (map snd modules) externs)) initialPSCiState
+                    config = PSCiConfig psciInputGlob
                     runner = flip runReaderT config
                              . flip evalStateT initialState
                              . runInputT (setComplete completion settings)
@@ -344,38 +344,38 @@ command = loop <$> options
                       c <- getCommand
                       case c of
                         Left err -> outputStrLn err >> go state
-                        Right Nothing -> go state
-                        Right (Just PasteLines) -> do
+                        Right xs -> goExec xs
+                      where
+                      goExec :: [Command] -> InputT (StateT PSCiState (ReaderT PSCiConfig IO)) ()
+                      goExec xs = case xs of
+                        [] -> go state
+                        (PasteLines : rest) -> do
                           c' <- pasteMode
                           case c' of
-                            Left err -> outputStrLn err >> go state
-                            Right c'' -> handleCommandWithInterrupts state c''
-                        Right (Just QuitPSCi) -> do
+                            Left err -> outputStrLn err >> goExec rest
+                            Right c'' -> handleCommandWithInterrupts state c'' >> goExec rest
+                        (QuitPSCi : _) -> do
                           outputStrLn quitMessage
                           liftIO $ shutdown state
-                        Right (Just c') -> handleCommandWithInterrupts state c'
+                        (c' : rest) -> handleCommandWithInterrupts state [c'] >> goExec rest
 
                     loadUserConfig :: state -> StateT PSCiState (ReaderT PSCiConfig IO) ()
                     loadUserConfig state = do
                       configFile <- (</> ".purs-repl") <$> liftIO getCurrentDirectory
                       exists <- liftIO $ doesFileExist configFile
                       when exists $ do
-                        ls <- lines <$> liftIO (readUTF8File configFile)
-                        for_ ls $ \l -> do
-                          liftIO (putStrLn l)
-                          case parseCommand l of
-                            Left err -> liftIO (putStrLn err >> exitFailure)
-                            Right cmd@Import{} -> handleCommand' state cmd
-                            Right _ -> liftIO (putStrLn "The .purs-repl file only supports import declarations")
+                        cf <- liftIO (readUTF8File configFile)
+                        case parseDotFile configFile cf of
+                          Left err -> liftIO (putStrLn err >> exitFailure)
+                          Right cmds -> liftIO (putStrLn cf) >> for_ cmds (handleCommand' state)
 
                     handleCommandWithInterrupts
                       :: state
-                      -> Command
+                      -> [Command]
                       -> InputT (StateT PSCiState (ReaderT PSCiConfig IO)) ()
-                    handleCommandWithInterrupts state cmd = do
+                    handleCommandWithInterrupts state cmds = do
                       handleInterrupt (outputStrLn "Interrupted.")
-                                      (withInterrupt (lift (handleCommand' state cmd)))
-                      go state
+                                      (withInterrupt (lift (for_ cmds (handleCommand' state))))
 
                 putStrLn prologueMessage
                 backendState <- setup

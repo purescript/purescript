@@ -1,19 +1,17 @@
 module Language.PureScript.Docs.AsMarkdown
-  ( renderModulesAsMarkdown
-  , Docs
+  ( Docs
   , runDocs
   , modulesAsMarkdown
+  , moduleAsMarkdown
   , codeToString
   ) where
 
 import Prelude.Compat
 
 import Control.Monad (unless, zipWithM_)
-import Control.Monad.Error.Class (MonadError)
 import Control.Monad.Writer (Writer, tell, execWriter)
 
 import Data.Foldable (for_)
-import Data.Monoid ((<>))
 import Data.List (partition)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -21,19 +19,7 @@ import qualified Data.Text as T
 import Language.PureScript.Docs.RenderedCode
 import Language.PureScript.Docs.Types
 import qualified Language.PureScript as P
-import qualified Language.PureScript.Docs.Convert as Convert
 import qualified Language.PureScript.Docs.Render as Render
-
--- |
--- Take a list of modules and render them all in order, returning a single
--- Markdown-formatted Text.
---
-renderModulesAsMarkdown ::
-  (MonadError P.MultipleErrors m) =>
-  [P.Module] ->
-  m Text
-renderModulesAsMarkdown =
-  fmap (runDocs . modulesAsMarkdown) . Convert.convertModules Local
 
 modulesAsMarkdown :: [Module] -> Docs
 modulesAsMarkdown = mapM_ moduleAsMarkdown
@@ -43,23 +29,22 @@ moduleAsMarkdown Module{..} = do
   headerLevel 2 $ "Module " <> P.runModuleName modName
   spacer
   for_ modComments tell'
-  mapM_ (declAsMarkdown modName) modDeclarations
+  mapM_ declAsMarkdown modDeclarations
   spacer
   for_ modReExports $ \(mn', decls) -> do
     let mn = ignorePackage mn'
     headerLevel 3 $ "Re-exported from " <> P.runModuleName mn <> ":"
     spacer
-    mapM_ (declAsMarkdown mn) decls
+    mapM_ declAsMarkdown decls
 
-declAsMarkdown :: P.ModuleName -> Declaration -> Docs
-declAsMarkdown mn decl@Declaration{..} = do
-  let options = defaultRenderTypeOptions { currentModule = Just mn }
+declAsMarkdown :: Declaration -> Docs
+declAsMarkdown decl@Declaration{..} = do
   headerLevel 4 (ticks declTitle)
   spacer
 
   let (instances, children) = partition (isChildInstance . cdeclInfo) declChildren
   fencedBlock $ do
-    tell' (codeToString $ Render.renderDeclarationWithOptions options decl)
+    tell' (codeToString $ Render.renderDeclaration decl)
     zipWithM_ (\f c -> tell' (childToString f c)) (First : repeat NotFirst) children
   spacer
 

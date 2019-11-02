@@ -15,6 +15,7 @@ import qualified Data.Map.Lazy                   as M
 import           Data.Maybe                      (fromJust)
 import qualified Data.Set                        as S
 import qualified Language.PureScript             as P
+import qualified Language.PureScript.CST         as CST
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.State
@@ -42,16 +43,17 @@ rebuildFile
   -- ^ The file to rebuild
   -> Maybe FilePath
   -- ^ The file to use as the location for parsing and errors
+  -> Set P.CodegenTarget
+  -- ^ The targets to codegen
   -> (ReaderT IdeEnvironment (LoggingT IO) () -> m ())
   -- ^ A runner for the second build with open exports
   -> m Success
-rebuildFile file actualFile runOpenBuild = do
-
-  input <- ideReadFile file
-
-  m <- case snd <$> P.parseModuleFromFile (maybe identity const actualFile) (file, input) of
+rebuildFile file actualFile codegenTargets runOpenBuild = do
+  (fp, input) <- ideReadFile file
+  let fp' = fromMaybe fp actualFile
+  m <- case CST.parseFromFile fp' input of
     Left parseError ->
-      throwError (RebuildError (P.MultipleErrors [P.toPositionedError parseError]))
+      throwError $ RebuildError $ CST.toMultipleErrors fp' parseError
     Right m -> pure m
 
   -- Externs files must be sorted ahead of time, so that they get applied
@@ -69,7 +71,7 @@ rebuildFile file actualFile runOpenBuild = do
   -- Rebuild the single module using the cached externs
   (result, warnings) <- logPerf (labelTimespec "Rebuilding Module") $
     liftIO
-    . P.runMake P.defaultOptions
+    . P.runMake (P.defaultOptions { P.optionsCodegenTargets = codegenTargets })
     . P.rebuildModule (buildMakeActions
                         >>= shushProgress $ makeEnv) externs $ m
   case result of
@@ -87,8 +89,8 @@ isEditorMode = asks (confEditorMode . ideConfiguration)
 
 rebuildFileAsync
   :: forall m. (Ide m, MonadLogger m, MonadError IdeError m)
-  => FilePath -> Maybe FilePath -> m Success
-rebuildFileAsync fp fp' = rebuildFile fp fp' asyncRun
+  => FilePath -> Maybe FilePath -> Set P.CodegenTarget -> m Success
+rebuildFileAsync fp fp' ts = rebuildFile fp fp' ts asyncRun
   where
     asyncRun :: ReaderT IdeEnvironment (LoggingT IO) () -> m ()
     asyncRun action = do
@@ -98,8 +100,8 @@ rebuildFileAsync fp fp' = rebuildFile fp fp' asyncRun
 
 rebuildFileSync
   :: forall m. (Ide m, MonadLogger m, MonadError IdeError m)
-  => FilePath -> Maybe FilePath -> m Success
-rebuildFileSync fp fp' = rebuildFile fp fp' syncRun
+  => FilePath -> Maybe FilePath -> Set P.CodegenTarget -> m Success
+rebuildFileSync fp fp' ts = rebuildFile fp fp' ts syncRun
   where
     syncRun :: ReaderT IdeEnvironment (LoggingT IO) () -> m ()
     syncRun action = do
@@ -154,11 +156,12 @@ shushProgress :: P.MakeActions P.Make -> MakeActionsEnv -> P.MakeActions P.Make
 shushProgress ma _ =
   ma { P.progress = \_ -> pure () }
 
--- | Stops any kind of codegen (also silences errors about missing or unused FFI
--- files though)
+-- | Stops any kind of codegen
 shushCodegen :: P.MakeActions P.Make -> MakeActionsEnv -> P.MakeActions P.Make
 shushCodegen ma MakeActionsEnv{..} =
-  ma { P.codegen = \_ _ _ -> pure () }
+  ma { P.codegen = \_ _ _ -> pure ()
+     , P.ffiCodegen = \_ -> pure ()
+     }
 
 -- | Returns a topologically sorted list of dependent ExternsFiles for the given
 -- module. Throws an error if there is a cyclic dependency within the
@@ -170,7 +173,7 @@ sortExterns
   -> m [P.ExternsFile]
 sortExterns m ex = do
   sorted' <- runExceptT
-           . P.sortModules
+           . P.sortModules P.moduleSignature
            . (:) m
            . map mkShallowModule
            . M.elems

@@ -106,6 +106,23 @@ lintImports (Module _ _ mn mdecls (Just mexports)) env usedImps = do
         Hiding refs -> refs
         _ -> []
 
+  -- Check re-exported modules to see if we are re-exporting a qualified module
+  -- that has unspecified imports.
+  for_ mexports $ \case
+    ModuleRef _ mnq ->
+      case M.lookup mnq (byQual imports) of
+        -- We only match the single-entry case here as otherwise there will be
+        -- a different warning about implicit imports potentially colliding
+        -- anyway
+        Just [(ss, Implicit, mni)] -> do
+          let names = ordNub $ M.findWithDefault [] mni usedImps'
+              usedRefs = findUsedRefs ss env mni (Just mnq) names
+          tell . errorMessage' ss $
+            ImplicitQualifiedImportReExport mni mnq
+              $ map (simplifyTypeRef $ const True) usedRefs
+        _ -> pure ()
+    _ -> pure ()
+
   where
 
   defQual :: ImportDef -> Maybe ModuleName
@@ -262,7 +279,7 @@ lintImportDecl env mni qualifierName names ss declType allowImplicit =
           isMatch _ _ = False
 
   unused :: m Bool
-  unused = warn (UnusedImport mni)
+  unused = warn (UnusedImport mni qualifierName)
 
   warn :: SimpleErrorMessage -> m Bool
   warn err = tell (errorMessage' ss err) >> return True
@@ -282,7 +299,7 @@ lintImportDecl env mni qualifierName names ss declType allowImplicit =
 
   dtys
     :: ModuleName
-    -> M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ModuleName)
+    -> M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ExportSource)
   dtys mn = maybe M.empty exportedTypes $ envModuleExports <$> mn `M.lookup` env
 
   dctorsForType
@@ -356,6 +373,7 @@ runDeclRef (ValueOpRef _ op) = Just $ ValOpName op
 runDeclRef (TypeRef _ pn _) = Just $ TyName pn
 runDeclRef (TypeOpRef _ op) = Just $ TyOpName op
 runDeclRef (TypeClassRef _ pn) = Just $ TyClassName pn
+runDeclRef (KindRef _ pn) = Just $ KiName pn
 runDeclRef _ = Nothing
 
 checkDuplicateImports

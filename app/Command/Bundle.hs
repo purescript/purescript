@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -7,9 +8,10 @@
 module Command.Bundle (command) where
 
 import           Data.Traversable (for)
-import           Data.Monoid ((<>))
 import           Data.Aeson (encode)
+import           Data.Aeson.Encode.Pretty (confCompare, defConfig, encodePretty', keyOrder)
 import           Data.Maybe (isNothing)
+import           Data.Text (Text)
 import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Error.Class
@@ -21,8 +23,7 @@ import           System.Exit (exitFailure)
 import           System.IO (stderr, hPutStr, hPutStrLn)
 import           System.IO.UTF8 (readUTF8File, writeUTF8File)
 import           System.Directory (createDirectoryIfMissing, getCurrentDirectory)
-import qualified Data.ByteString.Lazy as B
-import qualified Data.ByteString.UTF8 as BU8
+import qualified Data.ByteString.Lazy.UTF8 as LBU8
 import           Language.PureScript.Bundle
 import           Options.Applicative (Parser)
 import qualified Options.Applicative as Opts
@@ -37,6 +38,7 @@ data Options = Options
   , optionsMainModule  :: Maybe String
   , optionsNamespace   :: String
   , optionsSourceMaps  :: Bool
+  , optionsDebug       :: Bool
   } deriving Show
 
 -- | The main application function.
@@ -61,7 +63,17 @@ app Options{..} = do
 
   currentDir <- liftIO getCurrentDirectory
   let outFile = if optionsSourceMaps then fmap (currentDir </>) optionsOutputFile else Nothing
-  bundleSM input entryIds optionsMainModule optionsNamespace outFile
+  let withRawModules = if optionsDebug then Just bundleDebug else Nothing
+  bundleSM input entryIds optionsMainModule optionsNamespace outFile withRawModules
+
+-- | Print a JSON representation of a list of modules to stderr.
+bundleDebug :: (MonadIO m) => [Module] -> m ()
+bundleDebug = liftIO . hPutStrLn stderr . LBU8.toString . encodePretty' (defConfig { confCompare = keyComparer })
+  where
+  -- | Some key order hints for improved readability.
+  keyComparer :: Text -> Text -> Ordering
+  keyComparer =  keyOrder ["type", "name", "moduleId"]     -- keys to put first
+              <> flip (keyOrder ["dependsOn", "elements"]) -- keys to put last
 
 -- | Command line options parser.
 options :: Parser Options
@@ -71,6 +83,7 @@ options = Options <$> some inputFile
                   <*> optional mainModule
                   <*> namespace
                   <*> sourceMaps
+                  <*> debug
   where
   inputFile :: Parser FilePath
   inputFile = Opts.strArgument $
@@ -107,6 +120,11 @@ options = Options <$> some inputFile
        Opts.long "source-maps"
     <> Opts.help "Whether to generate source maps for the bundle (requires --output)."
 
+  debug :: Parser Bool
+  debug = Opts.switch $
+       Opts.long "debug"
+    <> Opts.help "Whether to emit a JSON representation of all parsed modules to stderr."
+
 -- | Make it go.
 command :: Opts.Parser (IO ())
 command = run <$> (Opts.helper <*> options) where
@@ -124,6 +142,6 @@ command = run <$> (Opts.helper <*> options) where
             case sourcemap of
               Just sm -> do
                 writeUTF8File outputFile $ js ++ "\n//# sourceMappingURL=" ++ (takeFileName outputFile <.> "map") ++ "\n"
-                writeUTF8File (outputFile <.> "map") $ BU8.toString . B.toStrict . encode $ generate sm
+                writeUTF8File (outputFile <.> "map") $ LBU8.toString . encode $ generate sm
               Nothing -> writeUTF8File outputFile js
           Nothing -> putStrLn js

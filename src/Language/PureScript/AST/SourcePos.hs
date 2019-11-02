@@ -8,7 +8,6 @@ import Prelude.Compat
 
 import Control.DeepSeq (NFData)
 import Data.Aeson ((.=), (.:))
-import Data.Monoid
 import Data.Text (Text)
 import GHC.Generics (Generic)
 import Language.PureScript.Comments
@@ -34,6 +33,11 @@ displaySourcePos sp =
   "line " <> T.pack (show (sourcePosLine sp)) <>
     ", column " <> T.pack (show (sourcePosColumn sp))
 
+displaySourcePosShort :: SourcePos -> Text
+displaySourcePosShort sp =
+  T.pack (show (sourcePosLine sp)) <>
+    ":" <> T.pack (show (sourcePosColumn sp))
+
 instance A.ToJSON SourcePos where
   toJSON SourcePos{..} =
     A.toJSON [sourcePosLine, sourcePosColumn]
@@ -56,12 +60,19 @@ instance NFData SourceSpan
 
 displayStartEndPos :: SourceSpan -> Text
 displayStartEndPos sp =
+  "(" <>
   displaySourcePos (spanStart sp) <> " - " <>
-  displaySourcePos (spanEnd sp)
+  displaySourcePos (spanEnd sp) <> ")"
+
+displayStartEndPosShort :: SourceSpan -> Text
+displayStartEndPosShort sp =
+  displaySourcePosShort (spanStart sp) <> " - " <>
+  displaySourcePosShort (spanEnd sp)
 
 displaySourceSpan :: FilePath -> SourceSpan -> Text
 displaySourceSpan relPath sp =
-  T.pack (makeRelative relPath (spanName sp)) <> " " <>
+  T.pack (makeRelative relPath (spanName sp)) <> ":" <>
+    displayStartEndPosShort sp <> " " <>
     displayStartEndPos sp
 
 instance A.ToJSON SourceSpan where
@@ -83,3 +94,28 @@ internalModuleSourceSpan name = SourceSpan name (SourcePos 0 0) (SourcePos 0 0)
 
 nullSourceSpan :: SourceSpan
 nullSourceSpan = internalModuleSourceSpan ""
+
+nullSourceAnn :: SourceAnn
+nullSourceAnn = (nullSourceSpan, [])
+
+pattern NullSourceSpan :: SourceSpan
+pattern NullSourceSpan = SourceSpan "" (SourcePos 0 0) (SourcePos 0 0)
+
+pattern NullSourceAnn :: SourceAnn
+pattern NullSourceAnn = (NullSourceSpan, [])
+
+nonEmptySpan :: SourceAnn -> Maybe SourceSpan
+nonEmptySpan (NullSourceSpan, _) = Nothing
+nonEmptySpan (ss, _) = Just ss
+
+widenSourceSpan :: SourceSpan -> SourceSpan -> SourceSpan
+widenSourceSpan NullSourceSpan b = b
+widenSourceSpan a NullSourceSpan = a
+widenSourceSpan (SourceSpan n1 s1 e1) (SourceSpan n2 s2 e2) =
+  SourceSpan n (min s1 s2) (max e1 e2)
+  where
+  n | n1 == ""  = n2
+    | otherwise = n1
+
+widenSourceAnn :: SourceAnn -> SourceAnn -> SourceAnn
+widenSourceAnn (s1, _) (s2, _) = (widenSourceSpan s1 s2, [])

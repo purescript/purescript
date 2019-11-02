@@ -1,6 +1,24 @@
-resolver: lts-10.3
+resolver: lts-13.26
+pvp-bounds: upper
 packages:
 - '.'
 extra-deps:
-- pipes-http-1.0.5
-- Win32-notify-0.3.0.3
+- happy-1.19.9
+- language-javascript-0.7.0.0
+- network-3.0.1.1
+- these-1.0.1
+- semialign-1
+nix:
+  enable: false
+  packages:
+  - zlib
+  # Test dependencies
+  - nodejs
+  - nodePackages.npm
+  - nodePackages.bower
+flags:
+  aeson-pretty:
+    lib-only: true
+  these:
+    assoc: false
+    quickcheck: false

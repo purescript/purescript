@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module TestHierarchy where
 
+import Prelude
+
 import Language.PureScript.Hierarchy
 import qualified Language.PureScript as P
 
@@ -51,7 +53,7 @@ main = testSpec "hierarchy" $ do
                  (P.internalModuleSourceSpan "<B>", [])
                  (P.ProperName "B")
                  []
-                 [P.Constraint (P.Qualified Nothing $ P.ProperName "A") [] Nothing]
+                 [P.srcConstraint (P.Qualified Nothing $ P.ProperName "A") [] Nothing]
                  []
                  []
               ]

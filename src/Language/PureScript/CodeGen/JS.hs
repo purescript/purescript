@@ -15,11 +15,11 @@ import Control.Monad.Except (MonadError, throwError)
 import Control.Monad.Reader (MonadReader, asks)
 import Control.Monad.Supply.Class
 
-import Data.List ((\\), delete, intersect)
+import Data.List ((\\), intersect)
 import qualified Data.Foldable as F
 import qualified Data.Map as M
+import qualified Data.Set as S
 import Data.Maybe (fromMaybe, isNothing)
-import Data.Monoid ((<>))
 import Data.String (fromString)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -50,14 +50,18 @@ moduleToJs
   => Module Ann
   -> Maybe AST
   -> m [AST]
-moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
+moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreign_ =
   rethrow (addHint (ErrorInModule mn)) $ do
     let usedNames = concatMap getNames decls
     let mnLookup = renameImports usedNames imps
-    jsImports <- traverse (importToJs mnLookup) . delete (ModuleName [ProperName C.prim]) . (\\ [mn]) $ ordNub $ map snd imps
     let decls' = renameModules mnLookup decls
     jsDecls <- mapM bindToJs decls'
     optimized <- traverse (traverse optimize) jsDecls
+    let mnReverseLookup = M.fromList $ map (\(origName, (_, safeName)) -> (moduleNameToJs safeName, origName)) $ M.toList mnLookup
+    let usedModuleNames = foldMap (foldMap (findModules mnReverseLookup)) optimized
+    jsImports <- traverse (importToJs mnLookup)
+      . filter (flip S.member usedModuleNames)
+      . (\\ (mn : C.primModules)) $ ordNub $ map snd imps
     F.traverse_ (F.traverse_ checkIntegers) optimized
     comments <- not <$> asks optionsNoComments
     let strict = AST.StringLiteral Nothing "use strict"
@@ -103,7 +107,8 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
   importToJs :: M.Map ModuleName (Ann, ModuleName) -> ModuleName -> m AST
   importToJs mnLookup mn' = do
     let ((ss, _, _, _), mnSafe) = fromMaybe (internalError "Missing value in mnLookup") $ M.lookup mn' mnLookup
-    let moduleBody = AST.App Nothing (AST.Var Nothing "require") [AST.StringLiteral Nothing (fromString (".." </> T.unpack (runModuleName mn')))]
+    let moduleBody = AST.App Nothing (AST.Var Nothing "require")
+          [AST.StringLiteral Nothing (fromString (".." </> T.unpack (runModuleName mn') </> "index.js"))]
     withPos ss $ AST.VariableIntroduction Nothing (moduleNameToJs mnSafe) (Just moduleBody)
 
   -- | Replaces the `ModuleName`s in the AST so that the generated code refers to
@@ -124,6 +129,15 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
       let (_,mnSafe) = fromMaybe (internalError "Missing value in mnLookup") $ M.lookup mn' mnLookup
       in Qualified (Just mnSafe) a
     renameQual q = q
+
+  -- |
+  -- Find the set of ModuleNames referenced by an AST.
+  --
+  findModules :: M.Map Text ModuleName -> AST -> S.Set ModuleName
+  findModules mnReverseLookup = AST.everything mappend go
+    where
+    go (AST.Var _ name) = foldMap S.singleton $ M.lookup name mnReverseLookup
+    go _ = mempty
 
   -- |
   -- Generate code in the simplified JavaScript intermediate representation for a declaration
@@ -148,7 +162,7 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
 
   withPos :: SourceSpan -> AST -> m AST
   withPos ss js = do
-    withSM <- asks optionsSourceMaps
+    withSM <- asks (elem JSSourceMap . optionsCodegenTargets)
     return $ if withSM
       then withSourceSpan ss js
       else js
@@ -177,7 +191,7 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
 
   valueToJs' :: Expr Ann -> m AST
   valueToJs' (Literal (pos, _, _, _) l) =
-    rethrowWithPosition pos $ literalToValueJS l
+    rethrowWithPosition pos $ literalToValueJS pos l
   valueToJs' (Var (_, _, _, Just (IsConstructor _ [])) name) =
     return $ accessorString "value" $ qualifiedToJS id name
   valueToJs' (Var (_, _, _, Just (IsConstructor _ _)) name) =
@@ -232,16 +246,16 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
     ds' <- concat <$> mapM bindToJs ds
     ret <- valueToJs val
     return $ AST.App Nothing (AST.Function Nothing Nothing [] (AST.Block Nothing (ds' ++ [AST.Return Nothing ret]))) []
-  valueToJs' (Constructor (_, _, _, Just IsNewtype) _ (ProperName ctor) _) =
+  valueToJs' (Constructor (_, _, _, Just IsNewtype) _ ctor _) =
     return $ AST.VariableIntroduction Nothing (properToJs ctor) (Just $
                 AST.ObjectLiteral Nothing [("create",
                   AST.Function Nothing Nothing ["value"]
                     (AST.Block Nothing [AST.Return Nothing $ AST.Var Nothing "value"]))])
-  valueToJs' (Constructor _ _ (ProperName ctor) []) =
+  valueToJs' (Constructor _ _ ctor []) =
     return $ iife (properToJs ctor) [ AST.Function Nothing (Just (properToJs ctor)) [] (AST.Block Nothing [])
            , AST.Assignment Nothing (accessorString "value" (AST.Var Nothing (properToJs ctor)))
                 (AST.Unary Nothing AST.New $ AST.App Nothing (AST.Var Nothing (properToJs ctor)) []) ]
-  valueToJs' (Constructor _ _ (ProperName ctor) fields) =
+  valueToJs' (Constructor _ _ ctor fields) =
     let constructor =
           let body = [ AST.Assignment Nothing ((accessorString $ mkString $ identToJs f) (AST.Var Nothing "this")) (var f) | f <- fields ]
           in AST.Function Nothing (Just (properToJs ctor)) (identToJs `map` fields) (AST.Block Nothing body)
@@ -255,14 +269,14 @@ moduleToJs (Module coms mn _ imps exps foreigns decls) foreign_ =
   iife :: Text -> [AST] -> AST
   iife v exprs = AST.App Nothing (AST.Function Nothing Nothing [] (AST.Block Nothing $ exprs ++ [AST.Return Nothing $ AST.Var Nothing v])) []
 
-  literalToValueJS :: Literal (Expr Ann) -> m AST
-  literalToValueJS (NumericLiteral (Left i)) = return $ AST.NumericLiteral Nothing (Left i)
-  literalToValueJS (NumericLiteral (Right n)) = return $ AST.NumericLiteral Nothing (Right n)
-  literalToValueJS (StringLiteral s) = return $ AST.StringLiteral Nothing s
-  literalToValueJS (CharLiteral c) = return $ AST.StringLiteral Nothing (fromString [c])
-  literalToValueJS (BooleanLiteral b) = return $ AST.BooleanLiteral Nothing b
-  literalToValueJS (ArrayLiteral xs) = AST.ArrayLiteral Nothing <$> mapM valueToJs xs
-  literalToValueJS (ObjectLiteral ps) = AST.ObjectLiteral Nothing <$> mapM (sndM valueToJs) ps
+  literalToValueJS :: SourceSpan -> Literal (Expr Ann) -> m AST
+  literalToValueJS ss (NumericLiteral (Left i)) = return $ AST.NumericLiteral (Just ss) (Left i)
+  literalToValueJS ss (NumericLiteral (Right n)) = return $ AST.NumericLiteral (Just ss) (Right n)
+  literalToValueJS ss (StringLiteral s) = return $ AST.StringLiteral (Just ss) s
+  literalToValueJS ss (CharLiteral c) = return $ AST.StringLiteral (Just ss) (fromString [c])
+  literalToValueJS ss (BooleanLiteral b) = return $ AST.BooleanLiteral (Just ss) b
+  literalToValueJS ss (ArrayLiteral xs) = AST.ArrayLiteral (Just ss) <$> mapM valueToJs xs
+  literalToValueJS ss (ObjectLiteral ps) = AST.ObjectLiteral (Just ss) <$> mapM (sndM valueToJs) ps
 
   -- | Shallow copy an object.
   extendObj :: AST -> [(PSString, AST)] -> m AST

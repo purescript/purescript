@@ -28,6 +28,7 @@ import Language.PureScript.Sugar.TypeClasses (typeClassMemberName, superClassDic
 import Language.PureScript.Types
 import Language.PureScript.PSString (mkString)
 import qualified Language.PureScript.AST as A
+import qualified Language.PureScript.Constants as C
 
 -- | Desugars a module from AST to CoreFn representation.
 moduleToCoreFn :: Environment -> A.Module -> Module Ann
@@ -39,7 +40,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
       exps' = ordNub $ concatMap exportToCoreFn exps
       externs = ordNub $ mapMaybe externToCoreFn decls
       decls' = concatMap declToCoreFn decls
-  in Module coms mn (spanName modSS) imports' exps' externs decls'
+  in Module modSS coms mn (spanName modSS) imports' exps' externs decls'
 
   where
 
@@ -52,14 +53,16 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
 
   -- | Desugars member declarations from AST to CoreFn representation.
   declToCoreFn :: A.Declaration -> [Bind Ann]
-  declToCoreFn (A.DataDeclaration (ss, com) Newtype _ _ [(ctor, _)]) =
-    [NonRec (ssA ss) (properToIdent ctor) $
+  declToCoreFn (A.DataDeclaration (ss, com) Newtype _ _ [ctor]) =
+    [NonRec (ssA ss) (properToIdent $ A.dataCtorName ctor) $
       Abs (ss, com, Nothing, Just IsNewtype) (Ident "x") (Var (ssAnn ss) $ Qualified Nothing (Ident "x"))]
   declToCoreFn d@(A.DataDeclaration _ Newtype _ _ _) =
     error $ "Found newtype with multiple constructors: " ++ show d
   declToCoreFn (A.DataDeclaration (ss, com) Data tyName _ ctors) =
-    flip fmap ctors $ \(ctor, _) ->
-      let (_, _, _, fields) = lookupConstructor env (Qualified (Just mn) ctor)
+    flip fmap ctors $ \ctorDecl ->
+      let
+        ctor = A.dataCtorName ctorDecl
+        (_, _, _, fields) = lookupConstructor env (Qualified (Just mn) ctor)
       in NonRec (ssA ss) (properToIdent ctor) $ Constructor (ss, com, Nothing, Nothing) tyName ctor fields
   declToCoreFn (A.DataBindingGroupDeclaration ds) =
     concatMap declToCoreFn ds
@@ -72,8 +75,8 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   declToCoreFn _ = []
 
   -- | Desugars expressions from AST to CoreFn representation.
-  exprToCoreFn :: SourceSpan -> [Comment] -> Maybe Type -> A.Expr -> Expr Ann
-  exprToCoreFn ss com ty (A.Literal lit) =
+  exprToCoreFn :: SourceSpan -> [Comment] -> Maybe SourceType -> A.Expr -> Expr Ann
+  exprToCoreFn _ com ty (A.Literal ss lit) =
     Literal (ss, com, ty, Nothing) (fmap (exprToCoreFn ss com Nothing) lit)
   exprToCoreFn ss com ty (A.Accessor name v) =
     Accessor (ss, com, ty, Nothing) name (exprToCoreFn ss [] Nothing v)
@@ -85,6 +88,8 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     internalError "Abs with Binder argument was not desugared before exprToCoreFn mn"
   exprToCoreFn ss com ty (A.App v1 v2) =
     App (ss, com, ty, Nothing) (exprToCoreFn ss [] Nothing v1) (exprToCoreFn ss [] Nothing v2)
+  exprToCoreFn ss com ty (A.Unused _) =
+    Var (ss, com, ty, Nothing) (Qualified (Just (ModuleName [ProperName C.prim])) (Ident C.undefined))
   exprToCoreFn _ com ty (A.Var ss ident) =
     Var (ss, com, ty, getValueMeta ident) ident
   exprToCoreFn ss com ty (A.IfThenElse v1 v2 v3) =
@@ -99,11 +104,11 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     Case (ss, com, ty, Nothing) (fmap (exprToCoreFn ss [] Nothing) vs) (fmap (altToCoreFn ss) alts)
   exprToCoreFn ss com _ (A.TypedValue _ v ty) =
     exprToCoreFn ss com (Just ty) v
-  exprToCoreFn ss com ty (A.Let ds v) =
-    Let (ss, com, ty, Nothing) (concatMap declToCoreFn ds) (exprToCoreFn ss [] Nothing v)
-  exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name (A.TypedValue _ lit@(A.Literal (A.ObjectLiteral _)) _)) =
+  exprToCoreFn ss com ty (A.Let w ds v) =
+    Let (ss, com, ty, getLetMeta w) (concatMap declToCoreFn ds) (exprToCoreFn ss [] Nothing v)
+  exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name (A.TypedValue _ lit@(A.Literal _ (A.ObjectLiteral _)) _)) =
     exprToCoreFn ss com ty (A.TypeClassDictionaryConstructorApp name lit)
-  exprToCoreFn ss com _ (A.TypeClassDictionaryConstructorApp name (A.Literal (A.ObjectLiteral vs))) =
+  exprToCoreFn ss com _ (A.TypeClassDictionaryConstructorApp name (A.Literal _ (A.ObjectLiteral vs))) =
     let args = fmap (exprToCoreFn ss [] Nothing . snd) $ sortBy (compare `on` fst) vs
         ctor = Var (ss, [], Nothing, Just IsTypeClassConstructor) (fmap properToIdent name)
     in foldl (App (ss, com, Nothing, Nothing)) ctor args
@@ -133,7 +138,7 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
 
   -- | Desugars case binders from AST to CoreFn representation.
   binderToCoreFn :: SourceSpan -> [Comment] -> A.Binder -> Binder Ann
-  binderToCoreFn ss com (A.LiteralBinder lit) =
+  binderToCoreFn _ com (A.LiteralBinder ss lit) =
     LiteralBinder (ss, com, Nothing, Nothing) (fmap (binderToCoreFn ss com) lit)
   binderToCoreFn ss com A.NullBinder =
     NullBinder (ss, com, Nothing, Nothing)
@@ -155,6 +160,11 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
   binderToCoreFn _ _ A.ParensInBinder{} =
     internalError "ParensInBinder should have been desugared before binderToCoreFn"
 
+  -- | Gets metadata for let bindings.
+  getLetMeta :: A.WhereProvenance -> Maybe Meta
+  getLetMeta A.FromWhere = Just IsWhere
+  getLetMeta A.FromLet = Nothing
+
   -- | Gets metadata for values.
   getValueMeta :: Qualified Ident -> Maybe Meta
   getValueMeta name =
@@ -173,12 +183,12 @@ moduleToCoreFn env (A.Module modSS coms mn decls (Just exps)) =
     where
 
     numConstructors
-      :: (Qualified (ProperName 'ConstructorName), (DataDeclType, ProperName 'TypeName, Type, [Ident]))
+      :: (Qualified (ProperName 'ConstructorName), (DataDeclType, ProperName 'TypeName, SourceType, [Ident]))
       -> Int
     numConstructors ty = length $ filter (((==) `on` typeConstructor) ty) $ M.toList $ dataConstructors env
 
     typeConstructor
-      :: (Qualified (ProperName 'ConstructorName), (DataDeclType, ProperName 'TypeName, Type, [Ident]))
+      :: (Qualified (ProperName 'ConstructorName), (DataDeclType, ProperName 'TypeName, SourceType, [Ident]))
       -> (ModuleName, ProperName 'TypeName)
     typeConstructor (Qualified (Just mn') _, (_, tyCtor, _, _)) = (mn', tyCtor)
     typeConstructor _ = internalError "Invalid argument to typeConstructor"
@@ -236,7 +246,7 @@ exportToCoreFn _ = []
 -- | Makes a typeclass dictionary constructor function. The returned expression
 -- is a function that accepts the superclass instances and member
 -- implementations and returns a record for the instance dictionary.
-mkTypeClassConstructor :: SourceAnn -> [Constraint] -> [A.Declaration] -> Expr Ann
+mkTypeClassConstructor :: SourceAnn -> [SourceConstraint] -> [A.Declaration] -> Expr Ann
 mkTypeClassConstructor (ss, com) [] [] = Literal (ss, com, Nothing, Just IsTypeClassConstructor) (ObjectLiteral [])
 mkTypeClassConstructor (ss, com) supers members =
   let args@(a:as) = sort $ fmap typeClassMemberName members ++ superClassDictionaryNames supers

@@ -9,19 +9,16 @@ module Language.PureScript.Interactive.Completion
 import Prelude.Compat
 import Protolude (ordNub)
 
-import           Control.Arrow (second)
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.State.Class (MonadState(..))
 import           Control.Monad.Trans.Reader (asks, runReaderT, ReaderT)
-import           Data.Function (on)
-import           Data.List (nubBy, isPrefixOf, sortBy, stripPrefix)
+import           Data.List (nub, isPrefixOf, isInfixOf, isSuffixOf, sortBy, stripPrefix)
+import           Data.Map (keys)
 import           Data.Maybe (mapMaybe)
-import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Interactive.Directive as D
 import           Language.PureScript.Interactive.Types
-import qualified Language.PureScript.Names as N
 import           System.Console.Haskeline
 
 -- Completions may read the state, but not modify it.
@@ -45,7 +42,7 @@ completion
 completion = liftCompletionM . completion'
 
 completion' :: CompletionFunc CompletionM
-completion' = completeWordWithPrev Nothing " \t\n\r" findCompletions
+completion' = completeWordWithPrev Nothing " \t\n\r([" findCompletions
 
 -- | Callback for Haskeline's `completeWordWithPrev`.
 -- Expects:
@@ -66,7 +63,7 @@ findCompletions prev word = do
         CtxFilePath f        -> map Right <$> listFiles f
         CtxModule            -> map Left <$> getModuleNames
         CtxIdentifier        -> map Left <$> ((++) <$> getIdentNames <*> getDctorNames)
-        CtxType              -> map Left <$> getTypeNames
+        CtxType pre          -> map (Left . (pre ++)) <$> getTypeNames
         CtxFixed str         -> return [Left str]
         CtxDirective d       -> return (map Left (completeDirectives d))
 
@@ -99,7 +96,7 @@ data CompletionContext
   | CtxFilePath String
   | CtxModule
   | CtxIdentifier
-  | CtxType
+  | CtxType String
   | CtxFixed String
   deriving (Show)
 
@@ -108,36 +105,36 @@ data CompletionContext
 -- a list of complete words (to the left of the cursor) as the first argument,
 -- and the current word as the second argument.
 completionContext :: [String] -> String -> [CompletionContext]
+completionContext _ w  | "::" `isInfixOf` w = [CtxType (w `endingWith` "::")]
+completionContext ws _ | lastSatisfies ("::" `isSuffixOf`) ws = [CtxType ""]
 completionContext [] _ = [CtxDirective "", CtxIdentifier, CtxFixed "import"]
 completionContext ws w | headSatisfies (":" `isPrefixOf`) ws = completeDirective ws w
 completionContext ws w | headSatisfies (== "import") ws = completeImport ws w
 completionContext _ _ = [CtxIdentifier]
 
+endingWith :: String -> String -> String
+endingWith str stop = aux "" str
+  where
+  aux acc s@(x:xs)
+    | stop `isPrefixOf` s = reverse (stop ++ acc)
+    | otherwise           = aux (x:acc) xs
+  aux acc []              = reverse (stop ++ acc)
+
 completeDirective :: [String] -> String -> [CompletionContext]
 completeDirective ws w =
   case ws of
-    []    -> [CtxDirective w]
-    [dir] -> case D.directivesFor <$> stripPrefix ":" dir of
-                -- only offer completions if the directive is unambiguous
-                Just [dir'] -> directiveArg w dir'
-                _           -> []
+    []     -> [CtxDirective w]
+    (x:xs) -> case D.directivesFor <$> stripPrefix ":" x of
+                 -- only offer completions if the directive is unambiguous
+                 Just [dir] -> directiveArg xs dir
+                 _          -> []
 
-    -- All directives take exactly one argument. If we haven't yet matched,
-    -- that means one argument has already been supplied. So don't complete
-    -- any others.
-    _     -> []
-
-directiveArg :: String -> Directive -> [CompletionContext]
-directiveArg _ Browse      = [CtxModule]
-directiveArg _ Quit        = []
-directiveArg _ Reload      = []
-directiveArg _ Clear       = []
-directiveArg _ Help        = []
-directiveArg _ Paste       = []
-directiveArg _ Show        = map CtxFixed replQueryStrings
-directiveArg _ Type        = [CtxIdentifier]
-directiveArg _ Kind        = [CtxType]
-directiveArg _ Complete    = []
+directiveArg :: [String] -> Directive -> [CompletionContext]
+directiveArg [] Browse = [CtxModule]                    -- only complete very next term
+directiveArg [] Show   = map CtxFixed replQueryStrings  -- only complete very next term
+directiveArg _ Type    = [CtxIdentifier]
+directiveArg _ Kind    = [CtxType ""]
+directiveArg _ _       = []
 
 completeImport :: [String] -> String -> [CompletionContext]
 completeImport ws w' =
@@ -151,82 +148,46 @@ headSatisfies p str =
     (c:_)  -> p c
     _     -> False
 
+lastSatisfies :: (a -> Bool) -> [a] -> Bool
+lastSatisfies _ [] = False
+lastSatisfies p xs = p (last xs)
+
 getLoadedModules :: CompletionM [P.Module]
 getLoadedModules = asks (map fst . psciLoadedExterns)
 
 getModuleNames :: CompletionM [String]
 getModuleNames = moduleNames <$> getLoadedModules
 
-mapLoadedModulesAndQualify :: (a -> Text) -> (P.Module -> [(a, P.Declaration)]) -> CompletionM [String]
-mapLoadedModulesAndQualify sho f = do
-  ms <- getLoadedModules
-  let argPairs = do m <- ms
-                    fm <- f m
-                    return (m, fm)
-  concat <$> traverse (uncurry (getAllQualifications sho)) argPairs
-
 getIdentNames :: CompletionM [String]
-getIdentNames = mapLoadedModulesAndQualify P.showIdent identNames
+getIdentNames = do
+  importedVals <- asks (keys . P.importedValues . psciImports)
+  exportedVals <- asks (keys . P.exportedValues . psciExports)
+
+  importedValOps <- asks (keys . P.importedValueOps . psciImports)
+  exportedValOps <- asks (keys . P.exportedValueOps . psciExports)
+
+  return . nub $ map (T.unpack . P.showQualified P.showIdent) importedVals
+              ++ map (T.unpack . P.showQualified P.runOpName) importedValOps
+              ++ map (T.unpack . P.showIdent) exportedVals
+              ++ map (T.unpack . P.runOpName) exportedValOps
 
 getDctorNames :: CompletionM [String]
-getDctorNames = mapLoadedModulesAndQualify P.runProperName dctorNames
+getDctorNames = do
+  imports <- asks (keys . P.importedDataConstructors . psciImports)
+  return . nub $ map (T.unpack . P.showQualified P.runProperName) imports
 
 getTypeNames :: CompletionM [String]
-getTypeNames = mapLoadedModulesAndQualify P.runProperName typeDecls
+getTypeNames = do
+  importedTypes <- asks (keys . P.importedTypes . psciImports)
+  exportedTypes <- asks (keys . P.exportedTypes . psciExports)
 
--- | Given a module and a declaration in that module, return all possible ways
--- it could have been referenced given the current PSCiState - including fully
--- qualified, qualified using an alias, and unqualified.
-getAllQualifications :: (a -> Text) -> P.Module -> (a, P.Declaration) -> CompletionM [String]
-getAllQualifications sho m (declName, decl) = do
-  imports <- getAllImportsOf m
-  let fullyQualified = qualifyWith (Just (P.getModuleName m))
-  let otherQuals = ordNub (concatMap qualificationsUsing imports)
-  return $ fullyQualified : otherQuals
-  where
-  qualifyWith mMod = T.unpack (P.showQualified sho (P.Qualified mMod declName))
-  referencedBy refs = P.isExported (Just refs) decl
+  importedTypeOps <- asks (keys . P.importedTypeOps . psciImports)
+  exportedTypeOps <- asks (keys . P.exportedTypeOps . psciExports)
 
-  qualificationsUsing (_, importType, asQ') =
-    let q = qualifyWith asQ'
-    in case importType of
-          P.Implicit      -> [q]
-          P.Explicit refs -> [q | referencedBy refs]
-          P.Hiding refs   -> [q | not $ referencedBy refs]
-
-
--- | Returns all the ImportedModule values referring to imports of a particular
--- module.
-getAllImportsOf :: P.Module -> CompletionM [ImportedModule]
-getAllImportsOf = asks . allImportsOf
-
-nubOnFst :: Eq a => [(a, b)] -> [(a, b)]
-nubOnFst = nubBy ((==) `on` fst)
-
-typeDecls :: P.Module -> [(N.ProperName 'N.TypeName, P.Declaration)]
-typeDecls = mapMaybe getTypeName . filter P.isDataDecl . P.exportedDeclarations
-  where
-  getTypeName :: P.Declaration -> Maybe (N.ProperName 'N.TypeName, P.Declaration)
-  getTypeName d@(P.TypeSynonymDeclaration _ name _ _) = Just (name, d)
-  getTypeName d@(P.DataDeclaration _ _ name _ _) = Just (name, d)
-  getTypeName _ = Nothing
-
-identNames :: P.Module -> [(N.Ident, P.Declaration)]
-identNames = nubOnFst . concatMap getDeclNames . P.exportedDeclarations
-  where
-  getDeclNames :: P.Declaration -> [(P.Ident, P.Declaration)]
-  getDeclNames d@(P.ValueDecl _ ident _ _ _)  = [(ident, d)]
-  getDeclNames d@(P.TypeDeclaration td) = [(P.tydeclIdent td, d)]
-  getDeclNames d@(P.ExternDeclaration _ ident _) = [(ident, d)]
-  getDeclNames d@(P.TypeClassDeclaration _ _ _ _ _ ds) = map (second (const d)) $ concatMap getDeclNames ds
-  getDeclNames _ = []
-
-dctorNames :: P.Module -> [(N.ProperName 'N.ConstructorName, P.Declaration)]
-dctorNames = nubOnFst . concatMap go . P.exportedDeclarations
-  where
-  go :: P.Declaration -> [(N.ProperName 'N.ConstructorName, P.Declaration)]
-  go decl@(P.DataDeclaration _ _ _ _ ctors) = map ((\n -> (n, decl)) . fst) ctors
-  go _ = []
+  return . nub $ map (T.unpack . P.showQualified P.runProperName) importedTypes
+              ++ map (T.unpack . P.showQualified P.runOpName) importedTypeOps
+              ++ map (T.unpack . P.runProperName) exportedTypes
+              ++ map (T.unpack . P.runOpName) exportedTypeOps
 
 moduleNames :: [P.Module] -> [String]
 moduleNames = ordNub . map (T.unpack . P.runModuleName . P.getModuleName)

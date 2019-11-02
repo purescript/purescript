@@ -22,13 +22,13 @@ ann1 = (span1, [])
 ann2 = (span2, [])
 
 typeAnnotation1, value1, synonym1, class1, class2, data1, data2, valueFixity, typeFixity, foreign1, foreign2, foreign3, member1 :: P.Declaration
-typeAnnotation1 = P.TypeDeclaration (P.TypeDeclarationData ann1 (P.Ident "value1") P.REmpty)
+typeAnnotation1 = P.TypeDeclaration (P.TypeDeclarationData ann1 (P.Ident "value1") P.srcREmpty)
 value1 = P.ValueDecl ann1 (P.Ident "value1") P.Public [] []
-synonym1 = P.TypeSynonymDeclaration ann1 (P.ProperName "Synonym1") [] P.REmpty
+synonym1 = P.TypeSynonymDeclaration ann1 (P.ProperName "Synonym1") [] P.srcREmpty
 class1 = P.TypeClassDeclaration ann1 (P.ProperName "Class1") [] [] [] []
 class2 = P.TypeClassDeclaration ann1 (P.ProperName "Class2") [] [] [] [member1]
 data1 = P.DataDeclaration ann1 P.Newtype (P.ProperName "Data1") [] []
-data2 = P.DataDeclaration ann1 P.Data (P.ProperName "Data2") [] [(P.ProperName "Cons1", [])]
+data2 = P.DataDeclaration ann1 P.Data (P.ProperName "Data2") [] [P.DataConstructorDeclaration ann2 (P.ProperName "Cons1") []]
 valueFixity =
   P.ValueFixityDeclaration
     ann1
@@ -41,10 +41,10 @@ typeFixity =
     (P.Fixity P.Infix 0)
     (P.Qualified Nothing (P.ProperName ""))
     (P.OpName "~>")
-foreign1 = P.ExternDeclaration ann1 (P.Ident "foreign1") P.REmpty
+foreign1 = P.ExternDeclaration ann1 (P.Ident "foreign1") P.srcREmpty
 foreign2 = P.ExternDataDeclaration ann1 (P.ProperName "Foreign2") P.kindType
 foreign3 = P.ExternKindDeclaration ann1 (P.ProperName "Foreign3")
-member1 = P.TypeDeclaration (P.TypeDeclarationData ann2 (P.Ident "member1") P.REmpty)
+member1 = P.TypeDeclaration (P.TypeDeclarationData ann2 (P.Ident "member1") P.srcREmpty)
 
 spec :: Spec
 spec = do
@@ -60,7 +60,7 @@ spec = do
     it "extracts a span for a data declaration" $
       extractSpans data1 `shouldBe` [(IdeNamespaced IdeNSType "Data1", span1)]
     it "extracts spans for a data declaration and its constructors" $
-      extractSpans data2 `shouldBe` [(IdeNamespaced IdeNSType "Data2", span1), (IdeNamespaced IdeNSValue "Cons1", span1)]
+      extractSpans data2 `shouldBe` [(IdeNamespaced IdeNSType "Data2", span1), (IdeNamespaced IdeNSValue "Cons1", span2)]
     it "extracts a span for a value operator fixity declaration" $
       extractSpans valueFixity `shouldBe` [(IdeNamespaced IdeNSValue "<$>", span1)]
     it "extracts a span for a type operator fixity declaration" $
@@ -73,7 +73,7 @@ spec = do
       extractSpans foreign3 `shouldBe` [(IdeNamespaced IdeNSKind "Foreign3", span1)]
   describe "Type annotations" $ do
     it "extracts a type annotation" $
-      extractTypeAnnotations [typeAnnotation1] `shouldBe` [(P.Ident "value1", P.REmpty)]
+      extractTypeAnnotations [typeAnnotation1] `shouldBe` [(P.Ident "value1", P.srcREmpty)]
   describe "Finding Source Spans for identifiers" $ do
     it "finds a value declaration" $ do
       Just r <- getLocation "sfValue"
@@ -93,6 +93,9 @@ spec = do
     it "finds a type operator declaration" $ do
       Just r <- getLocation "~>"
       r `shouldBe` typeOpSS
+    it "finds a module declaration" $ do
+      Just r <- getLocation "SfModule"
+      r `shouldBe` moduleSS
 
 getLocation :: Text -> IO (Maybe P.SourceSpan)
 getLocation s = do
@@ -102,7 +105,8 @@ getLocation s = do
   where
     ideState = emptyIdeState `volatileState`
       [ ("Test",
-         [ ideValue "sfValue" Nothing `annLoc` valueSS
+         [ ideModule "SfModule" `annLoc` moduleSS
+         , ideValue "sfValue" Nothing `annLoc` valueSS
          , ideSynonym "SFType" Nothing Nothing `annLoc` synonymSS
          , ideType "SFData" Nothing [] `annLoc` typeSS
          , ideDtor "SFOne" "SFData" Nothing `annLoc` typeSS

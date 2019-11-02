@@ -20,7 +20,6 @@ import Control.Monad.Supply.Class (MonadSupply, fresh, freshName)
 import Data.Function (on)
 import Data.List (foldl', sortBy)
 import Data.Maybe (fromMaybe)
-import Data.Monoid ((<>))
 import qualified Data.Map as M
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -64,15 +63,15 @@ qualifyName n defmn qn = Qualified (Just mn) n
 -- where: - ProperName is the name of the constructor (for example, "Nothing" in Maybe)
 --        - [Type] is the list of arguments, if it has (for example, "Just" has [TypeVar "a"])
 --
-getConstructors :: Environment -> ModuleName -> Qualified (ProperName 'ConstructorName) -> [(ProperName 'ConstructorName, [Type])]
+getConstructors :: Environment -> ModuleName -> Qualified (ProperName 'ConstructorName) -> [(ProperName 'ConstructorName, [SourceType])]
 getConstructors env defmn n = extractConstructors lnte
   where
 
-  extractConstructors :: Maybe (Kind, TypeKind) -> [(ProperName 'ConstructorName, [Type])]
+  extractConstructors :: Maybe (SourceKind, TypeKind) -> [(ProperName 'ConstructorName, [SourceType])]
   extractConstructors (Just (_, DataType _ pt)) = pt
   extractConstructors _ = internalError "Data name not in the scope of the current environment in extractConstructors"
 
-  lnte :: Maybe (Kind, TypeKind)
+  lnte :: Maybe (SourceKind, TypeKind)
   lnte = M.lookup qpn (types env)
 
   qpn :: Qualified (ProperName 'TypeName)
@@ -84,7 +83,7 @@ getConstructors env defmn n = extractConstructors lnte
       Nothing -> internalError $ "Constructor " ++ T.unpack (showQualified runProperName con) ++ " not in the scope of the current environment in getConsDataName."
       Just (_, pm, _, _) -> qualifyName pm defmn con
 
-  getConsInfo :: Qualified (ProperName 'ConstructorName) -> Maybe (DataDeclType, ProperName 'TypeName, Type, [Ident])
+  getConsInfo :: Qualified (ProperName 'ConstructorName) -> Maybe (DataDeclType, ProperName 'TypeName, SourceType, [Ident])
   getConsInfo con = M.lookup con (dataConstructors env)
 
 -- |
@@ -126,12 +125,12 @@ missingCasesSingle env mn NullBinder cb@(ConstructorBinder ss con _) =
 missingCasesSingle env mn cb@(ConstructorBinder ss con bs) (ConstructorBinder _ con' bs')
   | con == con' = let (bs'', pr) = missingCasesMultiple env mn bs bs' in (map (ConstructorBinder ss con) bs'', pr)
   | otherwise = ([cb], return False)
-missingCasesSingle env mn NullBinder (LiteralBinder (ObjectLiteral bs)) =
-  (map (LiteralBinder . ObjectLiteral . zip (map fst bs)) allMisses, pr)
+missingCasesSingle env mn NullBinder (LiteralBinder ss (ObjectLiteral bs)) =
+  (map (LiteralBinder ss . ObjectLiteral . zip (map fst bs)) allMisses, pr)
   where
   (allMisses, pr) = missingCasesMultiple env mn (initialize $ length bs) (map snd bs)
-missingCasesSingle env mn (LiteralBinder (ObjectLiteral bs)) (LiteralBinder (ObjectLiteral bs')) =
-  (map (LiteralBinder . ObjectLiteral . zip sortedNames) allMisses, pr)
+missingCasesSingle env mn (LiteralBinder _ (ObjectLiteral bs)) (LiteralBinder ss (ObjectLiteral bs')) =
+  (map (LiteralBinder ss . ObjectLiteral . zip sortedNames) allMisses, pr)
   where
   (allMisses, pr) = uncurry (missingCasesMultiple env mn) (unzip binders)
 
@@ -148,10 +147,10 @@ missingCasesSingle env mn (LiteralBinder (ObjectLiteral bs)) (LiteralBinder (Obj
   compBS e s b b' = (s, compB e b b')
 
   (sortedNames, binders) = unzip $ genericMerge (compBS NullBinder) sbs sbs'
-missingCasesSingle _ _ NullBinder (LiteralBinder (BooleanLiteral b)) = ([LiteralBinder . BooleanLiteral $ not b], return True)
-missingCasesSingle _ _ (LiteralBinder (BooleanLiteral bl)) (LiteralBinder (BooleanLiteral br))
+missingCasesSingle _ _ NullBinder (LiteralBinder ss (BooleanLiteral b)) = ([LiteralBinder ss . BooleanLiteral $ not b], return True)
+missingCasesSingle _ _ (LiteralBinder ss (BooleanLiteral bl)) (LiteralBinder _ (BooleanLiteral br))
   | bl == br = ([], return True)
-  | otherwise = ([LiteralBinder $ BooleanLiteral bl], return False)
+  | otherwise = ([LiteralBinder ss $ BooleanLiteral bl], return False)
 missingCasesSingle env mn b (PositionedBinder _ _ cb) = missingCasesSingle env mn b cb
 missingCasesSingle env mn b (TypedBinder _ cb) = missingCasesSingle env mn b cb
 missingCasesSingle _ _ b _ = ([b], Left Unknown)
@@ -290,6 +289,7 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
     var <- freshName
     return $
       Let
+        FromLet
         [ partial var tyVar ]
         $ App (Var ss (Qualified Nothing UnusedIdent)) e
     where
@@ -303,12 +303,13 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
            (ty tyVar))
         ]
 
-      ty :: Text -> Type
+      ty :: Text -> SourceType
       ty tyVar =
-        ForAll tyVar
-          ( ConstrainedType
-              (Constraint C.Partial [] (Just constraintData))
-              $ TypeApp (TypeApp tyFunction (TypeVar tyVar)) (TypeVar tyVar)
+        srcForAll tyVar
+          Nothing
+          ( srcConstrainedType
+              (srcConstraint C.Partial [] (Just constraintData))
+              $ srcTypeApp (srcTypeApp tyFunction (srcTypeVar tyVar)) (srcTypeVar tyVar)
           )
           Nothing
 
@@ -337,8 +338,8 @@ checkExhaustiveExpr initSS env mn = onExpr initSS
 
   onExpr :: SourceSpan -> Expr -> m Expr
   onExpr _ (UnaryMinus ss e) = UnaryMinus ss <$> onExpr ss e
-  onExpr ss (Literal (ArrayLiteral es)) = Literal . ArrayLiteral <$> mapM (onExpr ss) es
-  onExpr ss (Literal (ObjectLiteral es)) = Literal . ObjectLiteral <$> mapM (sndM (onExpr ss)) es
+  onExpr _ (Literal ss (ArrayLiteral es)) = Literal ss . ArrayLiteral <$> mapM (onExpr ss) es
+  onExpr _ (Literal ss (ObjectLiteral es)) = Literal ss . ObjectLiteral <$> mapM (sndM (onExpr ss)) es
   onExpr ss (TypeClassDictionaryConstructorApp x e) = TypeClassDictionaryConstructorApp x <$> onExpr ss e
   onExpr ss (Accessor x e) = Accessor x <$> onExpr ss e
   onExpr ss (ObjectUpdate o es) = ObjectUpdate <$> onExpr ss o <*> mapM (sndM (onExpr ss)) es
@@ -349,7 +350,7 @@ checkExhaustiveExpr initSS env mn = onExpr initSS
     case' <- Case <$> mapM (onExpr ss) es <*> mapM (onCaseAlternative ss) cas
     checkExhaustive ss env mn (length es) cas case'
   onExpr ss (TypedValue x e y) = TypedValue x <$> onExpr ss e <*> pure y
-  onExpr ss (Let ds e) = Let <$> mapM onDecl ds <*> onExpr ss e
+  onExpr ss (Let w ds e) = Let w <$> mapM onDecl ds <*> onExpr ss e
   onExpr _ (PositionedValue ss x e) = PositionedValue ss x <$> onExpr ss e
   onExpr _ expr = return expr
 
