@@ -297,7 +297,7 @@ withDeps (Module modulePath fn es) = Module modulePath fn (map expandDeps es)
       = ([(mid, nm', Public)], bn)
     toReference (JSIdentifier _ nm) bn
       | nm `elem` bn
-      -- ^ only add a dependency if this name is still in the list of names
+      -- only add a dependency if this name is still in the list of names
       -- bound to the module level (i.e., hasn't been shadowed by a function
       -- parameter)
       = ([(m, nm, Internal)], bn)
@@ -305,7 +305,7 @@ withDeps (Module modulePath fn es) = Module modulePath fn (map expandDeps es)
       = let
           shorthandNames =
             filter (`elem` bn) $
-            -- ^ only add a dependency if this name is still in the list of
+            -- only add a dependency if this name is still in the list of
             -- names bound to the module level (i.e., hasn't been shadowed by a
             -- function parameter)
             mapMaybe unPropertyIdentRef $
@@ -316,7 +316,7 @@ withDeps (Module modulePath fn es) = Module modulePath fn (map expandDeps es)
       = ([], bn \\ (mapMaybe unIdentifier $ commaList params))
     toReference e bn
       | Just nm <- exportsAccessor e
-      -- ^ exports.foo means there's a dependency on the public member "foo" of
+      -- exports.foo means there's a dependency on the public member "foo" of
       -- this module.
       = ([(m, nm, Public)], bn)
     toReference _ bn = ([], bn)
