@@ -188,7 +188,7 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
     findExistingExtern :: ModuleName -> m (Maybe Prebuilt)
     findExistingExtern moduleName = runMaybeT $ do
       timestamp <- MaybeT $ getOutputTimestamp moduleName
-      externs <- MaybeT $ decodeExterns . snd <$> readExterns moduleName
+      externs <- MaybeT $ snd <$> readExterns moduleName
       pure (Prebuilt timestamp externs)
 
     collectPrebuiltModules :: M.Map ModuleName Prebuilt -> (ModuleName, Bool, Prebuilt) -> M.Map ModuleName Prebuilt

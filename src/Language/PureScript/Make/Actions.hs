@@ -1,7 +1,6 @@
 module Language.PureScript.Make.Actions
   ( MakeActions(..)
   , RebuildPolicy(..)
-  , Externs()
   , ProgressMessage(..)
   , buildMakeActions
   , checkForeignDecls
@@ -43,6 +42,7 @@ import           Language.PureScript.Crash
 import qualified Language.PureScript.CST as CST
 import qualified Language.PureScript.Docs.Types as Docs
 import           Language.PureScript.Errors
+import           Language.PureScript.Externs (ExternsFile)
 import           Language.PureScript.Make.Monad
 import           Language.PureScript.Make.Cache
 import           Language.PureScript.Names
@@ -69,9 +69,6 @@ data ProgressMessage
   -- ^ Compilation started for the specified module
   deriving (Show, Eq, Ord)
 
--- | Generated code for an externs file.
-type Externs = LB.ByteString
-
 -- | Render a progress message
 renderProgressMessage :: ProgressMessage -> String
 renderProgressMessage (CompilingModule mn) = "Compiling " ++ T.unpack (runModuleName mn)
@@ -92,10 +89,10 @@ data MakeActions m = MakeActions
   -- ^ Get the timestamp for the output files for a module. This should be the
   -- timestamp for the oldest modified file, or 'Nothing' if any of the required
   -- output files are missing.
-  , readExterns :: ModuleName -> m (FilePath, Externs)
+  , readExterns :: ModuleName -> m (FilePath, Maybe ExternsFile)
   -- ^ Read the externs file for a module as a string and also return the actual
   -- path for the file.
-  , codegen :: CF.Module CF.Ann -> Docs.Module -> Externs -> SupplyT m ()
+  , codegen :: CF.Module CF.Ann -> Docs.Module -> ExternsFile -> SupplyT m ()
   -- ^ Run the code generator for the module and write any required output files.
   , ffiCodegen :: CF.Module CF.Ann -> m ()
   -- ^ Check ffi and print it in the output directory.
@@ -159,20 +156,20 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     timestamps <- traverse getTimestampMaybe outputPaths
     pure $ fmap minimum . NEL.nonEmpty =<< sequence timestamps
 
-  readExterns :: ModuleName -> Make (FilePath, Externs)
+  readExterns :: ModuleName -> Make (FilePath, Maybe ExternsFile)
   readExterns mn = do
     let path = outputDir </> T.unpack (runModuleName mn) </> "externs.json"
-    (path, ) <$> readTextFile path
+    (path, ) <$> readExternsFile path
 
-  codegen :: CF.Module CF.Ann -> Docs.Module -> Externs -> SupplyT Make ()
+  codegen :: CF.Module CF.Ann -> Docs.Module -> ExternsFile -> SupplyT Make ()
   codegen m docs exts = do
     let mn = CF.moduleName m
-    lift $ writeTextFile (outputFilename mn "externs.json") exts
+    lift $ writeJSONFile (outputFilename mn "externs.json") exts
     codegenTargets <- lift $ asks optionsCodegenTargets
     when (S.member CoreFn codegenTargets) $ do
       let coreFnFile = targetFilename mn CoreFn
           json = CFJ.moduleToJSON Paths.version m
-      lift $ writeTextFile coreFnFile (Aeson.encode json)
+      lift $ writeJSONFile coreFnFile json
     when (S.member JS codegenTargets) $ do
       foreignInclude <- case mn `M.lookup` foreigns of
         Just _
@@ -195,7 +192,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
         writeTextFile jsFile (B.fromStrict $ TE.encodeUtf8 $ js <> mapRef)
         when sourceMaps $ genSourceMap dir mapFile (length prefix) mappings
     when (S.member Docs codegenTargets) $ do
-      lift $ writeTextFile (outputFilename mn "docs.json") (Aeson.encode docs)
+      lift $ writeJSONFile (outputFilename mn "docs.json") docs
 
   ffiCodegen :: CF.Module CF.Ann -> Make ()
   ffiCodegen m = do
@@ -228,7 +225,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
         }) mappings
     }
     let mapping = generate rawMapping
-    writeTextFile mapFile (Aeson.encode mapping)
+    writeJSONFile mapFile mapping
     where
     add :: Int -> Int -> SourcePos -> SourcePos
     add n m (SourcePos n' m') = SourcePos (n+n') (m+m')
