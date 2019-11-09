@@ -15,10 +15,8 @@ import           Control.Monad.Reader (asks)
 import           Control.Monad.Supply
 import           Control.Monad.Trans.Class (MonadTrans(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
-import qualified Data.Aeson as Aeson
 import           Data.Bifunctor (bimap)
 import qualified Data.ByteString.Lazy as B
-import qualified Data.ByteString.Lazy as LB
 import qualified Data.ByteString.Lazy.UTF8 as LBU8
 import           Data.Either (partitionEithers)
 import           Data.Foldable (for_, minimum)
