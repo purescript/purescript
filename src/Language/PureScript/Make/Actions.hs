@@ -197,7 +197,6 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
     codegenTargets <- asks optionsCodegenTargets
     when (S.member JS codegenTargets) $ do
       let mn = CF.moduleName m
-          foreignFile = outputFilename mn "foreign.js"
       case mn `M.lookup` foreigns of
         Just path
           | not $ requiresForeign m ->
@@ -206,7 +205,8 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
               checkForeignDecls m path
         Nothing | requiresForeign m -> throwError . errorMessage' (CF.moduleSourceSpan m) $ MissingFFIModule mn
                 | otherwise -> return ()
-      for_ (mn `M.lookup` foreigns) (readTextFile >=> writeTextFile foreignFile)
+      for_ (mn `M.lookup` foreigns) $ \path ->
+        copyFile path (outputFilename mn "foreign.js")
 
   genSourceMap :: String -> String -> Int -> [SMap] -> Make ()
   genSourceMap dir mapFile extraLines mappings = do

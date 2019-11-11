@@ -13,6 +13,7 @@ module Language.PureScript.Make.Monad
   , readExternsFile
   , writeTextFile
   , writeJSONFile
+  , copyFile
   ) where
 
 import           Prelude
@@ -37,6 +38,7 @@ import           Language.PureScript.Errors
 import           Language.PureScript.Externs (ExternsFile, externsIsCurrentVersion)
 import           Language.PureScript.Options
 import           System.Directory (createDirectoryIfMissing, getModificationTime)
+import qualified System.Directory as Directory
 import           System.FilePath (takeDirectory)
 import           System.IO.Error (tryIOError, isDoesNotExistError)
 
@@ -133,6 +135,13 @@ writeJSONFile :: Aeson.ToJSON a => FilePath -> a -> Make ()
 writeJSONFile path value = makeIO ("write JSON file: " <> Text.pack path) $ do
   createParentDirectory path
   Aeson.encodeFile path value
+
+-- | Copy a file in the 'Make' monad, capturing any errors using the
+-- 'MonadError' instance.
+copyFile :: FilePath -> FilePath -> Make ()
+copyFile src dest =
+  makeIO ("copy file: " <> Text.pack src <> " -> " <> Text.pack dest) $
+    Directory.copyFile src dest
 
 createParentDirectory :: FilePath -> IO ()
 createParentDirectory = createDirectoryIfMissing True . takeDirectory
