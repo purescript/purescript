@@ -16,8 +16,6 @@ import           Control.Monad.Supply
 import           Control.Monad.Trans.Class (MonadTrans(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
 import           Data.Bifunctor (bimap)
-import qualified Data.ByteString.Lazy as B
-import qualified Data.ByteString.Lazy.UTF8 as LBU8
 import           Data.Either (partitionEithers)
 import           Data.Foldable (for_, minimum)
 import qualified Data.List.NonEmpty as NEL
@@ -131,7 +129,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
         let inputPaths = filePath : maybeToList (M.lookup mn foreigns)
             getInfo fp = do
               ts <- getTimestamp fp
-              return (ts, hash <$> readTextFile fp)
+              return (ts, hashFile fp)
         pathsWithInfo <- traverse (\fp -> (fp,) <$> getInfo fp) inputPaths
         return $ Right $ M.fromList pathsWithInfo
 
@@ -187,7 +185,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
           js = T.unlines $ map ("// " <>) prefix ++ [pjs]
           mapRef = if sourceMaps then "//# sourceMappingURL=index.js.map\n" else ""
       lift $ do
-        writeTextFile jsFile (B.fromStrict $ TE.encodeUtf8 $ js <> mapRef)
+        writeTextFile jsFile (TE.encodeUtf8 $ js <> mapRef)
         when sourceMaps $ genSourceMap dir mapFile (length prefix) mappings
     when (S.member Docs codegenTargets) $ do
       lift $ writeJSONFile (outputFilename mn "docs.json") docs
@@ -250,8 +248,8 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 -- in its corresponding foreign module.
 checkForeignDecls :: CF.Module ann -> FilePath -> Make ()
 checkForeignDecls m path = do
-  jsStr <- readTextFile path
-  js <- either (errorParsingModule . Bundle.UnableToParseModule) pure $ JS.parse (LBU8.toString jsStr) path
+  jsStr <- T.unpack <$> readTextFile path
+  js <- either (errorParsingModule . Bundle.UnableToParseModule) pure $ JS.parse jsStr path
 
   foreignIdentsStrs <- either errorParsingModule pure $ getExps js
   foreignIdents <- either

@@ -8,9 +8,9 @@ module Language.PureScript.Make.Monad
   , getTimestamp
   , getTimestampMaybe
   , readTextFile
-  , readTextFileMaybe
   , readJSONFile
   , readExternsFile
+  , hashFile
   , writeTextFile
   , writeJSONFile
   , copyFile
@@ -29,18 +29,20 @@ import           Control.Monad.Trans.Control (MonadBaseControl(..))
 import           Control.Monad.Trans.Except
 import           Control.Monad.Writer.Class (MonadWriter(..))
 import qualified Data.Aeson as Aeson
-import qualified Data.ByteString.Lazy as B
+import qualified Data.ByteString as B
 import           Data.Text (Text)
 import qualified Data.Text as Text
 import           Data.Time.Clock (UTCTime)
 import           Language.PureScript.AST
 import           Language.PureScript.Errors
 import           Language.PureScript.Externs (ExternsFile, externsIsCurrentVersion)
+import           Language.PureScript.Make.Cache (ContentHash, hash)
 import           Language.PureScript.Options
 import           System.Directory (createDirectoryIfMissing, getModificationTime)
 import qualified System.Directory as Directory
 import           System.FilePath (takeDirectory)
 import           System.IO.Error (tryIOError, isDoesNotExistError)
+import           System.IO.UTF8 (readUTF8FileT)
 
 -- | A monad for running make actions
 newtype Make a = Make
@@ -79,17 +81,12 @@ getTimestampMaybe :: FilePath -> Make (Maybe UTCTime)
 getTimestampMaybe path =
   makeIO ("get a timestamp for file: " <> Text.pack path) $ catchDoesNotExist $ getModificationTime path
 
--- | Read a text file in the 'Make' monad, capturing any errors using the
--- 'MonadError' instance.
-readTextFile :: FilePath -> Make B.ByteString
+-- | Read a text file strictly in the 'Make' monad, capturing any errors using
+-- the 'MonadError' instance.
+readTextFile :: FilePath -> Make Text
 readTextFile path =
-  makeIO ("read file: " <> Text.pack path) $ B.readFile path
-
--- | Read a text file in the 'Make' monad, or return 'Nothing' if the file does
--- not exist. Errors are captured using the 'MonadError' instance.
-readTextFileMaybe :: FilePath -> Make (Maybe B.ByteString)
-readTextFileMaybe path =
-  makeIO ("read file: " <> Text.pack path) $ catchDoesNotExist $ B.readFile path
+  makeIO ("read file: " <> Text.pack path) $
+    readUTF8FileT path
 
 -- | Read a JSON file in the 'Make' monad, returning 'Nothing' if the file does
 -- not exist or could not be parsed. Errors are captured using the 'MonadError'
@@ -110,6 +107,11 @@ readExternsFile path = do
     externs <- mexterns
     guard $ externsIsCurrentVersion externs
     return externs
+
+hashFile :: FilePath -> Make ContentHash
+hashFile path = do
+  makeIO ("hash file: " <> Text.pack path)
+    (hash <$> B.readFile path)
 
 -- | If the provided action threw an 'isDoesNotExist' error, catch it and
 -- return Nothing. Otherwise return Just the result of the inner action.
@@ -140,7 +142,8 @@ writeJSONFile path value = makeIO ("write JSON file: " <> Text.pack path) $ do
 -- 'MonadError' instance.
 copyFile :: FilePath -> FilePath -> Make ()
 copyFile src dest =
-  makeIO ("copy file: " <> Text.pack src <> " -> " <> Text.pack dest) $
+  makeIO ("copy file: " <> Text.pack src <> " -> " <> Text.pack dest) $ do
+    createParentDirectory dest
     Directory.copyFile src dest
 
 createParentDirectory :: FilePath -> IO ()
