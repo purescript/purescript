@@ -178,6 +178,7 @@ lintImports (Module _ _ mn mdecls (Just mexports)) env usedImps = do
       ++ extractByQual mne (importedDataConstructors scope) DctorName
       ++ extractByQual mne (importedValues scope) IdentName
       ++ extractByQual mne (importedValueOps scope) ValOpName
+      ++ extractByQual mne (importedKinds scope) KiName
     where
     go :: (ModuleName, Qualified Name) -> UsedImports -> UsedImports
     go (q, name) = M.alter (Just . maybe [name] (name :)) q
