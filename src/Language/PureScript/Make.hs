@@ -17,7 +17,6 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Supply
 import           Control.Monad.Trans.Control (MonadBaseControl(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
-import           Data.Aeson (encode)
 import           Data.Function (on)
 import           Data.Foldable (for_)
 import           Data.List (foldl', sortBy)
@@ -95,7 +94,7 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
                  ++ "; details:\n" ++ prettyPrintMultipleErrors defaultPPEOptions errs
                Right d -> d
 
-  evalSupplyT nextVar' . codegen renamed docs . encode $ exts
+  evalSupplyT nextVar' $ codegen renamed docs exts
   return exts
 
 -- | Compiles in "make" mode, compiling each module separately to a @.js@ file and an @externs.json@ file.

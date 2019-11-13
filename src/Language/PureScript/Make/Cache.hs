@@ -13,12 +13,12 @@ import Prelude
 
 import Control.Category ((>>>))
 import Control.Monad ((>=>))
-import Crypto.Hash (hashlazy, HashAlgorithm, Digest, SHA512, digestFromByteString)
+import Crypto.Hash (HashAlgorithm, Digest, SHA512)
+import qualified Crypto.Hash as Hash
 import qualified Data.Aeson as Aeson
 import Data.Align (align)
 import Data.ByteArray.Encoding (Base(Base16), convertToBase, convertFromBase)
 import qualified Data.ByteString as BS
-import qualified Data.ByteString.Lazy as BSL
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
@@ -39,7 +39,7 @@ digestFromHex :: forall a. HashAlgorithm a => Text -> Maybe (Digest a)
 digestFromHex =
   encodeUtf8
   >>> either (const Nothing) Just . convertFromBase Base16
-  >=> (digestFromByteString :: BS.ByteString -> Maybe (Digest a))
+  >=> (Hash.digestFromByteString :: BS.ByteString -> Maybe (Digest a))
 
 -- | Defines the hash algorithm we use for cache invalidation of input files.
 newtype ContentHash = ContentHash
@@ -58,8 +58,8 @@ instance Aeson.FromJSON ContentHash where
       Nothing ->
         fail "Unable to decode ContentHash"
 
-hash :: BSL.ByteString -> ContentHash
-hash = ContentHash . hashlazy
+hash :: BS.ByteString -> ContentHash
+hash = ContentHash . Hash.hash
 
 type CacheDb = Map ModuleName CacheInfo
 
