@@ -18,7 +18,7 @@ import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
 import Control.Exception (try, evaluate)
 import Control.Applicative ((<|>))
-import Data.Char (chr)
+import qualified Data.Char as Char
 import Data.Bits (shiftR)
 import Data.List (unfoldr)
 import Data.Scientific (toBoundedInteger)
@@ -67,7 +67,7 @@ instance Show PSString where
 -- we do not export it.
 --
 codePoints :: PSString -> String
-codePoints = map (either (chr . fromIntegral) id) . decodeStringEither
+codePoints = map (either (Char.chr . fromIntegral) id) . decodeStringEither
 
 -- |
 -- Decode a PSString as UTF-16 text. Lone surrogates will be replaced with
@@ -92,14 +92,6 @@ decodeStringEither = unfoldr decode . toUTF16CodeUnits
 
   unsurrogate :: Word16 -> Word16 -> Char
   unsurrogate h l = toEnum ((toInt h - 0xD800) * 0x400 + (toInt l - 0xDC00) + 0x10000)
-
--- |
--- Pretty print a PSString, using Haskell/PureScript escape sequences.
--- This is identical to the Show instance except that we get a Text out instead
--- of a String.
---
-prettyPrintString :: PSString -> Text
-prettyPrintString = T.pack . show
 
 -- |
 -- Attempt to decode a PSString as UTF-16 text. This will fail (returning
@@ -156,6 +148,52 @@ instance A.FromJSON PSString where
     parseCodeUnit b = A.withScientific "two-byte non-negative integer" (maybe (A.typeMismatch "" b) return . toBoundedInteger) b
 
 -- |
+-- Pretty print a PSString, using PureScript escape sequences.
+--
+prettyPrintString :: PSString -> Text
+prettyPrintString s = "\"" <> foldMap encodeChar (decodeStringEither s) <> "\""
+  where
+  encodeChar :: Either Word16 Char -> Text
+  encodeChar (Left c) = "\\x" <> showHex' 6 c
+  encodeChar (Right c)
+    | c == '\t' = "\\t"
+    | c == '\r' = "\\r"
+    | c == '\n' = "\\n"
+    | c == '"'  = "\\\""
+    | c == '\''  = "\\\'"
+    | c == '\\' = "\\\\"
+    | shouldPrint c = T.singleton c
+    | otherwise = "\\x" <> showHex' 6 (Char.ord c)
+
+  -- Note we do not use Data.Char.isPrint here because that includes things
+  -- like zero-width spaces and combining punctuation marks, which could be
+  -- confusing to print unescaped.
+  shouldPrint :: Char -> Bool
+  -- The standard space character, U+20 SPACE, is the only space char we should
+  -- print without escaping
+  shouldPrint ' ' = True
+  shouldPrint c =
+    Char.generalCategory c `elem`
+      [ Char.UppercaseLetter
+      , Char.LowercaseLetter
+      , Char.TitlecaseLetter
+      , Char.OtherLetter
+      , Char.DecimalNumber
+      , Char.LetterNumber
+      , Char.OtherNumber
+      , Char.ConnectorPunctuation
+      , Char.DashPunctuation
+      , Char.OpenPunctuation
+      , Char.InitialQuote
+      , Char.FinalQuote
+      , Char.OtherPunctuation
+      , Char.MathSymbol
+      , Char.CurrencySymbol
+      , Char.ModifierSymbol
+      , Char.OtherSymbol
+      ]
+
+-- |
 -- Pretty print a PSString, using JavaScript escape sequences. Intended for
 -- use in compiled JS output.
 --
@@ -163,8 +201,8 @@ prettyPrintStringJS :: PSString -> Text
 prettyPrintStringJS s = "\"" <> foldMap encodeChar (toUTF16CodeUnits s) <> "\""
   where
   encodeChar :: Word16 -> Text
-  encodeChar c | c > 0xFF = "\\u" <> hex 4 c
-  encodeChar c | c > 0x7E || c < 0x20 = "\\x" <> hex 2 c
+  encodeChar c | c > 0xFF = "\\u" <> showHex' 4 c
+  encodeChar c | c > 0x7E || c < 0x20 = "\\x" <> showHex' 2 c
   encodeChar c | toChar c == '\b' = "\\b"
   encodeChar c | toChar c == '\t' = "\\t"
   encodeChar c | toChar c == '\n' = "\\n"
@@ -175,10 +213,10 @@ prettyPrintStringJS s = "\"" <> foldMap encodeChar (toUTF16CodeUnits s) <> "\""
   encodeChar c | toChar c == '\\' = "\\\\"
   encodeChar c = T.singleton $ toChar c
 
-  hex :: (Enum a) => Int -> a -> Text
-  hex width c =
-    let hs = showHex (fromEnum c) "" in
-    T.pack (replicate (width - length hs) '0' <> hs)
+showHex' :: Enum a => Int -> a -> Text
+showHex' width c =
+  let hs = showHex (fromEnum c) "" in
+  T.pack (replicate (width - length hs) '0' <> hs)
 
 isLead :: Word16 -> Bool
 isLead h = h >= 0xD800 && h <= 0xDBFF
