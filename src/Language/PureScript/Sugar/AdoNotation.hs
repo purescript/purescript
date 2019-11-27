@@ -25,26 +25,27 @@ desugarAdoModule (Module ss coms mn ds exts) = Module ss coms mn <$> parU ds des
 -- | Desugar a single ado statement
 desugarAdo :: forall m. (MonadSupply m, MonadError MultipleErrors m) => Declaration -> m Declaration
 desugarAdo d =
-  let (f, _, _) = everywhereOnValuesM return replace return
-  in f d
+  let ss = declSourceSpan d
+      (f, _, _) = everywhereOnValuesM return (replace ss) return
+  in rethrowWithPosition ss $ f d
   where
-  pure' :: Maybe ModuleName -> Expr
-  pure' m = Var nullSourceSpan (Qualified m (Ident C.pure'))
+  pure' :: SourceSpan -> Maybe ModuleName -> Expr
+  pure' ss m = Var ss (Qualified m (Ident C.pure'))
 
-  map' :: Maybe ModuleName -> Expr
-  map' m = Var nullSourceSpan (Qualified m (Ident C.map))
+  map' :: SourceSpan -> Maybe ModuleName -> Expr
+  map' ss m = Var ss (Qualified m (Ident C.map))
 
-  apply :: Maybe ModuleName -> Expr
-  apply m = Var nullSourceSpan (Qualified m (Ident C.apply))
+  apply :: SourceSpan -> Maybe ModuleName -> Expr
+  apply ss m = Var ss (Qualified m (Ident C.apply))
 
-  replace :: Expr -> m Expr
-  replace (Ado m els yield) = do
+  replace :: SourceSpan -> Expr -> m Expr
+  replace pos (Ado m els yield) = do
     (func, args) <- foldM go (yield, []) (reverse els)
     return $ case args of
-      [] -> App (pure' m) func
-      hd : tl -> foldl' (\a b -> App (App (apply m) a) b) (App (App (map' m) func) hd) tl
-  replace (PositionedValue pos com v) = PositionedValue pos com <$> rethrowWithPosition pos (replace v)
-  replace other = return other
+      [] -> App (pure' pos m) func
+      hd : tl -> foldl' (\a b -> App (App (apply pos m) a) b) (App (App (map' pos m) func) hd) tl
+  replace _ (PositionedValue pos com v) = PositionedValue pos com <$> rethrowWithPosition pos (replace pos v)
+  replace _ other = return other
 
   go :: (Expr, [Expr]) -> DoNotationElement -> m (Expr, [Expr])
   go (yield, args) (DoNotationValue val) =
