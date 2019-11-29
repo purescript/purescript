@@ -321,7 +321,7 @@ typeFromJSON defaultAnn annFromJSON = A.withObject "Type" $ \o -> do
   go :: A.Value -> A.Parser (Type a)
   go = typeFromJSON defaultAnn annFromJSON
 
--- These overlapping instances exist to preserve compatability for common
+-- These overlapping instances exist to preserve compatibility for common
 -- instances which have a sensible default for missing annotations.
 instance {-# OVERLAPPING #-} A.FromJSON (Type SourceAnn) where
   parseJSON = typeFromJSON (pure NullSourceAnn) A.parseJSON

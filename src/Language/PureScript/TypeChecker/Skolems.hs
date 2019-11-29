@@ -30,7 +30,7 @@ newSkolemConstant = do
   modify $ \st -> st { checkNextSkolem = s + 1 }
   return s
 
--- | Introduce skolem scope at every occurence of a ForAll
+-- | Introduce skolem scope at every occurrence of a ForAll
 introduceSkolemScope :: MonadState CheckState m => Type a -> m (Type a)
 introduceSkolemScope = everywhereOnTypesM go
   where
