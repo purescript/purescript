@@ -303,7 +303,7 @@ addImportForIdentifier fp ident qual filters = do
     -- This case comes up for newtypes and dataconstructors. Because values and
     -- types don't share a namespace we can get multiple matches from the same
     -- module. This also happens for parameterized types, as these generate both
-    -- a type aswell as a type synonym.
+    -- a type as well as a type synonym.
 
     ms@[Match (m1, d1), Match (m2, d2)] ->
       if m1 /= m2
