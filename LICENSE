@@ -5060,7 +5060,7 @@ vector-algorithms LICENSE file:
   ------------------------------------------------------------------------------
 
   The code in Data.Array.Vector.Algorithms.Mutable.Optimal is adapted from a C
-  algorithm for the same purpose. The following is the copyright notice for said
+  algorithm for the same purpose. The folowing is the copyright notice for said
   C code:
 
   Copyright (c) 2004 Paul Hsieh
