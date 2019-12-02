@@ -40,29 +40,29 @@ desugarAdo d =
 
   replace :: SourceSpan -> Expr -> m Expr
   replace pos (Ado m els yield) = do
-    (func, args) <- foldM go (yield, []) (reverse els)
+    (func, args) <- foldM (go pos) (yield, []) (reverse els)
     return $ case args of
       [] -> App (pure' pos m) func
       hd : tl -> foldl' (\a b -> App (App (apply pos m) a) b) (App (App (map' pos m) func) hd) tl
   replace _ (PositionedValue pos com v) = PositionedValue pos com <$> rethrowWithPosition pos (replace pos v)
   replace _ other = return other
 
-  go :: (Expr, [Expr]) -> DoNotationElement -> m (Expr, [Expr])
-  go (yield, args) (DoNotationValue val) =
+  go :: SourceSpan -> (Expr, [Expr]) -> DoNotationElement -> m (Expr, [Expr])
+  go _ (yield, args) (DoNotationValue val) =
     return (Abs NullBinder yield, val : args)
-  go (yield, args) (DoNotationBind (VarBinder ss ident) val) =
+  go _ (yield, args) (DoNotationBind (VarBinder ss ident) val) =
     return (Abs (VarBinder ss ident) yield, val : args)
-  go (yield, args) (DoNotationBind binder val) = do
+  go ss (yield, args) (DoNotationBind binder val) = do
     ident <- freshIdent'
-    let abs = Abs (VarBinder nullSourceSpan ident)
-                  (Case [Var nullSourceSpan (Qualified Nothing ident)]
+    let abs = Abs (VarBinder ss ident)
+                  (Case [Var ss (Qualified Nothing ident)]
                         [CaseAlternative [binder] [MkUnguarded yield]])
     return (abs, val : args)
-  go (yield, args) (DoNotationLet ds) = do
+  go _ (yield, args) (DoNotationLet ds) = do
     return (Let FromLet ds yield, args)
-  go acc (PositionedDoNotationElement pos com el) =
+  go _ acc (PositionedDoNotationElement pos com el) =
     rethrowWithPosition pos $ do
-      (yield, args) <- go acc el
+      (yield, args) <- go pos acc el
       return $ case args of
         [] -> (PositionedValue pos com yield, args)
         (a : as) -> (yield, PositionedValue pos com a : as)
