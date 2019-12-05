@@ -52,6 +52,7 @@ dependencies:
   - cheapskate >=0.1 && <0.2
   - clock
   - containers
+  - contravariant
   - cryptonite >=0.25
   - data-ordlist >=0.4.7.0
   - deepseq
