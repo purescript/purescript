@@ -16,6 +16,7 @@ import Protolude (ordNub)
 import Control.Applicative ((<|>))
 import Control.Arrow (first)
 import Control.DeepSeq (NFData)
+import Data.Graph (stronglyConnComp, flattenSCCs)
 import Control.Monad ((<=<), (>=>))
 import Data.Aeson ((.:), (.=))
 import qualified Data.Aeson as A
@@ -444,6 +445,23 @@ freeTypeVariables = ordNub . go [] where
   go bound (ParensInType _ t) = go bound t
   go _ _ = []
 
+-- | Collect a complete set of kind-annotated quantifiers at the front of a type.
+completeBinderList :: Type a -> Maybe ([(a, (Text, Type a))], Type a)
+completeBinderList = go []
+  where
+  go acc = \case
+    ForAll _ _ Nothing _ _ -> Nothing
+    ForAll ann var (Just k) ty _ -> go ((ann, (var, k)) : acc) ty
+    ty -> Just (reverse acc, ty)
+
+-- | Sort quantifiers in dependency order, since the kinds of type variables may
+-- | depend on previously bound type variables.
+sortBinderList :: [(a, (Text, Type a))] -> [(a, (Text, Type a))]
+sortBinderList = flattenSCCs . stronglyConnComp . fmap go
+  where
+  go binding@(_, (var, k)) =
+    (binding, var, usedTypeVariables k)
+
 -- | Universally quantify over all type variables appearing free in a type
 quantify :: Type a -> Type a
 quantify ty = foldr (\arg t -> ForAll (getAnnForType ty) arg Nothing t Nothing) ty $ freeTypeVariables ty
@@ -479,6 +497,12 @@ eraseKindApps :: Type a -> Type a
 eraseKindApps = everywhereOnTypes $ \case
   KindApp _ ty _ -> ty
   other -> other
+
+unapplyTypes :: Type a -> (Type a, [Type a])
+unapplyTypes = go []
+  where
+  go acc (TypeApp _ a b) = go (b : acc) a
+  go acc a = (a, acc)
 
 everywhereOnTypes :: (Type a -> Type a) -> Type a -> Type a
 everywhereOnTypes f = go where

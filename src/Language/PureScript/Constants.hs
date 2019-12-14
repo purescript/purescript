@@ -516,7 +516,7 @@ row :: forall a. (IsString a) => a
 row = "Row"
 
 constraint :: forall a. (IsString a) => a
-constraint = "Constraint"
+constraint = "Type"
 
 constrainedValue :: forall a. (IsString a) => a
 constrainedValue = "ConstrainedValue"

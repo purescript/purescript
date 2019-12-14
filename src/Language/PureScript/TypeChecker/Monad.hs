@@ -13,15 +13,17 @@ import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
 import Control.Monad.Writer.Class (MonadWriter(..), censor)
 
+import Data.List (intercalate)
 import Data.Maybe
 import qualified Data.Map as M
-import Data.Text (Text)
+import Data.Text (Text, unpack)
 import qualified Data.List.NonEmpty as NEL
 
 import Language.PureScript.Crash (internalError)
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Names
+import Language.PureScript.Pretty.Types
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 
@@ -334,3 +336,52 @@ unsafeCheckCurrentModule
 unsafeCheckCurrentModule = checkCurrentModule <$> get >>= \case
   Nothing -> internalError "No module name set in scope"
   Just name -> pure name
+
+debugTypes :: Environment -> [String]
+debugTypes = fmap go . M.toList . types
+  where
+  go (qual, (srcTy, which)) = do
+    let
+      ppTy = prettyPrintType 100 srcTy
+      name = showQualified runProperName qual
+      decl = case which of
+        DataType _ _      -> "data  "
+        TypeSynonym       -> "type  "
+        ExternData        -> "extern"
+        LocalTypeVariable -> "local "
+        ScopedTypeVar     -> "scoped"
+    decl <> " " <> unpack name <> " :: " <> init ppTy
+
+debugNames :: Environment -> [String]
+debugNames = fmap go . M.toList . names
+  where
+  go (qual, (srcTy, _, _)) = do
+    let
+      ppTy = prettyPrintType 100 srcTy
+      name = showQualified runIdent qual
+    unpack name <> " :: " <> init ppTy
+
+debugTypeSynonyms :: Environment -> [String]
+debugTypeSynonyms = fmap go . M.toList . typeSynonyms
+  where
+  go (qual, (binders, subTy)) = do
+    let
+      vars = intercalate " " $ flip fmap binders $ \case
+               (v, Just k) -> "(" <> unpack v <> " :: " <> init (prettyPrintType 100 k) <> ")"
+               (v, Nothing) -> unpack v
+      ppTy = prettyPrintType 100 subTy
+      name = showQualified runProperName qual
+    "type " <> unpack name <> " " <> vars <> " = " <> init ppTy
+
+debugTypeClassDictionaries :: Environment -> [String]
+debugTypeClassDictionaries = go . typeClassDictionaries
+  where
+  go tcds = do
+    (mbModuleName, classes) <- M.toList tcds
+    (className, instances) <- M.toList classes
+    (ident, dicts) <- M.toList instances
+    let
+      moduleName = maybe "" (\m -> "[" <> runModuleName m <> "] ") mbModuleName
+      className' = showQualified runProperName className
+      ident' = showQualified runIdent ident
+    pure $ "dict " <> unpack moduleName <> unpack className' <> " " <> unpack ident' <> " (" <> show (length dicts) <> ")"

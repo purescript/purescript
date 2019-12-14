@@ -42,9 +42,6 @@ import Language.PureScript.Types
 
 import Lens.Micro.Platform ((^..), _2)
 
-import Language.PureScript.Pretty.Types
-import Debug.Trace
-
 addDataType
   :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
@@ -88,12 +85,6 @@ addTypeSynonym
 addTypeSynonym moduleName name args ty kind = do
   env <- getEnv
   checkTypeSynonyms ty
-  traceM $ unlines
-    [ "addTypeSynonym"
-    , "  " <> show name
-    , "  " <> prettyPrintType 100 kind
-    , "  " <> show (fmap (const ()) kind)
-    ]
   putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (kind, TypeSynonym) (types env)
                , typeSynonyms = M.insert (Qualified (Just moduleName) name) (args, ty) (typeSynonyms env) }
 
@@ -259,7 +250,7 @@ typeCheckAll moduleName _ = traverse go
         bindingGroupNames = ordNub ((syns^..traverse._2) ++ (dataDecls^..traverse._2._2))
         sss = fmap declSourceSpan tys
     warnAndRethrow (addHint (ErrorInDataBindingGroup bindingGroupNames) . addHint (PositionedError sss)) $ do
-      (syn_ks, data_ks) <- kindsOfAll moduleName syns (fmap snd dataDecls)
+      (syn_ks, data_ks, _) <- kindsOfAll moduleName syns (fmap snd dataDecls) []
       for_ (zip dataDecls data_ks) $ \((dtype, (_, name, args, dctors)), (dataCtors, ctorKind)) -> do
         when (dtype == Newtype) $ checkNewtype name dctors
         checkDuplicateTypeArguments $ map fst args
@@ -333,9 +324,11 @@ typeCheckAll moduleName _ = traverse go
       let qualifiedClassName = Qualified (Just moduleName) pn
       guardWith (errorMessage (DuplicateTypeClass pn ss)) $
         not (M.member qualifiedClassName (typeClasses env))
+      -- TODO: What should we do with this signature vs the desugared type synonym?
+      -- (args', _) <- kindOfClass moduleName (sa, pn, args, implies, tys)
       addTypeClass qualifiedClassName args implies deps tys
       return d
-  go (d@(TypeInstanceDeclaration (ss, _) ch idx dictName deps className tys body)) =
+  go (d@(TypeInstanceDeclaration sa@(ss, _) ch idx dictName deps className tys body)) =
     rethrow (addHint (ErrorInInstance className tys) . addHint (positionedError ss)) $ do
       env <- getEnv
       let qualifiedDictName = Qualified (Just moduleName) dictName
@@ -353,7 +346,8 @@ typeCheckAll moduleName _ = traverse go
           checkOverlappingInstance qualifiedChain dictName className typeClass tys nonOrphanModules
           _ <- traverseTypeInstanceBody checkInstanceMembers body
           deps' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms deps
-          let dict = TypeClassDictionaryInScope qualifiedChain idx qualifiedDictName [] className tys (Just deps')
+          tys' <- checkInstanceDeclaration moduleName (sa, deps', className, tys)
+          let dict = TypeClassDictionaryInScope qualifiedChain idx qualifiedDictName [] className tys' (Just deps')
           addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) (pure dict)
           return d
 

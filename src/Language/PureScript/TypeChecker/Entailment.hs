@@ -45,9 +45,6 @@ import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString, mkString, decodeString)
 import qualified Language.PureScript.Constants as C
 
-import Debug.Trace
-import Language.PureScript.Pretty.Types
-
 -- | Describes what sort of dictionary to generate for type class instances
 data Evidence
   -- | An existing named instance
@@ -205,14 +202,6 @@ entails SolverOptions{..} constraint context hints =
             -- apply the latest substitution.
             latestSubst <- lift . lift $ gets checkSubstitution
             let tys'' = map (substituteType latestSubst) tys'
-
-            traceM $ unlines
-              [ "solve"
-              , "  " <> show className'
-              , foldr (<>) "" $ fmap (("  " <>) . prettyPrintType 100 . fmap (const ())) tys'
-              , "  "
-              , foldr (<>) "" $ fmap (("  " <>) . prettyPrintType 100 . fmap (const ())) tys''
-              ]
 
             -- Get the inferred constraint context so far, and merge it with the global context
             inferred <- lift get

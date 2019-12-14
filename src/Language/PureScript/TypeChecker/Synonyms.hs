@@ -34,6 +34,7 @@ replaceAllTypeSynonyms' syns = everywhereOnTypesTopDownM try
   try :: SourceType -> Either MultipleErrors SourceType
   try t = fromMaybe t <$> go 0 [] [] t
 
+  -- TODO: Kind arg substitution
   go :: Int -> [SourceType] -> [SourceType] -> SourceType -> Either MultipleErrors (Maybe SourceType)
   go c kargs args (TypeConstructor _ ctor)
     | Just (synArgs, body) <- M.lookup ctor syns
