@@ -93,7 +93,20 @@ replaceTypeClassDictionaries shouldGeneralize expr = flip evalStateT M.empty $ d
           if getAny solved
             then loop e'
             else return e'
-    loop expr >>= generalizePass
+
+        containsUnknownNames :: Expr -> Bool
+        containsUnknownNames =
+          let
+            goExpr (UnknownValue name) = [ ErrorMessage [] (UnknownName name Nothing) ]
+            goExpr _ = []
+
+            (_, f, _, _ , _) = everythingOnValues (++) mempty goExpr mempty mempty mempty
+          in
+            not . null . f
+
+    if containsUnknownNames expr
+      then pure (expr, [])
+      else loop expr >>= generalizePass
   where
     -- This pass solves constraints where possible, deferring constraints if not.
     deferPass :: Expr -> StateT InstanceContext m (Expr, Any)
@@ -313,6 +326,7 @@ entails SolverOptions{..} constraint context hints =
               -- to generalize over Partial constraints.
               | solverShouldGeneralize && (null tyArgs || any canBeGeneralized tyArgs) = return (Unsolved (srcConstraint className' tyArgs conInfo))
               | otherwise = throwError . errorMessage $ NoInstanceFound (srcConstraint className' tyArgs conInfo)
+
             unique _      [(a, dict)] = return $ Solved a dict
             unique tyArgs tcds
               | pairwiseAny overlapping (map snd tcds) =

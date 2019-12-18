@@ -66,6 +66,16 @@ getModName :: Name -> Maybe ModuleName
 getModName (ModName name) = Just name
 getModName _ = Nothing
 
+showName :: Name -> Text
+showName (IdentName ident) = runIdent ident
+showName (ValOpName opName) = runOpName opName
+showName (TyName tyName) = runProperName tyName
+showName (TyOpName tyOpName) = runOpName tyOpName
+showName (DctorName dctorName) = runProperName dctorName
+showName (TyClassName tyClassName) = runProperName tyClassName
+showName (ModName modName) = runModuleName modName
+showName (KiName kiName) = runProperName kiName
+
 -- |
 -- Names for value identifiers
 --

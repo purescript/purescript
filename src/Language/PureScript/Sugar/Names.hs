@@ -269,16 +269,27 @@ renameInModule imports (Module modSS coms mn decls exps) =
       throwError . errorMessage' pos $ OverlappingNamesInLet
     return ((pos, args ++ bound), Let w ds val')
   updateValue (_, bound) (Var ss name'@(Qualified Nothing ident)) | ident `notElem` bound =
-    (,) (ss, bound) <$> (Var ss <$> updateValueName name' ss)
+    updateOrReplaceValue (ss, bound) name' updateValueName' (Var ss)
   updateValue (_, bound) (Var ss name'@(Qualified (Just _) _)) =
-    (,) (ss, bound) <$> (Var ss <$> updateValueName name' ss)
+    updateOrReplaceValue (ss, bound) name' updateValueName' (Var ss)
   updateValue (_, bound) (Op ss op) =
-    (,) (ss, bound) <$> (Op ss <$> updateValueOpName op ss)
+    updateOrReplaceValue (ss, bound) op updateValueOpName' (Op ss)
   updateValue (_, bound) (Constructor ss name) =
-    (,) (ss, bound) <$> (Constructor ss <$> updateDataConstructorName name ss)
+    updateOrReplaceValue (ss, bound) name updateDataConstructorName' (Constructor ss)
   updateValue s (TypedValue check val ty) =
     (,) s <$> (TypedValue check val <$> updateTypesEverywhere ty)
   updateValue s v = return (s, v)
+
+  updateOrReplaceValue
+    :: (SourceSpan, [Ident])
+    -> Qualified a
+    -> (Qualified a -> SourceSpan -> m (Either (Qualified Name) (Qualified a)))
+    -> (Qualified a -> Expr)
+    -> m ((SourceSpan, [Ident]), Expr)
+  updateOrReplaceValue (ss, bounds) name updateName mkExpr = do
+    updated <- updateName name ss
+    let expr = either UnknownValue mkExpr updated
+    return ((ss, bounds), expr)
 
   updateBinder
     :: (SourceSpan, [Ident])
@@ -367,6 +378,12 @@ renameInModule imports (Module modSS coms mn decls exps) =
     -> m (Qualified (ProperName 'ConstructorName))
   updateDataConstructorName = update (importedDataConstructors imports) DctorName
 
+  updateDataConstructorName'
+    :: Qualified (ProperName 'ConstructorName)
+    -> SourceSpan
+    -> m (Either (Qualified Name) (Qualified (ProperName 'ConstructorName)))
+  updateDataConstructorName' = update' (importedDataConstructors imports) DctorName
+
   updateClassName
     :: Qualified (ProperName 'ClassName)
     -> SourceSpan
@@ -376,11 +393,23 @@ renameInModule imports (Module modSS coms mn decls exps) =
   updateValueName :: Qualified Ident -> SourceSpan -> m (Qualified Ident)
   updateValueName = update (importedValues imports) IdentName
 
+  updateValueName'
+    :: Qualified Ident
+    -> SourceSpan
+    -> m (Either (Qualified Name) (Qualified Ident))
+  updateValueName' = update' (importedValues imports) IdentName
+
   updateValueOpName
     :: Qualified (OpName 'ValueOpName)
     -> SourceSpan
     -> m (Qualified (OpName 'ValueOpName))
   updateValueOpName = update (importedValueOps imports) ValOpName
+
+  updateValueOpName'
+    :: Qualified (OpName 'ValueOpName)
+    -> SourceSpan
+    -> m (Either (Qualified Name) (Qualified (OpName 'ValueOpName)))
+  updateValueOpName' = update' (importedValueOps imports) ValOpName
 
   updateKindName
     :: Qualified (ProperName 'KindName)
@@ -389,8 +418,8 @@ renameInModule imports (Module modSS coms mn decls exps) =
   updateKindName = update (importedKinds imports) KiName
 
   -- Update names so unqualified references become qualified, and locally
-  -- qualified references are replaced with their canoncial qualified names
-  -- (e.g. M.Map -> Data.Map.Map).
+  -- qualified references are replaced with their canoncial qualified names.
+  -- Throws UnknownName error if a name can't be qualified.
   update
     :: (Ord a)
     => M.Map (Qualified a) [ImportRecord a]
@@ -398,32 +427,48 @@ renameInModule imports (Module modSS coms mn decls exps) =
     -> Qualified a
     -> SourceSpan
     -> m (Qualified a)
-  update imps toName qname@(Qualified mn' name) pos = warnAndRethrowWithPosition pos $
-    case (M.lookup qname imps, mn') of
+  update imps toName qname@(Qualified mn' _) pos = warnAndRethrowWithPosition pos $ do
+    qualified <- update' imps toName qname pos
+    either (const reportError) pure qualified
+    where
+    reportError =
+      case mn' of
 
+        -- If the name wasn't found in our imports but was qualified then we need
+        -- to check whether it's a failed import from a "pseudo" module (created
+        -- by qualified importing). If that's not the case, then we just need to
+        -- check it refers to a symbol in another module.
+        Just mn'' ->
+          if mn'' `S.member` importedQualModules imports || mn'' `S.member` importedModules imports
+          then throwUnknown
+          else throwError . errorMessage $ UnknownName (Qualified Nothing (ModName mn'')) Nothing
+
+        Nothing -> throwUnknown
+
+    throwUnknown = throwError . errorMessage $ UnknownName (fmap toName qname) Nothing
+
+  -- Update names so unqualified references become qualified, and locally
+  -- qualified references are replaced with their canoncial qualified names.
+  -- Returns Nothing if name can't be qualified, so that errors can be thrown
+  -- or substitutions can be made.
+  -- (e.g. M.Map -> Data.Map.Map).
+  update'
+    :: (Ord a)
+    => M.Map (Qualified a) [ImportRecord a]
+    -> (a -> Name)
+    -> Qualified a
+    -> SourceSpan
+    -> m (Either (Qualified Name) (Qualified a))
+  update' imps toName qname@(Qualified _ name) pos = warnAndRethrowWithPosition pos $ do
+    maybe (pure . Left . fmap toName $ qname) updateName (M.lookup qname imps)
+    where
+    updateName options = do
       -- We found the name in our imports, so we return the name for it,
       -- qualifying with the name of the module it was originally defined in
       -- rather than the module we're importing from, to handle the case of
       -- re-exports. If there are multiple options for the name to resolve to
       -- in scope, we throw an error.
-      (Just options, _) -> do
-        (mnNew, mnOrig) <- checkImportConflicts pos mn toName options
-        modify $ \usedImports ->
-          M.insertWith (++) mnNew [fmap toName qname] usedImports
-        return $ Qualified (Just mnOrig) name
-
-      -- If the name wasn't found in our imports but was qualified then we need
-      -- to check whether it's a failed import from a "pseudo" module (created
-      -- by qualified importing). If that's not the case, then we just need to
-      -- check it refers to a symbol in another module.
-      (Nothing, Just mn'') ->
-        if mn'' `S.member` importedQualModules imports || mn'' `S.member` importedModules imports
-        then throwUnknown
-        else throwError . errorMessage . UnknownName . Qualified Nothing $ ModName mn''
-
-      -- If neither of the above cases are true then it's an undefined or
-      -- unimported symbol.
-      _ -> throwUnknown
-
-    where
-    throwUnknown = throwError . errorMessage . UnknownName . fmap toName $ qname
+      (mnNew, mnOrig) <- checkImportConflicts pos mn toName options
+      modify $ \usedImports ->
+        M.insertWith (++) mnNew [fmap toName qname] usedImports
+      return . Right $ Qualified (Just mnOrig) name

@@ -95,6 +95,7 @@ prettyPrintValue d (TypedValue _ val _) = prettyPrintValue d val
 prettyPrintValue d (PositionedValue _ _ val) = prettyPrintValue d val
 prettyPrintValue d (Literal _ l) = prettyPrintLiteralValue d l
 prettyPrintValue _ (Hole name) = text "?" <> textT name
+prettyPrintValue _ (UnknownValue name) = textT . showName $ disqualify name
 prettyPrintValue d expr@AnonymousArgument{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@Constructor{} = prettyPrintValueAtom d expr
 prettyPrintValue d expr@Var{} = prettyPrintValueAtom d expr

@@ -303,7 +303,7 @@ typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
 
   -- Lookup the type arguments and member types for the type class
   TypeClassData{..} <-
-    maybe (throwError . errorMessage' ss . UnknownName $ fmap TyClassName className) return $
+    maybe (throwError . errorMessage' ss $ UnknownName (fmap TyClassName className) Nothing) return $
       M.lookup (qualify mn className) m
 
   -- Replace the type arguments with the appropriate types in the member types

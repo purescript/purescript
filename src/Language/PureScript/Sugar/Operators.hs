@@ -149,7 +149,7 @@ rebracketFiltered pred_ externs modules = do
         Just (Qualified mn' (Right alias)) ->
           return $ Constructor pos (Qualified mn' alias)
         Nothing ->
-          throwError . errorMessage' pos . UnknownName $ fmap ValOpName op
+          throwError . errorMessage' pos $ UnknownName (fmap ValOpName op) Nothing
     goExpr pos other = return (pos, other)
 
     goBinder :: SourceSpan -> Binder -> m (SourceSpan, Binder)
@@ -161,7 +161,7 @@ rebracketFiltered pred_ externs modules = do
         Just (Qualified mn' (Right alias)) ->
           return (pos, ConstructorBinder pos (Qualified mn' alias) [lhs, rhs])
         Nothing ->
-          throwError . errorMessage' pos . UnknownName $ fmap ValOpName op
+          throwError . errorMessage' pos $ UnknownName (fmap ValOpName op) Nothing
     goBinder _ BinaryNoParensBinder{} =
       internalError "BinaryNoParensBinder has no OpBinder"
     goBinder pos other = return (pos, other)
@@ -172,7 +172,7 @@ rebracketFiltered pred_ externs modules = do
         Just alias ->
           return $ TypeApp ann (TypeApp ann (TypeConstructor ann2 alias) lhs) rhs
         Nothing ->
-          throwError . errorMessage' pos $ UnknownName $ fmap TyOpName op
+          throwError . errorMessage' pos $ UnknownName (fmap TyOpName op) Nothing
     goType _ other = return other
 
 rebracketModule

@@ -288,6 +288,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (NoInstanceFound con) = NoInstanceFound <$> overConstraintArgs (traverse f) con
   gSimple (AmbiguousTypeVariables t con) = AmbiguousTypeVariables <$> f t <*> pure con
   gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> pure insts
+  gSimple (UnknownName name (Just (ts, ctx))) = fmap (UnknownName name . Just) $ (,) <$> f ts <*> traverse (sndM f) ctx
   gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
   gSimple (CannotDerive cl ts) = CannotDerive cl <$> traverse f ts
   gSimple (InvalidNewtypeInstance cl ts) = InvalidNewtypeInstance cl <$> traverse f ts
@@ -454,6 +455,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       unknownInfo :: Int -> Box.Box
       unknownInfo u = line $ markCode ("t" <> T.pack (show u)) <> " is an unknown type"
 
+    containsUnknowns :: Type a -> Bool
+    containsUnknowns = everythingOnTypes (||) go
+      where
+      go TUnknown{} = True
+      go _ = False
+
     renderSimpleErrorMessage :: SimpleErrorMessage -> Box.Box
     renderSimpleErrorMessage (ModuleNotFound mn) =
       paras [ line $ "Module " <> markCode (runModuleName mn) <> " was not found."
@@ -525,10 +532,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line $ "The type declaration for " <> markCode (showIdent nm) <> " should be followed by its definition."
     renderSimpleErrorMessage (RedefinedIdent name) =
       line $ "The value " <> markCode (showIdent name) <> " has been defined multiple times"
-    renderSimpleErrorMessage (UnknownName name@(Qualified Nothing (IdentName (Ident i)))) | i `elem` [ C.bind, C.discard ] =
+    renderSimpleErrorMessage (UnknownName name@(Qualified Nothing (IdentName (Ident i))) Nothing) | i `elem` [ C.bind, C.discard ] =
       line $ "Unknown " <> printName name <> ". You're probably using do-notation, which the compiler replaces with calls to the " <> markCode i <> " function. Please import " <> markCode i <> " from module " <> markCode "Prelude"
-    renderSimpleErrorMessage (UnknownName name) =
+    renderSimpleErrorMessage (UnknownName name Nothing) =
       line $ "Unknown " <> printName name
+    renderSimpleErrorMessage (UnknownName name (Just (ty, ctx))) =
+      paras $ [ line $ "Unknown " <> printName name <> " has the inferred type "
+              , markCodeBox (indent (typeAsBox maxBound ty))
+              ] ++ renderContext ctx
     renderSimpleErrorMessage (UnknownImport mn name) =
       paras [ line $ "Cannot import " <> printName (Qualified Nothing name) <> " from module " <> markCode (runModuleName mn)
             , line "It either does not exist or the module does not export it."
@@ -673,12 +684,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                     | any containsUnknowns ts
                     ]
             ]
-      where
-      containsUnknowns :: Type a -> Bool
-      containsUnknowns = everythingOnTypes (||) go
-        where
-        go TUnknown{} = True
-        go _ = False
     renderSimpleErrorMessage (AmbiguousTypeVariables t _) =
       paras [ line "The inferred type"
             , markCodeBox $ indent $ typeAsBox prettyDepth t

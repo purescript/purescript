@@ -120,7 +120,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           TypeClassData{ typeClassDependencies } <- gets (findClass . typeClasses . checkEnv)
           let solved = foldMap (S.fromList . fdDetermined) typeClassDependencies
           let constraintTypeVars = ordNub . foldMap (unknownsInType . fst) . filter ((`notElem` solved) . snd) $ zip (constraintArgs con) [0..]
-          when (any (`notElem` unsolvedTypeVars) constraintTypeVars) .
+          when (any (`notElem` unsolvedTypeVars) constraintTypeVars) $ do
             throwError
               . onErrorMessages (replaceTypes currentSubst)
               . errorMessage' ss
@@ -388,7 +388,7 @@ infer' (Var ss var) = do
 infer' v@(Constructor _ c) = do
   env <- getEnv
   case M.lookup c (dataConstructors env) of
-    Nothing -> throwError . errorMessage . UnknownName . fmap DctorName $ c
+    Nothing -> throwError . errorMessage $ UnknownName (fmap DctorName c) Nothing
     Just (_, _, ty, _) -> do (v', ty') <- sndM (introduceSkolemScope <=< replaceAllTypeSynonyms) <=< instantiatePolyTypeWithUnknowns v $ ty
                              return $ TypedValue' True v' ty'
 infer' (Case vals binders) = do
@@ -424,8 +424,13 @@ infer' (Hole name) = do
   ty <- freshType
   ctx <- getLocalContext
   env <- getEnv
-  tell . errorMessage $ HoleInferredType name ty ctx . Just $ TSBefore env
+  tell . errorMessage $ HoleInferredType name ty ctx (Just (TSBefore env))
   return $ TypedValue' True (Hole name) ty
+infer' (UnknownValue name) = do
+  ty <- freshType
+  ctx <- getLocalContext
+  tell . errorMessage . UnknownName name $ Just (ty, ctx)
+  return $ TypedValue' True (UnknownValue name) ty
 infer' (PositionedValue pos c val) = warnAndRethrowWithPositionTC pos $ do
   TypedValue' t v ty <- infer' val
   return $ TypedValue' t (PositionedValue pos c v) ty
@@ -496,7 +501,7 @@ inferBinder val (ConstructorBinder ss ctor binders) = do
       unless (expected == actual) . throwError . errorMessage' ss $ IncorrectConstructorArity ctor expected actual
       unifyTypes ret val
       M.unions <$> zipWithM inferBinder (reverse args) binders
-    _ -> throwError . errorMessage' ss . UnknownName . fmap DctorName $ ctor
+    _ -> throwError . errorMessage' ss $ UnknownName (fmap DctorName ctor) Nothing
   where
   peelArgs :: Type a -> ([Type a], Type a)
   peelArgs = go []
@@ -732,7 +737,7 @@ check' (Accessor prop val) ty = withErrorMessageHint (ErrorCheckingAccessor val 
 check' v@(Constructor _ c) ty = do
   env <- getEnv
   case M.lookup c (dataConstructors env) of
-    Nothing -> throwError . errorMessage . UnknownName . fmap DctorName $ c
+    Nothing -> throwError . errorMessage $ UnknownName (fmap DctorName c) Nothing
     Just (_, _, ty1, _) -> do
       repl <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty1
       ty' <- introduceSkolemScope ty

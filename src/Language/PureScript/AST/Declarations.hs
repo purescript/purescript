@@ -83,7 +83,7 @@ data SimpleErrorMessage
   | OrphanTypeDeclaration Ident
   | RedefinedIdent Ident
   | OverlappingNamesInLet
-  | UnknownName (Qualified Name)
+  | UnknownName (Qualified Name) (Maybe (SourceType, Context))
   | UnknownImport ModuleName Name
   | UnknownImportDataConstructor ModuleName (ProperName 'TypeName) (ProperName 'ConstructorName)
   | UnknownExport Name
@@ -834,6 +834,10 @@ data Expr
   -- A typed hole that will be turned into a hint/error during typechecking
   --
   | Hole Text
+  -- |
+  -- A hole representing an unknown value that will be turned into an error during typechecking
+  --
+  | UnknownValue (Qualified Name)
   -- |
   -- A value with source position information
   --
