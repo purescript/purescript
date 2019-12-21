@@ -147,6 +147,7 @@ data Type a
   | TypeArrName a SourceToken
   | TypeConstrained a (Constraint a) SourceToken (Type a)
   | TypeParens a (Wrapped (Type a))
+  | TypeUnaryRow a SourceToken (Type a)
   deriving (Show, Eq, Ord, Functor, Foldable, Traversable, Generic)
 
 data TypeVarBinding a

@@ -261,6 +261,7 @@ typeRange = \case
   TypeArrName _ a -> (a, a)
   TypeConstrained _ a _ b -> (fst $ constraintRange a, snd $ typeRange b)
   TypeParens _ a -> wrappedRange a
+  TypeUnaryRow _ a b -> (a, snd $ typeRange b)
 
 constraintRange :: Constraint a -> TokenRange
 constraintRange = \case

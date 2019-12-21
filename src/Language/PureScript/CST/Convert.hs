@@ -180,6 +180,12 @@ convertType fileName = go
       T.ConstrainedType ann a' b'
     TypeParens _ (Wrapped a ty b) ->
       T.ParensInType (sourceAnnCommented fileName a b) $ go ty
+    ty@(TypeUnaryRow _ _ a) -> do
+      let
+        a' = go a
+        rng = typeRange ty
+        ann = uncurry (sourceAnnCommented fileName) rng
+      T.setAnnForType ann $ Env.kindRow a'
 
 convertConstraint :: String -> Constraint a -> T.SourceConstraint
 convertConstraint fileName = go

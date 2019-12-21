@@ -553,11 +553,15 @@ checkInstanceDeclaration
   => ModuleName
   -> InstanceDeclarationArgs
   -> m InstanceDeclarationResult
-checkInstanceDeclaration _ (ann, constraints, clsName, args) = do
+checkInstanceDeclaration moduleName (ann, constraints, clsName, args) = do
   let ty = foldl (TypeApp ann) (TypeConstructor ann (fmap coerceProperName clsName)) args
-  (_, args') <- unapplyTypes <$> checkKind ty E.kindConstraint
-  for_ constraints $ void . checkConstraint
-  for args' apply
+      tyWithConstraints = foldr srcConstrainedType ty constraints
+      freeVars = freeTypeVariables tyWithConstraints
+  freeVarsDict <- for freeVars $ \v -> (ProperName v,) <$> freshKind
+  bindLocalTypeVariables moduleName freeVarsDict $ do
+    (_, args') <- unapplyTypes <$> checkKind ty E.kindConstraint
+    for_ constraints $ void . checkConstraint
+    for args' apply
 
 kindsOfAll
   :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)

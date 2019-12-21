@@ -202,8 +202,9 @@ matchType :: TypeRenderOptions -> Pattern () PrettyPrintType Box
 matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
   operators :: OperatorTable () PrettyPrintType Box
   operators =
-    OperatorTable [ [ AssocL kindApp $ \f x -> keepSingleLinesOr (moveRight 2) f (text "@" <> x) ]
-                  , [ AssocL typeApp $ \f x -> keepSingleLinesOr (moveRight 2) f x ]
+    OperatorTable [ [ AssocL kindApp $ \f x -> keepSingleLinesOr (moveRight 2) f (text "@" <> x)
+                    , AssocL typeApp $ \f x -> keepSingleLinesOr (moveRight 2) f x
+                    ]
                   , [ AssocR appliedFunction $ \arg ret -> keepSingleLinesOr id arg (text rightArrow <> " " <> ret) ]
                   , [ Wrap constrained $ \deps ty -> constraintsAsBox tro deps ty ]
                   , [ Wrap forall_ $ \idents ty -> keepSingleLinesOr (moveRight 2) (hsep 1 top (text forall' : fmap printMbKindedType idents) <> text ".") ty ]

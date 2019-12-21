@@ -12,8 +12,8 @@ module Language.PureScript.TypeChecker
 import Prelude.Compat
 import Protolude (ordNub)
 
-import Control.Monad (when, unless, void, forM)
-import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad (when, unless, void, forM, join)
+import Control.Monad.Error.Class (MonadError(..), catchError)
 import Control.Monad.State.Class (MonadState(..), modify, gets)
 import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Writer.Class (MonadWriter(..), censor)
@@ -41,6 +41,8 @@ import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 
 import Lens.Micro.Platform ((^..), _2)
+
+import Debug.Trace
 
 addDataType
   :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
@@ -122,7 +124,7 @@ addTypeClass
 addTypeClass qualifiedClassName args implies dependencies ds = do
   env <- getEnv
   let newClass = mkNewClass env
-  traverse_ (checkMemberIsUsable newClass (typeSynonyms env)) classMembers
+  traverse_ (checkMemberIsUsable newClass (typeSynonyms env) (types env)) classMembers
   modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert qualifiedClassName newClass (typeClasses . checkEnv $ st) } }
   where
     classMembers :: [(Ident, SourceType)]
@@ -148,9 +150,9 @@ addTypeClass qualifiedClassName args implies dependencies ds = do
     -- Currently we are only checking usability based on the type class currently
     -- being defined.  If the mentioned arguments don't include a covering set,
     -- then we won't be able to find a instance.
-    checkMemberIsUsable :: TypeClassData -> T.SynonymMap -> (Ident, SourceType) -> m ()
-    checkMemberIsUsable newClass syns (ident, memberTy) = do
-      memberTy' <- T.replaceAllTypeSynonymsM syns memberTy
+    checkMemberIsUsable :: TypeClassData -> T.SynonymMap -> T.KindMap -> (Ident, SourceType) -> m ()
+    checkMemberIsUsable newClass syns kinds (ident, memberTy) = do
+      memberTy' <- T.replaceAllTypeSynonymsM syns kinds memberTy
       let mentionedArgIndexes = S.fromList (mapMaybe argToIndex (freeTypeVariables memberTy'))
       let leftovers = map (`S.difference` mentionedArgIndexes) (coveringSets newClass)
 
@@ -232,8 +234,17 @@ typeCheckAll
   -> [DeclarationRef]
   -> [Declaration]
   -> m [Declaration]
-typeCheckAll moduleName _ = traverse go
+typeCheckAll moduleName _ = flip catchError (\err -> debugEnv *> throwError err) . (\a -> traverse go a <* debugEnv)
   where
+  -- debugEnv = pure ()
+  debugEnv = do
+    env <- gets checkEnv
+    traceM $ unlines $ join
+      [ debugTypes env
+      , debugTypeSynonyms env
+      , debugNames env
+      ]
+
   go :: Declaration -> m Declaration
   go (DataDeclaration sa@(ss, _) dtype name args dctors) = do
     warnAndRethrow (addHint (ErrorInTypeConstructor name) . addHint (positionedError ss)) $ do

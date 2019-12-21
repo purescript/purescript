@@ -27,6 +27,7 @@ everythingOnTypes op k = goTy
       | null ty2 -> k ty `op` goTy ty3
       | otherwise -> k ty `op` (foldr1 op (k <$> ty2) `op` goTy ty3)
     TypeParens _ (Wrapped _ ty2 _) -> k ty `op` goTy ty2
+    TypeUnaryRow _ _ ty2 -> k ty `op` goTy ty2
 
   goRow ty = \case
     Row Nothing Nothing -> k ty

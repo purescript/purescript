@@ -616,7 +616,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , markCodeBox $ indent $ typeAsBox prettyDepth ty
             ]
     renderSimpleErrorMessage (TypesDoNotUnify u1 u2)
-      = let (row1Box, row2Box) = printRows (eraseKindApps u1) (eraseKindApps u2)
+      = let (row1Box, row2Box) = printRows u1 u2
 
         in paras [ line "Could not match type"
                  , row1Box
@@ -626,9 +626,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
 
     renderSimpleErrorMessage (KindsDoNotUnify k1 k2) =
       paras [ line "Could not match kind"
-            , markCodeBox $ indent $ typeAsBox prettyDepth $ eraseKindApps k1
+            , markCodeBox $ indent $ typeAsBox prettyDepth k1
             , line "with kind"
-            , markCodeBox $ indent $ typeAsBox prettyDepth $ eraseKindApps k2
+            , markCodeBox $ indent $ typeAsBox prettyDepth k2
             ]
     renderSimpleErrorMessage (ConstrainedTypeUnified t1 t2) =
       paras [ line "Could not match constrained type"
@@ -886,7 +886,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line $ "No type declaration was provided for the top-level declaration of " <> markCode (showIdent ident) <> "."
             , line "It is good practice to provide type declarations as a form of documentation."
             , line $ "The inferred type of " <> markCode (showIdent ident) <> " was:"
-            , markCodeBox $ indent $ typeAsBox prettyDepth $ eraseKindApps ty
+            , markCodeBox $ indent $ typeAsBox prettyDepth ty
             ]
     renderSimpleErrorMessage (OverlappingPattern bs b) =
       paras $ [ line "A case expression contains unreachable cases:\n"
