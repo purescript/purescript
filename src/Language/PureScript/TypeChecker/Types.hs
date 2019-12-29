@@ -25,7 +25,7 @@ module Language.PureScript.TypeChecker.Types
 -}
 
 import Prelude.Compat
-import Protolude (ordNub)
+import Protolude (ordNub, fold, atMay)
 
 import Control.Arrow (first, second, (***))
 import Control.Monad
@@ -110,21 +110,56 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           . throwError
           . errorMessage' ss
           $ CannotGeneralizeRecursiveFunction ident generalized
-        -- Make sure any unsolved type constraints only use type variables which appear
-        -- unknown in the inferred type.
-        forM_ unsolved $ \(_, _, con) -> do
-          -- We need information about functional dependencies, since we allow
-          -- ambiguous types to be inferred if they can be solved by some functional
-          -- dependency.
+        -- We need information about functional dependencies, since we allow
+        -- ambiguous types to be inferred if they can be solved by some functional
+        -- dependency.
+        conData <- forM unsolved $ \(_, _, con) -> do
           let findClass = fromMaybe (internalError "entails: type class not found in environment") . M.lookup (constraintClass con)
           TypeClassData{ typeClassDependencies } <- gets (findClass . typeClasses . checkEnv)
-          let solved = foldMap (S.fromList . fdDetermined) typeClassDependencies
-          let constraintTypeVars = ordNub . foldMap (unknownsInType . fst) . filter ((`notElem` solved) . snd) $ zip (constraintArgs con) [0..]
-          when (any (`notElem` unsolvedTypeVars) constraintTypeVars) .
-            throwError
-              . onErrorMessages (replaceTypes currentSubst)
-              . errorMessage' ss
-              $ AmbiguousTypeVariables generalized con
+          let
+            -- The set of unknowns mentioned in each argument.
+            unknownsForArg :: [S.Set Int]
+            unknownsForArg =
+              map (S.fromList . map snd . unknownsInType) (constraintArgs con)
+          pure (typeClassDependencies, unknownsForArg)
+        -- Make sure any unsolved type constraints are determined by the
+        -- type variables which appear unknown in the inferred type.
+        let
+          -- Take the closure of fundeps across constraints, to get more
+          -- and more solved variables until reaching a fixpoint.
+          solveFrom :: S.Set Int -> S.Set Int
+          solveFrom determined = do
+            let solved = solve1 determined
+            if solved `S.isSubsetOf` determined
+              then determined
+              else solveFrom (determined <> solved)
+          solve1 :: S.Set Int -> S.Set Int
+          solve1 determined = fold $ do
+            (tcDeps, conArgUnknowns) <- conData
+            let
+              lookupUnknowns :: Int -> Maybe (S.Set Int)
+              lookupUnknowns = atMay conArgUnknowns
+              unknownsDetermined :: Maybe (S.Set Int) -> Bool
+              unknownsDetermined Nothing = False
+              unknownsDetermined (Just unknowns) =
+                unknowns `S.isSubsetOf` determined
+            -- If all of the determining arguments of a particular fundep are
+            -- already determined, add the determined arguments from the fundep
+            tcDep <- tcDeps
+            guard $ all (unknownsDetermined . lookupUnknowns) (fdDeterminers tcDep)
+            map (fromMaybe S.empty . lookupUnknowns) (fdDetermined tcDep)
+        -- These unknowns can be determined from the body of the inferred
+        -- type (i.e. excluding the unknowns mentioned in the constraints)
+        let determinedFromType = S.fromList . map snd $ unsolvedTypeVars
+        -- These are all the unknowns mentioned in the constraints
+        let constraintTypeVars = fold (conData >>= snd)
+        let solved = solveFrom determinedFromType
+        let unsolvedVars = S.difference constraintTypeVars solved
+        when (not (S.null unsolvedVars)) .
+          throwError
+            . onErrorMessages (replaceTypes currentSubst)
+            . errorMessage' ss
+            $ AmbiguousTypeVariables generalized (S.toList unsolvedVars)
 
       -- Check skolem variables did not escape their scope
       skolemEscapeCheck val'

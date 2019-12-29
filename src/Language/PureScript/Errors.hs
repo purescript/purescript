@@ -286,7 +286,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (ExprDoesNotHaveType e t) = ExprDoesNotHaveType e <$> f t
   gSimple (InvalidInstanceHead t) = InvalidInstanceHead <$> f t
   gSimple (NoInstanceFound con) = NoInstanceFound <$> overConstraintArgs (traverse f) con
-  gSimple (AmbiguousTypeVariables t con) = AmbiguousTypeVariables <$> f t <*> pure con
+  gSimple (AmbiguousTypeVariables t us) = AmbiguousTypeVariables <$> f t <*> pure us
   gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> pure insts
   gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
   gSimple (CannotDerive cl ts) = CannotDerive cl <$> traverse f ts
@@ -679,10 +679,16 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
         where
         go TUnknown{} = True
         go _ = False
-    renderSimpleErrorMessage (AmbiguousTypeVariables t _) =
+    renderSimpleErrorMessage (AmbiguousTypeVariables t us) =
       paras [ line "The inferred type"
             , markCodeBox $ indent $ typeAsBox prettyDepth t
-            , line "has type variables which are not mentioned in the body of the type. Consider adding a type annotation."
+            , line "has type variables which are not determined by those mentioned in the body of the type:"
+            , indent $ Box.hsep 1 Box.left
+              [ Box.vcat Box.left
+                [ line $ markCode ("t" <> T.pack (show u)) <> " could not be determined"
+                | u <- us ]
+              ]
+            , line "Consider adding a type annotation."
             ]
     renderSimpleErrorMessage (PossiblyInfiniteInstance nm ts) =
       paras [ line "Type class instance for"

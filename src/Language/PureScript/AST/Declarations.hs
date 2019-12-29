@@ -111,7 +111,7 @@ data SimpleErrorMessage
   | ConstrainedTypeUnified SourceType SourceType
   | OverlappingInstances (Qualified (ProperName 'ClassName)) [SourceType] [Qualified Ident]
   | NoInstanceFound SourceConstraint
-  | AmbiguousTypeVariables SourceType SourceConstraint
+  | AmbiguousTypeVariables SourceType [Int]
   | UnknownClass (Qualified (ProperName 'ClassName))
   | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [SourceType]
   | CannotDerive (Qualified (ProperName 'ClassName)) [SourceType]
