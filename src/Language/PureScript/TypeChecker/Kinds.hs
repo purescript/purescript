@@ -259,7 +259,14 @@ inferAppKind ann (fn, fnKind) arg = case fnKind of
     u <- freshUnknown
     addUnsolved Nothing u k
     inferAppKind ann (KindApp ann fn (TUnknown ann u), replaceTypeVars a (TUnknown ann u) ty) arg
-  _ -> -- TODO
+  _ -> do
+    -- This is an artificial construction designed to trigger an error
+    -- TODO: Better error?
+    (_, argKind) <- inferKind arg
+    u <- freshKind
+    unifyKinds
+      fnKind
+      (srcTypeApp (srcTypeApp E.tyFunction argKind) u)
     internalError "Cannot apply type"
 
 checkKind
