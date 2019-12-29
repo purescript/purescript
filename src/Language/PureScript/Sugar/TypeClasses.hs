@@ -91,7 +91,7 @@ desugarModule (Module ss coms name decls (Just exps)) = do
   superClassesNames _ = []
 
   constraintName :: SourceConstraint -> Qualified (ProperName 'ClassName)
-  constraintName (Constraint _ cName _ _) = cName
+  constraintName (Constraint _ cName _ _ _) = cName
 
   classDeclName :: Declaration -> Qualified (ProperName 'ClassName)
   classDeclName (TypeClassDeclaration _ pn _ _ _ _) = Qualified (Just name) pn
@@ -260,7 +260,7 @@ typeClassDictionaryDeclaration
 typeClassDictionaryDeclaration sa name args implies members =
   let superclassTypes = superClassDictionaryNames implies `zip`
         [ function unit (foldl srcTypeApp (srcTypeConstructor (fmap coerceProperName superclass)) tyArgs)
-        | (Constraint _ superclass tyArgs _) <- implies
+        | (Constraint _ superclass _ tyArgs _) <- implies
         ]
       members' = map (first runIdent . memberToNameAndType) members
       mtys = members' ++ superclassTypes
@@ -321,7 +321,7 @@ typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
       -- The dictionary itself is a record literal.
       let superclasses = superClassDictionaryNames typeClassSuperclasses `zip`
             [ Abs (VarBinder ss UnusedIdent) (DeferredDictionary superclass tyArgs)
-            | (Constraint _ superclass suTyArgs _) <- typeClassSuperclasses
+            | (Constraint _ superclass _ suTyArgs _) <- typeClassSuperclasses
             , let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
             ]
 
@@ -351,5 +351,5 @@ typeClassMemberName = fromMaybe (internalError "typeClassMemberName: Invalid dec
 superClassDictionaryNames :: [Constraint a] -> [Text]
 superClassDictionaryNames supers =
   [ superclassName pn index
-  | (index, Constraint _ pn _ _) <- zip [0..] supers
+  | (index, Constraint _ pn _ _ _) <- zip [0..] supers
   ]

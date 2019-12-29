@@ -140,7 +140,7 @@ usedTypeNames moduleName =
   usedNames :: SourceType -> [ProperName 'TypeName]
   usedNames (ConstrainedType _ con _) =
     case con of
-      (Constraint _ (Qualified (Just moduleName') name) _ _)
+      (Constraint _ (Qualified (Just moduleName') name) _ _ _)
         | moduleName == moduleName' -> [coerceProperName name]
       _ -> []
   usedNames (TypeConstructor _ (Qualified (Just moduleName') name))

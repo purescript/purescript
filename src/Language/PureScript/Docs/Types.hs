@@ -686,6 +686,8 @@ asSourcePos = P.SourcePos <$> nth 0 asIntegral
 
 asConstraint :: Parse PackageError Constraint'
 asConstraint = P.Constraint () <$> key "constraintClass" asQualifiedProperName
+                               -- TODO: Backwards compat?
+                               <*> key "constraintKindArgs" (eachInArray asType)
                                <*> key "constraintArgs" (eachInArray asType)
                                <*> pure Nothing
 

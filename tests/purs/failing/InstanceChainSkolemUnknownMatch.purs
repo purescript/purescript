@@ -10,6 +10,6 @@ same :: forall l r o. Same l r o => l -> r -> SProxy o
 same _ _ = SProxy
 
 -- shouldn't discard sameY as Apart
-example :: forall t. Proxy t -> SProxy _
+example :: forall (t :: Type). Proxy t -> SProxy _
 example _ = same (Proxy :: Proxy t) (Proxy :: Proxy Int)
 

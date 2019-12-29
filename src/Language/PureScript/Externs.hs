@@ -136,6 +136,7 @@ data ExternsDeclaration =
   | EDInstance
       { edInstanceClassName       :: Qualified (ProperName 'ClassName)
       , edInstanceName            :: Ident
+      , edInstanceKinds           :: [SourceType]
       , edInstanceTypes           :: [SourceType]
       , edInstanceConstraints     :: Maybe [SourceConstraint]
       , edInstanceChain           :: [Qualified Ident]
@@ -153,14 +154,14 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   applyDecl env (EDDataConstructor pn dTy tNm ty nms) = env { dataConstructors = M.insert (qual pn) (dTy, tNm, ty, nms) (dataConstructors env) }
   applyDecl env (EDValue ident ty) = env { names = M.insert (Qualified (Just efModuleName) ident) (ty, External, Defined) (names env) }
   applyDecl env (EDClass pn args members cs deps tcIsEmpty) = env { typeClasses = M.insert (qual pn) (makeTypeClassData args members cs deps tcIsEmpty) (typeClasses env) }
-  applyDecl env (EDInstance className ident tys cs ch idx) =
+  applyDecl env (EDInstance className ident kinds tys cs ch idx) =
     env { typeClassDictionaries =
             updateMap
               (updateMap (M.insertWith (<>) (qual ident) (pure dict)) className)
               (Just efModuleName) (typeClassDictionaries env) }
     where
     dict :: NamedDict
-    dict = TypeClassDictionaryInScope ch idx (qual ident) [] className tys cs
+    dict = TypeClassDictionaryInScope ch idx (qual ident) [] className kinds tys cs
 
     updateMap :: (Ord k, Monoid a) => (a -> a) -> k -> M.Map k a -> M.Map k a
     updateMap f = M.alter (Just . f . fold)
@@ -219,13 +220,13 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
   toExternsDeclaration (TypeClassRef _ className)
     | Just TypeClassData{..} <- Qualified (Just mn) className `M.lookup` typeClasses env
     , Just (kind, TypeSynonym) <- Qualified (Just mn) (coerceProperName className) `M.lookup` types env
-    , Just (_, synTy) <- Qualified (Just mn) (coerceProperName className) `M.lookup` typeSynonyms env
+    , Just (synArgs, synTy) <- Qualified (Just mn) (coerceProperName className) `M.lookup` typeSynonyms env
     = [ EDType (coerceProperName className) kind TypeSynonym
-      , EDTypeSynonym (coerceProperName className) typeClassArguments synTy
+      , EDTypeSynonym (coerceProperName className) synArgs synTy
       , EDClass className typeClassArguments typeClassMembers typeClassSuperclasses typeClassDependencies typeClassIsEmpty
       ]
   toExternsDeclaration (TypeInstanceRef _ ident)
-    = [ EDInstance tcdClassName ident tcdInstanceTypes tcdDependencies tcdChain tcdIndex
+    = [ EDInstance tcdClassName ident tcdInstanceKinds tcdInstanceTypes tcdDependencies tcdChain tcdIndex
       | m1 <- maybeToList (M.lookup (Just mn) (typeClassDictionaries env))
       , m2 <- M.elems m1
       , nel <- maybeToList (M.lookup (Qualified (Just mn) ident) m2)

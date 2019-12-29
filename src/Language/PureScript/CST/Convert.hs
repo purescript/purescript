@@ -193,7 +193,7 @@ convertConstraint fileName = go
   go = \case
     cst@(Constraint _ name args) -> do
       let ann = uncurry (sourceAnnCommented fileName) $ constraintRange cst
-      T.Constraint ann (qualified name) (convertType fileName <$> args) Nothing
+      T.Constraint ann (qualified name) [] (convertType fileName <$> args) Nothing
     ConstraintParens _ (Wrapped _ c _) -> go c
 
 convertGuarded :: String -> Guarded a -> [AST.GuardedExpr]

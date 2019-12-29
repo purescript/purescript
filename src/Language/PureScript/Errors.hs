@@ -265,14 +265,14 @@ replaceUnknowns = everywhereOnTypesM replaceTypes where
         put $ m { umUnknownMap = M.insert u u' (umUnknownMap m), umNextIndex = u' + 1 }
         return (TUnknown ann u')
       Just u' -> return (TUnknown ann u')
-  replaceTypes (Skolem ann name s sko) = do
+  replaceTypes (Skolem ann name mbK s sko) = do
     m <- get
     case M.lookup s (umSkolemMap m) of
       Nothing -> do
         let s' = umNextIndex m
         put $ m { umSkolemMap = M.insert s (T.unpack name, s', Just (fst ann)) (umSkolemMap m), umNextIndex = s' + 1 }
-        return (Skolem ann name s' sko)
-      Just (_, s', _) -> return (Skolem ann name s' sko)
+        return (Skolem ann name mbK s' sko)
+      Just (_, s', _) -> return (Skolem ann name mbK s' sko)
   replaceTypes other = return other
 
 onTypesInErrorMessage :: (SourceType -> SourceType) -> ErrorMessage -> ErrorMessage
@@ -651,11 +651,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , markCodeBox $ indent $ line (showQualified runProperName nm)
             , line "because the class was not in scope. Perhaps it was not exported."
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Fail [ ty ] _)) | Just box <- toTypelevelString ty =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Fail _ [ ty ] _)) | Just box <- toTypelevelString ty =
       paras [ line "A custom type error occurred while solving type class constraints:"
             , indent box
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Partial
+                                                          _
                                                           _
                                                           (Just (PartialConstraintData bs b)))) =
       paras [ line "A case expression could not be determined to cover all inputs."
@@ -666,13 +667,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                   : [line "..." | not b]
             , line "Alternatively, add a Partial constraint to the type of the enclosing value."
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Discard [ty] _)) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Discard _ [ty] _)) =
       paras [ line "A result of type"
             , markCodeBox $ indent $ typeAsBox prettyDepth ty
             , line "was implicitly discarded in a do notation block."
             , line ("You can use " <> markCode "_ <- ..." <> " to explicitly discard the result.")
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm ts _)) =
+    -- TODO: Kind args
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm _ ts _)) =
       paras [ line "No type class instance was found for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
@@ -1173,7 +1175,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ detail
             , line $ "in foreign import " <> markCode (showIdent nm)
             ]
-    renderHint (ErrorSolvingConstraint (Constraint _ nm ts _)) detail =
+    -- TODO: Kind args
+    renderHint (ErrorSolvingConstraint (Constraint _ nm _ ts _)) detail =
       paras [ detail
             , line "while solving type class constraint"
             , markCodeBox $ indent $ Box.hsep 1 Box.left

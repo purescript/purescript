@@ -12,7 +12,7 @@ module Language.PureScript.TypeChecker
 import Prelude.Compat
 import Protolude (ordNub)
 
-import Control.Monad (when, unless, void, forM, join)
+import Control.Monad (when, unless, void, forM)
 import Control.Monad.Error.Class (MonadError(..), catchError)
 import Control.Monad.State.Class (MonadState(..), modify, gets)
 import Control.Monad.Supply.Class (MonadSupply)
@@ -234,16 +234,16 @@ typeCheckAll
   -> [DeclarationRef]
   -> [Declaration]
   -> m [Declaration]
-typeCheckAll moduleName _ = flip catchError (\err -> debugEnv *> throwError err) . (\a -> traverse go a <* debugEnv)
+typeCheckAll moduleName _ = flip catchError (\err -> debugEnv' *> throwError err) . (\a -> traverse go a <* debugEnv')
   where
-  -- debugEnv = pure ()
-  debugEnv = do
-    env <- gets checkEnv
-    traceM $ unlines $ join
-      [ debugTypes env
-      , debugTypeSynonyms env
-      , debugNames env
-      ]
+  debugEnv' = pure ()
+  -- debugEnv' = do
+  --   env <- gets checkEnv
+  --   let ppEnv = unlines $ debugEnv env
+  --   traceM
+  --     . unlines
+  --     $ T.unpack (runModuleName moduleName)
+  --     : fmap ("  " <>) (lines ppEnv)
 
   go :: Declaration -> m Declaration
   go (DataDeclaration sa@(ss, _) dtype name args dctors) = do
@@ -296,7 +296,6 @@ typeCheckAll moduleName _ = flip catchError (\err -> debugEnv *> throwError err)
           addValue moduleName name ty nameKind
           return $ ValueDecl sa name nameKind [] [MkUnguarded val'']
         _ -> internalError "typesOf did not return a singleton"
-    where
   go ValueDeclaration{} = internalError "Binders were not desugared"
   go BoundValueDeclaration{} = internalError "BoundValueDeclaration should be desugared"
   go (BindingGroupDeclaration vals) = do
@@ -315,29 +314,31 @@ typeCheckAll moduleName _ = flip catchError (\err -> debugEnv *> throwError err)
         return (sai, nameKind, val)
       return . BindingGroupDeclaration $ NEL.fromList vals''
   go (d@(ExternDataDeclaration _ name kind)) = do
+    (elabKind, kindKind) <- kindOf kind
+    checkTypeKind elabKind kindKind
     env <- getEnv
-    putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (kind, ExternData) (types env) }
+    putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (elabKind, ExternData) (types env) }
     return d
   go (d@(ExternDeclaration (ss, _) name ty)) = do
     warnAndRethrow (addHint (ErrorInForeignImport name) . addHint (positionedError ss)) $ do
       env <- getEnv
       (elabTy, kind) <- kindOf ty
-      guardWith (errorMessage (ExpectedType ty kind)) $ kind == kindType
+      checkTypeKind elabTy kind
       case M.lookup (Qualified (Just moduleName) name) (names env) of
         Just _ -> throwError . errorMessage $ RedefinedIdent name
         Nothing -> putEnv (env { names = M.insert (Qualified (Just moduleName) name) (elabTy, External, Defined) (names env) })
     return d
   go d@FixityDeclaration{} = return d
   go d@ImportDeclaration{} = return d
-  go d@(TypeClassDeclaration (ss, _) pn args implies deps tys) = do
+  go d@(TypeClassDeclaration sa@(ss, _) pn args implies deps tys) = do
     warnAndRethrow (addHint (ErrorInTypeClassDeclaration pn) . addHint (positionedError ss)) $ do
       env <- getEnv
       let qualifiedClassName = Qualified (Just moduleName) pn
       guardWith (errorMessage (DuplicateTypeClass pn ss)) $
         not (M.member qualifiedClassName (typeClasses env))
       -- TODO: What should we do with this signature vs the desugared type synonym?
-      -- (args', _) <- kindOfClass moduleName (sa, pn, args, implies, tys)
-      addTypeClass qualifiedClassName args implies deps tys
+      (args', implies', tys', _) <- kindOfClass moduleName (sa, pn, args, implies, tys)
+      addTypeClass qualifiedClassName (fmap Just <$> args') implies' deps tys'
       return d
   go (d@(TypeInstanceDeclaration sa@(ss, _) ch idx dictName deps className tys body)) =
     rethrow (addHint (ErrorInInstance className tys) . addHint (positionedError ss)) $ do
@@ -356,9 +357,9 @@ typeCheckAll moduleName _ = flip catchError (\err -> debugEnv *> throwError err)
           let qualifiedChain = Qualified (Just moduleName) <$> ch
           checkOverlappingInstance qualifiedChain dictName className typeClass tys nonOrphanModules
           _ <- traverseTypeInstanceBody checkInstanceMembers body
-          deps' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms deps
-          tys' <- checkInstanceDeclaration moduleName (sa, deps', className, tys)
-          let dict = TypeClassDictionaryInScope qualifiedChain idx qualifiedDictName [] className tys' (Just deps')
+          (deps', kinds', tys') <- withFreshSubstitution $ checkInstanceDeclaration moduleName (sa, deps, className, tys)
+          deps'' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms deps'
+          let dict = TypeClassDictionaryInScope qualifiedChain idx qualifiedDictName [] className kinds' tys' (Just deps'')
           addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) (pure dict)
           return d
 

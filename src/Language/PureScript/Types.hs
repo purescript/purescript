@@ -75,7 +75,7 @@ data Type a
   -- | A type with a set of type class constraints
   | ConstrainedType a (Constraint a) (Type a)
   -- | A skolem constant
-  | Skolem a Text Int SkolemScope
+  | Skolem a Text (Maybe (Type a)) Int SkolemScope
   -- | An empty row
   | REmpty a
   -- | A non-empty row
@@ -125,9 +125,6 @@ srcForAll = ForAll NullSourceAnn
 srcConstrainedType :: SourceConstraint -> SourceType -> SourceType
 srcConstrainedType = ConstrainedType NullSourceAnn
 
-srcSkolem :: Text -> Int -> SkolemScope -> SourceType
-srcSkolem = Skolem NullSourceAnn
-
 srcREmpty :: SourceType
 srcREmpty = REmpty NullSourceAnn
 
@@ -161,6 +158,8 @@ data Constraint a = Constraint
   -- ^ constraint annotation
   , constraintClass :: Qualified (ProperName 'ClassName)
   -- ^ constraint class name
+  , constraintKindArgs :: [Type a]
+  -- ^ kind arguments
   , constraintArgs  :: [Type a]
   -- ^ type arguments
   , constraintData  :: Maybe ConstraintData
@@ -170,7 +169,7 @@ data Constraint a = Constraint
 instance NFData a => NFData (Constraint a)
 
 srcConstraint :: Qualified (ProperName 'ClassName) -> [SourceType] -> Maybe ConstraintData -> SourceConstraint
-srcConstraint = Constraint NullSourceAnn
+srcConstraint cn = Constraint NullSourceAnn cn []
 
 mapConstraintArgs :: ([Type a] -> [Type a]) -> Constraint a -> Constraint a
 mapConstraintArgs f c = c { constraintArgs = f (constraintArgs c) }
@@ -189,6 +188,7 @@ constraintToJSON annToJSON (Constraint {..}) =
   A.object
     [ "constraintAnn"   .= annToJSON constraintAnn
     , "constraintClass" .= constraintClass
+    , "constraintKindArgs"  .= fmap (typeToJSON annToJSON) constraintArgs
     , "constraintArgs"  .= fmap (typeToJSON annToJSON) constraintArgs
     , "constraintData"  .= fmap constraintDataToJSON constraintData
     ]
@@ -218,8 +218,8 @@ typeToJSON annToJSON ty =
         Just k -> variant "ForAll" a (b, go k, go d, e)
     ConstrainedType a b c ->
       variant "ConstrainedType" a (constraintToJSON annToJSON b, go c)
-    Skolem a b c d ->
-      variant "Skolem" a (b, c, d)
+    Skolem a b c d e ->
+      variant "Skolem" a (b, go <$> c, d, e)
     REmpty a ->
       nullary "REmpty" a
     RCons a b c d ->
@@ -267,6 +267,7 @@ constraintFromJSON :: forall a. A.Parser a -> (A.Value -> A.Parser a) -> A.Value
 constraintFromJSON defaultAnn annFromJSON = A.withObject "Constraint" $ \o -> do
   constraintAnn   <- (o .: "constraintAnn" >>= annFromJSON) <|> defaultAnn
   constraintClass <- o .: "constraintClass"
+  constraintKindArgs <- o .: "constraintKindArgs" >>= traverse (typeFromJSON defaultAnn annFromJSON)
   constraintArgs  <- o .: "constraintArgs" >>= traverse (typeFromJSON defaultAnn annFromJSON)
   constraintData  <- o .: "constraintData" >>= traverse constraintDataFromJSON
   pure $ Constraint {..}
@@ -311,8 +312,9 @@ typeFromJSON defaultAnn annFromJSON = A.withObject "Type" $ \o -> do
       (b, c) <- contents
       ConstrainedType a <$> constraintFromJSON defaultAnn annFromJSON b <*> go c
     "Skolem" -> do
-      (b, c, d) <- contents
-      pure $ Skolem a b c d
+      (b, c, d, e) <- contents
+      c' <- traverse go c
+      pure $ Skolem a b c' d e
     "REmpty" ->
       pure $ REmpty a
     "RCons" -> do
@@ -456,11 +458,17 @@ completeBinderList = go []
 
 -- | Sort quantifiers in dependency order, since the kinds of type variables may
 -- | depend on previously bound type variables.
-sortBinderList :: [(a, (Text, Type a))] -> [(a, (Text, Type a))]
-sortBinderList = flattenSCCs . stronglyConnComp . fmap go
+sortCompleteBinderList :: [(a, (Text, Type a))] -> [(a, (Text, Type a))]
+sortCompleteBinderList = sortVars (fst . snd) (usedTypeVariables . snd . snd)
+
+sortBinderList :: [(a, (Text, Maybe (Type a)))] -> [(a, (Text, Maybe (Type a)))]
+sortBinderList = sortVars (fst . snd) (maybe [] usedTypeVariables . snd . snd)
+
+sortVars :: (a -> Text) -> (a -> [Text]) -> [a] -> [a]
+sortVars toVar toUsed = flattenSCCs . stronglyConnComp . fmap go
   where
-  go binding@(_, (var, k)) =
-    (binding, var, usedTypeVariables k)
+  go binding =
+    (binding, toVar binding, toUsed binding)
 
 -- | Universally quantify over all type variables appearing free in a type
 quantify :: Type a -> Type a
@@ -498,11 +506,21 @@ eraseKindApps = everywhereOnTypes $ \case
   KindApp _ ty _ -> ty
   other -> other
 
-unapplyTypes :: Type a -> (Type a, [Type a])
-unapplyTypes = go []
+unapplyTypes :: Type a -> (Type a, [Type a], [Type a])
+unapplyTypes = goTypes []
   where
-  go acc (TypeApp _ a b) = go (b : acc) a
-  go acc a = (a, acc)
+
+  goTypes acc (TypeApp _ a b) = goTypes (b : acc) a
+  goTypes acc a = let (ty, kinds) = goKinds [] a in (ty, kinds, acc)
+
+  goKinds acc (KindApp _ a b) = goKinds (b : acc) a
+  goKinds acc a = (a, acc)
+
+unapplyConstraints :: Type a -> ([Constraint a], Type a)
+unapplyConstraints = go []
+  where
+  go acc (ConstrainedType _ con ty) = go (con : acc) ty
+  go acc ty = (reverse acc, ty)
 
 everywhereOnTypes :: (Type a -> Type a) -> Type a -> Type a
 everywhereOnTypes f = go where
@@ -602,7 +620,7 @@ annForType k (TypeApp a b c) = (\z -> TypeApp z b c) <$> k a
 annForType k (KindApp a b c) = (\z -> KindApp z b c) <$> k a
 annForType k (ForAll a b c d e) = (\z -> ForAll z b c d e) <$> k a
 annForType k (ConstrainedType a b c) = (\z -> ConstrainedType z b c) <$> k a
-annForType k (Skolem a b c d) = (\z -> Skolem z b c d) <$> k a
+annForType k (Skolem a b c d e) = (\z -> Skolem z b c d e) <$> k a
 annForType k (REmpty a) = REmpty <$> k a
 annForType k (RCons a b c d) = (\z -> RCons z b c d) <$> k a
 annForType k (KindedType a b c) = (\z -> KindedType z b c) <$> k a
@@ -632,7 +650,7 @@ eqType (TypeApp _ a b) (TypeApp _ a' b') = eqType a a' && eqType b b'
 eqType (KindApp _ a b) (KindApp _ a' b') = eqType a a' && eqType b b'
 eqType (ForAll _ a b c d) (ForAll _ a' b' c' d') = a == a' && eqMaybeType b b' && eqType c c' && d == d'
 eqType (ConstrainedType _ a b) (ConstrainedType _ a' b') = eqConstraint a a' && eqType b b'
-eqType (Skolem _ a b c) (Skolem _ a' b' c') = a == a' && b == b' && c == c'
+eqType (Skolem _ a b c d) (Skolem _ a' b' c' d') = a == a' && eqMaybeType b b' && c == c' && d == d'
 eqType (REmpty _) (REmpty _) = True
 eqType (RCons _ a b c) (RCons _ a' b' c') = a == a' && eqType b b' && eqType c c'
 eqType (KindedType _ a b) (KindedType _ a' b') = eqType a a' && eqType b b'
@@ -685,7 +703,7 @@ compareType (ConstrainedType _ a b) (ConstrainedType _ a' b') = compareConstrain
 compareType (ConstrainedType {}) _ = LT
 compareType _ (ConstrainedType {}) = GT
 
-compareType (Skolem _ a b c) (Skolem _ a' b' c') = compare a a' <> compare b b' <> compare c c'
+compareType (Skolem _ a b c d) (Skolem _ a' b' c' d') = compare a a' <> compareMaybeType b b' <> compare c c' <> compare d d'
 compareType (Skolem {}) _ = LT
 compareType _ (Skolem {}) = GT
 
@@ -721,7 +739,7 @@ instance Ord (Constraint a) where
   compare = compareConstraint
 
 eqConstraint :: Constraint a -> Constraint b -> Bool
-eqConstraint (Constraint _ a b c) (Constraint _ a' b' c') = a == a' && and (zipWith eqType b b') && c == c'
+eqConstraint (Constraint _ a b c d) (Constraint _ a' b' c' d') = a == a' && and (zipWith eqType b b') && and (zipWith eqType c c') && d == d'
 
 compareConstraint :: Constraint a -> Constraint b -> Ordering
-compareConstraint (Constraint _ a b c) (Constraint _ a' b' c') = compare a a' <> fold (zipWith compareType b b') <> compare c c'
+compareConstraint (Constraint _ a b c d) (Constraint _ a' b' c' d') = compare a a' <> fold (zipWith compareType b b') <> fold (zipWith compareType c c') <> compare d d'

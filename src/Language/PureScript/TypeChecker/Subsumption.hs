@@ -76,14 +76,14 @@ subsumes'
   -> SourceType
   -> m (Coercion mode)
 subsumes' mode (ForAll _ ident mbK ty1 _) ty2 = do
-  u <- freshTypeWithKind . maybe kindType id $ mbK
+  u <- maybe freshType freshTypeWithKind mbK
   let replaced = replaceTypeVars ident u ty1
   subsumes' mode replaced ty2
-subsumes' mode ty1 (ForAll _ ident _ ty2 sco) =
+subsumes' mode ty1 (ForAll _ ident mbK ty2 sco) =
   case sco of
     Just sco' -> do
       sko <- newSkolemConstant
-      let sk = skolemize NullSourceAnn ident sko sco' ty2
+      let sk = skolemize NullSourceAnn ident mbK sko sco' ty2
       subsumes' mode ty1 sk
     Nothing -> internalError "subsumes: unspecified skolem scope"
 subsumes' mode (TypeApp _ (TypeApp _ f1 arg1) ret1) (TypeApp _ (TypeApp _ f2 arg2) ret2) | eqType f1 tyFunction && eqType f2 tyFunction = do

@@ -87,7 +87,8 @@ prettyPrintValue d (Do m els) =
 prettyPrintValue d (Ado m els yield) =
   textT (maybe "" ((Monoid.<> ".") . runModuleName) m) <> text "ado " <> vcat left (map (prettyPrintDoNotationElement (d - 1)) els) //
   (text "in " <> prettyPrintValue (d - 1) yield)
-prettyPrintValue d (TypeClassDictionary (Constraint _ name tys _) _ _) = foldl1 beforeWithSpace $ text ("#dict " ++ T.unpack (runProperName (disqualify name))) : map (typeAtomAsBox d) tys
+-- TODO: constraint kind args
+prettyPrintValue d (TypeClassDictionary (Constraint _ name _ tys _) _ _) = foldl1 beforeWithSpace $ text ("#dict " ++ T.unpack (runProperName (disqualify name))) : map (typeAtomAsBox d) tys
 prettyPrintValue _ (DeferredDictionary name _) = text $ "#dict " ++ T.unpack (runProperName (disqualify name))
 prettyPrintValue _ (TypeClassDictionaryAccessor className ident) =
     text "#dict-accessor " <> text (T.unpack (runProperName (disqualify className))) <> text "." <> text (T.unpack (showIdent ident)) <> text ">"

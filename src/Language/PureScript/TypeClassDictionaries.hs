@@ -27,6 +27,8 @@ data TypeClassDictionaryInScope v
     , tcdPath :: [(Qualified (ProperName 'ClassName), Integer)]
     -- | The name of the type class to which this type class instance applies
     , tcdClassName :: Qualified (ProperName 'ClassName)
+    -- | The kinds to which this type class instance applies
+    , tcdInstanceKinds :: [SourceType]
     -- | The types to which this type class instance applies
     , tcdInstanceTypes :: [SourceType]
     -- | Type class dependencies which must be satisfied to construct this dictionary

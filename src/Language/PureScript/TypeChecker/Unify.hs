@@ -25,16 +25,13 @@ import Control.Monad.State.Class (MonadState(..), gets, modify)
 import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Foldable (traverse_)
-import Data.Function (on)
-import Data.List (sortBy, nubBy)
 import qualified Data.Map as M
-import Data.Ord (comparing)
 import qualified Data.Text as T
 
 import Language.PureScript.Crash
 import qualified Language.PureScript.Environment as E
 import Language.PureScript.Errors
-import Language.PureScript.TypeChecker.Kinds (unifyKinds)
+import Language.PureScript.TypeChecker.Kinds (checkKind, unifyKinds)
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Skolems
 import Language.PureScript.Types
@@ -42,7 +39,7 @@ import Language.PureScript.Types
 -- | Generate a fresh type variable
 freshType :: (MonadState CheckState m) => m SourceType
 freshType = do
-  freshTypeWithKind E.kindType
+  freshTypeWithKind =<< freshTypeWithKind E.kindType
   -- t <- gets checkNextType
   -- modify $ \st -> st { checkNextType = t + 1
   --                    , checkSubstitution =
@@ -68,6 +65,13 @@ solveType u t = do
                                                     M.insert u t $ substType $ checkSubstitution cs
                                                 }
                      }
+  mbK <- gets (M.lookup u . substUnsolved . checkSubstitution)
+  case mbK of
+    Just (_, k) ->
+      void $ checkKind t k
+    _ ->
+      internalError $ "No kind for unification variable " <> show u
+
 
 -- | Apply a substitution to a type
 substituteType :: Substitution -> SourceType -> SourceType
@@ -105,17 +109,17 @@ unifyTypes t1 t2 = do
   unifyTypes' (TUnknown _ u1) (TUnknown _ u2) | u1 == u2 = return ()
   unifyTypes' (TUnknown _ u) t = solveType u t
   unifyTypes' t (TUnknown _ u) = solveType u t
-  unifyTypes' (ForAll ann1 ident1 _ ty1 sc1) (ForAll ann2 ident2 _ ty2 sc2) =
+  unifyTypes' (ForAll ann1 ident1 mbK1 ty1 sc1) (ForAll ann2 ident2 mbK2 ty2 sc2) =
     case (sc1, sc2) of
       (Just sc1', Just sc2') -> do
         sko <- newSkolemConstant
-        let sk1 = skolemize ann1 ident1 sko sc1' ty1
-        let sk2 = skolemize ann2 ident2 sko sc2' ty2
+        let sk1 = skolemize ann1 ident1 mbK1 sko sc1' ty1
+        let sk2 = skolemize ann2 ident2 mbK2 sko sc2' ty2
         sk1 `unifyTypes` sk2
       _ -> internalError "unifyTypes: unspecified skolem scope"
-  unifyTypes' (ForAll ann ident _ ty1 (Just sc)) ty2 = do
+  unifyTypes' (ForAll ann ident mbK ty1 (Just sc)) ty2 = do
     sko <- newSkolemConstant
-    let sk = skolemize ann ident sko sc ty1
+    let sk = skolemize ann ident mbK sko sc ty1
     sk `unifyTypes` ty2
   unifyTypes' ForAll{} _ = internalError "unifyTypes: unspecified skolem scope"
   unifyTypes' ty f@ForAll{} = f `unifyTypes` ty
@@ -129,7 +133,7 @@ unifyTypes t1 t2 = do
   unifyTypes' (KindApp _ t3 t4) (KindApp _ t5 t6) = do
     t3 `unifyKinds` t5
     t4 `unifyTypes` t6
-  unifyTypes' (Skolem _ _ s1 _) (Skolem _ _ s2 _) | s1 == s2 = return ()
+  unifyTypes' (Skolem _ _ _ s1 _) (Skolem _ _ _ s2 _) | s1 == s2 = return ()
   unifyTypes' (KindedType _ ty1 _) ty2 = ty1 `unifyTypes` ty2
   unifyTypes' ty1 (KindedType _ ty2 _) = ty1 `unifyTypes` ty2
   unifyTypes' r1@RCons{} r2 = unifyRows r1 r2
@@ -182,7 +186,7 @@ unifyRows r1 r2 = sequence_ matches *> uncurry unifyTails rest where
   unifyTails (sd, r)               ([], TUnknown _ u)    = solveType u (rowFromList (sd, r))
   unifyTails ([], REmpty _)        ([], REmpty _)        = return ()
   unifyTails ([], TypeVar _ v1)    ([], TypeVar _ v2)    | v1 == v2 = return ()
-  unifyTails ([], Skolem _ s1 _ _) ([], Skolem _ s2 _ _) | s1 == s2 = return ()
+  unifyTails ([], Skolem _ _ s1 _ _) ([], Skolem _ _ s2 _ _) | s1 == s2 = return ()
   unifyTails (sd1, TUnknown _ u1)  (sd2, TUnknown _ u2)  = do
     forM_ sd1 $ occursCheck u2 . rowListType
     forM_ sd2 $ occursCheck u1 . rowListType
@@ -210,13 +214,13 @@ replaceTypeWildcards = everywhereOnTypesM replace
 -- |
 -- Replace outermost unsolved unification variables with named type variables
 --
-varIfUnknown :: SourceType -> SourceType
-varIfUnknown ty =
-  let unks = nubBy ((==) `on` snd) $ unknownsInType ty
-      toName = T.cons 't' . T.pack .  show
-      addKind a = (a, Nothing)
-      ty' = everywhereOnTypes typeToVar ty
-      typeToVar :: SourceType -> SourceType
-      typeToVar (TUnknown ann u) = TypeVar ann (toName u)
-      typeToVar t = t
-  in mkForAll (fmap (fmap addKind) . sortBy (comparing snd) . fmap (fmap toName) $ unks) ty'
+varIfUnknown :: [(Unknown, SourceType)] -> SourceType -> SourceType
+varIfUnknown unks ty =
+  mkForAll (toBinding <$> unks) $ go ty
+  where
+  toName = T.cons 't' . T.pack .  show
+  toBinding (a, k) = (getAnnForType ty, (toName a, Just $ go k))
+  go = everywhereOnTypes $ \case
+    (TUnknown ann u)
+      | Just _ <- lookup u unks -> TypeVar ann (toName u)
+    t -> t

@@ -45,14 +45,14 @@ newSkolemScope = do
   return $ SkolemScope s
 
 -- | Skolemize a type variable by replacing its instances with fresh skolem constants
-skolemize :: a -> Text -> Int -> SkolemScope -> Type a -> Type a
-skolemize ann ident sko scope = replaceTypeVars ident (Skolem ann ident sko scope)
+skolemize :: a -> Text -> Maybe (Type a) -> Int -> SkolemScope -> Type a -> Type a
+skolemize ann ident mbK sko scope = replaceTypeVars ident (Skolem ann ident mbK sko scope)
 
 -- | This function skolemizes type variables appearing in any type signatures or
 -- 'DeferredDictionary' placeholders. These type variables are the only places
 -- where scoped type variables can appear in expressions.
-skolemizeTypesInValue :: SourceAnn -> Text -> Int -> SkolemScope -> Expr -> Expr
-skolemizeTypesInValue ann ident sko scope =
+skolemizeTypesInValue :: SourceAnn -> Text -> Maybe SourceType -> Int -> SkolemScope -> Expr -> Expr
+skolemizeTypesInValue ann ident mbK sko scope =
     runIdentity . onExpr'
   where
     onExpr' :: Expr -> Identity Expr
@@ -60,14 +60,14 @@ skolemizeTypesInValue ann ident sko scope =
 
     onExpr :: [Text] -> Expr -> Identity ([Text], Expr)
     onExpr sco (DeferredDictionary c ts)
-      | ident `notElem` sco = return (sco, DeferredDictionary c (map (skolemize ann ident sko scope) ts))
+      | ident `notElem` sco = return (sco, DeferredDictionary c (map (skolemize ann ident mbK sko scope) ts))
     onExpr sco (TypedValue check val ty)
-      | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedValue check val (skolemize ann ident sko scope ty))
+      | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedValue check val (skolemize ann ident mbK sko scope ty))
     onExpr sco other = return (sco, other)
 
     onBinder :: [Text] -> Binder -> Identity ([Text], Binder)
     onBinder sco (TypedBinder ty b)
-      | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedBinder (skolemize ann ident sko scope ty) b)
+      | ident `notElem` sco = return (sco ++ peelTypeVars ty, TypedBinder (skolemize ann ident mbK sko scope ty) b)
     onBinder sco other = return (sco, other)
 
     peelTypeVars :: SourceType -> [Text]
@@ -123,7 +123,7 @@ skolemEscapeCheck expr@TypedValue{} =
         -- Collect any skolem variables appearing in a type
         collectSkolems :: SourceType -> [(SourceAnn, Text, SkolemScope)]
         collectSkolems = everythingOnTypes (++) collect where
-          collect (Skolem ss name _ scope) = [(ss, name, scope)]
+          collect (Skolem ss name _ _ scope) = [(ss, name, scope)]
           collect _ = []
     go scos _ = (scos, [])
 skolemEscapeCheck _ = internalError "skolemEscapeCheck: untyped value"

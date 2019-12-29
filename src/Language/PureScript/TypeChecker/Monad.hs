@@ -24,8 +24,10 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.Pretty.Types
+import Language.PureScript.Pretty.Values
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
+import Text.PrettyPrint.Boxes (render)
 
 newtype UnkLevel = UnkLevel (NEL.NonEmpty Int)
   deriving (Eq, Ord, Show)
@@ -337,6 +339,21 @@ unsafeCheckCurrentModule = checkCurrentModule <$> get >>= \case
   Nothing -> internalError "No module name set in scope"
   Just name -> pure name
 
+debugEnv :: Environment -> [String]
+debugEnv env = join
+  [ debugTypes env
+  , debugTypeSynonyms env
+  , debugNames env
+  , debugTypeClassDictionaries env
+  ]
+
+debugType :: Type a -> String
+debugType = init . prettyPrintType 100
+
+debugConstraint :: Constraint a -> String
+debugConstraint (Constraint ann clsName kinds args _) =
+  debugType $ foldl (TypeApp ann) (foldl (KindApp ann) (TypeConstructor ann (fmap coerceProperName clsName)) kinds) args
+
 debugTypes :: Environment -> [String]
 debugTypes = fmap go . M.toList . types
   where
@@ -345,10 +362,10 @@ debugTypes = fmap go . M.toList . types
       ppTy = prettyPrintType 100 srcTy
       name = showQualified runProperName qual
       decl = case which of
-        DataType _ _      -> "data  "
-        TypeSynonym       -> "type  "
+        DataType _ _      -> "data"
+        TypeSynonym       -> "type"
         ExternData        -> "extern"
-        LocalTypeVariable -> "local "
+        LocalTypeVariable -> "local"
         ScopedTypeVar     -> "scoped"
     decl <> " " <> unpack name <> " :: " <> init ppTy
 
@@ -384,4 +401,21 @@ debugTypeClassDictionaries = go . typeClassDictionaries
       moduleName = maybe "" (\m -> "[" <> runModuleName m <> "] ") mbModuleName
       className' = showQualified runProperName className
       ident' = showQualified runIdent ident
-    pure $ "dict " <> unpack moduleName <> unpack className' <> " " <> unpack ident' <> " (" <> show (length dicts) <> ")"
+      tys = intercalate " " $ fmap ((\a -> "(" <> a <> ")") . debugType) $ tcdInstanceTypes $ NEL.head dicts
+    pure $ "dict " <> unpack moduleName <> unpack className' <> " " <> unpack ident' <> " (" <> show (length dicts) <> ")" <> " " <> tys
+
+debugValue :: Expr -> String
+debugValue = init . render . prettyPrintValue 100
+
+debugSubstitution :: Substitution -> [String]
+debugSubstitution (Substitution solved unsolved) =
+  fmap go1 (M.toList solved) <> fmap go2 (M.toList unsolved')
+  where
+  unsolved' =
+    M.filterWithKey (\k _ -> M.notMember k solved) unsolved
+
+  go1 (u, ty) =
+    "?" <> show u <> " = " <> debugType ty
+
+  go2 (u, (_, k)) =
+    "?" <> show u <> " :: " <> debugType k

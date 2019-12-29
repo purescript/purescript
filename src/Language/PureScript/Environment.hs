@@ -26,6 +26,8 @@ import           Language.PureScript.TypeClassDictionaries
 import           Language.PureScript.Types
 import qualified Language.PureScript.Constants as C
 
+import Lens.Micro.Platform (Lens')
+
 -- | The @Environment@ defines all values and types which are currently in scope:
 data Environment = Environment
   { names :: M.Map (Qualified Ident) (SourceType, NameKind, NameVisibility)
@@ -360,6 +362,22 @@ isFunction = isTypeOrApplied tyFunction
 isTypeOrApplied :: Type a -> Type b -> Bool
 isTypeOrApplied t1 (TypeApp _ t2 _) = eqType t1 t2
 isTypeOrApplied t1 t2 = eqType t1 t2
+
+resultingType :: Lens' (Type a) (Type a)
+resultingType k = go id
+  where
+  go f (ConstrainedType a c t) =
+    go (f . ConstrainedType a c) t
+  go f (TypeApp a1 (TypeApp a2 tyFn t1) t2) | eqType tyFn tyFunction =
+    go (f . TypeApp a1 (TypeApp a2 tyFn t1)) t2
+  go f (ForAll a b c t e) =
+    go (f . (\t' -> ForAll a b c t' e)) t
+  go f (ParensInType a t) =
+    go (f . ParensInType a) t
+  go f (KindedType a t c) =
+    go (f . (\t' -> KindedType a t' c)) t
+  go f t =
+    f <$> k t
 
 -- | Smart constructor for function types
 function :: SourceType -> SourceType -> SourceType

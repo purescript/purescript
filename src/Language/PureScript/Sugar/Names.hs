@@ -323,13 +323,14 @@ renameInModule imports (Module modSS coms mn decls exps) =
     updateType (ConstrainedType ann c t) = ConstrainedType ann <$> updateInConstraint c <*> pure t
     updateType t = return t
     updateInConstraint :: SourceConstraint -> m SourceConstraint
-    updateInConstraint (Constraint ann@(ss, _) name ts info) =
-      Constraint ann <$> updateClassName name ss <*> pure ts <*> pure info
+    updateInConstraint (Constraint ann@(ss, _) name ks ts info) =
+      Constraint ann <$> updateClassName name ss <*> pure ks <*> pure ts <*> pure info
 
   updateConstraints :: SourceSpan -> [SourceConstraint] -> m [SourceConstraint]
-  updateConstraints pos = traverse $ \(Constraint ann name ts info) ->
+  updateConstraints pos = traverse $ \(Constraint ann name ks ts info) ->
     Constraint ann
       <$> updateClassName name pos
+      <*> traverse updateTypesEverywhere ks
       <*> traverse updateTypesEverywhere ts
       <*> pure info
 

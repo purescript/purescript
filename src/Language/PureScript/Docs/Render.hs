@@ -96,8 +96,8 @@ renderChildDeclaration ChildDeclaration{..} =
       ]
 
 renderConstraint :: Constraint' -> RenderedCode
-renderConstraint (P.Constraint ann pn tys _) =
-  renderType $ foldl (P.TypeApp ann) (P.TypeConstructor ann (fmap P.coerceProperName pn)) tys
+renderConstraint (P.Constraint ann pn kinds tys _) =
+  renderType $ foldl (P.TypeApp ann) (foldl (P.KindApp ann) (P.TypeConstructor ann (fmap P.coerceProperName pn)) kinds) tys
 
 renderConstraints :: [Constraint'] -> Maybe RenderedCode
 renderConstraints constraints

@@ -6,6 +6,8 @@
 module Language.PureScript.TypeChecker.Types
   ( BindingGroupType(..)
   , typesOf
+  , checkTypeKind
+  , checkKindResultsInType
   ) where
 
 {-
@@ -62,6 +64,8 @@ import Language.PureScript.Types
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString)
 
+import Lens.Micro.Platform ((^.))
+
 data BindingGroupType
   = RecursiveBindingGroup
   | NonRecursiveBindingGroup
@@ -95,11 +99,10 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
       -- Generalize and constrain the type
       currentSubst <- gets checkSubstitution
       let ty' = substituteType currentSubst ty
-          unsolvedTypeVars = ordNub $ unknownsInType ty'
-          generalized = generalize unsolved ty'
-
-      -- Use the fully kind-elaborated type for the environment.
-      elabGeneralized <- fst <$> kindOf generalized
+      ((unsolvedTypeVarsWithKinds, ty''), _) <- kindOfWithUnknowns $ constrain unsolved ty'
+      let unsolvedTypeVars = snd <$> unknownsInType ty'
+          elabGeneralized = varIfUnknown unsolvedTypeVarsWithKinds ty''
+          generalized = elabGeneralized -- TODO: Remove kind annotations and kind vars?
 
       when shouldGeneralize $ do
         -- Show the inferred type in a warning
@@ -121,7 +124,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
           let findClass = fromMaybe (internalError "entails: type class not found in environment") . M.lookup (constraintClass con)
           TypeClassData{ typeClassDependencies } <- gets (findClass . typeClasses . checkEnv)
           let solved = foldMap (S.fromList . fdDetermined) typeClassDependencies
-          let constraintTypeVars = ordNub . foldMap (unknownsInType . fst) . filter ((`notElem` solved) . snd) $ zip (constraintArgs con) [0..]
+          let constraintTypeVars = ordNub . foldMap (fmap snd . unknownsInType . fst) . filter ((`notElem` solved) . snd) $ zip (constraintArgs con) [0..]
           when (any (`notElem` unsolvedTypeVars) constraintTypeVars) .
             throwError
               . onErrorMessages (replaceTypes currentSubst)
@@ -168,9 +171,6 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
         in ErrorMessage hints (HoleInferredType x ty y (Just searchResult))
       other -> other
 
-    -- | Generalize type vars using forall and add inferred constraints
-    generalize unsolved = varIfUnknown . constrain unsolved
-
     -- | Add any unsolved constraints
     constrain cs ty = foldr srcConstrainedType ty (map (\(_, _, x) -> x) cs)
 
@@ -203,7 +203,7 @@ data SplitBindingGroup = SplitBindingGroup
 -- This function also generates fresh unification variables for the types of
 -- declarations without type annotations, returned in the 'UntypedData' structure.
 typeDictionaryForBindingGroup
-  :: (MonadState CheckState m, MonadWriter MultipleErrors m)
+  :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => Maybe ModuleName
   -> [((SourceAnn, Ident), Expr)]
   -> m SplitBindingGroup
@@ -213,7 +213,8 @@ typeDictionaryForBindingGroup moduleName vals = do
     -- fully expanded types.
     let (untyped, typed) = partitionEithers (map splitTypeAnnotation vals)
     (typedDict, typed') <- fmap unzip . for typed $ \(sai, (expr, ty, checkType)) -> do
-      ty' <- replaceTypeWildcards ty
+      -- TODO: this results in kind checking twice
+      ty' <- replaceTypeWildcards . fst =<< kindOf ty
       return ((sai, ty'), (sai, (expr, ty', checkType)))
     -- Create fresh unification variables for the types of untyped declarations
     (untypedDict, untyped') <- fmap unzip . for untyped $ \(sai, expr) -> do
@@ -247,7 +248,10 @@ checkTypedBindingGroupElement
   -> m ((SourceAnn, Ident), (Expr, SourceType))
 checkTypedBindingGroupElement mn (ident, (val, ty, checkType)) dict = do
   ((args, elabTy), kind) <- kindOfWithScopedVars ty
-  checkTypeKind ty kind
+  -- TODO: Better error?
+  -- checkTypeKind ty kind
+  unifyKinds kind kindType
+
   -- We replace type synonyms _after_ kind-checking, since we don't want type
   -- synonym expansion to bring type variables into scope. See #2542.
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ elabTy
@@ -281,6 +285,13 @@ checkTypeKind
   -> m ()
 checkTypeKind ty kind = guardWith (errorMessage (ExpectedType ty kind)) $ isKindType kind
 
+checkKindResultsInType
+  :: MonadError MultipleErrors m
+  => SourceType
+  -> m ()
+checkKindResultsInType kind =
+  checkTypeKind kind (kind ^. resultingType)
+
 -- | Remove any ForAlls and ConstrainedType constructors in a type by introducing new unknowns
 -- or TypeClassDictionary values.
 --
@@ -292,7 +303,7 @@ instantiatePolyTypeWithUnknowns
   -> SourceType
   -> m (Expr, SourceType)
 instantiatePolyTypeWithUnknowns val (ForAll _ ident mbK ty _) = do
-  u <- freshTypeWithKind . maybe kindType id $ mbK
+  u <- maybe freshType freshTypeWithKind mbK
   instantiatePolyTypeWithUnknowns val $ replaceTypeVars ident u ty
 instantiatePolyTypeWithUnknowns val (ConstrainedType _ con ty) = do
   dicts <- getTypeClassDictionaries
@@ -411,13 +422,16 @@ infer' (Let w ds val) = do
 infer' (DeferredDictionary className tys) = do
   dicts <- getTypeClassDictionaries
   hints <- getHints
+  con <- checkConstraint (srcConstraint className tys Nothing)
   return $ TypedValue' False
-             (TypeClassDictionary (srcConstraint className tys Nothing) dicts hints)
+             (TypeClassDictionary con dicts hints)
              (foldl srcTypeApp (srcTypeConstructor (fmap coerceProperName className)) tys)
 infer' (TypedValue checkType val ty) = do
   moduleName <- unsafeCheckCurrentModule
   ((args, elabTy), kind) <- kindOfWithScopedVars ty
-  checkTypeKind ty kind
+  -- TODO: Better error?
+  -- checkTypeKind ty kind
+  unifyKinds kind kindType
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ elabTy
   tv <- if checkType then withScopedTypeVars moduleName args (check val ty') else return (TypedValue' False val ty)
   return $ TypedValue' True (tvToExpr tv) ty'
@@ -444,7 +458,9 @@ inferLetBinding seen (ValueDecl sa@(ss, _) ident nameKind [] [MkUnguarded (Typed
   moduleName <- unsafeCheckCurrentModule
   TypedValue' _ val' ty'' <- warnAndRethrowWithPositionTC ss $ do
     ((args, elabTy), kind) <- kindOfWithScopedVars ty
-    checkTypeKind ty kind
+    -- TODO: Better error?
+    -- checkTypeKind ty kind
+    unifyKinds kind kindType
     let dict = M.singleton (Qualified Nothing ident) (elabTy, nameKind, Undefined)
     ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ elabTy
     if checkType
@@ -531,7 +547,9 @@ inferBinder val (PositionedBinder pos _ binder) =
   warnAndRethrowWithPositionTC pos $ inferBinder val binder
 inferBinder val (TypedBinder ty binder) = do
   (elabTy, kind) <- kindOf ty
-  checkTypeKind ty kind
+  -- TODO: Better error?
+  -- checkTypeKind ty kind
+  unifyKinds kind kindType
   ty1 <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ elabTy
   unifyTypes val ty1
   inferBinder ty1 binder
@@ -632,11 +650,11 @@ check' val (ForAll ann ident mbK ty _) = do
   let ss = case val of
              PositionedValue pos c _ -> (pos, c)
              _ -> NullSourceAnn
-      sk = skolemize ss ident sko scope ty
-      skVal = skolemizeTypesInValue ss ident sko scope val
+      sk = skolemize ss ident mbK sko scope ty
+      skVal = skolemizeTypesInValue ss ident mbK sko scope val
   val' <- tvToExpr <$> check skVal sk
   return $ TypedValue' True val' (ForAll ann ident mbK ty (Just scope))
-check' val t@(ConstrainedType _ con@(Constraint _ (Qualified _ (ProperName className)) _ _) ty) = do
+check' val t@(ConstrainedType _ con@(Constraint _ (Qualified _ (ProperName className)) _ _ _) ty) = do
   dictName <- freshIdent ("dict" <> className)
   dicts <- newDictionaries [] (Qualified Nothing dictName) con
   val' <- withBindingGroupVisible $ withTypeClassDictionaries dicts $ check val ty
@@ -687,14 +705,17 @@ check' (DeferredDictionary className tys) ty = do
   -}
   dicts <- getTypeClassDictionaries
   hints <- getHints
+  con <- checkConstraint (srcConstraint className tys Nothing)
   return $ TypedValue' False
-             (TypeClassDictionary (srcConstraint className tys Nothing) dicts hints)
+             (TypeClassDictionary con dicts hints)
              ty
 check' (TypedValue checkType val ty1) ty2 = do
   (elabTy1, kind1) <- kindOf ty1
   (elabTy2, kind2) <- kindOf ty2
   unifyKinds kind1 kind2
-  checkTypeKind ty1 kind1
+  -- TODO: Better error?
+  -- checkTypeKind ty1 kind1
+  unifyKinds kind1 kindType
   ty1' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ elabTy1
   ty2' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ elabTy2
   elaborate <- subsumes ty1' ty2'
@@ -745,7 +766,9 @@ check' (Let w ds val) ty = do
   (ds', val') <- inferLetBinding [] ds val (`check` ty)
   return $ TypedValue' True (Let w ds' (tvToExpr val')) ty
 check' val kt@(KindedType _ ty kind) = do
-  checkTypeKind ty kind
+  -- TODO: Better error?
+  -- checkTypeKind ty kind
+  unifyKinds kind kindType
   val' <- tvToExpr <$> check' val ty
   return $ TypedValue' True val' kt
 check' (PositionedValue pos c val) ty = warnAndRethrowWithPositionTC pos $ do
@@ -834,8 +857,7 @@ checkFunctionApplication' fn (TypeApp _ (TypeApp _ tyFunction' argTy) retTy) arg
   arg' <- tvToExpr <$> check arg argTy
   return (retTy, App fn arg')
 checkFunctionApplication' fn (ForAll _ ident mbK ty _) arg = do
-  let kind = maybe kindType id $ mbK
-  u <- freshTypeWithKind kind
+  u <- maybe freshType freshTypeWithKind mbK
   let replaced = replaceTypeVars ident u ty
   checkFunctionApplication fn replaced arg
 checkFunctionApplication' fn (KindedType _ ty _) arg =
