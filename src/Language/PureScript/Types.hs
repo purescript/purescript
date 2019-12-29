@@ -188,7 +188,7 @@ constraintToJSON annToJSON (Constraint {..}) =
   A.object
     [ "constraintAnn"   .= annToJSON constraintAnn
     , "constraintClass" .= constraintClass
-    , "constraintKindArgs"  .= fmap (typeToJSON annToJSON) constraintArgs
+    , "constraintKindArgs"  .= fmap (typeToJSON annToJSON) constraintKindArgs
     , "constraintArgs"  .= fmap (typeToJSON annToJSON) constraintArgs
     , "constraintData"  .= fmap constraintDataToJSON constraintData
     ]

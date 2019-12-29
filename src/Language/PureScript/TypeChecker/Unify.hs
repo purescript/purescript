@@ -68,6 +68,7 @@ solveType u t = do
   mbK <- gets (M.lookup u . substUnsolved . checkSubstitution)
   case mbK of
     Just (_, k) ->
+      -- TODO: Probably needs to be something else
       void $ checkKind t k
     _ ->
       internalError $ "No kind for unification variable " <> show u
