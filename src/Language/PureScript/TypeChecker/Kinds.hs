@@ -18,6 +18,7 @@ module Language.PureScript.TypeChecker.Kinds
   , inferKind
   , checkConstraint
   , checkInstanceDeclaration
+  , checkTypeKind
   ) where
 
 import Prelude.Compat
@@ -299,28 +300,48 @@ unifyKinds
   => SourceType
   -> SourceType
   -> m ()
-unifyKinds = curry $ \case
-  (TypeApp _ p1 p2, TypeApp _ p3 p4) -> do
-    unifyKinds p1 p3
-    join $ unifyKinds <$> apply p2 <*> apply p4
-  (KindApp _ p1 p2, KindApp _ p3 p4) -> do
-    unifyKinds p1 p3
-    join $ unifyKinds <$> apply p2 <*> apply p4
-  (w1, w2) | eqType w1 w2 ->
-    pure ()
-  (TUnknown ss a', p1) ->
-    unifyUnknown ss a' p1
-  (p1, TUnknown ss a') ->
-    unifyUnknown ss a' p1
-  (w1, w2) ->
-    throwError
-      . errorMessage''' (fst . getAnnForType <$> [w1, w2])
-      $ KindsDoNotUnify w1 w2
+unifyKinds = unifyKindsWithFailure $ \w1 w2 ->
+  throwError
+    . errorMessage''' (fst . getAnnForType <$> [w1, w2])
+    $ KindsDoNotUnify w1 w2
+
+-- | Check the kind of a type, failing if it is not of kind *.
+checkTypeKind
+  :: (MonadError MultipleErrors m, MonadState CheckState m)
+  => SourceType
+  -> SourceType
+  -> m ()
+checkTypeKind ty kind =
+  unifyKindsWithFailure (\_ _ -> throwError . errorMessage $ ExpectedType ty kind) kind E.kindType
+
+unifyKindsWithFailure
+  :: (MonadError MultipleErrors m, MonadState CheckState m)
+  => (SourceType -> SourceType -> m ())
+  -> SourceType
+  -> SourceType
+  -> m ()
+unifyKindsWithFailure onFailure = go
   where
+  go = curry $ \case
+    (TypeApp _ p1 p2, TypeApp _ p3 p4) -> do
+      go p1 p3
+      join $ go <$> apply p2 <*> apply p4
+    (KindApp _ p1 p2, KindApp _ p3 p4) -> do
+      go p1 p3
+      join $ go <$> apply p2 <*> apply p4
+    (w1, w2) | eqType w1 w2 ->
+      pure ()
+    (TUnknown ss a', p1) ->
+      unifyUnknown ss a' p1
+    (p1, TUnknown ss a') ->
+      unifyUnknown ss a' p1
+    (w1, w2) ->
+      onFailure w1 w2
+
   unifyUnknown _ a' p1 = do
     p2 <- promoteKind a' p1
     w1 <- snd <$> lookupUnsolved a'
-    join $ unifyKinds <$> apply w1 <*> elaborateKind p2
+    join $ go <$> apply w1 <*> elaborateKind p2
     solve a' p2
 
 promoteKind

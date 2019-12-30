@@ -18,7 +18,6 @@ data DeclarationType
   | TypeClass
   | ValueOperator
   | TypeOperator
-  | Kind
   | Module
   deriving (Show, Eq, Ord)
 
@@ -32,7 +31,6 @@ instance FromJSON DeclarationType where
       "typeclass"         -> pure TypeClass
       "valueoperator"     -> pure ValueOperator
       "typeoperator"      -> pure TypeOperator
-      "kind"              -> pure Kind
       "module"            -> pure Module
       _                   -> mzero
 

@@ -7,7 +7,6 @@ module Language.PureScript.TypeChecker.Types
   ( BindingGroupType(..)
   , typesOf
   , checkTypeKind
-  , checkKindResultsInType
   ) where
 
 {-
@@ -63,8 +62,6 @@ import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.Types
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString)
-
-import Lens.Micro.Platform ((^.))
 
 data BindingGroupType
   = RecursiveBindingGroup
@@ -248,9 +245,7 @@ checkTypedBindingGroupElement
   -> m ((SourceAnn, Ident), (Expr, SourceType))
 checkTypedBindingGroupElement mn (ident, (val, ty, checkType)) dict = do
   ((args, elabTy), kind) <- kindOfWithScopedVars ty
-  -- TODO: Better error?
-  -- checkTypeKind ty kind
-  unifyKinds kind kindType
+  checkTypeKind ty kind
 
   -- We replace type synonyms _after_ kind-checking, since we don't want type
   -- synonym expansion to bring type variables into scope. See #2542.
@@ -276,21 +271,6 @@ typeForBindingGroupElement (ident, (val, ty)) dict = do
   -- Unify the type with the unification variable we chose for this definition
   unifyTypes ty ty'
   return (ident, (TypedValue True val' ty', ty'))
-
--- | Check the kind of a type, failing if it is not of kind *.
-checkTypeKind
-  :: MonadError MultipleErrors m
-  => SourceType
-  -> SourceType
-  -> m ()
-checkTypeKind ty kind = guardWith (errorMessage (ExpectedType ty kind)) $ isKindType kind
-
-checkKindResultsInType
-  :: MonadError MultipleErrors m
-  => SourceType
-  -> m ()
-checkKindResultsInType kind =
-  checkTypeKind kind (kind ^. resultingType)
 
 -- | Remove any ForAlls and ConstrainedType constructors in a type by introducing new unknowns
 -- or TypeClassDictionary values.
@@ -429,9 +409,7 @@ infer' (DeferredDictionary className tys) = do
 infer' (TypedValue checkType val ty) = do
   moduleName <- unsafeCheckCurrentModule
   ((args, elabTy), kind) <- kindOfWithScopedVars ty
-  -- TODO: Better error?
-  -- checkTypeKind ty kind
-  unifyKinds kind kindType
+  checkTypeKind ty kind
   ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ elabTy
   tv <- if checkType then withScopedTypeVars moduleName args (check val ty') else return (TypedValue' False val ty)
   return $ TypedValue' True (tvToExpr tv) ty'
@@ -458,9 +436,7 @@ inferLetBinding seen (ValueDecl sa@(ss, _) ident nameKind [] [MkUnguarded (Typed
   moduleName <- unsafeCheckCurrentModule
   TypedValue' _ val' ty'' <- warnAndRethrowWithPositionTC ss $ do
     ((args, elabTy), kind) <- kindOfWithScopedVars ty
-    -- TODO: Better error?
-    -- checkTypeKind ty kind
-    unifyKinds kind kindType
+    checkTypeKind ty kind
     let dict = M.singleton (Qualified Nothing ident) (elabTy, nameKind, Undefined)
     ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ elabTy
     if checkType
@@ -547,9 +523,7 @@ inferBinder val (PositionedBinder pos _ binder) =
   warnAndRethrowWithPositionTC pos $ inferBinder val binder
 inferBinder val (TypedBinder ty binder) = do
   (elabTy, kind) <- kindOf ty
-  -- TODO: Better error?
-  -- checkTypeKind ty kind
-  unifyKinds kind kindType
+  checkTypeKind ty kind
   ty1 <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ elabTy
   unifyTypes val ty1
   inferBinder ty1 binder
@@ -713,9 +687,7 @@ check' (TypedValue checkType val ty1) ty2 = do
   (elabTy1, kind1) <- kindOf ty1
   (elabTy2, kind2) <- kindOf ty2
   unifyKinds kind1 kind2
-  -- TODO: Better error?
-  -- checkTypeKind ty1 kind1
-  unifyKinds kind1 kindType
+  checkTypeKind ty1 kind1
   ty1' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ elabTy1
   ty2' <- introduceSkolemScope <=< replaceAllTypeSynonyms <=< replaceTypeWildcards $ elabTy2
   elaborate <- subsumes ty1' ty2'
@@ -766,9 +738,7 @@ check' (Let w ds val) ty = do
   (ds', val') <- inferLetBinding [] ds val (`check` ty)
   return $ TypedValue' True (Let w ds' (tvToExpr val')) ty
 check' val kt@(KindedType _ ty kind) = do
-  -- TODO: Better error?
-  -- checkTypeKind ty kind
-  unifyKinds kind kindType
+  checkTypeKind ty kind
   val' <- tvToExpr <$> check' val ty
   return $ TypedValue' True val' kt
 check' (PositionedValue pos c val) ty = warnAndRethrowWithPositionTC pos $ do
