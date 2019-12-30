@@ -11,7 +11,6 @@ import Data.Functor (($>))
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import Language.PureScript.Docs.Types
 
 import qualified Language.PureScript.Crash as P
@@ -58,8 +57,7 @@ primBooleanDocsModule = Module
   { modName = P.moduleNameFromString "Prim.Boolean"
   , modComments = Just "The Prim.Boolean module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains a type level `Boolean` data structure."
   , modDeclarations =
-      [ kindBoolean
-      , booleanTrue
+      [ booleanTrue
       , booleanFalse
       ]
   , modReExports = []
@@ -149,25 +147,6 @@ unsafeLookupOf k m errorMsg name = go name
   fromJust' (Just x) = x
   fromJust' _ = P.internalError $ errorMsg ++ show name
 
-primKindOf
-  :: NameGen 'P.TypeName
-  -> Text
-  -> Text
-  -> Declaration
-primKindOf g title comments =
-  if Set.member (g title) mempty -- TODO: P.allPrimKinds
-     then Declaration
-          { declTitle = title
-          , declComments = Just comments
-          , declSourceSpan = Nothing
-          , declChildren = []
-          , declInfo = undefined -- TODO: ExternKindDeclaration
-          }
-    else P.internalError $ "Docs.Prim: No such Prim kind: " ++ T.unpack title
-
-primKind :: Text -> Text -> Declaration
-primKind = primKindOf P.primName
-
 lookupPrimTypeKindOf
   :: NameGen 'P.TypeName
   -> Text
@@ -224,13 +203,13 @@ primClassOf gen title comments = Declaration
   }
 
 kindType :: Declaration
-kindType = primKind "Type" $ T.unlines
+kindType = primType "Type" $ T.unlines
   [ "`Type` is the kind of all proper types: those that classify value-level terms."
   , "For example the type `Boolean` has kind `Type`; denoted by `Boolean :: Type`."
   ]
 
 kindSymbol :: Declaration
-kindSymbol = primKind "Symbol" $ T.unlines
+kindSymbol = primType "Symbol" $ T.unlines
   [ "`Symbol` is the kind of type-level strings."
   , ""
   , "Construct types of this kind using the same literal syntax as documented"
@@ -351,11 +330,6 @@ partial = primClass "Partial" $ T.unlines
   , "[purescript-partial](https://pursuit.purescript.org/packages/purescript-partial/)."
   ]
 
-kindBoolean :: Declaration
-kindBoolean = primKindOf (P.primSubName "Boolean") "Boolean" $ T.unlines
-  [ "The `Boolean` kind provides True/False types at the type level"
-  ]
-
 booleanTrue :: Declaration
 booleanTrue = primTypeOf (P.primSubName "Boolean") "True" $ T.unlines
   [ "The 'True' boolean type."
@@ -367,7 +341,7 @@ booleanFalse = primTypeOf (P.primSubName "Boolean") "False" $ T.unlines
   ]
 
 kindOrdering :: Declaration
-kindOrdering = primKindOf (P.primSubName "Ordering") "Ordering" $ T.unlines
+kindOrdering = primTypeOf (P.primSubName "Ordering") "Ordering" $ T.unlines
   [ "The `Ordering` kind represents the three possibilites of comparing two"
   , "types of the same kind: `LT` (less than), `EQ` (equal to), and"
   , "`GT` (greater than)."
@@ -414,7 +388,7 @@ rowCons = primClassOf (P.primSubName "Row") "Cons" $ T.unlines
   ]
 
 kindRowList :: Declaration
-kindRowList = primKindOf (P.primSubName "RowList") "RowList" $ T.unlines
+kindRowList = primTypeOf (P.primSubName "RowList") "RowList" $ T.unlines
   [ "A type level list representation of a row of types."
   ]
 
@@ -474,7 +448,7 @@ warn = primClassOf (P.primSubName "TypeError") "Warn" $ T.unlines
   ]
 
 kindDoc :: Declaration
-kindDoc = primKindOf (P.primSubName "TypeError") "Doc" $ T.unlines
+kindDoc = primTypeOf (P.primSubName "TypeError") "Doc" $ T.unlines
   [ "`Doc` is the kind of type-level documents."
   , ""
   , "This kind is used with the `Fail` and `Warn` type clases."
