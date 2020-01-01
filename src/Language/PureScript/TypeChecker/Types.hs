@@ -63,6 +63,8 @@ import Language.PureScript.Types
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString)
 
+import Debug.Trace
+
 data BindingGroupType
   = RecursiveBindingGroup
   | NonRecursiveBindingGroup
@@ -619,13 +621,22 @@ check'
   -> SourceType
   -> m TypedValue'
 check' val (ForAll ann ident mbK ty _) = do
+  env <- getEnv
+  mn <- gets checkCurrentModule
   scope <- newSkolemScope
   sko <- newSkolemConstant
   let ss = case val of
              PositionedValue pos c _ -> (pos, c)
              _ -> NullSourceAnn
       sk = skolemize ss ident mbK sko scope ty
-      skVal = skolemizeTypesInValue ss ident mbK sko scope val
+      -- We should only skolemize types in values when the type variable
+      -- was actually brought into scope. Otherwise we can end up skolemizing
+      -- an undefined type variable that happens to clash with the variable we
+      -- want to skolemize. This can happen due to synonym expansion (see 2542).
+      skVal
+        | Just _ <- M.lookup (Qualified mn (ProperName ident)) $ types env =
+            skolemizeTypesInValue ss ident mbK sko scope val
+        | otherwise = val
   val' <- tvToExpr <$> check skVal sk
   return $ TypedValue' True val' (ForAll ann ident mbK ty (Just scope))
 check' val t@(ConstrainedType _ con@(Constraint _ (Qualified _ (ProperName className)) _ _ _) ty) = do

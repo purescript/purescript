@@ -7,7 +7,6 @@
 module Language.PureScript.TypeChecker.Kinds
   ( kindOf
   , kindOfWithUnknowns
-  , kindOfWithGeneralized
   , kindOfWithScopedVars
   , kindOfData
   , kindOfTypeSynonym
@@ -244,7 +243,7 @@ inferAppKind
   -> m (SourceType, SourceType)
 inferAppKind ann (fn, fnKind) arg = case fnKind of
   TypeApp _ (TypeApp _ arrKind argKind) resKind
-    | eqType arrKind E.tyFunction || eqType arrKind E.tyConstrainedValue -> do
+    | eqType arrKind E.tyFunction -> do
         arg' <- checkKind arg argKind
         (TypeApp ann fn arg',) <$> apply resKind
   TUnknown _ u -> do
@@ -373,7 +372,7 @@ elaborateKind
   -> m SourceType
 elaborateKind = \case
   TypeLevelString ann _ ->
-    pure $ E.kindType $> ann
+    pure $ E.kindSymbol $> ann
   TypeConstructor ann v -> do
     env <- getEnv
     case M.lookup v (E.types env) of
@@ -425,15 +424,6 @@ kindOfWithUnknowns ty = do
   unks <- unknownsWithKinds . IS.toList $ unknowns ty'
   pure ((unks, ty'), kind)
 
-kindOfWithGeneralized
-  :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
-  => SourceType
-  -> m ([(Unknown, SourceType)], SourceType, SourceType, SourceType)
-kindOfWithGeneralized ty = do
-  (ty', kind) <- kindOf ty
-  unks <- unknownsWithKinds . IS.toList $ unknowns ty'
-  pure (unks, ty', generalizeUnknowns unks ty', kind)
-
 -- | Infer the kind of a single type
 kindOf
   :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
@@ -444,13 +434,12 @@ kindOf = fmap (first snd) . kindOfWithScopedVars
 -- | Infer the kind of a single type, returning the kinds of any scoped type variables
 kindOfWithScopedVars
   :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
-  => SourceType ->
-  m (([(Text, SourceType)], SourceType), SourceType)
+  => SourceType
+  -> m (([(Text, SourceType)], SourceType), SourceType)
 kindOfWithScopedVars ty = do
-  (ty', kind) <- bindTypes mempty $ inferKind ty
-  (binders, ty'') <- first sortCompleteBinderList . fromJust . completeBinderList <$> apply ty'
-  let ty''' = foldr (\(ann, (ident, k)) t -> ForAll ann ident (Just k) t Nothing) ty'' binders
-  ((fmap snd binders, ty'''),) <$> apply kind
+  (ty', kind) <- bitraverse apply apply =<< inferKind ty
+  let binders = fst . fromJust $ completeBinderList ty'
+  pure ((snd <$> binders, ty'), kind)
 
 type DataDeclarationArgs =
   ( SourceAnn

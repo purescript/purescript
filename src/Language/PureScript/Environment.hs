@@ -313,10 +313,6 @@ primTy = TypeConstructor nullSourceAnn . primName
 tyFunction :: SourceType
 tyFunction = primTy "Function"
 
--- | Type constructor for constrained values
-tyConstrainedValue :: SourceType
-tyConstrainedValue = primTy "ConstrainedValue"
-
 -- | Type constructor for strings
 tyString :: SourceType
 tyString = primTy "String"
@@ -397,8 +393,6 @@ primTypes =
     [ (primName "Type",             (kindType, ExternData))
     , (primName "Symbol",           (kindType, ExternData))
     , (primName "Row",              (kindType -:> kindType, ExternData))
-    , (primName "Constraint",       (kindType, ExternData))
-    , (primName "ConstrainedValue", (kindConstraint -:> kindType -:> kindType, ExternData))
     , (primName "Function",         (kindType -:> kindType -:> kindType, ExternData))
     , (primName "Array",            (kindType -:> kindType, ExternData))
     , (primName "Record",           (kindRow kindType -:> kindType, ExternData))

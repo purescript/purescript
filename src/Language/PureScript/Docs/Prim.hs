@@ -48,6 +48,7 @@ primDocsModule = Module
       , partial
       , kindType
       , kindSymbol
+      , kindRow
       ]
   , modReExports = []
   }
@@ -214,6 +215,12 @@ kindSymbol = primType "Symbol" $ T.unlines
   , ""
   , "Construct types of this kind using the same literal syntax as documented"
   , "for strings."
+  ]
+
+kindRow :: Declaration
+kindRow = primType "Row" $ T.unlines
+  [ "`Row` is the kind constructor of label-indexed types which map type-level strings to other types."
+  , "For example, the kind of `Record` is `Row Type -> Type`, mapping field names to values."
   ]
 
 function :: Declaration

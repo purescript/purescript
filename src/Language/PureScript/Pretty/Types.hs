@@ -45,7 +45,7 @@ data PrettyPrintType
   | PPTypeOp (Qualified (OpName 'TypeOpName))
   | PPSkolem Text Int
   | PPTypeApp PrettyPrintType PrettyPrintType
-  | PPKindApp PrettyPrintType PrettyPrintType
+  | PPKindArg PrettyPrintType
   | PPConstrainedType PrettyPrintConstraint PrettyPrintType
   | PPKindedType PrettyPrintType PrettyPrintType
   | PPBinaryNoParensType PrettyPrintType PrettyPrintType PrettyPrintType
@@ -81,10 +81,10 @@ convertPrettyPrintType = go
   go d ty@RCons{} = uncurry PPRow (goRow d ty)
   go d (ForAll _ v mbK ty _) = goForAll d [(v, fmap (go (d-1)) mbK)] ty
   go d (TypeApp _ a b) = goTypeApp d a b
-  go d (KindApp _ a b) = PPKindApp (go (d-1) a) (go (d-1) b)
+  go d (KindApp _ a b) = PPTypeApp (go (d-1) a) (PPKindArg (go (d-1) b))
 
   goForAll d vs (ForAll _ v mbK ty _) = goForAll d ((v, fmap (go (d-1)) mbK) : vs) ty
-  goForAll d vs ty = PPForAll vs (go (d-1) ty)
+  goForAll d vs ty = PPForAll (reverse vs) (go (d-1) ty)
 
   goRow d ty =
     let (items, tail_) = rowToSortedList ty
@@ -145,10 +145,10 @@ typeApp = mkPattern match
   match (PPTypeApp f x) = Just (f, x)
   match _ = Nothing
 
-kindApp :: Pattern () PrettyPrintType (PrettyPrintType, PrettyPrintType)
-kindApp = mkPattern match
+kindArg :: Pattern () PrettyPrintType ((), PrettyPrintType)
+kindArg = mkPattern match
   where
-  match (PPKindApp f x) = Just (f, x)
+  match (PPKindArg ty) = Just ((), ty)
   match _ = Nothing
 
 appliedFunction :: Pattern () PrettyPrintType (PrettyPrintType, PrettyPrintType)
@@ -203,9 +203,8 @@ matchType :: TypeRenderOptions -> Pattern () PrettyPrintType Box
 matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
   operators :: OperatorTable () PrettyPrintType Box
   operators =
-    OperatorTable [ [ AssocL kindApp $ \f x -> keepSingleLinesOr (moveRight 2) f (text "@" <> x)
-                    , AssocL typeApp $ \f x -> keepSingleLinesOr (moveRight 2) f x
-                    ]
+    OperatorTable [ [ Wrap kindArg $ \_ ty -> text "@" <> ty ]
+                  , [ AssocL typeApp $ \f x -> keepSingleLinesOr (moveRight 2) f x ]
                   , [ AssocR appliedFunction $ \arg ret -> keepSingleLinesOr id arg (text rightArrow <> " " <> ret) ]
                   , [ Wrap constrained $ \deps ty -> constraintsAsBox tro deps ty ]
                   , [ Wrap forall_ $ \idents ty -> keepSingleLinesOr (moveRight 2) (hsep 1 top (text forall' : fmap printMbKindedType idents) <> text ".") ty ]
@@ -230,7 +229,7 @@ matchType tro = buildPrettyPrinter operators (matchTypeAtom tro) where
 forall_ :: Pattern () PrettyPrintType ([(String, Maybe PrettyPrintType)], PrettyPrintType)
 forall_ = mkPattern match
   where
-  match (PPForAll idents ty) = Just (reverse $ map (\(v, mbK) -> (T.unpack v, mbK)) idents, ty)
+  match (PPForAll idents ty) = Just (map (\(v, mbK) -> (T.unpack v, mbK)) idents, ty)
   match _ = Nothing
 
 typeAtomAsBox' :: PrettyPrintType -> Box

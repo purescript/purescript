@@ -96,8 +96,10 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
       -- Recursively walk the type and prune used variables from `unused`
       go :: S.Set Text -> SourceType -> (S.Set Text, MultipleErrors)
       go unused (TypeVar _ v) = (S.delete v unused, mempty)
-      go unused (ForAll _ tv _ t1 _) =
-        let (nowUnused, errors) = go (S.insert tv unused) t1
+      go unused (ForAll _ tv mbK t1 _) =
+        let (nowUnused, errors)
+              | Just k <- mbK = go unused k `combine` go (S.insert tv unused) t1
+              | otherwise = go (S.insert tv unused) t1
             restoredUnused = if S.member tv unused then S.insert tv nowUnused else nowUnused
             combinedErrors = if S.member tv nowUnused then errors <> errorMessage' ss (UnusedTypeVar tv) else errors
         in (restoredUnused, combinedErrors)

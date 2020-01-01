@@ -92,10 +92,10 @@ typeApp = mkPattern match
   match (PPTypeApp f x) = Just (f, x)
   match _ = Nothing
 
-kindApp :: Pattern () PrettyPrintType (PrettyPrintType, PrettyPrintType)
-kindApp = mkPattern match
+kindArg :: Pattern () PrettyPrintType ((), PrettyPrintType)
+kindArg = mkPattern match
   where
-  match (PPKindApp f x) = Just (f, x)
+  match (PPKindArg ty) = Just ((), ty)
   match _ = Nothing
 
 appliedFunction :: Pattern () PrettyPrintType (PrettyPrintType, PrettyPrintType)
@@ -132,8 +132,8 @@ matchType = buildPrettyPrinter operators matchTypeAtom
   where
   operators :: OperatorTable () PrettyPrintType RenderedCode
   operators =
-    OperatorTable [ [ AssocL typeApp $ \f x -> f <> sp <> x ]
-                  , [ AssocL kindApp $ \f x -> f <> sp <> syntax "@(" <> x <> syntax ")" ] -- TODO
+    OperatorTable [ [ Wrap kindArg $ \_ ty -> syntax "@" <> ty ]
+                  , [ AssocL typeApp $ \f x -> f <> sp <> x ]
                   , [ AssocR appliedFunction $ \arg ret -> mintersperse sp [arg, syntax "->", ret] ]
                   , [ Wrap constrained $ \deps ty -> renderConstraints deps ty ]
                   , [ Wrap forall_ $ \tyVars ty -> mconcat [ keywordForall, sp, renderTypeVars tyVars, syntax ".", sp, ty ] ]

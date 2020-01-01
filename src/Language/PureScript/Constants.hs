@@ -390,14 +390,8 @@ pattern Record = Qualified (Just Prim) (ProperName "Record")
 pattern Type :: Qualified (ProperName 'TypeName)
 pattern Type = Qualified (Just Prim) (ProperName "Type")
 
-pattern Constraint :: Qualified (ProperName 'TypeName)
-pattern Constraint = Qualified (Just Prim) (ProperName "Constraint")
-
 pattern Function :: Qualified (ProperName 'TypeName)
 pattern Function = Qualified (Just Prim) (ProperName "Function")
-
-pattern ConstrainedValue :: Qualified (ProperName 'TypeName)
-pattern ConstrainedValue = Qualified (Just Prim) (ProperName "ConstrainedValue")
 
 pattern Array :: Qualified (ProperName 'TypeName)
 pattern Array = Qualified (Just Prim) (ProperName "Array")
@@ -517,9 +511,6 @@ row = "Row"
 
 constraint :: forall a. (IsString a) => a
 constraint = "Type"
-
-constrainedValue :: forall a. (IsString a) => a
-constrainedValue = "ConstrainedValue"
 
 -- Modules
 
