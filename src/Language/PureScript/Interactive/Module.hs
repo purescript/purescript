@@ -3,8 +3,10 @@ module Language.PureScript.Interactive.Module where
 import           Prelude.Compat
 
 import qualified Language.PureScript as P
+import qualified Language.PureScript.Options as POpts
 import qualified Language.PureScript.CST as CST
 import           Language.PureScript.Interactive.Types
+import qualified Data.Text as T
 import           System.Directory (getCurrentDirectory)
 import           System.FilePath (pathSeparator, makeRelative)
 import           System.IO.UTF8 (readUTF8FileT, readUTF8FilesT)
@@ -40,12 +42,12 @@ loadAllModules files = do
 -- |
 -- Makes a volatile module to execute the current expression.
 --
-createTemporaryModule :: Bool -> PSCiState -> P.Expr -> P.Module
-createTemporaryModule exec st val =
+createTemporaryModule :: POpts.CodegenTarget -> Bool -> PSCiState -> P.Expr -> P.Module
+createTemporaryModule cgt exec st val =
   let
     imports       = psciImportedModules st
     lets          = psciLetBindings st
-    moduleName    = P.ModuleName [P.ProperName "$PSCI"]
+    moduleName    = P.ModuleName [P.ProperName $ T.pack $ psciModuleName cgt]
     effModuleName = P.moduleNameFromString "Effect"
     effImport     = (effModuleName, P.Implicit, Just (P.ModuleName [P.ProperName "$Effect"]))
     supportImport = (fst (psciInteractivePrint st), P.Implicit, Just (P.ModuleName [P.ProperName "$Support"]))
@@ -70,12 +72,12 @@ createTemporaryModule exec st val =
 -- |
 -- Makes a volatile module to hold a non-qualified type synonym for a fully-qualified data type declaration.
 --
-createTemporaryModuleForKind :: PSCiState -> P.SourceType -> P.Module
-createTemporaryModuleForKind st typ =
+createTemporaryModuleForKind :: POpts.CodegenTarget -> PSCiState -> P.SourceType -> P.Module
+createTemporaryModuleForKind cgt st typ =
   let
     imports    = psciImportedModules st
     lets       = psciLetBindings st
-    moduleName = P.ModuleName [P.ProperName "$PSCI"]
+    moduleName = P.ModuleName [P.ProperName $ T.pack $ psciModuleName cgt]
     itDecl     = P.TypeSynonymDeclaration (internalSpan, []) (P.ProperName "IT") [] typ
   in
     P.Module internalSpan [] moduleName ((importDecl `map` imports) ++ lets ++ [itDecl]) Nothing
@@ -83,11 +85,11 @@ createTemporaryModuleForKind st typ =
 -- |
 -- Makes a volatile module to execute the current imports.
 --
-createTemporaryModuleForImports :: PSCiState -> P.Module
-createTemporaryModuleForImports st =
+createTemporaryModuleForImports :: POpts.CodegenTarget -> PSCiState -> P.Module
+createTemporaryModuleForImports cgt st =
   let
     imports    = psciImportedModules st
-    moduleName = P.ModuleName [P.ProperName "$PSCI"]
+    moduleName = P.ModuleName [P.ProperName $ T.pack $ psciModuleName cgt]
   in
     P.Module internalSpan [] moduleName (importDecl `map` imports) Nothing
 

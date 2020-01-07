@@ -3,6 +3,7 @@
 --
 module Language.PureScript.Interactive.Types
   ( PSCiConfig(..)
+  , psciModuleName
   , psciEnvironment
   , PSCiState -- constructor is not exported, to prevent psciImports and psciExports from
               -- becoming inconsistent with importedModules, letBindings and loadedExterns
@@ -32,19 +33,26 @@ module Language.PureScript.Interactive.Types
 import Prelude.Compat
 
 import qualified Language.PureScript as P
+import qualified Language.PureScript.Options as POpts
 import qualified Data.Map as M
 import           Data.List (foldl')
+import qualified Data.Text as T
 import           Language.PureScript.Sugar.Names.Env (nullImports, primExports)
 import           Control.Monad.Trans.Except (runExceptT)
 import           Control.Monad.Writer.Strict (runWriterT)
 
+psciModuleName :: POpts.CodegenTarget -> String
+psciModuleName POpts.CoreFn = "PSCI"
+psciModuleName _ = "$PSCI"
 
 -- | The PSCI configuration.
 --
 -- These configuration values do not change during execution.
 --
-newtype PSCiConfig = PSCiConfig
+data PSCiConfig = PSCiConfig
   { psciFileGlobs :: [String]
+  , psciCodegenTarget :: POpts.CodegenTarget
+  , psciModulesDir :: FilePath
   } deriving Show
 
 -- | The PSCI state.
@@ -83,10 +91,10 @@ psciImports :: PSCiState -> P.Imports
 psciImports (PSCiState _ _ _ _ x _) = x
 
 psciExports :: PSCiState -> P.Exports
-psciExports (PSCiState _ _ _ _ _ x) = x
+psciExports (PSCiState _ _ _ _ _ x ) = x
 
 initialPSCiState :: PSCiState
-initialPSCiState = PSCiState [] [] [] initialInteractivePrint nullImports primExports
+initialPSCiState = PSCiState [] [] [] initialInteractivePrint nullImports primExports 
 
 -- | The default interactive print function.
 initialInteractivePrint :: (P.ModuleName, P.Ident)
@@ -116,13 +124,13 @@ psciImportedModuleNames st =
 -- This function updates the Imports and Exports values in the PSCiState, which are used for
 -- handling completions. This function must be called whenever the PSCiState is modified to
 -- ensure that completions remain accurate.
-updateImportExports :: PSCiState -> PSCiState
-updateImportExports st@(PSCiState modules lets externs iprint _ _) =
+updateImportExports :: POpts.CodegenTarget -> PSCiState -> PSCiState
+updateImportExports cgt st@(PSCiState modules lets externs iprint _ _) =
   case desugarModule [temporaryModule] of
     Left _          -> st -- TODO: can this fail and what should we do?
     Right (env, _)  ->
       case M.lookup temporaryName env of
-        Just (_, is, es)  -> PSCiState modules lets externs iprint is es
+        Just (_, is, es)  -> PSCiState modules lets externs iprint is es 
         _                 -> st -- impossible
   where
 
@@ -131,7 +139,7 @@ updateImportExports st@(PSCiState modules lets externs iprint _ _) =
   hushWarnings  = fmap fst . runWriterT
 
   temporaryName :: P.ModuleName
-  temporaryName = P.ModuleName [P.ProperName "$PSCI"]
+  temporaryName = P.ModuleName [P.ProperName $ T.pack $ psciModuleName cgt ]
 
   temporaryModule :: P.Module
   temporaryModule =
@@ -148,19 +156,19 @@ updateImportExports st@(PSCiState modules lets externs iprint _ _) =
   internalSpan = P.internalModuleSourceSpan "<internal>"
 
 -- | Updates the imported modules in the state record.
-updateImportedModules :: ([ImportedModule] -> [ImportedModule]) -> PSCiState -> PSCiState
-updateImportedModules f (PSCiState x a b c d e) =
-  updateImportExports (PSCiState (f x) a b c d e)
+updateImportedModules :: POpts.CodegenTarget -> ([ImportedModule] -> [ImportedModule]) -> PSCiState -> PSCiState
+updateImportedModules cgt f (PSCiState x a b c d e) =
+  updateImportExports cgt (PSCiState (f x) a b c d e)
 
 -- | Updates the loaded externs files in the state record.
-updateLoadedExterns :: ([(P.Module, P.ExternsFile)] -> [(P.Module, P.ExternsFile)]) -> PSCiState -> PSCiState
-updateLoadedExterns f (PSCiState a b x c d e) =
-  updateImportExports (PSCiState a b (f x) c d e)
+updateLoadedExterns :: POpts.CodegenTarget -> ([(P.Module, P.ExternsFile)] -> [(P.Module, P.ExternsFile)]) -> PSCiState -> PSCiState
+updateLoadedExterns cgt f (PSCiState a b x c d e) =
+  updateImportExports cgt (PSCiState a b (f x) c d e)
 
 -- | Updates the let bindings in the state record.
-updateLets :: ([P.Declaration] -> [P.Declaration]) -> PSCiState -> PSCiState
-updateLets f (PSCiState a x b c d e) =
-  updateImportExports (PSCiState a (f x) b c d e)
+updateLets :: POpts.CodegenTarget -> ([P.Declaration] -> [P.Declaration]) -> PSCiState -> PSCiState
+updateLets cgt f (PSCiState a x b c d e) =
+  updateImportExports cgt (PSCiState a (f x) b c d e)
 
 -- | Replaces the interactive printing function in the state record with a new
 -- one.

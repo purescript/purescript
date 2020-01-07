@@ -28,6 +28,7 @@ import           Control.Monad.Trans.State.Strict (StateT, runStateT, evalStateT
 import           Control.Monad.Writer.Strict (Writer(), runWriter)
 
 import qualified Language.PureScript as P
+import qualified Language.PureScript.Options as POpts
 import qualified Language.PureScript.CST as CST
 import qualified Language.PureScript.Names as N
 import qualified Language.PureScript.Constants as C
@@ -52,21 +53,22 @@ printErrors errs = liftIO $ do
 
 -- | This is different than the runMake in 'Language.PureScript.Make' in that it specifies the
 -- options and ignores the warning messages.
-runMake :: P.Make a -> IO (Either P.MultipleErrors a)
-runMake mk = fst <$> P.runMake P.defaultOptions mk
+runMake :: POpts.CodegenTarget -> P.Make a -> IO (Either P.MultipleErrors a)
+runMake cgt mk = fst <$> P.runMake (POpts.Options False False (S.singleton cgt) ) mk
 
 -- | Rebuild a module, using the cached externs data for dependencies.
 rebuild
-  :: [P.ExternsFile]
+  :: FilePath
+  -> [P.ExternsFile]
   -> P.Module
   -> P.Make (P.ExternsFile, P.Environment)
-rebuild loadedExterns m = do
+rebuild modDir loadedExterns m = do
     externs <- P.rebuildModule buildActions loadedExterns m
     return (externs, foldl' (flip P.applyExternsFileToEnvironment) P.initEnvironment (loadedExterns ++ [externs]))
   where
     buildActions :: P.MakeActions P.Make
     buildActions =
-      (P.buildMakeActions modulesDir
+      (P.buildMakeActions modDir
                           filePathMap
                           M.empty
                           False) { P.progress = const (return ()) }
@@ -76,16 +78,17 @@ rebuild loadedExterns m = do
 
 -- | Build the collection of modules from scratch. This is usually done on startup.
 make
-  :: [(FilePath, CST.PartialResult P.Module)]
+  :: FilePath
+  -> [(FilePath, CST.PartialResult P.Module)]
   -> P.Make ([P.ExternsFile], P.Environment)
-make ms = do
+make modDir ms = do
     foreignFiles <- P.inferForeignModules filePathMap
     externs <- P.make (buildActions foreignFiles) (map snd ms)
     return (externs, foldl' (flip P.applyExternsFileToEnvironment) P.initEnvironment externs)
   where
     buildActions :: M.Map P.ModuleName FilePath -> P.MakeActions P.Make
     buildActions foreignFiles =
-      P.buildMakeActions modulesDir
+      P.buildMakeActions modDir
                          filePathMap
                          foreignFiles
                          False
@@ -123,17 +126,20 @@ handleReloadState
   => m ()
   -> m ()
 handleReloadState reload = do
-  modify $ updateLets (const [])
+  cgt <- asks psciCodegenTarget
+  modDir <- asks psciModulesDir
+  modify $ updateLets cgt (const [])
   globs <- asks psciFileGlobs
   files <- liftIO $ concat <$> traverse glob globs
   e <- runExceptT $ do
     modules <- ExceptT . liftIO $ loadAllModules files
-    (externs, _) <- ExceptT . liftIO . runMake . make $ fmap CST.pureResult <$> modules
+    (externs, _) <- ExceptT . liftIO . (runMake cgt) .
+                    (make modDir) $ fmap CST.pureResult <$> modules
     return (map snd modules, externs)
   case e of
     Left errs -> printErrors errs
     Right (modules, externs) -> do
-      modify (updateLoadedExterns (const (zip modules externs)))
+      modify (updateLoadedExterns cgt (const (zip modules externs)))
       reload
 
 -- | Clear the application state
@@ -142,7 +148,8 @@ handleClearState
   => m ()
   -> m ()
 handleClearState reload = do
-  modify $ updateImportedModules (const [])
+  cgt <- asks psciCodegenTarget
+  modify $ updateImportedModules cgt (const [])
   handleReloadState reload
 
 -- | Takes a value expression and evaluates it with the current state.
@@ -153,13 +160,19 @@ handleExpression
   -> m ()
 handleExpression evaluate val = do
   st <- get
-  let m = createTemporaryModule True st val
-  e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
+  cgt <- asks psciCodegenTarget
+  modDir <- asks psciModulesDir
+  let m = createTemporaryModule cgt True st val
+  e <- liftIO . (runMake cgt) $ rebuild modDir (map snd (psciLoadedExterns st)) m
   case e of
     Left errs -> printErrors errs
     Right _ -> do
-      js <- liftIO $ readFile (modulesDir </> "$PSCI" </> "index.js")
-      evaluate js
+      case cgt of
+        POpts.JS -> do
+          js <- liftIO $ readFile (modDir </> (psciModuleName cgt) </> "index.js")
+          evaluate js
+        _ -> do
+          evaluate ""
 
 -- |
 -- Takes a list of declarations and updates the environment, then run a make. If the declaration fails,
@@ -170,9 +183,11 @@ handleDecls
   => [P.Declaration]
   -> m ()
 handleDecls ds = do
-  st <- gets (updateLets (++ ds))
-  let m = createTemporaryModule False st (P.Literal P.nullSourceSpan (P.ObjectLiteral []))
-  e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
+  cgt <- asks psciCodegenTarget
+  modDir <- asks psciModulesDir
+  st <- gets (updateLets cgt (++ ds))
+  let m = createTemporaryModule cgt False st (P.Literal P.nullSourceSpan (P.ObjectLiteral []))
+  e <- liftIO . (runMake cgt) $ rebuild modDir (map snd (psciLoadedExterns st)) m
   case e of
     Left err -> printErrors err
     Right _ -> put st
@@ -254,12 +269,16 @@ handleImport
   => ImportedModule
   -> m ()
 handleImport im = do
-   st <- gets (updateImportedModules (im :))
-   let m = createTemporaryModuleForImports st
-   e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
+   cgt <- asks psciCodegenTarget
+   modDir <- asks psciModulesDir
+   st <- gets (updateImportedModules cgt (im :))
+   let m = createTemporaryModuleForImports cgt st
+   e <- liftIO . (runMake cgt) $ rebuild modDir (map snd (psciLoadedExterns st)) m
    case e of
      Left errs -> printErrors errs
      Right _  -> put st
+
+
 
 -- | Takes a value and prints its type
 handleTypeOf
@@ -269,12 +288,15 @@ handleTypeOf
   -> m ()
 handleTypeOf print' val = do
   st <- get
-  let m = createTemporaryModule False st val
-  e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
+  cgt <- asks psciCodegenTarget
+  modDir <- asks psciModulesDir
+  let m = createTemporaryModule cgt False st val
+  e <- liftIO . (runMake cgt) $ rebuild modDir (map snd (psciLoadedExterns st)) m
   case e of
     Left errs -> printErrors errs
     Right (_, env') ->
-      case M.lookup (P.mkQualified (P.Ident "it") (P.ModuleName [P.ProperName "$PSCI"])) (P.names env') of
+      case M.lookup (P.mkQualified (P.Ident "it")
+                     (P.ModuleName [P.ProperName $ T.pack $ psciModuleName cgt])) (P.names env') of
         Just (ty, _, _) -> print' . P.prettyPrintType maxBound $ ty
         Nothing -> print' "Could not find type"
 
@@ -286,9 +308,11 @@ handleKindOf
   -> m ()
 handleKindOf print' typ = do
   st <- get
-  let m = createTemporaryModuleForKind st typ
-      mName = P.ModuleName [P.ProperName "$PSCI"]
-  e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
+  cgt <- asks psciCodegenTarget
+  modDir <- asks psciModulesDir
+  let m = createTemporaryModuleForKind cgt st typ
+      mName = P.ModuleName [P.ProperName $ T.pack $ psciModuleName cgt]
+  e <- liftIO . (runMake cgt) $ rebuild modDir (map snd (psciLoadedExterns st)) m
   case e of
     Left errs -> printErrors errs
     Right (_, env') ->
@@ -344,7 +368,7 @@ handleComplete print' prefix = do
 -- only be updated if the interactive print function exists and appears to
 -- work; we test it by attempting to evaluate '0'.
 handleSetInteractivePrint
-  :: (MonadState PSCiState m, MonadIO m)
+  :: (MonadReader PSCiConfig m, MonadState PSCiState m, MonadIO m)
   => (String -> m ())
   -> (P.ModuleName, P.Ident)
   -> m ()
@@ -352,9 +376,11 @@ handleSetInteractivePrint print' new = do
   current <- gets psciInteractivePrint
   modify (setInteractivePrint new)
   st <- get
+  cgt <- asks psciCodegenTarget
+  modDir <- asks psciModulesDir
   let expr = P.Literal internalSpan (P.NumericLiteral (Left 0))
-  let m = createTemporaryModule True st expr
-  e <- liftIO . runMake $ rebuild (map snd (psciLoadedExterns st)) m
+  let m = createTemporaryModule cgt True st expr
+  e <- liftIO . (runMake cgt) $ rebuild modDir (map snd (psciLoadedExterns st)) m
   case e of
     Left errs -> do
       modify (setInteractivePrint current)

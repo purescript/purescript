@@ -38,6 +38,7 @@ import qualified Language.PureScript as P
 import qualified Language.PureScript.Bundle as Bundle
 import qualified Language.PureScript.CST as CST
 import           Language.PureScript.Interactive
+import qualified Language.PureScript.Options as POpts
 import           Network.HTTP.Types.Header (hContentType, hCacheControl,
                                             hPragma, hExpires)
 import           Network.HTTP.Types.Status (status200, status404, status503)
@@ -49,7 +50,8 @@ import qualified Options.Applicative as Opts
 import           System.Console.Haskeline
 import           System.IO.UTF8 (readUTF8File)
 import           System.Exit
-import           System.Directory (doesFileExist, getCurrentDirectory)
+import           System.Directory ( doesFileExist, getCurrentDirectory
+                                  , findExecutable)
 import           System.FilePath ((</>))
 import           System.FilePath.Glob (glob)
 import           System.Process (readProcessWithExitCode)
@@ -87,10 +89,34 @@ port = Opts.option Opts.auto $
   <> Opts.short 'p'
   <> Opts.help "The web server port"
 
+nativeEvalArgs :: Opts.Parser [String]
+nativeEvalArgs = Opts.option parser $
+     Opts.long "native-args"
+  <> Opts.metavar "ARGS"
+  <> Opts.value []
+  <> Opts.help "Arguments to be passed to the eval command, separated by spaces."
+  where
+    parser = words <$> Opts.str
+
+nativeEvalCmd :: Opts.Parser String
+nativeEvalCmd = Opts.strOption $
+     Opts.long "native-eval"
+  <> Opts.metavar "CMD"
+  <> Opts.help "Produce corefn output and trigger evaluation by given command CMD."
+
+nativeOutputDirectory :: Opts.Parser FilePath
+nativeOutputDirectory = Opts.strOption $
+     Opts.short 'o'
+  <> Opts.long "output"
+  <> Opts.value "output"
+  <> Opts.showDefault
+  <> Opts.help "The output directory for native target."
+
 backend :: Opts.Parser Backend
 backend =
   (browserBackend <$> port)
   <|> (nodeBackend <$> nodePathOption <*> nodeFlagsOption)
+  <|> (nativeBackend <$> nativeEvalCmd <*> nativeEvalArgs <*> nativeOutputDirectory)
 
 psciOptions :: Opts.Parser PSCiOptions
 psciOptions = PSCiOptions <$> many inputFile
@@ -130,7 +156,11 @@ indexPage = $(embedStringFile "app/static/index.html")
 
 -- | All of the functions required to implement a PSCi backend
 data Backend = forall state. Backend
-  { _backendSetup :: IO state
+  { _codegenTarget :: POpts.CodegenTarget
+  -- ^ Codegen Target for make
+  , _modulesDir :: FilePath
+  -- ^ output modules dir
+  , _backendSetup :: IO state
   -- ^ Initialize, and call the continuation when the backend is ready
   , _backendEval :: state -> String -> IO ()
   -- ^ Evaluate JavaScript code
@@ -161,7 +191,7 @@ data BrowserState = BrowserState
   }
 
 browserBackend :: Int -> Backend
-browserBackend serverPort = Backend setup evaluate reload shutdown
+browserBackend serverPort = Backend POpts.JS modulesDir setup evaluate reload shutdown
   where
     setup :: IO BrowserState
     setup = do
@@ -280,7 +310,7 @@ browserBackend serverPort = Backend setup evaluate reload shutdown
       putStrLn result
 
 nodeBackend :: Maybe FilePath -> [String] -> Backend
-nodeBackend nodePath nodeArgs = Backend setup eval reload shutdown
+nodeBackend nodePath nodeArgs = Backend POpts.JS modulesDir setup eval reload shutdown
   where
     setup :: IO ()
     setup = return ()
@@ -301,6 +331,27 @@ nodeBackend nodePath nodeArgs = Backend setup eval reload shutdown
     shutdown :: () -> IO ()
     shutdown _ = return ()
 
+nativeBackend :: String -> [String] -> FilePath -> Backend
+nativeBackend cmd args modDir = Backend POpts.CoreFn modDir setup eval reload shutdown
+  where
+    setup :: IO ()
+    setup = return ()
+
+    eval :: () -> String -> IO ()
+    eval _ _ = do
+      process <- findExecutable cmd 
+      result <- traverse (\p -> readProcessWithExitCode p args "") process
+      case result of
+        Just (ExitSuccess, out, _)   -> putStrLn out
+        Just (ExitFailure _, _, err) -> putStrLn err
+        Nothing                      -> putStrLn "Could not find native eval command."
+    
+    reload :: () -> IO ()
+    reload _ = return ()
+
+    shutdown :: () -> IO ()
+    shutdown _ = return ()
+
 options :: Opts.Parser PSCiOptions
 options = Opts.helper <*> psciOptions
 
@@ -310,7 +361,7 @@ command = loop <$> options
   where
     loop :: PSCiOptions -> IO ()
     loop PSCiOptions{..} = do
-        inputFiles <- concat <$> traverse glob psciInputGlob
+        inputFiles <- concat <$> traverse glob psciInputGlob        
         e <- runExceptT $ do
           modules <- ExceptT (loadAllModules inputFiles)
           when (null modules) . liftIO $ do
@@ -319,10 +370,12 @@ command = loop <$> options
           unless (supportModuleIsDefined (map (P.getModuleName . snd) modules)) . liftIO $ do
             putStr supportModuleMessage
             exitFailure
-          (externs, _) <- ExceptT . runMake . make $ fmap CST.pureResult <$> modules
+          (externs, _) <- ExceptT . (runMake $ _codegenTarget psciBackend)
+                          . (make $ _modulesDir psciBackend)
+                          $ fmap CST.pureResult <$> modules
           return (modules, externs)
         case psciBackend of
-          Backend setup eval reload (shutdown :: state -> IO ()) ->
+          Backend cgt modDir setup eval reload (shutdown :: state -> IO ()) ->
             case e of
               Left errs -> do
                 pwd <- getCurrentDirectory
@@ -330,8 +383,8 @@ command = loop <$> options
               Right (modules, externs) -> do
                 historyFilename <- getHistoryFilename
                 let settings = defaultSettings { historyFile = Just historyFilename }
-                    initialState = updateLoadedExterns (const (zip (map snd modules) externs)) initialPSCiState
-                    config = PSCiConfig psciInputGlob
+                    initialState = updateLoadedExterns cgt (const (zip (map snd modules) externs)) initialPSCiState
+                    config = PSCiConfig psciInputGlob cgt modDir
                     runner = flip runReaderT config
                              . flip evalStateT initialState
                              . runInputT (setComplete completion settings)
