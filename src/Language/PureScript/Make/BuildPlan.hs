@@ -29,6 +29,7 @@ import           Language.PureScript.Externs
 import           Language.PureScript.Make.Actions as Actions
 import           Language.PureScript.Make.Cache
 import           Language.PureScript.Names (ModuleName)
+import           Language.PureScript.Sugar.Names.Env
 
 -- | The BuildPlan tracks information about our build progress, and holds all
 -- prebuilt modules for incremental builds.
@@ -141,7 +142,7 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
   let toBeRebuilt = filter (not . flip M.member prebuilt) sortedModuleNames
   buildJobs <- foldM makeBuildJob M.empty toBeRebuilt
   pure
-    ( BuildPlan prebuilt buildJobs
+    ( BuildPlan prebuilt buildJobs 
     , let
         update = flip $ \s ->
           M.alter (const (statusNewCacheInfo s)) (statusModuleName s)

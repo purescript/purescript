@@ -2,6 +2,7 @@ module Language.PureScript.Make
   (
   -- * Make API
   rebuildModule
+  , rebuildModule'
   , make
   , inferForeignModules
   , module Monad
@@ -15,8 +16,10 @@ import           Control.Monad hiding (sequence)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.IO.Class
 import           Control.Monad.Supply
+import           Control.Monad.Supply.Class
 import           Control.Monad.Trans.Control (MonadBaseControl(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
+import           Control.Monad.Writer.Strict (runWriterT)
 import           Data.Function (on)
 import           Data.Foldable (for_)
 import           Data.List (foldl', sortBy)
@@ -50,20 +53,22 @@ import           System.FilePath (replaceExtension)
 -- | Rebuild a single module.
 --
 -- This function is used for fast-rebuild workflows (PSCi and psc-ide are examples).
-rebuildModule
+rebuildModule'
   :: forall m
    . (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => MakeActions m
   -> [ExternsFile]
   -> Module
   -> m ExternsFile
-rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
+rebuildModule' MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
   progress $ CompilingModule moduleName
   let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
       withPrim = importPrim m
+      silence = fmap fst . runWriterT
+  exEnv <- silence $ foldM externsEnv primEnv externs
   lint withPrim
   ((Module ss coms _ elaborated exps, env'), nextVar) <- runSupplyT 0 $ do
-    desugar externs [withPrim] >>= \case
+    desugar exEnv externs [withPrim] >>= \case
       [desugared] -> runCheck' (emptyCheckState env) $ typeCheckModule desugared
       _ -> internalError "desugar did not return a singleton"
 
@@ -88,7 +93,58 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
   -- a bug in the compiler, which should be reported as such.
   -- 2. We do not want to perform any extra work generating docs unless the
   -- user has asked for docs to be generated.
-  let docs = case Docs.convertModule externs env' m of
+  let docs = case Docs.convertModule externs exEnv env' m of
+               Left errs -> internalError $
+                 "Failed to produce docs for " ++ T.unpack (runModuleName moduleName)
+                 ++ "; details:\n" ++ prettyPrintMultipleErrors defaultPPEOptions errs
+               Right d -> d
+
+  evalSupplyT nextVar' $ codegen renamed docs exts
+  return exts
+
+-- | Rebuild a single module.
+--
+-- This function is used for fast-rebuild workflows (PSCi and psc-ide are examples).
+rebuildModule
+  :: forall m
+   . (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => MakeActions m
+  -> Env
+  -> [ExternsFile]
+  -> Module
+  -> m ExternsFile
+rebuildModule MakeActions{..} exEnv externs m@(Module _ _ moduleName _ _) = do
+  progress $ CompilingModule moduleName
+  let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
+      withPrim = importPrim m
+  lint withPrim
+  ((Module ss coms _ elaborated exps, env'), nextVar) <- runSupplyT 0 $ do
+    desugar exEnv externs [withPrim] >>= \case
+      [desugared] -> runCheck' (emptyCheckState env) $ typeCheckModule desugared
+      _ -> internalError "desugar did not return a singleton"
+
+  -- desugar case declarations *after* type- and exhaustiveness checking
+  -- since pattern guards introduces cases which the exhaustiveness checker
+  -- reports as not-exhaustive.
+  (deguarded, nextVar') <- runSupplyT nextVar $ do
+    desugarCaseGuards elaborated
+
+  regrouped <- createBindingGroups moduleName . collapseBindingGroups $ deguarded
+  let mod' = Module ss coms moduleName regrouped exps
+      corefn = CF.moduleToCoreFn env' mod'
+      optimized = CF.optimizeCoreFn corefn
+      [renamed] = renameInModules [optimized]
+      exts = moduleToExternsFile mod' env'
+  ffiCodegen renamed
+
+  -- It may seem more obvious to write `docs <- Docs.convertModule m env' here,
+  -- but I have not done so for two reasons:
+  -- 1. This should never fail; any genuine errors in the code should have been
+  -- caught earlier in this function. Therefore if we do fail here it indicates
+  -- a bug in the compiler, which should be reported as such.
+  -- 2. We do not want to perform any extra work generating docs unless the
+  -- user has asked for docs to be generated.
+  let docs = case Docs.convertModule externs exEnv env' m of
                Left errs -> internalError $
                  "Failed to produce docs for " ++ T.unpack (runModuleName moduleName)
                  ++ "; details:\n" ++ prettyPrintMultipleErrors defaultPPEOptions errs
@@ -108,6 +164,7 @@ make :: forall m. (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, 
 make ma@MakeActions{..} ms = do
   checkModuleNames
   cacheDb <- readCacheDb
+  env <- C.newMVar primEnv
 
   (sorted, graph) <- sortModules (moduleSignature . CST.resPartial) ms
 
@@ -117,9 +174,9 @@ make ma@MakeActions{..} ms = do
   for_ toBeRebuilt $ \m -> fork $ do
     let moduleName = getModuleName . CST.resPartial $ m
     let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
-    buildModule buildPlan moduleName
+    buildModule env buildPlan moduleName
       (spanName . getModuleSourceSpan . CST.resPartial $ m)
-      (importPrim <$> CST.resFull m)
+      (CST.resFull m)
       (deps `inOrderOf` map (getModuleName . CST.resPartial) sorted)
 
   -- Wait for all threads to complete, and collect results (and errors).
@@ -181,8 +238,8 @@ make ma@MakeActions{..} ms = do
   inOrderOf :: (Ord a) => [a] -> [a] -> [a]
   inOrderOf xs ys = let s = S.fromList xs in filter (`S.member` s) ys
 
-  buildModule :: BuildPlan -> ModuleName -> FilePath -> Either (NEL.NonEmpty CST.ParserError) Module -> [ModuleName] -> m ()
-  buildModule buildPlan moduleName fp mres deps = do
+  buildModule :: C.MVar Env -> BuildPlan -> ModuleName -> FilePath -> Either (NEL.NonEmpty CST.ParserError) Module -> [ModuleName] -> m ()
+  buildModule env buildPlan moduleName fp mres deps = do
     result <- flip catchError (return . BuildJobFailed) $ do
       m <- CST.unwrapParserError fp mres
       -- We need to wait for dependencies to be built, before checking if the current
@@ -192,7 +249,9 @@ make ma@MakeActions{..} ms = do
 
       case mexterns of
         Just (_, externs) -> do
-          (exts, warnings) <- listen $ rebuildModule ma externs m
+          exEnv <- C.readMVar env
+          (exts, warnings) <- listen $ rebuildModule ma exEnv externs m
+          C.modifyMVar_ env (\exEnv' -> externsEnv exEnv' exts)
           return $ BuildJobSucceeded warnings exts
         Nothing -> return BuildJobSkipped
 

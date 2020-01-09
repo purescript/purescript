@@ -62,31 +62,32 @@ data PSCiState = PSCiState
   [ImportedModule]
   [P.Declaration]
   [(P.Module, P.ExternsFile)]
+  P.Env
   (P.ModuleName, P.Ident)
   P.Imports
   P.Exports
   deriving Show
 
 psciImportedModules :: PSCiState -> [ImportedModule]
-psciImportedModules (PSCiState x _ _ _ _ _) = x
+psciImportedModules (PSCiState x _ _ _ _ _ _) = x
 
 psciLetBindings :: PSCiState -> [P.Declaration]
-psciLetBindings (PSCiState _ x _ _ _ _) = x
+psciLetBindings (PSCiState _ x _ _ _ _ _) = x
 
 psciLoadedExterns :: PSCiState -> [(P.Module, P.ExternsFile)]
-psciLoadedExterns (PSCiState _ _ x _ _ _) = x
+psciLoadedExterns (PSCiState _ _ x _ _ _ _) = x
 
 psciInteractivePrint :: PSCiState -> (P.ModuleName, P.Ident)
-psciInteractivePrint (PSCiState _ _ _ x _ _) = x
+psciInteractivePrint (PSCiState _ _ _ _ x _ _) = x
 
 psciImports :: PSCiState -> P.Imports
-psciImports (PSCiState _ _ _ _ x _) = x
+psciImports (PSCiState _ _ _ _ _ x _) = x
 
 psciExports :: PSCiState -> P.Exports
-psciExports (PSCiState _ _ _ _ _ x) = x
+psciExports (PSCiState _ _ _ _ _ _ x) = x
 
 initialPSCiState :: PSCiState
-initialPSCiState = PSCiState [] [] [] initialInteractivePrint nullImports primExports
+initialPSCiState = PSCiState [] [] [] P.primEnv initialInteractivePrint nullImports primExports
 
 -- | The default interactive print function.
 initialInteractivePrint :: (P.ModuleName, P.Ident)
@@ -117,17 +118,17 @@ psciImportedModuleNames st =
 -- handling completions. This function must be called whenever the PSCiState is modified to
 -- ensure that completions remain accurate.
 updateImportExports :: PSCiState -> PSCiState
-updateImportExports st@(PSCiState modules lets externs iprint _ _) =
+updateImportExports st@(PSCiState modules lets externs exEnv iprint _ _) = do
   case desugarModule [temporaryModule] of
     Left _          -> st -- TODO: can this fail and what should we do?
     Right (env, _)  ->
       case M.lookup temporaryName env of
-        Just (_, is, es)  -> PSCiState modules lets externs iprint is es
+        Just (_, is, es)  -> PSCiState modules lets externs exEnv iprint is es
         _                 -> st -- impossible
   where
 
   desugarModule :: [P.Module] -> Either P.MultipleErrors (P.Env, [P.Module])
-  desugarModule = runExceptT =<< hushWarnings . P.desugarImportsWithEnv (map snd externs)
+  desugarModule = runExceptT =<< hushWarnings . P.desugarImportsWithEnv exEnv
   hushWarnings  = fmap fst . runWriterT
 
   temporaryName :: P.ModuleName
@@ -149,24 +150,24 @@ updateImportExports st@(PSCiState modules lets externs iprint _ _) =
 
 -- | Updates the imported modules in the state record.
 updateImportedModules :: ([ImportedModule] -> [ImportedModule]) -> PSCiState -> PSCiState
-updateImportedModules f (PSCiState x a b c d e) =
-  updateImportExports (PSCiState (f x) a b c d e)
+updateImportedModules g (PSCiState x a b c d e f) =
+  updateImportExports (PSCiState (g x) a b c d e f)
 
 -- | Updates the loaded externs files in the state record.
 updateLoadedExterns :: ([(P.Module, P.ExternsFile)] -> [(P.Module, P.ExternsFile)]) -> PSCiState -> PSCiState
-updateLoadedExterns f (PSCiState a b x c d e) =
-  updateImportExports (PSCiState a b (f x) c d e)
+updateLoadedExterns g (PSCiState a b x c d e f) =
+  updateImportExports (PSCiState a b (g x) c d e f)
 
 -- | Updates the let bindings in the state record.
 updateLets :: ([P.Declaration] -> [P.Declaration]) -> PSCiState -> PSCiState
-updateLets f (PSCiState a x b c d e) =
-  updateImportExports (PSCiState a (f x) b c d e)
+updateLets g (PSCiState a x b c d e f) =
+  updateImportExports (PSCiState a (g x) b c d e f)
 
 -- | Replaces the interactive printing function in the state record with a new
 -- one.
 setInteractivePrint :: (P.ModuleName, P.Ident) -> PSCiState -> PSCiState
-setInteractivePrint iprint (PSCiState a b c _ d e) =
-  PSCiState a b c iprint d e
+setInteractivePrint iprint (PSCiState a b c d _ e f) =
+  PSCiState a b c d iprint e f
 
 -- * Commands
 

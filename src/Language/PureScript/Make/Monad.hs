@@ -24,6 +24,9 @@ import           Control.Monad.Base (MonadBase(..))
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger
+import           Control.Monad.State
+import           Control.Monad.Supply
+import           Control.Monad.Supply.Class
 import           Control.Monad.Reader (MonadReader(..), ReaderT(..))
 import           Control.Monad.Trans.Control (MonadBaseControl(..))
 import           Control.Monad.Trans.Except
