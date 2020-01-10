@@ -2,7 +2,6 @@ module Language.PureScript.Make
   (
   -- * Make API
   rebuildModule
-  , rebuildModule'
   , make
   , inferForeignModules
   , module Monad
@@ -52,59 +51,20 @@ import           System.FilePath (replaceExtension)
 -- | Rebuild a single module.
 --
 -- This function is used for fast-rebuild workflows (PSCi and psc-ide are examples).
-rebuildModule'
+rebuildModule
   :: forall m
    . (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => MakeActions m
   -> [ExternsFile]
   -> Module
   -> m ExternsFile
-rebuildModule' MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
-  progress $ CompilingModule moduleName
-  let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
-      withPrim = importPrim m
-      silence = fmap fst . runWriterT
-  exEnv <- silence $ foldM externsEnv primEnv externs
-  lint withPrim
-  ((Module ss coms _ elaborated exps, env'), nextVar) <- runSupplyT 0 $ do
-    desugar exEnv externs [withPrim] >>= \case
-      [desugared] -> runCheck' (emptyCheckState env) $ typeCheckModule desugared
-      _ -> internalError "desugar did not return a singleton"
+rebuildModule actions externs m = do
+  let
+    silence = fmap fst . runWriterT
+  env <- silence $ foldM externsEnv primEnv externs
+  rebuildModule' actions env externs m
 
-  -- desugar case declarations *after* type- and exhaustiveness checking
-  -- since pattern guards introduces cases which the exhaustiveness checker
-  -- reports as not-exhaustive.
-  (deguarded, nextVar') <- runSupplyT nextVar $ do
-    desugarCaseGuards elaborated
-
-  regrouped <- createBindingGroups moduleName . collapseBindingGroups $ deguarded
-  let mod' = Module ss coms moduleName regrouped exps
-      corefn = CF.moduleToCoreFn env' mod'
-      optimized = CF.optimizeCoreFn corefn
-      [renamed] = renameInModules [optimized]
-      exts = moduleToExternsFile mod' env'
-  ffiCodegen renamed
-
-  -- It may seem more obvious to write `docs <- Docs.convertModule m env' here,
-  -- but I have not done so for two reasons:
-  -- 1. This should never fail; any genuine errors in the code should have been
-  -- caught earlier in this function. Therefore if we do fail here it indicates
-  -- a bug in the compiler, which should be reported as such.
-  -- 2. We do not want to perform any extra work generating docs unless the
-  -- user has asked for docs to be generated.
-  let docs = case Docs.convertModule externs exEnv env' m of
-               Left errs -> internalError $
-                 "Failed to produce docs for " ++ T.unpack (runModuleName moduleName)
-                 ++ "; details:\n" ++ prettyPrintMultipleErrors defaultPPEOptions errs
-               Right d -> d
-
-  evalSupplyT nextVar' $ codegen renamed docs exts
-  return exts
-
--- | Rebuild a single module.
---
--- This function is used for fast-rebuild workflows (PSCi and psc-ide are examples).
-rebuildModule
+rebuildModule'
   :: forall m
    . (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => MakeActions m
@@ -112,7 +72,7 @@ rebuildModule
   -> [ExternsFile]
   -> Module
   -> m ExternsFile
-rebuildModule MakeActions{..} exEnv externs m@(Module _ _ moduleName _ _) = do
+rebuildModule' MakeActions{..} exEnv externs m@(Module _ _ moduleName _ _) = do
   progress $ CompilingModule moduleName
   let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
       withPrim = importPrim m
@@ -172,7 +132,6 @@ make ma@MakeActions{..} ms = do
   for_ toBeRebuilt $ \m -> fork $ do
     let moduleName = getModuleName . CST.resPartial $ m
     let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
-
     buildModule buildPlan moduleName
       (spanName . getModuleSourceSpan . CST.resPartial $ m)
       (importPrim <$> CST.resFull m)
@@ -259,7 +218,7 @@ make ma@MakeActions{..} ms = do
                 _ -> return e
             foldM go env deps
           env <- C.readMVar (bpEnv buildPlan)
-          (exts, warnings) <- listen $ rebuildModule ma env externs m
+          (exts, warnings) <- listen $ rebuildModule' ma env externs m
           return $ BuildJobSucceeded warnings exts
         Nothing -> return BuildJobSkipped
 

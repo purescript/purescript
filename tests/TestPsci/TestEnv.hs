@@ -43,7 +43,7 @@ initTestPSCiEnv = do
       makeResultOrError <- runMake . make $ fmap CST.pureResult <$> modules
       case makeResultOrError of
         Left errs -> putStrLn (P.prettyPrintMultipleErrors P.defaultPPEOptions errs) >> exitFailure
-        Right (externs, _) -> do
+        Right (externs, _) ->
           return (updateLoadedExterns (const (zip (map snd modules) externs)) initialPSCiState, PSCiConfig pursFiles)
 
 -- | Execute a TestPSCi, returning IO

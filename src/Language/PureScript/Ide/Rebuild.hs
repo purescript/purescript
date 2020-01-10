@@ -72,7 +72,7 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
   (result, warnings) <- logPerf (labelTimespec "Rebuilding Module") $
     liftIO
     . P.runMake (P.defaultOptions { P.optionsCodegenTargets = codegenTargets })
-    . P.rebuildModule' (buildMakeActions
+    . P.rebuildModule (buildMakeActions
                         >>= shushProgress $ makeEnv) externs $ m
   case result of
     Left errors -> throwError (RebuildError errors)
@@ -121,7 +121,7 @@ rebuildModuleOpen
 rebuildModuleOpen makeEnv externs m = void $ runExceptT $ do
   (openResult, _) <- liftIO
     . P.runMake P.defaultOptions
-    . P.rebuildModule' (buildMakeActions
+    . P.rebuildModule (buildMakeActions
                        >>= shushProgress
                        >>= shushCodegen
                        $ makeEnv) externs $ openModuleExports m

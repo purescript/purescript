@@ -114,30 +114,27 @@ psciImportedModuleNames st =
 
 -- * State helpers
 
-
 -- This function updates the Imports and Exports values in the PSCiState, which are used for
 -- handling completions. This function must be called whenever the PSCiState is modified to
 -- ensure that completions remain accurate.
 updateImportExports :: PSCiState -> PSCiState
 updateImportExports st@(PSCiState modules lets externs iprint _ _) = do
-  case createEnv (map snd externs) of
-    Left _ -> st
-    Right e ->
-      case desugarModule e [temporaryModule] of
-        Left _          -> st -- TODO: can this fail and what should we do?
-        Right (env, _)  ->
-          case M.lookup temporaryName env of
-            Just (_, is, es)  -> PSCiState modules lets externs iprint is es
-            _                 -> st -- impossible
+  case createEnv (map snd externs) >>= flip desugarModule [temporaryModule] of
+    Left _          -> st -- TODO: can this fail and what should we do?
+    Right (env, _)  ->
+      case M.lookup temporaryName env of
+        Just (_, is, es)  -> PSCiState modules lets externs iprint is es
+        _                 -> st -- impossible
   where
 
   desugarModule :: P.Env -> [P.Module] -> Either P.MultipleErrors (P.Env, [P.Module])
-  desugarModule e = runExceptT =<< hushWarnings . P.desugarImportsWithEnv e
+  desugarModule e = runExceptT =<< hushModuleWarnings . P.desugarImportsWithEnv e
 
   createEnv :: [P.ExternsFile] -> Either P.MultipleErrors P.Env
-  createEnv = runExceptT =<< fmap fst . runWriterT . foldM P.externsEnv P.primEnv
+  createEnv = runExceptT =<< hushEnvWarnings . foldM P.externsEnv P.primEnv
 
-  hushWarnings  = fmap fst . runWriterT
+  hushModuleWarnings  = fmap fst . runWriterT
+  hushEnvWarnings  = fmap fst . runWriterT
 
   temporaryName :: P.ModuleName
   temporaryName = P.ModuleName [P.ProperName "$PSCI"]
@@ -158,18 +155,18 @@ updateImportExports st@(PSCiState modules lets externs iprint _ _) = do
 
 -- | Updates the imported modules in the state record.
 updateImportedModules :: ([ImportedModule] -> [ImportedModule]) -> PSCiState -> PSCiState
-updateImportedModules g (PSCiState x a b c d e) =
-  updateImportExports (PSCiState (g x) a b c d e)
+updateImportedModules f (PSCiState x a b c d e) =
+  updateImportExports (PSCiState (f x) a b c d e)
 
 -- | Updates the loaded externs files in the state record.
 updateLoadedExterns :: ([(P.Module, P.ExternsFile)] -> [(P.Module, P.ExternsFile)]) -> PSCiState -> PSCiState
-updateLoadedExterns g (PSCiState a b x c d e) =
-  updateImportExports (PSCiState a b (g x) c d e)
+updateLoadedExterns f (PSCiState a b x c d e) =
+  updateImportExports (PSCiState a b (f x) c d e)
 
 -- | Updates the let bindings in the state record.
 updateLets :: ([P.Declaration] -> [P.Declaration]) -> PSCiState -> PSCiState
-updateLets g (PSCiState a x b c d e) =
-  updateImportExports (PSCiState a (g x) b c d e)
+updateLets f (PSCiState a x b c d e) =
+  updateImportExports (PSCiState a (f x) b c d e)
 
 -- | Replaces the interactive printing function in the state record with a new
 -- one.

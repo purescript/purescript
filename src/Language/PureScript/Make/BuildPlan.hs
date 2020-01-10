@@ -1,5 +1,5 @@
 module Language.PureScript.Make.BuildPlan
-  ( BuildPlan(..)
+  ( BuildPlan(bpEnv)
   , BuildJobResult(..)
   , buildJobSuccess
   , buildJobFailure
@@ -8,7 +8,6 @@ module Language.PureScript.Make.BuildPlan
   , collectResults
   , markComplete
   , needsRebuild
-  , Prebuilt(..)
   ) where
 
 import           Prelude

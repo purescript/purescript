@@ -174,7 +174,7 @@ compile supportModules supportExterns supportForeigns inputFiles check = runTest
   liftIO (check (map snd ms))
   let actions = makeActions supportModules (foreigns `M.union` supportForeigns)
   case ms of
-    [singleModule] -> pure <$> P.rebuildModule' actions supportExterns (snd singleModule)
+    [singleModule] -> pure <$> P.rebuildModule actions supportExterns (snd singleModule)
     _ -> P.make actions (CST.pureResult <$> supportModules ++ map snd ms)
 
 assert

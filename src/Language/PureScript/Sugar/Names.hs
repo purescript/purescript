@@ -52,17 +52,13 @@ desugarImports env modules =
 desugarImportsWithEnv
   :: forall m
   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
-  => Env --[ExternsFile]
+  => Env
   -> [Module]
   -> m (Env, [Module])
 desugarImportsWithEnv e modules = do
-  --env <- silence $ foldM externsEnv primEnv externs
   (modules', env') <- first reverse <$> foldM updateEnv ([], e) modules
   (env',) <$> traverse (renameInModule' env') modules'
   where
---  silence :: m a -> m a
---  silence = censor (const mempty)
-
   updateEnv :: ([Module], Env) -> Module -> m ([Module], Env)
   updateEnv (ms, env) m@(Module ss _ mn _ refs) = do
     members <- findExportable m
