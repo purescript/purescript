@@ -6,10 +6,9 @@ import Prelude ()
 import Prelude.Compat
 
 import           Control.Exception.Lifted (bracket_)
-import           Control.Monad (void, when, foldM)
+import           Control.Monad (void, when)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Trans.RWS.Strict (evalRWST, asks, local, RWST)
-import           Control.Monad.Writer.Strict (runWriterT)
 import           Data.Foldable (traverse_)
 import           Data.List (isSuffixOf)
 import qualified Data.Text as T

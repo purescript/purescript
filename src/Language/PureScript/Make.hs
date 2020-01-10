@@ -16,7 +16,6 @@ import           Control.Monad hiding (sequence)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.IO.Class
 import           Control.Monad.Supply
-import           Control.Monad.Supply.Class
 import           Control.Monad.Trans.Control (MonadBaseControl(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
 import           Control.Monad.Writer.Strict (runWriterT)
