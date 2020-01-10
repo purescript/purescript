@@ -128,13 +128,10 @@ updateImportExports st@(PSCiState modules lets externs iprint _ _) =
   where
 
   desugarModule :: P.Env -> [P.Module] -> Either P.MultipleErrors (P.Env, [P.Module])
-  desugarModule e = runExceptT =<< hushModuleWarnings . P.desugarImportsWithEnv e
+  desugarModule e = runExceptT =<< fmap fst . runWriterT . P.desugarImportsWithEnv e
 
   createEnv :: [P.ExternsFile] -> Either P.MultipleErrors P.Env
-  createEnv = runExceptT =<< hushEnvWarnings . foldM P.externsEnv P.primEnv
-
-  hushModuleWarnings  = fmap fst . runWriterT
-  hushEnvWarnings  = fmap fst . runWriterT
+  createEnv = runExceptT =<< fmap fst . runWriterT . foldM P.externsEnv P.primEnv
 
   temporaryName :: P.ModuleName
   temporaryName = P.ModuleName [P.ProperName "$PSCI"]

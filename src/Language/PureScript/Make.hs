@@ -59,9 +59,7 @@ rebuildModule
   -> Module
   -> m ExternsFile
 rebuildModule actions externs m = do
-  let
-    silence = fmap fst . runWriterT
-  env <- silence $ foldM externsEnv primEnv externs
+  env <- fmap fst . runWriterT $ foldM externsEnv primEnv externs
   rebuildModule' actions env externs m
 
 rebuildModule'
