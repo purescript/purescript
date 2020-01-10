@@ -118,7 +118,7 @@ psciImportedModuleNames st =
 -- handling completions. This function must be called whenever the PSCiState is modified to
 -- ensure that completions remain accurate.
 updateImportExports :: PSCiState -> PSCiState
-updateImportExports st@(PSCiState modules lets externs iprint _ _) = do
+updateImportExports st@(PSCiState modules lets externs iprint _ _) =
   case createEnv (map snd externs) >>= flip desugarModule [temporaryModule] of
     Left _          -> st -- TODO: can this fail and what should we do?
     Right (env, _)  ->

@@ -17,7 +17,7 @@ import Control.Arrow (first)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Lazy
-import Control.Monad.Writer (MonadWriter(..)) --, censor
+import Control.Monad.Writer (MonadWriter(..))
 
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M

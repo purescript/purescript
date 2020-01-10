@@ -137,7 +137,6 @@ make ma@MakeActions{..} ms = do
       (importPrim <$> CST.resFull m)
       (deps `inOrderOf` map (getModuleName . CST.resPartial) sorted)
 
-
   -- Wait for all threads to complete, and collect results (and errors).
   (failures, successes) <-
     let
