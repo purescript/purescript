@@ -163,28 +163,20 @@ make :: forall m. (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, 
 make ma@MakeActions{..} ms = do
   checkModuleNames
   cacheDb <- readCacheDb
-  env <- C.newMVar primEnv
 
   (sorted, graph) <- sortModules (moduleSignature . CST.resPartial) ms
 
   (buildPlan, newCacheDb) <- BuildPlan.construct ma cacheDb (sorted, graph)
 
-  for_ sorted $ \m -> fork $ do
+  let toBeRebuilt = filter (BuildPlan.needsRebuild buildPlan . getModuleName . CST.resPartial) sorted
+  for_ toBeRebuilt $ \m -> fork $ do
     let moduleName = getModuleName . CST.resPartial $ m
     let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
 
-    if BuildPlan.needsRebuild buildPlan moduleName
-      then do
-        buildModule env buildPlan moduleName
-          (spanName . getModuleSourceSpan . CST.resPartial $ m)
-          (importPrim <$> CST.resFull m)
-          (deps `inOrderOf` map (getModuleName . CST.resPartial) sorted)
-      else do
-        _ <- traverse (getEnvResult buildPlan) deps
-        for_ (M.lookup moduleName (bpPrebuilt buildPlan)) $ \(Prebuilt _ externs) -> do
-          C.modifyMVar_ env (\exEnv' -> externsEnv exEnv' externs)
-          for_ (M.lookup moduleName (bpBuildEnv buildPlan)) $ \envJob -> do
-            C.putMVar envJob ()
+    buildModule buildPlan moduleName
+      (spanName . getModuleSourceSpan . CST.resPartial $ m)
+      (importPrim <$> CST.resFull m)
+      (deps `inOrderOf` map (getModuleName . CST.resPartial) sorted)
 
 
   -- Wait for all threads to complete, and collect results (and errors).
@@ -246,24 +238,28 @@ make ma@MakeActions{..} ms = do
   inOrderOf :: (Ord a) => [a] -> [a] -> [a]
   inOrderOf xs ys = let s = S.fromList xs in filter (`S.member` s) ys
 
-  buildModule :: C.MVar Env -> BuildPlan -> ModuleName -> FilePath -> Either (NEL.NonEmpty CST.ParserError) Module -> [ModuleName] -> m ()
-  buildModule env buildPlan moduleName fp mres deps = do
+  buildModule :: BuildPlan -> ModuleName -> FilePath -> Either (NEL.NonEmpty CST.ParserError) Module -> [ModuleName] -> m ()
+  buildModule buildPlan moduleName fp mres deps = do
     result <- flip catchError (return . BuildJobFailed) $ do
       m <- CST.unwrapParserError fp mres
       -- We need to wait for dependencies to be built, before checking if the current
       -- module should be rebuilt, so the first thing to do is to wait on the
       -- MVars for the module's dependencies.
       mexterns <- fmap unzip . sequence <$> traverse (getResult buildPlan) deps
-      _ <- traverse (getEnvResult buildPlan) deps
-
-      exEnv <- C.readMVar env
 
       case mexterns of
         Just (_, externs) -> do
-          (exts, warnings) <- listen $ rebuildModule ma exEnv externs m
-          C.modifyMVar_ env (\exEnv' -> externsEnv exEnv' exts)
-          for_ (M.lookup moduleName (bpBuildEnv buildPlan)) $ \envJob -> do
-            C.putMVar envJob ()
+          -- We need to ensure that all dependencies have been included in Env
+          C.modifyMVar_ (bpEnv buildPlan) $ \env -> do
+            let
+              go :: Env -> ModuleName -> m Env
+              go e dep = case lookup dep (zip deps externs) of
+                Just exts
+                  | not (M.member dep e) -> externsEnv e exts
+                _ -> return e
+            foldM go env deps
+          env <- C.readMVar (bpEnv buildPlan)
+          (exts, warnings) <- listen $ rebuildModule ma env externs m
           return $ BuildJobSucceeded warnings exts
         Nothing -> return BuildJobSkipped
 
