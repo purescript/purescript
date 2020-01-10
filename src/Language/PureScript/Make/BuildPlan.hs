@@ -1,13 +1,15 @@
 module Language.PureScript.Make.BuildPlan
-  ( BuildPlan()
+  ( BuildPlan(..)
   , BuildJobResult(..)
   , buildJobSuccess
   , buildJobFailure
   , construct
+  , getEnvResult
   , getResult
   , collectResults
   , markComplete
   , needsRebuild
+  , Prebuilt(..)
   ) where
 
 import           Prelude
@@ -36,6 +38,7 @@ import           Language.PureScript.Sugar.Names.Env
 data BuildPlan = BuildPlan
   { bpPrebuilt :: M.Map ModuleName Prebuilt
   , bpBuildJobs :: M.Map ModuleName BuildJob
+  , bpBuildEnv :: M.Map ModuleName (C.MVar ())
   }
 
 data Prebuilt = Prebuilt
@@ -123,6 +126,14 @@ getResult buildPlan moduleName =
       r <- readMVar $ bjResult $ fromMaybe (internalError "make: no barrier") $ M.lookup moduleName (bpBuildJobs buildPlan)
       pure $ buildJobSuccess r
 
+getEnvResult
+  :: (MonadBaseControl IO m)
+  => BuildPlan
+  -> ModuleName
+  -> m ()
+getEnvResult buildPlan moduleName = do
+  readMVar $ fromMaybe (internalError "make: no barrier") $ M.lookup moduleName (bpBuildEnv buildPlan)
+
 -- | Constructs a BuildPlan for the given module graph.
 --
 -- The given MakeActions are used to collect various timestamps in order to
@@ -141,8 +152,9 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
           mapMaybe (\s -> (statusModuleName s, statusRebuildNever s,) <$> statusPrebuilt s) rebuildStatuses
   let toBeRebuilt = filter (not . flip M.member prebuilt) sortedModuleNames
   buildJobs <- foldM makeBuildJob M.empty toBeRebuilt
+  envJobs <- foldM makeEnvJob M.empty sortedModuleNames
   pure
-    ( BuildPlan prebuilt buildJobs 
+    ( BuildPlan prebuilt buildJobs envJobs
     , let
         update = flip $ \s ->
           M.alter (const (statusNewCacheInfo s)) (statusModuleName s)
@@ -153,6 +165,10 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
     makeBuildJob prev moduleName = do
       buildJob <- BuildJob <$> C.newEmptyMVar
       pure (M.insert moduleName buildJob prev)
+
+    makeEnvJob prev moduleName = do
+      envJob <- C.newEmptyMVar
+      pure (M.insert moduleName envJob prev)
 
     getRebuildStatus :: ModuleName -> m RebuildStatus
     getRebuildStatus moduleName = do

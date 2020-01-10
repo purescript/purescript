@@ -170,14 +170,23 @@ make ma@MakeActions{..} ms = do
 
   (buildPlan, newCacheDb) <- BuildPlan.construct ma cacheDb (sorted, graph)
 
-  let toBeRebuilt = filter (BuildPlan.needsRebuild buildPlan . getModuleName . CST.resPartial) sorted
-  for_ toBeRebuilt $ \m -> fork $ do
+  for_ sorted $ \m -> fork $ do
     let moduleName = getModuleName . CST.resPartial $ m
     let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
-    buildModule env buildPlan moduleName
-      (spanName . getModuleSourceSpan . CST.resPartial $ m)
-      (CST.resFull m)
-      (deps `inOrderOf` map (getModuleName . CST.resPartial) sorted)
+
+    if BuildPlan.needsRebuild buildPlan moduleName
+      then do
+        buildModule env buildPlan moduleName
+          (spanName . getModuleSourceSpan . CST.resPartial $ m)
+          (importPrim <$> CST.resFull m)
+          (deps `inOrderOf` map (getModuleName . CST.resPartial) sorted)
+      else do
+        _ <- traverse (getEnvResult buildPlan) deps
+        for_ (M.lookup moduleName (bpPrebuilt buildPlan)) $ \(Prebuilt _ externs) -> do
+          C.modifyMVar_ env (\exEnv' -> externsEnv exEnv' externs)
+          for_ (M.lookup moduleName (bpBuildEnv buildPlan)) $ \envJob -> do
+            C.putMVar envJob ()
+
 
   -- Wait for all threads to complete, and collect results (and errors).
   (failures, successes) <-
@@ -246,12 +255,16 @@ make ma@MakeActions{..} ms = do
       -- module should be rebuilt, so the first thing to do is to wait on the
       -- MVars for the module's dependencies.
       mexterns <- fmap unzip . sequence <$> traverse (getResult buildPlan) deps
+      _ <- traverse (getEnvResult buildPlan) deps
+
+      exEnv <- C.readMVar env
 
       case mexterns of
         Just (_, externs) -> do
-          exEnv <- C.readMVar env
           (exts, warnings) <- listen $ rebuildModule ma exEnv externs m
           C.modifyMVar_ env (\exEnv' -> externsEnv exEnv' exts)
+          for_ (M.lookup moduleName (bpBuildEnv buildPlan)) $ \envJob -> do
+            C.putMVar envJob ()
           return $ BuildJobSucceeded warnings exts
         Nothing -> return BuildJobSkipped
 

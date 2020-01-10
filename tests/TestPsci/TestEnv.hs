@@ -6,9 +6,10 @@ import Prelude ()
 import Prelude.Compat
 
 import           Control.Exception.Lifted (bracket_)
-import           Control.Monad (void, when)
+import           Control.Monad (void, when, foldM)
 import           Control.Monad.IO.Class (liftIO)
 import           Control.Monad.Trans.RWS.Strict (evalRWST, asks, local, RWST)
+import           Control.Monad.Writer.Strict (runWriterT)
 import           Data.Foldable (traverse_)
 import           Data.List (isSuffixOf)
 import qualified Data.Text as T
@@ -43,7 +44,7 @@ initTestPSCiEnv = do
       makeResultOrError <- runMake . make $ fmap CST.pureResult <$> modules
       case makeResultOrError of
         Left errs -> putStrLn (P.prettyPrintMultipleErrors P.defaultPPEOptions errs) >> exitFailure
-        Right (externs, _) ->
+        Right (externs, _) -> do
           return (updateLoadedExterns (const (zip (map snd modules) externs)) initialPSCiState, PSCiConfig pursFiles)
 
 -- | Execute a TestPSCi, returning IO
