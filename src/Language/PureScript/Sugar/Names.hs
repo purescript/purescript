@@ -2,6 +2,7 @@ module Language.PureScript.Sugar.Names
   ( desugarImports
   , desugarImportsWithEnv
   , Env
+  , externsEnv
   , primEnv
   , ImportRecord(..)
   , ImportProvenance(..)
@@ -16,7 +17,7 @@ import Control.Arrow (first)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Lazy
-import Control.Monad.Writer (MonadWriter(..), censor)
+import Control.Monad.Writer (MonadWriter(..))
 
 import Data.Maybe (fromMaybe, mapMaybe)
 import qualified Data.Map as M
@@ -42,73 +43,22 @@ import Language.PureScript.Types
 desugarImports
   :: forall m
    . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
-  => [ExternsFile]
+  => Env
   -> [Module]
   -> m [Module]
-desugarImports externs modules =
-  fmap snd (desugarImportsWithEnv externs modules)
+desugarImports env modules =
+  fmap snd (desugarImportsWithEnv env modules)
 
 desugarImportsWithEnv
   :: forall m
   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
-  => [ExternsFile]
+  => Env
   -> [Module]
   -> m (Env, [Module])
-desugarImportsWithEnv externs modules = do
-  env <- silence $ foldM externsEnv primEnv externs
-  (modules', env') <- first reverse <$> foldM updateEnv ([], env) modules
+desugarImportsWithEnv e modules = do
+  (modules', env') <- first reverse <$> foldM updateEnv ([], e) modules
   (env',) <$> traverse (renameInModule' env') modules'
   where
-  silence :: m a -> m a
-  silence = censor (const mempty)
-
-  -- | Create an environment from a collection of externs files
-  externsEnv :: Env -> ExternsFile -> m Env
-  externsEnv env ExternsFile{..} = do
-    let members = Exports{..}
-        env' = M.insert efModuleName (efSourceSpan, nullImports, members) env
-        fromEFImport (ExternsImport mn mt qmn) = (mn, [(efSourceSpan, Just mt, qmn)])
-    imps <- foldM (resolveModuleImport env') nullImports (map fromEFImport efImports)
-    exps <- resolveExports env' efSourceSpan efModuleName imps members efExports
-    return $ M.insert efModuleName (efSourceSpan, imps, exps) env
-    where
-
-    -- An ExportSource for declarations local to the module which the given
-    -- ExternsFile corresponds to.
-    localExportSource =
-      ExportSource { exportSourceDefinedIn = efModuleName
-                   , exportSourceImportedFrom = Nothing
-                   }
-
-    exportedTypes :: M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ExportSource)
-    exportedTypes = M.fromList $ mapMaybe toExportedType efExports
-      where
-      toExportedType (TypeRef _ tyCon dctors) = Just (tyCon, (fromMaybe (mapMaybe forTyCon efDeclarations) dctors, localExportSource))
-        where
-        forTyCon :: ExternsDeclaration -> Maybe (ProperName 'ConstructorName)
-        forTyCon (EDDataConstructor pn _ tNm _ _) | tNm == tyCon = Just pn
-        forTyCon _ = Nothing
-      toExportedType _ = Nothing
-
-    exportedTypeOps :: M.Map (OpName 'TypeOpName) ExportSource
-    exportedTypeOps = exportedRefs getTypeOpRef
-
-    exportedTypeClasses :: M.Map (ProperName 'ClassName) ExportSource
-    exportedTypeClasses = exportedRefs getTypeClassRef
-
-    exportedValues :: M.Map Ident ExportSource
-    exportedValues = exportedRefs getValueRef
-
-    exportedValueOps :: M.Map (OpName 'ValueOpName) ExportSource
-    exportedValueOps = exportedRefs getValueOpRef
-
-    exportedKinds :: M.Map (ProperName 'KindName) ExportSource
-    exportedKinds = exportedRefs getKindRef
-
-    exportedRefs :: Ord a => (DeclarationRef -> Maybe a) -> M.Map a ExportSource
-    exportedRefs f =
-      M.fromList $ (, localExportSource) <$> mapMaybe f efExports
-
   updateEnv :: ([Module], Env) -> Module -> m ([Module], Env)
   updateEnv (ms, env) m@(Module ss _ mn _ refs) = do
     members <- findExportable m
@@ -125,6 +75,58 @@ desugarImportsWithEnv externs modules = do
       let m'' = elaborateExports exps m'
       lintImports m'' env used
       return m''
+
+-- | Create an environment from a collection of externs files
+externsEnv
+  :: forall m
+   . (MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => Env
+  -> ExternsFile
+  -> m Env
+externsEnv env ExternsFile{..} = do
+  let members = Exports{..}
+      env' = M.insert efModuleName (efSourceSpan, nullImports, members) env
+      fromEFImport (ExternsImport mn mt qmn) = (mn, [(efSourceSpan, Just mt, qmn)])
+  imps <- foldM (resolveModuleImport env') nullImports (map fromEFImport efImports)
+  exps <- resolveExports env' efSourceSpan efModuleName imps members efExports
+  return $ M.insert efModuleName (efSourceSpan, imps, exps) env
+  where
+
+  -- An ExportSource for declarations local to the module which the given
+  -- ExternsFile corresponds to.
+  localExportSource =
+    ExportSource { exportSourceDefinedIn = efModuleName
+                  , exportSourceImportedFrom = Nothing
+                  }
+
+  exportedTypes :: M.Map (ProperName 'TypeName) ([ProperName 'ConstructorName], ExportSource)
+  exportedTypes = M.fromList $ mapMaybe toExportedType efExports
+    where
+    toExportedType (TypeRef _ tyCon dctors) = Just (tyCon, (fromMaybe (mapMaybe forTyCon efDeclarations) dctors, localExportSource))
+      where
+      forTyCon :: ExternsDeclaration -> Maybe (ProperName 'ConstructorName)
+      forTyCon (EDDataConstructor pn _ tNm _ _) | tNm == tyCon = Just pn
+      forTyCon _ = Nothing
+    toExportedType _ = Nothing
+
+  exportedTypeOps :: M.Map (OpName 'TypeOpName) ExportSource
+  exportedTypeOps = exportedRefs getTypeOpRef
+
+  exportedTypeClasses :: M.Map (ProperName 'ClassName) ExportSource
+  exportedTypeClasses = exportedRefs getTypeClassRef
+
+  exportedValues :: M.Map Ident ExportSource
+  exportedValues = exportedRefs getValueRef
+
+  exportedValueOps :: M.Map (OpName 'ValueOpName) ExportSource
+  exportedValueOps = exportedRefs getValueOpRef
+
+  exportedKinds :: M.Map (ProperName 'KindName) ExportSource
+  exportedKinds = exportedRefs getKindRef
+
+  exportedRefs :: Ord a => (DeclarationRef -> Maybe a) -> M.Map a ExportSource
+  exportedRefs f =
+    M.fromList $ (, localExportSource) <$> mapMaybe f efExports
 
 -- |
 -- Make all exports for a module explicit. This may still affect modules that

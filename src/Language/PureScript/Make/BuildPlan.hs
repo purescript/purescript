@@ -1,5 +1,5 @@
 module Language.PureScript.Make.BuildPlan
-  ( BuildPlan()
+  ( BuildPlan(bpEnv)
   , BuildJobResult(..)
   , buildJobSuccess
   , buildJobFailure
@@ -29,12 +29,14 @@ import           Language.PureScript.Externs
 import           Language.PureScript.Make.Actions as Actions
 import           Language.PureScript.Make.Cache
 import           Language.PureScript.Names (ModuleName)
+import           Language.PureScript.Sugar.Names.Env
 
 -- | The BuildPlan tracks information about our build progress, and holds all
 -- prebuilt modules for incremental builds.
 data BuildPlan = BuildPlan
   { bpPrebuilt :: M.Map ModuleName Prebuilt
   , bpBuildJobs :: M.Map ModuleName BuildJob
+  , bpEnv :: C.MVar Env
   }
 
 data Prebuilt = Prebuilt
@@ -140,8 +142,9 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
           mapMaybe (\s -> (statusModuleName s, statusRebuildNever s,) <$> statusPrebuilt s) rebuildStatuses
   let toBeRebuilt = filter (not . flip M.member prebuilt) sortedModuleNames
   buildJobs <- foldM makeBuildJob M.empty toBeRebuilt
+  env <- C.newMVar primEnv
   pure
-    ( BuildPlan prebuilt buildJobs
+    ( BuildPlan prebuilt buildJobs env
     , let
         update = flip $ \s ->
           M.alter (const (statusNewCacheInfo s)) (statusModuleName s)

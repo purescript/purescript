@@ -17,6 +17,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Supply
 import           Control.Monad.Trans.Control (MonadBaseControl(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
+import           Control.Monad.Writer.Strict (runWriterT)
 import           Data.Function (on)
 import           Data.Foldable (for_)
 import           Data.List (foldl', sortBy)
@@ -57,13 +58,25 @@ rebuildModule
   -> [ExternsFile]
   -> Module
   -> m ExternsFile
-rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
+rebuildModule actions externs m = do
+  env <- fmap fst . runWriterT $ foldM externsEnv primEnv externs
+  rebuildModule' actions env externs m
+
+rebuildModule'
+  :: forall m
+   . (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => MakeActions m
+  -> Env
+  -> [ExternsFile]
+  -> Module
+  -> m ExternsFile
+rebuildModule' MakeActions{..} exEnv externs m@(Module _ _ moduleName _ _) = do
   progress $ CompilingModule moduleName
   let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
       withPrim = importPrim m
   lint withPrim
   ((Module ss coms _ elaborated exps, env'), nextVar) <- runSupplyT 0 $ do
-    desugar externs [withPrim] >>= \case
+    desugar exEnv externs [withPrim] >>= \case
       [desugared] -> runCheck' (emptyCheckState env) $ typeCheckModule desugared
       _ -> internalError "desugar did not return a singleton"
 
@@ -88,7 +101,7 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
   -- a bug in the compiler, which should be reported as such.
   -- 2. We do not want to perform any extra work generating docs unless the
   -- user has asked for docs to be generated.
-  let docs = case Docs.convertModule externs env' m of
+  let docs = case Docs.convertModule externs exEnv env' m of
                Left errs -> internalError $
                  "Failed to produce docs for " ++ T.unpack (runModuleName moduleName)
                  ++ "; details:\n" ++ prettyPrintMultipleErrors defaultPPEOptions errs
@@ -192,7 +205,17 @@ make ma@MakeActions{..} ms = do
 
       case mexterns of
         Just (_, externs) -> do
-          (exts, warnings) <- listen $ rebuildModule ma externs m
+          -- We need to ensure that all dependencies have been included in Env
+          C.modifyMVar_ (bpEnv buildPlan) $ \env -> do
+            let
+              go :: Env -> ModuleName -> m Env
+              go e dep = case lookup dep (zip deps externs) of
+                Just exts
+                  | not (M.member dep e) -> externsEnv e exts
+                _ -> return e
+            foldM go env deps
+          env <- C.readMVar (bpEnv buildPlan)
+          (exts, warnings) <- listen $ rebuildModule' ma env externs m
           return $ BuildJobSucceeded warnings exts
         Nothing -> return BuildJobSkipped
 
