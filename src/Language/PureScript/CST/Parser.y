@@ -54,6 +54,7 @@ import Language.PureScript.PSString (PSString)
 %partial parseGuardExpr guardExpr
 %partial parseGuardNext guardNext
 %partial parseGuardStatement guardStatement
+%partial parseClassSignature classSignature
 %partial parseClassSuper classSuper
 %partial parseClassNameAndFundeps classNameAndFundeps
 %partial parseBinderAndArrow binderAndArrow
@@ -645,10 +646,13 @@ decl :: { Declaration () }
   | dataHead '=' sep(dataCtor, '|') { DeclData () $1 (Just ($2, $3)) }
   | typeHead '=' type {% checkNoWildcards $3 *> pure (DeclType () $1 $2 $3) }
   | newtypeHead '=' properName typeAtom {% checkNoWildcards $4 *> pure (DeclNewtype () $1 $2 $3 $4) }
-  | classHead {% checkFundeps $1 *> pure (DeclClass () $1 Nothing) }
-  | classHead 'where' '\{' manySep(classMember, '\;') '\}' {% checkFundeps $1 *> pure (DeclClass () $1 (Just ($2, $4))) }
+  | classHead { either id (\h -> DeclClass () h Nothing) $1 }
+  | classHead 'where' '\{' manySep(classMember, '\;') '\}' {% either (const (parseError $2)) (\h -> pure $ DeclClass () h (Just ($2, $4))) $1 }
   | instHead { DeclInstanceChain () (Separated (Instance $1 Nothing) []) }
   | instHead 'where' '\{' manySep(instBinding, '\;') '\}' { DeclInstanceChain () (Separated (Instance $1 (Just ($2, $4))) []) }
+  | 'data' properName '::' type { DeclKindSignature () $1 (Labeled $2 $3 $4) }
+  | 'newtype' properName '::' type { DeclKindSignature () $1 (Labeled $2 $3 $4) }
+  | 'type' properName '::' type { DeclKindSignature () $1 (Labeled $2 $3 $4) }
   | 'derive' instHead { DeclDerive () $1 Nothing $2 }
   | 'derive' 'newtype' instHead { DeclDerive () $1 (Just $2) $3 }
   | ident '::' type { DeclSignature () (Labeled $1 $2 $3) }
@@ -678,16 +682,22 @@ dataCtor :: { DataCtor () }
 --       : 'class' classNameAndFundeps
 --       | 'class' constraints '<=' classNameAndFundeps
 --
-classHead :: { ClassHead () }
+classHead :: { Either (Declaration ()) (ClassHead ()) }
   : 'class'
-      {%% revert $ do
-        let
-          ctr (super, (name, vars, fundeps)) =
-            ClassHead $1 super name vars fundeps
-        fmap ctr $ tryPrefix parseClassSuper parseClassNameAndFundeps
+      {%% revert $ oneOf $ NE.fromList
+          [ fmap (Left . DeclKindSignature () $1) parseClassSignature
+          , do
+              (super, (name, vars, fundeps)) <- tryPrefix parseClassSuper parseClassNameAndFundeps
+              let hd = ClassHead $1 super name vars fundeps
+              checkFundeps hd
+              pure $ Right hd
+          ]
       }
 
-classSuper
+classSignature :: { Labeled (Name (N.ProperName 'N.TypeName)) (Type ()) }
+  : properName '::' type {%^ revert . pure $ Labeled $1 $2 $3 }
+
+classSuper :: { (OneOrDelimited (Constraint ()), SourceToken) }
   : constraints '<=' {%^ revert $ pure ($1, $2) }
 
 classNameAndFundeps :: { (Name (N.ProperName 'N.ClassName), [TypeVarBinding ()], Maybe (SourceToken, Separated ClassFundep)) }

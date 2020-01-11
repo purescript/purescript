@@ -178,6 +178,7 @@ declRange = \case
     where start = classHeadRange hd
   DeclInstanceChain _ a -> (fst . instanceRange $ sepHead a, snd . instanceRange $ sepLast a)
   DeclDerive _ a _ b -> (a, snd $ instanceHeadRange b)
+  DeclKindSignature _ a (Labeled _ _ b) -> (a, snd $ typeRange b)
   DeclSignature _ (Labeled a _ b) -> (nameTok a, snd $ typeRange b)
   DeclValue _ a -> valueBindingFieldsRange a
   DeclFixity _ (FixityFields a _ (FixityValue _ _ b)) -> (fst a, nameTok b)

@@ -220,6 +220,10 @@ renameInModule imports (Module modSS coms mn decls exps) =
         <*> updateClassName cn ss
         <*> traverse updateTypesEverywhere ts
         <*> pure ds
+  updateDecl bound (KindDeclaration sa kindFor name ty) =
+    fmap (bound,) $
+      KindDeclaration sa kindFor name
+        <$> updateTypesEverywhere ty
   updateDecl bound (TypeDeclaration (TypeDeclarationData sa name ty)) =
     fmap (bound,) $
       TypeDeclaration . TypeDeclarationData sa name

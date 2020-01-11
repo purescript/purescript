@@ -288,6 +288,17 @@ typeCheckAll moduleName _ = flip catchError (\err -> debugEnv' *> throwError err
       let args' = args `withKinds` kind
       addTypeSynonym moduleName name args' elabTy kind
     return $ TypeSynonymDeclaration sa name args ty
+  go (KindDeclaration sa@(ss, _) kindFor name ty) = do
+    -- TODO: warnAndRethrow ErrorInKindSignature
+    warnAndRethrow (addHint (positionedError ss)) $ do
+      elabTy <- withFreshSubstitution $ do
+        (elabTy, kind) <- kindOf ty
+        checkTypeKind kind kindType
+        return elabTy
+      env <- getEnv
+      -- TODO: Extern data?
+      putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (elabTy, LocalTypeVariable) (types env) }
+      return $ KindDeclaration sa kindFor name elabTy
   go TypeDeclaration{} =
     internalError "Type declarations should have been removed before typeCheckAlld"
   go (ValueDecl sa@(ss, _) name nameKind [] [MkUnguarded val]) = do

@@ -82,6 +82,7 @@ data SimpleErrorMessage
   | MultipleValueOpFixities (OpName 'ValueOpName)
   | MultipleTypeOpFixities (OpName 'TypeOpName)
   | OrphanTypeDeclaration Ident
+  | OrphanKindDeclaration (ProperName 'TypeName)
   | RedefinedIdent Ident
   | OverlappingNamesInLet
   | UnknownName (Qualified Name)
@@ -493,6 +494,10 @@ data Declaration
   --
   | TypeSynonymDeclaration SourceAnn (ProperName 'TypeName) [(Text, Maybe SourceType)] SourceType
   -- |
+  -- A kind signature declaration
+  --
+  | KindDeclaration SourceAnn KindSignatureFor (ProperName 'TypeName) SourceType
+  -- |
   -- A type declaration for a value (name, ty)
   --
   | TypeDeclaration {-# UNPACK #-} !TypeDeclarationData
@@ -567,10 +572,19 @@ traverseTypeInstanceBody :: (Applicative f) => ([Declaration] -> f [Declaration]
 traverseTypeInstanceBody f (ExplicitInstance ds) = ExplicitInstance <$> f ds
 traverseTypeInstanceBody _ other = pure other
 
+-- | What sort of declaration the kind signature applies to.
+data KindSignatureFor
+  = DataSig
+  | NewtypeSig
+  | TypeSynonymSig
+  | ClassSig
+  deriving (Eq, Ord, Show)
+
 declSourceAnn :: Declaration -> SourceAnn
 declSourceAnn (DataDeclaration sa _ _ _ _) = sa
 declSourceAnn (DataBindingGroupDeclaration ds) = declSourceAnn (NEL.head ds)
 declSourceAnn (TypeSynonymDeclaration sa _ _ _) = sa
+declSourceAnn (KindDeclaration sa _ _ _) = sa
 declSourceAnn (TypeDeclaration td) = tydeclSourceAnn td
 declSourceAnn (ValueDeclaration vd) = valdeclSourceAnn vd
 declSourceAnn (BoundValueDeclaration sa _ _) = sa
@@ -599,6 +613,7 @@ declName ImportDeclaration{} = Nothing
 declName BindingGroupDeclaration{} = Nothing
 declName DataBindingGroupDeclaration{} = Nothing
 declName BoundValueDeclaration{} = Nothing
+declName KindDeclaration{} = Nothing
 declName TypeDeclaration{} = Nothing
 
 -- |
@@ -661,6 +676,13 @@ isTypeClassInstanceDeclaration _ = False
 isTypeClassDeclaration :: Declaration -> Bool
 isTypeClassDeclaration TypeClassDeclaration{} = True
 isTypeClassDeclaration _ = False
+
+-- |
+-- Test if a declaration is a kind signature declaration.
+--
+isKindDeclaration :: Declaration -> Bool
+isKindDeclaration KindDeclaration{} = True
+isKindDeclaration _ = False
 
 -- |
 -- Recursively flatten data binding groups in the list of declarations

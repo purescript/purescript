@@ -67,9 +67,15 @@ createBindingGroups moduleName = mapM f <=< handleDecls
   handleDecls :: [Declaration] -> m [Declaration]
   handleDecls ds = do
     let values = mapMaybe (fmap (fmap extractGuardedExpr) . getValueDeclaration) ds
-        dataDecls = filter (\a -> isDataDecl a || isTypeClassDeclaration a) ds
-        allProperNames = fmap declTypeName dataDecls
-        dataVerts = fmap (\d -> (d, declTypeName d, usedTypeNames moduleName d `intersect` allProperNames)) dataDecls
+        kindDecls = fmap (,True) $ filter isKindDeclaration ds
+        dataDecls = fmap (,False) $ filter (\a -> isDataDecl a || isTypeClassDeclaration a) ds
+        kindSigs = fmap (declTypeName . fst) kindDecls
+        allProperNames = fmap (declTypeName . fst) dataDecls
+        allDecls = kindDecls ++ dataDecls
+        mkVert (d, isSig) =
+          let names = usedTypeNames moduleName d `intersect` allProperNames
+          in (d, (declTypeName d, isSig), fmap (\n -> (n, n `elem` kindSigs)) names)
+        dataVerts = fmap mkVert allDecls
     dataBindingGroupDecls <- parU (stronglyConnComp dataVerts) toDataBindingGroup
     let allIdents = fmap valdeclIdent values
         valueVerts = fmap (\d -> (d, valdeclIdent d, usedIdents moduleName d `intersect` allIdents)) values
@@ -159,6 +165,7 @@ declTypeName :: Declaration -> ProperName 'TypeName
 declTypeName (DataDeclaration _ _ pn _ _) = pn
 declTypeName (TypeSynonymDeclaration _ pn _ _) = pn
 declTypeName (TypeClassDeclaration _ pn _ _ _ _) = coerceProperName pn
+declTypeName (KindDeclaration _ _ pn _) = pn
 declTypeName _ = internalError "Expected DataDeclaration"
 
 -- |

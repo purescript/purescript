@@ -198,6 +198,7 @@ data Declaration a
   | DeclClass a (ClassHead a) (Maybe (SourceToken, NonEmpty (Labeled (Name Ident) (Type a))))
   | DeclInstanceChain a (Separated (Instance a))
   | DeclDerive a SourceToken (Maybe SourceToken) (InstanceHead a)
+  | DeclKindSignature a SourceToken (Labeled (Name (N.ProperName 'N.TypeName)) (Type a))
   | DeclSignature a (Labeled (Name Ident) (Type a))
   | DeclValue a (ValueBindingFields a)
   | DeclFixity a FixityFields

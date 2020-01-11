@@ -634,6 +634,17 @@ checkInstanceDeclaration moduleName (ann, constraints, clsName, args) = do
         (allConstraints, (_, allKinds, allArgs)) = unapplyTypes <$> unapplyConstraints allWithVars
     pure (allConstraints, allKinds, allArgs)
 
+existingSignatureOrFreshKind
+  :: forall m. MonadState CheckState m
+  => ModuleName
+  -> ProperName 'TypeName
+  -> m SourceType
+existingSignatureOrFreshKind moduleName name = do
+  env <- getEnv
+  case M.lookup (Qualified (Just moduleName) name) (E.types env) of
+    Nothing -> freshKind
+    Just (kind, _) -> pure kind
+
 kindsOfAll
   :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)
   => ModuleName
@@ -642,9 +653,9 @@ kindsOfAll
   -> [ClassDeclarationArgs]
   -> m ([TypeDeclarationResult], [DataDeclarationResult], [ClassDeclarationResult])
 kindsOfAll moduleName syns dats clss = withFreshSubstitution $ do
-  synDict <- for syns $ \(_, synName, _, _) -> fmap (synName,) freshKind
-  datDict <- for dats $ \(_, datName, _, _) -> fmap (datName,) freshKind
-  clsDict <- for clss $ \(_, clsName, _, _, _) -> fmap (coerceProperName clsName,) freshKind
+  synDict <- for syns $ \(_, synName, _, _) -> fmap (synName,) $ existingSignatureOrFreshKind moduleName synName
+  datDict <- for dats $ \(_, datName, _, _) -> fmap (datName,) $ existingSignatureOrFreshKind moduleName datName
+  clsDict <- for clss $ \(_, clsName, _, _, _) -> fmap (coerceProperName clsName,) $ existingSignatureOrFreshKind moduleName $ coerceProperName clsName
   let bindingGroup = synDict <> datDict <> clsDict
   bindLocalTypeVariables moduleName bindingGroup $ do
     synResults <- for syns (inferTypeSynonym moduleName)

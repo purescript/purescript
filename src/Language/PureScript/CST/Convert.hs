@@ -488,6 +488,15 @@ convertDeclaration fileName decl = case decl of
       (qualified cls)
       (convertType fileName <$> args)
       instTy
+  DeclKindSignature _ kw (Labeled name _ ty) -> do
+    let
+      kindFor = case tokValue kw of
+        TokLowerName [] "data" -> AST.DataSig
+        TokLowerName [] "newtype" -> AST.NewtypeSig
+        TokLowerName [] "type" -> AST.TypeSynonymSig
+        TokLowerName [] "class" -> AST.ClassSig
+        _ -> AST.DataSig -- TODO
+    pure . AST.KindDeclaration ann kindFor (nameValue name) $ convertType fileName ty
   DeclSignature _ lbl ->
     pure $ convertSignature fileName lbl
   DeclValue _ fields ->

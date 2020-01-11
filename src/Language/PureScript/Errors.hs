@@ -93,6 +93,7 @@ errorCode em = case unwrapErrorMessage em of
   MultipleValueOpFixities{} -> "MultipleValueOpFixities"
   MultipleTypeOpFixities{} -> "MultipleTypeOpFixities"
   OrphanTypeDeclaration{} -> "OrphanTypeDeclaration"
+  OrphanKindDeclaration{} -> "OrphanKindDeclaration"
   RedefinedIdent{} -> "RedefinedIdent"
   OverlappingNamesInLet -> "OverlappingNamesInLet"
   UnknownName{} -> "UnknownName"
@@ -532,6 +533,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line $ "There are multiple fixity/precedence declarations for type operator " <> markCode (showOp op)
     renderSimpleErrorMessage (OrphanTypeDeclaration nm) =
       line $ "The type declaration for " <> markCode (showIdent nm) <> " should be followed by its definition."
+    renderSimpleErrorMessage (OrphanKindDeclaration nm) =
+      line $ "The kind declaration for " <> markCode (runProperName nm) <> " should be followed by its definition."
     renderSimpleErrorMessage (RedefinedIdent name) =
       line $ "The value " <> markCode (showIdent name) <> " has been defined multiple times"
     renderSimpleErrorMessage (UnknownName name@(Qualified Nothing (IdentName (Ident i)))) | i `elem` [ C.bind, C.discard ] =

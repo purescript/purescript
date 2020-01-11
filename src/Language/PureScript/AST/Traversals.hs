@@ -642,6 +642,7 @@ accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (con
   forDecls (TypeClassDeclaration _ _ _ implies _ _) = mconcat (concatMap (fmap f . constraintArgs) implies)
   forDecls (TypeInstanceDeclaration _ _ _ _ cs _ tys _) = mconcat (concatMap (fmap f . constraintArgs) cs) <> mconcat (fmap f tys)
   forDecls (TypeSynonymDeclaration _ _ _ ty) = f ty
+  forDecls (KindDeclaration _ _ _ ty) = f ty
   forDecls (TypeDeclaration td) = f (tydeclType td)
   forDecls _ = mempty
 
@@ -673,6 +674,7 @@ accumKinds f = everythingOnValues mappend forDecls forValues (const mempty) (con
   forDecls (TypeSynonymDeclaration _ _ args ty) =
     foldMap (foldMap f . snd) args <>
     forTypes ty
+  forDecls (KindDeclaration _ _ _ k) = f k
   forDecls (TypeDeclaration td) = forTypes (tydeclType td)
   forDecls (ExternDeclaration _ _ ty) = forTypes ty
   forDecls (ExternDataDeclaration _ _ kn) = f kn
