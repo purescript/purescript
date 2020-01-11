@@ -210,7 +210,7 @@ desugarDecl mn exps = go
     dictDecl <- typeInstanceDictionaryDeclaration sa name mn deps className tys desugared
     return (expRef name className tys, [d, dictDecl])
   go d@(TypeInstanceDeclaration sa _ _ name deps className tys (NewtypeInstanceWithDictionary dict)) = do
-    let dictTy = foldl srcTypeApp (srcTypeConstructor (fmap coerceProperName className)) tys
+    let dictTy = foldl srcTypeApp (srcTypeConstructor (fmap (coerceProperName . dictSynonymName) className)) tys
         constrainedTy = quantify (foldr (srcConstrainedType) dictTy deps)
     return (expRef name className tys, [d, ValueDecl sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]])
   go other = return (Nothing, [other])
@@ -259,13 +259,13 @@ typeClassDictionaryDeclaration
   -> Declaration
 typeClassDictionaryDeclaration sa name args implies members =
   let superclassTypes = superClassDictionaryNames implies `zip`
-        [ function unit (foldl srcTypeApp (srcTypeConstructor (fmap coerceProperName superclass)) tyArgs)
+        [ function unit (foldl srcTypeApp (srcTypeConstructor (fmap (coerceProperName . dictSynonymName) superclass)) tyArgs)
         | (Constraint _ superclass _ tyArgs _) <- implies
         ]
       members' = map (first runIdent . memberToNameAndType) members
       mtys = members' ++ superclassTypes
       toRowListItem (l, t) = srcRowListItem (Label $ mkString l) t
-  in TypeSynonymDeclaration sa (coerceProperName name) args (srcTypeApp tyRecord $ rowFromList (map toRowListItem mtys, srcREmpty))
+  in TypeSynonymDeclaration sa (coerceProperName $ dictSynonymName name) args (srcTypeApp tyRecord $ rowFromList (map toRowListItem mtys, srcREmpty))
 
 typeClassMemberToDictionaryAccessor
   :: ModuleName
@@ -326,7 +326,7 @@ typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
             ]
 
       let props = Literal ss $ ObjectLiteral $ map (first mkString) (members ++ superclasses)
-          dictTy = foldl srcTypeApp (srcTypeConstructor (fmap coerceProperName className)) tys
+          dictTy = foldl srcTypeApp (srcTypeConstructor (fmap (coerceProperName . dictSynonymName) className)) tys
           constrainedTy = quantify (foldr srcConstrainedType dictTy deps)
           dict = TypeClassDictionaryConstructorApp className props
           result = ValueDecl sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]

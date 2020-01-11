@@ -160,18 +160,16 @@ inferKind = \case
         pure (ty, kind' $> ann)
       Just (kind, _) -> do
         pure (ty, kind $> ann)
-  ConstrainedType ann' (Constraint ann v kinds args dat) ty -> do
+  ConstrainedType ann' con@(Constraint ann v _ _ _) ty -> do
     env <- getEnv
-    (kinds', args') <- case M.lookup (coerceProperName <$> v) (E.types env) of
+    con' <- case M.lookup (coerceProperName <$> v) (E.types env) of
       Nothing ->
         throwError . errorMessage' (fst ann) . UnknownName . fmap TyClassName $ v
-      Just _ -> do
-        let fakeTy = foldl (TypeApp ann) (foldl (KindApp ann) (TypeConstructor ann (coerceProperName <$> v)) kinds) args
-        (_, kinds', args') <- unapplyTypes <$> checkKind fakeTy E.kindType
-        pure (kinds', args')
+      Just _ ->
+        checkConstraint con
     ty' <- checkKind ty E.kindType
-    c' <- applyConstraint $ Constraint ann v kinds' args' dat
-    pure (ConstrainedType ann' c' ty', E.kindType $> ann')
+    con'' <- applyConstraint con'
+    pure (ConstrainedType ann' con'' ty', E.kindType $> ann')
   ty@(TypeLevelString ann _) ->
     pure (ty, E.kindSymbol $> ann)
   ty@(TypeVar ann v) -> do

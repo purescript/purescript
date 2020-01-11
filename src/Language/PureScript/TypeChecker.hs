@@ -115,17 +115,21 @@ addValue moduleName name ty nameKind = do
 addTypeClass
   :: forall m
    . (MonadState CheckState m, MonadError MultipleErrors m)
-  => Qualified (ProperName 'ClassName)
+  => ModuleName
+  -> Qualified (ProperName 'ClassName)
   -> [(Text, Maybe SourceType)]
   -> [SourceConstraint]
   -> [FunctionalDependency]
   -> [Declaration]
+  -> SourceType
   -> m ()
-addTypeClass qualifiedClassName args implies dependencies ds = do
+addTypeClass moduleName qualifiedClassName args implies dependencies ds kind = do
   env <- getEnv
   let newClass = mkNewClass env
   traverse_ (checkMemberIsUsable newClass (typeSynonyms env) (types env)) classMembers
-  modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert qualifiedClassName newClass (typeClasses . checkEnv $ st) } }
+  -- modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert qualifiedClassName newClass (typeClasses . checkEnv $ st) } }
+  putEnv $ env { types = M.insert (fmap coerceProperName qualifiedClassName) (kind, ExternData) (types env)
+               , typeClasses = M.insert qualifiedClassName newClass (typeClasses env) }
   where
     classMembers :: [(Ident, SourceType)]
     classMembers = map toPair ds
@@ -337,8 +341,8 @@ typeCheckAll moduleName _ = flip catchError (\err -> debugEnv' *> throwError err
       guardWith (errorMessage (DuplicateTypeClass pn ss)) $
         not (M.member qualifiedClassName (typeClasses env))
       -- TODO: What should we do with this signature vs the desugared type synonym?
-      (args', implies', tys', _) <- kindOfClass moduleName (sa, pn, args, implies, tys)
-      addTypeClass qualifiedClassName (fmap Just <$> args') implies' deps tys'
+      (args', implies', tys', kind) <- kindOfClass moduleName (sa, pn, args, implies, tys)
+      addTypeClass moduleName qualifiedClassName (fmap Just <$> args') implies' deps tys' kind
       return d
   go (d@(TypeInstanceDeclaration sa@(ss, _) ch idx dictName deps className tys body)) =
     rethrow (addHint (ErrorInInstance className tys) . addHint (positionedError ss)) $ do

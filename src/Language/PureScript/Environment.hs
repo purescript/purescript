@@ -391,6 +391,7 @@ primTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primTypes =
   M.fromList
     [ (primName "Type",             (kindType, ExternData))
+    , (primName "Constraint",       (kindType, ExternData))
     , (primName "Symbol",           (kindType, ExternData))
     , (primName "Row",              (kindType -:> kindType, ExternData))
     , (primName "Function",         (kindType -:> kindType -:> kindType, ExternData))
@@ -601,3 +602,9 @@ isNewtypeConstructor e ctor = case lookupConstructor e ctor of
 -- | Finds information about values from the current environment.
 lookupValue :: Environment -> Qualified Ident -> Maybe (SourceType, NameKind, NameVisibility)
 lookupValue env ident = ident `M.lookup` names env
+
+dictSynonymName' :: Text -> Text
+dictSynonymName' = (<> "$Dict")
+
+dictSynonymName :: ProperName a -> ProperName a
+dictSynonymName = ProperName . dictSynonymName' . runProperName

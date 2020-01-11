@@ -67,7 +67,7 @@ createBindingGroups moduleName = mapM f <=< handleDecls
   handleDecls :: [Declaration] -> m [Declaration]
   handleDecls ds = do
     let values = mapMaybe (fmap (fmap extractGuardedExpr) . getValueDeclaration) ds
-        dataDecls = filter isDataDecl ds
+        dataDecls = filter (\a -> isDataDecl a || isTypeClassDeclaration a) ds
         allProperNames = fmap declTypeName dataDecls
         dataVerts = fmap (\d -> (d, declTypeName d, usedTypeNames moduleName d `intersect` allProperNames)) dataDecls
     dataBindingGroupDecls <- parU (stronglyConnComp dataVerts) toDataBindingGroup
@@ -77,7 +77,7 @@ createBindingGroups moduleName = mapM f <=< handleDecls
     return $ filter isImportDecl ds ++
              filter isExternDataDecl ds ++
              dataBindingGroupDecls ++
-             filter isTypeClassDeclaration ds ++
+            --  filter isTypeClassDeclaration ds ++
              filter isTypeClassInstanceDeclaration ds ++
              filter isFixityDecl ds ++
              filter isExternDecl ds ++
@@ -133,23 +133,32 @@ usedImmediateIdents moduleName =
   usedNamesE scope _ = (scope, [])
 
 usedTypeNames :: ModuleName -> Declaration -> [ProperName 'TypeName]
-usedTypeNames moduleName =
-  let (f, _, _, _, _) = accumTypes (everythingOnTypes (++) usedNames)
-  in ordNub . f
+usedTypeNames moduleName = go
   where
+  (f, _, _, _, _) = accumTypes (everythingOnTypes (++) usedNames)
+
+  go :: Declaration -> [ProperName 'TypeName]
+  go decl = ordNub (f decl <> usedNamesForTypeClassDeps decl)
+
   usedNames :: SourceType -> [ProperName 'TypeName]
-  usedNames (ConstrainedType _ con _) =
-    case con of
-      (Constraint _ (Qualified (Just moduleName') name) _ _ _)
-        | moduleName == moduleName' -> [coerceProperName name]
-      _ -> []
+  usedNames (ConstrainedType _ con _) = usedConstraint con
   usedNames (TypeConstructor _ (Qualified (Just moduleName') name))
     | moduleName == moduleName' = [name]
   usedNames _ = []
 
+  usedConstraint :: SourceConstraint -> [ProperName 'TypeName]
+  usedConstraint (Constraint _ (Qualified (Just moduleName') name) _ _ _)
+    | moduleName == moduleName' = [coerceProperName name]
+  usedConstraint _ = []
+
+  usedNamesForTypeClassDeps :: Declaration -> [ProperName 'TypeName]
+  usedNamesForTypeClassDeps (TypeClassDeclaration _ _ _ deps _ _) = foldMap usedConstraint deps
+  usedNamesForTypeClassDeps _ = []
+
 declTypeName :: Declaration -> ProperName 'TypeName
 declTypeName (DataDeclaration _ _ pn _ _) = pn
 declTypeName (TypeSynonymDeclaration _ pn _ _) = pn
+declTypeName (TypeClassDeclaration _ pn _ _ _ _) = coerceProperName pn
 declTypeName _ = internalError "Expected DataDeclaration"
 
 -- |
