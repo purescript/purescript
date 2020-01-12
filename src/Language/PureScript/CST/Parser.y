@@ -334,7 +334,7 @@ rowLabel :: { Labeled Label (Type ()) }
 
 typeVarBinding :: { TypeVarBinding () }
   : ident { TypeVarName $1 }
-  | '(' ident '::' type ')' { TypeVarKinded (Wrapped $1 (Labeled $2 $3 $4) $5) }
+  | '(' ident '::' type ')' {% checkNoWildcards $4 *> pure (TypeVarKinded (Wrapped $1 (Labeled $2 $3 $4) $5)) }
 
 forall :: { SourceToken }
   : 'forall' { $1 }
