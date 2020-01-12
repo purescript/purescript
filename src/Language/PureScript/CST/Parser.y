@@ -650,9 +650,9 @@ decl :: { Declaration () }
   | classHead 'where' '\{' manySep(classMember, '\;') '\}' {% either (const (parseError $2)) (\h -> pure $ DeclClass () h (Just ($2, $4))) $1 }
   | instHead { DeclInstanceChain () (Separated (Instance $1 Nothing) []) }
   | instHead 'where' '\{' manySep(instBinding, '\;') '\}' { DeclInstanceChain () (Separated (Instance $1 (Just ($2, $4))) []) }
-  | 'data' properName '::' type { DeclKindSignature () $1 (Labeled $2 $3 $4) }
-  | 'newtype' properName '::' type { DeclKindSignature () $1 (Labeled $2 $3 $4) }
-  | 'type' properName '::' type { DeclKindSignature () $1 (Labeled $2 $3 $4) }
+  | 'data' properName '::' type {% checkNoWildcards $4 *> pure (DeclKindSignature () $1 (Labeled $2 $3 $4)) }
+  | 'newtype' properName '::' type {% checkNoWildcards $4 *> pure (DeclKindSignature () $1 (Labeled $2 $3 $4)) }
+  | 'type' properName '::' type {% checkNoWildcards $4 *> pure (DeclKindSignature () $1 (Labeled $2 $3 $4)) }
   | 'derive' instHead { DeclDerive () $1 Nothing $2 }
   | 'derive' 'newtype' instHead { DeclDerive () $1 (Just $2) $3 }
   | ident '::' type { DeclSignature () (Labeled $1 $2 $3) }
@@ -695,7 +695,7 @@ classHead :: { Either (Declaration ()) (ClassHead ()) }
       }
 
 classSignature :: { Labeled (Name (N.ProperName 'N.TypeName)) (Type ()) }
-  : properName '::' type {%^ revert . pure $ Labeled $1 $2 $3 }
+  : properName '::' type {%^ revert $ checkNoWildcards $3 *> pure (Labeled $1 $2 $3) }
 
 classSuper :: { (OneOrDelimited (Constraint ()), SourceToken) }
   : constraints '<=' {%^ revert $ pure ($1, $2) }
