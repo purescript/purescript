@@ -294,7 +294,7 @@ typeCheckAll moduleName _ = flip catchError (\err -> debugEnv' *> throwError err
       elabTy <- withFreshSubstitution $ do
         (elabTy, kind) <- kindOf ty
         checkTypeKind kind kindType
-        return elabTy
+        replaceAllTypeSynonyms elabTy
       env <- getEnv
       -- TODO: Extern data?
       putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (elabTy, LocalTypeVariable) (types env) }

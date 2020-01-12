@@ -72,7 +72,7 @@ desugarModule
   => Module
   -> Desugar m Module
 desugarModule (Module ss coms name decls (Just exps)) = do
-  let (classDecls, restDecls) = partition isTypeClassDeclaration decls
+  let (classDecls, restDecls) = partition isTypeClassDecl decls
       classVerts = fmap (\d -> (d, classDeclName d, superClassesNames d)) classDecls
   (classNewExpss, classDeclss) <- unzip <$> parU (stronglyConnComp classVerts) (desugarClassDecl name exps)
   (restNewExpss, restDeclss) <- unzip <$> parU restDecls (desugarDecl name exps)

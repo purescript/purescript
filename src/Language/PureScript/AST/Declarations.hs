@@ -624,12 +624,18 @@ isValueDecl ValueDeclaration{} = True
 isValueDecl _ = False
 
 -- |
--- Test if a declaration is a data type or type synonym declaration
+-- Test if a declaration is a data type declaration
 --
 isDataDecl :: Declaration -> Bool
 isDataDecl DataDeclaration{} = True
-isDataDecl TypeSynonymDeclaration{} = True
 isDataDecl _ = False
+
+-- |
+-- Test if a declaration is a type synonym declaration
+--
+isTypeSynonymDecl :: Declaration -> Bool
+isTypeSynonymDecl TypeSynonymDeclaration{} = True
+isTypeSynonymDecl _ = False
 
 -- |
 -- Test if a declaration is a module import
@@ -666,23 +672,23 @@ isExternDecl _ = False
 -- |
 -- Test if a declaration is a type class instance declaration
 --
-isTypeClassInstanceDeclaration :: Declaration -> Bool
-isTypeClassInstanceDeclaration TypeInstanceDeclaration{} = True
-isTypeClassInstanceDeclaration _ = False
+isTypeClassInstanceDecl :: Declaration -> Bool
+isTypeClassInstanceDecl TypeInstanceDeclaration{} = True
+isTypeClassInstanceDecl _ = False
 
 -- |
 -- Test if a declaration is a type class declaration
 --
-isTypeClassDeclaration :: Declaration -> Bool
-isTypeClassDeclaration TypeClassDeclaration{} = True
-isTypeClassDeclaration _ = False
+isTypeClassDecl :: Declaration -> Bool
+isTypeClassDecl TypeClassDeclaration{} = True
+isTypeClassDecl _ = False
 
 -- |
 -- Test if a declaration is a kind signature declaration.
 --
-isKindDeclaration :: Declaration -> Bool
-isKindDeclaration KindDeclaration{} = True
-isKindDeclaration _ = False
+isKindDecl :: Declaration -> Bool
+isKindDecl KindDeclaration{} = True
+isKindDecl _ = False
 
 -- |
 -- Recursively flatten data binding groups in the list of declarations

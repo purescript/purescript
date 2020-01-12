@@ -67,24 +67,30 @@ createBindingGroups moduleName = mapM f <=< handleDecls
   handleDecls :: [Declaration] -> m [Declaration]
   handleDecls ds = do
     let values = mapMaybe (fmap (fmap extractGuardedExpr) . getValueDeclaration) ds
-        kindDecls = fmap (,True) $ filter isKindDeclaration ds
-        dataDecls = fmap (,False) $ filter (\a -> isDataDecl a || isTypeClassDeclaration a) ds
+        kindDecls = fmap (,True) $ filter isKindDecl ds
+        dataDecls = fmap (,False) $ filter (\a -> isDataDecl a || isExternDataDecl a || isTypeSynonymDecl a || isTypeClassDecl a) ds
         kindSigs = fmap (declTypeName . fst) kindDecls
+        typeSyns = fmap declTypeName $ filter isTypeSynonymDecl ds
         allProperNames = fmap (declTypeName . fst) dataDecls
         allDecls = kindDecls ++ dataDecls
         mkVert (d, isSig) =
           let names = usedTypeNames moduleName d `intersect` allProperNames
-          in (d, (declTypeName d, isSig), fmap (\n -> (n, n `elem` kindSigs)) names)
+              name = declTypeName d
+              -- If a dependency has a kind signature, than that's all we need to depend on, except
+              -- in the case that we are defining a kind signature and using a type synonym. In order
+              -- to expand the type synonym, we must depend on the synonym declaration itself.
+              deps = fmap (\n -> (n, n `elem` kindSigs && (isSig && not (n `elem` typeSyns)))) names
+              self | not isSig && name `elem` kindSigs = [(name, True)]
+                   | otherwise = []
+          in (d, (name, isSig), self ++ deps)
         dataVerts = fmap mkVert allDecls
     dataBindingGroupDecls <- parU (stronglyConnComp dataVerts) toDataBindingGroup
     let allIdents = fmap valdeclIdent values
         valueVerts = fmap (\d -> (d, valdeclIdent d, usedIdents moduleName d `intersect` allIdents)) values
     bindingGroupDecls <- parU (stronglyConnComp valueVerts) (toBindingGroup moduleName)
     return $ filter isImportDecl ds ++
-             filter isExternDataDecl ds ++
              dataBindingGroupDecls ++
-            --  filter isTypeClassDeclaration ds ++
-             filter isTypeClassInstanceDeclaration ds ++
+             filter isTypeClassInstanceDecl ds ++
              filter isFixityDecl ds ++
              filter isExternDecl ds ++
              bindingGroupDecls
@@ -163,6 +169,7 @@ usedTypeNames moduleName = go
 
 declTypeName :: Declaration -> ProperName 'TypeName
 declTypeName (DataDeclaration _ _ pn _ _) = pn
+declTypeName (ExternDataDeclaration _ pn _) = pn
 declTypeName (TypeSynonymDeclaration _ pn _ _) = pn
 declTypeName (TypeClassDeclaration _ pn _ _ _ _) = coerceProperName pn
 declTypeName (KindDeclaration _ _ pn _) = pn

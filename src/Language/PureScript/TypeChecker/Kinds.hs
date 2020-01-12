@@ -45,6 +45,7 @@ import qualified Language.PureScript.Environment as E
 import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Monad
+import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.Types
 import Language.PureScript.Pretty.Types
 import Lens.Micro.Platform ((^.), _1, _2, _3)
@@ -213,13 +214,14 @@ inferKind = \case
         -- TODO: Better error for bad KindApp
         internalError "inferKind: unkinded forall binder"
   KindedType _ t1 t2 -> do
-    t1' <- checkKind t1 t2
-    t2' <- apply t2
-    pure (t1', t2')
+    t2' <- replaceAllTypeSynonyms . fst =<< inferKind t2
+    t1' <- checkKind t1 t2'
+    t2'' <- apply t2'
+    pure (t1', t2'')
   ForAll ann arg mbKind ty sc -> do
     moduleName <- unsafeCheckCurrentModule
     kind <- case mbKind of
-      Just k -> checkKind k E.kindType
+      Just k -> replaceAllTypeSynonyms =<< checkKind k E.kindType
       Nothing -> fmap ($> ann) freshKind
     (ty', unks) <- bindLocalTypeVariables moduleName [(ProperName arg, kind)] $ do
       ty' <- apply =<< checkKind ty E.kindType
@@ -230,6 +232,8 @@ inferKind = \case
       internalError "Quantification check failure" -- TODO
     for_ unks . uncurry $ addUnsolved Nothing
     pure (ForAll ann arg (Just kind) ty' sc, E.kindType $> ann)
+  ParensInType _ ty ->
+    inferKind ty
   ty ->
     internalError $ "inferKind: Unimplemented case \n" <> prettyPrintType 100 ty <> show ty
 
@@ -435,7 +439,7 @@ kindOfWithScopedVars
   => SourceType
   -> m (([(Text, SourceType)], SourceType), SourceType)
 kindOfWithScopedVars ty = do
-  (ty', kind) <- bitraverse apply apply =<< inferKind ty
+  (ty', kind) <- bitraverse apply (replaceAllTypeSynonyms <=< apply) =<< inferKind ty
   let binders = fst . fromJust $ completeBinderList ty'
   pure ((snd <$> binders, ty'), kind)
 
@@ -470,7 +474,7 @@ inferDataDeclaration moduleName (_, tyName, tyArgs, ctors) = do
   tyKind <- lookupTypeVariable moduleName (Qualified Nothing tyName)
   let (sigBinders, tyKind') = fromJust . completeBinderList $ tyKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
-    tyArgs' <- for tyArgs . traverse . maybe freshKind $ flip checkKind E.kindType
+    tyArgs' <- for tyArgs . traverse . maybe freshKind $ replaceAllTypeSynonyms <=< flip checkKind E.kindType
     unifyKinds tyKind' $ foldr ((E.-:>) . snd) E.kindType tyArgs'
     bindLocalTypeVariables moduleName (first ProperName <$> tyArgs') $ do
       let tyCtorName = srcTypeConstructor $ mkQualified tyName moduleName
@@ -520,7 +524,7 @@ inferTypeSynonym moduleName (_, tyName, tyArgs, tyBody) = do
   let (sigBinders, tyKind') = fromJust . completeBinderList $ tyKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
     kindRes <- freshKind
-    tyArgs' <- for tyArgs . traverse . maybe freshKind $ flip checkKind E.kindType
+    tyArgs' <- for tyArgs . traverse . maybe freshKind $ replaceAllTypeSynonyms <=< flip checkKind E.kindType
     unifyKinds tyKind' $ foldr ((E.-:>) . snd) kindRes tyArgs'
     bindLocalTypeVariables moduleName (first ProperName <$> tyArgs') $ do
       body <- inferKind tyBody
@@ -562,7 +566,7 @@ inferClassDeclaration moduleName (_, clsName, clsArgs, superClasses, decls) = do
   clsKind <- lookupTypeVariable moduleName (Qualified Nothing $ coerceProperName clsName)
   let (sigBinders, clsKind') = fromJust . completeBinderList $ clsKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
-    clsArgs' <- for clsArgs . traverse . maybe freshKind $ flip checkKind E.kindType
+    clsArgs' <- for clsArgs . traverse . maybe freshKind $ replaceAllTypeSynonyms <=< flip checkKind E.kindType
     unifyKinds clsKind' $ foldr ((E.-:>) . snd) E.kindConstraint clsArgs'
     bindLocalTypeVariables moduleName (first ProperName <$> clsArgs') $ do
       (clsArgs',,)
