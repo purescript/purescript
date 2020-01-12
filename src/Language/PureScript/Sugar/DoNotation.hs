@@ -7,8 +7,10 @@ module Language.PureScript.Sugar.DoNotation (desugarDoModule) where
 
 import           Prelude.Compat
 
+import           Control.Applicative ((<|>))
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Supply.Class
+import           Data.Maybe (fromMaybe)
 import           Data.Monoid (First(..))
 import           Language.PureScript.AST
 import           Language.PureScript.Crash
@@ -40,6 +42,13 @@ desugarDo d =
   replace _ (PositionedValue pos com v) = PositionedValue pos com <$> rethrowWithPosition pos (replace pos v)
   replace _ other = return other
 
+  stripPositionedBinder :: Binder -> (Maybe SourceSpan, Binder)
+  stripPositionedBinder (PositionedBinder ss _ b) =
+    let (ss', b') = stripPositionedBinder b
+     in (ss' <|> Just ss, b')
+  stripPositionedBinder b =
+    (Nothing, b)
+
   go :: SourceSpan -> Maybe ModuleName -> [DoNotationElement] -> m Expr
   go _ _ [] = internalError "The impossible happened in desugarDo"
   go _ _ [DoNotationValue val] = return val
@@ -52,13 +61,18 @@ desugarDo d =
     where
       fromIdent (Ident i) | i `elem` [ C.bind, C.discard ] = First (Just i)
       fromIdent _ = mempty
-  go pos m (DoNotationBind (VarBinder ss ident) val : rest) = do
-    rest' <- go pos m rest
-    return $ App (App (bind pos m) val) (Abs (VarBinder ss ident) rest')
   go pos m (DoNotationBind binder val : rest) = do
     rest' <- go pos m rest
-    ident <- freshIdent'
-    return $ App (App (bind pos m) val) (Abs (VarBinder pos ident) (Case [Var pos (Qualified Nothing ident)] [CaseAlternative [binder] [MkUnguarded rest']]))
+    let (mss, binder') = stripPositionedBinder binder
+    let ss = fromMaybe pos mss
+    case binder' of
+      NullBinder ->
+        return $ App (App (bind pos m) val) (Abs (VarBinder ss UnusedIdent) rest')
+      VarBinder _ ident ->
+        return $ App (App (bind pos m) val) (Abs (VarBinder ss ident) rest')
+      _ -> do
+        ident <- freshIdent'
+        return $ App (App (bind pos m) val) (Abs (VarBinder pos ident) (Case [Var pos (Qualified Nothing ident)] [CaseAlternative [binder] [MkUnguarded rest']]))
   go _ _ [DoNotationLet _] = throwError . errorMessage $ InvalidDoLet
   go pos m (DoNotationLet ds : rest) = do
     let checkBind :: Declaration -> m ()

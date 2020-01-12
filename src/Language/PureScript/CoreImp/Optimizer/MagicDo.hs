@@ -48,6 +48,10 @@ magicDo effectModule C.EffectDictionaries{..} = everywhereTopDown convert
   -- Desugar discard
   convert (App _ (App _ bind [m]) [Function s1 Nothing [] (Block s2 js)]) | isDiscard bind =
     Function s1 (Just fnName) [] $ Block s2 (App s2 m [] : map applyReturns js )
+  -- Desugar bind to wildcard
+  convert (App _ (App _ bind [m]) [Function s1 Nothing [] (Block s2 js)])
+    | isBind bind =
+    Function s1 (Just fnName) [] $ Block s2 (App s2 m [] : map applyReturns js )
   -- Desugar bind
   convert (App _ (App _ bind [m]) [Function s1 Nothing [arg] (Block s2 js)]) | isBind bind =
     Function s1 (Just fnName) [] $ Block s2 (VariableIntroduction s2 arg (Just (App s2 m [])) : map applyReturns js)
