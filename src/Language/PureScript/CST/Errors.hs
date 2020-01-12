@@ -1,9 +1,13 @@
 {-# LANGUAGE NamedFieldPuns #-}
 module Language.PureScript.CST.Errors
-  ( ParserError(..)
+  ( ParserErrorInfo(..)
   , ParserErrorType(..)
+  , ParserWarningType(..)
+  , ParserError
+  , ParserWarning
   , prettyPrintError
   , prettyPrintErrorMessage
+  , prettyPrintWarningMessage
   ) where
 
 import Prelude
@@ -53,15 +57,25 @@ data ParserErrorType
   | ErrCustom String
   deriving (Show, Eq, Ord)
 
-data ParserError = ParserError
+data ParserWarningType
+  = WarnDeprecatedRowSyntax
+  | WarnDeprecatedForeignKindSyntax
+  | WarnDeprecatedKindImportSyntax
+  | WarnDeprecatedKindExportSyntax
+  deriving (Show, Eq, Ord)
+
+data ParserErrorInfo a = ParserErrorInfo
   { errRange :: SourceRange
   , errToks :: [SourceToken]
   , errStack :: LayoutStack
-  , errType :: ParserErrorType
+  , errType :: a
   } deriving (Show, Eq)
 
+type ParserError = ParserErrorInfo ParserErrorType
+type ParserWarning = ParserErrorInfo ParserWarningType
+
 prettyPrintError :: ParserError -> String
-prettyPrintError pe@(ParserError { errRange }) =
+prettyPrintError pe@(ParserErrorInfo { errRange }) =
   prettyPrintErrorMessage pe <> " at " <> errPos
   where
   errPos = case errRange of
@@ -69,7 +83,7 @@ prettyPrintError pe@(ParserError { errRange }) =
       "line " <> show line <> ", column " <> show col
 
 prettyPrintErrorMessage :: ParserError -> String
-prettyPrintErrorMessage (ParserError {..}) = case errType of
+prettyPrintErrorMessage (ParserErrorInfo {..}) = case errType of
   ErrWildcardInType ->
     "Unexpected wildcard in type; type wildcards are only allowed in value annotations"
   ErrHoleInType ->
@@ -163,3 +177,14 @@ prettyPrintErrorMessage (ParserError {..}) = case errType of
   displayCodePoint :: Char -> String
   displayCodePoint x =
     "U+" <> map toUpper (printf "%0.4x" (fromEnum x))
+
+prettyPrintWarningMessage :: ParserWarning -> String
+prettyPrintWarningMessage (ParserErrorInfo {..}) = case errType of
+  WarnDeprecatedRowSyntax ->
+    "# syntax for row kinds is deprecated and will be removed in a future release. Use the 'Row' kind instead."
+  WarnDeprecatedForeignKindSyntax ->
+    "Foreign imports for kinds are deprecated and will be removed in a future release. Use 'foreign import data' instead."
+  WarnDeprecatedKindImportSyntax ->
+    "Kind imports are deprecated and will be removed in a future release. Omit the 'kind' keyword instead."
+  WarnDeprecatedKindExportSyntax ->
+    "Kind exports are deprecated and will be removed in a future release. Omit the 'kind' keyword instead."

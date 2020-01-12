@@ -41,7 +41,7 @@ parseModule path = do
 
 parseModule' :: FilePath -> Text -> Either FilePath (FilePath, P.Module)
 parseModule' path file =
-  case CST.parseFromFile path file of
+  case snd $ CST.parseFromFile path file of
     Left _ -> Left path
     Right m -> Right (path, m)
 

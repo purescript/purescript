@@ -369,7 +369,7 @@ answerRequest outfp rs  =
 -- | Test and ghci helper
 parseImport :: Text -> Maybe Import
 parseImport t =
-  case fmap (CST.convertImportDecl "<purs-ide>")
+  case fmap (CST.convertImportDecl "<purs-ide>" . snd)
         $ CST.runTokenParser CST.parseImportDeclP
         $ CST.lex t of
     Right (_, mn, idt, mmn) ->

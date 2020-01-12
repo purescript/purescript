@@ -22,7 +22,7 @@ import Control.Monad ((<=<), when)
 import Data.Foldable (foldl', for_)
 import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)
-import Data.Traversable (for)
+import Data.Traversable (for, sequence)
 import Language.PureScript.CST.Errors
 import Language.PureScript.CST.Lexer
 import Language.PureScript.CST.Monad
@@ -291,7 +291,7 @@ type3 :: { Type () }
 
 type4 :: { Type () }
   : type5 { $1 }
-  | '#' type4 { TypeUnaryRow () $1 $2 }
+  | '#' type4 {% addWarning [$1] WarnDeprecatedRowSyntax *> pure (TypeUnaryRow () $1 $2) }
 
 type5 :: { Type () }
   : typeAtom { $1 }
@@ -615,7 +615,7 @@ export :: { Export () }
   | properName dataMembers { ExportType () $1 (Just $2) }
   | 'type' symbol { ExportTypeOp () $1 $2 }
   | 'class' properName { ExportClass () $1 $2 }
-  | 'kind' properName { ExportKind () $1 $2 }
+  | 'kind' properName {% addWarning [$1, nameTok $2] WarnDeprecatedKindExportSyntax *> pure (ExportKind () $1 $2) }
   | 'module' moduleName { ExportModule () $1 $2 }
 
 dataMembers :: { (DataMembers ()) }
@@ -639,7 +639,7 @@ import :: { Import () }
   | properName dataMembers { ImportType () $1 (Just $2) }
   | 'type' symbol { ImportTypeOp () $1 $2 }
   | 'class' properName { ImportClass () $1 $2 }
-  | 'kind' properName { ImportKind () $1 $2 }
+  | 'kind' properName {% addWarning [$1, nameTok $2] WarnDeprecatedKindImportSyntax *> pure (ImportKind () $1 $2) }
 
 decl :: { Declaration () }
   : dataHead { DeclData () $1 Nothing }
@@ -745,7 +745,7 @@ infix :: { (SourceToken, Fixity) }
 foreign :: { Foreign () }
   : ident '::' type { ForeignValue (Labeled $1 $2 $3) }
   | 'data' properName '::' type { ForeignData $1 (Labeled $2 $3 $4) }
-  | 'kind' properName { ForeignKind $1 $2 }
+  | 'kind' properName {% addWarning [$1, nameTok $2] WarnDeprecatedForeignKindSyntax *> pure (ForeignKind $1 $2) }
 
 -- Partial parsers which can be combined with combinators for adhoc use. We need
 -- to revert the lookahead token so that it doesn't consume an extra token
@@ -773,24 +773,21 @@ qualIdentP :: { QualifiedName Ident }
 lexer :: (SourceToken -> Parser a) -> Parser a
 lexer k = munch >>= k
 
-parse :: Text -> Either (NE.NonEmpty ParserError) (Module ())
-parse = resFull <=< parseModule . lex
+parse :: Text -> ([ParserWarning], Either (NE.NonEmpty ParserError) (Module ()))
+parse = either (([],) . Left) resFull . parseModule . lex
 
 data PartialResult a = PartialResult
   { resPartial :: a
-  , resFull :: Either (NE.NonEmpty ParserError) a
+  , resFull :: ([ParserWarning], Either (NE.NonEmpty ParserError) a)
   } deriving (Functor)
 
 parseModule :: [LexResult] -> Either (NE.NonEmpty ParserError) (PartialResult (Module ()))
 parseModule toks = fmap (\header -> PartialResult header (parseFull header)) headerRes
   where
   (st, headerRes) =
-    runParser (ParserState (toks) []) parseModuleHeader
+    runParser (ParserState toks [] []) parseModuleHeader
 
   parseFull header = do
-    (decls, trailing) <- snd $ runParser st parseModuleBody
-    pure $ header
-      { modDecls = decls
-      , modTrailingComments = trailing
-      }
+    let (ParserState _ _ warnings, res) = runParser st parseModuleBody
+    (warnings, (\(decls, trailing) -> header { modDecls = decls, modTrailingComments = trailing }) <$> res)
 }

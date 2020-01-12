@@ -85,7 +85,7 @@ getSupportModuleTuples = do
   fileContents <- readInput pursFiles
   modules <- runExceptT $ ExceptT . return $ CST.parseFromFiles id fileContents
   case modules of
-    Right ms -> return ms
+    Right ms -> return (fmap (fmap snd) ms)
     Left errs -> fail (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
 
 getSupportModuleNames :: IO [T.Text]
@@ -169,7 +169,7 @@ compile
   -> IO (Either P.MultipleErrors [P.ExternsFile], P.MultipleErrors)
 compile supportModules supportExterns supportForeigns inputFiles check = runTest $ do
   fs <- liftIO $ readInput inputFiles
-  ms <- CST.parseFromFiles id fs
+  ms <- fmap (fmap snd) <$> CST.parseFromFiles id fs
   foreigns <- inferForeignModules ms
   liftIO (check (map snd ms))
   let actions = makeActions supportModules (foreigns `M.union` supportForeigns)

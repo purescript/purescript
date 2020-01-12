@@ -23,6 +23,7 @@ data LexState = LexState
 data ParserState = ParserState
   { parserBuff :: [LexResult]
   , parserErrors :: [ParserError]
+  , parserWarnings :: [ParserWarning]
   } deriving (Show)
 
 -- | A bare bones, CPS'ed `StateT s (Except e) a`.
@@ -67,8 +68,17 @@ runParser st (Parser k) = k st left right
     | null parserErrors = (st', Right res)
     | otherwise = (st', Left $ NE.fromList $ sortBy (comparing errRange) parserErrors)
 
-runTokenParser :: Parser a -> [LexResult] -> Either (NE.NonEmpty ParserError) a
-runTokenParser p = snd . flip runParser p . flip ParserState []
+runTokenParser :: Parser a -> [LexResult] -> Either (NE.NonEmpty ParserError) ([ParserWarning], a)
+runTokenParser p buff = fmap (warnings,) res
+  where
+  (ParserState _ _ warnings, res) =
+    runParser initialState p
+
+  initialState = ParserState
+    { parserBuff = buff
+    , parserErrors = []
+    , parserWarnings = []
+    }
 
 {-# INLINE throw #-}
 throw :: e -> ParserM e s a
@@ -76,16 +86,16 @@ throw e = Parser $ \st kerr _ -> kerr st e
 
 parseError :: SourceToken -> Parser a
 parseError tok = Parser $ \st kerr _ ->
-  kerr st $ ParserError
+  kerr st $ ParserErrorInfo
     { errRange = tokRange . tokAnn $ tok
     , errToks = [tok]
     , errStack = [] -- TODO parserStack st
     , errType = ErrToken
     }
 
-mkParserError :: LayoutStack -> [SourceToken] -> ParserErrorType -> ParserError
+mkParserError :: LayoutStack -> [SourceToken] -> a -> ParserErrorInfo a
 mkParserError stack toks ty =
-  ParserError
+  ParserErrorInfo
     { errRange =  range
     , errToks = toks
     , errStack = stack
@@ -109,6 +119,10 @@ parseFail' toks msg = Parser $ \st kerr _ -> kerr st (mkParserError [] toks msg)
 
 parseFail :: SourceToken -> ParserErrorType -> Parser a
 parseFail = parseFail' . pure
+
+addWarning :: [SourceToken] -> ParserWarningType -> Parser ()
+addWarning toks ty = Parser $ \st _ ksucc ->
+  ksucc (st { parserWarnings = mkParserError [] toks ty : parserWarnings st }) ()
 
 pushBack :: SourceToken -> Parser ()
 pushBack tok = Parser $ \st _ ksucc ->

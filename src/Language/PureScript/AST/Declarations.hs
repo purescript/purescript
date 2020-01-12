@@ -69,6 +69,7 @@ data SimpleErrorMessage
   | ErrorParsingFFIModule FilePath (Maybe Bundle.ErrorMessage)
   | ErrorParsingModule P.ParseError
   | ErrorParsingCSTModule CST.ParserError
+  | WarningParsingCSTModule CST.ParserWarning
   | MissingFFIModule ModuleName
   | UnnecessaryFFIModule ModuleName FilePath
   | MissingFFIImplementations ModuleName [Ident]

@@ -43,7 +43,7 @@ data HierarchyOptions = HierarchyOptions
 parseInput :: [FilePath] -> IO (Either P.MultipleErrors [P.Module])
 parseInput paths = do
   content <- readUTF8FilesT paths
-  return $ map snd <$> CST.parseFromFiles id content
+  return $ map (snd . snd) <$> CST.parseFromFiles id content
 
 compile :: HierarchyOptions -> IO ()
 compile (HierarchyOptions inputGlob mOutput) = do

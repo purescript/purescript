@@ -80,6 +80,7 @@ errorCode em = case unwrapErrorMessage em of
   ErrorParsingFFIModule{} -> "ErrorParsingFFIModule"
   ErrorParsingModule{} -> "ErrorParsingModule"
   ErrorParsingCSTModule{} -> "ErrorParsingModule"
+  WarningParsingCSTModule{} -> "WarningParsingModule"
   MissingFFIModule{} -> "MissingFFIModule"
   UnnecessaryFFIModule{} -> "UnnecessaryFFIModule"
   MissingFFIImplementations{} -> "MissingFFIImplementations"
@@ -490,6 +491,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (ErrorParsingCSTModule err) =
       paras [ line "Unable to parse module: "
             , line $ T.pack $ CST.prettyPrintErrorMessage err
+            ]
+    renderSimpleErrorMessage (WarningParsingCSTModule err) =
+      paras [ line "Warning while parsing module: "
+            , line $ T.pack $ CST.prettyPrintWarningMessage err
             ]
     renderSimpleErrorMessage (MissingFFIModule mn) =
       line $ "The foreign module implementation for module " <> markCode (runModuleName mn) <> " is missing."
