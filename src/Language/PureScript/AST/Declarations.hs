@@ -192,9 +192,10 @@ data ErrorMessageHint
   | ErrorInSubsumption SourceType SourceType
   | ErrorCheckingAccessor Expr PSString
   | ErrorCheckingType Expr SourceType
-  | ErrorCheckingKind SourceType
+  | ErrorCheckingKind SourceType SourceType
   | ErrorCheckingGuard
   | ErrorInferringType Expr
+  | ErrorInferringKind SourceType
   | ErrorInApplication Expr SourceType Expr
   | ErrorInDataConstructor (ProperName 'ConstructorName)
   | ErrorInTypeConstructor (ProperName 'TypeName)

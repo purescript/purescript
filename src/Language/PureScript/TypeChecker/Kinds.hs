@@ -150,92 +150,97 @@ inferKind
   :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
   => SourceType
   -> m (SourceType, SourceType)
-inferKind = \case
-  ty@(TypeConstructor ann v) -> do
-    env <- getEnv
-    case M.lookup v (E.types env) of
-      Nothing ->
-        throwError . errorMessage' (fst ann) . UnknownName . fmap TyName $ v
-      Just (kind, E.LocalTypeVariable) -> do
-        kind' <- apply kind
-        pure (ty, kind' $> ann)
-      Just (kind, _) -> do
-        pure (ty, kind $> ann)
-  ConstrainedType ann' con@(Constraint ann v _ _ _) ty -> do
-    env <- getEnv
-    con' <- case M.lookup (coerceProperName <$> v) (E.types env) of
-      Nothing ->
-        throwError . errorMessage' (fst ann) . UnknownName . fmap TyClassName $ v
-      Just _ ->
-        checkConstraint con
-    ty' <- checkKind ty E.kindType
-    con'' <- applyConstraint con'
-    pure (ConstrainedType ann' con'' ty', E.kindType $> ann')
-  ty@(TypeLevelString ann _) ->
-    pure (ty, E.kindSymbol $> ann)
-  ty@(TypeVar ann v) -> do
-    moduleName <- unsafeCheckCurrentModule
-    kind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing $ ProperName v)
-    pure (ty, kind $> ann)
-  ty@(Skolem ann _ mbK _ _) -> do
-    let
-      kind = case mbK of
-        Just k -> k
-        Nothing -> internalError "Skolem has no kind"
-    kind' <- apply kind
-    pure (ty, kind' $> ann)
-  ty@(TUnknown ann u) -> do
-    (_, kind) <- lookupUnsolved u
-    pure (ty, kind $> ann)
-  ty@(TypeWildcard ann _) -> do
-    -- TODO: Warning?
-    k <- freshKind
-    pure (ty, k $> ann)
-  ty@(REmpty ann) -> do
-    k <- freshKind
-    pure (ty, E.kindRow k $> ann)
-  ty@(RCons ann _ _ _) | (rowList, rowTail) <- rowToList ty -> do
-    kr <- freshKind
-    rowList' <- for rowList $ \(RowListItem a lbl t) ->
-      RowListItem a lbl <$> checkKind t kr
-    rowTail' <- checkKind rowTail $ E.kindRow kr
-    kr' <- apply kr
-    pure (rowFromList (rowList', rowTail'), E.kindRow kr' $> ann)
-  TypeApp ann t1 t2 -> do
-    (t1', k1) <- inferKind t1
-    inferAppKind ann (t1', k1) t2
-  KindApp ann t1 t2 -> do
-    (t1', kind) <- bitraverse pure apply =<< inferKind t1
-    case kind of
-      ForAll _ arg (Just argKind) resKind _ -> do
-        t2' <- checkKind t2 argKind
-        pure (KindApp ann t1' t2', replaceTypeVars arg t2' resKind)
-      _ ->
-        -- TODO: Better error for bad KindApp
-        internalError "inferKind: unkinded forall binder"
-  KindedType _ t1 t2 -> do
-    t2' <- replaceAllTypeSynonyms . fst =<< inferKind t2
-    t1' <- checkKind t1 t2'
-    t2'' <- apply t2'
-    pure (t1', t2'')
-  ForAll ann arg mbKind ty sc -> do
-    moduleName <- unsafeCheckCurrentModule
-    kind <- case mbKind of
-      Just k -> replaceAllTypeSynonyms =<< checkKind k E.kindType
-      Nothing -> fmap ($> ann) freshKind
-    (ty', unks) <- bindLocalTypeVariables moduleName [(ProperName arg, kind)] $ do
-      ty' <- apply =<< checkKind ty E.kindType
-      unks <- for (IS.toList $ unknowns ty') $ \u ->
-        fmap (u,) . apply . snd =<< lookupUnsolved u
-      pure (ty', unks)
-    unless (not . elem arg $ foldMap (freeTypeVariables . snd) unks) $
-      internalError "Quantification check failure" -- TODO
-    for_ unks . uncurry $ addUnsolved Nothing
-    pure (ForAll ann arg (Just kind) ty' sc, E.kindType $> ann)
-  ParensInType _ ty ->
-    inferKind ty
-  ty ->
-    internalError $ "inferKind: Unimplemented case \n" <> prettyPrintType 100 ty <> show ty
+inferKind = \tyToInfer ->
+  withErrorMessageHint (ErrorInferringKind tyToInfer)
+    . rethrowWithPosition (fst $ getAnnForType tyToInfer)
+    $ go tyToInfer
+  where
+  go = \case
+    ty@(TypeConstructor ann v) -> do
+      env <- getEnv
+      case M.lookup v (E.types env) of
+        Nothing ->
+          throwError . errorMessage' (fst ann) . UnknownName . fmap TyName $ v
+        Just (kind, E.LocalTypeVariable) -> do
+          kind' <- apply kind
+          pure (ty, kind' $> ann)
+        Just (kind, _) -> do
+          pure (ty, kind $> ann)
+    ConstrainedType ann' con@(Constraint ann v _ _ _) ty -> do
+      env <- getEnv
+      con' <- case M.lookup (coerceProperName <$> v) (E.types env) of
+        Nothing ->
+          throwError . errorMessage' (fst ann) . UnknownName . fmap TyClassName $ v
+        Just _ ->
+          checkConstraint con
+      ty' <- checkKind ty E.kindType
+      con'' <- applyConstraint con'
+      pure (ConstrainedType ann' con'' ty', E.kindType $> ann')
+    ty@(TypeLevelString ann _) ->
+      pure (ty, E.kindSymbol $> ann)
+    ty@(TypeVar ann v) -> do
+      moduleName <- unsafeCheckCurrentModule
+      kind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing $ ProperName v)
+      pure (ty, kind $> ann)
+    ty@(Skolem ann _ mbK _ _) -> do
+      let
+        kind = case mbK of
+          Just k -> k
+          Nothing -> internalError "Skolem has no kind"
+      kind' <- apply kind
+      pure (ty, kind' $> ann)
+    ty@(TUnknown ann u) -> do
+      (_, kind) <- lookupUnsolved u
+      pure (ty, kind $> ann)
+    ty@(TypeWildcard ann _) -> do
+      -- TODO: Warning?
+      k <- freshKind
+      pure (ty, k $> ann)
+    ty@(REmpty ann) -> do
+      k <- freshKind
+      pure (ty, E.kindRow k $> ann)
+    ty@(RCons ann _ _ _) | (rowList, rowTail) <- rowToList ty -> do
+      kr <- freshKind
+      rowList' <- for rowList $ \(RowListItem a lbl t) ->
+        RowListItem a lbl <$> checkKind t kr
+      rowTail' <- checkKind rowTail $ E.kindRow kr
+      kr' <- apply kr
+      pure (rowFromList (rowList', rowTail'), E.kindRow kr' $> ann)
+    TypeApp ann t1 t2 -> do
+      (t1', k1) <- inferKind t1
+      inferAppKind ann (t1', k1) t2
+    KindApp ann t1 t2 -> do
+      (t1', kind) <- bitraverse pure apply =<< inferKind t1
+      case kind of
+        ForAll _ arg (Just argKind) resKind _ -> do
+          t2' <- checkKind t2 argKind
+          pure (KindApp ann t1' t2', replaceTypeVars arg t2' resKind)
+        _ ->
+          -- TODO: Better error for bad KindApp
+          internalError "inferKind: unkinded forall binder"
+    KindedType _ t1 t2 -> do
+      t2' <- replaceAllTypeSynonyms . fst =<< go t2
+      t1' <- checkKind t1 t2'
+      t2'' <- apply t2'
+      pure (t1', t2'')
+    ForAll ann arg mbKind ty sc -> do
+      moduleName <- unsafeCheckCurrentModule
+      kind <- case mbKind of
+        Just k -> replaceAllTypeSynonyms =<< checkKind k E.kindType
+        Nothing -> fmap ($> ann) freshKind
+      (ty', unks) <- bindLocalTypeVariables moduleName [(ProperName arg, kind)] $ do
+        ty' <- apply =<< checkKind ty E.kindType
+        unks <- for (IS.toList $ unknowns ty') $ \u ->
+          fmap (u,) . apply . snd =<< lookupUnsolved u
+        pure (ty', unks)
+      unless (not . elem arg $ foldMap (freeTypeVariables . snd) unks) $
+        internalError "Quantification check failure" -- TODO
+      for_ unks . uncurry $ addUnsolved Nothing
+      pure (ForAll ann arg (Just kind) ty' sc, E.kindType $> ann)
+    ParensInType _ ty ->
+      go ty
+    ty ->
+      internalError $ "inferKind: Unimplemented case \n" <> prettyPrintType 100 ty <> show ty
 
 inferAppKind
   :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
@@ -276,11 +281,13 @@ checkKind
   => SourceType
   -> SourceType
   -> m SourceType
-checkKind ty kind2 = do
-  (ty', kind1) <- inferKind ty
-  kind1' <- apply kind1
-  kind2' <- apply kind2
-  instantiateKind (ty', kind1') kind2'
+checkKind ty kind2 =
+  withErrorMessageHint (ErrorCheckingKind ty kind2)
+    . rethrowWithPosition (fst $ getAnnForType ty) $ do
+        (ty', kind1) <- inferKind ty
+        kind1' <- apply kind1
+        kind2' <- apply kind2
+        instantiateKind (ty', kind1') kind2'
 
 instantiateKind
   :: (MonadError MultipleErrors m, MonadState CheckState m)

@@ -309,7 +309,8 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gHint (ErrorInSubsumption t1 t2) = ErrorInSubsumption <$> f t1 <*> f t2
   gHint (ErrorUnifyingTypes t1 t2) = ErrorUnifyingTypes <$> f t1 <*> f t2
   gHint (ErrorCheckingType e t) = ErrorCheckingType e <$> f t
-  gHint (ErrorCheckingKind t) = ErrorCheckingKind <$> f t
+  gHint (ErrorCheckingKind t k) = ErrorCheckingKind <$> f t <*> f k
+  gHint (ErrorInferringKind t) = ErrorInferringKind <$> f t
   gHint (ErrorInApplication e1 t1 e2) = ErrorInApplication e1 <$> f t1 <*> pure e2
   gHint (ErrorInInstance cl ts) = ErrorInInstance cl <$> traverse f ts
   gHint (ErrorSolvingConstraint con) = ErrorSolvingConstraint <$> overConstraintArgs (traverse f) con
@@ -1104,9 +1105,18 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
                ]
             ]
-    renderHint (ErrorCheckingKind ty) detail =
+    renderHint (ErrorCheckingKind ty kd) detail =
       paras [ detail
-            , Box.hsep 1 Box.top [ line "while checking the kind of"
+            , Box.hsep 1 Box.top [ line "while checking that type"
+                                 , markCodeBox $ typeAsBox prettyDepth ty
+                                 ]
+            , Box.moveRight 2 $ Box.hsep 1 Box.top [ line "has kind"
+                                                   , markCodeBox $ typeAsBox prettyDepth kd
+                                                   ]
+            ]
+    renderHint (ErrorInferringKind ty) detail =
+      paras [ detail
+            , Box.hsep 1 Box.top [ line "while inferring the kind of"
                                  , markCodeBox $ typeAsBox prettyDepth ty
                                  ]
             ]
