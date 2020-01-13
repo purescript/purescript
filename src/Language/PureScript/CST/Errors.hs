@@ -181,9 +181,9 @@ prettyPrintErrorMessage (ParserErrorInfo {..}) = case errType of
 prettyPrintWarningMessage :: ParserWarning -> String
 prettyPrintWarningMessage (ParserErrorInfo {..}) = case errType of
   WarnDeprecatedRowSyntax ->
-    "# syntax for row kinds is deprecated and will be removed in a future release. Use the 'Row' kind instead."
+    "Unary '#' syntax for row kinds is deprecated and will be removed in a future release. Use the 'Row' kind instead."
   WarnDeprecatedForeignKindSyntax ->
-    "Foreign imports for kinds are deprecated and will be removed in a future release. Use 'foreign import data' instead."
+    "Foreign kind imports are deprecated and will be removed in a future release. Use 'foreign import data' instead."
   WarnDeprecatedKindImportSyntax ->
     "Kind imports are deprecated and will be removed in a future release. Omit the 'kind' keyword instead."
   WarnDeprecatedKindExportSyntax ->

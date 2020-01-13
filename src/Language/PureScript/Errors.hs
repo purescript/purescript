@@ -188,6 +188,7 @@ errorCode em = case unwrapErrorMessage em of
   CannotDefinePrimModules{} -> "CannotDefinePrimModules"
   MixedAssociativityError{} -> "MixedAssociativityError"
   NonAssociativeError{} -> "NonAssociativeError"
+  QuantificationCheckFailure {} -> "QuantificationCheckFailure"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -494,8 +495,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , line $ T.pack $ CST.prettyPrintErrorMessage err
             ]
     renderSimpleErrorMessage (WarningParsingCSTModule err) =
-      paras [ line "Warning while parsing module: "
-            , line $ T.pack $ CST.prettyPrintWarningMessage err
+      paras [ line $ T.pack $ CST.prettyPrintWarningMessage err
             ]
     renderSimpleErrorMessage (MissingFFIModule mn) =
       line $ "The foreign module implementation for module " <> markCode (runModuleName mn) <> " is missing."
@@ -1057,6 +1057,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , indent $ paras $ map (line . markCode . showQualified showOp) (NEL.toList ops)
             , line "Use parentheses to resolve this ambiguity."
             ]
+
+    renderSimpleErrorMessage (QuantificationCheckFailure var) =
+      paras
+        [ line $ "Type variable " <> markCode var <> " is not well-ordered."
+        , line "Try adding kind annotations to any type variables."
+        ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =

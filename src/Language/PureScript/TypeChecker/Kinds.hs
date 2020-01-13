@@ -132,7 +132,7 @@ lookupUnsolved
 lookupUnsolved u = do
   uns <- gets (substUnsolved . checkSubstitution)
   case M.lookup u uns of
-    Nothing -> internalError "Unsolved variable is not bound" -- TODO
+    Nothing -> internalError $ "Unsolved unification variable ?" <> show u <> " is not bound"
     Just res -> return res
 
 unknownsWithKinds
@@ -183,17 +183,12 @@ inferKind = \tyToInfer ->
       kind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing $ ProperName v)
       pure (ty, kind $> ann)
     ty@(Skolem ann _ mbK _ _) -> do
-      let
-        kind = case mbK of
-          Just k -> k
-          Nothing -> internalError "Skolem has no kind"
-      kind' <- apply kind
+      kind' <- apply $ maybe (internalError "Skolem has no kind") id mbK
       pure (ty, kind' $> ann)
     ty@(TUnknown ann u) -> do
       (_, kind) <- lookupUnsolved u
       pure (ty, kind $> ann)
     ty@(TypeWildcard ann _) -> do
-      -- TODO: Warning?
       k <- freshKind
       pure (ty, k $> ann)
     ty@(REmpty ann) -> do
@@ -207,17 +202,16 @@ inferKind = \tyToInfer ->
       kr' <- apply kr
       pure (rowFromList (rowList', rowTail'), E.kindRow kr' $> ann)
     TypeApp ann t1 t2 -> do
-      (t1', k1) <- inferKind t1
+      (t1', k1) <- go t1
       inferAppKind ann (t1', k1) t2
     KindApp ann t1 t2 -> do
-      (t1', kind) <- bitraverse pure apply =<< inferKind t1
+      (t1', kind) <- bitraverse pure apply =<< go t1
       case kind of
         ForAll _ arg (Just argKind) resKind _ -> do
           t2' <- checkKind t2 argKind
           pure (KindApp ann t1' t2', replaceTypeVars arg t2' resKind)
         _ ->
-          -- TODO: Better error for bad KindApp
-          internalError "inferKind: unkinded forall binder"
+          internalError $ "inferKind: unkinded forall binder"
     KindedType _ t1 t2 -> do
       t2' <- replaceAllTypeSynonyms . fst =<< go t2
       t1' <- checkKind t1 t2'
@@ -234,13 +228,13 @@ inferKind = \tyToInfer ->
           fmap (u,) . apply . snd =<< lookupUnsolved u
         pure (ty', unks)
       unless (not . elem arg $ foldMap (freeTypeVariables . snd) unks) $
-        internalError "Quantification check failure" -- TODO
+        throwError . errorMessage' (fst ann) $ QuantificationCheckFailure arg
       for_ unks . uncurry $ addUnsolved Nothing
       pure (ForAll ann arg (Just kind) ty' sc, E.kindType $> ann)
     ParensInType _ ty ->
       go ty
     ty ->
-      internalError $ "inferKind: Unimplemented case \n" <> prettyPrintType 100 ty <> show ty
+      internalError $ "inferKind: Unimplemented case \n" <> prettyPrintType 100 ty
 
 inferAppKind
   :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
@@ -266,15 +260,29 @@ inferAppKind ann (fn, fnKind) arg = case fnKind of
     u <- freshUnknown
     addUnsolved Nothing u k
     inferAppKind ann (KindApp ann fn (TUnknown ann u), replaceTypeVars a (TUnknown ann u) ty) arg
-  _ -> do
-    -- This is an artificial construction designed to trigger an error
-    -- TODO: Better error?
-    (_, argKind) <- inferKind arg
-    u <- freshKind
-    unifyKinds
-      fnKind
-      (srcTypeApp (srcTypeApp E.tyFunction argKind) u)
-    internalError "Cannot apply type"
+  _ ->
+    cannotApplyTypeToType fn arg
+
+cannotApplyTypeToType
+  :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
+  => SourceType
+  -> SourceType
+  -> m a
+cannotApplyTypeToType fn arg = do
+  argKind <- snd <$> inferKind arg
+  _ <- checkKind fn . srcTypeApp (srcTypeApp E.tyFunction argKind) =<< freshKind
+  internalError "Cannot apply type to type"
+
+cannotApplyKindToType
+  :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
+  => SourceType
+  -> SourceType
+  -> m a
+cannotApplyKindToType poly arg = do
+  let ann = getAnnForType arg
+  argKind <- snd <$> inferKind arg
+  _ <- checkKind poly . mkForAll [(ann, ("k", Just argKind))] =<< freshKind
+  internalError "Cannot apply kind to type"
 
 checkKind
   :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
@@ -360,7 +368,6 @@ promoteKind
 promoteKind u2 ty = do
   lvl2 <- fst <$> lookupUnsolved u2
   flip everywhereOnTypesM ty $ \case
-    -- TODO: Do we need to check free type variables?
     ty'@(TUnknown ann u1) -> do
       when (u1 == u2) . throwError . errorMessage . InfiniteKind $ ty
       (lvl1, k) <- lookupUnsolved u1
@@ -401,28 +408,30 @@ elaborateKind = \case
     case k1 of
       TypeApp _ (TypeApp _ k w1) w2 | eqType k E.tyFunction -> do
         k2 <- elaborateKind t2
-        unless (eqType k2 w1) $ internalError "Cannot apply type" -- TODO
+        unless (eqType k2 w1) $ cannotApplyTypeToType t1 t2
         pure $ w2 $> ann
       _ ->
-        internalError "Cannot apply type" -- TODO
+        cannotApplyTypeToType t1 t2
   KindApp ann t1 t2 -> do
     k1 <- elaborateKind t1
     case k1 of
       ForAll _ a (Just w) n _ -> do
         k2 <- elaborateKind t2
-        unless (eqType k2 w) $ internalError "Cannot apply kind" -- TODO
+        unless (eqType k2 w) $ cannotApplyKindToType t1 t2
         flip (replaceTypeVars a) n . ($> ann) <$> apply t2
       _ ->
-        internalError "Cannot apply kind" -- TODO
+        cannotApplyKindToType t1 t2
   ForAll ann a (Just w) u _ -> do
     wIsStar <- elaborateKind w
-    unless (eqType wIsStar E.kindType) $ internalError "Elaborated kind is not Type" -- TODO
+    unless (eqType wIsStar E.kindType) $
+      internalError $ "elaborateKind: Elaborated kind is not Type " <> prettyPrintType 10 wIsStar
     moduleName <- unsafeCheckCurrentModule
     uIsStar <- bindLocalTypeVariables moduleName [(ProperName a, w)] $ elaborateKind u
-    unless (eqType uIsStar E.kindType) $ internalError "Elaborated kind is not Type" -- TODO
+    unless (eqType uIsStar E.kindType) $
+      internalError $ "elaborateKind: Elaborated kind is not Type " <> prettyPrintType 10 uIsStar
     pure $ E.kindType $> ann
   ty ->
-    internalError "elaboratedKind: Unimplemented case" -- TODO
+    internalError $ "elaborateKind: Unimplemented case " <> prettyPrintType 10 ty
 
 kindOfWithUnknowns
   :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
