@@ -123,11 +123,10 @@ addTypeClass
   -> [Declaration]
   -> SourceType
   -> m ()
-addTypeClass moduleName qualifiedClassName args implies dependencies ds kind = do
+addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
   env <- getEnv
   let newClass = mkNewClass env
   traverse_ (checkMemberIsUsable newClass (typeSynonyms env) (types env)) classMembers
-  -- modify $ \st -> st { checkEnv = (checkEnv st) { typeClasses = M.insert qualifiedClassName newClass (typeClasses . checkEnv $ st) } }
   putEnv $ env { types = M.insert (fmap coerceProperName qualifiedClassName) (kind, ExternData) (types env)
                , typeClasses = M.insert qualifiedClassName newClass (typeClasses env) }
   where

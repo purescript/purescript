@@ -63,8 +63,6 @@ import Language.PureScript.Types
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString)
 
-import Debug.Trace
-
 data BindingGroupType
   = RecursiveBindingGroup
   | NonRecursiveBindingGroup

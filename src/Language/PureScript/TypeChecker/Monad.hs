@@ -343,6 +343,7 @@ debugEnv :: Environment -> [String]
 debugEnv env = join
   [ debugTypes env
   , debugTypeSynonyms env
+  , debugDataConstructors env
   , debugNames env
   , debugTypeClassDictionaries env
   ]
@@ -376,6 +377,15 @@ debugNames = fmap go . M.toList . names
     let
       ppTy = prettyPrintType 100 srcTy
       name = showQualified runIdent qual
+    unpack name <> " :: " <> init ppTy
+
+debugDataConstructors :: Environment -> [String]
+debugDataConstructors = fmap go . M.toList . dataConstructors
+  where
+  go (qual, (_, _, ty, _)) = do
+    let
+      ppTy = prettyPrintType 100 ty
+      name = showQualified runProperName qual
     unpack name <> " :: " <> init ppTy
 
 debugTypeSynonyms :: Environment -> [String]

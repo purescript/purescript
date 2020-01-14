@@ -16,7 +16,6 @@ import Protolude (ordNub)
 import Control.Applicative ((<|>))
 import Control.Arrow (first)
 import Control.DeepSeq (NFData)
-import Data.Graph (stronglyConnComp, flattenSCCs)
 import Control.Monad ((<=<), (>=>))
 import Data.Aeson ((.:), (.=))
 import qualified Data.Aeson as A
@@ -391,7 +390,7 @@ isMonoType _        = True
 
 -- | Universally quantify a type
 mkForAll :: [(a, (Text, Maybe (Type a)))] -> Type a -> Type a
-mkForAll args ty = foldl (\t (ann, (arg, mbK)) -> ForAll ann arg mbK t Nothing) ty args
+mkForAll args ty = foldr (\(ann, (arg, mbK)) t -> ForAll ann arg mbK t Nothing) ty args
 
 -- | Replace a type variable, taking into account variable shadowing
 replaceTypeVars :: Text -> Type a -> Type a -> Type a
@@ -456,20 +455,6 @@ completeBinderList = go []
     ForAll ann var (Just k) ty _ -> go ((ann, (var, k)) : acc) ty
     ty -> Just (reverse acc, ty)
 
--- | Sort quantifiers in dependency order, since the kinds of type variables may
--- | depend on previously bound type variables.
-sortCompleteBinderList :: [(a, (Text, Type a))] -> [(a, (Text, Type a))]
-sortCompleteBinderList = sortVars (fst . snd) (usedTypeVariables . snd . snd)
-
-sortBinderList :: [(a, (Text, Maybe (Type a)))] -> [(a, (Text, Maybe (Type a)))]
-sortBinderList = sortVars (fst . snd) (maybe [] usedTypeVariables . snd . snd)
-
-sortVars :: (a -> Text) -> (a -> [Text]) -> [a] -> [a]
-sortVars toVar toUsed = flattenSCCs . stronglyConnComp . fmap go
-  where
-  go binding =
-    (binding, toVar binding, toUsed binding)
-
 -- | Universally quantify over all type variables appearing free in a type
 quantify :: Type a -> Type a
 quantify ty = foldr (\arg t -> ForAll (getAnnForType ty) arg Nothing t Nothing) ty $ freeTypeVariables ty
@@ -505,6 +490,20 @@ eraseKindApps :: Type a -> Type a
 eraseKindApps = everywhereOnTypes $ \case
   KindApp _ ty _ -> ty
   other -> other
+
+eraseForAllKindAnnotations :: Type a -> Type a
+eraseForAllKindAnnotations = removeAmbiguousVars . removeForAllKinds
+  where
+  removeForAllKinds = everywhereOnTypes $ \case
+    ForAll ann arg _ ty sco ->
+      ForAll ann arg Nothing ty sco
+    other -> other
+
+  removeAmbiguousVars = everywhereOnTypes $ \case
+    fa@(ForAll _ arg _ ty _)
+      | arg `elem` freeTypeVariables ty -> fa
+      | otherwise -> ty
+    other -> other
 
 unapplyTypes :: Type a -> (Type a, [Type a], [Type a])
 unapplyTypes = goTypes []

@@ -527,11 +527,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line "The same name was used more than once in a let binding."
     renderSimpleErrorMessage (InfiniteType ty) =
       paras [ line "An infinite type was inferred for an expression: "
-            , markCodeBox $ indent $ typeAsBox prettyDepth ty
+            , markCodeBox $ indent $ prettyType ty
             ]
     renderSimpleErrorMessage (InfiniteKind ki) =
       paras [ line "An infinite kind was inferred for a type: "
-            , markCodeBox $ indent $ typeAsBox prettyDepth ki
+            , markCodeBox $ indent $ prettyType ki
             ]
     renderSimpleErrorMessage (MultipleValueOpFixities op) =
       line $ "There are multiple fixity/precedence declarations for operator " <> markCode (showOp op)
@@ -616,13 +616,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
     renderSimpleErrorMessage (EscapedSkolem name Nothing ty) =
       paras [ line $ "The type variable " <> markCode name <> " has escaped its scope, appearing in the type"
-            , markCodeBox $ indent $ typeAsBox prettyDepth ty
+            , markCodeBox $ indent $ prettyType ty
             ]
     renderSimpleErrorMessage (EscapedSkolem name (Just srcSpan) ty) =
       paras [ line $ "The type variable " <> markCode name <> ", bound at"
             , indent $ line $ displaySourceSpan relPath srcSpan
             , line "has escaped its scope, appearing in the type"
-            , markCodeBox $ indent $ typeAsBox prettyDepth ty
+            , markCodeBox $ indent $ prettyType ty
             ]
     renderSimpleErrorMessage (TypesDoNotUnify u1 u2)
       = let (row1Box, row2Box) = printRows u1 u2
@@ -635,15 +635,15 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
 
     renderSimpleErrorMessage (KindsDoNotUnify k1 k2) =
       paras [ line "Could not match kind"
-            , markCodeBox $ indent $ typeAsBox prettyDepth k1
+            , markCodeBox $ indent $ prettyType k1
             , line "with kind"
-            , markCodeBox $ indent $ typeAsBox prettyDepth k2
+            , markCodeBox $ indent $ prettyType k2
             ]
     renderSimpleErrorMessage (ConstrainedTypeUnified t1 t2) =
       paras [ line "Could not match constrained type"
-            , markCodeBox $ indent $ typeAsBox prettyDepth t1
+            , markCodeBox $ indent $ prettyType t1
             , line "with type"
-            , markCodeBox $ indent $ typeAsBox prettyDepth t2
+            , markCodeBox $ indent $ prettyType t2
             ]
     renderSimpleErrorMessage (OverlappingInstances _ _ []) = internalError "OverlappingInstances: empty instance list"
     renderSimpleErrorMessage (OverlappingInstances nm ts ds) =
@@ -678,7 +678,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Discard _ [ty] _)) =
       paras [ line "A result of type"
-            , markCodeBox $ indent $ typeAsBox prettyDepth ty
+            , markCodeBox $ indent $ prettyType ty
             , line "was implicitly discarded in a do notation block."
             , line ("You can use " <> markCode "_ <- ..." <> " to explicitly discard the result.")
             ]
@@ -701,7 +701,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
         go _ = False
     renderSimpleErrorMessage (AmbiguousTypeVariables t _) =
       paras [ line "The inferred type"
-            , markCodeBox $ indent $ typeAsBox prettyDepth t
+            , markCodeBox $ indent $ prettyType t
             , line "has type variables which are not mentioned in the body of the type. Consider adding a type annotation."
             ]
     renderSimpleErrorMessage (PossiblyInfiniteInstance nm ts) =
@@ -767,7 +767,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
                 ]
             , "because the type"
-            , markCodeBox $ indent $ typeAsBox prettyDepth ty
+            , markCodeBox $ indent $ prettyType ty
             , line "is not of the required form T a_1 ... a_n, where T is a type constructor defined in the same module."
             ]
     renderSimpleErrorMessage (CannotFindDerivingType nm) =
@@ -788,7 +788,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (MissingClassMember identsAndTypes) =
       paras $ [ line "The following type class members have not been implemented:"
               , Box.vcat Box.left
-                [ markCodeBox $ Box.text (T.unpack (showIdent ident)) Box.<> " :: " Box.<> typeAsBox prettyDepth ty
+                [ markCodeBox $ Box.text (T.unpack (showIdent ident)) Box.<> " :: " Box.<> prettyType ty
                 | (ident, ty) <- NEL.toList identsAndTypes ]
               ]
     renderSimpleErrorMessage (ExtraneousClassMember ident className) =
@@ -796,9 +796,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (ExpectedType ty kind) =
       paras [ line $ "In a type-annotated expression " <> markCode "x :: t" <> ", the type " <> markCode "t" <> " must have kind " <> markCode C.typ <> "."
             , line "The error arises from the type"
-            , markCodeBox $ indent $ typeAsBox prettyDepth ty
+            , markCodeBox $ indent $ prettyType ty
             , line "having the kind"
-            , markCodeBox $ indent $ typeAsBox prettyDepth kind
+            , markCodeBox $ indent $ prettyType kind
             , line "instead."
             ]
     renderSimpleErrorMessage (IncorrectConstructorArity nm expected actual) =
@@ -809,7 +809,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line "Expression"
             , markCodeBox $ indent $ prettyPrintValue prettyDepth expr
             , line "does not have type"
-            , markCodeBox $ indent $ typeAsBox prettyDepth ty
+            , markCodeBox $ indent $ prettyType ty
             ]
     renderSimpleErrorMessage (PropertyIsMissing prop) =
       line $ "Type of expression lacks required label " <> markCode (prettyPrintLabel prop) <> "."
@@ -841,7 +841,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
     renderSimpleErrorMessage (InvalidInstanceHead ty) =
       paras [ line "Type class instance head is invalid due to use of type"
-            , markCodeBox $ indent $ typeAsBox prettyDepth ty
+            , markCodeBox $ indent $ prettyType ty
             , line "All types appearing in instance declarations must be of the form T a_1 .. a_n, where each type a_i is of the same form, unless the type is fully determined by other type class arguments via functional dependencies."
             ]
     renderSimpleErrorMessage (TransitiveExportError x ys) =
@@ -866,7 +866,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
     renderSimpleErrorMessage (WildcardInferredType ty ctx) =
       paras $ [ line "Wildcard type definition has the inferred type "
-              , markCodeBox $ indent $ typeAsBox prettyDepth ty
+              , markCodeBox $ indent $ prettyType ty
               ] <> renderContext ctx
     renderSimpleErrorMessage (HoleInferredType name ty ctx ts) =
       let
@@ -878,7 +878,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 let
                   idBoxes = Box.text . T.unpack . showQualified id <$> names
                   tyBoxes = (\t -> BoxHelpers.indented
-                              (Box.text ":: " Box.<> typeAsBox prettyDepth t)) <$> types
+                              (Box.text ":: " Box.<> prettyType t)) <$> types
                   longestId = maximum (map Box.cols idBoxes)
                 in
                   Box.vcat Box.top $
@@ -891,13 +891,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
           _ -> []
       in
         paras $ [ line $ "Hole '" <> markCode name <> "' has the inferred type "
-                , markCodeBox (indent (typeAsBox maxBound ty))
+                , markCodeBox (indent (prettyTypeWithDepth maxBound ty))
                 ] ++ tsResult ++ renderContext ctx
     renderSimpleErrorMessage (MissingTypeDeclaration ident ty) =
       paras [ line $ "No type declaration was provided for the top-level declaration of " <> markCode (showIdent ident) <> "."
             , line "It is good practice to provide type declarations as a form of documentation."
             , line $ "The inferred type of " <> markCode (showIdent ident) <> " was:"
-            , markCodeBox $ indent $ typeAsBox prettyDepth ty
+            , markCodeBox $ indent $ prettyTypeWithDepth maxBound ty
             ]
     renderSimpleErrorMessage (OverlappingPattern bs b) =
       paras $ [ line "A case expression contains unreachable cases:\n"
@@ -984,7 +984,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (CannotGeneralizeRecursiveFunction ident ty) =
       paras [ line $ "Unable to generalize the type of the recursive function " <> markCode (showIdent ident) <> "."
             , line $ "The inferred type of " <> markCode (showIdent ident) <> " was:"
-            , markCodeBox $ indent $ typeAsBox prettyDepth ty
+            , markCodeBox $ indent $ prettyType ty
             , line "Try adding a type signature."
             ]
 
@@ -1010,7 +1010,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
           argsMsg = if expected > 1 then "arguments" else "argument"
 
     renderSimpleErrorMessage (UserDefinedWarning msgTy) =
-      let msg = fromMaybe (typeAsBox prettyDepth msgTy) (toTypelevelString msgTy) in
+      let msg = fromMaybe (prettyType msgTy) (toTypelevelString msgTy) in
       paras [ line "A custom warning occurred while solving type class constraints:"
             , indent msg
             ]
@@ -1279,6 +1279,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
   prettyDepth :: Int
   prettyDepth | full = 1000
               | otherwise = 3
+
+  prettyType :: Type a -> Box.Box
+  prettyType = prettyTypeWithDepth prettyDepth
+
+  prettyTypeWithDepth :: Int -> Type a -> Box.Box
+  prettyTypeWithDepth depth
+    | full = typeAsBox depth
+    | otherwise = typeAsBox depth . eraseForAllKindAnnotations . eraseKindApps
 
   levelText :: Text
   levelText = case level of
