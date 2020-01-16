@@ -36,6 +36,7 @@ import qualified Language.PureScript.CoreFn.ToJSON as CFJ
 import qualified Language.PureScript.CoreImp.AST as Imp
 import           Language.PureScript.Crash
 import qualified Language.PureScript.CST as CST
+import qualified Language.PureScript.Docs.Prim as Docs.Prim
 import qualified Language.PureScript.Docs.Types as Docs
 import           Language.PureScript.Errors
 import           Language.PureScript.Externs (ExternsFile)
@@ -100,6 +101,8 @@ data MakeActions m = MakeActions
   , writeCacheDb :: CacheDb -> m ()
   -- ^ Write the given cache database to some external source (e.g. a file on
   -- disk).
+  , outputPrimDocs :: m ()
+  -- ^ If generating docs, output the documentation for the Prim modules
   }
 
 -- | A set of make actions that read and write modules from the given directory.
@@ -114,7 +117,7 @@ buildMakeActions
   -- ^ Generate a prefix comment?
   -> MakeActions Make
 buildMakeActions outputDir filePathMap foreigns usePrefix =
-    MakeActions getInputTimestampsAndHashes getOutputTimestamp readExterns codegen ffiCodegen progress readCacheDb writeCacheDb
+    MakeActions getInputTimestampsAndHashes getOutputTimestamp readExterns codegen ffiCodegen progress readCacheDb writeCacheDb outputPrimDocs
   where
 
   getInputTimestampsAndHashes
@@ -156,6 +159,12 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   readExterns mn = do
     let path = outputDir </> T.unpack (runModuleName mn) </> "externs.json"
     (path, ) <$> readExternsFile path
+
+  outputPrimDocs :: Make ()
+  outputPrimDocs = do
+    codegenTargets <- asks optionsCodegenTargets
+    when (S.member Docs codegenTargets) $ for_ Docs.Prim.primModules $ \docsMod@Docs.Module{..} ->
+      writeJSONFile (outputFilename modName "docs.json") docsMod
 
   codegen :: CF.Module CF.Ann -> Docs.Module -> ExternsFile -> SupplyT Make ()
   codegen m docs exts = do
