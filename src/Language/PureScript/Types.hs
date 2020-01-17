@@ -489,6 +489,8 @@ unknowns = everythingOnTypes (<>) go where
 eraseKindApps :: Type a -> Type a
 eraseKindApps = everywhereOnTypes $ \case
   KindApp _ ty _ -> ty
+  ConstrainedType ann con ty ->
+    ConstrainedType ann (con { constraintKindArgs = [] }) ty
   other -> other
 
 eraseForAllKindAnnotations :: Type a -> Type a

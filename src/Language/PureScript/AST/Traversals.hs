@@ -635,61 +635,32 @@ accumTypes
      , CaseAlternative -> r
      , DoNotationElement -> r
      )
-accumTypes f = everythingOnValues mappend forDecls forValues (const mempty) (const mempty) (const mempty)
+accumTypes f = everythingOnValues mappend forDecls forValues forBinders (const mempty) (const mempty)
   where
   forDecls (DataDeclaration _ _ _ args dctors) =
     foldMap (foldMap f . snd) args <>
     foldMap (foldMap (f . snd) . dataCtorFields) dctors
   forDecls (ExternDataDeclaration _ _ ty) = f ty
   forDecls (ExternDeclaration _ _ ty) = f ty
-  forDecls (TypeClassDeclaration _ _ _ implies _ _) = mconcat (concatMap (fmap f . constraintArgs) implies)
-  forDecls (TypeInstanceDeclaration _ _ _ _ cs _ tys _) = mconcat (concatMap (fmap f . constraintArgs) cs) <> mconcat (fmap f tys)
-  forDecls (TypeSynonymDeclaration _ _ _ ty) = f ty
+  forDecls (TypeClassDeclaration _ _ args implies _ _) =
+    foldMap (foldMap (foldMap f)) args <>
+    foldMap (foldMap f . constraintArgs) implies
+  forDecls (TypeInstanceDeclaration _ _ _ _ cs _ tys _) =
+    foldMap (foldMap f . constraintArgs) cs <> foldMap f tys
+  forDecls (TypeSynonymDeclaration _ _ args ty) =
+    foldMap (foldMap f . snd) args <>
+    f ty
   forDecls (KindDeclaration _ _ _ ty) = f ty
   forDecls (TypeDeclaration td) = f (tydeclType td)
   forDecls _ = mempty
 
-  forValues (TypeClassDictionary c _ _) = mconcat (fmap f (constraintArgs c))
-  forValues (DeferredDictionary _ tys) = mconcat (fmap f tys)
+  forValues (TypeClassDictionary c _ _) = foldMap f (constraintArgs c)
+  forValues (DeferredDictionary _ tys) = foldMap f tys
   forValues (TypedValue _ _ ty) = f ty
   forValues _ = mempty
 
-accumKinds
-  :: (Monoid r)
-  => (SourceType -> r)
-  -> ( Declaration -> r
-     , Expr -> r
-     , Binder -> r
-     , CaseAlternative -> r
-     , DoNotationElement -> r
-     )
-accumKinds f = everythingOnValues mappend forDecls forValues (const mempty) (const mempty) (const mempty)
-  where
-  forDecls (DataDeclaration _ _ _ args dctors) =
-    foldMap (foldMap f . snd) args <>
-    foldMap (foldMap (forTypes . snd) . dataCtorFields) dctors
-  forDecls (TypeClassDeclaration _ _ args implies _ _) =
-    foldMap (foldMap f . snd) args <>
-    foldMap (foldMap forTypes . constraintArgs) implies
-  forDecls (TypeInstanceDeclaration _ _ _ _ cs _ tys _) =
-    foldMap (foldMap forTypes . constraintArgs) cs <>
-    foldMap forTypes tys
-  forDecls (TypeSynonymDeclaration _ _ args ty) =
-    foldMap (foldMap f . snd) args <>
-    forTypes ty
-  forDecls (KindDeclaration _ _ _ k) = f k
-  forDecls (TypeDeclaration td) = forTypes (tydeclType td)
-  forDecls (ExternDeclaration _ _ ty) = forTypes ty
-  forDecls (ExternDataDeclaration _ _ kn) = f kn
-  forDecls _ = mempty
-
-  forValues (TypeClassDictionary c _ _) = foldMap forTypes (constraintArgs c)
-  forValues (DeferredDictionary _ tys) = foldMap forTypes tys
-  forValues (TypedValue _ _ ty) = forTypes ty
-  forValues _ = mempty
-
-  forTypes (KindedType _ _ k) = f k
-  forTypes _ = mempty
+  forBinders (TypedBinder ty _) = f ty
+  forBinders _ = mempty
 
 -- |
 -- Map a function over type annotations appearing inside a value

@@ -53,8 +53,8 @@ typeLiterals = mkPattern match
     Nothing
 
 renderConstraint :: PrettyPrintConstraint -> RenderedCode
-renderConstraint (pn, tys) =
-  let instApp = foldl PPTypeApp (PPTypeConstructor (fmap coerceProperName pn)) tys
+renderConstraint (pn, ks, tys) =
+  let instApp = foldl PPTypeApp (foldl (\a b -> PPTypeApp a (PPKindArg b)) (PPTypeConstructor (fmap coerceProperName pn)) ks) tys
   in  renderType' instApp
 
 renderConstraints :: PrettyPrintConstraint -> RenderedCode -> RenderedCode

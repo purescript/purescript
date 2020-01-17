@@ -10,9 +10,9 @@ module Language.PureScript.TypeChecker
   ) where
 
 import Prelude.Compat
-import Protolude (ordNub)
+import Protolude (headMay, ordNub)
 
-import Control.Monad (when, unless, void, forM)
+import Control.Monad (when, unless, void, forM,)
 import Control.Monad.Error.Class (MonadError(..), catchError)
 import Control.Monad.State.Class (MonadState(..), modify, gets)
 import Control.Monad.Supply.Class (MonadSupply)
@@ -239,14 +239,14 @@ typeCheckAll
   -> m [Declaration]
 typeCheckAll moduleName _ = flip catchError (\err -> debugEnv' *> throwError err) . (\a -> traverse go a <* debugEnv')
   where
-  debugEnv' = pure ()
-  -- debugEnv' = do
-  --   env <- gets checkEnv
-  --   let ppEnv = unlines $ debugEnv env
-  --   traceM
-  --     . unlines
-  --     $ T.unpack (runModuleName moduleName)
-  --     : fmap ("  " <>) (lines ppEnv)
+  -- debugEnv' = pure ()
+  debugEnv' = do
+    env <- gets checkEnv
+    let ppEnv = unlines $ debugEnv env
+    traceM
+      . unlines
+      $ T.unpack (runModuleName moduleName)
+      : fmap ("  " <>) (lines ppEnv)
 
   go :: Declaration -> m Declaration
   go (DataDeclaration sa@(ss, _) dtype name args dctors) = do
@@ -261,10 +261,11 @@ typeCheckAll moduleName _ = flip catchError (\err -> debugEnv' *> throwError err
     let tysList = NEL.toList tys
         syns = mapMaybe toTypeSynonym tysList
         dataDecls = mapMaybe toDataDecl tysList
-        bindingGroupNames = ordNub ((syns^..traverse._2) ++ (dataDecls^..traverse._2._2))
+        clss = mapMaybe toClassDecl tysList
+        bindingGroupNames = ordNub ((syns^..traverse._2) ++ (dataDecls^..traverse._2._2) ++ (fmap coerceProperName (clss^..traverse._2._2)))
         sss = fmap declSourceSpan tys
     warnAndRethrow (addHint (ErrorInDataBindingGroup bindingGroupNames) . addHint (PositionedError sss)) $ do
-      (syn_ks, data_ks, _) <- kindsOfAll moduleName syns (fmap snd dataDecls) []
+      (syn_ks, data_ks, cls_ks) <- kindsOfAll moduleName syns (fmap snd dataDecls) (fmap snd clss)
       for_ (zip dataDecls data_ks) $ \((dtype, (_, name, args, dctors)), (dataCtors, ctorKind)) -> do
         when (dtype == Newtype) $ checkNewtype name dctors
         checkDuplicateTypeArguments $ map fst args
@@ -274,12 +275,20 @@ typeCheckAll moduleName _ = flip catchError (\err -> debugEnv' *> throwError err
         checkDuplicateTypeArguments $ map fst args
         let args' = args `withKinds` kind
         addTypeSynonym moduleName name args' elabTy kind
+      for_ (zip clss cls_ks) $ \((deps, (sa, pn, _, _, _)), (args', implies', tys', kind)) -> do
+        env <- getEnv
+        let qualifiedClassName = Qualified (Just moduleName) pn
+        guardWith (errorMessage (DuplicateTypeClass pn (fst sa))) $
+          not (M.member qualifiedClassName (typeClasses env))
+        addTypeClass moduleName qualifiedClassName (fmap Just <$> args') implies' deps tys' kind
     return d
     where
     toTypeSynonym (TypeSynonymDeclaration sa nm args ty) = Just (sa, nm, args, ty)
     toTypeSynonym _ = Nothing
     toDataDecl (DataDeclaration sa dtype nm args dctors) = Just (dtype, (sa, nm, args, dctors))
     toDataDecl _ = Nothing
+    toClassDecl (TypeClassDeclaration sa nm args implies deps decls) = Just (deps, (sa, nm, args, implies, decls))
+    toClassDecl _ = Nothing
   go (TypeSynonymDeclaration sa@(ss, _) name args ty) = do
     warnAndRethrow (addHint (ErrorInTypeSynonym name) . addHint (positionedError ss) ) $ do
       checkDuplicateTypeArguments $ map fst args
@@ -350,7 +359,6 @@ typeCheckAll moduleName _ = flip catchError (\err -> debugEnv' *> throwError err
       let qualifiedClassName = Qualified (Just moduleName) pn
       guardWith (errorMessage (DuplicateTypeClass pn ss)) $
         not (M.member qualifiedClassName (typeClasses env))
-      -- TODO: What should we do with this signature vs the desugared type synonym?
       (args', implies', tys', kind) <- kindOfClass moduleName (sa, pn, args, implies, tys)
       addTypeClass moduleName qualifiedClassName (fmap Just <$> args') implies' deps tys' kind
       return d
@@ -682,6 +690,7 @@ typeCheckModule (Module ss coms mn decls (Just exps)) =
     where
     findClassMembers :: Declaration -> Maybe [Ident]
     findClassMembers (TypeClassDeclaration _ name' _ _ _ ds) | name == name' = Just $ map extractMemberName ds
+    findClassMembers (DataBindingGroupDeclaration decls') = headMay . mapMaybe findClassMembers $ NEL.toList decls'
     findClassMembers _ = Nothing
     extractMemberName :: Declaration -> Ident
     extractMemberName (TypeDeclaration td) = tydeclIdent td

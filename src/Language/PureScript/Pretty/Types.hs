@@ -56,7 +56,7 @@ data PrettyPrintType
   | PPRow [(Label, PrettyPrintType)] (Maybe PrettyPrintType)
   | PPTruncated
 
-type PrettyPrintConstraint = (Qualified (ProperName 'ClassName), [PrettyPrintType])
+type PrettyPrintConstraint = (Qualified (ProperName 'ClassName), [PrettyPrintType], [PrettyPrintType])
 
 convertPrettyPrintType :: Int -> Type a -> PrettyPrintType
 convertPrettyPrintType = go
@@ -74,7 +74,7 @@ convertPrettyPrintType = go
   -- truncate them.
   go d _ | d < 0 = PPTruncated
   -- TODO: constraint kind args
-  go d (ConstrainedType _ (Constraint _ cls _ args _) ty) = PPConstrainedType (cls, go (d-1) <$> args) (go d ty)
+  go d (ConstrainedType _ (Constraint _ cls kargs args _) ty) = PPConstrainedType (cls, go (d-1) <$> kargs, go (d-1) <$> args) (go d ty)
   go d (KindedType _ ty k) = PPKindedType (go (d-1) ty) (go (d-1) k)
   go d (BinaryNoParensType _ ty1 ty2 ty3) = PPBinaryNoParensType (go (d-1) ty1) (go (d-1) ty2) (go (d-1) ty3)
   go d (ParensInType _ ty) = PPParensInType (go (d-1) ty)
@@ -110,7 +110,7 @@ constraintsAsBox tro con ty =
     doubleRightArrow = if troUnicode tro then "⇒" else "=>"
 
 constraintAsBox :: PrettyPrintConstraint -> Box
-constraintAsBox (pn, tys) = typeAsBox' (foldl PPTypeApp (PPTypeConstructor (fmap coerceProperName pn)) tys)
+constraintAsBox (pn, ks, tys) = typeAsBox' (foldl PPTypeApp (foldl (\a b -> PPTypeApp a (PPKindArg b)) (PPTypeConstructor (fmap coerceProperName pn)) ks) tys)
 
 -- |
 -- Generate a pretty-printed string representing a Row
@@ -187,7 +187,7 @@ matchTypeAtom tro@TypeRenderOptions{troSuggesting = suggesting} =
       match (PPTypeConstructor ctor) = Just $ text $ T.unpack $ runProperName $ disqualify ctor
       match (PPTUnknown u)
         | suggesting = Just $ text "_"
-        | otherwise = Just $ text $ '?' : show u
+        | otherwise = Just $ text $ 't' : show u
       match (PPSkolem name s)
         | suggesting =  Just $ text $ T.unpack name
         | otherwise = Just $ text $ T.unpack name ++ show s
