@@ -104,6 +104,7 @@ data SimpleErrorMessage
   | CycleInDeclaration Ident
   | CycleInTypeSynonym (Maybe (ProperName 'TypeName))
   | CycleInTypeClassDeclaration [Qualified (ProperName 'ClassName)]
+  | CycleInKindDeclaration [Qualified (ProperName 'TypeName)]
   | CycleInModules [ModuleName]
   | NameIsUndefined Ident
   | UndefinedTypeVariable (ProperName 'TypeName)
@@ -206,6 +207,7 @@ data ErrorMessageHint
   | ErrorInValueDeclaration Ident
   | ErrorInTypeDeclaration Ident
   | ErrorInTypeClassDeclaration (ProperName 'ClassName)
+  | ErrorInKindDeclaration (ProperName 'TypeName)
   | ErrorInForeignImport Ident
   | ErrorSolvingConstraint SourceConstraint
   | PositionedError (NEL.NonEmpty SourceSpan)

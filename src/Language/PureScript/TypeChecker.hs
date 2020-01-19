@@ -42,8 +42,6 @@ import Language.PureScript.Types
 
 import Lens.Micro.Platform ((^..), _2)
 
-import Debug.Trace
-
 addDataType
   :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
@@ -204,6 +202,8 @@ checkTypeClassInstance cls i = check where
       when (ctor `M.member` typeSynonyms env) . throwError . errorMessage $ TypeSynonymInstance
       return ()
     TypeApp _ t1 t2 -> check t1 >> check t2
+    KindApp _ t k -> check t >> check k
+    KindedType _ t _ -> check t
     REmpty _ | isFunDepDetermined -> return ()
     RCons _ _ hd tl | isFunDepDetermined -> check hd >> check tl
     ty -> throwError . errorMessage $ InvalidInstanceHead ty
@@ -239,14 +239,14 @@ typeCheckAll
   -> m [Declaration]
 typeCheckAll moduleName _ = flip catchError (\err -> debugEnv' *> throwError err) . (\a -> traverse go a <* debugEnv')
   where
-  -- debugEnv' = pure ()
-  debugEnv' = do
-    env <- gets checkEnv
-    let ppEnv = unlines $ debugEnv env
-    traceM
-      . unlines
-      $ T.unpack (runModuleName moduleName)
-      : fmap ("  " <>) (lines ppEnv)
+  debugEnv' = pure ()
+  -- debugEnv' = do
+  --   env <- gets checkEnv
+  --   let ppEnv = unlines $ debugEnv env
+  --   traceM
+  --     . unlines
+  --     $ T.unpack (runModuleName moduleName)
+  --     : fmap ("  " <>) (lines ppEnv)
 
   go :: Declaration -> m Declaration
   go (DataDeclaration sa@(ss, _) dtype name args dctors) = do
@@ -297,8 +297,7 @@ typeCheckAll moduleName _ = flip catchError (\err -> debugEnv' *> throwError err
       addTypeSynonym moduleName name args' elabTy kind
     return $ TypeSynonymDeclaration sa name args ty
   go (KindDeclaration sa@(ss, _) kindFor name ty) = do
-    -- TODO: warnAndRethrow ErrorInKindSignature
-    warnAndRethrow (addHint (positionedError ss)) $ do
+    warnAndRethrow (addHint (ErrorInKindDeclaration name) . addHint (positionedError ss)) $ do
       elabTy <- withFreshSubstitution $ do
         (elabTy, kind) <- kindOf ty
         checkTypeKind kind kindType
@@ -373,13 +372,13 @@ typeCheckAll moduleName _ = flip catchError (\err -> debugEnv' *> throwError err
         Nothing -> internalError "typeCheckAll: Encountered unknown type class in instance declaration"
         Just typeClass -> do
           checkInstanceArity dictName className typeClass tys
-          sequence_ (zipWith (checkTypeClassInstance typeClass) [0..] tys)
-          let nonOrphanModules = findNonOrphanModules className typeClass tys
-          checkOrphanInstance dictName className tys nonOrphanModules
-          let qualifiedChain = Qualified (Just moduleName) <$> ch
-          checkOverlappingInstance qualifiedChain dictName className typeClass tys nonOrphanModules
-          _ <- traverseTypeInstanceBody checkInstanceMembers body
           (deps', kinds', tys') <- withFreshSubstitution $ checkInstanceDeclaration moduleName (sa, deps, className, tys)
+          sequence_ (zipWith (checkTypeClassInstance typeClass) [0..] tys')
+          let nonOrphanModules = findNonOrphanModules className typeClass tys'
+          checkOrphanInstance dictName className tys' nonOrphanModules
+          let qualifiedChain = Qualified (Just moduleName) <$> ch
+          checkOverlappingInstance qualifiedChain dictName className typeClass tys' nonOrphanModules
+          _ <- traverseTypeInstanceBody checkInstanceMembers body
           deps'' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms deps'
           let dict = TypeClassDictionaryInScope qualifiedChain idx qualifiedDictName [] className kinds' tys' (Just deps'')
           addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) (pure dict)
@@ -425,6 +424,8 @@ typeCheckAll moduleName _ = flip catchError (\err -> debugEnv' *> throwError err
     typeModule (TypeConstructor _ (Qualified (Just mn'') _)) = Just mn''
     typeModule (TypeConstructor _ (Qualified Nothing _)) = internalError "Unqualified type name in findNonOrphanModules"
     typeModule (TypeApp _ t1 _) = typeModule t1
+    typeModule (KindApp _ t1 _) = typeModule t1
+    typeModule (KindedType _ t1 _) = typeModule t1
     typeModule _ = internalError "Invalid type in instance in findNonOrphanModules"
 
     modulesByTypeIndex :: M.Map Int (Maybe ModuleName)

@@ -221,7 +221,11 @@ toDataBindingGroup (CyclicSCC [d]) = case isTypeSynonym d of
   _ -> return d
 toDataBindingGroup (CyclicSCC ds')
   | all (isJust . isTypeSynonym) ds' = throwError . errorMessage' (declSourceSpan (head ds')) $ CycleInTypeSynonym Nothing
+  | kds@((ss, _):_) <- concatMap kindDecl ds' = throwError . errorMessage' ss . CycleInKindDeclaration $ fmap snd kds
   | otherwise = return . DataBindingGroupDeclaration $ NEL.fromList ds'
+  where
+  kindDecl (KindDeclaration sa _ pn _) = [(fst sa, Qualified Nothing pn)]
+  kindDecl _ = []
 
 isTypeSynonym :: Declaration -> Maybe (ProperName 'TypeName)
 isTypeSynonym (TypeSynonymDeclaration _ pn _ _) = Just pn

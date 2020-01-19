@@ -34,7 +34,7 @@ primDocsModule = Module
   , modComments = Just $ T.unlines
       [ "The `Prim` module is embedded in the PureScript compiler in order to provide compiler support for certain types &mdash; for example, value literals, or syntax sugar. It is implicitly imported unqualified in every module except those that list it as a qualified import."
       , ""
-      , "`Prim` does not include additional built-in types and kinds that are defined deeper in the compiler. For example, row kinds (e.g. `# Type`, which is the kind of types such as `(name :: String, age :: Int)`), Type wildcards (e.g. `f :: _ -> Int`), and Quantified Types. Rather, these are documented in [the PureScript language reference](https://github.com/purescript/documentation/blob/master/language/Types.md)."
+      , "`Prim` does not include additional built-in types and kinds that are defined deeper in the compiler. For example, row kinds (e.g. `Row Type`, which is the kind of types such as `(name :: String, age :: Int)`), Type wildcards (e.g. `f :: _ -> Int`), and Quantified Types. Rather, these are documented in [the PureScript language reference](https://github.com/purescript/documentation/blob/master/language/Types.md)."
       ]
   , modDeclarations =
       [ function
@@ -47,6 +47,7 @@ primDocsModule = Module
       , boolean
       , partial
       , kindType
+      , kindConstraint
       , kindSymbol
       , kindRow
       ]
@@ -207,6 +208,19 @@ kindType :: Declaration
 kindType = primType "Type" $ T.unlines
   [ "`Type` is the kind of all proper types: those that classify value-level terms."
   , "For example the type `Boolean` has kind `Type`; denoted by `Boolean :: Type`."
+  ]
+
+kindConstraint :: Declaration
+kindConstraint = primType "Constraint" $ T.unlines
+  [ "`Constraint` is the kind of type class constraints."
+  , "For example, a type class declaration like this:"
+  , ""
+  , "    class Semigroup a where"
+  , "      append :: a -> a -> a"
+  , ""
+  , "has the kind signature:"
+  , ""
+  , "    class Semigroup :: Type -> Constraint"
   ]
 
 kindSymbol :: Declaration

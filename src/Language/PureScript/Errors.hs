@@ -115,6 +115,7 @@ errorCode em = case unwrapErrorMessage em of
   CycleInDeclaration{} -> "CycleInDeclaration"
   CycleInTypeSynonym{} -> "CycleInTypeSynonym"
   CycleInTypeClassDeclaration{} -> "CycleInTypeClassDeclaration"
+  CycleInKindDeclaration{} -> "CycleInKindDeclaration"
   CycleInModules{} -> "CycleInModules"
   NameIsUndefined{} -> "NameIsUndefined"
   UndefinedTypeVariable{} -> "UndefinedTypeVariable"
@@ -605,6 +606,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line $ "A cycle appears in a set of type class definitions:"
             , indent $ line $ "{" <> (T.intercalate ", " (map (markCode . runProperName . disqualify) names)) <> "}"
             , line "Cycles are disallowed because they can lead to loops in the type checker."
+            ]
+    renderSimpleErrorMessage (CycleInKindDeclaration [name]) =
+      paras [ line $ "A kind declaration '" <> markCode (runProperName (disqualify name)) <> "' may not refer to itself in its own signature." ]
+    renderSimpleErrorMessage (CycleInKindDeclaration names) =
+      paras [ line $ "A cycle appears in a set of kind declarations:"
+            , indent $ line $ "{" <> (T.intercalate ", " (map (markCode . runProperName . disqualify) names)) <> "}"
+            , line "Kind declarations may not refer to themselves in their own signatures."
             ]
     renderSimpleErrorMessage (NameIsUndefined ident) =
       line $ "Value " <> markCode (showIdent ident) <> " is undefined."
@@ -1194,6 +1202,10 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderHint (ErrorInTypeClassDeclaration name) detail =
       paras [ detail
             , line $ "in type class declaration for " <> markCode (runProperName name)
+            ]
+    renderHint (ErrorInKindDeclaration name) detail =
+      paras [ detail
+            , line $ "in kind declaration for " <> markCode (runProperName name)
             ]
     renderHint (ErrorInForeignImport nm) detail =
       paras [ detail

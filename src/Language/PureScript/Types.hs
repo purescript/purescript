@@ -22,7 +22,7 @@ import qualified Data.Aeson as A
 import qualified Data.Aeson.Types as A
 import Data.Foldable (fold)
 import qualified Data.IntSet as IS
-import Data.List (sortBy)
+import Data.List (sort, sortBy)
 import Data.Ord (comparing)
 import Data.Maybe (fromMaybe)
 import qualified Data.Set as S
@@ -434,17 +434,18 @@ usedTypeVariables = ordNub . everythingOnTypes (++) go where
 
 -- | Collect all free type variables appearing in a type
 freeTypeVariables :: Type a -> [Text]
-freeTypeVariables = ordNub . go [] where
-  go :: [Text] -> Type a -> [Text]
-  go bound (TypeVar _ v) | v `notElem` bound = [v]
-  go bound (TypeApp _ t1 t2) = go bound t1 ++ go bound t2
-  go bound (ForAll _ v _ t _) = go (v : bound) t
-  go bound (ConstrainedType _ c t) = concatMap (go bound) (constraintArgs c) ++ go bound t
-  go bound (RCons _ _ t r) = go bound t ++ go bound r
-  go bound (KindedType _ t k) = go bound t ++ go bound k
-  go bound (BinaryNoParensType _ t1 t2 t3) = go bound t1 ++ go bound t2 ++ go bound t3
-  go bound (ParensInType _ t) = go bound t
-  go _ _ = []
+freeTypeVariables = ordNub . fmap snd . sort . go 0 [] where
+  -- Tracks kind levels so that variables appearing in kind annotations are listed first.
+  go :: Int -> [Text] -> Type a -> [(Int, Text)]
+  go lvl bound (TypeVar _ v) | v `notElem` bound = [(lvl, v)]
+  go lvl bound (TypeApp _ t1 t2) = go lvl bound t1 ++ go lvl bound t2
+  go lvl bound (ForAll _ v mbK t _) = foldMap (go (lvl - 1) bound) mbK ++ go lvl (v : bound) t
+  go lvl bound (ConstrainedType _ c t) = concatMap (go lvl bound) (constraintArgs c) ++ go lvl bound t
+  go lvl bound (RCons _ _ t r) = go lvl bound t ++ go lvl bound r
+  go lvl bound (KindedType _ t k) = go lvl bound t ++ go (lvl - 1) bound k
+  go lvl bound (BinaryNoParensType _ t1 t2 t3) = go lvl bound t1 ++ go lvl bound t2 ++ go lvl bound t3
+  go lvl bound (ParensInType _ t) = go lvl bound t
+  go _ _ _ = []
 
 -- | Collect a complete set of kind-annotated quantifiers at the front of a type.
 completeBinderList :: Type a -> Maybe ([(a, (Text, Type a))], Type a)
