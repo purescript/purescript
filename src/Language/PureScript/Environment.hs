@@ -305,6 +305,9 @@ kindRowList = TypeApp nullSourceAnn (primSubKind C.moduleRowList C.kindRowList)
 kindRow :: SourceType -> SourceType
 kindRow = TypeApp nullSourceAnn (primKind C.row)
 
+kindOfREmpty :: SourceType
+kindOfREmpty = tyForall "k" kindType (kindRow (tyVar "k"))
+
 -- | Construct a type in the Prim module
 primTy :: Text -> SourceType
 primTy = TypeConstructor nullSourceAnn . primName

@@ -38,7 +38,6 @@ replaceAllTypeSynonyms' syns kinds = everywhereOnTypesTopDownM try
   try :: SourceType -> Either MultipleErrors SourceType
   try t = fromMaybe t <$> go 0 [] [] t
 
-  -- TODO: Clean up kind arg substitution. Is it even correct?
   go :: Int -> [SourceType] -> [SourceType] -> SourceType -> Either MultipleErrors (Maybe SourceType)
   go c kargs args (TypeConstructor _ ctor)
     | Just (synArgs, body) <- M.lookup ctor syns

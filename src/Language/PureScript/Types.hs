@@ -14,7 +14,7 @@ import Prelude.Compat
 import Protolude (ordNub)
 
 import Control.Applicative ((<|>))
-import Control.Arrow (first)
+import Control.Arrow (first, second)
 import Control.DeepSeq (NFData)
 import Control.Monad ((<=<), (>=>))
 import Data.Aeson ((.:), (.=))
@@ -24,7 +24,7 @@ import Data.Foldable (fold)
 import qualified Data.IntSet as IS
 import Data.List (sort, sortBy)
 import Data.Ord (comparing)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import qualified Data.Set as S
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -138,6 +138,17 @@ srcBinaryNoParensType = BinaryNoParensType NullSourceAnn
 
 srcParensInType :: SourceType -> SourceType
 srcParensInType = ParensInType NullSourceAnn
+
+pattern REmptyKinded :: forall a. a -> Maybe (Type a) -> Type a
+pattern REmptyKinded ann mbK <- (toREmptyKinded -> Just (ann, mbK))
+
+toREmptyKinded :: forall a. Type a -> Maybe (a, Maybe (Type a))
+toREmptyKinded (REmpty ann) = Just (ann, Nothing)
+toREmptyKinded (KindApp _ (REmpty ann) k) = Just (ann, Just k)
+toREmptyKinded _ = Nothing
+
+isREmpty :: forall a. Type a -> Bool
+isREmpty = isJust . toREmptyKinded
 
 -- | Additional data relevant to type class constraints
 data ConstraintData
@@ -380,6 +391,29 @@ rowToSortedList = first (sortBy (comparing rowListLabel)) . rowToList
 -- | Convert a list of labels and types to a row
 rowFromList :: ([RowListItem a], Type a) -> Type a
 rowFromList (xs, r) = foldr (\(RowListItem ann name ty) -> RCons ann name ty) r xs
+
+-- | Align two rows of types, splitting them into three parts:
+--
+-- * Those types which appear in both rows
+-- * Those which appear only on the left
+-- * Those which appear only on the right
+--
+-- Note: importantly, we preserve the order of the types with a given label.
+alignRowsWith
+  :: (Type a -> Type a -> r)
+  -> Type a
+  -> Type a
+  -> ([r], (([RowListItem a], Type a), ([RowListItem a], Type a)))
+alignRowsWith f ty1 ty2 = go s1 s2 where
+  (s1, tail1) = rowToSortedList ty1
+  (s2, tail2) = rowToSortedList ty2
+
+  go [] r = ([], (([], tail1), (r, tail2)))
+  go r [] = ([], ((r, tail1), ([], tail2)))
+  go lhs@(RowListItem a1 l1 t1 : r1) rhs@(RowListItem a2 l2 t2 : r2)
+    | l1 < l2 = (second . first . first) (RowListItem a1 l1 t1 :) (go r1 rhs)
+    | l2 < l1 = (second . second . first) (RowListItem a2 l2 t2 :) (go lhs r2)
+    | otherwise = first (f t1 t2 :) (go r1 r2)
 
 -- | Check whether a type is a monotype
 isMonoType :: Type a -> Bool

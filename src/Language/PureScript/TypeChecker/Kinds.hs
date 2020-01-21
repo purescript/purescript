@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 
 -- |
 -- This module implements the kind checker
@@ -17,6 +18,7 @@ module Language.PureScript.TypeChecker.Kinds
   , inferKind
   , checkConstraint
   , checkInstanceDeclaration
+  , checkKindDeclaration
   , checkTypeKind
   ) where
 
@@ -136,7 +138,7 @@ lookupUnsolved u = do
     Just res -> return res
 
 unknownsWithKinds
-  :: forall m. (MonadState CheckState m, MonadError MultipleErrors m)
+  :: forall m. (MonadState CheckState m, MonadError MultipleErrors m, HasCallStack)
   => [Unknown]
   -> m [(Unknown, SourceType)]
 unknownsWithKinds = fmap (fmap snd . nubBy ((==) `on` fst) . sortBy (comparing fst) . join) . traverse go
@@ -192,8 +194,7 @@ inferKind = \tyToInfer ->
       k <- freshKind
       pure (ty, k $> ann)
     ty@(REmpty ann) -> do
-      k <- freshKind
-      pure (ty, E.kindRow k $> ann)
+      pure (ty, E.kindOfREmpty $> ann)
     ty@(RCons ann _ _ _) | (rowList, rowTail) <- rowToList ty -> do
       kr <- freshKind
       rowList' <- for rowList $ \(RowListItem a lbl t) ->
@@ -298,7 +299,7 @@ checkKind ty kind2 =
         instantiateKind (ty', kind1') kind2'
 
 instantiateKind
-  :: (MonadError MultipleErrors m, MonadState CheckState m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
   => (SourceType, SourceType)
   -> SourceType
   -> m SourceType
@@ -312,7 +313,7 @@ instantiateKind (ty, kind1) kind2 = case kind1 of
     pure ty
 
 unifyKinds
-  :: (MonadError MultipleErrors m, MonadState CheckState m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
   => SourceType
   -> SourceType
   -> m ()
@@ -323,7 +324,7 @@ unifyKinds = unifyKindsWithFailure $ \w1 w2 ->
 
 -- | Check the kind of a type, failing if it is not of kind *.
 checkTypeKind
-  :: (MonadError MultipleErrors m, MonadState CheckState m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
   => SourceType
   -> SourceType
   -> m ()
@@ -331,7 +332,7 @@ checkTypeKind ty kind =
   unifyKindsWithFailure (\_ _ -> throwError . errorMessage $ ExpectedType ty kind) kind E.kindType
 
 unifyKindsWithFailure
-  :: (MonadError MultipleErrors m, MonadState CheckState m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
   => (SourceType -> SourceType -> m ())
   -> SourceType
   -> SourceType
@@ -345,6 +346,14 @@ unifyKindsWithFailure onFailure = go
     (KindApp _ p1 p2, KindApp _ p3 p4) -> do
       go p1 p3
       join $ go <$> apply p2 <*> apply p4
+    (r1@(RCons _ _ _ _), r2) ->
+      unifyRows r1 r2
+    (r1, r2@(RCons _ _ _ _)) ->
+      unifyRows r1 r2
+    (r1@(REmpty _), r2) ->
+      unifyRows r1 r2
+    (r1, r2@(REmpty _)) ->
+      unifyRows r1 r2
     (w1, w2) | eqType w1 w2 ->
       pure ()
     (TUnknown ss a', p1) ->
@@ -360,8 +369,27 @@ unifyKindsWithFailure onFailure = go
     join $ go <$> apply w1 <*> elaborateKind p2
     solve a' p2
 
+  unifyRows r1 r2 = do
+    let (matches, rest) = alignRowsWith go r1 r2
+    sequence_ matches
+    unifyTails rest
+
+  unifyTails = \case
+    (([], TUnknown ss a'), (rs, p1)) ->
+      unifyUnknown ss a' $ rowFromList (rs, p1)
+    ((rs, p1), ([], TUnknown ss a')) ->
+      unifyUnknown ss a' $ rowFromList (rs, p1)
+    (([], w1), ([], w2)) | eqType w1 w2 ->
+      pure ()
+    ((rs1, TUnknown ss1 u1), (rs2, TUnknown ss2 u2)) -> do
+      rest <- freshKind
+      unifyUnknown ss1 u1 $ rowFromList (rs2, rest)
+      unifyUnknown ss2 u2 $ rowFromList (rs1, rest)
+    (w1, w2) ->
+      onFailure (rowFromList w1) (rowFromList w2)
+
 promoteKind
-  :: (MonadError MultipleErrors m, MonadState CheckState m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
   => Unknown
   -> SourceType
   -> m SourceType
@@ -383,7 +411,7 @@ promoteKind u2 ty = do
       pure ty'
 
 elaborateKind
-  :: (MonadError MultipleErrors m, MonadState CheckState m)
+  :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
   => SourceType
   -> m SourceType
 elaborateKind = \case
@@ -403,6 +431,14 @@ elaborateKind = \case
   TUnknown ann a' -> do
     kind <- snd <$> lookupUnsolved a'
     ($> ann) <$> apply kind
+  REmpty ann -> do
+    pure $ E.kindOfREmpty $> ann
+  ty@(RCons ann _ _ _) -> do
+    let (rl, _) = rowToList ty
+    ks <- traverse (elaborateKind . rowListType) rl
+    unless (all (eqType (head ks)) $ tail ks) $
+      internalError $ "elaborateKind: Elaborated row kinds are not all " <> prettyPrintType 10 (head ks)
+    pure $ E.kindRow (head ks) $> ann
   TypeApp ann t1 t2 -> do
     k1 <- elaborateKind t1
     case k1 of
@@ -653,6 +689,18 @@ checkInstanceDeclaration moduleName (ann, constraints, clsName, args) = do
     let allWithVars = replaceUnknownsWithVars (unknownVarsForType allUnknowns allTy) allTy
         (allConstraints, (_, allKinds, allArgs)) = unapplyTypes <$> unapplyConstraints allWithVars
     pure (allConstraints, allKinds, allArgs)
+
+checkKindDeclaration
+  :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)
+  => ModuleName
+  -> SourceType
+  -> m SourceType
+checkKindDeclaration _ ty = do
+  (ty', kind) <- kindOf ty
+  checkTypeKind kind E.kindType
+  ty'' <- replaceAllTypeSynonyms ty'
+  unks <- unknownsWithKinds . IS.toList $ unknowns ty''
+  pure $ generalizeUnknowns unks ty''
 
 existingSignatureOrFreshKind
   :: forall m. MonadState CheckState m

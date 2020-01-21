@@ -40,6 +40,7 @@ import Data.Either (partitionEithers)
 import Data.Functor (($>))
 import Data.List (transpose, (\\), partition, delete)
 import Data.Maybe (fromMaybe)
+import Data.Text (Text)
 import Data.Traversable (for)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as M
@@ -98,8 +99,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
       let ty' = substituteType currentSubst ty
       ((unsolvedTypeVarsWithKinds, ty''), _) <- kindOfWithUnknowns $ constrain unsolved ty'
       let unsolvedTypeVars = snd <$> unknownsInType ty'
-          elabGeneralized = varIfUnknown unsolvedTypeVarsWithKinds ty''
-          generalized = elabGeneralized -- TODO: Remove kind annotations and kind vars?
+          generalized = varIfUnknown unsolvedTypeVarsWithKinds ty''
 
       when shouldGeneralize $ do
         -- Show the inferred type in a warning
@@ -130,7 +130,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
 
       -- Check skolem variables did not escape their scope
       skolemEscapeCheck val'
-      return ((sai, (foldr (Abs . VarBinder nullSourceSpan . (\(x, _, _) -> x)) val' unsolved, elabGeneralized)), unsolved)
+      return ((sai, (foldr (Abs . VarBinder nullSourceSpan . (\(x, _, _) -> x)) val' unsolved, generalized)), unsolved)
 
     -- Show warnings here, since types in wildcards might have been solved during
     -- instance resolution (by functional dependencies).
@@ -186,7 +186,7 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
 data SplitBindingGroup = SplitBindingGroup
   { _splitBindingGroupUntyped :: [((SourceAnn, Ident), (Expr, SourceType))]
   -- ^ The untyped expressions
-  , _splitBindingGroupTyped :: [((SourceAnn, Ident), (Expr, SourceType, Bool))]
+  , _splitBindingGroupTyped :: [((SourceAnn, Ident), (Expr, [(Text, SourceType)], SourceType, Bool))]
   -- ^ The typed expressions, along with their type annotations
   , _splitBindingGroupNames :: M.Map (Qualified Ident) (SourceType, NameKind, NameVisibility)
   -- ^ A map containing all expressions and their assigned types (which might be
@@ -211,8 +211,10 @@ typeDictionaryForBindingGroup moduleName vals = do
     let (untyped, typed) = partitionEithers (map splitTypeAnnotation vals)
     (typedDict, typed') <- fmap unzip . for typed $ \(sai, (expr, ty, checkType)) -> do
       -- TODO: this results in kind checking twice
-      ty' <- replaceTypeWildcards . fst =<< kindOf ty
-      return ((sai, ty'), (sai, (expr, ty', checkType)))
+      ((args, elabTy), kind) <- kindOfWithScopedVars ty
+      checkTypeKind ty kind
+      elabTy' <- replaceTypeWildcards elabTy
+      return ((sai, elabTy'), (sai, (expr, args, elabTy', checkType)))
     -- Create fresh unification variables for the types of untyped declarations
     (untypedDict, untyped') <- fmap unzip . for untyped $ \(sai, expr) -> do
       ty <- freshType
@@ -238,18 +240,15 @@ typeDictionaryForBindingGroup moduleName vals = do
 checkTypedBindingGroupElement
   :: (MonadSupply m, MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
-  -> ((SourceAnn, Ident), (Expr, SourceType, Bool))
+  -> ((SourceAnn, Ident), (Expr, [(Text, SourceType)], SourceType, Bool))
   -- ^ The identifier we are trying to define, along with the expression and its type annotation
   -> M.Map (Qualified Ident) (SourceType, NameKind, NameVisibility)
   -- ^ Names brought into scope in this binding group
   -> m ((SourceAnn, Ident), (Expr, SourceType))
-checkTypedBindingGroupElement mn (ident, (val, ty, checkType)) dict = do
-  ((args, elabTy), kind) <- kindOfWithScopedVars ty
-  checkTypeKind ty kind
-
+checkTypedBindingGroupElement mn (ident, (val, args, ty, checkType)) dict = do
   -- We replace type synonyms _after_ kind-checking, since we don't want type
   -- synonym expansion to bring type variables into scope. See #2542.
-  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ elabTy
+  ty' <- introduceSkolemScope <=< replaceAllTypeSynonyms $ ty
   -- Check the type with the new names in scope
   val' <- if checkType
             then withScopedTypeVars mn args $ bindNames dict $ check val ty'
@@ -338,7 +337,7 @@ infer' (Literal ss (ObjectLiteral ps)) = do
       toRowListItem (lbl, (_, ty)) = srcRowListItem (Label lbl) ty
 
   fields <- forM ps inferProperty
-  let ty = srcTypeApp tyRecord $ rowFromList (map toRowListItem fields, srcREmpty)
+  let ty = srcTypeApp tyRecord $ rowFromList (map toRowListItem fields, srcKindApp srcREmpty kindType)
   return $ TypedValue' True (Literal ss (ObjectLiteral (map (fmap (uncurry (TypedValue True))) fields))) ty
 infer' (ObjectUpdate o ps) = do
   ensureNoDuplicateProperties ps
@@ -774,7 +773,7 @@ checkProperties expr ps row lax = convert <$> go ps (toRowPair <$> ts') r' where
   convert = fmap (fmap tvToExpr)
   (ts', r') = rowToList row
   toRowPair (RowListItem _ lbl ty) = (lbl, ty)
-  go [] [] (REmpty _) = return []
+  go [] [] (REmptyKinded _ _) = return []
   go [] [] u@(TUnknown _ _)
     | lax = return []
     | otherwise = do unifyTypes u srcREmpty
@@ -782,7 +781,7 @@ checkProperties expr ps row lax = convert <$> go ps (toRowPair <$> ts') r' where
   go [] [] Skolem{} | lax = return []
   go [] ((p, _): _) _ | lax = return []
                       | otherwise = throwError . errorMessage $ PropertyIsMissing p
-  go ((p,_):_) [] (REmpty _) = throwError . errorMessage $ AdditionalProperty $ Label p
+  go ((p,_):_) [] (REmptyKinded _ _) = throwError . errorMessage $ AdditionalProperty $ Label p
   go ((p,v):ps') ts r =
     case lookup (Label p) ts of
       Nothing -> do

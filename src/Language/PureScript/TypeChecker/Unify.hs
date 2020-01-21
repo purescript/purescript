@@ -18,7 +18,6 @@ module Language.PureScript.TypeChecker.Unify
 
 import Prelude.Compat
 
-import Control.Arrow (first, second)
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), gets, modify)
@@ -133,8 +132,8 @@ unifyTypes t1 t2 = do
   unifyTypes' ty1 (KindedType _ ty2 _) = ty1 `unifyTypes` ty2
   unifyTypes' r1@RCons{} r2 = unifyRows r1 r2
   unifyTypes' r1 r2@RCons{} = unifyRows r1 r2
-  unifyTypes' r1@REmpty{} r2 = unifyRows r1 r2
-  unifyTypes' r1 r2@REmpty{} = unifyRows r1 r2
+  unifyTypes' r1@REmptyKinded{} r2 = unifyRows r1 r2
+  unifyTypes' r1 r2@REmptyKinded{} = unifyRows r1 r2
   unifyTypes' (ConstrainedType _ c1 ty1) (ConstrainedType _ c2 ty2)
     | constraintClass c1 == constraintClass c2 && constraintData c1 == constraintData c2 = do
         traverse_ (uncurry unifyTypes) (constraintArgs c1 `zip` constraintArgs c2)
@@ -144,29 +143,6 @@ unifyTypes t1 t2 = do
   unifyTypes' t3 t4@ConstrainedType{} = unifyTypes' t4 t3
   unifyTypes' t3 t4 =
     throwError . errorMessage $ TypesDoNotUnify t3 t4
-
--- | Align two rows of types, splitting them into three parts:
---
--- * Those types which appear in both rows
--- * Those which appear only on the left
--- * Those which appear only on the right
---
--- Note: importantly, we preserve the order of the types with a given label.
-alignRowsWith
-  :: (Type a -> Type a -> r)
-  -> Type a
-  -> Type a
-  -> ([r], (([RowListItem a], Type a), ([RowListItem a], Type a)))
-alignRowsWith f ty1 ty2 = go s1 s2 where
-  (s1, tail1) = rowToSortedList ty1
-  (s2, tail2) = rowToSortedList ty2
-
-  go [] r = ([], (([], tail1), (r, tail2)))
-  go r [] = ([], ((r, tail1), ([], tail2)))
-  go lhs@(RowListItem a1 l1 t1 : r1) rhs@(RowListItem a2 l2 t2 : r2)
-    | l1 < l2 = (second . first . first) (RowListItem a1 l1 t1 :) (go r1 rhs)
-    | l2 < l1 = (second . second . first) (RowListItem a2 l2 t2 :) (go lhs r2)
-    | otherwise = first (f t1 t2 :) (go r1 r2)
 
 -- | Unify two rows, updating the current substitution
 --
@@ -179,7 +155,7 @@ unifyRows r1 r2 = sequence_ matches *> uncurry unifyTails rest where
   unifyTails :: ([RowListItem SourceAnn], SourceType) -> ([RowListItem SourceAnn], SourceType) -> m ()
   unifyTails ([], TUnknown _ u)    (sd, r)               = solveType u (rowFromList (sd, r))
   unifyTails (sd, r)               ([], TUnknown _ u)    = solveType u (rowFromList (sd, r))
-  unifyTails ([], REmpty _)        ([], REmpty _)        = return ()
+  unifyTails ([], REmptyKinded _ _) ([], REmptyKinded _ _) = return ()
   unifyTails ([], TypeVar _ v1)    ([], TypeVar _ v2)    | v1 == v2 = return ()
   unifyTails ([], Skolem _ _ s1 _ _) ([], Skolem _ _ s2 _ _) | s1 == s2 = return ()
   unifyTails (sd1, TUnknown _ u1)  (sd2, TUnknown _ u2)  = do

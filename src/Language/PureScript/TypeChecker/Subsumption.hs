@@ -109,9 +109,9 @@ subsumes' mode (TypeApp _ f1 r1) (TypeApp _ f2 r2) | eqType f1 tyRecord && eqTyp
     -- every property in ts2 must appear in ts1. If not, then the candidate expression is missing a required property.
     -- Conversely, when r2 is empty, every property in ts1 must appear in ts2, or else the expression has
     -- an additional property which is not allowed.
-    when (eqType r1' $ REmpty ())
+    when (isREmpty r1')
       (for_ (firstMissingProp ts2' ts1') (throwError . errorMessage . PropertyIsMissing . rowListLabel))
-    when (eqType r2' $ REmpty ())
+    when (isREmpty r2')
       (for_ (firstMissingProp ts1' ts2') (throwError . errorMessage . AdditionalProperty . rowListLabel))
     -- Check subsumption for common labels
     sequence_ common

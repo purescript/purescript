@@ -444,7 +444,7 @@ entails SolverOptions{..} constraint context hints =
           case rest of
             -- If the left hand side is a closed row, then we can merge
             -- its labels into the right hand side.
-            REmpty _ -> (True, (fixed, r), Nothing)
+            REmptyKinded _ _ -> (True, (fixed, r), Nothing)
             -- If the left hand side is not definitely closed, then the only way we
             -- can safely make progress is to move any known labels from the left
             -- input into the output, and add a constraint for any remaining labels.
@@ -467,7 +467,7 @@ entails SolverOptions{..} constraint context hints =
     -- | Convert a closed row to a sorted list of entries
     rowToRowList :: SourceType -> SourceType -> Maybe SourceType
     rowToRowList kind r =
-        guard (eqType rest $ REmpty ()) $>
+        guard (isREmpty rest) $>
         foldr rowListCons (srcKindApp (srcTypeConstructor C.RowListNil) kind) fixed
       where
         (fixed, rest) = rowToSortedList r
@@ -485,7 +485,7 @@ entails SolverOptions{..} constraint context hints =
 
     nubRows :: SourceType -> Maybe SourceType
     nubRows r =
-        guard (eqType rest $ REmpty ()) $>
+        guard (isREmpty rest) $>
         rowFromList (nubBy ((==) `on` rowListLabel) fixed, rest)
       where
         (fixed, rest) = rowToSortedList r
@@ -506,7 +506,7 @@ entails SolverOptions{..} constraint context hints =
           not $ sym `elem` (runLabel . rowListLabel <$> fixed)
 
         (canMakeProgress, cst) = case rest of
-            REmpty _ -> (True, Nothing)
+            REmptyKinded _ _ -> (True, Nothing)
             _ -> (not (null fixed), Just [ srcConstraint C.RowLacks [srcTypeLevelString sym, rest] Nothing ])
 
 -- Check if an instance matches our list of types, allowing for types
@@ -574,6 +574,7 @@ matches deps TypeClassDictionaryInScope{..} tys =
         go :: ([RowListItem a], Type a) -> ([RowListItem a], Type a) -> (Matched (), Matching [Type a])
         go (l,  KindedType _ t1 _) (r,  t2)                            = go (l, t1) (r, t2)
         go (l,  t1)                (r,  KindedType _ t2 _)             = go (l, t1) (r, t2)
+        go (l,  KindApp _ t1 k1)   (r,  KindApp _ t2 k2) | eqType k1 k2 = go (l, t1) (r, t2)
         go ([], REmpty _)          ([], REmpty _)                      = (Match (), M.empty)
         go ([], TUnknown _ u1)     ([], TUnknown _ u2)      | u1 == u2 = (Match (), M.empty)
         go ([], TypeVar _ v1)      ([], TypeVar _ v2)       | v1 == v2 = (Match (), M.empty)
@@ -616,10 +617,11 @@ matches deps TypeClassDictionaryInScope{..} tys =
           go :: ([RowListItem a], Type a) -> ([RowListItem a], Type a) -> Matched ()
           go (l, KindedType _ t1 _) (r, t2)                           = go (l, t1) (r, t2)
           go (l, t1)                (r, KindedType _ t2 _)            = go (l, t1) (r, t2)
+          go ([], KindApp _ t1 k1)  ([], KindApp _ t2 k2)             = typesAreEqual t1 t2 <> typesAreEqual k1 k2
           go ([], TUnknown _ u1)    ([], TUnknown _ u2)    | u1 == u2 = Match ()
           go ([], Skolem _ _ _ s1 _)  ([], Skolem _ _ _ s2 _)  | s1 == s2 = Match ()
-          go ([], Skolem _ _ _ _ _)   _                                 = Unknown
-          go _                      ([], Skolem _ _ _ _ _)              = Unknown
+          go ([], Skolem _ _ _ _ _)   _                               = Unknown
+          go _                      ([], Skolem _ _ _ _ _)            = Unknown
           go ([], REmpty _)         ([], REmpty _)                    = Match ()
           go ([], TypeVar _ v1)     ([], TypeVar _ v2)     | v1 == v2 = Match ()
           go _  _                                                     = Apart

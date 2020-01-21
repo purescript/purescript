@@ -690,7 +690,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , line "was implicitly discarded in a do notation block."
             , line ("You can use " <> markCode "_ <- ..." <> " to explicitly discard the result.")
             ]
-    -- TODO: Kind args
     renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm _ ts _)) =
       paras [ line "No type class instance was found for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
@@ -1211,7 +1210,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ detail
             , line $ "in foreign import " <> markCode (showIdent nm)
             ]
-    -- TODO: Kind args
     renderHint (ErrorSolvingConstraint (Constraint _ nm _ ts _)) detail =
       paras [ detail
             , line "while solving type class constraint"

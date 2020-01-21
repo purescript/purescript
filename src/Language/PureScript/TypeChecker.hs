@@ -298,10 +298,7 @@ typeCheckAll moduleName _ = flip catchError (\err -> debugEnv' *> throwError err
     return $ TypeSynonymDeclaration sa name args ty
   go (KindDeclaration sa@(ss, _) kindFor name ty) = do
     warnAndRethrow (addHint (ErrorInKindDeclaration name) . addHint (positionedError ss)) $ do
-      elabTy <- withFreshSubstitution $ do
-        (elabTy, kind) <- kindOf ty
-        checkTypeKind kind kindType
-        replaceAllTypeSynonyms elabTy
+      elabTy <- withFreshSubstitution $ checkKindDeclaration moduleName ty
       env <- getEnv
       -- TODO: Extern data?
       putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (elabTy, LocalTypeVariable) (types env) }
@@ -336,8 +333,7 @@ typeCheckAll moduleName _ = flip catchError (\err -> debugEnv' *> throwError err
         return (sai, nameKind, val)
       return . BindingGroupDeclaration $ NEL.fromList vals''
   go (d@(ExternDataDeclaration _ name kind)) = do
-    (elabKind, kindKind) <- kindOf kind
-    checkTypeKind elabKind kindKind
+    elabKind <- checkKindDeclaration moduleName kind
     env <- getEnv
     putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (elabKind, ExternData) (types env) }
     return d

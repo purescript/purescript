@@ -204,7 +204,6 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
   toExternsDeclaration (TypeRef _ pn dctors) =
     case Qualified (Just mn) pn `M.lookup` types env of
       Nothing -> internalError "toExternsDeclaration: no kind in toExternsDeclaration"
-      -- TODO kind args
       Just (kind, TypeSynonym)
         | Just (args, synTy) <- Qualified (Just mn) pn `M.lookup` typeSynonyms env -> [ EDType pn kind TypeSynonym, EDTypeSynonym pn args synTy ]
       Just (kind, ExternData) -> [ EDType pn kind ExternData ]
