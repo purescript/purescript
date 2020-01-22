@@ -1,0 +1,13 @@
+Error found:
+in module [33mFoo[0m
+at tests/purs/failing/RequiredHiddenType.purs:3:1 - 9:6 (line 3, column 1 - line 9, column 6)
+
+  An export for [33ma[0m requires the following to also be exported:
+
+    [33mA[0m
+
+
+
+See https://github.com/purescript/documentation/blob/master/errors/TransitiveExportError.md for more information,
+or to contribute content related to this error.
+

@@ -1,0 +1,21 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/InfiniteType.purs:5:7 - 5:10 (line 5, column 7 - line 5, column 10)
+
+  An infinite type was inferred for an expression:
+  [33m          [0m
+  [33m  t0 -> t1[0m
+  [33m          [0m
+
+while trying to match type [33mt0[0m
+  with type [33mt0 -> t1[0m
+while inferring the type of [33m\a -> [0m
+                            [33m  a a [0m
+in value declaration [33mf[0m
+
+where [33mt0[0m is an unknown type
+      [33mt1[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/InfiniteType.md for more information,
+or to contribute content related to this error.
+

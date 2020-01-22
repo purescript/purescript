@@ -1,0 +1,17 @@
+Error found:
+at tests/purs/failing/InvalidDerivedInstance2.purs:6:1 - 6:34 (line 6, column 1 - line 6, column 34)
+
+  Cannot derive the type class instance
+  [33m                        [0m
+  [33m  Data.Eq.Eq (Record ())[0m
+  [33m                        [0m
+  because the type
+  [33m           [0m
+  [33m  Record ()[0m
+  [33m           [0m
+  is not of the required form T a_1 ... a_n, where T is a type constructor defined in the same module.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/ExpectedTypeConstructor.md for more information,
+or to contribute content related to this error.
+

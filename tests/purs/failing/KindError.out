@@ -1,0 +1,18 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/KindError.purs:6:35 - 6:38 (line 6, column 35 - line 6, column 38)
+
+  Could not match kind
+
+    [33mk2 -> k3[0m
+
+  with kind
+
+    [33mType[0m
+
+
+in type constructor [33mKindError[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/KindsDoNotUnify.md for more information,
+or to contribute content related to this error.
+

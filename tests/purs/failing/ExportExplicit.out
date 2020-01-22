@@ -1,0 +1,10 @@
+Error found:
+in module [33mM1[0m
+at tests/purs/failing/ExportExplicit.purs:3:18 - 3:19 (line 3, column 18 - line 3, column 19)
+
+  Cannot export unknown value [33mz[0m
+
+
+See https://github.com/purescript/documentation/blob/master/errors/UnknownExport.md for more information,
+or to contribute content related to this error.
+

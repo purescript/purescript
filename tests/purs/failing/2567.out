@@ -1,0 +1,18 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/2567.purs:7:8 - 7:67 (line 7, column 8 - line 7, column 67)
+
+  A custom type error occurred while solving type class constraints:
+
+    This constraint should be checked
+
+
+while checking that type [33mFail (Text "This constraint should be checked") => Int[0m
+  is at least as general as type [33mInt[0m
+while checking that expression [33m0[0m
+  has type [33mInt[0m
+in value declaration [33mfoo[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/NoInstanceFound.md for more information,
+or to contribute content related to this error.
+

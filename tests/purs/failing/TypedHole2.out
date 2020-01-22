@@ -1,0 +1,14 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/TypedHole2.purs:7:16 - 7:21 (line 7, column 16 - line 7, column 21)
+
+  Hole '[33mummm[0m' has the inferred type
+  [33m      [0m
+  [33m  Unit[0m
+  [33m      [0m
+
+in value declaration [33mmain[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/HoleInferredType.md for more information,
+or to contribute content related to this error.
+

@@ -1,0 +1,9 @@
+Error found:
+at tests/purs/failing/Foldable.purs:12:1 - 15:36 (line 12, column 1 - line 15, column 36)
+
+  The value of [33mfoldableL[0m is undefined here, so this reference is not allowed.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/CycleInDeclaration.md for more information,
+or to contribute content related to this error.
+
