@@ -16,7 +16,7 @@ import Control.Monad.Writer.Class (MonadWriter(..), censor)
 import Data.List (intercalate)
 import Data.Maybe
 import qualified Data.Map as M
-import Data.Text (Text, unpack)
+import Data.Text (Text, isPrefixOf, unpack)
 import qualified Data.List.NonEmpty as NEL
 
 import Language.PureScript.Crash (internalError)
@@ -356,7 +356,7 @@ debugConstraint (Constraint ann clsName kinds args _) =
   debugType $ foldl (TypeApp ann) (foldl (KindApp ann) (TypeConstructor ann (fmap coerceProperName clsName)) kinds) args
 
 debugTypes :: Environment -> [String]
-debugTypes = fmap go . M.toList . types
+debugTypes = go <=< M.toList . types
   where
   go (qual, (srcTy, which)) = do
     let
@@ -368,7 +368,8 @@ debugTypes = fmap go . M.toList . types
         ExternData        -> "extern"
         LocalTypeVariable -> "local"
         ScopedTypeVar     -> "scoped"
-    decl <> " " <> unpack name <> " :: " <> init ppTy
+    guard (not (isPrefixOf "Prim" name))
+    pure $ decl <> " " <> unpack name <> " :: " <> init ppTy
 
 debugNames :: Environment -> [String]
 debugNames = fmap go . M.toList . names

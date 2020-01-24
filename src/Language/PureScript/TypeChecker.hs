@@ -42,6 +42,8 @@ import Language.PureScript.Types
 
 import Lens.Micro.Platform ((^..), _2)
 
+import Debug.Trace
+
 addDataType
   :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName

@@ -185,10 +185,10 @@ inferKind = \tyToInfer ->
       kind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing $ ProperName v)
       pure (ty, kind $> ann)
     ty@(Skolem ann _ mbK _ _) -> do
-      kind' <- apply $ maybe (internalError "Skolem has no kind") id mbK
-      pure (ty, kind' $> ann)
+      kind <- apply $ maybe (internalError "Skolem has no kind") id mbK
+      pure (ty, kind $> ann)
     ty@(TUnknown ann u) -> do
-      (_, kind) <- lookupUnsolved u
+      kind <- apply . snd =<< lookupUnsolved u
       pure (ty, kind $> ann)
     ty@(TypeWildcard ann _) -> do
       k <- freshKind
@@ -244,10 +244,9 @@ inferAppKind
   -> SourceType
   -> m (SourceType, SourceType)
 inferAppKind ann (fn, fnKind) arg = case fnKind of
-  TypeApp _ (TypeApp _ arrKind argKind) resKind
-    | eqType arrKind E.tyFunction -> do
-        arg' <- checkKind arg argKind
-        (TypeApp ann fn arg',) <$> apply resKind
+  TypeApp _ (TypeApp _ arrKind argKind) resKind | eqType arrKind E.tyFunction -> do
+    arg' <- checkKind arg argKind
+    (TypeApp ann fn arg',) <$> apply resKind
   TUnknown _ u -> do
     (lvl, _) <- lookupUnsolved u
     u1 <- freshUnknown
@@ -356,18 +355,12 @@ unifyKindsWithFailure onFailure = go
       unifyRows r1 r2
     (w1, w2) | eqType w1 w2 ->
       pure ()
-    (TUnknown ss a', p1) ->
-      unifyUnknown ss a' p1
-    (p1, TUnknown ss a') ->
-      unifyUnknown ss a' p1
+    (TUnknown _ a', p1) ->
+      solveUnknown a' p1
+    (p1, TUnknown _ a') ->
+      solveUnknown a' p1
     (w1, w2) ->
       onFailure w1 w2
-
-  unifyUnknown _ a' p1 = do
-    p2 <- promoteKind a' p1
-    w1 <- snd <$> lookupUnsolved a'
-    join $ go <$> apply w1 <*> elaborateKind p2
-    solve a' p2
 
   unifyRows r1 r2 = do
     let (matches, rest) = alignRowsWith go r1 r2
@@ -375,18 +368,29 @@ unifyKindsWithFailure onFailure = go
     unifyTails rest
 
   unifyTails = \case
-    (([], TUnknown ss a'), (rs, p1)) ->
-      unifyUnknown ss a' $ rowFromList (rs, p1)
-    ((rs, p1), ([], TUnknown ss a')) ->
-      unifyUnknown ss a' $ rowFromList (rs, p1)
+    (([], TUnknown _ a'), (rs, p1)) ->
+      solveUnknown a' $ rowFromList (rs, p1)
+    ((rs, p1), ([], TUnknown _ a')) ->
+      solveUnknown a' $ rowFromList (rs, p1)
     (([], w1), ([], w2)) | eqType w1 w2 ->
       pure ()
-    ((rs1, TUnknown ss1 u1), (rs2, TUnknown ss2 u2)) -> do
+    ((rs1, TUnknown _ u1), (rs2, TUnknown _ u2)) -> do
       rest <- freshKind
-      unifyUnknown ss1 u1 $ rowFromList (rs2, rest)
-      unifyUnknown ss2 u2 $ rowFromList (rs1, rest)
+      solveUnknown u1 $ rowFromList (rs2, rest)
+      solveUnknown u2 $ rowFromList (rs1, rest)
     (w1, w2) ->
       onFailure (rowFromList w1) (rowFromList w2)
+
+solveUnknown
+  :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
+  => Unknown
+  -> SourceType
+  -> m ()
+solveUnknown a' p1 = do
+  p2 <- promoteKind a' p1
+  w1 <- snd <$> lookupUnsolved a'
+  join $ unifyKinds <$> apply w1 <*> elaborateKind p2
+  solve a' p2
 
 promoteKind
   :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
@@ -428,6 +432,9 @@ elaborateKind = \case
     moduleName <- unsafeCheckCurrentModule
     kind <- lookupTypeVariable moduleName . Qualified Nothing $ ProperName a
     ($> ann) <$> apply kind
+  (Skolem ann _ mbK _ _) -> do
+    kind <- apply $ maybe (internalError "Skolem has no kind") id mbK
+    pure $ kind $> ann
   TUnknown ann a' -> do
     kind <- snd <$> lookupUnsolved a'
     ($> ann) <$> apply kind
@@ -526,7 +533,7 @@ inferDataDeclaration moduleName (_, tyName, tyArgs, ctors) = do
   tyKind <- lookupTypeVariable moduleName (Qualified Nothing tyName)
   let (sigBinders, tyKind') = fromJust . completeBinderList $ tyKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
-    tyArgs' <- for tyArgs . traverse . maybe freshKind $ replaceAllTypeSynonyms <=< flip checkKind E.kindType
+    tyArgs' <- for tyArgs . traverse . maybe freshKind $ replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType
     unifyKinds tyKind' $ foldr ((E.-:>) . snd) E.kindType tyArgs'
     bindLocalTypeVariables moduleName (first ProperName <$> tyArgs') $ do
       let tyCtorName = srcTypeConstructor $ mkQualified tyName moduleName
@@ -576,7 +583,7 @@ inferTypeSynonym moduleName (_, tyName, tyArgs, tyBody) = do
   let (sigBinders, tyKind') = fromJust . completeBinderList $ tyKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
     kindRes <- freshKind
-    tyArgs' <- for tyArgs . traverse . maybe freshKind $ replaceAllTypeSynonyms <=< flip checkKind E.kindType
+    tyArgs' <- for tyArgs . traverse . maybe freshKind $ replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType
     unifyKinds tyKind' $ foldr ((E.-:>) . snd) kindRes tyArgs'
     bindLocalTypeVariables moduleName (first ProperName <$> tyArgs') $ do
       body <- inferKind tyBody
@@ -618,7 +625,7 @@ inferClassDeclaration moduleName (_, clsName, clsArgs, superClasses, decls) = do
   clsKind <- lookupTypeVariable moduleName (Qualified Nothing $ coerceProperName clsName)
   let (sigBinders, clsKind') = fromJust . completeBinderList $ clsKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
-    clsArgs' <- for clsArgs . traverse . maybe freshKind $ replaceAllTypeSynonyms <=< flip checkKind E.kindType
+    clsArgs' <- for clsArgs . traverse . maybe freshKind $ replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType
     unifyKinds clsKind' $ foldr ((E.-:>) . snd) E.kindConstraint clsArgs'
     bindLocalTypeVariables moduleName (first ProperName <$> clsArgs') $ do
       (clsArgs',,)
