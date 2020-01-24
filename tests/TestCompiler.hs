@@ -6,9 +6,23 @@
 
 module TestCompiler where
 
--- Failing tests in the `failing` and `warning` folders check their output
--- agains the relative golden files (`.out`).
--- To golden files are generated automatically when missing, and can be updated
+-- Failing tests can specify the kind of error that should be thrown with a
+-- @shouldFailWith declaration. For example:
+--
+--   "-- @shouldFailWith TypesDoNotUnify"
+--
+-- will cause the test to fail unless that module fails to compile with exactly
+-- one TypesDoNotUnify error.
+--
+-- If a module is expected to produce multiple type errors, then use multiple
+-- @shouldFailWith lines; for example:
+--
+--   -- @shouldFailWith TypesDoNotUnify
+--   -- @shouldFailWith TypesDoNotUnify
+--   -- @shouldFailWith TransitiveExportError
+--
+-- Failing tests also check their output against the relative golden files (`.out`).
+-- The golden files are generated automatically when missing, and can be updated
 -- by passing `--accept` to `--test-arguments.`
 
 import Prelude ()
@@ -16,8 +30,10 @@ import Prelude.Compat
 
 import qualified Language.PureScript as P
 
+import Control.Arrow ((>>>))
 import Data.Function (on)
-import Data.List (minimumBy)
+import Data.List (sort, stripPrefix, intercalate, minimumBy)
+import Data.Maybe (mapMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
 
@@ -31,6 +47,7 @@ import System.Exit
 import System.Process
 import System.FilePath
 import System.IO
+import System.IO.UTF8 (readUTF8File)
 
 import TestUtils
 import Test.Tasty
@@ -68,8 +85,18 @@ warningTests
   -> IO TestTree
 warningTests supportModules supportExterns supportForeigns = do
   warningTestCases <- getTestFiles "warning"
-  return $ testGroup "Warning examples" $
-    assertGolden supportModules supportExterns supportForeigns warningTestCases
+  tests <- forM warningTestCases $ \testPurs -> do
+    let mainPath = getTestMain testPurs
+    expectedWarnings <- getShouldWarnWith mainPath
+    wTc <- testSpecs $
+      it ("'" <> takeFileName mainPath <> "' should compile with warning(s) '" <> intercalate "', '" expectedWarnings <> "'") $
+        assertCompilesWithWarnings supportModules supportExterns supportForeigns testPurs expectedWarnings
+    return $ wTc ++ [ goldenVsString
+                      ("'" <> takeFileName mainPath <> "' golden test")
+                      (replaceExtension mainPath ".out")
+                      (BS.fromStrict . T.encodeUtf8 . T.pack <$> printErrorOrWarning supportModules supportExterns supportForeigns testPurs)
+                    ]
+  return $ testGroup "Warning examples" $ concat tests
 
 failingTests
   :: [P.Module]
@@ -78,8 +105,49 @@ failingTests
   -> IO TestTree
 failingTests supportModules supportExterns supportForeigns = do
   failingTestCases <- getTestFiles "failing"
-  return $ testGroup "Failing examples" $
-    assertGolden supportModules supportExterns supportForeigns failingTestCases
+  tests <- forM failingTestCases $ \testPurs -> do
+    let mainPath = getTestMain testPurs
+    expectedFailures <- getShouldFailWith mainPath
+    fTc <- testSpecs $
+      it ("'" <> takeFileName mainPath <> "' should fail with '" <> intercalate "', '" expectedFailures <> "'") $
+        assertDoesNotCompile supportModules supportExterns supportForeigns testPurs expectedFailures
+    return $ fTc ++ [ goldenVsString
+                    ("'" <> takeFileName mainPath <> "' golden test")
+                    (replaceExtension mainPath ".out")
+                    (BS.fromStrict . T.encodeUtf8 . T.pack <$> printErrorOrWarning supportModules supportExterns supportForeigns testPurs)
+                  ]
+  return $ testGroup "Failing examples" $ concat tests
+
+checkShouldFailWith :: [String] -> P.MultipleErrors -> Maybe String
+checkShouldFailWith expected errs =
+  let actual = map P.errorCode $ P.runMultipleErrors errs
+  in if sort expected == sort (map T.unpack actual)
+    then checkPositioned errs
+    else Just $ "Expected these errors: " ++ show expected ++ ", but got these: "
+      ++ show actual ++ ", full error messages: \n"
+      ++ unlines (map (P.renderBox . P.prettyPrintSingleError P.defaultPPEOptions) (P.runMultipleErrors errs))
+
+checkPositioned :: P.MultipleErrors -> Maybe String
+checkPositioned errs =
+  case mapMaybe guardSpans (P.runMultipleErrors errs) of
+    [] ->
+      Nothing
+    errs' ->
+      Just
+        $ "Found errors with missing source spans:\n"
+        ++ unlines (map (P.renderBox . P.prettyPrintSingleError P.defaultPPEOptions) errs')
+  where
+  guardSpans :: P.ErrorMessage -> Maybe P.ErrorMessage
+  guardSpans err = case P.errorSpan err of
+    Just ss | any (not . isNonsenseSpan) ss -> Nothing
+    _ -> Just err
+
+  isNonsenseSpan :: P.SourceSpan -> Bool
+  isNonsenseSpan (P.SourceSpan spanName spanStart spanEnd) =
+    spanName == "" || spanName == "<module>" || (spanStart == emptyPos && spanEnd == emptyPos)
+
+  emptyPos :: P.SourcePos
+  emptyPos = P.SourcePos 0 0
 
 assertCompiles
   :: [P.Module]
@@ -108,20 +176,48 @@ assertCompiles supportModules supportExterns supportForeigns inputFiles outputFi
           Just (ExitFailure _, _, err) -> return $ Just err
           Nothing -> return $ Just "Couldn't find node.js executable"
 
-assertGolden
+assertCompilesWithWarnings
   :: [P.Module]
   -> [P.ExternsFile]
   -> M.Map P.ModuleName FilePath
-  -> [[FilePath]]
-  -> [TestTree]
-assertGolden supportModules supportExterns supportForeigns testCases =
-  flip fmap testCases $ \files ->
-    let mainFile = head files
-    in
-      goldenVsString
-      (takeBaseName mainFile)
-      (replaceExtension mainFile ".out")
-      (BS.fromStrict . T.encodeUtf8 . T.pack <$> printErrorOrWarning supportModules supportExterns supportForeigns files)
+  -> [FilePath]
+  -> [String]
+  -> Expectation
+assertCompilesWithWarnings supportModules supportExterns supportForeigns inputFiles shouldWarnWith =
+  assert supportModules supportExterns supportForeigns inputFiles checkMain $ \e ->
+    case e of
+      Left errs ->
+        return . Just . P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
+      Right warnings ->
+        return
+          . fmap (printAllWarnings warnings)
+          $ checkShouldFailWith shouldWarnWith warnings
+
+  where
+  printAllWarnings warnings =
+    (<> "\n\n" <> P.prettyPrintMultipleErrors P.defaultPPEOptions warnings)
+
+assertDoesNotCompile
+  :: [P.Module]
+  -> [P.ExternsFile]
+  -> M.Map P.ModuleName FilePath
+  -> [FilePath]
+  -> [String]
+  -> Expectation
+assertDoesNotCompile supportModules supportExterns supportForeigns inputFiles shouldFailWith =
+  assert supportModules supportExterns supportForeigns inputFiles noPreCheck $ \e ->
+    case e of
+      Left errs ->
+        return $ if null shouldFailWith
+          then Just $ "shouldFailWith declaration is missing (errors were: "
+                      ++ show (map P.errorCode (P.runMultipleErrors errs))
+                      ++ ")"
+          else checkShouldFailWith shouldFailWith errs
+      Right _ ->
+        return $ Just "Should not have compiled"
+
+  where
+  noPreCheck = const (return ())
 
 printErrorOrWarning
   :: [P.Module]
@@ -139,8 +235,27 @@ printErrorOrWarning supportModules supportExterns supportForeigns inputFiles = d
   where
     noPreCheck = const (return ())
 
+-- Takes the test entry point from a group of purs files - this is determined
+-- by the file with the shortest path name, as everything but the main file
+-- will be under a subdirectory.
 getTestMain :: [FilePath] -> FilePath
 getTestMain = minimumBy (compare `on` length)
+
+-- Scans a file for @shouldFailWith directives in the comments, used to
+-- determine expected failures
+getShouldFailWith :: FilePath -> IO [String]
+getShouldFailWith = extractPragma "shouldFailWith"
+
+-- Scans a file for @shouldWarnWith directives in the comments, used to
+-- determine expected warnings
+getShouldWarnWith :: FilePath -> IO [String]
+getShouldWarnWith = extractPragma "shouldWarnWith"
+
+extractPragma :: String -> FilePath -> IO [String]
+extractPragma pragma = fmap go . readUTF8File
+  where
+    go = lines >>> mapMaybe (stripPrefix ("-- @" ++ pragma ++ " ")) >>> map trim
+
 
 logfile :: FilePath
 logfile = "psc-tests.out"
