@@ -1,7 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE PartialTypeSignatures #-}
-
 -- |
 -- This module implements the kind checker
 --
@@ -14,6 +10,7 @@ module Language.PureScript.TypeChecker.Kinds
   , kindOfClass
   , kindsOfAll
   , unifyKinds
+  , subsumesKind
   , checkKind
   , inferKind
   , checkConstraint
@@ -30,7 +27,7 @@ import Control.Monad.State
 
 import Data.Bifunctor (first)
 import Data.Bitraversable (bitraverse)
-import Data.Foldable (for_)
+import Data.Foldable (for_, traverse_)
 import Data.Function (on)
 import Data.Functor (($>))
 import qualified Data.IntSet as IS
@@ -47,6 +44,7 @@ import qualified Language.PureScript.Environment as E
 import Language.PureScript.Errors
 import Language.PureScript.Names
 import Language.PureScript.TypeChecker.Monad
+import Language.PureScript.TypeChecker.Skolems (newSkolemConstant, newSkolemScope, skolemize)
 import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.Types
 import Language.PureScript.Pretty.Types
@@ -303,13 +301,58 @@ instantiateKind
   -> SourceType
   -> m SourceType
 instantiateKind (ty, kind1) kind2 = case kind1 of
-  ForAll _ a (Just k) t _ -> do
+  ForAll _ a (Just k) t _ | shouldInstantiate kind2 -> do
     let ann = getAnnForType ty
     u <- freshKindWithKind k
     instantiateKind (KindApp ann ty u, replaceTypeVars a u t) kind2
   _ -> do
-    unifyKinds kind1 kind2
+    subsumesKind kind1 kind2
     pure ty
+  where
+  shouldInstantiate = not . \case
+    ForAll _ _ _ _ _ -> True
+    _ -> False
+
+subsumesKind
+  :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
+  => SourceType
+  -> SourceType
+  -> m ()
+subsumesKind = go
+  where
+  go = curry $ \case
+    (TypeApp _ (TypeApp _ arr1 a1) a2, TypeApp _ (TypeApp _ arr2 b1) b2)
+      | eqType arr1 E.tyFunction
+      , eqType arr2 E.tyFunction -> do
+          go b1 a1
+          join $ go <$> apply a2 <*> apply b2
+    (a, ForAll ann var mbKind b mbScope) -> do
+      scope <- maybe newSkolemScope pure mbScope
+      skolc <- newSkolemConstant
+      go a $ skolemize ann var mbKind skolc scope b
+    (ForAll _ var (Just kind) a _, b) -> do
+      a' <- freshKindWithKind kind
+      go (replaceTypeVars var a' a) b
+    (TUnknown ann u, b@(TypeApp _ (TypeApp _ arr _) _))
+      | eqType arr E.tyFunction
+      , IS.notMember u (unknowns b) ->
+          join $ go <$> unkArr ann u <*> pure b
+    (a@(TypeApp _ (TypeApp _ arr _) _), TUnknown ann u)
+      | eqType arr E.tyFunction
+      , IS.notMember u (unknowns a) ->
+          join $ go <$> pure a <*> unkArr ann u
+    (a, b) ->
+      unifyKinds a b
+
+  unkArr ann u = do
+    lvl <- fst <$> lookupUnsolved u
+    u1 <- freshUnknown
+    u2 <- freshUnknown
+    addUnsolved (Just lvl) u1 E.kindType
+    addUnsolved (Just lvl) u2 E.kindType
+    let uarr = (TUnknown ann u1 E.-:> TUnknown ann u2) $> ann
+    solve u uarr
+    pure uarr
 
 unifyKinds
   :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
@@ -475,6 +518,21 @@ elaborateKind = \case
     pure $ E.kindType $> ann
   ty ->
     internalError $ "elaborateKind: Unimplemented case " <> prettyPrintType 10 ty
+
+skolemEscapeCheck :: MonadError MultipleErrors m => SourceType -> m ()
+skolemEscapeCheck ty =
+  traverse_ (throwError . toSkolemError)
+    . everythingWithContextOnTypes ty [] (<>) go
+    $ ty
+  where
+  go :: SourceType -> SourceType -> (SourceType, [(SourceSpan, Text, SourceType)])
+  go ty' = \case
+    Skolem ss name _ _ _ -> (ty', [(fst ss, name, ty')])
+    ty''@(KindApp _ _ _) -> (ty'', [])
+    _ -> (ty', [])
+
+  toSkolemError (ss, name, ty') =
+    errorMessage' (fst $ getAnnForType ty') $ EscapedSkolem name (Just ss) ty'
 
 kindOfWithUnknowns
   :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
@@ -776,5 +834,7 @@ kindsOfAll moduleName syns dats clss = withFreshSubstitution $ do
           unkBinders = unknownVarsForType tyUnks synKind
           genBody = replaceUnknownsWithVars unkBinders $ replaceTypeCtors synBody
       remainingUnks <- unknownsWithKinds . IS.toList $ unknowns genBody
-      pure (generalizeUnknowns remainingUnks genBody, generalizeUnknownsWithVars unkBinders synKind)
+      let genBody' = generalizeUnknowns remainingUnks genBody
+      skolemEscapeCheck genBody'
+      pure (genBody', generalizeUnknownsWithVars unkBinders synKind)
     pure (synResultsWithKinds, datResultsWithKinds, clsResultsWithKinds)
