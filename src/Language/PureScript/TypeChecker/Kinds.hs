@@ -587,9 +587,7 @@ inferTypeSynonym moduleName (_, tyName, tyArgs, tyBody) = do
     unifyKinds tyKind' $ foldr ((E.-:>) . snd) kindRes tyArgs'
     bindLocalTypeVariables moduleName (first ProperName <$> tyArgs') $ do
       tyBodyAndKind <- inferKind tyBody
-      tyBody' <- apply =<< instantiateKind tyBodyAndKind =<< apply kindRes
-      unks <- unknownsWithKinds . IS.toList $ unknowns tyBody'
-      pure $ generalizeUnknowns unks tyBody'
+      apply =<< instantiateKind tyBodyAndKind =<< apply kindRes
 
 type ClassDeclarationArgs =
   ( SourceAnn
@@ -766,10 +764,6 @@ kindsOfAll moduleName syns dats clss = withFreshSubstitution $ do
           TypeConstructor _ name
             | Just (tyCtor, _) <- lookup name tySubs -> tyCtor
           other -> other
-        synResultsWithKinds = flip fmap synResultsWithUnks $ \(((synName, synKind), synBody), _) -> do
-          let tyUnks = snd . fromJust $ lookup (mkQualified synName moduleName) tySubs
-              unkBinders = unknownVarsForType tyUnks synKind
-          (replaceUnknownsWithVars unkBinders $ replaceTypeCtors synBody, generalizeUnknownsWithVars unkBinders synKind)
         datResultsWithKinds = flip fmap datResultsWithUnks $ \(((datName, datKind), ctors), _) -> do
           let tyUnks = snd . fromJust $ lookup (mkQualified datName moduleName) tySubs
               ctors' = fmap (fmap (generalizeUnknowns tyUnks . replaceTypeCtors)) ctors
@@ -777,4 +771,10 @@ kindsOfAll moduleName syns dats clss = withFreshSubstitution $ do
         clsResultsWithKinds = flip fmap clsResultsWithUnks $ \(((clsName, clsKind), (args, supers, decls)), _) -> do
           let tyUnks = snd . fromJust $ lookup (mkQualified clsName moduleName) tySubs
           (args, supers, decls, generalizeUnknowns tyUnks clsKind)
+    synResultsWithKinds <- for synResultsWithUnks $ \(((synName, synKind), synBody), _) -> do
+      let tyUnks = snd . fromJust $ lookup (mkQualified synName moduleName) tySubs
+          unkBinders = unknownVarsForType tyUnks synKind
+          genBody = replaceUnknownsWithVars unkBinders $ replaceTypeCtors synBody
+      remainingUnks <- unknownsWithKinds . IS.toList $ unknowns genBody
+      pure (generalizeUnknowns remainingUnks genBody, generalizeUnknownsWithVars unkBinders synKind)
     pure (synResultsWithKinds, datResultsWithKinds, clsResultsWithKinds)
