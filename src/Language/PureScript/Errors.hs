@@ -31,6 +31,7 @@ import qualified Language.PureScript.Bundle as Bundle
 import qualified Language.PureScript.Constants as C
 import           Language.PureScript.Crash
 import qualified Language.PureScript.CST.Errors as CST
+import qualified Language.PureScript.CST.Print as CST
 import           Language.PureScript.Environment
 import           Language.PureScript.Label (Label(..))
 import           Language.PureScript.Names
@@ -338,6 +339,17 @@ errorSuggestion err =
       HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
       MissingTypeDeclaration ident ty -> suggest $ showIdent ident <> " :: " <> T.pack (prettyPrintSuggestedType ty)
       WildcardInferredType ty _ -> suggest $ T.pack (prettyPrintSuggestedType ty)
+      WarningParsingCSTModule pe -> do
+        let toks = CST.errToks pe
+        case CST.errType pe of
+          CST.WarnDeprecatedRowSyntax -> do
+            let kind = CST.printTokens $ drop 1 toks
+                sugg | T.isPrefixOf " " kind = "Row" <> kind
+                     | otherwise = "Row " <> kind
+            suggest sugg
+          CST.WarnDeprecatedForeignKindSyntax -> suggest $ "data " <> CST.printTokens (drop 1 toks) <> " :: Type"
+          CST.WarnDeprecatedKindImportSyntax -> suggest $ CST.printTokens $ drop 1 toks
+          CST.WarnDeprecatedKindExportSyntax -> suggest $ CST.printTokens $ drop 1 toks
       _ -> Nothing
   where
     emptySuggestion = Just $ ErrorSuggestion ""

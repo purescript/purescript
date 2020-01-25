@@ -186,7 +186,7 @@ matchTypeAtom tro@TypeRenderOptions{troSuggesting = suggesting} =
       match (PPTypeConstructor ctor) = Just $ text $ T.unpack $ runProperName $ disqualify ctor
       match (PPTUnknown u)
         | suggesting = Just $ text "_"
-        | otherwise = Just $ text $ 't' : show u
+        | otherwise = Just $ text $ '?' : show u
       match (PPSkolem name s)
         | suggesting =  Just $ text $ T.unpack name
         | otherwise = Just $ text $ T.unpack name ++ show s

@@ -19,11 +19,12 @@ module Language.PureScript.CST.Parser
 import Prelude hiding (lex)
 
 import Control.Monad ((<=<), when)
-import Data.Foldable (foldl', for_)
+import Data.Foldable (foldl', for_, toList)
 import qualified Data.List.NonEmpty as NE
 import Data.Text (Text)
 import Data.Traversable (for, sequence)
 import Language.PureScript.CST.Errors
+import Language.PureScript.CST.Flatten (flattenType)
 import Language.PureScript.CST.Lexer
 import Language.PureScript.CST.Monad
 import Language.PureScript.CST.Positions
@@ -291,7 +292,7 @@ type3 :: { Type () }
 
 type4 :: { Type () }
   : type5 { $1 }
-  | '#' type4 {% addWarning [$1] WarnDeprecatedRowSyntax *> pure (TypeUnaryRow () $1 $2) }
+  | '#' type4 {% addWarning ($1 : toList (flattenType $2)) WarnDeprecatedRowSyntax *> pure (TypeUnaryRow () $1 $2) }
 
 type5 :: { Type () }
   : typeAtom { $1 }
