@@ -24,7 +24,6 @@ defConfig =
     { confLogLevel = LogNone
     , confOutputPath = "output/"
     , confGlobs = ["src/**/*.purs"]
-    , confEditorMode = False
     }
 
 runIde' :: IdeConfiguration -> IdeState -> [Command] -> IO ([Either IdeError Success], IdeState)

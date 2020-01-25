@@ -77,15 +77,11 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
   case result of
     Left errors -> throwError (RebuildError errors)
     Right newExterns -> do
-      whenM isEditorMode $ do
-        insertModule (fromMaybe file actualFile, m)
-        insertExterns newExterns
-        void populateVolatileState
+      insertModule (fromMaybe file actualFile, m)
+      insertExterns newExterns
+      void populateVolatileState
       runOpenBuild (rebuildModuleOpen makeEnv externs m)
       pure (RebuildSuccess warnings)
-
-isEditorMode :: Ide m => m Bool
-isEditorMode = asks (confEditorMode . ideConfiguration)
 
 rebuildFileAsync
   :: forall m. (Ide m, MonadLogger m, MonadError IdeError m)

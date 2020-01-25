@@ -15,10 +15,10 @@
   =purs ide= is split into a library and an executable. The library code lives
   inside =src/Language/PureScript/Ide=. The executable, which is invoked by the
   editors is located inside =app/Command/Ide.hs=.
-  
+
   The =purs ide= library is unopinionated about:
 
-  - Protocol 
+  - Protocol
   - Concurrency Model
   - Logging
   - File watchers
