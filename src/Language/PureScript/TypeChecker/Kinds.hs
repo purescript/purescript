@@ -586,8 +586,10 @@ inferTypeSynonym moduleName (_, tyName, tyArgs, tyBody) = do
     tyArgs' <- for tyArgs . traverse . maybe freshKind $ replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType
     unifyKinds tyKind' $ foldr ((E.-:>) . snd) kindRes tyArgs'
     bindLocalTypeVariables moduleName (first ProperName <$> tyArgs') $ do
-      body <- inferKind tyBody
-      apply =<< instantiateKind body =<< apply kindRes
+      tyBodyAndKind <- inferKind tyBody
+      tyBody' <- apply =<< instantiateKind tyBodyAndKind =<< apply kindRes
+      unks <- unknownsWithKinds . IS.toList $ unknowns tyBody'
+      pure $ generalizeUnknowns unks tyBody'
 
 type ClassDeclarationArgs =
   ( SourceAnn
