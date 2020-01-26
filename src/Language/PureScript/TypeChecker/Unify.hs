@@ -37,14 +37,7 @@ import Language.PureScript.Types
 
 -- | Generate a fresh type variable
 freshType :: (MonadState CheckState m) => m SourceType
-freshType = do
-  freshTypeWithKind =<< freshTypeWithKind E.kindType
-  -- t <- gets checkNextType
-  -- modify $ \st -> st { checkNextType = t + 1
-  --                    , checkSubstitution =
-  --                        (checkSubstitution st) { substUnsolved = M.insert t (UnkLevel (pure t), E.kindType) (substUnsolved (checkSubstitution st)) }
-  --                    }
-  -- return $ srcTUnknown t
+freshType = freshTypeWithKind =<< freshTypeWithKind E.kindType
 
 freshTypeWithKind :: (MonadState CheckState m) => SourceType -> m SourceType
 freshTypeWithKind kind = do

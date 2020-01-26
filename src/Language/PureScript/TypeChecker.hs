@@ -13,7 +13,7 @@ import Prelude.Compat
 import Protolude (headMay, ordNub)
 
 import Control.Monad (when, unless, void, forM,)
-import Control.Monad.Error.Class (MonadError(..), catchError)
+import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State.Class (MonadState(..), modify, gets)
 import Control.Monad.Supply.Class (MonadSupply)
 import Control.Monad.Writer.Class (MonadWriter(..), censor)
@@ -41,8 +41,6 @@ import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 
 import Lens.Micro.Platform ((^..), _2)
-
-import Debug.Trace
 
 addDataType
   :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
@@ -239,17 +237,8 @@ typeCheckAll
   -> [DeclarationRef]
   -> [Declaration]
   -> m [Declaration]
-typeCheckAll moduleName _ = flip catchError (\err -> debugEnv' *> throwError err) . (\a -> traverse go a <* debugEnv')
+typeCheckAll moduleName _ = traverse go
   where
-  debugEnv' = pure ()
-  -- debugEnv' = do
-  --   env <- gets checkEnv
-  --   let ppEnv = unlines $ debugEnv env
-  --   traceM
-  --     . unlines
-  --     $ T.unpack (runModuleName moduleName)
-  --     : fmap ("  " <>) (lines ppEnv)
-
   go :: Declaration -> m Declaration
   go (DataDeclaration sa@(ss, _) dtype name args dctors) = do
     warnAndRethrow (addHint (ErrorInTypeConstructor name) . addHint (positionedError ss)) $ do
