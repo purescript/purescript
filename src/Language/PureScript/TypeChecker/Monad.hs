@@ -29,8 +29,20 @@ import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 import Text.PrettyPrint.Boxes (render)
 
-newtype UnkLevel = UnkLevel (NEL.NonEmpty Int)
-  deriving (Eq, Ord, Show)
+newtype UnkLevel = UnkLevel (NEL.NonEmpty Unknown)
+  deriving (Eq, Show)
+
+-- This instance differs from the NEL instance in that longer but otherwise
+-- equal paths are LT rather than GT. An extended path puts it *before* its root.
+instance Ord UnkLevel where
+  compare (UnkLevel a) (UnkLevel b) =
+    go (NEL.toList a) (NEL.toList b)
+    where
+    go [] [] = EQ
+    go _  [] = LT
+    go [] _  = GT
+    go (x:xs) (y:ys) =
+      compare x y <> go xs ys
 
 -- | A substitution of unification variables for types.
 data Substitution = Substitution
