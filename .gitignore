@@ -32,3 +32,4 @@ TAGS
 *.prof
 *.ps
 *.svg
+tests/purs/make/

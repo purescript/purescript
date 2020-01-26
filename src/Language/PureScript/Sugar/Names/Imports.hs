@@ -32,10 +32,9 @@ findImports
   -> M.Map ModuleName [ImportDef]
 findImports = foldr go M.empty
   where
-  go (ImportDeclaration (pos, _) mn typ qual) result =
-    let imp = (pos, typ, qual)
-    in M.insert mn (maybe [imp] (imp :) (mn `M.lookup` result)) result
-  go _ result = result
+  go (ImportDeclaration (pos, _) mn typ qual) =
+    M.alter (return . ((pos, typ, qual) :) . fromMaybe []) mn
+  go _ = id
 
 -- |
 -- Constructs a set of imports for a module.

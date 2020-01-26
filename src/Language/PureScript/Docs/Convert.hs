@@ -35,11 +35,12 @@ import qualified Language.PureScript.Types as P
 convertModule ::
   MonadError P.MultipleErrors m =>
   [P.ExternsFile] ->
+  P.Env ->
   P.Environment ->
   P.Module ->
   m Module
-convertModule externs checkEnv m =
-  partiallyDesugar externs [m] >>= \case
+convertModule externs env checkEnv m =
+  partiallyDesugar externs env [m] >>= \case
     [m'] -> pure (insertValueTypes checkEnv (convertSingleModule m'))
     _ -> P.internalError "partiallyDesugar did not return a singleton"
 
@@ -88,9 +89,10 @@ runParser p =
 partiallyDesugar ::
   (MonadError P.MultipleErrors m) =>
   [P.ExternsFile] ->
+  P.Env ->
   [P.Module] ->
   m [P.Module]
-partiallyDesugar externs = evalSupplyT 0 . desugar'
+partiallyDesugar externs env = evalSupplyT 0 . desugar'
   where
   desugar' =
     traverse P.desugarDoModule
@@ -98,10 +100,8 @@ partiallyDesugar externs = evalSupplyT 0 . desugar'
       >=> map P.desugarLetPatternModule
       >>> traverse P.desugarCasesModule
       >=> traverse P.desugarTypeDeclarationsModule
-      >=> ignoreWarnings . P.desugarImports externs
+      >=> fmap fst . runWriterT . P.desugarImports env
       >=> P.rebracketFiltered isInstanceDecl externs
-
-  ignoreWarnings = fmap fst . runWriterT
 
   isInstanceDecl (P.TypeInstanceDeclaration {}) = True
   isInstanceDecl _ = False

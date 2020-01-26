@@ -279,7 +279,7 @@ lintImportDecl env mni qualifierName names ss declType allowImplicit =
           isMatch _ _ = False
 
   unused :: m Bool
-  unused = warn (UnusedImport mni)
+  unused = warn (UnusedImport mni qualifierName)
 
   warn :: SimpleErrorMessage -> m Bool
   warn err = tell (errorMessage' ss err) >> return True

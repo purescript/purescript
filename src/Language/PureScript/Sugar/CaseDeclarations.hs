@@ -171,8 +171,8 @@ desugarGuardedExprs ss (Case scrut alternatives) =
           -- if the binder is a var binder we must not add
           -- the fail case as it results in unreachable
           -- alternative
-          alt_fail' | all isIrrefutable vb = []
-                    | otherwise = alt_fail
+          alt_fail' n | all isIrrefutable vb = []
+                      | otherwise = alt_fail n
 
 
           -- we are here:
@@ -186,18 +186,18 @@ desugarGuardedExprs ss (Case scrut alternatives) =
           --
         in Case scrut
             (CaseAlternative vb [MkUnguarded (desugarGuard gs e alt_fail)]
-              : alt_fail')
+              : (alt_fail' (length scrut)))
 
       return [ CaseAlternative scrut_nullbinder [MkUnguarded rhs]]
 
-    desugarGuard :: [Guard] -> Expr -> [CaseAlternative] -> Expr
+    desugarGuard :: [Guard] -> Expr -> (Int ->[CaseAlternative]) -> Expr
     desugarGuard [] e _ = e
     desugarGuard (ConditionGuard c : gs) e match_failed
       | isTrueExpr c = desugarGuard gs e match_failed
       | otherwise =
         Case [c]
           (CaseAlternative [LiteralBinder ss (BooleanLiteral True)]
-            [MkUnguarded (desugarGuard gs e match_failed)] : match_failed)
+            [MkUnguarded (desugarGuard gs e match_failed)] : match_failed 1)
 
     desugarGuard (PatternGuard vb g : gs) e match_failed =
       Case [g]
@@ -206,7 +206,7 @@ desugarGuardedExprs ss (Case scrut alternatives) =
       where
         -- don't consider match_failed case if the binder is irrefutable
         match_failed' | isIrrefutable vb = []
-                      | otherwise        = match_failed
+                      | otherwise        = match_failed 1
 
     -- we generate a let-binding for the remaining guards
     -- and alternatives. A CaseAlternative is passed (or in
@@ -215,7 +215,7 @@ desugarGuardedExprs ss (Case scrut alternatives) =
     desugarAltOutOfLine :: [Binder]
                         -> [GuardedExpr]
                         -> [CaseAlternative]
-                        -> ([CaseAlternative] -> Expr)
+                        -> ((Int -> [CaseAlternative]) -> Expr)
                         -> m Expr
     desugarAltOutOfLine alt_binder rem_guarded rem_alts mk_body
       | Just rem_case <- mkCaseOfRemainingGuardsAndAlts = do
@@ -228,7 +228,8 @@ desugarGuardedExprs ss (Case scrut alternatives) =
           goto_rem_case :: Expr
           goto_rem_case = Var ss (Qualified Nothing rem_case_id)
             `App` Literal ss (BooleanLiteral True)
-          alt_fail = [CaseAlternative [NullBinder] [MkUnguarded goto_rem_case]]
+          alt_fail :: Int -> [CaseAlternative]
+          alt_fail n = [CaseAlternative (replicate n NullBinder) [MkUnguarded goto_rem_case]]
 
         pure $ Let FromLet [
           ValueDecl (ss, []) rem_case_id Private []
@@ -236,7 +237,7 @@ desugarGuardedExprs ss (Case scrut alternatives) =
           ] (mk_body alt_fail)
 
       | otherwise
-      = pure $ mk_body []
+      = pure $ mk_body (const [])
       where
         mkCaseOfRemainingGuardsAndAlts
           | not (null rem_guarded)

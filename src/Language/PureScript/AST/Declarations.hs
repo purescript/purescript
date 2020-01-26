@@ -75,9 +75,7 @@ data SimpleErrorMessage
   | MissingFFIImplementations ModuleName [Ident]
   | UnusedFFIImplementations ModuleName [Ident]
   | InvalidFFIIdentifier ModuleName Text
-  | CannotGetFileInfo FilePath
-  | CannotReadFile FilePath
-  | CannotWriteFile FilePath
+  | FileIOError Text IOError -- ^ A description of what we were trying to do, and the error which occurred
   | InfiniteType SourceType
   | InfiniteKind SourceType
   | MultipleValueOpFixities (OpName 'ValueOpName)
@@ -115,7 +113,7 @@ data SimpleErrorMessage
   | ConstrainedTypeUnified SourceType SourceType
   | OverlappingInstances (Qualified (ProperName 'ClassName)) [SourceType] [Qualified Ident]
   | NoInstanceFound SourceConstraint
-  | AmbiguousTypeVariables SourceType SourceConstraint
+  | AmbiguousTypeVariables SourceType [Int]
   | UnknownClass (Qualified (ProperName 'ClassName))
   | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [SourceType]
   | CannotDerive (Qualified (ProperName 'ClassName)) [SourceType]
@@ -153,7 +151,7 @@ data SimpleErrorMessage
   | IncompleteExhaustivityCheck
   | MisleadingEmptyTypeImport ModuleName (ProperName 'TypeName)
   | ImportHidingModule ModuleName
-  | UnusedImport ModuleName
+  | UnusedImport ModuleName (Maybe ModuleName)
   | UnusedExplicitImport ModuleName [Name] (Maybe ModuleName) [DeclarationRef]
   | UnusedDctorImport ModuleName (ProperName 'TypeName) (Maybe ModuleName) [DeclarationRef]
   | UnusedDctorExplicitImport ModuleName (ProperName 'TypeName) [ProperName 'ConstructorName] (Maybe ModuleName) [DeclarationRef]

@@ -17,12 +17,12 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Supply
 import           Control.Monad.Trans.Control (MonadBaseControl(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
-import           Data.Aeson (encode)
+import           Control.Monad.Writer.Strict (runWriterT)
 import           Data.Function (on)
 import           Data.Foldable (for_)
 import           Data.List (foldl', sortBy)
 import qualified Data.List.NonEmpty as NEL
-import           Data.Maybe (fromMaybe, mapMaybe)
+import           Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -41,6 +41,7 @@ import           Language.PureScript.Sugar
 import           Language.PureScript.TypeChecker
 import           Language.PureScript.Make.BuildPlan
 import qualified Language.PureScript.Make.BuildPlan as BuildPlan
+import qualified Language.PureScript.Make.Cache as Cache
 import           Language.PureScript.Make.Actions as Actions
 import           Language.PureScript.Make.Monad as Monad
 import qualified Language.PureScript.CoreFn as CF
@@ -57,13 +58,25 @@ rebuildModule
   -> [ExternsFile]
   -> Module
   -> m ExternsFile
-rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
+rebuildModule actions externs m = do
+  env <- fmap fst . runWriterT $ foldM externsEnv primEnv externs
+  rebuildModule' actions env externs m
+
+rebuildModule'
+  :: forall m
+   . (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
+  => MakeActions m
+  -> Env
+  -> [ExternsFile]
+  -> Module
+  -> m ExternsFile
+rebuildModule' MakeActions{..} exEnv externs m@(Module _ _ moduleName _ _) = do
   progress $ CompilingModule moduleName
   let env = foldl' (flip applyExternsFileToEnvironment) initEnvironment externs
       withPrim = importPrim m
   lint withPrim
   ((Module ss coms _ elaborated exps, env'), nextVar) <- runSupplyT 0 $ do
-    desugar externs [withPrim] >>= \case
+    desugar exEnv externs [withPrim] >>= \case
       [desugared] -> runCheck' (emptyCheckState env) $ typeCheckModule desugared
       _ -> internalError "desugar did not return a singleton"
 
@@ -88,29 +101,30 @@ rebuildModule MakeActions{..} externs m@(Module _ _ moduleName _ _) = do
   -- a bug in the compiler, which should be reported as such.
   -- 2. We do not want to perform any extra work generating docs unless the
   -- user has asked for docs to be generated.
-  let docs = case Docs.convertModule externs env' m of
+  let docs = case Docs.convertModule externs exEnv env' m of
                Left errs -> internalError $
                  "Failed to produce docs for " ++ T.unpack (runModuleName moduleName)
                  ++ "; details:\n" ++ prettyPrintMultipleErrors defaultPPEOptions errs
                Right d -> d
 
-  evalSupplyT nextVar' . codegen renamed docs . encode $ exts
+  evalSupplyT nextVar' $ codegen renamed docs exts
   return exts
 
 -- | Compiles in "make" mode, compiling each module separately to a @.js@ file and an @externs.json@ file.
 --
--- If timestamps have not changed, the externs file can be used to provide the module's types without
--- having to typecheck the module again.
+-- If timestamps or hashes have not changed, existing externs files can be used to provide upstream modules' types without
+-- having to typecheck those modules again.
 make :: forall m. (Monad m, MonadBaseControl IO m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
      => MakeActions m
      -> [CST.PartialResult Module]
      -> m [ExternsFile]
 make ma@MakeActions{..} ms = do
   checkModuleNames
+  cacheDb <- readCacheDb
 
   (sorted, graph) <- sortModules (moduleSignature . CST.resPartial) ms
 
-  buildPlan <- BuildPlan.construct ma (sorted, graph)
+  (buildPlan, newCacheDb) <- BuildPlan.construct ma cacheDb (sorted, graph)
 
   let toBeRebuilt = filter (BuildPlan.needsRebuild buildPlan . getModuleName . CST.resPartial) sorted
   for_ toBeRebuilt $ \m -> fork $ do
@@ -123,21 +137,34 @@ make ma@MakeActions{..} ms = do
       (deps `inOrderOf` map (getModuleName . CST.resPartial) sorted)
 
   -- Wait for all threads to complete, and collect results (and errors).
-  results <- BuildPlan.collectResults buildPlan
+  (failures, successes) <-
+    let
+      splitResults = \case
+        BuildJobSucceeded _ exts ->
+          Right exts
+        BuildJobFailed errs ->
+          Left errs
+        BuildJobSkipped ->
+          Left mempty
+    in
+      M.mapEither splitResults <$> BuildPlan.collectResults buildPlan
+
+  -- Write the updated build cache database to disk
+  writeCacheDb $ Cache.removeModules (M.keysSet failures) newCacheDb
+
+  -- If generating docs, also generate them for the Prim modules
+  outputPrimDocs
 
   -- All threads have completed, rethrow any caught errors.
-  let errors = mapMaybe buildJobFailure $ M.elems results
+  let errors = M.elems failures
   unless (null errors) $ throwError (mconcat errors)
 
   -- Here we return all the ExternsFile in the ordering of the topological sort,
   -- so they can be folded into an Environment. This result is used in the tests
   -- and in PSCI.
   let lookupResult mn =
-        snd
-        . fromMaybe (internalError "make: module's build job did not succeed")
-        . buildJobSuccess
-        . fromMaybe (internalError "make: module not found in results")
-        $ M.lookup mn results
+        fromMaybe (internalError "make: module not found in results")
+        $ M.lookup mn successes
   return (map (lookupResult . getModuleName . CST.resPartial) sorted)
 
   where
@@ -184,7 +211,17 @@ make ma@MakeActions{..} ms = do
 
       case mexterns of
         Just (_, externs) -> do
-          (exts, warnings) <- listen $ rebuildModule ma externs m
+          -- We need to ensure that all dependencies have been included in Env
+          C.modifyMVar_ (bpEnv buildPlan) $ \env -> do
+            let
+              go :: Env -> ModuleName -> m Env
+              go e dep = case lookup dep (zip deps externs) of
+                Just exts
+                  | not (M.member dep e) -> externsEnv e exts
+                _ -> return e
+            foldM go env deps
+          env <- C.readMVar (bpEnv buildPlan)
+          (exts, warnings) <- listen $ rebuildModule' ma env externs m
           return $ BuildJobSucceeded (pwarnings' <> warnings) exts
         Nothing -> return BuildJobSkipped
 

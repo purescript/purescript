@@ -12,7 +12,7 @@ import Data.Tuple (swap)
 import Language.PureScript.Interactive.Types
 
 -- |
--- List of all avaliable directives.
+-- List of all available directives.
 --
 directives :: [Directive]
 directives = map fst directiveStrings

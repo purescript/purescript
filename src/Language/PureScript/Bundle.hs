@@ -270,7 +270,7 @@ withDeps (Module modulePath fn es) = Module modulePath fn (map expandDeps es)
   boundNames = mapMaybe toBoundName es
     where
     toBoundName :: ModuleElement -> Maybe String
-    toBoundName (Member _ _ nm _ _) = Just nm
+    toBoundName (Member _ Internal nm _ _) = Just nm
     toBoundName _ = Nothing
 
   -- | Calculate dependencies and add them to the current element.
@@ -297,17 +297,37 @@ withDeps (Module modulePath fn es) = Module modulePath fn (map expandDeps es)
       = ([(mid, nm', Public)], bn)
     toReference (JSIdentifier _ nm) bn
       | nm `elem` bn
-      -- ^ only add a dependency if this name is still in the list of names
+      -- only add a dependency if this name is still in the list of names
       -- bound to the module level (i.e., hasn't been shadowed by a function
       -- parameter)
       = ([(m, nm, Internal)], bn)
+    toReference (JSObjectLiteral _ props _) bn
+      = let
+          shorthandNames =
+            filter (`elem` bn) $
+            -- only add a dependency if this name is still in the list of
+            -- names bound to the module level (i.e., hasn't been shadowed by a
+            -- function parameter)
+            mapMaybe unPropertyIdentRef $
+            trailingCommaList props
+        in
+          (map (\name -> (m, name, Internal)) shorthandNames, bn)
     toReference (JSFunctionExpression _ _ _ params _ _) bn
-      = ([], bn \\ (mapMaybe unIdent $ commaList params))
+      = ([], bn \\ (mapMaybe unIdentifier $ commaList params))
+    toReference e bn
+      | Just nm <- exportsAccessor e
+      -- exports.foo means there's a dependency on the public member "foo" of
+      -- this module.
+      = ([(m, nm, Public)], bn)
     toReference _ bn = ([], bn)
 
-    unIdent :: JSIdent -> Maybe String
-    unIdent (JSIdentName _ name) = Just name
-    unIdent _ = Nothing
+    unIdentifier :: JSExpression -> Maybe String
+    unIdentifier (JSIdentifier _ name) = Just name
+    unIdentifier _ = Nothing
+
+    unPropertyIdentRef :: JSObjectProperty -> Maybe String
+    unPropertyIdentRef (JSPropertyIdentRef _ name) = Just name
+    unPropertyIdentRef _ = Nothing
 
 -- String literals include the quote chars
 fromStringLiteral :: JSExpression -> Maybe String
@@ -450,21 +470,22 @@ matchMember stmt
   = Just (Internal, name, decl)
   -- exports.foo = expr; exports["foo"] = expr;
   | JSAssignStatement e (JSAssign _) decl _ <- stmt
-  , Just name <- accessor e
+  , Just name <- exportsAccessor e
   = Just (Public, name, decl)
   | otherwise
   = Nothing
-  where
-  accessor :: JSExpression -> Maybe String
-  accessor (JSMemberDot exports _ nm)
-    | JSIdentifier _ "exports" <- exports
-    , JSIdentifier _ name <- nm
-    = Just name
-  accessor (JSMemberSquare exports _ nm _)
-    | JSIdentifier _ "exports" <- exports
-    , Just name <- fromStringLiteral nm
-    = Just name
-  accessor _ = Nothing
+
+-- Matches exports.* or exports["*"] expressions and returns the property name.
+exportsAccessor :: JSExpression -> Maybe String
+exportsAccessor (JSMemberDot exports _ nm)
+  | JSIdentifier _ "exports" <- exports
+  , JSIdentifier _ name <- nm
+  = Just name
+exportsAccessor (JSMemberSquare exports _ nm _)
+  | JSIdentifier _ "exports" <- exports
+  , Just name <- fromStringLiteral nm
+  = Just name
+exportsAccessor _ = Nothing
 
 -- Matches assignments to module.exports, like this:
 -- module.exports = { ... }
@@ -757,7 +778,7 @@ codeGen optionsMainModule optionsNamespace ms outFileOpt = (fmap sourceMapping o
 
   iife :: [JSStatement] -> String -> JSExpression -> JSStatement
   iife body param arg =
-    JSMethodCall (JSExpressionParen lf (JSFunctionExpression JSNoAnnot JSIdentNone JSNoAnnot (JSLOne (JSIdentName JSNoAnnot param)) JSNoAnnot
+    JSMethodCall (JSExpressionParen lf (JSFunctionExpression JSNoAnnot JSIdentNone JSNoAnnot (JSLOne (JSIdentifier JSNoAnnot param)) JSNoAnnot
                                                              (JSBlock sp (prependWhitespace "\n  " body) lf))
                                     JSNoAnnot)
                  JSNoAnnot

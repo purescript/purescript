@@ -52,7 +52,7 @@ instance FromJSON (Matcher IdeDeclarationAnn) where
       Just _ -> mzero
       Nothing -> return mempty
 
--- | Matches any occurence of the search string with intersections
+-- | Matches any occurrence of the search string with intersections
 --
 -- The scoring measures how far the matches span the string where
 -- closer is better.

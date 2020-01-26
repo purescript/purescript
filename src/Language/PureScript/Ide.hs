@@ -51,7 +51,8 @@ handleCommand
   -> m Success
 handleCommand c = case c of
   Load [] ->
-    findAvailableExterns >>= loadModulesAsync
+    -- Clearing the State before populating it to avoid a space leak
+    resetIdeState *> findAvailableExterns >>= loadModulesAsync
   Load modules ->
     loadModulesAsync modules
   LoadSync [] ->
