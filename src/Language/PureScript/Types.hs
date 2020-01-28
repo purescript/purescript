@@ -187,6 +187,24 @@ mapConstraintArgs f c = c { constraintArgs = f (constraintArgs c) }
 overConstraintArgs :: Functor f => ([Type a] -> f [Type a]) -> Constraint a -> f (Constraint a)
 overConstraintArgs f c = (\args -> c { constraintArgs = args }) <$> f (constraintArgs c)
 
+mapConstraintKindArgs :: ([Type a] -> [Type a]) -> Constraint a -> Constraint a
+mapConstraintKindArgs f c = c { constraintKindArgs = f (constraintKindArgs c) }
+
+overConstraintKindArgs :: Functor f => ([Type a] -> f [Type a]) -> Constraint a -> f (Constraint a)
+overConstraintKindArgs f c = (\args -> c { constraintKindArgs = args }) <$> f (constraintKindArgs c)
+
+mapConstraintArgsAll :: ([Type a] -> [Type a]) -> Constraint a -> Constraint a
+mapConstraintArgsAll f c =
+  c { constraintKindArgs = f (constraintKindArgs c)
+    , constraintArgs = f (constraintArgs c)
+    }
+
+overConstraintArgsAll :: Applicative f => ([Type a] -> f [Type a]) -> Constraint a -> f (Constraint a)
+overConstraintArgsAll f c =
+  (\a b -> c { constraintKindArgs = a, constraintArgs = b })
+    <$> f (constraintKindArgs c)
+    <*> f (constraintArgs c)
+
 constraintDataToJSON :: ConstraintData -> A.Value
 constraintDataToJSON (PartialConstraintData bs trunc) =
   A.object
@@ -563,7 +581,7 @@ everywhereOnTypes f = go where
   go (TypeApp ann t1 t2) = f (TypeApp ann (go t1) (go t2))
   go (KindApp ann t1 t2) = f (KindApp ann (go t1) (go t2))
   go (ForAll ann arg mbK ty sco) = f (ForAll ann arg (go <$> mbK) (go ty) sco)
-  go (ConstrainedType ann c ty) = f (ConstrainedType ann (mapConstraintArgs (map go) c) (go ty))
+  go (ConstrainedType ann c ty) = f (ConstrainedType ann (mapConstraintArgsAll (map go) $ c) (go ty))
   go (RCons ann name ty rest) = f (RCons ann name (go ty) (go rest))
   go (KindedType ann ty k) = f (KindedType ann (go ty) (go k))
   go (BinaryNoParensType ann t1 t2 t3) = f (BinaryNoParensType ann (go t1) (go t2) (go t3))
@@ -575,7 +593,7 @@ everywhereOnTypesTopDown f = go . f where
   go (TypeApp ann t1 t2) = TypeApp ann (go (f t1)) (go (f t2))
   go (KindApp ann t1 t2) = KindApp ann (go (f t1)) (go (f t2))
   go (ForAll ann arg mbK ty sco) = ForAll ann arg (go . f <$> mbK) (go (f ty)) sco
-  go (ConstrainedType ann c ty) = ConstrainedType ann (mapConstraintArgs (map (go . f)) c) (go (f ty))
+  go (ConstrainedType ann c ty) = ConstrainedType ann (mapConstraintArgsAll (map (go . f)) c) (go (f ty))
   go (RCons ann name ty rest) = RCons ann name (go (f ty)) (go (f rest))
   go (KindedType ann ty k) = KindedType ann (go (f ty)) (go (f k))
   go (BinaryNoParensType ann t1 t2 t3) = BinaryNoParensType ann (go (f t1)) (go (f t2)) (go (f t3))
@@ -587,7 +605,7 @@ everywhereOnTypesM f = go where
   go (TypeApp ann t1 t2) = (TypeApp ann <$> go t1 <*> go t2) >>= f
   go (KindApp ann t1 t2) = (KindApp ann <$> go t1 <*> go t2) >>= f
   go (ForAll ann arg mbK ty sco) = (ForAll ann arg <$> traverse go mbK <*> go ty <*> pure sco) >>= f
-  go (ConstrainedType ann c ty) = (ConstrainedType ann <$> overConstraintArgs (mapM go) c <*> go ty) >>= f
+  go (ConstrainedType ann c ty) = (ConstrainedType ann <$> overConstraintArgsAll (mapM go) c <*> go ty) >>= f
   go (RCons ann name ty rest) = (RCons ann name <$> go ty <*> go rest) >>= f
   go (KindedType ann ty k) = (KindedType ann <$> go ty <*> go k) >>= f
   go (BinaryNoParensType ann t1 t2 t3) = (BinaryNoParensType ann <$> go t1 <*> go t2 <*> go t3) >>= f
@@ -599,7 +617,7 @@ everywhereWithScopeOnTypesM s0 f = go s0 where
   go s (TypeApp ann t1 t2) = (TypeApp ann <$> go s t1 <*> go s t2) >>= f s
   go s (KindApp ann t1 t2) = (KindApp ann <$> go s t1 <*> go s t2) >>= f s
   go s (ForAll ann arg mbK ty sco) = (ForAll ann arg <$> traverse (go s) mbK <*> go (S.insert arg s) ty <*> pure sco) >>= f s
-  go s (ConstrainedType ann c ty) = (ConstrainedType ann <$> overConstraintArgs (traverse (go s)) c <*> go s ty) >>= f s
+  go s (ConstrainedType ann c ty) = (ConstrainedType ann <$> overConstraintArgsAll (traverse (go s)) c <*> go s ty) >>= f s
   go s (RCons ann name ty rest) = (RCons ann name <$> go s ty <*> go s rest) >>= f s
   go s (KindedType ann ty k) = (KindedType ann <$> go s ty <*> go s k) >>= f s
   go s (BinaryNoParensType ann t1 t2 t3) = (BinaryNoParensType ann <$> go s t1 <*> go s t2 <*> go s t3) >>= f s
@@ -611,7 +629,7 @@ everywhereOnTypesTopDownM f = go <=< f where
   go (TypeApp ann t1 t2) = TypeApp ann <$> (f t1 >>= go) <*> (f t2 >>= go)
   go (KindApp ann t1 t2) = KindApp ann <$> (f t1 >>= go) <*> (f t2 >>= go)
   go (ForAll ann arg mbK ty sco) = ForAll ann arg <$> (traverse (f >=> go) mbK) <*> (f ty >>= go) <*> pure sco
-  go (ConstrainedType ann c ty) = ConstrainedType ann <$> overConstraintArgs (mapM (go <=< f)) c <*> (f ty >>= go)
+  go (ConstrainedType ann c ty) = ConstrainedType ann <$> overConstraintArgsAll (mapM (go <=< f)) c <*> (f ty >>= go)
   go (RCons ann name ty rest) = RCons ann name <$> (f ty >>= go) <*> (f rest >>= go)
   go (KindedType ann ty k) = KindedType ann <$> (f ty >>= go) <*> (f k >>= go)
   go (BinaryNoParensType ann t1 t2 t3) = BinaryNoParensType ann <$> (f t1 >>= go) <*> (f t2 >>= go) <*> (f t3 >>= go)
@@ -624,7 +642,7 @@ everythingOnTypes (<+>) f = go where
   go t@(KindApp _ t1 t2) = f t <+> go t1 <+> go t2
   go t@(ForAll _ _ (Just k) ty _) = f t <+> go k <+> go ty
   go t@(ForAll _ _ _ ty _) = f t <+> go ty
-  go t@(ConstrainedType _ c ty) = foldl (<+>) (f t) (map go (constraintArgs c)) <+> go ty
+  go t@(ConstrainedType _ c ty) = foldl (<+>) (f t) (map go (constraintKindArgs c) ++ map go (constraintArgs c)) <+> go ty
   go t@(RCons _ _ ty rest) = f t <+> go ty <+> go rest
   go t@(KindedType _ ty k) = f t <+> go ty <+> go k
   go t@(BinaryNoParensType _ t1 t2 t3) = f t <+> go t1 <+> go t2 <+> go t3
@@ -638,7 +656,7 @@ everythingWithContextOnTypes s0 r0 (<+>) f = go' s0 where
   go s (KindApp _ t1 t2) = go' s t1 <+> go' s t2
   go s (ForAll _ _ (Just k) ty _) = go' s k <+> go' s ty
   go s (ForAll _ _ _ ty _) = go' s ty
-  go s (ConstrainedType _ c ty) = foldl (<+>) r0 (map (go' s) (constraintArgs c)) <+> go' s ty
+  go s (ConstrainedType _ c ty) = foldl (<+>) r0 (map (go' s) (constraintKindArgs c) ++ map (go' s) (constraintArgs c)) <+> go' s ty
   go s (RCons _ _ ty rest) = go' s ty <+> go' s rest
   go s (KindedType _ ty k) = go' s ty <+> go' s k
   go s (BinaryNoParensType _ t1 t2 t3) = go' s t1 <+> go' s t2 <+> go' s t3

@@ -26,8 +26,6 @@ import           Language.PureScript.TypeClassDictionaries
 import           Language.PureScript.Types
 import qualified Language.PureScript.Constants as C
 
-import Lens.Micro.Platform (Lens')
-
 -- | The @Environment@ defines all values and types which are currently in scope:
 data Environment = Environment
   { names :: M.Map (Qualified Ident) (SourceType, NameKind, NameVisibility)

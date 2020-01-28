@@ -245,7 +245,6 @@ typeDictionaryForBindingGroup moduleName vals = do
     -- fully expanded types.
     let (untyped, typed) = partitionEithers (map splitTypeAnnotation vals)
     (typedDict, typed') <- fmap unzip . for typed $ \(sai, (expr, ty, checkType)) -> do
-      -- TODO: this results in kind checking twice
       ((args, elabTy), kind) <- kindOfWithScopedVars ty
       checkTypeKind ty kind
       elabTy' <- replaceTypeWildcards elabTy

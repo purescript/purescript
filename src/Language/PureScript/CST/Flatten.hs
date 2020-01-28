@@ -35,9 +35,9 @@ flattenType = \case
   TypeUnaryRow _ a b -> pure a <> flattenType b
 
 flattenRow :: Row a -> DList SourceToken
-flattenRow (Row lbls tail) =
+flattenRow (Row lbls tl) =
   foldMap (flattenSeparated (flattenLabeled (pure . lblTok) flattenType)) lbls
-    <> foldMap (\(a, b) -> pure a <> flattenType b) tail
+    <> foldMap (\(a, b) -> pure a <> flattenType b) tl
 
 flattenTypeVarBinding :: TypeVarBinding a -> DList SourceToken
 flattenTypeVarBinding = \case
