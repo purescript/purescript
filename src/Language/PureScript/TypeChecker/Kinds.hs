@@ -24,6 +24,7 @@ import Prelude.Compat
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
+import Control.Monad.Supply.Class
 
 import Data.Bifunctor (first)
 import Data.Bitraversable (bitraverse)
@@ -756,7 +757,7 @@ checkInstanceDeclaration moduleName (ann, constraints, clsName, args) = do
     pure (allConstraints, allKinds, allArgs)
 
 checkKindDeclaration
-  :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)
+  :: forall m. (MonadSupply m, MonadError MultipleErrors m, MonadState CheckState m)
   => ModuleName
   -> SourceType
   -> m SourceType
@@ -765,7 +766,24 @@ checkKindDeclaration _ ty = do
   checkTypeKind kind E.kindType
   ty'' <- replaceAllTypeSynonyms ty'
   unks <- unknownsWithKinds . IS.toList $ unknowns ty''
-  pure $ generalizeUnknowns unks ty''
+  freshUnks <- traverse (traverse (\k -> (,k) <$> freshVar "k")) unks
+  generalizeUnknownsWithVars freshUnks <$> freshenForAlls ty' ty''
+  where
+  -- When expanding type synoyms and generalizing, we need to generate more
+  -- unique names so that they don't clash or shadow other names, or can
+  -- be referenced (easily).
+  freshVar arg = (arg <>) . T.pack . show <$> fresh
+  freshenForAlls = curry $ \case
+    (ForAll _ v1 _ ty1 _, ForAll a2 v2 k2 ty2 sc2) | v1 == v2 -> do
+      ty2' <- freshenForAlls ty1 ty2
+      pure $ ForAll a2 v2 k2 ty2' sc2
+    (_, ty2) -> go ty2 where
+      go = \case
+        ForAll a' v' k' ty' sc' -> do
+          v'' <- freshVar v'
+          ty'' <- go (replaceTypeVars v' (TypeVar a' v'') ty')
+          pure $ ForAll a' v'' k' ty'' sc'
+        other -> pure other
 
 existingSignatureOrFreshKind
   :: forall m. MonadState CheckState m
