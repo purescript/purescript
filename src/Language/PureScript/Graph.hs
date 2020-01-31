@@ -2,17 +2,19 @@ module Language.PureScript.Graph (graph) where
 
 import Prelude.Compat
 
+import qualified Data.Aeson as Json
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Map as Map
-import qualified Data.Aeson as Json
 
-import           Control.Monad (forM, foldM)
+import           Control.Monad (forM)
 import           Data.Aeson ((.=))
+import           Data.Foldable (foldl')
 import           Data.Map (Map)
-import           Data.ByteString.Lazy.UTF8 (ByteString)
+import           Data.Maybe (fromMaybe)
 import           Data.Text (Text)
 import           System.IO.UTF8 (readUTF8FileT)
 
+import qualified Language.PureScript.Crash as Crash
 import qualified Language.PureScript.CST as CST
 import qualified Language.PureScript.Make as Make
 import qualified Language.PureScript.ModuleDependencies as Dependencies
@@ -22,42 +24,36 @@ import           Language.PureScript.Errors (MultipleErrors)
 import           Language.PureScript.Names (ModuleName, runModuleName)
 
 
-graph :: [FilePath] -> IO (MultipleErrors, Either MultipleErrors ByteString)
+-- | Given a set of filepaths, try to build the dependency graph and return
+--   that as its JSON representation (or a bunch of errors, if any)
+graph :: [FilePath] -> IO (MultipleErrors, Either MultipleErrors Json.Value)
 graph input = do
   moduleFiles <- readInput input
   (makeResult, makeWarnings) <- Make.runMake Options.defaultOptions $ do
     ms <- CST.parseModulesFromFiles id moduleFiles
     let parsedModuleSig = Dependencies.moduleSignature . CST.resPartial
     (_sorted, moduleGraph) <- Dependencies.sortModules (parsedModuleSig . snd) ms
-    let swap (a, b) = (b, a)
-    let pathMap = Map.fromList
-                . fmap (swap . fmap (Dependencies.sigModuleName . parsedModuleSig))
-                $ ms
+    let pathMap = Map.fromList $
+          map (\(p, m) -> (Dependencies.sigModuleName (parsedModuleSig m), p)) ms
     pure (moduleGraphToJSON pathMap moduleGraph)
   pure $ case makeResult of
     Left makeErrors -> (makeWarnings, Left makeErrors)
-    Right Nothing -> undefined -- TODO: what should happen here?
-    Right (Just json) -> (makeWarnings, Right $ Json.encode json)
-
+    Right json -> (makeWarnings, Right json)
 
 moduleGraphToJSON
-  :: Map ModuleName FilePath -> Dependencies.ModuleGraph -> Maybe Json.Value
-moduleGraphToJSON paths = fmap Json.Object . foldM insert mempty
+  :: Map ModuleName FilePath
+  -> Dependencies.ModuleGraph
+  -> Json.Value
+moduleGraphToJSON paths = Json.Object . foldl' insert mempty
   where
-  insert :: Json.Object -> (ModuleName, [ModuleName]) -> Maybe Json.Object
-  insert obj (mn, depends) = flip (HashMap.insert key) obj <$> value
+  insert :: Json.Object -> (ModuleName, [ModuleName]) -> Json.Object
+  insert obj (mn, depends) = HashMap.insert (runModuleName mn) value obj
     where
-    key :: Text
-    key = runModuleName mn
-
-    value :: Maybe Json.Value
-    value = do
-      path <- Map.lookup mn paths
-      pure $ Json.object
+      path = fromMaybe (Crash.internalError "missing module name in graph") $ Map.lookup mn paths
+      value = Json.object
         [ "path"  .= path
         , "depends" .= fmap runModuleName depends
         ]
-
 
 readInput :: [FilePath] -> IO [(FilePath, Text)]
 readInput inputFiles =
