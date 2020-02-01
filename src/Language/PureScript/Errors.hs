@@ -193,6 +193,7 @@ errorCode em = case unwrapErrorMessage em of
   NonAssociativeError{} -> "NonAssociativeError"
   QuantificationCheckFailureInKind {} -> "QuantificationCheckFailureInKind"
   QuantificationCheckFailureInType {} -> "QuantificationCheckFailureInType"
+  VisibleQuantificationCheckFailureInType {} -> "VisibleQuantificationCheckFailureInType"
   UnsupportedTypeInKind {} -> "UnsupportedTypeInKind"
 
 -- | A stack trace for an error
@@ -1109,6 +1110,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                                 , "Try adding a kind signature."
                                 ]
            ]
+
+    renderSimpleErrorMessage (VisibleQuantificationCheckFailureInType var) =
+      paras
+        [ line $ "Visible dependent quantification of type variable " <> markCode var <> " is not supported."
+        , line $ "If you would like this feature supported, please bother Liam Goodacre (@LiamGoodacre)."
+        ]
 
     renderSimpleErrorMessage (UnsupportedTypeInKind ty) =
       paras

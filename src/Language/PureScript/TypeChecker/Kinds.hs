@@ -679,6 +679,19 @@ checkQuantification ty =
     isDep =
       elem karg $ freeTypeVariables k
 
+checkVisibleTypeQuantification
+  :: forall m. (MonadError MultipleErrors m)
+  => SourceType
+  -> m ()
+checkVisibleTypeQuantification =
+  collectErrors . freeTypeVariables
+  where
+  collectErrors vars =
+    unless (null vars)
+      . throwError
+      . foldMap (errorMessage . VisibleQuantificationCheckFailureInType)
+      $ vars
+
 -- | Checks that there are no remaining unknowns in a type, and if so
 -- | throws an error. This is necessary for contexts where we can't
 -- | implicitly generalize unknowns, such as on the right-hand-side of
@@ -922,7 +935,9 @@ kindsOfAll moduleName syns dats clss = withFreshSubstitution $ do
       let tyUnks = snd . fromJust $ lookup (mkQualified synName moduleName) tySubs
           unkBinders = unknownVarNames (usedTypeVariables synKind <> usedTypeVariables synBody) tyUnks
           genBody = replaceUnknownsWithVars unkBinders $ replaceTypeCtors synBody
+          genSig = generalizeUnknownsWithVars unkBinders synKind
       checkEscapedSkolems genBody
       checkTypeQuantification genBody
-      pure (genBody, generalizeUnknownsWithVars unkBinders synKind)
+      checkVisibleTypeQuantification genSig
+      pure (genBody, genSig)
     pure (synResultsWithKinds, datResultsWithKinds, clsResultsWithKinds)

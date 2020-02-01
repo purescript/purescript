@@ -183,6 +183,7 @@ data SimpleErrorMessage
   | NonAssociativeError (NEL.NonEmpty (Qualified (OpName 'AnyOpName)))
   | QuantificationCheckFailureInKind Text
   | QuantificationCheckFailureInType Int SourceType
+  | VisibleQuantificationCheckFailureInType Text
   | UnsupportedTypeInKind SourceType
   deriving (Show)
 
