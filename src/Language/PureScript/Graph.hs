@@ -26,19 +26,16 @@ import           Language.PureScript.Names (ModuleName, runModuleName)
 
 -- | Given a set of filepaths, try to build the dependency graph and return
 --   that as its JSON representation (or a bunch of errors, if any)
-graph :: [FilePath] -> IO (MultipleErrors, Either MultipleErrors Json.Value)
+graph :: [FilePath] -> IO (Either MultipleErrors Json.Value, MultipleErrors)
 graph input = do
   moduleFiles <- readInput input
-  (makeResult, makeWarnings) <- Make.runMake Options.defaultOptions $ do
+  Make.runMake Options.defaultOptions $ do
     ms <- CST.parseModulesFromFiles id moduleFiles
     let parsedModuleSig = Dependencies.moduleSignature . CST.resPartial
     (_sorted, moduleGraph) <- Dependencies.sortModules (parsedModuleSig . snd) ms
     let pathMap = Map.fromList $
           map (\(p, m) -> (Dependencies.sigModuleName (parsedModuleSig m), p)) ms
     pure (moduleGraphToJSON pathMap moduleGraph)
-  pure $ case makeResult of
-    Left makeErrors -> (makeWarnings, Left makeErrors)
-    Right json -> (makeWarnings, Right json)
 
 moduleGraphToJSON
   :: Map ModuleName FilePath

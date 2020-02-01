@@ -26,7 +26,7 @@ spec = do
     let graphFixtureName = "graph.json"
 
     graphFixture <- readUTF8FileT (baseDir <> graphFixtureName)
-    eitherGraph <- snd <$> P.graph modulePaths
+    eitherGraph <- fst <$> P.graph modulePaths
     case eitherGraph of
       Left err -> error $ "Graph creation failed. Errors: " <> show err
       Right res ->
@@ -35,5 +35,5 @@ spec = do
 
   it "should fail when trying to include non-existing modules in the graph" $ do
     let modulePath = sourcesDir <> "ModuleFailing.purs"
-    graph <- snd <$> P.graph [modulePath]
+    graph <- fst <$> P.graph [modulePath]
     graph `shouldSatisfy` isLeft

@@ -34,7 +34,7 @@ graph GraphOptions{..} = do
       ]
     exitFailure
 
-  (makeWarnings, makeResult) <- P.graph input
+  (makeResult, makeWarnings) <- P.graph input
 
   printWarningsAndErrors graphJSONErrors makeWarnings makeResult
     >>= (LB.putStr . Json.encode)
