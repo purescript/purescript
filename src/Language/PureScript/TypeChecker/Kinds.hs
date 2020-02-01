@@ -134,7 +134,7 @@ lookupUnsolved
 lookupUnsolved u = do
   uns <- gets (substUnsolved . checkSubstitution)
   case M.lookup u uns of
-    Nothing -> internalError $ "Unsolved unification variable ?" <> show u <> " is not bound"
+    Nothing -> internalCompilerError $ "Unsolved unification variable ?" <> T.pack (show u) <> " is not bound"
     Just res -> return res
 
 unknownsWithKinds

@@ -65,7 +65,8 @@ onTypeSearchTypesM _ (TSBefore env) = pure (TSBefore env)
 
 -- | A type of error messages
 data SimpleErrorMessage
-  = ModuleNotFound ModuleName
+  = InternalCompilerError Text Text
+  | ModuleNotFound ModuleName
   | ErrorParsingFFIModule FilePath (Maybe Bundle.ErrorMessage)
   | ErrorParsingModule P.ParseError
   | ErrorParsingCSTModule CST.ParserError

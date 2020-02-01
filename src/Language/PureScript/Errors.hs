@@ -27,6 +27,7 @@ import           Data.Ord (comparing)
 import qualified Data.Set as S
 import qualified Data.Text as T
 import           Data.Text (Text)
+import qualified GHC.Stack
 import           Language.PureScript.AST
 import qualified Language.PureScript.Bundle as Bundle
 import qualified Language.PureScript.Constants as C
@@ -78,6 +79,7 @@ stripModuleAndSpan (ErrorMessage hints e) = ErrorMessage (filter (not . shouldSt
 -- | Get the error code for a particular error type
 errorCode :: ErrorMessage -> Text
 errorCode em = case unwrapErrorMessage em of
+  InternalCompilerError{} -> "InternalCompilerError"
   ModuleNotFound{} -> "ModuleNotFound"
   ErrorParsingFFIModule{} -> "ErrorParsingFFIModule"
   ErrorParsingModule{} -> "ErrorParsingModule"
@@ -474,6 +476,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       unknownInfo u = line $ markCode ("t" <> T.pack (show u)) <> " is an unknown type"
 
     renderSimpleErrorMessage :: SimpleErrorMessage -> Box.Box
+    renderSimpleErrorMessage (InternalCompilerError ctx err) =
+      paras [ line "Internal compiler error:"
+            , indent $ line err
+            , line ctx
+            ]
     renderSimpleErrorMessage (ModuleNotFound mn) =
       paras [ line $ "Module " <> markCode (runModuleName mn) <> " was not found."
             , line $
@@ -1620,3 +1627,12 @@ parU xs f =
     collectErrors es = case partitionEithers es of
       ([], rs) -> return rs
       (errs, _) -> throwError $ fold errs
+
+internalCompilerError
+  :: (MonadError MultipleErrors m, GHC.Stack.HasCallStack)
+  => Text
+  -> m a
+internalCompilerError =
+  throwError
+    . errorMessage
+    . InternalCompilerError (T.pack (GHC.Stack.prettyCallStack GHC.Stack.callStack))

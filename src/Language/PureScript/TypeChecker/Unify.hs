@@ -52,7 +52,9 @@ freshTypeWithKind kind = do
 solveType :: (MonadError MultipleErrors m, MonadState CheckState m) => Int -> SourceType -> m ()
 solveType u t = do
   occursCheck u t
-  kind <- gets (snd . maybe (internalError ("No kind for unification variable " <> show u)) id . M.lookup u . substUnsolved . checkSubstitution)
+  kind <-
+    maybe (internalCompilerError ("No kind for unification variable ?" <> T.pack (show u))) (pure . snd)
+      =<< gets (M.lookup u . substUnsolved . checkSubstitution)
   t' <- checkKind t kind
   modify $ \cs -> cs { checkSubstitution =
                          (checkSubstitution cs) { substType =
