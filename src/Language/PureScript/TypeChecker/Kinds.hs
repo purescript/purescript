@@ -516,7 +516,7 @@ elaborateKind = \case
       internalError $ "elaborateKind: Elaborated kind is not Type " <> prettyPrintType 10 uIsStar
     pure $ E.kindType $> ann
   ty ->
-    internalError $ "elaborateKind: Unimplemented case " <> prettyPrintType 10 ty
+    throwError . errorMessage' (fst (getAnnForType ty)) $ UnsupportedTypeInKind ty
 
 checkEscapedSkolems :: MonadError MultipleErrors m => SourceType -> m ()
 checkEscapedSkolems ty =

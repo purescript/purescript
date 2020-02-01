@@ -191,6 +191,7 @@ errorCode em = case unwrapErrorMessage em of
   NonAssociativeError{} -> "NonAssociativeError"
   QuantificationCheckFailureInKind {} -> "QuantificationCheckFailureInKind"
   QuantificationCheckFailureInType {} -> "QuantificationCheckFailureInType"
+  UnsupportedTypeInKind {} -> "UnsupportedTypeInKind"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -1101,6 +1102,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                                 , "Try adding a kind signature."
                                 ]
            ]
+
+    renderSimpleErrorMessage (UnsupportedTypeInKind ty) =
+      paras
+        [ line "The type:"
+        , indent $ markCodeBox $ prettyType ty
+        , line "is not supported in kinds."
+        ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =
