@@ -17,7 +17,7 @@ import Control.Applicative ((<|>))
 import Control.Arrow (first, second)
 import Control.DeepSeq (NFData)
 import Control.Monad ((<=<), (>=>))
-import Data.Aeson ((.:), (.=))
+import Data.Aeson ((.:), (.:?), (.!=), (.=))
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Types as A
 import Data.Foldable (fold)
@@ -31,6 +31,7 @@ import qualified Data.Text as T
 import GHC.Generics (Generic)
 
 import Language.PureScript.AST.SourcePos
+import qualified Language.PureScript.Constants as C
 import Language.PureScript.Names
 import Language.PureScript.Label (Label)
 import Language.PureScript.PSString (PSString)
@@ -295,7 +296,7 @@ constraintFromJSON :: forall a. A.Parser a -> (A.Value -> A.Parser a) -> A.Value
 constraintFromJSON defaultAnn annFromJSON = A.withObject "Constraint" $ \o -> do
   constraintAnn   <- (o .: "constraintAnn" >>= annFromJSON) <|> defaultAnn
   constraintClass <- o .: "constraintClass"
-  constraintKindArgs <- o .: "constraintKindArgs" >>= traverse (typeFromJSON defaultAnn annFromJSON)
+  constraintKindArgs <- o .:? "constraintKindArgs" .!= [] >>= traverse (typeFromJSON defaultAnn annFromJSON)
   constraintArgs  <- o .: "constraintArgs" >>= traverse (typeFromJSON defaultAnn annFromJSON)
   constraintData  <- o .: "constraintData" >>= traverse constraintDataFromJSON
   pure $ Constraint {..}
@@ -357,6 +358,16 @@ typeFromJSON defaultAnn annFromJSON = A.withObject "Type" $ \o -> do
     "ParensInType" -> do
       b <- contents
       ParensInType a <$> go b
+    -- Backwards compatability for kinds
+    "KUnknown" ->
+      TUnknown a <$> contents
+    "Row" ->
+      TypeApp a (TypeConstructor a C.Row) <$> (go =<< contents)
+    "FunKind" -> do
+      (b, c) <- contents
+      TypeApp a . TypeApp a (TypeConstructor a C.Function) <$> go b <*> go c
+    "NamedKind" ->
+      TypeConstructor a <$> contents
     other ->
       fail $ "Unrecognised tag: " ++ other
   where

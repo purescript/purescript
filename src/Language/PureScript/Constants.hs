@@ -399,6 +399,9 @@ pattern Function = Qualified (Just Prim) (ProperName "Function")
 pattern Array :: Qualified (ProperName 'TypeName)
 pattern Array = Qualified (Just Prim) (ProperName "Array")
 
+pattern Row :: Qualified (ProperName 'TypeName)
+pattern Row = Qualified (Just Prim) (ProperName "Row")
+
 -- Prim.Boolean
 
 pattern PrimBoolean :: ModuleName

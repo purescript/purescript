@@ -636,6 +636,9 @@ asDeclarationInfo = do
     "alias" ->
       AliasDeclaration <$> key "fixity" asFixity
                        <*> key "alias" asFixityAlias
+    -- Backwards compat: kinds are extern data
+    "kind" ->
+      pure $ ExternDataDeclaration (P.kindType $> ())
     other ->
       throwCustomError (InvalidDeclarationType other)
 
@@ -686,8 +689,7 @@ asSourcePos = P.SourcePos <$> nth 0 asIntegral
 
 asConstraint :: Parse PackageError Constraint'
 asConstraint = P.Constraint () <$> key "constraintClass" asQualifiedProperName
-                               -- TODO: Backwards compat?
-                               <*> key "constraintKindArgs" (eachInArray asType)
+                               <*> keyOrDefault "constraintKindArgs" [] (eachInArray asType)
                                <*> key "constraintArgs" (eachInArray asType)
                                <*> pure Nothing
 
