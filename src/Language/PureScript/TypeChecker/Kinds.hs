@@ -706,6 +706,10 @@ checkTypeQuantification = collectErrors . unknownsInKind
       | unks <- unknownsWithSpans k
       , not (IM.null unks) ->
           [(unks, srcKindedType (srcTypeVar arg) k)]
+    ty@(ConstrainedType _ (Constraint _ _ kinds _ _) _)
+      | unks <- foldMap unknownsWithSpans kinds
+      , not (IM.null unks) ->
+          [(unks, ty)]
     _ -> mempty
 
   unknownsWithSpans = everythingOnTypes (IM.unionWith widenSourceSpan) $ \case
