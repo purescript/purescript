@@ -189,7 +189,8 @@ errorCode em = case unwrapErrorMessage em of
   CannotDefinePrimModules{} -> "CannotDefinePrimModules"
   MixedAssociativityError{} -> "MixedAssociativityError"
   NonAssociativeError{} -> "NonAssociativeError"
-  QuantificationCheckFailure {} -> "QuantificationCheckFailure"
+  QuantificationCheckFailureInKind {} -> "QuantificationCheckFailureInKind"
+  QuantificationCheckFailureInType {} -> "QuantificationCheckFailureInType"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -1080,11 +1081,26 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , line "Use parentheses to resolve this ambiguity."
             ]
 
-    renderSimpleErrorMessage (QuantificationCheckFailure var) =
+    renderSimpleErrorMessage (QuantificationCheckFailureInKind var) =
       paras
-        [ line $ "Type variable " <> markCode var <> " is not well-ordered."
-        , line "Try adding kind annotations to any type variables."
+        [ line $ "Cannot generalize the kind of type variable " <> markCode var <> " since it would not be well-scoped."
+        , line "Try adding a kind annotation."
         ]
+
+    renderSimpleErrorMessage (QuantificationCheckFailureInType u ty) =
+      let unk = markCodeBox (prettyType (srcTUnknown u))
+      in paras
+           [ Box.hsep 1 Box.top [ "Cannot generalize the kind"
+                                , unk
+                                , "appearing in type:"
+                                ]
+           , indent $ markCodeBox $ typeAsBox prettyDepth ty
+           , Box.hsep 1 Box.top [ "where"
+                                , unk
+                                , "is an unknown kind."
+                                , "Try adding a kind signature."
+                                ]
+           ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =

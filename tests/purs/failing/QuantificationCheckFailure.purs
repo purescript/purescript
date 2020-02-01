@@ -1,4 +1,4 @@
--- @shouldFailWith QuantificationCheckFailure
+-- @shouldFailWith QuantificationCheckFailureInKind
 module Main where
 
 data Proxy :: forall k. k -> Type

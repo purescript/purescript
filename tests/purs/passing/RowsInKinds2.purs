@@ -8,6 +8,4 @@ foreign import data X :: R ()
 data P :: R () -> Type
 data P a = P
 
-type Test1 = P X
-
 main = log "Done"

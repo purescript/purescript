@@ -31,6 +31,7 @@ import Data.Bitraversable (bitraverse)
 import Data.Foldable (for_, traverse_)
 import Data.Function (on)
 import Data.Functor (($>))
+import qualified Data.IntMap.Strict as IM
 import qualified Data.IntSet as IS
 import Data.List (nubBy, sortBy, (\\))
 import qualified Data.Map as M
@@ -53,7 +54,7 @@ import Lens.Micro.Platform ((^.), _1, _2, _3)
 
 generalizeUnknowns :: [(Unknown, SourceType)] -> SourceType -> SourceType
 generalizeUnknowns unks ty =
-  generalizeUnknownsWithVars (unknownVarsForType unks ty) ty
+  generalizeUnknownsWithVars (unknownVarNames (usedTypeVariables ty) unks) ty
 
 generalizeUnknownsWithVars :: [(Unknown, (Text, SourceType))] -> SourceType -> SourceType
 generalizeUnknownsWithVars binders ty =
@@ -69,9 +70,9 @@ replaceUnknownsWithVars binders ty
     TUnknown ann unk | Just (name, _) <- lookup unk binders -> TypeVar ann name
     other -> other
 
-unknownVarsForType :: [(Unknown, SourceType)] -> SourceType -> [(Unknown, (Text, SourceType))]
-unknownVarsForType unks ty =
-  zipWith (\(a, b) n -> (a, (n, b))) unks $ allVars \\ usedTypeVariables ty
+unknownVarNames :: [Text] -> [(Unknown, SourceType)] -> [(Unknown, (Text, SourceType))]
+unknownVarNames used unks =
+  zipWith (\(a, b) n -> (a, (n, b))) unks $ allVars \\ used
   where
   allVars :: [Text]
   allVars
@@ -224,11 +225,8 @@ inferKind = \tyToInfer ->
         Nothing -> fmap ($> ann) freshKind
       (ty', unks) <- bindLocalTypeVariables moduleName [(ProperName arg, kind)] $ do
         ty' <- apply =<< checkKind ty E.kindType
-        unks <- for (IS.toList $ unknowns ty') $ \u ->
-          fmap (u,) . apply . snd =<< lookupUnsolved u
+        unks <- unknownsWithKinds . IS.toList $ unknowns ty'
         pure (ty', unks)
-      unless (not . elem arg $ foldMap (freeTypeVariables . snd) unks) $
-        throwError . errorMessage' (fst ann) $ QuantificationCheckFailure arg
       for_ unks . uncurry $ addUnsolved Nothing
       pure (ForAll ann arg (Just kind) ty' sc, E.kindType $> ann)
     ParensInType _ ty ->
@@ -520,8 +518,8 @@ elaborateKind = \case
   ty ->
     internalError $ "elaborateKind: Unimplemented case " <> prettyPrintType 10 ty
 
-skolemEscapeCheck :: MonadError MultipleErrors m => SourceType -> m ()
-skolemEscapeCheck ty =
+checkEscapedSkolems :: MonadError MultipleErrors m => SourceType -> m ()
+checkEscapedSkolems ty =
   traverse_ (throwError . toSkolemError)
     . everythingWithContextOnTypes ty [] (<>) go
     $ ty
@@ -648,6 +646,72 @@ inferTypeSynonym moduleName (_, tyName, tyArgs, tyBody) = do
       tyBodyAndKind <- inferKind tyBody
       apply =<< instantiateKind tyBodyAndKind =<< apply kindRes
 
+-- | Checks that a particular generalization is valid and well-scoped.
+-- | Implicitly generalized kinds are always elaborated before explicitly
+-- | quantified type variables. It's possible that such a kind can be
+-- | inserted before other variables that it depends on, making it
+-- | ill-scoped. We require that users explicitly generalize this kind
+-- | in such a case.
+checkQuantification
+  :: forall m. (MonadError MultipleErrors m)
+  => SourceType
+  -> m ()
+checkQuantification ty =
+  collectErrors . go [] [] . fst . fromJust . completeBinderList $ ty
+  where
+  collectErrors vars =
+    unless (null vars)
+      . throwError
+      . foldMap (\(ann, arg) -> errorMessage' (fst ann) $ QuantificationCheckFailureInKind arg)
+      $ vars
+
+  go acc _ [] = reverse acc
+  go acc sco ((_, (arg, k)) : rest)
+    | any (not . flip elem sco) $ freeTypeVariables k = goDeps acc arg rest
+    | otherwise = go acc (arg : sco) rest
+
+  goDeps acc _ [] = acc
+  goDeps acc karg ((ann, (arg, k)) : rest)
+    | isDep && arg == karg = (ann, arg) : acc
+    | isDep = goDeps ((ann, arg) : acc) karg rest
+    | otherwise = goDeps acc karg rest
+    where
+    isDep =
+      elem karg $ freeTypeVariables k
+
+-- | Checks that there are no remaining unknowns in a type, and if so
+-- | throws an error. This is necessary for contexts where we can't
+-- | implicitly generalize unknowns, such as on the right-hand-side of
+-- | a type synonym, or in arguments to data constructors.
+checkTypeQuantification
+  :: forall m. (MonadError MultipleErrors m)
+  => SourceType
+  -> m ()
+checkTypeQuantification = collectErrors . unknownsInKind
+  where
+  collectErrors tysWithUnks =
+    unless (null tysWithUnks)
+      . throwError
+      $ foldMap toMultipleErrors tysWithUnks
+
+  toMultipleErrors (unks, ty) =
+    foldMap (\(u, ss) -> errorMessage' ss $ QuantificationCheckFailureInType u ty) $ IM.toList unks
+
+  unknownsInKind = everythingOnTypes (<>) $ \case
+    ty@(KindApp _ _ k)
+      | unks <- unknownsWithSpans k
+      , not (IM.null unks) ->
+          [(unks, ty)]
+    (ForAll _ arg (Just k) _ _)
+      | unks <- unknownsWithSpans k
+      , not (IM.null unks) ->
+          [(unks, srcKindedType (srcTypeVar arg) k)]
+    _ -> mempty
+
+  unknownsWithSpans = everythingOnTypes (IM.unionWith widenSourceSpan) $ \case
+    TUnknown ann u -> IM.singleton u (fst ann)
+    _ -> IM.empty
+
 type ClassDeclarationArgs =
   ( SourceAnn
   , ProperName 'ClassName
@@ -752,7 +816,7 @@ checkInstanceDeclaration moduleName (ann, constraints, clsName, args) = do
     constraints' <- for constraints checkConstraint
     allTy <- apply $ foldr (\a b -> srcConstrainedType a b) ty' constraints'
     allUnknowns <- unknownsWithKinds . IS.toList $ unknowns allTy
-    let allWithVars = replaceUnknownsWithVars (unknownVarsForType allUnknowns allTy) allTy
+    let allWithVars = replaceUnknownsWithVars (unknownVarNames (usedTypeVariables allTy) allUnknowns) allTy
         (allConstraints, (_, allKinds, allArgs)) = unapplyTypes <$> unapplyConstraints allWithVars
     pure (allConstraints, allKinds, allArgs)
 
@@ -767,7 +831,9 @@ checkKindDeclaration _ ty = do
   ty'' <- replaceAllTypeSynonyms ty'
   unks <- unknownsWithKinds . IS.toList $ unknowns ty''
   freshUnks <- traverse (traverse (\k -> (,k) <$> freshVar "k")) unks
-  generalizeUnknownsWithVars freshUnks <$> freshenForAlls ty' ty''
+  finalTy <- generalizeUnknownsWithVars freshUnks <$> freshenForAlls ty' ty''
+  checkQuantification finalTy
+  pure finalTy
   where
   -- When expanding type synoyms and generalizing, we need to generate more
   -- unique names so that they don't clash or shadow other names, or can
@@ -840,19 +906,19 @@ kindsOfAll moduleName syns dats clss = withFreshSubstitution $ do
           TypeConstructor _ name
             | Just (tyCtor, _) <- lookup name tySubs -> tyCtor
           other -> other
-        datResultsWithKinds = flip fmap datResultsWithUnks $ \(((datName, datKind), ctors), _) -> do
-          let tyUnks = snd . fromJust $ lookup (mkQualified datName moduleName) tySubs
-              ctors' = fmap (fmap (generalizeUnknowns tyUnks . replaceTypeCtors)) ctors
-          (ctors', generalizeUnknowns tyUnks datKind)
         clsResultsWithKinds = flip fmap clsResultsWithUnks $ \(((clsName, clsKind), (args, supers, decls)), _) -> do
           let tyUnks = snd . fromJust $ lookup (mkQualified clsName moduleName) tySubs
           (args, supers, decls, generalizeUnknowns tyUnks clsKind)
+    datResultsWithKinds <- for datResultsWithUnks $ \(((datName, datKind), ctors), _) -> do
+      let tyUnks = snd . fromJust $ lookup (mkQualified datName moduleName) tySubs
+          ctors' = fmap (fmap (generalizeUnknowns tyUnks . replaceTypeCtors)) ctors
+      traverse_ (traverse_ checkTypeQuantification) ctors'
+      pure (ctors', generalizeUnknowns tyUnks datKind)
     synResultsWithKinds <- for synResultsWithUnks $ \(((synName, synKind), synBody), _) -> do
       let tyUnks = snd . fromJust $ lookup (mkQualified synName moduleName) tySubs
-          unkBinders = unknownVarsForType tyUnks synKind
+          unkBinders = unknownVarNames (usedTypeVariables synKind <> usedTypeVariables synBody) tyUnks
           genBody = replaceUnknownsWithVars unkBinders $ replaceTypeCtors synBody
-      remainingUnks <- unknownsWithKinds . IS.toList $ unknowns genBody
-      let genBody' = generalizeUnknowns remainingUnks genBody
-      skolemEscapeCheck genBody'
-      pure (genBody', generalizeUnknownsWithVars unkBinders synKind)
+      checkEscapedSkolems genBody
+      checkTypeQuantification genBody
+      pure (genBody, generalizeUnknownsWithVars unkBinders synKind)
     pure (synResultsWithKinds, datResultsWithKinds, clsResultsWithKinds)

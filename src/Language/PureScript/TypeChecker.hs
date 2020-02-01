@@ -291,7 +291,6 @@ typeCheckAll moduleName _ = traverse go
     warnAndRethrow (addHint (ErrorInKindDeclaration name) . addHint (positionedError ss)) $ do
       elabTy <- withFreshSubstitution $ checkKindDeclaration moduleName ty
       env <- getEnv
-      -- TODO: Extern data?
       putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (elabTy, LocalTypeVariable) (types env) }
       return $ KindDeclaration sa kindFor name elabTy
   go TypeDeclaration{} =
