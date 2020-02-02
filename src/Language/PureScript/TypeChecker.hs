@@ -37,6 +37,7 @@ import Language.PureScript.TypeChecker.Kinds as T
 import Language.PureScript.TypeChecker.Monad as T
 import Language.PureScript.TypeChecker.Synonyms as T
 import Language.PureScript.TypeChecker.Types as T
+import Language.PureScript.TypeChecker.Unify (varIfUnknown)
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 
@@ -330,7 +331,9 @@ typeCheckAll moduleName _ = traverse go
   go (d@(ExternDeclaration (ss, _) name ty)) = do
     warnAndRethrow (addHint (ErrorInForeignImport name) . addHint (positionedError ss)) $ do
       env <- getEnv
-      (elabTy, kind) <- kindOf ty
+      (elabTy, kind) <- withFreshSubstitution $ do
+        ((unks, ty'), kind) <- kindOfWithUnknowns ty
+        pure (varIfUnknown unks ty', kind)
       checkTypeKind elabTy kind
       case M.lookup (Qualified (Just moduleName) name) (names env) of
         Just _ -> throwError . errorMessage $ RedefinedIdent name
