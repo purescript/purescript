@@ -1096,19 +1096,17 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
         , line "Try adding a kind annotation."
         ]
 
-    renderSimpleErrorMessage (QuantificationCheckFailureInType u ty) =
-      let unk = markCodeBox (prettyType (srcTUnknown u))
+    renderSimpleErrorMessage (QuantificationCheckFailureInType us ty) =
+      let unks =
+            fmap (\u -> Box.hsep 1 Box.top [ "where"
+                                           , markCodeBox (prettyType (srcTUnknown u))
+                                           , "is an unknown kind."
+                                           ]) us
       in paras
-           [ Box.hsep 1 Box.top [ "Cannot generalize the kind"
-                                , unk
-                                , "appearing in type:"
-                                ]
+           [ line "Cannot unambiguously generalize kinds appearing in the elaborated type:"
            , indent $ markCodeBox $ typeAsBox prettyDepth ty
-           , Box.hsep 1 Box.top [ "where"
-                                , unk
-                                , "is an unknown kind."
-                                , "Try adding a kind signature."
-                                ]
+           , paras unks
+           , line "Try adding additional kind signatures or polymorphic kind variables."
            ]
 
     renderSimpleErrorMessage (VisibleQuantificationCheckFailureInType var) =

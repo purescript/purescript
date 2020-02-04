@@ -31,7 +31,6 @@ import Data.Bitraversable (bitraverse)
 import Data.Foldable (for_, traverse_)
 import Data.Function (on)
 import Data.Functor (($>))
-import qualified Data.IntMap.Strict as IM
 import qualified Data.IntSet as IS
 import Data.List (nubBy, sortBy, (\\))
 import qualified Data.Map as M
@@ -101,14 +100,14 @@ freshUnknown = do
   modify $ \st -> st { checkNextType = k + 1 }
   pure k
 
-freshKind :: (MonadState CheckState m) => m SourceType
-freshKind = freshKindWithKind E.kindType
+freshKind :: (MonadState CheckState m) => SourceSpan -> m SourceType
+freshKind ss = freshKindWithKind ss E.kindType
 
-freshKindWithKind :: (MonadState CheckState m) => SourceType -> m SourceType
-freshKindWithKind kind = do
+freshKindWithKind :: (MonadState CheckState m) => SourceSpan -> SourceType -> m SourceType
+freshKindWithKind ss kind = do
   u <- freshUnknown
   addUnsolved Nothing u kind
-  pure $ TUnknown nullSourceAnn u
+  pure $ TUnknown (ss, []) u
 
 addUnsolved :: (MonadState CheckState m) => Maybe UnkLevel -> Unknown -> SourceType -> m ()
 addUnsolved lvl unk kind = modify $ \st -> do
@@ -191,12 +190,12 @@ inferKind = \tyToInfer ->
       kind <- apply . snd =<< lookupUnsolved u
       pure (ty, kind $> ann)
     ty@(TypeWildcard ann _) -> do
-      k <- freshKind
+      k <- freshKind (fst ann)
       pure (ty, k $> ann)
     ty@(REmpty ann) -> do
       pure (ty, E.kindOfREmpty $> ann)
     ty@(RCons ann _ _ _) | (rowList, rowTail) <- rowToList ty -> do
-      kr <- freshKind
+      kr <- freshKind (fst ann)
       rowList' <- for rowList $ \(RowListItem a lbl t) ->
         RowListItem a lbl <$> checkKind t kr
       rowTail' <- checkKind rowTail $ E.kindRow kr
@@ -222,7 +221,7 @@ inferKind = \tyToInfer ->
       moduleName <- unsafeCheckCurrentModule
       kind <- case mbKind of
         Just k -> replaceAllTypeSynonyms =<< checkKind k E.kindType
-        Nothing -> fmap ($> ann) freshKind
+        Nothing -> freshKind (fst ann)
       (ty', unks) <- bindLocalTypeVariables moduleName [(ProperName arg, kind)] $ do
         ty' <- apply =<< checkKind ty E.kindType
         unks <- unknownsWithKinds . IS.toList $ unknowns ty'
@@ -267,7 +266,7 @@ cannotApplyTypeToType
   -> m a
 cannotApplyTypeToType fn arg = do
   argKind <- snd <$> inferKind arg
-  _ <- checkKind fn . srcTypeApp (srcTypeApp E.tyFunction argKind) =<< freshKind
+  _ <- checkKind fn . srcTypeApp (srcTypeApp E.tyFunction argKind) =<< freshKind nullSourceSpan
   internalError "Cannot apply type to type"
 
 cannotApplyKindToType
@@ -278,7 +277,7 @@ cannotApplyKindToType
 cannotApplyKindToType poly arg = do
   let ann = getAnnForType arg
   argKind <- snd <$> inferKind arg
-  _ <- checkKind poly . mkForAll [(ann, ("k", Just argKind))] =<< freshKind
+  _ <- checkKind poly . mkForAll [(ann, ("k", Just argKind))] =<< freshKind nullSourceSpan
   internalError "Cannot apply kind to type"
 
 checkKind
@@ -302,7 +301,7 @@ instantiateKind
 instantiateKind (ty, kind1) kind2 = case kind1 of
   ForAll _ a (Just k) t _ | shouldInstantiate kind2 -> do
     let ann = getAnnForType ty
-    u <- freshKindWithKind k
+    u <- freshKindWithKind (fst ann) k
     instantiateKind (KindApp ann ty u, replaceTypeVars a u t) kind2
   _ -> do
     subsumesKind kind1 kind2
@@ -329,8 +328,8 @@ subsumesKind = go
       scope <- maybe newSkolemScope pure mbScope
       skolc <- newSkolemConstant
       go a $ skolemize ann var mbKind skolc scope b
-    (ForAll _ var (Just kind) a _, b) -> do
-      a' <- freshKindWithKind kind
+    (ForAll ann var (Just kind) a _, b) -> do
+      a' <- freshKindWithKind (fst ann) kind
       go (replaceTypeVars var a' a) b
     (TUnknown ann u, b@(TypeApp _ (TypeApp _ arr _) _))
       | eqType arr E.tyFunction
@@ -417,7 +416,7 @@ unifyKindsWithFailure onFailure = go
     (([], w1), ([], w2)) | eqType w1 w2 ->
       pure ()
     ((rs1, TUnknown _ u1), (rs2, TUnknown _ u2)) -> do
-      rest <- freshKind
+      rest <- freshKind nullSourceSpan
       solveUnknown u1 $ rowFromList (rs2, rest)
       solveUnknown u2 $ rowFromList (rs1, rest)
     (w1, w2) ->
@@ -586,11 +585,11 @@ inferDataDeclaration
   => ModuleName
   -> DataDeclarationArgs
   -> m [(DataConstructorDeclaration, SourceType)]
-inferDataDeclaration moduleName (_, tyName, tyArgs, ctors) = do
+inferDataDeclaration moduleName (ann, tyName, tyArgs, ctors) = do
   tyKind <- lookupTypeVariable moduleName (Qualified Nothing tyName)
   let (sigBinders, tyKind') = fromJust . completeBinderList $ tyKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
-    tyArgs' <- for tyArgs . traverse . maybe freshKind $ replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType
+    tyArgs' <- for tyArgs . traverse . maybe (freshKind (fst ann)) $ replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType
     unifyKinds tyKind' $ foldr ((E.-:>) . snd) E.kindType tyArgs'
     bindLocalTypeVariables moduleName (first ProperName <$> tyArgs') $ do
       let tyCtorName = srcTypeConstructor $ mkQualified tyName moduleName
@@ -635,12 +634,12 @@ inferTypeSynonym
   => ModuleName
   -> TypeDeclarationArgs
   -> m SourceType
-inferTypeSynonym moduleName (_, tyName, tyArgs, tyBody) = do
+inferTypeSynonym moduleName (ann, tyName, tyArgs, tyBody) = do
   tyKind <- lookupTypeVariable moduleName (Qualified Nothing tyName)
   let (sigBinders, tyKind') = fromJust . completeBinderList $ tyKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
-    kindRes <- freshKind
-    tyArgs' <- for tyArgs . traverse . maybe freshKind $ replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType
+    kindRes <- freshKind (fst ann)
+    tyArgs' <- for tyArgs . traverse . maybe (freshKind (fst ann)) $ replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType
     unifyKinds tyKind' $ foldr ((E.-:>) . snd) kindRes tyArgs'
     bindLocalTypeVariables moduleName (first ProperName <$> tyArgs') $ do
       tyBodyAndKind <- inferKind tyBody
@@ -700,34 +699,25 @@ checkTypeQuantification
   :: forall m. (MonadError MultipleErrors m)
   => SourceType
   -> m ()
-checkTypeQuantification = collectErrors . unknownsInKind
+checkTypeQuantification =
+  collectErrors . everythingWithContextOnTypes True [] (<>) unknownsInKinds
   where
   collectErrors tysWithUnks =
-    unless (null tysWithUnks)
-      . throwError
-      $ foldMap toMultipleErrors tysWithUnks
+    unless (null tysWithUnks) . throwError . foldMap toMultipleErrors $ tysWithUnks
 
-  toMultipleErrors (unks, ty) =
-    foldMap (\(u, ss) -> errorMessage' ss $ QuantificationCheckFailureInType u ty) $ IM.toList unks
+  toMultipleErrors (ss, unks, ty) =
+    errorMessage' ss $ QuantificationCheckFailureInType (IS.toList unks) ty
 
-  unknownsInKind = everythingOnTypes (<>) $ \case
-    ty@(KindApp _ _ k)
-      | unks <- unknownsWithSpans k
-      , not (IM.null unks) ->
-          [(unks, ty)]
-    (ForAll _ arg (Just k) _ _)
-      | unks <- unknownsWithSpans k
-      , not (IM.null unks) ->
-          [(unks, srcKindedType (srcTypeVar arg) k)]
-    ty@(ConstrainedType _ (Constraint _ _ kinds _ _) _)
-      | unks <- foldMap unknownsWithSpans kinds
-      , not (IM.null unks) ->
-          [(unks, ty)]
-    _ -> mempty
-
-  unknownsWithSpans = everythingOnTypes (IM.unionWith widenSourceSpan) $ \case
-    TUnknown ann u -> IM.singleton u (fst ann)
-    _ -> IM.empty
+  unknownsInKinds False _ = (False, [])
+  unknownsInKinds _ ty = case ty of
+    ForAll sa _ _ _ _ | unks <- unknowns ty, not (IS.null unks) ->
+      (False, [(fst sa, unks, ty)])
+    KindApp sa _ _ | unks <- unknowns ty, not (IS.null unks) ->
+      (False, [(fst sa, unks, ty)])
+    ConstrainedType sa _ _ | unks <- unknowns ty, not (IS.null unks) ->
+      (False, [(fst sa, unks, ty)])
+    _ ->
+      (True, [])
 
 type ClassDeclarationArgs =
   ( SourceAnn
@@ -761,11 +751,11 @@ inferClassDeclaration
   => ModuleName
   -> ClassDeclarationArgs
   -> m ([(Text, SourceType)], [SourceConstraint], [Declaration])
-inferClassDeclaration moduleName (_, clsName, clsArgs, superClasses, decls) = do
+inferClassDeclaration moduleName (ann, clsName, clsArgs, superClasses, decls) = do
   clsKind <- lookupTypeVariable moduleName (Qualified Nothing $ coerceProperName clsName)
   let (sigBinders, clsKind') = fromJust . completeBinderList $ clsKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
-    clsArgs' <- for clsArgs . traverse . maybe freshKind $ replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType
+    clsArgs' <- for clsArgs . traverse . maybe (freshKind (fst ann)) $ replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType
     unifyKinds clsKind' $ foldr ((E.-:>) . snd) E.kindConstraint clsArgs'
     bindLocalTypeVariables moduleName (first ProperName <$> clsArgs') $ do
       (clsArgs',,)
@@ -827,7 +817,7 @@ checkInstanceDeclaration moduleName (ann, constraints, clsName, args) = do
   let ty = foldl (TypeApp ann) (TypeConstructor ann (fmap coerceProperName clsName)) args
       tyWithConstraints = foldr srcConstrainedType ty constraints
       freeVars = freeTypeVariables tyWithConstraints
-  freeVarsDict <- for freeVars $ \v -> (ProperName v,) <$> freshKind
+  freeVarsDict <- for freeVars $ \v -> (ProperName v,) <$> freshKind (fst ann)
   bindLocalTypeVariables moduleName freeVarsDict $ do
     ty' <- checkKind ty E.kindConstraint
     constraints' <- for constraints checkConstraint
@@ -871,12 +861,13 @@ checkKindDeclaration _ ty = do
 existingSignatureOrFreshKind
   :: forall m. MonadState CheckState m
   => ModuleName
+  -> SourceSpan
   -> ProperName 'TypeName
   -> m SourceType
-existingSignatureOrFreshKind moduleName name = do
+existingSignatureOrFreshKind moduleName ss name = do
   env <- getEnv
   case M.lookup (Qualified (Just moduleName) name) (E.types env) of
-    Nothing -> freshKind
+    Nothing -> freshKind ss
     Just (kind, _) -> pure kind
 
 kindsOfAll
@@ -887,9 +878,9 @@ kindsOfAll
   -> [ClassDeclarationArgs]
   -> m ([TypeDeclarationResult], [DataDeclarationResult], [ClassDeclarationResult])
 kindsOfAll moduleName syns dats clss = withFreshSubstitution $ do
-  synDict <- for syns $ \(_, synName, _, _) -> fmap (synName,) $ existingSignatureOrFreshKind moduleName synName
-  datDict <- for dats $ \(_, datName, _, _) -> fmap (datName,) $ existingSignatureOrFreshKind moduleName datName
-  clsDict <- for clss $ \(_, clsName, _, _, _) -> fmap (coerceProperName clsName,) $ existingSignatureOrFreshKind moduleName $ coerceProperName clsName
+  synDict <- for syns $ \(sa, synName, _, _) -> fmap (synName,) $ existingSignatureOrFreshKind moduleName (fst sa) synName
+  datDict <- for dats $ \(sa, datName, _, _) -> fmap (datName,) $ existingSignatureOrFreshKind moduleName (fst sa) datName
+  clsDict <- for clss $ \(sa, clsName, _, _, _) -> fmap (coerceProperName clsName,) $ existingSignatureOrFreshKind moduleName (fst sa) $ coerceProperName clsName
   let bindingGroup = synDict <> datDict <> clsDict
   bindLocalTypeVariables moduleName bindingGroup $ do
     synResults <- for syns (inferTypeSynonym moduleName)
