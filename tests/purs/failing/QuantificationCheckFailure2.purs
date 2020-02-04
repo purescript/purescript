@@ -1,5 +1,4 @@
 -- @shouldFailWith QuantificationCheckFailureInType
--- @shouldFailWith QuantificationCheckFailureInType
 module Main where
 
 data Proxy a = Proxy
