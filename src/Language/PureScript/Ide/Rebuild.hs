@@ -1,5 +1,4 @@
-{-# LANGUAGE PackageImports        #-}
-{-# LANGUAGE TemplateHaskell       #-}
+{-# language PackageImports, TemplateHaskell, BlockArguments #-}
 
 module Language.PureScript.Ide.Rebuild
   ( rebuildFileSync
@@ -7,20 +6,24 @@ module Language.PureScript.Ide.Rebuild
   , rebuildFile
   ) where
 
-import           Protolude
+import           Protolude hiding (moduleName)
 
 import           "monad-logger" Control.Monad.Logger
 import qualified Data.List                       as List
 import qualified Data.Map.Lazy                   as M
 import           Data.Maybe                      (fromJust)
 import qualified Data.Set                        as S
+import qualified Data.Time                       as Time
 import qualified Language.PureScript             as P
+import           Language.PureScript.Make.Cache (CacheDb, CacheInfo(..))
 import qualified Language.PureScript.CST         as CST
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
+import           System.Directory (getCurrentDirectory)
+import           System.FilePath (makeRelative)
 
 -- | Given a filepath performs the following steps:
 --
@@ -55,6 +58,7 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
     Left parseError ->
       throwError $ RebuildError $ CST.toMultipleErrors fp' parseError
     Right m -> pure m
+  let moduleName = P.getModuleName m
 
   -- Externs files must be sorted ahead of time, so that they get applied
   -- in the right order (bottom up) to the 'Environment'.
@@ -64,25 +68,47 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
 
   -- For rebuilding, we want to 'RebuildAlways', but for inferring foreign
   -- modules using their file paths, we need to specify the path in the 'Map'.
-  let filePathMap = M.singleton (P.getModuleName m) (Left P.RebuildAlways)
-  foreigns <- P.inferForeignModules (M.singleton (P.getModuleName m) (Right file))
+  let filePathMap = M.singleton moduleName (Left P.RebuildAlways)
+  foreigns <- P.inferForeignModules (M.singleton moduleName (Right file))
 
   let makeEnv = MakeActionsEnv outputDirectory filePathMap foreigns False
+
   -- Rebuild the single module using the cached externs
   (result, warnings) <- logPerf (labelTimespec "Rebuilding Module") $
-    liftIO
-    . P.runMake (P.defaultOptions { P.optionsCodegenTargets = codegenTargets })
-    . P.rebuildModule (buildMakeActions
-                        >>= shushProgress $ makeEnv) externs $ m
+    liftIO $ P.runMake (P.defaultOptions { P.optionsCodegenTargets = codegenTargets }) do
+      let ma@P.MakeActions{..} = (buildMakeActions >>= shushProgress) makeEnv
+      P.rebuildModule ma externs m
   case result of
-    Left errors -> throwError (RebuildError errors)
+    Left errors ->
+      throwError (RebuildError errors)
     Right newExterns -> do
-      whenM isEditorMode $ do
+      runExceptT do
+        cwd <- liftIO getCurrentDirectory
+        contentHash <- P.hashFile file
+        -- TODO(Christoph): Maybe we can avoid calling inferForeignmodule twice?
+        foreigns <- P.inferForeignModules (M.singleton moduleName (Right (fromMaybe file actualFile)))
+        -- TODO(Christoph): Make ALL filepaths in the cachedb.json file normalized relative paths
+        let cacheInfo' = M.singleton (makeRelative cwd (fromMaybe file actualFile)) (dayZero, contentHash)
+        -- TODO(Christoph): This is a bit clunky? I think we could use Map.alter?
+        cacheInfo <- case M.lookup moduleName foreigns of
+          Nothing -> pure cacheInfo'
+          Just foreignPath -> do
+            foreignHash <- P.hashFile foreignPath
+            pure (M.insert (makeRelative cwd foreignPath) (dayZero, foreignHash) cacheInfo')
+        cacheDb <- P.readCacheDb' outputDirectory
+        P.writeCacheDb' outputDirectory (M.insert moduleName (CacheInfo cacheInfo) cacheDb)
+      whenM isEditorMode do
         insertModule (fromMaybe file actualFile, m)
         insertExterns newExterns
         void populateVolatileState
       runOpenBuild (rebuildModuleOpen makeEnv externs m)
       pure (RebuildSuccess warnings)
+
+-- | When adjusting the cache db file after a rebuild we always pick a
+-- non-sensical timestamp ("1858-11-17T00:00:00Z"), and rely on the
+-- content hash to tell whether the module needs rebuilding
+dayZero :: Time.UTCTime
+dayZero = Time.UTCTime (Time.ModifiedJulianDay 0) 0
 
 isEditorMode :: Ide m => m Bool
 isEditorMode = asks (confEditorMode . ideConfiguration)

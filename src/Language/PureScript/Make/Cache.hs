@@ -4,7 +4,7 @@ module Language.PureScript.Make.Cache
   ( ContentHash
   , hash
   , CacheDb
-  , CacheInfo
+  , CacheInfo(..)
   , checkChanged
   , removeModules
   ) where
