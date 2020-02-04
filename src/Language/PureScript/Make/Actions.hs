@@ -4,6 +4,9 @@ module Language.PureScript.Make.Actions
   , ProgressMessage(..)
   , buildMakeActions
   , checkForeignDecls
+  , getInputTimestampsAndHashes'
+  , readCacheDb'
+  , writeCacheDb'
   ) where
 
 import           Prelude
@@ -105,6 +108,44 @@ data MakeActions m = MakeActions
   -- ^ If generating docs, output the documentation for the Prim modules
   }
 
+getInputTimestampsAndHashes'
+  :: (MonadIO m, MonadError MultipleErrors m)
+  => FilePath
+  -- ^ The filepath to the PureScript Module
+  -> Maybe FilePath
+  -- ^ The filepath to the module's potential FFI implementation
+  -> m (M.Map FilePath (UTCTime, m ContentHash))
+getInputTimestampsAndHashes' filePath foreignPath = do
+  let
+    inputPaths = filePath : maybeToList foreignPath
+    getInfo fp = do
+      ts <- getTimestamp fp
+      return (ts, hashFile fp)
+  pathsWithInfo <- traverse (\fp -> (fp,) <$> getInfo fp) inputPaths
+  pure (M.fromList pathsWithInfo)
+
+-- | Given the output directory, determines the location for the
+-- CacheDb file
+cacheDbFile :: FilePath -> FilePath
+cacheDbFile = (</> "cache-db.json")
+
+readCacheDb'
+  :: (MonadIO m, MonadError MultipleErrors m)
+  => FilePath
+  -- ^ The path to the output directory
+  -> m CacheDb
+readCacheDb' outputDir =
+  fromMaybe mempty <$> readJSONFile (cacheDbFile outputDir)
+
+writeCacheDb'
+  :: (MonadIO m, MonadError MultipleErrors m)
+  => FilePath
+  -- ^ The path to the output directory
+  -> CacheDb
+  -- ^ The CacheDb to be written
+  -> m ()
+writeCacheDb' = writeJSONFile . cacheDbFile
+
 -- | A set of make actions that read and write modules from the given directory.
 buildMakeActions
   :: FilePath
@@ -129,12 +170,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
       Left policy ->
         return (Left policy)
       Right filePath -> do
-        let inputPaths = filePath : maybeToList (M.lookup mn foreigns)
-            getInfo fp = do
-              ts <- getTimestamp fp
-              return (ts, hashFile fp)
-        pathsWithInfo <- traverse (\fp -> (fp,) <$> getInfo fp) inputPaths
-        return $ Right $ M.fromList pathsWithInfo
+        Right <$> getInputTimestampsAndHashes' filePath (M.lookup mn foreigns)
 
   outputFilename :: ModuleName -> String -> FilePath
   outputFilename mn fn =
@@ -246,12 +282,10 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   progress = liftIO . putStrLn . renderProgressMessage
 
   readCacheDb :: Make CacheDb
-  readCacheDb = fmap (fromMaybe mempty) $ readJSONFile cacheDbFile
+  readCacheDb = readCacheDb' outputDir
 
   writeCacheDb :: CacheDb -> Make ()
-  writeCacheDb = writeJSONFile cacheDbFile
-
-  cacheDbFile = outputDir </> "cache-db.json"
+  writeCacheDb = writeCacheDb' outputDir
 
 -- | Check that the declarations in a given PureScript module match with those
 -- in its corresponding foreign module.
