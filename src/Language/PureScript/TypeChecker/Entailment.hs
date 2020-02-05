@@ -643,15 +643,15 @@ newDictionaries path name (Constraint _ className instanceKinds instanceTy _) = 
     tcs <- gets (typeClasses . checkEnv)
     let TypeClassData{..} = fromMaybe (internalError "newDictionaries: type class lookup failed") $ M.lookup className tcs
     supDicts <- join <$> zipWithM (\(Constraint ann supName supKinds supArgs _) index ->
+                                      let sub = zip (map fst typeClassArguments) instanceTy in
                                       newDictionaries ((supName, index) : path)
                                                       name
-                                                      -- TODO: instantiate kinds args?
-                                                      (Constraint ann supName supKinds (instantiateSuperclass (map fst typeClassArguments) supArgs instanceTy) Nothing)
+                                                      (Constraint ann supName
+                                                        (replaceAllTypeVars sub <$> supKinds)
+                                                        (replaceAllTypeVars sub <$> supArgs)
+                                                        Nothing)
                                   ) typeClassSuperclasses [0..]
     return (TypeClassDictionaryInScope [] 0 name path className instanceKinds instanceTy Nothing : supDicts)
-  where
-    instantiateSuperclass :: [Text] -> [SourceType] -> [SourceType] -> [SourceType]
-    instantiateSuperclass args supArgs tys = map (replaceAllTypeVars (zip args tys)) supArgs
 
 mkContext :: [NamedDict] -> InstanceContext
 mkContext = foldr combineContexts M.empty . map fromDict where
