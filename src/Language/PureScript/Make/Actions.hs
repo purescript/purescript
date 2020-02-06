@@ -36,7 +36,6 @@ import qualified Language.PureScript.CodeGen.JS as J
 import           Language.PureScript.CodeGen.JS.Printer
 import qualified Language.PureScript.CoreFn as CF
 import qualified Language.PureScript.CoreFn.ToJSON as CFJ
-import qualified Language.PureScript.CoreImp.AST as Imp
 import           Language.PureScript.Crash
 import qualified Language.PureScript.CST as CST
 import qualified Language.PureScript.Docs.Prim as Docs.Prim
@@ -207,7 +206,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
           | not $ requiresForeign m -> do
               return Nothing
           | otherwise -> do
-              return $ Just $ Imp.App Nothing (Imp.Var Nothing "require") [Imp.StringLiteral Nothing "./foreign.js"]
+              return $ Just "./foreign.js"
         Nothing | requiresForeign m -> throwError . errorMessage' (CF.moduleSourceSpan m) $ MissingFFIModule mn
                 | otherwise -> return Nothing
       rawJs <- J.moduleToJs m foreignInclude
