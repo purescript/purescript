@@ -9,7 +9,6 @@ module Language.PureScript.CodeGen.JS
 import Prelude.Compat
 import Protolude (ordNub)
 
-import Control.Arrow ((&&&))
 import Control.Monad (forM, replicateM, void)
 import Control.Monad.Except (MonadError, throwError)
 import Control.Monad.Reader (MonadReader, asks)
@@ -70,9 +69,9 @@ moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreignInclude =
     let moduleBody = header : foreign' ++ jsImports ++ concat optimized
     let foreignExps = exps `intersect` foreigns
     let standardExps = exps \\ foreignExps
-    let exps' = AST.ObjectLiteral Nothing $ map (mkString . runIdent &&& AST.Var Nothing . identToJs) standardExps
-                               ++ map (mkString . runIdent &&& foreignIdent) foreignExps
-    return $ moduleBody ++ [AST.Assignment Nothing (accessorString "exports" (AST.Var Nothing "module")) exps']
+    return $ moduleBody ++ [ AST.Export Nothing (map runIdent foreignExps) foreignInclude
+                           , AST.Export Nothing (map runIdent standardExps) Nothing
+                           ]
 
   where
 
