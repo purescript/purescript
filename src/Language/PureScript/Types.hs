@@ -353,6 +353,25 @@ data RowListItem a = RowListItem
 srcRowListItem :: Label -> SourceType -> RowListItem SourceAnn
 srcRowListItem = RowListItem NullSourceAnn
 
+-- | Split a type application into a function/constructor and a list of
+--   arguments.
+splitTypeApp :: SourceType -> Maybe (SourceType, [SourceType])
+splitTypeApp
+  = \case
+      TypeApp _ f x ->
+        go [x] f
+      _ ->
+        Nothing
+  where
+    go xs
+      = \case
+          TypeApp _ f x ->
+            go (x : xs) f
+          KindedType _ t _ ->
+            go xs t
+          f ->
+            Just (f, xs)
+
 -- | Convert a row to a list of pairs of labels and types
 rowToList :: Type a -> ([RowListItem a], Type a)
 rowToList = go where

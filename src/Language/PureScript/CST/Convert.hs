@@ -529,6 +529,9 @@ convertDeclaration fileName decl = case decl of
         AST.ExternDataDeclaration ann (nameValue a) $ convertKind fileName b
       ForeignKind _ a ->
         AST.ExternKindDeclaration ann (nameValue a)
+  DeclRole _ _ _ name roles ->
+    pure $ AST.RoleDeclaration $
+      AST.RoleDeclarationData ann (nameValue name) (roleValue <$> NE.toList roles)
   where
   ann =
     uncurry (sourceAnnCommented fileName) $ declRange decl

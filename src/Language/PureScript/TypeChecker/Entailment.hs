@@ -14,6 +14,7 @@ module Language.PureScript.TypeChecker.Entailment
 import Prelude.Compat
 import Protolude (ordNub)
 
+import Control.Applicative ((<|>))
 import Control.Arrow (second, (&&&))
 import Control.Monad.Error.Class (MonadError(..))
 import Control.Monad.State
@@ -37,7 +38,10 @@ import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Names
+import Language.PureScript.Roles
 import Language.PureScript.TypeChecker.Monad
+import Language.PureScript.TypeChecker.Roles
+import Language.PureScript.TypeChecker.Synonyms
 import Language.PureScript.TypeChecker.Unify
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
@@ -162,22 +166,23 @@ entails
 entails SolverOptions{..} constraint context hints =
     solve constraint
   where
-    forClassName :: InstanceContext -> Qualified (ProperName 'ClassName) -> [SourceType] -> [TypeClassDict]
-    forClassName ctx cn@C.Warn [msg] =
+    forClassName :: Environment -> InstanceContext -> Qualified (ProperName 'ClassName) -> [SourceType] -> [TypeClassDict]
+    forClassName _ ctx cn@C.Warn [msg] =
       -- Prefer a warning dictionary in scope if there is one available.
       -- This allows us to defer a warning by propagating the constraint.
       findDicts ctx cn Nothing ++ [TypeClassDictionaryInScope [] 0 (WarnInstance msg) [] C.Warn [msg] Nothing]
-    forClassName _ C.IsSymbol args | Just dicts <- solveIsSymbol args = dicts
-    forClassName _ C.SymbolCompare args | Just dicts <- solveSymbolCompare args = dicts
-    forClassName _ C.SymbolAppend args | Just dicts <- solveSymbolAppend args = dicts
-    forClassName _ C.SymbolCons args | Just dicts <- solveSymbolCons args = dicts
-    forClassName _ C.RowUnion args | Just dicts <- solveUnion args = dicts
-    forClassName _ C.RowNub args | Just dicts <- solveNub args = dicts
-    forClassName _ C.RowLacks args | Just dicts <- solveLacks args = dicts
-    forClassName _ C.RowCons args | Just dicts <- solveRowCons args = dicts
-    forClassName _ C.RowToList args | Just dicts <- solveRowToList args = dicts
-    forClassName ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (ordNub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
-    forClassName _ _ _ = internalError "forClassName: expected qualified class name"
+    forClassName env _ C.Coercible args | Just dicts <- solveCoercible env args = dicts
+    forClassName _ _ C.IsSymbol args | Just dicts <- solveIsSymbol args = dicts
+    forClassName _ _ C.SymbolCompare args | Just dicts <- solveSymbolCompare args = dicts
+    forClassName _ _ C.SymbolAppend args | Just dicts <- solveSymbolAppend args = dicts
+    forClassName _ _ C.SymbolCons args | Just dicts <- solveSymbolCons args = dicts
+    forClassName _ _ C.RowUnion args | Just dicts <- solveUnion args = dicts
+    forClassName _ _ C.RowNub args | Just dicts <- solveNub args = dicts
+    forClassName _ _ C.RowLacks args | Just dicts <- solveLacks args = dicts
+    forClassName _ _ C.RowCons args | Just dicts <- solveRowCons args = dicts
+    forClassName _ _ C.RowToList args | Just dicts <- solveRowToList args = dicts
+    forClassName _ ctx cn@(Qualified (Just mn) _) tys = concatMap (findDicts ctx cn) (ordNub (Nothing : Just mn : map Just (mapMaybe ctorModules tys)))
+    forClassName _ _ _ _ = internalError "forClassName: expected qualified class name"
 
     ctorModules :: SourceType -> Maybe ModuleName
     ctorModules (TypeConstructor _ (Qualified (Just mn) _)) = Just mn
@@ -206,8 +211,8 @@ entails SolverOptions{..} constraint context hints =
             inferred <- lift get
             -- We need information about functional dependencies, so we have to look up the class
             -- name in the environment:
-            classesInScope <- lift . lift $ gets (typeClasses . checkEnv)
-
+            env <- lift . lift $ gets checkEnv
+            let classesInScope = typeClasses env
             TypeClassData
               { typeClassDependencies
               , typeClassIsEmpty
@@ -218,7 +223,7 @@ entails SolverOptions{..} constraint context hints =
             let instances = do
                   chain <- groupBy ((==) `on` tcdChain) $
                            sortBy (compare `on` (tcdChain &&& tcdIndex)) $
-                           forClassName (combineContexts context inferred) className' tys''
+                           forClassName env (combineContexts context inferred) className' tys''
                   -- process instances in a chain in index order
                   let found = for chain $ \tcd ->
                                 -- Make sure the type unifies with the type in the type instance definition
@@ -367,6 +372,79 @@ entails SolverOptions{..} constraint context hints =
         subclassDictionaryValue :: Expr -> Qualified (ProperName 'ClassName) -> Integer -> Expr
         subclassDictionaryValue dict className index =
           App (Accessor (mkString (superclassName className index)) dict) valUndefined
+
+    solveCoercible :: Environment -> [SourceType] -> Maybe [TypeClassDict]
+    solveCoercible env [a, b] = do
+      let tySynMap = typeSynonyms env
+          replaceTySyns = either (const Nothing) Just . replaceAllTypeSynonymsM tySynMap
+      a' <- replaceTySyns a
+      b' <- replaceTySyns b
+      -- Solving terminates when the two arguments are the same. Since we
+      -- currently don't support higher-rank arguments in instance heads, term
+      -- equality is a sufficient notion of "the same".
+      if a' == b'
+        then pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.Coercible [a, b] Nothing]
+        else do
+          -- When solving must reduce and recurse, it doesn't matter whether we
+          -- reduce the first or second argument -- if the constraint is
+          -- solvable, either path will yield the same outcome. Consequently we
+          -- just try the first argument first and the second argument second.
+          ws <- coercibleWanteds env a' b' <|> coercibleWanteds env b' a'
+          pure [TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.Coercible [a, b] (Just ws)]
+    solveCoercible _ _ = Nothing
+
+    -- | Take two types, @a@ and @b@ representing a desired constraint
+    -- @Coercible a b@ and reduce them to a set of simpler wanted constraints
+    -- whose satisfaction will yield the goal.
+    coercibleWanteds :: Environment -> SourceType -> SourceType -> Maybe [SourceConstraint]
+    coercibleWanteds env a b = case a of
+      TypeConstructor _ tyName -> do
+        -- If the first argument is a plain newtype (e.g. @newtype T = T U@ and
+        -- the constraint @Coercible T b@), look up the type of its wrapped
+        -- field and yield a new wanted constraint in terms of that type
+        -- (@Coercible U b@ in the example).
+        (_, wrappedTy, _) <- lookupNewtypeConstructor env tyName
+        pure [Constraint nullSourceAnn C.Coercible [wrappedTy, b] Nothing]
+      t
+        | Just (TypeConstructor _ aTyName, axs) <- splitTypeApp a
+        , Just (TypeConstructor _ bTyName, bxs) <- splitTypeApp b
+        , aTyName == bTyName
+        , tyRoles <- inferRoles env aTyName -> do
+            -- If both arguments are applications of the same type constructor
+            -- (e.g. @data D a b = D a@ in the constraint
+            -- @Coercible (D a b) (D a' b')@), infer the roles of the type
+            -- constructor's arguments and generate wanted constraints
+            -- appropriately (e.g. here @a@ is representational and @b@ is
+            -- phantom, yielding @Coercible a a'@).
+            let k role ax bx = case role of
+                  Nominal
+                    -- If we had first-class equality constraints, we'd just
+                    -- emit one of the form @(a ~ b)@ here and let the solver
+                    -- recurse. Since we don't we must compare the types at
+                    -- this point and fail if they don't match. This likely
+                    -- means there are cases we should be able to handle that
+                    -- we currently can't, but is at least sound.
+                    | ax == bx ->
+                        Just []
+                    | otherwise ->
+                        Nothing
+                  Representational ->
+                    Just [Constraint nullSourceAnn C.Coercible [ax, bx] Nothing]
+                  Phantom ->
+                    Just []
+            fmap concat $ sequence $ zipWith3 k tyRoles axs bxs
+        | Just (TypeConstructor _ tyName, xs) <- splitTypeApp t
+        , Just (tvs, wrappedTy, _) <- lookupNewtypeConstructor env tyName -> do
+            -- If the first argument is a newtype applied to some other types
+            -- (e.g. @newtype T a = T a@ in @Coercible (T X) b@), look up the
+            -- type of its wrapped field and yield a new wanted constraint in
+            -- terms of that type with the type arguments substituted in (e.g.
+            -- @Coercible (T[X/a]) b = Coercible X b@ in the example).
+            let wrappedTySub = replaceAllTypeVars (zip tvs xs) wrappedTy
+            pure [Constraint nullSourceAnn C.Coercible [wrappedTySub, b] Nothing]
+      _ ->
+        -- In all other cases we can't solve the constraint.
+        Nothing
 
     solveIsSymbol :: [SourceType] -> Maybe [TypeClassDict]
     solveIsSymbol [TypeLevelString ann sym] = Just [TypeClassDictionaryInScope [] 0 (IsSymbolInstance sym) [] C.IsSymbol [TypeLevelString ann sym] Nothing]

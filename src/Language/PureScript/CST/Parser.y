@@ -31,10 +31,11 @@ import Language.PureScript.CST.Positions
 import Language.PureScript.CST.Types
 import Language.PureScript.CST.Utils
 import qualified Language.PureScript.Names as N
+import qualified Language.PureScript.Roles as R
 import Language.PureScript.PSString (PSString)
 }
 
-%expect 98
+%expect 114
 
 %name parseKind kind
 %name parseType type
@@ -65,76 +66,80 @@ import Language.PureScript.PSString (PSString)
 %lexer { lexer } { SourceToken _ TokEof }
 
 %token
-  '('             { SourceToken _ TokLeftParen }
-  ')'             { SourceToken _ TokRightParen }
-  '{'             { SourceToken _ TokLeftBrace }
-  '}'             { SourceToken _ TokRightBrace }
-  '['             { SourceToken _ TokLeftSquare }
-  ']'             { SourceToken _ TokRightSquare }
-  '\{'            { SourceToken _ TokLayoutStart }
-  '\}'            { SourceToken _ TokLayoutEnd }
-  '\;'            { SourceToken _ TokLayoutSep }
-  '<-'            { SourceToken _ (TokLeftArrow _) }
-  '->'            { SourceToken _ (TokRightArrow _) }
-  '<='            { SourceToken _ (TokOperator [] sym) | isLeftFatArrow sym }
-  '=>'            { SourceToken _ (TokRightFatArrow _) }
-  ':'             { SourceToken _ (TokOperator [] ":") }
-  '::'            { SourceToken _ (TokDoubleColon _) }
-  '='             { SourceToken _ TokEquals }
-  '|'             { SourceToken _ TokPipe }
-  '`'             { SourceToken _ TokTick }
-  '.'             { SourceToken _ TokDot }
-  ','             { SourceToken _ TokComma }
-  '_'             { SourceToken _ TokUnderscore }
-  '\\'            { SourceToken _ TokBackslash }
-  '-'             { SourceToken _ (TokOperator [] "-") }
-  '@'             { SourceToken _ (TokOperator [] "@") }
-  '#'             { SourceToken _ (TokOperator [] "#") }
-  'ado'           { SourceToken _ (TokLowerName _ "ado") }
-  'as'            { SourceToken _ (TokLowerName [] "as") }
-  'case'          { SourceToken _ (TokLowerName [] "case") }
-  'class'         { SourceToken _ (TokLowerName [] "class") }
-  'data'          { SourceToken _ (TokLowerName [] "data") }
-  'derive'        { SourceToken _ (TokLowerName [] "derive") }
-  'do'            { SourceToken _ (TokLowerName _ "do") }
-  'else'          { SourceToken _ (TokLowerName [] "else") }
-  'false'         { SourceToken _ (TokLowerName [] "false") }
-  'forall'        { SourceToken _ (TokForall ASCII) }
-  'forallu'       { SourceToken _ (TokForall Unicode) }
-  'foreign'       { SourceToken _ (TokLowerName [] "foreign") }
-  'hiding'        { SourceToken _ (TokLowerName [] "hiding") }
-  'import'        { SourceToken _ (TokLowerName [] "import") }
-  'if'            { SourceToken _ (TokLowerName [] "if") }
-  'in'            { SourceToken _ (TokLowerName [] "in") }
-  'infix'         { SourceToken _ (TokLowerName [] "infix") }
-  'infixl'        { SourceToken _ (TokLowerName [] "infixl") }
-  'infixr'        { SourceToken _ (TokLowerName [] "infixr") }
-  'instance'      { SourceToken _ (TokLowerName [] "instance") }
-  'kind'          { SourceToken _ (TokLowerName [] "kind") }
-  'let'           { SourceToken _ (TokLowerName [] "let") }
-  'module'        { SourceToken _ (TokLowerName [] "module") }
-  'newtype'       { SourceToken _ (TokLowerName [] "newtype") }
-  'of'            { SourceToken _ (TokLowerName [] "of") }
-  'then'          { SourceToken _ (TokLowerName [] "then") }
-  'true'          { SourceToken _ (TokLowerName [] "true") }
-  'type'          { SourceToken _ (TokLowerName [] "type") }
-  'where'         { SourceToken _ (TokLowerName [] "where") }
-  '(->)'          { SourceToken _ (TokSymbolArr _) }
-  '(..)'          { SourceToken _ (TokSymbolName [] "..") }
-  LOWER           { SourceToken _ (TokLowerName [] _) }
-  QUAL_LOWER      { SourceToken _ (TokLowerName _ _) }
-  UPPER           { SourceToken _ (TokUpperName [] _) }
-  QUAL_UPPER      { SourceToken _ (TokUpperName _ _) }
-  SYMBOL          { SourceToken _ (TokSymbolName [] _) }
-  QUAL_SYMBOL     { SourceToken _ (TokSymbolName _ _) }
-  OPERATOR        { SourceToken _ (TokOperator [] _) }
-  QUAL_OPERATOR   { SourceToken _ (TokOperator _ _) }
-  LIT_HOLE        { SourceToken _ (TokHole _) }
-  LIT_CHAR        { SourceToken _ (TokChar _ _) }
-  LIT_STRING      { SourceToken _ (TokString _ _) }
-  LIT_RAW_STRING  { SourceToken _ (TokRawString _) }
-  LIT_INT         { SourceToken _ (TokInt _ _) }
-  LIT_NUMBER      { SourceToken _ (TokNumber _ _) }
+  '('                { SourceToken _ TokLeftParen }
+  ')'                { SourceToken _ TokRightParen }
+  '{'                { SourceToken _ TokLeftBrace }
+  '}'                { SourceToken _ TokRightBrace }
+  '['                { SourceToken _ TokLeftSquare }
+  ']'                { SourceToken _ TokRightSquare }
+  '\{'               { SourceToken _ TokLayoutStart }
+  '\}'               { SourceToken _ TokLayoutEnd }
+  '\;'               { SourceToken _ TokLayoutSep }
+  '<-'               { SourceToken _ (TokLeftArrow _) }
+  '->'               { SourceToken _ (TokRightArrow _) }
+  '<='               { SourceToken _ (TokOperator [] sym) | isLeftFatArrow sym }
+  '=>'               { SourceToken _ (TokRightFatArrow _) }
+  ':'                { SourceToken _ (TokOperator [] ":") }
+  '::'               { SourceToken _ (TokDoubleColon _) }
+  '='                { SourceToken _ TokEquals }
+  '|'                { SourceToken _ TokPipe }
+  '`'                { SourceToken _ TokTick }
+  '.'                { SourceToken _ TokDot }
+  ','                { SourceToken _ TokComma }
+  '_'                { SourceToken _ TokUnderscore }
+  '\\'               { SourceToken _ TokBackslash }
+  '-'                { SourceToken _ (TokOperator [] "-") }
+  '@'                { SourceToken _ (TokOperator [] "@") }
+  '#'                { SourceToken _ (TokOperator [] "#") }
+  'ado'              { SourceToken _ (TokLowerName _ "ado") }
+  'as'               { SourceToken _ (TokLowerName [] "as") }
+  'case'             { SourceToken _ (TokLowerName [] "case") }
+  'class'            { SourceToken _ (TokLowerName [] "class") }
+  'data'             { SourceToken _ (TokLowerName [] "data") }
+  'derive'           { SourceToken _ (TokLowerName [] "derive") }
+  'do'               { SourceToken _ (TokLowerName _ "do") }
+  'else'             { SourceToken _ (TokLowerName [] "else") }
+  'false'            { SourceToken _ (TokLowerName [] "false") }
+  'forall'           { SourceToken _ (TokForall ASCII) }
+  'forallu'          { SourceToken _ (TokForall Unicode) }
+  'foreign'          { SourceToken _ (TokLowerName [] "foreign") }
+  'hiding'           { SourceToken _ (TokLowerName [] "hiding") }
+  'import'           { SourceToken _ (TokLowerName [] "import") }
+  'if'               { SourceToken _ (TokLowerName [] "if") }
+  'in'               { SourceToken _ (TokLowerName [] "in") }
+  'infix'            { SourceToken _ (TokLowerName [] "infix") }
+  'infixl'           { SourceToken _ (TokLowerName [] "infixl") }
+  'infixr'           { SourceToken _ (TokLowerName [] "infixr") }
+  'instance'         { SourceToken _ (TokLowerName [] "instance") }
+  'kind'             { SourceToken _ (TokLowerName [] "kind") }
+  'let'              { SourceToken _ (TokLowerName [] "let") }
+  'module'           { SourceToken _ (TokLowerName [] "module") }
+  'newtype'          { SourceToken _ (TokLowerName [] "newtype") }
+  'nominal'          { SourceToken _ (TokLowerName [] "nominal") }
+  'phantom'          { SourceToken _ (TokLowerName [] "phantom") }
+  'of'               { SourceToken _ (TokLowerName [] "of") }
+  'representational' { SourceToken _ (TokLowerName [] "representational") }
+  'role'             { SourceToken _ (TokLowerName [] "role") }
+  'then'             { SourceToken _ (TokLowerName [] "then") }
+  'true'             { SourceToken _ (TokLowerName [] "true") }
+  'type'             { SourceToken _ (TokLowerName [] "type") }
+  'where'            { SourceToken _ (TokLowerName [] "where") }
+  '(->)'             { SourceToken _ (TokSymbolArr _) }
+  '(..)'             { SourceToken _ (TokSymbolName [] "..") }
+  LOWER              { SourceToken _ (TokLowerName [] _) }
+  QUAL_LOWER         { SourceToken _ (TokLowerName _ _) }
+  UPPER              { SourceToken _ (TokUpperName [] _) }
+  QUAL_UPPER         { SourceToken _ (TokUpperName _ _) }
+  SYMBOL             { SourceToken _ (TokSymbolName [] _) }
+  QUAL_SYMBOL        { SourceToken _ (TokSymbolName _ _) }
+  OPERATOR           { SourceToken _ (TokOperator [] _) }
+  QUAL_OPERATOR      { SourceToken _ (TokOperator _ _) }
+  LIT_HOLE           { SourceToken _ (TokHole _) }
+  LIT_CHAR           { SourceToken _ (TokChar _ _) }
+  LIT_STRING         { SourceToken _ (TokString _ _) }
+  LIT_RAW_STRING     { SourceToken _ (TokRawString _) }
+  LIT_INT            { SourceToken _ (TokInt _ _) }
+  LIT_NUMBER         { SourceToken _ (TokNumber _ _) }
 
 %%
 
@@ -188,12 +193,20 @@ qualIdent :: { QualifiedName Ident }
   | 'as' {% toQualifiedName Ident $1 }
   | 'hiding' {% toQualifiedName Ident $1 }
   | 'kind' {% toQualifiedName Ident $1 }
+  | 'role' {% toQualifiedName Ident $1 }
+  | 'nominal' {% toQualifiedName Ident $1 }
+  | 'representational' {% toQualifiedName Ident $1 }
+  | 'phantom' {% toQualifiedName Ident $1 }
 
 ident :: { Name Ident }
   : LOWER {% toName Ident $1 }
   | 'as' {% toName Ident $1 }
   | 'hiding' {% toName Ident $1 }
   | 'kind' {% toName Ident $1 }
+  | 'role' {% toName Ident $1 }
+  | 'nominal' {% toName Ident $1 }
+  | 'representational' {% toName Ident $1 }
+  | 'phantom' {% toName Ident $1 }
 
 qualOp :: { QualifiedName (N.OpName a) }
   : OPERATOR {% toQualifiedName N.OpName $1 }
@@ -662,6 +675,7 @@ decl :: { Declaration () }
   | ident manyOrEmpty(binderAtom) guardedDecl { DeclValue () (ValueBindingFields $1 $2 $3) }
   | fixity { DeclFixity () $1 }
   | 'foreign' 'import' foreign { DeclForeign () $1 $2 $3 }
+  | 'type' 'role' properName many(role) { DeclRole () $1 $2 $3 $4 }
 
 dataHead :: { DataHead () }
   : 'data' properName manyOrEmpty(typeVarBinding) { DataHead $1 $2 $3 }
@@ -743,6 +757,11 @@ foreign :: { Foreign () }
   : ident '::' type { ForeignValue (Labeled $1 $2 $3) }
   | 'data' properName '::' kind { ForeignData $1 (Labeled $2 $3 $4) }
   | 'kind' properName { ForeignKind $1 $2 }
+
+role :: { Role }
+  : 'nominal' { Role $1 R.Nominal }
+  | 'representational' { Role $1 R.Representational }
+  | 'phantom' { Role $1 R.Phantom }
 
 -- Partial parsers which can be combined with combinators for adhoc use. We need
 -- to revert the lookahead token so that it doesn't consume an extra token

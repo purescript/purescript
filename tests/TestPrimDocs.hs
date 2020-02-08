@@ -29,6 +29,7 @@ spec = do
           (map (P.runProperName . P.disqualify . fst) $ Map.toList
             ( P.primTypes <>
               P.primBooleanTypes <>
+              P.primCoerceTypes <>
               P.primOrderingTypes <>
               P.primRowTypes <>
               P.primRowListTypes <>

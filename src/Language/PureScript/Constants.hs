@@ -398,6 +398,14 @@ booleanTrue = Qualified (Just PrimBoolean) (ProperName "True")
 booleanFalse :: Qualified (ProperName 'TypeName)
 booleanFalse = Qualified (Just PrimBoolean) (ProperName "False")
 
+-- Prim.Coerce
+
+pattern PrimCoerce :: ModuleName
+pattern PrimCoerce = ModuleName [ProperName "Prim", ProperName "Coerce"]
+
+pattern Coercible :: Qualified (ProperName 'ClassName)
+pattern Coercible = Qualified (Just PrimCoerce) (ProperName "Coercible")
+
 -- Prim.Ordering
 
 pattern PrimOrdering :: ModuleName
@@ -469,7 +477,7 @@ pattern Warn :: Qualified (ProperName 'ClassName)
 pattern Warn = Qualified (Just PrimTypeError) (ProperName "Warn")
 
 primModules :: [ModuleName]
-primModules = [Prim, PrimBoolean, PrimOrdering, PrimRow, PrimRowList, PrimSymbol, PrimTypeError]
+primModules = [Prim, PrimBoolean, PrimCoerce, PrimOrdering, PrimRow, PrimRowList, PrimSymbol, PrimTypeError]
 
 -- Data.Symbol
 
@@ -504,6 +512,9 @@ prim = "Prim"
 
 moduleBoolean :: forall a. (IsString a) => a
 moduleBoolean = "Boolean"
+
+moduleCoerce :: forall a. (IsString a) => a
+moduleCoerce = "Coerce"
 
 moduleOrdering :: forall a. (IsString a) => a
 moduleOrdering = "Ordering"

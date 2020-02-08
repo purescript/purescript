@@ -22,6 +22,7 @@ primModules :: [Module]
 primModules =
   [ primDocsModule
   , primBooleanDocsModule
+  , primCoerceDocsModule
   , primOrderingDocsModule
   , primRowDocsModule
   , primRowListDocsModule
@@ -61,6 +62,16 @@ primBooleanDocsModule = Module
       [ kindBoolean
       , booleanTrue
       , booleanFalse
+      ]
+  , modReExports = []
+  }
+
+primCoerceDocsModule :: Module
+primCoerceDocsModule = Module
+  { modName = P.moduleNameFromString "Prim.Coerce"
+  , modComments = Just "The Prim.Coerce module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains automatically solved type classes for working with types that have provably-identical runtime representations."
+  , modDeclarations =
+      [ coercible
       ]
   , modReExports = []
   }
@@ -198,6 +209,7 @@ primTypeOf gen title comments = Declaration
 lookupPrimClassOf :: NameGen 'P.ClassName -> Text -> P.TypeClassData
 lookupPrimClassOf g = unsafeLookupOf g
   ( P.primClasses <>
+    P.primCoerceClasses <>
     P.primRowClasses <>
     P.primRowListClasses <>
     P.primSymbolClasses <>
@@ -364,6 +376,44 @@ booleanTrue = primTypeOf (P.primSubName "Boolean") "True" $ T.unlines
 booleanFalse :: Declaration
 booleanFalse = primTypeOf (P.primSubName "Boolean") "False" $ T.unlines
   [ "The 'False' boolean type."
+  ]
+
+coercible :: Declaration
+coercible = primClassOf (P.primSubName "Coerce") "Coercible" $ T.unlines
+  [ "Coercible is a two-parameter type class that has instances for types `a`"
+  , "and `b` if the compiler can infer that they have the same representation."
+  , "This class does not have regular instances; instead they are created"
+  , "on-the-fly during type-checking according to a set of rules."
+  , ""
+  , "First, as a trivial base-case, reflexivity - any type has the same"
+  , "representation as itself:"
+  , ""
+  , "    instance coercibleReflexive :: Coercible a a"
+  , ""
+  , "Second, for every type constructor there is an instance that allows one"
+  , "to coerce under the type constructor (`data` or `newtype`). For example,"
+  , "given a definition:"
+  , ""
+  , "data D a b = D a"
+  , ""
+  , "there is an instance:"
+  , ""
+  , "    coercibleConstructor :: Coercible a a' => Coercible (D a b) (D a' b')"
+  , ""
+  , "Note that, since the type variable `a` plays a role in `D`'s representation,"
+  , "we require that the types `a` and `a'` are themselves `Coercible`. However,"
+  , "since the variable `b` does not play a part in `D`'s representation (a type"
+  , "such as `b` is thus typically referred to as a \"phantom\" type), `b` and `b'`"
+  , "can differ arbitrarily."
+  , ""
+  , "Third, for every `newtype NT = MkNT T`, there is a pair of instances which"
+  , "permit coercion in and out of the `newtype`:"
+  , ""
+  , "    instance coercibleNewtypeLeft  :: Coercible a T => Coercible a NT"
+  , "    instance coercibleNewtypeRight :: Coercible T b => Coercible NT b"
+  , ""
+  , "To prevent breaking abstractions, these instances are only usable if the"
+  , "constructor `MkNT` is in scope."
   ]
 
 kindOrdering :: Declaration
