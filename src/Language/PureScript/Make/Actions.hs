@@ -281,7 +281,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
 checkForeignDecls :: CF.Module ann -> FilePath -> Make ()
 checkForeignDecls m path = do
   jsStr <- T.unpack <$> readTextFile path
-  js <- either (errorParsingModule . Bundle.UnableToParseModule) pure $ JS.parse jsStr path
+  js <- either (errorParsingModule . Bundle.UnableToParseModule) pure $ JS.parseModule jsStr path
 
   foreignIdentsStrs <- either errorParsingModule pure $ getExps js
 

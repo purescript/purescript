@@ -31,7 +31,7 @@ import Data.Foldable (fold)
 import Data.Generics (GenericM, everything, everythingWithContext, everywhere, gmapMo, mkMp, mkQ, mkT)
 import Data.Graph
 import Data.List (stripPrefix, (\\))
-import Data.Maybe (catMaybes, fromMaybe, mapMaybe)
+import Data.Maybe (catMaybes, fromMaybe, mapMaybe, maybeToList)
 import Data.Version (showVersion)
 import qualified Data.Aeson as A
 import qualified Data.Map as M
@@ -421,19 +421,22 @@ getExportedIdentifiers :: forall m. (MonadError ErrorMessage m)
                           -> JSAST
                           -> m [String]
 getExportedIdentifiers mname top
-  | JSAstProgram stmts _ <- top = concat <$> traverse go stmts
+  | JSAstModule jsModuleItems _ <- top = concat <$> traverse go jsModuleItems
   | otherwise = err InvalidTopLevel
   where
   err :: ErrorMessage -> m a
   err = throwError . ErrorInModule (ModuleIdentifier mname Foreign)
 
-  go stmt
-    | Just props <- matchExportsAssignment stmt
+  go (JSModuleStatementListItem jsStatement)
+    | Just props <- matchExportsAssignment jsStatement
     = traverse toIdent (trailingCommaList props)
-    | Just (Public, name, _) <- matchMember stmt
+    | Just (Public, name, _) <- matchMember jsStatement
     = pure [name]
     | otherwise
     = pure []
+  go (JSModuleExportDeclaration _ jsExportDeclaration) =
+    pure $ exportDeclarationIdentifiers jsExportDeclaration
+  go _ = pure []
 
   toIdent (JSPropertyNameandValue name _ [_]) =
     extractLabel' name
@@ -441,6 +444,41 @@ getExportedIdentifiers mname top
     err UnsupportedExport
 
   extractLabel' = maybe (err UnsupportedExport) pure . extractLabel
+
+  exportDeclarationIdentifiers (JSExportFrom jsExportClause _ _) =
+    exportClauseIdentifiers jsExportClause
+  exportDeclarationIdentifiers (JSExportLocals jsExportClause _) =
+    exportClauseIdentifiers jsExportClause
+  exportDeclarationIdentifiers (JSExport jsStatement _) =
+    exportStatementIdentifiers jsStatement
+
+  exportClauseIdentifiers (JSExportClause _ jsExportsSpecifiers _) =
+    mapMaybe exportSpecifierName $ commaList jsExportsSpecifiers
+
+  exportSpecifierName (JSExportSpecifier jsIdent) = identName jsIdent
+  exportSpecifierName (JSExportSpecifierAs _ _ jsIdentAs) = identName jsIdentAs
+
+  exportStatementIdentifiers (JSVariable _ jsExpressions _) =
+    varNames jsExpressions
+  exportStatementIdentifiers (JSConstant _ jsExpressions _) =
+    varNames jsExpressions
+  exportStatementIdentifiers (JSLet _ jsExpressions _) =
+    varNames jsExpressions
+  exportStatementIdentifiers (JSClass _ jsIdent _ _ _ _ _) =
+    maybeToList . identName $ jsIdent
+  exportStatementIdentifiers (JSFunction _ jsIdent _ _ _ _ _) =
+    maybeToList . identName $ jsIdent
+  exportStatementIdentifiers (JSGenerator _ _ jsIdent _ _ _ _ _) =
+    maybeToList . identName $ jsIdent
+  exportStatementIdentifiers _ = []
+
+  varNames = mapMaybe varName . commaList
+
+  varName (JSVarInitExpression (JSIdentifier _ ident) _) = Just ident
+  varName _ = Nothing
+
+  identName (JSIdentName _ ident) = Just ident
+  identName _ = Nothing
 
 -- Matches JS statements like this:
 -- var ModuleName = require("file");
