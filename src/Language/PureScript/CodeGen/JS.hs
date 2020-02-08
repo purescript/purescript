@@ -16,10 +16,11 @@ import Control.Monad.Supply.Class
 
 import Data.Bifunctor (first)
 import Data.List ((\\), intersect, uncons)
+import qualified Data.List.NonEmpty as NEL (nonEmpty)
 import qualified Data.Foldable as F
 import qualified Data.Map as M
 import qualified Data.Set as S
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, maybeToList)
 import Data.String (fromString)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -69,9 +70,9 @@ moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreignInclude =
     let moduleBody = maybe [] (uncurry (:)) . fmap (first header) . uncons $ foreign' ++ jsImports ++ concat optimized
     let foreignExps = exps `intersect` foreigns
     let standardExps = exps \\ foreignExps
-    return $ moduleBody ++ [ AST.Export Nothing (map runIdent foreignExps) foreignInclude
-                           , AST.Export Nothing (map runIdent standardExps) Nothing
-                           ]
+    return $ moduleBody
+      ++ (maybeToList . exportsToJs foreignInclude $ foreignExps)
+      ++ (maybeToList . exportsToJs Nothing $ standardExps)
 
   where
 
@@ -107,6 +108,11 @@ moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreignInclude =
   importToJs mnLookup mn' = do
     let ((ss, _, _, _), mnSafe) = fromMaybe (internalError "Missing value in mnLookup") $ M.lookup mn' mnLookup
     withPos ss $ AST.Import Nothing (moduleNameToJs mnSafe) (fromString (".." </> T.unpack (runModuleName mn') </> "index.js"))
+
+  -- | Generates JavaScript code for exporting at least one identifier,
+  -- eventually from another module.
+  exportsToJs :: Maybe PSString -> [Ident] -> Maybe AST
+  exportsToJs from = fmap (flip (AST.Export Nothing) from) . NEL.nonEmpty . fmap runIdent
 
   -- | Replaces the `ModuleName`s in the AST so that the generated code refers to
   -- the collision-avoiding renamed module imports.
