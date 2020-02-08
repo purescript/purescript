@@ -14,7 +14,8 @@ import Control.Monad.Except (MonadError, throwError)
 import Control.Monad.Reader (MonadReader, asks)
 import Control.Monad.Supply.Class
 
-import Data.List ((\\), intersect)
+import Data.Bifunctor (first)
+import Data.List ((\\), intersect, uncons)
 import qualified Data.Foldable as F
 import qualified Data.Map as M
 import qualified Data.Set as S
@@ -63,10 +64,9 @@ moduleToJs (Module _ coms mn _ imps exps foreigns decls) foreignInclude =
       . (\\ (mn : C.primModules)) $ ordNub $ map snd imps
     F.traverse_ (F.traverse_ checkIntegers) optimized
     comments <- not <$> asks optionsNoComments
-    let strict = AST.StringLiteral Nothing "use strict"
-    let header = if comments && not (null coms) then AST.Comment Nothing coms strict else strict
+    let header = if comments && not (null coms) then AST.Comment Nothing coms else id
     let foreign' = maybe [] (pure . AST.Import Nothing "$foreign") $ if null foreigns then Nothing else foreignInclude
-    let moduleBody = header : foreign' ++ jsImports ++ concat optimized
+    let moduleBody = maybe [] (uncurry (:)) . fmap (first header) . uncons $ foreign' ++ jsImports ++ concat optimized
     let foreignExps = exps `intersect` foreigns
     let standardExps = exps \\ foreignExps
     return $ moduleBody ++ [ AST.Export Nothing (map runIdent foreignExps) foreignInclude
