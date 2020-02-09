@@ -116,8 +116,9 @@ getInputTimestampsAndHashes'
   -- ^ The filepath to the module's potential FFI implementation
   -> m (M.Map FilePath (UTCTime, m ContentHash))
 getInputTimestampsAndHashes' filePath foreignPath = do
+  cwd <- liftIO getCurrentDirectory
   let
-    inputPaths = filePath : maybeToList foreignPath
+    inputPaths = map (normaliseForCache cwd) (filePath : maybeToList foreignPath)
     getInfo fp = do
       ts <- getTimestamp fp
       return (ts, hashFile fp)
