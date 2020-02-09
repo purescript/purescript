@@ -15,7 +15,7 @@ import           Data.Maybe                      (fromJust)
 import qualified Data.Set                        as S
 import qualified Data.Time                       as Time
 import qualified Language.PureScript             as P
-import           Language.PureScript.Make.Cache (CacheDb, CacheInfo(..))
+import           Language.PureScript.Make.Cache (CacheInfo(..))
 import qualified Language.PureScript.CST         as CST
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Logging
@@ -81,19 +81,19 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
     Left errors ->
       throwError (RebuildError errors)
     Right newExterns -> do
+      -- TODO(Christoph): Make ALL filepaths in the cachedb.json file normalized relative paths
       runExceptT do
         cwd <- liftIO getCurrentDirectory
         contentHash <- P.hashFile file
+        let moduleCacheInfo = (makeRelative cwd (fromMaybe file actualFile), (dayZero, contentHash))
+
         -- TODO(Christoph): Maybe we can avoid calling inferForeignmodule twice?
         foreigns <- P.inferForeignModules (M.singleton moduleName (Right (fromMaybe file actualFile)))
-        -- TODO(Christoph): Make ALL filepaths in the cachedb.json file normalized relative paths
-        let cacheInfo' = M.singleton (makeRelative cwd (fromMaybe file actualFile)) (dayZero, contentHash)
-        -- TODO(Christoph): This is a bit clunky? I think we could use Map.alter?
-        cacheInfo <- case M.lookup moduleName foreigns of
-          Nothing -> pure cacheInfo'
-          Just foreignPath -> do
-            foreignHash <- P.hashFile foreignPath
-            pure (M.insert (makeRelative cwd foreignPath) (dayZero, foreignHash) cacheInfo')
+        foreignCacheInfo <- for (M.lookup moduleName foreigns) \foreignPath -> do
+          foreignHash <- P.hashFile foreignPath
+          pure (makeRelative cwd foreignPath, (dayZero, foreignHash))
+
+        let cacheInfo = M.fromList (moduleCacheInfo : maybeToList foreignCacheInfo)
         cacheDb <- P.readCacheDb' outputDirectory
         P.writeCacheDb' outputDirectory (M.insert moduleName (CacheInfo cacheInfo) cacheDb)
       whenM isEditorMode do
