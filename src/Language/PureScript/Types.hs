@@ -179,8 +179,8 @@ data Constraint a = Constraint
 
 instance NFData a => NFData (Constraint a)
 
-srcConstraint :: Qualified (ProperName 'ClassName) -> [SourceType] -> Maybe ConstraintData -> SourceConstraint
-srcConstraint cn = Constraint NullSourceAnn cn []
+srcConstraint :: Qualified (ProperName 'ClassName) -> [SourceType] -> [SourceType] -> Maybe ConstraintData -> SourceConstraint
+srcConstraint = Constraint NullSourceAnn
 
 mapConstraintArgs :: ([Type a] -> [Type a]) -> Constraint a -> Constraint a
 mapConstraintArgs f c = c { constraintArgs = f (constraintArgs c) }

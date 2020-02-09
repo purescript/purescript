@@ -307,7 +307,7 @@ checkExhaustive ss env mn numArgs cas expr = makeResult . first ordNub $ foldl' 
         srcForAll tyVar
           Nothing
           ( srcConstrainedType
-              (srcConstraint C.Partial [] (Just constraintData))
+              (srcConstraint C.Partial [] [] (Just constraintData))
               $ srcTypeApp (srcTypeApp tyFunction (srcTypeVar tyVar)) (srcTypeVar tyVar)
           )
           Nothing

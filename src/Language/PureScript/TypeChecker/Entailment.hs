@@ -202,7 +202,8 @@ entails SolverOptions{..} constraint context hints =
             -- We might have unified types by solving other constraints, so we need to
             -- apply the latest substitution.
             latestSubst <- lift . lift $ gets checkSubstitution
-            let tys'' = map (substituteType latestSubst) tys'
+            let kinds'' = map (substituteType latestSubst) kinds'
+                tys'' = map (substituteType latestSubst) tys'
 
             -- Get the inferred constraint context so far, and merge it with the global context
             inferred <- lift get
@@ -220,7 +221,7 @@ entails SolverOptions{..} constraint context hints =
             let instances = do
                   chain <- groupBy ((==) `on` tcdChain) $
                            sortBy (compare `on` (tcdChain &&& tcdIndex)) $
-                           forClassName (combineContexts context inferred) className' kinds' tys''
+                           forClassName (combineContexts context inferred) className' kinds'' tys''
                   -- process instances in a chain in index order
                   let found = for chain $ \tcd ->
                                 -- Make sure the type unifies with the type in the type instance definition
@@ -232,7 +233,7 @@ entails SolverOptions{..} constraint context hints =
                     Right _               -> []          -- all apart
                     Left Nothing          -> []          -- last unknown
                     Left (Just substsTcd) -> [substsTcd] -- found a match
-            solution <- lift . lift $ unique tys'' instances
+            solution <- lift . lift $ unique kinds'' tys'' instances
             case solution of
               Solved substs tcd -> do
                 -- Note that we solved something.
@@ -275,7 +276,7 @@ entails SolverOptions{..} constraint context hints =
               Deferred ->
                 -- Constraint was deferred, just return the dictionary unchanged,
                 -- with no unsolved constraints. Hopefully, we can solve this later.
-                return (TypeClassDictionary (srcConstraint className' tys'' conInfo) context hints)
+                return (TypeClassDictionary (srcConstraint className' kinds'' tys'' conInfo) context hints)
           where
             -- | When checking functional dependencies, we need to use unification to make
             -- sure it is safe to use the selected instance. We will unify the solved type with
@@ -308,15 +309,16 @@ entails SolverOptions{..} constraint context hints =
                   t <- freshType
                   return (s, t)
 
-            unique :: [SourceType] -> [(a, TypeClassDict)] -> m (EntailsResult a)
-            unique tyArgs []
+            unique :: [SourceType] -> [SourceType] -> [(a, TypeClassDict)] -> m (EntailsResult a)
+            unique kindArgs tyArgs []
               | solverDeferErrors = return Deferred
               -- We need a special case for nullary type classes, since we want
               -- to generalize over Partial constraints.
-              | solverShouldGeneralize && (null tyArgs || any canBeGeneralized tyArgs) = return (Unsolved (srcConstraint className' tyArgs conInfo))
-              | otherwise = throwError . errorMessage $ NoInstanceFound (srcConstraint className' tyArgs conInfo)
-            unique _      [(a, dict)] = return $ Solved a dict
-            unique tyArgs tcds
+              | solverShouldGeneralize && ((null kindArgs && null tyArgs) || any canBeGeneralized kindArgs || any canBeGeneralized tyArgs) =
+                  return (Unsolved (srcConstraint className' kindArgs tyArgs conInfo))
+              | otherwise = throwError . errorMessage $ NoInstanceFound (srcConstraint className' kindArgs tyArgs conInfo)
+            unique _ _ [(a, dict)] = return $ Solved a dict
+            unique _ tyArgs tcds
               | pairwiseAny overlapping (map snd tcds) =
                   throwError . errorMessage $ OverlappingInstances className' tyArgs (tcds >>= (toList . namedInstanceIdentifier . tcdValue . snd))
               | otherwise = return $ uncurry Solved (minimumBy (compare `on` length . tcdPath . snd) tcds)
@@ -427,13 +429,13 @@ entails SolverOptions{..} constraint context hints =
 
     solveUnion :: [SourceType] -> [SourceType] -> Maybe [TypeClassDict]
     solveUnion kinds [l, r, u] = do
-      (lOut, rOut, uOut, cst) <- unionRows l r u
+      (lOut, rOut, uOut, cst) <- unionRows kinds l r u
       pure [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowUnion kinds [lOut, rOut, uOut] cst ]
     solveUnion _ _ = Nothing
 
     -- | Left biased union of two row types
-    unionRows :: SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType, Maybe [SourceConstraint])
-    unionRows l r _ =
+    unionRows :: [SourceType] -> SourceType -> SourceType -> SourceType -> Maybe (SourceType, SourceType, SourceType, Maybe [SourceConstraint])
+    unionRows kinds l r _ =
         guard canMakeProgress $> (l, r, rowFromList out, cons)
       where
         (fixed, rest) = rowToList l
@@ -451,7 +453,7 @@ entails SolverOptions{..} constraint context hints =
             -- Otherwise, the left hand tail might contain the same labels as on
             -- the right hand side, and we can't be certain we won't reorder the
             -- types for such labels.
-            _ -> (not (null fixed), (fixed, rowVar), Just [ srcConstraint C.RowUnion [rest, r, rowVar] Nothing ])
+            _ -> (not (null fixed), (fixed, rowVar), Just [ srcConstraint C.RowUnion kinds [rest, r, rowVar] Nothing ])
 
     solveRowCons :: [SourceType] -> [SourceType] -> Maybe [TypeClassDict]
     solveRowCons kinds [TypeLevelString ann sym, ty, r, _] =
@@ -491,13 +493,15 @@ entails SolverOptions{..} constraint context hints =
         (fixed, rest) = rowToSortedList r
 
     solveLacks :: [SourceType] -> [SourceType] -> Maybe [TypeClassDict]
+    solveLacks kinds tys@[_, REmptyKinded _ _] =
+      pure [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowLacks kinds tys Nothing ]
     solveLacks kinds [TypeLevelString ann sym, r] = do
-      (r', cst) <- rowLacks sym r
+      (r', cst) <- rowLacks kinds sym r
       pure [ TypeClassDictionaryInScope [] 0 EmptyClassInstance [] C.RowLacks kinds [TypeLevelString ann sym, r'] cst ]
     solveLacks _ _ = Nothing
 
-    rowLacks :: PSString -> SourceType -> Maybe (SourceType, Maybe [SourceConstraint])
-    rowLacks sym r =
+    rowLacks :: [SourceType] -> PSString -> SourceType -> Maybe (SourceType, Maybe [SourceConstraint])
+    rowLacks kinds sym r =
         guard (lacksSym && canMakeProgress) $> (r, cst)
       where
         (fixed, rest) = rowToList r
@@ -507,7 +511,7 @@ entails SolverOptions{..} constraint context hints =
 
         (canMakeProgress, cst) = case rest of
             REmptyKinded _ _ -> (True, Nothing)
-            _ -> (not (null fixed), Just [ srcConstraint C.RowLacks [srcTypeLevelString sym, rest] Nothing ])
+            _ -> (not (null fixed), Just [ srcConstraint C.RowLacks kinds [srcTypeLevelString sym, rest] Nothing ])
 
 -- Check if an instance matches our list of types, allowing for types
 -- to be solved via functional dependencies. If the types match, we return a

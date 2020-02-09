@@ -435,7 +435,7 @@ infer' (Let w ds val) = do
 infer' (DeferredDictionary className tys) = do
   dicts <- getTypeClassDictionaries
   hints <- getHints
-  con <- checkConstraint (srcConstraint className tys Nothing)
+  con <- checkConstraint (srcConstraint className [] tys Nothing)
   return $ TypedValue' False
              (TypeClassDictionary con dicts hints)
              (foldl srcTypeApp (srcTypeConstructor (fmap coerceProperName className)) tys)
@@ -721,7 +721,7 @@ check' (DeferredDictionary className tys) ty = do
   -}
   dicts <- getTypeClassDictionaries
   hints <- getHints
-  con <- checkConstraint (srcConstraint className tys Nothing)
+  con <- checkConstraint (srcConstraint className [] tys Nothing)
   return $ TypedValue' False
              (TypeClassDictionary con dicts hints)
              ty
