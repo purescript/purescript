@@ -71,13 +71,12 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
   let filePathMap = M.singleton moduleName (Left P.RebuildAlways)
   foreigns <- P.inferForeignModules (M.singleton moduleName (Right file))
 
-  let makeEnv = MakeActionsEnv outputDirectory filePathMap foreigns False
+  let makeEnv = P.buildMakeActions outputDirectory filePathMap foreigns False
 
   -- Rebuild the single module using the cached externs
   (result, warnings) <- logPerf (labelTimespec "Rebuilding Module") $
-    liftIO $ P.runMake (P.defaultOptions { P.optionsCodegenTargets = codegenTargets }) do
-      let ma@P.MakeActions{..} = (buildMakeActions >>= shushProgress) makeEnv
-      P.rebuildModule ma externs m
+    liftIO $ P.runMake (P.defaultOptions { P.optionsCodegenTargets = codegenTargets })
+      (P.rebuildModule (shushProgress makeEnv) externs m)
   case result of
     Left errors ->
       throwError (RebuildError errors)
@@ -140,17 +139,13 @@ rebuildFileSync fp fp' ts = rebuildFile fp fp' ts syncRun
 -- inside the rebuild cache
 rebuildModuleOpen
   :: (Ide m, MonadLogger m)
-  => MakeActionsEnv
+  => P.MakeActions P.Make
   -> [P.ExternsFile]
   -> P.Module
   -> m ()
-rebuildModuleOpen makeEnv externs m = void $ runExceptT $ do
-  (openResult, _) <- liftIO
-    . P.runMake P.defaultOptions
-    . P.rebuildModule (buildMakeActions
-                       >>= shushProgress
-                       >>= shushCodegen
-                       $ makeEnv) externs $ openModuleExports m
+rebuildModuleOpen makeEnv externs m = void $ runExceptT do
+  (openResult, _) <- liftIO $ P.runMake P.defaultOptions $
+    P.rebuildModule (shushProgress (shushCodegen makeEnv)) externs (openModuleExports m)
   case openResult of
     Left _ ->
       throwError (GeneralError "Failed when rebuilding with open exports")
@@ -159,32 +154,14 @@ rebuildModuleOpen makeEnv externs m = void $ runExceptT $ do
         ("Setting Rebuild cache: " <> P.runModuleName (P.efModuleName result))
       cacheRebuild result
 
--- | Parameters we can access while building our @MakeActions@
-data MakeActionsEnv =
-  MakeActionsEnv
-  { maeOutputDirectory :: FilePath
-  , maeFilePathMap     :: ModuleMap (Either P.RebuildPolicy FilePath)
-  , maeForeignPathMap  :: ModuleMap FilePath
-  , maePrefixComment   :: Bool
-  }
-
--- | Builds the default @MakeActions@ from a @MakeActionsEnv@
-buildMakeActions :: MakeActionsEnv -> P.MakeActions P.Make
-buildMakeActions MakeActionsEnv{..} =
-  P.buildMakeActions
-    maeOutputDirectory
-    maeFilePathMap
-    maeForeignPathMap
-    maePrefixComment
-
 -- | Shuts the compiler up about progress messages
-shushProgress :: P.MakeActions P.Make -> MakeActionsEnv -> P.MakeActions P.Make
-shushProgress ma _ =
+shushProgress :: Monad m => P.MakeActions m -> P.MakeActions m
+shushProgress ma =
   ma { P.progress = \_ -> pure () }
 
 -- | Stops any kind of codegen
-shushCodegen :: P.MakeActions P.Make -> MakeActionsEnv -> P.MakeActions P.Make
-shushCodegen ma MakeActionsEnv{..} =
+shushCodegen :: Monad m => P.MakeActions m -> P.MakeActions m
+shushCodegen ma =
   ma { P.codegen = \_ _ _ -> pure ()
      , P.ffiCodegen = \_ -> pure ()
      }
