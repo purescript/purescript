@@ -70,9 +70,9 @@ addDataConstructor
   -> SourceType
   -> m ()
 addDataConstructor moduleName dtype name dctor dctorArgs polyType = do
-  let (fields, tys) = unzip dctorArgs
+  let fields = fst <$> dctorArgs
   env <- getEnv
-  traverse_ checkTypeSynonyms tys
+  checkTypeSynonyms polyType
   putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (dtype, name, polyType, fields) (dataConstructors env) }
 
 addTypeSynonym
