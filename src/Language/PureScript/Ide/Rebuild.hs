@@ -15,7 +15,7 @@ import           Data.Maybe                      (fromJust)
 import qualified Data.Set                        as S
 import qualified Data.Time                       as Time
 import qualified Language.PureScript             as P
-import           Language.PureScript.Make.Cache (CacheInfo(..))
+import           Language.PureScript.Make.Cache (CacheInfo(..), normaliseForCache)
 import qualified Language.PureScript.CST         as CST
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Logging
@@ -23,7 +23,6 @@ import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 import           System.Directory (getCurrentDirectory)
-import           System.FilePath (makeRelative)
 
 -- | Given a filepath performs the following steps:
 --
@@ -85,13 +84,13 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
       runExceptT do
         cwd <- liftIO getCurrentDirectory
         contentHash <- P.hashFile file
-        let moduleCacheInfo = (makeRelative cwd (fromMaybe file actualFile), (dayZero, contentHash))
+        let moduleCacheInfo = (normaliseForCache cwd (fromMaybe file actualFile), (dayZero, contentHash))
 
         -- TODO(Christoph): Maybe we can avoid calling inferForeignmodule twice?
         foreigns <- P.inferForeignModules (M.singleton moduleName (Right (fromMaybe file actualFile)))
         foreignCacheInfo <- for (M.lookup moduleName foreigns) \foreignPath -> do
           foreignHash <- P.hashFile foreignPath
-          pure (makeRelative cwd foreignPath, (dayZero, foreignHash))
+          pure (normaliseForCache cwd foreignPath, (dayZero, foreignHash))
 
         let cacheInfo = M.fromList (moduleCacheInfo : maybeToList foreignCacheInfo)
         cacheDb <- P.readCacheDb' outputDirectory
@@ -133,7 +132,6 @@ rebuildFileSync fp fp' ts = rebuildFile fp fp' ts syncRun
         env <- ask
         let ll = confLogLevel (ideConfiguration env)
         void (liftIO (runLogger ll (runReaderT action env)))
-
 
 -- | Rebuilds a module but opens up its export list first and stores the result
 -- inside the rebuild cache
