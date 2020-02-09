@@ -586,7 +586,7 @@ inferDataDeclaration
   -> DataDeclarationArgs
   -> m [(DataConstructorDeclaration, SourceType)]
 inferDataDeclaration moduleName (ann, tyName, tyArgs, ctors) = do
-  tyKind <- lookupTypeVariable moduleName (Qualified Nothing tyName)
+  tyKind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing tyName)
   let (sigBinders, tyKind') = fromJust . completeBinderList $ tyKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
     tyArgs' <- for tyArgs . traverse . maybe (freshKind (fst ann)) $ replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType
@@ -635,7 +635,7 @@ inferTypeSynonym
   -> TypeDeclarationArgs
   -> m SourceType
 inferTypeSynonym moduleName (ann, tyName, tyArgs, tyBody) = do
-  tyKind <- lookupTypeVariable moduleName (Qualified Nothing tyName)
+  tyKind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing tyName)
   let (sigBinders, tyKind') = fromJust . completeBinderList $ tyKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
     kindRes <- freshKind (fst ann)
@@ -643,7 +643,7 @@ inferTypeSynonym moduleName (ann, tyName, tyArgs, tyBody) = do
     unifyKinds tyKind' $ foldr ((E.-:>) . snd) kindRes tyArgs'
     bindLocalTypeVariables moduleName (first ProperName <$> tyArgs') $ do
       tyBodyAndKind <- inferKind tyBody
-      apply =<< instantiateKind tyBodyAndKind =<< apply kindRes
+      instantiateKind tyBodyAndKind =<< apply kindRes
 
 -- | Checks that a particular generalization is valid and well-scoped.
 -- | Implicitly generalized kinds are always elaborated before explicitly
@@ -752,7 +752,7 @@ inferClassDeclaration
   -> ClassDeclarationArgs
   -> m ([(Text, SourceType)], [SourceConstraint], [Declaration])
 inferClassDeclaration moduleName (ann, clsName, clsArgs, superClasses, decls) = do
-  clsKind <- lookupTypeVariable moduleName (Qualified Nothing $ coerceProperName clsName)
+  clsKind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing $ coerceProperName clsName)
   let (sigBinders, clsKind') = fromJust . completeBinderList $ clsKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
     clsArgs' <- for clsArgs . traverse . maybe (freshKind (fst ann)) $ replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType
@@ -888,7 +888,8 @@ kindsOfAll moduleName syns dats clss = withFreshSubstitution $ do
     clsResults <- for clss (inferClassDeclaration moduleName)
     synResultsWithUnks <- for (zip synDict synResults) $ \((synName, synKind), synBody) -> do
       synKind' <- apply synKind
-      pure (((synName, synKind'), synBody), unknowns synKind')
+      synBody' <- apply synBody
+      pure (((synName, synKind'), synBody'), unknowns synKind')
     datResultsWithUnks <- for (zip datDict datResults) $ \((datName, datKind), ctors) -> do
       datKind' <- apply datKind
       ctors' <- traverse (traverse apply) ctors
