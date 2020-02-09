@@ -369,6 +369,12 @@ function t1 t2 = TypeApp nullSourceAnn (TypeApp nullSourceAnn tyFunction t1) t2
 (-:>) = function
 infixr 4 -:>
 
+primClass :: Qualified (ProperName 'TypeName) -> (SourceType -> SourceType) -> [(Qualified (ProperName 'TypeName), (SourceType, TypeKind))]
+primClass name mkTy =
+  [ (name, (mkTy kindConstraint, ExternData))
+  , (dictSynonymName <$> name, (mkTy kindType, TypeSynonym))
+  ]
+
 -- | The primitive types in the external environment with their
 -- associated kinds. There are also pseudo `Fail`, `Warn`, and `Partial` types
 -- that correspond to the classes with the same names.
@@ -420,33 +426,34 @@ primOrderingTypes =
 
 primRowTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primRowTypes =
-  M.fromList
-    [ (primSubName C.moduleRow "Union", (tyForall "k" kindType $ kindRow (tyVar "k") -:> kindRow (tyVar "k") -:> kindRow (tyVar "k") -:> kindConstraint, ExternData))
-    , (primSubName C.moduleRow "Nub",   (tyForall "k" kindType $ kindRow (tyVar "k") -:> kindRow (tyVar "k") -:> kindConstraint, ExternData))
-    , (primSubName C.moduleRow "Lacks", (tyForall "k" kindType $ kindSymbol -:> kindRow (tyVar "k") -:> kindConstraint, ExternData))
-    , (primSubName C.moduleRow "Cons",  (tyForall "k" kindType $ kindSymbol -:> tyVar "k" -:> kindRow (tyVar "k") -:> kindRow (tyVar "k") -:> kindConstraint, ExternData))
+  M.fromList $ mconcat
+    [ primClass (primSubName C.moduleRow "Union") (\kind -> tyForall "k" kindType $ kindRow (tyVar "k") -:> kindRow (tyVar "k") -:> kindRow (tyVar "k") -:> kind)
+    , primClass (primSubName C.moduleRow "Nub")   (\kind -> tyForall "k" kindType $ kindRow (tyVar "k") -:> kindRow (tyVar "k") -:> kind)
+    , primClass (primSubName C.moduleRow "Lacks") (\kind -> tyForall "k" kindType $ kindSymbol -:> kindRow (tyVar "k") -:> kind)
+    , primClass (primSubName C.moduleRow "Cons")  (\kind -> tyForall "k" kindType $ kindSymbol -:> tyVar "k" -:> kindRow (tyVar "k") -:> kindRow (tyVar "k") -:> kind)
     ]
 
 primRowListTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primRowListTypes =
-  M.fromList
+  M.fromList $
     [ (primSubName C.moduleRowList "RowList", (kindType -:> kindType, ExternData))
     , (primSubName C.moduleRowList "Cons", (tyForall "k" kindType $ kindSymbol -:> tyVar "k" -:> kindRowList (tyVar "k") -:> kindRowList (tyVar "k"), ExternData))
     , (primSubName C.moduleRowList "Nil", (tyForall "k" kindType $ kindRowList (tyVar "k"), ExternData))
-    , (primSubName C.moduleRowList "RowToList",  (tyForall "k" kindType $ kindRow (tyVar "k") -:> kindRowList (tyVar "k") -:> kindConstraint, ExternData))
+    ] <> mconcat
+    [ primClass (primSubName C.moduleRowList "RowToList")  (\kind -> tyForall "k" kindType $ kindRow (tyVar "k") -:> kindRowList (tyVar "k") -:> kind)
     ]
 
 primSymbolTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primSymbolTypes =
-  M.fromList
-    [ (primSubName C.moduleSymbol "Append",  (kindSymbol -:> kindSymbol -:> kindSymbol -:> kindConstraint, ExternData))
-    , (primSubName C.moduleSymbol "Compare", (kindSymbol -:> kindSymbol -:> kindOrdering -:> kindConstraint, ExternData))
-    , (primSubName C.moduleSymbol "Cons",  (kindSymbol -:> kindSymbol -:> kindSymbol -:> kindConstraint, ExternData))
+  M.fromList $ mconcat
+    [ primClass (primSubName C.moduleSymbol "Append")  (\kind -> kindSymbol -:> kindSymbol -:> kindSymbol -:> kind)
+    , primClass (primSubName C.moduleSymbol "Compare") (\kind -> kindSymbol -:> kindSymbol -:> kindOrdering -:> kind)
+    , primClass (primSubName C.moduleSymbol "Cons")    (\kind -> kindSymbol -:> kindSymbol -:> kindSymbol -:> kind)
     ]
 
 primTypeErrorTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceType, TypeKind)
 primTypeErrorTypes =
-  M.fromList
+  M.fromList $
     [ (primSubName C.typeError "Doc", (kindType, ExternData))
     , (primSubName C.typeError "Fail", (kindDoc -:> kindConstraint, ExternData))
     , (primSubName C.typeError "Warn", (kindDoc -:> kindConstraint, ExternData))
@@ -455,6 +462,9 @@ primTypeErrorTypes =
     , (primSubName C.typeError "QuoteLabel", (kindSymbol -:> kindDoc, ExternData))
     , (primSubName C.typeError "Beside", (kindDoc -:> kindDoc -:> kindDoc, ExternData))
     , (primSubName C.typeError "Above", (kindDoc -:> kindDoc -:> kindDoc, ExternData))
+    ] <> mconcat
+    [ primClass (primSubName C.typeError "Fail") (\kind -> kindDoc -:> kind)
+    , primClass (primSubName C.typeError "Warn") (\kind -> kindDoc -:> kind)
     ]
 
 -- | The primitive class map. This just contains the `Partial` class.

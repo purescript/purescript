@@ -6,6 +6,7 @@ import Data.List (sort)
 import Control.Exception (evaluate)
 import Control.DeepSeq (force)
 import qualified Data.Map as Map
+import qualified Data.Text as Text
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Docs as D
 
@@ -25,7 +26,7 @@ spec = do
   it "all Prim modules are fully documented" $ do
     let actualPrimNames =
           -- note that prim type classes are listed in P.primTypes
-          (map (P.runProperName . P.disqualify . fst) $ Map.toList
+          (filter (not . Text.any (== '$')) . map (P.runProperName . P.disqualify . fst) $ Map.toList
             ( P.primTypes <>
               P.primBooleanTypes <>
               P.primOrderingTypes <>
