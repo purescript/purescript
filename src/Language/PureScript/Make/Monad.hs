@@ -33,7 +33,6 @@ import qualified Data.ByteString as B
 import           Data.Text (Text)
 import qualified Data.Text as Text
 import           Data.Time.Clock (UTCTime)
-import           Language.PureScript.AST
 import           Language.PureScript.Errors
 import           Language.PureScript.Externs (ExternsFile, externsIsCurrentVersion)
 import           Language.PureScript.Make.Cache (ContentHash, hash)

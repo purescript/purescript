@@ -16,7 +16,6 @@ import Control.Monad.Identity
 
 import Data.Aeson.TH
 import qualified Data.Map as M
-import Data.Set (Set)
 import Data.Text (Text)
 import qualified Data.List.NonEmpty as NEL
 import GHC.Generics (Generic)
@@ -33,11 +32,7 @@ import Language.PureScript.Kinds
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Comments
 import Language.PureScript.Environment
-import qualified Language.PureScript.Bundle as Bundle
 import qualified Language.PureScript.Constants as C
-import qualified Language.PureScript.CST.Errors as CST
-
-import qualified Text.Parsec as P
 
 -- | A map of locally-bound names in scope.
 type Context = [(Ident, SourceType)]
@@ -63,122 +58,6 @@ onTypeSearchTypes f = runIdentity . onTypeSearchTypesM (Identity . f)
 onTypeSearchTypesM :: (Applicative m) => (SourceType -> m SourceType) -> TypeSearch -> m TypeSearch
 onTypeSearchTypesM f (TSAfter i r) = TSAfter <$> traverse (traverse f) i <*> traverse (traverse (traverse f)) r
 onTypeSearchTypesM _ (TSBefore env) = pure (TSBefore env)
-
--- | A type of error messages
-data SimpleErrorMessage
-  = ModuleNotFound ModuleName
-  | ErrorParsingFFIModule FilePath (Maybe Bundle.ErrorMessage)
-  | ErrorParsingModule P.ParseError
-  | ErrorParsingCSTModule CST.ParserError
-  | MissingFFIModule ModuleName
-  | UnnecessaryFFIModule ModuleName FilePath
-  | MissingFFIImplementations ModuleName [Ident]
-  | UnusedFFIImplementations ModuleName [Ident]
-  | InvalidFFIIdentifier ModuleName Text
-  | FileIOError Text IOError -- ^ A description of what we were trying to do, and the error which occurred
-  | InfiniteType SourceType
-  | InfiniteKind SourceKind
-  | MultipleValueOpFixities (OpName 'ValueOpName)
-  | MultipleTypeOpFixities (OpName 'TypeOpName)
-  | OrphanTypeDeclaration Ident
-  | RedefinedIdent Ident
-  | OverlappingNamesInLet
-  | UnknownName (Qualified Name)
-  | UnknownImport ModuleName Name
-  | UnknownImportDataConstructor ModuleName (ProperName 'TypeName) (ProperName 'ConstructorName)
-  | UnknownExport Name
-  | UnknownExportDataConstructor (ProperName 'TypeName) (ProperName 'ConstructorName)
-  | ScopeConflict Name [ModuleName]
-  | ScopeShadowing Name (Maybe ModuleName) [ModuleName]
-  | DeclConflict Name Name
-  | ExportConflict (Qualified Name) (Qualified Name)
-  | DuplicateModule ModuleName
-  | DuplicateTypeClass (ProperName 'ClassName) SourceSpan
-  | DuplicateInstance Ident SourceSpan
-  | DuplicateTypeArgument Text
-  | InvalidDoBind
-  | InvalidDoLet
-  | CycleInDeclaration Ident
-  | CycleInTypeSynonym (Maybe (ProperName 'TypeName))
-  | CycleInTypeClassDeclaration [Qualified (ProperName 'ClassName)]
-  | CycleInModules [ModuleName]
-  | NameIsUndefined Ident
-  | UndefinedTypeVariable (ProperName 'TypeName)
-  | PartiallyAppliedSynonym (Qualified (ProperName 'TypeName))
-  | EscapedSkolem Text (Maybe SourceSpan) SourceType
-  | TypesDoNotUnify SourceType SourceType
-  | KindsDoNotUnify SourceKind SourceKind
-  | ConstrainedTypeUnified SourceType SourceType
-  | OverlappingInstances (Qualified (ProperName 'ClassName)) [SourceType] [Qualified Ident]
-  | NoInstanceFound SourceConstraint
-  | AmbiguousTypeVariables SourceType [Int]
-  | UnknownClass (Qualified (ProperName 'ClassName))
-  | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [SourceType]
-  | CannotDerive (Qualified (ProperName 'ClassName)) [SourceType]
-  | InvalidDerivedInstance (Qualified (ProperName 'ClassName)) [SourceType] Int
-  | ExpectedTypeConstructor (Qualified (ProperName 'ClassName)) [SourceType] SourceType
-  | InvalidNewtypeInstance (Qualified (ProperName 'ClassName)) [SourceType]
-  | MissingNewtypeSuperclassInstance (Qualified (ProperName 'ClassName)) (Qualified (ProperName 'ClassName)) [SourceType]
-  | UnverifiableSuperclassInstance (Qualified (ProperName 'ClassName)) (Qualified (ProperName 'ClassName)) [SourceType]
-  | CannotFindDerivingType (ProperName 'TypeName)
-  | DuplicateLabel Label (Maybe Expr)
-  | DuplicateValueDeclaration Ident
-  | ArgListLengthsDiffer Ident
-  | OverlappingArgNames (Maybe Ident)
-  | MissingClassMember (NEL.NonEmpty (Ident, SourceType))
-  | ExtraneousClassMember Ident (Qualified (ProperName 'ClassName))
-  | ExpectedType SourceType SourceKind
-  -- | constructor name, expected argument count, actual argument count
-  | IncorrectConstructorArity (Qualified (ProperName 'ConstructorName)) Int Int
-  | ExprDoesNotHaveType Expr SourceType
-  | PropertyIsMissing Label
-  | AdditionalProperty Label
-  | TypeSynonymInstance
-  | OrphanInstance Ident (Qualified (ProperName 'ClassName)) (Set ModuleName) [SourceType]
-  | InvalidNewtype (ProperName 'TypeName)
-  | InvalidInstanceHead SourceType
-  | TransitiveExportError DeclarationRef [DeclarationRef]
-  | TransitiveDctorExportError DeclarationRef (ProperName 'ConstructorName)
-  | ShadowedName Ident
-  | ShadowedTypeVar Text
-  | UnusedTypeVar Text
-  | WildcardInferredType SourceType Context
-  | HoleInferredType Text SourceType Context (Maybe TypeSearch)
-  | MissingTypeDeclaration Ident SourceType
-  | OverlappingPattern [[Binder]] Bool
-  | IncompleteExhaustivityCheck
-  | MisleadingEmptyTypeImport ModuleName (ProperName 'TypeName)
-  | ImportHidingModule ModuleName
-  | UnusedImport ModuleName (Maybe ModuleName)
-  | UnusedExplicitImport ModuleName [Name] (Maybe ModuleName) [DeclarationRef]
-  | UnusedDctorImport ModuleName (ProperName 'TypeName) (Maybe ModuleName) [DeclarationRef]
-  | UnusedDctorExplicitImport ModuleName (ProperName 'TypeName) [ProperName 'ConstructorName] (Maybe ModuleName) [DeclarationRef]
-  | DuplicateSelectiveImport ModuleName
-  | DuplicateImport ModuleName ImportDeclarationType (Maybe ModuleName)
-  | DuplicateImportRef Name
-  | DuplicateExportRef Name
-  | IntOutOfRange Integer Text Integer Integer
-  | ImplicitQualifiedImport ModuleName ModuleName [DeclarationRef]
-  | ImplicitQualifiedImportReExport ModuleName ModuleName [DeclarationRef]
-  | ImplicitImport ModuleName [DeclarationRef]
-  | HidingImport ModuleName [DeclarationRef]
-  | CaseBinderLengthDiffers Int [Binder]
-  | IncorrectAnonymousArgument
-  | InvalidOperatorInBinder (Qualified (OpName 'ValueOpName)) (Qualified Ident)
-  | CannotGeneralizeRecursiveFunction Ident SourceType
-  | CannotDeriveNewtypeForData (ProperName 'TypeName)
-  | ExpectedWildcard (ProperName 'TypeName)
-  | CannotUseBindWithDo Ident
-  -- | instance name, type class, expected argument count, actual argument count
-  | ClassInstanceArityMismatch Ident (Qualified (ProperName 'ClassName)) Int Int
-  -- | a user-defined warning raised by using the Warn type class
-  | UserDefinedWarning SourceType
-  -- | a declaration couldn't be used because it contained free variables
-  | UnusableDeclaration Ident [[Text]]
-  | CannotDefinePrimModules ModuleName
-  | MixedAssociativityError (NEL.NonEmpty (Qualified (OpName 'AnyOpName), Associativity))
-  | NonAssociativeError (NEL.NonEmpty (Qualified (OpName 'AnyOpName)))
-  deriving (Show)
 
 -- | Error message hints, providing more detailed information about failure.
 data ErrorMessageHint
@@ -215,11 +94,6 @@ data HintCategory
   | SolverHint
   | OtherHint
   deriving (Show, Eq)
-
-data ErrorMessage = ErrorMessage
-  [ErrorMessageHint]
-  SimpleErrorMessage
-  deriving (Show)
 
 -- |
 -- A module declaration, consisting of comments about the module, a module name,
