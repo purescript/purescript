@@ -69,15 +69,14 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
   let makeEnv = P.buildMakeActions outputDirectory filePathMap foreigns False
   -- Rebuild the single module using the cached externs
   (result, warnings) <- logPerf (labelTimespec "Rebuilding Module") $
-    liftIO $ P.runMake (P.defaultOptions { P.optionsCodegenTargets = codegenTargets })
-      (P.rebuildModule (shushProgress makeEnv) externs m)
+    liftIO $ P.runMake (P.defaultOptions { P.optionsCodegenTargets = codegenTargets }) do
+      newExterns <- P.rebuildModule (shushProgress makeEnv) externs m
+      updateCacheDb codegenTargets outputDirectory file actualFile moduleName
+      pure newExterns
   case result of
     Left errors ->
       throwError (RebuildError errors)
     Right newExterns -> do
-      runExceptT (updateCacheDb codegenTargets outputDirectory file actualFile moduleName) >>= \case
-        Right _ -> pure ()
-        Left errs -> throwError (RebuildError errs)
       whenM isEditorMode do
         insertModule (fromMaybe file actualFile, m)
         insertExterns newExterns
@@ -87,7 +86,9 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
 
 -- | When adjusting the cache db file after a rebuild we always pick a
 -- non-sensical timestamp ("1858-11-17T00:00:00Z"), and rely on the
--- content hash to tell whether the module needs rebuilding
+-- content hash to tell whether the module needs rebuilding. This is
+-- because IDE rebuilds may be triggered on temporary files to not
+-- force editors to save the actual source file to get at diagnostics
 dayZero :: Time.UTCTime
 dayZero = Time.UTCTime (Time.ModifiedJulianDay 0) 0
 

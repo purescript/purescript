@@ -154,7 +154,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
         return (Left policy)
       Right filePath -> do
         cwd <- makeIO "Getting the current directory" getCurrentDirectory
-        let inputPaths = map (normaliseForCache cwd) (filePath : maybeToList foreignPath)
+        let inputPaths = map (normaliseForCache cwd) (filePath : maybeToList (M.lookup mn foreigns))
             getInfo fp = do
               ts <- getTimestamp fp
               return (ts, hashFile fp)
