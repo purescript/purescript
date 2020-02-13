@@ -1,3 +1,5 @@
+{-# LANGUAGE PackageImports #-}
+
 -- | This module contains data types for the entire PureScript surface language. Every
 -- token is represented in the tree, and every token is annotated with
 -- whitespace and comments (both leading and trailing). This means one can write
@@ -7,14 +9,14 @@
 
 module Language.PureScript.CST.Types where
 
-import Prelude
+import "base" Prelude
 
-import Data.List.NonEmpty (NonEmpty)
-import Data.Text (Text)
-import Data.Void (Void)
-import GHC.Generics (Generic)
-import qualified Language.PureScript.Names as N
-import Language.PureScript.PSString (PSString)
+import "base" Data.List.NonEmpty (NonEmpty)
+import "text" Data.Text (Text)
+import "base" Data.Void (Void)
+import "base" GHC.Generics (Generic)
+import qualified "purescript-ast" Language.PureScript.Names as N
+import "purescript-ast" Language.PureScript.PSString (PSString)
 
 data SourcePos = SourcePos
   { srcLine :: {-# UNPACK #-} !Int

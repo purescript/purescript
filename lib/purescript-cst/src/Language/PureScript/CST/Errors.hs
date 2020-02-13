@@ -1,4 +1,5 @@
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE PackageImports #-}
 module Language.PureScript.CST.Errors
   ( ParserError(..)
   , ParserErrorType(..)
@@ -6,14 +7,14 @@ module Language.PureScript.CST.Errors
   , prettyPrintErrorMessage
   ) where
 
-import Prelude
+import "base" Prelude
 
-import qualified Data.Text as Text
-import Data.Char (isSpace, toUpper)
-import Language.PureScript.CST.Layout
-import Language.PureScript.CST.Print
-import Language.PureScript.CST.Types
-import Text.Printf (printf)
+import qualified "text" Data.Text as Text
+import "base" Data.Char (isSpace, toUpper)
+import "this" Language.PureScript.CST.Layout
+import "this" Language.PureScript.CST.Print
+import "this" Language.PureScript.CST.Types
+import "base" Text.Printf (printf)
 
 data ParserErrorType
   = ErrWildcardInType

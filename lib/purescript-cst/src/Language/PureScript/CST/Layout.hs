@@ -1,3 +1,5 @@
+{-# LANGUAGE PackageImports #-}
+
 -- | The parser itself is unaware of indentation, and instead only parses explicit
 -- delimiters which are inserted by this layout algorithm (much like Haskell).
 -- This is convenient because the actual grammar can be specified apart from the
@@ -20,13 +22,13 @@
 
 module Language.PureScript.CST.Layout where
 
-import Prelude
+import "base" Prelude
 
-import Data.DList (snoc)
-import qualified Data.DList as DList
-import Data.Foldable (find)
-import Data.Function ((&))
-import Language.PureScript.CST.Types
+import "dlist" Data.DList (snoc)
+import qualified "dlist" Data.DList as DList
+import "base" Data.Foldable (find)
+import "base" Data.Function ((&))
+import "this" Language.PureScript.CST.Types
 
 type LayoutStack = [(SourcePos, LayoutDelim)]
 

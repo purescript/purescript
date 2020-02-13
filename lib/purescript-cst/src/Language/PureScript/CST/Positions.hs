@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE PackageImports #-}
 
 -- | This module contains utilities for calculating positions and offsets. While
 -- tokens are annotated with ranges, CST nodes are not, but they can be
@@ -8,14 +9,14 @@
 
 module Language.PureScript.CST.Positions where
 
-import Prelude
+import "base" Prelude
 
-import Data.Foldable (foldl')
-import qualified Data.List.NonEmpty as NE
-import Data.Text (Text)
-import Data.Void (Void)
-import qualified Data.Text as Text
-import Language.PureScript.CST.Types
+import "base" Data.Foldable (foldl')
+import qualified "base" Data.List.NonEmpty as NE
+import "text" Data.Text (Text)
+import "base" Data.Void (Void)
+import qualified "text" Data.Text as Text
+import "this" Language.PureScript.CST.Types
 
 advanceToken :: SourcePos -> Token -> SourcePos
 advanceToken pos = applyDelta pos . tokenDelta

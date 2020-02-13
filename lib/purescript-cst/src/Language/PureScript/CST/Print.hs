@@ -1,3 +1,5 @@
+{-# LANGUAGE PackageImports #-}
+
 -- | This is just a simple token printer. It's not a full fledged formatter, but
 -- it is used by the layout golden tests. Printing each token in the tree with
 -- this printer will result in the exact input that was given to the lexer.
@@ -9,11 +11,11 @@ module Language.PureScript.CST.Print
   , printTrailingComment
   ) where
 
-import Prelude
+import "base" Prelude
 
-import Data.Text (Text)
-import qualified Data.Text as Text
-import Language.PureScript.CST.Types
+import "text" Data.Text (Text)
+import qualified "text" Data.Text as Text
+import "this" Language.PureScript.CST.Types
 
 printToken :: Token -> Text
 printToken = \case

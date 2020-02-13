@@ -1,4 +1,5 @@
 {
+{-# LANGUAGE PackageImports #-}
 module Language.PureScript.CST.Parser
   ( parseType
   , parseKind
@@ -17,21 +18,21 @@ module Language.PureScript.CST.Parser
   , PartialResult(..)
   ) where
 
-import Prelude hiding (lex)
+import "base" Prelude hiding (lex)
 
-import Control.Monad ((<=<), when)
-import Data.Foldable (foldl', for_)
-import qualified Data.List.NonEmpty as NE
-import Data.Text (Text)
-import Data.Traversable (for)
-import Language.PureScript.CST.Errors
-import Language.PureScript.CST.Lexer
-import Language.PureScript.CST.Monad
-import Language.PureScript.CST.Positions
-import Language.PureScript.CST.Types
-import Language.PureScript.CST.Utils
-import qualified Language.PureScript.Names as N
-import Language.PureScript.PSString (PSString)
+import "base" Control.Monad ((<=<), when)
+import "base" Data.Foldable (foldl', for_)
+import qualified "base" Data.List.NonEmpty as NE
+import "text" Data.Text (Text)
+import "base" Data.Traversable (for)
+import "this" Language.PureScript.CST.Errors
+import "this" Language.PureScript.CST.Lexer
+import "this" Language.PureScript.CST.Monad
+import "this" Language.PureScript.CST.Positions
+import "this" Language.PureScript.CST.Types
+import "this" Language.PureScript.CST.Utils
+import qualified "purescript-ast" Language.PureScript.Names as N
+import "purescript-ast" Language.PureScript.PSString (PSString)
 }
 
 %expect 98

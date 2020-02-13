@@ -1,15 +1,16 @@
+{-# LANGUAGE PackageImports #-}
 module Language.PureScript.CST.Monad where
 
-import Prelude
+import "base" Prelude
 
-import Data.List (sortBy)
-import qualified Data.List.NonEmpty as NE
-import Data.Ord (comparing)
-import Data.Text (Text)
-import Language.PureScript.CST.Errors
-import Language.PureScript.CST.Layout
-import Language.PureScript.CST.Positions
-import Language.PureScript.CST.Types
+import "base" Data.List (sortBy)
+import qualified "base" Data.List.NonEmpty as NE
+import "base" Data.Ord (comparing)
+import "text" Data.Text (Text)
+import "this" Language.PureScript.CST.Errors
+import "this" Language.PureScript.CST.Layout
+import "this" Language.PureScript.CST.Positions
+import "this" Language.PureScript.CST.Types
 
 type LexResult = Either (LexState, ParserError) SourceToken
 

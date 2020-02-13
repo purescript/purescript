@@ -2,7 +2,7 @@ package = purescript
 exe_target = purs
 stack_yaml = STACK_YAML="stack.yaml"
 stack = $(stack_yaml) stack
-licenses = LICENSE lib/purescript-ast/LICENSE
+licenses = LICENSE lib/purescript-ast/LICENSE lib/purescript-cst/LICENSE
 license_generator_files = license-generator/generate.hs license-generator/header.txt
 
 help: ## Print documentation

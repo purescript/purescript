@@ -1,8 +1,9 @@
+{-# LANGUAGE PackageImports #-}
 module Language.PureScript.CST.Traversals where
 
-import Prelude
+import "base" Prelude
 
-import Language.PureScript.CST.Types
+import "this" Language.PureScript.CST.Types
 
 everythingOnSeparated :: (r -> r -> r) -> (a -> r) -> Separated a -> r
 everythingOnSeparated op k (Separated hd tl) = go hd tl
