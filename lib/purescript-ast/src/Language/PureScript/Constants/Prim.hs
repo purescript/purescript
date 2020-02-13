@@ -1,10 +1,12 @@
+{-# LANGUAGE PackageImports #-}
+
 -- | Various constants which refer to things in Prim
 module Language.PureScript.Constants.Prim where
 
-import Prelude.Compat
+import "base-compat" Prelude.Compat
 
-import Data.String (IsString)
-import Language.PureScript.Names
+import "base" Data.String (IsString)
+import "this" Language.PureScript.Names
 
 -- Prim values
 

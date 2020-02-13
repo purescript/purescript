@@ -1,40 +1,41 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE PackageImports #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- |
 -- Data types for types
 --
 module Language.PureScript.Types where
 
-import Prelude.Compat
-import Protolude (ordNub)
+import "base-compat" Prelude.Compat
+import "protolude" Protolude (ordNub)
 
-import Control.Applicative ((<|>))
-import Control.Arrow (first)
-import Control.DeepSeq (NFData)
-import Control.Monad ((<=<))
-import Data.Aeson ((.:), (.=))
-import qualified Data.Aeson as A
-import qualified Data.Aeson.Types as A
-import Data.Foldable (fold)
-import Data.List (sortBy)
-import Data.Ord (comparing)
-import Data.Maybe (fromMaybe)
-import Data.Text (Text)
-import qualified Data.Text as T
-import GHC.Generics (Generic)
+import "base" Control.Applicative ((<|>))
+import "base" Control.Arrow (first)
+import "deepseq" Control.DeepSeq (NFData)
+import "base" Control.Monad ((<=<))
+import "aeson" Data.Aeson ((.:), (.=))
+import qualified "aeson" Data.Aeson as A
+import qualified "aeson" Data.Aeson.Types as A
+import "base" Data.Foldable (fold)
+import "base" Data.List (sortBy)
+import "base" Data.Ord (comparing)
+import "base" Data.Maybe (fromMaybe)
+import "text" Data.Text (Text)
+import qualified "text" Data.Text as T
+import "base" GHC.Generics (Generic)
 
-import Language.PureScript.AST.SourcePos
-import Language.PureScript.Kinds
-import Language.PureScript.Names
-import Language.PureScript.Label (Label)
-import Language.PureScript.PSString (PSString)
+import "this" Language.PureScript.AST.SourcePos
+import "this" Language.PureScript.Kinds
+import "this" Language.PureScript.Names
+import "this" Language.PureScript.Label (Label)
+import "this" Language.PureScript.PSString (PSString)
 
-import Lens.Micro.Platform (Lens', (^.), set)
+import "microlens-platform" Lens.Micro.Platform (Lens', (^.), set)
 
 type SourceType = Type SourceAnn
 type SourceConstraint = Constraint SourceAnn

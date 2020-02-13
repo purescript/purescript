@@ -1,11 +1,12 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ImplicitParams #-}
+{-# LANGUAGE PackageImports #-}
 
 module Language.PureScript.Crash where
 
-import Prelude.Compat
+import "base-compat" Prelude.Compat
 
-import qualified GHC.Stack
+import qualified "base" GHC.Stack
 
 -- | A compatibility wrapper for the @GHC.Stack.HasCallStack@ constraint.
 #if __GLASGOW_HASKELL__ >= 800
@@ -13,7 +14,7 @@ type HasCallStack = GHC.Stack.HasCallStack
 #elif MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
 type HasCallStack = (?callStack :: GHC.Stack.CallStack)
 #else
-import GHC.Exts (Constraint)
+import "base" GHC.Exts (Constraint)
 -- CallStack wasn't present in GHC 7.10.1
 type HasCallStack = (() :: Constraint)
 #endif

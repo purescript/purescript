@@ -1,7 +1,9 @@
+{-# LANGUAGE PackageImports #-}
+
 -- | Common functions for implementing generic traversals
 module Language.PureScript.Traversals where
 
-import Prelude.Compat
+import "base-compat" Prelude.Compat
 
 fstM :: (Functor f) => (a -> f c) -> (a, b) -> f (c, b)
 fstM f (a, b) = flip (,) b <$> f a

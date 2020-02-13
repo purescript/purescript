@@ -1,16 +1,17 @@
 {-# LANGUAGE DeriveFoldable    #-}
-{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DeriveGeneric     #-}
+{-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE PackageImports #-}
 module Language.PureScript.TypeClassDictionaries where
 
-import Prelude.Compat
+import "base-compat" Prelude.Compat
 
-import GHC.Generics (Generic)
-import Control.DeepSeq (NFData)
-import Data.Text (Text, pack)
+import "base" GHC.Generics (Generic)
+import "deepseq" Control.DeepSeq (NFData)
+import "text" Data.Text (Text, pack)
 
-import Language.PureScript.Names
-import Language.PureScript.Types
+import "this" Language.PureScript.Names
+import "this" Language.PureScript.Types
 
 -- |
 -- Data representing a type class dictionary which is in scope

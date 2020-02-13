@@ -1,17 +1,18 @@
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE PackageImports #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- |
 -- Defines the types of source code comments
 --
 module Language.PureScript.Comments where
 
-import Prelude.Compat
-import Control.DeepSeq (NFData)
-import Data.Text (Text)
-import GHC.Generics (Generic)
+import "base-compat" Prelude.Compat
+import "deepseq" Control.DeepSeq (NFData)
+import "text" Data.Text (Text)
+import "base" GHC.Generics (Generic)
 
-import Data.Aeson.TH
+import "aeson" Data.Aeson.TH
 
 data Comment
   = LineComment Text

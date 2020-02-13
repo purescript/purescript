@@ -1,19 +1,21 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE PackageImports #-}
+
 -- |
 -- Source position information
 --
 module Language.PureScript.AST.SourcePos where
 
-import Prelude.Compat
+import "base-compat" Prelude.Compat
 
-import Control.DeepSeq (NFData)
-import Data.Aeson ((.=), (.:))
-import Data.Text (Text)
-import GHC.Generics (Generic)
-import Language.PureScript.Comments
-import qualified Data.Aeson as A
-import qualified Data.Text as T
-import System.FilePath (makeRelative)
+import "deepseq" Control.DeepSeq (NFData)
+import "aeson" Data.Aeson ((.=), (.:))
+import "text" Data.Text (Text)
+import "base" GHC.Generics (Generic)
+import "this" Language.PureScript.Comments
+import qualified "aeson" Data.Aeson as A
+import qualified "text" Data.Text as T
+import "filepath" System.FilePath (makeRelative)
 
 -- | Source annotation - position information and comments.
 type SourceAnn = (SourceSpan, [Comment])

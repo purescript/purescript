@@ -1,25 +1,26 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE PackageImports #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Language.PureScript.Kinds where
 
-import Prelude.Compat
+import "base-compat" Prelude.Compat
 
-import GHC.Generics (Generic)
-import Control.Applicative ((<|>))
-import Control.DeepSeq (NFData)
-import Data.Text (Text)
-import Data.Aeson (Value, toJSON, (.=), (.:))
-import Data.Aeson.Types (Parser)
-import qualified Data.Aeson as A
+import "base" GHC.Generics (Generic)
+import "base" Control.Applicative ((<|>))
+import "deepseq" Control.DeepSeq (NFData)
+import "text" Data.Text (Text)
+import "aeson" Data.Aeson (Value, toJSON, (.=), (.:))
+import "aeson" Data.Aeson.Types (Parser)
+import qualified "aeson" Data.Aeson as A
 
-import Language.PureScript.AST.SourcePos
-import Language.PureScript.Names
+import "this" Language.PureScript.AST.SourcePos
+import "this" Language.PureScript.Names
 
-import Lens.Micro.Platform (Lens', (^.), set)
+import "microlens-platform" Lens.Micro.Platform (Lens', (^.), set)
 
 type SourceKind = Kind SourceAnn
 

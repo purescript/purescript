@@ -1,10 +1,12 @@
+{-# LANGUAGE PackageImports #-}
+
 -- |
 -- The core functional representation for literal values.
 --
 module Language.PureScript.AST.Literals where
 
-import Prelude.Compat
-import Language.PureScript.PSString (PSString)
+import "base-compat" Prelude.Compat
+import "this" Language.PureScript.PSString (PSString)
 
 -- |
 -- Data type for literal values. Parameterised so it can be used for Exprs and

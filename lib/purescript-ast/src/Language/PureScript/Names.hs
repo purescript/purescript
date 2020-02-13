@@ -1,24 +1,25 @@
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE PackageImports #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 -- |
 -- Data types for names
 --
 module Language.PureScript.Names where
 
-import Prelude.Compat
+import "base-compat" Prelude.Compat
 
-import Control.Monad.Supply.Class
-import Control.DeepSeq (NFData)
-import Data.Functor.Contravariant (contramap)
+import "this" Control.Monad.Supply.Class
+import "deepseq" Control.DeepSeq (NFData)
+import "base" Data.Functor.Contravariant (contramap)
 
-import GHC.Generics (Generic)
-import Data.Aeson
-import Data.Aeson.TH
-import Data.Text (Text)
-import qualified Data.Text as T
+import "base" GHC.Generics (Generic)
+import "aeson" Data.Aeson
+import "aeson" Data.Aeson.TH
+import "text" Data.Text (Text)
+import qualified "text" Data.Text as T
 
 -- | A sum of the possible name types, useful for error and lint messages.
 data Name

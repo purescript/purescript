@@ -2,6 +2,8 @@ package = purescript
 exe_target = purs
 stack_yaml = STACK_YAML="stack.yaml"
 stack = $(stack_yaml) stack
+licenses = LICENSE lib/purescript-ast/LICENSE
+license_generator_files = license-generator/generate.hs license-generator/header.txt
 
 help: ## Print documentation
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
@@ -56,8 +58,12 @@ bench: ## Run benchmarks for PureScript
 dev-deps: ## Install helpful development tools.
 	stack install ghcid ghc-prof-aeson-flamegraph
 
-license-generator: ## Update dependencies in LICENSE
-	$(stack) ls dependencies --flag purescript:RELEASE | stack license-generator/generate.hs > LICENSE
+license-generator: $(licenses) ## Update dependencies in all LICENSE files
 
+LICENSE: package.yaml $(license_generator_files) ## Update dependencies in LICENSE
+	$(stack) ls dependencies purescript --flag purescript:RELEASE | stack license-generator/generate.hs > $@
+
+lib/%/LICENSE: lib/%/package.yaml $(license_generator_files) ## Update dependencies in lib LICENSE files
+	$(stack) ls dependencies $* | stack license-generator/generate.hs > $@
 
 .PHONY : build build-dirty run install ghci test test-ghci test-profiling ghcid dev-deps license-generator

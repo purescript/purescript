@@ -1,15 +1,17 @@
+{-# LANGUAGE PackageImports #-}
+
 -- |
 -- Case binders
 --
 module Language.PureScript.AST.Binders where
 
-import Prelude.Compat
+import "base-compat" Prelude.Compat
 
-import Language.PureScript.AST.SourcePos
-import Language.PureScript.AST.Literals
-import Language.PureScript.Names
-import Language.PureScript.Comments
-import Language.PureScript.Types
+import "this" Language.PureScript.AST.SourcePos
+import "this" Language.PureScript.AST.Literals
+import "this" Language.PureScript.Names
+import "this" Language.PureScript.Comments
+import "this" Language.PureScript.Types
 
 -- |
 -- Data type for binders

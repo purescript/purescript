@@ -2,6 +2,7 @@ resolver: lts-13.26
 pvp-bounds: upper
 packages:
 - '.'
+- lib/purescript-ast
 extra-deps:
 - happy-1.19.9
 - language-javascript-0.7.0.0
