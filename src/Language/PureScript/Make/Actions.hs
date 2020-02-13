@@ -4,7 +4,6 @@ module Language.PureScript.Make.Actions
   , ProgressMessage(..)
   , buildMakeActions
   , checkForeignDecls
-  , getInputTimestampsAndHashes'
   , readCacheDb'
   , writeCacheDb'
   ) where
@@ -108,23 +107,6 @@ data MakeActions m = MakeActions
   -- ^ If generating docs, output the documentation for the Prim modules
   }
 
-getInputTimestampsAndHashes'
-  :: (MonadIO m, MonadError MultipleErrors m)
-  => FilePath
-  -- ^ The filepath to the PureScript Module
-  -> Maybe FilePath
-  -- ^ The filepath to the module's potential FFI implementation
-  -> m (M.Map FilePath (UTCTime, m ContentHash))
-getInputTimestampsAndHashes' filePath foreignPath = do
-  cwd <- liftIO getCurrentDirectory
-  let
-    inputPaths = map (normaliseForCache cwd) (filePath : maybeToList foreignPath)
-    getInfo fp = do
-      ts <- getTimestamp fp
-      return (ts, hashFile fp)
-  pathsWithInfo <- traverse (\fp -> (fp,) <$> getInfo fp) inputPaths
-  pure (M.fromList pathsWithInfo)
-
 -- | Given the output directory, determines the location for the
 -- CacheDb file
 cacheDbFile :: FilePath -> FilePath
@@ -171,7 +153,13 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
       Left policy ->
         return (Left policy)
       Right filePath -> do
-        Right <$> getInputTimestampsAndHashes' filePath (M.lookup mn foreigns)
+        cwd <- makeIO "Getting the current directory" getCurrentDirectory
+        let inputPaths = map (normaliseForCache cwd) (filePath : maybeToList foreignPath)
+            getInfo fp = do
+              ts <- getTimestamp fp
+              return (ts, hashFile fp)
+        pathsWithInfo <- traverse (\fp -> (fp,) <$> getInfo fp) inputPaths
+        pure $ Right $ M.fromList pathsWithInfo
 
   outputFilename :: ModuleName -> String -> FilePath
   outputFilename mn fn =
