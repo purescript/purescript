@@ -58,20 +58,15 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
       throwError $ RebuildError $ CST.toMultipleErrors fp' parseError
     Right m -> pure m
   let moduleName = P.getModuleName m
-
   -- Externs files must be sorted ahead of time, so that they get applied
   -- in the right order (bottom up) to the 'Environment'.
   externs <- logPerf (labelTimespec "Sorting externs") (sortExterns m =<< getExternFiles)
-
   outputDirectory <- confOutputPath . ideConfiguration <$> ask
-
   -- For rebuilding, we want to 'RebuildAlways', but for inferring foreign
   -- modules using their file paths, we need to specify the path in the 'Map'.
   let filePathMap = M.singleton moduleName (Left P.RebuildAlways)
   foreigns <- P.inferForeignModules (M.singleton moduleName (Right file))
-
   let makeEnv = P.buildMakeActions outputDirectory filePathMap foreigns False
-
   -- Rebuild the single module using the cached externs
   (result, warnings) <- logPerf (labelTimespec "Rebuilding Module") $
     liftIO $ P.runMake (P.defaultOptions { P.optionsCodegenTargets = codegenTargets })
@@ -80,21 +75,9 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
     Left errors ->
       throwError (RebuildError errors)
     Right newExterns -> do
-      -- TODO(Christoph): Make ALL filepaths in the cachedb.json file normalized relative paths
-      runExceptT do
-        cwd <- liftIO getCurrentDirectory
-        contentHash <- P.hashFile file
-        let moduleCacheInfo = (normaliseForCache cwd (fromMaybe file actualFile), (dayZero, contentHash))
-
-        -- TODO(Christoph): Maybe we can avoid calling inferForeignmodule twice?
-        foreigns <- P.inferForeignModules (M.singleton moduleName (Right (fromMaybe file actualFile)))
-        foreignCacheInfo <- for (M.lookup moduleName foreigns) \foreignPath -> do
-          foreignHash <- P.hashFile foreignPath
-          pure (normaliseForCache cwd foreignPath, (dayZero, foreignHash))
-
-        let cacheInfo = M.fromList (moduleCacheInfo : maybeToList foreignCacheInfo)
-        cacheDb <- P.readCacheDb' outputDirectory
-        P.writeCacheDb' outputDirectory (M.insert moduleName (CacheInfo cacheInfo) cacheDb)
+      runExceptT (updateCacheDb codegenTargets outputDirectory file actualFile moduleName) >>= \case
+        Right _ -> pure ()
+        Left errs -> throwError (RebuildError errs)
       whenM isEditorMode do
         insertModule (fromMaybe file actualFile, m)
         insertExterns newExterns
@@ -107,6 +90,37 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
 -- content hash to tell whether the module needs rebuilding
 dayZero :: Time.UTCTime
 dayZero = Time.UTCTime (Time.ModifiedJulianDay 0) 0
+
+updateCacheDb
+  :: MonadIO m
+  => MonadError P.MultipleErrors m
+  => Set P.CodegenTarget
+  -> FilePath
+  -- ^ The output directory
+  -> FilePath
+  -- ^ The file to read the content hash from
+  -> Maybe FilePath
+  -- ^ The file name to update in the cache
+  -> P.ModuleName
+  -- ^ The module name to update in the cache
+  -> m ()
+updateCacheDb codegenTargets outputDirectory file actualFile moduleName = do
+  cwd <- liftIO getCurrentDirectory
+  contentHash <- P.hashFile file
+  let moduleCacheInfo = (normaliseForCache cwd (fromMaybe file actualFile), (dayZero, contentHash))
+
+  foreignCacheInfo <-
+    if S.member P.JS codegenTargets then do
+      foreigns' <- P.inferForeignModules (M.singleton moduleName (Right (fromMaybe file actualFile)))
+      for (M.lookup moduleName foreigns') \foreignPath -> do
+        foreignHash <- P.hashFile foreignPath
+        pure (normaliseForCache cwd foreignPath, (dayZero, foreignHash))
+    else
+      pure Nothing
+
+  let cacheInfo = M.fromList (moduleCacheInfo : maybeToList foreignCacheInfo)
+  cacheDb <- P.readCacheDb' outputDirectory
+  P.writeCacheDb' outputDirectory (M.insert moduleName (CacheInfo cacheInfo) cacheDb)
 
 isEditorMode :: Ide m => m Bool
 isEditorMode = asks (confEditorMode . ideConfiguration)
