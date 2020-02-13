@@ -159,7 +159,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
               ts <- getTimestamp fp
               return (ts, hashFile fp)
         pathsWithInfo <- traverse (\fp -> (fp,) <$> getInfo fp) inputPaths
-        pure $ Right $ M.fromList pathsWithInfo
+        return $ Right $ M.fromList pathsWithInfo
 
   outputFilename :: ModuleName -> String -> FilePath
   outputFilename mn fn =
