@@ -287,7 +287,7 @@ checkForeignDecls m path = do
 
   let deprecatedFFI = filter (any (== '\'')) foreignIdentsStrs
   unless (null deprecatedFFI) $
-    warningDeprecatedForeignPrimes deprecatedFFI
+    errorDeprecatedForeignPrimes deprecatedFFI
 
   foreignIdents <- either
                      errorInvalidForeignIdentifiers
@@ -319,9 +319,9 @@ checkForeignDecls m path = do
   errorInvalidForeignIdentifiers =
     throwError . mconcat . map (errorMessage . InvalidFFIIdentifier mname . T.pack)
 
-  warningDeprecatedForeignPrimes :: [String] -> Make ()
-  warningDeprecatedForeignPrimes =
-    tell . mconcat . map (errorMessage' modSS . DeprecatedFFIPrime mname . T.pack)
+  errorDeprecatedForeignPrimes :: [String] -> Make a
+  errorDeprecatedForeignPrimes =
+    throwError . mconcat . map (errorMessage' modSS . DeprecatedFFIPrime mname . T.pack)
 
   parseIdents :: [String] -> Either [String] [Ident]
   parseIdents strs =

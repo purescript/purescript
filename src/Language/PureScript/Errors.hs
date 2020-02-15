@@ -675,7 +675,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line $ "In the FFI module for " <> markCode (runModuleName mn) <> ":"
             , indent . paras $
                 [ line $ "The identifier " <> markCode ident <> " contains a prime (" <> markCode "'" <> ")."
-                , line $ "Primes in identifiers exported from FFI modules are deprecated and won’t be supported in the future."
+                , line $ "Primes are not allowed in identifiers exported from FFI modules."
                 ]
             ]
     renderSimpleErrorMessage InvalidDoBind =
