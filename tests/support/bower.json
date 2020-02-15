@@ -1,8 +1,8 @@
 {
   "name": "purescript-test-suite-support",
   "dependencies": {
-    "purescript-arrays": "5.0.0",
-    "purescript-assert": "4.0.0",
+    "purescript-arrays": "#55cb9e6d6766c74c275924324f520b368931c5e6",
+    "purescript-assert": "https://github.com/kl0tl/purescript-assert.git#no-foreign-primes",
     "purescript-bifunctors": "4.0.0",
     "purescript-console": "4.1.0",
     "purescript-control": "4.0.0",
@@ -27,10 +27,10 @@
     "purescript-prelude": "#c932361d008379958f14ca8cc2fe32e06cc2647d",
     "purescript-proxy": "3.0.0",
     "purescript-psci-support": "4.0.0",
-    "purescript-refs": "4.1.0",
+    "purescript-refs": "#0fc21a8476f74139cf220084166d1e1822ed0d3a",
     "purescript-safe-coerce": "0.0.2",
-    "purescript-st": "4.0.0",
-    "purescript-strings": "4.0.0",
+    "purescript-st": "https://github.com/kl0tl/purescript-st.git#no-foreign-primes",
+    "purescript-strings": "#eefc8b04c16bce4669ffe88f9d5eeb6333bb2382",
     "purescript-tailrec": "4.0.0",
     "purescript-tuples": "5.0.0",
     "purescript-type-equality": "3.0.0",
@@ -40,6 +40,9 @@
   },
   "resolutions": {
     "purescript-prelude": "c932361d008379958f14ca8cc2fe32e06cc2647d",
-    "purescript-typelevel-prelude": "52ac4bcf9a38941606b3d928127089bd363ee946"
+    "purescript-typelevel-prelude": "52ac4bcf9a38941606b3d928127089bd363ee946",
+    "purescript-st": "no-foreign-primes",
+    "purescript-refs": "0fc21a8476f74139cf220084166d1e1822ed0d3a",
+    "purescript-arrays": "55cb9e6d6766c74c275924324f520b368931c5e6"
   }
 }
