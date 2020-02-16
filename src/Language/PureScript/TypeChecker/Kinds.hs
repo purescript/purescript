@@ -13,6 +13,7 @@ module Language.PureScript.TypeChecker.Kinds
   , subsumesKind
   , checkKind
   , inferKind
+  , elaborateKind
   , checkConstraint
   , checkInstanceDeclaration
   , checkKindDeclaration

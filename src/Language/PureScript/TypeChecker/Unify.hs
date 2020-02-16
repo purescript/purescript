@@ -20,7 +20,7 @@ import Prelude.Compat
 
 import Control.Monad
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State.Class (MonadState(..), gets, modify)
+import Control.Monad.State.Class (MonadState(..), gets, modify, state)
 import Control.Monad.Writer.Class (MonadWriter(..))
 
 import Data.Foldable (traverse_)
@@ -30,23 +30,37 @@ import qualified Data.Text as T
 import Language.PureScript.Crash
 import qualified Language.PureScript.Environment as E
 import Language.PureScript.Errors
-import Language.PureScript.TypeChecker.Kinds (checkKind, unifyKinds)
+import Language.PureScript.TypeChecker.Kinds (checkKind, elaborateKind, unifyKinds)
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Skolems
 import Language.PureScript.Types
 
 -- | Generate a fresh type variable
 freshType :: (MonadState CheckState m) => m SourceType
-freshType = freshTypeWithKind =<< freshTypeWithKind E.kindType
+freshType = state $ \st -> do
+  let
+    t = checkNextType st
+    st' = st { checkNextType = t + 2
+             , checkSubstitution =
+                 (checkSubstitution st) { substUnsolved = M.insert t (UnkLevel (pure t), E.kindType)
+                                                        . M.insert (t + 1) (UnkLevel (pure (t + 1)), srcTUnknown t)
+                                                        . substUnsolved
+                                                        $ checkSubstitution st
+                                        }
+             }
+  (srcTUnknown (t + 1), st')
+
+  -- freshTypeWithKind =<< freshTypeWithKind E.kindType
 
 freshTypeWithKind :: (MonadState CheckState m) => SourceType -> m SourceType
-freshTypeWithKind kind = do
-  t <- gets checkNextType
-  modify $ \st -> st { checkNextType = t + 1
-                     , checkSubstitution =
-                         (checkSubstitution st) { substUnsolved = M.insert t (UnkLevel (pure t), kind) (substUnsolved (checkSubstitution st)) }
-                     }
-  return $ srcTUnknown t
+freshTypeWithKind kind = state $ \st -> do
+  let
+    t = checkNextType st
+    st' = st { checkNextType = t + 1
+             , checkSubstitution =
+                 (checkSubstitution st) { substUnsolved = M.insert t (UnkLevel (pure t), kind) (substUnsolved (checkSubstitution st)) }
+             }
+  (srcTUnknown t, st')
 
 -- | Update the substitution to solve a type constraint
 solveType :: (MonadError MultipleErrors m, MonadState CheckState m) => Int -> SourceType -> m ()
@@ -153,10 +167,10 @@ unifyRows r1 r2 = sequence_ matches *> uncurry unifyTails rest where
   unifyTails ([], REmptyKinded _ _) ([], REmptyKinded _ _) = return ()
   unifyTails ([], TypeVar _ v1)    ([], TypeVar _ v2)    | v1 == v2 = return ()
   unifyTails ([], Skolem _ _ s1 _ _) ([], Skolem _ _ s2 _ _) | s1 == s2 = return ()
-  unifyTails (sd1, TUnknown _ u1)  (sd2, TUnknown _ u2)  = do
+  unifyTails (sd1, TUnknown a u1)  (sd2, TUnknown _ u2)  = do
     forM_ sd1 $ occursCheck u2 . rowListType
     forM_ sd2 $ occursCheck u1 . rowListType
-    rest' <- freshType
+    rest' <- freshTypeWithKind =<< elaborateKind (TUnknown a u1)
     solveType u1 (rowFromList (sd2, rest'))
     solveType u2 (rowFromList (sd1, rest'))
   unifyTails _ _ =
