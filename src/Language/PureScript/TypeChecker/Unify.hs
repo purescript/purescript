@@ -30,12 +30,12 @@ import qualified Data.Text as T
 import Language.PureScript.Crash
 import qualified Language.PureScript.Environment as E
 import Language.PureScript.Errors
-import Language.PureScript.TypeChecker.Kinds (checkKind, elaborateKind, unifyKinds)
+import Language.PureScript.TypeChecker.Kinds (elaborateKind, instantiateKind, unifyKinds)
 import Language.PureScript.TypeChecker.Monad
 import Language.PureScript.TypeChecker.Skolems
 import Language.PureScript.Types
 
--- | Generate a fresh type variable
+-- | Generate a fresh type variable with an unknown kind. Avoid this if at all possible.
 freshType :: (MonadState CheckState m) => m SourceType
 freshType = state $ \st -> do
   let
@@ -50,8 +50,7 @@ freshType = state $ \st -> do
              }
   (srcTUnknown (t + 1), st')
 
-  -- freshTypeWithKind =<< freshTypeWithKind E.kindType
-
+-- | Generate a fresh type variable with a known kind.
 freshTypeWithKind :: (MonadState CheckState m) => SourceType -> m SourceType
 freshTypeWithKind kind = state $ \st -> do
   let
@@ -66,10 +65,14 @@ freshTypeWithKind kind = state $ \st -> do
 solveType :: (MonadError MultipleErrors m, MonadState CheckState m) => Int -> SourceType -> m ()
 solveType u t = do
   occursCheck u t
-  kind <-
-    maybe (internalCompilerError ("No kind for unification variable ?" <> T.pack (show u))) (pure . snd)
-      =<< gets (M.lookup u . substUnsolved . checkSubstitution)
-  t' <- checkKind t kind
+  k1 <- elaborateKind t
+  subst <- gets checkSubstitution
+  let k2 = substituteType subst
+         . maybe (internalError ("No kind for unification variable ?" <> show u)) snd
+         . M.lookup u
+         . substUnsolved
+         $ subst
+  t' <- instantiateKind (t, k1) k2
   modify $ \cs -> cs { checkSubstitution =
                          (checkSubstitution cs) { substType =
                                                     M.insert u t' $ substType $ checkSubstitution cs

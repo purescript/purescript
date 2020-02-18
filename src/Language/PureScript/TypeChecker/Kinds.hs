@@ -11,6 +11,7 @@ module Language.PureScript.TypeChecker.Kinds
   , kindsOfAll
   , unifyKinds
   , subsumesKind
+  , instantiateKind
   , checkKind
   , inferKind
   , elaborateKind
@@ -18,6 +19,7 @@ module Language.PureScript.TypeChecker.Kinds
   , checkInstanceDeclaration
   , checkKindDeclaration
   , checkTypeKind
+  , unknownsWithKinds
   ) where
 
 import Prelude.Compat
@@ -268,7 +270,7 @@ cannotApplyTypeToType
 cannotApplyTypeToType fn arg = do
   argKind <- snd <$> inferKind arg
   _ <- checkKind fn . srcTypeApp (srcTypeApp E.tyFunction argKind) =<< freshKind nullSourceSpan
-  internalError "Cannot apply type to type"
+  internalCompilerError . T.pack $ "Cannot apply type to type: " <> debugType (srcTypeApp fn arg)
 
 cannotApplyKindToType
   :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
@@ -279,7 +281,7 @@ cannotApplyKindToType poly arg = do
   let ann = getAnnForType arg
   argKind <- snd <$> inferKind arg
   _ <- checkKind poly . mkForAll [(ann, ("k", Just argKind))] =<< freshKind nullSourceSpan
-  internalError "Cannot apply kind to type"
+  internalCompilerError . T.pack $ "Cannot apply kind to type: " <> debugType (srcKindApp poly arg)
 
 checkKind
   :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
@@ -335,23 +337,13 @@ subsumesKind = go
     (TUnknown ann u, b@(TypeApp _ (TypeApp _ arr _) _))
       | eqType arr E.tyFunction
       , IS.notMember u (unknowns b) ->
-          join $ go <$> unkArr ann u <*> pure b
+          join $ go <$> solveUnknownAsFunction ann u <*> pure b
     (a@(TypeApp _ (TypeApp _ arr _) _), TUnknown ann u)
       | eqType arr E.tyFunction
       , IS.notMember u (unknowns a) ->
-          join $ go <$> pure a <*> unkArr ann u
+          join $ go <$> pure a <*> solveUnknownAsFunction ann u
     (a, b) ->
       unifyKinds a b
-
-  unkArr ann u = do
-    lvl <- fst <$> lookupUnsolved u
-    u1 <- freshUnknown
-    u2 <- freshUnknown
-    addUnsolved (Just lvl) u1 E.kindType
-    addUnsolved (Just lvl) u2 E.kindType
-    let uarr = (TUnknown ann u1 E.-:> TUnknown ann u2) $> ann
-    solve u uarr
-    pure uarr
 
 unifyKinds
   :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
@@ -434,6 +426,21 @@ solveUnknown a' p1 = do
   join $ unifyKinds <$> apply w1 <*> elaborateKind p2
   solve a' p2
 
+solveUnknownAsFunction
+  :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
+  => SourceAnn
+  -> Unknown
+  -> m SourceType
+solveUnknownAsFunction ann u = do
+  lvl <- fst <$> lookupUnsolved u
+  u1 <- freshUnknown
+  u2 <- freshUnknown
+  addUnsolved (Just lvl) u1 E.kindType
+  addUnsolved (Just lvl) u2 E.kindType
+  let uarr = (TUnknown ann u1 E.-:> TUnknown ann u2) $> ann
+  solve u uarr
+  pure uarr
+
 promoteKind
   :: (MonadError MultipleErrors m, MonadState CheckState m, HasCallStack)
   => Unknown
@@ -472,8 +479,8 @@ elaborateKind = \case
         ($> ann) <$> apply kind
   TypeVar ann a -> do
     moduleName <- unsafeCheckCurrentModule
-    kind <- lookupTypeVariable moduleName . Qualified Nothing $ ProperName a
-    ($> ann) <$> apply kind
+    kind <- apply =<< lookupTypeVariable moduleName (Qualified Nothing $ ProperName a)
+    pure (kind $> ann)
   (Skolem ann _ mbK _ _) -> do
     kind <- apply $ maybe (internalError "Skolem has no kind") id mbK
     pure $ kind $> ann
@@ -482,38 +489,32 @@ elaborateKind = \case
     ($> ann) <$> apply kind
   REmpty ann -> do
     pure $ E.kindOfREmpty $> ann
-  ty@(RCons ann _ _ _) -> do
-    let (rl, _) = rowToList ty
-    ks <- traverse (elaborateKind . rowListType) rl
-    unless (all (eqType (head ks)) $ tail ks) $
-      internalError $ "elaborateKind: Elaborated row kinds are not all " <> prettyPrintType 10 (head ks)
-    pure $ E.kindRow (head ks) $> ann
-  TypeApp ann t1 t2 -> do
+  RCons ann _ t1 _ -> do
+    k1 <- elaborateKind t1
+    pure $ E.kindRow k1 $> ann
+  ty@(TypeApp ann t1 t2) -> do
     k1 <- elaborateKind t1
     case k1 of
-      TypeApp _ (TypeApp _ k w1) w2 | eqType k E.tyFunction -> do
-        k2 <- elaborateKind t2
-        unless (eqType k2 w1) $ cannotApplyTypeToType t1 t2
+      TypeApp _ (TypeApp _ k _) w2 | eqType k E.tyFunction -> do
         pure $ w2 $> ann
+      -- Normally we wouldn't unify in `elaborateKind`, but `Entailment` likes
+      -- to introduce unknown kinds, and this becomes necessary. TODO: fix
+      -- entailment so that it always uses known kinds for unknowns.
+      TUnknown a u -> do
+        _ <- solveUnknownAsFunction a u
+        elaborateKind ty
       _ ->
         cannotApplyTypeToType t1 t2
   KindApp ann t1 t2 -> do
     k1 <- elaborateKind t1
     case k1 of
-      ForAll _ a (Just w) n _ -> do
-        k2 <- elaborateKind t2
-        unless (eqType k2 w) $ cannotApplyKindToType t1 t2
+      ForAll _ a _ n _ -> do
         flip (replaceTypeVars a) n . ($> ann) <$> apply t2
       _ ->
         cannotApplyKindToType t1 t2
-  ForAll ann a (Just w) u _ -> do
-    wIsStar <- elaborateKind w
-    unless (eqType wIsStar E.kindType) $
-      internalError $ "elaborateKind: Elaborated kind is not Type " <> prettyPrintType 10 wIsStar
-    moduleName <- unsafeCheckCurrentModule
-    uIsStar <- bindLocalTypeVariables moduleName [(ProperName a, w)] $ elaborateKind u
-    unless (eqType uIsStar E.kindType) $
-      internalError $ "elaborateKind: Elaborated kind is not Type " <> prettyPrintType 10 uIsStar
+  ForAll ann _ _ _ _ -> do
+    pure $ E.kindType $> ann
+  ConstrainedType ann _ _ ->
     pure $ E.kindType $> ann
   ty ->
     throwError . errorMessage' (fst (getAnnForType ty)) $ UnsupportedTypeInKind ty
