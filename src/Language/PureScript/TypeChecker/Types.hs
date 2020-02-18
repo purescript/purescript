@@ -45,6 +45,7 @@ import Data.Traversable (for)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map as M
 import qualified Data.Set as S
+import qualified Data.IntSet as IS
 
 import Language.PureScript.AST
 import Language.PureScript.Crash
@@ -97,8 +98,9 @@ typesOf bindingGroupType moduleName vals = withFreshSubstitution $ do
       -- Generalize and constrain the type
       currentSubst <- gets checkSubstitution
       let ty' = substituteType currentSubst ty
-      ((unsolvedTypeVarsWithKinds, ty''), _) <- kindOfWithUnknowns $ constrain unsolved ty'
-      let unsolvedTypeVars = snd <$> unknownsInType ty'
+          ty'' = constrain unsolved ty'
+      unsolvedTypeVarsWithKinds <- unknownsWithKinds . IS.toList . unknowns $ constrain unsolved ty''
+      let unsolvedTypeVars = IS.toList $ unknowns ty'
           generalized = varIfUnknown unsolvedTypeVarsWithKinds ty''
 
       when shouldGeneralize $ do
@@ -316,7 +318,7 @@ instantiatePolyTypeWithUnknowns
   -> SourceType
   -> m (Expr, SourceType)
 instantiatePolyTypeWithUnknowns val (ForAll _ ident mbK ty _) = do
-  u <- maybe freshType freshTypeWithKind mbK
+  u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
   instantiatePolyTypeWithUnknowns val $ replaceTypeVars ident u ty
 instantiatePolyTypeWithUnknowns val (ConstrainedType _ con ty) = do
   dicts <- getTypeClassDictionaries
@@ -869,7 +871,7 @@ checkFunctionApplication' fn (TypeApp _ (TypeApp _ tyFunction' argTy) retTy) arg
   arg' <- tvToExpr <$> check arg argTy
   return (retTy, App fn arg')
 checkFunctionApplication' fn (ForAll _ ident mbK ty _) arg = do
-  u <- maybe freshType freshTypeWithKind mbK
+  u <- maybe (internalCompilerError "Unelaborated forall") freshTypeWithKind mbK
   let replaced = replaceTypeVars ident u ty
   checkFunctionApplication fn replaced arg
 checkFunctionApplication' fn (KindedType _ ty _) arg =
