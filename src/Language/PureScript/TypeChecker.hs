@@ -33,6 +33,7 @@ import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Linter
 import Language.PureScript.Names
+import Language.PureScript.Roles
 import Language.PureScript.TypeChecker.Kinds as T
 import Language.PureScript.TypeChecker.Monad as T
 import Language.PureScript.TypeChecker.Synonyms as T
@@ -74,6 +75,16 @@ addDataConstructor moduleName dtype name dctor dctorArgs polyType = do
   env <- getEnv
   checkTypeSynonyms polyType
   putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (dtype, name, polyType, fields) (dataConstructors env) }
+
+addRoleDeclaration
+  :: (MonadState CheckState m, MonadError MultipleErrors m)
+  => ModuleName
+  -> ProperName 'TypeName
+  -> [Role]
+  -> m ()
+addRoleDeclaration moduleName name roles = do
+  env <- getEnv
+  putEnv $ env { roleDeclarations = M.insert (Qualified (Just moduleName) name) roles (roleDeclarations env) }
 
 addTypeSynonym
   :: (MonadState CheckState m, MonadError MultipleErrors m)
@@ -294,6 +305,9 @@ typeCheckAll moduleName _ = traverse go
       env <- getEnv
       putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (elabTy, LocalTypeVariable) (types env) }
       return $ KindDeclaration sa kindFor name elabTy
+  go d@(RoleDeclaration (RoleDeclarationData _sa name roles)) = do
+    addRoleDeclaration moduleName name roles
+    return d
   go TypeDeclaration{} =
     internalError "Type declarations should have been removed before typeCheckAlld"
   go (ValueDecl sa@(ss, _) name nameKind [] [MkUnguarded val]) = do

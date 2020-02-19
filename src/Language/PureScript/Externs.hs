@@ -31,6 +31,7 @@ import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Names
+import Language.PureScript.Roles
 import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 
@@ -101,6 +102,11 @@ data ExternsDeclaration =
       , edTypeKind                :: SourceType
       , edTypeDeclarationKind     :: TypeKind
       }
+  -- | A role declaration
+  | EDRole
+      { edRoleTypeName            :: ProperName 'TypeName
+      , edRoleRoles               :: [Role]
+      }
   -- | A type synonym
   | EDTypeSynonym
       { edTypeSynonymName         :: ProperName 'TypeName
@@ -153,6 +159,7 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   where
   applyDecl :: Environment -> ExternsDeclaration -> Environment
   applyDecl env (EDType pn kind tyKind) = env { types = M.insert (qual pn) (kind, tyKind) (types env) }
+  applyDecl env (EDRole pn roles) = env { roleDeclarations = M.insert (qual pn) roles (roleDeclarations env) }
   applyDecl env (EDTypeSynonym pn args ty) = env { typeSynonyms = M.insert (qual pn) (args, ty) (typeSynonyms env) }
   applyDecl env (EDDataConstructor pn dTy tNm ty nms) = env { dataConstructors = M.insert (qual pn) (dTy, tNm, ty, nms) (dataConstructors env) }
   applyDecl env (EDValue ident ty) = env { names = M.insert (Qualified (Just efModuleName) ident) (ty, External, Defined) (names env) }
@@ -183,7 +190,7 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
   efImports       = mapMaybe importDecl ds
   efFixities      = mapMaybe fixityDecl ds
   efTypeFixities  = mapMaybe typeFixityDecl ds
-  efDeclarations  = concatMap toExternsDeclaration efExports
+  efDeclarations  = concatMap toExternsDeclaration efExports ++ mapMaybe roleDecl ds
   efSourceSpan    = ss
 
   fixityDecl :: Declaration -> Maybe ExternsFixity
@@ -202,6 +209,10 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
   importDecl :: Declaration -> Maybe ExternsImport
   importDecl (ImportDeclaration _ m mt qmn) = Just (ExternsImport m mt qmn)
   importDecl _ = Nothing
+
+  roleDecl :: Declaration -> Maybe ExternsDeclaration
+  roleDecl (RoleDeclaration (RoleDeclarationData _ name roles)) = Just (EDRole name roles)
+  roleDecl _ = Nothing
 
   toExternsDeclaration :: DeclarationRef -> [ExternsDeclaration]
   toExternsDeclaration (TypeRef _ pn dctors) =

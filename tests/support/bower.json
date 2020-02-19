@@ -28,6 +28,7 @@
     "purescript-proxy": "3.0.0",
     "purescript-psci-support": "4.0.0",
     "purescript-refs": "4.1.0",
+    "purescript-safe-coerce": "0.0.2",
     "purescript-st": "4.0.0",
     "purescript-strings": "4.0.0",
     "purescript-tailrec": "4.0.0",
