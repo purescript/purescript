@@ -94,7 +94,8 @@ inferRoles env tyName
       -- type beneath.
       walk btvs t
     walk btvs t
-      | Just (t1, t2s) <- splitTypeApp t =
+      | (t1, _, t2s) <- unapplyTypes t
+      , not $ null t2s =
           case t1 of
             -- If the type is an application of a type constructor to some
             -- arguments, recursively infer the roles of the type constructor's

@@ -411,9 +411,9 @@ entails SolverOptions{..} constraint context hints =
         (_, wrappedTy, _) <- lookupNewtypeConstructor env tyName
         pure [Constraint nullSourceAnn C.Coercible [] [wrappedTy, b] Nothing]
       t
-        | Just (TypeConstructor _ aTyName, axs) <- splitTypeApp a
-        , Just (TypeConstructor _ bTyName, bxs) <- splitTypeApp b
-        , aTyName == bTyName
+        | (TypeConstructor _ aTyName, _, axs) <- unapplyTypes a
+        , (TypeConstructor _ bTyName, _, bxs) <- unapplyTypes b
+        , not (null axs) && not (null bxs) && aTyName == bTyName
         , tyRoles <- inferRoles env aTyName -> do
             -- If both arguments are applications of the same type constructor
             -- (e.g. @data D a b = D a@ in the constraint
@@ -438,7 +438,8 @@ entails SolverOptions{..} constraint context hints =
                   Phantom ->
                     Just []
             fmap concat $ sequence $ zipWith3 k tyRoles axs bxs
-        | Just (TypeConstructor _ tyName, xs) <- splitTypeApp t
+        | (TypeConstructor _ tyName, _, xs) <- unapplyTypes t
+        , not $ null xs
         , Just (tvs, wrappedTy, _) <- lookupNewtypeConstructor env tyName -> do
             -- If the first argument is a newtype applied to some other types
             -- (e.g. @newtype T a = T a@ in @Coercible (T X) b@), look up the

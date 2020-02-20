@@ -28,6 +28,9 @@ id12ToId21 = coerce
 
 newtype Phantom1 a b = Phantom1 a
 
+phantom1TypeToPhantom1Symbol :: forall x (y :: Type) (z :: Symbol). Phantom1 x y -> Phantom1 x z
+phantom1TypeToPhantom1Symbol = coerce
+
 phantom1ToId12 :: forall x y. Phantom1 x y -> Id1 (Id2 x)
 phantom1ToId12 = coerce
 
