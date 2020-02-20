@@ -50,7 +50,7 @@
    - MonadLogger
      
      purs ide uses the =MonadLogger= constraint to defer the choice of logging
-     to the exeutable. This constraint can be fulfilled with a console based
+     to the executable. This constraint can be fulfilled with a console based
      logger, a file-based one or the log messages can just be discarded (helpful
      during testing)
 
@@ -285,7 +285,7 @@ Language.PureScript.Ide.RebuildSpec)
 - All data is regenerated on starting ide = no cache invalidation necessary
 - Things are fast, without any effort spent on optimizing things
 - Simple model, keeps complexity low
-- We don't polute projects with ide artifacts
+- We don't pollute projects with ide artifacts
 *** Cons
 - Imposes a limit on how big of a project we can handle
 - Means we need to be careful about what information we denormalize, since it

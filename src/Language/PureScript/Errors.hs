@@ -365,8 +365,8 @@ showSuggestion suggestion = case errorSuggestion suggestion of
   _ -> ""
 
 ansiColor :: (ANSI.ColorIntensity, ANSI.Color) -> String
-ansiColor (intesity, color) =
-   ANSI.setSGRCode [ANSI.SetColor ANSI.Foreground intesity color]
+ansiColor (intensity, color) =
+   ANSI.setSGRCode [ANSI.SetColor ANSI.Foreground intensity color]
 
 ansiColorReset :: String
 ansiColorReset =
@@ -391,7 +391,7 @@ colorCodeBox codeColor b = case codeColor of
         ]
 
 
--- | Default color intesity and color for code
+-- | Default color intensity and color for code
 defaultCodeColor :: (ANSI.ColorIntensity, ANSI.Color)
 defaultCodeColor = (ANSI.Dull, ANSI.Yellow)
 
@@ -1279,7 +1279,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     where
     -- Take the last instance of each "hint category"
     simplifyHints :: [ErrorMessageHint] -> [ErrorMessageHint]
-    simplifyHints = reverse . nubBy categoriesEqual . stripRedudantHints simple . reverse
+    simplifyHints = reverse . nubBy categoriesEqual . stripRedundantHints simple . reverse
 
     -- Don't remove hints in the "other" category
     categoriesEqual :: ErrorMessageHint -> ErrorMessageHint -> Bool
@@ -1290,20 +1290,20 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
         (c1, c2) -> c1 == c2
 
     -- | See https://github.com/purescript/purescript/issues/1802
-    stripRedudantHints :: SimpleErrorMessage -> [ErrorMessageHint] -> [ErrorMessageHint]
-    stripRedudantHints ExprDoesNotHaveType{} = stripFirst isCheckHint
+    stripRedundantHints :: SimpleErrorMessage -> [ErrorMessageHint] -> [ErrorMessageHint]
+    stripRedundantHints ExprDoesNotHaveType{} = stripFirst isCheckHint
       where
       isCheckHint ErrorCheckingType{} = True
       isCheckHint _ = False
-    stripRedudantHints TypesDoNotUnify{} = stripFirst isUnifyHint
+    stripRedundantHints TypesDoNotUnify{} = stripFirst isUnifyHint
       where
       isUnifyHint ErrorUnifyingTypes{} = True
       isUnifyHint _ = False
-    stripRedudantHints NoInstanceFound{} = stripFirst isSolverHint
+    stripRedundantHints NoInstanceFound{} = stripFirst isSolverHint
       where
       isSolverHint ErrorSolvingConstraint{} = True
       isSolverHint _ = False
-    stripRedudantHints _ = id
+    stripRedundantHints _ = id
 
     stripFirst :: (ErrorMessageHint -> Bool) -> [ErrorMessageHint] -> [ErrorMessageHint]
     stripFirst p (PositionedError pos : hs) = PositionedError pos : stripFirst p hs

@@ -431,7 +431,7 @@ typeCheckAll moduleName _ = traverse go
   -- Check that the instance currently being declared doesn't overlap with any
   -- other instance in any module that this instance wouldn't be considered an
   -- orphan in.  There are overlapping instance situations that won't be caught
-  -- by this, for example when combining multiparametr type classes with
+  -- by this, for example when combining multiparameter type classes with
   -- flexible instances: the instances `Cls X y` and `Cls x Y` overlap and
   -- could live in different modules but won't be caught here.
   checkOverlappingInstance

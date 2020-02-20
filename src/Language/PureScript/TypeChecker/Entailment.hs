@@ -282,7 +282,7 @@ entails SolverOptions{..} constraint context hints =
           where
             -- | When checking functional dependencies, we need to use unification to make
             -- sure it is safe to use the selected instance. We will unify the solved type with
-            -- the type in the instance head under the substition inferred from its instantiation.
+            -- the type in the instance head under the substitution inferred from its instantiation.
             -- As an example, when solving MonadState t0 (State Int), we choose the
             -- MonadState s (State s) instance, and we unify t0 with Int, since the functional
             -- dependency from MonadState dictates that t0 should unify with s\[s -> Int], which is

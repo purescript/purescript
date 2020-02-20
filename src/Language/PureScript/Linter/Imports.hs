@@ -203,7 +203,7 @@ lintImports (Module _ _ mn mdecls (Just mexports)) env usedImps = do
 
 
 -- Replace explicit type refs with data constructor lists from listing the
--- used constructors explicity `T(X, Y, [...])` to `T(..)` for suggestion
+-- used constructors explicitly `T(X, Y, [...])` to `T(..)` for suggestion
 -- message.
 -- Done everywhere when suggesting a completely new explicit imports list, otherwise
 -- maintain the existing form.
