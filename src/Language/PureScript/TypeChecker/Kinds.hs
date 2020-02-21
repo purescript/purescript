@@ -592,7 +592,7 @@ inferDataDeclaration moduleName (ann, tyName, tyArgs, ctors) = do
   let (sigBinders, tyKind') = fromJust . completeBinderList $ tyKind
   bindLocalTypeVariables moduleName (first ProperName . snd <$> sigBinders) $ do
     tyArgs' <- for tyArgs . traverse . maybe (freshKind (fst ann)) $ replaceAllTypeSynonyms <=< apply <=< flip checkKind E.kindType
-    unifyKinds tyKind' $ foldr ((E.-:>) . snd) E.kindType tyArgs'
+    subsumesKind (foldr ((E.-:>) . snd) E.kindType tyArgs') tyKind'
     bindLocalTypeVariables moduleName (first ProperName <$> tyArgs') $ do
       let tyCtorName = srcTypeConstructor $ mkQualified tyName moduleName
           tyCtor = foldl (\ty -> srcKindApp ty . srcTypeVar . fst . snd) tyCtorName sigBinders

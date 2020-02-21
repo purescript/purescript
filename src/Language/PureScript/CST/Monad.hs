@@ -142,14 +142,15 @@ tryPrefix (Parser lhs) rhs = Parser $ \st kerr ksucc ->
 oneOf :: NE.NonEmpty (Parser a) -> Parser a
 oneOf parsers = Parser $ \st kerr ksucc -> do
   let
+    prevErrs = parserErrors st
     go (st', Right a) _ = (st', Right a)
     go _ (st', Right a) = (st', Right a)
     go (st1, Left errs1) (st2, Left errs2)
       | errRange (NE.last errs2) > errRange (NE.last errs1) = (st2, Left errs2)
       | otherwise = (st1, Left errs1)
-  case foldr1 go $ runParser st <$> parsers of
-    (st', Left errs) -> kerr (st' { parserErrors = NE.tail errs }) $ NE.head errs
-    (st', Right res) -> ksucc st' res
+  case foldr1 go $ runParser (st { parserErrors = [] }) <$> parsers of
+    (st', Left errs) -> kerr (st' { parserErrors = prevErrs <> NE.tail errs}) $ NE.head errs
+    (st', Right res) -> ksucc (st' { parserErrors = prevErrs }) res
 
 manyDelimited :: Token -> Token -> Token -> Parser a -> Parser [a]
 manyDelimited open close sep p = do

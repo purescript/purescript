@@ -1,4 +1,4 @@
--- @shouldFailWith UnsupportedTypeInKind
+-- @shouldFailWith ErrorParsingModule
 module Main where
 
 class Ok

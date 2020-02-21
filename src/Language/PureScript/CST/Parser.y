@@ -259,7 +259,11 @@ label :: { Label }
   | 'let' { toLabel $1 }
   | 'module' { toLabel $1 }
   | 'newtype' { toLabel $1 }
+  | 'nominal' { toLabel $1 }
   | 'of' { toLabel $1 }
+  | 'phantom' { toLabel $1 }
+  | 'representational' { toLabel $1 }
+  | 'role' { toLabel $1 }
   | 'then' { toLabel $1 }
   | 'true' { toLabel $1 }
   | 'type' { toLabel $1 }
@@ -288,7 +292,7 @@ boolean :: { (SourceToken, Bool) }
 
 type :: { Type () }
   : type1 { $1 }
-  | type1 '::' type { TypeKinded () $1 $2 $3 }
+  | type1 '::' type {% checkValidKind $3 *> pure (TypeKinded () $1 $2 $3) }
 
 type1 :: { Type () }
   : type2 { $1 }
@@ -322,7 +326,7 @@ typeAtom :: { Type ()}
   | '{' row '}' { TypeRecord () (Wrapped $1 $2 $3) }
   | '(' row ')' { TypeRow () (Wrapped $1 $2 $3) }
   | '(' type1 ')' { TypeParens () (Wrapped $1 $2 $3) }
-  | '(' typeKindedAtom '::' type ')' { TypeParens () (Wrapped $1 (TypeKinded () $2 $3 $4) $5) }
+  | '(' typeKindedAtom '::' type ')' {% checkValidKind $4 *> pure (TypeParens () (Wrapped $1 (TypeKinded () $2 $3 $4) $5)) }
 
 -- Due to a conflict between row syntax and kinded type syntax, we require
 -- kinded type variables to be wrapped in parens. Thus `(a :: Foo)` is always a
@@ -664,9 +668,9 @@ decl :: { Declaration () }
   | classHead 'where' '\{' manySep(classMember, '\;') '\}' {% either (const (parseError $2)) (\h -> pure $ DeclClass () h (Just ($2, $4))) $1 }
   | instHead { DeclInstanceChain () (Separated (Instance $1 Nothing) []) }
   | instHead 'where' '\{' manySep(instBinding, '\;') '\}' { DeclInstanceChain () (Separated (Instance $1 (Just ($2, $4))) []) }
-  | 'data' properName '::' type {% checkNoWildcards $4 *> pure (DeclKindSignature () $1 (Labeled $2 $3 $4)) }
-  | 'newtype' properName '::' type {% checkNoWildcards $4 *> pure (DeclKindSignature () $1 (Labeled $2 $3 $4)) }
-  | 'type' properName '::' type {% checkNoWildcards $4 *> pure (DeclKindSignature () $1 (Labeled $2 $3 $4)) }
+  | 'data' properName '::' type {% checkNoWildcards $4 *> checkValidKind $4 *> pure (DeclKindSignature () $1 (Labeled $2 $3 $4)) }
+  | 'newtype' properName '::' type {% checkNoWildcards $4 *> checkValidKind $4 *> pure (DeclKindSignature () $1 (Labeled $2 $3 $4)) }
+  | 'type' properName '::' type {% checkNoWildcards $4 *> checkValidKind $4 *> pure (DeclKindSignature () $1 (Labeled $2 $3 $4)) }
   | 'derive' instHead { DeclDerive () $1 Nothing $2 }
   | 'derive' 'newtype' instHead { DeclDerive () $1 (Just $2) $3 }
   | ident '::' type { DeclSignature () (Labeled $1 $2 $3) }
@@ -710,7 +714,7 @@ classHead :: { Either (Declaration ()) (ClassHead ()) }
       }
 
 classSignature :: { Labeled (Name (N.ProperName 'N.TypeName)) (Type ()) }
-  : properName '::' type {%^ revert $ checkNoWildcards $3 *> pure (Labeled $1 $2 $3) }
+  : properName '::' type {%^ revert $ checkNoWildcards $3 *> checkValidKind $3 *> pure (Labeled $1 $2 $3) }
 
 classSuper :: { (OneOrDelimited (Constraint ()), SourceToken) }
   : constraints '<=' {%^ revert $ pure ($1, $2) }

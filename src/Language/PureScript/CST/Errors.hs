@@ -21,6 +21,7 @@ import Text.Printf (printf)
 
 data ParserErrorType
   = ErrWildcardInType
+  | ErrConstraintInKind
   | ErrHoleInType
   | ErrExprInBinder
   | ErrExprInDeclOrBinder
@@ -86,6 +87,8 @@ prettyPrintErrorMessage :: ParserError -> String
 prettyPrintErrorMessage (ParserErrorInfo {..}) = case errType of
   ErrWildcardInType ->
     "Unexpected wildcard in type; type wildcards are only allowed in value annotations"
+  ErrConstraintInKind ->
+    "Unsupported constraint in kind; constraints are only allowed in value annotations"
   ErrHoleInType ->
     "Unexpected hole in type; type holes are only allowed in value annotations"
   ErrExprInBinder ->
