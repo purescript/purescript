@@ -861,8 +861,8 @@ checkKindDeclaration _ ty = do
         other -> pure other
 
   checkValidKind = everywhereOnTypesM $ \case
-    ty@(ConstrainedType ann _ _) ->
-      throwError . errorMessage' (fst ann) $ UnsupportedTypeInKind ty
+    ty'@(ConstrainedType ann _ _) ->
+      throwError . errorMessage' (fst ann) $ UnsupportedTypeInKind ty'
     other -> pure other
 
 existingSignatureOrFreshKind
