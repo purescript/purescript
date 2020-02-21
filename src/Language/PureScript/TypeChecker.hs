@@ -338,7 +338,7 @@ typeCheckAll moduleName _ = traverse go
         return (sai, nameKind, val)
       return . BindingGroupDeclaration $ NEL.fromList vals''
   go (d@(ExternDataDeclaration _ name kind)) = do
-    elabKind <- checkKindDeclaration moduleName kind
+    elabKind <- withFreshSubstitution $ checkKindDeclaration moduleName kind
     env <- getEnv
     putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (elabKind, ExternData) (types env) }
     return d
