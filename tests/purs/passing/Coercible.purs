@@ -155,4 +155,12 @@ testRolesNotReserved nominal representational phantom = ""
 
 data RoleNotReserved role = RoleNotReserved role
 
+-- Contextual keywords should be allowed unquoted in rows.
+type ContextualKeywords =
+  ( nominal :: String
+  , phantom :: String
+  , representational :: String
+  , role :: String
+  )
+
 main = log (coerce (NTString1 "Done") :: String)
