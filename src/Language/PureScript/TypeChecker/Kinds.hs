@@ -842,7 +842,7 @@ checkKindDeclaration _ ty = do
   freshUnks <- traverse (traverse (\k -> (,k) <$> freshVar "k")) unks
   finalTy <- generalizeUnknownsWithVars freshUnks <$> freshenForAlls ty' ty''
   checkQuantification finalTy
-  pure finalTy
+  checkValidKind finalTy
   where
   -- When expanding type synoyms and generalizing, we need to generate more
   -- unique names so that they don't clash or shadow other names, or can
@@ -859,6 +859,11 @@ checkKindDeclaration _ ty = do
           ty'' <- go (replaceTypeVars v' (TypeVar a' v'') ty')
           pure $ ForAll a' v'' k' ty'' sc'
         other -> pure other
+
+  checkValidKind = everywhereOnTypesM $ \case
+    ty@(ConstrainedType ann _ _) ->
+      throwError . errorMessage' (fst ann) $ UnsupportedTypeInKind ty
+    other -> pure other
 
 existingSignatureOrFreshKind
   :: forall m. MonadState CheckState m

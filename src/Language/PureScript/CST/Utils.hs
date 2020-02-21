@@ -273,14 +273,6 @@ checkNoForalls ty = do
       _ -> []
   sequence_ $ everythingOnTypes (<>) k ty
 
-checkValidKind :: Type a -> Parser ()
-checkValidKind ty = do
-  let
-    k = \case
-      TypeConstrained _ _ a _ -> [addFailure [a] ErrConstraintInKind]
-      _ -> []
-  sequence_ $ everythingOnTypes (<>) k ty
-
 revert :: Parser a -> SourceToken -> Parser a
 revert p lk = pushBack lk *> p
 
