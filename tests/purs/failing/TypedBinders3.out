@@ -1,0 +1,21 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/TypedBinders3.purs:8:4 - 8:15 (line 8, column 4 - line 8, column 15)
+
+  Could not match type
+  [33m     [0m
+  [33m  Int[0m
+  [33m     [0m
+  with type
+  [33m        [0m
+  [33m  String[0m
+  [33m        [0m
+
+while inferring the type of [33mcase 1 of   [0m
+                            [33m  0 -> true [0m
+                            [33m  _ -> false[0m
+in value declaration [33mtest[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
+or to contribute content related to this error.
+

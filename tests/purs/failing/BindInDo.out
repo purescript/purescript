@@ -1,0 +1,9 @@
+Error found:
+at tests/purs/failing/BindInDo.purs:7:3 - 7:18 (line 7, column 3 - line 7, column 18)
+
+  The name [33mbind[0m cannot be brought into scope in a do notation block, since do notation uses the same name.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/CannotUseBindWithDo.md for more information,
+or to contribute content related to this error.
+

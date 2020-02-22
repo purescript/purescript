@@ -1,0 +1,19 @@
+Error found:
+in module [33mBindingGroupErrorPos[0m
+at tests/purs/failing/3275-BindingGroupErrorPos.purs:11:17 - 11:30 (line 11, column 17 - line 11, column 30)
+
+  Could not match kind
+
+    [33mType[0m
+
+  with kind
+
+    [33mType -> k4[0m
+
+
+while checking the kind of [33mInt -> Result String[0m
+in binding group wrong
+
+See https://github.com/purescript/documentation/blob/master/errors/KindsDoNotUnify.md for more information,
+or to contribute content related to this error.
+

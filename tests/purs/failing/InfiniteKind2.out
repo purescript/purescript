@@ -1,0 +1,14 @@
+Error found:
+in module [33mInfiniteKind2[0m
+at tests/purs/failing/InfiniteKind2.purs:5:1 - 5:36 (line 5, column 1 - line 5, column 36)
+
+  An infinite kind was inferred for a type:
+
+    [33m(k4 -> k3) -> Type[0m
+
+
+in type constructor [33mTree[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/InfiniteKind.md for more information,
+or to contribute content related to this error.
+

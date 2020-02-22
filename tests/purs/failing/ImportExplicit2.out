@@ -1,0 +1,10 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/ImportExplicit2.purs:4:12 - 4:19 (line 4, column 12 - line 4, column 19)
+
+  Module M1 does not export data constructor [33mZ[0m for type [33mX[0m
+
+
+See https://github.com/purescript/documentation/blob/master/errors/UnknownImportDataConstructor.md for more information,
+or to contribute content related to this error.
+

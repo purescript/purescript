@@ -1,0 +1,13 @@
+Error found:
+in module [33mUnknownSuperclassTypeVar[0m
+at tests/purs/failing/Superclasses3.purs:8:1 - 8:23 (line 8, column 1 - line 8, column 23)
+
+  Type variable [33mb[0m is undefined.
+
+while checking the kind of [33m{ "Foo0" :: Record () -> Foo b[0m
+                           [33m}                             [0m
+in type synonym [33mBar[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/UndefinedTypeVariable.md for more information,
+or to contribute content related to this error.
+

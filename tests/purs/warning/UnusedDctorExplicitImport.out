@@ -1,0 +1,17 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/warning/UnusedDctorExplicitImport.purs:4:1 - 4:40 (line 4, column 1 - line 4, column 40)
+
+  The import of type [33mOrdering[0m from module [33mData.Ordering[0m includes the following unused data constructors:
+
+    [33mLT[0m
+
+  It could be replaced with:
+
+    [33mimport Data.Ordering (Ordering(EQ))[0m
+
+
+
+See https://github.com/purescript/documentation/blob/master/errors/UnusedDctorExplicitImport.md for more information,
+or to contribute content related to this error.
+

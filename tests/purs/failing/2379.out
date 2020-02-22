@@ -1,0 +1,31 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/2379.purs:6:8 - 6:19 (line 6, column 8 - line 6, column 19)
+
+  No type class instance was found for class
+  [33m       [0m
+  [33m  Lib.Y[0m
+  [33m       [0m
+  because the class was not in scope. Perhaps it was not exported.
+
+while solving type class constraint
+[33m           [0m
+[33m  Lib.Y Int[0m
+[33m           [0m
+while applying a function [33mx[0m
+  of type [33mX t0 => t0 -> String[0m
+  to argument [33m[ 1[0m
+              [33m, 2[0m
+              [33m, 3[0m
+              [33m]  [0m
+while inferring the type of [33mx [ 1[0m
+                            [33m  , 2[0m
+                            [33m  , 3[0m
+                            [33m  ]  [0m
+in value declaration [33mtest[0m
+
+where [33mt0[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/UnknownClass.md for more information,
+or to contribute content related to this error.
+

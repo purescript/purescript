@@ -1,0 +1,14 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/warning/WildcardInferredType2.purs:4:6 - 4:7 (line 4, column 6 - line 4, column 7)
+
+  Wildcard type definition has the inferred type
+  [33m     [0m
+  [33m  Int[0m
+  [33m     [0m
+
+in value declaration [33mx[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/WildcardInferredType.md for more information,
+or to contribute content related to this error.
+

@@ -1,0 +1,13 @@
+Error found:
+at tests/purs/failing/NewtypeInstance2.purs:8:1 - 8:54 (line 8, column 1 - line 8, column 54)
+
+  Cannot derive newtype instance for
+  [33m                      [0m
+  [33m  Data.Show.Show (X a)[0m
+  [33m                      [0m
+  Make sure this is a newtype.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/InvalidNewtypeInstance.md for more information,
+or to contribute content related to this error.
+

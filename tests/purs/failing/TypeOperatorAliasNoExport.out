@@ -1,0 +1,13 @@
+Error found:
+in module [33mTest[0m
+at tests/purs/failing/TypeOperatorAliasNoExport.purs:2:1 - 6:25 (line 2, column 1 - line 6, column 25)
+
+  An export for [33mtype (×)[0m requires the following to also be exported:
+
+    [33mTuple[0m
+
+
+
+See https://github.com/purescript/documentation/blob/master/errors/TransitiveExportError.md for more information,
+or to contribute content related to this error.
+
