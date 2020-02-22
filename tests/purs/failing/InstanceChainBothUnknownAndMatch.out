@@ -19,7 +19,7 @@ at tests/purs/failing/InstanceChainBothUnknownAndMatch.purs:17:13 - 17:55 (line 
   The instance head contains unknown type variables. Consider adding a type annotation.
 
 while applying a function [33msame[0m
-  of type [33mSame t0 t1 t2 => t0 -> t1 -> SProxy t2[0m
+  of type [33mSame @Type @Type t0 t1 t2 => t0 -> t1 -> SProxy t2[0m
   to argument [33mRProxy[0m
 while inferring the type of [33msame RProxy[0m
 in value declaration [33mexample[0m
@@ -27,9 +27,9 @@ in value declaration [33mexample[0m
 where [33mt3[0m is a rigid type variable
         bound at (line 0, column 0 - line 0, column 0)
       [33mt4[0m is an unknown type
-      [33mt2[0m is an unknown type
-      [33mt1[0m is an unknown type
       [33mt0[0m is an unknown type
+      [33mt1[0m is an unknown type
+      [33mt2[0m is an unknown type
 
 See https://github.com/purescript/documentation/blob/master/errors/NoInstanceFound.md for more information,
 or to contribute content related to this error.
