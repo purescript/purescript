@@ -520,7 +520,7 @@ convertDeclaration fileName decl = case decl of
       ForeignData _ (Labeled a _ b) ->
         AST.ExternDataDeclaration ann (nameValue a) $ convertType fileName b
       ForeignKind _ a ->
-        AST.ExternDataDeclaration ann (nameValue a) $ Env.kindType $> ann
+        AST.DataDeclaration ann Env.Data (nameValue a) [] []
   DeclRole _ _ _ name roles ->
     pure $ AST.RoleDeclaration $
       AST.RoleDeclarationData ann (nameValue name) (roleValue <$> NE.toList roles)

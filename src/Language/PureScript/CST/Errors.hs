@@ -186,7 +186,7 @@ prettyPrintWarningMessage (ParserErrorInfo {..}) = case errType of
   WarnDeprecatedRowSyntax ->
     "Unary '#' syntax for row kinds is deprecated and will be removed in a future release. Use the 'Row' kind instead."
   WarnDeprecatedForeignKindSyntax ->
-    "Foreign kind imports are deprecated and will be removed in a future release. Use 'foreign import data' instead."
+    "Foreign kind imports are deprecated and will be removed in a future release. Use empty 'data' instead."
   WarnDeprecatedKindImportSyntax ->
     "Kind imports are deprecated and will be removed in a future release. Omit the 'kind' keyword instead."
   WarnDeprecatedKindExportSyntax ->

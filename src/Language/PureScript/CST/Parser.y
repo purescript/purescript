@@ -676,7 +676,9 @@ decl :: { Declaration () }
   | ident '::' type { DeclSignature () (Labeled $1 $2 $3) }
   | ident manyOrEmpty(binderAtom) guardedDecl { DeclValue () (ValueBindingFields $1 $2 $3) }
   | fixity { DeclFixity () $1 }
-  | 'foreign' 'import' foreign { DeclForeign () $1 $2 $3 }
+  | 'foreign' 'import' ident '::' type { DeclForeign () $1 $2 (ForeignValue (Labeled $3 $4 $5)) }
+  | 'foreign' 'import' 'data' properName '::' type { DeclForeign () $1 $2 (ForeignData $3 (Labeled $4 $5 $6)) }
+  | 'foreign' 'import' 'kind' properName {% addWarning [$1, $2, $3, nameTok $4] WarnDeprecatedForeignKindSyntax *> pure (DeclForeign () $1 $2 (ForeignKind $3 $4)) }
   | 'type' 'role' properName many(role) { DeclRole () $1 $2 $3 $4 }
 
 dataHead :: { DataHead () }
@@ -760,11 +762,6 @@ infix :: { (SourceToken, Fixity) }
   : 'infix' { ($1, Infix) }
   | 'infixl' { ($1, Infixl) }
   | 'infixr' { ($1, Infixr) }
-
-foreign :: { Foreign () }
-  : ident '::' type { ForeignValue (Labeled $1 $2 $3) }
-  | 'data' properName '::' type { ForeignData $1 (Labeled $2 $3 $4) }
-  | 'kind' properName {% addWarning [$1, nameTok $2] WarnDeprecatedForeignKindSyntax *> pure (ForeignKind $1 $2) }
 
 role :: { Role }
   : 'nominal' { Role $1 R.Nominal }

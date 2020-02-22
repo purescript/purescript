@@ -351,7 +351,7 @@ errorSuggestion err =
                 sugg | T.isPrefixOf " " kind = "Row" <> kind
                      | otherwise = "Row " <> kind
             suggest sugg
-          CST.WarnDeprecatedForeignKindSyntax -> suggest $ "data " <> CST.printTokens (drop 1 toks) <> " :: Type"
+          CST.WarnDeprecatedForeignKindSyntax -> suggest $ "data " <> CST.printTokens (drop 3 toks)
           CST.WarnDeprecatedKindImportSyntax -> suggest $ CST.printTokens $ drop 1 toks
           CST.WarnDeprecatedKindExportSyntax -> suggest $ CST.printTokens $ drop 1 toks
       _ -> Nothing
