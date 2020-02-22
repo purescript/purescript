@@ -1,0 +1,10 @@
+Error found:
+at tests/purs/failing/3335-TypeOpAssociativityError.purs:6:1 - 6:33 (line 6, column 1 - line 6, column 33)
+
+  Cannot parse an expression that uses multiple instances of the non-associative operator [33mMain.(>>)[0m.
+  Use parentheses to resolve this ambiguity.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/NonAssociativeError.md for more information,
+or to contribute content related to this error.
+

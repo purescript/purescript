@@ -1,0 +1,11 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/warning/ShadowedNameParens.purs:5:9 - 5:10 (line 5, column 9 - line 5, column 10)
+
+  Name [33mn[0m was shadowed.
+
+in value declaration [33mf[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/ShadowedName.md for more information,
+or to contribute content related to this error.
+

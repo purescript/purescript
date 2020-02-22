@@ -1,0 +1,10 @@
+Error found:
+at tests/purs/failing/PrimSubModuleReserved/Prim_Foobar.purs:1:1 - 1:25 (line 1, column 1 - line 1, column 25)
+
+  The module name [33mPrim.Foobar[0m is in the Prim namespace.
+  The Prim namespace is reserved for compiler-defined terms.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/CannotDefinePrimModules.md for more information,
+or to contribute content related to this error.
+

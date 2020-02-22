@@ -1,0 +1,11 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/warning/ShadowedBinderPatternGuard.purs:6:7 - 6:8 (line 6, column 7 - line 6, column 8)
+
+  Name [33mi[0m was shadowed.
+
+in value declaration [33mf[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/ShadowedName.md for more information,
+or to contribute content related to this error.
+

@@ -1,0 +1,30 @@
+Error 1 of 2:
+
+  in module [33mMain[0m
+  at tests/purs/warning/ImplicitQualifiedImportReExport.purs:9:1 - 9:23 (line 9, column 1 - line 9, column 23)
+
+    Module [33mData.Maybe[0m was imported as [33mX[0m with unspecified imports.
+    As this module is being re-exported, consider using the explicit form:
+
+      [33mimport Data.Maybe (Maybe(..), fromJust, fromMaybe, fromMaybe', isJust, isNothing, maybe, maybe', optional) as X[0m
+
+
+
+  See https://github.com/purescript/documentation/blob/master/errors/ImplicitQualifiedImportReExport.md for more information,
+  or to contribute content related to this error.
+
+Error 2 of 2:
+
+  in module [33mMain[0m
+  at tests/purs/warning/ImplicitQualifiedImportReExport.purs:10:1 - 10:24 (line 10, column 1 - line 10, column 24)
+
+    Module [33mData.Either[0m was imported as [33mY[0m with unspecified imports.
+    As this module is being re-exported, consider using the explicit form:
+
+      [33mimport Data.Either (Either(..), choose, either, fromLeft, fromRight, hush, isLeft, isRight, note, note') as Y[0m
+
+
+
+  See https://github.com/purescript/documentation/blob/master/errors/ImplicitQualifiedImportReExport.md for more information,
+  or to contribute content related to this error.
+

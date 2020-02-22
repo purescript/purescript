@@ -1,0 +1,9 @@
+Error found:
+at tests/purs/failing/DuplicateModule.purs:2:1 - 2:16 (line 2, column 1 - line 2, column 16)
+
+  Module [33mM1[0m has been defined multiple times
+
+
+See https://github.com/purescript/documentation/blob/master/errors/DuplicateModule.md for more information,
+or to contribute content related to this error.
+

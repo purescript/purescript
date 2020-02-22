@@ -1,0 +1,16 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/CaseDoesNotMatchAllConstructorArgs.purs:11:9 - 11:17 (line 11, column 9 - line 11, column 17)
+
+  Data constructor [33mMain.Person[0m was given 1 arguments in a case expression, but expected 2 arguments.
+  This problem can be fixed by giving [33mMain.Person[0m 2 arguments.
+
+while inferring the type of [33m\p ->                                   [0m
+                            [33m  case p of                             [0m
+                            [33m    (Two (Person n) (Person n2 a2)) -> n[0m
+                            [33m    _ -> "Unknown"                      [0m
+in value declaration [33mgetName[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/IncorrectConstructorArity.md for more information,
+or to contribute content related to this error.
+

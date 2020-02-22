@@ -1,0 +1,11 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/IntOutOfRange.purs:6:5 - 6:15 (line 6, column 5 - line 6, column 15)
+
+  Integer value [33m2147483648[0m is out of range for the JavaScript backend.
+  Acceptable values fall within the range [33m-2147483648[0m to [33m2147483647[0m (inclusive).
+
+
+See https://github.com/purescript/documentation/blob/master/errors/IntOutOfRange.md for more information,
+or to contribute content related to this error.
+

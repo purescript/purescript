@@ -1,0 +1,10 @@
+Error found:
+at tests/purs/failing/2128-class.purs:5:15 - 5:18 (line 5, column 15 - line 5, column 18)
+
+  Unable to parse module:
+  Unexpected token '!!!'
+
+
+See https://github.com/purescript/documentation/blob/master/errors/ErrorParsingModule.md for more information,
+or to contribute content related to this error.
+

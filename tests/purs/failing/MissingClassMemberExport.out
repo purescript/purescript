@@ -1,0 +1,13 @@
+Error found:
+in module [33mTest[0m
+at tests/purs/failing/MissingClassMemberExport.purs:2:1 - 7:16 (line 2, column 1 - line 7, column 16)
+
+  An export for [33mclass Foo[0m requires the following to also be exported:
+
+    [33mbar[0m
+
+
+
+See https://github.com/purescript/documentation/blob/master/errors/TransitiveExportError.md for more information,
+or to contribute content related to this error.
+

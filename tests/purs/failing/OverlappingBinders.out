@@ -1,0 +1,14 @@
+Error found:
+in module [33mOverlappingBinders[0m
+at tests/purs/failing/OverlappingBinders.purs:8:7 - 9:28 (line 8, column 7 - line 9, column 28)
+
+  Overlapping names in function/binder
+
+while inferring the type of [33m\x ->                      [0m
+                            [33m  case x of                [0m
+                            [33m    (S y (S y@S z zs)) -> y[0m
+in value declaration [33mf[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/OverlappingArgNames.md for more information,
+or to contribute content related to this error.
+

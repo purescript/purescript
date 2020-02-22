@@ -1,0 +1,10 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/warning/DuplicateSelectiveImport.purs:5:1 - 5:22 (line 5, column 1 - line 5, column 22)
+
+  There is an existing import of [33mPrelude[0m, consider merging the import lists
+
+
+See https://github.com/purescript/documentation/blob/master/errors/DuplicateSelectiveImport.md for more information,
+or to contribute content related to this error.
+

@@ -1,0 +1,10 @@
+Error found:
+at tests/purs/failing/InvalidOperatorInBinder.purs:12:12 - 12:13 (line 12, column 12 - line 12, column 13)
+
+  Operator [33mMain.(:)[0m cannot be used in a pattern as it is an alias for function Main.cons.
+  Only aliases for data constructors may be used in patterns.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/InvalidOperatorInBinder.md for more information,
+or to contribute content related to this error.
+
