@@ -127,7 +127,6 @@ checkChanged cacheDb mn basePath currentInfo = do
             pure (Map.singleton fp (newTimestamp, newHash), All (dbHash == newHash))
 
   pure (CacheInfo newInfo, getAll isUpToDate)
-  where
 
 -- | Remove any modules from the given set from the cache database; used when
 -- they failed to build.
