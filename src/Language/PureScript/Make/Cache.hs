@@ -4,9 +4,10 @@ module Language.PureScript.Make.Cache
   ( ContentHash
   , hash
   , CacheDb
-  , CacheInfo
+  , CacheInfo(..)
   , checkChanged
   , removeModules
+  , normaliseForCache
   ) where
 
 import Prelude
@@ -29,6 +30,7 @@ import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import Data.These (These(..))
 import Data.Time.Clock (UTCTime)
 import Data.Traversable (for)
+import qualified System.FilePath as FilePath
 
 import Language.PureScript.Names (ModuleName)
 
@@ -93,13 +95,15 @@ checkChanged
   :: Monad m
   => CacheDb
   -> ModuleName
+  -> FilePath
   -> Map FilePath (UTCTime, m ContentHash)
   -> m (CacheInfo, Bool)
-checkChanged cacheDb mn currentInfo = do
+checkChanged cacheDb mn basePath currentInfo = do
+
   let dbInfo = unCacheInfo $ fromMaybe mempty (Map.lookup mn cacheDb)
   (newInfo, isUpToDate) <-
     fmap mconcat $
-      for (Map.toList (align dbInfo currentInfo)) $ \(fp, aligned) -> do
+      for (Map.toList (align dbInfo currentInfo)) $ \(normaliseForCache basePath -> fp, aligned) -> do
         case aligned of
           This _ -> do
             -- One of the input files listed in the cache no longer exists;
@@ -128,3 +132,20 @@ checkChanged cacheDb mn currentInfo = do
 -- they failed to build.
 removeModules :: Set ModuleName -> CacheDb -> CacheDb
 removeModules moduleNames = flip Map.withoutKeys moduleNames
+
+-- | 1. Any path that is beneath our current working directory will be
+-- stored as a normalised relative path
+-- 2. Any path that isn't will be stored as an absolute path
+normaliseForCache :: FilePath -> FilePath -> FilePath
+normaliseForCache basePath fp =
+    if FilePath.isRelative fp then
+      FilePath.normalise fp
+    else
+      let relativePath = FilePath.makeRelative basePath fp in
+      if FilePath.isRelative relativePath then
+        FilePath.normalise relativePath
+      else
+        -- If the path is still absolute after trying to make it
+        -- relative to the base that means it is not underneath
+        -- the base path
+        FilePath.normalise fp
