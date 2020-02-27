@@ -23,6 +23,8 @@ import           Protolude hiding (moduleName)
 
 import           Control.Concurrent.STM
 import           Data.Aeson
+import           Data.IORef (IORef)
+import           Data.Time.Clock (UTCTime)
 import qualified Data.Map.Lazy as M
 import qualified Language.PureScript as P
 import qualified Language.PureScript.Errors.JSON as P
@@ -184,12 +186,13 @@ data IdeEnvironment =
   IdeEnvironment
   { ideStateVar      :: TVar IdeState
   , ideConfiguration :: IdeConfiguration
+  , ideCacheDbTimestamp :: IORef (Maybe UTCTime)
   }
 
 type Ide m = (MonadIO m, MonadReader IdeEnvironment m)
 
 data IdeState = IdeState
-  { ideFileState     :: IdeFileState
+  { ideFileState :: IdeFileState
   , ideVolatileState :: IdeVolatileState
   } deriving (Show)
 

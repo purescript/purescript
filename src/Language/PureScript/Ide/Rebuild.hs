@@ -81,6 +81,7 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
         insertModule (fromMaybe file actualFile, m)
         insertExterns newExterns
         void populateVolatileState
+      _ <- updateCacheTimestamp
       runOpenBuild (rebuildModuleOpen makeEnv externs m)
       pure (RebuildSuccess warnings)
 

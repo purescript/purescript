@@ -12,10 +12,11 @@
 -- Functions to access psc-ide's state
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE PackageImports  #-}
+{-# LANGUAGE PackageImports #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE NamedFieldPuns  #-}
-{-# LANGUAGE BangPatterns    #-}
+{-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Language.PureScript.Ide.State
   ( getLoadedModulenames
@@ -31,6 +32,8 @@ module Language.PureScript.Ide.State
   , populateVolatileState
   , populateVolatileStateSync
   , populateVolatileStateSTM
+  , getOutputDirectory
+  , updateCacheTimestamp
   -- for tests
   , resolveOperatorsForModule
   , resolveInstances
@@ -42,22 +45,51 @@ import           Protolude hiding (moduleName)
 import           Control.Arrow
 import           Control.Concurrent.STM
 import           "monad-logger" Control.Monad.Logger
+import           Data.IORef
 import qualified Data.Map.Lazy                      as Map
+import           Data.Time.Clock (UTCTime)
 import qualified Language.PureScript                as P
 import           Language.PureScript.Docs.Convert.Single (convertComments)
 import           Language.PureScript.Externs
+import           Language.PureScript.Make.Actions (cacheDbFile)
 import           Language.PureScript.Ide.Externs
 import           Language.PureScript.Ide.Reexports
 import           Language.PureScript.Ide.SourceFile
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
 import           Lens.Micro.Platform                hiding ((&))
+import           System.Directory (getModificationTime)
 
 -- | Resets all State inside psc-ide
 resetIdeState :: Ide m => m ()
 resetIdeState = do
   ideVar <- ideStateVar <$> ask
   liftIO (atomically (writeTVar ideVar emptyIdeState))
+
+getOutputDirectory :: Ide m => m FilePath
+getOutputDirectory = do
+  confOutputPath . ideConfiguration <$> ask
+
+getCacheTimestamp :: Ide m => m (Maybe UTCTime)
+getCacheTimestamp = do
+  x <- ideCacheDbTimestamp <$> ask
+  liftIO (readIORef x)
+
+readCacheTimestamp :: Ide m => m (Maybe UTCTime)
+readCacheTimestamp = do
+  cacheDb <- cacheDbFile <$> getOutputDirectory
+  liftIO (hush <$> try @SomeException (getModificationTime cacheDb))
+
+updateCacheTimestamp :: Ide m => m (Maybe (Maybe UTCTime, Maybe UTCTime))
+updateCacheTimestamp = do
+  old <- getCacheTimestamp
+  new <- readCacheTimestamp
+  if old == new
+    then pure Nothing
+    else do
+      ts <- ideCacheDbTimestamp <$> ask
+      liftIO (writeIORef ts new)
+      pure (Just (old, new))
 
 -- | Gets the loaded Modulenames
 getLoadedModulenames :: Ide m => m [P.ModuleName]

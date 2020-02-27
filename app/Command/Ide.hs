@@ -12,13 +12,14 @@
 -- The server accepting commands for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE PackageImports        #-}
-{-# LANGUAGE RecordWildCards       #-}
-{-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PackageImports #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Command.Ide (command) where
 
@@ -27,6 +28,7 @@ import           Protolude
 import qualified Data.Aeson as Aeson
 import           Control.Concurrent.STM
 import           "monad-logger" Control.Monad.Logger
+import           Data.IORef
 import qualified Data.Text.IO                      as T
 import qualified Data.ByteString.Char8             as BS8
 import qualified Data.ByteString.Lazy.Char8        as BSL8
@@ -35,6 +37,7 @@ import           Language.PureScript.Ide
 import           Language.PureScript.Ide.Command
 import           Language.PureScript.Ide.Util
 import           Language.PureScript.Ide.Error
+import           Language.PureScript.Ide.State (updateCacheTimestamp)
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Watcher
 import qualified Network.Socket                    as Network
@@ -135,7 +138,13 @@ command = Opts.helper <*> subcommands where
         , confGlobs = globs
         , confEditorMode = editorMode
         }
-    let env = IdeEnvironment {ideStateVar = ideState, ideConfiguration = conf}
+    ts <- newIORef Nothing
+    let
+      env = IdeEnvironment
+        { ideStateVar = ideState
+        , ideConfiguration = conf
+        , ideCacheDbTimestamp = ts
+        }
     startServer port env
 
   serverOptions :: Opts.Parser ServerOptions
@@ -185,7 +194,16 @@ startServer port env = Network.withSocketsDo $ do
                       <> " took "
                       <> displayTimeSpec duration
               logPerf message $ do
-                result <- runExceptT (handleCommand cmd')
+                result <- runExceptT $ do
+                  updateCacheTimestamp >>= \case
+                    Nothing -> pure ()
+                    Just (before, after) -> do
+                      -- If the cache db file was changed outside of the IDE
+                      -- we trigger a reset before processing the command
+                      $(logInfo) ("cachedb was changed from: " <> show before <> ", to: " <> show after)
+                      unless (isLoadAll cmd') $
+                        void (handleCommand Reset *> handleCommand (LoadSync []))
+                  handleCommand cmd'
                 liftIO $ catchGoneHandle $ BSL8.hPutStrLn h $ case result of
                   Right r  -> Aeson.encode r
                   Left err -> Aeson.encode err
@@ -197,11 +215,16 @@ startServer port env = Network.withSocketsDo $ do
                 hFlush stdout
           liftIO $ catchGoneHandle (hClose h)
 
+isLoadAll :: Command -> Bool
+isLoadAll = \case
+  Load [] -> True
+  _ -> False
+
 catchGoneHandle :: IO () -> IO ()
 catchGoneHandle =
   handle (\e -> case e of
     IOError { ioe_type = ResourceVanished } ->
-      putText ("[Error] psc-ide-server tried interact with the handle, but the connection was already gone.")
+      putText ("[Error] psc-ide-server tried to interact with the handle, but the connection was already gone.")
     _ -> throwIO e)
 
 acceptCommand
