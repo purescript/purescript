@@ -27,6 +27,8 @@ data TypeClassDictionaryInScope v
     , tcdPath :: [(Qualified (ProperName 'ClassName), Integer)]
     -- | The name of the type class to which this type class instance applies
     , tcdClassName :: Qualified (ProperName 'ClassName)
+    -- | Quantification of type variables in the instance head and dependencies
+    , tcdForAll :: [(Text, SourceType)]
     -- | The kinds to which this type class instance applies
     , tcdInstanceKinds :: [SourceType]
     -- | The types to which this type class instance applies

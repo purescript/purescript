@@ -516,6 +516,8 @@ elaborateKind = \case
     pure $ E.kindType $> ann
   ConstrainedType ann _ _ ->
     pure $ E.kindType $> ann
+  KindedType ann _ k ->
+    pure $ k $> ann
   ty ->
     throwError . errorMessage' (fst (getAnnForType ty)) $ UnsupportedTypeInKind ty
 
@@ -782,6 +784,13 @@ applyClassMemberDeclaration = \case
     TypeDeclaration . TypeDeclarationData ann ident <$> apply ty
   _ -> internalError "Invalid class member declaration"
 
+mapTypeDeclaration :: (SourceType -> SourceType) -> Declaration -> Declaration
+mapTypeDeclaration f = \case
+  TypeDeclaration (TypeDeclarationData ann ident ty) ->
+    TypeDeclaration . TypeDeclarationData ann ident $ f ty
+  other ->
+    other
+
 checkConstraint
   :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)
   => SourceConstraint
@@ -808,7 +817,11 @@ type InstanceDeclarationArgs =
   )
 
 type InstanceDeclarationResult =
-  ([SourceConstraint], [SourceType], [SourceType])
+  ( [SourceConstraint]
+  , [SourceType]
+  , [SourceType]
+  , [(Text, SourceType)]
+  )
 
 checkInstanceDeclaration
   :: forall m. (MonadError MultipleErrors m, MonadState CheckState m)
@@ -823,11 +836,13 @@ checkInstanceDeclaration moduleName (ann, constraints, clsName, args) = do
   bindLocalTypeVariables moduleName freeVarsDict $ do
     ty' <- checkKind ty E.kindConstraint
     constraints' <- for constraints checkConstraint
-    allTy <- apply $ foldr (\a b -> srcConstrainedType a b) ty' constraints'
+    allTy <- apply $ foldr srcConstrainedType ty' constraints'
     allUnknowns <- unknownsWithKinds . IS.toList $ unknowns allTy
-    let allWithVars = replaceUnknownsWithVars (unknownVarNames (usedTypeVariables allTy) allUnknowns) allTy
-        (allConstraints, (_, allKinds, allArgs)) = unapplyTypes <$> unapplyConstraints allWithVars
-    pure (allConstraints, allKinds, allArgs)
+    let unknownVars = unknownVarNames (usedTypeVariables allTy) allUnknowns
+    let allWithVars = replaceUnknownsWithVars unknownVars allTy
+    let (allConstraints, (_, allKinds, allArgs)) = unapplyTypes <$> unapplyConstraints allWithVars
+    varKinds <- traverse (traverse (fmap (replaceUnknownsWithVars unknownVars) . apply)) $ (snd <$> unknownVars) <> (first runProperName <$> freeVarsDict)
+    pure (allConstraints, allKinds, allArgs, varKinds)
 
 checkKindDeclaration
   :: forall m. (MonadSupply m, MonadError MultipleErrors m, MonadState CheckState m)
@@ -924,7 +939,16 @@ kindsOfAll moduleName syns dats clss = withFreshSubstitution $ do
           other -> other
         clsResultsWithKinds = flip fmap clsResultsWithUnks $ \(((clsName, clsKind), (args, supers, decls)), _) -> do
           let tyUnks = snd . fromJust $ lookup (mkQualified clsName moduleName) tySubs
-          (args, supers, decls, generalizeUnknowns tyUnks clsKind)
+              (usedTypeVariablesInDecls, _, _, _, _) = accumTypes usedTypeVariables
+              usedVars = usedTypeVariables clsKind
+                      <> foldMap (usedTypeVariables . snd) args
+                      <> foldMap (foldMap usedTypeVariables . (\c -> constraintKindArgs c <> constraintArgs c)) supers
+                      <> foldMap usedTypeVariablesInDecls decls
+              unkBinders = unknownVarNames usedVars tyUnks
+              args' = fmap (replaceUnknownsWithVars unkBinders . replaceTypeCtors) <$> args
+              supers' = mapConstraintArgsAll (fmap (replaceUnknownsWithVars unkBinders . replaceTypeCtors)) <$> supers
+              decls' = mapTypeDeclaration (replaceUnknownsWithVars unkBinders . replaceTypeCtors) <$> decls
+          (args', supers', decls', generalizeUnknownsWithVars unkBinders clsKind)
     datResultsWithKinds <- for datResultsWithUnks $ \(((datName, datKind), ctors), _) -> do
       let tyUnks = snd . fromJust $ lookup (mkQualified datName moduleName) tySubs
           ctors' = fmap (fmap (generalizeUnknowns tyUnks . replaceTypeCtors)) ctors

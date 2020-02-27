@@ -375,7 +375,7 @@ typeCheckAll moduleName _ = traverse go
         Nothing -> internalError "typeCheckAll: Encountered unknown type class in instance declaration"
         Just typeClass -> do
           checkInstanceArity dictName className typeClass tys
-          (deps', kinds', tys') <- withFreshSubstitution $ checkInstanceDeclaration moduleName (sa, deps, className, tys)
+          (deps', kinds', tys', vars) <- withFreshSubstitution $ checkInstanceDeclaration moduleName (sa, deps, className, tys)
           sequence_ (zipWith (checkTypeClassInstance typeClass) [0..] tys')
           let nonOrphanModules = findNonOrphanModules className typeClass tys'
           checkOrphanInstance dictName className tys' nonOrphanModules
@@ -383,7 +383,7 @@ typeCheckAll moduleName _ = traverse go
           checkOverlappingInstance qualifiedChain dictName className typeClass tys' nonOrphanModules
           _ <- traverseTypeInstanceBody checkInstanceMembers body
           deps'' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms deps'
-          let dict = TypeClassDictionaryInScope qualifiedChain idx qualifiedDictName [] className kinds' tys' (Just deps'')
+          let dict = TypeClassDictionaryInScope qualifiedChain idx qualifiedDictName [] className vars kinds' tys' (Just deps'')
           addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) (pure dict)
           return d
 

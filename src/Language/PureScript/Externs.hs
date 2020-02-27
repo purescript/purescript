@@ -139,6 +139,7 @@ data ExternsDeclaration =
   | EDInstance
       { edInstanceClassName       :: Qualified (ProperName 'ClassName)
       , edInstanceName            :: Ident
+      , edInstanceForAll          :: [(Text, SourceType)]
       , edInstanceKinds           :: [SourceType]
       , edInstanceTypes           :: [SourceType]
       , edInstanceConstraints     :: Maybe [SourceConstraint]
@@ -164,14 +165,14 @@ applyExternsFileToEnvironment ExternsFile{..} = flip (foldl' applyDecl) efDeclar
   applyDecl env (EDDataConstructor pn dTy tNm ty nms) = env { dataConstructors = M.insert (qual pn) (dTy, tNm, ty, nms) (dataConstructors env) }
   applyDecl env (EDValue ident ty) = env { names = M.insert (Qualified (Just efModuleName) ident) (ty, External, Defined) (names env) }
   applyDecl env (EDClass pn args members cs deps tcIsEmpty) = env { typeClasses = M.insert (qual pn) (makeTypeClassData args members cs deps tcIsEmpty) (typeClasses env) }
-  applyDecl env (EDInstance className ident kinds tys cs ch idx) =
+  applyDecl env (EDInstance className ident vars kinds tys cs ch idx) =
     env { typeClassDictionaries =
             updateMap
               (updateMap (M.insertWith (<>) (qual ident) (pure dict)) className)
               (Just efModuleName) (typeClassDictionaries env) }
     where
     dict :: NamedDict
-    dict = TypeClassDictionaryInScope ch idx (qual ident) [] className kinds tys cs
+    dict = TypeClassDictionaryInScope ch idx (qual ident) [] className vars kinds tys cs
 
     updateMap :: (Ord k, Monoid a) => (a -> a) -> k -> M.Map k a -> M.Map k a
     updateMap f = M.alter (Just . f . fold)
@@ -242,7 +243,7 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
       , EDClass className typeClassArguments typeClassMembers typeClassSuperclasses typeClassDependencies typeClassIsEmpty
       ]
   toExternsDeclaration (TypeInstanceRef _ ident)
-    = [ EDInstance tcdClassName ident tcdInstanceKinds tcdInstanceTypes tcdDependencies tcdChain tcdIndex
+    = [ EDInstance tcdClassName ident tcdForAll tcdInstanceKinds tcdInstanceTypes tcdDependencies tcdChain tcdIndex
       | m1 <- maybeToList (M.lookup (Just mn) (typeClassDictionaries env))
       , m2 <- M.elems m1
       , nel <- maybeToList (M.lookup (Qualified (Just mn) ident) m2)

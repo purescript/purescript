@@ -58,6 +58,8 @@ ef = P.ExternsFile
       (P.Qualified (Just (mn "ClassModule")) (P.ProperName "MyClass"))
       -- , edInstanceName =
       (P.Ident "myClassInstance")
+      -- . edInstanceForAll =
+      []
       -- , edInstanceKinds =
       mempty
       -- , edInstanceTypes =

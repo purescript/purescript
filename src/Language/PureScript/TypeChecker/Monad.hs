@@ -355,9 +355,10 @@ debugEnv :: Environment -> [String]
 debugEnv env = join
   [ debugTypes env
   , debugTypeSynonyms env
+  , debugTypeClasses env
+  , debugTypeClassDictionaries env
   , debugDataConstructors env
   , debugNames env
-  , debugTypeClassDictionaries env
   ]
 
 debugType :: Type a -> String
@@ -424,8 +425,18 @@ debugTypeClassDictionaries = go . typeClassDictionaries
       moduleName = maybe "" (\m -> "[" <> runModuleName m <> "] ") mbModuleName
       className' = showQualified runProperName className
       ident' = showQualified runIdent ident
+      kds = intercalate " " $ fmap ((\a -> "@(" <> a <> ")") . debugType) $ tcdInstanceKinds $ NEL.head dicts
       tys = intercalate " " $ fmap ((\a -> "(" <> a <> ")") . debugType) $ tcdInstanceTypes $ NEL.head dicts
-    pure $ "dict " <> unpack moduleName <> unpack className' <> " " <> unpack ident' <> " (" <> show (length dicts) <> ")" <> " " <> tys
+    pure $ "dict " <> unpack moduleName <> unpack className' <> " " <> unpack ident' <> " (" <> show (length dicts) <> ")" <> " " <> kds <> " " <> tys
+
+debugTypeClasses :: Environment -> [String]
+debugTypeClasses = fmap go . M.toList . typeClasses
+  where
+  go (className, tc) = do
+    let
+      className' = showQualified runProperName className
+      args = intercalate " " $ fmap (\(a, b) -> "(" <> debugType (maybe (srcTypeVar a) (srcKindedType (srcTypeVar a)) b) <> ")") $ typeClassArguments tc
+    "class " <> unpack className' <> " " <> args
 
 debugValue :: Expr -> String
 debugValue = init . render . prettyPrintValue 100
