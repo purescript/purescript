@@ -481,6 +481,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line "Internal compiler error:"
             , indent $ line err
             , line ctx
+            , line "Please report this at https://github.com/purescript/purescript/issues"
             ]
     renderSimpleErrorMessage (ModuleNotFound mn) =
       paras [ line $ "Module " <> markCode (runModuleName mn) <> " was not found."
