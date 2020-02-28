@@ -73,7 +73,6 @@ deriveInstances
 deriveInstances externs (Module ss coms mn ds exts) =
     Module ss coms mn <$> mapM (deriveInstance mn synonyms kinds instanceData ds) ds <*> pure exts
   where
-    -- TODO: Do we need to reconstruct kind information?
     kinds :: KindMap
     kinds = mempty
 
