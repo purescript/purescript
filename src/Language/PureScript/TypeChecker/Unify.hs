@@ -67,11 +67,7 @@ solveType u t = do
   occursCheck u t
   k1 <- elaborateKind t
   subst <- gets checkSubstitution
-  let k2 = substituteType subst
-         . maybe (internalError ("No kind for unification variable ?" <> show u)) snd
-         . M.lookup u
-         . substUnsolved
-         $ subst
+  k2 <- maybe (internalCompilerError ("No kind for unification variable ?" <> T.pack (show u))) (pure . substituteType subst . snd) . M.lookup u . substUnsolved $ subst
   t' <- instantiateKind (t, k1) k2
   modify $ \cs -> cs { checkSubstitution =
                          (checkSubstitution cs) { substType =
