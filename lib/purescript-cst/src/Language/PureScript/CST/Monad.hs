@@ -1,4 +1,3 @@
-{-# LANGUAGE PackageImports #-}
 module Language.PureScript.CST.Monad where
 
 import "base" Prelude

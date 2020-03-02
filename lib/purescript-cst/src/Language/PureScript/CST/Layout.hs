@@ -1,5 +1,3 @@
-{-# LANGUAGE PackageImports #-}
-
 -- | The parser itself is unaware of indentation, and instead only parses explicit
 -- delimiters which are inserted by this layout algorithm (much like Haskell).
 -- This is convenient because the actual grammar can be specified apart from the

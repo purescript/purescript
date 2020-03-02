@@ -1,5 +1,3 @@
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE PackageImports #-}
 module Language.PureScript.CST.Errors
   ( ParserError(..)
   , ParserErrorType(..)

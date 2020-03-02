@@ -1,5 +1,3 @@
-{-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE PackageImports #-}
 module Language.PureScript.CST.Utils where
 
 import "base" Prelude

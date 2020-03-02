@@ -1,7 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE NamedFieldPuns #-}
-{-# LANGUAGE PackageImports #-}
-
 -- | This module contains utilities for calculating positions and offsets. While
 -- tokens are annotated with ranges, CST nodes are not, but they can be
 -- dynamically derived with the functions in this module, which will return the

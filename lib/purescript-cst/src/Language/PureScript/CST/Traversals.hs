@@ -1,4 +1,3 @@
-{-# LANGUAGE PackageImports #-}
 module Language.PureScript.CST.Traversals where
 
 import "base" Prelude

@@ -34,6 +34,7 @@ library:
   source-dirs: src
   ghc-options: -Wall -O2
   default-extensions:
+    - BangPatterns
     - ConstraintKinds
     - DataKinds
     - DeriveFunctor
@@ -46,7 +47,9 @@ library:
     - KindSignatures
     - LambdaCase
     - MultiParamTypeClasses
+    - NamedFieldPuns
     - NoImplicitPrelude
+    - PackageImports
     - PatternGuards
     - PatternSynonyms
     - RankNTypes

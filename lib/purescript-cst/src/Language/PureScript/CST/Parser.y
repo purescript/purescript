@@ -1,5 +1,4 @@
 {
-{-# LANGUAGE PackageImports #-}
 module Language.PureScript.CST.Parser
   ( parseType
   , parseKind

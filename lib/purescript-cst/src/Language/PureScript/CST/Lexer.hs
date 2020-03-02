@@ -1,5 +1,3 @@
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE PackageImports #-}
 module Language.PureScript.CST.Lexer
   ( lenient
   , lex
