@@ -1,5 +1,3 @@
-{-# LANGUAGE PackageImports #-}
-
 -- |
 -- AST traversal helpers
 --

@@ -1,6 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE PackageImports #-}
-
 module Language.PureScript.Environment where
 
 import "base-compat" Prelude.Compat

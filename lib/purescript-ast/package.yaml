@@ -38,6 +38,7 @@ library:
   default-extensions:
     - ConstraintKinds
     - DataKinds
+    - DefaultSignatures
     - DeriveFunctor
     - DeriveFoldable
     - DeriveTraversable
@@ -45,10 +46,13 @@ library:
     - DerivingStrategies
     - EmptyDataDecls
     - FlexibleContexts
+    - FlexibleInstances
+    - GeneralizedNewtypeDeriving
     - KindSignatures
     - LambdaCase
     - MultiParamTypeClasses
     - NoImplicitPrelude
+    - PackageImports
     - PatternGuards
     - PatternSynonyms
     - RankNTypes
@@ -56,6 +60,7 @@ library:
     - OverloadedStrings
     - ScopedTypeVariables
     - TupleSections
+    - TypeFamilies
     - ViewPatterns
 
 stability: experimental

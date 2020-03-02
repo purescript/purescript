@@ -1,5 +1,3 @@
-{-# LANGUAGE PackageImports #-}
-
 -- |
 -- The initial PureScript AST
 --

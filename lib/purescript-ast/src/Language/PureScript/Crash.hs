@@ -1,6 +1,5 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE ImplicitParams #-}
-{-# LANGUAGE PackageImports #-}
 
 module Language.PureScript.Crash where
 

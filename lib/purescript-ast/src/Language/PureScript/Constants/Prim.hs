@@ -1,5 +1,3 @@
-{-# LANGUAGE PackageImports #-}
-
 -- | Various constants which refer to things in Prim
 module Language.PureScript.Constants.Prim where
 

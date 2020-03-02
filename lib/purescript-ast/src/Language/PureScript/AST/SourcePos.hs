@@ -1,6 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE PackageImports #-}
-
 -- |
 -- Source position information
 --

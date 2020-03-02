@@ -1,5 +1,3 @@
-{-# LANGUAGE PackageImports #-}
-
 -- |
 -- The core functional representation for literal values.
 --

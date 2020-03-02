@@ -1,6 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE PackageImports #-}
-
 -- |
 -- Fresh variable supply
 --

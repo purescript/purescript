@@ -1,5 +1,3 @@
-{-# LANGUAGE PackageImports #-}
-
 module Language.PureScript.AST.Exported
   ( exportedDeclarations
   , isExported

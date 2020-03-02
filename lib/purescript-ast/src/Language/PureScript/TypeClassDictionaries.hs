@@ -1,7 +1,3 @@
-{-# LANGUAGE DeriveFoldable    #-}
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE PackageImports #-}
 module Language.PureScript.TypeClassDictionaries where
 
 import "base-compat" Prelude.Compat

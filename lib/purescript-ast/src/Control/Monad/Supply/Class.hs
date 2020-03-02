@@ -2,10 +2,6 @@
 -- A class for monads supporting a supply of fresh names
 --
 
-{-# LANGUAGE DefaultSignatures #-}
-{-# LANGUAGE PackageImports #-}
-{-# LANGUAGE TypeFamilies #-}
-
 module Control.Monad.Supply.Class where
 
 import "base-compat" Prelude.Compat

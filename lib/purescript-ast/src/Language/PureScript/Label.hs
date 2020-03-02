@@ -1,7 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE PackageImports #-}
-
 module Language.PureScript.Label (Label(..)) where
 
 import "base-compat" Prelude.Compat hiding (lex)
