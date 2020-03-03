@@ -64,8 +64,6 @@ depsNamesAndVersions = do
   where
   excluded name =
     name == "purescript"
-    || name == "purescript-ast"
-    || name == "purescript-cst"
     || name == "rts"
 
   parse line =
