@@ -11,7 +11,7 @@ import           Protolude hiding (head)
 import           Data.Graph
 import qualified Data.Set as S
 import           Language.PureScript.AST
-import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Constants.Prim as C
 import           Language.PureScript.Crash
 import           Language.PureScript.Errors hiding (nonEmpty)
 import           Language.PureScript.Names

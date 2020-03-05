@@ -29,7 +29,8 @@ import qualified Data.Text as T
 import           Data.Text (Text)
 import           Language.PureScript.AST
 import qualified Language.PureScript.Bundle as Bundle
-import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Constants.Prelude as C
+import qualified Language.PureScript.Constants.Prim as C
 import           Language.PureScript.Crash
 import qualified Language.PureScript.CST.Errors as CST
 import           Language.PureScript.Environment

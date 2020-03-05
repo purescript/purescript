@@ -37,7 +37,7 @@ import qualified Data.List.NonEmpty                 as NE
 import qualified Data.Map                           as Map
 import qualified Data.Text                          as T
 import qualified Language.PureScript                as P
-import qualified Language.PureScript.Constants      as C
+import qualified Language.PureScript.Constants.Prim as C
 import qualified Language.PureScript.CST            as CST
 import           Language.PureScript.Ide.Completion
 import           Language.PureScript.Ide.Error

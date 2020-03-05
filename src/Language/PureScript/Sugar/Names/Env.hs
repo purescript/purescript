@@ -36,7 +36,7 @@ import Safe (headMay)
 import qualified Data.Map as M
 import qualified Data.Set as S
 
-import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Constants.Prim as C
 import Language.PureScript.AST
 import Language.PureScript.Environment
 import Language.PureScript.Errors

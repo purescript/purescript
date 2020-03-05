@@ -4,7 +4,7 @@ module Language.PureScript.CoreImp.Optimizer.TCO (tco) where
 import Prelude.Compat
 
 import Data.Text (Text)
-import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Constants.Prim as C
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.AST.SourcePos (SourceSpan)
 import Safe (headDef, tailSafe)
