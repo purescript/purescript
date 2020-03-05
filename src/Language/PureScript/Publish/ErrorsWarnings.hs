@@ -159,7 +159,7 @@ displayUserError e = case e of
           [ "The currently checked out commit seems to have been tagged with "
           , "more than 1 version, and I don't know which one should be used. "
           , "Please either delete some of the tags, or create a new commit "
-          , "to tag the desired verson with."
+          , "to tag the desired version with."
           ])
       , spacer
       , para "Tags for the currently checked out commit:"

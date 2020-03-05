@@ -418,7 +418,7 @@ coercible = primClassOf (P.primSubName "Coerce") "Coercible" $ T.unlines
 
 kindOrdering :: Declaration
 kindOrdering = primKindOf (P.primSubName "Ordering") "Ordering" $ T.unlines
-  [ "The `Ordering` kind represents the three possibilites of comparing two"
+  [ "The `Ordering` kind represents the three possibilities of comparing two"
   , "types of the same kind: `LT` (less than), `EQ` (equal to), and"
   , "`GT` (greater than)."
   ]
@@ -527,7 +527,7 @@ kindDoc :: Declaration
 kindDoc = primKindOf (P.primSubName "TypeError") "Doc" $ T.unlines
   [ "`Doc` is the kind of type-level documents."
   , ""
-  , "This kind is used with the `Fail` and `Warn` type clases."
+  , "This kind is used with the `Fail` and `Warn` type classes."
   , "Build up a `Doc` with `Text`, `Quote`, `QuoteLabel`, `Beside`, and `Above`."
   ]
 

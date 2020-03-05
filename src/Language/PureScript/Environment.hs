@@ -144,10 +144,10 @@ makeTypeClassData
   -> TypeClassData
 makeTypeClassData args m s deps tcIsEmpty = TypeClassData args m s deps determinedArgs coveringSets tcIsEmpty
   where
-    argumentIndicies = [0 .. length args - 1]
+    argumentIndices = [0 .. length args - 1]
 
     -- each argument determines themselves
-    identities = (\i -> (i, [i])) <$> argumentIndicies
+    identities = (\i -> (i, [i])) <$> argumentIndices
 
     -- list all the edges in the graph: for each fundep an edge exists for each determiner to each determined
     contributingDeps = M.fromListWith (++) $ identities ++ do
@@ -168,7 +168,7 @@ makeTypeClassData args m s deps tcIsEmpty = TypeClassData args m s deps determin
 
     -- find all the arguments that are determined
     determinedArgs :: S.Set Int
-    determinedArgs = S.fromList $ filter isFunDepDetermined argumentIndicies
+    determinedArgs = S.fromList $ filter isFunDepDetermined argumentIndices
 
     argFromVertex :: G.Vertex -> Int
     argFromVertex index = let (_, arg, _) = fromVertex index in arg
@@ -205,7 +205,7 @@ data NameKind
   -- ^ A private value introduced as an artifact of code generation (class instances, class member
   -- accessors, etc.)
   | Public
-  -- ^ A public value for a module member or foreing import declaration
+  -- ^ A public value for a module member or foreign import declaration
   | External
   -- ^ A name for member introduced by foreign import
   deriving (Show, Eq, Generic)
