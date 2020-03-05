@@ -1,5 +1,5 @@
 name: purescript-cst
-version: '0.13.6'
+version: '0.1.0.0'
 synopsis: PureScript Programming Language Concrete Syntax Tree
 description: The surface syntax of the PureScript Programming Language.
 category: Language
