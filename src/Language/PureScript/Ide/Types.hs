@@ -179,7 +179,6 @@ data IdeConfiguration =
   { confOutputPath :: FilePath
   , confLogLevel   :: IdeLogLevel
   , confGlobs      :: [FilePath]
-  , confEditorMode :: Bool
   }
 
 data IdeEnvironment =

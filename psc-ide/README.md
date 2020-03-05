@@ -23,12 +23,7 @@ It supports the following options:
 - `--output-directory`: Specify where to look for compiled output inside your
   project directory. Defaults to `output/`, relative to either the current
   directory or the directory specified by `-d`.
-- `--polling`: Uses polling instead of file system events to watch the externs
-  files. This flag is reversed on Windows and polling is the default.
 - `--log-level`: Can be set to one of "all", "none", "debug" and "perf"
-- `--no-watch`: Disables the filewatcher
-- `--editor-mode`: Rather than watch externs files, expect an editor to report
-  changed source files.
 - `--version`: Output psc-ide version
 
 ## Issuing queries
