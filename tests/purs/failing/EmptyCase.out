@@ -1,0 +1,10 @@
+Error found:
+at tests/purs/failing/EmptyCase.purs:4:25 - 4:26 (line 4, column 25 - line 4, column 26)
+
+  Unable to parse module:
+  Unexpected token '\'
+
+
+See https://github.com/purescript/documentation/blob/master/errors/ErrorParsingModule.md for more information,
+or to contribute content related to this error.
+

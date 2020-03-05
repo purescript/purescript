@@ -36,7 +36,7 @@ import qualified Language.PureScript.CST as CST
 import           Language.PureScript.Hierarchy (Graph(..), _unDigraph, _unGraphName, typeClasses)
 
 data HierarchyOptions = HierarchyOptions
-  { _hierachyInput   :: FilePath
+  { _hierarchyInput   :: FilePath
   , _hierarchyOutput :: Maybe FilePath
   }
 

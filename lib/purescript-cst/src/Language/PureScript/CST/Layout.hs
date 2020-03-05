@@ -215,7 +215,7 @@ insertLayout src@(SourceToken tokAnn tok) nextPos stack =
       state & insertKwProperty (pushStack tokPos LytForall)
 
     -- Lambdas need masking because the usage of `->` should not close a
-    -- LytDeclGaurd or LytCaseGuard context.
+    -- LytDeclGuard or LytCaseGuard context.
     TokBackslash ->
       state & insertDefault & pushStack tokPos LytLambdaBinders
 
@@ -267,7 +267,7 @@ insertLayout src@(SourceToken tokAnn tok) nextPos stack =
         _ ->
           state & insertDefault & pushStack tokPos LytTick
 
-    -- In gneral, commas should close all indented contexts.
+    -- In general, commas should close all indented contexts.
     --     example = [ do foo
     --                    bar, baz ]
     TokComma ->

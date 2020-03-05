@@ -1,0 +1,15 @@
+Error found:
+in module [33mTest[0m
+at tests/purs/failing/1169.purs:12:8 - 12:15 (line 12, column 8 - line 12, column 15)
+
+  Data constructor [33mTest.Inner[0m was given 1 arguments in a case expression, but expected 2 arguments.
+  This problem can be fixed by giving [33mTest.Inner[0m 2 arguments.
+
+while checking that expression [33mcase $1 of         [0m
+                               [33m  (Inner _) -> true[0m
+  has type [33mBoolean[0m
+in value declaration [33mtest2[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/IncorrectConstructorArity.md for more information,
+or to contribute content related to this error.
+

@@ -1,5 +1,4 @@
-{-# LANGUAGE PackageImports        #-}
-{-# LANGUAGE TemplateHaskell       #-}
+{-# language PackageImports, TemplateHaskell, BlockArguments #-}
 
 module Language.PureScript.Ide.Rebuild
   ( rebuildFileSync
@@ -7,20 +6,23 @@ module Language.PureScript.Ide.Rebuild
   , rebuildFile
   ) where
 
-import           Protolude
+import           Protolude hiding (moduleName)
 
 import           "monad-logger" Control.Monad.Logger
 import qualified Data.List                       as List
 import qualified Data.Map.Lazy                   as M
 import           Data.Maybe                      (fromJust)
 import qualified Data.Set                        as S
+import qualified Data.Time                       as Time
 import qualified Language.PureScript             as P
+import           Language.PureScript.Make.Cache (CacheInfo(..), normaliseForCache)
 import qualified Language.PureScript.CST         as CST
 import           Language.PureScript.Ide.Error
 import           Language.PureScript.Ide.Logging
 import           Language.PureScript.Ide.State
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util
+import           System.Directory (getCurrentDirectory)
 
 -- | Given a filepath performs the following steps:
 --
@@ -55,34 +57,71 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
     Left parseError ->
       throwError $ RebuildError $ CST.toMultipleErrors fp' parseError
     Right m -> pure m
-
+  let moduleName = P.getModuleName m
   -- Externs files must be sorted ahead of time, so that they get applied
   -- in the right order (bottom up) to the 'Environment'.
   externs <- logPerf (labelTimespec "Sorting externs") (sortExterns m =<< getExternFiles)
-
   outputDirectory <- confOutputPath . ideConfiguration <$> ask
-
   -- For rebuilding, we want to 'RebuildAlways', but for inferring foreign
   -- modules using their file paths, we need to specify the path in the 'Map'.
-  let filePathMap = M.singleton (P.getModuleName m) (Left P.RebuildAlways)
-  foreigns <- P.inferForeignModules (M.singleton (P.getModuleName m) (Right file))
-
-  let makeEnv = MakeActionsEnv outputDirectory filePathMap foreigns False
+  let filePathMap = M.singleton moduleName (Left P.RebuildAlways)
+  foreigns <- P.inferForeignModules (M.singleton moduleName (Right file))
+  let makeEnv = P.buildMakeActions outputDirectory filePathMap foreigns False
   -- Rebuild the single module using the cached externs
   (result, warnings) <- logPerf (labelTimespec "Rebuilding Module") $
-    liftIO
-    . P.runMake (P.defaultOptions { P.optionsCodegenTargets = codegenTargets })
-    . P.rebuildModule (buildMakeActions
-                        >>= shushProgress $ makeEnv) externs $ m
+    liftIO $ P.runMake (P.defaultOptions { P.optionsCodegenTargets = codegenTargets }) do
+      newExterns <- P.rebuildModule (shushProgress makeEnv) externs m
+      updateCacheDb codegenTargets outputDirectory file actualFile moduleName
+      pure newExterns
   case result of
-    Left errors -> throwError (RebuildError errors)
+    Left errors ->
+      throwError (RebuildError errors)
     Right newExterns -> do
-      whenM isEditorMode $ do
+      whenM isEditorMode do
         insertModule (fromMaybe file actualFile, m)
         insertExterns newExterns
         void populateVolatileState
       runOpenBuild (rebuildModuleOpen makeEnv externs m)
       pure (RebuildSuccess warnings)
+
+-- | When adjusting the cache db file after a rebuild we always pick a
+-- non-sensical timestamp ("1858-11-17T00:00:00Z"), and rely on the
+-- content hash to tell whether the module needs rebuilding. This is
+-- because IDE rebuilds may be triggered on temporary files to not
+-- force editors to save the actual source file to get at diagnostics
+dayZero :: Time.UTCTime
+dayZero = Time.UTCTime (Time.ModifiedJulianDay 0) 0
+
+updateCacheDb
+  :: MonadIO m
+  => MonadError P.MultipleErrors m
+  => Set P.CodegenTarget
+  -> FilePath
+  -- ^ The output directory
+  -> FilePath
+  -- ^ The file to read the content hash from
+  -> Maybe FilePath
+  -- ^ The file name to update in the cache
+  -> P.ModuleName
+  -- ^ The module name to update in the cache
+  -> m ()
+updateCacheDb codegenTargets outputDirectory file actualFile moduleName = do
+  cwd <- liftIO getCurrentDirectory
+  contentHash <- P.hashFile file
+  let moduleCacheInfo = (normaliseForCache cwd (fromMaybe file actualFile), (dayZero, contentHash))
+
+  foreignCacheInfo <-
+    if S.member P.JS codegenTargets then do
+      foreigns' <- P.inferForeignModules (M.singleton moduleName (Right (fromMaybe file actualFile)))
+      for (M.lookup moduleName foreigns') \foreignPath -> do
+        foreignHash <- P.hashFile foreignPath
+        pure (normaliseForCache cwd foreignPath, (dayZero, foreignHash))
+    else
+      pure Nothing
+
+  let cacheInfo = M.fromList (moduleCacheInfo : maybeToList foreignCacheInfo)
+  cacheDb <- P.readCacheDb' outputDirectory
+  P.writeCacheDb' outputDirectory (M.insert moduleName (CacheInfo cacheInfo) cacheDb)
 
 isEditorMode :: Ide m => m Bool
 isEditorMode = asks (confEditorMode . ideConfiguration)
@@ -109,22 +148,17 @@ rebuildFileSync fp fp' ts = rebuildFile fp fp' ts syncRun
         let ll = confLogLevel (ideConfiguration env)
         void (liftIO (runLogger ll (runReaderT action env)))
 
-
 -- | Rebuilds a module but opens up its export list first and stores the result
 -- inside the rebuild cache
 rebuildModuleOpen
   :: (Ide m, MonadLogger m)
-  => MakeActionsEnv
+  => P.MakeActions P.Make
   -> [P.ExternsFile]
   -> P.Module
   -> m ()
-rebuildModuleOpen makeEnv externs m = void $ runExceptT $ do
-  (openResult, _) <- liftIO
-    . P.runMake P.defaultOptions
-    . P.rebuildModule (buildMakeActions
-                       >>= shushProgress
-                       >>= shushCodegen
-                       $ makeEnv) externs $ openModuleExports m
+rebuildModuleOpen makeEnv externs m = void $ runExceptT do
+  (openResult, _) <- liftIO $ P.runMake P.defaultOptions $
+    P.rebuildModule (shushProgress (shushCodegen makeEnv)) externs (openModuleExports m)
   case openResult of
     Left _ ->
       throwError (GeneralError "Failed when rebuilding with open exports")
@@ -133,32 +167,14 @@ rebuildModuleOpen makeEnv externs m = void $ runExceptT $ do
         ("Setting Rebuild cache: " <> P.runModuleName (P.efModuleName result))
       cacheRebuild result
 
--- | Parameters we can access while building our @MakeActions@
-data MakeActionsEnv =
-  MakeActionsEnv
-  { maeOutputDirectory :: FilePath
-  , maeFilePathMap     :: ModuleMap (Either P.RebuildPolicy FilePath)
-  , maeForeignPathMap  :: ModuleMap FilePath
-  , maePrefixComment   :: Bool
-  }
-
--- | Builds the default @MakeActions@ from a @MakeActionsEnv@
-buildMakeActions :: MakeActionsEnv -> P.MakeActions P.Make
-buildMakeActions MakeActionsEnv{..} =
-  P.buildMakeActions
-    maeOutputDirectory
-    maeFilePathMap
-    maeForeignPathMap
-    maePrefixComment
-
 -- | Shuts the compiler up about progress messages
-shushProgress :: P.MakeActions P.Make -> MakeActionsEnv -> P.MakeActions P.Make
-shushProgress ma _ =
+shushProgress :: Monad m => P.MakeActions m -> P.MakeActions m
+shushProgress ma =
   ma { P.progress = \_ -> pure () }
 
 -- | Stops any kind of codegen
-shushCodegen :: P.MakeActions P.Make -> MakeActionsEnv -> P.MakeActions P.Make
-shushCodegen ma MakeActionsEnv{..} =
+shushCodegen :: Monad m => P.MakeActions m -> P.MakeActions m
+shushCodegen ma =
   ma { P.codegen = \_ _ _ -> pure ()
      , P.ffiCodegen = \_ -> pure ()
      }

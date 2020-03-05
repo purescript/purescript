@@ -1,0 +1,9 @@
+Error found:
+at tests/purs/failing/ExpectedWildcard.purs:8:1 - 8:51 (line 8, column 1 - line 8, column 51)
+
+  Expected a type wildcard (_) when deriving an instance for [33mTest[0m.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/ExpectedWildcard.md for more information,
+or to contribute content related to this error.
+

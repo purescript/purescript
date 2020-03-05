@@ -1,0 +1,19 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/3549.purs:8:78 - 8:79 (line 8, column 78 - line 8, column 79)
+
+  Could not match kind
+
+    [33mType[0m
+
+  with kind
+
+    [33mType -> Type[0m
+
+
+while checking the kind of [33mFunctor f => (a -> b) -> f a -> f b[0m
+in value declaration [33mmap'[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/KindsDoNotUnify.md for more information,
+or to contribute content related to this error.
+

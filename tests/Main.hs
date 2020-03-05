@@ -21,6 +21,7 @@ import qualified TestPscPublish
 import qualified TestBundle
 import qualified TestMake
 import qualified TestUtils
+import qualified TestGraph
 
 import System.IO (hSetEncoding, stdout, stderr, utf8)
 
@@ -42,6 +43,7 @@ main = do
   primDocsTests <- TestPrimDocs.main
   publishTests <- TestPscPublish.main
   hierarchyTests <- TestHierarchy.main
+  graphTests <- TestGraph.main
 
   defaultMain $
     testGroup
@@ -56,6 +58,7 @@ main = do
       , primDocsTests
       , publishTests
       , hierarchyTests
+      , graphTests
       ]
 
   where

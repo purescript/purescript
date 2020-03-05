@@ -21,6 +21,7 @@ import "this" Language.PureScript.AST.SourcePos
 import "this" Language.PureScript.Crash
 import "this" Language.PureScript.Kinds
 import "this" Language.PureScript.Names
+import "this" Language.PureScript.Roles
 import "this" Language.PureScript.TypeClassDictionaries
 import "this" Language.PureScript.Types
 import qualified "this" Language.PureScript.Constants.Prim as C
@@ -34,6 +35,8 @@ data Environment = Environment
   , dataConstructors :: M.Map (Qualified (ProperName 'ConstructorName)) (DataDeclType, ProperName 'TypeName, SourceType, [Ident])
   -- ^ Data constructors currently in scope, along with their associated type
   -- constructor name, argument types and return type.
+  , roleDeclarations :: M.Map (Qualified (ProperName 'TypeName)) [Role]
+  -- ^ Explicit role declarations currently in scope.
   , typeSynonyms :: M.Map (Qualified (ProperName 'TypeName)) ([(Text, Maybe SourceKind)], SourceType)
   -- ^ Type synonyms currently in scope
   , typeClassDictionaries :: M.Map (Maybe ModuleName) (M.Map (Qualified (ProperName 'ClassName)) (M.Map (Qualified Ident) (NEL.NonEmpty NamedDict)))
@@ -98,7 +101,17 @@ instance A.ToJSON FunctionalDependency where
 
 -- | The initial environment with no values and only the default javascript types defined
 initEnvironment :: Environment
-initEnvironment = Environment M.empty allPrimTypes M.empty M.empty M.empty allPrimClasses allPrimKinds
+initEnvironment = Environment M.empty allPrimTypes M.empty primRoles M.empty M.empty allPrimClasses allPrimKinds
+
+-- |
+-- A lookup table of role definitions for primitive types whose constructors
+-- won't be present in any environment.
+primRoles :: M.Map (Qualified (ProperName 'TypeName)) [Role]
+primRoles = M.fromList
+  [ (primName "Function", [Representational, Representational])
+  , (primName "Array", [Representational])
+  , (primName "Record", [Representational])
+  ]
 
 -- | A constructor for TypeClassData that computes which type class arguments are fully determined
 -- and argument covering sets.
@@ -129,10 +142,10 @@ makeTypeClassData
   -> TypeClassData
 makeTypeClassData args m s deps tcIsEmpty = TypeClassData args m s deps determinedArgs coveringSets tcIsEmpty
   where
-    argumentIndicies = [0 .. length args - 1]
+    argumentIndices = [0 .. length args - 1]
 
     -- each argument determines themselves
-    identities = (\i -> (i, [i])) <$> argumentIndicies
+    identities = (\i -> (i, [i])) <$> argumentIndices
 
     -- list all the edges in the graph: for each fundep an edge exists for each determiner to each determined
     contributingDeps = M.fromListWith (++) $ identities ++ do
@@ -153,7 +166,7 @@ makeTypeClassData args m s deps tcIsEmpty = TypeClassData args m s deps determin
 
     -- find all the arguments that are determined
     determinedArgs :: S.Set Int
-    determinedArgs = S.fromList $ filter isFunDepDetermined argumentIndicies
+    determinedArgs = S.fromList $ filter isFunDepDetermined argumentIndices
 
     argFromVertex :: G.Vertex -> Int
     argFromVertex index = let (_, arg, _) = fromVertex index in arg
@@ -190,7 +203,7 @@ data NameKind
   -- ^ A private value introduced as an artifact of code generation (class instances, class member
   -- accessors, etc.)
   | Public
-  -- ^ A public value for a module member or foreing import declaration
+  -- ^ A public value for a module member or foreign import declaration
   | External
   -- ^ A name for member introduced by foreign import
   deriving (Show, Eq, Generic)
@@ -423,6 +436,7 @@ allPrimTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceKind, TypeKind)
 allPrimTypes = M.unions
   [ primTypes
   , primBooleanTypes
+  , primCoerceTypes
   , primOrderingTypes
   , primRowTypes
   , primRowListTypes
@@ -435,6 +449,12 @@ primBooleanTypes =
   M.fromList
     [ (primSubName C.moduleBoolean "True", (kindBoolean, ExternData))
     , (primSubName C.moduleBoolean "False", (kindBoolean, ExternData))
+    ]
+
+primCoerceTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceKind, TypeKind)
+primCoerceTypes =
+  M.fromList
+    [ (primSubName C.moduleCoerce "Coercible", (kindType -:> kindType -:> kindConstraint, ExternData))
     ]
 
 primOrderingTypes :: M.Map (Qualified (ProperName 'TypeName)) (SourceKind, TypeKind)
@@ -494,11 +514,21 @@ primClasses =
 allPrimClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 allPrimClasses = M.unions
   [ primClasses
+  , primCoerceClasses
   , primRowClasses
   , primRowListClasses
   , primSymbolClasses
   , primTypeErrorClasses
   ]
+
+primCoerceClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
+primCoerceClasses =
+  M.fromList
+    [ (primSubName C.moduleCoerce "Coercible", makeTypeClassData
+        [ ("a", Just kindType)
+        , ("b", Just kindType)
+        ] [] [] [] True)
+    ]
 
 primRowClasses :: M.Map (Qualified (ProperName 'ClassName)) TypeClassData
 primRowClasses =
@@ -597,6 +627,21 @@ primTypeErrorClasses =
     , (primSubName C.typeError "Warn", makeTypeClassData
         [("message", Just kindDoc)] [] [] [] True)
     ]
+
+-- | Looks up a given name and, if it names a newtype, returns the names of the
+-- type's parameters, the type the newtype wraps and the names of the type's
+-- fields.
+lookupNewtypeConstructor :: Environment -> Qualified (ProperName 'TypeName) -> Maybe ([Text], SourceType, [Ident])
+lookupNewtypeConstructor env ty@(Qualified mn _) =
+  M.lookup ty (types env) >>= \case
+    (_, DataType tvs [(ctor, [wrappedTy])]) ->
+      M.lookup (Qualified mn ctor) (dataConstructors env) >>= \case
+        (Newtype, _, _, ids) ->
+          pure (map fst tvs, wrappedTy, ids)
+        _ ->
+          Nothing
+    _ ->
+      Nothing
 
 -- | Finds information about data constructors from the current environment.
 lookupConstructor :: Environment -> Qualified (ProperName 'ConstructorName) -> (DataDeclType, ProperName 'TypeName, SourceType, [Ident])

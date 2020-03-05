@@ -1,0 +1,10 @@
+Error found:
+at tests/purs/failing/2434.purs:5:13 - 5:14 (line 5, column 13 - line 5, column 14)
+
+  Unable to parse module:
+  Illegal astral code point in character literal
+
+
+See https://github.com/purescript/documentation/blob/master/errors/ErrorParsingModule.md for more information,
+or to contribute content related to this error.
+

@@ -67,6 +67,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@legrostdg](https://github.com/legrostdg) | Félix Sipma | [MIT license](http://opensource.org/licenses/MIT) |
 | [@LiamGoodacre](https://github.com/LiamGoodacre) | Liam Goodacre | [MIT license](http://opensource.org/licenses/MIT) |
 | [@lukerandall](https://github.com/lukerandall) | Luke Randall | [MIT license](http://opensource.org/licenses/MIT) |
+| [@lunaris](https://github.com/lunaris) | Will Jones | [MIT license](http://opensource.org/licenses/MIT) |
 | [@matthewleon](https://github.com/matthewleon) | Matthew Leon | [MIT license](http://opensource.org/licenses/MIT) |
 | [@mcoffin](https://github.com/mcoffin) | Matt Coffin | [MIT license](http://opensource.org/licenses/MIT) |
 | [@mhcurylo](https://github.com/mhcurylo) | Mateusz Curylo | [MIT license](http://opensource.org/licenses/MIT) |
@@ -137,6 +138,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@marcosh](https://github.com/marcosh) | Marco Perone | [MIT license](http://opensource.org/licenses/MIT) |
 | [@matthew-hilty](https://github.com/matthew-hilty) | Matthew Hilty | [MIT license](http://opensource.org/licenses/MIT) |
 | [@woody88](https://github.com/woody88) | Woodson Delhia | [MIT license](http://opensource.org/licenses/MIT) |
+| [@mhmdanas](https://github.com/mhmdanas) | Mohammed Anas | [MIT license](http://opensource.org/licenses/MIT) |
 
 ### Contributors using Modified Terms
 

@@ -34,6 +34,7 @@ import Language.PureScript.Errors
 import Language.PureScript.Kinds
 import Language.PureScript.Linter
 import Language.PureScript.Names
+import Language.PureScript.Roles
 import Language.PureScript.TypeChecker.Kinds as T
 import Language.PureScript.TypeChecker.Monad as T
 import Language.PureScript.TypeChecker.Synonyms as T
@@ -77,6 +78,16 @@ addDataConstructor moduleName dtype name args dctor dctorArgs = do
   let dctorTy = foldr function retTy tys
   let polyType = mkForAll (map (\i -> (NullSourceAnn, (i, Nothing))) args) dctorTy
   putEnv $ env { dataConstructors = M.insert (Qualified (Just moduleName) dctor) (dtype, name, polyType, fields) (dataConstructors env) }
+
+addRoleDeclaration
+  :: (MonadState CheckState m, MonadError MultipleErrors m)
+  => ModuleName
+  -> ProperName 'TypeName
+  -> [Role]
+  -> m ()
+addRoleDeclaration moduleName name roles = do
+  env <- getEnv
+  putEnv $ env { roleDeclarations = M.insert (Qualified (Just moduleName) name) roles (roleDeclarations env) }
 
 addTypeSynonym
   :: (MonadState CheckState m, MonadError MultipleErrors m)
@@ -277,6 +288,9 @@ typeCheckAll moduleName _ = traverse go
       let args' = args `withKinds` kind
       addTypeSynonym moduleName name args' ty kind
     return $ TypeSynonymDeclaration sa name args ty
+  go d@(RoleDeclaration (RoleDeclarationData _sa name roles)) = do
+    addRoleDeclaration moduleName name roles
+    return d
   go TypeDeclaration{} =
     internalError "Type declarations should have been removed before typeCheckAlld"
   go (ValueDecl sa@(ss, _) name nameKind [] [MkUnguarded val]) = do
@@ -417,7 +431,7 @@ typeCheckAll moduleName _ = traverse go
   -- Check that the instance currently being declared doesn't overlap with any
   -- other instance in any module that this instance wouldn't be considered an
   -- orphan in.  There are overlapping instance situations that won't be caught
-  -- by this, for example when combining multiparametr type classes with
+  -- by this, for example when combining multiparameter type classes with
   -- flexible instances: the instances `Cls X y` and `Cls x Y` overlap and
   -- could live in different modules but won't be caught here.
   checkOverlappingInstance

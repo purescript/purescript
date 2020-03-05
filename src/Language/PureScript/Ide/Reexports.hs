@@ -104,7 +104,7 @@ resolveRef decls ref = case ref of
           Nothing ->
             -- If the dataconstructor field inside the TypeRef is Nothing, that
             -- means that all data constructors are exported, so we need to look
-            -- those up ourselfes
+            -- those up ourselves
             findDtors tn
           Just dtors -> mapMaybe lookupDtor dtors
   P.ValueRef _ i ->

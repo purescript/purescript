@@ -134,6 +134,8 @@ convertDecl ed = case ed of
       (Just
         (IdeDeclDataConstructor
           (IdeDataConstructor edDataCtorName edDataCtorTypeCtor edDataCtorType)))
+  P.EDRole{..} ->
+    Right Nothing
   P.EDValue{..} ->
     Right (Just (IdeDeclValue (IdeValue edValueName edValueType)))
   P.EDClass{..} ->

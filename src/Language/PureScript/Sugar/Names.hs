@@ -391,7 +391,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
   updateKindName = update (importedKinds imports) KiName
 
   -- Update names so unqualified references become qualified, and locally
-  -- qualified references are replaced with their canoncial qualified names
+  -- qualified references are replaced with their canonical qualified names
   -- (e.g. M.Map -> Data.Map.Map).
   update
     :: (Ord a)

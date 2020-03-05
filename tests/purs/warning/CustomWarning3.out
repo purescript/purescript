@@ -1,0 +1,30 @@
+Error 1 of 2:
+
+  in module [33mMain[0m
+  at tests/purs/warning/CustomWarning3.purs:14:1 - 14:11 (line 14, column 1 - line 14, column 11)
+
+    A custom warning occurred while solving type class constraints:
+
+      foo
+
+
+  in value declaration [33mbaz[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/UserDefinedWarning.md for more information,
+  or to contribute content related to this error.
+
+Error 2 of 2:
+
+  in module [33mMain[0m
+  at tests/purs/warning/CustomWarning3.purs:14:1 - 14:11 (line 14, column 1 - line 14, column 11)
+
+    A custom warning occurred while solving type class constraints:
+
+      bar
+
+
+  in value declaration [33mbaz[0m
+
+  See https://github.com/purescript/documentation/blob/master/errors/UserDefinedWarning.md for more information,
+  or to contribute content related to this error.
+

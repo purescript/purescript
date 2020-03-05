@@ -1,0 +1,25 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/RowLacks.purs:16:9 - 16:68 (line 16, column 9 - line 16, column 68)
+
+  No type class instance was found for
+  [33m                              [0m
+  [33m  Prim.Row.Lacks "x"          [0m
+  [33m                 ( x :: Int   [0m
+  [33m                 , y :: Int   [0m
+  [33m                 , z :: String[0m
+  [33m                 )            [0m
+  [33m                              [0m
+
+while applying a function [33mlacksX[0m
+  of type [33mLacks "x" t0 => RProxy t0 -> RProxy ()[0m
+  to argument [33mRProxy[0m
+while checking that expression [33mlacksX RProxy[0m
+  has type [33mRProxy ()[0m
+in value declaration [33mtest1[0m
+
+where [33mt0[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/NoInstanceFound.md for more information,
+or to contribute content related to this error.
+

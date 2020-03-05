@@ -1,0 +1,11 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/warning/ShadowedTypeVar.purs:4:1 - 4:44 (line 4, column 1 - line 4, column 44)
+
+  Type variable [33ma[0m was shadowed.
+
+in type declaration for [33mf[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/ShadowedTypeVar.md for more information,
+or to contribute content related to this error.
+

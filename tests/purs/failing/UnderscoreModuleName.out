@@ -1,0 +1,10 @@
+Error found:
+at tests/purs/failing/UnderscoreModuleName.purs:2:8 - 2:18 (line 2, column 8 - line 2, column 18)
+
+  Unable to parse module:
+  Invalid module name; underscores and primes are not allowed in module names
+
+
+See https://github.com/purescript/documentation/blob/master/errors/ErrorParsingModule.md for more information,
+or to contribute content related to this error.
+

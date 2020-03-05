@@ -60,7 +60,7 @@ desugarGuardedExprs
 desugarGuardedExprs ss (Case scrut alternatives)
   | any (not . isTrivialExpr) scrut = do
     -- in case the scrutinee is non trivial (e.g. not a Var or Literal)
-    -- we may evaluate the scrutinee more than once when a guard occurrs.
+    -- we may evaluate the scrutinee more than once when a guard occurs.
     -- We bind the scrutinee to Vars here to mitigate this case.
     (scrut', scrut_decls) <- unzip <$> forM scrut (\e -> do
       scrut_id <- freshIdent'
@@ -252,7 +252,7 @@ desugarGuardedExprs ss (Case scrut alternatives) =
 
     -- case expressions with a single alternative which have
     -- a NullBinder occur frequently after desugaring
-    -- complex guards. This function removes these superflous
+    -- complex guards. This function removes these superfluous
     -- cases.
     optimize :: Expr -> Expr
     optimize (Case _ [CaseAlternative vb [MkUnguarded v]])
@@ -267,8 +267,8 @@ desugarGuardedExprs ss (Case scrut alternatives) =
     alts' <- desugarAlternatives alternatives
     return $ optimize (Case scrut alts')
 
-desugarGuardedExprs ss (TypedValue infered e ty) =
-  TypedValue infered <$> desugarGuardedExprs ss e <*> pure ty
+desugarGuardedExprs ss (TypedValue inferred e ty) =
+  TypedValue inferred <$> desugarGuardedExprs ss e <*> pure ty
 
 desugarGuardedExprs _ (PositionedValue ss comms e) =
   PositionedValue ss comms <$> desugarGuardedExprs ss e
@@ -406,7 +406,7 @@ makeCaseDeclaration ss ident alternatives = do
   argName _ = freshIdent'
 
   -- Combine two lists of potential names from two case alternatives
-  -- by zipping correspoding columns.
+  -- by zipping corresponding columns.
   resolveNames :: [Maybe Ident] -> [Maybe Ident] -> [Maybe Ident]
   resolveNames = zipWith resolveName
 

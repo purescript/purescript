@@ -1,0 +1,14 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/ConflictingExports.purs:3:14 - 3:22 (line 3, column 14 - line 3, column 22)
+
+  Conflicting definitions are in scope for value [33mthing[0m from the following modules:
+
+    [33mA[0m
+    [33mB[0m
+
+
+
+See https://github.com/purescript/documentation/blob/master/errors/ScopeConflict.md for more information,
+or to contribute content related to this error.
+

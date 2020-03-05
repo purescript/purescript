@@ -1,0 +1,9 @@
+Error found:
+at tests/purs/failing/AnonArgument3.purs:5:1 - 5:13 (line 5, column 1 - line 5, column 13)
+
+  An anonymous function argument appears in an invalid context.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/IncorrectAnonymousArgument.md for more information,
+or to contribute content related to this error.
+

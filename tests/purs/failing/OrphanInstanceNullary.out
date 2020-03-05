@@ -1,0 +1,18 @@
+Error found:
+in module [33mTest[0m
+at tests/purs/failing/OrphanInstanceNullary.purs:4:1 - 4:16 (line 4, column 1 - line 4, column 16)
+
+  Orphan instance [33mc[0m found for
+  [33m        [0m
+  [33m  Lib.C [0m
+  [33m        [0m
+  This problem can be resolved by declaring the instance in [33mLib[0m, or by defining the instance on a newtype wrapper.
+
+in type class instance
+[33m        [0m
+[33m  Lib.C [0m
+[33m        [0m
+
+See https://github.com/purescript/documentation/blob/master/errors/OrphanInstance.md for more information,
+or to contribute content related to this error.
+

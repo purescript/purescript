@@ -121,7 +121,7 @@ setupSupportModules = do
 getTestFiles :: FilePath -> IO [[FilePath]]
 getTestFiles testDir = do
   cwd <- getCurrentDirectory
-  let dir = cwd </> "tests" </> "purs" </> testDir
+  let dir = "tests" </> "purs" </> testDir
   testsInPath <- getFiles dir <$> testGlob dir
   let rerunPath = dir </> "RerunCompilerTests.txt"
   hasRerunFile <- doesFileExist rerunPath

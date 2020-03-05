@@ -4,6 +4,8 @@ module Language.PureScript.Make.Actions
   , ProgressMessage(..)
   , buildMakeActions
   , checkForeignDecls
+  , readCacheDb'
+  , writeCacheDb'
   ) where
 
 import           Prelude
@@ -105,6 +107,28 @@ data MakeActions m = MakeActions
   -- ^ If generating docs, output the documentation for the Prim modules
   }
 
+-- | Given the output directory, determines the location for the
+-- CacheDb file
+cacheDbFile :: FilePath -> FilePath
+cacheDbFile = (</> "cache-db.json")
+
+readCacheDb'
+  :: (MonadIO m, MonadError MultipleErrors m)
+  => FilePath
+  -- ^ The path to the output directory
+  -> m CacheDb
+readCacheDb' outputDir =
+  fromMaybe mempty <$> readJSONFile (cacheDbFile outputDir)
+
+writeCacheDb'
+  :: (MonadIO m, MonadError MultipleErrors m)
+  => FilePath
+  -- ^ The path to the output directory
+  -> CacheDb
+  -- ^ The CacheDb to be written
+  -> m ()
+writeCacheDb' = writeJSONFile . cacheDbFile
+
 -- | A set of make actions that read and write modules from the given directory.
 buildMakeActions
   :: FilePath
@@ -129,7 +153,8 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
       Left policy ->
         return (Left policy)
       Right filePath -> do
-        let inputPaths = filePath : maybeToList (M.lookup mn foreigns)
+        cwd <- makeIO "Getting the current directory" getCurrentDirectory
+        let inputPaths = map (normaliseForCache cwd) (filePath : maybeToList (M.lookup mn foreigns))
             getInfo fp = do
               ts <- getTimestamp fp
               return (ts, hashFile fp)
@@ -246,12 +271,10 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   progress = liftIO . putStrLn . renderProgressMessage
 
   readCacheDb :: Make CacheDb
-  readCacheDb = fmap (fromMaybe mempty) $ readJSONFile cacheDbFile
+  readCacheDb = readCacheDb' outputDir
 
   writeCacheDb :: CacheDb -> Make ()
-  writeCacheDb = writeJSONFile cacheDbFile
-
-  cacheDbFile = outputDir </> "cache-db.json"
+  writeCacheDb = writeCacheDb' outputDir
 
 -- | Check that the declarations in a given PureScript module match with those
 -- in its corresponding foreign module.

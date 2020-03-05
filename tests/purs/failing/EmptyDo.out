@@ -1,0 +1,10 @@
+Error found:
+at tests/purs/failing/EmptyDo.purs:7:1 - 7:1 (line 7, column 1 - line 7, column 1)
+
+  Unable to parse module:
+  Unexpected or mismatched indentation
+
+
+See https://github.com/purescript/documentation/blob/master/errors/ErrorParsingModule.md for more information,
+or to contribute content related to this error.
+

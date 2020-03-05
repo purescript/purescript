@@ -1,0 +1,19 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/1071.purs:7:18 - 7:23 (line 7, column 18 - line 7, column 23)
+
+  Could not match kind
+
+    [33mType -> Type[0m
+
+  with kind
+
+    [33mType[0m
+
+
+while checking the kind of [33mFoo a => a -> a[0m
+in value declaration [33mbar[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/KindsDoNotUnify.md for more information,
+or to contribute content related to this error.
+

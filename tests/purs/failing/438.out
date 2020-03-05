@@ -1,0 +1,25 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/438.purs:15:11 - 15:25 (line 15, column 11 - line 15, column 25)
+
+  Type class instance for
+  [33m                                [0m
+  [33m  Data.Eq.Eq (Array (Fix Array))[0m
+  [33m                                [0m
+  is possibly infinite.
+
+while solving type class constraint
+[33m                        [0m
+[33m  Data.Eq.Eq (Fix Array)[0m
+[33m                        [0m
+while applying a function [33meq[0m
+  of type [33mEq t0 => t0 -> t0 -> Boolean[0m
+  to argument [33mIn [][0m
+while inferring the type of [33meq (In [])[0m
+in value declaration [33mexample[0m
+
+where [33mt0[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/PossiblyInfiniteInstance.md for more information,
+or to contribute content related to this error.
+

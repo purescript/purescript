@@ -1,0 +1,22 @@
+Error 1 of 2:
+
+  in module [33mMain[0m
+  at tests/purs/warning/UnusedImport.purs:8:1 - 8:14 (line 8, column 1 - line 8, column 14)
+
+    The import of [33mEffect[0m is redundant
+
+
+  See https://github.com/purescript/documentation/blob/master/errors/UnusedImport.md for more information,
+  or to contribute content related to this error.
+
+Error 2 of 2:
+
+  in module [33mMain[0m
+  at tests/purs/warning/UnusedImport.purs:9:1 - 9:33 (line 9, column 1 - line 9, column 33)
+
+    The qualified import of [33mEffect.Console[0m as [33mConsole[0m is redundant
+
+
+  See https://github.com/purescript/documentation/blob/master/errors/UnusedImport.md for more information,
+  or to contribute content related to this error.
+

@@ -1,0 +1,10 @@
+Error found:
+in module [33mC[0m
+at tests/purs/failing/ExportConflictType.purs:2:21 - 2:29 (line 2, column 21 - line 2, column 29)
+
+  Export for type [33mB.T[0m conflicts with type [33mA.T[0m
+
+
+See https://github.com/purescript/documentation/blob/master/errors/ExportConflict.md for more information,
+or to contribute content related to this error.
+

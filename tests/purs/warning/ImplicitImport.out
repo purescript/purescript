@@ -1,0 +1,28 @@
+Error 1 of 2:
+
+  in module [33mMain[0m
+  at tests/purs/warning/ImplicitImport.purs:6:1 - 6:14 (line 6, column 1 - line 6, column 14)
+
+    Module [33mEffect[0m has unspecified imports, consider using the explicit form:
+
+      [33mimport Effect (Effect)[0m
+
+
+
+  See https://github.com/purescript/documentation/blob/master/errors/ImplicitImport.md for more information,
+  or to contribute content related to this error.
+
+Error 2 of 2:
+
+  in module [33mMain[0m
+  at tests/purs/warning/ImplicitImport.purs:5:1 - 5:15 (line 5, column 1 - line 5, column 15)
+
+    Module [33mPrelude[0m has unspecified imports, consider using the explicit form:
+
+      [33mimport Prelude (Unit, pure, unit)[0m
+
+
+
+  See https://github.com/purescript/documentation/blob/master/errors/ImplicitImport.md for more information,
+  or to contribute content related to this error.
+

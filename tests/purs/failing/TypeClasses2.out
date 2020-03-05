@@ -1,0 +1,20 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/TypeClasses2.purs:7:8 - 7:22 (line 7, column 8 - line 7, column 22)
+
+  No type class instance was found for
+  [33m                  [0m
+  [33m  Main.Show String[0m
+  [33m                  [0m
+
+while applying a function [33mshow[0m
+  of type [33mShow t0 => t0 -> String[0m
+  to argument [33m"testing"[0m
+while inferring the type of [33mshow "testing"[0m
+in value declaration [33mtest[0m
+
+where [33mt0[0m is an unknown type
+
+See https://github.com/purescript/documentation/blob/master/errors/NoInstanceFound.md for more information,
+or to contribute content related to this error.
+

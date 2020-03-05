@@ -14,6 +14,7 @@ import           Prelude
 
 import           Control.Concurrent.Async.Lifted as A
 import           Control.Concurrent.Lifted as C
+import           Control.Monad.Base (liftBase)
 import           Control.Monad hiding (sequence)
 import           Control.Monad.Trans.Control (MonadBaseControl(..))
 import           Control.Monad.Trans.Maybe (MaybeT(..), runMaybeT)
@@ -30,6 +31,7 @@ import           Language.PureScript.Make.Actions as Actions
 import           Language.PureScript.Make.Cache
 import           Language.PureScript.Names (ModuleName)
 import           Language.PureScript.Sugar.Names.Env
+import           System.Directory (getCurrentDirectory)
 
 -- | The BuildPlan tracks information about our build progress, and holds all
 -- prebuilt modules for incremental builds.
@@ -176,7 +178,8 @@ construct MakeActions{..} cacheDb (sorted, graph) = do
             , statusNewCacheInfo = Nothing
             })
         Right cacheInfo -> do
-          (newCacheInfo, isUpToDate) <- checkChanged cacheDb moduleName cacheInfo
+          cwd <- liftBase getCurrentDirectory
+          (newCacheInfo, isUpToDate) <- checkChanged cacheDb moduleName cwd cacheInfo
           prebuilt <-
             if isUpToDate
               then findExistingExtern moduleName

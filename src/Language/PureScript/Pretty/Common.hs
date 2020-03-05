@@ -114,7 +114,7 @@ emptyPrinterState :: PrinterState
 emptyPrinterState = PrinterState { indent = 0 }
 
 -- |
--- Number of characters per identation level
+-- Number of characters per indentation level
 --
 blockIndent :: Int
 blockIndent = 4
