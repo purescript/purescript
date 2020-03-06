@@ -34,7 +34,11 @@ fi
 $STACK build --only-snapshot $STACK_OPTS
 
 # Test in a source distribution (see above)
-$STACK sdist --tar-dir sdist-test;
+$STACK sdist lib/purescript-ast --tar-dir sdist-test/lib/purescript-ast
+tar -xzf sdist-test/lib/purescript-ast/purescript-ast-*.tar.gz -C sdist-test/lib/purescript-ast --strip-components=1
+$STACK sdist lib/purescript-cst --tar-dir sdist-test/lib/purescript-cst
+tar -xzf sdist-test/lib/purescript-cst/purescript-cst-*.tar.gz -C sdist-test/lib/purescript-cst --strip-components=1
+$STACK sdist . --tar-dir sdist-test;
 tar -xzf sdist-test/purescript-*.tar.gz -C sdist-test --strip-components=1
 pushd sdist-test
 $STACK build --pedantic $STACK_OPTS
