@@ -77,10 +77,10 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
     Left errors ->
       throwError (RebuildError errors)
     Right newExterns -> do
-      whenM isEditorMode do
-        insertModule (fromMaybe file actualFile, m)
-        insertExterns newExterns
-        void populateVolatileState
+      insertModule (fromMaybe file actualFile, m)
+      insertExterns newExterns
+      void populateVolatileState
+      _ <- updateCacheTimestamp
       runOpenBuild (rebuildModuleOpen makeEnv externs m)
       pure (RebuildSuccess warnings)
 
@@ -122,9 +122,6 @@ updateCacheDb codegenTargets outputDirectory file actualFile moduleName = do
   let cacheInfo = M.fromList (moduleCacheInfo : maybeToList foreignCacheInfo)
   cacheDb <- P.readCacheDb' outputDirectory
   P.writeCacheDb' outputDirectory (M.insert moduleName (CacheInfo cacheInfo) cacheDb)
-
-isEditorMode :: Ide m => m Bool
-isEditorMode = asks (confEditorMode . ideConfiguration)
 
 rebuildFileAsync
   :: forall m. (Ide m, MonadLogger m, MonadError IdeError m)

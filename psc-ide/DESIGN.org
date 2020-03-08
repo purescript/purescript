@@ -15,10 +15,10 @@
   =purs ide= is split into a library and an executable. The library code lives
   inside =src/Language/PureScript/Ide=. The executable, which is invoked by the
   editors is located inside =app/Command/Ide.hs=.
-  
+
   The =purs ide= library is unopinionated about:
 
-  - Protocol 
+  - Protocol
   - Concurrency Model
   - Logging
   - File watchers
@@ -33,7 +33,7 @@
    Break down the type signature:
 
    =handleCommand :: (Ide m, MonadLogger m, MonadError IdeError m) => Command -> m Success=
-   
+
    Ide m expands to (MonadReader IdeEnvironment m, MonadIO m) and so we end up
    with 4 constraints/capabilities handleCommand needs to be provided with by
    the caller.
@@ -48,7 +48,7 @@
      gets to decide how to handle them.
 
    - MonadLogger
-     
+
      purs ide uses the =MonadLogger= constraint to defer the choice of logging
      to the exeutable. This constraint can be fulfilled with a console based
      logger, a file-based one or the log messages can just be discarded (helpful
@@ -96,7 +96,7 @@
        let environment = IdeEnvironment {ideStateVar = stateVar, ideConfiguration = defConfig}
        -- It's easiest to read the next line inside out:
 
-       -- 1. apply =handleCommand= to the command 
+       -- 1. apply =handleCommand= to the command
 
        -- 2. Satisfy the MonadReader IdeEnvironment constraint by passing
        -- =environment= to =runReaderT=
@@ -144,7 +144,7 @@
    plugins.
 
 *** The Query Pipeline
-    
+
     When fulfilling completion requests or other queries, `ide` runs the stored
     declarations through the following pipeline:
 
@@ -163,7 +163,7 @@
 
     All the different filters, matchers and completion options are documented in
     the PROTOCOL.md file.
-    
+
 *** Filters
     Filters are functions of type =Map ModuleName [IdeDeclaration] ->
     Map ModuleName [IdeDeclaration]=. They only ever keep or remove
