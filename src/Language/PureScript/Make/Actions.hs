@@ -4,6 +4,7 @@ module Language.PureScript.Make.Actions
   , ProgressMessage(..)
   , buildMakeActions
   , checkForeignDecls
+  , cacheDbFile
   , readCacheDb'
   , writeCacheDb'
   ) where
