@@ -56,7 +56,11 @@ addDataType
 addDataType moduleName dtype name args dctors ctorKind = do
   env <- getEnv
   let mapDataCtor (DataConstructorDeclaration _ ctorName vars) = (ctorName, snd <$> vars)
-  putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (ctorKind, DataType args (map (mapDataCtor . fst) dctors)) (types env) }
+      qualName = (Qualified (Just moduleName) name)
+      hasSig = qualName `M.member` types env
+  putEnv $ env { types = M.insert qualName (ctorKind, DataType args (map (mapDataCtor . fst) dctors)) (types env) }
+  unless (hasSig || not (containsForAll ctorKind)) $ do
+    tell . errorMessage $ MissingKindDeclaration (if dtype == Newtype then NewtypeSig else DataSig) name ctorKind
   for_ dctors $ \(DataConstructorDeclaration _ dctor fields, polyType) ->
     warnAndRethrow (addHint (ErrorInDataConstructor dctor)) $
       addDataConstructor moduleName dtype name dctor fields polyType
@@ -87,7 +91,7 @@ addRoleDeclaration moduleName name roles = do
   putEnv $ env { roleDeclarations = M.insert (Qualified (Just moduleName) name) roles (roleDeclarations env) }
 
 addTypeSynonym
-  :: (MonadState CheckState m, MonadError MultipleErrors m)
+  :: (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
   -> ProperName 'TypeName
   -> [(Text, Maybe SourceType)]
@@ -97,8 +101,12 @@ addTypeSynonym
 addTypeSynonym moduleName name args ty kind = do
   env <- getEnv
   checkTypeSynonyms ty
-  putEnv $ env { types = M.insert (Qualified (Just moduleName) name) (kind, TypeSynonym) (types env)
-               , typeSynonyms = M.insert (Qualified (Just moduleName) name) (args, ty) (typeSynonyms env) }
+  let qualName = (Qualified (Just moduleName) name)
+      hasSig = qualName `M.member` types env
+  unless (hasSig || isDictSynonym name || not (containsForAll kind)) $ do
+    tell . errorMessage $ MissingKindDeclaration TypeSynonymSig name kind
+  putEnv $ env { types = M.insert qualName (kind, TypeSynonym) (types env)
+               , typeSynonyms = M.insert qualName (args, ty) (typeSynonyms env) }
 
 valueIsNotDefined
   :: (MonadState CheckState m, MonadError MultipleErrors m)
@@ -124,7 +132,7 @@ addValue moduleName name ty nameKind = do
 
 addTypeClass
   :: forall m
-   . (MonadState CheckState m, MonadError MultipleErrors m)
+   . (MonadState CheckState m, MonadError MultipleErrors m, MonadWriter MultipleErrors m)
   => ModuleName
   -> Qualified (ProperName 'ClassName)
   -> [(Text, Maybe SourceType)]
@@ -136,8 +144,12 @@ addTypeClass
 addTypeClass _ qualifiedClassName args implies dependencies ds kind = do
   env <- getEnv
   let newClass = mkNewClass env
+      qualName = fmap coerceProperName qualifiedClassName
+      hasSig = qualName `M.member` types env
+  unless (hasSig || not (containsForAll kind)) $ do
+    tell . errorMessage $ MissingKindDeclaration ClassSig (disqualify qualName) kind
   traverse_ (checkMemberIsUsable newClass (typeSynonyms env) (types env)) classMembers
-  putEnv $ env { types = M.insert (fmap coerceProperName qualifiedClassName) (kind, ExternData) (types env)
+  putEnv $ env { types = M.insert qualName (kind, ExternData) (types env)
                , typeClasses = M.insert qualifiedClassName newClass (typeClasses env) }
   where
     classMembers :: [(Ident, SourceType)]

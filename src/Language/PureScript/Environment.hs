@@ -648,3 +648,6 @@ dictSynonymName' = (<> "$Dict")
 
 dictSynonymName :: ProperName a -> ProperName a
 dictSynonymName = ProperName . dictSynonymName' . runProperName
+
+isDictSynonym :: ProperName a -> Bool
+isDictSynonym = T.isSuffixOf "$Dict" . runProperName

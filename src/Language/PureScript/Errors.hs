@@ -161,6 +161,7 @@ errorCode em = case unwrapErrorMessage em of
   WildcardInferredType{} -> "WildcardInferredType"
   HoleInferredType{} -> "HoleInferredType"
   MissingTypeDeclaration{} -> "MissingTypeDeclaration"
+  MissingKindDeclaration{} -> "MissingKindDeclaration"
   OverlappingPattern{} -> "OverlappingPattern"
   IncompleteExhaustivityCheck{} -> "IncompleteExhaustivityCheck"
   MisleadingEmptyTypeImport{} -> "MisleadingEmptyTypeImport"
@@ -310,6 +311,7 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (WildcardInferredType ty ctx) = WildcardInferredType <$> f ty <*> traverse (sndM f) ctx
   gSimple (HoleInferredType name ty ctx env) = HoleInferredType name <$> f ty <*> traverse (sndM f) ctx  <*> traverse (onTypeSearchTypesM f) env
   gSimple (MissingTypeDeclaration nm ty) = MissingTypeDeclaration nm <$> f ty
+  gSimple (MissingKindDeclaration sig nm ty) = MissingKindDeclaration sig nm <$> f ty
   gSimple (CannotGeneralizeRecursiveFunction nm ty) = CannotGeneralizeRecursiveFunction nm <$> f ty
   gSimple other = pure other
 
@@ -341,8 +343,9 @@ errorSuggestion err =
       ImplicitQualifiedImport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
       ImplicitQualifiedImportReExport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
       HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
-      MissingTypeDeclaration ident ty -> suggest $ showIdent ident <> " :: " <> T.pack (prettyPrintSuggestedType ty)
-      WildcardInferredType ty _ -> suggest $ T.pack (prettyPrintSuggestedType ty)
+      MissingTypeDeclaration ident ty -> suggest $ showIdent ident <> " :: " <> T.pack (prettyPrintSuggestedTypeSimplified ty) <> "\n"
+      MissingKindDeclaration sig name ty -> suggest $ prettyPrintKindSignatureFor sig <> " " <> runProperName name <> " :: " <> T.pack (prettyPrintSuggestedTypeSimplified ty) <> "\n"
+      WildcardInferredType ty _ -> suggest $ T.pack (prettyPrintSuggestedTypeSimplified ty)
       WarningParsingCSTModule pe -> do
         let toks = CST.errToks pe
         case CST.errType pe of
@@ -379,6 +382,7 @@ suggestionSpan e =
     getSpan simple ss =
       case simple of
         MissingTypeDeclaration{} -> startOnly ss
+        MissingKindDeclaration{} -> startOnly ss
         _ -> ss
 
 showSuggestion :: SimpleErrorMessage -> Text
@@ -926,6 +930,15 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , line $ "The inferred type of " <> markCode (showIdent ident) <> " was:"
             , markCodeBox $ indent $ prettyTypeWithDepth maxBound ty
             ]
+    renderSimpleErrorMessage (MissingKindDeclaration sig name ty) =
+      let sigKw = prettyPrintKindSignatureFor sig in
+      paras [ line $ "The inferred kind for the " <> sigKw <> " declaration " <> markCode (runProperName name) <> " contains polymorphic kinds."
+            , line $ "Consider adding a top-level kind signature as a form of documentation."
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line $ sigKw <> " " <> runProperName name <> " ::"
+                , prettyTypeWithDepth maxBound ty
+                ]
+            ]
     renderSimpleErrorMessage (OverlappingPattern bs b) =
       paras $ [ line "A case expression contains unreachable cases:\n"
               , Box.hsep 1 Box.left (map (paras . map (line . prettyPrintBinderAtom)) (transpose bs))
@@ -1453,6 +1466,15 @@ prettyPrintRef (ModuleRef _ name) =
   Just $ "module " <> runModuleName name
 prettyPrintRef ReExportRef{} =
   Nothing
+
+prettyPrintKindSignatureFor :: KindSignatureFor -> Text
+prettyPrintKindSignatureFor DataSig = "data"
+prettyPrintKindSignatureFor NewtypeSig = "newtype"
+prettyPrintKindSignatureFor TypeSynonymSig = "type"
+prettyPrintKindSignatureFor ClassSig = "class"
+
+prettyPrintSuggestedTypeSimplified :: Type a -> String
+prettyPrintSuggestedTypeSimplified = prettyPrintSuggestedType . eraseForAllKindAnnotations . eraseKindApps
 
 -- | Pretty print multiple errors
 prettyPrintMultipleErrors :: PPEOptions -> MultipleErrors -> String

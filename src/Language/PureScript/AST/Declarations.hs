@@ -149,6 +149,7 @@ data SimpleErrorMessage
   | WildcardInferredType SourceType Context
   | HoleInferredType Text SourceType Context (Maybe TypeSearch)
   | MissingTypeDeclaration Ident SourceType
+  | MissingKindDeclaration KindSignatureFor (ProperName 'TypeName) SourceType
   | OverlappingPattern [[Binder]] Bool
   | IncompleteExhaustivityCheck
   | MisleadingEmptyTypeImport ModuleName (ProperName 'TypeName)
