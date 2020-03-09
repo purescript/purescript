@@ -6,6 +6,7 @@ module Language.PureScript.Ide.Test where
 
 import           Control.Concurrent.STM
 import           "monad-logger" Control.Monad.Logger
+import           Data.IORef
 import qualified Data.Map                        as Map
 import           Language.PureScript.Ide
 import           Language.PureScript.Ide.Command
@@ -24,13 +25,13 @@ defConfig =
     { confLogLevel = LogNone
     , confOutputPath = "output/"
     , confGlobs = ["src/**/*.purs"]
-    , confEditorMode = False
     }
 
 runIde' :: IdeConfiguration -> IdeState -> [Command] -> IO ([Either IdeError Success], IdeState)
 runIde' conf s cs = do
   stateVar <- newTVarIO s
-  let env' = IdeEnvironment {ideStateVar = stateVar, ideConfiguration = conf}
+  ts <- newIORef Nothing
+  let env' = IdeEnvironment {ideStateVar = stateVar, ideConfiguration = conf, ideCacheDbTimestamp = ts}
   r <- runNoLoggingT (runReaderT (traverse (runExceptT . handleCommand) cs) env')
   newState <- readTVarIO stateVar
   pure (r, newState)

@@ -12,13 +12,14 @@
 -- The server accepting commands for psc-ide
 -----------------------------------------------------------------------------
 
-{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings     #-}
-{-# LANGUAGE PackageImports        #-}
-{-# LANGUAGE RecordWildCards       #-}
-{-# LANGUAGE TemplateHaskell       #-}
-{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PackageImports #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE LambdaCase #-}
 
 module Command.Ide (command) where
 
@@ -27,6 +28,7 @@ import           Protolude
 import qualified Data.Aeson as Aeson
 import           Control.Concurrent.STM
 import           "monad-logger" Control.Monad.Logger
+import           Data.IORef
 import qualified Data.Text.IO                      as T
 import qualified Data.ByteString.Char8             as BS8
 import qualified Data.ByteString.Lazy.Char8        as BSL8
@@ -35,12 +37,11 @@ import           Language.PureScript.Ide
 import           Language.PureScript.Ide.Command
 import           Language.PureScript.Ide.Util
 import           Language.PureScript.Ide.Error
+import           Language.PureScript.Ide.State (updateCacheTimestamp)
 import           Language.PureScript.Ide.Types
-import           Language.PureScript.Ide.Watcher
 import qualified Network.Socket                    as Network
 import qualified Options.Applicative               as Opts
 import           System.Directory
-import           System.Info                       as SysInfo
 import           System.FilePath
 import           System.IO                         hiding (putStrLn, print)
 import           System.IO.Error                   (isEOFError)
@@ -66,10 +67,11 @@ data ServerOptions = ServerOptions
   , _serverGlobs      :: [FilePath]
   , _serverOutputPath :: FilePath
   , _serverPort       :: Network.PortNumber
-  , _serverNoWatch    :: Bool
-  , _serverPolling    :: Bool
   , _serverLoglevel   :: IdeLogLevel
+  -- TODO(Christoph) Deprecated
   , _serverEditorMode :: Bool
+  , _serverPolling    :: Bool
+  , _serverNoWatch    :: Bool
   } deriving (Show)
 
 data ClientOptions = ClientOptions
@@ -114,7 +116,7 @@ command = Opts.helper <*> subcommands where
     Opts.option Opts.auto (Opts.long "port" `mappend` Opts.short 'p' `mappend` Opts.value (4242 :: Integer))
 
   server :: ServerOptions -> IO ()
-  server opts'@(ServerOptions dir globs outputPath port noWatch polling logLevel editorMode) = do
+  server opts'@(ServerOptions dir globs outputPath port logLevel editorMode polling noWatch) = do
     when (logLevel == LogDebug || logLevel == LogAll)
       (putText "Parsed Options:" *> print opts')
     maybe (pure ()) setCurrentDirectory dir
@@ -122,20 +124,32 @@ command = Opts.helper <*> subcommands where
     cwd <- getCurrentDirectory
     let fullOutputPath = cwd </> outputPath
 
+    when editorMode
+      (putText "The --editor-mode flag is deprecated and ignored. It's now the default behaviour and the flag will be removed in a future version")
+
+    when polling
+      (putText "The --polling flag is deprecated and ignored. purs ide no longer uses a file system watcher, instead it relies on its clients to notify it about updates and checks timestamps to invalidate itself")
+
+    when noWatch
+      (putText "The --no-watch flag is deprecated and ignored. purs ide no longer uses a file system watcher, instead it relies on its clients to notify it about updates and checks timestamps to invalidate itself")
+
     unlessM (doesDirectoryExist fullOutputPath) $ do
       putText "Your output directory didn't exist. This usually means you didn't compile your project yet."
       putText "psc-ide needs you to compile your project (for example by running pulp build)"
 
-    unless (noWatch || editorMode) $
-      void (forkFinally (watcher polling logLevel ideState fullOutputPath) print)
     let
       conf = IdeConfiguration
         { confLogLevel = logLevel
         , confOutputPath = outputPath
         , confGlobs = globs
-        , confEditorMode = editorMode
         }
-    let env = IdeEnvironment {ideStateVar = ideState, ideConfiguration = conf}
+    ts <- newIORef Nothing
+    let
+      env = IdeEnvironment
+        { ideStateVar = ideState
+        , ideConfiguration = conf
+        , ideCacheDbTimestamp = ts
+        }
     startServer port env
 
   serverOptions :: Opts.Parser ServerOptions
@@ -146,13 +160,14 @@ command = Opts.helper <*> subcommands where
       <*> Opts.strOption (Opts.long "output-directory" `mappend` Opts.value "output/")
       <*> (fromIntegral <$>
            Opts.option Opts.auto (Opts.long "port" `mappend` Opts.short 'p' `mappend` Opts.value (4242 :: Integer)))
-      <*> Opts.switch (Opts.long "no-watch")
-      <*> flipIfWindows (Opts.switch (Opts.long "polling"))
       <*> (parseLogLevel <$> Opts.strOption
            (Opts.long "log-level"
             `mappend` Opts.value ""
             `mappend` Opts.help "One of \"debug\", \"perf\", \"all\" or \"none\""))
+      -- TODO(Christoph): Deprecated
       <*> Opts.switch (Opts.long "editor-mode")
+      <*> Opts.switch (Opts.long "no-watch")
+      <*> Opts.switch (Opts.long "polling")
 
   parseLogLevel :: Text -> IdeLogLevel
   parseLogLevel s = case s of
@@ -161,10 +176,6 @@ command = Opts.helper <*> subcommands where
     "all" -> LogAll
     "none" -> LogNone
     _ -> LogDefault
-
-  -- polling is the default on Windows and the flag turns it off. See
-  -- #2209 and #2414 for explanations
-  flipIfWindows = map (if SysInfo.os == "mingw32" then not else identity)
 
 startServer :: Network.PortNumber -> IdeEnvironment -> IO ()
 startServer port env = Network.withSocketsDo $ do
@@ -185,7 +196,16 @@ startServer port env = Network.withSocketsDo $ do
                       <> " took "
                       <> displayTimeSpec duration
               logPerf message $ do
-                result <- runExceptT (handleCommand cmd')
+                result <- runExceptT $ do
+                  updateCacheTimestamp >>= \case
+                    Nothing -> pure ()
+                    Just (before, after) -> do
+                      -- If the cache db file was changed outside of the IDE
+                      -- we trigger a reset before processing the command
+                      $(logInfo) ("cachedb was changed from: " <> show before <> ", to: " <> show after)
+                      unless (isLoadAll cmd') $
+                        void (handleCommand Reset *> handleCommand (LoadSync []))
+                  handleCommand cmd'
                 liftIO $ catchGoneHandle $ BSL8.hPutStrLn h $ case result of
                   Right r  -> Aeson.encode r
                   Left err -> Aeson.encode err
@@ -197,11 +217,16 @@ startServer port env = Network.withSocketsDo $ do
                 hFlush stdout
           liftIO $ catchGoneHandle (hClose h)
 
+isLoadAll :: Command -> Bool
+isLoadAll = \case
+  Load [] -> True
+  _ -> False
+
 catchGoneHandle :: IO () -> IO ()
 catchGoneHandle =
   handle (\e -> case e of
     IOError { ioe_type = ResourceVanished } ->
-      putText ("[Error] psc-ide-server tried interact with the handle, but the connection was already gone.")
+      putText ("[Error] psc-ide-server tried to interact with the handle, but the connection was already gone.")
     _ -> throwIO e)
 
 acceptCommand

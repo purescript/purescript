@@ -138,6 +138,7 @@ If you would prefer to use different terms, please use the section below instead
 | [@marcosh](https://github.com/marcosh) | Marco Perone | [MIT license](http://opensource.org/licenses/MIT) |
 | [@matthew-hilty](https://github.com/matthew-hilty) | Matthew Hilty | [MIT license](http://opensource.org/licenses/MIT) |
 | [@woody88](https://github.com/woody88) | Woodson Delhia | [MIT license](http://opensource.org/licenses/MIT) |
+| [@mhmdanas](https://github.com/mhmdanas) | Mohammed Anas | [MIT license](http://opensource.org/licenses/MIT) |
 
 ### Contributors using Modified Terms
 

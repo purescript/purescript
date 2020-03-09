@@ -113,7 +113,7 @@ data ExternsDeclaration =
       , edTypeSynonymArguments    :: [(Text, Maybe SourceType)]
       , edTypeSynonymType         :: SourceType
       }
-  -- | A data construtor
+  -- | A data constructor
   | EDDataConstructor
       { edDataCtorName            :: ProperName 'ConstructorName
       , edDataCtorOrigin          :: DataDeclType

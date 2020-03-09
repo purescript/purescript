@@ -43,7 +43,7 @@ import           System.Directory (getCurrentDirectory, getDirectoryContents, do
 import           System.FilePath ((</>), normalise)
 import           System.FilePath.Glob (glob)
 
--- | Accepts a Commmand and runs it against psc-ide's State. This is the main
+-- | Accepts a Command and runs it against psc-ide's State. This is the main
 -- entry point for the server.
 handleCommand
   :: (Ide m, MonadLogger m, MonadError IdeError m)
