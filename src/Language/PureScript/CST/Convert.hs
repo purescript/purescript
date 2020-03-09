@@ -26,12 +26,14 @@ import qualified Data.Text as Text
 import qualified Language.PureScript.AST as AST
 import qualified Language.PureScript.AST.SourcePos as Pos
 import qualified Language.PureScript.Comments as C
+import Language.PureScript.Crash (internalError)
 import qualified Language.PureScript.Environment as Env
 import qualified Language.PureScript.Label as L
 import qualified Language.PureScript.Names as N
 import Language.PureScript.PSString (mkString)
 import qualified Language.PureScript.Types as T
 import Language.PureScript.CST.Positions
+import Language.PureScript.CST.Print (printToken)
 import Language.PureScript.CST.Types
 
 comment :: Comment a -> Maybe C.Comment
@@ -495,7 +497,7 @@ convertDeclaration fileName decl = case decl of
         TokLowerName [] "newtype" -> AST.NewtypeSig
         TokLowerName [] "type" -> AST.TypeSynonymSig
         TokLowerName [] "class" -> AST.ClassSig
-        _ -> AST.DataSig -- TODO
+        tok -> internalError $ "Invalid kind signature keyword " <> Text.unpack (printToken tok)
     pure . AST.KindDeclaration ann kindFor (nameValue name) $ convertType fileName ty
   DeclSignature _ lbl ->
     pure $ convertSignature fileName lbl
