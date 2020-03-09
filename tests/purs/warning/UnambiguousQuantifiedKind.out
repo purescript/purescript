@@ -1,6 +1,6 @@
 Error found:
 in module [33mMain[0m
-at tests/purs/warning/UnambiguousQuantifiedKind.purs:11:1 - 11:11 (line 11, column 1 - line 11, column 11)
+at tests/purs/warning/UnambiguousQuantifiedKind.purs:12:1 - 12:11 (line 12, column 1 - line 12, column 11)
 
   No type declaration was provided for the top-level declaration of [33mtest2[0m.
   It is good practice to provide type declarations as a form of documentation.

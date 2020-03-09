@@ -1,6 +1,7 @@
 -- @shouldWarnWith MissingTypeDeclaration
 module Main where
 
+data Proxy :: forall k. k -> Type
 data Proxy a = Proxy
 
 -- Should not trigger a warning
