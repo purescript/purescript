@@ -27,7 +27,7 @@ import Language.PureScript.Names
 import Language.PureScript.Sugar.Names.Common (warnDuplicateRefs)
 import Language.PureScript.Sugar.Names.Env
 import Language.PureScript.Sugar.Names.Imports
-import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Constants.Prim as C
 
 -- |
 -- Map of module name to list of imported names from that module which have

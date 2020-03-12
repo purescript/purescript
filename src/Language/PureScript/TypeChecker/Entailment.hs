@@ -47,7 +47,8 @@ import Language.PureScript.TypeClassDictionaries
 import Language.PureScript.Types
 import Language.PureScript.Label (Label(..))
 import Language.PureScript.PSString (PSString, mkString, decodeString)
-import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Constants.Prelude as C
+import qualified Language.PureScript.Constants.Prim as C
 
 -- | Describes what sort of dictionary to generate for type class instances
 data Evidence

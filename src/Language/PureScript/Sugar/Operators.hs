@@ -37,7 +37,7 @@ import Data.Maybe (mapMaybe, listToMaybe)
 import Data.Traversable (for)
 import qualified Data.Map as M
 
-import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Constants.Prelude as C
 
 -- |
 -- Removes unary negation operators and replaces them with calls to `negate`.

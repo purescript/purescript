@@ -4,7 +4,7 @@ import           Protolude
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import qualified Language.PureScript as P
-import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Constants.Prim as C
 import qualified Language.PureScript.Environment as PEnv
 import           Language.PureScript.Ide.Types
 

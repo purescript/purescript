@@ -1,0 +1,162 @@
+-- | Various constants which refer to things in Prim
+module Language.PureScript.Constants.Prim where
+
+import "base-compat" Prelude.Compat
+
+import "base" Data.String (IsString)
+import "this" Language.PureScript.Names
+
+-- Prim values
+
+undefined :: forall a. (IsString a) => a
+undefined = "undefined"
+
+-- Prim
+
+partial :: forall a. (IsString a) => a
+partial = "Partial"
+
+pattern Prim :: ModuleName
+pattern Prim = ModuleName [ProperName "Prim"]
+
+pattern Partial :: Qualified (ProperName 'ClassName)
+pattern Partial = Qualified (Just Prim) (ProperName "Partial")
+
+pattern Record :: Qualified (ProperName 'TypeName)
+pattern Record = Qualified (Just Prim) (ProperName "Record")
+
+-- Prim.Boolean
+
+pattern PrimBoolean :: ModuleName
+pattern PrimBoolean = ModuleName [ProperName "Prim", ProperName "Boolean"]
+
+booleanTrue :: Qualified (ProperName 'TypeName)
+booleanTrue = Qualified (Just PrimBoolean) (ProperName "True")
+
+booleanFalse :: Qualified (ProperName 'TypeName)
+booleanFalse = Qualified (Just PrimBoolean) (ProperName "False")
+
+-- Prim.Coerce
+
+pattern PrimCoerce :: ModuleName
+pattern PrimCoerce = ModuleName [ProperName "Prim", ProperName "Coerce"]
+
+pattern Coercible :: Qualified (ProperName 'ClassName)
+pattern Coercible = Qualified (Just PrimCoerce) (ProperName "Coercible")
+
+-- Prim.Ordering
+
+pattern PrimOrdering :: ModuleName
+pattern PrimOrdering = ModuleName [ProperName "Prim", ProperName "Ordering"]
+
+orderingLT :: Qualified (ProperName 'TypeName)
+orderingLT = Qualified (Just PrimOrdering) (ProperName "LT")
+
+orderingEQ :: Qualified (ProperName 'TypeName)
+orderingEQ = Qualified (Just PrimOrdering) (ProperName "EQ")
+
+orderingGT :: Qualified (ProperName 'TypeName)
+orderingGT = Qualified (Just PrimOrdering) (ProperName "GT")
+
+-- Prim.Row
+
+pattern PrimRow :: ModuleName
+pattern PrimRow = ModuleName [ProperName "Prim", ProperName "Row"]
+
+pattern RowUnion :: Qualified (ProperName 'ClassName)
+pattern RowUnion = Qualified (Just PrimRow) (ProperName "Union")
+
+pattern RowNub :: Qualified (ProperName 'ClassName)
+pattern RowNub = Qualified (Just PrimRow) (ProperName "Nub")
+
+pattern RowCons :: Qualified (ProperName 'ClassName)
+pattern RowCons = Qualified (Just PrimRow) (ProperName "Cons")
+
+pattern RowLacks :: Qualified (ProperName 'ClassName)
+pattern RowLacks = Qualified (Just PrimRow) (ProperName "Lacks")
+
+-- Prim.RowList
+
+pattern PrimRowList :: ModuleName
+pattern PrimRowList = ModuleName [ProperName "Prim", ProperName "RowList"]
+
+pattern RowToList :: Qualified (ProperName 'ClassName)
+pattern RowToList = Qualified (Just PrimRowList) (ProperName "RowToList")
+
+pattern RowListNil :: Qualified (ProperName 'TypeName)
+pattern RowListNil = Qualified (Just PrimRowList) (ProperName "Nil")
+
+pattern RowListCons :: Qualified (ProperName 'TypeName)
+pattern RowListCons = Qualified (Just PrimRowList) (ProperName "Cons")
+
+-- Prim.Symbol
+
+pattern PrimSymbol :: ModuleName
+pattern PrimSymbol = ModuleName [ProperName "Prim", ProperName "Symbol"]
+
+pattern SymbolCompare :: Qualified (ProperName 'ClassName)
+pattern SymbolCompare = Qualified (Just PrimSymbol) (ProperName "Compare")
+
+pattern SymbolAppend :: Qualified (ProperName 'ClassName)
+pattern SymbolAppend = Qualified (Just PrimSymbol) (ProperName "Append")
+
+pattern SymbolCons :: Qualified (ProperName 'ClassName)
+pattern SymbolCons = Qualified (Just PrimSymbol) (ProperName "Cons")
+
+-- Prim.TypeError
+
+pattern PrimTypeError :: ModuleName
+pattern PrimTypeError = ModuleName [ProperName "Prim", ProperName "TypeError"]
+
+pattern Fail :: Qualified (ProperName 'ClassName)
+pattern Fail = Qualified (Just PrimTypeError) (ProperName "Fail")
+
+pattern Warn :: Qualified (ProperName 'ClassName)
+pattern Warn = Qualified (Just PrimTypeError) (ProperName "Warn")
+
+primModules :: [ModuleName]
+primModules = [Prim, PrimBoolean, PrimCoerce, PrimOrdering, PrimRow, PrimRowList, PrimSymbol, PrimTypeError]
+
+typ :: forall a. (IsString a) => a
+typ = "Type"
+
+kindBoolean :: forall a. (IsString a) => a
+kindBoolean = "Boolean"
+
+kindOrdering :: forall a. (IsString a) => a
+kindOrdering = "Ordering"
+
+kindRowList :: forall a. (IsString a) => a
+kindRowList = "RowList"
+
+symbol :: forall a. (IsString a) => a
+symbol = "Symbol"
+
+doc :: forall a. (IsString a) => a
+doc = "Doc"
+
+-- Modules
+
+prim :: forall a. (IsString a) => a
+prim = "Prim"
+
+moduleBoolean :: forall a. (IsString a) => a
+moduleBoolean = "Boolean"
+
+moduleCoerce :: forall a. (IsString a) => a
+moduleCoerce = "Coerce"
+
+moduleOrdering :: forall a. (IsString a) => a
+moduleOrdering = "Ordering"
+
+moduleRow :: forall a. (IsString a) => a
+moduleRow = "Row"
+
+moduleRowList :: forall a. (IsString a) => a
+moduleRowList = "RowList"
+
+moduleSymbol :: forall a. (IsString a) => a
+moduleSymbol = "Symbol"
+
+typeError :: forall a. (IsString a) => a
+typeError = "TypeError"
