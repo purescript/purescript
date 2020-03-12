@@ -11,7 +11,7 @@ import Data.Text (Text)
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.CoreImp.Optimizer.Common
 import Language.PureScript.PSString (mkString)
-import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Constants.Prelude as C
 
 -- | Inline type class dictionaries for >>= and return for the Eff monad
 --

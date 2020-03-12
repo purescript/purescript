@@ -17,7 +17,8 @@ import           Data.Ord (comparing)
 import qualified Data.Set as S
 import           Data.Text (Text)
 import           Language.PureScript.AST
-import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Constants.Prelude as C
+import qualified Language.PureScript.Constants.Prim as C
 import           Language.PureScript.Crash
 import           Language.PureScript.Environment
 import           Language.PureScript.Errors
