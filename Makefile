@@ -57,7 +57,6 @@ dev-deps: ## Install helpful development tools.
 	stack install ghcid ghc-prof-aeson-flamegraph
 
 license-generator: ## Update dependencies in LICENSE
-	$(stack) ls dependencies --flag purescript:RELEASE | stack license-generator/generate.hs > LICENSE
-
+	$(stack) ls dependencies purescript --flag purescript:RELEASE | stack license-generator/generate.hs > LICENSE
 
 .PHONY : build build-dirty run install ghci test test-ghci test-profiling ghcid dev-deps license-generator

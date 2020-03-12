@@ -59,9 +59,13 @@ depsNamesAndVersions :: IO [(String, String)]
 depsNamesAndVersions = do
   contents <- lines <$> getContents
   deps <- traverse parse contents
-  pure (filter (\(name, _) -> name /= "purescript" && name /= "rts") deps)
+  pure (filter (\(name, _) -> not (excluded name)) deps)
 
   where
+  excluded name =
+    name == "purescript"
+    || name == "rts"
+
   parse line =
     case splitOn " " line of
       [pkg, vers] -> pure (pkg, vers)

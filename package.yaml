@@ -56,7 +56,6 @@ dependencies:
   - data-ordlist >=0.4.7.0
   - deepseq
   - directory >=1.2.3
-  - dlist
   - edit-distance
   - file-embed
   - filepath
@@ -76,9 +75,10 @@ dependencies:
   - pattern-arrows >=0.0.2 && <0.1
   - process >=1.2.0 && <1.7
   - protolude >=0.1.6 && <0.2.4
+  - purescript-ast
+  - purescript-cst
   - regex-tdfa
   - safe >=0.3.9 && <0.4
-  - scientific >=0.3.4.9 && <0.4
   - semigroups >=0.16.2 && <0.19
   - semialign >=1 && <1.1
   - sourcemap >=0.1.6

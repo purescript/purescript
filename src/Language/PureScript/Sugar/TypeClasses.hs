@@ -21,7 +21,7 @@ import           Data.Maybe (catMaybes, mapMaybe, isJust, fromMaybe)
 import qualified Data.List.NonEmpty as NEL
 import qualified Data.Set as S
 import           Data.Text (Text)
-import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Constants.Prim as C
 import           Language.PureScript.Crash
 import           Language.PureScript.Environment
 import           Language.PureScript.Errors hiding (isExported)

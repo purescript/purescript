@@ -25,7 +25,8 @@ import Language.PureScript.PSString (PSString)
 import Language.PureScript.CoreImp.AST
 import Language.PureScript.CoreImp.Optimizer.Common
 import Language.PureScript.AST (SourceSpan(..))
-import qualified Language.PureScript.Constants as C
+import qualified Language.PureScript.Constants.Prelude as C
+import qualified Language.PureScript.Constants.Prim as C
 
 -- TODO: Potential bug:
 -- Shouldn't just inline this case: { var x = 0; x.toFixed(10); }
