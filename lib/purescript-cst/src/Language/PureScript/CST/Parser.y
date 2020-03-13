@@ -264,6 +264,10 @@ label :: { Label }
   | 'true' { toLabel $1 }
   | 'type' { toLabel $1 }
   | 'where' { toLabel $1 }
+  | 'role' { toLabel $1 }
+  | 'nominal' { toLabel $1 }
+  | 'representational' { toLabel $1 }
+  | 'phantom' { toLabel $1 }
 
 hole :: { Name Ident }
   : LIT_HOLE {% toName Ident $1 }
