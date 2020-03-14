@@ -4,7 +4,7 @@ at tests/purs/failing/TransitiveKindExport.purs:2:1 - 6:39 (line 2, column 1 - l
 
   An export for [33mTestProxy[0m requires the following to also be exported:
 
-    [33mkind Test[0m
+    [33mTest[0m
 
 
 

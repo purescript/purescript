@@ -327,7 +327,7 @@ checkForeignDecls m path = do
   -- identifier should be enough.
   parseIdent :: String -> Either String Ident
   parseIdent str =
-    bimap (const str) (Ident . CST.getIdent . CST.nameValue)
+    bimap (const str) (Ident . CST.getIdent . CST.nameValue . snd)
       . CST.runTokenParser CST.parseIdent
       . CST.lex
       $ T.pack str

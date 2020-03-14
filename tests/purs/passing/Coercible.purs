@@ -28,6 +28,9 @@ id12ToId21 = coerce
 
 newtype Phantom1 a b = Phantom1 a
 
+phantom1TypeToPhantom1Symbol :: forall x (y :: Type) (z :: Symbol). Phantom1 x y -> Phantom1 x z
+phantom1TypeToPhantom1Symbol = coerce
+
 phantom1ToId12 :: forall x y. Phantom1 x y -> Id1 (Id2 x)
 phantom1ToId12 = coerce
 
@@ -151,5 +154,13 @@ testRolesNotReserved :: String -> String -> String -> String
 testRolesNotReserved nominal representational phantom = ""
 
 data RoleNotReserved role = RoleNotReserved role
+
+-- Contextual keywords should be allowed unquoted in rows.
+type ContextualKeywords =
+  ( nominal :: String
+  , phantom :: String
+  , representational :: String
+  , role :: String
+  )
 
 main = log (coerce (NTString1 "Done") :: String)

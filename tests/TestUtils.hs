@@ -15,6 +15,7 @@ import Control.Monad
 import Control.Monad.Reader
 import Control.Monad.Trans.Except
 import Control.Monad.Trans.Maybe
+import Control.Monad.Writer.Class (tell)
 import Control.Exception
 import Data.Char (isSpace)
 import Data.Function (on)
@@ -85,7 +86,7 @@ getSupportModuleTuples = do
   fileContents <- readInput pursFiles
   modules <- runExceptT $ ExceptT . return $ CST.parseFromFiles id fileContents
   case modules of
-    Right ms -> return ms
+    Right ms -> return (fmap (fmap snd) ms)
     Left errs -> fail (P.prettyPrintMultipleErrors P.defaultPPEOptions errs)
 
 getSupportModuleNames :: IO [T.Text]
@@ -169,7 +170,9 @@ compile
   -> IO (Either P.MultipleErrors [P.ExternsFile], P.MultipleErrors)
 compile supportModules supportExterns supportForeigns inputFiles check = runTest $ do
   fs <- liftIO $ readInput inputFiles
-  ms <- CST.parseFromFiles id fs
+  msWithWarnings <- CST.parseFromFiles id fs
+  tell $ foldMap (\(fp, (ws, _)) -> CST.toMultipleWarnings fp ws) msWithWarnings
+  let ms = fmap snd <$> msWithWarnings
   foreigns <- inferForeignModules ms
   liftIO (check (map snd ms))
   let actions = makeActions supportModules (foreigns `M.union` supportForeigns)

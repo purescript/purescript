@@ -53,7 +53,7 @@ rebuildFile
 rebuildFile file actualFile codegenTargets runOpenBuild = do
   (fp, input) <- ideReadFile file
   let fp' = fromMaybe fp actualFile
-  m <- case CST.parseFromFile fp' input of
+  (pwarnings, m) <- case sequence $ CST.parseFromFile fp' input of
     Left parseError ->
       throwError $ RebuildError $ CST.toMultipleErrors fp' parseError
     Right m -> pure m
@@ -82,7 +82,7 @@ rebuildFile file actualFile codegenTargets runOpenBuild = do
       void populateVolatileState
       _ <- updateCacheTimestamp
       runOpenBuild (rebuildModuleOpen makeEnv externs m)
-      pure (RebuildSuccess warnings)
+      pure (RebuildSuccess (CST.toMultipleWarnings fp pwarnings <> warnings))
 
 -- | When adjusting the cache db file after a rebuild we always pick a
 -- non-sensical timestamp ("1858-11-17T00:00:00Z"), and rely on the

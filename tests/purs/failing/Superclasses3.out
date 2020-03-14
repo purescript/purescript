@@ -1,12 +1,21 @@
 Error found:
 in module [33mUnknownSuperclassTypeVar[0m
-at tests/purs/failing/Superclasses3.purs:8:1 - 8:23 (line 8, column 1 - line 8, column 23)
+at tests/purs/failing/Superclasses3.purs:8:12 - 8:13 (line 8, column 12 - line 8, column 13)
 
   Type variable [33mb[0m is undefined.
 
-while checking the kind of [33m{ "Foo0" :: Record () -> Foo b[0m
-                           [33m}                             [0m
-in type synonym [33mBar[0m
+while inferring the kind of [33mb[0m
+while checking that type [33mb[0m
+  has kind [33mt0[0m
+while inferring the kind of [33mFoo$Dict b[0m
+while inferring the kind of [33mRecord () -> Foo$Dict b[0m
+while inferring the kind of [33m( "Foo0" :: Record () -> Foo$Dict b[0m
+                            [33m)                                  [0m
+while inferring the kind of [33m{ "Foo0" :: Record () -> Foo$Dict b[0m
+                            [33m}                                  [0m
+in type synonym [33mBar$Dict[0m
+
+where [33mt0[0m is an unknown type
 
 See https://github.com/purescript/documentation/blob/master/errors/UndefinedTypeVariable.md for more information,
 or to contribute content related to this error.

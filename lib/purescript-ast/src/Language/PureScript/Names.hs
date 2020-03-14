@@ -26,7 +26,6 @@ data Name
   | DctorName (ProperName 'ConstructorName)
   | TyClassName (ProperName 'ClassName)
   | ModName ModuleName
-  | KiName (ProperName 'KindName)
   deriving (Eq, Ord, Show, Generic)
 
 instance NFData Name
@@ -42,10 +41,6 @@ getValOpName _ = Nothing
 getTypeName :: Name -> Maybe (ProperName 'TypeName)
 getTypeName (TyName name) = Just name
 getTypeName _ = Nothing
-
-getKindName :: Name -> Maybe (ProperName 'KindName)
-getKindName (KiName name) = Just name
-getKindName _ = Nothing
 
 getTypeOpName :: Name -> Maybe (OpName 'TypeOpName)
 getTypeOpName (TyOpName name) = Just name
@@ -144,7 +139,6 @@ data ProperNameType
   = TypeName
   | ConstructorName
   | ClassName
-  | KindName
   | Namespace
 
 -- |

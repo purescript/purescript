@@ -17,7 +17,7 @@ module Language.PureScript.Docs.AsHtml (
 import Prelude
 import Control.Category ((>>>))
 import Control.Monad (unless)
-import Data.Bifunctor (first)
+import Data.Bifunctor (bimap)
 import Data.Char (isUpper)
 import Data.Either (isRight)
 import qualified Data.List.NonEmpty as NE
@@ -225,7 +225,7 @@ codeAsHtml r = outputWith elemAsHtml
 
   runParser :: CST.Parser a -> Text -> Either String a
   runParser p' =
-    first (CST.prettyPrintError . NE.head)
+    bimap (CST.prettyPrintError . NE.head) snd
       . CST.runTokenParser p'
       . CST.lex
 
@@ -248,7 +248,6 @@ makeFragment ns = (prefix <>) . escape
   prefix = case ns of
     TypeLevel -> "#t:"
     ValueLevel -> "#v:"
-    KindLevel -> "#k:"
 
   -- TODO
   escape = id

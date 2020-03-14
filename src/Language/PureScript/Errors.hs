@@ -27,14 +27,15 @@ import           Data.Ord (comparing)
 import qualified Data.Set as S
 import qualified Data.Text as T
 import           Data.Text (Text)
+import qualified GHC.Stack
 import           Language.PureScript.AST
 import qualified Language.PureScript.Bundle as Bundle
 import qualified Language.PureScript.Constants.Prelude as C
 import qualified Language.PureScript.Constants.Prim as C
 import           Language.PureScript.Crash
 import qualified Language.PureScript.CST.Errors as CST
+import qualified Language.PureScript.CST.Print as CST
 import           Language.PureScript.Environment
-import qualified Language.PureScript.Kinds as Kinds
 import           Language.PureScript.Label (Label(..))
 import           Language.PureScript.Names
 import           Language.PureScript.Pretty
@@ -51,10 +52,12 @@ import qualified Text.PrettyPrint.Boxes as Box
 
 -- | A type of error messages
 data SimpleErrorMessage
-  = ModuleNotFound ModuleName
+  = InternalCompilerError Text Text
+  | ModuleNotFound ModuleName
   | ErrorParsingFFIModule FilePath (Maybe Bundle.ErrorMessage)
   | ErrorParsingModule P.ParseError
   | ErrorParsingCSTModule CST.ParserError
+  | WarningParsingCSTModule CST.ParserWarning
   | MissingFFIModule ModuleName
   | UnnecessaryFFIModule ModuleName FilePath
   | MissingFFIImplementations ModuleName [Ident]
@@ -62,10 +65,11 @@ data SimpleErrorMessage
   | InvalidFFIIdentifier ModuleName Text
   | FileIOError Text IOError -- ^ A description of what we were trying to do, and the error which occurred
   | InfiniteType SourceType
-  | InfiniteKind Kinds.SourceKind
+  | InfiniteKind SourceType
   | MultipleValueOpFixities (OpName 'ValueOpName)
   | MultipleTypeOpFixities (OpName 'TypeOpName)
   | OrphanTypeDeclaration Ident
+  | OrphanKindDeclaration (ProperName 'TypeName)
   | RedefinedIdent Ident
   | OverlappingNamesInLet
   | UnknownName (Qualified Name)
@@ -86,13 +90,14 @@ data SimpleErrorMessage
   | CycleInDeclaration Ident
   | CycleInTypeSynonym (Maybe (ProperName 'TypeName))
   | CycleInTypeClassDeclaration [Qualified (ProperName 'ClassName)]
+  | CycleInKindDeclaration [Qualified (ProperName 'TypeName)]
   | CycleInModules [ModuleName]
   | NameIsUndefined Ident
   | UndefinedTypeVariable (ProperName 'TypeName)
   | PartiallyAppliedSynonym (Qualified (ProperName 'TypeName))
   | EscapedSkolem Text (Maybe SourceSpan) SourceType
   | TypesDoNotUnify SourceType SourceType
-  | KindsDoNotUnify Kinds.SourceKind Kinds.SourceKind
+  | KindsDoNotUnify SourceType SourceType
   | ConstrainedTypeUnified SourceType SourceType
   | OverlappingInstances (Qualified (ProperName 'ClassName)) [SourceType] [Qualified Ident]
   | NoInstanceFound SourceConstraint
@@ -112,7 +117,7 @@ data SimpleErrorMessage
   | OverlappingArgNames (Maybe Ident)
   | MissingClassMember (NEL.NonEmpty (Ident, SourceType))
   | ExtraneousClassMember Ident (Qualified (ProperName 'ClassName))
-  | ExpectedType SourceType Kinds.SourceKind
+  | ExpectedType SourceType SourceType
   -- | constructor name, expected argument count, actual argument count
   | IncorrectConstructorArity (Qualified (ProperName 'ConstructorName)) Int Int
   | ExprDoesNotHaveType Expr SourceType
@@ -130,6 +135,7 @@ data SimpleErrorMessage
   | WildcardInferredType SourceType Context
   | HoleInferredType Text SourceType Context (Maybe TypeSearch)
   | MissingTypeDeclaration Ident SourceType
+  | MissingKindDeclaration KindSignatureFor (ProperName 'TypeName) SourceType
   | OverlappingPattern [[Binder]] Bool
   | IncompleteExhaustivityCheck
   | MisleadingEmptyTypeImport ModuleName (ProperName 'TypeName)
@@ -163,6 +169,10 @@ data SimpleErrorMessage
   | CannotDefinePrimModules ModuleName
   | MixedAssociativityError (NEL.NonEmpty (Qualified (OpName 'AnyOpName), Associativity))
   | NonAssociativeError (NEL.NonEmpty (Qualified (OpName 'AnyOpName)))
+  | QuantificationCheckFailureInKind Text
+  | QuantificationCheckFailureInType [Int] SourceType
+  | VisibleQuantificationCheckFailureInType Text
+  | UnsupportedTypeInKind SourceType
   deriving (Show)
 
 data ErrorMessage = ErrorMessage
@@ -200,10 +210,12 @@ stripModuleAndSpan (ErrorMessage hints e) = ErrorMessage (filter (not . shouldSt
 -- | Get the error code for a particular error type
 errorCode :: ErrorMessage -> Text
 errorCode em = case unwrapErrorMessage em of
+  InternalCompilerError{} -> "InternalCompilerError"
   ModuleNotFound{} -> "ModuleNotFound"
   ErrorParsingFFIModule{} -> "ErrorParsingFFIModule"
   ErrorParsingModule{} -> "ErrorParsingModule"
   ErrorParsingCSTModule{} -> "ErrorParsingModule"
+  WarningParsingCSTModule{} -> "WarningParsingModule"
   MissingFFIModule{} -> "MissingFFIModule"
   UnnecessaryFFIModule{} -> "UnnecessaryFFIModule"
   MissingFFIImplementations{} -> "MissingFFIImplementations"
@@ -215,6 +227,7 @@ errorCode em = case unwrapErrorMessage em of
   MultipleValueOpFixities{} -> "MultipleValueOpFixities"
   MultipleTypeOpFixities{} -> "MultipleTypeOpFixities"
   OrphanTypeDeclaration{} -> "OrphanTypeDeclaration"
+  OrphanKindDeclaration{} -> "OrphanKindDeclaration"
   RedefinedIdent{} -> "RedefinedIdent"
   OverlappingNamesInLet -> "OverlappingNamesInLet"
   UnknownName{} -> "UnknownName"
@@ -235,6 +248,7 @@ errorCode em = case unwrapErrorMessage em of
   CycleInDeclaration{} -> "CycleInDeclaration"
   CycleInTypeSynonym{} -> "CycleInTypeSynonym"
   CycleInTypeClassDeclaration{} -> "CycleInTypeClassDeclaration"
+  CycleInKindDeclaration{} -> "CycleInKindDeclaration"
   CycleInModules{} -> "CycleInModules"
   NameIsUndefined{} -> "NameIsUndefined"
   UndefinedTypeVariable{} -> "UndefinedTypeVariable"
@@ -278,6 +292,7 @@ errorCode em = case unwrapErrorMessage em of
   WildcardInferredType{} -> "WildcardInferredType"
   HoleInferredType{} -> "HoleInferredType"
   MissingTypeDeclaration{} -> "MissingTypeDeclaration"
+  MissingKindDeclaration{} -> "MissingKindDeclaration"
   OverlappingPattern{} -> "OverlappingPattern"
   IncompleteExhaustivityCheck{} -> "IncompleteExhaustivityCheck"
   MisleadingEmptyTypeImport{} -> "MisleadingEmptyTypeImport"
@@ -308,6 +323,10 @@ errorCode em = case unwrapErrorMessage em of
   CannotDefinePrimModules{} -> "CannotDefinePrimModules"
   MixedAssociativityError{} -> "MixedAssociativityError"
   NonAssociativeError{} -> "NonAssociativeError"
+  QuantificationCheckFailureInKind {} -> "QuantificationCheckFailureInKind"
+  QuantificationCheckFailureInType {} -> "QuantificationCheckFailureInType"
+  VisibleQuantificationCheckFailureInType {} -> "VisibleQuantificationCheckFailureInType"
+  UnsupportedTypeInKind {} -> "UnsupportedTypeInKind"
 
 -- | A stack trace for an error
 newtype MultipleErrors = MultipleErrors
@@ -387,14 +406,14 @@ replaceUnknowns = everywhereOnTypesM replaceTypes where
         put $ m { umUnknownMap = M.insert u u' (umUnknownMap m), umNextIndex = u' + 1 }
         return (TUnknown ann u')
       Just u' -> return (TUnknown ann u')
-  replaceTypes (Skolem ann name s sko) = do
+  replaceTypes (Skolem ann name mbK s sko) = do
     m <- get
     case M.lookup s (umSkolemMap m) of
       Nothing -> do
         let s' = umNextIndex m
         put $ m { umSkolemMap = M.insert s (T.unpack name, s', Just (fst ann)) (umSkolemMap m), umNextIndex = s' + 1 }
-        return (Skolem ann name s' sko)
-      Just (_, s', _) -> return (Skolem ann name s' sko)
+        return (Skolem ann name mbK s' sko)
+      Just (_, s', _) -> return (Skolem ann name mbK s' sko)
   replaceTypes other = return other
 
 onTypesInErrorMessage :: (SourceType -> SourceType) -> ErrorMessage -> ErrorMessage
@@ -423,13 +442,15 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (WildcardInferredType ty ctx) = WildcardInferredType <$> f ty <*> traverse (sndM f) ctx
   gSimple (HoleInferredType name ty ctx env) = HoleInferredType name <$> f ty <*> traverse (sndM f) ctx  <*> traverse (onTypeSearchTypesM f) env
   gSimple (MissingTypeDeclaration nm ty) = MissingTypeDeclaration nm <$> f ty
+  gSimple (MissingKindDeclaration sig nm ty) = MissingKindDeclaration sig nm <$> f ty
   gSimple (CannotGeneralizeRecursiveFunction nm ty) = CannotGeneralizeRecursiveFunction nm <$> f ty
   gSimple other = pure other
 
   gHint (ErrorInSubsumption t1 t2) = ErrorInSubsumption <$> f t1 <*> f t2
   gHint (ErrorUnifyingTypes t1 t2) = ErrorUnifyingTypes <$> f t1 <*> f t2
   gHint (ErrorCheckingType e t) = ErrorCheckingType e <$> f t
-  gHint (ErrorCheckingKind t) = ErrorCheckingKind <$> f t
+  gHint (ErrorCheckingKind t k) = ErrorCheckingKind <$> f t <*> f k
+  gHint (ErrorInferringKind t) = ErrorInferringKind <$> f t
   gHint (ErrorInApplication e1 t1 e2) = ErrorInApplication e1 <$> f t1 <*> pure e2
   gHint (ErrorInInstance cl ts) = ErrorInInstance cl <$> traverse f ts
   gHint (ErrorSolvingConstraint con) = ErrorSolvingConstraint <$> overConstraintArgs (traverse f) con
@@ -453,8 +474,20 @@ errorSuggestion err =
       ImplicitQualifiedImport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
       ImplicitQualifiedImportReExport mn asModule refs -> suggest $ importSuggestion mn refs (Just asModule)
       HidingImport mn refs -> suggest $ importSuggestion mn refs Nothing
-      MissingTypeDeclaration ident ty -> suggest $ showIdent ident <> " :: " <> T.pack (prettyPrintSuggestedType ty)
-      WildcardInferredType ty _ -> suggest $ T.pack (prettyPrintSuggestedType ty)
+      MissingTypeDeclaration ident ty -> suggest $ showIdent ident <> " :: " <> T.pack (prettyPrintSuggestedTypeSimplified ty) <> "\n"
+      MissingKindDeclaration sig name ty -> suggest $ prettyPrintKindSignatureFor sig <> " " <> runProperName name <> " :: " <> T.pack (prettyPrintSuggestedTypeSimplified ty) <> "\n"
+      WildcardInferredType ty _ -> suggest $ T.pack (prettyPrintSuggestedTypeSimplified ty)
+      WarningParsingCSTModule pe -> do
+        let toks = CST.errToks pe
+        case CST.errType pe of
+          CST.WarnDeprecatedRowSyntax -> do
+            let kind = CST.printTokens $ drop 1 toks
+                sugg | T.isPrefixOf " " kind = "Row" <> kind
+                     | otherwise = "Row " <> kind
+            suggest sugg
+          CST.WarnDeprecatedForeignKindSyntax -> suggest $ "data " <> CST.printTokens (drop 3 toks)
+          CST.WarnDeprecatedKindImportSyntax -> suggest $ CST.printTokens $ drop 1 toks
+          CST.WarnDeprecatedKindExportSyntax -> suggest $ CST.printTokens $ drop 1 toks
       _ -> Nothing
   where
     emptySuggestion = Just $ ErrorSuggestion ""
@@ -480,6 +513,7 @@ suggestionSpan e =
     getSpan simple ss =
       case simple of
         MissingTypeDeclaration{} -> startOnly ss
+        MissingKindDeclaration{} -> startOnly ss
         _ -> ss
 
 showSuggestion :: SimpleErrorMessage -> Text
@@ -578,6 +612,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       unknownInfo u = line $ markCode ("t" <> T.pack (show u)) <> " is an unknown type"
 
     renderSimpleErrorMessage :: SimpleErrorMessage -> Box.Box
+    renderSimpleErrorMessage (InternalCompilerError ctx err) =
+      paras [ line "Internal compiler error:"
+            , indent $ line err
+            , line ctx
+            , line "Please report this at https://github.com/purescript/purescript/issues"
+            ]
     renderSimpleErrorMessage (ModuleNotFound mn) =
       paras [ line $ "Module " <> markCode (runModuleName mn) <> " was not found."
             , line $
@@ -603,6 +643,9 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (ErrorParsingCSTModule err) =
       paras [ line "Unable to parse module: "
             , line $ T.pack $ CST.prettyPrintErrorMessage err
+            ]
+    renderSimpleErrorMessage (WarningParsingCSTModule err) =
+      paras [ line $ T.pack $ CST.prettyPrintWarningMessage err
             ]
     renderSimpleErrorMessage (MissingFFIModule mn) =
       line $ "The foreign module implementation for module " <> markCode (runModuleName mn) <> " is missing."
@@ -634,11 +677,11 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line "The same name was used more than once in a let binding."
     renderSimpleErrorMessage (InfiniteType ty) =
       paras [ line "An infinite type was inferred for an expression: "
-            , markCodeBox $ indent $ typeAsBox prettyDepth ty
+            , markCodeBox $ indent $ prettyType ty
             ]
     renderSimpleErrorMessage (InfiniteKind ki) =
       paras [ line "An infinite kind was inferred for a type: "
-            , indent $ line $ markCode $ prettyPrintKind ki
+            , markCodeBox $ indent $ prettyType ki
             ]
     renderSimpleErrorMessage (MultipleValueOpFixities op) =
       line $ "There are multiple fixity/precedence declarations for operator " <> markCode (showOp op)
@@ -646,6 +689,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       line $ "There are multiple fixity/precedence declarations for type operator " <> markCode (showOp op)
     renderSimpleErrorMessage (OrphanTypeDeclaration nm) =
       line $ "The type declaration for " <> markCode (showIdent nm) <> " should be followed by its definition."
+    renderSimpleErrorMessage (OrphanKindDeclaration nm) =
+      line $ "The kind declaration for " <> markCode (runProperName nm) <> " should be followed by its definition."
     renderSimpleErrorMessage (RedefinedIdent name) =
       line $ "The value " <> markCode (showIdent name) <> " has been defined multiple times"
     renderSimpleErrorMessage (UnknownName name@(Qualified Nothing (IdentName (Ident i)))) | i `elem` [ C.bind, C.discard ] =
@@ -711,6 +756,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , indent $ line $ "{" <> (T.intercalate ", " (map (markCode . runProperName . disqualify) names)) <> "}"
             , line "Cycles are disallowed because they can lead to loops in the type checker."
             ]
+    renderSimpleErrorMessage (CycleInKindDeclaration [name]) =
+      paras [ line $ "A kind declaration '" <> markCode (runProperName (disqualify name)) <> "' may not refer to itself in its own signature." ]
+    renderSimpleErrorMessage (CycleInKindDeclaration names) =
+      paras [ line $ "A cycle appears in a set of kind declarations:"
+            , indent $ line $ "{" <> (T.intercalate ", " (map (markCode . runProperName . disqualify) names)) <> "}"
+            , line "Kind declarations may not refer to themselves in their own signatures."
+            ]
     renderSimpleErrorMessage (NameIsUndefined ident) =
       line $ "Value " <> markCode (showIdent ident) <> " is undefined."
     renderSimpleErrorMessage (UndefinedTypeVariable name) =
@@ -721,13 +773,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
     renderSimpleErrorMessage (EscapedSkolem name Nothing ty) =
       paras [ line $ "The type variable " <> markCode name <> " has escaped its scope, appearing in the type"
-            , markCodeBox $ indent $ typeAsBox prettyDepth ty
+            , markCodeBox $ indent $ prettyType ty
             ]
     renderSimpleErrorMessage (EscapedSkolem name (Just srcSpan) ty) =
       paras [ line $ "The type variable " <> markCode name <> ", bound at"
             , indent $ line $ displaySourceSpan relPath srcSpan
             , line "has escaped its scope, appearing in the type"
-            , markCodeBox $ indent $ typeAsBox prettyDepth ty
+            , markCodeBox $ indent $ prettyType ty
             ]
     renderSimpleErrorMessage (TypesDoNotUnify u1 u2)
       = let (row1Box, row2Box) = printRows u1 u2
@@ -740,15 +792,15 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
 
     renderSimpleErrorMessage (KindsDoNotUnify k1 k2) =
       paras [ line "Could not match kind"
-            , indent $ line $ markCode $ prettyPrintKind k1
+            , markCodeBox $ indent $ prettyType k1
             , line "with kind"
-            , indent $ line $ markCode $ prettyPrintKind k2
+            , markCodeBox $ indent $ prettyType k2
             ]
     renderSimpleErrorMessage (ConstrainedTypeUnified t1 t2) =
       paras [ line "Could not match constrained type"
-            , markCodeBox $ indent $ typeAsBox prettyDepth t1
+            , markCodeBox $ indent $ prettyType t1
             , line "with type"
-            , markCodeBox $ indent $ typeAsBox prettyDepth t2
+            , markCodeBox $ indent $ prettyType t2
             ]
     renderSimpleErrorMessage (OverlappingInstances _ _ []) = internalError "OverlappingInstances: empty instance list"
     renderSimpleErrorMessage (OverlappingInstances nm ts ds) =
@@ -765,11 +817,12 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , markCodeBox $ indent $ line (showQualified runProperName nm)
             , line "because the class was not in scope. Perhaps it was not exported."
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Fail [ ty ] _)) | Just box <- toTypelevelString ty =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Fail _ [ ty ] _)) | Just box <- toTypelevelString ty =
       paras [ line "A custom type error occurred while solving type class constraints:"
             , indent box
             ]
     renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Partial
+                                                          _
                                                           _
                                                           (Just (PartialConstraintData bs b)))) =
       paras [ line "A case expression could not be determined to cover all inputs."
@@ -780,13 +833,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                   : [line "..." | not b]
             , line "Alternatively, add a Partial constraint to the type of the enclosing value."
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Discard [ty] _)) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ C.Discard _ [ty] _)) =
       paras [ line "A result of type"
-            , markCodeBox $ indent $ typeAsBox prettyDepth ty
+            , markCodeBox $ indent $ prettyType ty
             , line "was implicitly discarded in a do notation block."
             , line ("You can use " <> markCode "_ <- ..." <> " to explicitly discard the result.")
             ]
-    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm ts _)) =
+    renderSimpleErrorMessage (NoInstanceFound (Constraint _ nm _ ts _)) =
       paras [ line "No type class instance was found for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName nm)
@@ -804,7 +857,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
         go _ = False
     renderSimpleErrorMessage (AmbiguousTypeVariables t us) =
       paras [ line "The inferred type"
-            , markCodeBox $ indent $ typeAsBox prettyDepth t
+            , markCodeBox $ indent $ prettyType t
             , line "has type variables which are not determined by those mentioned in the body of the type:"
             , indent $ Box.hsep 1 Box.left
               [ Box.vcat Box.left
@@ -876,7 +929,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
                 ]
             , "because the type"
-            , markCodeBox $ indent $ typeAsBox prettyDepth ty
+            , markCodeBox $ indent $ prettyType ty
             , line "is not of the required form T a_1 ... a_n, where T is a type constructor defined in the same module."
             ]
     renderSimpleErrorMessage (CannotFindDerivingType nm) =
@@ -897,17 +950,17 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (MissingClassMember identsAndTypes) =
       paras $ [ line "The following type class members have not been implemented:"
               , Box.vcat Box.left
-                [ markCodeBox $ Box.text (T.unpack (showIdent ident)) Box.<> " :: " Box.<> typeAsBox prettyDepth ty
+                [ markCodeBox $ Box.text (T.unpack (showIdent ident)) Box.<> " :: " Box.<> prettyType ty
                 | (ident, ty) <- NEL.toList identsAndTypes ]
               ]
     renderSimpleErrorMessage (ExtraneousClassMember ident className) =
       line $ "" <> markCode (showIdent ident) <> " is not a member of type class " <> markCode (showQualified runProperName className)
     renderSimpleErrorMessage (ExpectedType ty kind) =
-      paras [ line $ "In a type-annotated expression " <> markCode "x :: t" <> ", the type " <> markCode "t" <> " must have kind " <> markCode (prettyPrintKind kindType) <> "."
+      paras [ line $ "In a type-annotated expression " <> markCode "x :: t" <> ", the type " <> markCode "t" <> " must have kind " <> markCode C.typ <> "."
             , line "The error arises from the type"
-            , markCodeBox $ indent $ typeAsBox prettyDepth ty
+            , markCodeBox $ indent $ prettyType ty
             , line "having the kind"
-            , indent $ line $ markCode $ prettyPrintKind kind
+            , markCodeBox $ indent $ prettyType kind
             , line "instead."
             ]
     renderSimpleErrorMessage (IncorrectConstructorArity nm expected actual) =
@@ -918,7 +971,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ line "Expression"
             , markCodeBox $ indent $ prettyPrintValue prettyDepth expr
             , line "does not have type"
-            , markCodeBox $ indent $ typeAsBox prettyDepth ty
+            , markCodeBox $ indent $ prettyType ty
             ]
     renderSimpleErrorMessage (PropertyIsMissing prop) =
       line $ "Type of expression lacks required label " <> markCode (prettyPrintLabel prop) <> "."
@@ -950,7 +1003,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
     renderSimpleErrorMessage (InvalidInstanceHead ty) =
       paras [ line "Type class instance head is invalid due to use of type"
-            , markCodeBox $ indent $ typeAsBox prettyDepth ty
+            , markCodeBox $ indent $ prettyType ty
             , line "All types appearing in instance declarations must be of the form T a_1 .. a_n, where each type a_i is of the same form, unless the type is fully determined by other type class arguments via functional dependencies."
             ]
     renderSimpleErrorMessage (TransitiveExportError x ys) =
@@ -975,7 +1028,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
     renderSimpleErrorMessage (WildcardInferredType ty ctx) =
       paras $ [ line "Wildcard type definition has the inferred type "
-              , markCodeBox $ indent $ typeAsBox prettyDepth ty
+              , markCodeBox $ indent $ prettyType ty
               ] <> renderContext ctx
     renderSimpleErrorMessage (HoleInferredType name ty ctx ts) =
       let
@@ -987,7 +1040,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 let
                   idBoxes = Box.text . T.unpack . showQualified id <$> names
                   tyBoxes = (\t -> BoxHelpers.indented
-                              (Box.text ":: " Box.<> typeAsBox prettyDepth t)) <$> types
+                              (Box.text ":: " Box.<> prettyType t)) <$> types
                   longestId = maximum (map Box.cols idBoxes)
                 in
                   Box.vcat Box.top $
@@ -1000,13 +1053,22 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
           _ -> []
       in
         paras $ [ line $ "Hole '" <> markCode name <> "' has the inferred type "
-                , markCodeBox (indent (typeAsBox maxBound ty))
+                , markCodeBox (indent (prettyTypeWithDepth maxBound ty))
                 ] ++ tsResult ++ renderContext ctx
     renderSimpleErrorMessage (MissingTypeDeclaration ident ty) =
       paras [ line $ "No type declaration was provided for the top-level declaration of " <> markCode (showIdent ident) <> "."
             , line "It is good practice to provide type declarations as a form of documentation."
             , line $ "The inferred type of " <> markCode (showIdent ident) <> " was:"
-            , markCodeBox $ indent $ typeAsBox prettyDepth ty
+            , markCodeBox $ indent $ prettyTypeWithDepth maxBound ty
+            ]
+    renderSimpleErrorMessage (MissingKindDeclaration sig name ty) =
+      let sigKw = prettyPrintKindSignatureFor sig in
+      paras [ line $ "The inferred kind for the " <> sigKw <> " declaration " <> markCode (runProperName name) <> " contains polymorphic kinds."
+            , line $ "Consider adding a top-level kind signature as a form of documentation."
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line $ sigKw <> " " <> runProperName name <> " ::"
+                , prettyTypeWithDepth maxBound ty
+                ]
             ]
     renderSimpleErrorMessage (OverlappingPattern bs b) =
       paras $ [ line "A case expression contains unreachable cases:\n"
@@ -1099,7 +1161,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     renderSimpleErrorMessage (CannotGeneralizeRecursiveFunction ident ty) =
       paras [ line $ "Unable to generalize the type of the recursive function " <> markCode (showIdent ident) <> "."
             , line $ "The inferred type of " <> markCode (showIdent ident) <> " was:"
-            , markCodeBox $ indent $ typeAsBox prettyDepth ty
+            , markCodeBox $ indent $ prettyType ty
             , line "Try adding a type signature."
             ]
 
@@ -1125,7 +1187,7 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
           argsMsg = if expected > 1 then "arguments" else "argument"
 
     renderSimpleErrorMessage (UserDefinedWarning msgTy) =
-      let msg = fromMaybe (typeAsBox prettyDepth msgTy) (toTypelevelString msgTy) in
+      let msg = fromMaybe (prettyType msgTy) (toTypelevelString msgTy) in
       paras [ line "A custom warning occurred while solving type class constraints:"
             , indent msg
             ]
@@ -1172,6 +1234,38 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             , indent $ paras $ map (line . markCode . showQualified showOp) (NEL.toList ops)
             , line "Use parentheses to resolve this ambiguity."
             ]
+
+    renderSimpleErrorMessage (QuantificationCheckFailureInKind var) =
+      paras
+        [ line $ "Cannot generalize the kind of type variable " <> markCode var <> " since it would not be well-scoped."
+        , line "Try adding a kind annotation."
+        ]
+
+    renderSimpleErrorMessage (QuantificationCheckFailureInType us ty) =
+      let unks =
+            fmap (\u -> Box.hsep 1 Box.top [ "where"
+                                           , markCodeBox (prettyType (srcTUnknown u))
+                                           , "is an unknown kind."
+                                           ]) us
+      in paras
+           [ line "Cannot unambiguously generalize kinds appearing in the elaborated type:"
+           , indent $ markCodeBox $ typeAsBox prettyDepth ty
+           , paras unks
+           , line "Try adding additional kind signatures or polymorphic kind variables."
+           ]
+
+    renderSimpleErrorMessage (VisibleQuantificationCheckFailureInType var) =
+      paras
+        [ line $ "Visible dependent quantification of type variable " <> markCode var <> " is not supported."
+        , line $ "If you would like this feature supported, please bother Liam Goodacre (@LiamGoodacre)."
+        ]
+
+    renderSimpleErrorMessage (UnsupportedTypeInKind ty) =
+      paras
+        [ line "The type:"
+        , indent $ markCodeBox $ prettyType ty
+        , line "is not supported in kinds."
+        ]
 
     renderHint :: ErrorMessageHint -> Box.Box -> Box.Box
     renderHint (ErrorUnifyingTypes t1@RCons{} t2@RCons{}) detail =
@@ -1220,9 +1314,18 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
                ]
             ]
-    renderHint (ErrorCheckingKind ty) detail =
+    renderHint (ErrorCheckingKind ty kd) detail =
       paras [ detail
-            , Box.hsep 1 Box.top [ line "while checking the kind of"
+            , Box.hsep 1 Box.top [ line "while checking that type"
+                                 , markCodeBox $ typeAsBox prettyDepth ty
+                                 ]
+            , Box.moveRight 2 $ Box.hsep 1 Box.top [ line "has kind"
+                                                   , markCodeBox $ typeAsBox prettyDepth kd
+                                                   ]
+            ]
+    renderHint (ErrorInferringKind ty) detail =
+      paras [ detail
+            , Box.hsep 1 Box.top [ line "while inferring the kind of"
                                  , markCodeBox $ typeAsBox prettyDepth ty
                                  ]
             ]
@@ -1295,11 +1398,15 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       paras [ detail
             , line $ "in type class declaration for " <> markCode (runProperName name)
             ]
+    renderHint (ErrorInKindDeclaration name) detail =
+      paras [ detail
+            , line $ "in kind declaration for " <> markCode (runProperName name)
+            ]
     renderHint (ErrorInForeignImport nm) detail =
       paras [ detail
             , line $ "in foreign import " <> markCode (showIdent nm)
             ]
-    renderHint (ErrorSolvingConstraint (Constraint _ nm ts _)) detail =
+    renderHint (ErrorSolvingConstraint (Constraint _ nm _ ts _)) detail =
       paras [ detail
             , line "while solving type class constraint"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
@@ -1318,13 +1425,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     -- If both rows are not empty, print them as diffs
     -- If verbose print all rows else only print unique rows
     printRows :: Type a -> Type a -> (Box.Box, Box.Box)
-    printRows r1 r2 = case (full, r1, r2) of 
+    printRows r1 r2 = case (full, r1, r2) of
       (True, _ , _) -> (printRow typeAsBox r1, printRow typeAsBox r2)
 
-      (_, RCons{}, RCons{}) -> 
+      (_, RCons{}, RCons{}) ->
         let (sorted1, sorted2) = filterRows (rowToList r1) (rowToList r2)
         in (printRow typeDiffAsBox sorted1, printRow typeDiffAsBox sorted2)
-        
+
       (_, _, _) -> (printRow typeAsBox r1, printRow typeAsBox r2)
 
 
@@ -1362,7 +1469,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
     nameType (DctorName _) = "data constructor"
     nameType (TyClassName _) = "type class"
     nameType (ModName _) = "module"
-    nameType (KiName _) = "kind"
 
     runName :: Qualified Name -> Text
     runName (Qualified mn (IdentName name)) =
@@ -1377,8 +1483,6 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       showQualified runProperName (Qualified mn name)
     runName (Qualified mn (TyClassName name)) =
       showQualified runProperName (Qualified mn name)
-    runName (Qualified mn (KiName name)) =
-      showQualified runProperName (Qualified mn name)
     runName (Qualified Nothing (ModName name)) =
       runModuleName name
     runName (Qualified _ ModName{}) =
@@ -1387,6 +1491,14 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
   prettyDepth :: Int
   prettyDepth | full = 1000
               | otherwise = 3
+
+  prettyType :: Type a -> Box.Box
+  prettyType = prettyTypeWithDepth prettyDepth
+
+  prettyTypeWithDepth :: Int -> Type a -> Box.Box
+  prettyTypeWithDepth depth
+    | full = typeAsBox depth
+    | otherwise = typeAsBox depth . eraseForAllKindAnnotations . eraseKindApps
 
   levelText :: Text
   levelText = case level of
@@ -1483,10 +1595,17 @@ prettyPrintRef (TypeInstanceRef _ ident) =
   Just $ showIdent ident
 prettyPrintRef (ModuleRef _ name) =
   Just $ "module " <> runModuleName name
-prettyPrintRef (KindRef _ pn) =
-  Just $ "kind " <> runProperName pn
 prettyPrintRef ReExportRef{} =
   Nothing
+
+prettyPrintKindSignatureFor :: KindSignatureFor -> Text
+prettyPrintKindSignatureFor DataSig = "data"
+prettyPrintKindSignatureFor NewtypeSig = "newtype"
+prettyPrintKindSignatureFor TypeSynonymSig = "type"
+prettyPrintKindSignatureFor ClassSig = "class"
+
+prettyPrintSuggestedTypeSimplified :: Type a -> String
+prettyPrintSuggestedTypeSimplified = prettyPrintSuggestedType . eraseForAllKindAnnotations . eraseKindApps
 
 -- | Pretty print multiple errors
 prettyPrintMultipleErrors :: PPEOptions -> MultipleErrors -> String
@@ -1667,3 +1786,12 @@ parU xs f =
     collectErrors es = case partitionEithers es of
       ([], rs) -> return rs
       (errs, _) -> throwError $ fold errs
+
+internalCompilerError
+  :: (MonadError MultipleErrors m, GHC.Stack.HasCallStack)
+  => Text
+  -> m a
+internalCompilerError =
+  throwError
+    . errorMessage
+    . InternalCompilerError (T.pack (GHC.Stack.prettyCallStack GHC.Stack.callStack))

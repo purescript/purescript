@@ -41,7 +41,7 @@ parseModule path = do
 
 parseModule' :: FilePath -> Text -> Either FilePath (FilePath, P.Module)
 parseModule' path file =
-  case CST.parseFromFile path file of
+  case snd $ CST.parseFromFile path file of
     Left _ -> Left path
     Right m -> Right (path, m)
 
@@ -96,8 +96,6 @@ extractSpans d = case d of
     [(IdeNamespaced IdeNSValue (P.runIdent ident), ss)]
   P.ExternDataDeclaration (ss, _) name _ ->
     [(IdeNamespaced IdeNSType (P.runProperName name), ss)]
-  P.ExternKindDeclaration (ss, _) name ->
-    [(IdeNamespaced IdeNSKind (P.runProperName name), ss)]
   _ -> []
   where
     dtorSpan :: P.DataConstructorDeclaration -> (IdeNamespaced, P.SourceSpan)

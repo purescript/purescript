@@ -5,7 +5,7 @@ module Main (main, module X) where
 import Prelude
 import Effect (Effect)
 import Effect.Console (log)
-import Prim.Ordering (kind Ordering) as X
+import Prim.Ordering (Ordering) as X
 
 main :: Effect Unit
 main = log "Done"

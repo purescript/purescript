@@ -120,8 +120,6 @@ spec = do
           prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideDtor i t Nothing)) mn q is)
         addTypeImport i mn q is =
           prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideType i Nothing [])) mn q is)
-        addKindImport i mn q is =
-          prettyPrintImportSection (addExplicitImport' (_idaDeclaration (Test.ideKind i)) mn q is)
         qualify s = Just (Test.mn s)
     it "adds an implicit unqualified import to a file without any imports" $
       shouldBe
@@ -196,20 +194,6 @@ spec = do
         [ "import Prelude"
         , ""
         , "import Data.Array (head, tail) as Array"
-        ]
-    it "adds a kind to an explicit import list" $
-      shouldBe
-        (addKindImport "Effect" (P.moduleNameFromString "Control.Monad.Eff") Nothing simpleFileImports)
-        [ "import Prelude"
-        , ""
-        , "import Control.Monad.Eff (kind Effect)"
-        ]
-    it "adds a kind to an explicit qualified import list" $
-      shouldBe
-        (addKindImport "Effect" (P.moduleNameFromString "Control.Monad.Eff") (qualify "Eff") simpleFileImports)
-        [ "import Prelude"
-        , ""
-        , "import Control.Monad.Eff (kind Effect) as Eff"
         ]
     it "adds an operator to an explicit import list" $
       shouldBe

@@ -1,6 +1,6 @@
 Error found:
 in module [33mMain[0m
-at tests/purs/warning/Kind-UnusedExplicitImport-1.purs:6:1 - 6:44 (line 6, column 1 - line 6, column 44)
+at tests/purs/warning/Kind-UnusedExplicitImport-1.purs:6:1 - 6:39 (line 6, column 1 - line 6, column 39)
 
   The import of module [33mType.RowList[0m contains the following unused references:
 
@@ -8,7 +8,7 @@ at tests/purs/warning/Kind-UnusedExplicitImport-1.purs:6:1 - 6:44 (line 6, colum
 
   It could be replaced with:
 
-    [33mimport Type.RowList (kind RowList)[0m
+    [33mimport Type.RowList (RowList)[0m
 
 
 

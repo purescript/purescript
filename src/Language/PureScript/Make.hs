@@ -132,7 +132,8 @@ make ma@MakeActions{..} ms = do
     let deps = fromMaybe (internalError "make: module not found in dependency graph.") (lookup moduleName graph)
     buildModule buildPlan moduleName
       (spanName . getModuleSourceSpan . CST.resPartial $ m)
-      (importPrim <$> CST.resFull m)
+      (fst $ CST.resFull m)
+      (fmap importPrim . snd $ CST.resFull m)
       (deps `inOrderOf` map (getModuleName . CST.resPartial) sorted)
 
   -- Wait for all threads to complete, and collect results (and errors).
@@ -197,9 +198,11 @@ make ma@MakeActions{..} ms = do
   inOrderOf :: (Ord a) => [a] -> [a] -> [a]
   inOrderOf xs ys = let s = S.fromList xs in filter (`S.member` s) ys
 
-  buildModule :: BuildPlan -> ModuleName -> FilePath -> Either (NEL.NonEmpty CST.ParserError) Module -> [ModuleName] -> m ()
-  buildModule buildPlan moduleName fp mres deps = do
+  buildModule :: BuildPlan -> ModuleName -> FilePath -> [CST.ParserWarning] -> Either (NEL.NonEmpty CST.ParserError) Module -> [ModuleName] -> m ()
+  buildModule buildPlan moduleName fp pwarnings mres deps = do
     result <- flip catchError (return . BuildJobFailed) $ do
+      let pwarnings' = CST.toMultipleWarnings fp pwarnings
+      tell pwarnings'
       m <- CST.unwrapParserError fp mres
       -- We need to wait for dependencies to be built, before checking if the current
       -- module should be rebuilt, so the first thing to do is to wait on the
@@ -219,7 +222,7 @@ make ma@MakeActions{..} ms = do
             foldM go env deps
           env <- C.readMVar (bpEnv buildPlan)
           (exts, warnings) <- listen $ rebuildModule' ma env externs m
-          return $ BuildJobSucceeded warnings exts
+          return $ BuildJobSucceeded (pwarnings' <> warnings) exts
         Nothing -> return BuildJobSkipped
 
     BuildPlan.markComplete buildPlan moduleName result

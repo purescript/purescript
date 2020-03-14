@@ -22,8 +22,8 @@ while applying a function [33m(bind (#dict Bind t1)) (log "Foo")[0m
 in value declaration [33mmain[0m
 
 where [33mt1[0m is an unknown type
-      [33mt2[0m is an unknown type
       [33mt0[0m is an unknown type
+      [33mt2[0m is an unknown type
 
 See https://github.com/purescript/documentation/blob/master/errors/TypesDoNotUnify.md for more information,
 or to contribute content related to this error.

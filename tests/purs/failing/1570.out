@@ -8,9 +8,9 @@ at tests/purs/failing/1570.purs:6:10 - 6:16 (line 6, column 10 - line 6, column 
   [33m  F[0m
   [33m   [0m
   having the kind
-
-    [33mType -> Type[0m
-
+  [33m              [0m
+  [33m  Type -> Type[0m
+  [33m              [0m
   instead.
 
 while inferring the type of [33m\$0 ->      [0m

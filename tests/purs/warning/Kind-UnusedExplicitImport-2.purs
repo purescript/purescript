@@ -3,7 +3,7 @@ module Main where
 
 import Prelude (Unit, unit, pure)
 import Effect (Effect)
-import Type.RowList (RLProxy, kind RowList)
+import Type.RowList (RLProxy, RowList)
 
 f :: forall l. RLProxy l -> Int
 f _ = 0

@@ -17,7 +17,6 @@ import qualified Data.Set as S
 import Data.Text (Text)
 
 import Language.PureScript.Environment
-import Language.PureScript.Kinds
 import Language.PureScript.Names
 import Language.PureScript.Roles
 import Language.PureScript.Types
@@ -95,7 +94,8 @@ inferRoles env tyName
       -- type beneath.
       walk btvs t
     walk btvs t
-      | Just (t1, t2s) <- splitTypeApp t =
+      | (t1, _, t2s) <- unapplyTypes t
+      , not $ null t2s =
           case t1 of
             -- If the type is an application of a type constructor to some
             -- arguments, recursively infer the roles of the type constructor's
@@ -138,12 +138,12 @@ inferRoles env tyName
 -- Given the kind of a foreign type, generate a list @Nominal@ roles which, in
 -- the absence of a role signature, provides the safest default for a type whose
 -- constructors are opaque to us.
-rolesFromForeignTypeKind :: SourceKind -> [Role]
+rolesFromForeignTypeKind :: SourceType -> [Role]
 rolesFromForeignTypeKind
   = go []
   where
     go acc = \case
-      FunKind _ k1 _k2 ->
+      TypeApp _ (TypeApp _ fn k1) _k2 | eqType fn tyFunction ->
         go (Nominal : acc) k1
       _k ->
         Nominal : acc

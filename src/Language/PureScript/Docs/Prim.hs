@@ -11,7 +11,6 @@ import Data.Functor (($>))
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Map as Map
-import qualified Data.Set as Set
 import Language.PureScript.Docs.Types
 
 import qualified Language.PureScript.Crash as P
@@ -36,7 +35,7 @@ primDocsModule = Module
   , modComments = Just $ T.unlines
       [ "The `Prim` module is embedded in the PureScript compiler in order to provide compiler support for certain types &mdash; for example, value literals, or syntax sugar. It is implicitly imported unqualified in every module except those that list it as a qualified import."
       , ""
-      , "`Prim` does not include additional built-in types and kinds that are defined deeper in the compiler. For example, row kinds (e.g. `# Type`, which is the kind of types such as `(name :: String, age :: Int)`), Type wildcards (e.g. `f :: _ -> Int`), and Quantified Types. Rather, these are documented in [the PureScript language reference](https://github.com/purescript/documentation/blob/master/language/Types.md)."
+      , "`Prim` does not include additional built-in types and kinds that are defined deeper in the compiler such as Type wildcards (e.g. `f :: _ -> Int`) and Quantified Types. Rather, these are documented in [the PureScript language reference](https://github.com/purescript/documentation/blob/master/language/Types.md)."
       ]
   , modDeclarations =
       [ function
@@ -49,7 +48,9 @@ primDocsModule = Module
       , boolean
       , partial
       , kindType
+      , kindConstraint
       , kindSymbol
+      , kindRow
       ]
   , modReExports = []
   }
@@ -59,8 +60,7 @@ primBooleanDocsModule = Module
   { modName = P.moduleNameFromString "Prim.Boolean"
   , modComments = Just "The Prim.Boolean module is embedded in the PureScript compiler. Unlike `Prim`, it is not imported implicitly. It contains a type level `Boolean` data structure."
   , modDeclarations =
-      [ kindBoolean
-      , booleanTrue
+      [ booleanTrue
       , booleanFalse
       ]
   , modReExports = []
@@ -160,29 +160,10 @@ unsafeLookupOf k m errorMsg name = go name
   fromJust' (Just x) = x
   fromJust' _ = P.internalError $ errorMsg ++ show name
 
-primKindOf
-  :: NameGen 'P.KindName
-  -> Text
-  -> Text
-  -> Declaration
-primKindOf g title comments =
-  if Set.member (g title) P.allPrimKinds
-     then Declaration
-          { declTitle = title
-          , declComments = Just comments
-          , declSourceSpan = Nothing
-          , declChildren = []
-          , declInfo = ExternKindDeclaration
-          }
-    else P.internalError $ "Docs.Prim: No such Prim kind: " ++ T.unpack title
-
-primKind :: Text -> Text -> Declaration
-primKind = primKindOf P.primName
-
 lookupPrimTypeKindOf
   :: NameGen 'P.TypeName
   -> Text
-  -> Kind'
+  -> Type'
 lookupPrimTypeKindOf k = ($> ()) . fst . unsafeLookupOf k
   ( P.primTypes <>
     P.primBooleanTypes <>
@@ -236,17 +217,36 @@ primClassOf gen title comments = Declaration
   }
 
 kindType :: Declaration
-kindType = primKind "Type" $ T.unlines
+kindType = primType "Type" $ T.unlines
   [ "`Type` is the kind of all proper types: those that classify value-level terms."
   , "For example the type `Boolean` has kind `Type`; denoted by `Boolean :: Type`."
   ]
 
+kindConstraint :: Declaration
+kindConstraint = primType "Constraint" $ T.unlines
+  [ "`Constraint` is the kind of type class constraints."
+  , "For example, a type class declaration like this:"
+  , ""
+  , "    class Semigroup a where"
+  , "      append :: a -> a -> a"
+  , ""
+  , "has the kind signature:"
+  , ""
+  , "    class Semigroup :: Type -> Constraint"
+  ]
+
 kindSymbol :: Declaration
-kindSymbol = primKind "Symbol" $ T.unlines
+kindSymbol = primType "Symbol" $ T.unlines
   [ "`Symbol` is the kind of type-level strings."
   , ""
   , "Construct types of this kind using the same literal syntax as documented"
   , "for strings."
+  ]
+
+kindRow :: Declaration
+kindRow = primType "Row" $ T.unlines
+  [ "`Row` is the kind constructor of label-indexed types which map type-level strings to other types."
+  , "For example, the kind of `Record` is `Row Type -> Type`, mapping field names to values."
   ]
 
 function :: Declaration
@@ -363,11 +363,6 @@ partial = primClass "Partial" $ T.unlines
   , "[purescript-partial](https://pursuit.purescript.org/packages/purescript-partial/)."
   ]
 
-kindBoolean :: Declaration
-kindBoolean = primKindOf (P.primSubName "Boolean") "Boolean" $ T.unlines
-  [ "The `Boolean` kind provides True/False types at the type level"
-  ]
-
 booleanTrue :: Declaration
 booleanTrue = primTypeOf (P.primSubName "Boolean") "True" $ T.unlines
   [ "The 'True' boolean type."
@@ -417,7 +412,7 @@ coercible = primClassOf (P.primSubName "Coerce") "Coercible" $ T.unlines
   ]
 
 kindOrdering :: Declaration
-kindOrdering = primKindOf (P.primSubName "Ordering") "Ordering" $ T.unlines
+kindOrdering = primTypeOf (P.primSubName "Ordering") "Ordering" $ T.unlines
   [ "The `Ordering` kind represents the three possibilities of comparing two"
   , "types of the same kind: `LT` (less than), `EQ` (equal to), and"
   , "`GT` (greater than)."
@@ -464,7 +459,7 @@ rowCons = primClassOf (P.primSubName "Row") "Cons" $ T.unlines
   ]
 
 kindRowList :: Declaration
-kindRowList = primKindOf (P.primSubName "RowList") "RowList" $ T.unlines
+kindRowList = primTypeOf (P.primSubName "RowList") "RowList" $ T.unlines
   [ "A type level list representation of a row of types."
   ]
 
@@ -524,7 +519,7 @@ warn = primClassOf (P.primSubName "TypeError") "Warn" $ T.unlines
   ]
 
 kindDoc :: Declaration
-kindDoc = primKindOf (P.primSubName "TypeError") "Doc" $ T.unlines
+kindDoc = primTypeOf (P.primSubName "TypeError") "Doc" $ T.unlines
   [ "`Doc` is the kind of type-level documents."
   , ""
   , "This kind is used with the `Fail` and `Warn` type classes."

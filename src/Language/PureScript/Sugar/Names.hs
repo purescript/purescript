@@ -27,7 +27,6 @@ import Language.PureScript.AST
 import Language.PureScript.Crash
 import Language.PureScript.Errors
 import Language.PureScript.Externs
-import Language.PureScript.Kinds
 import Language.PureScript.Linter.Imports
 import Language.PureScript.Names
 import Language.PureScript.Sugar.Names.Env
@@ -121,9 +120,6 @@ externsEnv env ExternsFile{..} = do
   exportedValueOps :: M.Map (OpName 'ValueOpName) ExportSource
   exportedValueOps = exportedRefs getValueOpRef
 
-  exportedKinds :: M.Map (ProperName 'KindName) ExportSource
-  exportedKinds = exportedRefs getKindRef
-
   exportedRefs :: Ord a => (DeclarationRef -> Maybe a) -> M.Map a ExportSource
   exportedRefs f =
     M.fromList $ (, localExportSource) <$> mapMaybe f efExports
@@ -145,7 +141,6 @@ elaborateExports exps (Module ss coms mn decls refs) =
     ++ go (TypeClassRef ss) exportedTypeClasses
     ++ go (ValueRef ss) exportedValues
     ++ go (ValueOpRef ss) exportedValueOps
-    ++ go (KindRef ss) exportedKinds
     ++ maybe [] (filter isModuleRef) refs
   where
 
@@ -227,6 +222,10 @@ renameInModule imports (Module modSS coms mn decls exps) =
         <*> updateClassName cn ss
         <*> traverse updateTypesEverywhere ts
         <*> pure ds
+  updateDecl bound (KindDeclaration sa kindFor name ty) =
+    fmap (bound,) $
+      KindDeclaration sa kindFor name
+        <$> updateTypesEverywhere ty
   updateDecl bound (TypeDeclaration (TypeDeclarationData sa name ty)) =
     fmap (bound,) $
       TypeDeclaration . TypeDeclarationData sa name
@@ -238,7 +237,7 @@ renameInModule imports (Module modSS coms mn decls exps) =
   updateDecl bound (ExternDataDeclaration sa name ki) =
     fmap (bound,) $
       ExternDataDeclaration sa name
-        <$> updateKindsEverywhere ki
+        <$> updateTypesEverywhere ki
   updateDecl bound (TypeFixityDeclaration sa@(ss, _) fixity alias op) =
     fmap (bound,) $
       TypeFixityDeclaration sa fixity
@@ -316,17 +315,10 @@ renameInModule imports (Module modSS coms mn decls exps) =
   letBoundVariable :: Declaration -> Maybe Ident
   letBoundVariable = fmap valdeclIdent . getValueDeclaration
 
-  updateKindsEverywhere :: SourceKind -> m SourceKind
-  updateKindsEverywhere = everywhereOnKindsM updateKind
-    where
-    updateKind :: SourceKind -> m SourceKind
-    updateKind (NamedKind ann@(ss, _) name) = NamedKind ann <$> updateKindName name ss
-    updateKind k = return k
-
   updateTypeArguments
     :: (Traversable f, Traversable g)
-    => f (a, g SourceKind) -> m (f (a, g SourceKind))
-  updateTypeArguments = traverse (sndM (traverse updateKindsEverywhere))
+    => f (a, g SourceType) -> m (f (a, g SourceType))
+  updateTypeArguments = traverse (sndM (traverse updateTypesEverywhere))
 
   updateTypesEverywhere :: SourceType -> m SourceType
   updateTypesEverywhere = everywhereOnTypesM updateType
@@ -335,19 +327,16 @@ renameInModule imports (Module modSS coms mn decls exps) =
     updateType (TypeOp ann@(ss, _) name) = TypeOp ann <$> updateTypeOpName name ss
     updateType (TypeConstructor ann@(ss, _) name) = TypeConstructor ann <$> updateTypeName name ss
     updateType (ConstrainedType ann c t) = ConstrainedType ann <$> updateInConstraint c <*> pure t
-    updateType (ForAll ann v mbK t sco) = case mbK of
-      Nothing -> pure $ ForAll ann v Nothing t sco
-      Just k -> ForAll ann v <$> fmap pure (updateKindsEverywhere k) <*> pure t <*> pure sco
-    updateType (KindedType ann t k) = KindedType ann t <$> updateKindsEverywhere k
     updateType t = return t
     updateInConstraint :: SourceConstraint -> m SourceConstraint
-    updateInConstraint (Constraint ann@(ss, _) name ts info) =
-      Constraint ann <$> updateClassName name ss <*> pure ts <*> pure info
+    updateInConstraint (Constraint ann@(ss, _) name ks ts info) =
+      Constraint ann <$> updateClassName name ss <*> pure ks <*> pure ts <*> pure info
 
   updateConstraints :: SourceSpan -> [SourceConstraint] -> m [SourceConstraint]
-  updateConstraints pos = traverse $ \(Constraint ann name ts info) ->
+  updateConstraints pos = traverse $ \(Constraint ann name ks ts info) ->
     Constraint ann
       <$> updateClassName name pos
+      <*> traverse updateTypesEverywhere ks
       <*> traverse updateTypesEverywhere ts
       <*> pure info
 
@@ -383,12 +372,6 @@ renameInModule imports (Module modSS coms mn decls exps) =
     -> SourceSpan
     -> m (Qualified (OpName 'ValueOpName))
   updateValueOpName = update (importedValueOps imports) ValOpName
-
-  updateKindName
-    :: Qualified (ProperName 'KindName)
-    -> SourceSpan
-    -> m (Qualified (ProperName 'KindName))
-  updateKindName = update (importedKinds imports) KiName
 
   -- Update names so unqualified references become qualified, and locally
   -- qualified references are replaced with their canonical qualified names

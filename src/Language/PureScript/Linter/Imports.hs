@@ -178,7 +178,6 @@ lintImports (Module _ _ mn mdecls (Just mexports)) env usedImps = do
       ++ extractByQual mne (importedDataConstructors scope) DctorName
       ++ extractByQual mne (importedValues scope) IdentName
       ++ extractByQual mne (importedValueOps scope) ValOpName
-      ++ extractByQual mne (importedKinds scope) KiName
     where
     go :: (ModuleName, Qualified Name) -> UsedImports -> UsedImports
     go (q, name) = M.alter (Just . maybe [name] (name :)) q
@@ -329,14 +328,13 @@ findUsedRefs ss env mni qn names =
     valueOpRefs = ValueOpRef ss <$> mapMaybe (getValOpName <=< disqualifyFor qn) names
     typeOpRefs = TypeOpRef ss <$> mapMaybe (getTypeOpName <=< disqualifyFor qn) names
     types = mapMaybe (getTypeName <=< disqualifyFor qn) names
-    kindRefs = KindRef ss <$> mapMaybe (getKindName <=< disqualifyFor qn) names
     dctors = mapMaybe (getDctorName <=< disqualifyFor qn) names
     typesWithDctors = reconstructTypeRefs dctors
     typesWithoutDctors = filter (`M.notMember` typesWithDctors) types
     typesRefs
       = map (flip (TypeRef ss) (Just [])) typesWithoutDctors
       ++ map (\(ty, ds) -> TypeRef ss ty (Just ds)) (M.toList typesWithDctors)
-  in sortBy compDecRef $ classRefs ++ typeOpRefs ++ typesRefs ++ kindRefs ++ valueRefs ++ valueOpRefs
+  in sortBy compDecRef $ classRefs ++ typeOpRefs ++ typesRefs ++ valueRefs ++ valueOpRefs
 
   where
 
@@ -374,7 +372,6 @@ runDeclRef (ValueOpRef _ op) = Just $ ValOpName op
 runDeclRef (TypeRef _ pn _) = Just $ TyName pn
 runDeclRef (TypeOpRef _ op) = Just $ TyOpName op
 runDeclRef (TypeClassRef _ pn) = Just $ TyClassName pn
-runDeclRef (KindRef _ pn) = Just $ KiName pn
 runDeclRef _ = Nothing
 
 checkDuplicateImports

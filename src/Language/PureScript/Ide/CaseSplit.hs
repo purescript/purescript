@@ -44,7 +44,7 @@ explicitAnnotations = WildcardAnnotations True
 noAnnotations :: WildcardAnnotations
 noAnnotations = WildcardAnnotations False
 
-type DataType = ([(Text, Maybe P.SourceKind)], [(P.ProperName 'P.ConstructorName, [P.SourceType])])
+type DataType = ([(Text, Maybe P.SourceType)], [(P.ProperName 'P.ConstructorName, [P.SourceType])])
 
 caseSplit
   :: (Ide m, MonadError IdeError m)
@@ -125,14 +125,14 @@ parseType' :: (MonadError IdeError m) =>
               Text -> m P.SourceType
 parseType' s =
   case CST.runTokenParser CST.parseType $ CST.lex s of
-    Right type' -> pure $ CST.convertType "<purs-ide>" type'
+    Right type' -> pure $ CST.convertType "<purs-ide>" $ snd type'
     Left err ->
       throwError (GeneralError ("Parsing the splittype failed with:"
                                 <> show err))
 
 parseTypeDeclaration' :: (MonadError IdeError m) => Text -> m (P.Ident, P.SourceType)
 parseTypeDeclaration' s =
-  let x = fmap (CST.convertDeclaration "<purs-ide>")
+  let x = fmap (CST.convertDeclaration "<purs-ide>" . snd)
         $ CST.runTokenParser CST.parseDecl
         $ CST.lex s
   in

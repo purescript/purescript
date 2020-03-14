@@ -21,7 +21,7 @@ ann0 = (span0, [])
 ann1 = (span1, [])
 ann2 = (span2, [])
 
-typeAnnotation1, value1, synonym1, class1, class2, data1, data2, valueFixity, typeFixity, foreign1, foreign2, foreign3, member1 :: P.Declaration
+typeAnnotation1, value1, synonym1, class1, class2, data1, data2, valueFixity, typeFixity, foreign1, foreign2, member1 :: P.Declaration
 typeAnnotation1 = P.TypeDeclaration (P.TypeDeclarationData ann1 (P.Ident "value1") P.srcREmpty)
 value1 = P.ValueDecl ann1 (P.Ident "value1") P.Public [] []
 synonym1 = P.TypeSynonymDeclaration ann1 (P.ProperName "Synonym1") [] P.srcREmpty
@@ -43,7 +43,6 @@ typeFixity =
     (P.OpName "~>")
 foreign1 = P.ExternDeclaration ann1 (P.Ident "foreign1") P.srcREmpty
 foreign2 = P.ExternDataDeclaration ann1 (P.ProperName "Foreign2") P.kindType
-foreign3 = P.ExternKindDeclaration ann1 (P.ProperName "Foreign3")
 member1 = P.TypeDeclaration (P.TypeDeclarationData ann2 (P.Ident "member1") P.srcREmpty)
 
 spec :: Spec
@@ -69,8 +68,6 @@ spec = do
       extractSpans foreign1 `shouldBe` [(IdeNamespaced IdeNSValue "foreign1", span1)]
     it "extracts a span for a data foreign declaration" $
       extractSpans foreign2 `shouldBe` [(IdeNamespaced IdeNSType "Foreign2", span1)]
-    it "extracts a span for a foreign kind declaration" $
-      extractSpans foreign3 `shouldBe` [(IdeNamespaced IdeNSKind "Foreign3", span1)]
   describe "Type annotations" $ do
     it "extracts a type annotation" $
       extractTypeAnnotations [typeAnnotation1] `shouldBe` [(P.Ident "value1", P.srcREmpty)]

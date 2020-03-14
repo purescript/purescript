@@ -1,0 +1,12 @@
+Error found:
+in module [33mMain[0m
+at tests/purs/failing/QuantificationCheckFailure3.purs:7:1 - 7:34 (line 7, column 1 - line 7, column 34)
+
+  Visible dependent quantification of type variable [33mk[0m is not supported.
+  If you would like this feature supported, please bother Liam Goodacre (@LiamGoodacre).
+
+in type synonym [33mHmm[0m
+
+See https://github.com/purescript/documentation/blob/master/errors/VisibleQuantificationCheckFailureInType.md for more information,
+or to contribute content related to this error.
+

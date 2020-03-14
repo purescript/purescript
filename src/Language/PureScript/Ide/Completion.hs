@@ -110,15 +110,14 @@ completionFromMatch (Match (m, IdeDeclarationAnn ann decl), mns) =
   where
     (complIdentifier, complExpandedType) = case decl of
       IdeDeclValue v -> (v ^. ideValueIdent . identT, v ^. ideValueType & prettyPrintTypeSingleLine)
-      IdeDeclType t -> (t ^. ideTypeName . properNameT, t ^. ideTypeKind & P.prettyPrintKind)
+      IdeDeclType t -> (t ^. ideTypeName . properNameT, t ^. ideTypeKind & prettyPrintTypeSingleLine)
       IdeDeclTypeSynonym s -> (s ^. ideSynonymName . properNameT, s ^. ideSynonymType & prettyPrintTypeSingleLine)
       IdeDeclDataConstructor d -> (d ^. ideDtorName . properNameT, d ^. ideDtorType & prettyPrintTypeSingleLine)
-      IdeDeclTypeClass d -> (d ^. ideTCName . properNameT, d ^. ideTCKind & P.prettyPrintKind)
+      IdeDeclTypeClass d -> (d ^. ideTCName . properNameT, d ^. ideTCKind & prettyPrintTypeSingleLine)
       IdeDeclValueOperator (IdeValueOperator op ref precedence associativity typeP) ->
         (P.runOpName op, maybe (showFixity precedence associativity (valueOperatorAliasT ref) op) prettyPrintTypeSingleLine typeP)
       IdeDeclTypeOperator (IdeTypeOperator op ref precedence associativity kind) ->
-        (P.runOpName op, maybe (showFixity precedence associativity (typeOperatorAliasT ref) op) P.prettyPrintKind kind)
-      IdeDeclKind k -> (P.runProperName k, "kind")
+        (P.runOpName op, maybe (showFixity precedence associativity (typeOperatorAliasT ref) op) prettyPrintTypeSingleLine kind)
       IdeDeclModule mn -> (P.runModuleName mn, "module")
 
     complExportedFrom = mns

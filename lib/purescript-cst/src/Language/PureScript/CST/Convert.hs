@@ -3,8 +3,7 @@
 -- and attaching comments.
 
 module Language.PureScript.CST.Convert
-  ( convertKind
-  , convertType
+  ( convertType
   , convertExpr
   , convertBinder
   , convertDeclaration
@@ -27,13 +26,14 @@ import qualified "text" Data.Text as Text
 import qualified "purescript-ast" Language.PureScript.AST as AST
 import qualified "purescript-ast" Language.PureScript.AST.SourcePos as Pos
 import qualified "purescript-ast" Language.PureScript.Comments as C
+import "purescript-ast" Language.PureScript.Crash (internalError)
 import qualified "purescript-ast" Language.PureScript.Environment as Env
-import qualified "purescript-ast" Language.PureScript.Kinds as K
 import qualified "purescript-ast" Language.PureScript.Label as L
 import qualified "purescript-ast" Language.PureScript.Names as N
 import "purescript-ast" Language.PureScript.PSString (mkString)
 import qualified "purescript-ast" Language.PureScript.Types as T
 import "this" Language.PureScript.CST.Positions
+import "this" Language.PureScript.CST.Print (printToken)
 import "this" Language.PureScript.CST.Types
 
 comment :: Comment a -> Maybe C.Comment
@@ -93,26 +93,6 @@ qualified q = N.Qualified (qualModule q) (qualName q)
 ident :: Ident -> N.Ident
 ident = N.Ident . getIdent
 
-convertKind :: String -> Kind a -> K.SourceKind
-convertKind fileName = go
-  where
-  go = \case
-    KindName _ a ->
-      K.NamedKind (sourceQualName fileName a) $ qualified a
-    KindArr _ a _ b -> do
-      let
-        lhs = go a
-        rhs = go b
-        ann = Pos.widenSourceAnn (K.getAnnForKind lhs) (K.getAnnForKind rhs)
-      K.FunKind ann lhs rhs
-    KindRow _ tok a -> do
-      let
-        kind = go a
-        ann = widenLeft (tokAnn tok) $ K.getAnnForKind kind
-      K.Row ann kind
-    KindParens _ (Wrapped _ a _) ->
-      go a
-
 convertType :: String -> Type a -> T.SourceType
 convertType fileName = go
   where
@@ -153,17 +133,16 @@ convertType fileName = go
         mkForAll a b t = do
           let ann' = widenLeft (tokAnn $ nameTok a) $ T.getAnnForType t
           T.ForAll ann' (getIdent $ nameValue a) b t Nothing
-        k t (TypeVarKinded (Wrapped _ (Labeled a _ b) _)) = mkForAll a (Just (convertKind fileName b)) t
-        k t (TypeVarName a) = mkForAll a Nothing t
-        -- The existing parser builds variables in reverse order
-        ty' = foldl k (go ty) bindings
+        k (TypeVarKinded (Wrapped _ (Labeled a _ b) _)) = mkForAll a (Just (go b))
+        k (TypeVarName a) = mkForAll a Nothing
+        ty' = foldr k (go ty) bindings
         ann = widenLeft (tokAnn kw) $ T.getAnnForType ty'
       T.setAnnForType ann ty'
     TypeKinded _ ty _ kd -> do
       let
         ty' = go ty
-        kd' = convertKind fileName kd
-        ann = Pos.widenSourceAnn (T.getAnnForType ty') (K.getAnnForKind kd')
+        kd' = go kd
+        ann = Pos.widenSourceAnn (T.getAnnForType ty') (T.getAnnForType kd')
       T.KindedType ann ty' kd'
     TypeApp _ a b -> do
       let
@@ -203,6 +182,12 @@ convertType fileName = go
       T.ConstrainedType ann a' b'
     TypeParens _ (Wrapped a ty b) ->
       T.ParensInType (sourceAnnCommented fileName a b) $ go ty
+    ty@(TypeUnaryRow _ _ a) -> do
+      let
+        a' = go a
+        rng = typeRange ty
+        ann = uncurry (sourceAnnCommented fileName) rng
+      T.setAnnForType ann $ Env.kindRow a'
 
 convertConstraint :: String -> Constraint a -> T.SourceConstraint
 convertConstraint fileName = go
@@ -210,7 +195,7 @@ convertConstraint fileName = go
   go = \case
     cst@(Constraint _ name args) -> do
       let ann = uncurry (sourceAnnCommented fileName) $ constraintRange cst
-      T.Constraint ann (qualified name) (convertType fileName <$> args) Nothing
+      T.Constraint ann (qualified name) [] (convertType fileName <$> args) Nothing
     ConstraintParens _ (Wrapped _ c _) -> go c
 
 convertGuarded :: String -> Guarded a -> [AST.GuardedExpr]
@@ -505,6 +490,15 @@ convertDeclaration fileName decl = case decl of
       (qualified cls)
       (convertType fileName <$> args)
       instTy
+  DeclKindSignature _ kw (Labeled name _ ty) -> do
+    let
+      kindFor = case tokValue kw of
+        TokLowerName [] "data" -> AST.DataSig
+        TokLowerName [] "newtype" -> AST.NewtypeSig
+        TokLowerName [] "type" -> AST.TypeSynonymSig
+        TokLowerName [] "class" -> AST.ClassSig
+        tok -> internalError $ "Invalid kind signature keyword " <> Text.unpack (printToken tok)
+    pure . AST.KindDeclaration ann kindFor (nameValue name) $ convertType fileName ty
   DeclSignature _ lbl ->
     pure $ convertSignature fileName lbl
   DeclValue _ fields ->
@@ -526,9 +520,9 @@ convertDeclaration fileName decl = case decl of
       ForeignValue (Labeled a _ b) ->
         AST.ExternDeclaration ann (ident $ nameValue a) $ convertType fileName b
       ForeignData _ (Labeled a _ b) ->
-        AST.ExternDataDeclaration ann (nameValue a) $ convertKind fileName b
+        AST.ExternDataDeclaration ann (nameValue a) $ convertType fileName b
       ForeignKind _ a ->
-        AST.ExternKindDeclaration ann (nameValue a)
+        AST.DataDeclaration ann Env.Data (nameValue a) [] []
   DeclRole _ _ _ name roles ->
     pure $ AST.RoleDeclaration $
       AST.RoleDeclarationData ann (nameValue name) (roleValue <$> NE.toList roles)
@@ -537,7 +531,7 @@ convertDeclaration fileName decl = case decl of
     uncurry (sourceAnnCommented fileName) $ declRange decl
 
   goTypeVar = \case
-    TypeVarKinded (Wrapped _ (Labeled x _ y) _) -> (getIdent $ nameValue x, Just $ convertKind fileName y)
+    TypeVarKinded (Wrapped _ (Labeled x _ y) _) -> (getIdent $ nameValue x, Just $ convertType fileName y)
     TypeVarName x -> (getIdent $ nameValue x, Nothing)
 
   goInstanceBinding = \case
@@ -597,7 +591,7 @@ convertImport fileName imp = case imp of
   ImportClass _ _ a ->
     AST.TypeClassRef ann $ nameValue a
   ImportKind _ _ a ->
-    AST.KindRef ann $ nameValue a
+    AST.TypeRef ann (nameValue a) (Just [])
   where
   ann = sourceSpan fileName . toSourceRange $ importRange imp
 
@@ -621,7 +615,7 @@ convertExport fileName export = case export of
   ExportClass _ _ a ->
     AST.TypeClassRef ann $ nameValue a
   ExportKind _ _ a ->
-    AST.KindRef ann $ nameValue a
+    AST.TypeRef ann (nameValue a) Nothing
   ExportModule _ _ a ->
     AST.ModuleRef ann (nameValue a)
   where

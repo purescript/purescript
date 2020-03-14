@@ -52,7 +52,6 @@ identifierFromIdeDeclaration d = case d of
   IdeDeclTypeClass tc -> tc ^. ideTCName . properNameT
   IdeDeclValueOperator op -> op ^. ideValueOpName & P.runOpName
   IdeDeclTypeOperator op -> op ^. ideTypeOpName & P.runOpName
-  IdeDeclKind name -> P.runProperName name
   IdeDeclModule name -> P.runModuleName name
 
 namespaceForDeclaration :: IdeDeclaration -> IdeNamespace
@@ -64,7 +63,6 @@ namespaceForDeclaration d = case d of
   IdeDeclTypeClass _ -> IdeNSType
   IdeDeclValueOperator _ -> IdeNSValue
   IdeDeclTypeOperator _ -> IdeNSType
-  IdeDeclKind _ -> IdeNSKind
   IdeDeclModule _ -> IdeNSModule
 
 discardAnn :: IdeDeclarationAnn -> IdeDeclaration

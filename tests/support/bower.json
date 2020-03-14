@@ -24,7 +24,7 @@
     "purescript-newtype": "3.0.0",
     "purescript-nonempty": "5.0.0",
     "purescript-partial": "2.0.0",
-    "purescript-prelude": "4.1.0",
+    "purescript-prelude": "#c932361d008379958f14ca8cc2fe32e06cc2647d",
     "purescript-proxy": "3.0.0",
     "purescript-psci-support": "4.0.0",
     "purescript-refs": "4.1.0",
@@ -34,8 +34,12 @@
     "purescript-tailrec": "4.0.0",
     "purescript-tuples": "5.0.0",
     "purescript-type-equality": "3.0.0",
-    "purescript-typelevel-prelude": "5.0.0",
+    "purescript-typelevel-prelude": "#52ac4bcf9a38941606b3d928127089bd363ee946",
     "purescript-unfoldable": "4.0.0",
     "purescript-unsafe-coerce": "4.0.0"
+  },
+  "resolutions": {
+    "purescript-prelude": "c932361d008379958f14ca8cc2fe32e06cc2647d",
+    "purescript-typelevel-prelude": "52ac4bcf9a38941606b3d928127089bd363ee946"
   }
 }

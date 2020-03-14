@@ -18,7 +18,6 @@ import Language.PureScript.Environment as P
 import Language.PureScript.Errors as P hiding (indent)
 import Language.PureScript.Externs as P
 import Language.PureScript.Graph as P
-import Language.PureScript.Kinds as P
 import Language.PureScript.Linter as P
 import Language.PureScript.Make as P
 import Language.PureScript.ModuleDependencies as P

@@ -9,7 +9,7 @@ module Language.PureScript.Interactive.Parser
 import           Prelude.Compat hiding (lex)
 
 import           Control.Monad (join, unless)
-import           Data.Bifunctor (first)
+import           Data.Bifunctor (bimap)
 import           Data.Char (isSpace)
 import           Data.List (intercalate)
 import qualified Data.List.NonEmpty as NE
@@ -26,7 +26,7 @@ import           Language.PureScript.Interactive.Types
 --
 parseDotFile :: FilePath -> String -> Either String [Command]
 parseDotFile filePath =
-  first (CST.prettyPrintError . NE.head)
+  bimap (CST.prettyPrintError . NE.head) snd
     . CST.runTokenParser (parseMany parser <* CSTM.token CST.TokEof)
     . CST.lexTopLevel
     . T.pack
@@ -65,7 +65,7 @@ parseOne p = CSTM.token CST.TokLayoutStart *> p <* CSTM.token CST.TokLayoutEnd
 
 parseRest :: CST.Parser a -> String -> Either String a
 parseRest p =
-   first (CST.prettyPrintError . NE.head)
+   bimap (CST.prettyPrintError . NE.head) snd
     . CST.runTokenParser (p <* CSTM.token CST.TokEof)
     . CST.lexTopLevel
     . T.pack
@@ -146,7 +146,6 @@ acceptable P.ExternDeclaration{} = True
 acceptable P.ExternDataDeclaration{} = True
 acceptable P.TypeClassDeclaration{} = True
 acceptable P.TypeInstanceDeclaration{} = True
-acceptable P.ExternKindDeclaration{} = True
 acceptable P.TypeDeclaration{} = True
 acceptable P.ValueDeclaration{} = True
 acceptable _ = False

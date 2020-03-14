@@ -26,7 +26,6 @@ import           Language.PureScript.Crash
 import           Language.PureScript.Environment
 import           Language.PureScript.Errors hiding (isExported)
 import           Language.PureScript.Externs
-import           Language.PureScript.Kinds
 import           Language.PureScript.Label (Label(..))
 import           Language.PureScript.Names
 import           Language.PureScript.PSString (mkString)
@@ -74,7 +73,7 @@ desugarModule
   => Module
   -> Desugar m Module
 desugarModule (Module ss coms name decls (Just exps)) = do
-  let (classDecls, restDecls) = partition isTypeClassDeclaration decls
+  let (classDecls, restDecls) = partition isTypeClassDecl decls
       classVerts = fmap (\d -> (d, classDeclName d, superClassesNames d)) classDecls
   (classNewExpss, classDeclss) <- unzip <$> parU (stronglyConnComp classVerts) (desugarClassDecl name exps)
   (restNewExpss, restDeclss) <- unzip <$> parU restDecls (desugarDecl name exps)
@@ -93,7 +92,7 @@ desugarModule (Module ss coms name decls (Just exps)) = do
   superClassesNames _ = []
 
   constraintName :: SourceConstraint -> Qualified (ProperName 'ClassName)
-  constraintName (Constraint _ cName _ _) = cName
+  constraintName (Constraint _ cName _ _ _) = cName
 
   classDeclName :: Declaration -> Qualified (ProperName 'ClassName)
   classDeclName (TypeClassDeclaration _ pn _ _ _ _) = Qualified (Just name) pn
@@ -212,7 +211,7 @@ desugarDecl mn exps = go
     dictDecl <- typeInstanceDictionaryDeclaration sa name mn deps className tys desugared
     return (expRef name className tys, [d, dictDecl])
   go d@(TypeInstanceDeclaration sa _ _ name deps className tys (NewtypeInstanceWithDictionary dict)) = do
-    let dictTy = foldl srcTypeApp (srcTypeConstructor (fmap coerceProperName className)) tys
+    let dictTy = foldl srcTypeApp (srcTypeConstructor (fmap (coerceProperName . dictSynonymName) className)) tys
         constrainedTy = quantify (foldr (srcConstrainedType) dictTy deps)
     return (expRef name className tys, [d, ValueDecl sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]])
   go other = return (Nothing, [other])
@@ -255,24 +254,24 @@ memberToNameAndType _ = internalError "Invalid declaration in type class definit
 typeClassDictionaryDeclaration
   :: SourceAnn
   -> ProperName 'ClassName
-  -> [(Text, Maybe SourceKind)]
+  -> [(Text, Maybe SourceType)]
   -> [SourceConstraint]
   -> [Declaration]
   -> Declaration
 typeClassDictionaryDeclaration sa name args implies members =
   let superclassTypes = superClassDictionaryNames implies `zip`
-        [ function unit (foldl srcTypeApp (srcTypeConstructor (fmap coerceProperName superclass)) tyArgs)
-        | (Constraint _ superclass tyArgs _) <- implies
+        [ function unit (foldl srcTypeApp (srcTypeConstructor (fmap (coerceProperName . dictSynonymName) superclass)) tyArgs)
+        | (Constraint _ superclass _ tyArgs _) <- implies
         ]
       members' = map (first runIdent . memberToNameAndType) members
       mtys = members' ++ superclassTypes
       toRowListItem (l, t) = srcRowListItem (Label $ mkString l) t
-  in TypeSynonymDeclaration sa (coerceProperName name) args (srcTypeApp tyRecord $ rowFromList (map toRowListItem mtys, srcREmpty))
+  in TypeSynonymDeclaration sa (coerceProperName $ dictSynonymName name) args (srcTypeApp tyRecord $ rowFromList (map toRowListItem mtys, srcREmpty))
 
 typeClassMemberToDictionaryAccessor
   :: ModuleName
   -> ProperName 'ClassName
-  -> [(Text, Maybe SourceKind)]
+  -> [(Text, Maybe SourceType)]
   -> Declaration
   -> Declaration
 typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarationData sa ident ty)) =
@@ -280,7 +279,7 @@ typeClassMemberToDictionaryAccessor mn name args (TypeDeclaration (TypeDeclarati
   in ValueDecl sa ident Private [] $
     [MkUnguarded (
      TypedValue False (TypeClassDictionaryAccessor className ident) $
-       moveQuantifiersToFront (quantify (srcConstrainedType (srcConstraint className (map (srcTypeVar . fst) args) Nothing) ty))
+       moveQuantifiersToFront (quantify (srcConstrainedType (srcConstraint className [] (map (srcTypeVar . fst) args) Nothing) ty))
     )]
 typeClassMemberToDictionaryAccessor _ _ _ _ = internalError "Invalid declaration in type class definition"
 
@@ -323,12 +322,12 @@ typeInstanceDictionaryDeclaration sa@(ss, _) name mn deps className tys decls =
       -- The dictionary itself is a record literal.
       let superclasses = superClassDictionaryNames typeClassSuperclasses `zip`
             [ Abs (VarBinder ss UnusedIdent) (DeferredDictionary superclass tyArgs)
-            | (Constraint _ superclass suTyArgs _) <- typeClassSuperclasses
+            | (Constraint _ superclass _ suTyArgs _) <- typeClassSuperclasses
             , let tyArgs = map (replaceAllTypeVars (zip (map fst typeClassArguments) tys)) suTyArgs
             ]
 
       let props = Literal ss $ ObjectLiteral $ map (first mkString) (members ++ superclasses)
-          dictTy = foldl srcTypeApp (srcTypeConstructor (fmap coerceProperName className)) tys
+          dictTy = foldl srcTypeApp (srcTypeConstructor (fmap (coerceProperName . dictSynonymName) className)) tys
           constrainedTy = quantify (foldr srcConstrainedType dictTy deps)
           dict = TypeClassDictionaryConstructorApp className props
           result = ValueDecl sa name Private [] [MkUnguarded (TypedValue True dict constrainedTy)]
@@ -353,5 +352,5 @@ typeClassMemberName = fromMaybe (internalError "typeClassMemberName: Invalid dec
 superClassDictionaryNames :: [Constraint a] -> [Text]
 superClassDictionaryNames supers =
   [ superclassName pn index
-  | (index, Constraint _ pn _ _) <- zip [0..] supers
+  | (index, Constraint _ pn _ _ _) <- zip [0..] supers
   ]

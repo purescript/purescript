@@ -81,7 +81,7 @@ lexWithState = go
         pos = applyDelta lexPos chunkDelta
       pure $ Left
         ( state { lexSource = lexSource' }
-        , ParserError (SourceRange pos $ applyDelta pos (0, 1)) [] lexStack err
+        , ParserErrorInfo (SourceRange pos $ applyDelta pos (0, 1)) [] lexStack err
         )
 
     onSuccess _ (TokEof, _) =

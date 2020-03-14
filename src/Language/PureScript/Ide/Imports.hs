@@ -222,8 +222,6 @@ addExplicitImport' decl moduleName qualifier imports =
       P.ValueOpRef ideSpan (op ^. ideValueOpName)
     refFromDeclaration (IdeDeclTypeOperator op) =
       P.TypeOpRef ideSpan (op ^. ideTypeOpName)
-    refFromDeclaration (IdeDeclKind kn) =
-      P.KindRef ideSpan kn
     refFromDeclaration d =
       P.ValueRef ideSpan (P.Ident (identifierFromIdeDeclaration d))
 
@@ -371,7 +369,7 @@ answerRequest outfp rs  =
 -- | Test and ghci helper
 parseImport :: Text -> Maybe Import
 parseImport t =
-  case fmap (CST.convertImportDecl "<purs-ide>")
+  case fmap (CST.convertImportDecl "<purs-ide>" . snd)
         $ CST.runTokenParser CST.parseImportDeclP
         $ CST.lex t of
     Right (_, mn, idt, mmn) ->

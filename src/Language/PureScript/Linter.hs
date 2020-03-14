@@ -96,12 +96,15 @@ lint (Module _ _ mn ds _) = censor (addHint (ErrorInModule mn)) $ mapM_ lintDecl
       -- Recursively walk the type and prune used variables from `unused`
       go :: S.Set Text -> SourceType -> (S.Set Text, MultipleErrors)
       go unused (TypeVar _ v) = (S.delete v unused, mempty)
-      go unused (ForAll _ tv _ t1 _) =
-        let (nowUnused, errors) = go (S.insert tv unused) t1
+      go unused (ForAll _ tv mbK t1 _) =
+        let (nowUnused, errors)
+              | Just k <- mbK = go unused k `combine` go (S.insert tv unused) t1
+              | otherwise = go (S.insert tv unused) t1
             restoredUnused = if S.member tv unused then S.insert tv nowUnused else nowUnused
             combinedErrors = if S.member tv nowUnused then errors <> errorMessage' ss (UnusedTypeVar tv) else errors
         in (restoredUnused, combinedErrors)
       go unused (TypeApp _ f x) = go unused f `combine` go unused x
+      go unused (KindApp _ f x) = go unused f `combine` go unused x
       go unused (ConstrainedType _ c t1) = foldl combine (unused, mempty) $ map (go unused) (constraintArgs c <> [t1])
       go unused (RCons _ _ t1 rest) = go unused t1 `combine` go unused rest
       go unused (KindedType _ t1 _) = go unused t1

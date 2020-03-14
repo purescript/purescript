@@ -78,7 +78,7 @@ insertValueTypes env m =
 
 runParser :: CST.Parser a -> Text -> Either String a
 runParser p =
-  first (CST.prettyPrintError . NE.head)
+  bimap (CST.prettyPrintError . NE.head) snd
     . CST.runTokenParser p
     . CST.lex
 

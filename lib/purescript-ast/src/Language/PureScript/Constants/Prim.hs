@@ -25,6 +25,21 @@ pattern Partial = Qualified (Just Prim) (ProperName "Partial")
 pattern Record :: Qualified (ProperName 'TypeName)
 pattern Record = Qualified (Just Prim) (ProperName "Record")
 
+pattern Type :: Qualified (ProperName 'TypeName)
+pattern Type = Qualified (Just Prim) (ProperName "Type")
+
+pattern Constraint :: Qualified (ProperName 'TypeName)
+pattern Constraint = Qualified (Just Prim) (ProperName "Constraint")
+
+pattern Function :: Qualified (ProperName 'TypeName)
+pattern Function = Qualified (Just Prim) (ProperName "Function")
+
+pattern Array :: Qualified (ProperName 'TypeName)
+pattern Array = Qualified (Just Prim) (ProperName "Array")
+
+pattern Row :: Qualified (ProperName 'TypeName)
+pattern Row = Qualified (Just Prim) (ProperName "Row")
+
 -- Prim.Boolean
 
 pattern PrimBoolean :: ModuleName
@@ -134,6 +149,12 @@ symbol = "Symbol"
 
 doc :: forall a. (IsString a) => a
 doc = "Doc"
+
+row :: forall a. (IsString a) => a
+row = "Row"
+
+constraint :: forall a. (IsString a) => a
+constraint = "Constraint"
 
 -- Modules
 

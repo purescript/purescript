@@ -1,7 +1,6 @@
 {
 module Language.PureScript.CST.Parser
   ( parseType
-  , parseKind
   , parseExpr
   , parseDecl
   , parseIdent
@@ -20,11 +19,12 @@ module Language.PureScript.CST.Parser
 import "base" Prelude hiding (lex)
 
 import "base" Control.Monad ((<=<), when)
-import "base" Data.Foldable (foldl', for_)
+import "base" Data.Foldable (foldl', for_, toList)
 import qualified "base" Data.List.NonEmpty as NE
 import "text" Data.Text (Text)
-import "base" Data.Traversable (for)
+import "base" Data.Traversable (for, sequence)
 import "this" Language.PureScript.CST.Errors
+import "this" Language.PureScript.CST.Flatten (flattenType)
 import "this" Language.PureScript.CST.Lexer
 import "this" Language.PureScript.CST.Monad
 import "this" Language.PureScript.CST.Positions
@@ -35,9 +35,8 @@ import qualified "purescript-ast" Language.PureScript.Roles as R
 import "purescript-ast" Language.PureScript.PSString (PSString)
 }
 
-%expect 114
+%expect 95
 
-%name parseKind kind
 %name parseType type
 %name parseExpr expr
 %name parseIdent ident
@@ -57,6 +56,7 @@ import "purescript-ast" Language.PureScript.PSString (PSString)
 %partial parseGuardExpr guardExpr
 %partial parseGuardNext guardNext
 %partial parseGuardStatement guardStatement
+%partial parseClassSignature classSignature
 %partial parseClassSuper classSuper
 %partial parseClassNameAndFundeps classNameAndFundeps
 %partial parseBinderAndArrow binderAndArrow
@@ -259,7 +259,11 @@ label :: { Label }
   | 'let' { toLabel $1 }
   | 'module' { toLabel $1 }
   | 'newtype' { toLabel $1 }
+  | 'nominal' { toLabel $1 }
   | 'of' { toLabel $1 }
+  | 'phantom' { toLabel $1 }
+  | 'representational' { toLabel $1 }
+  | 'role' { toLabel $1 }
   | 'then' { toLabel $1 }
   | 'true' { toLabel $1 }
   | 'type' { toLabel $1 }
@@ -286,18 +290,9 @@ boolean :: { (SourceToken, Bool) }
   : 'true' { toBoolean $1 }
   | 'false' { toBoolean $1 }
 
-kind :: { Kind () }
-  : kind1 { $1 }
-  | kind1 '->' kind { KindArr () $1 $2 $3 }
-
-kind1 :: { Kind () }
-  : qualProperName { KindName () $1 }
-  | '#' kind1 { KindRow () $1 $2 }
-  | '(' kind ')' { KindParens () (Wrapped $1 $2 $3) }
-
 type :: { Type () }
   : type1 { $1 }
-  | type1 '::' kind { TypeKinded () $1 $2 $3 }
+  | type1 '::' type { TypeKinded () $1 $2 $3 }
 
 type1 :: { Type () }
   : type2 { $1 }
@@ -313,8 +308,12 @@ type3 :: { Type () }
   | type3 qualOp type4 { TypeOp () $1 $2 $3 }
 
 type4 :: { Type () }
+  : type5 { $1 }
+  | '#' type4 {% addWarning ($1 : toList (flattenType $2)) WarnDeprecatedRowSyntax *> pure (TypeUnaryRow () $1 $2) }
+
+type5 :: { Type () }
   : typeAtom { $1 }
-  | type4 typeAtom { TypeApp () $1 $2 }
+  | type5 typeAtom { TypeApp () $1 $2 }
 
 typeAtom :: { Type ()}
   : '_' { TypeWildcard () $1 }
@@ -327,7 +326,7 @@ typeAtom :: { Type ()}
   | '{' row '}' { TypeRecord () (Wrapped $1 $2 $3) }
   | '(' row ')' { TypeRow () (Wrapped $1 $2 $3) }
   | '(' type1 ')' { TypeParens () (Wrapped $1 $2 $3) }
-  | '(' typeKindedAtom '::' kind ')' { TypeParens () (Wrapped $1 (TypeKinded () $2 $3 $4) $5) }
+  | '(' typeKindedAtom '::' type ')' { TypeParens () (Wrapped $1 (TypeKinded () $2 $3 $4) $5) }
 
 -- Due to a conflict between row syntax and kinded type syntax, we require
 -- kinded type variables to be wrapped in parens. Thus `(a :: Foo)` is always a
@@ -340,7 +339,7 @@ typeKindedAtom :: { Type () }
   | '{' row '}' { TypeRecord () (Wrapped $1 $2 $3) }
   | '(' row ')' { TypeRow () (Wrapped $1 $2 $3) }
   | '(' type1 ')' { TypeParens () (Wrapped $1 $2 $3) }
-  | '(' typeKindedAtom '::' kind ')' { TypeParens () (Wrapped $1 (TypeKinded () $2 $3 $4) $5) }
+  | '(' typeKindedAtom '::' type ')' { TypeParens () (Wrapped $1 (TypeKinded () $2 $3 $4) $5) }
 
 row :: { Row () }
   : {- empty -} { Row Nothing Nothing }
@@ -353,7 +352,7 @@ rowLabel :: { Labeled Label (Type ()) }
 
 typeVarBinding :: { TypeVarBinding () }
   : ident { TypeVarName $1 }
-  | '(' ident '::' kind ')' { TypeVarKinded (Wrapped $1 (Labeled $2 $3 $4) $5) }
+  | '(' ident '::' type ')' {% checkNoWildcards $4 *> pure (TypeVarKinded (Wrapped $1 (Labeled $2 $3 $4) $5)) }
 
 forall :: { SourceToken }
   : 'forall' { $1 }
@@ -634,7 +633,7 @@ export :: { Export () }
   | properName dataMembers { ExportType () $1 (Just $2) }
   | 'type' symbol { ExportTypeOp () $1 $2 }
   | 'class' properName { ExportClass () $1 $2 }
-  | 'kind' properName { ExportKind () $1 $2 }
+  | 'kind' properName {% addWarning [$1, nameTok $2] WarnDeprecatedKindExportSyntax *> pure (ExportKind () $1 $2) }
   | 'module' moduleName { ExportModule () $1 $2 }
 
 dataMembers :: { (DataMembers ()) }
@@ -658,23 +657,28 @@ import :: { Import () }
   | properName dataMembers { ImportType () $1 (Just $2) }
   | 'type' symbol { ImportTypeOp () $1 $2 }
   | 'class' properName { ImportClass () $1 $2 }
-  | 'kind' properName { ImportKind () $1 $2 }
+  | 'kind' properName {% addWarning [$1, nameTok $2] WarnDeprecatedKindImportSyntax *> pure (ImportKind () $1 $2) }
 
 decl :: { Declaration () }
   : dataHead { DeclData () $1 Nothing }
   | dataHead '=' sep(dataCtor, '|') { DeclData () $1 (Just ($2, $3)) }
   | typeHead '=' type {% checkNoWildcards $3 *> pure (DeclType () $1 $2 $3) }
   | newtypeHead '=' properName typeAtom {% checkNoWildcards $4 *> pure (DeclNewtype () $1 $2 $3 $4) }
-  | classHead {% checkFundeps $1 *> pure (DeclClass () $1 Nothing) }
-  | classHead 'where' '\{' manySep(classMember, '\;') '\}' {% checkFundeps $1 *> pure (DeclClass () $1 (Just ($2, $4))) }
+  | classHead { either id (\h -> DeclClass () h Nothing) $1 }
+  | classHead 'where' '\{' manySep(classMember, '\;') '\}' {% either (const (parseError $2)) (\h -> pure $ DeclClass () h (Just ($2, $4))) $1 }
   | instHead { DeclInstanceChain () (Separated (Instance $1 Nothing) []) }
   | instHead 'where' '\{' manySep(instBinding, '\;') '\}' { DeclInstanceChain () (Separated (Instance $1 (Just ($2, $4))) []) }
+  | 'data' properName '::' type {% checkNoWildcards $4 *> pure (DeclKindSignature () $1 (Labeled $2 $3 $4)) }
+  | 'newtype' properName '::' type {% checkNoWildcards $4 *> pure (DeclKindSignature () $1 (Labeled $2 $3 $4)) }
+  | 'type' properName '::' type {% checkNoWildcards $4 *> pure (DeclKindSignature () $1 (Labeled $2 $3 $4)) }
   | 'derive' instHead { DeclDerive () $1 Nothing $2 }
   | 'derive' 'newtype' instHead { DeclDerive () $1 (Just $2) $3 }
   | ident '::' type { DeclSignature () (Labeled $1 $2 $3) }
   | ident manyOrEmpty(binderAtom) guardedDecl { DeclValue () (ValueBindingFields $1 $2 $3) }
   | fixity { DeclFixity () $1 }
-  | 'foreign' 'import' foreign { DeclForeign () $1 $2 $3 }
+  | 'foreign' 'import' ident '::' type { DeclForeign () $1 $2 (ForeignValue (Labeled $3 $4 $5)) }
+  | 'foreign' 'import' 'data' properName '::' type { DeclForeign () $1 $2 (ForeignData $3 (Labeled $4 $5 $6)) }
+  | 'foreign' 'import' 'kind' properName {% addWarning [$1, $2, $3, nameTok $4] WarnDeprecatedForeignKindSyntax *> pure (DeclForeign () $1 $2 (ForeignKind $3 $4)) }
   | 'type' 'role' properName many(role) { DeclRole () $1 $2 $3 $4 }
 
 dataHead :: { DataHead () }
@@ -699,16 +703,22 @@ dataCtor :: { DataCtor () }
 --       : 'class' classNameAndFundeps
 --       | 'class' constraints '<=' classNameAndFundeps
 --
-classHead :: { ClassHead () }
+classHead :: { Either (Declaration ()) (ClassHead ()) }
   : 'class'
-      {%% revert $ do
-        let
-          ctr (super, (name, vars, fundeps)) =
-            ClassHead $1 super name vars fundeps
-        fmap ctr $ tryPrefix parseClassSuper parseClassNameAndFundeps
+      {%% revert $ oneOf $ NE.fromList
+          [ fmap (Left . DeclKindSignature () $1) parseClassSignature
+          , do
+              (super, (name, vars, fundeps)) <- tryPrefix parseClassSuper parseClassNameAndFundeps
+              let hd = ClassHead $1 super name vars fundeps
+              checkFundeps hd
+              pure $ Right hd
+          ]
       }
 
-classSuper
+classSignature :: { Labeled (Name (N.ProperName 'N.TypeName)) (Type ()) }
+  : properName '::' type {%^ revert $ checkNoWildcards $3 *> pure (Labeled $1 $2 $3) }
+
+classSuper :: { (OneOrDelimited (Constraint ()), SourceToken) }
   : constraints '<=' {%^ revert $ pure ($1, $2) }
 
 classNameAndFundeps :: { (Name (N.ProperName 'N.ClassName), [TypeVarBinding ()], Maybe (SourceToken, Separated ClassFundep)) }
@@ -753,11 +763,6 @@ infix :: { (SourceToken, Fixity) }
   | 'infixl' { ($1, Infixl) }
   | 'infixr' { ($1, Infixr) }
 
-foreign :: { Foreign () }
-  : ident '::' type { ForeignValue (Labeled $1 $2 $3) }
-  | 'data' properName '::' kind { ForeignData $1 (Labeled $2 $3 $4) }
-  | 'kind' properName { ForeignKind $1 $2 }
-
 role :: { Role }
   : 'nominal' { Role $1 R.Nominal }
   | 'representational' { Role $1 R.Representational }
@@ -789,24 +794,21 @@ qualIdentP :: { QualifiedName Ident }
 lexer :: (SourceToken -> Parser a) -> Parser a
 lexer k = munch >>= k
 
-parse :: Text -> Either (NE.NonEmpty ParserError) (Module ())
-parse = resFull <=< parseModule . lex
+parse :: Text -> ([ParserWarning], Either (NE.NonEmpty ParserError) (Module ()))
+parse = either (([],) . Left) resFull . parseModule . lex
 
 data PartialResult a = PartialResult
   { resPartial :: a
-  , resFull :: Either (NE.NonEmpty ParserError) a
+  , resFull :: ([ParserWarning], Either (NE.NonEmpty ParserError) a)
   } deriving (Functor)
 
 parseModule :: [LexResult] -> Either (NE.NonEmpty ParserError) (PartialResult (Module ()))
 parseModule toks = fmap (\header -> PartialResult header (parseFull header)) headerRes
   where
   (st, headerRes) =
-    runParser (ParserState (toks) []) parseModuleHeader
+    runParser (ParserState toks [] []) parseModuleHeader
 
   parseFull header = do
-    (decls, trailing) <- snd $ runParser st parseModuleBody
-    pure $ header
-      { modDecls = decls
-      , modTrailingComments = trailing
-      }
+    let (ParserState _ _ warnings, res) = runParser st parseModuleBody
+    (warnings, (\(decls, trailing) -> header { modDecls = decls, modTrailingComments = trailing }) <$> res)
 }

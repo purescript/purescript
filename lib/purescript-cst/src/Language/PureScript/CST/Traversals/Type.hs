@@ -17,7 +17,7 @@ everythingOnTypes op k = goTy
     TypeRow _ (Wrapped _ row _) -> goRow ty row
     TypeRecord _ (Wrapped _ row _) -> goRow ty row
     TypeForall _ _ _ _ ty2 -> k ty `op` goTy ty2
-    TypeKinded _ ty2 _ _ -> k ty `op` goTy ty2
+    TypeKinded _ ty2 _ ty3 -> k ty `op` (goTy ty2 `op` goTy ty3)
     TypeApp _ ty2 ty3 -> k ty `op` (goTy ty2 `op` goTy ty3)
     TypeOp _ ty2 _ ty3 -> k ty `op` (goTy ty2 `op` goTy ty3)
     TypeOpName _ _ -> k ty
@@ -27,6 +27,7 @@ everythingOnTypes op k = goTy
       | null ty2 -> k ty `op` goTy ty3
       | otherwise -> k ty `op` (foldr1 op (k <$> ty2) `op` goTy ty3)
     TypeParens _ (Wrapped _ ty2 _) -> k ty `op` goTy ty2
+    TypeUnaryRow _ _ ty2 -> k ty `op` goTy ty2
 
   goRow ty = \case
     Row Nothing Nothing -> k ty

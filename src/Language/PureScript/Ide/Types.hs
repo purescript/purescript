@@ -29,7 +29,6 @@ data IdeDeclaration
   | IdeDeclValueOperator IdeValueOperator
   | IdeDeclTypeOperator IdeTypeOperator
   | IdeDeclModule P.ModuleName
-  | IdeDeclKind (P.ProperName 'P.KindName)
   deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeValue = IdeValue
@@ -39,14 +38,14 @@ data IdeValue = IdeValue
 
 data IdeType = IdeType
  { _ideTypeName :: P.ProperName 'P.TypeName
- , _ideTypeKind :: P.SourceKind
+ , _ideTypeKind :: P.SourceType
  , _ideTypeDtors :: [(P.ProperName 'P.ConstructorName, P.SourceType)]
  } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeTypeSynonym = IdeTypeSynonym
   { _ideSynonymName :: P.ProperName 'P.TypeName
   , _ideSynonymType :: P.SourceType
-  , _ideSynonymKind :: P.SourceKind
+  , _ideSynonymKind :: P.SourceType
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 data IdeDataConstructor = IdeDataConstructor
@@ -57,7 +56,7 @@ data IdeDataConstructor = IdeDataConstructor
 
 data IdeTypeClass = IdeTypeClass
   { _ideTCName :: P.ProperName 'P.ClassName
-  , _ideTCKind :: P.SourceKind
+  , _ideTCKind :: P.SourceType
   , _ideTCInstances :: [IdeInstance]
   } deriving (Show, Eq, Ord, Generic, NFData)
 
@@ -81,7 +80,7 @@ data IdeTypeOperator = IdeTypeOperator
   , _ideTypeOpAlias :: P.Qualified (P.ProperName 'P.TypeName)
   , _ideTypeOpPrecedence :: P.Precedence
   , _ideTypeOpAssociativity :: P.Associativity
-  , _ideTypeOpKind :: Maybe P.SourceKind
+  , _ideTypeOpKind :: Maybe P.SourceType
   } deriving (Show, Eq, Ord, Generic, NFData)
 
 _IdeDeclValue :: Traversal' IdeDeclaration IdeValue
@@ -111,10 +110,6 @@ _IdeDeclValueOperator _ x = pure x
 _IdeDeclTypeOperator :: Traversal' IdeDeclaration IdeTypeOperator
 _IdeDeclTypeOperator f (IdeDeclTypeOperator x) = map IdeDeclTypeOperator (f x)
 _IdeDeclTypeOperator _ x = pure x
-
-_IdeDeclKind :: Traversal' IdeDeclaration (P.ProperName 'P.KindName)
-_IdeDeclKind f (IdeDeclKind x) = map IdeDeclKind (f x)
-_IdeDeclKind _ x = pure x
 
 _IdeDeclModule :: Traversal' IdeDeclaration P.ModuleName
 _IdeDeclModule f (IdeDeclModule x) = map IdeDeclModule (f x)
@@ -246,7 +241,6 @@ identifierFromDeclarationRef = \case
   P.TypeRef _ name _ -> P.runProperName name
   P.ValueRef _ ident -> P.runIdent ident
   P.TypeClassRef _ name -> P.runProperName name
-  P.KindRef _ name -> P.runProperName name
   P.ValueOpRef _ op -> P.showOp op
   P.TypeOpRef _ op -> P.showOp op
   _ -> ""
@@ -303,14 +297,13 @@ encodeImport (P.runModuleName -> mn, importType, map P.runModuleName -> qualifie
       ] ++ map ("qualifier" .=) (maybeToList qualifier)
 
 -- | Denotes the different namespaces a name in PureScript can reside in.
-data IdeNamespace = IdeNSValue | IdeNSType | IdeNSKind | IdeNSModule
+data IdeNamespace = IdeNSValue | IdeNSType | IdeNSModule
   deriving (Show, Eq, Ord, Generic, NFData)
 
 instance FromJSON IdeNamespace where
   parseJSON (Aeson.String s) = case s of
     "value" -> pure IdeNSValue
     "type" -> pure IdeNSType
-    "kind" -> pure IdeNSKind
     "module" -> pure IdeNSModule
     _       -> mzero
   parseJSON _ = mzero

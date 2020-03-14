@@ -67,13 +67,13 @@ ida = IdeDeclarationAnn emptyAnn
 ideValue :: Text -> Maybe P.SourceType -> IdeDeclarationAnn
 ideValue i ty = ida (IdeDeclValue (IdeValue (P.Ident i) (fromMaybe P.tyString ty)))
 
-ideType :: Text -> Maybe P.SourceKind -> [(P.ProperName 'P.ConstructorName, P.SourceType)] -> IdeDeclarationAnn
+ideType :: Text -> Maybe P.SourceType -> [(P.ProperName 'P.ConstructorName, P.SourceType)] -> IdeDeclarationAnn
 ideType pn ki dtors = ida (IdeDeclType (IdeType (P.ProperName pn) (fromMaybe P.kindType ki) dtors))
 
-ideSynonym :: Text -> Maybe P.SourceType -> Maybe P.SourceKind -> IdeDeclarationAnn
+ideSynonym :: Text -> Maybe P.SourceType -> Maybe P.SourceType -> IdeDeclarationAnn
 ideSynonym pn ty kind = ida (IdeDeclTypeSynonym (IdeTypeSynonym (P.ProperName pn) (fromMaybe P.tyString ty) (fromMaybe P.kindType kind)))
 
-ideTypeClass :: Text -> P.SourceKind -> [IdeInstance] -> IdeDeclarationAnn
+ideTypeClass :: Text -> P.SourceType -> [IdeInstance] -> IdeDeclarationAnn
 ideTypeClass pn kind instances = ida (IdeDeclTypeClass (IdeTypeClass (P.ProperName pn) kind instances))
 
 ideDtor :: Text -> Text -> Maybe P.SourceType -> IdeDeclarationAnn
@@ -89,7 +89,7 @@ ideValueOp opName ident precedence assoc t =
         (fromMaybe P.Infix assoc)
         t))
 
-ideTypeOp :: Text -> P.Qualified Text -> Integer -> Maybe P.Associativity -> Maybe P.SourceKind -> IdeDeclarationAnn
+ideTypeOp :: Text -> P.Qualified Text -> Integer -> Maybe P.Associativity -> Maybe P.SourceType -> IdeDeclarationAnn
 ideTypeOp opName ident precedence assoc k =
   ida (IdeDeclTypeOperator
        (IdeTypeOperator
@@ -100,7 +100,7 @@ ideTypeOp opName ident precedence assoc k =
         k))
 
 ideKind :: Text -> IdeDeclarationAnn
-ideKind pn = ida (IdeDeclKind (P.ProperName pn))
+ideKind pn = ideType pn (Just P.kindType) []
 
 ideModule :: Text -> IdeDeclarationAnn
 ideModule name = ida (IdeDeclModule (mn name))

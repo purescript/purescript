@@ -25,7 +25,6 @@ import "this" Language.PureScript.Types
 import "this" Language.PureScript.PSString (PSString)
 import "this" Language.PureScript.Label (Label)
 import "this" Language.PureScript.Names
-import "this" Language.PureScript.Kinds
 import "this" Language.PureScript.Roles
 import "this" Language.PureScript.TypeClassDictionaries
 import "this" Language.PureScript.Comments
@@ -66,9 +65,10 @@ data ErrorMessageHint
   | ErrorInSubsumption SourceType SourceType
   | ErrorCheckingAccessor Expr PSString
   | ErrorCheckingType Expr SourceType
-  | ErrorCheckingKind SourceType
+  | ErrorCheckingKind SourceType SourceType
   | ErrorCheckingGuard
   | ErrorInferringType Expr
+  | ErrorInferringKind SourceType
   | ErrorInApplication Expr SourceType Expr
   | ErrorInDataConstructor (ProperName 'ConstructorName)
   | ErrorInTypeConstructor (ProperName 'TypeName)
@@ -78,6 +78,7 @@ data ErrorMessageHint
   | ErrorInValueDeclaration Ident
   | ErrorInTypeDeclaration Ident
   | ErrorInTypeClassDeclaration (ProperName 'ClassName)
+  | ErrorInKindDeclaration (ProperName 'TypeName)
   | ErrorInForeignImport Ident
   | ErrorSolvingConstraint SourceConstraint
   | PositionedError (NEL.NonEmpty SourceSpan)
@@ -174,10 +175,6 @@ data DeclarationRef
   --
   | ModuleRef SourceSpan ModuleName
   -- |
-  -- A named kind
-  --
-  | KindRef SourceSpan (ProperName 'KindName)
-  -- |
   -- A value re-exported from another module. These will be inserted during
   -- elaboration in name desugaring.
   --
@@ -192,7 +189,6 @@ instance Eq DeclarationRef where
   (TypeClassRef _ name) == (TypeClassRef _ name') = name == name'
   (TypeInstanceRef _ name) == (TypeInstanceRef _ name') = name == name'
   (ModuleRef _ name) == (ModuleRef _ name') = name == name'
-  (KindRef _ name) == (KindRef _ name') = name == name'
   (ReExportRef _ mn ref) == (ReExportRef _ mn' ref') = mn == mn' && ref == ref'
   _ == _ = False
 
@@ -214,7 +210,6 @@ compDecRef (ValueOpRef _ name) (ValueOpRef _ name') = compare name name'
 compDecRef (TypeClassRef _ name) (TypeClassRef _ name') = compare name name'
 compDecRef (TypeInstanceRef _ ident) (TypeInstanceRef _ ident') = compare ident ident'
 compDecRef (ModuleRef _ name) (ModuleRef _ name') = compare name name'
-compDecRef (KindRef _ name) (KindRef _ name') = compare name name'
 compDecRef (ReExportRef _ name _) (ReExportRef _ name' _) = compare name name'
 compDecRef ref ref' = compare
   (orderOf ref) (orderOf ref')
@@ -225,7 +220,6 @@ compDecRef ref ref' = compare
       orderOf TypeRef{} = 2
       orderOf ValueRef{} = 3
       orderOf ValueOpRef{} = 4
-      orderOf KindRef{} = 5
       orderOf _ = 6
 
 declRefSourceSpan :: DeclarationRef -> SourceSpan
@@ -236,7 +230,6 @@ declRefSourceSpan (ValueOpRef ss _) = ss
 declRefSourceSpan (TypeClassRef ss _) = ss
 declRefSourceSpan (TypeInstanceRef ss _) = ss
 declRefSourceSpan (ModuleRef ss _) = ss
-declRefSourceSpan (KindRef ss _) = ss
 declRefSourceSpan (ReExportRef ss _ _) = ss
 
 declRefName :: DeclarationRef -> Name
@@ -247,7 +240,6 @@ declRefName (ValueOpRef _ n) = ValOpName n
 declRefName (TypeClassRef _ n) = TyClassName n
 declRefName (TypeInstanceRef _ n) = IdentName n
 declRefName (ModuleRef _ n) = ModName n
-declRefName (KindRef _ n) = KiName n
 declRefName (ReExportRef _ _ ref) = declRefName ref
 
 getTypeRef :: DeclarationRef -> Maybe (ProperName 'TypeName, Maybe [ProperName 'ConstructorName])
@@ -269,10 +261,6 @@ getValueOpRef _ = Nothing
 getTypeClassRef :: DeclarationRef -> Maybe (ProperName 'ClassName)
 getTypeClassRef (TypeClassRef _ name) = Just name
 getTypeClassRef _ = Nothing
-
-getKindRef :: DeclarationRef -> Maybe (ProperName 'KindName)
-getKindRef (KindRef _ name) = Just name
-getKindRef _ = Nothing
 
 isModuleRef :: DeclarationRef -> Bool
 isModuleRef ModuleRef{} = True
@@ -380,7 +368,7 @@ data Declaration
   -- |
   -- A data type declaration (data or newtype, name, arguments, data constructors)
   --
-  = DataDeclaration SourceAnn DataDeclType (ProperName 'TypeName) [(Text, Maybe SourceKind)] [DataConstructorDeclaration]
+  = DataDeclaration SourceAnn DataDeclType (ProperName 'TypeName) [(Text, Maybe SourceType)] [DataConstructorDeclaration]
   -- |
   -- A minimal mutually recursive set of data type declarations
   --
@@ -388,7 +376,11 @@ data Declaration
   -- |
   -- A type synonym declaration (name, arguments, type)
   --
-  | TypeSynonymDeclaration SourceAnn (ProperName 'TypeName) [(Text, Maybe SourceKind)] SourceType
+  | TypeSynonymDeclaration SourceAnn (ProperName 'TypeName) [(Text, Maybe SourceType)] SourceType
+  -- |
+  -- A kind signature declaration
+  --
+  | KindDeclaration SourceAnn KindSignatureFor (ProperName 'TypeName) SourceType
   -- |
   -- A role declaration (name, roles)
   --
@@ -415,11 +407,7 @@ data Declaration
   -- |
   -- A data type foreign import (name, kind)
   --
-  | ExternDataDeclaration SourceAnn (ProperName 'TypeName) SourceKind
-  -- |
-  -- A foreign kind import (name)
-  --
-  | ExternKindDeclaration SourceAnn (ProperName 'KindName)
+  | ExternDataDeclaration SourceAnn (ProperName 'TypeName) SourceType
   -- |
   -- A fixity declaration
   --
@@ -431,7 +419,7 @@ data Declaration
   -- |
   -- A type class declaration (name, argument, implies, member declarations)
   --
-  | TypeClassDeclaration SourceAnn (ProperName 'ClassName) [(Text, Maybe SourceKind)] [SourceConstraint] [FunctionalDependency] [Declaration]
+  | TypeClassDeclaration SourceAnn (ProperName 'ClassName) [(Text, Maybe SourceType)] [SourceConstraint] [FunctionalDependency] [Declaration]
   -- |
   -- A type instance declaration (instance chain, chain index, name,
   -- dependencies, class name, instance types, member declarations)
@@ -472,10 +460,19 @@ traverseTypeInstanceBody :: (Applicative f) => ([Declaration] -> f [Declaration]
 traverseTypeInstanceBody f (ExplicitInstance ds) = ExplicitInstance <$> f ds
 traverseTypeInstanceBody _ other = pure other
 
+-- | What sort of declaration the kind signature applies to.
+data KindSignatureFor
+  = DataSig
+  | NewtypeSig
+  | TypeSynonymSig
+  | ClassSig
+  deriving (Eq, Ord, Show)
+
 declSourceAnn :: Declaration -> SourceAnn
 declSourceAnn (DataDeclaration sa _ _ _ _) = sa
 declSourceAnn (DataBindingGroupDeclaration ds) = declSourceAnn (NEL.head ds)
 declSourceAnn (TypeSynonymDeclaration sa _ _ _) = sa
+declSourceAnn (KindDeclaration sa _ _ _) = sa
 declSourceAnn (RoleDeclaration rd) = rdeclSourceAnn rd
 declSourceAnn (TypeDeclaration td) = tydeclSourceAnn td
 declSourceAnn (ValueDeclaration vd) = valdeclSourceAnn vd
@@ -483,7 +480,6 @@ declSourceAnn (BoundValueDeclaration sa _ _) = sa
 declSourceAnn (BindingGroupDeclaration ds) = let ((sa, _), _, _) = NEL.head ds in sa
 declSourceAnn (ExternDeclaration sa _ _) = sa
 declSourceAnn (ExternDataDeclaration sa _ _) = sa
-declSourceAnn (ExternKindDeclaration sa _) = sa
 declSourceAnn (FixityDeclaration sa _) = sa
 declSourceAnn (ImportDeclaration sa _ _ _) = sa
 declSourceAnn (TypeClassDeclaration sa _ _ _ _ _) = sa
@@ -498,7 +494,6 @@ declName (TypeSynonymDeclaration _ n _ _) = Just (TyName n)
 declName (ValueDeclaration vd) = Just (IdentName (valdeclIdent vd))
 declName (ExternDeclaration _ n _) = Just (IdentName n)
 declName (ExternDataDeclaration _ n _) = Just (TyName n)
-declName (ExternKindDeclaration _ n) = Just (KiName n)
 declName (FixityDeclaration _ (Left (ValueFixity _ _ n))) = Just (ValOpName n)
 declName (FixityDeclaration _ (Right (TypeFixity _ _ n))) = Just (TyOpName n)
 declName (TypeClassDeclaration _ n _ _ _ _) = Just (TyClassName n)
@@ -507,6 +502,7 @@ declName ImportDeclaration{} = Nothing
 declName BindingGroupDeclaration{} = Nothing
 declName DataBindingGroupDeclaration{} = Nothing
 declName BoundValueDeclaration{} = Nothing
+declName KindDeclaration{} = Nothing
 declName TypeDeclaration{} = Nothing
 declName RoleDeclaration{} = Nothing
 
@@ -518,12 +514,18 @@ isValueDecl ValueDeclaration{} = True
 isValueDecl _ = False
 
 -- |
--- Test if a declaration is a data type or type synonym declaration
+-- Test if a declaration is a data type declaration
 --
 isDataDecl :: Declaration -> Bool
 isDataDecl DataDeclaration{} = True
-isDataDecl TypeSynonymDeclaration{} = True
 isDataDecl _ = False
+
+-- |
+-- Test if a declaration is a type synonym declaration
+--
+isTypeSynonymDecl :: Declaration -> Bool
+isTypeSynonymDecl TypeSynonymDeclaration{} = True
+isTypeSynonymDecl _ = False
 
 -- |
 -- Test if a declaration is a module import
@@ -547,13 +549,6 @@ isExternDataDecl ExternDataDeclaration{} = True
 isExternDataDecl _ = False
 
 -- |
--- Test if a declaration is a foreign kind import
---
-isExternKindDecl :: Declaration -> Bool
-isExternKindDecl ExternKindDeclaration{} = True
-isExternKindDecl _ = False
-
--- |
 -- Test if a declaration is a fixity declaration
 --
 isFixityDecl :: Declaration -> Bool
@@ -574,16 +569,23 @@ isExternDecl _ = False
 -- |
 -- Test if a declaration is a type class instance declaration
 --
-isTypeClassInstanceDeclaration :: Declaration -> Bool
-isTypeClassInstanceDeclaration TypeInstanceDeclaration{} = True
-isTypeClassInstanceDeclaration _ = False
+isTypeClassInstanceDecl :: Declaration -> Bool
+isTypeClassInstanceDecl TypeInstanceDeclaration{} = True
+isTypeClassInstanceDecl _ = False
 
 -- |
 -- Test if a declaration is a type class declaration
 --
-isTypeClassDeclaration :: Declaration -> Bool
-isTypeClassDeclaration TypeClassDeclaration{} = True
-isTypeClassDeclaration _ = False
+isTypeClassDecl :: Declaration -> Bool
+isTypeClassDecl TypeClassDeclaration{} = True
+isTypeClassDecl _ = False
+
+-- |
+-- Test if a declaration is a kind signature declaration.
+--
+isKindDecl :: Declaration -> Bool
+isKindDecl KindDeclaration{} = True
+isKindDecl _ = False
 
 -- |
 -- Recursively flatten data binding groups in the list of declarations
