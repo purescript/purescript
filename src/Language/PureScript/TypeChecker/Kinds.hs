@@ -497,9 +497,10 @@ elaborateKind = \case
     case k1 of
       TypeApp _ (TypeApp _ k _) w2 | eqType k E.tyFunction -> do
         pure $ w2 $> ann
-      -- Normally we wouldn't unify in `elaborateKind`, but `Entailment` likes
-      -- to introduce unknown kinds, and this becomes necessary. TODO: fix
-      -- entailment so that it always uses known kinds for unknowns.
+      -- Normally we wouldn't unify in `elaborateKind`, since an unknown should
+      -- always have a known kind. However, since type holes are fully inference
+      -- driven, they are unknowns with unknown kinds, which may require some
+      -- late unification here.
       TUnknown a u -> do
         _ <- solveUnknownAsFunction a u
         elaborateKind ty
