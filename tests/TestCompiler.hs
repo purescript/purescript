@@ -226,7 +226,8 @@ printErrorOrWarning
   -> [FilePath]
   -> IO String
 printErrorOrWarning supportModules supportExterns supportForeigns inputFiles = do
-  (e, w) <- compile supportModules supportExterns supportForeigns inputFiles noPreCheck
+  -- Sorting the input files makes some messages (e.g., duplicate module) deterministic
+  (e, w) <- compile supportModules supportExterns supportForeigns (sort inputFiles) noPreCheck
   case (const w <$> e) of
     Left errs ->
       return $ P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
