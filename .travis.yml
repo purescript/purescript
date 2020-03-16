@@ -71,9 +71,7 @@ install:
   mv stack "$HOME/.local/bin/"
   popd
 - | # Install hlint.
-  BUILD_DIR="$HOME/hlint"
-  BIN_DIR="$HOME/.local/bin/"
-  ci/install-hlint.sh
+  BIN_DIR="$HOME/.local/bin/" BUILD_DIR="$HOME/hlint" ci/install-hlint.sh
 - | # Set up the timeout command
   if which timeout >/dev/null
   then
