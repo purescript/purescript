@@ -6,12 +6,11 @@ set -o pipefail
 IFS=$'\n\t'
 
 readonly hlint_version=2.2.11
-readonly temporary_dir="$(mktemp --directory -t "install-hlint.XXXXXXXXXX")"
+readonly build_dir="${BUILD_DIR:?Must provide a directory to build in}"
+readonly bin_dir="${BIN_DIR:?Must provide a directory to install binaries}"
 
 function cleanup() {
     local exit_code="${?}"
-
-    rm --force --recursive "${temporary_dir}"
 
     exit "${exit_code}"
 }
@@ -22,27 +21,29 @@ function download_for_unix() {
     local os="${1}"
     local url="https://github.com/ndmitchell/hlint/releases/download/v${hlint_version}/hlint-${hlint_version}-x86_64-${os}.tar.gz"
 
-    pushd "${temporary_dir}"
+    mkdir -p "${build_dir}"
+    pushd "${build_dir}"
     curl --location "${url}" --output hlint.tar.gz
     tar -xzf hlint.tar.gz --strip-components=1
     popd
 
-    mkdir -p bin/data
-    cp -r "${temporary_dir}/data" bin
-    cp "${temporary_dir}/hlint" bin
+    mkdir -p "${bin_dir}/data"
+    cp -r "${build_dir}/data" "${bin_dir}"
+    cp "${build_dir}/hlint" "${bin_dir}"
 }
 
 function download_for_windows() {
     local url="https://github.com/ndmitchell/hlint/releases/download/v${hlint_version}/hlint-${hlint_version}-x86_64-windows.zip"
 
-    pushd "${temporary_dir}"
+    mkdir -p "${build_dir}"
+    pushd "${build_dir}"
     curl --location "${url}" --output hlint.zip
     7z e -r hlint.zip
     popd
 
-    mkdir -p bin/data
-    cp -r "${temporary_dir}/data" bin
-    cp "${temporary_dir}/hlint.exe" bin
+    mkdir -p "${bin_dir}/data"
+    cp -r "${build_dir}/data" "${bin_dir}"
+    cp "${build_dir}/hlint.exe" "${bin_dir}"
 }
 
 function main() {

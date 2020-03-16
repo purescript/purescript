@@ -1,4 +1,5 @@
-bindir = bin
+bin_dir = bin
+build_dir = .build
 package = purescript
 exe_target = purs
 stack_yaml = STACK_YAML="stack.yaml"
@@ -6,12 +7,13 @@ stack = $(stack_yaml) stack
 
 .DEFAULT_GOAL := help
 
-$(bindir)/hlint: ci/install-hlint.sh
-	$<
+$(bin_dir)/hlint: ci/install-hlint.sh
+	BIN_DIR=$(bin_dir) BUILD_DIR=$(build_dir) $<
 	touch $@
 
 clean: ## Remove build artifacts
-	rm -fr $(bindir)
+	rm -fr $(bin_dir)
+	rm -fr $(build_dir)
 
 help: ## Print documentation
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
@@ -71,7 +73,7 @@ license-generator: ## Update dependencies in LICENSE
 
 lint: lint-hlint ## Check project adheres to standards
 
-lint-hlint: $(bindir)/hlint ## Check project adheres to hlint standards
+lint-hlint: $(bin_dir)/hlint ## Check project adheres to hlint standards
 	$< --git
 
 .PHONY : build build-dirty run install ghci test test-ghci test-profiling ghcid dev-deps license-generator clean lint lint-hlint
