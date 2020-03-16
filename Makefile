@@ -1,7 +1,17 @@
+bindir = bin
 package = purescript
 exe_target = purs
 stack_yaml = STACK_YAML="stack.yaml"
 stack = $(stack_yaml) stack
+
+.DEFAULT_GOAL := help
+
+$(bindir)/hlint: ci/install-hlint.sh
+	$<
+	touch $@
+
+clean: ## Remove build artifacts
+	rm -fr $(bindir)
 
 help: ## Print documentation
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
@@ -59,4 +69,9 @@ dev-deps: ## Install helpful development tools.
 license-generator: ## Update dependencies in LICENSE
 	$(stack) ls dependencies purescript --flag purescript:RELEASE | stack license-generator/generate.hs > LICENSE
 
-.PHONY : build build-dirty run install ghci test test-ghci test-profiling ghcid dev-deps license-generator
+lint: lint-hlint ## Check project adheres to standards
+
+lint-hlint: $(bindir)/hlint ## Check project adheres to hlint standards
+	$< --git
+
+.PHONY : build build-dirty run install ghci test test-ghci test-profiling ghcid dev-deps license-generator clean lint lint-hlint

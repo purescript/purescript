@@ -97,6 +97,7 @@ install:
     export CI_RELEASE=true
   fi
 script:
+- make lint
 # Set a timeout of 35 minutes. We could use travis_wait here, but travis_wait
 # doesn't produce any output until the command finishes, and also doesn't
 # always show all of the command's output.
