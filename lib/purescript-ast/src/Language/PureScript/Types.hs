@@ -29,7 +29,7 @@ import "this" Language.PureScript.Names
 import "this" Language.PureScript.Label (Label)
 import "this" Language.PureScript.PSString (PSString)
 
-import "microlens-platform" Lens.Micro.Platform (Lens', (^.), set)
+import "microlens" Lens.Micro (Lens', (^.), set)
 
 type SourceType = Type SourceAnn
 type SourceConstraint = Constraint SourceAnn
