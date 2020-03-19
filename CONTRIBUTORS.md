@@ -86,7 +86,6 @@ If you would prefer to use different terms, please use the section below instead
 | [@nicodelpiano](https://github.com/nicodelpiano) | Nicolas Del Piano | [MIT license](http://opensource.org/licenses/MIT) |
 | [@noraesae](https://github.com/noraesae) | Hyunje Jun | [MIT license](http://opensource.org/licenses/MIT) |
 | [@nullobject](https://github.com/nullobject) | Josh Bassett | [MIT license](http://opensource.org/licenses/MIT) |
-| [@nwolverson](https://github.com/nwolverson) | Nicholas Wolverson | [MIT license](http://opensource.org/licenses/MIT) |
 | [@osa1](https://github.com/osa1) | Ömer Sinan Ağacan | MIT license |
 | [@paf31](https://github.com/paf31) | Phil Freeman | [MIT license](http://opensource.org/licenses/MIT) |
 | [@parsonsmatt](https://github.com/parsonsmatt) | Matt Parsons | [MIT license](http://opensource.org/licenses/MIT) |
@@ -155,6 +154,9 @@ If you would prefer to use different terms, please use the section below instead
 | [@leighman](http://github.com/leighman) | Jack Leigh | My existing contributions and all future contributions until further notice are Copyright Jack Leigh, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT). |
 | [@nagisa](https://github.com/nagisa) | nagisa | I hereby release my [only contribution](https://github.com/purescript/purescript/commit/80287a5d0de619862d3b4cda9c1ee276d18fdcd8) into public domain. |
 | [@puffnfresh](https://github.com/puffnfresh) | Brian McKenna | All contributions I made during June 2015 were during employment at [SlamData, Inc.](#companies) who owns the copyright. I assign copyright of all my personal contributions before June 2015 to the owners of the PureScript compiler. |
+| [@nwolverson](https://github.com/nwolverson) | Nicholas Wolverson | Contributions I made during March 2020 until further notice are in employment of [Id3as Company](#companies), who own the copyright. All other contributions remain Copyright Nicholas Wolverson, and are licensed to the owners and users of the PureScript compiler project under the terms of the [MIT license](http://opensource.org/licenses/MIT). |
+
+
 
 ### Companies
 
