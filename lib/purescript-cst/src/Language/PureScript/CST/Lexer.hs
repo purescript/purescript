@@ -6,22 +6,22 @@ module Language.PureScript.CST.Lexer
   , isUnquotedKey
   ) where
 
-import "base" Prelude hiding (lex, exp, exponent, lines)
+import Prelude hiding (lex, exp, exponent, lines)
 
-import "base" Control.Monad (join)
-import qualified "base" Data.Char as Char
-import qualified "dlist" Data.DList as DList
-import "base" Data.Foldable (foldl')
-import "base" Data.Functor (($>))
-import qualified "scientific" Data.Scientific as Sci
-import "base" Data.String (fromString)
-import "text" Data.Text (Text)
-import qualified "text" Data.Text as Text
-import "this" Language.PureScript.CST.Errors
-import "this" Language.PureScript.CST.Monad hiding (token)
-import "this" Language.PureScript.CST.Layout
-import "this" Language.PureScript.CST.Positions
-import "this" Language.PureScript.CST.Types
+import Control.Monad (join)
+import qualified Data.Char as Char
+import qualified Data.DList as DList
+import Data.Foldable (foldl')
+import Data.Functor (($>))
+import qualified Data.Scientific as Sci
+import Data.String (fromString)
+import Data.Text (Text)
+import qualified Data.Text as Text
+import Language.PureScript.CST.Errors
+import Language.PureScript.CST.Monad hiding (token)
+import Language.PureScript.CST.Layout
+import Language.PureScript.CST.Positions
+import Language.PureScript.CST.Types
 
 -- | Stops at the first lexing error and replaces it with TokEof. Otherwise,
 -- the parser will fail when it attempts to draw a lookahead token.

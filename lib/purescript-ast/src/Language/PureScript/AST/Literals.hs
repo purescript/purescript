@@ -3,8 +3,8 @@
 --
 module Language.PureScript.AST.Literals where
 
-import "base-compat" Prelude.Compat
-import "this" Language.PureScript.PSString (PSString)
+import Prelude.Compat
+import Language.PureScript.PSString (PSString)
 
 -- |
 -- Data type for literal values. Parameterised so it can be used for Exprs and

@@ -52,7 +52,6 @@ library:
     - LambdaCase
     - MultiParamTypeClasses
     - NoImplicitPrelude
-    - PackageImports
     - PatternGuards
     - PatternSynonyms
     - RankNTypes

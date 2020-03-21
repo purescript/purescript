@@ -9,28 +9,28 @@ module Language.PureScript.PSString
   , mkString
   ) where
 
-import "base-compat" Prelude.Compat
-import "base" GHC.Generics (Generic)
-import "deepseq" Control.DeepSeq (NFData)
-import "base" Control.Exception (try, evaluate)
-import "base" Control.Applicative ((<|>))
-import qualified "base" Data.Char as Char
-import "base" Data.Bits (shiftR)
-import "base" Data.List (unfoldr)
-import "scientific" Data.Scientific (toBoundedInteger)
-import "base" Data.String (IsString(..))
-import "bytestring" Data.ByteString (ByteString)
-import qualified "bytestring" Data.ByteString as BS
-import "text" Data.Text (Text)
-import qualified "text" Data.Text as T
-import "text" Data.Text.Encoding (decodeUtf16BE)
-import "text" Data.Text.Encoding.Error (UnicodeException)
-import qualified "vector" Data.Vector as V
-import "base" Data.Word (Word16, Word8)
-import "base" Numeric (showHex)
-import "base" System.IO.Unsafe (unsafePerformIO)
-import qualified "aeson" Data.Aeson as A
-import qualified "aeson" Data.Aeson.Types as A
+import Prelude.Compat
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
+import Control.Exception (try, evaluate)
+import Control.Applicative ((<|>))
+import qualified Data.Char as Char
+import Data.Bits (shiftR)
+import Data.List (unfoldr)
+import Data.Scientific (toBoundedInteger)
+import Data.String (IsString(..))
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
+import Data.Text (Text)
+import qualified Data.Text as T
+import Data.Text.Encoding (decodeUtf16BE)
+import Data.Text.Encoding.Error (UnicodeException)
+import qualified Data.Vector as V
+import Data.Word (Word16, Word8)
+import Numeric (showHex)
+import System.IO.Unsafe (unsafePerformIO)
+import qualified Data.Aeson as A
+import qualified Data.Aeson.Types as A
 
 -- |
 -- Strings in PureScript are sequences of UTF-16 code units, which do not

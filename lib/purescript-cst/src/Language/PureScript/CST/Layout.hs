@@ -20,13 +20,13 @@
 
 module Language.PureScript.CST.Layout where
 
-import "base" Prelude
+import Prelude
 
-import "dlist" Data.DList (snoc)
-import qualified "dlist" Data.DList as DList
-import "base" Data.Foldable (find)
-import "base" Data.Function ((&))
-import "this" Language.PureScript.CST.Types
+import Data.DList (snoc)
+import qualified Data.DList as DList
+import Data.Foldable (find)
+import Data.Function ((&))
+import Language.PureScript.CST.Types
 
 type LayoutStack = [(SourcePos, LayoutDelim)]
 

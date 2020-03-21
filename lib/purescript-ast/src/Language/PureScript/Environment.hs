@@ -1,29 +1,29 @@
 module Language.PureScript.Environment where
 
-import "base-compat" Prelude.Compat
-import "protolude" Protolude (ordNub)
+import Prelude.Compat
+import Protolude (ordNub)
 
-import "base" GHC.Generics (Generic)
-import "deepseq" Control.DeepSeq (NFData)
-import "aeson" Data.Aeson ((.=), (.:))
-import qualified "aeson" Data.Aeson as A
-import qualified "containers" Data.Map as M
-import qualified "containers" Data.Set as S
-import "base" Data.Maybe (fromMaybe, mapMaybe)
-import "text" Data.Text (Text)
-import qualified "text" Data.Text as T
-import "containers" Data.Tree (Tree, rootLabel)
-import qualified "containers" Data.Graph as G
-import "base" Data.Foldable (toList)
-import qualified "base" Data.List.NonEmpty as NEL
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
+import Data.Aeson ((.=), (.:))
+import qualified Data.Aeson as A
+import qualified Data.Map as M
+import qualified Data.Set as S
+import Data.Maybe (fromMaybe, mapMaybe)
+import Data.Text (Text)
+import qualified Data.Text as T
+import Data.Tree (Tree, rootLabel)
+import qualified Data.Graph as G
+import Data.Foldable (toList)
+import qualified Data.List.NonEmpty as NEL
 
-import "this" Language.PureScript.AST.SourcePos
-import "this" Language.PureScript.Crash
-import "this" Language.PureScript.Names
-import "this" Language.PureScript.Roles
-import "this" Language.PureScript.TypeClassDictionaries
-import "this" Language.PureScript.Types
-import qualified "this" Language.PureScript.Constants.Prim as C
+import Language.PureScript.AST.SourcePos
+import Language.PureScript.Crash
+import Language.PureScript.Names
+import Language.PureScript.Roles
+import Language.PureScript.TypeClassDictionaries
+import Language.PureScript.Types
+import qualified Language.PureScript.Constants.Prim as C
 
 -- | The @Environment@ defines all values and types which are currently in scope:
 data Environment = Environment

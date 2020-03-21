@@ -7,15 +7,15 @@
 
 module Language.PureScript.CST.Types where
 
-import "base" Prelude
+import Prelude
 
-import "base" Data.List.NonEmpty (NonEmpty)
-import "text" Data.Text (Text)
-import "base" Data.Void (Void)
-import "base" GHC.Generics (Generic)
-import qualified "purescript-ast" Language.PureScript.Names as N
+import Data.List.NonEmpty (NonEmpty)
+import Data.Text (Text)
+import Data.Void (Void)
+import GHC.Generics (Generic)
+import qualified Language.PureScript.Names as N
 import qualified Language.PureScript.Roles as R
-import "purescript-ast" Language.PureScript.PSString (PSString)
+import Language.PureScript.PSString (PSString)
 
 data SourcePos = SourcePos
   { srcLine :: {-# UNPACK #-} !Int

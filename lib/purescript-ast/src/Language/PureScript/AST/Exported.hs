@@ -3,17 +3,17 @@ module Language.PureScript.AST.Exported
   , isExported
   ) where
 
-import "base-compat" Prelude.Compat
-import "protolude" Protolude (sortBy, on)
+import Prelude.Compat
+import Protolude (sortBy, on)
 
-import "base" Control.Category ((>>>))
+import Control.Category ((>>>))
 
-import "base" Data.Maybe (mapMaybe)
-import qualified "containers" Data.Map as M
+import Data.Maybe (mapMaybe)
+import qualified Data.Map as M
 
-import "this" Language.PureScript.AST.Declarations
-import "this" Language.PureScript.Types
-import "this" Language.PureScript.Names
+import Language.PureScript.AST.Declarations
+import Language.PureScript.Types
+import Language.PureScript.Names
 
 -- |
 -- Return a list of all declarations which are exported from a module.

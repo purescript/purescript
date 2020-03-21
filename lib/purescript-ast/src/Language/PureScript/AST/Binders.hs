@@ -3,13 +3,13 @@
 --
 module Language.PureScript.AST.Binders where
 
-import "base-compat" Prelude.Compat
+import Prelude.Compat
 
-import "this" Language.PureScript.AST.SourcePos
-import "this" Language.PureScript.AST.Literals
-import "this" Language.PureScript.Names
-import "this" Language.PureScript.Comments
-import "this" Language.PureScript.Types
+import Language.PureScript.AST.SourcePos
+import Language.PureScript.AST.Literals
+import Language.PureScript.Names
+import Language.PureScript.Comments
+import Language.PureScript.Types
 
 -- |
 -- Data type for binders

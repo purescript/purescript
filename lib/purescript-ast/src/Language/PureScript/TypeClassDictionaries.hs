@@ -1,13 +1,13 @@
 module Language.PureScript.TypeClassDictionaries where
 
-import "base-compat" Prelude.Compat
+import Prelude.Compat
 
-import "base" GHC.Generics (Generic)
-import "deepseq" Control.DeepSeq (NFData)
-import "text" Data.Text (Text, pack)
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
+import Data.Text (Text, pack)
 
-import "this" Language.PureScript.Names
-import "this" Language.PureScript.Types
+import Language.PureScript.Names
+import Language.PureScript.Types
 
 --
 -- Data representing a type class dictionary which is in scope

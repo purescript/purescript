@@ -3,24 +3,24 @@
 --
 module Language.PureScript.AST.Traversals where
 
-import "base-compat" Prelude.Compat
+import Prelude.Compat
 
-import "base" Control.Monad
+import Control.Monad
 
-import "base" Data.Foldable (fold)
-import "base" Data.List (mapAccumL)
-import "base" Data.Maybe (mapMaybe)
-import qualified "base" Data.List.NonEmpty as NEL
-import qualified "containers" Data.Map as M
-import qualified "containers" Data.Set as S
+import Data.Foldable (fold)
+import Data.List (mapAccumL)
+import Data.Maybe (mapMaybe)
+import qualified Data.List.NonEmpty as NEL
+import qualified Data.Map as M
+import qualified Data.Set as S
 
-import "this" Language.PureScript.AST.Binders
-import "this" Language.PureScript.AST.Declarations
-import "this" Language.PureScript.AST.Literals
-import "this" Language.PureScript.Names
-import "this" Language.PureScript.Traversals
-import "this" Language.PureScript.TypeClassDictionaries (TypeClassDictionaryInScope(..))
-import "this" Language.PureScript.Types
+import Language.PureScript.AST.Binders
+import Language.PureScript.AST.Declarations
+import Language.PureScript.AST.Literals
+import Language.PureScript.Names
+import Language.PureScript.Traversals
+import Language.PureScript.TypeClassDictionaries (TypeClassDictionaryInScope(..))
+import Language.PureScript.Types
 
 guardedExprM :: Applicative m
              => (Guard -> m Guard)

@@ -6,13 +6,13 @@
 
 module Main (main) where
 
-import "base-compat" Prelude.Compat
+import Prelude.Compat
 
-import "tasty" Test.Tasty
+import Test.Tasty
 
-import qualified "this" TestCst
+import qualified TestCst
 
-import "base" System.IO (hSetEncoding, stdout, stderr, utf8)
+import System.IO (hSetEncoding, stdout, stderr, utf8)
 
 main :: IO ()
 main = do

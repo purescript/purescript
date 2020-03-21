@@ -7,12 +7,12 @@ module Language.PureScript.Roles
   ( Role(..)
   ) where
 
-import "base-compat" Prelude.Compat
+import Prelude.Compat
 
-import "deepseq" Control.DeepSeq (NFData)
-import qualified "aeson" Data.Aeson as A
-import qualified "aeson" Data.Aeson.TH as A
-import "base" GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
+import qualified Data.Aeson as A
+import qualified Data.Aeson.TH as A
+import GHC.Generics (Generic)
 
 -- |
 -- The role of a type constructor's parameter.

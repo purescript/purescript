@@ -1,23 +1,23 @@
 module Language.PureScript.CST.Utils where
 
-import "base" Prelude
+import Prelude
 
-import "base" Control.Monad (when)
-import "base" Data.Coerce (coerce)
-import "base" Data.Foldable (for_)
-import "base" Data.Functor (($>))
-import qualified "base" Data.List.NonEmpty as NE
-import "containers" Data.Set (Set)
-import qualified "containers" Data.Set as Set
-import "text" Data.Text (Text)
-import qualified "text" Data.Text as Text
-import "this" Language.PureScript.CST.Errors
-import "this" Language.PureScript.CST.Monad
-import "this" Language.PureScript.CST.Positions
-import "this" Language.PureScript.CST.Traversals.Type
-import "this" Language.PureScript.CST.Types
-import qualified "purescript-ast" Language.PureScript.Names as N
-import "purescript-ast" Language.PureScript.PSString (PSString, mkString)
+import Control.Monad (when)
+import Data.Coerce (coerce)
+import Data.Foldable (for_)
+import Data.Functor (($>))
+import qualified Data.List.NonEmpty as NE
+import Data.Set (Set)
+import qualified Data.Set as Set
+import Data.Text (Text)
+import qualified Data.Text as Text
+import Language.PureScript.CST.Errors
+import Language.PureScript.CST.Monad
+import Language.PureScript.CST.Positions
+import Language.PureScript.CST.Traversals.Type
+import Language.PureScript.CST.Types
+import qualified Language.PureScript.Names as N
+import Language.PureScript.PSString (PSString, mkString)
 
 placeholder :: SourceToken
 placeholder = SourceToken

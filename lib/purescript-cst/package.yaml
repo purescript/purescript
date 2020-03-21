@@ -49,7 +49,6 @@ library:
     - MultiParamTypeClasses
     - NamedFieldPuns
     - NoImplicitPrelude
-    - PackageImports
     - PatternGuards
     - PatternSynonyms
     - RankNTypes
