@@ -178,6 +178,7 @@ tests:
       - hspec
       - hspec-discover
       - HUnit
+      - regex-base
     default-extensions:
       - NoImplicitPrelude
       - LambdaCase
