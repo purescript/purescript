@@ -25,6 +25,8 @@ printModuleSignatures moduleName P.Environment{..} =
     let moduleNamesIdent = byModuleName names
         moduleTypeClasses = byModuleName typeClasses
         moduleTypes = byModuleName types
+
+        byModuleName :: M.Map (P.Qualified a) b -> [P.Qualified a]
         byModuleName = filter ((== Just moduleName) . P.getQual) . M.keys
 
   in
