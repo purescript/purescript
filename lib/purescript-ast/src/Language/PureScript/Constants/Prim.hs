@@ -1,10 +1,10 @@
 -- | Various constants which refer to things in Prim
 module Language.PureScript.Constants.Prim where
 
-import "base-compat" Prelude.Compat
+import Prelude.Compat
 
-import "base" Data.String (IsString)
-import "this" Language.PureScript.Names
+import Data.String (IsString)
+import Language.PureScript.Names
 
 -- Prim values
 

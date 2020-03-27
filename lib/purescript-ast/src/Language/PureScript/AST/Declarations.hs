@@ -6,30 +6,30 @@
 --
 module Language.PureScript.AST.Declarations where
 
-import "base-compat" Prelude.Compat
+import Prelude.Compat
 
-import "deepseq" Control.DeepSeq (NFData)
-import "base" Data.Functor.Identity
+import Control.DeepSeq (NFData)
+import Data.Functor.Identity
 
-import "aeson" Data.Aeson.TH
-import qualified "containers" Data.Map as M
-import "text" Data.Text (Text)
-import qualified "base" Data.List.NonEmpty as NEL
-import "base" GHC.Generics (Generic)
+import Data.Aeson.TH
+import qualified Data.Map as M
+import Data.Text (Text)
+import qualified Data.List.NonEmpty as NEL
+import GHC.Generics (Generic)
 
-import "this" Language.PureScript.AST.Binders
-import "this" Language.PureScript.AST.Literals
-import "this" Language.PureScript.AST.Operators
-import "this" Language.PureScript.AST.SourcePos
-import "this" Language.PureScript.Types
-import "this" Language.PureScript.PSString (PSString)
-import "this" Language.PureScript.Label (Label)
-import "this" Language.PureScript.Names
-import "this" Language.PureScript.Roles
-import "this" Language.PureScript.TypeClassDictionaries
-import "this" Language.PureScript.Comments
-import "this" Language.PureScript.Environment
-import qualified "this" Language.PureScript.Constants.Prim as C
+import Language.PureScript.AST.Binders
+import Language.PureScript.AST.Literals
+import Language.PureScript.AST.Operators
+import Language.PureScript.AST.SourcePos
+import Language.PureScript.Types
+import Language.PureScript.PSString (PSString)
+import Language.PureScript.Label (Label)
+import Language.PureScript.Names
+import Language.PureScript.Roles
+import Language.PureScript.TypeClassDictionaries
+import Language.PureScript.Comments
+import Language.PureScript.Environment
+import qualified Language.PureScript.Constants.Prim as C
 
 -- | A map of locally-bound names in scope.
 type Context = [(Ident, SourceType)]

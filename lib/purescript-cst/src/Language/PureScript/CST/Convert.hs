@@ -15,26 +15,26 @@ module Language.PureScript.CST.Convert
   , comments
   ) where
 
-import "base" Prelude
+import Prelude
 
-import "base" Data.Bifunctor (bimap, first)
-import "base" Data.Foldable (foldl', toList)
-import "base" Data.Functor (($>))
-import qualified "base" Data.List.NonEmpty as NE
-import "base" Data.Maybe (isJust, fromJust, mapMaybe)
-import qualified "text" Data.Text as Text
-import qualified "purescript-ast" Language.PureScript.AST as AST
-import qualified "purescript-ast" Language.PureScript.AST.SourcePos as Pos
-import qualified "purescript-ast" Language.PureScript.Comments as C
-import "purescript-ast" Language.PureScript.Crash (internalError)
-import qualified "purescript-ast" Language.PureScript.Environment as Env
-import qualified "purescript-ast" Language.PureScript.Label as L
-import qualified "purescript-ast" Language.PureScript.Names as N
-import "purescript-ast" Language.PureScript.PSString (mkString)
-import qualified "purescript-ast" Language.PureScript.Types as T
-import "this" Language.PureScript.CST.Positions
-import "this" Language.PureScript.CST.Print (printToken)
-import "this" Language.PureScript.CST.Types
+import Data.Bifunctor (bimap, first)
+import Data.Foldable (foldl', toList)
+import Data.Functor (($>))
+import qualified Data.List.NonEmpty as NE
+import Data.Maybe (isJust, fromJust, mapMaybe)
+import qualified Data.Text as Text
+import qualified Language.PureScript.AST as AST
+import qualified Language.PureScript.AST.SourcePos as Pos
+import qualified Language.PureScript.Comments as C
+import Language.PureScript.Crash (internalError)
+import qualified Language.PureScript.Environment as Env
+import qualified Language.PureScript.Label as L
+import qualified Language.PureScript.Names as N
+import Language.PureScript.PSString (mkString)
+import qualified Language.PureScript.Types as T
+import Language.PureScript.CST.Positions
+import Language.PureScript.CST.Print (printToken)
+import Language.PureScript.CST.Types
 
 comment :: Comment a -> Maybe C.Comment
 comment = \case

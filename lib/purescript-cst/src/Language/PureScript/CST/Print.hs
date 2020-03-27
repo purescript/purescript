@@ -9,11 +9,11 @@ module Language.PureScript.CST.Print
   , printTrailingComment
   ) where
 
-import "base" Prelude
+import Prelude
 
-import "text" Data.Text (Text)
-import qualified "text" Data.Text as Text
-import "this" Language.PureScript.CST.Types
+import Data.Text (Text)
+import qualified Data.Text as Text
+import Language.PureScript.CST.Types
 
 printToken :: Token -> Text
 printToken = \case

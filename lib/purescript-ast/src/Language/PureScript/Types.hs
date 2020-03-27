@@ -3,33 +3,33 @@
 --
 module Language.PureScript.Types where
 
-import "base-compat" Prelude.Compat
-import "protolude" Protolude (ordNub)
+import Prelude.Compat
+import Protolude (ordNub)
 
-import "base" Control.Applicative ((<|>))
-import "base" Control.Arrow (first, second)
-import "deepseq" Control.DeepSeq (NFData)
-import "base" Control.Monad ((<=<), (>=>))
-import "aeson" Data.Aeson ((.:), (.:?), (.!=), (.=))
-import qualified "aeson" Data.Aeson as A
-import qualified "aeson" Data.Aeson.Types as A
-import "base" Data.Foldable (fold)
-import qualified "containers" Data.IntSet as IS
-import "base" Data.List (sort, sortBy)
-import "base" Data.Ord (comparing)
-import "base" Data.Maybe (fromMaybe, isJust)
-import qualified "containers" Data.Set as S
-import "text" Data.Text (Text)
-import qualified "text" Data.Text as T
-import "base" GHC.Generics (Generic)
+import Control.Applicative ((<|>))
+import Control.Arrow (first, second)
+import Control.DeepSeq (NFData)
+import Control.Monad ((<=<), (>=>))
+import Data.Aeson ((.:), (.:?), (.!=), (.=))
+import qualified Data.Aeson as A
+import qualified Data.Aeson.Types as A
+import Data.Foldable (fold)
+import qualified Data.IntSet as IS
+import Data.List (sort, sortBy)
+import Data.Ord (comparing)
+import Data.Maybe (fromMaybe, isJust)
+import qualified Data.Set as S
+import Data.Text (Text)
+import qualified Data.Text as T
+import GHC.Generics (Generic)
 
-import "this" Language.PureScript.AST.SourcePos
-import qualified "this" Language.PureScript.Constants.Prim as C
-import "this" Language.PureScript.Names
-import "this" Language.PureScript.Label (Label)
-import "this" Language.PureScript.PSString (PSString)
+import Language.PureScript.AST.SourcePos
+import qualified Language.PureScript.Constants.Prim as C
+import Language.PureScript.Names
+import Language.PureScript.Label (Label)
+import Language.PureScript.PSString (PSString)
 
-import "microlens" Lens.Micro (Lens', (^.), set)
+import Lens.Micro (Lens', (^.), set)
 
 type SourceType = Type SourceAnn
 type SourceConstraint = Constraint SourceAnn

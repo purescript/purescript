@@ -1,9 +1,9 @@
 module Language.PureScript.CST.Traversals.Type where
 
-import "base" Prelude
+import Prelude
 
-import "this" Language.PureScript.CST.Types
-import "this" Language.PureScript.CST.Traversals
+import Language.PureScript.CST.Types
+import Language.PureScript.CST.Traversals
 
 everythingOnTypes :: (r -> r -> r) -> (Type a -> r) -> Type a -> r
 everythingOnTypes op k = goTy

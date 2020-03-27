@@ -1,9 +1,9 @@
 module Language.PureScript.CST.Flatten where
 
-import "base" Prelude
+import Prelude
 
-import "dlist" Data.DList (DList)
-import "this" Language.PureScript.CST.Types
+import Data.DList (DList)
+import Language.PureScript.CST.Types
 
 flattenWrapped :: (a -> DList SourceToken) -> Wrapped a -> DList SourceToken
 flattenWrapped k (Wrapped a b c) = pure a <> k b <> pure c

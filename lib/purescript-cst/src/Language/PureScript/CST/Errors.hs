@@ -9,14 +9,14 @@ module Language.PureScript.CST.Errors
   , prettyPrintWarningMessage
   ) where
 
-import "base" Prelude
+import Prelude
 
-import qualified "text" Data.Text as Text
-import "base" Data.Char (isSpace, toUpper)
-import "this" Language.PureScript.CST.Layout
-import "this" Language.PureScript.CST.Print
-import "this" Language.PureScript.CST.Types
-import "base" Text.Printf (printf)
+import qualified Data.Text as Text
+import Data.Char (isSpace, toUpper)
+import Language.PureScript.CST.Layout
+import Language.PureScript.CST.Print
+import Language.PureScript.CST.Types
+import Text.Printf (printf)
 
 data ParserErrorType
   = ErrWildcardInType

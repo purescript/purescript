@@ -5,17 +5,17 @@
 --
 module Language.PureScript.Names where
 
-import "base-compat" Prelude.Compat
+import Prelude.Compat
 
-import "this" Control.Monad.Supply.Class
-import "deepseq" Control.DeepSeq (NFData)
-import "base" Data.Functor.Contravariant (contramap)
+import Control.Monad.Supply.Class
+import Control.DeepSeq (NFData)
+import Data.Functor.Contravariant (contramap)
 
-import "base" GHC.Generics (Generic)
-import "aeson" Data.Aeson
-import "aeson" Data.Aeson.TH
-import "text" Data.Text (Text)
-import qualified "text" Data.Text as T
+import GHC.Generics (Generic)
+import Data.Aeson
+import Data.Aeson.TH
+import Data.Text (Text)
+import qualified Data.Text as T
 
 -- | A sum of the possible name types, useful for error and lint messages.
 data Name

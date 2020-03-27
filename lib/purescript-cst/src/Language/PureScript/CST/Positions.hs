@@ -5,14 +5,14 @@
 
 module Language.PureScript.CST.Positions where
 
-import "base" Prelude
+import Prelude
 
-import "base" Data.Foldable (foldl')
-import qualified "base" Data.List.NonEmpty as NE
-import "text" Data.Text (Text)
-import "base" Data.Void (Void)
-import qualified "text" Data.Text as Text
-import "this" Language.PureScript.CST.Types
+import Data.Foldable (foldl')
+import qualified Data.List.NonEmpty as NE
+import Data.Text (Text)
+import Data.Void (Void)
+import qualified Data.Text as Text
+import Language.PureScript.CST.Types
 
 advanceToken :: SourcePos -> Token -> SourcePos
 advanceToken pos = applyDelta pos . tokenDelta

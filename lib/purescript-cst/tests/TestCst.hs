@@ -3,24 +3,24 @@
 {-# LANGUAGE PackageImports #-}
 module TestCst where
 
-import "base" Prelude
+import Prelude
 
-import "base" Control.Monad (when)
-import qualified "bytestring" Data.ByteString.Lazy as BS
-import "base" Data.Maybe (fromMaybe)
-import "text" Data.Text (Text)
-import qualified "text" Data.Text as Text
-import qualified "text" Data.Text.Encoding as Text
-import qualified "text" Data.Text.IO as Text
-import "tasty" Test.Tasty (TestTree, testGroup)
-import "tasty-golden" Test.Tasty.Golden (goldenVsString, findByExtension)
-import "tasty-quickcheck" Test.Tasty.QuickCheck
-import "base" Text.Read (readMaybe)
-import "purescript-cst" Language.PureScript.CST.Errors as CST
-import "purescript-cst" Language.PureScript.CST.Lexer as CST
-import "purescript-cst" Language.PureScript.CST.Print as CST
-import "purescript-cst" Language.PureScript.CST.Types
-import "filepath" System.FilePath (takeBaseName, replaceExtension)
+import Control.Monad (when)
+import qualified Data.ByteString.Lazy as BS
+import Data.Maybe (fromMaybe)
+import Data.Text (Text)
+import qualified Data.Text as Text
+import qualified Data.Text.Encoding as Text
+import qualified Data.Text.IO as Text
+import Test.Tasty (TestTree, testGroup)
+import Test.Tasty.Golden (goldenVsString, findByExtension)
+import Test.Tasty.QuickCheck
+import Text.Read (readMaybe)
+import Language.PureScript.CST.Errors as CST
+import Language.PureScript.CST.Lexer as CST
+import Language.PureScript.CST.Print as CST
+import Language.PureScript.CST.Types
+import System.FilePath (takeBaseName, replaceExtension)
 
 main :: IO TestTree
 main = do

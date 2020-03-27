@@ -4,12 +4,12 @@
 
 module Control.Monad.Supply.Class where
 
-import "base-compat" Prelude.Compat
+import Prelude.Compat
 
-import "this" Control.Monad.Supply
-import "mtl" Control.Monad.State
-import "mtl" Control.Monad.Writer
-import "text" Data.Text (Text, pack)
+import Control.Monad.Supply
+import Control.Monad.State
+import Control.Monad.Writer
+import Data.Text (Text, pack)
 
 class Monad m => MonadSupply m where
   fresh :: m Integer

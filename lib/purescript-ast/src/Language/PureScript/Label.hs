@@ -1,13 +1,13 @@
 module Language.PureScript.Label (Label(..)) where
 
-import "base-compat" Prelude.Compat hiding (lex)
-import "base" GHC.Generics (Generic)
-import "deepseq" Control.DeepSeq (NFData)
-import "base" Data.Monoid ()
-import "base" Data.String (IsString(..))
-import qualified "aeson" Data.Aeson as A
+import Prelude.Compat hiding (lex)
+import GHC.Generics (Generic)
+import Control.DeepSeq (NFData)
+import Data.Monoid ()
+import Data.String (IsString(..))
+import qualified Data.Aeson as A
 
-import "this" Language.PureScript.PSString (PSString)
+import Language.PureScript.PSString (PSString)
 
 -- |
 -- Labels are used as record keys and row entry names. Labels newtype PSString

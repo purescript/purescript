@@ -3,15 +3,15 @@
 --
 module Control.Monad.Supply where
 
-import "base-compat" Prelude.Compat
+import Prelude.Compat
 
-import "base" Control.Applicative
-import "mtl" Control.Monad.Error.Class (MonadError(..))
-import "mtl" Control.Monad.Reader
-import "mtl" Control.Monad.State
-import "mtl" Control.Monad.Writer
+import Control.Applicative
+import Control.Monad.Error.Class (MonadError(..))
+import Control.Monad.Reader
+import Control.Monad.State
+import Control.Monad.Writer
 
-import "base" Data.Functor.Identity
+import Data.Functor.Identity
 
 newtype SupplyT m a = SupplyT { unSupplyT :: StateT Integer m a }
   deriving (Functor, Applicative, Monad, MonadTrans, MonadError e, MonadWriter w, MonadReader r, Alternative, MonadPlus)

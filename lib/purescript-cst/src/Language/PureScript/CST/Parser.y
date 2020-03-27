@@ -16,23 +16,23 @@ module Language.PureScript.CST.Parser
   , PartialResult(..)
   ) where
 
-import "base" Prelude hiding (lex)
+import Prelude hiding (lex)
 
-import "base" Control.Monad ((<=<), when)
-import "base" Data.Foldable (foldl', for_, toList)
-import qualified "base" Data.List.NonEmpty as NE
-import "text" Data.Text (Text)
-import "base" Data.Traversable (for, sequence)
-import "this" Language.PureScript.CST.Errors
-import "this" Language.PureScript.CST.Flatten (flattenType)
-import "this" Language.PureScript.CST.Lexer
-import "this" Language.PureScript.CST.Monad
-import "this" Language.PureScript.CST.Positions
-import "this" Language.PureScript.CST.Types
-import "this" Language.PureScript.CST.Utils
-import qualified "purescript-ast" Language.PureScript.Names as N
-import qualified "purescript-ast" Language.PureScript.Roles as R
-import "purescript-ast" Language.PureScript.PSString (PSString)
+import Control.Monad ((<=<), when)
+import Data.Foldable (foldl', for_, toList)
+import qualified Data.List.NonEmpty as NE
+import Data.Text (Text)
+import Data.Traversable (for, sequence)
+import Language.PureScript.CST.Errors
+import Language.PureScript.CST.Flatten (flattenType)
+import Language.PureScript.CST.Lexer
+import Language.PureScript.CST.Monad
+import Language.PureScript.CST.Positions
+import Language.PureScript.CST.Types
+import Language.PureScript.CST.Utils
+import qualified Language.PureScript.Names as N
+import qualified Language.PureScript.Roles as R
+import Language.PureScript.PSString (PSString)
 }
 
 %expect 95
