@@ -29,7 +29,7 @@ import Language.PureScript.Names
 import Language.PureScript.Label (Label)
 import Language.PureScript.PSString (PSString)
 
-import Lens.Micro.Platform (Lens', (^.), set)
+import Lens.Micro (Lens', (^.), set)
 
 type SourceType = Type SourceAnn
 type SourceConstraint = Constraint SourceAnn
