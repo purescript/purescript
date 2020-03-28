@@ -17,6 +17,7 @@
 
 module Command.Hierarchy (command) where
 
+import           Prelude
 import           Protolude (catMaybes)
 
 import           Control.Applicative (optional)

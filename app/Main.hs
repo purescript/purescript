@@ -7,6 +7,8 @@
 
 module Main where
 
+import Prelude
+
 import qualified Command.Bundle as Bundle
 import qualified Command.Compile as Compile
 import qualified Command.Docs as Docs

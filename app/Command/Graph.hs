@@ -4,6 +4,8 @@
 
 module Command.Graph (command) where
 
+import Prelude
+
 import           Control.Applicative (many)
 import           Control.Monad (unless, when)
 import qualified Data.Aeson as Json

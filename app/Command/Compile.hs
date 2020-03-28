@@ -5,6 +5,8 @@
 
 module Command.Compile (command) where
 
+import Prelude
+
 import           Control.Applicative
 import           Control.Monad
 import qualified Data.Aeson as A

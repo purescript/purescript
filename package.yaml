@@ -141,6 +141,7 @@ executables:
       else:
         dependencies:
         - gitrev >=1.2.0 && <1.4
+    default-extensions: !include "./default-extensions.yaml"
 
 tests:
   tests:

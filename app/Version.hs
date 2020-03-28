@@ -3,6 +3,8 @@
 
 module Version where
 
+import Prelude
+
 import Data.Version (showVersion)
 import Paths_purescript as Paths
 
