@@ -440,18 +440,33 @@ pattern ValueFixityDeclaration sa fixity name op = FixityDeclaration sa (Left (V
 pattern TypeFixityDeclaration :: SourceAnn -> Fixity -> Qualified (ProperName 'TypeName) -> OpName 'TypeOpName -> Declaration
 pattern TypeFixityDeclaration sa fixity name op = FixityDeclaration sa (Right (TypeFixity fixity name op))
 
+data DerivingStrategy
+  = DeriveNewtype
+  | DeriveVia SourceType
+  deriving (Show)
+
 -- | The members of a type class instance declaration
 data TypeInstanceBody
-  = DerivedInstance
+  = DerivedInstance (Maybe (DerivingStrategy))
   -- ^ This is a derived instance
-  | NewtypeInstance
-  -- ^ This is an instance derived from a newtype
   | NewtypeInstanceWithDictionary Expr
   -- ^ This is an instance derived from a newtype, desugared to include a
   -- dictionary for the type under the newtype.
+  | ViaInstanceWithDictionary SourceType Expr
+  -- ^ This is an instance derived via another type, desugared to include a
+  -- dictionary for the `via` type.
   | ExplicitInstance [Declaration]
   -- ^ This is a regular (explicit) instance
   deriving (Show)
+
+pattern DerivedInstanceWithDictionary :: Expr -> TypeInstanceBody
+pattern DerivedInstanceWithDictionary dict <- (derivedInstanceDict -> Just dict)
+
+derivedInstanceDict :: TypeInstanceBody -> Maybe Expr
+derivedInstanceDict = \case
+  NewtypeInstanceWithDictionary dict -> Just dict
+  ViaInstanceWithDictionary _ dict -> Just dict
+  _ -> Nothing
 
 mapTypeInstanceBody :: ([Declaration] -> [Declaration]) -> TypeInstanceBody -> TypeInstanceBody
 mapTypeInstanceBody f = runIdentity . traverseTypeInstanceBody (Identity . f)

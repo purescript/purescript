@@ -215,13 +215,16 @@ renameInModule imports (Module modSS coms mn decls exps) =
         <*> updateConstraints ss implies
         <*> pure deps
         <*> pure ds
-  updateDecl bound (TypeInstanceDeclaration sa@(ss, _) ch idx name cs cn ts ds) =
+  updateDecl bound (TypeInstanceDeclaration sa@(ss, _) ch idx name cs cn ts body) =
     fmap (bound,) $
       TypeInstanceDeclaration sa ch idx name
         <$> updateConstraints ss cs
         <*> updateClassName cn ss
         <*> traverse updateTypesEverywhere ts
-        <*> pure ds
+        <*> case body of
+              DerivedInstance (Just (DeriveVia viaTy)) ->
+                DerivedInstance . Just . DeriveVia <$> updateTypesEverywhere viaTy
+              _ -> pure body
   updateDecl bound (KindDeclaration sa kindFor name ty) =
     fmap (bound,) $
       KindDeclaration sa kindFor name

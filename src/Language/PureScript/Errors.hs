@@ -21,6 +21,7 @@ import           Data.Foldable (fold)
 import           Data.Functor.Identity (Identity(..))
 import           Data.List (transpose, nubBy, partition, dropWhileEnd, sort, sortBy)
 import qualified Data.List.NonEmpty as NEL
+import           Data.List.NonEmpty (NonEmpty((:|)))
 import           Data.Maybe (maybeToList, fromMaybe, mapMaybe)
 import qualified Data.Map as M
 import           Data.Ord (comparing)
@@ -106,12 +107,17 @@ data SimpleErrorMessage
   | UnknownClass (Qualified (ProperName 'ClassName))
   | PossiblyInfiniteInstance (Qualified (ProperName 'ClassName)) [SourceType]
   | CannotDerive (Qualified (ProperName 'ClassName)) [SourceType]
+  | CannotDeriveNullaryTypeClassInstance DerivingStrategy (Qualified (ProperName 'ClassName))
   | InvalidDerivedInstance (Qualified (ProperName 'ClassName)) [SourceType] Int
   | ExpectedTypeConstructor (Qualified (ProperName 'ClassName)) [SourceType] SourceType
   | InvalidNewtypeInstance (Qualified (ProperName 'ClassName)) [SourceType]
-  | MissingNewtypeSuperclassInstance (Qualified (ProperName 'ClassName)) (Qualified (ProperName 'ClassName)) [SourceType]
-  | UnverifiableSuperclassInstance (Qualified (ProperName 'ClassName)) (Qualified (ProperName 'ClassName)) [SourceType]
+  | InvalidViaType (Qualified (ProperName 'ClassName)) [SourceType] SourceType
+  | InvalidViaKind (Qualified (ProperName 'ClassName)) [SourceType] SourceType SourceType SourceType
+  | FloatingViaTypeVariables (Qualified (ProperName 'ClassName)) [SourceType] SourceType (NEL.NonEmpty Text)
+  | MissingSuperclassInstance DerivingStrategy (Qualified (ProperName 'ClassName)) (Qualified (ProperName 'ClassName)) [SourceType]
+  | UnverifiableSuperclassInstance DerivingStrategy (Qualified (ProperName 'ClassName)) (Qualified (ProperName 'ClassName)) [SourceType]
   | CannotFindDerivingType (ProperName 'TypeName)
+  | CannotFindViaType (ProperName 'TypeName)
   | DuplicateLabel Label (Maybe Expr)
   | DuplicateValueDeclaration Ident
   | ArgListLengthsDiffer Ident
@@ -265,12 +271,17 @@ errorCode em = case unwrapErrorMessage em of
   UnknownClass{} -> "UnknownClass"
   PossiblyInfiniteInstance{} -> "PossiblyInfiniteInstance"
   CannotDerive{} -> "CannotDerive"
+  CannotDeriveNullaryTypeClassInstance{} -> "CannotDeriveNullaryTypeClassInstance"
   InvalidNewtypeInstance{} -> "InvalidNewtypeInstance"
-  MissingNewtypeSuperclassInstance{} -> "MissingNewtypeSuperclassInstance"
+  InvalidViaType{} -> "InvalidViaType"
+  InvalidViaKind{} -> "InvalidViaKind"
+  FloatingViaTypeVariables{} -> "FloatingViaTypeVariables"
+  MissingSuperclassInstance{} -> "MissingSuperclassInstance"
   UnverifiableSuperclassInstance{} -> "UnverifiableSuperclassInstance"
   InvalidDerivedInstance{} -> "InvalidDerivedInstance"
   ExpectedTypeConstructor{} -> "ExpectedTypeConstructor"
   CannotFindDerivingType{} -> "CannotFindDerivingType"
+  CannotFindViaType{} -> "CannotFindViaType"
   DuplicateLabel{} -> "DuplicateLabel"
   DuplicateValueDeclaration{} -> "DuplicateValueDeclaration"
   ArgListLengthsDiffer{} -> "ArgListLengthsDiffer"
@@ -434,9 +445,13 @@ onTypesInErrorMessageM f (ErrorMessage hints simple) = ErrorMessage <$> traverse
   gSimple (OverlappingInstances cl ts insts) = OverlappingInstances cl <$> traverse f ts <*> pure insts
   gSimple (PossiblyInfiniteInstance cl ts) = PossiblyInfiniteInstance cl <$> traverse f ts
   gSimple (CannotDerive cl ts) = CannotDerive cl <$> traverse f ts
+  gSimple (CannotDeriveNullaryTypeClassInstance strat cl) = pure $ CannotDeriveNullaryTypeClassInstance strat cl
   gSimple (InvalidNewtypeInstance cl ts) = InvalidNewtypeInstance cl <$> traverse f ts
-  gSimple (MissingNewtypeSuperclassInstance cl1 cl2 ts) = MissingNewtypeSuperclassInstance cl1 cl2 <$> traverse f ts
-  gSimple (UnverifiableSuperclassInstance cl1 cl2 ts) = UnverifiableSuperclassInstance cl1 cl2 <$> traverse f ts
+  gSimple (InvalidViaType cl ts viaTy) = InvalidViaType cl <$> traverse f ts <*> f viaTy
+  gSimple (InvalidViaKind cl ts viaTy viaKind expectedKind) = InvalidViaKind cl <$> traverse f ts <*> f viaTy <*> f viaKind <*> f expectedKind
+  gSimple (FloatingViaTypeVariables cl ts viaTy viaTyVars) = FloatingViaTypeVariables cl <$> traverse f ts <*> f viaTy <*> pure viaTyVars
+  gSimple (MissingSuperclassInstance strat cl1 cl2 ts) = MissingSuperclassInstance strat cl1 cl2 <$> traverse f ts
+  gSimple (UnverifiableSuperclassInstance strat cl1 cl2 ts) = UnverifiableSuperclassInstance strat cl1 cl2 <$> traverse f ts
   gSimple (InvalidDerivedInstance cl ts n) = InvalidDerivedInstance cl <$> traverse f ts <*> pure n
   gSimple (ExpectedTypeConstructor cl ts ty) = ExpectedTypeConstructor cl <$> traverse f ts <*> f ty
   gSimple (ExpectedType ty k) = ExpectedType <$> f ty <*> pure k
@@ -891,6 +906,16 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 ]
             , line "since instances of this type class are not derivable."
             ]
+    renderSimpleErrorMessage (CannotDeriveNullaryTypeClassInstance DeriveNewtype nm) =
+      paras [ line $ "Cannot derive newtype instance for"
+            , markCodeBox $ indent $ line (showQualified runProperName nm)
+            , line "Nullary type classes cannot be derived."
+            ]
+    renderSimpleErrorMessage (CannotDeriveNullaryTypeClassInstance (DeriveVia viaTy) nm) =
+      paras [ line $ "Cannot derive instance via " <> markCode (T.pack $ prettyPrintTypeSimplifiedInline viaTy) <> " for"
+            , markCodeBox $ indent $ line (showQualified runProperName nm)
+            , line "Nullary type classes cannot be derived."
+            ]
     renderSimpleErrorMessage (InvalidNewtypeInstance nm ts) =
       paras [ line "Cannot derive newtype instance for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
@@ -899,21 +924,94 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
                 ]
             , line "Make sure this is a newtype."
             ]
-    renderSimpleErrorMessage (MissingNewtypeSuperclassInstance su cl ts) =
-      paras [ line "The derived newtype instance for"
+    renderSimpleErrorMessage (InvalidViaType nm ts viaTy) =
+      paras [ line $ "Cannot derive instance via " <> markCode (T.pack $ prettyPrintTypeSimplifiedInline viaTy) <> " for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
-                [ line (showQualified runProperName cl)
+                [ line (showQualified runProperName nm)
                 , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
                 ]
-            , line $ "does not include a derived superclass instance for " <> markCode (showQualified runProperName su) <> "."
+            , line $ T.intercalate " "
+                [ "because the type"
+                , markCode . T.pack $ prettyPrintTypeSimplifiedInline viaTy
+                , "is not of the required form T a_1 ... a_n."
+                ]
             ]
-    renderSimpleErrorMessage (UnverifiableSuperclassInstance su cl ts) =
-      paras [ line "The derived newtype instance for"
+    renderSimpleErrorMessage (InvalidViaKind nm ts viaTy viaKind expectedKind) =
+      paras [ line $ "Cannot derive instance via " <> markCode (T.pack $ prettyPrintTypeSimplifiedInline viaTy) <> " for"
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName nm)
+                , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
+                ]
+            , line $ T.intercalate " "
+                [ "because"
+                , markCode . T.pack $ prettyPrintTypeSimplifiedInline (last ts)
+                , "has kind"
+                , markCode . T.pack $ prettyPrintTypeSimplifiedInline expectedKind
+                , "but"
+                , markCode . T.pack $ prettyPrintTypeSimplifiedInline viaTy
+                , "has kind"
+                , markCode (T.pack $ prettyPrintTypeSimplifiedInline viaKind) <> "."
+                ]
+            ]
+    renderSimpleErrorMessage (FloatingViaTypeVariables nm ts viaTy viaTyVars) =
+      paras [ line $ "Cannot derive instance via " <> markCode (T.pack $ prettyPrintTypeSimplifiedInline viaTy) <> " for"
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName nm)
+                , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
+                ]
+            , line $ T.intercalate " " $
+                "because" : case viaTyVars of
+                  tv :| [] ->
+                    [ "the type variable"
+                    , markCode tv
+                    , "is"
+                    ]
+                  _ ->
+                    [ "type variables"
+                    , T.intercalate ", " $
+                        markCode <$> NEL.init viaTyVars
+                    , "and"
+                    , markCode $ NEL.last viaTyVars
+                    , "are"
+                    ]
+                ++ [ "bound in"
+                   , markCode . T.pack $ prettyPrintTypeSimplifiedInline viaTy
+                   , "but"
+                   , if length viaTyVars == 1 then "is" else "are"
+                   , "not mentioned in the instance head."
+                   ]
+            ]
+    renderSimpleErrorMessage (MissingSuperclassInstance DeriveNewtype su cl ts) =
+      paras [ line $ "The derived newtype instance for"
             , markCodeBox $ indent $ Box.hsep 1 Box.left
                 [ line (showQualified runProperName cl)
                 , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
                 ]
-            , line $ "implies an superclass instance for " <> markCode (showQualified runProperName su) <> " which could not be verified."
+            , line $ "implies a missing superclass instance for " <> markCode (showQualified runProperName su) <> "."
+            ]
+    renderSimpleErrorMessage (MissingSuperclassInstance (DeriveVia viaTy) su cl ts) =
+      paras [ line $ "The derived instance via " <> markCode (T.pack $ prettyPrintTypeSimplifiedInline viaTy) <> " for"
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName cl)
+                , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
+                ]
+            , line $ "implies a missing superclass instance for " <> markCode (showQualified runProperName su) <> "."
+            ]
+    renderSimpleErrorMessage (UnverifiableSuperclassInstance DeriveNewtype su cl ts) =
+      paras [ line $ "The derived newtype instance for"
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName cl)
+                , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
+                ]
+            , line $ "implies a superclass instance for " <> markCode (showQualified runProperName su) <> " which could not be verified."
+            ]
+    renderSimpleErrorMessage (UnverifiableSuperclassInstance (DeriveVia viaTy) su cl ts) =
+      paras [ line $ "The derived instance via " <> markCode (T.pack $ prettyPrintTypeSimplifiedInline viaTy) <> " for"
+            , markCodeBox $ indent $ Box.hsep 1 Box.left
+                [ line (showQualified runProperName cl)
+                , Box.vcat Box.left (map (typeAtomAsBox prettyDepth) ts)
+                ]
+            , line $ "implies a superclass instance for " <> markCode (showQualified runProperName su) <> " which could not be verified."
             ]
     renderSimpleErrorMessage (InvalidDerivedInstance nm ts argCount) =
       paras [ line "Cannot derive the type class instance"
@@ -943,6 +1041,8 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
             ]
     renderSimpleErrorMessage (CannotFindDerivingType nm) =
       line $ "Cannot derive a type class instance, because the type declaration for " <> markCode (runProperName nm) <> " could not be found."
+    renderSimpleErrorMessage (CannotFindViaType nm) =
+      line $ "Cannot derive a type class instance via " <> markCode (runProperName nm) <> " because its type declaration could not be found."
     renderSimpleErrorMessage (DuplicateLabel l expr) =
       paras $ [ line $ "Label " <> markCode (prettyPrintLabel l) <> " appears more than once in a row type." ]
                        <> foldMap (\expr' -> [ line "Relevant expression: "
@@ -1547,7 +1647,13 @@ prettyPrintSingleError (PPEOptions codeColor full level showDocs relPath) e = fl
       where
       isSolverHint ErrorSolvingConstraint{} = True
       isSolverHint _ = False
+    stripRedundantHints InvalidViaType{} = stripFirst isInstanceHint
+    stripRedundantHints InvalidViaKind{} = stripFirst isInstanceHint
+    stripRedundantHints FloatingViaTypeVariables{} = stripFirst isInstanceHint
     stripRedundantHints _ = id
+
+    isInstanceHint ErrorInInstance{} = True
+    isInstanceHint _ = False
 
     stripFirst :: (ErrorMessageHint -> Bool) -> [ErrorMessageHint] -> [ErrorMessageHint]
     stripFirst p (PositionedError pos : hs) = PositionedError pos : stripFirst p hs
@@ -1612,6 +1718,10 @@ prettyPrintKindSignatureFor DataSig = "data"
 prettyPrintKindSignatureFor NewtypeSig = "newtype"
 prettyPrintKindSignatureFor TypeSynonymSig = "type"
 prettyPrintKindSignatureFor ClassSig = "class"
+
+prettyPrintTypeSimplifiedInline :: Type a -> String
+prettyPrintTypeSimplifiedInline =
+  unwords . lines . prettyPrintType maxBound . eraseForAllKindAnnotations . eraseKindApps
 
 prettyPrintSuggestedTypeSimplified :: Type a -> String
 prettyPrintSuggestedTypeSimplified = prettyPrintSuggestedType . eraseForAllKindAnnotations . eraseKindApps

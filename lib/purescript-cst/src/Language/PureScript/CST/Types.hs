@@ -198,7 +198,7 @@ data Declaration a
   | DeclNewtype a (DataHead a) SourceToken (Name (N.ProperName 'N.ConstructorName)) (Type a)
   | DeclClass a (ClassHead a) (Maybe (SourceToken, NonEmpty (Labeled (Name Ident) (Type a))))
   | DeclInstanceChain a (Separated (Instance a))
-  | DeclDerive a SourceToken (Maybe SourceToken) (InstanceHead a)
+  | DeclDerive a SourceToken (Maybe (DerivingStrategy a)) (InstanceHead a)
   | DeclKindSignature a SourceToken (Labeled (Name (N.ProperName 'N.TypeName)) (Type a))
   | DeclSignature a (Labeled (Name Ident) (Type a))
   | DeclValue a (ValueBindingFields a)
@@ -258,6 +258,11 @@ data ClassFundep
   = FundepDetermined SourceToken (NonEmpty (Name Ident))
   | FundepDetermines (NonEmpty (Name Ident)) SourceToken (NonEmpty (Name Ident))
   deriving (Show, Eq, Ord, Generic)
+
+data DerivingStrategy a
+  = DeriveNewtype a SourceToken
+  | DeriveVia a SourceToken (Type a)
+  deriving (Show, Eq, Ord, Functor, Foldable, Traversable)
 
 data InstanceHead a = InstanceHead
   { instKeyword :: SourceToken

@@ -1,0 +1,14 @@
+Warning found:
+at tests/purs/warning/NewtypeInstanceMissingSuperclassInstance2.purs:15:1 - 15:86 (line 15, column 1 - line 15, column 86)
+
+  The derived newtype instance for
+  [33m                               [0m
+  [33m  Main.MonadWriter w           [0m
+  [33m                   (MyWriter w)[0m
+  [33m                               [0m
+  implies a missing superclass instance for [33mControl.Monad.Monad[0m.
+
+
+See https://github.com/purescript/documentation/blob/master/errors/MissingSuperclassInstance.md for more information,
+or to contribute content related to this warning.
+

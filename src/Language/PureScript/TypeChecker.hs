@@ -12,13 +12,15 @@ module Language.PureScript.TypeChecker
 import Prelude.Compat
 import Protolude (headMay, ordNub)
 
-import Control.Monad (when, unless, void, forM,)
+import Control.Monad (when, unless, void, forM, replicateM)
 import Control.Monad.Error.Class (MonadError(..))
-import Control.Monad.State.Class (MonadState(..), modify, gets)
-import Control.Monad.Supply.Class (MonadSupply)
-import Control.Monad.Writer.Class (MonadWriter(..), censor)
+import Control.Monad.State (MonadState(..), modify, gets, runStateT)
+import Control.Monad.Supply (runSupply)
+import Control.Monad.Supply.Class (MonadSupply, fresh)
+import Control.Monad.Writer (MonadWriter(..), censor, runWriterT)
 
-import Data.Foldable (for_, traverse_, toList)
+import Data.Foldable (for_, traverse_, toList, foldl')
+import Data.Function ((&))
 import Data.List (nub, nubBy, (\\), sort, group, intersect)
 import Data.Maybe
 import Data.Text (Text)
@@ -28,12 +30,14 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 
 import Language.PureScript.AST
+import Language.PureScript.Constants.Prim (pattern Coercible)
 import Language.PureScript.Crash
 import Language.PureScript.Environment
 import Language.PureScript.Errors
 import Language.PureScript.Linter
 import Language.PureScript.Names
 import Language.PureScript.Roles
+import Language.PureScript.TypeChecker.Entailment (SolverOptions(..), entails)
 import Language.PureScript.TypeChecker.Kinds as T
 import Language.PureScript.TypeChecker.Monad as T
 import Language.PureScript.TypeChecker.Synonyms as T
@@ -393,11 +397,63 @@ typeCheckAll moduleName _ = traverse go
           checkOrphanInstance dictName className tys' nonOrphanModules
           let qualifiedChain = Qualified (Just moduleName) <$> ch
           checkOverlappingInstance qualifiedChain dictName className typeClass tys' nonOrphanModules
+          checkInstanceBody body
           _ <- traverseTypeInstanceBody checkInstanceMembers body
           deps'' <- (traverse . overConstraintArgs . traverse) replaceAllTypeSynonyms deps'
           let dict = TypeClassDictionaryInScope qualifiedChain idx qualifiedDictName [] className vars kinds' tys' (Just deps'')
           addTypeClassDictionaries (Just moduleName) . M.singleton className $ M.singleton (tcdValue dict) (pure dict)
           return d
+    where
+    checkInstanceBody (ViaInstanceWithDictionary viaTy _) = do
+      (tyConName, tyConArgs) <- unapplyTypeConstructor (last tys)
+        & maybe (throwError . errorMessage' ss $ ExpectedTypeConstructor className tys (last tys)) return
+      (viaTyConName, viaTyConArgs) <- unapplyTypeConstructor viaTy
+        & maybe (throwError . errorMessage' ss $ InvalidViaType className tys viaTy) return
+      kinds <- gets (types . checkEnv)
+      (kind, _) <- M.lookup tyConName kinds
+        & maybe (throwError . errorMessage' ss . CannotFindDerivingType $ disqualify tyConName) return
+      (viaKind, _) <- M.lookup viaTyConName kinds
+        & maybe (throwError . errorMessage' ss . CannotFindViaType $ disqualify viaTyConName) return
+      let tyVars = S.fromList $ usedTypeVariables (last tys)
+          viaTyVars = S.fromList $ usedTypeVariables viaTy
+          floating = NEL.nonEmpty . S.toList $ viaTyVars `S.difference` tyVars
+      FloatingViaTypeVariables className tys viaTy <$> floating
+        & maybe (return ()) (throwError . errorMessage' ss)
+      checkViaKind moduleName ss className tys viaTy
+      let saturate' = saturate $ tyVars `S.union` viaTyVars
+          a = saturate' kind (last tys) (length tyConArgs)
+          b = saturate' viaKind viaTy (length viaTyConArgs)
+          constraint = srcConstraint Coercible [] [a, b] Nothing
+          solverOptions =
+            SolverOptions
+              { solverShouldGeneralize = False
+              , solverDeferErrors      = False
+              }
+      void . flip runStateT M.empty . runWriterT $
+        entails solverOptions constraint M.empty []
+    checkInstanceBody _ = return ()
+
+    unapplyTypeConstructor ty =
+      case unapplyTypes ty of
+        (TypeConstructor _ name, _, args) ->
+          Just (name, args)
+        _ -> Nothing
+
+    saturate vars k ty n = fst . runSupply 0 $ do
+      names <- replicateM (kindArity k - n) (freshVar vars "t")
+      return $ foldl' srcTypeApp ty (srcTypeVar <$> names)
+
+    kindArity = go' 0 where
+      go' n (TypeApp _ (TypeApp _ k _) b)
+        | k == tyFunction = go' (n + 1) b
+      go' n (ForAll _ _ _ k _) = go' n k
+      go' n _ = n
+
+    freshVar vars name = do
+      v <- (name <>) . T.pack . show <$> fresh
+      if v `elem` vars
+        then freshVar vars name
+        else return v
 
   checkInstanceArity :: Ident -> Qualified (ProperName 'ClassName) -> TypeClassData -> [SourceType] -> m ()
   checkInstanceArity dictName className typeClass tys = do
