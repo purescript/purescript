@@ -16,6 +16,7 @@ license: BSD3
 github: purescript/purescript
 homepage: http://www.purescript.org/
 extra-source-files:
+  - tests/purs/layout/*.out
   - tests/purs/layout/*.purs
   - README.md
 dependencies:
