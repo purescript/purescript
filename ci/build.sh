@@ -29,6 +29,12 @@ else
   STACK_OPTS="$STACK_OPTS --fast"
 fi
 
+# Fail the build instead of creating missing golden test files. Note that using
+# the environment variable as opposed to the command line flag version of this
+# option prevents test executables that don't contain golden tests from failing
+# with an invalid option error.
+export TASTY_NO_CREATE=true
+
 # Install snapshot dependencies (since these will be cached globally and thus
 # can be reused during the sdist build step)
 $STACK build --only-snapshot $STACK_OPTS

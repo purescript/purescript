@@ -49,6 +49,9 @@ import System.FilePath
 import System.IO
 import System.IO.UTF8 (readUTF8File)
 
+import Text.Regex.Base
+import Text.Regex.TDFA (Regex)
+
 import TestUtils
 import Test.Tasty
 import Test.Tasty.Hspec
@@ -228,13 +231,29 @@ printErrorOrWarning
 printErrorOrWarning supportModules supportExterns supportForeigns inputFiles = do
   -- Sorting the input files makes some messages (e.g., duplicate module) deterministic
   (e, w) <- compile supportModules supportExterns supportForeigns (sort inputFiles) noPreCheck
-  case (const w <$> e) of
-    Left errs ->
-      return $ P.prettyPrintMultipleErrors P.defaultPPEOptions $ errs
-    Right warnings ->
-      return $ P.prettyPrintMultipleErrors P.defaultPPEOptions $ warnings
+  return $ normalizePaths . P.prettyPrintMultipleErrors P.defaultPPEOptions $ either id (const w) e
   where
     noPreCheck = const (return ())
+
+-- Replaces Windows-style paths in an error or warning with POSIX paths
+normalizePaths :: String -> String
+normalizePaths = if pathSeparator == '\\'
+  then replaceMatches " [0-9A-Za-z_-]+(\\\\[0-9A-Za-z_-]+)+\\.[A-Za-z]+\\>" (map turnSlash)
+  else id
+  where
+    turnSlash '\\' = '/'
+    turnSlash c = c
+
+-- Uses a function to replace all matches of a regular expression in a string
+replaceMatches :: String -> (String -> String) -> String -> String
+replaceMatches reString phi = go
+  where
+    re :: Regex
+    re = makeRegex reString
+    go :: String -> String
+    go haystack =
+      let (prefix, needle, suffix) = match re haystack
+      in prefix ++ (if null needle then "" else phi needle ++ go suffix)
 
 -- Takes the test entry point from a group of purs files - this is determined
 -- by the file with the shortest path name, as everything but the main file

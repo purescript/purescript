@@ -23,6 +23,7 @@ extra-source-files:
   - tests/purs/**/*.js
   - tests/purs/**/*.purs
   - tests/purs/**/*.json
+  - tests/purs/**/*.out
   - tests/json-compat/**/*.json
   - tests/support/*.json
   - tests/support/setup-win.cmd
@@ -157,6 +158,7 @@ tests:
       - hspec
       - hspec-discover
       - HUnit
+      - regex-base
     default-extensions: !include "./default-extensions.yaml"
 
 flags:
