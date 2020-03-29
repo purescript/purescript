@@ -118,12 +118,12 @@ deriveInstance
   -> [Declaration]
   -> Declaration
   -> m Declaration
-deriveInstance mn syns _ ds (TypeInstanceDeclaration sa@(ss, _) ch idx nm deps className tys DerivedInstance)
+deriveInstance mn syns kinds _ ds (TypeInstanceDeclaration sa@(ss, _) ch idx nm deps className tys DerivedInstance)
   | className == Qualified (Just dataHashable) (ProperName "Hashable")
   = case tys of
       [ty] | Just (Qualified mn' tyCon, _) <- unwrapTypeConstructor ty
            , mn == fromMaybe mn mn'
-           -> TypeInstanceDeclaration sa ch idx nm deps className tys . ExplicitInstance <$> deriveHashable ss mn syns ds tyCon
+           -> TypeInstanceDeclaration sa ch idx nm deps className tys . ExplicitInstance <$> deriveHashable ss mn syns kinds ds tyCon
            | otherwise -> throwError . errorMessage' ss $ ExpectedTypeConstructor className tys ty
       _ -> throwError . errorMessage' ss $ InvalidDerivedInstance className tys 1
   | className == Qualified (Just dataEq) (ProperName "Eq")
@@ -626,10 +626,11 @@ deriveHashable :: forall m
   => SourceSpan
   -> ModuleName
   -> SynonymMap
+  -> KindMap
   -> [Declaration]
   -> ProperName 'TypeName
   -> m [Declaration]
-deriveHashable ss mn syns ds tyConNm = do
+deriveHashable ss mn syns kinds ds tyConNm = do
   tyCon <- findTypeDecl ss tyConNm ds
   hashFun <- mkHashFunction tyCon
   return [ ValueDecl (ss, []) (Ident C.hashWithSalt) Public [] (unguarded hashFun) ]
@@ -641,14 +642,14 @@ deriveHashable ss mn syns ds tyConNm = do
       lam ss s <$> lamCase ss' x <$> (concat <$> mapM (mkCases s) (zip args [0..]))
     mkHashFunction _ = internalError "mkHashFunction: expected DataDeclaration"
 
-    mkCases :: Ident -> ((ProperName 'ConstructorName, [SourceType]), Int) -> m [CaseAlternative]
-    mkCases s ((ctorName, tys), nth) = do
-      xs <- replicateM (length tys) (freshIdent "x")
-      let binder = ConstructorBinder ss (Qualified (Just mn) ctorName) (map (VarBinder ss) xs)
-      tys' <- mapM (replaceAllTypeSynonymsM syns) tys
+    mkCases :: Ident -> (DataConstructorDeclaration, Int) -> m [CaseAlternative]
+    mkCases s (DataConstructorDeclaration _ dataCtorName dataCtorFields, nth) = do
+      xs <- replicateM (length dataCtorFields) (freshIdent "x")
+      let binder = ConstructorBinder ss (Qualified (Just mn) dataCtorName) (map (VarBinder ss) xs)
+      dataCtorFields' <- mapM (replaceAllTypeSynonymsM syns kinds . snd) dataCtorFields
 
       -- collect all record and constructor fields
-      let es = collectFields (zip (map var xs) tys')
+      let es = collectFields (zip (map var xs) dataCtorFields')
       -- make recursive calls to `hash`
       let hashEs = map (App (App (Var ss (Qualified (Just dataHashable) (Ident C.hashWithSalt))) (var s))) es
       hs <- replicateM (length es) (freshIdent "h")
