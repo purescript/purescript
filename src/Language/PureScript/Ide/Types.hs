@@ -1,7 +1,7 @@
 -- |
 -- Type definitions for psc-ide
 
-{-# language DeriveGeneric, DeriveAnyClass, DeriveFoldable, TemplateHaskell #-}
+{-# language DeriveAnyClass, NoGeneralizedNewtypeDeriving, TemplateHaskell #-}
 
 module Language.PureScript.Ide.Types where
 
