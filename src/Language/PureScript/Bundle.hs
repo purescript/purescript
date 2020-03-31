@@ -378,6 +378,7 @@ toModule mids mid filename top
   | JSAstProgram smts _ <- top = Module mid filename <$> traverse toModuleElement smts
   | otherwise = err InvalidTopLevel
   where
+  err :: ErrorMessage -> m a
   err = throwError . ErrorInModule mid
 
   toModuleElement :: JSStatement -> m ModuleElement
@@ -415,7 +416,7 @@ toModule mids mid filename top
 --
 -- TODO: what if we assign to exports.foo and then later assign to
 -- module.exports (presumably overwriting exports.foo)?
-getExportedIdentifiers :: (MonadError ErrorMessage m)
+getExportedIdentifiers :: forall m. (MonadError ErrorMessage m)
                           => String
                           -> JSAST
                           -> m [String]
@@ -423,6 +424,7 @@ getExportedIdentifiers mname top
   | JSAstProgram stmts _ <- top = concat <$> traverse go stmts
   | otherwise = err InvalidTopLevel
   where
+  err :: ErrorMessage -> m a
   err = throwError . ErrorInModule (ModuleIdentifier mname Foreign)
 
   go stmt

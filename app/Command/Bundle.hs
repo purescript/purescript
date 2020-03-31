@@ -7,6 +7,8 @@
 -- | Bundles compiled PureScript modules for the browser.
 module Command.Bundle (command) where
 
+import Prelude
+
 import           Data.Traversable (for)
 import           Data.Aeson (encode)
 import           Data.Aeson.Encode.Pretty (confCompare, defConfig, encodePretty', keyOrder)

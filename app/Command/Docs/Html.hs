@@ -8,6 +8,8 @@ module Command.Docs.Html
   , writeHtmlModules
   ) where
 
+import Prelude
+
 import           Control.Applicative
 import           Control.Arrow ((&&&))
 import           Control.Monad.Writer

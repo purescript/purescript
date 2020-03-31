@@ -179,6 +179,7 @@ collectDeclarations reExports = do
   expCtors = concatMap (fromMaybe [] . (>>= snd) . P.getTypeRef . snd) reExports
 
 lookupValueDeclaration ::
+  forall m.
   (MonadState (Map P.ModuleName Module) m,
    MonadReader P.ModuleName m) =>
   P.ModuleName ->
@@ -190,6 +191,7 @@ lookupValueDeclaration importedFrom ident = do
     rs =
       filter (\d -> declTitle d == P.showIdent ident
                     && (isValue d || isValueAlias d)) decls
+    errOther :: Show a => a -> m b
     errOther other =
       internalErrorInModule
         ("lookupValueDeclaration: unexpected result:\n" ++

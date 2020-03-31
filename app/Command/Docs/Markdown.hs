@@ -5,6 +5,8 @@ module Command.Docs.Markdown
   , writeMarkdownModules
   ) where
 
+import Prelude
+
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Language.PureScript as P

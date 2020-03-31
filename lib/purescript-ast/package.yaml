@@ -35,31 +35,6 @@ dependencies:
 library:
   source-dirs: src
   ghc-options: -Wall -O2
-  default-extensions:
-    - ConstraintKinds
-    - DataKinds
-    - DefaultSignatures
-    - DeriveFunctor
-    - DeriveFoldable
-    - DeriveTraversable
-    - DeriveGeneric
-    - DerivingStrategies
-    - EmptyDataDecls
-    - FlexibleContexts
-    - FlexibleInstances
-    - GeneralizedNewtypeDeriving
-    - KindSignatures
-    - LambdaCase
-    - MultiParamTypeClasses
-    - NoImplicitPrelude
-    - PatternGuards
-    - PatternSynonyms
-    - RankNTypes
-    - RecordWildCards
-    - OverloadedStrings
-    - ScopedTypeVariables
-    - TupleSections
-    - TypeFamilies
-    - ViewPatterns
+  default-extensions: !include "../../default-extensions.yaml"
 
 stability: experimental

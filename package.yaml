@@ -103,28 +103,7 @@ library:
   source-dirs: src
   ghc-options: -Wall -O2
   other-modules: Paths_purescript
-  default-extensions:
-    - ConstraintKinds
-    - DataKinds
-    - DeriveFunctor
-    - DeriveFoldable
-    - DeriveTraversable
-    - DeriveGeneric
-    - DerivingStrategies
-    - EmptyDataDecls
-    - FlexibleContexts
-    - KindSignatures
-    - LambdaCase
-    - MultiParamTypeClasses
-    - NoImplicitPrelude
-    - PatternGuards
-    - PatternSynonyms
-    - RankNTypes
-    - RecordWildCards
-    - OverloadedStrings
-    - ScopedTypeVariables
-    - TupleSections
-    - ViewPatterns
+  default-extensions: !include "./default-extensions.yaml"
 
 executables:
   purs:
@@ -163,6 +142,7 @@ executables:
       else:
         dependencies:
         - gitrev >=1.2.0 && <1.4
+    default-extensions: !include "./default-extensions.yaml"
 
 tests:
   tests:
@@ -179,10 +159,7 @@ tests:
       - hspec-discover
       - HUnit
       - regex-base
-    default-extensions:
-      - NoImplicitPrelude
-      - LambdaCase
-      - OverloadedStrings
+    default-extensions: !include "./default-extensions.yaml"
 
 flags:
   release:

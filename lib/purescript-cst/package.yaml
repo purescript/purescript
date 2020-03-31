@@ -34,30 +34,7 @@ build-tools:
 library:
   source-dirs: src
   ghc-options: -Wall -O2
-  default-extensions:
-    - BangPatterns
-    - ConstraintKinds
-    - DataKinds
-    - DeriveFunctor
-    - DeriveFoldable
-    - DeriveTraversable
-    - DeriveGeneric
-    - DerivingStrategies
-    - EmptyDataDecls
-    - FlexibleContexts
-    - KindSignatures
-    - LambdaCase
-    - MultiParamTypeClasses
-    - NamedFieldPuns
-    - NoImplicitPrelude
-    - PatternGuards
-    - PatternSynonyms
-    - RankNTypes
-    - RecordWildCards
-    - OverloadedStrings
-    - ScopedTypeVariables
-    - TupleSections
-    - ViewPatterns
+  default-extensions: !include "../../default-extensions.yaml"
 
 tests:
   tests:
