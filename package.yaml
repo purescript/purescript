@@ -41,7 +41,7 @@ dependencies:
   - aeson >=1.0 && <1.5
   - aeson-better-errors >=0.8
   - aeson-pretty
-  - ansi-terminal >=0.7.1 && <0.9
+  - ansi-terminal
   - array
   - base >=4.11 && <4.13
   - base-compat >=0.6.0
@@ -61,7 +61,7 @@ dependencies:
   - file-embed
   - filepath
   - fsnotify >=0.2.1
-  - Glob >=0.9 && <0.10
+  - Glob
   - haskeline >=0.7.0.0 && <0.8.0.0
   - language-javascript >=0.7.0.0
   - lifted-async >=0.10.0.3 && <0.10.1
