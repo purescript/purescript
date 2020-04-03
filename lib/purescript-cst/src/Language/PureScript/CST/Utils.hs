@@ -222,6 +222,11 @@ toConstraint = convertParens
       addFailure [tok1, tok2] ErrTypeInConstraint
       pure $ Constraint mempty (QualifiedName tok1 Nothing (N.ProperName "<unexpected")) []
 
+isConstrained :: Type a -> Bool
+isConstrained = everythingOnTypes (||) $ \case
+  TypeConstrained{} -> True
+  _ -> False
+
 toBinderConstructor :: Monoid a => NE.NonEmpty (Binder a) -> Parser (Binder a)
 toBinderConstructor = \case
   BinderConstructor a name [] NE.:| bs ->

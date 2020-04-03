@@ -60,6 +60,7 @@ data ParserErrorType
 data ParserWarningType
   = WarnDeprecatedRowSyntax
   | WarnDeprecatedForeignKindSyntax
+  | WarnDeprecatedConstraintInForeignImportSyntax
   | WarnDeprecatedKindImportSyntax
   | WarnDeprecatedKindExportSyntax
   deriving (Show, Eq, Ord)
@@ -186,6 +187,8 @@ prettyPrintWarningMessage (ParserErrorInfo {..}) = case errType of
     "Unary '#' syntax for row kinds is deprecated and will be removed in a future release. Use the 'Row' kind instead."
   WarnDeprecatedForeignKindSyntax ->
     "Foreign kind imports are deprecated and will be removed in a future release. Use empty 'data' instead."
+  WarnDeprecatedConstraintInForeignImportSyntax ->
+    "Constraints are deprecated in foreign imports and will be removed in a future release. Omit the constraint instead and update the foreign module accordingly."
   WarnDeprecatedKindImportSyntax ->
     "Kind imports are deprecated and will be removed in a future release. Omit the 'kind' keyword instead."
   WarnDeprecatedKindExportSyntax ->
