@@ -285,6 +285,11 @@ checkForeignDecls m path = do
   js <- either (errorParsingModule . Bundle.UnableToParseModule) pure $ JS.parse jsStr path
 
   foreignIdentsStrs <- either errorParsingModule pure $ getExps js
+
+  let deprecatedFFI = filter (any (== '\'')) foreignIdentsStrs
+  unless (null deprecatedFFI) $
+    warningDeprecatedForeignPrimes deprecatedFFI
+
   foreignIdents <- either
                      errorInvalidForeignIdentifiers
                      (pure . S.fromList)
@@ -314,6 +319,10 @@ checkForeignDecls m path = do
   errorInvalidForeignIdentifiers :: [String] -> Make a
   errorInvalidForeignIdentifiers =
     throwError . mconcat . map (errorMessage . InvalidFFIIdentifier mname . T.pack)
+
+  warningDeprecatedForeignPrimes :: [String] -> Make ()
+  warningDeprecatedForeignPrimes =
+    tell . mconcat . map (errorMessage' modSS . DeprecatedFFIPrime mname . T.pack)
 
   parseIdents :: [String] -> Either [String] [Ident]
   parseIdents strs =
