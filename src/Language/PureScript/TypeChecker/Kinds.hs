@@ -60,7 +60,7 @@ generalizeUnknowns unks ty =
 
 generalizeUnknownsWithVars :: [(Unknown, (Text, SourceType))] -> SourceType -> SourceType
 generalizeUnknownsWithVars binders ty =
-  mkForAll ((getAnnForType ty,) . fmap Just . snd <$> binders) . replaceUnknownsWithVars binders $ ty
+  mkForAll ((getAnnForType ty,) . fmap (Just . replaceUnknownsWithVars binders) . snd <$> binders) . replaceUnknownsWithVars binders $ ty
 
 replaceUnknownsWithVars :: [(Unknown, (Text, a))] -> SourceType -> SourceType
 replaceUnknownsWithVars binders ty
@@ -855,8 +855,7 @@ checkKindDeclaration _ ty = do
   checkTypeKind kind E.kindType
   ty'' <- replaceAllTypeSynonyms ty'
   unks <- unknownsWithKinds . IS.toList $ unknowns ty''
-  freshUnks <- traverse (traverse (\k -> (,k) <$> freshVar "k")) unks
-  finalTy <- generalizeUnknownsWithVars freshUnks <$> freshenForAlls ty' ty''
+  finalTy <- generalizeUnknowns unks <$> freshenForAlls ty' ty''
   checkQuantification finalTy
   checkValidKind finalTy
   where
