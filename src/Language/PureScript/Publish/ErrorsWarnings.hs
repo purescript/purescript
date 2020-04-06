@@ -191,12 +191,9 @@ displayUserError e = case e of
     vcat $
       [ para (concat
           [ "The license specified in package manifest is not a valid SPDX license "
-          , "expression. Please use the SPDX license expression format. For "
-          , "example, any of the following would be acceptable:"
+          , "expression. For a list of valid licenses see https://spdx.org/licenses/"
           ])
-      , spacer
-      ] ++
-      spdxExamples
+      ]
   MissingDependencies pkgs ->
     let singular = NonEmpty.length pkgs == 1
         pl a b = if singular then b else a
@@ -223,16 +220,6 @@ displayUserError e = case e of
     successivelyIndented $
       [ "Error in resolutions file (" ++ path ++ "):" ]
       ++ map T.unpack (displayError D.displayPackageError err)
-
-spdxExamples :: [Box]
-spdxExamples =
-  map (indented . para)
-    [ "* \"MIT\""
-    , "* \"Apache-2.0\""
-    , "* \"BSD-2-Clause\""
-    , "* \"GPL-2.0+\""
-    , "* \"(GPL-3.0 OR MIT)\""
-    ]
 
 displayRepositoryError :: RepositoryFieldError -> Box
 displayRepositoryError err = case err of
