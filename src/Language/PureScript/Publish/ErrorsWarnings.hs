@@ -191,7 +191,8 @@ displayUserError e = case e of
     vcat $
       [ para (concat
           [ "The license specified in package manifest is not a valid SPDX license "
-          , "expression. For a list of valid licenses see https://spdx.org/licenses/"
+          , "expression. For a list of valid licenses see https://spdx.org/licenses/ "
+          , "For information how to build an SPDX license expression see https://spdx.org/ids-how"
           ])
       ]
   MissingDependencies pkgs ->
