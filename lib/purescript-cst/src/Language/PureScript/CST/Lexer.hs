@@ -357,7 +357,7 @@ token = peek >>= maybe (pure TokEof) k0
             | Char.isUpper ch2 -> next *> upper qual' ch2
             | isIdentStart ch2 -> next *> lower qual' ch2
             | isSymbolChar ch2 -> next *> operator qual' [ch2]
-            | otherwise -> throw $ ErrLexeme (Just [ch2]) []
+            | otherwise -> throw $ ErrQualifierLexeme  ch2
           Nothing ->
             throw ErrEof
       _ ->

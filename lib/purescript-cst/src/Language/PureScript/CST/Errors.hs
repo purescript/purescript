@@ -53,6 +53,7 @@ data ParserErrorType
   | ErrQualifiedName
   | ErrEmptyDo
   | ErrLexeme (Maybe String) [String]
+  | ErrQualifierLexeme Char
   | ErrEof
   | ErrCustom String
   deriving (Show, Eq, Ord)
@@ -128,6 +129,10 @@ prettyPrintErrorMessage (ParserErrorInfo {..}) = case errType of
     "Illegal whitespace character " <> displayCodePoint hd
   ErrLexeme (Just a) _ ->
     "Unexpected " <> a
+  ErrQualifierLexeme hd | isSpace hd ->
+    "Unexpected whitespace character " <> displayCodePoint hd <> ", expected qualifier"
+  ErrQualifierLexeme a ->
+    "Unexpected" <> [ a ] <> ", expected qualifier"
   ErrLineFeedInString ->
     "Unexpected line feed in string literal"
   ErrAstralCodePointInChar ->
