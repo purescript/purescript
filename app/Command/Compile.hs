@@ -51,7 +51,7 @@ printWarningsAndErrors verbose False warnings errors = do
       exitFailure
     Right _ -> return ()
 printWarningsAndErrors verbose True warnings errors = do
-  hPutStrLn stderr . LBU8.toString . A.encode $
+  hPutStrLn stdout . LBU8.toString . A.encode $
     JSONResult (toJSONErrors verbose P.Warning warnings)
                (either (toJSONErrors verbose P.Error) (const []) errors)
   either (const exitFailure) (const (return ())) errors
