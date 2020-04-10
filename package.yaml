@@ -145,6 +145,14 @@ executables:
         - gitrev >=1.2.0 && <1.4
     default-extensions: !include "./default-extensions.yaml"
 
+benchmarks:
+  ide-bench:
+    main: Main.hs
+    source-dirs: ide-bench
+    ghc-options: -Wall -O2 -fno-warn-unused-do-bind -threaded -rtsopts -with-rtsopts=-N
+    dependencies:
+        - purescript
+
 tests:
   tests:
     main: Main.hs
