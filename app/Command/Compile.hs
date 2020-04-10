@@ -44,7 +44,7 @@ printWarningsAndErrors verbose False warnings errors = do
   cc <- bool Nothing (Just P.defaultCodeColor) <$> ANSI.hSupportsANSI stdout
   let ppeOpts = P.defaultPPEOptions { P.ppeCodeColor = cc, P.ppeFull = verbose, P.ppeRelativeDirectory = pwd }
   when (P.nonEmpty warnings) $
-    hPutStrLn stderr (P.prettyPrintMultipleWarnings ppeOpts warnings)
+    hPutStrLn stdout (P.prettyPrintMultipleWarnings ppeOpts warnings)
   case errors of
     Left errs -> do
       hPutStrLn stdout (P.prettyPrintMultipleErrors ppeOpts errs)
