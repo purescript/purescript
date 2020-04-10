@@ -58,8 +58,8 @@ printWarningsAndErrors verbose True warnings errors = do
 
 compile :: PSCMakeOptions -> IO ()
 compile PSCMakeOptions{..} = do
-  input <- globWarningOnMisses (unless pscmJSONErrors . warnFileTypeNotFound) pscmInput
-  when (null input && not pscmJSONErrors) $ do
+  input <- globWarningOnMisses warnFileTypeNotFound pscmInput
+  when (null input) $ do
     hPutStr stderr $ unlines [ "purs compile: No input files."
                              , "Usage: For basic information, try the `--help' option."
                              ]
