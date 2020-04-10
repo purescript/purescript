@@ -54,6 +54,7 @@ import           SourceMap
 import           SourceMap.Types
 import           System.Directory (getCurrentDirectory)
 import           System.FilePath ((</>), makeRelative, splitPath, normalise)
+import           System.IO (hPutStrLn, stderr)
 
 -- | Determines when to rebuild a module
 data RebuildPolicy
