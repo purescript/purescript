@@ -172,7 +172,7 @@ findAvailableExterns = do
     containsExterns oDir d
       | d `elem` [".", ".."] = pure False
       | otherwise = do
-          let file = oDir </> d </> "externs.json"
+          let file = oDir </> d </> "externs.bin"
           doesFileExist file
 
 -- | Finds all matches for the globs specified at the commandline
@@ -211,7 +211,7 @@ loadModules moduleNames = do
   -- We resolve all the modulenames to externs files and load these into memory.
   oDir <- outputDirectory
   let efPaths =
-        map (\mn -> oDir </> toS (P.runModuleName mn) </> "externs.json") moduleNames
+        map (\mn -> oDir </> toS (P.runModuleName mn) </> "externs.bin") moduleNames
   efiles <- traverse readExternFile efPaths
   traverse_ insertExterns efiles
 

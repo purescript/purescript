@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 -- |
 -- Source position information
 --
@@ -13,6 +14,7 @@ import Language.PureScript.Comments
 import qualified Data.Aeson as A
 import qualified Data.Text as T
 import System.FilePath (makeRelative)
+import Data.Store (Store)
 
 -- | Source annotation - position information and comments.
 type SourceAnn = (SourceSpan, [Comment])
@@ -23,9 +25,7 @@ data SourcePos = SourcePos
     -- ^ Line number
   , sourcePosColumn :: Int
     -- ^ Column number
-  } deriving (Show, Eq, Ord, Generic)
-
-instance NFData SourcePos
+  } deriving (Show, Eq, Ord, Generic, NFData, Store)
 
 displaySourcePos :: SourcePos -> Text
 displaySourcePos sp =
@@ -53,9 +53,7 @@ data SourceSpan = SourceSpan
     -- ^ Start of the span
   , spanEnd :: SourcePos
     -- ^ End of the span
-  } deriving (Show, Eq, Ord, Generic)
-
-instance NFData SourceSpan
+  } deriving (Show, Eq, Ord, Generic, NFData, Store)
 
 displayStartEndPos :: SourceSpan -> Text
 displayStartEndPos sp =

@@ -21,6 +21,7 @@ import Data.Aeson.TH
 import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.List (foldl', find)
 import Data.Foldable (fold)
+import Data.Store.TH (makeStore)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Version (showVersion)
@@ -256,3 +257,9 @@ $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsF
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsTypeFixity)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsDeclaration)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsFile)
+
+makeStore ''ExternsImport
+makeStore ''ExternsFixity
+makeStore ''ExternsTypeFixity
+makeStore ''ExternsDeclaration
+makeStore ''ExternsFile

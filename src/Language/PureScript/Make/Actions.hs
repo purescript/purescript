@@ -177,13 +177,13 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   getOutputTimestamp :: ModuleName -> Make (Maybe UTCTime)
   getOutputTimestamp mn = do
     codegenTargets <- asks optionsCodegenTargets
-    let outputPaths = [outputFilename mn "externs.json"] <> fmap (targetFilename mn) (S.toList codegenTargets)
+    let outputPaths = [outputFilename mn "externs.bin"] <> fmap (targetFilename mn) (S.toList codegenTargets)
     timestamps <- traverse getTimestampMaybe outputPaths
     pure $ fmap minimum . NEL.nonEmpty =<< sequence timestamps
 
   readExterns :: ModuleName -> Make (FilePath, Maybe ExternsFile)
   readExterns mn = do
-    let path = outputDir </> T.unpack (runModuleName mn) </> "externs.json"
+    let path = outputDir </> T.unpack (runModuleName mn) </> "externs.bin"
     (path, ) <$> readExternsFile path
 
   outputPrimDocs :: Make ()
@@ -195,7 +195,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   codegen :: CF.Module CF.Ann -> Docs.Module -> ExternsFile -> SupplyT Make ()
   codegen m docs exts = do
     let mn = CF.moduleName m
-    lift $ writeJSONFile (outputFilename mn "externs.json") exts
+    lift $ writeBinaryFile (outputFilename mn "externs.bin") exts
     codegenTargets <- lift $ asks optionsCodegenTargets
     when (S.member CoreFn codegenTargets) $ do
       let coreFnFile = targetFilename mn CoreFn

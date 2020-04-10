@@ -85,6 +85,7 @@ dependencies:
   - sourcemap >=0.1.6
   - split
   - stm >=0.2.4.0
+  - store
   - stringsearch
   - syb
   - text

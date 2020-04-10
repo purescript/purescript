@@ -6,6 +6,7 @@ import Control.DeepSeq (NFData)
 import Data.Monoid ()
 import Data.String (IsString(..))
 import qualified Data.Aeson as A
+import Data.Store (Store)
 
 import Language.PureScript.PSString (PSString)
 
@@ -17,3 +18,4 @@ newtype Label = Label { runLabel :: PSString }
   deriving (Show, Eq, Ord, IsString, Semigroup, Monoid, A.ToJSON, A.FromJSON, Generic)
 
 instance NFData Label
+instance Store Label

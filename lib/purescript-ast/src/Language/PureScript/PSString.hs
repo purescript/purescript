@@ -31,6 +31,7 @@ import Numeric (showHex)
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Aeson as A
 import qualified Data.Aeson.Types as A
+import Data.Store (Store)
 
 -- |
 -- Strings in PureScript are sequences of UTF-16 code units, which do not
@@ -50,6 +51,7 @@ newtype PSString = PSString { toUTF16CodeUnits :: [Word16] }
   deriving (Eq, Ord, Semigroup, Monoid, Generic)
 
 instance NFData PSString
+instance Store PSString
 
 instance Show PSString where
   show = show . codePoints

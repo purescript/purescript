@@ -9,6 +9,7 @@ import Prelude.Compat
 import Control.DeepSeq (NFData)
 import Data.Text (Text)
 import GHC.Generics (Generic)
+import Data.Store (Store)
 
 import Data.Aeson.TH
 
@@ -18,5 +19,6 @@ data Comment
   deriving (Show, Eq, Ord, Generic)
 
 instance NFData Comment
+instance Store Comment
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Comment)

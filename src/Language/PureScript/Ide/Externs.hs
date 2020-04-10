@@ -12,6 +12,7 @@ import           Data.Aeson (decodeStrict)
 import           Data.Aeson.Types (withObject, parseMaybe, (.:))
 import qualified Data.ByteString as BS
 import           Data.Version (showVersion)
+import           Data.Store as Store
 import qualified Data.Text as Text
 import qualified Language.PureScript as P
 import           Language.PureScript.Ide.Error (IdeError (..))
@@ -25,8 +26,8 @@ readExternFile
   -> m P.ExternsFile
 readExternFile fp = do
    externsFile <- liftIO (BS.readFile fp)
-   case decodeStrict externsFile of
-     Nothing ->
+   case Store.decode externsFile of
+     Left _ ->
        let
          parser = withObject "ExternsFileVersion" (.: "efVersion")
          maybeEFVersion = parseMaybe parser =<< decodeStrict externsFile
@@ -39,7 +40,7 @@ readExternFile fp = do
                         <> " Found: " <> efVersion
            logErrorN errMsg
            throwError (GeneralError errMsg)
-     Just externs -> pure externs
+     Right externs -> pure externs
 
      where
        version = toS (showVersion P.version)

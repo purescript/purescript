@@ -12,6 +12,7 @@ import Control.DeepSeq (NFData)
 import Data.Functor.Identity
 
 import Data.Aeson.TH
+import Data.Store (Store)
 import qualified Data.Map as M
 import Data.Text (Text)
 import qualified Data.List.NonEmpty as NEL
@@ -179,7 +180,7 @@ data DeclarationRef
   -- elaboration in name desugaring.
   --
   | ReExportRef SourceSpan ExportSource DeclarationRef
-  deriving (Show, Generic, NFData)
+  deriving (Show, Generic, NFData, Store)
 
 instance Eq DeclarationRef where
   (TypeRef _ name dctors) == (TypeRef _ name' dctors') = name == name' && dctors == dctors'
@@ -197,7 +198,7 @@ data ExportSource =
   { exportSourceImportedFrom :: Maybe ModuleName
   , exportSourceDefinedIn :: ModuleName
   }
-  deriving (Eq, Ord, Show, Generic, NFData)
+  deriving (Eq, Ord, Show, Generic, NFData, Store)
 
 -- enable sorting lists of explicitly imported refs when suggesting imports in linting, IDE, etc.
 -- not an Ord because this implementation is not consistent with its Eq instance.
@@ -282,7 +283,7 @@ data ImportDeclarationType
   -- An import with a list of references to hide: `import M hiding (foo)`
   --
   | Hiding [DeclarationRef]
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic, Store)
 
 isImplicit :: ImportDeclarationType -> Bool
 isImplicit Implicit = True
