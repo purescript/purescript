@@ -269,7 +269,7 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   requiresForeign = not . null . CF.moduleForeign
 
   progress :: ProgressMessage -> Make ()
-  progress = liftIO . putStrLn . renderProgressMessage
+  progress = liftIO . hPutStrLn stderr . renderProgressMessage
 
   readCacheDb :: Make CacheDb
   readCacheDb = readCacheDb' outputDir
