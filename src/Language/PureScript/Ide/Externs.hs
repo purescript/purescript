@@ -8,13 +8,9 @@ module Language.PureScript.Ide.Externs
 import           Protolude hiding (to, from, (&))
 
 import           "monad-logger" Control.Monad.Logger
-import           Data.Aeson (decodeStrict)
-import           Data.Aeson.Types (withObject, parseMaybe, (.:))
-import qualified Data.ByteString as BS
-import           Data.Version (showVersion)
-import           Data.Store as Store
 import qualified Data.Text as Text
 import qualified Language.PureScript as P
+import qualified Language.PureScript.Make.Monad as Make
 import           Language.PureScript.Ide.Error (IdeError (..))
 import           Language.PureScript.Ide.Types
 import           Language.PureScript.Ide.Util (properNameT)
@@ -25,25 +21,13 @@ readExternFile
   => FilePath
   -> m P.ExternsFile
 readExternFile fp = do
-   externsFile <- liftIO (BS.readFile fp)
-   case Store.decode externsFile of
-     Left _ ->
-       let
-         parser = withObject "ExternsFileVersion" (.: "efVersion")
-         maybeEFVersion = parseMaybe parser =<< decodeStrict externsFile
-       in case maybeEFVersion of
-         Nothing ->
-           throwError (GeneralError ("Parsing the extern at: " <> toS fp <> " failed"))
-         Just efVersion -> do
-           let errMsg = "Version mismatch for the externs at: " <> toS fp
-                        <> " Expected: " <> version
-                        <> " Found: " <> efVersion
-           logErrorN errMsg
-           throwError (GeneralError errMsg)
-     Right externs -> pure externs
-
-     where
-       version = toS (showVersion P.version)
+  -- rofl
+  externsFile <- liftIO (Make.readCborJsonFileIO fp)
+  -- externsFile <- liftIO (Make.readBinaryFileIO fp)
+  -- externsFile <- liftIO (Make.readJSONFileIO fp)
+  case externsFile of
+    Nothing -> throwError (GeneralError "Failed to decode cbor json externs")
+    Just externs -> pure externs
 
 convertExterns :: P.ExternsFile -> ([IdeDeclarationAnn], [(P.ModuleName, P.DeclarationRef)])
 convertExterns ef =

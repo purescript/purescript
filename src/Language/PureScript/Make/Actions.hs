@@ -42,7 +42,7 @@ import qualified Language.PureScript.CST as CST
 import qualified Language.PureScript.Docs.Prim as Docs.Prim
 import qualified Language.PureScript.Docs.Types as Docs
 import           Language.PureScript.Errors
-import           Language.PureScript.Externs (ExternsFile)
+import           Language.PureScript.Externs (ExternsFile, externsFileName)
 import           Language.PureScript.Make.Monad
 import           Language.PureScript.Make.Cache
 import           Language.PureScript.Names
@@ -177,13 +177,13 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   getOutputTimestamp :: ModuleName -> Make (Maybe UTCTime)
   getOutputTimestamp mn = do
     codegenTargets <- asks optionsCodegenTargets
-    let outputPaths = [outputFilename mn "externs.bin"] <> fmap (targetFilename mn) (S.toList codegenTargets)
+    let outputPaths = [outputFilename mn externsFileName] <> fmap (targetFilename mn) (S.toList codegenTargets)
     timestamps <- traverse getTimestampMaybe outputPaths
     pure $ fmap minimum . NEL.nonEmpty =<< sequence timestamps
 
   readExterns :: ModuleName -> Make (FilePath, Maybe ExternsFile)
   readExterns mn = do
-    let path = outputDir </> T.unpack (runModuleName mn) </> "externs.bin"
+    let path = outputDir </> T.unpack (runModuleName mn) </> externsFileName
     (path, ) <$> readExternsFile path
 
   outputPrimDocs :: Make ()
@@ -195,7 +195,10 @@ buildMakeActions outputDir filePathMap foreigns usePrefix =
   codegen :: CF.Module CF.Ann -> Docs.Module -> ExternsFile -> SupplyT Make ()
   codegen m docs exts = do
     let mn = CF.moduleName m
-    lift $ writeBinaryFile (outputFilename mn "externs.bin") exts
+    -- rofl
+    -- lift $ writeJSONFile (outputFilename mn "externs.json") exts
+    -- lift $ writeBinaryFile (outputFilename mn "externs.bin") exts
+    lift $ writeCborJsonFile (outputFilename mn "externs.json.cbor") exts
     codegenTargets <- lift $ asks optionsCodegenTargets
     when (S.member CoreFn codegenTargets) $ do
       let coreFnFile = targetFilename mn CoreFn

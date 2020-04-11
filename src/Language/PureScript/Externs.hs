@@ -13,6 +13,7 @@ module Language.PureScript.Externs
   , externsIsCurrentVersion
   , moduleToExternsFile
   , applyExternsFileToEnvironment
+  , externsFileName
   ) where
 
 import Prelude.Compat
@@ -251,6 +252,10 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
       , TypeClassDictionaryInScope{..} <- NEL.toList nel
       ]
   toExternsDeclaration _ = []
+
+-- rofl
+externsFileName :: FilePath
+externsFileName = "externs.json.cbor"
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsImport)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsFixity)
