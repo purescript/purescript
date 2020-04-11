@@ -6,6 +6,7 @@
 module Language.PureScript.Comments where
 
 import Prelude.Compat
+import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)
 import Data.Text (Text)
 import GHC.Generics (Generic)
@@ -20,5 +21,6 @@ data Comment
 
 instance NFData Comment
 instance Store Comment
+instance Serialise Comment
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''Comment)

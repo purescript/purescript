@@ -12,12 +12,16 @@ module Language.PureScript.Make.Monad
   , readJSONFileIO
   , readStoreFile
   , readStoreFileIO
+  , readCborFile
+  , readCborFileIO
   , readExternsFile
+  , readCborJsonFile
   , readCborJsonFileIO
   , hashFile
   , writeTextFile
   , writeStoreFile
   , writeJSONFile
+  , writeCborFile
   , writeCborJsonFile
   , writeCborJsonFileIO
   , copyFile
@@ -25,6 +29,8 @@ module Language.PureScript.Make.Monad
 
 import           Prelude
 
+import           Codec.Serialise (Serialise)
+import qualified Codec.Serialise as Serialise
 import qualified Codec.CBOR.Write as Write
 import qualified Codec.CBOR.Read as Read
 import qualified Codec.CBOR.JSON as CborJson
@@ -131,13 +137,23 @@ readCborJsonFileIO path = do
 -- are captured using the 'MonadError' instance.
 readStoreFile :: (MonadIO m, MonadError MultipleErrors m) => Store.Store a => FilePath -> m (Maybe a)
 readStoreFile path =
-  makeIO ("read Binary file: " <> Text.pack path) $ do
-    r <- catchDoesNotExist $ Store.decodeEx <$> B.readFile path
-    return $ join r
+  makeIO ("read Binary file: " <> Text.pack path) (readStoreFileIO path)
 
 readStoreFileIO :: Store.Store a => FilePath -> IO (Maybe a)
 readStoreFileIO path = do
   r <- catchDoesNotExist $ Store.decodeEx <$> B.readFile path
+  return $ join r
+
+-- | Read a Cbor encoded file in the 'Make' monad, returning
+-- 'Nothing' if the file does not exist or could not be parsed. Errors
+-- are captured using the 'MonadError' instance.
+readCborFile :: (MonadIO m, MonadError MultipleErrors m) => Serialise a => FilePath -> m (Maybe a)
+readCborFile path =
+  makeIO ("read Binary file: " <> Text.pack path) (readCborFileIO path)
+
+readCborFileIO :: Serialise a => FilePath -> IO (Maybe a)
+readCborFileIO path = do
+  r <- catchDoesNotExist $ Serialise.readFileDeserialise path
   return $ join r
 
 -- | Read an externs file, returning 'Nothing' if the file does not exist,
@@ -148,7 +164,8 @@ readExternsFile path = do
   -- rofl
   -- mexterns <- readJsonFile path
   -- mexterns <- readStoreFile path
-  mexterns <- readCborJsonFile path
+  -- mexterns <- readCborJsonFile path
+  mexterns <- readCborFile path
   return $ do
     externs <- mexterns
     guard $ externsIsCurrentVersion externs
@@ -187,9 +204,14 @@ writeJSONFile path value = makeIO ("write JSON file: " <> Text.pack path) $ do
 -- | Write a Store encoded file in the 'Make' monad, capturing any
 -- errors using the 'MonadError' instance.
 writeStoreFile :: (MonadIO m, MonadError MultipleErrors m) => Store.Store a => FilePath -> a -> m ()
-writeStoreFile path value = makeIO ("write Binary file: " <> Text.pack path) $ do
+writeStoreFile path value = makeIO ("write Store file: " <> Text.pack path) $ do
   createParentDirectory path
   B.writeFile path (Store.encode value)
+
+writeCborFile :: (MonadIO m, MonadError MultipleErrors m) => Serialise a => FilePath -> a -> m ()
+writeCborFile path value = makeIO ("write Cbor file: " <> Text.pack path) $ do
+  createParentDirectory path
+  Serialise.writeFileSerialise path value
 
 -- | Write a Store encoded file in the 'Make' monad, capturing any
 -- errors using the 'MonadError' instance.

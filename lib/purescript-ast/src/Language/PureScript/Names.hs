@@ -7,6 +7,7 @@ module Language.PureScript.Names where
 
 import Prelude.Compat
 
+import Codec.Serialise (Serialise)
 import Control.Monad.Supply.Class
 import Control.DeepSeq (NFData)
 import Data.Functor.Contravariant (contramap)
@@ -31,6 +32,7 @@ data Name
 
 instance NFData Name
 instance Store Name
+instance Serialise Name
 
 getIdentName :: Name -> Maybe Ident
 getIdentName (IdentName name) = Just name
@@ -80,6 +82,7 @@ data Ident
 
 instance NFData Ident
 instance Store Ident
+instance Serialise Ident
 
 runIdent :: Ident -> Text
 runIdent (Ident i) = i
@@ -104,6 +107,7 @@ newtype OpName (a :: OpNameType) = OpName { runOpName :: Text }
 
 instance NFData (OpName a)
 instance Store (OpName a)
+instance Serialise (OpName a)
 
 instance ToJSON (OpName a) where
   toJSON = toJSON . runOpName
@@ -130,6 +134,7 @@ newtype ProperName (a :: ProperNameType) = ProperName { runProperName :: Text }
 
 instance NFData (ProperName a)
 instance Store (ProperName a)
+instance Serialise (ProperName a)
 
 instance ToJSON (ProperName a) where
   toJSON = toJSON . runProperName
@@ -162,6 +167,7 @@ newtype ModuleName = ModuleName [ProperName 'Namespace]
 
 instance NFData ModuleName
 instance Store ModuleName
+instance Serialise ModuleName
 
 runModuleName :: ModuleName -> Text
 runModuleName (ModuleName pns) = T.intercalate "." (runProperName <$> pns)
@@ -186,6 +192,7 @@ data Qualified a = Qualified (Maybe ModuleName) a
 
 instance NFData a => NFData (Qualified a)
 instance Store a => Store (Qualified a)
+instance Serialise a => Serialise (Qualified a)
 
 showQualified :: (a -> Text) -> Qualified a -> Text
 showQualified f (Qualified Nothing a) = f a

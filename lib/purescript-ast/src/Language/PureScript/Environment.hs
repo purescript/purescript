@@ -5,6 +5,7 @@ import Protolude (ordNub)
 
 import GHC.Generics (Generic)
 import Control.DeepSeq (NFData)
+import Codec.Serialise (Serialise)
 import Data.Aeson ((.=), (.:))
 import qualified Data.Aeson as A
 import qualified Data.Map as M
@@ -85,6 +86,7 @@ data FunctionalDependency = FunctionalDependency
 
 instance NFData FunctionalDependency
 instance Store FunctionalDependency
+instance Serialise FunctionalDependency
 
 instance A.FromJSON FunctionalDependency where
   parseJSON = A.withObject "FunctionalDependency" $ \o ->
@@ -195,6 +197,7 @@ data NameVisibility
 
 instance NFData NameVisibility
 instance Store NameVisibility
+instance Serialise NameVisibility
 
 -- | A flag for whether a name is for an private or public value - only public values will be
 -- included in a generated externs file.
@@ -210,6 +213,7 @@ data NameKind
 
 instance NFData NameKind
 instance Store NameKind
+instance Serialise NameKind
 
 -- | The kinds of a type
 data TypeKind
@@ -227,6 +231,7 @@ data TypeKind
 
 instance NFData TypeKind
 instance Store TypeKind
+instance Serialise TypeKind
 
 instance A.ToJSON TypeKind where
   toJSON (DataType args ctors) =
@@ -261,6 +266,7 @@ data DataDeclType
 
 instance NFData DataDeclType
 instance Store DataDeclType
+instance Serialise DataDeclType
 
 showDataDeclType :: DataDeclType -> Text
 showDataDeclType Data = "data"

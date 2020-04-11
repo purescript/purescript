@@ -2,6 +2,7 @@ module Language.PureScript.Label (Label(..)) where
 
 import Prelude.Compat hiding (lex)
 import GHC.Generics (Generic)
+import Codec.Serialise (Serialise)
 import Control.DeepSeq (NFData)
 import Data.Monoid ()
 import Data.String (IsString(..))
@@ -19,3 +20,4 @@ newtype Label = Label { runLabel :: PSString }
 
 instance NFData Label
 instance Store Label
+instance Serialise Label

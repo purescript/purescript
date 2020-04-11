@@ -22,7 +22,8 @@ readExternFile
   -> m P.ExternsFile
 readExternFile fp = do
   -- rofl
-  externsFile <- liftIO (Make.readCborJsonFileIO fp)
+  externsFile <- liftIO (Make.readCborFileIO fp)
+  -- externsFile <- liftIO (Make.readCborJsonFileIO fp)
   -- externsFile <- liftIO (Make.readStoreFileIO fp)
   -- externsFile <- liftIO (Make.readJSONFileIO fp)
   case externsFile of

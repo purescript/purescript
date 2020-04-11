@@ -18,6 +18,8 @@ module Language.PureScript.Externs
 
 import Prelude.Compat
 
+import Codec.Serialise (Serialise)
+import GHC.Generics (Generic)
 import Data.Aeson.TH
 import Data.Maybe (fromMaybe, mapMaybe, maybeToList)
 import Data.List (foldl', find)
@@ -57,7 +59,9 @@ data ExternsFile = ExternsFile
   -- ^ List of type and value declaration
   , efSourceSpan :: SourceSpan
   -- ^ Source span for error reporting
-  } deriving (Show)
+  } deriving (Show, Generic)
+
+instance Serialise ExternsFile
 
 -- | A module import in an externs file
 data ExternsImport = ExternsImport
@@ -68,7 +72,9 @@ data ExternsImport = ExternsImport
   , eiImportType :: ImportDeclarationType
   -- | The imported-as name, for qualified imports
   , eiImportedAs :: Maybe ModuleName
-  } deriving (Show)
+  } deriving (Show, Generic)
+
+instance Serialise ExternsImport
 
 -- | A fixity declaration in an externs file
 data ExternsFixity = ExternsFixity
@@ -81,7 +87,9 @@ data ExternsFixity = ExternsFixity
   , efOperator :: OpName 'ValueOpName
   -- | The value the operator is an alias for
   , efAlias :: Qualified (Either Ident (ProperName 'ConstructorName))
-  } deriving (Show)
+  } deriving (Show, Generic)
+
+instance Serialise ExternsFixity
 
 -- | A type fixity declaration in an externs file
 data ExternsTypeFixity = ExternsTypeFixity
@@ -94,7 +102,9 @@ data ExternsTypeFixity = ExternsTypeFixity
   , efTypeOperator :: OpName 'TypeOpName
   -- | The value the operator is an alias for
   , efTypeAlias :: Qualified (ProperName 'TypeName)
-  } deriving (Show)
+  } deriving (Show, Generic)
+
+instance Serialise ExternsTypeFixity
 
 -- | A type or value declaration appearing in an externs file
 data ExternsDeclaration =
@@ -148,7 +158,9 @@ data ExternsDeclaration =
       , edInstanceChain           :: [Qualified Ident]
       , edInstanceChainIndex      :: Integer
       }
-  deriving Show
+  deriving (Show, Generic)
+
+instance Serialise ExternsDeclaration
 
 -- | Check whether the version in an externs file matches the currently running
 -- version.
@@ -255,7 +267,10 @@ moduleToExternsFile (Module ss _ mn ds (Just exps)) env = ExternsFile{..}
 
 -- rofl
 externsFileName :: FilePath
-externsFileName = "externs.json.cbor"
+externsFileName = "externs.cbor"
+-- externsFileName = "externs.json"
+-- externsFileName = "externs.store"
+-- externsFileName = "externs.json.cbor"
 
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsImport)
 $(deriveJSON (defaultOptions { sumEncoding = ObjectWithSingleField }) ''ExternsFixity)
