@@ -10,13 +10,13 @@ module Language.PureScript.Make.Monad
   , readTextFile
   , readJSONFile
   , readJSONFileIO
-  , readBinaryFile
-  , readBinaryFileIO
+  , readStoreFile
+  , readStoreFileIO
   , readExternsFile
   , readCborJsonFileIO
   , hashFile
   , writeTextFile
-  , writeBinaryFile
+  , writeStoreFile
   , writeJSONFile
   , writeCborJsonFile
   , writeCborJsonFileIO
@@ -129,14 +129,14 @@ readCborJsonFileIO path = do
 -- | Read a Store encoded file in the 'Make' monad, returning
 -- 'Nothing' if the file does not exist or could not be parsed. Errors
 -- are captured using the 'MonadError' instance.
-readBinaryFile :: (MonadIO m, MonadError MultipleErrors m) => Store.Store a => FilePath -> m (Maybe a)
-readBinaryFile path =
+readStoreFile :: (MonadIO m, MonadError MultipleErrors m) => Store.Store a => FilePath -> m (Maybe a)
+readStoreFile path =
   makeIO ("read Binary file: " <> Text.pack path) $ do
     r <- catchDoesNotExist $ Store.decodeEx <$> B.readFile path
     return $ join r
 
-readBinaryFileIO :: Store.Store a => FilePath -> IO (Maybe a)
-readBinaryFileIO path = do
+readStoreFileIO :: Store.Store a => FilePath -> IO (Maybe a)
+readStoreFileIO path = do
   r <- catchDoesNotExist $ Store.decodeEx <$> B.readFile path
   return $ join r
 
@@ -147,7 +147,7 @@ readExternsFile :: (MonadIO m, MonadError MultipleErrors m) => FilePath -> m (Ma
 readExternsFile path = do
   -- rofl
   -- mexterns <- readJsonFile path
-  -- mexterns <- readBinaryFile path
+  -- mexterns <- readStoreFile path
   mexterns <- readCborJsonFile path
   return $ do
     externs <- mexterns
@@ -186,8 +186,8 @@ writeJSONFile path value = makeIO ("write JSON file: " <> Text.pack path) $ do
 
 -- | Write a Store encoded file in the 'Make' monad, capturing any
 -- errors using the 'MonadError' instance.
-writeBinaryFile :: (MonadIO m, MonadError MultipleErrors m) => Store.Store a => FilePath -> a -> m ()
-writeBinaryFile path value = makeIO ("write Binary file: " <> Text.pack path) $ do
+writeStoreFile :: (MonadIO m, MonadError MultipleErrors m) => Store.Store a => FilePath -> a -> m ()
+writeStoreFile path value = makeIO ("write Binary file: " <> Text.pack path) $ do
   createParentDirectory path
   B.writeFile path (Store.encode value)
 
