@@ -25,7 +25,9 @@ readExternFile
 readExternFile fp = do
   externsFile <- liftIO (Make.readCborFileIO fp)
   case externsFile of
-    Nothing ->
+    Just externs | version == P.efVersion externs ->
+      pure externs
+    _ ->
       liftIO (Make.readCborFileIO fp) >>= \case
         Just (Term.TList (_tag : Term.TString efVersion : _rest)) -> do
           let errMsg =
@@ -37,8 +39,6 @@ readExternFile fp = do
           throwError (GeneralError errMsg)
         _ ->
           throwError (GeneralError ("Parsing the extern at: " <> toS fp <> " failed"))
-    Just externs ->
-      pure externs
     where
       version = toS (showVersion P.version)
 
