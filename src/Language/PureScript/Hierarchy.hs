@@ -54,8 +54,8 @@ prettyPrint (SuperMap (Right (super, sub))) =
   "  " <> P.runProperName super <> " -> " <> P.runProperName sub <> ";"
 
 runModuleName :: P.ModuleName -> GraphName
-runModuleName (P.ModuleName pns) =
-  GraphName $ T.intercalate "_" (P.runProperName <$> pns)
+runModuleName (P.ModuleName name) =
+  GraphName $ T.replace "." "_" name
 
 typeClasses :: Functor f => f P.Module -> f (Maybe Graph)
 typeClasses =

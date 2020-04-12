@@ -100,7 +100,7 @@ qualifiedToJSON f (Qualified mn a) = object
   ]
 
 moduleNameToJSON :: ModuleName -> Value
-moduleNameToJSON (ModuleName pns) = toJSON $ properNameToJSON `map` pns
+moduleNameToJSON (ModuleName name) = toJSON name
 
 moduleToJSON :: Version -> Module Ann -> Value
 moduleToJSON v m = object

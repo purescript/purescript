@@ -42,7 +42,7 @@ isSuccess _           = False
 
 spec :: Spec
 spec = context "CoreFnFromJsonTest" $ do
-  let mn = ModuleName [ProperName "Example", ProperName "Main"]
+  let mn = ModuleName "Example.Main"
       mp = "src/Example/Main.purs"
       ss = SourceSpan mp (SourcePos 0 0) (SourcePos 0 0)
       ann = ssAnn ss
@@ -217,7 +217,7 @@ spec = context "CoreFnFromJsonTest" $ do
                       [ CaseAlternative
                         [ ConstructorBinder
                             ann
-                            (Qualified (Just (ModuleName [ProperName "Data", ProperName "Either"])) (ProperName "Either"))
+                            (Qualified (Just (ModuleName "Data.Either")) (ProperName "Either"))
                             (Qualified Nothing (ProperName "Left"))
                             [VarBinder ann (Ident "z")]
                         ]
